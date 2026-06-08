@@ -1,7 +1,8 @@
 import React, { useState } from "react";
-import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from "react-native";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
+import { getRoutingArea } from "@shared/routing-areas";
 
 export interface ErrorEvent {
   timestamp: number;
@@ -25,6 +26,30 @@ export interface HealthEvent {
   transitionFrom: string;
   transitionTo: string;
   occurredAt: string;
+}
+
+const SERVICE_LABELS: Record<string, string> = {
+  valhalla: "Valhalla",
+  ollama: "Ollama AI",
+  whisper: "Whisper ASR",
+  nominatim: "Nominatim",
+};
+
+function formatServiceLabel(serviceKey: string | null): string {
+  if (!serviceKey) return "globale";
+  if (serviceKey.startsWith("graphhopper:")) {
+    const code = serviceKey.slice("graphhopper:".length);
+    const area = getRoutingArea(code);
+    return area ? `GH · ${area.nome}` : `GH · ${code}`;
+  }
+  return SERVICE_LABELS[serviceKey] ?? serviceKey;
+}
+
+const FILTER_ALL = "__all__";
+const FILTER_GLOBAL = "__global__";
+
+function toFilterKey(serviceKey: string | null): string {
+  return serviceKey ?? FILTER_GLOBAL;
 }
 
 const TRANSITION_COLOR: Record<string, string> = {
@@ -87,8 +112,29 @@ export function ErrorHistory({ history }: { history: ErrorEvent[] }) {
 
 export function EventLog({ events }: { events: HealthEvent[] }) {
   const [open, setOpen] = useState(false);
+  const [filter, setFilter] = useState<string>(FILTER_ALL);
 
   if (!events || events.length === 0) return null;
+
+  const filterOptions: Array<{ key: string; label: string }> = [{ key: FILTER_ALL, label: "Tutti" }];
+  const seen = new Set<string>();
+  for (const ev of events) {
+    const k = toFilterKey(ev.serviceKey);
+    if (!seen.has(k)) {
+      seen.add(k);
+      filterOptions.push({ key: k, label: formatServiceLabel(ev.serviceKey) });
+    }
+  }
+
+  const validKeys = new Set(filterOptions.map((o) => o.key));
+
+  // If the selected filter is no longer present in the current event set (e.g. after
+  // a data refresh), fall back to "all" inline — no useEffect needed, no extra render.
+  const activeFilter = validKeys.has(filter) ? filter : FILTER_ALL;
+
+  const filtered = activeFilter === FILTER_ALL
+    ? events
+    : events.filter((ev) => toFilterKey(ev.serviceKey) === activeFilter);
 
   return (
     <View style={styles.eventLogContainer}>
@@ -104,24 +150,63 @@ export function EventLog({ events }: { events: HealthEvent[] }) {
       </TouchableOpacity>
 
       {open && (
-        <View style={styles.eventList}>
-          {events.map((ev) => (
-            <View key={ev.id} style={styles.eventRow}>
-              <Text style={styles.eventTime}>{formatIso(ev.occurredAt)}</Text>
-              <View style={styles.eventTransition}>
-                <StatusDot status={ev.transitionFrom} />
-                <Text style={styles.eventState}>{ev.transitionFrom}</Text>
-                <Ionicons name="arrow-forward" size={10} color="#6b7280" />
-                <StatusDot status={ev.transitionTo} />
-                <Text style={styles.eventState}>{ev.transitionTo}</Text>
-              </View>
-              {ev.serviceKey ? (
-                <Text style={styles.eventService}>{ev.serviceKey}</Text>
-              ) : (
-                <Text style={[styles.eventService, { color: "#60a5fa" }]}>globale</Text>
-              )}
-            </View>
-          ))}
+        <View>
+          {filterOptions.length > 2 && (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={styles.filterRow}
+              contentContainerStyle={styles.filterRowContent}
+            >
+              {filterOptions.map((opt) => {
+                const active = activeFilter === opt.key;
+                return (
+                  <TouchableOpacity
+                    key={opt.key}
+                    style={[styles.filterChip, active && styles.filterChipActive]}
+                    onPress={() => setFilter(opt.key)}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={[styles.filterChipText, active && styles.filterChipTextActive]}>
+                      {opt.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          )}
+          <View style={styles.eventList}>
+            {filtered.length === 0 ? (
+              <Text style={styles.eventEmpty}>Nessun evento per questo filtro.</Text>
+            ) : (
+              filtered.map((ev) => {
+                const isGh = ev.serviceKey?.startsWith("graphhopper:") ?? false;
+                const label = formatServiceLabel(ev.serviceKey);
+                const isGlobal = ev.serviceKey === null;
+                return (
+                  <View key={ev.id} style={styles.eventRow}>
+                    <Text style={styles.eventTime}>{formatIso(ev.occurredAt)}</Text>
+                    <View style={styles.eventTransition}>
+                      <StatusDot status={ev.transitionFrom} />
+                      <Text style={styles.eventState}>{ev.transitionFrom}</Text>
+                      <Ionicons name="arrow-forward" size={10} color="#6b7280" />
+                      <StatusDot status={ev.transitionTo} />
+                      <Text style={styles.eventState}>{ev.transitionTo}</Text>
+                    </View>
+                    <Text
+                      style={[
+                        styles.eventService,
+                        isGlobal && { color: "#60a5fa" },
+                        isGh && { color: "#a78bfa" },
+                      ]}
+                    >
+                      {label}
+                    </Text>
+                  </View>
+                );
+              })
+            )}
+          </View>
         </View>
       )}
     </View>
@@ -295,6 +380,22 @@ const styles = StyleSheet.create({
   },
   eventLogIcon: { marginRight: 1 },
   eventLogToggleText: { fontFamily: "Inter_600SemiBold", fontSize: 11, color: "#60a5fa" },
+  filterRow: { marginTop: 8 },
+  filterRowContent: { gap: 6, paddingHorizontal: 4 },
+  filterChip: {
+    paddingVertical: 3,
+    paddingHorizontal: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "rgba(148, 163, 184, 0.25)",
+    backgroundColor: "rgba(148, 163, 184, 0.07)",
+  },
+  filterChipActive: {
+    borderColor: "rgba(96, 165, 250, 0.5)",
+    backgroundColor: "rgba(96, 165, 250, 0.12)",
+  },
+  filterChipText: { fontFamily: "Inter_500Medium", fontSize: 10, color: Colors.textSecondary },
+  filterChipTextActive: { color: "#60a5fa" },
   eventList: {
     marginTop: 8,
     gap: 4,
@@ -302,6 +403,7 @@ const styles = StyleSheet.create({
     borderLeftWidth: 2,
     borderLeftColor: "rgba(96, 165, 250, 0.2)",
   },
+  eventEmpty: { fontFamily: "Inter_400Regular", fontSize: 10, color: "#6b7280", paddingLeft: 8, paddingVertical: 4 },
   eventRow: { flexDirection: "row", alignItems: "center", gap: 6, paddingLeft: 6, paddingVertical: 2 },
   eventTime: { fontFamily: "Inter_400Regular", fontSize: 9, color: "#6b7280", letterSpacing: 0.2, minWidth: 64 },
   eventTransition: { flexDirection: "row", alignItems: "center", gap: 3, flex: 1 },
