@@ -22,6 +22,7 @@ import { MatchTypeCard } from "@/components/admin/match-inspector/MatchTypeCard"
 import { ProfileGapsCard } from "@/components/admin/match-inspector/ProfileGapsCard";
 import { UserEditModal } from "@/components/admin/users/UserEditModal";
 import type { AdminUser } from "@/components/admin/users/UserCard";
+import { ZeroMatchDiagnosisCard } from "@/components/admin/match-inspector/ZeroMatchDiagnosisCard";
 
 interface MatchItem {
   id: string;
@@ -395,6 +396,10 @@ export default function MatchInspectorDetailScreen() {
           totalMatches={totalMatches}
           onEditUser={handleOpenEditModal}
         />
+
+        {totalMatches === 0 && (
+          <ZeroMatchDiagnosisCard userId={userId!} />
+        )}
 
         <PreferencesDiffCard sections={matchesByType} userId={userId!} nickname={user.nickname} />
 
