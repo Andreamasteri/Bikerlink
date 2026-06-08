@@ -105,6 +105,40 @@ export default function MatchInspectorDetailScreen() {
     onError: () => Alert.alert("Errore", "Ricalcolo fallito"),
   });
 
+  const deleteMatchesMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("DELETE", `/api/admin/users/${userId}/matches`);
+      return res.json();
+    },
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey });
+      const total = result.deleted?.total ?? 0;
+      const bb = result.deleted?.bikerBiker ?? 0;
+      const bz = result.deleted?.bikerZavorrina ?? 0;
+      const pp = result.deleted?.proposalProfile ?? 0;
+      Alert.alert(
+        "Match eliminati",
+        `Eliminati ${total} match totali:\n${bb} biker-biker · ${bz} biker-zavorrina · ${pp} proposal`,
+      );
+    },
+    onError: () => Alert.alert("Errore", "Eliminazione match fallita"),
+  });
+
+  const handleDeleteMatches = () => {
+    Alert.alert(
+      "Elimina tutti i match",
+      `Eliminare tutti i match dell'utente ${data?.user.nickname ?? ""}? L'operazione è irreversibile. Dopo potrai rilanciare il ricalcolo.`,
+      [
+        { text: "Annulla", style: "cancel" },
+        {
+          text: "Elimina",
+          style: "destructive",
+          onPress: () => deleteMatchesMutation.mutate(),
+        },
+      ],
+    );
+  };
+
   const toggleType = useCallback((typeKey: string) => {
     setExpandedTypes((prev) => {
       const next = new Set(prev);
@@ -163,6 +197,23 @@ export default function MatchInspectorDetailScreen() {
         </TouchableOpacity>
       </View>
 
+      <View style={styles.deleteMatchesRow}>
+        <TouchableOpacity
+          style={[styles.deleteMatchesBtn, deleteMatchesMutation.isPending && { opacity: 0.6 }]}
+          onPress={handleDeleteMatches}
+          disabled={deleteMatchesMutation.isPending}
+        >
+          {deleteMatchesMutation.isPending ? (
+            <ActivityIndicator size="small" color={Colors.error} />
+          ) : (
+            <MaterialCommunityIcons name="delete-sweep" size={16} color={Colors.error} />
+          )}
+          <Text style={styles.deleteMatchesText}>
+            {deleteMatchesMutation.isPending ? "Eliminazione..." : "Elimina tutti i match"}
+          </Text>
+        </TouchableOpacity>
+      </View>
+
       <PreferencesDiffCard sections={matchesByType} userId={userId!} nickname={user.nickname} />
 
       <Text style={styles.sectionTitle}>17 Tipi di Match</Text>
@@ -217,6 +268,22 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   recalcText: { fontFamily: "Inter_600SemiBold", fontSize: 13, color: "#fff" },
+  deleteMatchesRow: {
+    paddingHorizontal: 16,
+    marginBottom: 16,
+  },
+  deleteMatchesBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingVertical: 10,
+    backgroundColor: Colors.surface,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: Colors.error,
+  },
+  deleteMatchesText: { fontFamily: "Inter_600SemiBold", fontSize: 13, color: Colors.error },
   sectionTitle: {
     fontFamily: "Inter_700Bold",
     fontSize: 13,
