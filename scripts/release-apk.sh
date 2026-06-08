@@ -40,14 +40,23 @@ fs.writeFileSync('app.json', JSON.stringify(app, null, 2) + '\n');
 console.log('      app.json OK');
 JSEOF
 
-# ── 2. Aggiorna build.gradle ───────────────────────────────
-echo "[2/5] Aggiornamento android/app/build.gradle..."
+# ── 2. Aggiorna build.gradle + strings.xml ─────────────────
+echo "[2/5] Aggiornamento android/app/build.gradle e strings.xml..."
 sed -i.bak \
   -e "s/versionCode [0-9]*/versionCode ${NEW_CODE}/" \
   -e "s/versionName \"[^\"]*\"/versionName \"${NEW_NAME}\"/" \
   android/app/build.gradle
 rm -f android/app/build.gradle.bak
 echo "      build.gradle OK"
+
+# Legge runtimeVersion da app.json (aggiornato al passo 1) e allinea strings.xml
+RUNTIME_VERSION=$(node -p "require('./app.json').expo.runtimeVersion")
+STRINGS_XML="android/app/src/main/res/values/strings.xml"
+sed -i.bak \
+  -e "s|<string name=\"expo_runtime_version\">[^<]*</string>|<string name=\"expo_runtime_version\">${RUNTIME_VERSION}</string>|" \
+  "${STRINGS_XML}"
+rm -f "${STRINGS_XML}.bak"
+echo "      strings.xml  expo_runtime_version = ${RUNTIME_VERSION}"
 
 # ── 3. Aggiorna constants/buildInfo.ts ────────────────────
 # RELEASE_NUMBER e RUNTIME_VERSION sono derivati a runtime da app.json — non serve aggiornarli.
@@ -62,7 +71,7 @@ echo "      buildInfo.ts OK"
 
 # ── 4. Git commit + push ───────────────────────────────────
 echo "[4/5] Commit e push su GitHub..."
-git add app.json android/app/build.gradle constants/buildInfo.ts
+git add app.json android/app/build.gradle constants/buildInfo.ts android/app/src/main/res/values/strings.xml
 git commit -m "build: bump versione nativa v${NEW_NAME} (versionCode ${NEW_CODE})"
 git push
 echo "      Push OK"
