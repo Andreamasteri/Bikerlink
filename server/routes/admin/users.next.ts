@@ -364,7 +364,84 @@ router.get("/match-summary", async (req: Request, res: Response) => {
 
 
     type UserRow = { id: string; nickname: string; avatar_url: string | null; user_type: string | null; role: string; status: string; bb_count: string; bz_count: string; bb_counts: null };
-    const mappedUsers = (usersResult.rows as UserRow[]).map((row) => {
+    const rawUsers = usersResult.rows as UserRow[];
+    const userIds = rawUsers.map((r) => r.id);
+
+    // Bulk-fetch data needed to compute critical profile gaps
+    const [profilesResult, motorcyclesResult, tagCountsResult, wishlistResult] = await Promise.all([
+      userIds.length > 0
+        ? db.execute(sql`
+            SELECT user_id, latitude, longitude, is_available
+            FROM user_profiles
+            WHERE user_id = ANY(${userIds}::varchar[])
+          `)
+        : Promise.resolve({ rows: [] }),
+      userIds.length > 0
+        ? db.execute(sql`
+            SELECT user_id, brand
+            FROM user_motorcycles
+            WHERE user_id = ANY(${userIds}::varchar[])
+              AND brand IS NOT NULL AND brand != ''
+          `)
+        : Promise.resolve({ rows: [] }),
+      userIds.length > 0
+        ? db.execute(sql`
+            SELECT et.entity_id AS user_id, tc.slug
+            FROM entity_tags et
+            JOIN tags t ON et.tag_id = t.id
+            JOIN tag_categories tc ON t.category_id = tc.id
+            WHERE et.entity_type = 'user'
+              AND et.entity_id = ANY(${userIds}::varchar[])
+          `)
+        : Promise.resolve({ rows: [] }),
+      userIds.length > 0
+        ? db.execute(sql`
+            SELECT DISTINCT zw.user_id
+            FROM zavorrina_wishlist_motos zwm
+            JOIN zavorrina_wishlists zw ON zwm.wishlist_id = zw.id
+            WHERE zw.user_id = ANY(${userIds}::varchar[])
+          `)
+        : Promise.resolve({ rows: [] }),
+    ]);
+
+    type ProfileRow = { user_id: string; latitude: number | null; longitude: number | null; is_available: boolean | null };
+    type MotoRow = { user_id: string; brand: string };
+    type TagRow = { user_id: string; slug: string };
+    type WishlistRow = { user_id: string };
+
+    const profileMap = new Map<string, ProfileRow>();
+    for (const r of profilesResult.rows as ProfileRow[]) profileMap.set(r.user_id, r);
+
+    const motoSet = new Set<string>();
+    for (const r of motorcyclesResult.rows as MotoRow[]) motoSet.add(r.user_id);
+
+    const tagMap = new Map<string, Set<string>>();
+    for (const r of tagCountsResult.rows as TagRow[]) {
+      if (!tagMap.has(r.user_id)) tagMap.set(r.user_id, new Set());
+      tagMap.get(r.user_id)!.add(r.slug);
+    }
+
+    const wishlistSet = new Set<string>();
+    for (const r of wishlistResult.rows as WishlistRow[]) wishlistSet.add(r.user_id);
+
+    function computeCriticalGaps(row: UserRow): number {
+      const profile = profileMap.get(row.id);
+      const userType = row.user_type ?? "biker";
+
+      const hasLocation = !!(profile?.latitude && profile?.longitude);
+      const isAvailable = !!profile?.is_available;
+      const hasMotoWithBrand = motoSet.has(row.id);
+      const hasWishlist = wishlistSet.has(row.id);
+
+      let critical = 0;
+      if (!hasLocation) critical++;
+      if (!isAvailable) critical++;
+      if ((userType === "biker" || userType === "coppia") && !hasMotoWithBrand) critical++;
+      if (userType === "zavorrina" && !hasWishlist) critical++;
+      return critical;
+    }
+
+    const mappedUsers = rawUsers.map((row) => {
       const bbMatches = parseInt(row.bb_count || "0", 10);
       const bzMatches = parseInt(row.bz_count || "0", 10);
       return {
@@ -378,6 +455,7 @@ router.get("/match-summary", async (req: Request, res: Response) => {
         bzMatches,
         totalMatches: bbMatches + bzMatches,
         matchCounts: {} as Record<string, number>,
+        criticalGaps: computeCriticalGaps(row),
       };
     });
 

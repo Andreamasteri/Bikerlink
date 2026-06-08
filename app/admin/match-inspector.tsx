@@ -29,6 +29,7 @@ interface InspectorUser {
   bbMatches: number;
   bzMatches: number;
   matchCounts: MatchCounts;
+  criticalGaps: number;
 }
 
 interface UsersResponse {
@@ -196,6 +197,16 @@ export default function MatchInspectorScreen() {
           <Text style={styles.totalLabel}>tot</Text>
         </View>
 
+        <View style={styles.gapsBadge}>
+          {item.criticalGaps === 0 ? (
+            <Ionicons name="checkmark-circle" size={20} color={Colors.success} />
+          ) : (
+            <View style={styles.gapsCount}>
+              <Text style={styles.gapsCountText}>{item.criticalGaps}</Text>
+            </View>
+          )}
+        </View>
+
         <Ionicons name="chevron-forward" size={18} color={Colors.textSecondary} />
       </TouchableOpacity>
     );
@@ -332,6 +343,29 @@ const styles = StyleSheet.create({
   filterChipTextActive: {
     color: "#fff",
   },
+  zeroMatchBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 20,
+    borderWidth: 1.5,
+    borderColor: Colors.warning,
+    backgroundColor: "transparent",
+  },
+  zeroMatchBadgeActive: {
+    backgroundColor: Colors.warning,
+    borderColor: Colors.warning,
+  },
+  zeroMatchBadgeText: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 12,
+    color: Colors.warning,
+  },
+  zeroMatchBadgeTextActive: {
+    color: "#fff",
+  },
   refreshBtn: { padding: 4 },
   userRow: {
     flexDirection: "row",
@@ -421,6 +455,16 @@ const styles = StyleSheet.create({
   totalBadge: { alignItems: "center", minWidth: 36 },
   totalText: { fontFamily: "Inter_700Bold", fontSize: 18, color: Colors.accent },
   totalLabel: { fontFamily: "Inter_400Regular", fontSize: 10, color: Colors.textSecondary },
+  gapsBadge: { alignItems: "center", justifyContent: "center", width: 24 },
+  gapsCount: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: Colors.error ?? "#F44336",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  gapsCountText: { fontFamily: "Inter_700Bold", fontSize: 11, color: "#fff" },
   separator: { height: 1, backgroundColor: Colors.border, marginLeft: 72 },
   empty: { alignItems: "center", paddingTop: 60, gap: 12 },
   emptyText: { fontFamily: "Inter_400Regular", fontSize: 15, color: Colors.textSecondary },
