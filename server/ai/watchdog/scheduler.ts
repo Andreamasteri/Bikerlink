@@ -12,8 +12,13 @@ import { runMapsHealthChecks } from "./maps-health-checks";
 
 const TICK_MS = 60_000;
 const CLEANUP_MS = 60 * 60_000;
+// Cooldown proposer: evita di chiamare Groq/AI ogni minuto per problemi
+// persistenti (es. Valhalla down tutto il giorno). Limite: 1 run/30 min.
+const PROPOSER_COOLDOWN_MS = 30 * 60_000;
+
 let tickTimer: NodeJS.Timeout | null = null;
 let cleanupTimer: NodeJS.Timeout | null = null;
+let lastProposerRunAt = 0;
 
 let lastError: { at: string; message: string } | null = null;
 let totalCycles = 0;
@@ -29,11 +34,28 @@ async function tick(): Promise<void> {
     const fixes = await runAutoFix(snap);
     totalAutoFixesApplied += fixes.filter((f) => f.applied).length;
 
-    // Proposer solo se ci sono problemi high/critical residui.
+    // Proposer solo se ci sono problemi high/critical residui E cooldown scaduto.
+    // Senza cooldown, con un servizio giù tutto il giorno il proposer chiama
+    // l'AI ogni minuto bruciando 200k token/giorno (quota Groq gratuita).
     const stillHigh = snap.problems.some((p) => p.severity === "high" || p.severity === "critical");
     if (stillHigh) {
-      const prop = await runProposer(snap);
-      if (prop) totalProposalsCreated += prop.proposals.length;
+      const now = Date.now();
+      const cooldownRemainingSec = Math.ceil((PROPOSER_COOLDOWN_MS - (now - lastProposerRunAt)) / 1000);
+      if (now - lastProposerRunAt >= PROPOSER_COOLDOWN_MS) {
+        const prop = await runProposer(snap);
+        if (prop) {
+          totalProposalsCreated += prop.proposals.length;
+          lastProposerRunAt = now;
+          const providerInfo = prop.meta ? `provider=${prop.meta.provider} model=${prop.meta.model}` : "";
+          console.log(
+            `[watchdog/proposer] run: ${prop.proposals.length} proposta/e | ${providerInfo} | prossimo run tra ~${PROPOSER_COOLDOWN_MS / 60_000}min`,
+          );
+        }
+      } else {
+        console.log(
+          `[watchdog/proposer] skip cooldown — problemi rilevati ma AI non richiamata (riprova tra ${cooldownRemainingSec}s)`,
+        );
+      }
     }
 
     const alerts = await dispatchAlerts(snap);
@@ -72,8 +94,17 @@ export function stopWatchdogScheduler(): void {
 }
 
 export function getWatchdogStats() {
+  const cooldownRemainingSec =
+    lastProposerRunAt > 0
+      ? Math.max(0, Math.ceil((PROPOSER_COOLDOWN_MS - (Date.now() - lastProposerRunAt)) / 1000))
+      : 0;
   return {
     totalCycles, totalAutoFixesApplied, totalProposalsCreated, totalAlertsSent,
     lastError, running: !!tickTimer,
+    proposer: {
+      lastRunAt: lastProposerRunAt > 0 ? new Date(lastProposerRunAt).toISOString() : null,
+      cooldownRemainingSec,
+      cooldownTotalSec: PROPOSER_COOLDOWN_MS / 1000,
+    },
   };
 }

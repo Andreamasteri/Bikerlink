@@ -31,3 +31,4 @@
 - [Nominatim setup — revisione post-GH](nominatim-post-gh-review.md) — setup-nominatim.sh va rivisto/verificato dopo che le 7 zone GraphHopper+Valhalla sono operative sul ThinkCentre.
 - [Ollama nginx Host header fix](ollama-nginx-host-header.md) — Ollama 0.24+ ritorna 403 se `Host≠localhost`; fix: `proxy_set_header Host "localhost"` + nginx su `192.168.1.35:443` (no conflitto Tailscale).
 - [react-native-keyboard-controller version lock](keyboard-controller-lock.md) — bloccato a 1.21.6; NON aggiornare senza autorizzazione esplicita utente; in expo.install.exclude di package.json.
+- [Watchdog proposer cooldown — Groq quota burn](watchdog-proposer-cooldown.md) — proposer AI chiama Groq ogni 60s se c'è un problema high/critical persistente (es. Valhalla down) → brucia 200k TPD in poche ore. Fix: cooldown 30min in scheduler.ts.
