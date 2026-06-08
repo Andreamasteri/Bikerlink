@@ -561,4 +561,34 @@ router.get("/match-summary", async (req: Request, res: Response) => {
 });
 
 
+router.get("/zero-match-snapshots", async (_req: Request, res: Response) => {
+  try {
+    const result = await db.execute(sql`
+      SELECT snapshot_date, total_users, zero_match_count, created_at
+      FROM match_zero_snapshots
+      ORDER BY snapshot_date DESC
+      LIMIT 30
+    `);
+
+    type SnapshotRow = {
+      snapshot_date: string;
+      total_users: number | string;
+      zero_match_count: number | string;
+      created_at: string;
+    };
+
+    const snapshots = (result.rows as SnapshotRow[]).map((r) => ({
+      snapshotDate: r.snapshot_date,
+      totalUsers: parseInt(String(r.total_users), 10),
+      zeroMatchCount: parseInt(String(r.zero_match_count), 10),
+      createdAt: r.created_at,
+    }));
+
+    return res.json({ snapshots });
+  } catch (err) {
+    console.error("[admin] zero-match-snapshots error:", err);
+    return sendError(res, 500, "Errore caricamento snapshot");
+  }
+});
+
 export default router;

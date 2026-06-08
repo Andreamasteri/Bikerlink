@@ -8,6 +8,8 @@ import {
   timestamp,
   doublePrecision,
   uniqueIndex,
+  date,
+  index,
 } from "drizzle-orm/pg-core";
 import { z } from "zod";
 
@@ -56,3 +58,16 @@ export const insertMatchRuleSchema = z.object({
   notes: z.string().max(500).optional().nullable(),
 });
 export type InsertMatchRuleInput = z.infer<typeof insertMatchRuleSchema>;
+
+export const matchZeroSnapshots = pgTable("match_zero_snapshots", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  snapshotDate: date("snapshot_date").notNull(),
+  totalUsers: integer("total_users").notNull().default(0),
+  zeroMatchCount: integer("zero_match_count").notNull().default(0),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (t) => [
+  uniqueIndex("match_zero_snapshots_date_idx").on(t.snapshotDate),
+  index("match_zero_snapshots_created_idx").on(t.createdAt),
+]);
+
+export type MatchZeroSnapshot = typeof matchZeroSnapshots.$inferSelect;

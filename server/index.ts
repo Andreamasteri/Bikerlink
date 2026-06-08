@@ -563,6 +563,15 @@ process.on("SIGINT", () => gracefulShutdown("SIGINT"));
       console.warn("[INIT] AI App Integrity scheduler failed (non-fatal):", e);
     }
 
+    // Zero-match daily snapshot scheduler (nightly 03:00).
+    try {
+      const { startZeroMatchSnapshotScheduler } = await import("./jobs/zero-match-snapshot-job");
+      startZeroMatchSnapshotScheduler();
+      console.log("[INIT] Zero-match snapshot scheduler started");
+    } catch (e) {
+      console.warn("[INIT] Zero-match snapshot scheduler failed (non-fatal):", e);
+    }
+
     // Motion simulator for fake users — fire-and-forget so it cannot hang boot
     import("./motion-simulator")
       .then(({ startMotionSimulator }) => startMotionSimulator())
@@ -592,6 +601,7 @@ process.on("SIGINT", () => gracefulShutdown("SIGINT"));
   console.log(`[INIT][SUMMARY]     scheduleNightlyMapMatching : scheduled`);
   console.log(`[INIT][SUMMARY]     scheduleWeeklyCurvyScoreUpdate : scheduled`);
   console.log(`[INIT][SUMMARY]     syncProductionUpdates (OTA cron) : scheduled every 15 min`);
+  console.log(`[INIT][SUMMARY]     zeroMatchSnapshotScheduler       : scheduled nightly 03:00`);
   console.log(`[INIT][SUMMARY]   BACKGROUND (fire-and-forget after READY):`);
   console.log(`[INIT][SUMMARY]     runPlaylistSnapshot      : scheduled`);
   console.log(`[INIT][SUMMARY]     saveSchemaSnapshot       : scheduled`);

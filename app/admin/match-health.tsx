@@ -7,16 +7,15 @@ import {
   TouchableOpacity,
   ActivityIndicator,
 } from "react-native";
+import { useRouter } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 import { MaterialCommunityIcons, Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useRouter } from "expo-router";
 import Colors from "@/constants/colors";
 import { getApiUrl } from "@/lib/query-client";
 import { MatchCountsSection } from "@/components/admin/match-health/MatchCountsSection";
 import { SchemaSection } from "@/components/admin/match-health/SchemaSection";
-import { ZeroMatchKpiCard } from "@/components/admin/match-health/ZeroMatchKpiCard";
+import { ZeroMatchKpiCard, type ZeroMatchSnapshotPoint } from "@/components/admin/match-health/ZeroMatchKpiCard";
 
 interface MatchCount {
   id: number;
@@ -155,6 +154,19 @@ export default function MatchHealthScreen() {
     retry: false,
   });
 
+  const { data: snapshotsData } = useQuery<{ snapshots: ZeroMatchSnapshotPoint[] }>({
+    queryKey: ["/api/admin/users/zero-match-snapshots"],
+    queryFn: async () => {
+      const base = getApiUrl();
+      const url = new URL("/api/admin/users/zero-match-snapshots", base);
+      const res = await fetch(url.toString(), { credentials: "include" });
+      if (!res.ok) throw new Error("Errore caricamento snapshot");
+      return res.json();
+    },
+    staleTime: 60000,
+    retry: false,
+  });
+
   const handleRunCheck = () => {
     refetch();
   };
@@ -257,6 +269,7 @@ export default function MatchHealthScreen() {
             <ZeroMatchKpiCard
               zeroMatchCount={matchSummary.zeroMatchCount}
               total={matchSummary.total}
+              snapshots={snapshotsData?.snapshots ?? []}
             />
           )}
 
