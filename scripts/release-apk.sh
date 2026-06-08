@@ -50,9 +50,10 @@ rm -f android/app/build.gradle.bak
 echo "      build.gradle OK"
 
 # ── 3. Aggiorna constants/buildInfo.ts ────────────────────
+# RELEASE_NUMBER è derivato a runtime da app.json — non serve aggiornarlo.
+# Aggiorniamo solo OTA_BUNDLED_COUNT e APPLIED_OTA_NUMBER.
 echo "[3/5] Aggiornamento constants/buildInfo.ts..."
 sed -i.bak \
-  -e "s/export const RELEASE_NUMBER = [0-9]*/export const RELEASE_NUMBER = ${NEW_CODE}/" \
   -e "s/export const OTA_BUNDLED_COUNT = [0-9]*/export const OTA_BUNDLED_COUNT = ${OTA_BUNDLED}/" \
   -e "s/export const APPLIED_OTA_NUMBER.*$/export const APPLIED_OTA_NUMBER: number | null = null;/" \
   constants/buildInfo.ts

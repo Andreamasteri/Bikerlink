@@ -194,6 +194,34 @@ fi
 echo "════════════════════════════════════════"
 echo ""
 
+# ── GUARD RELEASE_NUMBER ─────────────────────────────────────
+# RELEASE_NUMBER deve essere derivato da app.json a runtime (non hardcoded).
+# Se qualcuno lo reintroduce come costante numerica, questo guard lo blocca.
+echo "════════════════════════════════════════"
+echo "  Guard RELEASE_NUMBER (buildInfo.ts)"
+echo "════════════════════════════════════════"
+RELEASE_NUMBER_HARDCODED=false
+if grep -qE '^export const RELEASE_NUMBER = [0-9]+' constants/buildInfo.ts 2>/dev/null; then
+  RELEASE_NUMBER_HARDCODED=true
+  HARDCODED_VALUE=$(grep -oE 'RELEASE_NUMBER = [0-9]+' constants/buildInfo.ts | grep -oE '[0-9]+' || echo "?")
+  VERSION_CODE=$(node -p "require('./app.json').expo.android.versionCode" 2>/dev/null || echo "?")
+  echo "❌ ERRORE: RELEASE_NUMBER è hardcoded (${HARDCODED_VALUE}) in constants/buildInfo.ts!"
+  echo "   Deve essere derivato da app.json a runtime:"
+  echo "   import appJson from '../app.json';"
+  echo "   export const RELEASE_NUMBER: number = appJson.expo.android.versionCode;"
+  if [ "$HARDCODED_VALUE" != "$VERSION_CODE" ]; then
+    echo "   ⚠️  Disallineamento rilevato: buildInfo.ts=${HARDCODED_VALUE}  app.json=${VERSION_CODE}"
+  fi
+else
+  echo "✅ RELEASE_NUMBER derivato a runtime da app.json — nessun valore hardcoded."
+fi
+echo "════════════════════════════════════════"
+echo ""
+if [ "$RELEASE_NUMBER_HARDCODED" = true ]; then
+  echo "❌ Guard RELEASE_NUMBER fallito — correggere constants/buildInfo.ts prima di procedere."
+  exit 1
+fi
+
 # ── CLEANUP UTENTI SMOKE RESIDUI POST-MERGE ──────────────────
 echo "════════════════════════════════════════"
 echo "  Cleanup utenti smoke residui"

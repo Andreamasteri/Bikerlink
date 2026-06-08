@@ -151,6 +151,29 @@ else
 fi
 
 
+# ── 4. Verifica RELEASE_NUMBER in buildInfo.ts ───────────────────────────────
+BUILDINFO="constants/buildInfo.ts"
+$QUIET || echo ""
+$QUIET || echo -e "  ${BOLD}─── constants/buildInfo.ts ──────────────────────────────────${RESET}"
+
+if [ ! -f "$BUILDINFO" ]; then
+  warning "$BUILDINFO non trovato — skip controllo RELEASE_NUMBER"
+else
+  if grep -qE '^export const RELEASE_NUMBER = [0-9]+' "$BUILDINFO" 2>/dev/null; then
+    HARDCODED_VALUE=$(grep -oE 'RELEASE_NUMBER = [0-9]+' "$BUILDINFO" | grep -oE '[0-9]+' | head -1 || echo "")
+    blocker "RELEASE_NUMBER hardcoded (${HARDCODED_VALUE}) in buildInfo.ts — deve essere derivato da app.json a runtime"
+    if [ -n "$APP_VERSION_CODE" ] && [ "$HARDCODED_VALUE" != "$APP_VERSION_CODE" ]; then
+      blocker "RELEASE_NUMBER disallineato: buildInfo.ts=${HARDCODED_VALUE}  app.json=${APP_VERSION_CODE}"
+    fi
+  else
+    if grep -q "appJson.expo.android.versionCode" "$BUILDINFO" 2>/dev/null; then
+      ok "buildInfo.ts  RELEASE_NUMBER derivato da app.json (runtime — nessun valore hardcoded)"
+    else
+      warning "buildInfo.ts: RELEASE_NUMBER non derivato da app.json — verificare la sorgente"
+    fi
+  fi
+fi
+
 # ── 5. Riepilogo e firma di completamento ─────────────────────────────────────
 $QUIET || echo ""
 $QUIET || echo -e "  ${BOLD}──────────────────────────────────────────────────────────────${RESET}"

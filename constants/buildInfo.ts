@@ -1,4 +1,6 @@
-export const RELEASE_NUMBER = 55;
+import appJson from '../app.json';
+
+export const RELEASE_NUMBER: number = appJson.expo.android.versionCode;
 export const OTA_BUNDLED_COUNT = 0;
 export const RUNTIME_VERSION = "10.0.0";
 
