@@ -84,16 +84,25 @@ function serviceStatusLabel(s: ServiceHealth): string {
 export function ThinkCentreCard() {
   const [collapsed, setCollapsed] = useState(true);
 
-  const { data, isLoading, error, refetch } = useQuery<ThinkCentreHealth>({
+  const { data, isLoading, isFetching, error, refetch } = useQuery<ThinkCentreHealth>({
     queryKey: ["/api/admin/thinkcentre-health"],
     queryFn: async ({ signal }) => {
-      const res = await fetch(new URL("/api/admin/thinkcentre-health", getApiUrl()).toString(), {
-        headers: { ...(await authFetchHeaders()) },
-        credentials: "include",
-        signal: AbortSignal.any([signal, AbortSignal.timeout(12_000)]),
-      });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      return res.json();
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 20_000);
+      const combined = signal
+        ? AbortSignal.any ? AbortSignal.any([signal, controller.signal]) : controller.signal
+        : controller.signal;
+      try {
+        const res = await fetch(new URL("/api/admin/thinkcentre-health", getApiUrl()).toString(), {
+          headers: { ...(await authFetchHeaders()) },
+          credentials: "include",
+          signal: combined,
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json() as Promise<ThinkCentreHealth>;
+      } finally {
+        clearTimeout(timer);
+      }
     },
     refetchInterval: 30_000,
     staleTime: 20_000,
@@ -222,13 +231,20 @@ export function ThinkCentreCard() {
           })}
           {data && data.configuredCount > 0 && data.onlineCount < data.configuredCount && (
             <TouchableOpacity
-              style={styles.retryButton}
-              onPress={() => { void refetch(); }}
-              activeOpacity={0.7}
+              style={[styles.retryButton, isFetching && styles.retryButtonBusy]}
+              onPress={() => { if (!isFetching) void refetch(); }}
+              activeOpacity={isFetching ? 1 : 0.7}
+              disabled={isFetching}
               testID="thinkcentre-retry-btn"
             >
-              <Ionicons name="refresh-outline" size={13} color="#60a5fa" />
-              <Text style={styles.retryText}>Riprova ora</Text>
+              {isFetching ? (
+                <ActivityIndicator size={12} color="#60a5fa" />
+              ) : (
+                <Ionicons name="refresh-outline" size={13} color="#60a5fa" />
+              )}
+              <Text style={styles.retryText}>
+                {isFetching ? "Probe in corso…" : "Riprova ora"}
+              </Text>
             </TouchableOpacity>
           )}
           {data && data.configuredCount > 0 && (
@@ -330,6 +346,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(96, 165, 250, 0.25)",
     marginTop: 2,
+  },
+  retryButtonBusy: {
+    opacity: 0.55,
   },
   retryText: { fontFamily: "Inter_600SemiBold", fontSize: 12, color: "#60a5fa" },
   pushToggleRow: {
