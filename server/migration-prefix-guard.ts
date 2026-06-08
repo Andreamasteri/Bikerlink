@@ -28,21 +28,8 @@ export const KNOWN_DUPLICATE_FILE_SETS: ReadonlyMap<string, ReadonlySet<string>>
   string,
   ReadonlySet<string>
 >([
-  [
-    "0067",
-    new Set([
-      "0067_ai_call_logs_and_memory.sql",
-      "0067_db_integrity_cascade_orphan_fix.sql",
-      "0067_gist_index_user_profiles_geom.sql",
-    ]),
-  ],
-  [
-    "0072",
-    new Set([
-      "0072_ride_telemetry_indexes.sql",
-      "0072_users_marketing_consent.sql",
-    ]),
-  ],
+  // Nessun duplicato noto: i prefissi 0067 e 0072 sono stati bonificati
+  // spostando i file duplicati a 0083/0084/0085 (tutti idempotenti).
 ]);
 
 /** Estrae il prefisso numerico iniziale (cifre prima del primo "_"). */
