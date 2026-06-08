@@ -114,11 +114,14 @@ export async function createTransporter(): Promise<{ transporter: nodemailer.Tra
 }
 
 export function getBaseTemplate(content: string, preheader: string = "U'll never ride alone"): string {
+  // Anti-spam / deliverability: il preheader nascosto migliora l'anteprima nella
+  // inbox senza mostrare testo extra nel corpo (tecnica standard email marketing).
   return `
+    <div style="display:none!important;visibility:hidden;mso-hide:all;font-size:1px;color:#1a1a2e;line-height:1px;max-height:0;max-width:0;opacity:0;overflow:hidden;">${escapeHtml(preheader)}&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;</div>
     <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 480px; margin: 0 auto; padding: 20px;">
       <div style="text-align: center; margin-bottom: 30px;">
-        <h1 style="color: #FF6B35; margin: 0; font-size: 28px;">🏍️ BikerLink</h1>
-        <p style="color: #888; font-size: 14px; margin-top: 4px;">${preheader}</p>
+        <h1 style="color: #FF6B35; margin: 0; font-size: 28px;">BikerLink</h1>
+        <p style="color: #888; font-size: 14px; margin-top: 4px;">U'll never ride alone</p>
       </div>
 
       <div style="background: #1a1a2e; border-radius: 12px; padding: 30px; color: #fff;">
@@ -134,6 +137,33 @@ export function getBaseTemplate(content: string, preheader: string = "U'll never
 
 export function escapeHtml(v: string): string {
   return v.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+/**
+ * Converte l'HTML di una email in testo semplice leggibile, usato come parte
+ * `text` del messaggio multipart. Una versione text/plain presente accanto
+ * all'HTML migliora sensibilmente lo spam score (Gmail/Outlook penalizzano le
+ * email html-only).
+ */
+export function htmlToPlainText(html: string): string {
+  return html
+    .replace(/<style[\s\S]*?<\/style>/gi, "")
+    .replace(/<head[\s\S]*?<\/head>/gi, "")
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/(p|div|h1|h2|h3|h4|tr|li)>/gi, "\n")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&zwnj;/g, "")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/\n{3,}/g, "\n\n")
+    .replace(/[ \t]{2,}/g, " ")
+    .split("\n")
+    .map((l) => l.trim())
+    .join("\n")
+    .trim();
 }
 
 export async function getEmailDiagnostics(): Promise<EmailDiagnostics> {

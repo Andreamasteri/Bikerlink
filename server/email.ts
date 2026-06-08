@@ -5,16 +5,27 @@ import {
   createTransporter,
   classifyEmailError,
   recordEmailSendStatus,
-  getEmailDiagnostics
+  getEmailDiagnostics,
+  htmlToPlainText
 } from "./email/templates";
 
 export { EmailErrorCode, EmailSendResult, EmailDiagnostics };
 
+export interface SendEmailOptions {
+  /** Versione text/plain. Se omessa viene derivata dall'HTML (anti-spam multipart). */
+  text?: string;
+  /** Indirizzo Reply-To. Default: lo stesso mittente (account Gmail configurato). */
+  replyTo?: string;
+}
+
 /**
  * Invia un'email e ritorna risultato strutturato + persiste l'esito in app_settings
  * (chiavi email_last_send_status/error/error_code/recipient/at).
+ *
+ * Anti-spam: invia sempre multipart (text + html) e imposta Reply-To per
+ * migliorare la deliverability (Gmail/Outlook penalizzano le email html-only).
  */
-export async function sendEmailDetailed(to: string, subject: string, html: string): Promise<EmailSendResult> {
+export async function sendEmailDetailed(to: string, subject: string, html: string, opts?: SendEmailOptions): Promise<EmailSendResult> {
   const t = await createTransporter();
   if (!t) {
     const result: EmailSendResult = {
@@ -29,10 +40,14 @@ export async function sendEmailDetailed(to: string, subject: string, html: strin
   }
 
   try {
+    const text = opts?.text ?? htmlToPlainText(html);
+    const replyTo = opts?.replyTo ?? t.creds.user;
     const info = await t.transporter.sendMail({
       from: `"BikerLink" <${t.creds.user}>`,
       to,
+      replyTo,
       subject,
+      text,
       html
     });
     console.log(`[EMAIL] Email inviata a ${to}: ${subject} (msgId=${info.messageId})`);
@@ -64,8 +79,8 @@ export async function sendEmailDetailed(to: string, subject: string, html: strin
  * Wrapper compat: ritorna boolean per i call site esistenti che non hanno bisogno
  * della diagnostica dettagliata. Lo stato dell'ultimo invio viene comunque persistito.
  */
-export async function sendEmail(to: string, subject: string, html: string): Promise<boolean> {
-  const r = await sendEmailDetailed(to, subject, html);
+export async function sendEmail(to: string, subject: string, html: string, opts?: SendEmailOptions): Promise<boolean> {
+  const r = await sendEmailDetailed(to, subject, html, opts);
   return r.ok;
 }
 
