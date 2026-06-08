@@ -184,7 +184,36 @@ export function registerAllRoutes(app: express.Application) {
     return webPortalHtml.replace("</head>", `${injection}\n</head>`);
   }
 
-  const webPortalRoutes = ["/registrati", "/accedi", "/area-utente", "/media", "/docs", "/admin/media", "/admin/settings"];
+  // /docs — dedicated route with SEO meta tags (og:title, og:description, og:url).
+  app.get("/docs", (req, res) => {
+    const proto = req.headers["x-forwarded-proto"] || req.protocol || "https";
+    const host = req.headers["x-forwarded-host"] || req.headers.host || "bikerlink.app";
+    const baseUrl = `${proto}://${host}`;
+    const docsMetaInjection = [
+      `<title>BikerLink Docs — Guida e documentazione per motociclisti</title>`,
+      `<meta name="description" content="Documentazione ufficiale di BikerLink: guida all'app, funzionalità matching, MotoClub, SOS biker, percorsi e telemetria. Tutto quello che devi sapere per usare BikerLink al meglio."/>`,
+      `<meta property="og:title" content="BikerLink Docs — Guida e documentazione"/>`,
+      `<meta property="og:description" content="Documentazione ufficiale di BikerLink: guida all'app, matching biker, MotoClub, SOS e percorsi moto. Scopri tutte le funzionalità."/>`,
+      `<meta property="og:url" content="${baseUrl}/docs"/>`,
+      `<meta property="og:type" content="website"/>`,
+      `<meta property="og:image" content="${baseUrl}/assets/images/og-default.png"/>`,
+      `<meta name="twitter:card" content="summary_large_image"/>`,
+      `<meta name="twitter:title" content="BikerLink Docs — Guida e documentazione"/>`,
+      `<meta name="twitter:description" content="Documentazione ufficiale di BikerLink: guida all'app, matching biker, MotoClub, SOS e percorsi moto."/>`,
+    ].join("\n  ");
+    const expoWebUrl = process.env.EXPO_WEB_URL || "";
+    const scriptInjection = `<script>window.EXPO_WEB_URL=${JSON.stringify(expoWebUrl)};</script>`;
+    const baseHtml = webPortalHtml || fs.readFileSync(webPortalPath, "utf8");
+    const html = baseHtml
+      .replace(/<title>.*?<\/title>/, "")
+      .replace(/<meta name="description"[^>]*\/?>/, "")
+      .replace("</head>", `  ${docsMetaInjection}\n  ${scriptInjection}\n</head>`);
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
+    res.setHeader("Cache-Control", "public, max-age=300");
+    res.send(html);
+  });
+
+  const webPortalRoutes = ["/registrati", "/accedi", "/area-utente", "/media", "/admin/media", "/admin/settings"];
   for (const route of webPortalRoutes) {
     app.get(route, (_req, res) => {
       res.setHeader("Content-Type", "text/html; charset=utf-8");

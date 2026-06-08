@@ -455,6 +455,7 @@ code{background:#f0f0f0;padding:1px 5px;border-radius:2px;font-size:11px;font-fa
         priority: p.sitemap.priority,
         changefreq: p.sitemap.changefreq,
       })),
+      { loc: `${baseUrl}/docs`, priority: 0.7, changefreq: "monthly" },
       { loc: `${baseUrl}/privacy`, priority: 0.3, changefreq: "yearly" },
       { loc: `${baseUrl}/terms`, priority: 0.3, changefreq: "yearly" },
       { loc: `${baseUrl}/delete-account`, priority: 0.3, changefreq: "yearly" },
