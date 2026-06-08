@@ -493,6 +493,7 @@ code{background:#f0f0f0;padding:1px 5px;border-radius:2px;font-size:11px;font-fa
         `- Sistema SOS: ${baseUrl}/sos`,
         `- MotoClub: ${baseUrl}/motoclub`,
         `- Community: ${baseUrl}/community`,
+        `- Documentazione: ${baseUrl}/docs`,
         `- Download app: ${baseUrl}/download`,
         `- Chi siamo: ${baseUrl}/about`,
         `- FAQ: ${baseUrl}/faq`,
