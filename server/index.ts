@@ -564,13 +564,9 @@ process.on("SIGINT", () => gracefulShutdown("SIGINT"));
     }
 
     // Zero-match daily snapshot scheduler (nightly 03:00).
-    try {
-      const { startZeroMatchSnapshotScheduler } = await import("./jobs/zero-match-snapshot-job");
-      startZeroMatchSnapshotScheduler();
-      console.log("[INIT] Zero-match snapshot scheduler started");
-    } catch (e) {
-      console.warn("[INIT] Zero-match snapshot scheduler failed (non-fatal):", e);
-    }
+    import("./jobs/zero-match-snapshot-job")
+      .then(({ startZeroMatchSnapshotScheduler }) => startZeroMatchSnapshotScheduler())
+      .catch((e) => console.warn("[INIT] Zero-match snapshot scheduler failed (non-fatal):", e));
 
     // Motion simulator for fake users — fire-and-forget so it cannot hang boot
     import("./motion-simulator")
@@ -588,26 +584,20 @@ process.on("SIGINT", () => gracefulShutdown("SIGINT"));
   console.log(`[INIT] All startup phases completed in ${totalElapsed}s — server is READY`);
 
   // ── Boot summary ──────────────────────────────────────────────────────────
-  console.log("[INIT][SUMMARY] ── Boot task summary ──────────────────────────");
-  console.log(`[INIT][SUMMARY]   FOREGROUND (ran before READY):`);
-  console.log(`[INIT][SUMMARY]     autoSeedEssentialUsers   : ${needsFakeSeed ? "ran" : "skipped (DB already seeded)"}`);
-  console.log(`[INIT][SUMMARY]     seedAppleReviewerAccount : ran`);
-  console.log(`[INIT][SUMMARY]     seedGooglePlayReviewerAccount : ran`);
-  console.log(`[INIT][SUMMARY]     ensureBikerLinkOfficialOnBoot : ran`);
-  console.log(`[INIT][SUMMARY]     seedMotoclubs            : ran`);
-  console.log(`[INIT][SUMMARY]     seedClubMembershipsOnBoot: ran`);
-  console.log(`[INIT][SUMMARY]     startMatchingEngine      : ran`);
-  console.log(`[INIT][SUMMARY]     scheduleNightlyVacuum    : scheduled`);
-  console.log(`[INIT][SUMMARY]     scheduleNightlyMapMatching : scheduled`);
-  console.log(`[INIT][SUMMARY]     scheduleWeeklyCurvyScoreUpdate : scheduled`);
-  console.log(`[INIT][SUMMARY]     syncProductionUpdates (OTA cron) : scheduled every 15 min`);
-  console.log(`[INIT][SUMMARY]     zeroMatchSnapshotScheduler       : scheduled nightly 03:00`);
-  console.log(`[INIT][SUMMARY]   BACKGROUND (fire-and-forget after READY):`);
-  console.log(`[INIT][SUMMARY]     runPlaylistSnapshot      : scheduled`);
-  console.log(`[INIT][SUMMARY]     saveSchemaSnapshot       : scheduled`);
-  console.log(`[INIT][SUMMARY]     initMissingClubConversations : scheduled`);
-  console.log(`[INIT][SUMMARY]     autoSeedFakeUsers        : ${needsFakeSeed ? "scheduled" : "skipped (needsFakeSeed=false)"}`);
-  console.log("[INIT][SUMMARY] ────────────────────────────────────────────────");
+  console.log(
+    `[INIT][SUMMARY] ── Boot task summary ──────────────────────────\n` +
+    `[INIT][SUMMARY]   FOREGROUND (ran before READY):\n` +
+    `[INIT][SUMMARY]     autoSeedEssentialUsers   : ${needsFakeSeed ? "ran" : "skipped (DB already seeded)"}\n` +
+    `[INIT][SUMMARY]     seedAppleReviewerAccount : ran\n` +
+    `[INIT][SUMMARY]     seedGooglePlayReviewerAccount : ran\n` +
+    `[INIT][SUMMARY]     ensureBikerLinkOfficialOnBoot : ran\n` +
+    `[INIT][SUMMARY]     seedMotoclubs / seedClubMembershipsOnBoot / startMatchingEngine : ran\n` +
+    `[INIT][SUMMARY]     schedulers (vacuum/mapMatch/curvyScore/OTA/zeroMatchSnapshot) : scheduled\n` +
+    `[INIT][SUMMARY]   BACKGROUND (fire-and-forget after READY):\n` +
+    `[INIT][SUMMARY]     runPlaylistSnapshot / saveSchemaSnapshot / initMissingClubConversations : scheduled\n` +
+    `[INIT][SUMMARY]     autoSeedFakeUsers        : ${needsFakeSeed ? "scheduled" : "skipped (needsFakeSeed=false)"}\n` +
+    `[INIT][SUMMARY] ────────────────────────────────────────────────`
+  );
   // Fire-and-forget background jobs (non bloccano il boot).
   ensureCompetitorAnalysisPdf();
 
