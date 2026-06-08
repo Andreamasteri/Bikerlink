@@ -137,6 +137,20 @@ fi
 echo "════════════════════════════════════════"
 echo ""
 
+# ── FIX I18N __TODO__ DUPLICATI (anti-regressione) ───────────
+# Rimuove automaticamente chiavi __TODO__ duplicate dai file lib/i18n/*.ts
+# prima del gate ratchet. Pattern: task che aggiungono stub __TODO__ per
+# chiavi già tradotte causano TS1117 e superamento baseline ad ogni merge.
+echo "════════════════════════════════════════"
+echo "  Fix i18n __TODO__ duplicati (auto)"
+echo "════════════════════════════════════════"
+I18N_EXIT=0
+npx tsx scripts/fix-i18n-todo-duplicates.ts 2>&1 || I18N_EXIT=$?
+if [ "$I18N_EXIT" -ne 0 ]; then
+  echo "⚠️  fix-i18n-todo-duplicates ha restituito exit ${I18N_EXIT} — verificare manualmente."
+fi
+echo ""
+
 # ── GATE "600 RIGHE PER FILE" POST-MERGE ─────────────────────
 # Subito dopo il merge (prima di chiudere): se un merge ha portato
 # dentro un file > 600 senza marker, falliamo qui e lasciamo
