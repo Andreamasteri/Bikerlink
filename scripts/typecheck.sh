@@ -26,6 +26,8 @@
 set -uo pipefail
 
 TARGET="${1:-both}"
+BUDGET_SECONDS=90
+_TC_START=$SECONDS
 
 IMPORT_ERROR_CODES="TS2307|TS2305|TS2614|TS2306|TS2440|TS2724"
 
@@ -238,4 +240,16 @@ fi
 echo ""
 echo "Running Sistema A — version alignment check..."
 bash "$(dirname "$0")/check-version-alignment.sh"
-exit $?
+_VERSION_CHECK_EXIT=$?
+
+_TC_ELAPSED=$(( SECONDS - _TC_START ))
+echo ""
+echo "TypeCheck completed in ${_TC_ELAPSED}s (budget: ${BUDGET_SECONDS}s)."
+if [ "$_TC_ELAPSED" -gt "$BUDGET_SECONDS" ]; then
+  echo ""
+  echo "ERROR: typecheck budget exceeded — ${_TC_ELAPSED}s > ${BUDGET_SECONDS}s limit."
+  echo "       Review recent tsconfig changes or new broad type-check scopes."
+  exit 1
+fi
+
+exit $_VERSION_CHECK_EXIT
