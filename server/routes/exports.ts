@@ -6,7 +6,7 @@ export function registerExportsRoutes(app: Express) {
       const { generateMatchingPdf } = await import("../exports/generate-matching-pdf");
       const stream = generateMatchingPdf();
       res.setHeader("Content-Type", "application/pdf");
-      res.setHeader("Content-Disposition", "attachment; filename=\"matching-system.pdf\"");
+      res.setHeader("Content-Disposition", "inline; filename=\"BikerLink-MatchingSystem.pdf\"");
       res.setHeader("Cache-Control", "public, max-age=3600");
       stream.on("error", (err) => {
         console.error("[exports] matching-system.pdf stream error:", err);

@@ -184,7 +184,7 @@ export function registerAllRoutes(app: express.Application) {
     return webPortalHtml.replace("</head>", `${injection}\n</head>`);
   }
 
-  const webPortalRoutes = ["/registrati", "/accedi", "/area-utente", "/media", "/admin/media", "/admin/settings"];
+  const webPortalRoutes = ["/registrati", "/accedi", "/area-utente", "/media", "/docs", "/admin/media", "/admin/settings"];
   for (const route of webPortalRoutes) {
     app.get(route, (_req, res) => {
       res.setHeader("Content-Type", "text/html; charset=utf-8");

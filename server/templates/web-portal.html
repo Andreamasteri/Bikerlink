@@ -351,6 +351,34 @@
     }
     .pdf-title { font-size: 15px; font-weight: 600; color: var(--text); margin-bottom: 8px; flex: 1; }
     .pdf-actions { margin-top: 16px; }
+    /* ── DOCS PAGE ────────────────────────────────────────────────────────── */
+    .docs-page { max-width: var(--max); margin: 0 auto; padding: 100px 24px 60px; }
+    .docs-hero { margin-bottom: 48px; }
+    .docs-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 24px; }
+    .doc-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 8px; padding: 28px; transition: border-color 0.2s;
+      display: flex; flex-direction: column;
+    }
+    .doc-card:hover { border-color: rgba(255,102,0,0.35); }
+    .doc-card-icon {
+      width: 52px; height: 52px; border-radius: 6px;
+      background: var(--accent-dim); border: 1px solid rgba(255,102,0,0.3);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 26px; margin-bottom: 18px;
+    }
+    .doc-card-title { font-size: 17px; font-weight: 700; color: var(--text); margin-bottom: 10px; }
+    .doc-card-desc { font-size: 13px; color: var(--text2); line-height: 1.6; flex: 1; }
+    .doc-card-actions { margin-top: 20px; display: flex; gap: 8px; flex-wrap: wrap; }
+    .doc-share-box {
+      margin-top: 12px; display: flex; align-items: center; gap: 8px;
+      background: var(--bg-alt); border: 1px solid var(--border);
+      border-radius: 6px; padding: 10px 14px;
+    }
+    .doc-share-url {
+      flex: 1; font-size: 12px; color: var(--text2); word-break: break-all;
+      font-family: monospace; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+    }
     .video-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 24px; }
     .video-card {
       background: var(--surface); border: 1px solid var(--border);
@@ -525,6 +553,7 @@
     <div class="nav-links" id="nav-links">
       <a href="/" onclick="navigate('/'); return false;" data-i18n="nav.home">Home</a>
       <button class="nav-link-btn" onclick="navigate('/media')" data-i18n="nav.media">Risorse</button>
+      <button class="nav-link-btn" onclick="navigate('/docs')" data-i18n="nav.docs">Documenti</button>
       <div class="lang-toggle">
         <button class="lang-btn" id="lang-it" onclick="setLang('it')">IT</button>
         <button class="lang-btn" id="lang-en" onclick="setLang('en')">EN</button>
@@ -632,6 +661,7 @@ const I18N = {
   it: {
     "nav.home": "Home",
     "nav.media": "Risorse",
+    "nav.docs": "Documenti",
     "nav.login": "Accedi",
     "nav.area": "Area Utente",
     "nav.logout": "Esci",
@@ -684,6 +714,14 @@ const I18N = {
     "media.play": "Guarda",
     "media.emptyPdf": "Nessuna guida disponibile al momento",
     "media.emptyVideo": "Nessun video disponibile al momento",
+    "docs.title": "Documenti",
+    "docs.subtitle": "Documentazione tecnica e whitepaper del progetto BikerLink",
+    "docs.matching.title": "Sistema di Matching BikerLink",
+    "docs.matching.desc": "Whitepaper tecnico che descrive l'algoritmo di matching tra biker: logica, pesi, compatibilità e funzionamento del motore.",
+    "docs.view": "Visualizza PDF",
+    "docs.download": "Scarica",
+    "docs.copyLink": "Copia Link",
+    "docs.copied": "Copiato!",
     "admin.title": "Gestione Media",
     "admin.add": "Aggiungi Risorsa",
     "admin.type": "Tipo",
@@ -711,6 +749,7 @@ const I18N = {
   en: {
     "nav.home": "Home",
     "nav.media": "Resources",
+    "nav.docs": "Documents",
     "nav.login": "Log In",
     "nav.area": "My Area",
     "nav.logout": "Log Out",
@@ -763,6 +802,14 @@ const I18N = {
     "media.play": "Watch",
     "media.emptyPdf": "No guides available yet",
     "media.emptyVideo": "No videos available yet",
+    "docs.title": "Documents",
+    "docs.subtitle": "Technical documentation and whitepapers for the BikerLink project",
+    "docs.matching.title": "BikerLink Matching System",
+    "docs.matching.desc": "Technical whitepaper describing the biker matching algorithm: logic, weights, compatibility and engine mechanics.",
+    "docs.view": "View PDF",
+    "docs.download": "Download",
+    "docs.copyLink": "Copy Link",
+    "docs.copied": "Copied!",
     "admin.title": "Media Management",
     "admin.add": "Add Resource",
     "admin.type": "Type",
@@ -823,6 +870,7 @@ const ROUTES = {
   '/accedi': renderLogin,
   '/area-utente': renderArea,
   '/media': renderMedia,
+  '/docs': renderDocs,
   '/admin/media': renderAdminMedia,
   '/admin/settings': renderAdminSettings,
 };
@@ -1439,6 +1487,58 @@ function switchMediaTab(type) {
   document.getElementById('tab-video').classList.toggle('active', type === 'video');
   document.getElementById('panel-pdf').classList.toggle('active', type === 'pdf');
   document.getElementById('panel-video').classList.toggle('active', type === 'video');
+}
+
+// ── DOCS PAGE ─────────────────────────────────────────────────────────────
+function renderDocs() {
+  document.title = `BikerLink — ${t('docs.title')}`;
+  const pdfUrl = '/api/exports/matching-system.pdf';
+  const fullUrl = `${location.origin}${pdfUrl}`;
+
+  setApp(`
+    <div class="docs-page">
+      <div class="docs-hero">
+        <div class="sec-label">${t('docs.title')}</div>
+        <h1>${t('docs.title')}</h1>
+        <p style="color:var(--text2);margin-top:8px;font-size:15px">${t('docs.subtitle')}</p>
+      </div>
+      <div class="docs-grid">
+        <div class="doc-card">
+          <div class="doc-card-icon">📄</div>
+          <div class="doc-card-title">${t('docs.matching.title')}</div>
+          <div class="doc-card-desc">${t('docs.matching.desc')}</div>
+          <div class="doc-card-actions">
+            <a href="${pdfUrl}" target="_blank" rel="noopener" class="btn btn-primary btn-sm">🔍 ${t('docs.view')}</a>
+            <a href="${pdfUrl}" download="BikerLink-MatchingSystem.pdf" class="btn btn-outline btn-sm">⬇ ${t('docs.download')}</a>
+          </div>
+          <div class="doc-share-box">
+            <span class="doc-share-url" id="matching-pdf-url">${fullUrl}</span>
+            <button class="btn btn-ghost btn-sm" id="copy-matching-btn" onclick="copyDocLink('${fullUrl}', 'copy-matching-btn')" title="${t('docs.copyLink')}">📋</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    ${renderFooter()}
+  `);
+}
+
+function copyDocLink(url, btnId) {
+  navigator.clipboard.writeText(url).then(() => {
+    const btn = document.getElementById(btnId);
+    if (!btn) return;
+    const orig = btn.textContent;
+    btn.textContent = '✓';
+    btn.style.color = 'var(--success)';
+    setTimeout(() => { btn.textContent = orig; btn.style.color = ''; }, 2000);
+  }).catch(() => {
+    const inp = document.createElement('textarea');
+    inp.value = url;
+    inp.style.position = 'fixed'; inp.style.opacity = '0';
+    document.body.appendChild(inp);
+    inp.select();
+    document.execCommand('copy');
+    document.body.removeChild(inp);
+  });
 }
 
 function openVideo(url) {
@@ -2241,6 +2341,7 @@ function renderFooter() {
           <a href="/privacy">Privacy</a>
           <a href="/terms">Termini</a>
           <a href="/media">Risorse</a>
+          <a href="#" onclick="navigate('/docs'); return false;">Documenti</a>
         </div>
         <div class="web-footer-copy">© ${new Date().getFullYear()} BikerLink — U'll Never Ride Alone</div>
       </div>
