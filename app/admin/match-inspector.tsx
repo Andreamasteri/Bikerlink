@@ -37,6 +37,7 @@ interface UsersResponse {
   page: number;
   limit: number;
   hasMore: boolean;
+  zeroMatchCount: number;
 }
 
 const TYPE_LABELS: { key: string; label: string; color: string }[] = [
@@ -121,6 +122,7 @@ export default function MatchInspectorScreen() {
 
   const users = data?.users ?? [];
   const total = data?.total ?? 0;
+  const zeroMatchCount = data?.zeroMatchCount ?? 0;
 
   const renderUser = ({ item }: { item: InspectorUser }) => {
     const nonZeroTypes = TYPE_LABELS.filter(
@@ -213,6 +215,14 @@ export default function MatchInspectorScreen() {
 
       <View style={styles.headerRow}>
         <Text style={styles.totalCount}>{total} utenti</Text>
+        {zeroMatchCount > 0 && (
+          <View style={styles.zeroMatchBadge}>
+            <MaterialCommunityIcons name="alert" size={12} color={Colors.warning} />
+            <Text style={styles.zeroMatchBadgeText}>
+              {zeroMatchCount} senza match
+            </Text>
+          </View>
+        )}
         <TouchableOpacity onPress={() => refetch()} style={styles.refreshBtn}>
           <Ionicons name="refresh" size={16} color={Colors.accent} />
           <Text style={styles.refreshText}>Aggiorna</Text>
@@ -281,6 +291,22 @@ const styles = StyleSheet.create({
   },
   refreshBtn: { flexDirection: "row", alignItems: "center", gap: 4 },
   refreshText: { fontFamily: "Inter_500Medium", fontSize: 13, color: Colors.accent },
+  zeroMatchBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: Colors.warning + "1A",
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderWidth: 1,
+    borderColor: Colors.warning + "55",
+  },
+  zeroMatchBadgeText: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 12,
+    color: Colors.warning,
+  },
   userRow: {
     flexDirection: "row",
     alignItems: "center",

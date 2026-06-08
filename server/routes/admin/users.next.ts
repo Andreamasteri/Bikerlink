@@ -298,12 +298,28 @@ router.get("/match-summary", async (req: Request, res: Response) => {
     const limit = parseInt(req.query.limit as string) || 50;
     const offset = (page - 1) * limit;
 
-    const countResult = await db.execute(sql`
-      SELECT COUNT(*) as cnt FROM users
-      WHERE is_fake = false AND role NOT IN ('admin', 'moderator')
-    `);
+    const [countResult, zeroMatchResult] = await Promise.all([
+      db.execute(sql`
+        SELECT COUNT(*) as cnt FROM users
+        WHERE is_fake = false AND role NOT IN ('admin', 'moderator')
+      `),
+      db.execute(sql`
+        SELECT COUNT(*) as cnt FROM users u
+        LEFT JOIN LATERAL (
+          SELECT COUNT(*) as cnt FROM biker_biker_matches m
+          WHERE m.biker1_id = u.id OR m.biker2_id = u.id
+        ) bb ON true
+        LEFT JOIN LATERAL (
+          SELECT COUNT(*) as cnt FROM biker_zavorrina_matches m
+          WHERE m.biker_id = u.id OR m.zavorrina_id = u.id
+        ) bz ON true
+        WHERE u.is_fake = false AND u.role NOT IN ('admin', 'moderator')
+          AND (COALESCE(bb.cnt, 0) + COALESCE(bz.cnt, 0)) = 0
+      `),
+    ]);
     type CountRow = { cnt?: string };
     const total = parseInt(((countResult.rows[0] as CountRow)?.cnt) ?? "0", 10);
+    const zeroMatchCount = parseInt(((zeroMatchResult.rows[0] as CountRow)?.cnt) ?? "0", 10);
 
     const usersResult = await db.execute(sql`
       SELECT
@@ -338,7 +354,7 @@ router.get("/match-summary", async (req: Request, res: Response) => {
       bbCounts: row.bb_counts,
     }));
 
-    return res.json({ users: mappedUsers, total, page });
+    return res.json({ users: mappedUsers, total, page, zeroMatchCount });
   } catch (_error) {
     console.error("Admin match-summary error:", _error);
     return sendError(res, 500, "Errore interno del server");
