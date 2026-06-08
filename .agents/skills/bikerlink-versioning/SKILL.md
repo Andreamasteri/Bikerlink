@@ -73,14 +73,15 @@ Il progetto usa il bare workflow (directory `android/` committata). I tre file d
 ### Nuova OTA (aggiornamento JS)
 
 Non toccare i file di versione. Lo script `scripts/publish-ota.sh` gestisce tutto automaticamente.
-La versione OTA segue la formula `<build>.<updateNumber>.<ciclo>` (hardcodata nello script).
+La versione OTA segue la formula `<build>.<updateNumber>.<ciclo>` — lo script legge `BUILD_NUM` e `RUNTIME_VER` dinamicamente da `app.json` a ogni esecuzione.
 
 ### Cambio runtimeVersion (breaking change nativo)
 
 1. Aggiorna `runtimeVersion` in `app.json`
 2. Aggiorna `expo_runtime_version` in `strings.xml` con lo stesso valore
-3. Aggiorna la formula in `publish-ota.sh` (il terzo numero del formato versione OTA)
-4. Pubblica un nuovo APK — i client con il vecchio APK non riceveranno le nuove OTA
+3. Pubblica un nuovo APK — i client con il vecchio APK non riceveranno le nuove OTA
+
+> `scripts/publish-ota.sh` legge `RUNTIME_VER` dinamicamente da `app.json`: non serve toccare lo script quando cambia il ciclo.
 
 ---
 
@@ -116,20 +117,18 @@ La versione OTA segue la formula `<build>.<updateNumber>.<ciclo>` (hardcodata ne
 
 ## Formula in publish-ota.sh
 
-La riga che calcola la versione OTA in `scripts/publish-ota.sh`:
+La versione OTA in `scripts/publish-ota.sh` è calcolata **dinamicamente** a ogni esecuzione:
 
 ```bash
-# Formato versione OTA: <build>.<updateNumber>.<ciclo_ota>
-# 50 = versionCode APK corrente, NEXT_OTA = numero progressivo OTA nel ciclo, 10 = ciclo runtimeVersion (10.0.0)
-local VERSION="50.${NEXT_OTA}.10"
+# Legge versionCode e ciclo runtimeVersion direttamente da app.json — nessun numero hardcoded
+BUILD_NUM=$(node -e "const a=require('./app.json'); console.log(a.expo.android.versionCode || 49)")
+RUNTIME_VER=$(node -e "const a=require('./app.json'); const rv=a.expo.runtimeVersion||'10.0.0'; console.log(rv.split('.')[0])")
+VERSION="${BUILD_NUM}.${NEXT_OTA}.${RUNTIME_VER}"
 ```
 
 ✅ `scripts/publish-ota.sh` esiste ed è funzionante. Pubblica su canale `staging`, registra la release nel database, e attende l'approvazione admin prima di promuovere su `production`.
 
-Quando viene pubblicato un nuovo APK con un nuovo ciclo, aggiornare:
-- Il primo numero (`49` → nuovo versionCode)
-- Il terzo numero (`10` → numero del nuovo ciclo runtimeVersion)
-- Il commento sopra la riga
+**Non è necessario aggiornare lo script dopo un nuovo APK o un cambio di ciclo**: legge sempre i valori correnti da `app.json` a runtime.
 
 ---
 
@@ -140,6 +139,7 @@ Checklist rapida per i task di bump versione:
 - [ ] `app.json` → `version`, `android.versionCode`, `runtimeVersion`
 - [ ] `android/app/build.gradle` → `versionCode`, `versionName`
 - [ ] `android/app/src/main/res/values/strings.xml` → `expo_runtime_version`
-- [ ] `scripts/publish-ota.sh` → formula `VERSION` (primo e terzo numero)
 - [ ] `.agents/skills/bikerlink-ota-publish/SKILL.md` → sezione "Contesto fisso" e "Cicli precedenti"
 - [ ] Questa skill → tabella storica dei cicli
+
+> `scripts/publish-ota.sh` **non va toccato**: legge `versionCode` e `runtimeVersion` dinamicamente da `app.json` a ogni esecuzione OTA.

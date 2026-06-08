@@ -65,5 +65,10 @@ perché la sandbox Replit blocca `.git/index.lock`. Questo prefisso è SEMPRE ne
 - Non eseguire `npx expo build` (deprecato)
 - Non eseguire `npx eas submit` (non richiesto dall'utente)
 
+## Formula versione OTA — automatica
+`scripts/publish-ota.sh` legge `versionCode` e `runtimeVersion` da `app.json` **a runtime** — non hardcoda i numeri.
+Basta aggiornare `app.json` + `build.gradle` per il bump APK; lo script OTA si adegua automaticamente.
+Non toccare la formula VERSION nello script: è già dinamica.
+
 **Why:** L'utente installa l'APK direttamente sui propri dispositivi via EAS internal distribution.
 Non usa il Play Store per i cicli di test/sviluppo.
