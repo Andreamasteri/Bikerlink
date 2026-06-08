@@ -84,6 +84,28 @@ log "=== [2/3] Build server TypeScript ==="
 node scripts/server-build.js
 log "  server_dist/ prodotto → $(size server_dist) ($(size server_dist/index.js 2>/dev/null) il bundle)"
 
+# Task #3501 — Garantisce che server/public/matching-system.pdf sia presente nel
+# Repl layer. Il file viene creato dal post-merge hook (scripts/generate-matching-pdf.mjs)
+# e copiato in server/public/. Se per qualsiasi motivo manca (primo deploy senza
+# post-merge, workspace pulito), lo rigeneriamo qui in modo che la route
+# GET /api/exports/matching-system.pdf non torni mai 500 in produzione.
+# NB: in caso di errore logghiamo un warning ma NON usciamo (set -e è attivo,
+# quindi usiamo || true per non bloccare l'intero deploy).
+log "=== [2b/3] Verifica PDF matching-system ==="
+MATCHING_PDF="server/public/matching-system.pdf"
+if [ -f "$MATCHING_PDF" ]; then
+  log "  $MATCHING_PDF già presente ($(size $MATCHING_PDF)) — nessuna azione."
+else
+  log "  $MATCHING_PDF assente — rigenero con scripts/generate-matching-pdf.mjs..."
+  PDF_EXIT=0
+  node scripts/generate-matching-pdf.mjs 2>&1 || PDF_EXIT=$?
+  if [ "$PDF_EXIT" -eq 0 ] && [ -f "$MATCHING_PDF" ]; then
+    log "  PDF rigenerato con successo ($(size $MATCHING_PDF))."
+  else
+    log "  ⚠️  Rigenerazione PDF fallita (exit ${PDF_EXIT}) — il fallback dinamico della route gestirà la richiesta a runtime."
+  fi
+fi
+
 # Task #2781-fix — invalida la cache hash delle migration.
 # server/migrate.ts ha un fast-skip basato su server_dist/.migrations-hash
 # (hash dei nomi file). In produzione il filesystem PERSISTE tra i deploy:
