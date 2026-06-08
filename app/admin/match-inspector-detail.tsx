@@ -5,8 +5,10 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
+  Pressable,
   ActivityIndicator,
   Alert,
+  Switch,
 } from "react-native";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocalSearchParams } from "expo-router";
@@ -73,6 +75,8 @@ export default function MatchInspectorDetailScreen() {
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
   const [expandedTypes, setExpandedTypes] = useState<Set<string>>(new Set());
+  const [justDeleted, setJustDeleted] = useState(false);
+  const [autoRecalc, setAutoRecalc] = useState(false);
 
   const queryKey = ["/api/admin/users", userId, "matches"];
 
@@ -90,12 +94,15 @@ export default function MatchInspectorDetailScreen() {
     staleTime: 5000,
   });
 
+  const totalMatches = data?.matchesByType.reduce((s, t) => s + t.count, 0) ?? 0;
+
   const recalcMutation = useMutation({
     mutationFn: async () => {
       const res = await apiRequest("POST", `/api/admin/users/${userId}/matches/recalculate`);
       return res.json();
     },
     onSuccess: (result) => {
+      setJustDeleted(false);
       queryClient.invalidateQueries({ queryKey });
       Alert.alert(
         "Ricalcolo completato",
@@ -111,6 +118,7 @@ export default function MatchInspectorDetailScreen() {
       return res.json();
     },
     onSuccess: (result) => {
+      setJustDeleted(true);
       queryClient.invalidateQueries({ queryKey });
       const total = result.deleted?.total ?? 0;
       const bb = result.deleted?.bikerBiker ?? 0;
@@ -119,6 +127,16 @@ export default function MatchInspectorDetailScreen() {
       Alert.alert(
         "Match eliminati",
         `Eliminati ${total} match totali:\n${bb} biker-biker · ${bz} biker-zavorrina · ${pp} proposal`,
+        [
+          {
+            text: "OK",
+            onPress: () => {
+              if (autoRecalc) {
+                recalcMutation.mutate();
+              }
+            },
+          },
+        ],
       );
     },
     onError: () => Alert.alert("Errore", "Eliminazione match fallita"),
@@ -165,7 +183,7 @@ export default function MatchInspectorDetailScreen() {
   }
 
   const { user, gpsRouteCount, matchesByType } = data;
-  const totalMatches = matchesByType.reduce((s, t) => s + t.count, 0);
+  const needsRecalculate = justDeleted && totalMatches === 0;
 
   return (
     <ScrollView
@@ -176,9 +194,10 @@ export default function MatchInspectorDetailScreen() {
         user={user}
         gpsRouteCount={gpsRouteCount}
         totalMatches={totalMatches}
+        needsRecalculate={needsRecalculate}
       />
 
-      <View style={styles.actionsRow}>
+      <View style={[styles.actionsRow, needsRecalculate && { marginTop: 12 }]}>
         <TouchableOpacity style={styles.refreshBtn} onPress={() => refetch()}>
           <Ionicons name="refresh" size={16} color={Colors.accent} />
           <Text style={styles.refreshText}>Aggiorna</Text>
@@ -193,25 +212,42 @@ export default function MatchInspectorDetailScreen() {
           ) : (
             <MaterialCommunityIcons name="calculator-variant" size={16} color="#fff" />
           )}
-          <Text style={styles.recalcText}>Ricalcola ora</Text>
+          <Text style={styles.recalcText}>
+            {recalcMutation.isPending ? "Ricalcolo..." : "Ricalcola ora"}
+          </Text>
         </TouchableOpacity>
       </View>
 
       <View style={styles.deleteMatchesRow}>
-        <TouchableOpacity
-          style={[styles.deleteMatchesBtn, deleteMatchesMutation.isPending && { opacity: 0.6 }]}
-          onPress={handleDeleteMatches}
-          disabled={deleteMatchesMutation.isPending}
+        <View style={styles.deleteMatchesTop}>
+          <TouchableOpacity
+            style={[styles.deleteMatchesBtn, deleteMatchesMutation.isPending && { opacity: 0.6 }]}
+            onPress={handleDeleteMatches}
+            disabled={deleteMatchesMutation.isPending}
+          >
+            {deleteMatchesMutation.isPending ? (
+              <ActivityIndicator size="small" color={Colors.error} />
+            ) : (
+              <MaterialCommunityIcons name="delete-sweep" size={16} color={Colors.error} />
+            )}
+            <Text style={styles.deleteMatchesText}>
+              {deleteMatchesMutation.isPending ? "Eliminazione..." : "Elimina tutti i match"}
+            </Text>
+          </TouchableOpacity>
+        </View>
+        <Pressable
+          style={styles.autoRecalcRow}
+          onPress={() => setAutoRecalc((v) => !v)}
         >
-          {deleteMatchesMutation.isPending ? (
-            <ActivityIndicator size="small" color={Colors.error} />
-          ) : (
-            <MaterialCommunityIcons name="delete-sweep" size={16} color={Colors.error} />
-          )}
-          <Text style={styles.deleteMatchesText}>
-            {deleteMatchesMutation.isPending ? "Eliminazione..." : "Elimina tutti i match"}
-          </Text>
-        </TouchableOpacity>
+          <Switch
+            value={autoRecalc}
+            onValueChange={() => {}}
+            trackColor={{ false: Colors.border, true: Colors.accent + "88" }}
+            thumbColor={autoRecalc ? Colors.accent : Colors.textSecondary}
+            style={styles.autoRecalcSwitch}
+          />
+          <Text style={styles.autoRecalcLabel}>Ricalcola automaticamente dopo l'eliminazione</Text>
+        </Pressable>
       </View>
 
       <PreferencesDiffCard sections={matchesByType} userId={userId!} nickname={user.nickname} />
@@ -242,6 +278,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 10,
     paddingHorizontal: 16,
+    marginTop: 16,
     marginBottom: 16,
   },
   refreshBtn: {
@@ -271,7 +308,9 @@ const styles = StyleSheet.create({
   deleteMatchesRow: {
     paddingHorizontal: 16,
     marginBottom: 16,
+    gap: 8,
   },
+  deleteMatchesTop: {},
   deleteMatchesBtn: {
     flexDirection: "row",
     alignItems: "center",
@@ -284,6 +323,20 @@ const styles = StyleSheet.create({
     borderColor: Colors.error,
   },
   deleteMatchesText: { fontFamily: "Inter_600SemiBold", fontSize: 13, color: Colors.error },
+  autoRecalcRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingVertical: 6,
+    paddingHorizontal: 4,
+  },
+  autoRecalcSwitch: { transform: [{ scaleX: 0.85 }, { scaleY: 0.85 }] },
+  autoRecalcLabel: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 13,
+    color: Colors.textSecondary,
+    flex: 1,
+  },
   sectionTitle: {
     fontFamily: "Inter_700Bold",
     fontSize: 13,
@@ -294,4 +347,3 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
 });
-

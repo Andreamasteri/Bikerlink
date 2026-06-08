@@ -12,40 +12,58 @@ interface MatchUserCardProps {
   };
   gpsRouteCount: number;
   totalMatches: number;
+  needsRecalculate?: boolean;
 }
 
-export const MatchUserCard: React.FC<MatchUserCardProps> = ({ user, gpsRouteCount, totalMatches }) => {
+export const MatchUserCard: React.FC<MatchUserCardProps> = ({
+  user,
+  gpsRouteCount,
+  totalMatches,
+  needsRecalculate,
+}) => {
   return (
-    <View style={styles.userCard}>
-      {user.avatarUrl ? (
-        <Image source={{ uri: user.avatarUrl }} style={styles.avatar} />
-      ) : (
-        <View style={styles.avatarPlaceholder}>
-          <Text style={styles.avatarLetter}>{user.nickname.charAt(0).toUpperCase()}</Text>
+    <View style={styles.wrapper}>
+      <View style={styles.userCard}>
+        {user.avatarUrl ? (
+          <Image source={{ uri: user.avatarUrl }} style={styles.avatar} />
+        ) : (
+          <View style={styles.avatarPlaceholder}>
+            <Text style={styles.avatarLetter}>{user.nickname.charAt(0).toUpperCase()}</Text>
+          </View>
+        )}
+        <View style={styles.userMeta}>
+          <Text style={styles.userNickname}>{user.nickname}</Text>
+          <Text style={styles.userType}>{user.userType} · {user.role}</Text>
+          <Text style={styles.gpsInfo}>
+            <MaterialCommunityIcons name="map-marker-path" size={12} color={Colors.textSecondary} />
+            {" "}{gpsRouteCount} percorsi GPS
+          </Text>
+        </View>
+        <View style={styles.totalBadge}>
+          <Text style={styles.totalNum}>{totalMatches}</Text>
+          <Text style={styles.totalLabel}>match totali</Text>
+        </View>
+      </View>
+
+      {needsRecalculate && (
+        <View style={styles.recalcBanner}>
+          <MaterialCommunityIcons name="alert-circle-outline" size={16} color={Colors.warning} />
+          <Text style={styles.recalcBannerText}>Nessun match — ricalcolo consigliato</Text>
         </View>
       )}
-      <View style={styles.userMeta}>
-        <Text style={styles.userNickname}>{user.nickname}</Text>
-        <Text style={styles.userType}>{user.userType} · {user.role}</Text>
-        <Text style={styles.gpsInfo}>
-          <MaterialCommunityIcons name="map-marker-path" size={12} color={Colors.textSecondary} />
-          {" "}{gpsRouteCount} percorsi GPS
-        </Text>
-      </View>
-      <View style={styles.totalBadge}>
-        <Text style={styles.totalNum}>{totalMatches}</Text>
-        <Text style={styles.totalLabel}>match totali</Text>
-      </View>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
+  wrapper: { gap: 0 },
   userCard: {
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: Colors.surface,
-    margin: 16,
+    marginHorizontal: 16,
+    marginTop: 16,
+    marginBottom: 0,
     borderRadius: 16,
     padding: 16,
     gap: 12,
@@ -69,4 +87,26 @@ const styles = StyleSheet.create({
   totalBadge: { alignItems: "center" },
   totalNum: { fontFamily: "Inter_700Bold", fontSize: 24, color: Colors.accent },
   totalLabel: { fontFamily: "Inter_400Regular", fontSize: 10, color: Colors.textSecondary },
+  recalcBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginHorizontal: 16,
+    marginTop: 0,
+    marginBottom: 0,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    backgroundColor: Colors.warning + "1A",
+    borderBottomLeftRadius: 12,
+    borderBottomRightRadius: 12,
+    borderWidth: 1,
+    borderTopWidth: 0,
+    borderColor: Colors.warning + "66",
+  },
+  recalcBannerText: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 13,
+    color: Colors.warning,
+    flex: 1,
+  },
 });
