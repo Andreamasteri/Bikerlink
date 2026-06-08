@@ -1380,5 +1380,13 @@ const it: Record<string, string> = {
   "tracking.deleteError": "Errore eliminazione percorso",
   "top": "Alto",
   "bottom": "Basso",
+
+  "match.tabTelemetry": "__TODO__:match.tabTelemetry",
+  "match.emptyRouteTitle": "__TODO__:match.emptyRouteTitle",
+  "match.emptyRouteDesc": "__TODO__:match.emptyRouteDesc",
+  "match.emptyTelemetryDesc": "__TODO__:match.emptyTelemetryDesc",
+  "match.telemetryAffinityLabel": "__TODO__:match.telemetryAffinityLabel",
+  "match.telemetryStyleTitle": "__TODO__:match.telemetryStyleTitle",
+  "match.styleLabel.${label}": "__TODO__:match.styleLabel.${label}",
 };
 export default it;
