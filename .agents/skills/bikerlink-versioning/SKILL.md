@@ -150,6 +150,7 @@ Checklist rapida per i task di bump versione:
 - [ ] `app.json` → `version`, `android.versionCode`, `runtimeVersion`
 - [ ] `android/app/build.gradle` → `versionCode`, `versionName`
 - [ ] `android/app/src/main/res/values/strings.xml` → `expo_runtime_version`
+- [ ] `constants/buildInfo.ts` → `RELEASE_NUMBER` (allinearlo al nuovo versionCode)
 - [ ] `.agents/skills/bikerlink-ota-publish/SKILL.md` → sezione "Contesto fisso" e "Cicli precedenti"
 - [ ] Questa skill → tabella storica dei cicli
 
