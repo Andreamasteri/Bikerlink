@@ -374,8 +374,52 @@ export class MatchingStorage extends ContestStorage {
   }
 
   async createProposalProfileMatch(data: InsertProposalProfileMatch): Promise<ProposalProfileMatch | null> {
-    const [match] = await db.insert(proposalProfileMatches).values(data).onConflictDoNothing().returning();
-    return match ?? null;
+    try {
+      const result = await db.execute(sql`
+        INSERT INTO proposal_profile_matches
+          (id, proposal_id, biker_id, zavorrina_id, distance_km, status, notification_priority)
+        VALUES
+          (gen_random_uuid(), ${data.proposalId}, ${data.bikerId}, ${data.zavarrinaId},
+           ${data.distanceKm ?? null}, ${data.status ?? 'new'}, ${data.notificationPriority ?? 'normal'})
+        ON CONFLICT (proposal_id, zavorrina_id)
+        DO UPDATE SET
+          status                = 'new',
+          archived_at           = NULL,
+          notified_at           = NULL,
+          distance_km           = EXCLUDED.distance_km,
+          notification_priority = EXCLUDED.notification_priority
+        WHERE proposal_profile_matches.status = 'accepted'
+           OR proposal_profile_matches.archived_at IS NOT NULL
+        RETURNING *`);
+      if (!result.rows || result.rows.length === 0) return null;
+      const row = result.rows[0] as Record<string, unknown>;
+      return {
+        id: row.id as string,
+        proposalId: row.proposal_id as string,
+        bikerId: row.biker_id as string,
+        zavarrinaId: row.zavorrina_id as string,
+        distanceKm: row.distance_km as number | null,
+        status: row.status as string,
+        notificationPriority: row.notification_priority as string,
+        notifiedAt: row.notified_at as Date | null,
+        archivedAt: row.archived_at as Date | null,
+        createdAt: row.created_at as Date,
+      };
+    } catch (err: unknown) {
+      // The partial unique index ppm_biker_zavorrina_active_idx on (biker_id, zavorrina_id)
+      // WHERE status='new' is not covered by the ON CONFLICT clause above (which targets
+      // only proposal_id+zavorrina_id). If that partial index fires, Postgres raises a
+      // unique_violation (23505). This means a 'new' match for this biker/zavorrina pair
+      // already exists from a different proposal — skip gracefully, same as the old
+      // onConflictDoNothing() behavior.
+      if (
+        typeof err === 'object' && err !== null &&
+        (err as Record<string, unknown>).code === '23505'
+      ) {
+        return null;
+      }
+      throw err;
+    }
   }
 
   async getProposalProfileMatchesForUser(userId: string, options?: { includeArchived?: boolean; halfLifeDays?: number }): Promise<ProposalProfileMatch[]> {
