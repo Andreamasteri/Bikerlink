@@ -724,6 +724,8 @@ const I18N = {
     "docs.privacy.desc": "Informativa completa sul trattamento dei dati personali, diritti GDPR, modalità di raccolta e conservazione dei dati degli utenti.",
     "docs.manual.title": "Manuale Utente",
     "docs.manual.desc": "Guida completa all'utilizzo di BikerLink: registrazione, profilo, matching, eventi, motoclub e funzionalità avanzate.",
+    "docs.competitor.title": "Analisi Competitor",
+    "docs.competitor.desc": "Confronto funzionalità tra BikerLink e i principali competitor del settore moto: Calimoto, Kurviger, Wheelo, Motobit e Motoplanner. Include posizionamento strategico e vantaggi differenziali.",
     "docs.view": "Visualizza PDF",
     "docs.download": "Scarica",
     "docs.copyLink": "Copia Link",
@@ -819,6 +821,8 @@ const I18N = {
     "docs.privacy.desc": "Full personal data processing notice, GDPR rights, data collection and retention policies for BikerLink users.",
     "docs.manual.title": "User Manual",
     "docs.manual.desc": "Complete guide to using BikerLink: registration, profile, matching, events, moto clubs and advanced features.",
+    "docs.competitor.title": "Competitor Analysis",
+    "docs.competitor.desc": "Feature comparison between BikerLink and the main competitors in the motorcycle sector: Calimoto, Kurviger, Wheelo, Motobit and Motoplanner. Includes strategic positioning and differentiating advantages.",
     "docs.view": "View PDF",
     "docs.download": "Download",
     "docs.copyLink": "Copy Link",
@@ -1508,10 +1512,11 @@ async function renderDocs() {
   document.title = `BikerLink — ${t('docs.title')}`;
   setApp(`<div class="loading-page"><div class="loader"></div></div>`);
 
-  const [eulaInfo, privacyInfo, manualInfo] = await Promise.all([
+  const [eulaInfo, privacyInfo, manualInfo, competitorAvailable] = await Promise.all([
     fetch('/api/eula/info').then(r => r.ok ? r.json() : { available: false }).catch(() => ({ available: false })),
     fetch('/api/privacy-policy/info').then(r => r.ok ? r.json() : { available: false }).catch(() => ({ available: false })),
     fetch('/api/manual/info').then(r => r.ok ? r.json() : { available: false }).catch(() => ({ available: false })),
+    fetch('/assets/competitor-analysis.pdf', { method: 'HEAD' }).then(r => r.ok).catch(() => false),
   ]);
 
   function docCard({ icon, titleKey, descKey, viewUrl, downloadUrl, downloadName, slug, available }) {
@@ -1590,6 +1595,16 @@ async function renderDocs() {
           downloadName: 'BikerLink-Manual.pdf',
           slug: 'manual',
           available: manualInfo.available,
+        })}
+        ${docCard({
+          icon: '🏁',
+          titleKey: 'docs.competitor.title',
+          descKey: 'docs.competitor.desc',
+          viewUrl: '/assets/competitor-analysis.pdf',
+          downloadUrl: '/assets/competitor-analysis.pdf',
+          downloadName: 'BikerLink-AnalisiCompetitor.pdf',
+          slug: 'competitor',
+          available: competitorAvailable,
         })}
       </div>
     </div>
