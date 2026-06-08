@@ -601,6 +601,42 @@ process.on("SIGINT", () => gracefulShutdown("SIGINT"));
 
   // Fire-and-forget background jobs — run after server is READY.
   // None of these can block, timeout, or crash the boot sequence.
+
+  // ── Competitor analysis PDF/PNG — genera se mancante ──────────────────────
+  // Se server/public/assets/competitor-analysis.pdf non esiste (deploy fresco
+  // o file non committato), lancia lo script di generazione in background.
+  // Il mancato completamento NON blocca il boot né il serving del resto.
+  setImmediate(() => {
+    (async () => {
+      const { existsSync } = await import("fs");
+      const { resolve } = await import("path");
+      // Use process.cwd()-based paths to match how routes serve these files
+      // (see server/routes/more-routes-2.ts: process.cwd()/server/public/assets/).
+      // Using __dirname would break in the compiled build (server_dist/).
+      const pdfPath = resolve(process.cwd(), "server/public/assets/competitor-analysis.pdf");
+      const pngPath = resolve(process.cwd(), "server/public/assets/competitor-analysis.png");
+      if (!existsSync(pdfPath) || !existsSync(pngPath)) {
+        console.log("[INIT][BG] competitor-analysis.pdf/png mancante — avvio generazione...");
+        const { execFile } = await import("child_process");
+        const scriptPath = resolve(process.cwd(), "scripts/generate-competitor-analysis.js");
+        await new Promise<void>((resolve) => {
+          execFile(process.execPath, [scriptPath], { timeout: 60_000 }, (err, stdout, stderr) => {
+            if (err) {
+              console.warn("[INIT][BG] generate-competitor-analysis: ERRORE —", err.message);
+              if (stderr) console.warn("[INIT][BG] generate-competitor-analysis stderr:", stderr.slice(0, 300));
+            } else {
+              console.log("[INIT][BG] generate-competitor-analysis: PDF/PNG generati correttamente.");
+              if (stdout) console.log("[INIT][BG] generate-competitor-analysis stdout:", stdout.trim().slice(0, 200));
+            }
+            resolve();
+          });
+        });
+      } else {
+        console.log("[INIT][BG] competitor-analysis.pdf/png già presenti — generazione saltata.");
+      }
+    })().catch((e) => console.warn("[INIT][BG] competitor-analysis setup error:", e));
+  });
+
   setImmediate(() => {
     console.log("[INIT][BG] Starting initMissingClubConversations...");
     initMissingClubConversations()

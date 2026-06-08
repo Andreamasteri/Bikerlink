@@ -254,4 +254,22 @@ fi
 echo "════════════════════════════════════════"
 echo ""
 
+# ── GENERA PDF ANALISI COMPETITOR POST-MERGE ─────────────────
+# Rigenera server/public/assets/competitor-analysis.pdf e .png
+# da scripts/generate-competitor-analysis.js dopo ogni merge,
+# così la card "Analisi Competitor" in /docs mostra sempre
+# il PDF aggiornato senza intervento manuale.
+echo "════════════════════════════════════════"
+echo "  Generazione PDF analisi competitor"
+echo "════════════════════════════════════════"
+COMPETITOR_PDF_EXIT=0
+node scripts/generate-competitor-analysis.js 2>&1 || COMPETITOR_PDF_EXIT=$?
+if [ "$COMPETITOR_PDF_EXIT" -ne 0 ]; then
+  echo "⚠️  generate-competitor-analysis.js ha restituito exit ${COMPETITOR_PDF_EXIT} — PDF potrebbe essere stale."
+else
+  echo "✅ PDF analisi competitor aggiornato."
+fi
+echo "════════════════════════════════════════"
+echo ""
+
 exit 0
