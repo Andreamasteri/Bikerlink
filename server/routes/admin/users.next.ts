@@ -441,9 +441,102 @@ router.get("/match-summary", async (req: Request, res: Response) => {
       return critical;
     }
 
+    const [bbBreakdownResult, bzBreakdownResult] = await Promise.all([
+      userIds.length > 0
+        ? db.execute(sql`
+            SELECT
+              u_id,
+              SUM(CASE WHEN
+                motorcycle_brand NOT LIKE '%:%'
+                AND motorcycle_brand NOT IN ('musica','musica_zav','distanza','distanza_zav','eventi')
+                AND motorcycle_brand NOT LIKE 'gps_%'
+                AND motorcycle_brand NOT LIKE 'zona_%'
+                AND motorcycle_brand NOT LIKE 'percorso%'
+              THEN 1 ELSE 0 END)::int AS "bikerBikerBrand",
+              SUM(CASE WHEN motorcycle_brand LIKE 'club:%' AND motorcycle_brand NOT LIKE 'club_zav:%' THEN 1 ELSE 0 END)::int AS "bikerClubBrand",
+              SUM(CASE WHEN motorcycle_brand LIKE 'club_zav:%' THEN 1 ELSE 0 END)::int AS "zavarrinaClubBrand",
+              SUM(CASE WHEN motorcycle_brand LIKE 'tipo:%' AND motorcycle_brand NOT LIKE 'tipo_zav:%' THEN 1 ELSE 0 END)::int AS "bikerBikerTypeStyle",
+              SUM(CASE WHEN motorcycle_brand LIKE 'tipo_zav:%' THEN 1 ELSE 0 END)::int AS "bikerZavarrinaTypeStyle",
+              SUM(CASE WHEN motorcycle_brand = 'distanza' THEN 1 ELSE 0 END)::int AS "bikerBikerDistance",
+              SUM(CASE WHEN motorcycle_brand = 'distanza_zav' THEN 1 ELSE 0 END)::int AS "bikerZavarrinaDistance",
+              SUM(CASE WHEN motorcycle_brand = 'musica' THEN 1 ELSE 0 END)::int AS "bikerBikerMusic",
+              SUM(CASE WHEN motorcycle_brand = 'musica_zav' THEN 1 ELSE 0 END)::int AS "bikerZavarrinaMusic",
+              SUM(CASE WHEN motorcycle_brand IN ('gps_tilt', 'gps_full') THEN 1 ELSE 0 END)::int AS "bikerBikerLeanAngle",
+              SUM(CASE WHEN motorcycle_brand LIKE 'zona_bb:%' OR motorcycle_brand LIKE 'percorso:%' THEN 1 ELSE 0 END)::int AS "bikerBikerRouteTypeZone",
+              SUM(CASE WHEN motorcycle_brand LIKE 'zona_zav:%' OR motorcycle_brand LIKE 'percorso_zav:%' THEN 1 ELSE 0 END)::int AS "bikerZavarrinaRouteTypeZone",
+              SUM(CASE WHEN motorcycle_brand IN ('gps_speed', 'gps_full') THEN 1 ELSE 0 END)::int AS "bikerBikerAvgSpeed",
+              SUM(CASE WHEN motorcycle_brand IN ('gps_speed', 'gps_full') THEN 1 ELSE 0 END)::int AS "bikerBikerAvgDuration",
+              SUM(CASE WHEN motorcycle_brand IN ('gps_day', 'gps_full') THEN 1 ELSE 0 END)::int AS "bikerBikerDayTime",
+              SUM(CASE WHEN motorcycle_brand = 'eventi' THEN 1 ELSE 0 END)::int AS "bikerBikerEvents"
+            FROM (
+              SELECT biker1_id AS u_id, motorcycle_brand
+              FROM biker_biker_matches
+              WHERE biker1_id = ANY(${userIds}::varchar[])
+              UNION ALL
+              SELECT biker2_id AS u_id, motorcycle_brand
+              FROM biker_biker_matches
+              WHERE biker2_id = ANY(${userIds}::varchar[])
+            ) sub
+            GROUP BY u_id
+          `)
+        : Promise.resolve({ rows: [] }),
+      userIds.length > 0
+        ? db.execute(sql`
+            SELECT u_id, COUNT(*)::int AS "bikerZavorrinaBrand"
+            FROM (
+              SELECT biker_id AS u_id FROM biker_zavorrina_matches WHERE biker_id = ANY(${userIds}::varchar[])
+              UNION ALL
+              SELECT zavorrina_id AS u_id FROM biker_zavorrina_matches WHERE zavorrina_id = ANY(${userIds}::varchar[])
+            ) sub
+            GROUP BY u_id
+          `)
+        : Promise.resolve({ rows: [] }),
+    ]);
+
+    type BbBreakdownRow = {
+      u_id: string;
+      bikerBikerBrand: number; bikerClubBrand: number; zavarrinaClubBrand: number;
+      bikerBikerTypeStyle: number; bikerZavarrinaTypeStyle: number;
+      bikerBikerDistance: number; bikerZavarrinaDistance: number;
+      bikerBikerMusic: number; bikerZavarrinaMusic: number;
+      bikerBikerLeanAngle: number; bikerBikerRouteTypeZone: number; bikerZavarrinaRouteTypeZone: number;
+      bikerBikerAvgSpeed: number; bikerBikerAvgDuration: number; bikerBikerDayTime: number; bikerBikerEvents: number;
+    };
+    type BzBreakdownRow = { u_id: string; bikerZavorrinaBrand: number };
+
+    const bbBreakdownMap = new Map<string, BbBreakdownRow>();
+    for (const r of bbBreakdownResult.rows as BbBreakdownRow[]) bbBreakdownMap.set(r.u_id, r);
+
+    const bzBreakdownMap = new Map<string, BzBreakdownRow>();
+    for (const r of bzBreakdownResult.rows as BzBreakdownRow[]) bzBreakdownMap.set(r.u_id, r);
+
     const mappedUsers = rawUsers.map((row) => {
       const bbMatches = parseInt(row.bb_count || "0", 10);
       const bzMatches = parseInt(row.bz_count || "0", 10);
+
+      const bb = bbBreakdownMap.get(row.id);
+      const bz = bzBreakdownMap.get(row.id);
+
+      const matchCounts: Record<string, number> = {
+        bikerBikerBrand:           bb?.bikerBikerBrand           ?? 0,
+        bikerZavorrinaBrand:       bz?.bikerZavorrinaBrand       ?? 0,
+        bikerClubBrand:            bb?.bikerClubBrand            ?? 0,
+        zavarrinaClubBrand:        bb?.zavarrinaClubBrand        ?? 0,
+        bikerBikerTypeStyle:       bb?.bikerBikerTypeStyle       ?? 0,
+        bikerZavarrinaTypeStyle:   bb?.bikerZavarrinaTypeStyle   ?? 0,
+        bikerBikerDistance:        bb?.bikerBikerDistance        ?? 0,
+        bikerZavarrinaDistance:    bb?.bikerZavarrinaDistance    ?? 0,
+        bikerBikerMusic:           bb?.bikerBikerMusic           ?? 0,
+        bikerZavarrinaMusic:       bb?.bikerZavarrinaMusic       ?? 0,
+        bikerBikerLeanAngle:       bb?.bikerBikerLeanAngle       ?? 0,
+        bikerBikerRouteTypeZone:   bb?.bikerBikerRouteTypeZone   ?? 0,
+        bikerZavarrinaRouteTypeZone: bb?.bikerZavarrinaRouteTypeZone ?? 0,
+        bikerBikerAvgSpeed:        bb?.bikerBikerAvgSpeed        ?? 0,
+        bikerBikerAvgDuration:     bb?.bikerBikerAvgDuration     ?? 0,
+        bikerBikerDayTime:         bb?.bikerBikerDayTime         ?? 0,
+        bikerBikerEvents:          bb?.bikerBikerEvents          ?? 0,
+      };
+
       return {
         id: row.id,
         nickname: row.nickname,
@@ -454,7 +547,7 @@ router.get("/match-summary", async (req: Request, res: Response) => {
         bbMatches,
         bzMatches,
         totalMatches: bbMatches + bzMatches,
-        matchCounts: {} as Record<string, number>,
+        matchCounts,
         criticalGaps: computeCriticalGaps(row),
       };
     });
