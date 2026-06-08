@@ -391,54 +391,30 @@ instructions=false" | python3 -m json.tool | grep -E '"distance"|"time"'
 
 Testa 3-4 percorsi in zone curvy note (Dolomiti, Prealpi Venete). **Solo se i risultati sono soddisfacenti**, procedi allo Step 2.
 
-### 5.2 Step 2 — Download Europa completa + Nord Africa
+### 5.2 Step 2 — Download dataset per regione
 
-> **Attenzione:** l'Europa completa è ~30 GB. Con una banda a 1 Gbps (Hetzner) scarica in ~4-5 minuti. Con banda limitata può richiedere ore. Usa `screen` per non perdere il download se la connessione SSH cade.
+> **Nota:** BikerLink usa 7 regioni GraphHopper separate (grecia, balcani, est-europa, iberia, arco-alpino, germania-centro, francia-benelux). Lo script `download-regions.sh` scarica i PBF corretti per ogni regione.
 
 ```bash
-# Apri sessione screen persistente
-screen -S osm-download
+cd infra/self-host
 
-cd /opt/graphhopper/data
+# Scarica tutti i PBF per-regione in ./data (idempotente, riprende se interrotto)
+bash download-regions.sh
 
-# Europa completa (~30 GB)
-wget --progress=dot:giga \
-  https://download.geofabrik.de/europe-latest.osm.pbf
-
-# Nord Africa — Paesi rilevanti per BikerLink
-wget --progress=dot:giga \
-  https://download.geofabrik.de/africa/morocco-latest.osm.pbf
-wget --progress=dot:giga \
-  https://download.geofabrik.de/africa/algeria-latest.osm.pbf
-wget --progress=dot:giga \
-  https://download.geofabrik.de/africa/tunisia-latest.osm.pbf
-wget --progress=dot:giga \
-  https://download.geofabrik.de/africa/egypt-latest.osm.pbf
-
-# Puoi staccarti dalla sessione screen: Ctrl+A poi D
-# Torni con: screen -r osm-download
+# Verifica i file scaricati
+ls -lh data/*.osm.pbf
 ```
 
-### 5.3 Merge dei dataset con osmium-tool
+### 5.3 Build tile per regione
+
+Ogni container GraphHopper legge il proprio PBF dalla cartella `./data`. Al primo avvio il build avviene automaticamente. Per forzare un rebuild:
 
 ```bash
-# Verifica che tutti i file siano presenti
-ls -lh /opt/graphhopper/data/*.osm.pbf
+# Rebuild di una singola regione (es. arco-alpino)
+docker compose restart graphhopper-arco-alpino
 
-# Merge in un unico file (richiede RAM proporzionale alla dimensione)
-# ~1-2 ore per l'operazione su CPX41
-osmium merge \
-  /opt/graphhopper/data/europe-latest.osm.pbf \
-  /opt/graphhopper/data/morocco-latest.osm.pbf \
-  /opt/graphhopper/data/algeria-latest.osm.pbf \
-  /opt/graphhopper/data/tunisia-latest.osm.pbf \
-  /opt/graphhopper/data/egypt-latest.osm.pbf \
-  -o /opt/graphhopper/data/full-coverage.osm.pbf \
-  --progress
-
-# Verifica output
-ls -lh /opt/graphhopper/data/full-coverage.osm.pbf
-# Atteso: ~34 GB
+# Verifica stato
+docker compose logs -f graphhopper-arco-alpino
 ```
 
 ### 5.4 Import completo (processo lungo — usare screen o tmux)

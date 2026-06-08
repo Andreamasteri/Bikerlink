@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
 # =============================================================================
 # BikerLink — build-valhalla-tiles.sh
-# Builda (o ricostruisce) i tile Valhalla a partire dal PBF unificato in ./data,
+# Builda (o ricostruisce) i tile Valhalla a partire dai PBF per-regione in ./data,
 # mostrando i log in tempo reale e verificando lo stato del server al termine.
 #
 # Cosa fa:
-#   1. Verifica i prerequisiti (Docker + plugin compose, curl, osmium).
-#   2. Se il PBF unificato manca, lancia download-osm.sh (download + merge).
+#   1. Verifica i prerequisiti (Docker + plugin compose, curl).
+#   2. Verifica che almeno un .osm.pbf sia presente in DATA_DIR.
+#      Se mancano, suggerisce di eseguire download-regions.sh prima.
 #   3. Avvia il container Valhalla con force_rebuild=True (rigenera i tile).
 #   4. Segue i log in tempo reale finché /status non risponde (timeout 3h).
 #   5. Verifica GET http://localhost:8002/status e stampa version + tile date.
@@ -16,8 +17,8 @@
 #   ./build-valhalla-tiles.sh
 #   DATA_DIR=/mnt/osm ./build-valhalla-tiles.sh
 #
-# NOTA: il build dei tile per l'Europa può richiedere fino a 3h e molta RAM.
-#       Se il PBF manca, il download iniziale (Europa + Ecuador) aggiunge ~2h.
+# NOTA: il build dei tile può richiedere fino a 3h e molta RAM.
+#       Se i PBF mancano, esegui prima: bash download-regions.sh
 # =============================================================================
 set -euo pipefail
 
@@ -26,7 +27,6 @@ cd "$SCRIPT_DIR"
 
 DATA_DIR="${DATA_DIR:-${SCRIPT_DIR}/data}"
 ENV_FILE="${SCRIPT_DIR}/.env"
-MERGED_PBF="${DATA_DIR}/europe-ecuador-merged.osm.pbf"
 
 VALHALLA_PORT="${VALHALLA_PORT:-8002}"
 STATUS_URL="http://localhost:${VALHALLA_PORT}/status"
@@ -45,25 +45,23 @@ COMPOSE="$DOCKER compose"
 [[ -f "$ENV_FILE" ]] && COMPOSE="$DOCKER compose --env-file $ENV_FILE"
 
 # ── Prerequisiti ──────────────────────────────────────────────────────────────
-command -v curl   >/dev/null 2>&1 || die "curl non installato (sudo apt install -y curl)"
-command -v osmium >/dev/null 2>&1 || die "osmium non installato (sudo apt install -y osmium-tool) — serve a download-osm.sh per il merge PBF."
+command -v curl >/dev/null 2>&1 || die "curl non installato (sudo apt install -y curl)"
 $DOCKER compose version >/dev/null 2>&1 || die "Docker Compose plugin non disponibile. Installa con: sudo apt install -y docker-compose-plugin"
 
-# PBF mancante → scaricalo (Europa + Ecuador + merge) via download-osm.sh.
-if [[ ! -f "$MERGED_PBF" ]]; then
-  log "[PBF] ${MERGED_PBF} non trovato — avvio download-osm.sh (download + merge, può richiedere ore)..."
-  DOWNLOAD_SCRIPT="${SCRIPT_DIR}/download-osm.sh"
-  [[ -f "$DOWNLOAD_SCRIPT" ]] || die "download-osm.sh non trovato in ${SCRIPT_DIR}/ — impossibile scaricare i PBF automaticamente."
-  chmod +x "$DOWNLOAD_SCRIPT"
-  DATA_DIR="$DATA_DIR" "$DOWNLOAD_SCRIPT"
-  [[ -f "$MERGED_PBF" ]] || die "download-osm.sh terminato ma ${MERGED_PBF} non risulta presente — controlla gli errori sopra."
+# PBF mancanti → segnala e interrompi (il download è responsabilità di download-regions.sh).
+mapfile -t PBF_FILES < <(find "$DATA_DIR" -maxdepth 1 -name '*.osm.pbf' 2>/dev/null | sort)
+if [[ ${#PBF_FILES[@]} -eq 0 ]]; then
+  die "Nessun .osm.pbf trovato in ${DATA_DIR}/. Esegui prima: bash download-regions.sh"
 fi
 
 echo "============================================================"
 echo " BikerLink — Build tile Valhalla"
-echo " PBF sorgente : ${MERGED_PBF} ($(du -h "$MERGED_PBF" | cut -f1))"
+echo " PBF in ${DATA_DIR}/:"
+for pbf in "${PBF_FILES[@]}"; do
+  echo "   $(basename "$pbf")  ($(du -h "$pbf" | cut -f1))"
+done
 echo " Status URL   : ${STATUS_URL}"
-echo " Timeout build: $((BUILD_TIMEOUT_SECS / 3600))h ($(($BUILD_TIMEOUT_SECS))s)"
+echo " Timeout build: $((BUILD_TIMEOUT_SECS / 3600))h (${BUILD_TIMEOUT_SECS}s)"
 echo "============================================================"
 
 # ── 1. Avvio con force_rebuild=True ──────────────────────────────────────────
