@@ -144,7 +144,7 @@ async function checkOllama() {
     token ? `Presente (${token.length} char)` : "Non configurata");
 
   record("Ollama", "OLLAMA_MODEL", "optional", !!model, null,
-    model ? `Configurato: ${model}` : "Non configurato (default: llama3.2:latest)");
+    model ? `Configurato: ${model}` : "Non configurato (default: llama3.1:8b)");
 
   if (!url) return;
 

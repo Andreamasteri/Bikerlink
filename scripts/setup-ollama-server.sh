@@ -24,8 +24,8 @@
 #                          se l'auto-detect via Tailscale non funziona.
 #   NGINX_CONF=<path>      Forza il file nginx da modificare
 #                          (default: auto-detect, fallback /etc/nginx/sites-enabled/default).
-#   CHAT_MODEL=<modello>   Modello chat/parsing (default: llama3.2:latest).
-#   TRANSLATE_MODEL=<mod>  Modello traduzioni (default: mistral:latest).
+#   CHAT_MODEL=<modello>   Modello chat/parsing (default: llama3.1:8b).
+#   TRANSLATE_MODEL=<mod>  Modello traduzioni (default: mistral-nemo:latest).
 #   SKIP_MODELS=1          Salta il download dei modelli (solo install + nginx).
 # =============================================================================
 
@@ -34,14 +34,20 @@ set -euo pipefail
 # ── Configurazione (override via env) ────────────────────────────────────────
 # NOTA SUI MODELLI:
 #   - CHAT_MODEL viene usato da BikerLink per chat/parsing comandi (OLLAMA_MODEL).
-#     llama3.2 nella variante ~3B/8B è un ottimo compromesso qualità/velocità su
-#     CPU. Per sostituirlo in futuro basta esportare CHAT_MODEL=<nuovo> e
-#     rieseguire questo script, poi aggiornare il secret OLLAMA_MODEL su Replit.
-#   - TRANSLATE_MODEL è il modello multilingue per le traduzioni. mistral copre
-#     bene le lingue europee. Alternative valide: qwen2.5, gemma2.
+#     llama3.1:8b offre qualità superiore e tool calling più affidabile rispetto
+#     a llama3.2 mantenendo un buon compromesso qualità/velocità su CPU (~5GB RAM).
+#     Per sostituirlo in futuro basta esportare CHAT_MODEL=<nuovo> e rieseguire
+#     questo script, poi aggiornare il secret OLLAMA_MODEL su Replit.
+#   - TRANSLATE_MODEL è il modello multilingue per le traduzioni. mistral-nemo
+#     (12B) è nettamente superiore nel multilingue rispetto a mistral 7B, ma
+#     richiede ~8GB RAM (vs ~4GB). Alternative valide: qwen2.5, gemma2.
 #   Verifica i modelli correnti consigliati su: https://ollama.com/library
-CHAT_MODEL="${CHAT_MODEL:-llama3.2:latest}"
-TRANSLATE_MODEL="${TRANSLATE_MODEL:-mistral:latest}"
+#
+# AGGIORNAMENTI (idempotente): rieseguendo questo script lo step di install
+# (curl ... install.sh | sh) aggiorna SEMPRE il runtime Ollama all'ultima
+# versione stabile, e i pull aggiornano i modelli se la tag :latest è cambiata.
+CHAT_MODEL="${CHAT_MODEL:-llama3.1:8b}"
+TRANSLATE_MODEL="${TRANSLATE_MODEL:-mistral-nemo:latest}"
 OLLAMA_PORT="11434"
 OLLAMA_HOST_BIND="127.0.0.1:${OLLAMA_PORT}"
 NGINX_SNIPPET="/etc/nginx/snippets/bikerlink-ollama.conf"
@@ -186,11 +192,11 @@ else
   MODELFILE_PATH="${MODELFILE_DIR}/BikerLink.Modelfile"
   if [[ -f "$MODELFILE_PATH" ]]; then
     log "  → Creazione modello custom bikerlink da BikerLink.Modelfile..."
-    # Il Modelfile usa FROM llama3.2:latest (già scaricato sopra)
+    # Il Modelfile usa FROM llama3.1:8b (già scaricato sopra)
     if ollama create bikerlink -f "$MODELFILE_PATH"; then
       ok "  Modello custom 'bikerlink' creato con successo."
       # Imposta OLLAMA_MODEL=bikerlink su Replit solo se non già configurato
-      if [[ "${OLLAMA_MODEL:-}" == "" || "${OLLAMA_MODEL:-}" == "llama3.2:latest" ]]; then
+      if [[ "${OLLAMA_MODEL:-}" == "" || "${OLLAMA_MODEL:-}" == "llama3.2:latest" || "${OLLAMA_MODEL:-}" == "llama3.1:8b" ]]; then
         warn "  Ricordati di impostare OLLAMA_MODEL=bikerlink nelle variabili Replit."
       fi
     else

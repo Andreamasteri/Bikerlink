@@ -219,7 +219,7 @@ systemctl cat ollama | grep -A5 "drop-in"
 | Latenza routing P50 | ~120 ms | ~80 ms | Governor + ZGC |
 | Latenza routing P99 | ~800 ms | ~400 ms | ZGC elimina pause GC lunghe |
 | Primo token Ollama | ~800 ms | ~500 ms | Governor + Flash Attention |
-| Token/s (Mistral 7B) | ~12–15 | ~18–22 | Flash Attention + threads |
+| Token/s (Mistral-Nemo 12B) | ~8–11 | ~13–16 | Flash Attention + threads (12B più lento del 7B) |
 | Spike swap (sotto carico) | frequenti | rari | swappiness=5 |
 | Stall I/O write-back | visibili | ridotti | dirty_ratio tuning |
 

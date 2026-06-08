@@ -35,7 +35,7 @@
 | `ANTHROPIC_API_KEY` | No (opzionale) | ❌ No | — | OpenAI/Gemini | Claude; sistema funziona senza |
 | `OLLAMA_URL` | No (opzionale) | ✅ Sì | ⚠️ 403 Forbidden | OpenAI/Gemini | Server self-hosted risponde 403 — token o endpoint cambiato |
 | `OLLAMA_TOKEN` | No | ✅ Sì | ⚠️ Vedi OLLAMA_URL | — | Usato come header `X-Ollama-Token` |
-| `OLLAMA_MODEL` | No | ✅ Sì | — | — | Es. `llama3.2:latest` |
+| `OLLAMA_MODEL` | No | ✅ Sì | — | — | Es. `llama3.1:8b` |
 | `COORDINATOR_DISABLED` | No (flag) | ❌ No | — | — | Assenza = coordinator abilitato (comportamento corretto) |
 
 ---

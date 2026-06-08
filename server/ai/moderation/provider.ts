@@ -286,7 +286,7 @@ function tryBuild(id: AiProviderId, role: ModelRole, forcedModelId?: string): Re
 function tryBuildOllama(): ResolvedModel | null {
   if (!isOllamaConfigured) return null;
   try {
-    const modelId = process.env.OLLAMA_MODEL ?? "llama3.2:latest";
+    const modelId = process.env.OLLAMA_MODEL ?? "llama3.1:8b";
     const model = getOllamaModel(modelId) as unknown as LanguageModelV2;
     return {
       id: "ollama",

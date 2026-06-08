@@ -500,7 +500,7 @@ Client condiviso: `server/lib/ollama-client.ts` — `isOllamaConfigured`, `getOl
 Variabili d'ambiente (tutte **opzionali** — segue il pattern URL/token-from-env di GraphHopper):
 - `OLLAMA_URL` — URL base del server Ollama self-hosted. **Se non impostata, Ollama è disabilitato e i flussi usano direttamente il cloud (zero breaking changes).**
 - `OLLAMA_TOKEN` — token opzionale inviato come header `X-Ollama-Token`.
-- `OLLAMA_MODEL` — modello da usare (default `llama3.2:latest`).
+- `OLLAMA_MODEL` — modello da usare (default `llama3.1:8b`).
 
 ### Nominatim self-hosted (geocoding)
 

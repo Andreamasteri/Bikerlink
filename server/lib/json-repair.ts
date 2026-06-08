@@ -2,7 +2,7 @@
  * JSON Repair — Task #3017
  *
  * Tenta di correggere JSON leggermente malformato prodotto da LLM locali
- * (llama3.2, ecc.) prima di propagare l'errore di parsing al chiamante.
+ * (llama3.1, ecc.) prima di propagare l'errore di parsing al chiamante.
  *
  * Casi gestiti:
  *  - Blocchi ```json ... ``` attorno al payload

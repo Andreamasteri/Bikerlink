@@ -378,7 +378,7 @@ Behaviour:
   - Glossary: scripts/i18n-glossary.json
 
 Required env: at least one of OLLAMA_URL (primary) or OPENAI_API_KEY (fallback).
-Optional: OLLAMA_TOKEN, OLLAMA_MODEL (default llama3.2:latest).
+Optional: OLLAMA_TOKEN, OLLAMA_MODEL (default llama3.1:8b).
 `);
 }
 
@@ -393,7 +393,7 @@ async function main() {
     process.exit(1);
   }
   if (ollamaConfigured) {
-    console.log(`[i18n] Provider primario: Ollama (${process.env.OLLAMA_MODEL ?? "llama3.2:latest"})${apiKey ? " — fallback OpenAI" : " — nessun fallback OpenAI (OPENAI_API_KEY mancante)"}`);
+    console.log(`[i18n] Provider primario: Ollama (${process.env.OLLAMA_MODEL ?? "llama3.1:8b"})${apiKey ? " — fallback OpenAI" : " — nessun fallback OpenAI (OPENAI_API_KEY mancante)"}`);
   }
 
   const itPath = path.join(I18N_DIR, `${SOURCE_LANG}.ts`);
