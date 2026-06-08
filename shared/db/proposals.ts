@@ -158,6 +158,7 @@ export const proposalProfileMatches = pgTable("proposal_profile_matches", {
   notificationPriority: varchar("notification_priority", { length: 10 }).notNull().default("normal"),
   notifiedAt: timestamp("notified_at"),
   archivedAt: timestamp("archived_at"),
+  resetCount: integer("reset_count").notNull().default(0),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (table) => [
   index("ppm_biker_id_idx").on(table.bikerId),

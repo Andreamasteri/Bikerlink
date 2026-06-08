@@ -387,7 +387,8 @@ export class MatchingStorage extends ContestStorage {
           archived_at           = NULL,
           notified_at           = NULL,
           distance_km           = EXCLUDED.distance_km,
-          notification_priority = EXCLUDED.notification_priority
+          notification_priority = EXCLUDED.notification_priority,
+          reset_count           = proposal_profile_matches.reset_count + 1
         WHERE proposal_profile_matches.status = 'accepted'
            OR proposal_profile_matches.archived_at IS NOT NULL
         RETURNING *`);
@@ -403,6 +404,7 @@ export class MatchingStorage extends ContestStorage {
         notificationPriority: row.notification_priority as string,
         notifiedAt: row.notified_at as Date | null,
         archivedAt: row.archived_at as Date | null,
+        resetCount: (row.reset_count as number | null) ?? 0,
         createdAt: row.created_at as Date,
       };
     } catch (err: unknown) {

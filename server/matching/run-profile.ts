@@ -99,35 +99,44 @@ export async function runProposalToProfileMatching(
         if (created) {
           existingKeys.add(key);
           matchCount++;
-          try {
-            const title = it["push.proposalMatch.title"] ?? "Hai un nuovo match proposta! 🔥";
-            const body = it["push.proposalMatch.body"] ?? "Una proposta compatibile è stata trovata per il tuo viaggio.";
-            await storage.createNotification({
-              userId: proposal.userId,
-              title,
-              body,
-              notificationType: "proposal_match",
-              referenceType: "proposal_profile_match",
-              referenceId: created.id
+          // Suppress re-notification for matches restored more than once after
+          // admin deletion (resetCount > 1). resetCount=0 → first creation (always
+          // notify); resetCount=1 → first restore after deletion (1 re-notify
+          // allowed); resetCount>1 → already re-notified at least once, suppress.
+          const shouldNotify = (created.resetCount ?? 0) <= 1;
+          if (shouldNotify) {
+            try {
+              const title = it["push.proposalMatch.title"] ?? "Hai un nuovo match proposta! 🔥";
+              const body = it["push.proposalMatch.body"] ?? "Una proposta compatibile è stata trovata per il tuo viaggio.";
+              await storage.createNotification({
+                userId: proposal.userId,
+                title,
+                body,
+                notificationType: "proposal_match",
+                referenceType: "proposal_profile_match",
+                referenceId: created.id
+              });
+              await storage.createNotification({
+                userId: zav.userId,
+                title,
+                body,
+                notificationType: "proposal_match",
+                referenceType: "proposal_profile_match",
+                referenceId: created.id
+              });
+            } catch (notifErr) {
+              console.error("[ProposalProfileMatching] Error sending notifications:", notifErr);
+            }
+            await dispatchMatchNotification({
+              table: "proposal_profile_matches",
+              matchId: created.id,
+              userIds: [proposal.userId, zav.userId],
+              priority: classifyMatch({ isFreshProposal: true, distanceKm: distKm }),
+              distanceKm: distKm,
             });
-            await storage.createNotification({
-              userId: zav.userId,
-              title,
-              body,
-              notificationType: "proposal_match",
-              referenceType: "proposal_profile_match",
-              referenceId: created.id
-            });
-          } catch (notifErr) {
-            console.error("[ProposalProfileMatching] Error sending notifications:", notifErr);
+          } else {
+            console.log(`[ProposalProfileMatching] Notifica soppressa per match ripristinato (resetCount=${created.resetCount}): proposalId=${proposal.id} zavarrinaId=${zav.userId}`);
           }
-          await dispatchMatchNotification({
-            table: "proposal_profile_matches",
-            matchId: created.id,
-            userIds: [proposal.userId, zav.userId],
-            priority: classifyMatch({ isFreshProposal: true, distanceKm: distKm }),
-            distanceKm: distKm,
-          });
         }
       }
     }
