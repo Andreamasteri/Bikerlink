@@ -3,8 +3,15 @@ export const OTA_BUNDLED_COUNT = 0;
 export const RUNTIME_VERSION = "10.0.0";
 
 /**
- * Numero dell'ultimo OTA interno applicato su questo dispositivo.
+ * Contatore GLOBALE SEQUENZIALE degli OTA applicati — conta tutte le OTA di tutti
+ * i cicli APK mai pubblicati (attualmente: 85).
+ *
+ * ⚠️  NON è il numero dell'OTA nel ciclo APK corrente.
+ *     Per sapere quale numero OTA pubblicare nel ciclo corrente,
+ *     leggi il versionName corrente da app.json (es. "55.10.10" → prossima OTA = OTA-11).
+ *     Vedi: .agents/skills/bikerlink-ota-publish/SKILL.md → sezione "Contesto fisso".
+ *
  * Valore null = nessun OTA applicato (installazione fresca o sistema OTA non attivo).
- * Aggiornare questo valore ad ogni OTA applicato tramite il sistema staged rollout.
+ * Aggiornare questo valore ad ogni OTA pubblicata (sempre +1 rispetto al precedente).
  */
 export const APPLIED_OTA_NUMBER: number | null = 85;

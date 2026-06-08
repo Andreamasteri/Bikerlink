@@ -29,8 +29,9 @@ Attivare questa skill quando l'utente dice una delle seguenti (o varianti):
 | `versionCode` APK | **55** |
 | `versionName` | **55.10.10** |
 | `runtimeVersion` | **10.0.0** |
+| Ultima OTA nel ciclo v55 | **OTA-10** → la prossima sarà **OTA-11** |
 
-> ⚠️ Aggiornare questa tabella ad ogni nuovo APK, in lockstep con la tabella storica in `bikerlink-versioning/SKILL.md`.
+> ⚠️ Aggiornare questa tabella ad ogni nuovo APK (e dopo ogni OTA pubblicata), in lockstep con la tabella storica in `bikerlink-versioning/SKILL.md`.
 > I valori correnti sono sempre la fonte di verità: `node -e "const a=require('./app.json'); console.log(a.expo.android.versionCode, a.expo.runtimeVersion, a.expo.version)"`
 
 ---
@@ -55,18 +56,39 @@ Lo script `scripts/publish-ota.sh` interroga l'API GraphQL di EAS per determinar
 
 ### 1. Determina il numero OTA corretto
 
-Leggi `constants/buildInfo.ts` e trova il valore attuale di `APPLIED_OTA_NUMBER`. Il prossimo OTA è `APPLIED_OTA_NUMBER + 1`.
+> ⚠️ **ATTENZIONE — Due contatori distinti, significati diversi:**
+>
+> | Contatore | Dove | Significato | Usa per |
+> |-----------|------|-------------|---------|
+> | `APPLIED_OTA_NUMBER` in `constants/buildInfo.ts` | Contatore **globale sequenziale** — conta tutte le OTA di tutti i cicli APK mai pubblicati (es. 85) | Solo aggiornamento di `constants/buildInfo.ts` |
+> | OTA nel ciclo APK corrente | Il numero centrale di `versionName` (es. `55.`**10**`.10`) — ricomincia da 1 ad ogni nuovo APK | Messaggio `--message`, `versionName`, e comunicazione all'utente |
+>
+> **NON usare `APPLIED_OTA_NUMBER` come numero OTA da pubblicare.** Se `APPLIED_OTA_NUMBER = 85` e siamo al ciclo v55 con OTA-10 come ultima, la prossima è **OTA-11** (non OTA-86).
+
+**Come trovare il numero OTA corretto nel ciclo:**
+
+Guarda la tabella "Contesto fisso" in questa skill (sezione sopra) → campo "Ultima OTA nel ciclo". In alternativa, leggi il `versionName` corrente da `app.json`:
+
+```bash
+node -e "const a=require('./app.json'); const v=a.expo.version.split('.'); console.log('Ultima OTA nel ciclo:', v[1], '→ prossima: OTA-' + (parseInt(v[1])+1))"
+```
+
+**Poi aggiorna `APPLIED_OTA_NUMBER`** (contatore globale, sempre +1 rispetto al precedente):
 
 ```bash
 grep APPLIED_OTA_NUMBER constants/buildInfo.ts
 ```
 
-### 2. Aggiorna `APPLIED_OTA_NUMBER` nel file
+### 2. Aggiorna i due contatori
+
+**a) Contatore globale** (`constants/buildInfo.ts`) — incrementa sempre di 1:
 
 ```ts
 // constants/buildInfo.ts
-export const APPLIED_OTA_NUMBER: number | null = <NEXT_OTA>;
+export const APPLIED_OTA_NUMBER: number | null = <APPLIED_OTA_NUMBER_PRECEDENTE + 1>;
 ```
+
+**b) Aggiorna "Contesto fisso"** in questa skill — cambia "Ultima OTA nel ciclo" con il numero appena pubblicato.
 
 ### 3. Esegui `eas update` direttamente (solo Android)
 

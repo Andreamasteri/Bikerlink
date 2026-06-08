@@ -43,6 +43,17 @@ Le OTA pubblicate durante il ciclo 10.x avranno versione `48.<updateNumber>.10`:
 - OTA-2 → `48.2.10`
 - OTA-3 → `48.3.10`
 
+### ⚠️ Due contatori OTA — non confonderli
+
+Nel codebase esistono **due numerazioni OTA con significati completamente diversi**:
+
+| Contatore | File | Valore tipico | Significato |
+|-----------|------|---------------|-------------|
+| `APPLIED_OTA_NUMBER` | `constants/buildInfo.ts` | es. 85 | **Globale sequenziale** — conta tutte le OTA di tutti i cicli APK mai pubblicati. Usato solo internamente per tracciare l'aggiornamento sul dispositivo. |
+| OTA nel ciclo corrente | `versionName` (posizione centrale) | es. 10 in `55.10.10` | **Per-ciclo** — ricomincia da 1 ad ogni nuovo APK. È il numero che appare nel messaggio OTA, nel `versionName`, e nella comunicazione all'utente. |
+
+**Regola pratica**: per sapere quale OTA pubblicare, leggi il `versionName` corrente da `app.json` e incrementa il numero centrale. **Non usare `APPLIED_OTA_NUMBER`** come numero OTA da comunicare — porta a numeri errati (es. OTA-86 invece di OTA-11).
+
 ---
 
 ## Consistenza tra file (CRITICO — bare workflow)
