@@ -731,6 +731,9 @@ const I18N = {
     "docs.copyLink": "Copia Link",
     "docs.copied": "Copiato!",
     "docs.notAvailable": "Non ancora disponibile",
+    "docs.uploadPdf": "Carica PDF",
+    "docs.uploadSuccess": "Documento caricato con successo",
+    "docs.uploadError": "Errore durante il caricamento",
     "admin.title": "Gestione Media",
     "admin.add": "Aggiungi Risorsa",
     "admin.type": "Tipo",
@@ -828,6 +831,9 @@ const I18N = {
     "docs.copyLink": "Copy Link",
     "docs.copied": "Copied!",
     "docs.notAvailable": "Not yet available",
+    "docs.uploadPdf": "Upload PDF",
+    "docs.uploadSuccess": "Document uploaded successfully",
+    "docs.uploadError": "Upload failed",
     "admin.title": "Media Management",
     "admin.add": "Add Resource",
     "admin.type": "Type",
@@ -1519,16 +1525,18 @@ async function renderDocs() {
     fetch('/assets/competitor-analysis.pdf', { method: 'HEAD' }).then(r => r.ok).catch(() => false),
   ]);
 
-  function docCard({ icon, titleKey, descKey, viewUrl, downloadUrl, downloadName, slug, available }) {
+  function docCard({ icon, titleKey, descKey, viewUrl, downloadUrl, downloadName, slug, available, uploadEndpoint }) {
     const shareUrl = `${location.origin}${viewUrl}`;
     if (!available) {
+      const isAdmin = currentUser && currentUser.role === 'admin';
       return `
-        <div class="doc-card" style="opacity:0.55">
+        <div class="doc-card" style="opacity:${isAdmin ? '0.75' : '0.55'}">
           <div class="doc-card-icon">${icon}</div>
           <div class="doc-card-title">${t(titleKey)}</div>
           <div class="doc-card-desc">${t(descKey)}</div>
           <div class="doc-card-actions">
             <span style="font-size:12px;color:var(--text3);font-style:italic">— ${t('docs.notAvailable')} —</span>
+            ${isAdmin && uploadEndpoint ? `<button class="btn btn-outline btn-sm" id="upload-btn-${slug}" onclick="uploadDocPdf('${uploadEndpoint}', 'upload-btn-${slug}')">📤 ${t('docs.uploadPdf')}</button>` : ''}
           </div>
         </div>`;
     }
@@ -1575,6 +1583,7 @@ async function renderDocs() {
           downloadName: 'BikerLink-EULA.pdf',
           slug: 'eula',
           available: eulaInfo.available,
+          uploadEndpoint: '/api/admin/eula/upload',
         })}
         ${docCard({
           icon: '🔒',
@@ -1585,6 +1594,7 @@ async function renderDocs() {
           downloadName: 'BikerLink-PrivacyPolicy.pdf',
           slug: 'privacy',
           available: privacyInfo.available,
+          uploadEndpoint: '/api/admin/privacy-policy/upload',
         })}
         ${docCard({
           icon: '📖',
@@ -1595,6 +1605,7 @@ async function renderDocs() {
           downloadName: 'BikerLink-Manual.pdf',
           slug: 'manual',
           available: manualInfo.available,
+          uploadEndpoint: '/api/admin/manual/upload',
         })}
         ${docCard({
           icon: '🏁',
@@ -1629,6 +1640,37 @@ function copyDocLink(url, btnId) {
     document.execCommand('copy');
     document.body.removeChild(inp);
   });
+}
+
+function uploadDocPdf(endpoint, btnId) {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = 'application/pdf';
+  input.style.display = 'none';
+  document.body.appendChild(input);
+  input.addEventListener('change', async () => {
+    const file = input.files && input.files[0];
+    document.body.removeChild(input);
+    if (!file) return;
+    const btn = document.getElementById(btnId);
+    if (btn) { btn.disabled = true; btn.textContent = '⏳ ' + t('admin.uploading'); }
+    try {
+      const form = new FormData();
+      form.append('file', file);
+      const res = await fetch(endpoint, { method: 'POST', body: form });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        alert(err.error || t('docs.uploadError'));
+        if (btn) { btn.disabled = false; btn.textContent = '📤 ' + t('docs.uploadPdf'); }
+        return;
+      }
+      await renderDocs();
+    } catch (e) {
+      alert(t('docs.uploadError'));
+      if (btn) { btn.disabled = false; btn.textContent = '📤 ' + t('docs.uploadPdf'); }
+    }
+  });
+  input.click();
 }
 
 function openVideo(url) {
