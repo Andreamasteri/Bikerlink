@@ -208,4 +208,22 @@ fi
 echo "════════════════════════════════════════"
 echo ""
 
+# ── GENERA PDF MATCHING POST-MERGE ───────────────────────────
+# Rigenera docs/matching-system.pdf (e la copia in server/public/)
+# da docs/matching-system.md dopo ogni merge, così la route
+# GET /api/exports/matching-system.pdf serve sempre la versione
+# aggiornata al codice senza richiedere un passo manuale.
+echo "════════════════════════════════════════"
+echo "  Generazione PDF matching system"
+echo "════════════════════════════════════════"
+PDF_EXIT=0
+node scripts/generate-matching-pdf.mjs 2>&1 || PDF_EXIT=$?
+if [ "$PDF_EXIT" -ne 0 ]; then
+  echo "⚠️  generate-matching-pdf.mjs ha restituito exit ${PDF_EXIT} — PDF potrebbe essere stale."
+else
+  echo "✅ PDF matching system aggiornato."
+fi
+echo "════════════════════════════════════════"
+echo ""
+
 exit 0
