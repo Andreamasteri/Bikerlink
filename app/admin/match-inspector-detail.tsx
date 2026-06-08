@@ -75,7 +75,7 @@ export default function MatchInspectorDetailScreen() {
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
   const [expandedTypes, setExpandedTypes] = useState<Set<string>>(new Set());
-  const [justDeleted, setJustDeleted] = useState(false);
+  const [deletedAt, setDeletedAt] = useState<string | null>(null);
   const [autoRecalc, setAutoRecalc] = useState(false);
 
   const queryKey = ["/api/admin/users", userId, "matches"];
@@ -102,7 +102,7 @@ export default function MatchInspectorDetailScreen() {
       return res.json();
     },
     onSuccess: (result) => {
-      setJustDeleted(false);
+      setDeletedAt(null);
       queryClient.invalidateQueries({ queryKey });
       Alert.alert(
         "Ricalcolo completato",
@@ -118,7 +118,7 @@ export default function MatchInspectorDetailScreen() {
       return res.json();
     },
     onSuccess: (result) => {
-      setJustDeleted(true);
+      setDeletedAt(result.lastDeletedAt ?? new Date().toISOString());
       queryClient.invalidateQueries({ queryKey });
       const total = result.deleted?.total ?? 0;
       const bb = result.deleted?.bikerBiker ?? 0;
@@ -183,7 +183,7 @@ export default function MatchInspectorDetailScreen() {
   }
 
   const { user, gpsRouteCount, matchesByType } = data;
-  const needsRecalculate = justDeleted && totalMatches === 0;
+  const needsRecalculate = !!deletedAt && totalMatches === 0;
 
   return (
     <ScrollView
@@ -195,6 +195,7 @@ export default function MatchInspectorDetailScreen() {
         gpsRouteCount={gpsRouteCount}
         totalMatches={totalMatches}
         needsRecalculate={needsRecalculate}
+        lastDeletedAt={deletedAt ?? undefined}
       />
 
       <View style={[styles.actionsRow, needsRecalculate && { marginTop: 12 }]}>

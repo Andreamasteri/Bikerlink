@@ -13,6 +13,18 @@ interface MatchUserCardProps {
   gpsRouteCount: number;
   totalMatches: number;
   needsRecalculate?: boolean;
+  lastDeletedAt?: string;
+}
+
+function formatDeletedAt(iso: string): string {
+  try {
+    const d = new Date(iso);
+    const date = d.toLocaleDateString("it-IT", { day: "2-digit", month: "2-digit", year: "numeric" });
+    const time = d.toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" });
+    return `eliminati il ${date} alle ${time}`;
+  } catch {
+    return "";
+  }
 }
 
 export const MatchUserCard: React.FC<MatchUserCardProps> = ({
@@ -20,6 +32,7 @@ export const MatchUserCard: React.FC<MatchUserCardProps> = ({
   gpsRouteCount,
   totalMatches,
   needsRecalculate,
+  lastDeletedAt,
 }) => {
   return (
     <View style={styles.wrapper}>
@@ -48,7 +61,12 @@ export const MatchUserCard: React.FC<MatchUserCardProps> = ({
       {needsRecalculate && (
         <View style={styles.recalcBanner}>
           <MaterialCommunityIcons name="alert-circle-outline" size={16} color={Colors.warning} />
-          <Text style={styles.recalcBannerText}>Nessun match — ricalcolo consigliato</Text>
+          <View style={styles.recalcBannerContent}>
+            <Text style={styles.recalcBannerText}>Nessun match — ricalcolo consigliato</Text>
+            {lastDeletedAt ? (
+              <Text style={styles.recalcBannerSub}>{formatDeletedAt(lastDeletedAt)}</Text>
+            ) : null}
+          </View>
         </View>
       )}
     </View>
@@ -103,10 +121,16 @@ const styles = StyleSheet.create({
     borderTopWidth: 0,
     borderColor: Colors.warning + "66",
   },
+  recalcBannerContent: { flex: 1, gap: 2 },
   recalcBannerText: {
     fontFamily: "Inter_600SemiBold",
     fontSize: 13,
     color: Colors.warning,
-    flex: 1,
+  },
+  recalcBannerSub: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 11,
+    color: Colors.warning,
+    opacity: 0.75,
   },
 });

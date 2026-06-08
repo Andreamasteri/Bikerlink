@@ -138,6 +138,7 @@ router.delete("/users/:userId/matches", async (req: Request, res: Response) => {
     console.log(`[admin/users/${userId}/matches] bb=${bbResult.length} bz=${bzResult.length} pp=${ppResult.length}`);
     return res.json({
       success: true,
+      lastDeletedAt: new Date().toISOString(),
       deleted: {
         bikerBiker: bbResult.length,
         bikerZavorrina: bzResult.length,
