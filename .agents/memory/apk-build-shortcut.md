@@ -26,10 +26,18 @@ Schema versioning: `<versionCode>.<ciclo_runtime>.<ota_inglobate>`
 Chiedi conferma all'utente prima di procedere con il bump.
 
 ### 3. Aggiorna app.json e build.gradle insieme
-- `app.json`: `expo.version` e `expo.android.versionCode`
-- `android/app/build.gradle`: `versionCode` e `versionName`
 
-I due file DEVONO essere allineati. Non aggiornare uno senza l'altro.
+In `app.json` ci sono DUE campi separati da aggiornare:
+1. `expo.version` → nuova stringa versione (es. `"56.10.88"`)
+2. `expo.android.versionCode` → nuovo intero (es. `56`)
+
+In `android/app/build.gradle`:
+3. `versionCode` → stesso intero (es. `56`)
+4. `versionName` → stessa stringa (es. `"56.10.88"`)
+
+⚠️ ERRORE COMUNE: aggiornare solo `expo.version` dimenticando `expo.android.versionCode` → il typecheck fallisce con "versionCode disallineato".
+
+Tutti e 4 i valori DEVONO essere allineati prima di lanciare la build.
 
 ### 4. Lancia la build EAS
 ```bash

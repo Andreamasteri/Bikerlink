@@ -44,8 +44,11 @@ Usare timeout 600000ms (10 minuti) per la bash tool.
 
 ## Versioning APK
 
-Schema: `<versionCode>.<ota_inglobate>.<ciclo_runtime>`
-- versionCode: intero incrementale (Play Store)
-- ota_inglobate: quante OTA sono state pubblicate nel ciclo precedente
+Schema: `<versionCode>.<ciclo_runtime>.<ota_inglobate>`
+- versionCode: intero incrementale
 - ciclo_runtime: primo numero di runtimeVersion (es. 10.0.0 → 10)
-Aggiornare sempre app.json E build.gradle insieme.
+- ota_inglobate: quante OTA sono state pubblicate nel ciclo corrente
+- Esempio corretto: 56.10.88 (versionCode=56, runtime=10, OTA=88)
+- ERRORE COMUNE: NON invertire ciclo_runtime e ota_inglobate → 56.88.10 è SBAGLIATO
+
+Aggiornare sempre app.json (ENTRAMBI i campi) E build.gradle insieme.
