@@ -6,6 +6,31 @@ import {
   conversations, 
   conversationParticipants 
 } from "@shared/db";
+import { existsSync } from "fs";
+import { resolve } from "path";
+import { execFile } from "child_process";
+
+export function ensureCompetitorAnalysisPdf(): void {
+  setImmediate(() => {
+    const pdfPath = resolve(process.cwd(), "server/public/assets/competitor-analysis.pdf");
+    const pngPath = resolve(process.cwd(), "server/public/assets/competitor-analysis.png");
+    if (!existsSync(pdfPath) || !existsSync(pngPath)) {
+      console.log("[INIT][BG] competitor-analysis.pdf/png mancante — avvio generazione...");
+      const scriptPath = resolve(process.cwd(), "scripts/generate-competitor-analysis.js");
+      execFile(process.execPath, [scriptPath], { timeout: 60_000 }, (err, stdout, stderr) => {
+        if (err) {
+          console.warn("[INIT][BG] generate-competitor-analysis: ERRORE —", err.message);
+          if (stderr) console.warn("[INIT][BG] generate-competitor-analysis stderr:", stderr.slice(0, 300));
+        } else {
+          console.log("[INIT][BG] generate-competitor-analysis: PDF/PNG generati correttamente.");
+          if (stdout) console.log("[INIT][BG] generate-competitor-analysis stdout:", stdout.trim().slice(0, 200));
+        }
+      });
+    } else {
+      console.log("[INIT][BG] competitor-analysis.pdf/png già presenti — generazione saltata.");
+    }
+  });
+}
 
 export async function initMissingClubConversations() {
   try {

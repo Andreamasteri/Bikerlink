@@ -638,12 +638,8 @@ const styles = StyleSheet.create({
     marginBottom: 14,
     backgroundColor: Colors.accent + "10",
   },
-  testAllBtnLoading: {
-    opacity: 0.6,
-  },
+  testAllBtnLoading: { opacity: 0.6 },
   testAllBtnText: {
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 14,
-    color: Colors.accent,
+    fontFamily: "Inter_600SemiBold", fontSize: 14, color: Colors.accent,
   },
 });
