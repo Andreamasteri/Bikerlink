@@ -9,6 +9,10 @@ Quando l'utente o i docs parlano di "ThinkCentre" (o "server di casa"), si rifer
 a un mini-PC **Lenovo ThinkCentre 910q** (i5-7500T, 32 GB RAM, Ubuntu) tenuto in casa
 dall'utente che ospita i servizi **self-hosted** dell'app.
 
+**IP interno LAN: `192.168.1.35`** — usare sempre questo indirizzo nei comandi bash/script
+che girano sulla rete locale (es. curl di test, ssh, probe diretti). NON usare localhost o
+altri indirizzi per raggiungere il ThinkCentre dalla LAN.
+
 **Servizio principale che ci gira: GraphHopper** (motore di routing self-hosted).
 
 Per i docs (`docs/*-server-setup.md`) sullo stesso ThinkCentre girano anche:
