@@ -29,3 +29,4 @@
 - [600-line ratchet gate](large-files-ratchet-gate.md) — gate post-merge per-file; conta split("\n") (=wc -l +1); un file oltre limite mergiato su main blocca OGNI merge successivo finché non lo splitti su main.
 - [AI routing engine selector](ai-routing-engine-selector.md) — dual-compare confidence-bassa DEVE usare engine grezzi (no routeViaValhallaWithFallback) o candidati identici falsano score+attribuzione; "ai" non è in supportedEngines.
 - [Nominatim setup — revisione post-GH](nominatim-post-gh-review.md) — setup-nominatim.sh va rivisto/verificato dopo che le 7 zone GraphHopper+Valhalla sono operative sul ThinkCentre.
+- [Ollama nginx Host header fix](ollama-nginx-host-header.md) — Ollama 0.24+ ritorna 403 se `Host≠localhost`; fix: `proxy_set_header Host "localhost"` + nginx su `192.168.1.35:443` (no conflitto Tailscale).
