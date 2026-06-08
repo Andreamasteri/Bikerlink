@@ -24,6 +24,7 @@ import { MatchCardStack } from "@/components/match/tabs/MatchCardStack";
 import { MatchFiltersPanel } from "@/components/match/tabs/MatchFiltersPanel";
 import { NegativeSuggestionsCard } from "@/components/match/tabs/NegativeSuggestionsCard";
 import { useRenderItem } from "@/components/match/useRenderItem";
+import { useMusicMatchFeature } from "@/components/match/useMusicMatchFeature";
 import { styles } from "@/components/match/match.styles";
 
 export default function MatchScreen() {
@@ -158,14 +159,10 @@ export default function MatchScreen() {
     enabled: !!user,
   });
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- music match shape
-  const { data: musicMatches, isLoading: musicLoading, refetch: musicRefetch, isRefetching: musicRefetching, error: musicError } = useQuery<any[]>({
-    queryKey: ["/api/match/music"],
-    enabled: !!user && activeTab === "music" && lastfmStatus?.connected === true,
-    refetchInterval: 60000,
+  const { musicMatches, musicLoading, musicRefetch, musicRefetching, isServerBusy, acceptMusicMutation, rejectMusicMutation } = useMusicMatchFeature({
+    activeTab,
+    lastfmConnected: lastfmStatus?.connected === true,
   });
-
-  const isServerBusy = musicError instanceof ServerBusyError;
 
   const acceptMutation = useMutation({
     mutationFn: (matchId: string) => apiRequest("POST", `/api/proposals/matches/${matchId}/accept`),
@@ -715,6 +712,8 @@ export default function MatchScreen() {
     freshIds,
     acceptMutation,
     rejectMutation,
+    acceptMusicMutation,
+    rejectMusicMutation,
     acceptGarageMutation,
     rejectGarageMutation,
     acceptBikerMutation,

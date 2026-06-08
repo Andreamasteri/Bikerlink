@@ -13,10 +13,11 @@ interface MusicMatchItem {
 }
 interface MusicMatchCardProps {
   item: MusicMatchItem;
-  onSendMessage: (userId: string) => void;
+  onAccept: (userId: string) => void;
+  onReject: (userId: string) => void;
 }
 
-export const MusicMatchCard: React.FC<MusicMatchCardProps> = ({ item, onSendMessage }) => {
+export const MusicMatchCard: React.FC<MusicMatchCardProps> = ({ item, onAccept, onReject }) => {
   const t = useT();
   const router = useRouter();
 
@@ -59,13 +60,21 @@ export const MusicMatchCard: React.FC<MusicMatchCardProps> = ({ item, onSendMess
         </View>
       )}
 
-      <TouchableOpacity
-        style={[styles.chatBtn, { marginTop: 12 }]}
-        onPress={() => otherUserId && onSendMessage(otherUserId)}
-      >
-        <Ionicons name="chatbubbles" size={18} color={Colors.background} />
-        <Text style={styles.chatBtnText}>{t("match.sendMessage")}</Text>
-      </TouchableOpacity>
+      <View style={styles.actionRow}>
+        <TouchableOpacity
+          style={[styles.rejectBtn]}
+          onPress={() => otherUserId && onReject(otherUserId)}
+        >
+          <Ionicons name="close" size={20} color={Colors.error} />
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.chatBtn, { flex: 1 }]}
+          onPress={() => otherUserId && onAccept(otherUserId)}
+        >
+          <Ionicons name="chatbubbles" size={18} color={Colors.background} />
+          <Text style={styles.chatBtnText}>{t("match.sendMessage")}</Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 };
@@ -96,6 +105,23 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_400Regular",
     color: Colors.textSecondary,
   },
+  actionRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginTop: 12,
+    marginBottom: 0,
+  },
+  rejectBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: Colors.error + "60",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: Colors.error + "12",
+  },
   chatBtn: {
     flexDirection: "row",
     alignItems: "center",
@@ -104,7 +130,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.accent,
     paddingVertical: 8,
     borderRadius: 10,
-    marginTop: 4,
+    marginTop: 0,
     marginBottom: 8,
   },
   chatBtnText: {

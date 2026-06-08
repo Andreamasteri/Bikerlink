@@ -41,7 +41,7 @@ import telemetryRoutes from "./routes/telemetry";
 import telemetryMapsRoutes from "./routes/telemetry-maps";
 import motoclubsRoutes from "./routes/motoclubs";
 import friendsRoutes from "./routes/friends";
-import { handleMusicMatch } from "./routes/music-match";
+import { handleMusicMatch, handleMusicMatchReject } from "./routes/music-match";
 import matchPreferencesRoutes from "./routes/match-preferences";
 import recapRoutes from "./routes/recap";
 import matchNegativePreferencesRoutes from "./routes/match-negative-preferences";
@@ -468,6 +468,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/match/music", (req: Request, res: Response) => {
     if (!req.session?.userId) return res.status(401).json({ message: "Non autenticato" });
     return handleMusicMatch(req, res);
+  });
+
+  app.post("/api/match/music/:targetUserId/reject", (req: Request, res: Response) => {
+    if (!req.session?.userId) return res.status(401).json({ message: "Non autenticato" });
+    return handleMusicMatchReject(req, res);
   });
 
 

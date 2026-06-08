@@ -22,6 +22,8 @@ interface UseRenderItemParams {
   freshIds: Set<string>;
   acceptMutation: MutateFn;
   rejectMutation: MutateFn;
+  acceptMusicMutation: MutateFn;
+  rejectMusicMutation: MutateFn;
   acceptGarageMutation: MutateFn;
   rejectGarageMutation: MutateFn;
   acceptBikerMutation: MutateFn;
@@ -58,7 +60,11 @@ export function useRenderItem(p: UseRenderItemParams): ({ item }: { item: any })
 
       if (p.activeTab === "music") {
         return (
-          <MusicMatchCard item={item} onSendMessage={(userId) => p.startChatMutation.mutate(userId)} />
+          <MusicMatchCard
+            item={item}
+            onAccept={(userId) => p.acceptMusicMutation.mutate(userId)}
+            onReject={(userId) => p.rejectMusicMutation.mutate(userId)}
+          />
         );
       }
 

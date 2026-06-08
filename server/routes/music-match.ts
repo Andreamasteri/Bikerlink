@@ -2,7 +2,7 @@ import { sendError } from "../lib/api-response";
 import { type Request, type Response } from "express";
 import { db } from "../db";
 import { storage } from "../storage";
-import { userMusicTracks, users } from "@shared/db";
+import { userMusicTracks, users, musicMatchDismissals } from "@shared/db";
 import { eq, and, inArray, sql } from "drizzle-orm";
 import { haversineKm } from "../geo";
 
@@ -42,12 +42,21 @@ export async function handleMusicMatch(req: Request, res: Response) {
     const myLat = myProfile?.latitude ?? null;
     const myLng = myProfile?.longitude ?? null;
 
+    const dismissedRows = await db
+      .select({ dismissedUserId: musicMatchDismissals.dismissedUserId })
+      .from(musicMatchDismissals)
+      .where(eq(musicMatchDismissals.userId, userId));
+    const dismissedIds = new Set(dismissedRows.map((r) => r.dismissedUserId));
+
     const candidateRows = await db
       .selectDistinct({ userId: userMusicTracks.userId })
       .from(userMusicTracks)
       .where(sql`${userMusicTracks.userId} != ${userId}`);
 
-    const candidateUserIds = candidateRows.map((c) => c.userId);
+    const candidateUserIds = candidateRows
+      .map((c) => c.userId)
+      .filter((id) => !dismissedIds.has(id));
+
     if (candidateUserIds.length === 0) {
       return res.json({ matches: [] });
     }
@@ -62,6 +71,7 @@ export async function handleMusicMatch(req: Request, res: Response) {
       songsInCommon: number;
       sharedArtist: string | null;
       sharedGenre: string | null;
+      commonGenres: string[];
       distanceKm: number;
     }> = [];
 
@@ -92,6 +102,11 @@ export async function handleMusicMatch(req: Request, res: Response) {
       const candidateTopGenre = [...candidateGenreCount.entries()].sort((a, b) => b[1] - a[1])[0]?.[0];
       const genreMatches = myTopGenre && candidateTopGenre === myTopGenre;
       const sharedGenre = genreMatches ? candidateTopGenre ?? null : null;
+
+      const commonGenres: string[] = [];
+      if (myTopGenre && genreMatches && candidateTopGenre) {
+        commonGenres.push(candidateTopGenre);
+      }
 
       const candidateProfile = await storage.getUserProfile(candidate.id);
       const candidateLat = candidateProfile?.latitude ?? null;
@@ -128,6 +143,7 @@ export async function handleMusicMatch(req: Request, res: Response) {
         songsInCommon,
         sharedArtist,
         sharedGenre,
+        commonGenres,
         distanceKm: Math.round(distanceKm),
       });
     }
@@ -138,5 +154,26 @@ export async function handleMusicMatch(req: Request, res: Response) {
   } catch (error) {
     console.error("[MusicMatch] match/music error:", error);
     return sendError(res, 500, "Errore durante il calcolo dei match musicali");
+  }
+}
+
+export async function handleMusicMatchReject(req: Request, res: Response) {
+  try {
+    const userId = req.session.userId!;
+    const { targetUserId } = req.params;
+
+    if (!targetUserId || typeof targetUserId !== "string") {
+      return sendError(res, 400, "targetUserId mancante");
+    }
+
+    await db
+      .insert(musicMatchDismissals)
+      .values({ userId, dismissedUserId: targetUserId })
+      .onConflictDoNothing();
+
+    return res.json({ ok: true });
+  } catch (error) {
+    console.error("[MusicMatch] reject error:", error);
+    return sendError(res, 500, "Errore durante il rifiuto del match musicale");
   }
 }

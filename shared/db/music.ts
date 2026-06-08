@@ -8,6 +8,7 @@ import {
   serial,
   index,
   uniqueIndex,
+  unique,
 } from "drizzle-orm/pg-core";
 import { users } from "./users";
 
@@ -69,3 +70,20 @@ export type UserLastfmSession = typeof userLastfmSessions.$inferSelect;
 export type InsertUserLastfmSession = typeof userLastfmSessions.$inferInsert;
 export type UserPlaylistSnapshot = typeof userPlaylistSnapshots.$inferSelect;
 export type InsertUserPlaylistSnapshot = typeof userPlaylistSnapshots.$inferInsert;
+
+export const musicMatchDismissals = pgTable("music_match_dismissals", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id", { length: 36 })
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  dismissedUserId: varchar("dismissed_user_id", { length: 36 })
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  dismissedAt: timestamp("dismissed_at").notNull().defaultNow(),
+}, (table) => [
+  unique("music_match_dismissals_user_dismissed_uniq").on(table.userId, table.dismissedUserId),
+  index("music_match_dismissals_user_idx").on(table.userId),
+]);
+
+export type MusicMatchDismissal = typeof musicMatchDismissals.$inferSelect;
+export type InsertMusicMatchDismissal = typeof musicMatchDismissals.$inferInsert;
