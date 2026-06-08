@@ -14,7 +14,15 @@ const TARGET_KM = parseFloat(process.env.TELEMETRY_TARGET_KM ?? "1000");
 router.post("/batch", async (req: Request, res: Response) => {
   const userId = requireUserId(req, res);
   if (!userId) {
-    console.warn(`[telemetry/batch] AUTH FAIL — ip=${req.ip} ua=${String(req.headers["user-agent"] ?? "").slice(0, 80)}`);
+    const ua = String(req.headers["user-agent"] ?? "").slice(0, 80);
+    console.warn(`[telemetry/batch] AUTH FAIL — ip=${req.ip} ua=${ua}`);
+    logTelemetryEvent({
+      ts: new Date().toISOString(),
+      type: "WARN",
+      context: "telemetry/batch",
+      message: `Auth fallita (JWT scaduto o assente) — ip=${req.ip}`,
+      detail: `ua=${ua}`,
+    });
     return;
   }
 
@@ -27,6 +35,13 @@ router.post("/batch", async (req: Request, res: Response) => {
     };
 
     if (!session_id || typeof session_id !== "string") {
+      logTelemetryEvent({
+        ts: new Date().toISOString(),
+        type: "WARN",
+        context: "telemetry/batch",
+        message: "Payload invalido: session_id mancante o non stringa",
+        userId,
+      });
       return sendError(res, 400, "session_id obbligatorio");
     }
 
@@ -146,12 +161,20 @@ router.post("/batch", async (req: Request, res: Response) => {
     }
 
     console.log(`[telemetry/batch] userId=${userId} sessionId=${session_id} received=${received} valid=${rows.length} discarded=${discarded}`);
+    logTelemetryEvent({
+      ts: new Date().toISOString(),
+      type: "INFO",
+      context: "telemetry/batch",
+      message: `Insert OK — received=${received} inserted=${rows.length} discarded=${discarded} type=${resolvedType}`,
+      userId,
+      sessionId: session_id,
+    });
     if (discarded > 0) {
       logTelemetryEvent({
         ts: new Date().toISOString(),
         type: "WARN",
         context: "telemetry/batch",
-        message: `Campioni scartati — received=${received} valid=${rows.length} discarded=${discarded}`,
+        message: `Campioni scartati (ts/lat/lon non validi) — received=${received} valid=${rows.length} discarded=${discarded}`,
         userId,
         sessionId: session_id,
       });
@@ -178,6 +201,7 @@ router.get("/stats", async (req: Request, res: Response) => {
   const userId = requireUserId(req, res);
   if (!userId) return;
 
+  const startMs = Date.now();
   try {
     const statsResult = await db.execute(sql`
       SELECT
@@ -191,6 +215,13 @@ router.get("/stats", async (req: Request, res: Response) => {
     const row = statsResult.rows[0] as { sample_count: string; session_count: string } | undefined;
     const sampleCount = parseInt(row?.sample_count ?? "0", 10);
     const sessionCount = parseInt(row?.session_count ?? "0", 10);
+    logTelemetryEvent({
+      ts: new Date().toISOString(),
+      type: sampleCount === 0 ? "WARN" : "INFO",
+      context: "telemetry/stats",
+      message: `userId=${userId} campioni=${sampleCount} sessioni=${sessionCount}${sampleCount === 0 ? " — nessun dato per questo utente" : ""}`,
+      userId,
+    });
 
     const kmResult = await db.execute(sql`
       WITH ordered AS (
@@ -270,7 +301,18 @@ router.get("/stats", async (req: Request, res: Response) => {
       track_km: trackKm,
     });
   } catch (err) {
-    console.error("[telemetry/stats] error:", err);
+    const elapsedMs = Date.now() - startMs;
+    const pgMsg = (err as any)?.cause?.message ?? "";
+    const errMsg = err instanceof Error ? err.message : String(err);
+    console.error("[telemetry/stats] error:", err, pgMsg ? `| PG: ${pgMsg}` : "");
+    logTelemetryEvent({
+      ts: new Date().toISOString(),
+      type: "ERROR",
+      context: "telemetry/stats",
+      message: `Fallita dopo ${elapsedMs}ms: ${errMsg}`,
+      userId: (req as any).user?.id,
+      detail: pgMsg || (err instanceof Error ? err.stack : undefined),
+    });
     return sendError(res, 500, "Errore interno del server");
   }
 });

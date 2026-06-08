@@ -3,7 +3,7 @@ import { db } from "../../db";
 import { sql } from "drizzle-orm";
 import { sendError } from "../../lib/api-response";
 import { storage } from "../../storage";
-import { getTelemetryErrorLog } from "../../lib/telemetry-error-log";
+import { getTelemetryErrorLog, logTelemetryEvent } from "../../lib/telemetry-error-log";
 import {
   isMapMatchingRunning,
   runMapMatchingJob,
@@ -55,8 +55,31 @@ router.get("/telemetry-stats", async (_req: Request, res: Response) => {
   const cached = getCached<object>(CACHE_KEY);
   if (cached) return res.json(cached);
 
+  const startMs = Date.now();
+  logTelemetryEvent({ ts: new Date().toISOString(), type: "INFO", context: "admin/telemetry-stats", message: "Avvio query statistiche" });
+
   try {
     const targetKm = await getTargetKm();
+
+    const rawCountResult = await db.execute<{ raw_total: string }>(
+      sql`SELECT COUNT(*)::text AS raw_total FROM ride_telemetry`
+    );
+    const rawTotal = parseInt(rawCountResult.rows[0]?.raw_total ?? "0", 10);
+    logTelemetryEvent({
+      ts: new Date().toISOString(),
+      type: "INFO",
+      context: "admin/telemetry-stats",
+      message: `Conteggio grezzo ride_telemetry: ${rawTotal} righe (senza filtri)`,
+    });
+
+    if (rawTotal === 0) {
+      logTelemetryEvent({
+        ts: new Date().toISOString(),
+        type: "WARN",
+        context: "admin/telemetry-stats",
+        message: "Tabella ride_telemetry vuota — nessun dato inviato dall'app",
+      });
+    }
 
     const [countResult, kmResult] = await db.transaction(async (tx) => {
       await tx.execute(sql`SET LOCAL statement_timeout = '8000'`);
@@ -120,6 +143,14 @@ router.get("/telemetry-stats", async (_req: Request, res: Response) => {
       ? Math.round((kmCollected / totalUsersWithTelemetry) * 10) / 10
       : 0;
 
+    const elapsedMs = Date.now() - startMs;
+    logTelemetryEvent({
+      ts: new Date().toISOString(),
+      type: "INFO",
+      context: "admin/telemetry-stats",
+      message: `OK in ${elapsedMs}ms — campioni=${totalSamples} utenti=${totalUsersWithTelemetry} attivi24h=${activeUsers} km=${kmCollected} latestSample=${latestSample ?? "null"}`,
+    });
+
     const payload = {
       totalSamples,
       activeUsers,
@@ -134,9 +165,19 @@ router.get("/telemetry-stats", async (_req: Request, res: Response) => {
     setCached(CACHE_KEY, payload);
     return res.json(payload);
   } catch (err) {
-    const cause = (err as any)?.cause?.message ?? "";
-    console.error("[admin/telemetry-stats] error:", err, cause ? `| PG: ${cause}` : "");
-    return sendError(res, 500, "Errore lettura statistiche telemetria");
+    const elapsedMs = Date.now() - startMs;
+    const pgMsg = (err as any)?.cause?.message ?? "";
+    const errMsg = err instanceof Error ? err.message : String(err);
+    const cause = pgMsg || errMsg;
+    console.error("[admin/telemetry-stats] error:", err, pgMsg ? `| PG: ${pgMsg}` : "");
+    logTelemetryEvent({
+      ts: new Date().toISOString(),
+      type: "ERROR",
+      context: "admin/telemetry-stats",
+      message: `Fallita dopo ${elapsedMs}ms: ${errMsg}`,
+      detail: pgMsg || (err instanceof Error ? err.stack : undefined),
+    });
+    return res.status(500).json({ success: false, message: "Errore lettura statistiche telemetria", detail: cause });
   }
 });
 
@@ -465,7 +506,21 @@ router.get("/telemetry-top-riders", async (req: Request, res: Response) => {
   const cached = getCached<object>(CACHE_KEY);
   if (cached) return res.json(cached);
 
+  const startMs = Date.now();
+  logTelemetryEvent({ ts: new Date().toISOString(), type: "INFO", context: "admin/telemetry-top-riders", message: `Avvio query top-riders limit=${limit}` });
+
   try {
+    const rawCountResult = await db.execute<{ raw_24h: string }>(
+      sql`SELECT COUNT(*)::text AS raw_24h FROM ride_telemetry WHERE created_at >= NOW() - INTERVAL '24 hours' AND session_type NOT IN ('ideal_lap')`
+    );
+    const raw24h = parseInt(rawCountResult.rows[0]?.raw_24h ?? "0", 10);
+    logTelemetryEvent({
+      ts: new Date().toISOString(),
+      type: "INFO",
+      context: "admin/telemetry-top-riders",
+      message: `Campioni ride (non ideal_lap) nelle ultime 24h: ${raw24h}`,
+    });
+
     const result = await db.transaction(async (tx) => {
       await tx.execute(sql`SET LOCAL statement_timeout = '8000'`);
       return tx.execute<{
@@ -525,13 +580,31 @@ router.get("/telemetry-top-riders", async (req: Request, res: Response) => {
       km: Math.round(parseFloat(r.km) * 10) / 10,
     }));
 
+    const elapsedMs = Date.now() - startMs;
+    logTelemetryEvent({
+      ts: new Date().toISOString(),
+      type: "INFO",
+      context: "admin/telemetry-top-riders",
+      message: `OK in ${elapsedMs}ms — riders restituiti: ${riders.length}`,
+    });
+
     const payload = { riders };
     setCached(CACHE_KEY, payload);
     return res.json(payload);
   } catch (err) {
-    const cause = (err as any)?.cause?.message ?? "";
-    console.error("[admin/telemetry-top-riders] error:", err, cause ? `| PG: ${cause}` : "");
-    return sendError(res, 500, "Errore lettura top rider");
+    const elapsedMs = Date.now() - startMs;
+    const pgMsg = (err as any)?.cause?.message ?? "";
+    const errMsg = err instanceof Error ? err.message : String(err);
+    const cause = pgMsg || errMsg;
+    console.error("[admin/telemetry-top-riders] error:", err, pgMsg ? `| PG: ${pgMsg}` : "");
+    logTelemetryEvent({
+      ts: new Date().toISOString(),
+      type: "ERROR",
+      context: "admin/telemetry-top-riders",
+      message: `Fallita dopo ${elapsedMs}ms: ${errMsg}`,
+      detail: pgMsg || (err instanceof Error ? err.stack : undefined),
+    });
+    return res.status(500).json({ success: false, message: "Errore lettura top rider", detail: cause });
   }
 });
 

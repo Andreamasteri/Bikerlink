@@ -23,6 +23,21 @@ interface TopRidersResponse {
   riders: TopRider[];
 }
 
+interface TelemetryDiagEntry {
+  ts: string;
+  type: "ERROR" | "WARN" | "INFO";
+  context: string;
+  message: string;
+  userId?: string | number;
+  sessionId?: string;
+  detail?: string;
+}
+
+interface TelemetryDiagResponse {
+  entries: TelemetryDiagEntry[];
+  count: number;
+}
+
 interface GHStatus {
   mode: "self-hosted" | "cloud" | "disabled";
   profile: string;
@@ -125,31 +140,45 @@ export function GraphHopperCard() {
   );
 }
 
+async function fetchWithCause(url: string, options?: RequestInit): Promise<Response> {
+  const res = await fetch(url, options);
+  if (!res.ok) {
+    let detail = "";
+    try {
+      const body = await res.clone().json();
+      detail = body?.detail || body?.message || "";
+    } catch (_) {}
+    const err = new Error(`HTTP ${res.status}${detail ? `: ${detail}` : ""}`);
+    (err as any).detail = detail;
+    throw err;
+  }
+  return res;
+}
+
 export function TelemetryCard() {
   const { data, isLoading, error } = useQuery<TelemetryStats>({
     queryKey: ["/api/admin/telemetry-stats"],
     queryFn: async ({ signal }) => {
-      const res = await fetch(new URL("/api/admin/telemetry-stats", getApiUrl()).toString(), {
+      const res = await fetchWithCause(new URL("/api/admin/telemetry-stats", getApiUrl()).toString(), {
         headers: { ...(await authFetchHeaders()) },
         credentials: "include",
-        signal: AbortSignal.any([signal, AbortSignal.timeout(5_000)]),
+        signal: AbortSignal.any([signal, AbortSignal.timeout(10_000)]),
       });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       return res.json();
     },
     staleTime: 60_000,
   });
 
   const [collapsed, setCollapsed] = useState(true);
+  const [diagVisible, setDiagVisible] = useState(false);
 
   const { data: topRidersData, isLoading: topRidersLoading, error: topRidersError } = useQuery<TopRidersResponse>({
     queryKey: ["/api/admin/telemetry-top-riders"],
     queryFn: async () => {
-      const res = await fetch(new URL("/api/admin/telemetry-top-riders?limit=5", getApiUrl()).toString(), {
+      const res = await fetchWithCause(new URL("/api/admin/telemetry-top-riders?limit=5", getApiUrl()).toString(), {
         headers: { ...(await authFetchHeaders()) },
         credentials: "include",
       });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       return res.json();
     },
     staleTime: 60_000,
@@ -157,10 +186,30 @@ export function TelemetryCard() {
     refetchOnMount: true,
   });
 
+  const { data: diagData, isLoading: diagLoading, refetch: refetchDiag } = useQuery<TelemetryDiagResponse>({
+    queryKey: ["/api/admin/telemetry/error-log"],
+    queryFn: async () => {
+      const res = await fetch(new URL("/api/admin/telemetry/error-log", getApiUrl()).toString(), {
+        headers: { ...(await authFetchHeaders()) },
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return res.json();
+    },
+    enabled: !collapsed && diagVisible,
+    staleTime: 0,
+    refetchOnMount: true,
+  });
+
   function formatDate(iso: string | null): string {
     if (!iso) return "—";
     const d = new Date(iso);
     return d.toLocaleDateString("it-IT", { day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit" });
+  }
+
+  function formatDiagTs(iso: string): string {
+    const d = new Date(iso);
+    return d.toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
   }
 
   const isStale = data
@@ -172,6 +221,9 @@ export function TelemetryCard() {
     : false;
 
   const [infoVisible, setInfoVisible] = useState(false);
+
+  const statsErrorDetail = (error as any)?.detail as string | undefined;
+  const ridersErrorDetail = (topRidersError as any)?.detail as string | undefined;
 
   return (
     <View style={telStyles.card}>
@@ -238,6 +290,14 @@ export function TelemetryCard() {
       </TouchableOpacity>
       {!collapsed && (
         <>
+          {error && !isLoading && (
+            <View style={telStyles.errorBanner}>
+              <MaterialCommunityIcons name="alert-circle" size={13} color="#ef4444" />
+              <Text style={telStyles.errorBannerText} numberOfLines={3}>
+                {statsErrorDetail || (error as Error).message || "Errore caricamento statistiche"}
+              </Text>
+            </View>
+          )}
           <View style={telStyles.statsRow}>
             <View style={telStyles.stat}>
               <Text style={telStyles.statValue}>{data ? data.totalSamples.toLocaleString("it-IT") : "—"}</Text>
@@ -274,9 +334,14 @@ export function TelemetryCard() {
               {topRidersLoading && <ActivityIndicator size="small" color="#22c55e" style={{ marginLeft: "auto" }} />}
             </View>
             {!topRidersLoading && topRidersError && (
-              <View style={telStyles.topRidersErrorRow}>
-                <MaterialCommunityIcons name="alert-circle-outline" size={13} color="#ef4444" />
-                <Text style={telStyles.topRidersErrorText}>Errore caricamento rider</Text>
+              <View style={telStyles.topRidersErrorBlock}>
+                <View style={telStyles.topRidersErrorRow}>
+                  <MaterialCommunityIcons name="alert-circle-outline" size={13} color="#ef4444" />
+                  <Text style={telStyles.topRidersErrorText}>Errore caricamento rider</Text>
+                </View>
+                {!!ridersErrorDetail && (
+                  <Text style={telStyles.topRidersErrorDetail} numberOfLines={3}>{ridersErrorDetail}</Text>
+                )}
               </View>
             )}
             {!topRidersLoading && !topRidersError && (!topRidersData?.riders || topRidersData.riders.length === 0) && (
@@ -296,6 +361,50 @@ export function TelemetryCard() {
                 </View>
               </View>
             ))}
+          </View>
+
+          <View style={telStyles.diagSection}>
+            <TouchableOpacity
+              style={telStyles.diagHeader}
+              onPress={() => {
+                setDiagVisible((v) => !v);
+                if (!diagVisible) refetchDiag();
+              }}
+              activeOpacity={0.7}
+            >
+              <MaterialCommunityIcons name="bug-outline" size={13} color={Colors.textSecondary} />
+              <Text style={telStyles.diagTitle}>Log diagnostici pipeline</Text>
+              {diagLoading && <ActivityIndicator size="small" color={Colors.textSecondary} style={{ marginLeft: 6 }} />}
+              <Ionicons
+                name={diagVisible ? "chevron-up" : "chevron-down"}
+                size={14}
+                color={Colors.textSecondary}
+                style={{ marginLeft: "auto" }}
+              />
+            </TouchableOpacity>
+            {diagVisible && (
+              <View style={telStyles.diagLog}>
+                {(!diagData?.entries || diagData.entries.length === 0) && (
+                  <Text style={telStyles.diagEmpty}>Nessun evento registrato</Text>
+                )}
+                {diagData?.entries.slice(0, 20).map((entry, i) => {
+                  const color = entry.type === "ERROR" ? "#ef4444" : entry.type === "WARN" ? "#f59e0b" : Colors.textSecondary;
+                  return (
+                    <View key={i} style={telStyles.diagRow}>
+                      <Text style={[telStyles.diagType, { color }]}>{entry.type}</Text>
+                      <View style={{ flex: 1 }}>
+                        <Text style={telStyles.diagContext}>{entry.context}</Text>
+                        <Text style={telStyles.diagMessage}>{entry.message}</Text>
+                        {!!entry.detail && (
+                          <Text style={telStyles.diagDetail} numberOfLines={2}>{entry.detail}</Text>
+                        )}
+                      </View>
+                      <Text style={telStyles.diagTs}>{formatDiagTs(entry.ts)}</Text>
+                    </View>
+                  );
+                })}
+              </View>
+            )}
           </View>
         </>
       )}
@@ -480,16 +589,114 @@ const telStyles = StyleSheet.create({
     fontStyle: "italic",
     paddingVertical: 4,
   },
+  topRidersErrorBlock: {
+    paddingVertical: 4,
+  },
   topRidersErrorRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 5,
-    paddingVertical: 4,
   },
   topRidersErrorText: {
     fontFamily: "Inter_400Regular",
     fontSize: 12,
     color: "#ef4444",
+  },
+  topRidersErrorDetail: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 11,
+    color: "#ef4444",
+    opacity: 0.8,
+    marginTop: 3,
+    lineHeight: 15,
+  },
+  errorBanner: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 6,
+    backgroundColor: "rgba(239, 68, 68, 0.10)",
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    marginBottom: 10,
+  },
+  errorBannerText: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    color: "#ef4444",
+    flex: 1,
+    lineHeight: 16,
+  },
+  diagSection: {
+    marginTop: 14,
+    borderTopWidth: 1,
+    borderTopColor: Colors.border,
+    paddingTop: 10,
+  },
+  diagHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+  },
+  diagTitle: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 11,
+    color: Colors.textSecondary,
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
+  },
+  diagLog: {
+    marginTop: 8,
+    backgroundColor: "rgba(0,0,0,0.18)",
+    borderRadius: 8,
+    padding: 8,
+    gap: 6,
+  },
+  diagEmpty: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 11,
+    color: Colors.textSecondary,
+    fontStyle: "italic",
+  },
+  diagRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 6,
+    paddingVertical: 3,
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(255,255,255,0.05)",
+  },
+  diagType: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 9,
+    width: 34,
+    marginTop: 1,
+  },
+  diagContext: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 10,
+    color: Colors.textSecondary,
+  },
+  diagMessage: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 11,
+    color: Colors.text,
+    lineHeight: 15,
+  },
+  diagDetail: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 10,
+    color: "#ef4444",
+    lineHeight: 14,
+    marginTop: 2,
+    opacity: 0.85,
+  },
+  diagTs: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 9,
+    color: Colors.textSecondary,
+    marginLeft: 4,
+    marginTop: 1,
   },
   riderRow: {
     flexDirection: "row",
