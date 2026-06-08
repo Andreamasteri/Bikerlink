@@ -17,9 +17,10 @@ grep -E "versionCode|versionName" android/app/build.gradle | head -5
 ```
 
 ### 2. Proponi il nuovo versionCode e version
-Schema versioning: `<versionCode>.<ota_inglobate>.<ciclo_runtime>`
+Schema versioning: `<versionCode>.<ciclo_runtime>.<ota_inglobate>`
 - `versionCode` → incrementa di 1 rispetto al valore attuale in app.json
-- `version` → `<nuovo_versionCode>.<ota_pubblicate_nel_ciclo>.<ciclo_runtime>` (es. 56.5.10)
+- `version` → `<nuovo_versionCode>.<ciclo_runtime>.<ota_inglobate>` (es. 56.10.88)
+- ATTENZIONE: ordine è versionCode · ciclo_runtime · ota — NON versionCode · ota · ciclo
 - `runtimeVersion` → invariato a meno che non sia cambiata la runtime
 
 Chiedi conferma all'utente prima di procedere con il bump.
