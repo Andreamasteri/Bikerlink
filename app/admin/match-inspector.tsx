@@ -10,7 +10,7 @@ import {
   ActivityIndicator,
 } from "react-native";
 import { useQuery } from "@tanstack/react-query";
-import { useRouter } from "expo-router";
+import { useRouter, useLocalSearchParams } from "expo-router";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
@@ -90,10 +90,11 @@ function userRoleText(userType: string): string {
 export default function MatchInspectorScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const params = useLocalSearchParams<{ zeroOnly?: string }>();
+  const [zeroOnlyFilter, setZeroOnlyFilter] = useState(params.zeroOnly === "true");
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [page, setPage] = useState(1);
-  const [filterZero, setFilterZero] = useState(false);
   const debounceRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const handleSearchChange = useCallback((text: string) => {
@@ -103,12 +104,12 @@ export default function MatchInspectorScreen() {
     debounceRef.current = setTimeout(() => setDebouncedSearch(text), 400);
   }, []);
 
-  const handleToggleFilterZero = useCallback(() => {
-    setFilterZero((prev) => !prev);
+  const toggleZeroMatchFilter = useCallback(() => {
+    setZeroOnlyFilter((prev) => !prev);
     setPage(1);
   }, []);
 
-  const queryKey = ["/api/admin/users/match-summary", debouncedSearch, page, filterZero];
+  const queryKey = ["/api/admin/users/match-summary", debouncedSearch, page, zeroOnlyFilter];
 
   const { data, isLoading, refetch } = useQuery<UsersResponse>({
     queryKey,
@@ -118,7 +119,7 @@ export default function MatchInspectorScreen() {
       url.searchParams.set("page", String(page));
       url.searchParams.set("limit", "30");
       if (debouncedSearch) url.searchParams.set("search", debouncedSearch);
-      if (filterZero) url.searchParams.set("zeroMatchesOnly", "true");
+      if (zeroOnlyFilter) url.searchParams.set("zeroOnly", "true");
       const res = await fetch(url.toString(), { credentials: "include" });
       if (!res.ok) throw new Error("Errore caricamento");
       return res.json();
@@ -222,25 +223,25 @@ export default function MatchInspectorScreen() {
 
       <View style={styles.headerRow}>
         <Text style={styles.totalCount}>{total} utenti</Text>
-        <View style={styles.headerActions}>
+        {(zeroMatchCount > 0 || zeroOnlyFilter) && (
           <TouchableOpacity
-            onPress={handleToggleFilterZero}
-            style={[styles.filterChip, filterZero && styles.filterChipActive]}
+            style={[styles.zeroMatchBadge, zeroOnlyFilter && styles.zeroMatchBadgeActive]}
+            onPress={toggleZeroMatchFilter}
             activeOpacity={0.7}
           >
             <MaterialCommunityIcons
-              name="alert-circle"
-              size={13}
-              color={filterZero ? "#fff" : Colors.warning}
+              name={zeroOnlyFilter ? "filter-remove" : "alert"}
+              size={12}
+              color={zeroOnlyFilter ? "#fff" : Colors.warning}
             />
-            <Text style={[styles.filterChipText, filterZero && styles.filterChipTextActive]}>
-              Da ricalcolare{zeroMatchCount > 0 ? ` (${zeroMatchCount})` : ""}
+            <Text style={[styles.zeroMatchBadgeText, zeroOnlyFilter && styles.zeroMatchBadgeTextActive]}>
+              {zeroMatchCount} senza match
             </Text>
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => refetch()} style={styles.refreshBtn}>
-            <Ionicons name="refresh" size={16} color={Colors.accent} />
-          </TouchableOpacity>
-        </View>
+        )}
+        <TouchableOpacity onPress={() => refetch()} style={styles.refreshBtn}>
+          <Ionicons name="refresh" size={16} color={Colors.accent} />
+        </TouchableOpacity>
       </View>
 
       {isLoading ? (

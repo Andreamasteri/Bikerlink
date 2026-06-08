@@ -297,32 +297,34 @@ router.get("/match-summary", async (req: Request, res: Response) => {
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 50;
     const offset = (page - 1) * limit;
-    const zeroMatchesOnly = req.query.zeroMatchesOnly === "true";
+    const zeroOnly = req.query.zeroOnly === "true";
     const searchRaw = typeof req.query.search === "string" ? req.query.search.trim() : "";
     const searchTerm = searchRaw ? `%${searchRaw}%` : null;
 
     type CountRow = { cnt?: string };
 
-    // Inizializziamo zeroMatchCount con una query separata
-    // Questa query conta gli utenti con 0 match totali, indipendentemente dai filtri attivi.
-    const zeroMatchResult = await db.execute(sql`
-      SELECT COUNT(*) as cnt FROM users u
-      LEFT JOIN LATERAL (
-        SELECT COUNT(*) as cnt FROM biker_biker_matches m
-        WHERE m.biker1_id = u.id OR m.biker2_id = u.id
-      ) bb ON true
-      LEFT JOIN LATERAL (
-        SELECT COUNT(*) as cnt FROM biker_zavorrina_matches m
-        WHERE m.biker_id = u.id OR m.zavorrina_id = u.id
-      ) bz ON true
-      WHERE u.is_fake = false AND u.role NOT IN ('admin', 'moderator')
-        AND (COALESCE(bb.cnt, 0) + COALESCE(bz.cnt, 0)) = 0
-    `);
-    const zeroMatchCount = parseInt(((zeroMatchResult.rows[0] as CountRow)?.cnt) ?? "0", 10);
-
-    let total: number;
-    if (zeroMatchesOnly) {
-      const countResult = await db.execute(sql`
+    const [countResult, zeroMatchResult] = await Promise.all([
+      zeroOnly
+        ? db.execute(sql`
+            SELECT COUNT(*) as cnt FROM users u
+            LEFT JOIN LATERAL (
+              SELECT COUNT(*) as cnt FROM biker_biker_matches m
+              WHERE m.biker1_id = u.id OR m.biker2_id = u.id
+            ) bb ON true
+            LEFT JOIN LATERAL (
+              SELECT COUNT(*) as cnt FROM biker_zavorrina_matches m
+              WHERE m.biker_id = u.id OR m.zavorrina_id = u.id
+            ) bz ON true
+            WHERE u.is_fake = false AND u.role NOT IN ('admin', 'moderator')
+              AND (COALESCE(bb.cnt, 0) + COALESCE(bz.cnt, 0)) = 0
+              ${searchTerm ? sql`AND u.nickname ILIKE ${searchTerm}` : sql``}
+          `)
+        : db.execute(sql`
+            SELECT COUNT(*) as cnt FROM users u
+            WHERE u.is_fake = false AND u.role NOT IN ('admin', 'moderator')
+              ${searchTerm ? sql`AND u.nickname ILIKE ${searchTerm}` : sql``}
+          `),
+      db.execute(sql`
         SELECT COUNT(*) as cnt FROM users u
         LEFT JOIN LATERAL (
           SELECT COUNT(*) as cnt FROM biker_biker_matches m
@@ -334,17 +336,11 @@ router.get("/match-summary", async (req: Request, res: Response) => {
         ) bz ON true
         WHERE u.is_fake = false AND u.role NOT IN ('admin', 'moderator')
           AND (COALESCE(bb.cnt, 0) + COALESCE(bz.cnt, 0)) = 0
-          ${searchTerm ? sql`AND u.nickname ILIKE ${searchTerm}` : sql``}
-      `);
-      total = parseInt(((countResult.rows[0] as CountRow)?.cnt) ?? "0", 10);
-    } else {
-      const countResult = await db.execute(sql`
-        SELECT COUNT(*) as cnt FROM users u
-        WHERE u.is_fake = false AND u.role NOT IN ('admin', 'moderator')
-          ${searchTerm ? sql`AND u.nickname ILIKE ${searchTerm}` : sql``}
-      `);
-      total = parseInt(((countResult.rows[0] as CountRow)?.cnt) ?? "0", 10);
-    }
+      `),
+    ]);
+
+    const total = parseInt(((countResult.rows[0] as CountRow)?.cnt) ?? "0", 10);
+    const zeroMatchCount = parseInt(((zeroMatchResult.rows[0] as CountRow)?.cnt) ?? "0", 10);
 
     const usersResult = await db.execute(sql`
       SELECT
@@ -362,11 +358,12 @@ router.get("/match-summary", async (req: Request, res: Response) => {
         WHERE m.biker_id = u.id OR m.zavorrina_id = u.id
       ) bz ON true
       WHERE u.is_fake = false AND u.role NOT IN ('admin', 'moderator')
-        ${zeroMatchesOnly ? sql`AND (COALESCE(bb.cnt, 0) + COALESCE(bz.cnt, 0)) = 0` : sql``}
+        ${zeroOnly ? sql`AND (COALESCE(bb.cnt, 0) + COALESCE(bz.cnt, 0)) = 0` : sql``}
         ${searchTerm ? sql`AND u.nickname ILIKE ${searchTerm}` : sql``}
       ORDER BY u.nickname
       LIMIT ${limit} OFFSET ${offset}
     `);
+
 
     type UserRow = { id: string; nickname: string; avatar_url: string | null; user_type: string | null; role: string; status: string; bb_count: string; bz_count: string; bb_counts: null };
     const mappedUsers = (usersResult.rows as UserRow[]).map((row) => {

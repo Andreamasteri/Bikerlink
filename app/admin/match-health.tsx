@@ -11,8 +11,10 @@ import { useQuery } from "@tanstack/react-query";
 import { MaterialCommunityIcons, Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
+import { getApiUrl } from "@/lib/query-client";
 import { MatchCountsSection } from "@/components/admin/match-health/MatchCountsSection";
 import { SchemaSection } from "@/components/admin/match-health/SchemaSection";
+import { ZeroMatchKpiCard } from "@/components/admin/match-health/ZeroMatchKpiCard";
 
 interface MatchCount {
   id: number;
@@ -121,12 +123,33 @@ function SectionCard({
   );
 }
 
+interface MatchSummaryResponse {
+  total: number;
+  zeroMatchCount: number;
+}
+
 export default function MatchHealthScreen() {
   const insets = useSafeAreaInsets();
+  const router = useRouter();
 
   const { data, isLoading, isFetching, error, refetch } = useQuery<MatchHealthResponse>({
     queryKey: ["/api/admin/match-health"],
     staleTime: 0,
+    retry: false,
+  });
+
+  const { data: matchSummary } = useQuery<MatchSummaryResponse>({
+    queryKey: ["/api/admin/users/match-summary-kpi"],
+    queryFn: async () => {
+      const base = getApiUrl();
+      const url = new URL("/api/admin/users/match-summary", base);
+      url.searchParams.set("page", "1");
+      url.searchParams.set("limit", "1");
+      const res = await fetch(url.toString(), { credentials: "include" });
+      if (!res.ok) throw new Error("Errore caricamento");
+      return res.json();
+    },
+    staleTime: 30000,
     retry: false,
   });
 
@@ -227,6 +250,13 @@ export default function MatchHealthScreen() {
               <Text style={styles.summaryKey}>Gate</Text>
             </View>
           </View>
+
+          {matchSummary !== undefined && (
+            <ZeroMatchKpiCard
+              zeroMatchCount={matchSummary.zeroMatchCount}
+              total={matchSummary.total}
+            />
+          )}
 
           <SectionCard title="17 Tipi di Match" status={data.checks.matchCounts.some(m => m.status === "WARN") ? "WARN" : "OK"}>
             <MatchCountsSection matchCounts={data.checks.matchCounts} />
