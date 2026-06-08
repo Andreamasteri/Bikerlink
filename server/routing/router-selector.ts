@@ -10,10 +10,11 @@ import { recordRoutingFallback, recordRoutingFailure, recordRoutingSuccess } fro
 import { isRoutingEnabled } from "./routing-kill-switch";
 import { isAreaRoutingActive } from "./routing-area-mode";
 import { resolveRoutingArea } from "./routing-area-resolver";
-import { ROUTING_AREA_OUTCOMES, type RoutingAreaCode } from "@shared/routing-areas";
+import { ROUTING_AREA_OUTCOMES, findRoutingAreasForPoint, type RoutingAreaCode } from "@shared/routing-areas";
 import { decideEngineWithAI, type AiRoutingContext } from "./ai-engine-decider";
 import { scoreRoute } from "./route-quality-score";
 import { recordAiDecision } from "./ai-decision-log";
+import { recordPipelineEvent, type PipelineOutcome } from "./routing-pipeline-log";
 import { haversineKm } from "../geo";
 
 /** Errore lanciato quando il routing è disabilitato dal kill-switch (admin/env). */
@@ -54,7 +55,7 @@ export class AreaNotEnabledError extends Error {
  * bloccanti. Con routing ad aree disattivo si comporta come prima (istanza
  * globale unica) — impatto zero sul comportamento storico.
  */
-async function graphHopperRoute(req: RouteRequest, isMapTester: boolean): Promise<RouteResult> {
+export async function graphHopperRoute(req: RouteRequest, isMapTester: boolean): Promise<RouteResult> {
   if (await isAreaRoutingActive(isMapTester)) {
     const resolution = await resolveRoutingArea(req.points);
     if (resolution.kind === ROUTING_AREA_OUTCOMES.CROSS_GROUP) {
@@ -259,12 +260,88 @@ async function routeViaTomTomWithFallback(
 }
 
 /**
- * Seleziona e invoca l'engine di routing attivo.
- * @param req    Parametri della richiesta di routing
- * @param opts   Configurazione rollout + engine
- * @param res    Risposta Express opzionale — usata per impostare X-Routing-Fallback
+ * Wrapper pubblico del selettore: esegue il dispatch e registra l'esito nel
+ * ring buffer "Coordinamento Engine" (#3557) — area GH risolta dalle coordinate,
+ * engine selezionato vs usato, motivo del fallback/errore, latenza ed esito.
+ * Il RoutingDisabledError non viene registrato (non è un evento di dispatch).
  */
 export async function getActiveRouter(
+  req: RouteRequest,
+  opts: RouterSelectorOptions,
+  res?: Response
+): Promise<RouteResult> {
+  const started = Date.now();
+  try {
+    const result = await getActiveRouterInner(req, opts, res);
+    recordPipelineOutcome(req, opts, res, Date.now() - started, null);
+    return result;
+  } catch (err) {
+    recordPipelineOutcome(req, opts, res, Date.now() - started, err);
+    throw err;
+  }
+}
+
+/** Registra un evento pipeline a partire dall'esito del dispatch. */
+function recordPipelineOutcome(
+  req: RouteRequest,
+  opts: RouterSelectorOptions,
+  res: Response | undefined,
+  latencyMs: number,
+  err: unknown,
+): void {
+  if (err instanceof RoutingDisabledError) return;
+
+  const start = req.points?.[0];
+  const areaCode: RoutingAreaCode | null = start
+    ? (findRoutingAreasForPoint(start[1], start[0])[0]?.codice ?? null)
+    : null;
+
+  const engineSelected = req.profile === "auto_curvy"
+    ? "valhalla"
+    : (opts.aiMode ? "ai" : opts.engine);
+
+  const fallbackHeader = res?.getHeader("X-Routing-Fallback");
+  const aiCompareHeader = res?.getHeader("X-Routing-Ai-Compare");
+  const aiDirectHeader = res?.getHeader("X-Routing-Ai");
+  const fallbackTarget = typeof fallbackHeader === "string" && fallbackHeader ? fallbackHeader : null;
+  const aiCompare = typeof aiCompareHeader === "string" && aiCompareHeader ? aiCompareHeader : null;
+  const aiDirect = typeof aiDirectHeader === "string" && aiDirectHeader ? aiDirectHeader : null;
+
+  // Engine "previsto" prima dell'eventuale fallback: vince la scelta AI, poi
+  // l'engine selezionato (in modalità AI senza header esplicito si assume GH).
+  const intendedEngine = aiCompare ?? aiDirect ?? (engineSelected === "ai" ? "graphhopper" : engineSelected);
+
+  let outcome: PipelineOutcome;
+  let engineUsed: string;
+  let fallbackReason: string | null = null;
+  let error: string | null = null;
+  if (err) {
+    outcome = "error";
+    engineUsed = intendedEngine;
+    error = (err instanceof Error ? err.message : String(err)).slice(0, 300);
+  } else if (fallbackTarget) {
+    outcome = "fallback";
+    engineUsed = fallbackTarget;
+    fallbackReason = `${intendedEngine} non disponibile → ${fallbackTarget}`;
+  } else {
+    outcome = "ok";
+    engineUsed = intendedEngine;
+  }
+
+  recordPipelineEvent({
+    ts: Date.now(),
+    areaCode,
+    engineSelected,
+    engineUsed,
+    fallbackReason,
+    latencyMs,
+    geocodingOk: true,
+    outcome,
+    error,
+  });
+}
+
+async function getActiveRouterInner(
   req: RouteRequest,
   opts: RouterSelectorOptions,
   res?: Response

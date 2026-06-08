@@ -25,9 +25,10 @@ import {
   HAS_HARD_ENV_OVERRIDE,
   HARD_OFF,
 } from "../../../routing/routing-kill-switch";
-import { getInfo as getValhallaInfo } from "../../../routing/valhalla-client";
-import { getActiveRouter } from "../../../routing/router-selector";
+import { getInfo as getValhallaInfo, calculateRoute as valhallaCalculateRoute } from "../../../routing/valhalla-client";
+import { getActiveRouter, graphHopperRoute } from "../../../routing/router-selector";
 import { getRoutingCounters } from "../../../routing/routing-metrics";
+import { getPipelineEvents, getPipelineSummary } from "../../../routing/routing-pipeline-log";
 import {
   getFunctionEngineConfig,
   setFunctionEngineConfig,
@@ -247,6 +248,100 @@ router.put("/function-engines", async (req: Request, res: Response) => {
     const msg = err instanceof Error ? err.message : String(err);
     return res.status(400).json({ ok: false, message: msg });
   }
+});
+
+/**
+ * GET /pipeline-log — log volatile del coordinamento engine (#3557).
+ * Restituisce gli ultimi 50 eventi di routing (area GH risolta, engine
+ * selezionato vs usato, motivo fallback/errore, latenza, esito) + i contatori
+ * aggregati degli ultimi 5 minuti. In-memory: si azzera al riavvio.
+ */
+router.get("/pipeline-log", async (_req: Request, res: Response) => {
+  return res.json({
+    events: getPipelineEvents(50),
+    summary: getPipelineSummary(),
+    volatile: true,
+  });
+});
+
+/**
+ * POST /coherence-test — invia la STESSA rotta di prova (arco-alpino,
+ * Mira→Belluno) a GraphHopper (istanza per-area se attiva) e a Valhalla in
+ * parallelo, senza fallback incrociato, e confronta distanza/durata. Esito
+ * "coerenti" se entrambe riescono ed entro ±10%, altrimenti "divergenti".
+ */
+router.post("/coherence-test", async (_req: Request, res: Response) => {
+  const killSwitch = await getRoutingKillSwitchState();
+  if (!killSwitch.enabled) {
+    return res.status(409).json({
+      ok: false,
+      error: "Routing disabilitato dal kill-switch: riattivalo prima di eseguire il test.",
+    });
+  }
+
+  const routeReq: RouteRequest = {
+    points: [MIRA, BELLUNO],
+    profile: "motorcycle",
+    instructions: false,
+    calc_points: true,
+    points_encoded: false,
+    elevation: false,
+  };
+
+  type Leg = {
+    ok: boolean;
+    distanceKm: number | null;
+    durationMinutes: number | null;
+    latencyMs: number;
+    error: string | null;
+  };
+
+  const runLeg = async (fn: () => Promise<{ paths: Array<{ distance: number; time: number }> }>): Promise<Leg> => {
+    const t0 = Date.now();
+    try {
+      const result = await fn();
+      const path = result.paths[0];
+      return {
+        ok: !!path,
+        distanceKm: path ? Math.round(path.distance / 100) / 10 : null,
+        durationMinutes: path ? Math.round(path.time / 60000) : null,
+        latencyMs: Date.now() - t0,
+        error: path ? null : "Nessun percorso restituito",
+      };
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      return { ok: false, distanceKm: null, durationMinutes: null, latencyMs: Date.now() - t0, error: msg.slice(0, 300) };
+    }
+  };
+
+  const [graphhopper, valhalla] = await Promise.all([
+    runLeg(() => graphHopperRoute(routeReq, true)),
+    runLeg(() => valhallaCalculateRoute(routeReq)),
+  ]);
+
+  const pctDiff = (a: number | null, b: number | null): number | null => {
+    if (a == null || b == null) return null;
+    const avg = (a + b) / 2;
+    if (avg === 0) return 0;
+    return Math.round((Math.abs(a - b) / avg) * 1000) / 10; // percentuale, 1 decimale
+  };
+
+  const bothOk = graphhopper.ok && valhalla.ok;
+  const distanceDiffPct = bothOk ? pctDiff(graphhopper.distanceKm, valhalla.distanceKm) : null;
+  const durationDiffPct = bothOk ? pctDiff(graphhopper.durationMinutes, valhalla.durationMinutes) : null;
+  const coherent = bothOk && distanceDiffPct != null && durationDiffPct != null
+    ? distanceDiffPct <= 10 && durationDiffPct <= 10
+    : null;
+
+  return res.json({
+    ok: true,
+    area: "arco-alpino",
+    from: "Mira (VE)",
+    to: "Belluno (BL)",
+    graphhopper,
+    valhalla,
+    comparison: { coherent, distanceDiffPct, durationDiffPct, thresholdPct: 10 },
+  });
 });
 
 export default router;

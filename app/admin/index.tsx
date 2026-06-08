@@ -9,6 +9,7 @@ import { TelemetryCard, GraphHopperCard } from "@/components/admin/AdminStatsCar
 import { ServerEfficiencyCard } from "@/components/admin/ServerEfficiencyCard";
 import { ThinkCentreCard } from "@/components/admin/ThinkCentreCard";
 import { ThinkCentreEfficiencyCard } from "@/components/admin/ThinkCentreEfficiencyCard";
+import { RoutingCoordinationCard } from "@/components/admin/RoutingCoordinationCard";
 import { RoutingCloudBanner } from "@/components/admin/RoutingCloudBanner";
 import { WhisperChainCard } from "@/components/admin/WhisperChainCard";
 
@@ -322,6 +323,7 @@ export default function AdminDashboard() {
           <ServerEfficiencyCard />
           <ThinkCentreEfficiencyCard />
           <ThinkCentreCard />
+          <RoutingCoordinationCard />
           <GraphHopperCard />
           <TelemetryCard />
           <WhisperChainCard />
