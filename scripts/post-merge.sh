@@ -201,9 +201,9 @@ echo "════════════════════════�
 echo "  Guard RELEASE_NUMBER (buildInfo.ts)"
 echo "════════════════════════════════════════"
 RELEASE_NUMBER_HARDCODED=false
-if grep -qE '^export const RELEASE_NUMBER = [0-9]+' constants/buildInfo.ts 2>/dev/null; then
+if grep -qE '^export const RELEASE_NUMBER(\s*:[^=]+)?\s*=\s*[0-9]+' constants/buildInfo.ts 2>/dev/null; then
   RELEASE_NUMBER_HARDCODED=true
-  HARDCODED_VALUE=$(grep -oE 'RELEASE_NUMBER = [0-9]+' constants/buildInfo.ts | grep -oE '[0-9]+' || echo "?")
+  HARDCODED_VALUE=$(grep -oP 'RELEASE_NUMBER(\s*:[^=]+)?\s*=\s*\K[0-9]+' constants/buildInfo.ts | head -1 || echo "?")
   VERSION_CODE=$(node -p "require('./app.json').expo.android.versionCode" 2>/dev/null || echo "?")
   echo "❌ ERRORE: RELEASE_NUMBER è hardcoded (${HARDCODED_VALUE}) in constants/buildInfo.ts!"
   echo "   Deve essere derivato da app.json a runtime:"
@@ -219,6 +219,34 @@ echo "════════════════════════�
 echo ""
 if [ "$RELEASE_NUMBER_HARDCODED" = true ]; then
   echo "❌ Guard RELEASE_NUMBER fallito — correggere constants/buildInfo.ts prima di procedere."
+  exit 1
+fi
+
+# ── GUARD RUNTIME_VERSION ────────────────────────────────────
+# RUNTIME_VERSION deve essere derivato da app.json a runtime (non hardcoded).
+# Se qualcuno lo reintroduce come stringa letterale, questo guard lo blocca.
+echo "════════════════════════════════════════"
+echo "  Guard RUNTIME_VERSION (buildInfo.ts)"
+echo "════════════════════════════════════════"
+RUNTIME_VERSION_HARDCODED=false
+if grep -qE '^export const RUNTIME_VERSION(\s*:[^=]+)?\s*=\s*"[^"]*"' constants/buildInfo.ts 2>/dev/null; then
+  RUNTIME_VERSION_HARDCODED=true
+  HARDCODED_RTVER=$(grep -oP 'RUNTIME_VERSION(\s*:[^=]+)?\s*=\s*"\K[^"]+' constants/buildInfo.ts || echo "?")
+  APP_RUNTIME=$(node -p "require('./app.json').expo.runtimeVersion" 2>/dev/null || echo "?")
+  echo "❌ ERRORE: RUNTIME_VERSION è hardcoded (\"${HARDCODED_RTVER}\") in constants/buildInfo.ts!"
+  echo "   Deve essere derivato da app.json a runtime:"
+  echo "   import appJson from '../app.json';"
+  echo "   export const RUNTIME_VERSION: string = appJson.expo.runtimeVersion;"
+  if [ "$HARDCODED_RTVER" != "$APP_RUNTIME" ]; then
+    echo "   ⚠️  Disallineamento rilevato: buildInfo.ts=\"${HARDCODED_RTVER}\"  app.json=${APP_RUNTIME}"
+  fi
+else
+  echo "✅ RUNTIME_VERSION derivato a runtime da app.json — nessun valore hardcoded."
+fi
+echo "════════════════════════════════════════"
+echo ""
+if [ "$RUNTIME_VERSION_HARDCODED" = true ]; then
+  echo "❌ Guard RUNTIME_VERSION fallito — correggere constants/buildInfo.ts prima di procedere."
   exit 1
 fi
 

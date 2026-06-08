@@ -1,8 +1,8 @@
 import appJson from '../app.json';
 
 export const RELEASE_NUMBER: number = appJson.expo.android.versionCode;
+export const RUNTIME_VERSION: string = appJson.expo.runtimeVersion;
 export const OTA_BUNDLED_COUNT = 0;
-export const RUNTIME_VERSION = "10.0.0";
 
 /**
  * Contatore GLOBALE SEQUENZIALE degli OTA applicati — conta tutte le OTA di tutti

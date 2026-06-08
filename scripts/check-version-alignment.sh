@@ -174,7 +174,29 @@ else
   fi
 fi
 
-# ── 5. Riepilogo e firma di completamento ─────────────────────────────────────
+# ── 5. Verifica RUNTIME_VERSION in buildInfo.ts ──────────────────────────────
+$QUIET || echo ""
+$QUIET || echo -e "  ${BOLD}─── RUNTIME_VERSION in buildInfo.ts ─────────────────────────${RESET}"
+
+if [ ! -f "$BUILDINFO" ]; then
+  warning "$BUILDINFO non trovato — skip controllo RUNTIME_VERSION"
+else
+  if grep -qE '^export const RUNTIME_VERSION(\s*:[^=]+)?\s*=\s*"[^"]*"' "$BUILDINFO" 2>/dev/null; then
+    HARDCODED_RTVER=$(grep -oP 'RUNTIME_VERSION(\s*:[^=]+)?\s*=\s*"\K[^"]+' "$BUILDINFO" | head -1 || echo "")
+    blocker "RUNTIME_VERSION hardcoded (\"${HARDCODED_RTVER}\") in buildInfo.ts — deve essere derivato da app.json a runtime"
+    if [ -n "$APP_RUNTIME" ] && [ "$HARDCODED_RTVER" != "$APP_RUNTIME" ]; then
+      blocker "RUNTIME_VERSION disallineato: buildInfo.ts=\"${HARDCODED_RTVER}\"  app.json=${APP_RUNTIME}"
+    fi
+  else
+    if grep -q "appJson.expo.runtimeVersion" "$BUILDINFO" 2>/dev/null; then
+      ok "buildInfo.ts  RUNTIME_VERSION derivato da app.json (runtime — nessun valore hardcoded)"
+    else
+      warning "buildInfo.ts: RUNTIME_VERSION non derivato da app.json — verificare la sorgente"
+    fi
+  fi
+fi
+
+# ── 6. Riepilogo e firma di completamento ─────────────────────────────────────
 $QUIET || echo ""
 $QUIET || echo -e "  ${BOLD}──────────────────────────────────────────────────────────────${RESET}"
 $QUIET || echo ""
