@@ -4,10 +4,10 @@ import { MaterialCommunityIcons, Ionicons } from "@expo/vector-icons";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import Colors from "@/constants/colors";
 import { getApiUrl, authFetchHeaders, queryClient } from "@/lib/query-client";
-import { ErrorHistory, EventLog } from "./ThinkCentreCardParts";
-import type { HealthEvent } from "./ThinkCentreCardParts";
+import { ErrorHistory, EventLog, GraphHopperBlock } from "./ThinkCentreCardParts";
+import type { HealthEvent, AreaServiceHealth } from "./ThinkCentreCardParts";
 
-type ServiceKey = "graphhopper" | "valhalla" | "ollama" | "whisper" | "nominatim";
+type ServiceKey = "valhalla" | "ollama" | "whisper" | "nominatim";
 
 interface ServiceHealth {
   key: ServiceKey;
@@ -27,6 +27,10 @@ interface ThinkCentreHealth {
   onlineCount: number;
   configuredCount: number;
   services: ServiceHealth[];
+  graphhopperConfigured: boolean;
+  graphhopperUrl: string | null;
+  graphhopperTokenMissing?: boolean;
+  graphhopperAreas: AreaServiceHealth[];
   tokenFingerprints?: {
     graphhopper: string | null;
     valhalla: string | null;
@@ -42,7 +46,6 @@ interface HealthEventsResponse {
 }
 
 const SERVICE_ICONS: Record<ServiceKey, keyof typeof MaterialCommunityIcons.glyphMap> = {
-  graphhopper: "map-marker-path",
   valhalla: "routes",
   ollama: "robot-outline",
   whisper: "microphone-outline",
@@ -189,6 +192,14 @@ export function ThinkCentreCard() {
         <View style={styles.list}>
           {error && !isLoading && (
             <Text style={styles.errorText}>Impossibile leggere lo stato dei servizi.</Text>
+          )}
+          {data && data.graphhopperConfigured && (
+            <GraphHopperBlock
+              areas={data.graphhopperAreas}
+              fingerprint={data.tokenFingerprints?.graphhopper ?? null}
+              url={data.graphhopperUrl}
+              tokenMissing={data.graphhopperTokenMissing}
+            />
           )}
           {data?.services.map((s) => {
             const fp = data.tokenFingerprints?.[s.key] ?? null;

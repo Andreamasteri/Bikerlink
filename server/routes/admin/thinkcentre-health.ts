@@ -15,6 +15,13 @@ import { Router, type Request, type Response as ExpressResponse } from "express"
 import { createHash } from "crypto";
 import { getNominatimHealthSnapshot } from "../../lib/nominatim-client";
 import { ACTIVE_PROFILE } from "../../graphhopper-client";
+import { getAreaEnabledMap } from "../../routing/routing-area-state";
+import {
+  ROUTING_AREAS,
+  type RoutingArea,
+  type RoutingAreaCode,
+  type RoutingAreaTier,
+} from "@shared/routing-areas";
 import { db } from "../../db";
 import { thinkcentreHealthEvents } from "@shared/db";
 import { desc } from "drizzle-orm";
@@ -31,17 +38,21 @@ interface ErrorEvent {
   error: string;
 }
 
-/** Storico degli ultimi N eventi KO per servizio (in-memory, max 20). */
+/**
+ * Storico degli ultimi N eventi KO per servizio/area (in-memory, max 20).
+ * Le chiavi sono i ServiceKey per i servizi singoli, oppure
+ * `graphhopper:<codice>` per le singole istanze GraphHopper per-area.
+ */
 const ERROR_HISTORY_MAX = 20;
-const errorHistory = new Map<ServiceKey, ErrorEvent[]>();
+const errorHistory = new Map<string, ErrorEvent[]>();
 
-function recordError(key: ServiceKey, error: string): void {
+function recordError(key: string, error: string): void {
   const prev = errorHistory.get(key) ?? [];
   const next = [{ timestamp: Date.now(), error }, ...prev].slice(0, ERROR_HISTORY_MAX);
   errorHistory.set(key, next);
 }
 
-function getHistory(key: ServiceKey): ErrorEvent[] {
+function getHistory(key: string): ErrorEvent[] {
   return errorHistory.get(key) ?? [];
 }
 
@@ -58,6 +69,25 @@ interface ServiceHealth {
   /** URL configurato ma token assente: diverso da 401 (token presente ma sbagliato). */
   tokenMissing?: boolean;
   /** Ultimi eventi KO registrati in memoria (max 20). */
+  history: ErrorEvent[];
+}
+
+/**
+ * Salute di una singola istanza GraphHopper per-area (gruppo-area regionale).
+ * A differenza di ServiceHealth, l'URL non viene esposto (è derivabile dal
+ * blocco GH) e c'è il campo `enabled`: un'area disabilitata dal toggle admin è
+ * "Non abilitata", non "Offline".
+ */
+interface AreaServiceHealth {
+  code: RoutingAreaCode;
+  nome: string;
+  tier: RoutingAreaTier;
+  /** Abilitata dal toggle admin: se false NON viene probata. */
+  enabled: boolean;
+  ok: boolean;
+  latencyMs: number | null;
+  error?: string;
+  /** Ultimi eventi KO registrati in memoria per questa area (max 20). */
   history: ErrorEvent[];
 }
 
@@ -155,6 +185,7 @@ async function httpProbe(
 async function graphHopperRouteProbe(
   base: string,
   token: string | undefined,
+  points: [number, number][] = [[9.19, 45.46], [9.08, 45.81]],
 ): Promise<{ ok: boolean; latencyMs: number | null; error?: string }> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), PROBE_TIMEOUT_MS);
@@ -167,7 +198,7 @@ async function graphHopperRouteProbe(
       headers,
       signal: controller.signal,
       body: JSON.stringify({
-        points: [[9.19, 45.46], [9.08, 45.81]],
+        points,
         profile: ACTIVE_PROFILE,
         points_encoded: true,
         instructions: false,
@@ -190,42 +221,117 @@ async function graphHopperRouteProbe(
   }
 }
 
-async function probeGraphHopper(): Promise<ServiceHealth> {
-  const base = process.env.GRAPHHOPPER_URL?.replace(/\/$/, "");
-  const token = process.env.GRAPHHOPPER_TOKEN;
-  if (!base) {
-    return { key: "graphhopper", label: "GraphHopper", configured: false, ok: false, latencyMs: null, url: null, history: getHistory("graphhopper") };
+/**
+ * Due punti di probe interni al bbox dell'area (offset 10% dal centro su
+ * entrambi gli assi). Usati SOLO dal fallback /route quando /health non risponde:
+ * essendo dentro l'area, GraphHopper riesce a snapparli su strada reale.
+ */
+function areaProbePoints(area: RoutingArea): [number, number][] {
+  const { minLon, minLat, maxLon, maxLat } = area.bbox;
+  const cLon = (minLon + maxLon) / 2;
+  const cLat = (minLat + maxLat) / 2;
+  const dLon = (maxLon - minLon) * 0.1;
+  const dLat = (maxLat - minLat) * 0.1;
+  return [
+    [cLon - dLon, cLat - dLat],
+    [cLon + dLon, cLat + dLat],
+  ];
+}
+
+/**
+ * Proba una singola istanza GraphHopper per-area su `{base}/areas/<codice>`.
+ * Stessa logica double-probe del monolite: GET /health, poi fallback POST /route
+ * (con punti interni al bbox dell'area). Le aree non abilitate non vengono
+ * probate e tornano `enabled:false` (la UI le mostra "Non abilitata").
+ */
+async function probeGraphHopperArea(
+  area: RoutingArea,
+  base: string,
+  token: string | undefined,
+  enabled: boolean,
+): Promise<AreaServiceHealth> {
+  const historyKey = `graphhopper:${area.codice}`;
+  const baseShape = {
+    code: area.codice,
+    nome: area.nome,
+    tier: area.tier,
+    history: getHistory(historyKey),
+  };
+
+  if (!enabled) {
+    return { ...baseShape, enabled: false, ok: false, latencyMs: null };
   }
-  const tokenMissing = !token || token.trim() === "";
+
+  const areaBase = `${base}${area.path}`;
   const headers: Record<string, string> = {};
   if (token) headers["X-GH-Token"] = token;
 
   const health = await httpProbe(
-    `${base}/health`,
+    `${areaBase}/health`,
     headers,
     (status) => (status >= 200 && status < 300) || status === 401 || status === 403,
   );
   if (health.ok) {
-    return { key: "graphhopper", label: "GraphHopper", configured: true, ok: true, latencyMs: health.latencyMs, url: maskUrl(base), tokenMissing, history: getHistory("graphhopper") };
+    return { ...baseShape, enabled: true, ok: true, latencyMs: health.latencyMs, history: getHistory(historyKey) };
   }
 
-  const route = await graphHopperRouteProbe(base, token);
+  const route = await graphHopperRouteProbe(areaBase, token, areaProbePoints(area));
   if (!route.ok) {
     const finalError = route.error ?? health.error ?? "errore sconosciuto";
-    console.error("[thinkcentre-probe] graphhopper KO", { status: finalError });
-    recordError("graphhopper", finalError);
+    console.error(`[thinkcentre-probe] graphhopper ${area.codice} KO`, { status: finalError });
+    recordError(historyKey, finalError);
   }
   return {
-    key: "graphhopper",
-    label: "GraphHopper",
-    configured: true,
+    ...baseShape,
+    enabled: true,
     ok: route.ok,
     latencyMs: route.latencyMs,
-    url: maskUrl(base),
     error: route.ok ? undefined : (route.error ?? health.error),
-    tokenMissing,
-    history: getHistory("graphhopper"),
+    history: getHistory(historyKey),
   };
+}
+
+interface GraphHopperHealth {
+  configured: boolean;
+  url: string | null;
+  tokenMissing: boolean;
+  /** ok aggregato per lo stato globale: almeno un'area abilitata risponde. */
+  ok: boolean;
+  areas: AreaServiceHealth[];
+}
+
+/**
+ * Proba tutte le 7 istanze GraphHopper per-area in parallelo.
+ * Lo stato aggregato `ok` (per il calcolo globale ThinkCentre) è true se almeno
+ * un'area ABILITATA risponde; le aree disabilitate non contano.
+ */
+async function probeGraphHopperAreas(): Promise<GraphHopperHealth> {
+  const base = process.env.GRAPHHOPPER_URL?.replace(/\/$/, "");
+  const token = process.env.GRAPHHOPPER_TOKEN;
+  if (!base) {
+    return { configured: false, url: null, tokenMissing: true, ok: false, areas: [] };
+  }
+  const tokenMissing = !token || token.trim() === "";
+
+  let enabledMap: Record<RoutingAreaCode, boolean>;
+  try {
+    enabledMap = await getAreaEnabledMap();
+  } catch (err) {
+    console.error("[thinkcentre-probe] lettura getAreaEnabledMap fallita:", err);
+    enabledMap = ROUTING_AREAS.reduce((acc, a) => {
+      acc[a.codice] = a.abilitatoDefault;
+      return acc;
+    }, {} as Record<RoutingAreaCode, boolean>);
+  }
+
+  const areas = await Promise.all(
+    ROUTING_AREAS.map((a) => probeGraphHopperArea(a, base, token, enabledMap[a.codice] ?? false)),
+  );
+
+  const enabledAreas = areas.filter((a) => a.enabled);
+  const ok = enabledAreas.some((a) => a.ok);
+
+  return { configured: true, url: maskUrl(base), tokenMissing, ok, areas };
 }
 
 /**
@@ -416,19 +522,29 @@ router.get("/thinkcentre-events", async (_req: Request, res: ExpressResponse) =>
 
 router.get("/thinkcentre-health", async (_req: Request, res: ExpressResponse) => {
   try {
-    const services = await Promise.all([
-      probeGraphHopper(),
+    const [graphhopper, ...services] = await Promise.all([
+      probeGraphHopperAreas(),
       probeValhalla(),
       probeOllama(),
       probeWhisper(),
       probeNominatim(),
     ]);
-    const configured = services.filter((s) => s.configured);
-    const onlineCount = configured.filter((s) => s.ok).length;
+
+    // GraphHopper conta come UN servizio nello stato globale, ma SOLO se è
+    // configurato (GRAPHHOPPER_URL impostato) E almeno un'area è abilitata.
+    // Con tutte le aree disabilitate GH è neutro (non contribuisce a
+    // configuredCount/onlineCount/overall), in linea col job di monitoraggio.
+    const graphhopperContributes = graphhopper.configured && graphhopper.areas.some((a) => a.enabled);
+    const configuredServices = services.filter((s) => s.configured);
+    const configuredCount = configuredServices.length + (graphhopperContributes ? 1 : 0);
+    const onlineCount =
+      configuredServices.filter((s) => s.ok).length +
+      (graphhopperContributes && graphhopper.ok ? 1 : 0);
+
     const overall: "green" | "yellow" | "red" | "idle" =
-      configured.length === 0
+      configuredCount === 0
         ? "idle"
-        : onlineCount === configured.length
+        : onlineCount === configuredCount
           ? "green"
           : onlineCount === 0
             ? "red"
@@ -442,7 +558,18 @@ router.get("/thinkcentre-health", async (_req: Request, res: ExpressResponse) =>
       nominatim:   tokenFingerprint(process.env.NOMINATIM_TOKEN),
     };
 
-    return res.json({ overall, onlineCount, configuredCount: configured.length, services, tokenFingerprints, checkedAt: Date.now() });
+    return res.json({
+      overall,
+      onlineCount,
+      configuredCount,
+      services,
+      graphhopperConfigured: graphhopper.configured,
+      graphhopperUrl: graphhopper.url,
+      graphhopperTokenMissing: graphhopper.tokenMissing,
+      graphhopperAreas: graphhopper.areas,
+      tokenFingerprints,
+      checkedAt: Date.now(),
+    });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error("[admin/thinkcentre-health] errore:", msg);

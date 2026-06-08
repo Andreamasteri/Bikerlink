@@ -32,6 +32,8 @@ import { eq } from "drizzle-orm";
 import { sendSystemAlertPushToAdmins } from "../push-notifications";
 import { getNominatimHealthSnapshot } from "../lib/nominatim-client";
 import { ACTIVE_PROFILE, fetchSelfHostedProfiles, isSelfHosted } from "../graphhopper-client";
+import { getAreaEnabledMap } from "../routing/routing-area-state";
+import { ROUTING_AREAS, type RoutingArea, type RoutingAreaCode } from "@shared/routing-areas";
 
 // ── Config ────────────────────────────────────────────────────────────────────
 const PROBE_INTERVAL_MS = 5 * 60 * 1000;       // ogni 5 min
@@ -42,20 +44,25 @@ const SERVICE_NOTIFY_COOLDOWN_MS = 15 * 60 * 1000; // 15 min per notifiche per-s
 
 // ── State ─────────────────────────────────────────────────────────────────────
 type OverallStatus = "green" | "yellow" | "red" | "idle";
-type ServiceKey = "graphhopper" | "ollama" | "whisper" | "nominatim" | "valhalla";
+/**
+ * Chiave di servizio per le notifiche/debounce per-servizio. I servizi singoli
+ * usano i loro nomi; GraphHopper è esploso per-area con chiavi
+ * `graphhopper:<codice>` (es. "graphhopper:arco-alpino").
+ */
+type ServiceKey = string;
 
 interface ServiceProbeResult {
   key: ServiceKey;
   label: string;
-  ok: boolean | null; // null = non configurato
+  ok: boolean | null; // null = non configurato / non abilitato
 }
 
 let lastStatus: OverallStatus | null = null;
 let lastNotifiedAt = new Map<string, number>();
 
-/** Stato precedente per ogni singolo servizio configurato (ok/ko). */
+/** Stato precedente per ogni singolo servizio/area configurato (ok/ko). */
 let lastServiceStatuses = new Map<ServiceKey, boolean>();
-/** Timestamp dell'ultima notifica per-servizio inviata. */
+/** Timestamp dell'ultima notifica per-servizio/area inviata. */
 let lastServiceNotifiedAt = new Map<ServiceKey, number>();
 
 let intervalHandle: ReturnType<typeof setInterval> | null = null;
@@ -170,24 +177,35 @@ async function httpProbe(
   }
 }
 
-async function probeGraphHopperOk(): Promise<boolean | null> {
-  const base = process.env.GRAPHHOPPER_URL?.replace(/\/$/, "");
-  if (!base) return null;
-  const headers: Record<string, string> = {};
-  const token = process.env.GRAPHHOPPER_TOKEN;
-  if (token) headers["X-GH-Token"] = token;
+/** Due punti di probe interni al bbox dell'area (offset 10% dal centro). */
+function areaProbePoints(area: RoutingArea): [number, number][] {
+  const { minLon, minLat, maxLon, maxLat } = area.bbox;
+  const cLon = (minLon + maxLon) / 2;
+  const cLat = (minLat + maxLat) / 2;
+  const dLon = (maxLon - minLon) * 0.1;
+  const dLat = (maxLat - minLat) * 0.1;
+  return [[cLon - dLon, cLat - dLat], [cLon + dLon, cLat + dLat]];
+}
 
-  if (await httpProbe(`${base}/health`, headers, (s) => (s >= 200 && s < 300) || s === 401 || s === 403)) return true;
-
+/** Proba una singola istanza GH per-area: GET /health, poi fallback POST /route. */
+async function probeGraphHopperAreaOk(
+  area: RoutingArea,
+  base: string,
+  headers: Record<string, string>,
+): Promise<boolean> {
+  const areaBase = `${base}${area.path}`;
+  if (await httpProbe(`${areaBase}/health`, headers, (s) => (s >= 200 && s < 300) || s === 401 || s === 403)) {
+    return true;
+  }
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), PROBE_TIMEOUT_MS);
   try {
-    const res = await fetch(`${base}/route`, {
+    const res = await fetch(`${areaBase}/route`, {
       method: "POST",
       headers: { ...headers, "Content-Type": "application/json" },
       signal: controller.signal,
       body: JSON.stringify({
-        points: [[9.19, 45.46], [9.08, 45.81]],
+        points: areaProbePoints(area),
         profile: ACTIVE_PROFILE,
         points_encoded: true,
         instructions: false,
@@ -200,6 +218,49 @@ async function probeGraphHopperOk(): Promise<boolean | null> {
   } finally {
     clearTimeout(timer);
   }
+}
+
+/**
+ * Proba le 7 istanze GraphHopper per-area e ritorna:
+ *  - `unitOk`: contributo di GH allo stato globale (null = non configurato/niente
+ *    abilitato; true = almeno un'area abilitata risponde; false = nessuna risponde);
+ *  - `areas`: un ServiceProbeResult per ogni area ABILITATA (key `graphhopper:<codice>`,
+ *    label `GH · <nome>`) per le notifiche/eventi per-area. Le aree non abilitate
+ *    sono escluse (non generano notifiche offline).
+ */
+async function probeGraphHopperAreas(): Promise<{ unitOk: boolean | null; areas: ServiceProbeResult[] }> {
+  const base = process.env.GRAPHHOPPER_URL?.replace(/\/$/, "");
+  if (!base) return { unitOk: null, areas: [] };
+
+  const headers: Record<string, string> = {};
+  const token = process.env.GRAPHHOPPER_TOKEN;
+  if (token) headers["X-GH-Token"] = token;
+
+  let enabledMap: Record<RoutingAreaCode, boolean>;
+  try {
+    enabledMap = await getAreaEnabledMap();
+  } catch {
+    enabledMap = ROUTING_AREAS.reduce((acc, a) => {
+      acc[a.codice] = a.abilitatoDefault;
+      return acc;
+    }, {} as Record<RoutingAreaCode, boolean>);
+  }
+
+  const enabledAreas = ROUTING_AREAS.filter((a) => enabledMap[a.codice] ?? false);
+  if (enabledAreas.length === 0) return { unitOk: null, areas: [] };
+
+  const results = await Promise.allSettled(
+    enabledAreas.map((a) => probeGraphHopperAreaOk(a, base, headers)),
+  );
+
+  const areas: ServiceProbeResult[] = enabledAreas.map((a, i) => {
+    const r = results[i];
+    const ok = r.status === "fulfilled" ? r.value : false;
+    return { key: `graphhopper:${a.codice}`, label: `GH · ${a.nome}`, ok };
+  });
+
+  const unitOk = areas.some((a) => a.ok === true);
+  return { unitOk, areas };
 }
 
 async function probeOllamaOk(): Promise<boolean | null> {
@@ -243,27 +304,40 @@ interface AggregateProbeResult {
 
 async function runAllProbes(): Promise<AggregateProbeResult> {
   const probes: Array<{ key: ServiceKey; label: string; fn: () => Promise<boolean | null> }> = [
-    { key: "graphhopper", label: "GraphHopper", fn: probeGraphHopperOk },
     { key: "ollama", label: "Ollama AI", fn: probeOllamaOk },
     { key: "whisper", label: "Whisper ASR", fn: probeWhisperOk },
     { key: "nominatim", label: "Nominatim", fn: probeNominatimOk },
     { key: "valhalla", label: "Valhalla", fn: probeValhallaOk },
   ];
 
-  const results = await Promise.allSettled(probes.map((p) => p.fn()));
+  const [otherResults, gh] = await Promise.all([
+    Promise.allSettled(probes.map((p) => p.fn())),
+    probeGraphHopperAreas(),
+  ]);
 
-  const services: ServiceProbeResult[] = probes.map((p, i) => {
-    const r = results[i];
+  // Servizi singoli (Ollama, Whisper, Nominatim, Valhalla).
+  const otherServices: ServiceProbeResult[] = probes.map((p, i) => {
+    const r = otherResults[i];
     const ok = r.status === "fulfilled" ? r.value : false;
     return { key: p.key, label: p.label, ok };
   });
 
-  const configured = services.filter((s) => s.ok !== null);
+  // GraphHopper conta come UN servizio per lo stato globale (unitOk), ma le
+  // notifiche/eventi per-servizio sono per-area (gh.areas).
+  const services: ServiceProbeResult[] = [...otherServices, ...gh.areas];
+
+  // ── Stato globale ──────────────────────────────────────────────────────────
+  // Le unità logiche sono i 4 servizi singoli + GraphHopper-come-unità.
+  const logicalUnits: Array<boolean | null> = [
+    ...otherServices.map((s) => s.ok),
+    gh.unitOk,
+  ];
+  const configured = logicalUnits.filter((ok) => ok !== null);
   let overall: OverallStatus;
   if (configured.length === 0) {
     overall = "idle";
   } else {
-    const onlineCount = configured.filter((s) => s.ok === true).length;
+    const onlineCount = configured.filter((ok) => ok === true).length;
     if (onlineCount === configured.length) overall = "green";
     else if (onlineCount === 0) overall = "red";
     else overall = "yellow";
