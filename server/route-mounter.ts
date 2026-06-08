@@ -184,22 +184,28 @@ export function registerAllRoutes(app: express.Application) {
     return webPortalHtml.replace("</head>", `${injection}\n</head>`);
   }
 
-  // /docs — dedicated route with SEO meta tags (og:title, og:description, og:url).
-  app.get("/docs", (req, res) => {
+  // /docs and /docs/* — dedicated routes with per-topic SEO meta tags.
+  function serveDocsPage(
+    req: Request,
+    res: Response,
+    title: string,
+    description: string,
+    urlPath: string,
+  ) {
     const proto = req.headers["x-forwarded-proto"] || req.protocol || "https";
     const host = req.headers["x-forwarded-host"] || req.headers.host || "bikerlink.app";
     const baseUrl = `${proto}://${host}`;
-    const docsMetaInjection = [
-      `<title>BikerLink Docs — Guida e documentazione per motociclisti</title>`,
-      `<meta name="description" content="Documentazione ufficiale di BikerLink: guida all'app, funzionalità matching, MotoClub, SOS biker, percorsi e telemetria. Tutto quello che devi sapere per usare BikerLink al meglio."/>`,
-      `<meta property="og:title" content="BikerLink Docs — Guida e documentazione"/>`,
-      `<meta property="og:description" content="Documentazione ufficiale di BikerLink: guida all'app, matching biker, MotoClub, SOS e percorsi moto. Scopri tutte le funzionalità."/>`,
-      `<meta property="og:url" content="${baseUrl}/docs"/>`,
+    const metaInjection = [
+      `<title>${title}</title>`,
+      `<meta name="description" content="${description}"/>`,
+      `<meta property="og:title" content="${title}"/>`,
+      `<meta property="og:description" content="${description}"/>`,
+      `<meta property="og:url" content="${baseUrl}${urlPath}"/>`,
       `<meta property="og:type" content="website"/>`,
       `<meta property="og:image" content="${baseUrl}/assets/images/og-default.png"/>`,
       `<meta name="twitter:card" content="summary_large_image"/>`,
-      `<meta name="twitter:title" content="BikerLink Docs — Guida e documentazione"/>`,
-      `<meta name="twitter:description" content="Documentazione ufficiale di BikerLink: guida all'app, matching biker, MotoClub, SOS e percorsi moto."/>`,
+      `<meta name="twitter:title" content="${title}"/>`,
+      `<meta name="twitter:description" content="${description}"/>`,
     ].join("\n  ");
     const expoWebUrl = process.env.EXPO_WEB_URL || "";
     const scriptInjection = `<script>window.EXPO_WEB_URL=${JSON.stringify(expoWebUrl)};</script>`;
@@ -207,10 +213,73 @@ export function registerAllRoutes(app: express.Application) {
     const html = baseHtml
       .replace(/<title>.*?<\/title>/, "")
       .replace(/<meta name="description"[^>]*\/?>/, "")
-      .replace("</head>", `  ${docsMetaInjection}\n  ${scriptInjection}\n</head>`);
+      .replace("</head>", `  ${metaInjection}\n  ${scriptInjection}\n</head>`);
     res.setHeader("Content-Type", "text/html; charset=utf-8");
     res.setHeader("Cache-Control", "public, max-age=300");
     res.send(html);
+  }
+
+  app.get("/docs", (req, res) => {
+    serveDocsPage(
+      req, res,
+      "BikerLink Docs — Guida e documentazione per motociclisti",
+      "Documentazione ufficiale di BikerLink: guida all'app, funzionalità matching, MotoClub, SOS biker, percorsi e telemetria. Tutto quello che devi sapere per usare BikerLink al meglio.",
+      "/docs",
+    );
+  });
+
+  app.get("/docs/matching", (req, res) => {
+    serveDocsPage(
+      req, res,
+      "BikerLink Docs — Matching AI tra motociclisti",
+      "Come funziona il sistema di matching AI di BikerLink: algoritmo, punteggi di compatibilità, telemetria reale e criteri di abbinamento tra biker.",
+      "/docs/matching",
+    );
+  });
+
+  app.get("/docs/sos", (req, res) => {
+    serveDocsPage(
+      req, res,
+      "BikerLink Docs — Sistema SOS Biker",
+      "Documentazione del sistema SOS Biker di BikerLink: segnalazione emergenze stradali, allerta automatica dei contatti e gestione degli incidenti in tempo reale.",
+      "/docs/sos",
+    );
+  });
+
+  app.get("/docs/motoclub", (req, res) => {
+    serveDocsPage(
+      req, res,
+      "BikerLink Docs — MotoClub",
+      "Guida completa ai MotoClub su BikerLink: creazione di club, gestione dei membri, codici invito, chat di gruppo e funzionalità dedicate ai gruppi moto.",
+      "/docs/motoclub",
+    );
+  });
+
+  app.get("/docs/percorsi", (req, res) => {
+    serveDocsPage(
+      req, res,
+      "BikerLink Docs — Percorsi e navigazione GPS",
+      "Documentazione dei percorsi moto su BikerLink: pianificazione curvy routing, navigazione GPS, profili di guida, suggerimenti AI e condivisione giri.",
+      "/docs/percorsi",
+    );
+  });
+
+  app.get("/docs/telemetria", (req, res) => {
+    serveDocsPage(
+      req, res,
+      "BikerLink Docs — Telemetria di guida",
+      "Come BikerLink raccoglie e usa la telemetria di guida: velocità in curva, inclinazione, stile di guida, dati GPS reali e loro impatto sul matching e sui percorsi.",
+      "/docs/telemetria",
+    );
+  });
+
+  app.get("/docs/api", (req, res) => {
+    serveDocsPage(
+      req, res,
+      "BikerLink Docs — Riferimento API",
+      "Riferimento API tecnico di BikerLink per sviluppatori: endpoint pubblici, autenticazione, formato delle risposte e integrazione con il sistema di matching e percorsi.",
+      "/docs/api",
+    );
   });
 
   const webPortalRoutes = ["/registrati", "/accedi", "/area-utente", "/media", "/admin/media", "/admin/settings"];
