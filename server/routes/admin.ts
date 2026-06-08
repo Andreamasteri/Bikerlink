@@ -242,6 +242,7 @@ router.post("/startup-beacon", startupBeaconLimiter, startupBeaconJson, (req: Re
 
 import usersRouter from './admin/users';
 import usersNextRouter from './admin/users.next';
+import usersNextDetailRouter from './admin/users.next-detail';
 import usersExtraRouter from './admin/users-extra';
 import settingsRouter from './admin/settings';
 import settingsNextRouter from './admin/settings.next';
@@ -369,6 +370,7 @@ router.use('/tags', _requireAdmin, tagsRouter);
 router.use('/', _requireAdmin, textAliasesRouter);
 router.use('/users', _requireAdmin, usersRouter);
 router.use('/users', _requireAdmin, usersNextRouter);
+router.use('/users', _requireAdmin, usersNextDetailRouter);
 router.use('/users', _requireAdmin, usersExtraRouter);
 router.use('/settings', _requireAdmin, settingsRouter);
 router.use('/settings', _requireAdmin, settingsNextRouter);
