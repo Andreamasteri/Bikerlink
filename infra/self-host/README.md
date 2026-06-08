@@ -164,7 +164,6 @@ Dataset disponibili:
 | **Italia intera** (default) | ~1.7 GB | ~30 GB | 1-2h |
 | Nord-Ovest Italia | ~350 MB | ~5 GB | ~15 min |
 | Nord-Est Italia | ~300 MB | ~5 GB | ~15 min |
-| Europa intera | ~25 GB | ~300 GB | 8-24h |
 
 #### Avvio/stop manuale
 

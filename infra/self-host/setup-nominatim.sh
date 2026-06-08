@@ -64,7 +64,6 @@ for (( i=0; i<${#args[@]}; i++ )); do
       echo ""
       echo "Dataset disponibili su Geofabrik:"
       echo "  Italia       https://download.geofabrik.de/europe/italy-latest.osm.pbf  (~1.7 GB)"
-      echo "  Europa       https://download.geofabrik.de/europe-latest.osm.pbf        (~25 GB, 8-24h)"
       echo "  Nord Italia  https://download.geofabrik.de/europe/italy/nord-ovest-latest.osm.pbf"
       exit 0 ;;
     *) die "Argomento sconosciuto: ${args[$i]} (usa --help)" ;;
@@ -78,22 +77,19 @@ declare -A DATASET_URLS=(
   [1]="https://download.geofabrik.de/europe/italy-latest.osm.pbf"
   [2]="https://download.geofabrik.de/europe/italy/nord-ovest-latest.osm.pbf"
   [3]="https://download.geofabrik.de/europe/italy/nord-est-latest.osm.pbf"
-  [4]="https://download.geofabrik.de/europe-latest.osm.pbf"
-  [5]="custom"
+  [4]="custom"
 )
 declare -A DATASET_LABELS=(
   [1]="Italia intera        (~1.7 GB PBF / ~30 GB DB / ~1-2h)"
   [2]="Nord-Ovest Italia    (~350 MB PBF / ~5 GB DB  / ~15 min)"
   [3]="Nord-Est Italia      (~300 MB PBF / ~5 GB DB  / ~15 min)"
-  [4]="Europa intera        (~25 GB PBF  / ~300 GB DB / 8-24h) — DISCO: 300+ GB"
-  [5]="URL personalizzato"
+  [4]="URL personalizzato"
 )
 declare -A DATASET_REPLICATION=(
   [1]="https://download.geofabrik.de/europe/italy-updates/"
   [2]="https://download.geofabrik.de/europe/italy/nord-ovest-updates/"
   [3]="https://download.geofabrik.de/europe/italy/nord-est-updates/"
-  [4]="https://download.geofabrik.de/europe-updates/"
-  [5]=""
+  [4]=""
 )
 
 # =============================================================================
@@ -135,7 +131,7 @@ else
     echo ""
     bold "Scegli il dataset OSM da importare:"
     echo ""
-    for key in 1 2 3 4 5; do
+    for key in 1 2 3 4; do
       echo "  ${key}) ${DATASET_LABELS[$key]}"
     done
     echo ""
@@ -144,16 +140,16 @@ else
       CHOICE=1
       info "Modalità non-interattiva: selezionato Italia intera (default)."
     else
-      read -r -p "  Scelta [1-5, default: 1]: " CHOICE
+      read -r -p "  Scelta [1-4, default: 1]: " CHOICE
       CHOICE="${CHOICE:-1}"
     fi
 
-    if [[ ! "$CHOICE" =~ ^[1-5]$ ]]; then
+    if [[ ! "$CHOICE" =~ ^[1-4]$ ]]; then
       warn "Scelta non valida — uso Italia intera (1)."
       CHOICE=1
     fi
 
-    if [[ "$CHOICE" == "5" ]]; then
+    if [[ "$CHOICE" == "4" ]]; then
       read -r -p "  Inserisci l'URL del PBF: " SELECTED_PBF_URL
       read -r -p "  Inserisci l'URL di replicazione OSM (lascia vuoto per disabilitare): " SELECTED_REPLICATION_URL
     else
