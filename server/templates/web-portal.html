@@ -732,6 +732,7 @@ const I18N = {
     "docs.copied": "Copiato!",
     "docs.notAvailable": "Non ancora disponibile",
     "docs.uploadPdf": "Carica PDF",
+    "docs.updatePdf": "Aggiorna PDF",
     "docs.uploadSuccess": "Documento caricato con successo",
     "docs.uploadError": "Errore durante il caricamento",
     "admin.title": "Gestione Media",
@@ -832,6 +833,7 @@ const I18N = {
     "docs.copied": "Copied!",
     "docs.notAvailable": "Not yet available",
     "docs.uploadPdf": "Upload PDF",
+    "docs.updatePdf": "Update PDF",
     "docs.uploadSuccess": "Document uploaded successfully",
     "docs.uploadError": "Upload failed",
     "admin.title": "Media Management",
@@ -1540,6 +1542,7 @@ async function renderDocs() {
           </div>
         </div>`;
     }
+    const isAdmin = currentUser && currentUser.role === 'admin';
     return `
       <div class="doc-card">
         <div class="doc-card-icon">${icon}</div>
@@ -1548,6 +1551,7 @@ async function renderDocs() {
         <div class="doc-card-actions">
           <a href="${viewUrl}" target="_blank" rel="noopener" class="btn btn-primary btn-sm">🔍 ${t('docs.view')}</a>
           <a href="${downloadUrl}" download="${downloadName}" class="btn btn-outline btn-sm">⬇ ${t('docs.download')}</a>
+          ${isAdmin && uploadEndpoint ? `<button class="btn btn-ghost btn-sm" id="upload-btn-${slug}" onclick="uploadDocPdf('${uploadEndpoint}', 'upload-btn-${slug}')" title="${t('docs.updatePdf')}">🔄 ${t('docs.updatePdf')}</button>` : ''}
         </div>
         <div class="doc-share-box">
           <span class="doc-share-url" id="share-url-${slug}">${shareUrl}</span>
@@ -1653,6 +1657,7 @@ function uploadDocPdf(endpoint, btnId) {
     document.body.removeChild(input);
     if (!file) return;
     const btn = document.getElementById(btnId);
+    const origLabel = btn ? btn.textContent : null;
     if (btn) { btn.disabled = true; btn.textContent = '⏳ ' + t('admin.uploading'); }
     try {
       const form = new FormData();
@@ -1661,13 +1666,13 @@ function uploadDocPdf(endpoint, btnId) {
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
         alert(err.error || t('docs.uploadError'));
-        if (btn) { btn.disabled = false; btn.textContent = '📤 ' + t('docs.uploadPdf'); }
+        if (btn) { btn.disabled = false; btn.textContent = origLabel; }
         return;
       }
       await renderDocs();
     } catch (e) {
       alert(t('docs.uploadError'));
-      if (btn) { btn.disabled = false; btn.textContent = '📤 ' + t('docs.uploadPdf'); }
+      if (btn) { btn.disabled = false; btn.textContent = origLabel; }
     }
   });
   input.click();
