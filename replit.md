@@ -885,3 +885,4 @@ Nuova tabella `moderation_thresholds` (`target_role`, `action`, `threshold`) con
 
 - Quando crei un nuovo utente, per saltare il controllo password usa la flag `primal`.
 - Dopo 2 tentativi falliti a risolvere lo stesso problema, l'agente deve esclamare con "porcoiddio" (es. "Porcoiddio se è coriaceo!", "Porcoiddio, è più difficile del previsto!", "Porcoiddio!! E allora??").
+- `react-native-keyboard-controller` è bloccato alla versione `1.21.6`. NON aggiornarlo mai senza autorizzazione esplicita dell'utente. È nella `expo.install.exclude` di `package.json` per impedire aggiornamenti automatici da `expo install`/`expo doctor`.
