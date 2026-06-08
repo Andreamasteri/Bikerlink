@@ -1,0 +1,40 @@
+{
+  "extends": "expo/tsconfig.base",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "ignoreDeprecations": "6.0",
+    "strict": true,
+    "paths": {
+      "@/*": [
+        "./*"
+      ],
+      "@shared/*": [
+        "./shared/*"
+      ]
+    }
+  },
+  "include": [
+    "app/**/*.ts",
+    "app/**/*.tsx",
+    "components/**/*.ts",
+    "components/**/*.tsx",
+    "hooks/**/*.ts",
+    "constants/**/*.ts",
+    "lib/**/*.ts",
+    "lib/**/*.tsx",
+    "shared/**/*.ts",
+    "config/**/*.ts",
+    "mocks/**/*.ts",
+    "plugins/**/*.ts",
+    ".expo/types/**/*.ts",
+    "expo-env.d.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "server",
+    "scripts",
+    "dist",
+    "dist-ota",
+    "static-build"
+  ]
+}
