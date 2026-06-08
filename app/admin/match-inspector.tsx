@@ -148,6 +148,11 @@ export default function MatchInspectorScreen() {
           <View style={[styles.typeBadge, { backgroundColor: userTypeColor(item.userType) }]}>
             <Text style={styles.typeBadgeText}>{userTypeLabel(item.userType)}</Text>
           </View>
+          {item.totalMatches === 0 && (
+            <View style={styles.noMatchDot}>
+              <MaterialCommunityIcons name="alert" size={8} color="#fff" />
+            </View>
+          )}
         </View>
 
         <View style={styles.userInfo}>
@@ -175,7 +180,9 @@ export default function MatchInspectorScreen() {
         </View>
 
         <View style={styles.totalBadge}>
-          <Text style={styles.totalText}>{item.totalMatches}</Text>
+          <Text style={[styles.totalText, item.totalMatches === 0 && { color: Colors.warning }]}>
+            {item.totalMatches}
+          </Text>
           <Text style={styles.totalLabel}>tot</Text>
         </View>
 
@@ -305,6 +312,19 @@ const styles = StyleSheet.create({
     borderColor: Colors.background,
   },
   typeBadgeText: { fontFamily: "Inter_700Bold", fontSize: 8, color: "#fff" },
+  noMatchDot: {
+    position: "absolute",
+    top: -2,
+    left: -2,
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: Colors.warning,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1.5,
+    borderColor: Colors.background,
+  },
   userInfo: { flex: 1, gap: 4 },
   nameRow: { flexDirection: "row", alignItems: "center", gap: 6 },
   nickname: {
