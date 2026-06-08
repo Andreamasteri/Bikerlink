@@ -8,7 +8,7 @@ export function registerExportsRoutes(app: Express) {
       res.setHeader("Content-Type", "application/pdf");
       res.setHeader("Content-Disposition", "inline; filename=\"BikerLink-MatchingSystem.pdf\"");
       res.setHeader("Cache-Control", "public, max-age=3600");
-      stream.on("error", (err) => {
+      stream.on("error", (err: Error) => {
         console.error("[exports] matching-system.pdf stream error:", err);
         if (!res.headersSent) {
           res.status(500).json({ message: "Errore generazione PDF" });

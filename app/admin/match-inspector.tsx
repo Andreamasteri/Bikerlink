@@ -93,7 +93,7 @@ export default function MatchInspectorScreen() {
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [page, setPage] = useState(1);
-  const [zeroMatchOnly, setZeroMatchOnly] = useState(false);
+  const [filterZero, setFilterZero] = useState(false);
   const debounceRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const handleSearchChange = useCallback((text: string) => {
@@ -103,12 +103,12 @@ export default function MatchInspectorScreen() {
     debounceRef.current = setTimeout(() => setDebouncedSearch(text), 400);
   }, []);
 
-  const toggleZeroMatchFilter = useCallback(() => {
-    setZeroMatchOnly((prev) => !prev);
+  const handleToggleFilterZero = useCallback(() => {
+    setFilterZero((prev) => !prev);
     setPage(1);
   }, []);
 
-  const queryKey = ["/api/admin/users/match-summary", debouncedSearch, page, zeroMatchOnly];
+  const queryKey = ["/api/admin/users/match-summary", debouncedSearch, page, filterZero];
 
   const { data, isLoading, refetch } = useQuery<UsersResponse>({
     queryKey,
@@ -118,7 +118,7 @@ export default function MatchInspectorScreen() {
       url.searchParams.set("page", String(page));
       url.searchParams.set("limit", "30");
       if (debouncedSearch) url.searchParams.set("search", debouncedSearch);
-      if (zeroMatchOnly) url.searchParams.set("zeroMatchOnly", "true");
+      if (filterZero) url.searchParams.set("zeroMatchesOnly", "true");
       const res = await fetch(url.toString(), { credentials: "include" });
       if (!res.ok) throw new Error("Errore caricamento");
       return res.json();
@@ -222,26 +222,25 @@ export default function MatchInspectorScreen() {
 
       <View style={styles.headerRow}>
         <Text style={styles.totalCount}>{total} utenti</Text>
-        {zeroMatchCount > 0 && (
+        <View style={styles.headerActions}>
           <TouchableOpacity
-            style={[styles.zeroMatchBadge, zeroMatchOnly && styles.zeroMatchBadgeActive]}
-            onPress={toggleZeroMatchFilter}
+            onPress={handleToggleFilterZero}
+            style={[styles.filterChip, filterZero && styles.filterChipActive]}
             activeOpacity={0.7}
           >
             <MaterialCommunityIcons
-              name={zeroMatchOnly ? "filter-remove" : "alert"}
-              size={12}
-              color={zeroMatchOnly ? "#fff" : Colors.warning}
+              name="alert-circle"
+              size={13}
+              color={filterZero ? "#fff" : Colors.warning}
             />
-            <Text style={[styles.zeroMatchBadgeText, zeroMatchOnly && styles.zeroMatchBadgeTextActive]}>
-              {zeroMatchCount} senza match
+            <Text style={[styles.filterChipText, filterZero && styles.filterChipTextActive]}>
+              Da ricalcolare{zeroMatchCount > 0 ? ` (${zeroMatchCount})` : ""}
             </Text>
           </TouchableOpacity>
-        )}
-        <TouchableOpacity onPress={() => refetch()} style={styles.refreshBtn}>
-          <Ionicons name="refresh" size={16} color={Colors.accent} />
-          <Text style={styles.refreshText}>Aggiorna</Text>
-        </TouchableOpacity>
+          <TouchableOpacity onPress={() => refetch()} style={styles.refreshBtn}>
+            <Ionicons name="refresh" size={16} color={Colors.accent} />
+          </TouchableOpacity>
+        </View>
       </View>
 
       {isLoading ? (
@@ -304,31 +303,35 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: Colors.textSecondary,
   },
-  refreshBtn: { flexDirection: "row", alignItems: "center", gap: 4 },
-  refreshText: { fontFamily: "Inter_500Medium", fontSize: 13, color: Colors.accent },
-  zeroMatchBadge: {
+  headerActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  filterChip: {
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
-    backgroundColor: Colors.warning + "1A",
-    borderRadius: 8,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderWidth: 1,
-    borderColor: Colors.warning + "55",
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 20,
+    borderWidth: 1.5,
+    borderColor: Colors.warning,
+    backgroundColor: "transparent",
   },
-  zeroMatchBadgeActive: {
+  filterChipActive: {
     backgroundColor: Colors.warning,
     borderColor: Colors.warning,
   },
-  zeroMatchBadgeText: {
+  filterChipText: {
     fontFamily: "Inter_600SemiBold",
     fontSize: 12,
     color: Colors.warning,
   },
-  zeroMatchBadgeTextActive: {
+  filterChipTextActive: {
     color: "#fff",
   },
+  refreshBtn: { padding: 4 },
   userRow: {
     flexDirection: "row",
     alignItems: "center",

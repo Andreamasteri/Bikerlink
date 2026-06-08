@@ -297,9 +297,15 @@ router.get("/match-summary", async (req: Request, res: Response) => {
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 50;
     const offset = (page - 1) * limit;
-    const zeroMatchOnly = req.query.zeroMatchOnly === "true";
+    const zeroMatchesOnly = req.query.zeroMatchesOnly === "true";
+    const searchRaw = typeof req.query.search === "string" ? req.query.search.trim() : "";
+    const searchTerm = searchRaw ? `%${searchRaw}%` : null;
 
-    const zeroMatchCountQuery = db.execute(sql`
+    type CountRow = { cnt?: string };
+
+    // Inizializziamo zeroMatchCount con una query separata
+    // Questa query conta gli utenti con 0 match totali, indipendentemente dai filtri attivi.
+    const zeroMatchResult = await db.execute(sql`
       SELECT COUNT(*) as cnt FROM users u
       LEFT JOIN LATERAL (
         SELECT COUNT(*) as cnt FROM biker_biker_matches m
@@ -312,85 +318,82 @@ router.get("/match-summary", async (req: Request, res: Response) => {
       WHERE u.is_fake = false AND u.role NOT IN ('admin', 'moderator')
         AND (COALESCE(bb.cnt, 0) + COALESCE(bz.cnt, 0)) = 0
     `);
-
-    const totalCountQuery = zeroMatchOnly
-      ? zeroMatchCountQuery
-      : db.execute(sql`
-          SELECT COUNT(*) as cnt FROM users
-          WHERE is_fake = false AND role NOT IN ('admin', 'moderator')
-        `);
-
-    const [countResult, zeroMatchResult] = await Promise.all([
-      totalCountQuery,
-      zeroMatchCountQuery,
-    ]);
-
-    type CountRow = { cnt?: string };
-    const total = parseInt(((countResult.rows[0] as CountRow)?.cnt) ?? "0", 10);
     const zeroMatchCount = parseInt(((zeroMatchResult.rows[0] as CountRow)?.cnt) ?? "0", 10);
 
-    const usersResult = await db.execute(
-      zeroMatchOnly
-        ? sql`
-            SELECT
-              u.id, u.nickname, u.avatar_url, u.user_type, u.role, u.status,
-              COALESCE(bb.cnt, 0)::text as bb_count,
-              COALESCE(bz.cnt, 0)::text as bz_count,
-              null as bb_counts
-            FROM users u
-            LEFT JOIN LATERAL (
-              SELECT COUNT(*) as cnt FROM biker_biker_matches m
-              WHERE m.biker1_id = u.id OR m.biker2_id = u.id
-            ) bb ON true
-            LEFT JOIN LATERAL (
-              SELECT COUNT(*) as cnt FROM biker_zavorrina_matches m
-              WHERE m.biker_id = u.id OR m.zavorrina_id = u.id
-            ) bz ON true
-            WHERE u.is_fake = false AND u.role NOT IN ('admin', 'moderator')
-              AND (COALESCE(bb.cnt, 0) + COALESCE(bz.cnt, 0)) = 0
-            ORDER BY u.nickname
-            LIMIT ${limit} OFFSET ${offset}
-          `
-        : sql`
-            SELECT
-              u.id, u.nickname, u.avatar_url, u.user_type, u.role, u.status,
-              COALESCE(bb.cnt, 0)::text as bb_count,
-              COALESCE(bz.cnt, 0)::text as bz_count,
-              null as bb_counts
-            FROM users u
-            LEFT JOIN LATERAL (
-              SELECT COUNT(*) as cnt FROM biker_biker_matches m
-              WHERE m.biker1_id = u.id OR m.biker2_id = u.id
-            ) bb ON true
-            LEFT JOIN LATERAL (
-              SELECT COUNT(*) as cnt FROM biker_zavorrina_matches m
-              WHERE m.biker_id = u.id OR m.zavorrina_id = u.id
-            ) bz ON true
-            WHERE u.is_fake = false AND u.role NOT IN ('admin', 'moderator')
-            ORDER BY u.nickname
-            LIMIT ${limit} OFFSET ${offset}
-          `
-    );
+    let total: number;
+    if (zeroMatchesOnly) {
+      const countResult = await db.execute(sql`
+        SELECT COUNT(*) as cnt FROM users u
+        LEFT JOIN LATERAL (
+          SELECT COUNT(*) as cnt FROM biker_biker_matches m
+          WHERE m.biker1_id = u.id OR m.biker2_id = u.id
+        ) bb ON true
+        LEFT JOIN LATERAL (
+          SELECT COUNT(*) as cnt FROM biker_zavorrina_matches m
+          WHERE m.biker_id = u.id OR m.zavorrina_id = u.id
+        ) bz ON true
+        WHERE u.is_fake = false AND u.role NOT IN ('admin', 'moderator')
+          AND (COALESCE(bb.cnt, 0) + COALESCE(bz.cnt, 0)) = 0
+          ${searchTerm ? sql`AND u.nickname ILIKE ${searchTerm}` : sql``}
+      `);
+      total = parseInt(((countResult.rows[0] as CountRow)?.cnt) ?? "0", 10);
+    } else {
+      const countResult = await db.execute(sql`
+        SELECT COUNT(*) as cnt FROM users u
+        WHERE u.is_fake = false AND u.role NOT IN ('admin', 'moderator')
+          ${searchTerm ? sql`AND u.nickname ILIKE ${searchTerm}` : sql``}
+      `);
+      total = parseInt(((countResult.rows[0] as CountRow)?.cnt) ?? "0", 10);
+    }
+
+    const usersResult = await db.execute(sql`
+      SELECT
+        u.id, u.nickname, u.avatar_url, u.user_type, u.role, u.status,
+        COALESCE(bb.cnt, 0)::text as bb_count,
+        COALESCE(bz.cnt, 0)::text as bz_count,
+        null as bb_counts
+      FROM users u
+      LEFT JOIN LATERAL (
+        SELECT COUNT(*) as cnt FROM biker_biker_matches m
+        WHERE m.biker1_id = u.id OR m.biker2_id = u.id
+      ) bb ON true
+      LEFT JOIN LATERAL (
+        SELECT COUNT(*) as cnt FROM biker_zavorrina_matches m
+        WHERE m.biker_id = u.id OR m.zavorrina_id = u.id
+      ) bz ON true
+      WHERE u.is_fake = false AND u.role NOT IN ('admin', 'moderator')
+        ${zeroMatchesOnly ? sql`AND (COALESCE(bb.cnt, 0) + COALESCE(bz.cnt, 0)) = 0` : sql``}
+        ${searchTerm ? sql`AND u.nickname ILIKE ${searchTerm}` : sql``}
+      ORDER BY u.nickname
+      LIMIT ${limit} OFFSET ${offset}
+    `);
 
     type UserRow = { id: string; nickname: string; avatar_url: string | null; user_type: string | null; role: string; status: string; bb_count: string; bz_count: string; bb_counts: null };
-    const mappedUsers = (usersResult.rows as UserRow[]).map((row) => ({
-      id: row.id,
-      nickname: row.nickname,
-      avatarUrl: row.avatar_url,
-      userType: row.user_type,
-      role: row.role,
-      status: row.status,
-      bbCount: parseInt(row.bb_count || "0", 10),
-      bzCount: parseInt(row.bz_count || "0", 10),
-      bbCounts: row.bb_counts,
-    }));
+    const mappedUsers = (usersResult.rows as UserRow[]).map((row) => {
+      const bbMatches = parseInt(row.bb_count || "0", 10);
+      const bzMatches = parseInt(row.bz_count || "0", 10);
+      return {
+        id: row.id,
+        nickname: row.nickname,
+        avatarUrl: row.avatar_url,
+        userType: row.user_type,
+        role: row.role,
+        status: row.status,
+        bbMatches,
+        bzMatches,
+        totalMatches: bbMatches + bzMatches,
+        matchCounts: {} as Record<string, number>,
+      };
+    });
 
     return res.json({ users: mappedUsers, total, page, zeroMatchCount });
+
   } catch (_error) {
     console.error("Admin match-summary error:", _error);
     return sendError(res, 500, "Errore interno del server");
   }
 });
+
 
 router.get("/:id/stats", async (req: Request, res: Response) => {
   try {
