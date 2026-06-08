@@ -360,6 +360,8 @@ const es: Record<string, string> = {
   "match.unblockUser": "Desbloquear Usuario",
   "match.userBlocked": "Usuario bloqueado",
   "match.removeError": "No se pudo eliminar el match. Inténtalo de nuevo.",
+  "match.acceptError": "No se pudo aceptar el match. Inténtalo de nuevo.",
+  "match.rejectError": "No se pudo rechazar el match. Inténtalo de nuevo.",
   "match.blockUserConfirmTitle": "Bloquear usuario",
   "match.blockUserConfirmMsg": "¿Bloquear a {nickname}? Desaparecerá de los matches, perfil y chat. Ya no podréis interactuar.",
   "match.bikerTabInfo": "Si rechazas un match, el sistema lo vuelve a proponer en el siguiente reset. Si bloqueas a un usuario, no volverá a aparecer.",

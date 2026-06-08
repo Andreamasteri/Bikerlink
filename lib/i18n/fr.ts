@@ -360,6 +360,8 @@ const fr: Record<string, string> = {
   "match.unblockUser": "Débloquer l'utilisateur",
   "match.userBlocked": "Utilisateur bloqué",
   "match.removeError": "Impossible de supprimer le match. Veuillez réessayer.",
+  "match.acceptError": "Impossible d'accepter le match. Veuillez réessayer.",
+  "match.rejectError": "Impossible de rejeter le match. Veuillez réessayer.",
   "match.blockUserConfirmTitle": "Bloquer l'utilisateur",
   "match.blockUserConfirmMsg": "Bloquer {nickname} ? Il disparaîtra des matches, du profil et du chat. Vous ne pourrez plus interagir.",
   "match.bikerTabInfo": "Si vous refusez un match, le système le repropose au prochain reset. Si vous bloquez un utilisateur, il ne sera plus affiché.",

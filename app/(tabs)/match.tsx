@@ -169,84 +169,224 @@ export default function MatchScreen() {
 
   const acceptMutation = useMutation({
     mutationFn: (matchId: string) => apiRequest("POST", `/api/proposals/matches/${matchId}/accept`),
+    onMutate: async (matchId: string) => {
+      await queryClient.cancelQueries({ queryKey: ["/api/proposals/matches"] });
+      const previousMatches = queryClient.getQueryData(["/api/proposals/matches"]);
+      queryClient.setQueryData(["/api/proposals/matches"], (old: any[]) =>
+        Array.isArray(old) ? old.filter((m: any) => m.id !== matchId) : old,
+      );
+      return { previousMatches };
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/proposals/matches"] });
       queryClient.invalidateQueries({ queryKey: ["/api/proposals/matches/accepted"] });
       setPendingMatchId(null);
     },
-    onError: () => setPendingMatchId(null),
+    onError: (_err: unknown, _matchId: string, context: any) => {
+      if (context?.previousMatches !== undefined) {
+        queryClient.setQueryData(["/api/proposals/matches"], context.previousMatches);
+      }
+      setPendingMatchId(null);
+      Alert.alert(t("common.error"), t("match.acceptError"));
+    },
   });
 
   const rejectMutation = useMutation({
     mutationFn: (matchId: string) => apiRequest("POST", `/api/proposals/matches/${matchId}/reject`),
+    onMutate: async (matchId: string) => {
+      await queryClient.cancelQueries({ queryKey: ["/api/proposals/matches"] });
+      const previousMatches = queryClient.getQueryData(["/api/proposals/matches"]);
+      queryClient.setQueryData(["/api/proposals/matches"], (old: any[]) =>
+        Array.isArray(old) ? old.filter((m: any) => m.id !== matchId) : old,
+      );
+      return { previousMatches };
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/proposals/matches"] });
+    },
+    onError: (_err: unknown, _matchId: string, context: any) => {
+      if (context?.previousMatches !== undefined) {
+        queryClient.setQueryData(["/api/proposals/matches"], context.previousMatches);
+      }
+      Alert.alert(t("common.error"), t("match.rejectError"));
     },
   });
 
   const acceptGarageMutation = useMutation({
     mutationFn: (matchId: string) => apiRequest("POST", `/api/proposals/garage-matches/${matchId}/accept`),
+    onMutate: async (matchId: string) => {
+      await queryClient.cancelQueries({ queryKey: ["/api/proposals/garage-matches"] });
+      const previousGarage = queryClient.getQueryData(["/api/proposals/garage-matches"]);
+      queryClient.setQueryData(["/api/proposals/garage-matches"], (old: any[]) =>
+        Array.isArray(old) ? old.filter((m: any) => m.id !== matchId) : old,
+      );
+      return { previousGarage };
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/proposals/garage-matches"] });
       queryClient.invalidateQueries({ queryKey: ["/api/proposals/matches/accepted"] });
       setPendingMatchId(null);
     },
-    onError: () => setPendingMatchId(null),
+    onError: (_err: unknown, _matchId: string, context: any) => {
+      if (context?.previousGarage !== undefined) {
+        queryClient.setQueryData(["/api/proposals/garage-matches"], context.previousGarage);
+      }
+      setPendingMatchId(null);
+      Alert.alert(t("common.error"), t("match.acceptError"));
+    },
   });
 
   const rejectGarageMutation = useMutation({
     mutationFn: (matchId: string) => apiRequest("POST", `/api/proposals/garage-matches/${matchId}/reject`),
+    onMutate: async (matchId: string) => {
+      await queryClient.cancelQueries({ queryKey: ["/api/proposals/garage-matches"] });
+      const previousGarage = queryClient.getQueryData(["/api/proposals/garage-matches"]);
+      queryClient.setQueryData(["/api/proposals/garage-matches"], (old: any[]) =>
+        Array.isArray(old) ? old.filter((m: any) => m.id !== matchId) : old,
+      );
+      return { previousGarage };
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/proposals/garage-matches"] });
+    },
+    onError: (_err: unknown, _matchId: string, context: any) => {
+      if (context?.previousGarage !== undefined) {
+        queryClient.setQueryData(["/api/proposals/garage-matches"], context.previousGarage);
+      }
+      Alert.alert(t("common.error"), t("match.rejectError"));
     },
   });
 
   const acceptBikerMutation = useMutation({
     mutationFn: (matchId: string) => apiRequest("POST", `/api/proposals/biker-matches/${matchId}/accept`),
+    onMutate: async (matchId: string) => {
+      await queryClient.cancelQueries({ queryKey: ["/api/proposals/biker-matches"] });
+      const previousBiker = queryClient.getQueryData(["/api/proposals/biker-matches"]);
+      queryClient.setQueryData(["/api/proposals/biker-matches"], (old: any[]) =>
+        Array.isArray(old) ? old.filter((m: any) => m.id !== matchId) : old,
+      );
+      return { previousBiker };
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/proposals/biker-matches"] });
       queryClient.invalidateQueries({ queryKey: ["/api/proposals/matches/accepted"] });
       setPendingMatchId(null);
     },
-    onError: () => setPendingMatchId(null),
+    onError: (_err: unknown, _matchId: string, context: any) => {
+      if (context?.previousBiker !== undefined) {
+        queryClient.setQueryData(["/api/proposals/biker-matches"], context.previousBiker);
+      }
+      setPendingMatchId(null);
+      Alert.alert(t("common.error"), t("match.acceptError"));
+    },
   });
 
   const rejectBikerMutation = useMutation({
     mutationFn: (matchId: string) => apiRequest("POST", `/api/proposals/biker-matches/${matchId}/reject`),
+    onMutate: async (matchId: string) => {
+      await queryClient.cancelQueries({ queryKey: ["/api/proposals/biker-matches"] });
+      const previousBiker = queryClient.getQueryData(["/api/proposals/biker-matches"]);
+      queryClient.setQueryData(["/api/proposals/biker-matches"], (old: any[]) =>
+        Array.isArray(old) ? old.filter((m: any) => m.id !== matchId) : old,
+      );
+      return { previousBiker };
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/proposals/biker-matches"] });
+    },
+    onError: (_err: unknown, _matchId: string, context: any) => {
+      if (context?.previousBiker !== undefined) {
+        queryClient.setQueryData(["/api/proposals/biker-matches"], context.previousBiker);
+      }
+      Alert.alert(t("common.error"), t("match.rejectError"));
     },
   });
 
   const acceptPropProfileMutation = useMutation({
     mutationFn: (matchId: string) => apiRequest("POST", `/api/proposals/proposal-profile-matches/${matchId}/accept`),
+    onMutate: async (matchId: string) => {
+      await queryClient.cancelQueries({ queryKey: ["/api/proposals/proposal-profile-matches"] });
+      const previousPropProfile = queryClient.getQueryData(["/api/proposals/proposal-profile-matches"]);
+      queryClient.setQueryData(["/api/proposals/proposal-profile-matches"], (old: any[]) =>
+        Array.isArray(old) ? old.filter((m: any) => m.id !== matchId) : old,
+      );
+      return { previousPropProfile };
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/proposals/proposal-profile-matches"] });
       setPropProfilePendingId(null);
     },
-    onError: () => setPropProfilePendingId(null),
+    onError: (_err: unknown, _matchId: string, context: any) => {
+      if (context?.previousPropProfile !== undefined) {
+        queryClient.setQueryData(["/api/proposals/proposal-profile-matches"], context.previousPropProfile);
+      }
+      setPropProfilePendingId(null);
+      Alert.alert(t("common.error"), t("match.acceptError"));
+    },
   });
 
   const rejectPropProfileMutation = useMutation({
     mutationFn: (matchId: string) => apiRequest("POST", `/api/proposals/proposal-profile-matches/${matchId}/reject`),
+    onMutate: async (matchId: string) => {
+      await queryClient.cancelQueries({ queryKey: ["/api/proposals/proposal-profile-matches"] });
+      const previousPropProfile = queryClient.getQueryData(["/api/proposals/proposal-profile-matches"]);
+      queryClient.setQueryData(["/api/proposals/proposal-profile-matches"], (old: any[]) =>
+        Array.isArray(old) ? old.filter((m: any) => m.id !== matchId) : old,
+      );
+      return { previousPropProfile };
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/proposals/proposal-profile-matches"] });
+    },
+    onError: (_err: unknown, _matchId: string, context: any) => {
+      if (context?.previousPropProfile !== undefined) {
+        queryClient.setQueryData(["/api/proposals/proposal-profile-matches"], context.previousPropProfile);
+      }
+      Alert.alert(t("common.error"), t("match.rejectError"));
     },
   });
 
   const acceptRouteAffinityMutation = useMutation({
     mutationFn: (matchId: string) => apiRequest("POST", `/api/proposals/route-affinity-matches/${matchId}/accept`),
+    onMutate: async (matchId: string) => {
+      await queryClient.cancelQueries({ queryKey: ["/api/proposals/route-affinity-matches"] });
+      const previousRouteAffinity = queryClient.getQueryData(["/api/proposals/route-affinity-matches"]);
+      queryClient.setQueryData(["/api/proposals/route-affinity-matches"], (old: any[]) =>
+        Array.isArray(old) ? old.filter((m: any) => m.id !== matchId) : old,
+      );
+      return { previousRouteAffinity };
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/proposals/route-affinity-matches"] });
       setPendingMatchId(null);
     },
-    onError: () => setPendingMatchId(null),
+    onError: (_err: unknown, _matchId: string, context: any) => {
+      if (context?.previousRouteAffinity !== undefined) {
+        queryClient.setQueryData(["/api/proposals/route-affinity-matches"], context.previousRouteAffinity);
+      }
+      setPendingMatchId(null);
+      Alert.alert(t("common.error"), t("match.acceptError"));
+    },
   });
 
   const rejectRouteAffinityMutation = useMutation({
     mutationFn: (matchId: string) => apiRequest("POST", `/api/proposals/route-affinity-matches/${matchId}/reject`),
+    onMutate: async (matchId: string) => {
+      await queryClient.cancelQueries({ queryKey: ["/api/proposals/route-affinity-matches"] });
+      const previousRouteAffinity = queryClient.getQueryData(["/api/proposals/route-affinity-matches"]);
+      queryClient.setQueryData(["/api/proposals/route-affinity-matches"], (old: any[]) =>
+        Array.isArray(old) ? old.filter((m: any) => m.id !== matchId) : old,
+      );
+      return { previousRouteAffinity };
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/proposals/route-affinity-matches"] });
+    },
+    onError: (_err: unknown, _matchId: string, context: any) => {
+      if (context?.previousRouteAffinity !== undefined) {
+        queryClient.setQueryData(["/api/proposals/route-affinity-matches"], context.previousRouteAffinity);
+      }
+      Alert.alert(t("common.error"), t("match.rejectError"));
     },
   });
 
@@ -283,17 +423,45 @@ export default function MatchScreen() {
   // Task #3393 — mutations per i match telemetry-affinity (stile di guida).
   const acceptTelemetryAffinityMutation = useMutation({
     mutationFn: (matchId: string) => apiRequest("POST", `/api/proposals/telemetry-affinity-matches/${matchId}/accept`),
+    onMutate: async (matchId: string) => {
+      await queryClient.cancelQueries({ queryKey: ["/api/proposals/telemetry-affinity-matches"] });
+      const previousTelemetryAffinity = queryClient.getQueryData(["/api/proposals/telemetry-affinity-matches"]);
+      queryClient.setQueryData(["/api/proposals/telemetry-affinity-matches"], (old: any[]) =>
+        Array.isArray(old) ? old.filter((m: any) => m.id !== matchId) : old,
+      );
+      return { previousTelemetryAffinity };
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/proposals/telemetry-affinity-matches"] });
       setPendingMatchId(null);
     },
-    onError: () => setPendingMatchId(null),
+    onError: (_err: unknown, _matchId: string, context: any) => {
+      if (context?.previousTelemetryAffinity !== undefined) {
+        queryClient.setQueryData(["/api/proposals/telemetry-affinity-matches"], context.previousTelemetryAffinity);
+      }
+      setPendingMatchId(null);
+      Alert.alert(t("common.error"), t("match.acceptError"));
+    },
   });
 
   const rejectTelemetryAffinityMutation = useMutation({
     mutationFn: (matchId: string) => apiRequest("POST", `/api/proposals/telemetry-affinity-matches/${matchId}/reject`),
+    onMutate: async (matchId: string) => {
+      await queryClient.cancelQueries({ queryKey: ["/api/proposals/telemetry-affinity-matches"] });
+      const previousTelemetryAffinity = queryClient.getQueryData(["/api/proposals/telemetry-affinity-matches"]);
+      queryClient.setQueryData(["/api/proposals/telemetry-affinity-matches"], (old: any[]) =>
+        Array.isArray(old) ? old.filter((m: any) => m.id !== matchId) : old,
+      );
+      return { previousTelemetryAffinity };
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/proposals/telemetry-affinity-matches"] });
+    },
+    onError: (_err: unknown, _matchId: string, context: any) => {
+      if (context?.previousTelemetryAffinity !== undefined) {
+        queryClient.setQueryData(["/api/proposals/telemetry-affinity-matches"], context.previousTelemetryAffinity);
+      }
+      Alert.alert(t("common.error"), t("match.rejectError"));
     },
   });
 

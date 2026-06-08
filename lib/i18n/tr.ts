@@ -351,6 +351,8 @@ const tr: Record<string, string> = {
   "match.unblockUser": "Engeli Kaldır",
   "match.userBlocked": "Kullanıcı engellendi",
   "match.removeError": "Eşleşme kaldırılamadı. Lütfen tekrar deneyin.",
+  "match.acceptError": "Eşleşme kabul edilemedi. Lütfen tekrar deneyin.",
+  "match.rejectError": "Eşleşme reddedilemedi. Lütfen tekrar deneyin.",
   "match.blockUserConfirmTitle": "Kullanıcıyı engelle",
   "match.blockUserConfirmMsg": "{nickname} engellensin mi? Kullanıcı eşleşmelerden, profilden ve sohbetten kaybolacak. Artık etkileşime giremeyeceksiniz.",
   "match.bikerTabInfo": "Bir eşleşmeyi reddedersen, sistem bir sonraki sıfırlamada yeniden önerir. Bir kullanıcıyı engellersen, tekrar karşına çıkmaz.",
