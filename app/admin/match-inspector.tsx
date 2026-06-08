@@ -93,6 +93,7 @@ export default function MatchInspectorScreen() {
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [page, setPage] = useState(1);
+  const [zeroMatchOnly, setZeroMatchOnly] = useState(false);
   const debounceRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const handleSearchChange = useCallback((text: string) => {
@@ -102,7 +103,12 @@ export default function MatchInspectorScreen() {
     debounceRef.current = setTimeout(() => setDebouncedSearch(text), 400);
   }, []);
 
-  const queryKey = ["/api/admin/users/match-summary", debouncedSearch, page];
+  const toggleZeroMatchFilter = useCallback(() => {
+    setZeroMatchOnly((prev) => !prev);
+    setPage(1);
+  }, []);
+
+  const queryKey = ["/api/admin/users/match-summary", debouncedSearch, page, zeroMatchOnly];
 
   const { data, isLoading, refetch } = useQuery<UsersResponse>({
     queryKey,
@@ -112,6 +118,7 @@ export default function MatchInspectorScreen() {
       url.searchParams.set("page", String(page));
       url.searchParams.set("limit", "30");
       if (debouncedSearch) url.searchParams.set("search", debouncedSearch);
+      if (zeroMatchOnly) url.searchParams.set("zeroMatchOnly", "true");
       const res = await fetch(url.toString(), { credentials: "include" });
       if (!res.ok) throw new Error("Errore caricamento");
       return res.json();
@@ -216,12 +223,20 @@ export default function MatchInspectorScreen() {
       <View style={styles.headerRow}>
         <Text style={styles.totalCount}>{total} utenti</Text>
         {zeroMatchCount > 0 && (
-          <View style={styles.zeroMatchBadge}>
-            <MaterialCommunityIcons name="alert" size={12} color={Colors.warning} />
-            <Text style={styles.zeroMatchBadgeText}>
+          <TouchableOpacity
+            style={[styles.zeroMatchBadge, zeroMatchOnly && styles.zeroMatchBadgeActive]}
+            onPress={toggleZeroMatchFilter}
+            activeOpacity={0.7}
+          >
+            <MaterialCommunityIcons
+              name={zeroMatchOnly ? "filter-remove" : "alert"}
+              size={12}
+              color={zeroMatchOnly ? "#fff" : Colors.warning}
+            />
+            <Text style={[styles.zeroMatchBadgeText, zeroMatchOnly && styles.zeroMatchBadgeTextActive]}>
               {zeroMatchCount} senza match
             </Text>
-          </View>
+          </TouchableOpacity>
         )}
         <TouchableOpacity onPress={() => refetch()} style={styles.refreshBtn}>
           <Ionicons name="refresh" size={16} color={Colors.accent} />
@@ -302,10 +317,17 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.warning + "55",
   },
+  zeroMatchBadgeActive: {
+    backgroundColor: Colors.warning,
+    borderColor: Colors.warning,
+  },
   zeroMatchBadgeText: {
     fontFamily: "Inter_600SemiBold",
     fontSize: 12,
     color: Colors.warning,
+  },
+  zeroMatchBadgeTextActive: {
+    color: "#fff",
   },
   userRow: {
     flexDirection: "row",
