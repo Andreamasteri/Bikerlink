@@ -43,7 +43,7 @@ const NOTIFY_COOLDOWN_MS = 10 * 60 * 1000;     // 10 min tra stesse notifiche gl
 const SERVICE_NOTIFY_COOLDOWN_MS = 15 * 60 * 1000; // 15 min per notifiche per-servizio
 
 // ── State ─────────────────────────────────────────────────────────────────────
-type OverallStatus = "green" | "yellow" | "red" | "idle";
+export type OverallStatus = "green" | "yellow" | "red" | "idle";
 /**
  * Chiave di servizio per le notifiche/debounce per-servizio. I servizi singoli
  * usano i loro nomi; GraphHopper è esploso per-area con chiavi
@@ -221,6 +221,20 @@ async function probeGraphHopperAreaOk(
 }
 
 /**
+ * Calcola lo stato globale aggregato a partire dalla lista di unità logiche
+ * (ogni servizio configurato = un boolean, non configurato = null).
+ * Funzione pura — utilizzabile nei test senza side-effect.
+ */
+export function computeOverallStatus(logicalUnits: Array<boolean | null>): OverallStatus {
+  const configured = logicalUnits.filter((ok) => ok !== null) as boolean[];
+  if (configured.length === 0) return "idle";
+  const onlineCount = configured.filter((ok) => ok === true).length;
+  if (onlineCount === configured.length) return "green";
+  if (onlineCount === 0) return "red";
+  return "yellow";
+}
+
+/**
  * Proba le 7 istanze GraphHopper per-area e ritorna:
  *  - `unitOk`: contributo di GH allo stato globale (null = non configurato/niente
  *    abilitato; true = almeno un'area abilitata risponde; false = nessuna risponde);
@@ -228,7 +242,7 @@ async function probeGraphHopperAreaOk(
  *    label `GH · <nome>`) per le notifiche/eventi per-area. Le aree non abilitate
  *    sono escluse (non generano notifiche offline).
  */
-async function probeGraphHopperAreas(): Promise<{ unitOk: boolean | null; areas: ServiceProbeResult[] }> {
+export async function probeGraphHopperAreas(): Promise<{ unitOk: boolean | null; areas: ServiceProbeResult[] }> {
   const base = process.env.GRAPHHOPPER_URL?.replace(/\/$/, "");
   if (!base) return { unitOk: null, areas: [] };
 
@@ -332,16 +346,7 @@ async function runAllProbes(): Promise<AggregateProbeResult> {
     ...otherServices.map((s) => s.ok),
     gh.unitOk,
   ];
-  const configured = logicalUnits.filter((ok) => ok !== null);
-  let overall: OverallStatus;
-  if (configured.length === 0) {
-    overall = "idle";
-  } else {
-    const onlineCount = configured.filter((ok) => ok === true).length;
-    if (onlineCount === configured.length) overall = "green";
-    else if (onlineCount === 0) overall = "red";
-    else overall = "yellow";
-  }
+  const overall = computeOverallStatus(logicalUnits);
 
   return { overall, services };
 }
