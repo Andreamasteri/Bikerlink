@@ -44,6 +44,21 @@ export function registerMoreRoutes2(app: Express) {
     fs.createReadStream(COMPETITOR_PNG_PATH).pipe(res);
   });
 
+  app.get("/api/manual/view", (_req, res) => {
+    if (!fs.existsSync(MANUAL_PATH)) {
+      return sendError(res, 404, "Manuale non disponibile");
+    }
+    res.setHeader("Content-Disposition", 'inline; filename="BikerLink-Manual.pdf"');
+    res.setHeader("Content-Type", "application/pdf");
+    const stream = fs.createReadStream(MANUAL_PATH);
+    stream.on("error", (err) => {
+      console.error("Manual view stream error:", err);
+      if (!res.headersSent) sendError(res, 500, "Errore lettura file");
+      else res.end();
+    });
+    stream.pipe(res);
+  });
+
   app.get("/api/manual/download", (_req, res) => {
     if (!fs.existsSync(MANUAL_PATH)) {
       return sendError(res, 404, "Manuale non disponibile");
@@ -138,6 +153,21 @@ export function registerMoreRoutes2(app: Express) {
     limits: { fileSize: 20 * 1024 * 1024 },
   });
 
+  app.get("/api/eula/view", (_req, res) => {
+    if (!fs.existsSync(EULA_PDF_PATH)) {
+      return sendError(res, 404, "EULA non disponibile");
+    }
+    res.setHeader("Content-Disposition", 'inline; filename="BikerLink-EULA.pdf"');
+    res.setHeader("Content-Type", "application/pdf");
+    const stream = fs.createReadStream(EULA_PDF_PATH);
+    stream.on("error", (err) => {
+      console.error("EULA view stream error:", err);
+      if (!res.headersSent) sendError(res, 500, "Errore lettura file");
+      else res.end();
+    });
+    stream.pipe(res);
+  });
+
   app.get("/api/eula/download", (_req, res) => {
     if (!fs.existsSync(EULA_PDF_PATH)) {
       return sendError(res, 404, "EULA non disponibile");
@@ -170,6 +200,21 @@ export function registerMoreRoutes2(app: Express) {
       const stats = fs.statSync(EULA_PDF_PATH);
       sendSuccess(res, { fileName: "BikerLink-EULA.pdf", fileSize: stats.size, lastModified: stats.mtime.toISOString() }, "EULA aggiornato con successo");
     });
+  });
+
+  app.get("/api/privacy-policy/view", (_req, res) => {
+    if (!fs.existsSync(PRIVACY_PDF_PATH)) {
+      return sendError(res, 404, "Privacy Policy non disponibile");
+    }
+    res.setHeader("Content-Disposition", 'inline; filename="BikerLink-PrivacyPolicy.pdf"');
+    res.setHeader("Content-Type", "application/pdf");
+    const stream = fs.createReadStream(PRIVACY_PDF_PATH);
+    stream.on("error", (err) => {
+      console.error("Privacy Policy view stream error:", err);
+      if (!res.headersSent) sendError(res, 500, "Errore lettura file");
+      else res.end();
+    });
+    stream.pipe(res);
   });
 
   app.get("/api/privacy-policy/download", (_req, res) => {

@@ -718,10 +718,17 @@ const I18N = {
     "docs.subtitle": "Documentazione tecnica e whitepaper del progetto BikerLink",
     "docs.matching.title": "Sistema di Matching BikerLink",
     "docs.matching.desc": "Whitepaper tecnico che descrive l'algoritmo di matching tra biker: logica, pesi, compatibilità e funzionamento del motore.",
+    "docs.eula.title": "Termini di Servizio (EULA)",
+    "docs.eula.desc": "Contratto di licenza utente finale: diritti d'uso, limitazioni, proprietà intellettuale e condizioni di utilizzo dell'app BikerLink.",
+    "docs.privacy.title": "Privacy Policy",
+    "docs.privacy.desc": "Informativa completa sul trattamento dei dati personali, diritti GDPR, modalità di raccolta e conservazione dei dati degli utenti.",
+    "docs.manual.title": "Manuale Utente",
+    "docs.manual.desc": "Guida completa all'utilizzo di BikerLink: registrazione, profilo, matching, eventi, motoclub e funzionalità avanzate.",
     "docs.view": "Visualizza PDF",
     "docs.download": "Scarica",
     "docs.copyLink": "Copia Link",
     "docs.copied": "Copiato!",
+    "docs.notAvailable": "Non ancora disponibile",
     "admin.title": "Gestione Media",
     "admin.add": "Aggiungi Risorsa",
     "admin.type": "Tipo",
@@ -806,10 +813,17 @@ const I18N = {
     "docs.subtitle": "Technical documentation and whitepapers for the BikerLink project",
     "docs.matching.title": "BikerLink Matching System",
     "docs.matching.desc": "Technical whitepaper describing the biker matching algorithm: logic, weights, compatibility and engine mechanics.",
+    "docs.eula.title": "Terms of Service (EULA)",
+    "docs.eula.desc": "End user license agreement: usage rights, restrictions, intellectual property and conditions for using the BikerLink app.",
+    "docs.privacy.title": "Privacy Policy",
+    "docs.privacy.desc": "Full personal data processing notice, GDPR rights, data collection and retention policies for BikerLink users.",
+    "docs.manual.title": "User Manual",
+    "docs.manual.desc": "Complete guide to using BikerLink: registration, profile, matching, events, moto clubs and advanced features.",
     "docs.view": "View PDF",
     "docs.download": "Download",
     "docs.copyLink": "Copy Link",
     "docs.copied": "Copied!",
+    "docs.notAvailable": "Not yet available",
     "admin.title": "Media Management",
     "admin.add": "Add Resource",
     "admin.type": "Type",
@@ -1490,10 +1504,44 @@ function switchMediaTab(type) {
 }
 
 // ── DOCS PAGE ─────────────────────────────────────────────────────────────
-function renderDocs() {
+async function renderDocs() {
   document.title = `BikerLink — ${t('docs.title')}`;
-  const pdfUrl = '/api/exports/matching-system.pdf';
-  const fullUrl = `${location.origin}${pdfUrl}`;
+  setApp(`<div class="loading-page"><div class="loader"></div></div>`);
+
+  const [eulaInfo, privacyInfo, manualInfo] = await Promise.all([
+    fetch('/api/eula/info').then(r => r.ok ? r.json() : { available: false }).catch(() => ({ available: false })),
+    fetch('/api/privacy-policy/info').then(r => r.ok ? r.json() : { available: false }).catch(() => ({ available: false })),
+    fetch('/api/manual/info').then(r => r.ok ? r.json() : { available: false }).catch(() => ({ available: false })),
+  ]);
+
+  function docCard({ icon, titleKey, descKey, viewUrl, downloadUrl, downloadName, slug, available }) {
+    const shareUrl = `${location.origin}${viewUrl}`;
+    if (!available) {
+      return `
+        <div class="doc-card" style="opacity:0.55">
+          <div class="doc-card-icon">${icon}</div>
+          <div class="doc-card-title">${t(titleKey)}</div>
+          <div class="doc-card-desc">${t(descKey)}</div>
+          <div class="doc-card-actions">
+            <span style="font-size:12px;color:var(--text3);font-style:italic">— ${t('docs.notAvailable')} —</span>
+          </div>
+        </div>`;
+    }
+    return `
+      <div class="doc-card">
+        <div class="doc-card-icon">${icon}</div>
+        <div class="doc-card-title">${t(titleKey)}</div>
+        <div class="doc-card-desc">${t(descKey)}</div>
+        <div class="doc-card-actions">
+          <a href="${viewUrl}" target="_blank" rel="noopener" class="btn btn-primary btn-sm">🔍 ${t('docs.view')}</a>
+          <a href="${downloadUrl}" download="${downloadName}" class="btn btn-outline btn-sm">⬇ ${t('docs.download')}</a>
+        </div>
+        <div class="doc-share-box">
+          <span class="doc-share-url" id="share-url-${slug}">${shareUrl}</span>
+          <button class="btn btn-ghost btn-sm" id="copy-btn-${slug}" onclick="copyDocLink('${shareUrl}', 'copy-btn-${slug}')" title="${t('docs.copyLink')}">📋</button>
+        </div>
+      </div>`;
+  }
 
   setApp(`
     <div class="docs-page">
@@ -1503,19 +1551,46 @@ function renderDocs() {
         <p style="color:var(--text2);margin-top:8px;font-size:15px">${t('docs.subtitle')}</p>
       </div>
       <div class="docs-grid">
-        <div class="doc-card">
-          <div class="doc-card-icon">📄</div>
-          <div class="doc-card-title">${t('docs.matching.title')}</div>
-          <div class="doc-card-desc">${t('docs.matching.desc')}</div>
-          <div class="doc-card-actions">
-            <a href="${pdfUrl}" target="_blank" rel="noopener" class="btn btn-primary btn-sm">🔍 ${t('docs.view')}</a>
-            <a href="${pdfUrl}" download="BikerLink-MatchingSystem.pdf" class="btn btn-outline btn-sm">⬇ ${t('docs.download')}</a>
-          </div>
-          <div class="doc-share-box">
-            <span class="doc-share-url" id="matching-pdf-url">${fullUrl}</span>
-            <button class="btn btn-ghost btn-sm" id="copy-matching-btn" onclick="copyDocLink('${fullUrl}', 'copy-matching-btn')" title="${t('docs.copyLink')}">📋</button>
-          </div>
-        </div>
+        ${docCard({
+          icon: '⚙️',
+          titleKey: 'docs.matching.title',
+          descKey: 'docs.matching.desc',
+          viewUrl: '/api/exports/matching-system.pdf',
+          downloadUrl: '/api/exports/matching-system.pdf',
+          downloadName: 'BikerLink-MatchingSystem.pdf',
+          slug: 'matching',
+          available: true,
+        })}
+        ${docCard({
+          icon: '📋',
+          titleKey: 'docs.eula.title',
+          descKey: 'docs.eula.desc',
+          viewUrl: '/api/eula/view',
+          downloadUrl: '/api/eula/download',
+          downloadName: 'BikerLink-EULA.pdf',
+          slug: 'eula',
+          available: eulaInfo.available,
+        })}
+        ${docCard({
+          icon: '🔒',
+          titleKey: 'docs.privacy.title',
+          descKey: 'docs.privacy.desc',
+          viewUrl: '/api/privacy-policy/view',
+          downloadUrl: '/api/privacy-policy/download',
+          downloadName: 'BikerLink-PrivacyPolicy.pdf',
+          slug: 'privacy',
+          available: privacyInfo.available,
+        })}
+        ${docCard({
+          icon: '📖',
+          titleKey: 'docs.manual.title',
+          descKey: 'docs.manual.desc',
+          viewUrl: '/api/manual/view',
+          downloadUrl: '/api/manual/download',
+          downloadName: 'BikerLink-Manual.pdf',
+          slug: 'manual',
+          available: manualInfo.available,
+        })}
       </div>
     </div>
     ${renderFooter()}
