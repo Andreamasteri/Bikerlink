@@ -243,6 +243,46 @@ services:
       start_period: 180m
 
   # ---------------------------------------------------------------------------
+  # Nominatim 4.4 — geocoding/reverse-geocoding self-hosted (OSM)
+  #
+  # Prima esecuzione: il container importa il PBF indicato da NOMINATIM_PBF_URL
+  # (default: Italy da Geofabrik). L'import richiede 1-3h per l'Italia.
+  # Monitorare con:  docker compose logs -f nominatim
+  # Una volta terminato l'import, Nominatim risponde su http://127.0.0.1:7070
+  #
+  # Profilo "nominatim": non parte con `docker compose up -d`.
+  # Avvio manuale (DOPO aver letto infra/self-host/setup-nominatim.sh):
+  #   docker compose --env-file .env up -d nominatim
+  #
+  # Variabili opzionali in .env:
+  #   NOMINATIM_PBF_URL   URL del PBF da importare (default: italy-latest)
+  #   NOMINATIM_REPLICATION_URL  URL aggiornamenti OSM (disabilitato se FREEZE=true)
+  # ---------------------------------------------------------------------------
+  nominatim:
+    image: mediagis/nominatim:4.4
+    container_name: bikerlink-nominatim
+    restart: unless-stopped
+    profiles: ["nominatim"]
+    shm_size: "1gb"
+    environment:
+      PBF_URL: ${NOMINATIM_PBF_URL:-https://download.geofabrik.de/europe/italy-latest.osm.pbf}
+      REPLICATION_URL: ${NOMINATIM_REPLICATION_URL:-https://download.geofabrik.de/europe/italy-updates/}
+      FREEZE: ${NOMINATIM_FREEZE:-false}
+      IMPORT_WIKIPEDIA: "false"
+      IMPORT_STYLE: extratags
+      NOMINATIM_PASSWORD: ${NOMINATIM_DB_PASSWORD:-nominatim}
+    ports:
+      - "127.0.0.1:7070:8080"
+    volumes:
+      - nominatimdata:/var/lib/postgresql/16/main
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS 'http://localhost:8080/status.php' || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 180m
+
+  # ---------------------------------------------------------------------------
   # pgAdmin 4 — UI di amministrazione DB
   # ---------------------------------------------------------------------------
   pgadmin:
@@ -266,3 +306,4 @@ volumes:
   redisdata:
   valhalladata:
   pgadmindata:
+  nominatimdata:
