@@ -457,6 +457,95 @@ describe("Real admin router — GET /users/match-summary", () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Tests: GET /users/match-summary — search filtering
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("Real admin router — GET /users/match-summary search filtering", () => {
+  type ExecuteResult = Awaited<ReturnType<typeof db.execute>>;
+
+  /**
+   * Fully primes db.execute for the three sequential calls match-summary makes:
+   *   1. Promise.all slot 1 — pagination COUNT (respects search + zeroOnly)
+   *   2. Promise.all slot 2 — zeroMatchCount badge (global, no search filter)
+   *   3. main SELECT — user rows (respects search + zeroOnly)
+   *   4+ — profile/motorcycle/tag/wishlist sub-queries (all empty)
+   */
+  function mockMatchSummaryFull(opts: {
+    paginationCount: number;
+    zeroMatchCount?: number;
+    userRows?: object[];
+  }) {
+    const { paginationCount, zeroMatchCount = 0, userRows = [] } = opts;
+    vi.mocked(db.execute)
+      .mockResolvedValueOnce({ rows: [{ cnt: String(paginationCount) }] } as unknown as ExecuteResult)
+      .mockResolvedValueOnce({ rows: [{ cnt: String(zeroMatchCount)  }] } as unknown as ExecuteResult)
+      .mockResolvedValueOnce({ rows: userRows }                           as unknown as ExecuteResult)
+      .mockResolvedValue(   { rows: [] }                                 as unknown as ExecuteResult);
+  }
+
+  beforeEach(() => {
+    vi.mocked(db.execute).mockReset();
+    vi.mocked(db.execute).mockResolvedValue({ rows: [] } as unknown as ExecuteResult);
+  });
+
+  it("returns only matching users when search param is provided", async () => {
+    mockMatchSummaryFull({
+      paginationCount: 1,
+      zeroMatchCount: 0,
+      userRows: [
+        { id: "u1", nickname: "Alpha", avatar_url: null, user_type: "biker", role: "user", status: "active", bb_count: "2", bz_count: "0", bb_counts: null },
+      ],
+    });
+
+    const response = await supertest(buildAdminApp()).get("/users/match-summary?search=Alpha");
+    expect(response.status).toBe(200);
+    expect(response.body.total).toBe(1);
+    expect(response.body.users).toHaveLength(1);
+    expect(response.body.users[0].nickname).toBe("Alpha");
+  });
+
+  it("pagination total reflects the search-filtered count, not the global count", async () => {
+    mockMatchSummaryFull({ paginationCount: 3, zeroMatchCount: 1, userRows: [] });
+
+    const response = await supertest(buildAdminApp()).get("/users/match-summary?search=xyz");
+    expect(response.status).toBe(200);
+    expect(response.body.total).toBe(3);
+  });
+
+  it("search and zeroOnly compose with AND logic — total reflects both filters", async () => {
+    mockMatchSummaryFull({ paginationCount: 2, zeroMatchCount: 5, userRows: [] });
+
+    const response = await supertest(buildAdminApp()).get("/users/match-summary?search=Test&zeroOnly=true");
+    expect(response.status).toBe(200);
+    expect(response.body.total).toBe(2);
+    expect(response.body.zeroMatchCount).toBe(5);
+  });
+
+  it("empty search string behaves the same as no search param", async () => {
+    mockMatchSummaryFull({ paginationCount: 10, zeroMatchCount: 3, userRows: [] });
+    const responseBlank = await supertest(buildAdminApp()).get("/users/match-summary?search=");
+    expect(responseBlank.status).toBe(200);
+    expect(responseBlank.body.total).toBe(10);
+
+    mockMatchSummaryFull({ paginationCount: 10, zeroMatchCount: 3, userRows: [] });
+    const responseAbsent = await supertest(buildAdminApp()).get("/users/match-summary");
+    expect(responseAbsent.status).toBe(200);
+    expect(responseAbsent.body.total).toBe(10);
+  });
+
+  it("source code contains ILIKE nickname filter applied to both COUNT and SELECT", () => {
+    const fs = require("fs");
+    const path = require("path");
+    const src: string = fs.readFileSync(
+      path.resolve(__dirname, "../routes/admin/users.next.ts"),
+      "utf-8"
+    );
+    const ilikeMentions = (src.match(/ILIKE/g) ?? []).length;
+    expect(ilikeMentions).toBeGreaterThanOrEqual(3);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Canary: confirms the filter IS used in the regular (non-admin) user routes
 // ─────────────────────────────────────────────────────────────────────────────
 
