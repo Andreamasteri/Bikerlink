@@ -8,6 +8,7 @@
  *   - GET /stats/devices — Statistiche dispositivi
  *   - GET /match-summary — Riepilogo match paginato
  *   - GET /:id/stats — Statistiche complete di un singolo utente
+ *   - GET /:id/profile-gaps — Campi profilo mancanti per il matching engine
  *   - GET /:id/geo-insights — Geo-insights utente
  *   - GET /:userId/sessions — Lista sessioni attive utente
  *   - DELETE /:userId/sessions/:sid — Revoca singola sessione
@@ -16,7 +17,7 @@
 import { Router, type Request, type Response } from "express";
 import { storage } from "../../storage";
 import { db } from "../../db";
-import { proposals, conversationParticipants, messages, reports, moderatorLogs, adClicks, adCampaigns, userDevices } from "@shared/db";
+import { proposals, conversationParticipants, messages, reports, moderatorLogs, adClicks, adCampaigns, userDevices, userMotorcycles, entityTags, tags, tagCategories, zavarrinaWishlists, zavarrinaWishlistMotos } from "@shared/db";
 import { eq, sql, count } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
@@ -513,6 +514,187 @@ router.get("/:id/stats", async (req: Request, res: Response) => {
   } catch (_error) {
     console.error("Admin get user stats error:", _error);
     return sendError(res, 500, "Errore lettura statistiche");
+  }
+});
+
+router.get("/:id/profile-gaps", async (req: Request, res: Response) => {
+  try {
+    const id = String(req.params.id);
+    const [user, profile] = await Promise.all([
+      storage.getUser(id),
+      storage.getUserProfile(id),
+    ]);
+    if (!user) return sendError(res, 404, "Utente non trovato");
+
+    const userType = user.userType ?? "biker";
+
+    const [motorcyclesRows, tagCountsResult, wishlistMotosResult] = await Promise.all([
+      db.select({
+        brand: userMotorcycles.brand,
+        motorcycleType: userMotorcycles.motorcycleType,
+        ridingStyle: userMotorcycles.ridingStyle,
+      }).from(userMotorcycles).where(eq(userMotorcycles.userId, id)),
+
+      db.execute(sql`
+        SELECT tc.slug, COUNT(et.id)::int AS cnt
+        FROM entity_tags et
+        JOIN tags t ON et.tag_id = t.id
+        JOIN tag_categories tc ON t.category_id = tc.id
+        WHERE et.entity_type = 'user' AND et.entity_id = ${id}
+        GROUP BY tc.slug
+      `),
+
+      userType === "zavorrina"
+        ? db.select({ id: zavarrinaWishlistMotos.id })
+            .from(zavarrinaWishlistMotos)
+            .innerJoin(zavarrinaWishlists, eq(zavarrinaWishlistMotos.wishlistId, zavarrinaWishlists.id))
+            .where(eq(zavarrinaWishlists.userId, id))
+            .limit(1)
+        : Promise.resolve([]),
+    ]);
+
+    type TagCountRow = { slug: string; cnt: number };
+    const tagCounts: Record<string, number> = {};
+    for (const row of tagCountsResult.rows as TagCountRow[]) {
+      tagCounts[row.slug] = row.cnt;
+    }
+
+    const hasLocation = !!(profile?.latitude && profile?.longitude);
+    const hasAvatar = !!user.avatarUrl;
+    const hasBirthYear = !!user.birthYear;
+    const hasRegion = !!user.region;
+    const isAvailable = !!profile?.isAvailable;
+    const hasBio = !!(profile?.bio && profile.bio.trim().length > 0);
+
+    const hasMotoWithBrand = motorcyclesRows.some((m) => !!m.brand);
+    const hasMotoWithType = motorcyclesRows.some((m) => !!m.motorcycleType);
+    const hasMotoWithStyle = motorcyclesRows.some((m) => !!m.ridingStyle);
+    const hasWishlist = wishlistMotosResult.length > 0;
+
+    interface GapField {
+      field: string;
+      label: string;
+      description: string;
+      filled: boolean;
+      importance: "critical" | "high" | "medium" | "low";
+    }
+
+    const gaps: GapField[] = [
+      {
+        field: "location",
+        label: "Posizione GPS",
+        description: "Coordinate geografiche (lat/lng) per il matching per distanza",
+        filled: hasLocation,
+        importance: "critical",
+      },
+      {
+        field: "avatar_url",
+        label: "Foto profilo",
+        description: "Avatar visibile agli altri utenti; filtro 'requires_photo'",
+        filled: hasAvatar,
+        importance: "medium",
+      },
+      {
+        field: "birth_year",
+        label: "Anno di nascita",
+        description: "Necessario per il filtro età (age_range)",
+        filled: hasBirthYear,
+        importance: "high",
+      },
+      {
+        field: "region",
+        label: "Regione",
+        description: "Usata nel filtro 'exclude_region'",
+        filled: hasRegion,
+        importance: "low",
+      },
+      {
+        field: "is_available",
+        label: "Disponibile",
+        description: "Flag 'Disponibile' nel profilo; utenti non disponibili sono esclusi",
+        filled: isAvailable,
+        importance: "critical",
+      },
+      {
+        field: "bio",
+        label: "Bio / descrizione",
+        description: "Testo libero usato per bio affinity matching",
+        filled: hasBio,
+        importance: "low",
+      },
+      {
+        field: "tag_tipo_moto",
+        label: "Tag tipo moto",
+        description: "Tag categoria 'tipo_moto' (es. naked, enduro, touring…)",
+        filled: (tagCounts["tipo_moto"] ?? 0) > 0,
+        importance: "high",
+      },
+      {
+        field: "tag_stile_guida",
+        label: "Tag stile di guida",
+        description: "Tag categoria 'stile_guida' (es. touring, sportivo, off-road…)",
+        filled: (tagCounts["stile_guida"] ?? 0) > 0,
+        importance: "high",
+      },
+      {
+        field: "tag_musica",
+        label: "Tag musica",
+        description: "Tag categoria 'musica' per music affinity matching",
+        filled: (tagCounts["musica"] ?? 0) > 0,
+        importance: "medium",
+      },
+    ];
+
+    if (userType === "biker" || userType === "coppia") {
+      gaps.push(
+        {
+          field: "moto_brand",
+          label: "Moto — Marca",
+          description: "Almeno una moto con marca impostata (bucket brand matching)",
+          filled: hasMotoWithBrand,
+          importance: "critical",
+        },
+        {
+          field: "moto_type",
+          label: "Moto — Tipo",
+          description: "Tipo moto della moto (naked, enduro, touring…)",
+          filled: hasMotoWithType,
+          importance: "high",
+        },
+        {
+          field: "moto_riding_style",
+          label: "Moto — Stile di guida",
+          description: "Stile di guida sulla moto (touring, sportivo…)",
+          filled: hasMotoWithStyle,
+          importance: "high",
+        },
+      );
+    }
+
+    if (userType === "zavorrina") {
+      gaps.push({
+        field: "wishlist",
+        label: "Wishlist moto",
+        description: "Almeno una moto nella wishlist per il matching B-Z",
+        filled: hasWishlist,
+        importance: "critical",
+      });
+    }
+
+    const importanceOrder: Record<string, number> = { critical: 0, high: 1, medium: 2, low: 3 };
+    gaps.sort((a, b) => {
+      const filledDiff = Number(a.filled) - Number(b.filled);
+      if (filledDiff !== 0) return filledDiff;
+      return (importanceOrder[a.importance] ?? 9) - (importanceOrder[b.importance] ?? 9);
+    });
+
+    const missingCount = gaps.filter((g) => !g.filled).length;
+    const criticalMissing = gaps.filter((g) => !g.filled && g.importance === "critical").length;
+
+    return res.json({ gaps, missingCount, criticalMissing, userType });
+  } catch (err) {
+    console.error("[admin] profile-gaps error:", err);
+    return sendError(res, 500, "Errore lettura profilo gaps");
   }
 });
 

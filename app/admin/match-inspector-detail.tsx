@@ -19,6 +19,7 @@ import { apiRequest, getApiUrl } from "@/lib/query-client";
 import { MatchUserCard } from "@/components/admin/match-inspector/MatchUserCard";
 import { PreferencesDiffCard } from "@/components/admin/match-inspector/PreferencesDiffCard";
 import { MatchTypeCard } from "@/components/admin/match-inspector/MatchTypeCard";
+import { ProfileGapsCard } from "@/components/admin/match-inspector/ProfileGapsCard";
 
 interface MatchItem {
   id: string;
@@ -250,6 +251,8 @@ export default function MatchInspectorDetailScreen() {
           <Text style={styles.autoRecalcLabel}>Ricalcola automaticamente dopo l'eliminazione</Text>
         </Pressable>
       </View>
+
+      <ProfileGapsCard userId={userId!} totalMatches={totalMatches} />
 
       <PreferencesDiffCard sections={matchesByType} userId={userId!} nickname={user.nickname} />
 
