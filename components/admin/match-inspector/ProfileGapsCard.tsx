@@ -23,6 +23,7 @@ interface ProfileGapsResponse {
 interface ProfileGapsCardProps {
   userId: string;
   totalMatches: number;
+  onEditUser?: () => void;
 }
 
 function importanceLabel(imp: string): string {
@@ -43,7 +44,7 @@ function importanceColor(imp: string): string {
   }
 }
 
-export const ProfileGapsCard: React.FC<ProfileGapsCardProps> = ({ userId, totalMatches }) => {
+export const ProfileGapsCard: React.FC<ProfileGapsCardProps> = ({ userId, totalMatches, onEditUser }) => {
   const [expanded, setExpanded] = useState(totalMatches === 0);
 
   const { data, isLoading, isError } = useQuery<ProfileGapsResponse>({
@@ -95,6 +96,19 @@ export const ProfileGapsCard: React.FC<ProfileGapsCardProps> = ({ userId, totalM
                   <Text style={styles.okBadgeText}>Completo</Text>
                 </View>
               )}
+              {onEditUser && (
+                <TouchableOpacity
+                  style={styles.editBtn}
+                  onPress={(e) => {
+                    e.stopPropagation();
+                    onEditUser();
+                  }}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <Ionicons name="pencil-outline" size={15} color={Colors.accent} />
+                  <Text style={styles.editBtnText}>Modifica</Text>
+                </TouchableOpacity>
+              )}
               <Ionicons
                 name={expanded ? "chevron-up" : "chevron-down"}
                 size={16}
@@ -117,7 +131,12 @@ export const ProfileGapsCard: React.FC<ProfileGapsCardProps> = ({ userId, totalM
           )}
 
           {data.gaps.map((gap) => (
-            <View key={gap.field} style={styles.row}>
+            <TouchableOpacity
+              key={gap.field}
+              style={styles.row}
+              onPress={!gap.filled && onEditUser ? onEditUser : undefined}
+              activeOpacity={!gap.filled && onEditUser ? 0.6 : 1}
+            >
               <View style={styles.rowIcon}>
                 <Ionicons
                   name={gap.filled ? "checkmark-circle" : "close-circle"}
@@ -140,7 +159,10 @@ export const ProfileGapsCard: React.FC<ProfileGapsCardProps> = ({ userId, totalM
                 </View>
                 <Text style={styles.rowDesc}>{gap.description}</Text>
               </View>
-            </View>
+              {!gap.filled && onEditUser && (
+                <Ionicons name="chevron-forward" size={14} color={Colors.textSecondary} style={styles.rowArrow} />
+              )}
+            </TouchableOpacity>
           ))}
         </View>
       )}
@@ -179,6 +201,20 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
+  },
+  editBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: Colors.accent + "18",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  editBtnText: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 11,
+    color: Colors.accent,
   },
   missingBadge: {
     paddingHorizontal: 8,
@@ -273,5 +309,9 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: Colors.textSecondary,
     opacity: 0.75,
+  },
+  rowArrow: {
+    marginTop: 2,
+    alignSelf: "center",
   },
 });

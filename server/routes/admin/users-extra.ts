@@ -6,6 +6,19 @@ import { sendError } from "../../lib/api-response";
 
 const router = Router();
 
+router.get("/:userId", async (req: Request, res: Response) => {
+  try {
+    const userId = String(req.params.userId);
+    const rows = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+    if (!rows.length) return sendError(res, 404, "Utente non trovato");
+    const { password: _, ...safe } = rows[0];
+    return res.json(safe);
+  } catch (err) {
+    console.error("[admin/users/:userId GET] error:", err);
+    return sendError(res, 500, "Errore interno del server");
+  }
+});
+
 router.put("/:userId/telemetry-disabled", async (req: Request, res: Response) => {
   try {
     const userId = String(req.params.userId);
