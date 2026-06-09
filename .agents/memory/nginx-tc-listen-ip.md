@@ -27,3 +27,11 @@ NON `listen 443 ssl;` (che diventa 0.0.0.0:443).
 sudo grep -n "^    listen" /etc/nginx/sites-enabled/bikerlink | head -20
 # Tutti devono mostrare: listen 192.168.1.35:443 ssl;
 ```
+
+## ATTENZIONE — due file distinti sul ThinkCentre
+`/etc/nginx/sites-available/bikerlink` e `/etc/nginx/sites-enabled/bikerlink` sono file **separati** (non symlink). Il blocco TC agent (`upstream tc_agent_backend` + `server_name tc.bikerlink.duckdns.org`) si trova **solo** in `sites-enabled/bikerlink` (≈ riga 530). Per editare la porta del TC agent occorre modificare `sites-enabled/bikerlink`, non `sites-available`.
+
+Fix applicato (Giugno 2026): `tc_agent_backend` puntava a `127.0.0.1:9101` (Bacula Director) — corretto a `127.0.0.1:9199` con:
+```bash
+sudo sed -i 's/server 127\.0\.0\.1:9101;/server 127.0.0.1:9199;/' /etc/nginx/sites-enabled/bikerlink && sudo nginx -t && sudo systemctl reload nginx
+```
