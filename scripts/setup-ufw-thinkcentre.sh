@@ -3,13 +3,25 @@
 # BikerLink — Configurazione ufw sul ThinkCentre (192.168.1.35, Ubuntu)
 #
 # Esegui come root:
-#   sudo bash scripts/setup-ufw-thinkcentre.sh
+#   sudo bash scripts/setup-ufw-thinkcentre.sh [--mode tunnel|dns-proxy] [--ssh-port PORT]
+#
+# Modalità Cloudflare (obbligatoria dopo installazione Cloudflare):
+#   --mode tunnel      Cloudflare Tunnel: NESSUNA porta 80/443 aperta verso
+#                      internet; cloudflared è un daemon outbound. (RACCOMANDATO)
+#   --mode dns-proxy   DNS proxy standard: 80/443 aperte solo agli IP Cloudflare.
+#
+# Default (nessun --mode): apre 80/443 a tutti — solo per test iniziale
+# PRIMA di configurare Cloudflare.
+#
+# Porta SSH:
+#   --ssh-port 22      porta SSH standard (default)
+#   --ssh-port 2222    dopo aver eseguito setup-ssh-hardening-thinkcentre.sh
 #
 # Idempotente: può essere rieseguito senza danni.
 #
 # Porta mappa:
-#   nginx           80, 443   → aperta verso internet
-#   SSH             22        → solo LAN 192.168.1.0/24 + rate limit
+#   nginx           80, 443   → dipende da --mode (vedi sopra)
+#   SSH             22|2222   → solo LAN 192.168.1.0/24 + rate limit
 #   Tailscale       —         → allow in on tailscale0 (interfaccia intera)
 #   GraphHopper     8990-8996 → solo LAN 192.168.1.0/24
 #   Valhalla        8002      → solo LAN 192.168.1.0/24
@@ -27,9 +39,38 @@ set -euo pipefail
 
 LAN="192.168.1.0/24"
 LOCALHOST="127.0.0.1"
+CLOUDFLARE_MODE=""   # tunnel | dns-proxy | "" (aperto — solo pre-Cloudflare)
+SSH_PORT=22          # cambia a 2222 dopo setup-ssh-hardening-thinkcentre.sh
+
+# ── Parsing argomenti ─────────────────────────────────────────────────────────
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --mode)
+      CLOUDFLARE_MODE="$2"
+      shift 2
+      ;;
+    --ssh-port)
+      SSH_PORT="$2"
+      shift 2
+      ;;
+    *)
+      echo "ERRORE: argomento sconosciuto: $1" >&2
+      echo "Uso: sudo bash $0 [--mode tunnel|dns-proxy] [--ssh-port PORT]" >&2
+      exit 1
+      ;;
+  esac
+done
+
+# Valida --mode
+if [[ -n "${CLOUDFLARE_MODE}" && "${CLOUDFLARE_MODE}" != "tunnel" && "${CLOUDFLARE_MODE}" != "dns-proxy" ]]; then
+  echo "ERRORE: --mode deve essere 'tunnel' o 'dns-proxy'" >&2
+  exit 1
+fi
 
 echo "=== BikerLink ufw setup ThinkCentre ==="
 echo "LAN: ${LAN}"
+echo "Modalità Cloudflare: ${CLOUDFLARE_MODE:-'nessuna (aperto — solo pre-Cloudflare)'}"
+echo "Porta SSH: ${SSH_PORT}"
 echo ""
 
 # ── Prerequisiti ──────────────────────────────────────────────────────────────
@@ -59,19 +100,54 @@ ufw allow in on tailscale0
 echo "→ Loopback: allow in on lo..."
 ufw allow in on lo
 
-# ── nginx: 80 e 443 verso internet ────────────────────────────────────────────
-echo "→ nginx 80/tcp (HTTP) — internet..."
-ufw allow 80/tcp
+# ── nginx: 80 e 443 — dipende dalla modalità Cloudflare ───────────────────────
+if [[ "${CLOUDFLARE_MODE}" == "tunnel" ]]; then
+  # Cloudflare Tunnel: cloudflared parla con nginx via loopback.
+  # Il loopback è già aperto sopra (allow in on lo).
+  # Nessuna porta 80/443 da aprire verso internet.
+  echo "→ nginx 80/443 — Cloudflare Tunnel: nessuna apertura internet (loopback già aperto)"
 
-echo "→ nginx 443/tcp (HTTPS) — internet..."
-ufw allow 443/tcp
+elif [[ "${CLOUDFLARE_MODE}" == "dns-proxy" ]]; then
+  # DNS proxy standard: accetta 80/443 solo dagli IP Cloudflare.
+  # Lista aggiornata: https://www.cloudflare.com/ips-v4
+  echo "→ nginx 80/443 — solo IP Cloudflare (DNS proxy mode)..."
+  for cf_ip in \
+    173.245.48.0/20 \
+    103.21.244.0/22 \
+    103.22.200.0/22 \
+    103.31.4.0/22 \
+    141.101.64.0/18 \
+    108.162.192.0/18 \
+    190.93.240.0/20 \
+    188.114.96.0/20 \
+    197.234.240.0/22 \
+    198.41.128.0/17 \
+    162.158.0.0/15 \
+    104.16.0.0/13 \
+    104.24.0.0/14 \
+    172.64.0.0/13 \
+    131.0.72.0/22; do
+      ufw allow from "${cf_ip}" to any port 80 proto tcp
+      ufw allow from "${cf_ip}" to any port 443 proto tcp
+  done
+  echo "   → Aggiornare trimestralmente da https://www.cloudflare.com/ips-v4"
+
+else
+  # Modalità legacy/pre-Cloudflare: apre 80/443 a tutti.
+  # Usare solo per test iniziali PRIMA di configurare Cloudflare.
+  echo "→ nginx 80/tcp (HTTP) — internet (modalità pre-Cloudflare)..."
+  ufw allow 80/tcp
+  echo "→ nginx 443/tcp (HTTPS) — internet (modalità pre-Cloudflare)..."
+  ufw allow 443/tcp
+  echo "   ⚠️  Passare a --mode tunnel o --mode dns-proxy dopo aver configurato Cloudflare."
+fi
 
 # ── SSH: solo LAN + rate limit ────────────────────────────────────────────────
 # ufw limit from <src> applica rate limiting (≥6 connessioni in 30s → DROP)
 # SOLO alle sorgenti che corrispondono alla regola LAN.
 # La policy "default deny incoming" blocca il resto senza regole aggiuntive.
-echo "→ SSH 22/tcp — solo LAN ${LAN} + rate limit (max 6 conn/30s)..."
-ufw limit from "${LAN}" to any port 22 proto tcp
+echo "→ SSH ${SSH_PORT}/tcp — solo LAN ${LAN} + rate limit (max 6 conn/30s)..."
+ufw limit from "${LAN}" to any port "${SSH_PORT}" proto tcp
 
 # ── Valhalla: solo LAN ────────────────────────────────────────────────────────
 echo "→ Valhalla 8002/tcp — solo LAN..."
