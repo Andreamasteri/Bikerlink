@@ -329,6 +329,7 @@ export function startMatchingEngine(): void {
   console.log("[Matching] Ciclo di matching automatico orario avviato");
 
   const runArchiveStaleMatches = async () => {
+    addMatchLog("INFO", "archive_stale", "Archiviazione match stale avviata");
     try {
       const afterSetting = await storage.getAppSetting("match_archive_after_days");
       const afterDays = afterSetting?.value ? Math.max(1, parseInt(afterSetting.value, 10)) : 30;
@@ -341,9 +342,13 @@ export function startMatchingEngine(): void {
       const total = bz + bb + pp + pm;
       if (total > 0) {
         console.log(`[Archive] Archiviati ${total} match 'new'/'pending' più vecchi di ${afterDays}gg (bz=${bz}, bb=${bb}, pp=${pp}, pm=${pm})`);
+        addMatchLog("INFO", "archive_stale", `Archiviati ${total} match stale — bz=${bz}, bb=${bb}, pp=${pp}, pm=${pm} (soglia ${afterDays}gg)`);
+      } else {
+        addMatchLog("INFO", "archive_stale", `Archiviazione completata — nessun match stale da archiviare (soglia ${afterDays}gg)`);
       }
     } catch (err) {
       console.error("[Archive] Errore archiviazione match stale:", err);
+      addMatchLog("ERROR", "archive_stale", `Errore archiviazione match stale: ${err instanceof Error ? err.message : String(err)}`);
     }
   };
   setImmediate(runArchiveStaleMatches);
@@ -357,11 +362,14 @@ export function startMatchingEngine(): void {
         "0 9 * * 1",
         { timezone: "Europe/Rome", protect: true, name: "weekly-recap" },
         async () => {
+          addMatchLog("INFO", "weekly_recap", "Weekly recap avviato (lun 09:00 Europe/Rome)");
           try {
             console.log("[WeeklyRecap] Trigger schedulato (lun 09:00 Europe/Rome)");
-            await runWeeklyRecapJob();
+            const r = await runWeeklyRecapJob();
+            addMatchLog("INFO", "weekly_recap", `Weekly recap completato — utenti: ${r.usersProcessed}, recap: ${r.recapsCreated}, push: ${r.pushSent}`);
           } catch (err) {
             console.error("[WeeklyRecap] Errore esecuzione schedulata:", err);
+            addMatchLog("ERROR", "weekly_recap", `Errore weekly recap: ${err instanceof Error ? err.message : String(err)}`);
           }
         },
       );
@@ -407,22 +415,32 @@ export function startMatchingEngine(): void {
   // Task #2523 — Daily detection of recurring reject patterns →
   // pending_auto_suggestions. Runs ~10 minutes after startup, then every 24h.
   setTimeout(() => {
+    addMatchLog("INFO", "neg_pattern", "Rilevamento pattern negativi avviato (startup)");
     runDetectNegativePatternsJob()
       .then((r) => {
         if (r.suggestionsInserted > 0) {
           console.log(`[NegPattern] ${r.suggestionsInserted} suggerimenti inseriti su ${r.usersProcessed} utenti`);
         }
+        addMatchLog("INFO", "neg_pattern", `Pattern negativi (startup): ${r.suggestionsInserted} suggerimenti / ${r.usersProcessed} utenti analizzati`);
       })
-      .catch((err) => console.error("[NegPattern] startup run failed:", err));
+      .catch((err) => {
+        console.error("[NegPattern] startup run failed:", err);
+        addMatchLog("ERROR", "neg_pattern", `Errore rilevamento pattern negativi (startup): ${err instanceof Error ? err.message : String(err)}`);
+      });
   }, 10 * 60 * 1000);
   _engineTimers.push(setInterval(() => {
+    addMatchLog("INFO", "neg_pattern", "Rilevamento pattern negativi avviato (giornaliero)");
     runDetectNegativePatternsJob()
       .then((r) => {
         if (r.suggestionsInserted > 0) {
           console.log(`[NegPattern] daily: ${r.suggestionsInserted} suggerimenti inseriti su ${r.usersProcessed} utenti`);
         }
+        addMatchLog("INFO", "neg_pattern", `Pattern negativi (giornaliero): ${r.suggestionsInserted} suggerimenti / ${r.usersProcessed} utenti analizzati`);
       })
-      .catch((err) => console.error("[NegPattern] daily run failed:", err));
+      .catch((err) => {
+        console.error("[NegPattern] daily run failed:", err);
+        addMatchLog("ERROR", "neg_pattern", `Errore rilevamento pattern negativi (giornaliero): ${err instanceof Error ? err.message : String(err)}`);
+      });
   }, 24 * 60 * 60 * 1000));
   console.log("[Matching] Daily negative-pattern detection scheduled");
 
