@@ -1,5 +1,6 @@
 // LARGE-FILE-LOCKED — limite: 608
 // Aggiungi nuove funzionalità in: components/admin/ads/useAdAdmin.next.ts
+import { useAdAdminStats } from "./useAdAdmin.stats";
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { Alert, BackHandler, Platform } from "react-native";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -62,29 +63,7 @@ export function useAdAdmin() {
     queryKey: ["/api/admin/advertisements"],
   });
 
-  const { data: imageHealth } = useQuery<ImageHealthData>({
-    queryKey: ["/api/admin/advertisements/image-health"],
-    refetchInterval: 60_000,
-  });
-
-  const { data: cacheStats } = useQuery<{ count: number; totalBytes: number }>({
-    queryKey: ["/api/admin/advertisements/cache-stats"],
-    staleTime: 60_000,
-  });
-
-  const [healthBannerDismissed, setHealthBannerDismissed] = useState(false);
-
-  async function handleCheckImages() {
-    try {
-      await apiRequest("POST", "/api/admin/advertisements/image-health/check");
-      setTimeout(() => {
-        queryClient.invalidateQueries({ queryKey: ["/api/admin/advertisements/image-health"] });
-      }, 3000);
-    } catch {
-      // no-op: ignore health check failures
-    }
-  }
-
+  const { imageHealth, cacheStats, healthBannerDismissed, setHealthBannerDismissed, handleCheckImages } = useAdAdminStats();
   const campaigns = activeTab === "tutti" ? allCampaigns : allCampaigns.filter((c) => c.targetUserType === activeTab);
   const brokenIdSet = new Set<string>(imageHealth?.brokenIds ?? []);
   const brokenInView = campaigns.filter((c) => brokenIdSet.has(c.id));
