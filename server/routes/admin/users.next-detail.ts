@@ -13,7 +13,7 @@
 import { Router, type Request, type Response } from "express";
 import { storage } from "../../storage";
 import { db } from "../../db";
-import { proposals, conversationParticipants, messages, reports, moderatorLogs, adClicks, adCampaigns, userDevices, userMotorcycles, zavarrinaWishlists, zavarrinaWishlistMotos } from "@shared/db";
+import { proposals, conversationParticipants, messages, reports, moderatorLogs, adClicks, adCampaigns, userDevices, userMotorcycles, zavarrinaWishlists, zavarrinaWishlistMotos, userSessions } from "@shared/db";
 import { eq, sql, count } from "drizzle-orm";
 import { sendError, sendSuccess } from "../../lib/api-response";
 
@@ -60,15 +60,26 @@ router.get("/:id/stats", async (req: Request, res: Response) => {
         .orderBy(adClicks.createdAt),
     ]);
 
-    const devicesRows = await db.select({
-      model: userDevices.model,
-      platform: userDevices.platform,
-      osVersion: userDevices.osVersion,
-      firstSeenAt: userDevices.firstSeenAt,
-      lastSeenAt: userDevices.lastSeenAt,
-    }).from(userDevices)
-      .where(eq(userDevices.userId, id))
-      .orderBy(sql`${userDevices.lastSeenAt} DESC`);
+    const [devicesRows, sessionStatsRows] = await Promise.all([
+      db.select({
+        model: userDevices.model,
+        platform: userDevices.platform,
+        osVersion: userDevices.osVersion,
+        firstSeenAt: userDevices.firstSeenAt,
+        lastSeenAt: userDevices.lastSeenAt,
+      }).from(userDevices)
+        .where(eq(userDevices.userId, id))
+        .orderBy(sql`${userDevices.lastSeenAt} DESC`),
+
+      db.select({
+        avgDuration: sql<number>`COALESCE(AVG(${userSessions.durationSeconds}) FILTER (WHERE ${userSessions.durationSeconds} IS NOT NULL), 0)::int`,
+        totalSessions: sql<number>`COUNT(*)::int`,
+        backgroundCount: sql<number>`COUNT(*) FILTER (WHERE ${userSessions.exitType} = 'background')::int`,
+        logoutCount: sql<number>`COUNT(*) FILTER (WHERE ${userSessions.exitType} = 'logout')::int`,
+        crashCount: sql<number>`COUNT(*) FILTER (WHERE ${userSessions.exitType} = 'crash')::int`,
+        nullCount: sql<number>`COUNT(*) FILTER (WHERE ${userSessions.exitType} IS NULL)::int`,
+      }).from(userSessions).where(eq(userSessions.userId, id)),
+    ]);
 
     const moderatorNicknameMap: Record<string, string> = {};
     const moderatorIds = [...new Set(moderatorLogsRows.map((l) => l.moderatorId).filter(Boolean))] as string[];
@@ -136,6 +147,18 @@ router.get("/:id/stats", async (req: Request, res: Response) => {
         firstSeenAt: d.firstSeenAt,
         lastSeenAt: d.lastSeenAt,
       })),
+      sessionStats: (() => {
+        const row = sessionStatsRows[0];
+        const total = row?.totalSessions ?? 0;
+        const bg = row?.backgroundCount ?? 0;
+        const lo = row?.logoutCount ?? 0;
+        const cr = row?.crashCount ?? 0;
+        return {
+          avgDurationSeconds: row?.avgDuration ?? 0,
+          totalSessions: total,
+          exitBreakdown: { background: bg, logout: lo, crash: cr, unknown: row?.nullCount ?? 0 },
+        };
+      })(),
     });
   } catch (_error) {
     console.error("Admin get user stats error:", _error);

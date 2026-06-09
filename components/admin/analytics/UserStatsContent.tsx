@@ -3,6 +3,17 @@ import { View, Text, StyleSheet, ScrollView } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
 
+export interface SessionStats {
+  avgDurationSeconds: number;
+  totalSessions: number;
+  exitBreakdown: {
+    background: number;
+    logout: number;
+    crash: number;
+    unknown: number;
+  };
+}
+
 interface UserStatsData {
   user: {
     id: string;
@@ -37,6 +48,73 @@ interface UserStatsData {
     ridingStyle: string;
   }[];
   moderatorLogs: { action: string; createdAt: string; moderatorNickname: string }[];
+  sessionStats?: SessionStats;
+}
+
+function formatDuration(seconds: number): string {
+  if (seconds <= 0) return "0s";
+  if (seconds < 60) return `${seconds}s`;
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  if (m < 60) return s > 0 ? `${m}m ${s}s` : `${m}m`;
+  const h = Math.floor(m / 60);
+  const rm = m % 60;
+  return rm > 0 ? `${h}h ${rm}m` : `${h}h`;
+}
+
+const EXIT_ICON_MAP: Record<string, { name: keyof typeof MaterialIcons.glyphMap; color: string }> = {
+  background: { name: "pause-circle-outline", color: Colors.textSecondary },
+  logout: { name: "logout", color: Colors.accent },
+  crash: { name: "warning", color: Colors.error },
+  unknown: { name: "help-outline", color: Colors.textSecondary },
+};
+
+function SessionStatsBlock({ sessionStats }: { sessionStats: SessionStats }) {
+  const { avgDurationSeconds, totalSessions, exitBreakdown } = sessionStats;
+  const safeTotal = totalSessions > 0 ? totalSessions : 1;
+
+  const exitEntries = [
+    { key: "background", label: "Background", count: exitBreakdown.background },
+    { key: "logout", label: "Logout", count: exitBreakdown.logout },
+    { key: "crash", label: "Crash", count: exitBreakdown.crash },
+    { key: "unknown", label: "Sconosciuto", count: exitBreakdown.unknown },
+  ];
+
+  return (
+    <View>
+      <View style={sessionStyles.kpiRow}>
+        <View style={sessionStyles.kpiBox}>
+          <Text style={sessionStyles.kpiNumber}>{totalSessions}</Text>
+          <Text style={sessionStyles.kpiLabel}>Sessioni totali</Text>
+        </View>
+        <View style={sessionStyles.kpiBox}>
+          <Text style={sessionStyles.kpiNumber}>{formatDuration(avgDurationSeconds)}</Text>
+          <Text style={sessionStyles.kpiLabel}>Durata media</Text>
+        </View>
+      </View>
+      {totalSessions > 0 ? (
+        <View style={sessionStyles.exitBlock}>
+          <Text style={sessionStyles.exitTitle}>Tipo di uscita</Text>
+          {exitEntries.filter((e) => e.count > 0).map(({ key, label, count }) => {
+            const icon = EXIT_ICON_MAP[key] ?? EXIT_ICON_MAP.unknown;
+            const pct = ((count / safeTotal) * 100).toFixed(1);
+            return (
+              <View key={key} style={sessionStyles.exitRow}>
+                <MaterialIcons name={icon.name} size={14} color={icon.color} />
+                <Text style={[sessionStyles.exitLabel, { color: icon.color }]}>{label}</Text>
+                <View style={sessionStyles.barTrack}>
+                  <View style={[sessionStyles.barFill, { width: `${(count / safeTotal) * 100}%` as `${number}%`, backgroundColor: icon.color }]} />
+                </View>
+                <Text style={sessionStyles.exitCount}>{count} <Text style={sessionStyles.exitPct}>({pct}%)</Text></Text>
+              </View>
+            );
+          })}
+        </View>
+      ) : (
+        <Text style={sessionStyles.emptyNote}>Nessuna sessione registrata.</Text>
+      )}
+    </View>
+  );
 }
 
 interface UserStatsContentProps {
@@ -198,6 +276,15 @@ export const UserStatsContent: React.FC<UserStatsContentProps> = ({
           ))}
         </View>
       )}
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Sessioni App</Text>
+        {s.sessionStats ? (
+          <SessionStatsBlock sessionStats={s.sessionStats} />
+        ) : (
+          <Text style={styles.logText}>Dati sessione non disponibili.</Text>
+        )}
+      </View>
     </ScrollView>
   );
 };
@@ -269,5 +356,85 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: Colors.textSecondary,
     marginLeft: 8,
+  },
+});
+
+const sessionStyles = StyleSheet.create({
+  kpiRow: {
+    flexDirection: "row",
+    gap: 8,
+    marginBottom: 12,
+  },
+  kpiBox: {
+    flex: 1,
+    backgroundColor: Colors.surface,
+    borderRadius: 10,
+    padding: 12,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  kpiNumber: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 20,
+    color: Colors.text,
+  },
+  kpiLabel: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 11,
+    color: Colors.textSecondary,
+    marginTop: 4,
+    textAlign: "center",
+  },
+  exitBlock: {
+    gap: 8,
+  },
+  exitTitle: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 12,
+    color: Colors.textSecondary,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+    marginBottom: 4,
+  },
+  exitRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  exitLabel: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 12,
+    width: 80,
+  },
+  barTrack: {
+    flex: 1,
+    height: 6,
+    backgroundColor: Colors.border,
+    borderRadius: 3,
+    overflow: "hidden",
+  },
+  barFill: {
+    height: 6,
+    borderRadius: 3,
+  },
+  exitCount: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 12,
+    color: Colors.text,
+    minWidth: 70,
+    textAlign: "right",
+  },
+  exitPct: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 11,
+    color: Colors.textSecondary,
+  },
+  emptyNote: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    color: Colors.textSecondary,
+    textAlign: "center",
+    paddingVertical: 8,
   },
 });

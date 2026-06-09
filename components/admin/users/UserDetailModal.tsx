@@ -3,8 +3,20 @@ import { View, Text, StyleSheet, Modal, TouchableOpacity, ScrollView, Platform }
 import { Ionicons, MaterialIcons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
 import { AdminUser } from "./UserCard";
+import { SessionStats } from "@/components/admin/analytics/UserStatsContent";
 
 // Using AdminUser from UserCard.tsx
+
+function formatSessionDuration(seconds: number): string {
+  if (seconds <= 0) return "0s";
+  if (seconds < 60) return `${seconds}s`;
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  if (m < 60) return s > 0 ? `${m}m ${s}s` : `${m}m`;
+  const h = Math.floor(m / 60);
+  const rm = m % 60;
+  return rm > 0 ? `${h}h ${rm}m` : `${h}h`;
+}
 
 export interface GeoZone {
   type: "H" | "W" | "P";
@@ -62,6 +74,7 @@ export interface UserStats {
   motorcycles: { brand: string; model: string; year: number; displacement: number; motorcycleType: string; ridingStyle: string }[];
   moderatorLogs: { action: string; createdAt: string; moderatorNickname: string }[];
   devices?: { model: string; platform: string | null; osVersion: string | null; firstSeenAt: string; lastSeenAt: string }[];
+  sessionStats?: SessionStats;
 }
 
 interface UserDetailModalProps {
@@ -349,6 +362,53 @@ export const UserDetailModal: React.FC<UserDetailModalProps> = ({
               )}
             </View>
 
+            <View style={statsStyles.section}>
+              <Text style={statsStyles.sectionTitle}>Sessioni App</Text>
+              {stats.sessionStats ? (
+                <>
+                  <View style={sessionBlockStyles.kpiRow}>
+                    <View style={sessionBlockStyles.kpiBox}>
+                      <Text style={sessionBlockStyles.kpiNumber}>{stats.sessionStats.totalSessions}</Text>
+                      <Text style={sessionBlockStyles.kpiLabel}>Sessioni totali</Text>
+                    </View>
+                    <View style={sessionBlockStyles.kpiBox}>
+                      <Text style={sessionBlockStyles.kpiNumber}>{formatSessionDuration(stats.sessionStats.avgDurationSeconds)}</Text>
+                      <Text style={sessionBlockStyles.kpiLabel}>Durata media</Text>
+                    </View>
+                  </View>
+                  {stats.sessionStats.totalSessions > 0 && (
+                    <View style={sessionBlockStyles.exitBlock}>
+                      {(
+                        [
+                          { key: "background", label: "Background", color: Colors.textSecondary },
+                          { key: "logout", label: "Logout", color: Colors.accent },
+                          { key: "crash", label: "Crash", color: Colors.error },
+                          { key: "unknown", label: "Sconosciuto", color: Colors.textSecondary },
+                        ] as const
+                      )
+                        .filter(({ key }) => (stats.sessionStats!.exitBreakdown[key] ?? 0) > 0)
+                        .map(({ key, label, color }) => {
+                          const count = stats.sessionStats!.exitBreakdown[key];
+                          const total = stats.sessionStats!.totalSessions;
+                          const pct = ((count / total) * 100).toFixed(1);
+                          return (
+                            <View key={key} style={sessionBlockStyles.exitRow}>
+                              <Text style={[sessionBlockStyles.exitLabel, { color }]}>{label}</Text>
+                              <View style={sessionBlockStyles.barTrack}>
+                                <View style={[sessionBlockStyles.barFill, { width: `${(count / total) * 100}%` as `${number}%`, backgroundColor: color }]} />
+                              </View>
+                              <Text style={sessionBlockStyles.exitCount}>{count} <Text style={sessionBlockStyles.exitPct}>({pct}%)</Text></Text>
+                            </View>
+                          );
+                        })}
+                    </View>
+                  )}
+                </>
+              ) : (
+                <Text style={{ color: Colors.textSecondary, fontSize: 13, marginTop: 4 }}>Nessuna sessione registrata.</Text>
+              )}
+            </View>
+
             {(stats.moderatorLogs?.length ?? 0) > 0 && (
               <View style={statsStyles.section}>
                 <Text style={statsStyles.sectionTitle}>Log Moderazione</Text>
@@ -600,5 +660,72 @@ const statsStyles = StyleSheet.create({
     fontSize: 11,
     color: Colors.textSecondary,
     marginLeft: 8,
+  },
+});
+
+const sessionBlockStyles = StyleSheet.create({
+  kpiRow: {
+    flexDirection: "row",
+    gap: 8,
+    marginBottom: 10,
+    marginTop: 4,
+  },
+  kpiBox: {
+    flex: 1,
+    backgroundColor: Colors.surface,
+    borderRadius: 10,
+    padding: 12,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  kpiNumber: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 20,
+    color: Colors.text,
+  },
+  kpiLabel: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 11,
+    color: Colors.textSecondary,
+    marginTop: 4,
+    textAlign: "center",
+  },
+  exitBlock: {
+    gap: 8,
+    marginTop: 4,
+  },
+  exitRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  exitLabel: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 12,
+    width: 80,
+  },
+  barTrack: {
+    flex: 1,
+    height: 6,
+    backgroundColor: Colors.border,
+    borderRadius: 3,
+    overflow: "hidden",
+  },
+  barFill: {
+    height: 6,
+    borderRadius: 3,
+  },
+  exitCount: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 12,
+    color: Colors.text,
+    minWidth: 70,
+    textAlign: "right",
+  },
+  exitPct: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 11,
+    color: Colors.textSecondary,
   },
 });
