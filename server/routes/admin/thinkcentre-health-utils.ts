@@ -6,20 +6,56 @@
 import { storage } from "../../storage";
 
 const PROBE_LOG_SNAPSHOT_KEY = "probe_log_snapshot";
+const ERROR_HISTORY_SNAPSHOT_KEY = "error_history_snapshot";
 
 export const PROBE_TIMEOUT_MS = 5_000;
 
 export const ERROR_HISTORY_MAX = 20;
 const errorHistory = new Map<string, Array<{ timestamp: number; error: string }>>();
 
+function persistErrorHistoryAsync(): void {
+  const snapshot: Record<string, Array<{ timestamp: number; error: string }>> = {};
+  for (const [key, entries] of errorHistory) {
+    snapshot[key] = entries;
+  }
+  storage.upsertAppSetting(ERROR_HISTORY_SNAPSHOT_KEY, undefined, snapshot).catch((err) => {
+    console.warn("[error-history] persist failed:", err instanceof Error ? err.message : String(err));
+  });
+}
+
 export function recordError(key: string, error: string): void {
   const prev = errorHistory.get(key) ?? [];
   const next = [{ timestamp: Date.now(), error }, ...prev].slice(0, ERROR_HISTORY_MAX);
   errorHistory.set(key, next);
+  persistErrorHistoryAsync();
 }
 
 export function getHistory(key: string): Array<{ timestamp: number; error: string }> {
   return errorHistory.get(key) ?? [];
+}
+
+export async function hydrateErrorHistory(): Promise<void> {
+  try {
+    const setting = await storage.getAppSetting(ERROR_HISTORY_SNAPSHOT_KEY);
+    if (!setting?.valueJson || typeof setting.valueJson !== "object") return;
+    const snapshot = setting.valueJson as Record<string, unknown>;
+    for (const [key, raw] of Object.entries(snapshot)) {
+      if (!Array.isArray(raw)) continue;
+      const entries = raw
+        .filter(
+          (e): e is { timestamp: number; error: string } =>
+            e !== null &&
+            typeof e === "object" &&
+            typeof e.timestamp === "number" &&
+            typeof e.error === "string",
+        )
+        .slice(0, ERROR_HISTORY_MAX);
+      if (entries.length > 0) errorHistory.set(key, entries);
+    }
+    console.log("[error-history] hydrated", errorHistory.size, "service(s) from DB snapshot");
+  } catch (err) {
+    console.warn("[error-history] hydration failed (non-fatal):", err instanceof Error ? err.message : String(err));
+  }
 }
 
 export const PROBE_LOG_MAX = 10;
