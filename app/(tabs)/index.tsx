@@ -333,6 +333,7 @@ export default function MapScreen() {
               borderRadius: animRadius,
               zIndex: mapFullscreen ? 100 : 2,
             },
+            !mapFullscreen && fixedPositionEnabled && styles.animatedMapFixedBorder,
           ]}
         >
           <InteractiveMap
@@ -443,5 +444,9 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0, 0, 0, 0.55)",
     padding: 6,
     borderRadius: 8,
+  },
+  animatedMapFixedBorder: {
+    borderWidth: 2,
+    borderColor: "rgba(255,111,0,0.92)",
   },
 });
