@@ -6,8 +6,8 @@ import Colors from "@/constants/colors";
 import { getApiUrl, authFetchHeaders, queryClient } from "@/lib/query-client";
 import { ErrorHistory, EventLog, GraphHopperBlock, ProbeLog } from "./ThinkCentreCardParts";
 import type { HealthEvent, AreaServiceHealth, ProbeLogEntry } from "./ThinkCentreCardParts";
-import { ValhallaBlock, NominatimBlock } from "./ThinkCentreValhallaNominatimBlocks";
-import type { ValhallaDetailedHealth, NominatimDetailedHealth } from "./ThinkCentreValhallaNominatimBlocks";
+import { ValhallaBlock, NominatimBlock, UfwBlock } from "./ThinkCentreValhallaNominatimBlocks";
+import type { ValhallaDetailedHealth, NominatimDetailedHealth, UfwDetailedHealth } from "./ThinkCentreValhallaNominatimBlocks";
 import type { DotStatus, SystemStatuses } from "./SystemHealthContainer";
 
 type ServiceKey = "valhalla" | "ollama" | "whisper" | "nominatim";
@@ -37,6 +37,7 @@ interface ThinkCentreHealth {
   graphhopperAreas: AreaServiceHealth[];
   valhallaDetail?: ValhallaDetailedHealth;
   nominatimDetail?: NominatimDetailedHealth;
+  ufwDetail?: UfwDetailedHealth;
   tokenFingerprints?: {
     graphhopper: string | null;
     valhalla: string | null;
@@ -224,6 +225,25 @@ export function ThinkCentreCard({
               {data.onlineCount}/{data.configuredCount}
             </Text>
           )}
+          {!isLoading && !error && data?.ufwDetail && (() => {
+            const ufw = data.ufwDetail!;
+            const ufwColor = !ufw.configured
+              ? "#6b7280"
+              : ufw.ok
+                ? "#22c55e"
+                : ufw.status === "inactive"
+                  ? "#ef4444"
+                  : "#6b7280";
+            return (
+              <View style={styles.ufwBadge}>
+                <MaterialCommunityIcons
+                  name={ufw.ok ? "shield-check-outline" : "shield-off-outline"}
+                  size={13}
+                  color={ufwColor}
+                />
+              </View>
+            );
+          })()}
           {!isLoading && !error && data && (
             <View style={[styles.healthDot, { backgroundColor: headerColor }]} />
           )}
@@ -253,6 +273,11 @@ export function ThinkCentreCard({
           <NominatimBlock
             detail={error ? null : (data?.nominatimDetail ?? null)}
             fingerprint={error ? null : (data?.tokenFingerprints?.nominatim ?? null)}
+            isLoading={isLoading}
+            hasError={!!error}
+          />
+          <UfwBlock
+            detail={error ? null : (data?.ufwDetail ?? null)}
             isLoading={isLoading}
             hasError={!!error}
           />
@@ -434,4 +459,5 @@ const styles = StyleSheet.create({
   pushToggleLeft: { flex: 1, gap: 2, flexDirection: "column" },
   pushToggleLabel: { fontFamily: "Inter_500Medium", fontSize: 13, color: Colors.text },
   pushToggleSub: { fontFamily: "Inter_400Regular", fontSize: 10, color: Colors.textSecondary },
+  ufwBadge: { justifyContent: "center", alignItems: "center" },
 });

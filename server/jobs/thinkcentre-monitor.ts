@@ -310,6 +310,23 @@ async function probeValhallaOk(): Promise<boolean | null> {
   return httpProbe(`${base}/status`, headers);
 }
 
+async function probeUfwOk(): Promise<boolean | null> {
+  const base = process.env.UFW_STATUS_URL?.replace(/\/$/, "");
+  if (!base) return null;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), PROBE_TIMEOUT_MS);
+  try {
+    const res = await fetch(base, { method: "GET", signal: controller.signal });
+    if (!res.ok) return false;
+    const data = (await res.json().catch(() => ({}))) as { status?: string };
+    return data.status === "active";
+  } catch {
+    return false;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 // ── Probe aggregato ───────────────────────────────────────────────────────────
 interface AggregateProbeResult {
   overall: OverallStatus;
@@ -322,6 +339,7 @@ async function runAllProbes(): Promise<AggregateProbeResult> {
     { key: "whisper", label: "Whisper ASR", fn: probeWhisperOk },
     { key: "nominatim", label: "Nominatim", fn: probeNominatimOk },
     { key: "valhalla", label: "Valhalla", fn: probeValhallaOk },
+    { key: "ufw", label: "Firewall (ufw)", fn: probeUfwOk },
   ];
 
   const [otherResults, gh] = await Promise.all([

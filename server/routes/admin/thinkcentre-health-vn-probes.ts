@@ -1,5 +1,5 @@
 /**
- * Probe Valhalla e Nominatim — estratti da thinkcentre-health.ts
+ * Probe Valhalla, Nominatim e ufw — estratti da thinkcentre-health.ts
  * Importati da thinkcentre-health.ts per mantenere il file sotto 600 righe.
  */
 
@@ -33,6 +33,110 @@ export interface NominatimDetailedHealth {
   tokenMissing?: boolean;
   history: Array<{ timestamp: number; error: string }>;
   probeLog: ProbeLogEntry[];
+}
+
+export interface UfwDetailedHealth {
+  configured: boolean;
+  ok: boolean;
+  status: "active" | "inactive" | "error" | "unreachable";
+  latencyMs: number | null;
+  url: string | null;
+  ruleCount?: number;
+  error?: string;
+  history: Array<{ timestamp: number; error: string }>;
+  probeLog: ProbeLogEntry[];
+}
+
+export async function probeUfwDetailed(): Promise<UfwDetailedHealth> {
+  const base = process.env.UFW_STATUS_URL?.replace(/\/$/, "");
+  if (!base) {
+    return {
+      configured: false,
+      ok: false,
+      status: "unreachable",
+      latencyMs: null,
+      url: null,
+      history: getHistory("ufw"),
+      probeLog: getProbeLog("ufw"),
+    };
+  }
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), PROBE_TIMEOUT_MS);
+  const t0 = Date.now();
+  try {
+    const res = await fetch(base, { method: "GET", signal: controller.signal });
+    const latencyMs = Date.now() - t0;
+    if (!res.ok) {
+      const body = await readBodySafe(res);
+      const error = sanitizeError(`HTTP ${res.status}${body.trim() ? ` — ${body.trim().slice(0, 200)}` : ""}`);
+      console.error("[thinkcentre-probe] ufw KO", { status: res.status, error });
+      recordError("ufw", error);
+      recordProbeLog("ufw", { timestamp: Date.now(), ok: false, latencyMs, detail: error });
+      return {
+        configured: true,
+        ok: false,
+        status: "error",
+        latencyMs,
+        url: maskUrl(base),
+        error,
+        history: getHistory("ufw"),
+        probeLog: getProbeLog("ufw"),
+      };
+    }
+    const data = (await res.json().catch(() => ({}))) as {
+      status?: string;
+      ruleCount?: number;
+      detail?: string;
+    };
+    const ufwStatus = data.status === "active" ? "active" : data.status === "inactive" ? "inactive" : "error";
+    const ok = ufwStatus === "active";
+    const detail = `ufw ${ufwStatus}${data.ruleCount != null ? ` · ${data.ruleCount} regole` : ""}`;
+    if (!ok) {
+      const err = `ufw ${ufwStatus}${data.detail ? `: ${data.detail}` : ""}`;
+      recordError("ufw", err);
+      recordProbeLog("ufw", { timestamp: Date.now(), ok: false, latencyMs, detail: err });
+      return {
+        configured: true,
+        ok: false,
+        status: ufwStatus,
+        latencyMs,
+        url: maskUrl(base),
+        ruleCount: data.ruleCount,
+        error: err,
+        history: getHistory("ufw"),
+        probeLog: getProbeLog("ufw"),
+      };
+    }
+    recordProbeLog("ufw", { timestamp: Date.now(), ok: true, latencyMs, detail });
+    return {
+      configured: true,
+      ok: true,
+      status: "active",
+      latencyMs,
+      url: maskUrl(base),
+      ruleCount: data.ruleCount,
+      history: getHistory("ufw"),
+      probeLog: getProbeLog("ufw"),
+    };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    const error = sanitizeError(msg);
+    console.error("[thinkcentre-probe] ufw KO (rete/timeout)", { error });
+    recordError("ufw", error);
+    recordProbeLog("ufw", { timestamp: Date.now(), ok: false, latencyMs: null, detail: error });
+    return {
+      configured: true,
+      ok: false,
+      status: "unreachable",
+      latencyMs: null,
+      url: maskUrl(base),
+      error,
+      history: getHistory("ufw"),
+      probeLog: getProbeLog("ufw"),
+    };
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 const KNOWN_VALHALLA_COSTING = ["motorcycle", "auto", "bicycle", "pedestrian"] as const;

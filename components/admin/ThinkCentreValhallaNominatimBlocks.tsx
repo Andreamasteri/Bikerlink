@@ -4,6 +4,18 @@ import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
 import { ErrorHistory, ProbeLog, type ProbeLogEntry } from "./ThinkCentreCardParts";
 
+export interface UfwDetailedHealth {
+  configured: boolean;
+  ok: boolean;
+  status: "active" | "inactive" | "error" | "unreachable";
+  latencyMs: number | null;
+  url: string | null;
+  ruleCount?: number;
+  error?: string;
+  history: Array<{ timestamp: number; error: string }>;
+  probeLog?: ProbeLogEntry[];
+}
+
 export interface ValhallaDetailedHealth {
   configured: boolean;
   ok: boolean;
@@ -320,6 +332,123 @@ export function NominatimBlock({
           )}
           {detail != null && detail.configured && !fingerprint && (
             <Text style={styles.fingerprint}>token Replit: non configurato</Text>
+          )}
+
+          {detail != null && detail.configured && !detail.ok && detail.history?.length > 0 && (
+            <ErrorHistory history={detail.history} />
+          )}
+          {detail != null && detail.probeLog && detail.probeLog.length > 0 && (
+            <ProbeLog entries={detail.probeLog} />
+          )}
+        </View>
+      )}
+    </View>
+  );
+}
+
+export function UfwBlock({
+  detail,
+  isLoading,
+  hasError,
+}: {
+  detail: UfwDetailedHealth | null;
+  isLoading?: boolean;
+  hasError?: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+
+  const statusColor =
+    detail == null
+      ? hasError
+        ? "#ef4444"
+        : "#6b7280"
+      : !detail.configured
+        ? "#6b7280"
+        : detail.ok
+          ? "#22c55e"
+          : detail.status === "inactive"
+            ? "#ef4444"
+            : "#6b7280";
+
+  const subtitleText =
+    detail == null
+      ? isLoading
+        ? "…"
+        : hasError
+          ? "Errore connessione"
+          : "…"
+      : detail.configured
+        ? detail.ok
+          ? `active${detail.ruleCount != null ? ` · ${detail.ruleCount} regole` : ""}${detail.latencyMs != null ? ` · ${detail.latencyMs} ms` : ""}`
+          : detail.status
+        : "non configurato";
+
+  const statusLabel =
+    detail == null
+      ? isLoading
+        ? "…"
+        : hasError
+          ? "Errore connessione"
+          : "…"
+      : !detail.configured
+        ? "Non configurato (UFW_STATUS_URL mancante)"
+        : detail.ok
+          ? `Firewall attivo${detail.latencyMs != null ? ` · ${detail.latencyMs} ms` : ""}`
+          : detail.error
+            ? `${detail.status} · ${detail.error}`
+            : detail.status;
+
+  return (
+    <View style={styles.block}>
+      <TouchableOpacity
+        style={styles.header}
+        onPress={() => setOpen((o) => !o)}
+        activeOpacity={0.7}
+        testID="thinkcentre-ufw-block-header"
+      >
+        <MaterialCommunityIcons
+          name={detail?.ok ? "shield-check-outline" : "shield-off-outline"}
+          size={18}
+          color={statusColor}
+          style={styles.headerIcon}
+        />
+        <View style={styles.headerText}>
+          <Text style={styles.title}>Firewall (ufw)</Text>
+          <Text style={[styles.subtitle, hasError && detail == null && styles.subtitleError]}>
+            {subtitleText}
+            {detail?.url ? ` · ${detail.url}` : ""}
+          </Text>
+        </View>
+        <View style={[styles.dot, { backgroundColor: statusColor }]} />
+        <Ionicons name={open ? "chevron-up" : "chevron-down"} size={16} color={Colors.textSecondary} />
+      </TouchableOpacity>
+
+      {open && (
+        <View style={styles.body}>
+          <View style={styles.statusRow}>
+            <View style={[styles.dot, { backgroundColor: statusColor }]} />
+            <Text style={[styles.statusLabel, hasError && detail == null && styles.statusLabelError]}>
+              {statusLabel}
+            </Text>
+          </View>
+
+          {detail != null && detail.configured && detail.ruleCount != null && (
+            <View style={styles.metaRow}>
+              <View style={styles.metaChip}>
+                <MaterialCommunityIcons name="shield-check-outline" size={10} color="#60a5fa" />
+                <Text style={styles.metaText}>{detail.ruleCount} regole attive</Text>
+              </View>
+            </View>
+          )}
+
+          {detail != null && !detail.configured && (
+            <View style={styles.publicNote}>
+              <Ionicons name="information-circle-outline" size={11} color="#f59e0b" />
+              <Text style={styles.publicNoteText}>
+                Nessun UFW_STATUS_URL — aggiungere il secret Replit dopo aver eseguito{" "}
+                setup-ufw-thinkcentre.sh sul ThinkCentre.
+              </Text>
+            </View>
           )}
 
           {detail != null && detail.configured && !detail.ok && detail.history?.length > 0 && (

@@ -36,13 +36,15 @@ import {
 import {
   probeValhallaDetailed,
   probeNominatimDetailed,
+  probeUfwDetailed,
   type ValhallaDetailedHealth,
   type NominatimDetailedHealth,
+  type UfwDetailedHealth,
 } from "./thinkcentre-health-vn-probes";
 
 const router = Router();
 
-type ServiceKey = "graphhopper" | "valhalla" | "ollama" | "whisper" | "nominatim";
+type ServiceKey = "graphhopper" | "valhalla" | "ollama" | "whisper" | "nominatim" | "ufw";
 
 interface ErrorEvent {
   timestamp: number;
@@ -327,12 +329,13 @@ router.get("/thinkcentre-events", async (_req: Request, res: ExpressResponse) =>
 
 router.get("/thinkcentre-health", async (_req: Request, res: ExpressResponse) => {
   try {
-    const [graphhopper, valhallaDetail, nominatimDetail, ollama, whisper] = await Promise.all([
+    const [graphhopper, valhallaDetail, nominatimDetail, ollama, whisper, ufwDetail] = await Promise.all([
       probeGraphHopperAreas(),
       probeValhallaDetailed(),
       probeNominatimDetailed(),
       probeOllama(),
       probeWhisper(),
+      probeUfwDetailed(),
     ]);
 
     const valhallaService: ServiceHealth = {
@@ -398,6 +401,7 @@ router.get("/thinkcentre-health", async (_req: Request, res: ExpressResponse) =>
       graphhopperAreas: graphhopper.areas,
       valhallaDetail,
       nominatimDetail,
+      ufwDetail,
       tokenFingerprints,
       checkedAt: Date.now(),
     });
