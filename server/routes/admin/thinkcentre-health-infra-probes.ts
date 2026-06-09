@@ -52,7 +52,11 @@ function tcpConnect(
 
     const timeout = setTimeout(() => {
       socket.destroy();
-      resolve({ ok: false, latencyMs: null, error: "timeout" });
+      resolve({
+        ok: false,
+        latencyMs: null,
+        error: `timeout (>${Math.round(PROBE_TIMEOUT_MS / 1000)} s) — TCP timeout`,
+      });
     }, PROBE_TIMEOUT_MS);
 
     socket.on("connect", () => {
@@ -64,7 +68,14 @@ function tcpConnect(
 
     socket.on("error", (err) => {
       clearTimeout(timeout);
-      resolve({ ok: false, latencyMs: Date.now() - t0, error: sanitizeError(err.message) });
+      const raw = err.message;
+      let classified: string;
+      if (/ECONNREFUSED|ENOTFOUND/i.test(raw)) {
+        classified = `network error — ${raw}`;
+      } else {
+        classified = raw;
+      }
+      resolve({ ok: false, latencyMs: Date.now() - t0, error: sanitizeError(classified) });
     });
   });
 }
