@@ -1,5 +1,5 @@
 // Task #2966 — AI Universal Cascade: verifica che runWithFallback percorra l'intera
-// catena cloud (Groq→Gemini→OpenAI→Anthropic) e, con ollamaBackstop attivo, ricada
+// catena cloud (Groq→Gemini→OpenAI) e, con ollamaBackstop attivo, ricada
 // su Ollama self-hosted come rete finale quando tutti i provider cloud falliscono.
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
@@ -9,7 +9,6 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // I provider cloud condividono createOpenAI (Groq riusa il client OpenAI con baseURL);
 // distinguiamo i tier tramite m.providerName, non tramite il modello sentinella.
-vi.mock("@ai-sdk/anthropic", () => ({ createAnthropic: vi.fn(() => vi.fn(() => ({ __p: "anthropic" }))) }));
 vi.mock("@ai-sdk/openai", () => ({ createOpenAI: vi.fn(() => vi.fn(() => ({ __p: "openai" }))) }));
 vi.mock("@ai-sdk/google", () => ({ createGoogleGenerativeAI: vi.fn(() => vi.fn(() => ({ __p: "google" }))) }));
 
@@ -21,7 +20,6 @@ vi.mock("../lib/ollama-client", () => ({
 // Scheduler pass-through: niente Bottleneck nei test.
 vi.mock("../lib/throttle", () => ({
   limiters: {
-    anthropic: { schedule: (f: () => unknown) => f() },
     openai: { schedule: (f: () => unknown) => f() },
     gemini: { schedule: (f: () => unknown) => f() },
     groq: { schedule: (f: () => unknown) => f() },
@@ -51,7 +49,7 @@ describe("runWithFallback — AI Universal Cascade (Task #2966)", () => {
     process.env.GROQ_API_KEY = "test-groq";
     process.env.GEMINI_API_KEY = "test-gemini";
     process.env.OPENAI_API_KEY = "test-openai";
-    process.env.ANTHROPIC_API_KEY = "test-anthropic";
+    delete process.env.ANTHROPIC_API_KEY;
   });
 
   it("primo provider (Groq) risponde → nessun fallback, Ollama non chiamato", async () => {
@@ -84,7 +82,7 @@ describe("runWithFallback — AI Universal Cascade (Task #2966)", () => {
     expect(value).toBe("ollama-saved-the-day");
     expect(model.providerName).toBe("ollama");
     // L'intera catena cloud è stata tentata prima del backstop.
-    expect(calls).toEqual(["groq", "google", "openai", "anthropic", "ollama"]);
+    expect(calls).toEqual(["groq", "google", "openai", "ollama"]);
   });
 
   it("tutti i cloud falliscono SENZA ollamaBackstop → propaga l'errore (nessun Ollama)", async () => {
@@ -100,7 +98,7 @@ describe("runWithFallback — AI Universal Cascade (Task #2966)", () => {
       ),
     ).rejects.toThrow("esaurito");
     expect(calls).not.toContain("ollama");
-    expect(calls).toEqual(["groq", "google", "openai", "anthropic"]);
+    expect(calls).toEqual(["groq", "google", "openai"]);
   });
 
   it("preferredProvider mette il provider scelto in testa alla catena", async () => {

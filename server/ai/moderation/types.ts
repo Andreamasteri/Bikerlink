@@ -34,7 +34,7 @@ export interface AiCallMeta {
   durationMs: number;
 }
 
-export type AiProviderId = "anthropic" | "openai" | "google" | "groq";
+export type AiProviderId = "openai" | "google" | "groq";
 
 export interface AiProviderHealth {
   id: AiProviderId;

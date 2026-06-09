@@ -48,10 +48,10 @@ import { systemPrompt } from "./ota-assistant/prompts";
 const router = Router();
 
 // Task #2966 — Provider preferito opzionale per l'OTA Assistant. OTA_ASSISTANT_MODEL
-// è ora interpretato come override del *provider* (groq/google/gemini/openai/anthropic):
+// è ora interpretato come override del *provider* (groq/google/gemini/openai):
 // se valido, viene messo in testa alla chain a cascata; altrimenti (vuoto o valore
 // legacy tipo "gpt-4o-mini") si usa la chain completa con primo provider disponibile.
-const VALID_PROVIDERS: AiProviderId[] = ["groq", "google", "openai", "anthropic"];
+const VALID_PROVIDERS: AiProviderId[] = ["groq", "google", "openai"];
 function parseOtaPreferred(raw: string | undefined): AiProviderId | "auto" {
   if (!raw) return "auto";
   const v = raw.trim().toLowerCase();

@@ -130,7 +130,6 @@ const envMissingForProvider: AppIntegrityCheck = {
     const hits: { pk: string; data: Record<string, unknown> }[] = [];
     const providers: Array<[string, string]> = [
       ["@ai-sdk/openai", "OPENAI_API_KEY"],
-      ["@ai-sdk/anthropic", "ANTHROPIC_API_KEY"],
       ["@ai-sdk/google", "GOOGLE_GENERATIVE_AI_API_KEY"],
       ["@sentry/node", "SENTRY_DSN"],
     ];

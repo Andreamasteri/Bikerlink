@@ -47,13 +47,6 @@ export const limiters = {
     reservoirRefreshAmount: Number(process.env.GROQ_RPM_LIMIT ?? 30),
     reservoirRefreshInterval: 60 * 1000,
   }),
-  anthropic: make({
-    maxConcurrent: 5,
-    minTime: 100,
-    reservoir: 50,
-    reservoirRefreshAmount: 50,
-    reservoirRefreshInterval: 60 * 1000,
-  }),
   mapbox: make({
     maxConcurrent: 10,
     minTime: 50,

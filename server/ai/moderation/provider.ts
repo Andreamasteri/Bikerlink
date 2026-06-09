@@ -1,7 +1,6 @@
-// Task #2532 — Provider abstraction con fallback chain Anthropic → OpenAI → Google.
+// Task #2532 — Provider abstraction con fallback chain Groq → Gemini → OpenAI.
 // Tutti i consumer AI moderazione passano da qui. Restituisce un model handle
 // pronto per generateObject/streamText con metadata cost tracking.
-import { createAnthropic } from "@ai-sdk/anthropic";
 import { createOpenAI } from "@ai-sdk/openai";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import type { LanguageModelV2 } from "@ai-sdk/provider";
@@ -27,7 +26,6 @@ interface ResolvedModel {
 
 // Prezzi $ per 1k token (Maggio 2026, vedi _ai-stack-decision.md). Aggiornati a mano.
 const PRICING: Record<string, { in: number; out: number }> = {
-  "claude-sonnet-4-6": { in: 0.003, out: 0.015 },
   "gpt-5.1": { in: 0.0025, out: 0.01 },
   "gemini-2.5-pro": { in: 0.00125, out: 0.005 },
   "gemini-2.5-flash": { in: 0.0003, out: 0.0025 },
@@ -59,7 +57,6 @@ function isQuotaError(msg: string): boolean {
 }
 
 const health: Record<AiProviderId, AiProviderHealth & { cooldownUntil: number; quotaError: boolean }> = {
-  anthropic: { id: "anthropic", available: true, cooldownUntil: 0, quotaError: false },
   openai: { id: "openai", available: true, cooldownUntil: 0, quotaError: false },
   google: { id: "google", available: true, cooldownUntil: 0, quotaError: false },
   groq: { id: "groq", available: true, cooldownUntil: 0, quotaError: false },
@@ -85,11 +82,9 @@ const DAILY_CAPS: Record<AiProviderId, number> = {
   groq: parseCap(process.env.GROQ_RPD_LIMIT, 1000),
   google: parseCap(process.env.GEMINI_RPD_LIMIT, 1500),
   openai: parseCap(process.env.OPENAI_RPD_LIMIT, Infinity),
-  anthropic: parseCap(process.env.ANTHROPIC_RPD_LIMIT, Infinity),
 };
 
 const dailyUsage: Record<AiProviderId, { day: string; count: number }> = {
-  anthropic: { day: "", count: 0 },
   openai: { day: "", count: 0 },
   google: { day: "", count: 0 },
   groq: { day: "", count: 0 },
@@ -177,7 +172,7 @@ export function markProviderOk(id: AiProviderId): void {
 // Chiamare una volta dopo le migrazioni DB per ripristinare i cooldown quota
 // persistiti prima del riavvio del server.
 export async function initProviderHealth(): Promise<void> {
-  const ids: AiProviderId[] = ["anthropic", "openai", "google"];
+  const ids: AiProviderId[] = ["openai", "google"];
   await Promise.all(ids.map(async (id) => {
     try {
       const row = await storage.getAppSetting(COOLDOWN_DB_KEY(id));
@@ -218,17 +213,6 @@ function isAvailable(id: AiProviderId): boolean {
 function tryBuild(id: AiProviderId, role: ModelRole, forcedModelId?: string): ResolvedModel | null {
   if (!isAvailable(id)) return null;
   try {
-    if (id === "anthropic") {
-      const key = process.env.ANTHROPIC_API_KEY;
-      if (!key) return null;
-      const modelId = forcedModelId ?? "claude-sonnet-4-6";
-      const client = createAnthropic({ apiKey: key });
-      return {
-        id, providerName: "anthropic", modelId,
-        model: client(modelId) as unknown as LanguageModelV2,
-        scheduler: <T>(fn: () => Promise<T>) => limiters.anthropic.schedule(fn),
-      };
-    }
     if (id === "openai") {
       const key = process.env.OPENAI_API_KEY;
       if (!key) return null;
@@ -301,18 +285,18 @@ function tryBuildOllama(): ResolvedModel | null {
 }
 
 // Ordine di preferenza: vedi _ai-stack-decision.md.
-// Groq primario (free, Llama 3.3 70B) → Gemini (free, Flash) → OpenAI → Anthropic.
+// Groq primario (free, Llama 3.3 70B) → Gemini (free, Flash) → OpenAI.
 // Quando i free tier esauriscono il cap giornaliero, la chain prosegue; per
 // l'assistente, l'ultima rete è Ollama (illimitato, gestito in agent.ts).
-const DEFAULT_BRAIN_CHAIN: AiProviderId[] = ["groq", "google", "openai", "anthropic"];
-const DEFAULT_ROUTER_CHAIN: AiProviderId[] = ["groq", "google", "openai", "anthropic"];
+const DEFAULT_BRAIN_CHAIN: AiProviderId[] = ["groq", "google", "openai"];
+const DEFAULT_ROUTER_CHAIN: AiProviderId[] = ["groq", "google", "openai"];
 
 export interface ResolveOpts {
   role?: ModelRole;
   preferredProvider?: AiProviderId | "auto";
   forcedModelId?: string;
-  // Task #2966 — Se true, dopo aver esaurito la chain cloud (Groq→Gemini→OpenAI→
-  // Anthropic) prova Ollama self-hosted come rete finale illimitata.
+  // Task #2966 — Se true, dopo aver esaurito la chain cloud (Groq→Gemini→OpenAI)
+  // prova Ollama self-hosted come rete finale illimitata.
   ollamaBackstop?: boolean;
 }
 
@@ -329,7 +313,7 @@ async function readPreferredProvider(): Promise<AiProviderId | "auto"> {
   try {
     const row = await storage.getAppSetting("ai_moderation_preferred_provider");
     const v = (row?.value ?? "auto") as string;
-    if (v === "anthropic" || v === "openai" || v === "google") return v;
+    if (v === "openai" || v === "google" || v === "groq") return v;
   } catch {/* ignore */}
   return "auto";
 }
@@ -390,18 +374,17 @@ export async function runWithFallback<T>(
 }
 
 // Task #2825 — Variabili d'ambiente che attivano almeno un provider AI.
-export const AI_PROVIDER_ENV_VARS = ["GROQ_API_KEY", "ANTHROPIC_API_KEY", "OPENAI_API_KEY", "GEMINI_API_KEY", "OLLAMA_URL"] as const;
+export const AI_PROVIDER_ENV_VARS = ["GROQ_API_KEY", "OPENAI_API_KEY", "GEMINI_API_KEY", "OLLAMA_URL"] as const;
 
 // Messaggio standard 503 quando nessun provider AI è configurato. Contiene i nomi
 // delle variabili mancanti così il client può riconoscere il caso "chiave mancante".
 export const AI_NO_PROVIDER_MESSAGE =
-  "Servizio AI non disponibile: nessuna chiave AI configurata (ANTHROPIC_API_KEY / OPENAI_API_KEY / GEMINI_API_KEY / OLLAMA_URL mancante)";
+  "Servizio AI non disponibile: nessuna chiave AI configurata (OPENAI_API_KEY / GEMINI_API_KEY / OLLAMA_URL mancante)";
 
 // Ritorna gli ID dei provider che hanno una chiave configurata (ignora il cooldown).
 export function getConfiguredProviders(): AiProviderId[] {
   const out: AiProviderId[] = [];
   if (process.env.GROQ_API_KEY) out.push("groq");
-  if (process.env.ANTHROPIC_API_KEY) out.push("anthropic");
   if (process.env.OPENAI_API_KEY) out.push("openai");
   if (process.env.GEMINI_API_KEY ?? process.env.GOOGLE_API_KEY) out.push("google");
   return out;

@@ -126,12 +126,6 @@ async function checkGemini() {
   }
 }
 
-function checkAnthropic() {
-  const key = process.env.ANTHROPIC_API_KEY;
-  record("Anthropic", "ANTHROPIC_API_KEY", "optional", !!key, null,
-    key ? "Configurata (validazione richiede POST — skip)" : "Non configurata (opzionale — usa OpenAI/Gemini come fallback)");
-}
-
 async function checkOllama() {
   const url = process.env.OLLAMA_URL;
   const token = process.env.OLLAMA_TOKEN;
@@ -451,7 +445,6 @@ async function main() {
     checkRedis(),
     checkTileProviders(),
   ]);
-  checkAnthropic();
   checkValhalla();
   checkSecurity();
   checkMonitoringAndFlags();

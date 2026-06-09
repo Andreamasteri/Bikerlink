@@ -111,7 +111,7 @@ router.get("/ai/providers/health", (_req: Request, res: Response) => {
 });
 
 const resetProviderSchema = z.object({
-  providerId: z.enum(["anthropic", "openai", "google", "groq"]).optional(),
+  providerId: z.enum(["openai", "google", "groq"]).optional(),
 });
 
 type ConsoleReq = Request & { consoleUser?: { id: string; role: string } };
@@ -126,7 +126,7 @@ router.post("/ai/providers/reset", async (req: ConsoleReq, res: Response) => {
   const modId = (req.session as { userId?: string }).userId;
   if (!modId) return sendError(res, 401, "Sessione scaduta");
   try {
-    const allIds = ["anthropic", "openai", "google", "groq"] as const;
+    const allIds = ["openai", "google", "groq"] as const;
     const targets = parsed.data.providerId ? [parsed.data.providerId] : allIds;
     for (const id of targets) markProviderOk(id);
     await storage.createModeratorLog({

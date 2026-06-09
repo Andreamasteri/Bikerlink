@@ -23,7 +23,6 @@
     "ios": "expo run:ios"
   },
   "dependencies": {
-    "@ai-sdk/anthropic": "^3.0.81",
     "@ai-sdk/google": "^3.0.80",
     "@ai-sdk/groq": "^3.0.39",
     "@ai-sdk/openai": "^3.0.68",

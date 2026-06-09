@@ -66,7 +66,6 @@ const PROVIDER_COLORS: Record<string, string> = {
   groq: "#f55036",
   google: "#4285f4",
   openai: "#10a37f",
-  anthropic: "#d97706",
   ollama: "#8b5cf6",
 };
 

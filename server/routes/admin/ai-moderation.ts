@@ -254,7 +254,7 @@ router.get("/ai/settings", async (_req: Request, res: Response) => {
 });
 
 const settingsSchema = z.object({
-  preferredProvider: z.enum(["auto", "anthropic", "openai", "google"]).optional(),
+  preferredProvider: z.enum(["auto", "openai", "google", "groq"]).optional(),
   anomalySigma: z.number().min(1).max(6).optional(),
   budgetLimitUsd: z.number().min(0).max(10000).optional(),
 });

@@ -1,6 +1,6 @@
 /**
  * Task #2532 — Settings Co-Pilot AI Moderazione.
- * Provider preferito (auto/anthropic/openai/google), sigma anomalie, limite budget mensile.
+ * Provider preferito (auto/groq/openai/google), sigma anomalie, limite budget mensile.
  */
 import React, { useState, useEffect } from "react";
 import { ScrollView, View, Text, StyleSheet, TouchableOpacity, TextInput, Alert, ActivityIndicator } from "react-native";
@@ -9,7 +9,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { apiRequest, queryClient } from "@/lib/query-client";
 import Colors from "@/constants/colors";
 
-const PROVIDERS = ["auto", "anthropic", "openai", "google"] as const;
+const PROVIDERS = ["auto", "openai", "google", "groq"] as const;
 
 interface SettingsResp {
   preferredProvider: typeof PROVIDERS[number];
@@ -79,7 +79,7 @@ export default function AiModerationSettingsScreen() {
             </TouchableOpacity>
           ))}
         </View>
-        <Text style={styles.help}>&quot;auto&quot; segue la chain Anthropic → OpenAI → Google con circuit-breaker su fallimenti.</Text>
+        <Text style={styles.help}>&quot;auto&quot; segue la chain Groq → OpenAI → Google con circuit-breaker su fallimenti.</Text>
       </View>
 
       <View style={styles.card}>

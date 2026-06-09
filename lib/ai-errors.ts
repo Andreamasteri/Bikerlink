@@ -8,7 +8,7 @@ export const AI_KEY_MISSING_MESSAGE = "Funzione AI non attivata — contatta l'a
 // Copre sia gli endpoint a chiave singola (GEMINI_API_KEY) sia gli endpoint con
 // fallback chain (AI_PROVIDER_UNAVAILABLE / nessun provider AI configurato).
 const AI_KEY_MISSING_PATTERN =
-  /(GEMINI_API_KEY|GOOGLE_API_KEY|OPENAI_API_KEY|ANTHROPIC_API_KEY|AI_PROVIDER_UNAVAILABLE|chiave AI|nessun provider AI)/i;
+  /(GEMINI_API_KEY|GOOGLE_API_KEY|OPENAI_API_KEY|AI_PROVIDER_UNAVAILABLE|chiave AI|nessun provider AI)/i;
 
 export function isAiKeyMissingResponse(status: number, message?: string | null): boolean {
   return status === 503 && AI_KEY_MISSING_PATTERN.test(String(message ?? ""));
