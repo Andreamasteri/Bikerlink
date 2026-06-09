@@ -73,6 +73,43 @@ systemctl reload nginx
 
 ---
 
+## ThinkCentre Metrics Agent — Esposizione pubblica via DuckDNS
+
+L'agent Node.js (porta 9101) è esposto su `tc.bikerlink.duckdns.org` via nginx HTTPS.
+Replit si connette con `THINKCENTRE_METRICS_URL=https://tc.bikerlink.duckdns.org` e header `X-Agent-Token`.
+
+### Setup (una tantum sul ThinkCentre)
+
+```bash
+# 1. Aggiorna DuckDNS: aggiungi sottodominio "tc" puntato allo stesso IP
+#    (pannello https://www.duckdns.org — stesso IP di gh, valhalla, ollama, ecc.)
+
+# 2. Esegui lo script come root dalla directory repo
+sudo bash scripts/setup-nginx-tc-metrics.sh
+
+# Lo script espande il certificato bikerlink, aggiorna il conf nginx e
+# stampa il token generato. Copia il token nei secret Replit.
+
+# 3. Verifica la connessione (sostituisci TOKEN con quello stampato dallo script)
+curl -s -H "X-Agent-Token: TOKEN" https://tc.bikerlink.duckdns.org/sys-metrics | jq .
+# → { "cpu": {...}, "memory": {...}, "uptimeSec": ... }
+
+# 4. Aggiorna i secret su Replit:
+#    THINKCENTRE_METRICS_URL = https://tc.bikerlink.duckdns.org
+#    THINKCENTRE_AGENT_TOKEN = <token stampato dallo script>
+```
+
+### Verifica agent attivo
+
+```bash
+# L'agent deve girare sul ThinkCentre (avviato come servizio o in tmux)
+node scripts/thinkcentre-agent/index.js
+# oppure, se hai il systemd service:
+systemctl status bikerlink-tc-agent
+```
+
+---
+
 ### Aggiungere porte future
 
 Decommentare le righe nel file `scripts/setup-ufw-thinkcentre.sh` e rieseguirlo, oppure aggiungere manualmente:
