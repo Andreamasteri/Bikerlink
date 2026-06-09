@@ -106,7 +106,7 @@ ufw allow from "${LOCALHOST}" to any port 5432 proto tcp
 
 # ── Redis TLS pubblico (porta 6380 via nginx stream) ─────────────────────────
 # nginx fa da proxy TLS → Redis locale 6379 rimane solo localhost.
-# Replit (cloud) si connette a rediss://bkredis.bikerlink.duckdns.org:6380
+# Replit (cloud) si connette a rediss://bikerlink.duckdns.org:6380
 echo "→ Redis TLS 6380/tcp — internet (nginx stream proxy)..."
 ufw allow 6380/tcp comment "Redis TLS pubblico via nginx stream (BikerLink)"
 
@@ -271,9 +271,9 @@ echo "  sudo ufw status verbose"
 echo "  curl -s http://localhost:9099/"
 echo "  systemctl status bikerlink-ufw-status"
 echo ""
-echo "Per aggiungere porte future (es. Redis 6379 o Uptime Kuma 3001):"
+echo "Per aggiungere porte future (es. Uptime Kuma 3001):"
 echo "  Decommentare le righe corrispondenti in questo script e rieseguirlo."
-echo "  Oppure: sudo ufw allow from 127.0.0.1 to any port 6379 proto tcp"
+echo "  Oppure: sudo ufw allow from 192.168.1.0/24 to any port 3001 proto tcp"
 echo ""
 echo "Per configurare il pannello admin BikerLink:"
 echo "  Aggiungere in Replit Secrets:  UFW_STATUS_URL=https://<host-thinkcentre>/ufw-status"
