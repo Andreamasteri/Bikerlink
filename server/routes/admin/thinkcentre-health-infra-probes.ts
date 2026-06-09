@@ -5,13 +5,15 @@
  * Importati da thinkcentre-health.ts.
  *
  * Env vars:
- *   REDIS_PROBE_HOST      hostname/IP Redis sul ThinkCentre (es. 192.168.1.35)
- *   REDIS_PROBE_PORT      porta Redis (default: 6379)
- *   POSTGRES_PROBE_HOST   hostname/IP PostgreSQL sul ThinkCentre
+ *   REDIS_PROBE_URL       URL HTTP del probe Redis via TC agent (es. https://tc.bikerlink.duckdns.org/probe/redis)
+ *                         Se impostato ha precedenza su REDIS_PROBE_HOST (modalità TCP diretta).
+ *   REDIS_PROBE_HOST      hostname/IP Redis (TCP diretto, fallback se REDIS_PROBE_URL non impostato)
+ *   REDIS_PROBE_PORT      porta Redis (default: 6379, usato solo in modalità TCP)
+ *   POSTGRES_PROBE_HOST   hostname/IP PostgreSQL sul ThinkCentre (TCP diretto)
  *   POSTGRES_PROBE_PORT   porta PostgreSQL (default: 5432)
- *   PGADMIN_URL           URL pgAdmin (es. http://192.168.1.35:5050)
- *   NGINX_MONITOR_URL     URL nginx (es. http://192.168.1.35:80)
- *   UPTIME_KUMA_URL       URL Uptime Kuma (es. http://127.0.0.1:3001)
+ *   PGADMIN_URL           URL pgAdmin — punta al probe TC agent: https://tc.bikerlink.duckdns.org/probe/pgadmin
+ *   NGINX_MONITOR_URL     URL nginx  — punta al probe TC agent: https://tc.bikerlink.duckdns.org/probe/nginx
+ *   UPTIME_KUMA_URL       URL Uptime Kuma — punta al probe TC agent: https://tc.bikerlink.duckdns.org/probe/uptime-kuma
  */
 
 import * as net from "net";
@@ -69,6 +71,22 @@ function tcpConnect(
 
 // ── Redis ─────────────────────────────────────────────────────────────────────
 export async function probeRedisInfra(): Promise<InfraServiceHealth> {
+  // Modalità HTTP via TC agent (REDIS_PROBE_URL ha precedenza)
+  const probeUrl = process.env.REDIS_PROBE_URL?.trim();
+  if (probeUrl) {
+    const agentToken = process.env.THINKCENTRE_AGENT_TOKEN ?? "";
+    const r = await httpProbe(probeUrl, agentToken ? { "X-Agent-Token": agentToken } : {}, (s) => s < 500);
+    if (!r.ok) {
+      const error = r.error ?? "HTTP error";
+      recordError("redis", error);
+      recordProbeLog("redis", { timestamp: Date.now(), ok: false, latencyMs: r.latencyMs, detail: error });
+      return { configured: true, ok: false, latencyMs: r.latencyMs, url: probeUrl, error, history: getHistory("redis"), probeLog: getProbeLog("redis") };
+    }
+    recordProbeLog("redis", { timestamp: Date.now(), ok: true, latencyMs: r.latencyMs, detail: "HTTP probe OK" });
+    return { configured: true, ok: true, latencyMs: r.latencyMs, url: probeUrl, history: getHistory("redis"), probeLog: getProbeLog("redis") };
+  }
+
+  // Modalità TCP diretta (fallback)
   const host = process.env.REDIS_PROBE_HOST?.trim();
   const port = parseInt(process.env.REDIS_PROBE_PORT ?? "6379", 10);
   if (!host) {
