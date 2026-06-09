@@ -131,6 +131,21 @@ export async function runBootSequence(server: Server, errorHandlersReady: Promis
     console.warn("[INIT] Phase 3: email bootstrap failed (non-fatal):", e);
   }
 
+  // APK download URL bootstrap — imposta il link Google Drive se non già presente
+  try {
+    const { storage: apkStorage } = await import("./storage");
+    const apkSetting = await apkStorage.getAppSetting("apk_download_url");
+    const APK_DRIVE_URL = "https://drive.google.com/uc?export=download&id=15teG0lCIWFi6YuXtcfIMPjuWcctPc5cH";
+    if (!apkSetting?.value?.trim()) {
+      await apkStorage.upsertAppSetting("apk_download_url", APK_DRIVE_URL);
+      console.log("[APK BOOTSTRAP] apk_download_url scritto in app_settings");
+    } else {
+      console.log("[APK BOOTSTRAP] apk_download_url già presente in app_settings — nessuna modifica");
+    }
+  } catch (e) {
+    console.warn("[INIT] Phase 3: APK URL bootstrap failed (non-fatal):", e);
+  }
+
   // Task #2817 — Ripristina il cooldown quota AI provider
   try {
     const { initProviderHealth } = await import("./ai/moderation/provider");
