@@ -3,8 +3,8 @@
  *
  * GET /api/admin/thinkcentre-health
  * Probe parallelo dei servizi self-hosted sul ThinkCentre:
- * GraphHopper (routing), Ollama (AI), Whisper (ASR) e Nominatim (geocoding).
- * Valhalla e Nominatim sono estratti in thinkcentre-health-vn-probes.ts.
+ * GraphHopper (routing), Ollama (AI), Whisper (ASR), Nominatim (geocoding),
+ * Valhalla (routing), Redis (cache), PostgreSQL (DB), pgAdmin, nginx, Uptime Kuma.
  */
 
 import { Router, type Request, type Response as ExpressResponse } from "express";
@@ -41,10 +41,28 @@ import {
   type NominatimDetailedHealth,
   type UfwDetailedHealth,
 } from "./thinkcentre-health-vn-probes";
+import {
+  probeRedisInfra,
+  probePostgresInfra,
+  probePgAdmin,
+  probeNginxInfra,
+  probeUptimeKuma,
+} from "./thinkcentre-health-infra-probes";
 
 const router = Router();
 
-type ServiceKey = "graphhopper" | "valhalla" | "ollama" | "whisper" | "nominatim" | "ufw";
+type ServiceKey =
+  | "graphhopper"
+  | "valhalla"
+  | "ollama"
+  | "whisper"
+  | "nominatim"
+  | "ufw"
+  | "redis"
+  | "postgres"
+  | "pgadmin"
+  | "nginx"
+  | "uptimekuma";
 
 interface ErrorEvent {
   timestamp: number;
@@ -295,22 +313,6 @@ async function probeWhisper(): Promise<ServiceHealth> {
   }
 }
 
-async function probeNominatim(): Promise<ServiceHealth> {
-  const detailed = await probeNominatimDetailed();
-  return {
-    key: "nominatim",
-    label: "Nominatim",
-    configured: detailed.configured,
-    ok: detailed.ok,
-    latencyMs: detailed.latencyMs,
-    url: detailed.url,
-    error: detailed.error,
-    tokenMissing: detailed.tokenMissing,
-    history: detailed.history,
-    probeLog: detailed.probeLog,
-  };
-}
-
 router.get("/thinkcentre-events", async (_req: Request, res: ExpressResponse) => {
   try {
     const limit = 20;
@@ -329,13 +331,30 @@ router.get("/thinkcentre-events", async (_req: Request, res: ExpressResponse) =>
 
 router.get("/thinkcentre-health", async (_req: Request, res: ExpressResponse) => {
   try {
-    const [graphhopper, valhallaDetail, nominatimDetail, ollama, whisper, ufwDetail] = await Promise.all([
+    const [
+      graphhopper,
+      valhallaDetail,
+      nominatimDetail,
+      ollama,
+      whisper,
+      ufwDetail,
+      redisInfra,
+      postgresInfra,
+      pgadminInfra,
+      nginxInfra,
+      uptimeKumaInfra,
+    ] = await Promise.all([
       probeGraphHopperAreas(),
       probeValhallaDetailed(),
       probeNominatimDetailed(),
       probeOllama(),
       probeWhisper(),
       probeUfwDetailed(),
+      probeRedisInfra(),
+      probePostgresInfra(),
+      probePgAdmin(),
+      probeNginxInfra(),
+      probeUptimeKuma(),
     ]);
 
     const valhallaService: ServiceHealth = {
@@ -364,7 +383,73 @@ router.get("/thinkcentre-health", async (_req: Request, res: ExpressResponse) =>
       probeLog: nominatimDetail.probeLog,
     };
 
-    const services: ServiceHealth[] = [valhallaService, ollama, whisper, nominatimService];
+    const redisService: ServiceHealth = {
+      key: "redis",
+      label: "Redis",
+      configured: redisInfra.configured,
+      ok: redisInfra.ok,
+      latencyMs: redisInfra.latencyMs,
+      url: redisInfra.url,
+      error: redisInfra.error,
+      history: redisInfra.history,
+      probeLog: redisInfra.probeLog,
+    };
+    const postgresService: ServiceHealth = {
+      key: "postgres",
+      label: "PostgreSQL",
+      configured: postgresInfra.configured,
+      ok: postgresInfra.ok,
+      latencyMs: postgresInfra.latencyMs,
+      url: postgresInfra.url,
+      error: postgresInfra.error,
+      history: postgresInfra.history,
+      probeLog: postgresInfra.probeLog,
+    };
+    const pgadminService: ServiceHealth = {
+      key: "pgadmin",
+      label: "pgAdmin",
+      configured: pgadminInfra.configured,
+      ok: pgadminInfra.ok,
+      latencyMs: pgadminInfra.latencyMs,
+      url: pgadminInfra.url,
+      error: pgadminInfra.error,
+      history: pgadminInfra.history,
+      probeLog: pgadminInfra.probeLog,
+    };
+    const nginxService: ServiceHealth = {
+      key: "nginx",
+      label: "nginx",
+      configured: nginxInfra.configured,
+      ok: nginxInfra.ok,
+      latencyMs: nginxInfra.latencyMs,
+      url: nginxInfra.url,
+      error: nginxInfra.error,
+      history: nginxInfra.history,
+      probeLog: nginxInfra.probeLog,
+    };
+    const uptimeKumaService: ServiceHealth = {
+      key: "uptimekuma",
+      label: "Uptime Kuma",
+      configured: uptimeKumaInfra.configured,
+      ok: uptimeKumaInfra.ok,
+      latencyMs: uptimeKumaInfra.latencyMs,
+      url: uptimeKumaInfra.url,
+      error: uptimeKumaInfra.error,
+      history: uptimeKumaInfra.history,
+      probeLog: uptimeKumaInfra.probeLog,
+    };
+
+    const services: ServiceHealth[] = [
+      valhallaService,
+      ollama,
+      whisper,
+      nominatimService,
+      redisService,
+      postgresService,
+      pgadminService,
+      nginxService,
+      uptimeKumaService,
+    ];
 
     const graphhopperContributes = graphhopper.configured && graphhopper.areas.some((a) => a.enabled);
     const configuredServices = services.filter((s) => s.configured);

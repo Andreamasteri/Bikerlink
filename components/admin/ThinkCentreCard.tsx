@@ -8,9 +8,27 @@ import { ErrorHistory, EventLog, GraphHopperBlock, ProbeLog } from "./ThinkCentr
 import type { HealthEvent, AreaServiceHealth, ProbeLogEntry } from "./ThinkCentreCardParts";
 import { ValhallaBlock, NominatimBlock, UfwBlock } from "./ThinkCentreValhallaNominatimBlocks";
 import type { ValhallaDetailedHealth, NominatimDetailedHealth, UfwDetailedHealth } from "./ThinkCentreValhallaNominatimBlocks";
+import {
+  OllamaBlock,
+  WhisperBlock,
+  RedisBlock,
+  PostgresBlock,
+  PgAdminBlock,
+  NginxBlock,
+  UptimeKumaBlock,
+} from "./ThinkCentreInfraBlocks";
 import type { DotStatus, SystemStatuses } from "./SystemHealthContainer";
 
-type ServiceKey = "valhalla" | "ollama" | "whisper" | "nominatim";
+type ServiceKey =
+  | "valhalla"
+  | "ollama"
+  | "whisper"
+  | "nominatim"
+  | "redis"
+  | "postgres"
+  | "pgadmin"
+  | "nginx"
+  | "uptimekuma";
 
 interface ServiceHealth {
   key: ServiceKey;
@@ -52,13 +70,6 @@ interface HealthEventsResponse {
   events: HealthEvent[];
 }
 
-const SERVICE_ICONS: Record<ServiceKey, keyof typeof MaterialCommunityIcons.glyphMap> = {
-  valhalla: "routes",
-  ollama: "robot-outline",
-  whisper: "microphone-outline",
-  nominatim: "map-search-outline",
-};
-
 const OVERALL_COLOR: Record<ThinkCentreHealth["overall"], string> = {
   green: "#22c55e",
   yellow: "#f59e0b",
@@ -74,21 +85,6 @@ function CollapseChevron({ collapsed }: { collapsed: boolean }) {
       color={Colors.textSecondary}
     />
   );
-}
-
-function serviceColor(s: ServiceHealth): string {
-  if (!s.configured) return "#6b7280";
-  return s.ok ? "#22c55e" : "#ef4444";
-}
-
-function serviceStatusLabel(s: ServiceHealth): string {
-  if (!s.configured) return "Non configurato";
-  if (s.ok) {
-    const base = s.latencyMs != null ? `Online · ${s.latencyMs} ms` : "Online";
-    return s.tileVersion ? `${base} · tile ${s.tileVersion}` : base;
-  }
-  if (s.tokenMissing) return "Offline · token assente in Replit";
-  return s.error ? `Offline · ${s.error}` : "Offline";
 }
 
 function overallToStatus(overall: ThinkCentreHealth["overall"]): DotStatus {
@@ -112,10 +108,143 @@ function ghToStatus(areas: AreaServiceHealth[], configured: boolean): DotStatus 
   return "offline";
 }
 
+function ufwToStatus(ufw: UfwDetailedHealth | undefined): DotStatus {
+  if (!ufw || !ufw.configured) return "unknown";
+  return ufw.ok ? "ok" : "offline";
+}
+
+// ── Inline badge strip ─────────────────────────────────────────────────────
+function svcColor(s: ServiceHealth | undefined): string {
+  if (!s || !s.configured) return "#6b7280";
+  return s.ok ? "#22c55e" : "#ef4444";
+}
+
+function ghBadgeColor(data: ThinkCentreHealth): string {
+  if (!data.graphhopperConfigured || data.graphhopperAreas.length === 0) return "#6b7280";
+  const enabled = data.graphhopperAreas.filter((a) => a.enabled);
+  if (enabled.length === 0) return "#6b7280";
+  const online = enabled.filter((a) => a.ok).length;
+  if (online === enabled.length) return "#22c55e";
+  if (online === 0) return "#ef4444";
+  return "#f59e0b";
+}
+
+function ufwBadgeColor(data: ThinkCentreHealth): string {
+  const ufw = data.ufwDetail;
+  if (!ufw || !ufw.configured) return "#6b7280";
+  return ufw.ok ? "#22c55e" : "#ef4444";
+}
+
+type BadgeItem = { name: string; color: string };
+type BadgeGroup = { label: string; items: BadgeItem[] };
+
+function ServiceBadgeStrip({ data }: { data: ThinkCentreHealth }) {
+  const find = (key: ServiceKey) => data.services.find((s) => s.key === key);
+
+  const groups: BadgeGroup[] = [
+    {
+      label: "Routing",
+      items: [
+        { name: "GH", color: ghBadgeColor(data) },
+        { name: "Valhalla", color: svcColor(find("valhalla")) },
+        { name: "Nominatim", color: svcColor(find("nominatim")) },
+      ],
+    },
+    {
+      label: "AI",
+      items: [
+        { name: "Ollama", color: svcColor(find("ollama")) },
+        { name: "Whisper", color: svcColor(find("whisper")) },
+      ],
+    },
+    {
+      label: "Infra",
+      items: [
+        { name: "Redis", color: svcColor(find("redis")) },
+        { name: "Postgres", color: svcColor(find("postgres")) },
+        { name: "pgAdmin", color: svcColor(find("pgadmin")) },
+        { name: "nginx", color: svcColor(find("nginx")) },
+        { name: "Kuma", color: svcColor(find("uptimekuma")) },
+      ],
+    },
+    {
+      label: "Sicurezza",
+      items: [
+        { name: "UFW", color: ufwBadgeColor(data) },
+      ],
+    },
+  ];
+
+  return (
+    <View style={badgeStyles.strip}>
+      {groups.map((g) => (
+        <View key={g.label} style={badgeStyles.group}>
+          <Text style={badgeStyles.groupLabel}>{g.label}</Text>
+          <View style={badgeStyles.badges}>
+            {g.items.map((item) => (
+              <View key={item.name} style={[badgeStyles.badge, { borderColor: item.color + "33" }]}>
+                <View style={[badgeStyles.dot, { backgroundColor: item.color }]} />
+                <Text style={[badgeStyles.badgeText, { color: item.color }]}>{item.name}</Text>
+              </View>
+            ))}
+          </View>
+        </View>
+      ))}
+    </View>
+  );
+}
+
+const badgeStyles = StyleSheet.create({
+  strip: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+    marginTop: 10,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: Colors.border,
+  },
+  group: { gap: 4 },
+  groupLabel: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 9,
+    color: "#6b7280",
+    letterSpacing: 0.6,
+    textTransform: "uppercase",
+  },
+  badges: { flexDirection: "row", gap: 4, flexWrap: "wrap" },
+  badge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    backgroundColor: "rgba(148,163,184,0.06)",
+    borderWidth: 1,
+  },
+  dot: { width: 5, height: 5, borderRadius: 3 },
+  badgeText: { fontFamily: "Inter_500Medium", fontSize: 9, letterSpacing: 0.2 },
+});
+
+type ThinkCentreStatusKeys =
+  | "thinkcentre"
+  | "graphhopper"
+  | "valhalla"
+  | "nominatim"
+  | "ollama"
+  | "whisper"
+  | "ufw"
+  | "redis"
+  | "postgres"
+  | "pgadmin"
+  | "nginx"
+  | "uptimeKuma";
+
 export function ThinkCentreCard({
   onStatuses,
 }: {
-  onStatuses?: (s: Pick<SystemStatuses, "thinkcentre" | "graphhopper" | "valhalla" | "nominatim">) => void;
+  onStatuses?: (s: Pick<SystemStatuses, ThinkCentreStatusKeys>) => void;
 }) {
   const [collapsed, setCollapsed] = useState(true);
 
@@ -193,17 +322,25 @@ export function ThinkCentreCard({
 
   useEffect(() => {
     if (!data || !onStatuses) return;
-    const vSvc = data.services.find((s) => s.key === "valhalla");
-    const nSvc = data.services.find((s) => s.key === "nominatim");
+    const findSvc = (key: ServiceKey) => data.services.find((s) => s.key === key);
     onStatuses({
       thinkcentre: overallToStatus(data.overall),
       graphhopper: ghToStatus(data.graphhopperAreas, data.graphhopperConfigured),
-      valhalla: serviceToStatus(vSvc),
-      nominatim: serviceToStatus(nSvc),
+      valhalla: serviceToStatus(findSvc("valhalla")),
+      nominatim: serviceToStatus(findSvc("nominatim")),
+      ollama: serviceToStatus(findSvc("ollama")),
+      whisper: serviceToStatus(findSvc("whisper")),
+      ufw: ufwToStatus(data.ufwDetail),
+      redis: serviceToStatus(findSvc("redis")),
+      postgres: serviceToStatus(findSvc("postgres")),
+      pgadmin: serviceToStatus(findSvc("pgadmin")),
+      nginx: serviceToStatus(findSvc("nginx")),
+      uptimeKuma: serviceToStatus(findSvc("uptimekuma")),
     });
   }, [data, onStatuses]);
 
   const headerColor = data ? OVERALL_COLOR[data.overall] : "#6b7280";
+  const fp = data?.tokenFingerprints;
 
   return (
     <View style={styles.card}>
@@ -251,6 +388,8 @@ export function ThinkCentreCard({
         </View>
       </TouchableOpacity>
 
+      {data && <ServiceBadgeStrip data={data} />}
+
       {!collapsed && (
         <View style={styles.list}>
           {error && !isLoading && (
@@ -259,20 +398,21 @@ export function ThinkCentreCard({
           {data && data.graphhopperConfigured && (
             <GraphHopperBlock
               areas={data.graphhopperAreas}
-              fingerprint={data.tokenFingerprints?.graphhopper ?? null}
+              fingerprint={fp?.graphhopper ?? null}
               url={data.graphhopperUrl}
               tokenMissing={data.graphhopperTokenMissing}
             />
           )}
+
           <ValhallaBlock
             detail={error ? null : (data?.valhallaDetail ?? null)}
-            fingerprint={error ? null : (data?.tokenFingerprints?.valhalla ?? null)}
+            fingerprint={error ? null : (fp?.valhalla ?? null)}
             isLoading={isLoading}
             hasError={!!error}
           />
           <NominatimBlock
             detail={error ? null : (data?.nominatimDetail ?? null)}
-            fingerprint={error ? null : (data?.tokenFingerprints?.nominatim ?? null)}
+            fingerprint={error ? null : (fp?.nominatim ?? null)}
             isLoading={isLoading}
             hasError={!!error}
           />
@@ -281,50 +421,45 @@ export function ThinkCentreCard({
             isLoading={isLoading}
             hasError={!!error}
           />
-          {data?.services
-            .filter((s) => s.key !== "valhalla" && s.key !== "nominatim")
-            .map((s) => {
-            const fp = data.tokenFingerprints?.[s.key] ?? null;
-            const showFingerprint = s.configured && fp != null;
-            const tokenOk = showFingerprint && s.ok;
-            return (
-              <View key={s.key} style={styles.row}>
-                <MaterialCommunityIcons
-                  name={SERVICE_ICONS[s.key]}
-                  size={18}
-                  color={serviceColor(s)}
-                  style={styles.rowIcon}
-                />
-                <View style={styles.rowText}>
-                  <Text style={styles.rowLabel}>{s.label}</Text>
-                  <Text style={styles.rowStatus}>
-                    {serviceStatusLabel(s)}
-                    {s.configured && s.url ? ` · ${s.url}` : ""}
-                  </Text>
-                  {showFingerprint && (
-                    <View style={styles.fingerprintRow}>
-                      <Text style={styles.fingerprint} numberOfLines={1}>
-                        token Replit: {fp}…
-                      </Text>
-                      {tokenOk && (
-                        <Ionicons name="checkmark-circle" size={11} color="#22c55e" style={styles.tokenOkIcon} />
-                      )}
-                    </View>
-                  )}
-                  {s.configured && !fp && (
-                    <Text style={styles.fingerprint}>token Replit: non configurato</Text>
-                  )}
-                  {s.configured && !s.ok && s.history?.length > 0 && (
-                    <ErrorHistory history={s.history} />
-                  )}
-                  {s.configured && s.probeLog && s.probeLog.length > 0 && (
-                    <ProbeLog entries={s.probeLog} />
-                  )}
-                </View>
-                <View style={[styles.healthDot, { backgroundColor: serviceColor(s) }]} />
-              </View>
-            );
-          })}
+
+          <OllamaBlock
+            service={error ? undefined : data?.services.find((s) => s.key === "ollama")}
+            fingerprint={error ? null : (fp?.ollama ?? null)}
+            isLoading={isLoading}
+            hasError={!!error}
+          />
+          <WhisperBlock
+            service={error ? undefined : data?.services.find((s) => s.key === "whisper")}
+            fingerprint={error ? null : (fp?.whisper ?? null)}
+            isLoading={isLoading}
+            hasError={!!error}
+          />
+          <RedisBlock
+            service={error ? undefined : data?.services.find((s) => s.key === "redis")}
+            isLoading={isLoading}
+            hasError={!!error}
+          />
+          <PostgresBlock
+            service={error ? undefined : data?.services.find((s) => s.key === "postgres")}
+            isLoading={isLoading}
+            hasError={!!error}
+          />
+          <PgAdminBlock
+            service={error ? undefined : data?.services.find((s) => s.key === "pgadmin")}
+            isLoading={isLoading}
+            hasError={!!error}
+          />
+          <NginxBlock
+            service={error ? undefined : data?.services.find((s) => s.key === "nginx")}
+            isLoading={isLoading}
+            hasError={!!error}
+          />
+          <UptimeKumaBlock
+            service={error ? undefined : data?.services.find((s) => s.key === "uptimekuma")}
+            isLoading={isLoading}
+            hasError={!!error}
+          />
+
           {data && data.configuredCount > 0 && data.onlineCount < data.configuredCount && (
             <TouchableOpacity
               style={[styles.retryButton, isFetching && styles.retryButtonBusy]}
@@ -407,15 +542,6 @@ const styles = StyleSheet.create({
   headerCount: { fontFamily: "Inter_600SemiBold", fontSize: 12, color: Colors.textSecondary },
   healthDot: { width: 10, height: 10, borderRadius: 5 },
   list: { marginTop: 14, gap: 10 },
-  row: { flexDirection: "row", alignItems: "flex-start", gap: 10 },
-  rowIcon: { width: 22, textAlign: "center", marginTop: 2 },
-  rowText: { flex: 1 },
-  rowLabel: { fontFamily: "Inter_600SemiBold", fontSize: 14, color: Colors.text },
-  rowStatus: { fontFamily: "Inter_400Regular", fontSize: 11, color: Colors.textSecondary, marginTop: 1 },
-  fingerprint: { fontFamily: "Inter_400Regular", fontSize: 10, color: "#6b7280", marginTop: 2, letterSpacing: 0.4 },
-  fingerprintRow: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 2 },
-  tokenOkIcon: { marginTop: 0 },
-  mono: { fontFamily: "Inter_400Regular", fontSize: 10, color: "#9ca3af" },
   errorText: { fontFamily: "Inter_400Regular", fontSize: 12, color: "#ef4444" },
   note: {
     flexDirection: "row",
@@ -430,6 +556,7 @@ const styles = StyleSheet.create({
   noteText: { fontFamily: "Inter_400Regular", fontSize: 11, color: Colors.textSecondary, lineHeight: 16 },
   legend: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 2 },
   legendText: { fontFamily: "Inter_400Regular", fontSize: 10, color: Colors.textSecondary },
+  mono: { fontFamily: "Inter_400Regular", fontSize: 10, color: "#9ca3af" },
   retryButton: {
     flexDirection: "row",
     alignItems: "center",
@@ -443,9 +570,7 @@ const styles = StyleSheet.create({
     borderColor: "rgba(96, 165, 250, 0.25)",
     marginTop: 2,
   },
-  retryButtonBusy: {
-    opacity: 0.55,
-  },
+  retryButtonBusy: { opacity: 0.55 },
   retryText: { fontFamily: "Inter_600SemiBold", fontSize: 12, color: "#60a5fa" },
   pushToggleRow: {
     flexDirection: "row",

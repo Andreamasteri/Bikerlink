@@ -340,6 +340,30 @@ services:
     volumes:
       - pgadmindata:/var/lib/pgadmin
 
+  # ---------------------------------------------------------------------------
+  # Uptime Kuma — dashboard di monitoring self-hosted
+  #
+  # Accesso: http://127.0.0.1:3001 (solo da ThinkCentre o via tunnel)
+  # Primo avvio: creare account admin dalla UI.
+  #
+  # Avvio con il profilo di default:
+  #   docker compose up -d uptime-kuma
+  # ---------------------------------------------------------------------------
+  uptime-kuma:
+    image: louislam/uptime-kuma:1
+    container_name: bikerlink-uptime-kuma
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3001:3001"
+    volumes:
+      - uptimekumadata:/app/data
+    healthcheck:
+      test: ["CMD-SHELL", "node /app/extra/healthcheck.js || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
 volumes:
   pgdata:
   redisdata:
@@ -347,3 +371,4 @@ volumes:
   pgadmindata:
   nominatimdata:
   whisperdata:
+  uptimekumadata:

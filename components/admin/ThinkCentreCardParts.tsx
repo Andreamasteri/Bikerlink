@@ -41,6 +41,12 @@ const SERVICE_LABELS: Record<string, string> = {
   ollama: "Ollama AI",
   whisper: "Whisper ASR",
   nominatim: "Nominatim",
+  ufw: "UFW",
+  redis: "Redis",
+  postgres: "PostgreSQL",
+  pgadmin: "pgAdmin",
+  nginx: "nginx",
+  uptimekuma: "Uptime Kuma",
 };
 
 function formatServiceLabel(serviceKey: string | null): string {

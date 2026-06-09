@@ -56,6 +56,14 @@ export interface SystemStatuses {
   graphhopper: DotStatus;
   valhalla: DotStatus;
   nominatim: DotStatus;
+  ollama: DotStatus;
+  whisper: DotStatus;
+  ufw: DotStatus;
+  redis: DotStatus;
+  postgres: DotStatus;
+  pgadmin: DotStatus;
+  nginx: DotStatus;
+  uptimeKuma: DotStatus;
   routing: DotStatus;
   matching: DotStatus;
 }
@@ -70,6 +78,14 @@ const DOT_DEFS: { key: keyof SystemStatuses; label: string }[] = [
   { key: "graphhopper", label: "GraphHopper" },
   { key: "valhalla", label: "Valhalla" },
   { key: "nominatim", label: "Nominatim" },
+  { key: "ollama", label: "Ollama AI" },
+  { key: "whisper", label: "Whisper ASR" },
+  { key: "ufw", label: "Firewall" },
+  { key: "redis", label: "Redis" },
+  { key: "postgres", label: "PostgreSQL" },
+  { key: "pgadmin", label: "pgAdmin" },
+  { key: "nginx", label: "nginx" },
+  { key: "uptimeKuma", label: "Uptime Kuma" },
   { key: "routing", label: "Routing" },
   { key: "matching", label: "Matching Engine" },
 ];
@@ -152,6 +168,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 6,
     marginLeft: "auto",
+    flexWrap: "wrap",
+    justifyContent: "flex-end",
   },
   chevron: {
     marginLeft: 4,

@@ -34,6 +34,7 @@ import { getNominatimHealthSnapshot } from "../lib/nominatim-client";
 import { ACTIVE_PROFILE, fetchSelfHostedProfiles, isSelfHosted } from "../graphhopper-client";
 import { getAreaEnabledMap } from "../routing/routing-area-state";
 import { ROUTING_AREAS, type RoutingArea, type RoutingAreaCode } from "@shared/routing-areas";
+import * as net from "net";
 
 // ── Config ────────────────────────────────────────────────────────────────────
 const PROBE_INTERVAL_MS = 5 * 60 * 1000;       // ogni 5 min
@@ -327,6 +328,49 @@ async function probeUfwOk(): Promise<boolean | null> {
   }
 }
 
+// ── TCP connect helper ────────────────────────────────────────────────────────
+function tcpConnectOk(host: string, port: number): Promise<boolean | null> {
+  return new Promise((resolve) => {
+    const socket = net.createConnection({ host, port });
+    const timeout = setTimeout(() => { socket.destroy(); resolve(false); }, PROBE_TIMEOUT_MS);
+    socket.on("connect", () => { clearTimeout(timeout); socket.destroy(); resolve(true); });
+    socket.on("error", () => { clearTimeout(timeout); resolve(false); });
+  });
+}
+
+// ── Infra probes (Redis, PostgreSQL, pgAdmin, nginx, Uptime Kuma) ─────────────
+async function probeRedisOk(): Promise<boolean | null> {
+  const host = process.env.REDIS_PROBE_HOST?.trim();
+  if (!host) return null;
+  const port = parseInt(process.env.REDIS_PROBE_PORT ?? "6379", 10);
+  return tcpConnectOk(host, port);
+}
+
+async function probePostgresOk(): Promise<boolean | null> {
+  const host = process.env.POSTGRES_PROBE_HOST?.trim();
+  if (!host) return null;
+  const port = parseInt(process.env.POSTGRES_PROBE_PORT ?? "5432", 10);
+  return tcpConnectOk(host, port);
+}
+
+async function probePgAdminOk(): Promise<boolean | null> {
+  const base = process.env.PGADMIN_URL?.replace(/\/$/, "");
+  if (!base) return null;
+  return httpProbe(`${base}/`, {}, (s) => s < 500);
+}
+
+async function probeNginxOk(): Promise<boolean | null> {
+  const base = process.env.NGINX_MONITOR_URL?.replace(/\/$/, "");
+  if (!base) return null;
+  return httpProbe(`${base}/`, {}, (s) => s < 500);
+}
+
+async function probeUptimeKumaOk(): Promise<boolean | null> {
+  const base = process.env.UPTIME_KUMA_URL?.replace(/\/$/, "");
+  if (!base) return null;
+  return httpProbe(`${base}/`, {}, (s) => s < 500);
+}
+
 // ── Probe aggregato ───────────────────────────────────────────────────────────
 interface AggregateProbeResult {
   overall: OverallStatus;
@@ -340,6 +384,11 @@ async function runAllProbes(): Promise<AggregateProbeResult> {
     { key: "nominatim", label: "Nominatim", fn: probeNominatimOk },
     { key: "valhalla", label: "Valhalla", fn: probeValhallaOk },
     { key: "ufw", label: "Firewall (ufw)", fn: probeUfwOk },
+    { key: "redis", label: "Redis", fn: probeRedisOk },
+    { key: "postgres", label: "PostgreSQL", fn: probePostgresOk },
+    { key: "pgadmin", label: "pgAdmin", fn: probePgAdminOk },
+    { key: "nginx", label: "nginx", fn: probeNginxOk },
+    { key: "uptimekuma", label: "Uptime Kuma", fn: probeUptimeKumaOk },
   ];
 
   const [otherResults, gh] = await Promise.all([

@@ -253,6 +253,14 @@ const UNKNOWN_STATUSES: SystemStatuses = {
   graphhopper: "unknown",
   valhalla: "unknown",
   nominatim: "unknown",
+  ollama: "unknown",
+  whisper: "unknown",
+  ufw: "unknown",
+  redis: "unknown",
+  postgres: "unknown",
+  pgadmin: "unknown",
+  nginx: "unknown",
+  uptimeKuma: "unknown",
   routing: "unknown",
   matching: "unknown",
 };
@@ -264,7 +272,7 @@ export default function AdminDashboard() {
   const [systemStatuses, setSystemStatuses] = useState<SystemStatuses>(UNKNOWN_STATUSES);
 
   const handleThinkCentreStatuses = useCallback(
-    (s: Pick<SystemStatuses, "thinkcentre" | "graphhopper" | "valhalla" | "nominatim">) => {
+    (s: Pick<SystemStatuses, "thinkcentre" | "graphhopper" | "valhalla" | "nominatim" | "ollama" | "whisper" | "ufw" | "redis" | "postgres" | "pgadmin" | "nginx" | "uptimeKuma">) => {
       setSystemStatuses((prev) => ({ ...prev, ...s }));
     },
     []
