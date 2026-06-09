@@ -92,8 +92,8 @@ android {
         applicationId 'com.bikerlink.app'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 56
-        versionName "56.10.88"
+        versionCode 57
+        versionName "57.10.89"
 
         buildConfigField "String", "REACT_NATIVE_RELEASE_LEVEL", "\"${findProperty('reactNativeReleaseLevel') ?: 'stable'}\""
 
