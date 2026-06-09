@@ -54,6 +54,7 @@ interface ProfileQueryData {
   fakeHomeLongitude?: number | null;
   latitude?: number | null;
   longitude?: number | null;
+  fixedPositionEnabled?: boolean;
 }
 
 interface ProposalItem {
@@ -302,6 +303,7 @@ export function useHomeMapState() {
   const fakeHomeEnabled = profileQData?.fakeHomeEnabled || false;
   const fakeHomeLat = profileQData?.fakeHomeLatitude ?? null;
   const fakeHomeLng = profileQData?.fakeHomeLongitude ?? null;
+  const fixedPositionEnabled = profileQData?.fixedPositionEnabled ?? false;
   const realMeMarker = fakeHomeEnabled && fakeHomeLat != null && fakeHomeLng != null && location != null
     ? { latitude: location.latitude, longitude: location.longitude } : null;
   const fakeMeMarker = fakeHomeEnabled && fakeHomeLat != null && fakeHomeLng != null
@@ -542,6 +544,7 @@ export function useHomeMapState() {
     startOfflineTimer,
     isAvailable,
     isGhostMode,
+    fixedPositionEnabled,
     realMeMarker,
     fakeMeMarker,
     onlineCount,

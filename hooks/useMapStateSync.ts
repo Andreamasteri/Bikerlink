@@ -26,6 +26,7 @@ interface UseMapStateSyncParams {
   realMeMarker?: { latitude: number; longitude: number } | null;
   fakeMeMarker?: { latitude: number; longitude: number } | null;
   currentUserId?: string | null;
+  fixedPositionEnabled?: boolean;
 }
 
 export function useMapStateSync({
@@ -50,6 +51,7 @@ export function useMapStateSync({
   realMeMarker,
   fakeMeMarker,
   currentUserId,
+  fixedPositionEnabled,
 }: UseMapStateSyncParams): void {
   const buildAndPushState = useCallback(() => {
     if (!mapReady) return;
@@ -57,14 +59,14 @@ export function useMapStateSync({
       mapsEnabled, activeTileUrl, activeTileMaxZoom, userLocation, isAvailable, searchRadiusKm,
       filteredUsers, workshops, eventPins, showEventPins, filterEvents,
       clubPins, filterClubs, easterEggs, activeSosRequests,
-      realMeMarker, fakeMeMarker, currentUserId,
+      realMeMarker, fakeMeMarker, currentUserId, fixedPositionEnabled,
     });
     inject("window.leafletBridge && window.leafletBridge.updateState(" + encoded + ")");
   }, [
     mapReady, mapsEnabled, activeTileUrl, activeTileMaxZoom, userLocation, isAvailable, searchRadiusKm,
     filteredUsers, workshops, eventPins, showEventPins, filterEvents,
     clubPins, filterClubs, easterEggs, activeSosRequests,
-    realMeMarker, fakeMeMarker, currentUserId, inject,
+    realMeMarker, fakeMeMarker, currentUserId, fixedPositionEnabled, inject,
   ]);
 
   useEffect(() => { buildAndPushState(); }, [buildAndPushState]);

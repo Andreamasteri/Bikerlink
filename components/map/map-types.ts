@@ -92,6 +92,7 @@ export interface InteractiveMapProps {
   gpsFollowupEnabled?: boolean;
   showHazardReportButton?: boolean;
   onFatalError?: () => void;
+  fixedPositionEnabled?: boolean;
 }
 
 export interface InteractiveMapHandle {

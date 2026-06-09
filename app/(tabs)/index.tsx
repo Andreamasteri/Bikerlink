@@ -103,6 +103,7 @@ export default function MapScreen() {
     startOfflineTimer,
     isAvailable,
     isGhostMode,
+    fixedPositionEnabled,
     realMeMarker,
     fakeMeMarker,
     onlineCount,
@@ -373,6 +374,7 @@ export default function MapScreen() {
             currentUserId={user?.id ?? null}
             realMeMarker={realMeMarker}
             fakeMeMarker={fakeMeMarker}
+            fixedPositionEnabled={fixedPositionEnabled}
             showEventPins={mapFullscreen}
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             clubPins={(mapData.clubPinsQuery.data ?? []) as any}

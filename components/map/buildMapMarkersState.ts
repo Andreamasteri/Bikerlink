@@ -21,6 +21,7 @@ interface BuildMapMarkersStateParams {
   realMeMarker?: { latitude: number; longitude: number } | null;
   fakeMeMarker?: { latitude: number; longitude: number } | null;
   currentUserId?: string | null;
+  fixedPositionEnabled?: boolean;
 }
 
 const FALLBACK_TILE_URL = "https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png";
@@ -88,6 +89,7 @@ export function buildMapMarkersState(p: BuildMapMarkersStateParams): string {
       realMe: p.realMeMarker ? { lat: p.realMeMarker.latitude, lng: p.realMeMarker.longitude } : null,
       fakeMe: p.fakeMeMarker ? { lat: p.fakeMeMarker.latitude, lng: p.fakeMeMarker.longitude } : null,
     },
+    fixedPositionEnabled: p.fixedPositionEnabled ?? false,
   };
   return JSON.stringify(JSON.stringify(state));
 }

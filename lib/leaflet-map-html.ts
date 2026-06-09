@@ -369,12 +369,20 @@ ${LIVE_MAP_STYLES}
         var hasSpeed = !!speedBadge;
         var html;
         if (u.isCurrentUser) {
+          var lockBadge = state.fixedPositionEnabled
+            ? "<div style=\\"margin-top:2px;background:#FF6F00;" +
+              "padding:1px 6px;border-radius:7px;font-size:9px;font-weight:800;color:#fff;" +
+              "letter-spacing:0.3px;box-shadow:0 1px 3px rgba(0,0,0,0.45);" +
+              "border:1px solid rgba(255,255,255,0.85);white-space:nowrap;\\">" +
+              "&#128274; Pos. fissa</div>"
+            : "";
+          var meIconH = state.fixedPositionEnabled ? 78 : 60;
           html = "<div style=\\"display:flex;flex-direction:column;align-items:center;\\">" +
             "<div style=\\"background:" + color + ";padding:2px 6px;border-radius:8px;" +
             "font-size:10px;font-weight:700;color:#fff;margin-bottom:2px;" +
             "box-shadow:0 1px 4px rgba(0,0,0,0.4);border:1.5px solid rgba(255,255,255,0.8)\\">Tu</div>" +
-            iconBadge(color, svg, 36) + "</div>";
-          addMarker(u.lat, u.lng, html, [52, 60], [26, 60], null, omsData);
+            iconBadge(color, svg, 36) + lockBadge + "</div>";
+          addMarker(u.lat, u.lng, html, [52, meIconH], [26, meIconH], null, omsData);
         } else if (globalChip) {
           var rawNick2 = u.nickname || "";
           var truncNick2 = rawNick2.length > 10 ? rawNick2.substring(0, 10) + "\u2026" : rawNick2;

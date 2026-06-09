@@ -49,6 +49,7 @@ const InteractiveMap = forwardRef<InteractiveMapHandle, InteractiveMapProps>(fun
   onClubPress, initialCenterOverride,
   onRegionChangeComplete, gpsFollowupEnabled = false,
   showHazardReportButton = false,
+  fixedPositionEnabled = false,
 }: InteractiveMapProps, ref) {
   const { enabled: mapsEnabled } = useMapConfig();
   const webViewRef = useRef<WebView>(null);
@@ -147,7 +148,7 @@ const InteractiveMap = forwardRef<InteractiveMapHandle, InteractiveMapProps>(fun
     userLocation, isAvailable,
     searchRadiusKm, filteredUsers, workshops, eventPins, showEventPins, filterEvents,
     clubPins, filterClubs, easterEggs, activeSosRequests, realMeMarker, fakeMeMarker,
-    currentUserId,
+    currentUserId, fixedPositionEnabled,
   });
 
   useEffect(() => {
@@ -297,6 +298,11 @@ const InteractiveMap = forwardRef<InteractiveMapHandle, InteractiveMapProps>(fun
           <Text style={styles.hazardFabIcon}>⚠️</Text>
         </TouchableOpacity>
       )}
+      {fixedPositionEnabled && (
+        <View style={styles.fixedPositionBadge} pointerEvents="none">
+          <Text style={styles.fixedPositionText}>🔒 Posizione fissa attiva</Text>
+        </View>
+      )}
       <HazardDetailSheet
         hazardId={selectedHazardId}
         onClose={() => setSelectedHazardId(null)}
@@ -334,5 +340,23 @@ const styles = StyleSheet.create({
   },
   hazardFabIcon: {
     fontSize: 20,
+  },
+  fixedPositionBadge: {
+    position: "absolute",
+    bottom: 16,
+    left: 0,
+    right: 0,
+    alignItems: "center",
+  },
+  fixedPositionText: {
+    backgroundColor: "rgba(255,111,0,0.92)",
+    color: "#fff",
+    fontSize: 12,
+    fontWeight: "700",
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 14,
+    overflow: "hidden",
+    letterSpacing: 0.2,
   },
 });
