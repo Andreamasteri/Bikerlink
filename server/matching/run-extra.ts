@@ -12,7 +12,7 @@ import {
   tagCategories,
 } from "@shared/db";
 import { and, eq, isNotNull, gt, inArray } from "drizzle-orm";
-import { loadMatchPreferencesMap, bothPrefsEnabled, prefEnabled } from "./filters";
+import { loadMatchPreferencesMap, bothPrefsEnabled, prefEnabled, loadMatchingDisabledSet, neitherMatchingDisabled } from "./filters";
 import { getVariantConfig, trackAbEvent } from "./ab";
 import { classifyMatch } from "./notifications/classify";
 import { dispatchMatchNotification } from "./notifications/dispatcher";
@@ -77,7 +77,7 @@ export async function runMusicMatchBikerZavarrina(): Promise<number> {
       .innerJoin(tags, eq(tags.id, entityTags.tagId))
       .innerJoin(tagCategories, and(eq(tagCategories.id, tags.categoryId), eq(tagCategories.slug, "musica")))
       .innerJoin(users, eq(users.id, entityTags.entityId))
-      .where(and(eq(entityTags.entityType, "user"), eq(users.isFake, false)));
+      .where(and(eq(entityTags.entityType, "user"), eq(users.isFake, false), eq(users.matchingDisabled, false)));
 
     if (userRows.length < 2) return 0;
 
@@ -193,6 +193,7 @@ export async function runGpsBasedMatching(): Promise<number> {
         isNotNull(routes.avgSpeedKmh),
         isNotNull(routes.durationSeconds),
         eq(users.isFake, false),
+        eq(users.matchingDisabled, false),
         gt(routes.durationSeconds!, 0),
       ));
 
@@ -333,7 +334,7 @@ export async function runEventMatching(): Promise<number> {
       .select({ userId: eventParticipants.userId, eventId: eventParticipants.eventId })
       .from(eventParticipants)
       .innerJoin(users, eq(eventParticipants.userId, users.id))
-      .where(eq(users.isFake, false));
+      .where(and(eq(users.isFake, false), eq(users.matchingDisabled, false)));
 
     if (rows.length === 0) {
       console.log("[EventMatching] Nessun partecipante eventi, skip.");
@@ -464,8 +465,11 @@ export async function runBikerZavarrinaTypeStyleMatching(): Promise<number> {
     const MAX = 200;
     const zavIds = [...new Set(zavWishRows.map(r => r.userId))];
 
+    const matchingDisabledSet = await loadMatchingDisabledSet();
+
     for (const bm of bikerMotorcycles) {
       if (matchCount >= MAX) break;
+      if (matchingDisabledSet.has(bm.userId)) continue;
       if (!prefEnabled(prefsMap, bm.userId, "bikerZavarrinaTypeStyle")) continue;
       const motoTipo = motoTipoTags.get(bm.motorcycle.id) ?? new Set<string>();
       const motoStile = motoStileTags.get(bm.motorcycle.id) ?? new Set<string>();
@@ -476,6 +480,7 @@ export async function runBikerZavarrinaTypeStyleMatching(): Promise<number> {
         if (matchCount >= MAX) break;
         if (zavId === bm.userId) continue;
         if (blockedSet.has(`${bm.userId}:${zavId}`)) { skipCount++; continue; }
+        if (matchingDisabledSet.has(zavId)) { skipCount++; continue; }
         if (!prefEnabled(prefsMap, zavId, "bikerZavarrinaTypeStyle")) { skipCount++; continue; }
 
         const zavTipo = zavTipoByUser.get(zavId) ?? new Set<string>();

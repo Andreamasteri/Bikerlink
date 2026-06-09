@@ -9,7 +9,7 @@ import {
   appSettings,
 } from "@shared/db";
 import { findSimilar } from "../embeddings";
-import { loadMatchPreferencesMap, bothPrefsEnabled } from "./filters";
+import { loadMatchPreferencesMap, bothPrefsEnabled, loadMatchingDisabledSet, neitherMatchingDisabled } from "./filters";
 import { tagOverlap, loadMatchThresholds } from "./scoring";
 import { protectedNicknamesSqlArray } from "./protection-filter";
 
@@ -115,13 +115,14 @@ async function loadMusicTagsByUser(userIds: string[]): Promise<Map<string, Set<s
 
 export async function runMusicAffinityMatching(): Promise<number> {
   try {
-    const [embeddingsList, prefsMap, blocked, wTag, wEmb, minCombined] = await Promise.all([
+    const [embeddingsList, prefsMap, blocked, wTag, wEmb, minCombined, matchingDisabledSet] = await Promise.all([
       loadEmbeddingsForUsers(),
       loadMatchPreferencesMap(),
       storage.getAllBlockedPairs(),
       loadWeight("match_music_combined_weight_tag", DEFAULT_W_TAG),
       loadWeight("match_music_combined_weight_embedding", DEFAULT_W_EMB),
       loadCombinedThreshold(),
+      loadMatchingDisabledSet(),
     ]);
 
     if (embeddingsList.length < 2) {
@@ -157,6 +158,7 @@ export async function runMusicAffinityMatching(): Promise<number> {
         if (!uidB || uidB === uidA) continue;
         if (blockedSet.has(`${uidA}:${uidB}`)) { skipped++; continue; }
         if (!bothPrefsEnabled(prefsMap, uidA, uidB, "musicAffinity")) { skipped++; continue; }
+        if (!neitherMatchingDisabled(matchingDisabledSet, uidA, uidB)) { skipped++; continue; }
 
         const setB = tagSetsByUser.get(uidB) ?? new Set<string>();
         const ov = tagOverlap(setA, setB);

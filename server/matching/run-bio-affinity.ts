@@ -19,7 +19,7 @@ import { db } from "../db";
 import { storage } from "../storage";
 import { bioAffinityMatches } from "@shared/db";
 import { findSimilar, EMBEDDING_MODEL_TAG } from "../embeddings";
-import { loadMatchPreferencesMap, bothPrefsEnabled } from "./filters";
+import { loadMatchPreferencesMap, bothPrefsEnabled, loadMatchingDisabledSet, neitherMatchingDisabled } from "./filters";
 import { haversineKm } from "../geo";
 import { protectedNicknamesSqlArray } from "./protection-filter";
 
@@ -78,6 +78,7 @@ export async function runBioAffinityMatching(): Promise<number> {
     }
 
     const prefsMap = await loadMatchPreferencesMap();
+    const matchingDisabledSet = await loadMatchingDisabledSet();
     const blockedPairs = await storage.getAllBlockedPairs();
     const blockedSet = new Set(
       blockedPairs.flatMap((b) => [
@@ -134,6 +135,7 @@ export async function runBioAffinityMatching(): Promise<number> {
         if (!userMeta.has(userB)) continue; // userB filtered out (fake/deleted)
         if (blockedSet.has(`${userA}:${userB}`)) continue;
         if (!bothPrefsEnabled(prefsMap, userA, userB, "bioAffinity")) continue;
+        if (!neitherMatchingDisabled(matchingDisabledSet, userA, userB)) continue;
 
         // Geo filter: respect the smaller maxPickupDistance of the two.
         const bMeta = userMeta.get(userB)!;

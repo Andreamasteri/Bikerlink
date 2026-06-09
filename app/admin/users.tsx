@@ -221,6 +221,17 @@ export default function AdminUsers() {
     onError: () => Alert.alert("Errore", "Impossibile aggiornare stato sensori utente"),
   });
 
+  const matchingDisabledMutation = useMutation({
+    mutationFn: async ({ id, matchingDisabled }: { id: string; matchingDisabled: boolean }) => {
+      const res = await apiRequest("PUT", `/api/admin/users/${id}/matching-disabled`, { matchingDisabled });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+    },
+    onError: () => Alert.alert("Errore", "Impossibile aggiornare flag matching"),
+  });
+
   const clearLastfmMutation = useMutation({
     mutationFn: async ({ id }: { id: string }) => {
       const res = await apiRequest("DELETE", `/api/admin/users/${id}/lastfm`);
@@ -410,6 +421,22 @@ export default function AdminUsers() {
                     text: "Conferma",
                     style: disabled ? "destructive" : "default",
                     onPress: () => telemetryDisabledMutation.mutate({ id, disabled }),
+                  },
+                ]
+              );
+            }}
+            onToggleMatchingDisabled={(id, disabled) => {
+              const user = users.find((u) => u.id === id);
+              const label = disabled ? "Escludere dal matching" : "Riabilitare al matching";
+              Alert.alert(
+                label,
+                `${label} per ${user?.nickname ?? id}?`,
+                [
+                  { text: "Annulla", style: "cancel" },
+                  {
+                    text: "Conferma",
+                    style: disabled ? "destructive" : "default",
+                    onPress: () => matchingDisabledMutation.mutate({ id, matchingDisabled: disabled }),
                   },
                 ]
               );

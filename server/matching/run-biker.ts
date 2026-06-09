@@ -2,7 +2,7 @@ import { storage } from "../storage";
 import { db } from "../db";
 import { entityTags, tags, tagCategories } from "@shared/db";
 import { and, eq, inArray } from "drizzle-orm";
-import { loadMatchPreferencesMap, bothPrefsEnabled } from "./filters";
+import { loadMatchPreferencesMap, bothPrefsEnabled, loadMatchingDisabledSet, neitherMatchingDisabled } from "./filters";
 import { classifyMatch } from "./notifications/classify";
 import { dispatchMatchNotification } from "./notifications/dispatcher";
 import { getMultiplierForPair } from "./time-profile";
@@ -99,6 +99,7 @@ export async function runBikerBikerMatching(): Promise<number> {
     );
     const isPairBlocked = (id1: string, id2: string) => blockedSet.has(`${id1}:${id2}`);
     const prefsMap = await loadMatchPreferencesMap();
+    const matchingDisabledSet = await loadMatchingDisabledSet();
 
     // Task #2513: precarica i tag tipo_moto + stile_guida per tutte le moto
     // così possiamo calcolare il breakdown senza N+1 query.
@@ -137,6 +138,7 @@ export async function runBikerBikerMatching(): Promise<number> {
           const idB = m1.userId < m2.userId ? m2.userId : m1.userId;
 
           if (isPairBlocked(m1.userId, m2.userId)) { skipCount++; continue; }
+          if (!neitherMatchingDisabled(matchingDisabledSet, m1.userId, m2.userId)) { skipCount++; continue; }
           if (!bothPrefsEnabled(prefsMap, m1.userId, m2.userId, "bikerBikerBrand")) { skipCount++; continue; }
 
           // Task #2521 — time-profile multiplier come gate probabilistico.
@@ -187,6 +189,7 @@ export async function runBikerBikerTypeStyleMatching(): Promise<number> {
     if (bikerMotorcycles.length < 2) return 0;
 
     const prefsMap = await loadMatchPreferencesMap();
+    const matchingDisabledSet = await loadMatchingDisabledSet();
     const allBlockedPairs = await storage.getAllBlockedPairs();
     const blockedSet = new Set(
       allBlockedPairs.flatMap(b => [`${b.blockerId}:${b.blockedId}`, `${b.blockedId}:${b.blockerId}`])
@@ -223,6 +226,7 @@ export async function runBikerBikerTypeStyleMatching(): Promise<number> {
         const b = candidates[j];
         if (a.userId === b.userId) continue;
         if (blockedSet.has(`${a.userId}:${b.userId}`)) { skipCount++; continue; }
+        if (!neitherMatchingDisabled(matchingDisabledSet, a.userId, b.userId)) { skipCount++; continue; }
         if (!bothPrefsEnabled(prefsMap, a.userId, b.userId, "bikerBikerTypeStyle")) { skipCount++; continue; }
 
         const breakdown = computeStyleTypeBreakdown(a.motorcycle.id, b.motorcycle.id, tipoMap, stileMap);

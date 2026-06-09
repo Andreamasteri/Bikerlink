@@ -28,11 +28,15 @@ export async function runProposalToProfileMatching(
   try {
     const GUEST_TYPES = new Set(["find_a_guest", "hitcher"]);
 
+    const { loadMatchingDisabledSet } = await import("./filters");
+    const matchingDisabledSet = await loadMatchingDisabledSet();
+
     let activeProposals: Proposal[] = await storage.getActiveProposalsWithLocation();
     activeProposals = activeProposals.filter(
       (p) => p.searchType && GUEST_TYPES.has(p.searchType)
         && p.departureLatitude != null
         && p.departureLongitude != null
+        && !matchingDisabledSet.has(p.userId)
     );
 
     if (filterProposalId) {
@@ -55,6 +59,7 @@ export async function runProposalToProfileMatching(
         and(
           eq(users.status, "active"),
           eq(users.isFake, false),
+          eq(users.matchingDisabled, false),
           ...systemAccountConditions(users),
           isNotNull(userProfiles.latitude),
           isNotNull(userProfiles.longitude),

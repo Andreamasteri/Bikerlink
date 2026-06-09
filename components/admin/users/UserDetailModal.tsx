@@ -193,6 +193,19 @@ export const UserDetailModal: React.FC<UserDetailModalProps> = ({
                   <Text style={[statsStyles.value, { color: stats.user.ghostMode ? Colors.warning : Colors.textSecondary }]}>{stats.user.ghostMode ? t("common.siCapital") : t("common.noCapital")}</Text>
                 </View>
               </View>
+              <View style={statsStyles.row}>
+                <Text style={statsStyles.label}>Escluso dal matching</Text>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                  <MaterialIcons
+                    name={user.matchingDisabled ? "check-circle" : "cancel"}
+                    size={16}
+                    color={user.matchingDisabled ? "#f97316" : Colors.textSecondary}
+                  />
+                  <Text style={[statsStyles.value, { color: user.matchingDisabled ? "#f97316" : Colors.textSecondary }]}>
+                    {user.matchingDisabled ? "Sì — NON MATCHABILE" : t("common.noCapital")}
+                  </Text>
+                </View>
+              </View>
             </View>
 
             <View style={statsStyles.section}>

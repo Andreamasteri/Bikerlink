@@ -28,7 +28,7 @@ import { db } from "../db";
 import { storage } from "../storage";
 import { telemetryAffinityMatches, type Proposal } from "@shared/db";
 import { findSimilar } from "../embeddings";
-import { loadMatchPreferencesMap, bothPrefsEnabled, clubScopeAllows, getActiveClubMembershipKeys } from "./filters";
+import { loadMatchPreferencesMap, bothPrefsEnabled, clubScopeAllows, getActiveClubMembershipKeys, loadMatchingDisabledSet, neitherMatchingDisabled } from "./filters";
 import { protectedNicknamesSqlArray } from "./protection-filter";
 import { styleLabelsFromProfile } from "../ai/telemetry-style-embedder";
 
@@ -109,6 +109,7 @@ export async function runTelemetryAffinityMatching(): Promise<number> {
     }
 
     const prefsMap = await loadMatchPreferencesMap();
+    const matchingDisabledSet = await loadMatchingDisabledSet();
     const blockedPairs = await storage.getAllBlockedPairs();
     const blockedSet = new Set(
       blockedPairs.flatMap((b) => [
@@ -176,6 +177,7 @@ export async function runTelemetryAffinityMatching(): Promise<number> {
         if (!bMeta) continue;
         if (blockedSet.has(`${userA}:${userB}`)) continue;
         if (!bothPrefsEnabled(prefsMap, userA, userB, "telemetryAffinity")) continue;
+        if (!neitherMatchingDisabled(matchingDisabledSet, userA, userB)) continue;
         if (!clubScopeAllows(
           { userId: userA, clubId: aMeta.clubId } as Proposal,
           { userId: userB, clubId: bMeta.clubId } as Proposal,

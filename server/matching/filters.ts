@@ -2,10 +2,35 @@ import { db } from "../db";
 import { 
   matchPreferences,
   motoClubMembers,
+  users,
   type Proposal
 } from "@shared/db";
 import { and, eq, inArray } from "drizzle-orm";
 import { MatchPrefRow, MatchRule } from "./types";
+
+/**
+ * Carica l'insieme degli userId con matching_disabled = true.
+ * Usato da tutti gli engine per escludere questi utenti su entrambi i lati del match.
+ */
+export async function loadMatchingDisabledSet(): Promise<Set<string>> {
+  const rows = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(eq(users.matchingDisabled, true));
+  return new Set(rows.map((r) => r.id));
+}
+
+/**
+ * Ritorna true se NESSUNO dei due userId ha matching_disabled.
+ * Helper inline per usare il Set pre-caricato senza query aggiuntive.
+ */
+export function neitherMatchingDisabled(
+  disabledSet: Set<string>,
+  userId1: string,
+  userId2: string,
+): boolean {
+  return !disabledSet.has(userId1) && !disabledSet.has(userId2);
+}
 
 export async function loadMatchPreferencesMap(): Promise<Map<string, MatchPrefRow>> {
   const rows = await db.select().from(matchPreferences);

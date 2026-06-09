@@ -3,7 +3,7 @@ import { db } from "../db";
 import { haversineDistance } from "../geo";
 import { routes, routePoints, users } from "@shared/db";
 import { and, avg, eq, isNotNull } from "drizzle-orm";
-import { loadMatchPreferencesMap, bothPrefsEnabled } from "./filters";
+import { loadMatchPreferencesMap, bothPrefsEnabled, loadMatchingDisabledSet } from "./filters";
 import { loadNegativePreferencesMap, loadCandidateProfiles, isExcludedByNegativePrefs } from "./negative-filters";
 import { baseModelName, routeProfileOf } from "./scoring";
 import { MatchResult } from "./types";
@@ -12,6 +12,9 @@ import { dispatchMatchNotification } from "./notifications/dispatcher";
 
 export async function runMatchingForUser(userId: string): Promise<MatchResult> {
   try {
+    const matchingDisabledSet = await loadMatchingDisabledSet();
+    if (matchingDisabledSet.has(userId)) return { bikerBiker: 0, zavarrina: 0 };
+
     const bikerMotorcycles = await storage.getUserMotorcycles(userId);
     const myMoto = bikerMotorcycles[0];
     const wishlistRecord = await storage.getWishlist(userId);
@@ -51,6 +54,7 @@ export async function runMatchingForUser(userId: string): Promise<MatchResult> {
       for (const bm of allBikerMotorcycles) {
         if (bm.userId === userId) continue;
         if (blockedSet.has(`${userId}:${bm.userId}`)) continue;
+        if (matchingDisabledSet.has(bm.userId)) continue;
         if (isNegExcluded(bm.userId)) continue;
 
         let match = false;
@@ -91,6 +95,7 @@ export async function runMatchingForUser(userId: string): Promise<MatchResult> {
       for (const wm of allWishlistMotos) {
         if (wm.userId === userId) continue;
         if (blockedSet.has(`${userId}:${wm.userId}`)) continue;
+        if (matchingDisabledSet.has(wm.userId)) continue;
         if (isNegExcluded(wm.userId)) continue;
 
         let match = false;
@@ -134,6 +139,7 @@ export async function runMatchingForUser(userId: string): Promise<MatchResult> {
       for (const bm of allBikerMotorcycles) {
         if (bm.userId === userId) continue;
         if (blockedSet.has(`${userId}:${bm.userId}`)) continue;
+        if (matchingDisabledSet.has(bm.userId)) continue;
         if (isNegExcluded(bm.userId)) continue;
 
         let match = false;
@@ -209,7 +215,7 @@ export async function runMatchingForUser(userId: string): Promise<MatchResult> {
         .from(routes)
         .innerJoin(routePoints, eq(routePoints.routeId, routes.id))
         .innerJoin(users, eq(routes.userId, users.id))
-        .where(and(eq(users.isFake, false), eq(users.status, "active"), isNotNull(routes.avgSpeedKmh)))
+        .where(and(eq(users.isFake, false), eq(users.status, "active"), eq(users.matchingDisabled, false), isNotNull(routes.avgSpeedKmh)))
         .groupBy(routes.userId, users.userType);
 
       for (const row of otherRouteStats) {

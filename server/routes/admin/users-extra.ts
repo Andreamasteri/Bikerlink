@@ -37,4 +37,24 @@ router.put("/:userId/telemetry-disabled", async (req: Request, res: Response) =>
   }
 });
 
+router.put("/:userId/matching-disabled", async (req: Request, res: Response) => {
+  try {
+    const userId = String(req.params.userId);
+    const { matchingDisabled } = req.body as { matchingDisabled?: unknown };
+    if (typeof matchingDisabled !== "boolean") {
+      return sendError(res, 400, "matchingDisabled deve essere un booleano");
+    }
+    const result = await db
+      .update(users)
+      .set({ matchingDisabled, updatedAt: new Date() })
+      .where(eq(users.id, userId))
+      .returning({ id: users.id });
+    if (!result.length) return sendError(res, 404, "Utente non trovato");
+    return res.json({ userId, matchingDisabled });
+  } catch (err) {
+    console.error("[admin/users/:userId/matching-disabled] error:", err);
+    return sendError(res, 500, "Errore aggiornamento matching_disabled");
+  }
+});
+
 export default router;

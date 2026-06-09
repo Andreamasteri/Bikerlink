@@ -21,7 +21,7 @@ import {
 } from "@shared/db";
 import { and, eq, gte, sql, inArray } from "drizzle-orm";
 import { sendMatchPushNotifications } from "../push-notifications";
-import { loadMatchPreferencesMap, bothPrefsEnabled } from "./filters";
+import { loadMatchPreferencesMap, bothPrefsEnabled, loadMatchingDisabledSet, neitherMatchingDisabled } from "./filters";
 import {
   routeSimilarity,
   topCommonCells,
@@ -51,6 +51,7 @@ export async function runRouteSimilarityMatching(): Promise<number> {
   const startedAt = Date.now();
   try {
     const prefsMap = await loadMatchPreferencesMap();
+    const matchingDisabledSet = await loadMatchingDisabledSet();
     const allBlockedPairs = await storage.getAllBlockedPairs();
     const blockedSet = new Set(
       allBlockedPairs.flatMap((b) => [
@@ -111,6 +112,7 @@ export async function runRouteSimilarityMatching(): Promise<number> {
         if (a.userId === b.userId) continue;
         if (blockedSet.has(`${a.userId}:${b.userId}`)) continue;
         if (!bothPrefsEnabled(prefsMap, a.userId, b.userId, "routeAffinity")) continue;
+        if (!neitherMatchingDisabled(matchingDisabledSet, a.userId, b.userId)) continue;
 
         // Filtro prossimità
         if (a.centerLat != null && a.centerLon != null && b.centerLat != null && b.centerLon != null) {

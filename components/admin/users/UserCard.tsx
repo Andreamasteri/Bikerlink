@@ -22,6 +22,7 @@ export interface AdminUser {
   hasLastfmData?: boolean;
   mapTester?: boolean;
   telemetryDisabled?: boolean;
+  matchingDisabled?: boolean;
 }
 
 interface UserCardProps {
@@ -35,6 +36,7 @@ interface UserCardProps {
   onTogglePrimal: (id: string, isPrimal: boolean) => void;
   onToggleMapTester?: (id: string, enabled: boolean) => void;
   onToggleTelemetryDisabled?: (id: string, disabled: boolean) => void;
+  onToggleMatchingDisabled?: (id: string, disabled: boolean) => void;
   isLastfmPending?: boolean;
   currentAppVersion?: string;
 }
@@ -50,6 +52,7 @@ export const UserCard: React.FC<UserCardProps> = ({
   onTogglePrimal,
   onToggleMapTester,
   onToggleTelemetryDisabled,
+  onToggleMatchingDisabled,
   isLastfmPending,
   currentAppVersion = "1.0.0",
 }) => {
@@ -84,6 +87,9 @@ export const UserCard: React.FC<UserCardProps> = ({
         )}
         {item.telemetryDisabled === true && (
           <Text style={{ fontSize: 10, fontWeight: "bold" as const, color: "#ef4444" }}>SENSORI OFF</Text>
+        )}
+        {item.matchingDisabled === true && (
+          <Text style={{ fontSize: 10, fontWeight: "bold" as const, color: "#f97316" }}>NON MATCHABILE</Text>
         )}
         <Text style={styles.nickname}>{item.nickname}</Text>
         <Text style={styles.email}>{item.email}</Text>
@@ -183,6 +189,18 @@ export const UserCard: React.FC<UserCardProps> = ({
               name="pulse"
               size={22}
               color={item.telemetryDisabled ? "#ef4444" : Colors.border}
+            />
+          </TouchableOpacity>
+        )}
+        {onToggleMatchingDisabled && (
+          <TouchableOpacity
+            onPress={() => onToggleMatchingDisabled(item.id, !item.matchingDisabled)}
+            style={styles.actionBtn}
+          >
+            <Ionicons
+              name="ban"
+              size={22}
+              color={item.matchingDisabled ? "#f97316" : Colors.border}
             />
           </TouchableOpacity>
         )}

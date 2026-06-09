@@ -2,13 +2,14 @@ import { storage } from "../storage";
 import { db } from "../db";
 import { motoClubs, motoClubMembers, users } from "@shared/db";
 import { and, eq, isNotNull, sql } from "drizzle-orm";
-import { loadMatchPreferencesMap, prefEnabled } from "./filters";
+import { loadMatchPreferencesMap, prefEnabled, loadMatchingDisabledSet, neitherMatchingDisabled } from "./filters";
 import { classifyMatch } from "./notifications/classify";
 import { dispatchMatchNotification } from "./notifications/dispatcher";
 
 export async function runClubBrandMatching(): Promise<number> {
   try {
     const prefsMap = await loadMatchPreferencesMap();
+    const matchingDisabledSet = await loadMatchingDisabledSet();
     const allBlockedPairs = await storage.getAllBlockedPairs();
     const blockedSet = new Set(
       allBlockedPairs.flatMap(b => [`${b.blockerId}:${b.blockedId}`, `${b.blockedId}:${b.blockerId}`])
@@ -54,6 +55,7 @@ export async function runClubBrandMatching(): Promise<number> {
           if (matchCount >= MAX_CLUB_MATCHES) break;
           if (memberId === bm.userId) continue;
           if (blockedSet.has(`${bm.userId}:${memberId}`)) { skipCount++; continue; }
+          if (!neitherMatchingDisabled(matchingDisabledSet, bm.userId, memberId)) { skipCount++; continue; }
           if (!prefEnabled(prefsMap, memberId, "bikerClubBrand")) { skipCount++; continue; }
 
           const idA = bm.userId < memberId ? bm.userId : memberId;
@@ -90,6 +92,7 @@ export async function runClubBrandMatching(): Promise<number> {
 export async function runZavTypeStyleMatching(): Promise<number> {
   try {
     const prefsMap = await loadMatchPreferencesMap();
+    const matchingDisabledSet = await loadMatchingDisabledSet();
     const allBlockedPairs = await storage.getAllBlockedPairs();
     const blockedSet = new Set(
       allBlockedPairs.flatMap(b => [`${b.blockerId}:${b.blockedId}`, `${b.blockedId}:${b.blockerId}`])
@@ -102,6 +105,7 @@ export async function runZavTypeStyleMatching(): Promise<number> {
       .where(and(
         eq(users.userType, "zavorrina"),
         eq(users.isFake, false),
+        eq(users.matchingDisabled, false),
         isNotNull(sql`preferred_moto_type`),
         isNotNull(sql`preferred_ride_style`)
       ));
@@ -124,6 +128,7 @@ export async function runZavTypeStyleMatching(): Promise<number> {
       const mtype = bm.motorcycle.motorcycleType?.toLowerCase();
       const rstyle = bm.motorcycle.ridingStyle?.toLowerCase();
       if (!mtype || !rstyle) continue;
+      if (matchingDisabledSet.has(bm.userId)) continue;
       if (!prefEnabled(prefsMap, bm.userId, "bikerZavarrinaTypeStyle")) continue;
 
       const key = `${mtype}|${rstyle}`;
@@ -134,6 +139,7 @@ export async function runZavTypeStyleMatching(): Promise<number> {
         if (matchCount >= MAX) break;
         if (zavId === bm.userId) continue;
         if (blockedSet.has(`${bm.userId}:${zavId}`)) { skipCount++; continue; }
+        if (matchingDisabledSet.has(zavId)) { skipCount++; continue; }
         if (!prefEnabled(prefsMap, zavId, "bikerZavarrinaTypeStyle")) { skipCount++; continue; }
 
         const idA = bm.userId < zavId ? bm.userId : zavId;

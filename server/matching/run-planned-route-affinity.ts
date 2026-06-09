@@ -24,6 +24,7 @@ import {
   plannedRouteInvites,
   matchPreferences,
 } from "@shared/db";
+import { loadMatchingDisabledSet } from "./filters";
 import { and, eq, sql, gte, inArray, isNotNull } from "drizzle-orm";
 import type { CellMap } from "./route-fingerprint";
 import ngeohash from "ngeohash";
@@ -110,6 +111,7 @@ export async function runPlannedRouteAffinity(): Promise<PlannedRouteAffinityRes
   const blockedSet = new Set<string>(
     blocked.flatMap((b) => [`${b.blockerId}:${b.blockedId}`, `${b.blockedId}:${b.blockerId}`]),
   );
+  const matchingDisabledSet = await loadMatchingDisabledSet();
 
   // Routes candidate
   const routes = await db
@@ -143,6 +145,7 @@ export async function runPlannedRouteAffinity(): Promise<PlannedRouteAffinityRes
       if (blockedSet.has(`${route.userId}:${fp.userId}`)) continue;
       if (allowMap.get(fp.userId) === false) continue;
       if (allowMap.get(route.userId) === false) continue;
+      if (matchingDisabledSet.has(fp.userId) || matchingDisabledSet.has(route.userId)) continue;
 
       if (fp.centerLat != null && fp.centerLon != null) {
         const d = haversineKm(center.lat, center.lon, fp.centerLat, fp.centerLon);

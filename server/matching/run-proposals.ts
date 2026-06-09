@@ -9,17 +9,21 @@ import {
   loadMatchPreferencesMap, 
   bothPrefsEnabled, 
   getActiveClubMembershipKeys,
-  clubScopeAllows 
+  clubScopeAllows,
+  loadMatchingDisabledSet,
 } from "./filters";
 import { areCompatible, getAllSearchTypes } from "./scoring";
 
 export async function runProposalMatchingForUser(userId: string): Promise<number> {
   try {
+    const matchingDisabledSet = await loadMatchingDisabledSet();
+    if (matchingDisabledSet.has(userId)) return 0;
+
     const allActiveProposals = await storage.getActiveProposalsWithLocation();
     const myActiveProposals = allActiveProposals.filter(p => p.userId === userId);
     if (myActiveProposals.length === 0) return 0;
 
-    const otherActiveProposals = allActiveProposals.filter(p => p.userId !== userId);
+    const otherActiveProposals = allActiveProposals.filter(p => p.userId !== userId && !matchingDisabledSet.has(p.userId));
     if (otherActiveProposals.length === 0) return 0;
 
     const existingKeys = await storage.getAllExistingProposalMatchKeys();
@@ -158,8 +162,11 @@ export async function runProposalZoneNotifications(proposal: Proposal): Promise<
         )
       );
 
+    const proposalDisabledSet = await loadMatchingDisabledSet();
+    if (proposalDisabledSet.has(proposal.userId)) return;
+
     const candidateIds = candidateRows
-      .filter((u) => u.userId !== proposal.userId && u.role !== "admin")
+      .filter((u) => u.userId !== proposal.userId && u.role !== "admin" && !proposalDisabledSet.has(u.userId))
       .map((u) => u.userId);
 
     if (candidateIds.length === 0) return;

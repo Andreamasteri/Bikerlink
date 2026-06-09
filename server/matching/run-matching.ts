@@ -6,7 +6,9 @@ import {
   loadMatchPreferencesMap, 
   bothPrefsEnabled, 
   getActiveClubMembershipKeys,
-  clubScopeAllows 
+  clubScopeAllows,
+  loadMatchingDisabledSet,
+  neitherMatchingDisabled,
 } from "./filters";
 import {
   areCompatible,
@@ -80,6 +82,7 @@ export async function runMatching(): Promise<number> {
     const clubIds = [...new Set(clubProposals.map((p) => p.clubId as string))];
     const membershipKeys = await getActiveClubMembershipKeys(clubUserIds, clubIds);
     const proposalPrefsMap = await loadMatchPreferencesMap();
+    const matchingDisabledSet = await loadMatchingDisabledSet();
     let matchCount = 0;
 
     const BB_SEARCH_TYPES = new Set(["find_a_friend", "hitcher", "hitchhiker"]);
@@ -109,6 +112,8 @@ export async function runMatching(): Promise<number> {
         }
 
         if (!clubScopeAllows(p1, p2, membershipKeys)) continue;
+
+        if (!neitherMatchingDisabled(matchingDisabledSet, p1.userId, p2.userId)) continue;
 
         if (existingKeys.has(`${p1.id}:${p2.id}`)) continue;
 
@@ -211,6 +216,7 @@ export async function runWishlistMatching(): Promise<number> {
     }
 
     const prefsMap = await loadMatchPreferencesMap();
+    const matchingDisabledSetWL = await loadMatchingDisabledSet();
     const existingKeys = await storage.getAllExistingBikerZavarrinaMatchKeys();
 
     // Task #2513: precarica i tag delle moto biker coinvolte per
@@ -255,6 +261,7 @@ export async function runWishlistMatching(): Promise<number> {
 
       {
         if (!bothPrefsEnabled(prefsMap, bikerId, zavarrinaId, "bikerZavorrinaBrand")) { skipCount++; continue; }
+        if (!neitherMatchingDisabled(matchingDisabledSetWL, bikerId, zavarrinaId)) { skipCount++; continue; }
 
         const key = `${bikerId}:${zavarrinaId}:${moto.id}:${wish.id}`;
         if (existingKeys.has(key)) { skipCount++; continue; }
