@@ -1,5 +1,6 @@
 import React from "react";
 import { View, Text, StyleSheet } from "react-native";
+import { MaterialIcons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
 import { SessionStats } from "@/components/admin/analytics/UserStatsContent";
 
@@ -14,6 +15,11 @@ function formatSessionDuration(seconds: number): string {
   return rm > 0 ? `${h}h ${rm}m` : `${h}h`;
 }
 
+const PLATFORM_CONFIG: Record<string, { label: string; icon: keyof typeof MaterialIcons.glyphMap; color: string }> = {
+  ios: { label: "iOS", icon: "phone-iphone", color: "#007AFF" },
+  android: { label: "Android", icon: "android", color: "#3DDC84" },
+};
+
 interface Props {
   sessionStats?: SessionStats;
 }
@@ -26,6 +32,11 @@ export function UserSessionStatsBlock({ sessionStats }: Props) {
       </Text>
     );
   }
+
+  const platformEntries = Object.entries(sessionStats.platformBreakdown ?? {})
+    .filter(([key]) => key !== "unknown")
+    .sort(([a], [b]) => a.localeCompare(b));
+
   return (
     <>
       <View style={styles.kpiRow}>
@@ -38,6 +49,24 @@ export function UserSessionStatsBlock({ sessionStats }: Props) {
           <Text style={styles.kpiLabel}>Durata media</Text>
         </View>
       </View>
+      {platformEntries.length > 0 && (
+        <View style={styles.platformBlock}>
+          <Text style={styles.platformTitle}>Piattaforma</Text>
+          <View style={styles.platformRow}>
+            {platformEntries.map(([key, data]) => {
+              const cfg = PLATFORM_CONFIG[key] ?? { label: key, icon: "devices" as keyof typeof MaterialIcons.glyphMap, color: Colors.textSecondary };
+              return (
+                <View key={key} style={styles.platformChip}>
+                  <MaterialIcons name={cfg.icon} size={16} color={cfg.color} />
+                  <Text style={[styles.platformLabel, { color: cfg.color }]}>{cfg.label}</Text>
+                  <Text style={styles.platformSessions}>{data.sessions} sess.</Text>
+                  <Text style={styles.platformDuration}>{formatSessionDuration(data.avgDuration)} media</Text>
+                </View>
+              );
+            })}
+          </View>
+        </View>
+      )}
       {sessionStats.totalSessions > 0 && (
         <View style={styles.exitBlock}>
           {(
@@ -84,6 +113,32 @@ const styles = StyleSheet.create({
   },
   kpiNumber: { fontFamily: "Inter_700Bold", fontSize: 20, color: Colors.text },
   kpiLabel: { fontFamily: "Inter_400Regular", fontSize: 11, color: Colors.textSecondary, marginTop: 4, textAlign: "center" },
+  platformBlock: { marginBottom: 12 },
+  platformTitle: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 12,
+    color: Colors.textSecondary,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+    marginBottom: 6,
+  },
+  platformRow: { flexDirection: "row", gap: 8, flexWrap: "wrap" },
+  platformChip: {
+    flex: 1,
+    minWidth: 120,
+    flexDirection: "column",
+    alignItems: "center",
+    gap: 2,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    backgroundColor: Colors.surface,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  platformLabel: { fontFamily: "Inter_700Bold", fontSize: 13 },
+  platformSessions: { fontFamily: "Inter_600SemiBold", fontSize: 12, color: Colors.text },
+  platformDuration: { fontFamily: "Inter_400Regular", fontSize: 11, color: Colors.textSecondary },
   exitBlock: { gap: 8, marginTop: 4 },
   exitRow: { flexDirection: "row", alignItems: "center", gap: 6 },
   exitLabel: { fontFamily: "Inter_500Medium", fontSize: 12, width: 80 },

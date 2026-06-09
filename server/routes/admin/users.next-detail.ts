@@ -60,7 +60,7 @@ router.get("/:id/stats", async (req: Request, res: Response) => {
         .orderBy(adClicks.createdAt),
     ]);
 
-    const [devicesRows, sessionStatsRows] = await Promise.all([
+    const [devicesRows, sessionStatsRows, sessionPlatformRows] = await Promise.all([
       db.select({
         model: userDevices.model,
         platform: userDevices.platform,
@@ -79,6 +79,14 @@ router.get("/:id/stats", async (req: Request, res: Response) => {
         crashCount: sql<number>`COUNT(*) FILTER (WHERE ${userSessions.exitType} = 'crash')::int`,
         nullCount: sql<number>`COUNT(*) FILTER (WHERE ${userSessions.exitType} IS NULL)::int`,
       }).from(userSessions).where(eq(userSessions.userId, id)),
+
+      db.select({
+        platform: userSessions.platform,
+        sessions: sql<number>`COUNT(*)::int`,
+        avgDuration: sql<number>`COALESCE(AVG(${userSessions.durationSeconds}) FILTER (WHERE ${userSessions.durationSeconds} IS NOT NULL), 0)::int`,
+      }).from(userSessions)
+        .where(eq(userSessions.userId, id))
+        .groupBy(userSessions.platform),
     ]);
 
     const moderatorNicknameMap: Record<string, string> = {};
@@ -153,10 +161,16 @@ router.get("/:id/stats", async (req: Request, res: Response) => {
         const bg = row?.backgroundCount ?? 0;
         const lo = row?.logoutCount ?? 0;
         const cr = row?.crashCount ?? 0;
+        const platformBreakdown: Record<string, { sessions: number; avgDuration: number }> = {};
+        for (const p of sessionPlatformRows) {
+          const key = (p.platform ?? "unknown").toLowerCase();
+          platformBreakdown[key] = { sessions: p.sessions, avgDuration: p.avgDuration };
+        }
         return {
           avgDurationSeconds: row?.avgDuration ?? 0,
           totalSessions: total,
           exitBreakdown: { background: bg, logout: lo, crash: cr, unknown: row?.nullCount ?? 0 },
+          platformBreakdown,
         };
       })(),
     });

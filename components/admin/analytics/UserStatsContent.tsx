@@ -12,6 +12,7 @@ export interface SessionStats {
     crash: number;
     unknown: number;
   };
+  platformBreakdown?: Record<string, { sessions: number; avgDuration: number }>;
 }
 
 interface UserStatsData {
@@ -69,8 +70,13 @@ const EXIT_ICON_MAP: Record<string, { name: keyof typeof MaterialIcons.glyphMap;
   unknown: { name: "help-outline", color: Colors.textSecondary },
 };
 
+const PLATFORM_CONFIG: Record<string, { label: string; icon: keyof typeof MaterialIcons.glyphMap; color: string }> = {
+  ios: { label: "iOS", icon: "phone-iphone", color: "#007AFF" },
+  android: { label: "Android", icon: "android", color: "#3DDC84" },
+};
+
 function SessionStatsBlock({ sessionStats }: { sessionStats: SessionStats }) {
-  const { avgDurationSeconds, totalSessions, exitBreakdown } = sessionStats;
+  const { avgDurationSeconds, totalSessions, exitBreakdown, platformBreakdown } = sessionStats;
   const safeTotal = totalSessions > 0 ? totalSessions : 1;
 
   const exitEntries = [
@@ -79,6 +85,10 @@ function SessionStatsBlock({ sessionStats }: { sessionStats: SessionStats }) {
     { key: "crash", label: "Crash", count: exitBreakdown.crash },
     { key: "unknown", label: "Sconosciuto", count: exitBreakdown.unknown },
   ];
+
+  const platformEntries = Object.entries(platformBreakdown ?? {})
+    .filter(([key]) => key !== "unknown")
+    .sort(([a], [b]) => a.localeCompare(b));
 
   return (
     <View>
@@ -92,6 +102,24 @@ function SessionStatsBlock({ sessionStats }: { sessionStats: SessionStats }) {
           <Text style={sessionStyles.kpiLabel}>Durata media</Text>
         </View>
       </View>
+      {platformEntries.length > 0 && (
+        <View style={sessionStyles.platformBlock}>
+          <Text style={sessionStyles.exitTitle}>Piattaforma</Text>
+          <View style={sessionStyles.platformRow}>
+            {platformEntries.map(([key, data]) => {
+              const cfg = PLATFORM_CONFIG[key] ?? { label: key, icon: "devices" as keyof typeof MaterialIcons.glyphMap, color: Colors.textSecondary };
+              return (
+                <View key={key} style={sessionStyles.platformChip}>
+                  <MaterialIcons name={cfg.icon} size={16} color={cfg.color} />
+                  <Text style={[sessionStyles.platformLabel, { color: cfg.color }]}>{cfg.label}</Text>
+                  <Text style={sessionStyles.platformSessions}>{data.sessions} sess.</Text>
+                  <Text style={sessionStyles.platformDuration}>{formatDuration(data.avgDuration)} media</Text>
+                </View>
+              );
+            })}
+          </View>
+        </View>
+      )}
       {totalSessions > 0 ? (
         <View style={sessionStyles.exitBlock}>
           <Text style={sessionStyles.exitTitle}>Tipo di uscita</Text>
@@ -385,6 +413,41 @@ const sessionStyles = StyleSheet.create({
     color: Colors.textSecondary,
     marginTop: 4,
     textAlign: "center",
+  },
+  platformBlock: {
+    marginBottom: 12,
+  },
+  platformRow: {
+    flexDirection: "row",
+    gap: 8,
+    flexWrap: "wrap",
+  },
+  platformChip: {
+    flex: 1,
+    minWidth: 120,
+    flexDirection: "column",
+    alignItems: "center",
+    gap: 2,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    backgroundColor: Colors.surface,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  platformLabel: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 13,
+  },
+  platformSessions: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 12,
+    color: Colors.text,
+  },
+  platformDuration: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 11,
+    color: Colors.textSecondary,
   },
   exitBlock: {
     gap: 8,
