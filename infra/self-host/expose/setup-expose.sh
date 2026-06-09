@@ -135,6 +135,7 @@ ENV_VALHALLA_KEY="$(read_env_value VALHALLA_API_KEY "$ENV_LOCAL_FILE" 2>/dev/nul
 ENV_OLLAMA_TOKEN="$(read_env_value OLLAMA_TOKEN     "$ENV_LOCAL_FILE" 2>/dev/null || true)"
 ENV_WHISPER_TOKEN="$(read_env_value WHISPER_TOKEN   "$ENV_LOCAL_FILE" 2>/dev/null || true)"
 ENV_NOMINATIM_TOKEN="$(read_env_value NOMINATIM_TOKEN "$ENV_LOCAL_FILE" 2>/dev/null || true)"
+ENV_TC_AGENT_TOKEN="$(read_env_value TC_AGENT_TOKEN  "$ENV_LOCAL_FILE" 2>/dev/null || true)"
 
 # ─────────────────────────────────────────────────────────────────────────────
 section "2/5 — Parametri di esposizione"
@@ -199,6 +200,8 @@ resolve_token "WHISPER_TOKEN"     "$ENV_WHISPER_TOKEN"  "${WHISPER_TOKEN:-}"
 WHISPER_TOKEN_VAL="$RESOLVED_TOKEN"
 resolve_token "NOMINATIM_TOKEN"   "$ENV_NOMINATIM_TOKEN" "${NOMINATIM_TOKEN:-}"
 NOMINATIM_TOKEN_VAL="$RESOLVED_TOKEN"
+resolve_token "TC_AGENT_TOKEN"    "$ENV_TC_AGENT_TOKEN"  "${TC_AGENT_TOKEN:-}"
+TC_AGENT_TOKEN_VAL="$RESOLVED_TOKEN"
 
 # Se abbiamo generato token, rileggiamo i valori dal .env.local così la
 # validazione successiva li riconosce come coincidenti (non più placeholder).
@@ -208,6 +211,7 @@ if [[ "$GENERATED_ANY" == "1" ]]; then
   ENV_OLLAMA_TOKEN="$(read_env_value OLLAMA_TOKEN     "$ENV_LOCAL_FILE" 2>/dev/null || true)"
   ENV_WHISPER_TOKEN="$(read_env_value WHISPER_TOKEN   "$ENV_LOCAL_FILE" 2>/dev/null || true)"
   ENV_NOMINATIM_TOKEN="$(read_env_value NOMINATIM_TOKEN "$ENV_LOCAL_FILE" 2>/dev/null || true)"
+  ENV_TC_AGENT_TOKEN="$(read_env_value TC_AGENT_TOKEN  "$ENV_LOCAL_FILE" 2>/dev/null || true)"
 fi
 
 [[ -n "$GH_TOKEN"           && "$GH_TOKEN"           != "$PLACEHOLDER_VALUE" ]] \
@@ -220,6 +224,8 @@ fi
   || die "WHISPER_TOKEN mancante. Generane uno con: openssl rand -base64 32 (o riesegui con --gen-tokens)"
 [[ -n "$NOMINATIM_TOKEN_VAL" && "$NOMINATIM_TOKEN_VAL" != "$PLACEHOLDER_VALUE" ]] \
   || die "NOMINATIM_TOKEN mancante. Generane uno con: openssl rand -base64 32 (o riesegui con --gen-tokens)"
+[[ -n "$TC_AGENT_TOKEN_VAL"  && "$TC_AGENT_TOKEN_VAL"  != "$PLACEHOLDER_VALUE" ]] \
+  || die "TC_AGENT_TOKEN mancante. Generane uno con: openssl rand -base64 32 (o riesegui con --gen-tokens)"
 
 # Validazione: i token usati devono coincidere con quelli del .env.local.
 # Disabilitabile con SKIP_TOKEN_VALIDATION=1.
@@ -246,6 +252,7 @@ validate_token "VALHALLA_API_KEY"  "$VALHALLA_KEY"       "$ENV_VALHALLA_KEY"
 validate_token "OLLAMA_TOKEN"      "$OLLAMA_TOKEN_VAL"   "$ENV_OLLAMA_TOKEN"
 validate_token "WHISPER_TOKEN"     "$WHISPER_TOKEN_VAL"  "$ENV_WHISPER_TOKEN"
 validate_token "NOMINATIM_TOKEN"   "$NOMINATIM_TOKEN_VAL" "$ENV_NOMINATIM_TOKEN"
+validate_token "TC_AGENT_TOKEN"    "$TC_AGENT_TOKEN_VAL"  "$ENV_TC_AGENT_TOKEN"
 
 # ─────────────────────────────────────────────────────────────────────────────
 section "4/5 — Generazione config compilati"
@@ -259,6 +266,7 @@ E_VALHALLA_KEY="$(sed_escape "$VALHALLA_KEY")"
 E_OLLAMA_TOKEN="$(sed_escape "$OLLAMA_TOKEN_VAL")"
 E_WHISPER_TOKEN="$(sed_escape "$WHISPER_TOKEN_VAL")"
 E_NOMINATIM_TOKEN="$(sed_escape "$NOMINATIM_TOKEN_VAL")"
+E_TC_AGENT_TOKEN="$(sed_escape "$TC_AGENT_TOKEN_VAL")"
 E_TUNNEL_UUID="$(sed_escape "${TUNNEL_UUID:-__TUNNEL_UUID__}")"
 
 # Nginx
@@ -270,6 +278,7 @@ sed \
   -e "s#__OLLAMA_TOKEN__#${E_OLLAMA_TOKEN}#g" \
   -e "s#__WHISPER_TOKEN__#${E_WHISPER_TOKEN}#g" \
   -e "s#__NOMINATIM_TOKEN__#${E_NOMINATIM_TOKEN}#g" \
+  -e "s#__TC_AGENT_TOKEN__#${E_TC_AGENT_TOKEN}#g" \
   "$NGINX_TEMPLATE" > "$NGINX_OUT"
 chmod 600 "$NGINX_OUT"
 ok "Generato $NGINX_OUT"
@@ -300,7 +309,7 @@ $(bold "Nginx + Let's Encrypt (o DuckDNS)")
   sudo certbot certonly --standalone --cert-name bikerlink \\
     -d gh.${BASE_DOMAIN} -d valhalla.${BASE_DOMAIN} \\
     -d ollama.${BASE_DOMAIN} -d whisper.${BASE_DOMAIN} \\
-    -d nominatim.${BASE_DOMAIN}
+    -d nominatim.${BASE_DOMAIN} -d tc.${BASE_DOMAIN}
 
   # 3. Installa il config e avvia nginx
   sudo cp ${NGINX_OUT} /etc/nginx/sites-available/bikerlink
@@ -319,6 +328,7 @@ $(bold "Log auth-failure (401 token mismatch)")
     /var/log/nginx/ollama-auth-fail.log
     /var/log/nginx/whisper-auth-fail.log
     /var/log/nginx/nominatim-auth-fail.log
+    /var/log/nginx/tc-auth-fail.log
   Formato: timestamp | IP | request | header custom mascherato (4 char + ***) | Authorization mascherata
   Lettura 401 in tempo reale (es. GraphHopper):
     sudo tail -f /var/log/nginx/gh-auth-fail.log
@@ -343,6 +353,13 @@ $(bold "Secrets Replit da aggiornare")
   GRAPHHOPPER_TOKEN=<valore da .env.local>
   VALHALLA_URL=https://valhalla.${BASE_DOMAIN}
   VALHALLA_API_KEY=<valore da .env.local>
+  THINKCENTRE_METRICS_URL=https://tc.${BASE_DOMAIN}
+  THINKCENTRE_AGENT_TOKEN=<valore da .env.local (TC_AGENT_TOKEN)>
+  # Probe infra via TC agent (nessun token aggiuntivo: usano THINKCENTRE_AGENT_TOKEN)
+  NGINX_MONITOR_URL=https://tc.${BASE_DOMAIN}/probe/nginx
+  PGADMIN_URL=https://tc.${BASE_DOMAIN}/probe/pgadmin
+  UPTIME_KUMA_URL=https://tc.${BASE_DOMAIN}/probe/uptime-kuma
+  REDIS_PROBE_URL=https://tc.${BASE_DOMAIN}/probe/redis
 
 EOF
 # ─────────────────────────────────────────────────────────────────────────────

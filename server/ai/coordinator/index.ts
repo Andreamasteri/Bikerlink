@@ -128,7 +128,9 @@ export class AiCoordinator {
         this.subscribers.push({ client, pattern, cb });
         usingRedis = true;
       } catch (err) {
-        console.warn("[ai-coordinator/subscribe] redis subscribe failed:", (err as Error).message);
+        // Redis pub/sub non disponibile da cloud (es. porta non forwardata dal router).
+        // Fallback automatico al fanout in-process — nessun impatto funzionale.
+        console.log("[ai-coordinator/subscribe] redis pub/sub non raggiungibile (fallback in-process):", (err as Error).message);
         // Chiude il client duplicato per evitare leak di socket.
         if (client) {
           try { await client.quit(); } catch { /* ignore */ }
