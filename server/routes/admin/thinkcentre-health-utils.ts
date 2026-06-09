@@ -3,6 +3,10 @@
  * Usate da thinkcentre-health.ts e thinkcentre-health-vn-probes.ts.
  */
 
+import { storage } from "../../storage";
+
+const PROBE_LOG_SNAPSHOT_KEY = "probe_log_snapshot";
+
 export const PROBE_TIMEOUT_MS = 5_000;
 
 export const ERROR_HISTORY_MAX = 20;
@@ -29,14 +33,51 @@ export interface ProbeLogEntry {
 
 const probeLogStore = new Map<string, ProbeLogEntry[]>();
 
+function persistProbeLogAsync(): void {
+  const snapshot: Record<string, ProbeLogEntry[]> = {};
+  for (const [svc, entries] of probeLogStore) {
+    snapshot[svc] = entries;
+  }
+  storage.upsertAppSetting(PROBE_LOG_SNAPSHOT_KEY, undefined, snapshot).catch((err) => {
+    console.warn("[probe-log] persist failed:", err instanceof Error ? err.message : String(err));
+  });
+}
+
 export function recordProbeLog(service: string, entry: ProbeLogEntry): void {
   const prev = probeLogStore.get(service) ?? [];
   const next = [entry, ...prev].slice(0, PROBE_LOG_MAX);
   probeLogStore.set(service, next);
+  persistProbeLogAsync();
 }
 
 export function getProbeLog(service: string): ProbeLogEntry[] {
   return probeLogStore.get(service) ?? [];
+}
+
+export async function hydrateProbeLog(): Promise<void> {
+  try {
+    const setting = await storage.getAppSetting(PROBE_LOG_SNAPSHOT_KEY);
+    if (!setting?.valueJson || typeof setting.valueJson !== "object") return;
+    const snapshot = setting.valueJson as Record<string, unknown>;
+    for (const [svc, raw] of Object.entries(snapshot)) {
+      if (!Array.isArray(raw)) continue;
+      const entries: ProbeLogEntry[] = raw
+        .filter(
+          (e): e is ProbeLogEntry =>
+            e !== null &&
+            typeof e === "object" &&
+            typeof e.timestamp === "number" &&
+            typeof e.ok === "boolean" &&
+            (e.latencyMs === null || typeof e.latencyMs === "number") &&
+            typeof e.detail === "string",
+        )
+        .slice(0, PROBE_LOG_MAX);
+      if (entries.length > 0) probeLogStore.set(svc, entries);
+    }
+    console.log("[probe-log] hydrated", probeLogStore.size, "service(s) from DB snapshot");
+  } catch (err) {
+    console.warn("[probe-log] hydration failed (non-fatal):", err instanceof Error ? err.message : String(err));
+  }
 }
 
 export type FetchResponse = Awaited<ReturnType<typeof fetch>>;

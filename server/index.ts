@@ -481,6 +481,14 @@ process.on("SIGINT", () => gracefulShutdown("SIGINT"));
       console.warn("[INIT] Critical reports notifier failed (non-fatal):", e);
     }
 
+    // Hydrate probe log ring-buffer from DB snapshot (survives backend restarts).
+    try {
+      const { hydrateProbeLog } = await import("./routes/admin/thinkcentre-health-utils");
+      await hydrateProbeLog();
+    } catch (e) {
+      console.warn("[INIT] Probe log hydration failed (non-fatal):", e);
+    }
+
     // Monitors — push admin quando i servizi self-hosted o Valhalla vanno offline.
     try {
       const [{ startThinkCentreMonitor, checkMotorcycleProfile }, { startValhallaMonitor }] = await Promise.all([
