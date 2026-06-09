@@ -4,8 +4,10 @@ import { MaterialCommunityIcons, Ionicons } from "@expo/vector-icons";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import Colors from "@/constants/colors";
 import { getApiUrl, authFetchHeaders, queryClient } from "@/lib/query-client";
-import { ErrorHistory, EventLog, GraphHopperBlock, ValhallaBlock, NominatimBlock } from "./ThinkCentreCardParts";
-import type { HealthEvent, AreaServiceHealth, ValhallaDetailedHealth, NominatimDetailedHealth } from "./ThinkCentreCardParts";
+import { ErrorHistory, EventLog, GraphHopperBlock } from "./ThinkCentreCardParts";
+import type { HealthEvent, AreaServiceHealth } from "./ThinkCentreCardParts";
+import { ValhallaBlock, NominatimBlock } from "./ThinkCentreValhallaNominatimBlocks";
+import type { ValhallaDetailedHealth, NominatimDetailedHealth } from "./ThinkCentreValhallaNominatimBlocks";
 
 type ServiceKey = "valhalla" | "ollama" | "whisper" | "nominatim";
 
