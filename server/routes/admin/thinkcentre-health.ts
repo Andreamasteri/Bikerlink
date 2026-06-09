@@ -272,8 +272,19 @@ async function probeWhisper(): Promise<ServiceHealth> {
   wav.write("data", 36); wav.writeUInt32LE(dataSize, 40);
   const headers: Record<string, string> = {};
   if (token) headers["Authorization"] = `Bearer ${token}`;
+
+  // Step 1: lightweight GET /health probe (4 s timeout via httpProbe).
+  // If the server is up and healthy we skip the full audio inference entirely.
+  const healthResult = await httpProbe(`${base}/health`, headers);
+  if (healthResult.ok) {
+    recordProbeLog("whisper", { timestamp: Date.now(), ok: true, latencyMs: healthResult.latencyMs, detail: "health OK" });
+    return { key: "whisper", label: "Whisper ASR", configured: true, ok: true, latencyMs: healthResult.latencyMs, url: maskUrl(base), tokenMissing, history: getHistory("whisper"), probeLog: getProbeLog("whisper") };
+  }
+
+  // Step 2: /health not available or returned an error — fall through to full inference probe.
+  // Timeout raised to 20 s to survive Whisper cold-start (model loading).
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 8_000);
+  const timer = setTimeout(() => controller.abort(), 20_000);
   const t0 = Date.now();
   try {
     const formData = new FormData();
@@ -302,8 +313,17 @@ async function probeWhisper(): Promise<ServiceHealth> {
     recordProbeLog("whisper", { timestamp: Date.now(), ok: false, latencyMs, detail: error });
     return { key: "whisper", label: "Whisper ASR", configured: true, ok: false, latencyMs, url: maskUrl(base), error, tokenMissing, history: getHistory("whisper"), probeLog: getProbeLog("whisper") };
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    const error = sanitizeError(msg);
+    const raw = err instanceof Error ? err.message : String(err);
+    // Step 3: classify the error so the probe log is actionable.
+    let classified: string;
+    if (err instanceof Error && err.name === "AbortError") {
+      classified = `timeout (>20 s) — ${raw}`;
+    } else if (/fetch failed|ECONNREFUSED|ENOTFOUND/i.test(raw)) {
+      classified = `network error — ${raw}`;
+    } else {
+      classified = raw;
+    }
+    const error = sanitizeError(classified);
     console.error("[thinkcentre-probe] whisper KO (rete/timeout)", { error });
     recordError("whisper", error);
     recordProbeLog("whisper", { timestamp: Date.now(), ok: false, latencyMs: null, detail: error });
