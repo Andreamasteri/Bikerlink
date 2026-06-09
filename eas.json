@@ -17,6 +17,9 @@
       "distribution": "internal",
       "channel": "production",
       "credentialsSource": "remote",
+      "env": {
+        "NODE_OPTIONS": "--max_old_space_size=8192"
+      },
       "android": {
         "buildType": "apk",
         "gradleCommand": ":app:assembleRelease"
