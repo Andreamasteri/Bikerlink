@@ -300,6 +300,42 @@ interface GraphHopperHealth {
   areas: AreaServiceHealth[];
 }
 
+/** Dettaglio Valhalla arricchito con profili costing disponibili. */
+interface ValhallaDetailedHealth {
+  configured: boolean;
+  ok: boolean;
+  latencyMs: number | null;
+  url: string | null;
+  error?: string;
+  tileVersion?: string;
+  /** Costing model rispondenti (es: ["motorcycle","auto","bicycle"]). */
+  activeProfiles: string[];
+  tokenMissing?: boolean;
+  history: ErrorEvent[];
+}
+
+/** Dettaglio Nominatim con info dalla risposta /status. */
+interface NominatimDetailedHealth {
+  configured: boolean;
+  ok: boolean;
+  latencyMs: number | null;
+  url: string | null;
+  error?: string;
+  /** Data ultimo aggiornamento OSM (ISO string, da /status?format=json). */
+  dataUpdated?: string;
+  /** Versione software Nominatim. */
+  softwareVersion?: string;
+  /**
+   * Stato del database interno (da status.status: 0=OK, altrimenti ERROR + messaggio).
+   * "ok" | "error" | "unknown"
+   */
+  dbState?: "ok" | "error" | "unknown";
+  /** Latenza di una vera query di geocoding (POST /search?q=Roma). Null se non misurata. */
+  geocodeLatencyMs?: number | null;
+  tokenMissing?: boolean;
+  history: ErrorEvent[];
+}
+
 /**
  * Proba tutte le 7 istanze GraphHopper per-area in parallelo.
  * Lo stato aggregato `ok` (per il calcolo globale ThinkCentre) è true se almeno
@@ -334,17 +370,64 @@ async function probeGraphHopperAreas(): Promise<GraphHopperHealth> {
   return { configured: true, url: maskUrl(base), tokenMissing, ok, areas };
 }
 
+/** Costing model noti da sondare per determinare i profili attivi. */
+const KNOWN_VALHALLA_COSTING = ["motorcycle", "auto", "bicycle", "pedestrian"] as const;
+
+/**
+ * Sonda in parallelo i costing model noti di Valhalla con un percorso
+ * minimale (Milano → Como). Timeout ridotto a 3 s per non rallentare il probe.
+ * Ritorna l'array dei costing model che rispondono 2xx.
+ */
+async function probeValhallaProfiles(
+  base: string,
+  apiKey: string | undefined,
+): Promise<string[]> {
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (apiKey) headers["X-Valhalla-Key"] = apiKey;
+
+  const results = await Promise.all(
+    KNOWN_VALHALLA_COSTING.map(async (costing) => {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 3_000);
+      try {
+        const res = await fetch(`${base}/route`, {
+          method: "POST",
+          headers,
+          body: JSON.stringify({
+            locations: [{ lon: 9.19, lat: 45.46 }, { lon: 9.08, lat: 45.81 }],
+            costing,
+            directions_options: { units: "km" },
+          }),
+          signal: controller.signal,
+        });
+        return res.status >= 200 && res.status < 300 ? costing : null;
+      } catch {
+        return null;
+      } finally {
+        clearTimeout(timer);
+      }
+    }),
+  );
+
+  return results.filter((r): r is (typeof KNOWN_VALHALLA_COSTING)[number] => r !== null);
+}
+
 /**
  * Probe Valhalla via GET /status.
  * Oltre a ok/latency, estrae version + data del tileset per mostrare la
- * "tile version" inline nella card admin. Se VALHALLA_URL non è impostato,
+ * "tile version" inline nella card admin. Quando online, sonda anche i
+ * costing model disponibili. Se VALHALLA_URL non è impostato,
  * la card mostra "Non configurato" senza errori.
  */
 async function probeValhalla(): Promise<ServiceHealth> {
+  return (await probeValhallaDetailed()) as unknown as ServiceHealth;
+}
+
+async function probeValhallaDetailed(): Promise<ValhallaDetailedHealth> {
   const base = process.env.VALHALLA_URL?.replace(/\/$/, "");
   const apiKey = process.env.VALHALLA_API_KEY;
   if (!base) {
-    return { key: "valhalla", label: "Valhalla", configured: false, ok: false, latencyMs: null, url: null, history: getHistory("valhalla") };
+    return { configured: false, ok: false, latencyMs: null, url: null, activeProfiles: [], history: getHistory("valhalla") };
   }
   const tokenMissing = !apiKey || apiKey.trim() === "";
   const headers: Record<string, string> = {};
@@ -364,7 +447,7 @@ async function probeValhalla(): Promise<ServiceHealth> {
         : `HTTP ${res.status}`;
       console.error("[thinkcentre-probe] valhalla KO", { status: res.status, error });
       recordError("valhalla", error);
-      return { key: "valhalla", label: "Valhalla", configured: true, ok: false, latencyMs, url: maskUrl(base), error, tokenMissing, history: getHistory("valhalla") };
+      return { configured: true, ok: false, latencyMs, url: maskUrl(base), error, tokenMissing, activeProfiles: [], history: getHistory("valhalla") };
     }
     const data = (await res.json().catch(() => ({}))) as {
       version?: string;
@@ -374,22 +457,24 @@ async function probeValhalla(): Promise<ServiceHealth> {
       ? new Date(data.tileset_last_modified * 1000).toISOString().split("T")[0]
       : undefined;
     const tileVersion = [data.version, datePart].filter(Boolean).join(" · ") || undefined;
+
+    const activeProfiles = await probeValhallaProfiles(base, apiKey);
+
     return {
-      key: "valhalla",
-      label: "Valhalla",
       configured: true,
       ok: true,
       latencyMs,
       url: maskUrl(base),
       tileVersion,
       tokenMissing,
+      activeProfiles,
       history: getHistory("valhalla"),
     };
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
     const error = sanitizeError(msg);
     recordError("valhalla", error);
-    return { key: "valhalla", label: "Valhalla", configured: true, ok: false, latencyMs: null, url: maskUrl(base), error, tokenMissing, history: getHistory("valhalla") };
+    return { configured: true, ok: false, latencyMs: null, url: maskUrl(base), error, tokenMissing, activeProfiles: [], history: getHistory("valhalla") };
   } finally {
     clearTimeout(timer);
   }
@@ -484,24 +569,129 @@ async function probeWhisper(): Promise<ServiceHealth> {
 }
 
 async function probeNominatim(): Promise<ServiceHealth> {
-  const snap = await getNominatimHealthSnapshot();
-  const token = process.env.NOMINATIM_TOKEN;
-  const tokenMissing = snap.configured && (!token || token.trim() === "");
-  if (!snap.ok && snap.configured) {
-    console.error("[thinkcentre-probe] nominatim KO", { error: snap.error ?? "nessun dettaglio" });
-    if (snap.error) recordError("nominatim", snap.error);
-  }
+  const detailed = await probeNominatimDetailed();
   return {
     key: "nominatim",
     label: "Nominatim",
-    configured: snap.configured,
-    ok: snap.ok,
-    latencyMs: snap.latencyMs,
-    url: snap.configured ? snap.url : null,
-    error: snap.error,
-    tokenMissing,
-    history: getHistory("nominatim"),
+    configured: detailed.configured,
+    ok: detailed.ok,
+    latencyMs: detailed.latencyMs,
+    url: detailed.url,
+    error: detailed.error,
+    tokenMissing: detailed.tokenMissing,
+    history: detailed.history,
   };
+}
+
+/**
+ * Sonda la latenza di una vera query di geocoding verso Nominatim.
+ * Usa /search?q=Roma&format=json&limit=1 — risposta leggera ma rappresentativa.
+ * Timeout ridotto a 4 s per non rallentare il probe globale.
+ */
+async function probeNominatimGeocodeLatency(
+  base: string,
+  headers: Record<string, string>,
+): Promise<number | null> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 4_000);
+  const t0 = Date.now();
+  try {
+    const searchUrl = `${base}/search?q=Roma&format=json&limit=1&accept-language=it`;
+    const res = await fetch(searchUrl, { headers, signal: controller.signal });
+    if (res.status >= 200 && res.status < 300) {
+      return Date.now() - t0;
+    }
+    return null;
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
+ * Probe Nominatim esteso: oltre a ok/latency, legge il body di
+ * /status?format=json per estrarre data_updated, software_version e lo stato
+ * del database interno; inoltre sonda una vera query di geocoding per misurare
+ * la latenza operativa effettiva.
+ */
+async function probeNominatimDetailed(): Promise<NominatimDetailedHealth> {
+  const base = process.env.NOMINATIM_URL?.trim().replace(/\/$/, "") || null;
+  const configured = Boolean(base);
+  const token = process.env.NOMINATIM_TOKEN;
+  const tokenMissing = configured && (!token || token.trim() === "");
+  const maskedUrl = base ? maskUrl(base) : "nominatim.openstreetmap.org";
+  const probeBase = base ?? "https://nominatim.openstreetmap.org";
+  const probeUrl = `${probeBase}/status?format=json`;
+
+  const headers: Record<string, string> = {
+    "User-Agent": "BikerLink/4.0 (info@bikerlink.it)",
+  };
+  if (base && token) headers["X-Nominatim-Token"] = token;
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), PROBE_TIMEOUT_MS);
+  const t0 = Date.now();
+  try {
+    const res = await fetch(probeUrl, { headers, signal: controller.signal });
+    const latencyMs = Date.now() - t0;
+    if (!res.ok) {
+      const body = await readBodySafe(res);
+      const bodySnippet = body.trim().slice(0, 400);
+      const error = bodySnippet
+        ? sanitizeError(`HTTP ${res.status} — ${bodySnippet}`)
+        : `HTTP ${res.status}`;
+      if (configured) {
+        console.error("[thinkcentre-probe] nominatim KO", { status: res.status, error });
+        recordError("nominatim", error);
+      }
+      return { configured, ok: false, latencyMs, url: configured ? maskedUrl : null, error, tokenMissing, dbState: "unknown", history: getHistory("nominatim") };
+    }
+    const data = (await res.json().catch(() => ({}))) as {
+      status?: number;
+      message?: string;
+      data_updated?: string;
+      software_version?: string;
+      database_version?: string;
+    };
+    // status=0 → database OK; qualsiasi altro valore → database in errore
+    const dbState: "ok" | "error" | "unknown" =
+      data.status === 0 ? "ok" : data.status != null ? "error" : "unknown";
+    const isOk = dbState !== "error";
+
+    if (!isOk && configured) {
+      const error = sanitizeError(`DB status ${data.status} — ${data.message ?? ""}`);
+      recordError("nominatim", error);
+    }
+
+    // Probe geocoding in parallelo con la costruzione della risposta
+    const geocodeLatencyMs = isOk
+      ? await probeNominatimGeocodeLatency(probeBase, headers)
+      : null;
+
+    return {
+      configured,
+      ok: isOk,
+      latencyMs,
+      url: configured ? maskedUrl : null,
+      dataUpdated: data.data_updated,
+      softwareVersion: data.software_version ?? data.database_version,
+      dbState,
+      geocodeLatencyMs,
+      tokenMissing,
+      history: getHistory("nominatim"),
+    };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    const error = sanitizeError(msg);
+    if (configured) {
+      console.error("[thinkcentre-probe] nominatim KO (rete/timeout)", { error });
+      recordError("nominatim", error);
+    }
+    return { configured, ok: false, latencyMs: null, url: configured ? maskedUrl : null, error, tokenMissing, dbState: "unknown", history: getHistory("nominatim") };
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 router.get("/thinkcentre-events", async (_req: Request, res: ExpressResponse) => {
@@ -522,13 +712,41 @@ router.get("/thinkcentre-events", async (_req: Request, res: ExpressResponse) =>
 
 router.get("/thinkcentre-health", async (_req: Request, res: ExpressResponse) => {
   try {
-    const [graphhopper, ...services] = await Promise.all([
+    const [graphhopper, valhallaDetail, nominatimDetail, ollama, whisper] = await Promise.all([
       probeGraphHopperAreas(),
-      probeValhalla(),
+      probeValhallaDetailed(),
+      probeNominatimDetailed(),
       probeOllama(),
       probeWhisper(),
-      probeNominatim(),
     ]);
+
+    // Costruiamo il vecchio array `services` per retrocompatibilità con i consumer
+    // esistenti, ma Valhalla e Nominatim sono ora esposti anche come blocchi dedicati.
+    const valhallaService: ServiceHealth = {
+      key: "valhalla",
+      label: "Valhalla",
+      configured: valhallaDetail.configured,
+      ok: valhallaDetail.ok,
+      latencyMs: valhallaDetail.latencyMs,
+      url: valhallaDetail.url,
+      error: valhallaDetail.error,
+      tileVersion: valhallaDetail.tileVersion,
+      tokenMissing: valhallaDetail.tokenMissing,
+      history: valhallaDetail.history,
+    };
+    const nominatimService: ServiceHealth = {
+      key: "nominatim",
+      label: "Nominatim",
+      configured: nominatimDetail.configured,
+      ok: nominatimDetail.ok,
+      latencyMs: nominatimDetail.latencyMs,
+      url: nominatimDetail.url,
+      error: nominatimDetail.error,
+      tokenMissing: nominatimDetail.tokenMissing,
+      history: nominatimDetail.history,
+    };
+
+    const services: ServiceHealth[] = [valhallaService, ollama, whisper, nominatimService];
 
     // GraphHopper conta come UN servizio nello stato globale, ma SOLO se è
     // configurato (GRAPHHOPPER_URL impostato) E almeno un'area è abilitata.
@@ -567,6 +785,8 @@ router.get("/thinkcentre-health", async (_req: Request, res: ExpressResponse) =>
       graphhopperUrl: graphhopper.url,
       graphhopperTokenMissing: graphhopper.tokenMissing,
       graphhopperAreas: graphhopper.areas,
+      valhallaDetail,
+      nominatimDetail,
       tokenFingerprints,
       checkedAt: Date.now(),
     });

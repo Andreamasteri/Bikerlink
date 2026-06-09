@@ -4,8 +4,8 @@ import { MaterialCommunityIcons, Ionicons } from "@expo/vector-icons";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import Colors from "@/constants/colors";
 import { getApiUrl, authFetchHeaders, queryClient } from "@/lib/query-client";
-import { ErrorHistory, EventLog, GraphHopperBlock } from "./ThinkCentreCardParts";
-import type { HealthEvent, AreaServiceHealth } from "./ThinkCentreCardParts";
+import { ErrorHistory, EventLog, GraphHopperBlock, ValhallaBlock, NominatimBlock } from "./ThinkCentreCardParts";
+import type { HealthEvent, AreaServiceHealth, ValhallaDetailedHealth, NominatimDetailedHealth } from "./ThinkCentreCardParts";
 
 type ServiceKey = "valhalla" | "ollama" | "whisper" | "nominatim";
 
@@ -31,6 +31,8 @@ interface ThinkCentreHealth {
   graphhopperUrl: string | null;
   graphhopperTokenMissing?: boolean;
   graphhopperAreas: AreaServiceHealth[];
+  valhallaDetail?: ValhallaDetailedHealth;
+  nominatimDetail?: NominatimDetailedHealth;
   tokenFingerprints?: {
     graphhopper: string | null;
     valhalla: string | null;
@@ -201,7 +203,21 @@ export function ThinkCentreCard() {
               tokenMissing={data.graphhopperTokenMissing}
             />
           )}
-          {data?.services.map((s) => {
+          {data?.valhallaDetail && (
+            <ValhallaBlock
+              detail={data.valhallaDetail}
+              fingerprint={data.tokenFingerprints?.valhalla ?? null}
+            />
+          )}
+          {data?.nominatimDetail && (
+            <NominatimBlock
+              detail={data.nominatimDetail}
+              fingerprint={data.tokenFingerprints?.nominatim ?? null}
+            />
+          )}
+          {data?.services
+            .filter((s) => s.key !== "valhalla" && s.key !== "nominatim")
+            .map((s) => {
             const fp = data.tokenFingerprints?.[s.key] ?? null;
             const showFingerprint = s.configured && fp != null;
             const tokenOk = showFingerprint && s.ok;
