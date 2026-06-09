@@ -115,6 +115,9 @@ export class AiCoordinator {
     if (raw) {
       try {
         client = raw.duplicate();
+        // Silenzio errori di connessione sul client duplicato (ETIMEDOUT ecc.)
+        // per evitare flooding "Unhandled error event" nei log.
+        client.on("error", () => {});
         const pattern = aiName === "*" ? CHANNEL_PREFIX + "*" : CHANNEL_PREFIX + aiName;
         await client.psubscribe(pattern);
         client.on("pmessage", (_p: string, _channel: string, message: string) => {
