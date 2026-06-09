@@ -131,28 +131,20 @@
 <link rel="icon" type="image/png" href="/favicon.png" />
 </head>
   <body>
-    <div id="lang-banner" style="display:none;width:100%;background:#1A1A2E;border-bottom:3px solid #D4A017;padding:12px 24px;text-align:center;font-size:13px;color:#C0C0C0;box-sizing:border-box;">
-      This document is currently available in Italian only. An English translation is in preparation.
-    </div>
-    <script>
-      (function(){
-        try { if(localStorage.getItem('bl_lang')==='en'){var b=document.getElementById('lang-banner');if(b)b.style.display='block';} } catch(e){}
-      })();
-    </script>
-    <a href="#main" style="position:absolute;left:-9999px;top:0" class="skip-link" onfocus="this.style.left='8px';this.style.top='8px';this.style.background='#FF3B30';this.style.color='#fff';this.style.padding='8px 14px';this.style.zIndex='9999'">Salta al contenuto</a>
+    <a href="#main" style="position:absolute;left:-9999px;top:0" class="skip-link" onfocus="this.style.left='8px';this.style.top='8px';this.style.background='#FF3B30';this.style.color='#fff';this.style.padding='8px 14px';this.style.zIndex='9999'" data-i18n="legal.skip">Salta al contenuto</a>
     <main id="main" role="main">
     <div class="header">
       <span class="logo">BikerLink</span>
-      <a href="/" class="back-link">&#8592; Home</a>
+      <a href="/" class="back-link" data-i18n="legal.back">&#8592; Home</a>
     </div>
 
     <div class="content">
       <h1 data-i18n="legal.privacy.h1">Informativa sulla Privacy</h1>
-      <p class="subtitle">Ultima modifica: 19 aprile 2026 &nbsp;|&nbsp; Versione 2.0</p>
+      <p class="subtitle" data-i18n="legal.privacy.subtitle">Ultima modifica: 19 aprile 2026 &nbsp;|&nbsp; Versione 2.0</p>
 
       <!-- ─── 1. TITOLARE ─── -->
       <h2 data-i18n="legal.privacy.s1">1. Titolare del Trattamento</h2>
-      <p>
+      <p data-i18n-html="legal.privacy.s1.p">
         Il titolare del trattamento dei dati personali è <strong>BikerLink</strong>.<br>
         Per qualsiasi domanda o per esercitare i tuoi diritti, scrivi a:
         <a href="mailto:bikerlinkapp@gmail.com">bikerlinkapp@gmail.com</a>
@@ -160,100 +152,100 @@
 
       <!-- ─── 2. DATI RACCOLTI ─── -->
       <h2 data-i18n="legal.privacy.s2">2. Dati Raccolti</h2>
-      <p>BikerLink raccoglie le seguenti categorie di dati personali:</p>
+      <p data-i18n="legal.privacy.s2.lead">BikerLink raccoglie le seguenti categorie di dati personali:</p>
 
       <h3 data-i18n="legal.privacy.s2.1">2.1 Profilo e Registrazione</h3>
       <ul>
-        <li>Nickname (nome visualizzato pubblicamente)</li>
-        <li>Indirizzo email (con verifica tramite link)</li>
-        <li>Numero di telefono (opzionale)</li>
-        <li>Anno di nascita e sesso</li>
-        <li>Configurazione di coppia (per il sistema di matching)</li>
-        <li>Tipo di utente (biker, zavarrina, officina, ecc.)</li>
-        <li>Bio / descrizione personale, lingue parlate</li>
-        <li>Regione e paese di residenza</li>
-        <li>Preferenze UI: tema, stile mappa, impostazioni widget</li>
-        <li>Statistiche aggregate: km totali, numero di giri registrati, easter egg sbloccati</li>
+        <li data-i18n="legal.privacy.s2.1.li1">Nickname (nome visualizzato pubblicamente)</li>
+        <li data-i18n="legal.privacy.s2.1.li2">Indirizzo email (con verifica tramite link)</li>
+        <li data-i18n="legal.privacy.s2.1.li3">Numero di telefono (opzionale)</li>
+        <li data-i18n="legal.privacy.s2.1.li4">Anno di nascita e sesso</li>
+        <li data-i18n="legal.privacy.s2.1.li5">Configurazione di coppia (per il sistema di matching)</li>
+        <li data-i18n="legal.privacy.s2.1.li6">Tipo di utente (biker, zavarrina, officina, ecc.)</li>
+        <li data-i18n="legal.privacy.s2.1.li7">Bio / descrizione personale, lingue parlate</li>
+        <li data-i18n="legal.privacy.s2.1.li8">Regione e paese di residenza</li>
+        <li data-i18n="legal.privacy.s2.1.li9">Preferenze UI: tema, stile mappa, impostazioni widget</li>
+        <li data-i18n="legal.privacy.s2.1.li10">Statistiche aggregate: km totali, numero di giri registrati, easter egg sbloccati</li>
       </ul>
 
       <h3 data-i18n="legal.privacy.s2.2">2.2 Dati Moto (Garage)</h3>
       <ul>
-        <li>Marca, modello, anno, cilindrata, tipo di moto</li>
-        <li>Stile di guida e foto del veicolo</li>
-        <li>Stato di vendita del veicolo e relativa descrizione</li>
+        <li data-i18n="legal.privacy.s2.2.li1">Marca, modello, anno, cilindrata, tipo di moto</li>
+        <li data-i18n="legal.privacy.s2.2.li2">Stile di guida e foto del veicolo</li>
+        <li data-i18n="legal.privacy.s2.2.li3">Stato di vendita del veicolo e relativa descrizione</li>
       </ul>
 
       <h3 data-i18n="legal.privacy.s2.3">2.3 Localizzazione GPS</h3>
       <ul>
-        <li>Coordinate geografiche correnti (latitudine e longitudine), aggiornate periodicamente durante l'uso dell'app</li>
-        <li>Cronologia delle posizioni registrate durante i percorsi in moto (tracking GPS attivo)</li>
-        <li>Velocità, accelerazione e G-force longitudinale (solo durante il tracking attivo)</li>
-        <li>Posizione acquisita in background durante tracking percorsi e funzione SOS</li>
-        <li>Coordinate di primo accesso e degli accessi successivi</li>
+        <li data-i18n="legal.privacy.s2.3.li1">Coordinate geografiche correnti (latitudine e longitudine), aggiornate periodicamente durante l'uso dell'app</li>
+        <li data-i18n="legal.privacy.s2.3.li2">Cronologia delle posizioni registrate durante i percorsi in moto (tracking GPS attivo)</li>
+        <li data-i18n="legal.privacy.s2.3.li3">Velocità, accelerazione e G-force longitudinale (solo durante il tracking attivo)</li>
+        <li data-i18n="legal.privacy.s2.3.li4">Posizione acquisita in background durante tracking percorsi e funzione SOS</li>
+        <li data-i18n="legal.privacy.s2.3.li5">Coordinate di primo accesso e degli accessi successivi</li>
       </ul>
       <div class="callout">
-        <p><strong>Controlli privacy disponibili:</strong> Ghost Mode (invisibile sulla mappa), Nascondi dalla mappa, Position Fuzzing (rumore ±500 m sulle coordinate), Fake Home (sostituisce coordinate reali con posizione fittizia nei pressi di casa).</p>
+        <p data-i18n-html="legal.privacy.s2.3.callout"><strong>Controlli privacy disponibili:</strong> Ghost Mode (invisibile sulla mappa), Nascondi dalla mappa, Position Fuzzing (rumore ±500 m sulle coordinate), Fake Home (sostituisce coordinate reali con posizione fittizia nei pressi di casa).</p>
       </div>
 
       <h3 data-i18n="legal.privacy.s2.4">2.4 Foto e Fotocamera</h3>
       <ul>
-        <li>Foto profilo (multiple, soggette ad approvazione del team)</li>
-        <li>Foto delle moto nel garage</li>
-        <li>Foto partecipanti ai contest fotografici settimanali</li>
-        <li>Foto associate a eventi motociclistici</li>
-        <li>Foto scattate direttamente tramite la fotocamera del dispositivo (permesso <code>android.permission.CAMERA</code>), esclusivamente su azione esplicita dell'utente</li>
-        <li>Foto selezionate dalla galleria del dispositivo tramite il selettore immagini di sistema (permesso <code>android.permission.READ_MEDIA_IMAGES</code>), esclusivamente su azione esplicita dell'utente</li>
+        <li data-i18n="legal.privacy.s2.4.li1">Foto profilo (multiple, soggette ad approvazione del team)</li>
+        <li data-i18n="legal.privacy.s2.4.li2">Foto delle moto nel garage</li>
+        <li data-i18n="legal.privacy.s2.4.li3">Foto partecipanti ai contest fotografici settimanali</li>
+        <li data-i18n="legal.privacy.s2.4.li4">Foto associate a eventi motociclistici</li>
+        <li data-i18n-html="legal.privacy.s2.4.li5">Foto scattate direttamente tramite la fotocamera del dispositivo (permesso <code>android.permission.CAMERA</code>), esclusivamente su azione esplicita dell'utente</li>
+        <li data-i18n-html="legal.privacy.s2.4.li6">Foto selezionate dalla galleria del dispositivo tramite il selettore immagini di sistema (permesso <code>android.permission.READ_MEDIA_IMAGES</code>), esclusivamente su azione esplicita dell'utente</li>
       </ul>
 
       <h3 data-i18n="legal.privacy.s2.5">2.5 Chat e Messaggi</h3>
       <ul>
-        <li>Contenuto testuale dei messaggi privati e di gruppo</li>
-        <li>URL di immagini condivise nelle chat</li>
-        <li>Posizioni GPS condivise volontariamente nelle conversazioni</li>
-        <li>Metadati: ID mittente, timestamp, stato di lettura</li>
-        <li>I messaggi sono soggetti a moderazione automatica del contenuto</li>
+        <li data-i18n="legal.privacy.s2.5.li1">Contenuto testuale dei messaggi privati e di gruppo</li>
+        <li data-i18n="legal.privacy.s2.5.li2">URL di immagini condivise nelle chat</li>
+        <li data-i18n="legal.privacy.s2.5.li3">Posizioni GPS condivise volontariamente nelle conversazioni</li>
+        <li data-i18n="legal.privacy.s2.5.li4">Metadati: ID mittente, timestamp, stato di lettura</li>
+        <li data-i18n="legal.privacy.s2.5.li5">I messaggi sono soggetti a moderazione automatica del contenuto</li>
       </ul>
 
       <h3 data-i18n="legal.privacy.s2.6">2.6 Feature Sociale e Matching</h3>
       <ul>
-        <li>Dati di matching tra utenti (proposta, compatibilità musicale)</li>
-        <li>Appartenenza a MotoClub: iscrizioni, inviti, richieste di adesione</li>
-        <li>Lista utenti preferiti e lista utenti bloccati</li>
-        <li>Voti espressi nei contest fotografici</li>
+        <li data-i18n="legal.privacy.s2.6.li1">Dati di matching tra utenti (proposta, compatibilità musicale)</li>
+        <li data-i18n="legal.privacy.s2.6.li2">Appartenenza a MotoClub: iscrizioni, inviti, richieste di adesione</li>
+        <li data-i18n="legal.privacy.s2.6.li3">Lista utenti preferiti e lista utenti bloccati</li>
+        <li data-i18n="legal.privacy.s2.6.li4">Voti espressi nei contest fotografici</li>
       </ul>
 
       <h3 data-i18n="legal.privacy.s2.7">2.7 SOS / Emergenza Stradale</h3>
       <ul>
-        <li>Motivo dell'emergenza</li>
-        <li>Coordinate GPS precise al momento dell'attivazione SOS</li>
-        <li>Raggio di ricerca scelto dall'utente</li>
-        <li>Identificativo dell'utente che ha accettato l'emergenza</li>
-        <li>Stato della richiesta SOS (attiva, accettata, annullata)</li>
-        <li>Conversazione privata creata tra utente in difficoltà e soccorritore</li>
+        <li data-i18n="legal.privacy.s2.7.li1">Motivo dell'emergenza</li>
+        <li data-i18n="legal.privacy.s2.7.li2">Coordinate GPS precise al momento dell'attivazione SOS</li>
+        <li data-i18n="legal.privacy.s2.7.li3">Raggio di ricerca scelto dall'utente</li>
+        <li data-i18n="legal.privacy.s2.7.li4">Identificativo dell'utente che ha accettato l'emergenza</li>
+        <li data-i18n="legal.privacy.s2.7.li5">Stato della richiesta SOS (attiva, accettata, annullata)</li>
+        <li data-i18n="legal.privacy.s2.7.li6">Conversazione privata creata tra utente in difficoltà e soccorritore</li>
       </ul>
 
       <h3 data-i18n="legal.privacy.s2.8">2.8 Musica (Last.fm)</h3>
-      <p>Solo se l'utente connette volontariamente il proprio account musicale:</p>
+      <p data-i18n="legal.privacy.s2.8.lead">Solo se l'utente connette volontariamente il proprio account musicale:</p>
       <ul>
-        <li><strong>Last.fm:</strong> username e session key</li>
-        <li>Libreria tracce: nome brano, artista, album, generi, popolarità, data di aggiunta</li>
-        <li>Playlist condivise tra utenti (contenuto testuale e metadati tracce)</li>
+        <li data-i18n-html="legal.privacy.s2.8.li1"><strong>Last.fm:</strong> username e session key</li>
+        <li data-i18n="legal.privacy.s2.8.li2">Libreria tracce: nome brano, artista, album, generi, popolarità, data di aggiunta</li>
+        <li data-i18n="legal.privacy.s2.8.li3">Playlist condivise tra utenti (contenuto testuale e metadati tracce)</li>
       </ul>
 
       <h3 data-i18n="legal.privacy.s2.9">2.9 Notifiche Push</h3>
       <ul>
-        <li>Token Expo Push Notification (per l'invio di notifiche al dispositivo)</li>
-        <li>Preferenze sulle notifiche email per nuovi messaggi</li>
+        <li data-i18n="legal.privacy.s2.9.li1">Token Expo Push Notification (per l'invio di notifiche al dispositivo)</li>
+        <li data-i18n="legal.privacy.s2.9.li2">Preferenze sulle notifiche email per nuovi messaggi</li>
       </ul>
 
       <h3 data-i18n="legal.privacy.s2.10">2.10 Dati Tecnici e di Sistema</h3>
       <ul>
-        <li>Tipo di dispositivo, sistema operativo e versione</li>
-        <li>Log degli errori GPS (inclusi stack trace anonimi)</li>
-        <li>Log delle azioni dei moderatori</li>
-        <li>Impression e click su contenuti sponsorizzati</li>
-        <li>Punteggi nei giochi arcade integrati (es. Endless Biker)</li>
-        <li>Timestamp di accettazione dell'EULA e della presente Privacy Policy (consenso GDPR)</li>
+        <li data-i18n="legal.privacy.s2.10.li1">Tipo di dispositivo, sistema operativo e versione</li>
+        <li data-i18n="legal.privacy.s2.10.li2">Log degli errori GPS (inclusi stack trace anonimi)</li>
+        <li data-i18n="legal.privacy.s2.10.li3">Log delle azioni dei moderatori</li>
+        <li data-i18n="legal.privacy.s2.10.li4">Impression e click su contenuti sponsorizzati</li>
+        <li data-i18n="legal.privacy.s2.10.li5">Punteggi nei giochi arcade integrati (es. Endless Biker)</li>
+        <li data-i18n="legal.privacy.s2.10.li6">Timestamp di accettazione dell'EULA e della presente Privacy Policy (consenso GDPR)</li>
       </ul>
 
       <!-- ─── 3. FINALITÀ E BASE GIURIDICA ─── -->
@@ -261,193 +253,365 @@
       <table>
         <thead>
           <tr>
-            <th>Finalità</th>
-            <th>Dati coinvolti</th>
-            <th>Base giuridica</th>
+            <th data-i18n="legal.privacy.s3.th1">Finalità</th>
+            <th data-i18n="legal.privacy.s3.th2">Dati coinvolti</th>
+            <th data-i18n="legal.privacy.s3.th3">Base giuridica</th>
           </tr>
         </thead>
         <tbody>
           <tr>
-            <td>Creazione e gestione account</td>
-            <td>Profilo, email</td>
-            <td><span class="tag">Contratto</span></td>
+            <td data-i18n="legal.privacy.s3.r1.t1">Creazione e gestione account</td>
+            <td data-i18n="legal.privacy.s3.r1.t2">Profilo, email</td>
+            <td data-i18n-html="legal.privacy.s3.r1.t3"><span class="tag">Contratto</span></td>
           </tr>
           <tr>
-            <td>Matching tra utenti</td>
-            <td>Profilo, preferenze</td>
-            <td><span class="tag">Contratto</span></td>
+            <td data-i18n="legal.privacy.s3.r2.t1">Matching tra utenti</td>
+            <td data-i18n="legal.privacy.s3.r2.t2">Profilo, preferenze</td>
+            <td data-i18n-html="legal.privacy.s3.r2.t3"><span class="tag">Contratto</span></td>
           </tr>
           <tr>
-            <td>Tracking percorsi GPS</td>
-            <td>Posizione, velocità, G-force</td>
-            <td><span class="tag">Consenso</span></td>
+            <td data-i18n="legal.privacy.s3.r3.t1">Tracking percorsi GPS</td>
+            <td data-i18n="legal.privacy.s3.r3.t2">Posizione, velocità, G-force</td>
+            <td data-i18n-html="legal.privacy.s3.r3.t3"><span class="tag">Consenso</span></td>
           </tr>
           <tr>
-            <td>Funzione SOS emergenza</td>
-            <td>Posizione GPS, ID utente</td>
-            <td><span class="tag">Interesse vitale</span> <span class="tag">Consenso</span></td>
+            <td data-i18n="legal.privacy.s3.r4.t1">Funzione SOS emergenza</td>
+            <td data-i18n="legal.privacy.s3.r4.t2">Posizione GPS, ID utente</td>
+            <td data-i18n-html="legal.privacy.s3.r4.t3"><span class="tag">Interesse vitale</span> <span class="tag">Consenso</span></td>
           </tr>
           <tr>
-            <td>Chat e messaggi</td>
-            <td>Contenuti messaggi</td>
-            <td><span class="tag">Contratto</span></td>
+            <td data-i18n="legal.privacy.s3.r5.t1">Chat e messaggi</td>
+            <td data-i18n="legal.privacy.s3.r5.t2">Contenuti messaggi</td>
+            <td data-i18n-html="legal.privacy.s3.r5.t3"><span class="tag">Contratto</span></td>
           </tr>
           <tr>
-            <td>MotoClub e community</td>
-            <td>Profilo, posizione</td>
-            <td><span class="tag">Contratto</span></td>
+            <td data-i18n="legal.privacy.s3.r6.t1">MotoClub e community</td>
+            <td data-i18n="legal.privacy.s3.r6.t2">Profilo, posizione</td>
+            <td data-i18n-html="legal.privacy.s3.r6.t3"><span class="tag">Contratto</span></td>
           </tr>
           <tr>
-            <td>Integrazione Last.fm</td>
-            <td>Session key, libreria tracce</td>
-            <td><span class="tag">Consenso</span></td>
+            <td data-i18n="legal.privacy.s3.r7.t1">Integrazione Last.fm</td>
+            <td data-i18n="legal.privacy.s3.r7.t2">Session key, libreria tracce</td>
+            <td data-i18n-html="legal.privacy.s3.r7.t3"><span class="tag">Consenso</span></td>
           </tr>
           <tr>
-            <td>Moderazione contenuti</td>
-            <td>Messaggi, foto</td>
-            <td><span class="tag">Interesse legittimo</span></td>
+            <td data-i18n="legal.privacy.s3.r8.t1">Moderazione contenuti</td>
+            <td data-i18n="legal.privacy.s3.r8.t2">Messaggi, foto</td>
+            <td data-i18n-html="legal.privacy.s3.r8.t3"><span class="tag">Interesse legittimo</span></td>
           </tr>
           <tr>
-            <td>Notifiche push</td>
-            <td>Token dispositivo</td>
-            <td><span class="tag">Consenso</span></td>
+            <td data-i18n="legal.privacy.s3.r9.t1">Notifiche push</td>
+            <td data-i18n="legal.privacy.s3.r9.t2">Token dispositivo</td>
+            <td data-i18n-html="legal.privacy.s3.r9.t3"><span class="tag">Consenso</span></td>
           </tr>
           <tr>
-            <td>Sicurezza e antifrode</td>
-            <td>Log tecnici</td>
-            <td><span class="tag">Interesse legittimo</span></td>
+            <td data-i18n="legal.privacy.s3.r10.t1">Sicurezza e antifrode</td>
+            <td data-i18n="legal.privacy.s3.r10.t2">Log tecnici</td>
+            <td data-i18n-html="legal.privacy.s3.r10.t3"><span class="tag">Interesse legittimo</span></td>
           </tr>
           <tr>
-            <td>Statistiche anonime sull'uso</td>
-            <td>Dati aggregati</td>
-            <td><span class="tag">Interesse legittimo</span></td>
+            <td data-i18n="legal.privacy.s3.r11.t1">Statistiche anonime sull'uso</td>
+            <td data-i18n="legal.privacy.s3.r11.t2">Dati aggregati</td>
+            <td data-i18n-html="legal.privacy.s3.r11.t3"><span class="tag">Interesse legittimo</span></td>
           </tr>
           <tr>
-            <td>Adempimenti legali</td>
-            <td>Dati necessari per legge</td>
-            <td><span class="tag">Obbligo legale</span></td>
+            <td data-i18n="legal.privacy.s3.r12.t1">Adempimenti legali</td>
+            <td data-i18n="legal.privacy.s3.r12.t2">Dati necessari per legge</td>
+            <td data-i18n-html="legal.privacy.s3.r12.t3"><span class="tag">Obbligo legale</span></td>
           </tr>
         </tbody>
       </table>
 
       <!-- ─── 4. SERVIZI TERZE PARTI ─── -->
       <h2 data-i18n="legal.privacy.s4">4. Servizi Terze Parti</h2>
-      <p>BikerLink condivide o riceve dati dai seguenti servizi esterni:</p>
+      <p data-i18n="legal.privacy.s4.lead">BikerLink condivide o riceve dati dai seguenti servizi esterni:</p>
       <ul>
-        <li><strong>Last.fm / CBS Interactive</strong> — Dati musicali. <a href="https://www.last.fm/legal/privacy" target="_blank" rel="noopener noreferrer">Privacy Policy Last.fm</a></li>
-        <li><strong>OpenStreetMap Foundation</strong> — Tile mappa (le coordinate vengono inviate per il rendering della mappa). <a href="https://wiki.osmfoundation.org/wiki/Privacy_Policy" target="_blank" rel="noopener noreferrer">Privacy Policy OSM</a></li>
-        <li><strong>CartoDB / CARTO</strong> (Spagna) — Tile mappa alternative</li>
-        <li><strong>Esri</strong> (USA) — Tile mappa satellitare</li>
-        <li><strong>Expo</strong> (USA) — Push notification e aggiornamenti OTA. <a href="https://expo.dev/privacy" target="_blank" rel="noopener noreferrer">Privacy Policy Expo</a></li>
-        <li><strong>Syneco</strong> — Partner commerciale; stato partnership con officine</li>
+        <li data-i18n-html="legal.privacy.s4.li1"><strong>Last.fm / CBS Interactive</strong> — Dati musicali. <a href="https://www.last.fm/legal/privacy" target="_blank" rel="noopener noreferrer">Privacy Policy Last.fm</a></li>
+        <li data-i18n-html="legal.privacy.s4.li2"><strong>OpenStreetMap Foundation</strong> — Tile mappa (le coordinate vengono inviate per il rendering della mappa). <a href="https://wiki.osmfoundation.org/wiki/Privacy_Policy" target="_blank" rel="noopener noreferrer">Privacy Policy OSM</a></li>
+        <li data-i18n-html="legal.privacy.s4.li3"><strong>CartoDB / CARTO</strong> (Spagna) — Tile mappa alternative</li>
+        <li data-i18n-html="legal.privacy.s4.li4"><strong>Esri</strong> (USA) — Tile mappa satellitare</li>
+        <li data-i18n-html="legal.privacy.s4.li5"><strong>Expo</strong> (USA) — Push notification e aggiornamenti OTA. <a href="https://expo.dev/privacy" target="_blank" rel="noopener noreferrer">Privacy Policy Expo</a></li>
+        <li data-i18n-html="legal.privacy.s4.li6"><strong>Syneco</strong> — Partner commerciale; stato partnership con officine</li>
       </ul>
       <div class="callout">
-        <p>Alcuni provider trattano dati al di fuori dell'Unione Europea (in particolare USA). Il trasferimento avviene sulla base delle Clausole Contrattuali Standard approvate dalla Commissione Europea (art. 46 GDPR) o di meccanismi equivalenti.</p>
+        <p data-i18n-html="legal.privacy.s4.callout">Alcuni provider trattano dati al di fuori dell'Unione Europea (in particolare USA). Il trasferimento avviene sulla base delle Clausole Contrattuali Standard approvate dalla Commissione Europea (art. 46 GDPR) o di meccanismi equivalenti.</p>
       </div>
 
       <!-- ─── 5. CONSERVAZIONE ─── -->
       <h2 data-i18n="legal.privacy.s5">5. Periodo di Conservazione</h2>
       <ul>
-        <li><strong>Dati account:</strong> conservati finché l'account è attivo. Cancellati entro 30 giorni dalla richiesta di eliminazione, salvo obblighi di legge.</li>
-        <li><strong>Cronologia posizioni GPS:</strong> conservata per 90 giorni dall'ultima registrazione.</li>
-        <li><strong>Messaggi chat:</strong> conservati finché almeno uno dei partecipanti mantiene l'account attivo.</li>
-        <li><strong>Log tecnici ed errori:</strong> conservati per 12 mesi.</li>
-        <li><strong>Dati SOS:</strong> conservati per 6 mesi dalla chiusura della richiesta.</li>
-        <li><strong>Session key Last.fm:</strong> eliminata alla revoca della connessione.</li>
-        <li><strong>Foto:</strong> eliminate entro 30 giorni dalla cancellazione dell'account o del contenuto.</li>
+        <li data-i18n-html="legal.privacy.s5.li1"><strong>Dati account:</strong> conservati finché l'account è attivo. Cancellati entro 30 giorni dalla richiesta di eliminazione, salvo obblighi di legge.</li>
+        <li data-i18n-html="legal.privacy.s5.li2"><strong>Cronologia posizioni GPS:</strong> conservata per 90 giorni dall'ultima registrazione.</li>
+        <li data-i18n-html="legal.privacy.s5.li3"><strong>Messaggi chat:</strong> conservati finché almeno uno dei partecipanti mantiene l'account attivo.</li>
+        <li data-i18n-html="legal.privacy.s5.li4"><strong>Log tecnici ed errori:</strong> conservati per 12 mesi.</li>
+        <li data-i18n-html="legal.privacy.s5.li5"><strong>Dati SOS:</strong> conservati per 6 mesi dalla chiusura della richiesta.</li>
+        <li data-i18n-html="legal.privacy.s5.li6"><strong>Session key Last.fm:</strong> eliminata alla revoca della connessione.</li>
+        <li data-i18n-html="legal.privacy.s5.li7"><strong>Foto:</strong> eliminate entro 30 giorni dalla cancellazione dell'account o del contenuto.</li>
       </ul>
 
       <!-- ─── 6. DIRITTI GDPR ─── -->
       <h2 data-i18n="legal.privacy.s6">6. Diritti dell'Interessato (GDPR)</h2>
-      <p>In qualità di interessato, hai i seguenti diritti:</p>
+      <p data-i18n="legal.privacy.s6.lead">In qualità di interessato, hai i seguenti diritti:</p>
       <ul>
-        <li><strong>Accesso (art. 15):</strong> richiedere copia dei tuoi dati personali.</li>
-        <li><strong>Rettifica (art. 16):</strong> correggere dati inesatti.</li>
-        <li><strong>Cancellazione (art. 17 — "diritto all'oblio"):</strong> richiedere l'eliminazione dei dati, salvo obblighi di conservazione legale.</li>
-        <li><strong>Portabilità (art. 20):</strong> ricevere i tuoi dati in formato strutturato e leggibile da dispositivo automatico.</li>
-        <li><strong>Opposizione (art. 21):</strong> opporti al trattamento basato su interesse legittimo.</li>
-        <li><strong>Limitazione (art. 18):</strong> richiedere la limitazione del trattamento in determinati casi.</li>
-        <li><strong>Revoca del consenso:</strong> revocabile in qualsiasi momento senza pregiudicare la liceità del trattamento precedente.</li>
+        <li data-i18n-html="legal.privacy.s6.li1"><strong>Accesso (art. 15):</strong> richiedere copia dei tuoi dati personali.</li>
+        <li data-i18n-html="legal.privacy.s6.li2"><strong>Rettifica (art. 16):</strong> correggere dati inesatti.</li>
+        <li data-i18n-html="legal.privacy.s6.li3"><strong>Cancellazione (art. 17 — "diritto all'oblio"):</strong> richiedere l'eliminazione dei dati, salvo obblighi di conservazione legale.</li>
+        <li data-i18n-html="legal.privacy.s6.li4"><strong>Portabilità (art. 20):</strong> ricevere i tuoi dati in formato strutturato e leggibile da dispositivo automatico.</li>
+        <li data-i18n-html="legal.privacy.s6.li5"><strong>Opposizione (art. 21):</strong> opporti al trattamento basato su interesse legittimo.</li>
+        <li data-i18n-html="legal.privacy.s6.li6"><strong>Limitazione (art. 18):</strong> richiedere la limitazione del trattamento in determinati casi.</li>
+        <li data-i18n="legal.privacy.s6.li7">Revoca del consenso: revocabile in qualsiasi momento senza pregiudicare la liceità del trattamento precedente.</li>
       </ul>
-      <p>
+      <p data-i18n-html="legal.privacy.s6.p1">
         Per esercitare i tuoi diritti scrivi a: <a href="mailto:bikerlinkapp@gmail.com">bikerlinkapp@gmail.com</a><br>
         Risponderemo entro 30 giorni dalla ricezione della richiesta.
       </p>
-      <p>
+      <p data-i18n-html="legal.privacy.s6.p2">
         Hai il diritto di presentare reclamo all'autorità di controllo competente.<br>
         In Italia: <a href="https://www.garanteprivacy.it" target="_blank" rel="noopener noreferrer">Garante per la protezione dei dati personali</a>.
       </p>
 
       <!-- ─── 7. POSIZIONE IN BACKGROUND ─── -->
       <h2 data-i18n-html="legal.privacy.s7">7. Posizione GPS (<code>android.permission.ACCESS_FINE_LOCATION</code> / <code>ACCESS_BACKGROUND_LOCATION</code>)</h2>
-      <p>BikerLink richiede i permessi <code>ACCESS_COARSE_LOCATION</code>, <code>ACCESS_FINE_LOCATION</code> e <code>ACCESS_BACKGROUND_LOCATION</code> per le seguenti funzionalità:</p>
+      <p data-i18n-html="legal.privacy.s7.lead">BikerLink richiede i permessi <code>ACCESS_COARSE_LOCATION</code>, <code>ACCESS_FINE_LOCATION</code> e <code>ACCESS_BACKGROUND_LOCATION</code> per le seguenti funzionalità:</p>
       <ul>
         <li>
-          <strong>Mappa biker in tempo reale:</strong> mostra la posizione dell'utente e quella dei motociclisti vicini sulla mappa.
+          <strong data-i18n="legal.privacy.s7.li1.title">Mappa biker in tempo reale:</strong> <span data-i18n="legal.privacy.s7.li1.desc">mostra la posizione dell'utente e quella dei motociclisti vicini sulla mappa.</span>
         </li>
         <li>
-          <strong>Tracking percorsi:</strong> quando l'utente avvia manualmente la registrazione di un giro in moto, la posizione viene acquisita continuamente per tracciare il percorso. Il tracking si interrompe allo stop manuale o al termine del giro.
+          <strong data-i18n="legal.privacy.s7.li2.title">Tracking percorsi:</strong> <span data-i18n="legal.privacy.s7.li2.desc">quando l'utente avvia manualmente la registrazione di un giro in moto, la posizione viene acquisita continuamente per tracciare il percorso. Il tracking si interrompe allo stop manuale o al termine del giro.</span>
         </li>
         <li>
-          <strong>Funzione SOS:</strong> in caso di attivazione dell'emergenza, la posizione viene inviata ai soccorritori della community anche con l'app in background o lo schermo spento, per garantire la localizzazione in caso di necessità urgente.
+          <strong data-i18n="legal.privacy.s7.li3.title">Funzione SOS:</strong> <span data-i18n="legal.privacy.s7.li3.desc">in caso di attivazione dell'emergenza, la posizione viene inviata ai soccorritori della community anche con l'app in background o lo schermo spento, per garantire la localizzazione in caso di necessità urgente.</span>
         </li>
       </ul>
       <div class="callout">
-        <p>L'acquisizione in background (<code>ACCESS_BACKGROUND_LOCATION</code>) è attiva <strong>solo</strong> quando l'utente attiva esplicitamente il tracking o la funzione SOS. Non avviene in modo automatico, permanente o senza interazione dell'utente.</p>
+        <p data-i18n-html="legal.privacy.s7.callout">L'acquisizione in background (<code>ACCESS_BACKGROUND_LOCATION</code>) è attiva <strong>solo</strong> quando l'utente attiva esplicitamente il tracking o la funzione SOS. Non avviene in modo automatico, permanente o senza interazione dell'utente.</p>
       </div>
 
       <!-- ─── 8. FOTOCAMERA ─── -->
       <h2 data-i18n-html="legal.privacy.s8">8. Accesso alla Fotocamera (<code>android.permission.CAMERA</code>)</h2>
-      <p>BikerLink richiede il permesso di accesso alla fotocamera del dispositivo per le seguenti funzionalità:</p>
+      <p data-i18n-html="legal.privacy.s8.lead">BikerLink richiede il permesso di accesso alla fotocamera del dispositivo per le seguenti funzionalità:</p>
       <ul>
-        <li><strong>Foto profilo:</strong> l'utente può scattare una foto direttamente dalla fotocamera per impostarla come immagine del proprio profilo.</li>
-        <li><strong>Foto moto (Garage):</strong> l'utente può fotografare la propria moto per aggiungerla al garage digitale.</li>
-        <li><strong>Contest fotografici:</strong> l'utente può scattare e caricare una foto per partecipare ai contest settimanali.</li>
+        <li data-i18n-html="legal.privacy.s8.li1"><strong>Foto profilo:</strong> l'utente può scattare una foto direttamente dalla fotocamera per impostarla come immagine del proprio profilo.</li>
+        <li data-i18n-html="legal.privacy.s8.li2"><strong>Foto moto (Garage):</strong> l'utente può fotografare la propria moto per aggiungerla al garage digitale.</li>
+        <li data-i18n-html="legal.privacy.s8.li3"><strong>Contest fotografici:</strong> l'utente può scattare e caricare una foto per partecipare ai contest settimanali.</li>
       </ul>
       <div class="callout">
-        <p>La fotocamera viene attivata <strong>solo</strong> quando l'utente tocca esplicitamente il pulsante "Scatta foto". BikerLink non accede alla fotocamera in background, non registra video e non trasmette immagini senza il consenso esplicito dell'utente. Le foto caricate vengono archiviate in modo sicuro sui server BikerLink.</p>
+        <p data-i18n-html="legal.privacy.s8.callout">La fotocamera viene attivata <strong>solo</strong> quando l'utente tocca esplicitamente il pulsante "Scatta foto". BikerLink non accede alla fotocamera in background, non registra video e non trasmette immagini senza il consenso esplicito dell'utente. Le foto caricate vengono archiviate in modo sicuro sui server BikerLink.</p>
       </div>
 
       <!-- ─── 9. SICUREZZA ─── -->
       <h2 data-i18n="legal.privacy.s9">9. Sicurezza dei Dati</h2>
-      <p>BikerLink adotta le seguenti misure tecniche e organizzative:</p>
+      <p data-i18n="legal.privacy.s9.lead">BikerLink adotta le seguenti misure tecniche e organizzative:</p>
       <ul>
-        <li>Trasmissione dati cifrata via HTTPS/TLS</li>
-        <li>Password memorizzate con hashing sicuro (bcrypt)</li>
-        <li>Token OAuth non esposti lato client</li>
-        <li>Moderazione automatica dei contenuti</li>
-        <li>Accesso ai dati limitato al personale autorizzato</li>
+        <li data-i18n="legal.privacy.s9.li1">Trasmissione dati cifrata via HTTPS/TLS</li>
+        <li data-i18n-html="legal.privacy.s9.li2">Password memorizzate con hashing sicuro (bcrypt)</li>
+        <li data-i18n="legal.privacy.s9.li3">Token OAuth non esposti lato client</li>
+        <li data-i18n="legal.privacy.s9.li4">Moderazione automatica dei contenuti</li>
+        <li data-i18n="legal.privacy.s9.li5">Accesso ai dati limitato al personale autorizzato</li>
       </ul>
-      <p>Nessun sistema è infallibile. In caso di violazione che possa comportare rischi per i tuoi diritti, verrai notificato nei modi previsti dal GDPR.</p>
+      <p data-i18n="legal.privacy.s9.p2">Nessun sistema è infallibile. In caso di violazione che possa comportare rischi per i tuoi diritti, verrai notificato nei modi previsti dal GDPR.</p>
 
       <!-- ─── 10. MINORI ─── -->
       <h2 data-i18n="legal.privacy.s10">10. Minori</h2>
-      <p>BikerLink è destinato esclusivamente a utenti maggiorenni (18 anni o più). Non raccogliamo consapevolmente dati di minori. Se ritieni che un minore abbia creato un account, contattaci a <a href="mailto:bikerlinkapp@gmail.com">bikerlinkapp@gmail.com</a> e provvederemo alla cancellazione immediata.</p>
+      <p data-i18n-html="legal.privacy.s10.p">BikerLink è destinato esclusivamente a utenti maggiorenni (18 anni o più). Non raccogliamo consapevolmente dati di minori. Se ritieni che un minore abbia creato un account, contattaci a <a href="mailto:bikerlinkapp@gmail.com">bikerlinkapp@gmail.com</a> e provvederemo alla cancellazione immediata.</p>
 
       <!-- ─── 11. COOKIE ─── -->
       <h2 data-i18n="legal.privacy.s11">11. Cookie e Tecnologie Simili</h2>
-      <p>BikerLink è un'app mobile. Non utilizziamo cookie tradizionali. Le WebView integrate per la visualizzazione delle mappe (Leaflet/OpenStreetMap) possono utilizzare <em>localStorage</em> del browser per memorizzare preferenze tecniche di visualizzazione. Questi dati non vengono trasmessi ai nostri server.</p>
-      <p><strong>Sito marketing (bikerlink.it):</strong> sulle pagine pubbliche del sito utilizziamo un singolo cookie tecnico <code>bl_vid</code> (HttpOnly, SameSite=Lax, durata 1 anno) che genera un identificatore casuale anonimo per misurare il numero di visitatori unici. Registriamo lato server timestamp, pagina visitata, referrer, lingua del browser, paese e una versione anonimizzata dell'indirizzo IP (solo i primi 3 ottetti, es. <code>93.45.12</code>, mai l'IP completo, più un hash salato). Non utilizziamo questo cookie per profilazione pubblicitaria né lo condividiamo con terze parti. Base giuridica: legittimo interesse statistico (art. 6.1.f GDPR).</p>
+      <p data-i18n="legal.privacy.s11.p1">BikerLink è un'app mobile. Non utilizziamo cookie tradizionali. Le WebView integrate per la visualizzazione delle mappe (Leaflet/OpenStreetMap) possono utilizzare localStorage del browser per memorizzare preferenze tecniche di visualizzazione. Questi dati non vengono trasmessi ai nostri server.</p>
+      <p data-i18n-html="legal.privacy.s11.p2"><strong>Sito marketing (bikerlink.it):</strong> sulle pagine pubbliche del sito utilizziamo un singolo cookie tecnico <code>bl_vid</code> (HttpOnly, SameSite=Lax, durata 1 anno) che genera un identificatore casuale anonimo per misurare il numero di visitatori unici. Registriamo lato server timestamp, pagina visitata, referrer, lingua del browser, paese e una versione anonimizzata dell'indirizzo IP (solo i primi 3 ottetti, es. <code>93.45.12</code>, mai l'IP completo, più un hash salato). Non utilizziamo questo cookie per profilazione pubblicitaria né lo condividiamo con terze parti. Base giuridica: legittimo interesse statistico (art. 6.1.f GDPR).</p>
 
       <!-- ─── 12. AGGIORNAMENTI ─── -->
       <h2 data-i18n="legal.privacy.s12">12. Aggiornamenti a questa Informativa</h2>
-      <p>Ci riserviamo il diritto di modificare questa informativa in qualsiasi momento. Le modifiche sostanziali verranno comunicate tramite notifica in-app o via email. La data dell'ultima modifica è indicata in cima al documento. L'uso continuato dell'app dopo la comunicazione delle modifiche implica l'accettazione della nuova versione.</p>
+      <p data-i18n="legal.privacy.s12.p">Ci riserviamo il diritto di modificare questa informativa in qualsiasi momento. Le modifiche sostanziali verranno comunicate tramite notifica in-app o via email. La data dell'ultima modifica è indicata in cima al documento. L'uso continuato dell'app dopo la comunicazione delle modifiche implica l'accettazione della nuova versione.</p>
 
       <!-- ─── 13. CONTATTI ─── -->
       <h2 data-i18n="legal.privacy.s13">13. Contatti</h2>
-      <p>
+      <p data-i18n-html="legal.privacy.s13.p">
         <strong>BikerLink</strong><br>
         Email: <a href="mailto:bikerlinkapp@gmail.com">bikerlinkapp@gmail.com</a>
       </p>
     </div>
 
     <div class="footer">
-      <p>© 2026 BikerLink. Tutti i diritti riservati. &nbsp;|&nbsp; <a href="/">Home</a> &nbsp;|&nbsp; <a href="/privacy-policy">Privacy Policy</a></p>
+      <p data-i18n-html="legal.privacy.footer">© 2026 BikerLink. Tutti i diritti riservati. &nbsp;|&nbsp; <a href="/">Home</a> &nbsp;|&nbsp; <a href="/privacy-policy">Privacy Policy</a></p>
     </div>
       </main>
     <script>
       (function(){
-        var EN={'legal.privacy.h1':'Privacy Policy','legal.privacy.s1':'1. Data Controller','legal.privacy.s2':'2. Data Collected','legal.privacy.s2.1':'2.1 Profile and Registration','legal.privacy.s2.2':'2.2 Motorcycle Data (Garage)','legal.privacy.s2.3':'2.3 GPS Location','legal.privacy.s2.4':'2.4 Photos and Camera','legal.privacy.s2.5':'2.5 Chat and Messages','legal.privacy.s2.6':'2.6 Social Features and Matching','legal.privacy.s2.7':'2.7 SOS / Road Emergency','legal.privacy.s2.8':'2.8 Music (Last.fm)','legal.privacy.s2.9':'2.9 Push Notifications','legal.privacy.s2.10':'2.10 Technical and System Data','legal.privacy.s3':'3. Purposes and Legal Basis','legal.privacy.s4':'4. Third-Party Services','legal.privacy.s5':'5. Retention Period','legal.privacy.s6':'6. Your Rights (GDPR)','legal.privacy.s7':'7. GPS Location (<code>android.permission.ACCESS_FINE_LOCATION</code> / <code>ACCESS_BACKGROUND_LOCATION</code>)','legal.privacy.s8':'8. Camera Access (<code>android.permission.CAMERA</code>)','legal.privacy.s9':'9. Data Security','legal.privacy.s10':'10. Minors','legal.privacy.s11':'11. Cookies and Similar Technologies','legal.privacy.s12':'12. Updates to this Policy','legal.privacy.s13':'13. Contact'};
+        var EN={
+          'legal.skip':'Skip to content',
+          'legal.back':'\u2190 Home',
+          'legal.privacy.h1':'Privacy Policy',
+          'legal.privacy.subtitle':'Last updated: April 19, 2026 \u00a0|\u00a0 Version 2.0',
+          'legal.privacy.s1':'1. Data Controller',
+          'legal.privacy.s1.p':'The data controller is <strong>BikerLink</strong>.<br>For any questions or to exercise your rights, write to: <a href="mailto:bikerlinkapp@gmail.com">bikerlinkapp@gmail.com</a>',
+          'legal.privacy.s2':'2. Data Collected',
+          'legal.privacy.s2.lead':'BikerLink collects the following categories of personal data:',
+          'legal.privacy.s2.1':'2.1 Profile and Registration',
+          'legal.privacy.s2.1.li1':'Nickname (publicly displayed name)',
+          'legal.privacy.s2.1.li2':'Email address (verified via link)',
+          'legal.privacy.s2.1.li3':'Phone number (optional)',
+          'legal.privacy.s2.1.li4':'Year of birth and gender',
+          'legal.privacy.s2.1.li5':'Couple configuration (for the matching system)',
+          'legal.privacy.s2.1.li6':'User type (biker, passenger, workshop, etc.)',
+          'legal.privacy.s2.1.li7':'Bio / personal description, languages spoken',
+          'legal.privacy.s2.1.li8':'Region and country of residence',
+          'legal.privacy.s2.1.li9':'UI preferences: theme, map style, widget settings',
+          'legal.privacy.s2.1.li10':'Aggregate statistics: total km, number of recorded rides, unlocked easter eggs',
+          'legal.privacy.s2.2':'2.2 Motorcycle Data (Garage)',
+          'legal.privacy.s2.2.li1':'Make, model, year, displacement, motorcycle type',
+          'legal.privacy.s2.2.li2':'Riding style and vehicle photos',
+          'legal.privacy.s2.2.li3':'Vehicle sale status and related description',
+          'legal.privacy.s2.3':'2.3 GPS Location',
+          'legal.privacy.s2.3.li1':'Current geographic coordinates (latitude and longitude), updated periodically while using the app',
+          'legal.privacy.s2.3.li2':'History of positions recorded during motorcycle rides (active GPS tracking)',
+          'legal.privacy.s2.3.li3':'Speed, acceleration and longitudinal G-force (only during active tracking)',
+          'legal.privacy.s2.3.li4':'Location acquired in background during route tracking and SOS feature',
+          'legal.privacy.s2.3.li5':'Coordinates of first access and subsequent accesses',
+          'legal.privacy.s2.3.callout':'<strong>Available privacy controls:</strong> Ghost Mode (invisible on map), Hide from map, Position Fuzzing (\u00b1500 m noise on coordinates), Fake Home (replaces real coordinates with a fictitious position near home).',
+          'legal.privacy.s2.4':'2.4 Photos and Camera',
+          'legal.privacy.s2.4.li1':'Profile photos (multiple, subject to team approval)',
+          'legal.privacy.s2.4.li2':'Motorcycle photos in the garage',
+          'legal.privacy.s2.4.li3':'Photos submitted to weekly photo contests',
+          'legal.privacy.s2.4.li4':'Photos associated with motorcycle events',
+          'legal.privacy.s2.4.li5':'Photos taken directly via the device camera (permission <code>android.permission.CAMERA</code>), exclusively on explicit user action',
+          'legal.privacy.s2.4.li6':'Photos selected from the device gallery via the system image picker (permission <code>android.permission.READ_MEDIA_IMAGES</code>), exclusively on explicit user action',
+          'legal.privacy.s2.5':'2.5 Chat and Messages',
+          'legal.privacy.s2.5.li1':'Text content of private and group messages',
+          'legal.privacy.s2.5.li2':'URLs of images shared in chats',
+          'legal.privacy.s2.5.li3':'GPS locations voluntarily shared in conversations',
+          'legal.privacy.s2.5.li4':'Metadata: sender ID, timestamp, read status',
+          'legal.privacy.s2.5.li5':'Messages are subject to automatic content moderation',
+          'legal.privacy.s2.6':'2.6 Social Features and Matching',
+          'legal.privacy.s2.6.li1':'User matching data (proposal, music compatibility)',
+          'legal.privacy.s2.6.li2':'MotoClub membership: subscriptions, invitations, join requests',
+          'legal.privacy.s2.6.li3':'Favourite users list and blocked users list',
+          'legal.privacy.s2.6.li4':'Votes cast in photo contests',
+          'legal.privacy.s2.7':'2.7 SOS / Road Emergency',
+          'legal.privacy.s2.7.li1':'Reason for emergency',
+          'legal.privacy.s2.7.li2':'Precise GPS coordinates at the time of SOS activation',
+          'legal.privacy.s2.7.li3':'Search radius chosen by the user',
+          'legal.privacy.s2.7.li4':'Identifier of the user who accepted the emergency',
+          'legal.privacy.s2.7.li5':'SOS request status (active, accepted, cancelled)',
+          'legal.privacy.s2.7.li6':'Private conversation created between the user in distress and the responder',
+          'legal.privacy.s2.8':'2.8 Music (Last.fm)',
+          'legal.privacy.s2.8.lead':'Only if the user voluntarily connects their music account:',
+          'legal.privacy.s2.8.li1':'<strong>Last.fm:</strong> username and session key',
+          'legal.privacy.s2.8.li2':'Track library: track name, artist, album, genres, popularity, date added',
+          'legal.privacy.s2.8.li3':'Playlists shared between users (text content and track metadata)',
+          'legal.privacy.s2.9':'2.9 Push Notifications',
+          'legal.privacy.s2.9.li1':'Expo Push Notification token (for sending notifications to the device)',
+          'legal.privacy.s2.9.li2':'Email notification preferences for new messages',
+          'legal.privacy.s2.10':'2.10 Technical and System Data',
+          'legal.privacy.s2.10.li1':'Device type, operating system and version',
+          'legal.privacy.s2.10.li2':'GPS error logs (including anonymous stack traces)',
+          'legal.privacy.s2.10.li3':'Moderator action logs',
+          'legal.privacy.s2.10.li4':'Impressions and clicks on sponsored content',
+          'legal.privacy.s2.10.li5':'Scores in integrated arcade games (e.g. Endless Biker)',
+          'legal.privacy.s2.10.li6':'Timestamps of EULA and Privacy Policy acceptance (GDPR consent)',
+          'legal.privacy.s3':'3. Purposes and Legal Basis',
+          'legal.privacy.s3.th1':'Purpose',
+          'legal.privacy.s3.th2':'Data involved',
+          'legal.privacy.s3.th3':'Legal basis',
+          'legal.privacy.s3.r1.t1':'Account creation and management',
+          'legal.privacy.s3.r1.t2':'Profile, email',
+          'legal.privacy.s3.r1.t3':'<span class="tag">Contract</span>',
+          'legal.privacy.s3.r2.t1':'User matching',
+          'legal.privacy.s3.r2.t2':'Profile, preferences',
+          'legal.privacy.s3.r2.t3':'<span class="tag">Contract</span>',
+          'legal.privacy.s3.r3.t1':'GPS route tracking',
+          'legal.privacy.s3.r3.t2':'Location, speed, G-force',
+          'legal.privacy.s3.r3.t3':'<span class="tag">Consent</span>',
+          'legal.privacy.s3.r4.t1':'SOS emergency feature',
+          'legal.privacy.s3.r4.t2':'GPS location, user ID',
+          'legal.privacy.s3.r4.t3':'<span class="tag">Vital interest</span> <span class="tag">Consent</span>',
+          'legal.privacy.s3.r5.t1':'Chat and messages',
+          'legal.privacy.s3.r5.t2':'Message contents',
+          'legal.privacy.s3.r5.t3':'<span class="tag">Contract</span>',
+          'legal.privacy.s3.r6.t1':'MotoClub and community',
+          'legal.privacy.s3.r6.t2':'Profile, location',
+          'legal.privacy.s3.r6.t3':'<span class="tag">Contract</span>',
+          'legal.privacy.s3.r7.t1':'Last.fm integration',
+          'legal.privacy.s3.r7.t2':'Session key, track library',
+          'legal.privacy.s3.r7.t3':'<span class="tag">Consent</span>',
+          'legal.privacy.s3.r8.t1':'Content moderation',
+          'legal.privacy.s3.r8.t2':'Messages, photos',
+          'legal.privacy.s3.r8.t3':'<span class="tag">Legitimate interest</span>',
+          'legal.privacy.s3.r9.t1':'Push notifications',
+          'legal.privacy.s3.r9.t2':'Device token',
+          'legal.privacy.s3.r9.t3':'<span class="tag">Consent</span>',
+          'legal.privacy.s3.r10.t1':'Security and anti-fraud',
+          'legal.privacy.s3.r10.t2':'Technical logs',
+          'legal.privacy.s3.r10.t3':'<span class="tag">Legitimate interest</span>',
+          'legal.privacy.s3.r11.t1':'Anonymous usage statistics',
+          'legal.privacy.s3.r11.t2':'Aggregated data',
+          'legal.privacy.s3.r11.t3':'<span class="tag">Legitimate interest</span>',
+          'legal.privacy.s3.r12.t1':'Legal compliance',
+          'legal.privacy.s3.r12.t2':'Data required by law',
+          'legal.privacy.s3.r12.t3':'<span class="tag">Legal obligation</span>',
+          'legal.privacy.s4':'4. Third-Party Services',
+          'legal.privacy.s4.lead':'BikerLink shares or receives data from the following external services:',
+          'legal.privacy.s4.li1':'<strong>Last.fm / CBS Interactive</strong> \u2014 Music data. <a href="https://www.last.fm/legal/privacy" target="_blank" rel="noopener noreferrer">Last.fm Privacy Policy</a>',
+          'legal.privacy.s4.li2':'<strong>OpenStreetMap Foundation</strong> \u2014 Map tiles (coordinates are sent for map rendering). <a href="https://wiki.osmfoundation.org/wiki/Privacy_Policy" target="_blank" rel="noopener noreferrer">OSM Privacy Policy</a>',
+          'legal.privacy.s4.li3':'<strong>CartoDB / CARTO</strong> (Spain) \u2014 Alternative map tiles',
+          'legal.privacy.s4.li4':'<strong>Esri</strong> (USA) \u2014 Satellite map tiles',
+          'legal.privacy.s4.li5':'<strong>Expo</strong> (USA) \u2014 Push notifications and OTA updates. <a href="https://expo.dev/privacy" target="_blank" rel="noopener noreferrer">Expo Privacy Policy</a>',
+          'legal.privacy.s4.li6':'<strong>Syneco</strong> \u2014 Commercial partner; workshop partnership status',
+          'legal.privacy.s4.callout':'Some providers process data outside the European Union (in particular the USA). The transfer takes place on the basis of Standard Contractual Clauses approved by the European Commission (art. 46 GDPR) or equivalent mechanisms.',
+          'legal.privacy.s5':'5. Retention Period',
+          'legal.privacy.s5.li1':'<strong>Account data:</strong> retained while the account is active. Deleted within 30 days of the deletion request, unless legally required.',
+          'legal.privacy.s5.li2':'<strong>GPS position history:</strong> retained for 90 days from the last recording.',
+          'legal.privacy.s5.li3':'<strong>Chat messages:</strong> retained while at least one participant keeps their account active.',
+          'legal.privacy.s5.li4':'<strong>Technical logs and errors:</strong> retained for 12 months.',
+          'legal.privacy.s5.li5':'<strong>SOS data:</strong> retained for 6 months from closure of the request.',
+          'legal.privacy.s5.li6':'<strong>Last.fm session key:</strong> deleted upon connection revocation.',
+          'legal.privacy.s5.li7':'<strong>Photos:</strong> deleted within 30 days of account or content deletion.',
+          'legal.privacy.s6':'6. Your Rights (GDPR)',
+          'legal.privacy.s6.lead':'As a data subject, you have the following rights:',
+          'legal.privacy.s6.li1':'<strong>Access (art. 15):</strong> request a copy of your personal data.',
+          'legal.privacy.s6.li2':'<strong>Rectification (art. 16):</strong> correct inaccurate data.',
+          'legal.privacy.s6.li3':'<strong>Erasure (art. 17 \u2014 \u201cright to be forgotten\u201d):</strong> request deletion of your data, subject to legal retention obligations.',
+          'legal.privacy.s6.li4':'<strong>Portability (art. 20):</strong> receive your data in a structured, machine-readable format.',
+          'legal.privacy.s6.li5':'<strong>Objection (art. 21):</strong> object to processing based on legitimate interest.',
+          'legal.privacy.s6.li6':'<strong>Restriction (art. 18):</strong> request restriction of processing in certain cases.',
+          'legal.privacy.s6.li7':'Withdrawal of consent: can be withdrawn at any time without affecting the lawfulness of prior processing.',
+          'legal.privacy.s6.p1':'To exercise your rights, write to: <a href="mailto:bikerlinkapp@gmail.com">bikerlinkapp@gmail.com</a><br>We will respond within 30 days of receiving your request.',
+          'legal.privacy.s6.p2':'You have the right to lodge a complaint with the competent supervisory authority.<br>In the EU: <a href="https://www.garanteprivacy.it" target="_blank" rel="noopener noreferrer">Italian Data Protection Authority (Garante)</a>.',
+          'legal.privacy.s7':'7. GPS Location (<code>android.permission.ACCESS_FINE_LOCATION</code> / <code>ACCESS_BACKGROUND_LOCATION</code>)',
+          'legal.privacy.s7.lead':'BikerLink requests the <code>ACCESS_COARSE_LOCATION</code>, <code>ACCESS_FINE_LOCATION</code> and <code>ACCESS_BACKGROUND_LOCATION</code> permissions for the following features:',
+          'legal.privacy.s7.li1.title':'Live biker map:',
+          'legal.privacy.s7.li1.desc':'shows the user\'s position and that of nearby riders on the map.',
+          'legal.privacy.s7.li2.title':'Route tracking:',
+          'legal.privacy.s7.li2.desc':'when the user manually starts recording a motorcycle ride, the location is continuously acquired to trace the route. Tracking stops on manual stop or end of the ride.',
+          'legal.privacy.s7.li3.title':'SOS feature:',
+          'legal.privacy.s7.li3.desc':'when an emergency is activated, the location is sent to nearby community members even with the app in background or the screen off, to ensure localisation in urgent situations.',
+          'legal.privacy.s7.callout':'Background acquisition (<code>ACCESS_BACKGROUND_LOCATION</code>) is active <strong>only</strong> when the user explicitly activates tracking or the SOS feature. It does not occur automatically, permanently, or without user interaction.',
+          'legal.privacy.s8':'8. Camera Access (<code>android.permission.CAMERA</code>)',
+          'legal.privacy.s8.lead':'BikerLink requests access to the device camera for the following features:',
+          'legal.privacy.s8.li1':'<strong>Profile photo:</strong> the user can take a photo directly from the camera to set as their profile picture.',
+          'legal.privacy.s8.li2':'<strong>Motorcycle photos (Garage):</strong> the user can photograph their motorcycle to add it to the digital garage.',
+          'legal.privacy.s8.li3':'<strong>Photo contests:</strong> the user can take and upload a photo to participate in weekly contests.',
+          'legal.privacy.s8.callout':'The camera is activated <strong>only</strong> when the user explicitly taps the \u201cTake photo\u201d button. BikerLink does not access the camera in background, does not record video, and does not transmit images without the user\'s explicit consent. Uploaded photos are securely stored on BikerLink servers.',
+          'legal.privacy.s9':'9. Data Security',
+          'legal.privacy.s9.lead':'BikerLink adopts the following technical and organisational measures:',
+          'legal.privacy.s9.li1':'Data transmission encrypted via HTTPS/TLS',
+          'legal.privacy.s9.li2':'Passwords stored with secure hashing (bcrypt)',
+          'legal.privacy.s9.li3':'OAuth tokens not exposed client-side',
+          'legal.privacy.s9.li4':'Automatic content moderation',
+          'legal.privacy.s9.li5':'Data access restricted to authorised personnel',
+          'legal.privacy.s9.p2':'No system is infallible. In the event of a breach that may pose risks to your rights, you will be notified in the manner required by the GDPR.',
+          'legal.privacy.s10':'10. Minors',
+          'legal.privacy.s10.p':'BikerLink is intended exclusively for users who are of legal age (18 years or older). We do not knowingly collect data from minors. If you believe a minor has created an account, contact us at <a href="mailto:bikerlinkapp@gmail.com">bikerlinkapp@gmail.com</a> and we will delete it immediately.',
+          'legal.privacy.s11':'11. Cookies and Similar Technologies',
+          'legal.privacy.s11.p1':'BikerLink is a mobile app. We do not use traditional cookies. The embedded WebViews for map display (Leaflet/OpenStreetMap) may use browser localStorage to store technical display preferences. This data is not transmitted to our servers.',
+          'legal.privacy.s11.p2':'<strong>Marketing website (bikerlink.it):</strong> on public pages we use a single technical cookie <code>bl_vid</code> (HttpOnly, SameSite=Lax, 1-year duration) that generates an anonymous random identifier to measure unique visitors. We record server-side: timestamp, page visited, referrer, browser language, country and an anonymised IP address (first 3 octets only, e.g. <code>93.45.12</code>, never the full IP, plus a salted hash). We do not use this cookie for advertising profiling or share it with third parties. Legal basis: legitimate statistical interest (art. 6.1.f GDPR).',
+          'legal.privacy.s12':'12. Updates to this Policy',
+          'legal.privacy.s12.p':'We reserve the right to modify this policy at any time. Material changes will be communicated via in-app notification or email. The date of the last change is indicated at the top of the document. Continued use of the app after notification of changes constitutes acceptance of the new version.',
+          'legal.privacy.s13':'13. Contact',
+          'legal.privacy.s13.p':'<strong>BikerLink</strong><br>Email: <a href="mailto:bikerlinkapp@gmail.com">bikerlinkapp@gmail.com</a>',
+          'legal.privacy.footer':'\u00a9 2026 BikerLink. All rights reserved. \u00a0|\u00a0 <a href="/">Home</a> \u00a0|\u00a0 <a href="/privacy">Privacy Policy</a>'
+        };
         try{
           if(localStorage.getItem('bl_lang')==='en'){
             document.querySelectorAll('[data-i18n]').forEach(function(el){
