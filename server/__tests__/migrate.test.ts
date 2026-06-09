@@ -6,7 +6,7 @@ vi.mock("../db", () => ({
   },
 }));
 
-import { isPostgisOwnerError, applyMigration } from "../migrate";
+import { isPostgisOwnerError, isNoTransactionMigration, applyMigration, applyMigrationNoTransaction } from "../migrate";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -110,6 +110,116 @@ describe("isPostgisOwnerError", () => {
     it("plain string", () => {
       expect(isPostgisOwnerError("42501")).toBe(false);
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Unit tests — isNoTransactionMigration
+// ---------------------------------------------------------------------------
+
+describe("isNoTransactionMigration", () => {
+  it("returns true when pragma is present at the top", () => {
+    const sql = "-- migrate:no-transaction\nCREATE INDEX CONCURRENTLY IF NOT EXISTS idx ON t(c);";
+    expect(isNoTransactionMigration(sql)).toBe(true);
+  });
+
+  it("returns true regardless of whitespace around the colon", () => {
+    const sql = "--  migrate:no-transaction\nCREATE TABLE t (id INT);";
+    expect(isNoTransactionMigration(sql)).toBe(true);
+  });
+
+  it("returns true when pragma is mixed-case", () => {
+    const sql = "-- MIGRATE:NO-TRANSACTION\nCREATE INDEX CONCURRENTLY idx ON t(c);";
+    expect(isNoTransactionMigration(sql)).toBe(true);
+  });
+
+  it("returns false when pragma is absent", () => {
+    const sql = "-- Normal migration\nCREATE INDEX IF NOT EXISTS idx ON t(c);";
+    expect(isNoTransactionMigration(sql)).toBe(false);
+  });
+
+  it("returns false for an empty string", () => {
+    expect(isNoTransactionMigration("")).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Integration tests — applyMigrationNoTransaction
+// ---------------------------------------------------------------------------
+
+describe("applyMigrationNoTransaction", () => {
+  let client: ReturnType<typeof makeMockClient>;
+
+  beforeEach(() => {
+    client = makeMockClient();
+  });
+
+  it("runs statements without BEGIN/COMMIT and records migration", async () => {
+    const statements = [
+      "CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_brand ON app_crash_logs USING gin (device_brand gin_trgm_ops)",
+    ];
+
+    await expect(
+      applyMigrationNoTransaction(client as never, "0087_test.sql", statements)
+    ).resolves.toBeUndefined();
+
+    const hasBegin = client._queries.some((q) => q === "BEGIN");
+    const hasCommit = client._queries.some((q) => q === "COMMIT");
+    expect(hasBegin).toBe(false);
+    expect(hasCommit).toBe(false);
+
+    const recorded = client._queries.some((q) =>
+      q.startsWith("INSERT INTO schema_migrations")
+    );
+    expect(recorded).toBe(true);
+  });
+
+  it("skips duplicate-object errors (42710) without throwing", async () => {
+    const dupErr = makeDbError("42710", 'index "idx_brand" already exists');
+
+    client.query.mockImplementation(async (sql: string) => {
+      const trimmed = typeof sql === "string" ? sql.trim() : sql;
+      client._queries.push(trimmed);
+      if (trimmed.startsWith("CREATE INDEX CONCURRENTLY")) throw dupErr;
+      return { rows: [] };
+    });
+
+    const statements = [
+      "CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_brand ON t USING gin (c gin_trgm_ops)",
+    ];
+
+    await expect(
+      applyMigrationNoTransaction(client as never, "0087_test.sql", statements)
+    ).resolves.toBeUndefined();
+
+    const recorded = client._queries.some((q) =>
+      q.startsWith("INSERT INTO schema_migrations")
+    );
+    expect(recorded).toBe(true);
+  });
+
+  it("throws on non-skippable errors without recording the migration", async () => {
+    const fatalErr = makeDbError("XX000", "unexpected internal error");
+
+    client.query.mockImplementation(async (sql: string) => {
+      const trimmed = typeof sql === "string" ? sql.trim() : sql;
+      client._queries.push(trimmed);
+      if (trimmed.startsWith("CREATE INDEX CONCURRENTLY")) throw fatalErr;
+      return { rows: [] };
+    });
+
+    const statements = [
+      "CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_brand ON t USING gin (c gin_trgm_ops)",
+    ];
+
+    await expect(
+      applyMigrationNoTransaction(client as never, "0087_test.sql", statements)
+    ).rejects.toThrow(/0087_test\.sql.*failed/i);
+
+    const recorded = client._queries.some((q) =>
+      q.startsWith("INSERT INTO schema_migrations")
+    );
+    expect(recorded).toBe(false);
   });
 });
 

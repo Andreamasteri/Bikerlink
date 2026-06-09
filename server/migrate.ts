@@ -138,6 +138,66 @@ function writeCachedHash(hash: string): void {
 }
 
 /**
+ * Returns true when the raw SQL contains the `-- migrate:no-transaction`
+ * pragma.  Migrations tagged with this pragma are applied outside of a
+ * BEGIN/COMMIT block so that statements like CREATE INDEX CONCURRENTLY — which
+ * PostgreSQL forbids inside a transaction — can be used safely.
+ */
+export function isNoTransactionMigration(sql: string): boolean {
+  return /--\s*migrate:no-transaction/i.test(sql);
+}
+
+/**
+ * Apply a single migration file OUTSIDE of a transaction (autocommit mode).
+ *
+ * Used for migrations tagged with `-- migrate:no-transaction`, e.g. those
+ * that contain `CREATE INDEX CONCURRENTLY` statements.  Because there is no
+ * surrounding transaction, partial failures cannot be rolled back atomically —
+ * the migration will simply not be recorded in schema_migrations and will
+ * retry on the next restart, which is the correct behaviour for idempotent DDL.
+ *
+ * Skippable errors (already-exists / already-dropped) are still handled the
+ * same way, but without SAVEPOINTs (each statement is its own implicit txn).
+ */
+export async function applyMigrationNoTransaction(
+  client: import("pg").PoolClient,
+  filename: string,
+  statements: string[]
+): Promise<void> {
+  let skipped = 0;
+  for (let i = 0; i < statements.length; i++) {
+    const stmt = statements[i];
+    try {
+      await client.query(stmt);
+    } catch (err) {
+      if (isSkippableError(err)) {
+        const code = (err as { code?: string }).code;
+        const msg = err instanceof Error ? err.message : String(err);
+        console.warn(`[migrate]   skip stmt #${i + 1} in ${filename} (code ${code}): ${msg}`);
+        skipped++;
+      } else if (isPostgisOwnerError(err)) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.warn(
+          `[migrate]   skip stmt #${i + 1} in ${filename} (42501 on PostGIS system table — not owner, safe to ignore): ${msg}`
+        );
+        skipped++;
+      } else {
+        const message = err instanceof Error ? err.message : String(err);
+        throw new Error(`[migrate] Migration "${filename}" failed at stmt #${i + 1}: ${message}`);
+      }
+    }
+  }
+
+  await client.query(
+    "INSERT INTO schema_migrations (filename) VALUES ($1)",
+    [filename]
+  );
+
+  const note = skipped > 0 ? ` (${skipped}/${statements.length} stmt already existed, skipped)` : "";
+  console.log(`[migrate] ✓ ${filename} applied (no-transaction)${note}`);
+}
+
+/**
  * Apply a single migration file inside a transaction.
  *
  * Each SQL statement runs inside its own SAVEPOINT. If a statement fails
@@ -254,11 +314,16 @@ export async function runMigrations(): Promise<void> {
       const filePath = path.join(MIGRATIONS_DIR, filename);
       const sql = fs.readFileSync(filePath, "utf-8");
       const statements = splitStatements(sql);
+      const noTxn = isNoTransactionMigration(sql);
 
-      console.log(`[migrate] → ${filename} (${statements.length} statement(s))`);
+      console.log(`[migrate] → ${filename} (${statements.length} statement(s))${noTxn ? " [no-transaction]" : ""}`);
 
       try {
-        await applyMigration(client, filename, statements);
+        if (noTxn) {
+          await applyMigrationNoTransaction(client, filename, statements);
+        } else {
+          await applyMigration(client, filename, statements);
+        }
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         console.error(`[migrate] ✗ ${filename} FAILED: ${message}`);
