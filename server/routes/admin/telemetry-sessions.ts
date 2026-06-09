@@ -2,6 +2,7 @@ import { Router, type Request, type Response } from "express";
 import { db } from "../../db";
 import { sql } from "drizzle-orm";
 import { sendError } from "../../lib/api-response";
+import { logTelemetryEvent } from "../../lib/telemetry-error-log";
 
 const router = Router();
 
@@ -98,7 +99,15 @@ router.get("/telemetry/users", async (req: Request, res: Response) => {
     });
   } catch (err) {
     const cause = (err as any)?.cause?.message ?? "";
+    const errMsg = err instanceof Error ? err.message : String(err);
     console.error("[admin/telemetry/users] error:", err, cause ? `| PG: ${cause}` : "");
+    logTelemetryEvent({
+      ts: new Date().toISOString(),
+      type: "ERROR",
+      context: "admin/telemetry/users",
+      message: errMsg,
+      detail: cause || (err instanceof Error ? err.stack : undefined),
+    });
     return sendError(res, 500, "Errore lettura utenti telemetria");
   }
 });
@@ -168,7 +177,15 @@ router.get("/telemetry/users/:userId/sessions", async (req: Request, res: Respon
     return res.json({ sessions, userId });
   } catch (err) {
     const cause = (err as any)?.cause?.message ?? "";
+    const errMsg = err instanceof Error ? err.message : String(err);
     console.error("[admin/telemetry/users/:userId/sessions] error:", err, cause ? `| PG: ${cause}` : "");
+    logTelemetryEvent({
+      ts: new Date().toISOString(),
+      type: "ERROR",
+      context: "admin/telemetry/users/:userId/sessions",
+      message: errMsg,
+      detail: cause || (err instanceof Error ? err.stack : undefined),
+    });
     return sendError(res, 500, "Errore lettura sessioni utente");
   }
 });
@@ -220,7 +237,15 @@ router.get("/telemetry/sessions/:sessionId/samples", async (req: Request, res: R
     return res.json({ samples, total, sessionId });
   } catch (err) {
     const cause = (err as any)?.cause?.message ?? "";
+    const errMsg = err instanceof Error ? err.message : String(err);
     console.error("[admin/telemetry/sessions/:sessionId/samples] error:", err, cause ? `| PG: ${cause}` : "");
+    logTelemetryEvent({
+      ts: new Date().toISOString(),
+      type: "ERROR",
+      context: "admin/telemetry/sessions/:sessionId/samples",
+      message: errMsg,
+      detail: cause || (err instanceof Error ? err.stack : undefined),
+    });
     return sendError(res, 500, "Errore lettura campioni sessione");
   }
 });

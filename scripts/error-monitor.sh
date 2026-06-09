@@ -102,6 +102,36 @@ check_lastfm_prod() {
   fi
 }
 
+# ── Check 5: Endpoint critici locali (ogni 10 cicli, ~5 min) ──────────────────
+# Proba endpoint che coprono telemetria, road-hazards e matching.
+# Risposta 5xx → ENDPOINT_ERROR. Auth richiesta (401/403) = route viva → OK.
+check_critical_endpoints() {
+  local endpoints=(
+    "http://localhost:$BACKEND_PORT/api/road-hazards"
+    "http://localhost:$BACKEND_PORT/api/admin/telemetry-stats"
+    "http://localhost:$BACKEND_PORT/api/admin/telemetry/users"
+    "http://localhost:$BACKEND_PORT/api/proposals"
+  )
+
+  for url in "${endpoints[@]}"; do
+    local http_code path_part
+    path_part=$(echo "$url" | sed "s|http://localhost:$BACKEND_PORT||")
+    http_code=$(curl -s --max-time 6 --connect-timeout 3 \
+      -o /tmp/em_endpoint_check.txt -w "%{http_code}" \
+      "$url" 2>/dev/null)
+
+    if [ "$http_code" = "000" ] || [ -z "$http_code" ]; then
+      log "ENDPOINT_WARN: $path_part → timeout/non raggiungibile"
+    elif [ "${http_code:0:1}" = "5" ]; then
+      local trimmed
+      trimmed=$(cat /tmp/em_endpoint_check.txt 2>/dev/null | head -c 150)
+      log "ENDPOINT_ERROR: $path_part → $http_code — $trimmed"
+    else
+      log "ENDPOINT_OK: $path_part → $http_code"
+    fi
+  done
+}
+
 # ── Ciclo principale ─────────────────────────────────────────────────────────
 run_all_checks() {
   check_backend
@@ -117,7 +147,7 @@ log "  Produzione:   $PROD_HOST"
 log "  Intervallo:   ${CHECK_INTERVAL}s"
 log "  Log:          $LOG_FILE"
 log "  Checks/ciclo: backend, backend-crashes"
-log "  Check Last.fm produzione: ogni 10 cicli (~5 min)"
+log "  Check Last.fm + endpoint critici: ogni 10 cicli (~5 min)"
 log "============================================"
 
 run_all_checks
@@ -131,6 +161,7 @@ while true; do
 
   if [ $((CYCLE % 10)) -eq 0 ]; then
     check_lastfm_prod
+    check_critical_endpoints
   fi
 
 

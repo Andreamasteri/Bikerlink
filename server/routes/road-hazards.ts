@@ -67,7 +67,8 @@ router.get("/", async (req: Request, res: Response) => {
 
     return sendSuccess(res, { hazards });
   } catch (error) {
-    console.error("[road-hazards] GET / error:", error);
+    const pgCause = (error as any)?.cause?.message ?? "";
+    console.error("[road-hazards] GET / error:", error, pgCause ? `| PG: ${pgCause}` : "");
     return sendError(res, 500, "Errore lettura segnalazioni");
   }
 });
@@ -125,7 +126,8 @@ router.get("/:id", async (req: Request, res: Response) => {
       comments
     });
   } catch (error) {
-    console.error("[road-hazards] GET /:id error:", error);
+    const pgCause = (error as any)?.cause?.message ?? "";
+    console.error("[road-hazards] GET /:id error:", error, pgCause ? `| PG: ${pgCause}` : "");
     return sendError(res, 500, "Errore lettura segnalazione");
   }
 });
@@ -160,7 +162,8 @@ router.post("/:id/comments", async (req: Request, res: Response) => {
 
     return sendSuccess(res, { saved: true });
   } catch (error) {
-    console.error("[road-hazards] POST /:id/comments error:", error);
+    const pgCause = (error as any)?.cause?.message ?? "";
+    console.error("[road-hazards] POST /:id/comments error:", error, pgCause ? `| PG: ${pgCause}` : "");
     return sendError(res, 500, "Errore salvataggio commento");
   }
 });
@@ -200,7 +203,8 @@ router.post("/", async (req: Request, res: Response) => {
 
     return res.status(201).json({ success: true, hazard });
   } catch (error) {
-    console.error("[road-hazards] POST / error:", error);
+    const pgCause = (error as any)?.cause?.message ?? "";
+    console.error("[road-hazards] POST / error:", error, pgCause ? `| PG: ${pgCause}` : "");
     return sendError(res, 500, "Errore creazione segnalazione");
   }
 });
@@ -255,7 +259,8 @@ router.post("/:id/confirm", async (req: Request, res: Response) => {
 
     return sendSuccess(res, { confirmCount: newCount, approved: shouldApprove });
   } catch (error) {
-    console.error("[road-hazards] POST /:id/confirm error:", error);
+    const pgCause = (error as any)?.cause?.message ?? "";
+    console.error("[road-hazards] POST /:id/confirm error:", error, pgCause ? `| PG: ${pgCause}` : "");
     return sendError(res, 500, "Errore conferma segnalazione");
   }
 });
@@ -290,7 +295,8 @@ router.delete("/:id", async (req: Request, res: Response) => {
 
     return sendSuccess(res, { deleted: true });
   } catch (error) {
-    console.error("[road-hazards] DELETE /:id error:", error);
+    const pgCause = (error as any)?.cause?.message ?? "";
+    console.error("[road-hazards] DELETE /:id error:", error, pgCause ? `| PG: ${pgCause}` : "");
     return sendError(res, 500, "Errore eliminazione segnalazione");
   }
 });

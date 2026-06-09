@@ -190,7 +190,15 @@ router.get("/map-matching-stats", async (_req: Request, res: Response) => {
     return res.json(stats);
   } catch (err) {
     const cause = (err as any)?.cause?.message ?? "";
+    const errMsg = err instanceof Error ? err.message : String(err);
     console.error("[admin/map-matching-stats] error:", err, cause ? `| PG: ${cause}` : "");
+    logTelemetryEvent({
+      ts: new Date().toISOString(),
+      type: "ERROR",
+      context: "admin/map-matching-stats",
+      message: errMsg,
+      detail: cause || (err instanceof Error ? err.stack : undefined),
+    });
     return sendError(res, 500, "Errore lettura statistiche map matching");
   }
 });
@@ -209,7 +217,15 @@ router.get("/curvy-score-stats", async (_req: Request, res: Response) => {
     });
   } catch (err) {
     const cause = (err as any)?.cause?.message ?? "";
+    const errMsg = err instanceof Error ? err.message : String(err);
     console.error("[admin/curvy-score-stats] error:", err, cause ? `| PG: ${cause}` : "");
+    logTelemetryEvent({
+      ts: new Date().toISOString(),
+      type: "ERROR",
+      context: "admin/curvy-score-stats",
+      message: errMsg,
+      detail: cause || (err instanceof Error ? err.stack : undefined),
+    });
     return sendError(res, 500, "Errore lettura statistiche curvy score");
   }
 });
@@ -226,7 +242,15 @@ router.put("/sensors-global", async (req: Request, res: Response) => {
     return res.json({ enabled });
   } catch (err) {
     const cause = (err as any)?.cause?.message ?? "";
+    const errMsg = err instanceof Error ? err.message : String(err);
     console.error("[admin/sensors-global] error:", err, cause ? `| PG: ${cause}` : "");
+    logTelemetryEvent({
+      ts: new Date().toISOString(),
+      type: "ERROR",
+      context: "admin/sensors-global PUT",
+      message: errMsg,
+      detail: cause || (err instanceof Error ? err.stack : undefined),
+    });
     return sendError(res, 500, "Errore aggiornamento sensori globali");
   }
 });
@@ -238,7 +262,15 @@ router.get("/sensors-global", async (_req: Request, res: Response) => {
     return res.json({ enabled });
   } catch (err) {
     const cause = (err as any)?.cause?.message ?? "";
+    const errMsg = err instanceof Error ? err.message : String(err);
     console.error("[admin/sensors-global GET] error:", err, cause ? `| PG: ${cause}` : "");
+    logTelemetryEvent({
+      ts: new Date().toISOString(),
+      type: "ERROR",
+      context: "admin/sensors-global GET",
+      message: errMsg,
+      detail: cause || (err instanceof Error ? err.stack : undefined),
+    });
     return sendError(res, 500, "Errore lettura sensori globali");
   }
 });
@@ -254,7 +286,15 @@ router.put("/telemetry-target-km", async (req: Request, res: Response) => {
     return res.json({ target_km: val });
   } catch (err) {
     const cause = (err as any)?.cause?.message ?? "";
+    const errMsg = err instanceof Error ? err.message : String(err);
     console.error("[admin/telemetry-target-km] error:", err, cause ? `| PG: ${cause}` : "");
+    logTelemetryEvent({
+      ts: new Date().toISOString(),
+      type: "ERROR",
+      context: "admin/telemetry-target-km PUT",
+      message: errMsg,
+      detail: cause || (err instanceof Error ? err.stack : undefined),
+    });
     return sendError(res, 500, "Errore aggiornamento obiettivo km");
   }
 });
