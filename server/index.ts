@@ -67,14 +67,8 @@ app.get("/api/metrics", (_req: Request, res: Response) => {
   });
 });
 
-// Task #2789 — Gate delle rotte applicative durante il boot.
-// Con la porta HTTP aperta PRIMA di migrazioni/seed (vedi sequenza sotto), le
-// rotte `/api/*` sono raggiungibili mentre lo schema/seed non sono ancora
-// pronti. Per evitare di servire dati parziali o errori DB grezzi, finché
-// initState.initializing è true rispondiamo 503 a tutte le `/api/*` tranne
-// `/api/health` (che ha il proprio handler initializing-aware) e `/api/metrics`
-// (montato sopra, fuori dal gate). Lo startup probe autoscale colpisce `GET /`,
-// che NON è sotto questo gate e risponde 200 subito.
+// Task #2789 — Gate: 503 su /api/* mentre initState.initializing=true.
+// Eccezioni: /api/health (initializing-aware) e /api/metrics (montato sopra, fuori gate).
 app.use("/api", (req: Request, res: Response, next) => {
   if (!initState.initializing) return next();
   if (req.path === "/health") return next();
@@ -151,9 +145,7 @@ process.on("SIGINT", () => gracefulShutdown("SIGINT"));
   // Read by the post-boot fire-and-forget block to decide if autoSeedFakeUsers should run.
   let needsFakeSeed = false;
 
-  // Task #2527 — assicura che Sentry sia inizializzato, l'error handler
-  // Sentry montato e poi il custom error handler montato dopo, prima di
-  // accettare traffico (no-op se SENTRY_DSN non è impostato).
+  // Task #2527 — await Sentry init + error handler chain prima di accettare traffico.
   await errorHandlersReady;
 
   // ── Phase 1: HTTP Listen (FIRST) ──────────────────────────────────────────
