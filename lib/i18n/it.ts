@@ -1380,6 +1380,5 @@ const it: Record<string, string> = {
   "tracking.deleteError": "Errore eliminazione percorso",
   "top": "Alto",
   "bottom": "Basso",
-
 };
 export default it;
