@@ -41,5 +41,8 @@ export default defineConfig({
     "!match_negative_preferences",
     "!pending_auto_suggestions",
     "!ai_messages",
+    // app_crash_logs ha GIN trgm indexes su device_brand e device_model (migration 0087)
+    // che Drizzle non sa generare con gin_trgm_ops → escludiamo dal diff publish.
+    "!app_crash_logs",
   ],
 });
