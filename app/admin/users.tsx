@@ -14,6 +14,7 @@ import { UserDetailModal, UserStats, SessionsData, GeoZone } from "@/components/
 import { UserEditModal } from "@/components/admin/users/UserEditModal";
 import { CreateUserModal, CreateUserPayload } from "@/components/admin/users/CreateUserModal";
 import { ZoneMapModal } from "@/components/admin/users/ZoneMapModal";
+import { UserPrivacyModal } from "@/components/admin/users/UserPrivacyModal";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import AiCopilotDrawer from "@/components/admin/ai/AiCopilotDrawer";
 import { MaterialCommunityIcons, Ionicons } from "@expo/vector-icons";
@@ -34,6 +35,7 @@ export default function AdminUsers() {
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [statsModalVisible, setStatsModalVisible] = useState(false);
   const [createModalVisible, setCreateModalVisible] = useState(false);
+  const [privacyModalUser, setPrivacyModalUser] = useState<AdminUser | null>(null);
   const [selectedUser, setSelectedUser] = useState<AdminUser | null>(null);
   const [editEmail, setEditEmail] = useState("");
   const [editPassword, setEditPassword] = useState("");
@@ -441,6 +443,7 @@ export default function AdminUsers() {
                 ]
               );
             }}
+            onOpenPrivacy={(user) => setPrivacyModalUser(user)}
             isLastfmPending={clearLastfmMutation.isPending}
             currentAppVersion={CURRENT_APP_VERSION}
           />
@@ -548,6 +551,12 @@ export default function AdminUsers() {
           insets={insets}
         />
       </ErrorBoundary>
+
+      <UserPrivacyModal
+        visible={!!privacyModalUser}
+        onClose={() => setPrivacyModalUser(null)}
+        user={privacyModalUser}
+      />
     </View>
   );
 }

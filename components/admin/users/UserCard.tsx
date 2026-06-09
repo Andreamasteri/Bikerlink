@@ -37,6 +37,7 @@ interface UserCardProps {
   onToggleMapTester?: (id: string, enabled: boolean) => void;
   onToggleTelemetryDisabled?: (id: string, disabled: boolean) => void;
   onToggleMatchingDisabled?: (id: string, disabled: boolean) => void;
+  onOpenPrivacy?: (user: AdminUser) => void;
   isLastfmPending?: boolean;
   currentAppVersion?: string;
 }
@@ -53,6 +54,7 @@ export const UserCard: React.FC<UserCardProps> = ({
   onToggleMapTester,
   onToggleTelemetryDisabled,
   onToggleMatchingDisabled,
+  onOpenPrivacy,
   isLastfmPending,
   currentAppVersion = "1.0.0",
 }) => {
@@ -161,6 +163,11 @@ export const UserCard: React.FC<UserCardProps> = ({
               size={22}
               color={isLastfmPending ? Colors.border : "#E31005"}
             />
+          </TouchableOpacity>
+        )}
+        {onOpenPrivacy && (
+          <TouchableOpacity onPress={() => onOpenPrivacy(item)} style={styles.actionBtn}>
+            <Ionicons name="shield-outline" size={22} color={Colors.accent} />
           </TouchableOpacity>
         )}
         <TouchableOpacity onPress={() => onDeleteUser(item)} style={styles.actionBtn}>

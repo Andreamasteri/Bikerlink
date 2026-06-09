@@ -1253,6 +1253,11 @@ const it: Record<string, string> = {
   "ready.privacy.offlineRandomizeLabel": "Randomizza posizione offline",
   "ready.privacy.offlineRandomizeDesc": "Quando chiudi l'app, la posizione viene spostata di ±20 km.",
   "ready.privacy.moreOptions": "Altre opzioni privacy & GPS",
+  "ready.privacy.fixedPositionLabel": "Posizione fissa",
+  "ready.privacy.fixedPositionDesc": "Gli altri utenti ti vedono sempre nella stessa posizione.",
+  "ready.privacy.fixedPositionActive": "Posizione fissa attiva",
+  "ready.privacy.setHere": "Impostala qua",
+  "ready.privacy.chooseOnMap": "Scegli sulla mappa",
 
   "gps_error_title": "Errore GPS",
   "gps_error_body": "Impossibile salvare i punti GPS. Coordinate non valide rilevate.",

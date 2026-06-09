@@ -16,6 +16,17 @@ router.put("/location", requireAuth, async (req: Request, res: Response) => {
     if (!parsedLoc.success) return sendError(res, 400, parsedLoc.error.issues[0].message);
     const { latitude, longitude } = parsedLoc.data;
     const existingProfile = await storage.getUserProfile(userId);
+    if (existingProfile?.fixedPositionEnabled && existingProfile.fixedPositionLat != null && existingProfile.fixedPositionLng != null) {
+      const updateData = { coordinatesUpdatedAt: new Date() };
+      if (existingProfile) {
+        await storage.updateUserProfile(userId, updateData);
+      }
+      const user = await storage.getUser(userId);
+      if (user && (user.userType === "zavorrina" || user.userType === "coppia")) {
+        triggerProposalProfileMatchingForZavorrina(userId);
+      }
+      return sendSuccess(res);
+    }
     let fLat = latitude;
     let fLng = longitude;
     const fakeResult = applyFakeZones(latitude, longitude, existingProfile);

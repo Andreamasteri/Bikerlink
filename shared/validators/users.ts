@@ -168,6 +168,9 @@ export const privacySettingsSchema = z.object({
   fakeWhateverLatitude: z.number().finite().nullable().optional(),
   fakeWhateverLongitude: z.number().finite().nullable().optional(),
   fakeWhateverRadius: z.number().positive().nullable().optional(),
+  fixedPositionEnabled: z.boolean().optional(),
+  fixedPositionLat: z.number().finite().nullable().optional(),
+  fixedPositionLng: z.number().finite().nullable().optional(),
 }).passthrough();
 export type PrivacySettingsInput = z.infer<typeof privacySettingsSchema>;
 

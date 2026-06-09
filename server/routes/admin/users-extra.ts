@@ -1,8 +1,9 @@
 import { Router, type Request, type Response } from "express";
 import { db } from "../../db";
-import { users } from "@shared/db";
+import { users, userProfiles } from "@shared/db";
 import { eq } from "drizzle-orm";
 import { sendError } from "../../lib/api-response";
+import { storage } from "../../storage";
 
 const router = Router();
 
@@ -15,6 +16,37 @@ router.get("/:userId", async (req: Request, res: Response) => {
     return res.json(safe);
   } catch (err) {
     console.error("[admin/users/:userId GET] error:", err);
+    return sendError(res, 500, "Errore interno del server");
+  }
+});
+
+router.get("/:userId/privacy-settings", async (req: Request, res: Response) => {
+  try {
+    const userId = String(req.params.userId);
+    const [userRow, profile] = await Promise.all([
+      storage.getUser(userId),
+      storage.getUserProfile(userId),
+    ]);
+    if (!userRow) return sendError(res, 404, "Utente non trovato");
+    return res.json({
+      ghostMode: userRow.ghostMode,
+      fixedPositionEnabled: profile?.fixedPositionEnabled ?? false,
+      fixedPositionLat: profile?.fixedPositionLat ?? null,
+      fixedPositionLng: profile?.fixedPositionLng ?? null,
+      hideFromMap: profile?.hideFromMap ?? false,
+      hideOnlineStatus: profile?.hideOnlineStatus ?? false,
+      hideLastSeen: profile?.hideLastSeen ?? false,
+      hideDistance: profile?.hideDistance ?? false,
+      offlinePositionRandomize: profile?.offlinePositionRandomize ?? true,
+      positionFuzz: profile?.positionFuzz ?? false,
+      positionFuzzKm: profile?.positionFuzzKm ?? 1,
+      fakeHomeEnabled: profile?.fakeHomeEnabled ?? false,
+      fakeWorkEnabled: profile?.fakeWorkEnabled ?? false,
+      fakeWhateverEnabled: profile?.fakeWhateverEnabled ?? false,
+      gpsPrecision: profile?.gpsPrecision ?? "balanced",
+    });
+  } catch (err) {
+    console.error("[admin/users/:userId/privacy-settings GET] error:", err);
     return sendError(res, 500, "Errore interno del server");
   }
 });

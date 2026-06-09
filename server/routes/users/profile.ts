@@ -316,7 +316,7 @@ router.put("/me/privacy", requireAuth, async (req: Request, res: Response) => {
     const userId = req.session.userId!;
     const parsed = privacySettingsSchema.safeParse(req.body);
     if (!parsed.success) return sendError(res, 400, parsed.error.issues[0].message);
-    const { hideFromMap, hideOnlineStatus, hideLastSeen, hideDistance, positionFuzz, positionFuzzKm, fakeHomeEnabled, fakeHomeLatitude, fakeHomeLongitude, fakeHomeRadius, fakeWorkEnabled, fakeWorkLatitude, fakeWorkLongitude, fakeWorkRadius, fakeWhateverEnabled, fakeWhateverLatitude, fakeWhateverLongitude, fakeWhateverRadius, offlinePositionRandomize } = parsed.data;
+    const { hideFromMap, hideOnlineStatus, hideLastSeen, hideDistance, positionFuzz, positionFuzzKm, fakeHomeEnabled, fakeHomeLatitude, fakeHomeLongitude, fakeHomeRadius, fakeWorkEnabled, fakeWorkLatitude, fakeWorkLongitude, fakeWorkRadius, fakeWhateverEnabled, fakeWhateverLatitude, fakeWhateverLongitude, fakeWhateverRadius, offlinePositionRandomize, fixedPositionEnabled, fixedPositionLat, fixedPositionLng } = parsed.data;
 
     const existing = await storage.getUserProfile(userId);
     const updateData: Partial<InsertUserProfile> = {};
@@ -327,6 +327,15 @@ router.put("/me/privacy", requireAuth, async (req: Request, res: Response) => {
     if (positionFuzz !== undefined) updateData.positionFuzz = positionFuzz;
     if (positionFuzzKm !== undefined) updateData.positionFuzzKm = positionFuzzKm;
     if (offlinePositionRandomize !== undefined) updateData.offlinePositionRandomize = offlinePositionRandomize;
+
+    if (fixedPositionEnabled !== undefined) updateData.fixedPositionEnabled = fixedPositionEnabled;
+    if (fixedPositionLat !== undefined) updateData.fixedPositionLat = fixedPositionLat ?? undefined;
+    if (fixedPositionLng !== undefined) updateData.fixedPositionLng = fixedPositionLng ?? undefined;
+    if (fixedPositionEnabled === true && fixedPositionLat != null && fixedPositionLng != null) {
+      updateData.latitude = fixedPositionLat;
+      updateData.longitude = fixedPositionLng;
+      updateData.coordinatesUpdatedAt = new Date();
+    }
 
     if (fakeHomeEnabled !== undefined) updateData.fakeHomeEnabled = fakeHomeEnabled;
     if (fakeHomeLatitude !== undefined) updateData.homeLatitude = fakeHomeLatitude;

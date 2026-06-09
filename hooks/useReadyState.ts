@@ -46,9 +46,15 @@ export function useReadyState() {
   const [fakeWhateverRadius, setFakeWhateverRadius] = useState(2);
   const [gpsPrecision, setGpsPrecision] = useState("balanced");
 
+  const [fixedPositionEnabled, setFixedPositionEnabled] = useState(false);
+  const [fixedPositionLat, setFixedPositionLat] = useState<number | null>(null);
+  const [fixedPositionLng, setFixedPositionLng] = useState<number | null>(null);
+  const [isSettingFixedPosition, setIsSettingFixedPosition] = useState(false);
+
   const [mapPickerVisible, setMapPickerVisible] = useState(false);
   const [mapPickerTarget, setMapPickerTarget] = useState<MapTarget>("homeReal");
   const [mapPickerCoord, setMapPickerCoord] = useState({ latitude: 41.9, longitude: 12.5 });
+  const [mapPickerForFixed, setMapPickerForFixed] = useState(false);
 
   useEffect(() => {
     return () => {
@@ -102,6 +108,7 @@ export function useReadyState() {
     fakeWhateverEnabled?: boolean; whateverLatitude?: number | null; whateverLongitude?: number | null;
     fakeWhateverLatitude?: number | null; fakeWhateverLongitude?: number | null; fakeWhateverRadius?: number;
     gpsPrecision?: string;
+    fixedPositionEnabled?: boolean; fixedPositionLat?: number | null; fixedPositionLng?: number | null;
   }
   interface MeQueryData { profile?: MeProfile | null }
   const meQ = meData as MeQueryData | undefined;
@@ -133,6 +140,9 @@ export function useReadyState() {
     setFakeWhateverLongitude(p.fakeWhateverLongitude ?? null);
     setFakeWhateverRadius(p.fakeWhateverRadius ?? 2);
     setGpsPrecision(p.gpsPrecision ?? "balanced");
+    setFixedPositionEnabled(p.fixedPositionEnabled ?? false);
+    setFixedPositionLat(p.fixedPositionLat ?? null);
+    setFixedPositionLng(p.fixedPositionLng ?? null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [(meData as MeQueryData | undefined)?.profile]);
 
@@ -234,14 +244,28 @@ export function useReadyState() {
   };
 
   const openMapPicker = (target: MapTarget, lat?: number | null, lng?: number | null) => {
+    setMapPickerForFixed(false);
     setMapPickerTarget(target);
-    setMapPickerCoord({ latitude: lat ?? 41.9, longitude: lng ?? 12.5 });
+    setMapPickerCoord({ latitude: lat ?? location?.latitude ?? 41.9, longitude: lng ?? location?.longitude ?? 12.5 });
+    setMapPickerVisible(true);
+  };
+
+  const openFixedPositionMapPicker = () => {
+    setMapPickerForFixed(true);
+    setMapPickerCoord({ latitude: fixedPositionLat ?? location?.latitude ?? 41.9, longitude: fixedPositionLng ?? location?.longitude ?? 12.5 });
     setMapPickerVisible(true);
   };
 
   const confirmMapPicker = () => {
     const lat = mapPickerCoord.latitude;
     const lng = mapPickerCoord.longitude;
+    if (mapPickerForFixed) {
+      setFixedPositionLat(lat);
+      setFixedPositionLng(lng);
+      privacyMutation.mutate({ fixedPositionEnabled: true, fixedPositionLat: lat, fixedPositionLng: lng });
+      setMapPickerVisible(false);
+      return;
+    }
     const updates: Record<string, number> = {};
     if (mapPickerTarget === "homeReal") { setHomeLatitude(lat); setHomeLongitude(lng); updates.homeLatitude = lat; updates.homeLongitude = lng; }
     else if (mapPickerTarget === "homeFake") { setFakeHomeLatitude(lat); setFakeHomeLongitude(lng); updates.fakeHomeLatitude = lat; updates.fakeHomeLongitude = lng; }
@@ -252,6 +276,27 @@ export function useReadyState() {
     privacyMutation.mutate(updates);
     setMapPickerVisible(false);
   };
+
+  const setFixedPositionFromGPS = useCallback(async () => {
+    try {
+      setIsSettingFixedPosition(true);
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== "granted") {
+        Alert.alert("Permesso negato", "Concedi l'accesso alla posizione nelle impostazioni.");
+        return;
+      }
+      const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+      const lat = loc.coords.latitude;
+      const lng = loc.coords.longitude;
+      setFixedPositionLat(lat);
+      setFixedPositionLng(lng);
+      privacyMutation.mutate({ fixedPositionEnabled: true, fixedPositionLat: lat, fixedPositionLng: lng });
+    } catch {
+      Alert.alert("Errore GPS", "Impossibile ottenere la posizione.");
+    } finally {
+      setIsSettingFixedPosition(false);
+    }
+  }, [privacyMutation]);
 
   const pickFromGPS = async (target: MapTarget) => {
     try {
@@ -303,6 +348,12 @@ export function useReadyState() {
     fakeWhateverLatitude, fakeWhateverLongitude,
     fakeWhateverRadius, setFakeWhateverRadius,
     gpsPrecision, setGpsPrecision,
+    fixedPositionEnabled, setFixedPositionEnabled,
+    fixedPositionLat, setFixedPositionLat,
+    fixedPositionLng, setFixedPositionLng,
+    isSettingFixedPosition,
+    setFixedPositionFromGPS,
+    openFixedPositionMapPicker,
     mapPickerVisible, setMapPickerVisible,
     mapPickerCoord, setMapPickerCoord,
     ghostModeFeatureEnabled,

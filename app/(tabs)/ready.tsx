@@ -68,6 +68,12 @@ export default function ReadyToRideScreen() {
     openMapPicker,
     confirmMapPicker,
     pickFromGPS,
+    fixedPositionEnabled,
+    fixedPositionLat,
+    fixedPositionLng,
+    isSettingFixedPosition,
+    setFixedPositionFromGPS,
+    openFixedPositionMapPicker,
   } = useReadyState();
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- SOS response shape from API
@@ -188,6 +194,12 @@ export default function ReadyToRideScreen() {
             offlineRandomize={offlineRandomize}
             // eslint-disable-next-line @typescript-eslint/no-explicit-any -- privacyMutation shape from useReadyState
             privacyMutation={privacyMutation as any}
+            fixedPositionEnabled={fixedPositionEnabled}
+            fixedPositionLat={fixedPositionLat}
+            fixedPositionLng={fixedPositionLng}
+            onSetFixedPositionFromGPS={setFixedPositionFromGPS}
+            onChooseFixedPositionOnMap={openFixedPositionMapPicker}
+            isSettingFixedPosition={isSettingFixedPosition}
           />
 
           <PrivacyPositionSettings
