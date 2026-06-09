@@ -32,9 +32,16 @@ function buildOptions(): RedisOptions {
     maxRetriesPerRequest: 2,
     enableReadyCheck: true,
     enableOfflineQueue: false,
+    // Timeout per singolo tentativo di connessione TLS.
+    connectTimeout: 8_000,
     retryStrategy(times: number) {
-      // Exponential backoff capped at 30s.
-      return Math.min(1000 * 2 ** Math.min(times, 5), 30_000);
+      // Dopo 4 tentativi (~30s totali) desistiamo silenziosamente.
+      // In ambiente cloud Redis TCP non è raggiungibile dal router → il
+      // flooding di ETIMEDOUT nei log non porta benefici; il fallback
+      // in-memory gestisce tutto. Se Redis torna disponibile (es. restart
+      // del server di casa), il prossimo boot ricomincia da zero.
+      if (times > 4) return null;
+      return Math.min(1000 * 2 ** Math.min(times, 4), 15_000);
     },
     reconnectOnError() {
       return true;
