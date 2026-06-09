@@ -1,4 +1,4 @@
-// LARGE-FILE-LOCKED — limite: 580
+// LARGE-FILE-LOCKED — limite: 567
 // Aggiungi nuove funzionalità in: server/routes/client-settings-extra.ts
 
 import type { Express, Request, Response } from "express";

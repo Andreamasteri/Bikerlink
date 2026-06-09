@@ -1,4 +1,4 @@
-// LARGE-FILE-LOCKED — limite: 608
+// LARGE-FILE-LOCKED — limite: 587
 // Aggiungi nuove funzionalità in: components/admin/ads/useAdAdmin.next.ts
 import { useAdAdminStats } from "./useAdAdmin.stats";
 import { useState, useEffect, useCallback, useMemo } from "react";
