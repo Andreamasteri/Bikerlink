@@ -1,3 +1,4 @@
+// LARGE-FILE-ALLOW: file di traduzione — struttura piatta inevitabile, una chiave per riga
 const es: Record<string, string> = {
   "app.name": "BikerLink",
   "app.tagline": "Nunca irás solo",

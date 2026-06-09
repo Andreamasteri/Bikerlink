@@ -10,3 +10,20 @@
 # Aggiunte a questa lista richiedono un task utente esplicito.
 #
 # Vedi `replit.md` → sezione "⛔ REGOLA FERREA — Limite 600 righe per file".
+
+# ── File di traduzione i18n ────────────────────────────────────────────────
+# Struttura piatta inevitabile: una chiave-valore per riga, nessuna logica.
+# Splitta meno di 150 chiavi per file è rumore senza beneficio.
+lib/i18n/de.ts
+lib/i18n/el.ts
+lib/i18n/en.ts
+lib/i18n/es.ts
+lib/i18n/fr.ts
+lib/i18n/it.ts
+lib/i18n/tr.ts
+
+# ── File di test ───────────────────────────────────────────────────────────
+# Test estesi per funzionalità critica (privacy-filter): copertura completa
+# richiede molti casi d'uso separati; refactoring in più file romperebbe
+# la leggibilità della suite.
+server/__tests__/privacy-filter.test.ts

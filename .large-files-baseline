@@ -16,16 +16,8 @@ LEGACY app/navigate/[id].tsx 635
 LEGACY app/proposals/create.tsx 637
 LEGACY components/admin/ota/OtaPanel.tsx 813
 LEGACY components/admin/users/UserDetailModal.tsx 605
-LEGACY lib/i18n/de.ts 1370
-LEGACY lib/i18n/el.ts 1163
-LEGACY lib/i18n/en.ts 1401
-LEGACY lib/i18n/es.ts 1370
-LEGACY lib/i18n/fr.ts 1370
-LEGACY lib/i18n/it.ts 1385
-LEGACY lib/i18n/tr.ts 1163
 LEGACY lib/leaflet-bundle.ts 676
 LEGACY scripts/verify-matching-integration.ts 746
-LEGACY server/__tests__/privacy-filter.test.ts 800
 LEGACY server/index.ts 625
 LEGACY server/motion-simulator.ts 935
 LEGACY server/push-notifications.ts 625

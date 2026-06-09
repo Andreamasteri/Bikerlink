@@ -1,3 +1,4 @@
+// LARGE-FILE-ALLOW: file di test — copertura casi d'uso estesa necessaria per privacy-filter
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import express, { type Request, type Response, type NextFunction } from "express";
 import request from "supertest";
