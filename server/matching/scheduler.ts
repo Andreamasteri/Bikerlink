@@ -17,7 +17,7 @@ import { runDistanceMatching, runRouteTypeZoneMatching } from "./run-distance";
 import { runProposalToProfileMatching } from "./run-profile";
 import { recomputeAllUserMatchProfiles } from "./recompute-profiles";
 import { PhaseRecorder } from "./perf-metrics";
-import { schedulerLogger } from "../lib/logger";
+import { schedulerLogger, matchingLogger } from "../lib/logger";
 import { prettyMs, memoryRssPretty } from "../lib/format";
 import { withMatchingLock, forceUnlockMatchingLock, getMatchingLockStatus } from "../cache/matching-lock";
 import {
@@ -27,6 +27,7 @@ import {
   setMatchingLockState,
 } from "./metrics";
 import { captureMatchingError } from "../sentry";
+import { addMatchLog, hookPinoLogger } from "./match-log-buffer";
 import {
   runCleanup,
   pruneStaleProposalProfileMatches,
@@ -40,10 +41,16 @@ import {
 
 export { triggerProposalProfileMatchingForZavorrina, triggerProposalCreatedMatching, triggerMatchingForUser };
 
+// Tap both loggers so every info/warn/error line automatically lands in the
+// in-memory ring buffer (not only the explicit addMatchLog() call-sites).
+hookPinoLogger(schedulerLogger, "scheduler");
+hookPinoLogger(matchingLogger, "matching");
+
 const MATCH_DEBOUNCE_MS = 10_000;
 
 let cycleInFlight = false;
 let lastMatchingStart: number | null = null;
+let lastCycleOutcome: "ok" | "error" | null = null;
 let lastCycleMeta: {
   completedAt: string;
   durationMs: number;
@@ -53,6 +60,10 @@ let lastCycleMeta: {
 
 export function getLastMatchingCycleMeta() {
   return lastCycleMeta;
+}
+
+export function getLastCycleOutcome(): "ok" | "error" | null {
+  return lastCycleOutcome;
 }
 
 /**
@@ -100,6 +111,7 @@ export function triggerMatchingRun(): { started: boolean; reason?: string } {
     void setMatchingLockState(true);
     const recorder = new PhaseRecorder("on-demand");
     schedulerLogger.info({ event: "cycle_start", trigger: "on-demand" }, "Ciclo on-demand avviato");
+    addMatchLog("INFO", "lock", "Ciclo on-demand avviato — lock acquisito");
 
     let totalMatches = 0;
     let garageMatches = 0;
@@ -114,6 +126,7 @@ export function triggerMatchingRun(): { started: boolean; reason?: string } {
         if (deleted > 0) schedulerLogger.info({ deleted }, "Eliminate proposte scadute");
       } catch (err) {
         schedulerLogger.error({ err }, "Errore eliminazione proposte scadute");
+        addMatchLog("ERROR", "cleanup_delete_expired", `Errore eliminazione proposte scadute: ${err instanceof Error ? err.message : String(err)}`);
       }
 
       const autoMatchSetting = await storage.getAppSetting("auto_matching_enabled");
@@ -128,7 +141,10 @@ export function triggerMatchingRun(): { started: boolean; reason?: string } {
           matchesCreated: propStats.matchesCreated,
         });
         totalMatches += matches;
-        if (matches > 0) schedulerLogger.info({ matches, ...propStats }, "new proposal matches");
+        if (matches > 0) {
+          schedulerLogger.info({ matches, ...propStats }, "new proposal matches");
+          addMatchLog("INFO", "proposal_matching", `Proposte: ${matches} match — candidati: ${propStats.candidatesPre ?? "?"}→${propStats.candidatesPost ?? "?"}`);
+        }
 
         garageMatches = await recorder.time("wishlist_matching", () => runWishlistMatching());
         const wishStats = getLastWishlistMatchingStats();
@@ -138,11 +154,17 @@ export function triggerMatchingRun(): { started: boolean; reason?: string } {
           matchesCreated: wishStats.matchesCreated,
         });
         totalMatches += garageMatches;
-        if (garageMatches > 0) schedulerLogger.info({ garageMatches, ...wishStats }, "new garage matches");
+        if (garageMatches > 0) {
+          schedulerLogger.info({ garageMatches, ...wishStats }, "new garage matches");
+          addMatchLog("INFO", "wishlist_matching", `Wishlist/garage: ${garageMatches} match`);
+        }
 
         bikerBikerMatchCount = await recorder.time("biker_biker_matching", () => runBikerBikerMatching());
         totalMatches += bikerBikerMatchCount;
-        if (bikerBikerMatchCount > 0) schedulerLogger.info({ bikerBikerMatchCount }, "new biker-biker matches");
+        if (bikerBikerMatchCount > 0) {
+          schedulerLogger.info({ bikerBikerMatchCount }, "new biker-biker matches");
+          addMatchLog("INFO", "biker_biker_matching", `Biker↔Biker: ${bikerBikerMatchCount} match`);
+        }
         // Task #2527 — metriche Prometheus per match creati per fase.
         void recordMatchesCreated("proposal", matches);
         void recordMatchesCreated("garage", garageMatches);
@@ -168,14 +190,16 @@ export function triggerMatchingRun(): { started: boolean; reason?: string } {
             if (typeof count === "number" && count > 0) {
               totalMatches += count;
               schedulerLogger.info({ phase: name, count }, "phase produced matches");
+              addMatchLog("INFO", name, `${name.replace(/_/g, " ")}: ${count} match`);
               // Task #2527 — metrica match creati per matcher/fase.
               void recordMatchesCreated(name, count);
             }
           } catch (err) {
             schedulerLogger.error({ err, phase: name }, "phase failed (non-blocking)");
-            // Task #2527 — Sentry + Prometheus per errori di fase.
+            void captureMatchingError(err, { phase: name, trigger: "on-demand" }).then((eid) => {
+              addMatchLog("ERROR", name, `Fase fallita: ${err instanceof Error ? err.message : String(err)}`, undefined, eid);
+            });
             void recordCycleError(name);
-            void captureMatchingError(err, { phase: name, trigger: "on-demand" });
           }
         }
 
@@ -183,14 +207,20 @@ export function triggerMatchingRun(): { started: boolean; reason?: string } {
           const fpResult = await runExtractRouteCellsJob();
           if (fpResult.usersProcessed > 0) {
             console.log(`[Matching] Route fingerprint aggiornata: ${fpResult.usersProcessed} utenti, ${fpResult.cellsTotal} celle`);
+            addMatchLog("INFO", "route_cells", `Route fingerprint: ${fpResult.usersProcessed} utenti, ${fpResult.cellsTotal} celle`);
           }
           const raCount = await runRouteSimilarityMatching();
-          if (raCount > 0) console.log(`[Matching] Found ${raCount} new route-affinity matches`);
+          if (raCount > 0) {
+            console.log(`[Matching] Found ${raCount} new route-affinity matches`);
+            addMatchLog("INFO", "route_similarity", `Route affinity: ${raCount} match`);
+          }
         } catch (err) {
           console.error("[Matching] RouteAffinity matching error (non-blocking):", err);
+          addMatchLog("ERROR", "route_affinity", `Route affinity errore: ${err instanceof Error ? err.message : String(err)}`);
         }
       } else {
         schedulerLogger.info("Auto matching disabilitato dall'admin, skip");
+        addMatchLog("WARN", "auto_match", "Auto matching disabilitato dall'admin — ciclo saltato");
       }
 
       const cycleMetric = recorder.finish(totalMatches);
@@ -215,6 +245,8 @@ export function triggerMatchingRun(): { started: boolean; reason?: string } {
         })
         .catch((err) => schedulerLogger.warn({ err }, "matching_scheduler_state persist failed (non-blocking)"));
 
+      lastCycleOutcome = "ok";
+      addMatchLog("INFO", "cycle_complete", `Ciclo completato — ${totalMatches} match totali — ${prettyMs(cycleMetric.durationMs)} — ${memoryRssPretty()}`);
       schedulerLogger.info(
         { duration: prettyMs(cycleMetric.durationMs), totalMatches, rss: memoryRssPretty() },
         "Ciclo on-demand completato"
@@ -223,18 +255,25 @@ export function triggerMatchingRun(): { started: boolean; reason?: string } {
       schedulerLogger.error({ err }, "Errore nel ciclo on-demand");
       recorder.finish(totalMatches);
       cycleStatus = "error";
+      lastCycleOutcome = "error";
       void recordCycleError("cycle_root");
-      void captureMatchingError(err, { trigger: "on-demand", phase: "cycle_root" });
+      void captureMatchingError(err, { trigger: "on-demand", phase: "cycle_root" }).then((eid) => {
+        addMatchLog("ERROR", "cycle_root", `Errore ciclo: ${err instanceof Error ? err.message : String(err)}`, undefined, eid);
+      });
     }
     });
     if (!lockOutcome.acquired) {
       schedulerLogger.warn({ reason: lockOutcome.reason }, "Ciclo skippato — lock già attivo");
+      addMatchLog("WARN", "lock", `Ciclo skippato — lock già attivo: ${lockOutcome.reason ?? ""}`);
     }
     } catch (err) {
       schedulerLogger.error({ err }, "Errore non gestito attorno a withMatchingLock");
       cycleStatus = "error";
+      lastCycleOutcome = "error";
       void recordCycleError("lock_wrapper");
-      void captureMatchingError(err, { trigger: "on-demand", phase: "lock_wrapper" });
+      void captureMatchingError(err, { trigger: "on-demand", phase: "lock_wrapper" }).then((eid) => {
+        addMatchLog("ERROR", "lock_wrapper", `Errore withMatchingLock: ${err instanceof Error ? err.message : String(err)}`, undefined, eid);
+      });
     } finally {
       // Task #2527 — chiusura ciclo: durata + status + lock state per Prometheus.
       void recordMatchingCycle(cycleStatus, Date.now() - cycleStartedAt);

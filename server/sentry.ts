@@ -41,12 +41,18 @@ export async function attachSentryErrorHandler(app: Express): Promise<void> {
   }
 }
 
-export async function captureMatchingError(err: unknown, context: Record<string, unknown> = {}): Promise<void> {
-  if (!sentryReady) return;
+/**
+ * Captures an exception via Sentry and returns the Sentry event ID so it can
+ * be stored alongside the ring-buffer log entry for deep-link access.
+ * Returns null if Sentry is disabled or the capture fails.
+ */
+export async function captureMatchingError(err: unknown, context: Record<string, unknown> = {}): Promise<string | null> {
+  if (!sentryReady) return null;
   try {
     const Sentry = await import("@sentry/node");
-    Sentry.captureException(err, { extra: { component: "matching", ...context } });
+    const eventId = Sentry.captureException(err, { extra: { component: "matching", ...context } });
+    return eventId ?? null;
   } catch {
-    /* ignore */
+    return null;
   }
 }

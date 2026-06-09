@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, Platform } from "react-native";
 import { useRouter } from "expo-router";
 import type { Href } from "expo-router";
 import { MaterialCommunityIcons, MaterialIcons, Ionicons } from "@expo/vector-icons";
@@ -12,6 +12,7 @@ import { ThinkCentreEfficiencyCard } from "@/components/admin/ThinkCentreEfficie
 import { RoutingCoordinationCard } from "@/components/admin/RoutingCoordinationCard";
 import { RoutingCloudBanner } from "@/components/admin/RoutingCloudBanner";
 import { WhisperChainCard } from "@/components/admin/WhisperChainCard";
+import { MatchingMonitorCard } from "@/components/admin/MatchingMonitorCard";
 
 type MaterialIconName = React.ComponentProps<typeof MaterialIcons>["name"];
 type MaterialCommunityIconName = React.ComponentProps<typeof MaterialCommunityIcons>["name"];
@@ -249,6 +250,7 @@ export default function AdminDashboard() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [search, setSearch] = useState("");
+  const [matchingEngineStatus, setMatchingEngineStatus] = useState<"ok" | "degraded" | "offline">("ok");
 
   const initialCollapsed = useMemo<Record<string, boolean>>(
     () => Object.fromEntries(adminGroups.map((g) => [g.title, !OPEN_BY_DEFAULT.has(g.title)])),
@@ -327,6 +329,21 @@ export default function AdminDashboard() {
           <GraphHopperCard />
           <TelemetryCard />
           <WhisperChainCard />
+          {matchingEngineStatus !== "ok" && (
+            <View style={[styles.matchingStatusBanner, matchingEngineStatus === "offline" ? styles.matchingStatusOffline : styles.matchingStatusDegraded]}>
+              <MaterialCommunityIcons
+                name={matchingEngineStatus === "offline" ? "link-off" : "alert"}
+                size={14}
+                color={matchingEngineStatus === "offline" ? "#ef4444" : "#f59e0b"}
+              />
+              <Text style={[styles.matchingStatusText, { color: matchingEngineStatus === "offline" ? "#ef4444" : "#f59e0b" }]}>
+                {matchingEngineStatus === "offline"
+                  ? "Matching Engine offline — endpoint non raggiungibile"
+                  : "Matching Engine degraded — errori rilevati negli ultimi 5 minuti"}
+              </Text>
+            </View>
+          )}
+          <MatchingMonitorCard onStatus={setMatchingEngineStatus} />
         </>
       )}
 
@@ -420,6 +437,14 @@ const styles = StyleSheet.create({
   clearButton: {
     marginLeft: 8,
   },
+  matchingStatusBanner: {
+    flexDirection: "row", alignItems: "center", gap: 6,
+    paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8,
+    marginBottom: 8,
+  },
+  matchingStatusDegraded: { backgroundColor: "#f59e0b18", borderWidth: 1, borderColor: "#f59e0b44" },
+  matchingStatusOffline: { backgroundColor: "#ef444418", borderWidth: 1, borderColor: "#ef444444" },
+  matchingStatusText: { fontFamily: "Inter_500Medium", fontSize: 12, flex: 1 },
   emptyState: {
     paddingVertical: 40,
     alignItems: "center",

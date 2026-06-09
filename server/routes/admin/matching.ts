@@ -12,6 +12,7 @@ import debugRouter from "./matching/debug";
 import explainRouter from "./matching/explain";
 import notificationsRouter from "./matching/notifications";
 import rulesRouter from "./matching/rules";
+import monitorRouter from "./matching/monitor";
 
 const router = Router();
 
@@ -26,5 +27,6 @@ router.use(debugRouter);
 router.use(explainRouter);
 router.use(notificationsRouter);
 router.use(rulesRouter);
+router.use(monitorRouter);
 
 export default router;
