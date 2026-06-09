@@ -24,9 +24,10 @@ const STORAGE_KEY = "admin_system_health_collapsed";
 interface StatusDotProps {
   label: string;
   status: DotStatus;
+  showPersistentLabel?: boolean;
 }
 
-export function StatusDot({ label, status }: StatusDotProps) {
+export function StatusDot({ label, status, showPersistentLabel }: StatusDotProps) {
   const [showLabel, setShowLabel] = useState(false);
 
   return (
@@ -38,7 +39,10 @@ export function StatusDot({ label, status }: StatusDotProps) {
       style={styles.dotWrapper}
     >
       <View style={[styles.dot, { backgroundColor: DOT_COLOR[status] }]} />
-      {showLabel && (
+      {showPersistentLabel && (
+        <Text style={styles.dotLabel} numberOfLines={1}>{label}</Text>
+      )}
+      {!showPersistentLabel && showLabel && (
         <View style={styles.tooltip}>
           <Text style={styles.tooltipText}>{label}</Text>
         </View>
@@ -65,7 +69,7 @@ const DOT_DEFS: { key: keyof SystemStatuses; label: string }[] = [
   { key: "graphhopper", label: "GraphHopper" },
   { key: "valhalla", label: "Valhalla" },
   { key: "nominatim", label: "Nominatim" },
-  { key: "routing", label: "Routing Engine System" },
+  { key: "routing", label: "Routing" },
 ];
 
 export function SystemHealthContainer({
@@ -97,9 +101,14 @@ export function SystemHealthContainer({
       >
         <Ionicons name="pulse-outline" size={18} color={Colors.textSecondary} />
         <Text style={styles.title}>System Health</Text>
-        <View style={styles.dotsRow}>
+        <View style={[styles.dotsRow, !collapsed && styles.dotsRowExpanded]}>
           {DOT_DEFS.map(({ key, label }) => (
-            <StatusDot key={key} label={label} status={statuses[key]} />
+            <StatusDot
+              key={key}
+              label={label}
+              status={statuses[key]}
+              showPersistentLabel={!collapsed}
+            />
           ))}
         </View>
         <Ionicons
@@ -153,14 +162,25 @@ const styles = StyleSheet.create({
   bodyHidden: {
     display: "none",
   },
+  dotsRowExpanded: {
+    alignItems: "flex-start",
+  },
   dotWrapper: {
     alignItems: "center",
-    justifyContent: "center",
+    justifyContent: "flex-start",
   },
   dot: {
     width: 16,
     height: 16,
     borderRadius: 8,
+  },
+  dotLabel: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 10,
+    color: Colors.textSecondary,
+    marginTop: 3,
+    textAlign: "center",
+    maxWidth: 52,
   },
   tooltip: {
     position: "absolute",
