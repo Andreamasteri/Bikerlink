@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, Platform } from "react-native";
 import { useRouter } from "expo-router";
 import type { Href } from "expo-router";
@@ -13,6 +13,8 @@ import { RoutingCoordinationCard } from "@/components/admin/RoutingCoordinationC
 import { RoutingCloudBanner } from "@/components/admin/RoutingCloudBanner";
 import { WhisperChainCard } from "@/components/admin/WhisperChainCard";
 import { MatchingMonitorCard } from "@/components/admin/MatchingMonitorCard";
+import { SystemHealthContainer } from "@/components/admin/SystemHealthContainer";
+import type { SystemStatuses, DotStatus } from "@/components/admin/SystemHealthContainer";
 
 type MaterialIconName = React.ComponentProps<typeof MaterialIcons>["name"];
 type MaterialCommunityIconName = React.ComponentProps<typeof MaterialCommunityIcons>["name"];
@@ -246,11 +248,31 @@ function normalize(text: string): string {
     .replace(/\s+/g, " ");
 }
 
+const UNKNOWN_STATUSES: SystemStatuses = {
+  thinkcentre: "unknown",
+  graphhopper: "unknown",
+  valhalla: "unknown",
+  nominatim: "unknown",
+  routing: "unknown",
+};
+
 export default function AdminDashboard() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [search, setSearch] = useState("");
   const [matchingEngineStatus, setMatchingEngineStatus] = useState<"ok" | "degraded" | "offline">("ok");
+  const [systemStatuses, setSystemStatuses] = useState<SystemStatuses>(UNKNOWN_STATUSES);
+
+  const handleThinkCentreStatuses = useCallback(
+    (s: Pick<SystemStatuses, "thinkcentre" | "graphhopper" | "valhalla" | "nominatim">) => {
+      setSystemStatuses((prev) => ({ ...prev, ...s }));
+    },
+    []
+  );
+
+  const handleRoutingStatus = useCallback((routing: DotStatus) => {
+    setSystemStatuses((prev) => ({ ...prev, routing }));
+  }, []);
 
   const initialCollapsed = useMemo<Record<string, boolean>>(
     () => Object.fromEntries(adminGroups.map((g) => [g.title, !OPEN_BY_DEFAULT.has(g.title)])),
@@ -322,28 +344,30 @@ export default function AdminDashboard() {
       {!isSearching && (
         <>
           <RoutingCloudBanner onPress={() => router.push("/admin/routing-health" as never)} />
-          <ServerEfficiencyCard />
-          <ThinkCentreEfficiencyCard />
-          <ThinkCentreCard />
-          <RoutingCoordinationCard />
-          <GraphHopperCard />
-          <TelemetryCard />
-          <WhisperChainCard />
-          {matchingEngineStatus !== "ok" && (
-            <View style={[styles.matchingStatusBanner, matchingEngineStatus === "offline" ? styles.matchingStatusOffline : styles.matchingStatusDegraded]}>
-              <MaterialCommunityIcons
-                name={matchingEngineStatus === "offline" ? "link-off" : "alert"}
-                size={14}
-                color={matchingEngineStatus === "offline" ? "#ef4444" : "#f59e0b"}
-              />
-              <Text style={[styles.matchingStatusText, { color: matchingEngineStatus === "offline" ? "#ef4444" : "#f59e0b" }]}>
-                {matchingEngineStatus === "offline"
-                  ? "Matching Engine offline — endpoint non raggiungibile"
-                  : "Matching Engine degraded — errori rilevati negli ultimi 5 minuti"}
-              </Text>
-            </View>
-          )}
-          <MatchingMonitorCard onStatus={setMatchingEngineStatus} />
+          <SystemHealthContainer statuses={systemStatuses}>
+            <ServerEfficiencyCard />
+            <ThinkCentreEfficiencyCard />
+            <ThinkCentreCard onStatuses={handleThinkCentreStatuses} />
+            <RoutingCoordinationCard onStatus={handleRoutingStatus} />
+            <GraphHopperCard />
+            <TelemetryCard />
+            <WhisperChainCard />
+            {matchingEngineStatus !== "ok" && (
+              <View style={[styles.matchingStatusBanner, matchingEngineStatus === "offline" ? styles.matchingStatusOffline : styles.matchingStatusDegraded]}>
+                <MaterialCommunityIcons
+                  name={matchingEngineStatus === "offline" ? "link-off" : "alert"}
+                  size={14}
+                  color={matchingEngineStatus === "offline" ? "#ef4444" : "#f59e0b"}
+                />
+                <Text style={[styles.matchingStatusText, { color: matchingEngineStatus === "offline" ? "#ef4444" : "#f59e0b" }]}>
+                  {matchingEngineStatus === "offline"
+                    ? "Matching Engine offline — endpoint non raggiungibile"
+                    : "Matching Engine degraded — errori rilevati negli ultimi 5 minuti"}
+                </Text>
+              </View>
+            )}
+            <MatchingMonitorCard onStatus={setMatchingEngineStatus} />
+          </SystemHealthContainer>
         </>
       )}
 

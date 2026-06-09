@@ -1,9 +1,10 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { View, Text, StyleSheet, ActivityIndicator, TouchableOpacity } from "react-native";
 import { MaterialCommunityIcons, Ionicons } from "@expo/vector-icons";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import Colors from "@/constants/colors";
 import { getApiUrl, authFetchHeaders } from "@/lib/query-client";
+import type { DotStatus } from "./SystemHealthContainer";
 
 type PipelineOutcome = "ok" | "fallback" | "error";
 
@@ -111,7 +112,20 @@ function overallColor(summary: PipelineSummary | undefined): string {
   return "#22c55e";
 }
 
-export function RoutingCoordinationCard() {
+function metricsToStatus(metrics: RoutingStatusResponse["metrics"] | undefined): DotStatus {
+  if (!metrics) return "unknown";
+  const total = metrics.successes + metrics.fallbacks + metrics.failures;
+  if (total === 0) return "unknown";
+  if (metrics.failures > 0) return "offline";
+  if (metrics.fallbacks > 0) return "degraded";
+  return "ok";
+}
+
+export function RoutingCoordinationCard({
+  onStatus,
+}: {
+  onStatus?: (s: DotStatus) => void;
+}) {
   const [collapsed, setCollapsed] = useState(true);
   const [openFlow, setOpenFlow] = useState(true);
   const [openLog, setOpenLog] = useState(true);
@@ -122,7 +136,6 @@ export function RoutingCoordinationCard() {
     queryFn: () => authGet<RoutingStatusResponse>("/api/admin/routing/status"),
     refetchInterval: 30_000,
     staleTime: 20_000,
-    enabled: !collapsed,
   });
 
   const aiMode = status?.activeEngine === "ai";
@@ -156,6 +169,11 @@ export function RoutingCoordinationCard() {
       return json as CoherenceResponse;
     },
   });
+
+  useEffect(() => {
+    if (!onStatus) return;
+    onStatus(metricsToStatus(status?.metrics));
+  }, [status?.metrics, onStatus]);
 
   const headerColor = overallColor(pipeline?.summary);
   const summary = pipeline?.summary;

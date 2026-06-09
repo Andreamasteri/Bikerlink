@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { View, Text, StyleSheet, ActivityIndicator, TouchableOpacity, Switch } from "react-native";
 import { MaterialCommunityIcons, Ionicons } from "@expo/vector-icons";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -8,6 +8,7 @@ import { ErrorHistory, EventLog, GraphHopperBlock } from "./ThinkCentreCardParts
 import type { HealthEvent, AreaServiceHealth } from "./ThinkCentreCardParts";
 import { ValhallaBlock, NominatimBlock } from "./ThinkCentreValhallaNominatimBlocks";
 import type { ValhallaDetailedHealth, NominatimDetailedHealth } from "./ThinkCentreValhallaNominatimBlocks";
+import type { DotStatus, SystemStatuses } from "./SystemHealthContainer";
 
 type ServiceKey = "valhalla" | "ollama" | "whisper" | "nominatim";
 
@@ -88,7 +89,32 @@ function serviceStatusLabel(s: ServiceHealth): string {
   return s.error ? `Offline · ${s.error}` : "Offline";
 }
 
-export function ThinkCentreCard() {
+function overallToStatus(overall: ThinkCentreHealth["overall"]): DotStatus {
+  if (overall === "green") return "ok";
+  if (overall === "yellow") return "degraded";
+  if (overall === "red") return "offline";
+  return "unknown";
+}
+
+function serviceToStatus(s: ServiceHealth | undefined): DotStatus {
+  if (!s || !s.configured) return "unknown";
+  return s.ok ? "ok" : "offline";
+}
+
+function ghToStatus(areas: AreaServiceHealth[], configured: boolean): DotStatus {
+  if (!configured || areas.length === 0) return "unknown";
+  const anyOk = areas.some((a) => a.ok);
+  const allOk = areas.every((a) => a.ok);
+  if (allOk) return "ok";
+  if (anyOk) return "degraded";
+  return "offline";
+}
+
+export function ThinkCentreCard({
+  onStatuses,
+}: {
+  onStatuses?: (s: Pick<SystemStatuses, "thinkcentre" | "graphhopper" | "valhalla" | "nominatim">) => void;
+}) {
   const [collapsed, setCollapsed] = useState(true);
 
   const { data, isLoading, isFetching, error, refetch } = useQuery<ThinkCentreHealth>({
@@ -162,6 +188,18 @@ export function ThinkCentreCard() {
       void queryClient.invalidateQueries({ queryKey: ["/api/admin/settings/thinkcentre-service-push"] });
     },
   });
+
+  useEffect(() => {
+    if (!data || !onStatuses) return;
+    const vSvc = data.services.find((s) => s.key === "valhalla");
+    const nSvc = data.services.find((s) => s.key === "nominatim");
+    onStatuses({
+      thinkcentre: overallToStatus(data.overall),
+      graphhopper: ghToStatus(data.graphhopperAreas, data.graphhopperConfigured),
+      valhalla: serviceToStatus(vSvc),
+      nominatim: serviceToStatus(nSvc),
+    });
+  }, [data, onStatuses]);
 
   const headerColor = data ? OVERALL_COLOR[data.overall] : "#6b7280";
 
