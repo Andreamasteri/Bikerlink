@@ -20,7 +20,8 @@
  *   pm2 startup
  *
  * Variabili d'ambiente:
- *   PORT          — porta di ascolto (default: 9101)
+ *   PORT          — porta di ascolto (default: 9199)
+ *                   NB: 9101 è occupata da Bacula Director sul ThinkCentre.
  *   AGENT_TOKEN   — se impostato, richiede header "X-Agent-Token: <token>"
  *   DISK_PATH     — path del disco da monitorare (default: /)
  */
@@ -31,7 +32,7 @@ const os   = require("os");
 const nodePath = require("path");
 const { execSync, exec } = require("child_process");
 
-const PORT        = parseInt(process.env.PORT || "9101", 10);
+const PORT        = parseInt(process.env.PORT || "9199", 10);
 const AGENT_TOKEN = process.env.AGENT_TOKEN || "";
 const DISK_PATH   = process.env.DISK_PATH   || "/";
 
