@@ -19,11 +19,12 @@ import {
   type ScoreBreakdown,
 } from "./scoring";
 import { db } from "../db";
-import { entityTags, tags as tagsTable, tagCategories } from "@shared/db";
-import { and, eq, inArray } from "drizzle-orm";
+import { entityTags, tags as tagsTable, tagCategories, zavarrinaWishlistMotos } from "@shared/db";
+import { and, count, eq, inArray } from "drizzle-orm";
 import { bboxAround } from "../lib/geo-bbox";
 import { createUserLoader } from "../lib/user-loader";
 import { matchingLogger } from "../lib/logger";
+import { addMatchLog } from "./match-log-buffer";
 
 export type MatchingRunStats = {
   candidatesPre: number;
@@ -179,6 +180,16 @@ export async function runWishlistMatching(): Promise<number> {
       if (!Array.isArray(matchingCountries) || matchingCountries.length === 0) matchingCountries = undefined;
     }
 
+    // Fast-path: skip the heavy JOIN entirely when the wishlist table is empty.
+    // This avoids a crash caused by a SQL/schema issue in the complex query
+    // when there is no data to match on (which is the expected state until
+    // real zavarrine populate their wishlists).
+    const [{ wishlistRowCount }] = await db.select({ wishlistRowCount: count() }).from(zavarrinaWishlistMotos);
+    if (wishlistRowCount === 0) {
+      matchingLogger.info({ scope: "wishlist" }, "WishlistMatching: wishlist vuota, nessuna coppia possibile");
+      return 0;
+    }
+
     // SQL JOIN — only compatible wishlist↔garage pairs are returned, with
     // isFake/status/role/userType + optional country filter applied in SQL.
     const compatiblePairs = await storage.getCompatibleWishlistGaragePairs(matchingCountries);
@@ -271,29 +282,34 @@ export async function runWishlistMatching(): Promise<number> {
         // suppress "unused" warning until thresholds in supermatch fully wired
         void getThresholdSync;
 
-        const inserted = await storage.createMatch({
-          bikerId,
-          zavarrinaId,
-          bikerMotorcycleId: moto.id,
-          wishlistMotoId: wish.id,
-          status: "new",
-          isSupermatch,
-          scoreBreakdown: breakdown,
-        });
-
-        existingKeys.add(key);
-        matchCount++;
-        if (inserted) {
-          const motoParts = [moto.brand, moto.model].filter(Boolean);
-          const matchName = motoParts.length > 0 ? motoParts.join(" ") : undefined;
-          await dispatchMatchNotification({
-            table: "biker_zavorrina_matches",
-            matchId: inserted.id,
-            userIds: [bikerId, zavarrinaId],
-            priority: classifyMatch({ isSupermatch }),
+        try {
+          const inserted = await storage.createMatch({
+            bikerId,
+            zavarrinaId,
+            bikerMotorcycleId: moto.id,
+            wishlistMotoId: wish.id,
+            status: "new",
             isSupermatch,
-            matchName,
+            scoreBreakdown: breakdown,
           });
+
+          existingKeys.add(key);
+          matchCount++;
+          if (inserted) {
+            const motoParts = [moto.brand, moto.model].filter(Boolean);
+            const matchName = motoParts.length > 0 ? motoParts.join(" ") : undefined;
+            await dispatchMatchNotification({
+              table: "biker_zavorrina_matches",
+              matchId: inserted.id,
+              userIds: [bikerId, zavarrinaId],
+              priority: classifyMatch({ isSupermatch }),
+              isSupermatch,
+              matchName,
+            });
+          }
+        } catch (pairErr) {
+          matchingLogger.warn({ err: pairErr, bikerId, zavarrinaId }, "WishlistMatching: coppia fallita (non-blocking)");
+          addMatchLog("WARN", "wishlist_matching", `Coppia fallita (${bikerId}↔${zavarrinaId}): ${pairErr instanceof Error ? pairErr.message : String(pairErr)}`);
         }
       }
     }
@@ -314,7 +330,11 @@ export async function runWishlistMatching(): Promise<number> {
 
     return matchCount;
   } catch (error) {
-    matchingLogger.error({ err: error }, "Wishlist matching error");
+    const errMsg = error instanceof Error ? error.message : String(error);
+    const errCode = (error as Record<string, unknown>)?.code as string | undefined;
+    const detail = errCode ? `${errMsg} [code=${errCode}]` : errMsg;
+    matchingLogger.error({ err: error, errCode }, `Wishlist matching error: ${detail}`);
+    addMatchLog("ERROR", "wishlist_matching", `Wishlist matching error: ${detail}`);
     return 0;
   }
 }
