@@ -44,5 +44,11 @@ export default defineConfig({
     // app_crash_logs ha GIN trgm indexes su device_brand e device_model (migration 0087)
     // che Drizzle non sa generare con gin_trgm_ops → escludiamo dal diff publish.
     "!app_crash_logs",
+    // tags, users, user_motorcycles hanno GIN expression indexes su normalize_text(col)
+    // (migration 0042). Drizzle non può gestire expression indexes con operator class
+    // personalizzata → escludiamo dal diff publish per prevenire DROP/CREATE errati.
+    "!tags",
+    "!users",
+    "!user_motorcycles",
   ],
 });

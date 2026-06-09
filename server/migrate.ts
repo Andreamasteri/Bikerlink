@@ -38,7 +38,27 @@ const SKIPPABLE_ERROR_CODES = new Set([
   "42704",
 ]);
 
+/**
+ * Returns true when a 42704 (undefined_object) error is caused by a missing
+ * GIN operator class (e.g. `gin_trgm_ops` when pg_trgm is not enabled).
+ *
+ * 42704 is normally skippable for DROP CONSTRAINT / DROP TYPE / DROP INDEX on
+ * a missing object. But when a CREATE INDEX ... USING gin (col gin_trgm_ops)
+ * fails with 42704, it means the operator class itself doesn't exist — the
+ * extension is not enabled. This is a FATAL error that must NOT be silently
+ * skipped: the index would never be created and the migration would be marked
+ * as applied with no actual work done.
+ *
+ * Detection: message contains both "operator class" and "gin" when code=42704.
+ */
+function isGinOperatorClassError(err: unknown): boolean {
+  if ((err as { code?: string })?.code !== "42704") return false;
+  const msg = (err instanceof Error ? err.message : String(err)).toLowerCase();
+  return msg.includes("operator class") && msg.includes("gin");
+}
+
 function isSkippableError(err: unknown): boolean {
+  if (isGinOperatorClassError(err)) return false;
   const code = (err as { code?: string })?.code;
   return typeof code === "string" && SKIPPABLE_ERROR_CODES.has(code);
 }
