@@ -44,6 +44,8 @@ export interface CrashLogRow {
   platform: string | null;
   osVersion: string | null;
   deviceModel: string | null;
+  deviceBrand: string | null;
+  totalMemoryMb: number | null;
   errorMessage: string | null;
   stackTrace: string | null;
   sessionStartedAt: string | null;
@@ -55,7 +57,25 @@ export interface CrashLogRow {
 export interface DeviceStat {
   platform: string | null;
   deviceModel: string | null;
+  deviceBrand: string | null;
   total: number;
+}
+
+export interface BrandStat {
+  brand: string;
+  total: number;
+  pct: number;
+}
+
+export interface CrashAlert {
+  device_model: string;
+  device_brand: string | null;
+  cnt: number;
+}
+
+export interface CrashAlertsResponse {
+  alerts: CrashAlert[];
+  threshold: number;
 }
 
 export interface CrashLogsResponse {
@@ -64,6 +84,7 @@ export interface CrashLogsResponse {
   page: number;
   limit: number;
   deviceStats: DeviceStat[];
+  brandStats: BrandStat[];
 }
 
 export interface VersionStat {

@@ -144,6 +144,8 @@ export const appCrashLogs = pgTable("app_crash_logs", {
   platform: varchar("platform", { length: 16 }),
   osVersion: varchar("os_version", { length: 50 }),
   deviceModel: varchar("device_model", { length: 100 }),
+  deviceBrand: varchar("device_brand", { length: 100 }),
+  totalMemoryMb: integer("total_memory_mb"),
   errorMessage: text("error_message"),
   stackTrace: text("stack_trace"),
   sessionStartedAt: timestamp("session_started_at"),

@@ -53,10 +53,20 @@ export function CrashLogCard({
             </Text>
           </View>
         ) : null}
-        {item.deviceModel ? (
+        {(item.deviceBrand || item.deviceModel) ? (
           <View style={cardStyles.metaItem}>
             <MaterialCommunityIcons name="cellphone" size={12} color={colors.textSecondary} />
-            <Text style={[cardStyles.metaText, { color: colors.textSecondary }]}>{item.deviceModel}</Text>
+            <Text style={[cardStyles.metaText, { color: colors.textSecondary }]}>
+              {[item.deviceBrand, item.deviceModel].filter(Boolean).join(" ")}
+            </Text>
+          </View>
+        ) : null}
+        {item.totalMemoryMb != null ? (
+          <View style={cardStyles.metaItem}>
+            <MaterialCommunityIcons name="memory" size={12} color={colors.textSecondary} />
+            <Text style={[cardStyles.metaText, { color: item.totalMemoryMb < 2048 ? "#FF6B35" : colors.textSecondary }]}>
+              {(item.totalMemoryMb / 1024).toFixed(1)} GB RAM
+            </Text>
           </View>
         ) : null}
         {item.appVersion ? (

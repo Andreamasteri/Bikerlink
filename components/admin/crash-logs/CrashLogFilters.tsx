@@ -21,6 +21,8 @@ interface CrashLogFiltersProps {
   setFilterDateFrom: (val: string) => void;
   filterDateTo: string;
   setFilterDateTo: (val: string) => void;
+  filterDevice: string;
+  setFilterDevice: (val: string) => void;
   showFilters: boolean;
   setShowFilters: (val: boolean | ((v: boolean) => boolean)) => void;
   resetFilters: () => void;
@@ -38,13 +40,15 @@ export function CrashLogFilters({
   setFilterDateFrom,
   filterDateTo,
   setFilterDateTo,
+  filterDevice,
+  setFilterDevice,
   showFilters,
   setShowFilters,
   resetFilters,
   setPage,
 }: CrashLogFiltersProps) {
   const colors = useColors();
-  const hasActiveFilters = !!(filterUser.trim() || filterVersion.trim() || filterDateFrom.trim() || filterDateTo.trim());
+  const hasActiveFilters = !!(filterUser.trim() || filterVersion.trim() || filterDateFrom.trim() || filterDateTo.trim() || filterDevice.trim());
 
   return (
     <View>
@@ -81,6 +85,18 @@ export function CrashLogFilters({
 
       {showFilters && (
         <View style={[styles.filtersPanel, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <View style={styles.filterRow}>
+            <Text style={[styles.filterLabel, { color: colors.textSecondary }]}>Dispositivo</Text>
+            <TextInput
+              style={[styles.filterInput, { color: colors.text, borderColor: colors.border, backgroundColor: colors.background }]}
+              value={filterDevice}
+              onChangeText={(v) => { setFilterDevice(v); setPage(1); }}
+              placeholder="es. Xiaomi, Samsung, Redmi…"
+              placeholderTextColor={colors.textSecondary}
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+          </View>
           <View style={styles.filterRow}>
             <Text style={[styles.filterLabel, { color: colors.textSecondary }]}>User ID</Text>
             <TextInput
@@ -165,7 +181,7 @@ const styles = StyleSheet.create({
   filterLabel: {
     fontFamily: "Inter_500Medium",
     fontSize: 13,
-    width: 60,
+    width: 70,
   },
   filterInput: {
     flex: 1,

@@ -1,13 +1,16 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { AppState, Platform } from "react-native";
 import Constants from "expo-constants";
+import * as Device from "expo-device";
 import { apiRequest } from "@/lib/query-client";
 
 const SESSION_KEY = "@bikerlink/crash_session";
 const QUEUE_KEY = "@bikerlink/crash_queue";
 const MAX_QUEUE = 100;
+const MAX_QUEUE_LOW_RAM = 20;
 const BATCH_SIZE = 50;
 const RETRY_INTERVAL_MS = 5 * 60 * 1000;
+const LOW_RAM_THRESHOLD_MB = 2048;
 
 export type CrashType = "crash_system" | "crash_js" | "clean_close";
 
@@ -26,6 +29,8 @@ export interface CrashLogEntry {
   platform: string;
   osVersion: string | null;
   deviceModel: string | null;
+  deviceBrand: string | null;
+  totalMemoryMB: number | null;
   errorMessage: string | null;
   stackTrace: string | null;
   sessionStartedAt: string;
@@ -53,12 +58,44 @@ function getOsVersion(): string | null {
 
 function getDeviceModel(): string | null {
   try {
+    const model = Device.modelName;
+    if (model) return model;
     const c = Platform.constants as Record<string, unknown>;
     if (typeof c?.Model === "string") return c.Model;
     return null;
   } catch {
     return null;
   }
+}
+
+function getDeviceBrand(): string | null {
+  try {
+    return Device.brand ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function getTotalMemoryMB(): number | null {
+  try {
+    const bytes = Device.totalMemory;
+    if (typeof bytes === "number" && bytes > 0) {
+      return Math.round(bytes / (1024 * 1024));
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+function getMaxQueue(): number {
+  try {
+    const mb = getTotalMemoryMB();
+    if (mb !== null && mb < LOW_RAM_THRESHOLD_MB) return MAX_QUEUE_LOW_RAM;
+  } catch {
+    // fall through
+  }
+  return MAX_QUEUE;
 }
 
 let _currentSession: CrashSessionMeta | null = null;
@@ -79,7 +116,8 @@ async function readQueue(): Promise<CrashLogEntry[]> {
 
 async function writeQueue(queue: CrashLogEntry[]): Promise<void> {
   try {
-    const trimmed = queue.slice(-MAX_QUEUE);
+    const maxQ = getMaxQueue();
+    const trimmed = queue.slice(-maxQ);
     await AsyncStorage.setItem(QUEUE_KEY, JSON.stringify(trimmed));
   } catch {
     // no-op: crash queue persistence is best-effort
@@ -121,6 +159,8 @@ export async function markJsError(error: Error, stack?: string): Promise<void> {
     platform: Platform.OS,
     osVersion: getOsVersion(),
     deviceModel: getDeviceModel(),
+    deviceBrand: getDeviceBrand(),
+    totalMemoryMB: getTotalMemoryMB(),
     errorMessage: errMsg || null,
     stackTrace: errStack || null,
     sessionStartedAt: _currentSession.startedAt,
@@ -182,6 +222,8 @@ export async function initCrashLogger(userId: string): Promise<void> {
         platform: Platform.OS,
         osVersion: getOsVersion(),
         deviceModel: getDeviceModel(),
+        deviceBrand: getDeviceBrand(),
+        totalMemoryMB: getTotalMemoryMB(),
         errorMessage: prevSession.jsError?.message ?? null,
         stackTrace: prevSession.jsError?.stack ?? null,
         sessionStartedAt: prevSession.startedAt,
