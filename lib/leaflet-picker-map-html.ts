@@ -103,28 +103,34 @@ html, body, #map { width: 100%; height: 100%; background: #1a1a1a; }
       "box-shadow:0 2px 8px rgba(0,0,0,0.6);\\"></div>";
   }
 
-  if (initialSelected) {
-    selectedMarker = L.marker([initialSelected.lat, initialSelected.lng], {
-      icon: L.divIcon({ html: makeSelectedPin(), className: "", iconSize: [26, 26], iconAnchor: [13, 13] })
+  function makeDraggableMarker(lat, lng) {
+    var m = L.marker([lat, lng], {
+      icon: L.divIcon({ html: makeSelectedPin(), className: "", iconSize: [26, 26], iconAnchor: [13, 13] }),
+      draggable: true
     }).addTo(map);
+    m.on("dragend", function() {
+      var pos = m.getLatLng();
+      postMsg({ type: "coordPicked", lat: pos.lat, lng: pos.lng });
+    });
+    return m;
+  }
+
+  if (initialSelected) {
+    selectedMarker = makeDraggableMarker(initialSelected.lat, initialSelected.lng);
   }
 
   map.on("click", function(e) {
     var lat = e.latlng.lat;
     var lng = e.latlng.lng;
     if (selectedMarker) { map.removeLayer(selectedMarker); }
-    selectedMarker = L.marker([lat, lng], {
-      icon: L.divIcon({ html: makeSelectedPin(), className: "", iconSize: [26, 26], iconAnchor: [13, 13] })
-    }).addTo(map);
+    selectedMarker = makeDraggableMarker(lat, lng);
     postMsg({ type: "coordPicked", lat: lat, lng: lng });
   });
 
   window.pickerBridge = {
     setCoord: function(lat, lng) {
       if (selectedMarker) { map.removeLayer(selectedMarker); }
-      selectedMarker = L.marker([lat, lng], {
-        icon: L.divIcon({ html: makeSelectedPin(), className: "", iconSize: [26, 26], iconAnchor: [13, 13] })
-      }).addTo(map);
+      selectedMarker = makeDraggableMarker(lat, lng);
       map.setView([lat, lng], map.getZoom() < 12 ? 12 : map.getZoom(), { animate: true });
     },
     setZoom: function(z) {

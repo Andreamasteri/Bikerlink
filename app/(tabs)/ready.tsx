@@ -55,6 +55,7 @@ export default function ReadyToRideScreen() {
     gpsPrecision, setGpsPrecision,
     mapPickerVisible, setMapPickerVisible,
     mapPickerCoord, setMapPickerCoord,
+    mapPickerForFixed,
     ghostModeFeatureEnabled,
     isAvailable,
     isGhostMode,
@@ -157,6 +158,7 @@ export default function ReadyToRideScreen() {
         coord={mapPickerCoord}
         setCoord={setMapPickerCoord}
         insets={insets}
+        isFixedPosition={mapPickerForFixed}
       />
 
       <ScrollView

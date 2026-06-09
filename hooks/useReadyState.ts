@@ -356,6 +356,7 @@ export function useReadyState() {
     openFixedPositionMapPicker,
     mapPickerVisible, setMapPickerVisible,
     mapPickerCoord, setMapPickerCoord,
+    mapPickerForFixed,
     ghostModeFeatureEnabled,
     isAvailable,
     isGhostMode,
