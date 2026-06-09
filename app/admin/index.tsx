@@ -254,13 +254,13 @@ const UNKNOWN_STATUSES: SystemStatuses = {
   valhalla: "unknown",
   nominatim: "unknown",
   routing: "unknown",
+  matching: "unknown",
 };
 
 export default function AdminDashboard() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [search, setSearch] = useState("");
-  const [matchingEngineStatus, setMatchingEngineStatus] = useState<"ok" | "degraded" | "offline">("ok");
   const [systemStatuses, setSystemStatuses] = useState<SystemStatuses>(UNKNOWN_STATUSES);
 
   const handleThinkCentreStatuses = useCallback(
@@ -352,21 +352,7 @@ export default function AdminDashboard() {
             <GraphHopperCard />
             <TelemetryCard />
             <WhisperChainCard />
-            {matchingEngineStatus !== "ok" && (
-              <View style={[styles.matchingStatusBanner, matchingEngineStatus === "offline" ? styles.matchingStatusOffline : styles.matchingStatusDegraded]}>
-                <MaterialCommunityIcons
-                  name={matchingEngineStatus === "offline" ? "link-off" : "alert"}
-                  size={14}
-                  color={matchingEngineStatus === "offline" ? "#ef4444" : "#f59e0b"}
-                />
-                <Text style={[styles.matchingStatusText, { color: matchingEngineStatus === "offline" ? "#ef4444" : "#f59e0b" }]}>
-                  {matchingEngineStatus === "offline"
-                    ? "Matching Engine offline — endpoint non raggiungibile"
-                    : "Matching Engine degraded — errori rilevati negli ultimi 5 minuti"}
-                </Text>
-              </View>
-            )}
-            <MatchingMonitorCard onStatus={setMatchingEngineStatus} />
+            <MatchingMonitorCard onStatus={(s) => setSystemStatuses((prev) => ({ ...prev, matching: s as DotStatus }))} />
           </SystemHealthContainer>
         </>
       )}
@@ -461,14 +447,6 @@ const styles = StyleSheet.create({
   clearButton: {
     marginLeft: 8,
   },
-  matchingStatusBanner: {
-    flexDirection: "row", alignItems: "center", gap: 6,
-    paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8,
-    marginBottom: 8,
-  },
-  matchingStatusDegraded: { backgroundColor: "#f59e0b18", borderWidth: 1, borderColor: "#f59e0b44" },
-  matchingStatusOffline: { backgroundColor: "#ef444418", borderWidth: 1, borderColor: "#ef444444" },
-  matchingStatusText: { fontFamily: "Inter_500Medium", fontSize: 12, flex: 1 },
   emptyState: {
     paddingVertical: 40,
     alignItems: "center",

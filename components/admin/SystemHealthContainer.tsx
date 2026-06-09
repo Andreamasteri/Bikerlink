@@ -57,6 +57,7 @@ export interface SystemStatuses {
   valhalla: DotStatus;
   nominatim: DotStatus;
   routing: DotStatus;
+  matching: DotStatus;
 }
 
 interface SystemHealthContainerProps {
@@ -70,6 +71,7 @@ const DOT_DEFS: { key: keyof SystemStatuses; label: string }[] = [
   { key: "valhalla", label: "Valhalla" },
   { key: "nominatim", label: "Nominatim" },
   { key: "routing", label: "Routing" },
+  { key: "matching", label: "Matching Engine" },
 ];
 
 export function SystemHealthContainer({
