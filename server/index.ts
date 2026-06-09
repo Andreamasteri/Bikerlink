@@ -473,20 +473,12 @@ process.on("SIGINT", () => gracefulShutdown("SIGINT"));
       console.warn("[INIT] Critical reports notifier failed (non-fatal):", e);
     }
 
-    // Hydrate probe log ring-buffer from DB snapshot (survives backend restarts).
+    // Hydrate probe log + error history ring-buffers from DB (survives backend restarts).
     try {
-      const { hydrateProbeLog } = await import("./routes/admin/thinkcentre-health-utils");
-      await hydrateProbeLog();
+      const { hydrateProbeLog, hydrateErrorHistory } = await import("./routes/admin/thinkcentre-health-utils");
+      await Promise.all([hydrateProbeLog(), hydrateErrorHistory()]);
     } catch (e) {
-      console.warn("[INIT] Probe log hydration failed (non-fatal):", e);
-    }
-
-    // Hydrate error history ring-buffer from DB snapshot (survives backend restarts).
-    try {
-      const { hydrateErrorHistory } = await import("./routes/admin/thinkcentre-health-utils");
-      await hydrateErrorHistory();
-    } catch (e) {
-      console.warn("[INIT] Error history hydration failed (non-fatal):", e);
+      console.warn("[INIT] Ring-buffer hydration failed (non-fatal):", e);
     }
 
     // Monitors — push admin quando i servizi self-hosted o Valhalla vanno offline.
