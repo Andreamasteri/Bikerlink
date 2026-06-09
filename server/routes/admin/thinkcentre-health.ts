@@ -60,6 +60,7 @@ interface ServiceHealth {
   tileVersion?: string;
   tokenMissing?: boolean;
   history: ErrorEvent[];
+  probeLog: ProbeLogEntry[];
 }
 
 interface AreaServiceHealth {
@@ -211,7 +212,7 @@ async function probeOllama(): Promise<ServiceHealth> {
   const base = process.env.OLLAMA_URL?.replace(/\/$/, "");
   const token = process.env.OLLAMA_TOKEN;
   if (!base) {
-    return { key: "ollama", label: "Ollama AI", configured: false, ok: false, latencyMs: null, url: null, history: getHistory("ollama") };
+    return { key: "ollama", label: "Ollama AI", configured: false, ok: false, latencyMs: null, url: null, history: getHistory("ollama"), probeLog: getProbeLog("ollama") };
   }
   const tokenMissing = !token || token.trim() === "";
   const headers: Record<string, string> = {};
@@ -226,15 +227,18 @@ async function probeOllama(): Promise<ServiceHealth> {
   if (!r.ok) {
     console.error("[thinkcentre-probe] ollama KO", { error });
     if (error) recordError("ollama", error);
+    recordProbeLog("ollama", { timestamp: Date.now(), ok: false, latencyMs: r.latencyMs, detail: error ?? "errore sconosciuto" });
+  } else {
+    recordProbeLog("ollama", { timestamp: Date.now(), ok: true, latencyMs: r.latencyMs, detail: "tags OK" });
   }
-  return { key: "ollama", label: "Ollama AI", configured: true, ok: r.ok, latencyMs: r.latencyMs, url: maskUrl(base), error, tokenMissing, history: getHistory("ollama") };
+  return { key: "ollama", label: "Ollama AI", configured: true, ok: r.ok, latencyMs: r.latencyMs, url: maskUrl(base), error, tokenMissing, history: getHistory("ollama"), probeLog: getProbeLog("ollama") };
 }
 
 async function probeWhisper(): Promise<ServiceHealth> {
   const base = process.env.WHISPER_URL?.replace(/\/$/, "");
   const token = process.env.WHISPER_TOKEN;
   if (!base) {
-    return { key: "whisper", label: "Whisper ASR", configured: false, ok: false, latencyMs: null, url: null, history: getHistory("whisper") };
+    return { key: "whisper", label: "Whisper ASR", configured: false, ok: false, latencyMs: null, url: null, history: getHistory("whisper"), probeLog: getProbeLog("whisper") };
   }
   const tokenMissing = !token || token.trim() === "";
   const sampleRate = 16000;
@@ -258,7 +262,8 @@ async function probeWhisper(): Promise<ServiceHealth> {
     const res = await fetch(`${base}/inference`, { method: "POST", headers, body: formData, signal: controller.signal });
     const latencyMs = Date.now() - t0;
     if (res.status >= 200 && res.status < 300) {
-      return { key: "whisper", label: "Whisper ASR", configured: true, ok: true, latencyMs, url: maskUrl(base), tokenMissing, history: getHistory("whisper") };
+      recordProbeLog("whisper", { timestamp: Date.now(), ok: true, latencyMs, detail: "inference OK" });
+      return { key: "whisper", label: "Whisper ASR", configured: true, ok: true, latencyMs, url: maskUrl(base), tokenMissing, history: getHistory("whisper"), probeLog: getProbeLog("whisper") };
     }
     const body = await readBodySafe(res);
     const bodySnippet = body.trim().slice(0, 400);
@@ -274,13 +279,15 @@ async function probeWhisper(): Promise<ServiceHealth> {
     }
     console.error("[thinkcentre-probe] whisper KO", { status: res.status, error });
     recordError("whisper", error);
-    return { key: "whisper", label: "Whisper ASR", configured: true, ok: false, latencyMs, url: maskUrl(base), error, tokenMissing, history: getHistory("whisper") };
+    recordProbeLog("whisper", { timestamp: Date.now(), ok: false, latencyMs, detail: error });
+    return { key: "whisper", label: "Whisper ASR", configured: true, ok: false, latencyMs, url: maskUrl(base), error, tokenMissing, history: getHistory("whisper"), probeLog: getProbeLog("whisper") };
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
     const error = sanitizeError(msg);
     console.error("[thinkcentre-probe] whisper KO (rete/timeout)", { error });
     recordError("whisper", error);
-    return { key: "whisper", label: "Whisper ASR", configured: true, ok: false, latencyMs: null, url: maskUrl(base), error, tokenMissing, history: getHistory("whisper") };
+    recordProbeLog("whisper", { timestamp: Date.now(), ok: false, latencyMs: null, detail: error });
+    return { key: "whisper", label: "Whisper ASR", configured: true, ok: false, latencyMs: null, url: maskUrl(base), error, tokenMissing, history: getHistory("whisper"), probeLog: getProbeLog("whisper") };
   } finally {
     clearTimeout(timer);
   }
@@ -298,6 +305,7 @@ async function probeNominatim(): Promise<ServiceHealth> {
     error: detailed.error,
     tokenMissing: detailed.tokenMissing,
     history: detailed.history,
+    probeLog: detailed.probeLog,
   };
 }
 
@@ -338,6 +346,7 @@ router.get("/thinkcentre-health", async (_req: Request, res: ExpressResponse) =>
       tileVersion: valhallaDetail.tileVersion,
       tokenMissing: valhallaDetail.tokenMissing,
       history: valhallaDetail.history,
+      probeLog: valhallaDetail.probeLog,
     };
     const nominatimService: ServiceHealth = {
       key: "nominatim",
@@ -349,6 +358,7 @@ router.get("/thinkcentre-health", async (_req: Request, res: ExpressResponse) =>
       error: nominatimDetail.error,
       tokenMissing: nominatimDetail.tokenMissing,
       history: nominatimDetail.history,
+      probeLog: nominatimDetail.probeLog,
     };
 
     const services: ServiceHealth[] = [valhallaService, ollama, whisper, nominatimService];

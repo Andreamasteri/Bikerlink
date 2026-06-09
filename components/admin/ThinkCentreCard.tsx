@@ -4,8 +4,8 @@ import { MaterialCommunityIcons, Ionicons } from "@expo/vector-icons";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import Colors from "@/constants/colors";
 import { getApiUrl, authFetchHeaders, queryClient } from "@/lib/query-client";
-import { ErrorHistory, EventLog, GraphHopperBlock } from "./ThinkCentreCardParts";
-import type { HealthEvent, AreaServiceHealth } from "./ThinkCentreCardParts";
+import { ErrorHistory, EventLog, GraphHopperBlock, ProbeLog } from "./ThinkCentreCardParts";
+import type { HealthEvent, AreaServiceHealth, ProbeLogEntry } from "./ThinkCentreCardParts";
 import { ValhallaBlock, NominatimBlock } from "./ThinkCentreValhallaNominatimBlocks";
 import type { ValhallaDetailedHealth, NominatimDetailedHealth } from "./ThinkCentreValhallaNominatimBlocks";
 import type { DotStatus, SystemStatuses } from "./SystemHealthContainer";
@@ -23,6 +23,7 @@ interface ServiceHealth {
   tileVersion?: string;
   tokenMissing?: boolean;
   history: { timestamp: number; error: string }[];
+  probeLog?: ProbeLogEntry[];
 }
 
 interface ThinkCentreHealth {
@@ -290,6 +291,9 @@ export function ThinkCentreCard({
                   )}
                   {s.configured && !s.ok && s.history?.length > 0 && (
                     <ErrorHistory history={s.history} />
+                  )}
+                  {s.configured && s.probeLog && s.probeLog.length > 0 && (
+                    <ProbeLog entries={s.probeLog} />
                   )}
                 </View>
                 <View style={[styles.healthDot, { backgroundColor: serviceColor(s) }]} />
