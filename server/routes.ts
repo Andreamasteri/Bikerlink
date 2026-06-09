@@ -202,6 +202,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/recap", recapRoutes);
   app.use("/api/auth", enforceOrigin, authRoutes);
   app.use("/api/users", userRoutes);
+  app.use("/api/sessions", (await import("./routes/sessions")).default);
   app.use("/api/tags", (await import("./routes/tags")).default);
   // Task #2503 — endpoint pubblici OTA (gating manifest + telemetria boot)
   const { default: otaPublicRouter } = await import("./routes/ota-public");

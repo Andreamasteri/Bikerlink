@@ -17,6 +17,12 @@ import { getDeviceModel } from "@/lib/device-model";
 
 const HEARTBEAT_INTERVAL_MS = 2 * 60 * 1000;
 
+// Module-level export so auth-context can read the current session ID
+// before issuing the logout request (client-side per-session close).
+let _currentSessionId: string | null = null;
+export function getCurrentSessionId(): string | null { return _currentSessionId; }
+export function clearCurrentSessionId(): void { _currentSessionId = null; }
+
 async function sendHeartbeat() {
   try {
     const appVersion = Constants.expoConfig?.version ?? "0.0.0";
@@ -26,9 +32,36 @@ async function sendHeartbeat() {
     const payload: Record<string, string> = { appVersion, platform };
     if (deviceModel) payload.deviceModel = deviceModel;
     if (osVersion) payload.osVersion = osVersion;
+    // Include current sessionId so the server can update last_heartbeat_at per-session
+    const sid = _currentSessionId;
+    if (sid) payload.sessionId = sid;
     await apiRequest("POST", "/api/auth/heartbeat", payload);
   } catch {
     // no-op: ignore heartbeat failures
+  }
+}
+
+async function startSession(): Promise<string | null> {
+  try {
+    const appVersion = Constants.expoConfig?.version ?? "0.0.0";
+    const platform = Platform.OS;
+    const deviceModel = getDeviceModel();
+    const result = await apiRequest("POST", "/api/sessions/start", {
+      appVersion,
+      platform,
+      deviceModel: deviceModel ?? null,
+    }) as { sessionId?: string };
+    return result?.sessionId ?? null;
+  } catch {
+    return null;
+  }
+}
+
+async function endSession(sessionId: string, exitType: "background" | "logout" | "crash") {
+  try {
+    await apiRequest("POST", "/api/sessions/end", { sessionId, exitType });
+  } catch {
+    // no-op: ignore session end failures
   }
 }
 
@@ -39,6 +72,7 @@ export function AppStateHandler() {
   const heartbeatTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const locationWatcherRef = useRef<Location.LocationSubscription | null>(null);
   const nativeWatcherStartingRef = useRef(false);
+  const sessionIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (hasBackgroundPermission && locationWatcherRef.current) {
@@ -119,11 +153,24 @@ export function AppStateHandler() {
     sendStartupBeacon("app_state_handler_mount");
     startNativeWatcher();
 
+    startSession().then((id) => {
+      if (!cancelled) {
+        sessionIdRef.current = id;
+        _currentSessionId = id;
+      }
+    });
+
     const subscription = AppState.addEventListener("change", (nextAppState) => {
       const prev = appStateRef.current;
 
       if (nextAppState.match(/inactive|background/) && prev === "active") {
         apiRequest("POST", "/api/users/app-close").catch(() => {});
+        const sid = sessionIdRef.current;
+        if (sid) {
+          sessionIdRef.current = null;
+          _currentSessionId = null;
+          endSession(sid, "background");
+        }
       }
 
       if (prev.match(/inactive|background/) && nextAppState === "active") {
@@ -138,6 +185,11 @@ export function AppStateHandler() {
         if (!locationWatcherRef.current && !hasBackgroundPermission) {
           startNativeWatcher();
         }
+
+        startSession().then((id) => {
+          sessionIdRef.current = id;
+          _currentSessionId = id;
+        });
       }
 
       appStateRef.current = nextAppState;
@@ -150,6 +202,12 @@ export function AppStateHandler() {
       stopNativeWatcher();
       markClean().catch(() => {});
       resetCrashLogger();
+      const sid = sessionIdRef.current;
+      if (sid) {
+        sessionIdRef.current = null;
+        _currentSessionId = null;
+        endSession(sid, "background");
+      }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);

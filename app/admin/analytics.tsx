@@ -13,6 +13,7 @@ import { AdClicksModal } from "@/components/admin/analytics/AdClicksModal";
 import { PendingReportsModal } from "@/components/admin/analytics/PendingReportsModal";
 import { UserStatsContent } from "@/components/admin/analytics/UserStatsContent";
 import { styles } from "@/components/admin/analytics.styles";
+import { SessionsSection } from "@/components/admin/analytics/SessionsSection";
 
 interface Analytics {
   totalUsers: number;
@@ -491,6 +492,8 @@ export default function AdminAnalytics() {
               </View>
             )}
           </View>
+
+          <SessionsSection />
 
           <AnalyticsExport onExport={handleExportCSV} />
         </>

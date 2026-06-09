@@ -38,7 +38,7 @@ router.post("/heartbeat", async (req: Request, res: Response) => {
   try {
     const userId = req.session?.userId;
     if (!userId) return sendError(res, 401, "Non autenticato");
-    const body = (req.body ?? {}) as { appVersion?: unknown; platform?: unknown; deviceModel?: unknown; osVersion?: unknown };
+    const body = (req.body ?? {}) as { appVersion?: unknown; platform?: unknown; deviceModel?: unknown; osVersion?: unknown; sessionId?: unknown };
     const semverRe = /^\d+\.\d+\.\d+$/;
     const platformAllowed = new Set(["android", "ios", "web"]);
     const lastAppVersion =
@@ -87,6 +87,18 @@ router.post("/heartbeat", async (req: Request, res: Response) => {
       }
     }
     onlineTracker.touch(userId);
+
+    // Update per-session heartbeat timestamp if sessionId provided
+    if (typeof body.sessionId === "string" && body.sessionId.length > 0) {
+      const { db: dbConn } = await import("../../db");
+      const { userSessions } = await import("@shared/db");
+      const { and, isNull, eq } = await import("drizzle-orm");
+      dbConn.update(userSessions)
+        .set({ lastHeartbeatAt: new Date() })
+        .where(and(eq(userSessions.id, body.sessionId), eq(userSessions.userId, userId), isNull(userSessions.endedAt)))
+        .catch(() => {});
+    }
+
     return sendSuccess(res);
   } catch {
     return sendError(res, 500, "Errore interno");

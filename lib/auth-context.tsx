@@ -203,6 +203,19 @@ function useRegisterMutation() {
 function useLogoutMutation() {
   return useMutation({
     mutationFn: async () => {
+      // 0. Close the current app session BEFORE destroying the server session,
+      //    so the request is still authenticated and targets only this device.
+      try {
+        const { getCurrentSessionId, clearCurrentSessionId } = await import("@/components/layout/AppStateHandler");
+        const sid = getCurrentSessionId();
+        if (sid) {
+          clearCurrentSessionId();
+          await apiRequest("POST", "/api/sessions/end", { sessionId: sid, exitType: "logout" });
+        }
+      } catch {
+        // best-effort: crash cleanup job handles any leftovers
+      }
+
       // 1. Invalidate the server-side session FIRST — while the Bearer token
       //    is still present so the server can identify the session.
       let serverLogoutFailed = false;

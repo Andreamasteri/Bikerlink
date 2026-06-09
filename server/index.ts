@@ -526,6 +526,14 @@ process.on("SIGINT", () => gracefulShutdown("SIGINT"));
     }
 
     try {
+      const { scheduleSessionCrashCleanup } = await import("./jobs/session-crash-cleanup");
+      scheduleSessionCrashCleanup();
+      console.log("[INIT] Session crash cleanup scheduled every 10 min");
+    } catch (e) {
+      console.warn("[INIT] Session crash cleanup scheduler failed (non-fatal):", e);
+    }
+
+    try {
       const { wireOtaToCoordinator } = await import("./ai/coordinator/integrations/ota");
       const { wireModerationToCoordinator } = await import("./ai/coordinator/integrations/moderation");
       const { wireWatchdogToCoordinator } = await import("./ai/coordinator/integrations/watchdog");

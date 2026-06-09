@@ -270,6 +270,30 @@ export const userTimeProfile = pgTable("user_time_profile", {
 export type UserTimeProfile = typeof userTimeProfile.$inferSelect;
 export type InsertUserTimeProfile = typeof userTimeProfile.$inferInsert;
 
+export const userSessions = pgTable("user_sessions", {
+  id: varchar("id", { length: 36 })
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  userId: varchar("user_id", { length: 36 })
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  startedAt: timestamp("started_at").notNull().defaultNow(),
+  lastHeartbeatAt: timestamp("last_heartbeat_at"),
+  endedAt: timestamp("ended_at"),
+  durationSeconds: integer("duration_seconds"),
+  exitType: varchar("exit_type", { length: 20 }),
+  deviceModel: varchar("device_model", { length: 100 }),
+  platform: varchar("platform", { length: 16 }),
+  appVersion: varchar("app_version", { length: 32 }),
+}, (table) => [
+  index("user_sessions_user_id_idx").on(table.userId),
+  index("user_sessions_started_at_idx").on(table.startedAt),
+]);
+
+export type SessionExitType = "background" | "logout" | "crash";
+export type UserSession = Omit<typeof userSessions.$inferSelect, "exitType"> & { exitType: SessionExitType | null };
+export type InsertUserSession = Omit<typeof userSessions.$inferInsert, "exitType"> & { exitType?: SessionExitType | null };
+
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
 export type UserPhoto = typeof userPhotos.$inferSelect;

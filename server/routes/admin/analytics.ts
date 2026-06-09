@@ -329,4 +329,101 @@ router.get("/onboarding-tags", async (_req: Request, res: Response) => {
   }
 });
 
+router.get("/sessions/stats", async (req: Request, res: Response) => {
+  try {
+    const period = parseInt(String(req.query.period ?? "7"), 10) || 7;
+    const periodInterval = `${period} days`;
+
+    const [avgDur1d, avgDur7d, avgDur30d, timeBands, exitBreakdown, top10] = await Promise.all([
+      db.execute(sql`
+        SELECT COALESCE(AVG(duration_seconds), 0)::float AS avg
+        FROM user_sessions
+        WHERE ended_at IS NOT NULL AND started_at >= NOW() - INTERVAL '1 day'
+      `),
+      db.execute(sql`
+        SELECT COALESCE(AVG(duration_seconds), 0)::float AS avg
+        FROM user_sessions
+        WHERE ended_at IS NOT NULL AND started_at >= NOW() - INTERVAL '7 days'
+      `),
+      db.execute(sql`
+        SELECT COALESCE(AVG(duration_seconds), 0)::float AS avg
+        FROM user_sessions
+        WHERE ended_at IS NOT NULL AND started_at >= NOW() - INTERVAL '30 days'
+      `),
+      db.execute(sql`
+        SELECT
+          CASE
+            WHEN EXTRACT(HOUR FROM started_at) < 6 THEN '00-06'
+            WHEN EXTRACT(HOUR FROM started_at) < 12 THEN '06-12'
+            WHEN EXTRACT(HOUR FROM started_at) < 18 THEN '12-18'
+            ELSE '18-24'
+          END AS band,
+          COUNT(*)::int AS count
+        FROM user_sessions
+        WHERE started_at >= NOW() - INTERVAL ${sql.raw(`'${periodInterval}'`)}
+        GROUP BY 1
+        ORDER BY 1
+      `),
+      db.execute(sql`
+        SELECT
+          COALESCE(exit_type, 'unknown') AS exit_type,
+          COUNT(*)::int AS count
+        FROM user_sessions
+        WHERE ended_at IS NOT NULL AND started_at >= NOW() - INTERVAL ${sql.raw(`'${periodInterval}'`)}
+        GROUP BY 1
+      `),
+      db.execute(sql`
+        SELECT
+          s.user_id,
+          u.nickname,
+          SUM(s.duration_seconds)::int AS total_seconds,
+          COUNT(*)::int AS session_count
+        FROM user_sessions s
+        JOIN users u ON u.id = s.user_id
+        WHERE s.ended_at IS NOT NULL
+          AND s.started_at >= NOW() - INTERVAL '30 days'
+          AND u.is_fake = false
+        GROUP BY s.user_id, u.nickname
+        ORDER BY total_seconds DESC
+        LIMIT 10
+      `),
+    ]);
+
+    const bandsMap: Record<string, number> = { "00-06": 0, "06-12": 0, "12-18": 0, "18-24": 0 };
+    for (const row of timeBands.rows as Array<{ band: string; count: number }>) {
+      bandsMap[row.band] = row.count;
+    }
+
+    const exitMap: Record<string, number> = { background: 0, logout: 0, crash: 0 };
+    let exitTotal = 0;
+    for (const row of exitBreakdown.rows as Array<{ exit_type: string; count: number }>) {
+      if (row.exit_type in exitMap) exitMap[row.exit_type] = row.count;
+      exitTotal += row.count;
+    }
+    const exitPct = (key: string) => exitTotal > 0 ? Math.round((exitMap[key] / exitTotal) * 1000) / 10 : 0;
+
+    return res.json({
+      avgDurationSeconds: {
+        today: Math.round((avgDur1d.rows[0] as { avg: number }).avg),
+        last7d: Math.round((avgDur7d.rows[0] as { avg: number }).avg),
+        last30d: Math.round((avgDur30d.rows[0] as { avg: number }).avg),
+      },
+      timeBands: bandsMap,
+      exitType: {
+        counts: exitMap,
+        total: exitTotal,
+        pct: {
+          background: exitPct("background"),
+          logout: exitPct("logout"),
+          crash: exitPct("crash"),
+        },
+      },
+      top10: top10.rows,
+    });
+  } catch (err) {
+    console.error("[admin/sessions/stats] error:", err);
+    return sendError(res, 500, "Errore statistiche sessioni");
+  }
+});
+
 export default router;
