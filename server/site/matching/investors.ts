@@ -58,30 +58,30 @@ export function buildMatchingInvestors(baseUrl: string): { meta: PageMeta; body:
 ${matchSubnav("/matching/per-investitori")}
 
 <section class="match-hero" aria-labelledby="inv-h1">
-  <div class="match-breadcrumb"><a href="/">Home</a> &nbsp;/&nbsp; <a href="/matching">Matching</a> &nbsp;/&nbsp; Per Investitori</div>
-  <div class="match-hero-eyebrow">Technical Deep Dive</div>
-  <h1 id="inv-h1">MATCHING<br/><span class="accent">TECNICO</span><br/>PER INVESTITORI</h1>
-  <p class="lead">L'architettura completa del sistema di matching BikerLink: database, scoring engine, AI, feedback loop. Per chi vuole capire la profondità tecnica, non solo il prodotto.</p>
+  <div class="match-breadcrumb"><a href="/">Home</a> &nbsp;/&nbsp; <a href="/matching">Matching</a> &nbsp;/&nbsp; <span data-i18n="match.inv.breadcrumb">Per Investitori</span></div>
+  <div class="match-hero-eyebrow" data-i18n="match.inv.eyebrow">Technical Deep Dive</div>
+  <h1 id="inv-h1" data-i18n-html="match.inv.h1">MATCHING<br/><span class="accent">TECNICO</span><br/>PER INVESTITORI</h1>
+  <p class="lead" data-i18n="match.inv.lead">L'architettura completa del sistema di matching BikerLink: database, scoring engine, AI, feedback loop. Per chi vuole capire la profondità tecnica, non solo il prodotto.</p>
   <div style="display:flex;flex-wrap:wrap;gap:14px;justify-content:center;margin-top:8px">
     <a class="btn btn-primary" href="/matching/pdf" target="_blank" rel="noopener">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-      Scarica PDF tecnico
+      <span data-i18n="match.inv.btn1">Scarica PDF tecnico</span>
     </a>
-    <a class="btn btn-outline" href="/matching/per-investitori">Technical deep dive per investitori</a>
+    <a class="btn btn-outline" href="/matching/per-investitori" data-i18n="match.inv.btn2">Technical deep dive per investitori</a>
   </div>
 </section>
 
 <div class="match-stats">
-  <div class="match-stat"><div class="match-stat-val">17</div><div class="match-stat-lbl">Segnali affinità</div></div>
-  <div class="match-stat"><div class="match-stat-val">&lt;200ms</div><div class="match-stat-lbl">P99 latency engine</div></div>
-  <div class="match-stat"><div class="match-stat-val">∞</div><div class="match-stat-lbl">Scala orizzontale</div></div>
-  <div class="match-stat"><div class="match-stat-val">99.95%</div><div class="match-stat-lbl">Uptime atteso AI</div></div>
+  <div class="match-stat"><div class="match-stat-val">17</div><div class="match-stat-lbl" data-i18n="match.inv.stat1">Segnali affinità</div></div>
+  <div class="match-stat"><div class="match-stat-val">&lt;200ms</div><div class="match-stat-lbl" data-i18n="match.inv.stat2">P99 latency engine</div></div>
+  <div class="match-stat"><div class="match-stat-val">∞</div><div class="match-stat-lbl" data-i18n="match.inv.stat3">Scala orizzontale</div></div>
+  <div class="match-stat"><div class="match-stat-val">99.95%</div><div class="match-stat-lbl" data-i18n="match.inv.stat4">Uptime atteso AI</div></div>
 </div>
 
 <section class="section" aria-labelledby="arch-h2">
   <div class="section-inner">
-    <span class="section-eyebrow">Architettura</span>
-    <h2 class="section-title" id="arch-h2">Come è costruito<br/><span class="accent">il sistema.</span></h2>
+    <span class="section-eyebrow" data-i18n="match.inv.arch.eyebrow">Architettura</span>
+    <h2 class="section-title" id="arch-h2" data-i18n="match.inv.arch.title">Come è costruito il sistema.</h2>
 
     <!-- SVG inline statico: stack architettura DB → Cache → Engine → API → Client -->
     <div style="background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:28px 24px;margin:28px 0;overflow-x:auto">
@@ -104,8 +104,8 @@ ${matchSubnav("/matching/per-investitori")}
           const parts = b.s.split("<br/>");
           return `<g><rect x="${x}" y="60" width="130" height="100" rx="4" fill="#1A1A1A" stroke="${b.c}" stroke-width="${b.c==='#FF3B30'?2:1}"/><text x="${x+65}" y="90" text-anchor="middle" fill="${b.c}" font-size="14" font-weight="700" letter-spacing="2">${b.l}</text><text x="${x+65}" y="115" text-anchor="middle" fill="#F0F0F0" font-size="11">${parts[0]}</text><text x="${x+65}" y="132" text-anchor="middle" fill="#999" font-size="11">${parts[1]||''}</text></g>${i<4?`<line x1="${x+130}" y1="110" x2="${x+150}" y2="110" stroke="#FF3B30" stroke-width="2" marker-end="url(#arch-arrow)"/>`:''}`;
         }).join("")}
-        <text x="380" y="40" text-anchor="middle" fill="#666" font-size="11" letter-spacing="2">PIPELINE END-TO-END · &lt;200ms P99</text>
-        <text x="380" y="190" text-anchor="middle" fill="#666" font-size="11">Scala orizzontale su ogni layer · AI Orchestrator (Anthropic + OpenAI + Gemini) collegato all'ENGINE</text>
+        <text x="380" y="40" text-anchor="middle" fill="#666" font-size="11" letter-spacing="2" data-i18n="match.inv.arch.svg.top">PIPELINE END-TO-END · &lt;200ms P99</text>
+        <text x="380" y="190" text-anchor="middle" fill="#666" font-size="11" data-i18n="match.inv.arch.svg.bot">Scala orizzontale su ogni layer · AI Orchestrator (Anthropic + OpenAI + Gemini) collegato all'ENGINE</text>
       </svg>
     </div>
 
@@ -148,15 +148,15 @@ flowchart TB
 
 <section class="section alt" aria-labelledby="stack-tech-h2">
   <div class="section-inner">
-    <span class="section-eyebrow">Stack tecnico</span>
-    <h2 class="section-title" id="stack-tech-h2">Tecnologie<br/><span class="accent">e versioni.</span></h2>
+    <span class="section-eyebrow" data-i18n="match.inv.stack.eyebrow">Stack tecnico</span>
+    <h2 class="section-title" id="stack-tech-h2" data-i18n="match.inv.stack.title">Tecnologie e versioni.</h2>
     <div class="match-ai-table-wrap">
       <table class="match-ai-table" aria-label="Stack tecnico matching">
         <thead>
           <tr>
-            <th>Layer</th>
-            <th>Tecnologia</th>
-            <th>Note</th>
+            <th data-i18n="match.inv.tbl.layer">Layer</th>
+            <th data-i18n="match.inv.tbl.tech">Tecnologia</th>
+            <th data-i18n="match.inv.tbl.note">Note</th>
           </tr>
         </thead>
         <tbody>
@@ -174,24 +174,24 @@ flowchart TB
 
 <section class="section" aria-labelledby="moat-h2">
   <div class="section-inner">
-    <span class="section-eyebrow">Vantaggio competitivo</span>
-    <h2 class="section-title" id="moat-h2">Perché è<br/><span class="accent">difficile da copiare.</span></h2>
+    <span class="section-eyebrow" data-i18n="match.inv.moat.eyebrow">Vantaggio competitivo</span>
+    <h2 class="section-title" id="moat-h2" data-i18n="match.inv.moat.title">Perché è difficile da copiare.</h2>
     <div class="grid grid-2" style="margin-top:28px;gap:24px">
       <div class="card">
-        <h3>Telemetria reale</h3>
-        <p>Nessun competitor usa lean angle e G-force dal telefono per il matching. Questo dato — lo stile di guida reale — è il nostro moat più profondo: richiede anni di raccolta per essere significativo.</p>
+        <h3 data-i18n="match.inv.moat.c1.title">Telemetria reale</h3>
+        <p data-i18n="match.inv.moat.c1.desc">Nessun competitor usa lean angle e G-force dal telefono per il matching. Questo dato — lo stile di guida reale — è il nostro moat più profondo: richiede anni di raccolta per essere significativo.</p>
       </div>
       <div class="card">
-        <h3>Embeddings su testo biker</h3>
-        <p>Il corpus di bio e gusti musicali di motociclisti italiani è unico. I nostri embeddings sono calibrati su questo dominio specifico — un modello generico farebbe peggio.</p>
+        <h3 data-i18n="match.inv.moat.c2.title">Embeddings su testo biker</h3>
+        <p data-i18n="match.inv.moat.c2.desc">Il corpus di bio e gusti musicali di motociclisti italiani è unico. I nostri embeddings sono calibrati su questo dominio specifico — un modello generico farebbe peggio.</p>
       </div>
       <div class="card">
-        <h3>Feedback loop + dati storici</h3>
-        <p>Ogni interazione migliora il modello. Un nuovo competitor partirebbe da zero — noi abbiamo mesi di segnali di apprendimento. Il vantaggio cresce nel tempo.</p>
+        <h3 data-i18n="match.inv.moat.c3.title">Feedback loop + dati storici</h3>
+        <p data-i18n="match.inv.moat.c3.desc">Ogni interazione migliora il modello. Un nuovo competitor partirebbe da zero — noi abbiamo mesi di segnali di apprendimento. Il vantaggio cresce nel tempo.</p>
       </div>
       <div class="card">
-        <h3>Verticale moto — zero distrazione</h3>
-        <p>Tinder e app generaliste non ottimizzeranno mai per il biker italiano. BikerLink è l'unica piattaforma dove il contesto "motociclista" è nativo in ogni feature, compreso il matching.</p>
+        <h3 data-i18n="match.inv.moat.c4.title">Verticale moto — zero distrazione</h3>
+        <p data-i18n="match.inv.moat.c4.desc">Tinder e app generaliste non ottimizzeranno mai per il biker italiano. BikerLink è l'unica piattaforma dove il contesto "motociclista" è nativo in ogni feature, compreso il matching.</p>
       </div>
     </div>
   </div>
@@ -199,14 +199,14 @@ flowchart TB
 
 <section class="section alt" aria-labelledby="roadmap-h2">
   <div class="section-inner">
-    <span class="section-eyebrow">Stato attuale</span>
-    <h2 class="section-title" id="roadmap-h2">Cosa è fatto.<br/><span class="accent">Cosa segue.</span></h2>
+    <span class="section-eyebrow" data-i18n="match.inv.roadmap.eyebrow">Stato attuale</span>
+    <h2 class="section-title" id="roadmap-h2" data-i18n="match.inv.roadmap.title">Cosa è fatto. Cosa segue.</h2>
     <!-- SVG: progress bar Done vs In corso vs Pianificato -->
     <svg viewBox="0 0 720 140" role="img" aria-labelledby="roadmap-svg-title roadmap-svg-desc" style="width:100%;max-width:720px;height:auto;display:block;margin:24px auto" xmlns="http://www.w3.org/2000/svg">
       <title id="roadmap-svg-title">Stato di avanzamento roadmap matching</title>
       <desc id="roadmap-svg-desc">Barra orizzontale che mostra 6 feature completate (55%), 2 in corso (18%), 3 pianificate (27%) sul totale di 11 feature roadmap.</desc>
-      <text x="20" y="28" fill="#F0F0F0" font-size="14" font-weight="700" letter-spacing="1">AVANZAMENTO ROADMAP MATCHING</text>
-      <text x="20" y="48" fill="#999" font-size="12">11 feature · 6 completate · 2 in corso · 3 pianificate</text>
+      <text x="20" y="28" fill="#F0F0F0" font-size="14" font-weight="700" letter-spacing="1" data-i18n="match.inv.roadmap.svg.title">AVANZAMENTO ROADMAP MATCHING</text>
+      <text x="20" y="48" fill="#999" font-size="12" data-i18n="match.inv.roadmap.svg.sub">11 feature · 6 completate · 2 in corso · 3 pianificate</text>
       <rect x="20" y="65" width="680" height="36" fill="#1A1A1A" stroke="#333" rx="2"/>
       <rect x="20" y="65" width="${680*6/11}" height="36" fill="#FF3B30" rx="2"/>
       <rect x="${20+680*6/11}" y="65" width="${680*2/11}" height="36" fill="#FFA99A" opacity="0.85"/>
@@ -215,9 +215,9 @@ flowchart TB
       <text x="${20+680*7/11}" y="88" text-anchor="middle" fill="#1A1A1A" font-size="12" font-weight="700">2 wip</text>
       <text x="${20+680*9.5/11}" y="88" text-anchor="middle" fill="#F0F0F0" font-size="12" font-weight="700">3 plan</text>
       <g font-size="11" fill="#999">
-        <rect x="20"  y="118" width="12" height="12" fill="#FF3B30"/><text x="38" y="128">Completato</text>
-        <rect x="140" y="118" width="12" height="12" fill="#FFA99A"/><text x="158" y="128">In corso</text>
-        <rect x="240" y="118" width="12" height="12" fill="#444"/><text x="258" y="128">Pianificato</text>
+        <rect x="20"  y="118" width="12" height="12" fill="#FF3B30"/><text x="38" y="128" data-i18n="match.inv.roadmap.done">Completato</text>
+        <rect x="140" y="118" width="12" height="12" fill="#FFA99A"/><text x="158" y="128" data-i18n="match.inv.roadmap.wip">In corso</text>
+        <rect x="240" y="118" width="12" height="12" fill="#444"/><text x="258" y="128" data-i18n="match.inv.roadmap.plan">Pianificato</text>
         <text x="690" y="128" text-anchor="end" fill="#FF3B30" font-weight="700">55% delivery rate</text>
       </g>
     </svg>
@@ -226,9 +226,9 @@ flowchart TB
       <table class="match-ai-table" aria-label="Roadmap matching">
         <thead>
           <tr>
-            <th>Stato</th>
-            <th>Feature</th>
-            <th>Quando</th>
+            <th data-i18n="match.inv.rdm.tbl.stato">Stato</th>
+            <th data-i18n="match.inv.rdm.tbl.feature">Feature</th>
+            <th data-i18n="match.inv.rdm.tbl.quando">Quando</th>
           </tr>
         </thead>
         <tbody>
@@ -246,30 +246,30 @@ flowchart TB
 
 <section class="section" aria-labelledby="ai-inv-h2">
   <div class="section-inner">
-    <span class="section-eyebrow">AI per investitori</span>
-    <h2 class="section-title" id="ai-inv-h2">L'orchestra AI<br/><span class="accent">in numeri.</span></h2>
-    <p class="section-lead">Per il dettaglio tecnico completo dell'architettura AI, vedi la <a href="/matching/intelligenza-artificiale">pagina dedicata</a>.</p>
+    <span class="section-eyebrow" data-i18n="match.inv.ai.eyebrow">AI per investitori</span>
+    <h2 class="section-title" id="ai-inv-h2" data-i18n="match.inv.ai.title">L'orchestra AI in numeri.</h2>
+    <p class="section-lead" data-i18n-html="match.inv.ai.lead">Per il dettaglio tecnico completo dell'architettura AI, vedi la <a href="/matching/intelligenza-artificiale">pagina dedicata</a>.</p>
     <div class="match-kpi-grid">
-      <div class="match-kpi"><div class="match-kpi-val">6</div><div class="match-kpi-lbl">AI specializzate</div></div>
-      <div class="match-kpi"><div class="match-kpi-val">8</div><div class="match-kpi-lbl">Modelli orchestrati</div></div>
-      <div class="match-kpi"><div class="match-kpi-val">4</div><div class="match-kpi-lbl">Provider in failover</div></div>
-      <div class="match-kpi"><div class="match-kpi-val">60-80%</div><div class="match-kpi-lbl">Risparmio costi AI stimato</div></div>
-      <div class="match-kpi"><div class="match-kpi-val">100%</div><div class="match-kpi-lbl">Decisioni auditabili</div></div>
-      <div class="match-kpi"><div class="match-kpi-val">0</div><div class="match-kpi-lbl">Azioni distruttive autonome</div></div>
+      <div class="match-kpi"><div class="match-kpi-val">6</div><div class="match-kpi-lbl" data-i18n="match.inv.kpi1">AI specializzate</div></div>
+      <div class="match-kpi"><div class="match-kpi-val">8</div><div class="match-kpi-lbl" data-i18n="match.inv.kpi2">Modelli orchestrati</div></div>
+      <div class="match-kpi"><div class="match-kpi-val">4</div><div class="match-kpi-lbl" data-i18n="match.inv.kpi3">Provider in failover</div></div>
+      <div class="match-kpi"><div class="match-kpi-val">60-80%</div><div class="match-kpi-lbl" data-i18n="match.inv.kpi4">Risparmio costi AI stimato</div></div>
+      <div class="match-kpi"><div class="match-kpi-val">100%</div><div class="match-kpi-lbl" data-i18n="match.inv.kpi5">Decisioni auditabili</div></div>
+      <div class="match-kpi"><div class="match-kpi-val">0</div><div class="match-kpi-lbl" data-i18n="match.inv.kpi6">Azioni distruttive autonome</div></div>
     </div>
     <div style="text-align:center;margin-top:24px">
-      <a class="btn btn-outline" href="/matching/intelligenza-artificiale">Vai alla pagina AI completa →</a>
+      <a class="btn btn-outline" href="/matching/intelligenza-artificiale" data-i18n="match.inv.ai.btn">Vai alla pagina AI completa →</a>
     </div>
   </div>
 </section>
 
 <div class="cta-block">
-  <h2>Interessato a <span style="color:var(--accent)">investire o collaborare?</span></h2>
-  <p>Siamo in fase early — il momento giusto per entrare. Scrivici per una call.</p>
+  <h2 data-i18n="match.inv.cta.title">Interessato a <span style="color:var(--accent)">investire o collaborare?</span></h2>
+  <p data-i18n="match.inv.cta.desc">Siamo in fase early — il momento giusto per entrare. Scrivici per una call.</p>
   <div class="btn-row" style="justify-content:center">
-    <a class="btn btn-primary" href="mailto:invest@bikerlink.app">📩 Contattaci</a>
-    <a class="btn btn-outline" href="/matching/per-investitori">Technical deep dive per investitori</a>
-    <a class="btn btn-outline" href="/matching/pdf" target="_blank" rel="noopener">📄 Scarica PDF</a>
+    <a class="btn btn-primary" href="mailto:invest@bikerlink.app" data-i18n="match.inv.cta.btn1">📩 Contattaci</a>
+    <a class="btn btn-outline" href="/matching/per-investitori" data-i18n="match.inv.btn2">Technical deep dive per investitori</a>
+    <a class="btn btn-outline" href="/matching/pdf" target="_blank" rel="noopener" data-i18n="match.inv.cta.btn3">📄 Scarica PDF</a>
   </div>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js" defer></script>

@@ -103,6 +103,14 @@
 <link rel="icon" type="image/png" href="/favicon.png" />
 </head>
   <body>
+    <div id="lang-banner" style="display:none;width:100%;background:#1A1A2E;border-bottom:3px solid #D4A017;padding:12px 24px;text-align:center;font-size:13px;color:#C0C0C0;box-sizing:border-box;">
+      This document is currently available in Italian only. An English translation is in preparation.
+    </div>
+    <script>
+      (function(){
+        try { if(localStorage.getItem('bl_lang')==='en'){var b=document.getElementById('lang-banner');if(b)b.style.display='block';} } catch(e){}
+      })();
+    </script>
     <a href="#main" style="position:absolute;left:-9999px;top:0" class="skip-link" onfocus="this.style.left='8px';this.style.top='8px';this.style.background='#FF3B30';this.style.color='#fff';this.style.padding='8px 14px';this.style.zIndex='9999'">Salta al contenuto</a>
     <main id="main" role="main">
     <div class="header">
@@ -111,7 +119,7 @@
     </div>
 
     <div class="content">
-      <h1>Termini di Servizio</h1>
+      <h1 data-i18n="legal.terms.h1">Termini di Servizio</h1>
       <p class="subtitle">Ultima modifica: 21 aprile 2026 &nbsp;|&nbsp; Versione 1.0</p>
 
       <div class="callout">
@@ -119,7 +127,7 @@
       </div>
 
       <!-- ─── 1. ACCETTAZIONE ─── -->
-      <h2>1. Accettazione dei Termini</h2>
+      <h2 data-i18n="legal.terms.s1">1. Accettazione dei Termini</h2>
       <p>
         Questi Termini di Servizio (di seguito "Termini" o "ToS") regolano l'accesso e l'utilizzo dell'applicazione mobile <strong>BikerLink</strong> (di seguito "App" o "Servizio"), gestita da BikerLink. Accedendo o utilizzando l'App, l'utente dichiara di aver letto, compreso e accettato integralmente i presenti Termini e la <a href="/privacy-policy">Informativa sulla Privacy</a>.
       </p>
@@ -127,7 +135,7 @@
       <p>BikerLink si riserva il diritto di modificare i presenti Termini in qualsiasi momento. Le modifiche sostanziali saranno comunicate tramite notifica in-app o via email con almeno 15 giorni di preavviso. L'utilizzo continuato dell'App dopo tale comunicazione costituisce accettazione dei Termini aggiornati.</p>
 
       <!-- ─── 2. DESCRIZIONE DEL SERVIZIO ─── -->
-      <h2>2. Descrizione del Servizio</h2>
+      <h2 data-i18n="legal.terms.s2">2. Descrizione del Servizio</h2>
       <p>BikerLink è una piattaforma social dedicata alla comunità motociclistica. Il Servizio include, senza limitazione:</p>
       <ul>
         <li>Creazione di un profilo utente e gestione del garage virtuale (moto)</li>
@@ -145,7 +153,7 @@
       <p>BikerLink si riserva il diritto di modificare, sospendere o interrompere, temporaneamente o permanentemente, il Servizio o qualsiasi sua parte in qualsiasi momento, con o senza preavviso.</p>
 
       <!-- ─── 3. REQUISITI DI ACCESSO ─── -->
-      <h2>3. Requisiti di Accesso</h2>
+      <h2 data-i18n="legal.terms.s3">3. Requisiti di Accesso</h2>
       <p>Per utilizzare BikerLink è necessario:</p>
       <ul>
         <li>Avere almeno <strong>18 anni</strong> di età. BikerLink non è destinato ai minori.</li>
@@ -157,7 +165,7 @@
       <p>L'utente è responsabile della riservatezza delle proprie credenziali di accesso. Qualsiasi attività svolta tramite l'account dell'utente è di esclusiva responsabilità di quest'ultimo. In caso di accesso non autorizzato, l'utente deve notificarlo immediatamente a <a href="mailto:bikerlinkapp@gmail.com">bikerlinkapp@gmail.com</a>.</p>
 
       <!-- ─── 4. CONDOTTA DEGLI UTENTI ─── -->
-      <h2>4. Condotta degli Utenti</h2>
+      <h2 data-i18n="legal.terms.s4">4. Condotta degli Utenti</h2>
       <p>L'utente si impegna a utilizzare BikerLink in modo lecito e rispettoso. È espressamente vietato:</p>
 
       <h3>4.1 Contenuti Vietati</h3>
@@ -189,7 +197,7 @@
       </div>
 
       <!-- ─── 5. CONTENUTI GENERATI DAGLI UTENTI ─── -->
-      <h2>5. Contenuti Generati dagli Utenti</h2>
+      <h2 data-i18n="legal.terms.s5">5. Contenuti Generati dagli Utenti</h2>
       <p>
         L'utente mantiene la titolarità dei contenuti che carica su BikerLink (foto, messaggi, dati del profilo, ecc.). Caricando tali contenuti, l'utente concede a BikerLink una licenza non esclusiva, gratuita, worldwide, sub-licenziabile e trasferibile per utilizzare, riprodurre, distribuire, visualizzare e adattare detti contenuti al fine esclusivo di erogare e migliorare il Servizio.
       </p>
@@ -202,7 +210,7 @@
       <p>BikerLink si riserva il diritto di rimuovere, senza preavviso, qualsiasi contenuto ritenuto in violazione dei presenti Termini o della normativa applicabile. I contenuti sono soggetti a moderazione automatica e manuale.</p>
 
       <!-- ─── 6. FUNZIONE SOS ─── -->
-      <h2>6. Funzione SOS — Emergenza Stradale</h2>
+      <h2 data-i18n="legal.terms.s6">6. Funzione SOS — Emergenza Stradale</h2>
       <p>La funzione SOS è pensata esclusivamente per situazioni di emergenza stradale reale (guasto, incidente, necessità di soccorso). L'utente si impegna a:</p>
       <ul>
         <li>Utilizzare la funzione SOS solo in caso di effettiva emergenza.</li>
@@ -214,14 +222,14 @@
       </div>
 
       <!-- ─── 7. PRIVACY E DATI PERSONALI ─── -->
-      <h2>7. Privacy e Dati Personali</h2>
+      <h2 data-i18n="legal.terms.s7">7. Privacy e Dati Personali</h2>
       <p>
         Il trattamento dei dati personali è disciplinato dall'<a href="/privacy-policy">Informativa sulla Privacy</a>, che costituisce parte integrante dei presenti Termini. Utilizzando BikerLink, l'utente acconsente al trattamento dei propri dati come descritto nell'Informativa.
       </p>
       <p>L'utente ha pieno controllo sulla visibilità della propria posizione tramite le funzioni Ghost Mode, Position Fuzzing e Fake Home disponibili nelle impostazioni dell'App.</p>
 
       <!-- ─── 8. PROPRIETÀ INTELLETTUALE ─── -->
-      <h2>8. Proprietà Intellettuale</h2>
+      <h2 data-i18n="legal.terms.s8">8. Proprietà Intellettuale</h2>
       <p>
         L'App, inclusi il codice sorgente, il design, il logo, i marchi, i testi e tutti gli altri elementi creativi, sono di proprietà esclusiva di BikerLink o dei suoi licenzianti e sono protetti dalle leggi applicabili in materia di proprietà intellettuale.
       </p>
@@ -229,7 +237,7 @@
       <p>I marchi e loghi di terze parti presenti nell'App (es. Last.fm, OpenStreetMap) appartengono ai rispettivi proprietari.</p>
 
       <!-- ─── 9. LIMITAZIONE DI RESPONSABILITÀ ─── -->
-      <h2>9. Limitazione di Responsabilità</h2>
+      <h2 data-i18n="legal.terms.s9">9. Limitazione di Responsabilità</h2>
       <p>BikerLink fornisce il Servizio "così com'è" e "come disponibile", senza garanzie di alcun tipo, esplicite o implicite, incluse, senza limitazione, le garanzie di commerciabilità, idoneità per uno scopo particolare e non violazione.</p>
       <p>BikerLink non garantisce che:</p>
       <ul>
@@ -253,13 +261,13 @@
       </div>
 
       <!-- ─── 10. INDENNIZZO ─── -->
-      <h2>10. Indennizzo</h2>
+      <h2 data-i18n="legal.terms.s10">10. Indennizzo</h2>
       <p>
         L'utente si impegna a tenere indenne e a manlevare BikerLink, i suoi dirigenti, dipendenti, collaboratori e agenti da qualsiasi reclamo, danno, perdita, responsabilità, costo o spesa (incluse le spese legali) derivante da: (i) l'utilizzo del Servizio da parte dell'utente; (ii) la violazione dei presenti Termini; (iii) i contenuti caricati dall'utente; (iv) la violazione di diritti di terzi.
       </p>
 
       <!-- ─── 11. SOSPENSIONE E CANCELLAZIONE ACCOUNT ─── -->
-      <h2>11. Sospensione e Cancellazione dell'Account</h2>
+      <h2 data-i18n="legal.terms.s11">11. Sospensione e Cancellazione dell'Account</h2>
       <p>BikerLink si riserva il diritto di sospendere o cancellare l'account di un utente, con o senza preavviso, in caso di:</p>
       <ul>
         <li>Violazione dei presenti Termini.</li>
@@ -270,12 +278,12 @@
       <p>L'utente può richiedere la cancellazione del proprio account in qualsiasi momento contattando <a href="mailto:bikerlinkapp@gmail.com">bikerlinkapp@gmail.com</a> oppure tramite la funzione di eliminazione account disponibile nelle impostazioni dell'App. La cancellazione dell'account comporta l'eliminazione dei dati personali nei termini descritti nell'<a href="/privacy-policy">Informativa sulla Privacy</a>.</p>
 
       <!-- ─── 12. SERVIZI DI TERZE PARTI ─── -->
-      <h2>12. Servizi di Terze Parti</h2>
+      <h2 data-i18n="legal.terms.s12">12. Servizi di Terze Parti</h2>
       <p>BikerLink integra servizi di terze parti (es. Last.fm, OpenStreetMap, Expo). L'utilizzo di tali servizi è soggetto ai rispettivi termini e condizioni. BikerLink non è responsabile per la disponibilità, l'accuratezza o le pratiche privacy di tali servizi esterni.</p>
       <p>Il Servizio potrebbe contenere link a siti web o risorse di terze parti. BikerLink non controlla e non è responsabile per il contenuto di tali siti o risorse.</p>
 
       <!-- ─── 13. LEGGE APPLICABILE E FORO COMPETENTE ─── -->
-      <h2>13. Legge Applicabile e Foro Competente</h2>
+      <h2 data-i18n="legal.terms.s13">13. Legge Applicabile e Foro Competente</h2>
       <p>
         I presenti Termini sono regolati dalla legge italiana. Per qualsiasi controversia relativa all'interpretazione, validità o esecuzione dei presenti Termini, sarà competente in via esclusiva il Foro del luogo di residenza o domicilio dell'utente consumatore, ai sensi del D.Lgs. 206/2005 (Codice del Consumo).
       </p>
@@ -284,7 +292,7 @@
       </p>
 
       <!-- ─── 14. DISPOSIZIONI GENERALI ─── -->
-      <h2>14. Disposizioni Generali</h2>
+      <h2 data-i18n="legal.terms.s14">14. Disposizioni Generali</h2>
       <ul>
         <li><strong>Accordo completo:</strong> I presenti Termini, unitamente all'Informativa sulla Privacy, costituiscono l'intero accordo tra l'utente e BikerLink in relazione al Servizio.</li>
         <li><strong>Separabilità:</strong> Se una disposizione dei presenti Termini è ritenuta invalida o inapplicabile, le restanti disposizioni rimarranno pienamente in vigore.</li>
@@ -293,7 +301,7 @@
       </ul>
 
       <!-- ─── 15. CONTATTI ─── -->
-      <h2>15. Contatti</h2>
+      <h2 data-i18n="legal.terms.s15">15. Contatti</h2>
       <p>
         Per qualsiasi domanda relativa ai presenti Termini di Servizio:<br>
         <strong>BikerLink</strong><br>
@@ -305,5 +313,17 @@
       <p>© 2026 BikerLink. Tutti i diritti riservati. &nbsp;|&nbsp; <a href="/">Home</a> &nbsp;|&nbsp; <a href="/privacy-policy">Privacy Policy</a> &nbsp;|&nbsp; <a href="/terms">Termini di Servizio</a></p>
     </div>
       </main>
+    <script>
+      (function(){
+        var EN={'legal.terms.h1':'Terms of Service','legal.terms.s1':'1. Acceptance of Terms','legal.terms.s2':'2. Service Description','legal.terms.s3':'3. Access Requirements','legal.terms.s4':'4. User Conduct','legal.terms.s5':'5. User-Generated Content','legal.terms.s6':'6. SOS Feature — Road Emergency','legal.terms.s7':'7. Privacy and Personal Data','legal.terms.s8':'8. Intellectual Property','legal.terms.s9':'9. Limitation of Liability','legal.terms.s10':'10. Indemnification','legal.terms.s11':'11. Account Suspension and Cancellation','legal.terms.s12':'12. Third-Party Services','legal.terms.s13':'13. Applicable Law and Jurisdiction','legal.terms.s14':'14. General Provisions','legal.terms.s15':'15. Contact'};
+        try{
+          if(localStorage.getItem('bl_lang')==='en'){
+            document.querySelectorAll('[data-i18n]').forEach(function(el){
+              var k=el.getAttribute('data-i18n');if(EN[k])el.textContent=EN[k];
+            });
+          }
+        }catch(e){}
+      })();
+    </script>
   </body>
 </html>

@@ -1,8 +1,11 @@
+import { SITE_TRANSLATIONS } from "./translations";
+
 export function navbar(currentPath: string): string {
   const link = (href: string, label: string, key: string) => {
     const active = href === currentPath ? ' aria-current="page"' : "";
     return `<a href="${href}"${active} data-i18n="${key}">${label}</a>`;
   };
+  const T_JSON = JSON.stringify(SITE_TRANSLATIONS);
   return `
 <header class="navbar" role="banner">
   <div class="nav-inner">
@@ -48,48 +51,21 @@ export function navbar(currentPath: string): string {
     });
   }
 
-  var T={
-    it:{
-      'nav.features':'Funzionalità','nav.matching':'Matching','nav.sos':'SOS','nav.motoclub':'MotoClub',
-      'nav.community':'Community','nav.about':'About','nav.faq':'FAQ',
-      'nav.planner':'🤖 Pianifica Giro',
-      'nav.download':'Scarica app',
-      'footer.product':'Prodotto','footer.company':'Azienda','footer.legal':'Legale',
-      'footer.features':'Funzionalità','footer.matching':'Matching','footer.sos':'SOS Biker','footer.motoclub':'MotoClub',
-      'footer.community':'Community','footer.dl':"Scarica l'app",
-      'footer.about':'Chi siamo','footer.faq':'Domande frequenti',
-      'footer.contact':'Contatti','footer.investors':'Investitori',
-      'footer.privacy':'Privacy Policy','footer.terms':'Termini di Servizio',
-      'footer.delete':'Elimina account',
-      'footer.tag':'La prima piattaforma verticale per motociclisti. Community, GPS live, MotoClub, SOS — gratis per sempre.',
-      'footer.dl-btn':"Scarica l'app",
-      'footer.rights':'Tutti i diritti riservati.',
-      'footer.tagline':'Made for riders, by riders.'
-    },
-    en:{
-      'nav.features':'Features','nav.matching':'Matching','nav.sos':'SOS','nav.motoclub':'MotoClub',
-      'nav.community':'Community','nav.about':'About','nav.faq':'FAQ',
-      'nav.planner':'🤖 AI Planner',
-      'nav.download':'Download app',
-      'footer.product':'Product','footer.company':'Company','footer.legal':'Legal',
-      'footer.features':'Features','footer.matching':'Matching','footer.sos':'SOS Biker','footer.motoclub':'MotoClub',
-      'footer.community':'Community','footer.dl':'Download app',
-      'footer.about':'About us','footer.faq':'FAQ',
-      'footer.contact':'Contact','footer.investors':'Investors',
-      'footer.privacy':'Privacy Policy','footer.terms':'Terms of Service',
-      'footer.delete':'Delete account',
-      'footer.tag':'The first vertical platform for motorcyclists. Community, live GPS, MotoClub, SOS — free forever.',
-      'footer.dl-btn':'Download app',
-      'footer.rights':'All rights reserved.',
-      'footer.tagline':'Made for riders, by riders.'
-    }
-  };
+  var T=${T_JSON};
 
   function applyLang(lang){
     var d=T[lang]||T.it;
     document.querySelectorAll('[data-i18n]').forEach(function(el){
       var k=el.getAttribute('data-i18n');
       if(d[k]!==undefined) el.textContent=d[k];
+    });
+    document.querySelectorAll('[data-i18n-html]').forEach(function(el){
+      var k=el.getAttribute('data-i18n-html');
+      if(d[k]!==undefined) el.innerHTML=d[k];
+    });
+    document.querySelectorAll('[data-lang-block]').forEach(function(el){
+      var b=el.getAttribute('data-lang-block');
+      el.style.display=(b===lang)?'block':'none';
     });
     var btnIT=document.getElementById('langIT'),btnEN=document.getElementById('langEN');
     if(btnIT&&btnEN){

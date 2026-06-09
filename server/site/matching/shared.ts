@@ -99,18 +99,18 @@ export const MATCHING_CSS = `<style>
 // ── SUB-NAV ───────────────────────────────────────────────────────────────────
 export function matchSubnav(current: string): string {
   const links = [
-    { href: "/matching", label: "Overview" },
-    { href: "/matching/come-funziona", label: "Come funziona" },
-    { href: "/matching/tipi-di-match", label: "I 17 tipi" },
-    { href: "/matching/come-impara", label: "Come impara" },
-    { href: "/matching/intelligenza-artificiale", label: "AI" },
-    { href: "/matching/privacy", label: "Privacy" },
-    { href: "/matching/per-investitori", label: "Investitori" },
+    { href: "/matching", label: "Overview", i18n: "match.nav.overview" },
+    { href: "/matching/come-funziona", label: "Come funziona", i18n: "match.nav.how" },
+    { href: "/matching/tipi-di-match", label: "I 17 tipi", i18n: "match.nav.types" },
+    { href: "/matching/come-impara", label: "Come impara", i18n: "match.nav.learn" },
+    { href: "/matching/intelligenza-artificiale", label: "AI", i18n: "match.nav.ai" },
+    { href: "/matching/privacy", label: "Privacy", i18n: "match.nav.privacy" },
+    { href: "/matching/per-investitori", label: "Investitori", i18n: "match.nav.investors" },
   ];
   return `
 <nav class="match-subnav" aria-label="Sezioni matching">
   <div class="match-subnav-inner">
-    ${links.map(l => `<a href="${l.href}"${l.href === current ? ' class="active" aria-current="page"' : ''}>${l.label}</a>`).join("")}
+    ${links.map(l => `<a href="${l.href}"${l.href === current ? ' class="active" aria-current="page"' : ''} data-i18n="${l.i18n}">${l.label}</a>`).join("")}
   </div>
 </nav>`;
 }

@@ -155,54 +155,97 @@
 <link rel="icon" type="image/png" href="/favicon.png" />
 </head>
   <body>
+    <div id="lang-banner" style="display:none;width:100%;background:#1A1A2E;border-bottom:3px solid #D4A017;padding:12px 24px;text-align:center;font-size:13px;color:#C0C0C0;box-sizing:border-box;">
+      This document is currently available in Italian only. An English translation is in preparation.
+    </div>
+    <script>
+      (function(){
+        try { if(localStorage.getItem('bl_lang')==='en'){var b=document.getElementById('lang-banner');if(b)b.style.display='block';} } catch(e){}
+      })();
+    </script>
     <div class="header">
       <span class="logo">🏍 BikerLink</span>
     </div>
 
     <div class="content">
-      <h1>Elimina il tuo account BikerLink</h1>
-      <p class="subtitle">Puoi richiedere la cancellazione del tuo account e di tutti i dati associati in qualsiasi momento.</p>
+      <h1 data-i18n="legal.delete.h1">Elimina il tuo account BikerLink</h1>
+      <p class="subtitle" data-i18n="legal.delete.subtitle">Puoi richiedere la cancellazione del tuo account e di tutti i dati associati in qualsiasi momento.</p>
 
       <div class="card">
         <div class="card-title">
-          Dall'app
-          <span class="badge">CONSIGLIATO</span>
+          <span data-i18n="legal.delete.app.title">Dall'app</span>
+          <span class="badge" data-i18n="legal.delete.app.badge">CONSIGLIATO</span>
         </div>
-        <p>Se hai BikerLink installato sul tuo dispositivo, puoi eliminare il tuo account direttamente dall'app seguendo questi passaggi:</p>
+        <p data-i18n="legal.delete.app.p">Se hai BikerLink installato sul tuo dispositivo, puoi eliminare il tuo account direttamente dall'app seguendo questi passaggi:</p>
         <ol class="steps">
-          <li data-n="1">Apri BikerLink e accedi al tuo account</li>
-          <li data-n="2">Vai alla scheda <strong>Profilo</strong> (icona in basso a destra)</li>
-          <li data-n="3">Scorri fino in fondo e tocca <strong>"Modifica profilo"</strong></li>
-          <li data-n="4">Scorri fino in fondo e tocca <strong>"Elimina account"</strong></li>
-          <li data-n="5">Conferma la richiesta — l'account sarà eliminato entro 30 giorni</li>
+          <li data-n="1" data-i18n="legal.delete.app.li1">Apri BikerLink e accedi al tuo account</li>
+          <li data-n="2" data-i18n-html="legal.delete.app.li2">Vai alla scheda <strong>Profilo</strong> (icona in basso a destra)</li>
+          <li data-n="3" data-i18n-html="legal.delete.app.li3">Scorri fino in fondo e tocca <strong>"Modifica profilo"</strong></li>
+          <li data-n="4" data-i18n-html="legal.delete.app.li4">Scorri fino in fondo e tocca <strong>"Elimina account"</strong></li>
+          <li data-n="5" data-i18n="legal.delete.app.li5">Conferma la richiesta — l'account sarà eliminato entro 30 giorni</li>
         </ol>
       </div>
 
       <div class="card">
         <div class="card-title">
-          Via email
-          <span class="badge-alt">ALTERNATIVA</span>
+          <span data-i18n="legal.delete.email.title">Via email</span>
+          <span class="badge-alt" data-i18n="legal.delete.email.badge">ALTERNATIVA</span>
         </div>
-        <p>Se non hai più accesso all'app, puoi richiedere la cancellazione inviando un'email a <strong>privacy@bikerlink.app</strong> con:</p>
+        <p data-i18n-html="legal.delete.email.p">Se non hai più accesso all'app, puoi richiedere la cancellazione inviando un'email a <strong>privacy@bikerlink.app</strong> con:</p>
         <ul class="steps">
-          <li data-n="·">Il <strong>nickname</strong> del tuo account BikerLink</li>
-          <li data-n="·">L'<strong>email</strong> con cui ti sei registrato</li>
-          <li data-n="·">La richiesta esplicita di eliminazione dell'account</li>
+          <li data-n="·" data-i18n-html="legal.delete.email.li1">Il <strong>nickname</strong> del tuo account BikerLink</li>
+          <li data-n="·" data-i18n-html="legal.delete.email.li2">L'<strong>email</strong> con cui ti sei registrato</li>
+          <li data-n="·" data-i18n="legal.delete.email.li3">La richiesta esplicita di eliminazione dell'account</li>
         </ul>
-        <a class="btn-email" href="mailto:privacy@bikerlink.app?subject=Richiesta%20eliminazione%20account&body=Salve%2C%0A%0Arichiedo%20l%27eliminazione%20del%20mio%20account%20BikerLink.%0A%0ANickname%3A%20%5Binserisci%20nickname%5D%0AEmail%20registrata%3A%20%5Binserisci%20email%5D%0A%0AGrazie.">
+        <a class="btn-email" href="mailto:privacy@bikerlink.app?subject=Richiesta%20eliminazione%20account&body=Salve%2C%0A%0Arichiedo%20l%27eliminazione%20del%20mio%20account%20BikerLink.%0A%0ANickname%3A%20%5Binserisci%20nickname%5D%0AEmail%20registrata%3A%20%5Binserisci%20email%5D%0A%0AGrazie." data-i18n="legal.delete.email.btn">
           ✉ Scrivi a privacy@bikerlink.app
         </a>
       </div>
 
-      <div class="info-box">
+      <div class="info-box" data-i18n-html="legal.delete.info">
         <strong>Tempi di cancellazione:</strong> una volta ricevuta la richiesta, il tuo account e tutti i dati associati (messaggi, foto, moto, preferenze) verranno eliminati entro <strong>30 giorni</strong>. Puoi annullare la richiesta entro questo periodo accedendo all'app.
       </div>
     </div>
 
     <footer>
       <a href="/privacy">Privacy Policy</a> &nbsp;·&nbsp;
-      <a href="/terms">Termini di Servizio</a> &nbsp;·&nbsp;
+      <a href="/terms" data-i18n="legal.delete.footer.terms">Termini di Servizio</a> &nbsp;·&nbsp;
       © 2025 BikerLink
     </footer>
+    <script>
+      (function(){
+        var EN={
+          'legal.delete.h1':'Delete your BikerLink account',
+          'legal.delete.subtitle':'You can request the deletion of your account and all associated data at any time.',
+          'legal.delete.app.title':'From the app',
+          'legal.delete.app.badge':'RECOMMENDED',
+          'legal.delete.app.p':'If BikerLink is installed on your device, you can delete your account directly from the app by following these steps:',
+          'legal.delete.app.li1':'Open BikerLink and log in to your account',
+          'legal.delete.app.li2':'Go to the <strong>Profile</strong> tab (icon at the bottom right)',
+          'legal.delete.app.li3':'Scroll to the bottom and tap <strong>\u201cEdit profile\u201d</strong>',
+          'legal.delete.app.li4':'Scroll to the bottom and tap <strong>\u201cDelete account\u201d</strong>',
+          'legal.delete.app.li5':'Confirm the request \u2014 the account will be deleted within 30 days',
+          'legal.delete.email.title':'By email',
+          'legal.delete.email.badge':'ALTERNATIVE',
+          'legal.delete.email.p':'If you no longer have access to the app, you can request deletion by sending an email to <strong>privacy@bikerlink.app</strong> with:',
+          'legal.delete.email.li1':'Your BikerLink account <strong>username</strong>',
+          'legal.delete.email.li2':'The <strong>email</strong> you registered with',
+          'legal.delete.email.li3':'An explicit account deletion request',
+          'legal.delete.email.btn':'\u2709 Write to privacy@bikerlink.app',
+          'legal.delete.info':'Deletion timeline: once the request is received, your account and all associated data (messages, photos, bikes, preferences) will be deleted within <strong>30 days</strong>. You can cancel the request within this period by logging into the app.',
+          'legal.delete.footer.terms':'Terms of Service'
+        };
+        try{
+          if(localStorage.getItem('bl_lang')==='en'){
+            document.querySelectorAll('[data-i18n]').forEach(function(el){
+              var k=el.getAttribute('data-i18n');if(EN[k])el.textContent=EN[k];
+            });
+            document.querySelectorAll('[data-i18n-html]').forEach(function(el){
+              var k=el.getAttribute('data-i18n-html');if(EN[k])el.innerHTML=EN[k];
+            });
+          }
+        }catch(e){}
+      })();
+    </script>
   </body>
 </html>

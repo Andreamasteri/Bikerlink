@@ -49,19 +49,19 @@ export function buildCommunity(
   };
   const body = `
 <section class="page-hero">
-  <div class="breadcrumb"><a href="/">Home</a> &nbsp;/&nbsp; Community</div>
-  <h1>COMMUNITY <span class="accent">BIKER</span><span style="display:block;font-size:0.38em;letter-spacing:3px;font-weight:700;color:var(--text3);margin-top:10px">MAPPA MONDIALE E RADUNI</span></h1>
-  <p class="lead">Riders da tutta Italia (e oltre). Mostriamo dove sono, cosa fanno, e perché vale la pena unirsi. Una rete pensata per chi vive la strada in moto e cerca persone vere con cui condividerla.</p>
+  <div class="breadcrumb"><a href="/">Home</a> &nbsp;/&nbsp; <span data-i18n="community.hero.breadcrumb">Community</span></div>
+  <h1><span data-i18n="community.hero.h1.main">COMMUNITY</span> <span class="accent">BIKER</span><span style="display:block;font-size:0.38em;letter-spacing:3px;font-weight:700;color:var(--text3);margin-top:10px" data-i18n="community.hero.subtitle">MAPPA MONDIALE E RADUNI</span></h1>
+  <p class="lead" data-i18n="community.hero.lead">Riders da tutta Italia (e oltre). Mostriamo dove sono, cosa fanno, e perché vale la pena unirsi. Una rete pensata per chi vive la strada in moto e cerca persone vere con cui condividerla.</p>
 </section>
 
 <section class="section">
   <div class="section-inner">
-    <span class="section-eyebrow">Mappa globale</span>
-    <h2 class="section-title">Dove sono i nostri <span class="accent">biker</span></h2>
-    <p class="section-lead">Distribuzione aggregata degli iscritti per paese. Aggiornata ogni 5 minuti. Nessun dato personale visibile — solo il conteggio.</p>
+    <span class="section-eyebrow" data-i18n="community.map.eyebrow">Mappa globale</span>
+    <h2 class="section-title" data-i18n="community.map.title">Dove sono i nostri <span class="accent">biker</span></h2>
+    <p class="section-lead" data-i18n="community.map.lead">Distribuzione aggregata degli iscritti per paese. Aggiornata ogni 5 minuti. Nessun dato personale visibile — solo il conteggio.</p>
     <div id="world-map" role="img" aria-label="Mappa mondiale degli iscritti BikerLink per paese"></div>
     <div class="map-legend">
-      <span><span class="dot"></span>Concentrazione biker (cerchio proporzionale al numero)</span>
+      <span><span class="dot"></span><span data-i18n="community.map.legend">Concentrazione biker (cerchio proporzionale al numero)</span></span>
     </div>
     <noscript><p style="margin-top:16px;color:var(--text3);font-size:13px">La mappa interattiva richiede JavaScript abilitato.</p></noscript>
   </div>
@@ -69,32 +69,32 @@ export function buildCommunity(
 
 <section class="section alt">
   <div class="section-inner">
-    <span class="section-eyebrow">Cosa succede</span>
-    <h2 class="section-title">La community è <span class="accent">viva</span></h2>
+    <span class="section-eyebrow" data-i18n="community.life.eyebrow">Cosa succede</span>
+    <h2 class="section-title" data-i18n="community.what.title">La community è <span class="accent">viva</span></h2>
     <div class="grid grid-3">
-      <article class="card"><div class="icon">${icon.camera}</div><h3>Contest fotografici</h3><p>Ogni settimana un tema: giro più tortuoso, alba in moto, ritratto biker. Vota le foto degli altri, pubblica le tue.</p></article>
-      <article class="card"><div class="icon">${icon.users}</div><h3>Eventi e raduni</h3><p>Sezione eventi con calendario, geolocalizzazione, RSVP. Organizza il tuo raduno o partecipa a quelli vicini.</p></article>
-      <article class="card"><div class="icon">${icon.message}</div><h3>Chat sempre attive</h3><p>Chat private 1-to-1, chat di gruppo MotoClub, condivisione GPS volontaria in chat per ritrovarsi durante un giro.</p></article>
-      <article class="card"><div class="icon">${icon.bike}</div><h3>Garage condiviso</h3><p>Mostra la tua moto. Storia, modifiche, foto. Connettiti con chi ha lo stesso modello.</p></article>
-      <article class="card"><div class="icon">${icon.heart}</div><h3>Profili veri</h3><p>Nickname, bio, anno di nascita, regione. Foto profilo soggetta ad approvazione: niente bot, niente fake.</p></article>
-      <article class="card"><div class="icon">${icon.shield}</div><h3>Moderazione attiva</h3><p>Segnalazioni con risposta entro 24h. Block list e mute personali sempre disponibili.</p></article>
+      <article class="card"><div class="icon">${icon.camera}</div><h3 data-i18n="community.life.card1.title">Contest fotografici</h3><p data-i18n="community.life.card1.desc">Ogni settimana un tema: giro più tortuoso, alba in moto, ritratto biker. Vota le foto degli altri, pubblica le tue.</p></article>
+      <article class="card"><div class="icon">${icon.users}</div><h3 data-i18n="community.life.card2.title">Eventi e raduni</h3><p data-i18n="community.life.card2.desc">Sezione eventi con calendario, geolocalizzazione, RSVP. Organizza il tuo raduno o partecipa a quelli vicini.</p></article>
+      <article class="card"><div class="icon">${icon.message}</div><h3 data-i18n="community.life.card3.title">Chat sempre attive</h3><p data-i18n="community.life.card3.desc">Chat private 1-to-1, chat di gruppo MotoClub, condivisione GPS volontaria in chat per ritrovarsi durante un giro.</p></article>
+      <article class="card"><div class="icon">${icon.bike}</div><h3 data-i18n="community.life.card4.title">Garage condiviso</h3><p data-i18n="community.life.card4.desc">Mostra la tua moto. Storia, modifiche, foto. Connettiti con chi ha lo stesso modello.</p></article>
+      <article class="card"><div class="icon">${icon.heart}</div><h3 data-i18n="community.life.card5.title">Profili veri</h3><p data-i18n="community.life.card5.desc">Nickname, bio, anno di nascita, regione. Foto profilo soggetta ad approvazione: niente bot, niente fake.</p></article>
+      <article class="card"><div class="icon">${icon.shield}</div><h3 data-i18n="community.life.card6.title">Moderazione attiva</h3><p data-i18n="community.life.card6.desc">Segnalazioni con risposta entro 24h. Block list e mute personali sempre disponibili.</p></article>
     </div>
   </div>
 </section>
 
 <section class="section">
   <div class="section-inner prose">
-    <h2>Una rete che cresce, ogni settimana</h2>
-    <p>BikerLink è una piattaforma in continua espansione. Ogni mese si registrano centinaia di nuovi utenti, prevalentemente dall'Italia ma anche da Francia, Spagna, Germania, Stati Uniti e Sud America. Non è un numero buttato lì: il backend traccia gli iscritti aggregati per paese e li mostra sulla mappa qui sopra in modo trasparente, senza esporre dati personali.</p>
-    <p>L'obiettivo non è massimizzare il numero di account, ma costruire una rete attiva e di qualità. Per questo ogni profilo viene controllato in fase di approvazione foto, ogni richiesta di adesione a un club passa dagli admin, e ogni segnalazione viene letta entro 24 ore. È un equilibrio fragile, e funziona solo se chi entra rispetta le regole di base: rispetto reciproco, niente spam, niente contenuti illegali.</p>
-    <p>Se vuoi capire come è nata BikerLink, chi la sviluppa e quali sono i principi guida, leggi la pagina <a href="/about">chi siamo</a>. Se invece hai dubbi pratici (privacy, costi, eliminazione account), trovi tutte le risposte nelle <a href="/faq">domande frequenti</a>.</p>
+    <h2 data-i18n="community.seo.h2">Una rete che cresce, ogni settimana</h2>
+    <p data-i18n="community.seo.p1">BikerLink è una piattaforma in continua espansione. Ogni mese si registrano centinaia di nuovi utenti, prevalentemente dall'Italia ma anche da Francia, Spagna, Germania, Stati Uniti e Sud America. Non è un numero buttato lì: il backend traccia gli iscritti aggregati per paese e li mostra sulla mappa qui sopra in modo trasparente, senza esporre dati personali.</p>
+    <p data-i18n="community.seo.p2">L'obiettivo non è massimizzare il numero di account, ma costruire una rete attiva e di qualità. Per questo ogni profilo viene controllato in fase di approvazione foto, ogni richiesta di adesione a un club passa dagli admin, e ogni segnalazione viene letta entro 24 ore. È un equilibrio fragile, e funziona solo se chi entra rispetta le regole di base: rispetto reciproco, niente spam, niente contenuti illegali.</p>
+    <p data-i18n-html="community.seo.p3">Se vuoi capire come è nata BikerLink, chi la sviluppa e quali sono i principi guida, leggi la pagina <a href="/about">chi siamo</a>. Se invece hai dubbi pratici (privacy, costi, eliminazione account), trovi tutte le risposte nelle <a href="/faq">domande frequenti</a>.</p>
   </div>
 </section>
 
 <section class="cta-block">
-  <h2>Unisciti.</h2>
-  <p>Oltre 5.000 iscritti italiani sono già dentro. Tocca a te.</p>
-  <div class="btn-row"><a class="btn btn-primary" href="/download">Scarica BikerLink</a></div>
+  <h2 data-i18n="community.cta.title">Unisciti.</h2>
+  <p data-i18n="community.cta.desc">Oltre 5.000 iscritti italiani sono già dentro. Tocca a te.</p>
+  <div class="btn-row"><a class="btn btn-primary" href="/download" data-i18n="community.cta.btn">Scarica BikerLink</a></div>
 </section>
 
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />

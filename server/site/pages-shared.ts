@@ -20,10 +20,10 @@ export const HERO_STATS = `
 <section class="section" aria-label="Statistiche piattaforma">
   <div class="section-inner">
     <div class="stats-row">
-      <div class="stat"><div class="stat-value" id="stat-users">5.000+</div><div class="stat-label">Biker registrati</div></div>
-      <div class="stat"><div class="stat-value">100%</div><div class="stat-label">Gratis, per sempre</div></div>
-      <div class="stat"><div class="stat-value">24/7</div><div class="stat-label">SOS attivo</div></div>
-      <div class="stat"><div class="stat-value">0€</div><div class="stat-label">Costi nascosti</div></div>
+      <div class="stat"><div class="stat-value" id="stat-users">5.000+</div><div class="stat-label" data-i18n="comp.stats.label1">Biker registrati</div></div>
+      <div class="stat"><div class="stat-value">100%</div><div class="stat-label" data-i18n="comp.stats.label2">Gratis, per sempre</div></div>
+      <div class="stat"><div class="stat-value">24/7</div><div class="stat-label" data-i18n="comp.stats.label3">SOS attivo</div></div>
+      <div class="stat"><div class="stat-value">0€</div><div class="stat-label" data-i18n="comp.stats.label4">Costi nascosti</div></div>
     </div>
   </div>
 </section>`;
@@ -33,34 +33,34 @@ export const COMP_SECTION = `
 <!-- ── COMPETITOR TABLE ── -->
 <section class="comp-section" aria-labelledby="comp-heading">
   <div class="section-inner">
-    <span class="section-eyebrow">Confronto funzionalità</span>
-    <h2 class="section-title" id="comp-heading">Dove siamo <span class="accent">unici.</span></h2>
-    <p class="section-lead">Tre funzionalità che nessun altro ha. Non aggiunte, non partial — solo BikerLink.</p>
+    <span class="section-eyebrow" data-i18n="comp.eyebrow">Confronto funzionalità</span>
+    <h2 class="section-title" id="comp-heading" data-i18n-html="comp.unique.h2">Dove siamo <span class="accent">unici.</span></h2>
+    <p class="section-lead" data-i18n="comp.lead">Tre funzionalità che nessun altro ha. Non aggiunte, non partial — solo BikerLink.</p>
     <div class="comp-highlights">
       <div class="comp-highlight">
         <div class="comp-highlight-icon">🤖</div>
-        <div class="comp-highlight-title">AI linguaggio naturale</div>
-        <div class="comp-highlight-desc">Pianifica un percorso scrivendo "strade curve in Toscana, 3 ore, evita autostrade" — l'AI capisce e costruisce il giro.</div>
-        <div class="comp-highlight-badge">Solo BikerLink</div>
+        <div class="comp-highlight-title" data-i18n="comp.h1.title">AI linguaggio naturale</div>
+        <div class="comp-highlight-desc" data-i18n="comp.h1.desc">Pianifica un percorso scrivendo "strade curve in Toscana, 3 ore, evita autostrade" — l'AI capisce e costruisce il giro.</div>
+        <div class="comp-highlight-badge" data-i18n="comp.badge">Solo BikerLink</div>
       </div>
       <div class="comp-highlight">
         <div class="comp-highlight-icon">🏆</div>
-        <div class="comp-highlight-title">BikerScore — Indice fun factor</div>
-        <div class="comp-highlight-desc">Ogni percorso ha un punteggio numerico basato su curvosità, dislivello, fondo e traffico. Scegli il giro più divertente, non solo il più veloce.</div>
-        <div class="comp-highlight-badge">Solo BikerLink</div>
+        <div class="comp-highlight-title" data-i18n="comp.h2.title">BikerScore — Indice fun factor</div>
+        <div class="comp-highlight-desc" data-i18n="comp.h2.desc">Ogni percorso ha un punteggio numerico basato su curvosità, dislivello, fondo e traffico. Scegli il giro più divertente, non solo il più veloce.</div>
+        <div class="comp-highlight-badge" data-i18n="comp.badge">Solo BikerLink</div>
       </div>
       <div class="comp-highlight">
         <div class="comp-highlight-icon">🤝</div>
-        <div class="comp-highlight-title">Matching engine biker</div>
-        <div class="comp-highlight-desc">Algoritmo di compatibilità che abbina moto, stile di guida e disponibilità. Trova il compagno di viaggio giusto, non solo il più vicino.</div>
-        <div class="comp-highlight-badge">Solo BikerLink</div>
+        <div class="comp-highlight-title" data-i18n="comp.h3.title">Matching engine biker</div>
+        <div class="comp-highlight-desc" data-i18n="comp.h3.desc">Algoritmo di compatibilità che abbina moto, stile di guida e disponibilità. Trova il compagno di viaggio giusto, non solo il più vicino.</div>
+        <div class="comp-highlight-badge" data-i18n="comp.badge">Solo BikerLink</div>
       </div>
     </div>
     <div class="comp-table-wrap" role="region" aria-label="Tabella comparativa funzionalità">
       <table class="comp-table">
         <thead>
           <tr>
-            <th scope="col">Funzionalità</th>
+            <th scope="col" data-i18n="comp.table.header">Funzionalità</th>
             <th scope="col">Kurviger</th>
             <th scope="col">Calimoto</th>
             <th scope="col">MotoPlanner</th>
@@ -70,20 +70,20 @@ export const COMP_SECTION = `
           </tr>
         </thead>
         <tbody>
-          <tr><td>Routing curvy</td><td><span class="comp-cell-check">✅</span></td><td><span class="comp-cell-check">✅</span></td><td><span class="comp-cell-partial">⚠️</span></td><td><span class="comp-cell-cross">❌</span></td><td><span class="comp-cell-check">✅</span></td><td class="col-bl"><span class="comp-cell-check">✅</span></td></tr>
-          <tr><td>AI linguaggio naturale</td><td><span class="comp-cell-cross">❌</span></td><td><span class="comp-cell-cross">❌</span></td><td><span class="comp-cell-cross">❌</span></td><td><span class="comp-cell-cross">❌</span></td><td><span class="comp-cell-cross">❌</span></td><td class="col-bl"><span class="comp-cell-check">✅</span></td></tr>
-          <tr><td>Indice "fun factor"</td><td><span class="comp-cell-cross">❌</span></td><td><span class="comp-cell-cross">❌</span></td><td><span class="comp-cell-cross">❌</span></td><td><span class="comp-cell-cross">❌</span></td><td><span class="comp-cell-cross">❌</span></td><td class="col-bl"><span class="comp-cell-check">✅</span></td></tr>
-          <tr><td>Round trip</td><td><span class="comp-cell-check">✅</span></td><td><span class="comp-cell-check">✅</span></td><td><span class="comp-cell-cross">❌</span></td><td><span class="comp-cell-cross">❌</span></td><td><span class="comp-cell-cross">❌</span></td><td class="col-bl"><span class="comp-cell-check">✅</span></td></tr>
-          <tr><td>Multi-day</td><td><span class="comp-cell-cross">❌</span></td><td><span class="comp-cell-cross">❌</span></td><td><span class="comp-cell-check">✅</span></td><td><span class="comp-cell-cross">❌</span></td><td><span class="comp-cell-cross">❌</span></td><td class="col-bl"><span class="comp-cell-check">✅</span></td></tr>
-          <tr><td>Meteo sul percorso</td><td><span class="comp-cell-check">✅</span></td><td><span class="comp-cell-check">✅</span></td><td><span class="comp-cell-cross">❌</span></td><td><span class="comp-cell-cross">❌</span></td><td><span class="comp-cell-cross">❌</span></td><td class="col-bl"><span class="comp-cell-check">✅</span></td></tr>
-          <tr><td>POI integrati</td><td><span class="comp-cell-check">✅</span></td><td><span class="comp-cell-partial">⚠️</span></td><td><span class="comp-cell-cross">❌</span></td><td><span class="comp-cell-cross">❌</span></td><td><span class="comp-cell-cross">❌</span></td><td class="col-bl"><span class="comp-cell-check">✅</span></td></tr>
-          <tr><td>Matching biker</td><td><span class="comp-cell-cross">❌</span></td><td><span class="comp-cell-cross">❌</span></td><td><span class="comp-cell-cross">❌</span></td><td><span class="comp-cell-cross">❌</span></td><td><span class="comp-cell-cross">❌</span></td><td class="col-bl"><span class="comp-cell-check">✅</span></td></tr>
-          <tr><td>Social community</td><td><span class="comp-cell-partial">⚠️</span></td><td><span class="comp-cell-check">✅</span></td><td><span class="comp-cell-cross">❌</span></td><td><span class="comp-cell-check">✅</span></td><td><span class="comp-cell-cross">❌</span></td><td class="col-bl"><span class="comp-cell-check">✅</span></td></tr>
-          <tr><td>GPX import</td><td><span class="comp-cell-check">✅</span></td><td><span class="comp-cell-check">✅</span></td><td><span class="comp-cell-check">✅</span></td><td><span class="comp-cell-check">✅</span></td><td><span class="comp-cell-check">✅</span></td><td class="col-bl"><span class="comp-cell-check">✅</span></td></tr>
-          <tr><td>Mappe offline</td><td><span class="comp-cell-check">✅</span></td><td><span class="comp-cell-check">✅</span></td><td><span class="comp-cell-cross">❌</span></td><td><span class="comp-cell-partial">⚠️</span></td><td><span class="comp-cell-check">✅</span></td><td class="col-bl"><span class="comp-cell-cross">❌</span></td></tr>
-          <tr><td>Navigazione voce</td><td><span class="comp-cell-check">✅</span></td><td><span class="comp-cell-check">✅</span></td><td><span class="comp-cell-cross">❌</span></td><td><span class="comp-cell-cross">❌</span></td><td><span class="comp-cell-check">✅</span></td><td class="col-bl"><span class="comp-cell-check">✅</span></td></tr>
-          <tr><td>Multilingual</td><td><span class="comp-cell-check">✅</span></td><td><span class="comp-cell-check">✅</span></td><td><span class="comp-cell-cross">❌</span></td><td><span class="comp-cell-check">✅</span></td><td><span class="comp-cell-check">✅</span></td><td class="col-bl"><span class="comp-cell-check">✅</span></td></tr>
-          <tr><td>CarPlay</td><td><span class="comp-cell-cross">❌</span></td><td><span class="comp-cell-check">✅</span></td><td><span class="comp-cell-cross">❌</span></td><td><span class="comp-cell-cross">❌</span></td><td><span class="comp-cell-check">✅</span></td><td class="col-bl"><span class="comp-cell-cross">❌</span></td></tr>
+          <tr><td data-i18n="comp.table.row1">Routing curvy</td><td><span class="comp-cell-check">✅</span></td><td><span class="comp-cell-check">✅</span></td><td><span class="comp-cell-partial">⚠️</span></td><td><span class="comp-cell-cross">❌</span></td><td><span class="comp-cell-check">✅</span></td><td class="col-bl"><span class="comp-cell-check">✅</span></td></tr>
+          <tr><td data-i18n="comp.table.row2">AI linguaggio naturale</td><td><span class="comp-cell-cross">❌</span></td><td><span class="comp-cell-cross">❌</span></td><td><span class="comp-cell-cross">❌</span></td><td><span class="comp-cell-cross">❌</span></td><td><span class="comp-cell-cross">❌</span></td><td class="col-bl"><span class="comp-cell-check">✅</span></td></tr>
+          <tr><td data-i18n="comp.table.row3">Indice "fun factor"</td><td><span class="comp-cell-cross">❌</span></td><td><span class="comp-cell-cross">❌</span></td><td><span class="comp-cell-cross">❌</span></td><td><span class="comp-cell-cross">❌</span></td><td><span class="comp-cell-cross">❌</span></td><td class="col-bl"><span class="comp-cell-check">✅</span></td></tr>
+          <tr><td data-i18n="comp.table.row4">Round trip</td><td><span class="comp-cell-check">✅</span></td><td><span class="comp-cell-check">✅</span></td><td><span class="comp-cell-cross">❌</span></td><td><span class="comp-cell-cross">❌</span></td><td><span class="comp-cell-cross">❌</span></td><td class="col-bl"><span class="comp-cell-check">✅</span></td></tr>
+          <tr><td data-i18n="comp.table.row5">Multi-day</td><td><span class="comp-cell-cross">❌</span></td><td><span class="comp-cell-cross">❌</span></td><td><span class="comp-cell-check">✅</span></td><td><span class="comp-cell-cross">❌</span></td><td><span class="comp-cell-cross">❌</span></td><td class="col-bl"><span class="comp-cell-check">✅</span></td></tr>
+          <tr><td data-i18n="comp.table.row6">Meteo sul percorso</td><td><span class="comp-cell-check">✅</span></td><td><span class="comp-cell-check">✅</span></td><td><span class="comp-cell-cross">❌</span></td><td><span class="comp-cell-cross">❌</span></td><td><span class="comp-cell-cross">❌</span></td><td class="col-bl"><span class="comp-cell-check">✅</span></td></tr>
+          <tr><td data-i18n="comp.table.row7">POI integrati</td><td><span class="comp-cell-check">✅</span></td><td><span class="comp-cell-partial">⚠️</span></td><td><span class="comp-cell-cross">❌</span></td><td><span class="comp-cell-cross">❌</span></td><td><span class="comp-cell-cross">❌</span></td><td class="col-bl"><span class="comp-cell-check">✅</span></td></tr>
+          <tr><td data-i18n="comp.table.row8">Matching biker</td><td><span class="comp-cell-cross">❌</span></td><td><span class="comp-cell-cross">❌</span></td><td><span class="comp-cell-cross">❌</span></td><td><span class="comp-cell-cross">❌</span></td><td><span class="comp-cell-cross">❌</span></td><td class="col-bl"><span class="comp-cell-check">✅</span></td></tr>
+          <tr><td data-i18n="comp.table.row9">Social community</td><td><span class="comp-cell-partial">⚠️</span></td><td><span class="comp-cell-check">✅</span></td><td><span class="comp-cell-cross">❌</span></td><td><span class="comp-cell-check">✅</span></td><td><span class="comp-cell-cross">❌</span></td><td class="col-bl"><span class="comp-cell-check">✅</span></td></tr>
+          <tr><td data-i18n="comp.table.row10">GPX import</td><td><span class="comp-cell-check">✅</span></td><td><span class="comp-cell-check">✅</span></td><td><span class="comp-cell-check">✅</span></td><td><span class="comp-cell-check">✅</span></td><td><span class="comp-cell-check">✅</span></td><td class="col-bl"><span class="comp-cell-check">✅</span></td></tr>
+          <tr><td data-i18n="comp.table.row11">Mappe offline</td><td><span class="comp-cell-check">✅</span></td><td><span class="comp-cell-check">✅</span></td><td><span class="comp-cell-cross">❌</span></td><td><span class="comp-cell-partial">⚠️</span></td><td><span class="comp-cell-check">✅</span></td><td class="col-bl"><span class="comp-cell-cross">❌</span></td></tr>
+          <tr><td data-i18n="comp.table.row12">Navigazione voce</td><td><span class="comp-cell-check">✅</span></td><td><span class="comp-cell-check">✅</span></td><td><span class="comp-cell-cross">❌</span></td><td><span class="comp-cell-cross">❌</span></td><td><span class="comp-cell-check">✅</span></td><td class="col-bl"><span class="comp-cell-check">✅</span></td></tr>
+          <tr><td data-i18n="comp.table.row13">Multilingual</td><td><span class="comp-cell-check">✅</span></td><td><span class="comp-cell-check">✅</span></td><td><span class="comp-cell-cross">❌</span></td><td><span class="comp-cell-check">✅</span></td><td><span class="comp-cell-check">✅</span></td><td class="col-bl"><span class="comp-cell-check">✅</span></td></tr>
+          <tr><td data-i18n="comp.table.row14">CarPlay</td><td><span class="comp-cell-cross">❌</span></td><td><span class="comp-cell-check">✅</span></td><td><span class="comp-cell-cross">❌</span></td><td><span class="comp-cell-cross">❌</span></td><td><span class="comp-cell-check">✅</span></td><td class="col-bl"><span class="comp-cell-cross">❌</span></td></tr>
         </tbody>
       </table>
     </div>
