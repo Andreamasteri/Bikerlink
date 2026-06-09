@@ -601,5 +601,3 @@ const statsStyles = StyleSheet.create({
     marginLeft: 8,
   },
 });
-
-
