@@ -106,7 +106,7 @@ ufw allow from "${LOCALHOST}" to any port 5432 proto tcp
 
 # ── Redis TLS pubblico (porta 6380 via nginx stream) ─────────────────────────
 # nginx fa da proxy TLS → Redis locale 6379 rimane solo localhost.
-# Replit (cloud) si connette a rediss://redis.bikerlink.duckdns.org:6380
+# Replit (cloud) si connette a rediss://bkredis.bikerlink.duckdns.org:6380
 echo "→ Redis TLS 6380/tcp — internet (nginx stream proxy)..."
 ufw allow 6380/tcp comment "Redis TLS pubblico via nginx stream (BikerLink)"
 

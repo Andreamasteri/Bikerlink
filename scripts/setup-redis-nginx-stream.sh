@@ -3,13 +3,13 @@
 # BikerLink — Redis via nginx stream (TCP+TLS) su DuckDNS
 # Eseguire sul ThinkCentre come root: sudo bash scripts/setup-redis-nginx-stream.sh
 #
-# Espone Redis su redis.bikerlink.duckdns.org:6380 con TLS Let's Encrypt.
-# Replit si connette con: rediss://:PASSWORD@redis.bikerlink.duckdns.org:6380
+# Espone Redis su bkredis.bikerlink.duckdns.org:6380 con TLS Let's Encrypt.
+# Replit si connette con: rediss://:PASSWORD@bkredis.bikerlink.duckdns.org:6380
 # =============================================================================
 
 set -euo pipefail
 
-DOMAIN="redis.bikerlink.duckdns.org"
+DOMAIN="bkredis.bikerlink.duckdns.org"
 REDIS_PORT_LOCAL=6379
 REDIS_PORT_PUBLIC=6380
 CERT_DIR="/etc/letsencrypt/live/${DOMAIN}"

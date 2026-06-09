@@ -44,24 +44,24 @@ systemctl status bikerlink-ufw-status
 
 ## Redis — Esposizione pubblica via nginx stream
 
-Redis è esposto su `redis.bikerlink.duckdns.org:6380` con TLS tramite nginx stream proxy.
-Replit si connette con `rediss://:PASSWORD@redis.bikerlink.duckdns.org:6380`.
+Redis è esposto su `bkredis.bikerlink.duckdns.org:6380` con TLS tramite nginx stream proxy.
+Replit si connette con `rediss://:PASSWORD@bkredis.bikerlink.duckdns.org:6380`.
 
 ### Setup (una tantum sul ThinkCentre)
 
 ```bash
-# 1. Aggiorna DuckDNS: aggiungi sottodominio "redis" puntato allo stesso IP
+# 1. Aggiorna DuckDNS: aggiungi sottodominio "bkredis" puntato allo stesso IP
 #    (pannello https://www.duckdns.org)
 
 # 2. Esegui lo script di setup come root
 sudo bash scripts/setup-redis-nginx-stream.sh
 
 # 3. Verifica la connessione
-redis-cli -h redis.bikerlink.duckdns.org -p 6380 --tls -a '<password>' ping
+redis-cli -h bkredis.bikerlink.duckdns.org -p 6380 --tls -a '<password>' ping
 # → PONG
 
 # 4. Aggiorna il secret REDIS_URL in Replit:
-#    rediss://:PASSWORD@redis.bikerlink.duckdns.org:6380
+#    rediss://:PASSWORD@bkredis.bikerlink.duckdns.org:6380
 ```
 
 ### Rinnovo certificato
