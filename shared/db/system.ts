@@ -155,6 +155,11 @@ export const appCrashLogs = pgTable("app_crash_logs", {
   index("app_crash_logs_user_id_idx").on(table.userId),
   index("app_crash_logs_crash_type_idx").on(table.crashType),
   index("app_crash_logs_reported_at_idx").on(table.reportedAt),
+  // GIN trigram indexes per filtri ILIKE nel pannello Admin (migration 0087).
+  // Sintassi con gin_trgm_ops esplicita: garantisce che il diff Replit publish
+  // generi SQL corretto se deve crearli (invece di fallire senza operator class).
+  index("app_crash_logs_device_brand_trgm").using("gin", sql`${table.deviceBrand} gin_trgm_ops`),
+  index("app_crash_logs_device_model_trgm").using("gin", sql`${table.deviceModel} gin_trgm_ops`),
 ]);
 
 export type Notification = typeof notifications.$inferSelect;
