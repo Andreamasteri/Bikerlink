@@ -170,7 +170,7 @@ export function ThinkCentreCard() {
         testID="thinkcentre-card-header"
       >
         <MaterialCommunityIcons name="home-assistant" size={18} color={headerColor} />
-        <Text style={styles.cardTitle}>Server di casa (ThinkCentre)</Text>
+        <Text style={styles.cardTitle}>ThinkCentre</Text>
         <View style={styles.headerRight}>
           {isLoading && <ActivityIndicator size="small" color={headerColor} />}
           {error && !isLoading && (

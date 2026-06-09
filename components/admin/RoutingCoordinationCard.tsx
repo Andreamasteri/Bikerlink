@@ -169,7 +169,7 @@ export function RoutingCoordinationCard() {
         testID="routing-coordination-header"
       >
         <MaterialCommunityIcons name="sitemap-outline" size={18} color={headerColor} />
-        <Text style={styles.cardTitle}>Coordinamento Engine</Text>
+        <Text style={styles.cardTitle}>Routing Engine System</Text>
         <View style={styles.headerRight}>
           {summary && summary.total > 0 && (
             <Text style={styles.headerCount}>

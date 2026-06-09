@@ -87,7 +87,7 @@ export async function getSttProviderStatusList(): Promise<{
   const statuses: SttProviderStatus[] = [
     {
       id: "home",
-      label: "Server di casa (Whisper)",
+      label: "ThinkCentre (Whisper)",
       configured: homeConfigured,
       tokenConfigured: Boolean(process.env.WHISPER_TOKEN),
       inChain: chain.includes("home"),

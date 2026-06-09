@@ -73,7 +73,7 @@ router.get("/routing-health", async (_req: Request, res: Response) => {
   if (routingDisabled) {
     message = "Routing disabilitato via kill-switch.";
   } else if (activeEngine === "valhalla" && valhallaDown) {
-    message = "Valhalla (server di casa) OFFLINE — fallback automatico a GraphHopper.";
+    message = "Valhalla (ThinkCentre) OFFLINE — fallback automatico a GraphHopper.";
   } else if (ghDown) {
     if (errorType === "tunnel_down") {
       message = snap.cloudFallbackAvailable
@@ -83,8 +83,8 @@ router.get("/routing-health", async (_req: Request, res: Response) => {
       message = "Profilo motorcycle non disponibile sul server GH.";
     } else {
       message = snap.cloudFallbackAvailable
-        ? "Server di casa OFFLINE — routing servito dalla Cloud API (profilo car)."
-        : "Server di casa OFFLINE — nessun fallback Cloud configurato (GRAPHHOPPER_API_KEY).";
+        ? "ThinkCentre OFFLINE — routing servito dalla Cloud API (profilo car)."
+        : "ThinkCentre OFFLINE — nessun fallback Cloud configurato (GRAPHHOPPER_API_KEY).";
     }
   } else {
     message = "Server di routing operativo.";

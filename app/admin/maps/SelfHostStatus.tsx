@@ -323,8 +323,8 @@ export function SelfHostStatus() {
     : "checkmark-circle";
 
   const title = disabled
-    ? "Server di casa: routing disabilitato"
-    : `Server di casa: ${down ? "OFFLINE" : "online"}`;
+    ? "ThinkCentre: routing disabilitato"
+    : `ThinkCentre: ${down ? "OFFLINE" : "online"}`;
 
   const lastCheck = formatTime(gh.last_check_at);
   const lastFailure = formatTime(gh.last_failure_at);

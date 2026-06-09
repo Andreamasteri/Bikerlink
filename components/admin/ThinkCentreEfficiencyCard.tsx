@@ -108,7 +108,7 @@ export function ThinkCentreEfficiencyCard() {
           {(!online) && (
             <View style={styles.offlineBanner}>
               <View style={styles.offlineDot} />
-              <Text style={styles.offlineText}>Server di casa offline</Text>
+              <Text style={styles.offlineText}>ThinkCentre offline</Text>
             </View>
           )}
 
