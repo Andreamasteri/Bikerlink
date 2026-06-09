@@ -30,32 +30,32 @@ export function buildMatchingAI(baseUrl: string): { meta: PageMeta; body: string
   };
 
   const brains = [
-    { icon: "🛡️", title: "AI Moderazione", desc: "Analizza ogni segnalazione, distingue spam e ritorsioni dai problemi veri, suggerisce azioni al moderatore umano. Non agisce da sola su decisioni irreversibili." },
-    { icon: "👁️", title: "AI Watchdog Sistema", desc: "Monitora 24/7 metriche, log ed errori. Auto-corregge i problemi noti e documentati, allerta gli admin solo per quelli nuovi o anomali." },
-    { icon: "🚀", title: "AI Orchestrator OTA", desc: "Gestisce gli aggiornamenti dell'app: decide quando rilasciare, come segmentare il rollout, e come eseguire il rollback automatico se qualcosa va storto." },
-    { icon: "🗄️", title: "AI Integrità Database", desc: "Controlla che i dati siano coerenti tra tabelle e microservizi. Ripara automaticamente le piccole incongruenze, segnala quelle grandi per revisione umana." },
-    { icon: "🧩", title: "AI Integrità App", desc: "Analizza il codice e l'interfaccia: trova duplicazioni, traduzioni mancanti, configurazioni incoerenti. È il QA automatizzato che non dorme mai." },
-    { icon: "🧠", title: "AI Console Unificata", desc: "La chat unica dove l'admin parla con tutti i 5 sistemi sopra contemporaneamente. Correla eventi tra sottosistemi diversi e risponde in linguaggio naturale." },
+    { icon: "🛡️", titleKey: "match.ai.brain1.title", title: "AI Moderazione", descKey: "match.ai.brain1.desc", desc: "Analizza ogni segnalazione, distingue spam e ritorsioni dai problemi veri, suggerisce azioni al moderatore umano. Non agisce da sola su decisioni irreversibili." },
+    { icon: "👁️", titleKey: "match.ai.brain2.title", title: "AI Watchdog Sistema", descKey: "match.ai.brain2.desc", desc: "Monitora 24/7 metriche, log ed errori. Auto-corregge i problemi noti e documentati, allerta gli admin solo per quelli nuovi o anomali." },
+    { icon: "🚀", titleKey: "match.ai.brain3.title", title: "AI Orchestrator OTA", descKey: "match.ai.brain3.desc", desc: "Gestisce gli aggiornamenti dell'app: decide quando rilasciare, come segmentare il rollout, e come eseguire il rollback automatico se qualcosa va storto." },
+    { icon: "🗄️", titleKey: "match.ai.brain4.title", title: "AI Integrità Database", descKey: "match.ai.brain4.desc", desc: "Controlla che i dati siano coerenti tra tabelle e microservizi. Ripara automaticamente le piccole incongruenze, segnala quelle grandi per revisione umana." },
+    { icon: "🧩", titleKey: "match.ai.brain5.title", title: "AI Integrità App", descKey: "match.ai.brain5.desc", desc: "Analizza il codice e l'interfaccia: trova duplicazioni, traduzioni mancanti, configurazioni incoerenti. È il QA automatizzato che non dorme mai." },
+    { icon: "🧠", titleKey: "match.ai.brain6.title", title: "AI Console Unificata", descKey: "match.ai.brain6.desc", desc: "La chat unica dove l'admin parla con tutti i 5 sistemi sopra contemporaneamente. Correla eventi tra sottosistemi diversi e risponde in linguaggio naturale." },
   ];
 
   const stackRows = [
-    { role: "Cervello principale", model: "Claude Sonnet 4.6", provider: "Anthropic", usage: "Tutte le decisioni complesse" },
-    { role: "Router veloce", model: "Gemini 2.5 Flash-Lite", provider: "Google", usage: "Classificazione rapida e instradamento" },
-    { role: "Heavy reasoning", model: "Claude Opus 4.7", provider: "Anthropic", usage: "Audit settimanali, casi rari e critici" },
-    { role: "Fallback 1", model: "GPT-5.1", provider: "OpenAI", usage: "Se Anthropic non risponde" },
-    { role: "Fallback 2", model: "Gemini 2.5 Pro", provider: "Google", usage: "Se anche OpenAI non risponde" },
-    { role: "Embeddings testuali", model: "text-embedding-3-large", provider: "OpenAI", usage: "Similarità bio e gusti musicali" },
-    { role: "Embeddings locali", model: "multilingual-e5-small", provider: "Self-hosted", usage: "Fallback se cloud non risponde" },
-    { role: "Routing curvy", model: "Gemini 2.5 Pro", provider: "Google", usage: "Generazione waypoint moto" },
+    { roleKey: "match.ai.stack.r1.role", role: "Cervello principale", model: "Claude Sonnet 4.6", provider: "Anthropic", usageKey: "match.ai.stack.r1.usage", usage: "Tutte le decisioni complesse" },
+    { roleKey: "match.ai.stack.r2.role", role: "Router veloce", model: "Gemini 2.5 Flash-Lite", provider: "Google", usageKey: "match.ai.stack.r2.usage", usage: "Classificazione rapida e instradamento" },
+    { roleKey: "match.ai.stack.r3.role", role: "Heavy reasoning", model: "Claude Opus 4.7", provider: "Anthropic", usageKey: "match.ai.stack.r3.usage", usage: "Audit settimanali, casi rari e critici" },
+    { roleKey: "match.ai.stack.r4.role", role: "Fallback 1", model: "GPT-5.1", provider: "OpenAI", usageKey: "match.ai.stack.r4.usage", usage: "Se Anthropic non risponde" },
+    { roleKey: "match.ai.stack.r5.role", role: "Fallback 2", model: "Gemini 2.5 Pro", provider: "Google", usageKey: "match.ai.stack.r5.usage", usage: "Se anche OpenAI non risponde" },
+    { roleKey: "match.ai.stack.r6.role", role: "Embeddings testuali", model: "text-embedding-3-large", provider: "OpenAI", usageKey: "match.ai.stack.r6.usage", usage: "Similarità bio e gusti musicali" },
+    { roleKey: "match.ai.stack.r7.role", role: "Embeddings locali", model: "multilingual-e5-small", provider: "Self-hosted", usageKey: "match.ai.stack.r7.usage", usage: "Fallback se cloud non risponde" },
+    { roleKey: "match.ai.stack.r8.role", role: "Routing curvy", model: "Gemini 2.5 Pro", provider: "Google", usageKey: "match.ai.stack.r8.usage", usage: "Generazione waypoint moto" },
   ];
 
   const kpis = [
-    { val: "6", lbl: "Sottosistemi AI specializzati" },
-    { val: "8", lbl: "Modelli orchestrati in cascata" },
-    { val: "4", lbl: "Provider con failover automatico" },
-    { val: "99.95%", lbl: "Uptime atteso (ridondanza)" },
-    { val: "100%", lbl: "Decisioni AI loggato & auditabile" },
-    { val: "0", lbl: "Azioni distruttive autonome" },
+    { val: "6", lblKey: "match.ai.kpi.lbl1", lbl: "Sottosistemi AI specializzati" },
+    { val: "8", lblKey: "match.ai.kpi.lbl2", lbl: "Modelli orchestrati in cascata" },
+    { val: "4", lblKey: "match.ai.kpi.lbl3", lbl: "Provider con failover automatico" },
+    { val: "99.95%", lblKey: "match.ai.kpi.lbl4", lbl: "Uptime atteso (ridondanza)" },
+    { val: "100%", lblKey: "match.ai.kpi.lbl5", lbl: "Decisioni AI loggato & auditabile" },
+    { val: "0", lblKey: "match.ai.kpi.lbl6", lbl: "Azioni distruttive autonome" },
   ];
 
   const body = `
@@ -69,7 +69,7 @@ ${matchSubnav("/matching/intelligenza-artificiale")}
 </section>
 
 <div class="match-stats" role="region" aria-label="KPI AI">
-  ${kpis.map(k => `<div class="match-stat"><div class="match-stat-val">${k.val}</div><div class="match-stat-lbl">${k.lbl}</div></div>`).join("")}
+  ${kpis.map(k => `<div class="match-stat"><div class="match-stat-val">${k.val}</div><div class="match-stat-lbl" data-i18n="${k.lblKey}">${k.lbl}</div></div>`).join("")}
 </div>
 
 <section class="section" aria-labelledby="brains-h2">
@@ -82,8 +82,8 @@ ${matchSubnav("/matching/intelligenza-artificiale")}
       ${brains.map(b => `
       <div class="match-ai-brain">
         <div class="match-ai-brain-icon">${b.icon}</div>
-        <div class="match-ai-brain-title">${b.title}</div>
-        <div class="match-ai-brain-desc">${b.desc}</div>
+        <div class="match-ai-brain-title" data-i18n="${b.titleKey}">${b.title}</div>
+        <div class="match-ai-brain-desc" data-i18n="${b.descKey}">${b.desc}</div>
       </div>`).join("")}
     </div>
   </div>
@@ -164,10 +164,10 @@ ${matchSubnav("/matching/intelligenza-artificiale")}
         <tbody>
           ${stackRows.map(r => `
           <tr>
-            <td>${r.role}</td>
+            <td data-i18n="${r.roleKey}">${r.role}</td>
             <td><code>${r.model}</code></td>
             <td><span class="match-ai-badge">${r.provider}</span></td>
-            <td style="color:var(--text2);font-size:13px">${r.usage}</td>
+            <td style="color:var(--text2);font-size:13px" data-i18n="${r.usageKey}">${r.usage}</td>
           </tr>`).join("")}
         </tbody>
       </table>

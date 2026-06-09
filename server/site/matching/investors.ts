@@ -41,17 +41,17 @@ export function buildMatchingInvestors(baseUrl: string): { meta: PageMeta; body:
   ];
 
   const roadmap = [
-    { status: "✅", item: "Engine scoring 17 segnali", when: "Completato" },
-    { status: "✅", item: "Embeddings bio e musica (OpenAI + self-hosted)", when: "Completato" },
-    { status: "✅", item: "Feedback loop + decay temporale", when: "Completato" },
-    { status: "✅", item: "A/B testing framework", when: "Completato" },
-    { status: "✅", item: "Lock distribuiti + code BullMQ", when: "Completato" },
-    { status: "✅", item: "AI Orchestration cascade", when: "Completato" },
-    { status: "🔄", item: "Integrazione routing curvy nel matching (route affinity)", when: "In corso" },
-    { status: "🔄", item: "Dashboard admin matching (pesi, metriche, A/B)", when: "In corso" },
-    { status: "📋", item: "Toggle utente segnali individuali (UI)", when: "Pianificato" },
-    { status: "📋", item: "Digest settimanale automatico (email/push)", when: "Pianificato" },
-    { status: "📋", item: "Matching cross-club (biker di club compatibili)", when: "Pianificato" },
+    { status: "✅", itemKey: "match.inv.rdm.item1", item: "Engine scoring 17 segnali", whenKey: "match.inv.roadmap.done", when: "Completato" },
+    { status: "✅", itemKey: "match.inv.rdm.item2", item: "Embeddings bio e musica (OpenAI + self-hosted)", whenKey: "match.inv.roadmap.done", when: "Completato" },
+    { status: "✅", itemKey: "match.inv.rdm.item3", item: "Feedback loop + decay temporale", whenKey: "match.inv.roadmap.done", when: "Completato" },
+    { status: "✅", itemKey: "match.inv.rdm.item4", item: "A/B testing framework", whenKey: "match.inv.roadmap.done", when: "Completato" },
+    { status: "✅", itemKey: "match.inv.rdm.item5", item: "Lock distribuiti + code BullMQ", whenKey: "match.inv.roadmap.done", when: "Completato" },
+    { status: "✅", itemKey: "match.inv.rdm.item6", item: "AI Orchestration cascade", whenKey: "match.inv.roadmap.done", when: "Completato" },
+    { status: "🔄", itemKey: "match.inv.rdm.item7", item: "Integrazione routing curvy nel matching (route affinity)", whenKey: "match.inv.roadmap.wip", when: "In corso" },
+    { status: "🔄", itemKey: "match.inv.rdm.item8", item: "Dashboard admin matching (pesi, metriche, A/B)", whenKey: "match.inv.roadmap.wip", when: "In corso" },
+    { status: "📋", itemKey: "match.inv.rdm.item9", item: "Toggle utente segnali individuali (UI)", whenKey: "match.inv.roadmap.plan", when: "Pianificato" },
+    { status: "📋", itemKey: "match.inv.rdm.item10", item: "Digest settimanale automatico (email/push)", whenKey: "match.inv.roadmap.plan", when: "Pianificato" },
+    { status: "📋", itemKey: "match.inv.rdm.item11", item: "Matching cross-club (biker di club compatibili)", whenKey: "match.inv.roadmap.plan", when: "Pianificato" },
   ];
 
   const body = `
@@ -235,8 +235,8 @@ flowchart TB
           ${roadmap.map(r => `
           <tr>
             <td style="font-size:16px;width:40px">${r.status}</td>
-            <td>${r.item}</td>
-            <td><span class="match-ai-badge" style="background:var(--surface2);color:var(--text3)">${r.when}</span></td>
+            <td data-i18n="${r.itemKey}">${r.item}</td>
+            <td><span class="match-ai-badge" style="background:var(--surface2);color:var(--text3)" data-i18n="${r.whenKey}">${r.when}</span></td>
           </tr>`).join("")}
         </tbody>
       </table>
