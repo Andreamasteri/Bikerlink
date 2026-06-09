@@ -30,6 +30,7 @@ import {
   getHistory,
   recordProbeLog,
   getProbeLog,
+  isStartingUp,
   type ProbeLogEntry,
   tokenFingerprint,
 } from "./thinkcentre-health-utils";
@@ -74,6 +75,7 @@ interface ServiceHealth {
   label: string;
   configured: boolean;
   ok: boolean;
+  startingUp: boolean;
   latencyMs: number | null;
   url: string | null;
   error?: string;
@@ -89,6 +91,7 @@ interface AreaServiceHealth {
   tier: RoutingAreaTier;
   enabled: boolean;
   ok: boolean;
+  startingUp: boolean;
   latencyMs: number | null;
   error?: string;
   history: ErrorEvent[];
@@ -169,7 +172,7 @@ async function probeGraphHopperArea(
     probeLog: getProbeLog(historyKey),
   };
   if (!enabled) {
-    return { ...baseShape, enabled: false, ok: false, latencyMs: null };
+    return { ...baseShape, enabled: false, ok: false, startingUp: false, latencyMs: null };
   }
   const areaBase = `${base}${area.path}`;
   const headers: Record<string, string> = {};
@@ -181,7 +184,7 @@ async function probeGraphHopperArea(
   );
   if (health.ok) {
     recordProbeLog(historyKey, { timestamp: Date.now(), ok: true, latencyMs: health.latencyMs, detail: "health OK" });
-    return { ...baseShape, enabled: true, ok: true, latencyMs: health.latencyMs, history: getHistory(historyKey), probeLog: getProbeLog(historyKey) };
+    return { ...baseShape, enabled: true, ok: true, startingUp: false, latencyMs: health.latencyMs, history: getHistory(historyKey), probeLog: getProbeLog(historyKey) };
   }
   const route = await graphHopperRouteProbe(areaBase, token, areaProbePoints(area));
   if (!route.ok) {
@@ -196,6 +199,7 @@ async function probeGraphHopperArea(
     ...baseShape,
     enabled: true,
     ok: route.ok,
+    startingUp: route.ok ? false : isStartingUp(historyKey),
     latencyMs: route.latencyMs,
     error: route.ok ? undefined : (route.error ?? health.error),
     history: getHistory(historyKey),
@@ -240,7 +244,7 @@ async function probeOllama(): Promise<ServiceHealth> {
   const base = process.env.OLLAMA_URL?.replace(/\/$/, "");
   const token = process.env.OLLAMA_TOKEN;
   if (!base) {
-    return { key: "ollama", label: "Ollama AI", configured: false, ok: false, latencyMs: null, url: null, history: getHistory("ollama"), probeLog: getProbeLog("ollama") };
+    return { key: "ollama", label: "Ollama AI", configured: false, ok: false, startingUp: false, latencyMs: null, url: null, history: getHistory("ollama"), probeLog: getProbeLog("ollama") };
   }
   const tokenMissing = !token || token.trim() === "";
   const headers: Record<string, string> = {};
@@ -259,14 +263,14 @@ async function probeOllama(): Promise<ServiceHealth> {
   } else {
     recordProbeLog("ollama", { timestamp: Date.now(), ok: true, latencyMs: r.latencyMs, detail: "tags OK" });
   }
-  return { key: "ollama", label: "Ollama AI", configured: true, ok: r.ok, latencyMs: r.latencyMs, url: maskUrl(base), error, tokenMissing, history: getHistory("ollama"), probeLog: getProbeLog("ollama") };
+  return { key: "ollama", label: "Ollama AI", configured: true, ok: r.ok, startingUp: r.ok ? false : isStartingUp("ollama"), latencyMs: r.latencyMs, url: maskUrl(base), error, tokenMissing, history: getHistory("ollama"), probeLog: getProbeLog("ollama") };
 }
 
 async function probeWhisper(): Promise<ServiceHealth> {
   const base = process.env.WHISPER_URL?.replace(/\/$/, "");
   const token = process.env.WHISPER_TOKEN;
   if (!base) {
-    return { key: "whisper", label: "Whisper ASR", configured: false, ok: false, latencyMs: null, url: null, history: getHistory("whisper"), probeLog: getProbeLog("whisper") };
+    return { key: "whisper", label: "Whisper ASR", configured: false, ok: false, startingUp: false, latencyMs: null, url: null, history: getHistory("whisper"), probeLog: getProbeLog("whisper") };
   }
   const tokenMissing = !token || token.trim() === "";
   const sampleRate = 16000;
@@ -286,7 +290,7 @@ async function probeWhisper(): Promise<ServiceHealth> {
   const healthResult = await httpProbe(`${base}/health`, headers);
   if (healthResult.ok) {
     recordProbeLog("whisper", { timestamp: Date.now(), ok: true, latencyMs: healthResult.latencyMs, detail: "health OK" });
-    return { key: "whisper", label: "Whisper ASR", configured: true, ok: true, latencyMs: healthResult.latencyMs, url: maskUrl(base), tokenMissing, history: getHistory("whisper"), probeLog: getProbeLog("whisper") };
+    return { key: "whisper", label: "Whisper ASR", configured: true, ok: true, startingUp: false, latencyMs: healthResult.latencyMs, url: maskUrl(base), tokenMissing, history: getHistory("whisper"), probeLog: getProbeLog("whisper") };
   }
 
   // Step 2: /health not available or returned an error — fall through to full inference probe.
@@ -302,7 +306,7 @@ async function probeWhisper(): Promise<ServiceHealth> {
     const latencyMs = Date.now() - t0;
     if (res.status >= 200 && res.status < 300) {
       recordProbeLog("whisper", { timestamp: Date.now(), ok: true, latencyMs, detail: "inference OK" });
-      return { key: "whisper", label: "Whisper ASR", configured: true, ok: true, latencyMs, url: maskUrl(base), tokenMissing, history: getHistory("whisper"), probeLog: getProbeLog("whisper") };
+      return { key: "whisper", label: "Whisper ASR", configured: true, ok: true, startingUp: false, latencyMs, url: maskUrl(base), tokenMissing, history: getHistory("whisper"), probeLog: getProbeLog("whisper") };
     }
     const body = await readBodySafe(res);
     const bodySnippet = body.trim().slice(0, 400);
@@ -319,7 +323,7 @@ async function probeWhisper(): Promise<ServiceHealth> {
     console.error("[thinkcentre-probe] whisper KO", { status: res.status, error });
     recordError("whisper", error);
     recordProbeLog("whisper", { timestamp: Date.now(), ok: false, latencyMs, detail: error });
-    return { key: "whisper", label: "Whisper ASR", configured: true, ok: false, latencyMs, url: maskUrl(base), error, tokenMissing, history: getHistory("whisper"), probeLog: getProbeLog("whisper") };
+    return { key: "whisper", label: "Whisper ASR", configured: true, ok: false, startingUp: isStartingUp("whisper"), latencyMs, url: maskUrl(base), error, tokenMissing, history: getHistory("whisper"), probeLog: getProbeLog("whisper") };
   } catch (err: unknown) {
     const raw = err instanceof Error ? err.message : String(err);
     // Step 3: classify the error so the probe log is actionable.
@@ -335,7 +339,7 @@ async function probeWhisper(): Promise<ServiceHealth> {
     console.error("[thinkcentre-probe] whisper KO (rete/timeout)", { error });
     recordError("whisper", error);
     recordProbeLog("whisper", { timestamp: Date.now(), ok: false, latencyMs: null, detail: error });
-    return { key: "whisper", label: "Whisper ASR", configured: true, ok: false, latencyMs: null, url: maskUrl(base), error, tokenMissing, history: getHistory("whisper"), probeLog: getProbeLog("whisper") };
+    return { key: "whisper", label: "Whisper ASR", configured: true, ok: false, startingUp: isStartingUp("whisper"), latencyMs: null, url: maskUrl(base), error, tokenMissing, history: getHistory("whisper"), probeLog: getProbeLog("whisper") };
   } finally {
     clearTimeout(timer);
   }
@@ -390,6 +394,7 @@ router.get("/thinkcentre-health", async (_req: Request, res: ExpressResponse) =>
       label: "Valhalla",
       configured: valhallaDetail.configured,
       ok: valhallaDetail.ok,
+      startingUp: valhallaDetail.ok ? false : isStartingUp("valhalla"),
       latencyMs: valhallaDetail.latencyMs,
       url: valhallaDetail.url,
       error: valhallaDetail.error,
@@ -403,6 +408,7 @@ router.get("/thinkcentre-health", async (_req: Request, res: ExpressResponse) =>
       label: "Nominatim",
       configured: nominatimDetail.configured,
       ok: nominatimDetail.ok,
+      startingUp: nominatimDetail.ok ? false : isStartingUp("nominatim"),
       latencyMs: nominatimDetail.latencyMs,
       url: nominatimDetail.url,
       error: nominatimDetail.error,
@@ -416,6 +422,7 @@ router.get("/thinkcentre-health", async (_req: Request, res: ExpressResponse) =>
       label: "Redis",
       configured: redisInfra.configured,
       ok: redisInfra.ok,
+      startingUp: redisInfra.ok ? false : isStartingUp("redis"),
       latencyMs: redisInfra.latencyMs,
       url: redisInfra.url,
       error: redisInfra.error,
@@ -427,6 +434,7 @@ router.get("/thinkcentre-health", async (_req: Request, res: ExpressResponse) =>
       label: "PostgreSQL",
       configured: postgresInfra.configured,
       ok: postgresInfra.ok,
+      startingUp: postgresInfra.ok ? false : isStartingUp("postgres"),
       latencyMs: postgresInfra.latencyMs,
       url: postgresInfra.url,
       error: postgresInfra.error,
@@ -438,6 +446,7 @@ router.get("/thinkcentre-health", async (_req: Request, res: ExpressResponse) =>
       label: "pgAdmin",
       configured: pgadminInfra.configured,
       ok: pgadminInfra.ok,
+      startingUp: pgadminInfra.ok ? false : isStartingUp("pgadmin"),
       latencyMs: pgadminInfra.latencyMs,
       url: pgadminInfra.url,
       error: pgadminInfra.error,
@@ -449,6 +458,7 @@ router.get("/thinkcentre-health", async (_req: Request, res: ExpressResponse) =>
       label: "nginx",
       configured: nginxInfra.configured,
       ok: nginxInfra.ok,
+      startingUp: nginxInfra.ok ? false : isStartingUp("nginx"),
       latencyMs: nginxInfra.latencyMs,
       url: nginxInfra.url,
       error: nginxInfra.error,
@@ -460,6 +470,7 @@ router.get("/thinkcentre-health", async (_req: Request, res: ExpressResponse) =>
       label: "Uptime Kuma",
       configured: uptimeKumaInfra.configured,
       ok: uptimeKumaInfra.ok,
+      startingUp: uptimeKumaInfra.ok ? false : isStartingUp("uptimekuma"),
       latencyMs: uptimeKumaInfra.latencyMs,
       url: uptimeKumaInfra.url,
       error: uptimeKumaInfra.error,

@@ -22,6 +22,7 @@ export interface AreaServiceHealth {
   tier: "core" | "on-demand";
   enabled: boolean;
   ok: boolean;
+  startingUp?: boolean;
   latencyMs: number | null;
   error?: string;
   history: ErrorEvent[];
@@ -254,12 +255,15 @@ export function EventLog({ events }: { events: HealthEvent[] }) {
 
 function areaColor(a: AreaServiceHealth): string {
   if (!a.enabled) return "#6b7280";
-  return a.ok ? "#22c55e" : "#ef4444";
+  if (a.ok) return "#22c55e";
+  if (a.startingUp) return "#f59e0b";
+  return "#ef4444";
 }
 
 function areaStatusLabel(a: AreaServiceHealth): string {
   if (!a.enabled) return "Non abilitata";
   if (a.ok) return a.latencyMs != null ? `Online · ${a.latencyMs} ms` : "Online";
+  if (a.startingUp) return "Avvio in corso…";
   return a.error ? `Offline · ${a.error}` : "Offline";
 }
 
@@ -278,13 +282,16 @@ export function GraphHopperBlock({
 
   const enabled = areas.filter((a) => a.enabled);
   const onlineCount = enabled.filter((a) => a.ok).length;
+  const anyStarting = onlineCount === 0 && enabled.some((a) => a.startingUp);
   const aggColor =
     enabled.length === 0
       ? "#6b7280"
       : onlineCount === enabled.length
         ? "#22c55e"
         : onlineCount === 0
-          ? "#ef4444"
+          ? anyStarting
+            ? "#f59e0b"
+            : "#ef4444"
           : "#f59e0b";
 
   const showFingerprint = fingerprint != null;

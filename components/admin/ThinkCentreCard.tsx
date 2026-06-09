@@ -35,6 +35,7 @@ interface ServiceHealth {
   label: string;
   configured: boolean;
   ok: boolean;
+  startingUp?: boolean;
   latencyMs: number | null;
   url: string | null;
   error?: string;
@@ -96,7 +97,9 @@ function overallToStatus(overall: ThinkCentreHealth["overall"]): DotStatus {
 
 function serviceToStatus(s: ServiceHealth | undefined): DotStatus {
   if (!s || !s.configured) return "unknown";
-  return s.ok ? "ok" : "offline";
+  if (s.ok) return "ok";
+  if (s.startingUp) return "degraded";
+  return "offline";
 }
 
 function ghToStatus(areas: AreaServiceHealth[], configured: boolean): DotStatus {
@@ -105,6 +108,8 @@ function ghToStatus(areas: AreaServiceHealth[], configured: boolean): DotStatus 
   const allOk = areas.every((a) => a.ok);
   if (allOk) return "ok";
   if (anyOk) return "degraded";
+  const anyStarting = areas.some((a) => a.enabled && a.startingUp);
+  if (anyStarting) return "degraded";
   return "offline";
 }
 
@@ -116,7 +121,9 @@ function ufwToStatus(ufw: UfwDetailedHealth | undefined): DotStatus {
 // ── Inline badge strip ─────────────────────────────────────────────────────
 function svcColor(s: ServiceHealth | undefined): string {
   if (!s || !s.configured) return "#6b7280";
-  return s.ok ? "#22c55e" : "#ef4444";
+  if (s.ok) return "#22c55e";
+  if (s.startingUp) return "#f59e0b";
+  return "#ef4444";
 }
 
 function ghBadgeColor(data: ThinkCentreHealth): string {
@@ -125,7 +132,10 @@ function ghBadgeColor(data: ThinkCentreHealth): string {
   if (enabled.length === 0) return "#6b7280";
   const online = enabled.filter((a) => a.ok).length;
   if (online === enabled.length) return "#22c55e";
-  if (online === 0) return "#ef4444";
+  if (online === 0) {
+    const anyStarting = enabled.some((a) => a.startingUp);
+    return anyStarting ? "#f59e0b" : "#ef4444";
+  }
   return "#f59e0b";
 }
 

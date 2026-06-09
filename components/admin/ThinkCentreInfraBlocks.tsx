@@ -8,6 +8,7 @@ import type { ProbeLogEntry } from "./ThinkCentreCardParts";
 export interface SimpleServiceHealth {
   configured: boolean;
   ok: boolean;
+  startingUp?: boolean;
   latencyMs: number | null;
   url: string | null;
   error?: string;
@@ -37,6 +38,8 @@ function InfraBlock({
 }: InfraBlockProps) {
   const [open, setOpen] = useState(false);
 
+  const startingUp = service != null && service.configured && !service.ok && !!service.startingUp;
+
   const statusColor =
     service == null
       ? hasError
@@ -46,7 +49,9 @@ function InfraBlock({
         ? "#6b7280"
         : service.ok
           ? "#22c55e"
-          : "#ef4444";
+          : startingUp
+            ? "#f59e0b"
+            : "#ef4444";
 
   const subtitleText =
     service == null
@@ -58,7 +63,9 @@ function InfraBlock({
       : service.configured
         ? service.ok
           ? `Online${service.latencyMs != null ? ` · ${service.latencyMs} ms` : ""}${service.url ? ` · ${service.url}` : ""}`
-          : "offline"
+          : startingUp
+            ? "avvio in corso…"
+            : "offline"
         : "non configurato";
 
   const statusLabel =
@@ -72,9 +79,11 @@ function InfraBlock({
         ? "Non configurato"
         : service.ok
           ? `Online${service.latencyMs != null ? ` · ${service.latencyMs} ms` : ""}`
-          : service.error
-            ? `Offline · ${service.error}`
-            : "Offline";
+          : startingUp
+            ? "Avvio in corso — timeout ripetuti senza successo recente"
+            : service.error
+              ? `Offline · ${service.error}`
+              : "Offline";
 
   const showFingerprint = service != null && service.configured && fingerprint != null;
   const fpOk = showFingerprint && service != null && service.ok;

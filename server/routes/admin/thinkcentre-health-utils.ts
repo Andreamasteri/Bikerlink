@@ -193,3 +193,36 @@ export function tokenFingerprint(token: string | undefined | null): string | nul
   const { createHash } = require("crypto");
   return createHash("sha256").update(token).digest("hex").slice(0, 8);
 }
+
+/**
+ * Detects whether a service is likely in a cold-start / warm-up window.
+ *
+ * Returns true when ALL of the following hold:
+ *  - The last `minFailures` probe entries are failures.
+ *  - Every one of those failures looks like a timeout or network error
+ *    (not an auth / HTTP-level error — those are real KO).
+ *  - No successful probe exists within the last `windowMs` milliseconds.
+ *
+ * Used by the health endpoint to surface an amber "avvio in corso" badge
+ * instead of the red KO during the cold-start window.
+ */
+export function isStartingUp(
+  service: string,
+  opts: { minFailures?: number; windowMs?: number } = {},
+): boolean {
+  const { minFailures = 3, windowMs = 5 * 60 * 1_000 } = opts;
+  const log = getProbeLog(service);
+  if (log.length < minFailures) return false;
+
+  const recent = log.slice(0, minFailures);
+  if (!recent.every((e) => !e.ok)) return false;
+
+  const isTimeoutOrNetwork = (detail: string): boolean =>
+    /timeout|network\s+error|ECONNREFUSED|ENOTFOUND|ETIMEDOUT|fetch\s+failed/i.test(detail);
+
+  if (!recent.every((e) => isTimeoutOrNetwork(e.detail))) return false;
+
+  const cutoff = Date.now() - windowMs;
+  const hasRecentSuccess = log.some((e) => e.ok && e.timestamp > cutoff);
+  return !hasRecentSuccess;
+}
