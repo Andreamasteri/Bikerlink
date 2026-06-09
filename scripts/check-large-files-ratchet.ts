@@ -20,7 +20,7 @@
  * Invoked through `scripts/check-large-files-ratchet.sh` which enforces
  * the env-var gate.
  */
-import { writeFileSync } from "fs";
+import { writeFileSync, readFileSync } from "fs";
 import { join } from "path";
 import {
   MAX_LINES,
@@ -73,7 +73,31 @@ for (const entry of state) {
   // LOCKED checks: drift, anti-bypass upward, companion required.
   if (entry.marker?.kind === "LOCKED") {
     const limit = entry.marker.lockedLimit ?? MAX_LINES;
-    lockedSnapshot.push({ file: entry.file, limit });
+
+    // When UPDATE=true and the file has shrunk significantly, auto-patch line 1
+    // so the marker comment reflects the new (lower) limit — no manual edit needed.
+    let effectiveLimit = limit;
+    if (UPDATE && limit - entry.lines > LOCKED_DRIFT) {
+      const newLimit = entry.lines;
+      const filePath = join(process.cwd(), entry.file);
+      const content = readFileSync(filePath, "utf-8");
+      const fileLines = content.split("\n");
+      const oldRaw = entry.marker.rawLine;
+      const newRaw = oldRaw.replace(
+        /(LARGE-FILE-LOCKED\s+[—-]\s*limite:\s*)\d+/,
+        `$1${newLimit}`,
+      );
+      if (newRaw !== oldRaw) {
+        fileLines[0] = newRaw;
+        writeFileSync(filePath, fileLines.join("\n"), "utf-8");
+        console.log(
+          `  ✏️  ${entry.file}: marker aggiornato limite ${limit} → ${newLimit}`,
+        );
+      }
+      effectiveLimit = newLimit;
+    }
+
+    lockedSnapshot.push({ file: entry.file, limit: effectiveLimit });
 
     // (f) Companion path obbligatorio (seconda riga).
     if (!entry.marker.companionPath) {
