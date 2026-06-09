@@ -14,8 +14,8 @@
 # PRIMA di configurare Cloudflare.
 #
 # Porta SSH:
-#   --ssh-port 22      porta SSH standard (default)
-#   --ssh-port 2222    dopo aver eseguito setup-ssh-hardening-thinkcentre.sh
+#   --ssh-port 2222    porta post-hardening (default — setup-ssh-hardening-thinkcentre.sh)
+#   --ssh-port 22      solo se l'hardening SSH non è ancora stato applicato
 #
 # Idempotente: può essere rieseguito senza danni.
 #
@@ -40,7 +40,7 @@ set -euo pipefail
 LAN="192.168.1.0/24"
 LOCALHOST="127.0.0.1"
 CLOUDFLARE_MODE=""   # tunnel | dns-proxy | "" (aperto — solo pre-Cloudflare)
-SSH_PORT=22          # cambia a 2222 dopo setup-ssh-hardening-thinkcentre.sh
+SSH_PORT=2222        # porta post-hardening (setup-ssh-hardening-thinkcentre.sh)
 
 # ── Parsing argomenti ─────────────────────────────────────────────────────────
 while [[ $# -gt 0 ]]; do

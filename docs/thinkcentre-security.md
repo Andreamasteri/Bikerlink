@@ -49,7 +49,7 @@ Il setup di `cloudflared` è documentato in `docs/uptime-kuma-cloudflare-tunnel.
 | DNS Proxy | `--mode dns-proxy` | Se si preferisce il proxy DNS standard |
 | Legacy (nessun flag) | *(nessun --mode)* | Solo pre-Cloudflare, per test iniziali |
 
-Il flag `--ssh-port` specifica la porta SSH da aprire in ufw (default: 22; usare 2222 dopo l'hardening):
+Il flag `--ssh-port` specifica la porta SSH da aprire in ufw (default: 2222 — post-hardening; usare 22 solo se l'hardening non è ancora stato applicato):
 
 ### Cloudflare Tunnel (raccomandato)
 
@@ -166,17 +166,18 @@ ssh -p 2222 utente@192.168.1.35
 
 ### Azioni post-script (obbligatorie)
 
-1. **Aggiornare ufw** per la nuova porta SSH:
+1. **Aggiornare ufw** per la nuova porta SSH (rieseguire lo script con il flag corretto):
    ```bash
-   sudo ufw delete limit from 192.168.1.0/24 to any port 22 proto tcp
-   sudo ufw limit from 192.168.1.0/24 to any port 2222 proto tcp
+   sudo bash scripts/setup-ufw-thinkcentre.sh --mode tunnel --ssh-port 2222
    sudo ufw status verbose
    ```
+   Lo script è idempotente: esegue un reset + riapplica tutte le regole con la porta corretta.
 
-2. **Aggiornare fail2ban** per la nuova porta:
+2. **Aggiornare fail2ban** per la nuova porta (rieseguire lo script — scrive jail.local automaticamente):
    ```bash
-   # Editare /etc/fail2ban/jail.local → port = 2222
-   sudo systemctl restart fail2ban
+   sudo bash scripts/setup-fail2ban-thinkcentre.sh
+   # (default già 2222 — nessun flag necessario)
+   sudo fail2ban-client status sshd
    ```
 
 ---
