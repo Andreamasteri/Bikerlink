@@ -535,6 +535,43 @@ router.get("/match-health", async (_req: Request, res: Response) => {
       warns.push("admin gate 'auto_matching_enabled' non trovata");
     }
 
+    const realUsersRes = await client.query<{ cnt: string }>(`
+      SELECT COUNT(*)::int AS cnt FROM users
+      WHERE is_fake = false AND is_system = false AND role <> 'admin' AND status = 'active'
+    `);
+    const realUsersTotal = parseInt(realUsersRes.rows[0]?.cnt ?? "0", 10);
+
+    const missingPrefsRes = await client.query<{ cnt: string }>(`
+      SELECT COUNT(*)::int AS cnt FROM users u
+      LEFT JOIN match_preferences mp ON mp.user_id = u.id
+      WHERE u.is_fake = false AND u.is_system = false AND u.role <> 'admin'
+        AND u.status = 'active' AND mp.id IS NULL
+    `);
+    const missingPrefs = parseInt(missingPrefsRes.rows[0]?.cnt ?? "0", 10);
+
+    const missingCoordsRes = await client.query<{ cnt: string }>(`
+      SELECT COUNT(*)::int AS cnt FROM users u
+      INNER JOIN user_profiles up ON up.user_id = u.id
+      WHERE u.is_fake = false AND u.is_system = false AND u.role <> 'admin'
+        AND u.status = 'active' AND (up.latitude IS NULL OR up.longitude IS NULL)
+    `);
+    const missingCoords = parseInt(missingCoordsRes.rows[0]?.cnt ?? "0", 10);
+
+    const missingMotosRes = await client.query<{ cnt: string }>(`
+      SELECT COUNT(*)::int AS cnt FROM users u
+      LEFT JOIN user_motorcycles um ON um.user_id = u.id
+      WHERE u.is_fake = false AND u.is_system = false AND u.role <> 'admin'
+        AND u.status = 'active' AND um.id IS NULL
+    `);
+    const missingMotos = parseInt(missingMotosRes.rows[0]?.cnt ?? "0", 10);
+
+    if (missingPrefs > 0) {
+      warns.push(`${missingPrefs} utenti reali privi di match_preferences — eseguire il backfill`);
+    }
+    if (missingCoords > 0) {
+      warns.push(`${missingCoords} utenti reali privi di coordinate GPS — eseguire il backfill`);
+    }
+
     const typesWithZeroResults = matchCounts.filter(m => m.count === 0).length;
     const typesAnomalous = matchCounts.filter(m => m.status === "WARN").length;
     const typesNoData = matchCounts.filter(m => m.status === "NO_DATA").length;
@@ -556,6 +593,12 @@ router.get("/match-health", async (_req: Request, res: Response) => {
         prefsStatus,
         distanceStatus,
         adminGateStatus,
+        realUsers: {
+          total: realUsersTotal,
+          missingPrefs,
+          missingCoords,
+          missingMotos,
+        },
       },
       checks: {
         schema: {
@@ -590,6 +633,91 @@ router.get("/match-health", async (_req: Request, res: Response) => {
   } catch (error) {
     console.error("[match-health] Errore:", error);
     return sendError(res, 500, "Errore esecuzione health check");
+  } finally {
+    client.release();
+  }
+});
+
+/**
+ * GET /api/admin/matching/real-users-matchability
+ *
+ * Report degli utenti reali non matchabili con il motivo.
+ * Lista ogni utente reale attivo non di servizio e indica se mancano:
+ *   - match_preferences (riga nella tabella)
+ *   - coordinate GPS (lat/lon in user_profiles)
+ *   - moto in garage (user_motorcycles)
+ *   - entity_tags
+ */
+router.get("/real-users-matchability", async (_req: Request, res: Response) => {
+  const client = await pool.connect();
+  try {
+    const rows = await client.query<{
+      user_id: string;
+      nickname: string;
+      email: string;
+      user_type: string;
+      status: string;
+      has_prefs: boolean;
+      has_coords: boolean;
+      has_motos: boolean;
+      has_tags: boolean;
+    }>(`
+      SELECT
+        u.id                                            AS user_id,
+        u.nickname,
+        u.email,
+        u.user_type,
+        u.status,
+        (mp.id IS NOT NULL)                             AS has_prefs,
+        (up.latitude IS NOT NULL AND up.longitude IS NOT NULL) AS has_coords,
+        (COUNT(DISTINCT um.id) > 0)                    AS has_motos,
+        (COUNT(DISTINCT et.id) > 0)                    AS has_tags
+      FROM users u
+      LEFT JOIN match_preferences mp ON mp.user_id = u.id
+      LEFT JOIN user_profiles     up ON up.user_id = u.id
+      LEFT JOIN user_motorcycles  um ON um.user_id = u.id
+      LEFT JOIN entity_tags       et ON et.entity_id = u.id AND et.entity_type = 'user'
+      WHERE u.is_fake  = false
+        AND u.is_system = false
+        AND u.role <> 'admin'
+        AND u.status = 'active'
+      GROUP BY u.id, u.nickname, u.email, u.user_type, u.status, mp.id, up.latitude, up.longitude
+      ORDER BY u.nickname
+    `);
+
+    const users_list = rows.rows.map((r) => {
+      const reasons: string[] = [];
+      if (!r.has_prefs)  reasons.push("no_preferences");
+      if (!r.has_coords) reasons.push("no_coordinates");
+      if (!r.has_motos)  reasons.push("no_motorcycles");
+      if (!r.has_tags)   reasons.push("no_tags");
+      return {
+        userId: r.user_id,
+        nickname: r.nickname,
+        email: r.email,
+        userType: r.user_type,
+        status: r.status,
+        hasPrefs: r.has_prefs,
+        hasCoords: r.has_coords,
+        hasMotos: r.has_motos,
+        hasTags: r.has_tags,
+        matchable: reasons.length === 0,
+        reasons,
+      };
+    });
+
+    const total = users_list.length;
+    const matchable = users_list.filter(u => u.matchable).length;
+    const notMatchable = users_list.filter(u => !u.matchable);
+
+    return res.json({
+      summary: { total, matchable, notMatchable: total - matchable },
+      users: users_list,
+      nonMatchableUsers: notMatchable,
+    });
+  } catch (error) {
+    console.error("[real-users-matchability] error:", error);
+    return sendError(res, 500, "Errore report matchabilità utenti reali");
   } finally {
     client.release();
   }

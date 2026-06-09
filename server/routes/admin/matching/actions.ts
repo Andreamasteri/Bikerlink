@@ -185,6 +185,24 @@ router.post("/matching/force-unlock", async (_req: Request, res: Response) => {
 router.post("/matching/backfill-real-users", async (_req: Request, res: Response) => {
   const client = await pool.connect();
   try {
+    // --- step 0: marca gli account di servizio noti come is_system=true ---
+    // Idempotente: non tocca account già marcati.
+    const SERVICE_EMAILS = [
+      "admin@bikerlink.it",
+      "mod@bikerlink.it",
+      "smoke@bikerlink.test",
+      "noreply-system@bikerlink.internal",
+      "applereview@bikerlink.it",
+      "googlereview@bikerlink.it",
+    ];
+    const serviceMarked = await client.query(`
+      UPDATE users SET is_system = true
+      WHERE LOWER(email) = ANY($1::text[])
+        AND is_system = false
+    `, [SERVICE_EMAILS]);
+    const serviceMarkedCount = serviceMarked.rowCount ?? 0;
+    console.log(`[backfill] account di servizio marcati is_system=true: ${serviceMarkedCount}`);
+
     // --- A: match_preferences backfill ---
     const prefsResult = await client.query<{ user_id: string }>(`
       INSERT INTO match_preferences (user_id)
@@ -271,6 +289,7 @@ router.post("/matching/backfill-real-users", async (_req: Request, res: Response
     return res.json({
       success: true,
       stats: {
+        serviceAccountsMarked: serviceMarkedCount,
         prefsInserted,
         coordsFromLogin: coordsFromLoginCount,
         coordsFromGps: coordsFromGpsCount,

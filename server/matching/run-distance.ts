@@ -39,6 +39,7 @@ async function fetchCentroidPairs(radiusKm: number): Promise<CentroidPairRow[]> 
       INNER JOIN route_points rp ON rp.route_id = r.id
       INNER JOIN users u ON u.id = r.user_id
       WHERE u.is_fake = false
+        AND u.is_system = false
         AND u.matching_disabled = false
         AND u.nickname <> ALL(${sql.raw(protectedNicknamesSqlArray())})
       GROUP BY r.user_id, u.user_type
@@ -155,7 +156,7 @@ export async function runRouteTypeZoneMatching(): Promise<number> {
         FROM routes r
         INNER JOIN route_points rp ON rp.route_id = r.id
         INNER JOIN users u ON u.id = r.user_id
-        WHERE u.is_fake = false AND u.matching_disabled = false AND r.avg_speed_kmh IS NOT NULL
+        WHERE u.is_fake = false AND u.is_system = false AND u.matching_disabled = false AND r.avg_speed_kmh IS NOT NULL
           AND u.nickname <> ALL(${sql.raw(protectedNicknamesSqlArray())})
         GROUP BY r.user_id, u.user_type
         HAVING AVG(rp.latitude) IS NOT NULL AND AVG(rp.longitude) IS NOT NULL

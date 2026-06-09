@@ -77,7 +77,7 @@ export async function runMusicMatchBikerZavarrina(): Promise<number> {
       .innerJoin(tags, eq(tags.id, entityTags.tagId))
       .innerJoin(tagCategories, and(eq(tagCategories.id, tags.categoryId), eq(tagCategories.slug, "musica")))
       .innerJoin(users, eq(users.id, entityTags.entityId))
-      .where(and(eq(entityTags.entityType, "user"), eq(users.isFake, false), eq(users.matchingDisabled, false)));
+      .where(and(eq(entityTags.entityType, "user"), eq(users.isFake, false), eq(users.isSystem, false), eq(users.matchingDisabled, false)));
 
     if (userRows.length < 2) return 0;
 
@@ -193,6 +193,7 @@ export async function runGpsBasedMatching(): Promise<number> {
         isNotNull(routes.avgSpeedKmh),
         isNotNull(routes.durationSeconds),
         eq(users.isFake, false),
+        eq(users.isSystem, false),
         eq(users.matchingDisabled, false),
         gt(routes.durationSeconds!, 0),
       ));
@@ -334,7 +335,7 @@ export async function runEventMatching(): Promise<number> {
       .select({ userId: eventParticipants.userId, eventId: eventParticipants.eventId })
       .from(eventParticipants)
       .innerJoin(users, eq(eventParticipants.userId, users.id))
-      .where(and(eq(users.isFake, false), eq(users.matchingDisabled, false)));
+      .where(and(eq(users.isFake, false), eq(users.isSystem, false), eq(users.matchingDisabled, false)));
 
     if (rows.length === 0) {
       console.log("[EventMatching] Nessun partecipante eventi, skip.");

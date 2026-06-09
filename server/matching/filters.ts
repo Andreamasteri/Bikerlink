@@ -5,18 +5,20 @@ import {
   users,
   type Proposal
 } from "@shared/db";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, or } from "drizzle-orm";
 import { MatchPrefRow, MatchRule } from "./types";
 
 /**
- * Carica l'insieme degli userId con matching_disabled = true.
+ * Carica l'insieme degli userId da escludere dal matching:
+ *  - matching_disabled = true (esplicitamente disabilitati)
+ *  - is_system = true (account di servizio: admin, mod, smoke, noreply, ecc.)
  * Usato da tutti gli engine per escludere questi utenti su entrambi i lati del match.
  */
 export async function loadMatchingDisabledSet(): Promise<Set<string>> {
   const rows = await db
     .select({ id: users.id })
     .from(users)
-    .where(eq(users.matchingDisabled, true));
+    .where(or(eq(users.matchingDisabled, true), eq(users.isSystem, true)));
   return new Set(rows.map((r) => r.id));
 }
 
