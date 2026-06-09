@@ -4,6 +4,7 @@ import { MaterialCommunityIcons, Ionicons } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
 import Colors from "@/constants/colors";
 import { getApiUrl, authFetchHeaders } from "@/lib/query-client";
+import type { ValhallaDetailedHealth, NominatimDetailedHealth } from "./ThinkCentreValhallaNominatimBlocks";
 
 export { TelemetryCard } from "./AdminTelemetryCard";
 
@@ -14,6 +15,18 @@ interface GHStatus {
   url: string;
 }
 
+interface ThinkCentreHealthMinimal {
+  valhallaDetail?: ValhallaDetailedHealth;
+  nominatimDetail?: NominatimDetailedHealth;
+  tokenFingerprints?: {
+    graphhopper: string | null;
+    valhalla: string | null;
+    ollama: string | null;
+    whisper: string | null;
+    nominatim: string | null;
+  };
+}
+
 function CollapseChevron({ collapsed }: { collapsed: boolean }) {
   return (
     <Ionicons
@@ -22,6 +35,39 @@ function CollapseChevron({ collapsed }: { collapsed: boolean }) {
       color={Colors.textSecondary}
     />
   );
+}
+
+const PROFILE_ICONS: Record<string, keyof typeof MaterialCommunityIcons.glyphMap> = {
+  motorcycle: "motorbike",
+  auto: "car",
+  bicycle: "bicycle",
+  pedestrian: "walk",
+};
+
+const PROFILE_LABELS: Record<string, string> = {
+  motorcycle: "Moto",
+  auto: "Auto",
+  bicycle: "Bici",
+  pedestrian: "Pedonale",
+};
+
+async function fetchThinkCentreHealth(signal?: AbortSignal): Promise<ThinkCentreHealthMinimal> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 20_000);
+  const combined = signal
+    ? (AbortSignal.any ? AbortSignal.any([signal, controller.signal]) : controller.signal)
+    : controller.signal;
+  try {
+    const res = await fetch(new URL("/api/admin/thinkcentre-health", getApiUrl()).toString(), {
+      headers: { ...(await authFetchHeaders()) },
+      credentials: "include",
+      signal: combined,
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return res.json();
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 export function GraphHopperCard() {
@@ -107,6 +153,256 @@ export function GraphHopperCard() {
   );
 }
 
+export function ValhallaCard() {
+  const [collapsed, setCollapsed] = useState(true);
+
+  const { data, isLoading, error } = useQuery<ThinkCentreHealthMinimal>({
+    queryKey: ["/api/admin/thinkcentre-health"],
+    queryFn: ({ signal }) => fetchThinkCentreHealth(signal),
+    refetchInterval: 30_000,
+    staleTime: 20_000,
+    refetchOnMount: true,
+  });
+
+  const detail = error ? null : (data?.valhallaDetail ?? null);
+
+  const statusColor = detail == null
+    ? (error ? "#ef4444" : "#6b7280")
+    : !detail.configured
+      ? "#6b7280"
+      : detail.ok
+        ? "#22c55e"
+        : "#ef4444";
+
+  const dotColor = isLoading && !detail ? "#6b7280" : statusColor;
+
+  return (
+    <View style={styles.card}>
+      <TouchableOpacity
+        style={styles.cardHeader}
+        onPress={() => setCollapsed((c) => !c)}
+        activeOpacity={0.7}
+        testID="valhalla-card-header"
+      >
+        <MaterialCommunityIcons name="routes" size={18} color={dotColor} />
+        <Text style={styles.cardTitle}>Valhalla</Text>
+        <View style={styles.headerRight}>
+          {isLoading && !detail && <ActivityIndicator size="small" color={dotColor} />}
+          {error && !isLoading && (
+            <MaterialCommunityIcons name="alert-circle-outline" size={16} color="#ef4444" />
+          )}
+          {detail != null && (
+            <View style={[styles.healthDot, { backgroundColor: dotColor }]} />
+          )}
+          <CollapseChevron collapsed={collapsed} />
+        </View>
+      </TouchableOpacity>
+
+      {!collapsed && (
+        <View style={styles.body}>
+          {error && !isLoading && (
+            <Text style={styles.errorText}>Impossibile leggere lo stato di Valhalla.</Text>
+          )}
+          {detail == null && !error && !isLoading && (
+            <Text style={styles.metaText}>Nessun dato disponibile.</Text>
+          )}
+          {detail != null && (
+            <>
+              <View style={styles.row}>
+                <View style={styles.stat}>
+                  <Text style={[styles.statValue, { color: dotColor }]}>
+                    {!detail.configured
+                      ? "Non config."
+                      : detail.ok
+                        ? "Online"
+                        : "Offline"}
+                  </Text>
+                  <Text style={styles.statLabel}>Stato</Text>
+                </View>
+                <View style={styles.divider} />
+                <View style={styles.stat}>
+                  <Text style={styles.statValue}>
+                    {detail.configured && detail.ok
+                      ? `${detail.activeProfiles.length}/4`
+                      : "—"}
+                  </Text>
+                  <Text style={styles.statLabel}>Profili</Text>
+                </View>
+                <View style={styles.divider} />
+                <View style={styles.stat}>
+                  <Text style={styles.statValue}>
+                    {detail.latencyMs != null ? `${detail.latencyMs} ms` : "—"}
+                  </Text>
+                  <Text style={styles.statLabel}>Latenza</Text>
+                </View>
+              </View>
+
+              {detail.configured && detail.ok && detail.activeProfiles.length > 0 && (
+                <View style={styles.chipsRow}>
+                  {detail.activeProfiles.map((p) => (
+                    <View key={p} style={styles.profileChip}>
+                      <MaterialCommunityIcons
+                        name={PROFILE_ICONS[p] ?? "routes"}
+                        size={11}
+                        color="#a78bfa"
+                      />
+                      <Text style={styles.profileChipText}>{PROFILE_LABELS[p] ?? p}</Text>
+                    </View>
+                  ))}
+                </View>
+              )}
+
+              {detail.tileVersion != null && (
+                <Text style={styles.metaText}>Tile: {detail.tileVersion}</Text>
+              )}
+
+              {detail.configured && !detail.ok && detail.error != null && (
+                <View style={styles.warningBanner}>
+                  <MaterialCommunityIcons name="alert-outline" size={13} color="#ef4444" />
+                  <Text style={[styles.warningText, { color: "#ef4444" }]}>{detail.error}</Text>
+                </View>
+              )}
+
+              {!detail.configured && (
+                <View style={styles.warningBanner}>
+                  <MaterialCommunityIcons name="information-outline" size={13} color="#f59e0b" />
+                  <Text style={styles.warningText}>Nessun VALHALLA_URL configurato.</Text>
+                </View>
+              )}
+            </>
+          )}
+        </View>
+      )}
+    </View>
+  );
+}
+
+export function NominatimCard() {
+  const [collapsed, setCollapsed] = useState(true);
+
+  const { data, isLoading, error } = useQuery<ThinkCentreHealthMinimal>({
+    queryKey: ["/api/admin/thinkcentre-health"],
+    queryFn: ({ signal }) => fetchThinkCentreHealth(signal),
+    refetchInterval: 30_000,
+    staleTime: 20_000,
+    refetchOnMount: true,
+  });
+
+  const detail = error ? null : (data?.nominatimDetail ?? null);
+
+  const statusColor = detail == null
+    ? (error ? "#ef4444" : "#6b7280")
+    : !detail.configured
+      ? "#6b7280"
+      : detail.ok
+        ? "#22c55e"
+        : "#ef4444";
+
+  const dotColor = isLoading && !detail ? "#6b7280" : statusColor;
+
+  const dbStateColor = (s: string | undefined) => {
+    if (s === "ok") return "#22c55e";
+    if (s === "error") return "#ef4444";
+    return "#6b7280";
+  };
+
+  return (
+    <View style={styles.card}>
+      <TouchableOpacity
+        style={styles.cardHeader}
+        onPress={() => setCollapsed((c) => !c)}
+        activeOpacity={0.7}
+        testID="nominatim-card-header"
+      >
+        <MaterialCommunityIcons name="map-search-outline" size={18} color={dotColor} />
+        <Text style={styles.cardTitle}>Nominatim</Text>
+        <View style={styles.headerRight}>
+          {isLoading && !detail && <ActivityIndicator size="small" color={dotColor} />}
+          {error && !isLoading && (
+            <MaterialCommunityIcons name="alert-circle-outline" size={16} color="#ef4444" />
+          )}
+          {detail != null && (
+            <View style={[styles.healthDot, { backgroundColor: dotColor }]} />
+          )}
+          <CollapseChevron collapsed={collapsed} />
+        </View>
+      </TouchableOpacity>
+
+      {!collapsed && (
+        <View style={styles.body}>
+          {error && !isLoading && (
+            <Text style={styles.errorText}>Impossibile leggere lo stato di Nominatim.</Text>
+          )}
+          {detail == null && !error && !isLoading && (
+            <Text style={styles.metaText}>Nessun dato disponibile.</Text>
+          )}
+          {detail != null && (
+            <>
+              <View style={styles.row}>
+                <View style={styles.stat}>
+                  <Text style={[styles.statValue, { color: dotColor }]}>
+                    {!detail.configured
+                      ? "Pubblico"
+                      : detail.ok
+                        ? "Online"
+                        : "Offline"}
+                  </Text>
+                  <Text style={styles.statLabel}>Stato</Text>
+                </View>
+                <View style={styles.divider} />
+                <View style={styles.stat}>
+                  <Text style={[styles.statValue, { color: dbStateColor(detail.dbState) }]}>
+                    {detail.dbState ? detail.dbState.toUpperCase() : "—"}
+                  </Text>
+                  <Text style={styles.statLabel}>DB</Text>
+                </View>
+                <View style={styles.divider} />
+                <View style={styles.stat}>
+                  <Text style={styles.statValue}>
+                    {detail.geocodeLatencyMs != null ? `${detail.geocodeLatencyMs} ms` : "—"}
+                  </Text>
+                  <Text style={styles.statLabel}>Geocode</Text>
+                </View>
+              </View>
+
+              {detail.softwareVersion != null && (
+                <View style={styles.chipsRow}>
+                  <View style={styles.metaChip}>
+                    <Ionicons name="code-outline" size={11} color="#60a5fa" />
+                    <Text style={styles.metaChipText}>v{detail.softwareVersion}</Text>
+                  </View>
+                  {detail.latencyMs != null && (
+                    <View style={styles.metaChip}>
+                      <Ionicons name="timer-outline" size={11} color="#60a5fa" />
+                      <Text style={styles.metaChipText}>{detail.latencyMs} ms ping</Text>
+                    </View>
+                  )}
+                </View>
+              )}
+
+              {!detail.configured && (
+                <View style={styles.warningBanner}>
+                  <MaterialCommunityIcons name="information-outline" size={13} color="#f59e0b" />
+                  <Text style={styles.warningText}>
+                    Nessun NOMINATIM_URL — usa il server pubblico (rate-limited).
+                  </Text>
+                </View>
+              )}
+
+              {detail.configured && !detail.ok && detail.error != null && (
+                <View style={styles.warningBanner}>
+                  <MaterialCommunityIcons name="alert-outline" size={13} color="#ef4444" />
+                  <Text style={[styles.warningText, { color: "#ef4444" }]}>{detail.error}</Text>
+                </View>
+              )}
+            </>
+          )}
+        </View>
+      )}
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   card: {
     backgroundColor: Colors.surface,
@@ -138,10 +434,13 @@ const styles = StyleSheet.create({
     height: 10,
     borderRadius: 5,
   },
+  body: {
+    gap: 10,
+  },
   row: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 10,
+    marginBottom: 4,
   },
   stat: {
     flex: 1,
@@ -178,5 +477,53 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: "#f59e0b",
     flex: 1,
+  },
+  errorText: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    color: "#ef4444",
+  },
+  metaText: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 11,
+    color: Colors.textSecondary,
+  },
+  chipsRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+    marginTop: 2,
+  },
+  profileChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingVertical: 3,
+    paddingHorizontal: 8,
+    borderRadius: 8,
+    backgroundColor: "rgba(167, 139, 250, 0.1)",
+    borderWidth: 1,
+    borderColor: "rgba(167, 139, 250, 0.3)",
+  },
+  profileChipText: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 10,
+    color: "#a78bfa",
+  },
+  metaChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingVertical: 3,
+    paddingHorizontal: 8,
+    borderRadius: 8,
+    backgroundColor: "rgba(96, 165, 250, 0.08)",
+    borderWidth: 1,
+    borderColor: "rgba(96, 165, 250, 0.2)",
+  },
+  metaChipText: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 10,
+    color: "#60a5fa",
   },
 });

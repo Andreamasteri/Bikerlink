@@ -5,7 +5,7 @@ import type { Href } from "expo-router";
 import { MaterialCommunityIcons, MaterialIcons, Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
-import { TelemetryCard, GraphHopperCard } from "@/components/admin/AdminStatsCards";
+import { TelemetryCard, GraphHopperCard, ValhallaCard, NominatimCard } from "@/components/admin/AdminStatsCards";
 import { ServerEfficiencyCard } from "@/components/admin/ServerEfficiencyCard";
 import { ThinkCentreCard } from "@/components/admin/ThinkCentreCard";
 import { ThinkCentreEfficiencyCard } from "@/components/admin/ThinkCentreEfficiencyCard";
@@ -348,6 +348,8 @@ export default function AdminDashboard() {
             <ServerEfficiencyCard />
             <ThinkCentreEfficiencyCard />
             <ThinkCentreCard onStatuses={handleThinkCentreStatuses} />
+            <ValhallaCard />
+            <NominatimCard />
             <RoutingCoordinationCard onStatus={handleRoutingStatus} />
             <GraphHopperCard />
             <TelemetryCard />
