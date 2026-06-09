@@ -1,4 +1,5 @@
 import React, { createContext, useContext, ReactNode } from "react";
+import { Platform } from "react-native";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth-context";
 import type { MapProvider } from "@/lib/map-tiles";
@@ -69,8 +70,9 @@ export function MapSettingsProvider({ children }: { children: ReactNode }) {
     enabled: !!user,
   });
 
+  const tilePlatform = Platform.OS === "web" ? "web" : "mobile";
   const { data: tileData, isLoading: tileLoading } = useQuery<TileProvidersResponse>({
-    queryKey: ["/api/settings/tile-providers"],
+    queryKey: [`/api/settings/tile-providers?platform=${tilePlatform}`],
     staleTime: 120000,
     retry: false,
     enabled: !!user,

@@ -451,7 +451,10 @@ export function registerClientSettingsRoutes(app: Express) {
         storage.getAppSetting("maps_routing_engine"),
         storage.getAppSetting("active_tile_provider"),
       ]);
-      const activeTileId = activeTileSetting?.value ?? DEFAULT_TILE_PROVIDER_ID;
+      const rawTileId = activeTileSetting?.value ?? DEFAULT_TILE_PROVIDER_ID;
+      const rawProvider = findTileProvider(rawTileId);
+      // If DB contains an archived provider, silently fall back to the default.
+      const activeTileId = (rawProvider && !rawProvider.archived) ? rawTileId : DEFAULT_TILE_PROVIDER_ID;
       const tileProviderObj = findTileProvider(activeTileId) ?? findTileProvider(DEFAULT_TILE_PROVIDER_ID)!;
       res.json({
         enabled: enabledSetting?.value !== "false",
@@ -511,21 +514,44 @@ export function registerClientSettingsRoutes(app: Express) {
     try {
       const { getStatus } = await import("./maps/provider-status");
       const setting = await storage.getAppSetting("active_tile_provider");
-      const activeId = setting?.value ?? DEFAULT_TILE_PROVIDER_ID;
+      const rawActiveId = setting?.value ?? DEFAULT_TILE_PROVIDER_ID;
+      const rawActiveProvider = findTileProvider(rawActiveId);
+
+      const platformFilter = (res.req as import("express").Request).query?.platform as string | undefined;
+
+      const filteredProviders = TILE_PROVIDERS.filter((p) => {
+        if (p.archived) return false;
+        if (!platformFilter) return true;
+        return p.platform === platformFilter || p.platform === "both";
+      });
+
+      // Resolve a safe active ID: archived providers fall back to default;
+      // platform-incompatible providers (e.g. web-only when mobile client asks)
+      // fall back to the first compatible provider in the filtered list.
+      let activeId: string;
+      if (!rawActiveProvider || rawActiveProvider.archived) {
+        activeId = DEFAULT_TILE_PROVIDER_ID;
+      } else if (platformFilter && !filteredProviders.find((p) => p.id === rawActiveId)) {
+        activeId = filteredProviders[0]?.id ?? DEFAULT_TILE_PROVIDER_ID;
+      } else {
+        activeId = rawActiveId;
+      }
 
       const providers = await Promise.all(
-        TILE_PROVIDERS.map(async (p) => {
+        filteredProviders.map(async (p) => {
           const status = await getStatus(p.id);
           return {
             id: p.id,
             label: p.label,
             category: p.category,
             cost: p.cost,
+            tierLimited: p.tierLimited ?? false,
             maxZoom: p.maxZoom,
             rendererCompat: p.rendererCompat,
             urlTemplate: p.urlTemplate,
             keyRequired: !!p.apiKeyEnvVar,
             isActive: p.id === activeId,
+            platform: p.platform,
             status,
           };
         }),

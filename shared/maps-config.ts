@@ -9,6 +9,7 @@ export interface MapsOption<T extends string> {
   label: string;
   description: string;
   implemented: boolean;
+  archived?: boolean;
 }
 
 export const RENDERER_OPTIONS: MapsOption<MapsRendererId>[] = [
@@ -75,8 +76,9 @@ export const ROUTING_OPTIONS: MapsOption<RoutingEngineId>[] = [
   {
     id: "mapbox-directions",
     label: "Mapbox Directions",
-    description: "Cloud emergency fallback — 100k richieste/mese gratuiti. Attivare solo se entrambi i self-hosted sono down.",
+    description: "Archiviato — duplicato di TomTom come fallback cloud. Ignorato anche se impostato nel DB.",
     implemented: false,
+    archived: true,
   },
   {
     id: "tomtom",
@@ -87,8 +89,9 @@ export const ROUTING_OPTIONS: MapsOption<RoutingEngineId>[] = [
   {
     id: "ai",
     label: "AI (auto-selezione)",
-    description: "Un modello AI sceglie l'engine ottimale per ogni richiesta (confronto qualità se incerto). Fallback automatico al selettore normale.",
+    description: "Engine sperimentale: un modello AI sceglie il routing ottimale. Archiviato: configurazioni DB esistenti ricadono su GraphHopper.",
     implemented: true,
+    archived: true,
   },
 ];
 
@@ -106,3 +109,11 @@ export const ROUTING_PROFILE_OPTIONS: MapsOption<RoutingProfileId>[] = [
     implemented: true,
   },
 ];
+
+/**
+ * Engine ignorati nella catena di fallback del router anche se impostati nel DB.
+ * Derivato da ROUTING_OPTIONS.archived — include mapbox-directions e ai.
+ */
+export const ARCHIVED_ROUTING_ENGINES = new Set<RoutingEngineId>(
+  ROUTING_OPTIONS.filter((o) => o.archived).map((o) => o.id),
+);

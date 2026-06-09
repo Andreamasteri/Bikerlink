@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Platform } from "react-native";
 import { useQuery } from "@tanstack/react-query";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useAuth } from "@/lib/auth-context";
@@ -70,8 +71,9 @@ export function useMapsRollout(): MapsRolloutResult {
     staleTime: 60_000,
   });
 
+  const tilePlatform = Platform.OS === "web" ? "web" : "mobile";
   const { data: tileData } = useQuery<TileProvidersSettings>({
-    queryKey: ["/api/settings/tile-providers"],
+    queryKey: [`/api/settings/tile-providers?platform=${tilePlatform}`],
     staleTime: 60_000,
   });
 
@@ -97,7 +99,15 @@ export function useMapsRollout(): MapsRolloutResult {
     let customTile = activeTile;
     if (testerTileId) {
       const provider = findTileProvider(testerTileId);
-      if (provider) {
+      // Reject archived providers and platform-incompatible providers.
+      // If the stored testerTileId is invalid for this client, fall back to
+      // the server-resolved activeTile so no archived/incompatible tile is loaded.
+      const clientPlatform = Platform.OS === "web" ? "web" : "mobile";
+      const isPlatformCompatible =
+        provider &&
+        !provider.archived &&
+        (provider.platform === "both" || provider.platform === clientPlatform);
+      if (isPlatformCompatible) {
         customTile = {
           id: provider.id,
           urlTemplate: provider.urlTemplate,

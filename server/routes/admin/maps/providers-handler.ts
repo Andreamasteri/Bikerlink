@@ -7,13 +7,22 @@ import { getStatus, resetStatus, ProviderStatus } from "../../maps/provider-stat
 
 const router = Router();
 
-router.get("/providers", async (_req: Request, res: Response) => {
+router.get("/providers", async (req: Request, res: Response) => {
   try {
     const setting = await storage.getAppSetting("active_tile_provider");
     const activeId = setting?.value ?? DEFAULT_TILE_PROVIDER_ID;
 
+    const platformFilter = req.query.platform as string | undefined;
+
+    const filtered = platformFilter
+      ? TILE_PROVIDERS.filter((p) => {
+          if (p.archived) return false;
+          return p.platform === platformFilter || p.platform === "both";
+        })
+      : TILE_PROVIDERS;
+
     const providers = await Promise.all(
-      TILE_PROVIDERS.map(async (p) => {
+      filtered.map(async (p) => {
         const [quota, status] = await Promise.all([getQuota(p.id), getStatus(p.id)]);
         return {
           id: p.id,
@@ -28,6 +37,10 @@ router.get("/providers", async (_req: Request, res: Response) => {
           isActive: p.id === activeId,
           quotaThisMonth: quota,
           status,
+          platform: p.platform,
+          archived: p.archived,
+          note: p.note ?? null,
+          tierLimited: p.tierLimited ?? false,
         };
       }),
     );
@@ -52,6 +65,14 @@ router.put("/providers/active", async (req: Request, res: Response) => {
     if (!provider) {
       const validIds = TILE_PROVIDERS.map((p) => p.id).join(", ");
       return sendError(res, 400, `Provider non valido. Valori ammessi: ${validIds}`);
+    }
+
+    if (provider.archived) {
+      return sendError(res, 400, `Il provider "${provider.label}" è archiviato e non può essere impostato come attivo.`);
+    }
+
+    if (provider.category === "overlay") {
+      return sendError(res, 400, `Il provider "${provider.label}" è un overlay e non può essere impostato come provider base.`);
     }
 
     await storage.upsertAppSetting("active_tile_provider", id);

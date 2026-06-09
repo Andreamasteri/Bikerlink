@@ -507,12 +507,16 @@ export async function resolveRouterOpts(
   const { storage } = await import("../../storage");
   const { resolveRoutingEngine } = await import("../../routing/function-engine-config");
   const { isAiRoutingMode, buildAiRoutingContext } = await import("../../routing/ai-engine-decider");
-  const [rolloutSetting, routingEngine, routeUser, aiMode] = await Promise.all([
+  const { ARCHIVED_ROUTING_ENGINES } = await import("@shared/maps-config");
+  const [rolloutSetting, routingEngine, routeUser, aiModeRaw] = await Promise.all([
     storage.getAppSetting("maps_rollout"),
     resolveRoutingEngine(),
     storage.getUser(userId),
     isAiRoutingMode(),
   ]);
+  // Defense-in-depth: se il DB ha "ai" ma l'engine è archiviato, non attiviamo
+  // il path AI — il guard in getActiveRouterInner lo bloccherebbe comunque.
+  const aiMode = aiModeRaw && !ARCHIVED_ROUTING_ENGINES.has("ai" as import("@shared/maps-config").RoutingEngineId);
   return {
     rollout: (rolloutSetting?.value ?? "disabled") as import("@shared/maps-config").MapsRollout,
     engine: routingEngine,

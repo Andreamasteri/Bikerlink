@@ -20,6 +20,10 @@ router.get("/tiles/:providerId/:z/:x/:y", async (req: Request, res: Response) =>
     return res.status(404).json({ error: "Provider sconosciuto" });
   }
 
+  if (provider.archived) {
+    return res.status(404).json({ error: "Provider archiviato — non disponibile" });
+  }
+
   let baseUrl = resolveTileUrl(provider);
   baseUrl = baseUrl
     .replace("{z}", z)

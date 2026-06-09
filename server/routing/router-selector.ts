@@ -1,5 +1,6 @@
 import type { Response } from "express";
 import type { MapsRollout, RoutingEngineId } from "@shared/maps-config";
+import { ARCHIVED_ROUTING_ENGINES } from "@shared/maps-config";
 import { routeViaGraphHopper, type RouteRequest, type RouteResult } from "./graphhopper-adapter";
 import { calculateRoute as valhallaCalculateRoute } from "./valhalla-client";
 import { calculateRoute as mapboxCalculateRoute } from "./mapbox-directions-client";
@@ -362,6 +363,19 @@ async function getActiveRouterInner(
     return wrapMetrics("graphhopper", () => graphHopperRoute(req, opts.isMapTester), res);
   }
 
+  // Engine archiviati (es. mapbox-directions, ai): ignorati completamente anche se
+  // impostati nel DB — fallback silenzioso a GraphHopper. Questo guard è PRIMA
+  // della modalità AI: quando il DB contiene "ai" e aiMode=true, opts.engine è il
+  // safe-default (graphhopper) — non "ai" — quindi controlliamo esplicitamente anche
+  // il flag aiMode per evitare che l'AI path venga comunque eseguito.
+  const aiEngineArchived = opts.aiMode && ARCHIVED_ROUTING_ENGINES.has("ai" as import("@shared/maps-config").RoutingEngineId);
+  if (ARCHIVED_ROUTING_ENGINES.has(opts.engine) || aiEngineArchived) {
+    const archivedName = aiEngineArchived ? "ai" : opts.engine;
+    console.warn(`[RouterSelector] Engine archiviato "${archivedName}" ignorato — fallback a GraphHopper`);
+    if (res && !res.headersSent) res.setHeader("X-Routing-Fallback", "graphhopper");
+    return wrapMetrics("graphhopper", () => graphHopperRoute(req, opts.isMapTester), res);
+  }
+
   // Modalità AI: un modello sceglie l'engine ottimale. Se l'AI non risponde
   // entro il timeout (o non sceglie), aiOverride ritorna null e si ricade sulla
   // logica normale sotto (opts.engine, che in modalità AI è il safe default).
@@ -371,7 +385,6 @@ async function getActiveRouterInner(
   }
 
   if (opts.engine === "valhalla") return wrapMetrics("valhalla", () => routeViaValhallaWithFallback(req, opts.isMapTester, res), res);
-  if (opts.engine === "mapbox-directions") return wrapMetrics("mapbox", () => routeViaMapboxWithFallback(req, opts.isMapTester, res), res);
   if (opts.engine === "tomtom") return wrapMetrics("tomtom", () => routeViaTomTomWithFallback(req, opts.isMapTester, res), res);
   return wrapMetrics("graphhopper", () => graphHopperRoute(req, opts.isMapTester), res);
 }
