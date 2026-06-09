@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import Colors from "@/constants/colors";
 import { getApiUrl, authFetchHeaders } from "@/lib/query-client";
 import type { ValhallaDetailedHealth, NominatimDetailedHealth } from "./ThinkCentreValhallaNominatimBlocks";
+import { ErrorHistory, ProbeLog } from "./ThinkCentreCardParts";
 
 export { TelemetryCard } from "./AdminTelemetryCard";
 
@@ -269,6 +270,14 @@ export function ValhallaCard() {
                   <Text style={styles.warningText}>Nessun VALHALLA_URL configurato.</Text>
                 </View>
               )}
+
+              {!detail.ok && detail.history.length > 0 && (
+                <ErrorHistory history={detail.history} />
+              )}
+
+              {detail.probeLog && detail.probeLog.length > 0 && (
+                <ProbeLog entries={detail.probeLog} />
+              )}
             </>
           )}
         </View>
@@ -394,6 +403,14 @@ export function NominatimCard() {
                   <MaterialCommunityIcons name="alert-outline" size={13} color="#ef4444" />
                   <Text style={[styles.warningText, { color: "#ef4444" }]}>{detail.error}</Text>
                 </View>
+              )}
+
+              {!detail.ok && detail.history.length > 0 && (
+                <ErrorHistory history={detail.history} />
+              )}
+
+              {detail.probeLog && detail.probeLog.length > 0 && (
+                <ProbeLog entries={detail.probeLog} />
               )}
             </>
           )}
