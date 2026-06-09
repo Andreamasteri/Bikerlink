@@ -1,3 +1,13 @@
+// Silenzia "[ioredis] Unhandled error event" — ioredis chiama console.error
+// via silentEmit quando non trova listener sull'oggetto interno; tutti i
+// client Redis hanno già handler espliciti, ma ioredis v5 bypassa talvolta
+// il lookup. Il fallback in-memory è sempre attivo, nessun impatto funzionale.
+const _origConsoleError = console.error.bind(console);
+console.error = (...args: unknown[]) => {
+  if (typeof args[0] === "string" && args[0].startsWith("[ioredis]")) return;
+  _origConsoleError(...args);
+};
+
 import express from "express";
 import type { Request, Response } from "express";
 import { createServer } from "http";

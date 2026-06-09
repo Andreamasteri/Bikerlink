@@ -136,7 +136,7 @@ export class AiCoordinator {
         console.log("[ai-coordinator/subscribe] redis pub/sub non raggiungibile (fallback in-process):", (err as Error).message);
         // Chiude il client duplicato per evitare leak di socket.
         if (client) {
-          try { await client.quit(); } catch { /* ignore */ }
+          try { client.disconnect(); } catch { /* ignore */ }
         }
         client = null;
       }
