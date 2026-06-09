@@ -447,14 +447,26 @@ export function startMatchingEngine(): void {
   // Daily recompute of per-user match feedback profiles (24h interval).
   // Runs once shortly after startup, then every 24 hours.
   setTimeout(() => {
-    recomputeAllUserMatchProfiles().catch((err) =>
-      console.error("[ProfileRecompute] startup run failed:", err),
-    );
+    addMatchLog("INFO", "profile_recompute", "Ricalcolo profili utente avviato (startup)");
+    recomputeAllUserMatchProfiles()
+      .then(() => {
+        addMatchLog("INFO", "profile_recompute", "Ricalcolo profili utente completato (startup)");
+      })
+      .catch((err) => {
+        console.error("[ProfileRecompute] startup run failed:", err);
+        addMatchLog("ERROR", "profile_recompute", `Errore ricalcolo profili utente (startup): ${err instanceof Error ? err.message : String(err)}`);
+      });
   }, 5 * 60 * 1000);
   _engineTimers.push(setInterval(() => {
-    recomputeAllUserMatchProfiles().catch((err) =>
-      console.error("[ProfileRecompute] daily run failed:", err),
-    );
+    addMatchLog("INFO", "profile_recompute", "Ricalcolo profili utente avviato (giornaliero)");
+    recomputeAllUserMatchProfiles()
+      .then(() => {
+        addMatchLog("INFO", "profile_recompute", "Ricalcolo profili utente completato (giornaliero)");
+      })
+      .catch((err) => {
+        console.error("[ProfileRecompute] daily run failed:", err);
+        addMatchLog("ERROR", "profile_recompute", `Errore ricalcolo profili utente (giornaliero): ${err instanceof Error ? err.message : String(err)}`);
+      });
   }, 24 * 60 * 60 * 1000));
   console.log("[Matching] Daily user-match-profile recompute scheduled");
 
@@ -501,6 +513,7 @@ export function startMatchingEngine(): void {
   // sempre il matcher così i match usano dati freschi. Bassa frequenza (24h):
   // lo stile di guida evolve lentamente ed è costoso (embeddings).
   const runTelemetryAffinitySafe = async () => {
+    addMatchLog("INFO", "telemetry_affinity", "TelemetryAffinity avviato");
     try {
       const profiles = await aggregateTelemetryProfiles();
       if (profiles > 0) {
@@ -510,8 +523,10 @@ export function startMatchingEngine(): void {
       if (count > 0) {
         console.log(`[Matching] TelemetryAffinity ciclo: ${count} nuovi match`);
       }
+      addMatchLog("INFO", "telemetry_affinity", `TelemetryAffinity completato: ${profiles} profili aggregati, ${count} nuovi match`);
     } catch (err) {
       console.error("[Matching] TelemetryAffinity ciclo errore:", err);
+      addMatchLog("ERROR", "telemetry_affinity", `Errore TelemetryAffinity: ${err instanceof Error ? err.message : String(err)}`);
     }
   };
   setTimeout(() => { runTelemetryAffinitySafe(); }, 5 * 60 * 1000);
