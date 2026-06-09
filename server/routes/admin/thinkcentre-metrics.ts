@@ -3,7 +3,7 @@
  *
  * GET /api/admin/thinkcentre-metrics
  * Proxy leggero verso l'agente Node.js che gira sul ThinkCentre (mini-PC di casa).
- * L'agente espone GET /sys-metrics su THINKCENTRE_METRICS_URL (default porta 9101).
+ * L'agente espone GET /sys-metrics su THINKCENTRE_METRICS_URL (porta 9199).
  *
  * Se la variabile non è configurata o l'agente non risponde entro 4 s,
  * restituisce { online: false } senza crash.

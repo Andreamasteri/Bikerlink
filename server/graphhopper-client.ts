@@ -48,6 +48,7 @@ export const canFallbackToCloud = isSelfHosted && Boolean(CLOUD_API_KEY);
  */
 export { isRoutingEnabled } from "./routing/routing-kill-switch";
 import { isRoutingEnabled as _isRoutingEnabled } from "./routing/routing-kill-switch";
+import { ROUTING_AREAS } from "@shared/routing-areas";
 
 /**
  * Profilo attivo: "motorcycle" quando si usa il server self-hosted,
@@ -249,35 +250,36 @@ export interface GHProfilesResult {
  */
 export async function fetchSelfHostedProfiles(): Promise<GHProfilesResult> {
   if (!isSelfHosted) return { reachable: false, profiles: null, error_reason: "not_self_hosted" };
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 5_000);
-  try {
-    const headers: Record<string, string> = { "Content-Type": "application/json" };
-    if (SELF_HOSTED_TOKEN) headers["X-GH-Token"] = SELF_HOSTED_TOKEN;
-    const res = await fetch(`${GH_BASE_URL}/info`, { headers, signal: controller.signal });
-    clearTimeout(timer);
-    if (!res.ok) {
-      return { reachable: true, profiles: null, error_reason: `http_${res.status}` };
+
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (SELF_HOSTED_TOKEN) headers["X-GH-Token"] = SELF_HOSTED_TOKEN;
+
+  // Con il setup multi-area, ogni istanza GH risponde su /areas/<codice>/info —
+  // non esiste un /info alla root. Proviamo le aree in ordine finché una risponde.
+  for (const area of ROUTING_AREAS) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 5_000);
+    try {
+      const res = await fetch(`${GH_BASE_URL}${area.path}/info`, { headers, signal: controller.signal });
+      clearTimeout(timer);
+      if (!res.ok) continue;
+      const data = await res.json() as Record<string, unknown>;
+      let profiles: string[] | null = null;
+      if (Array.isArray(data.supported_vehicles)) {
+        profiles = data.supported_vehicles as string[];
+      } else if (Array.isArray(data.profiles)) {
+        profiles = (data.profiles as Array<{ name: string } | string>).map(
+          (p) => (typeof p === "string" ? p : p.name),
+        );
+      }
+      if (profiles) return { reachable: true, profiles, error_reason: null };
+    } catch {
+      clearTimeout(timer);
     }
-    const data = await res.json() as Record<string, unknown>;
-    let profiles: string[] | null = null;
-    if (Array.isArray(data.supported_vehicles)) {
-      profiles = data.supported_vehicles as string[];
-    } else if (Array.isArray(data.profiles)) {
-      profiles = (data.profiles as Array<{ name: string } | string>).map(
-        (p) => (typeof p === "string" ? p : p.name),
-      );
-    }
-    return { reachable: true, profiles, error_reason: profiles ? null : "parse" };
-  } catch (err: unknown) {
-    clearTimeout(timer);
-    const isTimeout = err instanceof Error && err.name === "AbortError";
-    return {
-      reachable: false,
-      profiles: null,
-      error_reason: isTimeout ? "timeout" : "network",
-    };
   }
+
+  // Nessuna area ha risposto con profili validi — server non raggiungibile o parse error
+  return { reachable: false, profiles: null, error_reason: "network" };
 }
 
 /**
