@@ -419,16 +419,13 @@ process.on("SIGINT", () => gracefulShutdown("SIGINT"));
     // Valhalla — startup validation, fire-and-forget.
     setImmediate(() => void import("./routing/valhalla-startup").then(m => m.validateValhallaStartup()));
     const { saveSchemaSnapshot } = await import("./scripts/snapshot-schema");
-    // saveSchemaSnapshot is a dev/maintenance utility — non-essential at boot, fire-and-forget
     setImmediate(() => {
-      console.log("[INIT][BG] Starting saveSchemaSnapshot...");
       saveSchemaSnapshot()
         .then(() => console.log("[INIT][BG] saveSchemaSnapshot — done"))
         .catch((e) => console.warn("[INIT][BG] saveSchemaSnapshot error:", e));
     });
 
     setImmediate(() => void import("./ai/db-integrity/boot-schema-check").then((m) => m.runBootSchemaDriftCheck()).catch((e) => console.warn("[INIT][BG] boot schema drift check error:", e)));
-    // OTA sync cron — ogni 15 min, sincronizza branch EAS `production` nel DB (distribuzione via EAS).
     const FIFTEEN_MIN_MS = 15 * 60 * 1000;
     const { syncProductionUpdates } = await import("./routes/admin/ota");
     setImmediate(() => {
@@ -442,8 +439,7 @@ process.on("SIGINT", () => gracefulShutdown("SIGINT"));
     }, FIFTEEN_MIN_MS);
     console.log("[INIT] OTA cron scheduled every 15 min");
 
-    // Task #2503 — worker auto-rollback OTA (ogni 5 min). Marca come rejected le release
-    // con auto_rollback_enabled=true se boot success rate < soglia con abbastanza download.
+    // Task #2503 — auto-rollback OTA ogni 5 min (rejected se boot success rate < soglia).
     const FIVE_MIN_MS = 5 * 60 * 1000;
     const { runOtaAutoRollback } = await import("./jobs/ota-auto-rollback");
     setInterval(() => {
@@ -518,19 +514,15 @@ process.on("SIGINT", () => gracefulShutdown("SIGINT"));
     }
 
     try {
-      const { startCoordinatorCleanupScheduler } = await import("./ai/coordinator/cleanup");
+      const [{ startCoordinatorCleanupScheduler }, { scheduleSessionCrashCleanup }] = await Promise.all([
+        import("./ai/coordinator/cleanup"),
+        import("./jobs/session-crash-cleanup"),
+      ]);
       startCoordinatorCleanupScheduler();
-      console.log("[INIT] AI Coordinator cleanup scheduler started");
-    } catch (e) {
-      console.warn("[INIT] AI Coordinator cleanup scheduler failed (non-fatal):", e);
-    }
-
-    try {
-      const { scheduleSessionCrashCleanup } = await import("./jobs/session-crash-cleanup");
       scheduleSessionCrashCleanup();
-      console.log("[INIT] Session crash cleanup scheduled every 10 min");
+      console.log("[INIT] Coordinator cleanup + session crash cleanup schedulers started");
     } catch (e) {
-      console.warn("[INIT] Session crash cleanup scheduler failed (non-fatal):", e);
+      console.warn("[INIT] Cleanup schedulers failed (non-fatal):", e);
     }
 
     try {
