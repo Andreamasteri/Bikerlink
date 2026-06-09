@@ -26,6 +26,8 @@
     "../node_modules",
     "../server/__tests__/**",
     "../server/mass-seed/**",
-    "../server/auto-seed.ts"
+    "../server/auto-seed.ts",
+    "../server/backup-service.ts",
+    "../server/export-service.ts"
   ]
 }
