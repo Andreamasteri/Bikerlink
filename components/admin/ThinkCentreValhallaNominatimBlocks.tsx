@@ -61,30 +61,46 @@ function formatDataUpdated(iso: string | undefined): string {
 export function ValhallaBlock({
   detail,
   fingerprint,
+  isLoading,
+  hasError,
 }: {
-  detail: ValhallaDetailedHealth;
+  detail: ValhallaDetailedHealth | null;
   fingerprint: string | null;
+  isLoading?: boolean;
+  hasError?: boolean;
 }) {
   const [open, setOpen] = useState(false);
 
-  const statusColor = !detail.configured
-    ? "#6b7280"
-    : detail.ok
-      ? "#22c55e"
-      : "#ef4444";
+  const statusColor = detail == null
+    ? (hasError ? "#ef4444" : "#6b7280")
+    : !detail.configured
+      ? "#6b7280"
+      : detail.ok
+        ? "#22c55e"
+        : "#ef4444";
 
-  const statusLabel = !detail.configured
-    ? "Non configurato"
-    : detail.ok
-      ? detail.latencyMs != null
-        ? `Online · ${detail.latencyMs} ms`
-        : "Online"
-      : detail.error
-        ? `Offline · ${detail.error}`
-        : "Offline";
+  const subtitleText = detail == null
+    ? (isLoading ? "…" : hasError ? "Errore connessione" : "…")
+    : detail.configured
+      ? detail.ok
+        ? `${detail.activeProfiles.length} profil${detail.activeProfiles.length === 1 ? "o" : "i"}${detail.latencyMs != null ? ` · ${detail.latencyMs} ms` : ""}`
+        : "offline"
+      : "non configurato";
 
-  const showFingerprint = detail.configured && fingerprint != null;
-  const fpOk = showFingerprint && detail.ok;
+  const statusLabel = detail == null
+    ? (isLoading ? "…" : hasError ? "Errore connessione" : "…")
+    : !detail.configured
+      ? "Non configurato"
+      : detail.ok
+        ? detail.latencyMs != null
+          ? `Online · ${detail.latencyMs} ms`
+          : "Online"
+        : detail.error
+          ? `Offline · ${detail.error}`
+          : "Offline";
+
+  const showFingerprint = detail != null && detail.configured && fingerprint != null;
+  const fpOk = showFingerprint && detail != null && detail.ok;
 
   return (
     <View style={styles.block}>
@@ -97,16 +113,12 @@ export function ValhallaBlock({
         <MaterialCommunityIcons name="routes" size={18} color={statusColor} style={styles.headerIcon} />
         <View style={styles.headerText}>
           <Text style={styles.title}>Valhalla</Text>
-          <Text style={styles.subtitle}>
-            {detail.configured
-              ? detail.ok
-                ? `${detail.activeProfiles.length} profil${detail.activeProfiles.length === 1 ? "o" : "i"}${detail.latencyMs != null ? ` · ${detail.latencyMs} ms` : ""}`
-                : "offline"
-              : "non configurato"}
-            {detail.url ? ` · ${detail.url}` : ""}
+          <Text style={[styles.subtitle, hasError && detail == null && styles.subtitleError]}>
+            {subtitleText}
+            {detail?.url ? ` · ${detail.url}` : ""}
           </Text>
         </View>
-        {detail.configured && (
+        {detail != null && detail.configured && (
           <Text style={styles.count}>
             {detail.ok ? `${detail.activeProfiles.length}/4` : "0/—"}
           </Text>
@@ -119,14 +131,16 @@ export function ValhallaBlock({
         <View style={styles.body}>
           <View style={styles.statusRow}>
             <View style={[styles.dot, { backgroundColor: statusColor }]} />
-            <Text style={styles.statusLabel}>{statusLabel}</Text>
+            <Text style={[styles.statusLabel, hasError && detail == null && styles.statusLabelError]}>
+              {statusLabel}
+            </Text>
           </View>
 
-          {detail.tileVersion && (
+          {detail != null && detail.tileVersion && (
             <Text style={styles.meta}>Tile: {detail.tileVersion}</Text>
           )}
 
-          {detail.ok && detail.activeProfiles.length > 0 && (
+          {detail != null && detail.ok && detail.activeProfiles.length > 0 && (
             <View style={styles.profilesRow}>
               {detail.activeProfiles.map((p) => (
                 <View key={p} style={styles.profileChip}>
@@ -141,7 +155,7 @@ export function ValhallaBlock({
             </View>
           )}
 
-          {detail.ok && detail.activeProfiles.length === 0 && (
+          {detail != null && detail.ok && detail.activeProfiles.length === 0 && (
             <Text style={styles.meta}>Nessun profilo rilevato</Text>
           )}
 
@@ -155,14 +169,14 @@ export function ValhallaBlock({
               )}
             </View>
           )}
-          {detail.configured && !fingerprint && (
+          {detail != null && detail.configured && !fingerprint && (
             <Text style={styles.fingerprint}>token Replit: non configurato</Text>
           )}
 
-          {detail.configured && !detail.ok && detail.history?.length > 0 && (
+          {detail != null && detail.configured && !detail.ok && detail.history?.length > 0 && (
             <ErrorHistory history={detail.history} />
           )}
-          {detail.probeLog && detail.probeLog.length > 0 && (
+          {detail != null && detail.probeLog && detail.probeLog.length > 0 && (
             <ProbeLog entries={detail.probeLog} />
           )}
         </View>
@@ -174,30 +188,44 @@ export function ValhallaBlock({
 export function NominatimBlock({
   detail,
   fingerprint,
+  isLoading,
+  hasError,
 }: {
-  detail: NominatimDetailedHealth;
+  detail: NominatimDetailedHealth | null;
   fingerprint: string | null;
+  isLoading?: boolean;
+  hasError?: boolean;
 }) {
   const [open, setOpen] = useState(false);
 
-  const statusColor = !detail.configured
-    ? "#6b7280"
-    : detail.ok
-      ? "#22c55e"
-      : "#ef4444";
+  const statusColor = detail == null
+    ? (hasError ? "#ef4444" : "#6b7280")
+    : !detail.configured
+      ? "#6b7280"
+      : detail.ok
+        ? "#22c55e"
+        : "#ef4444";
 
-  const statusLabel = !detail.configured
-    ? "Pubblico (OSM)"
-    : detail.ok
-      ? detail.latencyMs != null
-        ? `Online · ${detail.latencyMs} ms`
-        : "Online"
-      : detail.error
-        ? `Offline · ${detail.error}`
-        : "Offline";
+  const subtitleText = detail == null
+    ? (isLoading ? "…" : hasError ? "Errore connessione" : "…")
+    : detail.configured
+      ? `Self-hosted${detail.ok && detail.latencyMs != null ? ` · ${detail.latencyMs} ms` : ""}${detail.ok && detail.dbState ? ` · DB ${detail.dbState}` : ""}`
+      : "Fallback pubblico";
 
-  const showFingerprint = detail.configured && fingerprint != null;
-  const fpOk = showFingerprint && detail.ok;
+  const statusLabel = detail == null
+    ? (isLoading ? "…" : hasError ? "Errore connessione" : "…")
+    : !detail.configured
+      ? "Pubblico (OSM)"
+      : detail.ok
+        ? detail.latencyMs != null
+          ? `Online · ${detail.latencyMs} ms`
+          : "Online"
+        : detail.error
+          ? `Offline · ${detail.error}`
+          : "Offline";
+
+  const showFingerprint = detail != null && detail.configured && fingerprint != null;
+  const fpOk = showFingerprint && detail != null && detail.ok;
 
   return (
     <View style={styles.block}>
@@ -210,11 +238,9 @@ export function NominatimBlock({
         <MaterialCommunityIcons name="map-search-outline" size={18} color={statusColor} style={styles.headerIcon} />
         <View style={styles.headerText}>
           <Text style={styles.title}>Nominatim</Text>
-          <Text style={styles.subtitle}>
-            {detail.configured ? "Self-hosted" : "Fallback pubblico"}
-            {detail.ok && detail.latencyMs != null ? ` · ${detail.latencyMs} ms` : ""}
-            {detail.ok && detail.dbState ? ` · DB ${detail.dbState}` : ""}
-            {detail.url ? ` · ${detail.url}` : ""}
+          <Text style={[styles.subtitle, hasError && detail == null && styles.subtitleError]}>
+            {subtitleText}
+            {detail?.url ? ` · ${detail.url}` : ""}
           </Text>
         </View>
         <View style={[styles.dot, { backgroundColor: statusColor }]} />
@@ -225,10 +251,12 @@ export function NominatimBlock({
         <View style={styles.body}>
           <View style={styles.statusRow}>
             <View style={[styles.dot, { backgroundColor: statusColor }]} />
-            <Text style={styles.statusLabel}>{statusLabel}</Text>
+            <Text style={[styles.statusLabel, hasError && detail == null && styles.statusLabelError]}>
+              {statusLabel}
+            </Text>
           </View>
 
-          {(detail.dbState || detail.geocodeLatencyMs != null || detail.softwareVersion || detail.dataUpdated) && (
+          {detail != null && (detail.dbState || detail.geocodeLatencyMs != null || detail.softwareVersion || detail.dataUpdated) && (
             <View style={styles.metaRow}>
               {detail.dbState && (
                 <View style={[
@@ -271,7 +299,7 @@ export function NominatimBlock({
             </View>
           )}
 
-          {!detail.configured && (
+          {detail != null && !detail.configured && (
             <View style={styles.publicNote}>
               <Ionicons name="information-circle-outline" size={11} color="#f59e0b" />
               <Text style={styles.publicNoteText}>
@@ -290,14 +318,14 @@ export function NominatimBlock({
               )}
             </View>
           )}
-          {detail.configured && !fingerprint && (
+          {detail != null && detail.configured && !fingerprint && (
             <Text style={styles.fingerprint}>token Replit: non configurato</Text>
           )}
 
-          {detail.configured && !detail.ok && detail.history?.length > 0 && (
+          {detail != null && detail.configured && !detail.ok && detail.history?.length > 0 && (
             <ErrorHistory history={detail.history} />
           )}
-          {detail.probeLog && detail.probeLog.length > 0 && (
+          {detail != null && detail.probeLog && detail.probeLog.length > 0 && (
             <ProbeLog entries={detail.probeLog} />
           )}
         </View>
@@ -338,6 +366,8 @@ const styles = StyleSheet.create({
   },
   statusRow: { flexDirection: "row", alignItems: "center", gap: 6 },
   statusLabel: { fontFamily: "Inter_400Regular", fontSize: 11, color: Colors.textSecondary },
+  statusLabelError: { color: "#ef4444" },
+  subtitleError: { color: "#ef4444" },
   meta: { fontFamily: "Inter_400Regular", fontSize: 10, color: Colors.textSecondary },
   profilesRow: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 4 },
   profileChip: {

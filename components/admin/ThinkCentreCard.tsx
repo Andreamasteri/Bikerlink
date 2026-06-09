@@ -244,18 +244,18 @@ export function ThinkCentreCard({
               tokenMissing={data.graphhopperTokenMissing}
             />
           )}
-          {data?.valhallaDetail && (
-            <ValhallaBlock
-              detail={data.valhallaDetail}
-              fingerprint={data.tokenFingerprints?.valhalla ?? null}
-            />
-          )}
-          {data?.nominatimDetail && (
-            <NominatimBlock
-              detail={data.nominatimDetail}
-              fingerprint={data.tokenFingerprints?.nominatim ?? null}
-            />
-          )}
+          <ValhallaBlock
+            detail={error ? null : (data?.valhallaDetail ?? null)}
+            fingerprint={error ? null : (data?.tokenFingerprints?.valhalla ?? null)}
+            isLoading={isLoading}
+            hasError={!!error}
+          />
+          <NominatimBlock
+            detail={error ? null : (data?.nominatimDetail ?? null)}
+            fingerprint={error ? null : (data?.tokenFingerprints?.nominatim ?? null)}
+            isLoading={isLoading}
+            hasError={!!error}
+          />
           {data?.services
             .filter((s) => s.key !== "valhalla" && s.key !== "nominatim")
             .map((s) => {
