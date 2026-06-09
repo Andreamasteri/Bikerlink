@@ -127,8 +127,16 @@ async function graphHopperRouteProbe(
       : `HTTP ${res.status}`;
     return { ok: false, latencyMs, error };
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    return { ok: false, latencyMs: null, error: sanitizeError(msg) };
+    const raw = err instanceof Error ? err.message : String(err);
+    let classified: string;
+    if (err instanceof Error && err.name === "AbortError") {
+      classified = `timeout (>${Math.round(PROBE_TIMEOUT_MS / 1000)} s) — ${raw}`;
+    } else if (/fetch failed|ECONNREFUSED|ENOTFOUND/i.test(raw)) {
+      classified = `network error — ${raw}`;
+    } else {
+      classified = raw;
+    }
+    return { ok: false, latencyMs: null, error: sanitizeError(classified) };
   } finally {
     clearTimeout(timer);
   }
@@ -273,7 +281,7 @@ async function probeWhisper(): Promise<ServiceHealth> {
   const headers: Record<string, string> = {};
   if (token) headers["Authorization"] = `Bearer ${token}`;
 
-  // Step 1: lightweight GET /health probe (4 s timeout via httpProbe).
+  // Step 1: lightweight GET /health probe (PROBE_TIMEOUT_MS via httpProbe).
   // If the server is up and healthy we skip the full audio inference entirely.
   const healthResult = await httpProbe(`${base}/health`, headers);
   if (healthResult.ok) {

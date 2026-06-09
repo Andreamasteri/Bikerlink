@@ -119,8 +119,16 @@ export async function probeUfwDetailed(): Promise<UfwDetailedHealth> {
       probeLog: getProbeLog("ufw"),
     };
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    const error = sanitizeError(msg);
+    const raw = err instanceof Error ? err.message : String(err);
+    let classified: string;
+    if (err instanceof Error && err.name === "AbortError") {
+      classified = `timeout (>${Math.round(PROBE_TIMEOUT_MS / 1000)} s) — ${raw}`;
+    } else if (/fetch failed|ECONNREFUSED|ENOTFOUND/i.test(raw)) {
+      classified = `network error — ${raw}`;
+    } else {
+      classified = raw;
+    }
+    const error = sanitizeError(classified);
     console.error("[thinkcentre-probe] ufw KO (rete/timeout)", { error });
     recordError("ufw", error);
     recordProbeLog("ufw", { timestamp: Date.now(), ok: false, latencyMs: null, detail: error });
@@ -151,7 +159,7 @@ export async function probeValhallaProfiles(
   const results = await Promise.all(
     KNOWN_VALHALLA_COSTING.map(async (costing) => {
       const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 3_000);
+      const timer = setTimeout(() => controller.abort(), PROBE_TIMEOUT_MS);
       try {
         const res = await fetch(`${base}/route`, {
           method: "POST",
@@ -164,7 +172,17 @@ export async function probeValhallaProfiles(
           signal: controller.signal,
         });
         return res.status >= 200 && res.status < 300 ? costing : null;
-      } catch {
+      } catch (err: unknown) {
+        const raw = err instanceof Error ? err.message : String(err);
+        let classified: string;
+        if (err instanceof Error && err.name === "AbortError") {
+          classified = `timeout (>${Math.round(PROBE_TIMEOUT_MS / 1000)} s) — ${raw}`;
+        } else if (/fetch failed|ECONNREFUSED|ENOTFOUND/i.test(raw)) {
+          classified = `network error — ${raw}`;
+        } else {
+          classified = raw;
+        }
+        console.error(`[thinkcentre-probe] valhalla profile ${costing} KO`, { error: sanitizeError(classified) });
         return null;
       } finally {
         clearTimeout(timer);
@@ -217,8 +235,17 @@ export async function probeValhallaDetailed(): Promise<ValhallaDetailedHealth> {
     recordProbeLog("valhalla", { timestamp: Date.now(), ok: true, latencyMs, detail });
     return { configured: true, ok: true, latencyMs, url: maskUrl(base), tileVersion, tokenMissing, activeProfiles, history: getHistory("valhalla"), probeLog: getProbeLog("valhalla") };
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    const error = sanitizeError(msg);
+    const raw = err instanceof Error ? err.message : String(err);
+    let classified: string;
+    if (err instanceof Error && err.name === "AbortError") {
+      classified = `timeout (>${Math.round(PROBE_TIMEOUT_MS / 1000)} s) — ${raw}`;
+    } else if (/fetch failed|ECONNREFUSED|ENOTFOUND/i.test(raw)) {
+      classified = `network error — ${raw}`;
+    } else {
+      classified = raw;
+    }
+    const error = sanitizeError(classified);
+    console.error("[thinkcentre-probe] valhalla KO (rete/timeout)", { error });
     recordError("valhalla", error);
     recordProbeLog("valhalla", { timestamp: Date.now(), ok: false, latencyMs: null, detail: error });
     return { configured: true, ok: false, latencyMs: null, url: maskUrl(base), error, tokenMissing, activeProfiles: [], history: getHistory("valhalla"), probeLog: getProbeLog("valhalla") };
@@ -307,8 +334,16 @@ export async function probeNominatimDetailed(): Promise<NominatimDetailedHealth>
       probeLog: getProbeLog("nominatim"),
     };
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    const error = sanitizeError(msg);
+    const raw = err instanceof Error ? err.message : String(err);
+    let classified: string;
+    if (err instanceof Error && err.name === "AbortError") {
+      classified = `timeout (>${Math.round(PROBE_TIMEOUT_MS / 1000)} s) — ${raw}`;
+    } else if (/fetch failed|ECONNREFUSED|ENOTFOUND/i.test(raw)) {
+      classified = `network error — ${raw}`;
+    } else {
+      classified = raw;
+    }
+    const error = sanitizeError(classified);
     if (configured) {
       console.error("[thinkcentre-probe] nominatim KO (rete/timeout)", { error });
       recordError("nominatim", error);

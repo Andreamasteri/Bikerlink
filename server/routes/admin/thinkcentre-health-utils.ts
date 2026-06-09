@@ -8,7 +8,7 @@ import { storage } from "../../storage";
 const PROBE_LOG_SNAPSHOT_KEY = "probe_log_snapshot";
 const ERROR_HISTORY_SNAPSHOT_KEY = "error_history_snapshot";
 
-export const PROBE_TIMEOUT_MS = 5_000;
+export const PROBE_TIMEOUT_MS = 15_000;
 
 export const ERROR_HISTORY_MAX = 20;
 const errorHistory = new Map<string, Array<{ timestamp: number; error: string }>>();
@@ -173,8 +173,16 @@ export async function httpProbe(
       : `HTTP ${res.status}`;
     return { ok: false, latencyMs, error };
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    return { ok: false, latencyMs: null, error: sanitizeError(msg) };
+    const raw = err instanceof Error ? err.message : String(err);
+    let classified: string;
+    if (err instanceof Error && err.name === "AbortError") {
+      classified = `timeout (>${Math.round(PROBE_TIMEOUT_MS / 1000)} s) — ${raw}`;
+    } else if (/fetch failed|ECONNREFUSED|ENOTFOUND/i.test(raw)) {
+      classified = `network error — ${raw}`;
+    } else {
+      classified = raw;
+    }
+    return { ok: false, latencyMs: null, error: sanitizeError(classified) };
   } finally {
     clearTimeout(timer);
   }
