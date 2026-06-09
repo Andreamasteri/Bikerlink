@@ -28,7 +28,8 @@
 const http = require("http");
 const net  = require("net");
 const os   = require("os");
-const { execSync } = require("child_process");
+const nodePath = require("path");
+const { execSync, exec } = require("child_process");
 
 const PORT        = parseInt(process.env.PORT || "9101", 10);
 const AGENT_TOKEN = process.env.AGENT_TOKEN || "";
@@ -198,6 +199,23 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // Self-update: git pull + pm2 restart (POST /self-update)
+  if (method === "POST" && path === "/self-update") {
+    const repoRoot = nodePath.resolve(__dirname, "..");
+    res.writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-store" });
+    const startedAt = Date.now();
+    exec(
+      `git -C "${repoRoot}" pull origin main 2>&1 && pm2 restart bikerlink-agent 2>&1`,
+      { timeout: 30000 },
+      (err, stdout, stderr) => {
+        const output = (stdout || "") + (stderr || "");
+        const ok = !err;
+        res.end(JSON.stringify({ ok, output: output.trim(), elapsedMs: Date.now() - startedAt }));
+      }
+    );
+    return;
+  }
+
   res.writeHead(404, { "Content-Type": "application/json" });
   res.end(JSON.stringify({ error: "Not found" }));
 });
@@ -211,6 +229,7 @@ server.listen(PORT, "0.0.0.0", () => {
   console.log(`[bikerlink-agent] /probe/uptime-kuma    → check Uptime Kuma localhost:3001`);
   console.log(`[bikerlink-agent] /probe/redis          → check Redis TCP localhost:6379`);
   console.log(`[bikerlink-agent] /probe/postgres       → check PostgreSQL TCP localhost:5432`);
+  console.log(`[bikerlink-agent] POST /self-update     → git pull origin main + pm2 restart bikerlink-agent`);
 });
 
 server.on("error", (err) => {
