@@ -50,6 +50,7 @@ const InteractiveMap = forwardRef<InteractiveMapHandle, InteractiveMapProps>(fun
   onRegionChangeComplete, gpsFollowupEnabled = false,
   showHazardReportButton = false,
   fixedPositionEnabled = false,
+  onFixedPositionBadgePress,
 }: InteractiveMapProps, ref) {
   const { enabled: mapsEnabled } = useMapConfig();
   const webViewRef = useRef<WebView>(null);
@@ -299,9 +300,14 @@ const InteractiveMap = forwardRef<InteractiveMapHandle, InteractiveMapProps>(fun
         </TouchableOpacity>
       )}
       {fixedPositionEnabled && (
-        <View style={styles.fixedPositionBadge} pointerEvents="none">
+        <TouchableOpacity
+          style={styles.fixedPositionBadge}
+          onPress={onFixedPositionBadgePress}
+          activeOpacity={onFixedPositionBadgePress ? 0.7 : 1}
+          disabled={!onFixedPositionBadgePress}
+        >
           <Text style={styles.fixedPositionText}>🔒 Posizione fissa attiva</Text>
-        </View>
+        </TouchableOpacity>
       )}
       <HazardDetailSheet
         hazardId={selectedHazardId}

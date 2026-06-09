@@ -93,6 +93,7 @@ export interface InteractiveMapProps {
   showHazardReportButton?: boolean;
   onFatalError?: () => void;
   fixedPositionEnabled?: boolean;
+  onFixedPositionBadgePress?: () => void;
 }
 
 export interface InteractiveMapHandle {

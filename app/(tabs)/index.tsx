@@ -376,6 +376,7 @@ export default function MapScreen() {
             realMeMarker={realMeMarker}
             fakeMeMarker={fakeMeMarker}
             fixedPositionEnabled={fixedPositionEnabled}
+            onFixedPositionBadgePress={() => router.navigate("/ready" as never)}
             showEventPins={mapFullscreen}
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             clubPins={(mapData.clubPinsQuery.data ?? []) as any}
@@ -386,11 +387,13 @@ export default function MapScreen() {
             showHazardReportButton={mapFullscreen}
           />
 
-          {/* Compact mode: transparent tap target to expand + expand icon */}
+          {/* Compact mode: transparent tap target to expand + expand icon.
+              Leave a 50px gap at the bottom so the fixed-position badge (bottom:16)
+              remains tappable even when the map is in compact (non-fullscreen) state. */}
           {!mapFullscreen && (
             <>
               <Pressable
-                style={StyleSheet.absoluteFill}
+                style={[StyleSheet.absoluteFill, { bottom: fixedPositionEnabled ? 50 : 0 }]}
                 onPress={() => setMapFullscreen(true)}
               />
               <View style={styles.expandHint} pointerEvents="none">
