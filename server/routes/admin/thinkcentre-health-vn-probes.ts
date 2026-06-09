@@ -3,7 +3,9 @@
  * Importati da thinkcentre-health.ts per mantenere il file sotto 600 righe.
  */
 
-import { PROBE_TIMEOUT_MS, readBodySafe, sanitizeError, maskUrl, recordError, getHistory } from "./thinkcentre-health-utils";
+import { PROBE_TIMEOUT_MS, readBodySafe, sanitizeError, maskUrl, recordError, getHistory, recordProbeLog, getProbeLog, type ProbeLogEntry } from "./thinkcentre-health-utils";
+
+export type { ProbeLogEntry };
 
 export interface ValhallaDetailedHealth {
   configured: boolean;
@@ -15,6 +17,7 @@ export interface ValhallaDetailedHealth {
   activeProfiles: string[];
   tokenMissing?: boolean;
   history: Array<{ timestamp: number; error: string }>;
+  probeLog: ProbeLogEntry[];
 }
 
 export interface NominatimDetailedHealth {
@@ -29,6 +32,7 @@ export interface NominatimDetailedHealth {
   geocodeLatencyMs?: number | null;
   tokenMissing?: boolean;
   history: Array<{ timestamp: number; error: string }>;
+  probeLog: ProbeLogEntry[];
 }
 
 const KNOWN_VALHALLA_COSTING = ["motorcycle", "auto", "bicycle", "pedestrian"] as const;
@@ -71,7 +75,7 @@ export async function probeValhallaDetailed(): Promise<ValhallaDetailedHealth> {
   const base = process.env.VALHALLA_URL?.replace(/\/$/, "");
   const apiKey = process.env.VALHALLA_API_KEY;
   if (!base) {
-    return { configured: false, ok: false, latencyMs: null, url: null, activeProfiles: [], history: getHistory("valhalla") };
+    return { configured: false, ok: false, latencyMs: null, url: null, activeProfiles: [], history: getHistory("valhalla"), probeLog: getProbeLog("valhalla") };
   }
   const tokenMissing = !apiKey || apiKey.trim() === "";
   const headers: Record<string, string> = {};
@@ -91,7 +95,8 @@ export async function probeValhallaDetailed(): Promise<ValhallaDetailedHealth> {
         : `HTTP ${res.status}`;
       console.error("[thinkcentre-probe] valhalla KO", { status: res.status, error });
       recordError("valhalla", error);
-      return { configured: true, ok: false, latencyMs, url: maskUrl(base), error, tokenMissing, activeProfiles: [], history: getHistory("valhalla") };
+      recordProbeLog("valhalla", { timestamp: Date.now(), ok: false, latencyMs, detail: error });
+      return { configured: true, ok: false, latencyMs, url: maskUrl(base), error, tokenMissing, activeProfiles: [], history: getHistory("valhalla"), probeLog: getProbeLog("valhalla") };
     }
     const data = (await res.json().catch(() => ({}))) as {
       version?: string;
@@ -102,12 +107,17 @@ export async function probeValhallaDetailed(): Promise<ValhallaDetailedHealth> {
       : undefined;
     const tileVersion = [data.version, datePart].filter(Boolean).join(" · ") || undefined;
     const activeProfiles = await probeValhallaProfiles(base, apiKey);
-    return { configured: true, ok: true, latencyMs, url: maskUrl(base), tileVersion, tokenMissing, activeProfiles, history: getHistory("valhalla") };
+    const detail = activeProfiles.length > 0
+      ? `${activeProfiles.length} profil${activeProfiles.length === 1 ? "o" : "i"}: ${activeProfiles.join(", ")}`
+      : "OK (nessun profilo)";
+    recordProbeLog("valhalla", { timestamp: Date.now(), ok: true, latencyMs, detail });
+    return { configured: true, ok: true, latencyMs, url: maskUrl(base), tileVersion, tokenMissing, activeProfiles, history: getHistory("valhalla"), probeLog: getProbeLog("valhalla") };
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
     const error = sanitizeError(msg);
     recordError("valhalla", error);
-    return { configured: true, ok: false, latencyMs: null, url: maskUrl(base), error, tokenMissing, activeProfiles: [], history: getHistory("valhalla") };
+    recordProbeLog("valhalla", { timestamp: Date.now(), ok: false, latencyMs: null, detail: error });
+    return { configured: true, ok: false, latencyMs: null, url: maskUrl(base), error, tokenMissing, activeProfiles: [], history: getHistory("valhalla"), probeLog: getProbeLog("valhalla") };
   } finally {
     clearTimeout(timer);
   }
@@ -159,7 +169,8 @@ export async function probeNominatimDetailed(): Promise<NominatimDetailedHealth>
         console.error("[thinkcentre-probe] nominatim KO", { status: res.status, error });
         recordError("nominatim", error);
       }
-      return { configured, ok: false, latencyMs, url: configured ? maskedUrl : null, error, tokenMissing, dbState: "unknown", history: getHistory("nominatim") };
+      recordProbeLog("nominatim", { timestamp: Date.now(), ok: false, latencyMs, detail: error });
+      return { configured, ok: false, latencyMs, url: configured ? maskedUrl : null, error, tokenMissing, dbState: "unknown", history: getHistory("nominatim"), probeLog: getProbeLog("nominatim") };
     }
     const data = (await res.json().catch(() => ({}))) as {
       status?: number;
@@ -175,6 +186,9 @@ export async function probeNominatimDetailed(): Promise<NominatimDetailedHealth>
       recordError("nominatim", sanitizeError(`DB status ${data.status} — ${data.message ?? ""}`));
     }
     const geocodeLatencyMs = isOk ? await probeNominatimGeocodeLatency(probeBase, headers) : null;
+    const detailParts: string[] = [`DB ${dbState}`];
+    if (geocodeLatencyMs != null) detailParts.push(`geocode ${geocodeLatencyMs} ms`);
+    recordProbeLog("nominatim", { timestamp: Date.now(), ok: isOk, latencyMs, detail: detailParts.join(", ") });
     return {
       configured,
       ok: isOk,
@@ -186,6 +200,7 @@ export async function probeNominatimDetailed(): Promise<NominatimDetailedHealth>
       geocodeLatencyMs,
       tokenMissing,
       history: getHistory("nominatim"),
+      probeLog: getProbeLog("nominatim"),
     };
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
@@ -194,7 +209,8 @@ export async function probeNominatimDetailed(): Promise<NominatimDetailedHealth>
       console.error("[thinkcentre-probe] nominatim KO (rete/timeout)", { error });
       recordError("nominatim", error);
     }
-    return { configured, ok: false, latencyMs: null, url: configured ? maskedUrl : null, error, tokenMissing, dbState: "unknown", history: getHistory("nominatim") };
+    recordProbeLog("nominatim", { timestamp: Date.now(), ok: false, latencyMs: null, detail: error });
+    return { configured, ok: false, latencyMs: null, url: configured ? maskedUrl : null, error, tokenMissing, dbState: "unknown", history: getHistory("nominatim"), probeLog: getProbeLog("nominatim") };
   } finally {
     clearTimeout(timer);
   }

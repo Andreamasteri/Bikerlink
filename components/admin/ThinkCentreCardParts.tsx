@@ -9,6 +9,13 @@ export interface ErrorEvent {
   error: string;
 }
 
+export interface ProbeLogEntry {
+  timestamp: number;
+  ok: boolean;
+  latencyMs: number | null;
+  detail: string;
+}
+
 export interface AreaServiceHealth {
   code: string;
   nome: string;
@@ -18,6 +25,7 @@ export interface AreaServiceHealth {
   latencyMs: number | null;
   error?: string;
   history: ErrorEvent[];
+  probeLog?: ProbeLogEntry[];
 }
 
 export interface HealthEvent {
@@ -76,6 +84,39 @@ function formatIso(iso: string): string {
 function StatusDot({ status }: { status: string }) {
   const color = TRANSITION_COLOR[status] ?? "#6b7280";
   return <View style={[styles.eventDot, { backgroundColor: color }]} />;
+}
+
+export function ProbeLog({ entries }: { entries: ProbeLogEntry[] }) {
+  const [open, setOpen] = useState(false);
+  if (!entries || entries.length === 0) return null;
+  return (
+    <View style={styles.probeLogContainer}>
+      <TouchableOpacity
+        style={styles.probeLogToggle}
+        onPress={() => setOpen((o) => !o)}
+        activeOpacity={0.7}
+        testID="thinkcentre-probe-log-toggle"
+      >
+        <Ionicons name="list-outline" size={11} color="#a78bfa" style={styles.probeLogIcon} />
+        <Text style={styles.probeLogToggleText}>Probe log ({entries.length})</Text>
+        <Ionicons name={open ? "chevron-up" : "chevron-down"} size={11} color="#a78bfa" />
+      </TouchableOpacity>
+      {open && (
+        <View style={styles.probeLogList}>
+          {entries.map((e, idx) => (
+            <View key={idx} style={styles.probeLogRow}>
+              <Text style={styles.probeLogTimestamp}>{formatTimestamp(e.timestamp)}</Text>
+              <View style={[styles.probeLogDot, { backgroundColor: e.ok ? "#22c55e" : "#ef4444" }]} />
+              {e.latencyMs != null && (
+                <Text style={styles.probeLogLatency}>{e.latencyMs} ms</Text>
+              )}
+              <Text style={styles.probeLogDetail} numberOfLines={2}>{e.detail}</Text>
+            </View>
+          ))}
+        </View>
+      )}
+    </View>
+  );
 }
 
 export function ErrorHistory({ history }: { history: ErrorEvent[] }) {
@@ -299,6 +340,9 @@ export function GraphHopperBlock({
                 {a.enabled && !a.ok && a.history?.length > 0 && (
                   <ErrorHistory history={a.history} />
                 )}
+                {a.enabled && a.probeLog && a.probeLog.length > 0 && (
+                  <ProbeLog entries={a.probeLog} />
+                )}
               </View>
             </View>
           ))}
@@ -325,6 +369,56 @@ export function GraphHopperBlock({
 }
 
 const styles = StyleSheet.create({
+  probeLogContainer: { marginTop: 6 },
+  probeLogToggle: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    alignSelf: "flex-start",
+    paddingVertical: 3,
+    paddingHorizontal: 8,
+    backgroundColor: "rgba(167, 139, 250, 0.08)",
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: "rgba(167, 139, 250, 0.2)",
+  },
+  probeLogIcon: { marginRight: 1 },
+  probeLogToggleText: { fontFamily: "Inter_600SemiBold", fontSize: 10, color: "#a78bfa" },
+  probeLogList: {
+    marginTop: 6,
+    gap: 4,
+    paddingLeft: 4,
+    borderLeftWidth: 2,
+    borderLeftColor: "rgba(167, 139, 250, 0.2)",
+  },
+  probeLogRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingLeft: 6,
+    paddingVertical: 1,
+  },
+  probeLogTimestamp: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 9,
+    color: "#6b7280",
+    letterSpacing: 0.2,
+    minWidth: 72,
+  },
+  probeLogDot: { width: 6, height: 6, borderRadius: 3, flexShrink: 0 },
+  probeLogLatency: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 9,
+    color: "#9ca3af",
+    minWidth: 40,
+  },
+  probeLogDetail: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 10,
+    color: "#9ca3af",
+    flex: 1,
+    lineHeight: 13,
+  },
   historyContainer: { marginTop: 6 },
   historyToggle: {
     flexDirection: "row",

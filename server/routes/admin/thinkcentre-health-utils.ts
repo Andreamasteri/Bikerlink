@@ -18,6 +18,27 @@ export function getHistory(key: string): Array<{ timestamp: number; error: strin
   return errorHistory.get(key) ?? [];
 }
 
+export const PROBE_LOG_MAX = 10;
+
+export interface ProbeLogEntry {
+  timestamp: number;
+  ok: boolean;
+  latencyMs: number | null;
+  detail: string;
+}
+
+const probeLogStore = new Map<string, ProbeLogEntry[]>();
+
+export function recordProbeLog(service: string, entry: ProbeLogEntry): void {
+  const prev = probeLogStore.get(service) ?? [];
+  const next = [entry, ...prev].slice(0, PROBE_LOG_MAX);
+  probeLogStore.set(service, next);
+}
+
+export function getProbeLog(service: string): ProbeLogEntry[] {
+  return probeLogStore.get(service) ?? [];
+}
+
 export type FetchResponse = Awaited<ReturnType<typeof fetch>>;
 
 export async function readBodySafe(res: FetchResponse, timeoutMs = 2_000): Promise<string> {

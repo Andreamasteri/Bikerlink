@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
-import { ErrorHistory } from "./ThinkCentreCardParts";
+import { ErrorHistory, ProbeLog, type ProbeLogEntry } from "./ThinkCentreCardParts";
 
 export interface ValhallaDetailedHealth {
   configured: boolean;
@@ -14,6 +14,7 @@ export interface ValhallaDetailedHealth {
   activeProfiles: string[];
   tokenMissing?: boolean;
   history: Array<{ timestamp: number; error: string }>;
+  probeLog?: ProbeLogEntry[];
 }
 
 export interface NominatimDetailedHealth {
@@ -28,6 +29,7 @@ export interface NominatimDetailedHealth {
   geocodeLatencyMs?: number | null;
   tokenMissing?: boolean;
   history: Array<{ timestamp: number; error: string }>;
+  probeLog?: ProbeLogEntry[];
 }
 
 const PROFILE_ICONS: Record<string, keyof typeof MaterialCommunityIcons.glyphMap> = {
@@ -98,7 +100,7 @@ export function ValhallaBlock({
           <Text style={styles.subtitle}>
             {detail.configured
               ? detail.ok
-                ? `${detail.activeProfiles.length} profil${detail.activeProfiles.length === 1 ? "o" : "i"}`
+                ? `${detail.activeProfiles.length} profil${detail.activeProfiles.length === 1 ? "o" : "i"}${detail.latencyMs != null ? ` · ${detail.latencyMs} ms` : ""}`
                 : "offline"
               : "non configurato"}
             {detail.url ? ` · ${detail.url}` : ""}
@@ -160,6 +162,9 @@ export function ValhallaBlock({
           {detail.configured && !detail.ok && detail.history?.length > 0 && (
             <ErrorHistory history={detail.history} />
           )}
+          {detail.probeLog && detail.probeLog.length > 0 && (
+            <ProbeLog entries={detail.probeLog} />
+          )}
         </View>
       )}
     </View>
@@ -207,6 +212,8 @@ export function NominatimBlock({
           <Text style={styles.title}>Nominatim</Text>
           <Text style={styles.subtitle}>
             {detail.configured ? "Self-hosted" : "Fallback pubblico"}
+            {detail.ok && detail.latencyMs != null ? ` · ${detail.latencyMs} ms` : ""}
+            {detail.ok && detail.dbState ? ` · DB ${detail.dbState}` : ""}
             {detail.url ? ` · ${detail.url}` : ""}
           </Text>
         </View>
@@ -289,6 +296,9 @@ export function NominatimBlock({
 
           {detail.configured && !detail.ok && detail.history?.length > 0 && (
             <ErrorHistory history={detail.history} />
+          )}
+          {detail.probeLog && detail.probeLog.length > 0 && (
+            <ProbeLog entries={detail.probeLog} />
           )}
         </View>
       )}

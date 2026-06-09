@@ -28,6 +28,9 @@ import {
   httpProbe,
   recordError,
   getHistory,
+  recordProbeLog,
+  getProbeLog,
+  type ProbeLogEntry,
   tokenFingerprint,
 } from "./thinkcentre-health-utils";
 import {
@@ -68,6 +71,7 @@ interface AreaServiceHealth {
   latencyMs: number | null;
   error?: string;
   history: ErrorEvent[];
+  probeLog: ProbeLogEntry[];
 }
 
 async function graphHopperRouteProbe(
@@ -133,6 +137,7 @@ async function probeGraphHopperArea(
     nome: area.nome,
     tier: area.tier,
     history: getHistory(historyKey),
+    probeLog: getProbeLog(historyKey),
   };
   if (!enabled) {
     return { ...baseShape, enabled: false, ok: false, latencyMs: null };
@@ -146,13 +151,17 @@ async function probeGraphHopperArea(
     (status) => (status >= 200 && status < 300) || status === 401 || status === 403,
   );
   if (health.ok) {
-    return { ...baseShape, enabled: true, ok: true, latencyMs: health.latencyMs, history: getHistory(historyKey) };
+    recordProbeLog(historyKey, { timestamp: Date.now(), ok: true, latencyMs: health.latencyMs, detail: "health OK" });
+    return { ...baseShape, enabled: true, ok: true, latencyMs: health.latencyMs, history: getHistory(historyKey), probeLog: getProbeLog(historyKey) };
   }
   const route = await graphHopperRouteProbe(areaBase, token, areaProbePoints(area));
   if (!route.ok) {
     const finalError = route.error ?? health.error ?? "errore sconosciuto";
     console.error(`[thinkcentre-probe] graphhopper ${area.codice} KO`, { status: finalError });
     recordError(historyKey, finalError);
+    recordProbeLog(historyKey, { timestamp: Date.now(), ok: false, latencyMs: route.latencyMs, detail: finalError });
+  } else {
+    recordProbeLog(historyKey, { timestamp: Date.now(), ok: true, latencyMs: route.latencyMs, detail: "route OK" });
   }
   return {
     ...baseShape,
@@ -161,6 +170,7 @@ async function probeGraphHopperArea(
     latencyMs: route.latencyMs,
     error: route.ok ? undefined : (route.error ?? health.error),
     history: getHistory(historyKey),
+    probeLog: getProbeLog(historyKey),
   };
 }
 
