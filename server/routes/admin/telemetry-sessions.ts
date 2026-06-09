@@ -66,7 +66,7 @@ router.get("/telemetry/users", async (req: Request, res: Response) => {
         )
         SELECT
           ua.user_id::text,
-          COALESCE(u.username, 'utente#' || ua.user_id) AS username,
+          COALESCE(u.nickname, 'utente#' || ua.user_id) AS username,
           ROUND(ua.km_ride::numeric, 2)::text AS km_ride,
           ROUND(ua.km_track::numeric, 2)::text AS km_track,
           ua.session_count::text,
@@ -82,7 +82,7 @@ router.get("/telemetry/users", async (req: Request, res: Response) => {
     ]);
 
     const users = usersResult.rows.map((r) => ({
-      userId: parseInt(r.user_id, 10),
+      userId: r.user_id,
       username: r.username,
       kmRide: Math.round(parseFloat(r.km_ride) * 10) / 10,
       kmTrack: Math.round(parseFloat(r.km_track) * 10) / 10,
@@ -105,8 +105,8 @@ router.get("/telemetry/users", async (req: Request, res: Response) => {
 
 router.get("/telemetry/users/:userId/sessions", async (req: Request, res: Response) => {
   try {
-    const userId = parseInt(String(req.params.userId), 10);
-    if (!Number.isFinite(userId)) return sendError(res, 400, "userId non valido");
+    const userId = String(req.params.userId);
+    if (!userId || userId.length < 1) return sendError(res, 400, "userId non valido");
 
     const result = await db.execute<{
       session_id: string;

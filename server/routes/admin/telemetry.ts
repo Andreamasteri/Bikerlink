@@ -346,7 +346,7 @@ router.get("/telemetry-top-riders", async (req: Request, res: Response) => {
       )
       SELECT
         ua.user_id::text,
-        COALESCE(u.username, 'utente#' || ua.user_id) AS username,
+        COALESCE(u.nickname, 'utente#' || ua.user_id) AS username,
         ua.sample_count::text,
         ROUND(ua.km::numeric, 1)::text AS km
       FROM user_agg ua
@@ -357,7 +357,7 @@ router.get("/telemetry-top-riders", async (req: Request, res: Response) => {
     });
 
     const riders = result.rows.map((r) => ({
-      userId: parseInt(r.user_id, 10),
+      userId: r.user_id,
       username: r.username,
       sampleCount: parseInt(r.sample_count, 10),
       km: Math.round(parseFloat(r.km) * 10) / 10,

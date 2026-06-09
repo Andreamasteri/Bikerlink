@@ -99,7 +99,7 @@ router.get("/:id", async (req: Request, res: Response) => {
       nickname: string | null;
     }>(
       `SELECT c.id, c.user_id, c.text, c.created_at, c.updated_at,
-              u.username AS nickname
+              u.nickname AS nickname
          FROM road_hazard_comments c
          JOIN users u ON u.id = c.user_id
         WHERE c.hazard_id = $1
