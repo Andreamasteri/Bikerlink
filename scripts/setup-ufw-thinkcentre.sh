@@ -19,7 +19,8 @@
 #   ufw-status      9099      → solo localhost (health endpoint admin)
 #   PostgreSQL      5432      → solo localhost (mai LAN/internet)
 #   # Uptime Kuma   3001      → commentato — abilitare quando installato
-#   # Redis         6379      → commentato — abilitare quando installato
+#   Redis TLS       6380      → internet (nginx stream proxy, setup-redis-nginx-stream.sh)
+#   Redis raw       6379      → solo localhost
 # =============================================================================
 
 set -euo pipefail
@@ -103,12 +104,18 @@ ufw allow from "${LOCALHOST}" to any port 9099 proto tcp
 echo "→ PostgreSQL 5432/tcp — solo localhost..."
 ufw allow from "${LOCALHOST}" to any port 5432 proto tcp
 
+# ── Redis TLS pubblico (porta 6380 via nginx stream) ─────────────────────────
+# nginx fa da proxy TLS → Redis locale 6379 rimane solo localhost.
+# Replit (cloud) si connette a rediss://redis.bikerlink.duckdns.org:6380
+echo "→ Redis TLS 6380/tcp — internet (nginx stream proxy)..."
+ufw allow 6380/tcp comment "Redis TLS pubblico via nginx stream (BikerLink)"
+
+# Redis raw 6379: solo localhost (mai LAN/internet)
+ufw allow from "${LOCALHOST}" to any port 6379 proto tcp comment "Redis raw — solo localhost"
+
 # ── Regole future (commentate) ────────────────────────────────────────────────
 # Uptime Kuma — abilitare quando installato:
 #   ufw allow from "${LAN}" to any port 3001 proto tcp
-
-# Redis — abilitare quando installato sul ThinkCentre:
-#   ufw allow from "${LOCALHOST}" to any port 6379 proto tcp
 
 # ── Abilita al boot e attiva ──────────────────────────────────────────────────
 echo "→ ufw enable (abilitato al boot)..."

@@ -28,8 +28,9 @@ Lo script è **idempotente**: può essere rieseguito senza danni in qualsiasi mo
 | Whisper | 9000 | Solo LAN |
 | ufw-status daemon | 9099 | Solo localhost |
 | PostgreSQL | 5432 | Solo localhost |
+| Redis TLS (nginx stream) | 6380 | Internet |
+| Redis raw | 6379 | Solo localhost |
 | Uptime Kuma *(futuro)* | 3001 | Commentato |
-| Redis *(futuro)* | 6379 | Commentato |
 
 ### Verifica stato
 
@@ -39,6 +40,39 @@ curl -s http://localhost:9099/
 systemctl status bikerlink-ufw-status
 ```
 
+---
+
+## Redis — Esposizione pubblica via nginx stream
+
+Redis è esposto su `redis.bikerlink.duckdns.org:6380` con TLS tramite nginx stream proxy.
+Replit si connette con `rediss://:PASSWORD@redis.bikerlink.duckdns.org:6380`.
+
+### Setup (una tantum sul ThinkCentre)
+
+```bash
+# 1. Aggiorna DuckDNS: aggiungi sottodominio "redis" puntato allo stesso IP
+#    (pannello https://www.duckdns.org)
+
+# 2. Esegui lo script di setup come root
+sudo bash scripts/setup-redis-nginx-stream.sh
+
+# 3. Verifica la connessione
+redis-cli -h redis.bikerlink.duckdns.org -p 6380 --tls -a '<password>' ping
+# → PONG
+
+# 4. Aggiorna il secret REDIS_URL in Replit:
+#    rediss://:PASSWORD@redis.bikerlink.duckdns.org:6380
+```
+
+### Rinnovo certificato
+
+```bash
+certbot renew --quiet
+systemctl reload nginx
+```
+
+---
+
 ### Aggiungere porte future
 
 Decommentare le righe nel file `scripts/setup-ufw-thinkcentre.sh` e rieseguirlo, oppure aggiungere manualmente:
@@ -47,7 +81,7 @@ Decommentare le righe nel file `scripts/setup-ufw-thinkcentre.sh` e rieseguirlo,
 # Uptime Kuma (quando installato)
 sudo ufw allow from 192.168.1.0/24 to any port 3001 proto tcp
 
-# Redis (quando installato sul ThinkCentre)
+# Redis raw (solo localhost — non aprire verso internet)
 sudo ufw allow from 127.0.0.1 to any port 6379 proto tcp
 
 sudo ufw status verbose
