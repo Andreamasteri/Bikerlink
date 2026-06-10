@@ -34,6 +34,7 @@ import {
   fmtMb,
   fmtTime,
   fmtBuildDate,
+  isStaleGraph,
   parseCpu,
   parseMemMb,
 } from "@/hooks/useRoutingAreas";
@@ -161,10 +162,12 @@ export default function RoutingAreasScreen() {
               const hasMoto = a.profiles?.includes("motorcycle") ?? false;
               const buildLabel = a.buildDate ? fmtBuildDate(a.buildDate) : null;
               const profilesLabel = a.profiles ? a.profiles.join(", ") : null;
+              const stale = a.ok && isStaleGraph(a.buildDate);
+              const borderColor = stale ? Colors.warning : chipColor + "55";
               return (
                 <View
                   key={a.code}
-                  style={[styles.ghChip, { backgroundColor: bgColor, borderColor: chipColor + "55" }]}
+                  style={[styles.ghChip, { backgroundColor: bgColor, borderColor }]}
                 >
                   <View style={styles.ghChipHeader}>
                     <View style={[styles.ghDot, { backgroundColor: tierDot }]} />
@@ -181,9 +184,21 @@ export default function RoutingAreasScreen() {
                     {latText}
                   </Text>
                   {a.ok && buildLabel ? (
-                    <Text style={styles.ghChipBuild} numberOfLines={1}>
-                      {buildLabel}
-                    </Text>
+                    <View style={styles.ghChipBuildRow}>
+                      {stale && (
+                        <MaterialCommunityIcons
+                          name="calendar-alert"
+                          size={10}
+                          color={Colors.warning}
+                        />
+                      )}
+                      <Text
+                        style={[styles.ghChipBuild, stale && styles.ghChipBuildStale]}
+                        numberOfLines={1}
+                      >
+                        {buildLabel}
+                      </Text>
+                    </View>
                   ) : null}
                   {a.ok && profilesLabel ? (
                     <View style={styles.ghChipProfiles}>

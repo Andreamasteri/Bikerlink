@@ -206,12 +206,22 @@ export const styles = StyleSheet.create({
     marginTop: 3,
     textAlign: "center",
   },
+  ghChipBuildRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+    marginTop: 4,
+    justifyContent: "center",
+  },
   ghChipBuild: {
     fontFamily: "Inter_400Regular",
     fontSize: 9,
     color: Colors.textSecondary,
-    marginTop: 4,
     textAlign: "center",
+  },
+  ghChipBuildStale: {
+    color: Colors.warning,
+    fontFamily: "Inter_500Medium",
   },
   ghChipProfiles: {
     flexDirection: "row",

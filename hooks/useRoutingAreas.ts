@@ -129,11 +129,21 @@ export function fmtTime(raw?: string): string {
   return d.toLocaleTimeString("it-IT");
 }
 
+export const GH_STALE_DAYS = 30;
+
 export function fmtBuildDate(raw: string): string {
   if (!raw) return "—";
   const d = new Date(raw);
   if (Number.isNaN(d.getTime())) return raw.slice(0, 10);
   return d.toLocaleDateString("it-IT", { day: "numeric", month: "short", year: "numeric" });
+}
+
+export function isStaleGraph(buildDate: string | null): boolean {
+  if (!buildDate) return false;
+  const d = new Date(buildDate);
+  if (Number.isNaN(d.getTime())) return false;
+  const ageMs = Date.now() - d.getTime();
+  return ageMs > GH_STALE_DAYS * 24 * 60 * 60 * 1000;
 }
 
 export function useRoutingAreas() {
