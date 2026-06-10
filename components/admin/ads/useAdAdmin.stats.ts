@@ -1,5 +1,5 @@
 // overflow di components/admin/ads/useAdAdmin.ts — sottoset stats estratto
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/query-client";
 
@@ -22,11 +22,26 @@ export function useAdAdminStats() {
 
   const [healthBannerDismissed, setHealthBannerDismissed] = useState(false);
 
+  useEffect(() => {
+    if (imageHealth?.checkedAt === undefined) return;
+    if (imageHealth.checkedAt === null && !imageHealth.isRunning) {
+      apiRequest("POST", "/api/admin/advertisements/image-health/check")
+        .then(() => {
+          setTimeout(() => {
+            queryClient.invalidateQueries({ queryKey: ["/api/admin/advertisements/image-health"] });
+            queryClient.invalidateQueries({ queryKey: ["/api/admin/advertisements"] });
+          }, 3000);
+        })
+        .catch(() => {});
+    }
+  }, [imageHealth?.checkedAt]);
+
   async function handleCheckImages() {
     try {
       await apiRequest("POST", "/api/admin/advertisements/image-health/check");
       setTimeout(() => {
         queryClient.invalidateQueries({ queryKey: ["/api/admin/advertisements/image-health"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/admin/advertisements"] });
       }, 3000);
     } catch {
       // no-op: ignore health check failures

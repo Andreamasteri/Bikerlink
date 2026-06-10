@@ -21,6 +21,7 @@ export interface Campaign {
   placement: string;
   imageVersion: number;
   groupId: string | null;
+  imageHealthy?: boolean;
 }
 
 interface AdCardProps {

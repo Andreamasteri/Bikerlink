@@ -27,6 +27,10 @@ let healthState: ImageHealthState = {
   isRunning: false,
 };
 
+export function getImageHealthState(): ImageHealthState {
+  return healthState;
+}
+
 export async function runAdImageHealthCheck(): Promise<void> {
   if (healthState.isRunning) return;
   healthState.isRunning = true;

@@ -65,7 +65,7 @@ export function useAdAdmin() {
 
   const { imageHealth, cacheStats, healthBannerDismissed, setHealthBannerDismissed, handleCheckImages } = useAdAdminStats();
   const campaigns = activeTab === "tutti" ? allCampaigns : allCampaigns.filter((c) => c.targetUserType === activeTab);
-  const brokenIdSet = new Set<string>(imageHealth?.brokenIds ?? []);
+  const brokenIdSet = new Set<string>([...(imageHealth?.brokenIds ?? []), ...allCampaigns.filter((c) => c.imageHealthy === false).map((c) => c.id)]);
   const brokenInView = campaigns.filter((c) => brokenIdSet.has(c.id));
 
   const reuploadMutation = useMutation({

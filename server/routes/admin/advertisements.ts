@@ -69,7 +69,17 @@ async function deleteAdImageIfUnreferenced(filename: string, excludeIds: string[
 router.get("/", async (_req: Request, res: Response) => {
   try {
     const campaigns = await storage.getAllCampaigns();
-    return res.json(campaigns);
+    const { getImageHealthState, runAdImageHealthCheck } = await import("./advertisements.next");
+    const health = getImageHealthState();
+    if (!health.checkedAt && !health.isRunning) {
+      runAdImageHealthCheck().catch(() => {});
+    }
+    const brokenSet = new Set<string>(health.brokenIds);
+    const enriched = campaigns.map((c) => ({
+      ...c,
+      imageHealthy: !brokenSet.has(c.id),
+    }));
+    return res.json(enriched);
   } catch (error) {
     console.error("Admin get advertisements error:", error);
     return sendError(res, 500, "Errore interno del server");
