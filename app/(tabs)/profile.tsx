@@ -42,6 +42,7 @@ import { ProfileVersionSection } from "@/components/profile/view/ProfileVersionS
 import { ProfileMapsBetaSection } from "@/components/profile/view/ProfileMapsBetaSection";
 import { ProfileDeletionBanner } from "@/components/profile/view/ProfileDeletionBanner";
 import { ProfileLogoutModal } from "@/components/profile/view/ProfileLogoutModal";
+import { ProfileSupportSection } from "@/components/profile/view/ProfileSupportSection";
 
 function getUserTypeColor(userType: string, sex?: string): string {
   if (userType === "coppia") return Colors.coupleIcon;
@@ -331,6 +332,8 @@ export default function ProfileScreen() {
         />
 
         <ProfileDonationSection donationData={donationData} t={t} />
+
+        <ProfileSupportSection />
 
         <ProfileDocsSection nickname={profile?.nickname} t={t} />
 

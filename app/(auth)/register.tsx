@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useRef } from "react";
 import {
   View,
+  Text,
   TouchableOpacity,
   StyleSheet,
   Alert,
+  Linking,
 } from "react-native";
 import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollViewCompat";
 import { useRouter, useLocalSearchParams } from "expo-router";
@@ -30,6 +32,7 @@ import {
   PHONE_PREFIXES,
   PHONE_PREFIX_TO_COUNTRY,
   EULA_TEXTS,
+  SUPPORT_EMAIL,
 } from "@/constants/register";
 
 export default function RegisterScreen() {
@@ -357,6 +360,14 @@ export default function RegisterScreen() {
         {step === 1 && (
           <LoginPrompt onPress={() => router.back()} />
         )}
+
+        <TouchableOpacity
+          onPress={() => Linking.openURL(`mailto:${SUPPORT_EMAIL}`)}
+          style={styles.supportRow}
+          testID="register-support"
+        >
+          <Text style={styles.supportLink}>Problemi? Contatta il supporto</Text>
+        </TouchableOpacity>
       </KeyboardAwareScrollViewCompat>
 
       <PrivacyNoticeModal
@@ -402,5 +413,16 @@ const styles = StyleSheet.create({
     color: Colors.accent,
     fontSize: 14,
     fontFamily: "Inter_600SemiBold",
+  },
+  supportRow: {
+    alignItems: "center",
+    marginTop: 12,
+    paddingVertical: 4,
+  },
+  supportLink: {
+    color: Colors.textSecondary,
+    fontSize: 12,
+    fontFamily: "Inter_400Regular",
+    textDecorationLine: "underline",
   },
 });

@@ -1,3 +1,5 @@
+export const SUPPORT_EMAIL = 'bikerlinkapp@gmail.com';
+
 export const PHONE_PREFIXES = [
   { code: "+39", country: "Italia" },
   { code: "+1", country: "USA/Canada" },

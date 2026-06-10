@@ -12,10 +12,12 @@ import { useRouter } from "expo-router";
 import { useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { Linking } from "react-native";
 import Colors from "@/constants/colors";
 import { t } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth-context";
 import { sendStartupBeacon } from "@/lib/startup-beacon";
+import { SUPPORT_EMAIL } from "@/constants/register";
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -165,6 +167,14 @@ export default function LoginScreen() {
               <Text style={styles.registerLink}>{t("auth.register")}</Text>
             </TouchableOpacity>
           </View>
+
+          <TouchableOpacity
+            onPress={() => Linking.openURL(`mailto:${SUPPORT_EMAIL}`)}
+            style={styles.supportRow}
+            testID="login-support"
+          >
+            <Text style={styles.supportLink}>Problemi? Contatta il supporto</Text>
+          </TouchableOpacity>
         </View>
     </KeyboardAwareScrollViewCompat>
   );
@@ -284,5 +294,16 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     fontSize: 13,
     fontFamily: "Inter_400Regular",
+  },
+  supportRow: {
+    alignItems: "center",
+    marginTop: 8,
+    paddingVertical: 4,
+  },
+  supportLink: {
+    color: Colors.textSecondary,
+    fontSize: 12,
+    fontFamily: "Inter_400Regular",
+    textDecorationLine: "underline",
   },
 });
