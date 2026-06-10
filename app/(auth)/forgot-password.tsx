@@ -9,6 +9,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  Linking,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -17,6 +18,7 @@ import Colors from "@/constants/colors";
 import { apiRequest, setSessionToken } from "@/lib/query-client";
 import { queryClient } from "@/lib/query-client";
 import { useT } from "@/lib/language-context";
+import { SUPPORT_EMAIL } from "@/constants/register";
 
 const RESEND_COOLDOWN = 60;
 
@@ -299,6 +301,14 @@ export default function ForgotPasswordScreen() {
             </>
           )}
         </View>
+
+        <TouchableOpacity
+          style={styles.supportLink}
+          onPress={() => Linking.openURL(`mailto:${SUPPORT_EMAIL}`)}
+          testID="forgot-support-link"
+        >
+          <Text style={styles.supportLinkText}>Problemi? Contatta il supporto</Text>
+        </TouchableOpacity>
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -453,5 +463,16 @@ const styles = StyleSheet.create({
     color: Colors.accent,
     fontSize: 15,
     fontFamily: "Inter_600SemiBold",
+  },
+  supportLink: {
+    alignItems: "center",
+    marginTop: 24,
+    paddingVertical: 8,
+  },
+  supportLinkText: {
+    color: Colors.textSecondary,
+    fontSize: 13,
+    fontFamily: "Inter_400Regular",
+    textDecorationLine: "underline",
   },
 });
