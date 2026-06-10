@@ -295,6 +295,8 @@ import aiMetricsRouter from './admin/ai/metrics';
 import thinkcentreHealthRouter from './admin/thinkcentre-health';
 // Metriche hardware ThinkCentre (CPU/RAM/uptime via agente Node.js sul mini-PC).
 import thinkcentreMetricsRouter from './admin/thinkcentre-metrics';
+// Lightweight System Health probe — returns cached dot statuses updated by the heavy endpoints.
+import systemProbeRouter from './admin/system-probe';
 
 router.post('/maps/osm-updated', async (req: Request, res: Response) => {
   try {
@@ -391,6 +393,7 @@ router.use('/ai', _requireAdmin, aiRouteProvidersRouter);
 router.use('/ai', _requireAdmin, aiMetricsRouter);
 router.use('/', _requireAdmin, thinkcentreHealthRouter);
 router.use('/', _requireAdmin, thinkcentreMetricsRouter);
+router.use('/', _requireAdmin, systemProbeRouter);
 router.use('/routing', _requireAdmin, routingAdminRouter);
 router.use('/routing-areas', _requireAdmin, routingAreasAdminRouter);
 router.use('/', _requireAdmin, dbAdminRouter);

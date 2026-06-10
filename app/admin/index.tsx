@@ -1,10 +1,12 @@
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, Platform } from "react-native";
 import { useRouter } from "expo-router";
 import type { Href } from "expo-router";
 import { MaterialCommunityIcons, MaterialIcons, Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useQuery } from "@tanstack/react-query";
 import Colors from "@/constants/colors";
+import { getApiUrl, authFetchHeaders } from "@/lib/query-client";
 import { TelemetryCard, GraphHopperCard, ValhallaCard, NominatimCard } from "@/components/admin/AdminStatsCards";
 import { ServerEfficiencyCard } from "@/components/admin/ServerEfficiencyCard";
 import { ThinkCentreCard } from "@/components/admin/ThinkCentreCard";
@@ -265,11 +267,33 @@ const UNKNOWN_STATUSES: SystemStatuses = {
   matching: "unknown",
 };
 
+async function fetchSystemProbe(): Promise<SystemStatuses> {
+  const res = await fetch(new URL("/api/admin/system-probe", getApiUrl()).toString(), {
+    headers: { ...(await authFetchHeaders()) },
+    credentials: "include",
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json() as Promise<SystemStatuses>;
+}
+
 export default function AdminDashboard() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [search, setSearch] = useState("");
   const [systemStatuses, setSystemStatuses] = useState<SystemStatuses>(UNKNOWN_STATUSES);
+
+  const { data: probeData } = useQuery<SystemStatuses>({
+    queryKey: ["/api/admin/system-probe"],
+    queryFn: fetchSystemProbe,
+    refetchInterval: 30_000,
+    staleTime: 25_000,
+    retry: 1,
+  });
+
+  useEffect(() => {
+    if (!probeData) return;
+    setSystemStatuses((prev) => ({ ...prev, ...probeData }));
+  }, [probeData]);
 
   const handleThinkCentreStatuses = useCallback(
     (s: Pick<SystemStatuses, "thinkcentre" | "graphhopper" | "valhalla" | "nominatim" | "ollama" | "whisper" | "ufw" | "redis" | "postgres" | "pgadmin" | "nginx" | "uptimeKuma">) => {

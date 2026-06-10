@@ -49,6 +49,7 @@ import {
   probeNginxInfra,
   probeUptimeKuma,
 } from "./thinkcentre-health-infra-probes";
+import { updateSystemStatus, type DotStatus as CachedDotStatus } from "../../lib/system-status-cache";
 
 const router = Router();
 
@@ -514,6 +515,45 @@ router.get("/thinkcentre-health", async (_req: Request, res: ExpressResponse) =>
       nominatim:   tokenFingerprint(process.env.NOMINATIM_TOKEN),
     };
 
+    function svcDot(s: ServiceHealth | undefined): CachedDotStatus {
+      if (!s || !s.configured) return "unknown";
+      if (s.ok) return "ok";
+      if (s.startingUp) return "degraded";
+      return "offline";
+    }
+    function ghDot(): CachedDotStatus {
+      if (!graphhopper.configured || graphhopper.areas.length === 0) return "unknown";
+      const anyOk = graphhopper.areas.some((a) => a.ok);
+      const allOk = graphhopper.areas.every((a) => a.ok);
+      if (allOk) return "ok";
+      if (anyOk) return "degraded";
+      const anyStarting = graphhopper.areas.some((a) => a.enabled && a.startingUp);
+      if (anyStarting) return "degraded";
+      return "offline";
+    }
+    function ufwDot(): CachedDotStatus {
+      if (!ufwDetail || !ufwDetail.configured) return "unknown";
+      return ufwDetail.ok ? "ok" : "offline";
+    }
+    const tcDot: CachedDotStatus =
+      overall === "green" ? "ok" : overall === "yellow" ? "degraded" : overall === "red" ? "offline" : "unknown";
+
+    const svcMap = new Map(services.map((s) => [s.key, s]));
+    updateSystemStatus({
+      thinkcentre: tcDot,
+      graphhopper: ghDot(),
+      valhalla: svcDot(svcMap.get("valhalla")),
+      nominatim: svcDot(svcMap.get("nominatim")),
+      ollama: svcDot(svcMap.get("ollama")),
+      whisper: svcDot(svcMap.get("whisper")),
+      ufw: ufwDot(),
+      redis: svcDot(svcMap.get("redis")),
+      postgres: svcDot(svcMap.get("postgres")),
+      pgadmin: svcDot(svcMap.get("pgadmin")),
+      nginx: svcDot(svcMap.get("nginx")),
+      uptimeKuma: svcDot(svcMap.get("uptimekuma")),
+    });
+
     return res.json({
       overall,
       onlineCount,
@@ -535,5 +575,88 @@ router.get("/thinkcentre-health", async (_req: Request, res: ExpressResponse) =>
     return res.status(500).json({ error: "Errore probe servizi ThinkCentre" });
   }
 });
+
+/**
+ * Runs all ThinkCentre probes in parallel and returns a compact status
+ * snapshot.  Exported so /api/admin/system-probe can call it independently,
+ * keeping dot colours fresh even when the dashboard cards are collapsed.
+ */
+export async function probeThinkCentreStatusSnapshot(): Promise<
+  Pick<
+    import("../../lib/system-status-cache").SystemStatusSnapshot,
+    | "thinkcentre" | "graphhopper" | "valhalla" | "nominatim"
+    | "ollama" | "whisper" | "ufw"
+    | "redis" | "postgres" | "pgadmin" | "nginx" | "uptimeKuma"
+  >
+> {
+  const [
+    graphhopper,
+    valhallaDetail,
+    nominatimDetail,
+    ollama,
+    whisper,
+    ufwDetail,
+    redisInfra,
+    postgresInfra,
+    pgadminInfra,
+    nginxInfra,
+    uptimeKumaInfra,
+  ] = await Promise.all([
+    probeGraphHopperAreas(),
+    probeValhallaDetailed(),
+    probeNominatimDetailed(),
+    probeOllama(),
+    probeWhisper(),
+    probeUfwDetailed(),
+    probeRedisInfra(),
+    probePostgresInfra(),
+    probePgAdmin(),
+    probeNginxInfra(),
+    probeUptimeKuma(),
+  ]);
+
+  function svc(s: { configured: boolean; ok: boolean; startingUp?: boolean }): import("../../lib/system-status-cache").DotStatus {
+    if (!s.configured) return "unknown";
+    if (s.ok) return "ok";
+    if (s.startingUp) return "degraded";
+    return "offline";
+  }
+
+  const ghDot = (): import("../../lib/system-status-cache").DotStatus => {
+    if (!graphhopper.configured || graphhopper.areas.length === 0) return "unknown";
+    const allOk = graphhopper.areas.every((a) => a.ok);
+    if (allOk) return "ok";
+    if (graphhopper.areas.some((a) => a.ok)) return "degraded";
+    if (graphhopper.areas.some((a) => a.enabled && a.startingUp)) return "degraded";
+    return "offline";
+  };
+
+  const configuredServices = [valhallaDetail, nominatimDetail, ollama, whisper, redisInfra, postgresInfra, pgadminInfra, nginxInfra, uptimeKumaInfra].filter((s) => s.configured);
+  const ghContributes = graphhopper.configured && graphhopper.areas.some((a) => a.enabled);
+  const configuredCount = configuredServices.length + (ghContributes ? 1 : 0);
+  const onlineCount = configuredServices.filter((s) => s.ok).length + (ghContributes && graphhopper.ok ? 1 : 0);
+  const overall: import("../../lib/system-status-cache").DotStatus =
+    configuredCount === 0 ? "unknown" :
+    onlineCount === configuredCount ? "ok" :
+    onlineCount === 0 ? "offline" : "degraded";
+
+  const snap = {
+    thinkcentre: overall,
+    graphhopper: ghDot(),
+    valhalla: svc(valhallaDetail),
+    nominatim: svc(nominatimDetail),
+    ollama: svc(ollama),
+    whisper: svc(whisper),
+    ufw: ufwDetail.configured ? (ufwDetail.ok ? "ok" : "offline") as import("../../lib/system-status-cache").DotStatus : "unknown",
+    redis: svc(redisInfra),
+    postgres: svc(postgresInfra),
+    pgadmin: svc(pgadminInfra),
+    nginx: svc(nginxInfra),
+    uptimeKuma: svc(uptimeKumaInfra),
+  };
+
+  updateSystemStatus(snap);
+  return snap;
+}
 
 export default router;

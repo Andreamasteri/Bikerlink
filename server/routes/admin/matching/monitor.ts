@@ -19,6 +19,7 @@ import { getAggregate, getRecentCycles } from "../../../matching/perf-metrics";
 import { getRedisStatus } from "../../../cache/redis";
 import { getLimiterStats } from "../../../lib/throttle";
 import { getMatchLogs, getRecentErrorCount } from "../../../matching/match-log-buffer";
+import { updateSystemStatus } from "../../../lib/system-status-cache";
 
 const router = Router();
 
@@ -172,6 +173,10 @@ router.get("/matching/monitor", async (_req: Request, res: Response) => {
         sourceStatus: sourceStatus[p.key] ?? "NO_DATA",
       };
     });
+
+    const matchingDot =
+      cycleStatus === "error" || recentErrors > 0 ? "degraded" : "ok";
+    updateSystemStatus({ matching: matchingDot });
 
     return sendSuccess(res, {
       cycleStatus,

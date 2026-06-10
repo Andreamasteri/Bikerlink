@@ -39,6 +39,7 @@ import type { RouteRequest } from "../../../routing/graphhopper-adapter";
 import { SELF_HOSTED_TILES_URL, isTilesSelfHosted } from "../../../../lib/map-tiles";
 import { SELF_HOSTED_BASE_URL, isSelfHosted } from "../../../graphhopper-client";
 import { ROUTING_AREAS, routingAreaUrl } from "@shared/routing-areas";
+import { updateSystemStatus } from "../../../lib/system-status-cache";
 
 const router = Router();
 
@@ -87,6 +88,16 @@ router.get("/status", async (_req: Request, res: Response) => {
         ? profilesResult.profiles.includes("motorcycle")
         : null)
     : null;
+
+  const { successes = 0, fallbacks = 0, failures = 0 } = counters as {
+    successes?: number; fallbacks?: number; failures?: number;
+  };
+  const routingTotal = successes + fallbacks + failures;
+  const routingDot =
+    routingTotal === 0 ? "unknown" :
+    failures > 0 ? "offline" :
+    fallbacks > 0 ? "degraded" : "ok";
+  updateSystemStatus({ routing: routingDot });
 
   return res.json({
     killSwitch: {
