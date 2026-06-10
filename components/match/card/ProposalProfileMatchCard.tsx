@@ -10,6 +10,7 @@ import { WhyMatchButton } from "../WhyMatchButton";
 import { getSearchTypeIcon } from "./constants";
 import { sharedStyles } from "./sharedStyles";
 import { NuovoBadge } from "./NuovoBadge";
+import { MatchReasonChipsInline } from "../MatchReasonChipsInline";
 
 export function ProposalProfileMatchCard({ match, currentUserId, onAccept, onReject, onChatPress, isPending, t, locale }: {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- match shape varies by type
@@ -103,6 +104,11 @@ export function ProposalProfileMatchCard({ match, currentUserId, onAccept, onRej
           <Text style={sharedStyles.chatBtnText}>{t("match.sendMessage")}</Text>
         </TouchableOpacity>
       )}
+
+      <MatchReasonChipsInline
+        scoreBreakdown={match.scoreBreakdown}
+        isSupermatch={!!(match.isSupermatch)}
+      />
 
       {(isNew || isAccepted) && match.id && (
         <View style={{ marginTop: 8 }}>

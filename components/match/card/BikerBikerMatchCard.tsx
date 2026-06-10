@@ -11,6 +11,7 @@ import { SUPERMATCH_COLOR } from "./constants";
 import { sharedStyles } from "./sharedStyles";
 import { NuovoBadge } from "./NuovoBadge";
 import { CompatibilityBadge } from "./CompatibilityBadge";
+import { MatchReasonChipsInline } from "../MatchReasonChipsInline";
 
 export function BikerBikerMatchCard({ match, currentUserId, onAccept, onReject, onBlock, onChatPress, onRemove, isPending, t, locale }: {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- match shape varies by type
@@ -83,6 +84,11 @@ export function BikerBikerMatchCard({ match, currentUserId, onAccept, onReject, 
         myTargets={["biker"]}
         theirTargets={["biker"]}
         t={t}
+      />
+
+      <MatchReasonChipsInline
+        scoreBreakdown={match.scoreBreakdown}
+        isSupermatch={isSuperMatch}
       />
 
       {isAccepted && onChatPress && (

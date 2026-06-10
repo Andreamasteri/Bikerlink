@@ -11,6 +11,7 @@ import { SUPERMATCH_COLOR } from "./constants";
 import { sharedStyles } from "./sharedStyles";
 import { NuovoBadge } from "./NuovoBadge";
 import { CompatibilityBadge } from "./CompatibilityBadge";
+import { MatchReasonChipsInline } from "../MatchReasonChipsInline";
 
 export function GarageMatchCard({ match, currentUserId, onAccept, onReject, onChatPress, onRemove, isPending, t, locale }: {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- match shape varies by type
@@ -119,6 +120,11 @@ export function GarageMatchCard({ match, currentUserId, onAccept, onReject, onCh
         myTargets={isBiker ? ["zavorrina"] : ["biker"]}
         theirTargets={isBiker ? ["biker"] : ["zavorrina"]}
         t={t}
+      />
+
+      <MatchReasonChipsInline
+        scoreBreakdown={match.scoreBreakdown}
+        isSupermatch={isSuperMatch}
       />
 
       {(isNew || isAccepted) && match.id && (

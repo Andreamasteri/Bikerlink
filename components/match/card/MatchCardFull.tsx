@@ -10,6 +10,7 @@ import { getSearchTypeIcon, SEARCH_TYPE_I18N } from "./constants";
 import { sharedStyles } from "./sharedStyles";
 import { NuovoBadge } from "./NuovoBadge";
 import { CompatibilityBadge } from "./CompatibilityBadge";
+import { MatchReasonChipsInline } from "../MatchReasonChipsInline";
 
 export function MatchCardFull({ match, currentUserId, onAccept, onReject, onRemove, isPending, t, locale }: {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- match shape varies by type
@@ -126,6 +127,11 @@ export function MatchCardFull({ match, currentUserId, onAccept, onReject, onRemo
         myTargets={myProposal?.targetUserTypes}
         theirTargets={otherProposal?.targetUserTypes}
         t={t}
+      />
+
+      <MatchReasonChipsInline
+        scoreBreakdown={match.scoreBreakdown}
+        isSupermatch={!!(match.isSupermatch)}
       />
 
       {otherProposal?.departureAddress && (
