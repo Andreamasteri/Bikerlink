@@ -555,3 +555,4 @@ const styles = StyleSheet.create({
   ghFingerprint: { fontFamily: "Inter_400Regular", fontSize: 10, color: "#6b7280", letterSpacing: 0.2 },
   tokenOkIcon: { marginLeft: 1 },
 });
+

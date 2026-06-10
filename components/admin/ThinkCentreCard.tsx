@@ -6,6 +6,7 @@ import Colors from "@/constants/colors";
 import { getApiUrl, authFetchHeaders, queryClient } from "@/lib/query-client";
 import { ErrorHistory, EventLog, GraphHopperBlock, ProbeLog } from "./ThinkCentreCardParts";
 import type { HealthEvent, AreaServiceHealth, ProbeLogEntry } from "./ThinkCentreCardParts";
+import { ServiceBadgeStrip } from "./ThinkCentreServiceBadge";
 import { ValhallaBlock, NominatimBlock, UfwBlock } from "./ThinkCentreValhallaNominatimBlocks";
 import type { ValhallaDetailedHealth, NominatimDetailedHealth, UfwDetailedHealth } from "./ThinkCentreValhallaNominatimBlocks";
 import {
@@ -117,125 +118,6 @@ function ufwToStatus(ufw: UfwDetailedHealth | undefined): DotStatus {
   if (!ufw || !ufw.configured) return "unknown";
   return ufw.ok ? "ok" : "offline";
 }
-
-// ── Inline badge strip ─────────────────────────────────────────────────────
-function svcColor(s: ServiceHealth | undefined): string {
-  if (!s || !s.configured) return "#6b7280";
-  if (s.ok) return "#22c55e";
-  if (s.startingUp) return "#f59e0b";
-  return "#ef4444";
-}
-
-function ghBadgeColor(data: ThinkCentreHealth): string {
-  if (!data.graphhopperConfigured || data.graphhopperAreas.length === 0) return "#6b7280";
-  const enabled = data.graphhopperAreas.filter((a) => a.enabled);
-  if (enabled.length === 0) return "#6b7280";
-  const online = enabled.filter((a) => a.ok).length;
-  if (online === enabled.length) return "#22c55e";
-  if (online === 0) {
-    const anyStarting = enabled.some((a) => a.startingUp);
-    return anyStarting ? "#f59e0b" : "#ef4444";
-  }
-  return "#f59e0b";
-}
-
-function ufwBadgeColor(data: ThinkCentreHealth): string {
-  const ufw = data.ufwDetail;
-  if (!ufw || !ufw.configured) return "#6b7280";
-  return ufw.ok ? "#22c55e" : "#ef4444";
-}
-
-type BadgeItem = { name: string; color: string };
-type BadgeGroup = { label: string; items: BadgeItem[] };
-
-function ServiceBadgeStrip({ data }: { data: ThinkCentreHealth }) {
-  const find = (key: ServiceKey) => data.services.find((s) => s.key === key);
-
-  const groups: BadgeGroup[] = [
-    {
-      label: "Routing",
-      items: [
-        { name: "GH", color: ghBadgeColor(data) },
-        { name: "Valhalla", color: svcColor(find("valhalla")) },
-        { name: "Nominatim", color: svcColor(find("nominatim")) },
-      ],
-    },
-    {
-      label: "AI",
-      items: [
-        { name: "Ollama", color: svcColor(find("ollama")) },
-        { name: "Whisper", color: svcColor(find("whisper")) },
-      ],
-    },
-    {
-      label: "Infra",
-      items: [
-        { name: "Redis", color: svcColor(find("redis")) },
-        { name: "Postgres", color: svcColor(find("postgres")) },
-        { name: "pgAdmin", color: svcColor(find("pgadmin")) },
-        { name: "nginx", color: svcColor(find("nginx")) },
-        { name: "Kuma", color: svcColor(find("uptimekuma")) },
-      ],
-    },
-    {
-      label: "Sicurezza",
-      items: [
-        { name: "UFW", color: ufwBadgeColor(data) },
-      ],
-    },
-  ];
-
-  return (
-    <View style={badgeStyles.strip}>
-      {groups.map((g) => (
-        <View key={g.label} style={badgeStyles.group}>
-          <Text style={badgeStyles.groupLabel}>{g.label}</Text>
-          <View style={badgeStyles.badges}>
-            {g.items.map((item) => (
-              <View key={item.name} style={[badgeStyles.badge, { borderColor: item.color + "33" }]}>
-                <View style={[badgeStyles.dot, { backgroundColor: item.color }]} />
-                <Text style={[badgeStyles.badgeText, { color: item.color }]}>{item.name}</Text>
-              </View>
-            ))}
-          </View>
-        </View>
-      ))}
-    </View>
-  );
-}
-
-const badgeStyles = StyleSheet.create({
-  strip: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 10,
-    marginTop: 10,
-    paddingTop: 10,
-    borderTopWidth: 1,
-    borderTopColor: Colors.border,
-  },
-  group: { gap: 4 },
-  groupLabel: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 10,
-    color: "#6b7280",
-    letterSpacing: 0.6,
-    textTransform: "uppercase",
-  },
-  badges: { flexDirection: "row", gap: 4, flexWrap: "wrap" },
-  badge: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 3,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 6,
-    backgroundColor: "rgba(148,163,184,0.06)",
-    borderWidth: 1,
-  },
-  dot: { width: 5, height: 5, borderRadius: 3 },
-  badgeText: { fontFamily: "Inter_500Medium", fontSize: 10, letterSpacing: 0.2 },
-});
 
 type ThinkCentreStatusKeys =
   | "thinkcentre"
