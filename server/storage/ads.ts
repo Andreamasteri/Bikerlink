@@ -9,12 +9,21 @@ import { SocialStorage } from "./social";
 
 export class AdsStorage extends SocialStorage {
   async getActiveCampaigns(): Promise<AdCampaign[]> {
-    return db.select().from(adCampaigns).where(eq(adCampaigns.isActive, true));
+    return db.select().from(adCampaigns).where(
+      and(
+        eq(adCampaigns.isActive, true),
+        sql`${adCampaigns.name} NOT LIKE '\\_\\_selfcheck\\_\\_%' ESCAPE '\\'`
+      )
+    );
   }
 
   async getActiveAdsByUserType(userType: string): Promise<AdCampaign[]> {
     return db.select().from(adCampaigns).where(
-      and(eq(adCampaigns.isActive, true), or(eq(adCampaigns.targetUserType, userType), eq(adCampaigns.targetUserType, "tutti")))
+      and(
+        eq(adCampaigns.isActive, true),
+        or(eq(adCampaigns.targetUserType, userType), eq(adCampaigns.targetUserType, "tutti")),
+        sql`${adCampaigns.name} NOT LIKE '\\_\\_selfcheck\\_\\_%' ESCAPE '\\'`
+      )
     ).orderBy(asc(adCampaigns.sortOrder));
   }
 

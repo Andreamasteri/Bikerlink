@@ -206,7 +206,7 @@ router.get("/active", async (req: Request, res: Response) => {
 
     const now = new Date();
     const activeCampaigns = campaigns.filter((c) => {
-      if (c.name.startsWith("__selfcheck__")) return false;
+      if (c.name.startsWith("__selfcheck__")) return false; // safety belt (primary filter is in DB layer)
       if (c.startDate && new Date(c.startDate) > now) return false;
       if (c.endDate && new Date(c.endDate) < now) return false;
       return true;
@@ -243,7 +243,7 @@ router.get("/my-ads", async (req: Request, res: Response) => {
 
     const now = new Date();
     const activeCampaigns = campaigns.filter((c) => {
-      if (c.name.startsWith("__selfcheck__")) return false;
+      if (c.name.startsWith("__selfcheck__")) return false; // safety belt (primary filter is in DB layer)
       if (c.startDate && new Date(c.startDate) > now) return false;
       if (c.endDate && new Date(c.endDate) < now) return false;
       const p = c.placement || "all";
@@ -276,7 +276,7 @@ router.get("/placement/:placement", async (req: Request, res: Response) => {
 
     const now = new Date();
     const activeCampaigns = campaigns.filter((c) => {
-      if (c.name.startsWith("__selfcheck__")) return false;
+      if (c.name.startsWith("__selfcheck__")) return false; // safety belt (primary filter is in DB layer)
       if (c.startDate && new Date(c.startDate) > now) return false;
       if (c.endDate && new Date(c.endDate) < now) return false;
       const cp = c.placement || "all";
