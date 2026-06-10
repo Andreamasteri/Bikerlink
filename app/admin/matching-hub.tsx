@@ -7,12 +7,13 @@
  * Rules, Tags, Embeddings, Feedback, Route Sim, Time Profile, ecc.).
  */
 import React from "react";
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from "react-native";
-import { useQuery } from "@tanstack/react-query";
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Alert } from "react-native";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
+import { apiRequest } from "@/lib/query-client";
 
 interface AuditIssue {
   severity: "error" | "warn" | "info";
@@ -48,6 +49,8 @@ interface QuickLink {
   color: string;
 }
 
+const LOCK_STALE_THRESHOLD_MS = 15 * 60 * 1000; // 15 minutes
+
 const QUICK_LINKS: QuickLink[] = [
   { key: "engine", label: "Motore", icon: "engine", iconSet: "MaterialCommunityIcons", route: "/admin/match-engine", color: "#FF9500" },
   { key: "control", label: "Controllo", icon: "tune-variant", iconSet: "MaterialCommunityIcons", route: "/admin/match-control", color: "#9C27B0" },
@@ -80,6 +83,7 @@ function severityColor(s: AuditIssue["severity"]) {
 export default function MatchingHubScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const queryClient = useQueryClient();
 
   const { data: audit, isLoading: auditLoading } = useQuery<AuditResponse>({
     queryKey: ["/api/admin/matching/audit"],
@@ -96,6 +100,18 @@ export default function MatchingHubScreen() {
     refetchInterval: 30000,
     staleTime: 10000,
   });
+
+  const forceUnlock = useMutation({
+    mutationFn: () => apiRequest("POST", "/api/admin/matching/force-unlock"),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["/api/admin/matching/lock-state"] });
+    },
+    onError: () => {
+      Alert.alert("Errore", "Force-unlock fallito. Riprova.");
+    },
+  });
+
+  const lockIsStale = !!(lock?.isRunning && lock.elapsedMs != null && lock.elapsedMs > LOCK_STALE_THRESHOLD_MS);
 
   const overallColor =
     audit?.overallStatus === "error" ? Colors.error :
@@ -130,16 +146,25 @@ export default function MatchingHubScreen() {
 
       {/* Lock engine */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Lock Engine</Text>
-        <View style={styles.lockCard}>
+        <View style={styles.sectionHeaderRow}>
+          <Text style={styles.sectionTitle}>Lock Engine</Text>
+          {lockIsStale && (
+            <View style={[styles.statusBadge, { backgroundColor: Colors.error + "22" }]}>
+              <Text style={[styles.statusBadgeText, { color: Colors.error }]}>
+                BLOCCATO DA {Math.floor((lock!.elapsedMs!) / 60000)}min
+              </Text>
+            </View>
+          )}
+        </View>
+        <View style={[styles.lockCard, lockIsStale && styles.lockCardStale]}>
           <MaterialCommunityIcons
             name={lock?.isRunning ? "lock" : "lock-open-variant"}
             size={22}
-            color={lock?.isRunning ? Colors.warning : Colors.success}
+            color={lockIsStale ? Colors.error : lock?.isRunning ? Colors.warning : Colors.success}
           />
           <View style={{ flex: 1 }}>
-            <Text style={styles.lockTitle}>
-              {lock?.isRunning ? "BLOCCATO" : "Libero"}
+            <Text style={[styles.lockTitle, lockIsStale && { color: Colors.error }]}>
+              {lockIsStale ? "LOCK SCADUTO" : lock?.isRunning ? "BLOCCATO" : "Libero"}
             </Text>
             {lock?.isRunning && lock.elapsedMs != null && (
               <Text style={styles.lockSub}>In esecuzione da {Math.floor(lock.elapsedMs / 1000)}s</Text>
@@ -147,7 +172,36 @@ export default function MatchingHubScreen() {
             {!lock?.isRunning && lock?.lastStartIso && (
               <Text style={styles.lockSub}>Ultimo avvio: {formatDate(lock.lastStartIso)}</Text>
             )}
+            {lockIsStale && (
+              <Text style={[styles.lockSub, { color: Colors.error, marginTop: 4 }]}>
+                Il ciclo supera la soglia di 15 minuti — probabile blocco anomalo
+              </Text>
+            )}
           </View>
+          {lock?.isRunning && (
+            <TouchableOpacity
+              style={[styles.unlockBtn, lockIsStale && styles.unlockBtnStale]}
+              onPress={() => {
+                Alert.alert(
+                  "Force-Unlock",
+                  lockIsStale
+                    ? "Il lock risulta bloccato da più di 15 minuti. Sbloccare forzatamente?"
+                    : "Sbloccare il lock del ciclo matching in corso?",
+                  [
+                    { text: "Annulla", style: "cancel" },
+                    { text: "Sblocca", style: "destructive", onPress: () => forceUnlock.mutate() },
+                  ]
+                );
+              }}
+              disabled={forceUnlock.isPending}
+              activeOpacity={0.7}
+            >
+              {forceUnlock.isPending
+                ? <ActivityIndicator size="small" color="#fff" />
+                : <MaterialCommunityIcons name="lock-open-alert" size={18} color="#fff" />
+              }
+            </TouchableOpacity>
+          )}
         </View>
       </View>
 
@@ -225,8 +279,18 @@ const styles = StyleSheet.create({
     flexDirection: "row", alignItems: "center", gap: 12, padding: 14,
     backgroundColor: Colors.surface, borderRadius: 12, borderWidth: 1, borderColor: Colors.border,
   },
+  lockCardStale: {
+    borderColor: Colors.error, backgroundColor: Colors.error + "0D",
+  },
   lockTitle: { fontFamily: "Inter_600SemiBold", fontSize: 14, color: Colors.text },
   lockSub: { fontFamily: "Inter_400Regular", fontSize: 11, color: Colors.textSecondary, marginTop: 2 },
+  unlockBtn: {
+    backgroundColor: Colors.warning, borderRadius: 8, padding: 8,
+    alignItems: "center", justifyContent: "center",
+  },
+  unlockBtnStale: {
+    backgroundColor: Colors.error,
+  },
   statusBadge: { borderRadius: 6, paddingHorizontal: 10, paddingVertical: 4 },
   statusBadgeText: { fontFamily: "Inter_700Bold", fontSize: 11, letterSpacing: 0.5 },
   okCard: {

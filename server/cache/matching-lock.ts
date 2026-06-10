@@ -22,7 +22,7 @@ type Holder = {
 };
 
 const HISTORY_MAX = 10;
-const history: Array<{ event: "acquired" | "released" | "expired" | "rejected"; at: string; owner: string; source: string; reason?: string }> = [];
+const history: Array<{ event: "acquired" | "released" | "expired" | "rejected"; at: string; owner: string; source: string; reason?: string; ttlMs?: number }> = [];
 
 let memoryLockHeld = false;
 let memoryLockHolder: Holder | null = null;
@@ -30,7 +30,7 @@ let lastHolder: Holder | null = null;
 
 let redlock: Redlock | null = null;
 
-function pushHistory(entry: { event: "acquired" | "released" | "expired" | "rejected"; owner: string; source: string; reason?: string }) {
+function pushHistory(entry: { event: "acquired" | "released" | "expired" | "rejected"; owner: string; source: string; reason?: string; ttlMs?: number }) {
   history.push({ at: new Date().toISOString(), ...entry });
   if (history.length > HISTORY_MAX) history.shift();
 }
@@ -97,16 +97,17 @@ export async function withMatchingLock<T>(
         );
       } catch { /* best-effort */ }
     }
-    pushHistory({ event: "acquired", owner, source: "redis" });
+    pushHistory({ event: "acquired", owner, source: "redis", ttlMs: LOCK_TTL_MS });
     try {
       const result = await fn();
       return { acquired: true, result, source: "redis" };
     } finally {
+      const ttlResidualMs = Math.max(0, holder.expiresAt - Date.now());
       try {
         await lock.release();
-        pushHistory({ event: "released", owner, source: "redis" });
+        pushHistory({ event: "released", owner, source: "redis", ttlMs: ttlResidualMs });
       } catch (err: unknown) {
-        pushHistory({ event: "expired", owner, source: "redis", reason: err instanceof Error ? err.message : String(err) });
+        pushHistory({ event: "expired", owner, source: "redis", ttlMs: ttlResidualMs, reason: err instanceof Error ? err.message : String(err) });
       }
       memoryLockHolder = null;
       if (rawClient) {
@@ -117,8 +118,21 @@ export async function withMatchingLock<T>(
 
   // In-memory fallback (single-instance mode).
   if (memoryLockHeld) {
-    pushHistory({ event: "rejected", owner, source: "memory", reason: "already_held" });
-    return { acquired: false, reason: "already_running" };
+    // Auto-recover stale lock: if the TTL has elapsed the previous holder never
+    // released (e.g. an unhandled throw outside the try/finally), release it
+    // now instead of permanently blocking new acquisitions until process restart.
+    if (memoryLockHolder && memoryLockHolder.expiresAt < Date.now()) {
+      console.warn(
+        `[matching-lock] In-memory lock stale (owner=${memoryLockHolder.owner}, expired=${new Date(memoryLockHolder.expiresAt).toISOString()}) — auto-releasing and allowing new acquisition`
+      );
+      pushHistory({ event: "expired", owner: memoryLockHolder.owner, source: "memory", reason: "lock_force_expired" });
+      memoryLockHeld = false;
+      memoryLockHolder = null;
+      // Fall through to acquire the lock below.
+    } else {
+      pushHistory({ event: "rejected", owner, source: "memory", reason: "already_held" });
+      return { acquired: false, reason: "already_running" };
+    }
   }
   memoryLockHeld = true;
   const holder: Holder = {
@@ -129,7 +143,7 @@ export async function withMatchingLock<T>(
   };
   memoryLockHolder = holder;
   lastHolder = holder;
-  pushHistory({ event: "acquired", owner, source: "memory" });
+  pushHistory({ event: "acquired", owner, source: "memory", ttlMs: LOCK_TTL_MS });
   if (!useRedis) {
     console.warn("[matching-lock] Redis not available — using in-memory lock fallback");
   }
@@ -137,18 +151,20 @@ export async function withMatchingLock<T>(
     const result = await fn();
     return { acquired: true, result, source: "memory" };
   } finally {
+    const ttlResidualMs = Math.max(0, holder.expiresAt - Date.now());
     memoryLockHeld = false;
     memoryLockHolder = null;
-    pushHistory({ event: "released", owner, source: "memory" });
+    pushHistory({ event: "released", owner, source: "memory", ttlMs: ttlResidualMs });
   }
 }
 
 export function forceUnlockMatchingLock(): { wasHeld: boolean; holder: Holder | null } {
   const wasHeld = memoryLockHeld || !!memoryLockHolder;
   const holder = memoryLockHolder;
+  const ttlResidualMs = holder ? Math.max(0, holder.expiresAt - Date.now()) : undefined;
   memoryLockHeld = false;
   memoryLockHolder = null;
-  pushHistory({ event: "released", owner: holder?.owner ?? "force", source: holder?.source ?? "memory", reason: "force_unlock" });
+  pushHistory({ event: "released", owner: holder?.owner ?? "force", source: holder?.source ?? "memory", reason: "force_unlock", ttlMs: ttlResidualMs });
   // Best-effort Redis release.
   const r = getRawRedis();
   if (r) {
