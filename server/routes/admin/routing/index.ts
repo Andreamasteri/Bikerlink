@@ -37,6 +37,8 @@ import {
 import { ROUTING_FUNCTIONS } from "@shared/routing-functions";
 import type { RouteRequest } from "../../../routing/graphhopper-adapter";
 import { SELF_HOSTED_TILES_URL, isTilesSelfHosted } from "../../../../lib/map-tiles";
+import { SELF_HOSTED_BASE_URL, isSelfHosted } from "../../../graphhopper-client";
+import { ROUTING_AREAS, routingAreaUrl } from "@shared/routing-areas";
 
 const router = Router();
 
@@ -341,6 +343,99 @@ router.post("/coherence-test", async (_req: Request, res: Response) => {
     graphhopper,
     valhalla,
     comparison: { coherent, distanceDiffPct, durationDiffPct, thresholdPct: 10 },
+  });
+});
+
+/**
+ * GET /areas/health — probe diretta delle 7 istanze GraphHopper per-area.
+ *
+ * Testa l'endpoint /health su ogni istanza tramite il reverse proxy del
+ * ThinkCentre (SELF_HOSTED_BASE_URL/areas/<codice>/health). Timeout 2s per
+ * istanza, probe parallele. Restituisce lo stato anche per le aree on-demand
+ * non abilitate, così il pannello admin mostra sempre tutte e 7 le istanze.
+ */
+const AREA_HEALTH_TIMEOUT_MS = 2_000;
+
+interface AreaHealthResult {
+  code: string;
+  nome: string;
+  tier: "core" | "on-demand";
+  portaInterna: number;
+  ok: boolean;
+  latencyMs: number | null;
+  statusCode: number | null;
+  error: string | null;
+  probedAt: string;
+}
+
+async function probeAreaHealth(
+  code: string,
+  nome: string,
+  tier: "core" | "on-demand",
+  portaInterna: number,
+  url: string,
+  token: string,
+): Promise<AreaHealthResult> {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), AREA_HEALTH_TIMEOUT_MS);
+  const started = Date.now();
+  const probedAt = new Date().toISOString();
+  try {
+    const headers: Record<string, string> = {};
+    if (token) headers["X-GH-Token"] = token;
+    const resp = await fetch(url, { method: "GET", signal: ctrl.signal, headers });
+    clearTimeout(timer);
+    const latencyMs = Date.now() - started;
+    const ok = resp.status >= 200 && resp.status < 300;
+    return { code, nome, tier, portaInterna, ok, latencyMs, statusCode: resp.status, error: null, probedAt };
+  } catch (err: unknown) {
+    clearTimeout(timer);
+    const msg = err instanceof Error
+      ? (err.name === "AbortError" ? "timeout (2s)" : err.message.slice(0, 120))
+      : String(err).slice(0, 120);
+    return { code, nome, tier, portaInterna, ok: false, latencyMs: null, statusCode: null, error: msg, probedAt };
+  }
+}
+
+router.get("/areas/health", async (_req: Request, res: Response) => {
+  if (!isSelfHosted || !SELF_HOSTED_BASE_URL) {
+    return res.json({
+      available: false,
+      reason: "not_self_hosted",
+      areas: ROUTING_AREAS.map((a) => ({
+        code: a.codice,
+        nome: a.nome,
+        tier: a.tier,
+        portaInterna: a.portaInterna,
+        ok: false,
+        latencyMs: null,
+        statusCode: null,
+        error: "ThinkCentre non configurato",
+        probedAt: new Date().toISOString(),
+      })),
+    });
+  }
+
+  const token = process.env.GRAPHHOPPER_TOKEN ?? "";
+  const probes = await Promise.all(
+    ROUTING_AREAS.map((a) =>
+      probeAreaHealth(
+        a.codice,
+        a.nome,
+        a.tier,
+        a.portaInterna,
+        `${routingAreaUrl(a, SELF_HOSTED_BASE_URL)}/health`,
+        token,
+      ),
+    ),
+  );
+
+  const healthyCount = probes.filter((p) => p.ok).length;
+  return res.json({
+    available: true,
+    healthyCount,
+    totalCount: probes.length,
+    areas: probes,
   });
 });
 

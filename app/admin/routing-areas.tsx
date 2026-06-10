@@ -32,7 +32,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 import { apiRequest } from "@/lib/query-client";
 
-// ─── Tipi (rispecchiano server/routes/admin/routing-areas/index.ts) ──────────
+// ─── Tipi ────────────────────────────────────────────────────────────────────
 
 type RoutingAreaMode = "disabled" | "tester" | "enabled";
 
@@ -96,6 +96,27 @@ interface MetricsResponse {
   watchdog?: WatchdogEvent[];
 }
 
+/** Risposta di GET /api/admin/routing/areas/health (probe diretta 2s). */
+interface DirectAreaHealth {
+  code: string;
+  nome: string;
+  tier: "core" | "on-demand";
+  portaInterna: number;
+  ok: boolean;
+  latencyMs: number | null;
+  statusCode: number | null;
+  error: string | null;
+  probedAt: string;
+}
+
+interface DirectHealthResponse {
+  available: boolean;
+  reason?: string;
+  healthyCount?: number;
+  totalCount?: number;
+  areas: DirectAreaHealth[];
+}
+
 const MODES: { id: RoutingAreaMode; label: string; icon: string }[] = [
   { id: "disabled", label: "Disattivo", icon: "power-off" },
   { id: "tester", label: "Tester", icon: "account-wrench" },
@@ -157,6 +178,16 @@ export default function RoutingAreasScreen() {
     queryKey: ["/api/admin/routing-areas/metrics"],
     refetchInterval: 15000,
     staleTime: 5000,
+  });
+
+  const {
+    data: directHealth,
+    isFetching: directHealthFetching,
+    refetch: refetchDirectHealth,
+  } = useQuery<DirectHealthResponse>({
+    queryKey: ["/api/admin/routing/areas/health"],
+    refetchInterval: 60_000,
+    staleTime: 30_000,
   });
 
   const modeMutation = useMutation({
@@ -272,6 +303,70 @@ export default function RoutingAreasScreen() {
             </Text>
           </View>
         )}
+      </View>
+
+      {/* Health diretta istanze GH (probe 2s per porta) */}
+      <View style={styles.section}>
+        <View style={styles.tableHeaderRow}>
+          <Text style={styles.sectionTitle}>
+            Health Istanze GH
+            {directHealth && directHealth.available
+              ? `  ${directHealth.healthyCount ?? 0}/${directHealth.totalCount ?? 0} up`
+              : ""}
+          </Text>
+          <TouchableOpacity
+            onPress={() => refetchDirectHealth()}
+            disabled={directHealthFetching}
+            style={styles.refreshBtn}
+            activeOpacity={0.7}
+          >
+            {directHealthFetching ? (
+              <ActivityIndicator size="small" color={Colors.accent} />
+            ) : (
+              <MaterialCommunityIcons name="refresh" size={18} color={Colors.accent} />
+            )}
+          </TouchableOpacity>
+        </View>
+
+        {!directHealth ? (
+          <View style={styles.monitorCard}>
+            <ActivityIndicator size="small" color={Colors.accent} />
+          </View>
+        ) : !directHealth.available ? (
+          <View style={styles.warnCard}>
+            <MaterialCommunityIcons name="information-outline" size={16} color={Colors.warning} />
+            <Text style={styles.warnText}>
+              ThinkCentre non raggiungibile — probe non disponibili.
+            </Text>
+          </View>
+        ) : (
+          <View style={styles.chipGrid}>
+            {directHealth.areas.map((a) => {
+              const chipColor = a.ok ? Colors.success : Colors.error;
+              const bgColor = a.ok ? Colors.success + "18" : Colors.error + "18";
+              const latText = a.ok && a.latencyMs != null ? `${a.latencyMs}ms` : a.error?.slice(0, 18) ?? "—";
+              const tierDot = a.tier === "core" ? Colors.accent : Colors.warning;
+              return (
+                <View key={a.code} style={[styles.ghChip, { backgroundColor: bgColor, borderColor: chipColor + "55" }]}>
+                  <View style={styles.ghChipHeader}>
+                    <View style={[styles.ghDot, { backgroundColor: tierDot }]} />
+                    <Text style={[styles.ghChipStatus, { color: chipColor }]} numberOfLines={1}>
+                      {a.ok ? "●" : "○"}
+                    </Text>
+                  </View>
+                  <Text style={styles.ghChipName} numberOfLines={1}>{a.nome}</Text>
+                  <Text style={styles.ghChipPort}>:{a.portaInterna}</Text>
+                  <Text style={[styles.ghChipLatency, { color: a.ok ? Colors.textSecondary : Colors.error }]} numberOfLines={1}>
+                    {latText}
+                  </Text>
+                </View>
+              );
+            })}
+          </View>
+        )}
+        <Text style={styles.modeHint}>
+          Probe diretta su tutte e 7 le istanze (core + on-demand) via reverse proxy. Timeout 2s. Auto-refresh 60s.
+        </Text>
       </View>
 
       {/* Monitor risorse complessivo */}
@@ -596,4 +691,56 @@ const styles = StyleSheet.create({
     borderColor: Colors.border,
   },
   emptyText: { fontFamily: "Inter_400Regular", fontSize: 12, color: Colors.textSecondary, flex: 1, lineHeight: 17 },
+
+  // Direct health chip grid
+  refreshBtn: { padding: 4 },
+  chipGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  ghChip: {
+    width: "30%",
+    flexGrow: 1,
+    minWidth: 90,
+    maxWidth: 120,
+    borderRadius: 10,
+    borderWidth: 1,
+    paddingHorizontal: 8,
+    paddingVertical: 8,
+    alignItems: "center",
+  },
+  ghChipHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    marginBottom: 4,
+  },
+  ghDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  ghChipStatus: {
+    fontSize: 14,
+    fontFamily: "Inter_700Bold",
+  },
+  ghChipName: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 10,
+    color: Colors.text,
+    textAlign: "center",
+  },
+  ghChipPort: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 10,
+    color: Colors.textSecondary,
+    marginTop: 2,
+  },
+  ghChipLatency: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 10,
+    marginTop: 3,
+    textAlign: "center",
+  },
 });
