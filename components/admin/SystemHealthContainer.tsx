@@ -8,6 +8,7 @@ import {
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Ionicons } from "@expo/vector-icons";
+import { useRouter, type Href } from "expo-router";
 import Colors from "@/constants/colors";
 
 export type DotStatus = "ok" | "degraded" | "offline" | "unknown";
@@ -25,15 +26,23 @@ interface StatusDotProps {
   label: string;
   status: DotStatus;
   showPersistentLabel?: boolean;
+  onNavigate?: () => void;
 }
 
-export function StatusDot({ label, status, showPersistentLabel }: StatusDotProps) {
+export function StatusDot({ label, status, showPersistentLabel, onNavigate }: StatusDotProps) {
   const [showLabel, setShowLabel] = useState(false);
+
+  function handlePress() {
+    if (onNavigate) {
+      onNavigate();
+    } else {
+      setShowLabel((v) => !v);
+    }
+  }
 
   return (
     <TouchableOpacity
-      onPress={() => setShowLabel((v) => !v)}
-      onLongPress={() => setShowLabel((v) => !v)}
+      onPress={handlePress}
       activeOpacity={0.7}
       hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
       style={styles.dotWrapper}
@@ -42,7 +51,7 @@ export function StatusDot({ label, status, showPersistentLabel }: StatusDotProps
       {showPersistentLabel && (
         <Text style={styles.dotLabel} numberOfLines={1}>{label}</Text>
       )}
-      {!showPersistentLabel && showLabel && (
+      {!showPersistentLabel && !onNavigate && showLabel && (
         <View style={styles.tooltip}>
           <Text style={styles.tooltipText}>{label}</Text>
         </View>
@@ -73,28 +82,30 @@ interface SystemHealthContainerProps {
   children: React.ReactNode;
 }
 
-const DOT_DEFS: { key: keyof SystemStatuses; label: string }[] = [
-  { key: "thinkcentre", label: "ThinkCentre" },
-  { key: "graphhopper", label: "GraphHopper" },
-  { key: "valhalla", label: "Valhalla" },
-  { key: "nominatim", label: "Nominatim" },
-  { key: "ollama", label: "Ollama AI" },
-  { key: "whisper", label: "Whisper ASR" },
-  { key: "ufw", label: "Firewall" },
-  { key: "redis", label: "Redis" },
-  { key: "postgres", label: "PostgreSQL" },
-  { key: "pgadmin", label: "pgAdmin" },
-  { key: "nginx", label: "nginx" },
-  { key: "uptimeKuma", label: "Uptime Kuma" },
-  { key: "routing", label: "Routing" },
-  { key: "matching", label: "Matching Engine" },
+const DOT_DEFS: { key: keyof SystemStatuses; label: string; route: Href }[] = [
+  { key: "thinkcentre",  label: "ThinkCentre",    route: "/admin/system" },
+  { key: "graphhopper",  label: "GraphHopper",    route: "/admin/routing-health" },
+  { key: "valhalla",     label: "Valhalla",        route: "/admin/routing-health" },
+  { key: "nominatim",    label: "Nominatim",       route: "/admin/routing-health" },
+  { key: "ollama",       label: "Ollama AI",       route: "/admin/ai-hub" },
+  { key: "whisper",      label: "Whisper ASR",     route: "/admin/whisper-config" },
+  { key: "ufw",          label: "Firewall",        route: "/admin/system" },
+  { key: "redis",        label: "Redis",           route: "/admin/system" },
+  { key: "postgres",     label: "PostgreSQL",      route: "/admin/system" },
+  { key: "pgadmin",      label: "pgAdmin",         route: "/admin/system" },
+  { key: "nginx",        label: "nginx",           route: "/admin/system" },
+  { key: "uptimeKuma",   label: "Uptime Kuma",     route: "/admin/system" },
+  { key: "routing",      label: "Routing",         route: "/admin/routing-hub" },
+  { key: "matching",     label: "Matching Engine", route: "/admin/matching-hub" },
 ];
 
 export function SystemHealthContainer({
   statuses,
   children,
 }: SystemHealthContainerProps) {
+  const router = useRouter();
   const [collapsed, setCollapsed] = useState(true);
+
   useEffect(() => {
     AsyncStorage.getItem(STORAGE_KEY)
       .then((val) => {
@@ -109,34 +120,47 @@ export function SystemHealthContainer({
     AsyncStorage.setItem(STORAGE_KEY, next ? "1" : "0").catch(() => {});
   }
 
+  function handleDotPress(route: Href) {
+    if (collapsed) {
+      setCollapsed(false);
+      AsyncStorage.setItem(STORAGE_KEY, "0").catch(() => {});
+    }
+    router.push(route);
+  }
+
   return (
     <View style={styles.container}>
+      {/* Header row: icon + title + spacer + chevron */}
       <TouchableOpacity
-        style={styles.header}
+        style={styles.headerRow}
         onPress={toggle}
         activeOpacity={0.7}
         testID="system-health-header"
       >
         <Ionicons name="pulse-outline" size={18} color={Colors.textSecondary} />
         <Text style={styles.title}>System Health</Text>
-        <View style={[styles.dotsRow, !collapsed && styles.dotsRowExpanded]}>
-          {DOT_DEFS.map(({ key, label }) => (
-            <StatusDot
-              key={key}
-              label={label}
-              status={statuses[key]}
-              showPersistentLabel={!collapsed}
-            />
-          ))}
-        </View>
+        <View style={styles.spacer} />
         <Ionicons
           name={collapsed ? "chevron-down" : "chevron-up"}
           size={18}
           color={Colors.textSecondary}
-          style={styles.chevron}
         />
       </TouchableOpacity>
 
+      {/* Dots row: always visible, below the header */}
+      <View style={styles.dotsRow}>
+        {DOT_DEFS.map(({ key, label, route }) => (
+          <StatusDot
+            key={key}
+            label={label}
+            status={statuses[key]}
+            showPersistentLabel={!collapsed}
+            onNavigate={() => handleDotPress(route)}
+          />
+        ))}
+      </View>
+
+      {/* Body: collapsible */}
       <View style={[styles.body, collapsed && styles.bodyHidden]}>{children}</View>
     </View>
   );
@@ -151,10 +175,12 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     overflow: "visible",
   },
-  header: {
+  headerRow: {
     flexDirection: "row",
     alignItems: "center",
-    padding: 14,
+    paddingHorizontal: 14,
+    paddingTop: 14,
+    paddingBottom: 10,
     gap: 8,
   },
   title: {
@@ -163,16 +189,17 @@ const styles = StyleSheet.create({
     color: Colors.text,
     flexShrink: 1,
   },
+  spacer: {
+    flex: 1,
+  },
   dotsRow: {
     flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    marginLeft: "auto",
     flexWrap: "wrap",
-    justifyContent: "flex-end",
-  },
-  chevron: {
-    marginLeft: 4,
+    justifyContent: "space-around",
+    alignItems: "flex-start",
+    paddingHorizontal: 10,
+    paddingBottom: 12,
+    gap: 4,
   },
   body: {
     paddingHorizontal: 12,
@@ -182,21 +209,19 @@ const styles = StyleSheet.create({
   bodyHidden: {
     display: "none",
   },
-  dotsRowExpanded: {
-    alignItems: "flex-start",
-  },
   dotWrapper: {
     alignItems: "center",
     justifyContent: "flex-start",
+    minWidth: 28,
   },
   dot: {
-    width: 16,
-    height: 16,
-    borderRadius: 8,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
   },
   dotLabel: {
     fontFamily: "Inter_400Regular",
-    fontSize: 12,
+    fontSize: 9,
     color: Colors.textSecondary,
     marginTop: 3,
     textAlign: "center",
@@ -204,7 +229,7 @@ const styles = StyleSheet.create({
   },
   tooltip: {
     position: "absolute",
-    bottom: 20,
+    bottom: 26,
     backgroundColor: Colors.surface,
     borderWidth: 1,
     borderColor: Colors.border,
