@@ -1,0 +1,51 @@
+[Unit]
+Description=BikerLink — avvio istanze GraphHopper core al boot (grecia, balcani, iberia, arco-alpino)
+Documentation=https://github.com/bikerlink/bikerlink (infra/self-host/README.md)
+After=docker.service network-online.target
+Requires=docker.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+
+# Cartella dello stack self-host. Personalizza qui se lo stack è altrove.
+Environment=COMPOSE_DIR=/opt/bikerlink/self-host
+
+# Carica variabili opzionali (.env locale dello stack, es. GRAPHS_DIR, GH_HEAP_*).
+# NOTA: EnvironmentFile= non espande ${COMPOSE_DIR}, il path va hardcodato.
+# Se cambi COMPOSE_DIR qui sopra, aggiorna anche il path qui sotto.
+EnvironmentFile=-/opt/bikerlink/self-host/.env
+
+# Verifica rapida che il daemon Docker sia raggiungibile prima di procedere.
+ExecStartPre=/usr/bin/docker info
+
+# Avvia i 4 gruppi core in parallelo (docker compose up -d è idempotente:
+# se un container è già in esecuzione non lo tocca).
+ExecStart=/usr/bin/docker compose \
+  -f ${COMPOSE_DIR}/docker-compose.yml \
+  up -d \
+  graphhopper-grecia \
+  graphhopper-balcani \
+  graphhopper-iberia \
+  graphhopper-arco-alpino
+
+# Al reboot il servizio non ferma i container (li lascia in vita).
+# Se vuoi fermarli con `systemctl stop bikerlink-areas-core` decommentare:
+# ExecStop=/usr/bin/docker compose \
+#   -f ${COMPOSE_DIR}/docker-compose.yml \
+#   stop \
+#   graphhopper-grecia graphhopper-balcani graphhopper-iberia graphhopper-arco-alpino
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=bikerlink-areas-core
+
+# Riprova fino a 3 volte se Docker non è ancora pronto al primo avvio.
+Restart=on-failure
+RestartSec=15s
+StartLimitIntervalSec=120s
+StartLimitBurst=3
+
+[Install]
+WantedBy=multi-user.target

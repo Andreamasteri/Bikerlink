@@ -418,6 +418,41 @@ sudo systemctl enable --now areas-metrics
 curl -H "X-GH-Token: <token>" https://gh.<dominio>/metrics/areas
 ```
 
+### 6. Avvio automatico al boot (istanze core)
+
+`scripts/thinkcentre/bikerlink-areas-core.service` avvia automaticamente i 4 gruppi
+core (`grecia`, `balcani`, `iberia`, `arco-alpino`) dopo che Docker è pronto, così
+lo stack GraphHopper torna operativo senza intervento manuale anche dopo un riavvio
+imprevisto del ThinkCentre.
+
+**Installazione:**
+
+```bash
+# 1. Copia la unit (se lo stack non è in /opt/bikerlink/self-host vedi nota COMPOSE_DIR sotto)
+sudo cp scripts/thinkcentre/bikerlink-areas-core.service /etc/systemd/system/
+
+# 2. Ricarica il daemon e abilita l'avvio automatico
+sudo systemctl daemon-reload
+sudo systemctl enable --now bikerlink-areas-core
+
+# 3. Verifica
+systemctl status bikerlink-areas-core
+journalctl -u bikerlink-areas-core -n 30
+```
+
+> **Compatibilità con il watchdog:** `areas-watchdog.sh` controlla sempre lo stato
+> corrente del container prima di agire. Se un'istanza è già in esecuzione (avviata
+> dalla unit al boot) il watchdog non la tocca — nessun conflitto.
+
+> **Solo gruppi core:** `est`, `germania-centro` e `francia-benelux` sono OFF per
+> default e rimangono spenti al boot. Vengono accesi/spenti esclusivamente dal
+> watchdog in base allo stato configurato nell'app.
+
+> **COMPOSE_DIR:** la unit usa `/opt/bikerlink/self-host` come default. Se hai
+> installato lo stack in una cartella diversa, modifica **due righe** nel file `.service`
+> prima di copiarlo: `Environment=COMPOSE_DIR=…` e `EnvironmentFile=-…/.env`
+> (systemd non espande variabili nei path `EnvironmentFile=`).
+
 ### Aggiornare il pin dell'immagine GraphHopper
 
 L'immagine è **pinnata per digest** (riproducibilità) in `docker-compose.yml` e
