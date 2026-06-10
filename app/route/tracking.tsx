@@ -17,6 +17,7 @@ import { apiRequest } from "@/lib/query-client";
 import Colors from "@/constants/colors";
 import { t } from "@/lib/i18n";
 import { useTelemetry } from "@/hooks/useTelemetry";
+import { setManualTrackingActive } from "@/lib/manual-tracking-flag";
 import { useApiDebugLog } from "@/hooks/useApiDebugLog";
 import DebugPanel from "@/components/DebugPanel";
 import { StatBox } from "@/components/route/tracking/StatBox";
@@ -156,6 +157,7 @@ export default function TrackingScreen() {
     try {
       const route = await startMutation.mutateAsync(frequency);
       setRouteId(route.id);
+      setManualTrackingActive(true);
       setIsTracking(true);
       setPoints([]);
       pendingPointsRef.current = [];
@@ -275,6 +277,7 @@ export default function TrackingScreen() {
       router.replace(`/route/${routeId}` as any);
     }
 
+    setManualTrackingActive(false);
     setIsTracking(false);
     setRouteId(null);
   };
@@ -292,6 +295,7 @@ export default function TrackingScreen() {
     return () => {
       if (locationSubRef.current) locationSubRef.current.remove();
       if (intervalRef.current) clearInterval(intervalRef.current);
+      setManualTrackingActive(false);
     };
   }, []);
 

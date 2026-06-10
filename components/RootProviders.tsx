@@ -15,6 +15,7 @@ import { TaskbarStyleProvider } from "@/lib/taskbar-style-context";
 import { UnitsProvider } from "@/lib/units-context";
 import { PlayerProvider } from "@/lib/player-context";
 import { FloatingWidgetProvider } from "@/lib/floating-widget-context";
+import { AutoTelemetryProvider } from "@/lib/auto-telemetry-context";
 import { queryClient } from "@/lib/query-client";
 import { useAuth } from "@/lib/auth-context";
 
@@ -77,7 +78,9 @@ export function RootProviders({
                           <FloatingWidgetProvider>
                             <GestureHandlerRootView style={{ flex: 1 }}>
                               <KeyboardProvider>
-                                {children}
+                                <AutoTelemetryProvider>
+                                  {children}
+                                </AutoTelemetryProvider>
                               </KeyboardProvider>
                             </GestureHandlerRootView>
                           </FloatingWidgetProvider>

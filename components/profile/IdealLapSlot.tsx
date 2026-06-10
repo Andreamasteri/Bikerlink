@@ -95,6 +95,10 @@ export default function IdealLapSlot({ index, targetKm, onSaved }: LapSlotProps)
 
   return (
     <View style={styles.container}>
+      <View style={styles.telemetryBadge}>
+        <Ionicons name="checkmark-circle" size={11} color="#27ae60" />
+        <Text style={styles.telemetryBadgeText}>Incluso nella telemetria totale</Text>
+      </View>
       <View style={styles.header}>
         {editing ? (
           <TextInput
@@ -177,6 +181,17 @@ const styles = StyleSheet.create({
     borderTopColor: Colors.border,
     paddingTop: 10,
     gap: 8,
+  },
+  telemetryBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    alignSelf: "flex-start",
+  },
+  telemetryBadgeText: {
+    fontSize: 10,
+    fontFamily: "Inter_500Medium",
+    color: "#27ae60",
   },
   header: {
     flexDirection: "row",

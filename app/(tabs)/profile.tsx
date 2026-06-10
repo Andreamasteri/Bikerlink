@@ -20,7 +20,7 @@ import { useTaskbarStyle } from "@/lib/taskbar-style-context";
 import { useUnits } from "@/lib/units-context";
 
 import type { ProfileData } from "@/components/profile/types";
-import TelemetryPanel from "@/components/profile/TelemetryPanel";
+import TelemetryPanel from "@/components/profile/TelemetryPanel.next";
 import MyStylePanel from "@/components/profile/MyStylePanel";
 import TimeHeatmap from "@/components/profile/TimeHeatmap";
 import PhotoGrid from "@/components/profile/PhotoGrid";
