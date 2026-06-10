@@ -763,6 +763,7 @@ const fr: Record<string, string> = {
   "profile.notOnMap": "Ne pas m'afficher sur la carte",
   "profile.garageReminder": "Hé, pense à garer tes motos dans le garage !! Tu le trouveras sous Profil utilisateur, en bas de la page.",
   "auth.enterCredentials": "Entre e-mail/pseudo et mot de passe",
+  "auth.notMe": "Ce n'est pas moi ?",
   "auth.loginError": "Erreur lors de la connexion",
   "admin.deleteAllCampaigns": "Supprimer toutes les campagnes",
   "admin.verifyInProgress": "Vérification en cours…",

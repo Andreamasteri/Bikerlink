@@ -753,6 +753,7 @@ const el: Record<string, string> = {
   "profile.notOnMap": "Να μην εμφανίζομαι στον χάρτη",
   "profile.garageReminder": "Γεια, θυμήσου να παρκάρεις τις μοτοσυκλέτες σου στο γκαράζ!! Το βρίσκεις στο Προφίλ Χρήστη, στο κάτω μέρος της σελίδας.",
   "auth.enterCredentials": "Εισήγαγε email/nickname και κωδικό",
+  "auth.notMe": "Δεν είμαι εγώ;",
   "auth.loginError": "Σφάλμα κατά τη σύνδεση",
   "admin.deleteAllCampaigns": "Διαγραφή όλων των καμπανιών",
   "admin.verifyInProgress": "Επαλήθευση σε εξέλιξη…",

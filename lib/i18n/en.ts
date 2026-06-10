@@ -826,6 +826,7 @@ const en: Record<string, string> = {
   "profile.notOnMap": "Don't show me on the map",
   "profile.garageReminder": "Hey, remember to park your bikes in the garage!! You'll find it under User Profile, at the bottom of the page.",
   "auth.enterCredentials": "Enter email/nickname and password",
+  "auth.notMe": "Not me?",
   "auth.loginError": "Error during login",
   "admin.deleteAllCampaigns": "Delete all campaigns",
   "admin.verifyInProgress": "Verification in progress…",

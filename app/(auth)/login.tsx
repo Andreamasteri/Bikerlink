@@ -32,6 +32,7 @@ export default function LoginScreen() {
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSupportModal, setShowSupportModal] = useState(false);
+  const [hasSavedCredentials, setHasSavedCredentials] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -40,10 +41,22 @@ export default function LoginScreen() {
         const savedPassword = await AsyncStorage.getItem(SAVED_PASSWORD_KEY);
         if (savedIdentifier) setIdentifier(savedIdentifier);
         if (savedPassword) setPassword(savedPassword);
+        if (savedIdentifier || savedPassword) setHasSavedCredentials(true);
       } catch {
       }
     })();
   }, []);
+
+  const handleForgetCredentials = async () => {
+    try {
+      await AsyncStorage.removeItem(SAVED_IDENTIFIER_KEY);
+      await AsyncStorage.removeItem(SAVED_PASSWORD_KEY);
+    } catch {
+    }
+    setIdentifier("");
+    setPassword("");
+    setHasSavedCredentials(false);
+  };
 
   useFocusEffect(
     useCallback(() => {
@@ -122,7 +135,7 @@ export default function LoginScreen() {
               placeholder={t("auth.emailOrNickname")}
               placeholderTextColor={Colors.textSecondary}
               value={identifier}
-              onChangeText={setIdentifier}
+              onChangeText={(v) => { setIdentifier(v); setHasSavedCredentials(false); }}
               autoCapitalize="none"
               autoCorrect={false}
               keyboardType="email-address"
@@ -130,6 +143,15 @@ export default function LoginScreen() {
               autoComplete="off"
               testID="login-identifier"
             />
+            {hasSavedCredentials && (
+              <TouchableOpacity
+                onPress={handleForgetCredentials}
+                style={styles.forgetButton}
+                testID="forget-credentials"
+              >
+                <Text style={styles.forgetButtonText}>{t("auth.notMe")}</Text>
+              </TouchableOpacity>
+            )}
           </View>
 
           <View style={styles.inputWrapper}>
@@ -139,7 +161,7 @@ export default function LoginScreen() {
               placeholder={t("auth.password")}
               placeholderTextColor={Colors.textSecondary}
               value={password}
-              onChangeText={setPassword}
+              onChangeText={(v) => { setPassword(v); setHasSavedCredentials(false); }}
               secureTextEntry={!showPassword}
               autoCapitalize="none"
               textContentType="newPassword"
@@ -324,6 +346,16 @@ const styles = StyleSheet.create({
   },
   supportLink: {
     color: Colors.textSecondary,
+    fontSize: 12,
+    fontFamily: "Inter_400Regular",
+    textDecorationLine: "underline",
+  },
+  forgetButton: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  forgetButtonText: {
+    color: Colors.accent,
     fontSize: 12,
     fontFamily: "Inter_400Regular",
     textDecorationLine: "underline",

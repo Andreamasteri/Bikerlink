@@ -754,6 +754,7 @@ const tr: Record<string, string> = {
   "profile.notOnMap": "Haritada gösterme",
   "profile.garageReminder": "Hey, motosikletlerini garaja park etmeyi unutma!! Kullanıcı Profili altında, sayfanın en altında bulabilirsin.",
   "auth.enterCredentials": "E-posta/kullanıcı adı ve şifre gir",
+  "auth.notMe": "Ben değilim?",
   "auth.loginError": "Giriş sırasında hata",
   "admin.deleteAllCampaigns": "Tüm kampanyaları sil",
   "admin.verifyInProgress": "Doğrulama devam ediyor…",
