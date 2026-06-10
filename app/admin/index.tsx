@@ -300,6 +300,8 @@ export default function AdminDashboard() {
     queryFn: fetchSystemProbe,
     refetchInterval: pollInterval,
     staleTime: 25_000,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: true,
     retry: 1,
   });
 
