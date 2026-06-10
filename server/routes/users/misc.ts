@@ -233,4 +233,137 @@ router.put("/me/tags", requireAuth, async (req: Request, res: Response) => {
   }
 });
 
+/**
+ * GET /api/users/:id/match-summary
+ * Restituisce le ragioni di match tra l'utente corrente e :id.
+ * Interroga in parallelo tutte le tabelle di match, estrae chip-reasons
+ * da: tipo tabella (motivo principale) + score_breakdown + flag is_supermatch.
+ */
+router.get("/:id/match-summary", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const me = req.session.userId!;
+    const other = req.params.id as string;
+    if (me === other) return res.json({ reasons: [] });
+
+    const { db } = await import("../../db");
+    const {
+      bikerBikerMatches, bikerZavarrinaMatches,
+      routeAffinityMatches, telemetryAffinityMatches, musicAffinityMatches,
+      proposalProfileMatches, proposalMatches,
+    } = await import("@shared/db");
+    const { eq, and, or, isNull, inArray, sql: dsql, desc } = await import("drizzle-orm");
+
+    // Only statuses that represent an active/valid match — rejected rows must not produce chips.
+    // proposal_matches also uses 'pending' while both sides haven't acted yet.
+    const ACTIVE_STATUSES = ["new", "accepted"] as const;
+    const PROPOSAL_ACTIVE_STATUSES = ["new", "accepted", "pending"] as const;
+
+    // Deterministic ordering: accepted first (most meaningful), then newest.
+    const statusOrder = (col: { name: string }) =>
+      dsql`CASE WHEN ${dsql.identifier(col.name)} = 'accepted' THEN 0 ELSE 1 END`;
+
+    const [bbRows, bzRows, propRows, ppRows, raRows, taRows, maRows] = await Promise.all([
+      db.select().from(bikerBikerMatches).where(and(
+        or(
+          and(eq(bikerBikerMatches.biker1Id, me), eq(bikerBikerMatches.biker2Id, other)),
+          and(eq(bikerBikerMatches.biker1Id, other), eq(bikerBikerMatches.biker2Id, me)),
+        ),
+        isNull(bikerBikerMatches.archivedAt),
+        inArray(bikerBikerMatches.status, [...ACTIVE_STATUSES]),
+      )).orderBy(statusOrder({ name: "status" }), desc(bikerBikerMatches.createdAt)).limit(1),
+      db.select().from(bikerZavarrinaMatches).where(and(
+        or(
+          and(eq(bikerZavarrinaMatches.bikerId, me), eq(bikerZavarrinaMatches.zavarrinaId, other)),
+          and(eq(bikerZavarrinaMatches.bikerId, other), eq(bikerZavarrinaMatches.zavarrinaId, me)),
+        ),
+        isNull(bikerZavarrinaMatches.archivedAt),
+        inArray(bikerZavarrinaMatches.status, [...ACTIVE_STATUSES]),
+      )).orderBy(statusOrder({ name: "status" }), desc(bikerZavarrinaMatches.createdAt)).limit(1),
+      db.select().from(proposalMatches).where(and(
+        or(
+          and(eq(proposalMatches.userId1, me), eq(proposalMatches.userId2, other)),
+          and(eq(proposalMatches.userId1, other), eq(proposalMatches.userId2, me)),
+        ),
+        isNull(proposalMatches.archivedAt),
+        inArray(proposalMatches.status, [...PROPOSAL_ACTIVE_STATUSES]),
+      )).orderBy(statusOrder({ name: "status" }), desc(proposalMatches.createdAt)).limit(1),
+      db.select().from(proposalProfileMatches).where(and(
+        or(
+          and(eq(proposalProfileMatches.bikerId, me), eq(proposalProfileMatches.zavarrinaId, other)),
+          and(eq(proposalProfileMatches.bikerId, other), eq(proposalProfileMatches.zavarrinaId, me)),
+        ),
+        isNull(proposalProfileMatches.archivedAt),
+        inArray(proposalProfileMatches.status, [...ACTIVE_STATUSES]),
+      )).orderBy(statusOrder({ name: "status" }), desc(proposalProfileMatches.createdAt)).limit(1),
+      db.select().from(routeAffinityMatches).where(and(
+        or(
+          and(eq(routeAffinityMatches.userAId, me), eq(routeAffinityMatches.userBId, other)),
+          and(eq(routeAffinityMatches.userAId, other), eq(routeAffinityMatches.userBId, me)),
+        ),
+        isNull(routeAffinityMatches.archivedAt),
+        inArray(routeAffinityMatches.status, [...ACTIVE_STATUSES]),
+      )).orderBy(statusOrder({ name: "status" }), desc(routeAffinityMatches.createdAt)).limit(1),
+      db.select().from(telemetryAffinityMatches).where(and(
+        or(
+          and(eq(telemetryAffinityMatches.userAId, me), eq(telemetryAffinityMatches.userBId, other)),
+          and(eq(telemetryAffinityMatches.userAId, other), eq(telemetryAffinityMatches.userBId, me)),
+        ),
+        isNull(telemetryAffinityMatches.archivedAt),
+        inArray(telemetryAffinityMatches.status, [...ACTIVE_STATUSES]),
+      )).orderBy(statusOrder({ name: "status" }), desc(telemetryAffinityMatches.createdAt)).limit(1),
+      db.select().from(musicAffinityMatches).where(and(
+        or(
+          and(eq(musicAffinityMatches.userAId, me), eq(musicAffinityMatches.userBId, other)),
+          and(eq(musicAffinityMatches.userAId, other), eq(musicAffinityMatches.userBId, me)),
+        ),
+        isNull(musicAffinityMatches.archivedAt),
+        inArray(musicAffinityMatches.status, [...ACTIVE_STATUSES]),
+      )).orderBy(statusOrder({ name: "status" }), desc(musicAffinityMatches.createdAt)).limit(1),
+    ]);
+
+    const hasAnyMatch = bbRows.length > 0 || bzRows.length > 0 || propRows.length > 0 ||
+      ppRows.length > 0 || raRows.length > 0 || taRows.length > 0 || maRows.length > 0;
+
+    if (!hasAnyMatch) return res.json({ reasons: [] });
+
+    const reasons: Array<{ key: string; label: string }> = [];
+    const addedKeys = new Set<string>();
+    const add = (key: string, label: string) => {
+      if (!addedKeys.has(key)) { addedKeys.add(key); reasons.push({ key, label }); }
+    };
+
+    const SCORE_THRESHOLD = 0.20;
+
+    if (bbRows.length > 0) {
+      const m = bbRows[0];
+      const sb = (m.scoreBreakdown ?? {}) as Record<string, number>;
+      add("tipo_moto", "Stessa moto 🏍");
+      if ((sb.musica ?? 0) >= SCORE_THRESHOLD) add("musica", "Musica 🎵");
+      if ((sb.stile_guida ?? 0) >= SCORE_THRESHOLD) add("stile_guida", "Stile guida 🛣");
+      if (m.isSupermatch) add("supermatch", "Supermatch ⚡");
+    }
+
+    if (bzRows.length > 0) {
+      const m = bzRows[0];
+      const sb = (m.scoreBreakdown ?? {}) as Record<string, number>;
+      add("garage", "Biker+Zavorrina ❤️");
+      if ((sb.musica ?? 0) >= SCORE_THRESHOLD) add("musica", "Musica 🎵");
+      if ((sb.stile_guida ?? 0) >= SCORE_THRESHOLD) add("stile_guida", "Stile guida 🛣");
+      if ((sb.tipo_moto ?? 0) >= SCORE_THRESHOLD) add("tipo_moto", "Stessa moto 🏍");
+      if (m.isSupermatch) add("supermatch", "Supermatch ⚡");
+    }
+
+    if (propRows.length > 0) add("proposal", "Giro proposto 🗺");
+    if (ppRows.length > 0) add("propProfile", "Giro proposto 🗺");
+    if (raRows.length > 0) add("routeAffinity", "Percorso affine 🌍");
+    if (taRows.length > 0) add("telemetryAffinity", "Guida simile 📡");
+    if (maRows.length > 0) add("musica", "Musica 🎵");
+
+    return res.json({ reasons });
+  } catch (error) {
+    console.error("Match summary error:", error);
+    return sendError(res, 500, "Errore interno del server");
+  }
+});
+
 export default router;

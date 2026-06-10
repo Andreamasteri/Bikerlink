@@ -24,6 +24,7 @@ import { ProfileDetailMoto } from "@/components/profile/detail/ProfileDetailMoto
 import { ProfileDetailGallery } from "@/components/profile/detail/ProfileDetailGallery";
 import { ProfileDetailActions } from "@/components/profile/detail/ProfileDetailActions";
 import { ProfileReportModal } from "@/components/profile/detail/ProfileReportModal";
+import { MatchReasonChips } from "@/components/profile/detail/MatchReasonChips";
 import { styles } from "@/components/profile/[id].styles";
 
 function formatLastSeen(dateStr: string | null): string {
@@ -378,6 +379,8 @@ export default function PublicProfileScreen() {
             router.push(href as Parameters<typeof router.push>[0]);
           }}
         />
+
+        {!isSelf && id && <MatchReasonChips userId={id} />}
 
         <ProfileDetailMoto
           profile={profile}
