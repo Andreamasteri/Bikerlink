@@ -104,15 +104,16 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: Colors.border,
   },
-  group: { gap: 4 },
+  group: { flexDirection: "row", alignItems: "center", gap: 6 },
   groupLabel: {
     fontFamily: "Inter_400Regular",
     fontSize: 10,
     color: "#6b7280",
     letterSpacing: 0.6,
     textTransform: "uppercase",
+    minWidth: 52,
   },
-  badges: { flexDirection: "row", gap: 4, flexWrap: "wrap" },
+  badges: { flexDirection: "row", gap: 4, flexWrap: "wrap", flex: 1 },
   badge: {
     flexDirection: "row",
     alignItems: "center",

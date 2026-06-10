@@ -163,8 +163,9 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: Colors.surface,
     borderRadius: 16,
-    padding: 16,
-    marginBottom: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginBottom: 16,
     borderWidth: 1,
     borderColor: Colors.border,
   },
@@ -172,7 +173,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-    marginBottom: 14,
+    marginBottom: 10,
   },
   cardTitle: {
     fontFamily: "Inter_700Bold",

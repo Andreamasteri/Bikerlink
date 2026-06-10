@@ -395,11 +395,13 @@ export default function AdminDashboard() {
             <ServerEfficiencyCard />
             <ThinkCentreEfficiencyCard />
             <ThinkCentreCard onStatuses={handleThinkCentreStatuses} />
-            <ValhallaCard />
-            <NominatimCard />
             <RoutingCoordinationCard onStatus={handleRoutingStatus} />
-            <GraphHopperCard />
-            <TelemetryCard />
+            <View style={styles.routingSubGroup}>
+              <GraphHopperCard />
+              <ValhallaCard />
+              <NominatimCard />
+              <TelemetryCard />
+            </View>
             <WhisperChainCard />
             <MatchingMonitorCard onStatus={(s) => setSystemStatuses((prev) => ({ ...prev, matching: s as DotStatus }))} />
           </SystemHealthContainer>
@@ -531,6 +533,13 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 12,
+  },
+  routingSubGroup: {
+    marginLeft: 16,
+    paddingLeft: 12,
+    borderLeftWidth: 2,
+    borderLeftColor: Colors.border,
+    marginBottom: 4,
   },
   card: {
     width: "47%",
