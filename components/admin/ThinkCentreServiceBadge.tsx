@@ -113,7 +113,7 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
     minWidth: 52,
   },
-  badges: { flexDirection: "row", gap: 4, flexWrap: "wrap", flex: 1 },
+  badges: { flexDirection: "row", gap: 4, flexWrap: "wrap", flexShrink: 0, alignSelf: "flex-start" },
   badge: {
     flexDirection: "row",
     alignItems: "center",

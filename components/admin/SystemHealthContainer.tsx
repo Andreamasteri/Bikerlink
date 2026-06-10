@@ -48,7 +48,7 @@ export function StatusDot({ label, status, showPersistentLabel, onNavigate }: St
     >
       <View style={[styles.dot, { backgroundColor: DOT_COLOR[status] }]} />
       {showPersistentLabel && (
-        <Text style={styles.dotLabel} numberOfLines={1}>{label}</Text>
+        <Text style={styles.dotLabel} numberOfLines={3}>{label}</Text>
       )}
       {!showPersistentLabel && !onNavigate && showLabel && (
         <View style={styles.tooltip}>
@@ -154,7 +154,7 @@ export function SystemHealthContainer({
             key={key}
             label={label}
             status={statuses[key]}
-            showPersistentLabel={!collapsed}
+            showPersistentLabel={true}
             onNavigate={() => handleDotPress(key)}
           />
         ))}
@@ -195,7 +195,7 @@ const styles = StyleSheet.create({
   dotsRow: {
     flexDirection: "row",
     flexWrap: "wrap",
-    justifyContent: "space-around",
+    justifyContent: "flex-start",
     alignItems: "flex-start",
     paddingHorizontal: 10,
     paddingBottom: 12,
@@ -212,7 +212,7 @@ const styles = StyleSheet.create({
   dotWrapper: {
     alignItems: "center",
     justifyContent: "flex-start",
-    minWidth: 28,
+    width: 52,
   },
   dot: {
     width: 22,
@@ -221,7 +221,7 @@ const styles = StyleSheet.create({
   },
   dotLabel: {
     fontFamily: "Inter_400Regular",
-    fontSize: 9,
+    fontSize: 11,
     color: Colors.textSecondary,
     marginTop: 3,
     textAlign: "center",
