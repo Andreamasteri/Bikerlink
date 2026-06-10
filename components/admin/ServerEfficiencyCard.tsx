@@ -244,7 +244,8 @@ const srvStyles = StyleSheet.create({
   card: {
     backgroundColor: Colors.surface,
     borderRadius: 16,
-    padding: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
     marginBottom: 16,
     borderWidth: 1,
     borderColor: Colors.border,
