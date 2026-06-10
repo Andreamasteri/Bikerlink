@@ -12,6 +12,7 @@ import { runDetectNegativePatternsJob } from "./jobs/detect-negative-patterns";
 import { runRouteSimilarityMatching } from "./run-route-similarity";
 import { runBioAffinityMatching } from "./run-bio-affinity";
 import { runTelemetryAffinityMatching } from "./run-telemetry-affinity";
+import { enrichBikerMatchBreakdowns } from "./enrich-breakdowns";
 import { aggregateTelemetryProfiles } from "../jobs/aggregate-telemetry-profiles";
 import { runDistanceMatching, runRouteTypeZoneMatching } from "./run-distance";
 import { runProposalToProfileMatching } from "./run-profile";
@@ -217,6 +218,22 @@ export function triggerMatchingRun(): { started: boolean; reason?: string } {
         } catch (err) {
           console.error("[Matching] RouteAffinity matching error (non-blocking):", err);
           addMatchLog("ERROR", "route_affinity", `Route affinity errore: ${err instanceof Error ? err.message : String(err)}`);
+        }
+
+        try {
+          const enrichResult = await enrichBikerMatchBreakdowns();
+          const enrichTotal = enrichResult.bbMusicUpdated + enrichResult.bbTelemetryUpdated
+            + enrichResult.bzMusicUpdated + enrichResult.bzTelemetryUpdated;
+          const enrichCleared = enrichResult.bbMusicCleared + enrichResult.bbTelemetryCleared
+            + enrichResult.bzMusicCleared + enrichResult.bzTelemetryCleared;
+          if (enrichTotal > 0 || enrichCleared > 0) {
+            schedulerLogger.info(enrichResult, "score_breakdown enriched with affinity scores");
+            addMatchLog("INFO", "enrich_breakdowns",
+              `Breakdown — scritto bb musica:${enrichResult.bbMusicUpdated} stile:${enrichResult.bbTelemetryUpdated} bz musica:${enrichResult.bzMusicUpdated} stile:${enrichResult.bzTelemetryUpdated} | rimosso bb musica:${enrichResult.bbMusicCleared} stile:${enrichResult.bbTelemetryCleared} bz musica:${enrichResult.bzMusicCleared} stile:${enrichResult.bzTelemetryCleared}`);
+          }
+        } catch (err) {
+          console.error("[Matching] EnrichBreakdowns error (non-blocking):", err);
+          addMatchLog("ERROR", "enrich_breakdowns", `Errore arricchimento breakdown: ${err instanceof Error ? err.message : String(err)}`);
         }
       } else {
         schedulerLogger.info("Auto matching disabilitato dall'admin, skip");
@@ -524,6 +541,13 @@ export function startMatchingEngine(): void {
         console.log(`[Matching] TelemetryAffinity ciclo: ${count} nuovi match`);
       }
       addMatchLog("INFO", "telemetry_affinity", `TelemetryAffinity completato: ${profiles} profili aggregati, ${count} nuovi match`);
+      const enrichResult = await enrichBikerMatchBreakdowns();
+      const enrichTotal = enrichResult.bbTelemetryUpdated + enrichResult.bzTelemetryUpdated;
+      const enrichCleared = enrichResult.bbTelemetryCleared + enrichResult.bzTelemetryCleared;
+      if (enrichTotal > 0 || enrichCleared > 0) {
+        addMatchLog("INFO", "enrich_breakdowns",
+          `Breakdown stile_guida post-telemetry — scritto bb:${enrichResult.bbTelemetryUpdated} bz:${enrichResult.bzTelemetryUpdated} | rimosso bb:${enrichResult.bbTelemetryCleared} bz:${enrichResult.bzTelemetryCleared}`);
+      }
     } catch (err) {
       console.error("[Matching] TelemetryAffinity ciclo errore:", err);
       addMatchLog("ERROR", "telemetry_affinity", `Errore TelemetryAffinity: ${err instanceof Error ? err.message : String(err)}`);

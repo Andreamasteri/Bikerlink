@@ -248,7 +248,7 @@ router.get("/:id/match-summary", requireAuth, async (req: Request, res: Response
     const { db } = await import("../../db");
     const {
       bikerBikerMatches, bikerZavarrinaMatches,
-      routeAffinityMatches, telemetryAffinityMatches, musicAffinityMatches,
+      routeAffinityMatches,
       proposalProfileMatches, proposalMatches,
     } = await import("@shared/db");
     const { eq, and, or, isNull, inArray, sql: dsql, desc } = await import("drizzle-orm");
@@ -262,7 +262,7 @@ router.get("/:id/match-summary", requireAuth, async (req: Request, res: Response
     const statusOrder = (col: { name: string }) =>
       dsql`CASE WHEN ${dsql.identifier(col.name)} = 'accepted' THEN 0 ELSE 1 END`;
 
-    const [bbRows, bzRows, propRows, ppRows, raRows, taRows, maRows] = await Promise.all([
+    const [bbRows, bzRows, propRows, ppRows, raRows] = await Promise.all([
       db.select().from(bikerBikerMatches).where(and(
         or(
           and(eq(bikerBikerMatches.biker1Id, me), eq(bikerBikerMatches.biker2Id, other)),
@@ -303,26 +303,10 @@ router.get("/:id/match-summary", requireAuth, async (req: Request, res: Response
         isNull(routeAffinityMatches.archivedAt),
         inArray(routeAffinityMatches.status, [...ACTIVE_STATUSES]),
       )).orderBy(statusOrder({ name: "status" }), desc(routeAffinityMatches.createdAt)).limit(1),
-      db.select().from(telemetryAffinityMatches).where(and(
-        or(
-          and(eq(telemetryAffinityMatches.userAId, me), eq(telemetryAffinityMatches.userBId, other)),
-          and(eq(telemetryAffinityMatches.userAId, other), eq(telemetryAffinityMatches.userBId, me)),
-        ),
-        isNull(telemetryAffinityMatches.archivedAt),
-        inArray(telemetryAffinityMatches.status, [...ACTIVE_STATUSES]),
-      )).orderBy(statusOrder({ name: "status" }), desc(telemetryAffinityMatches.createdAt)).limit(1),
-      db.select().from(musicAffinityMatches).where(and(
-        or(
-          and(eq(musicAffinityMatches.userAId, me), eq(musicAffinityMatches.userBId, other)),
-          and(eq(musicAffinityMatches.userAId, other), eq(musicAffinityMatches.userBId, me)),
-        ),
-        isNull(musicAffinityMatches.archivedAt),
-        inArray(musicAffinityMatches.status, [...ACTIVE_STATUSES]),
-      )).orderBy(statusOrder({ name: "status" }), desc(musicAffinityMatches.createdAt)).limit(1),
     ]);
 
     const hasAnyMatch = bbRows.length > 0 || bzRows.length > 0 || propRows.length > 0 ||
-      ppRows.length > 0 || raRows.length > 0 || taRows.length > 0 || maRows.length > 0;
+      ppRows.length > 0 || raRows.length > 0;
 
     if (!hasAnyMatch) return res.json({ reasons: [] });
 
@@ -356,8 +340,6 @@ router.get("/:id/match-summary", requireAuth, async (req: Request, res: Response
     if (propRows.length > 0) add("proposal", "Giro proposto 🗺");
     if (ppRows.length > 0) add("propProfile", "Giro proposto 🗺");
     if (raRows.length > 0) add("routeAffinity", "Percorso affine 🌍");
-    if (taRows.length > 0) add("telemetryAffinity", "Guida simile 📡");
-    if (maRows.length > 0) add("musica", "Musica 🎵");
 
     return res.json({ reasons });
   } catch (error) {
