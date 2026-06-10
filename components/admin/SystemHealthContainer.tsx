@@ -196,7 +196,7 @@ const styles = StyleSheet.create({
   },
   dotLabel: {
     fontFamily: "Inter_400Regular",
-    fontSize: 10,
+    fontSize: 12,
     color: Colors.textSecondary,
     marginTop: 3,
     textAlign: "center",
@@ -224,7 +224,7 @@ const styles = StyleSheet.create({
   },
   tooltipText: {
     fontFamily: "Inter_500Medium",
-    fontSize: 10,
+    fontSize: 12,
     color: Colors.text,
   },
 });

@@ -217,7 +217,7 @@ const badgeStyles = StyleSheet.create({
   group: { gap: 4 },
   groupLabel: {
     fontFamily: "Inter_400Regular",
-    fontSize: 9,
+    fontSize: 10,
     color: "#6b7280",
     letterSpacing: 0.6,
     textTransform: "uppercase",
@@ -234,7 +234,7 @@ const badgeStyles = StyleSheet.create({
     borderWidth: 1,
   },
   dot: { width: 5, height: 5, borderRadius: 3 },
-  badgeText: { fontFamily: "Inter_500Medium", fontSize: 9, letterSpacing: 0.2 },
+  badgeText: { fontFamily: "Inter_500Medium", fontSize: 10, letterSpacing: 0.2 },
 });
 
 type ThinkCentreStatusKeys =
@@ -549,10 +549,10 @@ const styles = StyleSheet.create({
   cardHeader: { flexDirection: "row", alignItems: "center", gap: 8 },
   cardTitle: { fontFamily: "Inter_700Bold", fontSize: 15, color: Colors.text },
   headerRight: { marginLeft: "auto", flexDirection: "row", alignItems: "center", gap: 8 },
-  headerCount: { fontFamily: "Inter_600SemiBold", fontSize: 12, color: Colors.textSecondary },
+  headerCount: { fontFamily: "Inter_600SemiBold", fontSize: 14, color: Colors.textSecondary },
   healthDot: { width: 10, height: 10, borderRadius: 5 },
   list: { marginTop: 14, gap: 10 },
-  errorText: { fontFamily: "Inter_400Regular", fontSize: 12, color: "#ef4444" },
+  errorText: { fontFamily: "Inter_400Regular", fontSize: 14, color: "#ef4444" },
   note: {
     flexDirection: "row",
     alignItems: "flex-start",
@@ -563,10 +563,10 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   noteBody: { flex: 1, gap: 4 },
-  noteText: { fontFamily: "Inter_400Regular", fontSize: 11, color: Colors.textSecondary, lineHeight: 16 },
+  noteText: { fontFamily: "Inter_400Regular", fontSize: 13, color: Colors.textSecondary, lineHeight: 16 },
   legend: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 2 },
-  legendText: { fontFamily: "Inter_400Regular", fontSize: 10, color: Colors.textSecondary },
-  mono: { fontFamily: "Inter_400Regular", fontSize: 10, color: "#9ca3af" },
+  legendText: { fontFamily: "Inter_400Regular", fontSize: 12, color: Colors.textSecondary },
+  mono: { fontFamily: "Inter_400Regular", fontSize: 12, color: "#9ca3af" },
   retryButton: {
     flexDirection: "row",
     alignItems: "center",
@@ -581,7 +581,7 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   retryButtonBusy: { opacity: 0.55 },
-  retryText: { fontFamily: "Inter_600SemiBold", fontSize: 12, color: "#60a5fa" },
+  retryText: { fontFamily: "Inter_600SemiBold", fontSize: 14, color: "#60a5fa" },
   pushToggleRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -593,6 +593,6 @@ const styles = StyleSheet.create({
   },
   pushToggleLeft: { flex: 1, gap: 2, flexDirection: "column" },
   pushToggleLabel: { fontFamily: "Inter_500Medium", fontSize: 13, color: Colors.text },
-  pushToggleSub: { fontFamily: "Inter_400Regular", fontSize: 10, color: Colors.textSecondary },
+  pushToggleSub: { fontFamily: "Inter_400Regular", fontSize: 12, color: Colors.textSecondary },
   ufwBadge: { justifyContent: "center", alignItems: "center" },
 });

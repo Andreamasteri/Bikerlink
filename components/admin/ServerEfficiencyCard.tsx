@@ -273,7 +273,7 @@ const srvStyles = StyleSheet.create({
   },
   sectionLabel: {
     fontFamily: "Inter_600SemiBold",
-    fontSize: 11,
+    fontSize: 13,
     color: Colors.textSecondary,
     textTransform: "uppercase",
     letterSpacing: 0.5,
@@ -297,7 +297,7 @@ const srvStyles = StyleSheet.create({
   },
   statLabel: {
     fontFamily: "Inter_400Regular",
-    fontSize: 11,
+    fontSize: 13,
     color: Colors.textSecondary,
     marginTop: 2,
     textAlign: "center",
@@ -318,12 +318,12 @@ const srvStyles = StyleSheet.create({
   },
   logLine: {
     fontFamily: "Inter_400Regular",
-    fontSize: 10,
+    fontSize: 12,
     color: Colors.textSecondary,
   },
   logEmpty: {
     fontFamily: "Inter_400Regular",
-    fontSize: 11,
+    fontSize: 13,
     color: Colors.textSecondary,
     fontStyle: "italic",
   },

@@ -92,7 +92,7 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     fontFamily: "Inter_400Regular",
-    fontSize: 12,
+    fontSize: 14,
     color: Colors.textSecondary,
     marginTop: 2,
   },
@@ -111,7 +111,7 @@ const styles = StyleSheet.create({
   },
   badgeText: {
     fontFamily: "Inter_700Bold",
-    fontSize: 12,
+    fontSize: 14,
     color: "#fff",
   },
 });

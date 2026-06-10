@@ -482,8 +482,8 @@ const styles = StyleSheet.create({
   headerIcon: { marginRight: 2 },
   headerText: { flex: 1 },
   title: { fontFamily: "Inter_600SemiBold", fontSize: 13, color: Colors.text },
-  subtitle: { fontFamily: "Inter_400Regular", fontSize: 10, color: Colors.textSecondary, marginTop: 1 },
-  count: { fontFamily: "Inter_600SemiBold", fontSize: 11, color: Colors.textSecondary, letterSpacing: 0.3 },
+  subtitle: { fontFamily: "Inter_400Regular", fontSize: 12, color: Colors.textSecondary, marginTop: 1 },
+  count: { fontFamily: "Inter_600SemiBold", fontSize: 13, color: Colors.textSecondary, letterSpacing: 0.3 },
   dot: { width: 9, height: 9, borderRadius: 5 },
   body: {
     paddingHorizontal: 12,
@@ -494,10 +494,10 @@ const styles = StyleSheet.create({
     paddingTop: 8,
   },
   statusRow: { flexDirection: "row", alignItems: "center", gap: 6 },
-  statusLabel: { fontFamily: "Inter_400Regular", fontSize: 11, color: Colors.textSecondary },
+  statusLabel: { fontFamily: "Inter_400Regular", fontSize: 13, color: Colors.textSecondary },
   statusLabelError: { color: "#ef4444" },
   subtitleError: { color: "#ef4444" },
-  meta: { fontFamily: "Inter_400Regular", fontSize: 10, color: Colors.textSecondary },
+  meta: { fontFamily: "Inter_400Regular", fontSize: 12, color: Colors.textSecondary },
   profilesRow: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 4 },
   profileChip: {
     flexDirection: "row",
@@ -510,7 +510,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(167, 139, 250, 0.3)",
   },
-  profileChipText: { fontFamily: "Inter_600SemiBold", fontSize: 10, color: "#a78bfa" },
+  profileChipText: { fontFamily: "Inter_600SemiBold", fontSize: 12, color: "#a78bfa" },
   metaRow: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 4 },
   metaChip: {
     flexDirection: "row",
@@ -527,7 +527,7 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(239, 68, 68, 0.08)",
     borderColor: "rgba(239, 68, 68, 0.25)",
   },
-  metaText: { fontFamily: "Inter_500Medium", fontSize: 10, color: "#60a5fa" },
+  metaText: { fontFamily: "Inter_500Medium", fontSize: 12, color: "#60a5fa" },
   publicNote: {
     flexDirection: "row",
     alignItems: "flex-start",
@@ -541,12 +541,12 @@ const styles = StyleSheet.create({
   },
   publicNoteText: {
     fontFamily: "Inter_400Regular",
-    fontSize: 10,
+    fontSize: 12,
     color: "#f59e0b",
     flex: 1,
     lineHeight: 14,
   },
   fingerprintRow: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 2 },
-  fingerprint: { fontFamily: "Inter_400Regular", fontSize: 9, color: "#6b7280", letterSpacing: 0.2 },
+  fingerprint: { fontFamily: "Inter_400Regular", fontSize: 10, color: "#6b7280", letterSpacing: 0.2 },
   tokenOkIcon: { marginLeft: 1 },
 });
