@@ -11,7 +11,7 @@ import {
   TouchableOpacity,
 } from "react-native";
 import { KeyboardAvoidingView } from "react-native-keyboard-controller";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter, useFocusEffect } from "expo-router";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Ionicons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
@@ -111,6 +111,28 @@ export default function ChatConversationScreen() {
   const isMotoclubRef = useRef(false);
   if (conversation !== undefined) isMotoclubRef.current = isMotoclub;
 
+  const markAsRead = useCallback(async () => {
+    if (!id) return;
+    try {
+      await apiRequest("POST", `/api/chat/conversations/${id}/read`);
+    } catch {
+    }
+    queryClient.setQueryData<Array<{ id: string; unreadCount: number; [key: string]: unknown }>>(
+      ["/api/chat/conversations"],
+      (old) => {
+        if (!old) return old;
+        return old.map((c) => (c.id === id ? { ...c, unreadCount: 0 } : c));
+      }
+    );
+    queryClient.invalidateQueries({ queryKey: ["/api/chat/conversations"] });
+  }, [id]);
+
+  useFocusEffect(
+    useCallback(() => {
+      markAsRead();
+    }, [markAsRead])
+  );
+
   const { data: messages, isLoading, isError: isMessagesError, refetch: refetchMessages } = useQuery<ChatMessage[]>({
     queryKey: ["/api/chat/conversations", id, "messages"],
     queryFn: getQueryFnWithTimeout(15000),
@@ -135,8 +157,15 @@ export default function ChatConversationScreen() {
             return [incoming, ...old];
           }
         );
+        markAsRead();
       }
-      queryClient.invalidateQueries({ queryKey: ["/api/chat/conversations"] });
+      queryClient.setQueryData<Array<{ id: string; unreadCount: number; [key: string]: unknown }>>(
+        ["/api/chat/conversations"],
+        (old) => {
+          if (!old) return old;
+          return old.map((c) => (c.id === id ? { ...c, unreadCount: 0 } : c));
+        }
+      );
     } else if (event.type === "conversation_update") {
       queryClient.invalidateQueries({ queryKey: ["/api/chat/conversations"] });
     } else if (event.conversationId === id) {
