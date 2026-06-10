@@ -106,9 +106,11 @@ export const bikerZavarrinaMatches = pgTable("biker_zavorrina_matches", {
   }).onDelete("cascade"),
 ]);
 
-// bikerBikerMatches — definita in shared/db/matching-drizzle-excluded.ts (Task #2682).
-// NOTA: nessun re-export qui. Il consumer accede via `@shared/db` (index.ts
-// importa direttamente matching-drizzle-excluded.ts).
+// bikerBikerMatches — definita in shared/db/matching-drizzle-excluded.ts.
+// NOTA: nessun re-export qui. Il consumer usa `@shared/db` (shared/db/index.ts
+// ri-esporta entrambi i file matching come unico punto di accesso).
+// La tabella è esclusa da drizzle-kit (tablesFilter in drizzle.config.ts);
+// le sue migration passano da numbered SQL in migrations/.
 
 export const directMatchRequests = pgTable("direct_match_requests", {
   id: varchar("id", { length: 36 })
@@ -543,8 +545,9 @@ export type UserMatchProfile = typeof userMatchProfile.$inferSelect;
 export type InsertUserMatchProfile = typeof userMatchProfile.$inferInsert;
 
 // matchNegativePreferences + pendingAutoSuggestions — definite in
-// shared/db/matching-drizzle-excluded.ts (Task #2682). Nessun re-export qui:
-// vedi NOTA sopra su bikerBikerMatches.
+// shared/db/matching-drizzle-excluded.ts (stesso motivo di bikerBikerMatches:
+// expression-index LEAST/GREATEST e FK troncati → escluse da drizzle-kit).
+// Accessibili via `@shared/db`; nessun re-export qui.
 
 export const NEGATIVE_PREF_KINDS = [
   "bike_type",

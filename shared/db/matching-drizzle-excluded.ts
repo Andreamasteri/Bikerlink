@@ -1,11 +1,37 @@
-// Task #2682 — Tabelle gestite esclusivamente via migration SQL numerata.
+// =============================================================================
+// TABELLE MATCHING — GESTIONE MANUALE (NON DRIZZLE-KIT)
+// =============================================================================
 //
-// Perché: queste 3 tabelle hanno FK names lunghi (troncati da PG) e indici su
-// espressioni LEAST/GREATEST che genererebbero diff spurie se gestiti via ORM.
-// Source of truth = migrations/*.sql.
+// Questo file contiene 3 tabelle del dominio matching che NON vengono gestite
+// da `drizzle-kit generate`:
 //
-// Questo file è importato da shared/db/index.ts (runtime).
-// Eventuali ALTER schema future devono passare per una numbered SQL migration in migrations/.
+//   • biker_biker_matches
+//   • match_negative_preferences
+//   • pending_auto_suggestions
+//
+// PERCHÉ SONO ESCLUSE DA DRIZZLE-KIT:
+//   1. FK con nomi auto-generati che superano i 63 caratteri → PostgreSQL li
+//      tronca silenziosamente. Drizzle-kit non conosce i nomi troncati e
+//      genererebbe DROP + CREATE di FK ad ogni `generate`, anche senza cambi.
+//   2. Indici su espressioni LEAST/GREATEST (es. symmetric index biker-biker)
+//      e cast `::text` che drizzle-kit non sa confrontare con lo schema live →
+//      stessa trappola DROP + CREATE spuria.
+//
+//   Le tre tabelle sono escluse esplicitamente in drizzle.config.ts
+//   (`tablesFilter: ["!biker_biker_matches", ...]`), quindi `drizzle-kit
+//   generate` non le toccherà mai.
+//
+// COME AGGIORNARE LO SCHEMA DI QUESTE TABELLE:
+//   1. Scrivere una numbered SQL migration in migrations/ (es. 0100_xxx.sql).
+//   2. Eseguire la migration via server/migrate.ts (il deploy la applica
+//      automaticamente all'avvio).
+//   3. Aggiornare la definizione TypeScript qui sotto (per i tipi e le query
+//      ORM), ma NON creare migration drizzle-kit — resterebbero ignorate.
+//
+// IMPORT: non importare direttamente da questo file. Usare sempre
+//   `@shared/db` (shared/db/index.ts), che ri-esporta sia matching.ts sia
+//   questo file come unico punto di accesso a tutte le tabelle matching.
+// =============================================================================
 
 import { sql } from "drizzle-orm";
 import {
