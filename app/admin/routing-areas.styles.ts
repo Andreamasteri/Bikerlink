@@ -188,4 +188,26 @@ export const styles = StyleSheet.create({
     marginTop: 3,
     textAlign: "center",
   },
+  ghChipBuild: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 9,
+    color: Colors.textSecondary,
+    marginTop: 4,
+    textAlign: "center",
+  },
+  ghChipProfiles: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+    marginTop: 4,
+    flexWrap: "wrap",
+    justifyContent: "center",
+  },
+  ghChipProfilesText: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 9,
+    color: Colors.textSecondary,
+    textAlign: "center",
+    flexShrink: 1,
+  },
 });

@@ -74,6 +74,8 @@ export interface DirectAreaHealth {
   statusCode: number | null;
   error: string | null;
   probedAt: string;
+  buildDate: string | null;
+  profiles: string[] | null;
 }
 
 export interface DirectHealthResponse {
@@ -114,6 +116,13 @@ export function fmtTime(raw?: string): string {
   const d = new Date(raw);
   if (Number.isNaN(d.getTime())) return raw;
   return d.toLocaleTimeString("it-IT");
+}
+
+export function fmtBuildDate(raw: string): string {
+  if (!raw) return "—";
+  const d = new Date(raw);
+  if (Number.isNaN(d.getTime())) return raw.slice(0, 10);
+  return d.toLocaleDateString("it-IT", { day: "numeric", month: "short", year: "numeric" });
 }
 
 export function useRoutingAreas() {

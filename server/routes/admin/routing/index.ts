@@ -366,6 +366,8 @@ interface AreaHealthResult {
   statusCode: number | null;
   error: string | null;
   probedAt: string;
+  buildDate: string | null;
+  profiles: string[] | null;
 }
 
 async function probeAreaHealth(
@@ -387,13 +389,26 @@ async function probeAreaHealth(
     clearTimeout(timer);
     const latencyMs = Date.now() - started;
     const ok = resp.status >= 200 && resp.status < 300;
-    return { code, nome, tier, portaInterna, ok, latencyMs, statusCode: resp.status, error: null, probedAt };
+
+    let buildDate: string | null = null;
+    let profiles: string[] | null = null;
+    if (ok) {
+      try {
+        const body = await resp.json() as Record<string, unknown>;
+        if (typeof body.build_date === "string") buildDate = body.build_date;
+        if (Array.isArray(body.profiles)) profiles = body.profiles as string[];
+      } catch {
+        // body non parsabile — ignoriamo silenziosamente
+      }
+    }
+
+    return { code, nome, tier, portaInterna, ok, latencyMs, statusCode: resp.status, error: null, probedAt, buildDate, profiles };
   } catch (err: unknown) {
     clearTimeout(timer);
     const msg = err instanceof Error
       ? (err.name === "AbortError" ? "timeout (2s)" : err.message.slice(0, 120))
       : String(err).slice(0, 120);
-    return { code, nome, tier, portaInterna, ok: false, latencyMs: null, statusCode: null, error: msg, probedAt };
+    return { code, nome, tier, portaInterna, ok: false, latencyMs: null, statusCode: null, error: msg, probedAt, buildDate: null, profiles: null };
   }
 }
 

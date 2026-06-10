@@ -33,6 +33,7 @@ import {
   useRoutingAreas,
   fmtMb,
   fmtTime,
+  fmtBuildDate,
   parseCpu,
   parseMemMb,
 } from "@/hooks/useRoutingAreas";
@@ -157,6 +158,9 @@ export default function RoutingAreasScreen() {
               const latText =
                 a.ok && a.latencyMs != null ? `${a.latencyMs}ms` : a.error?.slice(0, 18) ?? "—";
               const tierDot = a.tier === "core" ? Colors.accent : Colors.warning;
+              const hasMoto = a.profiles?.includes("motorcycle") ?? false;
+              const buildLabel = a.buildDate ? fmtBuildDate(a.buildDate) : null;
+              const profilesLabel = a.profiles ? a.profiles.join(", ") : null;
               return (
                 <View
                   key={a.code}
@@ -176,6 +180,21 @@ export default function RoutingAreasScreen() {
                   >
                     {latText}
                   </Text>
+                  {a.ok && buildLabel ? (
+                    <Text style={styles.ghChipBuild} numberOfLines={1}>
+                      {buildLabel}
+                    </Text>
+                  ) : null}
+                  {a.ok && profilesLabel ? (
+                    <View style={styles.ghChipProfiles}>
+                      {hasMoto && (
+                        <MaterialCommunityIcons name="motorbike" size={11} color={Colors.accent} />
+                      )}
+                      <Text style={[styles.ghChipProfilesText, !hasMoto && { color: Colors.warning }]} numberOfLines={2}>
+                        {profilesLabel}
+                      </Text>
+                    </View>
+                  ) : null}
                 </View>
               );
             })}
