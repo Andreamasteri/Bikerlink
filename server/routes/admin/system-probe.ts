@@ -2,9 +2,13 @@
  * GET /api/admin/system-probe
  *
  * Lightweight-to-call endpoint that returns live dot status for every
- * System Health indicator.  It runs its own probes on each request so
- * dots stay fresh even when the SystemHealthContainer body is collapsed
- * and the heavy dashboard cards are not polling.
+ * System Health indicator.
+ *
+ * Cache behaviour:
+ *  - Cold cache (updatedAt === 0): probe runs inline so the first response
+ *    contains real data instead of grey "unknown" dots.
+ *  - Warm cache: cached snapshot is returned immediately (fast-path) and a
+ *    background probe is fired to refresh it for the next caller.
  *
  * ThinkCentre services (graphhopper, valhalla, nominatim, ollama, whisper,
  * ufw, redis, postgres, pgadmin, nginx, uptimeKuma, thinkcentre overall) →
@@ -23,7 +27,11 @@ import { updateSystemStatus, getSystemStatus, type DotStatus } from "../../lib/s
 
 const router = Router();
 
-router.get("/system-probe", async (_req: Request, res: Response) => {
+let _probeInFlight = false;
+
+async function runProbe(): Promise<void> {
+  if (_probeInFlight) return;
+  _probeInFlight = true;
   try {
     const [tcSnap] = await Promise.all([
       probeThinkCentreStatusSnapshot(),
@@ -44,13 +52,47 @@ router.get("/system-probe", async (_req: Request, res: Response) => {
       cycleStatus === "error" || recentErrors > 0 ? "degraded" : "ok";
 
     updateSystemStatus({ ...tcSnap, routing, matching });
+  } finally {
+    _probeInFlight = false;
+  }
+}
 
-    return res.json(getSystemStatus());
+/**
+ * Called once at server boot (via setImmediate in boot-sequence.ts) to
+ * populate the in-memory cache before the first admin request arrives.
+ * Only runs when the cache is still at its cold-boot default (updatedAt === 0).
+ */
+export async function warmUpSystemStatusCache(): Promise<void> {
+  if (getSystemStatus().updatedAt !== 0) return;
+  try {
+    await runProbe();
+    console.log("[system-probe] warm-up probe complete");
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    console.error("[admin/system-probe] error:", msg);
+    console.warn("[system-probe] warm-up probe failed (non-fatal):", msg);
+  }
+}
+
+router.get("/system-probe", async (_req: Request, res: Response) => {
+  const cached = getSystemStatus();
+
+  if (cached.updatedAt === 0) {
+    // Cold cache: probe inline so the very first response has real data.
+    try {
+      await runProbe();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error("[admin/system-probe] cold-cache inline probe error:", msg);
+    }
     return res.json(getSystemStatus());
   }
+
+  // Warm cache: return immediately, refresh in background for the next caller.
+  runProbe().catch((err) => {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error("[admin/system-probe] background probe error:", msg);
+  });
+  return res.json(cached);
 });
 
 export default router;

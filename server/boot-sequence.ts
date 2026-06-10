@@ -351,6 +351,15 @@ export async function runBootSequence(server: Server, errorHandlersReady: Promis
     scheduleTomTomQuotaReset(); console.log("[INIT] TomTom quota daily reset scheduled");
 
     setImmediate(() => void import("./routing/valhalla-startup").then(m => m.validateValhallaStartup()));
+
+    setImmediate(async () => {
+      try {
+        const { warmUpSystemStatusCache } = await import("./routes/admin/system-probe");
+        await warmUpSystemStatusCache();
+      } catch (e) {
+        console.warn("[INIT][BG] warmUpSystemStatusCache error:", e);
+      }
+    });
     const { saveSchemaSnapshot } = await import("./scripts/snapshot-schema");
     setImmediate(() => {
       saveSchemaSnapshot()
