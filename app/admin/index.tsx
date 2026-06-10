@@ -276,16 +276,29 @@ async function fetchSystemProbe(): Promise<SystemStatuses> {
   return res.json() as Promise<SystemStatuses>;
 }
 
+/** Aggressive polling for the first 30 s after mount, then normal cadence. */
+const FAST_POLL_DURATION_MS = 30_000;
+const FAST_POLL_INTERVAL_MS = 3_000;
+const NORMAL_POLL_INTERVAL_MS = 30_000;
+
 export default function AdminDashboard() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [search, setSearch] = useState("");
   const [systemStatuses, setSystemStatuses] = useState<SystemStatuses>(UNKNOWN_STATUSES);
 
+  // Start fast, then relax after FAST_POLL_DURATION_MS.
+  const [pollInterval, setPollInterval] = useState(FAST_POLL_INTERVAL_MS);
+
+  useEffect(() => {
+    const t = setTimeout(() => setPollInterval(NORMAL_POLL_INTERVAL_MS), FAST_POLL_DURATION_MS);
+    return () => clearTimeout(t);
+  }, []);
+
   const { data: probeData } = useQuery<SystemStatuses>({
     queryKey: ["/api/admin/system-probe"],
     queryFn: fetchSystemProbe,
-    refetchInterval: 30_000,
+    refetchInterval: pollInterval,
     staleTime: 25_000,
     retry: 1,
   });
