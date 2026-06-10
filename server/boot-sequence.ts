@@ -16,6 +16,7 @@ import { sql } from "drizzle-orm";
 import { initUptimeTracking, startMetroMonitor } from "./uptime";
 import { runMigrations } from "./migrate";
 import { initMissingClubConversations, ensureCompetitorAnalysisPdf } from "./init-helpers";
+import { enrichBikerMatchBreakdowns } from "./matching/enrich-breakdowns";
 import type { Server } from "http";
 
 // ── Phase timeout helper ─────────────────────────────────────────────────────
@@ -488,6 +489,7 @@ export async function runBootSequence(server: Server, errorHandlersReady: Promis
     `[INIT][SUMMARY]     schedulers (vacuum/mapMatch/curvyScore/OTA/zeroMatchSnapshot) : scheduled\n` +
     `[INIT][SUMMARY]   BACKGROUND (fire-and-forget after READY):\n` +
     `[INIT][SUMMARY]     runPlaylistSnapshot / saveSchemaSnapshot / initMissingClubConversations : scheduled\n` +
+    `[INIT][SUMMARY]     enrichBikerMatchBreakdowns (back-fill affinity chips) : scheduled\n` +
     `[INIT][SUMMARY]     autoSeedFakeUsers        : ${needsFakeSeed ? "scheduled" : "skipped (needsFakeSeed=false)"}\n` +
     `[INIT][SUMMARY] ────────────────────────────────────────────────`
   );
@@ -500,6 +502,19 @@ export async function runBootSequence(server: Server, errorHandlersReady: Promis
       .then(() => console.log("[INIT][BG] initMissingClubConversations — done"))
       .catch((err) => {
         console.warn("[INIT][BG] initMissingClubConversations error:", err);
+      });
+
+    console.log("[INIT][BG] Starting enrichBikerMatchBreakdowns (back-fill affinity chips)...");
+    enrichBikerMatchBreakdowns()
+      .then((r) =>
+        console.log(
+          `[INIT][BG] enrichBikerMatchBreakdowns — done` +
+          ` bb_music=${r.bbMusicUpdated} bb_telem=${r.bbTelemetryUpdated}` +
+          ` bz_music=${r.bzMusicUpdated} bz_telem=${r.bzTelemetryUpdated}`
+        )
+      )
+      .catch((err) => {
+        console.warn("[INIT][BG] enrichBikerMatchBreakdowns error:", err);
       });
 
     if (needsFakeSeed) {
