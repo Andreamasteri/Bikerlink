@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import {
   View,
   Text,
@@ -7,6 +7,7 @@ import {
   StyleSheet,
   ActivityIndicator,
 } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollViewCompat";
 import { useRouter } from "expo-router";
 import { useFocusEffect } from "expo-router";
@@ -17,6 +18,9 @@ import { t } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth-context";
 import { sendStartupBeacon } from "@/lib/startup-beacon";
 import { SupportContactModal } from "@/components/SupportContactModal";
+
+const SAVED_IDENTIFIER_KEY = "bikerlink_saved_identifier";
+const SAVED_PASSWORD_KEY = "bikerlink_saved_password";
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -29,12 +33,21 @@ export default function LoginScreen() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSupportModal, setShowSupportModal] = useState(false);
 
+  useEffect(() => {
+    (async () => {
+      try {
+        const savedIdentifier = await AsyncStorage.getItem(SAVED_IDENTIFIER_KEY);
+        const savedPassword = await AsyncStorage.getItem(SAVED_PASSWORD_KEY);
+        if (savedIdentifier) setIdentifier(savedIdentifier);
+        if (savedPassword) setPassword(savedPassword);
+      } catch {
+      }
+    })();
+  }, []);
+
   useFocusEffect(
     useCallback(() => {
-      setIdentifier("");
-      setPassword("");
       setError("");
-      setShowPassword(false);
     }, [])
   );
 
@@ -54,6 +67,11 @@ export default function LoginScreen() {
         onSuccess: async () => {
           sendStartupBeacon("login_4_success");
           setIsSubmitting(false);
+          try {
+            await AsyncStorage.setItem(SAVED_IDENTIFIER_KEY, identifier.trim());
+            await AsyncStorage.setItem(SAVED_PASSWORD_KEY, password);
+          } catch {
+          }
           router.replace("/");
         },
         onError: (err: Error) => {

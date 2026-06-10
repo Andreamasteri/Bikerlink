@@ -1,6 +1,7 @@
 import React from "react";
 import { View, Text, TouchableOpacity, Modal, ScrollView, FlatList, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 import { CONTINENT_MAP, getCountriesForContinent, getRegionsForCountry, CountryData, ContinentData, getCountryName } from "@/lib/countries-regions";
 
@@ -29,6 +30,7 @@ export const LocationSelector: React.FC<LocationSelectorProps> = ({
   expandedContinents,
   setExpandedContinents,
 }) => {
+  const insets = useSafeAreaInsets();
   const regions = country ? getRegionsForCountry(country) : [];
 
   const toggleContinent = (continent: string) => {
@@ -69,7 +71,7 @@ export const LocationSelector: React.FC<LocationSelectorProps> = ({
       {/* Country Modal */}
       <Modal visible={showCountries} transparent animationType="slide">
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
+          <View style={[styles.modalContent, { paddingBottom: insets.bottom }]}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Seleziona Paese</Text>
               <TouchableOpacity onPress={() => setShowCountries(false)}>
@@ -117,7 +119,7 @@ export const LocationSelector: React.FC<LocationSelectorProps> = ({
       {/* Region Modal */}
       <Modal visible={showRegions} transparent animationType="slide">
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
+          <View style={[styles.modalContent, { paddingBottom: insets.bottom }]}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Seleziona Regione</Text>
               <TouchableOpacity onPress={() => setShowRegions(false)}>
@@ -183,7 +185,6 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     maxHeight: "60%",
-    paddingBottom: 0,
   },
   modalHeader: {
     flexDirection: "row",

@@ -1,10 +1,11 @@
-import React from "react";
+import React, { useState } from "react";
 import {
   View,
   Text,
   TextInput,
   TouchableOpacity,
   StyleSheet,
+  Modal,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
@@ -56,6 +57,14 @@ interface StepBasicInfoProps {
   setShowEmailConfirm: (v: boolean) => void;
 }
 
+function getPasswordError(password: string): string | null {
+  if (password.length < 8) return "La password deve avere almeno 8 caratteri.";
+  if (!/[A-Z]/.test(password)) return "La password deve contenere almeno una lettera MAIUSCOLA.";
+  if (!/[a-z]/.test(password)) return "La password deve contenere almeno una lettera minuscola.";
+  if (!/[0-9]/.test(password)) return "La password deve contenere almeno un numero.";
+  return null;
+}
+
 export const StepBasicInfo: React.FC<StepBasicInfoProps> = ({
   nickname,
   setNickname,
@@ -97,14 +106,20 @@ export const StepBasicInfo: React.FC<StepBasicInfoProps> = ({
   emailConfirmed,
   setShowEmailConfirm,
 }) => {
+  const [passwordModalVisible, setPasswordModalVisible] = useState(false);
+  const [passwordModalMessage, setPasswordModalMessage] = useState("");
+
+  const handleConfirmPasswordFocus = () => {
+    const err = getPasswordError(password);
+    if (err) {
+      setPasswordModalMessage(err);
+      setPasswordModalVisible(true);
+    }
+  };
+
   return (
     <View style={styles.stepContent}>
-      <Text style={styles.stepTitle}>{t("register.step3.title")}</Text>
-
-      <View style={styles.privacyNoticeCard}>
-        <Ionicons name="information-circle" size={24} color={Colors.accent} />
-        <Text style={styles.privacyNoticeText}>{t("register.step3.privacyNotice")}</Text>
-      </View>
+      <Text style={styles.stepTitle}>Joini BikerLink!</Text>
 
       <View style={[styles.inputWrapper, styles.inputWrapperRequired]}>
         <Ionicons name="person-outline" size={22} color={Colors.textSecondary} style={styles.inputIcon} />
@@ -158,7 +173,7 @@ export const StepBasicInfo: React.FC<StepBasicInfoProps> = ({
         <Ionicons name="lock-closed-outline" size={22} color={Colors.textSecondary} style={styles.inputIcon} />
         <TextInput
           style={[styles.input, styles.passwordInput]}
-          placeholder={t("register.step3.passwordPlaceholder")}
+          placeholder="8 caratteri, 1 numero, 1 maiusc., 1 min."
           placeholderTextColor={Colors.textSecondary}
           value={password}
           onChangeText={setPassword}
@@ -177,12 +192,6 @@ export const StepBasicInfo: React.FC<StepBasicInfoProps> = ({
         </TouchableOpacity>
       </View>
 
-      <View style={styles.passwordHint}>
-        <Text style={styles.passwordHintItalic}>
-          Min 8 caratt., 1 <Text style={styles.passwordHintUpper}>MAIUSCOLA</Text> e 1 numero
-        </Text>
-      </View>
-
       <View style={[styles.inputWrapper, styles.inputWrapperRequired]}>
         <Ionicons name="lock-closed-outline" size={22} color={Colors.textSecondary} style={styles.inputIcon} />
         <TextInput
@@ -191,6 +200,7 @@ export const StepBasicInfo: React.FC<StepBasicInfoProps> = ({
           placeholderTextColor={Colors.textSecondary}
           value={confirmPassword}
           onChangeText={setConfirmPassword}
+          onFocus={handleConfirmPasswordFocus}
           secureTextEntry={!showConfirmPassword}
           testID="input-confirm-password"
         />
@@ -227,6 +237,21 @@ export const StepBasicInfo: React.FC<StepBasicInfoProps> = ({
         expandedContinents={expandedContinents}
         setExpandedContinents={setExpandedContinents}
       />
+
+      <Modal visible={passwordModalVisible} transparent animationType="fade">
+        <View style={styles.pwModalOverlay}>
+          <View style={styles.pwModalContent}>
+            <Ionicons name="warning-outline" size={40} color={Colors.error} style={styles.pwModalIcon} />
+            <Text style={styles.pwModalMessage}>{passwordModalMessage}</Text>
+            <TouchableOpacity
+              style={styles.pwModalButton}
+              onPress={() => setPasswordModalVisible(false)}
+            >
+              <Text style={styles.pwModalButtonText}>Ok, ho capito</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -241,23 +266,6 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_700Bold",
     color: Colors.text,
     textAlign: "center",
-  },
-  privacyNoticeCard: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 10,
-    backgroundColor: Colors.surface,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: Colors.accent + "44",
-    padding: 14,
-    marginBottom: 16,
-  },
-  privacyNoticeText: {
-    flex: 1,
-    color: Colors.textSecondary,
-    fontSize: 14,
-    lineHeight: 20,
   },
   inputWrapper: {
     flexDirection: "row",
@@ -290,19 +298,6 @@ const styles = StyleSheet.create({
     right: 14,
     height: "100%",
     justifyContent: "center",
-  },
-  passwordHint: {
-    paddingHorizontal: 4,
-    marginBottom: -4,
-  },
-  passwordHintItalic: {
-    color: Colors.accent,
-    fontSize: 14,
-    fontStyle: "italic" as const,
-    fontFamily: "Inter_400Regular",
-  },
-  passwordHintUpper: {
-    fontFamily: "Inter_700Bold",
   },
   inlineError: {
     color: Colors.error,
@@ -451,5 +446,43 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_700Bold",
     textTransform: "uppercase" as const,
     letterSpacing: 1,
+  },
+  pwModalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.65)",
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 32,
+  },
+  pwModalContent: {
+    backgroundColor: Colors.surface,
+    borderRadius: 20,
+    padding: 28,
+    alignItems: "center",
+    gap: 20,
+    width: "100%",
+  },
+  pwModalIcon: {
+    marginBottom: 4,
+  },
+  pwModalMessage: {
+    color: Colors.text,
+    fontSize: 22,
+    fontFamily: "Inter_700Bold",
+    textAlign: "center",
+    lineHeight: 30,
+  },
+  pwModalButton: {
+    backgroundColor: Colors.accent,
+    borderRadius: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 32,
+    alignItems: "center",
+    width: "100%",
+  },
+  pwModalButtonText: {
+    color: Colors.background,
+    fontSize: 17,
+    fontFamily: "Inter_700Bold",
   },
 });
