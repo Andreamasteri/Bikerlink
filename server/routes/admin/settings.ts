@@ -242,6 +242,28 @@ router.put("/coordinates_max_age_seconds", async (req: Request, res: Response) =
   }
 });
 
+router.put("/support-email", async (req: Request, res: Response) => {
+  try {
+    const { value } = req.body;
+    if (typeof value !== "string") return sendError(res, 400, "Valore non valido");
+    const setting = await storage.upsertAppSetting("support_email", value);
+    return res.json(setting);
+  } catch (_error) {
+    return sendError(res, 500, "Errore salvataggio email supporto");
+  }
+});
+
+router.put("/support-whatsapp", async (req: Request, res: Response) => {
+  try {
+    const { value } = req.body;
+    if (typeof value !== "string") return sendError(res, 400, "Valore non valido");
+    const setting = await storage.upsertAppSetting("support_whatsapp", value);
+    return res.json(setting);
+  } catch (_error) {
+    return sendError(res, 500, "Errore salvataggio WhatsApp supporto");
+  }
+});
+
 router.put("/:key", async (req: Request, res: Response) => {
   try {
     const key = req.params.key as string;

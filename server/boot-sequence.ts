@@ -147,6 +147,25 @@ export async function runBootSequence(server: Server, errorHandlersReady: Promis
     console.warn("[INIT] Phase 3: APK URL bootstrap failed (non-fatal):", e);
   }
 
+  // Support contact settings bootstrap
+  try {
+    const { storage: supportStorage } = await import("./storage");
+    const [supportEmailSetting, supportWhatsappSetting] = await Promise.all([
+      supportStorage.getAppSetting("support_email"),
+      supportStorage.getAppSetting("support_whatsapp"),
+    ]);
+    if (!supportEmailSetting) {
+      await supportStorage.upsertAppSetting("support_email", "bikerlinkapp@gmail.com");
+      console.log("[SUPPORT BOOTSTRAP] support_email impostato al default");
+    }
+    if (!supportWhatsappSetting) {
+      await supportStorage.upsertAppSetting("support_whatsapp", "");
+      console.log("[SUPPORT BOOTSTRAP] support_whatsapp inizializzato vuoto");
+    }
+  } catch (e) {
+    console.warn("[INIT] Phase 3: support settings bootstrap failed (non-fatal):", e);
+  }
+
   // Task #2817 — Ripristina il cooldown quota AI provider
   try {
     const { initProviderHealth } = await import("./ai/moderation/provider");

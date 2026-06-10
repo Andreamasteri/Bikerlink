@@ -9,7 +9,6 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
-  Linking,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -18,7 +17,7 @@ import Colors from "@/constants/colors";
 import { apiRequest, setSessionToken } from "@/lib/query-client";
 import { queryClient } from "@/lib/query-client";
 import { useT } from "@/lib/language-context";
-import { SUPPORT_EMAIL } from "@/constants/register";
+import { SupportContactModal } from "@/components/SupportContactModal";
 
 const RESEND_COOLDOWN = 60;
 
@@ -28,6 +27,7 @@ export default function ForgotPasswordScreen() {
   const insets = useSafeAreaInsets();
 
   const [step, setStep] = useState<1 | 2>(1);
+  const [showSupportModal, setShowSupportModal] = useState(false);
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -304,12 +304,14 @@ export default function ForgotPasswordScreen() {
 
         <TouchableOpacity
           style={styles.supportLink}
-          onPress={() => Linking.openURL(`mailto:${SUPPORT_EMAIL}`)}
+          onPress={() => setShowSupportModal(true)}
           testID="forgot-support-link"
         >
           <Text style={styles.supportLinkText}>Problemi? Contatta il supporto</Text>
         </TouchableOpacity>
       </ScrollView>
+
+      <SupportContactModal visible={showSupportModal} onClose={() => setShowSupportModal(false)} />
     </KeyboardAvoidingView>
   );
 }

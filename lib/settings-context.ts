@@ -2,6 +2,23 @@ import { useQuery } from "@tanstack/react-query";
 
 export type MapProvider = "carto_light" | "carto_dark" | "osm";
 
+interface SupportSettings {
+  email: string;
+  whatsapp: string;
+}
+
+export function useSupportSettings(): SupportSettings {
+  const { data } = useQuery<SupportSettings>({
+    queryKey: ["/api/settings/support"],
+    staleTime: 60000,
+    retry: false,
+  });
+  return {
+    email: data?.email ?? "bikerlinkapp@gmail.com",
+    whatsapp: data?.whatsapp ?? "",
+  };
+}
+
 interface AppSettings {
   synecoBranding: boolean;
   emailVerification: boolean;

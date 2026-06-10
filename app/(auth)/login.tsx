@@ -12,12 +12,11 @@ import { useRouter } from "expo-router";
 import { useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Linking } from "react-native";
 import Colors from "@/constants/colors";
 import { t } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth-context";
 import { sendStartupBeacon } from "@/lib/startup-beacon";
-import { SUPPORT_EMAIL } from "@/constants/register";
+import { SupportContactModal } from "@/components/SupportContactModal";
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -28,6 +27,7 @@ export default function LoginScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showSupportModal, setShowSupportModal] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -73,6 +73,7 @@ export default function LoginScreen() {
   };
 
   return (
+    <>
     <KeyboardAwareScrollViewCompat
       contentContainerStyle={[
         styles.container,
@@ -169,7 +170,7 @@ export default function LoginScreen() {
           </View>
 
           <TouchableOpacity
-            onPress={() => Linking.openURL(`mailto:${SUPPORT_EMAIL}`)}
+            onPress={() => setShowSupportModal(true)}
             style={styles.supportRow}
             testID="login-support"
           >
@@ -177,6 +178,9 @@ export default function LoginScreen() {
           </TouchableOpacity>
         </View>
     </KeyboardAwareScrollViewCompat>
+
+    <SupportContactModal visible={showSupportModal} onClose={() => setShowSupportModal(false)} />
+    </>
   );
 }
 

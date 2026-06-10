@@ -90,6 +90,22 @@ export function registerClientSettingsExtraRoutes(app: Express) {
     }
   });
 
+  app.get("/api/settings/support", async (_req, res) => {
+    try {
+      const [emailSetting, whatsappSetting] = await Promise.all([
+        storage.getAppSetting("support_email"),
+        storage.getAppSetting("support_whatsapp"),
+      ]);
+      res.json({
+        email: emailSetting?.value || "bikerlinkapp@gmail.com",
+        whatsapp: whatsappSetting?.value || "",
+      });
+    } catch (err) {
+      console.warn("[client-settings-extra] Failed to fetch support settings:", err);
+      res.json({ email: "bikerlinkapp@gmail.com", whatsapp: "" });
+    }
+  });
+
   app.get("/api/settings/tile-providers", async (req: Request, res) => {
     try {
       const { getStatus } = await import("./maps/provider-status");

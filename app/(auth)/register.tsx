@@ -5,7 +5,6 @@ import {
   TouchableOpacity,
   StyleSheet,
   Alert,
-  Linking,
 } from "react-native";
 import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollViewCompat";
 import { useRouter, useLocalSearchParams } from "expo-router";
@@ -32,8 +31,8 @@ import {
   PHONE_PREFIXES,
   PHONE_PREFIX_TO_COUNTRY,
   EULA_TEXTS,
-  SUPPORT_EMAIL,
 } from "@/constants/register";
+import { SupportContactModal } from "@/components/SupportContactModal";
 
 export default function RegisterScreen() {
   const router = useRouter();
@@ -81,6 +80,7 @@ export default function RegisterScreen() {
     return new Set<string>();
   });
 
+  const [showSupportModal, setShowSupportModal] = useState(false);
   const [inviteCode, setInviteCode] = useState(params.inviteCode ?? "");
   const [invitePreview, setInvitePreview] = useState<{ code: string; label: string | null; giftMessage: string | null } | null>(null);
   const [invitePreviewLoading, setInvitePreviewLoading] = useState(false);
@@ -362,13 +362,15 @@ export default function RegisterScreen() {
         )}
 
         <TouchableOpacity
-          onPress={() => Linking.openURL(`mailto:${SUPPORT_EMAIL}`)}
+          onPress={() => setShowSupportModal(true)}
           style={styles.supportRow}
           testID="register-support"
         >
           <Text style={styles.supportLink}>Problemi? Contatta il supporto</Text>
         </TouchableOpacity>
       </KeyboardAwareScrollViewCompat>
+
+      <SupportContactModal visible={showSupportModal} onClose={() => setShowSupportModal(false)} />
 
       <PrivacyNoticeModal
         visible={showPrivacyModal}

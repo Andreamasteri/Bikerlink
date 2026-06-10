@@ -23,6 +23,7 @@ import { HomeMessageSection } from "@/components/admin/settings/HomeMessageSecti
 import { SplashMessagesSection } from "@/components/admin/settings/SplashMessagesSection";
 import { SyncSection } from "@/components/admin/settings/SyncSection";
 import { MapStyleSection } from "@/components/admin/settings/MapStyleSection";
+import { SupportSection } from "@/components/admin/settings/SupportSection";
 import { useAdminSettingsState } from "@/components/admin/settings/useAdminSettingsState";
 
 type IoniconsName = React.ComponentProps<typeof Ionicons>["name"];
@@ -70,7 +71,11 @@ export default function AdminSettings() {
           handleSaveSplashList={state.handleSaveSplashList}
         />
 
-        {/* ── 2. ACCESSO & REGISTRAZIONE ── */}
+        {/* ── 2. SUPPORTO TECNICO ── */}
+        <SectionHeader icon="headset-outline" label="Supporto tecnico" />
+        <SupportSection />
+
+        {/* ── 3. ACCESSO & REGISTRAZIONE ── */}
         <SectionHeader icon="person-circle-outline" label="Accesso & Registrazione" />
         <EmailStatusCard />
         <RegistrationSection
