@@ -123,13 +123,19 @@ function metricsToStatus(metrics: RoutingStatusResponse["metrics"] | undefined):
 
 export function RoutingCoordinationCard({
   onStatus,
+  onCollapsedChange,
 }: {
   onStatus?: (s: DotStatus) => void;
+  onCollapsedChange?: (collapsed: boolean) => void;
 }) {
   const [collapsed, setCollapsed] = useState(true);
   const [openFlow, setOpenFlow] = useState(true);
   const [openLog, setOpenLog] = useState(true);
   const [openAi, setOpenAi] = useState(false);
+
+  useEffect(() => {
+    onCollapsedChange?.(collapsed);
+  }, [collapsed, onCollapsedChange]);
 
   const { data: status } = useQuery<RoutingStatusResponse>({
     queryKey: ["/api/admin/routing/status"],

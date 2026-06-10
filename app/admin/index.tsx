@@ -161,6 +161,8 @@ export default function AdminDashboard() {
     setTimeout(() => scrollToRef(target), 350);
   }, []);
 
+  const [routingCardCollapsed, setRoutingCardCollapsed] = useState(true);
+
   const initialCollapsed = useMemo<Record<string, boolean>>(
     () => Object.fromEntries(adminGroups.map((g) => [g.title, !OPEN_BY_DEFAULT.has(g.title)])),
     []
@@ -239,20 +241,25 @@ export default function AdminDashboard() {
               <ThinkCentreCard onStatuses={handleThinkCentreStatuses} />
             </View>
             <View ref={routingRef}>
-              <RoutingCoordinationCard onStatus={handleRoutingStatus} />
+              <RoutingCoordinationCard
+                onStatus={handleRoutingStatus}
+                onCollapsedChange={setRoutingCardCollapsed}
+              />
             </View>
-            <View style={styles.routingSubGroup}>
-              <View ref={graphhopperRef}>
-                <GraphHopperCard />
+            {!routingCardCollapsed && (
+              <View style={styles.routingSubGroup}>
+                <View ref={graphhopperRef}>
+                  <GraphHopperCard />
+                </View>
+                <View ref={valhallaRef}>
+                  <ValhallaCard />
+                </View>
+                <View ref={nominatimRef}>
+                  <NominatimCard />
+                </View>
+                <TelemetryCard />
               </View>
-              <View ref={valhallaRef}>
-                <ValhallaCard />
-              </View>
-              <View ref={nominatimRef}>
-                <NominatimCard />
-              </View>
-              <TelemetryCard />
-            </View>
+            )}
             <View ref={whisperRef}>
               <WhisperChainCard />
             </View>
