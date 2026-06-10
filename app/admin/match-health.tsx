@@ -9,10 +9,11 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
-import { MaterialCommunityIcons, Ionicons } from "@expo/vector-icons";
+import { MaterialCommunityIcons, Ionicons, MaterialIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 import { getApiUrl } from "@/lib/query-client";
+import { copyLogToClipboard } from "@/lib/copyAdminLog";
 import { MatchCountsSection } from "@/components/admin/match-health/MatchCountsSection";
 import { SchemaSection } from "@/components/admin/match-health/SchemaSection";
 import { ZeroMatchKpiCard, type ZeroMatchSnapshotPoint } from "@/components/admin/match-health/ZeroMatchKpiCard";
@@ -132,6 +133,7 @@ interface MatchSummaryResponse {
 export default function MatchHealthScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const [copied, setCopied] = useState(false);
 
   const { data, isLoading, isFetching, error, refetch } = useQuery<MatchHealthResponse>({
     queryKey: ["/api/admin/match-health"],
@@ -203,22 +205,60 @@ export default function MatchHealthScreen() {
             )}
           </View>
         </View>
-        <TouchableOpacity
-          style={[styles.runButton, (isLoading || isFetching) && styles.runButtonDisabled]}
-          onPress={handleRunCheck}
-          activeOpacity={0.7}
-          disabled={isLoading || isFetching}
-        >
-          {isLoading || isFetching ? (
-            <ActivityIndicator size="small" color="#fff" />
-          ) : (
-            <>
-              <MaterialCommunityIcons name="refresh" size={16} color="#fff" />
-              <Text style={styles.runButtonText}>Run Check</Text>
-            </>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+          {data && (
+            <TouchableOpacity
+              onPress={async () => {
+                const extraLines: string[] = [
+                  `Tipi totali: ${data.summary.totalMatchTypes}`,
+                  `Anomalie: ${data.summary.typesAnomalous ?? data.summary.typesWithZeroResults}`,
+                  `Senza dati: ${(data.summary.typesNoData ?? 0) + (data.summary.typesInactive ?? 0)}`,
+                  `Gate: ${data.summary.adminGateStatus}`,
+                  `Schema: ${data.summary.schemaStatus}`,
+                  `Preferenze: ${data.summary.prefsStatus}`,
+                  `Distanze: ${data.summary.distanceStatus}`,
+                  "",
+                  `Tipi di match:`,
+                  ...data.checks.matchCounts.map(
+                    (m) => `  [${m.status}] ${m.label}: ${m.count}${m.sourceCount !== undefined ? ` (sorgente: ${m.sourceCount})` : ""}`
+                  ),
+                ];
+                const ok = await copyLogToClipboard({
+                  title: "Match Engine Health",
+                  overall: data.overallStatus,
+                  extraLines,
+                });
+                if (ok) {
+                  setCopied(true);
+                  setTimeout(() => setCopied(false), 2000);
+                }
+              }}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              style={styles.copyBtn}
+            >
+              <MaterialIcons name="content-copy" size={18} color={Colors.textSecondary} />
+            </TouchableOpacity>
           )}
-        </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.runButton, (isLoading || isFetching) && styles.runButtonDisabled]}
+            onPress={handleRunCheck}
+            activeOpacity={0.7}
+            disabled={isLoading || isFetching}
+          >
+            {isLoading || isFetching ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <>
+                <MaterialCommunityIcons name="refresh" size={16} color="#fff" />
+                <Text style={styles.runButtonText}>Run Check</Text>
+              </>
+            )}
+          </TouchableOpacity>
+        </View>
       </View>
+      {copied && (
+        <Text style={styles.copiedHint}>Copiato!</Text>
+      )}
 
       {data && (
         <Text style={styles.checkedAt}>
@@ -543,5 +583,14 @@ const styles = StyleSheet.create({
   gateValue: {
     fontFamily: "Inter_700Bold",
     fontSize: 14,
+  },
+  copyBtn: {
+    padding: 4,
+  },
+  copiedHint: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 11,
+    color: Colors.success,
+    textAlign: "center",
   },
 });

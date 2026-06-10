@@ -1,16 +1,17 @@
 // Task #2551 — Schermata digest AI moderazione: brief mattutino con i casi
 // prioritari, generato dal Co-Pilot. Pull-to-refresh + bottone "Genera adesso".
-import React from "react";
+import React, { useState } from "react";
 import {
   ScrollView, View, Text, StyleSheet, ActivityIndicator,
   RefreshControl, TouchableOpacity, Alert,
 } from "react-native";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { MaterialCommunityIcons, MaterialIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import Colors from "@/constants/colors";
 import { apiRequest } from "@/lib/query-client";
+import { copyLogToClipboard } from "@/lib/copyAdminLog";
 
 interface CaseSummary {
   id: string;
@@ -67,6 +68,8 @@ export default function AiModerationDigestScreen() {
     onError: (err: Error) => Alert.alert("Errore", err.message),
   });
 
+  const [briefCopied, setBriefCopied] = useState(false);
+
   const d = q.data?.digest ?? null;
   const digestId = q.data?.digestId ?? null;
   const isRead = q.data?.read ?? false;
@@ -122,12 +125,41 @@ export default function AiModerationDigestScreen() {
           <View style={styles.briefCard}>
             <View style={styles.briefHeader}>
               <Text style={styles.briefTitle}>Brief AI</Text>
-              {d.aiMeta && (
-                <Text style={styles.briefMeta}>
-                  {d.aiMeta.fallback ? "fallback" : `${d.aiMeta.provider}/${d.aiMeta.model}`}
-                </Text>
-              )}
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                {d.aiMeta && (
+                  <Text style={styles.briefMeta}>
+                    {d.aiMeta.fallback ? "fallback" : `${d.aiMeta.provider}/${d.aiMeta.model}`}
+                  </Text>
+                )}
+                <TouchableOpacity
+                  onPress={async () => {
+                    const ok = await copyLogToClipboard({
+                      title: "AI Moderation Digest",
+                      aiBrief: d.aiBrief || "(vuoto)",
+                      aiMeta: d.aiMeta,
+                      extraLines: [
+                        `Generato il: ${new Date(d.generatedAt).toLocaleString("it-IT")}`,
+                        `Nuovi 24h: ${d.totalReports24h} · Pending: ${d.pendingTotal} · Anomalie: ${d.anomalies24h}`,
+                        ...(d.topCases.length > 0
+                          ? ["", `Casi prioritari (${d.topCases.length}):`,
+                              ...d.topCases.map((c) => `  [${c.severity.toUpperCase()}] ${c.category ?? "—"} — ${new Date(c.createdAt).toLocaleString("it-IT")}${c.aiSummary ? `: ${c.aiSummary}` : ""}`)]
+                          : ["", "Nessun caso urgente."]),
+                      ],
+                    });
+                    if (ok) {
+                      setBriefCopied(true);
+                      setTimeout(() => setBriefCopied(false), 2000);
+                    }
+                  }}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <MaterialIcons name="content-copy" size={16} color={Colors.textSecondary} />
+                </TouchableOpacity>
+              </View>
             </View>
+            {briefCopied && (
+              <Text style={styles.copiedHint}>Copiato!</Text>
+            )}
             <Text style={styles.briefBody}>{d.aiBrief || "(vuoto)"}</Text>
             <Text style={styles.briefFooter}>
               Generato il {new Date(d.generatedAt).toLocaleString("it-IT")}
@@ -277,4 +309,5 @@ const styles = StyleSheet.create({
   markReadBtnDisabled: { opacity: 0.7 },
   markReadText: { color: Colors.accent, fontFamily: "Inter_600SemiBold", fontSize: 12 },
   markReadTextDone: { color: Colors.textSecondary },
+  copiedHint: { fontFamily: "Inter_600SemiBold", fontSize: 11, color: Colors.success, marginBottom: 6 },
 });

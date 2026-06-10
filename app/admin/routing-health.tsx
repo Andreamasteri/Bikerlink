@@ -4,7 +4,7 @@
  * Stato di salute per ogni engine/componente del routing: GraphHopper
  * (self-hosted), Cloud fallback, Valhalla e tiles. Pull-to-refresh manuale.
  */
-import React from "react";
+import React, { useState } from "react";
 import {
   View,
   Text,
@@ -14,11 +14,12 @@ import {
   ActivityIndicator,
 } from "react-native";
 import { useQuery } from "@tanstack/react-query";
-import { MaterialCommunityIcons, Ionicons } from "@expo/vector-icons";
+import { MaterialCommunityIcons, Ionicons, MaterialIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 import { RoutingCloudBanner } from "@/components/admin/RoutingCloudBanner";
 import type { RoutingStatus } from "./routing-control/types";
+import { copyLogToClipboard } from "@/lib/copyAdminLog";
 
 function statusColor(ok: boolean | null, down: boolean): string {
   if (down) return Colors.error;
@@ -94,6 +95,7 @@ function EngineCard({
 
 export default function RoutingHealthScreen() {
   const insets = useSafeAreaInsets();
+  const [copied, setCopied] = useState(false);
 
   const { data, isLoading, isFetching, refetch } = useQuery<RoutingStatus>({
     queryKey: ["/api/admin/routing/status"],
@@ -131,22 +133,56 @@ export default function RoutingHealthScreen() {
             </Text>
           </View>
         </View>
-        <TouchableOpacity
-          style={[styles.runButton, (isLoading || isFetching) && styles.runButtonDisabled]}
-          onPress={() => refetch()}
-          activeOpacity={0.7}
-          disabled={isLoading || isFetching}
-        >
-          {isLoading || isFetching ? (
-            <ActivityIndicator size="small" color="#fff" />
-          ) : (
-            <>
-              <MaterialCommunityIcons name="refresh" size={16} color="#fff" />
-              <Text style={styles.runButtonText}>Aggiorna</Text>
-            </>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+          {data && (
+            <TouchableOpacity
+              onPress={async () => {
+                const extraLines: string[] = [
+                  `Routing: ${data.killSwitch.enabled ? "ATTIVO" : "DISABILITATO"}`,
+                  `Engine attivo: ${data.activeEngine}`,
+                  `Rollout: ${data.rollout}`,
+                  "",
+                  `GraphHopper: ${gh?.down ? "DOWN" : gh?.ok ? "OK" : "—"} · Latenza: ${gh?.latencyMs != null ? `${gh.latencyMs}ms` : "—"} · Fallimenti: ${gh?.consecutiveFailures ?? 0}`,
+                  `Cloud Fallback: ${cloud?.active ? "ATTIVO" : cloud?.available ? "PRONTO" : "N/D"}`,
+                  `Valhalla: ${!valhalla?.configured ? "N/D" : valhalla?.down ? "DOWN" : valhalla?.ok ? "OK" : "—"}`,
+                  `Tiles: ${tiles?.selfHosted ? "SELF-HOSTED" : "ESTERNI"}`,
+                  ...(gh?.error ? [`Errore GH: ${gh.error}`] : []),
+                ];
+                const ok = await copyLogToClipboard({
+                  title: "Routing Health",
+                  extraLines,
+                });
+                if (ok) {
+                  setCopied(true);
+                  setTimeout(() => setCopied(false), 2000);
+                }
+              }}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              style={styles.copyBtn}
+            >
+              <MaterialIcons name="content-copy" size={18} color={Colors.textSecondary} />
+            </TouchableOpacity>
           )}
-        </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.runButton, (isLoading || isFetching) && styles.runButtonDisabled]}
+            onPress={() => refetch()}
+            activeOpacity={0.7}
+            disabled={isLoading || isFetching}
+          >
+            {isLoading || isFetching ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <>
+                <MaterialCommunityIcons name="refresh" size={16} color="#fff" />
+                <Text style={styles.runButtonText}>Aggiorna</Text>
+              </>
+            )}
+          </TouchableOpacity>
+        </View>
       </View>
+      {copied && (
+        <Text style={styles.copiedHint}>Copiato!</Text>
+      )}
 
       {data && gh?.down && cloud?.active && (
         <RoutingCloudBanner />
@@ -281,4 +317,6 @@ const styles = StyleSheet.create({
   rowValue: { fontFamily: "Inter_500Medium", fontSize: 13, color: Colors.text, flexShrink: 1, textAlign: "right" },
   infoRow: { flexDirection: "row", alignItems: "center", gap: 6, justifyContent: "center", marginTop: 4 },
   infoText: { fontFamily: "Inter_400Regular", fontSize: 12, color: Colors.textSecondary, textTransform: "capitalize" },
+  copyBtn: { padding: 4 },
+  copiedHint: { fontFamily: "Inter_600SemiBold", fontSize: 11, color: Colors.success, textAlign: "center" },
 });

@@ -15,6 +15,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useMutation } from "@tanstack/react-query";
 import Colors from "@/constants/colors";
 import { queryClient, apiRequest } from "@/lib/query-client";
+import { copyLogToClipboard } from "@/lib/copyAdminLog";
 
 interface SelfCheckEntry { name: string; status: "ok" | "warn" | "error"; durationMs: number; message?: string }
 interface SelfCheckResult {
@@ -129,6 +130,7 @@ function AdminAdsInner() {
   const [selfCheckResult, setSelfCheckResult] = useState<SelfCheckResult | null>(null);
   const [showSelfCheckModal, setShowSelfCheckModal] = useState(false);
   const [lastFetched, setLastFetched] = useState(false);
+  const [scCopied, setScCopied] = useState(false);
   const selfCheckMutation = useMutation<SelfCheckResult>({
     mutationFn: async () => {
       const res = await apiRequest("POST", "/api/admin/advertisements/self-check", { withAi: true });
@@ -238,10 +240,39 @@ function AdminAdsInner() {
                 color={selfCheckResult ? overallColor(selfCheckResult.overall) : Colors.textSecondary}
               />
               <Text style={styles.scModalTitle}>Verifica con AI — Campagne</Text>
-              <TouchableOpacity onPress={() => setShowSelfCheckModal(false)}>
-                <MaterialIcons name="close" size={22} color={Colors.textSecondary} />
-              </TouchableOpacity>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                {selfCheckResult && (
+                  <TouchableOpacity
+                    onPress={async () => {
+                      const ok = await copyLogToClipboard({
+                        title: "Verifica con AI — Campagne",
+                        overall: overallLabel(selfCheckResult.overall),
+                        durationMs: selfCheckResult.durationMs,
+                        triggeredBy: selfCheckResult.triggeredBy,
+                        summary: selfCheckResult.summary,
+                        suggestedFix: selfCheckResult.suggestedFix,
+                        aiBrief: selfCheckResult.aiBrief,
+                        aiMeta: selfCheckResult.aiMeta,
+                        checks: selfCheckResult.checks,
+                      });
+                      if (ok) {
+                        setScCopied(true);
+                        setTimeout(() => setScCopied(false), 2000);
+                      }
+                    }}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  >
+                    <MaterialIcons name="content-copy" size={20} color={Colors.textSecondary} />
+                  </TouchableOpacity>
+                )}
+                <TouchableOpacity onPress={() => setShowSelfCheckModal(false)}>
+                  <MaterialIcons name="close" size={22} color={Colors.textSecondary} />
+                </TouchableOpacity>
+              </View>
             </View>
+            {scCopied && (
+              <Text style={styles.scCopiedHint}>Copiato!</Text>
+            )}
             <ScrollView style={styles.scModalBody}>
               {selfCheckResult ? (
                 <>
@@ -503,6 +534,7 @@ const styles = StyleSheet.create({
   scAiBriefLabel: { fontFamily: "Inter_600SemiBold", fontSize: 11, color: Colors.textSecondary, marginBottom: 4, textTransform: "uppercase" },
   scAiBriefText: { fontFamily: "Inter_400Regular", fontSize: 13, color: Colors.text, lineHeight: 18 },
   scNoAi: { fontFamily: "Inter_400Regular", fontSize: 12, color: Colors.textSecondary, fontStyle: "italic", marginBottom: 12 },
+  scCopiedHint: { fontFamily: "Inter_600SemiBold", fontSize: 11, color: Colors.success, textAlign: "center", paddingBottom: 4 },
   scStepsLabel: { fontFamily: "Inter_600SemiBold", fontSize: 12, color: Colors.textSecondary, marginBottom: 6, marginTop: 4, textTransform: "uppercase" },
   scStepRow: { flexDirection: "row", alignItems: "flex-start", gap: 8, paddingVertical: 6 },
   scStepName: { fontFamily: "Inter_500Medium", fontSize: 13, color: Colors.text },
