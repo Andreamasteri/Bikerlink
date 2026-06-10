@@ -1,5 +1,5 @@
 import React from "react";
-import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, Alert } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
 
@@ -25,6 +25,22 @@ export interface AdminUser {
   matchingDisabled?: boolean;
 }
 
+export interface MatchabilityInfo {
+  matchable: boolean;
+  reasons: string[];
+  hasPrefs: boolean;
+  hasCoords: boolean;
+  hasMotos: boolean;
+  hasTags: boolean;
+}
+
+const REASON_LABELS: Record<string, string> = {
+  no_preferences: "Preferenze assenti",
+  no_coordinates: "Posizione GPS assente",
+  no_motorcycles: "Nessuna moto",
+  no_tags: "Nessun tag",
+};
+
 interface UserCardProps {
   item: AdminUser;
   onOpenStats: (user: AdminUser) => void;
@@ -40,6 +56,7 @@ interface UserCardProps {
   onOpenPrivacy?: (user: AdminUser) => void;
   isLastfmPending?: boolean;
   currentAppVersion?: string;
+  matchabilityInfo?: MatchabilityInfo;
 }
 
 export const UserCard: React.FC<UserCardProps> = ({
@@ -57,7 +74,30 @@ export const UserCard: React.FC<UserCardProps> = ({
   onOpenPrivacy,
   isLastfmPending,
   currentAppVersion = "1.0.0",
+  matchabilityInfo,
 }) => {
+  function handleMatchabilityPress() {
+    if (!matchabilityInfo) return;
+    if (matchabilityInfo.matchable) {
+      Alert.alert("✅ Matchabile", `${item.nickname} soddisfa tutti i requisiti di matching.`);
+    } else {
+      const missing = matchabilityInfo.reasons
+        .map((r) => `• ${REASON_LABELS[r] ?? r}`)
+        .join("\n");
+      Alert.alert(
+        "⚠️ Non matchabile",
+        `${item.nickname} non può essere abbinato.\n\nRequisiti mancanti:\n${missing}`
+      );
+    }
+  }
+
+  function getMatchabilityColor(): string {
+    if (!matchabilityInfo) return "transparent";
+    if (matchabilityInfo.matchable) return Colors.success;
+    if (matchabilityInfo.reasons.length <= 2) return Colors.warning;
+    return Colors.error;
+  }
+
   function getStatusColor(status: string) {
     switch (status) {
       case "active": return Colors.success;
@@ -78,21 +118,35 @@ export const UserCard: React.FC<UserCardProps> = ({
   return (
     <TouchableOpacity style={styles.card} onPress={() => onOpenStats(item)} activeOpacity={0.7}>
       <View style={styles.userInfo}>
-        {item.isFake === true && (
-          <Text style={{ fontSize: 10, fontWeight: "bold" as const, color: "#FF00FF" }}>FAKE</Text>
-        )}
-        {item.isPrimal === true && (
-          <Text style={{ fontSize: 10, fontWeight: "bold" as const, color: "#FF3B30" }}>PRIMAL</Text>
-        )}
-        {item.mapTester === true && (
-          <Text style={{ fontSize: 10, fontWeight: "bold" as const, color: "#0EA5E9" }}>MAP TESTER</Text>
-        )}
-        {item.telemetryDisabled === true && (
-          <Text style={{ fontSize: 10, fontWeight: "bold" as const, color: "#ef4444" }}>SENSORI OFF</Text>
-        )}
-        {item.matchingDisabled === true && (
-          <Text style={{ fontSize: 10, fontWeight: "bold" as const, color: "#f97316" }}>NON MATCHABILE</Text>
-        )}
+        <View style={styles.flagsRow}>
+          {item.isFake === true && (
+            <Text style={{ fontSize: 10, fontWeight: "bold" as const, color: "#FF00FF" }}>FAKE</Text>
+          )}
+          {item.isPrimal === true && (
+            <Text style={{ fontSize: 10, fontWeight: "bold" as const, color: "#FF3B30" }}>PRIMAL</Text>
+          )}
+          {item.mapTester === true && (
+            <Text style={{ fontSize: 10, fontWeight: "bold" as const, color: "#0EA5E9" }}>MAP TESTER</Text>
+          )}
+          {item.telemetryDisabled === true && (
+            <Text style={{ fontSize: 10, fontWeight: "bold" as const, color: "#ef4444" }}>SENSORI OFF</Text>
+          )}
+          {item.matchingDisabled === true && (
+            <Text style={{ fontSize: 10, fontWeight: "bold" as const, color: "#f97316" }}>NON MATCHABILE</Text>
+          )}
+          {matchabilityInfo && (
+            <TouchableOpacity
+              onPress={handleMatchabilityPress}
+              style={[styles.matchabilityBadge, { backgroundColor: getMatchabilityColor() + "22", borderColor: getMatchabilityColor() }]}
+              hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+            >
+              <View style={[styles.matchabilityDot, { backgroundColor: getMatchabilityColor() }]} />
+              <Text style={[styles.matchabilityText, { color: getMatchabilityColor() }]}>
+                {matchabilityInfo.matchable ? "MATCH ✓" : `MATCH ✗ (${matchabilityInfo.reasons.length})`}
+              </Text>
+            </TouchableOpacity>
+          )}
+        </View>
         <Text style={styles.nickname}>{item.nickname}</Text>
         <Text style={styles.email}>{item.email}</Text>
         <View style={styles.badges}>
@@ -228,6 +282,18 @@ const styles = StyleSheet.create({
     borderColor: Colors.border,
   },
   userInfo: { flex: 1 },
+  flagsRow: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginBottom: 4, alignItems: "center" },
+  matchabilityBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  matchabilityDot: { width: 7, height: 7, borderRadius: 4 },
+  matchabilityText: { fontFamily: "Inter_600SemiBold", fontSize: 10 },
   nickname: { fontFamily: "Inter_600SemiBold", fontSize: 16, color: Colors.text },
   email: { fontFamily: "Inter_400Regular", fontSize: 13, color: Colors.textSecondary, marginTop: 2 },
   badges: { flexDirection: "row", gap: 6, marginTop: 8, flexWrap: "wrap" },

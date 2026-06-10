@@ -7,7 +7,7 @@ import { apiRequest, queryClient, getApiUrl } from "@/lib/query-client";
 import { useT } from "@/lib/language-context";
 
 // Local components
-import { AdminUser, UserCard } from "@/components/admin/users/UserCard";
+import { AdminUser, UserCard, MatchabilityInfo } from "@/components/admin/users/UserCard";
 import { UserFilters } from "@/components/admin/users/UserFilters";
 import { UserSummary } from "@/components/admin/users/UserSummary";
 import { UserDetailModal, UserStats, SessionsData, GeoZone } from "@/components/admin/users/UserDetailModal";
@@ -41,6 +41,7 @@ export default function AdminUsers() {
   const [editPassword, setEditPassword] = useState("");
   const [searchText, setSearchText] = useState("");
   const [hideFake, setHideFake] = useState(true);
+  const [filterNotMatchable, setFilterNotMatchable] = useState(false);
   // Task #2532 — Co-Pilot AI scope=user: chat contestuale all'utente selezionato.
   const [aiUserDrawer, setAiUserDrawer] = useState<{ visible: boolean; userId?: string }>({ visible: false });
 
@@ -104,6 +105,38 @@ export default function AdminUsers() {
   const { data: summary } = useQuery<any>({
     queryKey: ["/api/admin/users/stats/summary"],
   });
+
+  const { data: matchabilityData } = useQuery<{
+    summary: { total: number; matchable: number; notMatchable: number };
+    users: Array<{
+      userId: string;
+      matchable: boolean;
+      reasons: string[];
+      hasPrefs: boolean;
+      hasCoords: boolean;
+      hasMotos: boolean;
+      hasTags: boolean;
+    }>;
+  }>({
+    queryKey: ["/api/admin/matching/real-users-matchability"],
+    staleTime: 60_000,
+  });
+
+  const matchabilityMap = React.useMemo<Record<string, MatchabilityInfo>>(() => {
+    if (!matchabilityData?.users) return {};
+    const map: Record<string, MatchabilityInfo> = {};
+    for (const u of matchabilityData.users) {
+      map[u.userId] = {
+        matchable: u.matchable,
+        reasons: u.reasons,
+        hasPrefs: u.hasPrefs,
+        hasCoords: u.hasCoords,
+        hasMotos: u.hasMotos,
+        hasTags: u.hasTags,
+      };
+    }
+    return map;
+  }, [matchabilityData]);
 
   const statsQuery = useQuery<UserStats>({
     queryKey: ["/api/admin/users", selectedUser?.id, "stats"],
@@ -275,6 +308,10 @@ export default function AdminUsers() {
 
   const filteredUsers = users.filter((u) => {
     if (hideFake && u.isFake === true) return false;
+    if (filterNotMatchable) {
+      const info = matchabilityMap[u.id];
+      if (!info || info.matchable) return false;
+    }
     if (!searchText) return true;
     const q = searchText.toLowerCase();
     return u.nickname.toLowerCase().includes(q) || u.email.toLowerCase().includes(q) || (u.phone?.toLowerCase().includes(q) ?? false);
@@ -411,6 +448,7 @@ export default function AdminUsers() {
             onDeleteUser={handleDeleteUser}
             onTogglePrimal={(id, isPrimal) => primalMutation.mutate({ id, isPrimal })}
             onToggleMapTester={(id, enabled) => mapTesterMutation.mutate({ id, enabled })}
+            matchabilityInfo={matchabilityMap[item.id]}
             onToggleTelemetryDisabled={(id, disabled) => {
               const user = users.find((u) => u.id === id);
               const label = disabled ? "Disattivare i sensori" : "Riattivare i sensori";
@@ -458,6 +496,8 @@ export default function AdminUsers() {
                   onSearchChange={setSearchText}
                   hideFake={hideFake}
                   onToggleHideFake={() => setHideFake(!hideFake)}
+                  filterNotMatchable={filterNotMatchable}
+                  onToggleNotMatchable={() => setFilterNotMatchable(!filterNotMatchable)}
                   t={t}
                 />
               </View>
