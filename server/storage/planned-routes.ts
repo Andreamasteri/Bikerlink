@@ -37,6 +37,21 @@ export class PlannedRoutesStorage extends SystemStorage {
     }
   }
 
+  async getLatestCoordinateHistory(userId: string): Promise<{ latitude: number; longitude: number } | null> {
+    try {
+      const [record] = await db
+        .select()
+        .from(coordinateHistory)
+        .where(eq(coordinateHistory.userId, userId))
+        .orderBy(desc(coordinateHistory.createdAt))
+        .limit(1);
+      if (!record) return null;
+      return { latitude: record.latitude, longitude: record.longitude };
+    } catch {
+      return null;
+    }
+  }
+
   async getCoordinateHistoryStats(): Promise<{ totalRecords: number; trackedUsers: number; oldestRecord: string | null; newestRecord: string | null }> {
     const result = await db.execute(sql`SELECT COUNT(*)::int as total_records, COUNT(DISTINCT user_id)::int as tracked_users, MIN(created_at)::text as oldest_record, MAX(created_at)::text as newest_record FROM coordinate_history`);
     const row = result.rows[0] as { total_records: number; tracked_users: number; oldest_record: string | null; newest_record: string | null };

@@ -12,6 +12,7 @@ import { sendSuccess, sendError } from "../../lib/api-response";
 import { parseVisitorCookie, recordVisit } from "../../lib/visitor-tracking";
 import { createRegionalClubInvite } from "../motoclubs";
 import { addSessionSseClient, removeSessionSseClient } from "../../session-sse";
+import { ITALIAN_REGION_CENTROIDS } from "../../lib/region-centroids";
 import type { InsertUser, InsertUserProfile } from "@shared/db";
 
 function buildSessionToken(sessionID: string): string {
@@ -112,6 +113,48 @@ router.post("/login", loginLimiter, async (req: Request, res: Response) => {
     } catch { /* no-op: visitor tracking failure */ }
 
     const userProfile = await storage.getUserProfile(user.id).catch(() => null);
+
+    if (userProfile && userProfile.latitude == null && userProfile.longitude == null) {
+      (async () => {
+        try {
+          const historyCoord = await storage.getLatestCoordinateHistory(user.id);
+          if (historyCoord) {
+            await storage.upsertUserProfile(user.id, {
+              latitude: historyCoord.latitude,
+              longitude: historyCoord.longitude,
+              coordinatesUpdatedAt: new Date(),
+            } as Partial<InsertUserProfile>);
+            console.log(`[login] coordinate recovered from history for user ${user.id}`);
+            return;
+          }
+          const ur = userRecord ?? user;
+          if (typeof (ur as { firstLoginLat?: number | null }).firstLoginLat === "number" && typeof (ur as { firstLoginLng?: number | null }).firstLoginLng === "number") {
+            const lat = (ur as { firstLoginLat: number }).firstLoginLat;
+            const lng = (ur as { firstLoginLng: number }).firstLoginLng;
+            await storage.upsertUserProfile(user.id, {
+              latitude: lat,
+              longitude: lng,
+              coordinatesUpdatedAt: new Date(),
+            } as Partial<InsertUserProfile>);
+            console.log(`[login] coordinate recovered from firstLogin for user ${user.id}`);
+            return;
+          }
+          const region = (userRecord ?? user).region ?? "";
+          const centroid = ITALIAN_REGION_CENTROIDS[region];
+          if (centroid) {
+            await storage.upsertUserProfile(user.id, {
+              latitude: centroid[0],
+              longitude: centroid[1],
+              coordinatesUpdatedAt: new Date(),
+            } as Partial<InsertUserProfile>);
+            console.log(`[login] coordinate recovered from region centroid for user ${user.id}`);
+          }
+        } catch (e) {
+          console.warn("[login] coordinate recovery failed (non-blocking):", (e as Error)?.message);
+        }
+      })();
+    }
+
     const isGhost = userRecord?.ghostMode ?? false;
     const isAvail = !isGhost && (userProfile?.isAvailable ?? false);
     onlineTracker.setOnline(user.id, {

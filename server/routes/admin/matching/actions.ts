@@ -7,35 +7,7 @@ import { sendSuccess, sendError } from "../../../lib/api-response";
 import { sql, or, eq } from "drizzle-orm";
 import { triggerMatchingRun } from "../../../matching-engine";
 import { forceUnlockMatching, getMatchingLockState } from "../../../matching/scheduler";
-
-// Centroidi delle regioni italiane (lat/lon) come ultimo fallback per coordinate mancanti.
-// Usati SOLO quando non ci sono fonti reali (first_login, GPS storico).
-const ITALIAN_REGION_CENTROIDS: Record<string, [number, number]> = {
-  "Abruzzo": [42.35, 13.40],
-  "Basilicata": [40.53, 15.87],
-  "Calabria": [38.91, 16.59],
-  "Campania": [40.84, 14.25],
-  "Emilia-Romagna": [44.50, 11.34],
-  "Friuli-Venezia Giulia": [45.65, 13.78],
-  "Lazio": [41.89, 12.48],
-  "Liguria": [44.40, 8.95],
-  "Lombardia": [45.47, 9.19],
-  "Marche": [43.61, 13.51],
-  "Molise": [41.56, 14.66],
-  "Piemonte": [45.07, 7.68],
-  "Puglia": [41.12, 16.87],
-  "Sardegna": [39.22, 9.12],
-  "Sicilia": [37.60, 14.01],
-  "Toscana": [43.77, 11.26],
-  "Trentino-Alto Adige": [46.07, 11.12],
-  "Umbria": [43.11, 12.39],
-  "Valle d'Aosta": [45.73, 7.43],
-  "Veneto": [45.44, 12.35],
-  // Ecuador (utenti registrati in Ecuador)
-  "Pichincha": [-0.18, -78.47],
-  "Guayas": [-2.17, -79.92],
-  "Azuay": [-2.90, -78.98],
-};
+import { ITALIAN_REGION_CENTROIDS } from "../../../lib/region-centroids";
 
 const router = Router();
 

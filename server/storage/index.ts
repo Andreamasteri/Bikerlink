@@ -324,6 +324,7 @@ export interface IStorage {
   getActiveSosRequests(): Promise<SosRequest[]>;
   updateSosRequest(id: string, data: Partial<InsertSosRequest>): Promise<SosRequest | undefined>;
   saveCoordinateHistory(userId: string, latitude: number, longitude: number): Promise<CoordinateHistory | null>;
+  getLatestCoordinateHistory(userId: string): Promise<{ latitude: number; longitude: number } | null>;
   getCoordinateHistoryStats(): Promise<{ totalRecords: number; trackedUsers: number; oldestRecord: string | null; newestRecord: string | null }>;
   getCoordinateHistoryUsers(): Promise<Array<{ userId: string; nickname: string; recordCount: number; lastRecord: string }>>;
   cleanupOldCoordinateHistory(): Promise<number>;
