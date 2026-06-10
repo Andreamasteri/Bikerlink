@@ -54,7 +54,7 @@ NONINTERACTIVE="${NONINTERACTIVE:-0}"
 # Timeout health check (secondi)
 TIMEOUT_FAST=120                    # postgres, redis, pgadmin  (2 min)
 TIMEOUT_GH_SERVE=600               # 10 min (istanza GH che carica grafo pronto)
-TIMEOUT_VALHALLA=$((3 * 60 * 60))  # 3h (build tile Europa)
+TIMEOUT_VALHALLA=$((3 * 60 * 60))  # 3h (build tile Valhalla)
 
 # ── Libreria condivisa ────────────────────────────────────────────────────────
 # shellcheck source=lib/env-helpers.sh

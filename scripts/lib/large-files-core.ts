@@ -9,6 +9,7 @@ export const EXCLUDED_DIRS = new Set([
   "node_modules",
   ".expo",
   ".git",
+  ".local",
   "dist",
   "server_dist",
   "build",

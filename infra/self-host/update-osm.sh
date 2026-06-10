@@ -43,7 +43,7 @@ OSM_UPDATE_SECRET="${OSM_UPDATE_SECRET:-}"
 
 # Timeout per /health di ogni istanza GraphHopper dopo il restart (secondi).
 GH_HEALTH_TIMEOUT="${GH_HEALTH_TIMEOUT:-600}"   # 10 min (serving, grafo già pronto)
-VALHALLA_TIMEOUT_SECS="${VALHALLA_TIMEOUT_SECS:-10800}"  # 3h rebuild tile Europa
+VALHALLA_TIMEOUT_SECS="${VALHALLA_TIMEOUT_SECS:-10800}"  # 3h rebuild tile Valhalla
 
 log()  { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"; }
 die()  { echo "[$(date '+%Y-%m-%d %H:%M:%S')] ERRORE: $*" >&2; exit 1; }

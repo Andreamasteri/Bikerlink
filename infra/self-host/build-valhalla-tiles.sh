@@ -1,13 +1,12 @@
 #!/usr/bin/env bash
 # =============================================================================
 # BikerLink — build-valhalla-tiles.sh
-# Builda (o ricostruisce) i tile Valhalla a partire dai PBF per-regione in ./data,
+# Builda (o ricostruisce) i tile Valhalla a partire dai PBF per area in ./data,
 # mostrando i log in tempo reale e verificando lo stato del server al termine.
 #
 # Cosa fa:
-#   1. Verifica i prerequisiti (Docker + plugin compose, curl).
-#   2. Verifica che almeno un .osm.pbf sia presente in DATA_DIR.
-#      Se mancano, suggerisce di eseguire download-regions.sh prima.
+#   1. Verifica i prerequisiti (Docker + plugin compose, curl, osmium).
+#   2. Unisce i PBF delle aree core in valhalla-merged.osm.pbf (se necessario).
 #   3. Avvia il container Valhalla con force_rebuild=True (rigenera i tile).
 #   4. Segue i log in tempo reale finché /status non risponde (timeout 3h).
 #   5. Verifica GET http://localhost:8002/status e stampa version + tile date.
@@ -18,7 +17,7 @@
 #   DATA_DIR=/mnt/osm ./build-valhalla-tiles.sh
 #
 # NOTA: il build dei tile può richiedere fino a 3h e molta RAM.
-#       Se i PBF mancano, esegui prima: bash download-regions.sh
+#       Se i PBF per area mancano, lancia prima: ./download-osm.sh
 # =============================================================================
 set -euo pipefail
 
@@ -28,45 +27,77 @@ cd "$SCRIPT_DIR"
 DATA_DIR="${DATA_DIR:-${SCRIPT_DIR}/data}"
 ENV_FILE="${SCRIPT_DIR}/.env"
 
+MERGED_PBF="${DATA_DIR}/valhalla-merged.osm.pbf"
+
+# Aree core da unire per Valhalla (modifica se vuoi coprire aree on-demand).
+VALHALLA_AREAS=(grecia balcani iberia arco-alpino)
+
 VALHALLA_PORT="${VALHALLA_PORT:-8002}"
 STATUS_URL="http://localhost:${VALHALLA_PORT}/status"
 
-# Timeout massimo di attesa del build dei tile (secondi). Default 3h.
 BUILD_TIMEOUT_SECS="${BUILD_TIMEOUT_SECS:-10800}"
-# Intervallo di polling dello /status durante il build (secondi).
 POLL_INTERVAL_SECS="${POLL_INTERVAL_SECS:-30}"
 
 log()  { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"; }
 die()  { echo "[$(date '+%Y-%m-%d %H:%M:%S')] ERRORE: $*" >&2; exit 1; }
 
-# ── Docker / compose wrapper (con o senza sudo) ──────────────────────────────
 DOCKER="docker"; docker info >/dev/null 2>&1 || DOCKER="sudo docker"
 COMPOSE="$DOCKER compose"
 [[ -f "$ENV_FILE" ]] && COMPOSE="$DOCKER compose --env-file $ENV_FILE"
 
 # ── Prerequisiti ──────────────────────────────────────────────────────────────
-command -v curl >/dev/null 2>&1 || die "curl non installato (sudo apt install -y curl)"
+command -v curl   >/dev/null 2>&1 || die "curl non installato (sudo apt install -y curl)"
+command -v osmium >/dev/null 2>&1 || die "osmium non installato (sudo apt install -y osmium-tool)"
 $DOCKER compose version >/dev/null 2>&1 || die "Docker Compose plugin non disponibile. Installa con: sudo apt install -y docker-compose-plugin"
 
-# PBF mancanti → segnala e interrompi (il download è responsabilità di download-regions.sh).
-mapfile -t PBF_FILES < <(find "$DATA_DIR" -maxdepth 1 -name '*.osm.pbf' 2>/dev/null | sort)
-if [[ ${#PBF_FILES[@]} -eq 0 ]]; then
-  die "Nessun .osm.pbf trovato in ${DATA_DIR}/. Esegui prima: bash download-regions.sh"
+# ── Verifica PBF per area presenti ────────────────────────────────────────────
+AREA_PBFS=()
+MISSING=()
+for area in "${VALHALLA_AREAS[@]}"; do
+  pbf="${DATA_DIR}/${area}.osm.pbf"
+  if [[ -f "$pbf" ]]; then
+    AREA_PBFS+=("$pbf")
+  else
+    MISSING+=("$area")
+  fi
+done
+
+if [[ ${#MISSING[@]} -gt 0 ]]; then
+  log "[PBF] Aree mancanti: ${MISSING[*]}"
+  log "[PBF] Lancia prima: ./download-osm.sh"
+  log "[PBF] oppure: AREAS=\"${MISSING[*]}\" ./download-osm.sh"
+  die "PBF mancanti per le aree: ${MISSING[*]}"
+fi
+
+# ── Merge PBF aree → valhalla-merged.osm.pbf ─────────────────────────────────
+needs_merge=false
+if [[ ! -f "$MERGED_PBF" ]]; then
+  needs_merge=true
+else
+  for pbf in "${AREA_PBFS[@]}"; do
+    if [[ "$pbf" -nt "$MERGED_PBF" ]]; then
+      needs_merge=true; break
+    fi
+  done
+fi
+
+if [[ "$needs_merge" == "true" ]]; then
+  log "[PBF] Unione PBF aree in ${MERGED_PBF}..."
+  osmium merge "${AREA_PBFS[@]}" -o "$MERGED_PBF" --overwrite
+  log "[PBF] merge completato ✓ ($(du -h "$MERGED_PBF" | cut -f1))"
+else
+  log "[PBF] ${MERGED_PBF} già aggiornato ($(du -h "$MERGED_PBF" | cut -f1)) — skip merge"
 fi
 
 echo "============================================================"
 echo " BikerLink — Build tile Valhalla"
-echo " PBF in ${DATA_DIR}/:"
-for pbf in "${PBF_FILES[@]}"; do
-  echo "   $(basename "$pbf")  ($(du -h "$pbf" | cut -f1))"
-done
+echo " PBF sorgente : ${MERGED_PBF} ($(du -h "$MERGED_PBF" | cut -f1))"
+echo " Aree incluse : ${VALHALLA_AREAS[*]}"
 echo " Status URL   : ${STATUS_URL}"
 echo " Timeout build: $((BUILD_TIMEOUT_SECS / 3600))h (${BUILD_TIMEOUT_SECS}s)"
 echo "============================================================"
 
 # ── 1. Avvio con force_rebuild=True ──────────────────────────────────────────
-# La variabile force_rebuild è letta dal docker-compose.yml (env del container).
-# La esportiamo per questa esecuzione; al termine ricreiamo con force_rebuild=False.
 log "[Valhalla] avvio container in modalità build (force_rebuild=True)..."
 VALHALLA_FORCE_REBUILD=True $COMPOSE up -d --force-recreate valhalla
 
@@ -74,7 +105,6 @@ VALHALLA_FORCE_REBUILD=True $COMPOSE up -d --force-recreate valhalla
 log "[Valhalla] log in tempo reale (Ctrl-C interrompe SOLO il tail, non il build):"
 $COMPOSE logs -f --since 1s valhalla &
 LOGS_PID=$!
-# Assicura che il tail dei log venga terminato all'uscita dello script.
 cleanup() { kill "$LOGS_PID" >/dev/null 2>&1 || true; }
 trap cleanup EXIT
 
@@ -123,7 +153,7 @@ while (( elapsed < 300 )); do
   elapsed=$((elapsed + 5))
 done
 
-[[ "$serve_ok" == "true" ]] || die "[Valhalla] /status non è tornato online entro 5 min dopo il riavvio in modalità serve. Controlla: $COMPOSE logs -f valhalla"
+[[ "$serve_ok" == "true" ]] || die "[Valhalla] /status non è tornato online entro 5 min. Controlla: $COMPOSE logs -f valhalla"
 
 echo "============================================================"
 echo " ✓ Tile Valhalla pronti."

@@ -12,7 +12,7 @@
 #   3. Genera .env (da .env.local.template) con password casuali sicure.
 #   4. Crea le directory dei volumi (data/, graphs/).
 #   5. Chiede conferma e scarica i dati OSM per i gruppi core
-#      (download-regions.sh: Europa per area).
+#      (download-osm.sh: per area).
 #   6. Builda i grafi GraphHopper per i gruppi core (build-regions.sh).
 #   7. `docker compose up -d` (postgres, redis, valhalla, pgadmin) e avvia le
 #      istanze graphhopper-* core; attende l'health check di ogni servizio.
@@ -52,7 +52,7 @@ NONINTERACTIVE="${NONINTERACTIVE:-0}"
 # Timeout health check (secondi)
 TIMEOUT_FAST=120           # postgres, redis, pgadmin
 TIMEOUT_GH_SERVE=600       # 10 min (istanza GH che carica grafo già pronto)
-TIMEOUT_VALHALLA=$((3 * 60 * 60))  # 3h (build tile Europa)
+TIMEOUT_VALHALLA=$((3 * 60 * 60))  # 3h (build tile Valhalla)
 
 # ── Libreria condivisa ────────────────────────────────────────────────────────
 # shellcheck source=lib/env-helpers.sh

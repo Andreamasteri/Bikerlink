@@ -47,8 +47,10 @@ x-gh-area: &gh-area
   # Lo STESSO pin va usato in build-regions.sh. Aggiornare il pin: vedi README.md.
   image: israelhikingmap/graphhopper@sha256:ca307b8952e5e1e662c150c2d14f1fe0c4a7761b998bb9a36d97ffcd1e99f1c8
   restart: unless-stopped
-  # Profilo "areas": esclude questi servizi dall'up di default; il watchdog li
-  # accende per nome. Ogni servizio aggiunge anche il proprio codice come profilo.
+  # Override entrypoint: l'immagine usa per default "./graphhopper.sh -c config-example.yml"
+  # (path relativo → legge il file bundled car/foot/bike ignorando il nostro mount).
+  # Usiamo il path assoluto /graphhopper/config.yml per puntare al nostro config montato.
+  entrypoint: ["./graphhopper.sh", "-c", "/graphhopper/config.yml"]
   healthcheck:
     test: ["CMD-SHELL", "curl -fsS http://localhost:8989/health || exit 1"]
     interval: 30s
