@@ -1,5 +1,5 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, Platform } from "react-native";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, Platform, findNodeHandle } from "react-native";
 import { useRouter } from "expo-router";
 import type { Href } from "expo-router";
 import { MaterialCommunityIcons, MaterialIcons, Ionicons } from "@expo/vector-icons";
@@ -287,6 +287,15 @@ export default function AdminDashboard() {
   const [search, setSearch] = useState("");
   const [systemStatuses, setSystemStatuses] = useState<SystemStatuses>(UNKNOWN_STATUSES);
 
+  const scrollViewRef = useRef<ScrollView>(null);
+  const thinkcentreRef = useRef<View>(null);
+  const graphhopperRef = useRef<View>(null);
+  const valhallaRef = useRef<View>(null);
+  const nominatimRef = useRef<View>(null);
+  const whisperRef = useRef<View>(null);
+  const routingRef = useRef<View>(null);
+  const matchingRef = useRef<View>(null);
+
   // Start fast, then relax after FAST_POLL_DURATION_MS.
   const [pollInterval, setPollInterval] = useState(FAST_POLL_INTERVAL_MS);
 
@@ -319,6 +328,38 @@ export default function AdminDashboard() {
 
   const handleRoutingStatus = useCallback((routing: DotStatus) => {
     setSystemStatuses((prev) => ({ ...prev, routing }));
+  }, []);
+
+  function scrollToRef(ref: React.RefObject<View | null>) {
+    if (!ref.current || !scrollViewRef.current) return;
+    const nodeHandle = findNodeHandle(scrollViewRef.current);
+    if (!nodeHandle) return;
+    ref.current.measureLayout(
+      nodeHandle,
+      (_x, y) => scrollViewRef.current?.scrollTo({ y, animated: true }),
+      () => {}
+    );
+  }
+
+  const handleDotPress = useCallback((key: keyof SystemStatuses) => {
+    const refMap: Partial<Record<keyof SystemStatuses, React.RefObject<View | null>>> = {
+      thinkcentre: thinkcentreRef,
+      ollama:      thinkcentreRef,
+      ufw:         thinkcentreRef,
+      redis:       thinkcentreRef,
+      postgres:    thinkcentreRef,
+      pgadmin:     thinkcentreRef,
+      nginx:       thinkcentreRef,
+      uptimeKuma:  thinkcentreRef,
+      graphhopper: graphhopperRef,
+      valhalla:    valhallaRef,
+      nominatim:   nominatimRef,
+      whisper:     whisperRef,
+      routing:     routingRef,
+      matching:    matchingRef,
+    };
+    const target = refMap[key] ?? thinkcentreRef;
+    setTimeout(() => scrollToRef(target), 350);
   }, []);
 
   const initialCollapsed = useMemo<Record<string, boolean>>(
@@ -356,6 +397,7 @@ export default function AdminDashboard() {
 
   return (
     <ScrollView
+      ref={scrollViewRef}
       style={styles.container}
       contentContainerStyle={[
         styles.content,
@@ -391,19 +433,33 @@ export default function AdminDashboard() {
       {!isSearching && (
         <>
           <RoutingCloudBanner onPress={() => router.push("/admin/routing-health" as never)} />
-          <SystemHealthContainer statuses={systemStatuses}>
+          <SystemHealthContainer statuses={systemStatuses} onDotPress={handleDotPress}>
             <ServerEfficiencyCard />
             <ThinkCentreEfficiencyCard />
-            <ThinkCentreCard onStatuses={handleThinkCentreStatuses} />
-            <RoutingCoordinationCard onStatus={handleRoutingStatus} />
+            <View ref={thinkcentreRef}>
+              <ThinkCentreCard onStatuses={handleThinkCentreStatuses} />
+            </View>
+            <View ref={routingRef}>
+              <RoutingCoordinationCard onStatus={handleRoutingStatus} />
+            </View>
             <View style={styles.routingSubGroup}>
-              <GraphHopperCard />
-              <ValhallaCard />
-              <NominatimCard />
+              <View ref={graphhopperRef}>
+                <GraphHopperCard />
+              </View>
+              <View ref={valhallaRef}>
+                <ValhallaCard />
+              </View>
+              <View ref={nominatimRef}>
+                <NominatimCard />
+              </View>
               <TelemetryCard />
             </View>
-            <WhisperChainCard />
-            <MatchingMonitorCard onStatus={(s) => setSystemStatuses((prev) => ({ ...prev, matching: s as DotStatus }))} />
+            <View ref={whisperRef}>
+              <WhisperChainCard />
+            </View>
+            <View ref={matchingRef}>
+              <MatchingMonitorCard onStatus={(s) => setSystemStatuses((prev) => ({ ...prev, matching: s as DotStatus }))} />
+            </View>
           </SystemHealthContainer>
         </>
       )}

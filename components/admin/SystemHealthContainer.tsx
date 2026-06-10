@@ -8,7 +8,6 @@ import {
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter, type Href } from "expo-router";
 import Colors from "@/constants/colors";
 
 export type DotStatus = "ok" | "degraded" | "offline" | "unknown";
@@ -80,30 +79,31 @@ export interface SystemStatuses {
 interface SystemHealthContainerProps {
   statuses: SystemStatuses;
   children: React.ReactNode;
+  onDotPress: (key: keyof SystemStatuses) => void;
 }
 
-const DOT_DEFS: { key: keyof SystemStatuses; label: string; route: Href }[] = [
-  { key: "thinkcentre",  label: "ThinkCentre",    route: "/admin/system" },
-  { key: "graphhopper",  label: "GraphHopper",    route: "/admin/routing-health" },
-  { key: "valhalla",     label: "Valhalla",        route: "/admin/routing-health" },
-  { key: "nominatim",    label: "Nominatim",       route: "/admin/routing-health" },
-  { key: "ollama",       label: "Ollama AI",       route: "/admin/ai-hub" },
-  { key: "whisper",      label: "Whisper ASR",     route: "/admin/whisper-config" },
-  { key: "ufw",          label: "Firewall",        route: "/admin/system" },
-  { key: "redis",        label: "Redis",           route: "/admin/system" },
-  { key: "postgres",     label: "PostgreSQL",      route: "/admin/system" },
-  { key: "pgadmin",      label: "pgAdmin",         route: "/admin/system" },
-  { key: "nginx",        label: "nginx",           route: "/admin/system" },
-  { key: "uptimeKuma",   label: "Uptime Kuma",     route: "/admin/system" },
-  { key: "routing",      label: "Routing",         route: "/admin/routing-hub" },
-  { key: "matching",     label: "Matching Engine", route: "/admin/matching-hub" },
+const DOT_DEFS: { key: keyof SystemStatuses; label: string }[] = [
+  { key: "thinkcentre",  label: "ThinkCentre"    },
+  { key: "graphhopper",  label: "GraphHopper"    },
+  { key: "valhalla",     label: "Valhalla"        },
+  { key: "nominatim",    label: "Nominatim"       },
+  { key: "ollama",       label: "Ollama AI"       },
+  { key: "whisper",      label: "Whisper ASR"     },
+  { key: "ufw",          label: "Firewall"        },
+  { key: "redis",        label: "Redis"           },
+  { key: "postgres",     label: "PostgreSQL"      },
+  { key: "pgadmin",      label: "pgAdmin"         },
+  { key: "nginx",        label: "nginx"           },
+  { key: "uptimeKuma",   label: "Uptime Kuma"     },
+  { key: "routing",      label: "Routing"         },
+  { key: "matching",     label: "Matching Engine" },
 ];
 
 export function SystemHealthContainer({
   statuses,
   children,
+  onDotPress,
 }: SystemHealthContainerProps) {
-  const router = useRouter();
   const [collapsed, setCollapsed] = useState(true);
 
   useEffect(() => {
@@ -120,12 +120,12 @@ export function SystemHealthContainer({
     AsyncStorage.setItem(STORAGE_KEY, next ? "1" : "0").catch(() => {});
   }
 
-  function handleDotPress(route: Href) {
+  function handleDotPress(key: keyof SystemStatuses) {
     if (collapsed) {
       setCollapsed(false);
       AsyncStorage.setItem(STORAGE_KEY, "0").catch(() => {});
     }
-    router.push(route);
+    onDotPress(key);
   }
 
   return (
@@ -149,13 +149,13 @@ export function SystemHealthContainer({
 
       {/* Dots row: always visible, below the header */}
       <View style={styles.dotsRow}>
-        {DOT_DEFS.map(({ key, label, route }) => (
+        {DOT_DEFS.map(({ key, label }) => (
           <StatusDot
             key={key}
             label={label}
             status={statuses[key]}
             showPersistentLabel={!collapsed}
-            onNavigate={() => handleDotPress(route)}
+            onNavigate={() => handleDotPress(key)}
           />
         ))}
       </View>
