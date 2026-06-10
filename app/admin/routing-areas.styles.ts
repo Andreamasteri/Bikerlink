@@ -138,6 +138,24 @@ export const styles = StyleSheet.create({
   },
   emptyText: { fontFamily: "Inter_400Regular", fontSize: 12, color: Colors.textSecondary, flex: 1, lineHeight: 17 },
 
+  // Timeline cronologia up/down
+  timelineIconCol: { width: 24, alignItems: "center", paddingTop: 1 },
+  timelineBody: { flex: 1 },
+  timelineTopRow: { flexDirection: "row", alignItems: "center", gap: 6 },
+  timelineBadge: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 10,
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    borderRadius: 4,
+    borderWidth: 1,
+    overflow: "hidden",
+  },
+  timelineArea: { fontFamily: "Inter_600SemiBold", fontSize: 12, color: Colors.text, flex: 1 },
+  timelineCode: { fontFamily: "Inter_400Regular", fontSize: 10, color: Colors.textSecondary },
+  timelineBottomRow: { flexDirection: "row", alignItems: "center", gap: 10, marginTop: 2 },
+  timelineLatency: { fontFamily: "Inter_400Regular", fontSize: 10, color: Colors.textSecondary },
+
   refreshBtn: { padding: 4 },
   chipGrid: {
     flexDirection: "row",

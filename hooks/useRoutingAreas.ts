@@ -78,12 +78,23 @@ export interface DirectAreaHealth {
   profiles: string[] | null;
 }
 
+/** Evento di cambio stato up↔down per un'istanza GH (ring buffer server). */
+export interface AreaStateEvent {
+  areaCode: string;
+  nome: string;
+  timestamp: string;
+  from: boolean;
+  to: boolean;
+  latencyMs: number | null;
+}
+
 export interface DirectHealthResponse {
   available: boolean;
   reason?: string;
   healthyCount?: number;
   totalCount?: number;
   areas: DirectAreaHealth[];
+  events?: AreaStateEvent[];
 }
 
 export function parseMemMb(s?: string): number | null {

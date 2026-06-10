@@ -203,6 +203,56 @@ export default function RoutingAreasScreen() {
         <Text style={styles.modeHint}>
           Probe diretta su tutte e 7 le istanze (core + on-demand) via reverse proxy. Timeout 2s. Auto-refresh 60s.
         </Text>
+
+        {/* Cronologia cambiamenti di stato */}
+        {(() => {
+          const stateEvents = directHealth?.events ?? [];
+          if (!directHealth) return null;
+          return (
+            <View style={{ marginTop: 14 }}>
+              <Text style={styles.sectionTitle}>Cronologia up/down</Text>
+              {stateEvents.length === 0 ? (
+                <View style={styles.emptyCard}>
+                  <MaterialCommunityIcons name="clock-outline" size={18} color={Colors.textSecondary} />
+                  <Text style={styles.emptyText}>
+                    Nessun cambio di stato rilevato dall'ultimo avvio del server. I cambiamenti up↔down appariranno qui.
+                  </Text>
+                </View>
+              ) : (
+                <View style={styles.logCard}>
+                  {stateEvents.slice(0, 30).map((e, i) => {
+                    const wentUp = e.to;
+                    const color = wentUp ? Colors.success : Colors.error;
+                    const icon = wentUp ? "arrow-up-circle" : "arrow-down-circle";
+                    const label = wentUp ? "UP" : "DOWN";
+                    return (
+                      <View key={`${e.areaCode}-${e.timestamp}-${i}`} style={styles.logRow}>
+                        <View style={styles.timelineIconCol}>
+                          <MaterialCommunityIcons name={icon as never} size={16} color={color} />
+                        </View>
+                        <View style={styles.timelineBody}>
+                          <View style={styles.timelineTopRow}>
+                            <Text style={[styles.timelineBadge, { color, borderColor: color + "55" }]}>
+                              {label}
+                            </Text>
+                            <Text style={styles.timelineArea} numberOfLines={1}>{e.nome}</Text>
+                            <Text style={styles.timelineCode}>[{e.areaCode}]</Text>
+                          </View>
+                          <View style={styles.timelineBottomRow}>
+                            <Text style={styles.logTime}>{fmtTime(e.timestamp)}</Text>
+                            {e.latencyMs != null && (
+                              <Text style={styles.timelineLatency}>{e.latencyMs}ms</Text>
+                            )}
+                          </View>
+                        </View>
+                      </View>
+                    );
+                  })}
+                </View>
+              )}
+            </View>
+          );
+        })()}
       </View>
 
       {/* Monitor risorse complessivo */}
