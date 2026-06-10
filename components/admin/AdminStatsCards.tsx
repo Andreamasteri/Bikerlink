@@ -84,7 +84,8 @@ export function GraphHopperCard() {
       return res.json();
     },
     staleTime: 60_000,
-    refetchOnMount: true,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: true,
   });
 
   const modeLabel: Record<string, string> = {
@@ -162,7 +163,8 @@ export function ValhallaCard() {
     queryFn: ({ signal }) => fetchThinkCentreHealth(signal),
     refetchInterval: 30_000,
     staleTime: 20_000,
-    refetchOnMount: true,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: true,
   });
 
   const detail = error ? null : (data?.valhallaDetail ?? null);
@@ -294,7 +296,8 @@ export function NominatimCard() {
     queryFn: ({ signal }) => fetchThinkCentreHealth(signal),
     refetchInterval: 30_000,
     staleTime: 20_000,
-    refetchOnMount: true,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: true,
   });
 
   const detail = error ? null : (data?.nominatimDetail ?? null);

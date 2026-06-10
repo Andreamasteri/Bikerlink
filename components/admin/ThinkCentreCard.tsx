@@ -280,7 +280,8 @@ export function ThinkCentreCard({
     },
     refetchInterval: 30_000,
     staleTime: 20_000,
-    refetchOnMount: true,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: true,
   });
 
   const { data: eventsData } = useQuery<HealthEventsResponse>({
@@ -295,6 +296,7 @@ export function ThinkCentreCard({
     },
     refetchInterval: 60_000,
     staleTime: 30_000,
+    refetchOnMount: "always",
     enabled: !collapsed,
   });
 

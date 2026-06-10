@@ -25,6 +25,8 @@ export function WhisperChainCard() {
     queryFn: fetchWhisperConfig,
     staleTime: 30_000,
     retry: false,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: true,
   });
 
   const activeCount = data?.chain.length ?? 0;

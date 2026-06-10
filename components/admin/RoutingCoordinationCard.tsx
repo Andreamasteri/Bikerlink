@@ -136,6 +136,8 @@ export function RoutingCoordinationCard({
     queryFn: () => authGet<RoutingStatusResponse>("/api/admin/routing/status"),
     refetchInterval: 30_000,
     staleTime: 20_000,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: true,
   });
 
   const aiMode = status?.activeEngine === "ai";
@@ -145,6 +147,7 @@ export function RoutingCoordinationCard({
     queryFn: () => authGet<PipelineLogResponse>("/api/admin/routing/pipeline-log"),
     refetchInterval: 15_000,
     staleTime: 10_000,
+    refetchOnMount: "always",
     enabled: !collapsed,
   });
 
@@ -153,6 +156,7 @@ export function RoutingCoordinationCard({
     queryFn: () => authGet<{ decisions: AiDecision[] }>("/api/admin/maps/ai-decisions?limit=10"),
     refetchInterval: 30_000,
     staleTime: 20_000,
+    refetchOnMount: "always",
     enabled: !collapsed && !!aiMode,
   });
 

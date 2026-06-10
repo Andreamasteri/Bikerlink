@@ -62,6 +62,8 @@ export function MatchingMonitorCard({ onStatus }: { onStatus?: (s: "ok" | "degra
     staleTime: collapsed ? 55_000 : 10_000,
     enabled: true,
     retry: 2,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: true,
   });
 
   const {
@@ -73,6 +75,7 @@ export function MatchingMonitorCard({ onStatus }: { onStatus?: (s: "ok" | "degra
     queryFn: () => authGet<LogsData>("/api/admin/matching/logs"),
     refetchInterval: 30_000,
     staleTime: 20_000,
+    refetchOnMount: "always",
     enabled: !collapsed,
   });
 
