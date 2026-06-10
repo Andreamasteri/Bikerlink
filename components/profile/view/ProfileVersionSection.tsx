@@ -4,7 +4,7 @@ import Constants from "expo-constants";
 import { useQuery } from "@tanstack/react-query";
 import { useColors } from "@/hooks/useColors";
 import { useAuth } from "@/lib/auth-context";
-import { APPLIED_OTA_NUMBER } from "@/constants/buildInfo";
+import { APPLIED_OTA_NUMBER, OTA_BUNDLED_COUNT } from "@/constants/buildInfo";
 import { loadAppliedOtaNumber, saveAppliedOtaNumber } from "@/lib/otaStorage";
 
 function parseAppVersion(): { apk: string; runtime: string; ota: string } {
@@ -73,7 +73,7 @@ export const ProfileVersionSection: React.FC = () => {
     return null;
   }, [releases]);
 
-  const { apk, runtime, ota: otaBundledStr } = parseAppVersion();
+  const { apk, runtime } = parseAppVersion();
 
   // Riga 1: per admin mostra l'OTA distribuita a tutti; per utenti normali mostra quella corrente
   const displayOta = isAdmin && lastApprovedOtaNum !== null ? lastApprovedOtaNum : appliedOta;
@@ -91,7 +91,7 @@ export const ProfileVersionSection: React.FC = () => {
         <View style={styles.item}>
           <Text style={[styles.label, { color: colors.textSecondary }]}>Build</Text>
           <Text style={[styles.value, { color: colors.textSecondary }]}>
-            V{apk}.{runtime}.{appliedOta ?? otaBundledStr}
+            V{apk}.{runtime}.{OTA_BUNDLED_COUNT}
           </Text>
         </View>
         <Text style={[styles.dot, { color: colors.textSecondary }]}>·</Text>
