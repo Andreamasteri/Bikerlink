@@ -30,8 +30,9 @@ import { LoginPrompt } from "@/components/register/LoginPrompt";
 import {
   PHONE_PREFIXES,
   PHONE_PREFIX_TO_COUNTRY,
-  EULA_TEXTS,
+  buildEulaTexts,
 } from "@/constants/register";
+import { useSupportSettings } from "@/lib/settings-context";
 import { SupportContactModal } from "@/components/SupportContactModal";
 
 export default function RegisterScreen() {
@@ -39,6 +40,7 @@ export default function RegisterScreen() {
   const insets = useSafeAreaInsets();
   const { registerMutation } = useAuth();
   const params = useLocalSearchParams<{ inviteCode?: string }>();
+  const supportSettings = useSupportSettings();
 
   useQuery<{ enabled: boolean }>({
     queryKey: ["/api/settings/email-verification"],
@@ -346,7 +348,7 @@ export default function RegisterScreen() {
             setPrivacyAccepted={setPrivacyAccepted}
             marketingAccepted={marketingAccepted}
             setMarketingAccepted={setMarketingAccepted}
-            eulaTexts={EULA_TEXTS}
+            eulaTexts={buildEulaTexts(supportSettings.email)}
           />
         )}
 

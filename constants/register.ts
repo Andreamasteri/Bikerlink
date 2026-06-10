@@ -1,5 +1,6 @@
 export const SUPPORT_EMAIL = 'bikerlinkapp@gmail.com';
 
+
 export const PHONE_PREFIXES = [
   { code: "+39", country: "Italia" },
   { code: "+1", country: "USA/Canada" },
@@ -48,8 +49,9 @@ export const PHONE_PREFIX_TO_COUNTRY: Record<string, string> = {
 
 import { AppLanguage } from "@/lib/i18n";
 
-export const EULA_TEXTS: Record<AppLanguage, string> = {
-  it: `TERMINI E CONDIZIONI D'USO - BikerLink
+export function buildEulaTexts(supportEmail: string): Record<AppLanguage, string> {
+  return {
+    it: `TERMINI E CONDIZIONI D'USO - BikerLink
 
 1. ACCETTAZIONE DEI TERMINI
 Utilizzando l'app BikerLink, accetti integralmente i presenti termini e condizioni.
@@ -85,9 +87,9 @@ BikerLink è una piattaforma che connette motociclisti (biker) e passeggeri (zav
 BikerLink si riserva il diritto di modificare i presenti termini in qualsiasi momento.
 
 9. CONTATTI
-Per domande o segnalazioni: support@bikerlink.app`,
+Per domande o segnalazioni: ${supportEmail}`,
 
-  en: `TERMS AND CONDITIONS OF USE - BikerLink
+    en: `TERMS AND CONDITIONS OF USE - BikerLink
 
 1. ACCEPTANCE OF TERMS
 By using the BikerLink app, you fully accept these terms and conditions.
@@ -123,9 +125,9 @@ BikerLink is a platform that connects motorcyclists (bikers) and passengers (pil
 BikerLink reserves the right to modify these terms at any time.
 
 9. CONTACT
-For questions or reports: support@bikerlink.app`,
+For questions or reports: ${supportEmail}`,
 
-  de: `NUTZUNGSBEDINGUNGEN - BikerLink
+    de: `NUTZUNGSBEDINGUNGEN - BikerLink
 
 1. ANNAHME DER BEDINGUNGEN
 Durch die Nutzung der BikerLink-App akzeptierst du diese Nutzungsbedingungen vollständig.
@@ -161,9 +163,9 @@ BikerLink ist eine Plattform, die Motorradfahrer (Biker) und Mitfahrer (Soziusfa
 BikerLink behält sich das Recht vor, diese Bedingungen jederzeit zu ändern.
 
 9. KONTAKT
-Für Fragen oder Meldungen: support@bikerlink.app`,
+Für Fragen oder Meldungen: ${supportEmail}`,
 
-  es: `TÉRMINOS Y CONDICIONES DE USO - BikerLink
+    es: `TÉRMINOS Y CONDICIONES DE USO - BikerLink
 
 1. ACEPTACIÓN DE LOS TÉRMINOS
 Al usar la app BikerLink, aceptas íntegramente estos términos y condiciones.
@@ -199,9 +201,9 @@ BikerLink es una plataforma que conecta motociclistas (bikers) y pasajeros (pill
 BikerLink se reserva el diritto de modificar estos términos en cualquier momento.
 
 9. CONTACTO
-Para preguntas o notificaciones: support@bikerlink.app`,
+Para preguntas o notificaciones: ${supportEmail}`,
 
-  fr: `CONDITIONS GÉNÉRALES D'UTILISATION - BikerLink
+    fr: `CONDITIONS GÉNÉRALES D'UTILISATION - BikerLink
 
 1. ACCEPTATION DES CONDITIONS
 En utilisant l'app BikerLink, vous acceptez intégralement les présentes conditions générales.
@@ -237,9 +239,9 @@ BikerLink est una plateforme qui connecte des motocyclistes (bikers) et des pass
 BikerLink se réserve le droit de modifier les présentes conditions à tout moment.
 
 9. CONTACT
-Pour toute question ou signalement : support@bikerlink.app`,
+Pour toute question ou signalement : ${supportEmail}`,
 
-  el: `ΌΡΟΙ ΚΑΙ ΠΡΟΫΠΟΘΈΣΕΙΣ ΧΡΉΣΗΣ - BikerLink
+    el: `ΌΡΟΙ ΚΑΙ ΠΡΟΫΠΟΘΈΣΕΙΣ ΧΡΉΣΗΣ - BikerLink
 
 1. ΑΠΟΔΟΧΗ ΟΡΩΝ
 Χρησιμοποιώντας την εφαρμογή BikerLink, αποδέχεστε πλήρως τους παρόντες όρους και προϋποθέσεις.
@@ -253,9 +255,9 @@ Pour toute question ou signalement : support@bikerlink.app`,
 - Πρέπει να είστε τουλάχιστον 18 ετών για να χρησιμοποιήσετε την υπηρεσία
 
 9. ΕΠΙΚΟΙΝΩΝΙΑ
-Για ερωτήσεις ή αναφορές: support@bikerlink.app`,
+Για ερωτήσεις ή αναφορές: ${supportEmail}`,
 
-  tr: `KULLANIM KOŞULLARI - BikerLink
+    tr: `KULLANIM KOŞULLARI - BikerLink
 
 1. KOŞULLARIN KABULÜ
 BikerLink uygulamasını kullanarak bu kullanım koşullarını tam olarak kabul etmiş sayılırsınız.
@@ -291,5 +293,6 @@ BikerLink, motosikletçileri (biker) ve yolcuları (zavorrina) motosiklet seyaha
 BikerLink, bu koşulları istediği zaman değiştirme hakkını saklı tutar.
 
 9. İLETİŞİM
-Sorular veya bildirimler için: support@bikerlink.app`,
-};
+Sorular veya bildirimler için: ${supportEmail}`,
+  };
+}
