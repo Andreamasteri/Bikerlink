@@ -121,10 +121,22 @@ export default function ChatConversationScreen() {
       ["/api/chat/conversations"],
       (old) => {
         if (!old) return old;
+        const conv = old.find((c) => c.id === id);
+        const wasUnread = (conv?.unreadCount ?? 0) as number;
+        if (wasUnread > 0) {
+          queryClient.setQueryData<{ count: number }>(
+            ["/api/chat/conversations/unread-total"],
+            (prev) => {
+              if (!prev) return { count: 0 };
+              return { count: Math.max(0, prev.count - wasUnread) };
+            }
+          );
+        }
         return old.map((c) => (c.id === id ? { ...c, unreadCount: 0 } : c));
       }
     );
     queryClient.invalidateQueries({ queryKey: ["/api/chat/conversations"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/chat/conversations/unread-total"] });
   }, [id]);
 
   useFocusEffect(
