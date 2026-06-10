@@ -12,6 +12,26 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/query-client";
 import Colors from "@/constants/colors";
 
+const WA_REGEX = /^\+?[1-9]\d{6,14}$/;
+
+function normalizeWhatsapp(raw: string): string {
+  return raw.replace(/[\s\-().]/g, "");
+}
+
+function validateWhatsapp(raw: string): string | null {
+  if (raw.trim() === "") return null;
+  const normalized = normalizeWhatsapp(raw);
+  if (!WA_REGEX.test(normalized)) {
+    return "Formato non valido. Usa formato internazionale es. +39XXXXXXXXXX";
+  }
+  return null;
+}
+
+function buildWaUrl(raw: string): string {
+  const digits = normalizeWhatsapp(raw).replace(/^\+/, "");
+  return `https://wa.me/${digits}`;
+}
+
 interface SupportData {
   email: string;
   whatsapp: string;
@@ -26,11 +46,24 @@ export function SupportSection() {
   const [whatsappInput, setWhatsappInput] = useState("");
   const [emailSaved, setEmailSaved] = useState(false);
   const [whatsappSaved, setWhatsappSaved] = useState(false);
+  const [whatsappError, setWhatsappError] = useState<string | null>(null);
+  const [whatsappTouched, setWhatsappTouched] = useState(false);
 
   useEffect(() => {
     if (data?.email !== undefined) setEmailInput(data.email);
-    if (data?.whatsapp !== undefined) setWhatsappInput(data.whatsapp);
+    if (data?.whatsapp !== undefined) {
+      setWhatsappInput(data.whatsapp);
+      setWhatsappError(null);
+      setWhatsappTouched(false);
+    }
   }, [data]);
+
+  const whatsappIsValid =
+    whatsappInput.trim() === "" || validateWhatsapp(whatsappInput) === null;
+  const waPreviewUrl =
+    whatsappInput.trim() !== "" && whatsappIsValid
+      ? buildWaUrl(whatsappInput)
+      : null;
 
   const emailMutation = useMutation({
     mutationFn: () =>
@@ -92,17 +125,26 @@ export function SupportSection() {
       </Text>
       <View style={styles.inputRow}>
         <TextInput
-          style={styles.input}
+          style={[styles.input, whatsappTouched && !!whatsappError && styles.inputError]}
           value={whatsappInput}
-          onChangeText={(v) => { setWhatsappInput(v); setWhatsappSaved(false); }}
+          onChangeText={(v) => {
+            setWhatsappInput(v);
+            setWhatsappSaved(false);
+            if (whatsappTouched) setWhatsappError(validateWhatsapp(v));
+          }}
+          onBlur={() => {
+            setWhatsappTouched(true);
+            setWhatsappError(validateWhatsapp(whatsappInput));
+          }}
           placeholder="es. +39 123 456 7890"
           placeholderTextColor={Colors.textSecondary}
           keyboardType="phone-pad"
+          autoCorrect={false}
         />
         <TouchableOpacity
-          style={[styles.btn, whatsappSaved && styles.btnSaved]}
+          style={[styles.btn, whatsappSaved && styles.btnSaved, !whatsappIsValid && styles.btnDisabled]}
           onPress={() => whatsappMutation.mutate()}
-          disabled={whatsappMutation.isPending}
+          disabled={whatsappMutation.isPending || !whatsappIsValid}
           testID="support-whatsapp-save"
         >
           {whatsappMutation.isPending ? (
@@ -114,6 +156,16 @@ export function SupportSection() {
           )}
         </TouchableOpacity>
       </View>
+      {whatsappTouched && !!whatsappError && (
+        <Text style={styles.errorText}>{whatsappError}</Text>
+      )}
+      {waPreviewUrl !== null && (
+        <View style={styles.previewRow}>
+          <Ionicons name="logo-whatsapp" size={14} color={Colors.success} />
+          <Text style={styles.previewLabel}>Link generato: </Text>
+          <Text style={styles.previewUrl} numberOfLines={1}>{waPreviewUrl}</Text>
+        </View>
+      )}
       <Text style={styles.hint}>
         Lascia vuoto il numero WhatsApp per non mostrare quel canale agli utenti.
       </Text>
@@ -190,5 +242,36 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     marginTop: 10,
     lineHeight: 16,
+  },
+  inputError: {
+    borderColor: Colors.error,
+  },
+  btnDisabled: {
+    opacity: 0.45,
+  },
+  errorText: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    color: Colors.error,
+    marginTop: 5,
+    lineHeight: 16,
+  },
+  previewRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    marginTop: 6,
+    flexWrap: "nowrap",
+  },
+  previewLabel: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 12,
+    color: Colors.textSecondary,
+  },
+  previewUrl: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    color: Colors.success,
+    flexShrink: 1,
   },
 });

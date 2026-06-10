@@ -253,11 +253,24 @@ router.put("/support-email", async (req: Request, res: Response) => {
   }
 });
 
+const WA_NUMBER_REGEX = /^\+?[1-9]\d{6,14}$/;
+
+function normalizeWaNumber(raw: string): string {
+  return raw.replace(/[\s\-().]/g, "");
+}
+
 router.put("/support-whatsapp", async (req: Request, res: Response) => {
   try {
     const { value } = req.body;
     if (typeof value !== "string") return sendError(res, 400, "Valore non valido");
-    const setting = await storage.upsertAppSetting("support_whatsapp", value);
+    const trimmed = value.trim();
+    if (trimmed !== "") {
+      const normalized = normalizeWaNumber(trimmed);
+      if (!WA_NUMBER_REGEX.test(normalized)) {
+        return sendError(res, 400, "Numero WhatsApp non valido. Usa formato internazionale es. +39XXXXXXXXXX");
+      }
+    }
+    const setting = await storage.upsertAppSetting("support_whatsapp", trimmed);
     return res.json(setting);
   } catch (_error) {
     return sendError(res, 500, "Errore salvataggio WhatsApp supporto");
