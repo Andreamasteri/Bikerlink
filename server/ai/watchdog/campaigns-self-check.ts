@@ -222,24 +222,12 @@ export async function runCampaignsSelfCheck(opts: RunSelfCheckOpts): Promise<Cam
   let modCampaignId: string | null = null;
   let selfCheckModeratorId: string | null = null;
 
-  // Se le ads sono globalmente disattivate, /api/ads/placement/all ritorna []
-  // a priori: in quel caso usiamo getActiveAdsByUserType direttamente come
-  // sostituto del probe HTTP pubblico (così il check resta significativo).
-  const adsEnabledSetting = await storage.getAppSetting("ads_enabled").catch(() => null);
-  const adsGloballyDisabled = adsEnabledSetting?.value === "false";
-
-  async function probeActiveContains(expected: boolean): Promise<{ found: boolean; total: number; via: "http" | "storage" }> {
-    if (!adsGloballyDisabled) {
-      const r = await httpProbe("GET", "/api/ads/placement/all", undefined, {
-        [getInternalProbeHeaderName()]: "",
-      });
-      if (r.status !== 200) throw new Error(`status ${r.status}`);
-      const list = (r.json as Array<{ id: string }>) ?? [];
-      return { found: list.some((a) => a.id === createdCampaignId), total: list.length, via: "http" };
-    }
-    // Fallback: query diretta storage (l'endpoint pubblico è dietro feature flag)
+  async function probeActiveContains(_expected: boolean): Promise<{ found: boolean; total: number; via: "http" | "storage" }> {
+    // L'endpoint pubblico /api/ads/placement/all ora filtra intenzionalmente
+    // le campagne __selfcheck__* per non mostrarle agli utenti reali.
+    // Il self-check usa quindi la query storage diretta per verificare che il
+    // toggle isActive funzioni correttamente, indipendentemente da ads_enabled.
     const list = await storage.getActiveAdsByUserType("biker");
-    void expected;
     return { found: list.some((a) => a.id === createdCampaignId), total: list.length, via: "storage" };
   }
 
@@ -386,18 +374,40 @@ export async function runCampaignsSelfCheck(opts: RunSelfCheckOpts): Promise<Cam
   } finally {
     // Cleanup di sicurezza: probe privata sempre rimossa
     try { await deleteObject(privateObjectPath); } catch {/* ignore */}
+
+    // Helper: tenta la DELETE HTTP con max `maxAttempts` tentativi (retry su errore).
+    async function deleteProbeWithRetry(id: string, label: string, maxAttempts = 2): Promise<void> {
+      for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        try {
+          const r = await httpProbe("DELETE", `/api/admin/advertisements/${id}`);
+          if (r.status === 200 || r.status === 404) return;
+          if (attempt < maxAttempts) {
+            await new Promise((res) => setTimeout(res, 500 * attempt));
+          } else {
+            console.warn(`[campaigns-self-check] WARN: campagna test non eliminata, id=${id} label=${label} status=${r.status}`);
+          }
+        } catch (e) {
+          if (attempt < maxAttempts) {
+            await new Promise((res) => setTimeout(res, 500 * attempt));
+          } else {
+            console.warn(`[campaigns-self-check] WARN: campagna test non eliminata, id=${id} label=${label} err=${(e as Error)?.message}`);
+          }
+        }
+      }
+    }
+
     // Se la DELETE HTTP non è andata, prova a forzare via probe HTTP (idempotente)
     if (createdCampaignId) {
       try {
         const stillExists = await objectExists(publicObjectPath);
         if (stillExists) await deleteObject(publicObjectPath);
       } catch {/* ignore */}
-      try { await httpProbe("DELETE", `/api/admin/advertisements/${createdCampaignId}`); } catch {/* ignore */}
+      await deleteProbeWithRetry(createdCampaignId, "admin-probe");
     }
     // La route moderatore non espone DELETE: la campagna creata dal probe viene
     // rimossa tramite la route admin (idempotente, stesso storage).
     if (modCampaignId) {
-      try { await httpProbe("DELETE", `/api/admin/advertisements/${modCampaignId}`); } catch {/* ignore */}
+      await deleteProbeWithRetry(modCampaignId, "mod-probe");
     }
   }
 

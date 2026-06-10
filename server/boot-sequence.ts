@@ -209,6 +209,16 @@ export async function runBootSequence(server: Server, errorHandlersReady: Promis
     console.warn("[INIT] Phase 3: maps_telemetry_events ensure failed (non-fatal):", e);
   }
 
+  // Pre-warm ad image cache so images survive restarts without first-request fetch
+  setImmediate(async () => {
+    try {
+      const { warmupAdImageCache } = await import("./routes/ads");
+      await warmupAdImageCache();
+    } catch (e) {
+      console.warn("[INIT][BG] warmupAdImageCache error:", e);
+    }
+  });
+
   bootLog(3, TOTAL, "DB Init", "done");
 
   // ── Phase 4: Seed + Core services (FATAL — timeout → process.exit) ────────

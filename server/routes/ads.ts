@@ -189,9 +189,9 @@ router.get("/images/:filename", async (req: Request, res: Response) => {
     res.setHeader("Cache-Control", "public, max-age=31536000");
     return res.send(imageBuffer);
   } catch (error) {
-    console.error("Ad image serve error:", error);
+    console.error(`[ADS IMAGE] 404 — file "${filename}" non trovato su Object Storage:`, error);
     res.setHeader("Cache-Control", "no-store");
-    return sendError(res, 404, "Immagine non trovata");
+    return sendError(res, 404, `Immagine non trovata: ${filename}`);
   }
 });
 
@@ -206,6 +206,7 @@ router.get("/active", async (req: Request, res: Response) => {
 
     const now = new Date();
     const activeCampaigns = campaigns.filter((c) => {
+      if (c.name.startsWith("__selfcheck__")) return false;
       if (c.startDate && new Date(c.startDate) > now) return false;
       if (c.endDate && new Date(c.endDate) < now) return false;
       return true;
@@ -242,6 +243,7 @@ router.get("/my-ads", async (req: Request, res: Response) => {
 
     const now = new Date();
     const activeCampaigns = campaigns.filter((c) => {
+      if (c.name.startsWith("__selfcheck__")) return false;
       if (c.startDate && new Date(c.startDate) > now) return false;
       if (c.endDate && new Date(c.endDate) < now) return false;
       const p = c.placement || "all";
@@ -274,6 +276,7 @@ router.get("/placement/:placement", async (req: Request, res: Response) => {
 
     const now = new Date();
     const activeCampaigns = campaigns.filter((c) => {
+      if (c.name.startsWith("__selfcheck__")) return false;
       if (c.startDate && new Date(c.startDate) > now) return false;
       if (c.endDate && new Date(c.endDate) < now) return false;
       const cp = c.placement || "all";
