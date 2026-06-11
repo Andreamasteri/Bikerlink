@@ -225,6 +225,30 @@ if [ "$RUNTIME_VERSION_HARDCODED" = true ]; then
   exit 1
 fi
 
+# ── GUARD REGISTRY ↔ MIGRATION DRIFT (pre-boot guard) ────────
+# Verifica che ogni tabella dichiarata nel registry Drizzle sia coperta da
+# almeno un file di migration numerato. Stessa guardia che gira in boot-sequence
+# Phase 2b — qui viene anticipata al merge così lo sviluppatore riceve feedback
+# immediato senza dover avviare il server.
+echo "════════════════════════════════════════"
+echo "  Guard Registry ↔ Migration drift"
+echo "════════════════════════════════════════"
+SCHEMA_DRIFT_EXIT=0
+npx tsx server/scripts/check-schema-migration-drift.ts 2>&1 || SCHEMA_DRIFT_EXIT=$?
+if [ "$SCHEMA_DRIFT_EXIT" -eq 0 ]; then
+  echo "✅ Registry ↔ Migration: nessun nuovo drift rilevato."
+elif [ "$SCHEMA_DRIFT_EXIT" -eq 2 ]; then
+  echo "⚠️  Registry ↔ Migration check: impossibile leggere le migration (exit 2) — verificare manualmente."
+else
+  echo "❌ Registry ↔ Migration DRIFT rilevato — tabelle o colonne senza migration numerata."
+  echo "   Crea il file migrations/NNNN_*.sql con le DDL mancanti prima di procedere."
+  echo "════════════════════════════════════════"
+  echo ""
+  exit "$SCHEMA_DRIFT_EXIT"
+fi
+echo "════════════════════════════════════════"
+echo ""
+
 # ── CLEANUP UTENTI SMOKE RESIDUI POST-MERGE ──────────────────
 echo "════════════════════════════════════════"
 echo "  Cleanup utenti smoke residui"

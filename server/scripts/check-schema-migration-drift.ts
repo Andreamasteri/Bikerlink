@@ -41,26 +41,55 @@ const KNOWN_UNMIGRATED = new Set<string>([
   // match_negative_preferences è coperta da 0077_align_match_negative_preferences.sql.
 ]);
 
-/** Legge le migration in ordine numerico e le concatena come elenco ordinato. */
-function loadMigrationFiles(): string[] {
+// ── Exported result type ────────────────────────────────────────────────────
+
+export interface DriftCheckResult {
+  ok: boolean;
+  /** Tables declared in the registry with no covering CREATE TABLE in any migration. */
+  newTables: string[];
+  /** Columns declared in the registry with no covering ADD COLUMN for their table. */
+  newColumns: string[];
+  /** Known-baseline drift entries that were found (non-blocking). */
+  knownHits: string[];
+}
+
+// ── I/O helpers ─────────────────────────────────────────────────────────────
+
+/**
+ * Reads migration file contents in sort order.
+ * Throws an Error on I/O failure (never calls process.exit).
+ * Used by runDriftCheck() so it can be embedded in the boot pipeline.
+ */
+function loadMigrationContents(): string[] {
   let files: string[];
   try {
     files = readdirSync(MIGRATIONS_DIR)
       .filter((f) => f.endsWith(".sql"))
-      .sort(); // ordine documentale = ordine di applicazione
+      .sort();
   } catch (e) {
-    console.error(`[schema-drift] impossibile leggere ${MIGRATIONS_DIR}:`, (e as Error).message);
-    process.exit(2);
+    throw new Error(
+      `[schema-drift] impossibile leggere ${MIGRATIONS_DIR}: ${(e as Error).message}`,
+    );
   }
   if (!files.length) {
-    console.error("[schema-drift] nessun file .sql in migrations/ — atteso almeno il baseline");
-    process.exit(2);
+    throw new Error(
+      "[schema-drift] nessun file .sql in migrations/ — atteso almeno il baseline",
+    );
   }
   return files.map((f) => readFileSync(join(MIGRATIONS_DIR, f), "utf8"));
 }
 
-function main(): void {
-  const migrationSchema = buildMigrationSchema(loadMigrationFiles());
+// ── Core check (exported for programmatic use) ───────────────────────────────
+
+/**
+ * Compares every table/column declared in the Drizzle registry against the set
+ * of numbered migration files. Pure structural check — no DB connection needed.
+ *
+ * Throws if the migrations directory cannot be read (let the caller decide
+ * whether to treat that as fatal or non-fatal).
+ */
+export function runDriftCheck(): DriftCheckResult {
+  const migrationSchema = buildMigrationSchema(loadMigrationContents());
   const declared = listDeclaredTables();
 
   const newTables: string[] = [];
@@ -73,7 +102,6 @@ function main(): void {
     if (!migCols) {
       if (KNOWN_UNMIGRATED.has(tableName)) knownHits.push(tableName);
       else newTables.push(tableName);
-      // Se manca l'intera tabella non ha senso elencarne le colonne.
       continue;
     }
     for (const c of t.columns) {
@@ -84,15 +112,36 @@ function main(): void {
     }
   }
 
+  return {
+    ok: newTables.length === 0 && newColumns.length === 0,
+    newTables,
+    newColumns,
+    knownHits,
+  };
+}
+
+// ── CLI entry-point ──────────────────────────────────────────────────────────
+
+function main(): void {
+  let result: DriftCheckResult;
+  try {
+    result = runDriftCheck();
+  } catch (e) {
+    console.error((e as Error).message);
+    process.exit(2);
+  }
+
+  const { ok, newTables, newColumns, knownHits } = result;
+
   if (knownHits.length) {
     console.log(`[schema-drift] drift noto (baseline, non bloccante): ${knownHits.length}`);
     for (const k of knownHits) console.log(`  • ${k}`);
   }
 
-  const total = newTables.length + newColumns.length;
-  if (total === 0) {
+  if (ok) {
+    const declared = newTables.length + newColumns.length + knownHits.length;
     console.log(
-      `[schema-drift] OK — ${declared.length} tabelle dichiarate coperte dalle migration (verifica table-qualified); nessun NUOVO drift registry↔migration.`,
+      `[schema-drift] OK — tabelle dichiarate coperte dalle migration (verifica table-qualified); nessun NUOVO drift registry↔migration.`,
     );
     process.exit(0);
   }
@@ -117,4 +166,10 @@ function main(): void {
   process.exit(1);
 }
 
-main();
+// Guard: only run as CLI entry-point, never when imported as a module.
+// When this file is `import()`-ed by boot-sequence.ts at runtime, `main()` must
+// NOT execute — otherwise `process.exit(0)` would kill the whole server.
+const _currentFile = process.argv[1] ?? "";
+if (_currentFile.includes("check-schema-migration-drift")) {
+  main();
+}

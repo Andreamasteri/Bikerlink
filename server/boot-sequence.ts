@@ -86,6 +86,47 @@ export async function runBootSequence(server: Server, errorHandlersReady: Promis
     process.exit(1);
   }
 
+  // ── Phase 2b: Registry ↔ Migration structural drift guard (FATAL) ──────────
+  // Verifica PRIMA del boot che ogni tabella dichiarata nel registry Drizzle
+  // abbia un corrispondente CREATE TABLE in un file di migration numerato.
+  // Copre lo scenario: sviluppatore aggiunge tabella al registry + applica con
+  // `drizzle-kit push` senza creare il .sql → dev funziona, prod resta indietro.
+  // Check puramente strutturale: nessuna connessione al DB, legge solo i file.
+  try {
+    const { runDriftCheck } = await import("./scripts/check-schema-migration-drift");
+    const drift = runDriftCheck();
+    if (!drift.ok) {
+      console.error("──────────────────────────────────────────────────────────────");
+      console.error("[BOOT] FATAL — Registry ↔ Migration drift rilevato al pre-boot.");
+      console.error("Tabelle o colonne dichiarate in @shared/db senza migration numerata.");
+      console.error("La prod resterebbe indietro se questo container fosse promosso.");
+      console.error("──────────────────────────────────────────────────────────────");
+      if (drift.newTables.length) {
+        console.error(`  Tabelle senza migration (${drift.newTables.length}):`);
+        for (const t of drift.newTables) console.error(`    • ${t}`);
+      }
+      if (drift.newColumns.length) {
+        console.error(`  Colonne senza migration (${drift.newColumns.length}):`);
+        for (const c of drift.newColumns) console.error(`    • ${c}`);
+      }
+      console.error("  Azione: crea il file migrations/NNNN_*.sql con le DDL mancanti e riavvia.");
+      console.error("  (Se il drift è intenzionale e già in prod, aggiungilo a KNOWN_UNMIGRATED.)");
+      process.exit(1);
+    }
+    const baselineNote = drift.knownHits.length > 0
+      ? ` (${drift.knownHits.length} drift noti in baseline ignorati)`
+      : "";
+    console.log(`[BOOT] Registry ↔ Migration: OK — nessun nuovo drift${baselineNote}.`);
+  } catch (e) {
+    // Non-fatal: se il check stesso fallisce (es. migrations/ non accessibile in
+    // un ambiente di test) logghiamo un warning ma non blocchiamo il boot.
+    // Il runtime db-integrity check coprirà comunque il drift a boot completato.
+    console.warn(
+      "[BOOT] Registry ↔ Migration check fallito (non-fatal, db-integrity coprirà a runtime):",
+      (e as Error).message,
+    );
+  }
+
   // ── Phase 3: DB Init (non-fatal sub-steps) ────────────────────────────────
   bootLog(3, TOTAL, "DB Init", "start");
 
