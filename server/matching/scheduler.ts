@@ -1,4 +1,5 @@
 import { storage } from "../storage";
+import { bootJobQueue } from "../lib/boot-job-queue";
 import { runMatching, runWishlistMatching, getLastProposalMatchingStats, getLastWishlistMatchingStats } from "./run-matching";
 import { runBikerBikerMatching, runBikerBikerTypeStyleMatching } from "./run-biker";
 import { runClubBrandMatching } from "./run-clubs";
@@ -317,27 +318,23 @@ export function startMatchingEngine(): void {
 
   // Task #2516 — backfill embedding `music_taste` (one-shot per day, best-effort).
   // Guarded by AppSetting `music_backfill_last_ran_at`: skipped if < 23h ago.
-  // Delay di 4 min al boot per evitare contesa sul pool DB nelle prime fasi di avvio.
-  setTimeout(async () => {
-    try {
-      const lastRanSetting = await storage.getAppSetting("music_backfill_last_ran_at");
-      const lastRanAt = lastRanSetting?.value ? parseInt(lastRanSetting.value, 10) : 0;
-      const TWENTY_THREE_HOURS_MS = 23 * 60 * 60 * 1000;
-      if (Number.isFinite(lastRanAt) && Date.now() - lastRanAt < TWENTY_THREE_HOURS_MS) {
-        const elapsedH = ((Date.now() - lastRanAt) / 3_600_000).toFixed(1);
-        console.log(`[Matching] MusicEmbeddings backfill skipped — last ran ${elapsedH}h ago (<23h)`);
-        return;
-      }
-      const result = await runMusicEmbeddingsBackfill();
-      await storage.upsertAppSetting("music_backfill_last_ran_at", String(Date.now()));
-      console.log(
-        `[Matching] MusicEmbeddings backfill done — scanned=${result.scanned}` +
-        ` generated=${result.generated} cached=${result.cached} skipped=${result.skipped} errors=${result.errors}`,
-      );
-    } catch (err) {
-      console.error("[Matching] MusicEmbeddings backfill error (non-blocking):", err);
+  // Runs via bootJobQueue to avoid DB pool contention with other heavy boot jobs.
+  bootJobQueue.register("MusicEmbeddingsBackfill", async () => {
+    const lastRanSetting = await storage.getAppSetting("music_backfill_last_ran_at");
+    const lastRanAt = lastRanSetting?.value ? parseInt(lastRanSetting.value, 10) : 0;
+    const TWENTY_THREE_HOURS_MS = 23 * 60 * 60 * 1000;
+    if (Number.isFinite(lastRanAt) && Date.now() - lastRanAt < TWENTY_THREE_HOURS_MS) {
+      const elapsedH = ((Date.now() - lastRanAt) / 3_600_000).toFixed(1);
+      console.log(`[Matching] MusicEmbeddings backfill skipped — last ran ${elapsedH}h ago (<23h)`);
+      return;
     }
-  }, 4 * 60_000);
+    const result = await runMusicEmbeddingsBackfill();
+    await storage.upsertAppSetting("music_backfill_last_ran_at", String(Date.now()));
+    console.log(
+      `[Matching] MusicEmbeddings backfill done — scanned=${result.scanned}` +
+      ` generated=${result.generated} cached=${result.cached} skipped=${result.skipped} errors=${result.errors}`,
+    );
+  });
 
   // Delay di 3 min: la lettura di fake_users_enabled non è urgente al boot e la
   // contesa sul pool DB nei primi minuti causa timeout sporadici in produzione.
@@ -547,8 +544,8 @@ export function startMatchingEngine(): void {
       console.error("[Matching] BioAffinity ciclo errore:", err);
     }
   };
-  // Delay di 4 min (era 2 min): evita contesa pool DB nelle prime fasi del boot.
-  setTimeout(() => { runBioAffinitySafe(); }, 4 * 60 * 1000);
+  // Registered in bootJobQueue to avoid overlapping with other heavy boot jobs.
+  bootJobQueue.register("BioAffinityMatching", runBioAffinitySafe);
   _engineTimers.push(setInterval(runBioAffinitySafe, 30 * 60 * 1000));
   console.log("[Matching] BioAffinity matcher schedulato (30 min)");
 
@@ -580,7 +577,8 @@ export function startMatchingEngine(): void {
       addMatchLog("ERROR", "telemetry_affinity", `Errore TelemetryAffinity: ${err instanceof Error ? err.message : String(err)}`);
     }
   };
-  setTimeout(() => { runTelemetryAffinitySafe(); }, 5 * 60 * 1000);
+  // Registered in bootJobQueue to avoid overlapping with other heavy boot jobs.
+  bootJobQueue.register("TelemetryAffinityMatching", runTelemetryAffinitySafe);
   _engineTimers.push(setInterval(runTelemetryAffinitySafe, 24 * 60 * 60 * 1000));
   console.log("[Matching] TelemetryAffinity matcher schedulato (24h)");
 }

@@ -1,5 +1,6 @@
 import { db } from "./db";
 import { sql } from "drizzle-orm";
+import { bootJobQueue } from "./lib/boot-job-queue";
 
 /**
  * Phase 5 of the boot sequence: schedulers + maintenance jobs.
@@ -45,14 +46,12 @@ export async function runPhase5Schedulers(): Promise<void> {
   };
   const safeRunPlaylistSnapshot = () =>
     runPlaylistSnapshot().catch((e) => console.warn("[SNAPSHOT] runPlaylistSnapshot (interval) error:", e));
-  // Delay di 5 min al boot: runPlaylistSnapshot itera su tutti gli utenti con
-  // molte query DB — eseguirlo subito al boot aggrava la contesa sul pool.
-  setTimeout(() => {
+  // Registered in bootJobQueue to avoid overlapping with other heavy boot jobs.
+  bootJobQueue.register("PlaylistSnapshot", async () => {
     console.log("[INIT][BG] Starting runPlaylistSnapshot...");
-    runPlaylistSnapshot()
-      .then(() => console.log("[INIT][BG] runPlaylistSnapshot — done"))
-      .catch((e) => console.warn("[INIT][BG] runPlaylistSnapshot error:", e));
-  }, 5 * 60_000);
+    await runPlaylistSnapshot();
+    console.log("[INIT][BG] runPlaylistSnapshot — done");
+  });
   setInterval(safeRunPlaylistSnapshot, SIX_HOURS_MS);
 
   const { cleanupOrphanedAdImages } = await import("./routes/ads");
@@ -254,12 +253,11 @@ export async function runPhase5Schedulers(): Promise<void> {
     .then(({ startMotionSimulator }) => startMotionSimulator())
     .catch((e) => console.warn("[INIT] Background: motion simulator error:", e));
 
-  // Bio embedding back-fill: runs once at boot (delay 5 min), then every 24h.
+  // Bio embedding back-fill: runs once at boot (via bootJobQueue), then every 24h.
   // Catches users whose bio changed or whose embedding was missed due to API errors.
   // NOTE: The duplicate call in boot-sequence.ts has been removed — this is the
   // single source of truth for bio embedding back-fill scheduling.
-  // Delay di 5 min al boot: il backfill scansiona tutti gli utenti e genera
-  // embedding — eseguirlo subito al boot aggrava la contesa sul pool DB.
+  // Registered in bootJobQueue to avoid overlapping with other heavy boot jobs.
   const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
   const runBioBackfill = () =>
     import("./embeddings/backfill-bio")
@@ -271,10 +269,10 @@ export async function runPhase5Schedulers(): Promise<void> {
         ),
       )
       .catch((e) => console.warn("[EMBED BACKFILL] error:", e));
-  setTimeout(() => {
+  bootJobQueue.register("BioEmbeddingsBackfill", async () => {
     console.log("[INIT][BG] Starting backfillBioEmbeddings (boot-time pass)...");
-    void runBioBackfill();
-  }, 5 * 60_000);
+    await runBioBackfill();
+  });
   setInterval(runBioBackfill, TWENTY_FOUR_HOURS_MS);
   console.log("[INIT] Bio embedding back-fill scheduled (boot + every 24h)");
 
@@ -292,4 +290,9 @@ export async function runPhase5Schedulers(): Promise<void> {
   } catch (e) {
     console.warn("[INIT] Embedding cap alert job failed (non-fatal):", e);
   }
+
+  // Arm the boot-job queue here — phase 5 is the last boot phase, so all
+  // registrations from startMatchingEngine() and runPhase5Schedulers() are
+  // guaranteed to have happened before this point.
+  bootJobQueue.start();
 }
