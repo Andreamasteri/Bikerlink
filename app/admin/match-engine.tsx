@@ -1,13 +1,15 @@
 import React from "react";
-import { StyleSheet } from "react-native";
+import { StyleSheet, Text } from "react-native";
 import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollViewCompat";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "@/lib/theme-context";
 import { useT } from "@/lib/language-context";
 import { useAuth } from "@/lib/auth-context";
+import Colors from "@/constants/colors";
 
 import { MatchingEngineSection } from "@/components/admin/settings/MatchingEngineSection";
 import { useAdminSettingsState } from "@/components/admin/settings/useAdminSettingsState";
+import { EmbeddingCoverageCard } from "@/components/admin/matching/EmbeddingCoverageCard";
 
 export default function AdminMatchEngine() {
   const t = useT();
@@ -65,6 +67,9 @@ export default function AdminMatchEngine() {
         motoclubCreationPending={state.motoclubCreationMutation.isPending}
         matchingTriggerFeedback={state.matchingTriggerFeedback}
       />
+
+      <Text style={styles.sectionLabel}>EMBEDDING</Text>
+      <EmbeddingCoverageCard />
     </KeyboardAwareScrollViewCompat>
   );
 }
@@ -75,5 +80,14 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: 16,
+    gap: 12,
+  },
+  sectionLabel: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 11,
+    color: Colors.textSecondary,
+    letterSpacing: 0.8,
+    textTransform: "uppercase",
+    marginTop: 4,
   },
 });

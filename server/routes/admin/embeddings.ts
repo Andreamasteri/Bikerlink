@@ -182,4 +182,43 @@ router.get("/coverage", async (_req: Request, res: Response) => {
   }
 });
 
+/**
+ * PATCH /api/admin/embeddings/settings
+ *
+ * Updates embedding-related AppSettings: `embedding_ef_search` and/or
+ * `embedding_coverage_threshold`. Both are optional — only the keys present in
+ * the body are updated.
+ */
+const settingsBodySchema = z.object({
+  efSearch: z.number().int().min(1).max(1000).optional(),
+  coverageThreshold: z.number().int().min(0).max(100).optional(),
+});
+
+router.patch("/settings", async (req: Request, res: Response) => {
+  const parsed = settingsBodySchema.safeParse(req.body);
+  if (!parsed.success) {
+    return sendError(res, 400, "Body non valido");
+  }
+  const { efSearch, coverageThreshold } = parsed.data;
+  if (efSearch === undefined && coverageThreshold === undefined) {
+    return sendError(res, 400, "Nessun campo da aggiornare");
+  }
+
+  try {
+    const updates: Promise<unknown>[] = [];
+    if (efSearch !== undefined) {
+      updates.push(storage.upsertAppSetting("embedding_ef_search", String(efSearch)));
+    }
+    if (coverageThreshold !== undefined) {
+      updates.push(storage.upsertAppSetting("embedding_coverage_threshold", String(coverageThreshold)));
+    }
+    await Promise.all(updates);
+    return sendSuccess(res, { updated: true });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error("[admin/embeddings/settings] error:", msg);
+    return sendError(res, 500, `Errore salvataggio impostazioni embedding: ${msg}`);
+  }
+});
+
 export default router;
