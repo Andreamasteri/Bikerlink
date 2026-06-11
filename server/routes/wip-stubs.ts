@@ -222,22 +222,52 @@ router.delete("/proposals/matches/:id", requireAuth, async (req: Request, res: R
 
 // ── /api/rides/me/telemetry-stats (GET) ──────────────────────────────────
 // Shape attesa dal TelemetryProgressBanner: { km_collected, progress_pct, target_km }.
+// Usa la stessa query Haversine con filtro speed >= 20 di /api/telemetry/stats
+// per garantire che banner e pannello profilo mostrino sempre lo stesso valore.
 router.get("/rides/me/telemetry-stats", requireAuth, async (req: Request, res: Response) => {
   try {
     const userId = req.session.userId as string;
-    const { getUserStyleProfile } = await import("../curvy-score-job");
 
-    const [profile, targetSetting] = await Promise.all([
-      getUserStyleProfile(userId).catch(() => null),
+    const [kmResult, targetSetting] = await Promise.all([
+      db.execute(sql`
+        WITH ordered AS (
+          SELECT
+            lat,
+            lon,
+            speed_kmh,
+            LAG(lat) OVER (PARTITION BY session_id ORDER BY ts) AS prev_lat,
+            LAG(lon) OVER (PARTITION BY session_id ORDER BY ts) AS prev_lon
+          FROM ride_telemetry
+          WHERE user_id = ${userId}
+        ),
+        distances AS (
+          SELECT
+            2 * 6371 * ASIN(
+              SQRT(
+                POWER(SIN(RADIANS(lat - prev_lat) / 2), 2)
+                + COS(RADIANS(prev_lat)) * COS(RADIANS(lat))
+                * POWER(SIN(RADIANS(lon - prev_lon) / 2), 2)
+              )
+            ) AS dist_km
+          FROM ordered
+          WHERE prev_lat IS NOT NULL AND prev_lon IS NOT NULL
+            AND ABS(lat - prev_lat) < 0.5
+            AND ABS(lon - prev_lon) < 0.5
+            AND (speed_kmh IS NULL OR speed_kmh >= 20)
+        )
+        SELECT COALESCE(SUM(dist_km), 0) AS km_collected
+        FROM distances
+      `),
       storage.getAppSetting("telemetry_target_km").catch(() => undefined),
     ]);
 
+    const kmRow = kmResult.rows[0] as { km_collected: string } | undefined;
+    const kmCollected = Math.round(parseFloat(kmRow?.km_collected ?? "0") * 10) / 10;
     const targetKm = parseInt(targetSetting?.value ?? "400", 10) || 400;
-    const km = profile?.totalKm ?? 0;
-    const pct = Math.min(100, Math.round((km / Math.max(1, targetKm)) * 100));
+    const pct = Math.min(100, Math.round((kmCollected / Math.max(1, targetKm)) * 100));
 
     return res.json({
-      km_collected: Math.round(km * 10) / 10,
+      km_collected: kmCollected,
       progress_pct: pct,
       target_km: targetKm,
     });
