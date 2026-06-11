@@ -210,8 +210,7 @@ async function checkRegistryVsUi() {
   const aggregate = Object.values(contents).join("\n");
   const gaps: Gap[] = [];
   for (const t of MATCHING_REGISTRY) {
-    // Le voci affinity-only (table === null) non richiedono un controllo UI.
-    if (t.table === null) continue;
+    if (t.table === null) continue; // affinity-only: no UI control required
     const referenced = aggregate.includes(t.key) || aggregate.includes(t.prefColumn);
     if (!referenced) {
       gaps.push({
