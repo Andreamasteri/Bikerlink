@@ -443,18 +443,5 @@ export async function runBootSequence(server: Server, errorHandlersReady: Promis
         });
     }
 
-    console.log("[INIT][BG] Starting backfillBioEmbeddings (back-fill stale/missing bio embeddings)...");
-    import("./embeddings/backfill-bio")
-      .then(({ backfillBioEmbeddings }) => backfillBioEmbeddings())
-      .then((r) =>
-        console.log(
-          `[INIT][BG] backfillBioEmbeddings — done` +
-          ` processed=${r.processed} backfilled=${r.backfilled}` +
-          ` skipped=${r.skipped} errors=${r.errors}`,
-        ),
-      )
-      .catch((err) => {
-        console.warn("[INIT][BG] backfillBioEmbeddings error:", err);
-      });
   });
 }

@@ -8,7 +8,10 @@ import {
   EMBEDDING_DIMENSIONS,
 } from "../../embeddings";
 import { pool } from "../../db";
+import { db } from "../../db";
+import { sql } from "drizzle-orm";
 import { storage } from "../../storage";
+import { getTodayEmbeddingApiCallCount } from "../../embeddings/store";
 
 const router = Router();
 
@@ -218,6 +221,74 @@ router.patch("/settings", async (req: Request, res: Response) => {
     const msg = err instanceof Error ? err.message : String(err);
     console.error("[admin/embeddings/settings] error:", msg);
     return sendError(res, 500, `Errore salvataggio impostazioni embedding: ${msg}`);
+  }
+});
+
+/**
+ * GET /api/admin/embeddings/stats
+ *
+ * Returns:
+ *   - lastReport: the latest daily report from AppSetting `embedding_daily_report`
+ *   - last7Days: per-day totals from embedding_call_log (API calls, cache hits, local fallback)
+ *   - cap: current configured daily cap (AppSetting `embedding_daily_cap`, default 500)
+ *   - todayApiCalls: in-memory counter for the current day
+ */
+router.get("/stats", async (_req: Request, res: Response) => {
+  try {
+    const [reportSetting, capSetting] = await Promise.all([
+      storage.getAppSetting("embedding_daily_report"),
+      storage.getAppSetting("embedding_daily_cap"),
+    ]);
+
+    const lastReport = reportSetting?.valueJson ?? null;
+    const cap = capSetting?.value ? parseInt(capSetting.value, 10) : 500;
+    const todayApiCalls = getTodayEmbeddingApiCallCount();
+
+    // Last 7 days of totals from embedding_call_log
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+    const rows7d = await db.execute<{
+      day: string;
+      model: string;
+      cached: boolean;
+      cnt: string;
+    }>(sql`
+      SELECT
+        DATE(created_at AT TIME ZONE 'UTC') AS day,
+        model,
+        cached,
+        COUNT(*) AS cnt
+      FROM embedding_call_log
+      WHERE created_at >= ${sevenDaysAgo}::timestamptz
+      GROUP BY day, model, cached
+      ORDER BY day
+    `);
+
+    type DayEntry = { apiCalls: number; cacheHits: number; localFallback: number };
+    const dayMap = new Map<string, DayEntry>();
+    for (const r of (rows7d.rows ?? []) as { day: string; model: string; cached: boolean; cnt: string }[]) {
+      const day = typeof r.day === "string" ? r.day.slice(0, 10) : new Date(r.day).toISOString().slice(0, 10);
+      const cnt = parseInt(r.cnt, 10);
+      if (!dayMap.has(day)) dayMap.set(day, { apiCalls: 0, cacheHits: 0, localFallback: 0 });
+      const entry = dayMap.get(day)!;
+      if (r.cached) entry.cacheHits += cnt;
+      else if (r.model.startsWith("local:")) entry.localFallback += cnt;
+      else entry.apiCalls += cnt;
+    }
+
+    const last7Days = Array.from(dayMap.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([date, v]) => ({ date, ...v }));
+
+    return sendSuccess(res, {
+      lastReport,
+      last7Days,
+      cap: Number.isFinite(cap) && cap > 0 ? cap : 500,
+      todayApiCalls,
+    });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error("[admin/embeddings/stats] error:", msg);
+    return sendError(res, 500, `Errore stats embedding: ${msg}`);
   }
 });
 

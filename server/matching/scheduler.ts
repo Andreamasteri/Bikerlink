@@ -308,12 +308,27 @@ const _engineCrons: Cron[] = [];
 export function startMatchingEngine(): void {
   console.log("[Matching] Engine avviato — modalità on-demand (trigger da login utente)");
 
-  // Task #2516 — backfill embedding `music_taste` (one-shot, best-effort).
-  // Eseguito in background con ritardo per non rallentare il boot.
-  setTimeout(() => {
-    runMusicEmbeddingsBackfill().catch((err) => {
+  // Task #2516 — backfill embedding `music_taste` (one-shot per day, best-effort).
+  // Guarded by AppSetting `music_backfill_last_ran_at`: skipped if < 23h ago.
+  setTimeout(async () => {
+    try {
+      const lastRanSetting = await storage.getAppSetting("music_backfill_last_ran_at");
+      const lastRanAt = lastRanSetting?.value ? parseInt(lastRanSetting.value, 10) : 0;
+      const TWENTY_THREE_HOURS_MS = 23 * 60 * 60 * 1000;
+      if (Number.isFinite(lastRanAt) && Date.now() - lastRanAt < TWENTY_THREE_HOURS_MS) {
+        const elapsedH = ((Date.now() - lastRanAt) / 3_600_000).toFixed(1);
+        console.log(`[Matching] MusicEmbeddings backfill skipped — last ran ${elapsedH}h ago (<23h)`);
+        return;
+      }
+      const result = await runMusicEmbeddingsBackfill();
+      await storage.upsertAppSetting("music_backfill_last_ran_at", String(Date.now()));
+      console.log(
+        `[Matching] MusicEmbeddings backfill done — scanned=${result.scanned}` +
+        ` generated=${result.generated} cached=${result.cached} skipped=${result.skipped} errors=${result.errors}`,
+      );
+    } catch (err) {
       console.error("[Matching] MusicEmbeddings backfill error (non-blocking):", err);
-    });
+    }
   }, 30_000);
 
   (async () => {

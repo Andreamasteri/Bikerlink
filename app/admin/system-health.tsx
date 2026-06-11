@@ -20,6 +20,7 @@ import { TrendsChart } from "@/components/admin/system-health/TrendsChart";
 import { MapsHealthCard } from "@/components/admin/system-health/MapsHealthCard";
 import { useAdminWatchdogAlerts } from "@/hooks/useAdminWatchdogAlerts";
 import { WhisperWatchdogBadge, type WhisperHealthData } from "@/components/admin/WhisperWatchdogBadge";
+import { EmbeddingUsageCard } from "@/components/admin/EmbeddingUsageCard";
 
 interface Snapshot {
   status: "green" | "yellow" | "orange" | "red";
@@ -239,6 +240,9 @@ export default function SystemHealthScreen() {
 
           <SectionTitle icon="chat-processing-outline">Chat con il Watchdog</SectionTitle>
           <WatchdogChat />
+
+          <SectionTitle icon="vector-point">Embedding Usage</SectionTitle>
+          <EmbeddingUsageCard />
         </>
       )}
     </ScrollView>

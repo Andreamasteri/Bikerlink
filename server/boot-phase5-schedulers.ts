@@ -247,19 +247,33 @@ export async function runPhase5Schedulers(): Promise<void> {
     .then(({ startMotionSimulator }) => startMotionSimulator())
     .catch((e) => console.warn("[INIT] Background: motion simulator error:", e));
 
-  // Nightly bio embedding back-fill: catches any users whose bio changed after
-  // the boot-time pass, or whose embedding was missed due to API errors.
+  // Bio embedding back-fill: runs once at boot (setImmediate), then every 24h.
+  // Catches users whose bio changed or whose embedding was missed due to API errors.
+  // NOTE: The duplicate call in boot-sequence.ts has been removed — this is the
+  // single source of truth for bio embedding back-fill scheduling.
   const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
-  setInterval(() => {
+  const runBioBackfill = () =>
     import("./embeddings/backfill-bio")
       .then(({ backfillBioEmbeddings }) => backfillBioEmbeddings())
       .then((r) =>
         console.log(
-          `[EMBED BACKFILL][nightly] Done — processed=${r.processed}` +
+          `[EMBED BACKFILL] Done — processed=${r.processed}` +
           ` backfilled=${r.backfilled} skipped=${r.skipped} errors=${r.errors}`,
         ),
       )
-      .catch((e) => console.warn("[EMBED BACKFILL][nightly] error:", e));
-  }, TWENTY_FOUR_HOURS_MS);
-  console.log("[INIT] Bio embedding nightly back-fill scheduled (every 24h)");
+      .catch((e) => console.warn("[EMBED BACKFILL] error:", e));
+  setImmediate(() => {
+    console.log("[INIT][BG] Starting backfillBioEmbeddings (boot-time pass)...");
+    void runBioBackfill();
+  });
+  setInterval(runBioBackfill, TWENTY_FOUR_HOURS_MS);
+  console.log("[INIT] Bio embedding back-fill scheduled (boot + every 24h)");
+
+  try {
+    const { scheduleEmbeddingDailyReport } = await import("./jobs/embedding-daily-report");
+    scheduleEmbeddingDailyReport();
+    console.log("[INIT] Embedding daily report job scheduled (08:15 Europe/Rome)");
+  } catch (e) {
+    console.warn("[INIT] Embedding daily report scheduler failed (non-fatal):", e);
+  }
 }

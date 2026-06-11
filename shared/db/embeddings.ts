@@ -6,6 +6,9 @@ import {
   vector,
   uniqueIndex,
   index,
+  serial,
+  text,
+  boolean,
 } from "drizzle-orm/pg-core";
 
 /**
@@ -46,3 +49,27 @@ export const embeddings = pgTable(
 
 export type Embedding = typeof embeddings.$inferSelect;
 export type NewEmbedding = typeof embeddings.$inferInsert;
+
+/**
+ * Audit log for every embedding operation (API call or cache hit).
+ * Used for daily usage analysis, anomaly detection, and hard daily cap enforcement.
+ * Rows are purged after 30 days by the log-retention job.
+ */
+export const embeddingCallLog = pgTable(
+  "embedding_call_log",
+  {
+    id: serial("id").primaryKey(),
+    entityType: text("entity_type").notNull(),
+    entityId: text("entity_id").notNull(),
+    field: text("field").notNull(),
+    model: text("model").notNull(),
+    cached: boolean("cached").notNull().default(false),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index("embedding_call_log_created_at_idx").on(table.createdAt),
+  ],
+);
+
+export type EmbeddingCallLog = typeof embeddingCallLog.$inferSelect;
+export type NewEmbeddingCallLog = typeof embeddingCallLog.$inferInsert;

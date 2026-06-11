@@ -100,6 +100,19 @@ async function generateLocal(text: string): Promise<number[]> {
   return projectTo1536(arr);
 }
 
+/**
+ * Force local HF embedding regardless of OPENAI_API_KEY presence.
+ * Used by the hard daily cap path in upsertEmbedding so we never call OpenAI
+ * when the cap is reached, without needing to monkey-patch env vars.
+ */
+export async function generateLocalEmbedding(text: string): Promise<number[]> {
+  const cleaned = text?.trim();
+  if (!cleaned) throw new Error("generateLocalEmbedding: testo vuoto");
+  const vec = await generateLocal(cleaned);
+  _lastUsedModelTag = LOCAL_EMBEDDING_MODEL_TAG;
+  return vec;
+}
+
 async function generateLocalMany(texts: string[]): Promise<number[][]> {
   const pipe = await getLocalPipeline();
   const out = await pipe(texts, { pooling: "mean", normalize: true });

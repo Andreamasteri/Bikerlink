@@ -19,6 +19,7 @@ import {
   systemHealthSnapshot,
   systemSignals,
   mapsTelemetryEvents,
+  embeddingCallLog,
   appSettings,
 } from "@shared/db";
 
@@ -42,6 +43,7 @@ const RETENTION_TARGETS: RetentionTarget[] = [
   // non gira), così la policy di retention resta coerente a 7gg.
   { name: "system_signals", table: systemSignals, tsColumn: systemSignals.createdAt, retentionDays: 7 },
   { name: "maps_telemetry_events", table: mapsTelemetryEvents, tsColumn: mapsTelemetryEvents.createdAt, retentionDays: 7 },
+  { name: "embedding_call_log", table: embeddingCallLog, tsColumn: embeddingCallLog.createdAt, retentionDays: 30 },
 ];
 
 const GPS_ERRORS_FULL_PURGE_FLAG = "logRetention.gpsErrorsPurgedV1";
