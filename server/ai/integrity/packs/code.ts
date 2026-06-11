@@ -250,6 +250,27 @@ const codeDuplicationCheck: AppIntegrityCheck = {
           const b = c?.secondFile ?? {};
           const aPath = relWithin(ctx.projectRoot, a.name ?? "");
           const bPath = relWithin(ctx.projectRoot, b.name ?? "");
+
+          // Extractability hints -------------------------------------------
+          const aTop = aPath.split("/")[0] ?? "";
+          const bTop = bPath.split("/")[0] ?? "";
+          const familyHint: "same" | "cross" = aTop === bTop ? "same" : "cross";
+
+          // Longest common directory prefix → suggest extraction target
+          const aSegs = aPath.split("/").slice(0, -1);
+          const bSegs = bPath.split("/").slice(0, -1);
+          const commonSegs: string[] = [];
+          for (let i = 0; i < Math.min(aSegs.length, bSegs.length); i++) {
+            if (aSegs[i] === bSegs[i]) commonSegs.push(aSegs[i]!);
+            else break;
+          }
+          const suggestedExtract = commonSegs.length
+            ? `${commonSegs.join("/")}/shared.ts`
+            : familyHint === "same"
+            ? `${aTop}/shared.ts`
+            : null;
+          // ----------------------------------------------------------------
+
           return {
             pk: `${aPath}↔${bPath}`,
             data: {
@@ -257,6 +278,8 @@ const codeDuplicationCheck: AppIntegrityCheck = {
               b: { path: bPath, start: b.start, end: b.end },
               lines: c?.lines ?? null,
               tokens: c?.tokens ?? null,
+              family_hint: familyHint,
+              suggested_extract: suggestedExtract,
             },
           };
         });

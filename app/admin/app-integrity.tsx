@@ -260,7 +260,12 @@ function FamilyTab({ label, active, count, onPress }: { label: string; active: b
 }
 
 type DupFileRef = { path?: string; start?: number; end?: number };
-type DupData = { a?: DupFileRef; b?: DupFileRef; lines?: number | null; tokens?: number | null };
+type DupData = {
+  a?: DupFileRef; b?: DupFileRef;
+  lines?: number | null; tokens?: number | null;
+  family_hint?: "same" | "cross" | null;
+  suggested_extract?: string | null;
+};
 
 function DuplicationSampleList({ sample }: { sample: Array<{ pk?: string; data: Record<string, unknown> }> }) {
   const [copied, setCopied] = useState<string | null>(null);
@@ -273,21 +278,28 @@ function DuplicationSampleList({ sample }: { sample: Array<{ pk?: string; data: 
 
   const sorted = [...sample]
     .map((s) => ({ pk: s.pk, d: s.data as unknown as DupData }))
-    .sort((a, b) => ((b.d.tokens ?? 0) as number) - ((a.d.tokens ?? 0) as number));
+    .sort((a, b) => {
+      // easy wins (same family) first, then by token count descending
+      const aEasy = a.d.family_hint === "same" ? 1 : 0;
+      const bEasy = b.d.family_hint === "same" ? 1 : 0;
+      if (bEasy !== aEasy) return bEasy - aEasy;
+      return ((b.d.tokens ?? 0) as number) - ((a.d.tokens ?? 0) as number);
+    });
 
   if (!sorted.length) return <Text style={styles.cardMeta}>Nessun duplicato rilevato.</Text>;
 
   return (
     <View style={{ gap: 8, marginTop: 4 }}>
       {sorted.map((item) => {
-        const { a, b, lines, tokens } = item.d;
+        const { a, b, lines, tokens, family_hint, suggested_extract } = item.d;
         const aPath = a?.path ?? "?";
         const bPath = b?.path ?? "?";
         const aRange = a?.start != null && a?.end != null ? `L${a.start}–${a.end}` : null;
         const bRange = b?.start != null && b?.end != null ? `L${b.start}–${b.end}` : null;
         const cardKey = item.pk ?? `${aPath}↔${bPath}`;
+        const isEasyWin = family_hint === "same";
         return (
-          <View key={cardKey} style={styles.dupCard}>
+          <View key={cardKey} style={[styles.dupCard, isEasyWin && styles.dupCardEasyWin]}>
             <View style={styles.dupBadgeRow}>
               {tokens != null && (
                 <View style={styles.dupTokenBadge}>
@@ -298,6 +310,17 @@ function DuplicationSampleList({ sample }: { sample: Array<{ pk?: string; data: 
               {lines != null && (
                 <Text style={styles.dupLineMeta}>{lines} righe duplicate</Text>
               )}
+              {family_hint === "same" ? (
+                <View style={styles.dupFamilyBadgeSame}>
+                  <MaterialCommunityIcons name="check-circle-outline" size={11} color="#fff" />
+                  <Text style={styles.dupFamilyBadgeText}>stesso dominio</Text>
+                </View>
+              ) : family_hint === "cross" ? (
+                <View style={styles.dupFamilyBadgeCross}>
+                  <MaterialCommunityIcons name="swap-horizontal" size={11} color="#fff" />
+                  <Text style={styles.dupFamilyBadgeText}>cross-dominio</Text>
+                </View>
+              ) : null}
             </View>
             <TouchableOpacity style={styles.dupFileRow} onPress={() => copyPath(aPath)} activeOpacity={0.7}>
               <MaterialCommunityIcons
@@ -324,6 +347,14 @@ function DuplicationSampleList({ sample }: { sample: Array<{ pk?: string; data: 
               </View>
               <Text style={styles.dupCopyHint}>{copied === bPath ? "copiato" : "copia path"}</Text>
             </TouchableOpacity>
+            {isEasyWin && suggested_extract && (
+              <View style={styles.dupExtractHint}>
+                <MaterialCommunityIcons name="lightbulb-outline" size={12} color={Colors.success} />
+                <Text style={styles.dupExtractText} numberOfLines={2}>
+                  Estrai in: <Text style={styles.dupExtractPath}>{suggested_extract}</Text>
+                </Text>
+              </View>
+            )}
           </View>
         );
       })}
@@ -371,13 +402,20 @@ const styles = StyleSheet.create({
   tabBadge: { backgroundColor: "#00000040", borderRadius: 8, paddingHorizontal: 6, paddingVertical: 1 },
   tabBadgeText: { color: "#fff", fontSize: 10, fontFamily: "Inter_600SemiBold" },
   dupCard: { backgroundColor: Colors.background, borderRadius: 8, padding: 10, borderWidth: 1, borderColor: Colors.surface, gap: 6 },
-  dupBadgeRow: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 2 },
+  dupCardEasyWin: { borderColor: Colors.success, borderWidth: 1.5 },
+  dupBadgeRow: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 2, flexWrap: "wrap" },
   dupTokenBadge: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: "#ff7a00", paddingHorizontal: 7, paddingVertical: 3, borderRadius: 6 },
   dupTokenText: { color: "#fff", fontSize: 11, fontFamily: "Inter_600SemiBold" },
   dupLineMeta: { color: Colors.textSecondary, fontSize: 11 },
+  dupFamilyBadgeSame: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: Colors.success, paddingHorizontal: 7, paddingVertical: 3, borderRadius: 6 },
+  dupFamilyBadgeCross: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: Colors.textSecondary, paddingHorizontal: 7, paddingVertical: 3, borderRadius: 6 },
+  dupFamilyBadgeText: { color: "#fff", fontSize: 11, fontFamily: "Inter_600SemiBold" },
   dupFileRow: { flexDirection: "row", alignItems: "flex-start", gap: 8, paddingVertical: 2 },
   dupFilePath: { color: Colors.accent, fontSize: 12, fontFamily: "Inter_400Regular", flex: 1 },
   dupLineRange: { color: Colors.textSecondary, fontSize: 11, marginTop: 1 },
   dupDivider: { height: 1, backgroundColor: Colors.surface, marginVertical: 2 },
   dupCopyHint: { color: Colors.textSecondary, fontSize: 10, marginLeft: 4, alignSelf: "center" },
+  dupExtractHint: { flexDirection: "row", alignItems: "flex-start", gap: 6, marginTop: 2, paddingTop: 6, borderTopWidth: 1, borderTopColor: Colors.surface },
+  dupExtractText: { flex: 1, color: Colors.textSecondary, fontSize: 11 },
+  dupExtractPath: { color: Colors.success, fontFamily: "Inter_600SemiBold" },
 });
