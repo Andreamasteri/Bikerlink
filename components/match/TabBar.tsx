@@ -52,7 +52,8 @@ export function TabBar({ activeTab, setActiveTab, tabs }: TabBarProps) {
   const total = tabs.length;
   const row1 = tabs.slice(0, 3);
   const row2 = tabs.slice(3, Math.min(5, total));
-  const row3 = tabs.slice(5, total);
+  const row3 = tabs.slice(5, 8);
+  const row4 = tabs.slice(8, total);
 
   return (
     <View style={styles.container}>
@@ -75,6 +76,15 @@ export function TabBar({ activeTab, setActiveTab, tabs }: TabBarProps) {
           ))}
         </View>
       </View>
+      {row4.length > 0 && (
+        <View style={styles.row}>
+          <View style={styles.innerRowCentered}>
+            {row4.map((tab) => (
+              <TabItem key={tab.key} tab={tab} active={activeTab === tab.key} onPress={() => setActiveTab(tab.key)} />
+            ))}
+          </View>
+        </View>
+      )}
     </View>
   );
 }
