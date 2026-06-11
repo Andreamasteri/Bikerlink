@@ -106,6 +106,7 @@ export default function ProfileScreen() {
     progress_pct: number;
     target_km: number;
     track_km: number;
+    ideal_lap_km: number;
   }>({
     queryKey: ["/api/telemetry/stats"],
     enabled: !!user,

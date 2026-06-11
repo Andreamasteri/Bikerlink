@@ -35,6 +35,7 @@ type TelemetryStats = {
   progress_pct: number;
   target_km: number;
   track_km: number;
+  ideal_lap_km: number;
 };
 
 type Props = {
@@ -151,6 +152,15 @@ export default function TelemetryPanel({ telemetryStats }: Props) {
               <Text style={styles.trackKmLabel}>Km in pista</Text>
             </View>
             <Text style={styles.trackKmValue}>{telemetryStats.track_km.toFixed(1)} km</Text>
+          </View>
+        )}
+        {telemetryStats.ideal_lap_km > 0 && (
+          <View style={styles.trackKmRow}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
+              <Ionicons name="navigate-outline" size={13} color="#8e44ad" />
+              <Text style={[styles.trackKmLabel, { color: "#8e44ad" }]}>Km Giro Ideale</Text>
+            </View>
+            <Text style={[styles.trackKmValue, { color: "#8e44ad" }]}>{telemetryStats.ideal_lap_km.toFixed(1)} km</Text>
           </View>
         )}
         {telemetryExpanded && (

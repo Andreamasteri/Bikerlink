@@ -39,7 +39,8 @@ describe("GET /api/telemetry/stats — km_collected includes ideal_lap, speed fi
     dbExecute
       .mockResolvedValueOnce({ rows: [{ sample_count: "0", session_count: "0" }] } as unknown as Awaited<ReturnType<typeof db.execute>>)
       .mockResolvedValueOnce({ rows: [{ km_collected: "0" }] } as unknown as Awaited<ReturnType<typeof db.execute>>)
-      .mockResolvedValueOnce({ rows: [{ track_km: "0" }] } as unknown as Awaited<ReturnType<typeof db.execute>>);
+      .mockResolvedValueOnce({ rows: [{ track_km: "0" }] } as unknown as Awaited<ReturnType<typeof db.execute>>)
+      .mockResolvedValueOnce({ rows: [{ ideal_lap_km: "0" }] } as unknown as Awaited<ReturnType<typeof db.execute>>);
 
     const res = await request(app).get("/api/telemetry/stats");
 
@@ -48,6 +49,7 @@ describe("GET /api/telemetry/stats — km_collected includes ideal_lap, speed fi
     expect(res.body.session_count).toBe(0);
     expect(res.body.progress_pct).toBe(0);
     expect(res.body.track_km).toBe(0);
+    expect(res.body.ideal_lap_km).toBe(0);
   });
 
   it("km_collected includes ride sessions (sample_count/session_count still exclude ideal_lap)", async () => {
@@ -55,7 +57,8 @@ describe("GET /api/telemetry/stats — km_collected includes ideal_lap, speed fi
     dbExecute
       .mockResolvedValueOnce({ rows: [{ sample_count: "200", session_count: "3" }] } as unknown as Awaited<ReturnType<typeof db.execute>>)
       .mockResolvedValueOnce({ rows: [{ km_collected: "150.5" }] } as unknown as Awaited<ReturnType<typeof db.execute>>)
-      .mockResolvedValueOnce({ rows: [{ track_km: "0" }] } as unknown as Awaited<ReturnType<typeof db.execute>>);
+      .mockResolvedValueOnce({ rows: [{ track_km: "0" }] } as unknown as Awaited<ReturnType<typeof db.execute>>)
+      .mockResolvedValueOnce({ rows: [{ ideal_lap_km: "0" }] } as unknown as Awaited<ReturnType<typeof db.execute>>);
 
     const res = await request(app).get("/api/telemetry/stats");
 
@@ -72,13 +75,15 @@ describe("GET /api/telemetry/stats — km_collected includes ideal_lap, speed fi
     dbExecute
       .mockResolvedValueOnce({ rows: [{ sample_count: "300", session_count: "3" }] } as unknown as Awaited<ReturnType<typeof db.execute>>)
       .mockResolvedValueOnce({ rows: [{ km_collected: "18.5" }] } as unknown as Awaited<ReturnType<typeof db.execute>>)
-      .mockResolvedValueOnce({ rows: [{ track_km: "8.5" }] } as unknown as Awaited<ReturnType<typeof db.execute>>);
+      .mockResolvedValueOnce({ rows: [{ track_km: "8.5" }] } as unknown as Awaited<ReturnType<typeof db.execute>>)
+      .mockResolvedValueOnce({ rows: [{ ideal_lap_km: "6.2" }] } as unknown as Awaited<ReturnType<typeof db.execute>>);
 
     const res = await request(app).get("/api/telemetry/stats");
 
     expect(res.status).toBe(200);
     expect(res.body.km_collected).toBe(18.5);
     expect(res.body.track_km).toBe(8.5);
+    expect(res.body.ideal_lap_km).toBe(6.2);
     expect(res.body.progress_pct).toBe(2);
   });
 
@@ -87,7 +92,8 @@ describe("GET /api/telemetry/stats — km_collected includes ideal_lap, speed fi
     dbExecute
       .mockResolvedValueOnce({ rows: [{ sample_count: "500", session_count: "5" }] } as unknown as Awaited<ReturnType<typeof db.execute>>)
       .mockResolvedValueOnce({ rows: [{ km_collected: "300" }] } as unknown as Awaited<ReturnType<typeof db.execute>>)
-      .mockResolvedValueOnce({ rows: [{ track_km: "0" }] } as unknown as Awaited<ReturnType<typeof db.execute>>);
+      .mockResolvedValueOnce({ rows: [{ track_km: "0" }] } as unknown as Awaited<ReturnType<typeof db.execute>>)
+      .mockResolvedValueOnce({ rows: [{ ideal_lap_km: "0" }] } as unknown as Awaited<ReturnType<typeof db.execute>>);
 
     const res = await request(app).get("/api/telemetry/stats");
 
@@ -97,18 +103,20 @@ describe("GET /api/telemetry/stats — km_collected includes ideal_lap, speed fi
     expect(res.body.track_km).toBe(0);
   });
 
-  it("track_km is populated from ideal_lap sessions only", async () => {
+  it("ideal_lap_km uses speed >= 20 filter — distinct from track_km", async () => {
     const dbExecute = vi.mocked(db.execute);
     dbExecute
       .mockResolvedValueOnce({ rows: [{ sample_count: "300", session_count: "4" }] } as unknown as Awaited<ReturnType<typeof db.execute>>)
       .mockResolvedValueOnce({ rows: [{ km_collected: "200" }] } as unknown as Awaited<ReturnType<typeof db.execute>>)
-      .mockResolvedValueOnce({ rows: [{ track_km: "12.5" }] } as unknown as Awaited<ReturnType<typeof db.execute>>);
+      .mockResolvedValueOnce({ rows: [{ track_km: "12.5" }] } as unknown as Awaited<ReturnType<typeof db.execute>>)
+      .mockResolvedValueOnce({ rows: [{ ideal_lap_km: "10.3" }] } as unknown as Awaited<ReturnType<typeof db.execute>>);
 
     const res = await request(app).get("/api/telemetry/stats");
 
     expect(res.status).toBe(200);
     expect(res.body.km_collected).toBe(200);
     expect(res.body.track_km).toBe(12.5);
+    expect(res.body.ideal_lap_km).toBe(10.3);
     expect(res.body.progress_pct).toBe(20);
   });
 });
