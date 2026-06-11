@@ -14,6 +14,8 @@ import { collectMaps } from "./collectors/maps-collector";
 import { recordSignals } from "./signals";
 import type { HealthSnapshot, Problem, Severity, Signal } from "./types";
 import { collectDbIntegrity } from "../db-integrity/collector";
+import { storage } from "../../storage";
+import type { EmbeddingDailyReport } from "../../jobs/embedding-daily-report";
 
 // Task #2536 — wrapper che traduce lo snapshot db-integrity in Signal[] per
 // l'aggregator. Mappa severity → watchdog severity (info/warn/high/critical).
@@ -39,6 +41,41 @@ async function collectDbIntegritySignals(): Promise<Signal[]> {
   } catch (err) {
     return [{ source: "db", metric: "collector.error", severity: "warn",
       details: { collector: "db-integrity", error: (err as Error).message?.slice(0, 200) } }];
+  }
+}
+
+async function collectEmbeddingSignals(): Promise<Signal[]> {
+  try {
+    const setting = await storage.getAppSetting("embedding_daily_report");
+    if (!setting?.valueJson) return [];
+    const report = setting.valueJson as EmbeddingDailyReport;
+    const out: Signal[] = [];
+    if (report.anomaly) {
+      out.push({
+        source: "embedding",
+        metric: "embedding.anomaly",
+        severity: "high",
+        value: report.today.apiCalls,
+        details: {
+          reason: report.anomalyReason,
+          weeklyAvg: report.weeklyAvgApiCalls,
+          generatedAt: report.generatedAt,
+        },
+      });
+    }
+    if (report.today?.capReached) {
+      out.push({
+        source: "embedding",
+        metric: "embedding.cap_reached",
+        severity: "warn",
+        value: report.today.apiCalls,
+        details: { generatedAt: report.generatedAt },
+      });
+    }
+    return out;
+  } catch (err) {
+    return [{ source: "embedding", metric: "collector.error", severity: "warn",
+      details: { collector: "embedding", error: (err as Error).message?.slice(0, 200) } }];
   }
 }
 
@@ -121,6 +158,13 @@ function deriveProblems(signals: Signal[]): Problem[] {
       title = `Map-matching: ultimo run ${s.value}h fa`;
     } else if (s.metric === "matching.pending") {
       title = `Map-matching pending: ${s.value} rides`;
+    } else if (s.metric === "embedding.anomaly") {
+      title = `Consumo embedding anomalo: ${s.value} API call oggi`;
+      suggestion = (s.details as { reason?: string })?.reason ??
+        "Verifica embedding_call_log per field con spike inatteso.";
+    } else if (s.metric === "embedding.cap_reached") {
+      title = `Cap embedding giornaliero raggiunto (${s.value} call)`;
+      suggestion = "Embedding API call bloccate fino a mezzanotte. Aumenta il cap o verifica spike.";
     }
     problems.push({
       id, severity: s.severity, source: s.source, title, suggestion,
@@ -155,6 +199,7 @@ export async function runAggregatorCycle(): Promise<HealthSnapshot> {
     collectBullMq(), collectScheduler(), collectDb(),
     collectRedis(), collectLatency(), collectErrors(),
     collectDbIntegritySignals(), collectMaps(),
+    collectEmbeddingSignals(),
   ]);
   const signals: Signal[] = [];
   for (const r of collectors) {
