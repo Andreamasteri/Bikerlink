@@ -77,6 +77,9 @@ interface UserMusicEmbedding {
  * precaricare i tag musicali di tutti i potenziali neighbor.
  */
 async function loadMusicEmbeddingUserIds(): Promise<string[]> {
+  // Ordina per notified_at ASC NULLS FIRST: chi non ha mai ricevuto un match
+  // musicale (o lo ha ricevuto meno di recente) viene processato prima,
+  // così il cap non svantaggia sistematicamente gli stessi utenti.
   const result = await db.execute<{ entity_id: string }>(sql`
     SELECT e.entity_id
     FROM embeddings e
@@ -86,7 +89,11 @@ async function loadMusicEmbeddingUserIds(): Promise<string[]> {
       AND u.is_fake = false
       AND u.status = 'active'
       AND u.nickname <> ALL(${sql.raw(protectedNicknamesSqlArray())})
-    ORDER BY e.entity_id
+    ORDER BY (
+      SELECT MAX(m.notified_at)
+      FROM music_affinity_matches m
+      WHERE m.user_a_id = e.entity_id OR m.user_b_id = e.entity_id
+    ) ASC NULLS FIRST, e.entity_id
   `);
   const rows = (result.rows ?? result) as Array<{ entity_id: string }>;
   return rows.map((r) => r.entity_id);
@@ -149,9 +156,42 @@ async function loadMusicTagsByUser(userIds: string[]): Promise<Map<string, Set<s
   return out;
 }
 
+export type MusicAffinityCapStatus = {
+  cap: number;
+  capReached: boolean;
+  usersProcessed: number;
+  usersSkipped: number;
+  skipReasons: {
+    capReached: number;
+    noCandidate: number;
+  };
+};
+
+/** Fallback identico al vecchio hardcoded — music affinity era 1000. */
+const DEFAULT_MUSIC_CAP = 1000;
+
+let lastMusicAffinityCapStatus: MusicAffinityCapStatus = {
+  cap: DEFAULT_MUSIC_CAP,
+  capReached: false,
+  usersProcessed: 0,
+  usersSkipped: 0,
+  skipReasons: { capReached: 0, noCandidate: 0 },
+};
+
+export function getLastMusicAffinityCapStatus(): MusicAffinityCapStatus { return lastMusicAffinityCapStatus; }
+
+async function loadMusicMatchingCap(): Promise<number> {
+  try {
+    const [row] = await db.select().from(appSettings).where(eq(appSettings.key, "matching_max_per_run")).limit(1);
+    const v = parseInt(String(row?.value ?? ""), 10);
+    if (Number.isFinite(v) && v > 0) return v;
+  } catch { /* fall through */ }
+  return DEFAULT_MUSIC_CAP;
+}
+
 export async function runMusicAffinityMatching(): Promise<number> {
   try {
-    const [allUserIds, prefsMap, blocked, wTag, wEmb, minCombined, matchingDisabledSet] = await Promise.all([
+    const [allUserIds, prefsMap, blocked, wTag, wEmb, minCombined, matchingDisabledSet, maxTotal] = await Promise.all([
       loadMusicEmbeddingUserIds(),
       loadMatchPreferencesMap(),
       storage.getAllBlockedPairs(),
@@ -159,6 +199,7 @@ export async function runMusicAffinityMatching(): Promise<number> {
       loadWeight("match_music_combined_weight_embedding", DEFAULT_W_EMB),
       loadCombinedThreshold(),
       loadMatchingDisabledSet(),
+      loadMusicMatchingCap(),
     ]);
 
     if (allUserIds.length < 2) {
@@ -178,7 +219,7 @@ export async function runMusicAffinityMatching(): Promise<number> {
     let matchCount = 0;
     let attempted = 0;
     let skipped = 0;
-    const MAX_TOTAL_MATCHES = 1000;
+    let usersProcessed = 0;
     let batchIndex = 0;
 
     outer:
@@ -188,7 +229,8 @@ export async function runMusicAffinityMatching(): Promise<number> {
       batchIndex++;
 
       for (const { userId: uidA, vector } of batchEmbeddings) {
-        if (matchCount >= MAX_TOTAL_MATCHES) break outer;
+        if (matchCount >= maxTotal) break outer;
+        usersProcessed++;
 
         // Solo utenti che hanno il toggle musicAffinity attivo (default true)
         const prefA = prefsMap.get(uidA);
@@ -198,7 +240,7 @@ export async function runMusicAffinityMatching(): Promise<number> {
         const setA = tagSetsByUser.get(uidA) ?? new Set<string>();
 
         for (const hit of neighbors) {
-          if (matchCount >= MAX_TOTAL_MATCHES) break outer;
+          if (matchCount >= maxTotal) break outer;
           const uidB = hit.entityId;
           if (!uidB || uidB === uidA) continue;
           if (blockedSet.has(`${uidA}:${uidB}`)) { skipped++; continue; }
@@ -242,9 +284,27 @@ export async function runMusicAffinityMatching(): Promise<number> {
       );
     }
 
+    const capReached = matchCount >= maxTotal;
+    const usersSkipped = allUserIds.length - usersProcessed;
+
     console.log(
-      `[MusicAffinity] ${matchCount} match (combined>=${minCombined}, w_tag=${wTag}, w_emb=${wEmb}); valutati=${attempted}, saltati=${skipped}`,
+      `[MusicAffinity] ${matchCount} match (cap=${maxTotal}, combined>=${minCombined}, w_tag=${wTag}, w_emb=${wEmb}); utenti_processati=${usersProcessed}, utenti_saltati=${usersSkipped}, valutati=${attempted}, saltati=${skipped}`,
     );
+
+    if (capReached) {
+      console.warn(
+        `[MusicAffinity] cap raggiunto (${maxTotal}) — ${usersSkipped} utenti non processati. Aumenta matching_max_per_run per coprire tutta la base utenti.`,
+      );
+    }
+
+    lastMusicAffinityCapStatus = {
+      cap: maxTotal,
+      capReached,
+      usersProcessed,
+      usersSkipped,
+      skipReasons: { capReached: usersSkipped, noCandidate: skipped },
+    };
+
     return matchCount;
   } catch (err) {
     console.error("[MusicAffinity] error:", err);

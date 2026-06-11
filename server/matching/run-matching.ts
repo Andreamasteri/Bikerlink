@@ -46,6 +46,30 @@ export type MatchingRunStats = {
   matchesCreated: number;
 };
 
+export type CapStatus = {
+  cap: number;
+  capReached: boolean;
+  usersProcessed: number;
+  usersSkipped: number;
+  skipReasons: {
+    capReached: number;
+    noCandidate: number;
+  };
+};
+
+/** Fallback identico al vecchio hardcoded — wishlist era 500. */
+const DEFAULT_WISHLIST_CAP = 500;
+
+let lastWishlistCapStatus: CapStatus = {
+  cap: DEFAULT_WISHLIST_CAP,
+  capReached: false,
+  usersProcessed: 0,
+  usersSkipped: 0,
+  skipReasons: { capReached: 0, noCandidate: 0 },
+};
+
+export function getLastWishlistCapStatus(): CapStatus { return lastWishlistCapStatus; }
+
 let lastProposalStats: MatchingRunStats = {
   candidatesPre: 0, candidatesPost: 0, pairsConsidered: 0, pairsAfterBbox: 0, matchesCreated: 0,
 };
@@ -248,10 +272,16 @@ export async function runWishlistMatching(): Promise<number> {
       return 0;
     }
 
+    // Cap dinamico via AppSetting; se assente/non valido ricade sul vecchio hardcoded (500).
+    const capSetting = await storage.getAppSetting("matching_max_per_run");
+    const MAX_MATCHES_PER_RUN = (() => {
+      const v = parseInt(String(capSetting?.value ?? ""), 10);
+      return Number.isFinite(v) && v > 0 ? v : DEFAULT_WISHLIST_CAP;
+    })();
+
     // SQL JOIN — only compatible wishlist↔garage pairs are returned, with
     // isFake/status/role/userType + optional country filter applied in SQL.
     const compatiblePairs = await storage.getCompatibleWishlistGaragePairs(matchingCountries);
-    const shuffled = [...compatiblePairs].sort(() => Math.random() - 0.5);
 
     lastWishlistStats = {
       candidatesPre: compatiblePairs.length,
@@ -261,12 +291,49 @@ export async function runWishlistMatching(): Promise<number> {
       matchesCreated: 0,
     };
 
-    matchingLogger.info({ scope: "wishlist", pairs: compatiblePairs.length }, "WishlistMatching: compatible pairs (SQL)");
+    matchingLogger.info({ scope: "wishlist", pairs: compatiblePairs.length, cap: MAX_MATCHES_PER_RUN }, "WishlistMatching: compatible pairs (SQL)");
 
     if (compatiblePairs.length === 0) {
       matchingLogger.warn("WishlistMatching: nessuna coppia compatibile trovata");
       return 0;
     }
+
+    // Priorità notified_at: chi non riceve match da più tempo viene processato prima.
+    // Carichiamo il MAX(notified_at) per utente dalla tabella dei match esistenti.
+    const userIdSet = new Set<string>();
+    for (const p of compatiblePairs) { userIdSet.add(p.bikerId); userIdSet.add(p.zavarrinaId); }
+    const allUserIds = [...userIdSet];
+    let lastNotifiedByUser = new Map<string, Date>();
+    if (allUserIds.length > 0) {
+      try {
+        const rows = await db.execute<{ uid: string; last_notified: Date | null }>(sql`
+          SELECT uid, MAX(notified_at) AS last_notified
+          FROM (
+            SELECT biker_id AS uid, notified_at FROM biker_zavorrina_matches
+              WHERE biker_id = ANY(${allUserIds}::text[]) AND notified_at IS NOT NULL
+            UNION ALL
+            SELECT zavorrina_id AS uid, notified_at FROM biker_zavorrina_matches
+              WHERE zavorrina_id = ANY(${allUserIds}::text[]) AND notified_at IS NOT NULL
+          ) t
+          GROUP BY uid
+        `);
+        for (const r of (rows.rows ?? rows) as Array<{ uid: string; last_notified: Date | null }>) {
+          if (r.last_notified) lastNotifiedByUser.set(r.uid, r.last_notified);
+        }
+      } catch (err) {
+        matchingLogger.warn({ err }, "WishlistMatching: errore lettura notified_at utenti (ordine casuale)");
+        lastNotifiedByUser = new Map();
+      }
+    }
+
+    // Ordina le coppie per notified_at crescente (NULLS FIRST = chi non è mai stato notificato ha priorità).
+    const pairPriority = (p: { bikerId: string; zavarrinaId: string }): number => {
+      const bTs = lastNotifiedByUser.get(p.bikerId)?.getTime() ?? 0;
+      const zTs = lastNotifiedByUser.get(p.zavarrinaId)?.getTime() ?? 0;
+      // 0 = mai notificato (priorità massima); altrimenti il più recente dei due (chi ha aspettato meno)
+      return Math.max(bTs, zTs);
+    };
+    const sortedPairs = [...compatiblePairs].sort((a, b) => pairPriority(a) - pairPriority(b));
 
     const prefsMap = await loadMatchPreferencesMap();
     const matchingDisabledSetWL = await loadMatchingDisabledSet();
@@ -274,7 +341,7 @@ export async function runWishlistMatching(): Promise<number> {
 
     // Task #2513: precarica i tag delle moto biker coinvolte per
     // calcolare il breakdown jaccard senza N+1 query.
-    const motoIds = [...new Set(shuffled.map(p => p.motorcycle.id))];
+    const motoIds = [...new Set(sortedPairs.map(p => p.motorcycle.id))];
     const tagsByMoto = await (async () => {
       const out = new Map<string, { tipo: Set<string>; stile: Set<string> }>();
       if (motoIds.length === 0) return out;
@@ -302,11 +369,12 @@ export async function runWishlistMatching(): Promise<number> {
     // campi motorcycleType / ridingStyle come singolo slug normalizzato.
     let matchCount = 0;
     let skipCount = 0;
-    const MAX_MATCHES_PER_RUN = 500;
+    let usersProcessed = 0;
 
     outer:
-    for (const pair of shuffled) {
+    for (const pair of sortedPairs) {
       if (matchCount >= MAX_MATCHES_PER_RUN) break outer;
+      usersProcessed++;
 
       const { zavarrinaId, bikerId } = pair;
       const wish = pair.wishlistMoto;
@@ -393,15 +461,40 @@ export async function runWishlistMatching(): Promise<number> {
       }
     }
 
+    const capReached = matchCount >= MAX_MATCHES_PER_RUN;
+    // Coppie non raggiunte perché il cap è stato raggiunto prima (= cap hit).
+    const usersSkippedByCap = sortedPairs.length - usersProcessed;
+    // Coppie raggiunte ma filtrate internamente (prefs/disabled/già esistente).
+    const usersSkippedNoCandidate = skipCount;
+
     const notifStats = getNotificationCycleStats();
     matchingLogger.info(
-      { matchCount, skipCount, notifications_sent: notifStats.sent, notifications_failed: notifStats.failed, notifications_retried: notifStats.retried },
+      {
+        matchCount,
+        usersProcessed,
+        usersSkippedByCap,
+        usersSkippedNoCandidate,
+        capReached,
+        cap: MAX_MATCHES_PER_RUN,
+        notifications_sent: notifStats.sent,
+        notifications_failed: notifStats.failed,
+        notifications_retried: notifStats.retried,
+      },
       "WishlistMatching: ciclo completato",
     );
 
-    if (matchCount >= MAX_MATCHES_PER_RUN) {
-      matchingLogger.info({ cap: MAX_MATCHES_PER_RUN }, "WishlistMatching: cap raggiunto");
+    if (capReached) {
+      addMatchLog("WARN", "wishlist_matching",
+        `WishlistMatching: cap raggiunto (${MAX_MATCHES_PER_RUN}) — ${usersSkippedByCap} coppie saltate per cap, ${usersSkippedNoCandidate} filtrate per assenza candidati (imposta matching_max_per_run per aumentare il cap)`);
     }
+
+    lastWishlistCapStatus = {
+      cap: MAX_MATCHES_PER_RUN,
+      capReached,
+      usersProcessed,
+      usersSkipped: usersSkippedByCap + usersSkippedNoCandidate,
+      skipReasons: { capReached: usersSkippedByCap, noCandidate: usersSkippedNoCandidate },
+    };
 
     lastWishlistStats = {
       candidatesPre: compatiblePairs.length,

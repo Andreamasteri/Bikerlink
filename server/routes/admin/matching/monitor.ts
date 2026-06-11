@@ -15,7 +15,8 @@ import { sql } from "drizzle-orm";
 import { sendSuccess, sendError } from "../../../lib/api-response";
 import { getMatchingLockState, getMatchingLockStatus, getLastCycleOutcome } from "../../../matching/scheduler";
 import { getLastMatchingCycleMeta } from "../../../matching-engine";
-import { getNotificationCycleStats } from "../../../matching/run-matching";
+import { getNotificationCycleStats, getLastWishlistCapStatus } from "../../../matching/run-matching";
+import { getLastMusicAffinityCapStatus } from "../../../matching/run-music-affinity";
 import { getAggregate, getRecentCycles } from "../../../matching/perf-metrics";
 import { getRedisStatus } from "../../../cache/redis";
 import { getLimiterStats } from "../../../lib/throttle";
@@ -180,6 +181,8 @@ router.get("/matching/monitor", async (_req: Request, res: Response) => {
     updateSystemStatus({ matching: matchingDot });
 
     const notificationStats = getNotificationCycleStats();
+    const wishlistCapStatus = getLastWishlistCapStatus();
+    const musicAffinityCapStatus = getLastMusicAffinityCapStatus();
 
     return sendSuccess(res, {
       cycleStatus,
@@ -205,6 +208,11 @@ router.get("/matching/monitor", async (_req: Request, res: Response) => {
         sent: notificationStats.sent,
         failed: notificationStats.failed,
         retried: notificationStats.retried,
+      },
+      capStatus: {
+        wishlist: wishlistCapStatus,
+        musicAffinity: musicAffinityCapStatus,
+        capSettingKey: "matching_max_per_run",
       },
     });
   } catch (error) {
