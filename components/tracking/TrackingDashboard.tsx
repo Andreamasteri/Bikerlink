@@ -9,6 +9,7 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
+import { CalibrationBanner } from "@/components/CalibrationBanner";
 import { StatCard } from "./StatCard";
 import { SensorOverlayPanel } from "./SensorOverlayPanel";
 import TrackingMap from "@/components/TrackingMap";
@@ -276,7 +277,7 @@ export function TrackingDashboard({
                 value={maxAltitude.toFixed(0)}
                 label={t("tracking.maxAlt")}
               />
-              {/* G max card with recalibrate button — only when sensors enabled */}
+              {/* G max card — only when sensors enabled */}
               {sensorsEnabled && <View style={styles.statCard}>
                 <Ionicons name="pulse-outline" size={16} color={Colors.accentRed} />
                 {isCalibrating ? (
@@ -289,15 +290,14 @@ export function TrackingDashboard({
                   </Text>
                 )}
                 <Text style={styles.statLabel}>G max</Text>
-                {phase === "active" && !isCalibrating && (
-                  <TouchableOpacity
-                    onPress={handleRecalibrate}
-                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                  >
-                    <Text style={styles.recalibrateLink}>Ricalibra</Text>
-                  </TouchableOpacity>
-                )}
               </View>}
+              {/* Calibration banner — shown below G max when sensors enabled */}
+              {sensorsEnabled && !isCalibrating && (
+                <CalibrationBanner
+                  isCalibrated={mountAxisCalib !== null}
+                  onCalibrate={handleRecalibrate}
+                />
+              )}
               {sensorsEnabled && !isCalibrating && <View style={styles.statCard}>
                 <Ionicons name="compass-outline" size={16} color={Colors.accent} />
                 <Text style={styles.statValue} numberOfLines={1} adjustsFontSizeToFit>

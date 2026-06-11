@@ -10,7 +10,7 @@ import {
   Platform,
   TouchableOpacity,
 } from "react-native";
-import { useRouter } from "expo-router";
+import { useRouter, useFocusEffect } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
@@ -24,6 +24,7 @@ import {
   MountCalibWizard,
   loadMountCalibration
 } from "@/components/MountCalibWizard";
+import { CalibrationBanner } from "@/components/CalibrationBanner";
 
 interface ProposalItem {
   id: string;
@@ -192,12 +193,14 @@ export default function ProposalsScreen() {
   const locale = useLocale();
   const [activeFilter, setActiveFilter] = useState("all");
   const [activeHub, setActiveHub] = useState<"proposte" | "giri" | "percorsi" | "pianificati">("proposte");
-  const [, setMountCalib] = useState<MountAxisCalibration | null>(null);
+  const [mountCalib, setMountCalib] = useState<MountAxisCalibration | null>(null);
   const [showMountCalibWizard, setShowMountCalibWizard] = useState(false);
 
-  useEffect(() => {
-    loadMountCalibration().then(setMountCalib).catch(() => {});
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      loadMountCalibration().then(setMountCalib).catch(() => {});
+    }, [])
+  );
 
   const queryKey =
     activeFilter === "all"
@@ -280,6 +283,10 @@ export default function ProposalsScreen() {
 
       {activeHub === "giri" ? (
         <View style={{ flex: 1 }}>
+          <CalibrationBanner
+            isCalibrated={mountCalib !== null}
+            onCalibrate={() => setShowMountCalibWizard(true)}
+          />
           <View style={{ flex: 1 }}>
             <TrackingScreen />
           </View>

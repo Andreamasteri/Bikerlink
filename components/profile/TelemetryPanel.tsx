@@ -24,6 +24,7 @@ import {
   MountCalibWizard,
   loadMountCalibration,
 } from "@/components/MountCalibWizard";
+import { CalibrationBanner } from "@/components/CalibrationBanner";
 
 const LAP_TARGETS_KM = [10, 30, 50, 100];
 
@@ -154,35 +155,12 @@ export default function TelemetryPanel({ telemetryStats }: Props) {
         )}
         {telemetryExpanded && (
           <View style={styles.telemetryExpanded}>
-            <TouchableOpacity
-              style={styles.settingRow}
-              activeOpacity={0.7}
-              onPress={() => setShowCalibWizard(true)}
-            >
-              <View style={styles.settingTextCol}>
-                <Text style={styles.settingTitle}>Calibrazione supporto</Text>
-                <View style={styles.calibBadgeRow}>
-                  <Ionicons
-                    name={isCalibrated ? "checkmark-circle" : "alert-circle-outline"}
-                    size={20}
-                    color={isCalibrated ? "#27ae60" : "#e67e22"}
-                  />
-                  <Text
-                    style={[
-                      styles.calibBadgeText,
-                      { color: isCalibrated ? "#27ae60" : "#e67e22" },
-                    ]}
-                  >
-                    {isCalibrated === null
-                      ? "Verifica…"
-                      : isCalibrated
-                      ? "Calibrato"
-                      : "Non calibrato"}
-                  </Text>
-                </View>
-              </View>
-              <Ionicons name="chevron-forward" size={16} color={Colors.textSecondary} />
-            </TouchableOpacity>
+            {isCalibrated !== null && (
+              <CalibrationBanner
+                isCalibrated={isCalibrated}
+                onCalibrate={() => setShowCalibWizard(true)}
+              />
+            )}
 
             <View style={styles.telemetryExpandedHeader}>
               <Text style={styles.telemetryExpandedTitle}>Giri Ideali</Text>
