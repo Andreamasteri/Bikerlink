@@ -317,6 +317,7 @@ export function startMatchingEngine(): void {
 
   // Task #2516 — backfill embedding `music_taste` (one-shot per day, best-effort).
   // Guarded by AppSetting `music_backfill_last_ran_at`: skipped if < 23h ago.
+  // Delay di 4 min al boot per evitare contesa sul pool DB nelle prime fasi di avvio.
   setTimeout(async () => {
     try {
       const lastRanSetting = await storage.getAppSetting("music_backfill_last_ran_at");
@@ -336,9 +337,11 @@ export function startMatchingEngine(): void {
     } catch (err) {
       console.error("[Matching] MusicEmbeddings backfill error (non-blocking):", err);
     }
-  }, 30_000);
+  }, 4 * 60_000);
 
-  (async () => {
+  // Delay di 3 min: la lettura di fake_users_enabled non è urgente al boot e la
+  // contesa sul pool DB nei primi minuti causa timeout sporadici in produzione.
+  setTimeout(async () => {
     try {
       const fakeUsersSetting = await storage.getAppSetting("fake_users_enabled");
       const fakeUsersEnabled = fakeUsersSetting?.value === "true";
@@ -352,7 +355,7 @@ export function startMatchingEngine(): void {
     } catch (err) {
       console.error("[Matching] Error checking fake_users_enabled for rotation — skipped (fake users disabled):", err);
     }
-  })();
+  }, 3 * 60_000);
 
   _engineTimers.push(setInterval(() => {
     try {
@@ -544,7 +547,8 @@ export function startMatchingEngine(): void {
       console.error("[Matching] BioAffinity ciclo errore:", err);
     }
   };
-  setTimeout(() => { runBioAffinitySafe(); }, 2 * 60 * 1000);
+  // Delay di 4 min (era 2 min): evita contesa pool DB nelle prime fasi del boot.
+  setTimeout(() => { runBioAffinitySafe(); }, 4 * 60 * 1000);
   _engineTimers.push(setInterval(runBioAffinitySafe, 30 * 60 * 1000));
   console.log("[Matching] BioAffinity matcher schedulato (30 min)");
 

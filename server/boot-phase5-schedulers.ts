@@ -45,12 +45,14 @@ export async function runPhase5Schedulers(): Promise<void> {
   };
   const safeRunPlaylistSnapshot = () =>
     runPlaylistSnapshot().catch((e) => console.warn("[SNAPSHOT] runPlaylistSnapshot (interval) error:", e));
-  setImmediate(() => {
+  // Delay di 5 min al boot: runPlaylistSnapshot itera su tutti gli utenti con
+  // molte query DB — eseguirlo subito al boot aggrava la contesa sul pool.
+  setTimeout(() => {
     console.log("[INIT][BG] Starting runPlaylistSnapshot...");
     runPlaylistSnapshot()
       .then(() => console.log("[INIT][BG] runPlaylistSnapshot — done"))
       .catch((e) => console.warn("[INIT][BG] runPlaylistSnapshot error:", e));
-  });
+  }, 5 * 60_000);
   setInterval(safeRunPlaylistSnapshot, SIX_HOURS_MS);
 
   const { cleanupOrphanedAdImages } = await import("./routes/ads");
@@ -59,14 +61,15 @@ export async function runPhase5Schedulers(): Promise<void> {
     setInterval(cleanupOrphanedAdImages, 24 * 60 * 60 * 1000);
   }, 5 * 60 * 1000);
 
-  setImmediate(async () => {
+  // Delay di 2 min al boot: health-check leggero ma accede al DB; evita contesa sul pool.
+  setTimeout(async () => {
     try {
       const { runAdImageHealthCheck } = await import("./routes/admin/advertisements.next");
       await runAdImageHealthCheck();
     } catch (e) {
       console.warn("[INIT][BG] runAdImageHealthCheck error:", e);
     }
-  });
+  }, 2 * 60_000);
 
   const { scheduleNightlyVacuum } = await import("./vacuum-service");
   scheduleNightlyVacuum();
@@ -251,10 +254,12 @@ export async function runPhase5Schedulers(): Promise<void> {
     .then(({ startMotionSimulator }) => startMotionSimulator())
     .catch((e) => console.warn("[INIT] Background: motion simulator error:", e));
 
-  // Bio embedding back-fill: runs once at boot (setImmediate), then every 24h.
+  // Bio embedding back-fill: runs once at boot (delay 5 min), then every 24h.
   // Catches users whose bio changed or whose embedding was missed due to API errors.
   // NOTE: The duplicate call in boot-sequence.ts has been removed — this is the
   // single source of truth for bio embedding back-fill scheduling.
+  // Delay di 5 min al boot: il backfill scansiona tutti gli utenti e genera
+  // embedding — eseguirlo subito al boot aggrava la contesa sul pool DB.
   const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
   const runBioBackfill = () =>
     import("./embeddings/backfill-bio")
@@ -266,10 +271,10 @@ export async function runPhase5Schedulers(): Promise<void> {
         ),
       )
       .catch((e) => console.warn("[EMBED BACKFILL] error:", e));
-  setImmediate(() => {
+  setTimeout(() => {
     console.log("[INIT][BG] Starting backfillBioEmbeddings (boot-time pass)...");
     void runBioBackfill();
-  });
+  }, 5 * 60_000);
   setInterval(runBioBackfill, TWENTY_FOUR_HOURS_MS);
   console.log("[INIT] Bio embedding back-fill scheduled (boot + every 24h)");
 
