@@ -1213,6 +1213,7 @@ const fr: Record<string, string> = {
   "match.emptyTelemetryTitle": "Aucun match par style de conduite",
   "match.emptyTelemetryDesc": "Quand vous enregistrez suffisamment de trajets, nous vous montrons les bikers avec un style de conduite similaire.",
   "match.tabGiri": "Sorties invité", "match.emptyGiriTitle": "Aucune sortie planifiée", "match.emptyGiriDesc": "Quand d'autres bikers créent des itinéraires compatibles avec votre style, vous apparaissez ici comme suggestion.",
+  "match.giriBannerTitle": "Vous avez été proposé pour une sortie!", "match.giriBannerSubtitleOne": "1 sortie planifiée vous attend — touchez pour voir", "match.giriBannerSubtitleMany": "{n} sorties planifiées vous attendent — touchez pour voir",
   "match.giriScoreLabel": "Compatibilité", "match.giriOwnerLabel": "Organisateur",
   "match.giriAccept": "Accepter et chatter", "match.giriReject": "Refuser",
   "match.giriAcceptConfirm": "Accepter cette sortie et ouvrir un chat avec l'organisateur?",

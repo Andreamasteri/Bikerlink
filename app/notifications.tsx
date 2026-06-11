@@ -62,6 +62,8 @@ function getNotifIcon(type: string): { name: React.ComponentProps<typeof Ionicon
     case "event_approved":
     case "event_invite":
       return { name: "calendar", color: "#4A90E2" };
+    case "planned_route_invite":
+      return { name: "map", color: "#FF6600" };
     default:
       return { name: "notifications", color: "#FF6600" };
   }
@@ -95,6 +97,8 @@ function getNotifRoute(item: AppNotification): string | null {
       return "/(tabs)/index";
     case "chat":
       return rid ? `/chat/${rid}` : null;
+    case "planned_route_invite":
+      return "/(tabs)/match?tab=giri";
     case "system":
       return null;
     default:

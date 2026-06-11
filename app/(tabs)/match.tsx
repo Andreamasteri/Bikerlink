@@ -1,10 +1,10 @@
-import React, { useState, useCallback, useMemo } from "react";
+import React, { useState, useCallback, useMemo, useEffect } from "react";
 import {
   View,
   Alert,
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useRouter, useFocusEffect } from "expo-router";
+import { useRouter, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -24,6 +24,7 @@ import { MatchCardStack } from "@/components/match/tabs/MatchCardStack";
 import { MatchFiltersPanel } from "@/components/match/tabs/MatchFiltersPanel";
 import { NegativeSuggestionsCard } from "@/components/match/tabs/NegativeSuggestionsCard";
 import { PlannedRouteInvitesTab } from "@/components/match/tabs/PlannedRouteInvitesTab";
+import { PlannedRouteInviteBanner } from "@/components/match/tabs/PlannedRouteInviteBanner";
 import { useRenderItem } from "@/components/match/useRenderItem";
 import { useMusicMatchFeature } from "@/components/match/useMusicMatchFeature";
 import { styles } from "@/components/match/match.styles";
@@ -35,8 +36,10 @@ export default function MatchScreen() {
   const t = useT();
   const locale = useLocale();
   const insets = useSafeAreaInsets();
+  const { tab: tabParam } = useLocalSearchParams<{ tab?: string }>();
   const [activeTab, setActiveTab] = useState<TabKey>("zavorrine");
   const [propProfilePendingId, setPropProfilePendingId] = useState<string | null>(null);
+  const [giriBannerDismissed, setGiriBannerDismissed] = useState(false);
   const [pendingMatchId, setPendingMatchId] = useState<string | null>(null);
   const [distanceMode, setDistanceMode] = useState<"all" | "km">("all");
   const [distanceKm, setDistanceKm] = useState<string>("50");
@@ -54,6 +57,12 @@ export default function MatchScreen() {
     enabled: !!user,
     refetchInterval: profileRefetchMs,
   });
+
+  useEffect(() => {
+    if (tabParam === "giri") {
+      setActiveTab("giri");
+    }
+  }, [tabParam]);
 
   useFocusEffect(
     useCallback(() => {
@@ -809,11 +818,27 @@ export default function MatchScreen() {
         myLng={myLng}
       />
 
-      <TabBar activeTab={activeTab} setActiveTab={setActiveTab} tabs={tabs} />
+      <TabBar
+        activeTab={activeTab}
+        setActiveTab={(tab) => {
+          setActiveTab(tab);
+          if (tab === "giri") setGiriBannerDismissed(true);
+        }}
+        tabs={tabs}
+      />
 
       <NegativeSuggestionsCard />
 
       <BikerInfoBanner visible={activeTab === "biker"} />
+
+      <PlannedRouteInviteBanner
+        count={activeTab !== "giri" && !giriBannerDismissed ? (plannedRouteInvitesData?.count ?? 0) : 0}
+        onPress={() => {
+          setActiveTab("giri");
+          setGiriBannerDismissed(true);
+        }}
+        onDismiss={() => setGiriBannerDismissed(true)}
+      />
 
       <MusicCriteriaChip
         visible={activeTab === "music" && lastfmStatus?.connected === true}

@@ -20,11 +20,7 @@ function navigateFromNotifData(data: { type?: string; unreadChat?: number; route
     return;
   }
   if (data?.type === "planned_route_invite") {
-    if (data?.routeId) {
-      router.push(`/giri/${data.routeId}` as never);
-    } else {
-      router.push("/(tabs)/giri");
-    }
+    router.push("/(tabs)/match?tab=giri" as never);
     return;
   }
   if (data?.type !== "background_badge") return;

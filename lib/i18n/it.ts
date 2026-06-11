@@ -411,6 +411,7 @@ const it: Record<string, string> = {
   "match.routeAffinityLabel": "Stessi percorsi GPS", "match.telemetryAffinityLabel": "Stile di guida simile", "match.tabTelemetry": "Stile guida", "match.telemetryStyleTitle": "Stile in comune",
   "match.emptyTelemetryTitle": "Nessun match per stile di guida", "match.emptyTelemetryDesc": "Quando registri abbastanza tracce, ti mostriamo i biker con uno stile di guida simile al tuo.",
   "match.tabGiri": "Giri invitato", "match.emptyGiriTitle": "Nessun giro pianificato", "match.emptyGiriDesc": "Quando altri biker creano percorsi compatibili con il tuo stile, comparirai qui come suggerimento.",
+  "match.giriBannerTitle": "Sei stato proposto per un giro!", "match.giriBannerSubtitleOne": "1 giro pianificato ti aspetta — tocca per vedere", "match.giriBannerSubtitleMany": "{n} giri pianificati ti aspettano — tocca per vedere",
   "match.giriScoreLabel": "Compatibilità", "match.giriOwnerLabel": "Organizzatore", "match.giriDistanceLabel": "Distanza",
   "match.giriAccept": "Accetta e chatta", "match.giriReject": "Rifiuta",
   "match.giriAcceptConfirm": "Vuoi accettare il giro e aprire una chat con l'organizzatore?",

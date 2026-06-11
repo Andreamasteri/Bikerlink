@@ -1213,6 +1213,7 @@ const de: Record<string, string> = {
   "match.emptyTelemetryTitle": "Keine Fahrstil-Matches",
   "match.emptyTelemetryDesc": "Sobald du genug Fahrten aufgezeichnet hast, zeigen wir dir Biker mit ähnlichem Fahrstil.",
   "match.tabGiri": "Eingeladene Touren", "match.emptyGiriTitle": "Keine geplanten Touren", "match.emptyGiriDesc": "Wenn andere Biker kompatible Routen erstellen, wirst du hier als Vorschlag angezeigt.",
+  "match.giriBannerTitle": "Du wurdest für eine Tour vorgeschlagen!", "match.giriBannerSubtitleOne": "1 geplante Tour wartet auf dich — tippen zum Anzeigen", "match.giriBannerSubtitleMany": "{n} geplante Touren warten auf dich — tippen zum Anzeigen",
   "match.giriScoreLabel": "Kompatibilität", "match.giriOwnerLabel": "Organisator",
   "match.giriAccept": "Annehmen & chatten", "match.giriReject": "Ablehnen",
   "match.giriAcceptConfirm": "Tour annehmen und Chat mit dem Organisator öffnen?",

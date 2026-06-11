@@ -385,6 +385,7 @@ const en: Record<string, string> = {
   "match.routeAffinityLabel": "Shared GPS routes", "match.telemetryAffinityLabel": "Similar riding style", "match.tabTelemetry": "Riding style", "match.telemetryStyleTitle": "Shared style",
   "match.emptyTelemetryTitle": "No riding style matches", "match.emptyTelemetryDesc": "Once you record enough rides, we'll show bikers with a riding style similar to yours.",
   "match.tabGiri": "Invited rides", "match.emptyGiriTitle": "No planned rides", "match.emptyGiriDesc": "When other bikers create routes compatible with your style, you'll appear here as a suggestion.",
+  "match.giriBannerTitle": "You've been proposed for a ride!", "match.giriBannerSubtitleOne": "1 planned ride is waiting for you — tap to see", "match.giriBannerSubtitleMany": "{n} planned rides are waiting for you — tap to see",
   "match.giriScoreLabel": "Compatibility", "match.giriOwnerLabel": "Organizer", "match.giriDistanceLabel": "Distance",
   "match.giriAccept": "Accept & chat", "match.giriReject": "Decline",
   "match.giriAcceptConfirm": "Accept this ride and open a chat with the organizer?",

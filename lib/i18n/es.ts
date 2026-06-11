@@ -1213,6 +1213,7 @@ const es: Record<string, string> = {
   "match.emptyTelemetryTitle": "No hay matches por estilo de conducción",
   "match.emptyTelemetryDesc": "Cuando registres suficientes trazas, te mostraremos bikers con un estilo de conducción similar al tuyo.",
   "match.tabGiri": "Rutas invitado", "match.emptyGiriTitle": "Sin rutas planificadas", "match.emptyGiriDesc": "Cuando otros bikers creen rutas compatibles con tu estilo, aparecerás aquí como sugerencia.",
+  "match.giriBannerTitle": "¡Te han propuesto para una ruta!", "match.giriBannerSubtitleOne": "1 ruta planificada te espera — toca para ver", "match.giriBannerSubtitleMany": "{n} rutas planificadas te esperan — toca para ver",
   "match.giriScoreLabel": "Compatibilidad", "match.giriOwnerLabel": "Organizador",
   "match.giriAccept": "Aceptar y chatear", "match.giriReject": "Rechazar",
   "match.giriAcceptConfirm": "¿Aceptar esta ruta y abrir un chat con el organizador?",
