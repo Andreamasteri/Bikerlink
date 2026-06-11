@@ -390,7 +390,8 @@ export function startMatchingEngine(): void {
       addMatchLog("ERROR", "archive_stale", `Errore archiviazione match stale: ${err instanceof Error ? err.message : String(err)}`);
     }
   };
-  setImmediate(runArchiveStaleMatches);
+  addMatchLog("INFO", "archive_stale", "Prima archiviazione programmata tra 3 minuti");
+  setTimeout(runArchiveStaleMatches, 3 * 60 * 1000);
   _engineTimers.push(setInterval(runArchiveStaleMatches, 24 * 60 * 60 * 1000));
   console.log("[Matching] Archiviazione giornaliera match 'new' stale avviata");
 
