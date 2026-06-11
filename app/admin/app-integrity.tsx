@@ -45,7 +45,7 @@ interface Violation {
   count: number; sample: Array<{ pk?: string; data: Record<string, unknown> }>;
   details: Record<string, unknown> | null;
   status: string; autoFixApplied: boolean; autoFixSummary: string | null;
-  aiExplain: null | { rootCause: string; blastRadius: string; proposedFix: string; diff?: string; reasoning: string; risk: string; modelUsed?: string };
+  aiExplain: null | { rootCause: string; blastRadius: string; proposedFix: string; diff?: string; reasoning: string; risk: string; modelUsed?: string; extractedFunctionName?: string };
   createdAt: string;
 }
 
@@ -224,6 +224,12 @@ export default function AppIntegrityScreen() {
                       <Text style={styles.aiText}>{v.aiExplain.blastRadius}</Text>
                       <Text style={styles.aiLabel}>Fix proposto ({v.aiExplain.proposedFix}, rischio {v.aiExplain.risk})</Text>
                       <Text style={styles.aiText}>{v.aiExplain.reasoning}</Text>
+                      {v.aiExplain.extractedFunctionName ? (
+                        <View style={styles.extractRow}>
+                          <Text style={styles.aiLabel}>Funzione da estrarre</Text>
+                          <Text style={styles.extractChip}>{v.aiExplain.extractedFunctionName}</Text>
+                        </View>
+                      ) : null}
                       {v.aiExplain.diff ? (<Text style={styles.codeBlock} numberOfLines={20}>{v.aiExplain.diff}</Text>) : null}
                     </View>
                   ) : (
@@ -389,6 +395,8 @@ const styles = StyleSheet.create({
   aiPanel: { marginTop: 10, padding: 10, backgroundColor: Colors.background, borderRadius: 8, gap: 4 },
   aiLabel: { color: Colors.textSecondary, fontSize: 11, marginTop: 4, textTransform: "uppercase" },
   aiText: { color: Colors.text, fontSize: 13 },
+  extractRow: { marginTop: 6, gap: 2 },
+  extractChip: { alignSelf: "flex-start", fontFamily: "Inter_600SemiBold", fontSize: 13, color: Colors.accent, backgroundColor: Colors.surface, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, overflow: "hidden" },
   checkRow: { flexDirection: "row", alignItems: "center", gap: 8, padding: 10, marginBottom: 6, backgroundColor: Colors.surface, borderRadius: 8, borderLeftWidth: 4 },
   checkName: { color: Colors.text, fontSize: 13, fontFamily: "Inter_600SemiBold" },
   checkMeta: { color: Colors.textSecondary, fontSize: 11, marginTop: 2 },

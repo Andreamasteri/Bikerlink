@@ -297,7 +297,7 @@ const codeDuplicationCheck: AppIntegrityCheck = {
       return { ok: true, count: 0, sample: [], details: { error: (e as Error).message } };
     }
   },
-  explainHint: "Estrai i blocchi duplicati in funzioni/utility condivise.",
+  explainHint: "Estrai i blocchi duplicati in funzioni/utility condivise. Per ogni coppia proponi un nome di funzione/hook concreto (es. `formatDateRange`, `useMatchFilters`) da inserire nel file suggerito. Popola il campo `extractedFunctionName` con il nome più rappresentativo tra tutte le coppie.",
 };
 
 const circularImportsCheck: AppIntegrityCheck = {

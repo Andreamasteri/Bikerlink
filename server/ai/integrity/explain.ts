@@ -48,12 +48,31 @@ export async function explainViolation(input: ExplainInput): Promise<ExplainOk |
 
 function buildPrompt(input: ExplainInput): string {
   const { check, count, sample, details } = input;
+
+  // For duplication violations, collect suggested_extract paths from the sample
+  // so the AI can propose a concrete function/hook name alongside the file path.
+  const extractLines: string[] = [];
+  if (check.id === "code/duplication") {
+    const extracts = sample
+      .slice(0, 5)
+      .map((s) => (s.data as Record<string, unknown>).suggested_extract)
+      .filter((v): v is string => typeof v === "string" && v.length > 0);
+    const unique = [...new Set(extracts)];
+    if (unique.length > 0) {
+      extractLines.push(
+        `File di estrazione suggeriti (da sample): ${unique.join(", ")}`,
+        "Proponi un nome di funzione/hook concreto (es. `formatDateRange`, `useMatchFilters`) da estrarre verso quei file. Inserisci il nome più rappresentativo in `extractedFunctionName`.",
+      );
+    }
+  }
+
   return [
     `Famiglia: ${check.family}`,
     `Check: ${check.id} — ${check.name}`,
     `Severity: ${check.severity}`,
     `Descrizione: ${check.description}`,
     check.explainHint ? `Hint: ${check.explainHint}` : "",
+    ...extractLines,
     `Conteggio violazioni: ${count}`,
     `Sample (max 5):`,
     JSON.stringify(sample.slice(0, 5), null, 2),
@@ -67,6 +86,7 @@ function buildPrompt(input: ExplainInput): string {
       diff: "string (opzionale, max 6000 chars)",
       reasoning: "string",
       risk: "low|medium|high",
+      extractedFunctionName: "string (opzionale) — nome funzione/hook da estrarre, es. formatDateRange",
     }, null, 2),
   ].filter(Boolean).join("\n");
 }

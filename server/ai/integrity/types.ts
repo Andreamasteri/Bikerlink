@@ -63,6 +63,7 @@ export const aiExplainSchema = z.object({
   diff: z.string().max(6000).optional(),
   reasoning: z.string().min(1).max(2000),
   risk: z.enum(["low", "medium", "high"]),
+  extractedFunctionName: z.string().max(120).optional(),
 });
 export type AiExplain = z.infer<typeof aiExplainSchema>;
 
