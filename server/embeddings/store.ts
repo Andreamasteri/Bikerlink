@@ -107,6 +107,12 @@ export function getTodayEmbeddingApiCallCount(): number {
   return _todayApiCallCount;
 }
 
+/** Invalidate the in-memory cap cache so the next call re-reads from AppSetting. */
+export function invalidateDailyCapCache(): void {
+  _cachedCap = null;
+  _capCacheExpiry = 0;
+}
+
 // ─── Audit logging ─────────────────────────────────────────────────────────
 // Fire-and-forget insert into embedding_call_log. Never blocks the caller.
 

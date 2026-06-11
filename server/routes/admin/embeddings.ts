@@ -11,7 +11,7 @@ import { pool } from "../../db";
 import { db } from "../../db";
 import { sql } from "drizzle-orm";
 import { storage } from "../../storage";
-import { getTodayEmbeddingApiCallCount } from "../../embeddings/store";
+import { getTodayEmbeddingApiCallCount, invalidateDailyCapCache } from "../../embeddings/store";
 
 const router = Router();
 
@@ -195,6 +195,7 @@ router.get("/coverage", async (_req: Request, res: Response) => {
 const settingsBodySchema = z.object({
   efSearch: z.number().int().min(1).max(1000).optional(),
   coverageThreshold: z.number().int().min(0).max(100).optional(),
+  dailyCap: z.number().int().min(1).optional(),
 });
 
 router.patch("/settings", async (req: Request, res: Response) => {
@@ -202,8 +203,8 @@ router.patch("/settings", async (req: Request, res: Response) => {
   if (!parsed.success) {
     return sendError(res, 400, "Body non valido");
   }
-  const { efSearch, coverageThreshold } = parsed.data;
-  if (efSearch === undefined && coverageThreshold === undefined) {
+  const { efSearch, coverageThreshold, dailyCap } = parsed.data;
+  if (efSearch === undefined && coverageThreshold === undefined && dailyCap === undefined) {
     return sendError(res, 400, "Nessun campo da aggiornare");
   }
 
@@ -215,7 +216,13 @@ router.patch("/settings", async (req: Request, res: Response) => {
     if (coverageThreshold !== undefined) {
       updates.push(storage.upsertAppSetting("embedding_coverage_threshold", String(coverageThreshold)));
     }
+    if (dailyCap !== undefined) {
+      updates.push(storage.upsertAppSetting("embedding_daily_cap", String(dailyCap)));
+    }
     await Promise.all(updates);
+    if (dailyCap !== undefined) {
+      invalidateDailyCapCache();
+    }
     return sendSuccess(res, { updated: true });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);

@@ -1,7 +1,7 @@
-import React from "react";
-import { View, Text, StyleSheet, ActivityIndicator } from "react-native";
-import { useQuery } from "@tanstack/react-query";
-import { getQueryFnWithTimeout } from "@/lib/query-client";
+import React, { useState } from "react";
+import { View, Text, StyleSheet, ActivityIndicator, TextInput, TouchableOpacity } from "react-native";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { getQueryFnWithTimeout, apiRequest } from "@/lib/query-client";
 import Colors from "@/constants/colors";
 
 interface DayEntry {
@@ -34,11 +34,54 @@ interface StatsResponse {
 }
 
 export function EmbeddingUsageCard() {
+  const queryClient = useQueryClient();
+  const [capInput, setCapInput] = useState<string>("");
+  const [capEditMode, setCapEditMode] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "ok" | "error">("idle");
+
   const { data, isLoading, error } = useQuery<StatsResponse>({
     queryKey: ["/api/admin/embeddings/stats"],
     queryFn: getQueryFnWithTimeout<StatsResponse>(10_000),
     refetchInterval: 60_000,
   });
+
+  const mutation = useMutation({
+    mutationFn: async (dailyCap: number) => {
+      await apiRequest("PATCH", "/api/admin/embeddings/settings", { dailyCap });
+    },
+    onSuccess: () => {
+      setSaveStatus("ok");
+      setCapEditMode(false);
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/embeddings/stats"] });
+      setTimeout(() => setSaveStatus("idle"), 2500);
+    },
+    onError: () => {
+      setSaveStatus("error");
+      setTimeout(() => setSaveStatus("idle"), 3000);
+    },
+  });
+
+  const handleEditCap = () => {
+    setCapInput(String(data?.cap ?? 500));
+    setCapEditMode(true);
+    setSaveStatus("idle");
+  };
+
+  const handleSaveCap = () => {
+    const n = parseInt(capInput, 10);
+    if (!Number.isFinite(n) || n < 1) {
+      setSaveStatus("error");
+      setTimeout(() => setSaveStatus("idle"), 2000);
+      return;
+    }
+    setSaveStatus("saving");
+    mutation.mutate(n);
+  };
+
+  const handleCancelCap = () => {
+    setCapEditMode(false);
+    setSaveStatus("idle");
+  };
 
   if (isLoading) {
     return (
@@ -84,6 +127,55 @@ export function EmbeddingUsageCard() {
         <View style={styles.barBg}>
           <View style={[styles.barFill, { width: `${capPct}%` as `${number}%`, backgroundColor: barColor }]} />
         </View>
+      </View>
+
+      {/* Daily cap editor */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Daily Cap</Text>
+        {capEditMode ? (
+          <View style={styles.capEditorRow}>
+            <TextInput
+              style={styles.capInput}
+              value={capInput}
+              onChangeText={setCapInput}
+              keyboardType="numeric"
+              placeholder="es. 500"
+              placeholderTextColor="#636366"
+              editable={saveStatus !== "saving"}
+              autoFocus
+            />
+            <TouchableOpacity
+              style={[styles.capBtn, styles.capBtnSave, saveStatus === "saving" && styles.capBtnDisabled]}
+              onPress={handleSaveCap}
+              disabled={saveStatus === "saving"}
+            >
+              {saveStatus === "saving"
+                ? <ActivityIndicator color="#fff" size="small" />
+                : <Text style={styles.capBtnText}>Salva</Text>
+              }
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.capBtn, styles.capBtnCancel]}
+              onPress={handleCancelCap}
+              disabled={saveStatus === "saving"}
+            >
+              <Text style={styles.capBtnText}>Annulla</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <View style={styles.capEditorRow}>
+            <Text style={styles.capCurrentValue}>{cap} chiamate/giorno</Text>
+            <TouchableOpacity style={[styles.capBtn, styles.capBtnEdit]} onPress={handleEditCap}>
+              <Text style={styles.capBtnText}>Modifica</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+        {saveStatus === "ok" && (
+          <Text style={styles.saveOkText}>✓ Cap aggiornato</Text>
+        )}
+        {saveStatus === "error" && (
+          <Text style={styles.saveErrorText}>✗ Valore non valido o errore di salvataggio</Text>
+        )}
       </View>
 
       {/* Today snapshot from last report */}
@@ -209,6 +301,63 @@ const styles = StyleSheet.create({
   barFill: {
     height: 6,
     borderRadius: 3,
+  },
+  capEditorRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  capCurrentValue: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#ffffff",
+  },
+  capInput: {
+    flex: 1,
+    backgroundColor: "#2c2c2e",
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    fontSize: 14,
+    color: "#ffffff",
+    borderWidth: 1,
+    borderColor: "#48484a",
+  },
+  capBtn: {
+    borderRadius: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    alignItems: "center",
+    justifyContent: "center",
+    minWidth: 64,
+  },
+  capBtnEdit: {
+    backgroundColor: "#2c2c2e",
+  },
+  capBtnSave: {
+    backgroundColor: Colors.primary ?? "#3498db",
+  },
+  capBtnCancel: {
+    backgroundColor: "#3a3a3c",
+  },
+  capBtnDisabled: {
+    opacity: 0.6,
+  },
+  capBtnText: {
+    color: "#ffffff",
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  saveOkText: {
+    color: "#2ecc71",
+    fontSize: 12,
+    marginTop: 6,
+  },
+  saveErrorText: {
+    color: "#e74c3c",
+    fontSize: 12,
+    marginTop: 6,
   },
   statRow: {
     flexDirection: "row",
