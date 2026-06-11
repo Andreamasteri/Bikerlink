@@ -50,5 +50,9 @@ export default defineConfig({
     "!tags",
     "!users",
     "!user_motorcycles",
+    // embeddings ha un indice HNSW pgvector (migration 0095) che Drizzle non sa
+    // generare con vector_cosine_ops → escludiamo dal diff publish per prevenire
+    // un DROP spurio sull'indice HNSW.
+    "!embeddings",
   ],
 });

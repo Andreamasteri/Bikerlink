@@ -24,12 +24,21 @@ import { protectedNicknamesSqlArray } from "./protection-filter";
  * supera la soglia `music_taste_combined` (default 0.55).
  *
  * Complementa — non sostituisce — `runMusicMatchBikerZavarrina` (tag-only).
+ *
+ * Scalabilità (Task #3754): gli embedding vengono processati a batch di
+ * EMBEDDING_BATCH_SIZE utenti alla volta anziché caricarli tutti in RAM.
+ * I tag musicali vengono invece caricati una sola volta per tutti gli utenti
+ * attivi (sono dati leggeri: solo slug stringhe) in modo da non dover fare
+ * lookup ripetuti per i neighbor restituiti da findSimilar.
  */
 
 const DEFAULT_K = 10;
 const DEFAULT_MIN_SIMILARITY = 0.55;
 const DEFAULT_W_TAG = 0.5;
 const DEFAULT_W_EMB = 0.5;
+
+/** Numero di utenti caricati in memoria per ciclo di elaborazione. */
+const EMBEDDING_BATCH_SIZE = 200;
 
 async function loadWeight(key: string, fallback: number): Promise<number> {
   try {
@@ -62,9 +71,14 @@ interface UserMusicEmbedding {
   vector: number[];
 }
 
-async function loadEmbeddingsForUsers(): Promise<UserMusicEmbedding[]> {
-  const result = await db.execute<{ entity_id: string; vec: string }>(sql`
-    SELECT e.entity_id, e.embedding::text AS vec
+/**
+ * Restituisce gli ID di tutti gli utenti attivi con embedding `music_taste`.
+ * Non carica i vettori: è usata per dimensionare il batch loop e per
+ * precaricare i tag musicali di tutti i potenziali neighbor.
+ */
+async function loadMusicEmbeddingUserIds(): Promise<string[]> {
+  const result = await db.execute<{ entity_id: string }>(sql`
+    SELECT e.entity_id
     FROM embeddings e
     INNER JOIN users u ON u.id = e.entity_id
     WHERE e.entity_type = 'user'
@@ -72,7 +86,29 @@ async function loadEmbeddingsForUsers(): Promise<UserMusicEmbedding[]> {
       AND u.is_fake = false
       AND u.status = 'active'
       AND u.nickname <> ALL(${sql.raw(protectedNicknamesSqlArray())})
+    ORDER BY e.entity_id
   `);
+  const rows = (result.rows ?? result) as Array<{ entity_id: string }>;
+  return rows.map((r) => r.entity_id);
+}
+
+/**
+ * Carica i vettori di embedding per una singola pagina di utenti, identificati
+ * dall'array `userIds`. La dimensione della pagina è controllata dal chiamante
+ * tramite `EMBEDDING_BATCH_SIZE`.
+ *
+ * Usa un parametro bound `$1::text[]` per passare l'array di ID così da
+ * ottenere plan caching e non dover fare escaping manuale dei valori.
+ */
+async function loadEmbeddingBatch(userIds: string[]): Promise<UserMusicEmbedding[]> {
+  if (userIds.length === 0) return [];
+  const result = await db.execute<{ entity_id: string; vec: string }>(
+    sql`SELECT entity_id, embedding::text AS vec
+        FROM embeddings
+        WHERE entity_type = 'user'
+          AND field = 'music_taste'
+          AND entity_id = ANY(${userIds}::text[])`,
+  );
   const rows = (result.rows ?? result) as Array<{ entity_id: string; vec: string }>;
   return rows.map((r) => ({
     userId: r.entity_id,
@@ -115,8 +151,8 @@ async function loadMusicTagsByUser(userIds: string[]): Promise<Map<string, Set<s
 
 export async function runMusicAffinityMatching(): Promise<number> {
   try {
-    const [embeddingsList, prefsMap, blocked, wTag, wEmb, minCombined, matchingDisabledSet] = await Promise.all([
-      loadEmbeddingsForUsers(),
+    const [allUserIds, prefsMap, blocked, wTag, wEmb, minCombined, matchingDisabledSet] = await Promise.all([
+      loadMusicEmbeddingUserIds(),
       loadMatchPreferencesMap(),
       storage.getAllBlockedPairs(),
       loadWeight("match_music_combined_weight_tag", DEFAULT_W_TAG),
@@ -125,7 +161,7 @@ export async function runMusicAffinityMatching(): Promise<number> {
       loadMatchingDisabledSet(),
     ]);
 
-    if (embeddingsList.length < 2) {
+    if (allUserIds.length < 2) {
       console.log("[MusicAffinity] meno di 2 embedding `music_taste`, skip.");
       return 0;
     }
@@ -134,62 +170,76 @@ export async function runMusicAffinityMatching(): Promise<number> {
       blocked.flatMap((b) => [`${b.blockerId}:${b.blockedId}`, `${b.blockedId}:${b.blockerId}`]),
     );
 
-    const userIds = embeddingsList.map((e) => e.userId);
-    const tagSetsByUser = await loadMusicTagsByUser(userIds);
+    // I tag musicali vengono caricati una volta sola per tutti gli utenti attivi
+    // (sono leggeri). Questo copre sia i source-user del batch corrente sia i
+    // neighbor che findSimilar può restituire da qualsiasi batch.
+    const tagSetsByUser = await loadMusicTagsByUser(allUserIds);
 
     let matchCount = 0;
     let attempted = 0;
     let skipped = 0;
     const MAX_TOTAL_MATCHES = 1000;
+    let batchIndex = 0;
 
     outer:
-    for (const { userId: uidA, vector } of embeddingsList) {
-      // Solo utenti che hanno il toggle musicAffinity attivo (default true)
-      const prefA = prefsMap.get(uidA);
-      if (prefA && prefA.musicAffinity === false) continue;
+    for (let offset = 0; offset < allUserIds.length; offset += EMBEDDING_BATCH_SIZE) {
+      const batchIds = allUserIds.slice(offset, offset + EMBEDDING_BATCH_SIZE);
+      const batchEmbeddings = await loadEmbeddingBatch(batchIds);
+      batchIndex++;
 
-      const neighbors = await findSimilar("user", "music_taste", vector, DEFAULT_K + 1, 0);
-      // Skip the user itself (similarity = 1)
-      const setA = tagSetsByUser.get(uidA) ?? new Set<string>();
-
-      for (const hit of neighbors) {
+      for (const { userId: uidA, vector } of batchEmbeddings) {
         if (matchCount >= MAX_TOTAL_MATCHES) break outer;
-        const uidB = hit.entityId;
-        if (!uidB || uidB === uidA) continue;
-        if (blockedSet.has(`${uidA}:${uidB}`)) { skipped++; continue; }
-        if (!bothPrefsEnabled(prefsMap, uidA, uidB, "musicAffinity")) { skipped++; continue; }
-        if (!neitherMatchingDisabled(matchingDisabledSet, uidA, uidB)) { skipped++; continue; }
 
-        const setB = tagSetsByUser.get(uidB) ?? new Set<string>();
-        const ov = tagOverlap(setA, setB);
-        const embSim = Math.max(0, Math.min(1, hit.similarity));
-        const combined = ov.jaccard * wTag + embSim * wEmb;
-        attempted++;
-        if (combined < minCombined) { skipped++; continue; }
+        // Solo utenti che hanno il toggle musicAffinity attivo (default true)
+        const prefA = prefsMap.get(uidA);
+        if (prefA && prefA.musicAffinity === false) continue;
 
-        const idA = uidA < uidB ? uidA : uidB;
-        const idB = uidA < uidB ? uidB : uidA;
-        try {
-          const inserted = await db
-            .insert(musicAffinityMatches)
-            .values({
-              userAId: idA,
-              userBId: idB,
-              tagScore: Number(ov.jaccard.toFixed(4)),
-              embeddingScore: Number(embSim.toFixed(4)),
-              combinedScore: Number(combined.toFixed(4)),
-              tagCommon: ov.common,
-              status: "new",
-            })
-            .onConflictDoNothing()
-            .returning({ id: musicAffinityMatches.id });
-          if (inserted.length > 0) matchCount++;
-          else skipped++;
-        } catch (err) {
-          console.error("[MusicAffinity] insert err:", err);
-          skipped++;
+        const neighbors = await findSimilar("user", "music_taste", vector, DEFAULT_K + 1, 0);
+        const setA = tagSetsByUser.get(uidA) ?? new Set<string>();
+
+        for (const hit of neighbors) {
+          if (matchCount >= MAX_TOTAL_MATCHES) break outer;
+          const uidB = hit.entityId;
+          if (!uidB || uidB === uidA) continue;
+          if (blockedSet.has(`${uidA}:${uidB}`)) { skipped++; continue; }
+          if (!bothPrefsEnabled(prefsMap, uidA, uidB, "musicAffinity")) { skipped++; continue; }
+          if (!neitherMatchingDisabled(matchingDisabledSet, uidA, uidB)) { skipped++; continue; }
+
+          const setB = tagSetsByUser.get(uidB) ?? new Set<string>();
+          const ov = tagOverlap(setA, setB);
+          const embSim = Math.max(0, Math.min(1, hit.similarity));
+          const combined = ov.jaccard * wTag + embSim * wEmb;
+          attempted++;
+          if (combined < minCombined) { skipped++; continue; }
+
+          const idA = uidA < uidB ? uidA : uidB;
+          const idB = uidA < uidB ? uidB : uidA;
+          try {
+            const inserted = await db
+              .insert(musicAffinityMatches)
+              .values({
+                userAId: idA,
+                userBId: idB,
+                tagScore: Number(ov.jaccard.toFixed(4)),
+                embeddingScore: Number(embSim.toFixed(4)),
+                combinedScore: Number(combined.toFixed(4)),
+                tagCommon: ov.common,
+                status: "new",
+              })
+              .onConflictDoNothing()
+              .returning({ id: musicAffinityMatches.id });
+            if (inserted.length > 0) matchCount++;
+            else skipped++;
+          } catch (err) {
+            console.error("[MusicAffinity] insert err:", err);
+            skipped++;
+          }
         }
       }
+
+      console.log(
+        `[MusicAffinity] batch ${batchIndex} (utenti ${offset + 1}-${Math.min(offset + EMBEDDING_BATCH_SIZE, allUserIds.length)}/${allUserIds.length}) — match finora: ${matchCount}`,
+      );
     }
 
     console.log(
