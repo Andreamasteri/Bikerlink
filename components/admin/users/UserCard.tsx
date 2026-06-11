@@ -259,7 +259,7 @@ export const UserCard: React.FC<UserCardProps> = ({
             style={styles.actionBtn}
           >
             <Ionicons
-              name="ban"
+              name={item.matchingDisabled ? "person-remove" : "person-remove-outline"}
               size={22}
               color={item.matchingDisabled ? "#f97316" : Colors.border}
             />
