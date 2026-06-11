@@ -10,6 +10,7 @@ import { runWeeklyRecapJob } from "./jobs/weekly-recap";
 import { Cron } from "croner";
 import { runDetectNegativePatternsJob } from "./jobs/detect-negative-patterns";
 import { runRouteSimilarityMatching } from "./run-route-similarity";
+import { runPlannedRouteAffinity } from "./run-planned-route-affinity";
 import { runBioAffinityMatching } from "./run-bio-affinity";
 import { runTelemetryAffinityMatching } from "./run-telemetry-affinity";
 import { enrichBikerMatchBreakdowns } from "./enrich-breakdowns";
@@ -214,6 +215,12 @@ export function triggerMatchingRun(): { started: boolean; reason?: string } {
           if (raCount > 0) {
             console.log(`[Matching] Found ${raCount} new route-affinity matches`);
             addMatchLog("INFO", "route_similarity", `Route affinity: ${raCount} match`);
+          }
+          const priResult = await runPlannedRouteAffinity();
+          if (priResult.invitesCreated > 0) {
+            console.log(`[Matching] Planned route invites: ${priResult.invitesCreated} nuovi inviti su ${priResult.routesProcessed} route`);
+            addMatchLog("INFO", "planned_route_invite", `Planned route invite: ${priResult.invitesCreated} inviti su ${priResult.routesProcessed} route`);
+            void recordMatchesCreated("planned_route_invite", priResult.invitesCreated);
           }
         } catch (err) {
           console.error("[Matching] RouteAffinity matching error (non-blocking):", err);
