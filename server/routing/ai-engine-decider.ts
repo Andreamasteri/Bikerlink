@@ -110,18 +110,25 @@ function clampConfidence(n: number): number {
  * timeoutMs: scaduto il tempo, aborta la richiesta e ritorna null così il
  * chiamante ricade sul selettore normale.
  *
- * Task #3872 — Cascade Ollama-first con budget separato per Ollama:
- * - Fase 1: Ollama ottiene al massimo metà del budget (ollamaTimeoutMs = timeoutMs/2).
+ * Due-phase timeout (Ollama-first):
+ * - Fase 1: Ollama ottiene al massimo `ollamaTimeoutMs` ms (default 400ms).
  *   Se risponde entro quel tempo → risposta immediata, nessun cloud chiamato.
  *   Se scade o fallisce → scala immediatamente a Groq (non aspetta oltre).
- * - Fase 2: chain cloud (Groq → Gemini → OpenAI) con il budget residuo. L'abort
- *   globale si attiva al raggiungimento di timeoutMs totali dall'inizio.
- * Questo garantisce che Groq abbia sempre almeno metà del budget anche se Ollama
- * è lento (evita il problema "Ollama mangia tutto i 800ms").
+ * - Fase 2: chain cloud (Groq → Gemini → OpenAI) con il budget residuo fino a
+ *   `timeoutMs` totali dall'inizio (default 800ms). L'abort globale si attiva
+ *   allo scadere del budget totale.
+ * Con i default (ollamaTimeoutMs=400, timeoutMs=800) Groq ha sempre almeno
+ * 400ms anche se Ollama usa tutto il suo slot — evita il problema
+ * "Ollama mangia 700ms e Groq ottiene solo 100ms".
+ *
+ * @param ctx          - Contesto routing AI.
+ * @param timeoutMs    - Budget totale massimo (ms). Default 800.
+ * @param ollamaTimeoutMs - Budget massimo per il tentativo Ollama (ms). Default 400.
  */
 export async function decideEngineWithAI(
   ctx: AiRoutingContext,
   timeoutMs = 800,
+  ollamaTimeoutMs = 400,
 ): Promise<AiEngineDecision | null> {
   const startTs = Date.now();
   // Abort globale: si attiva allo scadere del budget totale. Usato dalla cloud chain.
@@ -136,13 +143,13 @@ export async function decideEngineWithAI(
   });
 
   try {
-    // ── Fase 1: Ollama con budget = metà del totale ─────────────────────────
+    // ── Fase 1: Ollama con budget esplicito (ollamaTimeoutMs) ───────────────
     const { tryBuildOllama } = await import("../ai/moderation/provider");
     const om = tryBuildOllama();
     if (om) {
-      const ollamaTimeoutMs = Math.floor(timeoutMs / 2);
+      const effectiveOllamaMs = Math.min(ollamaTimeoutMs, timeoutMs);
       const ollamaController = new AbortController();
-      const ollamaTimer = setTimeout(() => ollamaController.abort(), ollamaTimeoutMs);
+      const ollamaTimer = setTimeout(() => ollamaController.abort(), effectiveOllamaMs);
       try {
         const result = await generateObject({
           model: om.model,
