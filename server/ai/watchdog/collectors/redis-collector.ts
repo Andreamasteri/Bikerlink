@@ -1,7 +1,17 @@
 // Task #2533 — Collector Redis. Se non configurato, restituisce signal "absent" senza severità.
+// Task #3799 — Hysteresis: warn di default, high solo dopo 3 fallimenti consecutivi senza recovery.
 import type { Signal } from "../types";
 
 let warned = false;
+
+// Contatore fallimenti consecutivi — resettato a ogni ping riuscito.
+let consecutiveFailures = 0;
+const FAILURES_BEFORE_HIGH = 3;
+
+// True dopo il primo ping riuscito in questa sessione.
+// L'escalation a "high" richiede che Redis fosse stato raggiungibile in precedenza:
+// un Redis mai configurato/raggiungibile resta sempre "warn" (fallback in-memory).
+let hadSuccessfulConnection = false;
 
 export async function collectRedis(): Promise<Signal[]> {
   const signals: Signal[] = [];
@@ -25,6 +35,9 @@ export async function collectRedis(): Promise<Signal[]> {
     const started = Date.now();
     await client.ping();
     const pingMs = Date.now() - started;
+    // Ping riuscito: segna connessione avvenuta e azzera contatore fallimenti.
+    hadSuccessfulConnection = true;
+    consecutiveFailures = 0;
     signals.push({
       source: "redis", metric: "redis.ping_ms", value: pingMs, unit: "ms",
       severity: pingMs > 200 ? "warn" : "info",
@@ -42,9 +55,18 @@ export async function collectRedis(): Promise<Signal[]> {
     } catch { /* ignore */ }
     await client.quit().catch(() => {});
   } catch (err) {
+    consecutiveFailures += 1;
+    // Scala a high solo se Redis era raggiungibile in precedenza (hadSuccessfulConnection)
+    // e sono accumulati N fallimenti consecutivi. Un Redis mai disponibile in questa
+    // sessione resta sempre warn: il fallback in-memory è già attivo e non c'è regressione.
+    const severity = (hadSuccessfulConnection && consecutiveFailures >= FAILURES_BEFORE_HIGH) ? "high" : "warn";
     signals.push({
-      source: "redis", metric: "redis.unreachable", severity: "high",
-      details: { error: (err as Error).message },
+      source: "redis", metric: "redis.unreachable", severity,
+      details: {
+        error: (err as Error).message,
+        consecutiveFailures,
+        fallback: "in-memory",
+      },
     });
   }
   return signals;

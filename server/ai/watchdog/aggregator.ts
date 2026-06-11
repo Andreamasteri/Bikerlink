@@ -108,8 +108,9 @@ function deriveProblems(signals: Signal[]): Problem[] {
     } else if (s.metric === "db.slow_queries") {
       title = `${s.value} query lente (>500ms medi)`;
     } else if (s.metric === "redis.unreachable") {
-      title = "Redis non raggiungibile";
-      suggestion = "Verifica REDIS_URL e stato del servizio. Cache potrebbe essere degradata.";
+      const cf = (s.details as { consecutiveFailures?: number } | undefined)?.consecutiveFailures ?? 1;
+      title = `Redis non raggiungibile — fallback in-memory attivo (${cf} fallimenti consecutivi)`;
+      suggestion = "Fallback in-memory attivo: il matching continua a funzionare. Verifica REDIS_URL e stato del servizio per ripristinare il distributed lock.";
     } else if (s.metric === "latency.p95_ms" || s.metric === "latency.p99_ms") {
       title = `Latenza API ${s.metric}: ${s.value}ms`;
     } else if (s.metric === "http.5xx_per_min") {
