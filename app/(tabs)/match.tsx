@@ -58,11 +58,7 @@ export default function MatchScreen() {
     refetchInterval: profileRefetchMs,
   });
 
-  useEffect(() => {
-    if (tabParam === "giri") {
-      setActiveTab("giri");
-    }
-  }, [tabParam]);
+  useEffect(() => { if (tabParam === "giri") setActiveTab("giri"); }, [tabParam]);
 
   useFocusEffect(
     useCallback(() => {
@@ -163,7 +159,6 @@ export default function MatchScreen() {
     refetchInterval: 60000,
     refetchOnMount: true,
   });
-
   const { data: plannedRouteInvitesData, refetch: plannedRouteInvitesRefetch } = useQuery<{ count: number; invites: any[] }>({
     queryKey: ["/api/planned-route-invites/mine"],
     enabled: !!user,
@@ -657,31 +652,22 @@ export default function MatchScreen() {
     ]);
   }, [removeGarageMatchMutation, t]);
 
-  const confirmRemoveBikerMatch = useCallback((id: string) => {
+  const makeConfirmRemove = (mutate: (id: string) => void) => (id: string) =>
     Alert.alert(t("common.confirm"), t("match.confirmRemoveMatch"), [
       { text: t("common.cancel"), style: "cancel" },
-      { text: t("common.remove"), style: "destructive", onPress: () => removeBikerMatchMutation.mutate(id) },
+      { text: t("common.remove"), style: "destructive", onPress: () => mutate(id) },
     ]);
-  }, [removeBikerMatchMutation, t]);
-
-  const confirmRemoveProposalMatch = useCallback((id: string) => {
-    Alert.alert(t("common.confirm"), t("match.confirmRemoveMatch"), [
-      { text: t("common.cancel"), style: "cancel" },
-      { text: t("common.remove"), style: "destructive", onPress: () => removeProposalMatchMutation.mutate(id) },
-    ]);
-  }, [removeProposalMatchMutation, t]);
+  const confirmRemoveBikerMatch = useCallback(makeConfirmRemove(removeBikerMatchMutation.mutate), [removeBikerMatchMutation, t]);
+  const confirmRemoveProposalMatch = useCallback(makeConfirmRemove(removeProposalMatchMutation.mutate), [removeProposalMatchMutation, t]);
 
   const onRefresh = useCallback(() => {
-    if (activeTab === "proposals") proposalRefetch();
-    else if (activeTab === "zavorrine") garageRefetch();
-    else if (activeTab === "biker") bikerRefetch();
-    else if (activeTab === "blacklist") blockedRefetch();
-    else if (activeTab === "music") musicRefetch();
-    else if (activeTab === "accepted") acceptedRefetch();
-    else if (activeTab === "propProfile") propProfileRefetch();
-    else if (activeTab === "route") routeAffinityRefetch();
-    else if (activeTab === "telemetry") telemetryAffinityRefetch();
-    else if (activeTab === "giri") plannedRouteInvitesRefetch();
+    const refetchMap: Partial<Record<TabKey, () => void>> = {
+      proposals: proposalRefetch, zavorrine: garageRefetch, biker: bikerRefetch,
+      blacklist: blockedRefetch, music: musicRefetch, accepted: acceptedRefetch,
+      propProfile: propProfileRefetch, route: routeAffinityRefetch,
+      telemetry: telemetryAffinityRefetch, giri: plannedRouteInvitesRefetch,
+    };
+    refetchMap[activeTab]?.();
   }, [activeTab, proposalRefetch, garageRefetch, bikerRefetch, blockedRefetch, musicRefetch, acceptedRefetch, propProfileRefetch, routeAffinityRefetch, telemetryAffinityRefetch, plannedRouteInvitesRefetch]);
 
   const handleUnblock = useCallback((blockedUserId: string) => {
@@ -833,10 +819,7 @@ export default function MatchScreen() {
 
       <PlannedRouteInviteBanner
         count={activeTab !== "giri" && !giriBannerDismissed ? (plannedRouteInvitesData?.count ?? 0) : 0}
-        onPress={() => {
-          setActiveTab("giri");
-          setGiriBannerDismissed(true);
-        }}
+        onPress={() => { setActiveTab("giri"); setGiriBannerDismissed(true); }}
         onDismiss={() => setGiriBannerDismissed(true)}
       />
 
