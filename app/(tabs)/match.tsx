@@ -23,6 +23,7 @@ import { MusicCriteriaChip } from "@/components/match/tabs/MusicCriteriaChip";
 import { MatchCardStack } from "@/components/match/tabs/MatchCardStack";
 import { MatchFiltersPanel } from "@/components/match/tabs/MatchFiltersPanel";
 import { NegativeSuggestionsCard } from "@/components/match/tabs/NegativeSuggestionsCard";
+import { PlannedRouteInvitesTab } from "@/components/match/tabs/PlannedRouteInvitesTab";
 import { useRenderItem } from "@/components/match/useRenderItem";
 import { useMusicMatchFeature } from "@/components/match/useMusicMatchFeature";
 import { styles } from "@/components/match/match.styles";
@@ -149,6 +150,13 @@ export default function MatchScreen() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- match data shape varies
   const { data: telemetryAffinityMatches, isLoading: telemetryAffinityLoading, refetch: telemetryAffinityRefetch, isRefetching: telemetryAffinityRefetching } = useQuery<any[]>({
     queryKey: ["/api/proposals/telemetry-affinity-matches"],
+    enabled: !!user,
+    refetchInterval: 60000,
+    refetchOnMount: true,
+  });
+
+  const { data: plannedRouteInvitesData, refetch: plannedRouteInvitesRefetch } = useQuery<{ count: number; invites: any[] }>({
+    queryKey: ["/api/planned-route-invites/mine"],
     enabled: !!user,
     refetchInterval: 60000,
     refetchOnMount: true,
@@ -664,7 +672,8 @@ export default function MatchScreen() {
     else if (activeTab === "propProfile") propProfileRefetch();
     else if (activeTab === "route") routeAffinityRefetch();
     else if (activeTab === "telemetry") telemetryAffinityRefetch();
-  }, [activeTab, proposalRefetch, garageRefetch, bikerRefetch, blockedRefetch, musicRefetch, acceptedRefetch, propProfileRefetch, routeAffinityRefetch, telemetryAffinityRefetch]);
+    else if (activeTab === "giri") plannedRouteInvitesRefetch();
+  }, [activeTab, proposalRefetch, garageRefetch, bikerRefetch, blockedRefetch, musicRefetch, acceptedRefetch, propProfileRefetch, routeAffinityRefetch, telemetryAffinityRefetch, plannedRouteInvitesRefetch]);
 
   const handleUnblock = useCallback((blockedUserId: string) => {
     Alert.alert(t("common.confirm"), t("match.confirmUnblock"), [
@@ -750,6 +759,7 @@ export default function MatchScreen() {
     { key: "propProfile", label: t("match.tabPropProfile"), icon: "location", count: newPropProfileMatches.length },
     { key: "route", label: t("match.tabRoute"), icon: "map", count: (routeAffinityMatches?.filter((m) => m.status === "new") || []).length },
     { key: "telemetry", label: t("match.tabTelemetry"), icon: "speedometer", count: newTelemetryMatches.length },
+    { key: "giri", label: t("match.tabGiri"), icon: "map-outline", count: plannedRouteInvitesData?.count ?? 0 },
     { key: "accepted", label: t("match.tabAccepted"), icon: "checkmark-circle", count: 0 },
     { key: "blacklist", label: t("match.tabBlacklist"), icon: "ban", count: 0 },
   ];
@@ -763,6 +773,7 @@ export default function MatchScreen() {
     if (activeTab === "propProfile") return "location-outline";
     if (activeTab === "route") return "map-outline";
     if (activeTab === "telemetry") return "speedometer-outline";
+    if (activeTab === "giri") return "map-outline";
     return "flash-outline";
   };
 
@@ -775,6 +786,7 @@ export default function MatchScreen() {
     if (activeTab === "propProfile") return t("match.emptyPropProfileTitle");
     if (activeTab === "route") return t("match.emptyRouteTitle");
     if (activeTab === "telemetry") return t("match.emptyTelemetryTitle");
+    if (activeTab === "giri") return t("match.emptyGiriTitle");
     return t("match.emptyProposalsTitle");
   };
 
@@ -787,6 +799,7 @@ export default function MatchScreen() {
     if (activeTab === "propProfile") return t("match.emptyPropProfileDesc");
     if (activeTab === "route") return t("match.emptyRouteDesc");
     if (activeTab === "telemetry") return t("match.emptyTelemetryDesc");
+    if (activeTab === "giri") return t("match.emptyGiriDesc");
     return t("match.emptyProposalsDesc");
   };
 
@@ -833,7 +846,9 @@ export default function MatchScreen() {
         kmLimit={kmLimit}
       />
 
-      {activeTab === "music" && lastfmStatus?.connected !== true ? (
+      {activeTab === "giri" ? (
+        <PlannedRouteInvitesTab />
+      ) : activeTab === "music" && lastfmStatus?.connected !== true ? (
         <MatchEmptyState
           icon="musical-notes-outline"
           title={t("match.emptyMusicTitle")}

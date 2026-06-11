@@ -313,6 +313,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const { default: plannedRoutesRoutes } = await import("./routes/planned-routes");
   app.use("/api/planned-routes", plannedRoutesRoutes);
 
+  const { default: plannedRouteInvitesRoutes } = await import("./routes/planned-route-invites");
+  app.use("/api/planned-route-invites", plannedRouteInvitesRoutes);
+
   const { geocodeRouter } = await import("./routes/planned-routes/waypoints.next");
   app.use("/api/geocode", geocodeRouter);
 
