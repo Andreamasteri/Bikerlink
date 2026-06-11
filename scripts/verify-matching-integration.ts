@@ -739,7 +739,6 @@ async function main() {
   const hasCritical = results.some((r) => r.gaps.some((g) => g.severity === "critical" || g.severity === "high"));
   process.exit(hasFail || hasCritical ? 1 : 0);
 }
-
 main().catch((err) => {
   console.error("[verify] uncaught:", err);
   process.exit(2);
