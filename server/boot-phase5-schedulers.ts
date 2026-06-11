@@ -246,4 +246,20 @@ export async function runPhase5Schedulers(): Promise<void> {
   import("./motion-simulator")
     .then(({ startMotionSimulator }) => startMotionSimulator())
     .catch((e) => console.warn("[INIT] Background: motion simulator error:", e));
+
+  // Nightly bio embedding back-fill: catches any users whose bio changed after
+  // the boot-time pass, or whose embedding was missed due to API errors.
+  const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
+  setInterval(() => {
+    import("./embeddings/backfill-bio")
+      .then(({ backfillBioEmbeddings }) => backfillBioEmbeddings())
+      .then((r) =>
+        console.log(
+          `[EMBED BACKFILL][nightly] Done — processed=${r.processed}` +
+          ` backfilled=${r.backfilled} skipped=${r.skipped} errors=${r.errors}`,
+        ),
+      )
+      .catch((e) => console.warn("[EMBED BACKFILL][nightly] error:", e));
+  }, TWENTY_FOUR_HOURS_MS);
+  console.log("[INIT] Bio embedding nightly back-fill scheduled (every 24h)");
 }

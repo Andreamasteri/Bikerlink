@@ -352,6 +352,7 @@ export async function runBootSequence(server: Server, errorHandlersReady: Promis
     `[INIT][SUMMARY]   BACKGROUND (fire-and-forget after READY):\n` +
     `[INIT][SUMMARY]     runPlaylistSnapshot / saveSchemaSnapshot / initMissingClubConversations : scheduled\n` +
     `[INIT][SUMMARY]     enrichBikerMatchBreakdowns (back-fill affinity chips) : scheduled\n` +
+    `[INIT][SUMMARY]     backfillBioEmbeddings (back-fill missing/stale bio embeddings) : scheduled\n` +
     `[INIT][SUMMARY]     autoSeedFakeUsers        : ${needsFakeSeed ? "scheduled" : "skipped (needsFakeSeed=false)"}\n` +
     `[INIT][SUMMARY] ────────────────────────────────────────────────`
   );
@@ -441,5 +442,19 @@ export async function runBootSequence(server: Server, errorHandlersReady: Promis
           console.warn("[INIT][BG] autoSeedFakeUsers error:", err);
         });
     }
+
+    console.log("[INIT][BG] Starting backfillBioEmbeddings (back-fill stale/missing bio embeddings)...");
+    import("./embeddings/backfill-bio")
+      .then(({ backfillBioEmbeddings }) => backfillBioEmbeddings())
+      .then((r) =>
+        console.log(
+          `[INIT][BG] backfillBioEmbeddings — done` +
+          ` processed=${r.processed} backfilled=${r.backfilled}` +
+          ` skipped=${r.skipped} errors=${r.errors}`,
+        ),
+      )
+      .catch((err) => {
+        console.warn("[INIT][BG] backfillBioEmbeddings error:", err);
+      });
   });
 }
