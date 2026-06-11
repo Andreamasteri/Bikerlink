@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import * as Updates from "expo-updates";
 import { Platform } from "react-native";
+import * as Device from "expo-device";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { getApiUrl, authFetchHeaders } from "@/lib/query-client";
 
@@ -26,6 +27,7 @@ async function postOtaEvent(payload: {
   easUpdateId?: string | null;
   deviceId: string;
   eventType: "downloaded" | "boot_success" | "boot_failure";
+  deviceModel?: string | null;
 }): Promise<void> {
   try {
     await fetch(new URL("/api/ota/event", getApiUrl()).toString(), {
@@ -168,7 +170,20 @@ export function useOtaAutoUpdate(): { checking: boolean } {
 
         const deviceId = await getOrCreateDeviceId();
 
-        const result = await Updates.fetchUpdateAsync();
+        let result: { isNew: boolean };
+        try {
+          result = await Updates.fetchUpdateAsync();
+        } catch (fetchErr) {
+          console.warn("[useOtaAutoUpdate] fetchUpdateAsync failed:", fetchErr);
+          postOtaEvent({
+            releaseId: manifest.releaseId ?? null,
+            easUpdateId: manifest.allowedEasUpdateId,
+            deviceId,
+            eventType: "boot_failure",
+            deviceModel: Device.modelName ?? null,
+          });
+          return;
+        }
         if (!result.isNew) return;
 
         await postOtaEvent({

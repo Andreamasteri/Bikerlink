@@ -4,7 +4,7 @@ import { promisify } from "node:util";
 import { readFileSync, existsSync } from "node:fs";
 import { resolve } from "node:path";
 import { db } from "../../db";
-import { otaReleases } from "@shared/db";
+import { otaReleases, otaBootEvents } from "@shared/db";
 import { eq, desc, isNull, and, sql, ne, inArray } from "drizzle-orm";
 import { sendError } from "../../lib/api-response";
 
@@ -399,6 +399,31 @@ router.post("/:id/auto-rollback", async (req: Request, res: Response) => {
   } catch (err) {
     console.error("[ota] POST /:id/auto-rollback error:", err);
     return sendError(res, 500, "Errore aggiornamento config auto-rollback");
+  }
+});
+
+// ── GET /:id/failure-devices — modelli dispositivi con boot_failure per release ─
+router.get("/:id/failure-devices", async (req: Request, res: Response) => {
+  try {
+    const releaseId = req.params.id;
+    const rows = await db.execute<{ device_model: string | null; cnt: string }>(
+      sql`SELECT device_model, COUNT(*) AS cnt
+          FROM ota_boot_events
+          WHERE release_id = ${releaseId}
+            AND event_type = 'boot_failure'
+          GROUP BY device_model
+          ORDER BY cnt DESC`
+    );
+
+    const devices = (rows.rows ?? rows).map((r: { device_model: string | null; cnt: string }) => ({
+      deviceModel: r.device_model ?? null,
+      count: Number(r.cnt),
+    }));
+
+    return res.json({ devices });
+  } catch (err) {
+    console.error("[ota] GET /:id/failure-devices error:", err);
+    return sendError(res, 500, "Errore recupero dispositivi con fallimento");
   }
 });
 

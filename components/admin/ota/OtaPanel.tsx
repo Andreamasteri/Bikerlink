@@ -20,6 +20,7 @@ import * as Updates from "expo-updates";
 import { useTheme } from "@/lib/theme-context";
 import { apiRequest } from "@/lib/query-client";
 import OtaAssistantChat from "./OtaAssistantChat";
+import OtaFailureDevices from "./OtaFailureDevices";
 
 interface OtaRelease {
   id: string;
@@ -532,6 +533,7 @@ export default function OtaPanel() {
             )}
 
             {renderCounters(release)}
+            {release.bootFailureCount > 0 && <OtaFailureDevices releaseId={release.id} />}
             {renderAutoRollback(release)}
 
             {!hasGroupId && (
@@ -637,6 +639,7 @@ export default function OtaPanel() {
                     {release.approvedAt && <Text style={[styles.metaText, { color: colors.textSecondary }]}>Approvata: {formatDate(release.approvedAt)}</Text>}
                     {release.rejectedAt && <Text style={[styles.metaText, { color: colors.textSecondary }]}>Rifiutata: {formatDate(release.rejectedAt)}</Text>}
                     {renderCounters(release)}
+                    {release.bootFailureCount > 0 && <OtaFailureDevices releaseId={release.id} />}
                     {release.status === "approved" && renderAutoRollback(release)}
                     {release.status === "approved" && (
                       <TouchableOpacity

@@ -52,6 +52,7 @@ export const otaBootEvents = pgTable("ota_boot_events", {
   eventType: varchar("event_type", { length: 20 }).notNull(),
   platform: varchar("platform", { length: 16 }),
   appVersion: varchar("app_version", { length: 32 }),
+  deviceModel: text("device_model"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (table) => [
   index("ota_boot_events_release_id_idx").on(table.releaseId),

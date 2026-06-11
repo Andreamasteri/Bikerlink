@@ -100,6 +100,7 @@ router.post("/event", async (req: Request, res: Response) => {
       eventType?: unknown;
       platform?: unknown;
       appVersion?: unknown;
+      deviceModel?: unknown;
     };
 
     const deviceId = typeof body.deviceId === "string" ? body.deviceId.slice(0, 80) : null;
@@ -128,11 +129,12 @@ router.post("/event", async (req: Request, res: Response) => {
 
     const platform = typeof body.platform === "string" ? body.platform.slice(0, 16) : null;
     const appVersion = typeof body.appVersion === "string" ? body.appVersion.slice(0, 32) : null;
+    const deviceModel = typeof body.deviceModel === "string" ? body.deviceModel.slice(0, 120) : null;
 
     // Insert dedup via UNIQUE INDEX (release_id, device_id, event_type)
     const inserted = await db
       .insert(otaBootEvents)
-      .values({ releaseId, userId, deviceId, eventType, platform, appVersion })
+      .values({ releaseId, userId, deviceId, eventType, platform, appVersion, deviceModel })
       .onConflictDoNothing()
       .returning({ id: otaBootEvents.id });
 
