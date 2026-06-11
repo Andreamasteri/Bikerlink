@@ -40,6 +40,14 @@ interface StatsResponse {
   lastRunAt: string | null;
 }
 
+interface EmbeddingCoverage {
+  efSearch: number;
+  activeUsers: number;
+  byField: { field: string; coveragePct: number }[];
+  coverageWarning: boolean;
+  coverageThresholdPct: number;
+}
+
 interface QuickLink {
   key: string;
   label: string;
@@ -99,6 +107,11 @@ export default function MatchingHubScreen() {
     queryKey: ["/api/admin/matching/stats"],
     refetchInterval: 30000,
     staleTime: 10000,
+  });
+  const { data: embedding } = useQuery<EmbeddingCoverage>({
+    queryKey: ["/api/admin/embeddings/coverage"],
+    refetchInterval: 60000,
+    staleTime: 30000,
   });
 
   const forceUnlock = useMutation({
@@ -234,6 +247,47 @@ export default function MatchingHubScreen() {
         ))}
       </View>
 
+      {/* Embedding coverage tile */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Embedding</Text>
+        <TouchableOpacity
+          style={[
+            styles.embeddingTile,
+            embedding?.coverageWarning && styles.embeddingTileWarn,
+          ]}
+          onPress={() => router.push("/admin/match-engine" as never)}
+          activeOpacity={0.75}
+        >
+          <MaterialCommunityIcons
+            name="database-search"
+            size={20}
+            color={embedding?.coverageWarning ? Colors.warning : Colors.success}
+          />
+          <View style={{ flex: 1 }}>
+            <Text style={styles.embeddingLabel}>Copertura bio embedding</Text>
+            {embedding ? (
+              <Text
+                style={[
+                  styles.embeddingValue,
+                  { color: embedding.coverageWarning ? Colors.warning : Colors.success },
+                ]}
+              >
+                {(embedding.byField.find((r) => r.field === "bio")?.coveragePct ?? 0)}%
+              </Text>
+            ) : (
+              <Text style={styles.embeddingValue}>—</Text>
+            )}
+          </View>
+          {embedding?.coverageWarning && (
+            <View style={styles.warnBadge}>
+              <Ionicons name="warning" size={12} color={Colors.warning} />
+              <Text style={styles.warnBadgeText}>WARN</Text>
+            </View>
+          )}
+          <MaterialCommunityIcons name="chevron-right" size={18} color={Colors.textSecondary} />
+        </TouchableOpacity>
+      </View>
+
       {/* Quick links */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Sezioni Matching</Text>
@@ -304,6 +358,28 @@ const styles = StyleSheet.create({
   },
   issueCat: { fontFamily: "Inter_700Bold", fontSize: 10, letterSpacing: 0.5, marginBottom: 4 },
   issueMsg: { fontFamily: "Inter_400Regular", fontSize: 13, color: Colors.text },
+  embeddingTile: {
+    flexDirection: "row", alignItems: "center", gap: 12, padding: 14,
+    backgroundColor: Colors.surface, borderRadius: 12, borderWidth: 1, borderColor: Colors.border,
+  },
+  embeddingTileWarn: {
+    borderColor: Colors.warning, backgroundColor: Colors.warning + "0D",
+  },
+  embeddingLabel: {
+    fontFamily: "Inter_400Regular", fontSize: 11, color: Colors.textSecondary,
+  },
+  embeddingValue: {
+    fontFamily: "Inter_700Bold", fontSize: 20, color: Colors.text, marginTop: 2,
+  },
+  warnBadge: {
+    flexDirection: "row", alignItems: "center", gap: 4,
+    backgroundColor: Colors.warning + "22", borderRadius: 6,
+    paddingHorizontal: 8, paddingVertical: 3,
+    borderWidth: 1, borderColor: Colors.warning,
+  },
+  warnBadgeText: {
+    fontFamily: "Inter_700Bold", fontSize: 10, color: Colors.warning, letterSpacing: 0.5,
+  },
   linksGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   linkCard: {
     width: "31%", aspectRatio: 1, backgroundColor: Colors.surface,
