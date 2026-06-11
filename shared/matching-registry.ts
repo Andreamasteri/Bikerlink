@@ -287,6 +287,17 @@ export const MATCHING_REGISTRY: ReadonlyArray<MatchingTypeDef> = [
     defaultEnabled: true,
     addedBy: "#2528",
   },
+  {
+    id: 23,
+    key: "telemetryAffinity",
+    label: "Telemetry Affinity (#3393)",
+    category: "affinity",
+    table: null,
+    brandPattern: null,
+    prefColumn: "telemetry_affinity",
+    defaultEnabled: true,
+    addedBy: "#3393",
+  },
 ];
 
 /**
