@@ -317,6 +317,14 @@ export async function runBootSequence(server: Server, errorHandlersReady: Promis
     }
   });
 
+  // Unexpected-restart detection: record this boot + alert if too soon after last.
+  try {
+    const { recordBootSignal } = await import("./ai/watchdog/restart-monitor");
+    await recordBootSignal();
+  } catch (e) {
+    console.warn("[INIT] Phase 3: recordBootSignal failed (non-fatal):", e);
+  }
+
   bootLog(3, TOTAL, "DB Init", "done");
 
   // ── Phase 4: Seed + Core services (FATAL — timeout → process.exit) ────────

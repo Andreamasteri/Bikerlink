@@ -11,6 +11,7 @@ import { collectRedis } from "./collectors/redis-collector";
 import { collectLatency } from "./collectors/latency-collector";
 import { collectErrors } from "./collectors/error-collector";
 import { collectMaps } from "./collectors/maps-collector";
+import { collectRestarts } from "./collectors/restart-collector";
 import { recordSignals } from "./signals";
 import type { HealthSnapshot, Problem, Severity, Signal } from "./types";
 import { collectDbIntegrity } from "../db-integrity/collector";
@@ -166,6 +167,14 @@ function deriveProblems(signals: Signal[]): Problem[] {
     } else if (s.metric === "embedding.cap_reached") {
       title = `Cap embedding giornaliero raggiunto (${s.value} call)`;
       suggestion = "Embedding API call bloccate fino a mezzanotte. Aumenta il cap o verifica spike.";
+    } else if (s.metric === "server.restart_alert") {
+      const count = s.value ?? 1;
+      const det = s.details as { minutesSinceLast?: number; latestAt?: string } | undefined;
+      const minAgo = det?.minutesSinceLast ?? "?";
+      title = count >= 2
+        ? `Server riavviato ${count} volte di recente (ultimo: ${minAgo} min dopo il boot precedente)`
+        : `Server riavviato inaspettatamente (${minAgo} min dopo il boot precedente)`;
+      suggestion = "Possibile crash loop o deploy ripetuto. Verifica i log di avvio e Sentry.";
     }
     problems.push({
       id, severity: s.severity, source: s.source, title, suggestion,
@@ -200,7 +209,7 @@ export async function runAggregatorCycle(): Promise<HealthSnapshot> {
     collectBullMq(), collectScheduler(), collectDb(),
     collectRedis(), collectLatency(), collectErrors(),
     collectDbIntegritySignals(), collectMaps(),
-    collectEmbeddingSignals(),
+    collectEmbeddingSignals(), collectRestarts(),
   ]);
   const signals: Signal[] = [];
   for (const r of collectors) {
