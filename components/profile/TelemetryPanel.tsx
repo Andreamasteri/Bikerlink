@@ -164,7 +164,7 @@ export default function TelemetryPanel({ telemetryStats }: Props) {
                 <View style={styles.calibBadgeRow}>
                   <Ionicons
                     name={isCalibrated ? "checkmark-circle" : "alert-circle-outline"}
-                    size={13}
+                    size={20}
                     color={isCalibrated ? "#27ae60" : "#e67e22"}
                   />
                   <Text
@@ -424,7 +424,7 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   calibBadgeText: {
-    fontSize: 11,
+    fontSize: 22,
     fontFamily: "Inter_500Medium",
   },
   telemetryCard: {
