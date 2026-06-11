@@ -1,34 +1,21 @@
 -- migrate:no-transaction
 --
--- Migration 0095 — Ricrea indice HNSW pgvector sulla colonna embedding.
+-- Migration 0095 — INTENTIONALLY A NO-OP
 --
--- L'indice fu creato in 0039 e poi eliminato involontariamente in 0060 insieme
--- ad altri index in un'unica migration di refactor. Senza di esso findSimilar
--- esegue un full-scan sequenziale sull'intera tabella ad ogni chiamata, cosa
--- che diventa il collo di bottiglia principale oltre i 3k utenti.
+-- L'indice HNSW e l'estensione pgvector sono gestiti dalla boot sequence
+-- (server/boot-sequence.ts Phase 3) ad ogni avvio, DOPO che le migration
+-- sono state applicate. Questo garantisce che pgvector sia già installato
+-- nel DB prima che l'indice venga creato, indipendentemente dall'ambiente.
 --
--- HNSW è preferito a IVFFlat per dimensioni elevate (1536d):
---   - nessun bisogno di pre-training (niente VACUUM/ANALYZE obbligatorio prima)
---   - recall più alto a parità di ef_search
---   - build incrementale (nuove righe non richiedono REBUILD)
+-- Tentare CREATE EXTENSION + CREATE INDEX CONCURRENTLY dentro una migration
+-- fallisce in produzione perché pgvector non è ancora attivo quando il runner
+-- esegue le migration (il runner gira prima del boot del server).
 --
--- Parametri:
---   m = 16             — max connessioni per layer (default pgvector, buon recall)
---   ef_construction = 64 — qualità build; 64 è il minimo raccomandato per 1536d
+-- L'indice è creato da:
+--   server/boot-sequence.ts → Phase 3 → hnsw self-heal block
+-- L'extension è garantita da:
+--   server/boot-sequence.ts → Phase 3 → pgvector ensure block
 --
--- Il pragma `migrate:no-transaction` è richiesto perché CREATE INDEX CONCURRENTLY
--- non può girare dentro un BEGIN/COMMIT esplicito (PostgreSQL restituisce errore).
--- Il migrate runner lo rileva e applica la migration in autocommit mode.
---
--- NOTA: la migration include `CREATE EXTENSION IF NOT EXISTS vector` come safety
--- net per ambienti di produzione dove l'estensione potrebbe non essere stata
--- attivata correttamente dalla migration 0039 (eseguita quando pgvector non era
--- ancora disponibile sul provider). `IF NOT EXISTS` garantisce idempotenza.
--- La boot sequence (server/boot-sequence.ts Phase 3) garantisce pgvector attiva
--- a ogni riavvio in modo permanente, indipendentemente dalla storia delle migration.
+-- Non rimuovere questo file: è già registrato in schema_migrations su dev.
 
-CREATE EXTENSION IF NOT EXISTS vector;
-
-CREATE INDEX CONCURRENTLY IF NOT EXISTS "embeddings_vec_hnsw_cosine_idx"
-  ON "embeddings" USING hnsw ("embedding" vector_cosine_ops)
-  WITH (m = 16, ef_construction = 64);
+SELECT 1;
