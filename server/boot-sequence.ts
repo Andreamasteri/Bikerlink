@@ -552,6 +552,60 @@ export async function runBootSequence(server: Server, errorHandlersReady: Promis
   ensureCompetitorAnalysisPdf();
 
   setImmediate(() => {
+    // ── Embedding coverage check (non-fatal) ──────────────────────────────────
+    // Logs a warning when the fraction of active users with a 'bio' embedding
+    // drops below 80 %.  Threshold configurable via AppSetting
+    // `embedding_coverage_threshold` (integer 0–100, default 80).
+    (async () => {
+      try {
+        const { pool: pgPool } = await import("./db");
+        const { storage: s } = await import("./storage");
+        const thresholdSetting = await s.getAppSetting("embedding_coverage_threshold");
+        const threshold = (() => {
+          const raw = thresholdSetting?.value;
+          if (!raw) return 80;
+          const n = parseInt(raw, 10);
+          return Number.isFinite(n) ? Math.max(0, Math.min(100, n)) : 80;
+        })();
+
+        const client = await pgPool.connect();
+        try {
+          const [activeRes, covRes] = await Promise.all([
+            client.query<{ total: string }>(
+              `SELECT COUNT(*) AS total FROM users WHERE status = 'active'`,
+            ),
+            client.query<{ with_embedding: string }>(
+              `SELECT COUNT(DISTINCT e.entity_id) AS with_embedding
+               FROM embeddings e
+               JOIN users u ON u.id = e.entity_id AND u.status = 'active'
+               WHERE e.entity_type = 'user' AND e.field = 'bio'`,
+            ),
+          ]);
+          const activeUsers = parseInt(activeRes.rows[0]?.total ?? "0", 10);
+          const withEmbedding = parseInt(covRes.rows[0]?.with_embedding ?? "0", 10);
+          const pct = activeUsers > 0
+            ? Math.round((withEmbedding / activeUsers) * 100 * 10) / 10
+            : 100;
+          if (pct < threshold) {
+            console.warn(
+              `[INIT][EMBED] Coverage WARNING: only ${pct}% of active users have a 'bio' embedding` +
+              ` (${withEmbedding}/${activeUsers}, threshold=${threshold}%).` +
+              ` Match quality may be degraded for users without embeddings.`,
+            );
+          } else {
+            console.log(
+              `[INIT][EMBED] Coverage OK: ${pct}% of active users have a 'bio' embedding` +
+              ` (${withEmbedding}/${activeUsers}).`,
+            );
+          }
+        } finally {
+          client.release();
+        }
+      } catch (err) {
+        console.warn("[INIT][EMBED] Coverage check failed (non-fatal):", err);
+      }
+    })();
+
     console.log("[INIT][BG] Starting initMissingClubConversations...");
     initMissingClubConversations()
       .then(() => console.log("[INIT][BG] initMissingClubConversations — done"))

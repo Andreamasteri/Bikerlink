@@ -1,12 +1,34 @@
 import { createHash } from "crypto";
 import { sql } from "drizzle-orm";
-import { db } from "../db";
+import { db, pool } from "../db";
 import { embeddings } from "@shared/db";
 import {
   generateEmbedding,
   getLastUsedModelTag,
   EMBEDDING_DIMENSIONS,
 } from "./client";
+import { storage } from "../storage";
+
+const EF_SEARCH_DEFAULT = 64;
+const EF_SEARCH_MIN = 1;
+const EF_SEARCH_MAX = 1000;
+
+/**
+ * Read hnsw.ef_search from AppSetting `embedding_ef_search`.
+ * Falls back to 64 if the setting is absent or invalid.
+ * Result is clamped to [1, 1000] for safety.
+ */
+async function getEfSearch(): Promise<number> {
+  try {
+    const setting = await storage.getAppSetting("embedding_ef_search");
+    if (!setting?.value) return EF_SEARCH_DEFAULT;
+    const n = parseInt(setting.value, 10);
+    if (!Number.isFinite(n)) return EF_SEARCH_DEFAULT;
+    return Math.max(EF_SEARCH_MIN, Math.min(EF_SEARCH_MAX, n));
+  } catch {
+    return EF_SEARCH_DEFAULT;
+  }
+}
 
 /**
  * Task #2514 — Embeddings store: upsert + similarity search helpers.
@@ -130,53 +152,65 @@ export async function findSimilar(
   const literal = toVectorLiteral(vec);
   const safeLimit = Math.max(1, Math.min(100, Math.floor(limit)));
   const maxDistance = 1 - Math.max(0, Math.min(1, minSimilarity));
+  const efSearch = await getEfSearch();
 
-  const result = await db.execute<{
-    id: string;
-    entity_type: string;
-    entity_id: string;
-    field: string;
-    distance: number;
-    model: string;
-    updated_at: Date;
-  }>(
-    modelFilter
-      ? sql`SELECT id, entity_type, entity_id, field, model, updated_at,
-                   (embedding <=> ${literal}::vector) AS distance
-            FROM embeddings
-            WHERE entity_type = ${entityType}
-              AND field = ${field}
-              AND model = ${modelFilter}
-              AND (embedding <=> ${literal}::vector) <= ${maxDistance}
-            ORDER BY embedding <=> ${literal}::vector
-            LIMIT ${safeLimit}`
-      : sql`SELECT id, entity_type, entity_id, field, model, updated_at,
-                   (embedding <=> ${literal}::vector) AS distance
-            FROM embeddings
-            WHERE entity_type = ${entityType}
-              AND field = ${field}
-              AND (embedding <=> ${literal}::vector) <= ${maxDistance}
-            ORDER BY embedding <=> ${literal}::vector
-            LIMIT ${safeLimit}`,
-  );
-  const rows = (result.rows ?? result) as Array<{
-    id: string;
-    entity_type: string;
-    entity_id: string;
-    field: string;
-    distance: number | string;
-    model: string;
-    updated_at: Date;
-  }>;
-  return rows.map((r) => ({
-    id: r.id,
-    entityType: r.entity_type,
-    entityId: r.entity_id,
-    field: r.field,
-    similarity: 1 - Number(r.distance),
-    model: r.model,
-    updatedAt: r.updated_at,
-  }));
+  // Acquire a dedicated connection so that SET LOCAL (transaction-scoped) and
+  // the SELECT run on the same connection without leaking the setting.
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    await client.query(`SET LOCAL hnsw.ef_search = ${efSearch}`);
+
+    const selectSql = modelFilter
+      ? `SELECT id, entity_type, entity_id, field, model, updated_at,
+                (embedding <=> $1::vector) AS distance
+         FROM embeddings
+         WHERE entity_type = $2
+           AND field = $3
+           AND model = $4
+           AND (embedding <=> $1::vector) <= $5
+         ORDER BY embedding <=> $1::vector
+         LIMIT $6`
+      : `SELECT id, entity_type, entity_id, field, model, updated_at,
+                (embedding <=> $1::vector) AS distance
+         FROM embeddings
+         WHERE entity_type = $2
+           AND field = $3
+           AND (embedding <=> $1::vector) <= $4
+         ORDER BY embedding <=> $1::vector
+         LIMIT $5`;
+
+    const params = modelFilter
+      ? [literal, entityType, field, modelFilter, maxDistance, safeLimit]
+      : [literal, entityType, field, maxDistance, safeLimit];
+
+    const result = await client.query<{
+      id: string;
+      entity_type: string;
+      entity_id: string;
+      field: string;
+      distance: number | string;
+      model: string;
+      updated_at: Date;
+    }>(selectSql, params);
+
+    await client.query("COMMIT");
+
+    return result.rows.map((r) => ({
+      id: r.id,
+      entityType: r.entity_type,
+      entityId: r.entity_id,
+      field: r.field,
+      similarity: 1 - Number(r.distance),
+      model: r.model,
+      updatedAt: r.updated_at,
+    }));
+  } catch (err) {
+    await client.query("ROLLBACK").catch(() => undefined);
+    throw err;
+  } finally {
+    client.release();
+  }
 }
 
 /**
