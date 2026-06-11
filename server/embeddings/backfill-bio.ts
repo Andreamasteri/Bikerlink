@@ -2,6 +2,7 @@ import type { PoolClient } from "pg";
 import { pool } from "../db";
 import { upsertEmbedding } from "./store";
 import { storage } from "../storage";
+import { logAiUsage } from "../ai/audit";
 
 const DEFAULT_DELAY_MS = 500;
 const DEFAULT_BATCH_SIZE = 50;
@@ -139,6 +140,17 @@ export async function backfillBioEmbeddings(): Promise<{
     `[EMBED BACKFILL] Done — backfilled=${backfilled} skipped=${skipped} errors=${errors}` +
     ` (total candidates=${rows.length})`,
   );
+
+  if (backfilled > 0) {
+    const estimatedDim = 384;
+    const tokensPerBio = 60;
+    await logAiUsage(
+      "backfill-bio",
+      "local:multilingual-e5-small",
+      { tokensIn: backfilled * tokensPerBio, tokensOut: estimatedDim * backfilled },
+      "boot",
+    ).catch(() => {});
+  }
 
   return { processed: rows.length, backfilled, skipped, errors };
 }

@@ -6,13 +6,14 @@ import { Cron } from "croner";
 import { generateText } from "ai";
 import { db } from "../../db";
 import { reports, users, moderatorDigests, anomalyEvents } from "@shared/db";
-import { and, eq, gte, desc, or, inArray } from "drizzle-orm";
+import { and, eq, gte, desc, or, inArray, sql } from "drizzle-orm";
 import { sendDigestPush } from "./push";
 import { runWithFallback, estimateCostUsd } from "./provider";
 import { withBudget } from "./budget";
 import { logAiCall } from "./log";
 import { redactPII } from "./redact";
 import type { AiCallMeta } from "./types";
+import { logAiUsage } from "../audit";
 
 interface CaseSummary {
   id: string;
@@ -100,6 +101,7 @@ async function generateAiBrief(modId: string, ctx: Awaited<ReturnType<typeof gat
     prompt: prompt.slice(0, 4000), response: text.slice(0, 4000),
     suggestion: { brief: text }, meta,
   });
+  await logAiUsage("digest", m.modelId, { tokensIn, tokensOut }, "scheduler");
   return { brief: text, meta };
 }
 
@@ -129,7 +131,21 @@ async function generateForModerator(modId: string): Promise<DigestPayload> {
   };
 }
 
-export async function runDigestForAll(): Promise<{ moderators: number }> {
+export async function runDigestForAll(): Promise<{ moderators: number; skipped?: boolean }> {
+  // Skip se non ci sono abbastanza dati rilevanti nelle ultime 24h.
+  const MIN_REPORTS_THRESHOLD = 5;
+  const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
+  const [recentCount] = await db.select({ cnt: sql<number>`count(*)::int` })
+    .from(reports)
+    .where(gte(reports.createdAt, since));
+  const recentTotal = Number(recentCount?.cnt ?? 0);
+  if (recentTotal < MIN_REPORTS_THRESHOLD) {
+    console.info(
+      `[digest] skip — nessun dato rilevante (${recentTotal} report nelle ultime 24h, soglia=${MIN_REPORTS_THRESHOLD})`,
+    );
+    return { moderators: 0, skipped: true };
+  }
+
   const mods = await db.select({ id: users.id, expoPushToken: users.expoPushToken })
     .from(users)
     .where(and(eq(users.status, "active"), inArray(users.role, ["admin", "moderator"])));

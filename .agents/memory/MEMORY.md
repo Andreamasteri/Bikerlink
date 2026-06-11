@@ -41,3 +41,4 @@
 - [HNSW index deploy strategy](hnsw-deploy-strategy.md) — indice HNSW NON nelle migration né nel dev DB; Replit genera il diff dev↔prod autonomamente → se l'indice è in dev genera CREATE INDEX in prod che fallisce; boot-sequence lo crea al primo avvio.
 - [db-integrity schema-registry timeout](db-integrity-schema-registry.md) — information_schema.columns è lento in prod (148 tabelle): N query sequenziali → timeout 30s; fix: getAllColumnsMap() via pg_catalog in 1 query + cache 10min.
 - [Local embedding model projection](local-embedding-projection.md) — multilingual-e5-small produce 384 dim; client.ts proietta a 1536 (4× concat + L2-norm); model tag in DB = 'local:Xenova/multilingual-e5-small'; aggiungere alla whitelist db-integrity.
+- [AI audit logging pattern](ai-audit-logging.md) — logAiUsage() pattern, proposer Groq-only model routing fix, fingerprint+known-offline skip guards in proposer.ts.

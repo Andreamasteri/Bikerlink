@@ -22,6 +22,8 @@ const MAPS_FLAGS: readonly MapsKillSwitchKey[] = ["telemetry", "collector", "llm
 import { getMapsTelemetryBuckets, aggregateMapsTelemetry, getMapsSummaryTelemetry } from "../../ai/watchdog/maps-telemetry-store";
 import { getLastHealthCheckResults, runMapsHealthChecks } from "../../ai/watchdog/maps-health-checks";
 import { getRoutingCounters } from "../../routing/routing-metrics";
+import { getAiTokenAudit } from "../../ai/audit";
+import { getProposerSettings, setProposerModel } from "../../ai/watchdog/proposer";
 
 const router = Router();
 
@@ -226,6 +228,29 @@ router.get("/watchdog/maps/summary", async (_req, res) => {
 router.post("/watchdog/maps/health/run", async (_req, res) => {
   const results = await runMapsHealthChecks(true);
   return res.json({ results });
+});
+
+// === AI Token Audit ===
+
+router.get("/ai/token-audit", async (req, res) => {
+  const date = typeof req.query.date === "string" ? req.query.date : undefined;
+  const data = await getAiTokenAudit(date);
+  return res.json({ date: date ?? new Date().toISOString().slice(0, 10), audit: data });
+});
+
+// === Proposer settings (modello configurabile) ===
+
+router.get("/watchdog/proposer/settings", async (_req, res) => {
+  const settings = await getProposerSettings();
+  return res.json(settings);
+});
+
+router.post("/watchdog/proposer/settings", async (req, res) => {
+  const schema = z.object({ model: z.string().min(3).max(120) });
+  const parsed = schema.safeParse(req.body);
+  if (!parsed.success) return sendError(res, 400, parsed.error.issues[0].message);
+  await setProposerModel(parsed.data.model);
+  return res.json({ model: parsed.data.model });
 });
 
 export default router;

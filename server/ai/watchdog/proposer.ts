@@ -2,7 +2,7 @@
 // risolvibili da auto-fix sicuro, chiede all'AI di proporre 1-3 azioni rischiose
 // per approvazione admin. NIENTE esecuzione automatica.
 import { generateObject } from "ai";
-import { runWithFallback, estimateCostUsd } from "../moderation/provider";
+import { runWithFallback, resolveModel, estimateCostUsd } from "../moderation/provider";
 import { withBudget } from "../moderation/budget";
 import { logAiCall } from "../moderation/log";
 import { writeWatchdogLog } from "./log";
@@ -11,6 +11,8 @@ import { z } from "zod";
 import type { AiCallMeta } from "../moderation/types";
 import { isWatchdogEnabled } from "./kill-switch";
 import { isMapsFlagEnabled } from "./maps-kill-switch";
+import { storage } from "../../storage";
+import { logAiUsage } from "../audit";
 
 const SYSTEM = `Sei l'AI proposer del watchdog BikerLink. Analizza i problemi e proponi 1-3 azioni di rimedio.
 REGOLE:
@@ -32,9 +34,67 @@ const proposalsSchema = z.object({
   proposals: z.array(proposalSchema).min(0).max(3),
 });
 
+// Metric-id patterns that identify "known offline" ThinkCentre services.
+// If ALL high/critical problems match these patterns, the AI call is skipped.
+const KNOWN_OFFLINE_PATTERNS: RegExp[] = [
+  /^health\.engine\.(graphhopper|valhalla)/i,
+  /^routing\.engine_down\.(graphhopper|valhalla)/i,
+  /thinkcentre/i,
+  /dns_not_resolve/i,
+  /tunnel_offline/i,
+  /graphhopper/i,
+  /valhalla/i,
+];
+
+function isKnownOfflineProblem(problemId: string): boolean {
+  return KNOWN_OFFLINE_PATTERNS.some((re) => re.test(problemId));
+}
+
+function computeProblemsFingerprint(problems: HealthSnapshot["problems"]): string {
+  const ids = problems
+    .filter((p) => p.severity === "high" || p.severity === "critical")
+    .map((p) => p.id)
+    .sort();
+  return JSON.stringify(ids);
+}
+
+const FINGERPRINT_KEY = "watchdog_proposer_last_fingerprint";
+const MODEL_KEY = "watchdog_proposer_model";
+const DEFAULT_PROPOSER_MODEL = "llama-3.1-8b-instant";
+
+let _cachedFingerprint: string | null = null;
+
+async function getLastFingerprint(): Promise<string | null> {
+  if (_cachedFingerprint !== null) return _cachedFingerprint;
+  try {
+    const row = await storage.getAppSetting(FINGERPRINT_KEY);
+    return row?.value ?? null;
+  } catch {
+    return null;
+  }
+}
+
+async function saveFingerprint(fp: string): Promise<void> {
+  _cachedFingerprint = fp;
+  try {
+    await storage.upsertAppSetting(FINGERPRINT_KEY, fp);
+  } catch {/* best-effort */}
+}
+
+async function getProposerModel(): Promise<string> {
+  try {
+    const row = await storage.getAppSetting(MODEL_KEY);
+    return row?.value?.trim() || DEFAULT_PROPOSER_MODEL;
+  } catch {
+    return DEFAULT_PROPOSER_MODEL;
+  }
+}
+
 export interface ProposerResult {
   proposals: Array<Proposal & { logId: string | null }>;
   meta: { provider: string; model: string; costUsd: number };
+  skipped?: boolean;
+  skipReason?: string;
 }
 
 export async function runProposer(snap: HealthSnapshot): Promise<ProposerResult | null> {
@@ -44,6 +104,34 @@ export async function runProposer(snap: HealthSnapshot): Promise<ProposerResult 
     .filter((p) => p.severity === "high" || p.severity === "critical")
     .filter((p) => mapsLlmEnabled || p.source !== "maps");
   if (hiSev.length === 0) return null;
+
+  // Skip se tutti i problemi attivi sono "noti offline" (ThinkCentre/GraphHopper/Valhalla):
+  // non c'è niente che possiamo fare automaticamente, evita di bruciare quota AI.
+  const allKnownOffline = hiSev.every((p) => isKnownOfflineProblem(p.id));
+  if (allKnownOffline) {
+    console.info(
+      "[watchdog/proposer] skip — problemi invariati/noti, nessuna proposta" +
+      ` (${hiSev.length} problemi ThinkCentre/routing noti: ${hiSev.map((p) => p.id).join(", ")})`,
+    );
+    return null;
+  }
+
+  // Skip se i problemi non sono cambiati dall'ultima chiamata AI (fingerprint check).
+  const currentFp = computeProblemsFingerprint(snap.problems);
+  const lastFp = await getLastFingerprint();
+  if (lastFp !== null && lastFp === currentFp) {
+    console.info(
+      `[watchdog/proposer] skip — problemi invariati/noti, nessuna proposta` +
+      ` (fingerprint invariato: ${hiSev.length} problemi high/critical, stesso set della chiamata precedente)`,
+    );
+    return null;
+  }
+
+  const proposerModel = await getProposerModel();
+  // Groq-only models (llama-*, openai/gpt-oss-*) should not be forced on Google/OpenAI.
+  const isGroqOnlyModel = /^(llama-3\.|llama-3\d|meta-llama\/|openai\/gpt-oss)/i.test(proposerModel);
+  const forcedModelId = isGroqOnlyModel ? undefined : proposerModel;
+  const groqOverrideModelId = isGroqOnlyModel ? proposerModel : undefined;
 
   const prompt = [
     `Snapshot corrente: status=${snap.status} score=${snap.score}`,
@@ -56,12 +144,42 @@ export async function runProposer(snap: HealthSnapshot): Promise<ProposerResult 
   try {
     return await withBudget("triage", async () => {
       const started = Date.now();
-      const { value: result, model: m } = await runWithFallback({ role: "brain" }, (mm) =>
-        mm.scheduler(() => generateObject({
+
+      // Helper: call generateObject on a resolved model, auto-detecting llama json mode.
+      const callModel = (mm: ReturnType<typeof resolveModel>) => {
+        const needsJsonMode = mm.objectMode === "json" || /^(llama-3\.|meta-llama\/llama)/i.test(mm.modelId);
+        return mm.scheduler(() => generateObject({
           model: mm.model, schema: proposalsSchema, system: SYSTEM, prompt, temperature: 0.2,
-          ...(mm.objectMode === "json" ? { mode: "json" as const } : {}),
-        })),
-      );
+          ...(needsJsonMode ? { mode: "json" as const } : {}),
+        }));
+      };
+
+      // Two-step model routing:
+      // Step 1 — if the configured model is Groq-specific, try it directly on Groq ONLY.
+      //          Do NOT pass it through the full fallback chain so Google/OpenAI are not
+      //          asked to run a model they don't have, which would set incorrect cooldowns.
+      // Step 2 — if Groq fails (quota, cooldown, model error) or model is provider-agnostic,
+      //          run the standard chain (Groq default → Google → OpenAI) without forced model.
+      const resolveAndCall = async (): Promise<{ value: Awaited<ReturnType<typeof callModel>>; model: ReturnType<typeof resolveModel> }> => {
+        if (groqOverrideModelId) {
+          try {
+            const groqM = resolveModel({ role: "brain", preferredProvider: "groq", forcedModelId: groqOverrideModelId });
+            return { value: await callModel(groqM), model: groqM };
+          } catch (groqErr) {
+            console.warn(
+              `[watchdog/proposer] Groq/${groqOverrideModelId} fallito, uso chain standard:`,
+              (groqErr as Error).message,
+            );
+            // Fall through to standard chain with default models.
+          }
+          const fallback = await runWithFallback({ role: "brain" }, callModel);
+          return { value: fallback.value, model: fallback.model };
+        }
+        // Provider-agnostic model: pass forcedModelId through the full chain as before.
+        const fallback = await runWithFallback({ role: "brain", forcedModelId }, callModel);
+        return { value: fallback.value, model: fallback.model };
+      };
+      const { value: result, model: m } = await resolveAndCall();
       const tokensIn = result.usage?.inputTokens ?? Math.ceil(prompt.length / 4);
       const tokensOut = result.usage?.outputTokens ?? 200;
       const meta: AiCallMeta = {
@@ -74,6 +192,8 @@ export async function runProposer(snap: HealthSnapshot): Promise<ProposerResult 
         response: JSON.stringify(result.object).slice(0, 4000),
         suggestion: result.object, meta,
       });
+      await logAiUsage("proposer", m.modelId, { tokensIn, tokensOut }, "scheduler");
+      await saveFingerprint(currentFp);
       const proposals = result.object.proposals;
       const withIds: Array<Proposal & { logId: string | null }> = [];
       for (const p of proposals) {
@@ -94,4 +214,12 @@ export async function runProposer(snap: HealthSnapshot): Promise<ProposerResult 
     console.warn("[watchdog/proposer] error:", msg);
     return null;
   }
+}
+
+export async function getProposerSettings(): Promise<{ model: string; defaultModel: string }> {
+  return { model: await getProposerModel(), defaultModel: DEFAULT_PROPOSER_MODEL };
+}
+
+export async function setProposerModel(model: string): Promise<void> {
+  await storage.upsertAppSetting(MODEL_KEY, model.trim());
 }

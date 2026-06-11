@@ -14,6 +14,7 @@ import { writeWatchdogLog } from "./log";
 import { weeklyReportSchema } from "./types";
 import { isWatchdogEnabled } from "./kill-switch";
 import type { AiCallMeta } from "../moderation/types";
+import { logAiUsage } from "../audit";
 
 const SYSTEM = `Sei l'analista settimanale del watchdog BikerLink.
 Genera un report strutturato in italiano basato su dati grezzi.
@@ -111,6 +112,7 @@ export async function runWeeklyReport(_now = new Date()): Promise<string | null>
         response: JSON.stringify(result.object).slice(0, 4000),
         suggestion: result.object, meta,
       });
+      await logAiUsage("weekly-report", m.modelId, { tokensIn, tokensOut }, "scheduler");
       const [row] = await db.insert(weeklySystemReports).values({
         weekStart, payload: result.object as object, modelUsed: m.modelId, costUsd: meta.costUsd,
       }).onConflictDoNothing().returning({ id: weeklySystemReports.id });

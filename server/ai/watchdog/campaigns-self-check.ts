@@ -8,6 +8,7 @@ import crypto from "crypto";
 import { generateText } from "ai";
 import { runWithFallback, estimateCostUsd } from "../moderation/provider";
 import { writeWatchdogLog } from "./log";
+import { logAiUsage } from "../audit";
 import { uploadBuffer, deleteObject, objectExists } from "../../objectStorage";
 import { getInternalProbeToken, getInternalProbeHeaderName, getInternalProbeModeratorHeaderName } from "./internal-token";
 import { storage } from "../../storage";
@@ -163,9 +164,14 @@ async function buildAiBrief(
       }));
       const usage = res.usage as { inputTokens?: number; outputTokens?: number } | undefined;
       const cost = estimateCostUsd(m.modelId, usage?.inputTokens ?? 0, usage?.outputTokens ?? 0);
-      return { text: res.text, cost };
+      return { text: res.text, cost, tokensIn: usage?.inputTokens ?? 0, tokensOut: usage?.outputTokens ?? 0 };
     });
-    void value.cost;
+    await logAiUsage(
+      "campaigns-self-check",
+      model.modelId,
+      { tokensIn: value.tokensIn, tokensOut: value.tokensOut },
+      "scheduler",
+    );
     return { brief: value.text.trim(), meta: { provider: model.providerName, model: model.modelId } };
   } catch (e) {
     console.warn("[campaigns-self-check] AI brief skipped:", (e as Error).message);

@@ -21,6 +21,7 @@ import { MapsHealthCard } from "@/components/admin/system-health/MapsHealthCard"
 import { useAdminWatchdogAlerts } from "@/hooks/useAdminWatchdogAlerts";
 import { WhisperWatchdogBadge, type WhisperHealthData } from "@/components/admin/WhisperWatchdogBadge";
 import { EmbeddingUsageCard } from "@/components/admin/EmbeddingUsageCard";
+import { AiTokenAuditCard } from "@/components/admin/AiTokenAuditCard";
 
 interface Snapshot {
   status: "green" | "yellow" | "orange" | "red";
@@ -243,6 +244,9 @@ export default function SystemHealthScreen() {
 
           <SectionTitle icon="vector-point">Embedding Usage</SectionTitle>
           <EmbeddingUsageCard />
+
+          <SectionTitle icon="chart-bar">Consumo AI oggi</SectionTitle>
+          <AiTokenAuditCard />
         </>
       )}
     </ScrollView>
