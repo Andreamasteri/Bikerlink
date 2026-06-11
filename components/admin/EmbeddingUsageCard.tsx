@@ -103,6 +103,8 @@ export function EmbeddingUsageCard() {
 
   const { lastReport, last7Days, cap, todayApiCalls } = data;
   const capPct = cap > 0 ? Math.min(100, Math.round((todayApiCalls / cap) * 100)) : 0;
+  const capRatio = cap > 0 ? todayApiCalls / cap : 0;
+  const nearCap = capRatio >= 0.85;
   const barColor = capPct >= 90 ? "#e74c3c" : capPct >= 70 ? "#f39c12" : Colors.primary ?? "#3498db";
 
   return (
@@ -115,6 +117,18 @@ export function EmbeddingUsageCard() {
           </View>
         )}
       </View>
+
+      {/* Cap warning banner */}
+      {nearCap && (
+        <View style={styles.capWarningBanner}>
+          <Text style={styles.capWarningText}>
+            ⚠ Attenzione: cap quasi raggiunto ({capPct}% utilizzato)
+          </Text>
+          <Text style={styles.capWarningSubtext}>
+            Considera di aumentare il limite giornaliero per evitare il fallback locale.
+          </Text>
+        </View>
+      )}
 
       {/* Today cap bar */}
       <View style={styles.section}>
@@ -417,6 +431,24 @@ const styles = StyleSheet.create({
     textAlign: "left",
     flex: 1.5,
     color: "#8e8e93",
+  },
+  capWarningBanner: {
+    backgroundColor: "#7a3e00",
+    borderWidth: 1,
+    borderColor: "#f39c12",
+    borderRadius: 8,
+    padding: 10,
+    marginBottom: 12,
+  },
+  capWarningText: {
+    color: "#f39c12",
+    fontSize: 13,
+    fontWeight: "700",
+    marginBottom: 2,
+  },
+  capWarningSubtext: {
+    color: "#d4a027",
+    fontSize: 12,
   },
   errorText: {
     color: "#8e8e93",

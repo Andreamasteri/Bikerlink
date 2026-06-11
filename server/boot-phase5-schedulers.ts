@@ -276,4 +276,11 @@ export async function runPhase5Schedulers(): Promise<void> {
   } catch (e) {
     console.warn("[INIT] Embedding daily report scheduler failed (non-fatal):", e);
   }
+
+  try {
+    const { startEmbeddingCapAlertJob } = await import("./jobs/embedding-cap-alert");
+    startEmbeddingCapAlertJob();
+  } catch (e) {
+    console.warn("[INIT] Embedding cap alert job failed (non-fatal):", e);
+  }
 }
