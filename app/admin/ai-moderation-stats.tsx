@@ -19,6 +19,7 @@ interface Stats {
   byScope: Array<{ scope: string; n: number; cost: number; accepted: number }>;
   byModel: Array<{ model: string | null; n: number; cost: number }>;
   anomaliesRecent: Array<{ id: string; type: string; category: string | null; observed: number; threshold: number; createdAt: string }>;
+  groqTpd?: { used: number; cap: number; pct: number; exceeded: boolean };
 }
 
 export default function AiModerationStatsScreen() {
@@ -80,6 +81,37 @@ export default function AiModerationStatsScreen() {
               </View>
             ))}
           </View>
+
+          {/* Groq TPD soft-cap */}
+          {data.groqTpd != null && (
+            <View style={[styles.card, {
+              borderColor: data.groqTpd.exceeded
+                ? Colors.error
+                : data.groqTpd.pct >= 0.8
+                  ? Colors.warning
+                  : Colors.border,
+            }]}>
+              <Text style={styles.cardTitle}>Groq TPD — token oggi</Text>
+              <View style={styles.row}>
+                <Text style={styles.bigValue}>{data.groqTpd.used.toLocaleString("it-IT")}</Text>
+                <Text style={styles.muted}> / {data.groqTpd.cap.toLocaleString("it-IT")}</Text>
+              </View>
+              <View style={styles.barOuter}>
+                <View style={[styles.barFill, {
+                  width: `${Math.min(100, data.groqTpd.pct * 100)}%`,
+                  backgroundColor: data.groqTpd.exceeded
+                    ? Colors.error
+                    : data.groqTpd.pct >= 0.8
+                      ? Colors.warning
+                      : Colors.success,
+                }]} />
+              </View>
+              <Text style={styles.cardMeta}>
+                {Math.round(data.groqTpd.pct * 100)}%
+                {data.groqTpd.exceeded ? " — SOFT-CAP ATTIVO (Gemini/OpenAI in uso)" : data.groqTpd.pct >= 0.8 ? " — soglia vicina" : " — ok"}
+              </Text>
+            </View>
+          )}
 
           {/* Queue */}
           <View style={styles.card}>

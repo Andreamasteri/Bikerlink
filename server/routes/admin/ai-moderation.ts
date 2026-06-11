@@ -9,7 +9,8 @@ import { streamChat } from "../../ai/moderation/chat";
 import { runTriage } from "../../ai/moderation/triage";
 import { enqueueTriage, getQueueStats } from "../../ai/moderation/queue";
 import { getBudgetStatus, setBudgetLimit } from "../../ai/moderation/budget";
-import { getProviderHealth, hasAnyAiProvider, AI_NO_PROVIDER_MESSAGE } from "../../ai/moderation/provider";
+import { getProviderHealth, hasAnyAiProvider, AI_NO_PROVIDER_MESSAGE, getGroqTpdStatus } from "../../ai/moderation/provider";
+import { setGroqTpdSoftCap } from "../../ai/groq-quota";
 import { runAnomalyScan } from "../../ai/moderation/anomalies";
 import { runDigestForAll, getLatestDigestWithReadState, markDigestRead, hasUnreadDigest } from "../../ai/moderation/digest";
 import { storage } from "../../storage";
@@ -228,6 +229,7 @@ router.get("/ai/stats", async (_req: Request, res: Response) => {
       anomaliesRecent: anomaliesRecent.map((a) => ({
         ...a, createdAt: a.createdAt instanceof Date ? a.createdAt.toISOString() : a.createdAt,
       })),
+      groqTpd: getGroqTpdStatus(),
     });
   } catch (err) {
     console.error("[ai/stats] error:", err);
@@ -242,10 +244,12 @@ router.get("/ai/settings", async (_req: Request, res: Response) => {
       storage.getAppSetting("ai_moderation_anomaly_sigma"),
     ]);
     const budget = await getBudgetStatus();
+    const tpd = getGroqTpdStatus();
     return res.json({
       preferredProvider: preferred?.value ?? "auto",
       anomalySigma: sensitivity?.value ? parseFloat(sensitivity.value) : 3,
       budget,
+      groqTpdSoftCap: tpd.cap,
     });
   } catch (err) {
     console.error("[ai/settings] error:", err);
@@ -257,6 +261,7 @@ const settingsSchema = z.object({
   preferredProvider: z.enum(["auto", "openai", "google", "groq"]).optional(),
   anomalySigma: z.number().min(1).max(6).optional(),
   budgetLimitUsd: z.number().min(0).max(10000).optional(),
+  groqTpdSoftCap: z.number().int().min(10000).max(200000).optional(),
 });
 
 router.patch("/ai/settings", async (req: Request, res: Response) => {
@@ -271,6 +276,9 @@ router.patch("/ai/settings", async (req: Request, res: Response) => {
     }
     if (parsed.data.budgetLimitUsd != null) {
       await setBudgetLimit(parsed.data.budgetLimitUsd);
+    }
+    if (parsed.data.groqTpdSoftCap != null) {
+      await setGroqTpdSoftCap(parsed.data.groqTpdSoftCap);
     }
     return res.json({ ok: true });
   } catch (err) {

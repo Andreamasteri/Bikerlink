@@ -15,6 +15,7 @@ interface SettingsResp {
   preferredProvider: typeof PROVIDERS[number];
   anomalySigma: number;
   budget: { month: string; totalCostUsd: number; limitUsd: number; pct: number };
+  groqTpdSoftCap?: number;
 }
 
 export default function AiModerationSettingsScreen() {
@@ -27,12 +28,14 @@ export default function AiModerationSettingsScreen() {
   const [provider, setProvider] = useState<typeof PROVIDERS[number]>("auto");
   const [sigma, setSigma] = useState("3");
   const [limit, setLimit] = useState("");
+  const [tpdCap, setTpdCap] = useState("160000");
 
   useEffect(() => {
     if (data) {
       setProvider(data.preferredProvider);
       setSigma(String(data.anomalySigma));
       setLimit(String(data.budget.limitUsd));
+      if (data.groqTpdSoftCap != null) setTpdCap(String(data.groqTpdSoftCap));
     }
   }, [data]);
 
@@ -63,9 +66,11 @@ export default function AiModerationSettingsScreen() {
   function commit() {
     const sigmaNum = parseFloat(sigma);
     const limitNum = parseFloat(limit);
+    const tpdCapNum = parseInt(tpdCap, 10);
     if (!Number.isFinite(sigmaNum) || sigmaNum < 1 || sigmaNum > 6) return Alert.alert("Errore", "Sigma deve essere tra 1 e 6");
     if (!Number.isFinite(limitNum) || limitNum < 0) return Alert.alert("Errore", "Limite USD non valido");
-    save.mutate({ preferredProvider: provider, anomalySigma: sigmaNum, budgetLimitUsd: limitNum });
+    if (!Number.isFinite(tpdCapNum) || tpdCapNum < 10000 || tpdCapNum > 200000) return Alert.alert("Errore", "Soglia TPD Groq deve essere tra 10.000 e 200.000");
+    save.mutate({ preferredProvider: provider, anomalySigma: sigmaNum, budgetLimitUsd: limitNum, groqTpdSoftCap: tpdCapNum });
   }
 
   return (
@@ -97,6 +102,12 @@ export default function AiModerationSettingsScreen() {
             Speso mese: ${data.budget.totalCostUsd.toFixed(2)} ({Math.round(data.budget.pct * 100)}%)
           </Text>
         ) : null}
+      </View>
+
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>Soglia token Groq giornalieri (TPD)</Text>
+        <TextInput value={tpdCap} onChangeText={setTpdCap} keyboardType="numeric" style={styles.input} placeholderTextColor={Colors.textSecondary} />
+        <Text style={styles.help}>Default 160.000 (80% del limite free tier 200k/giorno). Quando superata, le richieste passano automaticamente a Gemini/OpenAI fino alla mezzanotte UTC.</Text>
       </View>
 
       <TouchableOpacity style={[styles.saveBtn, save.isPending && { opacity: 0.6 }]} onPress={commit} disabled={save.isPending}>

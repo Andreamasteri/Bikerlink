@@ -8,6 +8,12 @@ import { limiters } from "../../lib/throttle";
 import { storage } from "../../storage";
 import { getOllamaModel, isOllamaConfigured } from "../../lib/ollama-client";
 import type { AiProviderHealth, AiProviderId } from "./types";
+import {
+  isGroqTpdExceededSync,
+  recordGroqTokens,
+  loadGroqTpdFromDb,
+  getGroqTpdStatus,
+} from "../groq-quota";
 
 export type ModelRole = "brain" | "router";
 
@@ -170,25 +176,29 @@ export function markProviderOk(id: AiProviderId): void {
 }
 
 // Chiamare una volta dopo le migrazioni DB per ripristinare i cooldown quota
-// persistiti prima del riavvio del server.
+// persistiti prima del riavvio del server e per caricare il contatore TPD Groq.
 export async function initProviderHealth(): Promise<void> {
   const ids: AiProviderId[] = ["openai", "google"];
-  await Promise.all(ids.map(async (id) => {
-    try {
-      const row = await storage.getAppSetting(COOLDOWN_DB_KEY(id));
-      if (!row?.valueJson) return;
-      const data = row.valueJson as PersistedCooldown;
-      if (!data.quotaError || !data.cooldownUntil) return;
-      const remaining = data.cooldownUntil - Date.now();
-      if (remaining <= 0) return;
-      health[id].available = false;
-      health[id].cooldownUntil = data.cooldownUntil;
-      health[id].quotaError = true;
-      if (data.lastError) health[id].lastError = data.lastError;
-      if (data.lastErrorAt) health[id].lastErrorAt = data.lastErrorAt;
-      console.log(`[ai-provider] ${id} quota cooldown ripristinato: ${Math.round(remaining / 60_000)}min rimasti`);
-    } catch {/* best-effort */}
-  }));
+  await Promise.all([
+    ...ids.map(async (id) => {
+      try {
+        const row = await storage.getAppSetting(COOLDOWN_DB_KEY(id));
+        if (!row?.valueJson) return;
+        const data = row.valueJson as PersistedCooldown;
+        if (!data.quotaError || !data.cooldownUntil) return;
+        const remaining = data.cooldownUntil - Date.now();
+        if (remaining <= 0) return;
+        health[id].available = false;
+        health[id].cooldownUntil = data.cooldownUntil;
+        health[id].quotaError = true;
+        if (data.lastError) health[id].lastError = data.lastError;
+        if (data.lastErrorAt) health[id].lastErrorAt = data.lastErrorAt;
+        console.log(`[ai-provider] ${id} quota cooldown ripristinato: ${Math.round(remaining / 60_000)}min rimasti`);
+      } catch {/* best-effort */}
+    }),
+    // Carica il contatore TPD Groq dal DB in modo che il soft-cap sopravviva ai restart.
+    loadGroqTpdFromDb().catch(() => {}),
+  ]);
 }
 
 export function getProviderHealth(): AiProviderHealth[] {
@@ -207,7 +217,12 @@ export function getProviderHealth(): AiProviderHealth[] {
 }
 
 function isAvailable(id: AiProviderId): boolean {
-  return Date.now() >= health[id].cooldownUntil && withinDailyCap(id);
+  if (Date.now() < health[id].cooldownUntil) return false;
+  if (!withinDailyCap(id)) return false;
+  // Groq TPD soft-cap: salta Groq per il resto del giorno se i token giornalieri
+  // superano la soglia configurata (default 160k). Logga solo una volta al superamento.
+  if (id === "groq" && isGroqTpdExceededSync()) return false;
+  return true;
 }
 
 function tryBuild(id: AiProviderId, role: ModelRole, forcedModelId?: string): ResolvedModel | null {
@@ -346,6 +361,25 @@ export async function runWithFallback<T>(
       const value = await fn(m);
       markProviderOk(id);
       console.log(`[ai-provider] risposta da ${m.providerName}/${m.modelId}`);
+      // Registra i token usati su Groq per il soft-cap TPD giornaliero.
+      // generateObject: usage è direttamente sull'oggetto ritornato.
+      // streamText: usage è una Promise che si risolve al completamento dello stream.
+      if (id === "groq") {
+        const v = value as unknown as { usage?: unknown };
+        if (v?.usage instanceof Promise) {
+          // streamText: aspetta la Promise in background — non blocca la risposta.
+          (v.usage as Promise<{ inputTokens?: number; outputTokens?: number }>)
+            .then((u) => {
+              const total = (u?.inputTokens ?? 0) + (u?.outputTokens ?? 0);
+              if (total > 0) recordGroqTokens(total);
+            })
+            .catch(() => {});
+        } else {
+          const u = v?.usage as { inputTokens?: number; outputTokens?: number } | undefined;
+          const total = (u?.inputTokens ?? 0) + (u?.outputTokens ?? 0);
+          if (total > 0) recordGroqTokens(total);
+        }
+      }
       return { value, model: m };
     } catch (err) {
       markProviderError(id, err);
@@ -395,5 +429,5 @@ export function hasAnyAiProvider(): boolean {
   return getConfiguredProviders().length > 0 || Boolean(process.env.OLLAMA_URL);
 }
 
-export { readPreferredProvider };
+export { readPreferredProvider, getGroqTpdStatus };
 export type { ResolvedModel };
