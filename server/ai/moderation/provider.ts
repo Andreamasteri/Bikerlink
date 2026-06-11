@@ -299,10 +299,10 @@ export function tryBuildOllama(): ResolvedModel | null {
   }
 }
 
-// Ordine di preferenza: vedi _ai-stack-decision.md.
-// Groq primario (free, Llama 3.3 70B) → Gemini (free, Flash) → OpenAI.
-// Quando i free tier esauriscono il cap giornaliero, la chain prosegue; per
-// l'assistente, l'ultima rete è Ollama (illimitato, gestito in agent.ts).
+// Task #3872 — Ordine cascade universale: Ollama (ThinkCentre, costo zero, tentato
+// per PRIMO in runWithFallback) → Groq (free, Llama) → Gemini (free, Flash) → OpenAI.
+// Questi array rappresentano la chain cloud fallback; Ollama è gestito separatamente
+// all'inizio di runWithFallback (non è un AiProviderId perché non ha cap/cooldown cloud).
 const DEFAULT_BRAIN_CHAIN: AiProviderId[] = ["groq", "google", "openai"];
 const DEFAULT_ROUTER_CHAIN: AiProviderId[] = ["groq", "google", "openai"];
 
@@ -312,7 +312,12 @@ export interface ResolveOpts {
   forcedModelId?: string;
   // Task #2966 — Se true, dopo aver esaurito la chain cloud (Groq→Gemini→OpenAI)
   // prova Ollama self-hosted come rete finale illimitata.
+  // Deprecato: con Ollama-first (Task #3872) Ollama viene tentato PRIMA della chain cloud;
+  // questo flag è mantenuto per compatibilità ma è ora ridondante.
   ollamaBackstop?: boolean;
+  // Task #3872 — Se true, salta Ollama completamente (cloud-only). Usare solo per
+  // casi in cui Ollama non è adatto, es. tool calling multi-step (moderation chat).
+  skipOllama?: boolean;
 }
 
 function buildChain(role: ModelRole, preferred?: AiProviderId | "auto"): AiProviderId[] {
@@ -345,6 +350,10 @@ export function resolveModel(opts: ResolveOpts = {}): ResolvedModel {
 
 // Per-request fallback: prova ogni provider della chain DENTRO la stessa richiesta.
 // Se uno fallisce, marca cooldown e prova il successivo. Solo l'ultimo errore propaga.
+//
+// Task #3872 — Ordine cascade universale: Ollama (ThinkCentre, costo zero) → Groq →
+// Gemini → OpenAI. Ollama viene tentato per PRIMO se configurato e non esplicitamente
+// saltato (skipOllama: true). Se Ollama è offline/lento la chain prosegue normalmente.
 export async function runWithFallback<T>(
   opts: ResolveOpts,
   fn: (m: ResolvedModel) => Promise<T>,
@@ -353,6 +362,24 @@ export async function runWithFallback<T>(
   const preferred = opts.preferredProvider ?? (await readPreferredProvider());
   const chain = buildChain(role, preferred);
   let lastErr: unknown = null;
+
+  // Ollama-first: se configurato e non esplicitamente saltato, prova Ollama
+  // prima della chain cloud. Ollama è self-hosted e a costo zero; se è offline
+  // o risponde lentamente la chain cloud prosegue senza impatto su health/cooldown.
+  if (!opts.skipOllama) {
+    const om = tryBuildOllama();
+    if (om) {
+      try {
+        const value = await om.scheduler(() => fn(om));
+        console.log(`[ai-provider] risposta da ${om.providerName}/${om.modelId} (ollama-first)`);
+        return { value, model: om };
+      } catch (err) {
+        lastErr = err;
+        console.warn(`[ai-provider] ollama-first fallito, scalo a chain cloud:`, (err as Error).message);
+      }
+    }
+  }
+
   for (const id of chain) {
     const m = tryBuild(id, role, opts.forcedModelId);
     if (!m) continue;
@@ -387,10 +414,11 @@ export async function runWithFallback<T>(
       console.warn(`[ai-provider] ${m.providerName}/${m.modelId} fallito, provo fallback:`, (err as Error).message);
     }
   }
-  // Task #2966 — Ollama backstop: rete finale locale illimitata (ThinkCentre).
-  // Attiva solo con opts.ollamaBackstop. Non tocca health/cooldown/cap dei
-  // provider cloud (Ollama è self-hosted, fuori dai limiti free tier).
-  if (opts.ollamaBackstop) {
+  // Task #2966/3872 — ollamaBackstop è ora ridondante (Ollama è già il primo tentativo),
+  // ma viene mantenuto per compatibilità con i caller che lo impostano esplicitamente
+  // e non è stato ancora aggiornato. Se skipOllama è true, questo blocco non si esegue
+  // (rispetta l'intento del caller di non usare Ollama).
+  if (opts.ollamaBackstop && !opts.skipOllama) {
     const om = tryBuildOllama();
     if (om) {
       try {

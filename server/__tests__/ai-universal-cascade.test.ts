@@ -1,14 +1,13 @@
-// Task #2966 — AI Universal Cascade: verifica che runWithFallback percorra l'intera
-// catena cloud (Groq→Gemini→OpenAI) e, con ollamaBackstop attivo, ricada
-// su Ollama self-hosted come rete finale quando tutti i provider cloud falliscono.
+// Task #3872 — AI Universal Cascade: ordine Ollama-first universale.
+// Verifica che runWithFallback tenti Ollama per PRIMO (se configurato),
+// poi Groq → Gemini → OpenAI; e che skipOllama: true preservi il comportamento
+// cloud-only per i caller che lo richiedono (es. moderation chat con tool calling).
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // ---------------------------------------------------------------------------
 // Module mocks — hoisted before any import
 // ---------------------------------------------------------------------------
 
-// I provider cloud condividono createOpenAI (Groq riusa il client OpenAI con baseURL);
-// distinguiamo i tier tramite m.providerName, non tramite il modello sentinella.
 vi.mock("@ai-sdk/openai", () => ({ createOpenAI: vi.fn(() => vi.fn(() => ({ __p: "openai" }))) }));
 vi.mock("@ai-sdk/google", () => ({ createGoogleGenerativeAI: vi.fn(() => vi.fn(() => ({ __p: "google" }))) }));
 
@@ -27,7 +26,10 @@ vi.mock("../lib/throttle", () => ({
 }));
 
 vi.mock("../storage", () => ({
-  storage: { getAppSetting: vi.fn().mockResolvedValue(null) },
+  storage: {
+    getAppSetting: vi.fn().mockResolvedValue(null),
+    upsertAppSetting: vi.fn().mockResolvedValue(null),
+  },
 }));
 
 // ---------------------------------------------------------------------------
@@ -44,7 +46,7 @@ async function freshRunWithFallback(): Promise<RunWithFallback> {
   return mod.runWithFallback;
 }
 
-describe("runWithFallback — AI Universal Cascade (Task #2966)", () => {
+describe("runWithFallback — AI Universal Cascade (Task #3872, Ollama-first)", () => {
   beforeEach(() => {
     process.env.GROQ_API_KEY = "test-groq";
     process.env.GEMINI_API_KEY = "test-gemini";
@@ -52,11 +54,74 @@ describe("runWithFallback — AI Universal Cascade (Task #2966)", () => {
     delete process.env.ANTHROPIC_API_KEY;
   });
 
-  it("primo provider (Groq) risponde → nessun fallback, Ollama non chiamato", async () => {
+  it("Ollama configurato e funzionante → risponde per primo, cloud non chiamato", async () => {
     const runWithFallback = await freshRunWithFallback();
     const calls: string[] = [];
     const { value, model } = await runWithFallback(
-      { role: "brain", preferredProvider: "auto", ollamaBackstop: true },
+      { role: "brain" },
+      (m) => {
+        calls.push(m.providerName);
+        return Promise.resolve(`ok-${m.providerName}`);
+      },
+    );
+    expect(value).toBe("ok-ollama");
+    expect(model.providerName).toBe("ollama");
+    expect(calls).toEqual(["ollama"]);
+    expect(calls).not.toContain("groq");
+  });
+
+  it("Ollama offline → scala a Groq (primo cloud), resto non chiamato", async () => {
+    const runWithFallback = await freshRunWithFallback();
+    const calls: string[] = [];
+    const { value, model } = await runWithFallback(
+      { role: "brain" },
+      (m) => {
+        calls.push(m.providerName);
+        if (m.providerName === "ollama") return Promise.reject(new Error("ollama timeout"));
+        return Promise.resolve(`ok-${m.providerName}`);
+      },
+    );
+    expect(value).toBe("ok-groq");
+    expect(model.providerName).toBe("groq");
+    expect(calls).toEqual(["ollama", "groq"]);
+  });
+
+  it("Ollama + Groq + Google offline → OpenAI risponde", async () => {
+    const runWithFallback = await freshRunWithFallback();
+    const calls: string[] = [];
+    const { value, model } = await runWithFallback(
+      { role: "brain" },
+      (m) => {
+        calls.push(m.providerName);
+        if (m.providerName !== "openai") return Promise.reject(new Error(`${m.providerName} down`));
+        return Promise.resolve("openai-saved");
+      },
+    );
+    expect(value).toBe("openai-saved");
+    expect(model.providerName).toBe("openai");
+    expect(calls).toEqual(["ollama", "groq", "google", "openai"]);
+  });
+
+  it("tutti i provider falliscono → propaga l'errore dell'ultimo", async () => {
+    const runWithFallback = await freshRunWithFallback();
+    const calls: string[] = [];
+    await expect(
+      runWithFallback(
+        { role: "brain" },
+        (m) => {
+          calls.push(m.providerName);
+          return Promise.reject(new Error(`${m.providerName} esaurito`));
+        },
+      ),
+    ).rejects.toThrow("esaurito");
+    expect(calls).toEqual(["ollama", "groq", "google", "openai"]);
+  });
+
+  it("skipOllama: true → Groq per primo (cloud-only, es. tool calling)", async () => {
+    const runWithFallback = await freshRunWithFallback();
+    const calls: string[] = [];
+    const { value, model } = await runWithFallback(
+      { role: "brain", skipOllama: true },
       (m) => {
         calls.push(m.providerName);
         return Promise.resolve(`ok-${m.providerName}`);
@@ -68,29 +133,12 @@ describe("runWithFallback — AI Universal Cascade (Task #2966)", () => {
     expect(calls).not.toContain("ollama");
   });
 
-  it("tutti i cloud falliscono + ollamaBackstop → ricade su Ollama self-hosted", async () => {
-    const runWithFallback = await freshRunWithFallback();
-    const calls: string[] = [];
-    const { value, model } = await runWithFallback(
-      { role: "brain", preferredProvider: "auto", ollamaBackstop: true },
-      (m) => {
-        calls.push(m.providerName);
-        if (m.providerName === "ollama") return Promise.resolve("ollama-saved-the-day");
-        return Promise.reject(new Error(`${m.providerName} esaurito (429)`));
-      },
-    );
-    expect(value).toBe("ollama-saved-the-day");
-    expect(model.providerName).toBe("ollama");
-    // L'intera catena cloud è stata tentata prima del backstop.
-    expect(calls).toEqual(["groq", "google", "openai", "ollama"]);
-  });
-
-  it("tutti i cloud falliscono SENZA ollamaBackstop → propaga l'errore (nessun Ollama)", async () => {
+  it("skipOllama: true + tutti cloud falliscono → propaga errore (nessun Ollama)", async () => {
     const runWithFallback = await freshRunWithFallback();
     const calls: string[] = [];
     await expect(
       runWithFallback(
-        { role: "brain", preferredProvider: "auto", ollamaBackstop: false },
+        { role: "brain", skipOllama: true },
         (m) => {
           calls.push(m.providerName);
           return Promise.reject(new Error(`${m.providerName} esaurito`));
@@ -101,11 +149,11 @@ describe("runWithFallback — AI Universal Cascade (Task #2966)", () => {
     expect(calls).toEqual(["groq", "google", "openai"]);
   });
 
-  it("preferredProvider mette il provider scelto in testa alla catena", async () => {
+  it("preferredProvider mette il provider cloud scelto in testa (dopo Ollama)", async () => {
     const runWithFallback = await freshRunWithFallback();
     const calls: string[] = [];
-    const { model } = await runWithFallback(
-      { role: "brain", preferredProvider: "openai", ollamaBackstop: true },
+    const { value, model } = await runWithFallback(
+      { role: "brain", preferredProvider: "openai", skipOllama: true },
       (m) => {
         calls.push(m.providerName);
         return Promise.resolve(`ok-${m.providerName}`);
@@ -113,5 +161,23 @@ describe("runWithFallback — AI Universal Cascade (Task #2966)", () => {
     );
     expect(model.providerName).toBe("openai");
     expect(calls[0]).toBe("openai");
+    expect(calls).not.toContain("ollama");
+  });
+
+  it("ollamaBackstop (legacy): ridondante con Ollama-first, ma non causa doppioni se Ollama già tentato", async () => {
+    const runWithFallback = await freshRunWithFallback();
+    const calls: string[] = [];
+    const { value, model } = await runWithFallback(
+      { role: "brain", ollamaBackstop: true },
+      (m) => {
+        calls.push(m.providerName);
+        return Promise.resolve(`ok-${m.providerName}`);
+      },
+    );
+    // Ollama risponde per primo → valore corretto, nessun cloud chiamato.
+    expect(value).toBe("ok-ollama");
+    expect(model.providerName).toBe("ollama");
+    // Ollama appare una sola volta (non doppiato dalla sezione backstop).
+    expect(calls.filter((c) => c === "ollama")).toHaveLength(1);
   });
 });

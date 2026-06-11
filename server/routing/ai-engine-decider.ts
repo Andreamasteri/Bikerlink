@@ -109,49 +109,97 @@ function clampConfidence(n: number): number {
  * Chiede al modello l'engine ottimale. Garantisce di non bloccare oltre
  * timeoutMs: scaduto il tempo, aborta la richiesta e ritorna null così il
  * chiamante ricade sul selettore normale.
+ *
+ * Task #3872 — Cascade Ollama-first con budget separato per Ollama:
+ * - Fase 1: Ollama ottiene al massimo metà del budget (ollamaTimeoutMs = timeoutMs/2).
+ *   Se risponde entro quel tempo → risposta immediata, nessun cloud chiamato.
+ *   Se scade o fallisce → scala immediatamente a Groq (non aspetta oltre).
+ * - Fase 2: chain cloud (Groq → Gemini → OpenAI) con il budget residuo. L'abort
+ *   globale si attiva al raggiungimento di timeoutMs totali dall'inizio.
+ * Questo garantisce che Groq abbia sempre almeno metà del budget anche se Ollama
+ * è lento (evita il problema "Ollama mangia tutto i 800ms").
  */
 export async function decideEngineWithAI(
   ctx: AiRoutingContext,
   timeoutMs = 800,
 ): Promise<AiEngineDecision | null> {
-  const controller = new AbortController();
-  let timer: ReturnType<typeof setTimeout> | null = null;
+  const startTs = Date.now();
+  // Abort globale: si attiva allo scadere del budget totale. Usato dalla cloud chain.
+  const globalController = new AbortController();
+  const globalTimer = setTimeout(() => globalController.abort(), timeoutMs);
 
-  const timeoutPromise = new Promise<null>((resolve) => {
-    timer = setTimeout(() => {
-      controller.abort();
-      resolve(null);
-    }, timeoutMs);
+  const makeDecision = (value: { object: { engine: AiCandidateEngine; confidence: number; reason: string } }, providerName: string): AiEngineDecision => ({
+    engine: value.object.engine,
+    confidence: clampConfidence(value.object.confidence),
+    reason: value.object.reason,
+    provider: providerName,
   });
 
-  const aiPromise = (async (): Promise<AiEngineDecision | null> => {
-    try {
-      const { value, model } = await runWithFallback({ role: "router" }, (mm) =>
-        mm.scheduler(() =>
-          generateObject({
-            model: mm.model,
-            schema: decisionSchema,
-            system: SYSTEM_PROMPT,
-            prompt: JSON.stringify(ctx),
-            temperature: 0,
-            abortSignal: controller.signal,
-            ...(mm.objectMode ? { mode: mm.objectMode } : {}),
-          }),
-        ),
-      );
-      return {
-        engine: value.object.engine,
-        confidence: clampConfidence(value.object.confidence),
-        reason: value.object.reason,
-        provider: model.providerName,
-      };
-    } catch (err) {
-      console.warn("[ai-engine-decider] decisione AI fallita:", (err as Error)?.message ?? err);
+  try {
+    // ── Fase 1: Ollama con budget = metà del totale ─────────────────────────
+    const { tryBuildOllama } = await import("../ai/moderation/provider");
+    const om = tryBuildOllama();
+    if (om) {
+      const ollamaTimeoutMs = Math.floor(timeoutMs / 2);
+      const ollamaController = new AbortController();
+      const ollamaTimer = setTimeout(() => ollamaController.abort(), ollamaTimeoutMs);
+      try {
+        const result = await generateObject({
+          model: om.model,
+          schema: decisionSchema,
+          system: SYSTEM_PROMPT,
+          prompt: JSON.stringify(ctx),
+          temperature: 0,
+          abortSignal: ollamaController.signal,
+        });
+        clearTimeout(ollamaTimer);
+        clearTimeout(globalTimer);
+        console.log(`[ai-engine-decider] risposta da ollama/${om.modelId} (${Date.now() - startTs}ms)`);
+        return makeDecision(result, om.providerName);
+      } catch {
+        clearTimeout(ollamaTimer);
+        console.info(`[ai-engine-decider] ollama timeout/fallito (${Date.now() - startTs}ms), scala a cloud`);
+        // Non propaga: passa subito alla Fase 2.
+      }
+    }
+
+    // ── Fase 2: chain cloud con budget residuo (abortSignal globale) ─────────
+    const remainingMs = timeoutMs - (Date.now() - startTs);
+    if (remainingMs <= 0) {
+      clearTimeout(globalTimer);
       return null;
     }
-  })();
 
-  const result = await Promise.race([aiPromise, timeoutPromise]);
-  if (timer) clearTimeout(timer);
-  return result;
+    const cloudResult = await Promise.race([
+      (async () => {
+        try {
+          const { value, model } = await runWithFallback({ role: "router", skipOllama: true }, (mm) =>
+            mm.scheduler(() =>
+              generateObject({
+                model: mm.model,
+                schema: decisionSchema,
+                system: SYSTEM_PROMPT,
+                prompt: JSON.stringify(ctx),
+                temperature: 0,
+                abortSignal: globalController.signal,
+                ...(mm.objectMode ? { mode: mm.objectMode } : {}),
+              }),
+            ),
+          );
+          return makeDecision(value, model.providerName);
+        } catch (err) {
+          console.warn("[ai-engine-decider] cloud chain fallita:", (err as Error)?.message ?? err);
+          return null;
+        }
+      })(),
+      new Promise<null>((resolve) => setTimeout(() => { globalController.abort(); resolve(null); }, remainingMs)),
+    ]);
+
+    clearTimeout(globalTimer);
+    return cloudResult;
+  } catch (err) {
+    clearTimeout(globalTimer);
+    console.warn("[ai-engine-decider] decisione AI fallita:", (err as Error)?.message ?? err);
+    return null;
+  }
 }

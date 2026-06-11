@@ -2,7 +2,7 @@
 // risolvibili da auto-fix sicuro, chiede all'AI di proporre 1-3 azioni rischiose
 // per approvazione admin. NIENTE esecuzione automatica.
 import { generateObject } from "ai";
-import { runWithFallback, resolveModel, estimateCostUsd } from "../moderation/provider";
+import { runWithFallback, resolveModel, estimateCostUsd, tryBuildOllama } from "../moderation/provider";
 import { withBudget } from "../moderation/budget";
 import { logAiCall } from "../moderation/log";
 import { writeWatchdogLog } from "./log";
@@ -154,13 +154,31 @@ export async function runProposer(snap: HealthSnapshot): Promise<ProposerResult 
         }));
       };
 
-      // Two-step model routing:
-      // Step 1 — if the configured model is Groq-specific, try it directly on Groq ONLY.
-      //          Do NOT pass it through the full fallback chain so Google/OpenAI are not
-      //          asked to run a model they don't have, which would set incorrect cooldowns.
-      // Step 2 — if Groq fails (quota, cooldown, model error) or model is provider-agnostic,
-      //          run the standard chain (Groq default → Google → OpenAI) without forced model.
+      // Three-step model routing (Task #3872 — Ollama-first universale):
+      // Step 0 — Ollama self-hosted (ThinkCentre, costo zero). Se configurato,
+      //          prova per primo. Se offline/lento scende al passo successivo.
+      // Step 1 — se il modello configurato è Groq-specifico, provalo su Groq ONLY.
+      //          NON passare per la full chain: Google/OpenAI non hanno quel modello
+      //          e setterebbe cooldown sbagliati.
+      // Step 2 — se Groq fallisce (quota, cooldown, errore modello) o il modello
+      //          è provider-agnostico, usa la chain standard (Groq → Gemini → OpenAI).
       const resolveAndCall = async (): Promise<{ value: Awaited<ReturnType<typeof callModel>>; model: ReturnType<typeof resolveModel> }> => {
+        // Step 0: Ollama-first (skipOllama non impostato → tentiamo Ollama)
+        {
+          const om = tryBuildOllama();
+          if (om) {
+            try {
+              const value = await callModel(om);
+              console.log(`[watchdog/proposer] risposta da ollama/${om.modelId} (ollama-first)`);
+              return { value, model: om };
+            } catch (ollamaErr) {
+              console.warn(
+                `[watchdog/proposer] ollama-first fallito, scalo a chain cloud:`,
+                (ollamaErr as Error).message,
+              );
+            }
+          }
+        }
         if (groqOverrideModelId) {
           try {
             const groqM = resolveModel({ role: "brain", preferredProvider: "groq", forcedModelId: groqOverrideModelId });
@@ -172,11 +190,12 @@ export async function runProposer(snap: HealthSnapshot): Promise<ProposerResult 
             );
             // Fall through to standard chain with default models.
           }
-          const fallback = await runWithFallback({ role: "brain" }, callModel);
+          const fallback = await runWithFallback({ role: "brain", skipOllama: true }, callModel);
           return { value: fallback.value, model: fallback.model };
         }
-        // Provider-agnostic model: pass forcedModelId through the full chain as before.
-        const fallback = await runWithFallback({ role: "brain", forcedModelId }, callModel);
+        // Provider-agnostic model: pass forcedModelId through the full chain (skipOllama:
+        // true perché Ollama è già stato tentato nel Step 0 qui sopra).
+        const fallback = await runWithFallback({ role: "brain", forcedModelId, skipOllama: true }, callModel);
         return { value: fallback.value, model: fallback.model };
       };
       const { value: result, model: m } = await resolveAndCall();

@@ -231,7 +231,11 @@ export async function streamChat(opts: ChatStreamOpts) {
     });
     // Per-request fallback: se il provider primario errora in fase di setup stream,
     // il prossimo provider della chain viene provato all'interno della stessa request.
-    const { value: result, model: m } = await runWithFallback({ role: "brain" }, async (mm) => {
+    // Task #3872 — skipOllama: true: il co-pilot usa tool calling multi-step (max 6
+    // step). Ollama con tool calling multi-step è inaffidabile su modelli locali 8B
+    // (allucinazioni nei function call, schema JSON non rispettato). Si mantiene
+    // cloud-only per garantire qualità e sicurezza delle azioni suggerite all'admin.
+    const { value: result, model: m } = await runWithFallback({ role: "brain", skipOllama: true }, async (mm) => {
       return streamText({
         model: mm.model,
         system: `${SYSTEM_PROMPT}\n\nCONTESTO: ${ctxLine}`,
