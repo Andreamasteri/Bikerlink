@@ -22,6 +22,7 @@ export type MatchPrefsPayload = {
   telemetryAffinity: boolean;
   timeOverlap: boolean;
   directMatch: boolean;
+  plannedRouteInvite: boolean;
   topMatchesOnly: boolean;
   weeklyRecap: boolean;
 };
@@ -50,6 +51,7 @@ export const DEFAULT_MATCH_PREFS: MatchPrefsPayload = {
   telemetryAffinity: true,
   timeOverlap: true,
   directMatch: true,
+  plannedRouteInvite: true,
   topMatchesOnly: false,
   weeklyRecap: true,
 };
@@ -78,4 +80,5 @@ export const MATCH_PREF_ITEMS: { key: keyof MatchPrefsPayload; label: string }[]
   { key: "telemetryAffinity", label: "Biker ↔ Biker — Stile di guida simile (telemetria)" },
   { key: "timeOverlap", label: "Biker ↔ Biker — Sovrapposizione fasce orarie" },
   { key: "directMatch", label: "Match Diretto (Richiedi Match)" },
+  { key: "plannedRouteInvite", label: "Invito Percorso Pianificato" },
 ];
