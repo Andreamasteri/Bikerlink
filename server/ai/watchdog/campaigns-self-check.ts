@@ -222,13 +222,17 @@ export async function runCampaignsSelfCheck(opts: RunSelfCheckOpts): Promise<Cam
   let modCampaignId: string | null = null;
   let selfCheckModeratorId: string | null = null;
 
-  async function probeActiveContains(_expected: boolean): Promise<{ found: boolean; total: number; via: "http" | "storage" }> {
-    // L'endpoint pubblico /api/ads/placement/all ora filtra intenzionalmente
+  async function probeDbState(): Promise<{ exists: boolean; isActive: boolean | null; via: "db" }> {
+    // L'endpoint pubblico /api/ads/placement/all filtra intenzionalmente
     // le campagne __selfcheck__* per non mostrarle agli utenti reali.
-    // Il self-check usa quindi la query storage diretta per verificare che il
-    // toggle isActive funzioni correttamente, indipendentemente da ads_enabled.
-    const list = await storage.getActiveAdsByUserType("biker");
-    return { found: list.some((a) => a.id === createdCampaignId), total: list.length, via: "storage" };
+    // Verifichiamo direttamente nel DB tramite ID se isActive è stato salvato
+    // correttamente, indipendentemente dal filtro nome e da ads_enabled.
+    const campaign = createdCampaignId ? await storage.getAdCampaign(createdCampaignId) : undefined;
+    return {
+      exists: campaign !== undefined,
+      isActive: campaign ? campaign.isActive : null,
+      via: "db",
+    };
   }
 
   try {
@@ -291,14 +295,14 @@ export async function runCampaignsSelfCheck(opts: RunSelfCheckOpts): Promise<Cam
       }));
     }
 
-    // 6. La probe deve apparire fra le active (unauth → userType default biker,
-    //    matcha targetUserType "tutti"). Se ads_enabled=false l'endpoint pubblico
-    //    è cortocircuitato a [], quindi usiamo lo storage come fallback.
+    // 6. La probe deve avere isActive=true nel DB dopo il toggle ON.
+    //    Usiamo getAdCampaign diretto perché getActiveAdsByUserType filtra __selfcheck__*.
     if (createdCampaignId) {
       checks.push(await runStep("GET /api/ads/placement/all dopo attivazione", async () => {
-        const r = await probeActiveContains(true);
-        if (!r.found) throw new Error(`probe attiva NON presente fra le active (via=${r.via}, total=${r.total})`);
-        return { message: `presente in ${r.total} active (via=${r.via})` };
+        const r = await probeDbState();
+        if (!r.exists) throw new Error(`ad non trovato nel DB (via=${r.via})`);
+        if (r.isActive !== true) throw new Error(`isActive=${r.isActive} nel DB dopo toggle ON (via=${r.via})`);
+        return { message: `isActive=true confermato nel DB (via=${r.via})` };
       }));
     }
 
@@ -313,12 +317,13 @@ export async function runCampaignsSelfCheck(opts: RunSelfCheckOpts): Promise<Cam
       }));
     }
 
-    // 8. La probe NON deve più apparire
+    // 8. La probe deve avere isActive=false nel DB dopo il toggle OFF.
     if (createdCampaignId) {
       checks.push(await runStep("GET /api/ads/placement/all dopo disattivazione", async () => {
-        const r = await probeActiveContains(false);
-        if (r.found) throw new Error(`probe disattivata ANCORA presente fra le active (via=${r.via})`);
-        return { message: `rimossa correttamente (via=${r.via})` };
+        const r = await probeDbState();
+        if (!r.exists) throw new Error(`ad non trovato nel DB (via=${r.via})`);
+        if (r.isActive !== false) throw new Error(`isActive=${r.isActive} nel DB dopo toggle OFF (via=${r.via})`);
+        return { message: `isActive=false confermato nel DB (via=${r.via})` };
       }));
     }
 
