@@ -16,6 +16,7 @@ import { MATCH_PREF_ITEMS } from "../lib/match-pref-items";
 const SOFT_EXCLUDED = new Set([
   "id", "user_id", "updated_at",
   "direct_match", "top_matches_only", "weekly_recap",
+  "enableRLS",
 ]);
 
 function camelToSnake(s: string): string {
