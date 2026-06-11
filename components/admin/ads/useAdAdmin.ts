@@ -274,6 +274,9 @@ export function useAdAdmin() {
       if (context?.previous) {
         queryClient.setQueryData(["/api/admin/advertisements"], context.previous);
       }
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/advertisements"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/ads/active"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/ads/my-ads"] });
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/advertisements"] });

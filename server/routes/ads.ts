@@ -34,17 +34,32 @@ export async function warmupAdImageCache(): Promise<void> {
         continue;
       }
 
-      try {
-        const buffer = await downloadBuffer(`public/ads/${filename}`);
-        fs.writeFileSync(localPath, buffer);
-        downloaded++;
-        console.log(`[ADS WARMUP] Cached: ${filename}`);
-      } catch (err) {
+      const WARMUP_BACKOFF_MS = [1_000, 2_000, 4_000];
+      let lastErr: unknown;
+      let ok = false;
+      for (let attempt = 0; attempt <= WARMUP_BACKOFF_MS.length; attempt++) {
+        try {
+          const buffer = await downloadBuffer(`public/ads/${filename}`);
+          fs.writeFileSync(localPath, buffer);
+          downloaded++;
+          console.log(`[ADS WARMUP] Cached: ${filename}${attempt > 0 ? ` (attempt ${attempt + 1})` : ""}`);
+          ok = true;
+          break;
+        } catch (err) {
+          lastErr = err;
+          if (attempt < WARMUP_BACKOFF_MS.length) {
+            const delay = WARMUP_BACKOFF_MS[attempt];
+            console.warn(`[ADS WARMUP] Retry ${attempt + 1}/${WARMUP_BACKOFF_MS.length} per ${filename} tra ${delay}ms:`, (err as Error)?.message);
+            await new Promise((r) => setTimeout(r, delay));
+          }
+        }
+      }
+      if (!ok) {
         console.error(
           `[ADS WARMUP] IMMAGINE ROTTA — campagna "${campaign.name}" (id=${campaign.id}): ` +
-          `il file ${filename} non esiste su Object Storage. ` +
+          `il file ${filename} non esiste su Object Storage dopo ${WARMUP_BACKOFF_MS.length + 1} tentativi. ` +
           `Vai su /admin/ads → modifica la campagna → ricarica l'immagine.`,
-          err,
+          lastErr,
         );
       }
     }

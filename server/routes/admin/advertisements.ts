@@ -8,9 +8,10 @@ import multer from "multer";
 import path from "path";
 import fs from "fs";
 import { uploadBuffer, deleteObject } from "../../objectStorage";
-import { cacheAdImage } from "../ads";
+import { cacheAdImage, warmupAdImageCache } from "../ads";
 import { sendSuccess, sendError } from "../../lib/api-response";
 import { safeModLog } from "../../lib/safe-mod-log";
+import { withDbRetry } from "../../lib/db-retry";
 import crypto from "crypto";
 
 const router = Router();
@@ -320,6 +321,16 @@ router.delete("/bulk-delete", async (req: Request, res: Response) => {
   }
 });
 
+router.post("/warmup", async (_req: Request, res: Response) => {
+  try {
+    warmupAdImageCache().catch((e) => console.warn("[ADS WARMUP] manual trigger error:", e));
+    return sendSuccess(res, undefined, "Warmup avviato in background");
+  } catch (error) {
+    console.error("Admin ads warmup error:", error);
+    return sendError(res, 500, "Errore interno del server");
+  }
+});
+
 router.put("/group/:groupId", async (req: Request, res: Response) => {
   try {
     const groupId = req.params.groupId as string;
@@ -332,7 +343,9 @@ router.put("/group/:groupId", async (req: Request, res: Response) => {
     if (!hasName && !hasLink && !hasActive) {
       return sendError(res, 400, "Almeno un campo (name, linkUrl, isActive) è obbligatorio");
     }
-    const existing = await db.select().from(adCampaignsTable).where(eq(adCampaignsTable.groupId, groupId));
+    const existing = await withDbRetry("[ads/group toggle] select", () =>
+      db.select().from(adCampaignsTable).where(eq(adCampaignsTable.groupId, groupId))
+    );
     if (existing.length === 0) {
       return sendError(res, 404, "Gruppo non trovato");
     }
@@ -354,10 +367,12 @@ router.put("/group/:groupId", async (req: Request, res: Response) => {
         updated.push(sorted[i]);
         continue;
       }
-      const [upd] = await db.update(adCampaignsTable)
-        .set(updatePayload)
-        .where(eq(adCampaignsTable.id, sorted[i].id))
-        .returning();
+      const [upd] = await withDbRetry(`[ads/group toggle] update id=${sorted[i].id}`, () =>
+        db.update(adCampaignsTable)
+          .set(updatePayload)
+          .where(eq(adCampaignsTable.id, sorted[i].id))
+          .returning()
+      );
       updated.push(upd);
     }
     const parts: string[] = [];

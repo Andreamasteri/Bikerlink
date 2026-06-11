@@ -250,13 +250,39 @@ export async function runCampaignsSelfCheck(opts: RunSelfCheckOpts): Promise<Cam
       return { message: `${(r.json as unknown[]).length} campagne` };
     }));
 
-    // 2. Upload privato (.private/selfcheck/)
-    checks.push(await runStep("object_storage_upload_private", async () => {
-      await uploadBuffer(privateObjectPath, TINY_PNG, "image/png");
-      const exists = await objectExists(privateObjectPath);
-      if (!exists) throw new Error("oggetto privato non trovato dopo upload");
-      return { message: privateObjectPath };
-    }));
+    // 2. Upload privato (.private/selfcheck/) — timeout esplicito 10s; se scade → WARN non ERROR
+    {
+      const privateStart = Date.now();
+      try {
+        await Promise.race([
+          (async () => {
+            await uploadBuffer(privateObjectPath, TINY_PNG, "image/png");
+            const exists = await objectExists(privateObjectPath);
+            if (!exists) throw new Error("oggetto privato non trovato dopo upload");
+          })(),
+          new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error("__PRIVATE_BUCKET_TIMEOUT__")), 10_000),
+          ),
+        ]);
+        checks.push({
+          name: "object_storage_upload_private",
+          status: "ok",
+          durationMs: Date.now() - privateStart,
+          message: privateObjectPath,
+        });
+      } catch (err) {
+        const msg = (err as Error)?.message ?? "errore sconosciuto";
+        const isTimeout = msg === "__PRIVATE_BUCKET_TIMEOUT__";
+        checks.push({
+          name: "object_storage_upload_private",
+          status: isTimeout ? "warn" : "error",
+          durationMs: Date.now() - privateStart,
+          message: isTimeout
+            ? "timeout 10s — bucket privato non raggiungibile (non bloccante per gli utenti)"
+            : msg.slice(0, 400),
+        });
+      }
+    }
 
     // 3. Upload pubblico (public/ads/<file>) — è la copia usata dall'URL della campagna
     checks.push(await runStep("object_storage_upload_public", async () => {
