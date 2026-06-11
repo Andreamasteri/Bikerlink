@@ -122,12 +122,16 @@ export async function runPhase5Schedulers(): Promise<void> {
   }, FIFTEEN_MIN_MS);
   console.log("[INIT] OTA cron scheduled every 15 min");
 
-  const FIVE_MIN_MS = 5 * 60 * 1000;
+  // OTA auto-rollback: cron al minuto :00 di ogni slot di 5 min → :00, :05, :10, ...
+  // Slot :00 — critical-reports è a :02, unban è a :01: tutti distanziati di 60s.
   const { runOtaAutoRollback } = await import("./jobs/ota-auto-rollback");
-  setInterval(() => {
-    runOtaAutoRollback().catch((e) => console.warn("[OTA-AUTO-ROLLBACK] worker error:", e));
-  }, FIVE_MIN_MS);
-  console.log("[INIT] OTA auto-rollback worker scheduled every 5 min");
+  {
+    const { Cron } = await import("croner");
+    new Cron("0-59/5 * * * *", { timezone: "Europe/Rome" }, () => {
+      runOtaAutoRollback().catch((e) => console.warn("[OTA-AUTO-ROLLBACK] worker error:", e));
+    });
+  }
+  console.log("[INIT] OTA auto-rollback worker scheduled every 5 min (cron slot :00)");
 
   try {
     const { startAnomalyScheduler } = await import("./ai/moderation/anomalies");

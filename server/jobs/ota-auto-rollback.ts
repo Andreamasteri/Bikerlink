@@ -12,15 +12,18 @@
 import { db } from "../db";
 import { otaReleases } from "@shared/db";
 import { eq, and, or, sql, inArray } from "drizzle-orm";
+import { withDbRetry } from "../lib/db-retry";
 
 const TWO_HOURS_MS = 2 * 60 * 60 * 1000;
 
 export async function runOtaAutoRollback(): Promise<void> {
   try {
-    const candidates = await db.select().from(otaReleases).where(
-      and(
-        eq(otaReleases.autoRollbackEnabled, true),
-        inArray(otaReleases.status, ["pending", "approved"]),
+    const candidates = await withDbRetry("[ota-rollback]", () =>
+      db.select().from(otaReleases).where(
+        and(
+          eq(otaReleases.autoRollbackEnabled, true),
+          inArray(otaReleases.status, ["pending", "approved"]),
+        ),
       ),
     );
 
@@ -46,18 +49,20 @@ export async function runOtaAutoRollback(): Promise<void> {
         `[ota][AUTO-ROLLBACK] release ${r.id} (${r.easUpdateId}) — boot success ${successes}/${downloads} (${rate}%) < soglia ${r.autoRollbackThreshold}% → REJECT`,
       );
 
-      await db
-        .update(otaReleases)
-        .set({
-          status: "rejected",
-          rejectedAt: new Date(),
-          rejectedBy: null,
-          autoRolledBackAt: new Date(),
-        })
-        .where(eq(otaReleases.id, r.id));
+      await withDbRetry("[ota-rollback]", () =>
+        db
+          .update(otaReleases)
+          .set({
+            status: "rejected",
+            rejectedAt: new Date(),
+            rejectedBy: null,
+            autoRolledBackAt: new Date(),
+          })
+          .where(eq(otaReleases.id, r.id)),
+      );
     }
   } catch (err) {
-    console.error("[ota][AUTO-ROLLBACK] worker error:", err);
+    console.warn("[ota][AUTO-ROLLBACK] worker error:", err);
   }
 }
 

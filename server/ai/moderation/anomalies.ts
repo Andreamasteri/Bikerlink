@@ -8,6 +8,7 @@ import { gte, and, eq, isNotNull } from "drizzle-orm";
 import { mean, standardDeviation } from "simple-statistics";
 import { sendAiAnomalyAlertPush } from "./push";
 import { storage } from "../../storage";
+import { withDbRetry } from "../../lib/db-retry";
 
 const WINDOW_MIN = 60;
 const HISTORY_HOURS = 24;
@@ -28,10 +29,12 @@ let timer: NodeJS.Timeout | null = null;
 
 async function bucketCounts(since: Date, until: Date): Promise<Map<string, Map<number, number>>> {
   // Recupera tutti i report nel range e li raggruppa per categoria + slot orario.
-  const rows = await db.select({
-    category: reports.category, createdAt: reports.createdAt,
-  }).from(reports).where(
-    and(gte(reports.createdAt, since), isNotNull(reports.category)),
+  const rows = await withDbRetry("[ai-anomaly]", () =>
+    db.select({
+      category: reports.category, createdAt: reports.createdAt,
+    }).from(reports).where(
+      and(gte(reports.createdAt, since), isNotNull(reports.category)),
+    ),
   );
   const result = new Map<string, Map<number, number>>();
   for (const r of rows) {
@@ -47,9 +50,11 @@ async function bucketCounts(since: Date, until: Date): Promise<Map<string, Map<n
 }
 
 async function currentWindowCounts(since: Date): Promise<Map<string, number>> {
-  const rows = await db.select({ category: reports.category })
-    .from(reports)
-    .where(and(gte(reports.createdAt, since), isNotNull(reports.category)));
+  const rows = await withDbRetry("[ai-anomaly]", () =>
+    db.select({ category: reports.category })
+      .from(reports)
+      .where(and(gte(reports.createdAt, since), isNotNull(reports.category))),
+  );
   const m = new Map<string, number>();
   for (const r of rows) {
     const cat = r.category ?? "other";
@@ -59,13 +64,15 @@ async function currentWindowCounts(since: Date): Promise<Map<string, number>> {
 }
 
 async function alreadyNotified(type: string, category: string, since: Date): Promise<boolean> {
-  const [row] = await db.select({ id: anomalyEvents.id })
-    .from(anomalyEvents)
-    .where(and(
-      eq(anomalyEvents.type, type),
-      eq(anomalyEvents.category, category),
-      gte(anomalyEvents.createdAt, since),
-    )).limit(1);
+  const [row] = await withDbRetry("[ai-anomaly]", () =>
+    db.select({ id: anomalyEvents.id })
+      .from(anomalyEvents)
+      .where(and(
+        eq(anomalyEvents.type, type),
+        eq(anomalyEvents.category, category),
+        gte(anomalyEvents.createdAt, since),
+      )).limit(1),
+  );
   return !!row;
 }
 
@@ -99,13 +106,15 @@ export async function runAnomalyScan(): Promise<{ created: number; scannedCatego
       // Dedupe: non rinotificare la stessa categoria entro 2h.
       const since = new Date(now.getTime() - 2 * 60 * 60 * 1000);
       if (await alreadyNotified("report_spike", cat, since)) continue;
-      await db.insert(anomalyEvents).values({
-        type: "report_spike", category: cat,
-        windowMinutes: WINDOW_MIN, observed,
-        threshold,
-        details: { mean: m, stddev: s, sigmaMult } as object,
-        notifiedAdmins: true,
-      });
+      await withDbRetry("[ai-anomaly]", () =>
+        db.insert(anomalyEvents).values({
+          type: "report_spike", category: cat,
+          windowMinutes: WINDOW_MIN, observed,
+          threshold,
+          details: { mean: m, stddev: s, sigmaMult } as object,
+          notifiedAdmins: true,
+        }),
+      );
       sendAiAnomalyAlertPush({ type: "report_spike", category: cat, observed, threshold }).catch(() => {});
       created++;
     }
@@ -115,7 +124,8 @@ export async function runAnomalyScan(): Promise<{ created: number; scannedCatego
 
 export function startAnomalyScheduler(): void {
   if (timer) return;
-  // Primo run dopo 1 min, poi ogni 10 min.
+  // Primo run dopo 1 min, poi ogni 10 min. Corre ogni 10min quindi non contribuisce
+  // al thundering herd dei worker a 5min — offset minimo sufficiente.
   setTimeout(() => {
     runAnomalyScan().catch((err) => console.warn("[ai-anomaly] first scan error:", err));
   }, 60_000);

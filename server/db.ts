@@ -14,7 +14,13 @@ export const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   keepAlive: true,
   idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 5000,
+  // Aumentato da 5s a 10s per dare più margine al pool sotto pressione.
+  connectionTimeoutMillis: 10000,
+  // Limite esplicito di connessioni — evita saturation burst.
+  max: 10,
+  // statement_timeout di 15s come default: i worker non tengono connessioni
+  // appese indefinitamente in caso di query lente o lock.
+  statement_timeout: 15000,
 });
 
 pool.on("error", (err) => {

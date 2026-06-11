@@ -22,6 +22,7 @@ import {
   embeddingCallLog,
   appSettings,
 } from "@shared/db";
+import { withDbRetry } from "../lib/db-retry";
 
 interface RetentionTarget {
   name: string;
@@ -52,10 +53,12 @@ const FIVE_DAYS_MS = 5 * ONE_DAY_MS;
 const INITIAL_DELAY_MS = 2 * 60 * 1000;
 
 async function countOlderThan(target: RetentionTarget, cutoff: Date): Promise<number> {
-  const [row] = await db
-    .select({ c: sql<number>`count(*)::int` })
-    .from(target.table)
-    .where(lt(target.tsColumn, cutoff));
+  const [row] = await withDbRetry(`[log-retention:${target.name}]`, () =>
+    db
+      .select({ c: sql<number>`count(*)::int` })
+      .from(target.table)
+      .where(lt(target.tsColumn, cutoff)),
+  );
   return row?.c ?? 0;
 }
 
@@ -63,7 +66,9 @@ async function purgeTarget(target: RetentionTarget): Promise<number> {
   const cutoff = new Date(Date.now() - target.retentionDays * ONE_DAY_MS);
   const count = await countOlderThan(target, cutoff);
   if (count > 0) {
-    await db.delete(target.table).where(lt(target.tsColumn, cutoff));
+    await withDbRetry(`[log-retention:${target.name}]`, () =>
+      db.delete(target.table).where(lt(target.tsColumn, cutoff)),
+    );
     console.log(
       `[LOG-RETENTION] ${target.name}: rimosse ${count} righe più vecchie di ${target.retentionDays}gg`
     );
@@ -75,25 +80,27 @@ async function purgeTarget(target: RetentionTarget): Promise<number> {
 // Delete + set flag avvengono nella STESSA transazione: o entrambi o nessuno.
 // Questo evita il caso in cui il delete riesce ma il flag no, che farebbe
 // ripetere il purge totale ai run successivi cancellando di continuo la telemetria.
-async function runOneTimeGpsErrorsPurge(): Promise<void> {
+export async function runOneTimeGpsErrorsPurge(): Promise<void> {
   try {
     const flag = await storage.getAppSetting(GPS_ERRORS_FULL_PURGE_FLAG);
     if (flag?.value === "done") return;
-    await db.transaction(async (tx) => {
-      const [row] = await tx.select({ c: sql<number>`count(*)::int` }).from(gpsErrors);
-      const total = row?.c ?? 0;
-      if (total > 0) {
-        await tx.delete(gpsErrors);
-        console.log(`[LOG-RETENTION] Purge una-tantum gps_errors: rimosse ${total} righe`);
-      }
-      await tx
-        .insert(appSettings)
-        .values({ key: GPS_ERRORS_FULL_PURGE_FLAG, value: "done", updatedAt: new Date() })
-        .onConflictDoUpdate({
-          target: [appSettings.key],
-          set: { value: "done", updatedAt: new Date() },
-        });
-    });
+    await withDbRetry("[log-retention:gps-purge]", () =>
+      db.transaction(async (tx) => {
+        const [row] = await tx.select({ c: sql<number>`count(*)::int` }).from(gpsErrors);
+        const total = row?.c ?? 0;
+        if (total > 0) {
+          await tx.delete(gpsErrors);
+          console.log(`[LOG-RETENTION] Purge una-tantum gps_errors: rimosse ${total} righe`);
+        }
+        await tx
+          .insert(appSettings)
+          .values({ key: GPS_ERRORS_FULL_PURGE_FLAG, value: "done", updatedAt: new Date() })
+          .onConflictDoUpdate({
+            target: [appSettings.key],
+            set: { value: "done", updatedAt: new Date() },
+          });
+      }),
+    );
   } catch (err) {
     console.warn("[LOG-RETENTION] Purge una-tantum gps_errors fallita:", err);
   }
