@@ -764,44 +764,21 @@ export default function MatchScreen() {
     { key: "blacklist", label: t("match.tabBlacklist"), icon: "ban", count: 0 },
   ];
 
-  const getEmptyIcon = (): keyof typeof Ionicons.glyphMap => {
-    if (activeTab === "zavorrine") return "person-outline";
-    if (activeTab === "biker") return "bicycle-outline";
-    if (activeTab === "music") return "musical-notes-outline";
-    if (activeTab === "accepted") return "checkmark-circle-outline";
-    if (activeTab === "blacklist") return "ban-outline";
-    if (activeTab === "propProfile") return "location-outline";
-    if (activeTab === "route") return "map-outline";
-    if (activeTab === "telemetry") return "speedometer-outline";
-    if (activeTab === "giri") return "map-outline";
-    return "flash-outline";
+  const EMPTY_META: Record<string, { icon: keyof typeof Ionicons.glyphMap; title: string; desc: string }> = {
+    zavorrine: { icon: "person-outline",          title: t("match.emptyZavorrinaTitle"),    desc: t("match.emptyZavorrinaDesc") },
+    biker:     { icon: "bicycle-outline",         title: t("match.emptyBikerTitle"),        desc: t("match.emptyBikerDesc") },
+    music:     { icon: "musical-notes-outline",   title: t("match.emptyMusicNoMatchTitle"), desc: t("match.emptyMusicNoMatchDesc") },
+    accepted:  { icon: "checkmark-circle-outline",title: t("match.emptyAcceptedTitle"),     desc: t("match.emptyAcceptedDesc") },
+    blacklist: { icon: "ban-outline",             title: t("match.emptyBlacklistTitle"),    desc: t("match.emptyBlacklistDesc") },
+    propProfile:{ icon: "location-outline",       title: t("match.emptyPropProfileTitle"),  desc: t("match.emptyPropProfileDesc") },
+    route:     { icon: "map-outline",             title: t("match.emptyRouteTitle"),        desc: t("match.emptyRouteDesc") },
+    telemetry: { icon: "speedometer-outline",     title: t("match.emptyTelemetryTitle"),    desc: t("match.emptyTelemetryDesc") },
+    giri:      { icon: "map-outline",             title: t("match.emptyGiriTitle"),         desc: t("match.emptyGiriDesc") },
   };
-
-  const getEmptyTitle = () => {
-    if (activeTab === "zavorrine") return t("match.emptyZavorrinaTitle");
-    if (activeTab === "biker") return t("match.emptyBikerTitle");
-    if (activeTab === "music") return t("match.emptyMusicNoMatchTitle");
-    if (activeTab === "accepted") return t("match.emptyAcceptedTitle");
-    if (activeTab === "blacklist") return t("match.emptyBlacklistTitle");
-    if (activeTab === "propProfile") return t("match.emptyPropProfileTitle");
-    if (activeTab === "route") return t("match.emptyRouteTitle");
-    if (activeTab === "telemetry") return t("match.emptyTelemetryTitle");
-    if (activeTab === "giri") return t("match.emptyGiriTitle");
-    return t("match.emptyProposalsTitle");
-  };
-
-  const getEmptyDesc = () => {
-    if (activeTab === "zavorrine") return t("match.emptyZavorrinaDesc");
-    if (activeTab === "biker") return t("match.emptyBikerDesc");
-    if (activeTab === "music") return t("match.emptyMusicNoMatchDesc");
-    if (activeTab === "accepted") return t("match.emptyAcceptedDesc");
-    if (activeTab === "blacklist") return t("match.emptyBlacklistDesc");
-    if (activeTab === "propProfile") return t("match.emptyPropProfileDesc");
-    if (activeTab === "route") return t("match.emptyRouteDesc");
-    if (activeTab === "telemetry") return t("match.emptyTelemetryDesc");
-    if (activeTab === "giri") return t("match.emptyGiriDesc");
-    return t("match.emptyProposalsDesc");
-  };
+  const _emptyMeta = EMPTY_META[activeTab] ?? { icon: "flash-outline" as keyof typeof Ionicons.glyphMap, title: t("match.emptyProposalsTitle"), desc: t("match.emptyProposalsDesc") };
+  const getEmptyIcon = (): keyof typeof Ionicons.glyphMap => _emptyMeta.icon;
+  const getEmptyTitle = () => _emptyMeta.title;
+  const getEmptyDesc = () => _emptyMeta.desc;
 
   const isRematching = resetAndRematchMutation.isPending;
   const isAnyRefetching = garageIsFetching || bikerIsFetching || proposalRefetching;
