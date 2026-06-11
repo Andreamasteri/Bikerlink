@@ -91,7 +91,10 @@ function main(): number {
   }
 
   // (4) Registry deve essere coperto dall'UI (warning informativo).
-  const registryMissingFromUi = [...registryCols].filter((c) => !uiCols.has(c));
+  // Le voci affinity-only (table === null) non richiedono un controllo UI.
+  const registryMissingFromUi = [...registryCols].filter(
+    (c) => !uiCols.has(c) && !affinityOnly.has(c)
+  );
   if (registryMissingFromUi.length > 0) {
     console.warn(
       `[WARN] Entry registry non esposte in MATCH_PREF_ITEMS: ${registryMissingFromUi.join(", ")}`

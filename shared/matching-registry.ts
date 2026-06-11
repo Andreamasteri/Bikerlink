@@ -313,7 +313,7 @@ export function getCountableMatchingTypes(): MatchingTypeDef[] {
  * Usato dall'audit + dallo script `check-match-preferences-sync.ts`.
  */
 export function getRegistryPrefColumns(): string[] {
-  return MATCHING_REGISTRY.map((t) => t.prefColumn);
+  return MATCHING_REGISTRY.map((t) => t.prefColumn).filter((c): c is string => c !== null && c !== undefined);
 }
 
 /** Look-up helpers */
