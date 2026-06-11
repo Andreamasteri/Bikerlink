@@ -1,6 +1,6 @@
-// Task #2536 / #3395 — Check pack: drift di schema registry Drizzle ⇄ PostgreSQL.
+// Check pack: drift di schema registry Drizzle ⇄ PostgreSQL.
 //
-// Confronto BIDIREZIONALE (information_schema):
+// Confronto BIDIREZIONALE (pg_catalog — fast, non information_schema):
 //   registry → DB:
 //     - presenza di ogni tabella dichiarata
 //     - presenza di ogni colonna dichiarata su tabella esistente
@@ -11,8 +11,9 @@
 //   tabelle critiche (telemetria + matching):
 //     - qualsiasi drift (in entrambe le direzioni) → severità critical
 //
-// Gli oggetti di sistema (PostGIS, session, schema_migrations, integrity_*)
-// sono esclusi via EXCLUDED_TABLES (registry-introspect.ts).
+// PERFORMANCE: tutte le query usano pg_catalog invece di information_schema.
+// getAllColumnsMap() carica tutte le colonne di tutte le tabelle in UNA sola
+// query e mette in cache il risultato per CACHE_TTL_MS (evita N round-trip).
 import { sql } from "drizzle-orm";
 import { db } from "../../../db";
 import {
@@ -24,34 +25,66 @@ import {
 import type { IntegrityCheck, CheckResult } from "../types";
 
 const MAX_SAMPLE = 50;
+const CACHE_TTL_MS = 10 * 60 * 1000;
 
-async function tableExists(name: string): Promise<boolean> {
-  const r = await db.execute(sql`SELECT to_regclass(${"public." + name}) IS NOT NULL AS ok`);
-  return Boolean((r.rows?.[0] as { ok?: boolean } | undefined)?.ok);
-}
+// ── cache in-process (per il ciclo di un run completo) ──────────────────────
+let _colCache: { data: Map<string, Map<string, { nullable: boolean }>>; ts: number } | null = null;
+let _tableCache: { data: Set<string>; ts: number } | null = null;
 
-async function columnsOf(table: string): Promise<Map<string, { nullable: boolean }>> {
-  const r = await db.execute(
-    sql`SELECT column_name, is_nullable FROM information_schema.columns WHERE table_schema = 'public' AND table_name = ${table}`,
-  );
-  return new Map(
-    ((r.rows ?? []) as Array<{ column_name: string; is_nullable: string }>).map((x) => [
-      x.column_name,
-      { nullable: x.is_nullable === "YES" },
-    ]),
-  );
-}
-
-/** Tutte le tabelle del public schema (escludendo gli oggetti di sistema). */
-async function dbPublicTables(): Promise<string[]> {
+/**
+ * Una singola query pg_catalog carica tutte le colonne di tutte le tabelle
+ * public. Molto più veloce di N query information_schema.columns.
+ */
+async function getAllColumnsMap(): Promise<Map<string, Map<string, { nullable: boolean }>>> {
+  const now = Date.now();
+  if (_colCache && now - _colCache.ts < CACHE_TTL_MS) return _colCache.data;
   const r = await db.execute(sql`
-    SELECT table_name FROM information_schema.tables
-    WHERE table_schema = 'public' AND table_type = 'BASE TABLE'
-    ORDER BY table_name
+    SELECT c.relname AS table_name,
+           a.attname AS column_name,
+           NOT a.attnotnull AS nullable
+    FROM pg_catalog.pg_class c
+    JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+    JOIN pg_catalog.pg_attribute a ON a.attrelid = c.oid
+    WHERE n.nspname = 'public'
+      AND c.relkind = 'r'
+      AND a.attnum > 0
+      AND NOT a.attisdropped
   `);
-  return ((r.rows ?? []) as Array<{ table_name: string }>)
-    .map((x) => x.table_name)
-    .filter((n) => !EXCLUDED_TABLES.has(n));
+  const data = new Map<string, Map<string, { nullable: boolean }>>();
+  for (const row of (r.rows ?? []) as Array<{
+    table_name: string;
+    column_name: string;
+    nullable: boolean;
+  }>) {
+    let tMap = data.get(row.table_name);
+    if (!tMap) {
+      tMap = new Map();
+      data.set(row.table_name, tMap);
+    }
+    tMap.set(row.column_name, { nullable: Boolean(row.nullable) });
+  }
+  _colCache = { data, ts: now };
+  return data;
+}
+
+/** Set di tutti i nomi tabella public (pg_catalog, esclude oggetti di sistema). */
+async function dbPublicTableSet(): Promise<Set<string>> {
+  const now = Date.now();
+  if (_tableCache && now - _tableCache.ts < CACHE_TTL_MS) return _tableCache.data;
+  const r = await db.execute(sql`
+    SELECT c.relname AS table_name
+    FROM pg_catalog.pg_class c
+    JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+    WHERE n.nspname = 'public' AND c.relkind = 'r'
+    ORDER BY c.relname
+  `);
+  const data = new Set(
+    ((r.rows ?? []) as Array<{ table_name: string }>)
+      .map((x) => x.table_name)
+      .filter((n) => !EXCLUDED_TABLES.has(n)),
+  );
+  _tableCache = { data, ts: now };
+  return data;
 }
 
 // ── registry → DB ───────────────────────────────────────────────────────────
@@ -59,9 +92,10 @@ async function dbPublicTables(): Promise<string[]> {
 async function checkTablesExist(): Promise<CheckResult> {
   const declared = listDeclaredTables();
   if (!declared.length) return { ok: true, count: 0, sample: [], details: { note: "registry empty" } };
+  const allCols = await getAllColumnsMap();
   const missing: Array<{ pk: string; data: Record<string, unknown> }> = [];
   for (const t of declared) {
-    if (!(await tableExists(t.name))) {
+    if (!allCols.has(t.name)) {
       missing.push({ pk: t.name, data: { table: t.name, critical: isCriticalTable(t.name) } });
     }
     if (missing.length >= 20) break;
@@ -73,10 +107,11 @@ async function checkTablesExist(): Promise<CheckResult> {
 async function checkColumnsExist(): Promise<CheckResult> {
   const declared = listDeclaredTables();
   if (!declared.length) return { ok: true, count: 0, sample: [] };
+  const allCols = await getAllColumnsMap();
   const missing: Array<{ pk: string; data: Record<string, unknown> }> = [];
   for (const t of declared) {
-    if (!(await tableExists(t.name))) continue;
-    const present = await columnsOf(t.name);
+    const present = allCols.get(t.name);
+    if (!present) continue;
     for (const c of t.columns) {
       if (!present.has(c.name)) {
         missing.push({ pk: `${t.name}.${c.name}`, data: { table: t.name, column: c.name } });
@@ -92,10 +127,11 @@ async function checkColumnsExist(): Promise<CheckResult> {
 async function checkNullableMismatch(): Promise<CheckResult> {
   const declared = listDeclaredTables();
   if (!declared.length) return { ok: true, count: 0, sample: [] };
+  const allCols = await getAllColumnsMap();
   const issues: Array<{ pk: string; data: Record<string, unknown> }> = [];
   for (const t of declared) {
-    if (!(await tableExists(t.name))) continue;
-    const present = await columnsOf(t.name);
+    const present = allCols.get(t.name);
+    if (!present) continue;
     for (const c of t.columns) {
       if (!c.notNull) continue;
       const info = present.get(c.name);
@@ -117,29 +153,33 @@ async function checkNullableMismatch(): Promise<CheckResult> {
 
 async function checkUndeclaredTables(): Promise<CheckResult> {
   const declared = declaredTableNames();
-  const dbTables = await dbPublicTables();
+  const dbTables = await dbPublicTableSet();
   const extra: Array<{ pk: string; data: Record<string, unknown> }> = [];
   for (const name of dbTables) {
     if (declared.has(name)) continue;
-    if (isCriticalTable(name)) continue; // gestita dal check critical-tables-drift
+    if (isCriticalTable(name)) continue;
     extra.push({ pk: name, data: { table: name, presentIn: "db", declaredInRegistry: false } });
     if (extra.length >= 20) break;
   }
-  if (!extra.length) return { ok: true, count: 0, sample: [], details: { dbTables: dbTables.length } };
-  return { ok: false, count: extra.length, sample: extra, details: { dbTables: dbTables.length } };
+  if (!extra.length) return { ok: true, count: 0, sample: [], details: { dbTables: dbTables.size } };
+  return { ok: false, count: extra.length, sample: extra, details: { dbTables: dbTables.size } };
 }
 
 async function checkUndeclaredColumns(): Promise<CheckResult> {
   const declared = listDeclaredTables();
+  const allCols = await getAllColumnsMap();
   const extra: Array<{ pk: string; data: Record<string, unknown> }> = [];
   for (const t of declared) {
-    if (isCriticalTable(t.name)) continue; // gestita dal check critical-tables-drift
-    if (!(await tableExists(t.name))) continue;
+    if (isCriticalTable(t.name)) continue;
+    const present = allCols.get(t.name);
+    if (!present) continue;
     const declaredCols = new Set(t.columns.map((c) => c.name));
-    const present = await columnsOf(t.name);
     for (const colName of present.keys()) {
       if (!declaredCols.has(colName)) {
-        extra.push({ pk: `${t.name}.${colName}`, data: { table: t.name, column: colName, declaredInRegistry: false } });
+        extra.push({
+          pk: `${t.name}.${colName}`,
+          data: { table: t.name, column: colName, declaredInRegistry: false },
+        });
         if (extra.length >= MAX_SAMPLE) break;
       }
     }
@@ -154,35 +194,49 @@ async function checkUndeclaredColumns(): Promise<CheckResult> {
 async function checkCriticalTablesDrift(): Promise<CheckResult> {
   const declared = listDeclaredTables();
   const declaredNames = declaredTableNames();
-  const dbTables = await dbPublicTables();
+  const allCols = await getAllColumnsMap();
+  const dbTables = await dbPublicTableSet();
   const issues: Array<{ pk: string; data: Record<string, unknown> }> = [];
 
-  // 1) Tabelle critiche dichiarate: verifica esistenza + drift colonne bidirezionale.
   for (const t of declared) {
     if (!isCriticalTable(t.name)) continue;
-    if (!(await tableExists(t.name))) {
+    const present = allCols.get(t.name);
+    if (!present) {
       issues.push({ pk: t.name, data: { table: t.name, kind: "missing_table", direction: "registry->db" } });
       continue;
     }
-    const present = await columnsOf(t.name);
     const declaredCols = new Set(t.columns.map((c) => c.name));
     for (const c of t.columns) {
       const info = present.get(c.name);
       if (!info) {
-        issues.push({ pk: `${t.name}.${c.name}`, data: { table: t.name, column: c.name, kind: "missing_column", direction: "registry->db" } });
+        issues.push({
+          pk: `${t.name}.${c.name}`,
+          data: { table: t.name, column: c.name, kind: "missing_column", direction: "registry->db" },
+        });
       } else if (c.notNull && info.nullable) {
-        issues.push({ pk: `${t.name}.${c.name}`, data: { table: t.name, column: c.name, kind: "nullable_mismatch", declared: "NOT NULL", db: "NULLABLE" } });
+        issues.push({
+          pk: `${t.name}.${c.name}`,
+          data: {
+            table: t.name, column: c.name,
+            kind: "nullable_mismatch", declared: "NOT NULL", db: "NULLABLE",
+          },
+        });
       }
     }
     for (const colName of present.keys()) {
       if (!declaredCols.has(colName)) {
-        issues.push({ pk: `${t.name}.${colName}`, data: { table: t.name, column: colName, kind: "undeclared_column", direction: "db->registry" } });
+        issues.push({
+          pk: `${t.name}.${colName}`,
+          data: {
+            table: t.name, column: colName,
+            kind: "undeclared_column", direction: "db->registry",
+          },
+        });
       }
     }
     if (issues.length >= MAX_SAMPLE) break;
   }
 
-  // 2) Tabelle critiche presenti nel DB ma NON dichiarate (legacy solo in prod).
   if (issues.length < MAX_SAMPLE) {
     for (const name of dbTables) {
       if (!isCriticalTable(name)) continue;

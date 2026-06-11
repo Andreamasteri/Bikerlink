@@ -73,8 +73,8 @@ const checks: IntegrityCheck[] = [
     async query() {
       if (!(await tableExists("users"))) return { ok: true, count: 0, sample: [] };
       return rawCheck("invalid-status",
-        `SELECT COUNT(*)::int AS c FROM users WHERE status NOT IN ('active','suspended','deleted','pending')`,
-        `SELECT id, nickname, status FROM users WHERE status NOT IN ('active','suspended','deleted','pending') LIMIT 10`,
+        `SELECT COUNT(*)::int AS c FROM users WHERE status NOT IN ('active','suspended','deleted','pending','blocked')`,
+        `SELECT id, nickname, status FROM users WHERE status NOT IN ('active','suspended','deleted','pending','blocked') LIMIT 10`,
       );
     },
     autofix: {
