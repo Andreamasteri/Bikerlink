@@ -13,6 +13,45 @@ const EF_SEARCH_DEFAULT = 64;
 const EF_SEARCH_MIN = 1;
 const EF_SEARCH_MAX = 1000;
 
+const HNSW_INDEX_NAME = "embeddings_vec_hnsw_cosine_idx";
+
+/**
+ * Once-per-process guard: query pg_indexes once to verify the HNSW index
+ * exists. If it is missing we emit a clear warning so operators know that
+ * findSimilar() is silently falling back to a sequential scan.
+ * The result is cached so subsequent calls have zero overhead.
+ */
+let _hnswIndexChecked = false;
+async function warnIfHnswIndexMissing(
+  client: import("pg").PoolClient,
+): Promise<void> {
+  if (_hnswIndexChecked) return;
+  try {
+    const res = await client.query<{ exists: boolean }>(
+      `SELECT EXISTS (
+         SELECT 1 FROM pg_indexes
+         WHERE schemaname = 'public'
+           AND tablename = 'embeddings'
+           AND indexname = $1
+       ) AS exists`,
+      [HNSW_INDEX_NAME],
+    );
+    // Mark checked only after a successful query so transient failures allow
+    // a retry on the next findSimilar() call.
+    _hnswIndexChecked = true;
+    if (!(res.rows[0]?.exists ?? false)) {
+      console.warn(
+        `[embeddings] WARNING: HNSW index '${HNSW_INDEX_NAME}' non trovato — ` +
+          "findSimilar() userà un sequential scan (molto lento a scala). " +
+          "Riavviare il server per il self-heal automatico o eseguire la migration manualmente.",
+      );
+    }
+  } catch {
+    // Non-fatal: the index check must never block the actual query.
+    // _hnswIndexChecked stays false so the next call retries.
+  }
+}
+
 /**
  * Read hnsw.ef_search from AppSetting `embedding_ef_search`.
  * Falls back to 64 if the setting is absent or invalid.
@@ -158,6 +197,7 @@ export async function findSimilar(
   // the SELECT run on the same connection without leaking the setting.
   const client = await pool.connect();
   try {
+    await warnIfHnswIndexMissing(client);
     await client.query("BEGIN");
     await client.query(`SET LOCAL hnsw.ef_search = ${efSearch}`);
 

@@ -106,6 +106,46 @@ export async function runBootSequence(server: Server, errorHandlersReady: Promis
     console.warn("[boot] pgvector extension ensure failed (non-fatal) — findSimilar userà full-scan:", e);
   }
 
+  // HNSW index self-heal — if the index was dropped or never created (e.g. on
+  // a fresh DB restore), attempt to rebuild it at boot. CONCURRENTLY lets
+  // reads/writes proceed during the build so this is safe in production.
+  // Non-fatal: if it fails the server still boots, but findSimilar() will
+  // emit a runtime warning on the first call.
+  try {
+    const client = await pool.connect();
+    try {
+      const idxCheck = await client.query<{ exists: boolean }>(
+        `SELECT EXISTS (
+           SELECT 1 FROM pg_indexes
+           WHERE schemaname = 'public'
+             AND tablename = 'embeddings'
+             AND indexname = 'embeddings_vec_hnsw_cosine_idx'
+         ) AS exists`,
+      );
+      const idxExists = idxCheck.rows[0]?.exists ?? false;
+      if (!idxExists) {
+        console.warn(
+          "[boot] HNSW index 'embeddings_vec_hnsw_cosine_idx' mancante — tento self-heal con CREATE INDEX CONCURRENTLY...",
+        );
+        // CREATE INDEX CONCURRENTLY must run outside a transaction block.
+        await client.query(
+          `CREATE INDEX CONCURRENTLY IF NOT EXISTS "embeddings_vec_hnsw_cosine_idx"
+             ON "embeddings" USING hnsw ("embedding" vector_cosine_ops)`,
+        );
+        console.log("[boot] HNSW index creato con successo (self-heal)");
+      } else {
+        console.log("[boot] HNSW index verificato OK");
+      }
+    } finally {
+      client.release();
+    }
+  } catch (e) {
+    console.warn(
+      "[boot] HNSW index self-heal fallito (non-fatal) — findSimilar userà sequential scan alla prima chiamata:",
+      e,
+    );
+  }
+
   // Task #2838 — Email bootstrap
   try {
     const { storage } = await import("./storage");
