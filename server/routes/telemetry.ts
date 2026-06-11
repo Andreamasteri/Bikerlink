@@ -230,11 +230,11 @@ router.get("/stats", async (req: Request, res: Response) => {
           lat,
           lon,
           ts,
+          speed_kmh,
           LAG(lat) OVER (PARTITION BY session_id ORDER BY ts) AS prev_lat,
           LAG(lon) OVER (PARTITION BY session_id ORDER BY ts) AS prev_lon
         FROM ride_telemetry
         WHERE user_id = ${userId}
-          AND session_type NOT IN ('ideal_lap')
       ),
       distances AS (
         SELECT
@@ -249,6 +249,7 @@ router.get("/stats", async (req: Request, res: Response) => {
         WHERE prev_lat IS NOT NULL AND prev_lon IS NOT NULL
           AND ABS(lat - prev_lat) < 0.5
           AND ABS(lon - prev_lon) < 0.5
+          AND (speed_kmh IS NULL OR speed_kmh >= 20)
       )
       SELECT COALESCE(SUM(dist_km), 0) AS km_collected
       FROM distances

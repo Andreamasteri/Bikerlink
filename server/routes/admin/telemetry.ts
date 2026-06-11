@@ -109,6 +109,7 @@ router.get("/telemetry-stats", async (_req: Request, res: Response) => {
           SELECT
             session_id,
             lat, lon, ts,
+            speed_kmh,
             LAG(lat) OVER (PARTITION BY session_id ORDER BY ts) AS prev_lat,
             LAG(lon) OVER (PARTITION BY session_id ORDER BY ts) AS prev_lon
           FROM ride_telemetry
@@ -128,6 +129,7 @@ router.get("/telemetry-stats", async (_req: Request, res: Response) => {
           WHERE prev_lat IS NOT NULL AND prev_lon IS NOT NULL
             AND ABS(lat - prev_lat) < 0.5
             AND ABS(lon - prev_lon) < 0.5
+            AND (speed_kmh IS NULL OR speed_kmh >= 20)
         )
         SELECT COALESCE(SUM(dist_km), 0)::text AS total_km FROM distances
       `);

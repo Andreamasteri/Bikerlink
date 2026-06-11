@@ -56,7 +56,10 @@ function AutoTelemetryInner({ children }: { children: React.ReactNode }) {
   }, []);
 
   // ── Auto-detect only when all conditions are met ─────────────────────────
-  // Suppressed while manual tracking is active to avoid two concurrent sessions.
+  // Suppressed while manual route tracking is active (session_type='ride') to
+  // avoid two concurrent ride sessions inflating km_collected.
+  // Note: ideal_lap recording (useIdealLapRecorder) does NOT set manualActive,
+  // so auto-telemetry correctly keeps running during Giro Ideale sessions.
   const isEnabled = !!user && alwaysActive && isCalibrated && !manualActive;
 
   const { isRiding } = useMotorcycleDetector({ enabled: isEnabled });

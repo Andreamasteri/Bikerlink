@@ -255,7 +255,7 @@ export async function getUserStyleProfile(userId: string): Promise<UserStyleProf
           SELECT
             lean_angle,
             gforce_x, gforce_y, gforce_z,
-            lat, lon, ts, session_id,
+            lat, lon, ts, session_id, speed_kmh,
             LAG(lat) OVER (PARTITION BY session_id ORDER BY ts) AS prev_lat,
             LAG(lon) OVER (PARTITION BY session_id ORDER BY ts) AS prev_lon
           FROM ride_telemetry
@@ -268,6 +268,7 @@ export async function getUserStyleProfile(userId: string): Promise<UserStyleProf
             CASE
               WHEN prev_lat IS NOT NULL AND prev_lon IS NOT NULL
                 AND ABS(lat - prev_lat) < 0.5 AND ABS(lon - prev_lon) < 0.5
+                AND (speed_kmh IS NULL OR speed_kmh >= 20)
               THEN 2 * 6371 * ASIN(
                 SQRT(
                   POWER(SIN(RADIANS(lat - prev_lat) / 2), 2)

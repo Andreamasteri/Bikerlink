@@ -26,7 +26,7 @@ function buildApp(): express.Application {
   return app;
 }
 
-describe("GET /api/telemetry/stats — ideal_lap exclusion", () => {
+describe("GET /api/telemetry/stats — km_collected includes ideal_lap, speed filter applied", () => {
   let app: express.Application;
 
   beforeEach(() => {
@@ -34,7 +34,7 @@ describe("GET /api/telemetry/stats — ideal_lap exclusion", () => {
     app = buildApp();
   });
 
-  it("progress_pct stays 0 when DB returns 0 km (i.e. ideal_lap filtered out)", async () => {
+  it("progress_pct stays 0 when DB returns 0 km (no movement at speed >= 20 km/h)", async () => {
     const dbExecute = vi.mocked(db.execute);
     dbExecute
       .mockResolvedValueOnce({ rows: [{ sample_count: "0", session_count: "0" }] } as unknown as Awaited<ReturnType<typeof db.execute>>)
@@ -50,7 +50,7 @@ describe("GET /api/telemetry/stats — ideal_lap exclusion", () => {
     expect(res.body.track_km).toBe(0);
   });
 
-  it("progress_pct and session_count reflect only non-ideal_lap data from DB", async () => {
+  it("km_collected includes ride sessions (sample_count/session_count still exclude ideal_lap)", async () => {
     const dbExecute = vi.mocked(db.execute);
     dbExecute
       .mockResolvedValueOnce({ rows: [{ sample_count: "200", session_count: "3" }] } as unknown as Awaited<ReturnType<typeof db.execute>>)
@@ -67,7 +67,22 @@ describe("GET /api/telemetry/stats — ideal_lap exclusion", () => {
     expect(res.body.track_km).toBe(0);
   });
 
-  it("adding more km (simulating a non-ideal ride) increases progress_pct", async () => {
+  it("km_collected reflects ideal_lap km — DB returns combined total (ride + ideal_lap)", async () => {
+    const dbExecute = vi.mocked(db.execute);
+    dbExecute
+      .mockResolvedValueOnce({ rows: [{ sample_count: "300", session_count: "3" }] } as unknown as Awaited<ReturnType<typeof db.execute>>)
+      .mockResolvedValueOnce({ rows: [{ km_collected: "18.5" }] } as unknown as Awaited<ReturnType<typeof db.execute>>)
+      .mockResolvedValueOnce({ rows: [{ track_km: "8.5" }] } as unknown as Awaited<ReturnType<typeof db.execute>>);
+
+    const res = await request(app).get("/api/telemetry/stats");
+
+    expect(res.status).toBe(200);
+    expect(res.body.km_collected).toBe(18.5);
+    expect(res.body.track_km).toBe(8.5);
+    expect(res.body.progress_pct).toBe(2);
+  });
+
+  it("adding more km increases progress_pct correctly", async () => {
     const dbExecute = vi.mocked(db.execute);
     dbExecute
       .mockResolvedValueOnce({ rows: [{ sample_count: "500", session_count: "5" }] } as unknown as Awaited<ReturnType<typeof db.execute>>)
