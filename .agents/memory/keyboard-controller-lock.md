@@ -9,6 +9,8 @@ description: Versione aggiornata a 1.21.11 per fix Kotlin 2.1.20 / compileSdk 36
 
 **Why:** Kotlin 2.1.20 (usato da Expo SDK 56 / compileSdk 36) richiede che `onConfigurationChanged` abbia un parametro `Configuration` non-nullable. Versioni < 1.21.9 dichiaravano `Configuration?` → errore `'onConfigurationChanged' overrides nothing` → build Android fallisce a runtime EAS. Il fix è nella 1.21.9 (linea 1.21.x, nessuna breaking change JS).
 
+**Build verificata:** EAS release-apk build 7d1afb7b (2026-06-11, v60.10.100) completata con successo (status: finished) — nessun errore Kotlin. APK arm64 prodotto correttamente. Vedi `docs/build-reports/keyboard-controller-1.21.11-verification.md`.
+
 **How to apply:**
 - La versione in `package.json` è `"^1.21.11"` (caret, Expo può aggiornarla entro la linea compatibile).
 - **Non** è in `expo.install.exclude` → expo doctor / expo install possono gestirla.
