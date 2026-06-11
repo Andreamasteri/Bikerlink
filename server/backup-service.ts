@@ -1,7 +1,7 @@
 import { exec } from "child_process";
 import { promisify } from "util";
 import zlib from "zlib";
-import archiver from "archiver";
+import { ZipArchive } from "archiver";
 import fs from "fs";
 import os from "os";
 import path from "path";
@@ -215,7 +215,7 @@ export async function backupMedia(): Promise<{ path: string; name: string; size:
 
     const zipBuffer = await new Promise<Buffer>((resolve, reject) => {
       const output = fs.createWriteStream(tmpZip);
-      const archive = archiver("zip", { zlib: { level: 6 } });
+      const archive = new ZipArchive({ zlib: { level: 6 } });
       archive.pipe(output);
       if (fs.existsSync(mediaDir)) {
         archive.directory(mediaDir, false);

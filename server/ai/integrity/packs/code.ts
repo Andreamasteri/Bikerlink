@@ -188,6 +188,8 @@ const codeDuplicationCheck: AppIntegrityCheck = {
   description: "Detection blocchi duplicati >50 token con jscpd su server/app/lib/hooks/components/shared.",
   async query(ctx) {
     try {
+      // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+      // @ts-ignore — jscpd v5 è un binario nativo, non ha tipi npm
       const mod = (await import("jscpd").catch(() => null)) as { JSCPD?: new (opts: unknown) => { detect: (paths: string[]) => Promise<unknown> } } | null;
       if (!mod?.JSCPD) {
         return { ok: true, count: 0, sample: [], details: { skipped: "jscpd non installato" } };

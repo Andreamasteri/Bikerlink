@@ -2,7 +2,7 @@ import fs from "fs";
 import os from "os";
 import path from "path";
 import zlib from "zlib";
-import archiver from "archiver";
+import { ZipArchive } from "archiver";
 import { Pool } from "pg";
 import { uploadBuffer, downloadBuffer, listObjects } from "./objectStorage";
 import { db } from "./db";
@@ -394,7 +394,7 @@ export async function runExport(options: Partial<ExportOptions> = {}): Promise<E
 
     const zipBuffer = await new Promise<Buffer>((resolve, reject) => {
       const output = fs.createWriteStream(tmpZip);
-      const archive = archiver("zip", { zlib: { level: 6 } });
+      const archive = new ZipArchive({ zlib: { level: 6 } });
       archive.pipe(output);
       archive.directory(tmpDir, false);
       archive.finalize();
