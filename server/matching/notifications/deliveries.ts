@@ -23,16 +23,20 @@ export async function recordDelivery(
     `);
     // Mark notified_at on the match row (first delivery wins; ON CONFLICT DO NOTHING on insert
     // above means subsequent deliveries to the same match won't run this if already set).
-    if (table === "bio_affinity_matches") {
-      await db.execute(sql`
-        UPDATE bio_affinity_matches SET notified_at = NOW()
-         WHERE id = ${matchId} AND notified_at IS NULL
-      `);
-    } else if (table === "route_affinity_matches") {
-      await db.execute(sql`
-        UPDATE route_affinity_matches SET notified_at = NOW()
-         WHERE id = ${matchId} AND notified_at IS NULL
-      `);
+    // Covers all match tables that carry the notified_at column.
+    const tablesSupportingNotifiedAt = new Set([
+      "biker_zavorrina_matches",
+      "biker_biker_matches",
+      "proposal_matches",
+      "bio_affinity_matches",
+      "route_affinity_matches",
+      "music_affinity_matches",
+      "telemetry_affinity_matches",
+    ]);
+    if (tablesSupportingNotifiedAt.has(table)) {
+      await db.execute(
+        sql`UPDATE ${sql.raw(table)} SET notified_at = NOW() WHERE id = ${matchId} AND notified_at IS NULL`,
+      );
     }
   } catch (err) {
     console.warn("[NotifDeliveries] recordDelivery error:", err);

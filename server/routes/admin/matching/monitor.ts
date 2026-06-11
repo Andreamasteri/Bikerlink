@@ -15,6 +15,7 @@ import { sql } from "drizzle-orm";
 import { sendSuccess, sendError } from "../../../lib/api-response";
 import { getMatchingLockState, getMatchingLockStatus, getLastCycleOutcome } from "../../../matching/scheduler";
 import { getLastMatchingCycleMeta } from "../../../matching-engine";
+import { getNotificationCycleStats } from "../../../matching/run-matching";
 import { getAggregate, getRecentCycles } from "../../../matching/perf-metrics";
 import { getRedisStatus } from "../../../cache/redis";
 import { getLimiterStats } from "../../../lib/throttle";
@@ -178,6 +179,8 @@ router.get("/matching/monitor", async (_req: Request, res: Response) => {
       cycleStatus === "error" || recentErrors > 0 ? "degraded" : "ok";
     updateSystemStatus({ matching: matchingDot });
 
+    const notificationStats = getNotificationCycleStats();
+
     return sendSuccess(res, {
       cycleStatus,
       lock: {
@@ -198,6 +201,11 @@ router.get("/matching/monitor", async (_req: Request, res: Response) => {
         rateLimiterOk,
       },
       recentErrorCount: recentErrors,
+      lastCycleNotifications: {
+        sent: notificationStats.sent,
+        failed: notificationStats.failed,
+        retried: notificationStats.retried,
+      },
     });
   } catch (error) {
     console.error("[admin/matching/monitor] error:", error);

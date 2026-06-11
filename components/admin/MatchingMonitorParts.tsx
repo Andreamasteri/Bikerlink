@@ -48,6 +48,12 @@ export interface ThroughputEntry {
   sourceStatus: SourceStatus;
 }
 
+export interface NotificationCycleStats {
+  sent: number;
+  failed: number;
+  retried: number;
+}
+
 export interface MonitorData {
   success: true;
   cycleStatus: "running" | "idle" | "error";
@@ -67,6 +73,7 @@ export interface MonitorData {
     rateLimiterOk: boolean;
   };
   recentErrorCount: number;
+  lastCycleNotifications?: NotificationCycleStats;
 }
 
 export interface LogEntry {

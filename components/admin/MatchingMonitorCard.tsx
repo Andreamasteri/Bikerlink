@@ -25,7 +25,7 @@ import {
   CYCLE_STATUS_LABEL,
   SOURCE_STATUS_COLOR,
 } from "./MatchingMonitorParts";
-import type { MonitorData, LogsData } from "./MatchingMonitorParts";
+import type { MonitorData, LogsData, NotificationCycleStats } from "./MatchingMonitorParts";
 
 async function authGet<T>(path: string): Promise<T> {
   const res = await fetch(new URL(path, getApiUrl()).toString(), {
@@ -47,6 +47,49 @@ async function authPost<T>(path: string): Promise<T> {
   if (!res.ok) throw new Error((json as { message?: string })?.message ?? `HTTP ${res.status}`);
   return json as T;
 }
+
+function NotifStatsRow({ stats }: { stats?: NotificationCycleStats }) {
+  if (!stats) return null;
+  const hasFailed = stats.failed > 0;
+  const hasRetried = stats.retried > 0;
+  return (
+    <View style={notifStyles.row}>
+      <MaterialCommunityIcons name="bell-outline" size={13} color={Colors.textSecondary} />
+      <Text style={notifStyles.label}>Notifiche ciclo:</Text>
+      <View style={notifStyles.chip}>
+        <MaterialCommunityIcons name="check-circle-outline" size={12} color="#22c55e" />
+        <Text style={[notifStyles.chipText, { color: "#22c55e" }]}>{stats.sent} inviate</Text>
+      </View>
+      {hasFailed && (
+        <View style={notifStyles.chip}>
+          <MaterialCommunityIcons name="close-circle-outline" size={12} color="#ef4444" />
+          <Text style={[notifStyles.chipText, { color: "#ef4444" }]}>{stats.failed} fallite</Text>
+        </View>
+      )}
+      {hasRetried && (
+        <View style={notifStyles.chip}>
+          <MaterialCommunityIcons name="refresh" size={12} color="#f59e0b" />
+          <Text style={[notifStyles.chipText, { color: "#f59e0b" }]}>{stats.retried} retry</Text>
+        </View>
+      )}
+    </View>
+  );
+}
+
+const notifStyles = StyleSheet.create({
+  row: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: Colors.border,
+    flexWrap: "wrap",
+  },
+  label: { fontFamily: "Inter_500Medium", fontSize: 12, color: Colors.textSecondary },
+  chip: { flexDirection: "row", alignItems: "center", gap: 3 },
+  chipText: { fontFamily: "Inter_600SemiBold", fontSize: 12 },
+});
 
 export function MatchingMonitorCard({ onStatus }: { onStatus?: (s: "ok" | "degraded" | "offline") => void }) {
   const [collapsed, setCollapsed] = useState(true);
@@ -189,6 +232,8 @@ export function MatchingMonitorCard({ onStatus }: { onStatus?: (s: "ok" | "degra
                   </Text>
                 </View>
               </View>
+
+              <NotifStatsRow stats={monitor.lastCycleNotifications} />
 
               <View style={styles.lockRow}>
                 <View style={styles.lockStatus}>
