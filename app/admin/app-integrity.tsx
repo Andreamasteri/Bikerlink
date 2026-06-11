@@ -1,6 +1,7 @@
 // Task #2537 — Dashboard AI App Integrity (9 famiglie generaliste).
 import React, { useState } from "react";
 import { ScrollView, View, Text, StyleSheet, ActivityIndicator, RefreshControl, TouchableOpacity, Alert } from "react-native";
+import * as Clipboard from "expo-clipboard";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
@@ -202,12 +203,18 @@ export default function AppIntegrityScreen() {
               </TouchableOpacity>
               {expanded === v.id && (
                 <View style={styles.expand}>
-                  <Text style={styles.subTitle}>Sample</Text>
-                  {v.sample.slice(0, 3).map((s, i) => (
-                    <Text key={i} style={styles.codeBlock} numberOfLines={6}>
-                      {JSON.stringify(s.data, null, 2)}
-                    </Text>
-                  ))}
+                  <Text style={styles.subTitle}>
+                    {v.checkId === "code/duplication" ? `Hotspot (${v.sample.length} coppie, peggiori prima)` : "Sample"}
+                  </Text>
+                  {v.checkId === "code/duplication" ? (
+                    <DuplicationSampleList sample={v.sample} />
+                  ) : (
+                    v.sample.slice(0, 3).map((s, i) => (
+                      <Text key={i} style={styles.codeBlock} numberOfLines={6}>
+                        {JSON.stringify(s.data, null, 2)}
+                      </Text>
+                    ))
+                  )}
                   {v.aiExplain ? (
                     <View style={styles.aiPanel}>
                       <Text style={styles.subTitle}>AI ({v.aiExplain.modelUsed ?? "?"})</Text>
@@ -252,6 +259,78 @@ function FamilyTab({ label, active, count, onPress }: { label: string; active: b
   );
 }
 
+type DupFileRef = { path?: string; start?: number; end?: number };
+type DupData = { a?: DupFileRef; b?: DupFileRef; lines?: number | null; tokens?: number | null };
+
+function DuplicationSampleList({ sample }: { sample: Array<{ pk?: string; data: Record<string, unknown> }> }) {
+  const [copied, setCopied] = useState<string | null>(null);
+
+  const copyPath = (p: string) => {
+    Clipboard.setStringAsync(p).catch(() => {});
+    setCopied(p);
+    setTimeout(() => setCopied(null), 1500);
+  };
+
+  const sorted = [...sample]
+    .map((s) => ({ pk: s.pk, d: s.data as unknown as DupData }))
+    .sort((a, b) => ((b.d.tokens ?? 0) as number) - ((a.d.tokens ?? 0) as number));
+
+  if (!sorted.length) return <Text style={styles.cardMeta}>Nessun duplicato rilevato.</Text>;
+
+  return (
+    <View style={{ gap: 8, marginTop: 4 }}>
+      {sorted.map((item) => {
+        const { a, b, lines, tokens } = item.d;
+        const aPath = a?.path ?? "?";
+        const bPath = b?.path ?? "?";
+        const aRange = a?.start != null && a?.end != null ? `L${a.start}–${a.end}` : null;
+        const bRange = b?.start != null && b?.end != null ? `L${b.start}–${b.end}` : null;
+        const cardKey = item.pk ?? `${aPath}↔${bPath}`;
+        return (
+          <View key={cardKey} style={styles.dupCard}>
+            <View style={styles.dupBadgeRow}>
+              {tokens != null && (
+                <View style={styles.dupTokenBadge}>
+                  <MaterialCommunityIcons name="content-copy" size={11} color="#fff" />
+                  <Text style={styles.dupTokenText}>{tokens} tok</Text>
+                </View>
+              )}
+              {lines != null && (
+                <Text style={styles.dupLineMeta}>{lines} righe duplicate</Text>
+              )}
+            </View>
+            <TouchableOpacity style={styles.dupFileRow} onPress={() => copyPath(aPath)} activeOpacity={0.7}>
+              <MaterialCommunityIcons
+                name={copied === aPath ? "check" : "file-code-outline"}
+                size={13}
+                color={copied === aPath ? Colors.success : Colors.accent}
+              />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.dupFilePath} numberOfLines={2}>{aPath}</Text>
+                {aRange && <Text style={styles.dupLineRange}>{aRange}</Text>}
+              </View>
+              <Text style={styles.dupCopyHint}>{copied === aPath ? "copiato" : "copia path"}</Text>
+            </TouchableOpacity>
+            <View style={styles.dupDivider} />
+            <TouchableOpacity style={styles.dupFileRow} onPress={() => copyPath(bPath)} activeOpacity={0.7}>
+              <MaterialCommunityIcons
+                name={copied === bPath ? "check" : "file-code-outline"}
+                size={13}
+                color={copied === bPath ? Colors.success : Colors.accent}
+              />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.dupFilePath} numberOfLines={2}>{bPath}</Text>
+                {bRange && <Text style={styles.dupLineRange}>{bRange}</Text>}
+              </View>
+              <Text style={styles.dupCopyHint}>{copied === bPath ? "copiato" : "copia path"}</Text>
+            </TouchableOpacity>
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
   empty: { color: Colors.textSecondary, textAlign: "center", marginTop: 40 },
@@ -291,4 +370,14 @@ const styles = StyleSheet.create({
   tabTextActive: { color: "#fff" },
   tabBadge: { backgroundColor: "#00000040", borderRadius: 8, paddingHorizontal: 6, paddingVertical: 1 },
   tabBadgeText: { color: "#fff", fontSize: 10, fontFamily: "Inter_600SemiBold" },
+  dupCard: { backgroundColor: Colors.background, borderRadius: 8, padding: 10, borderWidth: 1, borderColor: Colors.surface, gap: 6 },
+  dupBadgeRow: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 2 },
+  dupTokenBadge: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: "#ff7a00", paddingHorizontal: 7, paddingVertical: 3, borderRadius: 6 },
+  dupTokenText: { color: "#fff", fontSize: 11, fontFamily: "Inter_600SemiBold" },
+  dupLineMeta: { color: Colors.textSecondary, fontSize: 11 },
+  dupFileRow: { flexDirection: "row", alignItems: "flex-start", gap: 8, paddingVertical: 2 },
+  dupFilePath: { color: Colors.accent, fontSize: 12, fontFamily: "Inter_400Regular", flex: 1 },
+  dupLineRange: { color: Colors.textSecondary, fontSize: 11, marginTop: 1 },
+  dupDivider: { height: 1, backgroundColor: Colors.surface, marginVertical: 2 },
+  dupCopyHint: { color: Colors.textSecondary, fontSize: 10, marginLeft: 4, alignSelf: "center" },
 });
