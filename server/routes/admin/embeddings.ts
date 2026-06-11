@@ -92,7 +92,7 @@ router.get("/coverage", async (_req: Request, res: Response) => {
   try {
     const client = await pool.connect();
     try {
-      const [activeUsersResult, embeddingStatsResult, efSearchSetting, thresholdSetting] =
+      const [activeUsersResult, embeddingStatsResult, efSearchSetting, thresholdSetting, capSetting] =
         await Promise.all([
           client.query<{ total: string }>(
             `SELECT COUNT(*) AS total FROM users WHERE status = 'active'`,
@@ -113,6 +113,7 @@ router.get("/coverage", async (_req: Request, res: Response) => {
           ),
           storage.getAppSetting("embedding_ef_search"),
           storage.getAppSetting("embedding_coverage_threshold"),
+          storage.getAppSetting("embedding_daily_cap"),
         ]);
 
       const activeUsers = parseInt(activeUsersResult.rows[0]?.total ?? "0", 10);
@@ -129,6 +130,13 @@ router.get("/coverage", async (_req: Request, res: Response) => {
         if (!raw) return 80;
         const n = parseInt(raw, 10);
         return Number.isFinite(n) ? Math.max(0, Math.min(100, n)) : 80;
+      })();
+
+      const dailyCap = (() => {
+        const raw = capSetting?.value;
+        if (!raw) return 500;
+        const n = parseInt(raw, 10);
+        return Number.isFinite(n) && n > 0 ? n : 500;
       })();
 
       const fieldMap = new Map<
@@ -174,6 +182,7 @@ router.get("/coverage", async (_req: Request, res: Response) => {
         byField,
         coverageWarning,
         coverageThresholdPct: coverageThreshold,
+        dailyCap,
       });
     } finally {
       client.release();

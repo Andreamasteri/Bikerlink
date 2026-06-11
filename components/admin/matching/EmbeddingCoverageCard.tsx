@@ -27,6 +27,7 @@ interface CoverageResponse {
   byField: CoverageFieldRow[];
   coverageWarning: boolean;
   coverageThresholdPct: number;
+  dailyCap: number;
 }
 
 function formatDate(iso: string | null): string {
@@ -55,19 +56,22 @@ export function EmbeddingCoverageCard() {
 
   const [efSearchInput, setEfSearchInput] = useState<string>("");
   const [thresholdInput, setThresholdInput] = useState<string>("");
+  const [dailyCapInput, setDailyCapInput] = useState<string>("");
 
   React.useEffect(() => {
     if (data) {
       setEfSearchInput(String(data.efSearch));
       setThresholdInput(String(data.coverageThresholdPct));
+      setDailyCapInput(String(data.dailyCap));
     }
-  }, [data?.efSearch, data?.coverageThresholdPct]);
+  }, [data?.efSearch, data?.coverageThresholdPct, data?.dailyCap]);
 
   const settingsMutation = useMutation({
-    mutationFn: (body: { efSearch?: number; coverageThreshold?: number }) =>
+    mutationFn: (body: { efSearch?: number; coverageThreshold?: number; dailyCap?: number }) =>
       apiRequest("PATCH", "/api/admin/embeddings/settings", body),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["/api/admin/embeddings/coverage"] });
+      void queryClient.invalidateQueries({ queryKey: ["/api/admin/embeddings/stats"] });
     },
     onError: () => {
       Alert.alert("Errore", "Impossibile salvare le impostazioni embedding.");
@@ -92,6 +96,16 @@ export function EmbeddingCoverageCard() {
       return;
     }
     settingsMutation.mutate({ coverageThreshold: val });
+  };
+
+  const handleDailyCapSave = () => {
+    const val = parseInt(dailyCapInput, 10);
+    if (!Number.isFinite(val) || val < 1) {
+      Alert.alert("Valore non valido", "Il daily cap deve essere un intero >= 1.");
+      setDailyCapInput(String(data?.dailyCap ?? 500));
+      return;
+    }
+    settingsMutation.mutate({ dailyCap: val });
   };
 
   const bioBioRow = data?.byField.find((r) => r.field === "bio");
@@ -249,6 +263,40 @@ export function EmbeddingCoverageCard() {
                 <TouchableOpacity
                   style={[styles.saveBtn, settingsMutation.isPending && styles.saveBtnDisabled]}
                   onPress={handleThresholdSave}
+                  disabled={settingsMutation.isPending}
+                  activeOpacity={0.7}
+                >
+                  {settingsMutation.isPending ? (
+                    <ActivityIndicator size="small" color="#fff" />
+                  ) : (
+                    <MaterialCommunityIcons name="check" size={16} color="#fff" />
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            <View style={styles.settingRow}>
+              <View style={styles.settingInfo}>
+                <Text style={styles.settingLabel}>Daily cap API</Text>
+                <Text style={styles.settingDesc}>
+                  Max chiamate embedding/giorno (default 500)
+                </Text>
+              </View>
+              <View style={styles.settingInputRow}>
+                <TextInput
+                  style={styles.settingInput}
+                  value={dailyCapInput}
+                  onChangeText={setDailyCapInput}
+                  onEndEditing={handleDailyCapSave}
+                  keyboardType="numeric"
+                  maxLength={6}
+                  selectTextOnFocus
+                  editable={!settingsMutation.isPending}
+                  returnKeyType="done"
+                />
+                <TouchableOpacity
+                  style={[styles.saveBtn, settingsMutation.isPending && styles.saveBtnDisabled]}
+                  onPress={handleDailyCapSave}
                   disabled={settingsMutation.isPending}
                   activeOpacity={0.7}
                 >
