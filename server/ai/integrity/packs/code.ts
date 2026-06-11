@@ -4,8 +4,13 @@
 // arricchirli — qui restano cheap/medium per stabilità.
 import path from "path";
 import fs from "fs/promises";
+import os from "os";
+import { execFile } from "child_process";
+import { promisify } from "util";
 import type { AppIntegrityCheck } from "../types";
 import { walkFiles, readSafe, countLines, relWithin } from "../fs-helpers";
+
+const execFileAsync = promisify(execFile);
 
 const TS_EXTS = [".ts", ".tsx"];
 const SERVER_DIRS = ["server"];
@@ -188,59 +193,83 @@ const codeDuplicationCheck: AppIntegrityCheck = {
   description: "Detection blocchi duplicati >50 token con jscpd su server/app/lib/hooks/components/shared.",
   async query(ctx) {
     try {
-      // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-      // @ts-ignore — jscpd v5 è un binario nativo, non ha tipi npm
-      const mod = (await import("jscpd").catch(() => null)) as { JSCPD?: new (opts: unknown) => { detect: (paths: string[]) => Promise<unknown> } } | null;
-      if (!mod?.JSCPD) {
+      const jscpdBin = path.join(ctx.projectRoot, "node_modules", ".bin", "jscpd");
+      try { await fs.access(jscpdBin); } catch {
         return { ok: true, count: 0, sample: [], details: { skipped: "jscpd non installato" } };
       }
+
       const targets = EXPENSIVE_DIRS
         .map((d) => path.join(ctx.projectRoot, d))
-        .filter((p) => p);
+        .filter(Boolean);
       const existing: string[] = [];
       for (const t of targets) {
         try { await fs.access(t); existing.push(t); } catch { /* skip */ }
       }
       if (!existing.length) return { ok: true, count: 0, sample: [] };
 
-      const jscpd = new mod.JSCPD({
-        path: existing,
-        mode: "mild",
-        minTokens: 50,
-        minLines: 5,
-        formatsExts: { typescript: ["ts", "tsx"] },
-        format: ["typescript"],
-        ignore: ["**/node_modules/**", "**/dist/**", "**/server_dist/**", "**/.expo/**", "**/build/**"],
-        reporters: [],
-        silent: true,
-        absolute: false,
-        gitignore: true,
-      });
-      type ClonePos = { sourceId?: string; start?: { line?: number }; end?: { line?: number } };
-      type Clone = { duplicationA?: ClonePos; duplicationB?: ClonePos; lines?: number; tokens?: number };
-      const clones = await withTimeout(jscpd.detect(existing), EXPENSIVE_TIMEOUT_MS, "jscpd") as unknown;
-      const list: Clone[] = Array.isArray(clones) ? (clones as Clone[]) : [];
-      const offenders = list.map((c) => {
-        const a = c?.duplicationA ?? {};
-        const b = c?.duplicationB ?? {};
-        const aPath = relWithin(ctx.projectRoot, a.sourceId ?? "");
-        const bPath = relWithin(ctx.projectRoot, b.sourceId ?? "");
+      const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "jscpd-"));
+      try {
+        const args = [
+          ...existing,
+          "--min-tokens", "50",
+          "--min-lines", "5",
+          "--mode", "mild",
+          "--format", "typescript",
+          "--formats-exts", "typescript:ts,tsx",
+          "--ignore", "**/node_modules/**,**/dist/**,**/server_dist/**,**/.expo/**,**/build/**",
+          "--reporters", "json",
+          "--output", tmpDir,
+          "--no-colors",
+        ];
+
+        await withTimeout(
+          execFileAsync(jscpdBin, args, { cwd: ctx.projectRoot }).catch((err: NodeJS.ErrnoException & { code?: number }) => {
+            if (typeof err.code === "number" && err.code > 0) return;
+            throw err;
+          }),
+          EXPENSIVE_TIMEOUT_MS,
+          "jscpd",
+        );
+
+        const reportPath = path.join(tmpDir, "jscpd-report.json");
+        let report: unknown;
+        try {
+          const raw = await fs.readFile(reportPath, "utf-8");
+          report = JSON.parse(raw);
+        } catch {
+          return { ok: true, count: 0, sample: [], details: { skipped: "report jscpd non generato" } };
+        }
+
+        type FileRef = { name?: string; start?: number; end?: number };
+        type Duplicate = { firstFile?: FileRef; secondFile?: FileRef; lines?: number; tokens?: number };
+        type Report = { duplicates?: Duplicate[] };
+
+        const list: Duplicate[] = (report as Report)?.duplicates ?? [];
+        const offenders = list.map((c) => {
+          const a = c?.firstFile ?? {};
+          const b = c?.secondFile ?? {};
+          const aPath = relWithin(ctx.projectRoot, a.name ?? "");
+          const bPath = relWithin(ctx.projectRoot, b.name ?? "");
+          return {
+            pk: `${aPath}↔${bPath}`,
+            data: {
+              a: { path: aPath, start: a.start, end: a.end },
+              b: { path: bPath, start: b.start, end: b.end },
+              lines: c?.lines ?? null,
+              tokens: c?.tokens ?? null,
+            },
+          };
+        });
+
         return {
-          pk: `${aPath}↔${bPath}`,
-          data: {
-            a: { path: aPath, start: a.start?.line, end: a.end?.line },
-            b: { path: bPath, start: b.start?.line, end: b.end?.line },
-            lines: c?.lines ?? null,
-            tokens: c?.tokens ?? null,
-          },
+          ok: offenders.length === 0,
+          count: offenders.length,
+          sample: sampleOf(offenders),
+          details: { tool: "jscpd@5", minTokens: 50, scanned: existing.length },
         };
-      });
-      return {
-        ok: offenders.length === 0,
-        count: offenders.length,
-        sample: sampleOf(offenders),
-        details: { tool: "jscpd", minTokens: 50, scanned: existing.length },
-      };
+      } finally {
+        await fs.rm(tmpDir, { recursive: true, force: true });
+      }
     } catch (e) {
       return { ok: true, count: 0, sample: [], details: { error: (e as Error).message } };
     }
