@@ -1,7 +1,6 @@
-// LARGE-FILE-LOCKED — limite: 816 righe (attuali: ~816)
+// LARGE-FILE-LOCKED — limite: 813 righe (baseline)
 // Aggiungi nuove funzionalità in: components/admin/ota/OtaPanelExtra.tsx
 // Motivo: file delicato di dimensione media. Splittare ora introduce rischio.
-//         Vedi Task #2584 (regola 600 righe) e Task "Lock dimensione file priorità media".
 
 import React, { useState, useCallback, useEffect, useRef } from "react";
 import {
@@ -535,7 +534,6 @@ export default function OtaPanel() {
             {renderCounters(release)}
             {release.bootFailureCount > 0 && <OtaFailureDevices releaseId={release.id} />}
             {renderAutoRollback(release)}
-
             {!hasGroupId && (
               <View style={[styles.warningBox, { backgroundColor: colors.error + "11", borderColor: colors.error + "44" }]}>
                 <Text style={[styles.warningText, { color: colors.error }]}>
@@ -662,7 +660,6 @@ export default function OtaPanel() {
     </View>
   );
 }
-
 interface AutoRollbackFieldProps {
   label: string;
   value: number;
