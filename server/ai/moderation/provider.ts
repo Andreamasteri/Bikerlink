@@ -282,7 +282,7 @@ function tryBuild(id: AiProviderId, role: ModelRole, forcedModelId?: string): Re
 // Task #2966 — Rete finale self-hosted: Ollama (ThinkCentre). Illimitato e locale,
 // quindi fuori dai cooldown/cap dei provider cloud. Lo scheduler è pass-through
 // (nessun limiter Bottleneck). Ritorna null se OLLAMA_URL non è configurato.
-function tryBuildOllama(): ResolvedModel | null {
+export function tryBuildOllama(): ResolvedModel | null {
   if (!isOllamaConfigured) return null;
   try {
     const modelId = process.env.OLLAMA_MODEL ?? "llama3.1:8b";
