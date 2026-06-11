@@ -45,69 +45,78 @@ export async function runIntegrityScan(opts: RunOptions = {}): Promise<RunSummar
 
   let violationsFound = 0;
   let autoFixed = 0;
+  let autoResolved = 0;
   const byFamily: Record<Family, number> = ALL_FAMILIES.reduce((a, f) => { a[f] = 0; return a; }, {} as Record<Family, number>);
   const bySeverity: Record<Severity, number> = { low: 0, medium: 0, high: 0, critical: 0 };
   const currentHashes: string[] = [];
   const scannedCheckIds = checks.map((c) => c.id);
 
-  for (const check of checks) {
-    const { result } = await executeCheck(check, { dryRun: !!opts.dryRun, projectRoot });
-    if (result.ok || result.count === 0) continue;
-    violationsFound++;
-    byFamily[check.family]++;
-    bySeverity[check.severity]++;
-    const hash = hashViolation(check.id, result);
-    currentHashes.push(hash);
+  try {
+    for (const check of checks) {
+      const { result } = await executeCheck(check, { dryRun: !!opts.dryRun, projectRoot });
+      if (result.ok || result.count === 0) continue;
+      violationsFound++;
+      byFamily[check.family]++;
+      bySeverity[check.severity]++;
+      const hash = hashViolation(check.id, result);
+      currentHashes.push(hash);
 
-    // Tentativo autofix safe se richiesto
-    let autoFixSummary: string | null = null; let didFix = false;
-    if (opts.applySafeAutofix && check.autofix?.safe) {
-      const r = await executeAutofix(check, { dryRun: !!opts.dryRun, projectRoot });
-      didFix = !!r.applied; autoFixSummary = r.summary;
-      if (didFix) autoFixed++;
-      // Task #2654 — emit autofix al Coordinator (graceful)
-      await emitAppAutofix({ runId: runRow.id, checkId: check.id, applied: didFix, affected: r.affected ?? 0, summary: r.summary ?? "" });
+      // Tentativo autofix safe se richiesto
+      let autoFixSummary: string | null = null; let didFix = false;
+      if (opts.applySafeAutofix && check.autofix?.safe) {
+        const r = await executeAutofix(check, { dryRun: !!opts.dryRun, projectRoot });
+        didFix = !!r.applied; autoFixSummary = r.summary;
+        if (didFix) autoFixed++;
+        // Task #2654 — emit autofix al Coordinator (graceful)
+        await emitAppAutofix({ runId: runRow.id, checkId: check.id, applied: didFix, affected: r.affected ?? 0, summary: r.summary ?? "" }).catch(() => { /* graceful */ });
+      }
+      // Task #2654 — emit violation al Coordinator (graceful)
+      await emitAppViolation({
+        runId: runRow.id, checkId: check.id, checkName: check.name,
+        family: check.family, count: result.count, severity: check.severity,
+      }).catch(() => { /* graceful */ });
+
+      await db.insert(integrityViolations).values({
+        runId: runRow.id,
+        family: check.family,
+        checkId: check.id,
+        checkName: check.name,
+        severity: check.severity,
+        count: result.count,
+        sample: result.sample,
+        details: result.details ?? null,
+        hash,
+        status: didFix ? "auto_fixed" : "open",
+        autoFixApplied: didFix,
+        autoFixSummary,
+        resolvedAt: didFix ? new Date() : null,
+      });
     }
-    // Task #2654 — emit violation al Coordinator (graceful)
-    await emitAppViolation({
-      runId: runRow.id, checkId: check.id, checkName: check.name,
-      family: check.family, count: result.count, severity: check.severity,
-    });
 
-    await db.insert(integrityViolations).values({
-      runId: runRow.id,
-      family: check.family,
-      checkId: check.id,
-      checkName: check.name,
-      severity: check.severity,
-      count: result.count,
-      sample: result.sample,
-      details: result.details ?? null,
-      hash,
-      status: didFix ? "auto_fixed" : "open",
-      autoFixApplied: didFix,
-      autoFixSummary,
-      resolvedAt: didFix ? new Date() : null,
-    });
-  }
-
-  // Riconciliazione auto: violazioni "open" precedenti che non sono più riprodotte
-  // dai check eseguiti in questo run vengono marcate "auto_resolved".
-  const autoResolved = await reconcileAutoResolved(runRow.id, scannedCheckIds, currentHashes);
-  if (trigger === "scheduled" || trigger === "expensive") {
-    console.log(`[app-integrity ${trigger}] reconciliation: ${autoResolved} violation(s) auto-resolved, ${violationsFound} new found, ${autoFixed} auto-fixed`);
+    // Riconciliazione auto: violazioni "open" precedenti che non sono più riprodotte
+    // dai check eseguiti in questo run vengono marcate "auto_resolved".
+    autoResolved = await reconcileAutoResolved(runRow.id, scannedCheckIds, currentHashes);
+    if (trigger === "scheduled" || trigger === "expensive") {
+      console.log(`[app-integrity ${trigger}] reconciliation: ${autoResolved} violation(s) auto-resolved, ${violationsFound} new found, ${autoFixed} auto-fixed`);
+    }
+  } catch (e) {
+    console.error("[app-integrity runner] loop/reconcile error:", (e as Error).message);
+  } finally {
+    // Aggiorna sempre il run row, anche in caso di crash parziale, per evitare checksRun=0 spuri.
+    const manualPending = violationsFound - autoFixed;
+    await db.update(integrityRuns).set({
+      durationMs: Date.now() - start,
+      checksRun: checks.length,
+      violationsFound,
+      autoFixed,
+      autoResolved,
+      manualPending,
+    }).where(eq(integrityRuns.id, runRow.id)).catch((e2) =>
+      console.error("[app-integrity runner] failed to update run row:", (e2 as Error).message),
+    );
   }
 
   const manualPending = violationsFound - autoFixed;
-  await db.update(integrityRuns).set({
-    durationMs: Date.now() - start,
-    checksRun: checks.length,
-    violationsFound,
-    autoFixed,
-    autoResolved,
-    manualPending,
-  }).where(eq(integrityRuns.id, runRow.id));
-
   return buildSummary(runRow.id, checks.length, violationsFound, autoFixed, autoResolved, manualPending, bySeverity, byFamily, start, trigger, family, includeExpensive);
 }
 

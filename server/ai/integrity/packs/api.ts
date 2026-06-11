@@ -146,10 +146,15 @@ const adminRouteWithoutGuard: AppIntegrityCheck = {
     for (const f of files) {
       const base = f.relPath.replace(/^server\/routes\//, "./").replace(/\.ts$/, "");
       const referenced = mountText.includes(`from '${base}'`) || mountText.includes(`from "${base}"`);
-      if (!referenced && f.relPath.endsWith(".ts") && !f.relPath.endsWith("/index.ts")) {
-        // È mountato se è importato dal file admin.ts. Se no, potrebbe essere un orfano.
-        hits.push({ pk: f.relPath, data: { path: f.relPath, reason: "Router admin non importato da server/routes/admin.ts (verifica mount o rimuovi)" } });
-      }
+      if (referenced || !f.relPath.endsWith(".ts") || f.relPath.endsWith("/index.ts")) continue;
+      // Controlla anche se il parent directory ha un index.ts montato da admin.ts
+      // (es. admin/maps/handler.ts è coperto se admin.ts monta admin/maps o admin/maps/index).
+      const parentDir = base.replace(/\/[^/]+$/, ""); // ./admin/maps
+      const parentIndexReferenced =
+        mountText.includes(`from '${parentDir}'`) || mountText.includes(`from "${parentDir}"`) ||
+        mountText.includes(`from '${parentDir}/index'`) || mountText.includes(`from "${parentDir}/index"`);
+      if (parentIndexReferenced) continue;
+      hits.push({ pk: f.relPath, data: { path: f.relPath, reason: "Router admin non importato da server/routes/admin.ts (verifica mount o rimuovi)" } });
     }
     return { ok: hits.length === 0, count: hits.length, sample: hits.slice(0, 10) };
   },
