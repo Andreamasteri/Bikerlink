@@ -11,7 +11,7 @@ import {
 import { seedTranslationKeys } from "./routes/admin/translations";
 import { seedTagsAtStartup } from "./seed-tags-runtime";
 import { seedMotoclubs, seedClubMembershipsOnBoot } from "./routes/motoclubs/seed";
-import { db } from "./db";
+import { db, pool } from "./db";
 import { sql } from "drizzle-orm";
 import { initUptimeTracking, startMetroMonitor } from "./uptime";
 import { runMigrations } from "./migrate";
@@ -88,6 +88,23 @@ export async function runBootSequence(server: Server, errorHandlersReady: Promis
 
   // ── Phase 3: DB Init (non-fatal sub-steps) ────────────────────────────────
   bootLog(3, TOTAL, "DB Init", "start");
+
+  // pgvector extension — garanzia permanente a ogni avvio del server.
+  // Gira PRIMA di qualsiasi altra init DB: anche se la migration 0039 o 0095
+  // è stata saltata o ha fallito silenziosamente in produzione, l'estensione
+  // viene attivata qui. Non-fatal: se il provider non supporta pgvector logga
+  // un warning ma non blocca il boot.
+  try {
+    const client = await pool.connect();
+    try {
+      await client.query("CREATE EXTENSION IF NOT EXISTS vector");
+      console.log("[boot] pgvector extension ensured");
+    } finally {
+      client.release();
+    }
+  } catch (e) {
+    console.warn("[boot] pgvector extension ensure failed (non-fatal) — findSimilar userà full-scan:", e);
+  }
 
   // Task #2838 — Email bootstrap
   try {

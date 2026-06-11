@@ -19,6 +19,15 @@
 -- Il pragma `migrate:no-transaction` è richiesto perché CREATE INDEX CONCURRENTLY
 -- non può girare dentro un BEGIN/COMMIT esplicito (PostgreSQL restituisce errore).
 -- Il migrate runner lo rileva e applica la migration in autocommit mode.
+--
+-- NOTA: la migration include `CREATE EXTENSION IF NOT EXISTS vector` come safety
+-- net per ambienti di produzione dove l'estensione potrebbe non essere stata
+-- attivata correttamente dalla migration 0039 (eseguita quando pgvector non era
+-- ancora disponibile sul provider). `IF NOT EXISTS` garantisce idempotenza.
+-- La boot sequence (server/boot-sequence.ts Phase 3) garantisce pgvector attiva
+-- a ogni riavvio in modo permanente, indipendentemente dalla storia delle migration.
+
+CREATE EXTENSION IF NOT EXISTS vector;
 
 CREATE INDEX CONCURRENTLY IF NOT EXISTS "embeddings_vec_hnsw_cosine_idx"
   ON "embeddings" USING hnsw ("embedding" vector_cosine_ops)
