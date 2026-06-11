@@ -10,13 +10,21 @@ try {
   // no-op: expo-notifications is optional or missing
 }
 
-function navigateFromNotifData(data: { type?: string; unreadChat?: number } | undefined, router: ReturnType<typeof useRouter>) {
+function navigateFromNotifData(data: { type?: string; unreadChat?: number; routeId?: string } | undefined, router: ReturnType<typeof useRouter>) {
   if (data?.type === "weekly_recap") {
     router.push("/recap");
     return;
   }
   if (data?.type === "match") {
     router.push("/(tabs)/match");
+    return;
+  }
+  if (data?.type === "planned_route_invite") {
+    if (data?.routeId) {
+      router.push(`/giri/${data.routeId}` as never);
+    } else {
+      router.push("/(tabs)/giri");
+    }
     return;
   }
   if (data?.type !== "background_badge") return;

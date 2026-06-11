@@ -1,5 +1,5 @@
 import { db } from "./db";
-import { users, userProfiles, appSettings } from "@shared/db";
+import { users, userProfiles, appSettings, matchPreferences } from "@shared/db";
 import { inArray, eq } from "drizzle-orm";
 import it from "../lib/i18n/it";
 
@@ -428,5 +428,102 @@ export async function sendDrivingStyleChangePushNotification(
   }
 }
 
+
+/**
+ * Sends a push notification to bikers suggested as companions for a planned route.
+ * Returns the list of userIds for which the push was successfully transported to Expo
+ * (HTTP 2xx response). Callers use this list to update notifiedAt and budget counts.
+ *
+ * Enforces two preference layers:
+ *  1. userProfiles.notificationPreferences.matches (master push category toggle)
+ *  2. matchPreferences.plannedRouteInvite (route-invite-specific toggle)
+ *
+ * The HTTP send is done inline (not via sendExpoMessages) so that transport failures
+ * propagate and the caller never marks notifiedAt for unsent messages.
+ */
+export async function sendPlannedRouteInvitePushNotifications(
+  userIds: string[],
+  opts: { routeId: string },
+): Promise<string[]> {
+  if (!userIds.length) return [];
+  try {
+    // Layer 1: master push + category preference
+    const afterMatchesPref = await filterUserIdsByPreference(userIds, "matches");
+    if (!afterMatchesPref.length) return [];
+
+    // Layer 2: planned_route_invite toggle in match_preferences
+    const prefRows = await db
+      .select({ userId: matchPreferences.userId, allowed: matchPreferences.plannedRouteInvite })
+      .from(matchPreferences)
+      .where(inArray(matchPreferences.userId, afterMatchesPref));
+    const allowMap = new Map<string, boolean>();
+    for (const r of prefRows) allowMap.set(r.userId, r.allowed);
+    // Users with no row default to allowed (column default = true)
+    const filteredIds = afterMatchesPref.filter((id) => allowMap.get(id) !== false);
+    if (!filteredIds.length) return [];
+
+    const rows = await db
+      .select({ id: users.id, expoPushToken: users.expoPushToken })
+      .from(users)
+      .where(inArray(users.id, filteredIds));
+
+    const userIdByToken = new Map<string, string>();
+    const messages: ExpoPushMessage[] = [];
+    const candidateUserIds: string[] = [];
+
+    for (const row of rows) {
+      if (row.expoPushToken && isValidExpoPushToken(row.expoPushToken)) {
+        userIdByToken.set(row.expoPushToken, row.id);
+        candidateUserIds.push(row.id);
+        messages.push({
+          to: row.expoPushToken,
+          title: it["push.plannedRouteInvite.title"] ?? "Sei stato proposto per un giro! 🏍️",
+          body: it["push.plannedRouteInvite.body"] ?? "Un percorso compatibile con il tuo stile ti aspetta — apri BikerLink",
+          sound: "default" as const,
+          data: { type: "planned_route_invite", routeId: opts.routeId },
+          channelId: "matches",
+        });
+      }
+    }
+
+    if (messages.length === 0) return [];
+
+    // Inline HTTP send — intentionally NOT using sendExpoMessages() so that
+    // transport failures throw and the caller skips notifiedAt / budget updates.
+    const resp = await fetch(EXPO_PUSH_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify(messages),
+    });
+    if (!resp.ok) {
+      console.warn("[Push] plannedRouteInvite Expo push HTTP error:", resp.status);
+      return [];
+    }
+
+    // Parse per-message tickets; clear stale tokens on DeviceNotRegistered
+    const result = await resp.json() as { data?: ExpoPushTicket[] };
+    const tickets = result.data ?? [];
+    const sentUserIds: string[] = [];
+    for (let i = 0; i < tickets.length; i++) {
+      const ticket = tickets[i];
+      if (ticket.status === "error" && ticket.details?.error === "DeviceNotRegistered") {
+        const token = messages[i]?.to;
+        if (token) {
+          const uid = userIdByToken.get(token);
+          if (uid) clearStaleToken(uid);
+        }
+      } else {
+        // ok or other error: still count as attempted — Expo accepted the message
+        const uid = userIdByToken.get(messages[i]?.to ?? "");
+        if (uid) sentUserIds.push(uid);
+      }
+    }
+    // Fallback: if Expo returned no tickets, treat candidateUserIds as sent
+    return sentUserIds.length > 0 ? sentUserIds : candidateUserIds;
+  } catch (err) {
+    console.warn("[Push] sendPlannedRouteInvitePushNotifications error (non-fatal):", err);
+    return [];
+  }
+}
 
 export { sendModeratorReportPush, sendGpsRejectionAlertToAdmins, sendSystemAlertPushToAdmins, sendOtaPendingApprovalPushToAdmins, sendAdminGpsAlertPush } from './push-notifications-admin';

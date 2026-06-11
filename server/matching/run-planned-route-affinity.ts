@@ -28,6 +28,8 @@ import { loadMatchingDisabledSet } from "./filters";
 import { and, eq, sql, gte, inArray, isNotNull } from "drizzle-orm";
 import type { CellMap } from "./route-fingerprint";
 import ngeohash from "ngeohash";
+import { sendPlannedRouteInvitePushNotifications } from "../push-notifications";
+import { getDailyBudget, getIndividualPushCount, incrementIndividualPushCount } from "./notifications/budget";
 
 const MIN_CELLS_ROUTE = 5;
 const MIN_GEO_OVERLAP = 0.15;
@@ -184,6 +186,11 @@ export async function runPlannedRouteAffinity(): Promise<PlannedRouteAffinityRes
 
     candidates.sort((a, b) => b.score - a.score);
     const top = candidates.slice(0, TOP_K_PER_ROUTE);
+
+    // Track newly created invites for push dispatch
+    type NewInvite = { id: string; suggestedUserId: string };
+    const newInvites: NewInvite[] = [];
+
     for (const c of top) {
       const priority = c.score >= 0.55 ? "high" : "normal";
       try {
@@ -200,12 +207,70 @@ export async function runPlannedRouteAffinity(): Promise<PlannedRouteAffinityRes
           })
           .onConflictDoNothing()
           .returning({ id: plannedRouteInvites.id });
-        if (inserted.length > 0) invitesCreated++;
+        if (inserted.length > 0) {
+          invitesCreated++;
+          newInvites.push({ id: inserted[0].id, suggestedUserId: c.userId });
+        }
       } catch (err) {
         errors++;
         console.error("[plannedRouteAffinity] insert error:", err instanceof Error ? err.message : err);
       }
     }
+
+    // Dispatch push notifications for newly created invites (budget-aware).
+    // plannedRouteInvite preference is already enforced at candidate selection
+    // (line above: allowMap.get(fp.userId) === false → skip) and re-checked
+    // inside sendPlannedRouteInvitePushNotifications for defense-in-depth.
+    if (newInvites.length > 0) {
+      try {
+        const budget = await getDailyBudget();
+
+        // Build per-invite budget map: userId → inviteId (for budgeted users only)
+        const budgetEligibleUserIds: string[] = [];
+        const inviteByUserId = new Map<string, string>();
+        for (const inv of newInvites) {
+          // Defense-in-depth: re-check plannedRouteInvite toggle at dispatch
+          if (allowMap.get(inv.suggestedUserId) === false) continue;
+          const used = await getIndividualPushCount(inv.suggestedUserId);
+          if (used < budget) {
+            budgetEligibleUserIds.push(inv.suggestedUserId);
+            inviteByUserId.set(inv.suggestedUserId, inv.id);
+          }
+        }
+
+        if (budgetEligibleUserIds.length > 0) {
+          // Push function returns only users that actually had a message enqueued
+          // (valid token + preferences passed). Budget and notifiedAt are updated
+          // only for this confirmed subset.
+          const actuallySentUserIds = await sendPlannedRouteInvitePushNotifications(
+            budgetEligibleUserIds,
+            { routeId: route.id },
+          );
+
+          if (actuallySentUserIds.length > 0) {
+            const sentInviteIds = actuallySentUserIds
+              .map((uid) => inviteByUserId.get(uid))
+              .filter((id): id is string => id !== undefined);
+
+            // Increment budget only for users that received the push
+            for (const uid of actuallySentUserIds) {
+              await incrementIndividualPushCount(uid, 1);
+            }
+
+            // Update notifiedAt to prevent duplicate notifications
+            if (sentInviteIds.length > 0) {
+              await db
+                .update(plannedRouteInvites)
+                .set({ notifiedAt: new Date() })
+                .where(inArray(plannedRouteInvites.id, sentInviteIds));
+            }
+          }
+        }
+      } catch (err) {
+        console.warn("[plannedRouteAffinity] push dispatch error (non-fatal):", err instanceof Error ? err.message : err);
+      }
+    }
+
     processed++;
   }
 
