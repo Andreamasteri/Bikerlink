@@ -67,11 +67,29 @@ fi
 
 log_info "EAS_TOKEN: ${#EAS_TOKEN} chars — OK"
 
-# ── 3. Calcola numero OTA (informativo) ─────────────────────────────────────
-TOTAL_OTA_COUNT=$(psql "$DATABASE_URL" -tAc "
-  SELECT COUNT(*) FROM ota_releases
-" 2>/dev/null || echo "0")
-NEXT_OTA=$(( TOTAL_OTA_COUNT + 1 ))
+# ── 3. Calcola numero OTA da ultima ota_version in DB ───────────────────────
+LAST_OTA_NUMBER=$(psql "$DATABASE_URL" -tAc "
+  SELECT COALESCE(
+    (SELECT CAST(SPLIT_PART(ota_version, '.', 3) AS INTEGER)
+     FROM ota_releases
+     ORDER BY published_at DESC, id DESC
+     LIMIT 1),
+    0
+  )
+" 2>/dev/null | tr -d '[:space:]' || echo "0")
+
+# Fallback se la query restituisce stringa vuota o non numerica
+if ! [[ "$LAST_OTA_NUMBER" =~ ^[0-9]+$ ]]; then
+  LAST_OTA_NUMBER=0
+fi
+
+if [[ "$LAST_OTA_NUMBER" -eq 0 ]]; then
+  log_info "DB vuoto → NEXT=1"
+else
+  log_info "OTA number da DB: ${LAST_OTA_NUMBER} → NEXT=$(( LAST_OTA_NUMBER + 1 ))"
+fi
+NEXT_OTA=$(( LAST_OTA_NUMBER + 1 ))
+
 BUILD_NUM=$(node -e "const a=require('./app.json'); console.log(a.expo.android.versionCode || 53)" 2>/dev/null || echo "53")
 RUNTIME_FULL=$(node -e "const a=require('./app.json'); console.log(a.expo.runtimeVersion||'10.0.0')" 2>/dev/null || echo "10.0.0")
 RUNTIME_VER=$(echo "$RUNTIME_FULL" | cut -d. -f1)
@@ -79,6 +97,18 @@ RUNTIME_VER=$(echo "$RUNTIME_FULL" | cut -d. -f1)
 VERSION="${BUILD_NUM}.${RUNTIME_VER}.${NEXT_OTA}"
 
 log_info "Build: ${BUILD_NUM} | NEXT_OTA: ${NEXT_OTA} | Versione: ${VERSION}"
+
+# ── 3c. Guard pre-EAS: blocca se VERSION esiste già in ota_releases ──────────
+EXISTING_VERSION=$(psql "$DATABASE_URL" -tAc "
+  SELECT ota_version FROM ota_releases WHERE ota_version = '${VERSION}' LIMIT 1
+" 2>/dev/null | tr -d '[:space:]' || true)
+
+if [[ -n "$EXISTING_VERSION" ]]; then
+  log_error "DUPLICATO RILEVATO: ota_version '${VERSION}' esiste già in ota_releases — pubblicazione annullata."
+  log_error "Verifica il DB (SELECT ota_version, published_at FROM ota_releases ORDER BY id DESC LIMIT 5) e correggi prima di ripubblicare."
+  exit 1
+fi
+log_info "Guard versione OK: '${VERSION}' non presente in DB — procedo."
 
 # Prefisso OTA nel messaggio EAS — consente al server prod di estrarre la versione via sync
 EAS_MESSAGE="[OTA:${VERSION}] ${MESSAGE}"
