@@ -68,6 +68,16 @@ fi
 log_info "EAS_TOKEN: ${#EAS_TOKEN} chars — OK"
 
 # ── 3. Calcola numero OTA da ultima ota_version in DB ───────────────────────
+LAST_OTA_VERSION=$(psql "$DATABASE_URL" -tAc "
+  SELECT COALESCE(
+    (SELECT ota_version
+     FROM ota_releases
+     ORDER BY published_at DESC, id DESC
+     LIMIT 1),
+    ''
+  )
+" 2>/dev/null | tr -d '[:space:]' || echo "")
+
 LAST_OTA_NUMBER=$(psql "$DATABASE_URL" -tAc "
   SELECT COALESCE(
     (SELECT CAST(SPLIT_PART(ota_version, '.', 3) AS INTEGER)
@@ -83,10 +93,12 @@ if ! [[ "$LAST_OTA_NUMBER" =~ ^[0-9]+$ ]]; then
   LAST_OTA_NUMBER=0
 fi
 
-if [[ "$LAST_OTA_NUMBER" -eq 0 ]]; then
+if [[ "$LAST_OTA_NUMBER" -eq 0 && -z "$LAST_OTA_VERSION" ]]; then
   log_info "DB vuoto → NEXT=1"
+elif [[ "$LAST_OTA_NUMBER" -eq 0 ]]; then
+  log_info "Ultima OTA in DB: '${LAST_OTA_VERSION}' → numero estratto non valido (parse fallito) → NEXT=1"
 else
-  log_info "OTA number da DB: ${LAST_OTA_NUMBER} → NEXT=$(( LAST_OTA_NUMBER + 1 ))"
+  log_info "Ultima OTA in DB: '${LAST_OTA_VERSION}' → numero estratto: ${LAST_OTA_NUMBER} → NEXT=$(( LAST_OTA_NUMBER + 1 ))"
 fi
 NEXT_OTA=$(( LAST_OTA_NUMBER + 1 ))
 
