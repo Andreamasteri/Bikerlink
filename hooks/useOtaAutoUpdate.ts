@@ -5,7 +5,8 @@ import * as Device from "expo-device";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { getApiUrl, authFetchHeaders } from "@/lib/query-client";
 
-const DEVICE_ID_KEY = "@bikerlink/ota_device_id";
+const DEVICE_ID_KEY = "bikerlink:ota:device-id:v1";
+const DEVICE_ID_LEGACY_KEY = "@bikerlink/ota_device_id";
 const PENDING_RELEASE_KEY = "@bikerlink/ota_pending_release_id";
 const BOOT_SUCCESS_DELAY_MS = 8000;
 
@@ -13,6 +14,13 @@ async function getOrCreateDeviceId(): Promise<string> {
   try {
     const existing = await AsyncStorage.getItem(DEVICE_ID_KEY);
     if (existing) return existing;
+    // Migration one-shot: vecchia chiave → nuova chiave
+    const legacy = await AsyncStorage.getItem(DEVICE_ID_LEGACY_KEY);
+    if (legacy) {
+      await AsyncStorage.setItem(DEVICE_ID_KEY, legacy);
+      await AsyncStorage.removeItem(DEVICE_ID_LEGACY_KEY);
+      return legacy;
+    }
     // Note: non usare il pacchetto uuid (crash iOS/Android) — Date.now() + random è sufficiente per device-id.
     const fresh = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 11)}-${Math.random().toString(36).slice(2, 11)}`;
     await AsyncStorage.setItem(DEVICE_ID_KEY, fresh);

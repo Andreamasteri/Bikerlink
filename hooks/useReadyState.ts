@@ -62,6 +62,21 @@ export function useReadyState() {
     };
   }, []);
 
+  // Migration one-shot: vecchia chiave "user_ghost_mode" → "@bikerlink/ghost_mode_active"
+  useEffect(() => {
+    (async () => {
+      try {
+        const legacy = await AsyncStorage.getItem("user_ghost_mode");
+        if (legacy !== null) {
+          await AsyncStorage.setItem("@bikerlink/ghost_mode_active", legacy);
+          await AsyncStorage.removeItem("user_ghost_mode");
+        }
+      } catch {
+        // no-op: migration fallita, la chiave legacy verrà ignorata
+      }
+    })();
+  }, []);
+
   useEffect(() => {
     let cancelled = false;
     async function initLocation() {
@@ -187,7 +202,7 @@ export function useReadyState() {
     onSuccess: (enabled: boolean) => {
       invalidateOnlineQueries();
       queryClient.invalidateQueries({ queryKey: ["/api/users/me"] });
-      AsyncStorage.setItem("user_ghost_mode", enabled ? "true" : "false").catch(() => {
+      AsyncStorage.setItem("@bikerlink/ghost_mode_active", enabled ? "true" : "false").catch(() => {
         // no-op: ignore storage write failures
       });
     },

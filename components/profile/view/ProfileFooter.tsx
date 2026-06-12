@@ -17,7 +17,17 @@ export const ProfileFooter: React.FC<ProfileFooterProps> = ({
   const handleClearCache = useCallback(() => {
     const doClear = async () => {
       try {
-        await AsyncStorage.clear();
+        const allKeys = await AsyncStorage.getAllKeys();
+        const appKeys = ([...allKeys] as string[]).filter(
+          (k) =>
+            k.startsWith("@bikerlink/") ||
+            k.startsWith("bikerlink:") ||
+            k.startsWith("bikerlink_") ||
+            k === "user_ghost_mode"
+        );
+        if (appKeys.length > 0) {
+          await AsyncStorage.multiRemove(appKeys);
+        }
         queryClient.clear();
         Alert.alert(t("profile.cacheClearedTitle"), t("profile.cacheClearedMsg"));
       } catch {

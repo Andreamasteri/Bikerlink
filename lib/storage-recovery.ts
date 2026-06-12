@@ -20,7 +20,7 @@ const GPS_BUFFER_SEGCOUNT_KEY = "@bikerlink/gps_buffer_segcount";
 
 export async function purgeLegacyGpsBuffer(): Promise<number> {
   try {
-    const keys = await AsyncStorage.getAllKeys();
+    const keys = [...(await AsyncStorage.getAllKeys())] as string[];
     const stale = keys.filter(
       (k) => k === GPS_BUFFER_SEGCOUNT_KEY || k.startsWith(GPS_BUFFER_SEG_PREFIX)
     );

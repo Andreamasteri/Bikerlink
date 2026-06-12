@@ -316,7 +316,7 @@ export function useTelemetry(isActive: boolean, externalGps = false) {
   // Each key is removed after a successful (or definitively-failed) send attempt.
   const drainUnsentStorage = useCallback(async () => {
     try {
-      const keys = await AsyncStorage.getAllKeys();
+      const keys = [...(await AsyncStorage.getAllKeys())] as string[];
       const unsentKeys = keys.filter((k) => k.startsWith(UNSENT_PREFIX));
       for (const key of unsentKeys) {
         const raw = await AsyncStorage.getItem(key);

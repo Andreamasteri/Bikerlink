@@ -7,7 +7,7 @@ import {
   StyleSheet,
   ActivityIndicator,
 } from "react-native";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as SecureStore from "expo-secure-store";
 import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollViewCompat";
 import { useRouter } from "expo-router";
 import { useFocusEffect } from "expo-router";
@@ -37,8 +37,8 @@ export default function LoginScreen() {
   useEffect(() => {
     (async () => {
       try {
-        const savedIdentifier = await AsyncStorage.getItem(SAVED_IDENTIFIER_KEY);
-        const savedPassword = await AsyncStorage.getItem(SAVED_PASSWORD_KEY);
+        const savedIdentifier = await SecureStore.getItemAsync(SAVED_IDENTIFIER_KEY);
+        const savedPassword = await SecureStore.getItemAsync(SAVED_PASSWORD_KEY);
         if (savedIdentifier) setIdentifier(savedIdentifier);
         if (savedPassword) setPassword(savedPassword);
         if (savedIdentifier || savedPassword) setHasSavedCredentials(true);
@@ -50,8 +50,8 @@ export default function LoginScreen() {
 
   const handleForgetCredentials = async () => {
     try {
-      await AsyncStorage.removeItem(SAVED_IDENTIFIER_KEY);
-      await AsyncStorage.removeItem(SAVED_PASSWORD_KEY);
+      await SecureStore.deleteItemAsync(SAVED_IDENTIFIER_KEY);
+      await SecureStore.deleteItemAsync(SAVED_PASSWORD_KEY);
     } catch {
       // no-op: ignore storage clear errors
     }
@@ -83,8 +83,8 @@ export default function LoginScreen() {
           sendStartupBeacon("login_4_success");
           setIsSubmitting(false);
           try {
-            await AsyncStorage.setItem(SAVED_IDENTIFIER_KEY, identifier.trim());
-            await AsyncStorage.setItem(SAVED_PASSWORD_KEY, password);
+            await SecureStore.setItemAsync(SAVED_IDENTIFIER_KEY, identifier.trim());
+            await SecureStore.setItemAsync(SAVED_PASSWORD_KEY, password);
           } catch {
             // no-op: ignore credential save errors
           }
