@@ -70,6 +70,20 @@ export function registerMoreRoutes(app: Express) {
 
   app.get("/api/admin/uptime", requireAdmin, async (_req, res) => {
     const { SERVER_START_TIME, uptimeState } = await import("../uptime");
+    let crashCount24h = 0;
+    try {
+      const { appCrashLogs } = await import("@shared/db");
+      const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
+      const rows = await db
+        .select({ count: count() })
+        .from(appCrashLogs)
+        .where(
+          sql`${appCrashLogs.crashType} IN ('crash_system', 'crash_js') AND ${appCrashLogs.reportedAt} >= ${since}`
+        );
+      crashCount24h = Number(rows[0]?.count ?? 0);
+    } catch {
+      // no-op: non-critical
+    }
     res.json({
       backendStartedAt: SERVER_START_TIME,
       metroStartedAt: uptimeState.metroStartTime,
@@ -77,6 +91,7 @@ export function registerMoreRoutes(app: Express) {
       metroOnline: uptimeState.metroOnline,
       frontendStartTime: uptimeState.frontendStartTime,
       serverNow: Date.now(),
+      crashCount24h,
     });
   });
 

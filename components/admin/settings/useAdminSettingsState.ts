@@ -1,8 +1,8 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo } from "react";
 import { Alert } from "react-native";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { getApiUrl, queryClient } from "@/lib/query-client";
+import { useUptimeWidget } from "@/lib/uptime-widget-context";
 import { ThemeName } from "@/constants/colors";
 
 // Sub-hooks
@@ -46,7 +46,7 @@ export function useAdminSettingsState({ isAdmin, t, setTheme }: UseAdminSettings
   const [protectedToggle, setProtectedToggle] = useState<{ key: string; value: boolean; label: string } | null>(null);
   const [protectedPassword, setProtectedPassword] = useState("");
   const [clubInviteFeedback, setClubInviteFeedback] = useState<string | null>(null);
-  const [uptimeWidgetEnabled, setUptimeWidgetEnabled] = useState<boolean>(true);
+  const { enabled: uptimeWidgetEnabled, setEnabled: setUptimeWidgetEnabled } = useUptimeWidget();
   
   const [matchingEngineExpanded, setMatchingEngineExpanded] = useState(false);
   const [coordHistoryExpanded, setCoordHistoryExpanded] = useState(false);
@@ -69,15 +69,8 @@ export function useAdminSettingsState({ isAdmin, t, setTheme }: UseAdminSettings
   const maintenance = useAdminSettingsMaintenance(isAdmin, t);
   const systemConfig = useAdminSettingsSystemConfig(isAdmin);
 
-  useEffect(() => {
-    AsyncStorage.getItem("uptime_widget_enabled").then((val) => {
-      setUptimeWidgetEnabled(val === null ? true : val === "true");
-    });
-  }, []);
-
   const handleUptimeToggle = (val: boolean) => {
     setUptimeWidgetEnabled(val);
-    AsyncStorage.setItem("uptime_widget_enabled", val ? "true" : "false");
   };
 
   const { data: settings = [], isLoading } = useQuery<AppSetting[]>({

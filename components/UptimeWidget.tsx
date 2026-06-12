@@ -12,6 +12,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 interface UptimeData {
   backendStartedAt: number;
   serverNow: number;
+  crashCount24h: number;
 }
 
 function formatUptime(elapsedMs: number): string {
@@ -85,6 +86,8 @@ export default function UptimeWidget() {
   const bottomBase =
     84 + insets.bottom;
 
+  const crashCount = data?.crashCount24h ?? 0;
+
   return (
     <View
       style={[
@@ -99,6 +102,9 @@ export default function UptimeWidget() {
       <Text style={styles.label}>
         {"⏱ "}
         {frontendElapsed >= 0 ? formatUptime(frontendElapsed) : "00:00.0"}
+        {crashCount > 0 ? (
+          <Text style={styles.crashLabel}>{`  💥 ${crashCount}`}</Text>
+        ) : null}
       </Text>
     </View>
   );
@@ -126,5 +132,10 @@ const styles = StyleSheet.create({
     fontSize: 12,
     letterSpacing: 0.5,
     fontVariant: ["tabular-nums"],
+  },
+  crashLabel: {
+    color: "#FF6B35",
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 12,
   },
 });

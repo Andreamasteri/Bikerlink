@@ -16,6 +16,7 @@ import { UnitsProvider } from "@/lib/units-context";
 import { PlayerProvider } from "@/lib/player-context";
 import { FloatingWidgetProvider } from "@/lib/floating-widget-context";
 import { AutoTelemetryProvider } from "@/lib/auto-telemetry-context";
+import { UptimeWidgetProvider } from "@/lib/uptime-widget-context";
 import { queryClient } from "@/lib/query-client";
 import { useAuth } from "@/lib/auth-context";
 
@@ -76,13 +77,15 @@ export function RootProviders({
                       <LocationProvider>
                         <PlayerProvider>
                           <FloatingWidgetProvider>
-                            <GestureHandlerRootView style={{ flex: 1 }}>
-                              <KeyboardProvider>
-                                <AutoTelemetryProvider>
-                                  {children}
-                                </AutoTelemetryProvider>
-                              </KeyboardProvider>
-                            </GestureHandlerRootView>
+                            <UptimeWidgetProvider>
+                              <GestureHandlerRootView style={{ flex: 1 }}>
+                                <KeyboardProvider>
+                                  <AutoTelemetryProvider>
+                                    {children}
+                                  </AutoTelemetryProvider>
+                                </KeyboardProvider>
+                              </GestureHandlerRootView>
+                            </UptimeWidgetProvider>
                           </FloatingWidgetProvider>
                         </PlayerProvider>
                       </LocationProvider>

@@ -10,9 +10,8 @@ import { useUpdateCheck } from "@/hooks/useUpdateCheck";
 import AlwaysPermissionNotice from "@/components/AlwaysPermissionNotice";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Updates from "expo-updates";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-
 import { useAuth } from "@/lib/auth-context";
+import { useUptimeWidget } from "@/lib/uptime-widget-context";
 
 import { useLocationGate } from "@/lib/location-context";
 import { useLanguage } from "@/lib/language-context";
@@ -159,20 +158,7 @@ function OtaPendingBanner() {
 
 function AdminUptimeOverlay() {
   const { user } = useAuth();
-  const [enabled, setEnabled] = useState<boolean>(false);
-
-  useEffect(() => {
-    if (user?.role !== "admin") return;
-    AsyncStorage.getItem("uptime_widget_enabled").then((val) => {
-      setEnabled(val === null ? true : val === "true");
-    });
-    const id = setInterval(() => {
-      AsyncStorage.getItem("uptime_widget_enabled").then((val) => {
-        setEnabled(val === null ? true : val === "true");
-      });
-    }, 2000);
-    return () => clearInterval(id);
-  }, [user]);
+  const { enabled } = useUptimeWidget();
 
   if (user?.role !== "admin" || !enabled) return null;
   return <UptimeWidget />;
