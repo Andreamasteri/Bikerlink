@@ -65,11 +65,14 @@ export interface IntegrityCheck {
 }
 
 // Schema Zod per output AI explainer (validato runtime).
+// NOTA: sql usa .nullable() (non .optional()) per compatibilità con OpenAI/Gemini
+// strict json_schema mode — tutti i campi devono essere in "required". Il consumer
+// usa if (value.sql) che gestisce correttamente sia null che undefined.
 export const aiExplainSchema = z.object({
   rootCause: z.string().min(1).max(800),
   blastRadius: z.string().min(1).max(500),
   proposedFix: z.enum(["sql", "script", "manual"]),
-  sql: z.string().max(4000).optional(),
+  sql: z.string().max(4000).nullable(),
   reasoning: z.string().min(1).max(2000),
   risk: z.enum(["low", "medium", "high"]),
 });

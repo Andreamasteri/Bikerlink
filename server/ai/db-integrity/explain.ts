@@ -84,8 +84,8 @@ function buildPrompt(p: {
     "```",
     "",
     "## Output richiesto",
-    "Compila i campi dello schema. Il campo `sql` può contenere un singolo statement UPDATE/DELETE con WHERE esplicito,",
-    "oppure essere omesso se la riparazione richiede uno script di codice o intervento manuale.",
+    "Compila i campi dello schema. Il campo `sql` deve contenere un singolo statement UPDATE/DELETE con WHERE esplicito",
+    "quando proposedFix è 'sql'. Imposta sql: null (non omettere il campo) se la riparazione richiede uno script di codice o intervento manuale.",
     "MAI usare DROP, TRUNCATE, ALTER, CREATE, GRANT, REVOKE — verranno rifiutati dalla safety guard.",
     "MAI eseguire UPDATE/DELETE senza WHERE.",
   ].filter(Boolean).join("\n");

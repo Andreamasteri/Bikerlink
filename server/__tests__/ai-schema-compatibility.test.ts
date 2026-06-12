@@ -214,3 +214,34 @@ describe("Schemi AI aggiuntivi — nessun propertyNames né unknown (compatibili
     });
   }
 });
+
+// ---------------------------------------------------------------------------
+// Test Suite 4 — aiExplainSchema (db-integrity): sql deve essere nullable, non optional
+// Regressione: .optional() rimuove il campo da "required" → rifiutato da OpenAI strict mode.
+// ---------------------------------------------------------------------------
+
+describe("aiExplainSchema (db-integrity) — sql nullable per OpenAI strict mode", () => {
+  it("il campo sql è presente nella lista 'required' del JSON Schema serializzato", () => {
+    const jsonSchema = z.toJSONSchema(aiExplainSchema) as { required?: string[] };
+    expect(jsonSchema.required).toBeDefined();
+    expect(jsonSchema.required).toContain("sql");
+  });
+
+  it("il campo sql accetta null (non è solo z.string())", () => {
+    const result = aiExplainSchema.safeParse({
+      rootCause: "test", blastRadius: "nessuno",
+      proposedFix: "manual", sql: null,
+      reasoning: "test", risk: "low",
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("il campo sql accetta una stringa SQL valida", () => {
+    const result = aiExplainSchema.safeParse({
+      rootCause: "test", blastRadius: "nessuno",
+      proposedFix: "sql", sql: "DELETE FROM foo WHERE id = 1",
+      reasoning: "test", risk: "low",
+    });
+    expect(result.success).toBe(true);
+  });
+});
