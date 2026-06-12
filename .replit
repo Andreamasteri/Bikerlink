@@ -65,6 +65,10 @@ args = "schema-drift"
 task = "workflow.run"
 args = "migration-prefix-check"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "lint"
+
 [[workflows.workflow]]
 name = "Start App"
 mode = "parallel"
@@ -116,12 +120,12 @@ outputType = "console"
 name = "typecheck"
 author = "agent"
 
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "bash scripts/typecheck.sh"
-
 [workflows.workflow.metadata]
 isValidation = true
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "npx tsc --noEmit -p tsconfig.client.json && npx tsc --noEmit -p server/tsconfig.json"
 
 [[workflows.workflow]]
 name = "typecheck-client"
@@ -178,6 +182,17 @@ args = "npx tsx server/scripts/check-migration-prefix-duplicates.ts"
 
 [workflows.workflow.metadata]
 outputType = "console"
+
+[[workflows.workflow]]
+name = "lint"
+author = "agent"
+
+[workflows.workflow.metadata]
+isValidation = true
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "npm run lint -- --max-warnings=0"
 
 [objectStorage]
 defaultBucketID = "replit-objstore-ca2daf22-cabb-4140-a095-7b5a6f1afcde"
