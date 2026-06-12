@@ -17,7 +17,7 @@ import { useQuery } from "@tanstack/react-query";
 import Colors from "@/constants/colors";
 import { useAuth } from "@/lib/auth-context";
 import { useLanguage } from "@/lib/language-context";
-import { apiRequest, getApiUrl, queryClient } from "@/lib/query-client";
+import { getApiUrl, queryClient } from "@/lib/query-client";
 import { findCountryByRegion } from "@/lib/countries-regions";
 import { showImagePickerMenu, appendFileToForm } from "@/lib/image-picker-utils";
 import { useT } from "@/lib/language-context";

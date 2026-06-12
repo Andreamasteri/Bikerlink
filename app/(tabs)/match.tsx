@@ -10,7 +10,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { InlineMiniPlayer } from "@/components/MiniPlayer";
 import { useColors } from "@/hooks/useColors";
-import { queryClient, apiRequest, ServerBusyError } from "@/lib/query-client";
+import { queryClient, apiRequest } from "@/lib/query-client";
 import { useAuth } from "@/lib/auth-context";
 import { useT, useLocale } from "@/lib/language-context";
 

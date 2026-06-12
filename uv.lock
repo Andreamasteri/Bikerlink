@@ -4810,7 +4810,7 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "browser-use", specifier = ">=0.11.13" },
-    { name = "detect-secrets", specifier = ">=1.5.0" },
+    { name = "detect-secrets", specifier = "==1.5.0" },
     { name = "pillow", specifier = ">=12.2.0" },
     { name = "reportlab", specifier = ">=4.5.1" },
     { name = "yt-dlp", specifier = ">=2026.3.17" },

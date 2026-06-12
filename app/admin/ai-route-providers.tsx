@@ -12,7 +12,7 @@
  */
 import React, { useState, useEffect, useCallback } from "react";
 import {
-  ScrollView, View, Text, StyleSheet, TouchableOpacity,
+  ScrollView, View, Text, TouchableOpacity,
   Alert, ActivityIndicator, Platform,
 } from "react-native";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -22,7 +22,7 @@ import { apiRequest, queryClient } from "@/lib/query-client";
 import Colors from "@/constants/colors";
 
 import {
-  RouteProviderId, ProviderStatus, StatusResp, PingResult, PingState,
+  RouteProviderId, StatusResp, PingResult,
   ProviderPing, ProviderStat, PROVIDER_ICONS, PROVIDER_COLORS, PROVIDER_DESC,
   ALL_PROVIDERS,
 } from './ai-route-providers.constants';
