@@ -28,7 +28,7 @@ import { otaAssistantRuns, otaWatchdogReports } from "@shared/db";
 import { eq, desc, and, gte, sql, or, like } from "drizzle-orm";
 import { sendError } from "../../lib/api-response";
 import { generateText, tool } from "ai";
-import { runWithFallback, hasAnyAiProvider, AI_NO_PROVIDER_MESSAGE, tryBuildOllama } from "../../ai/moderation/provider";
+import { runWithFallback, hasAnyAiProvider, AI_NO_PROVIDER_MESSAGE } from "../../ai/moderation/provider";
 import type { AiProviderId } from "../../ai/moderation/types";
 import { z } from "zod";
 import {
@@ -144,59 +144,22 @@ router.post("/", async (req: Request, res: Response) => {
   } as const;
 
   try {
-    // Task #3870 — Ollama (ThinkCentre) è ora il primo tentativo: illimitato e locale,
-    // non brucia quote cloud. Se non risponde (ThinkCentre spento o OLLAMA_URL assente),
-    // scende a Groq → Gemini → OpenAI via runWithFallback (senza ollamaBackstop, per
-    // evitare di riprovare Ollama dopo che ha già fallito in testa alla chain).
+    // runWithFallback è Ollama-first per default (Task #3872): Ollama locale → Groq → Gemini → OpenAI.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    let result: any;
-    let usedModel: { providerName: string; modelId: string };
-
-    const ollamaModel = tryBuildOllama();
-    if (ollamaModel) {
-      try {
-        result = await ollamaModel.scheduler(() => generateText({
-          model: ollamaModel.model,
-          temperature: TEMPERATURE,
-          system: systemPrompt,
-          prompt: parsed.data.prompt,
-          tools: tools as never,
-          stopWhen: ({ steps }) => steps.length >= 5,
-        }));
-        usedModel = ollamaModel;
-      } catch (ollamaErr) {
-        console.warn(`[ota-assistant] ollama fallito, scendo ai provider cloud:`, (ollamaErr as Error).message);
-        const fallback = await runWithFallback(
-          { role: "brain", preferredProvider: PREFERRED_PROVIDER, ollamaBackstop: false },
-          (m) => m.scheduler(() => generateText({
-            model: m.model,
-            temperature: TEMPERATURE,
-            system: systemPrompt,
-            prompt: parsed.data.prompt,
-            tools: tools as never,
-            stopWhen: ({ steps }) => steps.length >= 5,
-          })),
-        );
-        result = fallback.value;
-        usedModel = fallback.model;
-      }
-    } else {
-      const fallback = await runWithFallback(
-        { role: "brain", preferredProvider: PREFERRED_PROVIDER, ollamaBackstop: false },
-        (m) => m.scheduler(() => generateText({
-          model: m.model,
-          temperature: TEMPERATURE,
-          system: systemPrompt,
-          prompt: parsed.data.prompt,
-          tools: tools as never,
-          stopWhen: ({ steps }) => steps.length >= 5,
-        })),
-      );
-      result = fallback.value;
-      usedModel = fallback.model;
-    }
-    const provider = usedModel.providerName;
-    const modelId = usedModel.modelId;
+    const fallback = await runWithFallback(
+      { role: "brain", preferredProvider: PREFERRED_PROVIDER },
+      (m) => m.scheduler(() => generateText({
+        model: m.model,
+        temperature: TEMPERATURE,
+        system: systemPrompt,
+        prompt: parsed.data.prompt,
+        tools: tools as never,
+        stopWhen: ({ steps }) => steps.length >= 5,
+      })),
+    );
+    const result = fallback.value;
+    const provider = fallback.model.providerName;
+    const modelId = fallback.model.modelId;
     console.log(`[ota-assistant] risposta generata da ${provider}/${modelId}`);
 
     // Estrai eventuali proposte di mutazione dai tool results

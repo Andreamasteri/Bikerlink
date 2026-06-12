@@ -62,7 +62,7 @@ export async function runAgent(opts: AgentRunOpts): Promise<AgentRunResult> {
 
   try {
     const { model } = await runWithFallback(
-      { role: "brain", ollamaBackstop: true },
+      { role: "brain" },
       async (m: ResolvedModel) => {
         const result = streamText({
           model: m.model,
