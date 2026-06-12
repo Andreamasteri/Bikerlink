@@ -1,24 +1,46 @@
 // Task #2641 — Drawer compatto del FAB: input + ultimi 5 messaggi + link console.
-import React, { useState, useEffect } from "react";
+// Task #3894 — Aggiunto tab "Raccolta Bug" con lista errori consolidata.
+import React, { useState, useEffect, useCallback } from "react";
 import {
   Modal, View, Text, StyleSheet, TouchableOpacity, TextInput,
-  useWindowDimensions,
+  ScrollView, useWindowDimensions,
 } from "react-native";
 import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
+import * as Clipboard from "expo-clipboard";
 import { useColors } from "@/hooks/useColors";
 import { useAiConsole } from "@/hooks/admin/ai-console/useAiConsole";
 import {
   useAiConversations,
   useAiConversationMessages,
 } from "@/hooks/admin/ai-console/useAiConversation";
+import { useBugReport, formatBugReportClipboard, type BugItem } from "@/hooks/admin/ai-console/useBugReport";
 import MessageItem from "./MessageItem";
 
 interface Props {
   visible: boolean;
   onClose: () => void;
+}
+
+type Tab = "console" | "bugs";
+
+function severityColor(severity: string, colors: ReturnType<typeof useColors>): string {
+  return severity === "critical" ? (colors.error ?? "#E53E3E") : (colors.warning ?? "#FFB300");
+}
+
+function sourceIcon(source: BugItem["source"]): string {
+  if (source === "crash") return "nuclear-outline";
+  if (source === "signal") return "pulse-outline";
+  return "eye-outline";
+}
+
+function fmtDate(iso: string): string {
+  return new Date(iso).toLocaleString("it-IT", {
+    day: "2-digit", month: "2-digit",
+    hour: "2-digit", minute: "2-digit",
+  });
 }
 
 export default function FabDrawer({ visible, onClose }: Props) {
@@ -27,14 +49,24 @@ export default function FabDrawer({ visible, onClose }: Props) {
   const { height: windowHeight } = useWindowDimensions();
   const sheetHeight = windowHeight * 0.75;
   const router = useRouter();
+  const [activeTab, setActiveTab] = useState<Tab>("console");
   const [input, setInput] = useState("");
+  const [copied, setCopied] = useState(false);
+
   const { data: convs } = useAiConversations();
   const lastId = convs?.conversations?.[0]?.id ?? null;
   const [activeId, setActiveId] = useState<string | null>(null);
 
+  const { query: bugQuery, markSeen } = useBugReport();
+  const bugItems = bugQuery.data?.items ?? [];
+
   useEffect(() => {
     if (visible) setActiveId(lastId);
   }, [visible, lastId]);
+
+  useEffect(() => {
+    if (visible && activeTab === "bugs") markSeen();
+  }, [visible, activeTab, markSeen]);
 
   const { data: thread } = useAiConversationMessages(activeId);
   const { state, send } = useAiConsole(activeId, (id) => setActiveId(id));
@@ -45,6 +77,22 @@ export default function FabDrawer({ visible, onClose }: Props) {
     onClose();
     router.push("/admin/ai-console" as never);
   };
+
+  const handleCopy = useCallback(async () => {
+    const text = formatBugReportClipboard(bugItems);
+    await Clipboard.setStringAsync(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }, [bugItems]);
+
+  const handleSendToConsole = useCallback(() => {
+    if (bugItems.length === 0) return;
+    const lines = bugItems.slice(0, 8).map(
+      (i) => `• [${i.source.toUpperCase()}] ${i.title}: ${i.message}`,
+    ).join("\n");
+    setInput(`Analizza questi errori recenti di BikerLink:\n\n${lines}\n\nCosa consigli?`);
+    setActiveTab("console");
+  }, [bugItems]);
 
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
@@ -62,59 +110,135 @@ export default function FabDrawer({ visible, onClose }: Props) {
             },
           ]}
         >
+          {/* Header */}
           <View style={[styles.header, { borderColor: colors.border }]}>
-            <Ionicons name="sparkles" size={16} color={colors.accent} />
-            <Text style={[styles.title, { color: colors.text }]}>AI Console</Text>
-            <TouchableOpacity onPress={openFull} style={styles.openBtn}>
-              <Text style={[styles.openTxt, { color: colors.accent }]}>Apri completa</Text>
-              <Ionicons name="open-outline" size={14} color={colors.accent} />
-            </TouchableOpacity>
+            <Ionicons name={activeTab === "bugs" ? "bug" : "sparkles"} size={16} color={colors.accent} />
+            <View style={[styles.tabs, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+              <TouchableOpacity
+                onPress={() => setActiveTab("console")}
+                style={[styles.tab, activeTab === "console" && { backgroundColor: colors.accent }]}
+              >
+                <Text style={[styles.tabTxt, { color: activeTab === "console" ? "#fff" : colors.textSecondary }]}>
+                  AI Console
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => { setActiveTab("bugs"); markSeen(); }}
+                style={[styles.tab, activeTab === "bugs" && { backgroundColor: colors.error ?? "#E53E3E" }]}
+              >
+                <Text style={[styles.tabTxt, { color: activeTab === "bugs" ? "#fff" : colors.textSecondary }]}>
+                  🐛 Bug
+                  {bugQuery.data?.total ? ` (${bugQuery.data.total})` : ""}
+                </Text>
+              </TouchableOpacity>
+            </View>
+            {activeTab === "console" && (
+              <TouchableOpacity onPress={openFull} style={styles.openBtn}>
+                <Text style={[styles.openTxt, { color: colors.accent }]}>Apri</Text>
+                <Ionicons name="open-outline" size={14} color={colors.accent} />
+              </TouchableOpacity>
+            )}
             <TouchableOpacity onPress={onClose} accessibilityLabel="Chiudi">
               <Ionicons name="close" size={22} color={colors.text} />
             </TouchableOpacity>
           </View>
 
-          <View style={styles.thread}>
-            {recent.length === 0 && !state.streaming && !state.text ? (
-              <Text style={[styles.empty, { color: colors.textSecondary }]}>
-                Scrivi una domanda per iniziare.
-              </Text>
-            ) : (
-              recent.map((m) => <MessageItem key={m.id} message={m} />)
-            )}
-            {state.streaming || state.text ? (
-              <MessageItem
-                message={{
-                  id: "__live__", conversationId: activeId ?? "live", role: "assistant",
-                  content: state.text || "…", scopes: state.router?.scopes ?? null,
-                  toolCalls: state.toolCalls.map((t) => ({ name: t.name, args: t.args, result: t.result })),
-                  entities: null, model: null, provider: null,
-                  tokensIn: 0, tokensOut: 0, costUsd: "0",
-                  createdAt: new Date().toISOString(),
-                }}
-              />
-            ) : null}
-          </View>
+          {/* AI Console tab */}
+          {activeTab === "console" && (
+            <>
+              <View style={styles.thread}>
+                {recent.length === 0 && !state.streaming && !state.text ? (
+                  <Text style={[styles.empty, { color: colors.textSecondary }]}>
+                    Scrivi una domanda per iniziare.
+                  </Text>
+                ) : (
+                  recent.map((m) => <MessageItem key={m.id} message={m} />)
+                )}
+                {state.streaming || state.text ? (
+                  <MessageItem
+                    message={{
+                      id: "__live__", conversationId: activeId ?? "live", role: "assistant",
+                      content: state.text || "…", scopes: state.router?.scopes ?? null,
+                      toolCalls: state.toolCalls.map((t) => ({ name: t.name, args: t.args, result: t.result })),
+                      entities: null, model: null, provider: null,
+                      tokensIn: 0, tokensOut: 0, costUsd: "0",
+                      createdAt: new Date().toISOString(),
+                    }}
+                  />
+                ) : null}
+              </View>
+              <View style={[styles.inputRow, { borderColor: colors.border, backgroundColor: colors.surface }]}>
+                <TextInput
+                  value={input}
+                  onChangeText={setInput}
+                  placeholder="Chiedi all'AI…"
+                  placeholderTextColor={colors.textSecondary}
+                  style={[styles.input, { color: colors.text, backgroundColor: colors.surfaceLight }]}
+                  editable={!state.streaming}
+                  multiline
+                />
+                <TouchableOpacity
+                  style={[styles.send, { backgroundColor: colors.accent, opacity: state.streaming || !input.trim() ? 0.5 : 1 }]}
+                  onPress={() => { const t = input; setInput(""); void send(t); }}
+                  disabled={state.streaming || !input.trim()}
+                  accessibilityLabel="Invia"
+                >
+                  <Ionicons name="send" size={16} color="#fff" />
+                </TouchableOpacity>
+              </View>
+            </>
+          )}
 
-          <View style={[styles.inputRow, { borderColor: colors.border, backgroundColor: colors.surface }]}>
-            <TextInput
-              value={input}
-              onChangeText={setInput}
-              placeholder="Chiedi all'AI…"
-              placeholderTextColor={colors.textSecondary}
-              style={[styles.input, { color: colors.text, backgroundColor: colors.surfaceLight }]}
-              editable={!state.streaming}
-              multiline
-            />
-            <TouchableOpacity
-              style={[styles.send, { backgroundColor: colors.accent, opacity: state.streaming || !input.trim() ? 0.5 : 1 }]}
-              onPress={() => { const t = input; setInput(""); void send(t); }}
-              disabled={state.streaming || !input.trim()}
-              accessibilityLabel="Invia"
-            >
-              <Ionicons name="send" size={16} color="#fff" />
-            </TouchableOpacity>
-          </View>
+          {/* Raccolta Bug tab */}
+          {activeTab === "bugs" && (
+            <View style={styles.bugContainer}>
+              <ScrollView style={styles.bugList} contentContainerStyle={styles.bugListContent}>
+                {bugQuery.isLoading ? (
+                  <Text style={[styles.empty, { color: colors.textSecondary }]}>Caricamento…</Text>
+                ) : bugItems.length === 0 ? (
+                  <Text style={[styles.empty, { color: colors.textSecondary }]}>Nessun errore recente. ✅</Text>
+                ) : bugItems.map((item) => (
+                  <View key={item.id} style={[styles.bugItem, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                    <View style={styles.bugItemHeader}>
+                      <Ionicons
+                        name={sourceIcon(item.source) as never}
+                        size={14}
+                        color={severityColor(item.severity, colors)}
+                      />
+                      <Text style={[styles.bugTitle, { color: colors.text }]} numberOfLines={1}>{item.title}</Text>
+                      <View style={[styles.severityBadge, { backgroundColor: severityColor(item.severity, colors) + "33" }]}>
+                        <Text style={[styles.severityTxt, { color: severityColor(item.severity, colors) }]}>
+                          {item.severity}
+                        </Text>
+                      </View>
+                    </View>
+                    <Text style={[styles.bugMsg, { color: colors.textSecondary }]} numberOfLines={2}>{item.message}</Text>
+                    <Text style={[styles.bugDate, { color: colors.textSecondary }]}>{fmtDate(item.createdAt)}</Text>
+                  </View>
+                ))}
+              </ScrollView>
+              <View style={[styles.bugActions, { borderColor: colors.border, backgroundColor: colors.surface }]}>
+                <TouchableOpacity
+                  style={[styles.bugBtn, { backgroundColor: copied ? (colors.success ?? "#38A169") : colors.surfaceLight, borderColor: colors.border }]}
+                  onPress={() => { void handleCopy(); }}
+                  disabled={bugItems.length === 0}
+                >
+                  <Ionicons name={copied ? "checkmark" : "copy-outline"} size={15} color={copied ? "#fff" : colors.text} />
+                  <Text style={[styles.bugBtnTxt, { color: copied ? "#fff" : colors.text }]}>
+                    {copied ? "Copiato!" : "Copia"}
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.bugBtn, { backgroundColor: colors.accent, borderColor: colors.accent }]}
+                  onPress={handleSendToConsole}
+                  disabled={bugItems.length === 0}
+                >
+                  <Ionicons name="sparkles" size={15} color="#fff" />
+                  <Text style={[styles.bugBtnTxt, { color: "#fff" }]}>Invia alla AI Console</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
         </KeyboardAvoidingView>
       </View>
     </Modal>
@@ -129,7 +253,14 @@ const styles = StyleSheet.create({
     flexDirection: "row", alignItems: "center", gap: 8,
     padding: 12, borderBottomWidth: 1,
   },
-  title: { fontFamily: "Inter_700Bold", fontSize: 14, flex: 1 },
+  tabs: {
+    flexDirection: "row", flex: 1, borderRadius: 8,
+    borderWidth: 1, overflow: "hidden",
+  },
+  tab: {
+    flex: 1, paddingVertical: 5, alignItems: "center", justifyContent: "center",
+  },
+  tabTxt: { fontFamily: "Inter_600SemiBold", fontSize: 11 },
   openBtn: { flexDirection: "row", alignItems: "center", gap: 4 },
   openTxt: { fontFamily: "Inter_500Medium", fontSize: 11 },
   thread: { flex: 1, padding: 10 },
@@ -143,4 +274,24 @@ const styles = StyleSheet.create({
     borderRadius: 18, paddingHorizontal: 12, paddingVertical: 8, maxHeight: 100,
   },
   send: { width: 36, height: 36, borderRadius: 18, alignItems: "center", justifyContent: "center" },
+  bugContainer: { flex: 1, flexDirection: "column" },
+  bugList: { flex: 1 },
+  bugListContent: { padding: 10, gap: 8 },
+  bugItem: {
+    borderRadius: 10, borderWidth: 1, padding: 10, gap: 4,
+  },
+  bugItemHeader: { flexDirection: "row", alignItems: "center", gap: 6 },
+  bugTitle: { fontFamily: "Inter_600SemiBold", fontSize: 12, flex: 1 },
+  severityBadge: { borderRadius: 4, paddingHorizontal: 5, paddingVertical: 2 },
+  severityTxt: { fontFamily: "Inter_700Bold", fontSize: 9, textTransform: "uppercase" },
+  bugMsg: { fontFamily: "Inter_400Regular", fontSize: 11, paddingLeft: 20 },
+  bugDate: { fontFamily: "Inter_400Regular", fontSize: 10, paddingLeft: 20, opacity: 0.7 },
+  bugActions: {
+    flexDirection: "row", gap: 8, padding: 10, borderTopWidth: 1,
+  },
+  bugBtn: {
+    flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center",
+    gap: 6, paddingVertical: 10, borderRadius: 10, borderWidth: 1,
+  },
+  bugBtnTxt: { fontFamily: "Inter_600SemiBold", fontSize: 12 },
 });

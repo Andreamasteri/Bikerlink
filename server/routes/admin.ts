@@ -297,6 +297,8 @@ import thinkcentreHealthRouter from './admin/thinkcentre-health';
 import thinkcentreMetricsRouter from './admin/thinkcentre-metrics';
 // Lightweight System Health probe — returns cached dot statuses updated by the heavy endpoints.
 import systemProbeRouter from './admin/system-probe';
+// Task #3894 — Raccolta bug consolidata per il FAB admin.
+import bugReportRouter from './admin/bug-report';
 
 router.post('/maps/osm-updated', async (req: Request, res: Response) => {
   try {
@@ -425,5 +427,7 @@ router.use('/', _requireAdmin, exportsRouter);
 router.use('/', _requireAdmin, whisperConfigRouter);
 router.use('/legal', _requireAdmin, legalRouter);
 router.use('/legal', _requireAdmin, legalNextRouter);
+// Task #3894 — Raccolta bug FAB.
+router.use('/', _requireAdmin, bugReportRouter);
 
 export default router;

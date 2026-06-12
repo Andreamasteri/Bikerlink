@@ -22,6 +22,7 @@ import { useColors } from "@/hooks/useColors";
 import { useAiActionQueue } from "@/hooks/admin/ai-console/useAiActionQueue";
 import { useAiAlertsState, useAiAlertsSubscriber } from "@/hooks/admin/ai-console/useAiAlerts";
 import { useExplainPending } from "@/hooks/admin/ai-console/useAiExplain";
+import { useBugReport } from "@/hooks/admin/ai-console/useBugReport";
 import FabDrawer from "./FabDrawer";
 
 import * as Haptics from "expo-haptics";
@@ -54,7 +55,8 @@ export default function FabWidget() {
   const scale = useSharedValue(1);
   const animStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
 
-  const total = (queue?.items?.length ?? 0) + alerts.unread;
+  const { unseenCount: bugUnseen } = useBugReport();
+  const total = (queue?.items?.length ?? 0) + alerts.unread + bugUnseen;
   const hasExplain = !!explain;
 
   const bottomInset = Math.max(insets.bottom, Platform.OS === "web" ? 34 : 12);
