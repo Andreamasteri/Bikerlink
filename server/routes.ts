@@ -66,6 +66,7 @@ import { registerClientSettingsRoutes } from "./routes/client-settings";
 import { registerClientSettingsExtraRoutes } from "./routes/client-settings-extra";
 import { registerMoreRoutes } from "./routes/more-routes";
 import { registerMoreRoutes2 } from "./routes/more-routes-2";
+import { registerMediaPromoRoutes } from "./routes/media-promo";
 
 async function _requireAdmin(req: Request, res: Response, next: NextFunction) {
   const session = req.session as { userId?: string };
@@ -361,95 +362,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // specifiche già registrate sopra. Vedi docs/sweep-404-2621.md sezione B.
   app.use("/api", wipStubsRouter);
 
-  app.get("/api/media/promo-video", async (_req: Request, res: Response) => {
-    try {
-      const { downloadBuffer } = await import("./objectStorage");
-      const buffer = await downloadBuffer("public/playstore/bikerlink_promo_video.mp4");
-      res.setHeader("Content-Type", "video/mp4");
-      res.setHeader("Content-Length", buffer.length);
-      res.setHeader("Content-Disposition", "inline; filename=\"bikerlink_promo_video.mp4\"");
-      res.setHeader("Cache-Control", "public, max-age=86400");
-      return res.send(buffer);
-    } catch (error) {
-      console.error("Promo video serve error:", error);
-      return res.status(404).json({ message: "Video non trovato" });
-    }
-  });
-
-  app.get("/api/media/convoy-promo", async (_req: Request, res: Response) => {
-    try {
-      const { downloadBuffer } = await import("./objectStorage");
-      const buffer = await downloadBuffer("public/playstore/bikerlink_convoy_promo_30s.mp4");
-      res.setHeader("Content-Type", "video/mp4");
-      res.setHeader("Content-Length", buffer.length);
-      res.setHeader("Content-Disposition", "inline; filename=\"bikerlink_convoy_promo_30s.mp4\"");
-      res.setHeader("Cache-Control", "public, max-age=86400");
-      return res.send(buffer);
-    } catch (error) {
-      console.error("Convoy promo video serve error:", error);
-      return res.status(404).json({ message: "Video non trovato" });
-    }
-  });
-
-  app.get("/api/media/youtube-promo", async (_req: Request, res: Response) => {
-    try {
-      const { downloadBuffer } = await import("./objectStorage");
-      const buffer = await downloadBuffer("public/playstore/bikerlink_youtube_60s.mp4");
-      res.setHeader("Content-Type", "video/mp4");
-      res.setHeader("Content-Length", buffer.length);
-      res.setHeader("Content-Disposition", "inline; filename=\"bikerlink_youtube_60s.mp4\"");
-      res.setHeader("Cache-Control", "public, max-age=86400");
-      return res.send(buffer);
-    } catch (error) {
-      console.error("YouTube promo video serve error:", error);
-      return res.status(404).json({ message: "Video non trovato" });
-    }
-  });
-
-  app.get("/api/media/harley-promo", async (_req: Request, res: Response) => {
-    try {
-      const { downloadBuffer } = await import("./objectStorage");
-      const buffer = await downloadBuffer("public/playstore/bikerlink_harley_30s.mp4");
-      res.setHeader("Content-Type", "video/mp4");
-      res.setHeader("Content-Length", buffer.length);
-      res.setHeader("Content-Disposition", "inline; filename=\"bikerlink_harley_30s.mp4\"");
-      res.setHeader("Cache-Control", "public, max-age=86400");
-      return res.send(buffer);
-    } catch (error) {
-      console.error("Harley promo video serve error:", error);
-      return res.status(404).json({ message: "Video non trovato" });
-    }
-  });
-
-  app.get("/api/media/adrenaline-promo", async (_req: Request, res: Response) => {
-    try {
-      const { downloadBuffer } = await import("./objectStorage");
-      const buffer = await downloadBuffer("public/playstore/bikerlink_adrenaline_30s.mp4");
-      res.setHeader("Content-Type", "video/mp4");
-      res.setHeader("Content-Length", buffer.length);
-      res.setHeader("Content-Disposition", "inline; filename=\"bikerlink_adrenaline_30s.mp4\"");
-      res.setHeader("Cache-Control", "public, max-age=86400");
-      return res.send(buffer);
-    } catch (error) {
-      console.error("Adrenaline promo video serve error:", error);
-      return res.status(404).json({ message: "Video non trovato" });
-    }
-  });
-
-  app.get("/api/media/solo-rider-promo", async (_req: Request, res: Response) => {
-    try {
-      const { downloadBuffer } = await import("./objectStorage");
-      const buffer = await downloadBuffer("public/playstore/bikerlink_solo_rider_17s.mp4");
-      res.setHeader("Content-Type", "video/mp4");
-      res.setHeader("Content-Length", buffer.length);
-      res.setHeader("Content-Disposition", "inline; filename=\"bikerlink_solo_rider_17s.mp4\"");
-      res.setHeader("Cache-Control", "public, max-age=86400");
-      return res.send(buffer);
-    } catch (error) {
-      console.error("Solo rider promo video serve error:", error);
-      return res.status(404).json({ message: "Video non trovato" });
-    }
-  });
+  registerMediaPromoRoutes(app);
 
   app.get("/api/favorites", async (req: Request, res: Response) => {
     if (!req.session.userId) return res.status(401).json({ message: "Non autenticato" });
