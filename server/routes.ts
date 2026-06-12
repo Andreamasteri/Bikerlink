@@ -11,6 +11,7 @@ import path from "node:path";
 import crypto from "node:crypto";
 import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
+import pg from "pg";
 import { pool } from "./db";
 import { storage } from "./storage";
 import { enforceOrigin } from "./middleware";
@@ -88,6 +89,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const PgStore = connectPgSimple(session);
   const SESSION_MAX_AGE_MS = 365 * 24 * 60 * 60 * 1000; // 1 anno
 
+  // Pool dedicato per il session store — separato dal pool principale per evitare
+  // contesa sotto carico e per poter configurare keepAlive indipendente.
+  const sessionPool = new pg.Pool({
+    connectionString: process.env.DATABASE_URL,
+    keepAlive: true,
+    idleTimeoutMillis: 60000,
+    connectionTimeoutMillis: 10000,
+    max: 3,
+  });
+  sessionPool.on("error", (err) => {
+    console.error("[session-pool] Errore connessione idle (ignorato):", err.message);
+  });
+
+  const sessionStore = new PgStore({
+    pool: sessionPool,
+    tableName: "session",
+    createTableIfMissing: true,
+    ttl: 365 * 24 * 60 * 60,
+    disableTouch: true,
+    errorLog: (err: Error) =>
+      console.error("[session-store]", err.message),
+  });
+
+  const sessionMiddleware = session({
+    store: sessionStore,
+    secret: process.env.SESSION_SECRET!,
+    resave: false,
+    saveUninitialized: false,
+    rolling: true,
+    cookie: {
+      maxAge: SESSION_MAX_AGE_MS,
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: process.env.NODE_ENV === "production" ? "lax" : (false as const),
+    },
+  });
+
   // Bridge Bearer token → cookie connect.sid (per client mobile React Native).
   app.use((req, _res, next) => {
     const authHeader = req.headers.authorization;
@@ -110,26 +148,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     next();
   });
 
-  app.use(
-    session({
-      store: new PgStore({
-        pool,
-        tableName: "session",
-        createTableIfMissing: true,
-        ttl: 365 * 24 * 60 * 60,
-      }),
-      secret: process.env.SESSION_SECRET!,
-      resave: false,
-      saveUninitialized: false,
-      rolling: true,
-      cookie: {
-        maxAge: SESSION_MAX_AGE_MS,
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: process.env.NODE_ENV === "production" ? "lax" : (false as const),
-      },
-    })
-  );
+  // Wrapper error-safe: un errore del session store viene loggato ma non
+  // interrompe la request chain — la request procede senza sessione.
+  app.use((req, res, next) => {
+    sessionMiddleware(req, res, (err) => {
+      if (err) {
+        console.error("[session-middleware] Errore non fatale, request continua senza sessione:", err.message);
+        return next();
+      }
+      next();
+    });
+  });
 
   app.use(async (req: Request, res: Response, next: NextFunction) => {
     if (req.session?.userId) {
