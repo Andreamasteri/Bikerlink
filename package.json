@@ -203,7 +203,8 @@
         "react-native-worklets",
         "react-native-webview",
         "react-native",
-        "react"
+        "react",
+        "react-native-keyboard-controller"
       ]
     },
     "doctor": {
