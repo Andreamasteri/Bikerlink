@@ -23,7 +23,7 @@ router.get("/bug-report/recent", async (_req: Request, res: Response) => {
         FROM app_crash_logs
         WHERE crash_type IN ('crash_system', 'crash_js')
         GROUP BY crash_type, COALESCE(LEFT(error_message, 200), 'no-message')
-        ORDER BY count DESC, latest_at DESC
+        ORDER BY latest_at DESC, count DESC
         LIMIT 10
       `),
 
@@ -40,7 +40,7 @@ router.get("/bug-report/recent", async (_req: Request, res: Response) => {
         FROM system_signals
         WHERE severity IN ('high', 'critical')
         GROUP BY source, metric, severity
-        ORDER BY count DESC, latest_at DESC
+        ORDER BY latest_at DESC, count DESC
         LIMIT 5
       `),
 
@@ -56,7 +56,7 @@ router.get("/bug-report/recent", async (_req: Request, res: Response) => {
         FROM ai_watchdog_log
         WHERE status = 'error'
         GROUP BY kind, scope, status
-        ORDER BY count DESC, latest_at DESC
+        ORDER BY latest_at DESC, count DESC
         LIMIT 5
       `),
     ]);
