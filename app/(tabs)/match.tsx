@@ -429,7 +429,6 @@ export default function MatchScreen() {
     },
   });
 
-  // Task #3393 — mutations per i match telemetry-affinity (stile di guida).
   const acceptTelemetryAffinityMutation = useMutation({
     mutationFn: (matchId: string) => apiRequest("POST", `/api/proposals/telemetry-affinity-matches/${matchId}/accept`),
     onMutate: async (matchId: string) => {
@@ -516,10 +515,7 @@ export default function MatchScreen() {
     mutationFn: (targetUserId: string) => apiRequest("POST", "/api/chat/conversations", { targetUserId }),
     onSuccess: (data) => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any -- API response shape
-      if ((data as any).id) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- API response shape
-        router.push(`/chat/${(data as any).id}` as never);
-      }
+      if ((data as any).id) { router.push(`/chat/${(data as any).id}` as never); }
     },
   });
 
@@ -776,8 +772,7 @@ export default function MatchScreen() {
   };
   const _emptyMeta = EMPTY_META[activeTab] ?? { icon: "flash-outline" as keyof typeof Ionicons.glyphMap, title: t("match.emptyProposalsTitle"), desc: t("match.emptyProposalsDesc") };
   const getEmptyIcon = (): keyof typeof Ionicons.glyphMap => _emptyMeta.icon;
-  const getEmptyTitle = () => _emptyMeta.title;
-  const getEmptyDesc = () => _emptyMeta.desc;
+  const getEmptyTitle = () => _emptyMeta.title; const getEmptyDesc = () => _emptyMeta.desc;
 
   const isRematching = resetAndRematchMutation.isPending;
   const isAnyRefetching = garageIsFetching || bikerIsFetching || proposalRefetching;
