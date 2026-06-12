@@ -8,6 +8,7 @@ import { messages, conversations } from "@shared/db/conversations";
 import { users } from "@shared/db/users";
 import { proposals } from "@shared/db/proposals";
 import { eq, gte, sql } from "drizzle-orm";
+import { getSessionHealthStats } from "../session-health";
 
 const router = Router();
 
@@ -280,6 +281,16 @@ router.post("/purge-fake-users", async (req: Request, res: Response) => {
     console.error("[internal/purge-fake-users] ERROR:", err);
     return res.status(500).json({ message: "Errore durante la purge" });
   }
+});
+
+router.get("/health", (_req: Request, res: Response) => {
+  const stats = getSessionHealthStats();
+  const httpStatus = stats.status === "critical" ? 503 : 200;
+  return res.status(httpStatus).json({
+    ok: stats.status !== "critical",
+    sessionStore: stats,
+    generatedAt: new Date().toISOString(),
+  });
 });
 
 export default router;

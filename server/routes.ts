@@ -67,6 +67,7 @@ import { registerClientSettingsExtraRoutes } from "./routes/client-settings-extr
 import { registerMoreRoutes } from "./routes/more-routes";
 import { registerMoreRoutes2 } from "./routes/more-routes-2";
 import { registerMediaPromoRoutes } from "./routes/media-promo";
+import { recordSessionError, recordSessionSuccess } from "./session-health";
 
 async function _requireAdmin(req: Request, res: Response, next: NextFunction) {
   const session = req.session as { userId?: string };
@@ -100,7 +101,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     max: 3,
   });
   sessionPool.on("error", (err) => {
-    console.error("[session-pool] Errore connessione idle (ignorato):", err.message);
+    recordSessionError("session-pool", err.message);
   });
 
   const sessionStore = new PgStore({
@@ -109,9 +110,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
     createTableIfMissing: true,
     ttl: 365 * 24 * 60 * 60,
     disableTouch: true,
-    errorLog: (err: Error) =>
-      console.error("[session-store]", err.message),
+    errorLog: (err: Error) => {
+      recordSessionError("session-store", err.message);
+    },
   });
+
+  // Patch store methods: success recorded only on actual DB-backed I/O.
+  // This ensures the consecutive-error counter is reset only when the session
+  // store successfully completes a real operation, not on every HTTP request.
+  const _storeGet = sessionStore.get.bind(sessionStore);
+  sessionStore.get = (sid, cb) => {
+    _storeGet(sid, (err, session) => {
+      if (!err) recordSessionSuccess();
+      cb(err, session);
+    });
+  };
+  const _storeSet = sessionStore.set.bind(sessionStore);
+  sessionStore.set = (sid, sess, cb) => {
+    _storeSet(sid, sess, (err?: Error | null) => {
+      if (!err) recordSessionSuccess();
+      if (cb) cb(err);
+    });
+  };
+  const _storeDestroy = sessionStore.destroy.bind(sessionStore);
+  sessionStore.destroy = (sid, cb) => {
+    _storeDestroy(sid, (err?: Error | null) => {
+      if (!err) recordSessionSuccess();
+      if (cb) cb(err);
+    });
+  };
 
   const sessionMiddleware = session({
     store: sessionStore,
@@ -154,7 +181,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use((req, res, next) => {
     sessionMiddleware(req, res, (err) => {
       if (err) {
-        console.error("[session-middleware] Errore non fatale, request continua senza sessione:", err.message);
+        recordSessionError("session-middleware", err.message);
         return next();
       }
       next();
