@@ -30,7 +30,7 @@ import { CrashLogStats } from "@/components/admin/crash-logs/CrashLogStats";
 
 const LIMIT = 20;
 const ALERT_THRESHOLD_KEY = "@bikerlink/crash_alert_threshold";
-const DEFAULT_THRESHOLD = 10;
+const DEFAULT_THRESHOLD = 3;
 
 function useAlertThreshold() {
   const [threshold, setThresholdState] = useState(DEFAULT_THRESHOLD);

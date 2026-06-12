@@ -6,8 +6,24 @@ import { CrashStatsResponse, DayTrend } from "./CrashLogTypes";
 
 const JS_COLOR = "#FF4444";
 const SYS_COLOR = "#FF6B35";
+const GREEN = "#22C55E";
+const YELLOW = "#F59E0B";
+const RED = "#EF4444";
 const BAR_MAX_HEIGHT = 36;
 const BAR_WIDTH = 14;
+
+function crashFreeColor(rate: number): string {
+  if (rate < 90) return RED;
+  if (rate < 95) return YELLOW;
+  return GREEN;
+}
+
+function deltaColor(delta: number): string {
+  if (delta > 100) return RED;
+  if (delta > 50) return YELLOW;
+  if (delta < 0) return GREEN;
+  return "#6B7280";
+}
 
 export function CrashLogStats({ stats }: { stats: CrashStatsResponse }) {
   const colors = useColors();
@@ -37,23 +53,75 @@ export function CrashLogStats({ stats }: { stats: CrashStatsResponse }) {
     return d.toLocaleDateString("it-IT", { day: "2-digit", month: "2-digit", timeZone: "UTC" });
   };
 
+  const crashFreeRate = stats.crashFreeRate24h;
+  const ramMedian = stats.ramMedianCrashMb;
+
+  const byVersion = stats.byVersion ?? [];
+  const currentVer = byVersion[0] ?? null;
+  const prevVer = byVersion[1] ?? null;
+  const versionDelta: number | null = (() => {
+    if (!currentVer || !prevVer || prevVer.total === 0) return null;
+    const currentRate = currentVer.total;
+    const prevRate = prevVer.total;
+    return Math.round(((currentRate - prevRate) / prevRate) * 100);
+  })();
+
   return (
     <View style={statsStyles.wrapper}>
+      {/* Crash-free rate card */}
+      {crashFreeRate !== null && (
+        <View style={[statsStyles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <View style={statsStyles.cardHeader}>
+            <MaterialCommunityIcons name="shield-check-outline" size={14} color={colors.textSecondary} />
+            <Text style={[statsStyles.cardTitle, { color: colors.textSecondary }]}>Crash-free rate (24h)</Text>
+          </View>
+          <View style={statsStyles.rateRow}>
+            <Text style={[statsStyles.rateValue, { color: crashFreeColor(crashFreeRate) }]}>
+              {crashFreeRate.toFixed(1)}%
+            </Text>
+            <View style={statsStyles.rateMetaCol}>
+              {ramMedian !== null && (
+                <View style={statsStyles.ramRow}>
+                  <MaterialCommunityIcons name="memory" size={12} color={colors.textSecondary} />
+                  <Text style={[statsStyles.ramText, { color: colors.textSecondary }]}>
+                    RAM mediana crash: {ramMedian} MB
+                  </Text>
+                </View>
+              )}
+              <View style={statsStyles.typePillRow}>
+                <View style={[statsStyles.typePill, { backgroundColor: SYS_COLOR + "22" }]}>
+                  <Text style={[statsStyles.typePillText, { color: SYS_COLOR }]}>
+                    Sis: {totalSystem}
+                  </Text>
+                </View>
+                <View style={[statsStyles.typePill, { backgroundColor: JS_COLOR + "22" }]}>
+                  <Text style={[statsStyles.typePillText, { color: JS_COLOR }]}>
+                    JS: {totalJs}
+                  </Text>
+                </View>
+              </View>
+            </View>
+          </View>
+        </View>
+      )}
+
       {/* Type summary tiles */}
-      <View style={statsStyles.tiles}>
-        <View style={[statsStyles.tile, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <Text style={[statsStyles.tileCount, { color: SYS_COLOR }]}>{totalSystem}</Text>
-          <Text style={[statsStyles.tileLabel, { color: colors.textSecondary }]}>Sistema</Text>
+      {crashFreeRate === null && (
+        <View style={statsStyles.tiles}>
+          <View style={[statsStyles.tile, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <Text style={[statsStyles.tileCount, { color: SYS_COLOR }]}>{totalSystem}</Text>
+            <Text style={[statsStyles.tileLabel, { color: colors.textSecondary }]}>Sistema</Text>
+          </View>
+          <View style={[statsStyles.tile, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <Text style={[statsStyles.tileCount, { color: JS_COLOR }]}>{totalJs}</Text>
+            <Text style={[statsStyles.tileLabel, { color: colors.textSecondary }]}>JS Error</Text>
+          </View>
+          <View style={[statsStyles.tile, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <Text style={[statsStyles.tileCount, { color: colors.text }]}>{grandTotal}</Text>
+            <Text style={[statsStyles.tileLabel, { color: colors.textSecondary }]}>Totale</Text>
+          </View>
         </View>
-        <View style={[statsStyles.tile, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <Text style={[statsStyles.tileCount, { color: JS_COLOR }]}>{totalJs}</Text>
-          <Text style={[statsStyles.tileLabel, { color: colors.textSecondary }]}>JS Error</Text>
-        </View>
-        <View style={[statsStyles.tile, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <Text style={[statsStyles.tileCount, { color: colors.text }]}>{grandTotal}</Text>
-          <Text style={[statsStyles.tileLabel, { color: colors.textSecondary }]}>Totale</Text>
-        </View>
-      </View>
+      )}
 
       {/* Daily trend mini-chart */}
       {trend.length > 0 && (
@@ -101,14 +169,32 @@ export function CrashLogStats({ stats }: { stats: CrashStatsResponse }) {
         </View>
       )}
 
-      {/* Per-version breakdown */}
-      {stats.byVersion.length > 0 && (
+      {/* Per-version breakdown + delta */}
+      {byVersion.length > 0 && (
         <View style={[statsStyles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <View style={statsStyles.cardHeader}>
             <MaterialCommunityIcons name="tag-multiple-outline" size={14} color={colors.textSecondary} />
             <Text style={[statsStyles.cardTitle, { color: colors.textSecondary }]}>Top versioni</Text>
+            {versionDelta !== null && (
+              <View style={[statsStyles.deltaPill, { backgroundColor: deltaColor(versionDelta) + "22" }]}>
+                <MaterialCommunityIcons
+                  name={versionDelta > 0 ? "trending-up" : versionDelta < 0 ? "trending-down" : "trending-neutral"}
+                  size={12}
+                  color={deltaColor(versionDelta)}
+                />
+                <Text style={[statsStyles.deltaPillText, { color: deltaColor(versionDelta) }]}>
+                  {versionDelta > 0 ? "+" : ""}{versionDelta}%
+                </Text>
+              </View>
+            )}
           </View>
-          {stats.byVersion.map((v) => {
+          {versionDelta !== null && currentVer && prevVer && (
+            <Text style={[statsStyles.deltaCaption, { color: colors.textSecondary }]}>
+              v{currentVer.version} vs v{prevVer.version}: crash totali{" "}
+              {versionDelta > 0 ? "aumentati" : versionDelta < 0 ? "diminuiti" : "stabili"}
+            </Text>
+          )}
+          {byVersion.map((v) => {
             const barTotalW = Math.max(1, grandTotal);
             const pct = Math.round((v.total / barTotalW) * 100);
             const sysPct = v.total > 0 ? Math.round((v.crash_system / v.total) * 100) : 0;
@@ -166,7 +252,16 @@ const statsStyles = StyleSheet.create({
     fontSize: 12,
     textTransform: "uppercase",
     letterSpacing: 0.5,
+    flex: 1,
   },
+  rateRow: { flexDirection: "row", alignItems: "center", gap: 16 },
+  rateValue: { fontFamily: "Inter_700Bold", fontSize: 32 },
+  rateMetaCol: { flex: 1, gap: 6 },
+  ramRow: { flexDirection: "row", alignItems: "center", gap: 4 },
+  ramText: { fontFamily: "Inter_400Regular", fontSize: 12 },
+  typePillRow: { flexDirection: "row", gap: 6 },
+  typePill: { borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 },
+  typePillText: { fontFamily: "Inter_600SemiBold", fontSize: 12 },
   chartRow: { flexDirection: "row", flexWrap: "wrap", gap: 6, alignItems: "flex-end" },
   barWrapper: { alignItems: "center", gap: 3 },
   barWrapperLast: {},
@@ -176,6 +271,16 @@ const statsStyles = StyleSheet.create({
   legendItem: { flexDirection: "row", alignItems: "center", gap: 4 },
   legendDot: { width: 8, height: 8, borderRadius: 4 },
   legendText: { fontFamily: "Inter_400Regular", fontSize: 11 },
+  deltaPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+    borderRadius: 6,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+  },
+  deltaPillText: { fontFamily: "Inter_700Bold", fontSize: 11 },
+  deltaCaption: { fontFamily: "Inter_400Regular", fontSize: 11, marginTop: -4 },
   versionRow: {
     flexDirection: "row",
     alignItems: "center",

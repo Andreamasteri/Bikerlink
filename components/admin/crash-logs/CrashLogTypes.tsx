@@ -104,6 +104,8 @@ export interface CrashStatsResponse {
   byType: { crash_system: number; crash_js: number };
   byVersion: VersionStat[];
   dailyTrend: DayTrend[];
+  crashFreeRate24h: number | null;
+  ramMedianCrashMb: number | null;
 }
 
 export function formatDate(iso: string): string {

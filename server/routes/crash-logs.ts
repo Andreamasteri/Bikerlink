@@ -157,16 +157,47 @@ adminRouter.get("/stats", requireAdmin, (_req: Request, res: Response): void => 
       GROUP BY day
       ORDER BY day ASC
     `),
+    // 4. Crash-free rate last 24h
+    db.execute(sql`
+      SELECT
+        COUNT(*) FILTER (WHERE crash_type IN ('crash_system','crash_js')) AS crash_count,
+        COUNT(*) AS total_sessions
+      FROM app_crash_logs
+      WHERE reported_at >= NOW() - INTERVAL '24 hours'
+    `),
+    // 5. Median RAM of crashing devices (last 30 days)
+    db.execute(sql`
+      SELECT PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY total_memory_mb) AS ram_median
+      FROM app_crash_logs
+      WHERE crash_type IN ('crash_system','crash_js')
+        AND total_memory_mb IS NOT NULL
+        AND reported_at >= NOW() - INTERVAL '30 days'
+    `),
   ])
-    .then(([typeRows, versionRows, trendRows]) => {
+    .then(([typeRows, versionRows, trendRows, rateRows, ramRows]) => {
       const byType: Record<string, number> = { crash_system: 0, crash_js: 0 };
       for (const row of typeRows.rows as { crash_type: string; cnt: number }[]) {
         byType[row.crash_type] = row.cnt;
       }
+
+      const rateRow = rateRows.rows[0] as { crash_count: string; total_sessions: string } | undefined;
+      const crashCount = Number(rateRow?.crash_count ?? 0);
+      const totalSessions = Number(rateRow?.total_sessions ?? 0);
+      const crashFreeRate24h: number | null = totalSessions > 0
+        ? Math.round(((totalSessions - crashCount) / totalSessions) * 100 * 10) / 10
+        : null;
+
+      const ramRow = ramRows.rows[0] as { ram_median: string | null } | undefined;
+      const ramMedianCrashMb: number | null = ramRow?.ram_median != null
+        ? Math.round(Number(ramRow.ram_median))
+        : null;
+
       res.json({
         byType,
         byVersion: versionRows.rows as { version: string; crash_system: number; crash_js: number; total: number }[],
         dailyTrend: trendRows.rows as { day: string; crash_system: number; crash_js: number }[],
+        crashFreeRate24h,
+        ramMedianCrashMb,
       });
     })
     .catch((err) => {
@@ -176,7 +207,7 @@ adminRouter.get("/stats", requireAdmin, (_req: Request, res: Response): void => 
 });
 
 adminRouter.get("/alerts", requireAdmin, (req: Request, res: Response): void => {
-  const threshold = Math.max(1, parseInt(String(req.query.threshold ?? "10"), 10));
+  const threshold = Math.max(1, parseInt(String(req.query.threshold ?? "3"), 10));
 
   db.execute(sql`
     SELECT
