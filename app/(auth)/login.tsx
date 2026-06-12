@@ -43,6 +43,7 @@ export default function LoginScreen() {
         if (savedPassword) setPassword(savedPassword);
         if (savedIdentifier || savedPassword) setHasSavedCredentials(true);
       } catch {
+        // no-op: ignore storage read errors
       }
     })();
   }, []);
@@ -52,6 +53,7 @@ export default function LoginScreen() {
       await AsyncStorage.removeItem(SAVED_IDENTIFIER_KEY);
       await AsyncStorage.removeItem(SAVED_PASSWORD_KEY);
     } catch {
+      // no-op: ignore storage clear errors
     }
     setIdentifier("");
     setPassword("");
@@ -84,6 +86,7 @@ export default function LoginScreen() {
             await AsyncStorage.setItem(SAVED_IDENTIFIER_KEY, identifier.trim());
             await AsyncStorage.setItem(SAVED_PASSWORD_KEY, password);
           } catch {
+            // no-op: ignore credential save errors
           }
           router.replace("/");
         },

@@ -116,6 +116,7 @@ export default function ChatConversationScreen() {
     try {
       await apiRequest("POST", `/api/chat/conversations/${id}/read`);
     } catch {
+      // no-op: ignore mark-as-read errors
     }
     queryClient.setQueryData<Array<{ id: string; unreadCount: number; [key: string]: unknown }>>(
       ["/api/chat/conversations"],

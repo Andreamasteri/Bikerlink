@@ -34,7 +34,7 @@ export function useAdAdminStats() {
         })
         .catch(() => {});
     }
-  }, [imageHealth?.checkedAt]);
+  }, [imageHealth?.checkedAt, imageHealth?.isRunning]);
 
   async function handleCheckImages() {
     try {

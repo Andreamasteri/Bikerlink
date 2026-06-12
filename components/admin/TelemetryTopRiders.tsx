@@ -32,7 +32,7 @@ export function TelemetryTopRiders({ collapsed }: { collapsed: boolean }) {
     refetchOnMount: true,
   });
 
-  const ridersErrorDetail = (error as any)?.detail as string | undefined;
+  const ridersErrorDetail = (error as (Error & { detail?: string }) | null)?.detail;
 
   return (
     <View style={styles.section}>

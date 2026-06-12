@@ -23,9 +23,11 @@ async function fetchWithCause(url: string, options?: RequestInit): Promise<Respo
     try {
       const body = await res.clone().json();
       detail = body?.detail || body?.message || "";
-    } catch (_) {}
+    } catch (_) {
+      // no-op: ignore JSON parse errors when building error message
+    }
     const err = new Error(`HTTP ${res.status}${detail ? `: ${detail}` : ""}`);
-    (err as any).detail = detail;
+    (err as Error & { detail?: string }).detail = detail;
     throw err;
   }
   return res;
@@ -64,7 +66,7 @@ export function TelemetryCard() {
       })()
     : false;
 
-  const statsErrorDetail = (error as any)?.detail as string | undefined;
+  const statsErrorDetail = (error as (Error & { detail?: string }) | null)?.detail;
 
   return (
     <View style={styles.card}>

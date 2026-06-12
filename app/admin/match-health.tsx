@@ -7,7 +7,6 @@ import {
   TouchableOpacity,
   ActivityIndicator,
 } from "react-native";
-import { useRouter } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 import { MaterialCommunityIcons, Ionicons, MaterialIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -132,7 +131,6 @@ interface MatchSummaryResponse {
 
 export default function MatchHealthScreen() {
   const insets = useSafeAreaInsets();
-  const router = useRouter();
   const [copied, setCopied] = useState(false);
 
   const { data, isLoading, isFetching, error, refetch } = useQuery<MatchHealthResponse>({

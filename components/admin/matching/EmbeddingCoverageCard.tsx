@@ -64,7 +64,7 @@ export function EmbeddingCoverageCard() {
       setThresholdInput(String(data.coverageThresholdPct));
       setDailyCapInput(String(data.dailyCap));
     }
-  }, [data?.efSearch, data?.coverageThresholdPct, data?.dailyCap]);
+  }, [data]);
 
   const settingsMutation = useMutation({
     mutationFn: (body: { efSearch?: number; coverageThreshold?: number; dailyCap?: number }) =>

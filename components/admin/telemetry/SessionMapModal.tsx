@@ -68,7 +68,7 @@ export function SessionMapModal({
     enabled: visible,
   });
 
-  const samples = data?.samples ?? [];
+  const samples = useMemo(() => data?.samples ?? [], [data?.samples]);
   const hasSpeed = samples.some((s) => s.speedKmh != null);
   const hasLean = samples.some((s) => s.leanAngle != null);
 

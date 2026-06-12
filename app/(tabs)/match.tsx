@@ -159,7 +159,7 @@ export default function MatchScreen() {
     refetchInterval: 60000,
     refetchOnMount: true,
   });
-  const { data: plannedRouteInvitesData, refetch: plannedRouteInvitesRefetch } = useQuery<{ count: number; invites: any[] }>({
+  const { data: plannedRouteInvitesData, refetch: plannedRouteInvitesRefetch } = useQuery<{ count: number; invites: unknown[] }>({
     queryKey: ["/api/planned-route-invites/mine"],
     enabled: !!user,
     refetchInterval: 60000,
@@ -181,8 +181,8 @@ export default function MatchScreen() {
     onMutate: async (matchId: string) => {
       await queryClient.cancelQueries({ queryKey: ["/api/proposals/matches"] });
       const previousMatches = queryClient.getQueryData(["/api/proposals/matches"]);
-      queryClient.setQueryData(["/api/proposals/matches"], (old: any[]) =>
-        Array.isArray(old) ? old.filter((m: any) => m.id !== matchId) : old,
+      queryClient.setQueryData(["/api/proposals/matches"], (old: unknown) =>
+        Array.isArray(old) ? (old as { id: string }[]).filter((m) => m.id !== matchId) : old,
       );
       return { previousMatches };
     },
@@ -191,7 +191,7 @@ export default function MatchScreen() {
       queryClient.invalidateQueries({ queryKey: ["/api/proposals/matches/accepted"] });
       setPendingMatchId(null);
     },
-    onError: (_err: unknown, _matchId: string, context: any) => {
+    onError: (_err: unknown, _matchId: string, context: Record<string, unknown> | undefined) => {
       if (context?.previousMatches !== undefined) {
         queryClient.setQueryData(["/api/proposals/matches"], context.previousMatches);
       }
@@ -205,15 +205,15 @@ export default function MatchScreen() {
     onMutate: async (matchId: string) => {
       await queryClient.cancelQueries({ queryKey: ["/api/proposals/matches"] });
       const previousMatches = queryClient.getQueryData(["/api/proposals/matches"]);
-      queryClient.setQueryData(["/api/proposals/matches"], (old: any[]) =>
-        Array.isArray(old) ? old.filter((m: any) => m.id !== matchId) : old,
+      queryClient.setQueryData(["/api/proposals/matches"], (old: unknown) =>
+        Array.isArray(old) ? (old as { id: string }[]).filter((m) => m.id !== matchId) : old,
       );
       return { previousMatches };
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/proposals/matches"] });
     },
-    onError: (_err: unknown, _matchId: string, context: any) => {
+    onError: (_err: unknown, _matchId: string, context: Record<string, unknown> | undefined) => {
       if (context?.previousMatches !== undefined) {
         queryClient.setQueryData(["/api/proposals/matches"], context.previousMatches);
       }
@@ -226,8 +226,8 @@ export default function MatchScreen() {
     onMutate: async (matchId: string) => {
       await queryClient.cancelQueries({ queryKey: ["/api/proposals/garage-matches"] });
       const previousGarage = queryClient.getQueryData(["/api/proposals/garage-matches"]);
-      queryClient.setQueryData(["/api/proposals/garage-matches"], (old: any[]) =>
-        Array.isArray(old) ? old.filter((m: any) => m.id !== matchId) : old,
+      queryClient.setQueryData(["/api/proposals/garage-matches"], (old: unknown) =>
+        Array.isArray(old) ? (old as { id: string }[]).filter((m) => m.id !== matchId) : old,
       );
       return { previousGarage };
     },
@@ -236,7 +236,7 @@ export default function MatchScreen() {
       queryClient.invalidateQueries({ queryKey: ["/api/proposals/matches/accepted"] });
       setPendingMatchId(null);
     },
-    onError: (_err: unknown, _matchId: string, context: any) => {
+    onError: (_err: unknown, _matchId: string, context: Record<string, unknown> | undefined) => {
       if (context?.previousGarage !== undefined) {
         queryClient.setQueryData(["/api/proposals/garage-matches"], context.previousGarage);
       }
@@ -250,15 +250,15 @@ export default function MatchScreen() {
     onMutate: async (matchId: string) => {
       await queryClient.cancelQueries({ queryKey: ["/api/proposals/garage-matches"] });
       const previousGarage = queryClient.getQueryData(["/api/proposals/garage-matches"]);
-      queryClient.setQueryData(["/api/proposals/garage-matches"], (old: any[]) =>
-        Array.isArray(old) ? old.filter((m: any) => m.id !== matchId) : old,
+      queryClient.setQueryData(["/api/proposals/garage-matches"], (old: unknown) =>
+        Array.isArray(old) ? (old as { id: string }[]).filter((m) => m.id !== matchId) : old,
       );
       return { previousGarage };
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/proposals/garage-matches"] });
     },
-    onError: (_err: unknown, _matchId: string, context: any) => {
+    onError: (_err: unknown, _matchId: string, context: Record<string, unknown> | undefined) => {
       if (context?.previousGarage !== undefined) {
         queryClient.setQueryData(["/api/proposals/garage-matches"], context.previousGarage);
       }
@@ -271,8 +271,8 @@ export default function MatchScreen() {
     onMutate: async (matchId: string) => {
       await queryClient.cancelQueries({ queryKey: ["/api/proposals/biker-matches"] });
       const previousBiker = queryClient.getQueryData(["/api/proposals/biker-matches"]);
-      queryClient.setQueryData(["/api/proposals/biker-matches"], (old: any[]) =>
-        Array.isArray(old) ? old.filter((m: any) => m.id !== matchId) : old,
+      queryClient.setQueryData(["/api/proposals/biker-matches"], (old: unknown) =>
+        Array.isArray(old) ? (old as { id: string }[]).filter((m) => m.id !== matchId) : old,
       );
       return { previousBiker };
     },
@@ -281,7 +281,7 @@ export default function MatchScreen() {
       queryClient.invalidateQueries({ queryKey: ["/api/proposals/matches/accepted"] });
       setPendingMatchId(null);
     },
-    onError: (_err: unknown, _matchId: string, context: any) => {
+    onError: (_err: unknown, _matchId: string, context: Record<string, unknown> | undefined) => {
       if (context?.previousBiker !== undefined) {
         queryClient.setQueryData(["/api/proposals/biker-matches"], context.previousBiker);
       }
@@ -295,15 +295,15 @@ export default function MatchScreen() {
     onMutate: async (matchId: string) => {
       await queryClient.cancelQueries({ queryKey: ["/api/proposals/biker-matches"] });
       const previousBiker = queryClient.getQueryData(["/api/proposals/biker-matches"]);
-      queryClient.setQueryData(["/api/proposals/biker-matches"], (old: any[]) =>
-        Array.isArray(old) ? old.filter((m: any) => m.id !== matchId) : old,
+      queryClient.setQueryData(["/api/proposals/biker-matches"], (old: unknown) =>
+        Array.isArray(old) ? (old as { id: string }[]).filter((m) => m.id !== matchId) : old,
       );
       return { previousBiker };
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/proposals/biker-matches"] });
     },
-    onError: (_err: unknown, _matchId: string, context: any) => {
+    onError: (_err: unknown, _matchId: string, context: Record<string, unknown> | undefined) => {
       if (context?.previousBiker !== undefined) {
         queryClient.setQueryData(["/api/proposals/biker-matches"], context.previousBiker);
       }
@@ -316,8 +316,8 @@ export default function MatchScreen() {
     onMutate: async (matchId: string) => {
       await queryClient.cancelQueries({ queryKey: ["/api/proposals/proposal-profile-matches"] });
       const previousPropProfile = queryClient.getQueryData(["/api/proposals/proposal-profile-matches"]);
-      queryClient.setQueryData(["/api/proposals/proposal-profile-matches"], (old: any[]) =>
-        Array.isArray(old) ? old.filter((m: any) => m.id !== matchId) : old,
+      queryClient.setQueryData(["/api/proposals/proposal-profile-matches"], (old: unknown) =>
+        Array.isArray(old) ? (old as { id: string }[]).filter((m) => m.id !== matchId) : old,
       );
       return { previousPropProfile };
     },
@@ -325,7 +325,7 @@ export default function MatchScreen() {
       queryClient.invalidateQueries({ queryKey: ["/api/proposals/proposal-profile-matches"] });
       setPropProfilePendingId(null);
     },
-    onError: (_err: unknown, _matchId: string, context: any) => {
+    onError: (_err: unknown, _matchId: string, context: Record<string, unknown> | undefined) => {
       if (context?.previousPropProfile !== undefined) {
         queryClient.setQueryData(["/api/proposals/proposal-profile-matches"], context.previousPropProfile);
       }
@@ -339,15 +339,15 @@ export default function MatchScreen() {
     onMutate: async (matchId: string) => {
       await queryClient.cancelQueries({ queryKey: ["/api/proposals/proposal-profile-matches"] });
       const previousPropProfile = queryClient.getQueryData(["/api/proposals/proposal-profile-matches"]);
-      queryClient.setQueryData(["/api/proposals/proposal-profile-matches"], (old: any[]) =>
-        Array.isArray(old) ? old.filter((m: any) => m.id !== matchId) : old,
+      queryClient.setQueryData(["/api/proposals/proposal-profile-matches"], (old: unknown) =>
+        Array.isArray(old) ? (old as { id: string }[]).filter((m) => m.id !== matchId) : old,
       );
       return { previousPropProfile };
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/proposals/proposal-profile-matches"] });
     },
-    onError: (_err: unknown, _matchId: string, context: any) => {
+    onError: (_err: unknown, _matchId: string, context: Record<string, unknown> | undefined) => {
       if (context?.previousPropProfile !== undefined) {
         queryClient.setQueryData(["/api/proposals/proposal-profile-matches"], context.previousPropProfile);
       }
@@ -360,8 +360,8 @@ export default function MatchScreen() {
     onMutate: async (matchId: string) => {
       await queryClient.cancelQueries({ queryKey: ["/api/proposals/route-affinity-matches"] });
       const previousRouteAffinity = queryClient.getQueryData(["/api/proposals/route-affinity-matches"]);
-      queryClient.setQueryData(["/api/proposals/route-affinity-matches"], (old: any[]) =>
-        Array.isArray(old) ? old.filter((m: any) => m.id !== matchId) : old,
+      queryClient.setQueryData(["/api/proposals/route-affinity-matches"], (old: unknown) =>
+        Array.isArray(old) ? (old as { id: string }[]).filter((m) => m.id !== matchId) : old,
       );
       return { previousRouteAffinity };
     },
@@ -369,7 +369,7 @@ export default function MatchScreen() {
       queryClient.invalidateQueries({ queryKey: ["/api/proposals/route-affinity-matches"] });
       setPendingMatchId(null);
     },
-    onError: (_err: unknown, _matchId: string, context: any) => {
+    onError: (_err: unknown, _matchId: string, context: Record<string, unknown> | undefined) => {
       if (context?.previousRouteAffinity !== undefined) {
         queryClient.setQueryData(["/api/proposals/route-affinity-matches"], context.previousRouteAffinity);
       }
@@ -383,15 +383,15 @@ export default function MatchScreen() {
     onMutate: async (matchId: string) => {
       await queryClient.cancelQueries({ queryKey: ["/api/proposals/route-affinity-matches"] });
       const previousRouteAffinity = queryClient.getQueryData(["/api/proposals/route-affinity-matches"]);
-      queryClient.setQueryData(["/api/proposals/route-affinity-matches"], (old: any[]) =>
-        Array.isArray(old) ? old.filter((m: any) => m.id !== matchId) : old,
+      queryClient.setQueryData(["/api/proposals/route-affinity-matches"], (old: unknown) =>
+        Array.isArray(old) ? (old as { id: string }[]).filter((m) => m.id !== matchId) : old,
       );
       return { previousRouteAffinity };
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/proposals/route-affinity-matches"] });
     },
-    onError: (_err: unknown, _matchId: string, context: any) => {
+    onError: (_err: unknown, _matchId: string, context: Record<string, unknown> | undefined) => {
       if (context?.previousRouteAffinity !== undefined) {
         queryClient.setQueryData(["/api/proposals/route-affinity-matches"], context.previousRouteAffinity);
       }
@@ -406,15 +406,15 @@ export default function MatchScreen() {
       await queryClient.cancelQueries({ queryKey: ["/api/proposals/matches/accepted"] });
       const previousRouteAffinity = queryClient.getQueryData(["/api/proposals/route-affinity-matches"]);
       const previousAccepted = queryClient.getQueryData(["/api/proposals/matches/accepted"]);
-      queryClient.setQueryData(["/api/proposals/route-affinity-matches"], (old: any[]) =>
-        Array.isArray(old) ? old.filter((m: any) => m.id !== matchId) : old,
+      queryClient.setQueryData(["/api/proposals/route-affinity-matches"], (old: unknown) =>
+        Array.isArray(old) ? (old as { id: string }[]).filter((m) => m.id !== matchId) : old,
       );
-      queryClient.setQueryData(["/api/proposals/matches/accepted"], (old: any[]) =>
-        Array.isArray(old) ? old.filter((m: any) => m.id !== matchId) : old,
+      queryClient.setQueryData(["/api/proposals/matches/accepted"], (old: unknown) =>
+        Array.isArray(old) ? (old as { id: string }[]).filter((m) => m.id !== matchId) : old,
       );
       return { previousRouteAffinity, previousAccepted };
     },
-    onError: (_err, _matchId, context: any) => {
+    onError: (_err, _matchId, context: Record<string, unknown> | undefined) => {
       if (context?.previousRouteAffinity !== undefined) {
         queryClient.setQueryData(["/api/proposals/route-affinity-matches"], context.previousRouteAffinity);
       }
@@ -435,8 +435,8 @@ export default function MatchScreen() {
     onMutate: async (matchId: string) => {
       await queryClient.cancelQueries({ queryKey: ["/api/proposals/telemetry-affinity-matches"] });
       const previousTelemetryAffinity = queryClient.getQueryData(["/api/proposals/telemetry-affinity-matches"]);
-      queryClient.setQueryData(["/api/proposals/telemetry-affinity-matches"], (old: any[]) =>
-        Array.isArray(old) ? old.filter((m: any) => m.id !== matchId) : old,
+      queryClient.setQueryData(["/api/proposals/telemetry-affinity-matches"], (old: unknown) =>
+        Array.isArray(old) ? (old as { id: string }[]).filter((m) => m.id !== matchId) : old,
       );
       return { previousTelemetryAffinity };
     },
@@ -444,7 +444,7 @@ export default function MatchScreen() {
       queryClient.invalidateQueries({ queryKey: ["/api/proposals/telemetry-affinity-matches"] });
       setPendingMatchId(null);
     },
-    onError: (_err: unknown, _matchId: string, context: any) => {
+    onError: (_err: unknown, _matchId: string, context: Record<string, unknown> | undefined) => {
       if (context?.previousTelemetryAffinity !== undefined) {
         queryClient.setQueryData(["/api/proposals/telemetry-affinity-matches"], context.previousTelemetryAffinity);
       }
@@ -458,15 +458,15 @@ export default function MatchScreen() {
     onMutate: async (matchId: string) => {
       await queryClient.cancelQueries({ queryKey: ["/api/proposals/telemetry-affinity-matches"] });
       const previousTelemetryAffinity = queryClient.getQueryData(["/api/proposals/telemetry-affinity-matches"]);
-      queryClient.setQueryData(["/api/proposals/telemetry-affinity-matches"], (old: any[]) =>
-        Array.isArray(old) ? old.filter((m: any) => m.id !== matchId) : old,
+      queryClient.setQueryData(["/api/proposals/telemetry-affinity-matches"], (old: unknown) =>
+        Array.isArray(old) ? (old as { id: string }[]).filter((m) => m.id !== matchId) : old,
       );
       return { previousTelemetryAffinity };
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/proposals/telemetry-affinity-matches"] });
     },
-    onError: (_err: unknown, _matchId: string, context: any) => {
+    onError: (_err: unknown, _matchId: string, context: Record<string, unknown> | undefined) => {
       if (context?.previousTelemetryAffinity !== undefined) {
         queryClient.setQueryData(["/api/proposals/telemetry-affinity-matches"], context.previousTelemetryAffinity);
       }
@@ -481,15 +481,15 @@ export default function MatchScreen() {
       await queryClient.cancelQueries({ queryKey: ["/api/proposals/matches/accepted"] });
       const previousTelemetryAffinity = queryClient.getQueryData(["/api/proposals/telemetry-affinity-matches"]);
       const previousAccepted = queryClient.getQueryData(["/api/proposals/matches/accepted"]);
-      queryClient.setQueryData(["/api/proposals/telemetry-affinity-matches"], (old: any[]) =>
-        Array.isArray(old) ? old.filter((m: any) => m.id !== matchId) : old,
+      queryClient.setQueryData(["/api/proposals/telemetry-affinity-matches"], (old: unknown) =>
+        Array.isArray(old) ? (old as { id: string }[]).filter((m) => m.id !== matchId) : old,
       );
-      queryClient.setQueryData(["/api/proposals/matches/accepted"], (old: any[]) =>
-        Array.isArray(old) ? old.filter((m: any) => m.id !== matchId) : old,
+      queryClient.setQueryData(["/api/proposals/matches/accepted"], (old: unknown) =>
+        Array.isArray(old) ? (old as { id: string }[]).filter((m) => m.id !== matchId) : old,
       );
       return { previousTelemetryAffinity, previousAccepted };
     },
-    onError: (_err, _matchId, context: any) => {
+    onError: (_err, _matchId, context: Record<string, unknown> | undefined) => {
       if (context?.previousTelemetryAffinity !== undefined) {
         queryClient.setQueryData(["/api/proposals/telemetry-affinity-matches"], context.previousTelemetryAffinity);
       }
@@ -539,15 +539,15 @@ export default function MatchScreen() {
       await queryClient.cancelQueries({ queryKey: ["/api/proposals/matches/accepted"] });
       const previousGarage = queryClient.getQueryData(["/api/proposals/garage-matches"]);
       const previousAccepted = queryClient.getQueryData(["/api/proposals/matches/accepted"]);
-      queryClient.setQueryData(["/api/proposals/garage-matches"], (old: any[]) =>
-        Array.isArray(old) ? old.filter((m: any) => m.id !== matchId) : old,
+      queryClient.setQueryData(["/api/proposals/garage-matches"], (old: unknown) =>
+        Array.isArray(old) ? (old as { id: string }[]).filter((m) => m.id !== matchId) : old,
       );
-      queryClient.setQueryData(["/api/proposals/matches/accepted"], (old: any[]) =>
-        Array.isArray(old) ? old.filter((m: any) => m.id !== matchId) : old,
+      queryClient.setQueryData(["/api/proposals/matches/accepted"], (old: unknown) =>
+        Array.isArray(old) ? (old as { id: string }[]).filter((m) => m.id !== matchId) : old,
       );
       return { previousGarage, previousAccepted };
     },
-    onError: (_err, _matchId, context: any) => {
+    onError: (_err, _matchId, context: Record<string, unknown> | undefined) => {
       if (context?.previousGarage !== undefined) {
         queryClient.setQueryData(["/api/proposals/garage-matches"], context.previousGarage);
       }
@@ -569,15 +569,15 @@ export default function MatchScreen() {
       await queryClient.cancelQueries({ queryKey: ["/api/proposals/matches/accepted"] });
       const previousBiker = queryClient.getQueryData(["/api/proposals/biker-matches"]);
       const previousAccepted = queryClient.getQueryData(["/api/proposals/matches/accepted"]);
-      queryClient.setQueryData(["/api/proposals/biker-matches"], (old: any[]) =>
-        Array.isArray(old) ? old.filter((m: any) => m.id !== matchId) : old,
+      queryClient.setQueryData(["/api/proposals/biker-matches"], (old: unknown) =>
+        Array.isArray(old) ? (old as { id: string }[]).filter((m) => m.id !== matchId) : old,
       );
-      queryClient.setQueryData(["/api/proposals/matches/accepted"], (old: any[]) =>
-        Array.isArray(old) ? old.filter((m: any) => m.id !== matchId) : old,
+      queryClient.setQueryData(["/api/proposals/matches/accepted"], (old: unknown) =>
+        Array.isArray(old) ? (old as { id: string }[]).filter((m) => m.id !== matchId) : old,
       );
       return { previousBiker, previousAccepted };
     },
-    onError: (_err, _matchId, context: any) => {
+    onError: (_err, _matchId, context: Record<string, unknown> | undefined) => {
       if (context?.previousBiker !== undefined) {
         queryClient.setQueryData(["/api/proposals/biker-matches"], context.previousBiker);
       }
@@ -599,15 +599,15 @@ export default function MatchScreen() {
       await queryClient.cancelQueries({ queryKey: ["/api/proposals/matches/accepted"] });
       const previousProposal = queryClient.getQueryData(["/api/proposals/matches"]);
       const previousAccepted = queryClient.getQueryData(["/api/proposals/matches/accepted"]);
-      queryClient.setQueryData(["/api/proposals/matches"], (old: any[]) =>
-        Array.isArray(old) ? old.filter((m: any) => m.id !== matchId) : old,
+      queryClient.setQueryData(["/api/proposals/matches"], (old: unknown) =>
+        Array.isArray(old) ? (old as { id: string }[]).filter((m) => m.id !== matchId) : old,
       );
-      queryClient.setQueryData(["/api/proposals/matches/accepted"], (old: any[]) =>
-        Array.isArray(old) ? old.filter((m: any) => m.id !== matchId) : old,
+      queryClient.setQueryData(["/api/proposals/matches/accepted"], (old: unknown) =>
+        Array.isArray(old) ? (old as { id: string }[]).filter((m) => m.id !== matchId) : old,
       );
       return { previousProposal, previousAccepted };
     },
-    onError: (_err, _matchId, context: any) => {
+    onError: (_err, _matchId, context: Record<string, unknown> | undefined) => {
       if (context?.previousProposal !== undefined) {
         queryClient.setQueryData(["/api/proposals/matches"], context.previousProposal);
       }
@@ -652,13 +652,17 @@ export default function MatchScreen() {
     ]);
   }, [removeGarageMatchMutation, t]);
 
-  const makeConfirmRemove = (mutate: (id: string) => void) => (id: string) =>
+  const confirmRemoveBikerMatch = useCallback((id: string) =>
     Alert.alert(t("common.confirm"), t("match.confirmRemoveMatch"), [
       { text: t("common.cancel"), style: "cancel" },
-      { text: t("common.remove"), style: "destructive", onPress: () => mutate(id) },
-    ]);
-  const confirmRemoveBikerMatch = useCallback(makeConfirmRemove(removeBikerMatchMutation.mutate), [removeBikerMatchMutation, t]);
-  const confirmRemoveProposalMatch = useCallback(makeConfirmRemove(removeProposalMatchMutation.mutate), [removeProposalMatchMutation, t]);
+      { text: t("common.remove"), style: "destructive", onPress: () => removeBikerMatchMutation.mutate(id) },
+    ]), [removeBikerMatchMutation, t]);
+
+  const confirmRemoveProposalMatch = useCallback((id: string) =>
+    Alert.alert(t("common.confirm"), t("match.confirmRemoveMatch"), [
+      { text: t("common.cancel"), style: "cancel" },
+      { text: t("common.remove"), style: "destructive", onPress: () => removeProposalMatchMutation.mutate(id) },
+    ]), [removeProposalMatchMutation, t]);
 
   const onRefresh = useCallback(() => {
     const refetchMap: Partial<Record<TabKey, () => void>> = {

@@ -139,7 +139,6 @@ export default function WhisperConfigScreen() {
       autoTestedRef.current = true;
       testProvider("home");
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data]);
 
   const activeChain: SttProviderId[] = data?.chain ?? [];

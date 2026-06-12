@@ -232,7 +232,7 @@ function RoutingHistorySection() {
   );
 }
 
-function TestRoutingButton({ selfHosted }: { selfHosted: boolean }) {
+function TestRoutingButton({ selfHosted: _selfHosted }: { selfHosted: boolean }) {
   const [loading, setLoading] = React.useState(false);
   const [result, setResult] = React.useState<TestRoutingResult | null>(null);
 

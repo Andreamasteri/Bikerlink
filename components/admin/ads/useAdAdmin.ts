@@ -12,12 +12,6 @@ import { ListItem } from "./AdGroupList";
 
 type TabKey = "biker" | "zavorrina" | "coppia" | "tutti";
 
-interface ImageHealthData {
-  brokenIds: string[];
-  checkedAt: string | null;
-  isRunning: boolean;
-}
-
 interface BulkUploadResponse {
   created: number;
   failed: number;

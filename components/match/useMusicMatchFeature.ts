@@ -10,7 +10,6 @@ interface Options {
   lastfmConnected: boolean;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any -- music match shape varies
 export function useMusicMatchFeature({ activeTab, lastfmConnected }: Options) {
   const router = useRouter();
   const { user } = useAuth();
@@ -34,8 +33,8 @@ export function useMusicMatchFeature({ activeTab, lastfmConnected }: Options) {
       const previousMusic = queryClient.getQueryData(["/api/match/music"]);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any -- music match shape
       queryClient.setQueryData(["/api/match/music"], (old: any) => {
-        if (Array.isArray(old)) return old.filter((m: any) => m.user?.id !== userId);
-        if (old && Array.isArray(old.matches)) return { ...old, matches: old.matches.filter((m: any) => m.user?.id !== userId) };
+        if (Array.isArray(old)) return old.filter((m: { user?: { id?: string } }) => m.user?.id !== userId);
+        if (old && Array.isArray(old.matches)) return { ...old, matches: old.matches.filter((m: { user?: { id?: string } }) => m.user?.id !== userId) };
         return old;
       });
       return { previousMusic };
@@ -48,7 +47,7 @@ export function useMusicMatchFeature({ activeTab, lastfmConnected }: Options) {
         router.push(`/chat/${(data as any).id}` as never);
       }
     },
-    onError: (_err: unknown, _userId: string, context: any) => {
+    onError: (_err: unknown, _userId: string, context: { previousMusic?: unknown } | undefined) => {
       if (context?.previousMusic !== undefined) {
         queryClient.setQueryData(["/api/match/music"], context.previousMusic);
       }
@@ -63,8 +62,8 @@ export function useMusicMatchFeature({ activeTab, lastfmConnected }: Options) {
       const previousMusic = queryClient.getQueryData(["/api/match/music"]);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any -- music match shape
       queryClient.setQueryData(["/api/match/music"], (old: any) => {
-        if (Array.isArray(old)) return old.filter((m: any) => m.user?.id !== userId);
-        if (old && Array.isArray(old.matches)) return { ...old, matches: old.matches.filter((m: any) => m.user?.id !== userId) };
+        if (Array.isArray(old)) return old.filter((m: { user?: { id?: string } }) => m.user?.id !== userId);
+        if (old && Array.isArray(old.matches)) return { ...old, matches: old.matches.filter((m: { user?: { id?: string } }) => m.user?.id !== userId) };
         return old;
       });
       return { previousMusic };
@@ -72,7 +71,7 @@ export function useMusicMatchFeature({ activeTab, lastfmConnected }: Options) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/match/music"] });
     },
-    onError: (_err: unknown, _userId: string, context: any) => {
+    onError: (_err: unknown, _userId: string, context: { previousMusic?: unknown } | undefined) => {
       if (context?.previousMusic !== undefined) {
         queryClient.setQueryData(["/api/match/music"], context.previousMusic);
       }

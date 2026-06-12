@@ -8,6 +8,7 @@ import {
   Alert,
   Platform,
   Modal,
+  Linking,
 } from "react-native";
 import { styles } from "./legal-docs.styles";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
@@ -102,7 +103,7 @@ export default function LegalDocsAdmin() {
       })
       .catch(() => setFullText(prev => ({ ...prev, [key]: "__ERROR__" })))
       .finally(() => setLoadingText(null));
-  }, [viewModal]);
+  }, [viewModal, fullText]);
 
   const setDraft = (key: DocType, text: string | null, src: "ai" | "file" | null) => {
     setDraftText(prev => ({ ...prev, [key]: text }));
@@ -210,8 +211,6 @@ export default function LegalDocsAdmin() {
 
   const handleDownload = (key: DocType) => {
     const url = new URL(`/api/admin/legal/download/${key}`, getApiUrl()).toString();
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const { Linking } = require("react-native");
     Linking.openURL(url);
   };
 

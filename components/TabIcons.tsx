@@ -50,7 +50,7 @@ function MatchBadge({
       scale.value = 0;
     }
     prevCount.current = count;
-  }, [count]);
+  }, [count, scale]);
 
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],

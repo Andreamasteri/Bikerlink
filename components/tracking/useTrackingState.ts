@@ -463,7 +463,7 @@ export function useTrackingState() {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any -- VolumeManager.showNativeVolumeUI not in typedefs
       (VolumeManager as any).showNativeVolumeUI(true);
     }
-  }, [cleanupTracking, flushPoints, stats, gps, sensors, sprint, battery, refetchRecords, t, session, settings, mapState, refs]);
+  }, [cleanupTracking, flushPoints, stats, gps, sensors, sprint, battery, refetchRecords, t, session, settings, mapState, refs, offlineQueue]);
 
   const handlePause = useCallback(() => {
     if (session.phaseRef.current !== "active" && session.phaseRef.current !== "paused") return;

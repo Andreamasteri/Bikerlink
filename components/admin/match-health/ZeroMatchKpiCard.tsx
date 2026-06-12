@@ -72,8 +72,6 @@ function Sparkline({ snapshots, currentCount }: { snapshots: ZeroMatchSnapshotPo
     y: HEIGHT - ((v - minVal) / range) * HEIGHT,
   }));
 
-  const pathD = coords.map((c, i) => `${i === 0 ? "M" : "L"} ${c.x.toFixed(1)} ${c.y.toFixed(1)}`).join(" ");
-
   const lastColor = all[all.length - 1] > all[0] ? Colors.error : Colors.success;
 
   return (

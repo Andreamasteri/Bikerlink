@@ -19,7 +19,6 @@ export default function NavigateScreen() {
     isRerouting, isOffline, weatherLoading, currentWeather, aheadWeather,
     voiceCmdToast, mapUri, offline, whisper, activeStepsRef,
     handleMapMessage, handleVoiceCommand, handleClose, triggerWeatherReroute,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- router.replace path
   } = useNavigateState();
 
   const s = makeStyles(colors);
