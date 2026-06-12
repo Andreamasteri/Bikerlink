@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BikerLink — Schema AI Stack</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --orange:  #E8541A;
+    --dark:    #1A1A2E;
+    --grey:    #4A4A6A;
+    --light:   #F5F5F7;
+    --border:  #D0D0E0;
+    --green:   #1B5E35;
+    --green-light: #E8F5E9;
+    --blue:    #1A5FA8;
+    --blue-light: #E3F0FB;
+    --red:     #C62828;
+    --red-light: #FFEBEE;
+    --amber:   #E65100;
+    --amber-light: #FFF3E0;
+    --purple:  #6A1B9A;
+    --purple-light: #F3E5F5;
+    --white:   #ffffff;
+    --alt-row: #EEF0F8;
+  }
+
+  body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 8.5pt; color: var(--dark); background: #e8eaf0; padding: 10mm; }
+
+  .page { width: 210mm; min-height: 297mm; background: var(--white); margin: 0 auto 10mm; padding: 13mm 14mm 12mm; box-shadow: 0 2px 16px rgba(0,0,0,.18); }
+
+  @page { size: A4; margin: 13mm 14mm 12mm; }
+
+  @media print {
+    body { background: none; padding: 0; }
+    .page { box-shadow: none; margin: 0; padding: 0; width: 100%; min-height: 0; }
+    .page-break { page-break-before: always; }
+    .no-break { page-break-inside: avoid; }
+  }
+
+  header { background: var(--dark); color: var(--white); border-radius: 5px; padding: 8px 14px; display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+  header h1 { font-size: 14pt; font-weight: 700; letter-spacing: -.3px; }
+  header h1 span { color: var(--orange); }
+  .header-meta { text-align: right; font-size: 7pt; opacity: .85; line-height: 1.5; }
+  .header-meta strong { display: block; font-size: 8.5pt; color: var(--orange); }
+
+  h2 { font-size: 10.5pt; font-weight: 700; color: var(--dark); border-left: 4px solid var(--orange); padding-left: 8px; margin: 14px 0 6px; }
+  h3 { font-size: 9pt; font-weight: 700; color: var(--grey); margin: 10px 0 4px; }
+
+  .cascade { display: flex; align-items: center; gap: 0; margin: 8px 0 10px; flex-wrap: wrap; }
+  .cascade-node { border-radius: 6px; padding: 7px 10px; text-align: center; min-width: 90px; }
+  .cascade-node .label { font-size: 8pt; font-weight: 700; }
+  .cascade-node .sub  { font-size: 6.5pt; opacity: .85; margin-top: 2px; }
+  .cascade-node .badge { font-size: 5.5pt; border-radius: 3px; padding: 1px 4px; margin-top: 3px; display: inline-block; }
+  .n-groq   { background: #E8F5E9; border: 1.5px solid #2E7D32; color: #1B5E20; }
+  .n-gemini { background: #E3F0FB; border: 1.5px solid #1565C0; color: #0D47A1; }
+  .n-openai { background: #F3E5F5; border: 1.5px solid #7B1FA2; color: #4A148C; }
+  .n-ollama { background: #FFF3E0; border: 1.5px solid #E65100; color: #BF360C; }
+  .badge-free   { background: #C8E6C9; color: #1B5E20; }
+  .badge-paid   { background: #E1BEE7; color: #4A148C; }
+  .badge-local  { background: #FFE0B2; color: #BF360C; }
+
+  .arrow { font-size: 14pt; color: var(--grey); padding: 0 4px; line-height: 1; }
+  .arrow-label { font-size: 6pt; color: var(--grey); text-align: center; display: block; margin-top: 2px; }
+  .arrow-wrap { display: flex; flex-direction: column; align-items: center; justify-content: center; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 7.5pt; margin: 4px 0 10px; }
+  thead tr { background: var(--dark); color: var(--white); }
+  thead th { padding: 5px 6px; text-align: left; font-weight: 600; font-size: 7pt; }
+  tbody td { padding: 4px 6px; vertical-align: top; line-height: 1.35; border-bottom: 1px solid var(--border); }
+  tbody tr:last-child td { border-bottom: none; }
+
+  .tag { display: inline-block; border-radius: 3px; padding: 1px 5px; font-size: 6.5pt; font-weight: 600; white-space: nowrap; }
+  .tag-groq   { background: #C8E6C9; color: #1B5E20; }
+  .tag-gemini { background: #BBDEFB; color: #0D47A1; }
+  .tag-openai { background: #E1BEE7; color: #4A148C; }
+  .tag-ollama { background: #FFE0B2; color: #BF360C; }
+  .tag-local  { background: #FFF3E0; color: #E65100; }
+  .tag-rule   { background: #ECEFF1; color: #37474F; }
+  .tag-chain  { background: #E8EAF6; color: #283593; }
+
+  .infobox { border-radius: 5px; padding: 7px 10px; margin: 6px 0; font-size: 7.5pt; line-height: 1.45; }
+  .infobox-green  { background: var(--green-light); border-left: 3px solid var(--green); }
+  .infobox-blue   { background: var(--blue-light);  border-left: 3px solid var(--blue); }
+  .infobox-orange { background: var(--amber-light);  border-left: 3px solid var(--amber); }
+  .infobox strong { font-weight: 700; }
+
+  .cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin: 6px 0 10px; }
+  .card { border: 1px solid var(--border); border-radius: 5px; padding: 7px 9px; background: var(--light); }
+  .card-title { font-size: 7.5pt; font-weight: 700; color: var(--dark); margin-bottom: 3px; border-bottom: 1px solid var(--border); padding-bottom: 3px; }
+  .card-body { font-size: 7pt; color: var(--grey); line-height: 1.4; }
+  .card-body ul { padding-left: 12px; }
+  .card-body li { margin: 1px 0; }
+
+  .embed-stack { display: flex; gap: 8px; margin: 6px 0 10px; }
+  .embed-box { flex: 1; border-radius: 5px; padding: 8px 10px; font-size: 7.5pt; }
+  .embed-primary  { background: var(--purple-light); border: 1.5px solid var(--purple); }
+  .embed-fallback { background: var(--amber-light);  border: 1.5px solid var(--amber); }
+  .embed-box strong { display: block; font-size: 8pt; margin-bottom: 3px; }
+
+  footer { margin-top: 12px; padding-top: 6px; border-top: 1px solid var(--border); font-size: 6.5pt; color: var(--grey); display: flex; justify-content: space-between; }
+
+  .mono { font-family: 'Consolas', 'Courier New', monospace; }
+  .dim  { opacity: .65; }
+  .bold { font-weight: 700; }
+  p     { margin: 4px 0; line-height: 1.4; }
+</style>
+</head>
+<body>
+
+<!-- PAGE 1 -->
+<div class="page">
+
+<header>
+  <h1>Biker<span>Link</span> — Schema AI Stack</h1>
+  <div class="header-meta">
+    <strong>Documento tecnico riservato</strong>
+    Revisione: 11 giugno 2026<br>
+    Classificazione: Interno · Team &amp; Investitori
+  </div>
+</header>
+
+<h2>1. Panoramica — Catene di Esecuzione</h2>
+<p>Dal <strong>Task #3872</strong>, <code>runWithFallback</code> usa la cascade <strong>Ollama-first</strong> per tutte le chiamate AI (a meno che il caller non passi <code>skipOllama:true</code>). Se Ollama è offline/lento, la chain scende automaticamente al provider cloud successivo.</p>
+
+<h3>Catena Universale — Ollama-first &nbsp;<span class="tag tag-chain">server/ai/moderation/provider.ts</span> &nbsp;<span class="dim" style="font-size:6.5pt">— Task #3872</span></h3>
+
+<div class="cascade">
+  <div class="cascade-node n-ollama">
+    <div class="label">① Ollama</div>
+    <div class="sub mono">llama3.1:8b<br>(ThinkCentre)</div>
+    <span class="badge badge-local">Self-hosted</span>
+  </div>
+  <div class="arrow-wrap"><span class="arrow">→</span><span class="arrow-label">fallback</span></div>
+  <div class="cascade-node n-groq">
+    <div class="label">② Groq</div>
+    <div class="sub mono">openai/gpt-oss-20b<br>(brain + router)</div>
+    <span class="badge badge-free">Free Tier</span>
+  </div>
+  <div class="arrow-wrap"><span class="arrow">→</span><span class="arrow-label">fallback</span></div>
+  <div class="cascade-node n-gemini">
+    <div class="label">③ Gemini</div>
+    <div class="sub mono">gemini-2.5-flash (brain)<br>gemini-2.5-flash-lite (router)</div>
+    <span class="badge badge-free">Free Tier</span>
+  </div>
+  <div class="arrow-wrap"><span class="arrow">→</span><span class="arrow-label">fallback</span></div>
+  <div class="cascade-node n-openai">
+    <div class="label">④ OpenAI</div>
+    <div class="sub mono">gpt-5.1</div>
+    <span class="badge badge-paid">Pay-per-use</span>
+  </div>
+</div>
+
+<h3>Catena Route AI (pianificazione percorso) &nbsp;<span class="tag tag-chain">server/ai/route-provider-config.ts</span> &nbsp;<span class="dim" style="font-size:6.5pt">— configurabile via DB / env ROUTE_AI_PROVIDERS</span></h3>
+
+<div class="cascade">
+  <div class="cascade-node n-ollama">
+    <div class="label">① Ollama</div>
+    <div class="sub mono">llama3.1:8b<br>(ThinkCentre)</div>
+    <span class="badge badge-local">Primary</span>
+  </div>
+  <div class="arrow-wrap"><span class="arrow">→</span><span class="arrow-label">fallback</span></div>
+  <div class="cascade-node n-groq">
+    <div class="label">② Groq</div>
+    <div class="sub mono">llama-3.3-70b<br>(parse model)</div>
+    <span class="badge badge-free">Free Tier</span>
+  </div>
+  <div class="arrow-wrap"><span class="arrow">→</span><span class="arrow-label">fallback</span></div>
+  <div class="cascade-node n-gemini">
+    <div class="label">③ Gemini</div>
+    <div class="sub mono">gemini-2.0-flash</div>
+    <span class="badge badge-free">Free Tier</span>
+  </div>
+  <div class="arrow-wrap"><span class="arrow">→</span><span class="arrow-label">fallback</span></div>
+  <div class="cascade-node n-openai">
+    <div class="label">④ OpenAI</div>
+    <div class="sub mono">gpt-4o-mini<br>(route)</div>
+    <span class="badge badge-paid">Pay-per-use</span>
+  </div>
+</div>
+
+<div class="infobox infobox-blue">
+  <strong>Cascade universale (Task #3872):</strong> Ollama viene tentato per PRIMO in ogni <code>runWithFallback</code> se configurato; se offline la chain prosegue su Groq → Gemini → OpenAI.
+  &nbsp;&nbsp;
+  <strong>Engine Selector AI:</strong> 2 fasi — Fase 1 Ollama (½ del budget 800ms), Fase 2 chain cloud (<code>skipOllama:true</code>) col budget residuo.
+  &nbsp;&nbsp;
+  <strong>Chat co-pilot moderazione</strong> (<code>moderation/chat.ts</code>): <code>skipOllama:true</code> per tool calling multi-step — cloud-only.
+  &nbsp;&nbsp;
+  <strong>DB Integrity Watchdog:</strong> 3-step manual — (0) Ollama, (1) Groq modello specifico, (2) chain cloud standard; cooldown 30min.
+  &nbsp;&nbsp;
+  <strong>Catena Route AI:</strong> chain separata, stessa priorità Ollama-first, configurabile via DB <code>ai_route_provider_chain</code> / env <code>ROUTE_AI_PROVIDERS</code>.
+</div>
+
+<h2>2. Feature AI — Dettaglio per Modulo</h2>
+
+<table class="no-break">
+  <thead>
+    <tr>
+      <th style="width:15%">Feature</th>
+      <th style="width:18%">File / Modulo</th>
+      <th style="width:14%">Provider primario</th>
+      <th style="width:20%">Modello</th>
+      <th style="width:18%">Fallback</th>
+      <th style="width:15%">Note</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td class="bold">Triage moderazione</td>
+      <td class="mono dim">server/ai/moderation/triage.ts</td>
+      <td>Ollama (first)</td>
+      <td class="mono">llama3.1:8b (Ollama) → openai/gpt-oss-20b (Groq, brain) → gemini-2.5-flash → gpt-5.1</td>
+      <td>Rule-based se budget esaurito; cascade automatica se provider KO</td>
+      <td>Role: brain; generateObject; schema Zod; retry ×2; log ai_call_logs</td>
+    </tr>
+    <tr style="background:var(--alt-row)">
+      <td class="bold">AI Assistant (chat utente)</td>
+      <td class="mono dim">server/ai/assistant/agent.ts</td>
+      <td>Ollama (first)</td>
+      <td class="mono">llama3.1:8b (Ollama) → openai/gpt-oss-20b (Groq, router) → gemini-2.5-flash-lite → gpt-5.1</td>
+      <td>Cascade universale Ollama-first; ollamaBackstop ora ridondante (Task #3872)</td>
+      <td>Streaming SSE; RAG 3-snippet; memoria DB; tool call Ollama (maxSteps:3)</td>
+    </tr>
+    <tr>
+      <td class="bold">Route AI Parse (JSON)</td>
+      <td class="mono dim">server/routes/planned-routes/waypoints.ts<br>+waypoints.next.ts<br>server/ai/route-provider-config.ts</td>
+      <td>Ollama (primary)</td>
+      <td class="mono">llama3.1:8b (Ollama) → Groq parse model → gemini-2.0-flash → gpt-4o-mini</td>
+      <td>Chain configurabile DB/env; probe raggiungibilità Ollama; schema Zod + balanced-JSON</td>
+      <td>Timeout GEMINI_TIMEOUT_MS (30s); POI via Overpass; stats per provider</td>
+    </tr>
+    <tr style="background:var(--alt-row)">
+      <td class="bold">Route AI Stream (SSE)</td>
+      <td class="mono dim">server/routes/planned-routes/waypoints.ts<br>+waypoints.next.ts<br>server/ai/route-provider-config.ts</td>
+      <td>Ollama (primary)</td>
+      <td class="mono">llama3.1:8b (Ollama) → Groq → Gemini → OpenAI</td>
+      <td>Buffering Ollama: emette solo se JSON valido; ricade su cloud se non valido</td>
+      <td>Evento SSE done con parsed; validazione tryParseRoute progressiva</td>
+    </tr>
+    <tr>
+      <td class="bold">Engine Selector AI</td>
+      <td class="mono dim">server/routing/ai-engine-decider.ts</td>
+      <td>Ollama (fase 1)</td>
+      <td class="mono">Fase 1: llama3.1:8b (Ollama, ½ budget)<br>Fase 2: openai/gpt-oss-20b → gemini-2.5-flash-lite → gpt-5.1 (skipOllama:true)</td>
+      <td>Timeout 800ms totale; Fase 1=400ms Ollama; Fase 2=cloud residuo; scade → rule-based</td>
+      <td>Sceglie GH vs Valhalla; input: bbox quality + health + ora; confidence<0.6 → doppia route</td>
+    </tr>
+    <tr style="background:var(--alt-row)">
+      <td class="bold">DB Integrity Watchdog</td>
+      <td class="mono dim">server/ai/db-integrity/scheduler.ts<br>+worker.ts<br>server/ai/watchdog/proposer.ts</td>
+      <td>Ollama → Groq</td>
+      <td class="mono">llama3.1:8b (Ollama, step 0) → openai/gpt-oss-20b (Groq, step 1) → chain cloud (step 2)</td>
+      <td>3-step manual: Ollama → Groq specifico → chain cloud (skipOllama:true); cooldown 30min</td>
+      <td>Scan notturno 03:00 + domenica 04:00 (expensive); cron croner; BullMQ</td>
+    </tr>
+    <tr>
+      <td class="bold">Embeddings (generazione)</td>
+      <td class="mono dim">server/embeddings/client.ts</td>
+      <td>OpenAI</td>
+      <td class="mono">text-embedding-3-large (dim=1536)</td>
+      <td>HF locale Xenova/multilingual-e5-small (384→1536, 4× concat + L2)</td>
+      <td>Timeout 15s; retry ×3; tag model in DB: openai: vs local:</td>
+    </tr>
+    <tr style="background:var(--alt-row)">
+      <td class="bold">Coordinate/geocode AI prompt</td>
+      <td class="mono dim">server/routes/planned-routes/waypoints.ts</td>
+      <td>Non AI</td>
+      <td class="mono">Nominatim (OSM self-hosted)</td>
+      <td>Overpass per POI search</td>
+      <td>Downstream dall'AI Parse; no provider AI diretto</td>
+    </tr>
+  </tbody>
+</table>
+
+<footer>
+  <span>BikerLink AI Stack Schema — Documento riservato</span>
+  <span>11 giugno 2026</span>
+  <span>Pagina 1 / 2</span>
+</footer>
+</div>
+
+<!-- PAGE 2 -->
+<div class="page page-break">
+
+<header>
+  <h1>Biker<span>Link</span> — Schema AI Stack</h1>
+  <div class="header-meta">
+    <strong>Meccanismi Trasversali &amp; Embedding</strong>
+    Revisione: 11 giugno 2026
+  </div>
+</header>
+
+<h2>3. Meccanismi Trasversali</h2>
+
+<div class="cards">
+  <div class="card no-break">
+    <div class="card-title">💰 Budget Mensile</div>
+    <div class="card-body">
+      File: <span class="mono">server/ai/moderation/budget.ts</span><br>
+      <ul>
+        <li>Limite default: $55/mese</li>
+        <li>Alert push a 80% utilizzo</li>
+        <li>Freeze chat al 100%; triage → rule-based</li>
+        <li>Scopes: chat, triage, digest, anomaly</li>
+        <li>Tabella: ai_usage_budget (per mese)</li>
+        <li>Costo via estimateCostUsd() (prezzi per modello)</li>
+      </ul>
+    </div>
+  </div>
+  <div class="card no-break">
+    <div class="card-title">🔁 Circuit Breaker + Cooldown</div>
+    <div class="card-body">
+      File: <span class="mono">server/ai/moderation/provider.ts</span><br>
+      <ul>
+        <li>Errore generico: 60s cooldown (in-memory)</li>
+        <li>Errore quota/rate limit: 6h (persistito DB)</li>
+        <li>Pattern: quota, rate_limit, RESOURCE_EXHAUSTED</li>
+        <li>Cap RPD: Groq 1.000, Gemini 1.500, OpenAI ∞</li>
+        <li>Groq TPD soft-cap: 160k token/giorno</li>
+        <li>Ripristino via initProviderHealth() al boot</li>
+      </ul>
+    </div>
+  </div>
+  <div class="card no-break">
+    <div class="card-title">⏱ Rate Limiter RPM (Bottleneck)</div>
+    <div class="card-body">
+      File: <span class="mono">server/lib/throttle.ts</span><br>
+      <ul>
+        <li>Ogni provider ha uno scheduler dedicato</li>
+        <li>Groq: 30 RPM (free tier)</li>
+        <li>Gemini: limiter RPM configurato</li>
+        <li>Ollama: pass-through (nessun limite)</li>
+        <li>OGNI chiamata AI DEVE passare da m.scheduler()</li>
+      </ul>
+    </div>
+  </div>
+  <div class="card no-break">
+    <div class="card-title">🎛 AiCoordinator — Event Bus</div>
+    <div class="card-body">
+      File: <span class="mono">server/ai/coordinator/index.ts</span><br>
+      <ul>
+        <li>Singleton: getCoordinator()</li>
+        <li>emit → ai_events + Redis pub/sub</li>
+        <li>subscribe → Redis + fallback in-process</li>
+        <li>recordDecision → ai_decisions</li>
+        <li>evaluateConflict → ai_conflicts + policy</li>
+        <li>Admin bypass: aiName='admin' non bloccato</li>
+      </ul>
+    </div>
+  </div>
+  <div class="card no-break">
+    <div class="card-title">🔴 Kill Switch / Pause</div>
+    <div class="card-body">
+      File: <span class="mono">server/ai/coordinator/index.ts</span><br>
+      <ul>
+        <li>Pausa per-AI o globale (aiName='*')</li>
+        <li>Stato Redis con TTL; fallback in-memory</li>
+        <li>pauseAi(), resumeAi(), listPaused()</li>
+        <li>Emit silenzioso se AI in pausa</li>
+        <li>COORDINATOR_DISABLED=1 disabilita tutto</li>
+      </ul>
+    </div>
+  </div>
+  <div class="card no-break">
+    <div class="card-title">🧠 Memoria Conversazionale + RAG</div>
+    <div class="card-body">
+      File: <span class="mono">server/ai/assistant/agent.ts</span><br>
+      <ul>
+        <li>Tabella: ai_conversation_turns</li>
+        <li>Ultimi N turni per contesto (MEMORY_TURNS_LIMIT)</li>
+        <li>RAG: top-3 snippet da knowledge base</li>
+        <li>Pruning asincrono (fire-and-forget)</li>
+        <li>Tool calling: attivo solo su Ollama (maxSteps:3)</li>
+      </ul>
+    </div>
+  </div>
+  <div class="card no-break">
+    <div class="card-title">📊 Logging AI Usage</div>
+    <div class="card-body">
+      File: <span class="mono">server/lib/ai-logger.ts</span><br>
+      <ul>
+        <li>Log: provider, model, tokensIn/Out, latencyMs</li>
+        <li>Log: costUsd, degraded, error</li>
+        <li>Tabella: ai_call_logs (assistant + triage)</li>
+        <li>Groq token tracking → soft-cap TPD</li>
+        <li>Fire-and-forget (non bloccante)</li>
+      </ul>
+    </div>
+  </div>
+  <div class="card no-break">
+    <div class="card-title">🔄 Watchdog AI Proposer</div>
+    <div class="card-body">
+      File: <span class="mono">server/ai/watchdog/proposer.ts</span><br>
+      <ul>
+        <li>Routing 3-step: (0) Ollama, (1) Groq specifico, (2) chain cloud</li>
+        <li>Cooldown 30min se problema high/critical persistente</li>
+        <li>Scan: notturno 03:00, domenicale 04:00 (expensive)</li>
+        <li>Cleanup quarantena ogni 6h via croner</li>
+        <li>Anomalie via BullMQ worker</li>
+      </ul>
+    </div>
+  </div>
+  <div class="card no-break">
+    <div class="card-title">🗺 AI Routing Engine Selector</div>
+    <div class="card-body">
+      File: <span class="mono">server/routing/ai-engine-decider.ts</span><br>
+      <ul>
+        <li>Attivo se maps_routing_engine = 'ai'</li>
+        <li>Sceglie: GraphHopper vs Valhalla</li>
+        <li>Fase 1: Ollama (½ budget 800ms); Fase 2: cloud (skipOllama:true)</li>
+        <li>Timeout hard 800ms → ricade su rule-based</li>
+        <li>Confidence < 0.6 → doppia route + confronto</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<h2>4. Stack Embeddings</h2>
+
+<div class="embed-stack">
+  <div class="embed-box embed-primary">
+    <strong>🥇 Provider primario — OpenAI</strong>
+    Modello: <span class="mono">text-embedding-3-large</span><br>
+    Dimensioni: <strong>1536</strong> (providerOptions: dimensions=1536 su dim nativa 3072)<br>
+    Tag DB: <span class="mono">openai:text-embedding-3-large</span><br>
+    Timeout: 15s · Retry: ×3 su 429 / 5xx<br>
+    Attivo quando: <span class="mono">OPENAI_API_KEY</span> presente
+  </div>
+  <div class="embed-box embed-fallback">
+    <strong>🔁 Fallback locale — HuggingFace Transformers</strong>
+    Modello: <span class="mono">Xenova/multilingual-e5-small</span> (quantized)<br>
+    Dim nativa: <strong>384</strong> → proiettata a <strong>1536</strong> via 4× concat + L2-normalize<br>
+    Tag DB: <span class="mono">local:Xenova/multilingual-e5-small</span><br>
+    Caricamento pigro (lazy): init solo alla prima chiamata<br>
+    Attivo quando: OPENAI_API_KEY assente o quota/errore persistente
+  </div>
+</div>
+
+<div class="infobox infobox-orange">
+  <strong>⚠️ Cross-provider similarity:</strong> La similarità coseno tra vettori OpenAI e vettori locali NON è significativa. Il matcher filtra per campo <span class="mono">model</span> quando serve confronto omogeneo. Le righe <span class="mono">local:</span> sono confrontabili solo tra loro.
+</div>
+
+<h2>5. Variabili d'Ambiente — Riepilogo</h2>
+
+<table>
+  <thead>
+    <tr>
+      <th style="width:28%">Variabile</th>
+      <th style="width:20%">Provider / Feature</th>
+      <th style="width:52%">Note</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td class="mono">GROQ_API_KEY</td>
+      <td>Groq (primario)</td>
+      <td>Free tier — 30 RPM, 1.000 RPD, TPD soft-cap 160k token. Override: GROQ_RPD_LIMIT, GROQ_TPD_LIMIT</td>
+    </tr>
+    <tr style="background:var(--alt-row)">
+      <td class="mono">GEMINI_API_KEY / GOOGLE_API_KEY</td>
+      <td>Gemini (fallback)</td>
+      <td>Free tier Google AI Studio — 1.500 RPD. Override: GEMINI_RPD_LIMIT. Flash-lite su router, Flash su brain</td>
+    </tr>
+    <tr>
+      <td class="mono">OPENAI_API_KEY</td>
+      <td>OpenAI + Embeddings</td>
+      <td>Pay-per-use. Nessun cap RPD di default (Infinity). Attiva anche text-embedding-3-large</td>
+    </tr>
+    <tr style="background:var(--alt-row)">
+      <td class="mono">OLLAMA_URL</td>
+      <td>Ollama (self-hosted)</td>
+      <td>ThinkCentre LAN/Cloudflare. Se assente, Ollama disabilitato. Modello: OLLAMA_MODEL (default llama3.1:8b)</td>
+    </tr>
+    <tr>
+      <td class="mono">COORDINATOR_DISABLED</td>
+      <td>AiCoordinator</td>
+      <td>Se =1, tutto il layer coordinator è disabilitato (emit/subscribe no-op)</td>
+    </tr>
+    <tr style="background:var(--alt-row)">
+      <td class="mono">GEMINI_TIMEOUT_MS</td>
+      <td>Route AI Parse/Stream</td>
+      <td>Timeout globale AI route planning (default 30.000ms)</td>
+    </tr>
+    <tr>
+      <td class="mono">VALHALLA_URL</td>
+      <td>AI Engine Selector</td>
+      <td>Se assente, il selector AI sceglie sempre GraphHopper con confidence alta</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="infobox infobox-green">
+  <strong>✅ Livello di resilienza:</strong> Il sistema funziona con un solo provider configurato. Con solo <span class="mono">GROQ_API_KEY</span> tutte le feature AI sono attive (eccetto embeddings OpenAI). Con zero chiavi cloud ma <span class="mono">OLLAMA_URL</span> configurato, l'AI assistant è operativo in modalità degradata. Con zero provider, il server parte comunque e il triage usa il fallback rule-based deterministico.
+</div>
+
+<footer>
+  <span>BikerLink AI Stack Schema — Documento riservato</span>
+  <span>11 giugno 2026</span>
+  <span>Pagina 2 / 2</span>
+</footer>
+</div>
+
+</body>
+</html>
