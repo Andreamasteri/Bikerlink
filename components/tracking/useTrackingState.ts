@@ -27,6 +27,7 @@ import * as TaskManager from "expo-task-manager";
 
 // Sub-hooks
 import { useGpsTracking, GpsPoint } from "./useGpsTracking";
+import { MountAxisCalibration } from "@/components/MountCalibWizard";
 import { useSensorTracking } from "./useSensorTracking";
 import { useSprintTracking } from "./useSprintTracking";
 import { useBatteryTracking } from "./useBatteryTracking";
@@ -41,6 +42,8 @@ import { useOfflineQueue } from "@/hooks/tracking/useOfflineQueue";
 
 // Types
 export type Phase = "idle" | "countdown" | "active" | "paused";
+
+type VolumeManagerExt = typeof VolumeManager & { showNativeVolumeUI?: (show: boolean) => void };
 
 export interface RouteRecord {
   id: string;
@@ -285,15 +288,14 @@ export function useTrackingState() {
           let tiltDeg = 0, lateralG = 0, accelG = 0;
           if (sensors.mountAxisCalibRef.current) {
             const { x: ax, y: ay, z: az } = data.accelerationIncludingGravity;
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any -- MountAxisCalibration runtime shape
-            const up = (sensors.mountAxisCalibRef.current as any).up, forward = (sensors.mountAxisCalibRef.current as any).forward;
+            interface CalibVectors { up: { x: number; y: number; z: number }; forward: { x: number; y: number; z: number } }
+            const { up, forward } = sensors.mountAxisCalibRef.current as MountAxisCalibration & CalibVectors;
             const right = { x: up.y * forward.z - up.z * forward.y, y: up.z * forward.x - up.x * forward.z, z: up.x * forward.y - up.y * forward.x };
             accelG = (ax * forward.x + ay * forward.y + az * forward.z) / 9.81;
             lateralG = (ax * right.x + ay * right.y + az * right.z) / 9.81;
             tiltDeg = Math.atan2(lateralG, (ax * up.x + ay * up.y + az * up.z) / 9.81) * (180 / Math.PI);
           } else {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any -- DeviceMotion rotation.roll not typed in expo-sensors
-            accelG = y / 9.81; lateralG = x / 9.81; tiltDeg = ((data.rotation as any).roll || 0) * (180 / Math.PI);
+            accelG = y / 9.81; lateralG = x / 9.81; tiltDeg = ((data.rotation as { roll?: number }).roll || 0) * (180 / Math.PI);
           }
           sensors.currentAccelGRef.current = accelG; sensors.currentLateralGRef.current = lateralG; sensors.currentTiltDegRef.current = tiltDeg;
           sensors.setCurrentLateralG(lateralG); sensors.setCurrentTiltDeg(tiltDeg);
@@ -347,10 +349,8 @@ export function useTrackingState() {
     if (settings.sensorsEnabledRef.current) refs.telemetryAccumRef.current.push({ timestamp: point.timestamp, lat: latitude, lon: longitude, leanAngle: sensors.currentTiltDegRef.current, gForceX: sensors.currentAccelGRef.current, speedKmh: smoothedSpeed });
     if (settings.handsOffEnabledRef.current && !handsOffDismissedForRideRef.current) {
       if (smoothedSpeed >= settings.handsOffSpeedRef.current) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- VolumeManager.showNativeVolumeUI not in typedefs
-        if (!handsOffActive) { setHandsOffActive(true); setHandsOffBroadcast(true); (VolumeManager as any).showNativeVolumeUI(false); }
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- VolumeManager.showNativeVolumeUI not in typedefs
-      } else if (handsOffActive) { setHandsOffActive(false); setHandsOffBroadcast(false); (VolumeManager as any).showNativeVolumeUI(true); }
+        if (!handsOffActive) { setHandsOffActive(true); setHandsOffBroadcast(true); (VolumeManager as VolumeManagerExt).showNativeVolumeUI?.(false); }
+      } else if (handsOffActive) { setHandsOffActive(false); setHandsOffBroadcast(false); (VolumeManager as VolumeManagerExt).showNativeVolumeUI?.(true); }
     }
   }, [gps, sensors, sprint, bg, handsOffActive, settings, stats, session, refs]);
 
@@ -460,8 +460,7 @@ export function useTrackingState() {
       session.setSummaryPatchFailed(patchFailed);
       session.setSummaryVisible(true);
       session.setPhase("idle"); session.setLoading(false); setHandsOffActive(false); setHandsOffBroadcast(false);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- VolumeManager.showNativeVolumeUI not in typedefs
-      (VolumeManager as any).showNativeVolumeUI(true);
+      (VolumeManager as VolumeManagerExt).showNativeVolumeUI?.(true);
     }
   }, [cleanupTracking, flushPoints, stats, gps, sensors, sprint, battery, refetchRecords, t, session, settings, mapState, refs, offlineQueue]);
 
@@ -473,8 +472,8 @@ export function useTrackingState() {
 
   const handleRecalibrate = useCallback(() => {
     [sensors.maxAccelGRef, sensors.maxDecelGRef, sensors.maxTiltDegRef, sensors.maxLateralGRef].forEach(r => r.current = 0);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- sensor setter array, all accept number
-    [sensors.setMaxAccelG, sensors.setMaxDecelG, sensors.setMaxTiltDeg, sensors.setMaxLateralG, sensors.setCurrentG, sensors.setCurrentLateralG, sensors.setCurrentTiltDeg, sensors.setShowSensorOverlay].forEach(f => (f as any)(0));
+    sensors.setMaxAccelG(0); sensors.setMaxDecelG(0); sensors.setMaxTiltDeg(0); sensors.setMaxLateralG(0);
+    sensors.setCurrentG(0); sensors.setCurrentLateralG(0); sensors.setCurrentTiltDeg(0);
     sensors.setShowSensorOverlay(false);
     if (sensors.sensorSourceRef.current === "accelerometer") { sensors.setIsCalibrating(true); sensors.accelBaselineRef.current = null; sensors.accelCalibSamples.current = []; }
   }, [sensors]);
@@ -499,8 +498,7 @@ export function useTrackingState() {
           const raw = await AsyncStorage.getItem(BG_POINTS_KEY);
           if (raw) {
             const bgPoints: GpsPoint[] = JSON.parse(raw); await AsyncStorage.removeItem(BG_POINTS_KEY);
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any -- LocationObject partial shape, native handler accepts it
-            bgPoints.forEach(p => onNativeLocation({ coords: { latitude: p.latitude, longitude: p.longitude, altitude: p.altitude, speed: p.speedKmh / 3.6, accuracy: 0, heading: 0, altitudeAccuracy: 0 }, timestamp: new Date(p.timestamp).getTime() } as any));
+            bgPoints.forEach(p => onNativeLocation({ coords: { latitude: p.latitude, longitude: p.longitude, altitude: p.altitude, speed: p.speedKmh / 3.6, accuracy: 0, heading: 0, altitudeAccuracy: 0 }, timestamp: new Date(p.timestamp).getTime() } as Location.LocationObject));
             if (bgPoints.length > 0) {
               if (isTabFocusedRef.current) {
                 bg.setBgToastCount(bgPoints.length); bg.setBgToastVisible(true);

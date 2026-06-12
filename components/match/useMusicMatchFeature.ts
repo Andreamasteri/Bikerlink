@@ -10,18 +10,23 @@ interface Options {
   lastfmConnected: boolean;
 }
 
+interface MusicMatchItem {
+  user?: { id?: string };
+  [key: string]: unknown;
+}
+
+type MusicMatchRaw = MusicMatchItem[] | { matches?: MusicMatchItem[] };
+
 export function useMusicMatchFeature({ activeTab, lastfmConnected }: Options) {
   const router = useRouter();
   const { user } = useAuth();
   const t = useT();
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- music match shape
-  const { data: musicMatches, isLoading: musicLoading, refetch: musicRefetch, isRefetching: musicRefetching, error: musicError } = useQuery<any, unknown, any[]>({
+  const { data: musicMatches, isLoading: musicLoading, refetch: musicRefetch, isRefetching: musicRefetching, error: musicError } = useQuery<MusicMatchRaw, unknown, MusicMatchItem[]>({
     queryKey: ["/api/match/music"],
     enabled: !!user && activeTab === "music" && lastfmConnected,
     refetchInterval: 60000,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- server returns { matches: [] }, extract the array
-    select: (data: any) => (Array.isArray(data) ? data : (data?.matches ?? [])),
+    select: (data: MusicMatchRaw) => (Array.isArray(data) ? data : (data?.matches ?? [])),
   });
 
   const isServerBusy = musicError instanceof ServerBusyError;
@@ -31,20 +36,20 @@ export function useMusicMatchFeature({ activeTab, lastfmConnected }: Options) {
     onMutate: async (userId: string) => {
       await queryClient.cancelQueries({ queryKey: ["/api/match/music"] });
       const previousMusic = queryClient.getQueryData(["/api/match/music"]);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- music match shape
-      queryClient.setQueryData(["/api/match/music"], (old: any) => {
-        if (Array.isArray(old)) return old.filter((m: { user?: { id?: string } }) => m.user?.id !== userId);
-        if (old && Array.isArray(old.matches)) return { ...old, matches: old.matches.filter((m: { user?: { id?: string } }) => m.user?.id !== userId) };
+      queryClient.setQueryData(["/api/match/music"], (old: MusicMatchRaw | undefined) => {
+        if (Array.isArray(old)) return old.filter((m) => m.user?.id !== userId);
+        if (old && Array.isArray((old as { matches?: MusicMatchItem[] }).matches)) {
+          return { ...(old as { matches: MusicMatchItem[] }), matches: (old as { matches: MusicMatchItem[] }).matches.filter((m) => m.user?.id !== userId) };
+        }
         return old;
       });
       return { previousMusic };
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/match/music"] });
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- API response shape
-      if ((data as any).id) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- API response shape
-        router.push(`/chat/${(data as any).id}` as never);
+      const conv = data as unknown as { id?: string };
+      if (conv.id) {
+        router.push(`/chat/${conv.id}` as never);
       }
     },
     onError: (_err: unknown, _userId: string, context: { previousMusic?: unknown } | undefined) => {
@@ -60,10 +65,11 @@ export function useMusicMatchFeature({ activeTab, lastfmConnected }: Options) {
     onMutate: async (userId: string) => {
       await queryClient.cancelQueries({ queryKey: ["/api/match/music"] });
       const previousMusic = queryClient.getQueryData(["/api/match/music"]);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- music match shape
-      queryClient.setQueryData(["/api/match/music"], (old: any) => {
-        if (Array.isArray(old)) return old.filter((m: { user?: { id?: string } }) => m.user?.id !== userId);
-        if (old && Array.isArray(old.matches)) return { ...old, matches: old.matches.filter((m: { user?: { id?: string } }) => m.user?.id !== userId) };
+      queryClient.setQueryData(["/api/match/music"], (old: MusicMatchRaw | undefined) => {
+        if (Array.isArray(old)) return old.filter((m) => m.user?.id !== userId);
+        if (old && Array.isArray((old as { matches?: MusicMatchItem[] }).matches)) {
+          return { ...(old as { matches: MusicMatchItem[] }), matches: (old as { matches: MusicMatchItem[] }).matches.filter((m) => m.user?.id !== userId) };
+        }
         return old;
       });
       return { previousMusic };

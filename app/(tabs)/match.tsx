@@ -29,6 +29,14 @@ import { useRenderItem } from "@/components/match/useRenderItem";
 import { useMusicMatchFeature } from "@/components/match/useMusicMatchFeature";
 import { styles } from "@/components/match/match.styles";
 
+interface ApiMatchItem {
+  id: string;
+  status?: string;
+  updatedAt?: string | null;
+  createdAt?: string | null;
+  [key: string]: unknown;
+}
+
 export default function MatchScreen() {
   const router = useRouter();
   const colors = useColors();
@@ -85,24 +93,21 @@ export default function MatchScreen() {
     }, [activeTab])
   );
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- match data shape varies
-  const { data: proposalMatches, isLoading: proposalLoading, refetch: proposalRefetch, isRefetching: proposalRefetching } = useQuery<any[]>({
+  const { data: proposalMatches, isLoading: proposalLoading, refetch: proposalRefetch, isRefetching: proposalRefetching } = useQuery<ApiMatchItem[]>({
     queryKey: ["/api/proposals/matches"],
     enabled: !!user,
     refetchInterval: 30000,
     refetchOnMount: true,
   });
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- match data shape varies
-  const { data: garageMatches, isLoading: garageLoading, refetch: garageRefetch, isRefetching: garageRefetching, isFetching: garageIsFetching } = useQuery<any[]>({
+  const { data: garageMatches, isLoading: garageLoading, refetch: garageRefetch, isRefetching: garageRefetching, isFetching: garageIsFetching } = useQuery<ApiMatchItem[]>({
     queryKey: ["/api/proposals/garage-matches"],
     enabled: !!user,
     refetchInterval: 30000,
     refetchOnMount: true,
   });
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- match data shape varies
-  const { data: bikerMatches, isLoading: bikerLoading, refetch: bikerRefetch, isRefetching: bikerRefetching, isFetching: bikerIsFetching } = useQuery<any[]>({
+  const { data: bikerMatches, isLoading: bikerLoading, refetch: bikerRefetch, isRefetching: bikerRefetching, isFetching: bikerIsFetching } = useQuery<ApiMatchItem[]>({
     queryKey: ["/api/proposals/biker-matches"],
     enabled: !!user,
     refetchInterval: 30000,
@@ -120,40 +125,35 @@ export default function MatchScreen() {
     [freshMatchesList],
   );
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- user list shape
-  const { data: blockedUsers, isLoading: blockedLoading, refetch: blockedRefetch, isRefetching: blockedRefetching } = useQuery<any[]>({
+  const { data: blockedUsers, isLoading: blockedLoading, refetch: blockedRefetch, isRefetching: blockedRefetching } = useQuery<ApiMatchItem[]>({
     queryKey: ["/api/users/blocked"],
     enabled: !!user,
     refetchInterval: 30000,
     refetchOnMount: true,
   });
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- match data shape varies
-  const { data: acceptedMatches, isLoading: acceptedLoading, refetch: acceptedRefetch, isRefetching: acceptedRefetching } = useQuery<any[]>({
+  const { data: acceptedMatches, isLoading: acceptedLoading, refetch: acceptedRefetch, isRefetching: acceptedRefetching } = useQuery<ApiMatchItem[]>({
     queryKey: ["/api/proposals/matches/accepted"],
     enabled: !!user,
     refetchInterval: 30000,
     refetchOnMount: true,
   });
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- match data shape varies
-  const { data: propProfileMatches, isLoading: propProfileLoading, refetch: propProfileRefetch, isRefetching: propProfileRefetching } = useQuery<any[]>({
+  const { data: propProfileMatches, isLoading: propProfileLoading, refetch: propProfileRefetch, isRefetching: propProfileRefetching } = useQuery<ApiMatchItem[]>({
     queryKey: ["/api/proposals/proposal-profile-matches"],
     enabled: !!user,
     refetchInterval: 30000,
     refetchOnMount: true,
   });
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- match data shape varies
-  const { data: routeAffinityMatches, isLoading: routeAffinityLoading, refetch: routeAffinityRefetch, isRefetching: routeAffinityRefetching } = useQuery<any[]>({
+  const { data: routeAffinityMatches, isLoading: routeAffinityLoading, refetch: routeAffinityRefetch, isRefetching: routeAffinityRefetching } = useQuery<ApiMatchItem[]>({
     queryKey: ["/api/proposals/route-affinity-matches"],
     enabled: !!user,
     refetchInterval: 60000,
     refetchOnMount: true,
   });
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- match data shape varies
-  const { data: telemetryAffinityMatches, isLoading: telemetryAffinityLoading, refetch: telemetryAffinityRefetch, isRefetching: telemetryAffinityRefetching } = useQuery<any[]>({
+  const { data: telemetryAffinityMatches, isLoading: telemetryAffinityLoading, refetch: telemetryAffinityRefetch, isRefetching: telemetryAffinityRefetching } = useQuery<ApiMatchItem[]>({
     queryKey: ["/api/proposals/telemetry-affinity-matches"],
     enabled: !!user,
     refetchInterval: 60000,
@@ -514,8 +514,8 @@ export default function MatchScreen() {
   const startChatMutation = useMutation({
     mutationFn: (targetUserId: string) => apiRequest("POST", "/api/chat/conversations", { targetUserId }),
     onSuccess: (data) => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- API response shape
-      if ((data as any).id) { router.push(`/chat/${(data as any).id}` as never); }
+      const conv = data as unknown as { id?: string };
+      if (conv.id) { router.push(`/chat/${conv.id}` as never); }
     },
   });
 
