@@ -1,9 +1,10 @@
-// Task #3894 — Hook raccolta bug FAB: fetch consolidato + badge unseen via AsyncStorage.
-import { useQuery } from "@tanstack/react-query";
+// Task #3894 — Hook raccolta bug FAB: fetch consolidato + badge unseen condiviso via React Query.
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback } from "react";
 
-const SEEN_KEY = "admin:bug-fab:last-seen";
+const SEEN_STORAGE_KEY = "admin:bug-fab:last-seen";
+const SEEN_QUERY_KEY = ["admin:bug-fab:last-seen"] as const;
 
 export interface BugItem {
   id: string;
@@ -20,18 +21,31 @@ export interface BugReportData {
   total: number;
 }
 
-export function useBugReport() {
-  const [lastSeen, setLastSeen] = useState<string | null>(null);
-  const [seenLoaded, setSeenLoaded] = useState(false);
+/** Condiviso tra FabWidget e FabDrawer tramite React Query cache */
+function useLastSeen() {
+  const queryClient = useQueryClient();
 
-  useEffect(() => {
-    AsyncStorage.getItem(SEEN_KEY)
-      .then((v) => {
-        setLastSeen(v ?? null);
-        setSeenLoaded(true);
-      })
-      .catch(() => setSeenLoaded(true));
-  }, []);
+  const { data: lastSeen } = useQuery<string | null>({
+    queryKey: SEEN_QUERY_KEY,
+    queryFn: () => AsyncStorage.getItem(SEEN_STORAGE_KEY),
+    staleTime: Infinity,
+    gcTime: Infinity,
+  });
+
+  const markSeen = useCallback(() => {
+    const now = new Date().toISOString();
+    // setQueryData aggiorna TUTTE le istanze iscritte (FabWidget + FabDrawer)
+    queryClient.setQueryData(SEEN_QUERY_KEY, now);
+    AsyncStorage.setItem(SEEN_STORAGE_KEY, now).catch(() => {
+      /* skip */
+    });
+  }, [queryClient]);
+
+  return { lastSeen: lastSeen ?? null, markSeen };
+}
+
+export function useBugReport() {
+  const { lastSeen, markSeen } = useLastSeen();
 
   const query = useQuery<BugReportData>({
     queryKey: ["/api/admin/bug-report/recent"],
@@ -40,44 +54,69 @@ export function useBugReport() {
   });
 
   const unseenCount = (() => {
-    if (!seenLoaded || !query.data?.items) return 0;
+    if (lastSeen === undefined) return 0; // still loading
+    if (!query.data?.items) return 0;
     if (!lastSeen) return query.data.items.length;
     return query.data.items.filter(
       (i) => new Date(i.createdAt) > new Date(lastSeen),
     ).length;
   })();
 
-  const markSeen = useCallback(() => {
-    const now = new Date().toISOString();
-    setLastSeen(now);
-    AsyncStorage.setItem(SEEN_KEY, now).catch(() => {
-      /* skip */
-    });
-  }, []);
-
   return { query, unseenCount, markSeen };
 }
 
+/** Timestamp relativo in italiano */
+export function relativeTime(iso: string): string {
+  const diff = Date.now() - new Date(iso).getTime();
+  const mins = Math.floor(diff / 60_000);
+  if (mins < 1) return "ora";
+  if (mins < 60) return `${mins}m fa`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h fa`;
+  const days = Math.floor(hours / 24);
+  return `${days}g fa`;
+}
+
+/** Tronca una stringa a max N caratteri con ellissi */
+function trunc(s: string, max = 80): string {
+  return s.length > max ? s.slice(0, max) + "…" : s;
+}
+
+/** Formato clipboard: raggruppato per sorgente, max 5 per gruppo */
 export function formatBugReportClipboard(items: BugItem[]): string {
-  const now = new Date().toLocaleString("it-IT", { timeZone: "Europe/Rome" });
-  const lines: string[] = [
-    `=== BikerLink Bug Report ===`,
-    `Generato: ${now}`,
-    `Totale errori: ${items.length}`,
-    ``,
-  ];
-  for (const item of items) {
-    const src = item.source === "crash"
-      ? "CRASH"
-      : item.source === "signal"
-        ? "SIGNAL"
-        : "WATCHDOG";
-    const date = new Date(item.createdAt).toLocaleString("it-IT", { timeZone: "Europe/Rome" });
-    lines.push(`[${src}] ${item.title}`);
-    if (item.detail) lines.push(`  ${item.detail}`);
-    lines.push(`  ${item.message}`);
-    lines.push(`  Data: ${date}`);
-    lines.push(``);
+  const date = new Date().toLocaleDateString("it-IT");
+  const lines: string[] = [`[BikerLink Bug Report - ${date}]`, ``];
+
+  const crashes = items.filter((i) => i.source === "crash").slice(0, 5);
+  const signals = items.filter((i) => i.source === "signal").slice(0, 5);
+  const watchdog = items.filter((i) => i.source === "watchdog").slice(0, 5);
+
+  if (crashes.length) {
+    lines.push("## Crash:");
+    for (const c of crashes) {
+      lines.push(`• CRASH [${c.severity.toUpperCase()}] ${trunc(c.title)}: ${trunc(c.message)}`);
+      if (c.detail) lines.push(`  ${c.detail}`);
+    }
+    lines.push("");
   }
+  if (signals.length) {
+    lines.push("## Segnali sistema:");
+    for (const s of signals) {
+      lines.push(`• SERVER [${s.severity.toUpperCase()}] ${trunc(s.message)}`);
+    }
+    lines.push("");
+  }
+  if (watchdog.length) {
+    lines.push("## AI Watchdog:");
+    for (const w of watchdog) {
+      lines.push(`• AI [${w.severity.toUpperCase()}] ${trunc(w.title)}: ${trunc(w.message)}`);
+    }
+    lines.push("");
+  }
+
+  if (items.length === 0) {
+    lines.push("Nessun errore recente. ✅");
+  }
+
   return lines.join("\n");
 }

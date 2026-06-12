@@ -1,6 +1,6 @@
 // Task #2641 — Drawer compatto del FAB: input + ultimi 5 messaggi + link console.
 // Task #3894 — Aggiunto tab "Raccolta Bug" con lista errori consolidata.
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
   Modal, View, Text, StyleSheet, TouchableOpacity, TextInput,
   ScrollView, useWindowDimensions,
@@ -16,7 +16,12 @@ import {
   useAiConversations,
   useAiConversationMessages,
 } from "@/hooks/admin/ai-console/useAiConversation";
-import { useBugReport, formatBugReportClipboard, type BugItem } from "@/hooks/admin/ai-console/useBugReport";
+import {
+  useBugReport,
+  formatBugReportClipboard,
+  relativeTime,
+  type BugItem,
+} from "@/hooks/admin/ai-console/useBugReport";
 import MessageItem from "./MessageItem";
 
 interface Props {
@@ -36,11 +41,8 @@ function sourceIcon(source: BugItem["source"]): string {
   return "eye-outline";
 }
 
-function fmtDate(iso: string): string {
-  return new Date(iso).toLocaleString("it-IT", {
-    day: "2-digit", month: "2-digit",
-    hour: "2-digit", minute: "2-digit",
-  });
+function trunc80(s: string): string {
+  return s.length > 80 ? s.slice(0, 80) + "…" : s;
 }
 
 export default function FabDrawer({ visible, onClose }: Props) {
@@ -58,7 +60,7 @@ export default function FabDrawer({ visible, onClose }: Props) {
   const [activeId, setActiveId] = useState<string | null>(null);
 
   const { query: bugQuery, markSeen } = useBugReport();
-  const bugItems = bugQuery.data?.items ?? [];
+  const bugItems = useMemo(() => bugQuery.data?.items ?? [], [bugQuery.data]);
 
   useEffect(() => {
     if (visible) setActiveId(lastId);
@@ -86,13 +88,12 @@ export default function FabDrawer({ visible, onClose }: Props) {
   }, [bugItems]);
 
   const handleSendToConsole = useCallback(() => {
-    if (bugItems.length === 0) return;
-    const lines = bugItems.slice(0, 8).map(
-      (i) => `• [${i.source.toUpperCase()}] ${i.title}: ${i.message}`,
-    ).join("\n");
-    setInput(`Analizza questi errori recenti di BikerLink:\n\n${lines}\n\nCosa consigli?`);
+    const digest = formatBugReportClipboard(bugItems);
+    setInput(`Analizza questi errori recenti di BikerLink:\n\n${digest}\n\nCosa consigli?`);
     setActiveTab("console");
   }, [bugItems]);
+
+  const bugCount = bugQuery.data?.total ?? 0;
 
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
@@ -127,8 +128,7 @@ export default function FabDrawer({ visible, onClose }: Props) {
                 style={[styles.tab, activeTab === "bugs" && { backgroundColor: colors.error ?? "#E53E3E" }]}
               >
                 <Text style={[styles.tabTxt, { color: activeTab === "bugs" ? "#fff" : colors.textSecondary }]}>
-                  🐛 Bug
-                  {bugQuery.data?.total ? ` (${bugQuery.data.total})` : ""}
+                  🐛 Raccolta Bug{bugCount > 0 ? ` (${bugCount})` : ""}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -195,6 +195,13 @@ export default function FabDrawer({ visible, onClose }: Props) {
               <ScrollView style={styles.bugList} contentContainerStyle={styles.bugListContent}>
                 {bugQuery.isLoading ? (
                   <Text style={[styles.empty, { color: colors.textSecondary }]}>Caricamento…</Text>
+                ) : bugQuery.isError ? (
+                  <View style={[styles.errorBox, { backgroundColor: (colors.error ?? "#E53E3E") + "18", borderColor: colors.error ?? "#E53E3E" }]}>
+                    <Ionicons name="warning-outline" size={18} color={colors.error ?? "#E53E3E"} />
+                    <Text style={[styles.errorTxt, { color: colors.error ?? "#E53E3E" }]}>
+                      Errore nel caricamento dei bug
+                    </Text>
+                  </View>
                 ) : bugItems.length === 0 ? (
                   <Text style={[styles.empty, { color: colors.textSecondary }]}>Nessun errore recente. ✅</Text>
                 ) : bugItems.map((item) => (
@@ -212,8 +219,10 @@ export default function FabDrawer({ visible, onClose }: Props) {
                         </Text>
                       </View>
                     </View>
-                    <Text style={[styles.bugMsg, { color: colors.textSecondary }]} numberOfLines={2}>{item.message}</Text>
-                    <Text style={[styles.bugDate, { color: colors.textSecondary }]}>{fmtDate(item.createdAt)}</Text>
+                    <Text style={[styles.bugMsg, { color: colors.textSecondary }]} numberOfLines={2}>
+                      {trunc80(item.message)}
+                    </Text>
+                    <Text style={[styles.bugDate, { color: colors.textSecondary }]}>{relativeTime(item.createdAt)}</Text>
                   </View>
                 ))}
               </ScrollView>
@@ -260,7 +269,7 @@ const styles = StyleSheet.create({
   tab: {
     flex: 1, paddingVertical: 5, alignItems: "center", justifyContent: "center",
   },
-  tabTxt: { fontFamily: "Inter_600SemiBold", fontSize: 11 },
+  tabTxt: { fontFamily: "Inter_600SemiBold", fontSize: 10 },
   openBtn: { flexDirection: "row", alignItems: "center", gap: 4 },
   openTxt: { fontFamily: "Inter_500Medium", fontSize: 11 },
   thread: { flex: 1, padding: 10 },
@@ -277,6 +286,11 @@ const styles = StyleSheet.create({
   bugContainer: { flex: 1, flexDirection: "column" },
   bugList: { flex: 1 },
   bugListContent: { padding: 10, gap: 8 },
+  errorBox: {
+    flexDirection: "row", alignItems: "center", gap: 8,
+    padding: 12, borderRadius: 10, borderWidth: 1, margin: 12,
+  },
+  errorTxt: { fontFamily: "Inter_500Medium", fontSize: 13 },
   bugItem: {
     borderRadius: 10, borderWidth: 1, padding: 10, gap: 4,
   },
