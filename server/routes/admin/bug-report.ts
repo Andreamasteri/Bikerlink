@@ -1,87 +1,100 @@
 // Task #3894 — Endpoint raccolta bug consolidata per il FAB admin.
-// Aggrega crash_logs, system_signals (high/critical), ai_watchdog_log (error).
+// Aggrega per gruppo (deduplicando ripetizioni) da: crash_logs, system_signals
+// (high/critical), ai_watchdog_log (status=error).
 import { Router, type Request, type Response } from "express";
 import { db } from "../../db";
-import { appCrashLogs, systemSignals, aiWatchdogLog } from "@shared/db";
-import { desc, inArray, eq } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 
 const router = Router();
 
 router.get("/bug-report/recent", async (_req: Request, res: Response) => {
   try {
-    const [crashes, signals, watchdogErrors] = await Promise.all([
-      db
-        .select({
-          id: appCrashLogs.id,
-          crashType: appCrashLogs.crashType,
-          errorMessage: appCrashLogs.errorMessage,
-          appVersion: appCrashLogs.appVersion,
-          platform: appCrashLogs.platform,
-          deviceModel: appCrashLogs.deviceModel,
-          createdAt: appCrashLogs.reportedAt,
-        })
-        .from(appCrashLogs)
-        .where(inArray(appCrashLogs.crashType, ["crash_system", "crash_js"]))
-        .orderBy(desc(appCrashLogs.reportedAt))
-        .limit(10),
+    const [crashRows, signalRows, watchdogRows] = await Promise.all([
+      // Crash raggruppati per tipo + messaggio (prime 200 chars) — mostra count ripetizioni
+      db.execute(sql`
+        SELECT
+          crash_type,
+          COALESCE(LEFT(error_message, 200), 'no-message') AS msg_key,
+          COUNT(*)::int AS count,
+          MAX(reported_at) AS latest_at,
+          MAX(app_version) AS app_version,
+          MAX(platform) AS platform,
+          MAX(device_model) AS device_model
+        FROM app_crash_logs
+        WHERE crash_type IN ('crash_system', 'crash_js')
+        GROUP BY crash_type, COALESCE(LEFT(error_message, 200), 'no-message')
+        ORDER BY count DESC, latest_at DESC
+        LIMIT 10
+      `),
 
-      db
-        .select({
-          id: systemSignals.id,
-          source: systemSignals.source,
-          metric: systemSignals.metric,
-          severity: systemSignals.severity,
-          value: systemSignals.value,
-          unit: systemSignals.unit,
-          createdAt: systemSignals.createdAt,
-        })
-        .from(systemSignals)
-        .where(inArray(systemSignals.severity, ["high", "critical"]))
-        .orderBy(desc(systemSignals.createdAt))
-        .limit(5),
+      // Signal raggruppati per metric + severity — high/critical
+      db.execute(sql`
+        SELECT
+          source,
+          metric,
+          severity,
+          COUNT(*)::int AS count,
+          MAX(created_at) AS latest_at,
+          AVG(value) AS avg_value,
+          MAX(unit) AS unit
+        FROM system_signals
+        WHERE severity IN ('high', 'critical')
+        GROUP BY source, metric, severity
+        ORDER BY count DESC, latest_at DESC
+        LIMIT 5
+      `),
 
-      db
-        .select({
-          id: aiWatchdogLog.id,
-          kind: aiWatchdogLog.kind,
-          scope: aiWatchdogLog.scope,
-          status: aiWatchdogLog.status,
-          summary: aiWatchdogLog.summary,
-          createdAt: aiWatchdogLog.createdAt,
-        })
-        .from(aiWatchdogLog)
-        .where(eq(aiWatchdogLog.status, "error"))
-        .orderBy(desc(aiWatchdogLog.createdAt))
-        .limit(5),
+      // AI Watchdog raggruppati per kind + scope (errori)
+      db.execute(sql`
+        SELECT
+          kind,
+          scope,
+          status,
+          COUNT(*)::int AS count,
+          MAX(created_at) AS latest_at,
+          MAX(summary) AS summary
+        FROM ai_watchdog_log
+        WHERE status = 'error'
+        GROUP BY kind, scope, status
+        ORDER BY count DESC, latest_at DESC
+        LIMIT 5
+      `),
     ]);
 
+    type CrashRow = { crash_type: string; msg_key: string; count: number; latest_at: Date; app_version: string | null; platform: string | null; device_model: string | null };
+    type SignalRow = { source: string; metric: string; severity: string; count: number; latest_at: Date; avg_value: number | null; unit: string | null };
+    type WatchdogRow = { kind: string; scope: string | null; status: string; count: number; latest_at: Date; summary: string | null };
+
     const items = [
-      ...crashes.map((c) => ({
-        id: c.id,
+      ...(crashRows.rows as CrashRow[]).map((c, i) => ({
+        id: `crash-${i}`,
         source: "crash" as const,
         severity: "critical" as const,
-        title: c.crashType === "crash_js" ? "JS Crash" : "System Crash",
-        message: c.errorMessage ?? "Nessun messaggio",
-        detail: `${c.platform ?? "?"} · ${c.deviceModel ?? "?"} · v${c.appVersion ?? "?"}`,
-        createdAt: (c.createdAt as Date).toISOString(),
+        title: c.crash_type === "crash_js" ? "JS Crash" : "System Crash",
+        message: c.msg_key === "no-message" ? "Nessun messaggio" : c.msg_key,
+        detail: `${c.platform ?? "?"} · ${c.device_model ?? "?"} · v${c.app_version ?? "?"}`,
+        count: c.count,
+        createdAt: (c.latest_at as Date).toISOString(),
       })),
-      ...signals.map((s) => ({
-        id: s.id,
+      ...(signalRows.rows as SignalRow[]).map((s, i) => ({
+        id: `signal-${i}`,
         source: "signal" as const,
         severity: s.severity as "high" | "critical",
         title: `Signal: ${s.metric}`,
-        message: `[${s.source}] ${s.metric}${s.value != null ? ` = ${s.value}${s.unit ? " " + s.unit : ""}` : ""}`,
+        message: `[${s.source}] ${s.metric}${s.avg_value != null ? ` ≈ ${Math.round(s.avg_value)}${s.unit ? " " + s.unit : ""}` : ""}`,
         detail: s.severity.toUpperCase(),
-        createdAt: (s.createdAt as Date).toISOString(),
+        count: s.count,
+        createdAt: (s.latest_at as Date).toISOString(),
       })),
-      ...watchdogErrors.map((w) => ({
-        id: w.id,
+      ...(watchdogRows.rows as WatchdogRow[]).map((w, i) => ({
+        id: `watchdog-${i}`,
         source: "watchdog" as const,
         severity: "high" as const,
-        title: `Watchdog error: ${w.kind}${w.scope ? " · " + w.scope : ""}`,
+        title: `AI audit error: ${w.kind}${w.scope ? " · " + w.scope : ""}`,
         message: w.summary ?? "Nessun sommario",
         detail: w.scope ?? "",
-        createdAt: (w.createdAt as Date).toISOString(),
+        count: w.count,
+        createdAt: (w.latest_at as Date).toISOString(),
       })),
     ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 

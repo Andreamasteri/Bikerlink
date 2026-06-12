@@ -111,7 +111,7 @@ export default function FabDrawer({ visible, onClose }: Props) {
             },
           ]}
         >
-          {/* Header */}
+          {/* Header con selettore tab */}
           <View style={[styles.header, { borderColor: colors.border }]}>
             <Ionicons name={activeTab === "bugs" ? "bug" : "sparkles"} size={16} color={colors.accent} />
             <View style={[styles.tabs, { backgroundColor: colors.surface, borderColor: colors.border }]}>
@@ -199,7 +199,7 @@ export default function FabDrawer({ visible, onClose }: Props) {
                   <View style={[styles.errorBox, { backgroundColor: (colors.error ?? "#E53E3E") + "18", borderColor: colors.error ?? "#E53E3E" }]}>
                     <Ionicons name="warning-outline" size={18} color={colors.error ?? "#E53E3E"} />
                     <Text style={[styles.errorTxt, { color: colors.error ?? "#E53E3E" }]}>
-                      Errore nel caricamento dei bug
+                      Errore nel caricamento
                     </Text>
                   </View>
                 ) : bugItems.length === 0 ? (
@@ -213,11 +213,18 @@ export default function FabDrawer({ visible, onClose }: Props) {
                         color={severityColor(item.severity, colors)}
                       />
                       <Text style={[styles.bugTitle, { color: colors.text }]} numberOfLines={1}>{item.title}</Text>
+                      {/* Severity badge */}
                       <View style={[styles.severityBadge, { backgroundColor: severityColor(item.severity, colors) + "33" }]}>
                         <Text style={[styles.severityTxt, { color: severityColor(item.severity, colors) }]}>
                           {item.severity}
                         </Text>
                       </View>
+                      {/* Repeat count badge — visibile solo se > 1 occorrenza */}
+                      {item.count > 1 && (
+                        <View style={[styles.countBadge, { backgroundColor: colors.textSecondary + "22", borderColor: colors.border }]}>
+                          <Text style={[styles.countTxt, { color: colors.textSecondary }]}>×{item.count}</Text>
+                        </View>
+                      )}
                     </View>
                     <Text style={[styles.bugMsg, { color: colors.textSecondary }]} numberOfLines={2}>
                       {trunc80(item.message)}
@@ -291,13 +298,15 @@ const styles = StyleSheet.create({
     padding: 12, borderRadius: 10, borderWidth: 1, margin: 12,
   },
   errorTxt: { fontFamily: "Inter_500Medium", fontSize: 13 },
-  bugItem: {
-    borderRadius: 10, borderWidth: 1, padding: 10, gap: 4,
-  },
+  bugItem: { borderRadius: 10, borderWidth: 1, padding: 10, gap: 4 },
   bugItemHeader: { flexDirection: "row", alignItems: "center", gap: 6 },
   bugTitle: { fontFamily: "Inter_600SemiBold", fontSize: 12, flex: 1 },
   severityBadge: { borderRadius: 4, paddingHorizontal: 5, paddingVertical: 2 },
   severityTxt: { fontFamily: "Inter_700Bold", fontSize: 9, textTransform: "uppercase" },
+  countBadge: {
+    borderRadius: 4, paddingHorizontal: 5, paddingVertical: 2, borderWidth: 1,
+  },
+  countTxt: { fontFamily: "Inter_600SemiBold", fontSize: 9 },
   bugMsg: { fontFamily: "Inter_400Regular", fontSize: 11, paddingLeft: 20 },
   bugDate: { fontFamily: "Inter_400Regular", fontSize: 10, paddingLeft: 20, opacity: 0.7 },
   bugActions: {

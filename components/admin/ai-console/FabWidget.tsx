@@ -56,7 +56,8 @@ export default function FabWidget() {
   const animStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
 
   const { unseenCount: bugUnseen } = useBugReport();
-  const total = (queue?.items?.length ?? 0) + alerts.unread + bugUnseen;
+  // Badge principale: alert AI + coda azioni (separato da bug)
+  const total = (queue?.items?.length ?? 0) + alerts.unread;
   const hasExplain = !!explain;
 
   const bottomInset = Math.max(insets.bottom, Platform.OS === "web" ? 34 : 12);
@@ -183,6 +184,12 @@ export default function FabWidget() {
           ) : hasExplain ? (
             <View style={[styles.dot, { backgroundColor: colors.warning ?? "#FFB300", borderColor: colors.background }]} />
           ) : null}
+          {/* Badge bug separato — angolo in basso a sinistra, distinto dagli alert AI */}
+          {bugUnseen > 0 && (
+            <View style={[styles.bugBadge, { backgroundColor: colors.error ?? "#E53E3E", borderColor: colors.background }]}>
+              <Text style={styles.bugBadgeText}>{bugUnseen > 9 ? "9+" : bugUnseen}</Text>
+            </View>
+          )}
         </Pressable>
       </Animated.View>
       <FabDrawer visible={drawerOpen} onClose={() => setDrawerOpen(false)} />
@@ -204,4 +211,10 @@ const styles = StyleSheet.create({
   },
   badgeText: { color: "#fff", fontFamily: "Inter_700Bold", fontSize: 10 },
   dot: { position: "absolute", top: -2, right: -2, width: 12, height: 12, borderRadius: 6, borderWidth: 2 },
+  bugBadge: {
+    position: "absolute", bottom: -4, left: -4,
+    minWidth: 16, height: 16, borderRadius: 8, paddingHorizontal: 3,
+    alignItems: "center", justifyContent: "center", borderWidth: 2,
+  },
+  bugBadgeText: { color: "#fff", fontFamily: "Inter_700Bold", fontSize: 8 },
 });

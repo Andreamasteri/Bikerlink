@@ -13,6 +13,7 @@ export interface BugItem {
   title: string;
   message: string;
   detail: string;
+  count: number;
   createdAt: string;
 }
 
@@ -54,7 +55,7 @@ export function useBugReport() {
   });
 
   const unseenCount = (() => {
-    if (lastSeen === undefined) return 0; // still loading
+    if (lastSeen === undefined) return 0;
     if (!query.data?.items) return 0;
     if (!lastSeen) return query.data.items.length;
     return query.data.items.filter(
@@ -77,7 +78,7 @@ export function relativeTime(iso: string): string {
   return `${days}g fa`;
 }
 
-/** Tronca una stringa a max N caratteri con ellissi */
+/** Tronca a max N caratteri con ellissi */
 function trunc(s: string, max = 80): string {
   return s.length > max ? s.slice(0, max) + "…" : s;
 }
@@ -94,7 +95,8 @@ export function formatBugReportClipboard(items: BugItem[]): string {
   if (crashes.length) {
     lines.push("## Crash:");
     for (const c of crashes) {
-      lines.push(`• CRASH [${c.severity.toUpperCase()}] ${trunc(c.title)}: ${trunc(c.message)}`);
+      const countStr = c.count > 1 ? ` (×${c.count})` : "";
+      lines.push(`• CRASH [${c.severity.toUpperCase()}]${countStr} ${trunc(c.title)}: ${trunc(c.message)}`);
       if (c.detail) lines.push(`  ${c.detail}`);
     }
     lines.push("");
@@ -102,21 +104,21 @@ export function formatBugReportClipboard(items: BugItem[]): string {
   if (signals.length) {
     lines.push("## Segnali sistema:");
     for (const s of signals) {
-      lines.push(`• SERVER [${s.severity.toUpperCase()}] ${trunc(s.message)}`);
+      const countStr = s.count > 1 ? ` (×${s.count})` : "";
+      lines.push(`• SERVER [${s.severity.toUpperCase()}]${countStr} ${trunc(s.message)}`);
     }
     lines.push("");
   }
   if (watchdog.length) {
     lines.push("## AI Watchdog:");
     for (const w of watchdog) {
-      lines.push(`• AI [${w.severity.toUpperCase()}] ${trunc(w.title)}: ${trunc(w.message)}`);
+      const countStr = w.count > 1 ? ` (×${w.count})` : "";
+      lines.push(`• AI [${w.severity.toUpperCase()}]${countStr} ${trunc(w.title)}: ${trunc(w.message)}`);
     }
     lines.push("");
   }
 
-  if (items.length === 0) {
-    lines.push("Nessun errore recente. ✅");
-  }
+  if (items.length === 0) lines.push("Nessun errore recente. ✅");
 
   return lines.join("\n");
 }
