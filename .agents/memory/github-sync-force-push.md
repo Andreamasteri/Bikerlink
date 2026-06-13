@@ -16,10 +16,11 @@ la scelta dell'utente è in genere force-push del locale → GitHub.
 Confermare comunque con l'utente perché scarta i commit presenti solo sul remoto.
 
 **How to apply:**
-- Auth: header `http.https://github.com/.extraheader` con
-  `AUTHORIZATION: basic <base64 di x-access-token:$GITHUB_TOKEN>`. Mai mettere il
-  token nella URL del remote né stamparlo. Per i log, NON usare un sed che
-  redige stringhe esadecimali di 40 char: maschera anche gli SHA git.
+- Auth (push normale): usare URL con credenziali nel formato
+  `https://x-access-token:${GITHUB_TOKEN}@github.com/Andreamasteri/Bikerlink.git`.
+  Il formato senza username (`https://${GITHUB_TOKEN}@...`) ritorna 401.
+  Mai stampare il token nei log. Per i log, NON usare un sed che redige stringhe
+  esadecimali di 40 char: maschera anche gli SHA git.
 - Le operazioni git distruttive (force-push, merge, rebase, rm in `.git/`) sono
   bloccate per il main agent → vanno eseguite tramite un Project Task in background.
 - Quirk ricorrente in questo env Replit: `.git/refs/remotes/origin/main.lock`
