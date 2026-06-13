@@ -42,24 +42,27 @@ interface UsersResponse {
 }
 
 const TYPE_LABELS: { key: string; label: string; color: string }[] = [
-  { key: "bikerBikerBrand",         label: "B-B",     color: Colors.accent },
-  { key: "bikerZavorrinaBrand",      label: "B-Z",     color: "#E91E8C" },
-  { key: "bikerZavarrinaBase",       label: "Intento", color: "#C2185B" },
-  { key: "bikerClubBrand",           label: "B-Club",  color: "#9C27B0" },
-  { key: "zavarrinaClubBrand",       label: "Z-Club",  color: "#673AB7" },
-  { key: "bikerBikerTypeStyle",      label: "Tipo BB", color: "#2196F3" },
-  { key: "bikerZavarrinaTypeStyle",  label: "Tipo BZ", color: "#03A9F4" },
-  { key: "bikerBikerDistance",       label: "Dist BB", color: Colors.success },
-  { key: "bikerZavarrinaDistance",   label: "Dist BZ", color: "#66BB6A" },
-  { key: "bikerBikerMusic",          label: "Mus BB",  color: "#FF5722" },
-  { key: "bikerZavarrinaMusic",      label: "Mus BZ",  color: "#FF7043" },
-  { key: "bikerBikerLeanAngle",      label: "Piega",   color: "#795548" },
-  { key: "bikerBikerRouteTypeZone",  label: "Zona BB", color: "#607D8B" },
+  { key: "bikerBikerBrand",            label: "B-B",     color: Colors.accent },
+  { key: "bikerClubBrand",             label: "B-Club",  color: "#9C27B0" },
+  { key: "bikerBikerTypeStyle",        label: "Tipo BB", color: "#2196F3" },
+  { key: "bikerBikerDistance",         label: "Dist BB", color: Colors.success },
+  { key: "bikerBikerMusic",            label: "Mus BB",  color: "#FF5722" },
+  { key: "bikerBikerLeanAngle",        label: "Piega",   color: "#795548" },
+  { key: "bikerBikerRouteTypeZone",    label: "Zona BB", color: "#607D8B" },
+  { key: "bikerBikerAvgSpeed",         label: "Speed",   color: Colors.warning },
+  { key: "bikerBikerAvgDuration",      label: "Dur",     color: "#FFA726" },
+  { key: "bikerBikerDayTime",          label: "Orario",  color: "#FFCC02" },
+  { key: "bikerBikerEvents",           label: "Eventi",  color: "#26C6DA" },
+];
+// B-Z types shown in a separate visual section (including base_intent)
+const BZ_TYPE_LABELS: { key: string; label: string; color: string }[] = [
+  { key: "bikerZavorrinaBrand",         label: "B-Z",     color: "#E91E8C" },
+  { key: "bikerZavarrinaBase",          label: "Intento", color: "#C2185B" },
+  { key: "zavarrinaClubBrand",          label: "Z-Club",  color: "#673AB7" },
+  { key: "bikerZavarrinaTypeStyle",     label: "Tipo BZ", color: "#03A9F4" },
+  { key: "bikerZavarrinaDistance",      label: "Dist BZ", color: "#66BB6A" },
+  { key: "bikerZavarrinaMusic",         label: "Mus BZ",  color: "#FF7043" },
   { key: "bikerZavarrinaRouteTypeZone", label: "Zona BZ", color: "#78909C" },
-  { key: "bikerBikerAvgSpeed",       label: "Speed",   color: Colors.warning },
-  { key: "bikerBikerAvgDuration",    label: "Dur",     color: "#FFA726" },
-  { key: "bikerBikerDayTime",        label: "Orario",  color: "#FFCC02" },
-  { key: "bikerBikerEvents",         label: "Eventi",  color: "#26C6DA" },
 ];
 
 function userTypeColor(userType: string): string {
@@ -135,9 +138,13 @@ export default function MatchInspectorScreen() {
   const zeroMatchCount = data?.zeroMatchCount ?? 0;
 
   const renderUser = ({ item }: { item: InspectorUser }) => {
-    const nonZeroTypes = TYPE_LABELS.filter(
+    const nonZeroBB = TYPE_LABELS.filter(
       (tl) => (item.matchCounts?.[tl.key] ?? 0) > 0
     );
+    const nonZeroBZ = BZ_TYPE_LABELS.filter(
+      (tl) => (item.matchCounts?.[tl.key] ?? 0) > 0
+    );
+    const hasAny = nonZeroBB.length > 0 || nonZeroBZ.length > 0;
 
     return (
       <TouchableOpacity
@@ -175,17 +182,33 @@ export default function MatchInspectorScreen() {
             </Text>
           </View>
 
-          {nonZeroTypes.length > 0 ? (
-            <View style={styles.countChipsRow}>
-              {nonZeroTypes.map((tl) => (
-                <View key={tl.key} style={[styles.countChip, { borderColor: tl.color + "55" }]}>
-                  <Text style={[styles.countChipLabel, { color: tl.color }]}>{tl.label}</Text>
-                  <Text style={[styles.countChipNum, { color: tl.color }]}>
-                    {item.matchCounts[tl.key]}
-                  </Text>
+          {hasAny ? (
+            <>
+              {nonZeroBB.length > 0 && (
+                <View style={styles.countChipsRow}>
+                  {nonZeroBB.map((tl) => (
+                    <View key={tl.key} style={[styles.countChip, { borderColor: tl.color + "55" }]}>
+                      <Text style={[styles.countChipLabel, { color: tl.color }]}>{tl.label}</Text>
+                      <Text style={[styles.countChipNum, { color: tl.color }]}>
+                        {item.matchCounts[tl.key]}
+                      </Text>
+                    </View>
+                  ))}
                 </View>
-              ))}
-            </View>
+              )}
+              {nonZeroBZ.length > 0 && (
+                <View style={[styles.countChipsRow, styles.bzChipsRow]}>
+                  {nonZeroBZ.map((tl) => (
+                    <View key={tl.key} style={[styles.countChip, { borderColor: tl.color + "55" }]}>
+                      <Text style={[styles.countChipLabel, { color: tl.color }]}>{tl.label}</Text>
+                      <Text style={[styles.countChipNum, { color: tl.color }]}>
+                        {item.matchCounts[tl.key]}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+              )}
+            </>
           ) : (
             <Text style={styles.noMatchText}>Nessun match</Text>
           )}
@@ -429,6 +452,12 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 4,
+  },
+  bzChipsRow: {
+    borderTopWidth: 1,
+    borderTopColor: "#E91E8C22",
+    paddingTop: 3,
+    marginTop: 1,
   },
   countChip: {
     flexDirection: "row",

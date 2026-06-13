@@ -176,6 +176,16 @@ function getRepoInfo(pkgName: string): RepoInfo | null {
     return { owner: "kucherenko", repo: "jscpd", changelogPath: "CHANGELOG.md", ref: "master" };
   }
 
+  // Vite (vitejs/vite) — usa GitHub Releases (nessun CHANGELOG.md nel repo)
+  if (pkgName === "vite") {
+    return { owner: "vitejs", repo: "vite", changelogPath: "packages/vite/CHANGELOG.md", ref: "main" };
+  }
+
+  // Vitest
+  if (pkgName === "vitest" || pkgName.startsWith("@vitest/")) {
+    return { owner: "vitest-dev", repo: "vitest", changelogPath: "packages/vitest/CHANGELOG.md", ref: "main" };
+  }
+
   return null;
 }
 
@@ -358,6 +368,31 @@ async function fetchGitHubRelease(info: RepoInfo, version: string, token?: strin
   }
 }
 
+/**
+ * Per upgrade cross-major (from 2.x → 3.x), recupera anche le release note
+ * di ogni versione .0.0 intermedia (es. 3.0.0, 4.0.0 ...).
+ * Restituisce una stringa multi-sezione o null se nulla trovato.
+ */
+async function fetchIntermediateMajorReleases(
+  info: RepoInfo,
+  fromVersion: string,
+  toVersion: string,
+  token?: string
+): Promise<string | null> {
+  const fromMajor = parseInt(fromVersion.split(".")[0], 10);
+  const toMajor = parseInt(toVersion.split(".")[0], 10);
+  if (isNaN(fromMajor) || isNaN(toMajor) || fromMajor >= toMajor) return null;
+
+  const notes: string[] = [];
+  for (let major = fromMajor + 1; major <= toMajor; major++) {
+    const majorVer = `${major}.0.0`;
+    if (majorVer === toVersion) continue; // già recuperata dal caller
+    const note = await fetchGitHubRelease(info, majorVer, token);
+    if (note) notes.push(`## v${majorVer} (major release)\n\n${note}`);
+  }
+  return notes.length > 0 ? notes.join("\n\n---\n\n") : null;
+}
+
 // ---------------------------------------------------------------------------
 // Report generator
 // ---------------------------------------------------------------------------
@@ -514,10 +549,15 @@ async function main() {
 
       // No CHANGELOG file — try GitHub Releases directly
       if (!content) {
-        const releaseNote = await fetchGitHubRelease(info, pkg.to, token);
-        if (releaseNote) {
-          console.log("⬜ nessun CHANGELOG, release note trovata");
-          results.push({ pkg, sections: [], releaseNote });
+        const [releaseNote, intermediateNotes] = await Promise.all([
+          fetchGitHubRelease(info, pkg.to, token),
+          fetchIntermediateMajorReleases(info, pkg.from, pkg.to, token),
+        ]);
+        const combined = [intermediateNotes, releaseNote].filter(Boolean).join("\n\n---\n\n") || null;
+        if (combined) {
+          const hasMajorNotes = !!intermediateNotes;
+          console.log(`⬜ nessun CHANGELOG, release note trovata${hasMajorNotes ? " (+ major releases)" : ""}`);
+          results.push({ pkg, sections: [], releaseNote: combined });
         } else {
           console.log("errore: CHANGELOG non trovato e nessuna release note");
           results.push({ pkg, sections: [], error: "CHANGELOG non trovato e nessuna release note disponibile" });
@@ -530,7 +570,11 @@ async function main() {
 
       let releaseNote: string | null = null;
       if (relevant.length === 0) {
-        releaseNote = await fetchGitHubRelease(info, pkg.to, token);
+        const [toRelease, intermediateNotes] = await Promise.all([
+          fetchGitHubRelease(info, pkg.to, token),
+          fetchIntermediateMajorReleases(info, pkg.from, pkg.to, token),
+        ]);
+        releaseNote = [intermediateNotes, toRelease].filter(Boolean).join("\n\n---\n\n") || null;
       }
 
       const flags = [

@@ -297,6 +297,24 @@ router.get("/stats", async (_req: Request, res: Response) => {
         SELECT COUNT(*) AS cnt FROM biker_biker_matches
         WHERE pair_type = 'bz' AND motorcycle_brand = 'base_intent'
       `);
+      // Breakdown BZ Base by biker search_preference and user_type.
+      // JOIN picks only the biker/coppia side (the zavorrina side has user_type='zavorrina').
+      const bzBaseBreakdownRes = await client.query<{
+        pref_zav: string; pref_both: string;
+        type_biker: string; type_coppia: string;
+      }>(`
+        SELECT
+          COUNT(*) FILTER (WHERE up.search_preference = 'zavorrina') AS pref_zav,
+          COUNT(*) FILTER (WHERE up.search_preference = 'both')      AS pref_both,
+          COUNT(*) FILTER (WHERE u.user_type = 'biker')              AS type_biker,
+          COUNT(*) FILTER (WHERE u.user_type = 'coppia')             AS type_coppia
+        FROM biker_biker_matches m
+        JOIN users u
+          ON (u.id = m.biker1_id OR u.id = m.biker2_id)
+          AND u.user_type IN ('biker', 'coppia')
+        JOIN user_profiles up ON up.user_id = u.id
+        WHERE m.pair_type = 'bz' AND m.motorcycle_brand = 'base_intent'
+      `);
       const lastRunRes = await client.query<{ last_run: string | null }>(`
         SELECT MAX(created_at)::text AS last_run FROM (
           SELECT created_at FROM biker_biker_matches
@@ -304,11 +322,20 @@ router.get("/stats", async (_req: Request, res: Response) => {
           SELECT created_at FROM biker_zavorrina_matches
         ) t
       `);
+      const bzbd = bzBaseBreakdownRes.rows[0];
       return res.json({
         totalBikerBikerMatches: parseInt(bbRes.rows[0]?.cnt ?? "0", 10),
         totalMusicMatches: parseInt(musicRes.rows[0]?.cnt ?? "0", 10),
         totalZavarrinaMatches: parseInt(bzRes.rows[0]?.cnt ?? "0", 10),
         totalBikerZavBaseMatches: parseInt(bzBaseRes.rows[0]?.cnt ?? "0", 10),
+        bzBaseByPref: {
+          zavorrina: parseInt(bzbd?.pref_zav ?? "0", 10),
+          both: parseInt(bzbd?.pref_both ?? "0", 10),
+        },
+        bzBaseByType: {
+          biker: parseInt(bzbd?.type_biker ?? "0", 10),
+          coppia: parseInt(bzbd?.type_coppia ?? "0", 10),
+        },
         lastRunAt: lastRunRes.rows[0]?.last_run ?? null,
       });
     } finally {

@@ -38,6 +38,8 @@ interface StatsResponse {
   totalBikerBikerMatches: number;
   totalMusicMatches: number;
   totalBikerZavBaseMatches: number;
+  bzBaseByPref?: { zavorrina: number; both: number };
+  bzBaseByType?: { biker: number; coppia: number };
   lastRunAt: string | null;
 }
 
@@ -157,6 +159,28 @@ export default function MatchingHubScreen() {
           <View style={styles.statCard}>
             <Text style={styles.statValue}>{stats?.totalBikerZavBaseMatches ?? "—"}</Text>
             <Text style={styles.statLabel}>BZ Base</Text>
+            {stats?.bzBaseByPref && (
+              <View style={styles.bzBaseBreakdownRow}>
+                <Text style={styles.bzBaseBreakdownItem}>
+                  Zav: {stats.bzBaseByPref.zavorrina}
+                </Text>
+                <Text style={styles.bzBaseBreakdownDot}>·</Text>
+                <Text style={styles.bzBaseBreakdownItem}>
+                  Both: {stats.bzBaseByPref.both}
+                </Text>
+              </View>
+            )}
+            {stats?.bzBaseByType && (stats.bzBaseByType.coppia > 0) && (
+              <View style={styles.bzBaseBreakdownRow}>
+                <Text style={styles.bzBaseBreakdownItem}>
+                  B: {stats.bzBaseByType.biker}
+                </Text>
+                <Text style={styles.bzBaseBreakdownDot}>·</Text>
+                <Text style={styles.bzBaseBreakdownItem}>
+                  C: {stats.bzBaseByType.coppia}
+                </Text>
+              </View>
+            )}
           </View>
         </View>
         <Text style={styles.lastRun}>
@@ -335,6 +359,9 @@ const styles = StyleSheet.create({
   },
   statValue: { fontFamily: "Inter_700Bold", fontSize: 20, color: Colors.text },
   statLabel: { fontFamily: "Inter_400Regular", fontSize: 11, color: Colors.textSecondary, marginTop: 4 },
+  bzBaseBreakdownRow: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 6 },
+  bzBaseBreakdownItem: { fontFamily: "Inter_400Regular", fontSize: 10, color: Colors.textSecondary },
+  bzBaseBreakdownDot: { fontFamily: "Inter_400Regular", fontSize: 10, color: Colors.textSecondary },
   lastRun: { fontFamily: "Inter_400Regular", fontSize: 11, color: Colors.textSecondary, marginTop: 8, textAlign: "center" },
   lockCard: {
     flexDirection: "row", alignItems: "center", gap: 12, padding: 14,
