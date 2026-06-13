@@ -66,9 +66,9 @@ export default function MatchScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      AsyncStorage.multiGet(["match_distance_mode", "match_distance_km"]).then(pairs => {
-        const mode = pairs[0][1];
-        const km = pairs[1][1];
+      AsyncStorage.getMany(["match_distance_mode", "match_distance_km"]).then(result => {
+        const mode = result["match_distance_mode"];
+        const km = result["match_distance_km"];
         if (mode === "all" || mode === "km") setDistanceMode(mode);
         if (km) { setDistanceKm(km); setPendingKm(km); }
       }).catch(() => {});
@@ -78,10 +78,10 @@ export default function MatchScreen() {
   useFocusEffect(
     useCallback(() => {
       if (activeTab !== "music") return;
-      AsyncStorage.multiGet(["music_match_criteria", "music_match_logic", "music_match_min_songs"])
-        .then(pairs => {
-          const criteria = pairs[0][1] ?? "songs,genre";
-          const minS = pairs[2][1] ?? "5";
+      AsyncStorage.getMany(["music_match_criteria", "music_match_logic", "music_match_min_songs"])
+        .then(result => {
+          const criteria = result["music_match_criteria"] ?? "songs,genre";
+          const minS = result["music_match_min_songs"] ?? "5";
           setMusicCriteria(criteria);
           setMusicMinSongs(parseInt(minS, 10) || 5);
         })
@@ -325,7 +325,7 @@ export default function MatchScreen() {
         setDistanceMode={(mode) => {
           const wasKm = distanceMode === "km" && mode === "all";
           setDistanceMode(mode);
-          AsyncStorage.multiSet([["match_distance_mode", mode], ["match_distance_km", distanceKm]]).catch(() => {});
+          AsyncStorage.setMany({ "match_distance_mode": mode, "match_distance_km": distanceKm }).catch(() => {});
           if (wasKm) resetAndRematchMutation.mutate();
         }}
         pendingKm={pendingKm}

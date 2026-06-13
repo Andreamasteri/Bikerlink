@@ -37,11 +37,11 @@ export const ProfileMapsBetaSection: React.FC = () => {
     let active = true;
     (async () => {
       try {
-        const [r, t] = await AsyncStorage.multiGet([TESTER_RENDERER_KEY, TESTER_TILE_KEY]);
+        const result = await AsyncStorage.getMany([TESTER_RENDERER_KEY, TESTER_TILE_KEY]);
         if (!active) return;
-        const rv = r[1];
+        const rv = result[TESTER_RENDERER_KEY];
         setRenderer(rv && VALID_RENDERERS.includes(rv as MapsRendererId) ? (rv as MapsRendererId) : null);
-        setTileId(t[1] ?? null);
+        setTileId(result[TESTER_TILE_KEY] ?? null);
       } catch {
         // Preferenze non leggibili: usa i default lato server
       }

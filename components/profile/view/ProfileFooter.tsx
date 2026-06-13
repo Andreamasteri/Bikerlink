@@ -26,7 +26,7 @@ export const ProfileFooter: React.FC<ProfileFooterProps> = ({
             k === "user_ghost_mode"
         );
         if (appKeys.length > 0) {
-          await AsyncStorage.multiRemove(appKeys);
+          await AsyncStorage.removeMany(appKeys);
         }
         queryClient.clear();
         Alert.alert(t("profile.cacheClearedTitle"), t("profile.cacheClearedMsg"));

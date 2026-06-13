@@ -54,11 +54,11 @@ export function useMapsRollout(): MapsRolloutResult {
     let active = true;
     (async () => {
       try {
-        const [r, t] = await AsyncStorage.multiGet([TESTER_RENDERER_KEY, TESTER_TILE_KEY]);
+        const result = await AsyncStorage.getMany([TESTER_RENDERER_KEY, TESTER_TILE_KEY]);
         if (!active) return;
-        const rv = r[1];
+        const rv = result[TESTER_RENDERER_KEY];
         setTesterRenderer(rv && VALID_RENDERERS.includes(rv as MapsRendererId) ? (rv as MapsRendererId) : null);
-        setTesterTileId(t[1] ?? null);
+        setTesterTileId(result[TESTER_TILE_KEY] ?? null);
       } catch {
         // AsyncStorage non disponibile: ignora le preferenze tester
       }

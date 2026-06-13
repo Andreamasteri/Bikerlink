@@ -145,11 +145,11 @@ export default function MusicScreen() {
   }, [playlistIdParam]);
 
   useEffect(() => {
-    AsyncStorage.multiGet(["music_match_criteria", "music_match_logic", "music_match_min_songs"])
-      .then(pairs => {
-        const criteria = pairs[0][1];
-        const logic = pairs[1][1];
-        const minS = pairs[2][1];
+    AsyncStorage.getMany(["music_match_criteria", "music_match_logic", "music_match_min_songs"])
+      .then(result => {
+        const criteria = result["music_match_criteria"];
+        const logic = result["music_match_logic"];
+        const minS = result["music_match_min_songs"];
         if (criteria) setMatchCriteria(criteria.split(",").filter(Boolean));
         // eslint-disable-next-line @typescript-eslint/no-explicit-any -- logic value matches union type at runtime
         if (logic === "tutti" || logic === "almeno_uno") setMatchLogic(logic as any);

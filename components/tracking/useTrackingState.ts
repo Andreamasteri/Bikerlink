@@ -524,7 +524,7 @@ export function useTrackingState() {
   // crescere fino a saturare AsyncStorage (SQLITE_FULL), rompendo la mappa.
   // Li svuotiamo al mount per liberare i device già intasati.
   useEffect(() => {
-    AsyncStorage.multiRemove([
+    AsyncStorage.removeMany([
       GPS_BUFFER_SEGCOUNT_KEY,
       ...Array.from({ length: 50 }, (_, i) => GPS_BUFFER_SEG_KEY(i)),
     ]).catch(() => {});

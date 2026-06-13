@@ -25,7 +25,7 @@ export async function purgeLegacyGpsBuffer(): Promise<number> {
       (k) => k === GPS_BUFFER_SEGCOUNT_KEY || k.startsWith(GPS_BUFFER_SEG_PREFIX)
     );
     if (stale.length > 0) {
-      await AsyncStorage.multiRemove(stale);
+      await AsyncStorage.removeMany(stale);
     }
     return stale.length;
   } catch {
