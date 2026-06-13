@@ -206,7 +206,8 @@
         "react-native-webview",
         "react-native",
         "react",
-        "react-native-keyboard-controller"
+        "react-native-keyboard-controller",
+        "@react-native-async-storage/async-storage"
       ]
     },
     "doctor": {
