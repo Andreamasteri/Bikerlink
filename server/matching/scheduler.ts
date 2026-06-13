@@ -4,6 +4,7 @@ import { runMatching, runWishlistMatching, getLastProposalMatchingStats, getLast
 import { runBikerBikerMatching, runBikerBikerTypeStyleMatching } from "./run-biker";
 import { runClubBrandMatching } from "./run-clubs";
 import { runMusicMatchBikerZavarrina, runGpsBasedMatching, runEventMatching, runBikerZavarrinaTypeStyleMatching } from "./run-extra";
+import { runBikerZavarrinaBase } from "./run-biker-zav-base";
 import { runMusicAffinityMatching } from "./run-music-affinity";
 import { runMusicEmbeddingsBackfill } from "./jobs/backfill-music-embeddings";
 import { runExtractRouteCellsJob } from "./jobs/extract-route-cells";
@@ -181,6 +182,8 @@ export function triggerMatchingRun(): { started: boolean; reason?: string } {
           ["music_affinity", runMusicAffinityMatching],
           ["gps_based", runGpsBasedMatching],
           ["event_matching", runEventMatching],
+          // Task #3917 — Biker↔Zav base (intento ruolo, nessun requisito moto/wishlist)
+          ["biker_zav_base", runBikerZavarrinaBase],
           ["biker_zav_type_style", runBikerZavarrinaTypeStyleMatching],
           ["distance_matching", runDistanceMatching],
           ["route_type_zone", runRouteTypeZoneMatching],

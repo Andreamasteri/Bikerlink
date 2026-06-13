@@ -298,6 +298,17 @@ export const MATCHING_REGISTRY: ReadonlyArray<MatchingTypeDef> = [
     defaultEnabled: true,
     addedBy: "#3393",
   },
+  {
+    id: 24,
+    key: "bikerZavarrinaBase",
+    label: "Biker↔Zav Intento Ruolo",
+    category: "garage",
+    table: "biker_biker_matches",
+    brandPattern: "motorcycle_brand = 'base_intent'",
+    prefColumn: "biker_zavorrina_brand",
+    defaultEnabled: true,
+    addedBy: "#3917",
+  },
 ];
 
 /**

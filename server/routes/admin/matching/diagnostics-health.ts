@@ -115,7 +115,7 @@ healthRouter.get("/match-health", async (_req: Request, res: Response) => {
     const unknownInDb = [...dbPrefCols].filter(col => !expectedPrefColumns.includes(col));
 
     let prefsStatus = "OK";
-    let prefsMessage = "match_preferences allineata con i 17 tipi.";
+    let prefsMessage = `match_preferences allineata con i ${MATCH_TYPES.length} tipi contabili.`;
     if (missingFromDb.length > 0) {
       prefsStatus = "ERROR";
       prefsMessage = `Colonne mancanti: ${missingFromDb.join(", ")}`;

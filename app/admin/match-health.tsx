@@ -311,7 +311,7 @@ export default function MatchHealthScreen() {
             />
           )}
 
-          <SectionCard title="17 Tipi di Match" status={data.checks.matchCounts.some(m => m.status === "WARN") ? "WARN" : "OK"}>
+          <SectionCard title={`${data.checks.matchCounts.length} Tipi di Match`} status={data.checks.matchCounts.some(m => m.status === "WARN") ? "WARN" : "OK"}>
             <MatchCountsSection matchCounts={data.checks.matchCounts} />
           </SectionCard>
 

@@ -45,7 +45,8 @@ export const MATCH_TYPES: ReadonlyArray<{
 // richiedono ≥2 entità; le sonde che contano già coppie compatibili usano min=1).
 export type SourceFamily =
   | "brand" | "wishlist" | "club" | "motoTags" | "motoTagsZav"
-  | "routeCentroid" | "musicTags" | "routeTelemetry" | "routeSpeed" | "events";
+  | "routeCentroid" | "musicTags" | "routeTelemetry" | "routeSpeed" | "events"
+  | "intentSearch";
 
 // Tipi senza alcun matcher che li produca (legacy/non eseguiti dallo scheduler):
 // nessun run-*.ts genera la stringa `club_zav:%`. Vanno marcati INACTIVE così
@@ -70,6 +71,7 @@ export const SOURCE_FAMILY_BY_ID: Readonly<Record<number, SourceFamily>> = {
   15: "routeTelemetry",
   16: "routeTelemetry",
   17: "events",
+  24: "intentSearch",
 };
 
 export const SOURCE_PROBES: Readonly<Record<SourceFamily, { min: number; desc: string; sql: string }>> = {
@@ -205,6 +207,18 @@ export const SOURCE_PROBES: Readonly<Record<SourceFamily, { min: number; desc: s
         GROUP BY ep.event_id
         HAVING COUNT(DISTINCT ep.user_id) >= 2
       ) t`,
+  },
+  intentSearch: {
+    min: 1,
+    desc: "biker con searchPreference zavorrina/both attivi",
+    sql: `
+      SELECT COUNT(*)::int AS cnt
+      FROM user_profiles bp
+      JOIN users bu ON bu.id = bp.user_id
+        AND bu.is_fake = false AND bu.status = 'active'
+        AND bu.user_type IN ('biker','coppia')
+        AND bu.matching_disabled = false
+      WHERE bp.search_preference IN ('zavorrina','both')`,
   },
 };
 

@@ -36,6 +36,7 @@ export const KNOWN_PHASES: Array<{ key: string; label: string }> = [
   { key: "music_affinity", label: "Music affinity" },
   { key: "gps_based", label: "GPS zona" },
   { key: "event_matching", label: "Eventi" },
+  { key: "biker_zav_base", label: "Biker↔Zav base" },
   { key: "biker_zav_type_style", label: "Biker↔Zav stile" },
   { key: "distance_matching", label: "Distanza" },
   { key: "route_type_zone", label: "Percorso zona" },
@@ -99,6 +100,7 @@ async function probeSourceAvailability(): Promise<Record<string, SourceStatus>> 
     result["music_affinity"] = needsUsers && hasTags ? "OK" : "NO_DATA";
     result["gps_based"] = needsUsers ? "OK" : "NO_DATA";
     result["event_matching"] = hasEvents ? "OK" : "NO_DATA";
+    result["biker_zav_base"] = needsUsers ? "OK" : "NO_DATA";
     result["biker_zav_type_style"] = needsUsers && hasWishlists && hasTags ? "OK" : hasWishlists ? "WARN" : "NO_DATA";
     result["distance_matching"] = needsUsers ? "OK" : "NO_DATA";
     result["route_type_zone"] = hasRoutes ? "OK" : "NO_DATA";
