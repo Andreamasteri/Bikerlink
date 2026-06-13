@@ -87,7 +87,28 @@ export function MatchReasonChipsInline({ scoreBreakdown, isSupermatch, motorcycl
       </View>
     );
   }
+
   const reasons = deriveReasons(scoreBreakdown ?? {}, isSupermatch ?? false);
+
+  const realBrand =
+    motorcycleBrand && motorcycleBrand !== "base_intent" ? motorcycleBrand : null;
+
+  if (realBrand) {
+    const tipoMotoIdx = reasons.findIndex((r) => r.key === "tipo_moto");
+    if (tipoMotoIdx !== -1) {
+      reasons[tipoMotoIdx] = {
+        key: "tipo_moto",
+        label: `Stessa moto 🏍 · ${realBrand}`,
+      };
+    } else {
+      const insertAt = isSupermatch ? 1 : 0;
+      reasons.splice(insertAt, 0, {
+        key: "tipo_moto",
+        label: `Stessa moto 🏍 · ${realBrand}`,
+      });
+    }
+  }
+
   if (reasons.length === 0) return null;
 
   return (
