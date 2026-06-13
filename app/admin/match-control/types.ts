@@ -16,6 +16,7 @@ export interface MatchStat {
   usersActive: number;
   totalMatches: number;
   isAnomaly: boolean;
+  isBzBase?: boolean;
 }
 
 export interface CycleMeta {

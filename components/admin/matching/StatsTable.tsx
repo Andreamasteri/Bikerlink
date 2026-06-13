@@ -13,6 +13,7 @@ export interface MatchStat {
   usersActive: number;
   totalMatches: number;
   isAnomaly: boolean;
+  isBzBase?: boolean;
 }
 
 interface Props {
@@ -39,11 +40,19 @@ export function StatsTable({ stats, isLoading }: Props) {
             styles.row,
             idx % 2 === 0 && { backgroundColor: Colors.surfaceLight + "44" },
             stat.isAnomaly && styles.anomalyRow,
+            stat.isBzBase && styles.bzBaseRow,
           ]}
         >
-          <Text style={[styles.cell, styles.typeName, { flex: 3 }]} numberOfLines={2}>
-            {stat.typeName}
-          </Text>
+          <View style={[{ flex: 3, flexDirection: "row", alignItems: "center", gap: 6 }]}>
+            <Text style={[styles.cell, styles.typeName]} numberOfLines={2}>
+              {stat.typeName}
+            </Text>
+            {stat.isBzBase && (
+              <View style={styles.bzBadge}>
+                <Text style={styles.bzBadgeText}>BZ</Text>
+              </View>
+            )}
+          </View>
           <Text style={[styles.cell, styles.cellCenter, { flex: 1.2 }]}>{stat.usersActive}</Text>
           <Text
             style={[
@@ -83,6 +92,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12, paddingVertical: 8, minHeight: 44,
   },
   anomalyRow: { backgroundColor: Colors.warning + "11" },
+  bzBaseRow: { backgroundColor: Colors.accent + "11" },
+  bzBadge: {
+    backgroundColor: Colors.accent + "33",
+    borderRadius: 4,
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+  },
+  bzBadgeText: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 9,
+    color: Colors.accent,
+    letterSpacing: 0.5,
+  },
   cell: { fontFamily: "Inter_400Regular", fontSize: 12, color: Colors.text },
   cellCenter: { textAlign: "center" },
   cellCenterView: { alignItems: "center", justifyContent: "center" },

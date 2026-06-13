@@ -342,6 +342,7 @@ router.get("/match-settings", async (_req: Request, res: Response) => {
         usersActive: number;
         totalMatches: number;
         isAnomaly: boolean;
+        isBzBase?: boolean;
       }> = [];
 
       for (const mt of MATCH_TYPES) {
@@ -355,12 +356,15 @@ router.get("/match-settings", async (_req: Request, res: Response) => {
         );
         const usersActive = parseInt(activeRes.rows[0]?.cnt ?? "0", 10);
 
+        const isBzBase = mt.key === "bikerZavarrinaBase";
+
         stats.push({
           typeKey: mt.key,
           typeName: mt.label,
           usersActive,
           totalMatches,
-          isAnomaly: totalMatches === 0,
+          isAnomaly: isBzBase ? false : totalMatches === 0,
+          ...(isBzBase ? { isBzBase: true } : {}),
         });
       }
 
