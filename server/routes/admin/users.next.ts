@@ -512,11 +512,14 @@ router.get("/match-summary", async (req: Request, res: Response) => {
     for (const r of bzBreakdownResult.rows as BzBreakdownRow[]) bzBreakdownMap.set(r.u_id, r);
 
     const mappedUsers = rawUsers.map((row) => {
-      const bbMatches = parseInt(row.bb_count || "0", 10);
-      const bzMatches = parseInt(row.bz_count || "0", 10);
-
       const bb = bbBreakdownMap.get(row.id);
       const bz = bzBreakdownMap.get(row.id);
+
+      // base_intent records sit in biker_biker_matches but are conceptually B-Z matches.
+      // bb_count (raw) includes them; subtract to keep bbMatches as pure B-B and add to bzMatches.
+      const baseIntentCount = bb?.bikerZavarrinaBase ?? 0;
+      const bbMatches = parseInt(row.bb_count || "0", 10) - baseIntentCount;
+      const bzMatches = parseInt(row.bz_count || "0", 10) + baseIntentCount;
 
       const matchCounts: Record<string, number> = {
         bikerBikerBrand:           bb?.bikerBikerBrand           ?? 0,
