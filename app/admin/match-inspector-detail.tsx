@@ -403,7 +403,7 @@ export default function MatchInspectorDetailScreen() {
 
         <PreferencesDiffCard sections={matchesByType} userId={userId!} nickname={user.nickname} />
 
-        <Text style={styles.sectionTitle}>17 Tipi di Match</Text>
+        <Text style={styles.sectionTitle}>{matchesByType.length} Tipi di Match</Text>
 
         {matchesByType.map((section) => (
           <MatchTypeCard

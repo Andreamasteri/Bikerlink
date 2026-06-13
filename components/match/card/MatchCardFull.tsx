@@ -132,6 +132,7 @@ export function MatchCardFull({ match, currentUserId, onAccept, onReject, onRemo
       <MatchReasonChipsInline
         scoreBreakdown={match.scoreBreakdown}
         isSupermatch={!!(match.isSupermatch)}
+        motorcycleBrand={match.motorcycleBrand}
       />
 
       {otherProposal?.departureAddress && (

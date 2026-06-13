@@ -44,6 +44,7 @@ interface UsersResponse {
 const TYPE_LABELS: { key: string; label: string; color: string }[] = [
   { key: "bikerBikerBrand",         label: "B-B",     color: Colors.accent },
   { key: "bikerZavorrinaBrand",      label: "B-Z",     color: "#E91E8C" },
+  { key: "bikerZavarrinaBase",       label: "Intento", color: "#C2185B" },
   { key: "bikerClubBrand",           label: "B-Club",  color: "#9C27B0" },
   { key: "zavarrinaClubBrand",       label: "Z-Club",  color: "#673AB7" },
   { key: "bikerBikerTypeStyle",      label: "Tipo BB", color: "#2196F3" },

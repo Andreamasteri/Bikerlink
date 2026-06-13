@@ -321,10 +321,14 @@ router.get("/:id/match-summary", requireAuth, async (req: Request, res: Response
     if (bbRows.length > 0) {
       const m = bbRows[0];
       const sb = (m.scoreBreakdown ?? {}) as Record<string, number>;
-      add("tipo_moto", "Stessa moto 🏍");
-      if ((sb.musica ?? 0) >= SCORE_THRESHOLD) add("musica", "Musica 🎵");
-      if ((sb.stile_guida ?? 0) >= SCORE_THRESHOLD) add("stile_guida", "Stile guida 🛣");
-      if (m.isSupermatch) add("supermatch", "Supermatch ⚡");
+      if (m.motorcycleBrand === "base_intent") {
+        add("base_intent", "Intento ruolo 🤝");
+      } else {
+        add("tipo_moto", "Stessa moto 🏍");
+        if ((sb.musica ?? 0) >= SCORE_THRESHOLD) add("musica", "Musica 🎵");
+        if ((sb.stile_guida ?? 0) >= SCORE_THRESHOLD) add("stile_guida", "Stile guida 🛣");
+        if (m.isSupermatch) add("supermatch", "Supermatch ⚡");
+      }
     }
 
     if (bzRows.length > 0) {

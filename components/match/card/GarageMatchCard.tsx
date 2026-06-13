@@ -125,6 +125,7 @@ export function GarageMatchCard({ match, currentUserId, onAccept, onReject, onCh
       <MatchReasonChipsInline
         scoreBreakdown={match.scoreBreakdown}
         isSupermatch={isSuperMatch}
+        motorcycleBrand={match.motorcycleBrand}
       />
 
       {(isNew || isAccepted) && match.id && (

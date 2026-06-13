@@ -448,11 +448,12 @@ router.get("/match-summary", async (req: Request, res: Response) => {
               u_id,
               SUM(CASE WHEN
                 motorcycle_brand NOT LIKE '%:%'
-                AND motorcycle_brand NOT IN ('musica','musica_zav','distanza','distanza_zav','eventi')
+                AND motorcycle_brand NOT IN ('musica','musica_zav','distanza','distanza_zav','eventi','base_intent')
                 AND motorcycle_brand NOT LIKE 'gps_%'
                 AND motorcycle_brand NOT LIKE 'zona_%'
                 AND motorcycle_brand NOT LIKE 'percorso%'
               THEN 1 ELSE 0 END)::int AS "bikerBikerBrand",
+              SUM(CASE WHEN motorcycle_brand = 'base_intent' THEN 1 ELSE 0 END)::int AS "bikerZavarrinaBase",
               SUM(CASE WHEN motorcycle_brand LIKE 'club:%' AND motorcycle_brand NOT LIKE 'club_zav:%' THEN 1 ELSE 0 END)::int AS "bikerClubBrand",
               SUM(CASE WHEN motorcycle_brand LIKE 'club_zav:%' THEN 1 ELSE 0 END)::int AS "zavarrinaClubBrand",
               SUM(CASE WHEN motorcycle_brand LIKE 'tipo:%' AND motorcycle_brand NOT LIKE 'tipo_zav:%' THEN 1 ELSE 0 END)::int AS "bikerBikerTypeStyle",
@@ -495,7 +496,7 @@ router.get("/match-summary", async (req: Request, res: Response) => {
 
     type BbBreakdownRow = {
       u_id: string;
-      bikerBikerBrand: number; bikerClubBrand: number; zavarrinaClubBrand: number;
+      bikerBikerBrand: number; bikerZavarrinaBase: number; bikerClubBrand: number; zavarrinaClubBrand: number;
       bikerBikerTypeStyle: number; bikerZavarrinaTypeStyle: number;
       bikerBikerDistance: number; bikerZavarrinaDistance: number;
       bikerBikerMusic: number; bikerZavarrinaMusic: number;
@@ -520,6 +521,7 @@ router.get("/match-summary", async (req: Request, res: Response) => {
       const matchCounts: Record<string, number> = {
         bikerBikerBrand:           bb?.bikerBikerBrand           ?? 0,
         bikerZavorrinaBrand:       bz?.bikerZavorrinaBrand       ?? 0,
+        bikerZavarrinaBase:        bb?.bikerZavarrinaBase        ?? 0,
         bikerClubBrand:            bb?.bikerClubBrand            ?? 0,
         zavarrinaClubBrand:        bb?.zavarrinaClubBrand        ?? 0,
         bikerBikerTypeStyle:       bb?.bikerBikerTypeStyle       ?? 0,

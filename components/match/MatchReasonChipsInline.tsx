@@ -73,9 +73,20 @@ function deriveReasons(
 interface Props {
   scoreBreakdown?: Record<string, unknown> | null;
   isSupermatch?: boolean;
+  motorcycleBrand?: string | null;
 }
 
-export function MatchReasonChipsInline({ scoreBreakdown, isSupermatch }: Props) {
+export function MatchReasonChipsInline({ scoreBreakdown, isSupermatch, motorcycleBrand }: Props) {
+  if (motorcycleBrand === "base_intent") {
+    return (
+      <View style={styles.row}>
+        <View style={styles.chip}>
+          <Ionicons name="people" size={12} color={Colors.accent} />
+          <Text style={styles.chipLabel}>Intento ruolo 🤝</Text>
+        </View>
+      </View>
+    );
+  }
   const reasons = deriveReasons(scoreBreakdown ?? {}, isSupermatch ?? false);
   if (reasons.length === 0) return null;
 

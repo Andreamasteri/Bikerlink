@@ -89,6 +89,7 @@ export function BikerBikerMatchCard({ match, currentUserId, onAccept, onReject, 
       <MatchReasonChipsInline
         scoreBreakdown={match.scoreBreakdown}
         isSupermatch={isSuperMatch}
+        motorcycleBrand={match.motorcycleBrand}
       />
 
       {isAccepted && onChatPress && (

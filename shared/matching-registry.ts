@@ -48,7 +48,7 @@ export const MATCHING_REGISTRY: ReadonlyArray<MatchingTypeDef> = [
     category: "garage",
     table: "biker_biker_matches",
     brandPattern:
-      "motorcycle_brand NOT LIKE '%:%' AND motorcycle_brand NOT IN ('musica','musica_zav','distanza','distanza_zav','eventi') AND motorcycle_brand NOT LIKE 'gps_%' AND motorcycle_brand NOT LIKE 'zona_%' AND motorcycle_brand NOT LIKE 'percorso%'",
+      "motorcycle_brand NOT LIKE '%:%' AND motorcycle_brand NOT IN ('musica','musica_zav','distanza','distanza_zav','eventi','base_intent') AND motorcycle_brand NOT LIKE 'gps_%' AND motorcycle_brand NOT LIKE 'zona_%' AND motorcycle_brand NOT LIKE 'percorso%'",
     prefColumn: "biker_biker_brand",
     defaultEnabled: true,
     addedBy: "core",

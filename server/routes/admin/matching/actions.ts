@@ -6,6 +6,7 @@ import { MATCHING_REGISTRY } from "@shared/matching-registry";
 import { sendSuccess, sendError } from "../../../lib/api-response";
 import { sql, or, eq, isNull, and, inArray } from "drizzle-orm";
 import { triggerMatchingRun } from "../../../matching-engine";
+import { runMatchingForUser } from "../../../matching/run-user";
 import { forceUnlockMatching, getMatchingLockState } from "../../../matching/scheduler";
 import { ITALIAN_REGION_CENTROIDS } from "../../../lib/region-centroids";
 import { sendPlannedRouteInvitePushNotifications } from "../../../push-notifications";
@@ -29,9 +30,11 @@ router.post("/match-settings/reset-all", async (_req: Request, res: Response) =>
     } finally {
       client.release();
     }
-    const cols = MATCHING_REGISTRY
-      .map((t) => t.prefColumn)
-      .filter((c) => schemaCols.has(c));
+    const cols = Array.from(new Set(
+      MATCHING_REGISTRY
+        .map((t) => t.prefColumn)
+        .filter((c) => schemaCols.has(c))
+    ));
     if (cols.length === 0) {
       return sendError(res, 500, "Nessuna colonna da resettare");
     }
@@ -93,6 +96,143 @@ router.delete("/reset-matches", async (_req: Request, res: Response) => {
   } catch (error) {
     console.error("[admin/reset-matches] error:", error);
     return sendError(res, 500, "Errore reset match");
+  }
+});
+
+router.get("/users/:userId/matches", async (req: Request, res: Response) => {
+  try {
+    const userId = req.params.userId as string;
+    if (!userId) return sendError(res, 400, "userId mancante");
+
+    const client = await pool.connect();
+    try {
+      const userRes = await client.query<{
+        id: string; nickname: string; avatar_url: string | null;
+        user_type: string; role: string; status: string;
+      }>(`SELECT id, nickname, avatar_url, user_type, role, status FROM users WHERE id = $1`, [userId]);
+      if (userRes.rows.length === 0) return sendError(res, 404, "Utente non trovato");
+      const userRow = userRes.rows[0];
+
+      const routeRes = await client.query<{ cnt: string }>(
+        `SELECT COUNT(DISTINCT r.id)::int AS cnt
+         FROM routes r JOIN route_points rp ON rp.route_id = r.id
+         WHERE r.user_id = $1`, [userId]
+      );
+      const gpsRouteCount = parseInt(routeRes.rows[0]?.cnt ?? "0", 10);
+
+      const prefsRes = await client.query<Record<string, unknown>>(
+        `SELECT * FROM match_preferences WHERE user_id = $1 LIMIT 1`, [userId]
+      );
+      const prefs = prefsRes.rows[0] ?? {};
+
+      const matchesByType = [];
+      for (const entry of MATCHING_REGISTRY) {
+        if (!entry.table || !entry.brandPattern) {
+          matchesByType.push({
+            typeKey: entry.key,
+            typeName: entry.label,
+            count: 0,
+            disabled: prefs[entry.prefColumn] === false,
+            insufficientData: true,
+            matches: [],
+          });
+          continue;
+        }
+
+        let matches: Array<{
+          id: string; matchedUserId: string; matchedNickname: string;
+          matchedAvatarUrl: string | null; distanceKm: number | null;
+          status: string; isSupermatch: boolean; createdAt: string;
+        }> = [];
+
+        if (entry.table === "biker_biker_matches") {
+          const rows = await client.query<{
+            id: string; status: string; is_supermatch: boolean; created_at: string;
+            matched_user_id: string; matched_nickname: string; matched_avatar_url: string | null;
+          }>(`
+            SELECT m.id, m.status, m.is_supermatch, m.created_at,
+              CASE WHEN m.biker1_id = $1 THEN m.biker2_id ELSE m.biker1_id END AS matched_user_id,
+              u.nickname AS matched_nickname, u.avatar_url AS matched_avatar_url
+            FROM biker_biker_matches m
+            JOIN users u ON u.id = CASE WHEN m.biker1_id = $1 THEN m.biker2_id ELSE m.biker1_id END
+            WHERE (m.biker1_id = $1 OR m.biker2_id = $1) AND (${entry.brandPattern})
+            ORDER BY m.created_at DESC LIMIT 50
+          `, [userId]);
+          matches = rows.rows.map((r) => ({
+            id: r.id,
+            matchedUserId: r.matched_user_id,
+            matchedNickname: r.matched_nickname,
+            matchedAvatarUrl: r.matched_avatar_url,
+            distanceKm: null,
+            status: r.status,
+            isSupermatch: r.is_supermatch,
+            createdAt: r.created_at,
+          }));
+        } else if (entry.table === "biker_zavorrina_matches") {
+          const rows = await client.query<{
+            id: string; status: string; is_supermatch: boolean; created_at: string;
+            matched_user_id: string; matched_nickname: string; matched_avatar_url: string | null;
+          }>(`
+            SELECT m.id, m.status, m.is_supermatch, m.created_at,
+              CASE WHEN m.biker_id = $1 THEN m.zavorrina_id ELSE m.biker_id END AS matched_user_id,
+              u.nickname AS matched_nickname, u.avatar_url AS matched_avatar_url
+            FROM biker_zavorrina_matches m
+            JOIN users u ON u.id = CASE WHEN m.biker_id = $1 THEN m.zavorrina_id ELSE m.biker_id END
+            WHERE (m.biker_id = $1 OR m.zavorrina_id = $1) AND (${entry.brandPattern})
+            ORDER BY m.created_at DESC LIMIT 50
+          `, [userId]);
+          matches = rows.rows.map((r) => ({
+            id: r.id,
+            matchedUserId: r.matched_user_id,
+            matchedNickname: r.matched_nickname,
+            matchedAvatarUrl: r.matched_avatar_url,
+            distanceKm: null,
+            status: r.status,
+            isSupermatch: r.is_supermatch,
+            createdAt: r.created_at,
+          }));
+        }
+
+        matchesByType.push({
+          typeKey: entry.key,
+          typeName: entry.label,
+          count: matches.length,
+          disabled: prefs[entry.prefColumn] === false,
+          insufficientData: false,
+          matches,
+        });
+      }
+
+      return res.json({
+        user: {
+          id: userRow.id,
+          nickname: userRow.nickname,
+          avatarUrl: userRow.avatar_url,
+          userType: userRow.user_type,
+          role: userRow.role,
+          status: userRow.status,
+        },
+        gpsRouteCount,
+        matchesByType,
+      });
+    } finally {
+      client.release();
+    }
+  } catch (error) {
+    console.error("[admin/users/:userId/matches GET] error:", error);
+    return sendError(res, 500, "Errore caricamento match utente");
+  }
+});
+
+router.post("/users/:userId/matches/recalculate", async (req: Request, res: Response) => {
+  try {
+    const userId = req.params.userId as string;
+    if (!userId) return sendError(res, 400, "userId mancante");
+    const result = await runMatchingForUser(userId);
+    return res.json({ success: true, bikerBiker: result.bikerBiker, zavarrina: result.zavarrina });
+  } catch (error) {
+    console.error("[admin/users/:userId/matches/recalculate] error:", error);
+    return sendError(res, 500, "Errore ricalcolo match utente");
   }
 });
 

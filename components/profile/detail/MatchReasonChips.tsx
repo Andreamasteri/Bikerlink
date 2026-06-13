@@ -17,6 +17,7 @@ const KEY_ICON: Record<string, keyof typeof Ionicons.glyphMap> = {
   routeAffinity: "trail-sign",
   telemetryAffinity: "pulse",
   supermatch: "flash",
+  base_intent: "people",
 };
 
 interface Props {
