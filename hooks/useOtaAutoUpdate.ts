@@ -138,6 +138,14 @@ export function useOtaAutoUpdate(): { checking: boolean } {
           return;
         }
 
+        // Guard pending: le OTA in stato "pending" sono visibili all'admin per il test manuale
+        // ma NON devono essere auto-applicate al cold start (incluso clear-cache Android dove
+        // AsyncStorage e cookie sopravvivono). Solo le OTA "approved" vengono auto-applicate.
+        if (manifest.status === "pending") {
+          console.log("[useOtaAutoUpdate] OTA status=pending → skip auto-apply (usa 'Prova OTA' dal pannello admin)");
+          return;
+        }
+
         // Se siamo già su questo bundle, non fare nulla.
         if (Updates.updateId && Updates.updateId === manifest.allowedEasUpdateId) {
           return;

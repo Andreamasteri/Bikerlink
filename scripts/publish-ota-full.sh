@@ -9,7 +9,8 @@
 #
 # Flusso post-publish: la release resta `pending` finché un admin non clicca
 # "Approva" dal pannello /admin/ota. Solo dopo l'approvazione gli utenti normali
-# la ricevono. Gli account admin la ricevono già dal cold start successivo per testarla.
+# la ricevono. Gli account admin devono premere "Prova OTA" per applicarla
+# manualmente — le OTA pending NON vengono auto-applicate al cold start.
 
 set -euo pipefail
 
@@ -68,33 +69,32 @@ fi
 log_info "EAS_TOKEN: ${#EAS_TOKEN} chars — OK"
 
 # ── 3. Calcola numero OTA da ultima ota_version in DB ───────────────────────
-LAST_OTA_VERSION=$(psql "$DATABASE_URL" -tAc "
-  SELECT COALESCE(
-    (SELECT ota_version
-     FROM ota_releases
-     ORDER BY published_at DESC, id DESC
-     LIMIT 1),
-    ''
-  )
+# Query unificata: un solo round-trip che restituisce "version|number" su una riga.
+# Il filtro WHERE esclude righe con ota_version vuota o non canoniche (N.N.N)
+# per evitare che un CAST fallisca silenziosamente e resetti NEXT_OTA a 1.
+OTA_ROW=$(psql "$DATABASE_URL" -tAc "
+  SELECT ota_version || '|' || CAST(SPLIT_PART(ota_version, '.', 3) AS INTEGER)
+  FROM ota_releases
+  WHERE ota_version ~ '^[0-9]+\.[0-9]+\.[0-9]+\$'
+  ORDER BY published_at DESC, id DESC
+  LIMIT 1
 " 2>/dev/null | tr -d '[:space:]' || echo "")
 
-LAST_OTA_NUMBER=$(psql "$DATABASE_URL" -tAc "
-  SELECT COALESCE(
-    (SELECT CAST(SPLIT_PART(ota_version, '.', 3) AS INTEGER)
-     FROM ota_releases
-     ORDER BY published_at DESC, id DESC
-     LIMIT 1),
-    0
-  )
-" 2>/dev/null | tr -d '[:space:]' || echo "0")
+if [[ -z "$OTA_ROW" ]]; then
+  LAST_OTA_VERSION=""
+  LAST_OTA_NUMBER=0
+else
+  LAST_OTA_VERSION="${OTA_ROW%%|*}"
+  LAST_OTA_NUMBER="${OTA_ROW##*|}"
+fi
 
-# Fallback se la query restituisce stringa vuota o non numerica
+# Fallback se la query restituisce un numero non valido
 if ! [[ "$LAST_OTA_NUMBER" =~ ^[0-9]+$ ]]; then
   LAST_OTA_NUMBER=0
 fi
 
 if [[ "$LAST_OTA_NUMBER" -eq 0 && -z "$LAST_OTA_VERSION" ]]; then
-  log_info "DB vuoto → NEXT=1"
+  log_info "DB vuoto (o nessuna riga con formato N.N.N) → NEXT=1"
 elif [[ "$LAST_OTA_NUMBER" -eq 0 ]]; then
   log_info "Ultima OTA in DB: '${LAST_OTA_VERSION}' → numero estratto non valido (parse fallito) → NEXT=1"
 else
@@ -217,7 +217,7 @@ psql "$DATABASE_URL" -c "
     ota_version  = EXCLUDED.ota_version;
 " -q 2>&1 && {
   T_DB=$(( $(date +%s) - _T0 ))
-  log_ok "DB: release inserita come PENDING (${UPDATE_ID}) — admin la testerà al cold-start"
+  log_ok "DB: release inserita come PENDING (${UPDATE_ID}) — admin la testerà premendo 'Prova OTA'"
   log_ok "⏱ DB insert completato in ${T_DB}s"
 } || {
   log_error "DB insert fallito — buildInfo NON modificato"
@@ -266,6 +266,6 @@ log_ok "OTA pubblicata come PENDING!"
 echo -e "  ${BLUE}Versione OTA${NC}  : ${VERSION}"
 echo -e "  ${BLUE}Update ID${NC}     : ${UPDATE_ID}"
 echo -e "  ${BLUE}Messaggio${NC}     : ${MESSAGE}"
-echo -e "  ${BLUE}Stato DB${NC}      : pending → ricevuta SOLO dagli account admin al prossimo cold start"
+echo -e "  ${BLUE}Stato DB${NC}      : pending → NON auto-applicata; admin usa 'Prova OTA' per testarla manualmente"
 echo -e "  ${YELLOW}Prossimo step${NC} : admin testa la OTA, poi click 'Approva' su /admin/ota per distribuirla a tutti"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
