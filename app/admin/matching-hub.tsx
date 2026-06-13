@@ -37,6 +37,7 @@ interface StatsResponse {
   totalZavarrinaMatches: number;
   totalBikerBikerMatches: number;
   totalMusicMatches: number;
+  totalBikerZavBaseMatches: number;
   lastRunAt: string | null;
 }
 
@@ -150,6 +151,12 @@ export default function MatchingHubScreen() {
           <View style={styles.statCard}>
             <Text style={styles.statValue}>{stats?.totalMusicMatches ?? "—"}</Text>
             <Text style={styles.statLabel}>Music</Text>
+          </View>
+        </View>
+        <View style={[styles.cardRow, { marginTop: 8 }]}>
+          <View style={styles.statCard}>
+            <Text style={styles.statValue}>{stats?.totalBikerZavBaseMatches ?? "—"}</Text>
+            <Text style={styles.statLabel}>BZ Base</Text>
           </View>
         </View>
         <Text style={styles.lastRun}>

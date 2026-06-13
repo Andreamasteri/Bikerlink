@@ -293,6 +293,10 @@ router.get("/stats", async (_req: Request, res: Response) => {
       const bzRes = await client.query<{ cnt: string }>(`
         SELECT COUNT(*) AS cnt FROM biker_zavorrina_matches
       `);
+      const bzBaseRes = await client.query<{ cnt: string }>(`
+        SELECT COUNT(*) AS cnt FROM biker_biker_matches
+        WHERE pair_type = 'bz' AND motorcycle_brand = 'base_intent'
+      `);
       const lastRunRes = await client.query<{ last_run: string | null }>(`
         SELECT MAX(created_at)::text AS last_run FROM (
           SELECT created_at FROM biker_biker_matches
@@ -304,6 +308,7 @@ router.get("/stats", async (_req: Request, res: Response) => {
         totalBikerBikerMatches: parseInt(bbRes.rows[0]?.cnt ?? "0", 10),
         totalMusicMatches: parseInt(musicRes.rows[0]?.cnt ?? "0", 10),
         totalZavarrinaMatches: parseInt(bzRes.rows[0]?.cnt ?? "0", 10),
+        totalBikerZavBaseMatches: parseInt(bzBaseRes.rows[0]?.cnt ?? "0", 10),
         lastRunAt: lastRunRes.rows[0]?.last_run ?? null,
       });
     } finally {
