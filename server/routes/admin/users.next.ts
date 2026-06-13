@@ -306,7 +306,13 @@ router.get("/match-summary", async (req: Request, res: Response) => {
         ? db.execute(sql`
             SELECT COUNT(*) as cnt FROM users u
             LEFT JOIN LATERAL (
-              SELECT COUNT(*) as cnt FROM biker_biker_matches m
+              -- Explicitly split base_intent rows (motorcycle_brand='base_intent'),
+              -- which are conceptually B-Z matches stored in biker_biker_matches.
+              -- Both sub-counts must be zero for a user to qualify as "zero matches".
+              SELECT
+                COUNT(*) FILTER (WHERE motorcycle_brand != 'base_intent') AS cnt,
+                COUNT(*) FILTER (WHERE motorcycle_brand = 'base_intent')  AS base_intent_cnt
+              FROM biker_biker_matches m
               WHERE m.biker1_id = u.id OR m.biker2_id = u.id
             ) bb ON true
             LEFT JOIN LATERAL (
@@ -314,7 +320,7 @@ router.get("/match-summary", async (req: Request, res: Response) => {
               WHERE m.biker_id = u.id OR m.zavorrina_id = u.id
             ) bz ON true
             WHERE u.is_fake = false AND u.role NOT IN ('admin', 'moderator')
-              AND (COALESCE(bb.cnt, 0) + COALESCE(bz.cnt, 0)) = 0
+              AND (COALESCE(bb.cnt, 0) + COALESCE(bb.base_intent_cnt, 0) + COALESCE(bz.cnt, 0)) = 0
               ${searchTerm ? sql`AND u.nickname ILIKE ${searchTerm}` : sql``}
           `)
         : db.execute(sql`
@@ -323,9 +329,16 @@ router.get("/match-summary", async (req: Request, res: Response) => {
               ${searchTerm ? sql`AND u.nickname ILIKE ${searchTerm}` : sql``}
           `),
       db.execute(sql`
+        -- zeroMatchCount stat: count users with no matches of any kind.
+        -- base_intent rows (motorcycle_brand='base_intent') live in biker_biker_matches
+        -- but are conceptually B-Z matches; they are split out explicitly so this count
+        -- stays correct even if the main bb.cnt subquery is later refactored.
         SELECT COUNT(*) as cnt FROM users u
         LEFT JOIN LATERAL (
-          SELECT COUNT(*) as cnt FROM biker_biker_matches m
+          SELECT
+            COUNT(*) FILTER (WHERE motorcycle_brand != 'base_intent') AS cnt,
+            COUNT(*) FILTER (WHERE motorcycle_brand = 'base_intent')  AS base_intent_cnt
+          FROM biker_biker_matches m
           WHERE m.biker1_id = u.id OR m.biker2_id = u.id
         ) bb ON true
         LEFT JOIN LATERAL (
@@ -333,7 +346,7 @@ router.get("/match-summary", async (req: Request, res: Response) => {
           WHERE m.biker_id = u.id OR m.zavorrina_id = u.id
         ) bz ON true
         WHERE u.is_fake = false AND u.role NOT IN ('admin', 'moderator')
-          AND (COALESCE(bb.cnt, 0) + COALESCE(bz.cnt, 0)) = 0
+          AND (COALESCE(bb.cnt, 0) + COALESCE(bb.base_intent_cnt, 0) + COALESCE(bz.cnt, 0)) = 0
       `),
     ]);
 
@@ -343,12 +356,20 @@ router.get("/match-summary", async (req: Request, res: Response) => {
     const usersResult = await db.execute(sql`
       SELECT
         u.id, u.nickname, u.avatar_url, u.user_type, u.role, u.status,
-        COALESCE(bb.cnt, 0)::text as bb_count,
+        COALESCE(bb.cnt + bb.base_intent_cnt, 0)::text as bb_count,
         COALESCE(bz.cnt, 0)::text as bz_count,
         null as bb_counts
       FROM users u
       LEFT JOIN LATERAL (
-        SELECT COUNT(*) as cnt FROM biker_biker_matches m
+        -- Explicitly split base_intent rows (motorcycle_brand='base_intent') from
+        -- regular B-B matches. base_intent are conceptually B-Z matches stored here.
+        -- bb_count display column uses (cnt + base_intent_cnt) = all rows so that
+        -- the JS mapping (lines ~518-522) can subtract base_intent_cnt correctly.
+        -- zeroOnly filter sums all three parts explicitly (mirrors count queries above).
+        SELECT
+          COUNT(*) FILTER (WHERE motorcycle_brand != 'base_intent') AS cnt,
+          COUNT(*) FILTER (WHERE motorcycle_brand = 'base_intent')  AS base_intent_cnt
+        FROM biker_biker_matches m
         WHERE m.biker1_id = u.id OR m.biker2_id = u.id
       ) bb ON true
       LEFT JOIN LATERAL (
@@ -356,7 +377,7 @@ router.get("/match-summary", async (req: Request, res: Response) => {
         WHERE m.biker_id = u.id OR m.zavorrina_id = u.id
       ) bz ON true
       WHERE u.is_fake = false AND u.role NOT IN ('admin', 'moderator')
-        ${zeroOnly ? sql`AND (COALESCE(bb.cnt, 0) + COALESCE(bz.cnt, 0)) = 0` : sql``}
+        ${zeroOnly ? sql`AND (COALESCE(bb.cnt, 0) + COALESCE(bb.base_intent_cnt, 0) + COALESCE(bz.cnt, 0)) = 0` : sql``}
         ${searchTerm ? sql`AND u.nickname ILIKE ${searchTerm}` : sql``}
       ORDER BY u.nickname
       LIMIT ${limit} OFFSET ${offset}
