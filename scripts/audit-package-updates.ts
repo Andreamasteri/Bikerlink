@@ -40,6 +40,8 @@ interface RepoInfo {
   changelogPath: string;
   /** git ref / branch to use */
   ref?: string;
+  /** custom tag prefix for GitHub Releases (default: "v") */
+  releaseTagPrefix?: string;
 }
 
 interface ChangelogSection {
@@ -154,6 +156,26 @@ function getRepoInfo(pkgName: string): RepoInfo | null {
     return { owner: "getsentry", repo: "sentry-javascript", changelogPath: "CHANGELOG.md", ref: "develop" };
   }
 
+  // Sharp
+  if (pkgName === "sharp") {
+    return { owner: "lovell", repo: "sharp", changelogPath: "CHANGELOG.md", ref: "main" };
+  }
+
+  // Bull Board
+  if (pkgName === "@bull-board/api" || pkgName === "@bull-board/express" || pkgName === "@bull-board/hapi" || pkgName === "@bull-board/koa" || pkgName === "@bull-board/fastify") {
+    return { owner: "felixmosh", repo: "bull-board", changelogPath: "CHANGELOG.md", ref: "master" };
+  }
+
+  // React Native Async Storage (tag non-standard: @scope/pkg@x.y.z)
+  if (pkgName === "@react-native-async-storage/async-storage") {
+    return { owner: "react-native-async-storage", repo: "async-storage", changelogPath: "CHANGELOG.md", ref: "main", releaseTagPrefix: "@react-native-async-storage/async-storage@" };
+  }
+
+  // jscpd
+  if (pkgName === "jscpd") {
+    return { owner: "kucherenko", repo: "jscpd", changelogPath: "CHANGELOG.md", ref: "master" };
+  }
+
   return null;
 }
 
@@ -192,19 +214,26 @@ function httpsGet(url: string, headers: Record<string, string> = {}): Promise<st
 
 async function fetchGitHubFile(info: RepoInfo, token?: string): Promise<string | null> {
   const ref = info.ref ?? "main";
-  const url = `https://api.github.com/repos/${info.owner}/${info.repo}/contents/${info.changelogPath}?ref=${ref}`;
   const headers: Record<string, string> = {};
   if (token) headers["Authorization"] = `Bearer ${token}`;
 
+  // Primary: GitHub Contents API (base64 encoded, max 1 MB)
+  const contentsUrl = `https://api.github.com/repos/${info.owner}/${info.repo}/contents/${info.changelogPath}?ref=${ref}`;
   try {
-    const raw = await httpsGet(url, headers);
+    const raw = await httpsGet(contentsUrl, headers);
     const json = JSON.parse(raw) as { content?: string; encoding?: string; message?: string };
-    if (json.message) throw new Error(json.message);
-    if (json.content && json.encoding === "base64") {
+    if (!json.message && json.content && json.encoding === "base64") {
       return Buffer.from(json.content.replace(/\n/g, ""), "base64").toString("utf-8");
     }
-    return null;
-  } catch (err) {
+  } catch {
+    // fall through to raw URL
+  }
+
+  // Fallback: raw.githubusercontent.com (no size limit)
+  const rawUrl = `https://raw.githubusercontent.com/${info.owner}/${info.repo}/${ref}/${info.changelogPath}`;
+  try {
+    return await httpsGet(rawUrl, token ? { Authorization: `Bearer ${token}` } : {});
+  } catch {
     return null;
   }
 }
@@ -316,7 +345,8 @@ function parseManualPackages(spec: string): PackageDiff[] {
 async function fetchGitHubRelease(info: RepoInfo, version: string, token?: string): Promise<string | null> {
   const headers: Record<string, string> = {};
   if (token) headers["Authorization"] = `Bearer ${token}`;
-  const tag = `v${version}`;
+  const prefix = info.releaseTagPrefix ?? "v";
+  const tag = encodeURIComponent(`${prefix}${version}`);
   const url = `https://api.github.com/repos/${info.owner}/${info.repo}/releases/tags/${tag}`;
   try {
     const raw = await httpsGet(url, headers);
@@ -481,8 +511,18 @@ async function main() {
 
     try {
       const content = await fetchGitHubFile(info, token);
+
+      // No CHANGELOG file — try GitHub Releases directly
       if (!content) {
-        throw new Error("CHANGELOG non trovato o non accessibile");
+        const releaseNote = await fetchGitHubRelease(info, pkg.to, token);
+        if (releaseNote) {
+          console.log("⬜ nessun CHANGELOG, release note trovata");
+          results.push({ pkg, sections: [], releaseNote });
+        } else {
+          console.log("errore: CHANGELOG non trovato e nessuna release note");
+          results.push({ pkg, sections: [], error: "CHANGELOG non trovato e nessuna release note disponibile" });
+        }
+        continue;
       }
 
       const allSections = parseChangelogSections(content);
