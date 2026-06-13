@@ -225,3 +225,18 @@ export function useOtaAutoUpdate(): { checking: boolean } {
 
   return { checking: false };
 }
+
+/**
+ * Percorso "Prova OTA" — scarica e applica l'aggiornamento disponibile
+ * direttamente, senza passare per il manifest server-side né controllare
+ * manifest.status. Rappresenta il contratto del bottone "Prova OTA"
+ * nell'admin panel (OtaPanel.handleTryOta): chiama fetchUpdateAsync
+ * direttamente senza gating, indipendentemente dallo status della release.
+ *
+ * Esportata separatamente per consentire test unitari senza dover montare
+ * il componente React OtaPanel (813 righe).
+ */
+export async function performDirectOtaUpdate(): Promise<{ isNew: boolean }> {
+  const result = await Updates.fetchUpdateAsync();
+  return result;
+}

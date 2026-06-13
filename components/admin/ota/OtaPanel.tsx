@@ -18,6 +18,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import * as Updates from "expo-updates";
 import { useTheme } from "@/lib/theme-context";
 import { apiRequest } from "@/lib/query-client";
+import { performDirectOtaUpdate } from "@/hooks/useOtaAutoUpdate";
 import OtaAssistantChat from "./OtaAssistantChat";
 import OtaFailureDevices from "./OtaFailureDevices";
 
@@ -297,7 +298,7 @@ export default function OtaPanel() {
     }
     setTryingId(release.id);
     try {
-      const result = await Updates.fetchUpdateAsync();
+      const result = await performDirectOtaUpdate();
       if (result.isNew) {
         Alert.alert(
           "OTA scaricata",
