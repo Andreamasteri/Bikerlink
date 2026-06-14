@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   Pressable,
   Dimensions,
+  useWindowDimensions,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -32,7 +33,7 @@ export default function FloatingWidget() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
 
-  const { width, height } = Dimensions.get("window");
+  const { width, height } = useWindowDimensions();
   const defaultX = width - WIDGET_SIZE - 16;
   const defaultY = height - WIDGET_SIZE - 90 - insets.bottom;
 
@@ -40,8 +41,22 @@ export default function FloatingWidget() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [isTouching, setIsTouching] = useState(false);
 
-  const insetsRef = useRef(insets);
-  useEffect(() => { insetsRef.current = insets; }, [insets]);
+  const insetsTop = useSharedValue(insets.top);
+  const insetsBottom = useSharedValue(insets.bottom);
+  useEffect(() => {
+    insetsTop.value = insets.top;
+    insetsBottom.value = insets.bottom;
+  }, [insets.top, insets.bottom]);
+
+  const screenW = useSharedValue(width);
+  const screenH = useSharedValue(height);
+  useEffect(() => {
+    const sub = Dimensions.addEventListener("change", ({ window }) => {
+      screenW.value = window.width;
+      screenH.value = window.height;
+    });
+    return () => sub.remove();
+  }, []);
 
   const refetchBadgesRef = useRef(refetchBadges);
   useEffect(() => { refetchBadgesRef.current = refetchBadges; }, [refetchBadges]);
@@ -103,30 +118,27 @@ export default function FloatingWidget() {
   }, []);
 
   const panGesture = Gesture.Pan()
-    .runOnJS(true)
     .minDistance(0)
     .onStart(() => {
       startX.value = posX.value;
       startY.value = posY.value;
-      setIsTouching(true);
+      runOnJS(setIsTouching)(true);
     })
     .onUpdate((e) => {
       const rawX = startX.value + e.translationX;
       const rawY = startY.value + e.translationY;
-      const screenW = Dimensions.get("window").width;
-      const screenH = Dimensions.get("window").height;
-      posX.value = Math.max(0, Math.min(rawX, screenW - WIDGET_SIZE));
+      posX.value = Math.max(0, Math.min(rawX, screenW.value - WIDGET_SIZE));
       posY.value = Math.max(
-        insetsRef.current.top + 8,
-        Math.min(rawY, screenH - WIDGET_SIZE - 8 - insetsRef.current.bottom),
+        insetsTop.value + 8,
+        Math.min(rawY, screenH.value - WIDGET_SIZE - 8 - insetsBottom.value),
       );
     })
     .onEnd((e) => {
       const dist = Math.sqrt(e.translationX ** 2 + e.translationY ** 2);
-      savePositionJS(posX.value, posY.value);
-      setIsTouching(false);
+      runOnJS(savePositionJS)(posX.value, posY.value);
+      runOnJS(setIsTouching)(false);
       if (dist <= TAP_THRESHOLD) {
-        handleTapJS();
+        runOnJS(handleTapJS)();
       }
     });
 
