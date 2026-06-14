@@ -51,6 +51,8 @@ Il comando DEVE girare in foreground nel tool `bash` con timeout esplicito.
 - [ ] Il comando viene eseguito in foreground (nessun `&`, nessun workflow background)
 - [ ] ⛔ `timeout` del tool bash DEVE essere `600000ms` — non il default (30s). L'upload è ~127 MB e richiede 2–3 minuti anche con connessione veloce.
 
+> **Guardia automatica:** `scripts/eas.sh` stampa un avviso boxed BEN VISIBILE su stderr ogni volta che il primo argomento è `build`. Se il warning non compare nell'output, il comando non è stato eseguito dal wrapper corretto.
+
 ```bash
 GIT_INDEX_FILE=/tmp/eas-build-index bash scripts/eas.sh build \
   --platform android \
