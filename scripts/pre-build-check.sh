@@ -205,7 +205,37 @@ else
   error "Runtime health: backend NON sano (ROSSO) — verificare i processi live"
 fi
 
-# ── 5. Riepilogo finale ─────────────────────────────────────────────────────
+# ── 5. EAS CLI — auto-bump major version ────────────────────────────────────
+echo ""
+echo -e "  ${BOLD}─── EAS CLI versione npm ───────────────────────────────────${RESET}"
+
+PINNED_MAJOR=$(grep -oP '(?<=EAS_CLI_VERSION=")[0-9]+' scripts/eas.sh 2>/dev/null || echo "")
+if [ -z "$PINNED_MAJOR" ]; then
+  warn "Impossibile leggere EAS_CLI_VERSION da scripts/eas.sh"
+else
+  LATEST_FULL=$(npm view eas-cli dist-tags.latest 2>/dev/null || echo "")
+  LATEST_MAJOR=$(echo "$LATEST_FULL" | grep -oP '^\d+' || echo "")
+
+  if [ -z "$LATEST_MAJOR" ] || [ -z "$LATEST_FULL" ]; then
+    warn "Impossibile interrogare npm per eas-cli (nessuna rete?). Pinned major: $PINNED_MAJOR"
+  elif [ "$LATEST_MAJOR" -gt "$PINNED_MAJOR" ] 2>/dev/null; then
+    echo -e "  ${YELLOW}⚠${RESET}  EAS CLI: nuovo major disponibile su npm ($LATEST_FULL) — pinned major era $PINNED_MAJOR"
+    echo -e "  ${CYAN}ℹ${RESET}  Auto-bump: EAS_CLI_VERSION → $LATEST_MAJOR in scripts/eas.sh"
+    sed -i "s/EAS_CLI_VERSION=\"$PINNED_MAJOR\"/EAS_CLI_VERSION=\"$LATEST_MAJOR\"/" scripts/eas.sh
+    if grep -q "EAS_CLI_VERSION=\"$LATEST_MAJOR\"" scripts/eas.sh; then
+      echo -e "  ${GREEN}✔${RESET}  scripts/eas.sh aggiornato automaticamente a major $LATEST_MAJOR"
+      ((WARNINGS++)); CHANGED=true
+    else
+      error "sed ha fallito — aggiorna manualmente EAS_CLI_VERSION a $LATEST_MAJOR in scripts/eas.sh"
+    fi
+  elif [ "$LATEST_MAJOR" -eq "$PINNED_MAJOR" ] 2>/dev/null; then
+    ok "EAS CLI major: $PINNED_MAJOR (latest npm: $LATEST_FULL)"
+  else
+    warn "EAS CLI: latest npm ($LATEST_FULL) è più vecchio del pinned major ($PINNED_MAJOR) — verifica"
+  fi
+fi
+
+# ── 6. Riepilogo finale ─────────────────────────────────────────────────────
 echo ""
 echo -e "  ${BOLD}────────────────────────────────────────────────────────────${RESET}"
 if [ "$CHANGED" = true ] || [ $WARNINGS -gt 0 ] || [ $ERRORS -gt 0 ]; then
