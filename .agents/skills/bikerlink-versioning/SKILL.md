@@ -62,11 +62,11 @@ Il progetto usa il bare workflow (directory `android/` committata). I tre file d
 
 | File | Campo | Valore corrente |
 |---|---|---|
-| `app.json` | `expo.version` | `55.10.10` |
-| `app.json` | `expo.android.versionCode` | `55` |
+| `app.json` | `expo.version` | `67.10.103` |
+| `app.json` | `expo.android.versionCode` | `67` |
 | `app.json` | `expo.runtimeVersion` | `10.0.0` |
-| `android/app/build.gradle` | `versionCode` | `55` |
-| `android/app/build.gradle` | `versionName` | `"55.10.10"` |
+| `android/app/build.gradle` | `versionCode` | `67` |
+| `android/app/build.gradle` | `versionName` | `"67.10.103"` |
 | `android/app/src/main/res/values/strings.xml` | `expo_runtime_version` | `10.0.0` |
 
 ⚠️ **Aggiornare sempre tutti e tre i file contemporaneamente.** Un disallineamento causa errori di update check a runtime.
@@ -112,7 +112,9 @@ La versione OTA segue la formula `<build>.<updateNumber>.<ciclo>` — lo script 
 | v52 | 52 | 52.3.10 | 10.0.0 | 10.x | OTA-3 inglobata | Fix mappa nera Android (OTA2), pulsante Forza OTA (OTA3), fix mutation GraphQL promozione staging→production |
 | v53 | 53 | 53.1.10 | 10.0.0 | 10.x | OTA-1 inglobata | Fix sistema mappe (tile ID, normalizeTileId, OpenLayers type), fix admin DB Debug/Dimensioni, SQL injection visitatori |
 | v54 | 54 | 54.10.36 | 10.0.0 | 10.x | OTA-10 inglobata | Task #3124 rotazione mappa due dita, fix vari fino a #3124 |
-| v55 | 55 | 55.10.10 | 10.0.0 | 10.x | OTA-10 inglobata | **Corrente** — build in corso |
+| v55 | 55 | 55.10.10 | 10.0.0 | 10.x | OTA-10 inglobata | — |
+| v56–v66 | 56–66 | — | 10.0.0 | 10.x | — | Build intermedie ciclo 10 |
+| v67 | 67 | 67.10.103 | 10.0.0 | 10.x | OTA-10 inglobata | **Corrente** — debug-apk build in corso |
 
 > **Cicli precedenti** (schema vecchio `major.minor.patch` senza significato semantico):
 > - Ciclo 2.x: rv 2.0.0

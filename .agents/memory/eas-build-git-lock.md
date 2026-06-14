@@ -22,11 +22,12 @@ della fase di upload.
 Non è possibile rimuovere `.git/index.lock` via `rm` o Node.js `fs.unlinkSync`
 perché anche queste chiamate vengono intercettate.
 
-**How to apply:** Aggiungere `GIT_INDEX_FILE=/tmp/eas-build-index` prima del
-comando EAS. Questo redirige il lock git su `/tmp/` anziché `.git/`, bypassando
-l'intercettazione:
+**How to apply:** Usare `npx eas-cli@latest` (NON `npx eas` né il binario globale
+`eas`) + `GIT_INDEX_FILE=/tmp/eas-build-index`. Il binario globale può essere
+outdated (es. v19 installato globalmente, constraint eas.json `>=20`); `npx eas-cli@latest`
+scarica e usa sempre la versione corretta:
 
-  GIT_INDEX_FILE=/tmp/eas-build-index npx eas build --platform android --profile release-apk --non-interactive --no-wait
+  GIT_INDEX_FILE=/tmp/eas-build-index npx eas-cli@latest build --platform android --profile release-apk --non-interactive --no-wait
 
 Il lock del code_execution sandbox (notebook JS) bypassa la stessa restrizione
 e può rimuovere file dentro `.git/` se necessario (fs.unlinkSync funziona lì).

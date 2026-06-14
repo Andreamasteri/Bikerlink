@@ -1,10 +1,10 @@
 {
   "cli": {
-    "version": ">= 12.0.0",
+    "version": ">= 20.0.0",
     "appVersionSource": "local"
   },
   "build": {
-    "debug-standalone": {
+    "debug-apk": {
       "distribution": "internal",
       "channel": "production",
       "credentialsSource": "remote",
@@ -14,7 +14,8 @@
       },
       "android": {
         "buildType": "apk",
-        "gradleCommand": ":app:assembleDebug"
+        "gradleCommand": ":app:assembleDebug",
+        "image": "latest"
       }
     },
     "preview": {
