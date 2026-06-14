@@ -183,12 +183,18 @@ export default function AdminDashboard() {
   const filteredGroups = useMemo(() => {
     if (!normalizedSearch) return adminGroups;
     return adminGroups
-      .map((group) => ({
-        ...group,
-        items: group.items.filter((item) =>
-          normalize(item.label).includes(normalizedSearch)
-        ),
-      }))
+      .map((group) => {
+        const groupTitleMatches = normalize(group.title).includes(normalizedSearch);
+        if (groupTitleMatches) return group;
+        return {
+          ...group,
+          items: group.items.filter((item) => {
+            if (normalize(item.label).includes(normalizedSearch)) return true;
+            if (item.keywords?.some((kw) => normalize(kw).includes(normalizedSearch))) return true;
+            return false;
+          }),
+        };
+      })
       .filter((group) => group.items.length > 0);
   }, [normalizedSearch]);
 

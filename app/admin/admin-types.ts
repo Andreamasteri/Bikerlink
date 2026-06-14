@@ -10,6 +10,7 @@ export type AdminItem = {
   label: string;
   route?: string;
   accentColor?: string;
+  keywords?: string[];
 } & (
   | { iconSet: "MaterialIcons"; icon: MaterialIconName }
   | { iconSet: "MaterialCommunityIcons"; icon: MaterialCommunityIconName }
