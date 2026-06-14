@@ -43,7 +43,7 @@ interface DeviceAgg {
   androidCount: number;
 }
 
-interface CrashCounts { last7d: number; last30d: number; }
+interface CrashCounts { last7d: number; last30d: number; restartLoops7d: number; }
 interface LogTableRow { name: string; rowCount: number; sizeMb: number; }
 interface GraphData { enabled: boolean; samples: ResourceSample[]; dbSizeMb: number | null; }
 
@@ -178,6 +178,14 @@ export default function ResourceMonitorScreen() {
           <BadgeCount label="7 giorni" count={d?.crashes?.last7d ?? 0} />
           <BadgeCount label="30 giorni" count={d?.crashes?.last30d ?? 0} />
         </View>
+        {(d?.crashes?.restartLoops7d ?? 0) > 0 && (
+          <View style={[styles.restartLoopAlert, { backgroundColor: "#FF4444" + "22", borderColor: "#FF4444" }]}>
+            <MaterialCommunityIcons name="restart-alert" size={16} color="#FF4444" />
+            <Text style={[styles.restartLoopText, { color: "#FF4444" }]}>
+              {d.crashes.restartLoops7d} restart-loop{d.crashes.restartLoops7d !== 1 ? " rilevati" : " rilevato"} negli ultimi 7 giorni
+            </Text>
+          </View>
+        )}
       </Card>
 
       <Card colors={colors} title="Peso Tabelle Logging" icon="database-clock">
@@ -265,4 +273,6 @@ const styles = StyleSheet.create({
   csvBtnText: { fontFamily: "Inter_600SemiBold", fontSize: 13 },
   graphInfo: { fontFamily: "Inter_400Regular", fontSize: 11, marginTop: 4 },
   emptyNote: { fontFamily: "Inter_400Regular", fontSize: 13, textAlign: "center", paddingVertical: 8 },
+  restartLoopAlert: { flexDirection: "row", alignItems: "center", gap: 8, borderWidth: 1, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8, marginTop: 8 },
+  restartLoopText: { fontFamily: "Inter_600SemiBold", fontSize: 13, flex: 1 },
 });

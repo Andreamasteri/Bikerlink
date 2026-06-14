@@ -89,6 +89,7 @@ async function sendMetrics(userId: string): Promise<void> {
       appUptimeSeconds: Math.floor(
         (Date.now() - parseInt(SESSION_ID.split("-")[0], 10)) / 1000
       ),
+      abnormalRestarts,
     });
   } catch {
     // non-fatal

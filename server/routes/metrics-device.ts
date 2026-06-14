@@ -1,8 +1,8 @@
 import { Router, type Request, type Response } from "express";
 import rateLimit from "express-rate-limit";
 import { db } from "../db";
-import { deviceMetrics } from "@shared/db";
-import { sql } from "drizzle-orm";
+import { deviceMetrics, appCrashLogs } from "@shared/db";
+import { sql, eq, and } from "drizzle-orm";
 import { sendError } from "../lib/api-response";
 
 const router = Router();
@@ -37,6 +37,7 @@ router.post(
         batteryLevel?: number;
         batteryState?: string;
         appUptimeSeconds?: number;
+        abnormalRestarts?: number;
       };
 
       const sessionId =
@@ -74,6 +75,42 @@ router.post(
             ? Math.round(body.appUptimeSeconds)
             : null,
       });
+
+      const abnormalRestarts =
+        typeof body.abnormalRestarts === "number" && body.abnormalRestarts > 0
+          ? Math.floor(body.abnormalRestarts)
+          : 0;
+
+      if (abnormalRestarts >= 3) {
+        const existing = await db
+          .select({ id: appCrashLogs.id })
+          .from(appCrashLogs)
+          .where(
+            and(
+              eq(appCrashLogs.userId, userId),
+              eq(appCrashLogs.sessionId, sessionId),
+              eq(appCrashLogs.crashType, "restart_loop")
+            )
+          )
+          .limit(1);
+
+        if (existing.length === 0) {
+          await db.insert(appCrashLogs)
+            .values({
+              userId,
+              sessionId,
+              crashType: "restart_loop",
+              platform:
+                typeof body.platform === "string"
+                  ? body.platform.substring(0, 16)
+                  : null,
+              errorMessage: `Rilevati ${abnormalRestarts} riavvii anomali consecutivi in questa sessione`,
+            })
+            .catch((err) => {
+              console.error("[metrics/device] restart_loop insert error:", err);
+            });
+        }
+      }
 
       const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
       db.delete(deviceMetrics)

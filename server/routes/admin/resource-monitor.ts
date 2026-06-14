@@ -69,6 +69,7 @@ router.get("/resource-monitor", async (_req: Request, res: Response) => {
       deviceAgg,
       crashStats7d,
       crashStats30d,
+      restartLoops7d,
       logTables,
       dbSizeRow,
       recentSamples,
@@ -100,7 +101,7 @@ router.get("/resource-monitor", async (_req: Request, res: Response) => {
         const client = await pool.connect();
         try {
           const r = await client.query(
-            "SELECT COUNT(*) AS cnt FROM app_crash_logs WHERE reported_at >= $1",
+            "SELECT COUNT(*) AS cnt FROM app_crash_logs WHERE crash_type IN ('crash_system','crash_js') AND reported_at >= $1",
             [sevenDaysAgo]
           );
           return Number((r.rows[0] as { cnt?: string | number })?.cnt ?? 0);
@@ -113,8 +114,21 @@ router.get("/resource-monitor", async (_req: Request, res: Response) => {
         const client = await pool.connect();
         try {
           const r = await client.query(
-            "SELECT COUNT(*) AS cnt FROM app_crash_logs WHERE reported_at >= $1",
+            "SELECT COUNT(*) AS cnt FROM app_crash_logs WHERE crash_type IN ('crash_system','crash_js') AND reported_at >= $1",
             [thirtyDaysAgo]
+          );
+          return Number((r.rows[0] as { cnt?: string | number })?.cnt ?? 0);
+        } finally {
+          client.release();
+        }
+      })(),
+      (async () => {
+        const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+        const client = await pool.connect();
+        try {
+          const r = await client.query(
+            "SELECT COUNT(*) AS cnt FROM app_crash_logs WHERE crash_type = 'restart_loop' AND reported_at >= $1",
+            [sevenDaysAgo]
           );
           return Number((r.rows[0] as { cnt?: string | number })?.cnt ?? 0);
         } finally {
@@ -170,6 +184,7 @@ router.get("/resource-monitor", async (_req: Request, res: Response) => {
       crashes: {
         last7d: crashStats7d,
         last30d: crashStats30d,
+        restartLoops7d,
       },
       logTables,
       graph: {
