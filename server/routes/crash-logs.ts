@@ -265,7 +265,7 @@ adminRouter.get("/alerts", requireAdmin, (req: Request, res: Response): void => 
       device_brand,
       COUNT(*)::int AS cnt
     FROM app_crash_logs
-    WHERE crash_type IN ('crash_system','crash_js')
+    WHERE crash_type IN ('crash_system','crash_js','restart_loop')
       AND reported_at >= NOW() - INTERVAL '24 hours'
       AND device_model IS NOT NULL
     GROUP BY device_model, device_brand
