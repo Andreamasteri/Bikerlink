@@ -12,6 +12,7 @@
     "server:build": "esbuild server/index.ts --platform=node --packages=external --bundle --format=cjs --outdir=server_dist",
     "server:prod": "NODE_ENV=production node server_dist/index.js",
     "db:check": "npx tsx scripts/check-schema-drift.ts",
+    "db:check-indexes": "npx tsx scripts/check-index-drift.ts",
     "docs:pdf": "node scripts/generate-matching-pdf.mjs",
     "i18n:translate": "tsx scripts/translate-i18n.ts",
     "i18n:translate:dry-run": "tsx scripts/translate-i18n.ts --dry-run",
