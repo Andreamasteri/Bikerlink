@@ -155,6 +155,15 @@ export function useAdminUsers() {
     onError: () => Alert.alert("Errore", "Impossibile aggiornare flag matching"),
   });
 
+  const aisMutation = useMutation({
+    mutationFn: async ({ id }: { id: string }) => {
+      const res = await apiRequest("PATCH", `/api/admin/users/${id}/ais`);
+      return res.json() as Promise<{ userId: string; aisEnabled: boolean }>;
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] }),
+    onError: () => Alert.alert("Errore", "Impossibile aggiornare permesso AIS"),
+  });
+
   const clearLastfmMutation = useMutation({
     mutationFn: async ({ id }: { id: string }) => {
       const res = await apiRequest("DELETE", `/api/admin/users/${id}/lastfm`);
@@ -221,6 +230,7 @@ export function useAdminUsers() {
     mapTesterMutation,
     telemetryDisabledMutation,
     matchingDisabledMutation,
+    aisMutation,
     clearLastfmMutation,
     revokeSessionMutation,
     useUserStats,

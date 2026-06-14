@@ -94,6 +94,7 @@ export default function MapScreen() {
     toggleFilterClubs,
     toggleFilterEvents,
     setMotoTags,
+    filterVessels, toggleFilterVessels, aisEnabled,
     locationLoading,
     mapData,
     saveCountries,
@@ -125,13 +126,10 @@ export default function MapScreen() {
   const [compactLayout, setCompactLayout] = useState<CardLayout | null>(null);
   const firstLayoutDoneRef = useRef(false);
   const [brokenAdIds, setBrokenAdIds] = useState<Set<string>>(new Set());
-
   const validAds = myAds.filter((ad) => !brokenAdIds.has(ad.id));
-
   const handleAdImageFailed = (id: string) => {
     setBrokenAdIds((prev) => new Set([...prev, id]));
   };
-
   const animTop = useRef(new Animated.Value(0)).current;
   const animLeft = useRef(new Animated.Value(0)).current;
   const animWidth = useRef(new Animated.Value(screenWidth)).current;
@@ -385,6 +383,7 @@ export default function MapScreen() {
             filterBarTopOffset={mapFullscreen ? insets.top : undefined}
             gpsFollowupEnabled={true}
             showHazardReportButton={mapFullscreen}
+            filterVessels={filterVessels} onToggleFilterVessels={toggleFilterVessels} aisEnabled={aisEnabled}
           />
 
           {/* Compact mode: transparent tap target to expand + expand icon.

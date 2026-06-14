@@ -51,8 +51,8 @@ export default function AdminUsers() {
     users, isLoading, summary, matchabilityMap,
     statusMutation, roleMutation, emailMutation, passwordMutation,
     deleteMutation, createUserMutation, primalMutation, mapTesterMutation,
-    telemetryDisabledMutation, matchingDisabledMutation, clearLastfmMutation,
-    revokeSessionMutation, useUserStats, useUserSessions,
+    telemetryDisabledMutation, matchingDisabledMutation, aisMutation,
+    clearLastfmMutation, revokeSessionMutation, useUserStats, useUserSessions,
   } = useAdminUsers();
 
   const [editModalVisible, setEditModalVisible] = useState(false);
@@ -214,6 +214,15 @@ export default function AdminUsers() {
               Alert.alert(label, `${label} per ${user?.nickname ?? id}?`, [
                 { text: "Annulla", style: "cancel" },
                 { text: "Conferma", style: disabled ? "destructive" : "default", onPress: () => matchingDisabledMutation.mutate({ id, matchingDisabled: disabled }) },
+              ]);
+            }}
+            onToggleAis={(id) => {
+              const user = users.find((u) => u.id === id);
+              const current = user?.aisEnabled ?? false;
+              const label = current ? "Rimuovere permesso AIS" : "Abilitare accesso AIS navi";
+              Alert.alert(label, `${label} per ${user?.nickname ?? id}?`, [
+                { text: "Annulla", style: "cancel" },
+                { text: "Conferma", onPress: () => aisMutation.mutate({ id }) },
               ]);
             }}
             onOpenPrivacy={(user) => setPrivacyModalUser(user)}

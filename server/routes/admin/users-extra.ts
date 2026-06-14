@@ -107,4 +107,26 @@ router.delete("/:userId/calibration", async (req: Request, res: Response) => {
   }
 });
 
+router.patch("/:userId/ais", async (req: Request, res: Response) => {
+  try {
+    const userId = String(req.params.userId);
+    const rows = await db
+      .select({ aisEnabled: users.aisEnabled })
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1);
+    if (!rows.length) return sendError(res, 404, "Utente non trovato");
+    const newValue = !rows[0].aisEnabled;
+    await db
+      .update(users)
+      .set({ aisEnabled: newValue, updatedAt: new Date() })
+      .where(eq(users.id, userId));
+    console.log(`[admin/users/${userId}/ais] aisEnabled=${newValue}`);
+    return res.json({ userId, aisEnabled: newValue });
+  } catch (err) {
+    console.error("[admin/users/:userId/ais] error:", err);
+    return sendError(res, 500, "Errore aggiornamento ais_enabled");
+  }
+});
+
 export default router;

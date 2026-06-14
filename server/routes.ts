@@ -38,6 +38,7 @@ import moderatorRoutes from "./routes/moderator";
 import customRoutesRouter from "./routes/custom-routes";
 import customRoutes2Router from "./routes/custom-routes2";
 import sosRoutes from "./routes/sos";
+import aisRoutes from "./routes/ais/relay";
 import telemetryRoutes from "./routes/telemetry";
 import telemetryMapsRoutes from "./routes/telemetry-maps";
 import motoclubsRoutes from "./routes/motoclubs";
@@ -81,10 +82,8 @@ async function _requireAdmin(req: Request, res: Response, next: NextFunction) {
   (req as Request & { adminUser?: unknown }).adminUser = user;
   next();
 }
-
 export async function registerRoutes(app: Express): Promise<Server> {
   app.set("trust proxy", true);
-
   // Internal tool routes — token auth only, no session, mounted before the Bearer bridge.
   app.use("/api/_internal", internalRouter);
 
@@ -351,6 +350,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/admin", adminRoutes);
   app.use("/api/moderator", moderatorRoutes);
   app.use("/api/sos", sosRoutes);
+  app.use("/api/ais", aisRoutes);
   app.use("/api/gdpr", gdprRoutes);
   app.use("/api/telemetry", telemetryRoutes);
   app.use("/api/telemetry", telemetryMapsRoutes);

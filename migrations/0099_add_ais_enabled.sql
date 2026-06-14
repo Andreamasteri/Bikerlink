@@ -1,0 +1,1 @@
+ALTER TABLE users ADD COLUMN IF NOT EXISTS ais_enabled boolean NOT NULL DEFAULT false;

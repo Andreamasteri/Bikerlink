@@ -45,7 +45,6 @@ interface Ad {
   linkUrl?: string;
   [key: string]: unknown;
 }
-
 interface ProfileQueryData {
   isAvailable?: boolean;
   ghostMode?: boolean;
@@ -63,7 +62,6 @@ interface ProposalItem {
   searchRadius?: number;
   [key: string]: unknown;
 }
-
 export function useHomeMapState() {
   const router = useRouter();
   const { focusLat: focusLatParam, focusLng: focusLngParam } = useLocalSearchParams<{ focusLat?: string; focusLng?: string }>();
@@ -121,6 +119,8 @@ export function useHomeMapState() {
     setMotoTags,
   } = useMapFilters({ user, isAuthenticated });
 
+  const [filterVessels, setFilterVessels] = useState(false);
+  const toggleFilterVessels = useCallback(() => setFilterVessels((v) => !v), []); const aisEnabled = !!(user as { aisEnabled?: boolean } | null)?.aisEnabled;
   const typedUser = user as UserWithProfileCoords | null | undefined;
 
   const { location, locationLoading, setLocation } = useMapLocation({
@@ -214,7 +214,6 @@ export function useHomeMapState() {
       ]).start(() => setFocusToast(null));
     }
   }, [mapReady, pendingFocusCoords, focusLatParam, focusLngParam, focusToastAnim]);
-
 
   useEffect(() => {
     (async () => {
@@ -533,6 +532,7 @@ export function useHomeMapState() {
     toggleFilterClubs,
     toggleFilterEvents,
     setMotoTags,
+    filterVessels, toggleFilterVessels, aisEnabled,
     location,
     locationLoading,
     setLocation,

@@ -27,6 +27,7 @@ router.get("/me", async (req: Request, res: Response) => {
       profileLongitude: profile?.longitude ?? null,
       mapFilters: profile?.mapFilters ?? null,
       mapTester: user.mapTester ?? false,
+      aisEnabled: user.aisEnabled ?? false,
     });
   } catch (error) {
     console.error("Me error:", error);

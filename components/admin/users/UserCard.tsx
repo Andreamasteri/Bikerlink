@@ -1,6 +1,6 @@
 import React from "react";
 import { View, Text, StyleSheet, TouchableOpacity, Alert } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
 
 export interface AdminUser {
@@ -23,6 +23,7 @@ export interface AdminUser {
   mapTester?: boolean;
   telemetryDisabled?: boolean;
   matchingDisabled?: boolean;
+  aisEnabled?: boolean;
 }
 
 export interface MatchabilityInfo {
@@ -53,6 +54,7 @@ interface UserCardProps {
   onToggleMapTester?: (id: string, enabled: boolean) => void;
   onToggleTelemetryDisabled?: (id: string, disabled: boolean) => void;
   onToggleMatchingDisabled?: (id: string, disabled: boolean) => void;
+  onToggleAis?: (id: string) => void;
   onOpenPrivacy?: (user: AdminUser) => void;
   isLastfmPending?: boolean;
   currentAppVersion?: string;
@@ -71,6 +73,7 @@ export const UserCard: React.FC<UserCardProps> = ({
   onToggleMapTester,
   onToggleTelemetryDisabled,
   onToggleMatchingDisabled,
+  onToggleAis,
   onOpenPrivacy,
   isLastfmPending,
   currentAppVersion = "1.0.0",
@@ -133,6 +136,9 @@ export const UserCard: React.FC<UserCardProps> = ({
           )}
           {item.matchingDisabled === true && (
             <Text style={{ fontSize: 10, fontWeight: "bold" as const, color: "#f97316" }}>NON MATCHABILE</Text>
+          )}
+          {item.aisEnabled === true && (
+            <Text style={{ fontSize: 10, fontWeight: "bold" as const, color: "#0284c7" }}>AIS</Text>
           )}
           {matchabilityInfo && (
             <TouchableOpacity
@@ -262,6 +268,18 @@ export const UserCard: React.FC<UserCardProps> = ({
               name={item.matchingDisabled ? "person-remove" : "person-remove-outline"}
               size={22}
               color={item.matchingDisabled ? "#f97316" : Colors.border}
+            />
+          </TouchableOpacity>
+        )}
+        {onToggleAis && (
+          <TouchableOpacity
+            onPress={() => onToggleAis(item.id)}
+            style={styles.actionBtn}
+          >
+            <MaterialCommunityIcons
+              name="ferry"
+              size={22}
+              color={item.aisEnabled ? "#0284c7" : Colors.border}
             />
           </TouchableOpacity>
         )}

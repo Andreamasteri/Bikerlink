@@ -63,7 +63,7 @@ ${LIVE_MAP_STYLES}
   var markersLayer = L.layerGroup().addTo(map);
   var circlesLayer = L.layerGroup().addTo(map);
   var pulseLayer = L.layerGroup().addTo(map);
-  var hazardsLayer = L.layerGroup().addTo(map);
+  var hazardsLayer = L.layerGroup().addTo(map); var vesselsLayer = L.layerGroup().addTo(map);
   var userDotMarker = null;
   var userPositions = {};
   var speedProfileUserPositions = [];
@@ -548,10 +548,8 @@ ${LIVE_MAP_STYLES}
         hazardsLayer.addLayer(marker);
       });
     },
-
-    invalidateSize: function() {
-      map.invalidateSize({ animate: false });
-    }
+    updateVessels: function(j) { var v; try{v=JSON.parse(j);}catch(e){return;} if(!Array.isArray(v))return; vesselsLayer.clearLayers(); v.forEach(function(s){var c=Number(s.course)||0,n=s.name||"MMSI "+s.mmsi,sp=s.speed!=null?(s.speed/10).toFixed(1)+" kn":"N/D",ic=L.divIcon({className:"",html:'<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 28 28"><g transform="rotate('+c+' 14 14)"><polygon points="14,3 20,22 14,18 8,22" fill="#0284c7" stroke="#fff" stroke-width="1.5"/></g></svg>',iconSize:[28,28],iconAnchor:[14,14],popupAnchor:[0,-16]}),m=L.marker([s.lat,s.lon],{icon:ic,zIndexOffset:500}); m.bindPopup("<b>"+n+"</b><br/>MMSI: "+s.mmsi+"<br/>Velocit\u00e0: "+sp+"<br/>Rotta: "+c+"\u00b0"); vesselsLayer.addLayer(m);}); },
+    invalidateSize: function() { map.invalidateSize({ animate: false }); }
   };
 
   /* Nascondi i fumetti nickname quando la mappa è troppo zoomata fuori (task #1432).

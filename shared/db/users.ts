@@ -24,7 +24,6 @@ const geographyPoint = customType<{ data: string; notNull: false; default: false
   dataType() { return "geography"; },
 });
 import { z } from "zod";
-
 export const users = pgTable("users", {
   id: varchar("id", { length: 36 })
     .primaryKey()
@@ -97,6 +96,7 @@ export const users = pgTable("users", {
     longSign: 1 | -1;
     timestamp: number;
   } | null>(),
+  aisEnabled: boolean("ais_enabled").notNull().default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (table) => [

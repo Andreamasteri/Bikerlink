@@ -20,6 +20,9 @@ interface MapFilterBarProps {
   onToggleFilterZavorrina: () => void;
   onToggleFilterClubs?: () => void;
   onToggleFilterEvents?: () => void;
+  filterVessels?: boolean;
+  onToggleFilterVessels?: () => void;
+  aisEnabled?: boolean;
 }
 
 // Task #2721 — risposta di GET /api/tags?category=<slug>.
@@ -39,6 +42,9 @@ export function MapFilterBar({
   onToggleFilterZavorrina,
   onToggleFilterClubs,
   onToggleFilterEvents: _onToggleFilterEvents,
+  filterVessels,
+  onToggleFilterVessels,
+  aisEnabled,
 }: MapFilterBarProps) {
   const [showMotoTagModal, setShowMotoTagModal] = useState(false);
   const selectedMotoTags = useMemo(() => motoTags ?? [], [motoTags]);
@@ -140,6 +146,22 @@ export function MapFilterBar({
         >
           <MaterialCommunityIcons name="shield-check" size={16} color={filterClubs ? "#fff" : "#009688"} />
           <Text style={[styles.filterText, filterClubs && styles.filterTextActive]}>Motoclub</Text>
+        </TouchableOpacity>
+      )}
+
+      {aisEnabled && onToggleFilterVessels != null && (
+        <TouchableOpacity
+          style={[styles.filterChip, filterVessels && { backgroundColor: "#0284c7" }]}
+          onPress={onToggleFilterVessels}
+          activeOpacity={0.7}
+          testID="map-filter-vessels"
+        >
+          <MaterialCommunityIcons
+            name="ferry"
+            size={16}
+            color={filterVessels ? "#fff" : "#0284c7"}
+          />
+          <Text style={[styles.filterText, filterVessels && styles.filterTextActive]}>Navi</Text>
         </TouchableOpacity>
       )}
 

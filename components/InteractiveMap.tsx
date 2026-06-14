@@ -51,6 +51,9 @@ const InteractiveMap = forwardRef<InteractiveMapHandle, InteractiveMapProps>(fun
   showHazardReportButton = false,
   fixedPositionEnabled = false,
   onFixedPositionBadgePress,
+  filterVessels = false,
+  onToggleFilterVessels,
+  aisEnabled = false,
 }: InteractiveMapProps, ref) {
   const { enabled: mapsEnabled } = useMapConfig();
   const webViewRef = useRef<WebView>(null);
@@ -134,6 +137,28 @@ const InteractiveMap = forwardRef<InteractiveMapHandle, InteractiveMapProps>(fun
   const inject = useCallback((js: string) => {
     webViewRef.current?.injectJavaScript(js + ";true;");
   }, []);
+
+  type VesselData = { mmsi: number; lat: number; lon: number; course: number; name: string; shipType: number; speed: number; timestamp: number };
+  const { data: aisVesselsRaw } = useQuery<VesselData[]>({
+    queryKey: ["/api/ais/vessels"],
+    queryFn: async () => {
+      const res = await apiRequest("GET", "/api/ais/vessels");
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: mapReady && !!aisEnabled && filterVessels,
+    staleTime: 25000,
+    refetchInterval: 30000,
+    retry: false,
+  });
+  const aisVessels = aisVesselsRaw ?? [];
+
+  useEffect(() => {
+    if (!mapReady) return;
+    const jsonStr = JSON.stringify(filterVessels ? aisVessels : []);
+    inject("window.leafletBridge && window.leafletBridge.updateVessels(" + JSON.stringify(jsonStr) + ")");
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mapReady, filterVessels, aisVessels.length]);
 
   const filteredUsers = users.filter((u) => {
     if (currentUserId != null && u.id === currentUserId) return true;
@@ -259,6 +284,8 @@ const InteractiveMap = forwardRef<InteractiveMapHandle, InteractiveMapProps>(fun
           onToggleFilterBiker={onToggleFilterBiker} onToggleFilterZavorrina={onToggleFilterZavorrina}
           onToggleFilterClubs={onToggleFilterClubs} onToggleFilterEvents={onToggleFilterEvents}
           motoTags={motoTags} onChangeMotoTags={onChangeMotoTags}
+          filterVessels={filterVessels} onToggleFilterVessels={onToggleFilterVessels}
+          aisEnabled={aisEnabled}
         />
       )}
       <MapControls

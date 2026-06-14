@@ -94,6 +94,9 @@ export interface InteractiveMapProps {
   onFatalError?: () => void;
   fixedPositionEnabled?: boolean;
   onFixedPositionBadgePress?: () => void;
+  filterVessels?: boolean;
+  onToggleFilterVessels?: () => void;
+  aisEnabled?: boolean;
 }
 
 export interface InteractiveMapHandle {

@@ -25,6 +25,9 @@ type Props = {
   setShowSosDetail: (v: boolean) => void;
   setSelectedEgg: (v: null) => void;
   t: (key: string) => string;
+  filterVessels?: boolean;
+  aisEnabled?: boolean;
+  mapBbox?: { minLon: number; minLat: number; maxLon: number; maxLat: number } | null;
 };
 
 export function useMapData({
