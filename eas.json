@@ -4,6 +4,18 @@
     "appVersionSource": "local"
   },
   "build": {
+    "debug-standalone": {
+      "distribution": "internal",
+      "channel": "production",
+      "credentialsSource": "remote",
+      "env": {
+        "NODE_OPTIONS": "--max_old_space_size=8192"
+      },
+      "android": {
+        "buildType": "apk",
+        "gradleCommand": ":app:assembleDebug"
+      }
+    },
     "preview": {
       "distribution": "internal",
       "channel": "staging",
