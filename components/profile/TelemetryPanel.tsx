@@ -1,4 +1,4 @@
-// LARGE-FILE-LOCKED — limite: 701
+// LARGE-FILE-LOCKED — limite: 689
 // Aggiungi nuove funzionalità in: components/profile/TelemetryPanel.next.tsx
 import React, { useEffect, useState } from "react";
 import {

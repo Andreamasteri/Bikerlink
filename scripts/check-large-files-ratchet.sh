@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# CI ratchet for the "max 600 lines per TS file" rule.
+# CI ratchet for the "max 450 lines per TS file" rule.
 #
 # Wraps `scripts/check-large-files-ratchet.ts` and enforces the
 # human-only gate on `--update-baseline`. See replit.md
-# "⛔ REGOLA FERREA — Limite 600 righe per file".
+# "⛔ REGOLA FERREA — Limite 450 righe per file".
 #
 # Usage:
 #   bash scripts/check-large-files-ratchet.sh
