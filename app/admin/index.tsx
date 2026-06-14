@@ -83,6 +83,14 @@ function HighlightedText({
   );
 }
 
+interface SystemCardDef {
+  key: string;
+  label: string;
+  keywords: string[];
+  ref: React.RefObject<View | null>;
+  icon: React.ComponentProps<typeof MaterialCommunityIcons>["name"];
+}
+
 const UNKNOWN_STATUSES: SystemStatuses = {
   thinkcentre: "unknown",
   graphhopper: "unknown",
@@ -193,6 +201,79 @@ export default function AdminDashboard() {
     setTimeout(() => scrollToRef(target), 350);
   }, []);
 
+  const normalizedSearch = normalize(search);
+
+  const systemCardDefs = useMemo<SystemCardDef[]>(
+    () => [
+      {
+        key: "thinkcentre",
+        label: "ThinkCentre",
+        keywords: ["thinkcentre", "think centre", "server di casa", "home server", "redis", "postgres", "postgresql", "nginx", "ufw", "pgadmin", "pg admin", "uptime kuma", "kuma", "tailscale", "minipc", "mini pc", "ollama", "ai locale", "llm locale"],
+        ref: thinkcentreRef,
+        icon: "server-network",
+      },
+      {
+        key: "graphhopper",
+        label: "GraphHopper",
+        keywords: ["graphhopper", "graph hopper", "gh", "osm routing", "mappa percorso", "strade", "routing locale"],
+        ref: graphhopperRef,
+        icon: "map-marker-path",
+      },
+      {
+        key: "valhalla",
+        label: "Valhalla",
+        keywords: ["valhalla", "routing engine", "motore routing", "curvy", "panoramico"],
+        ref: valhallaRef,
+        icon: "road-variant",
+      },
+      {
+        key: "nominatim",
+        label: "Nominatim",
+        keywords: ["nominatim", "geocoding", "geocodifica", "indirizzo", "address", "osm address", "reverse geo"],
+        ref: nominatimRef,
+        icon: "map-search",
+      },
+      {
+        key: "whisper",
+        label: "Whisper AI",
+        keywords: ["whisper", "speech", "voce", "audio", "riconoscimento vocale", "stt", "speech to text"],
+        ref: whisperRef,
+        icon: "microphone-outline",
+      },
+      {
+        key: "routing",
+        label: "Routing Coordination",
+        keywords: ["routing", "coordinamento routing", "route", "percorso", "engine", "fallback routing", "graphhopper", "valhalla"],
+        ref: routingRef,
+        icon: "directions-fork",
+      },
+      {
+        key: "matching",
+        label: "Matching Monitor",
+        keywords: ["matching", "match", "abbinamento", "proposta", "companion", "compagni di viaggio"],
+        ref: matchingRef,
+        icon: "account-multiple-check",
+      },
+    ],
+    []
+  );
+
+  const matchedSystemCards = useMemo<SystemCardDef[]>(() => {
+    if (!normalizedSearch) return [];
+    return systemCardDefs.filter((card) =>
+      normalize(card.label).includes(normalizedSearch) ||
+      card.keywords.some((kw) => normalize(kw).includes(normalizedSearch))
+    );
+  }, [normalizedSearch, systemCardDefs]);
+
+  function handleSystemCardPress(def: SystemCardDef) {
+    if (["graphhopper", "valhalla", "nominatim"].includes(def.key)) {
+      setRoutingCardCollapsed(false);
+    }
+    setSearch("");
+    setTimeout(() => scrollToRef(def.ref), 450);
+  }
+
   const [routingCardCollapsed, setRoutingCardCollapsed] = useState(true);
 
   const initialCollapsed = useMemo<Record<string, boolean>>(
@@ -211,7 +292,6 @@ export default function AdminDashboard() {
     }
   }
 
-  const normalizedSearch = normalize(search);
   const filteredGroups = useMemo(() => {
     if (!normalizedSearch) return adminGroups.map((g) => ({ ...g, titleMatched: false }));
     return adminGroups
@@ -233,7 +313,6 @@ export default function AdminDashboard() {
 
   const isSearching = normalizedSearch.length > 0;
   const hasInput = search.length > 0;
-  const isEmpty = isSearching && filteredGroups.length === 0;
 
   return (
     <ScrollView
@@ -309,7 +388,36 @@ export default function AdminDashboard() {
         </>
       )}
 
-      {isEmpty && (
+      {isSearching && matchedSystemCards.length > 0 && (
+        <View style={styles.systemSection}>
+          <View style={styles.systemSectionHeader}>
+            <MaterialCommunityIcons name="monitor-dashboard" size={16} color={Colors.textSecondary} />
+            <Text style={styles.systemSectionTitle}>MONITORAGGIO SISTEMA</Text>
+          </View>
+          <View style={styles.grid}>
+            {matchedSystemCards.map((def) => (
+              <TouchableOpacity
+                key={def.key}
+                style={[styles.card, styles.systemCard]}
+                onPress={() => handleSystemCardPress(def)}
+                activeOpacity={0.7}
+              >
+                <View style={[styles.cardIcon, styles.systemCardIcon]}>
+                  <MaterialCommunityIcons name={def.icon} size={28} color={Colors.accent} />
+                </View>
+                <HighlightedText
+                  text={def.label}
+                  query={search}
+                  style={styles.cardLabel}
+                />
+                <Text style={styles.systemCardHint}>Vai al monitor →</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+      )}
+
+      {isSearching && filteredGroups.length === 0 && matchedSystemCards.length === 0 && (
         <View style={styles.emptyState}>
           <Text style={styles.emptyStateText}>Nessuna funzione trovata</Text>
         </View>
@@ -484,5 +592,37 @@ const styles = StyleSheet.create({
   cardMatched: {
     borderColor: Colors.accent,
     borderWidth: 1.5,
+  },
+  systemSection: {
+    marginBottom: 24,
+  },
+  systemSectionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingVertical: 8,
+    marginBottom: 4,
+  },
+  systemSectionTitle: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 16,
+    color: Colors.textSecondary,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+  systemCard: {
+    borderColor: Colors.accent,
+    borderWidth: 1,
+    opacity: 0.92,
+  },
+  systemCardIcon: {
+    backgroundColor: Colors.background,
+  },
+  systemCardHint: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 11,
+    color: Colors.accent,
+    marginTop: 4,
+    textAlign: "center",
   },
 });
