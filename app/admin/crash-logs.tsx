@@ -22,6 +22,9 @@ import {
   CrashAlertsResponse,
   CrashType,
   BrandStat,
+  getAlertDominantType,
+  getAlertAccentColor,
+  getAlertDominantLabel,
 } from "@/components/admin/crash-logs/CrashLogTypes";
 import { CrashLogCard } from "@/components/admin/crash-logs/CrashLogCard";
 import { CrashLogFilters } from "@/components/admin/crash-logs/CrashLogFilters";
@@ -252,33 +255,63 @@ export default function CrashLogsScreen() {
                       </TouchableOpacity>
                     </View>
                   )}
-                  {alerts.map((alert, i) => (
-                    <TouchableOpacity
-                      key={i}
-                      style={[styles.alertBanner, { backgroundColor: "#FF6B3514", borderColor: "#FF6B3540" }]}
-                      onPress={() => applyDeviceFilter(alert.device_model)}
-                      activeOpacity={0.7}
-                    >
-                      <View style={styles.alertLeft}>
-                        <MaterialCommunityIcons name="cellphone-remove" size={16} color="#FF6B35" />
-                        <View>
-                          <Text style={[styles.alertModel, { color: colors.text }]} numberOfLines={1}>
-                            {alert.device_model}
-                            {alert.device_brand ? ` · ${alert.device_brand}` : ""}
-                          </Text>
-                          <Text style={[styles.alertCount, { color: "#FF6B35" }]}>
-                            {alert.cnt} crash nelle ultime 24h
-                          </Text>
+                  {alerts.map((alert, i) => {
+                    const dominant = getAlertDominantType(alert);
+                    const accentColor = getAlertAccentColor(dominant);
+                    const dominantLabel = getAlertDominantLabel(dominant);
+                    const iconName = dominant === "restart_loop"
+                      ? "restart"
+                      : dominant === "crash_js"
+                      ? "code-braces"
+                      : "phone-alert";
+                    return (
+                      <TouchableOpacity
+                        key={i}
+                        style={[
+                          styles.alertBanner,
+                          {
+                            backgroundColor: `${accentColor}14`,
+                            borderColor: `${accentColor}40`,
+                          },
+                        ]}
+                        onPress={() => applyDeviceFilter(alert.device_model)}
+                        activeOpacity={0.7}
+                      >
+                        <View style={styles.alertLeft}>
+                          <MaterialCommunityIcons name={iconName} size={16} color={accentColor} />
+                          <View>
+                            <Text style={[styles.alertModel, { color: colors.text }]} numberOfLines={1}>
+                              {alert.device_model}
+                              {alert.device_brand ? ` · ${alert.device_brand}` : ""}
+                            </Text>
+                            <View style={styles.alertCountRow}>
+                              <Text style={[styles.alertCount, { color: accentColor }]}>
+                                {alert.cnt} crash nelle ultime 24h
+                              </Text>
+                              <View style={[styles.alertTypeBadge, { backgroundColor: `${accentColor}22` }]}>
+                                <Text style={[styles.alertTypeBadgeText, { color: accentColor }]}>
+                                  {dominantLabel}
+                                </Text>
+                              </View>
+                            </View>
+                            {dominant === "mixed" && (
+                              <Text style={[styles.alertBreakdown, { color: colors.textSecondary }]}>
+                                {alert.crash_system > 0 ? `Sistema: ${alert.crash_system}  ` : ""}
+                                {alert.crash_js > 0 ? `JS: ${alert.crash_js}  ` : ""}
+                                {alert.restart_loop > 0 ? `Loop: ${alert.restart_loop}` : ""}
+                              </Text>
+                            )}
+                          </View>
                         </View>
-                      </View>
-                      <View style={styles.alertRight}>
-                        <Text style={[styles.alertFilterHint, { color: colors.accent }]}>
-                          Filtra
-                        </Text>
-                        <Ionicons name="chevron-forward" size={14} color={colors.accent} />
-                      </View>
-                    </TouchableOpacity>
-                  ))}
+                        <View style={styles.alertRight}>
+                          <Text style={[styles.alertFilterHint, { color: colors.accent }]}>
+                            Filtra
+                          </Text>
+                          <Ionicons name="chevron-forward" size={14} color={colors.accent} />
+                        </View>
+                      </TouchableOpacity>
+                    );
+                  })}
                 </View>
               )}
 
@@ -498,6 +531,27 @@ const styles = StyleSheet.create({
   alertFilterHint: {
     fontFamily: "Inter_600SemiBold",
     fontSize: 12,
+  },
+  alertCountRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    flexWrap: "wrap",
+    gap: 6,
+    marginTop: 2,
+  },
+  alertTypeBadge: {
+    borderRadius: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  alertTypeBadgeText: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 10,
+  },
+  alertBreakdown: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 11,
+    marginTop: 3,
   },
 
   deviceStatsContainer: {

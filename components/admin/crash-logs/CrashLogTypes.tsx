@@ -72,6 +72,36 @@ export interface CrashAlert {
   device_model: string;
   device_brand: string | null;
   cnt: number;
+  crash_system: number;
+  crash_js: number;
+  restart_loop: number;
+}
+
+export type AlertDominantType = "restart_loop" | "crash_js" | "crash_system" | "mixed";
+
+export function getAlertDominantType(alert: CrashAlert): AlertDominantType {
+  if (alert.restart_loop === alert.cnt) return "restart_loop";
+  if (alert.crash_js === alert.cnt) return "crash_js";
+  if (alert.crash_system === alert.cnt) return "crash_system";
+  return "mixed";
+}
+
+export function getAlertAccentColor(dominant: AlertDominantType): string {
+  switch (dominant) {
+    case "restart_loop": return "#9B59B6";
+    case "crash_js":     return "#FF4444";
+    case "crash_system": return "#FF6B35";
+    default:             return "#FF6B35";
+  }
+}
+
+export function getAlertDominantLabel(dominant: AlertDominantType): string {
+  switch (dominant) {
+    case "restart_loop": return "Restart Loop";
+    case "crash_js":     return "JS Error";
+    case "crash_system": return "Sistema";
+    default:             return "Misto";
+  }
 }
 
 export interface CrashAlertsResponse {

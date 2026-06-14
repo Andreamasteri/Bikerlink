@@ -263,7 +263,10 @@ adminRouter.get("/alerts", requireAdmin, (req: Request, res: Response): void => 
     SELECT
       device_model,
       device_brand,
-      COUNT(*)::int AS cnt
+      COUNT(*)::int AS cnt,
+      SUM(CASE WHEN crash_type = 'crash_system' THEN 1 ELSE 0 END)::int AS crash_system,
+      SUM(CASE WHEN crash_type = 'crash_js'     THEN 1 ELSE 0 END)::int AS crash_js,
+      SUM(CASE WHEN crash_type = 'restart_loop' THEN 1 ELSE 0 END)::int AS restart_loop
     FROM app_crash_logs
     WHERE crash_type IN ('crash_system','crash_js','restart_loop')
       AND reported_at >= NOW() - INTERVAL '24 hours'
@@ -275,7 +278,14 @@ adminRouter.get("/alerts", requireAdmin, (req: Request, res: Response): void => 
   `)
     .then((result) => {
       res.json({
-        alerts: result.rows as { device_model: string; device_brand: string | null; cnt: number }[],
+        alerts: result.rows as {
+          device_model: string;
+          device_brand: string | null;
+          cnt: number;
+          crash_system: number;
+          crash_js: number;
+          restart_loop: number;
+        }[],
         threshold,
       });
     })
