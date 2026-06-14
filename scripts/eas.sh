@@ -60,4 +60,59 @@ if [ ! -f "$EAS_BIN" ]; then
   exit 1
 fi
 
+# ─────────────────────────────────────────────────────────────────────────────
+#  PRE-FLIGHT: allineamento versioni app.json ↔ android/app/build.gradle
+#
+#  Verifica che versionCode e versionName siano identici nei due file prima
+#  di inviare la build a EAS. Un disallineamento produce un APK con metadati
+#  sbagliati senza alcun warning da EAS.
+# ─────────────────────────────────────────────────────────────────────────────
+if [[ "$FIRST_ARG" == "build" ]]; then
+  ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+  APP_JSON="$ROOT_DIR/app.json"
+  BUILD_GRADLE="$ROOT_DIR/android/app/build.gradle"
+
+  # Leggi i valori da app.json
+  AJ_VERSION=$(node -e "const a=require('$APP_JSON'); process.stdout.write(a.expo.version)")
+  AJ_VERSION_CODE=$(node -e "const a=require('$APP_JSON'); process.stdout.write(String(a.expo.android.versionCode))")
+
+  # Leggi i valori da build.gradle (prende la prima occorrenza di "versionCode <n>")
+  BG_VERSION_CODE=$(grep -E '^\s+versionCode\s+[0-9]+' "$BUILD_GRADLE" | head -1 | grep -oE '[0-9]+')
+  BG_VERSION_NAME=$(grep -E '^\s+versionName\s+"[^"]+"' "$BUILD_GRADLE" | head -1 | grep -oP '(?<=")[^"]+')
+
+  VERSION_OK=true
+
+  if [[ "$AJ_VERSION_CODE" != "$BG_VERSION_CODE" ]]; then
+    echo "" >&2
+    echo "╔══════════════════════════════════════════════════════════════════════╗" >&2
+    echo "║  ✖  VERSIONI DISALLINEATE — BUILD BLOCCATA                         ║" >&2
+    echo "║                                                                      ║" >&2
+    printf "║  versionCode  app.json     : %-39s║\n" "$AJ_VERSION_CODE" >&2
+    printf "║  versionCode  build.gradle : %-39s║\n" "$BG_VERSION_CODE" >&2
+    echo "║                                                                      ║" >&2
+    echo "║  Allinea i due file prima di lanciare la build.                     ║" >&2
+    echo "╚══════════════════════════════════════════════════════════════════════╝" >&2
+    VERSION_OK=false
+  fi
+
+  if [[ "$AJ_VERSION" != "$BG_VERSION_NAME" ]]; then
+    echo "" >&2
+    echo "╔══════════════════════════════════════════════════════════════════════╗" >&2
+    echo "║  ✖  VERSIONI DISALLINEATE — BUILD BLOCCATA                         ║" >&2
+    echo "║                                                                      ║" >&2
+    printf "║  version / versionName  app.json     : %-30s║\n" "$AJ_VERSION" >&2
+    printf "║  versionName            build.gradle : %-30s║\n" "$BG_VERSION_NAME" >&2
+    echo "║                                                                      ║" >&2
+    echo "║  Allinea i due file prima di lanciare la build.                     ║" >&2
+    echo "╚══════════════════════════════════════════════════════════════════════╝" >&2
+    VERSION_OK=false
+  fi
+
+  if [[ "$VERSION_OK" == "true" ]]; then
+    echo "  ✔  Versioni allineate: versionCode=$AJ_VERSION_CODE  versionName=$AJ_VERSION" >&2
+  else
+    exit 1
+  fi
+fi
+
 exec "$EAS_BIN" "$@"
