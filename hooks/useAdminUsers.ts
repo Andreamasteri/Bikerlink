@@ -160,7 +160,10 @@ export function useAdminUsers() {
       const res = await apiRequest("PATCH", `/api/admin/users/${id}/ais`);
       return res.json() as Promise<{ userId: string; aisEnabled: boolean }>;
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
+    },
     onError: () => Alert.alert("Errore", "Impossibile aggiornare permesso AIS"),
   });
 
