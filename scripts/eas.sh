@@ -5,9 +5,9 @@
 #  Usa eas-cli dal progetto (node_modules/.bin/eas) — versione gestita da
 #  package.json ("eas-cli": "^20.1.0").
 #
-#  NON usare `eas` globale né `npx eas-cli@X`:
+#  NON usare il binario eas globale né il CLI tramite package runner:
 #    - il binario globale può essere vecchio (v19 causa errore eas.json >= 20)
-#    - npx scarica il pacchetto ad ogni run → timeout durante Metro bundle
+#    - il CLI via package runner scarica il pacchetto ad ogni run → timeout Metro
 #
 #  Uso (da altri script):
 #    bash scripts/eas.sh <eas-command> [args...]

@@ -17,7 +17,7 @@
 #  l'uso — ogni build richiede una nuova autorizzazione esplicita.
 #
 #  ⚠️  Profilo "preview" RIMOSSO (Task #1017) — produceva APK universali ~135MB.
-#  ⚠️  NON usare `eas build` direttamente — usa SEMPRE questo script.
+#  ⚠️  NON usare il binario eas direttamente — usa SEMPRE questo script.
 # ═══════════════════════════════════════════════════════════════════════════
 
 set -euo pipefail

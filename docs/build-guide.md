@@ -1,7 +1,7 @@
 # BikerLink — Guida Build e OTA
 
 > Guida operativa per la prima build Android/iOS e per il ciclo di aggiornamento OTA.
-> EAS CLI v20 è installato come dipendenza progetto. Su Replit usare sempre `bash scripts/eas.sh` (mai `eas` grezzo né `npx eas`).
+> EAS CLI v20 è installato come dipendenza progetto. Su Replit usare sempre `bash scripts/eas.sh` — mai il binario eas direttamente.
 
 ---
 

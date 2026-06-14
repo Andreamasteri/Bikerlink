@@ -797,7 +797,7 @@ Non tentare di ripetere manualmente il comando EAS. La procedura corretta è:
 La nuova OTA (N+1) supera quella fallita: EAS distribuirà la versione corretta e `OtaStartupChecker` aggiornerà il numero OTA nel backend al termine.
 
 **Regole critiche**:
-- **MAI** usare `eas` grezzo o `npx eas-cli` direttamente — usare sempre `bash scripts/eas.sh` (wrapper ufficiale del progetto)
+- **MAI** usare il binario eas direttamente — usare sempre `bash scripts/eas.sh` (wrapper ufficiale del progetto)
 - Usa **sempre** `publish-ota.sh` per pubblicare OTA
 - Aggiorna sempre `CURRENT_OTA_NUMBER` e `ota-updates.json` **prima** dell'export, non dopo
 - Il bundle custom sul backend è già attivo dopo un timeout EAS — non è necessario ripubblicarlo, basta che EAS riceva la nuova versione tramite publish-ota.sh

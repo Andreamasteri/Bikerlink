@@ -192,7 +192,7 @@ Dev menu: scuoti il dispositivo → "Open Debugger".
 - [ ] Utente ha confermato prima del lancio
 - [ ] `debug-apk`: versionCode invariato
 - [ ] `release-apk`: bump versione completato nei 4 file
-- [ ] `GIT_INDEX_FILE=/tmp/eas-build-index bash scripts/eas.sh build` (mai `npx eas` né `eas` grezzo)
+- [ ] `GIT_INDEX_FILE=/tmp/eas-build-index bash scripts/eas.sh build` (usare sempre il wrapper — mai il binario diretto)
 - [ ] `--no-wait` nel comando
 
 ---

@@ -22,9 +22,7 @@ della fase di upload.
 Non è possibile rimuovere `.git/index.lock` via `rm` o Node.js `fs.unlinkSync`
 perché anche queste chiamate vengono intercettate.
 
-**How to apply:** Usare `bash scripts/eas.sh` (NON `npx eas`, `npx eas-cli@X`, né il
-binario globale `eas`). Il wrapper punta a `node_modules/.bin/eas` (eas-cli v20 installato
-come dipendenza di progetto in package.json). Combinare sempre con `GIT_INDEX_FILE`:
+**How to apply:** Usare `bash scripts/eas.sh` — NON il binario eas globale né il CLI tramite package runner. Il wrapper punta a `node_modules/.bin/eas` (eas-cli v20 installato come dipendenza di progetto in package.json). Combinare sempre con `GIT_INDEX_FILE`:
 
   GIT_INDEX_FILE=/tmp/eas-build-index bash scripts/eas.sh build --platform android --profile release-apk --non-interactive --no-wait
 
