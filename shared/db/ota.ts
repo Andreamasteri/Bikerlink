@@ -81,7 +81,7 @@ export const otaAssistantRuns = pgTable("ota_assistant_runs", {
   startedAt: timestamp("started_at").notNull().defaultNow(),
   finishedAt: timestamp("finished_at"),
 }, (table) => [
-  index("ota_assistant_runs_started_at_idx").on(table.startedAt),
+  index("ota_assistant_runs_started_at_idx").on(table.startedAt.desc()),
   index("ota_assistant_runs_admin_id_idx").on(table.adminId),
 ]);
 

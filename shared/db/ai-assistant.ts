@@ -19,9 +19,10 @@ export const aiCallLogs = pgTable("ai_call_logs", {
   error: text("error"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (t) => [
-  index("ai_call_logs_created_at_idx").on(t.createdAt),
-  index("ai_call_logs_provider_idx").on(t.provider, t.createdAt),
+  index("ai_call_logs_created_at_idx").on(t.createdAt.desc()),
+  index("ai_call_logs_provider_idx").on(t.provider, t.createdAt.desc()),
   index("ai_call_logs_user_id_idx").on(t.userId),
+  index("ai_call_logs_degraded_idx").on(t.degraded).where(sql`degraded = true`),
 ]);
 
 export type AiCallLog = typeof aiCallLogs.$inferSelect;
@@ -38,7 +39,7 @@ export const aiConversationTurns = pgTable("ai_conversation_turns", {
   summaryOf: uuid("summary_of"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (t) => [
-  index("ai_conversation_turns_user_id_idx").on(t.userId, t.createdAt),
+  index("ai_conversation_turns_user_id_idx").on(t.userId, t.createdAt.desc()),
   index("ai_conversation_turns_summary_of_idx").on(t.summaryOf),
 ]);
 

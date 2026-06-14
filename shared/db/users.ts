@@ -300,6 +300,7 @@ export const userSessions = pgTable("user_sessions", {
 }, (table) => [
   index("user_sessions_user_id_idx").on(table.userId),
   index("user_sessions_started_at_idx").on(table.startedAt),
+  index("user_sessions_ended_at_idx").on(table.endedAt).where(sql`ended_at IS NULL`),
 ]);
 
 export type SessionExitType = "background" | "logout" | "crash";
