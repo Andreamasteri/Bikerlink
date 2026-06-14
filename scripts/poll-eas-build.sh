@@ -51,7 +51,7 @@ fi
 
 # ── Verifica eas-cli disponibile ─────────────────────────────────────────────
 if ! bash scripts/eas.sh --version &>/dev/null 2>&1; then
-  echo -e "  ${RED}✖${RESET}  eas-cli non disponibile. Installare con: npm install -g eas-cli"
+  echo -e "  ${RED}✖${RESET}  eas-cli non disponibile in node_modules. Eseguire: npm install"
   exit 1
 fi
 

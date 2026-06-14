@@ -205,33 +205,31 @@ else
   error "Runtime health: backend NON sano (ROSSO) — verificare i processi live"
 fi
 
-# ── 5. EAS CLI — auto-bump major version ────────────────────────────────────
+# ── 5. EAS CLI — verifica versione installata in node_modules ───────────────
 echo ""
 echo -e "  ${BOLD}─── EAS CLI versione npm ───────────────────────────────────${RESET}"
 
-PINNED_MAJOR=$(grep -oP '(?<=EAS_CLI_VERSION=")[0-9]+' scripts/eas.sh 2>/dev/null || echo "")
-if [ -z "$PINNED_MAJOR" ]; then
-  warn "Impossibile leggere EAS_CLI_VERSION da scripts/eas.sh"
+# La versione installata è letta direttamente da node_modules (eas-cli in package.json).
+# Non esiste più la variabile EAS_CLI_VERSION in scripts/eas.sh — si usa node_modules/.bin/eas.
+INSTALLED_FULL=$(node -e "try{process.stdout.write(require('./node_modules/eas-cli/package.json').version)}catch(e){process.stdout.write('')}" 2>/dev/null || echo "")
+INSTALLED_MAJOR=$(echo "$INSTALLED_FULL" | grep -oP '^\d+' || echo "")
+
+if [ -z "$INSTALLED_FULL" ]; then
+  warn "eas-cli non trovato in node_modules — eseguire npm install"
 else
   LATEST_FULL=$(npm view eas-cli dist-tags.latest 2>/dev/null || echo "")
   LATEST_MAJOR=$(echo "$LATEST_FULL" | grep -oP '^\d+' || echo "")
 
   if [ -z "$LATEST_MAJOR" ] || [ -z "$LATEST_FULL" ]; then
-    warn "Impossibile interrogare npm per eas-cli (nessuna rete?). Pinned major: $PINNED_MAJOR"
-  elif [ "$LATEST_MAJOR" -gt "$PINNED_MAJOR" ] 2>/dev/null; then
-    echo -e "  ${YELLOW}⚠${RESET}  EAS CLI: nuovo major disponibile su npm ($LATEST_FULL) — pinned major era $PINNED_MAJOR"
-    echo -e "  ${CYAN}ℹ${RESET}  Auto-bump: EAS_CLI_VERSION → $LATEST_MAJOR in scripts/eas.sh"
-    sed -i "s/EAS_CLI_VERSION=\"$PINNED_MAJOR\"/EAS_CLI_VERSION=\"$LATEST_MAJOR\"/" scripts/eas.sh
-    if grep -q "EAS_CLI_VERSION=\"$LATEST_MAJOR\"" scripts/eas.sh; then
-      echo -e "  ${GREEN}✔${RESET}  scripts/eas.sh aggiornato automaticamente a major $LATEST_MAJOR"
-      ((WARNINGS++)); CHANGED=true
-    else
-      error "sed ha fallito — aggiorna manualmente EAS_CLI_VERSION a $LATEST_MAJOR in scripts/eas.sh"
-    fi
-  elif [ "$LATEST_MAJOR" -eq "$PINNED_MAJOR" ] 2>/dev/null; then
-    ok "EAS CLI major: $PINNED_MAJOR (latest npm: $LATEST_FULL)"
+    warn "Impossibile interrogare npm per eas-cli (nessuna rete?). Installata: $INSTALLED_FULL"
+  elif [ "$LATEST_MAJOR" -gt "$INSTALLED_MAJOR" ] 2>/dev/null; then
+    warn "EAS CLI: nuovo major disponibile su npm ($LATEST_FULL) — installata: $INSTALLED_FULL"
+    echo -e "  ${CYAN}ℹ${RESET}  Per aggiornare: aggiornare eas-cli in package.json e rieseguire npm install"
+    ((WARNINGS++)); CHANGED=true
+  elif [ "$LATEST_MAJOR" -eq "$INSTALLED_MAJOR" ] 2>/dev/null; then
+    ok "EAS CLI: v$INSTALLED_FULL (major corrente, latest npm: $LATEST_FULL)"
   else
-    warn "EAS CLI: latest npm ($LATEST_FULL) è più vecchio del pinned major ($PINNED_MAJOR) — verifica"
+    warn "EAS CLI: latest npm ($LATEST_FULL) è più vecchio dell'installata ($INSTALLED_FULL) — verifica"
   fi
 fi
 

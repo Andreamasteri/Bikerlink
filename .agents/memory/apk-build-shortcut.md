@@ -41,7 +41,7 @@ Tutti e 4 i valori DEVONO essere allineati prima di lanciare la build.
 
 ### 4. Lancia la build EAS
 ```bash
-GIT_INDEX_FILE=/tmp/eas-build-index npx eas build \
+GIT_INDEX_FILE=/tmp/eas-build-index bash scripts/eas.sh build \
   --platform android \
   --profile release-apk \
   --non-interactive \

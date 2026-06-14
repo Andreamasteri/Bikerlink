@@ -9,7 +9,7 @@
 
 ```bash
 # Build APK debug (da Replit, con EAS o build locale)
-GIT_INDEX_FILE=/tmp/eas-build-index npx eas build --platform android --profile debug --local
+GIT_INDEX_FILE=/tmp/eas-build-index bash scripts/eas.sh build --platform android --profile debug --local
 
 # Installa sul device connesso via USB (debug USB abilitato)
 adb install -r build-*.apk

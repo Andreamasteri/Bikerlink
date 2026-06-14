@@ -22,18 +22,23 @@ della fase di upload.
 Non è possibile rimuovere `.git/index.lock` via `rm` o Node.js `fs.unlinkSync`
 perché anche queste chiamate vengono intercettate.
 
-**How to apply:** Usare `npx eas-cli@latest` (NON `npx eas` né il binario globale
-`eas`) + `GIT_INDEX_FILE=/tmp/eas-build-index`. Il binario globale può essere
-outdated (es. v19 installato globalmente, constraint eas.json `>=20`); `npx eas-cli@latest`
-scarica e usa sempre la versione corretta:
+**How to apply:** Usare `bash scripts/eas.sh` (NON `npx eas`, `npx eas-cli@X`, né il
+binario globale `eas`). Il wrapper punta a `node_modules/.bin/eas` (eas-cli v20 installato
+come dipendenza di progetto in package.json). Combinare sempre con `GIT_INDEX_FILE`:
 
-  GIT_INDEX_FILE=/tmp/eas-build-index npx eas-cli@latest build --platform android --profile release-apk --non-interactive --no-wait
+  GIT_INDEX_FILE=/tmp/eas-build-index bash scripts/eas.sh build --platform android --profile release-apk --non-interactive --no-wait
 
 Il lock del code_execution sandbox (notebook JS) bypassa la stessa restrizione
 e può rimuovere file dentro `.git/` se necessario (fs.unlinkSync funziona lì).
 
 Timeout necessario: l'upload può richiedere 2-3 minuti per ~127 MB.
 Usare timeout 600000ms (10 minuti) per la bash tool.
+
+## Versione EAS CLI installata
+
+eas-cli v20 è installato come **dipendenza di progetto** in package.json (`"eas-cli": "^20.1.0"`).
+`scripts/eas.sh` punta a `node_modules/.bin/eas` — NON al globale né a npx.
+Per aggiornare il major: modificare package.json e rieseguire `npm install`.
 
 ## Profilo EAS per APK production arm64
 
