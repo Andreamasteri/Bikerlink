@@ -43,7 +43,9 @@ import { useOfflineQueue } from "@/hooks/tracking/useOfflineQueue";
 // Types
 export type Phase = "idle" | "countdown" | "active" | "paused";
 
-type VolumeManagerExt = typeof VolumeManager & { showNativeVolumeUI?: (show: boolean) => void };
+function setVolumeUI(enabled: boolean) {
+  VolumeManager.showNativeVolumeUI({ enabled }).catch(() => undefined);
+}
 
 export interface RouteRecord {
   id: string;
@@ -349,8 +351,8 @@ export function useTrackingState() {
     if (settings.sensorsEnabledRef.current) refs.telemetryAccumRef.current.push({ timestamp: point.timestamp, lat: latitude, lon: longitude, leanAngle: sensors.currentTiltDegRef.current, gForceX: sensors.currentAccelGRef.current, speedKmh: smoothedSpeed });
     if (settings.handsOffEnabledRef.current && !handsOffDismissedForRideRef.current) {
       if (smoothedSpeed >= settings.handsOffSpeedRef.current) {
-        if (!handsOffActive) { setHandsOffActive(true); setHandsOffBroadcast(true); (VolumeManager as VolumeManagerExt).showNativeVolumeUI?.(false); }
-      } else if (handsOffActive) { setHandsOffActive(false); setHandsOffBroadcast(false); (VolumeManager as VolumeManagerExt).showNativeVolumeUI?.(true); }
+        if (!handsOffActive) { setHandsOffActive(true); setHandsOffBroadcast(true); setVolumeUI(false); }
+      } else if (handsOffActive) { setHandsOffActive(false); setHandsOffBroadcast(false); setVolumeUI(true); }
     }
   }, [gps, sensors, sprint, bg, handsOffActive, settings, stats, session, refs]);
 
@@ -460,7 +462,7 @@ export function useTrackingState() {
       session.setSummaryPatchFailed(patchFailed);
       session.setSummaryVisible(true);
       session.setPhase("idle"); session.setLoading(false); setHandsOffActive(false); setHandsOffBroadcast(false);
-      (VolumeManager as VolumeManagerExt).showNativeVolumeUI?.(true);
+      setVolumeUI(true);
     }
   }, [cleanupTracking, flushPoints, stats, gps, sensors, sprint, battery, refetchRecords, t, session, settings, mapState, refs, offlineQueue]);
 
