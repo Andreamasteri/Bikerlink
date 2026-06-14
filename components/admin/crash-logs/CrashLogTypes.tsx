@@ -141,6 +141,19 @@ export interface CrashStatsResponse {
   ramMedianCrashMb: number | null;
 }
 
+export interface RestartLoopSummaryItem {
+  userId: string;
+  nickname: string | null;
+  appVersion: string | null;
+  platform: string | null;
+  sessionCount: number;
+  totalRestarts: number;
+}
+
+export interface RestartLoopSummaryResponse {
+  summary: RestartLoopSummaryItem[];
+}
+
 export function formatDate(iso: string): string {
   const d = new Date(iso);
   return (

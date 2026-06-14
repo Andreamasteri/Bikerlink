@@ -24,6 +24,8 @@ import {
   getAlertDominantType,
   getAlertAccentColor,
   getAlertDominantLabel,
+  RestartLoopSummaryResponse,
+  RestartLoopSummaryItem,
 } from "@/components/admin/crash-logs/CrashLogTypes";
 import { CrashLogCard } from "@/components/admin/crash-logs/CrashLogCard";
 import { CrashLogFilters } from "@/components/admin/crash-logs/CrashLogFilters";
@@ -128,6 +130,15 @@ export default function CrashLogsScreen() {
     staleTime: 60_000,
   });
 
+  const { data: restartSummaryData } = useQuery<RestartLoopSummaryResponse>({
+    queryKey: ["/api/admin/crash-logs/restart-loop-summary"],
+    queryFn: async () => {
+      const res = await apiRequest("GET", "/api/admin/crash-logs/restart-loop-summary");
+      return res.json() as Promise<RestartLoopSummaryResponse>;
+    },
+    staleTime: 60_000,
+  });
+
   const logs = data?.logs ?? [];
   const total = data?.total ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / LIMIT));
@@ -228,6 +239,7 @@ export default function CrashLogsScreen() {
               deviceStats={data?.deviceStats}
               deviceTab={deviceTab}
               setDeviceTab={setDeviceTab}
+              restartSummaryData={restartSummaryData}
             />
           }
           ListEmptyComponent={
@@ -283,6 +295,7 @@ interface CrashLogsHeaderProps {
   deviceStats: Array<{ platform?: string | null; deviceModel?: string | null; total: number }> | undefined;
   deviceTab: "model" | "brand";
   setDeviceTab: (tab: "model" | "brand") => void;
+  restartSummaryData?: RestartLoopSummaryResponse;
 }
 
 function CrashLogsHeader({
@@ -290,6 +303,7 @@ function CrashLogsHeader({
   setShowThresholdEdit, setThresholdInput, handleThresholdSubmit,
   applyDeviceFilter, statsData, total, filterType, filterVersion,
   filterDevice, brandStats, deviceStats, deviceTab, setDeviceTab,
+  restartSummaryData,
 }: CrashLogsHeaderProps) {
   const colors = useColors();
 
@@ -375,6 +389,47 @@ function CrashLogsHeader({
               </TouchableOpacity>
             );
           })}
+        </View>
+      )}
+
+      {/* Restart-Loop Summary */}
+      {restartSummaryData && restartSummaryData.summary.length > 0 && (
+        <View style={[styles.restartSummaryContainer, { backgroundColor: colors.surface, borderColor: "#9B59B640" }]}>
+          <View style={styles.restartSummaryHeader}>
+            <MaterialCommunityIcons name="restart" size={14} color="#9B59B6" />
+            <Text style={[styles.restartSummaryTitle, { color: colors.textSecondary }]}>
+              Top riavvii per utente (24h)
+            </Text>
+          </View>
+          {restartSummaryData.summary.map((item: RestartLoopSummaryItem, i: number) => (
+            <View key={`${item.userId}-${i}`} style={styles.restartSummaryRow}>
+              <View style={styles.restartSummaryLeft}>
+                <Text style={[styles.restartSummaryRank, { color: colors.textSecondary }]}>
+                  {i + 1}.
+                </Text>
+                <View style={styles.restartSummaryInfo}>
+                  <Text style={[styles.restartSummaryNickname, { color: colors.text }]} numberOfLines={1}>
+                    {item.nickname ?? item.userId}
+                  </Text>
+                  <Text style={[styles.restartSummaryMeta, { color: colors.textSecondary }]} numberOfLines={1}>
+                    {[item.platform, item.appVersion ? `v${item.appVersion}` : null]
+                      .filter(Boolean)
+                      .join(" · ") || "—"}
+                    {" · "}
+                    {item.sessionCount} {item.sessionCount === 1 ? "sessione" : "sessioni"}
+                  </Text>
+                </View>
+              </View>
+              <View style={[styles.restartSummaryBadge, { backgroundColor: "#9B59B622" }]}>
+                <Text style={[styles.restartSummaryCount, { color: "#9B59B6" }]}>
+                  {item.totalRestarts}
+                </Text>
+                <Text style={[styles.restartSummaryUnit, { color: "#9B59B6" }]}>
+                  {item.totalRestarts === 1 ? "riavvio" : "riavvii"}
+                </Text>
+              </View>
+            </View>
+          ))}
         </View>
       )}
 

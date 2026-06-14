@@ -197,4 +197,71 @@ export const styles = StyleSheet.create({
     textAlign: "center",
     paddingVertical: 8,
   },
+
+  restartSummaryContainer: {
+    borderRadius: 12,
+    borderWidth: 1,
+    padding: 12,
+    marginBottom: 12,
+    gap: 6,
+  },
+  restartSummaryHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginBottom: 4,
+  },
+  restartSummaryTitle: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 12,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+  restartSummaryRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 8,
+    paddingVertical: 3,
+  },
+  restartSummaryLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    flex: 1,
+  },
+  restartSummaryRank: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 12,
+    minWidth: 18,
+  },
+  restartSummaryInfo: {
+    flex: 1,
+    gap: 1,
+  },
+  restartSummaryNickname: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 13,
+  },
+  restartSummaryMeta: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 11,
+  },
+  restartSummaryBadge: {
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    alignItems: "center",
+    minWidth: 56,
+  },
+  restartSummaryCount: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 14,
+    lineHeight: 16,
+  },
+  restartSummaryUnit: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 10,
+    lineHeight: 12,
+  },
 });

@@ -256,6 +256,48 @@ adminRouter.get("/stats", requireAdmin, (req: Request, res: Response): void => {
     });
 });
 
+adminRouter.get("/restart-loop-summary", requireAdmin, (req: Request, res: Response): void => {
+  db.execute(sql`
+    SELECT
+      acl.user_id                                    AS "userId",
+      u.nickname,
+      acl.app_version                                AS "appVersion",
+      acl.platform,
+      COUNT(*)::int                                  AS "sessionCount",
+      SUM(
+        CAST(
+          COALESCE(
+            NULLIF(substring(acl.error_message FROM '^[0-9]+'), ''),
+            '0'
+          ) AS INTEGER
+        )
+      )::int                                         AS "totalRestarts"
+    FROM app_crash_logs acl
+    LEFT JOIN users u ON u.id = acl.user_id
+    WHERE acl.crash_type = 'restart_loop'
+      AND acl.reported_at >= NOW() - INTERVAL '24 hours'
+    GROUP BY acl.user_id, u.nickname, acl.app_version, acl.platform
+    ORDER BY "totalRestarts" DESC
+    LIMIT 10
+  `)
+    .then((result) => {
+      res.json({
+        summary: result.rows as {
+          userId: string;
+          nickname: string | null;
+          appVersion: string | null;
+          platform: string | null;
+          sessionCount: number;
+          totalRestarts: number;
+        }[],
+      });
+    })
+    .catch((err) => {
+      console.error("[crash-logs restart-loop-summary] query error:", err);
+      sendError(res, 500, "Errore interno");
+    });
+});
+
 adminRouter.get("/alerts", requireAdmin, (req: Request, res: Response): void => {
   const threshold = Math.max(1, parseInt(String(req.query.threshold ?? "3"), 10));
 
