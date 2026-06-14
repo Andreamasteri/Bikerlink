@@ -280,7 +280,7 @@ interface CrashLogsHeaderProps {
   filterVersion: string;
   filterDevice: string;
   brandStats: BrandStat[];
-  deviceStats: Array<{ platform?: string; deviceModel?: string; total: number }> | undefined;
+  deviceStats: Array<{ platform?: string | null; deviceModel?: string | null; total: number }> | undefined;
   deviceTab: "model" | "brand";
   setDeviceTab: (tab: "model" | "brand") => void;
 }
