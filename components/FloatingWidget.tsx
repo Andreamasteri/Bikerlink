@@ -60,6 +60,26 @@ export default function FloatingWidget() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const isMountedRef = useRef(false);
+  useEffect(() => {
+    if (!isMountedRef.current) {
+      isMountedRef.current = true;
+      return;
+    }
+    const maxX = width - WIDGET_SIZE;
+    const maxY = height - WIDGET_SIZE - 8 - insets.bottom;
+    const minY = insets.top + 8;
+    const clampedX = Math.max(0, Math.min(posX.value, maxX));
+    const clampedY = Math.max(minY, Math.min(posY.value, maxY));
+    if (clampedX !== posX.value) {
+      posX.value = withTiming(clampedX, { duration: 250, easing: Easing.out(Easing.ease) });
+    }
+    if (clampedY !== posY.value) {
+      posY.value = withTiming(clampedY, { duration: 250, easing: Easing.out(Easing.ease) });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [width, height]);
+
   const refetchBadgesRef = useRef(refetchBadges);
   useEffect(() => { refetchBadgesRef.current = refetchBadges; }, [refetchBadges]);
 
