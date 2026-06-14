@@ -31,6 +31,7 @@ import { useAutoTelemetry } from "@/lib/auto-telemetry-context";
 import { GateDots } from "./TelemetryGateDots";
 import { AutoRidingIndicator } from "./TelemetryAutoIndicator";
 import { SavedLapsSection } from "./TelemetrySavedLaps";
+import { useLocalSearchParams } from "expo-router";
 
 const LAP_TARGETS_KM = [10, 30, 50, 100];
 
@@ -48,8 +49,9 @@ type Props = { telemetryStats: TelemetryStats };
 
 export default function TelemetryPanel({ telemetryStats }: Props) {
   const { isAutoRiding, isCalibrated: ctxCalibrated, alwaysActive: ctxAlwaysActive } = useAutoTelemetry();
+  const { focusTelemetry } = useLocalSearchParams<{ focusTelemetry?: string }>();
 
-  const [telemetryExpanded, setTelemetryExpanded] = useState(false);
+  const [telemetryExpanded, setTelemetryExpanded] = useState(() => focusTelemetry === "1");
   const [idealLapResetKey, setIdealLapResetKey] = useState(0);
   const [compareMode, setCompareMode] = useState(false);
   const [selectedLaps, setSelectedLaps] = useState<string[]>([]);

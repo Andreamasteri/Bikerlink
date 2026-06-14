@@ -20,6 +20,7 @@ interface TabIconProps {
   hasActiveMatches?: boolean;
   statusIsAvailable?: boolean;
   isBikerOrCoppia?: boolean;
+  showCalibrationBadge?: boolean;
 }
 
 function MatchBadge({
@@ -101,6 +102,7 @@ export function TabIcon({
   hasActiveMatches = false,
   statusIsAvailable = false,
   isBikerOrCoppia = false,
+  showCalibrationBadge = false,
 }: TabIconProps) {
   const colors = useColors();
 
@@ -190,7 +192,26 @@ export function TabIcon({
       );
 
     case "profile":
-      return <Ionicons name="person" size={size} color={color} />;
+      return (
+        <View>
+          <Ionicons name="person" size={size} color={color} />
+          {showCalibrationBadge && (
+            <View
+              style={{
+                position: "absolute",
+                top: -3,
+                right: -5,
+                width: 9,
+                height: 9,
+                borderRadius: 5,
+                backgroundColor: "#e67e22",
+                borderWidth: 1.5,
+                borderColor: "#fff",
+              }}
+            />
+          )}
+        </View>
+      );
 
     default:
       return null;

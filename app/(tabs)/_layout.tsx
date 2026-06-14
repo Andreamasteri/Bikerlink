@@ -18,6 +18,7 @@ import { useNewMatchAlert } from "@/hooks/useNewMatchAlert";
 import { TabIcon } from "@/components/TabIcons";
 import { GpsBanner } from "@/components/layout/GpsBanner";
 import { sendStartupBeacon } from "@/lib/startup-beacon";
+import { useAutoTelemetry } from "@/lib/auto-telemetry-context";
 import { SafetyOverlay } from "@/components/layout/SafetyOverlay";
 import { GarageReminderModal } from "@/components/layout/GarageReminderModal";
 import { FakeHomeIntroModal } from "@/components/layout/FakeHomeIntroModal";
@@ -75,6 +76,8 @@ export default function TabLayout() {
   const { taskbarStyle } = useTaskbarStyle();
   const { unreadCount, hasActiveMatches } = useTabBadges();
   const { newMatchCount } = useNewMatchAlert();
+  const { alwaysActive, isCalibrated, isAutoRiding } = useAutoTelemetry();
+  const showCalibrationBadge = alwaysActive && (!isCalibrated || !isAutoRiding);
 
   // ── Global Hands-Off overlay ────────────────────────────────────────────────
   const [globalHandsOffActive, setGlobalHandsOffActive] = useState(false);
@@ -196,7 +199,14 @@ export default function TabLayout() {
             canPreventDefault: true,
           });
           if (!isFocused && !event.defaultPrevented) {
-            navigation.navigate(route.name, route.params as never);
+            const extraParams =
+              route.name === "profile" && showCalibrationBadge
+                ? { focusTelemetry: "1" }
+                : undefined;
+            navigation.navigate(
+              route.name,
+              { ...(route.params as object | undefined), ...extraParams } as never
+            );
           }
         };
 
@@ -480,7 +490,13 @@ export default function TabLayout() {
           options={{
             title: t("profile.title"),
             tabBarIcon: ({ color, size, focused }) => (
-              <TabIcon name="profile" color={color} size={size} focused={focused} />
+              <TabIcon
+                name="profile"
+                color={color}
+                size={size}
+                focused={focused}
+                showCalibrationBadge={showCalibrationBadge}
+              />
             ),
             headerTitle: t("profile.myProfile"),
           }}
