@@ -2,7 +2,6 @@ import React, { useState } from "react";
 import {
   View,
   Text,
-  StyleSheet,
   FlatList,
   TouchableOpacity,
   ActivityIndicator,
@@ -30,6 +29,7 @@ import { CrashLogCard } from "@/components/admin/crash-logs/CrashLogCard";
 import { CrashLogFilters } from "@/components/admin/crash-logs/CrashLogFilters";
 import { CrashStackTrace } from "@/components/admin/crash-logs/CrashStackTrace";
 import { CrashLogStats } from "@/components/admin/crash-logs/CrashLogStats";
+import { styles } from "@/components/admin/crash-logs/CrashLogsStyles";
 
 const LIMIT = 20;
 const ALERT_THRESHOLD_KEY = "@bikerlink/crash_alert_threshold";
@@ -132,6 +132,7 @@ export default function CrashLogsScreen() {
   const total = data?.total ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / LIMIT));
   const alerts = alertsData?.alerts ?? [];
+  const brandStats: BrandStat[] = data?.brandStats ?? [];
 
   function resetFilters() {
     setFilterUser("");
@@ -151,14 +152,10 @@ export default function CrashLogsScreen() {
 
   function handleThresholdSubmit() {
     const n = parseInt(thresholdInput, 10);
-    if (!isNaN(n) && n > 0) {
-      setThreshold(n);
-    }
+    if (!isNaN(n) && n > 0) setThreshold(n);
     setShowThresholdEdit(false);
     setThresholdInput("");
   }
-
-  const brandStats: BrandStat[] = data?.brandStats ?? [];
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -213,191 +210,25 @@ export default function CrashLogsScreen() {
           )}
           contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + 20 }]}
           ListHeaderComponent={
-            <View>
-              {/* Alert banners */}
-              {alerts.length > 0 && (
-                <View style={styles.alertsSection}>
-                  <View style={styles.alertsHeader}>
-                    <MaterialCommunityIcons name="alert" size={14} color="#FF6B35" />
-                    <Text style={[styles.alertsTitle, { color: "#FF6B35" }]}>
-                      Alert dispositivi critici (24h)
-                    </Text>
-                    <TouchableOpacity
-                      style={styles.thresholdBtn}
-                      onPress={() => {
-                        setShowThresholdEdit((v) => !v);
-                        setThresholdInput(String(threshold));
-                      }}
-                    >
-                      <Text style={[styles.thresholdBtnText, { color: colors.textSecondary }]}>
-                        soglia: {threshold}
-                      </Text>
-                      <Ionicons name="pencil-outline" size={12} color={colors.textSecondary} />
-                    </TouchableOpacity>
-                  </View>
-                  {showThresholdEdit && (
-                    <View style={[styles.thresholdRow, { borderColor: colors.border }]}>
-                      <TextInput
-                        style={[styles.thresholdInput, { color: colors.text, borderColor: colors.border, backgroundColor: colors.background }]}
-                        value={thresholdInput}
-                        onChangeText={setThresholdInput}
-                        keyboardType="number-pad"
-                        placeholder="Soglia crash"
-                        placeholderTextColor={colors.textSecondary}
-                        onSubmitEditing={handleThresholdSubmit}
-                        returnKeyType="done"
-                      />
-                      <TouchableOpacity
-                        style={[styles.thresholdSaveBtn, { backgroundColor: colors.accent }]}
-                        onPress={handleThresholdSubmit}
-                      >
-                        <Text style={styles.thresholdSaveBtnText}>OK</Text>
-                      </TouchableOpacity>
-                    </View>
-                  )}
-                  {alerts.map((alert, i) => {
-                    const dominant = getAlertDominantType(alert);
-                    const accentColor = getAlertAccentColor(dominant);
-                    const dominantLabel = getAlertDominantLabel(dominant);
-                    const iconName = dominant === "restart_loop"
-                      ? "restart"
-                      : dominant === "crash_js"
-                      ? "code-braces"
-                      : "phone-alert";
-                    return (
-                      <TouchableOpacity
-                        key={i}
-                        style={[
-                          styles.alertBanner,
-                          {
-                            backgroundColor: `${accentColor}14`,
-                            borderColor: `${accentColor}40`,
-                          },
-                        ]}
-                        onPress={() => applyDeviceFilter(alert.device_model)}
-                        activeOpacity={0.7}
-                      >
-                        <View style={styles.alertLeft}>
-                          <MaterialCommunityIcons name={iconName} size={16} color={accentColor} />
-                          <View>
-                            <Text style={[styles.alertModel, { color: colors.text }]} numberOfLines={1}>
-                              {alert.device_model}
-                              {alert.device_brand ? ` · ${alert.device_brand}` : ""}
-                            </Text>
-                            <View style={styles.alertCountRow}>
-                              <Text style={[styles.alertCount, { color: accentColor }]}>
-                                {alert.cnt} crash nelle ultime 24h
-                              </Text>
-                              <View style={[styles.alertTypeBadge, { backgroundColor: `${accentColor}22` }]}>
-                                <Text style={[styles.alertTypeBadgeText, { color: accentColor }]}>
-                                  {dominantLabel}
-                                </Text>
-                              </View>
-                            </View>
-                            {dominant === "mixed" && (
-                              <Text style={[styles.alertBreakdown, { color: colors.textSecondary }]}>
-                                {alert.crash_system > 0 ? `Sistema: ${alert.crash_system}  ` : ""}
-                                {alert.crash_js > 0 ? `JS: ${alert.crash_js}  ` : ""}
-                                {alert.restart_loop > 0 ? `Loop: ${alert.restart_loop}` : ""}
-                              </Text>
-                            )}
-                          </View>
-                        </View>
-                        <View style={styles.alertRight}>
-                          <Text style={[styles.alertFilterHint, { color: colors.accent }]}>
-                            Filtra
-                          </Text>
-                          <Ionicons name="chevron-forward" size={14} color={colors.accent} />
-                        </View>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-              )}
-
-              {statsData && <CrashLogStats stats={statsData} />}
-              <Text style={[styles.totalText, { color: colors.textSecondary, marginTop: statsData ? 12 : 4 }]}>
-                {total} crash
-                {filterType ? ` · ${filterType === "crash_js" ? "JS Error" : filterType === "restart_loop" ? "Restart Loop" : "Sistema"}` : ""}
-                {filterVersion.trim() ? ` · v${filterVersion.trim()}` : ""}
-                {filterDevice.trim() ? ` · ${filterDevice.trim()}` : ""}
-              </Text>
-
-              {/* Top dispositivi — tab model / brand */}
-              {((data?.deviceStats && data.deviceStats.length > 0) || brandStats.length > 0) && (
-                <View style={[styles.deviceStatsContainer, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                  <View style={styles.deviceTabRow}>
-                    <TouchableOpacity
-                      style={[styles.deviceTab, deviceTab === "model" && { borderBottomColor: colors.accent }]}
-                      onPress={() => setDeviceTab("model")}
-                    >
-                      <Text style={[styles.deviceTabText, { color: deviceTab === "model" ? colors.accent : colors.textSecondary }]}>
-                        Per modello
-                      </Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={[styles.deviceTab, deviceTab === "brand" && { borderBottomColor: colors.accent }]}
-                      onPress={() => setDeviceTab("brand")}
-                    >
-                      <Text style={[styles.deviceTabText, { color: deviceTab === "brand" ? colors.accent : colors.textSecondary }]}>
-                        Per marca
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-
-                  {deviceTab === "model" && data?.deviceStats?.map((stat, i) => {
-                    const label = [stat.platform, stat.deviceModel].filter(Boolean).join(" · ") || "Sconosciuto";
-                    return (
-                      <TouchableOpacity
-                        key={i}
-                        style={styles.deviceStatRow}
-                        onPress={() => stat.deviceModel ? applyDeviceFilter(stat.deviceModel) : undefined}
-                        activeOpacity={stat.deviceModel ? 0.6 : 1}
-                      >
-                        <Text style={[styles.deviceStatLabel, { color: colors.text }]} numberOfLines={1}>
-                          {label}
-                        </Text>
-                        <View style={[styles.deviceStatBadge, { backgroundColor: "#FF6B3522" }]}>
-                          <Text style={[styles.deviceStatCount, { color: "#FF6B35" }]}>{stat.total}</Text>
-                        </View>
-                      </TouchableOpacity>
-                    );
-                  })}
-
-                  {deviceTab === "brand" && (
-                    brandStats.length === 0 ? (
-                      <Text style={[styles.noDataText, { color: colors.textSecondary }]}>
-                        Nessun dato marca disponibile
-                      </Text>
-                    ) : (
-                      brandStats.map((b, i) => (
-                        <TouchableOpacity
-                          key={i}
-                          style={styles.deviceStatRow}
-                          onPress={() => applyDeviceFilter(b.brand === "Sconosciuto" ? "" : b.brand)}
-                          activeOpacity={0.6}
-                        >
-                          <View style={styles.brandLabelWrap}>
-                            <Text style={[styles.deviceStatLabel, { color: colors.text }]} numberOfLines={1}>
-                              {b.brand}
-                            </Text>
-                            <View style={[styles.brandPctBar, { backgroundColor: colors.border }]}>
-                              <View style={[styles.brandPctFill, { width: `${b.pct}%` as `${number}%`, backgroundColor: "#FF6B35" }]} />
-                            </View>
-                          </View>
-                          <View style={styles.brandBadgeGroup}>
-                            <Text style={[styles.brandPct, { color: colors.textSecondary }]}>{b.pct}%</Text>
-                            <View style={[styles.deviceStatBadge, { backgroundColor: "#FF6B3522" }]}>
-                              <Text style={[styles.deviceStatCount, { color: "#FF6B35" }]}>{b.total}</Text>
-                            </View>
-                          </View>
-                        </TouchableOpacity>
-                      ))
-                    )
-                  )}
-                </View>
-              )}
-            </View>
+            <CrashLogsHeader
+              alerts={alerts}
+              threshold={threshold}
+              showThresholdEdit={showThresholdEdit}
+              thresholdInput={thresholdInput}
+              setShowThresholdEdit={setShowThresholdEdit}
+              setThresholdInput={setThresholdInput}
+              handleThresholdSubmit={handleThresholdSubmit}
+              applyDeviceFilter={applyDeviceFilter}
+              statsData={statsData}
+              total={total}
+              filterType={filterType}
+              filterVersion={filterVersion}
+              filterDevice={filterDevice}
+              brandStats={brandStats}
+              deviceStats={data?.deviceStats}
+              deviceTab={deviceTab}
+              setDeviceTab={setDeviceTab}
+            />
           }
           ListEmptyComponent={
             <View style={styles.emptyInList}>
@@ -434,201 +265,190 @@ export default function CrashLogsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1 },
-  center: { flex: 1, alignItems: "center", justifyContent: "center", gap: 12, padding: 32 },
-  emptyText: { fontFamily: "Inter_400Regular", fontSize: 15, textAlign: "center" },
-  emptyInList: { alignItems: "center", gap: 12, padding: 32 },
-  retryBtn: { borderRadius: 8, paddingHorizontal: 20, paddingVertical: 10 },
-  retryBtnText: { color: "#fff", fontFamily: "Inter_600SemiBold", fontSize: 14 },
-  list: { paddingHorizontal: 16, paddingTop: 8 },
-  totalText: { fontFamily: "Inter_400Regular", fontSize: 13, marginBottom: 12, marginTop: 4 },
-  pagination: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 16, paddingTop: 16 },
-  pageBtn: { width: 36, height: 36, borderRadius: 8, borderWidth: 1, alignItems: "center", justifyContent: "center" },
-  pageText: { fontFamily: "Inter_500Medium", fontSize: 14 },
+interface CrashLogsHeaderProps {
+  alerts: CrashAlertsResponse["alerts"];
+  threshold: number;
+  showThresholdEdit: boolean;
+  thresholdInput: string;
+  setShowThresholdEdit: (v: boolean | ((prev: boolean) => boolean)) => void;
+  setThresholdInput: (v: string) => void;
+  handleThresholdSubmit: () => void;
+  applyDeviceFilter: (model: string) => void;
+  statsData: CrashStatsResponse | undefined;
+  total: number;
+  filterType: "" | CrashType;
+  filterVersion: string;
+  filterDevice: string;
+  brandStats: BrandStat[];
+  deviceStats: Array<{ platform?: string; deviceModel?: string; total: number }> | undefined;
+  deviceTab: "model" | "brand";
+  setDeviceTab: (tab: "model" | "brand") => void;
+}
 
-  alertsSection: {
-    gap: 8,
-    marginBottom: 12,
-  },
-  alertsHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-  },
-  alertsTitle: {
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 12,
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
-    flex: 1,
-  },
-  thresholdBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-  },
-  thresholdBtnText: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 12,
-  },
-  thresholdRow: {
-    flexDirection: "row",
-    gap: 8,
-    alignItems: "center",
-    borderTopWidth: StyleSheet.hairlineWidth,
-    paddingTop: 8,
-  },
-  thresholdInput: {
-    flex: 1,
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    fontFamily: "Inter_400Regular",
-    fontSize: 13,
-  },
-  thresholdSaveBtn: {
-    borderRadius: 8,
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-  },
-  thresholdSaveBtnText: {
-    color: "#fff",
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 13,
-  },
-  alertBanner: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    borderRadius: 10,
-    borderWidth: 1,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    gap: 8,
-  },
-  alertLeft: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 10,
-    flex: 1,
-  },
-  alertModel: {
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 13,
-  },
-  alertCount: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 12,
-    marginTop: 2,
-  },
-  alertRight: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 2,
-  },
-  alertFilterHint: {
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 12,
-  },
-  alertCountRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    flexWrap: "wrap",
-    gap: 6,
-    marginTop: 2,
-  },
-  alertTypeBadge: {
-    borderRadius: 4,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-  },
-  alertTypeBadgeText: {
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 10,
-  },
-  alertBreakdown: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 11,
-    marginTop: 3,
-  },
+function CrashLogsHeader({
+  alerts, threshold, showThresholdEdit, thresholdInput,
+  setShowThresholdEdit, setThresholdInput, handleThresholdSubmit,
+  applyDeviceFilter, statsData, total, filterType, filterVersion,
+  filterDevice, brandStats, deviceStats, deviceTab, setDeviceTab,
+}: CrashLogsHeaderProps) {
+  const colors = useColors();
 
-  deviceStatsContainer: {
-    borderRadius: 12,
-    borderWidth: 1,
-    padding: 12,
-    marginBottom: 12,
-    gap: 8,
-  },
-  deviceTabRow: {
-    flexDirection: "row",
-    gap: 0,
-    marginBottom: 4,
-  },
-  deviceTab: {
-    paddingBottom: 8,
-    marginRight: 16,
-    borderBottomWidth: 2,
-    borderBottomColor: "transparent",
-  },
-  deviceTabText: {
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 12,
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
-  },
-  deviceStatRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 8,
-    paddingVertical: 2,
-  },
-  deviceStatLabel: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 13,
-    flex: 1,
-  },
-  deviceStatBadge: {
-    borderRadius: 6,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-  },
-  deviceStatCount: {
-    fontFamily: "Inter_700Bold",
-    fontSize: 13,
-  },
-  brandLabelWrap: {
-    flex: 1,
-    gap: 3,
-  },
-  brandPctBar: {
-    height: 4,
-    borderRadius: 2,
-    overflow: "hidden",
-    marginTop: 2,
-  },
-  brandPctFill: {
-    height: 4,
-    borderRadius: 2,
-    minWidth: 2,
-  },
-  brandBadgeGroup: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-  },
-  brandPct: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 12,
-    minWidth: 30,
-    textAlign: "right",
-  },
-  noDataText: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 13,
-    textAlign: "center",
-    paddingVertical: 8,
-  },
-});
+  return (
+    <View>
+      {alerts.length > 0 && (
+        <View style={styles.alertsSection}>
+          <View style={styles.alertsHeader}>
+            <MaterialCommunityIcons name="alert" size={14} color="#FF6B35" />
+            <Text style={[styles.alertsTitle, { color: "#FF6B35" }]}>
+              Alert dispositivi critici (24h)
+            </Text>
+            <TouchableOpacity
+              style={styles.thresholdBtn}
+              onPress={() => {
+                setShowThresholdEdit((v) => !v);
+                setThresholdInput(String(threshold));
+              }}
+            >
+              <Text style={[styles.thresholdBtnText, { color: colors.textSecondary }]}>
+                soglia: {threshold}
+              </Text>
+              <Ionicons name="pencil-outline" size={12} color={colors.textSecondary} />
+            </TouchableOpacity>
+          </View>
+          {showThresholdEdit && (
+            <View style={[styles.thresholdRow, { borderColor: colors.border }]}>
+              <TextInput
+                style={[styles.thresholdInput, { color: colors.text, borderColor: colors.border, backgroundColor: colors.background }]}
+                value={thresholdInput}
+                onChangeText={setThresholdInput}
+                keyboardType="number-pad"
+                placeholder="Soglia crash"
+                placeholderTextColor={colors.textSecondary}
+                onSubmitEditing={handleThresholdSubmit}
+                returnKeyType="done"
+              />
+              <TouchableOpacity
+                style={[styles.thresholdSaveBtn, { backgroundColor: colors.accent }]}
+                onPress={handleThresholdSubmit}
+              >
+                <Text style={styles.thresholdSaveBtnText}>OK</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+          {alerts.map((alert, i) => {
+            const dominant = getAlertDominantType(alert);
+            const accentColor = getAlertAccentColor(dominant);
+            const dominantLabel = getAlertDominantLabel(dominant);
+            const iconName = dominant === "restart_loop" ? "restart" : dominant === "crash_js" ? "code-braces" : "phone-alert";
+            return (
+              <TouchableOpacity
+                key={i}
+                style={[styles.alertBanner, { backgroundColor: `${accentColor}14`, borderColor: `${accentColor}40` }]}
+                onPress={() => applyDeviceFilter(alert.device_model)}
+                activeOpacity={0.7}
+              >
+                <View style={styles.alertLeft}>
+                  <MaterialCommunityIcons name={iconName} size={16} color={accentColor} />
+                  <View>
+                    <Text style={[styles.alertModel, { color: colors.text }]} numberOfLines={1}>
+                      {alert.device_model}{alert.device_brand ? ` · ${alert.device_brand}` : ""}
+                    </Text>
+                    <View style={styles.alertCountRow}>
+                      <Text style={[styles.alertCount, { color: accentColor }]}>{alert.cnt} crash nelle ultime 24h</Text>
+                      <View style={[styles.alertTypeBadge, { backgroundColor: `${accentColor}22` }]}>
+                        <Text style={[styles.alertTypeBadgeText, { color: accentColor }]}>{dominantLabel}</Text>
+                      </View>
+                    </View>
+                    {dominant === "mixed" && (
+                      <Text style={[styles.alertBreakdown, { color: colors.textSecondary }]}>
+                        {alert.crash_system > 0 ? `Sistema: ${alert.crash_system}  ` : ""}
+                        {alert.crash_js > 0 ? `JS: ${alert.crash_js}  ` : ""}
+                        {alert.restart_loop > 0 ? `Loop: ${alert.restart_loop}` : ""}
+                      </Text>
+                    )}
+                  </View>
+                </View>
+                <View style={styles.alertRight}>
+                  <Text style={[styles.alertFilterHint, { color: colors.accent }]}>Filtra</Text>
+                  <Ionicons name="chevron-forward" size={14} color={colors.accent} />
+                </View>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      )}
+
+      {statsData && <CrashLogStats stats={statsData} />}
+      <Text style={[styles.totalText, { color: colors.textSecondary, marginTop: statsData ? 12 : 4 }]}>
+        {total} crash
+        {filterType ? ` · ${filterType === "crash_js" ? "JS Error" : filterType === "restart_loop" ? "Restart Loop" : "Sistema"}` : ""}
+        {filterVersion.trim() ? ` · v${filterVersion.trim()}` : ""}
+        {filterDevice.trim() ? ` · ${filterDevice.trim()}` : ""}
+      </Text>
+
+      {((deviceStats && deviceStats.length > 0) || brandStats.length > 0) && (
+        <View style={[styles.deviceStatsContainer, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <View style={styles.deviceTabRow}>
+            <TouchableOpacity
+              style={[styles.deviceTab, deviceTab === "model" && { borderBottomColor: colors.accent }]}
+              onPress={() => setDeviceTab("model")}
+            >
+              <Text style={[styles.deviceTabText, { color: deviceTab === "model" ? colors.accent : colors.textSecondary }]}>Per modello</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.deviceTab, deviceTab === "brand" && { borderBottomColor: colors.accent }]}
+              onPress={() => setDeviceTab("brand")}
+            >
+              <Text style={[styles.deviceTabText, { color: deviceTab === "brand" ? colors.accent : colors.textSecondary }]}>Per marca</Text>
+            </TouchableOpacity>
+          </View>
+
+          {deviceTab === "model" && deviceStats?.map((stat, i) => {
+            const label = [stat.platform, stat.deviceModel].filter(Boolean).join(" · ") || "Sconosciuto";
+            return (
+              <TouchableOpacity
+                key={i}
+                style={styles.deviceStatRow}
+                onPress={() => stat.deviceModel ? applyDeviceFilter(stat.deviceModel) : undefined}
+                activeOpacity={stat.deviceModel ? 0.6 : 1}
+              >
+                <Text style={[styles.deviceStatLabel, { color: colors.text }]} numberOfLines={1}>{label}</Text>
+                <View style={[styles.deviceStatBadge, { backgroundColor: "#FF6B3522" }]}>
+                  <Text style={[styles.deviceStatCount, { color: "#FF6B35" }]}>{stat.total}</Text>
+                </View>
+              </TouchableOpacity>
+            );
+          })}
+
+          {deviceTab === "brand" && (
+            brandStats.length === 0 ? (
+              <Text style={[styles.noDataText, { color: colors.textSecondary }]}>Nessun dato marca disponibile</Text>
+            ) : (
+              brandStats.map((b, i) => (
+                <TouchableOpacity
+                  key={i}
+                  style={styles.deviceStatRow}
+                  onPress={() => applyDeviceFilter(b.brand === "Sconosciuto" ? "" : b.brand)}
+                  activeOpacity={0.6}
+                >
+                  <View style={styles.brandLabelWrap}>
+                    <Text style={[styles.deviceStatLabel, { color: colors.text }]} numberOfLines={1}>{b.brand}</Text>
+                    <View style={[styles.brandPctBar, { backgroundColor: colors.border }]}>
+                      <View style={[styles.brandPctFill, { width: `${b.pct}%` as `${number}%`, backgroundColor: "#FF6B35" }]} />
+                    </View>
+                  </View>
+                  <View style={styles.brandBadgeGroup}>
+                    <Text style={[styles.brandPct, { color: colors.textSecondary }]}>{b.pct}%</Text>
+                    <View style={[styles.deviceStatBadge, { backgroundColor: "#FF6B3522" }]}>
+                      <Text style={[styles.deviceStatCount, { color: "#FF6B35" }]}>{b.total}</Text>
+                    </View>
+                  </View>
+                </TouchableOpacity>
+              ))
+            )
+          )}
+        </View>
+      )}
+    </View>
+  );
+}

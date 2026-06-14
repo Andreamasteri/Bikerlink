@@ -1,0 +1,200 @@
+import { StyleSheet } from "react-native";
+
+export const styles = StyleSheet.create({
+  container: { flex: 1 },
+  center: { flex: 1, alignItems: "center", justifyContent: "center", gap: 12, padding: 32 },
+  emptyText: { fontFamily: "Inter_400Regular", fontSize: 15, textAlign: "center" },
+  emptyInList: { alignItems: "center", gap: 12, padding: 32 },
+  retryBtn: { borderRadius: 8, paddingHorizontal: 20, paddingVertical: 10 },
+  retryBtnText: { color: "#fff", fontFamily: "Inter_600SemiBold", fontSize: 14 },
+  list: { paddingHorizontal: 16, paddingTop: 8 },
+  totalText: { fontFamily: "Inter_400Regular", fontSize: 13, marginBottom: 12, marginTop: 4 },
+  pagination: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 16, paddingTop: 16 },
+  pageBtn: { width: 36, height: 36, borderRadius: 8, borderWidth: 1, alignItems: "center", justifyContent: "center" },
+  pageText: { fontFamily: "Inter_500Medium", fontSize: 14 },
+
+  alertsSection: {
+    gap: 8,
+    marginBottom: 12,
+  },
+  alertsHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  alertsTitle: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 12,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+    flex: 1,
+  },
+  thresholdBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  thresholdBtnText: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+  },
+  thresholdRow: {
+    flexDirection: "row",
+    gap: 8,
+    alignItems: "center",
+    borderTopWidth: StyleSheet.hairlineWidth,
+    paddingTop: 8,
+  },
+  thresholdInput: {
+    flex: 1,
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    fontFamily: "Inter_400Regular",
+    fontSize: 13,
+  },
+  thresholdSaveBtn: {
+    borderRadius: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+  },
+  thresholdSaveBtnText: {
+    color: "#fff",
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 13,
+  },
+  alertBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    borderRadius: 10,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    gap: 8,
+  },
+  alertLeft: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 10,
+    flex: 1,
+  },
+  alertModel: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 13,
+  },
+  alertCount: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    marginTop: 2,
+  },
+  alertRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 2,
+  },
+  alertFilterHint: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 12,
+  },
+  alertCountRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    flexWrap: "wrap",
+    gap: 6,
+    marginTop: 2,
+  },
+  alertTypeBadge: {
+    borderRadius: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  alertTypeBadgeText: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 10,
+  },
+  alertBreakdown: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 11,
+    marginTop: 3,
+  },
+
+  deviceStatsContainer: {
+    borderRadius: 12,
+    borderWidth: 1,
+    padding: 12,
+    marginBottom: 12,
+    gap: 8,
+  },
+  deviceTabRow: {
+    flexDirection: "row",
+    gap: 0,
+    marginBottom: 4,
+  },
+  deviceTab: {
+    paddingBottom: 8,
+    marginRight: 16,
+    borderBottomWidth: 2,
+    borderBottomColor: "transparent",
+  },
+  deviceTabText: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 12,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+  deviceStatRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 8,
+    paddingVertical: 2,
+  },
+  deviceStatLabel: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 13,
+    flex: 1,
+  },
+  deviceStatBadge: {
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  deviceStatCount: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 13,
+  },
+  brandLabelWrap: {
+    flex: 1,
+    gap: 3,
+  },
+  brandPctBar: {
+    height: 4,
+    borderRadius: 2,
+    overflow: "hidden",
+    marginTop: 2,
+  },
+  brandPctFill: {
+    height: 4,
+    borderRadius: 2,
+    minWidth: 2,
+  },
+  brandBadgeGroup: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  brandPct: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    minWidth: 30,
+    textAlign: "right",
+  },
+  noDataText: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 13,
+    textAlign: "center",
+    paddingVertical: 8,
+  },
+});
