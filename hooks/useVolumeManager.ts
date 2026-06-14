@@ -38,23 +38,36 @@ export function useVolumeManager({ phase, onVolumeButton }: UseVolumeManagerOpti
   useEffect(() => {
     const isTracking = phase === "active" || phase === "paused";
 
+    if (__DEV__) {
+      console.log(`[VolumeManager] phase="${phase}" isTracking=${isTracking} platform=${Platform.OS}`);
+    }
+
     if (!isTracking || Platform.OS === "web") return;
 
     let subscription: { remove: () => void } | null = null;
 
     try {
       subscription = VolumeManager.addVolumeListener(() => {
+        if (__DEV__) {
+          console.log("[VolumeManager] volume button pressed — firing onVolumeButton callback");
+        }
         const cb = callbackRef.current;
         if (cb) {
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => undefined);
           cb();
         }
       });
+      if (__DEV__) {
+        console.log("[VolumeManager] listener registered (phase active/paused)");
+      }
     } catch (e) {
       console.warn("[useVolumeManager] addVolumeListener not supported in this environment:", e);
     }
 
     return () => {
+      if (__DEV__) {
+        console.log("[VolumeManager] listener removed (cleanup)");
+      }
       subscription?.remove();
     };
   }, [phase]);
