@@ -1,19 +1,24 @@
-import React, { useRef, useState, useCallback } from "react";
+import React, { useRef, useState, useCallback, useEffect } from "react";
 import {
   View,
   Text,
   StyleSheet,
-  PanResponder,
-  Animated,
   TouchableOpacity,
   Pressable,
   Dimensions,
-
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter, type Href } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { Gesture, GestureDetector } from "react-native-gesture-handler";
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  runOnJS,
+  withTiming,
+  Easing,
+} from "react-native-reanimated";
 import { useFloatingWidget } from "@/lib/floating-widget-context";
 import { useTheme } from "@/lib/theme-context";
 
@@ -31,38 +36,32 @@ export default function FloatingWidget() {
   const defaultX = width - WIDGET_SIZE - 16;
   const defaultY = height - WIDGET_SIZE - 90 - insets.bottom;
 
-  const positionRef = useRef({ x: defaultX, y: defaultY });
   const [positionLoaded, setPositionLoaded] = useState(false);
-  const pan = useRef(new Animated.ValueXY({ x: defaultX, y: defaultY })).current;
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [isTouching, setIsTouching] = useState(false);
 
   const insetsRef = useRef(insets);
-  React.useEffect(() => { insetsRef.current = insets; }, [insets]);
+  useEffect(() => { insetsRef.current = insets; }, [insets]);
 
   const refetchBadgesRef = useRef(refetchBadges);
-  React.useEffect(() => { refetchBadgesRef.current = refetchBadges; }, [refetchBadges]);
+  useEffect(() => { refetchBadgesRef.current = refetchBadges; }, [refetchBadges]);
 
-  const [menuOpen, setMenuOpen] = useState(false);
+  const posX = useSharedValue(defaultX);
+  const posY = useSharedValue(defaultY);
+  const startX = useSharedValue(defaultX);
+  const startY = useSharedValue(defaultY);
+  const menuOpacity = useSharedValue(0);
   const menuOpenRef = useRef(false);
-  const [isTouching, setIsTouching] = useState(false);
-  const dragDistanceRef = useRef(0);
-  const menuOpacity = useRef(new Animated.Value(0)).current;
 
-  const closeMenu = useCallback(() => {
-    menuOpenRef.current = false;
-    Animated.timing(menuOpacity, { toValue: 0, duration: 100, useNativeDriver: true }).start(() => {
-      setMenuOpen(false);
-    });
-  }, [menuOpacity]);
-
-  React.useEffect(() => {
+  useEffect(() => {
     AsyncStorage.getItem(POSITION_KEY).then((val) => {
       if (val) {
         try {
           const { x, y } = JSON.parse(val);
           const clampedX = Math.max(0, Math.min(x, width - WIDGET_SIZE));
           const clampedY = Math.max(insets.top + 8, Math.min(y, height - WIDGET_SIZE - 8 - insets.bottom));
-          positionRef.current = { x: clampedX, y: clampedY };
-          pan.setValue({ x: clampedX, y: clampedY });
+          posX.value = clampedX;
+          posY.value = clampedY;
         } catch {
           // no-op: fallback to default position if JSON is malformed
         }
@@ -72,59 +71,72 @@ export default function FloatingWidget() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const panResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: () => true,
-      onPanResponderGrant: () => {
-        dragDistanceRef.current = 0;
-        pan.setOffset({
-          x: positionRef.current.x,
-          y: positionRef.current.y,
-        });
-        pan.setValue({ x: 0, y: 0 });
-        setIsTouching(true);
-      },
-      onPanResponderMove: (evt, gestureState) => {
-        const dist = Math.sqrt(gestureState.dx ** 2 + gestureState.dy ** 2);
-        dragDistanceRef.current = dist;
-        Animated.event([null, { dx: pan.x, dy: pan.y }], {
-          useNativeDriver: false,
-        })(evt, gestureState);
-      },
-      onPanResponderRelease: (_evt, gestureState) => {
-        pan.flattenOffset();
+  const openMenu = useCallback(() => {
+    refetchBadgesRef.current();
+    menuOpenRef.current = true;
+    setMenuOpen(true);
+    menuOpacity.value = withTiming(1, { duration: 150, easing: Easing.out(Easing.ease) });
+  }, [menuOpacity]);
 
-        const screenWidth = Dimensions.get("window").width;
-        const screenHeight = Dimensions.get("window").height;
-        const rawX = positionRef.current.x + gestureState.dx;
-        const rawY = positionRef.current.y + gestureState.dy;
+  const closeMenuJS = useCallback(() => {
+    menuOpenRef.current = false;
+    setMenuOpen(false);
+  }, []);
 
-        const clampedX = Math.max(0, Math.min(rawX, screenWidth - WIDGET_SIZE));
-        const clampedY = Math.max(insetsRef.current.top + 8, Math.min(rawY, screenHeight - WIDGET_SIZE - 8 - insetsRef.current.bottom));
+  const closeMenu = useCallback(() => {
+    menuOpenRef.current = false;
+    menuOpacity.value = withTiming(0, { duration: 100, easing: Easing.in(Easing.ease) }, (finished) => {
+      if (finished) runOnJS(closeMenuJS)();
+    });
+  }, [menuOpacity, closeMenuJS]);
 
-        positionRef.current = { x: clampedX, y: clampedY };
-        pan.setValue({ x: clampedX, y: clampedY });
+  const handleTapJS = useCallback(() => {
+    if (menuOpenRef.current) {
+      closeMenu();
+    } else {
+      openMenu();
+    }
+  }, [closeMenu, openMenu]);
 
-        AsyncStorage.setItem(POSITION_KEY, JSON.stringify({ x: clampedX, y: clampedY }));
+  const savePositionJS = useCallback((x: number, y: number) => {
+    AsyncStorage.setItem(POSITION_KEY, JSON.stringify({ x, y }));
+  }, []);
 
-        if (dragDistanceRef.current <= TAP_THRESHOLD) {
-          if (menuOpenRef.current) {
-            menuOpenRef.current = false;
-            Animated.timing(menuOpacity, { toValue: 0, duration: 100, useNativeDriver: true }).start(() => {
-              setMenuOpen(false);
-            });
-          } else {
-            refetchBadgesRef.current();
-            menuOpenRef.current = true;
-            setMenuOpen(true);
-            Animated.timing(menuOpacity, { toValue: 1, duration: 150, useNativeDriver: true }).start();
-          }
-        }
-        setIsTouching(false);
-      },
+  const panGesture = Gesture.Pan()
+    .minDistance(0)
+    .onStart(() => {
+      startX.value = posX.value;
+      startY.value = posY.value;
+      runOnJS(setIsTouching)(true);
     })
-  ).current;
+    .onUpdate((e) => {
+      const rawX = startX.value + e.translationX;
+      const rawY = startY.value + e.translationY;
+      const screenW = Dimensions.get("window").width;
+      const screenH = Dimensions.get("window").height;
+      posX.value = Math.max(0, Math.min(rawX, screenW - WIDGET_SIZE));
+      posY.value = Math.max(
+        insetsRef.current.top + 8,
+        Math.min(rawY, screenH - WIDGET_SIZE - 8 - insetsRef.current.bottom),
+      );
+    })
+    .onEnd((e) => {
+      const dist = Math.sqrt(e.translationX ** 2 + e.translationY ** 2);
+      runOnJS(savePositionJS)(posX.value, posY.value);
+      runOnJS(setIsTouching)(false);
+      if (dist <= TAP_THRESHOLD) {
+        runOnJS(handleTapJS)();
+      }
+    });
+
+  const widgetAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: posX.value }, { translateY: posY.value }],
+  }));
+
+  const menuAnimatedStyle = useAnimatedStyle(() => ({
+    opacity: menuOpacity.value,
+    transform: [{ translateX: posX.value }, { translateY: posY.value }],
+  }));
 
   const handleChatPress = useCallback(() => {
     closeMenu();
@@ -141,7 +153,6 @@ export default function FloatingWidget() {
     router.push("/(tabs)/music");
   }, [closeMenu, router]);
 
-
   if (!isVisible || !positionLoaded) return null;
 
   const totalUnread = unreadChat + unreadNotifications;
@@ -154,21 +165,10 @@ export default function FloatingWidget() {
 
       {menuOpen && (
         <Animated.View
-          style={[
-            styles.menuContainer,
-            { opacity: menuOpacity, transform: [{ translateX: pan.x }, { translateY: pan.y }] },
-          ]}
+          style={[styles.menuContainer, menuAnimatedStyle]}
           pointerEvents="box-none"
         >
-          <View
-            style={[
-              styles.menu,
-              {
-                backgroundColor: colors.surface,
-                borderColor: colors.border,
-              },
-            ]}
-          >
+          <View style={[styles.menu, { backgroundColor: colors.surface, borderColor: colors.border }]}>
             <TouchableOpacity style={styles.menuItem} onPress={handleChatPress} activeOpacity={0.7}>
               <Ionicons name="chatbubbles" size={18} color={colors.accent} />
               <Text style={[styles.menuLabel, { color: colors.text }]}>Chat</Text>
@@ -201,30 +201,26 @@ export default function FloatingWidget() {
         </Animated.View>
       )}
 
-      <Animated.View
-        style={[
-          styles.widgetContainer,
-          { transform: [{ translateX: pan.x }, { translateY: pan.y }] },
-        ]}
-        {...panResponder.panHandlers}
-      >
-        <View
-          style={[
-            styles.ball,
-            {
-              backgroundColor: colors.accent,
-              opacity: isTouching ? 1 : 0.9,
-            },
-          ]}
-        >
-          <Ionicons name="notifications" size={22} color="#fff" />
-          {totalUnread > 0 && (
-            <View style={[styles.badge, { backgroundColor: colors.accentRed ?? "#FF3B30" }]}>
-              <Text style={styles.badgeText}>{totalUnread > 99 ? "99+" : totalUnread}</Text>
-            </View>
-          )}
-        </View>
-      </Animated.View>
+      <GestureDetector gesture={panGesture}>
+        <Animated.View style={[styles.widgetContainer, widgetAnimatedStyle]}>
+          <View
+            style={[
+              styles.ball,
+              {
+                backgroundColor: colors.accent,
+                opacity: isTouching ? 1 : 0.9,
+              },
+            ]}
+          >
+            <Ionicons name="notifications" size={22} color="#fff" />
+            {totalUnread > 0 && (
+              <View style={[styles.badge, { backgroundColor: colors.accentRed ?? "#FF3B30" }]}>
+                <Text style={styles.badgeText}>{totalUnread > 99 ? "99+" : totalUnread}</Text>
+              </View>
+            )}
+          </View>
+        </Animated.View>
+      </GestureDetector>
     </View>
   );
 }

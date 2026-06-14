@@ -26,7 +26,7 @@ export interface AssistantPlatformConfig {
 }
 
 const DEFAULT_CONFIG: AssistantPlatformConfig = {
-  enabled: false,
+  enabled: true,
   modes: { fab: true, selective: false, onboarding: true },
   actions: Object.fromEntries(
     Object.keys(ASSISTANT_ACTIONS).map((id) => [id, true]),
