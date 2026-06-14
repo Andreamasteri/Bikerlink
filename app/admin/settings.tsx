@@ -23,6 +23,7 @@ import { HomeMessageSection } from "@/components/admin/settings/HomeMessageSecti
 import { SplashMessagesSection } from "@/components/admin/settings/SplashMessagesSection";
 import { SyncSection } from "@/components/admin/settings/SyncSection";
 import { MapStyleSection } from "@/components/admin/settings/MapStyleSection";
+import { AisSection } from "@/components/admin/settings/AisSection";
 import { SupportSection } from "@/components/admin/settings/SupportSection";
 import { useAdminSettingsState } from "@/components/admin/settings/useAdminSettingsState";
 
@@ -179,6 +180,7 @@ export default function AdminSettings() {
           onMapsProviderChange={(val: "esri_gray" | "carto_light" | "carto_dark") => state.mapsProviderMutation.mutate(val)}
           mapsProviderPending={state.mapsProviderMutation.isPending}
         />
+        <AisSection />
 
         {/* ── 5. INTERFACCIA ── */}
         <SectionHeader icon="color-palette-outline" label="Interfaccia" />

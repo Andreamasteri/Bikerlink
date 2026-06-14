@@ -4,6 +4,7 @@ import { db } from "../../db";
 import { users } from "@shared/db";
 import { eq } from "drizzle-orm";
 import { sendError } from "../../lib/api-response";
+import { storage } from "../../storage";
 
 const router = Router();
 
@@ -21,8 +22,14 @@ interface VesselData {
 
 const vesselCache = new Map<number, VesselData>();
 const VESSEL_TTL_MS = 5 * 60 * 1000;
-const _maxVesselsParsed = parseInt(process.env.MAX_VESSELS ?? "2000", 10);
-const MAX_VESSELS = Number.isFinite(_maxVesselsParsed) && _maxVesselsParsed > 0 ? _maxVesselsParsed : 2000;
+
+let runtimeMaxVessels: number | null = null;
+
+function getMaxVessels(): number {
+  if (runtimeMaxVessels !== null) return runtimeMaxVessels;
+  const parsed = parseInt(process.env.MAX_VESSELS ?? "2000", 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 2000;
+}
 
 function parseBbox(raw: string): [[number, number], [number, number]] | null {
   const parts = raw.split(",").map(Number);
@@ -31,12 +38,41 @@ function parseBbox(raw: string): [[number, number], [number, number]] | null {
   return [[minLat, minLon], [maxLat, maxLon]];
 }
 
-function getSubscriptionBbox(): [[number, number], [number, number]] {
-  const raw = process.env.AISSTREAM_BBOX;
-  if (raw) {
-    const bbox = parseBbox(raw);
+let runtimeBbox: string | null = null;
+
+async function getSubscriptionBbox(): Promise<[[number, number], [number, number]]> {
+  if (runtimeBbox) {
+    const bbox = parseBbox(runtimeBbox);
     if (bbox) {
-      console.log(`[ais-relay] using bbox from env: ${raw}`);
+      console.log(`[ais-relay] using bbox from runtime config: ${runtimeBbox}`);
+      return bbox;
+    }
+  }
+
+  try {
+    const setting = await storage.getAppSetting("aisstream_bbox");
+    if (setting !== undefined) {
+      if (!setting.value) {
+        console.log("[ais-relay] bbox explicitly cleared in DB — using global");
+        return [[-90, -180], [90, 180]];
+      }
+      const bbox = parseBbox(setting.value);
+      if (bbox) {
+        console.log(`[ais-relay] using bbox from DB: ${setting.value}`);
+        runtimeBbox = setting.value;
+        return bbox;
+      }
+      console.warn("[ais-relay] DB bbox malformed, falling back to env/global");
+    }
+  } catch (err) {
+    console.warn("[ais-relay] could not read bbox from DB, falling back:", err);
+  }
+
+  const envRaw = process.env.AISSTREAM_BBOX;
+  if (envRaw) {
+    const bbox = parseBbox(envRaw);
+    if (bbox) {
+      console.log(`[ais-relay] using bbox from env: ${envRaw}`);
       return bbox;
     }
     console.warn("[ais-relay] AISSTREAM_BBOX malformed, falling back to global");
@@ -44,10 +80,24 @@ function getSubscriptionBbox(): [[number, number], [number, number]] {
   return [[-90, -180], [90, 180]];
 }
 
+async function loadRuntimeMaxVessels(): Promise<void> {
+  try {
+    const setting = await storage.getAppSetting("ais_max_vessels");
+    if (setting?.value) {
+      const parsed = parseInt(setting.value, 10);
+      if (Number.isFinite(parsed) && parsed > 0) {
+        runtimeMaxVessels = parsed;
+      }
+    }
+  } catch {
+  }
+}
+
 function evictOldestVessels() {
-  if (vesselCache.size <= MAX_VESSELS) return;
+  const max = getMaxVessels();
+  if (vesselCache.size <= max) return;
   const sorted = Array.from(vesselCache.entries()).sort((a, b) => a[1].updatedAt - b[1].updatedAt);
-  const toRemove = vesselCache.size - MAX_VESSELS;
+  const toRemove = vesselCache.size - max;
   for (let i = 0; i < toRemove; i++) {
     vesselCache.delete(sorted[i][0]);
   }
@@ -56,7 +106,7 @@ function evictOldestVessels() {
 let wsClient: WebSocket | null = null;
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 
-function connectAisStream() {
+async function connectAisStream() {
   const apiKey = process.env.AISSTREAM_API_KEY;
   if (!apiKey) {
     console.warn("[ais-relay] AISSTREAM_API_KEY not set — AIS relay disabled");
@@ -70,14 +120,16 @@ function connectAisStream() {
   try {
     wsClient = new WebSocket("wss://stream.aisstream.io/v0/stream");
 
-    wsClient.on("open", () => {
+    wsClient.on("open", async () => {
       console.log("[ais-relay] connected to aisstream.io");
+      const bbox = await getSubscriptionBbox();
+      if (!wsClient || wsClient.readyState !== WebSocket.OPEN) return;
       const sub = {
         APIKey: apiKey,
-        BoundingBoxes: [getSubscriptionBbox()],
+        BoundingBoxes: [bbox],
         FilterMessageTypes: ["PositionReport"],
       };
-      wsClient!.send(JSON.stringify(sub));
+      wsClient.send(JSON.stringify(sub));
     });
 
     wsClient.on("message", (raw: Buffer) => {
@@ -147,6 +199,31 @@ function connectAisStream() {
   }
 }
 
+function getAisStatus(): "connected" | "connecting" | "disconnected" {
+  if (!wsClient) return "disconnected";
+  if (wsClient.readyState === WebSocket.OPEN) return "connected";
+  if (wsClient.readyState === WebSocket.CONNECTING) return "connecting";
+  return "disconnected";
+}
+
+async function reconnectAisStream(newBbox?: string, newMaxVessels?: number): Promise<void> {
+  if (newBbox !== undefined) runtimeBbox = newBbox;
+  if (newMaxVessels !== undefined) runtimeMaxVessels = newMaxVessels;
+
+  if (reconnectTimer) {
+    clearTimeout(reconnectTimer);
+    reconnectTimer = null;
+  }
+
+  if (wsClient) {
+    wsClient.removeAllListeners();
+    wsClient.terminate();
+    wsClient = null;
+  }
+
+  await connectAisStream();
+}
+
 setInterval(() => {
   const now = Date.now();
   for (const [mmsi, v] of vesselCache) {
@@ -156,7 +233,7 @@ setInterval(() => {
   }
 }, 60_000);
 
-connectAisStream();
+loadRuntimeMaxVessels().then(() => connectAisStream());
 
 router.get("/vessels", async (req: Request, res: Response) => {
   try {
@@ -198,4 +275,4 @@ router.get("/vessels", async (req: Request, res: Response) => {
 });
 
 export default router;
-export { connectAisStream };
+export { connectAisStream, reconnectAisStream, getAisStatus };
