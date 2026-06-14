@@ -65,6 +65,7 @@ export default function AdminUsers() {
   const [searchText, setSearchText] = useState("");
   const [hideFake, setHideFake] = useState(true);
   const [filterNotMatchable, setFilterNotMatchable] = useState(false);
+  const [filterAis, setFilterAis] = useState(false);
   const [aiUserDrawer, setAiUserDrawer] = useState<{ visible: boolean; userId?: string }>({ visible: false });
 
   const [fzEnabled, setFzEnabled] = useState(false);
@@ -116,6 +117,7 @@ export default function AdminUsers() {
       const info = matchabilityMap[u.id];
       if (!info || info.matchable) return false;
     }
+    if (filterAis && !u.aisEnabled) return false;
     if (!searchText) return true;
     const q = searchText.toLowerCase();
     return u.nickname.toLowerCase().includes(q) || u.email.toLowerCase().includes(q) || (u.phone?.toLowerCase().includes(q) ?? false);
@@ -242,6 +244,8 @@ export default function AdminUsers() {
                   onToggleHideFake={() => setHideFake(!hideFake)}
                   filterNotMatchable={filterNotMatchable}
                   onToggleNotMatchable={() => setFilterNotMatchable(!filterNotMatchable)}
+                  filterAis={filterAis}
+                  onToggleFilterAis={() => setFilterAis(!filterAis)}
                   t={t}
                 />
               </View>

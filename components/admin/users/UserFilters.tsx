@@ -10,6 +10,8 @@ interface UserFiltersProps {
   onToggleHideFake: () => void;
   filterNotMatchable: boolean;
   onToggleNotMatchable: () => void;
+  filterAis: boolean;
+  onToggleFilterAis: () => void;
   t: (key: string) => string;
 }
 
@@ -20,6 +22,8 @@ export const UserFilters: React.FC<UserFiltersProps> = ({
   onToggleHideFake,
   filterNotMatchable,
   onToggleNotMatchable,
+  filterAis,
+  onToggleFilterAis,
   t,
 }) => {
   return (
@@ -39,6 +43,14 @@ export const UserFilters: React.FC<UserFiltersProps> = ({
         >
           <Text style={[styles.fakeToggleText, filterNotMatchable && styles.activeToggleText]}>
             {filterNotMatchable ? "✗ Solo non matchabili" : "Tutti"}
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          onPress={onToggleFilterAis}
+          style={[styles.fakeToggle, filterAis && styles.aisActiveToggle]}
+        >
+          <Text style={[styles.fakeToggleText, filterAis && styles.aisActiveToggleText]}>
+            {filterAis ? "★ Solo AIS" : "AIS"}
           </Text>
         </TouchableOpacity>
       </View>
@@ -89,6 +101,13 @@ const styles = StyleSheet.create({
   },
   activeToggleText: {
     color: Colors.error,
+  },
+  aisActiveToggle: {
+    backgroundColor: Colors.accent + "22",
+    borderColor: Colors.accent,
+  },
+  aisActiveToggleText: {
+    color: Colors.accent,
   },
   searchContainer: {
     flexDirection: "row",
