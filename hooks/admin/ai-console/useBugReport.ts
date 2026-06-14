@@ -1,7 +1,9 @@
 // Task #3894 — Hook raccolta bug FAB: fetch consolidato + badge unseen condiviso via React Query.
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+// Task #3945 — Aggiunto clearAll mutation per svuotare la lista dal DB.
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useCallback } from "react";
+import { apiRequest } from "@/lib/query-client";
 
 const SEEN_STORAGE_KEY = "admin:bug-fab:last-seen";
 const SEEN_QUERY_KEY = ["admin:bug-fab:last-seen"] as const;
@@ -45,13 +47,37 @@ function useLastSeen() {
   return { lastSeen: lastSeen ?? null, markSeen };
 }
 
+const BUG_REPORT_QUERY_KEY = ["/api/admin/bug-report/recent"] as const;
+
 export function useBugReport() {
   const { lastSeen, markSeen } = useLastSeen();
+  const queryClient = useQueryClient();
 
   const query = useQuery<BugReportData>({
-    queryKey: ["/api/admin/bug-report/recent"],
+    queryKey: BUG_REPORT_QUERY_KEY,
     refetchInterval: 60_000,
     staleTime: 30_000,
+  });
+
+  const clearAll = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("DELETE", "/api/admin/bug-report/recent");
+      return res.json() as Promise<{ ok: boolean; deleted: number }>;
+    },
+    onMutate: async () => {
+      await queryClient.cancelQueries({ queryKey: BUG_REPORT_QUERY_KEY });
+      const previous = queryClient.getQueryData<BugReportData>(BUG_REPORT_QUERY_KEY);
+      queryClient.setQueryData<BugReportData>(BUG_REPORT_QUERY_KEY, { items: [], total: 0 });
+      return { previous };
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(BUG_REPORT_QUERY_KEY, context.previous);
+      }
+    },
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: BUG_REPORT_QUERY_KEY });
+    },
   });
 
   const unseenCount = (() => {
@@ -63,7 +89,7 @@ export function useBugReport() {
     ).length;
   })();
 
-  return { query, unseenCount, markSeen };
+  return { query, unseenCount, markSeen, clearAll };
 }
 
 /** Timestamp relativo in italiano */

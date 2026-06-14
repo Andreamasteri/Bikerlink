@@ -59,7 +59,7 @@ export default function FabDrawer({ visible, onClose }: Props) {
   const lastId = convs?.conversations?.[0]?.id ?? null;
   const [activeId, setActiveId] = useState<string | null>(null);
 
-  const { query: bugQuery, markSeen } = useBugReport();
+  const { query: bugQuery, markSeen, clearAll } = useBugReport();
   const bugItems = useMemo(() => bugQuery.data?.items ?? [], [bugQuery.data]);
 
   useEffect(() => {
@@ -106,7 +106,6 @@ export default function FabDrawer({ visible, onClose }: Props) {
             {
               backgroundColor: colors.background,
               borderColor: colors.border,
-              paddingBottom: insets.bottom + 8,
               height: sheetHeight,
             },
           ]}
@@ -167,7 +166,7 @@ export default function FabDrawer({ visible, onClose }: Props) {
                   />
                 ) : null}
               </View>
-              <View style={[styles.inputRow, { borderColor: colors.border, backgroundColor: colors.surface }]}>
+              <View style={[styles.inputRow, { borderColor: colors.border, backgroundColor: colors.surface, paddingBottom: (insets.bottom || 8) }]}>
                 <TextInput
                   value={input}
                   onChangeText={setInput}
@@ -233,7 +232,7 @@ export default function FabDrawer({ visible, onClose }: Props) {
                   </View>
                 ))}
               </ScrollView>
-              <View style={[styles.bugActions, { borderColor: colors.border, backgroundColor: colors.surface }]}>
+              <View style={[styles.bugActions, { borderColor: colors.border, backgroundColor: colors.surface, paddingBottom: (insets.bottom || 8) }]}>
                 <TouchableOpacity
                   style={[styles.bugBtn, { backgroundColor: copied ? (colors.success ?? "#38A169") : colors.surfaceLight, borderColor: colors.border }]}
                   onPress={() => { void handleCopy(); }}
@@ -251,6 +250,14 @@ export default function FabDrawer({ visible, onClose }: Props) {
                 >
                   <Ionicons name="sparkles" size={15} color="#fff" />
                   <Text style={[styles.bugBtnTxt, { color: "#fff" }]}>Invia alla AI Console</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.bugBtn, { backgroundColor: (colors.error ?? "#E53E3E") + "18", borderColor: colors.error ?? "#E53E3E", opacity: (bugItems.length === 0 || clearAll.isPending) ? 0.4 : 1 }]}
+                  onPress={() => { clearAll.mutate(); }}
+                  disabled={bugItems.length === 0 || clearAll.isPending}
+                >
+                  <Ionicons name="trash-outline" size={15} color={colors.error ?? "#E53E3E"} />
+                  <Text style={[styles.bugBtnTxt, { color: colors.error ?? "#E53E3E" }]}>Svuota</Text>
                 </TouchableOpacity>
               </View>
             </View>

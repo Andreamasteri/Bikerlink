@@ -105,4 +105,36 @@ router.get("/bug-report/recent", async (_req: Request, res: Response) => {
   }
 });
 
+router.delete("/bug-report/recent", async (_req: Request, res: Response) => {
+  try {
+    const [crashDel, signalDel, watchdogDel] = await Promise.all([
+      db.execute(sql`
+        DELETE FROM app_crash_logs
+        WHERE crash_type IN ('crash_system', 'crash_js')
+        RETURNING id
+      `),
+      db.execute(sql`
+        DELETE FROM system_signals
+        WHERE severity IN ('high', 'critical')
+        RETURNING id
+      `),
+      db.execute(sql`
+        DELETE FROM ai_watchdog_log
+        WHERE status = 'error'
+        RETURNING id
+      `),
+    ]);
+
+    const deleted =
+      (crashDel.rows?.length ?? 0) +
+      (signalDel.rows?.length ?? 0) +
+      (watchdogDel.rows?.length ?? 0);
+
+    res.json({ ok: true, deleted });
+  } catch (err) {
+    console.error("[bug-report] delete error:", err);
+    res.status(500).json({ error: "Errore interno" });
+  }
+});
+
 export default router;
