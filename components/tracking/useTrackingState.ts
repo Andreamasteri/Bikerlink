@@ -2,7 +2,6 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { Alert, Animated, AppState } from "react-native";
 import * as Location from "expo-location";
 import { DeviceMotion } from "expo-sensors";
-import { VolumeManager } from "react-native-volume-manager";
 import * as Battery from "expo-battery";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useQuery } from "@tanstack/react-query";
@@ -39,13 +38,10 @@ import { useTrackingMap } from "@/hooks/tracking/useTrackingMap";
 import { useTrackingSettings } from "@/hooks/tracking/useTrackingSettings";
 import { useTrackingRefs } from "@/hooks/tracking/useTrackingRefs";
 import { useOfflineQueue } from "@/hooks/tracking/useOfflineQueue";
+import { useVolumeManager } from "@/hooks/useVolumeManager";
 
 // Types
 export type Phase = "idle" | "countdown" | "active" | "paused";
-
-function setVolumeUI(enabled: boolean) {
-  VolumeManager.showNativeVolumeUI({ enabled }).catch(() => undefined);
-}
 
 export interface RouteRecord {
   id: string;
@@ -149,6 +145,13 @@ export function useTrackingState() {
   const settings = useTrackingSettings();
   const refs = useTrackingRefs();
   const offlineQueue = useOfflineQueue();
+
+  // Stable ref holding the latest volume-button callback.
+  // Updated synchronously after handlePause is defined (below) so the listener
+  // always dispatches to the current implementation without re-subscribing.
+  const volumeButtonCallbackRef = useRef<() => void>(() => {});
+  const stableVolumeCallback = useCallback(() => { volumeButtonCallbackRef.current(); }, []);
+  const { setVolumeUI } = useVolumeManager({ phase: session.phase, onVolumeButton: stableVolumeCallback });
 
   const [handsOffActive, setHandsOffActive] = useState(false);
   const { logs: debugLogs, clearLogs: clearDebugLogs, logFetch } = useApiDebugLog();
@@ -354,7 +357,7 @@ export function useTrackingState() {
         if (!handsOffActive) { setHandsOffActive(true); setHandsOffBroadcast(true); setVolumeUI(false); }
       } else if (handsOffActive) { setHandsOffActive(false); setHandsOffBroadcast(false); setVolumeUI(true); }
     }
-  }, [gps, sensors, sprint, bg, handsOffActive, settings, stats, session, refs]);
+  }, [gps, sensors, sprint, bg, handsOffActive, settings, stats, session, refs, setVolumeUI]);
 
   const beginActiveTracking = useCallback(async () => {
     session.setPhase("active"); stats.startTimeRef.current = Date.now(); stats.pausedMsRef.current = 0; stats.isPausedRef.current = false;
@@ -464,13 +467,18 @@ export function useTrackingState() {
       session.setPhase("idle"); session.setLoading(false); setHandsOffActive(false); setHandsOffBroadcast(false);
       setVolumeUI(true);
     }
-  }, [cleanupTracking, flushPoints, stats, gps, sensors, sprint, battery, refetchRecords, t, session, settings, mapState, refs, offlineQueue]);
+  }, [cleanupTracking, flushPoints, stats, gps, sensors, sprint, battery, refetchRecords, t, session, settings, mapState, refs, offlineQueue, setVolumeUI]);
 
   const handlePause = useCallback(() => {
     if (session.phaseRef.current !== "active" && session.phaseRef.current !== "paused") return;
     if (stats.isPausedRef.current) { stats.pausedMsRef.current += Date.now() - stats.pauseStartRef.current; stats.isPausedRef.current = false; session.setPhase("active"); }
     else { stats.pauseStartRef.current = Date.now(); stats.isPausedRef.current = true; session.setPhase("paused"); flushPoints(); }
   }, [flushPoints, session, stats]);
+
+  // Keep the volume-button callback pointing at the latest handlePause.
+  // Assigning to a ref during render is intentional — it's safe because the
+  // volume listener only reads it asynchronously (on button press).
+  volumeButtonCallbackRef.current = handlePause;
 
   const handleRecalibrate = useCallback(() => {
     [sensors.maxAccelGRef, sensors.maxDecelGRef, sensors.maxTiltDegRef, sensors.maxLateralGRef].forEach(r => r.current = 0);
