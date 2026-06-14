@@ -51,6 +51,38 @@ function normalize(text: string): string {
     .replace(/\s+/g, " ");
 }
 
+function HighlightedText({
+  text,
+  query,
+  style,
+  highlightStyle,
+}: {
+  text: string;
+  query: string;
+  style?: object | object[];
+  highlightStyle?: object;
+}) {
+  if (!query) return <Text style={style}>{text}</Text>;
+
+  const lowerText = text.toLowerCase();
+  const lowerQuery = query.toLowerCase();
+  const idx = lowerText.indexOf(lowerQuery);
+
+  if (idx === -1) return <Text style={style}>{text}</Text>;
+
+  const before = text.slice(0, idx);
+  const match = text.slice(idx, idx + query.length);
+  const after = text.slice(idx + query.length);
+
+  return (
+    <Text style={style}>
+      {before}
+      <Text style={[highlightStyle, styles.highlight]}>{match}</Text>
+      {after}
+    </Text>
+  );
+}
+
 const UNKNOWN_STATUSES: SystemStatuses = {
   thinkcentre: "unknown",
   graphhopper: "unknown",
@@ -181,13 +213,14 @@ export default function AdminDashboard() {
 
   const normalizedSearch = normalize(search);
   const filteredGroups = useMemo(() => {
-    if (!normalizedSearch) return adminGroups;
+    if (!normalizedSearch) return adminGroups.map((g) => ({ ...g, titleMatched: false }));
     return adminGroups
       .map((group) => {
         const groupTitleMatches = normalize(group.title).includes(normalizedSearch);
-        if (groupTitleMatches) return group;
+        if (groupTitleMatches) return { ...group, titleMatched: true };
         return {
           ...group,
+          titleMatched: false,
           items: group.items.filter((item) => {
             if (normalize(item.label).includes(normalizedSearch)) return true;
             if (item.keywords?.some((kw) => normalize(kw).includes(normalizedSearch))) return true;
@@ -284,6 +317,7 @@ export default function AdminDashboard() {
 
       {filteredGroups.map((group) => {
         const isCollapsed = !isSearching && !!collapsed[group.title];
+        const titleQuery = isSearching && group.titleMatched ? search : "";
         return (
           <React.Fragment key={group.title}>
             <View style={styles.groupContainer}>
@@ -295,7 +329,11 @@ export default function AdminDashboard() {
               >
                 <View style={styles.groupHeaderLeft}>
                   {renderGroupHeaderIcon(group)}
-                  <Text style={styles.groupTitle}>{group.title}</Text>
+                  <HighlightedText
+                    text={group.title}
+                    query={titleQuery}
+                    style={[styles.groupTitle, group.titleMatched && isSearching ? styles.groupTitleMatched : null]}
+                  />
                 </View>
                 {!isSearching && (
                   <Ionicons
@@ -309,19 +347,22 @@ export default function AdminDashboard() {
                 <View style={styles.grid}>
                   {group.items.map((section) => {
                     const iconColor = section.accentColor || Colors.accent;
+                    const itemMatches = isSearching && !group.titleMatched && normalize(section.label).includes(normalizedSearch);
                     return (
                       <TouchableOpacity
                         key={section.key}
-                        style={styles.card}
+                        style={[styles.card, itemMatches ? styles.cardMatched : null]}
                         onPress={() => handleItemPress(section)}
                         activeOpacity={0.7}
                       >
                         <View style={styles.cardIcon}>
                           {renderIcon(section, 28, iconColor)}
                         </View>
-                        <Text style={styles.cardLabel}>
-                          {section.label}
-                        </Text>
+                        <HighlightedText
+                          text={section.label}
+                          query={itemMatches ? search : ""}
+                          style={styles.cardLabel}
+                        />
                       </TouchableOpacity>
                     );
                   })}
@@ -432,5 +473,16 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: Colors.text,
     textAlign: "center",
+  },
+  highlight: {
+    color: Colors.accent,
+    fontFamily: "Inter_700Bold",
+  },
+  groupTitleMatched: {
+    color: Colors.accent,
+  },
+  cardMatched: {
+    borderColor: Colors.accent,
+    borderWidth: 1.5,
   },
 });
