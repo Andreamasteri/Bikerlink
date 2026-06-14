@@ -26,10 +26,10 @@ Attivare questa skill quando l'utente dice una delle seguenti (o varianti):
 
 | Campo | Valore corrente |
 |-------|----------------|
-| `versionCode` APK | **55** |
-| `versionName` | **55.10.10** |
+| `versionCode` APK | **67** |
+| `versionName` | **67.10.103** |
 | `runtimeVersion` | **10.0.0** |
-| Ultima OTA nel ciclo v55 | **OTA-10** → la prossima sarà **OTA-11** |
+| Ultima OTA nel ciclo v67 | **OTA-10** → la prossima sarà **OTA-11** |
 
 > ⚠️ Aggiornare questa tabella ad ogni nuovo APK (e dopo ogni OTA pubblicata), in lockstep con la tabella storica in `bikerlink-versioning/SKILL.md`.
 > I valori correnti sono sempre la fonte di verità: `node -e "const a=require('./app.json'); console.log(a.expo.android.versionCode, a.expo.runtimeVersion, a.expo.version)"`
@@ -182,7 +182,9 @@ La promozione avviene tramite il pannello admin nell'app — non tramite CLI.
 | v50 | OTA-3 | Admin: pulsante "Forza Aggiornamento OTA" in OtaPanel | `efa135f0-1801-48fd-9b7c-871c6f415799` |
 | v53 | OTA-1 | Fix sistema mappe (tile ID, normalizeTileId), admin DB Debug/Dimensioni | — |
 | v53–v54 | OTA-2…10 | Task vari; v54 inglobava OTA-10 | — |
-| v55 | OTA-10 inglobata | Build corrente (vedi bikerlink-versioning per dettagli) | — |
+| v55 | OTA-10 inglobata | Build ciclo v55 | — |
+| v56–v66 | — | Build intermedie ciclo 10 (nessuna OTA standalone documentata) | — |
+| v67 | OTA-10 inglobata | **Build corrente** — debug-apk; prossima OTA sarà OTA-11 | — |
 
 ---
 
