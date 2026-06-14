@@ -517,6 +517,8 @@ export const resourceSamples = pgTable("resource_samples", {
   sampledAt: timestamp("sampled_at").notNull().defaultNow(),
   avgRamPct: integer("avg_ram_pct"),
   avgBatteryPct: integer("avg_battery_pct"),
+  avgIosRamPct: integer("avg_ios_ram_pct"),
+  avgAndroidRamPct: integer("avg_android_ram_pct"),
   onlineUsers: integer("online_users"),
   dbSizeMb: integer("db_size_mb"),
   backendRssMb: integer("backend_rss_mb"),

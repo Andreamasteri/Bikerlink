@@ -8,6 +8,8 @@ export interface ResourceSample {
   id: string;
   sampledAt: string;
   avgRamPct: number | null;
+  avgIosRamPct: number | null;
+  avgAndroidRamPct: number | null;
   avgBatteryPct: number | null;
   onlineUsers: number | null;
   dbSizeMb: number | null;
@@ -58,10 +60,14 @@ export function MiniChart({ samples, width, height }: MiniChartProps) {
   }
 
   const ramPcts = samples.map((s) => s.avgRamPct);
+  const iosRamPcts = samples.map((s) => s.avgIosRamPct);
+  const androidRamPcts = samples.map((s) => s.avgAndroidRamPct);
   const battPcts = samples.map((s) => s.avgBatteryPct);
   const onlineVals = samples.map((s) => s.onlineUsers);
   const maxOnline = Math.max(1, ...(onlineVals.filter((v) => v != null) as number[]));
   const ramPoints = toPoints(ramPcts);
+  const iosPoints = toPoints(iosRamPcts);
+  const androidPoints = toPoints(androidRamPcts);
   const battPoints = toPoints(battPcts);
   const onlinePoints = toPointsAbsolute(onlineVals, maxOnline);
   const gridLines = [0, 25, 50, 75, 100];
@@ -77,8 +83,10 @@ export function MiniChart({ samples, width, height }: MiniChartProps) {
           </React.Fragment>
         );
       })}
-      {ramPoints ? <Polyline points={ramPoints} fill="none" stroke="#FF6B35" strokeWidth={1.5} /> : null}
-      {battPoints ? <Polyline points={battPoints} fill="none" stroke="#22C55E" strokeWidth={1.5} /> : null}
+      {ramPoints ? <Polyline points={ramPoints} fill="none" stroke="#FF6B35" strokeWidth={1.5} strokeOpacity={0.4} /> : null}
+      {iosPoints ? <Polyline points={iosPoints} fill="none" stroke="#0A84FF" strokeWidth={1.5} strokeDasharray="3,2" /> : null}
+      {androidPoints ? <Polyline points={androidPoints} fill="none" stroke="#34C759" strokeWidth={1.5} strokeDasharray="3,2" /> : null}
+      {battPoints ? <Polyline points={battPoints} fill="none" stroke="#22C55E" strokeWidth={1.5} strokeOpacity={0.5} /> : null}
       {onlinePoints ? <Polyline points={onlinePoints} fill="none" stroke="#6366F1" strokeWidth={1.5} strokeDasharray="4,2" /> : null}
     </Svg>
   );

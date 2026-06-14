@@ -272,13 +272,15 @@ router.get("/resource-monitor/samples/csv", async (_req: Request, res: Response)
       .orderBy(desc(resourceSamples.sampledAt))
       .limit(1440);
 
-    const header = "sampled_at,avg_ram_pct,avg_battery_pct,online_users,db_size_mb,backend_rss_mb\n";
+    const header = "sampled_at,avg_ram_pct,avg_ios_ram_pct,avg_android_ram_pct,avg_battery_pct,online_users,db_size_mb,backend_rss_mb\n";
     const rows = samples
       .reverse()
       .map((s) =>
         [
           s.sampledAt.toISOString(),
           s.avgRamPct ?? "",
+          s.avgIosRamPct ?? "",
+          s.avgAndroidRamPct ?? "",
           s.avgBatteryPct ?? "",
           s.onlineUsers ?? "",
           s.dbSizeMb ?? "",

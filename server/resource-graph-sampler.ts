@@ -30,6 +30,8 @@ async function takeSample(): Promise<void> {
     let dbSizeMb: number | null = null;
     let avgRamPct: number | null = null;
     let avgBatteryPct: number | null = null;
+    let avgIosRamPct: number | null = null;
+    let avgAndroidRamPct: number | null = null;
 
     const client = await pool.connect();
     try {
@@ -45,14 +47,18 @@ async function takeSample(): Promise<void> {
       const avgRes = await client.query(
         `SELECT
           ROUND(AVG(CASE WHEN memory_total_mb > 0 THEN memory_used_mb::float / memory_total_mb * 100 ELSE NULL END))::int AS avg_ram_pct,
-          ROUND(AVG(battery_level))::int AS avg_battery_pct
+          ROUND(AVG(battery_level))::int AS avg_battery_pct,
+          ROUND(AVG(CASE WHEN platform = 'ios' AND memory_total_mb > 0 THEN memory_used_mb::float / memory_total_mb * 100 ELSE NULL END))::int AS avg_ios_ram_pct,
+          ROUND(AVG(CASE WHEN platform = 'android' AND memory_total_mb > 0 THEN memory_used_mb::float / memory_total_mb * 100 ELSE NULL END))::int AS avg_android_ram_pct
         FROM device_metrics
         WHERE recorded_at >= $1`,
         [twoMinAgo]
       );
-      const avgRow = avgRes.rows[0] as { avg_ram_pct?: number | null; avg_battery_pct?: number | null } | undefined;
+      const avgRow = avgRes.rows[0] as { avg_ram_pct?: number | null; avg_battery_pct?: number | null; avg_ios_ram_pct?: number | null; avg_android_ram_pct?: number | null } | undefined;
       avgRamPct = avgRow?.avg_ram_pct ?? null;
       avgBatteryPct = avgRow?.avg_battery_pct ?? null;
+      avgIosRamPct = avgRow?.avg_ios_ram_pct ?? null;
+      avgAndroidRamPct = avgRow?.avg_android_ram_pct ?? null;
     } finally {
       client.release();
     }
@@ -60,6 +66,8 @@ async function takeSample(): Promise<void> {
     await db.insert(resourceSamples).values({
       avgRamPct: avgRamPct != null ? Number(avgRamPct) : null,
       avgBatteryPct: avgBatteryPct != null ? Number(avgBatteryPct) : null,
+      avgIosRamPct: avgIosRamPct != null ? Number(avgIosRamPct) : null,
+      avgAndroidRamPct: avgAndroidRamPct != null ? Number(avgAndroidRamPct) : null,
       onlineUsers: onlineCount,
       dbSizeMb,
       backendRssMb: rssMb,

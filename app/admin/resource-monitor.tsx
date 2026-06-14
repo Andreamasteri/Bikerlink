@@ -292,7 +292,9 @@ export default function ResourceMonitorScreen() {
           <>
             <View style={styles.legendRow}>
               <Legend color="#FF6B35" label="RAM%" />
-              <Legend color="#22C55E" label="Batteria%" />
+              <Legend color="#0A84FF" label="iOS RAM%" />
+              <Legend color="#34C759" label="Android%" />
+              <Legend color="#22C55E" label="Batt%" />
               <Legend color="#6366F1" label="Online (--)" />
             </View>
             <View style={[styles.chartContainer, { borderColor: colors.border }]}>
