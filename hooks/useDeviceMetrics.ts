@@ -72,6 +72,33 @@ async function sendMetrics(userId: string): Promise<void> {
       ? Math.round(Device.totalMemory / 1024 / 1024)
       : null;
 
+    let memoryUsedMb: number | null = null;
+    try {
+      if (Platform.OS !== "web") {
+        type HermesGlobal = {
+          HermesInternal?: {
+            getInstrumentedStats?: () => Record<string, number>;
+          };
+        };
+        const stats = (globalThis as unknown as HermesGlobal)
+          .HermesInternal?.getInstrumentedStats?.();
+        const allocBytes = stats?.hermes_allocatedBytes;
+        if (typeof allocBytes === "number" && allocBytes > 0) {
+          memoryUsedMb = Math.round(allocBytes / 1024 / 1024);
+        }
+      } else {
+        type PerfWithMemory = typeof performance & {
+          memory?: { usedJSHeapSize?: number };
+        };
+        const heapBytes = (performance as PerfWithMemory).memory?.usedJSHeapSize;
+        if (typeof heapBytes === "number" && heapBytes > 0) {
+          memoryUsedMb = Math.round(heapBytes / 1024 / 1024);
+        }
+      }
+    } catch {
+      // memory API unavailable on this runtime
+    }
+
     const abnormalRestartsStr = await AsyncStorage.getItem(ABNORMAL_RESTARTS_KEY).catch(() => null);
     const abnormalRestarts = abnormalRestartsStr ? parseInt(abnormalRestartsStr, 10) : 0;
 
@@ -82,7 +109,7 @@ async function sendMetrics(userId: string): Promise<void> {
     await apiRequest("POST", "/api/metrics/device", {
       sessionId: SESSION_ID,
       platform,
-      memoryUsedMb: null,
+      memoryUsedMb,
       memoryTotalMb: totalMemoryMb,
       batteryLevel,
       batteryState,

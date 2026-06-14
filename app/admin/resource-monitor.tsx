@@ -165,7 +165,7 @@ export default function ResourceMonitorScreen() {
         ) : (
           <>
             <Row label="Campioni" value={String(d.devices.sampleCount)} />
-            <Row label="RAM media" value={d.devices.avgRamPct != null ? `${d.devices.avgRamPct}%` : "—"} />
+            <Row label="Heap JS medio" value={d.devices.avgRamPct != null ? `${d.devices.avgRamPct}%` : "—"} />
             <Row label="Batteria media" value={d.devices.avgBatteryPct != null ? `${d.devices.avgBatteryPct}%` : "—"} />
             <Row label="In carica" value={`${d.devices.chargingCount} dispositivi`} />
             <Row label="iOS / Android" value={`${d.devices.iosCount} / ${d.devices.androidCount}`} />
