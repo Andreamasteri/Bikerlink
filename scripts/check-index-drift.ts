@@ -295,54 +295,66 @@ function verifyLiveDef(
   return problems;
 }
 
-// ─── main ────────────────────────────────────────────────────────────────────
+// ─── Exported result type ─────────────────────────────────────────────────────
 
-async function main() {
-  console.log("══════════════════════════════════════════════");
-  console.log("  BikerLink — Index Drift Check (DESC/WHERE)");
-  console.log("══════════════════════════════════════════════\n");
+export interface IndexDriftResult {
+  /** 0 = OK, 1 = drift reale, 2 = DB non raggiungibile (live skippato) */
+  exitCode: 0 | 1 | 2;
+  /** Lista di messaggi di problema (vuota se exitCode=0 o 2) */
+  issues: string[];
+}
+
+// ─── runIndexDriftCheck (importabile dal server al boot) ──────────────────────
+
+/**
+ * Esegue le tre fasi di verifica (schema TS → migration SQL → DB live) e
+ * restituisce un risultato strutturato invece di chiamare process.exit().
+ * Usato da server/boot-sequence.ts per la verifica post-boot non bloccante.
+ */
+export async function runIndexDriftCheck(): Promise<IndexDriftResult> {
+  console.log("[INDEX-DRIFT] ══════════════════════════════════════════════");
+  console.log("[INDEX-DRIFT]   BikerLink — Index Drift Check (DESC/WHERE)");
+  console.log("[INDEX-DRIFT] ══════════════════════════════════════════════\n");
 
   // Fase 1: Drizzle TS schema
   const schemaSpecial = getSchemaSpecialIndexes();
 
   if (schemaSpecial.size === 0) {
-    console.log("  Nessun indice speciale (DESC/WHERE) trovato nello schema Drizzle TS.");
-    console.log("\n══════════════════════════════════════════════");
-    console.log("  RESULT: OK — 0 indici speciali da verificare");
-    console.log("══════════════════════════════════════════════");
-    process.exit(0);
+    console.log("[INDEX-DRIFT]   Nessun indice speciale (DESC/WHERE) trovato nello schema Drizzle TS.");
+    console.log("[INDEX-DRIFT]   RESULT: OK — 0 indici speciali da verificare");
+    return { exitCode: 0, issues: [] };
   }
 
-  console.log(`  Indici speciali dallo schema Drizzle TS: ${schemaSpecial.size}\n`);
+  console.log(`[INDEX-DRIFT]   Indici speciali dallo schema Drizzle TS: ${schemaSpecial.size}\n`);
   for (const idx of schemaSpecial.values()) {
     const tags: string[] = [];
     if (idx.hasDesc) tags.push(`DESC[${idx.descColumns.join(",")}]`);
     if (idx.hasWhere) tags.push("WHERE");
-    console.log(`    • ${idx.indexName} (${idx.tableName}) [${tags.join(",")}]`);
+    console.log(`[INDEX-DRIFT]     • ${idx.indexName} (${idx.tableName}) [${tags.join(",")}]`);
   }
 
-  let exitCode = 0;
+  let exitCode: 0 | 1 | 2 = 0;
   const allIssues: string[] = [];
 
   // Fase 2: Migration SQL — regressioni
-  console.log("\n  Analisi migration SQL per regressioni...");
+  console.log("\n[INDEX-DRIFT]   Analisi migration SQL per regressioni...");
   const regressions = detectMigrationRegressions(schemaSpecial);
   if (regressions.length === 0) {
-    console.log("  ✔  Nessuna regressione nelle migration SQL");
+    console.log("[INDEX-DRIFT]   ✔  Nessuna regressione nelle migration SQL");
   } else {
     exitCode = 1;
     for (const r of regressions) {
       const lost: string[] = [];
       if (r.lostDesc) lost.push("DESC perso");
       if (r.lostWhere) lost.push("WHERE perso");
-      const msg = `  ✖  "${r.indexName}": regressione in ${r.migration} — ${lost.join(", ")}`;
-      console.log(msg);
+      const msg = `"${r.indexName}": regressione in ${r.migration} — ${lost.join(", ")}`;
+      console.log(`[INDEX-DRIFT]   ✖  ${msg}`);
       allIssues.push(msg);
     }
   }
 
   // Fase 3: Live DB
-  console.log("\n  Verifica nel DB live...\n");
+  console.log("\n[INDEX-DRIFT]   Verifica nel DB live...\n");
 
   const pool = new Pool({ connectionString: process.env.DATABASE_URL });
   const okLines: string[] = [];
@@ -359,7 +371,7 @@ async function main() {
 
       if (!liveRow) {
         exitCode = 1;
-        const msg = `  ✖  "${idx.indexName}" (${idx.tableName}): ASSENTE nel DB`;
+        const msg = `"${idx.indexName}" (${idx.tableName}): ASSENTE nel DB`;
         driftLines.push(msg);
         allIssues.push(msg);
         continue;
@@ -368,54 +380,66 @@ async function main() {
       const problems = verifyLiveDef(idx, liveRow);
       if (problems.length > 0) {
         exitCode = 1;
-        driftLines.push(`  ✖  "${idx.indexName}" (${idx.tableName}):`);
         for (const p of problems) {
-          driftLines.push(`       ↳ ${p}`);
-          driftLines.push(`         schema TS : hasDesc=${idx.hasDesc} hasWhere=${idx.hasWhere} descCols=[${idx.descColumns.join(",")}]`);
-          driftLines.push(`         DB live   : ${normalizeSql(liveRow.indexdef)}`);
-          allIssues.push(`"${idx.indexName}": ${p}`);
+          const msg = `"${idx.indexName}" (${idx.tableName}): ${p}`;
+          driftLines.push(`[INDEX-DRIFT]   ✖  ${msg}`);
+          driftLines.push(`[INDEX-DRIFT]        schema TS : hasDesc=${idx.hasDesc} hasWhere=${idx.hasWhere} descCols=[${idx.descColumns.join(",")}]`);
+          driftLines.push(`[INDEX-DRIFT]        DB live   : ${normalizeSql(liveRow.indexdef)}`);
+          allIssues.push(msg);
         }
       } else {
-        okLines.push(`  ✔  ${idx.indexName} (${idx.tableName})`);
+        okLines.push(`[INDEX-DRIFT]   ✔  ${idx.indexName} (${idx.tableName})`);
       }
     }
   } catch (err) {
-    console.error("  WARN: impossibile connettersi al DB (connectivity) — fase live skippata.", err);
+    console.error("[INDEX-DRIFT]   WARN: impossibile connettersi al DB (connectivity) — fase live skippata.", err);
     await pool.end();
-    // Exit 2 = DB irraggiungibile (es. DATABASE_URL assente nell'env di build).
-    // Non è un drift reale: il deploy CONTINUA con un warning non bloccante.
-    // Exit 1 è riservato ai drift veri (regressioni migration o mismatch live).
+    // Exit 2 = DB irraggiungibile.
     // ATTENZIONE: se la fase statica ha già trovato regressioni (exitCode=1),
     // manteniamo exit 1 — il gate duro non va ammorbidito da un errore di connettività.
-    process.exit(exitCode === 1 ? 1 : 2);
+    return { exitCode: exitCode === 1 ? 1 : 2, issues: allIssues };
   }
 
   await pool.end();
 
   if (okLines.length > 0) {
-    console.log("  Indici allineati con il DB live:");
+    console.log("[INDEX-DRIFT]   Indici allineati con il DB live:");
     okLines.forEach((l) => console.log(l));
   }
 
   if (driftLines.length > 0) {
-    console.log("\n  Drift nel DB live:");
+    console.log("[INDEX-DRIFT]\n  Drift nel DB live:");
     driftLines.forEach((l) => console.log(l));
   }
 
-  console.log(`\n══════════════════════════════════════════════`);
+  console.log(`[INDEX-DRIFT] ══════════════════════════════════════════════`);
   if (exitCode !== 0) {
     console.log(
-      `  RESULT: PROBLEMI (${allIssues.length}) — migration correttiva o fix schema TS richiesti`,
+      `[INDEX-DRIFT]   RESULT: PROBLEMI (${allIssues.length}) — migration correttiva o fix schema TS richiesti`,
     );
-    console.log("══════════════════════════════════════════════");
-    process.exit(1);
+    console.log("[INDEX-DRIFT] ══════════════════════════════════════════════");
   } else {
     console.log(
-      `  RESULT: OK — ${okLines.length} indici speciali allineati, nessun drift, nessuna regressione`,
+      `[INDEX-DRIFT]   RESULT: OK — ${okLines.length} indici speciali allineati, nessun drift, nessuna regressione`,
     );
-    console.log("══════════════════════════════════════════════");
-    process.exit(0);
+    console.log("[INDEX-DRIFT] ══════════════════════════════════════════════");
   }
+
+  return { exitCode, issues: allIssues };
 }
 
-main();
+// ─── main (standalone CLI) ───────────────────────────────────────────────────
+
+async function main() {
+  const result = await runIndexDriftCheck();
+  process.exit(result.exitCode);
+}
+
+// Guard: esegui main() solo quando il file è lanciato direttamente come CLI
+// (npx tsx scripts/check-index-drift.ts), NON quando viene importato dal bundle
+// esbuild (server_dist/index.js). `require.main === module` non funziona in
+// esbuild __esm context; usiamo process.argv[1] che include il nome del file
+// quando lanciato direttamente, e non lo include nel bundle del server.
+if (process.argv[1] && process.argv[1].includes("check-index-drift")) {
+  main();
+}

@@ -409,6 +409,50 @@ export async function runBootSequence(server: Server, errorHandlersReady: Promis
   ensureCompetitorAnalysisPdf();
 
   setImmediate(() => {
+    // ── Index drift check post-boot (produzione, non-fatal, non-blocking) ────
+    // Covers the scenario where the build-time live-DB phase was skipped with
+    // exit 2 (DB unreachable during build). At container boot the DB is always
+    // available, so we verify here and alert loudly if real drift is detected.
+    // Boot is never blocked: this runs entirely fire-and-forget after READY.
+    // Runs only in production (NODE_ENV=production) to avoid unnecessary DB
+    // work during local dev/test where the live check adds no value.
+    // NOTE: scripts/check-index-drift.ts exports runIndexDriftCheck() and guards
+    // its main() call with `process.argv[1].includes("check-index-drift")` so
+    // importing it here does NOT trigger process.exit() in the esbuild bundle —
+    // only the explicit runIndexDriftCheck() call runs.
+    if (process.env.NODE_ENV === "production") (async () => {
+      try {
+        const { runIndexDriftCheck } = await import("../scripts/check-index-drift");
+        const result = await runIndexDriftCheck();
+        if (result.exitCode === 1) {
+          const summary = result.issues.slice(0, 3).join("; ") +
+            (result.issues.length > 3 ? ` (+${result.issues.length - 3} altri)` : "");
+          console.error(
+            `[BOOT][INDEX-DRIFT] CRITICAL — drift rilevato al boot (${result.issues.length} problema/i): ${summary}. ` +
+            `Correggere con migration o fix schema TS prima del prossimo deploy.`,
+          );
+          try {
+            const { sendSystemAlertPushToAdmins } = await import("./push-notifications");
+            await sendSystemAlertPushToAdmins(
+              "🔴 Index Drift rilevato al boot",
+              `${result.issues.length} indice/i speciale/i non allineato/i col DB. Correzione richiesta. ${summary}`,
+              { type: "index_drift_boot", issueCount: result.issues.length },
+            );
+          } catch (alertErr) {
+            console.warn("[BOOT][INDEX-DRIFT] Invio push alert fallito (non-fatal):", alertErr);
+          }
+        } else if (result.exitCode === 2) {
+          console.warn(
+            "[BOOT][INDEX-DRIFT] DB non raggiungibile durante il check post-boot — verifica skippata (insolito in prod).",
+          );
+        } else {
+          console.log("[BOOT][INDEX-DRIFT] OK — nessun drift di indici speciali rilevato.");
+        }
+      } catch (err) {
+        console.warn("[BOOT][INDEX-DRIFT] Check fallito (non-fatal):", err);
+      }
+    })();
+
     // ── Embedding coverage check (non-fatal) ──────────────────────────────────
     // Logs a warning when the fraction of active users with a 'bio' embedding
     // drops below 80 %.  Threshold configurable via AppSetting
