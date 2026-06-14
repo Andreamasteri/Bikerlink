@@ -3,6 +3,7 @@
 - ["Vai con la build" — procedura APK completa](apk-build-shortcut.md) — bump versioni, aggiorna app.json+build.gradle, lancia EAS release-apk; publish-ota.sh legge versionCode e runtimeVersion da app.json dinamicamente — non va toccato.
 - [GitHub sync force-push](github-sync-force-push.md) — credential helper in ~/.gitconfig legge $GITHUB_TOKEN; `git push github main --force` funziona senza workaround; lock stale .git/refs/remotes/github/main.lock non bloccante.
 - [Repl Layer Size Limit](repl-layer-size.md) — .local/state/replit/ cresce nel tempo (transcript agente + log-query.db) → supera limite Cloud Run 2 GB → deploy silenziosamente fallisce senza log.
+- [Index-drift gate deadlock](index-drift-gate-deadlock.md) — il gate deploy-build.sh DEVE usare --static-only: interrogare il DB live in Phase 2 (pre-migration) blocca il deploy che applicherebbe il fix.
 - [Expo (tabs) route pollution](expo-tabs-route-pollution.md) — file helper (es. *.styles.ts) dentro app/(tabs)/ diventano tab-icona rotte; la custom tab bar renderizza ogni state.route. Tenerli in components/.
 - [spatial_ref_sys deploy failure](spatial-ref-sys-deploy.md) — publish fallisce su copy-OFF con ALTER TABLE spatial_ref_sys ADD PRIMARY KEY; è migrazione interna di Replit, non fixabile lato nostro (filtri drizzle.config.ts ignorati). Copy ON cancella i dati prod. Da supporto Replit.
 - [Deploy build .cache cleanup](deploy-build-cache.md) — NON fare rm su .cache/ in deploy-build.sh: è un layer gestito dalla piattaforma e contiene file read-only di altro utente → build fallisce con set -e.

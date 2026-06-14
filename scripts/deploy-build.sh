@@ -80,38 +80,35 @@ rm -rf tmp_check/
 rm -rf logs/
 log "  backups, dist, dist-ota-env e artefatti temporanei rimossi."
 
-log "=== [1c/3] Gate Index Drift (DESC/WHERE — pre-deploy) ==="
-# Verifica che gli indici speciali (DESC / WHERE) dello schema Drizzle TS
-# siano allineati con le migration SQL e con il DB live (DATABASE_URL è
-# disponibile in FASE 2 poiché Replit ha già copiato dev→prod in FASE 1).
-# Se emerge un DROP+CREATE silenzioso per un indice già esistente, il deploy
-# viene bloccato qui con output esplicativo anziché silenziare il loop in prod.
+log "=== [1c/3] Gate Index Drift (DESC/WHERE — regressioni migration, solo statico) ==="
+# Verifica che nessuna migration SQL abbia introdotto una regressione sugli
+# indici speciali (DESC / WHERE) dichiarati nello schema Drizzle TS.
 #
-# Exit code semantica (definita in check-index-drift.ts):
-#   0 → tutto OK (fase statica + fase live entrambe verdi)
-#   1 → drift REALE (regressione migration SQL o mismatch con DB live) → GATE DURO
-#   2 → DB irraggiungibile (DATABASE_URL assente o connessione fallita) → WARNING non bloccante
-#        La fase statica (migration SQL) è già passata se siamo arrivati qui,
-#        quindi il deploy può continuare; la verifica live avverrà al boot.
+# ⚠️  PERCHÉ --static-only (no DB live):
+#   Il deploy-build.sh gira in FASE 2, PRIMA che migrate.ts applichi le nuove
+#   migration al DB di produzione (FASE 4 — al boot del container).
+#   Se interroghiamo il DB live in questa fase, troviamo lo stato PRE-migration
+#   che potrebbe non avere ancora gli indici corretti → falso positivo → deploy
+#   bloccato in loop (il gate impedisce il deploy che applicherebbe il fix).
+#   La verifica live POST-migration è già in place in server/boot-sequence.ts
+#   (Task #4052): gira in background dopo il boot, non blocca il server.
+#
+# Exit code semantica (--static-only):
+#   0 → nessuna regressione nelle migration SQL → OK
+#   1 → regressione trovata (es. DROP + CREATE senza DESC) → GATE DURO
 INDEX_DRIFT_EXIT=0
-npx tsx scripts/check-index-drift.ts 2>&1 || INDEX_DRIFT_EXIT=$?
+npx tsx scripts/check-index-drift.ts --static-only 2>&1 || INDEX_DRIFT_EXIT=$?
 if [ "$INDEX_DRIFT_EXIT" -eq 0 ]; then
-  log "  ✅ Index Drift OK — nessun drift DESC/WHERE rilevato (statico + live)."
-elif [ "$INDEX_DRIFT_EXIT" -eq 2 ]; then
-  log "  ⚠️  Index Drift — DB live non raggiungibile (exit 2): la fase live è skippata."
-  log "     La fase statica (migration SQL) era OK — nessuna regressione rilevata."
-  log "     Il deploy CONTINUA. La verifica live avverrà al primo boot in produzione."
-  log "     Se il problema persiste, controllare DATABASE_URL nell'env di build."
+  log "  ✅ Index Drift OK — nessuna regressione DESC/WHERE nelle migration SQL."
+  log "     La verifica live degli indici avverrà al boot (boot-sequence.ts)."
 else
-  log "  ❌ DEPLOY BLOCCATO — Index Drift rilevato (exit ${INDEX_DRIFT_EXIT})."
-  log "     Indici speciali (DESC/WHERE) non allineati tra schema Drizzle TS,"
-  log "     migration SQL e/o DB live."
+  log "  ❌ DEPLOY BLOCCATO — Regressione indici rilevata nelle migration SQL (exit ${INDEX_DRIFT_EXIT})."
+  log "     Una migration ha droppato e ricreato un indice speciale senza DESC/WHERE."
   log "     Azione richiesta:"
-  log "       1. Eseguire: npx tsx scripts/check-index-drift.ts"
-  log "       2. Per ogni indice segnalato: aggiungere migration correttiva in"
+  log "       1. Eseguire: npx tsx scripts/check-index-drift.ts --static-only"
+  log "       2. Per ogni regressione segnalata: aggiungere migration correttiva in"
   log "          migrations/NNNN_fix-index-<nome>.sql con DROP + CREATE corretto."
-  log "       3. Oppure correggere lo schema Drizzle TS se l'ordinamento è cambiato."
-  log "     Ref: docs/index-drift.md — HNSW index deploy strategy (memory)."
+  log "       3. Oppure correggere la migration che ha perso la caratteristica speciale."
   exit 1
 fi
 

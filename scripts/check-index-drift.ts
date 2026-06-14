@@ -430,8 +430,63 @@ export async function runIndexDriftCheck(): Promise<IndexDriftResult> {
 
 // ─── main (standalone CLI) ───────────────────────────────────────────────────
 
+/**
+ * Esegue solo le fasi 1+2 (schema TS + migration SQL), senza connettersi
+ * al DB live. Usato da deploy-build.sh dove il DB live è in uno stato
+ * pre-migration e non rappresenta la realtà post-deploy.
+ * Exit 0 = nessuna regressione · Exit 1 = regressione rilevata nelle migration
+ */
+export async function runStaticIndexDriftCheck(): Promise<IndexDriftResult> {
+  console.log("[INDEX-DRIFT] ══════════════════════════════════════════════");
+  console.log("[INDEX-DRIFT]   BikerLink — Index Drift Check (statico, no DB live)");
+  console.log("[INDEX-DRIFT] ══════════════════════════════════════════════\n");
+
+  const schemaSpecial = getSchemaSpecialIndexes();
+
+  if (schemaSpecial.size === 0) {
+    console.log("[INDEX-DRIFT]   Nessun indice speciale (DESC/WHERE) trovato nello schema Drizzle TS.");
+    console.log("[INDEX-DRIFT]   RESULT: OK — 0 indici speciali da verificare");
+    return { exitCode: 0, issues: [] };
+  }
+
+  console.log(`[INDEX-DRIFT]   Indici speciali dallo schema Drizzle TS: ${schemaSpecial.size}`);
+  for (const idx of schemaSpecial.values()) {
+    const tags: string[] = [];
+    if (idx.hasDesc) tags.push(`DESC[${idx.descColumns.join(",")}]`);
+    if (idx.hasWhere) tags.push("WHERE");
+    console.log(`[INDEX-DRIFT]     • ${idx.indexName} (${idx.tableName}) [${tags.join(",")}]`);
+  }
+
+  console.log("\n[INDEX-DRIFT]   Analisi migration SQL per regressioni...");
+  const regressions = detectMigrationRegressions(schemaSpecial);
+  if (regressions.length === 0) {
+    console.log("[INDEX-DRIFT]   ✔  Nessuna regressione nelle migration SQL");
+    console.log("[INDEX-DRIFT] ══════════════════════════════════════════════");
+    console.log(`[INDEX-DRIFT]   RESULT: OK — nessuna regressione, verifica live al boot`);
+    console.log("[INDEX-DRIFT] ══════════════════════════════════════════════");
+    return { exitCode: 0, issues: [] };
+  }
+
+  const issues: string[] = [];
+  for (const r of regressions) {
+    const lost: string[] = [];
+    if (r.lostDesc) lost.push("DESC perso");
+    if (r.lostWhere) lost.push("WHERE perso");
+    const msg = `"${r.indexName}": regressione in ${r.migration} — ${lost.join(", ")}`;
+    console.log(`[INDEX-DRIFT]   ✖  ${msg}`);
+    issues.push(msg);
+  }
+  console.log("[INDEX-DRIFT] ══════════════════════════════════════════════");
+  console.log(`[INDEX-DRIFT]   RESULT: REGRESSIONE (${issues.length}) — migration correttiva richiesta`);
+  console.log("[INDEX-DRIFT] ══════════════════════════════════════════════");
+  return { exitCode: 1, issues };
+}
+
 async function main() {
-  const result = await runIndexDriftCheck();
+  const staticOnly = process.argv.includes("--static-only");
+  const result = staticOnly
+    ? await runStaticIndexDriftCheck()
+    : await runIndexDriftCheck();
   process.exit(result.exitCode);
 }
 
