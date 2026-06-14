@@ -48,11 +48,93 @@ Attivare questa skill quando l'utente dice una delle seguenti (o varianti):
 
 Lo script `scripts/publish-ota.sh` interroga l'API GraphQL di EAS per determinare `NEXT_OTA`. **In ambiente Replit, l'API GraphQL EAS spesso non è raggiungibile** → lo script cade nel fallback `NEXT_OTA=1` e imposta erroneamente `APPLIED_OTA_NUMBER=1` in `constants/buildInfo.ts`.
 
-**Non usare lo script direttamente.** Seguire il flusso manuale sotto.
+**Non usare `publish-ota.sh` direttamente.** Usare invece `publish-ota-full.sh` (flusso primario sotto), che calcola `NEXT_OTA` dal DB invece di GraphQL — aggirando il bug senza workaround manuale.
 
 ---
 
-## Flusso corretto (manuale)
+## Flusso primario — `publish-ota-full.sh`
+
+> **Prerequisito**: `DATABASE_URL` deve essere disponibile nell'ambiente (sempre vero in Replit).
+> Se `DATABASE_URL` non è disponibile, usare il [Flusso manuale (fallback)](#flusso-manuale-fallback) più sotto.
+
+Lo script `publish-ota-full.sh` esegue in modo atomico:
+- Calcola `NEXT_OTA` dal DB (non da GraphQL → nessun bug di fallback)
+- Aggiorna `constants/buildInfo.ts` con `APPLIED_OTA_NUMBER` prima del bundle
+- Esegue `expo export` + `eas update` (Android only)
+- Inserisce la release nel DB come `pending`
+- Svuota `.ota-message`
+- Push su GitHub (best-effort, integrato)
+
+### 1. Scrivi il messaggio OTA in `.ota-message`
+
+```bash
+echo "OTA<N>: <descrizione breve del contenuto>" > .ota-message
+```
+
+Sostituire `<N>` con il numero OTA nel ciclo corrente (vedi tabella "Contesto fisso" sopra).
+
+### 2. Lancia `publish-ota-full.sh`
+
+```bash
+bash scripts/publish-ota-full.sh 2>&1; echo "EXIT=$?"
+```
+
+Impostare il timeout del tool a **120000ms** (il bundle Android cold-cache impiega ~3–5 minuti in totale).
+
+Se il comando supera il timeout, lanciarlo in background con polling:
+
+```bash
+cat > /tmp/run-ota-full.sh << ENDSCRIPT
+#!/usr/bin/env bash
+cd /home/runner/workspace
+bash scripts/publish-ota-full.sh > /tmp/ota-full.log 2>&1
+echo "EXIT=\$?" >> /tmp/ota-full.log
+ENDSCRIPT
+chmod +x /tmp/run-ota-full.sh
+/tmp/run-ota-full.sh &
+```
+
+Poi fare polling con `cat /tmp/ota-full.log` ogni 30–60 secondi.
+
+### 3. Verifica output
+
+Un publish riuscito termina con:
+```
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+[OTA ✓] OTA pubblicata come PENDING!
+  Versione OTA  : <BUILD>.<RUNTIME>.<N>
+  Update ID     : <uuid>
+  Messaggio     : <testo>
+  Stato DB      : pending → NON auto-applicata; admin usa 'Prova OTA' per testarla manualmente
+  Prossimo step : admin testa la OTA, poi click 'Approva' su /admin/ota per distribuirla a tutti
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+EXIT=0
+```
+
+Il timing di ogni fase (export / upload / db / git) è loggato in `logs/ota-timing.log`.
+
+### 4. Aggiorna "Contesto fisso" in questa skill
+
+Dopo la pubblicazione: aggiorna la tabella "Contesto fisso" (campo "Ultima OTA nel ciclo") con il numero appena pubblicato.
+
+> `constants/buildInfo.ts` e il push GitHub sono già gestiti dallo script — non servono step manuali aggiuntivi.
+
+### 5. Riporta il risultato all'utente
+
+> OTA<N> pubblicata ✓
+>
+> - Update group ID: `<uuid>`
+> - Runtime: `<runtimeVersion da app.json>` (es. `10.0.0`)
+> - Canale: production
+> - GitHub: sincronizzato ✓  *(oppure: "GitHub: push saltato (GITHUB_TOKEN non disponibile)")*
+>
+> Prossimo passo: apri il pannello OTA admin nell'app → "Prova OTA" su OTA<N> per testare, poi "Approva e Distribuisci" per promuovere a tutti gli utenti.
+
+---
+
+## Flusso manuale (fallback)
+
+> Usare **solo** quando `DATABASE_URL` non è disponibile nell'ambiente e `publish-ota-full.sh` non può girare.
 
 ### 1. Determina il numero OTA corretto
 
@@ -65,17 +147,8 @@ Lo script `scripts/publish-ota.sh` interroga l'API GraphQL di EAS per determinar
 >
 > **NON usare `APPLIED_OTA_NUMBER` come numero OTA da pubblicare.** Se `APPLIED_OTA_NUMBER = 85` e siamo al ciclo v55 con OTA-10 come ultima, la prossima è **OTA-11** (non OTA-86).
 
-**Come trovare il numero OTA corretto nel ciclo:**
-
-Guarda la tabella "Contesto fisso" in questa skill (sezione sopra) → campo "Ultima OTA nel ciclo". In alternativa, leggi il `versionName` corrente da `app.json`:
-
 ```bash
 node -e "const a=require('./app.json'); const v=a.expo.version.split('.'); console.log('Ultima OTA nel ciclo:', v[1], '→ prossima: OTA-' + (parseInt(v[1])+1))"
-```
-
-**Poi aggiorna `APPLIED_OTA_NUMBER`** (contatore globale, sempre +1 rispetto al precedente):
-
-```bash
 grep APPLIED_OTA_NUMBER constants/buildInfo.ts
 ```
 
@@ -92,7 +165,7 @@ export const APPLIED_OTA_NUMBER: number | null = <APPLIED_OTA_NUMBER_PRECEDENTE 
 
 ### 3. Esegui `bash scripts/eas.sh update` direttamente (solo Android)
 
-**Nota critica sul timeout**: `bash scripts/eas.sh update` con bundle Android cold-cache impiega **~90–120 secondi**. Il tool bash ha un timeout massimo di 120000ms. Usare **`--platform android`** (non `--platform all`) per dimezzare i tempi.
+**Nota critica sul timeout**: impiega **~90–120 secondi**. Impostare il timeout del tool a **120000ms**.
 
 ```bash
 cd /home/runner/workspace && EAS_SKIP_AUTO_FINGERPRINT=1 EXPO_TOKEN="${EAS_TOKEN}" EAS_TOKEN="${EAS_TOKEN}" bash scripts/eas.sh update \
@@ -103,10 +176,8 @@ cd /home/runner/workspace && EAS_SKIP_AUTO_FINGERPRINT=1 EXPO_TOKEN="${EAS_TOKEN
   --platform android 2>&1; echo "EXIT=$?"
 ```
 
-Impostare il timeout del tool a **120000ms**.
+Se supera il timeout, usare il file script temporaneo:
 
-Se il comando supera comunque il timeout:
-1. Scrivere un file script temporaneo con i token già espansi (le singole virgolette impediscono l'espansione):
 ```bash
 cat > /tmp/run-ota.sh << ENDSCRIPT
 #!/usr/bin/env bash
@@ -125,71 +196,32 @@ ENDSCRIPT
 chmod +x /tmp/run-ota.sh
 /tmp/run-ota.sh &
 ```
-2. Poi fare polling del log con `cat /tmp/ota-out.log` ogni 30–60 secondi.
 
-**Fallacy da evitare con background + redirection:**
-- `setsid bash -c '... $EAS_TOKEN ...'` con singole virgolette → `$EAS_TOKEN` NON viene espanso → processo termina silenziosamente
-- `> /tmp/file.log 2>&1 &` non funziona se `nohup` non viene usato o il processo non eredita l'fd
-- Soluzione sicura: **scrivere sempre lo script in un file temporaneo**, poi eseguirlo
+Poi fare polling con `cat /tmp/ota-out.log` ogni 30–60 secondi.
+
+**Fallacy da evitare**: `setsid bash -c '... $EAS_TOKEN ...'` con singole virgolette → `$EAS_TOKEN` NON viene espanso. Scrivere sempre in un file temporaneo.
 
 ### 4. Verifica output
 
-Un publish riuscito mostra:
 ```
 ✔ Published!
 Branch             staging
-Runtime version    <runtimeVersion>   ← corrisponde a expo.runtimeVersion in app.json (es. 10.0.0)
+Runtime version    <runtimeVersion>
 Platform           android
 Update group ID    <uuid>
 Android update ID  <uuid>
 EXIT=0
 ```
 
-### 5. Push GitHub (automatico)
+### 5. Push GitHub (manuale)
 
-> ⚠️ Il push è best-effort: un eventuale fallimento **non blocca** il report OTA all'utente.
-
-**Prerequisito**: verifica che `GITHUB_TOKEN` sia disponibile nell'ambiente:
-
-```bash
-if [[ -z "${GITHUB_TOKEN}" ]]; then
-  echo "[GH] GITHUB_TOKEN non disponibile — push saltato"
-fi
-```
-
-Se `GITHUB_TOKEN` è assente, loggare il warning e proseguire al **Step 6**.
-
-**Fase 1 — Push normale:**
+> Best-effort: un fallimento non blocca il report OTA.
 
 ```bash
 git push "https://x-access-token:${GITHUB_TOKEN}@github.com/Andreamasteri/Bikerlink.git" HEAD:main 2>&1
 ```
 
-> ⚠️ **Mai stampare `$GITHUB_TOKEN` nei log.** Usarlo esclusivamente espanso dentro la URL, come sopra.
-
-**Fase 2 — Force push** (solo se Fase 1 fallisce con errore "non-fast-forward"):
-
-```bash
-git push --force "https://x-access-token:${GITHUB_TOKEN}@github.com/Andreamasteri/Bikerlink.git" HEAD:main 2>&1
-```
-
-Se anche il force push fallisce: comunicare il messaggio di errore all'utente nel riepilogo (Step 6), senza bloccare il report OTA.
-
-**Verifica esito** (dopo un push riuscito):
-
-```bash
-REMOTE_SHA=$(git ls-remote "https://x-access-token:${GITHUB_TOKEN}@github.com/Andreamasteri/Bikerlink.git" refs/heads/main | awk '{print $1}')
-LOCAL_SHA=$(git rev-parse HEAD)
-if [[ "$REMOTE_SHA" == "$LOCAL_SHA" ]]; then
-  echo "[GH ✓] GitHub sincronizzato — SHA: ${LOCAL_SHA:0:8}"
-else
-  echo "[GH !] SHA remoto (${REMOTE_SHA:0:8}) ≠ HEAD locale (${LOCAL_SHA:0:8}) — push potrebbe non essere completo"
-fi
-```
-
-> **Nota auth**: il formato corretto è `https://x-access-token:${GITHUB_TOKEN}@github.com/...`.
-> Il formato senza username (`https://${GITHUB_TOKEN}@...`) ritorna 401.
-> `git ls-remote` non espone il token nei log — usarlo sempre per la verifica.
+Se fallisce con "non-fast-forward": aggiungere `--force`. Mai stampare `$GITHUB_TOKEN` nei log.
 
 ### 6. Riporta il risultato all'utente
 
@@ -198,7 +230,7 @@ fi
 > - Update group ID: `<uuid>`
 > - Runtime: `<runtimeVersion da app.json>` (es. `10.0.0`)
 > - Canale: staging
-> - GitHub: sincronizzato ✓  *(oppure: "GitHub: push saltato (GITHUB_TOKEN non disponibile)" / "GitHub: push fallito — `<messaggio errore>`")*
+> - GitHub: sincronizzato ✓  *(oppure: "GitHub: push saltato / fallito")*
 >
 > Prossimo passo: apri il pannello OTA admin nell'app → Direct Apply su OTA<N> per testare, poi Approva per promuovere a production.
 
