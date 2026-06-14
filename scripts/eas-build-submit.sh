@@ -1,13 +1,14 @@
 #!/usr/bin/env bash
-# Script build EAS v53 — APK release (profile: release-apk, canale: production)
-# Output va in /tmp/eas-build-v53-result.log
+# Script build EAS — APK release (profile: release-apk, canale: production)
+# Output va in /tmp/eas-build-result.log
+# Usa bash scripts/eas.sh (node_modules/.bin/eas v20) — NON il globale.
 
-LOG=/tmp/eas-build-v53-result.log
-echo "=== EAS BUILD v53 START $(date) ===" > "$LOG"
+LOG=/tmp/eas-build-result.log
+echo "=== EAS BUILD START $(date) ===" > "$LOG"
 
 cd /home/runner/workspace
 
-EAS_NO_VCS=1 EXPO_TOKEN=$EXPO_TOKEN eas build \
+EAS_NO_VCS=1 EXPO_TOKEN=$EXPO_TOKEN bash scripts/eas.sh build \
   --profile release-apk \
   --platform android \
   --non-interactive \

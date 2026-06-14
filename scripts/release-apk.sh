@@ -79,7 +79,7 @@ echo "      Push OK"
 # ── 5. EAS Build ──────────────────────────────────────────
 echo "[5/5] Invio build a EAS..."
 echo ""
-eas build --platform android --profile release-apk --non-interactive
+bash scripts/eas.sh build --platform android --profile release-apk --non-interactive
 
 echo ""
 echo "✅ Build v${NEW_NAME} inviata a EAS."

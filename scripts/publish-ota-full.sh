@@ -155,7 +155,7 @@ log_info "Fase 2/3 — EAS upload bundle su CDN (attendi 1-2 minuti)..."
 
 _T0=$(date +%s)
 EAS_OUTPUT=$(EAS_NO_VCS=1 EAS_SKIP_AUTO_FINGERPRINT=1 EXPO_TOKEN="${EAS_TOKEN}" \
-  eas update \
+  bash scripts/eas.sh update \
     --channel production \
     --environment production \
     --message "${EAS_MESSAGE}" \

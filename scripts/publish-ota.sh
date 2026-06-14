@@ -4,7 +4,7 @@
 #
 # Requisiti:
 #   - EAS_TOKEN nell'ambiente (unico secret necessario)
-#   - eas CLI installato (npm install -g eas-cli)
+#   - eas-cli ^20 in node_modules (npm install) — NON il globale
 #   - Eseguito dalla root del progetto Expo
 #
 # Formula versione OTA: <build>.<NEXT_OTA>.<ciclo>
@@ -61,8 +61,8 @@ if [[ -z "${EAS_TOKEN:-}" ]]; then
 fi
 
 # ── Verifica EAS CLI ──
-if ! command -v eas &> /dev/null; then
-  log_error "eas CLI non trovato. Installa con: npm install -g eas-cli"
+if [ ! -f "node_modules/.bin/eas" ]; then
+  log_error "eas CLI non trovato in node_modules/.bin/eas. Esegui: npm install"
   exit 1
 fi
 
@@ -147,7 +147,7 @@ log_success "⏱ Metro export completato in ${T_EXPORT}s"
 # T_UPLOAD misura il trasferimento CDN; il record EAS è incluso (T_PUBLISH=0).
 log_info "Fase 2/2 — EAS upload bundle su CDN (canale staging)..."
 _T0=$(date +%s)
-EAS_OUTPUT=$(EAS_NO_VCS=1 EAS_SKIP_AUTO_FINGERPRINT=1 EXPO_TOKEN="${EAS_TOKEN}" eas update \
+EAS_OUTPUT=$(EAS_NO_VCS=1 EAS_SKIP_AUTO_FINGERPRINT=1 EXPO_TOKEN="${EAS_TOKEN}" bash scripts/eas.sh update \
   --channel staging \
   --message "${MESSAGE}" \
   --environment production \

@@ -73,7 +73,7 @@ Si applicano a **tutti** i profili senza ridichiarare:
 ### Comando di lancio
 
 ```bash
-GIT_INDEX_FILE=/tmp/eas-build-index npx eas build \
+GIT_INDEX_FILE=/tmp/eas-build-index bash scripts/eas.sh build \
   --platform android \
   --profile debug-apk \
   --non-interactive \
@@ -110,7 +110,7 @@ GIT_INDEX_FILE=/tmp/eas-build-index npx eas build \
 ### Comando di lancio
 
 ```bash
-GIT_INDEX_FILE=/tmp/eas-build-index npx eas build \
+GIT_INDEX_FILE=/tmp/eas-build-index bash scripts/eas.sh build \
   --platform android \
   --profile release-apk \
   --non-interactive \
@@ -158,7 +158,7 @@ Usare il comando del profilo scelto (vedi sezioni sopra), sempre con il workarou
 
 **Perché:** senza `GIT_INDEX_FILE=/tmp/eas-build-index` il comando fallisce con exit 254 perché la sandbox Replit blocca `.git/index.lock`. Il prefisso redirige il lock su `/tmp/`.
 
-**Regola:** aggiungere SEMPRE `GIT_INDEX_FILE=/tmp/eas-build-index` prima di `npx eas build`, per qualsiasi profilo.
+**Regola:** aggiungere SEMPRE `GIT_INDEX_FILE=/tmp/eas-build-index` prima di `bash scripts/eas.sh build`, per qualsiasi profilo.
 
 **Timeout bash:** **600 000 ms** (10 min — upload ~100–130 MB).
 
@@ -192,7 +192,7 @@ Dev menu: scuoti il dispositivo → "Open Debugger".
 - [ ] Utente ha confermato prima del lancio
 - [ ] `debug-apk`: versionCode invariato
 - [ ] `release-apk`: bump versione completato nei 4 file
-- [ ] `GIT_INDEX_FILE=/tmp/eas-build-index` nel comando
+- [ ] `GIT_INDEX_FILE=/tmp/eas-build-index bash scripts/eas.sh build` (mai `npx eas` né `eas` grezzo)
 - [ ] `--no-wait` nel comando
 
 ---
