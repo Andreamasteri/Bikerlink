@@ -145,13 +145,60 @@ Android update ID  <uuid>
 EXIT=0
 ```
 
-### 5. Riporta il risultato all'utente
+### 5. Push GitHub (automatico)
+
+> ⚠️ Il push è best-effort: un eventuale fallimento **non blocca** il report OTA all'utente.
+
+**Prerequisito**: verifica che `GITHUB_TOKEN` sia disponibile nell'ambiente:
+
+```bash
+if [[ -z "${GITHUB_TOKEN}" ]]; then
+  echo "[GH] GITHUB_TOKEN non disponibile — push saltato"
+fi
+```
+
+Se `GITHUB_TOKEN` è assente, loggare il warning e proseguire al **Step 6**.
+
+**Fase 1 — Push normale:**
+
+```bash
+git push "https://x-access-token:${GITHUB_TOKEN}@github.com/Andreamasteri/Bikerlink.git" HEAD:main 2>&1
+```
+
+> ⚠️ **Mai stampare `$GITHUB_TOKEN` nei log.** Usarlo esclusivamente espanso dentro la URL, come sopra.
+
+**Fase 2 — Force push** (solo se Fase 1 fallisce con errore "non-fast-forward"):
+
+```bash
+git push --force "https://x-access-token:${GITHUB_TOKEN}@github.com/Andreamasteri/Bikerlink.git" HEAD:main 2>&1
+```
+
+Se anche il force push fallisce: comunicare il messaggio di errore all'utente nel riepilogo (Step 6), senza bloccare il report OTA.
+
+**Verifica esito** (dopo un push riuscito):
+
+```bash
+REMOTE_SHA=$(git ls-remote "https://x-access-token:${GITHUB_TOKEN}@github.com/Andreamasteri/Bikerlink.git" refs/heads/main | awk '{print $1}')
+LOCAL_SHA=$(git rev-parse HEAD)
+if [[ "$REMOTE_SHA" == "$LOCAL_SHA" ]]; then
+  echo "[GH ✓] GitHub sincronizzato — SHA: ${LOCAL_SHA:0:8}"
+else
+  echo "[GH !] SHA remoto (${REMOTE_SHA:0:8}) ≠ HEAD locale (${LOCAL_SHA:0:8}) — push potrebbe non essere completo"
+fi
+```
+
+> **Nota auth**: il formato corretto è `https://x-access-token:${GITHUB_TOKEN}@github.com/...`.
+> Il formato senza username (`https://${GITHUB_TOKEN}@...`) ritorna 401.
+> `git ls-remote` non espone il token nei log — usarlo sempre per la verifica.
+
+### 6. Riporta il risultato all'utente
 
 > OTA<N> pubblicata ✓
 >
 > - Update group ID: `<uuid>`
 > - Runtime: `<runtimeVersion da app.json>` (es. `10.0.0`)
 > - Canale: staging
+> - GitHub: sincronizzato ✓  *(oppure: "GitHub: push saltato (GITHUB_TOKEN non disponibile)" / "GitHub: push fallito — `<messaggio errore>`")*
 >
 > Prossimo passo: apri il pannello OTA admin nell'app → Direct Apply su OTA<N> per testare, poi Approva per promuovere a production.
 
@@ -243,6 +290,7 @@ Stato: `forcingUpdate` (boolean) per il loading indicator. Gestione errori con t
 |------|-------|
 | `constants/buildInfo.ts` | `APPLIED_OTA_NUMBER` — da aggiornare manualmente a ogni OTA |
 | `scripts/publish-ota.sh` | Script publish (con bug GraphQL fallback — vedi sopra) |
+| `scripts/publish-ota-full.sh` | Script publish atomico con push GitHub integrato (riferimento per logica di push consolidata) |
 | `app.json` | `runtimeVersion`, `versionCode`, `version` |
 | `components/admin/ota/OtaPanel.tsx` | Pannello admin OTA con pulsante Forza Aggiornamento |
 
