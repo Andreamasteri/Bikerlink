@@ -126,19 +126,20 @@ if [ "$I18N_EXIT" -ne 0 ]; then
 fi
 echo ""
 
-# ── GATE "450 RIGHE PER FILE" POST-MERGE ─────────────────────
+# ── GATE "600 RIGHE PER FILE" POST-MERGE ─────────────────────
 # Subito dopo il merge (prima di chiudere): se un merge ha portato
-# dentro un file > 450 senza marker, falliamo qui e lasciamo
-# evidenza nei log. Vedi replit.md → "⛔ REGOLA FERREA — Limite 450 righe per file".
+# dentro un file > 600 senza marker, falliamo qui e lasciamo
+# evidenza nei log. Vedi replit.md → "⛔ REGOLA FERREA — Limite 600 righe per file".
+# N.B.: quando si splitta un file, i file risultanti vanno tenuti ≤450 righe.
 echo "════════════════════════════════════════"
-echo "  Ratchet 450 righe per file (post-merge)"
+echo "  Ratchet 600 righe per file (post-merge)"
 echo "════════════════════════════════════════"
 RATCHET_EXIT=0
 bash scripts/check-large-files-ratchet.sh || RATCHET_EXIT=$?
 echo "════════════════════════════════════════"
 echo ""
 if [ "$RATCHET_EXIT" -ne 0 ]; then
-  echo "❌ Gate 450 righe fallito post-merge — verificare i file segnalati sopra."
+  echo "❌ Gate 600 righe fallito post-merge — verificare i file segnalati sopra."
   exit "$RATCHET_EXIT"
 fi
 

@@ -89,8 +89,8 @@ Lo split è sempre un'operazione **meccanica**: nessuna logica alterata, solo sp
 Rileggere ogni file risultante e verificare **tutti** i punti:
 
 - [ ] Il contenuto corrisponde esattamente all'originale (nulla inventato, nulla perso).
-- [ ] File sorgente ≤ 450 righe.
-- [ ] File destinazione ≤ 450 righe.
+- [ ] File sorgente ≤ 450 righe (split target; il gate blocca a 600).
+- [ ] File destinazione ≤ 450 righe (split target; il gate blocca a 600).
 - [ ] Import/export coerenti tra i file (nessun simbolo importato ma non esportato, nessun export orfano).
 
 > **La regola vale sempre, anche per split "ovvi".** La verifica non è facoltativa e non può essere saltata per split "piccoli" o "semplici".
@@ -296,15 +296,17 @@ I prefer detailed explanations and iterative development. Ask before making majo
 
 **Debug errori strani — Prima azione obbligatoria**: svuotare la cache e riavviare (Metro cache, workflow, ecc.) PRIMA di qualsiasi altra analisi o modifica al codice. Se l'errore persiste, usare il runtime reale (Chrome V8 inspector / log browser) per trovare la riga esatta — NON analizzare il codice staticamente per primo.
 
-## ⛔ REGOLA FERREA — Limite 450 righe per file
+## ⛔ REGOLA FERREA — Limite 600 righe per file
 
-**Motivazione**: file > 450 righe diventano monoliti illeggibili, ingestibili a code-review, fonte di merge-conflict e di bug nascosti. La regola è cablata come **gate CI ratchet** (stesso schema di `eslint-hooks-check.sh`): la soglia "dura" è **450 righe per file TypeScript** (`.ts`/`.tsx`); il debito legacy esistente è cristallizzato in una baseline e qualsiasi regressione è bloccata.
+**Motivazione**: file > 600 righe diventano monoliti illeggibili, ingestibili a code-review, fonte di merge-conflict e di bug nascosti. La regola è cablata come **gate CI ratchet** (stesso schema di `eslint-hooks-check.sh`): la soglia "dura" è **600 righe per file TypeScript** (`.ts`/`.tsx`); il debito legacy esistente è cristallizzato in una baseline e qualsiasi regressione è bloccata.
+
+> **Regola di split**: quando un file supera 600 righe e va splittato, i file risultanti devono stare sotto **450 righe**. Non 600. Così c'è margine prima che il gate scatti di nuovo.
 
 ### File chiave
 - `scripts/check-large-files.ts` — diagnostica standalone (marker-aware).
 - `scripts/check-large-files-ratchet.sh` / `scripts/check-large-files-ratchet.ts` — gate ratchet (CI).
 - `scripts/lib/large-files-core.ts` — logica condivisa scansione + parsing marker.
-- `.large-files-baseline` — snapshot legacy `>450` senza marker. Versionato. Formato `<path> <linecount>` per riga.
+- `.large-files-baseline` — snapshot legacy `>600` senza marker. Versionato. Formato `<path> <linecount>` per riga.
 - `.large-files-allow.txt` — lista CHIUSA dei path autorizzati al marker `LARGE-FILE-ALLOW`. Versionato. (Popolato dal task #2605.)
 
 ### Gate registrati (3 punti obbligatori, ognuno con `exit 1` su fallimento)
@@ -321,13 +323,13 @@ I prefer detailed explanations and iterative development. Ask before making majo
 
 **Regola operativa** per ogni agente che aggiunge codice nuovo:
 
-1. **Nessun file sorgente supera le 450 righe.** Vale per `.ts`, `.tsx`, `.js`, `.jsx` e qualsiasi altro file sorgente del progetto.
-2. **Quando un file si avvicina alle 450 righe**, le nuove feature non vanno in quel file: vanno in un file successore con il suffisso `-extra` (pattern già in uso nel progetto):
+1. **Nessun file sorgente supera le 600 righe.** Vale per `.ts`, `.tsx`, `.js`, `.jsx` e qualsiasi altro file sorgente del progetto.
+2. **Quando un file supera le 600 righe e va splittato**, i file risultanti (sorgente + destinazione) devono stare entrambi sotto **450 righe** — non 600. Così c'è margine prima che il gate scatti di nuovo. La suddivisione va in un file successore con il suffisso `-extra` (pattern già in uso nel progetto):
    - `server/routes/foo.ts` → nuove funzioni in `server/routes/foo-extra.ts`
    - `components/FooPanel.tsx` → nuove funzioni in `components/FooPanelExtra.tsx`
    - `shared/db/bar.ts` → nuove funzioni in `shared/db/bar-extra.ts`
-3. **Il file originale rimane congelato sotto i 450**: nessuna nuova riga di logica. Solo bugfix strettamente localizzati sono tollerati.
-4. **Il successore riceve tutto il codice nuovo.** Quando anche il successore si avvicina alle 450 righe, si crea il successore del successore (`foo-extra.ts` → `foo-extra-2.ts`), e così via.
+3. **Il file originale rimane congelato sotto i 600 (target 450)**: nessuna nuova riga di logica. Solo bugfix strettamente localizzati sono tollerati.
+4. **Il successore riceve tutto il codice nuovo.** Quando anche il successore supera le 600 righe, si crea il successore del successore (`foo-extra.ts` → `foo-extra-2.ts`), e così via — anche qui con split target ≤450.
 5. **Il companion viene creato solo quando ha contenuto reale** — non file vuoti con `export {}` per silenziare warning.
 
 Esempio concreto già presente nel progetto:
@@ -338,7 +340,7 @@ Esempio concreto già presente nel progetto:
 | `server/routes/admin/users.ts` | `server/routes/admin/users-extra.ts` |
 | `shared/db/matching.ts` | `shared/db/matching-extra.ts` |
 
-Il CI gate (`scripts/check-large-files-ratchet.sh`) blocca qualsiasi file che superi i 450 senza marker autorizzato. Se il gate fallisce, sposta il codice nel companion — non alzare la baseline.
+Il CI gate (`scripts/check-large-files-ratchet.sh`) blocca qualsiasi file che superi i 600 senza marker autorizzato. Se il gate fallisce, sposta il codice nel companion — non alzare la baseline. I file risultanti dallo split devono stare sotto **450 righe**.
 
 ### Le 6 REGOLE FERREE — non negoziabili (task agent, code reviewer, main agent)
 1. **Il gate va eseguito nei 3 punti elencati sopra**, ognuno con `exit 1` su fallimento. Non disabilitarli.
