@@ -57,7 +57,7 @@
     "@typescript-eslint/eslint-plugin": "^8.61.0",
     "@typescript-eslint/parser": "^8.61.0",
     "@xmldom/xmldom": "^0.9.10",
-    "ai": "^6.0.204",
+    "ai": "^6.0.205",
     "archiver": "^8.0.0",
     "bcryptjs": "^3.0.3",
     "bottleneck": "^2.19.5",
@@ -224,6 +224,7 @@
     "postcss": "^8.5.12",
     "fast-xml-builder": "^1.2.0",
     "brace-expansion": "^5.0.6",
-    "ip-address": "^10.2.0"
+    "ip-address": "^10.2.0",
+    "esbuild": ">=0.28.1"
   }
 }
