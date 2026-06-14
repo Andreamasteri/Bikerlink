@@ -6,6 +6,17 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { apiRequest } from "@/lib/query-client";
 import { useAuth } from "@/lib/auth-context";
 
+let _getUsedMemory: (() => Promise<number>) | null = null;
+try {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const DeviceInfo = require("react-native-device-info");
+  if (typeof DeviceInfo?.getUsedMemory === "function") {
+    _getUsedMemory = DeviceInfo.getUsedMemory as () => Promise<number>;
+  }
+} catch {
+  // native module not linked in this build — fall back to JS heap
+}
+
 const LAST_MOUNT_KEY = "@bikerlink/last_mount_ts";
 const CLEAN_SHUTDOWN_KEY = "@bikerlink/clean_shutdown";
 const ABNORMAL_RESTARTS_KEY = "@bikerlink/abnormal_restarts";
@@ -73,8 +84,22 @@ async function sendMetrics(userId: string): Promise<void> {
       : null;
 
     let memoryUsedMb: number | null = null;
-    try {
-      if (Platform.OS !== "web") {
+
+    // Tier 1: native process RSS via react-native-device-info
+    if (Platform.OS !== "web" && _getUsedMemory) {
+      try {
+        const rssBytes = await _getUsedMemory();
+        if (typeof rssBytes === "number" && rssBytes > 0) {
+          memoryUsedMb = Math.round(rssBytes / 1024 / 1024);
+        }
+      } catch {
+        // native module unavailable at runtime — proceed to Hermes fallback
+      }
+    }
+
+    // Tier 2: Hermes JS-engine heap (Expo Go / older APKs without native module)
+    if (memoryUsedMb === null && Platform.OS !== "web") {
+      try {
         type HermesGlobal = {
           HermesInternal?: {
             getInstrumentedStats?: () => Record<string, number>;
@@ -86,7 +111,14 @@ async function sendMetrics(userId: string): Promise<void> {
         if (typeof allocBytes === "number" && allocBytes > 0) {
           memoryUsedMb = Math.round(allocBytes / 1024 / 1024);
         }
-      } else {
+      } catch {
+        // Hermes API unavailable
+      }
+    }
+
+    // Tier 3: web performance.memory
+    if (memoryUsedMb === null && Platform.OS === "web") {
+      try {
         type PerfWithMemory = typeof performance & {
           memory?: { usedJSHeapSize?: number };
         };
@@ -94,9 +126,9 @@ async function sendMetrics(userId: string): Promise<void> {
         if (typeof heapBytes === "number" && heapBytes > 0) {
           memoryUsedMb = Math.round(heapBytes / 1024 / 1024);
         }
+      } catch {
+        // performance.memory unavailable
       }
-    } catch {
-      // memory API unavailable on this runtime
     }
 
     const abnormalRestartsStr = await AsyncStorage.getItem(ABNORMAL_RESTARTS_KEY).catch(() => null);
