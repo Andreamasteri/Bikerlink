@@ -1,6 +1,6 @@
 ---
 name: bikerlink-apk-build
-description: Procedura build APK BikerLink con EAS CLI 20.x — debug standalone arm64 e release arm64. Trigger: "vai con la build", "build apk", "build debug", "build release", "lancia la build", "nuova build". Leggere PRIMA di toccare eas.json o lanciare eas build.
+description: Procedura build APK BikerLink con EAS CLI 20.x — debug standalone arm64 e release arm64. Trigger: "vai con la build", "build apk", "build debug", "build release", "lancia la build", "nuova build". Leggere PRIMA di toccare eas.json o lanciare bash scripts/eas.sh build.
 ---
 
 # BikerLink — Build APK (Debug + Release)

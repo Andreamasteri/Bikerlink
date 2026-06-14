@@ -35,7 +35,7 @@ L'aggiornamento è live. Gli utenti Android lo ricevono al prossimo avvio dell'a
 1. Legge il messaggio da `.ota-message`
 2. Calcola il prossimo `APPLIED_OTA_NUMBER` dal DB
 3. Aggiorna `constants/buildInfo.ts`
-4. Esegue `eas update --channel production --message "..."` (bundle Metro)
+4. Esegue `bash scripts/eas.sh update --channel production --message "..."` (bundle Metro)
 5. Salva la release nel DB (`status='approved'`, `channel='production'`) per tracking admin
 6. Svuota `.ota-message`
 7. Fa il push su GitHub

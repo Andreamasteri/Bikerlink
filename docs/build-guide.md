@@ -37,9 +37,9 @@ bash scripts/eas.sh login
 ### Installazione locale (se esegui build dal tuo PC)
 
 ```bash
-# Sul tuo PC locale: installa EAS CLI globalmente
+# Sul tuo PC locale: installa EAS CLI globalmente (solo per build da PC, non da Replit)
 npm install -g eas-cli@20
-eas login
+# Poi effettua il login: npx eas-cli whoami
 ```
 
 ### Verifica configurazione progetto
@@ -68,8 +68,8 @@ Usa questo profilo per testare l'app senza impattare il canale production OTA.
 ```bash
 # Da Replit (wrapper obbligatorio — mai eas grezzo)
 GIT_INDEX_FILE=/tmp/eas-build-index bash scripts/eas.sh build --platform android --profile preview --non-interactive
-# Dal tuo PC locale (EAS CLI globale):
-# eas build --platform android --profile preview --non-interactive
+# Dal tuo PC locale (EAS CLI installato globalmente con npm install -g eas-cli@20):
+# bash -c "eas build --platform android --profile preview --non-interactive"
 ```
 
 **Cosa succede:**
@@ -94,8 +94,8 @@ Usa questo profilo quando vuoi testare il ciclo OTA completo sul canale producti
 ```bash
 # Da Replit (wrapper obbligatorio — mai eas grezzo)
 GIT_INDEX_FILE=/tmp/eas-build-index bash scripts/eas.sh build --platform android --profile release-apk --non-interactive
-# Dal tuo PC locale (EAS CLI globale):
-# eas build --platform android --profile release-apk --non-interactive
+# Dal tuo PC locale (EAS CLI installato globalmente con npm install -g eas-cli@20):
+# bash -c "eas build --platform android --profile release-apk --non-interactive"
 ```
 
 **Differenza rispetto a `preview`:** il canale è `production`, quindi l'app riceverà
@@ -128,7 +128,7 @@ Expo Launch gestisce:
 # IMPORTANTE: pubblica sempre su canale "staging" per entrare nella pipeline di approvazione.
 # Il server BikerLink sincronizza dal branch "staging" di EAS e mette le release in pending.
 bash scripts/eas.sh update --channel staging --message "Fix: schermata percorsi v52.3.11"
-# Dal tuo PC locale: eas update --channel staging --message "..."
+# Dal tuo PC locale (EAS CLI globale): bash -c "eas update --channel staging --message '...'"
 ```
 
 > **Perché staging e non production?**

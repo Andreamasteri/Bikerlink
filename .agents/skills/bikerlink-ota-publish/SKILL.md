@@ -90,12 +90,12 @@ export const APPLIED_OTA_NUMBER: number | null = <APPLIED_OTA_NUMBER_PRECEDENTE 
 
 **b) Aggiorna "Contesto fisso"** in questa skill — cambia "Ultima OTA nel ciclo" con il numero appena pubblicato.
 
-### 3. Esegui `eas update` direttamente (solo Android)
+### 3. Esegui `bash scripts/eas.sh update` direttamente (solo Android)
 
-**Nota critica sul timeout**: `eas update` con bundle Android cold-cache impiega **~90–120 secondi**. Il tool bash ha un timeout massimo di 120000ms. Usare **`--platform android`** (non `--platform all`) per dimezzare i tempi.
+**Nota critica sul timeout**: `bash scripts/eas.sh update` con bundle Android cold-cache impiega **~90–120 secondi**. Il tool bash ha un timeout massimo di 120000ms. Usare **`--platform android`** (non `--platform all`) per dimezzare i tempi.
 
 ```bash
-cd /home/runner/workspace && EAS_SKIP_AUTO_FINGERPRINT=1 EXPO_TOKEN="${EAS_TOKEN}" EAS_TOKEN="${EAS_TOKEN}" eas update \
+cd /home/runner/workspace && EAS_SKIP_AUTO_FINGERPRINT=1 EXPO_TOKEN="${EAS_TOKEN}" EAS_TOKEN="${EAS_TOKEN}" bash scripts/eas.sh update \
   --channel staging \
   --message "OTA<N>: <descrizione>" \
   --environment production \
@@ -114,7 +114,7 @@ cd /home/runner/workspace
 export EAS_TOKEN="${EAS_TOKEN}"
 export EXPO_TOKEN="${EAS_TOKEN}"
 export EAS_SKIP_AUTO_FINGERPRINT=1
-eas update \
+bash scripts/eas.sh update \
   --channel staging \
   --message "OTA<N>: <descrizione>" \
   --environment production \
