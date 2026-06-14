@@ -133,6 +133,7 @@
       ],
       "expo-asset"
     ],
+    "newArchEnabled": true,
     "experiments": {
       "typedRoutes": true
     },

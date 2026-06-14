@@ -206,8 +206,7 @@
         "react-native",
         "react",
         "react-native-keyboard-controller",
-        "@react-native-async-storage/async-storage",
-        "react-native-gesture-handler"
+        "@react-native-async-storage/async-storage"
       ]
     },
     "doctor": {
