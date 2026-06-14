@@ -157,7 +157,7 @@
     "qs": "^6.15.2",
     "react": "^19.2.7",
     "react-native": "^0.86.0",
-    "react-native-gesture-handler": "~2.31.0",
+    "react-native-gesture-handler": "^3.0.1",
     "react-native-keyboard-controller": "^1.21.11",
     "react-native-reanimated": "^4.4.1",
     "react-native-safe-area-context": "~5.8.0",
@@ -198,7 +198,6 @@
       "exclude": [
         "react-native-reanimated",
         "@react-native-community/slider",
-        "react-native-gesture-handler",
         "react-native-safe-area-context",
         "react-native-screens",
         "react-native-svg",
