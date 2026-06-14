@@ -16,7 +16,9 @@
  *   - l'indice ha una clausola .where(sql`...`)   → hasWhere
  *
  * Exit code 0 → tutti gli indici speciali allineati, nessuna regressione nelle migration
- * Exit code 1 → drift, regressione, o DB non raggiungibile
+ * Exit code 1 → drift REALE: regressione nelle migration SQL o mismatch con il DB live
+ * Exit code 2 → DB non raggiungibile (connettività): la fase live è skippata, la fase
+ *               statica (migration) era OK. Il deploy può continuare con un warning.
  *
  * Usage:
  *   npx tsx scripts/check-index-drift.ts
@@ -378,9 +380,14 @@ async function main() {
       }
     }
   } catch (err) {
-    console.error("  ERRORE: impossibile connettersi al DB.", err);
+    console.error("  WARN: impossibile connettersi al DB (connectivity) — fase live skippata.", err);
     await pool.end();
-    process.exit(1);
+    // Exit 2 = DB irraggiungibile (es. DATABASE_URL assente nell'env di build).
+    // Non è un drift reale: il deploy CONTINUA con un warning non bloccante.
+    // Exit 1 è riservato ai drift veri (regressioni migration o mismatch live).
+    // ATTENZIONE: se la fase statica ha già trovato regressioni (exitCode=1),
+    // manteniamo exit 1 — il gate duro non va ammorbidito da un errore di connettività.
+    process.exit(exitCode === 1 ? 1 : 2);
   }
 
   await pool.end();

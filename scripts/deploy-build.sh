@@ -86,10 +86,22 @@ log "=== [1c/3] Gate Index Drift (DESC/WHERE — pre-deploy) ==="
 # disponibile in FASE 2 poiché Replit ha già copiato dev→prod in FASE 1).
 # Se emerge un DROP+CREATE silenzioso per un indice già esistente, il deploy
 # viene bloccato qui con output esplicativo anziché silenziare il loop in prod.
+#
+# Exit code semantica (definita in check-index-drift.ts):
+#   0 → tutto OK (fase statica + fase live entrambe verdi)
+#   1 → drift REALE (regressione migration SQL o mismatch con DB live) → GATE DURO
+#   2 → DB irraggiungibile (DATABASE_URL assente o connessione fallita) → WARNING non bloccante
+#        La fase statica (migration SQL) è già passata se siamo arrivati qui,
+#        quindi il deploy può continuare; la verifica live avverrà al boot.
 INDEX_DRIFT_EXIT=0
 npx tsx scripts/check-index-drift.ts 2>&1 || INDEX_DRIFT_EXIT=$?
 if [ "$INDEX_DRIFT_EXIT" -eq 0 ]; then
-  log "  ✅ Index Drift OK — nessun drift DESC/WHERE rilevato."
+  log "  ✅ Index Drift OK — nessun drift DESC/WHERE rilevato (statico + live)."
+elif [ "$INDEX_DRIFT_EXIT" -eq 2 ]; then
+  log "  ⚠️  Index Drift — DB live non raggiungibile (exit 2): la fase live è skippata."
+  log "     La fase statica (migration SQL) era OK — nessuna regressione rilevata."
+  log "     Il deploy CONTINUA. La verifica live avverrà al primo boot in produzione."
+  log "     Se il problema persiste, controllare DATABASE_URL nell'env di build."
 else
   log "  ❌ DEPLOY BLOCCATO — Index Drift rilevato (exit ${INDEX_DRIFT_EXIT})."
   log "     Indici speciali (DESC/WHERE) non allineati tra schema Drizzle TS,"
@@ -100,7 +112,7 @@ else
   log "          migrations/NNNN_fix-index-<nome>.sql con DROP + CREATE corretto."
   log "       3. Oppure correggere lo schema Drizzle TS se l'ordinamento è cambiato."
   log "     Ref: docs/index-drift.md — HNSW index deploy strategy (memory)."
-  exit "$INDEX_DRIFT_EXIT"
+  exit 1
 fi
 
 log "=== [2/3] Build server TypeScript ==="
