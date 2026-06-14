@@ -255,7 +255,7 @@ set +e
 CI=1 \
 EAS_NO_VCS=1 \
 EXPO_PUBLIC_DOMAIN="${EXPO_PUBLIC_DOMAIN}" \
-npx eas-cli@20 build \
+bash scripts/eas.sh build \
   --platform android \
   --profile "$PROFILE" \
   --non-interactive \

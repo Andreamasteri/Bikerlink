@@ -84,7 +84,7 @@ DOCTOR_TOTAL=$(echo "$DOCTOR_RESULT" | grep -oP '(?<=\d/)\d+' | head -1 || echo 
 SDK_VERSION=$(node -e "try{process.stdout.write(require('./node_modules/expo/package.json').version)}catch(e){process.stdout.write('?')}" 2>/dev/null || echo "?")
 RUNTIME_VERSION=$(node -e "process.stdout.write(require('./app.json').expo.runtimeVersion||'?')" 2>/dev/null || echo "?")
 VERSION_CODE=$(node -e "process.stdout.write(String(require('./app.json').expo.android?.versionCode||'?'))" 2>/dev/null || echo "?")
-EAS_CLI_VERSION=$(npx eas-cli@20 --version 2>/dev/null | head -1 | grep -oP '[\d.]+' | head -1 || echo "?")
+EAS_CLI_VERSION=$(bash scripts/eas.sh --version 2>/dev/null | head -1 | grep -oP '[\d.]+' | head -1 || echo "?")
 NODE_VERSION=$(node --version 2>/dev/null || echo "?")
 
 CURRENT_JSON=$(cat <<EOF

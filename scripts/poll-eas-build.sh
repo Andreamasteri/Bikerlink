@@ -50,8 +50,8 @@ if [ -z "$BUILD_ID" ]; then
 fi
 
 # ── Verifica eas-cli disponibile ─────────────────────────────────────────────
-if ! npx eas-cli@20 --version &>/dev/null 2>&1; then
-  echo -e "  ${RED}✖${RESET}  eas-cli@20 non disponibile. Installare con: npm install -g eas-cli"
+if ! bash scripts/eas.sh --version &>/dev/null 2>&1; then
+  echo -e "  ${RED}✖${RESET}  eas-cli non disponibile. Installare con: npm install -g eas-cli"
   exit 1
 fi
 
@@ -73,7 +73,7 @@ while [ $ITERATION -lt $MAX_ITERATIONS ]; do
   NOW=$(date -u +"%H:%M:%S")
 
   # Interroga EAS per lo stato della build
-  EAS_OUTPUT=$(CI=1 npx eas-cli@20 build:view "$BUILD_ID" --json 2>/dev/null || echo '{"status":"ERROR_FETCHING"}')
+  EAS_OUTPUT=$(CI=1 bash scripts/eas.sh build:view "$BUILD_ID" --json 2>/dev/null || echo '{"status":"ERROR_FETCHING"}')
 
   BUILD_STATUS=$(echo "$EAS_OUTPUT" | node -e "
     let d='';
