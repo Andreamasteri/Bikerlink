@@ -171,9 +171,9 @@ adminRouter.get("/stats", requireAdmin, (req: Request, res: Response): void => {
       WITH ranked AS (
         SELECT DISTINCT app_version,
           ROW_NUMBER() OVER (ORDER BY
-            CAST(COALESCE(NULLIF(REGEXP_REPLACE(SPLIT_PART(app_version, '.', 1), '[^0-9]', '', 'g'), ''), '0') AS INTEGER) DESC,
-            CAST(COALESCE(NULLIF(REGEXP_REPLACE(SPLIT_PART(app_version, '.', 2), '[^0-9]', '', 'g'), ''), '0') AS INTEGER) DESC,
-            CAST(COALESCE(NULLIF(REGEXP_REPLACE(SPLIT_PART(app_version, '.', 3), '[^0-9]', '', 'g'), ''), '0') AS INTEGER) DESC
+            COALESCE(substring(SPLIT_PART(app_version, '.', 1) FROM '^\d+'), '0')::INTEGER DESC,
+            COALESCE(substring(SPLIT_PART(app_version, '.', 2) FROM '^\d+'), '0')::INTEGER DESC,
+            COALESCE(substring(SPLIT_PART(app_version, '.', 3) FROM '^\d+'), '0')::INTEGER DESC
           ) AS rn
         FROM app_crash_logs
         WHERE ${statsWhere} AND app_version IS NOT NULL
@@ -190,9 +190,9 @@ adminRouter.get("/stats", requireAdmin, (req: Request, res: Response): void => {
       WHERE r.rn <= 3
       GROUP BY r.app_version
       ORDER BY
-        CAST(COALESCE(NULLIF(REGEXP_REPLACE(SPLIT_PART(r.app_version, '.', 1), '[^0-9]', '', 'g'), ''), '0') AS INTEGER) DESC,
-        CAST(COALESCE(NULLIF(REGEXP_REPLACE(SPLIT_PART(r.app_version, '.', 2), '[^0-9]', '', 'g'), ''), '0') AS INTEGER) DESC,
-        CAST(COALESCE(NULLIF(REGEXP_REPLACE(SPLIT_PART(r.app_version, '.', 3), '[^0-9]', '', 'g'), ''), '0') AS INTEGER) DESC
+        COALESCE(substring(SPLIT_PART(r.app_version, '.', 1) FROM '^\d+'), '0')::INTEGER DESC,
+        COALESCE(substring(SPLIT_PART(r.app_version, '.', 2) FROM '^\d+'), '0')::INTEGER DESC,
+        COALESCE(substring(SPLIT_PART(r.app_version, '.', 3) FROM '^\d+'), '0')::INTEGER DESC
     `),
     // 3. Daily trend — last 14 days
     db.execute(sql`
