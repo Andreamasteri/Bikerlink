@@ -285,6 +285,7 @@ export default function ProposalsScreen() {
         <View style={{ flex: 1 }}>
           <CalibrationBanner
             isCalibrated={mountCalib !== null}
+            calibrationTimestamp={mountCalib?.timestamp ?? null}
             onCalibrate={() => setShowMountCalibWizard(true)}
           />
           <View style={{ flex: 1 }}>

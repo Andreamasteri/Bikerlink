@@ -31,6 +31,7 @@ interface IdleConfigScreenProps {
   handleStart: () => void;
   handleOpenMountCalib: () => void;
   isCalibrated: boolean;
+  calibrationTimestamp?: number | null;
   t: (key: string) => string;
   renderHistory: () => React.ReactNode;
 }
@@ -53,6 +54,7 @@ export function IdleConfigScreen({
   handleStart,
   handleOpenMountCalib,
   isCalibrated,
+  calibrationTimestamp,
   t,
   renderHistory,
 }: IdleConfigScreenProps) {
@@ -67,7 +69,11 @@ export function IdleConfigScreen({
       showsVerticalScrollIndicator={false}
     >
       {/* Calibration banner — always shown at top */}
-      <CalibrationBanner isCalibrated={isCalibrated} onCalibrate={handleOpenMountCalib} />
+      <CalibrationBanner
+        isCalibrated={isCalibrated}
+        calibrationTimestamp={calibrationTimestamp}
+        onCalibrate={handleOpenMountCalib}
+      />
 
       {/* GPS Profile */}
       <View style={styles.profileSection}>

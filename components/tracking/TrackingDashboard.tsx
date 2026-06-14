@@ -295,6 +295,7 @@ export function TrackingDashboard({
               {sensorsEnabled && !isCalibrating && (
                 <CalibrationBanner
                   isCalibrated={mountAxisCalib !== null}
+                  calibrationTimestamp={mountAxisCalib?.timestamp ?? null}
                   onCalibrate={handleRecalibrate}
                 />
               )}

@@ -3,19 +3,41 @@ import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
 
+function formatCalibrationDate(ts: number): string {
+  const d = new Date(ts);
+  const dd = String(d.getDate()).padStart(2, "0");
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const yy = String(d.getFullYear()).slice(-2);
+  const HH = String(d.getHours()).padStart(2, "0");
+  const MM = String(d.getMinutes()).padStart(2, "0");
+  return `${dd}/${mm}/${yy} ${HH}:${MM}`;
+}
+
 export function CalibrationBanner({
   isCalibrated,
   onCalibrate,
+  calibrationTimestamp,
 }: {
   isCalibrated: boolean;
   onCalibrate: () => void;
+  calibrationTimestamp?: number | null;
 }) {
   if (isCalibrated) {
+    const dateLabel = calibrationTimestamp
+      ? formatCalibrationDate(calibrationTimestamp)
+      : null;
     return (
       <View style={bannerStyles.calibratedHint}>
-        <Text style={bannerStyles.calibratedHintText}>
-          Hai già calibrato la posizione del telefono. Ricalibrala in caso venga montato in modo diverso.
-        </Text>
+        <View style={{ flex: 1 }}>
+          <Text style={bannerStyles.calibratedHintText}>
+            Hai già calibrato la posizione del telefono. Ricalibrala in caso venga montato in modo diverso.
+          </Text>
+          {dateLabel ? (
+            <Text style={bannerStyles.calibratedTimestamp}>
+              Ultima calibrazione: {dateLabel}
+            </Text>
+          ) : null}
+        </View>
         <TouchableOpacity
           style={bannerStyles.recalibrateBtn}
           onPress={onCalibrate}
@@ -115,11 +137,16 @@ export const bannerStyles = StyleSheet.create({
     paddingVertical: 2,
   },
   calibratedHintText: {
-    flex: 1,
     fontFamily: "Inter_400Regular",
     fontSize: 11,
     color: Colors.textSecondary,
     lineHeight: 16,
+  },
+  calibratedTimestamp: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 10,
+    color: Colors.success,
+    marginTop: 3,
   },
   recalibrateBtn: {
     flexDirection: "row",

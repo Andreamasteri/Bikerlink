@@ -233,6 +233,7 @@ function TrackingScreenInner() {
           handleStart={handlers.handleStart}
           handleOpenMountCalib={() => handlers.setShowMountCalibWizard(true)}
           isCalibrated={state.mountAxisCalib !== null}
+          calibrationTimestamp={state.mountAxisCalib?.timestamp ?? null}
           t={t}
           renderHistory={() => (
             <View style={styles.recordsSection}>
