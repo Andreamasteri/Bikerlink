@@ -103,11 +103,12 @@ export default function FloatingWidget() {
   }, []);
 
   const panGesture = Gesture.Pan()
+    .runOnJS(true)
     .minDistance(0)
     .onStart(() => {
       startX.value = posX.value;
       startY.value = posY.value;
-      runOnJS(setIsTouching)(true);
+      setIsTouching(true);
     })
     .onUpdate((e) => {
       const rawX = startX.value + e.translationX;
@@ -122,10 +123,10 @@ export default function FloatingWidget() {
     })
     .onEnd((e) => {
       const dist = Math.sqrt(e.translationX ** 2 + e.translationY ** 2);
-      runOnJS(savePositionJS)(posX.value, posY.value);
-      runOnJS(setIsTouching)(false);
+      savePositionJS(posX.value, posY.value);
+      setIsTouching(false);
       if (dist <= TAP_THRESHOLD) {
-        runOnJS(handleTapJS)();
+        handleTapJS();
       }
     });
 
