@@ -452,6 +452,59 @@ router.get("/sensor-settings", async (req: Request, res: Response) => {
   }
 });
 
+// ── GET /api/telemetry/calibration ───────────────────────────────────────────
+router.get("/calibration", async (req: Request, res: Response) => {
+  const userId = requireUserId(req, res);
+  if (!userId) return;
+
+  try {
+    const result = await db.execute(sql`
+      SELECT mount_calibration FROM users WHERE id = ${userId} LIMIT 1
+    `);
+    const row = result.rows[0] as { mount_calibration: unknown } | undefined;
+    return res.json({ calibration: row?.mount_calibration ?? null });
+  } catch (err) {
+    console.error("[telemetry/calibration GET] error:", err);
+    return sendError(res, 500, "Errore lettura calibrazione");
+  }
+});
+
+// ── PUT /api/telemetry/calibration ───────────────────────────────────────────
+router.put("/calibration", async (req: Request, res: Response) => {
+  const userId = requireUserId(req, res);
+  if (!userId) return;
+
+  try {
+    const { calibration } = req.body as { calibration: unknown };
+
+    if (calibration !== null && calibration !== undefined) {
+      const c = calibration as Record<string, unknown>;
+      const validAxes = ["x", "y", "z"];
+      if (
+        !validAxes.includes(c.longAxis as string) ||
+        !validAxes.includes(c.latAxis as string) ||
+        !validAxes.includes(c.vertAxis as string) ||
+        (c.longSign !== 1 && c.longSign !== -1) ||
+        typeof c.timestamp !== "number"
+      ) {
+        return sendError(res, 400, "Payload calibrazione non valido");
+      }
+    }
+
+    const value = calibration == null ? null : JSON.stringify(calibration);
+    await db.execute(sql`
+      UPDATE users
+      SET mount_calibration = ${value}::jsonb, updated_at = NOW()
+      WHERE id = ${userId}
+    `);
+
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error("[telemetry/calibration PUT] error:", err);
+    return sendError(res, 500, "Errore salvataggio calibrazione");
+  }
+});
+
 router.delete("/reset", async (req: Request, res: Response) => {
   const userId = requireUserId(req, res);
   if (!userId) return;

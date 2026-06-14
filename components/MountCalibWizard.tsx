@@ -11,6 +11,7 @@ import { DeviceMotion } from "expo-sensors";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import Colors from "@/constants/colors";
 import { useT } from "@/lib/language-context";
+import { apiRequest } from "@/lib/query-client";
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -31,25 +32,38 @@ export async function loadMountCalibration(): Promise<MountAxisCalibration | nul
     const raw = await AsyncStorage.getItem(MOUNT_CALIB_KEY);
     if (raw) return JSON.parse(raw) as MountAxisCalibration;
   } catch {
-    // no-op: return null if storage fails
+    // AsyncStorage failed — fall through to server
+  }
+  // Fallback: recupera dal server e ripristina in AsyncStorage
+  try {
+    const res = await apiRequest("GET", "/api/telemetry/calibration");
+    const json = (await res.json()) as { calibration: MountAxisCalibration | null };
+    if (json.calibration) {
+      try {
+        await AsyncStorage.setItem(MOUNT_CALIB_KEY, JSON.stringify(json.calibration));
+      } catch {
+        // ignora errori di scrittura locale
+      }
+      return json.calibration;
+    }
+  } catch {
+    // rete non disponibile — fallback silenzioso
   }
   return null;
 }
 
 export async function saveMountCalibration(c: MountAxisCalibration): Promise<void> {
-  try {
-    await AsyncStorage.setItem(MOUNT_CALIB_KEY, JSON.stringify(c));
-  } catch {
-    // no-op: ignore storage failures during save
-  }
+  await Promise.allSettled([
+    AsyncStorage.setItem(MOUNT_CALIB_KEY, JSON.stringify(c)),
+    apiRequest("PUT", "/api/telemetry/calibration", { calibration: c }),
+  ]);
 }
 
 export async function clearMountCalibration(): Promise<void> {
-  try {
-    await AsyncStorage.removeItem(MOUNT_CALIB_KEY);
-  } catch {
-    // no-op: ignore storage failures during clear
-  }
+  await Promise.allSettled([
+    AsyncStorage.removeItem(MOUNT_CALIB_KEY),
+    apiRequest("PUT", "/api/telemetry/calibration", { calibration: null }),
+  ]);
 }
 
 // ─── Axis computation ─────────────────────────────────────────────────────────

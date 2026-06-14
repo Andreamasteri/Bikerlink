@@ -89,6 +89,14 @@ export const users = pgTable("users", {
   lastSeenMatchAt: timestamp("last_seen_match_at"),
   telemetryDisabled: boolean("telemetry_disabled").notNull().default(false),
   matchingDisabled: boolean("matching_disabled").notNull().default(false),
+  // Task #3946 — calibrazione assi supporto moto persistente su server
+  mountCalibration: jsonb("mount_calibration").$type<{
+    longAxis: "x" | "y" | "z";
+    latAxis: "x" | "y" | "z";
+    vertAxis: "x" | "y" | "z";
+    longSign: 1 | -1;
+    timestamp: number;
+  } | null>(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (table) => [

@@ -1,10 +1,30 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import * as Location from "expo-location";
 import { Accelerometer } from "expo-sensors";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
   loadMountCalibration,
   type MountAxisCalibration,
 } from "@/components/MountCalibWizard";
+
+export const RELAXED_MOUNT_MODE_KEY = "@bikerlink/relaxed_mount_mode";
+
+export async function loadRelaxedMountMode(): Promise<boolean> {
+  try {
+    const val = await AsyncStorage.getItem(RELAXED_MOUNT_MODE_KEY);
+    return val === "true";
+  } catch {
+    return false;
+  }
+}
+
+export async function setRelaxedMountMode(enabled: boolean): Promise<void> {
+  try {
+    await AsyncStorage.setItem(RELAXED_MOUNT_MODE_KEY, enabled ? "true" : "false");
+  } catch {
+    // ignora errori storage
+  }
+}
 
 // ─── Thresholds (per task spec) ───────────────────────────────────────────────
 const SPEED_START_KMH = 20;      // speed must stay above this to trigger start
@@ -33,16 +53,17 @@ function isInMountOrientation(
   return vertVal / total >= VERT_AXIS_MIN_FRACTION;
 }
 
-interface Options { enabled: boolean }
+interface Options { enabled: boolean; relaxedMode?: boolean }
 
-export function useMotorcycleDetector({ enabled }: Options): { isRiding: boolean } {
+export function useMotorcycleDetector({ enabled, relaxedMode = false }: Options): { isRiding: boolean } {
   const [isRiding, setIsRiding] = useState(false);
 
   const isRidingRef          = useRef(false);
   const calibRef             = useRef<MountAxisCalibration | null>(null);
+  const relaxedRef           = useRef(relaxedMode);
   const accelRef             = useRef<{ x: number; y: number; z: number }>({ x: 0, y: 0, z: 0 });
-  const aboveStartAtRef      = useRef<number | null>(null); // timestamp when speed first exceeded 20 km/h
-  const belowStopAtRef       = useRef<number | null>(null); // timestamp when speed first dropped below 15 km/h
+  const aboveStartAtRef      = useRef<number | null>(null);
+  const belowStopAtRef       = useRef<number | null>(null);
 
   const locationSubRef       = useRef<Location.LocationSubscription | null>(null);
   const accelSubRef          = useRef<ReturnType<typeof Accelerometer.addListener> | null>(null);
@@ -60,6 +81,11 @@ export function useMotorcycleDetector({ enabled }: Options): { isRiding: boolean
     resetTimers();
   }, [resetTimers]);
 
+  // ── Sync relaxedRef whenever the prop changes (immediate, no restart needed) ─
+  useEffect(() => {
+    relaxedRef.current = relaxedMode;
+  }, [relaxedMode]);
+
   useEffect(() => {
     if (!enabled) {
       cleanup();
@@ -73,7 +99,7 @@ export function useMotorcycleDetector({ enabled }: Options): { isRiding: boolean
     let cancelled = false;
 
     (async () => {
-      // Load calibration first — required for orientation check
+      // Carica la calibrazione (relaxedMode arriva dal prop, non da AsyncStorage)
       const calib = await loadMountCalibration();
       if (cancelled) return;
       calibRef.current = calib;
@@ -100,9 +126,10 @@ export function useMotorcycleDetector({ enabled }: Options): { isRiding: boolean
           const rawSpeed  = loc.coords.speed ?? 0;
           const speedKmh  = Math.max(0, rawSpeed * 3.6);
           const calib     = calibRef.current;
-          const inMount   = calib ? isInMountOrientation(accelRef.current, calib) : true;
-          // ^^^ fallback true when no calib stored (should not happen — provider
-          //     disables when uncalibrated, but defensive default)
+          // In modalità rilassata, il gate orientamento è sempre soddisfatto
+          const inMount   = relaxedRef.current
+            ? true
+            : calib ? isInMountOrientation(accelRef.current, calib) : true;
 
           if (!isRidingRef.current) {
             // ── Waiting to start ──────────────────────────────────────────────
@@ -116,7 +143,6 @@ export function useMotorcycleDetector({ enabled }: Options): { isRiding: boolean
                 belowStopAtRef.current  = null;
               }
             } else {
-              // Reset if speed drops or phone leaves mount
               aboveStartAtRef.current = null;
             }
           } else {
@@ -125,14 +151,12 @@ export function useMotorcycleDetector({ enabled }: Options): { isRiding: boolean
               if (belowStopAtRef.current === null) {
                 belowStopAtRef.current = now;
               } else if (now - belowStopAtRef.current > STOP_DURATION_MS) {
-                // Strictly >60s (task spec says ">60s consecutive")
                 isRidingRef.current    = false;
                 setIsRiding(false);
                 belowStopAtRef.current = null;
                 aboveStartAtRef.current = null;
               }
             } else {
-              // Speed recovered (brief stop / traffic light) — reset stop timer
               belowStopAtRef.current = null;
             }
           }

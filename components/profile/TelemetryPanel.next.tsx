@@ -23,10 +23,84 @@ import {
   MountCalibWizard,
   loadMountCalibration,
 } from "@/components/MountCalibWizard";
+import {
+  loadRelaxedMountMode,
+  setRelaxedMountMode,
+} from "@/hooks/useMotorcycleDetector";
 import { TelemetryInfoModal } from "./TelemetryInfoModal";
 import { useAutoTelemetry } from "@/lib/auto-telemetry-context";
 
 const LAP_TARGETS_KM = [10, 30, 50, 100];
+
+// ── GateDots ─────────────────────────────────────────────────────────────────
+// 3 piccoli pallini discreti che mostrano lo stato dei 3 gate dell'auto-telemetria.
+// Visibili sempre sotto il contatore km (non solo quando espanso).
+
+function GateDots({
+  toggle,
+  calibrated,
+  riding,
+  onCalibratePress,
+}: {
+  toggle: boolean;
+  calibrated: boolean;
+  riding: boolean;
+  onCalibratePress: () => void;
+}) {
+  const dot1Color = toggle ? "#27ae60" : Colors.textSecondary;
+  const dot2Color = calibrated ? "#27ae60" : "#e67e22";
+  const dot3Color = riding ? "#27ae60" : "#e74c3c";
+
+  const handleDotPress = (gate: 1 | 2 | 3) => {
+    if (gate === 1 && toggle) return;
+    if (gate === 2 && calibrated) return;
+    if (gate === 3 && riding) return;
+    if (gate === 1) {
+      Alert.alert("Toggle spento", "Attiva 'Telemetria sempre attiva' per abilitare la raccolta automatica.");
+    } else if (gate === 2) {
+      Alert.alert(
+        "Non calibrato",
+        "Esegui la calibrazione supporto per permettere al rilevamento automatico di riconoscere che il telefono è montato sulla moto.",
+        [
+          { text: "Annulla", style: "cancel" },
+          { text: "Calibra ora", onPress: onCalibratePress },
+        ]
+      );
+    } else {
+      Alert.alert(
+        "Moto non rilevata",
+        "Monta il telefono e supera i 20 km/h per almeno 3 secondi, oppure attiva la modalità rilassata ('Non uso un supporto fisso') per ignorare il check orientamento."
+      );
+    }
+  };
+
+  return (
+    <View style={gateStyles.row}>
+      <TouchableOpacity onPress={() => handleDotPress(1)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+        <View style={[gateStyles.dot, { backgroundColor: dot1Color }]} />
+      </TouchableOpacity>
+      <TouchableOpacity onPress={() => handleDotPress(2)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+        <View style={[gateStyles.dot, { backgroundColor: dot2Color }]} />
+      </TouchableOpacity>
+      <TouchableOpacity onPress={() => handleDotPress(3)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+        <View style={[gateStyles.dot, { backgroundColor: dot3Color }]} />
+      </TouchableOpacity>
+    </View>
+  );
+}
+
+const gateStyles = StyleSheet.create({
+  row: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  dot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+});
 
 type TelemetryStats = {
   km_collected: number;
@@ -85,7 +159,7 @@ const autoStyles = StyleSheet.create({
 });
 
 export default function TelemetryPanel({ telemetryStats }: Props) {
-  const { isAutoRiding } = useAutoTelemetry();
+  const { isAutoRiding, isCalibrated: ctxCalibrated, alwaysActive: ctxAlwaysActive } = useAutoTelemetry();
 
   const [telemetryExpanded, setTelemetryExpanded] = useState(false);
   const [idealLapResetKey, setIdealLapResetKey] = useState(0);
@@ -95,9 +169,11 @@ export default function TelemetryPanel({ telemetryStats }: Props) {
   const [isCalibrated, setIsCalibrated] = useState<boolean | null>(null);
   const [showCalibWizard, setShowCalibWizard] = useState(false);
   const [showInfoModal, setShowInfoModal] = useState(false);
+  const [relaxedMode, setRelaxedMode] = useState(false);
 
   useEffect(() => {
     loadTelemetryAlwaysActive().then(setAlwaysActive).catch(() => {});
+    loadRelaxedMountMode().then(setRelaxedMode).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -201,6 +277,13 @@ export default function TelemetryPanel({ telemetryStats }: Props) {
           </Text>
         </View>
 
+        <GateDots
+          toggle={ctxAlwaysActive}
+          calibrated={ctxCalibrated}
+          riding={isAutoRiding}
+          onCalibratePress={() => setShowCalibWizard(true)}
+        />
+
         {telemetryStats.track_km > 0 && (
           <View style={styles.trackKmRow}>
             <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
@@ -243,6 +326,24 @@ export default function TelemetryPanel({ telemetryStats }: Props) {
               </View>
               <Ionicons name="chevron-forward" size={16} color={Colors.textSecondary} />
             </TouchableOpacity>
+
+            <View style={styles.settingRow}>
+              <View style={styles.settingTextCol}>
+                <Text style={styles.settingTitle}>Non uso un supporto fisso</Text>
+                <Text style={styles.settingSubtitle}>
+                  Attiva la telemetria basandosi solo sulla velocità GPS (≥ 20 km/h per 3s)
+                </Text>
+              </View>
+              <Switch
+                value={relaxedMode}
+                onValueChange={async (v) => {
+                  setRelaxedMode(v);
+                  await setRelaxedMountMode(v);
+                }}
+                trackColor={{ false: Colors.border, true: Colors.accent }}
+                thumbColor="#fff"
+              />
+            </View>
 
             <View style={styles.telemetryExpandedHeader}>
               <Text style={styles.telemetryExpandedTitle}>Giri Ideali</Text>
