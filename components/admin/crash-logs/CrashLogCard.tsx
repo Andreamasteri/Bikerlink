@@ -81,6 +81,14 @@ export function CrashLogCard({
             <Text style={[cardStyles.metaText, { color: colors.textSecondary }]}>Sessione {duration}</Text>
           </View>
         ) : null}
+        {item.sessionId ? (
+          <View style={cardStyles.metaItem}>
+            <MaterialCommunityIcons name="identifier" size={12} color={colors.textSecondary} />
+            <Text style={[cardStyles.metaText, { color: colors.textSecondary }]} numberOfLines={1}>
+              {item.sessionId.length > 12 ? item.sessionId.slice(0, 12) + "…" : item.sessionId}
+            </Text>
+          </View>
+        ) : null}
       </View>
 
       {item.errorMessage ? (

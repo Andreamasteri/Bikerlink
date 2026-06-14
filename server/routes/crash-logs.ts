@@ -67,7 +67,7 @@ publicRouter.post("/", (req: Request, res: Response): void => {
   const userId = req.session.userId;
   const batch = (parsed.data.logs as CrashLogEntryInput[]).slice(0, MAX_BATCH);
 
-  const validCrashTypes = ["crash_system", "crash_js", "clean_close"] as const;
+  const validCrashTypes = ["crash_system", "crash_js", "clean_close", "restart_loop"] as const;
   type ValidCrashType = typeof validCrashTypes[number];
 
   const rows = batch.map((entry) => {
@@ -109,13 +109,61 @@ publicRouter.post("/", (req: Request, res: Response): void => {
 
 export const adminRouter = Router();
 
-adminRouter.get("/stats", requireAdmin, (_req: Request, res: Response): void => {
+adminRouter.get("/stats", requireAdmin, (req: Request, res: Response): void => {
+  const {
+    crashType: qCrashType,
+    userId: qUserId,
+    dateFrom: qDateFrom,
+    dateTo: qDateTo,
+    appVersion: qAppVersion,
+    deviceModel: qDeviceModel,
+  } = req.query as Record<string, string>;
+  const qDeviceFilter = qDeviceModel?.trim();
+
+  const validStatsTypes = ["crash_system", "crash_js", "restart_loop"];
+  const isSingleType = validStatsTypes.includes(qCrashType);
+
+  // Base type filter (unqualified — for single-table queries)
+  let statsWhere = isSingleType
+    ? sql`crash_type = ${qCrashType}`
+    : sql`crash_type IN ('crash_system','crash_js','restart_loop')`;
+
+  // Base type filter qualified with "acl." alias — for the JOIN query
+  let aclTypeWhere = isSingleType
+    ? sql`acl.crash_type = ${qCrashType}`
+    : sql`acl.crash_type IN ('crash_system','crash_js','restart_loop')`;
+
+  // Chain extra conditions onto both
+  if (qUserId) {
+    statsWhere = sql`${statsWhere} AND user_id = ${qUserId}`;
+    aclTypeWhere = sql`${aclTypeWhere} AND acl.user_id = ${qUserId}`;
+  }
+  if (qDateFrom) {
+    const df = new Date(qDateFrom);
+    statsWhere = sql`${statsWhere} AND reported_at >= ${df}`;
+    aclTypeWhere = sql`${aclTypeWhere} AND acl.reported_at >= ${df}`;
+  }
+  if (qDateTo) {
+    const dt = new Date(qDateTo.length === 10 ? qDateTo + "T23:59:59.999Z" : qDateTo);
+    statsWhere = sql`${statsWhere} AND reported_at <= ${dt}`;
+    aclTypeWhere = sql`${aclTypeWhere} AND acl.reported_at <= ${dt}`;
+  }
+  if (qAppVersion) {
+    statsWhere = sql`${statsWhere} AND app_version = ${qAppVersion}`;
+    aclTypeWhere = sql`${aclTypeWhere} AND acl.app_version = ${qAppVersion}`;
+  }
+  if (qDeviceFilter) {
+    const pat = "%" + qDeviceFilter + "%";
+    statsWhere = sql`${statsWhere} AND (device_model ILIKE ${pat} OR device_brand ILIKE ${pat})`;
+    aclTypeWhere = sql`${aclTypeWhere} AND (acl.device_model ILIKE ${pat} OR acl.device_brand ILIKE ${pat})`;
+  }
+
   Promise.all([
     // 1. Total by crash type
     db.execute(sql`
       SELECT crash_type, COUNT(*)::int AS cnt
       FROM app_crash_logs
-      WHERE crash_type IN ('crash_system','crash_js')
+      WHERE ${statsWhere}
       GROUP BY crash_type
     `),
     // 2. Top-3 app versions with per-type breakdown
@@ -128,16 +176,17 @@ adminRouter.get("/stats", requireAdmin, (_req: Request, res: Response): void => 
             CAST(COALESCE(NULLIF(REGEXP_REPLACE(SPLIT_PART(app_version, '.', 3), '[^0-9]', '', 'g'), ''), '0') AS INTEGER) DESC
           ) AS rn
         FROM app_crash_logs
-        WHERE crash_type IN ('crash_system','crash_js') AND app_version IS NOT NULL
+        WHERE ${statsWhere} AND app_version IS NOT NULL
       )
       SELECT
         r.app_version AS version,
-        SUM(CASE WHEN acl.crash_type = 'crash_system' THEN 1 ELSE 0 END)::int AS crash_system,
-        SUM(CASE WHEN acl.crash_type = 'crash_js'     THEN 1 ELSE 0 END)::int AS crash_js,
+        SUM(CASE WHEN acl.crash_type = 'crash_system'   THEN 1 ELSE 0 END)::int AS crash_system,
+        SUM(CASE WHEN acl.crash_type = 'crash_js'       THEN 1 ELSE 0 END)::int AS crash_js,
+        SUM(CASE WHEN acl.crash_type = 'restart_loop'   THEN 1 ELSE 0 END)::int AS restart_loop,
         COUNT(*)::int AS total
       FROM ranked r
       JOIN app_crash_logs acl ON acl.app_version = r.app_version
-        AND acl.crash_type IN ('crash_system','crash_js')
+        AND ${aclTypeWhere}
       WHERE r.rn <= 3
       GROUP BY r.app_version
       ORDER BY
@@ -149,10 +198,11 @@ adminRouter.get("/stats", requireAdmin, (_req: Request, res: Response): void => 
     db.execute(sql`
       SELECT
         TO_CHAR(reported_at AT TIME ZONE 'UTC', 'YYYY-MM-DD') AS day,
-        SUM(CASE WHEN crash_type = 'crash_system' THEN 1 ELSE 0 END)::int AS crash_system,
-        SUM(CASE WHEN crash_type = 'crash_js'     THEN 1 ELSE 0 END)::int AS crash_js
+        SUM(CASE WHEN crash_type = 'crash_system'  THEN 1 ELSE 0 END)::int AS crash_system,
+        SUM(CASE WHEN crash_type = 'crash_js'      THEN 1 ELSE 0 END)::int AS crash_js,
+        SUM(CASE WHEN crash_type = 'restart_loop'  THEN 1 ELSE 0 END)::int AS restart_loop
       FROM app_crash_logs
-      WHERE crash_type IN ('crash_system','crash_js')
+      WHERE ${statsWhere}
         AND reported_at >= NOW() - INTERVAL '14 days'
       GROUP BY day
       ORDER BY day ASC
@@ -160,7 +210,7 @@ adminRouter.get("/stats", requireAdmin, (_req: Request, res: Response): void => 
     // 4. Crash-free rate last 24h
     db.execute(sql`
       SELECT
-        COUNT(*) FILTER (WHERE crash_type IN ('crash_system','crash_js')) AS crash_count,
+        COUNT(*) FILTER (WHERE ${statsWhere}) AS crash_count,
         COUNT(*) AS total_sessions
       FROM app_crash_logs
       WHERE reported_at >= NOW() - INTERVAL '24 hours'
@@ -169,13 +219,13 @@ adminRouter.get("/stats", requireAdmin, (_req: Request, res: Response): void => 
     db.execute(sql`
       SELECT PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY total_memory_mb) AS ram_median
       FROM app_crash_logs
-      WHERE crash_type IN ('crash_system','crash_js')
+      WHERE ${statsWhere}
         AND total_memory_mb IS NOT NULL
         AND reported_at >= NOW() - INTERVAL '30 days'
     `),
   ])
     .then(([typeRows, versionRows, trendRows, rateRows, ramRows]) => {
-      const byType: Record<string, number> = { crash_system: 0, crash_js: 0 };
+      const byType: Record<string, number> = { crash_system: 0, crash_js: 0, restart_loop: 0 };
       for (const row of typeRows.rows as { crash_type: string; cnt: number }[]) {
         byType[row.crash_type] = row.cnt;
       }
@@ -194,8 +244,8 @@ adminRouter.get("/stats", requireAdmin, (_req: Request, res: Response): void => 
 
       res.json({
         byType,
-        byVersion: versionRows.rows as { version: string; crash_system: number; crash_js: number; total: number }[],
-        dailyTrend: trendRows.rows as { day: string; crash_system: number; crash_js: number }[],
+        byVersion: versionRows.rows as { version: string; crash_system: number; crash_js: number; restart_loop: number; total: number }[],
+        dailyTrend: trendRows.rows as { day: string; crash_system: number; crash_js: number; restart_loop: number }[],
         crashFreeRate24h,
         ramMedianCrashMb,
       });
@@ -245,9 +295,9 @@ adminRouter.get("/", requireAdmin, (req: Request, res: Response): void => {
   const deviceFilter = deviceModel?.trim();
 
   const where = and(
-    inArray(appCrashLogs.crashType, ["crash_system", "crash_js"]),
+    inArray(appCrashLogs.crashType, ["crash_system", "crash_js", "restart_loop"]),
     filterUserId ? eq(appCrashLogs.userId, filterUserId) : undefined,
-    crashType === "crash_system" || crashType === "crash_js"
+    crashType === "crash_system" || crashType === "crash_js" || crashType === "restart_loop"
       ? eq(appCrashLogs.crashType, crashType)
       : undefined,
     dateFrom ? gte(appCrashLogs.reportedAt, new Date(dateFrom)) : undefined,
@@ -299,24 +349,20 @@ adminRouter.get("/", requireAdmin, (req: Request, res: Response): void => {
       .groupBy(appCrashLogs.platform, appCrashLogs.deviceModel, appCrashLogs.deviceBrand)
       .orderBy(desc(sql`count(*)`))
       .limit(10),
-    // Top brands aggregation
-    db.execute(sql`
-      SELECT
-        COALESCE(device_brand, 'Sconosciuto') AS brand,
-        COUNT(*)::int AS total
-      FROM app_crash_logs
-      WHERE crash_type IN ('crash_system','crash_js')
-        AND (
-          device_model IS NOT NULL OR device_brand IS NOT NULL
-        )
-      GROUP BY COALESCE(device_brand, 'Sconosciuto')
-      ORDER BY total DESC
-      LIMIT 10
-    `),
+    // Top brands aggregation — filter-aware via ORM where
+    db.select({
+      brand: sql<string>`COALESCE(${appCrashLogs.deviceBrand}, 'Sconosciuto')`,
+      total: count(),
+    })
+    .from(appCrashLogs)
+    .where(and(where, sql`(${appCrashLogs.deviceModel} IS NOT NULL OR ${appCrashLogs.deviceBrand} IS NOT NULL)`))
+    .groupBy(sql`COALESCE(${appCrashLogs.deviceBrand}, 'Sconosciuto')`)
+    .orderBy(desc(sql`count(*)`))
+    .limit(10),
   ])
     .then(([rows, countRows, deviceRows, brandRows]) => {
       const totalCount = countRows[0]?.count ?? 0;
-      const brandList = brandRows.rows as { brand: string; total: number }[];
+      const brandList = brandRows as { brand: string; total: number }[];
       const grandTotal = brandList.reduce((s, b) => s + b.total, 0);
       res.json({
         logs: rows,

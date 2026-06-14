@@ -95,13 +95,25 @@ export default function CrashLogsScreen() {
     staleTime: 30_000,
   });
 
+  function buildStatsQueryString() {
+    const p = new URLSearchParams();
+    if (filterType) p.set("crashType", filterType);
+    if (filterUser.trim()) p.set("userId", filterUser.trim());
+    if (filterVersion.trim()) p.set("appVersion", filterVersion.trim());
+    if (filterDateFrom.trim()) p.set("dateFrom", filterDateFrom.trim());
+    if (filterDateTo.trim()) p.set("dateTo", filterDateTo.trim());
+    if (filterDevice.trim()) p.set("deviceModel", filterDevice.trim());
+    const qs = p.toString();
+    return qs ? `?${qs}` : "";
+  }
+
   const { data: statsData } = useQuery<CrashStatsResponse>({
-    queryKey: ["/api/admin/crash-logs/stats"],
+    queryKey: ["/api/admin/crash-logs/stats", filterType, filterUser, filterVersion, filterDateFrom, filterDateTo, filterDevice],
     queryFn: async () => {
-      const res = await apiRequest("GET", "/api/admin/crash-logs/stats");
+      const res = await apiRequest("GET", `/api/admin/crash-logs/stats${buildStatsQueryString()}`);
       return res.json() as Promise<CrashStatsResponse>;
     },
-    staleTime: 60_000,
+    staleTime: 30_000,
   });
 
   const { data: alertsData } = useQuery<CrashAlertsResponse>({
@@ -273,7 +285,7 @@ export default function CrashLogsScreen() {
               {statsData && <CrashLogStats stats={statsData} />}
               <Text style={[styles.totalText, { color: colors.textSecondary, marginTop: statsData ? 12 : 4 }]}>
                 {total} crash
-                {filterType ? ` · ${filterType === "crash_js" ? "JS Error" : "Sistema"}` : ""}
+                {filterType ? ` · ${filterType === "crash_js" ? "JS Error" : filterType === "restart_loop" ? "Restart Loop" : "Sistema"}` : ""}
                 {filterVersion.trim() ? ` · v${filterVersion.trim()}` : ""}
                 {filterDevice.trim() ? ` · ${filterDevice.trim()}` : ""}
               </Text>

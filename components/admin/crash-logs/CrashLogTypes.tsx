@@ -2,21 +2,22 @@ import React from "react";
 import { View, Text, StyleSheet } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 
-export type CrashType = "crash_system" | "crash_js";
+export type CrashType = "crash_system" | "crash_js" | "restart_loop";
 
 export function CrashTypeBadge({ type }: { type: CrashType }) {
   const isJs = type === "crash_js";
-  const bg = isJs ? "#FF444422" : "#FF6B3522";
-  const color = isJs ? "#FF4444" : "#FF6B35";
+  const isLoop = type === "restart_loop";
+  const bg = isJs ? "#FF444422" : isLoop ? "#9B59B622" : "#FF6B3522";
+  const color = isJs ? "#FF4444" : isLoop ? "#9B59B6" : "#FF6B35";
   return (
     <View style={[badgeStyles.badge, { backgroundColor: bg }]}>
       <MaterialCommunityIcons
-        name={isJs ? "code-braces" : "phone-alert"}
+        name={isJs ? "code-braces" : isLoop ? "restart" : "phone-alert"}
         size={12}
         color={color}
       />
       <Text style={[badgeStyles.text, { color }]}>
-        {isJs ? "JS Error" : "Sistema"}
+        {isJs ? "JS Error" : isLoop ? "Restart Loop" : "Sistema"}
       </Text>
     </View>
   );
@@ -91,6 +92,7 @@ export interface VersionStat {
   version: string;
   crash_system: number;
   crash_js: number;
+  restart_loop: number;
   total: number;
 }
 
@@ -98,10 +100,11 @@ export interface DayTrend {
   day: string;
   crash_system: number;
   crash_js: number;
+  restart_loop: number;
 }
 
 export interface CrashStatsResponse {
-  byType: { crash_system: number; crash_js: number };
+  byType: { crash_system: number; crash_js: number; restart_loop: number };
   byVersion: VersionStat[];
   dailyTrend: DayTrend[];
   crashFreeRate24h: number | null;

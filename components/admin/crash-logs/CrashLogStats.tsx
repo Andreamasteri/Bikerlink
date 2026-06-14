@@ -6,6 +6,7 @@ import { CrashStatsResponse, DayTrend } from "./CrashLogTypes";
 
 const JS_COLOR = "#FF4444";
 const SYS_COLOR = "#FF6B35";
+const LOOP_COLOR = "#9B59B6";
 const GREEN = "#22C55E";
 const YELLOW = "#F59E0B";
 const RED = "#EF4444";
@@ -29,7 +30,8 @@ export function CrashLogStats({ stats }: { stats: CrashStatsResponse }) {
   const colors = useColors();
   const totalSystem = stats.byType.crash_system ?? 0;
   const totalJs = stats.byType.crash_js ?? 0;
-  const grandTotal = totalSystem + totalJs;
+  const totalLoop = stats.byType.restart_loop ?? 0;
+  const grandTotal = totalSystem + totalJs + totalLoop;
 
   const rawTrend = React.useMemo(() => stats.dailyTrend ?? [], [stats.dailyTrend]);
 
@@ -41,12 +43,12 @@ export function CrashLogStats({ stats }: { stats: CrashStatsResponse }) {
     for (let i = 13; i >= 0; i--) {
       const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - i));
       const key = d.toISOString().slice(0, 10);
-      days.push(map[key] ?? { day: key, crash_system: 0, crash_js: 0 });
+      days.push(map[key] ?? { day: key, crash_system: 0, crash_js: 0, restart_loop: 0 });
     }
     return days;
   }, [rawTrend]);
 
-  const maxDay = Math.max(1, ...trend.map((d) => d.crash_system + d.crash_js));
+  const maxDay = Math.max(1, ...trend.map((d) => d.crash_system + d.crash_js + (d.restart_loop ?? 0)));
 
   const shortDay = (iso: string) => {
     const d = new Date(iso + "T00:00:00Z");
@@ -99,6 +101,13 @@ export function CrashLogStats({ stats }: { stats: CrashStatsResponse }) {
                     JS: {totalJs}
                   </Text>
                 </View>
+                {totalLoop > 0 && (
+                  <View style={[statsStyles.typePill, { backgroundColor: LOOP_COLOR + "22" }]}>
+                    <Text style={[statsStyles.typePillText, { color: LOOP_COLOR }]}>
+                      RL: {totalLoop}
+                    </Text>
+                  </View>
+                )}
               </View>
             </View>
           </View>
@@ -117,6 +126,10 @@ export function CrashLogStats({ stats }: { stats: CrashStatsResponse }) {
             <Text style={[statsStyles.tileLabel, { color: colors.textSecondary }]}>JS Error</Text>
           </View>
           <View style={[statsStyles.tile, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <Text style={[statsStyles.tileCount, { color: LOOP_COLOR }]}>{totalLoop}</Text>
+            <Text style={[statsStyles.tileLabel, { color: colors.textSecondary }]}>Restart</Text>
+          </View>
+          <View style={[statsStyles.tile, { backgroundColor: colors.surface, borderColor: colors.border }]}>
             <Text style={[statsStyles.tileCount, { color: colors.text }]}>{grandTotal}</Text>
             <Text style={[statsStyles.tileLabel, { color: colors.textSecondary }]}>Totale</Text>
           </View>
@@ -132,17 +145,22 @@ export function CrashLogStats({ stats }: { stats: CrashStatsResponse }) {
           </View>
           <View style={statsStyles.chartRow}>
             {trend.map((d, i) => {
-              const total = d.crash_system + d.crash_js;
+              const loopCount = d.restart_loop ?? 0;
+              const total = d.crash_system + d.crash_js + loopCount;
               const barH = Math.max(2, Math.round((total / maxDay) * BAR_MAX_HEIGHT));
               const sysH = total > 0 ? Math.round((d.crash_system / total) * barH) : 0;
-              const jsH = barH - sysH;
+              const jsH = total > 0 ? Math.round((d.crash_js / total) * barH) : 0;
+              const loopH = barH - sysH - jsH;
               const isLast = i === trend.length - 1;
               return (
                 <View key={d.day} style={[statsStyles.barWrapper, isLast && statsStyles.barWrapperLast]}>
                   <View style={[statsStyles.barContainer, { height: BAR_MAX_HEIGHT }]}>
                     <View style={{ width: BAR_WIDTH, height: barH, justifyContent: "flex-end" }}>
+                      {loopH > 0 && (
+                        <View style={{ width: BAR_WIDTH, height: loopH, backgroundColor: LOOP_COLOR, borderTopLeftRadius: 2, borderTopRightRadius: 2 }} />
+                      )}
                       {jsH > 0 && (
-                        <View style={{ width: BAR_WIDTH, height: jsH, backgroundColor: JS_COLOR, borderTopLeftRadius: 2, borderTopRightRadius: 2 }} />
+                        <View style={{ width: BAR_WIDTH, height: jsH, backgroundColor: JS_COLOR, borderTopLeftRadius: loopH > 0 ? 0 : 2, borderTopRightRadius: loopH > 0 ? 0 : 2 }} />
                       )}
                       {sysH > 0 && (
                         <View style={{ width: BAR_WIDTH, height: sysH, backgroundColor: SYS_COLOR }} />
@@ -164,6 +182,10 @@ export function CrashLogStats({ stats }: { stats: CrashStatsResponse }) {
             <View style={statsStyles.legendItem}>
               <View style={[statsStyles.legendDot, { backgroundColor: JS_COLOR }]} />
               <Text style={[statsStyles.legendText, { color: colors.textSecondary }]}>JS Error</Text>
+            </View>
+            <View style={statsStyles.legendItem}>
+              <View style={[statsStyles.legendDot, { backgroundColor: LOOP_COLOR }]} />
+              <Text style={[statsStyles.legendText, { color: colors.textSecondary }]}>Restart Loop</Text>
             </View>
           </View>
         </View>
@@ -198,6 +220,9 @@ export function CrashLogStats({ stats }: { stats: CrashStatsResponse }) {
             const barTotalW = Math.max(1, grandTotal);
             const pct = Math.round((v.total / barTotalW) * 100);
             const sysPct = v.total > 0 ? Math.round((v.crash_system / v.total) * 100) : 0;
+            const jsPct = v.total > 0 ? Math.round((v.crash_js / v.total) * 100) : 0;
+            const loopPct = Math.max(0, 100 - sysPct - jsPct);
+            const loopCount = v.restart_loop ?? 0;
             return (
               <View key={v.version} style={statsStyles.versionRow}>
                 <Text style={[statsStyles.versionLabel, { color: colors.text }]} numberOfLines={1}>
@@ -208,8 +233,9 @@ export function CrashLogStats({ stats }: { stats: CrashStatsResponse }) {
                     <View
                       style={[statsStyles.versionBarFill, { width: `${pct}%` as `${number}%` }]}
                     >
-                      <View style={{ flex: sysPct, backgroundColor: SYS_COLOR, borderRadius: 3 }} />
-                      <View style={{ flex: 100 - sysPct, backgroundColor: JS_COLOR, borderTopRightRadius: 3, borderBottomRightRadius: 3 }} />
+                      <View style={{ flex: sysPct || 0, backgroundColor: SYS_COLOR, borderRadius: 3 }} />
+                      <View style={{ flex: jsPct || 0, backgroundColor: JS_COLOR }} />
+                      <View style={{ flex: loopPct || 0, backgroundColor: LOOP_COLOR, borderTopRightRadius: 3, borderBottomRightRadius: 3 }} />
                     </View>
                   </View>
                 </View>
@@ -217,6 +243,12 @@ export function CrashLogStats({ stats }: { stats: CrashStatsResponse }) {
                   <Text style={[statsStyles.versionCountSys, { color: SYS_COLOR }]}>{v.crash_system}</Text>
                   <Text style={[statsStyles.versionCountSep, { color: colors.textSecondary }]}>/</Text>
                   <Text style={[statsStyles.versionCountJs, { color: JS_COLOR }]}>{v.crash_js}</Text>
+                  {loopCount > 0 && (
+                    <>
+                      <Text style={[statsStyles.versionCountSep, { color: colors.textSecondary }]}>/</Text>
+                      <Text style={[statsStyles.versionCountJs, { color: LOOP_COLOR }]}>{loopCount}</Text>
+                    </>
+                  )}
                 </View>
               </View>
             );

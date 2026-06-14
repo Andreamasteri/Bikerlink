@@ -8,6 +8,7 @@ export const TYPE_FILTERS: { label: string; value: "" | CrashType }[] = [
   { label: "Tutti", value: "" },
   { label: "Sistema", value: "crash_system" },
   { label: "JS Error", value: "crash_js" },
+  { label: "Restart Loop", value: "restart_loop" },
 ];
 
 interface CrashLogFiltersProps {
