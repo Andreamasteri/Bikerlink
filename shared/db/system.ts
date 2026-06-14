@@ -488,6 +488,44 @@ export const mapsQuota = pgTable("maps_quota", {
 export type MapsQuota = typeof mapsQuota.$inferSelect;
 export type InsertMapsQuota = typeof mapsQuota.$inferInsert;
 
+export const deviceMetrics = pgTable("device_metrics", {
+  id: varchar("id", { length: 36 })
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  userId: varchar("user_id", { length: 36 })
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  sessionId: varchar("session_id", { length: 64 }).notNull(),
+  platform: varchar("platform", { length: 16 }),
+  memoryUsedMb: integer("memory_used_mb"),
+  memoryTotalMb: integer("memory_total_mb"),
+  batteryLevel: integer("battery_level"),
+  batteryState: varchar("battery_state", { length: 20 }),
+  appUptimeSeconds: integer("app_uptime_seconds"),
+  recordedAt: timestamp("recorded_at").notNull().defaultNow(),
+}, (table) => [
+  index("device_metrics_user_id_idx").on(table.userId),
+  index("device_metrics_recorded_at_idx").on(table.recordedAt),
+]);
+export type DeviceMetric = typeof deviceMetrics.$inferSelect;
+export type InsertDeviceMetric = typeof deviceMetrics.$inferInsert;
+
+export const resourceSamples = pgTable("resource_samples", {
+  id: varchar("id", { length: 36 })
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  sampledAt: timestamp("sampled_at").notNull().defaultNow(),
+  avgRamPct: integer("avg_ram_pct"),
+  avgBatteryPct: integer("avg_battery_pct"),
+  onlineUsers: integer("online_users"),
+  dbSizeMb: integer("db_size_mb"),
+  backendRssMb: integer("backend_rss_mb"),
+}, (table) => [
+  index("resource_samples_sampled_at_idx").on(table.sampledAt),
+]);
+export type ResourceSample = typeof resourceSamples.$inferSelect;
+export type InsertResourceSample = typeof resourceSamples.$inferInsert;
+
 export const thinkcentreHealthEvents = pgTable("thinkcentre_health_events", {
   id: varchar("id", { length: 36 })
     .primaryKey()

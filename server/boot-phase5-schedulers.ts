@@ -291,6 +291,14 @@ export async function runPhase5Schedulers(): Promise<void> {
     console.warn("[INIT] Embedding cap alert job failed (non-fatal):", e);
   }
 
+  try {
+    const { startResourceGraphSampler } = await import("./resource-graph-sampler");
+    startResourceGraphSampler();
+    console.log("[INIT] Resource graph sampler started (samples when resource_graph_enabled=true)");
+  } catch (e) {
+    console.warn("[INIT] Resource graph sampler failed to start (non-fatal):", e);
+  }
+
   // Arm the boot-job queue here — phase 5 is the last boot phase, so all
   // registrations from startMatchingEngine() and runPhase5Schedulers() are
   // guaranteed to have happened before this point.

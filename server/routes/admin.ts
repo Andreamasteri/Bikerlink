@@ -300,6 +300,7 @@ import thinkcentreMetricsRouter from './admin/thinkcentre-metrics';
 import systemProbeRouter from './admin/system-probe';
 // Task #3894 — Raccolta bug consolidata per il FAB admin.
 import bugReportRouter from './admin/bug-report';
+import resourceMonitorRouter from './admin/resource-monitor';
 
 router.post('/maps/osm-updated', async (req: Request, res: Response) => {
   try {
@@ -431,5 +432,6 @@ router.use('/legal', _requireAdmin, legalRouter);
 router.use('/legal', _requireAdmin, legalNextRouter);
 // Task #3894 — Raccolta bug FAB.
 router.use('/', _requireAdmin, bugReportRouter);
+router.use('/', _requireAdmin, resourceMonitorRouter);
 
 export default router;

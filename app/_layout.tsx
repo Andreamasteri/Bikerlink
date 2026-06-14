@@ -39,7 +39,13 @@ import { PushTokenRegistrar } from "@/components/layout/PushTokenRegistrar";
 import AssistantFab from "@/components/user/ai-assistant/AssistantFab";
 import AssistantOnboardingTour from "@/components/user/ai-assistant/AssistantOnboardingTour";
 import { useOtaStagingBanner } from "@/hooks/useOtaStagingBanner";
+import { useDeviceMetrics } from "@/hooks/useDeviceMetrics";
 SplashScreen.preventAutoHideAsync();
+
+function DeviceMetricsReporter() {
+  useDeviceMetrics();
+  return null;
+}
 
 function GpsAlwaysGate({ isAuthenticated }: { isAuthenticated: boolean }) {
   const { hasBackgroundPermission, backgroundPermissionChecked, backgroundPermissionRevoked } = useLocationGate();
@@ -269,6 +275,7 @@ export default function RootLayout() {
       <StartupGate ready={ready}>
         <NativeUpdateChecker />
         <MapReadyGate>
+          <DeviceMetricsReporter />
           <AppStateHandler />
           <GpsAlwaysGateWrapper />
           <OtaPendingBanner />

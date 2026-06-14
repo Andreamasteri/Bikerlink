@@ -231,6 +231,15 @@ export const adminGroupsPart1: AdminGroup[] = [
         keywords: ["sistema", "system", "monitor", "cpu", "ram", "memoria", "server", "risorse", "health"],
       },
       {
+        key: "resource-monitor",
+        label: "Risorse & Salute",
+        icon: "memory",
+        iconSet: "MaterialCommunityIcons",
+        route: "/admin/resource-monitor",
+        accentColor: "#8B5CF6",
+        keywords: ["risorse", "salute", "resource", "ram", "batteria", "battery", "crash", "riavvio", "restart", "grafico", "campionamento", "metriche dispositivo", "uptime", "logging weight"],
+      },
+      {
         key: "moderator-logs",
         label: "Log Moderatori",
         icon: "shield-account-outline",
