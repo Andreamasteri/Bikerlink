@@ -321,4 +321,34 @@ fi
 echo "════════════════════════════════════════"
 echo ""
 
+# ── GUARD SKILL OTA ↔ app.json (versionCode sync) ────────────
+# La sezione "Contesto fisso" in bikerlink-ota-publish/SKILL.md
+# contiene il versionCode APK corrente. Se non è aggiornato dopo
+# un APK bump, l'agente OTA pubblica con numero di ciclo errato.
+echo "════════════════════════════════════════"
+echo "  Guard skill OTA ↔ app.json (versionCode)"
+echo "════════════════════════════════════════"
+OTA_SKILL=".agents/skills/bikerlink-ota-publish/SKILL.md"
+if [ -f "$OTA_SKILL" ] && [ -f "app.json" ]; then
+  APPJSON_VC=$(node -p "require('./app.json').expo.android.versionCode" 2>/dev/null || echo "")
+  SKILL_VC=$(grep -oP '`versionCode` APK \| \*\*\K[0-9]+' "$OTA_SKILL" | head -1 || echo "")
+  if [ -z "$APPJSON_VC" ]; then
+    echo "⚠️  Impossibile leggere versionCode da app.json — guard saltato."
+  elif [ -z "$SKILL_VC" ]; then
+    echo "⚠️  Impossibile leggere versionCode dalla skill OTA — guard saltato."
+  elif [ "$APPJSON_VC" != "$SKILL_VC" ]; then
+    echo "⚠️  bikerlink-ota-publish/SKILL.md out of sync with app.json"
+    echo "   app.json versionCode  = ${APPJSON_VC}"
+    echo "   SKILL.md versionCode  = ${SKILL_VC}"
+    echo "   → Aggiornare la tabella 'Contesto fisso' in ${OTA_SKILL}"
+    echo "     prima di pubblicare il prossimo OTA."
+  else
+    echo "✅ Skill OTA in sync con app.json (versionCode=${APPJSON_VC})."
+  fi
+else
+  echo "⚠️  File mancante (app.json o skill OTA) — guard saltato."
+fi
+echo "════════════════════════════════════════"
+echo ""
+
 exit 0
