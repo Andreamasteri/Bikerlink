@@ -40,6 +40,17 @@ In `android/app/build.gradle`:
 Tutti e 4 i valori DEVONO essere allineati prima di lanciare la build.
 
 ### 4. Lancia la build EAS
+
+## ⛔ Esecuzione in background — VIETATA
+
+**NON usare `&`, `nohup`, né avviare il comando tramite un workflow in background.**
+La sandbox Replit killa i processi background prima che completino l'handshake con EAS → log vuoto → build non inviata, zero feedback di errore.
+Il comando DEVE girare in foreground nel tool `bash` con timeout esplicito.
+
+**Checklist obbligatoria prima di eseguire:**
+- [ ] Il comando viene eseguito in foreground (nessun `&`, nessun workflow background)
+- [ ] ⛔ `timeout` del tool bash DEVE essere `600000ms` — non il default (30s). L'upload è ~127 MB e richiede 2–3 minuti anche con connessione veloce.
+
 ```bash
 GIT_INDEX_FILE=/tmp/eas-build-index bash scripts/eas.sh build \
   --platform android \
@@ -47,12 +58,13 @@ GIT_INDEX_FILE=/tmp/eas-build-index bash scripts/eas.sh build \
   --non-interactive \
   --no-wait
 ```
-Timeout bash: 600000ms (10 minuti — l'upload è ~127 MB).
+
+> **Nota su `--no-wait`:** questo flag dice a EAS di **non aspettare il risultato della compilazione in cloud** (che richiede 10–20 min). NON influisce sul lancio locale — il comando locale deve comunque girare fino al completamento dell'upload (~2–3 min, 127 MB). Se il processo viene interrotto prima di aver stampato l'URL della dashboard EAS, la build non è stata inviata.
 
 ### 5. Comunica all'utente
 - Conferma che la build è stata inviata ad EAS
 - Fornisci il link alla dashboard EAS (viene stampato nel log)
-- Ricorda che `--no-wait` significa che la build gira in cloud; può scaricarla quando è pronta
+- Ricorda che `--no-wait` significa che la compilazione gira in cloud; può scaricarla quando è pronta
 
 ## Profilo EAS usato
 - Profile: `release-apk`
