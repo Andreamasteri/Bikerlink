@@ -250,6 +250,27 @@ fi
 echo "════════════════════════════════════════"
 echo ""
 
+# ── GUARD INDICI DESC/WHERE — INDEX DRIFT ────────────────────
+# Verifica che gli indici speciali (DESC / WHERE) dello schema Drizzle TS
+# siano allineati con le migration SQL e con il DB live.
+# Un DROP+CREATE silenzioso nelle migration reintroduce drift a ogni deploy.
+echo "════════════════════════════════════════"
+echo "  Guard Index Drift (DESC/WHERE)"
+echo "════════════════════════════════════════"
+INDEX_DRIFT_EXIT=0
+npx tsx scripts/check-index-drift.ts 2>&1 || INDEX_DRIFT_EXIT=$?
+if [ "$INDEX_DRIFT_EXIT" -eq 0 ]; then
+  echo "✅ Index Drift: nessun drift DESC/WHERE rilevato."
+else
+  echo "❌ Index Drift RILEVATO — indici speciali (DESC/WHERE) non allineati."
+  echo "   Aggiungere una migration correttiva o correggere lo schema Drizzle TS."
+  echo "════════════════════════════════════════"
+  echo ""
+  exit "$INDEX_DRIFT_EXIT"
+fi
+echo "════════════════════════════════════════"
+echo ""
+
 # ── CLEANUP UTENTI SMOKE RESIDUI POST-MERGE ──────────────────
 echo "════════════════════════════════════════"
 echo "  Cleanup utenti smoke residui"

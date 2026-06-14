@@ -69,6 +69,10 @@ args = "migration-prefix-check"
 task = "workflow.run"
 args = "lint"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "index-drift"
+
 [[workflows.workflow]]
 name = "Start App"
 mode = "parallel"
@@ -193,6 +197,17 @@ isValidation = true
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "npm run lint -- --max-warnings=0"
+
+[[workflows.workflow]]
+name = "index-drift"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "npx tsx scripts/check-index-drift.ts"
+
+[workflows.workflow.metadata]
+isValidation = true
 
 [objectStorage]
 defaultBucketID = "replit-objstore-ca2daf22-cabb-4140-a095-7b5a6f1afcde"
