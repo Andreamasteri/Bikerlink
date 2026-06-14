@@ -7,7 +7,6 @@
     "icon": "./assets/images/icon.png",
     "scheme": "bikerlink",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
     "ios": {
       "supportsTablet": false,
       "buildNumber": "35",
