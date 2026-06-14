@@ -80,6 +80,29 @@ rm -rf tmp_check/
 rm -rf logs/
 log "  backups, dist, dist-ota-env e artefatti temporanei rimossi."
 
+log "=== [1c/3] Gate Index Drift (DESC/WHERE — pre-deploy) ==="
+# Verifica che gli indici speciali (DESC / WHERE) dello schema Drizzle TS
+# siano allineati con le migration SQL e con il DB live (DATABASE_URL è
+# disponibile in FASE 2 poiché Replit ha già copiato dev→prod in FASE 1).
+# Se emerge un DROP+CREATE silenzioso per un indice già esistente, il deploy
+# viene bloccato qui con output esplicativo anziché silenziare il loop in prod.
+INDEX_DRIFT_EXIT=0
+npx tsx scripts/check-index-drift.ts 2>&1 || INDEX_DRIFT_EXIT=$?
+if [ "$INDEX_DRIFT_EXIT" -eq 0 ]; then
+  log "  ✅ Index Drift OK — nessun drift DESC/WHERE rilevato."
+else
+  log "  ❌ DEPLOY BLOCCATO — Index Drift rilevato (exit ${INDEX_DRIFT_EXIT})."
+  log "     Indici speciali (DESC/WHERE) non allineati tra schema Drizzle TS,"
+  log "     migration SQL e/o DB live."
+  log "     Azione richiesta:"
+  log "       1. Eseguire: npx tsx scripts/check-index-drift.ts"
+  log "       2. Per ogni indice segnalato: aggiungere migration correttiva in"
+  log "          migrations/NNNN_fix-index-<nome>.sql con DROP + CREATE corretto."
+  log "       3. Oppure correggere lo schema Drizzle TS se l'ordinamento è cambiato."
+  log "     Ref: docs/index-drift.md — HNSW index deploy strategy (memory)."
+  exit "$INDEX_DRIFT_EXIT"
+fi
+
 log "=== [2/3] Build server TypeScript ==="
 node scripts/server-build.js
 log "  server_dist/ prodotto → $(size server_dist) ($(size server_dist/index.js 2>/dev/null) il bundle)"
