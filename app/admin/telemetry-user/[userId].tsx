@@ -8,7 +8,7 @@ import {
   ActivityIndicator,
   Alert,
 } from "react-native";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { MaterialCommunityIcons, Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useLocalSearchParams } from "expo-router";
@@ -16,6 +16,18 @@ import Colors from "@/constants/colors";
 import { getApiUrl, authFetchHeaders } from "@/lib/query-client";
 import { type GpsSample } from "@/lib/leaflet-gps-track-html";
 import { SessionMapModal, type Session } from "@/components/admin/telemetry/SessionMapModal";
+
+type MountCalibration = {
+  longAxis: "x" | "y" | "z";
+  latAxis: "x" | "y" | "z";
+  vertAxis: "x" | "y" | "z";
+  longSign: 1 | -1;
+  timestamp: number;
+} | null;
+
+type UserDetail = {
+  mountCalibration: MountCalibration;
+};
 
 async function adminFetch<T>(path: string): Promise<T> {
   const res = await fetch(new URL(path, getApiUrl()).toString(), {
@@ -110,6 +122,55 @@ function SamplesPreview({ sessionId }: { sessionId: string }) {
   );
 }
 
+function CalibrationCard({ calibration }: { calibration: MountCalibration }) {
+  if (calibration === null) {
+    return (
+      <View style={styles.calibrationCard}>
+        <View style={styles.calibrationHeader}>
+          <MaterialCommunityIcons name="bike" size={16} color={Colors.textSecondary} />
+          <Text style={styles.calibrationTitle}>Calibrazione moto</Text>
+          <View style={styles.calibrationBadgeNone}>
+            <Text style={styles.calibrationBadgeNoneText}>Nessuna calibrazione</Text>
+          </View>
+        </View>
+      </View>
+    );
+  }
+
+  const ts = new Date(calibration.timestamp).toLocaleString("it-IT", {
+    day: "2-digit", month: "2-digit", year: "2-digit",
+    hour: "2-digit", minute: "2-digit", second: "2-digit",
+  });
+
+  return (
+    <View style={styles.calibrationCard}>
+      <View style={styles.calibrationHeader}>
+        <MaterialCommunityIcons name="bike" size={16} color={Colors.accent} />
+        <Text style={styles.calibrationTitle}>Calibrazione moto</Text>
+        <View style={styles.calibrationBadgeOk}>
+          <Text style={styles.calibrationBadgeOkText}>Presente</Text>
+        </View>
+      </View>
+      <Text style={styles.calibrationTs}>{ts}</Text>
+      <View style={styles.calibrationAxes}>
+        <View style={styles.calibrationAxisItem}>
+          <Text style={styles.calibrationAxisLabel}>longAxis</Text>
+          <Text style={styles.calibrationAxisValue}>{calibration.longAxis.toUpperCase()}</Text>
+          <Text style={styles.calibrationAxisSign}>{calibration.longSign === 1 ? "+" : "−"}</Text>
+        </View>
+        <View style={styles.calibrationAxisItem}>
+          <Text style={styles.calibrationAxisLabel}>latAxis</Text>
+          <Text style={styles.calibrationAxisValue}>{calibration.latAxis.toUpperCase()}</Text>
+        </View>
+        <View style={styles.calibrationAxisItem}>
+          <Text style={styles.calibrationAxisLabel}>vertAxis</Text>
+          <Text style={styles.calibrationAxisValue}>{calibration.vertAxis.toUpperCase()}</Text>
+        </View>
+      </View>
+    </View>
+  );
+}
+
 function SessionCard({ session }: { session: Session }) {
   const [expanded, setExpanded] = useState(false);
   const [mapVisible, setMapVisible] = useState(false);
@@ -167,6 +228,7 @@ export default function TelemetryUserDetailScreen() {
   const insets = useSafeAreaInsets();
   const { userId } = useLocalSearchParams<{ userId: string }>();
   const [resettingCalibration, setResettingCalibration] = useState(false);
+  const queryClient = useQueryClient();
 
   const { data, isLoading, error, refetch } = useQuery<{ sessions: Session[]; userId: number }>({
     queryKey: ["/api/admin/telemetry/users", userId, "sessions"],
@@ -174,6 +236,17 @@ export default function TelemetryUserDetailScreen() {
     staleTime: 30_000,
     enabled: !!userId,
   });
+
+  const userDetailKey = ["/api/admin/users", userId];
+  const { data: userDetail, isLoading: userDetailLoading, isError: userDetailError, refetch: refetchUserDetail } = useQuery<UserDetail>({
+    queryKey: userDetailKey,
+    queryFn: () => adminFetch(`/api/admin/users/${userId}`),
+    staleTime: 30_000,
+    enabled: !!userId,
+  });
+
+  const calibration = userDetail !== undefined ? (userDetail.mountCalibration ?? null) : null;
+  const hasCalibration = calibration !== null && !userDetailError;
 
   async function handleResetCalibration() {
     Alert.alert(
@@ -196,6 +269,7 @@ export default function TelemetryUserDetailScreen() {
                 },
               );
               if (!res.ok) throw new Error(`HTTP ${res.status}`);
+              await queryClient.invalidateQueries({ queryKey: userDetailKey });
               Alert.alert("Fatto", "Calibrazione resettata. L'utente dovrà ricalibrar al prossimo avvio dell'app.");
             } catch (err) {
               console.error("[admin] reset calibration error:", err);
@@ -266,22 +340,41 @@ export default function TelemetryUserDetailScreen() {
         <Text style={styles.refreshText}>Aggiorna</Text>
       </TouchableOpacity>
 
-      <TouchableOpacity
-        style={styles.resetCalibrationBtn}
-        onPress={handleResetCalibration}
-        activeOpacity={0.8}
-        disabled={resettingCalibration}
-      >
-        {resettingCalibration ? (
-          <ActivityIndicator size="small" color="#ef4444" />
-        ) : (
-          <MaterialCommunityIcons name="refresh-circle" size={16} color="#ef4444" />
-        )}
-        <Text style={styles.resetCalibrationText}>Reset calibrazione moto</Text>
-      </TouchableOpacity>
-      <Text style={styles.resetCalibrationNote}>
-        L'utente dovrà ricalibrar la prossima volta che apre l'app
-      </Text>
+      {userDetailLoading ? (
+        <ActivityIndicator style={{ marginTop: 16 }} size="small" color={Colors.accent} />
+      ) : userDetailError ? (
+        <TouchableOpacity
+          style={styles.calibrationErrorRow}
+          onPress={() => refetchUserDetail()}
+          activeOpacity={0.75}
+        >
+          <Ionicons name="warning-outline" size={15} color="#f59e0b" />
+          <Text style={styles.calibrationErrorText}>Errore caricamento calibrazione — Riprova</Text>
+        </TouchableOpacity>
+      ) : (
+        <CalibrationCard calibration={calibration} />
+      )}
+
+      {hasCalibration && (
+        <>
+          <TouchableOpacity
+            style={styles.resetCalibrationBtn}
+            onPress={handleResetCalibration}
+            activeOpacity={0.8}
+            disabled={resettingCalibration}
+          >
+            {resettingCalibration ? (
+              <ActivityIndicator size="small" color="#ef4444" />
+            ) : (
+              <MaterialCommunityIcons name="refresh-circle" size={16} color="#ef4444" />
+            )}
+            <Text style={styles.resetCalibrationText}>Reset calibrazione moto</Text>
+          </TouchableOpacity>
+          <Text style={styles.resetCalibrationNote}>
+            L'utente dovrà ricalibrar la prossima volta che apre l'app
+          </Text>
+        </>
+      )}
     </ScrollView>
   );
 }
@@ -483,5 +576,99 @@ const styles = StyleSheet.create({
     marginTop: 6,
     marginBottom: 8,
     paddingHorizontal: 16,
+  },
+  calibrationCard: {
+    backgroundColor: Colors.surface,
+    borderRadius: 12,
+    padding: 14,
+    marginTop: 16,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  calibrationHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  calibrationTitle: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 13,
+    color: Colors.text,
+    flex: 1,
+  },
+  calibrationBadgeNone: {
+    backgroundColor: Colors.textSecondary + "22",
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  calibrationBadgeNoneText: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 11,
+    color: Colors.textSecondary,
+  },
+  calibrationBadgeOk: {
+    backgroundColor: "#22c55e22",
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  calibrationBadgeOkText: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 11,
+    color: "#22c55e",
+  },
+  calibrationTs: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    color: Colors.textSecondary,
+    marginTop: 8,
+    marginBottom: 10,
+  },
+  calibrationAxes: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  calibrationAxisItem: {
+    flex: 1,
+    alignItems: "center",
+    backgroundColor: Colors.background,
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 4,
+    gap: 2,
+  },
+  calibrationAxisLabel: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 10,
+    color: Colors.textSecondary,
+  },
+  calibrationAxisValue: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 18,
+    color: Colors.accent,
+  },
+  calibrationAxisSign: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 12,
+    color: Colors.textSecondary,
+  },
+  calibrationErrorRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginTop: 16,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    backgroundColor: "#f59e0b18",
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#f59e0b33",
+  },
+  calibrationErrorText: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 13,
+    color: "#f59e0b",
+    flex: 1,
   },
 });
