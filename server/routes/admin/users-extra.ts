@@ -1,7 +1,7 @@
 import { Router, type Request, type Response } from "express";
 import { db } from "../../db";
 import { users, userProfiles } from "@shared/db";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { sendError } from "../../lib/api-response";
 import { storage } from "../../storage";
 
@@ -86,6 +86,24 @@ router.put("/:userId/matching-disabled", async (req: Request, res: Response) => 
   } catch (err) {
     console.error("[admin/users/:userId/matching-disabled] error:", err);
     return sendError(res, 500, "Errore aggiornamento matching_disabled");
+  }
+});
+
+// ── DELETE /api/admin/users/:userId/calibration ───────────────────────────────
+router.delete("/:userId/calibration", async (req: Request, res: Response) => {
+  try {
+    const userId = String(req.params.userId);
+    const result = await db
+      .update(users)
+      .set({ mountCalibration: sql`NULL`, updatedAt: new Date() })
+      .where(eq(users.id, userId))
+      .returning({ id: users.id });
+    if (!result.length) return sendError(res, 404, "Utente non trovato");
+    console.log(`[admin] calibrazione resettata per utente ${userId}`);
+    return res.json({ ok: true, userId });
+  } catch (err) {
+    console.error("[admin/users/:userId/calibration DELETE] error:", err);
+    return sendError(res, 500, "Errore reset calibrazione");
   }
 });
 

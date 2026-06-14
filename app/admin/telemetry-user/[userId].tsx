@@ -6,6 +6,7 @@ import {
   ScrollView,
   TouchableOpacity,
   ActivityIndicator,
+  Alert,
 } from "react-native";
 import { useQuery } from "@tanstack/react-query";
 import { MaterialCommunityIcons, Ionicons } from "@expo/vector-icons";
@@ -165,6 +166,7 @@ function SessionCard({ session }: { session: Session }) {
 export default function TelemetryUserDetailScreen() {
   const insets = useSafeAreaInsets();
   const { userId } = useLocalSearchParams<{ userId: string }>();
+  const [resettingCalibration, setResettingCalibration] = useState(false);
 
   const { data, isLoading, error, refetch } = useQuery<{ sessions: Session[]; userId: number }>({
     queryKey: ["/api/admin/telemetry/users", userId, "sessions"],
@@ -172,6 +174,40 @@ export default function TelemetryUserDetailScreen() {
     staleTime: 30_000,
     enabled: !!userId,
   });
+
+  async function handleResetCalibration() {
+    Alert.alert(
+      "Reset calibrazione moto",
+      "Cancella la calibrazione salvata sul server per questo utente. L'utente dovrà ricalibrar la prossima volta che apre l'app.\n\nProcedere?",
+      [
+        { text: "Annulla", style: "cancel" },
+        {
+          text: "Reset",
+          style: "destructive",
+          onPress: async () => {
+            setResettingCalibration(true);
+            try {
+              const res = await fetch(
+                new URL(`/api/admin/users/${userId}/calibration`, getApiUrl()).toString(),
+                {
+                  method: "DELETE",
+                  headers: { ...(await authFetchHeaders()) },
+                  credentials: "include",
+                },
+              );
+              if (!res.ok) throw new Error(`HTTP ${res.status}`);
+              Alert.alert("Fatto", "Calibrazione resettata. L'utente dovrà ricalibrar al prossimo avvio dell'app.");
+            } catch (err) {
+              console.error("[admin] reset calibration error:", err);
+              Alert.alert("Errore", "Reset calibrazione fallito. Riprova.");
+            } finally {
+              setResettingCalibration(false);
+            }
+          },
+        },
+      ],
+    );
+  }
 
   const sessions = data?.sessions ?? [];
   const rideKm = sessions
@@ -229,6 +265,23 @@ export default function TelemetryUserDetailScreen() {
         <Ionicons name="refresh" size={16} color={Colors.accent} />
         <Text style={styles.refreshText}>Aggiorna</Text>
       </TouchableOpacity>
+
+      <TouchableOpacity
+        style={styles.resetCalibrationBtn}
+        onPress={handleResetCalibration}
+        activeOpacity={0.8}
+        disabled={resettingCalibration}
+      >
+        {resettingCalibration ? (
+          <ActivityIndicator size="small" color="#ef4444" />
+        ) : (
+          <MaterialCommunityIcons name="refresh-circle" size={16} color="#ef4444" />
+        )}
+        <Text style={styles.resetCalibrationText}>Reset calibrazione moto</Text>
+      </TouchableOpacity>
+      <Text style={styles.resetCalibrationNote}>
+        L'utente dovrà ricalibrar la prossima volta che apre l'app
+      </Text>
     </ScrollView>
   );
 }
@@ -403,5 +456,32 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_500Medium",
     fontSize: 14,
     color: Colors.accent,
+  },
+  resetCalibrationBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    marginTop: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#ef444433",
+    backgroundColor: "#ef444412",
+  },
+  resetCalibrationText: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 14,
+    color: "#ef4444",
+  },
+  resetCalibrationNote: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 11,
+    color: Colors.textSecondary,
+    textAlign: "center",
+    marginTop: 6,
+    marginBottom: 8,
+    paddingHorizontal: 16,
   },
 });
