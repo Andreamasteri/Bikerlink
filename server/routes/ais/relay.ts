@@ -21,6 +21,37 @@ interface VesselData {
 
 const vesselCache = new Map<number, VesselData>();
 const VESSEL_TTL_MS = 5 * 60 * 1000;
+const _maxVesselsParsed = parseInt(process.env.MAX_VESSELS ?? "2000", 10);
+const MAX_VESSELS = Number.isFinite(_maxVesselsParsed) && _maxVesselsParsed > 0 ? _maxVesselsParsed : 2000;
+
+function parseBbox(raw: string): [[number, number], [number, number]] | null {
+  const parts = raw.split(",").map(Number);
+  if (parts.length !== 4 || parts.some(isNaN)) return null;
+  const [minLat, minLon, maxLat, maxLon] = parts;
+  return [[minLat, minLon], [maxLat, maxLon]];
+}
+
+function getSubscriptionBbox(): [[number, number], [number, number]] {
+  const raw = process.env.AISSTREAM_BBOX;
+  if (raw) {
+    const bbox = parseBbox(raw);
+    if (bbox) {
+      console.log(`[ais-relay] using bbox from env: ${raw}`);
+      return bbox;
+    }
+    console.warn("[ais-relay] AISSTREAM_BBOX malformed, falling back to global");
+  }
+  return [[-90, -180], [90, 180]];
+}
+
+function evictOldestVessels() {
+  if (vesselCache.size <= MAX_VESSELS) return;
+  const sorted = Array.from(vesselCache.entries()).sort((a, b) => a[1].updatedAt - b[1].updatedAt);
+  const toRemove = vesselCache.size - MAX_VESSELS;
+  for (let i = 0; i < toRemove; i++) {
+    vesselCache.delete(sorted[i][0]);
+  }
+}
 
 let wsClient: WebSocket | null = null;
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
@@ -43,7 +74,7 @@ function connectAisStream() {
       console.log("[ais-relay] connected to aisstream.io");
       const sub = {
         APIKey: apiKey,
-        BoundingBoxes: [[[-90, -180], [90, 180]]],
+        BoundingBoxes: [getSubscriptionBbox()],
         FilterMessageTypes: ["PositionReport"],
       };
       wsClient!.send(JSON.stringify(sub));
@@ -94,6 +125,7 @@ function connectAisStream() {
           shipType: meta?.ShipType ?? 0,
           updatedAt: Date.now(),
         });
+        evictOldestVessels();
       } catch {
       }
     });
