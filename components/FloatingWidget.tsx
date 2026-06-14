@@ -46,6 +46,7 @@ export default function FloatingWidget() {
   useEffect(() => {
     insetsTop.value = insets.top;
     insetsBottom.value = insets.bottom;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [insets.top, insets.bottom]);
 
   const screenW = useSharedValue(width);
@@ -56,6 +57,7 @@ export default function FloatingWidget() {
       screenH.value = window.height;
     });
     return () => sub.remove();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const refetchBadgesRef = useRef(refetchBadges);
