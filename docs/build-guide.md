@@ -1,7 +1,7 @@
 # BikerLink — Guida Build e OTA
 
 > Guida operativa per la prima build Android/iOS e per il ciclo di aggiornamento OTA.
-> EAS CLI è già installato su Replit (`eas --version` per verificare).
+> EAS CLI v20 è installato come dipendenza progetto. Su Replit usare sempre `bash scripts/eas.sh` (mai `eas` grezzo né `npx eas`).
 
 ---
 
@@ -22,22 +22,23 @@
 
 ## 1. Prerequisiti
 
-### EAS CLI (già installato su Replit)
+### EAS CLI (già installato su Replit come dipendenza progetto)
 
 ```bash
-# Verifica versione — deve essere >= 12.0.0
-eas --version
+# Verifica versione — deve restituire eas-cli/20.x
+bash scripts/eas.sh --version
 
 # Login con account Expo (andreamasteri)
-eas whoami
+bash scripts/eas.sh whoami
 # Se non loggato:
-eas login
+bash scripts/eas.sh login
 ```
 
 ### Installazione locale (se esegui build dal tuo PC)
 
 ```bash
-npm install -g eas-cli
+# Sul tuo PC locale: installa EAS CLI globalmente
+npm install -g eas-cli@20
 eas login
 ```
 
@@ -65,8 +66,10 @@ cat app.json | python3 -c "import json,sys; d=json.load(sys.stdin)['expo']; prin
 Usa questo profilo per testare l'app senza impattare il canale production OTA.
 
 ```bash
-# Dalla shell di Replit o dal tuo terminale locale nella root del progetto
-eas build --platform android --profile preview --non-interactive
+# Da Replit (wrapper obbligatorio — mai eas grezzo)
+GIT_INDEX_FILE=/tmp/eas-build-index bash scripts/eas.sh build --platform android --profile preview --non-interactive
+# Dal tuo PC locale (EAS CLI globale):
+# eas build --platform android --profile preview --non-interactive
 ```
 
 **Cosa succede:**
@@ -89,7 +92,10 @@ eas build --platform android --profile preview --non-interactive
 Usa questo profilo quando vuoi testare il ciclo OTA completo sul canale production.
 
 ```bash
-eas build --platform android --profile release-apk --non-interactive
+# Da Replit (wrapper obbligatorio — mai eas grezzo)
+GIT_INDEX_FILE=/tmp/eas-build-index bash scripts/eas.sh build --platform android --profile release-apk --non-interactive
+# Dal tuo PC locale (EAS CLI globale):
+# eas build --platform android --profile release-apk --non-interactive
 ```
 
 **Differenza rispetto a `preview`:** il canale è `production`, quindi l'app riceverà
@@ -121,7 +127,8 @@ Expo Launch gestisce:
 # Dalla root del progetto (shell Replit o terminale locale)
 # IMPORTANTE: pubblica sempre su canale "staging" per entrare nella pipeline di approvazione.
 # Il server BikerLink sincronizza dal branch "staging" di EAS e mette le release in pending.
-eas update --channel staging --message "Fix: schermata percorsi v52.3.11"
+bash scripts/eas.sh update --channel staging --message "Fix: schermata percorsi v52.3.11"
+# Dal tuo PC locale: eas update --channel staging --message "..."
 ```
 
 > **Perché staging e non production?**
@@ -163,7 +170,7 @@ L'app scarica il nuovo bundle JS e si riavvia automaticamente.
 ### Flusso completo visivo
 
 ```
-Developer → eas update --channel staging → EAS ospita bundle JS (branch: staging)
+Developer → bash scripts/eas.sh update --channel staging → EAS ospita bundle JS (branch: staging)
                                                       ↓
                               Server BikerLink sincronizza branch staging da EAS
                               Release creata con status "pending" nel DB
@@ -248,7 +255,7 @@ APK/AAB caricato su Play Store. Non può tornare indietro.
 [ ] Incrementa android.versionCode (es. 52 → 53)
 [ ] Incrementa ios.buildNumber (es. "34" → "35")
 [ ] Bumpa runtimeVersion se cambiano dipendenze native (es. "10.0.0" → "11.0.0")
-[ ] Commit + push su GitHub prima di avviare eas build
+[ ] Commit + push su GitHub prima di avviare bash scripts/eas.sh build
 ```
 
 ---
@@ -279,7 +286,7 @@ come se fosse un nuovo update.
 
 ```bash
 # Pubblica hotfix immediato sul canale staging (entra nella coda admin come sempre)
-eas update --channel staging --message "Hotfix critico: ripristino funzionalità X"
+bash scripts/eas.sh update --channel staging --message "Hotfix critico: ripristino funzionalità X"
 # Poi approva immediatamente dal pannello admin
 # Admin BikerLink → /admin/ota → pulsante "Sync" → Approva
 ```
@@ -307,8 +314,8 @@ sono embedded a build-time).
 
 Dalla shell di Replit:
 ```bash
-# Verificare lo stato attuale
-eas env:list
+# Verificare lo stato attuale (da Replit — usa il wrapper)
+bash scripts/eas.sh env:list
 
 # Le variabili EXPO_PUBLIC_* vanno nelle Secrets di Replit oppure
 # configurate nel progetto EAS:

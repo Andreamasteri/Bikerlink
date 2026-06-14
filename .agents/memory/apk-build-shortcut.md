@@ -72,7 +72,7 @@ perché la sandbox Replit blocca `.git/index.lock`. Questo prefisso è SEMPRE ne
 - Non usare `--profile preview` (channel staging, non production)
 - Non modificare eas.json
 - Non eseguire `npx expo build` (deprecato)
-- Non eseguire `npx eas submit` (non richiesto dall'utente)
+- Non eseguire `eas submit` direttamente (non richiesto dall'utente)
 
 ## Formula versione OTA — automatica
 `scripts/publish-ota.sh` legge `versionCode` e `runtimeVersion` da `app.json` **a runtime** — non hardcoda i numeri.

@@ -1,5 +1,5 @@
 - [Vite/Vitest upgrade audit](vite-vitest-upgrade-audit.md) — vitest 4.1.8 già supporta vite 8.x (peerDep `^6||^7||^8`); solo vite va aggiornato (6.4.3→8.0.16); zero modifiche ai 3 config.
-- [EAS build — GIT_INDEX_FILE workaround](eas-build-git-lock.md) — `GIT_INDEX_FILE=/tmp/eas-build-index npx eas build ...` bypassa il blocco sandbox su .git/index.lock; profilo release-apk per APK production arm64.
+- [EAS build — GIT_INDEX_FILE workaround](eas-build-git-lock.md) — `GIT_INDEX_FILE=/tmp/eas-build-index bash scripts/eas.sh build ...` bypassa il blocco sandbox su .git/index.lock; eas-cli v20 in node_modules, profilo release-apk.
 - ["Vai con la build" — procedura APK completa](apk-build-shortcut.md) — bump versioni, aggiorna app.json+build.gradle, lancia EAS release-apk; publish-ota.sh legge versionCode e runtimeVersion da app.json dinamicamente — non va toccato.
 - [GitHub sync force-push](github-sync-force-push.md) — credential helper in ~/.gitconfig legge $GITHUB_TOKEN; `git push github main --force` funziona senza workaround; lock stale .git/refs/remotes/github/main.lock non bloccante.
 - [Repl Layer Size Limit](repl-layer-size.md) — .local/state/replit/ cresce nel tempo (transcript agente + log-query.db) → supera limite Cloud Run 2 GB → deploy silenziosamente fallisce senza log.
