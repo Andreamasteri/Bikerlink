@@ -703,7 +703,7 @@ Il seed imposta `emailVerified: true` per tutti gli utenti creati.
 
 **Nessuna build APK può essere avviata senza autorizzazione esplicita dell'utente.**
 
-Usare SEMPRE `scripts/build-apk.sh` — mai `npx eas-cli build` direttamente.
+Usare SEMPRE `scripts/build-apk.sh` — mai il binario eas direttamente (né globale né tramite npx).
 
 Procedura:
 1. Ottenere approvazione esplicita dall'utente ("sì, avvia la build APK")

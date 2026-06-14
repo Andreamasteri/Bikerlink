@@ -39,7 +39,7 @@ bash scripts/eas.sh login
 ```bash
 # Sul tuo PC locale: installa EAS CLI globalmente (solo per build da PC, non da Replit)
 npm install -g eas-cli@20
-# Poi effettua il login: npx eas-cli whoami
+# Poi effettua il login: eas whoami
 ```
 
 ### Verifica configurazione progetto
