@@ -18,6 +18,7 @@ import { useMapStateSync } from "@/hooks/useMapStateSync";
 import { createMapMessageHandler } from "@/components/map/createMapMessageHandler";
 import { HazardDetailSheet } from "@/components/map/HazardDetailSheet";
 import { HazardReportSheet } from "@/components/map/HazardReportSheet";
+import { VesselDetailSheet } from "@/components/map/VesselDetailSheet";
 import { useMapTelemetry } from "@/hooks/useMapTelemetry";
 import { HAZARD_ICONS } from "@shared/db/road-hazards";
 import type {
@@ -71,6 +72,7 @@ const InteractiveMap = forwardRef<InteractiveMapHandle, InteractiveMapProps>(fun
   const { userLocation, locationLoading } = useLocationWatch();
   const [selectedHazardId, setSelectedHazardId] = useState<string | null>(null);
   const [showHazardReport, setShowHazardReport] = useState(false);
+  const [selectedVesselMmsi, setSelectedVesselMmsi] = useState<string | null>(null);
   const { styleId, setStyle } = useMapStyle();
   const activePreset = MAP_STYLE_PRESETS[styleId];
   const effectiveTileUrl = activePreset.tileUrl;
@@ -208,6 +210,7 @@ const InteractiveMap = forwardRef<InteractiveMapHandle, InteractiveMapProps>(fun
       users, clubPins, easterEggs,
       onUserPress, onClubPress, onEventPress, onEasterEggPress,
       onHazardPress: (id) => setSelectedHazardId(id),
+      onVesselPress: (mmsi) => setSelectedVesselMmsi(mmsi),
       onReady, onRegionChangeComplete, setMapReady,
       onMapReadyEpoch: () => setMapReadyEpoch((n) => n + 1),
       onViewStateChange: (s) => setViewState(s),
@@ -344,6 +347,12 @@ const InteractiveMap = forwardRef<InteractiveMapHandle, InteractiveMapProps>(fun
         visible={showHazardReport}
         onClose={() => setShowHazardReport(false)}
         userLocation={userLocation}
+      />
+      <VesselDetailSheet
+        vessel={selectedVesselMmsi != null
+          ? (aisVessels.find((v) => String(v.mmsi) === selectedVesselMmsi) ?? null)
+          : null}
+        onClose={() => setSelectedVesselMmsi(null)}
       />
     </View>
   );
