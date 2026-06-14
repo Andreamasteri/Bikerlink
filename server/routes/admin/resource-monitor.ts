@@ -67,6 +67,7 @@ router.get("/resource-monitor", async (_req: Request, res: Response) => {
     const [
       graphEnabled,
       deviceAgg,
+      topDeviceSessions,
       crashStats7d,
       crashStats30d,
       restartLoops7d,
@@ -92,6 +93,39 @@ router.get("/resource-monitor", async (_req: Request, res: Response) => {
             [twoHoursAgo]
           );
           return r.rows[0] ?? {};
+        } finally {
+          client.release();
+        }
+      })(),
+      (async () => {
+        const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000);
+        const client = await pool.connect();
+        try {
+          const r = await client.query(
+            `SELECT user_id_anon, platform, memory_used_mb, battery_level, recorded_at
+            FROM (
+              SELECT DISTINCT ON (user_id)
+                SUBSTRING(user_id, 1, 8) AS user_id_anon,
+                platform,
+                memory_used_mb,
+                battery_level,
+                recorded_at
+              FROM device_metrics
+              WHERE recorded_at >= $1
+                AND memory_used_mb IS NOT NULL
+              ORDER BY user_id, memory_used_mb DESC
+            ) sub
+            ORDER BY memory_used_mb DESC
+            LIMIT 20`,
+            [twoHoursAgo]
+          );
+          return r.rows as Array<{
+            user_id_anon: string;
+            platform: string | null;
+            memory_used_mb: string | number;
+            battery_level: string | number | null;
+            recorded_at: string;
+          }>;
         } finally {
           client.release();
         }
@@ -180,6 +214,13 @@ router.get("/resource-monitor", async (_req: Request, res: Response) => {
         chargingCount: Number(agd.charging_count ?? 0),
         iosCount: Number(agd.ios_count ?? 0),
         androidCount: Number(agd.android_count ?? 0),
+        topSessions: topDeviceSessions.map((row) => ({
+          userIdAnon: row.user_id_anon,
+          platform: row.platform ?? "—",
+          memoryUsedMb: Number(row.memory_used_mb),
+          batteryPct: row.battery_level != null ? Number(row.battery_level) : null,
+          recordedAt: row.recorded_at,
+        })),
       },
       crashes: {
         last7d: crashStats7d,

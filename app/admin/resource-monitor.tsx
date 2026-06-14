@@ -34,6 +34,14 @@ interface BackendInfo {
   onlineUsers: number;
 }
 
+interface DeviceSession {
+  userIdAnon: string;
+  platform: string;
+  memoryUsedMb: number;
+  batteryPct: number | null;
+  recordedAt: string;
+}
+
 interface DeviceAgg {
   sampleCount: number;
   avgRamPct: number | null;
@@ -41,6 +49,7 @@ interface DeviceAgg {
   chargingCount: number;
   iosCount: number;
   androidCount: number;
+  topSessions: DeviceSession[];
 }
 
 interface CrashCounts { last7d: number; last30d: number; restartLoops7d: number; }
@@ -74,6 +83,7 @@ export default function ResourceMonitorScreen() {
   const queryClient = useQueryClient();
   const [refreshing, setRefreshing] = useState(false);
   const [localUptime, setLocalUptime] = useState(0);
+  const [showTopSessions, setShowTopSessions] = useState(false);
 
   const { data, isLoading, isError, refetch } = useQuery<ResourceMonitorData>({
     queryKey: QUERY_KEY,
@@ -169,6 +179,65 @@ export default function ResourceMonitorScreen() {
             <Row label="Batteria media" value={d.devices.avgBatteryPct != null ? `${d.devices.avgBatteryPct}%` : "—"} />
             <Row label="In carica" value={`${d.devices.chargingCount} dispositivi`} />
             <Row label="iOS / Android" value={`${d.devices.iosCount} / ${d.devices.androidCount}`} />
+
+            {(d.devices.topSessions ?? []).length > 0 && (
+              <>
+                <TouchableOpacity
+                  onPress={() => setShowTopSessions((v) => !v)}
+                  style={[styles.sessionToggle, { borderTopColor: colors.border }]}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[styles.sessionToggleLabel, { color: colors.accent }]}>
+                    Top sessioni per memoria ({d.devices.topSessions.length})
+                  </Text>
+                  <MaterialCommunityIcons
+                    name={showTopSessions ? "chevron-up" : "chevron-down"}
+                    size={18}
+                    color={colors.accent}
+                  />
+                </TouchableOpacity>
+
+                {showTopSessions && (
+                  <View style={styles.sessionTable}>
+                    <View style={[styles.sessionHeaderRow, { borderBottomColor: colors.border }]}>
+                      <Text style={[styles.sessionHeaderCell, styles.sessionCellId, { color: colors.textSecondary }]}>User</Text>
+                      <Text style={[styles.sessionHeaderCell, styles.sessionCellPlatform, { color: colors.textSecondary }]}>OS</Text>
+                      <Text style={[styles.sessionHeaderCell, styles.sessionCellMb, { color: colors.textSecondary }]}>Heap MB</Text>
+                      <Text style={[styles.sessionHeaderCell, styles.sessionCellBattery, { color: colors.textSecondary }]}>Batt%</Text>
+                      <Text style={[styles.sessionHeaderCell, styles.sessionCellTime, { color: colors.textSecondary }]}>Ora</Text>
+                    </View>
+                    {d.devices.topSessions.map((s, idx) => {
+                      const time = new Date(s.recordedAt).toLocaleTimeString("it", { hour: "2-digit", minute: "2-digit" });
+                      const isHigh = s.memoryUsedMb > 500;
+                      const isMid = s.memoryUsedMb > 300;
+                      const mbColor = isHigh ? "#FF4444" : isMid ? "#FF9500" : colors.text;
+                      return (
+                        <View
+                          key={idx}
+                          style={[styles.sessionDataRow, { borderBottomColor: colors.border }]}
+                        >
+                          <Text style={[styles.sessionCell, styles.sessionCellId, { color: colors.text }]} numberOfLines={1}>
+                            {s.userIdAnon}…
+                          </Text>
+                          <Text style={[styles.sessionCell, styles.sessionCellPlatform, { color: colors.textSecondary }]} numberOfLines={1}>
+                            {s.platform}
+                          </Text>
+                          <Text style={[styles.sessionCell, styles.sessionCellMb, { color: mbColor, fontFamily: "Inter_600SemiBold" }]}>
+                            {s.memoryUsedMb}
+                          </Text>
+                          <Text style={[styles.sessionCell, styles.sessionCellBattery, { color: colors.textSecondary }]}>
+                            {s.batteryPct != null ? `${s.batteryPct}%` : "—"}
+                          </Text>
+                          <Text style={[styles.sessionCell, styles.sessionCellTime, { color: colors.textSecondary }]}>
+                            {time}
+                          </Text>
+                        </View>
+                      );
+                    })}
+                  </View>
+                )}
+              </>
+            )}
           </>
         )}
       </Card>
@@ -275,4 +344,16 @@ const styles = StyleSheet.create({
   emptyNote: { fontFamily: "Inter_400Regular", fontSize: 13, textAlign: "center", paddingVertical: 8 },
   restartLoopAlert: { flexDirection: "row", alignItems: "center", gap: 8, borderWidth: 1, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8, marginTop: 8 },
   restartLoopText: { fontFamily: "Inter_600SemiBold", fontSize: 13, flex: 1 },
+  sessionToggle: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingTop: 10, marginTop: 6, borderTopWidth: StyleSheet.hairlineWidth },
+  sessionToggleLabel: { fontFamily: "Inter_600SemiBold", fontSize: 13 },
+  sessionTable: { marginTop: 6 },
+  sessionHeaderRow: { flexDirection: "row", paddingVertical: 4, borderBottomWidth: StyleSheet.hairlineWidth },
+  sessionDataRow: { flexDirection: "row", paddingVertical: 5, borderBottomWidth: StyleSheet.hairlineWidth },
+  sessionHeaderCell: { fontFamily: "Inter_600SemiBold", fontSize: 10 },
+  sessionCell: { fontFamily: "Inter_400Regular", fontSize: 11 },
+  sessionCellId: { flex: 2 },
+  sessionCellPlatform: { flex: 1.2 },
+  sessionCellMb: { flex: 1.2, textAlign: "right" },
+  sessionCellBattery: { flex: 1, textAlign: "right" },
+  sessionCellTime: { flex: 1.4, textAlign: "right" },
 });
