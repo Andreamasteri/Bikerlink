@@ -18,6 +18,21 @@
         "image": "latest"
       }
     },
+    "diagnostic-apk": {
+      "distribution": "internal",
+      "channel": "production",
+      "credentialsSource": "remote",
+      "env": {
+        "NODE_OPTIONS": "--max_old_space_size=8192",
+        "ORG_GRADLE_PROJECT_bundleInDebug": "true",
+        "ORG_GRADLE_PROJECT_newArchEnabled": "false"
+      },
+      "android": {
+        "buildType": "apk",
+        "gradleCommand": ":app:assembleDebug",
+        "image": "latest"
+      }
+    },
     "preview": {
       "distribution": "internal",
       "channel": "staging",
