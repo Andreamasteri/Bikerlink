@@ -87,7 +87,29 @@ router.post("/heartbeat", async (req: Request, res: Response) => {
         console.error("[heartbeat] user_devices upsert error:", err);
       }
     }
-    onlineTracker.touch(userId);
+    const wasTracked = onlineTracker.touch(userId);
+    if (!wasTracked) {
+      // Tracker vuoto dopo restart del server: reidrata l'utente dal DB
+      // senza bloccare la risposta (fire-and-forget non-critico).
+      Promise.all([
+        storage.getUser(userId),
+        storage.getUserProfile(userId),
+      ]).then(([user, profile]) => {
+        if (!user || user.status !== "active" || user.isFake) return;
+        const isGhost = user.ghostMode ?? false;
+        onlineTracker.setOnline(userId, {
+          role: user.role,
+          nickname: user.nickname,
+          status: user.status,
+          userType: user.userType,
+          isAvailable: !isGhost && (profile?.isAvailable ?? false),
+          ghostMode: isGhost,
+          country: user.country ?? null,
+          isFake: user.isFake ?? false,
+          isSystem: user.isSystem ?? false,
+        });
+      }).catch(() => {});
+    }
 
     // Update per-session heartbeat timestamp if sessionId provided
     if (typeof body.sessionId === "string" && body.sessionId.length > 0) {

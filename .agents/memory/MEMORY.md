@@ -45,3 +45,4 @@
 - [db-integrity schema-registry timeout](db-integrity-schema-registry.md) — information_schema.columns è lento in prod (148 tabelle): N query sequenziali → timeout 30s; fix: getAllColumnsMap() via pg_catalog in 1 query + cache 10min.
 - [Local embedding model projection](local-embedding-projection.md) — multilingual-e5-small produce 384 dim; client.ts proietta a 1536 (4× concat + L2-norm); model tag in DB = 'local:Xenova/multilingual-e5-small'; aggiungere alla whitelist db-integrity.
 - [AI audit logging pattern](ai-audit-logging.md) — logAiUsage() pattern, proposer Groq-only model routing fix, fingerprint+known-offline skip guards in proposer.ts.
+- [OnlineTracker touch() e restart server](online-tracker-touch-restart.md) — touch() restituisce false se user non nel tracker; heartbeat deve chiamare setOnline() via DB se touch()=false, altrimenti counter home restano a 0 dopo restart.
