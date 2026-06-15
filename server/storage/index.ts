@@ -249,6 +249,7 @@ export interface IStorage {
   getWishlist(userId: string): Promise<ZavarrinaWishlist | undefined>;
   createOrUpdateWishlist(userId: string, description: string): Promise<ZavarrinaWishlist>;
   getWishlistPhotos(wishlistId: string): Promise<ZavarrinaWishlistPhoto[]>;
+  getWishlistPhoto(id: string): Promise<ZavarrinaWishlistPhoto | undefined>;
   addWishlistPhoto(data: InsertZavarrinaWishlistPhoto): Promise<ZavarrinaWishlistPhoto>;
   deleteWishlistPhoto(id: string): Promise<void>;
   getWishlistPhotoCount(wishlistId: string): Promise<number>;

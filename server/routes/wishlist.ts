@@ -98,6 +98,24 @@ router.post("/photos", requireAuth, async (req: Request, res: Response) => {
 router.delete("/photos/:photoId", requireAuth, async (req: Request, res: Response) => {
   try {
     const photoId = req.params.photoId as string;
+    const userId = req.session.userId!;
+
+    const photo = await storage.getWishlistPhoto(photoId);
+    if (!photo) {
+      return sendError(res, 404, "Foto non trovata");
+    }
+
+    const userWishlist = await storage.getWishlist(userId);
+    if (!userWishlist || photo.wishlistId !== userWishlist.id) {
+      return sendError(res, 403, "Non autorizzato");
+    }
+
+    const filename = path.basename(photo.photoUrl);
+    const filePath = path.join(uploadsDir, filename);
+    if (fs.existsSync(filePath)) {
+      fs.unlinkSync(filePath);
+    }
+
     await storage.deleteWishlistPhoto(photoId);
     return sendSuccess(res, undefined, "Foto eliminata");
   } catch (error) {

@@ -8,7 +8,9 @@ import { db } from "./db";
 import { 
   motorcyclePhotos, 
   userMotorcycles, 
-  userPhotos 
+  userPhotos,
+  zavarrinaWishlistPhotos,
+  zavarrinaWishlists,
 } from "@shared/db";
 import { eq } from "drizzle-orm";
 
@@ -306,6 +308,35 @@ export function setupStaticRoutes(app: express.Application) {
       return next();
     } catch (err) {
       console.error("[uploads/photos auth] error:", err);
+      return res.status(500).json({ message: "Errore interno del server" });
+    }
+  });
+
+  // Wishlist photos ACL
+  app.get("/uploads/wishlist/:filename", async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      if (!req.session?.userId) {
+        return res.status(401).json({ message: "Non autenticato" });
+      }
+      const requesterId = req.session.userId;
+      const filename = req.params.filename;
+      if (!filename || filename.includes("/") || filename.includes("..")) {
+        return res.status(404).json({ message: "Foto non trovata" });
+      }
+      const photoUrl = `/uploads/wishlist/${filename}`;
+      const [row] = await db
+        .select({ ownerId: zavarrinaWishlists.userId })
+        .from(zavarrinaWishlistPhotos)
+        .innerJoin(zavarrinaWishlists, eq(zavarrinaWishlistPhotos.wishlistId, zavarrinaWishlists.id))
+        .where(eq(zavarrinaWishlistPhotos.photoUrl, photoUrl))
+        .limit(1);
+      if (!row || row.ownerId !== requesterId) {
+        return res.status(404).json({ message: "Foto non trovata" });
+      }
+      res.set("Cache-Control", "private, max-age=3600");
+      return next();
+    } catch (err) {
+      console.error("[uploads/wishlist auth] error:", err);
       return res.status(500).json({ message: "Errore interno del server" });
     }
   });

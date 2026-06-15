@@ -35,6 +35,11 @@ export class MatchingStorage extends ContestStorage {
     return db.select().from(zavarrinaWishlistPhotos).where(eq(zavarrinaWishlistPhotos.wishlistId, wishlistId)).orderBy(asc(zavarrinaWishlistPhotos.sortOrder));
   }
 
+  async getWishlistPhoto(id: string): Promise<ZavarrinaWishlistPhoto | undefined> {
+    const [photo] = await db.select().from(zavarrinaWishlistPhotos).where(eq(zavarrinaWishlistPhotos.id, id)).limit(1);
+    return photo;
+  }
+
   async addWishlistPhoto(data: InsertZavarrinaWishlistPhoto): Promise<ZavarrinaWishlistPhoto> {
     const [photo] = await db.insert(zavarrinaWishlistPhotos).values(data).returning();
     return photo;
