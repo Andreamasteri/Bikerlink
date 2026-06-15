@@ -111,6 +111,7 @@ function AdminAdsInner() {
     openSingleEdit,
     openGroupEdit,
     openRotationSettings,
+    openBulkModal,
     handleSaveRotation,
     createMutation,
     singleEditMutation,
@@ -353,7 +354,7 @@ function AdminAdsInner() {
 
       <TouchableOpacity
         style={[styles.fab, styles.fabFolder, { bottom: insets.bottom + 16 }]}
-        onPress={() => setShowBulkModal(true)}
+        onPress={() => openBulkModal()}
       >
         <MaterialIcons name="folder-open" size={24} color={Colors.accent} />
       </TouchableOpacity>

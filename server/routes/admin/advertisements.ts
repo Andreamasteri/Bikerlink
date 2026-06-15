@@ -107,7 +107,16 @@ router.post("/bulk", adUpload.array("images", 10), async (req: Request, res: Res
     if (!base) return sendError(res, 400, "baseName obbligatorio");
     const startIdx = startIndex ? parseInt(startIndex) : 0;
     const total = totalImages ? parseInt(totalImages) : files.length;
-    const duration = (displayDuration ?? rotationDuration) ? parseInt(String(displayDuration ?? rotationDuration)) : 10;
+    const explicitDur = displayDuration ?? rotationDuration;
+    let duration = 10;
+    if (explicitDur) {
+      duration = parseInt(String(explicitDur));
+    } else {
+      const durSetting = await storage.getAppSetting("ads_rotation_duration");
+      if (durSetting?.valueJson != null) duration = Number(durSetting.valueJson);
+    }
+    const modeSetting = await storage.getAppSetting("ads_rotation_mode");
+    const defaultMode = modeSetting?.valueJson != null ? String(modeSetting.valueJson) : "sequential";
     const normalizedTarget = normalizeTargetUserType(targetUserType);
 
     for (let i = 0; i < files.length; i++) {
@@ -123,7 +132,7 @@ router.post("/bulk", adUpload.array("images", 10), async (req: Request, res: Res
           displayMode: "banner",
           targetUserType: normalizedTarget,
           rotationDuration: duration,
-          rotationMode: rotationMode || "sequential",
+          rotationMode: rotationMode || defaultMode,
           sortOrder: (sortOrder ? parseInt(sortOrder) : 0) + globalIndex,
           startDate: startDate ? new Date(startDate) : null,
           endDate: endDate ? new Date(endDate) : null,
@@ -189,6 +198,12 @@ router.post("/", adUpload.single("image"), async (req: Request, res: Response) =
      // sempre un groupId) e permette al self-check di esercitare /group/:groupId.
     const groupIdFromBody = typeof req.body.groupId === "string" && req.body.groupId.trim().length > 0
       ? req.body.groupId.trim() : undefined;
+    const [durSetting2, modeSetting2] = await Promise.all([
+      storage.getAppSetting("ads_rotation_duration"),
+      storage.getAppSetting("ads_rotation_mode"),
+    ]);
+    const defaultDuration2 = durSetting2?.valueJson != null ? Number(durSetting2.valueJson) : 10;
+    const defaultMode2 = modeSetting2?.valueJson != null ? String(modeSetting2.valueJson) : "sequential";
     const campaign = await storage.createAdCampaign({
       name,
       sponsor: sponsor || "Syneco Lubrificanti",
@@ -197,8 +212,8 @@ router.post("/", adUpload.single("image"), async (req: Request, res: Response) =
       displayMode: "banner",
       description: description || null,
       targetUserType: normalizeTargetUserType(targetUserType),
-      rotationDuration: rotationDuration ? parseInt(String(rotationDuration)) : 10,
-      rotationMode: rotationMode || "sequential",
+      rotationDuration: rotationDuration ? parseInt(String(rotationDuration)) : defaultDuration2,
+      rotationMode: rotationMode || defaultMode2,
       sortOrder: sortOrder ? parseInt(String(sortOrder)) : 0,
       ...(groupIdFromBody ? { groupId: groupIdFromBody } : {}),
       startDate: startDate ? new Date(startDate) : null,
@@ -389,6 +404,49 @@ router.put("/group/:groupId", async (req: Request, res: Response) => {
     return res.json(updated);
   } catch (error) {
     console.error("Admin update advertisement group error:", error);
+    return sendError(res, 500, "Errore interno del server");
+  }
+});
+
+router.get("/settings", async (_req: Request, res: Response) => {
+  try {
+    const [durSetting, modeSetting] = await Promise.all([
+      storage.getAppSetting("ads_rotation_duration"),
+      storage.getAppSetting("ads_rotation_mode"),
+    ]);
+    const duration = durSetting?.valueJson != null ? Number(durSetting.valueJson) : 10;
+    const mode = modeSetting?.valueJson != null ? String(modeSetting.valueJson) : "sequential";
+    return res.json({ duration, mode });
+  } catch (error) {
+    console.error("Admin get ads settings error:", error);
+    return sendError(res, 500, "Errore interno del server");
+  }
+});
+
+router.post("/settings", async (req: Request, res: Response) => {
+  try {
+    const { duration, mode } = req.body as { duration?: unknown; mode?: unknown };
+    const parsedDuration = typeof duration === "number" ? duration : parseInt(String(duration));
+    if (!Number.isFinite(parsedDuration) || parsedDuration < 1) {
+      return sendError(res, 400, "duration deve essere un numero intero ≥ 1");
+    }
+    if (mode !== "sequential" && mode !== "random") {
+      return sendError(res, 400, "mode deve essere 'sequential' o 'random'");
+    }
+    await Promise.all([
+      storage.upsertAppSetting("ads_rotation_duration", undefined, parsedDuration),
+      storage.upsertAppSetting("ads_rotation_mode", undefined, mode),
+    ]);
+    await safeModLog({
+      moderatorId: req.session.userId!,
+      action: "update_advertisement",
+      targetType: "campaign",
+      targetId: "settings",
+      details: `Rotazione impostata: ${parsedDuration}s, modalità ${mode}`,
+    });
+    return res.json({ duration: parsedDuration, mode });
+  } catch (error) {
+    console.error("Admin post ads settings error:", error);
     return sendError(res, 500, "Errore interno del server");
   }
 });

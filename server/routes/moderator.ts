@@ -265,6 +265,12 @@ router.post("/advertisements", adUpload.single("image"), async (req: Request, re
       }
       imageUrl = req.body.imageUrl;
     }
+    const [durSettingMod, modeSettingMod] = await Promise.all([
+      storage.getAppSetting("ads_rotation_duration"),
+      storage.getAppSetting("ads_rotation_mode"),
+    ]);
+    const defaultDurationMod = durSettingMod?.valueJson != null ? Number(durSettingMod.valueJson) : 10;
+    const defaultModeMod = modeSettingMod?.valueJson != null ? String(modeSettingMod.valueJson) : "sequential";
     const campaign = await storage.createAdCampaign({
       name,
       sponsor: sponsor || "Syneco Lubrificanti",
@@ -273,8 +279,8 @@ router.post("/advertisements", adUpload.single("image"), async (req: Request, re
       displayMode: "banner",
       description: description || null,
       targetUserType: targetUserType || "biker",
-      rotationDuration: rotationDuration ? parseInt(rotationDuration) : 10,
-      rotationMode: rotationMode || "sequential",
+      rotationDuration: rotationDuration ? parseInt(rotationDuration) : defaultDurationMod,
+      rotationMode: rotationMode || defaultModeMod,
       sortOrder: sortOrder ? parseInt(sortOrder) : 0,
       startDate: startDate ? new Date(startDate) : null,
       endDate: endDate ? new Date(endDate) : null,

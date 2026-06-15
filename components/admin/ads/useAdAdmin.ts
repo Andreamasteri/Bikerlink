@@ -1,6 +1,7 @@
 // LARGE-FILE-LOCKED — limite: 587
 // Aggiungi nuove funzionalità in: components/admin/ads/useAdAdmin.next.ts
 import { useAdAdminStats } from "./useAdAdmin.stats";
+import { useAdRotationSettings } from "./useAdAdmin.next";
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { Alert, BackHandler, Platform } from "react-native";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -50,8 +51,8 @@ export function useAdAdmin() {
   const [editGroupIsActive, setEditGroupIsActive] = useState(true);
   const [editGroupIsActiveDirty, setEditGroupIsActiveDirty] = useState(false);
 
-  const [settingsDuration, setSettingsDuration] = useState("10");
-  const [settingsMode, setSettingsMode] = useState<"sequential" | "random">("sequential");
+  const { settingsDuration, setSettingsDuration, settingsMode, setSettingsMode,
+    serverDuration, saveRotationSettings, initFromServer } = useAdRotationSettings();
 
   const { data: allCampaigns = [], isLoading, error: campaignsError } = useQuery<Campaign[]>({
     queryKey: ["/api/admin/advertisements"],
@@ -213,7 +214,8 @@ export function useAdAdmin() {
         )
       );
     },
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
+      saveRotationSettings(variables.rotationDuration, variables.rotationMode);
       queryClient.invalidateQueries({ queryKey: ["/api/admin/advertisements"] });
       setShowSettingsModal(false);
     },
@@ -499,21 +501,20 @@ export function useAdAdmin() {
   };
 
   const openRotationSettings = () => {
-    const firstCampaign = campaigns[0];
-    if (firstCampaign) {
-      setSettingsDuration(String(firstCampaign.rotationDuration));
-      setSettingsMode(firstCampaign.rotationMode as "sequential" | "random");
-    } else {
-      setSettingsDuration("10");
-      setSettingsMode("sequential");
-    }
+    initFromServer();
     setShowSettingsModal(true);
+  };
+
+  const openBulkModal = () => {
+    setBulkDuration(String(serverDuration || 10));
+    setShowBulkModal(true);
   };
 
   const handleSaveRotation = () => {
     const duration = parseInt(settingsDuration) || 10;
-    const ids = campaigns.map((c) => c.id);
+    const ids = allCampaigns.map((c) => c.id);
     if (ids.length === 0) {
+      saveRotationSettings(duration, settingsMode);
       setShowSettingsModal(false);
       return;
     }
@@ -567,6 +568,7 @@ export function useAdAdmin() {
     openSingleEdit,
     openGroupEdit,
     openRotationSettings,
+    openBulkModal,
     handleSaveRotation,
     createMutation,
     singleEditMutation,
