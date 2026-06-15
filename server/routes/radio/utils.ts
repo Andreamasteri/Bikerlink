@@ -346,12 +346,70 @@ export function isAllowedStreamContentType(ct: string | null): boolean {
   if (c.startsWith("audio/")) return true;
   if (c.startsWith("video/")) return true;
   if (c === "application/ogg") return true;
-  if (c === "application/octet-stream") return true;
+  // application/octet-stream intentionally excluded: it allows proxying arbitrary
+  // binary file downloads from public CDNs, turning this into a general-purpose relay.
   if (c === "application/vnd.apple.mpegurl") return true;
   if (c === "application/x-mpegurl") return true;
   if (c === "application/dash+xml") return true;
   return false;
 }
+
+// ---------------------------------------------------------------------------
+// Per-user stream rate limiter: max STREAM_RATE_LIMIT_MAX new stream requests
+// per STREAM_RATE_LIMIT_WINDOW_MS per authenticated user ID.
+// ---------------------------------------------------------------------------
+export const streamRateLimitMap = new Map<string, { count: number; resetAt: number }>();
+export const STREAM_RATE_LIMIT_MAX = 10;
+export const STREAM_RATE_LIMIT_WINDOW_MS = 60 * 1000;
+
+export function checkStreamRateLimit(userId: string): boolean {
+  const now = Date.now();
+  const entry = streamRateLimitMap.get(userId);
+  if (!entry || now > entry.resetAt) {
+    streamRateLimitMap.set(userId, { count: 1, resetAt: now + STREAM_RATE_LIMIT_WINDOW_MS });
+    return true;
+  }
+  if (entry.count >= STREAM_RATE_LIMIT_MAX) {
+    return false;
+  }
+  entry.count++;
+  return true;
+}
+
+// ---------------------------------------------------------------------------
+// Per-user concurrent stream cap: at most STREAM_MAX_CONCURRENT open proxy
+// connections per authenticated user at any given time.
+// ---------------------------------------------------------------------------
+export const STREAM_MAX_CONCURRENT = 2;
+const activeStreamMap = new Map<string, number>();
+
+export function acquireStreamSlot(userId: string): boolean {
+  const current = activeStreamMap.get(userId) ?? 0;
+  if (current >= STREAM_MAX_CONCURRENT) return false;
+  activeStreamMap.set(userId, current + 1);
+  return true;
+}
+
+export function releaseStreamSlot(userId: string): void {
+  const current = activeStreamMap.get(userId) ?? 0;
+  if (current <= 1) {
+    activeStreamMap.delete(userId);
+  } else {
+    activeStreamMap.set(userId, current - 1);
+  }
+}
+
+// Max bytes relayed per stream connection before the server closes the pipe.
+// Legitimate radio streams are infinite (no Content-Length), so a hard byte
+// cap stops the proxy from relaying multi-gigabyte file downloads.
+export const STREAM_MAX_BYTES = 500 * 1024 * 1024; // 500 MB
+
+// Maximum wall-clock duration for a single proxied connection (ms).
+export const STREAM_MAX_DURATION_MS = 8 * 60 * 60 * 1000; // 8 hours
+
+// Content-Length ceiling: if the upstream declares a finite body this large
+// it is almost certainly a file download, not a radio stream.
+export const STREAM_MAX_CONTENT_LENGTH = 50 * 1024 * 1024; // 50 MB
 
 export function buildLastfmUrl(params: Record<string, string>, apiKey: string): string {
   const url = new URL("https://ws.audioscrobbler.com/2.0/");
