@@ -42,6 +42,49 @@ function bootLog(n: number, total: number, step: string, msg: string) {
   console.log(`[${new Date().toISOString()}] [${n}/${total}] ${step} — ${elapsed}s | ${msg}`);
 }
 
+// ── DB readiness pre-flight ───────────────────────────────────────────────────
+// Tenta di ottenere una connessione al DB con retry + backoff prima che il boot
+// raggiunga le fasi fatali (Migrations, Seed). Protegge dal crash loop causato
+// da pool exhaustion durante restart ciclici: ogni process.exit(1) lascia
+// connessioni pendenti; i tentativi successivi trovano il pool saturo e muoiono
+// in pochi secondi → loop si auto-rinforza. Attendere che il pool sia libero
+// rompe il ciclo prima che si avvii.
+//
+// Non-fatal: se la DB non risponde entro il timeout, logghiamo un warning e
+// lasciamo che Phase 2 (Migrations) gestisca l'errore con i propri messaggi.
+// Il retry copre i casi transienti (pool saturo, breve indisponibilità DB);
+// gli errori strutturali (credenziali errate) si manifestano immediatamente.
+const DB_READY_MAX_ATTEMPTS = 10;
+const DB_READY_INTERVAL_MS = 3_000;
+
+async function waitForDatabaseReady(): Promise<void> {
+  for (let attempt = 1; attempt <= DB_READY_MAX_ATTEMPTS; attempt++) {
+    let client: import("pg").PoolClient | null = null;
+    try {
+      client = await pool.connect();
+      await client.query("SELECT 1");
+      if (attempt > 1) {
+        console.log(`[BOOT][DB-READY] DB disponibile al tentativo ${attempt} — proseguo con le migration.`);
+      }
+      return;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (attempt === DB_READY_MAX_ATTEMPTS) {
+        console.warn(
+          `[BOOT][DB-READY] DB non raggiungibile dopo ${DB_READY_MAX_ATTEMPTS} tentativi (ultimo errore: ${msg}) — procedo comunque, Phase 2 gestirà l'errore.`,
+        );
+        return;
+      }
+      console.warn(
+        `[BOOT][DB-READY] Tentativo ${attempt}/${DB_READY_MAX_ATTEMPTS} fallito (${msg}) — riprovo tra ${DB_READY_INTERVAL_MS / 1000}s...`,
+      );
+      await new Promise<void>((res) => setTimeout(res, DB_READY_INTERVAL_MS));
+    } finally {
+      try { client?.release(); } catch { /* ignore */ }
+    }
+  }
+}
+
 export async function runBootSequence(server: Server, errorHandlersReady: Promise<void>): Promise<void> {
   const TOTAL = 5;
   // ── FASE 4/4 del deploy/publish: avvio del container in produzione ──────────
@@ -75,6 +118,11 @@ export async function runBootSequence(server: Server, errorHandlersReady: Promis
 
   initUptimeTracking();
   startMetroMonitor();
+
+  // ── DB readiness pre-flight (prima di Phase 2) ────────────────────────────
+  // Attendi che il DB sia raggiungibile prima di avviare migration e seed fatali.
+  // Rompe il crash loop da pool-exhaustion durante restart ciclici.
+  await waitForDatabaseReady();
 
   // ── Phase 2: Migrations (FATAL — gira dopo il listen) ─────────────────────
   bootLog(2, TOTAL, "Migrations", "start");
