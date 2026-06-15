@@ -1,10 +1,17 @@
--- Unique constraint on (session_id, crash_type) so that if the same session
--- is reported multiple times (client re-init race), only one row is kept.
--- The existing .onConflictDoNothing() in crash-logs.ts now becomes effective.
+-- NO-OP migration (constraint removed — see 0108_crash_logs_drop_unique_constraint.sql)
 --
--- Safety: deduplicate any existing (session_id, crash_type) pairs first,
--- keeping the row with the latest reported_at (highest id on tie).
--- Uses ROW_NUMBER() CTE instead of NOT IN to be NULL-safe and performant.
+-- Original intent: add a UNIQUE constraint on (session_id, crash_type) so that
+-- onConflictDoNothing() in crash-logs.ts would be DB-enforced.
+--
+-- Why this is now a no-op:
+--   Migration 0108 drops the very same constraint immediately after because
+--   prod rows contain duplicates and PostgreSQL refuses to build the UNIQUE index.
+--   App-level deduplication via onConflictDoNothing() is sufficient.
+--
+-- The dedup CTE below is kept: it is safe, idempotent, and cleans up any stale
+-- duplicates in dev environments without the risk of a constraint failure.
+-- Reference for the safe ROW_NUMBER() dedup pattern (see check-migration-unsafe-dedup.ts).
+
 WITH dupes AS (
   SELECT id,
          ROW_NUMBER() OVER (
@@ -15,17 +22,3 @@ WITH dupes AS (
 )
 DELETE FROM app_crash_logs
 WHERE id IN (SELECT id FROM dupes WHERE rn > 1);
-
---> statement-breakpoint
-
-DO $$ BEGIN
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_constraint
-    WHERE conname = 'app_crash_logs_session_id_crash_type_key'
-      AND conrelid = 'app_crash_logs'::regclass
-  ) THEN
-    ALTER TABLE app_crash_logs
-      ADD CONSTRAINT app_crash_logs_session_id_crash_type_key
-      UNIQUE (session_id, crash_type);
-  END IF;
-END $$;
