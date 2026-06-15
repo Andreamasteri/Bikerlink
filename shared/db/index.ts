@@ -28,3 +28,4 @@ export * from "./ai-console";
 export * from "./ai-console-messages";
 export * from "./ai-coordinator";
 export * from "./ai-assistant";
+export * from "./diagnostic";

@@ -232,6 +232,31 @@ export const adminGroupsPart2: AdminGroup[] = [
     ],
   },
   {
+    title: "Diagnostica",
+    headerIcon: "stethoscope",
+    headerIconSet: "MaterialCommunityIcons",
+    items: [
+      {
+        key: "diagnostic",
+        label: "Diagnostica Locale",
+        icon: "stethoscope",
+        iconSet: "MaterialCommunityIcons",
+        route: "/admin/diagnostic",
+        accentColor: "#22C55E",
+        keywords: ["diagnostica", "diagnostic", "test", "self-test", "debug", "log", "errore", "sentry"],
+      },
+      {
+        key: "diagnostic-reports",
+        label: "Diagnostica Remota",
+        icon: "remote-desktop",
+        iconSet: "MaterialCommunityIcons",
+        route: "/admin/diagnostic-reports",
+        accentColor: "#3B82F6",
+        keywords: ["diagnostica", "remota", "report", "utenti", "online", "debug remoto", "trigger"],
+      },
+    ],
+  },
+  {
     title: "Controllo OTA",
     headerIcon: "cloud-download",
     headerIconSet: "MaterialCommunityIcons",

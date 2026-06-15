@@ -387,6 +387,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const { default: metricsDeviceRouter } = await import("./routes/metrics-device");
   app.use("/api/metrics", metricsDeviceRouter);
 
+  const { default: diagnosticUserRouter } = await import("./routes/diagnostic");
+  app.use("/api/diagnostic", diagnosticUserRouter);
+
   // Task #2632 — Stub endpoints per chiamate client senza handler reale.
   // Mounted ULTIMO sotto /api/ così non sovrascrive route esistenti più
   // specifiche già registrate sopra. Vedi docs/sweep-404-2621.md sezione B.

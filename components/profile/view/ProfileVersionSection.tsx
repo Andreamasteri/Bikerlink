@@ -1,11 +1,15 @@
-import React, { useEffect, useState, useMemo } from "react";
-import { View, Text, StyleSheet } from "react-native";
+import React, { useEffect, useState, useMemo, useRef, useCallback } from "react";
+import { View, Text, StyleSheet, TouchableOpacity, Vibration } from "react-native";
 import Constants from "expo-constants";
 import { useQuery } from "@tanstack/react-query";
 import { useColors } from "@/hooks/useColors";
 import { useAuth } from "@/lib/auth-context";
 import { APPLIED_OTA_NUMBER, OTA_BUNDLED_COUNT } from "@/constants/buildInfo";
 import { loadAppliedOtaNumber, saveAppliedOtaNumber } from "@/lib/otaStorage";
+import { useRouter } from "expo-router";
+
+const HIDDEN_TAP_TARGET = 7;
+const HIDDEN_TAP_WINDOW_MS = 4000;
 
 function parseAppVersion(): { apk: string; runtime: string; ota: string } {
   const version = Constants.expoConfig?.version ?? "";
@@ -29,9 +33,12 @@ interface OtaReleaseSummary {
 export const ProfileVersionSection: React.FC = () => {
   const colors = useColors();
   const { user } = useAuth();
+  const router = useRouter();
   const isAdmin = user?.role === "admin";
 
   const [appliedOta, setAppliedOta] = useState<number | null>(APPLIED_OTA_NUMBER);
+  const tapCountRef = useRef(0);
+  const tapTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     const syncOtaNumber = async () => {
@@ -51,7 +58,6 @@ export const ProfileVersionSection: React.FC = () => {
     syncOtaNumber();
   }, []);
 
-  // Per admin: recupera l'ultimo OTA approvato (distribuito a tutti)
   const { data: releases } = useQuery<OtaReleaseSummary[]>({
     queryKey: ["/api/admin/ota/releases"],
     enabled: isAdmin,
@@ -64,10 +70,8 @@ export const ProfileVersionSection: React.FC = () => {
       .sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime());
     if (!approved.length) return null;
     const top = approved[0];
-    // Prova prima otaVersion ("54.10.27" → 27)
     const fromVersion = top.otaVersion?.match(/^\d+\.\d+\.(\d+)$/);
     if (fromVersion) return Number(fromVersion[1]);
-    // Fallback: estrai dal messaggio EAS ("[OTA:54.10.27] testo" → 27)
     const fromMessage = top.message?.match(/^\[OTA:\d+\.\d+\.(\d+)\]/);
     if (fromMessage) return Number(fromMessage[1]);
     return null;
@@ -75,33 +79,45 @@ export const ProfileVersionSection: React.FC = () => {
 
   const { apk, runtime } = parseAppVersion();
 
-  // Riga 1: per admin mostra l'OTA distribuita a tutti; per utenti normali mostra quella corrente
   const displayOta = isAdmin && lastApprovedOtaNum !== null ? lastApprovedOtaNum : appliedOta;
 
-  // Riga admin (blu): visibile solo quando l'admin sta testando un OTA diverso dall'approvato
   const showAdminOta =
     isAdmin &&
     APPLIED_OTA_NUMBER !== null &&
     lastApprovedOtaNum !== null &&
     APPLIED_OTA_NUMBER !== lastApprovedOtaNum;
 
+  const handleVersionTap = useCallback(() => {
+    tapCountRef.current += 1;
+    if (tapTimerRef.current) clearTimeout(tapTimerRef.current);
+    if (tapCountRef.current >= HIDDEN_TAP_TARGET) {
+      tapCountRef.current = 0;
+      try { Vibration.vibrate(80); } catch {/* noop */}
+      router.push("/admin/diagnostic" as never);
+      return;
+    }
+    tapTimerRef.current = setTimeout(() => { tapCountRef.current = 0; }, HIDDEN_TAP_WINDOW_MS);
+  }, [router]);
+
   return (
     <View style={styles.container}>
-      <View style={styles.row}>
-        <View style={styles.item}>
-          <Text style={[styles.label, { color: colors.textSecondary }]}>Build</Text>
-          <Text style={[styles.value, { color: colors.textSecondary }]}>
-            V{apk}.{runtime}.{OTA_BUNDLED_COUNT}
-          </Text>
+      <TouchableOpacity onPress={handleVersionTap} activeOpacity={0.7}>
+        <View style={styles.row}>
+          <View style={styles.item}>
+            <Text style={[styles.label, { color: colors.textSecondary }]}>Build</Text>
+            <Text style={[styles.value, { color: colors.textSecondary }]}>
+              V{apk}.{runtime}.{OTA_BUNDLED_COUNT}
+            </Text>
+          </View>
+          <Text style={[styles.dot, { color: colors.textSecondary }]}>·</Text>
+          <View style={styles.item}>
+            <Text style={[styles.label, { color: colors.textSecondary }]}>OTA applicata</Text>
+            <Text style={[styles.value, { color: colors.textSecondary }]}>
+              {displayOta != null ? `#${displayOta}` : "—"}
+            </Text>
+          </View>
         </View>
-        <Text style={[styles.dot, { color: colors.textSecondary }]}>·</Text>
-        <View style={styles.item}>
-          <Text style={[styles.label, { color: colors.textSecondary }]}>OTA applicata</Text>
-          <Text style={[styles.value, { color: colors.textSecondary }]}>
-            {displayOta != null ? `#${displayOta}` : "—"}
-          </Text>
-        </View>
-      </View>
+      </TouchableOpacity>
       {showAdminOta && (
         <View style={styles.adminRow}>
           <Text style={[styles.adminLabel, { color: "#3B82F6" }]}>Admin OTA in test</Text>

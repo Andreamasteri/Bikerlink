@@ -35,6 +35,7 @@ export class ErrorBoundary extends Component<
       this.lastErrorKey = errorKey;
     }
     markJsError(error, info.componentStack).catch(() => {});
+    import("@/lib/sentry").then(s => s.captureException(error, { componentStack: info.componentStack })).catch(() => {});
     if (typeof this.props.onError === "function") {
       this.props.onError(error, info.componentStack);
     }

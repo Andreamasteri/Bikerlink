@@ -92,6 +92,7 @@ function useLoginMutation() {
       queryClient.setQueryData(["/api/auth/me"], user);
       sendStartupBeacon("auth_login_success", { userId: user?.id });
       AsyncStorage.setItem(HAD_SESSION_KEY, "true").catch(() => {});
+      import("@/lib/sentry").then(s => s.setSentryUser({ id: user.id, email: user.email, username: user.nickname, role: user.role })).catch(() => {});
       // Clear the freshly-issued connect.sid cookie from the Android native jar
       if (Platform.OS === "android") {
         fetch(new URL("/api/auth/clear-session-cookie", getApiUrl()).toString(), {
@@ -258,6 +259,7 @@ function useLogoutMutation() {
     onSuccess: () => {
       // Credentials already wiped in mutationFn; reset the in-memory cache.
       queryClient.setQueryData(["/api/auth/me"], null);
+      import("@/lib/sentry").then(s => s.setSentryUser(null)).catch(() => {});
     },
     onError: () => {
       // Reached only if Promise.allSettled itself throws (extremely unlikely).
@@ -369,6 +371,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setSessionExpired(false);
     }
   }, [userQuery.data]);
+
+  // Diagnostic WS lifecycle: init on auth, teardown on logout.
+  useEffect(() => {
+    if (userQuery.data) {
+      import("@/lib/diagnostic/ws-client").then(m => {
+        m.initDiagnosticWS({ isAdmin: userQuery.data?.role === "admin" });
+      }).catch(() => {});
+    } else if (userQuery.data === null && storageChecked) {
+      import("@/lib/diagnostic/ws-client").then(m => m.teardownDiagnosticWS()).catch(() => {});
+    }
+  }, [userQuery.data, storageChecked]);
 
   // isReconnecting is true only during the INITIAL auth check when the user had a previous session.
   // Background refetches (triggered by scheduleAuthRecheck) don't set this flag.

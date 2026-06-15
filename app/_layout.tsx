@@ -42,6 +42,8 @@ import { useOtaStagingBanner } from "@/hooks/useOtaStagingBanner";
 import { useDeviceMetrics } from "@/hooks/useDeviceMetrics";
 SplashScreen.preventAutoHideAsync();
 
+import("@/lib/sentry").then(s => s.initSentry()).catch(() => {});
+
 function DeviceMetricsReporter({ tokenReady }: { tokenReady: boolean }) {
   useDeviceMetrics(tokenReady);
   return null;

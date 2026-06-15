@@ -415,6 +415,12 @@ export async function runBootSequence(server: Server, errorHandlersReady: Promis
     } catch (e) {
       console.warn("[INIT] admin notifications WS attach failed (non-fatal):", e);
     }
+    try {
+      const { attachDiagnosticWS } = await import("./diagnostic-ws");
+      attachDiagnosticWS(server);
+    } catch (e) {
+      console.warn("[INIT] diagnostic WS attach failed (non-fatal):", e);
+    }
   } catch (err) {
     console.error("[INIT] FATAL — Phase 4 failed:", err);
     process.exit(1);
