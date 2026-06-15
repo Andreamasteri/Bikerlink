@@ -8,6 +8,19 @@ interface SseEntry {
 const MAX_CONNECTIONS_PER_USER = 3;
 const sseClients = new Map<string, SseEntry[]>();
 
+const PRESENCE_DEBOUNCE_MS = 3_000;
+const presenceDebounceTimers = new Map<string, ReturnType<typeof setTimeout>>();
+
+export function schedulePushPresence(userId: string, fn: (userId: string) => Promise<void>): void {
+  const existing = presenceDebounceTimers.get(userId);
+  if (existing !== undefined) clearTimeout(existing);
+  const timer = setTimeout(() => {
+    presenceDebounceTimers.delete(userId);
+    fn(userId).catch(() => { /* best-effort */ });
+  }, PRESENCE_DEBOUNCE_MS);
+  presenceDebounceTimers.set(userId, timer);
+}
+
 export function addSseClient(userId: string, res: Response): string {
   const connId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
   const existing = sseClients.get(userId) ?? [];
