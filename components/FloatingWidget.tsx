@@ -140,6 +140,7 @@ export default function FloatingWidget() {
   }, []);
 
   const panGesture = Gesture.Pan()
+    .runOnJS(true)
     .minDistance(0)
     .onStart(() => {
       startX.value = posX.value;
