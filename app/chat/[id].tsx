@@ -14,8 +14,7 @@ import { useLocalSearchParams, useRouter, useFocusEffect } from "expo-router";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Ionicons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
-import { apiRequest, queryClient, getApiUrl, getQueryFnWithTimeout } from "@/lib/query-client";
-import { showImagePickerMenu, uriToBlob } from "@/lib/image-picker-utils";
+import { apiRequest, queryClient, getQueryFnWithTimeout } from "@/lib/query-client";
 import { useChatSSE, useChatSseConnected } from "@/hooks/useChatSSE";
 import { useT } from "@/lib/language-context";
 import { useAuth } from "@/lib/auth-context";
@@ -26,49 +25,15 @@ import { ChatInput } from "@/components/chat/ChatInput";
 import { ChatMembersModal } from "@/components/chat/ChatMembersModal";
 import { HashtagPanel } from "@/components/chat/HashtagPanel";
 import { styles } from "@/app/chat/chat-id-styles";
-
-interface ConversationDetail {
-  id: string;
-  conversationType: string;
-  title: string | null;
-  participants: Array<{
-    id: string;
-    nickname: string;
-    avatarUrl: string | null;
-    userType: string;
-  }>;
-}
-
-interface MotoClub {
-  id: string;
-  name: string;
-  conversationId: string | null;
-}
-
-function parseHashtagsFromInput(input: string): string[] {
-  return input
-    .split(/\s+/)
-    .map((w) => w.trim().toLowerCase())
-    .filter((w) => w.startsWith("#") && w.length > 1);
-}
-
-function messageMatchesHashtags(content: string | null, hashtags: string[]): boolean {
-  if (!content || hashtags.length === 0) return true;
-  const lower = content.toLowerCase();
-  return hashtags.some((tag) => lower.includes(tag));
-}
-
-function MotoclubWelcomeBanner() {
-  return (
-    <View style={styles.welcomeBanner}>
-      <Ionicons name="information-circle" size={18} color={Colors.accent} />
-      <Text style={styles.welcomeText}>
-        Usa gli hashtag della tua regione per organizzare i messaggi del club.{"\n"}
-        <Text style={{ color: Colors.accent, fontFamily: "Inter_600SemiBold" }}>Esempio: #veneto #lombardia</Text>
-      </Text>
-    </View>
-  );
-}
+import {
+  ConversationDetail,
+  MotoClub,
+  parseHashtagsFromInput,
+  messageMatchesHashtags,
+  MotoclubWelcomeBanner,
+} from "@/app/chat/chat-id-types";
+import { useChatImageUpload } from "@/hooks/useChatImageUpload";
+import { useChatConversationActions } from "@/hooks/useChatConversationActions";
 
 export default function ChatConversationScreen() {
   const t = useT();
@@ -84,7 +49,6 @@ export default function ChatConversationScreen() {
   const [hashtagInput, setHashtagInput] = useState("");
   const [autoHashtag, setAutoHashtag] = useState(false);
   const [showMembersPanel, setShowMembersPanel] = useState(false);
-  const [isUploadingImage, setIsUploadingImage] = useState(false);
 
   const sseConnected = useChatSseConnected();
 
@@ -278,93 +242,10 @@ export default function ChatConversationScreen() {
   const sendMutateRef = useRef(sendMutation.mutate);
   sendMutateRef.current = sendMutation.mutate;
 
-  const deleteConversationMutation = useMutation({
-    mutationFn: async () => {
-      await apiRequest("DELETE", `/api/chat/conversations/${id}`);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/chat/conversations"] });
-      router.back();
-    },
-  });
+  const { handleSendPhoto, isUploadingImage } = useChatImageUpload({ id, userId, user: user ?? null, t });
 
-  const deleteMessageMutation = useMutation({
-    mutationFn: async (messageId: string) => {
-      await apiRequest("DELETE", `/api/chat/messages/${messageId}`);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/chat/conversations", id, "messages"] });
-    },
-    onError: () => {
-      Alert.alert("Errore", "Impossibile eliminare il messaggio. Riprova.");
-    },
-  });
-
-  const handleDeleteMessage = useCallback((messageId: string) => {
-    deleteMessageMutation.mutate(messageId);
-  }, [deleteMessageMutation]);
-
-  const { data: lastfmStatus } = useQuery<{ connected: boolean; trackCount?: number }>({
-    queryKey: ["/api/lastfm/status"],
-    retry: false,
-  });
-
-  const musicConnected = lastfmStatus?.connected ?? false;
-  const musicTrackCount = lastfmStatus?.trackCount ?? 0;
-
-  const sharePlaylistMutation = useMutation({
-    mutationFn: async ({ toUserId }: { toUserId: string }) => {
-      const res = await apiRequest("POST", "/api/lastfm/share-playlist", {
-        toUserId,
-        conversationId: id,
-      });
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/chat/conversations", id, "messages"] });
-      Alert.alert(t("chat.librarySent"), t("chat.librarySentMsg"));
-    },
-    onError: () => {
-      Alert.alert("Errore", "Impossibile condividere la libreria. Riprova.");
-    },
-  });
-
-  const otherParticipant = conversation?.participants.find((p) => p.id !== userId);
-  const isPrivateChat = !isMotoclub && conversation?.participants.length === 2;
-
-  const handleSharePlaylist = useCallback(() => {
-    if (!musicConnected) {
-      Alert.alert(t("chat.musicNotConnected"), t("chat.connectLastfmMsg"));
-      return;
-    }
-    if (!isPrivateChat || !otherParticipant) return;
-    Alert.alert(
-      t("chat.sendLibraryTitle"),
-      t("chat.sendLibraryMsg").replace("{count}", String(musicTrackCount)).replace("{name}", otherParticipant.nickname ?? ""),
-      [
-        { text: t("common.cancel"), style: "cancel" },
-        {
-          text: t("chat.send"),
-          onPress: () => sharePlaylistMutation.mutate({ toUserId: otherParticipant.id }),
-        },
-      ]
-    );
-  }, [musicConnected, musicTrackCount, isPrivateChat, otherParticipant, sharePlaylistMutation, t]);
-
-  const handleDeleteConversation = useCallback(() => {
-    Alert.alert(
-      t("chat.deleteTitle2"),
-      t("chat.deleteConversationSimpleMsg"),
-      [
-        { text: t("common.cancel"), style: "cancel" },
-        {
-          text: t("common.delete"),
-          style: "destructive",
-          onPress: () => deleteConversationMutation.mutate(),
-        },
-      ]
-    );
-  }, [deleteConversationMutation, t]);
+  const { otherParticipant, isPrivateChat, handleDeleteMessage, handleSharePlaylist, handleDeleteConversation } =
+    useChatConversationActions({ id, userId, user: user ?? null, conversation, isMotoclub, t, onDeleteSuccess: () => router.back() });
 
   const handleSend = useCallback(() => {
     let text = inputTextRef.current.trim();
@@ -388,93 +269,18 @@ export default function ChatConversationScreen() {
     };
 
     try {
-        const Location = require("expo-location");
-        const { status } = await Location.requestForegroundPermissionsAsync();
-        if (status !== "granted") {
-          Alert.alert(t("chat.permissionDenied"), t("chat.locationPermissionMsg"));
-          return;
-        }
-        const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
-        insertCoords(loc.coords.latitude, loc.coords.longitude);
-      } catch {
-        Alert.alert(t("chat.locationError"), t("chat.cannotGetGps"));
+      const Location = require("expo-location");
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== "granted") {
+        Alert.alert(t("chat.permissionDenied"), t("chat.locationPermissionMsg"));
+        return;
       }
-  }, [t]);
-
-  const uploadPhoto = useCallback(async (uri: string) => {
-    const optimisticId = `optimistic-photo-${Date.now()}`;
-    const optimisticMsg: ChatMessage = {
-      id: optimisticId,
-      conversationId: id,
-      senderId: userId,
-      messageType: "image",
-      content: null,
-      imageUrl: uri,
-      latitude: null,
-      longitude: null,
-      isFiltered: false,
-      createdAt: new Date().toISOString(),
-      sender: user
-        ? {
-            id: user.id,
-            nickname: user.nickname ?? "",
-            avatarUrl: user.avatarUrl ?? null,
-            userType: user.userType ?? "biker",
-            sex: user.sex ?? null,
-          }
-        : null,
-    };
-    queryClient.setQueryData<ChatMessage[]>(
-      ["/api/chat/conversations", id, "messages"],
-      (old) => (old ? [optimisticMsg, ...old] : [optimisticMsg])
-    );
-
-    setIsUploadingImage(true);
-    try {
-      const formData = new FormData();
-      const filename = uri.split("/").pop() ?? "photo.jpg";
-      const ext = filename.split(".").pop()?.toLowerCase() ?? "jpg";
-      const mimeType = ext === "png" ? "image/png" : ext === "gif" ? "image/gif" : "image/jpeg";
-      const blob = await uriToBlob(uri, mimeType);
-      formData.append("image", blob, filename);
-
-      const uploadUrl = new URL(`/api/chat/conversations/${id}/images`, getApiUrl()).toString();
-      const resp = await fetch(uploadUrl, {
-        method: "POST",
-        body: formData,
-        credentials: "include",
-      });
-
-      if (!resp.ok) {
-        const err = await resp.json().catch(() => ({ message: t("chat.uploadError") }));
-        throw new Error((err as Error).message ?? t("chat.uploadPhotoError"));
-      }
-
-      const newMessage: ChatMessage = await resp.json();
-      queryClient.setQueryData<ChatMessage[]>(
-        ["/api/chat/conversations", id, "messages"],
-        (old) => {
-          if (!old) return [newMessage];
-          return old.map((m) => (m.id === optimisticId ? newMessage : m));
-        }
-      );
-      queryClient.invalidateQueries({ queryKey: ["/api/chat/conversations"] });
-    } catch (err: unknown) {
-      queryClient.setQueryData<ChatMessage[]>(
-        ["/api/chat/conversations", id, "messages"],
-        (old) => (old ? old.filter((m) => m.id !== optimisticId) : old)
-      );
-      Alert.alert("Errore", (err instanceof Error ? err.message : null) ?? "Impossibile inviare la foto.");
-    } finally {
-      setIsUploadingImage(false);
+      const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
+      insertCoords(loc.coords.latitude, loc.coords.longitude);
+    } catch {
+      Alert.alert(t("chat.locationError"), t("chat.cannotGetGps"));
     }
-  }, [id, userId, user, t]);
-
-  const handleSendPhoto = useCallback(() => {
-    showImagePickerMenu((uri) => {
-      uploadPhoto(uri);
-    });
-  }, [uploadPhoto]);
+  }, [t]);
 
   const getTitle = (): string => {
     if (conversation?.title) return conversation.title;
@@ -573,9 +379,7 @@ export default function ChatConversationScreen() {
         <View style={styles.emptyChatOuter}>
           <Ionicons name="chatbubble-outline" size={40} color={Colors.textSecondary} />
           <Text style={styles.emptyChatText}>Inizia la conversazione!</Text>
-          {isMotoclub && (
-            <MotoclubWelcomeBanner />
-          )}
+          {isMotoclub && <MotoclubWelcomeBanner />}
         </View>
       ) : (
         <FlatList
