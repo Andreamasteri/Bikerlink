@@ -26,7 +26,7 @@
       },
       "android": {
         "buildType": "apk",
-        "gradleCommand": ":app:assembleDebug",
+        "gradleCommand": ":app:assembleStandaloneDebug",
         "image": "latest"
       }
     },
