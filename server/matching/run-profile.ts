@@ -37,6 +37,7 @@ export async function runProposalToProfileMatching(
         && p.departureLatitude != null
         && p.departureLongitude != null
         && !matchingDisabledSet.has(p.userId)
+        && !p.clubId
     );
 
     if (filterProposalId) {

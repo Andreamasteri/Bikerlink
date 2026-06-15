@@ -11,7 +11,30 @@ const router = Router();
 
 router.get("/:id/participants", requireAuth, async (req: Request, res: Response) => {
   try {
-    const participants = await storage.getProposalParticipants(req.params.id as string);
+    const proposalId = req.params.id as string;
+    const userId = req.session.userId as string;
+
+    const proposal = await storage.getProposal(proposalId);
+    if (!proposal) {
+      return sendError(res, 404, "Proposta non trovata");
+    }
+
+    if (proposal.clubId) {
+      const [membership] = await db
+        .select({ userId: motoClubMembers.userId })
+        .from(motoClubMembers)
+        .where(and(
+          eq(motoClubMembers.clubId, proposal.clubId),
+          eq(motoClubMembers.userId, userId),
+          eq(motoClubMembers.status, "active"),
+        ))
+        .limit(1);
+      if (!membership) {
+        return sendError(res, 403, "Non sei membro attivo di questo club");
+      }
+    }
+
+    const participants = await storage.getProposalParticipants(proposalId);
     return res.json(participants);
   } catch (error) {
     console.error("Get participants error:", error);

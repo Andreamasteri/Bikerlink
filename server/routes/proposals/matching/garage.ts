@@ -55,6 +55,8 @@ router.get("/garage-matches", requireAuth, async (req: Request, res: Response) =
         const myLng = myProfile?.longitude ?? null;
         const myCoordUpdatedAt = myProfile?.coordinatesUpdatedAt ?? null;
         const maxAgeSec = await getCoordinatesMaxAgeSec();
+        const offlineRandomSetting = await storage.getAppSetting("offline_position_randomize_default");
+        const globalOfflineRandomize = offlineRandomSetting?.value !== "false";
 
         const filteredMatches = garageMatches.filter((match) => {
           const otherId = match.bikerId === userId ? match.zavarrinaId : match.bikerId;
@@ -89,20 +91,35 @@ router.get("/garage-matches", requireAuth, async (req: Request, res: Response) =
             }
 
             const otherProfile = otherUser?.id ? profileMap.get(otherUser.id) : undefined;
-            const otherLat: number | null = otherProfile?.latitude ?? null;
-            const otherLng: number | null = otherProfile?.longitude ?? null;
+            const otherHidden = !!otherProfile?.hideFromMap;
             const otherCoordUpdatedAt: Date | null = otherProfile?.coordinatesUpdatedAt ?? null;
+            const myOld = isCoordOld(myCoordUpdatedAt, maxAgeSec);
+            const otherOld = isCoordOld(otherCoordUpdatedAt, maxAgeSec);
+
+            let otherLat: number | null = null;
+            let otherLng: number | null = null;
+            if (!otherHidden) {
+              if (otherOld) {
+                const useOffline = globalOfflineRandomize && otherProfile?.offlinePositionRandomize !== false;
+                const hasFuzzed = otherProfile?.lastOfflineLat != null && otherProfile?.lastOfflineLng != null;
+                if (useOffline && hasFuzzed) {
+                  otherLat = otherProfile!.lastOfflineLat!;
+                  otherLng = otherProfile!.lastOfflineLng!;
+                }
+              } else {
+                otherLat = otherProfile?.latitude ?? null;
+                otherLng = otherProfile?.longitude ?? null;
+              }
+            }
 
             let distanceKm: number | null = null;
             let distanceFlag: "ok" | "old_psn" | "no_psn" = "no_psn";
-            if (myLat != null && myLng != null && otherLat != null && otherLng != null) {
-              const myOld = isCoordOld(myCoordUpdatedAt, maxAgeSec);
-              const otherOld = isCoordOld(otherCoordUpdatedAt, maxAgeSec);
+            if (myLat != null && myLng != null && otherProfile?.latitude != null && otherProfile?.longitude != null) {
               if (myOld || otherOld) {
                 distanceFlag = "old_psn";
                 distanceKm = null;
               } else {
-                distanceKm = Math.round(haversineKm(myLat, myLng, otherLat, otherLng) * 10) / 10;
+                distanceKm = Math.round(haversineKm(myLat, myLng, otherProfile.latitude, otherProfile.longitude) * 10) / 10;
                 distanceFlag = "ok";
               }
             }

@@ -250,9 +250,16 @@ router.get("/proposal-profile-matches", requireAuth, async (req: Request, res: R
     const halfLifeDays = await getHalfLifeDays("proposal");
     const matches = await storage.getProposalProfileMatchesForUser(userId, { halfLifeDays });
 
+    const userMemberships = await db
+      .select({ clubId: motoClubMembers.clubId })
+      .from(motoClubMembers)
+      .where(and(eq(motoClubMembers.userId, userId), eq(motoClubMembers.status, "active")));
+    const memberClubIds = new Set(userMemberships.map((m) => m.clubId));
+
     const results = await allLimited(
       matches.map((match) => async () => {
         const proposal = await storage.getProposal(match.proposalId);
+        if (proposal?.clubId && !memberClubIds.has(proposal.clubId)) return null;
         const biker = await storage.getUser(match.bikerId);
         const zavorrina = await storage.getUser(match.zavarrinaId);
         if (!biker || !zavorrina) return null;
