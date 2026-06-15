@@ -1,4 +1,5 @@
 import crypto from "crypto";
+import { EventEmitter } from "events";
 import { writeWatchdogLog } from "../watchdog/log";
 import { checkTelemetryRide, checkTelemetryMaps } from "./checks/telemetry";
 import { checkMatching } from "./checks/matching";
@@ -30,6 +31,11 @@ const ALL_CHECKS: Array<[PipelineName, CheckFn]> = [
 
 let _lastRunResult: PipelineRunResult | null = null;
 let _runInProgress = false;
+
+// In-process emitter — fires 'run-complete' with the PipelineRunResult after
+// each successful radiografia run so SSE clients get an immediate push.
+export const pipelineRunEmitter = new EventEmitter();
+pipelineRunEmitter.setMaxListeners(50);
 
 export function getLastPipelineRunResult(): PipelineRunResult | null {
   return _lastRunResult;
@@ -95,6 +101,8 @@ export async function runPipelineChecks(opts: {
       summary: `Pipeline check (${scope}): ${overall} — ${results.length} pipeline in ${runResult.durationMs}ms (trigger=${triggeredBy})`,
       details: runResult,
     });
+
+    pipelineRunEmitter.emit("run-complete", runResult);
 
     return runResult;
   } finally {

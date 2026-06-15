@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   View, Text, ScrollView, TouchableOpacity, ActivityIndicator,
-  Platform, RefreshControl, Alert,
+  Platform, RefreshControl, Alert, Linking,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
@@ -561,6 +561,20 @@ export default function DiagnosticaScreen() {
           </TouchableOpacity>
         ))}
       </View>
+
+      {/* Live Dashboard link */}
+      <TouchableOpacity
+        style={s.liveDashboardBtn}
+        onPress={() => {
+          const url = new URL("/admin/diagnostics/live", getApiUrl()).toString();
+          Linking.openURL(url);
+        }}
+        activeOpacity={0.75}
+      >
+        <Ionicons name="desktop-outline" size={13} color={Colors.accent} />
+        <Text style={s.liveDashboardBtnText}>Live Dashboard (PC)</Text>
+        <Ionicons name="open-outline" size={11} color={Colors.textSecondary} />
+      </TouchableOpacity>
 
       {/* Content */}
       <View style={[s.tabContent2, { paddingBottom: insets.bottom + 20 }]}>

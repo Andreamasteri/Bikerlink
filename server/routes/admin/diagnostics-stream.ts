@@ -1,0 +1,109 @@
+import { Router, type Request, type Response } from "express";
+import {
+  getPipelineStatusPayload,
+  getHolesPayload,
+  getWatchdogLogsPayload,
+  getPoolHealthPayload,
+  getHeartbeatPayload,
+} from "../../ai/pipeline-monitor/stream-aggregators";
+import { watchdogLogEmitter } from "../../ai/watchdog/log";
+import { pipelineRunEmitter } from "../../ai/pipeline-monitor/runner";
+
+const router = Router();
+
+function sseWrite(res: Response, event: string, data: unknown): boolean {
+  try {
+    res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// GET /api/admin/diagnostics/stream
+// SSE stream: mantiene la connessione aperta e invia 5 tipi di eventi.
+// Protetto da _requireAdmin nel parent router.
+router.get("/diagnostics/stream", async (req: Request, res: Response) => {
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache");
+  res.setHeader("Connection", "keep-alive");
+  res.setHeader("X-Accel-Buffering", "no");
+  res.flushHeaders();
+
+  const timers: ReturnType<typeof setInterval>[] = [];
+  let closed = false;
+
+  const cleanup = () => {
+    if (closed) return;
+    closed = true;
+    for (const t of timers) clearInterval(t);
+    watchdogLogEmitter.off("new-entry", onNewWatchdogLog);
+    pipelineRunEmitter.off("run-complete", onPipelineRunComplete);
+  };
+
+  req.on("close", cleanup);
+  req.on("abort", cleanup);
+
+  // ── Emitter subscriptions (immediate push) ───────────────────────────────────
+
+  const onNewWatchdogLog = () => {
+    if (closed) return;
+    getWatchdogLogsPayload().then((payload) => {
+      if (!closed) sseWrite(res, "watchdog-log", payload);
+    }).catch(() => { /* noop */ });
+  };
+
+  const onPipelineRunComplete = () => {
+    if (closed) return;
+    sseWrite(res, "pipeline-status", getPipelineStatusPayload());
+  };
+
+  watchdogLogEmitter.on("new-entry", onNewWatchdogLog);
+  pipelineRunEmitter.on("run-complete", onPipelineRunComplete);
+
+  // ── Initial burst ────────────────────────────────────────────────────────────
+  try {
+    const wdLogs = await getWatchdogLogsPayload();
+    sseWrite(res, "pipeline-status", getPipelineStatusPayload());
+    sseWrite(res, "holes", getHolesPayload());
+    sseWrite(res, "watchdog-log", wdLogs);
+    sseWrite(res, "pool-health", getPoolHealthPayload());
+    sseWrite(res, "heartbeat", getHeartbeatPayload());
+  } catch (err) {
+    sseWrite(res, "error", { message: (err as Error).message });
+  }
+
+  // ── Periodic fallback intervals ───────────────────────────────────────────────
+
+  // Pipeline status fallback — ogni 60s (il push immediato copre i run)
+  timers.push(setInterval(() => {
+    if (closed) return;
+    sseWrite(res, "pipeline-status", getPipelineStatusPayload());
+  }, 60_000));
+
+  // Buchi attivi — ogni 30s (hole-detector scheduler gira ogni 5 min)
+  timers.push(setInterval(() => {
+    if (closed) return;
+    sseWrite(res, "holes", getHolesPayload());
+  }, 30_000));
+
+  // Pool DB — ogni 15s
+  timers.push(setInterval(() => {
+    if (closed) return;
+    sseWrite(res, "pool-health", getPoolHealthPayload());
+  }, 15_000));
+
+  // Heartbeat servizi — ogni 10s
+  timers.push(setInterval(() => {
+    if (closed) return;
+    sseWrite(res, "heartbeat", getHeartbeatPayload());
+  }, 10_000));
+
+  // Keep-alive ping — ogni 25s
+  timers.push(setInterval(() => {
+    if (closed) { cleanup(); return; }
+    try { res.write(": ping\n\n"); } catch { cleanup(); }
+  }, 25_000));
+});
+
+export default router;

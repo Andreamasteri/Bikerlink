@@ -165,6 +165,23 @@ function _requireAdmin(req: Request, res: Response, next: Function) {
       return next();
     }
   } catch {/* token module non disponibile: ignora bypass */}
+  // ADMIN_DIAGNOSTICS_TOKEN query-param bypass — allows EventSource (SSE) to
+  // GET /diagnostics/stream from a PC browser without an active admin session.
+  // Strictly scoped to that single path+method so the token cannot be used to
+  // call any other privileged admin endpoint.
+  {
+    const isSseEndpoint = req.method === "GET" && req.path === "/diagnostics/stream";
+    if (isSseEndpoint) {
+      const diagToken = process.env.ADMIN_DIAGNOSTICS_TOKEN;
+      const provided = typeof req.query.token === "string" ? req.query.token : null;
+      if (diagToken && provided && diagToken.length >= 16 && provided === diagToken) {
+        (req as Request & { currentUser?: unknown }).currentUser = {
+          id: "__diagnostics-token__", role: "admin", status: "active",
+        };
+        return next();
+      }
+    }
+  }
   if (!req.session.userId) {
     console.warn(`[admin-auth] 401 reason=no-session path=${path} sid=${sid}`);
     return sendError(res, 401, "Sessione scaduta. Effettua di nuovo l'accesso.");
@@ -303,6 +320,7 @@ import bugReportRouter from './admin/bug-report';
 import resourceMonitorRouter from './admin/resource-monitor';
 import diagnosticAdminRouter from './admin/diagnostic';
 import pipelineCheckRouter from './admin/pipeline-check';
+import diagnosticsStreamRouter from './admin/diagnostics-stream';
 
 router.post('/maps/osm-updated', async (req: Request, res: Response) => {
   try {
@@ -437,5 +455,6 @@ router.use('/', _requireAdmin, bugReportRouter);
 router.use('/', _requireAdmin, resourceMonitorRouter);
 router.use('/', _requireAdmin, diagnosticAdminRouter);
 router.use('/', _requireAdmin, pipelineCheckRouter);
+router.use('/', _requireAdmin, diagnosticsStreamRouter);
 
 export default router;

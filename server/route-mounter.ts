@@ -302,4 +302,38 @@ export function registerAllRoutes(app: express.Application) {
     res.setHeader("Cache-Control", "no-store");
     res.sendFile(pianificaPath);
   });
+
+  // Live diagnostics dashboard (admin only — session or ADMIN_DIAGNOSTICS_TOKEN)
+  const diagnosticsLivePath = path.resolve(process.cwd(), "server", "templates", "diagnostics-live.html");
+  app.get("/admin/diagnostics/live", async (req, res) => {
+    // Token-based access: ?token=<ADMIN_DIAGNOSTICS_TOKEN> for PC browser without session
+    const diagToken = process.env.ADMIN_DIAGNOSTICS_TOKEN;
+    const providedToken = typeof req.query.token === "string" ? req.query.token : null;
+    if (diagToken && providedToken) {
+      if (diagToken.length >= 16 && providedToken === diagToken) {
+        res.setHeader("Content-Type", "text/html; charset=utf-8");
+        res.setHeader("Cache-Control", "no-store");
+        return res.sendFile(diagnosticsLivePath);
+      }
+      return res.status(403).send("Token non valido.");
+    }
+
+    // Session-based access (browser with active admin session)
+    const userId = (req.session as { userId?: string })?.userId;
+    if (!userId) {
+      return res.redirect(302, "/accedi?next=/admin/diagnostics/live");
+    }
+    try {
+      const { storage: appStorage } = await import("./storage");
+      const user = await appStorage.getUser(userId);
+      if (!user || user.role !== "admin") {
+        return res.status(403).send("Accesso riservato agli amministratori.");
+      }
+    } catch {
+      return res.status(500).send("Errore interno.");
+    }
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
+    res.setHeader("Cache-Control", "no-store");
+    res.sendFile(diagnosticsLivePath);
+  });
 }

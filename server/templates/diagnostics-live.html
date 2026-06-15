@@ -1,0 +1,474 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>BikerLink — Live Diagnostics</title>
+<meta name="robots" content="noindex,nofollow"/>
+<style>
+:root{
+  --bg:#080808;--bg-alt:#0D0D0D;--surface:#111;--surface2:#181818;--surface3:#1E1E1E;
+  --accent:#FF3B30;--accent2:#FF9500;--border:rgba(255,255,255,.07);--border-mid:rgba(255,255,255,.13);
+  --text:#EFEFEF;--text2:#A0A0A0;--text3:#606060;
+  --ok:#22C55E;--warn:#F59E0B;--err:#EF4444;--info:#3B82F6;
+  --pill-ok:rgba(34,197,94,.15);--pill-warn:rgba(245,158,11,.15);--pill-err:rgba(239,68,68,.15);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",sans-serif;font-size:13px;line-height:1.5;min-height:100vh}
+a{color:var(--accent);text-decoration:none}
+
+/* ── Top bar ── */
+.topbar{display:flex;align-items:center;justify-content:space-between;padding:12px 20px;background:var(--bg-alt);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:100}
+.topbar-left{display:flex;align-items:center;gap:12px}
+.logo{font-size:15px;font-weight:800;letter-spacing:.5px;color:var(--text)}
+.logo span{color:var(--accent)}
+.topbar-title{font-size:11px;text-transform:uppercase;letter-spacing:2px;color:var(--text3);font-weight:700}
+.topbar-right{display:flex;align-items:center;gap:14px}
+.ts-label{font-size:11px;color:var(--text3)}
+.ts-value{font-size:11px;color:var(--text2);font-variant-numeric:tabular-nums}
+.conn-dot{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:5px;vertical-align:middle;transition:background .3s}
+.conn-ok{background:var(--ok);box-shadow:0 0 6px rgba(34,197,94,.5)}
+.conn-err{background:var(--err);animation:blink 1s infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+.conn-label{font-size:11px;color:var(--text2);vertical-align:middle}
+.btn-refresh{background:transparent;border:1px solid var(--border-mid);color:var(--text2);padding:5px 10px;border-radius:3px;cursor:pointer;font-size:11px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;font-family:inherit}
+.btn-refresh:hover{border-color:var(--accent);color:var(--accent)}
+
+/* ── Layout ── */
+.main{padding:20px;display:grid;gap:20px;max-width:1600px;margin:0 auto}
+.grid-top{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+.grid-bottom{display:grid;grid-template-columns:2fr 1fr;gap:20px}
+@media(max-width:1024px){.grid-top,.grid-bottom{grid-template-columns:1fr}}
+@media(max-width:640px){.main{padding:12px;gap:12px}}
+
+/* ── Card ── */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:6px;overflow:hidden}
+.card-header{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--border);background:var(--bg-alt)}
+.card-title{font-size:11px;text-transform:uppercase;letter-spacing:1.5px;color:var(--text2);font-weight:700}
+.card-meta{font-size:10px;color:var(--text3);font-variant-numeric:tabular-nums}
+.card-body{padding:16px}
+
+/* ── Pipeline grid ── */
+.pipeline-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px}
+.pipeline-item{background:var(--surface2);border:1px solid var(--border);border-radius:4px;padding:10px 12px;display:flex;flex-direction:column;gap:4px}
+.pipeline-item-label{font-size:11px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pipeline-badge{display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;padding:2px 7px;border-radius:2px}
+.badge-ok{background:var(--pill-ok);color:var(--ok)}
+.badge-degraded{background:var(--pill-warn);color:var(--warn)}
+.badge-broken{background:var(--pill-err);color:var(--err)}
+.badge-unknown{background:rgba(96,96,96,.2);color:var(--text3)}
+.pipeline-dur{font-size:10px;color:var(--text3)}
+.no-data{color:var(--text3);font-style:italic;font-size:12px;text-align:center;padding:24px 0}
+
+/* ── Holes list ── */
+.hole-list{display:flex;flex-direction:column;gap:8px;max-height:320px;overflow-y:auto}
+.hole-item{background:var(--surface2);border:1px solid var(--border);border-left:3px solid var(--err);border-radius:4px;padding:10px 12px;display:flex;flex-direction:column;gap:3px}
+.hole-pipeline{font-size:12px;font-weight:700;color:var(--text);text-transform:capitalize}
+.hole-meta{font-size:11px;color:var(--text3);display:flex;gap:12px;flex-wrap:wrap}
+.hole-age{color:var(--warn);font-weight:700}
+.hole-empty{color:var(--ok);font-size:12px;text-align:center;padding:20px 0;display:flex;align-items:center;gap:6px;justify-content:center}
+
+/* ── Watchdog log feed ── */
+.log-feed{max-height:380px;overflow-y:auto;display:flex;flex-direction:column;gap:2px;font-size:11px;font-family:"SF Mono",ui-monospace,monospace}
+.log-row{display:flex;gap:8px;align-items:flex-start;padding:4px 6px;border-radius:2px;background:transparent}
+.log-row:hover{background:var(--surface2)}
+.log-ts{color:var(--text3);white-space:nowrap;min-width:76px;flex-shrink:0;font-size:10px;padding-top:1px}
+.log-badge{flex-shrink:0;min-width:44px;text-align:center;font-size:9px;font-weight:700;text-transform:uppercase;padding:1px 5px;border-radius:2px;letter-spacing:.5px}
+.log-badge-ok{background:var(--pill-ok);color:var(--ok)}
+.log-badge-warn{background:var(--pill-warn);color:var(--warn)}
+.log-badge-error{background:var(--pill-err);color:var(--err)}
+.log-badge-pending{background:rgba(59,130,246,.15);color:var(--info)}
+.log-badge-accepted{background:rgba(34,197,94,.1);color:var(--ok)}
+.log-badge-rejected{background:rgba(239,68,68,.1);color:var(--err)}
+.log-msg{color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0}
+.log-kind{color:var(--text3);font-size:9px;padding-top:1px;flex-shrink:0}
+
+/* ── Pool gauge ── */
+.pool-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px}
+.pool-metric{background:var(--surface2);border:1px solid var(--border);border-radius:4px;padding:12px;text-align:center}
+.pool-val{font-size:26px;font-weight:800;line-height:1;color:var(--text)}
+.pool-val.ok{color:var(--ok)}
+.pool-val.warn{color:var(--warn)}
+.pool-val.critical{color:var(--err)}
+.pool-lbl{font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--text3);margin-top:5px;font-weight:700}
+.pool-bar-wrap{background:var(--surface2);border-radius:3px;height:8px;overflow:hidden}
+.pool-bar{height:100%;border-radius:3px;transition:width .4s,background .4s}
+.pool-bar-ok{background:var(--ok)}
+.pool-bar-warn{background:var(--warn)}
+.pool-bar-critical{background:var(--err)}
+.pool-bar-label{display:flex;justify-content:space-between;margin-top:5px;font-size:10px;color:var(--text3)}
+
+/* ── Heartbeat pills ── */
+.hb-grid{display:flex;flex-wrap:wrap;gap:8px}
+.hb-pill{display:flex;align-items:center;gap:7px;padding:8px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:20px;font-size:12px;font-weight:600}
+.hb-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0}
+.hb-dot-ok{background:var(--ok);box-shadow:0 0 6px rgba(34,197,94,.5)}
+.hb-dot-warn{background:var(--warn);box-shadow:0 0 6px rgba(245,158,11,.4)}
+.hb-dot-err{background:var(--err);box-shadow:0 0 6px rgba(239,68,68,.5);animation:blink 1.5s infinite}
+.hb-dot-unknown{background:var(--text3)}
+.hb-name{color:var(--text)}
+.hb-status{font-size:10px;color:var(--text3);text-transform:capitalize}
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar{width:4px;height:4px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border-mid);border-radius:2px}
+::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,.2)}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-left">
+    <span class="logo">Biker<span>Link</span></span>
+    <span class="topbar-title">Live Diagnostics</span>
+  </div>
+  <div class="topbar-right">
+    <span class="ts-label">Aggiornato</span>
+    <span class="ts-value" id="lastUpdate">—</span>
+    <button class="btn-refresh" onclick="reconnect()">↺ Riconnetti</button>
+    <span id="connIndicator">
+      <span class="conn-dot conn-err" id="connDot"></span>
+      <span class="conn-label" id="connLabel">Connessione…</span>
+    </span>
+  </div>
+</div>
+
+<div class="main">
+  <!-- Row 1: Pipeline + Holes -->
+  <div class="grid-top">
+    <!-- Pipeline status -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">Stato Pipeline</span>
+        <span class="card-meta" id="pipelineMeta">—</span>
+      </div>
+      <div class="card-body">
+        <div class="pipeline-grid" id="pipelineGrid">
+          <p class="no-data">In attesa di dati…</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Buchi attivi -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">Buchi Attivi</span>
+        <span class="card-meta" id="holesMeta">—</span>
+      </div>
+      <div class="card-body">
+        <div id="holesList"><p class="no-data">In attesa di dati…</p></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Row 2: Log + (Pool + Heartbeat) -->
+  <div class="grid-bottom">
+    <!-- Watchdog log feed -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">Log Watchdog AI</span>
+        <span class="card-meta" id="logMeta">— eventi</span>
+      </div>
+      <div class="card-body" style="padding:8px">
+        <div class="log-feed" id="logFeed">
+          <p class="no-data">In attesa di dati…</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Pool DB + Heartbeat -->
+    <div style="display:flex;flex-direction:column;gap:20px">
+      <!-- Pool DB -->
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Pool DB</span>
+          <span class="card-meta" id="poolMeta">—</span>
+        </div>
+        <div class="card-body">
+          <div class="pool-grid" id="poolMetrics">
+            <div class="pool-metric"><div class="pool-val" id="pTotal">—</div><div class="pool-lbl">Total</div></div>
+            <div class="pool-metric"><div class="pool-val" id="pIdle">—</div><div class="pool-lbl">Idle</div></div>
+            <div class="pool-metric"><div class="pool-val" id="pWaiting">—</div><div class="pool-lbl">Wait</div></div>
+            <div class="pool-metric"><div class="pool-val" id="pMax">—</div><div class="pool-lbl">Max</div></div>
+          </div>
+          <div class="pool-bar-wrap">
+            <div class="pool-bar pool-bar-ok" id="poolBar" style="width:0%"></div>
+          </div>
+          <div class="pool-bar-label">
+            <span>0</span>
+            <span id="poolBarLabel">Utilizzo pool</span>
+            <span id="pMaxLabel">—</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Heartbeat servizi -->
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Heartbeat Servizi</span>
+          <span class="card-meta" id="hbMeta">—</span>
+        </div>
+        <div class="card-body">
+          <div class="hb-grid" id="hbGrid">
+            <p class="no-data">In attesa…</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function() {
+  var es = null;
+
+  // ── XSS guard — escape all dynamic strings before inserting into innerHTML ──
+  function escHtml(s) {
+    if (s == null) return "";
+    return String(s)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
+  }
+
+  // ── Token forwarding — if page was opened with ?token=, pass it to SSE ──────
+  function buildStreamUrl() {
+    var params = new URLSearchParams(window.location.search);
+    var token = params.get("token");
+    var url = "/api/admin/diagnostics/stream";
+    if (token) url += "?token=" + encodeURIComponent(token);
+    return url;
+  }
+
+  function setConn(ok) {
+    var dot = document.getElementById("connDot");
+    var lbl = document.getElementById("connLabel");
+    dot.className = "conn-dot " + (ok ? "conn-ok" : "conn-err");
+    lbl.textContent = ok ? "Connesso" : "Disconnesso — retry…";
+  }
+
+  function setLastUpdate() {
+    document.getElementById("lastUpdate").textContent = new Date().toLocaleTimeString("it-IT");
+  }
+
+  function badgeClass(overall) {
+    if (overall === "ok") return "badge-ok";
+    if (overall === "degraded") return "badge-degraded";
+    if (overall === "broken") return "badge-broken";
+    return "badge-unknown";
+  }
+
+  function badgeText(overall) {
+    if (overall === "ok") return "OK";
+    if (overall === "degraded") return "WARN";
+    if (overall === "broken") return "BROKEN";
+    return "—";
+  }
+
+  function fmtAge(ms) {
+    if (ms < 60000) return Math.round(ms / 1000) + "s";
+    if (ms < 3600000) return Math.round(ms / 60000) + "m";
+    return Math.round(ms / 3600000) + "h";
+  }
+
+  function fmtTs(iso) {
+    if (!iso) return "—";
+    try {
+      return new Date(iso).toLocaleTimeString("it-IT");
+    } catch (e) { return escHtml(iso); }
+  }
+
+  function dotClass(status) {
+    if (status === "ok") return "hb-dot-ok";
+    if (status === "degraded" || status === "warn") return "hb-dot-warn";
+    if (status === "offline" || status === "error") return "hb-dot-err";
+    return "hb-dot-unknown";
+  }
+
+  function logBadgeClass(status) {
+    var allowed = {ok:1,warn:1,error:1,pending:1,accepted:1,rejected:1};
+    return "log-badge-" + (allowed[status] ? status : "ok");
+  }
+
+  // ── Pipeline status ──────────────────────────────────────────────────────────
+  function renderPipelines(data) {
+    var grid = document.getElementById("pipelineGrid");
+    var meta = document.getElementById("pipelineMeta");
+    if (!data || !data.result || !data.result.pipelines) {
+      if (data && data.inProgress) {
+        meta.textContent = "Run in corso…";
+        grid.innerHTML = '<p class="no-data">Run in corso…</p>';
+      } else {
+        grid.innerHTML = '<p class="no-data">Nessun run ancora</p>';
+        meta.textContent = "—";
+      }
+      return;
+    }
+    var r = data.result;
+    var ago = r.generatedAt ? fmtTs(r.generatedAt) : "—";
+    meta.textContent = ago + " · " + Number(r.pipelines.length) + " pipeline · " + Number(r.durationMs) + "ms";
+    if (data.inProgress) meta.textContent += " · run in corso…";
+
+    grid.innerHTML = r.pipelines.map(function(p) {
+      var overall = String(p.overall || "");
+      return '<div class="pipeline-item">' +
+        '<span class="pipeline-item-label" title="' + escHtml(p.pipeline) + '">' + escHtml(p.label || p.pipeline) + '</span>' +
+        '<span class="pipeline-badge ' + badgeClass(overall) + '">' + badgeText(overall) + '</span>' +
+        '<span class="pipeline-dur">' + Number(p.durationMs) + 'ms</span>' +
+        '</div>';
+    }).join("");
+  }
+
+  // ── Holes ────────────────────────────────────────────────────────────────────
+  function renderHoles(data) {
+    var list = document.getElementById("holesList");
+    var meta = document.getElementById("holesMeta");
+    if (!data || !data.active) { list.innerHTML = '<p class="no-data">In attesa…</p>'; return; }
+    var active = data.active || [];
+    meta.textContent = Number(active.length) + " attivi · " + Number((data.recent || []).length) + " recenti";
+
+    if (active.length === 0) {
+      list.innerHTML = '<div class="hole-empty">✓ Nessun buco attivo</div>';
+      return;
+    }
+    list.innerHTML = '<div class="hole-list">' + active.map(function(h) {
+      return '<div class="hole-item">' +
+        '<span class="hole-pipeline">' + escHtml(String(h.pipeline || "").replace(/_/g, " ")) + '</span>' +
+        '<span class="hole-meta">' +
+          '<span>cp: ' + escHtml(String(h.lastCheckpoint || "—")) + '</span>' +
+          '<span class="hole-age">età: ' + escHtml(fmtAge(Number(h.ageMs) || 0)) + '</span>' +
+          '<span style="color:var(--text3);font-size:10px">' + escHtml(String(h.traceId || "").slice(0, 8)) + '</span>' +
+        '</span>' +
+        '</div>';
+    }).join("") + '</div>';
+  }
+
+  // ── Watchdog log ─────────────────────────────────────────────────────────────
+  function renderWatchdogLogs(data) {
+    var feed = document.getElementById("logFeed");
+    var meta = document.getElementById("logMeta");
+    if (!data || !data.logs) { feed.innerHTML = '<p class="no-data">In attesa…</p>'; return; }
+    var logs = data.logs;
+    meta.textContent = Number(logs.length) + " eventi";
+
+    if (logs.length === 0) { feed.innerHTML = '<p class="no-data">Nessun log recente</p>'; return; }
+
+    feed.innerHTML = logs.map(function(l) {
+      var summary = escHtml((l.summary || "—").slice(0, 120));
+      var fullSummary = escHtml(l.summary || "");
+      var status = String(l.status || "ok");
+      var kind = escHtml(String(l.kind || ""));
+      return '<div class="log-row">' +
+        '<span class="log-ts">' + fmtTs(l.createdAt) + '</span>' +
+        '<span class="log-badge ' + logBadgeClass(status) + '">' + escHtml(status) + '</span>' +
+        '<span class="log-msg" title="' + fullSummary + '">' + summary + '</span>' +
+        '<span class="log-kind">' + kind + '</span>' +
+        '</div>';
+    }).join("");
+  }
+
+  // ── Pool health ──────────────────────────────────────────────────────────────
+  function renderPool(data) {
+    if (!data) return;
+    var total = Number(data.total) || 0;
+    var idle = Number(data.idle) || 0;
+    var waiting = Number(data.waiting) || 0;
+    var max = Number(data.max) || 10;
+    var allowedStatus = {ok:1,warn:1,critical:1};
+    var status = allowedStatus[data.status] ? data.status : "ok";
+
+    document.getElementById("pTotal").textContent = total;
+    document.getElementById("pIdle").textContent = idle;
+    document.getElementById("pMax").textContent = max;
+    document.getElementById("pMaxLabel").textContent = max;
+    document.getElementById("poolMeta").textContent = "max " + max + " · " + status.toUpperCase();
+
+    var wEl = document.getElementById("pWaiting");
+    wEl.textContent = waiting;
+    wEl.className = "pool-val " + status;
+
+    var pct = max > 0 ? Math.min(100, Math.round((total / max) * 100)) : 0;
+    var bar = document.getElementById("poolBar");
+    bar.style.width = pct + "%";
+    bar.className = "pool-bar pool-bar-" + status;
+    document.getElementById("poolBarLabel").textContent = pct + "% utilizzo";
+  }
+
+  // ── Heartbeat ────────────────────────────────────────────────────────────────
+  var HB_LABELS = {backend:"Backend",matching:"Matching",ota:"OTA",ai:"AI (Ollama)",websocket:"WebSocket"};
+
+  function renderHeartbeat(data) {
+    var grid = document.getElementById("hbGrid");
+    var meta = document.getElementById("hbMeta");
+    if (!data) { grid.innerHTML = '<p class="no-data">In attesa…</p>'; return; }
+
+    var keys = ["backend","matching","ota","ai","websocket"];
+    meta.textContent = data.ts ? fmtTs(data.ts) : "—";
+
+    grid.innerHTML = keys.map(function(k) {
+      var rawStatus = String(data[k] || "unknown");
+      var normalized = rawStatus === "ok" ? "ok" : (rawStatus === "offline" ? "offline" : (rawStatus === "unknown" ? "unknown" : "degraded"));
+      var dot = dotClass(normalized);
+      return '<div class="hb-pill">' +
+        '<span class="hb-dot ' + dot + '"></span>' +
+        '<span class="hb-name">' + escHtml(HB_LABELS[k] || k) + '</span>' +
+        '<span class="hb-status">' + escHtml(rawStatus) + '</span>' +
+        '</div>';
+    }).join("");
+  }
+
+  // ── SSE connection ───────────────────────────────────────────────────────────
+  var retryTimer = null;
+
+  function connect() {
+    if (es) { try { es.close(); } catch(e) {} }
+    setConn(false);
+
+    es = new EventSource(buildStreamUrl());
+
+    es.addEventListener("open", function() {
+      setConn(true);
+      if (retryTimer) { clearTimeout(retryTimer); retryTimer = null; }
+    });
+
+    es.addEventListener("pipeline-status", function(e) {
+      try { renderPipelines(JSON.parse(e.data)); setLastUpdate(); } catch(err) {}
+    });
+
+    es.addEventListener("holes", function(e) {
+      try { renderHoles(JSON.parse(e.data)); setLastUpdate(); } catch(err) {}
+    });
+
+    es.addEventListener("watchdog-log", function(e) {
+      try { renderWatchdogLogs(JSON.parse(e.data)); setLastUpdate(); } catch(err) {}
+    });
+
+    es.addEventListener("pool-health", function(e) {
+      try { renderPool(JSON.parse(e.data)); setLastUpdate(); } catch(err) {}
+    });
+
+    es.addEventListener("heartbeat", function(e) {
+      try { renderHeartbeat(JSON.parse(e.data)); setLastUpdate(); } catch(err) {}
+    });
+
+    es.addEventListener("error", function(e) {
+      setConn(false);
+      es.close();
+      if (!retryTimer) {
+        retryTimer = setTimeout(function() { retryTimer = null; connect(); }, 5000);
+      }
+    });
+  }
+
+  window.reconnect = function() { connect(); };
+
+  document.addEventListener("DOMContentLoaded", function() {
+    connect();
+  });
+})();
+</script>
+</body>
+</html>

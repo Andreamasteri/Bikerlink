@@ -119,6 +119,13 @@ const s = StyleSheet.create({
   deviceCardBody: { marginTop: 10, gap: 2, paddingTop: 10, borderTopWidth: 1, borderTopColor: Colors.border },
   deviceSummaryLine: { fontSize: 12, color: Colors.text },
 
+  liveDashboardBtn: {
+    flexDirection: "row", alignItems: "center", gap: 6,
+    paddingHorizontal: 12, paddingVertical: 6,
+    backgroundColor: Colors.surface, borderBottomWidth: 1, borderBottomColor: Colors.border,
+  },
+  liveDashboardBtnText: { fontSize: 11, color: Colors.accent, fontWeight: "600", flex: 1 },
+
   centered: { flex: 1, justifyContent: "center", alignItems: "center", minHeight: 200 },
   emptyState: { alignItems: "center", padding: 40, gap: 10 },
   emptyStateText: { fontSize: 16, fontWeight: "600", color: Colors.text },
