@@ -25,7 +25,7 @@
       "env": {
         "NODE_OPTIONS": "--max_old_space_size=8192",
         "ORG_GRADLE_PROJECT_bundleInDebug": "true",
-        "ORG_GRADLE_PROJECT_newArchEnabled": "false"
+        "EX_DEV_CLIENT_NETWORK_INSPECTOR": "false"
       },
       "android": {
         "buildType": "apk",
