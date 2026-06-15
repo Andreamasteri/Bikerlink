@@ -497,6 +497,82 @@ router.get("/telemetry-health", async (_req: Request, res: Response) => {
   }
 });
 
+// GET /api/admin/telemetry/debug-events — ultimi 20 eventi maps_telemetry_events
+// + sommario ride_telemetry (totale campioni + ultimo campione). Admin-only.
+router.get("/telemetry/debug-events", async (_req: Request, res: Response) => {
+  try {
+    const [eventsResult, rideResult] = await Promise.all([
+      db.execute<{
+        id: string;
+        event: string;
+        component: string | null;
+        platform: string | null;
+        app_version: string | null;
+        created_at: string;
+      }>(sql`
+        SELECT id, event, component, platform, app_version, created_at::text
+        FROM maps_telemetry_events
+        ORDER BY created_at DESC
+        LIMIT 20
+      `),
+      db.execute<{ total: string; last_at: string | null }>(sql`
+        SELECT COUNT(*)::text AS total, MAX(created_at)::text AS last_at
+        FROM ride_telemetry
+      `),
+    ]);
+
+    const mapsEvents = eventsResult.rows.map((r) => ({
+      id: r.id,
+      event: r.event,
+      component: r.component ?? null,
+      platform: r.platform ?? null,
+      appVersion: r.app_version ?? null,
+      createdAt: r.created_at,
+    }));
+
+    const rideRow = rideResult.rows[0];
+    const rideSummary = {
+      total: parseInt(rideRow?.total ?? "0", 10),
+      lastAt: rideRow?.last_at ?? null,
+    };
+
+    return res.json({ mapsEvents, rideSummary });
+  } catch (err) {
+    const errMsg = err instanceof Error ? err.message : String(err);
+    console.error("[admin/telemetry/debug-events] error:", err);
+    return sendError(res, 500, `Errore lettura debug events: ${errMsg}`);
+  }
+});
+
+// POST /api/admin/telemetry/debug-ping — inserisce un evento test tramite
+// recordMapsTelemetryBatch e risponde con { inserted, eventId }.
+router.post("/telemetry/debug-ping", async (_req: Request, res: Response) => {
+  try {
+    const { recordMapsTelemetryBatch } = await import("../../ai/watchdog/maps-telemetry-store");
+    const result = await recordMapsTelemetryBatch([
+      { event: "map_init", component: "admin-debug-ping", platform: "web" },
+    ]);
+    const inserted = result.inserted > 0;
+
+    let eventId: string | null = null;
+    if (inserted) {
+      const row = await db.execute<{ id: string }>(sql`
+        SELECT id FROM maps_telemetry_events
+        WHERE component = 'admin-debug-ping'
+        ORDER BY created_at DESC
+        LIMIT 1
+      `);
+      eventId = row.rows[0]?.id ?? null;
+    }
+
+    return res.json({ inserted, eventId });
+  } catch (err) {
+    const errMsg = err instanceof Error ? err.message : String(err);
+    console.error("[admin/telemetry/debug-ping] error:", err);
+    return sendError(res, 500, `Errore debug ping: ${errMsg}`);
+  }
+});
+
 // POST /api/admin/telemetry-health/ping — inserisce una riga di test in
 // maps_telemetry_events e risponde con il conteggio aggiornato nelle ultime 24h.
 // Utile per verificare che la pipeline server→DB funzioni indipendentemente dal client.

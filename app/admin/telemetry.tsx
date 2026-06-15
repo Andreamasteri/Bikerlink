@@ -22,6 +22,7 @@ import { InfoModal } from "@/components/admin/telemetry/InfoModal";
 import { SensorsGlobalCard } from "@/components/admin/telemetry/SensorsGlobalCard";
 import { ErrorLogPanel } from "@/components/admin/telemetry/ErrorLogPanel";
 import { TelemetryHealthCard } from "@/components/admin/telemetry/TelemetryHealthCard";
+import { TelemetryDebugCard } from "@/components/admin/telemetry/TelemetryDebugCard";
 import type { ErrorLogEntry } from "@/components/admin/telemetry/ErrorLogPanel";
 
 interface TelemetryAdminStats {
@@ -259,6 +260,8 @@ export default function AdminTelemetryScreen() {
         />
 
         <TelemetryHealthCard />
+
+        <TelemetryDebugCard />
 
         {stats && (
           <>
