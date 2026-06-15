@@ -12,6 +12,7 @@ import { collectLatency } from "./collectors/latency-collector";
 import { collectErrors } from "./collectors/error-collector";
 import { collectMaps } from "./collectors/maps-collector";
 import { collectRestarts } from "./collectors/restart-collector";
+import { collectPool } from "./collectors/pool-collector";
 import { recordSignals } from "./signals";
 import type { HealthSnapshot, Problem, Severity, Signal } from "./types";
 import { collectDbIntegrity } from "../db-integrity/collector";
@@ -167,6 +168,19 @@ function deriveProblems(signals: Signal[]): Problem[] {
     } else if (s.metric === "embedding.cap_reached") {
       title = `Cap embedding giornaliero raggiunto (${s.value} call)`;
       suggestion = "Embedding API call bloccate fino a mezzanotte. Aumenta il cap o verifica spike.";
+    } else if (s.metric === "db.pool.waiting") {
+      const det = s.details as { total?: number; idle?: number; max?: number; consecutiveWaiting?: number } | undefined;
+      if (s.severity === "critical") {
+        title = `Pool DB esaurito: ${s.value} client in attesa (max=${det?.max ?? 10})`;
+        suggestion = "Il pool è completamente saturo. Controlla query lente/lock e valuta di aumentare pool.max o ridurre la concorrenza.";
+      } else {
+        const ticks = det?.consecutiveWaiting ?? 2;
+        title = `Pool DB sotto pressione: ${s.value} client in attesa da ${ticks} tick consecutivi`;
+        suggestion = "Possibile accumulo di query lente o leak di connessioni. Verifica pg_stat_activity e monitora.";
+      }
+    } else if (s.metric === "db.pool.collector.error") {
+      title = `Errore probe pool DB`;
+      suggestion = "Verifica che pool sia correttamente inizializzato e accessibile dal collector.";
     } else if (s.metric === "server.restart_alert") {
       const count = s.value ?? 1;
       const det = s.details as { minutesSinceLast?: number; latestAt?: string } | undefined;
@@ -210,6 +224,7 @@ export async function runAggregatorCycle(): Promise<HealthSnapshot> {
     collectRedis(), collectLatency(), collectErrors(),
     collectDbIntegritySignals(), collectMaps(),
     collectEmbeddingSignals(), collectRestarts(),
+    Promise.resolve(collectPool()),
   ]);
   const signals: Signal[] = [];
   for (const r of collectors) {
