@@ -316,7 +316,7 @@ router.put("/me/privacy", requireAuth, async (req: Request, res: Response) => {
     const userId = req.session.userId!;
     const parsed = privacySettingsSchema.safeParse(req.body);
     if (!parsed.success) return sendError(res, 400, parsed.error.issues[0].message);
-    const { hideFromMap, hideOnlineStatus, hideLastSeen, hideDistance, positionFuzz, positionFuzzKm, fakeHomeEnabled, fakeHomeLatitude, fakeHomeLongitude, fakeHomeRadius, fakeWorkEnabled, fakeWorkLatitude, fakeWorkLongitude, fakeWorkRadius, fakeWhateverEnabled, fakeWhateverLatitude, fakeWhateverLongitude, fakeWhateverRadius, offlinePositionRandomize, fixedPositionEnabled, fixedPositionLat, fixedPositionLng } = parsed.data;
+    const { hideFromMap, hideOnlineStatus, hideLastSeen, hideDistance, positionFuzz, positionFuzzKm, gpsPrecision, fakeHomeEnabled, fakeHomeLatitude, fakeHomeLongitude, fakeHomeRadius, fakeWorkEnabled, fakeWorkLatitude, fakeWorkLongitude, fakeWorkRadius, fakeWhateverEnabled, fakeWhateverLatitude, fakeWhateverLongitude, fakeWhateverRadius, offlinePositionRandomize, fixedPositionEnabled, fixedPositionLat, fixedPositionLng } = parsed.data;
 
     const existing = await storage.getUserProfile(userId);
     const updateData: Partial<InsertUserProfile> = {};
@@ -326,6 +326,7 @@ router.put("/me/privacy", requireAuth, async (req: Request, res: Response) => {
     if (hideDistance !== undefined) updateData.hideDistance = (hideDistance as boolean | null) ?? undefined;
     if (positionFuzz !== undefined) updateData.positionFuzz = positionFuzz;
     if (positionFuzzKm !== undefined) updateData.positionFuzzKm = positionFuzzKm;
+    if (gpsPrecision !== undefined) updateData.gpsPrecision = gpsPrecision;
     if (offlinePositionRandomize !== undefined) updateData.offlinePositionRandomize = offlinePositionRandomize;
 
     if (fixedPositionEnabled !== undefined) updateData.fixedPositionEnabled = fixedPositionEnabled;
