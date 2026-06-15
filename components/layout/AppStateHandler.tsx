@@ -201,7 +201,6 @@ export function AppStateHandler() {
       if (heartbeatTimerRef.current) clearInterval(heartbeatTimerRef.current);
       stopNativeWatcher();
       markClean().catch(() => {});
-      resetCrashLogger();
       const sid = sessionIdRef.current;
       if (sid) {
         sessionIdRef.current = null;
@@ -210,6 +209,12 @@ export function AppStateHandler() {
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
+
+  useEffect(() => {
+    if (!user) {
+      resetCrashLogger();
+    }
   }, [user]);
 
   useEffect(() => {

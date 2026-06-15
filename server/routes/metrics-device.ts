@@ -15,6 +15,9 @@ const deviceMetricsLimiter = rateLimit({
     const sessionId = (req.body as { sessionId?: string })?.sessionId;
     return userId ? `${userId}:${sessionId ?? ""}` : req.ip ?? "unknown";
   },
+  // skip() already bypasses unauthenticated requests, so req.ip fallback
+  // is never reached. Suppress the IPv6 key-generator validation warning.
+  validate: { keyGeneratorIpFallback: false },
   message: { message: "Rate limit: 1 invio ogni 60s" },
   standardHeaders: true,
   legacyHeaders: false,
