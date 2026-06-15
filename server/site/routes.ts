@@ -1,6 +1,7 @@
 import type { Express, Request, Response } from "express";
 import * as path from "path";
 import * as fs from "fs";
+import { initState } from "../init-state";
 import { db } from "../db";
 import { users } from "@shared/db";
 import { sql } from "drizzle-orm";
@@ -230,6 +231,18 @@ export function registerSiteRoutes(app: Express) {
       // By the time we reach here, we know it's a regular browser request
       // for the website.
       if (route === "/" && req.method !== "GET") return next();
+
+      // Durante l'inizializzazione (boot DB non ancora completo) la landing
+      // page farebbe una query DB che potrebbe lanciare → 500 → il deploy
+      // probe fallisce. Rispondiamo subito con uno stub 200 leggero.
+      if (route === "/" && initState.initializing) {
+        res.setHeader("Content-Type", "text/html; charset=utf-8");
+        res.setHeader("Cache-Control", "no-store");
+        return res.status(200).send(
+          "<!doctype html><html lang=\"it\"><head><meta charset=\"utf-8\"><title>BikerLink</title></head><body></body></html>",
+        );
+      }
+
       try {
         const baseUrl = getBaseUrl(req);
         let pageResult: { meta: ReturnType<typeof buildHome>["meta"]; body: string };

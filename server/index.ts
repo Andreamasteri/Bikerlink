@@ -11,6 +11,7 @@ console.error = (...args: unknown[]) => {
 import express from "express";
 import type { Request, Response } from "express";
 import { createServer } from "http";
+import { createServer as createProbeServer } from "http";
 import { initState } from "./init-state";
 import { stopMatchingEngine } from "./matching-engine";
 import { pool } from "./db";
@@ -67,6 +68,26 @@ const errorHandlersReady = sentryInitPromise
   .then(() => setupErrorHandler(app));
 
 const server = createServer(app);
+
+// In produzione la piattaforma Replit (stack=EXPO) attende Metro su porta 8081.
+// Avviamo un probe server minimale per soddisfare il check senza avviare Metro.
+// In sviluppo la porta 8081 è già occupata da Metro, quindi non la tocchiamo.
+if (process.env.NODE_ENV === "production") {
+  const probeApp = createProbeServer((_req, probeRes) => {
+    probeRes.writeHead(200, { "Content-Type": "text/plain" });
+    probeRes.end("ok");
+  });
+  probeApp.listen(8081, "0.0.0.0", () => {
+    console.log("[probe] Port 8081 probe server ready (deploy health check)");
+  });
+  probeApp.on("error", (err: NodeJS.ErrnoException) => {
+    // Non bloccare il boot se 8081 è già in uso (es. Metro in staging)
+    if (err.code !== "EADDRINUSE") {
+      console.warn("[probe] Port 8081 probe error:", err.message);
+    }
+  });
+}
+
 const activeConnections = new Set<import("net").Socket>();
 
 server.on("connection", (socket) => {
