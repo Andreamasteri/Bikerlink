@@ -51,7 +51,7 @@ export default function TelemetryPanel({ telemetryStats }: Props) {
   const { isAutoRiding, isCalibrated: ctxCalibrated, alwaysActive: ctxAlwaysActive } = useAutoTelemetry();
   const { focusTelemetry } = useLocalSearchParams<{ focusTelemetry?: string }>();
 
-  const [telemetryExpanded, setTelemetryExpanded] = useState(() => focusTelemetry === "1");
+  const [telemetryExpanded, setTelemetryExpanded] = useState(false);
   const [idealLapResetKey, setIdealLapResetKey] = useState(0);
   const [compareMode, setCompareMode] = useState(false);
   const [selectedLaps, setSelectedLaps] = useState<string[]>([]);
@@ -60,6 +60,10 @@ export default function TelemetryPanel({ telemetryStats }: Props) {
   const [showCalibWizard, setShowCalibWizard] = useState(false);
   const [showInfoModal, setShowInfoModal] = useState(false);
   const [relaxedMode, setRelaxedMode] = useState(false);
+
+  useEffect(() => {
+    if (focusTelemetry === "1") setTelemetryExpanded(true);
+  }, [focusTelemetry]);
 
   useEffect(() => {
     loadTelemetryAlwaysActive().then(setAlwaysActive).catch(() => {});

@@ -3,7 +3,7 @@
 // (user_telemetry_profile). Stato "dati insufficienti" sotto la soglia embedding.
 import React from "react";
 import { View, Text, StyleSheet, TouchableOpacity, Alert } from "react-native";
-import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import { Ionicons } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
 import { useColors } from "@/hooks/useColors";
 import { useAuth } from "@/lib/auth-context";
@@ -91,7 +91,6 @@ export default function MyStylePanel() {
     <View style={styles.section}>
       <View style={[styles.card, { backgroundColor: colors.surface, borderColor: accentSoft }]}>
         <View style={styles.headerRow}>
-          <MaterialCommunityIcons name="motorbike" size={16} color={colors.accent} />
           <Text style={[styles.title, { color: colors.text }]}>Il tuo stile di guida</Text>
           <TouchableOpacity
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
@@ -201,7 +200,7 @@ const styles = StyleSheet.create({
   card: {
     borderRadius: 12,
     padding: 14,
-    gap: 12,
+    gap: 8,
     borderWidth: 1,
   },
   headerRow: {
@@ -216,7 +215,7 @@ const styles = StyleSheet.create({
   emptyState: {
     alignItems: "center",
     gap: 8,
-    paddingVertical: 8,
+    paddingVertical: 4,
   },
   emptyTitle: {
     fontSize: 13,
