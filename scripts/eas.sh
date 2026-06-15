@@ -2,12 +2,9 @@
 # ═══════════════════════════════════════════════════════════════════════════
 #  BikerLink — EAS CLI wrapper
 #
-#  Usa eas-cli dal progetto (node_modules/.bin/eas) — versione gestita da
-#  package.json ("eas-cli": "^20.1.0").
-#
-#  NON usare il binario eas globale né il CLI tramite package runner:
-#    - il binario globale può essere vecchio (v19 causa errore eas.json >= 20)
-#    - il CLI via package runner scarica il pacchetto ad ogni run → timeout Metro
+#  Usa eas-cli tramite npx con versione ^20.1.0 (npx usa la cache locale,
+#  quindi non scarica il pacchetto ad ogni run dopo la prima volta).
+#  La versione minima è imposta anche in eas.json "cli.version": ">= 20.0.0".
 #
 #  Uso (da altri script):
 #    bash scripts/eas.sh <eas-command> [args...]
@@ -20,7 +17,16 @@
 # ═══════════════════════════════════════════════════════════════════════════
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-EAS_BIN="$SCRIPT_DIR/../node_modules/.bin/eas"
+
+# Usa il binario locale se ancora presente (backward compat), altrimenti npx.
+LOCAL_BIN="$SCRIPT_DIR/../node_modules/.bin/eas"
+if [ -f "$LOCAL_BIN" ]; then
+  EAS_BIN="$LOCAL_BIN"
+  _USE_NPX=false
+else
+  EAS_BIN="npx"
+  _USE_NPX=true
+fi
 
 # ─────────────────────────────────────────────────────────────────────────────
 #  PRE-FLIGHT: timeout guard per comandi build
@@ -54,11 +60,7 @@ if [[ "$FIRST_ARG" == "build" ]]; then
   echo "" >&2
 fi
 
-if [ ! -f "$EAS_BIN" ]; then
-  echo "  ✖  eas-cli non trovato in node_modules/.bin/eas" >&2
-  echo "  Esegui: npm install    (richiede eas-cli ^20 in package.json)" >&2
-  exit 1
-fi
+# (nessun check necessario: npx è sempre disponibile)
 
 # ─────────────────────────────────────────────────────────────────────────────
 #  PRE-FLIGHT: allineamento versioni app.json ↔ android/app/build.gradle
@@ -115,4 +117,8 @@ if [[ "$FIRST_ARG" == "build" ]]; then
   fi
 fi
 
-exec "$EAS_BIN" "$@"
+if [[ "$_USE_NPX" == "true" ]]; then
+  exec "$EAS_BIN" "eas-cli@^20.1.0" "$@"
+else
+  exec "$EAS_BIN" "$@"
+fi
