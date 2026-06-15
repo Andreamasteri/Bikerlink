@@ -2,17 +2,38 @@
  * Tile proxy — forwards tile requests to upstream providers.
  * Detects 429 (quota exceeded) and 5xx (unreachable) from upstream
  * and updates provider status accordingly.
+ *
+ * The route requires an authenticated session. Anonymous callers receive
+ * a 401 before any upstream fetch or API-key substitution occurs.
+ * A per-user/IP rate limiter caps tile fetches to block scripted quota sweeps.
+ *
+ * Provider status (quota_exceeded / unreachable) is written exclusively here,
+ * after the server has directly observed the upstream HTTP response.
+ * There is no client-facing endpoint to assert provider status — such an
+ * endpoint would allow any authenticated user to force a global map fallback
+ * for all users with a single request.
  */
 
 import { Router, type Request, type Response } from "express";
-import { storage } from "../../storage";
-import { DEFAULT_TILE_PROVIDER_ID, findTileProvider } from "../../../lib/maps/tile-providers";
+import { findTileProvider } from "../../../lib/maps/tile-providers";
 import { resolveTileUrl } from "../../../lib/maps/tile-for-renderer";
 import { markQuotaExceeded, markUnreachable } from "./provider-status";
+import { requireAuth } from "../../lib/auth-middleware";
+import {
+  tileProxyRateLimiter,
+  getTrustedClientIp,
+} from "../../lib/abuse-rate-limit";
 
 const router = Router();
 
-router.get("/tiles/:providerId/:z/:x/:y", async (req: Request, res: Response) => {
+router.get("/tiles/:providerId/:z/:x/:y", requireAuth, async (req: Request, res: Response) => {
+  const userId = req.session.userId!;
+  const ip = getTrustedClientIp(req);
+
+  if (tileProxyRateLimiter.isOverLimit(userId, ip)) {
+    return res.status(429).json({ error: "Troppo richieste — riprova tra un momento" });
+  }
+
   const { providerId, z, x, y } = req.params as Record<string, string>;
 
   const provider = findTileProvider(providerId);
@@ -63,25 +84,6 @@ router.get("/tiles/:providerId/:z/:x/:y", async (req: Request, res: Response) =>
     res.setHeader("X-Tile-Fallback-Needed", "true");
     return res.status(503).json({ error: "Provider irraggiungibile", fallbackNeeded: true });
   }
-});
-
-router.post("/tiles/:providerId/report-error", async (req: Request, res: Response) => {
-  const { providerId } = req.params as { providerId: string };
-  const { errorType } = req.body as { errorType?: string };
-
-  const provider = findTileProvider(providerId);
-  if (!provider) return res.status(404).json({ error: "Provider sconosciuto" });
-
-  if (errorType === "quota") {
-    await markQuotaExceeded(providerId);
-  } else {
-    await markUnreachable(providerId);
-  }
-
-  const setting = await storage.getAppSetting("active_tile_provider");
-  const activeId = setting?.value ?? DEFAULT_TILE_PROVIDER_ID;
-
-  return res.json({ ok: true, fallbackNeeded: activeId === providerId });
 });
 
 export default router;

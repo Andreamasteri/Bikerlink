@@ -177,3 +177,15 @@ export const feedbackRateLimiter = createUserIpRateLimiter({
   maxPerIp: 15,
   windowMs: 60 * 60 * 1000,
 });
+
+// Tile proxy — authenticated users fetching map tiles through the server-side
+// proxy. 500 tiles/min per user comfortably covers aggressive map panning and
+// zoom sweeps; 200/min per IP gives a hard ceiling for shared NAT without
+// penalising normal households. A scripted sweep of a zoom range would require
+// thousands of tiles per minute, so the per-user cap blocks it cleanly.
+export const tileProxyRateLimiter = createUserIpRateLimiter({
+  maxPerUser: 500,
+  maxPerIp: 200,
+  windowMs: 60 * 1000,
+});
+
