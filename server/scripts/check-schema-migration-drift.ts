@@ -18,8 +18,8 @@
 // esclusi dal registry, quindi non entrano nel confronto.
 import { readdirSync, readFileSync } from "fs";
 import { join } from "path";
-import { listDeclaredTables } from "../ai/db-integrity/registry-introspect";
-import { buildMigrationSchema } from "../ai/db-integrity/migration-schema-parser";
+import { listDeclaredTables, listDeclaredUniqueIndexes } from "../ai/db-integrity/registry-introspect";
+import { buildMigrationSchema, buildMigrationUniqueIndexes } from "../ai/db-integrity/migration-schema-parser";
 
 const MIGRATIONS_DIR = join(process.cwd(), "migrations");
 
@@ -41,6 +41,15 @@ const KNOWN_UNMIGRATED = new Set<string>([
   // match_negative_preferences è coperta da 0077_align_match_negative_preferences.sql.
 ]);
 
+// Baseline per unique index/constraint dichiarati nel registry ma non presenti
+// in alcuna migration numerata.
+// Formato: "table.index_name" (il nome dell'indice come passato a uniqueIndex("name")).
+// Esempio: "app_crash_logs.app_crash_logs_session_id_crash_type_key"
+const KNOWN_UNMIGRATED_UNIQUE_INDEXES = new Set<string>([
+  // Nessun caso noto al momento — 0105_crash_logs_unique_session.sql copre
+  // l'unico uniqueIndex() su app_crash_logs.
+]);
+
 // ── Exported result type ────────────────────────────────────────────────────
 
 export interface DriftCheckResult {
@@ -49,6 +58,12 @@ export interface DriftCheckResult {
   newTables: string[];
   /** Columns declared in the registry with no covering ADD COLUMN for their table. */
   newColumns: string[];
+  /**
+   * uniqueIndex() declarations in the registry with no matching
+   * ADD CONSTRAINT ... UNIQUE or CREATE UNIQUE INDEX in any migration.
+   * Format: "table.index_name".
+   */
+  newUniqueIndexes: string[];
   /** Known-baseline drift entries that were found (non-blocking). */
   knownHits: string[];
 }
@@ -89,11 +104,15 @@ function loadMigrationContents(): string[] {
  * whether to treat that as fatal or non-fatal).
  */
 export function runDriftCheck(): DriftCheckResult {
-  const migrationSchema = buildMigrationSchema(loadMigrationContents());
+  const migrationContents = loadMigrationContents();
+  const migrationSchema = buildMigrationSchema(migrationContents);
+  const migrationUniqueIndexes = buildMigrationUniqueIndexes(migrationContents);
   const declared = listDeclaredTables();
+  const declaredUniqueIndexes = listDeclaredUniqueIndexes();
 
   const newTables: string[] = [];
   const newColumns: string[] = [];
+  const newUniqueIndexes: string[] = [];
   const knownHits: string[] = [];
 
   for (const t of declared) {
@@ -112,10 +131,22 @@ export function runDriftCheck(): DriftCheckResult {
     }
   }
 
+  // Check uniqueIndex() declarations against migration DDL.
+  for (const { table, name } of declaredUniqueIndexes) {
+    const tableName = table.toLowerCase();
+    const indexName = name.toLowerCase();
+    const migIndexes = migrationUniqueIndexes.get(tableName);
+    if (migIndexes && migIndexes.has(indexName)) continue;
+    const key = `${tableName}.${indexName}`;
+    if (KNOWN_UNMIGRATED_UNIQUE_INDEXES.has(key)) knownHits.push(key);
+    else newUniqueIndexes.push(key);
+  }
+
   return {
-    ok: newTables.length === 0 && newColumns.length === 0,
+    ok: newTables.length === 0 && newColumns.length === 0 && newUniqueIndexes.length === 0,
     newTables,
     newColumns,
+    newUniqueIndexes,
     knownHits,
   };
 }
@@ -131,7 +162,7 @@ function main(): void {
     process.exit(2);
   }
 
-  const { ok, newTables, newColumns, knownHits } = result;
+  const { ok, newTables, newColumns, newUniqueIndexes, knownHits } = result;
 
   if (knownHits.length) {
     console.log(`[schema-drift] drift noto (baseline, non bloccante): ${knownHits.length}`);
@@ -139,7 +170,6 @@ function main(): void {
   }
 
   if (ok) {
-    const declared = newTables.length + newColumns.length + knownHits.length;
     console.log(
       `[schema-drift] OK — tabelle dichiarate coperte dalle migration (verifica table-qualified); nessun NUOVO drift registry↔migration.`,
     );
@@ -161,8 +191,15 @@ function main(): void {
     console.error(`\nColonne senza migration (${newColumns.length}):`);
     for (const c of newColumns) console.error(`  • ${c}`);
   }
+  if (newUniqueIndexes.length) {
+    console.error(`\nuniqueIndex() senza migration (${newUniqueIndexes.length}):`);
+    for (const u of newUniqueIndexes) console.error(`  • ${u}`);
+    console.error("  → Aggiungi ALTER TABLE ... ADD CONSTRAINT ... UNIQUE");
+    console.error("    o CREATE UNIQUE INDEX ... ON ... nella migration numerata.");
+    console.error("  → Se già in prod, aggiungilo a KNOWN_UNMIGRATED_UNIQUE_INDEXES.");
+  }
   console.error("\nAzione: crea il file migrations/NNNN_*.sql con le DDL mancanti e ri-esegui.");
-  console.error("(Se il drift è intenzionale e già in prod, aggiungilo a KNOWN_UNMIGRATED.)");
+  console.error("(Se il drift è intenzionale e già in prod, aggiungilo alla baseline appropriata.)");
   process.exit(1);
 }
 

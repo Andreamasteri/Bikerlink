@@ -14,6 +14,10 @@ export interface DeclaredTable {
   name: string;
   columns: DeclaredColumn[];
 }
+export interface DeclaredUniqueIndex {
+  table: string;
+  name: string;
+}
 
 /**
  * Tabelle presenti nel DB ma volutamente NON dichiarate nel registry Drizzle.
@@ -72,4 +76,24 @@ export function listDeclaredTables(): DeclaredTable[] {
 /** Set dei nomi tabella dichiarati (per i confronti DB → registry). */
 export function declaredTableNames(): Set<string> {
   return new Set(listDeclaredTables().map((t) => t.name));
+}
+
+/**
+ * Elenca tutti i `uniqueIndex()` dichiarati nel registry Drizzle.
+ * Usa getTableConfig().indexes filtrato a unique:true.
+ * Il nome dell'indice è quello passato a `uniqueIndex("name")` e corrisponde
+ * al nome del constraint/index SQL che la migration deve creare.
+ */
+export function listDeclaredUniqueIndexes(): DeclaredUniqueIndex[] {
+  const out: DeclaredUniqueIndex[] = [];
+  for (const v of Object.values(schema)) {
+    if (!is(v, PgTable)) continue;
+    const cfg = getTableConfig(v);
+    for (const idx of cfg.indexes) {
+      if (idx.config.unique && idx.config.name) {
+        out.push({ table: cfg.name, name: idx.config.name });
+      }
+    }
+  }
+  return out;
 }

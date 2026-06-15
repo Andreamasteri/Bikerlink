@@ -64,6 +64,13 @@ const ADD_COL_RE = /\badd\s+column\s+(?:if\s+not\s+exists\s+)?("?[a-zA-Z_][a-zA-
 const DROP_COL_RE = /\bdrop\s+column\s+(?:if\s+exists\s+)?("?[a-zA-Z_][a-zA-Z0-9_]*"?)/gi;
 const RENAME_COL_RE = /\brename\s+column\s+("?[a-zA-Z0-9_]+"?)\s+to\s+("?[a-zA-Z0-9_]+"?)/gi;
 
+// Unique constraint/index patterns:
+// ALTER TABLE tbl ADD CONSTRAINT name UNIQUE (cols)  — possibilmente su più righe
+const ADD_UNIQUE_CONSTRAINT_RE = /\badd\s+constraint\s+("?[a-zA-Z0-9_]+"?)\s+unique\b/gi;
+// CREATE UNIQUE INDEX name ON table (cols)
+const CREATE_UNIQUE_INDEX_RE =
+  /create\s+unique\s+index\s+(?:if\s+not\s+exists\s+)?("?[a-zA-Z0-9_]+"?)\s+on\s+("?[a-zA-Z0-9_.]+"?)/gi;
+
 /**
  * Ricostruisce dalle migration la mappa tabella → set di colonne, applicando in
  * ordine documentale: CREATE TABLE, ALTER ... ADD COLUMN, RENAME COLUMN,
@@ -135,4 +142,56 @@ export function buildMigrationSchema(files: string[]): Map<string, Set<string>> 
   }
 
   return schema;
+}
+
+/**
+ * Ricostruisce dalle migration la mappa tabella → set di nomi di unique index/constraint.
+ * Copre due forme DDL:
+ *   - CREATE UNIQUE INDEX "name" ON "table" (...)
+ *   - ALTER TABLE "table" ... ADD CONSTRAINT "name" UNIQUE (...)
+ *
+ * Il confronto avviene PER NOME dell'indice/constraint (non per colonne), allineandosi
+ * a come Drizzle ORM dichiara i `uniqueIndex("name")` nel registro TS.
+ */
+export function buildMigrationUniqueIndexes(files: string[]): Map<string, Set<string>> {
+  const result = new Map<string, Set<string>>();
+  const ensure = (table: string): Set<string> => {
+    let s = result.get(table);
+    if (!s) {
+      s = new Set<string>();
+      result.set(table, s);
+    }
+    return s;
+  };
+
+  for (const file of files) {
+    const clean = file.replace(/--[^\n]*/g, "");
+
+    // CREATE UNIQUE INDEX "name" ON "table" — scansione sull'intero file (non diviso per statement)
+    CREATE_UNIQUE_INDEX_RE.lastIndex = 0;
+    let m: RegExpExecArray | null;
+    while ((m = CREATE_UNIQUE_INDEX_RE.exec(clean))) {
+      const indexName = norm(m[1]);
+      const tableName = norm(m[2]);
+      ensure(tableName).add(indexName);
+    }
+
+    // ALTER TABLE "table" ADD CONSTRAINT "name" UNIQUE — si divide per ';' e si cerca
+    // il nome tabella dall'ALTER HEAD, poi ADD CONSTRAINT ... UNIQUE dallo stesso statement.
+    for (const rawStmt of clean.split(";")) {
+      const alterIdx = rawStmt.search(/alter\s+table\s+/i);
+      if (alterIdx === -1) continue;
+      const alter = rawStmt.slice(alterIdx);
+      const head = alter.match(ALTER_HEAD);
+      if (!head) continue;
+      const tableName = norm(head[1]);
+
+      ADD_UNIQUE_CONSTRAINT_RE.lastIndex = 0;
+      while ((m = ADD_UNIQUE_CONSTRAINT_RE.exec(alter))) {
+        ensure(tableName).add(norm(m[1]));
+      }
+    }
+  }
+
+  return result;
 }
