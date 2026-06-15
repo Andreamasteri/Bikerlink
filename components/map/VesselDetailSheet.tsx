@@ -84,11 +84,12 @@ export interface VesselData {
   mmsi: number;
   name?: string | null;
   lat: number;
-  lon: number;
-  course: number;
-  speed: number | null;
+  lng: number;
+  cog: number;
+  sog: number | null;
   shipType?: number | null;
-  timestamp?: number | null;
+  updatedAt?: number | null;
+  trueHeading?: number;
 }
 
 interface VesselDetailSheetProps {
@@ -139,9 +140,9 @@ export function VesselDetailSheet({ vessel, onClose }: VesselDetailSheetProps) {
 
             <View style={styles.rows}>
               <Row label="MMSI" value={String(vessel.mmsi)} colors={colors} />
-              <Row label="Velocità" value={formatSpeed(vessel.speed)} colors={colors} />
-              <Row label="Rotta" value={vessel.course != null ? `${vessel.course}°` : "N/D"} colors={colors} />
-              <Row label="Ultima posizione" value={formatLastSeen(vessel.timestamp)} colors={colors} />
+              <Row label="Velocità" value={formatSpeed(vessel.sog)} colors={colors} />
+              <Row label="Rotta" value={vessel.cog != null ? `${vessel.cog}°` : "N/D"} colors={colors} />
+              <Row label="Ultima posizione" value={formatLastSeen(vessel.updatedAt)} colors={colors} />
             </View>
 
             <TouchableOpacity

@@ -140,7 +140,7 @@ const InteractiveMap = forwardRef<InteractiveMapHandle, InteractiveMapProps>(fun
     webViewRef.current?.injectJavaScript(js + ";true;");
   }, []);
 
-  type VesselData = { mmsi: number; lat: number; lon: number; course: number; name: string; shipType: number; speed: number; timestamp: number };
+  type VesselData = { mmsi: number; lat: number; lng: number; cog: number; sog: number; name: string; shipType: number; updatedAt: number; trueHeading: number };
   const { data: aisVesselsRaw } = useQuery<VesselData[]>({
     queryKey: ["/api/ais/vessels"],
     queryFn: async () => {

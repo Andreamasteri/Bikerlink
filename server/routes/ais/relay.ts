@@ -49,23 +49,32 @@ async function getSubscriptionBbox(): Promise<[[number, number], [number, number
     }
   }
 
-  try {
-    const setting = await storage.getAppSetting("aisstream_bbox");
-    if (setting !== undefined) {
-      if (!setting.value) {
-        console.log("[ais-relay] bbox explicitly cleared in DB — using global");
-        return [[-90, -180], [90, 180]];
+  const MAX_DB_ATTEMPTS = 3;
+  for (let attempt = 1; attempt <= MAX_DB_ATTEMPTS; attempt++) {
+    try {
+      const setting = await storage.getAppSetting("aisstream_bbox");
+      if (setting !== undefined) {
+        if (!setting.value) {
+          console.log("[ais-relay] bbox explicitly cleared in DB — using Mediterranean default");
+          break;
+        }
+        const bbox = parseBbox(setting.value);
+        if (bbox) {
+          console.log(`[ais-relay] using bbox from DB: ${setting.value}`);
+          runtimeBbox = setting.value;
+          return bbox;
+        }
+        console.warn("[ais-relay] DB bbox malformed, falling back to env/default");
       }
-      const bbox = parseBbox(setting.value);
-      if (bbox) {
-        console.log(`[ais-relay] using bbox from DB: ${setting.value}`);
-        runtimeBbox = setting.value;
-        return bbox;
+      break;
+    } catch (err) {
+      if (attempt < MAX_DB_ATTEMPTS) {
+        console.warn(`[ais-relay] DB not ready (attempt ${attempt}/${MAX_DB_ATTEMPTS}), retrying in 3s…`, (err as Error).message);
+        await new Promise(r => setTimeout(r, 3000));
+      } else {
+        console.warn("[ais-relay] could not read bbox from DB after retries, falling back:", err);
       }
-      console.warn("[ais-relay] DB bbox malformed, falling back to env/global");
     }
-  } catch (err) {
-    console.warn("[ais-relay] could not read bbox from DB, falling back:", err);
   }
 
   const envRaw = process.env.AISSTREAM_BBOX;
@@ -75,9 +84,11 @@ async function getSubscriptionBbox(): Promise<[[number, number], [number, number
       console.log(`[ais-relay] using bbox from env: ${envRaw}`);
       return bbox;
     }
-    console.warn("[ais-relay] AISSTREAM_BBOX malformed, falling back to global");
+    console.warn("[ais-relay] AISSTREAM_BBOX malformed, falling back to Mediterranean");
   }
-  return [[-90, -180], [90, 180]];
+  // Default: Mediterranean + Italian coasts (minLat, minLon, maxLat, maxLon)
+  console.log("[ais-relay] using default bbox: Mediterranean");
+  return [[30, -10], [47, 42]];
 }
 
 async function loadRuntimeMaxVessels(): Promise<void> {
@@ -153,7 +164,10 @@ async function connectAisStream() {
           };
         };
 
-        if (msg.MessageType !== "PositionReport") return;
+        if (msg.MessageType !== "PositionReport") {
+          console.warn(`[ais-relay] non-PositionReport message received: type="${msg.MessageType ?? "unknown"}" raw=${raw.toString().slice(0, 300)}`);
+          return;
+        }
 
         const pr = msg.Message?.PositionReport;
         const meta = msg.MetaData;
