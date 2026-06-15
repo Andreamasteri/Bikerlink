@@ -237,6 +237,15 @@ export const adminGroupsPart2: AdminGroup[] = [
     headerIconSet: "MaterialCommunityIcons",
     items: [
       {
+        key: "diagnostica-avanzata",
+        label: "Diagnostica Avanzata",
+        icon: "magnify-scan",
+        iconSet: "MaterialCommunityIcons",
+        route: "/admin/diagnostica",
+        accentColor: "#ef4444",
+        keywords: ["diagnostica", "avanzata", "radiografia", "pipeline", "flusso", "monitor", "buchi", "check", "sonde", "telemetria pipeline", "matching check", "device report"],
+      },
+      {
         key: "diagnostic",
         label: "Diagnostica Locale",
         icon: "stethoscope",

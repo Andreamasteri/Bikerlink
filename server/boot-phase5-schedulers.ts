@@ -299,6 +299,30 @@ export async function runPhase5Schedulers(): Promise<void> {
     console.warn("[INIT] Resource graph sampler failed to start (non-fatal):", e);
   }
 
+  try {
+    const { startHoleDetectorScheduler } = await import("./ai/pipeline-monitor/hole-detector");
+    startHoleDetectorScheduler();
+    console.log("[INIT] Pipeline hole detector scheduler started (5min interval)");
+  } catch (e) {
+    console.warn("[INIT] Pipeline hole detector scheduler failed (non-fatal):", e);
+  }
+
+  try {
+    const { runPipelineChecks } = await import("./ai/pipeline-monitor/runner");
+    const SIX_HOURS_MS = 6 * 60 * 60_000;
+    setTimeout(() => {
+      runPipelineChecks({ triggeredBy: "scheduler" }).catch((e) =>
+        console.warn("[pipeline-check] startup run failed:", e));
+    }, 5 * 60_000);
+    setInterval(() => {
+      runPipelineChecks({ triggeredBy: "scheduler" }).catch((e) =>
+        console.warn("[pipeline-check] scheduled run failed:", e));
+    }, SIX_HOURS_MS);
+    console.log("[INIT] Pipeline radiografia scheduler started (6h interval)");
+  } catch (e) {
+    console.warn("[INIT] Pipeline radiografia scheduler failed (non-fatal):", e);
+  }
+
   // Arm the boot-job queue here — phase 5 is the last boot phase, so all
   // registrations from startMatchingEngine() and runPhase5Schedulers() are
   // guaranteed to have happened before this point.

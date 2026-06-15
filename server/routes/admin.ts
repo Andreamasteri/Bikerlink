@@ -302,6 +302,7 @@ import systemProbeRouter from './admin/system-probe';
 import bugReportRouter from './admin/bug-report';
 import resourceMonitorRouter from './admin/resource-monitor';
 import diagnosticAdminRouter from './admin/diagnostic';
+import pipelineCheckRouter from './admin/pipeline-check';
 
 router.post('/maps/osm-updated', async (req: Request, res: Response) => {
   try {
@@ -435,5 +436,6 @@ router.use('/legal', _requireAdmin, legalNextRouter);
 router.use('/', _requireAdmin, bugReportRouter);
 router.use('/', _requireAdmin, resourceMonitorRouter);
 router.use('/', _requireAdmin, diagnosticAdminRouter);
+router.use('/', _requireAdmin, pipelineCheckRouter);
 
 export default router;

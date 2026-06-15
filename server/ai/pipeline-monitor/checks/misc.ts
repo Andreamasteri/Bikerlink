@@ -1,0 +1,316 @@
+import { db } from "../../../db";
+import { sql } from "drizzle-orm";
+import http from "http";
+import { getInternalProbeToken, getInternalProbeHeaderName } from "../../watchdog/internal-token";
+import type { PipelineCheckResult, PipelineCheckStep } from "../types";
+
+function httpProbe(
+  method: string,
+  pathname: string,
+): Promise<{ status: number; durationMs: number }> {
+  return new Promise((resolve, reject) => {
+    const port = parseInt(process.env.PORT ?? "5000", 10);
+    const start = Date.now();
+    const headers: Record<string, string> = {
+      [getInternalProbeHeaderName()]: getInternalProbeToken(),
+    };
+    const req = http.request(
+      { hostname: "127.0.0.1", port, path: pathname, method, headers, timeout: 8_000 },
+      (res) => {
+        res.resume();
+        res.on("end", () => resolve({ status: res.statusCode ?? 0, durationMs: Date.now() - start }));
+      },
+    );
+    req.on("error", reject);
+    req.on("timeout", () => { req.destroy(new Error("probe timeout 8s")); });
+    req.end();
+  });
+}
+
+async function runStep(name: string, fn: () => Promise<string | void>): Promise<PipelineCheckStep> {
+  const start = Date.now();
+  try {
+    const msg = await fn();
+    return { name, status: "ok", durationMs: Date.now() - start, message: msg ?? undefined };
+  } catch (err) {
+    return { name, status: "error", durationMs: Date.now() - start, message: (err as Error).message?.slice(0, 300) };
+  }
+}
+
+async function warnStep(name: string, fn: () => Promise<string | void>): Promise<PipelineCheckStep> {
+  const start = Date.now();
+  try {
+    const msg = await fn();
+    return { name, status: "ok", durationMs: Date.now() - start, message: msg ?? undefined };
+  } catch (err) {
+    return { name, status: "warn", durationMs: Date.now() - start, message: (err as Error).message?.slice(0, 300) };
+  }
+}
+
+// ---------- NOTIFICATIONS ----------
+export async function checkNotifications(): Promise<PipelineCheckResult> {
+  const t0 = Date.now();
+  const steps: PipelineCheckStep[] = [];
+
+  steps.push(await warnStep("notification_history recenti", async () => {
+    const res = await db.execute(sql`
+      SELECT COUNT(*) AS cnt FROM notification_history WHERE created_at > NOW() - INTERVAL '24 hours'
+    `);
+    const cnt = parseInt((res.rows[0] as { cnt: string }).cnt ?? "0", 10);
+    if (cnt === 0) return "0 notifiche nelle ultime 24h (normale se non ci sono match recenti)";
+    return `${cnt} notifiche nelle ultime 24h`;
+  }));
+
+  steps.push(await warnStep("notifiche fallite recenti", async () => {
+    const res = await db.execute(sql`
+      SELECT COUNT(*) AS cnt FROM notification_history
+      WHERE status = 'failed' AND created_at > NOW() - INTERVAL '1 hour'
+    `);
+    const cnt = parseInt((res.rows[0] as { cnt: string }).cnt ?? "0", 10);
+    if (cnt > 5) throw new Error(`${cnt} notifiche fallite nell'ultima ora`);
+    return cnt === 0 ? "nessun fallimento recente" : `${cnt} fallimenti (soglia: 5)`;
+  }));
+
+  const overall = steps.some(s => s.status === "error") ? "broken"
+    : steps.some(s => s.status === "warn") ? "degraded" : "ok";
+
+  return {
+    pipeline: "notifications",
+    label: "Notifiche Push",
+    overall,
+    steps,
+    suggestedFix: overall !== "ok" ? "Verifica Expo push token e notification dispatcher." : null,
+    durationMs: Date.now() - t0,
+  };
+}
+
+// ---------- OTA ----------
+export async function checkOta(): Promise<PipelineCheckResult> {
+  const t0 = Date.now();
+  const steps: PipelineCheckStep[] = [];
+
+  steps.push(await runStep("GET /api/admin/ota/updates (sync <5s)", async () => {
+    const r = await httpProbe("GET", "/api/admin/ota/updates");
+    if (r.status !== 200) throw new Error(`status ${r.status}`);
+    if (r.durationMs > 5_000) throw new Error(`risposta lenta ${r.durationMs}ms (soglia: 5000ms)`);
+    return `${r.durationMs}ms`;
+  }));
+
+  const overall = steps.some(s => s.status === "error") ? "broken"
+    : steps.some(s => s.status === "warn") ? "degraded" : "ok";
+
+  return {
+    pipeline: "ota",
+    label: "OTA Update",
+    overall,
+    steps,
+    suggestedFix: overall !== "ok" ? "Verifica /api/admin/ota/updates e la connessione a EAS." : null,
+    durationMs: Date.now() - t0,
+  };
+}
+
+// ---------- GPS ----------
+export async function checkGps(): Promise<PipelineCheckResult> {
+  const t0 = Date.now();
+  const steps: PipelineCheckStep[] = [];
+
+  steps.push(await runStep("sessioni GPS aperte da >4h", async () => {
+    const res = await db.execute(sql`
+      SELECT COUNT(*) AS cnt FROM gps_sessions
+      WHERE ended_at IS NULL AND started_at < NOW() - INTERVAL '4 hours'
+    `);
+    const cnt = parseInt((res.rows[0] as { cnt: string }).cnt ?? "0", 10);
+    if (cnt > 0) throw new Error(`${cnt} sessioni GPS bloccate (aperte >4h senza chiusura)`);
+    return "nessuna sessione aperta da troppo tempo";
+  }));
+
+  const overall = steps.some(s => s.status === "error") ? "broken"
+    : steps.some(s => s.status === "warn") ? "degraded" : "ok";
+
+  return {
+    pipeline: "gps",
+    label: "GPS Tracking",
+    overall,
+    steps,
+    suggestedFix: overall !== "ok" ? "Esegui il session-crash-cleanup manualmente o controlla il job scheduleSessionCrashCleanup." : null,
+    durationMs: Date.now() - t0,
+  };
+}
+
+// ---------- EMBEDDING BIO ----------
+export async function checkEmbeddingBio(): Promise<PipelineCheckResult> {
+  const t0 = Date.now();
+  const steps: PipelineCheckStep[] = [];
+
+  steps.push(await warnStep("utenti con bio >48h senza embedding", async () => {
+    const res = await db.execute(sql`
+      SELECT COUNT(*) AS cnt FROM users u
+      WHERE u.bio IS NOT NULL
+        AND u.bio <> ''
+        AND u.updated_at < NOW() - INTERVAL '48 hours'
+        AND NOT EXISTS (
+          SELECT 1 FROM user_embeddings ue
+          WHERE ue.user_id = u.id AND ue.embedding_type = 'bio'
+            AND ue.updated_at > u.updated_at - INTERVAL '1 hour'
+        )
+      LIMIT 1
+    `);
+    const cnt = parseInt((res.rows[0] as { cnt: string }).cnt ?? "0", 10);
+    if (cnt > 0) throw new Error(`${cnt} utenti con bio aggiornata >48h fa senza embedding`);
+    return "tutti gli utenti hanno embedding aggiornato";
+  }));
+
+  const overall = steps.some(s => s.status === "error") ? "broken"
+    : steps.some(s => s.status === "warn") ? "degraded" : "ok";
+
+  return {
+    pipeline: "embedding_bio",
+    label: "Embedding Bio",
+    overall,
+    steps,
+    suggestedFix: overall !== "ok" ? "Esegui backfillBioEmbeddings manualmente o controlla il job di backfill." : null,
+    durationMs: Date.now() - t0,
+  };
+}
+
+// ---------- EMBEDDING MUSIC ----------
+export async function checkEmbeddingMusic(): Promise<PipelineCheckResult> {
+  const t0 = Date.now();
+  const steps: PipelineCheckStep[] = [];
+
+  steps.push(await warnStep("utenti con tracce senza embedding musicale", async () => {
+    const res = await db.execute(sql`
+      SELECT COUNT(DISTINCT umt.user_id) AS cnt
+      FROM user_music_tracks umt
+      WHERE NOT EXISTS (
+        SELECT 1 FROM user_embeddings ue
+        WHERE ue.user_id = umt.user_id AND ue.embedding_type = 'music_taste'
+      )
+    `);
+    const cnt = parseInt((res.rows[0] as { cnt: string }).cnt ?? "0", 10);
+    if (cnt > 10) throw new Error(`${cnt} utenti con tracce musicali senza embedding`);
+    if (cnt > 0) return `${cnt} utenti in attesa di embedding (sotto soglia)`;
+    return "tutti gli utenti hanno embedding musicale";
+  }));
+
+  const overall = steps.some(s => s.status === "error") ? "broken"
+    : steps.some(s => s.status === "warn") ? "degraded" : "ok";
+
+  return {
+    pipeline: "embedding_music",
+    label: "Embedding Musica",
+    overall,
+    steps,
+    suggestedFix: overall !== "ok" ? "Controlla runMusicEmbeddingsBackfill nel matching engine." : null,
+    durationMs: Date.now() - t0,
+  };
+}
+
+// ---------- CHAT ----------
+export async function checkChat(): Promise<PipelineCheckResult> {
+  const t0 = Date.now();
+  const steps: PipelineCheckStep[] = [];
+
+  steps.push(await warnStep("messaggi pending >5min", async () => {
+    const res = await db.execute(sql`
+      SELECT COUNT(*) AS cnt FROM messages
+      WHERE status = 'pending' AND created_at < NOW() - INTERVAL '5 minutes'
+    `);
+    const cnt = parseInt((res.rows[0] as { cnt: string }).cnt ?? "0", 10);
+    if (cnt > 0) throw new Error(`${cnt} messaggi pending da >5min`);
+    return "nessun messaggio bloccato";
+  }));
+
+  const overall = steps.some(s => s.status === "error") ? "broken"
+    : steps.some(s => s.status === "warn") ? "degraded" : "ok";
+
+  return {
+    pipeline: "chat",
+    label: "Chat",
+    overall,
+    steps,
+    suggestedFix: overall !== "ok" ? "Verifica il dispatcher WebSocket e la tabella messages." : null,
+    durationMs: Date.now() - t0,
+  };
+}
+
+// ---------- ROAD HAZARDS ----------
+export async function checkRoadHazards(): Promise<PipelineCheckResult> {
+  const t0 = Date.now();
+  const steps: PipelineCheckStep[] = [];
+
+  steps.push(await runStep("GET /api/road-hazards (<2s)", async () => {
+    const r = await httpProbe("GET", "/api/road-hazards?lat=45.464&lon=9.188&radius=50");
+    if (r.status !== 200) throw new Error(`status ${r.status}`);
+    if (r.durationMs > 2_000) throw new Error(`risposta lenta ${r.durationMs}ms (soglia: 2000ms)`);
+    return `${r.durationMs}ms`;
+  }));
+
+  const overall = steps.some(s => s.status === "error") ? "broken"
+    : steps.some(s => s.status === "warn") ? "degraded" : "ok";
+
+  return {
+    pipeline: "road_hazards",
+    label: "Road Hazards",
+    overall,
+    steps,
+    suggestedFix: overall !== "ok" ? "Verifica /api/road-hazards e la tabella road_hazards." : null,
+    durationMs: Date.now() - t0,
+  };
+}
+
+// ---------- AI ASSISTANT ----------
+export async function checkAiAssistant(): Promise<PipelineCheckResult> {
+  const t0 = Date.now();
+  const steps: PipelineCheckStep[] = [];
+
+  steps.push(await warnStep("sessioni AI assistant recenti", async () => {
+    const res = await db.execute(sql`
+      SELECT COUNT(*) AS cnt FROM ai_assistant_sessions
+      WHERE updated_at > NOW() - INTERVAL '24 hours'
+    `);
+    const cnt = parseInt((res.rows[0] as { cnt: string }).cnt ?? "0", 10);
+    return `${cnt} sessioni aggiornate nelle ultime 24h`;
+  }));
+
+  const overall = steps.some(s => s.status === "error") ? "broken"
+    : steps.some(s => s.status === "warn") ? "degraded" : "ok";
+
+  return {
+    pipeline: "ai_assistant",
+    label: "AI Assistant",
+    overall,
+    steps,
+    suggestedFix: overall !== "ok" ? "Verifica il provider AI e la tabella ai_assistant_sessions." : null,
+    durationMs: Date.now() - t0,
+  };
+}
+
+// ---------- SESSION CRASH CLEANUP ----------
+export async function checkSessionCrash(): Promise<PipelineCheckResult> {
+  const t0 = Date.now();
+  const steps: PipelineCheckStep[] = [];
+
+  steps.push(await runStep("sessioni crash non chiuse", async () => {
+    const res = await db.execute(sql`
+      SELECT COUNT(*) AS cnt FROM gps_sessions
+      WHERE ended_at IS NULL
+        AND started_at < NOW() - INTERVAL '8 hours'
+    `);
+    const cnt = parseInt((res.rows[0] as { cnt: string }).cnt ?? "0", 10);
+    if (cnt > 0) throw new Error(`${cnt} sessioni aperte da >8h (cleanup job non le ha chiuse)`);
+    return "nessuna sessione crash irrisolta";
+  }));
+
+  const overall = steps.some(s => s.status === "error") ? "broken"
+    : steps.some(s => s.status === "warn") ? "degraded" : "ok";
+
+  return {
+    pipeline: "session_crash",
+    label: "Session Crash Cleanup",
+    overall,
+    steps,
+    suggestedFix: overall !== "ok" ? "Verifica scheduleSessionCrashCleanup — il job non sta chiudendo le sessioni orfane." : null,
+    durationMs: Date.now() - t0,
+  };
+}
