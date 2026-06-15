@@ -10,6 +10,7 @@ import {
 } from "react-native";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import Svg, { Rect, Line, Text as SvgText } from "react-native-svg";
 import Colors from "@/constants/colors";
 import { getApiUrl, authFetchHeaders } from "@/lib/query-client";
 
@@ -89,10 +90,192 @@ function formatDateTime(iso: string | null | undefined): string {
   }
 }
 
+interface BucketItem {
+  bucketStart: string;
+  at: string;
+  total: number;
+  events: number;
+  errors: number;
+}
+
+interface BucketsData {
+  minutes: number;
+  buckets: BucketItem[];
+}
+
 interface PingResult {
   inserted: boolean;
   eventId: string | null;
 }
+
+const CHART_W = 280;
+const CHART_H = 56;
+const CHART_PAD_LEFT = 28;
+const CHART_PAD_BOTTOM = 16;
+const CHART_INNER_W = CHART_W - CHART_PAD_LEFT - 4;
+const CHART_INNER_H = CHART_H - CHART_PAD_BOTTOM - 4;
+
+function formatHour(iso: string): string {
+  try {
+    return new Date(iso).toLocaleString("it-IT", { hour: "2-digit", minute: "2-digit" });
+  } catch {
+    return "";
+  }
+}
+
+function SparklineChart({
+  buckets,
+  color,
+  valueKey,
+  label,
+  emptyText,
+}: {
+  buckets: BucketItem[];
+  color: string;
+  valueKey: "total" | "errors";
+  label: string;
+  emptyText: string;
+}) {
+  if (buckets.length === 0) {
+    return (
+      <View style={sparkS.emptyWrap}>
+        <Text style={sparkS.emptyLabel}>{label}</Text>
+        <Text style={sparkS.emptyText}>{emptyText}</Text>
+      </View>
+    );
+  }
+
+  const values = buckets.map((b) => b[valueKey]);
+  const maxVal = Math.max(...values, 1);
+  const n = buckets.length;
+  const barW = Math.max(2, Math.floor((CHART_INNER_W / n) * 0.7));
+  const gap = CHART_INNER_W / n;
+
+  const yTicks = [0, Math.round(maxVal / 2), maxVal];
+  const colorBg = color + "22";
+
+  return (
+    <View style={sparkS.chartWrap}>
+      <Text style={sparkS.chartLabel}>{label}</Text>
+      <Svg width={CHART_W} height={CHART_H}>
+        {/* Y-axis grid lines + labels */}
+        {yTicks.map((tick, i) => {
+          const y = 4 + CHART_INNER_H - (tick / maxVal) * CHART_INNER_H;
+          return (
+            <React.Fragment key={i}>
+              <Line
+                x1={CHART_PAD_LEFT}
+                y1={y}
+                x2={CHART_W - 4}
+                y2={y}
+                stroke="#374151"
+                strokeWidth={0.5}
+                strokeDasharray={i === 0 ? undefined : "2,2"}
+              />
+              <SvgText
+                x={CHART_PAD_LEFT - 2}
+                y={y + 3}
+                fontSize={7}
+                fill="#6b7280"
+                textAnchor="end"
+              >
+                {tick > 999 ? `${Math.round(tick / 100) / 10}k` : String(tick)}
+              </SvgText>
+            </React.Fragment>
+          );
+        })}
+
+        {/* Bars */}
+        {buckets.map((b, i) => {
+          const val = b[valueKey];
+          const barH = Math.max(1, (val / maxVal) * CHART_INNER_H);
+          const x = CHART_PAD_LEFT + i * gap + (gap - barW) / 2;
+          const y = 4 + CHART_INNER_H - barH;
+          return (
+            <React.Fragment key={i}>
+              <Rect x={x} y={y} width={barW} height={barH} fill={colorBg} rx={1} />
+              <Rect x={x} y={y} width={barW} height={Math.min(2, barH)} fill={color} rx={1} />
+            </React.Fragment>
+          );
+        })}
+
+        {/* X-axis labels: first, middle, last — deduplicated to avoid key collisions on small datasets */}
+        {Array.from(new Set([0, Math.floor((n - 1) / 2), n - 1].filter((idx) => idx < n))).map((idx) => {
+          const x = CHART_PAD_LEFT + idx * gap + gap / 2;
+          return (
+            <SvgText
+              key={idx}
+              x={x}
+              y={CHART_H - 2}
+              fontSize={7}
+              fill="#6b7280"
+              textAnchor="middle"
+            >
+              {formatHour(buckets[idx].bucketStart)}
+            </SvgText>
+          );
+        })}
+      </Svg>
+      <View style={sparkS.statsRow}>
+        <Text style={sparkS.statText}>
+          max <Text style={[sparkS.statValue, { color }]}>{maxVal.toLocaleString("it-IT")}</Text>
+        </Text>
+        <Text style={sparkS.statText}>
+          tot{" "}
+          <Text style={[sparkS.statValue, { color }]}>
+            {values.reduce((a, b) => a + b, 0).toLocaleString("it-IT")}
+          </Text>
+        </Text>
+        <Text style={sparkS.statText}>
+          {n} bucket / 24h
+        </Text>
+      </View>
+    </View>
+  );
+}
+
+const sparkS = StyleSheet.create({
+  chartWrap: {
+    marginBottom: 8,
+  },
+  chartLabel: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 10,
+    color: Colors.textSecondary,
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
+    marginBottom: 4,
+  },
+  statsRow: {
+    flexDirection: "row",
+    gap: 12,
+    marginTop: 2,
+  },
+  statText: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 10,
+    color: Colors.textSecondary,
+  },
+  statValue: {
+    fontFamily: "Inter_600SemiBold",
+  },
+  emptyWrap: {
+    paddingVertical: 8,
+  },
+  emptyLabel: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 10,
+    color: Colors.textSecondary,
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
+    marginBottom: 2,
+  },
+  emptyText: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 11,
+    color: Colors.textSecondary,
+  },
+});
 
 export function TelemetryDebugCard() {
   const qc = useQueryClient();
@@ -114,6 +297,14 @@ export function TelemetryDebugCard() {
       queryFn: () => adminFetch("/api/admin/watchdog/maps/flags").then((r) => r.json()),
       staleTime: 8_000,
       refetchInterval: 15_000,
+    });
+
+  const { data: bucketsData, isLoading: loadingBuckets, refetch: refetchBuckets } =
+    useQuery<BucketsData>({
+      queryKey: ["/api/admin/watchdog/maps/buckets", 1440],
+      queryFn: () => adminFetch("/api/admin/watchdog/maps/buckets?minutes=1440").then((r) => r.json()),
+      staleTime: 60_000,
+      refetchInterval: 120_000,
     });
 
   const pingMutation = useMutation({
@@ -258,6 +449,40 @@ export function TelemetryDebugCard() {
             <Text style={s.summaryLabel}>Ultimo campione</Text>
           </View>
         </View>
+      </View>
+
+      {/* --- Trend 24h sparkline --- */}
+      <View style={s.section}>
+        <View style={s.feedHeader}>
+          <Text style={s.sectionTitle}>Trend 24h</Text>
+          <TouchableOpacity onPress={() => refetchBuckets()} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
+            {loadingBuckets ? (
+              <ActivityIndicator size="small" color={Colors.textSecondary} />
+            ) : (
+              <Ionicons name="refresh" size={14} color={Colors.textSecondary} />
+            )}
+          </TouchableOpacity>
+        </View>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+          <View style={s.sparkRow}>
+            <SparklineChart
+              buckets={bucketsData?.buckets ?? []}
+              color="#60a5fa"
+              valueKey="total"
+              label="Eventi totali / ora"
+              emptyText="Nessun dato nelle ultime 24h"
+            />
+            <View style={s.sparkDivider} />
+            <SparklineChart
+              buckets={bucketsData?.buckets ?? []}
+              color="#f87171"
+              valueKey="errors"
+              label="Errori / ora"
+              emptyText="Nessun errore nelle ultime 24h"
+            />
+          </View>
+        </ScrollView>
+        <Text style={s.refreshHint}>Auto-refresh ogni 2m</Text>
       </View>
 
       {/* --- Live events feed --- */}
@@ -500,5 +725,17 @@ const s = StyleSheet.create({
     color: Colors.textSecondary,
     textAlign: "right",
     marginTop: 6,
+  },
+  sparkRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 16,
+    paddingVertical: 4,
+  },
+  sparkDivider: {
+    width: 1,
+    height: 80,
+    backgroundColor: Colors.border,
+    alignSelf: "center",
   },
 });

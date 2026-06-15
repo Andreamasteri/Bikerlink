@@ -6,7 +6,7 @@ import { useLocationGate } from "@/lib/location-context";
 import { queryClient, apiRequest } from "@/lib/query-client";
 import { sendStartupBeacon } from "@/lib/startup-beacon";
 import { isTrackingActive, registerLayoutWatcherCallbacks } from "@/lib/tracking-active";
-import { initCrashLogger, markClean } from "@/lib/crash-logger";
+import { initCrashLogger, markClean, resetCrashLogger } from "@/lib/crash-logger";
 import {
   startBackgroundLocationTask,
   stopBackgroundLocationTask,
