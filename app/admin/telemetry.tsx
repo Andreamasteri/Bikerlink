@@ -8,7 +8,7 @@ import {
   Alert,
   ActivityIndicator,
 } from "react-native";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
@@ -22,6 +22,12 @@ import { InfoModal } from "@/components/admin/telemetry/InfoModal";
 import { SensorsGlobalCard } from "@/components/admin/telemetry/SensorsGlobalCard";
 import { ErrorLogPanel } from "@/components/admin/telemetry/ErrorLogPanel";
 import type { ErrorLogEntry } from "@/components/admin/telemetry/ErrorLogPanel";
+
+interface TelemetryHealthData {
+  maps: { count24h: number; lastEvent: string | null; killSwitchEnabled: boolean };
+  device: { count24h: number; lastEvent: string | null };
+  ota: { count24h: number; lastEvent: string | null; bootSuccessTotal: number };
+}
 
 interface TelemetryAdminStats {
   activeUsers: number;
@@ -54,11 +60,141 @@ interface CurvyScoreStats {
 
 async function adminFetch(path: string): Promise<Response> {
   const res = await fetch(new URL(path, getApiUrl()).toString(), {
-    headers: { ...(await authFetchHeaders()) },
+    headers: { ...(authFetchHeaders()) },
     credentials: "include",
   });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return res;
+}
+
+function formatAge(iso: string | null | undefined): string {
+  if (!iso) return "Mai ricevuto";
+  try {
+    const diffMs = Date.now() - new Date(iso).getTime();
+    const mins = Math.floor(diffMs / 60_000);
+    if (mins < 1) return "< 1 minuto fa";
+    if (mins < 60) return `${mins} min fa`;
+    const hours = Math.floor(mins / 60);
+    if (hours < 24) return `${hours}h fa`;
+    return `${Math.floor(hours / 24)}g fa`;
+  } catch { return iso; }
+}
+
+function PipelineRow({
+  label,
+  icon,
+  count24h,
+  lastEvent,
+  extra,
+  killSwitchOff,
+}: {
+  label: string;
+  icon: React.ReactNode;
+  count24h: number;
+  lastEvent: string | null;
+  extra?: string;
+  killSwitchOff?: boolean;
+}) {
+  const isStale = !lastEvent || Date.now() - new Date(lastEvent).getTime() > 60 * 60_000;
+  const statusColor = killSwitchOff ? "#f59e0b" : isStale ? "#ef4444" : "#22c55e";
+  const statusLabel = killSwitchOff ? "Kill-switch OFF" : isStale ? "⚠ Nessun dato recente" : "OK";
+
+  return (
+    <View style={phStyles.row}>
+      <View style={phStyles.rowLeft}>
+        {icon}
+        <View style={{ flex: 1 }}>
+          <Text style={phStyles.rowLabel}>{label}</Text>
+          <Text style={phStyles.rowSub}>{formatAge(lastEvent)}{extra ? ` · ${extra}` : ""}</Text>
+        </View>
+      </View>
+      <View style={phStyles.rowRight}>
+        <Text style={[phStyles.count, { color: count24h > 0 ? "#22c55e" : "#94a3b8" }]}>{count24h}</Text>
+        <Text style={[phStyles.status, { color: statusColor }]}>{statusLabel}</Text>
+      </View>
+    </View>
+  );
+}
+
+function TelemetryHealthCard() {
+  const qc = useQueryClient();
+  const { data: health, isLoading, refetch } = useQuery<TelemetryHealthData>({
+    queryKey: ["/api/admin/telemetry-health"],
+    queryFn: () => adminFetch("/api/admin/telemetry-health").then((r) => r.json()),
+    staleTime: 15_000,
+    refetchInterval: 30_000,
+  });
+
+  const pingMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch(new URL("/api/admin/telemetry-health/ping", getApiUrl()).toString(), {
+        method: "POST",
+        headers: authFetchHeaders(),
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return res.json() as Promise<{ ok: boolean; maps_count_24h: number }>;
+    },
+    onSuccess: (data) => {
+      Alert.alert("Pipeline OK", `Evento test inserito. Mappe 24h: ${data.maps_count_24h} eventi.`);
+      refetch();
+      qc.invalidateQueries({ queryKey: ["/api/admin/telemetry-health"] });
+    },
+    onError: (err) => {
+      Alert.alert("Errore", `Ping fallito: ${(err as Error).message}`);
+    },
+  });
+
+  return (
+    <View style={phStyles.card}>
+      <View style={phStyles.cardHeader}>
+        <MaterialCommunityIcons name="pulse" size={16} color={Colors.accent} />
+        <Text style={phStyles.cardTitle}>Salute Pipeline Telemetria</Text>
+        {isLoading && <ActivityIndicator size="small" color={Colors.accent} style={{ marginLeft: "auto" }} />}
+      </View>
+      <Text style={phStyles.cardSub}>Eventi ricevuti nelle ultime 24h · Ultimo evento ricevuto</Text>
+
+      {health ? (
+        <>
+          <PipelineRow
+            label="Mappe"
+            icon={<MaterialCommunityIcons name="map" size={16} color="#60a5fa" style={{ marginRight: 8 }} />}
+            count24h={health.maps.count24h}
+            lastEvent={health.maps.lastEvent}
+            killSwitchOff={!health.maps.killSwitchEnabled}
+          />
+          <PipelineRow
+            label="Device Metrics"
+            icon={<MaterialCommunityIcons name="cellphone" size={16} color="#a78bfa" style={{ marginRight: 8 }} />}
+            count24h={health.device.count24h}
+            lastEvent={health.device.lastEvent}
+          />
+          <PipelineRow
+            label="OTA Boot"
+            icon={<MaterialCommunityIcons name="update" size={16} color="#fb923c" style={{ marginRight: 8 }} />}
+            count24h={health.ota.count24h}
+            lastEvent={health.ota.lastEvent}
+            extra={`boot_success totali: ${health.ota.bootSuccessTotal}`}
+          />
+        </>
+      ) : !isLoading ? (
+        <Text style={phStyles.errorText}>Errore caricamento stato pipeline</Text>
+      ) : null}
+
+      <TouchableOpacity
+        style={[phStyles.pingBtn, pingMutation.isPending && { opacity: 0.6 }]}
+        onPress={() => pingMutation.mutate()}
+        disabled={pingMutation.isPending}
+        activeOpacity={0.8}
+      >
+        {pingMutation.isPending
+          ? <ActivityIndicator size="small" color="#fff" />
+          : <Ionicons name="flash" size={14} color="#fff" />
+        }
+        <Text style={phStyles.pingBtnText}>Invia evento test</Text>
+      </TouchableOpacity>
+    </View>
+  );
 }
 
 export default function AdminTelemetryScreen() {
@@ -257,6 +393,8 @@ export default function AdminTelemetryScreen() {
           onToggle={handleToggleSensorsGlobal}
         />
 
+        <TelemetryHealthCard />
+
         {stats && (
           <>
             <TelemetryStats stats={stats} />
@@ -426,5 +564,91 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_700Bold",
     fontSize: 11,
     color: "#fff",
+  },
+});
+
+const phStyles = StyleSheet.create({
+  card: {
+    backgroundColor: Colors.surface,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    padding: 14,
+    marginBottom: 16,
+  },
+  cardHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginBottom: 2,
+  },
+  cardTitle: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 14,
+    color: Colors.text,
+  },
+  cardSub: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 11,
+    color: Colors.textSecondary,
+    marginBottom: 12,
+  },
+  row: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 8,
+    borderTopWidth: 1,
+    borderTopColor: Colors.border,
+  },
+  rowLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    flex: 1,
+  },
+  rowRight: {
+    alignItems: "flex-end",
+    gap: 2,
+  },
+  rowLabel: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 13,
+    color: Colors.text,
+  },
+  rowSub: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 11,
+    color: Colors.textSecondary,
+  },
+  count: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 15,
+  },
+  status: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 10,
+  },
+  pingBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    backgroundColor: Colors.accent,
+    borderRadius: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    marginTop: 12,
+  },
+  pingBtnText: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 13,
+    color: "#fff",
+  },
+  errorText: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    color: "#ef4444",
+    textAlign: "center",
+    paddingVertical: 8,
   },
 });

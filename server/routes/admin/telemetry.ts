@@ -15,6 +15,8 @@ import {
   getCurvyScoreStats,
 } from "../../curvy-score-job";
 import { isSelfHosted } from "../../graphhopper-client";
+import { getAllMapsFlags } from "../../ai/watchdog/maps-kill-switch";
+import { mapsTelemetryEvents } from "@shared/db";
 import telemetrySessionsRouter from "./telemetry-sessions";
 
 const router = Router();
@@ -441,6 +443,80 @@ router.get("/telemetry/error-log", (_req: Request, res: Response) => {
     const cause = (err as any)?.cause?.message ?? "";
     console.error("[admin/telemetry/error-log] error:", err, cause ? `| PG: ${cause}` : "");
     return sendError(res, 500, "Errore lettura log errori");
+  }
+});
+
+// GET /api/admin/telemetry-health — stato pipeline telemetria in tempo reale.
+// Ritorna count 24h + ultimo evento per maps_telemetry_events, device_metrics,
+// ota_boot_events e stato kill-switch maps. Admin-only (già gated in admin.ts).
+router.get("/telemetry-health", async (_req: Request, res: Response) => {
+  try {
+    const [rows, flags] = await Promise.all([
+      db.execute<{
+        maps_count: string;
+        maps_last: string | null;
+        device_count: string;
+        device_last: string | null;
+        ota_count: string;
+        ota_last: string | null;
+        ota_boot_success: string;
+      }>(sql`
+        SELECT
+          (SELECT COUNT(*)::text FROM maps_telemetry_events WHERE created_at >= NOW() - INTERVAL '24 hours') AS maps_count,
+          (SELECT MAX(created_at)::text FROM maps_telemetry_events) AS maps_last,
+          (SELECT COUNT(*)::text FROM device_metrics WHERE recorded_at >= NOW() - INTERVAL '24 hours') AS device_count,
+          (SELECT MAX(recorded_at)::text FROM device_metrics) AS device_last,
+          (SELECT COUNT(*)::text FROM ota_boot_events WHERE created_at >= NOW() - INTERVAL '24 hours') AS ota_count,
+          (SELECT MAX(created_at)::text FROM ota_boot_events) AS ota_last,
+          (SELECT COUNT(*)::text FROM ota_boot_events WHERE event_type = 'boot_success') AS ota_boot_success
+      `),
+      getAllMapsFlags(),
+    ]);
+
+    const r = rows.rows[0];
+    return res.json({
+      maps: {
+        count24h: parseInt(r?.maps_count ?? "0", 10),
+        lastEvent: r?.maps_last ?? null,
+        killSwitchEnabled: flags.telemetry,
+      },
+      device: {
+        count24h: parseInt(r?.device_count ?? "0", 10),
+        lastEvent: r?.device_last ?? null,
+      },
+      ota: {
+        count24h: parseInt(r?.ota_count ?? "0", 10),
+        lastEvent: r?.ota_last ?? null,
+        bootSuccessTotal: parseInt(r?.ota_boot_success ?? "0", 10),
+      },
+    });
+  } catch (err) {
+    const errMsg = err instanceof Error ? err.message : String(err);
+    console.error("[admin/telemetry-health] error:", err);
+    return sendError(res, 500, `Errore lettura stato pipeline: ${errMsg}`);
+  }
+});
+
+// POST /api/admin/telemetry-health/ping — inserisce una riga di test in
+// maps_telemetry_events e risponde con il conteggio aggiornato nelle ultime 24h.
+// Utile per verificare che la pipeline server→DB funzioni indipendentemente dal client.
+router.post("/telemetry-health/ping", async (_req: Request, res: Response) => {
+  try {
+    await db.insert(mapsTelemetryEvents).values({
+      event: "map_init",
+      component: "admin_ping",
+      platform: "web",
+    });
+
+    const countRow = await db.execute<{ cnt: string }>(
+      sql`SELECT COUNT(*)::text AS cnt FROM maps_telemetry_events WHERE created_at >= NOW() - INTERVAL '24 hours'`
+    );
+    const count24h = parseInt(countRow.rows[0]?.cnt ?? "0", 10);
+    return res.json({ ok: true, maps_count_24h: count24h });
+  } catch (err) {
+    const errMsg = err instanceof Error ? err.message : String(err);
+    console.error("[admin/telemetry-health/ping] error:", err);
+    return sendError(res, 500, `Errore ping telemetria: ${errMsg}`);
   }
 });
 

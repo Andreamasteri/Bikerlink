@@ -42,8 +42,8 @@ import { useOtaStagingBanner } from "@/hooks/useOtaStagingBanner";
 import { useDeviceMetrics } from "@/hooks/useDeviceMetrics";
 SplashScreen.preventAutoHideAsync();
 
-function DeviceMetricsReporter() {
-  useDeviceMetrics();
+function DeviceMetricsReporter({ tokenReady }: { tokenReady: boolean }) {
+  useDeviceMetrics(tokenReady);
   return null;
 }
 
@@ -230,8 +230,8 @@ function reportClientError(error: Error, componentStack: string) {
 }
 
 export default function RootLayout() {
-  const { ready } = useAppBootstrap();
-  useOtaAutoUpdate();
+  const { ready, tokenReady } = useAppBootstrap();
+  useOtaAutoUpdate(tokenReady);
   usePostUpdateRefresh();
 
   useEffect(() => {
@@ -275,7 +275,7 @@ export default function RootLayout() {
       <StartupGate ready={ready}>
         <NativeUpdateChecker />
         <MapReadyGate>
-          <DeviceMetricsReporter />
+          <DeviceMetricsReporter tokenReady={tokenReady} />
           <AppStateHandler />
           <GpsAlwaysGateWrapper />
           <OtaPendingBanner />

@@ -155,7 +155,7 @@ async function sendMetrics(userId: string): Promise<void> {
   }
 }
 
-export function useDeviceMetrics(): void {
+export function useDeviceMetrics(tokenReady = false): void {
   const { user } = useAuth();
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const appStateRef = useRef<AppStateStatus>(AppState.currentState);
@@ -181,7 +181,7 @@ export function useDeviceMetrics(): void {
   }, []);
 
   useEffect(() => {
-    if (!user?.id) {
+    if (!tokenReady || !user?.id) {
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
         intervalRef.current = null;
@@ -206,5 +206,5 @@ export function useDeviceMetrics(): void {
         intervalRef.current = null;
       }
     };
-  }, [user?.id]);
+  }, [user?.id, tokenReady]);
 }

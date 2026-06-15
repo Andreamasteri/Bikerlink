@@ -4,7 +4,7 @@
 import { useCallback, useEffect, useRef } from "react";
 import { Platform } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { getApiUrl } from "@/lib/query-client";
+import { getApiUrl, authFetchHeaders } from "@/lib/query-client";
 import { getTelemetryAlwaysActive } from "@/lib/telemetry-prefs";
 import Constants from "expo-constants";
 
@@ -109,7 +109,7 @@ async function flushNow(): Promise<void> {
     const resp = await fetch(url, {
       method: "POST",
       credentials: "include",
-      headers: { "Content-Type": "application/json" },
+      headers: authFetchHeaders({ "Content-Type": "application/json" }),
       body: JSON.stringify({
         events: batch.map((e) => ({
           event: e.event, renderer: e.renderer ?? null, component: e.component ?? null,

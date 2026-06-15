@@ -16,6 +16,8 @@ interface CachedFlag { value: boolean; at: number }
 const TTL_MS = 5_000;
 const cache = new Map<MapsKillSwitchKey, CachedFlag>();
 
+const _loggedOnce = new Set<MapsKillSwitchKey>();
+
 export async function isMapsFlagEnabled(flag: MapsKillSwitchKey): Promise<boolean> {
   const now = Date.now();
   const c = cache.get(flag);
@@ -25,6 +27,10 @@ export async function isMapsFlagEnabled(flag: MapsKillSwitchKey): Promise<boolea
     const v = (row?.value ?? "true").toLowerCase();
     const value = v !== "false" && v !== "0";
     cache.set(flag, { value, at: now });
+    if (!_loggedOnce.has(flag)) {
+      _loggedOnce.add(flag);
+      console.log(`[maps-kill-switch] ${flag} = ${value} (db=${row?.value ?? "not set, default true"})`);
+    }
     return value;
   } catch {
     cache.set(flag, { value: true, at: now });

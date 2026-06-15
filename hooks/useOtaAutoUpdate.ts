@@ -94,10 +94,11 @@ async function fetchManifest(): Promise<ManifestResponse | null> {
  *   3. Dopo 8s di app stabile sul nuovo bundle, emettiamo `boot_success`.
  *      Se il bundle crasha prima → niente boot_success (worker auto-rollback userà i contatori).
  */
-export function useOtaAutoUpdate(): { checking: boolean } {
+export function useOtaAutoUpdate(tokenReady = false): { checking: boolean } {
   const ranRef = useRef(false);
 
   useEffect(() => {
+    if (!tokenReady) return;
     if (ranRef.current) return;
     ranRef.current = true;
 
@@ -221,7 +222,7 @@ export function useOtaAutoUpdate(): { checking: boolean } {
         console.warn("[useOtaAutoUpdate] OTA check/fetch failed:", err);
       }
     })();
-  }, []);
+  }, [tokenReady]);
 
   return { checking: false };
 }

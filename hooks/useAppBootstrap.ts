@@ -9,6 +9,7 @@ import {
 import * as SplashScreen from "expo-splash-screen";
 import { sendStartupBeacon, recoverLastBeacon } from "@/lib/startup-beacon";
 import { purgeLegacyGpsBuffer } from "@/lib/storage-recovery";
+import { initSessionToken } from "@/lib/query-client";
 
 export function useAppBootstrap() {
   const [fontsLoaded, fontError] = useFonts({
@@ -19,9 +20,15 @@ export function useAppBootstrap() {
   });
 
   const [ready, setReady] = useState(false);
+  const [tokenReady, setTokenReady] = useState(false);
 
   useEffect(() => {
     (async () => {
+      // initSessionToken DEVE essere la primissima operazione: useOtaAutoUpdate
+      // e DeviceMetricsReporter vengono montati subito dopo e devono trovare il
+      // token già in cache per non inviare richieste anonime al cold start.
+      await initSessionToken();
+      setTokenReady(true);
       await recoverLastBeacon();
       sendStartupBeacon("layout_mount");
       // Recovery storage saturato dal vecchio buffer GPS offline (mappa nera,
@@ -51,5 +58,5 @@ export function useAppBootstrap() {
     return () => clearTimeout(timeout);
   }, [fontsLoaded, fontError]);
 
-  return { ready, fontsLoaded, fontError };
+  return { ready, tokenReady, fontsLoaded, fontError };
 }
