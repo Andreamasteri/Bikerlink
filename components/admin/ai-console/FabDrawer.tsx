@@ -61,6 +61,9 @@ export default function FabDrawer({ visible, onClose }: Props) {
 
   const { query: bugQuery, markSeen, clearAll } = useBugReport();
   const bugItems = useMemo(() => bugQuery.data?.items ?? [], [bugQuery.data]);
+  // Task #4080: Copia e Invia restano attivi anche in caso di errore di caricamento,
+  // così l'utente può almeno copiare/inviare il messaggio d'errore contestuale.
+  const canCopyOrSend = bugItems.length > 0 || bugQuery.isError;
 
   useEffect(() => {
     if (visible) setActiveId(lastId);
@@ -81,17 +84,23 @@ export default function FabDrawer({ visible, onClose }: Props) {
   };
 
   const handleCopy = useCallback(async () => {
-    const text = formatBugReportClipboard(bugItems);
+    // Task #4080: se c'è un errore di caricamento, copia un messaggio diagnostico
+    const text = bugQuery.isError && bugItems.length === 0
+      ? `[BikerLink Bug Report - errore caricamento]\n\nImpossibile caricare la Raccolta Bug. Controllare i log del backend.`
+      : formatBugReportClipboard(bugItems);
     await Clipboard.setStringAsync(text);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
-  }, [bugItems]);
+  }, [bugItems, bugQuery.isError]);
 
   const handleSendToConsole = useCallback(() => {
-    const digest = formatBugReportClipboard(bugItems);
+    // Task #4080: se c'è un errore di caricamento, invia il messaggio diagnostico
+    const digest = bugQuery.isError && bugItems.length === 0
+      ? `[Errore caricamento Raccolta Bug]\n\nImpossibile caricare i dati dalla Raccolta Bug. Controllare i log del backend (tabelle app_crash_logs, system_signals, ai_watchdog_log).`
+      : formatBugReportClipboard(bugItems);
     setInput(`Analizza questi errori recenti di BikerLink:\n\n${digest}\n\nCosa consigli?`);
     setActiveTab("console");
-  }, [bugItems]);
+  }, [bugItems, bugQuery.isError]);
 
   const bugCount = bugQuery.data?.total ?? 0;
 
@@ -234,9 +243,9 @@ export default function FabDrawer({ visible, onClose }: Props) {
               </ScrollView>
               <View style={[styles.bugActions, { borderColor: colors.border, backgroundColor: colors.surface, paddingBottom: (insets.bottom || 8) }]}>
                 <TouchableOpacity
-                  style={[styles.bugBtn, { backgroundColor: copied ? (colors.success ?? "#38A169") : colors.surfaceLight, borderColor: colors.border }]}
+                  style={[styles.bugBtn, { backgroundColor: copied ? (colors.success ?? "#38A169") : colors.surfaceLight, borderColor: colors.border, opacity: canCopyOrSend ? 1 : 0.4 }]}
                   onPress={() => { void handleCopy(); }}
-                  disabled={bugItems.length === 0}
+                  disabled={!canCopyOrSend}
                 >
                   <Ionicons name={copied ? "checkmark" : "copy-outline"} size={15} color={copied ? "#fff" : colors.text} />
                   <Text style={[styles.bugBtnTxt, { color: copied ? "#fff" : colors.text }]}>
@@ -244,9 +253,9 @@ export default function FabDrawer({ visible, onClose }: Props) {
                   </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={[styles.bugBtn, { backgroundColor: colors.accent, borderColor: colors.accent }]}
+                  style={[styles.bugBtn, { backgroundColor: colors.accent, borderColor: colors.accent, opacity: canCopyOrSend ? 1 : 0.4 }]}
                   onPress={handleSendToConsole}
-                  disabled={bugItems.length === 0}
+                  disabled={!canCopyOrSend}
                 >
                   <Ionicons name="sparkles" size={15} color="#fff" />
                   <Text style={[styles.bugBtnTxt, { color: "#fff" }]}>Invia alla AI Console</Text>

@@ -142,6 +142,9 @@ export default function FloatingWidget() {
   const panGesture = Gesture.Pan()
     .runOnJS(true)
     .minDistance(0)
+    // Task #4080: activateAfterLongPress(0) dà priorità a questo gesture rispetto
+    // al pan del navigator tab evitando conflitti sullo swipe orizzontale.
+    .activateAfterLongPress(0)
     .onStart(() => {
       startX.value = posX.value;
       startY.value = posY.value;

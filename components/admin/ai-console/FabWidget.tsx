@@ -1,12 +1,12 @@
 // Task #2641 — FAB flottante AI Console: tap=drawer, long-press=console intera.
 // Task #2692 — FAB trascinabile con persistenza posizione (AsyncStorage) e clamp ai bordi.
+// Task #4080 — Fix drag: onStartShouldSetPanResponder true + tap/long-press via release timing.
 // Haptics conditional; reanimated per fade/scale.
 import React, { useEffect, useRef, useState } from "react";
 import {
   View,
   Text,
   StyleSheet,
-  Pressable,
   Platform,
   PanResponder,
   useWindowDimensions,
@@ -39,6 +39,7 @@ function triggerHaptic(style: "light" | "medium" = "light") {
 const FAB_SIZE = 56;
 const EDGE_MARGIN = 8;
 const DRAG_THRESHOLD = 5;
+const LONG_PRESS_MS = 500;
 const STORAGE_KEY = "admin:ai-fab:pos";
 
 export default function FabWidget() {
@@ -63,6 +64,12 @@ export default function FabWidget() {
   const bottomInset = Math.max(insets.bottom, Platform.OS === "web" ? 34 : 12);
   const topInset = Math.max(insets.top, Platform.OS === "web" ? 67 : 0);
 
+  // Refs aggiornati ad ogni render per evitare stale closure nel PanResponder
+  const hasExplainRef = useRef(hasExplain);
+  hasExplainRef.current = hasExplain;
+  const routerRef = useRef(router);
+  routerRef.current = router;
+
   const clamp = (x: number, y: number) => {
     const minX = EDGE_MARGIN + insets.left;
     const maxX = winW - FAB_SIZE - EDGE_MARGIN - insets.right;
@@ -73,6 +80,9 @@ export default function FabWidget() {
       y: Math.min(Math.max(y, minY), Math.max(minY, maxY)),
     };
   };
+
+  const clampRef = useRef(clamp);
+  clampRef.current = clamp;
 
   const defaultPos = () => ({
     x: winW - FAB_SIZE - 16 - insets.right,
@@ -85,6 +95,11 @@ export default function FabWidget() {
   posRef.current = pos;
   const dragStartRef = useRef<{ x: number; y: number } | null>(null);
   const didDragRef = useRef(false);
+  const pressStartRef = useRef<number>(0);
+
+  // refs per handlers che cambiano con lo state
+  const setDrawerOpenRef = useRef(setDrawerOpen);
+  setDrawerOpenRef.current = setDrawerOpen;
 
   // Load persisted position
   useEffect(() => {
@@ -94,47 +109,70 @@ export default function FabWidget() {
         if (raw) {
           const parsed = JSON.parse(raw);
           if (typeof parsed?.x === "number" && typeof parsed?.y === "number") {
-            setPos(clamp(parsed.x, parsed.y));
+            setPos(clampRef.current(parsed.x, parsed.y));
           }
         }
       } catch { /* skip */ }
       setLoaded(true);
     })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Re-clamp on window resize / inset change
   useEffect(() => {
     if (!loaded) return;
-    setPos((prev) => clamp(prev.x, prev.y));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    setPos((prev) => clampRef.current(prev.x, prev.y));
   }, [winW, winH, insets.top, insets.bottom, insets.left, insets.right, loaded]);
 
   const panResponder = useRef(
     PanResponder.create({
-      onStartShouldSetPanResponder: () => false,
-      onMoveShouldSetPanResponder: (_e: GestureResponderEvent, g: PanResponderGestureState) =>
-        Math.abs(g.dx) > DRAG_THRESHOLD || Math.abs(g.dy) > DRAG_THRESHOLD,
+      // Task #4080: true per catturare subito il gesto; tap/long-press
+      // vengono distinti in onPanResponderRelease tramite distanza e tempo.
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
       onPanResponderGrant: () => {
         dragStartRef.current = { x: posRef.current.x, y: posRef.current.y };
         didDragRef.current = false;
+        pressStartRef.current = Date.now();
+        scale.value = withSpring(0.92);
       },
-      onPanResponderMove: (_e, g) => {
+      onPanResponderMove: (_e: GestureResponderEvent, g: PanResponderGestureState) => {
         const start = dragStartRef.current;
         if (!start) return;
-        didDragRef.current = true;
-        const next = clamp(start.x + g.dx, start.y + g.dy);
-        setPos(next);
+        // Attiva il drag solo dopo aver superato la soglia
+        if (Math.abs(g.dx) > DRAG_THRESHOLD || Math.abs(g.dy) > DRAG_THRESHOLD) {
+          didDragRef.current = true;
+        }
+        if (didDragRef.current) {
+          const next = clampRef.current(start.x + g.dx, start.y + g.dy);
+          setPos(next);
+        }
       },
-      onPanResponderRelease: () => {
+      onPanResponderRelease: (_e: GestureResponderEvent, _g: PanResponderGestureState) => {
+        scale.value = withSpring(1);
         dragStartRef.current = null;
         if (didDragRef.current) {
+          // Era un drag: salva posizione
           const final = posRef.current;
           AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(final)).catch(() => { /* skip */ });
+        } else {
+          // Era un tap o long-press: distingui per durata
+          const elapsed = Date.now() - pressStartRef.current;
+          if (elapsed >= LONG_PRESS_MS) {
+            triggerHaptic("medium");
+            routerRef.current.push("/admin/ai-console" as never);
+          } else {
+            triggerHaptic("light");
+            if (hasExplainRef.current) {
+              routerRef.current.push("/admin/ai-console" as never);
+            } else {
+              setDrawerOpenRef.current(true);
+            }
+          }
         }
         didDragRef.current = false;
       },
       onPanResponderTerminate: () => {
+        scale.value = withSpring(1);
         dragStartRef.current = null;
         didDragRef.current = false;
       },
@@ -147,30 +185,11 @@ export default function FabWidget() {
         pointerEvents="box-none"
         style={[styles.wrap, { left: pos.x, top: pos.y }, animStyle]}
         {...panResponder.panHandlers}
+        accessibilityRole="button"
+        accessibilityLabel="AI Console"
+        testID="ai-console-fab"
       >
-        <Pressable
-          // Task #2645 — quando c'è un explain pendente, il tap apre direttamente
-          // la Console (che consumerà il pending e auto-invierà il seed). Altrimenti
-          // tap = drawer rapido, long-press = console intera (comportamento storico).
-          onPress={() => {
-            if (didDragRef.current) { didDragRef.current = false; return; }
-            triggerHaptic("light");
-            if (hasExplain) {
-              router.push("/admin/ai-console" as never);
-            } else {
-              setDrawerOpen(true);
-            }
-          }}
-          onLongPress={() => {
-            if (didDragRef.current) return;
-            triggerHaptic("medium");
-            router.push("/admin/ai-console" as never);
-          }}
-          onPressIn={() => { scale.value = withSpring(0.92); }}
-          onPressOut={() => { scale.value = withSpring(1); }}
-          accessibilityRole="button"
-          accessibilityLabel="AI Console"
-          testID="ai-console-fab"
+        <View
           style={[
             styles.btn,
             { backgroundColor: colors.accent, shadowColor: colors.accent },
@@ -190,7 +209,7 @@ export default function FabWidget() {
               <Text style={styles.bugBadgeText}>{bugUnseen > 9 ? "9+" : bugUnseen}</Text>
             </View>
           )}
-        </Pressable>
+        </View>
       </Animated.View>
       <FabDrawer visible={drawerOpen} onClose={() => setDrawerOpen(false)} />
     </>

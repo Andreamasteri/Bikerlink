@@ -50,9 +50,9 @@ export default function UptimeWidget() {
 
   const panResponder = useRef(
     PanResponder.create({
-      onStartShouldSetPanResponder: () => false,
-      onMoveShouldSetPanResponder: (_, gs) =>
-        Math.abs(gs.dx) > 5 || Math.abs(gs.dy) > 5,
+      // Task #4080: true per catturare subito il gesto e trascinare fluido al primo tocco.
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
       onPanResponderGrant: () => {
         startPosRef.current = { ...posRef.current };
       },
