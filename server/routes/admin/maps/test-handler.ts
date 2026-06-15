@@ -185,7 +185,8 @@ async function handleTestRouting(_req: Request, res: Response): Promise<Response
     const result = await getActiveRouter(
       routeReq,
       { rollout, engine, isMapTester: true },
-      res
+      res,
+      true, // coordinate dirette — nessun geocoding testuale upstream
     );
 
     const latency_ms = Date.now() - start;

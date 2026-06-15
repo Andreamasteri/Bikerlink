@@ -126,8 +126,8 @@ function isTransientValhallaError(err: unknown): boolean {
   if (name === "AbortError") return true;
   if (err instanceof TypeError) return true;
   if (msg.includes("VALHALLA_URL non configurato")) return true;
-  if (/Valhalla \/route error 5\d{2}/.test(msg)) return true;
-  if (/Valhalla \/trace_attributes error 5\d{2}/.test(msg)) return true;
+  if (/Valhalla \/route error [45]\d{2}/.test(msg)) return true;
+  if (/Valhalla \/trace_attributes error [45]\d{2}/.test(msg)) return true;
   if (msg.startsWith("Valhalla: ")) return true;
   return false;
 }
@@ -269,15 +269,16 @@ async function routeViaTomTomWithFallback(
 export async function getActiveRouter(
   req: RouteRequest,
   opts: RouterSelectorOptions,
-  res?: Response
+  res?: Response,
+  geocodingOk?: boolean,
 ): Promise<RouteResult> {
   const started = Date.now();
   try {
     const result = await getActiveRouterInner(req, opts, res);
-    recordPipelineOutcome(req, opts, res, Date.now() - started, null);
+    recordPipelineOutcome(req, opts, res, Date.now() - started, null, geocodingOk ?? true);
     return result;
   } catch (err) {
-    recordPipelineOutcome(req, opts, res, Date.now() - started, err);
+    recordPipelineOutcome(req, opts, res, Date.now() - started, err, geocodingOk ?? true);
     throw err;
   }
 }
@@ -289,6 +290,7 @@ function recordPipelineOutcome(
   res: Response | undefined,
   latencyMs: number,
   err: unknown,
+  geocodingOk: boolean,
 ): void {
   if (err instanceof RoutingDisabledError) return;
 
@@ -336,7 +338,7 @@ function recordPipelineOutcome(
     engineUsed,
     fallbackReason,
     latencyMs,
-    geocodingOk: true,
+    geocodingOk,
     outcome,
     error,
   });
@@ -499,6 +501,7 @@ export async function aiOverride(
 }
 
 export async function resolveActiveEngine(opts: RouterSelectorOptions): Promise<RoutingEngineId> {
+  if (opts.aiMode) return "ai";
   if (!isNewEngineEnabled(opts)) return "graphhopper";
   return opts.engine;
 }

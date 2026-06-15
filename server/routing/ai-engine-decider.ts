@@ -2,7 +2,7 @@
  * Task #3191 — AI Routing Engine Selector.
  *
  * Quando l'admin imposta `maps_routing_engine = "ai"`, per ogni richiesta di
- * routing un modello cloud (chain Groq→Gemini→OpenAI→Anthropic, role "router")
+ * routing un modello cloud (chain Groq→Gemini→OpenAI, role "router")
  * sceglie l'engine self-hosted ottimale. La chiamata NON deve mai bloccare oltre
  * il timeout (default 800ms): oltre quel tempo si aborta e si ricade sul
  * selettore normale (vedi router-selector.ts).

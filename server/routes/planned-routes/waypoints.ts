@@ -429,7 +429,8 @@ router.post("/calculate", async (req: Request, res: Response) => {
       if (geo.distanceInfluence !== undefined) customModel.distance_influence = geo.distanceInfluence;
       if (areas) customModel.areas = areas;
       if (Object.keys(customModel).length > 0) reqBody.custom_model = customModel;
-      return getActiveRouter(reqBody as unknown as RouteRequest, routerOpts, res);
+      // geocodingOk=true: i waypoint sono già coordinate lat/lng (nessun geocoding testuale upstream)
+      return getActiveRouter(reqBody as unknown as RouteRequest, routerOpts, res, true);
     };
 
     // Percorso geometrico di base: è il risultato per il profilo "geometric" e

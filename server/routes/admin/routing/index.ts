@@ -202,6 +202,7 @@ router.post("/test", async (req: Request, res: Response) => {
       routeReq,
       { rollout: "all", engine, isMapTester: true },
       res,
+      true, // coordinate hardcoded (MIRA, BELLUNO) — nessun geocoding
     );
     const latencyMs = Date.now() - start;
     const path = result.paths[0];

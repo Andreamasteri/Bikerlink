@@ -30,7 +30,7 @@ export const ROUTING_FUNCTIONS: RoutingFunctionDef[] = [
     id: "routing",
     label: "Calcolo percorso",
     description: "Calcolo del percorso tra waypoint (route planning, percorsi curvy).",
-    supportedEngines: ["graphhopper", "valhalla", "tomtom", "mapbox-directions"],
+    supportedEngines: ["graphhopper", "valhalla", "tomtom"],
     defaultEngine: "graphhopper",
   },
   {
