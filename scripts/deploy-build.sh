@@ -112,6 +112,36 @@ else
   exit 1
 fi
 
+log "=== [1d/3] Gate Dedup Pattern (DELETE…NOT IN → ROW_NUMBER CTE) ==="
+# Verifica che nessuna migration SQL usi il pattern NULL-unsafe
+# `DELETE FROM <t> WHERE id NOT IN (SELECT id FROM <t>)` per deduplicare
+# righe prima di aggiungere un vincolo UNIQUE.
+#
+# Perché è pericoloso:
+#   - Se la subquery ritorna anche un solo NULL, l'intera NOT IN restituisce
+#     UNKNOWN → nessuna riga viene cancellata (silenziosamente sbagliato).
+#   - Su tabelle grandi la NOT IN non può usare un indice → timeout.
+#
+# Pattern corretto: CTE con ROW_NUMBER() (vedi 0105_crash_logs_unique_session.sql)
+#   WITH dupes AS (SELECT id, ROW_NUMBER() OVER (PARTITION BY … ORDER BY …) AS rn FROM t)
+#   DELETE FROM t WHERE id IN (SELECT id FROM dupes WHERE rn > 1);
+#
+# Exit code:
+#   0 → nessun pattern insicuro → OK
+#   1 → trovato pattern insicuro → GATE DURO
+DEDUP_EXIT=0
+npx tsx scripts/check-migration-unsafe-dedup.ts 2>&1 || DEDUP_EXIT=$?
+if [ "$DEDUP_EXIT" -eq 0 ]; then
+  log "  ✅ Dedup Pattern OK — nessun DELETE…NOT IN self-referenziale nelle migration SQL."
+else
+  log "  ❌ DEPLOY BLOCCATO — Migration usa DELETE…NOT IN (NULL-unsafe) per deduplicare."
+  log "     Azione richiesta:"
+  log "       1. Eseguire: npx tsx scripts/check-migration-unsafe-dedup.ts"
+  log "       2. Sostituire il pattern con la CTE ROW_NUMBER()."
+  log "       3. Riferimento: migrations/0105_crash_logs_unique_session.sql"
+  exit 1
+fi
+
 log "=== [2/3] Build server TypeScript ==="
 node scripts/server-build.js
 log "  server_dist/ prodotto → $(size server_dist) ($(size server_dist/index.js 2>/dev/null) il bundle)"
