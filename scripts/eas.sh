@@ -118,7 +118,7 @@ if [[ "$FIRST_ARG" == "build" ]]; then
 fi
 
 if [[ "$_USE_NPX" == "true" ]]; then
-  exec "$EAS_BIN" "eas-cli@^20.1.0" "$@"
+  exec "$EAS_BIN" --yes "eas-cli@^20.1.0" "$@"
 else
   exec "$EAS_BIN" "$@"
 fi

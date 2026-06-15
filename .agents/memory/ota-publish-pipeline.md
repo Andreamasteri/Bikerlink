@@ -19,6 +19,21 @@ scrivi SEMPRE il `.ota-message` corretto per il task in corso. La versione OTA �
 Ogni release nasce `status='pending'` e richiede approvazione admin da /admin/ota
 (gli admin la ricevono al cold start per testarla; gli utenti normali solo dopo l'approvazione).
 
+## npx eas-cli hang — aggiungere sempre --yes
+
+Quando `eas-cli` **non è in `node_modules/.bin`**, `npx eas-cli@^20.1.0` chiede
+interattivamente `Ok to proceed? (y)` prima di installarlo. Nessuno risponde →
+il workflow OTA Publish resta bloccato silenziosamente per 30+ minuti.
+
+**Fix permanente** (`scripts/eas.sh`): usa `exec npx --yes eas-cli@^20.1.0 ...`
+così npx auto-conferma l'installazione senza input utente.
+
+**Come applicarlo:** verificare che `--yes` sia sempre presente nella chiamata
+npx in `scripts/eas.sh`; se per qualunque motivo viene rimosso, il workflow
+pendente richiede kill + restart manuale.
+
+---
+
 ## Accoppiamento client OTA ↔ deploy server Express
 
 L'OTA consegna **solo il bundle JS** del client. Il server Express si deploya
