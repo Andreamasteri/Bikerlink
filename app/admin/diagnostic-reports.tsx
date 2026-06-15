@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
   ActivityIndicator, RefreshControl,
@@ -8,7 +8,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useColors } from "@/hooks/useColors";
-import { apiRequest, getApiUrl, authFetchHeaders, getSessionToken, queryClient } from "@/lib/query-client";
+import { apiRequest, getApiUrl, getSessionToken, queryClient } from "@/lib/query-client";
 import type { DiagnosticSummary, DiagnosticTestResult } from "@/lib/diagnostic/runner";
 
 interface OnlineUser { userId: string; role: string }

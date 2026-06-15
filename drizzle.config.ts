@@ -54,5 +54,14 @@ export default defineConfig({
     // generare con vector_cosine_ops → escludiamo dal diff publish per prevenire
     // un DROP spurio sull'indice HNSW.
     "!embeddings",
+    //
+    // NOTA: diagnostic_reports e diagnostic_queue (migration 0106) NON sono in
+    // questa lista perché il deploy pipeline le crea automaticamente prima che
+    // il diff venga calcolato: server/boot-sequence.ts Phase 2 chiama
+    // runMigrations() (server/migrate.ts) che applica tutti i file .sql pending,
+    // incluso 0106_diagnostic_tables.sql con CREATE TABLE IF NOT EXISTS.
+    // I loro indici sono standard (nessun GIN/expression/HNSW) → Drizzle li
+    // confronta correttamente senza generare DROP/CREATE spuri.
+    // Non aggiungere qui salvo regressioni nel pipeline di migrazione.
   ],
 });
