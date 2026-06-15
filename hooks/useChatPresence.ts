@@ -2,13 +2,21 @@ import { useEffect, useState, useContext } from "react";
 import { ChatSseContext, type PresenceSseEvent } from "@/lib/chat-sse-provider";
 import { getApiUrl, authFetchHeaders } from "@/lib/query-client";
 
-export function useChatPresence(conversationId: string | undefined, enabled: boolean): Set<string> {
-  const [onlineIds, setOnlineIds] = useState<Set<string>>(new Set());
+interface PresenceState {
+  onlineIds: Set<string>;
+  lastSeenAt: Record<string, string | null>;
+}
+
+export function useChatPresence(
+  conversationId: string | undefined,
+  enabled: boolean
+): PresenceState {
+  const [state, setState] = useState<PresenceState>({ onlineIds: new Set(), lastSeenAt: {} });
   const ctx = useContext(ChatSseContext);
 
   useEffect(() => {
     if (!conversationId || !enabled) {
-      setOnlineIds(new Set());
+      setState({ onlineIds: new Set(), lastSeenAt: {} });
       return;
     }
 
@@ -22,8 +30,13 @@ export function useChatPresence(conversationId: string | undefined, enabled: boo
           headers: authFetchHeaders({}),
         });
         if (!res.ok || cancelled) return;
-        const data: { onlineUserIds: string[] } = await res.json();
-        if (!cancelled) setOnlineIds(new Set(data.onlineUserIds));
+        const data: { onlineUserIds: string[]; participantLastSeenAt?: Record<string, string | null> } = await res.json();
+        if (!cancelled) {
+          setState({
+            onlineIds: new Set(data.onlineUserIds),
+            lastSeenAt: data.participantLastSeenAt ?? {},
+          });
+        }
       } catch {
         // no-op: best-effort presence fetch
       }
@@ -38,9 +51,12 @@ export function useChatPresence(conversationId: string | undefined, enabled: boo
 
     return ctx.subscribePresence((evt: PresenceSseEvent) => {
       if (evt.conversationId !== conversationId) return;
-      setOnlineIds(new Set(evt.onlineUserIds));
+      setState((prev) => ({
+        onlineIds: new Set(evt.onlineUserIds),
+        lastSeenAt: prev.lastSeenAt,
+      }));
     });
   }, [conversationId, enabled, ctx]);
 
-  return onlineIds;
+  return state;
 }

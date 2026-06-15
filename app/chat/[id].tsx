@@ -68,7 +68,7 @@ export default function ChatConversationScreen() {
   const conversation = conversationDetail ?? conversations?.find((c) => c.id === id);
   const isMotoclub = conversation?.conversationType === "motoclub";
 
-  const onlineUserIds = useChatPresence(id, isMotoclub);
+  const { onlineIds: onlineUserIds, lastSeenAt: presenceLastSeenAt } = useChatPresence(id, !!id);
 
   const { data: myClubs } = useQuery<MotoClub[]>({
     queryKey: ["/api/motoclubs/me/clubs"],
@@ -339,6 +339,8 @@ export default function ChatConversationScreen() {
         isMotoclub={isMotoclub}
         participantCount={conversation?.participants.length}
         onlineCount={isMotoclub ? onlineUserIds.size : undefined}
+        isOtherOnline={isPrivateChat && otherParticipant ? onlineUserIds.has(otherParticipant.id) : undefined}
+        otherParticipantLastSeen={isPrivateChat && otherParticipant ? (presenceLastSeenAt[otherParticipant.id] ?? null) : undefined}
         isPrivateChat={isPrivateChat}
         otherParticipantId={otherParticipant?.id}
         onShowMembers={() => setShowMembersPanel(true)}

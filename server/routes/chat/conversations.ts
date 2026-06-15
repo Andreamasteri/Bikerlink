@@ -407,7 +407,20 @@ router.get("/:id/presence", async (req: Request, res: Response) => {
     const participantUserIds = participants.map((p) => p.userId);
     const onlineUserIds = filterConnectedUserIds(participantUserIds);
 
-    return res.json({ onlineUserIds });
+    const otherParticipantIds = participantUserIds.filter((uid) => uid !== userId);
+    const lastSeenRows = otherParticipantIds.length > 0
+      ? await db
+          .select({ id: users.id, lastLoginAt: users.lastLoginAt })
+          .from(users)
+          .where(inArray(users.id, otherParticipantIds))
+      : [];
+
+    const participantLastSeenAt: Record<string, string | null> = {};
+    for (const row of lastSeenRows) {
+      participantLastSeenAt[row.id] = row.lastLoginAt ? row.lastLoginAt.toISOString() : null;
+    }
+
+    return res.json({ onlineUserIds, participantLastSeenAt });
   } catch (error) {
     console.error("Get conversation presence error:", error);
     return sendError(res, 500, "Errore interno del server");

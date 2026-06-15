@@ -10,6 +10,8 @@ interface ChatHeaderProps {
   isMotoclub: boolean;
   participantCount?: number;
   onlineCount?: number;
+  isOtherOnline?: boolean;
+  otherParticipantLastSeen?: string | null;
   isPrivateChat: boolean;
   otherParticipantId?: string;
   onShowMembers?: () => void;
@@ -18,11 +20,24 @@ interface ChatHeaderProps {
   showHashtagPanel?: boolean;
 }
 
+function formatLastSeen(isoString: string): string {
+  const diff = Math.floor((Date.now() - new Date(isoString).getTime()) / 60000);
+  if (diff < 2) return "visto poco fa";
+  if (diff < 60) return `visto ${diff} min fa`;
+  const hours = Math.floor(diff / 60);
+  if (hours < 24) return `visto ${hours}h fa`;
+  const days = Math.floor(hours / 24);
+  if (days === 1) return "visto ieri";
+  return `visto ${days} giorni fa`;
+}
+
 export function ChatHeader({
   title,
   isMotoclub,
   participantCount,
   onlineCount,
+  isOtherOnline,
+  otherParticipantLastSeen,
   isPrivateChat,
   otherParticipantId,
   onShowMembers,
@@ -34,12 +49,22 @@ export function ChatHeader({
   const insets = useSafeAreaInsets();
 
   const buildSubtitle = (): string | null => {
-    if (!isMotoclub) return null;
-    const parts: string[] = [];
-    if (participantCount !== undefined) parts.push(`${participantCount} partecipanti`);
-    if (onlineCount !== undefined && onlineCount > 0) parts.push(`${onlineCount} online`);
-    return parts.length > 0 ? parts.join(" · ") : null;
+    if (isMotoclub) {
+      const parts: string[] = [];
+      if (participantCount !== undefined) parts.push(`${participantCount} partecipanti`);
+      if (onlineCount !== undefined && onlineCount > 0) parts.push(`${onlineCount} online`);
+      return parts.length > 0 ? parts.join(" · ") : null;
+    }
+    if (isOtherOnline !== undefined) {
+      if (isOtherOnline) return "online";
+      if (otherParticipantLastSeen) return formatLastSeen(otherParticipantLastSeen);
+    }
+    return null;
   };
+
+  const showDot = isMotoclub
+    ? (onlineCount !== undefined && onlineCount > 0)
+    : !!isOtherOnline;
 
   const subtitle = buildSubtitle();
 
@@ -52,7 +77,7 @@ export function ChatHeader({
         <Text style={styles.topBarTitle} numberOfLines={1}>{title}</Text>
         {subtitle !== null && (
           <View style={styles.subtitleRow}>
-            {onlineCount !== undefined && onlineCount > 0 && (
+            {showDot && (
               <View style={styles.onlineDot} />
             )}
             <Text style={styles.topBarSubtitle}>{subtitle}</Text>
