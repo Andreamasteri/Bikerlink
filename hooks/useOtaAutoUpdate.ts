@@ -3,7 +3,7 @@ import * as Updates from "expo-updates";
 import { Platform } from "react-native";
 import * as Device from "expo-device";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { getApiUrl, authFetchHeaders } from "@/lib/query-client";
+import { getApiUrl, authFetchHeaders, getSessionToken } from "@/lib/query-client";
 
 const DEVICE_ID_KEY = "bikerlink:ota:device-id:v1";
 const DEVICE_ID_LEGACY_KEY = "@bikerlink/ota_device_id";
@@ -38,15 +38,23 @@ async function postOtaEvent(payload: {
   deviceModel?: string | null;
 }): Promise<void> {
   try {
+    // Auth via Bearer header (caso normale).
+    // Fallback: al cold start assoluto (primo avvio post-installazione) il Bearer può essere
+    // assente perché il login non è ancora avvenuto. In quel caso passiamo il sessionToken
+    // nel body così il server può ricavare userId dalla session table.
+    const headers = authFetchHeaders({ "Content-Type": "application/json" });
+    const hasBearer = "Authorization" in headers;
+    const sessionToken = !hasBearer ? (getSessionToken() ?? undefined) : undefined;
+
     await fetch(new URL("/api/ota/event", getApiUrl()).toString(), {
       method: "POST",
-      // Auth via Bearer (cookie persistence può fallire al cold start in produzione)
-      headers: authFetchHeaders({ "Content-Type": "application/json" }),
+      headers,
       credentials: "include",
       body: JSON.stringify({
         ...payload,
         platform: Platform.OS,
         appVersion: Updates.runtimeVersion ?? null,
+        ...(sessionToken !== undefined ? { sessionToken } : {}),
       }),
     });
   } catch (err) {

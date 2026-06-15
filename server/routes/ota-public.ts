@@ -3,12 +3,35 @@
 //        Admin riceve la pending più recente per testarla; gli utenti normali ricevono solo `approved`.
 // - POST /api/ota/event    : telemetria boot (downloaded | boot_success | boot_failure) per device.
 import { Router, type Request, type Response } from "express";
-import { db } from "../db";
+import { db, pool } from "../db";
 import { otaReleases, otaBootEvents, users } from "@shared/db";
 import { eq, desc, sql, and, or, inArray } from "drizzle-orm";
 import { sendError } from "../lib/api-response";
 
 const router = Router();
+
+/**
+ * Fallback: ricava userId da un sessionToken passato nel body dell'evento OTA.
+ * Usato quando l'Authorization header è assente (cold start pre-login).
+ * Il token è il valore raw del cookie connect.sid (formato express-session: s:<sid>.<hmac>).
+ */
+async function lookupUserIdBySessionToken(token: string): Promise<string | null> {
+  try {
+    const decoded = decodeURIComponent(token);
+    const withoutPrefix = decoded.startsWith("s:") ? decoded.slice(2) : decoded;
+    const lastDot = withoutPrefix.lastIndexOf(".");
+    const sid = lastDot >= 0 ? withoutPrefix.slice(0, lastDot) : withoutPrefix;
+    if (!sid) return null;
+    const result = await pool.query<{ sess: { userId?: string } }>(
+      "SELECT sess FROM session WHERE sid = $1 LIMIT 1",
+      [sid]
+    );
+    const sess = result.rows[0]?.sess;
+    return typeof sess?.userId === "string" ? sess.userId : null;
+  } catch {
+    return null;
+  }
+}
 
 async function getUserRole(userId: string | undefined): Promise<string | null> {
   if (!userId) return null;
@@ -85,14 +108,10 @@ router.get("/manifest", async (req: Request, res: Response) => {
 // POST /api/ota/event — telemetria boot per device. Idempotente: dedup per (release, device, event_type).
 // Richiede sessione autenticata: senza questo gating un attaccante potrebbe inflazionare i contatori
 // e triggerare false auto-rollback. La sessione è sempre presente in produzione (l'app fa login al boot).
+// Fallback: se l'header Authorization è assente (cold start assoluto pre-login), il client può
+// passare il sessionToken nel body — viene usato per ricavare userId dalla session table.
 router.post("/event", async (req: Request, res: Response) => {
   try {
-    const userId = req.session?.userId;
-    if (!userId) {
-      // Silenzioso: utenti non loggati o boot pre-login non contribuiscono alla telemetria.
-      return res.json({ ok: true, ignored: "no_session" });
-    }
-
     const body = req.body as {
       releaseId?: unknown;
       easUpdateId?: unknown;
@@ -101,7 +120,18 @@ router.post("/event", async (req: Request, res: Response) => {
       platform?: unknown;
       appVersion?: unknown;
       deviceModel?: unknown;
+      sessionToken?: unknown;
     };
+
+    // Lookup userId: Authorization header → body.sessionToken → no session
+    let userId = req.session?.userId;
+    if (!userId && typeof body.sessionToken === "string" && body.sessionToken.length > 0) {
+      userId = (await lookupUserIdBySessionToken(body.sessionToken)) ?? undefined;
+    }
+    if (!userId) {
+      // Silenzioso: utenti non loggati o boot pre-login non contribuiscono alla telemetria.
+      return res.json({ ok: true, ignored: "no_session" });
+    }
 
     const deviceId = typeof body.deviceId === "string" ? body.deviceId.slice(0, 80) : null;
     const eventType = typeof body.eventType === "string" ? body.eventType : null;
