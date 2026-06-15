@@ -63,6 +63,10 @@ Production assumptions for this scan:
 - Treat match-linked object identifiers as sensitive capability references; if a route leaks another user's object ID, every downstream mutation path must still verify ownership server-side.
 - Treat every `/api/admin/*` subrouter mount as suspect until it is explicitly wrapped in a server-side admin guard; being nested under the admin prefix alone is not an authorization control.
 - Treat moderation approval flags as enforcement controls across every list, detail, vote, and media path that references moderated content, not only on the final file-serving route.
+- Treat tokenized operator URLs and SSE endpoints as privileged bearer channels: query-string secrets are likely to leak via browser history, screenshots, shared links, and request logs, so they are not equivalent to a real admin session.
+- Treat proposal and match APIs as part of the same privacy boundary as discovery/profile routes: they must honor `hideFromMap`, offline coordinate fuzzing, and club-membership scoping before returning location or proposal details.
+- Treat the `/uploads` tree as deny-by-default for private user media: any new subpath is public unless explicitly wrapped in an auth check, and delete flows must remove the underlying object as well as the DB row.
+- Treat public map-tile helpers as abuse surfaces: unauthenticated proxying of key-backed providers or unauthenticated provider-status mutation can become quota exhaustion or global service degradation for all users.
 
 ## Threat Categories
 
