@@ -16,4 +16,4 @@ export const OTA_BUNDLED_COUNT = 0;
  * Valore null = nessun OTA applicato (installazione fresca o sistema OTA non attivo).
  * Aggiornare questo valore ad ogni OTA pubblicata (sempre +1 rispetto al precedente).
  */
-export const APPLIED_OTA_NUMBER: number | null = 106;
+export const APPLIED_OTA_NUMBER: number | null = 105;
