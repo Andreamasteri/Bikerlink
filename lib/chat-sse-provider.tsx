@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useRef } from "react";
+import React, { createContext, useContext, useEffect, useRef, useState } from "react";
 import { AppState, type AppStateStatus } from "react-native";
 import { getApiUrl, authFetchHeaders } from "@/lib/query-client";
 
@@ -13,12 +13,14 @@ type Listener = (e: ChatSseEvent) => void;
 
 export const ChatSseContext = createContext<{
   subscribe: (fn: Listener) => () => void;
+  isConnected: boolean;
 } | null>(null);
 
 export function ChatSseProvider({ children, enabled }: { children: React.ReactNode; enabled: boolean }) {
   const listenersRef = useRef<Set<Listener>>(new Set());
   const streamActiveRef = useRef<boolean>(false);
   const lastConnectAttemptRef = useRef<number>(0);
+  const [isConnected, setIsConnected] = useState(false);
 
   const subscribeRef = useRef((fn: Listener) => {
     listenersRef.current.add(fn);
@@ -26,7 +28,10 @@ export function ChatSseProvider({ children, enabled }: { children: React.ReactNo
   });
 
   useEffect(() => {
-    if (!enabled) return;
+    if (!enabled) {
+      setIsConnected(false);
+      return;
+    }
 
     let aborted = false;
     let abortController = new AbortController();
@@ -37,6 +42,7 @@ export function ChatSseProvider({ children, enabled }: { children: React.ReactNo
       lastConnectAttemptRef.current = Date.now();
       abortController = new AbortController();
       streamActiveRef.current = false;
+      setIsConnected(false);
       try {
         const url = new URL("/api/chat/stream", getApiUrl()).toString();
         const response = await fetch(url, {
@@ -51,6 +57,7 @@ export function ChatSseProvider({ children, enabled }: { children: React.ReactNo
         }
 
         streamActiveRef.current = true;
+        setIsConnected(true);
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
         let buffer = "";
@@ -86,6 +93,7 @@ export function ChatSseProvider({ children, enabled }: { children: React.ReactNo
         // no-op: SSE connection closed or failed, reconnect logic handles it
       }
       streamActiveRef.current = false;
+      setIsConnected(false);
       if (!aborted) reconnectTimer = setTimeout(connect, 4000);
     }
 
@@ -104,14 +112,20 @@ export function ChatSseProvider({ children, enabled }: { children: React.ReactNo
     return () => {
       aborted = true;
       streamActiveRef.current = false;
+      setIsConnected(false);
       if (reconnectTimer) clearTimeout(reconnectTimer);
       abortController.abort();
       appStateSub.remove();
     };
   }, [enabled]);
 
+  const contextValue = React.useMemo(
+    () => ({ subscribe: subscribeRef.current, isConnected }),
+    [isConnected]
+  );
+
   return (
-    <ChatSseContext.Provider value={{ subscribe: subscribeRef.current }}>
+    <ChatSseContext.Provider value={contextValue}>
       {children}
     </ChatSseContext.Provider>
   );

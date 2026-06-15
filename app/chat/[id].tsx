@@ -16,11 +16,10 @@ import { Ionicons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
 import { apiRequest, queryClient, getApiUrl, getQueryFnWithTimeout } from "@/lib/query-client";
 import { showImagePickerMenu, uriToBlob } from "@/lib/image-picker-utils";
-import { useChatSSE } from "@/hooks/useChatSSE";
+import { useChatSSE, useChatSseConnected } from "@/hooks/useChatSSE";
 import { useT } from "@/lib/language-context";
 import { useAuth } from "@/lib/auth-context";
 
-// Custom Components
 import { MessageBubble, ChatMessage } from "@/components/chat/MessageBubble";
 import { ChatHeader } from "@/components/chat/ChatHeader";
 import { ChatInput } from "@/components/chat/ChatInput";
@@ -87,11 +86,13 @@ export default function ChatConversationScreen() {
   const [showMembersPanel, setShowMembersPanel] = useState(false);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
 
-  const { data: conversations } = useQuery<ConversationDetail[]>({
+  const sseConnected = useChatSseConnected();
+
+  const { data: conversations, isLoading: isConvsLoading } = useQuery<ConversationDetail[]>({
     queryKey: ["/api/chat/conversations"],
   });
 
-  const { data: conversationDetail } = useQuery<ConversationDetail>({
+  const { data: conversationDetail, isLoading: isConvDetailLoading } = useQuery<ConversationDetail>({
     queryKey: ["/api/chat/conversations", id],
     queryFn: getQueryFnWithTimeout(15000),
     staleTime: 60000,
@@ -149,8 +150,8 @@ export default function ChatConversationScreen() {
   const { data: messages, isLoading, isError: isMessagesError, refetch: refetchMessages } = useQuery<ChatMessage[]>({
     queryKey: ["/api/chat/conversations", id, "messages"],
     queryFn: getQueryFnWithTimeout(15000),
-    refetchInterval: 60000,
-    staleTime: 60000,
+    refetchInterval: 10000,
+    staleTime: 10000,
     retry: false,
     enabled: !!id,
   });
@@ -401,6 +402,33 @@ export default function ChatConversationScreen() {
   }, [t]);
 
   const uploadPhoto = useCallback(async (uri: string) => {
+    const optimisticId = `optimistic-photo-${Date.now()}`;
+    const optimisticMsg: ChatMessage = {
+      id: optimisticId,
+      conversationId: id,
+      senderId: userId,
+      messageType: "image",
+      content: null,
+      imageUrl: uri,
+      latitude: null,
+      longitude: null,
+      isFiltered: false,
+      createdAt: new Date().toISOString(),
+      sender: user
+        ? {
+            id: user.id,
+            nickname: user.nickname ?? "",
+            avatarUrl: user.avatarUrl ?? null,
+            userType: user.userType ?? "biker",
+            sex: user.sex ?? null,
+          }
+        : null,
+    };
+    queryClient.setQueryData<ChatMessage[]>(
+      ["/api/chat/conversations", id, "messages"],
+      (old) => (old ? [optimisticMsg, ...old] : [optimisticMsg])
+    );
+
     setIsUploadingImage(true);
     try {
       const formData = new FormData();
@@ -422,13 +450,25 @@ export default function ChatConversationScreen() {
         throw new Error((err as Error).message ?? t("chat.uploadPhotoError"));
       }
 
-      await queryClient.invalidateQueries({ queryKey: ["/api/chat/conversations", id, "messages"] });
+      const newMessage: ChatMessage = await resp.json();
+      queryClient.setQueryData<ChatMessage[]>(
+        ["/api/chat/conversations", id, "messages"],
+        (old) => {
+          if (!old) return [newMessage];
+          return old.map((m) => (m.id === optimisticId ? newMessage : m));
+        }
+      );
+      queryClient.invalidateQueries({ queryKey: ["/api/chat/conversations"] });
     } catch (err: unknown) {
+      queryClient.setQueryData<ChatMessage[]>(
+        ["/api/chat/conversations", id, "messages"],
+        (old) => (old ? old.filter((m) => m.id !== optimisticId) : old)
+      );
       Alert.alert("Errore", (err instanceof Error ? err.message : null) ?? "Impossibile inviare la foto.");
     } finally {
       setIsUploadingImage(false);
     }
-  }, [id, t]);
+  }, [id, userId, user, t]);
 
   const handleSendPhoto = useCallback(() => {
     showImagePickerMenu((uri) => {
@@ -464,6 +504,21 @@ export default function ChatConversationScreen() {
     [userId, handleDeleteMessage]
   );
 
+  const isConvResolved = !isConvDetailLoading && !isConvsLoading;
+
+  if (isConvResolved && !conversation) {
+    return (
+      <View style={styles.notFoundContainer}>
+        <Ionicons name="chatbubble-ellipses-outline" size={48} color={Colors.textSecondary} />
+        <Text style={styles.notFoundTitle}>Conversazione non disponibile</Text>
+        <Text style={styles.notFoundSubtitle}>Non è stato possibile trovare questa conversazione.</Text>
+        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+          <Text style={styles.backButtonText}>Torna indietro</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
   return (
     <KeyboardAvoidingView
       style={styles.container}
@@ -481,6 +536,13 @@ export default function ChatConversationScreen() {
         onDeleteConversation={handleDeleteConversation}
         showHashtagPanel={showHashtagPanel}
       />
+
+      {!sseConnected && (
+        <View style={styles.sseBanner}>
+          <Ionicons name="cloud-offline-outline" size={14} color="#ffbb55" />
+          <Text style={styles.sseBannerText}>Connessione persa — riconnessione in corso…</Text>
+        </View>
+      )}
 
       {isMotoclub && showHashtagPanel && (
         <HashtagPanel
@@ -548,4 +610,3 @@ export default function ChatConversationScreen() {
     </KeyboardAvoidingView>
   );
 }
-

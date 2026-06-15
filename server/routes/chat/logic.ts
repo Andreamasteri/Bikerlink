@@ -1,7 +1,7 @@
 import { storage } from "../../storage";
 import { db } from "../../db";
-import { motoClubs, motoClubMembers, users } from "@shared/db";
-import { eq, and, ne } from "drizzle-orm";
+import { motoClubs, motoClubMembers, users, messages as messagesTable } from "@shared/db";
+import { eq, and, ne, count } from "drizzle-orm";
 import { invalidateConvCache, escapeHtml } from "./utils";
 import { notifyChatEvent } from "../../chat-sse";
 import { sendChatPushNotifications, sendMotoclubPushNotifications } from "../../push-notifications";
@@ -337,8 +337,17 @@ export function getFakeBotReply(content: string, conversationId: string, ctx: Fa
 
 export async function handleNotifications(conversationId: string, senderId: string, message: { messageType: string; content?: string }, participants: Array<{ userId: string }>) {
   const { messageType, content: finalContent } = message;
-  const conversation = await storage.getConversation(conversationId);
-  const senderUser = await storage.getUser(senderId);
+
+  const nonSenderIds = participants.filter((p) => p.userId !== senderId).map((p) => p.userId);
+  if (nonSenderIds.length === 0) return;
+
+  const [conversation, senderUser, targetUsers] = await Promise.all([
+    storage.getConversation(conversationId),
+    storage.getUser(senderId),
+    storage.getUsersByIds(nonSenderIds),
+  ]);
+
+  const userMap = new Map(targetUsers.filter(Boolean).map((u) => [u!.id, u!]));
 
   let motoclubMeta: { id: string; name: string } | null = null;
   if (conversation?.conversationType === "motoclub") {
@@ -350,13 +359,17 @@ export async function handleNotifications(conversationId: string, senderId: stri
     motoclubMeta = clubRow[0] || null;
   }
 
+  const profileResults = await Promise.all(
+    nonSenderIds.map((uid) => storage.getUserProfile(uid))
+  );
+  const profileMap = new Map(nonSenderIds.map((uid, i) => [uid, profileResults[i]]));
+
   for (const p of participants) {
     if (p.userId === senderId) continue;
-    
-    const targetUser = await storage.getUser(p.userId);
+
+    const targetUser = userMap.get(p.userId);
     if (!targetUser) continue;
 
-    // PUSH
     if (targetUser.expoPushToken) {
       let pushPreview: string;
       if (messageType === "image") pushPreview = "📸 Foto";
@@ -380,8 +393,7 @@ export async function handleNotifications(conversationId: string, senderId: stri
       }
     }
 
-    // EMAIL
-    const targetProfile = await storage.getUserProfile(p.userId);
+    const targetProfile = profileMap.get(p.userId);
     const emailPref = !!targetProfile?.emailChatNotifications;
     const hasEmail = !!targetUser.email;
     const isOnline = onlineTracker.isOnline(p.userId);
@@ -429,76 +441,91 @@ export async function handleNotifications(conversationId: string, senderId: stri
 }
 
 export async function handleFakeReplies(conversationId: string, senderId: string, finalContent: string, participants: Array<{ userId: string }>) {
-  const conversation = await storage.getConversation(conversationId);
-  if (conversation?.conversationType === "motoclub") {
-    const chatbotSetting = await storage.getAppSetting("chatbot_enabled");
-    if (chatbotSetting?.value !== "false") {
-      const clubRow = await db
-        .select({ id: motoClubs.id })
-        .from(motoClubs)
-        .where(eq(motoClubs.conversationId, conversationId))
-        .limit(1);
+  const [conversation, chatbotSetting] = await Promise.all([
+    storage.getConversation(conversationId),
+    storage.getAppSetting("chatbot_enabled"),
+  ]);
 
-      if (clubRow[0]) {
-        const fakeMembers = await db
-          .select({ userId: motoClubMembers.userId })
-          .from(motoClubMembers)
-          .innerJoin(users, eq(motoClubMembers.userId, users.id))
-          .where(and(
-            eq(motoClubMembers.clubId, clubRow[0].id),
-            eq(motoClubMembers.status, "active"),
-            eq(users.isFake, true),
-            ne(motoClubMembers.userId, senderId),
-          ));
+  if (conversation?.conversationType !== "motoclub") return;
+  if (chatbotSetting?.value === "false") return;
 
-        if (fakeMembers.length > 0) {
-          const randomFake = fakeMembers[Math.floor(Math.random() * fakeMembers.length)];
-          const fakeUserId = randomFake.userId;
-          storage.recordFakeUserInteraction(fakeUserId, senderId, "chat_message").catch(() => {});
-          const fakeUser = await storage.getUser(fakeUserId);
-          const fakeProfile = await storage.getUserProfile(fakeUserId);
-          const fakeMotoList = await storage.getUserMotorcycles(fakeUserId);
-          const firstMoto = fakeMotoList[0];
-          const senderUserForCtx = await storage.getUser(senderId);
-          const fakeCtx: FakeUserContext = {
-            nickname: fakeUser?.nickname || "Rider",
-            region: fakeUser?.region || undefined,
-            bio: fakeProfile?.bio || undefined,
-            brand: firstMoto?.brand || undefined,
-            model: firstMoto?.model || undefined,
-            userType: fakeUser?.userType || undefined,
-            sex: fakeUser?.sex || undefined,
-            senderUserType: senderUserForCtx?.userType || undefined,
-            senderSex: senderUserForCtx?.sex || undefined,
-            senderNickname: senderUserForCtx?.nickname || undefined,
-          };
-          const contentLen = finalContent?.length || 0;
-          const delay = contentLen > 50 ? 2500 + Math.random() * 2000 : 1500 + Math.random() * 2000;
-          setTimeout(async () => {
-            try {
-              const replyText = getFakeBotReply(finalContent || "", conversationId, fakeCtx);
-              const fakeMsg = await storage.createMessage({
-                conversationId: conversationId,
-                senderId: fakeUserId,
-                messageType: "text",
-                content: replyText,
-                imageUrl: null,
-                latitude: null,
-                longitude: null,
-                isFiltered: false,
-              });
-              await storage.updateConversationTimestamp(conversationId);
-              participants.forEach(p => invalidateConvCache(p.userId));
-              notifyChatEvent(
-                participants.map(p => p.userId),
-                { type: "new_message", conversationId: conversationId, message: { ...fakeMsg, sender: { id: fakeUserId, nickname: fakeUser?.nickname, avatarUrl: fakeUser?.avatarUrl, userType: fakeUser?.userType } } }
-              );
-            } catch (err) {
-              console.error("Motoclub fake reply error:", err);
-            }
-          }, delay);
-        }
-      }
-    }
+  const clubRow = await db
+    .select({ id: motoClubs.id })
+    .from(motoClubs)
+    .where(eq(motoClubs.conversationId, conversationId))
+    .limit(1);
+
+  if (!clubRow[0]) return;
+
+  const fakeMembers = await db
+    .select({ userId: motoClubMembers.userId })
+    .from(motoClubMembers)
+    .innerJoin(users, eq(motoClubMembers.userId, users.id))
+    .where(and(
+      eq(motoClubMembers.clubId, clubRow[0].id),
+      eq(motoClubMembers.status, "active"),
+      eq(users.isFake, true),
+      ne(motoClubMembers.userId, senderId),
+    ));
+
+  if (fakeMembers.length === 0) return;
+
+  const randomFake = fakeMembers[Math.floor(Math.random() * fakeMembers.length)];
+  const fakeUserId = randomFake.userId;
+
+  if (!fakeBotMessageCounts.has(conversationId)) {
+    const [countRow] = await db
+      .select({ cnt: count() })
+      .from(messagesTable)
+      .where(eq(messagesTable.conversationId, conversationId));
+    fakeBotMessageCounts.set(conversationId, countRow?.cnt ?? 0);
   }
+
+  storage.recordFakeUserInteraction(fakeUserId, senderId, "chat_message").catch(() => {});
+
+  const [fakeUser, fakeProfile, fakeMotoList, senderUserForCtx] = await Promise.all([
+    storage.getUser(fakeUserId),
+    storage.getUserProfile(fakeUserId),
+    storage.getUserMotorcycles(fakeUserId),
+    storage.getUser(senderId),
+  ]);
+
+  const firstMoto = fakeMotoList[0];
+  const fakeCtx: FakeUserContext = {
+    nickname: fakeUser?.nickname || "Rider",
+    region: fakeUser?.region || undefined,
+    bio: fakeProfile?.bio || undefined,
+    brand: firstMoto?.brand || undefined,
+    model: firstMoto?.model || undefined,
+    userType: fakeUser?.userType || undefined,
+    sex: fakeUser?.sex || undefined,
+    senderUserType: senderUserForCtx?.userType || undefined,
+    senderSex: senderUserForCtx?.sex || undefined,
+    senderNickname: senderUserForCtx?.nickname || undefined,
+  };
+  const contentLen = finalContent?.length || 0;
+  const delay = contentLen > 50 ? 2500 + Math.random() * 2000 : 1500 + Math.random() * 2000;
+  setTimeout(async () => {
+    try {
+      const replyText = getFakeBotReply(finalContent || "", conversationId, fakeCtx);
+      const fakeMsg = await storage.createMessage({
+        conversationId: conversationId,
+        senderId: fakeUserId,
+        messageType: "text",
+        content: replyText,
+        imageUrl: null,
+        latitude: null,
+        longitude: null,
+        isFiltered: false,
+      });
+      await storage.updateConversationTimestamp(conversationId);
+      participants.forEach(p => invalidateConvCache(p.userId));
+      notifyChatEvent(
+        participants.map(p => p.userId),
+        { type: "new_message", conversationId: conversationId, message: { ...fakeMsg, sender: { id: fakeUserId, nickname: fakeUser?.nickname, avatarUrl: fakeUser?.avatarUrl, userType: fakeUser?.userType } } }
+      );
+    } catch (err) {
+      console.error("Motoclub fake reply error:", err);
+    }
+  }, delay);
 }

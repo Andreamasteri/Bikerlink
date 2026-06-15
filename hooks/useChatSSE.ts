@@ -13,3 +13,8 @@ export function useChatSSE(onEvent: (event: ChatSseEvent) => void): void {
     return ctx.subscribe((e) => onEventRef.current(e));
   }, [ctx]);
 }
+
+export function useChatSseConnected(): boolean {
+  const ctx = useContext(ChatSseContext);
+  return ctx?.isConnected ?? false;
+}

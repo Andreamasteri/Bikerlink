@@ -9,9 +9,17 @@ import { requireAuth } from "./auth";
 
 const router = Router();
 
-const PHONE_REGEX = /(?:\+?\d[\d\s\-().]{6,}\d|\b\d{3}[\s\-.]?\d{3}[\s\-.]?\d{4}\b)/g;
+const PHONE_REGEX = /(?<![/\w])(\+?(?:\d[\s\-.]?){8,}\d)(?![/\d])/g;
+
+console.assert(!PHONE_REGEX.test("12/03/2024"), "PHONE_REGEX: date DD/MM/YYYY non deve fare match");
+PHONE_REGEX.lastIndex = 0;
+console.assert(!PHONE_REGEX.test("SKU-1234567"), "PHONE_REGEX: codice prodotto 7 cifre non deve fare match");
+PHONE_REGEX.lastIndex = 0;
+console.assert(PHONE_REGEX.test("+39 02 1234567"), "PHONE_REGEX: numero internazionale deve fare match");
+PHONE_REGEX.lastIndex = 0;
 
 async function filterPhoneNumbers(content: string, conversationId: string, senderId: string): Promise<{ filtered: string; wasFiltered: boolean }> {
+  PHONE_REGEX.lastIndex = 0;
   const matches = content.match(PHONE_REGEX);
   if (!matches || matches.length === 0) {
     return { filtered: content, wasFiltered: false };
@@ -24,6 +32,7 @@ async function filterPhoneNumbers(content: string, conversationId: string, sende
     return { filtered: content, wasFiltered: false };
   }
 
+  PHONE_REGEX.lastIndex = 0;
   const filtered = content.replace(PHONE_REGEX, "[numero bloccato]");
   return {
     filtered: filtered + "\n\n⚠ Per la tua sicurezza, puoi condividere il tuo numero di telefono solo una volta per conversazione.",
