@@ -9,8 +9,7 @@
       "channel": "production",
       "credentialsSource": "remote",
       "env": {
-        "NODE_OPTIONS": "--max_old_space_size=8192",
-        "ORG_GRADLE_PROJECT_bundleInDebug": "true"
+        "NODE_OPTIONS": "--max_old_space_size=8192"
       },
       "android": {
         "buildType": "apk",
@@ -23,9 +22,7 @@
       "channel": "production",
       "credentialsSource": "remote",
       "env": {
-        "NODE_OPTIONS": "--max_old_space_size=8192",
-        "ORG_GRADLE_PROJECT_bundleInDebug": "true",
-        "EX_DEV_CLIENT_NETWORK_INSPECTOR": "false"
+        "NODE_OPTIONS": "--max_old_space_size=8192"
       },
       "android": {
         "buildType": "apk",
