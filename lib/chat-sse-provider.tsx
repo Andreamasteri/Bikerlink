@@ -9,22 +9,36 @@ export interface ChatSseEvent {
   messageId?: string;
 }
 
-type Listener = (e: ChatSseEvent) => void;
+export interface PresenceSseEvent {
+  type: "presence";
+  conversationId: string;
+  onlineUserIds: string[];
+}
+
+type ChatListener = (e: ChatSseEvent) => void;
+type PresenceListener = (e: PresenceSseEvent) => void;
 
 export const ChatSseContext = createContext<{
-  subscribe: (fn: Listener) => () => void;
+  subscribe: (fn: ChatListener) => () => void;
+  subscribePresence: (fn: PresenceListener) => () => void;
   isConnected: boolean;
 } | null>(null);
 
 export function ChatSseProvider({ children, enabled }: { children: React.ReactNode; enabled: boolean }) {
-  const listenersRef = useRef<Set<Listener>>(new Set());
+  const listenersRef = useRef<Set<ChatListener>>(new Set());
+  const presenceListenersRef = useRef<Set<PresenceListener>>(new Set());
   const streamActiveRef = useRef<boolean>(false);
   const lastConnectAttemptRef = useRef<number>(0);
   const [isConnected, setIsConnected] = useState(false);
 
-  const subscribeRef = useRef((fn: Listener) => {
+  const subscribeRef = useRef((fn: ChatListener) => {
     listenersRef.current.add(fn);
     return () => { listenersRef.current.delete(fn); };
+  });
+
+  const subscribePresenceRef = useRef((fn: PresenceListener) => {
+    presenceListenersRef.current.add(fn);
+    return () => { presenceListenersRef.current.delete(fn); };
   });
 
   useEffect(() => {
@@ -86,6 +100,13 @@ export function ChatSseProvider({ children, enabled }: { children: React.ReactNo
               } catch {
                 // no-op: silent failure for invalid JSON in SSE data
               }
+            } else if (eventType === "presence" && data) {
+              try {
+                const evt: PresenceSseEvent = JSON.parse(data);
+                presenceListenersRef.current.forEach(fn => fn(evt));
+              } catch {
+                // no-op: silent failure for invalid JSON in SSE presence data
+              }
             }
           }
         }
@@ -120,7 +141,7 @@ export function ChatSseProvider({ children, enabled }: { children: React.ReactNo
   }, [enabled]);
 
   const contextValue = React.useMemo(
-    () => ({ subscribe: subscribeRef.current, isConnected }),
+    () => ({ subscribe: subscribeRef.current, subscribePresence: subscribePresenceRef.current, isConnected }),
     [isConnected]
   );
 

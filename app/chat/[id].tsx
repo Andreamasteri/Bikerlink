@@ -16,6 +16,7 @@ import { Ionicons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
 import { apiRequest, queryClient, getQueryFnWithTimeout } from "@/lib/query-client";
 import { useChatSSE, useChatSseConnected } from "@/hooks/useChatSSE";
+import { useChatPresence } from "@/hooks/useChatPresence";
 import { useT } from "@/lib/language-context";
 import { useAuth } from "@/lib/auth-context";
 
@@ -66,6 +67,8 @@ export default function ChatConversationScreen() {
 
   const conversation = conversationDetail ?? conversations?.find((c) => c.id === id);
   const isMotoclub = conversation?.conversationType === "motoclub";
+
+  const onlineUserIds = useChatPresence(id, isMotoclub);
 
   const { data: myClubs } = useQuery<MotoClub[]>({
     queryKey: ["/api/motoclubs/me/clubs"],
@@ -335,6 +338,7 @@ export default function ChatConversationScreen() {
         title={getTitle()}
         isMotoclub={isMotoclub}
         participantCount={conversation?.participants.length}
+        onlineCount={isMotoclub ? onlineUserIds.size : undefined}
         isPrivateChat={isPrivateChat}
         otherParticipantId={otherParticipant?.id}
         onShowMembers={() => setShowMembersPanel(true)}
@@ -410,6 +414,7 @@ export default function ChatConversationScreen() {
         visible={showMembersPanel}
         onClose={() => setShowMembersPanel(false)}
         members={conversation?.participants || []}
+        onlineUserIds={onlineUserIds}
       />
     </KeyboardAvoidingView>
   );

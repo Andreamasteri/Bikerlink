@@ -386,4 +386,32 @@ router.post("/:id/read", async (req: Request, res: Response) => {
   }
 });
 
+router.get("/:id/presence", async (req: Request, res: Response) => {
+  try {
+    const userId = requireAuth(req, res);
+    if (!userId) return;
+
+    const conversationId = req.params.id as string;
+
+    const participants = await db
+      .select({ userId: conversationParticipants.userId })
+      .from(conversationParticipants)
+      .where(eq(conversationParticipants.conversationId, conversationId));
+
+    const isMember = participants.some((p) => p.userId === userId);
+    if (!isMember) {
+      return sendError(res, 403, "Non sei partecipante di questa conversazione");
+    }
+
+    const { filterConnectedUserIds } = await import("../../chat-sse");
+    const participantUserIds = participants.map((p) => p.userId);
+    const onlineUserIds = filterConnectedUserIds(participantUserIds);
+
+    return res.json({ onlineUserIds });
+  } catch (error) {
+    console.error("Get conversation presence error:", error);
+    return sendError(res, 500, "Errore interno del server");
+  }
+});
+
 export default router;

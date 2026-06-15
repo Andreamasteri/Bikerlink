@@ -43,6 +43,14 @@ export function closeSseClient(userId: string): void {
   }
 }
 
+export function isUserConnected(userId: string): boolean {
+  return sseClients.has(userId);
+}
+
+export function filterConnectedUserIds(userIds: string[]): string[] {
+  return userIds.filter((uid) => sseClients.has(uid));
+}
+
 export interface ChatSseEvent {
   type: "new_message" | "conversation_update" | "message_deleted";
   conversationId: string;
@@ -50,8 +58,39 @@ export interface ChatSseEvent {
   messageId?: string;
 }
 
+export interface PresenceSseEvent {
+  type: "presence";
+  conversationId: string;
+  onlineUserIds: string[];
+}
+
 export function notifyChatEvent(participantIds: string[], event: ChatSseEvent): void {
   const payload = `event: chat\ndata: ${JSON.stringify(event)}\n\n`;
+  for (const uid of participantIds) {
+    const entries = sseClients.get(uid);
+    if (!entries) continue;
+    const failed: string[] = [];
+    for (const entry of entries) {
+      try {
+        entry.res.write(payload);
+      } catch {
+        failed.push(entry.connId);
+      }
+    }
+    if (failed.length > 0) {
+      const updated = entries.filter((e) => !failed.includes(e.connId));
+      if (updated.length === 0) {
+        sseClients.delete(uid);
+      } else {
+        sseClients.set(uid, updated);
+      }
+    }
+  }
+}
+
+export function notifyPresenceEvent(participantIds: string[], conversationId: string, onlineUserIds: string[]): void {
+  const event: PresenceSseEvent = { type: "presence", conversationId, onlineUserIds };
+  const payload = `event: presence\ndata: ${JSON.stringify(event)}\n\n`;
   for (const uid of participantIds) {
     const entries = sseClients.get(uid);
     if (!entries) continue;

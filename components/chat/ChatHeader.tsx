@@ -9,6 +9,7 @@ interface ChatHeaderProps {
   title: string;
   isMotoclub: boolean;
   participantCount?: number;
+  onlineCount?: number;
   isPrivateChat: boolean;
   otherParticipantId?: string;
   onShowMembers?: () => void;
@@ -21,6 +22,7 @@ export function ChatHeader({
   title,
   isMotoclub,
   participantCount,
+  onlineCount,
   isPrivateChat,
   otherParticipantId,
   onShowMembers,
@@ -31,6 +33,16 @@ export function ChatHeader({
   const router = useRouter();
   const insets = useSafeAreaInsets();
 
+  const buildSubtitle = (): string | null => {
+    if (!isMotoclub) return null;
+    const parts: string[] = [];
+    if (participantCount !== undefined) parts.push(`${participantCount} partecipanti`);
+    if (onlineCount !== undefined && onlineCount > 0) parts.push(`${onlineCount} online`);
+    return parts.length > 0 ? parts.join(" · ") : null;
+  };
+
+  const subtitle = buildSubtitle();
+
   return (
     <View style={[styles.topBar, { paddingTop: insets.top + 8 }]}>
       <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
@@ -38,10 +50,13 @@ export function ChatHeader({
       </TouchableOpacity>
       <View style={styles.topBarInfo}>
         <Text style={styles.topBarTitle} numberOfLines={1}>{title}</Text>
-        {isMotoclub && participantCount !== undefined && (
-          <Text style={styles.topBarSubtitle}>
-            {participantCount} partecipanti
-          </Text>
+        {subtitle !== null && (
+          <View style={styles.subtitleRow}>
+            {onlineCount !== undefined && onlineCount > 0 && (
+              <View style={styles.onlineDot} />
+            )}
+            <Text style={styles.topBarSubtitle}>{subtitle}</Text>
+          </View>
         )}
       </View>
       {isMotoclub && (
@@ -102,11 +117,22 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_700Bold",
     color: Colors.text,
   },
+  subtitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 1,
+    gap: 5,
+  },
+  onlineDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+    backgroundColor: Colors.success,
+  },
   topBarSubtitle: {
     fontSize: 12,
     fontFamily: "Inter_400Regular",
     color: Colors.textSecondary,
-    marginTop: 1,
   },
   infoButton: {
     padding: 8,
