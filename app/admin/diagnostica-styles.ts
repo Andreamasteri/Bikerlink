@@ -123,6 +123,19 @@ const s = StyleSheet.create({
   emptyState: { alignItems: "center", padding: 40, gap: 10 },
   emptyStateText: { fontSize: 16, fontWeight: "600", color: Colors.text },
   emptyStateSub: { fontSize: 13, color: Colors.textSecondary, textAlign: "center" },
+
+  deviceTabHeader: {
+    flexDirection: "row", justifyContent: "space-between", alignItems: "center",
+    marginBottom: 4,
+  },
+  deviceTabTitle: { fontSize: 13, fontWeight: "600", color: Colors.text },
+  exportButton: {
+    flexDirection: "row", alignItems: "center", gap: 5,
+    backgroundColor: Colors.accent, paddingHorizontal: 12, paddingVertical: 7,
+    borderRadius: 8,
+  },
+  exportButtonDisabled: { opacity: 0.6 },
+  exportButtonText: { color: "#fff", fontWeight: "600", fontSize: 13 },
 });
 
 export default s;

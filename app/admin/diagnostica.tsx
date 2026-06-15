@@ -1,11 +1,13 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   View, Text, ScrollView, TouchableOpacity, ActivityIndicator,
-  Platform, RefreshControl,
+  Platform, RefreshControl, Alert,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import * as FileSystem from "expo-file-system/legacy";
+import * as Sharing from "expo-sharing";
 import Colors from "@/constants/colors";
 import { getApiUrl, authFetchHeaders } from "@/lib/query-client";
 import s from "./diagnostica-styles";
@@ -363,6 +365,38 @@ function TabMonitor({ onActiveCount }: { onActiveCount: (n: number) => void }) {
   );
 }
 
+// ─────────────────────────────────── Export helper ───────────────────────────
+
+async function downloadDiagnosticsExport(): Promise<void> {
+  const url = new URL("/api/admin/diagnostics/export", getApiUrl()).toString();
+  const headers = await authFetchHeaders();
+
+  if (Platform.OS === "web") {
+    const res = await fetch(url, { headers, credentials: "include" });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const text = await res.text();
+    const isoDate = new Date().toISOString().slice(0, 19).replace(/:/g, "-");
+    const blob = new Blob([text], { type: "application/json" });
+    const objUrl = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = objUrl;
+    a.download = `bikerlink-diagnostics-${isoDate}.json`;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(objUrl); }, 1000);
+  } else {
+    const res = await fetch(url, { headers, credentials: "include" });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const text = await res.text();
+    const isoDate = new Date().toISOString().slice(0, 19).replace(/:/g, "-");
+    const filePath = `${FileSystem.cacheDirectory}bikerlink-diagnostics-${isoDate}.json`;
+    await FileSystem.writeAsStringAsync(filePath, text, { encoding: FileSystem.EncodingType.UTF8 });
+    const canShare = await Sharing.isAvailableAsync();
+    if (!canShare) throw new Error("Condivisione non disponibile su questo dispositivo");
+    await Sharing.shareAsync(filePath, { mimeType: "application/json", UTI: "public.json" });
+  }
+}
+
 // ─────────────────────────────────── Tab 3: Device ───────────────────────────
 
 function TabDevice() {
@@ -378,6 +412,18 @@ function TabDevice() {
   });
 
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
+
+  const handleExport = useCallback(async () => {
+    setExporting(true);
+    try {
+      await downloadDiagnosticsExport();
+    } catch (err) {
+      Alert.alert("Errore export", (err as Error).message ?? "Impossibile scaricare il report");
+    } finally {
+      setExporting(false);
+    }
+  }, []);
 
   if (isLoading) return (
     <View style={s.centered}><ActivityIndicator color={Colors.accent} /></View>
@@ -394,6 +440,24 @@ function TabDevice() {
 
   return (
     <ScrollView contentContainerStyle={s.tabContent}>
+      {/* Export button */}
+      <View style={s.deviceTabHeader}>
+        <Text style={s.deviceTabTitle}>Report device ({reports.length})</Text>
+        <TouchableOpacity
+          style={[s.exportButton, exporting && s.exportButtonDisabled]}
+          onPress={handleExport}
+          disabled={exporting}
+          activeOpacity={0.75}
+        >
+          {exporting
+            ? <ActivityIndicator color="#fff" size="small" />
+            : <Ionicons name="download-outline" size={16} color="#fff" />}
+          <Text style={s.exportButtonText}>
+            {exporting ? "Esportando…" : "Scarica report JSON"}
+          </Text>
+        </TouchableOpacity>
+      </View>
+
       {reports.length === 0 ? (
         <View style={s.emptyState}>
           <MaterialCommunityIcons name="devices" size={40} color={Colors.textSecondary} />
