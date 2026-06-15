@@ -8,7 +8,6 @@ import {
   timestamp,
   jsonb,
   index,
-  uniqueIndex,
   serial,
 } from "drizzle-orm/pg-core";
 import { z } from "zod";
@@ -156,7 +155,7 @@ export const appCrashLogs = pgTable("app_crash_logs", {
   index("app_crash_logs_user_id_idx").on(table.userId),
   index("app_crash_logs_crash_type_idx").on(table.crashType),
   index("app_crash_logs_reported_at_idx").on(table.reportedAt),
-  uniqueIndex("app_crash_logs_session_id_crash_type_key").on(table.sessionId, table.crashType),
+  index("app_crash_logs_session_id_crash_type_idx").on(table.sessionId, table.crashType),
 ]);
 
 export type Notification = typeof notifications.$inferSelect;
