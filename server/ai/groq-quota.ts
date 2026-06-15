@@ -20,7 +20,7 @@ import { sql } from "drizzle-orm";
 
 const TPD_KEY_PREFIX = "groq_tpd_";
 const SOFT_CAP_KEY = "groq_tpd_soft_cap";
-export const DEFAULT_SOFT_CAP = 160_000;
+export const DEFAULT_SOFT_CAP = 150_000;
 
 function todayUtc(): string {
   return new Date().toISOString().slice(0, 10);
@@ -153,4 +153,24 @@ export function getGroqTpdStatus(): { used: number; cap: number; pct: number; ex
 export async function setGroqTpdSoftCap(cap: number): Promise<void> {
   softCap = cap;
   await storage.upsertAppSetting(SOFT_CAP_KEY, undefined, { cap });
+}
+
+// ─── Admin: reset quota giornaliera ──────────────────────────────────────────
+// Azzera il contatore in-memory e cancella la riga DB per oggi,
+// permettendo di risincronizzare manualmente il contatore con la realtà Groq.
+
+export async function resetGroqTpd(): Promise<{ day: string; previousTokens: number }> {
+  const day = todayUtc();
+  const previousTokens = state.day === day ? state.tokens : 0;
+  state = { day, tokens: 0 };
+  lastDbLoad = Date.now();
+  try {
+    await db.execute(sql`
+      DELETE FROM app_settings WHERE key = ${tpdKey(day)}
+    `);
+  } catch (err) {
+    console.warn("[groq-quota] resetGroqTpd DB error (in-memory reset ok):", (err as Error).message);
+  }
+  console.log(`[groq-quota] quota reset manuale: ${previousTokens} → 0 token (${day})`);
+  return { day, previousTokens };
 }

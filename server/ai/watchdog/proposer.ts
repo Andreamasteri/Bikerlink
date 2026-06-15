@@ -60,7 +60,7 @@ function computeProblemsFingerprint(problems: HealthSnapshot["problems"]): strin
 
 const FINGERPRINT_KEY = "watchdog_proposer_last_fingerprint";
 const MODEL_KEY = "watchdog_proposer_model";
-const DEFAULT_PROPOSER_MODEL = "llama-3.1-8b-instant";
+const DEFAULT_PROPOSER_MODEL = "llama-3.3-70b-versatile";
 
 let _cachedFingerprint: string | null = null;
 

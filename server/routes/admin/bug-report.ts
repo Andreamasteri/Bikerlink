@@ -91,7 +91,7 @@ router.get("/bug-report/recent", async (_req: Request, res: Response) => {
       message: c.msg_key === "no-message" ? "Nessun messaggio" : c.msg_key,
       detail: `${c.platform ?? "?"} · ${c.device_model ?? "?"} · v${c.app_version ?? "?"}`,
       count: c.count,
-      createdAt: (c.latest_at as Date).toISOString(),
+      createdAt: new Date(c.latest_at).toISOString(),
     })),
     ...signalRows.map((s, i) => ({
       id: `signal-${i}`,
@@ -101,7 +101,7 @@ router.get("/bug-report/recent", async (_req: Request, res: Response) => {
       message: `[${s.source}] ${s.metric}${s.avg_value != null ? ` ≈ ${Math.round(s.avg_value)}${s.unit ? " " + s.unit : ""}` : ""}`,
       detail: s.severity.toUpperCase(),
       count: s.count,
-      createdAt: (s.latest_at as Date).toISOString(),
+      createdAt: new Date(s.latest_at).toISOString(),
     })),
     ...watchdogRows.map((w, i) => ({
       id: `watchdog-${i}`,
@@ -111,7 +111,7 @@ router.get("/bug-report/recent", async (_req: Request, res: Response) => {
       message: w.summary ?? "Nessun sommario",
       detail: w.scope ?? "",
       count: w.count,
-      createdAt: (w.latest_at as Date).toISOString(),
+      createdAt: new Date(w.latest_at).toISOString(),
     })),
   ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 

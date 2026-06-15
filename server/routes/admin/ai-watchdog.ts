@@ -24,6 +24,7 @@ import { getLastHealthCheckResults, runMapsHealthChecks } from "../../ai/watchdo
 import { getRoutingCounters } from "../../routing/routing-metrics";
 import { getAiTokenAudit } from "../../ai/audit";
 import { getProposerSettings, setProposerModel } from "../../ai/watchdog/proposer";
+import { getGroqTpdStatus, resetGroqTpd, setGroqTpdSoftCap } from "../../ai/groq-quota";
 
 const router = Router();
 
@@ -236,6 +237,25 @@ router.get("/ai/token-audit", async (req, res) => {
   const date = typeof req.query.date === "string" ? req.query.date : undefined;
   const data = await getAiTokenAudit(date);
   return res.json({ date: date ?? new Date().toISOString().slice(0, 10), audit: data });
+});
+
+// === Groq quota management ===
+
+router.get("/ai/groq-quota", (_req, res) => {
+  return res.json(getGroqTpdStatus());
+});
+
+router.post("/ai/groq-quota/reset", async (_req, res) => {
+  const result = await resetGroqTpd();
+  return res.json({ ok: true, ...result });
+});
+
+router.post("/ai/groq-quota/soft-cap", async (req, res) => {
+  const schema = z.object({ cap: z.number().int().min(1000).max(1_000_000) });
+  const parsed = schema.safeParse(req.body);
+  if (!parsed.success) return sendError(res, 400, parsed.error.issues[0].message);
+  await setGroqTpdSoftCap(parsed.data.cap);
+  return res.json({ ok: true, cap: parsed.data.cap });
 });
 
 // === Proposer settings (modello configurabile) ===
