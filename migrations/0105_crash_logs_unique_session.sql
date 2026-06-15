@@ -4,14 +4,28 @@
 --
 -- Safety: deduplicate any existing (session_id, crash_type) pairs first,
 -- keeping the row with the latest reported_at (highest id on tie).
--- Without this step, ALTER TABLE fails with 23505 if duplicates exist in prod.
-DELETE FROM app_crash_logs
-WHERE id NOT IN (
-  SELECT DISTINCT ON (session_id, crash_type) id
+-- Uses ROW_NUMBER() CTE instead of NOT IN to be NULL-safe and performant.
+WITH dupes AS (
+  SELECT id,
+         ROW_NUMBER() OVER (
+           PARTITION BY session_id, crash_type
+           ORDER BY reported_at DESC, id DESC
+         ) AS rn
   FROM app_crash_logs
-  ORDER BY session_id, crash_type, reported_at DESC, id DESC
-);
+)
+DELETE FROM app_crash_logs
+WHERE id IN (SELECT id FROM dupes WHERE rn > 1);
 
-ALTER TABLE app_crash_logs
-  ADD CONSTRAINT app_crash_logs_session_id_crash_type_key
-  UNIQUE (session_id, crash_type);
+--> statement-breakpoint
+
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'app_crash_logs_session_id_crash_type_key'
+      AND conrelid = 'app_crash_logs'::regclass
+  ) THEN
+    ALTER TABLE app_crash_logs
+      ADD CONSTRAINT app_crash_logs_session_id_crash_type_key
+      UNIQUE (session_id, crash_type);
+  END IF;
+END $$;
