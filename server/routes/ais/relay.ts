@@ -220,6 +220,10 @@ function getAisStatus(): "connected" | "connecting" | "disconnected" {
   return "disconnected";
 }
 
+function getVesselCount(): number {
+  return vesselCache.size;
+}
+
 async function reconnectAisStream(newBbox?: string, newMaxVessels?: number): Promise<void> {
   if (newBbox !== undefined) runtimeBbox = newBbox;
   if (newMaxVessels !== undefined) runtimeMaxVessels = newMaxVessels;
@@ -289,4 +293,4 @@ router.get("/vessels", async (req: Request, res: Response) => {
 });
 
 export default router;
-export { connectAisStream, reconnectAisStream, getAisStatus };
+export { connectAisStream, reconnectAisStream, getAisStatus, getVesselCount };

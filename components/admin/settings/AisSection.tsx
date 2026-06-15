@@ -10,6 +10,7 @@ interface AisConfig {
   bbox: string;
   maxVessels: string;
   status: "connected" | "connecting" | "disconnected";
+  vesselCount: number;
 }
 
 const STATUS_COLOR: Record<AisConfig["status"], string> = {
@@ -24,24 +25,61 @@ const STATUS_LABEL: Record<AisConfig["status"], string> = {
   disconnected: "Disconnesso",
 };
 
+function parseBboxParts(raw: string): { minLat: string; minLon: string; maxLat: string; maxLon: string } {
+  const parts = raw.split(",").map((s) => s.trim());
+  if (parts.length === 4) {
+    return { minLat: parts[0], minLon: parts[1], maxLat: parts[2], maxLon: parts[3] };
+  }
+  return { minLat: "", minLon: "", maxLat: "", maxLon: "" };
+}
+
+function joinBbox(parts: { minLat: string; minLon: string; maxLat: string; maxLon: string }): string {
+  const { minLat, minLon, maxLat, maxLon } = parts;
+  if (!minLat && !minLon && !maxLat && !maxLon) return "";
+  return `${minLat},${minLon},${maxLat},${maxLon}`;
+}
+
 export function AisSection() {
   const queryClient = useQueryClient();
 
   const { data, isLoading } = useQuery<AisConfig>({
     queryKey: ["/api/admin/settings/ais-config"],
-    refetchInterval: 10_000,
+    refetchInterval: 30_000,
   });
 
-  const [bboxInput, setBboxInput] = useState<string | null>(null);
+  const remoteParts = parseBboxParts(data?.bbox ?? "");
+
+  const [minLat, setMinLat] = useState<string | null>(null);
+  const [minLon, setMinLon] = useState<string | null>(null);
+  const [maxLat, setMaxLat] = useState<string | null>(null);
+  const [maxLon, setMaxLon] = useState<string | null>(null);
   const [maxVesselsInput, setMaxVesselsInput] = useState<string | null>(null);
 
-  const bbox = bboxInput !== null ? bboxInput : (data?.bbox ?? "");
+  const effectiveMinLat = minLat !== null ? minLat : remoteParts.minLat;
+  const effectiveMinLon = minLon !== null ? minLon : remoteParts.minLon;
+  const effectiveMaxLat = maxLat !== null ? maxLat : remoteParts.maxLat;
+  const effectiveMaxLon = maxLon !== null ? maxLon : remoteParts.maxLon;
   const maxVessels = maxVesselsInput !== null ? maxVesselsInput : (data?.maxVessels ?? "2000");
+
+  const bboxDirty = minLat !== null || minLon !== null || maxLat !== null || maxLon !== null;
+  const isDirty = bboxDirty || maxVesselsInput !== null;
 
   const mutation = useMutation({
     mutationFn: async () => {
       const body: { bbox?: string; maxVessels?: number } = {};
-      if (bboxInput !== null) body.bbox = bboxInput.trim();
+      if (bboxDirty) {
+        const parts = [effectiveMinLat, effectiveMinLon, effectiveMaxLat, effectiveMaxLon];
+        const filled = parts.filter((p) => p.trim() !== "");
+        if (filled.length !== 0 && filled.length !== 4) {
+          throw new Error("Inserisci tutti e 4 i valori della bbox oppure lascia tutto vuoto.");
+        }
+        body.bbox = joinBbox({
+          minLat: effectiveMinLat,
+          minLon: effectiveMinLon,
+          maxLat: effectiveMaxLat,
+          maxLon: effectiveMaxLon,
+        });
+      }
       if (maxVesselsInput !== null) {
         const n = parseInt(maxVesselsInput, 10);
         if (!Number.isFinite(n) || n < 1) throw new Error("Max navi non valido");
@@ -50,7 +88,10 @@ export function AisSection() {
       await apiRequest("PUT", `${getApiUrl()}/api/admin/settings/ais-config`, body);
     },
     onSuccess: () => {
-      setBboxInput(null);
+      setMinLat(null);
+      setMinLon(null);
+      setMaxLat(null);
+      setMaxLon(null);
       setMaxVesselsInput(null);
       queryClient.invalidateQueries({ queryKey: ["/api/admin/settings/ais-config"] });
       Alert.alert("AIS", "Configurazione salvata e WebSocket riconnesso.");
@@ -60,7 +101,17 @@ export function AisSection() {
     },
   });
 
-  const isDirty = bboxInput !== null || maxVesselsInput !== null;
+  const reconnectMutation = useMutation({
+    mutationFn: async () => {
+      await apiRequest("POST", `${getApiUrl()}/api/admin/settings/ais-reconnect`, {});
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/settings/ais-config"] });
+    },
+    onError: (err: Error) => {
+      Alert.alert("Errore", err.message ?? "Impossibile riconnettere AIS.");
+    },
+  });
 
   return (
     <View style={styles.card}>
@@ -69,19 +120,42 @@ export function AisSection() {
           <Ionicons name="boat-outline" size={20} color="#0ea5e9" />
           <Text style={styles.title}>AIS Stream</Text>
         </View>
-        {data && (
-          <View style={styles.statusBadge}>
-            <View style={[styles.statusDot, { backgroundColor: STATUS_COLOR[data.status] }]} />
-            <Text style={[styles.statusText, { color: STATUS_COLOR[data.status] }]}>
-              {STATUS_LABEL[data.status]}
-            </Text>
-          </View>
-        )}
+        <View style={styles.headerRight}>
+          {data && (
+            <View style={styles.statusBadge}>
+              <View style={[styles.statusDot, { backgroundColor: STATUS_COLOR[data.status] }]} />
+              <Text style={[styles.statusText, { color: STATUS_COLOR[data.status] }]}>
+                {STATUS_LABEL[data.status]}
+              </Text>
+            </View>
+          )}
+        </View>
       </View>
+
+      {data && (
+        <View style={styles.statsRow}>
+          <Ionicons name="navigate-outline" size={13} color={Colors.textSecondary} />
+          <Text style={styles.statText}>
+            {data.vesselCount} {data.vesselCount === 1 ? "nave" : "navi"} in cache
+          </Text>
+          <TouchableOpacity
+            style={styles.reconnectBtn}
+            onPress={() => reconnectMutation.mutate()}
+            disabled={reconnectMutation.isPending}
+          >
+            {reconnectMutation.isPending ? (
+              <ActivityIndicator size="small" color="#0ea5e9" style={{ marginRight: 4 }} />
+            ) : (
+              <Ionicons name="refresh-outline" size={13} color="#0ea5e9" />
+            )}
+            <Text style={styles.reconnectText}>Riconnetti</Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
       <Text style={styles.desc}>
         Configura il bounding box AIS e il numero massimo di navi in cache. Il WebSocket si riconnette
-        automaticamente al salvataggio, senza riavviare il server.
+        automaticamente al salvataggio. Contatore aggiornato ogni 30s.
       </Text>
 
       {isLoading ? (
@@ -90,17 +164,61 @@ export function AisSection() {
         <>
           <View style={styles.field}>
             <Text style={styles.label}>Bounding Box</Text>
-            <Text style={styles.hint}>Formato: minLat,minLon,maxLat,maxLon (vuoto = globale)</Text>
-            <TextInput
-              style={styles.input}
-              value={bbox}
-              onChangeText={setBboxInput}
-              placeholder="es. 35.0,6.0,47.0,18.5"
-              placeholderTextColor={Colors.textSecondary}
-              autoCapitalize="none"
-              autoCorrect={false}
-              keyboardType="default"
-            />
+            <Text style={styles.hint}>Lascia tutti i campi vuoti per usare il default (Mediterraneo).</Text>
+            <View style={styles.bboxGrid}>
+              <View style={styles.bboxCell}>
+                <Text style={styles.bboxLabel}>minLat</Text>
+                <TextInput
+                  style={styles.input}
+                  value={effectiveMinLat}
+                  onChangeText={setMinLat}
+                  placeholder="es. 35.0"
+                  placeholderTextColor={Colors.textSecondary}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  keyboardType="default"
+                />
+              </View>
+              <View style={styles.bboxCell}>
+                <Text style={styles.bboxLabel}>minLon</Text>
+                <TextInput
+                  style={styles.input}
+                  value={effectiveMinLon}
+                  onChangeText={setMinLon}
+                  placeholder="es. -10.0"
+                  placeholderTextColor={Colors.textSecondary}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  keyboardType="default"
+                />
+              </View>
+              <View style={styles.bboxCell}>
+                <Text style={styles.bboxLabel}>maxLat</Text>
+                <TextInput
+                  style={styles.input}
+                  value={effectiveMaxLat}
+                  onChangeText={setMaxLat}
+                  placeholder="es. 47.0"
+                  placeholderTextColor={Colors.textSecondary}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  keyboardType="default"
+                />
+              </View>
+              <View style={styles.bboxCell}>
+                <Text style={styles.bboxLabel}>maxLon</Text>
+                <TextInput
+                  style={styles.input}
+                  value={effectiveMaxLon}
+                  onChangeText={setMaxLon}
+                  placeholder="es. 42.0"
+                  placeholderTextColor={Colors.textSecondary}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  keyboardType="default"
+                />
+              </View>
+            </View>
           </View>
 
           <View style={styles.field}>
@@ -145,7 +263,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginBottom: 8,
+    marginBottom: 6,
   },
   titleRow: {
     flexDirection: "row",
@@ -156,6 +274,11 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_600SemiBold",
     fontSize: 15,
     color: Colors.text,
+  },
+  headerRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
   },
   statusBadge: {
     flexDirection: "row",
@@ -174,6 +297,33 @@ const styles = StyleSheet.create({
   statusText: {
     fontFamily: "Inter_500Medium",
     fontSize: 11,
+  },
+  statsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    marginBottom: 10,
+  },
+  statText: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    color: Colors.textSecondary,
+    flex: 1,
+  },
+  reconnectBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: "#0ea5e9",
+  },
+  reconnectText: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 12,
+    color: "#0ea5e9",
   },
   desc: {
     fontFamily: "Inter_400Regular",
@@ -195,7 +345,24 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_400Regular",
     fontSize: 11,
     color: Colors.textSecondary,
-    marginBottom: 4,
+    marginBottom: 6,
+  },
+  bboxGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  bboxCell: {
+    flex: 1,
+    minWidth: "45%",
+  },
+  bboxLabel: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 10,
+    color: Colors.textSecondary,
+    marginBottom: 2,
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
   },
   input: {
     borderWidth: 1,

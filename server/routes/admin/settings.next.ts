@@ -118,7 +118,7 @@ router.put("/thinkcentre-service-push", async (req: Request, res: Response) => {
  */
 router.get("/ais-config", async (_req: Request, res: Response) => {
   try {
-    const { getAisStatus } = await import("../ais/relay");
+    const { getAisStatus, getVesselCount } = await import("../ais/relay");
     const [bboxSetting, maxVesselsSetting] = await Promise.all([
       storage.getAppSetting("aisstream_bbox"),
       storage.getAppSetting("ais_max_vessels"),
@@ -127,6 +127,7 @@ router.get("/ais-config", async (_req: Request, res: Response) => {
       bbox: bboxSetting?.value ?? process.env.AISSTREAM_BBOX ?? "",
       maxVessels: maxVesselsSetting?.value ?? process.env.MAX_VESSELS ?? "2000",
       status: getAisStatus(),
+      vesselCount: getVesselCount(),
     });
   } catch (_error) {
     return sendError(res, 500, "Errore lettura config AIS");
@@ -178,6 +179,21 @@ router.put("/ais-config", async (req: Request, res: Response) => {
   } catch (_error) {
     console.error("[ais-config] save error:", _error);
     return sendError(res, 500, "Errore salvataggio config AIS");
+  }
+});
+
+/**
+ * POST /ais-reconnect
+ * Riconnette il WebSocket AIS senza modificare la configurazione.
+ */
+router.post("/ais-reconnect", async (_req: Request, res: Response) => {
+  try {
+    const { reconnectAisStream } = await import("../ais/relay");
+    await reconnectAisStream();
+    return res.json({ ok: true });
+  } catch (_error) {
+    console.error("[ais-reconnect] error:", _error);
+    return sendError(res, 500, "Errore riconnessione AIS");
   }
 });
 
