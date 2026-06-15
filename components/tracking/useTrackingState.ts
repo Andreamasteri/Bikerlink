@@ -206,6 +206,10 @@ export function useTrackingState() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const onNativeLocation = useCallback(onNativeLocationFn, [gps, sensors, sprint, bg, handsOffActive, settings, stats, session, refs, setVolumeUI]);
 
+  // startDeviceMotionRef lets beginActiveTracking call startDeviceMotion without a
+  // forward-reference problem (startDeviceMotion is declared by useTrackingHandlers below).
+  const startDeviceMotionRef = useRef<() => Promise<void>>(async () => {});
+
   const beginActiveTracking = useCallback(async () => {
     session.setPhase("active"); stats.startTimeRef.current = Date.now(); stats.pausedMsRef.current = 0; stats.isPausedRef.current = false;
     if (await Battery.isAvailableAsync()) {
@@ -235,8 +239,8 @@ export function useTrackingState() {
     const timeInterval = p === "easy" ? 2000 : p === "medium" ? 1000 : 500, distanceInterval = p === "easy" ? 5 : p === "medium" ? 2 : 0;
     try { refs.watchSubRef.current = await Location.watchPositionAsync({ accuracy, timeInterval, distanceInterval }, (loc) => onNativeLocation(loc)); }
     catch (e) { logGpsError(e, "watchPositionAsync"); Alert.alert(t("common.error"), t("tracking.gpsStartError")); cleanupTracking(); session.setPhase("idle"); return; }
-    startDeviceMotion(); setTrackingActive(true); Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-  }, [cleanupTracking, flushPoints, t, gps, battery, session, stats, settings, refs, onNativeLocation, startDeviceMotion]); // startDeviceMotion defined below
+    startDeviceMotionRef.current(); setTrackingActive(true); Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+  }, [cleanupTracking, flushPoints, t, gps, battery, session, stats, settings, refs, onNativeLocation]);
 
   const { startDeviceMotion, discardSprintAttempt, handleStart, handleStop, handlePause, handleRecalibrate } =
     useTrackingHandlers({
@@ -244,6 +248,9 @@ export function useTrackingState() {
       handsOffActive, setHandsOffActive, setVolumeUI, refetchRecords,
       flushPoints, beginActiveTracking, resetTrackingState, cleanupTracking,
     });
+
+  // Wire startDeviceMotionRef now that startDeviceMotion is declared
+  startDeviceMotionRef.current = startDeviceMotion;
 
   // Keep volume-button callback pointing at the latest handlePause
   volumeButtonCallbackRef.current = handlePause;
