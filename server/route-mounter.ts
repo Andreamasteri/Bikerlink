@@ -303,21 +303,9 @@ export function registerAllRoutes(app: express.Application) {
     res.sendFile(pianificaPath);
   });
 
-  // Live diagnostics dashboard (admin only — session or ADMIN_DIAGNOSTICS_TOKEN)
+  // Live diagnostics dashboard (admin only — requires active admin session)
   const diagnosticsLivePath = path.resolve(process.cwd(), "server", "templates", "diagnostics-live.html");
   app.get("/admin/diagnostics/live", async (req, res) => {
-    // Token-based access: ?token=<ADMIN_DIAGNOSTICS_TOKEN> for PC browser without session
-    const diagToken = process.env.ADMIN_DIAGNOSTICS_TOKEN;
-    const providedToken = typeof req.query.token === "string" ? req.query.token : null;
-    if (diagToken && providedToken) {
-      if (diagToken.length >= 16 && providedToken === diagToken) {
-        res.setHeader("Content-Type", "text/html; charset=utf-8");
-        res.setHeader("Cache-Control", "no-store");
-        return res.sendFile(diagnosticsLivePath);
-      }
-      return res.status(403).send("Token non valido.");
-    }
-
     // Session-based access (browser with active admin session)
     const userId = (req.session as { userId?: string })?.userId;
     if (!userId) {

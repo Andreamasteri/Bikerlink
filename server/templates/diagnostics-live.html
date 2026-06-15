@@ -234,13 +234,9 @@ a{color:var(--accent);text-decoration:none}
       .replace(/'/g, "&#39;");
   }
 
-  // ── Token forwarding — if page was opened with ?token=, pass it to SSE ──────
+  // ── SSE stream URL — session cookie is sent automatically by the browser ─────
   function buildStreamUrl() {
-    var params = new URLSearchParams(window.location.search);
-    var token = params.get("token");
-    var url = "/api/admin/diagnostics/stream";
-    if (token) url += "?token=" + encodeURIComponent(token);
-    return url;
+    return "/api/admin/diagnostics/stream";
   }
 
   function setConn(ok) {
