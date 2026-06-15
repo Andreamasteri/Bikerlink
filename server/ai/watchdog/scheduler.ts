@@ -13,8 +13,8 @@ import { runMapsHealthChecks } from "./maps-health-checks";
 const TICK_MS = 60_000;
 const CLEANUP_MS = 60 * 60_000;
 // Cooldown proposer: evita di chiamare Groq/AI ogni minuto per problemi
-// persistenti (es. Valhalla down tutto il giorno). Limite: 1 run/30 min.
-const PROPOSER_COOLDOWN_MS = 30 * 60_000;
+// persistenti (es. Valhalla down tutto il giorno). Limite: 1 run/60 min.
+const PROPOSER_COOLDOWN_MS = 60 * 60_000;
 
 let tickTimer: NodeJS.Timeout | null = null;
 let cleanupTimer: NodeJS.Timeout | null = null;

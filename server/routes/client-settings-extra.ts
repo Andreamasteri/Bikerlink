@@ -9,6 +9,27 @@ import { getPublicTileInfo } from "../../lib/maps/tile-for-renderer";
  * bloccato a dimensione massima — vedi header di quel file).
  */
 export function registerClientSettingsExtraRoutes(app: Express) {
+  // Endpoint pubblico (nessuna auth) per le impostazioni bg-location.
+  // Il client le legge per decidere se avviare il task in background — tutti gli
+  // utenti con permesso background possono leggere, non solo gli admin.
+  // La scrittura rimane protetta dall'endpoint /api/admin/settings/bg-location.
+  app.get("/api/settings/bg-location", async (_req, res) => {
+    const defaults = {
+      enabled: true,
+      trigger: "always",
+      intervalSeconds: 30,
+      notificationText: "BikerLink — {motivo}: posizione attiva in background",
+      ghostModeContinue: false,
+    };
+    try {
+      const setting = await storage.getAppSetting("bg_location_settings");
+      const data = (setting?.valueJson as typeof defaults | null) || null;
+      return res.json(data ? { ...defaults, ...data } : defaults);
+    } catch {
+      return res.json(defaults);
+    }
+  });
+
   // Gate pubblico per il profilo "auto panoramica" (auto_curvy): vero solo se il
   // server Valhalla self-hosted è configurato e raggiungibile. Il client usa
   // questo flag per mostrare/nascondere l'opzione nel pianificatore giri.

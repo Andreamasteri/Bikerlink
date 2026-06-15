@@ -232,7 +232,7 @@ export function AppStateHandler() {
         let notificationText = "BikerLink: {motivo} — posizione attiva in background";
         try {
           const domain = process.env.EXPO_PUBLIC_DOMAIN || "biker-link.replit.app";
-          const res = await fetch(`https://${domain}/api/admin/settings/bg-location`, {
+          const res = await fetch(`https://${domain}/api/settings/bg-location`, {
             credentials: "include",
           });
           if (res.ok) {

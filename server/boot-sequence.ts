@@ -373,6 +373,66 @@ export async function runBootSequence(server: Server, errorHandlersReady: Promis
     console.warn("[INIT] Phase 3: recordBootSignal failed (non-fatal):", e);
   }
 
+  // Crash pattern analysis — legge app_crash_logs degli ultimi 7 giorni e
+  // logga i top bucket per crash_type/error_message/app_version. Serve come
+  // tracciabilità al boot per identificare pattern di crash senza SQL diretto.
+  try {
+    type CrashRow = { crash_type: string | null; error_prefix: string | null; app_version: string | null; count: string };
+    const crashResult = await db.execute<CrashRow>(sql`
+      SELECT
+        crash_type,
+        SUBSTRING(error_message, 1, 100) AS error_prefix,
+        app_version,
+        COUNT(*) AS count
+      FROM app_crash_logs
+      WHERE reported_at >= NOW() - INTERVAL '7 days'
+      GROUP BY crash_type, SUBSTRING(error_message, 1, 100), app_version
+      ORDER BY COUNT(*) DESC
+      LIMIT 10
+    `);
+    const rows = (crashResult as { rows?: CrashRow[] }).rows ?? [];
+    if (rows.length === 0) {
+      console.log("[boot/crash-analysis] Nessun crash log negli ultimi 7 giorni");
+    } else {
+      const total = rows.reduce((s, r) => s + Number(r.count), 0);
+      console.log(`[boot/crash-analysis] Top crash pattern (7gg, ${total} eventi totali):`);
+      for (const r of rows) {
+        console.log(
+          `[boot/crash-analysis]   type=${r.crash_type ?? "?"} v=${r.app_version ?? "?"} n=${r.count} msg="${r.error_prefix ?? ""}"`
+        );
+      }
+    }
+  } catch (e) {
+    console.warn("[INIT] Phase 3: crash-analysis failed (non-fatal):", (e as Error).message);
+  }
+
+  // Redis connectivity check — log chiaro dello stato a boot invece di
+  // scoprirlo solo dai contatori del watchdog al primo ciclo (60s dopo).
+  try {
+    const redisUrl = process.env.REDIS_URL ?? process.env.REDIS_URI;
+    if (!redisUrl) {
+      console.log("[boot] Redis: REDIS_URL non impostato — fallback in-memory attivo");
+    } else {
+      try {
+        const ioredis = await import("ioredis").catch(() => null);
+        if (ioredis) {
+          const Redis = (ioredis as { default?: unknown }).default ?? ioredis;
+          const RedisCtor = Redis as unknown as { new (url: string, opts?: unknown): { ping: () => Promise<string>; quit: () => Promise<unknown> } };
+          const client = new RedisCtor(redisUrl, { lazyConnect: true, maxRetriesPerRequest: 1, connectTimeout: 2000 });
+          const t0 = Date.now();
+          await client.ping();
+          const ms = Date.now() - t0;
+          await client.quit().catch(() => {});
+          console.log(`[boot] Redis: raggiungibile — ping ${ms}ms (${redisUrl.replace(/:[^:@]*@/, ":***@")})`);
+        }
+      } catch (redisErr) {
+        console.warn(`[boot] Redis: NON raggiungibile (${(redisErr as Error).message}) — fallback in-memory attivo`);
+      }
+    }
+  } catch (e) {
+    console.warn("[INIT] Phase 3: Redis check failed (non-fatal):", e);
+  }
+
   bootLog(3, TOTAL, "DB Init", "done");
 
   // ── Phase 4: Seed + Core services (FATAL — timeout → process.exit) ────────

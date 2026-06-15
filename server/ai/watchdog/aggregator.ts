@@ -245,13 +245,18 @@ export async function runAggregatorCycle(): Promise<HealthSnapshot> {
   latest = snap;
   // persist snapshot (best-effort)
   try {
+    // Sanitize: strip undefined/circular refs that break JSONB serialization.
+    const safeProblems = JSON.parse(JSON.stringify(problems)) as typeof problems;
+    const safeMetrics = JSON.parse(JSON.stringify(metrics)) as typeof metrics;
     await db.insert(systemHealthSnapshot).values({
-      status, score,
-      problems: problems as unknown as typeof systemHealthSnapshot.$inferInsert["problems"],
-      metrics: metrics as object,
+      status,
+      score: Math.round(score),
+      problems: safeProblems as unknown as typeof systemHealthSnapshot.$inferInsert["problems"],
+      metrics: safeMetrics as object,
     });
   } catch (err) {
-    console.warn("[watchdog/aggregator] persist snapshot error:", err);
+    const msg = (err as Error).message ?? "unknown";
+    console.warn(`[watchdog/aggregator] persist snapshot error (status=${status} score=${score} problems=${problems.length}): ${msg}`);
   }
   for (const cb of subscribers) { try { cb(snap); } catch { /* ignore */ } }
   return snap;

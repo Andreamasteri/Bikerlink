@@ -62,6 +62,20 @@ const FINGERPRINT_KEY = "watchdog_proposer_last_fingerprint";
 const MODEL_KEY = "watchdog_proposer_model";
 const DEFAULT_PROPOSER_MODEL = "llama-3.3-70b-versatile";
 
+// Modelli Groq che NON supportano structured outputs (json_schema).
+// Se il DB ha uno di questi salvati, usiamo il default.
+// Ref: https://console.groq.com/docs/structured-outputs#supported-models
+const GROQ_UNSUPPORTED_STRUCTURED_MODELS = new Set([
+  "llama-3.1-8b-instant",
+  "llama-3.1-70b-versatile",
+  "llama-3.2-1b-preview",
+  "llama-3.2-3b-preview",
+  "llama-3.2-11b-vision-preview",
+  "llama-3.2-90b-vision-preview",
+  "whisper-large-v3",
+  "whisper-large-v3-turbo",
+]);
+
 let _cachedFingerprint: string | null = null;
 
 async function getLastFingerprint(): Promise<string | null> {
@@ -84,7 +98,16 @@ async function saveFingerprint(fp: string): Promise<void> {
 async function getProposerModel(): Promise<string> {
   try {
     const row = await storage.getAppSetting(MODEL_KEY);
-    return row?.value?.trim() || DEFAULT_PROPOSER_MODEL;
+    const saved = row?.value?.trim() || "";
+    if (!saved) return DEFAULT_PROPOSER_MODEL;
+    if (GROQ_UNSUPPORTED_STRUCTURED_MODELS.has(saved)) {
+      console.warn(
+        `[watchdog/proposer] modello salvato "${saved}" non supporta json_schema — ` +
+        `reset al default ${DEFAULT_PROPOSER_MODEL}`,
+      );
+      return DEFAULT_PROPOSER_MODEL;
+    }
+    return saved;
   } catch {
     return DEFAULT_PROPOSER_MODEL;
   }

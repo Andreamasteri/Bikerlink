@@ -89,9 +89,9 @@ export async function collectErrors(): Promise<Signal[]> {
         WHERE app_version IS NOT NULL
           AND crash_type IN ('crash_system','crash_js')
         ORDER BY
-          COALESCE(substring(SPLIT_PART(app_version, '.', 1) FROM '^\d+'), '0')::INTEGER DESC,
-          COALESCE(substring(SPLIT_PART(app_version, '.', 2) FROM '^\d+'), '0')::INTEGER DESC,
-          COALESCE(substring(SPLIT_PART(app_version, '.', 3) FROM '^\d+'), '0')::INTEGER DESC
+          COALESCE(substring(SPLIT_PART(app_version, '.', 1) FROM '^[0-9]+'), '0')::INTEGER DESC,
+          COALESCE(substring(SPLIT_PART(app_version, '.', 2) FROM '^[0-9]+'), '0')::INTEGER DESC,
+          COALESCE(substring(SPLIT_PART(app_version, '.', 3) FROM '^[0-9]+'), '0')::INTEGER DESC
         LIMIT 2
       ),
       stats AS (
@@ -109,9 +109,9 @@ export async function collectErrors(): Promise<Signal[]> {
           s.crashes::float / NULLIF(s.sessions, 0) AS crash_rate,
           ROW_NUMBER() OVER (
             ORDER BY
-              COALESCE(substring(SPLIT_PART(s.app_version, '.', 1) FROM '^\d+'), '0')::INTEGER DESC,
-              COALESCE(substring(SPLIT_PART(s.app_version, '.', 2) FROM '^\d+'), '0')::INTEGER DESC,
-              COALESCE(substring(SPLIT_PART(s.app_version, '.', 3) FROM '^\d+'), '0')::INTEGER DESC
+              COALESCE(substring(SPLIT_PART(s.app_version, '.', 1) FROM '^[0-9]+'), '0')::INTEGER DESC,
+              COALESCE(substring(SPLIT_PART(s.app_version, '.', 2) FROM '^[0-9]+'), '0')::INTEGER DESC,
+              COALESCE(substring(SPLIT_PART(s.app_version, '.', 3) FROM '^[0-9]+'), '0')::INTEGER DESC
           ) AS rn
         FROM stats s
       )

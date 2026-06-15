@@ -98,7 +98,7 @@ async function fetchAndCacheSettings(domain: string): Promise<{
     ghostModeContinue: false,
   };
   try {
-    const res = await fetch(`https://${domain}/api/admin/settings/bg-location`, {
+    const res = await fetch(`https://${domain}/api/settings/bg-location`, {
       credentials: "include",
     });
     if (res.ok) {

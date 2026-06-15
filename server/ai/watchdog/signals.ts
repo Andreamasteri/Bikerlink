@@ -8,17 +8,19 @@ const RETENTION_DAYS = 7;
 
 export async function recordSignals(signals: Signal[]): Promise<void> {
   if (!signals.length) return;
+  const valid = signals.filter((s) => s.source && s.metric && s.severity);
+  if (!valid.length) return;
   try {
     await db.insert(systemSignals).values(
-      signals.map((s) => ({
+      valid.map((s) => ({
         source: s.source,
-        metric: s.metric,
+        metric: String(s.metric).substring(0, 80),
         value: s.value ?? null,
-        unit: s.unit ?? null,
+        unit: s.unit ? String(s.unit).substring(0, 20) : null,
         severity: s.severity,
         details: (s.details ?? null) as object | null,
       })),
-    );
+    ).onConflictDoNothing();
   } catch (err) {
     console.warn("[watchdog/signals] insert error (non-fatal):", err);
   }

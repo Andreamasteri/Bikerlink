@@ -10,6 +10,16 @@ export async function collectDb(): Promise<Signal[]> {
     // Ping
     await db.execute(sql`SELECT 1`);
     const pingMs = Date.now() - started;
+    if (pingMs > 5000) {
+      try {
+        const poolMod = await import("../../../db").catch(() => null);
+        const poolInfo = poolMod ? (poolMod.pool as { totalCount?: number; idleCount?: number; waitingCount?: number }) : null;
+        console.warn(
+          `[watchdog/db] ping spike: ${pingMs}ms` +
+          (poolInfo ? ` — pool: total=${poolInfo.totalCount ?? "?"} idle=${poolInfo.idleCount ?? "?"} waiting=${poolInfo.waitingCount ?? "?"}` : ""),
+        );
+      } catch { /* best-effort */ }
+    }
     signals.push({
       source: "db", metric: "db.ping_ms", value: pingMs, unit: "ms",
       severity: pingMs > 500 ? "high" : pingMs > 150 ? "warn" : "info",
