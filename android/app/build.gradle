@@ -133,16 +133,6 @@ android {
         debug {
             signingConfig signingConfigs.debug
         }
-        // standaloneDebug: debuggable=false so BuildConfig.DEBUG=false
-        // → useDeveloperSupport=false → RN loads embedded bundle instead of waiting for Metro.
-        // Used for distributable debug APKs that work without a running Metro server.
-        standaloneDebug {
-            debuggable false
-            jniDebuggable false
-            minifyEnabled false
-            signingConfig signingConfigs.debug
-            matchingFallbacks = ['debug']
-        }
         release {
             signingConfig signingConfigs.release
             def enableShrinkResources = findProperty('android.enableShrinkResourcesInReleaseBuilds') ?: 'false'
