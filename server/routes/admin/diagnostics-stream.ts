@@ -8,6 +8,8 @@ import {
 } from "../../ai/pipeline-monitor/stream-aggregators";
 import { watchdogLogEmitter } from "../../ai/watchdog/log";
 import { pipelineRunEmitter } from "../../ai/pipeline-monitor/runner";
+import { storage } from "../../storage";
+import { getUserIdFromCookieHeader } from "../../session-utils";
 
 const router = Router();
 
@@ -40,6 +42,38 @@ router.get("/diagnostics/stream", async (req: Request, res: Response) => {
     watchdogLogEmitter.off("new-entry", onNewWatchdogLog);
     pipelineRunEmitter.off("run-complete", onPipelineRunComplete);
   };
+
+  // Periodic re-authorization: close the stream if the session row has been
+  // deleted (logout / displacement) OR if the user no longer holds the admin
+  // role or has been suspended. Both checks run every 60 s.
+  // Pseudo-users (watchdog / ADMIN_DIAGNOSTICS_TOKEN bypass) carry no real
+  // session — skip revalidation for them.
+  const realUserId: string | undefined = req.session?.userId;
+  const cookieHeaderForAdmin = req.headers.cookie ?? "";
+  if (realUserId && cookieHeaderForAdmin) {
+    timers.push(setInterval(async () => {
+      if (closed) return;
+      try {
+        // 1. Verify the session row still exists in the store.
+        const sessionUserId = await getUserIdFromCookieHeader(cookieHeaderForAdmin);
+        if (!sessionUserId || sessionUserId !== realUserId) {
+          sseWrite(res, "auth-error", { message: "Session revoked." });
+          cleanup();
+          try { res.end(); } catch { /* noop */ }
+          return;
+        }
+        // 2. Verify the user account still has admin privileges and is active.
+        const user = await storage.getUser(realUserId);
+        if (!user || user.role !== "admin" || user.status !== "active") {
+          sseWrite(res, "auth-error", { message: "Privileges changed or account inactive." });
+          cleanup();
+          try { res.end(); } catch { /* noop */ }
+        }
+      } catch {
+        // DB error: leave stream open rather than close on transient failure.
+      }
+    }, 60_000));
+  }
 
   req.on("close", cleanup);
   req.on("abort", cleanup);

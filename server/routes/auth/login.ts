@@ -12,6 +12,7 @@ import { sendSuccess, sendError } from "../../lib/api-response";
 import { parseVisitorCookie, recordVisit } from "../../lib/visitor-tracking";
 import { createRegionalClubInvite } from "../motoclubs";
 import { addSessionSseClient, removeSessionSseClient } from "../../session-sse";
+import { closeSseClient } from "../../chat-sse";
 import { ITALIAN_REGION_CENTROIDS } from "../../lib/region-centroids";
 import type { InsertUser, InsertUserProfile } from "@shared/db";
 
@@ -95,6 +96,7 @@ router.post("/login", loginLimiter, async (req: Request, res: Response) => {
 
     if (sessionType === "web") {
       notifySessionDisplaced(user.id);
+      closeSseClient(user.id);
     }
 
     await revokeSessionsByType(user.id, sessionType).catch((e) => {
@@ -198,6 +200,7 @@ router.post("/logout", (req: Request, res: Response) => {
     if (userId) {
       onlineTracker.setOffline(userId);
       storage.updateUser(userId, { lastLogoutAt: new Date() }).catch(() => {});
+      closeSseClient(userId);
     }
     res.clearCookie("connect.sid");
     return sendSuccess(res, undefined, "Logout effettuato");
