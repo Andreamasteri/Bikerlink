@@ -106,7 +106,11 @@ router.patch("/routes/:id", requireAuth, async (req: Request, res: Response) => 
             };
             const rows: typeof rideTelemetry.$inferInsert[] = [];
             for (const s of parsed as ClientSample[]) {
-              const ts = typeof s.timestamp === "number" ? s.timestamp : Number(s.timestamp);
+              const ts = typeof s.timestamp === "number"
+                ? s.timestamp
+                : typeof s.timestamp === "string"
+                  ? new Date(s.timestamp).getTime()
+                  : NaN;
               const lat = typeof s.lat === "number" ? s.lat : Number(s.lat);
               const lon = typeof s.lon === "number" ? s.lon : Number(s.lon);
               if (!Number.isFinite(ts) || !Number.isFinite(lat) || !Number.isFinite(lon)) continue;

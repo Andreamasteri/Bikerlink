@@ -86,11 +86,15 @@ export function useOfflineQueue() {
         const remaining: OfflineQueueEntry[] = [];
         for (const entry of queue) {
           try {
-            await apiRequest("PATCH", `/api/routes/${entry.routeId}`, entry.payload);
-            synced += 1;
+            // "complete" entries must use PUT /stop (updates profile km + fingerprint).
+            // "title" entries use PATCH as before.
             if (entry.type === "complete") {
+              await apiRequest("PUT", `/api/routes/${entry.routeId}/stop`, entry.payload);
               queryClient.invalidateQueries({ queryKey: ["/api/routes"] });
+            } else {
+              await apiRequest("PATCH", `/api/routes/${entry.routeId}`, entry.payload);
             }
+            synced += 1;
           } catch {
             remaining.push(entry);
           }

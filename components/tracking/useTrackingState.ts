@@ -423,28 +423,67 @@ export function useTrackingState() {
       Alert.alert(t("common.error"), t("tracking.routeNotCreatedError"));
       return;
     }
+
+    // Bug 3: drain background-accumulated GPS points into the buffer before flushing,
+    // in case the user pressed Stop just after returning from background (the AppState
+    // handler that replays BG_POINTS_KEY runs concurrently and may not have finished).
+    try {
+      const bgRaw = await AsyncStorage.getItem(BG_POINTS_KEY);
+      if (bgRaw) {
+        const bgPoints: GpsPoint[] = JSON.parse(bgRaw);
+        await AsyncStorage.removeItem(BG_POINTS_KEY);
+        if (bgPoints.length > 0) {
+          refs.pointsBufferRef.current = [...bgPoints, ...refs.pointsBufferRef.current];
+          stats.setPointsBuffered(refs.pointsBufferRef.current.length);
+        }
+      }
+    } catch { /* ignore — don't block stop if AsyncStorage fails */ }
+
     await flushPoints();
 
-    // Pre-set summary data so the modal always has it regardless of PATCH outcome
+    // Bug 4: if flushPoints failed (network error), some points may still be in the
+    // buffer. After stop there is no retry interval, so persist them to AsyncStorage
+    // for recovery on the next app launch.
+    if (refs.pointsBufferRef.current.length > 0) {
+      try {
+        await AsyncStorage.setItem(
+          `@bikerlink/pending_points_${rId}`,
+          JSON.stringify(refs.pointsBufferRef.current)
+        );
+        refs.pointsBufferRef.current = [];
+        stats.setPointsBuffered(0);
+      } catch { /* ignore */ }
+    }
+
+    // Pre-set summary data so the modal always has it regardless of stop outcome
     session.setCompletedRouteId(rId);
     mapState.setSummaryRoutePoints(gps.mapCoordsRef.current.map(c => ({ lat: c.latitude, lng: c.longitude })));
 
-    let patchFailed = false;
-    const updateData: {
-      status: string; stoppedAt: string; totalDistanceKm: number; maxSpeedKmh: number; avgSpeedKmh: number; maxAltitude: number;
-      durationSeconds: number; idleTimeSeconds: number; maxAccelerationG: number | null;
-      isSprint: boolean; sprint0to100Ms: number | null; gpsBlackoutCount: number; gpsBlackoutSeconds: number;
-      telemetryData?: string;
-    } = {
-      status: "completed", stoppedAt: new Date().toISOString(), totalDistanceKm: gps.totalKmRef.current, maxSpeedKmh: gps.maxSpeedRef.current, avgSpeedKmh: stats.avgSpeedDisplayKmh, maxAltitude: gps.maxAltRef.current,
-      durationSeconds: Math.floor(stats.totalMs / 1000), idleTimeSeconds: Math.floor(stats.idleMsRef.current / 1000), maxAccelerationG: sensors.maxAccelGRef.current,
-      isSprint: settings.is0100EnabledRef.current, sprint0to100Ms: sprint.sprint0to100MsRef.current, gpsBlackoutCount: gps.gpsBlackoutCountRef.current, gpsBlackoutSeconds: Math.floor(gps.gpsBlackoutSecondsRef.current / 1000),
+    let stopFailed = false;
+    // Bug 2: use PUT /stop (stats.ts) which updates profile.totalKm, profile.totalRides
+    // and calls triggerFingerprintUpdate. The old PATCH (route-completion.ts) did none of that.
+    const stopPayload = {
+      totalDistanceKm: gps.totalKmRef.current,
+      maxSpeedKmh: gps.maxSpeedRef.current,
+      avgSpeedKmh: stats.avgSpeedDisplayKmh,
+      maxAltitude: gps.maxAltRef.current,
+      durationSeconds: Math.floor(stats.totalMs / 1000),
+      idleTimeSeconds: Math.floor(stats.idleMsRef.current / 1000),
+      maxAccelerationG: sensors.maxAccelGRef.current,
+      sprint0to100Ms: sprint.sprint0to100MsRef.current,
+      gpsBlackoutCount: gps.gpsBlackoutCountRef.current,
+      gpsBlackoutSeconds: Math.floor(gps.gpsBlackoutSecondsRef.current / 1000),
     };
-    if (settings.sensorsEnabledRef.current && refs.telemetryAccumRef.current.length > 0) updateData.telemetryData = JSON.stringify(refs.telemetryAccumRef.current);
     try {
-      await apiRequest("PATCH", `/api/routes/${rId}`, updateData);
+      await apiRequest("PUT", `/api/routes/${rId}/stop`, stopPayload);
+      // Telemetry is sent via the PATCH endpoint which owns that logic.
+      // It is fire-and-forget: a failure here is non-fatal for the stop flow.
       if (settings.sensorsEnabledRef.current && refs.telemetryAccumRef.current.length > 0) {
-        queryClient.invalidateQueries({ queryKey: ["/api/telemetry/stats"] });
+        apiRequest("PATCH", `/api/routes/${rId}`, {
+          telemetryData: JSON.stringify(refs.telemetryAccumRef.current),
+        }).then(() => {
+          queryClient.invalidateQueries({ queryKey: ["/api/telemetry/stats"] });
+        }).catch(e => logGpsError(e, "handleStop/telemetry"));
       }
       refetchRecords();
       try {
@@ -458,11 +497,11 @@ export function useTrackingState() {
       } catch { /* battery level unavailable on this device — ignore silently */ }
     } catch (e) {
       logGpsError(e, "handleStop");
-      patchFailed = true;
-      await offlineQueue.enqueue(rId, updateData as unknown as Record<string, unknown>, "complete").catch(() => {});
+      stopFailed = true;
+      await offlineQueue.enqueue(rId, stopPayload as unknown as Record<string, unknown>, "complete").catch(() => {});
     }
     finally {
-      session.setSummaryPatchFailed(patchFailed);
+      session.setSummaryPatchFailed(stopFailed);
       session.setSummaryVisible(true);
       session.setPhase("idle"); session.setLoading(false); setHandsOffActive(false); setHandsOffBroadcast(false);
       setVolumeUI(true);
@@ -538,6 +577,34 @@ export function useTrackingState() {
       GPS_BUFFER_SEGCOUNT_KEY,
       ...Array.from({ length: 50 }, (_, i) => GPS_BUFFER_SEG_KEY(i)),
     ]).catch(() => {});
+  }, []);
+
+  // Bug 4 recovery: on mount, retry any GPS point batches that were persisted
+  // to AsyncStorage because flushPoints failed at stop time (no network).
+  // Each key is `@bikerlink/pending_points_<routeId>`.
+  useEffect(() => {
+    (async () => {
+      try {
+        const keys = await AsyncStorage.getAllKeys();
+        const pendingKeys = keys.filter(k => k.startsWith("@bikerlink/pending_points_"));
+        for (const key of pendingKeys) {
+          const raw = await AsyncStorage.getItem(key);
+          if (!raw) { await AsyncStorage.removeItem(key).catch(() => {}); continue; }
+          const routeId = key.replace("@bikerlink/pending_points_", "");
+          try {
+            const points: GpsPoint[] = JSON.parse(raw);
+            if (points.length > 0) {
+              await apiRequest("POST", `/api/routes/${routeId}/points`, { points });
+            }
+            await AsyncStorage.removeItem(key);
+          } catch {
+            // Network still unavailable — leave the key, retry next mount.
+          }
+        }
+      } catch {
+        // AsyncStorage unavailable — ignore.
+      }
+    })();
   }, []);
 
   return {
