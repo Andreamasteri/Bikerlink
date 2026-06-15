@@ -544,6 +544,8 @@ const es: Record<string, string> = {
   "tracking.routeNotCreatedError": "Los datos de la ruta no se pudieron guardar: la ruta nunca se creó en el servidor.",
   "tracking.autoSaveIn": "Guardado automático en",
   "tracking.syncWarning": "Ruta no sincronizada — pulsa Guardar para reintentar.",
+  "tracking.kmAddedToTotal": "+{distance} añadidos a tu total",
+  "tracking.kmAddedOffline": "-- Se actualizará al volver a conectarse",
   "tracking.newRecord": "¡Nuevo Récord!",
   "home.easterEggPrize": "¡Premio desbloqueado!",
   "home.easterEgg10Msg": "¡Has recogido 10 Easter Eggs!",

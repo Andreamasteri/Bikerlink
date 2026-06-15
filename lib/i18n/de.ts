@@ -544,6 +544,8 @@ const de: Record<string, string> = {
   "tracking.routeNotCreatedError": "Die Fahrtdaten konnten nicht gespeichert werden: Die Strecke wurde nie auf dem Server angelegt.",
   "tracking.autoSaveIn": "Automatisch speichern in",
   "tracking.syncWarning": "Fahrt nicht synchronisiert — Speichern zum Wiederholen.",
+  "tracking.kmAddedToTotal": "+{distance} zu deinem Gesamtwert hinzugefügt",
+  "tracking.kmAddedOffline": "-- Wird bei Rückkehr ins Netz aktualisiert",
   "tracking.newRecord": "Neuer Rekord!",
   "home.easterEggPrize": "Preis freigeschaltet!",
   "home.easterEgg10Msg": "Du hast 10 Easter Eggs gesammelt!",

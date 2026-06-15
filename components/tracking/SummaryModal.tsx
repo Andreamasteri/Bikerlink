@@ -171,6 +171,19 @@ export function SummaryModal({
               </View>
             )}
 
+            <View style={[styles.kmGainedBanner, patchFailed && styles.kmGainedBannerOffline]}>
+              <Ionicons
+                name={patchFailed ? "cloud-offline-outline" : "trending-up-outline"}
+                size={16}
+                color={patchFailed ? Colors.textSecondary : Colors.success}
+              />
+              <Text style={[styles.kmGainedText, patchFailed && styles.kmGainedTextOffline]}>
+                {patchFailed
+                  ? t("tracking.kmAddedOffline")
+                  : t("tracking.kmAddedToTotal").replace("{distance}", formatDistance(totalKm, distanceUnit, 2))}
+              </Text>
+            </View>
+
             <TextInput
               style={styles.rideTitleInput}
               value={rideTitle}
@@ -375,6 +388,32 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_500Medium",
     color: Colors.warning,
     lineHeight: 16
+  },
+  kmGainedBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: Colors.success + "15",
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: Colors.success + "35",
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginBottom: 14
+  },
+  kmGainedBannerOffline: {
+    backgroundColor: Colors.textSecondary + "12",
+    borderColor: Colors.textSecondary + "25"
+  },
+  kmGainedText: {
+    fontSize: 14,
+    fontFamily: "Inter_700Bold",
+    color: Colors.success
+  },
+  kmGainedTextOffline: {
+    fontSize: 12,
+    fontFamily: "Inter_500Medium",
+    color: Colors.textSecondary
   },
   rideTitleInput: {
     backgroundColor: Colors.surface,

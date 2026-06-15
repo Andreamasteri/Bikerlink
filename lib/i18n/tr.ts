@@ -535,6 +535,8 @@ const tr: Record<string, string> = {
   "tracking.routeNotCreatedError": "Gezi verileri kaydedilemedi: rota sunucuda hiç oluşturulmadı.",
   "tracking.autoSaveIn": "Otomatik kayıt",
   "tracking.syncWarning": "Gezi senkronize edilmedi — tekrar denemek için Kaydet'e bas.",
+  "tracking.kmAddedToTotal": "+{distance} toplamına eklendi",
+  "tracking.kmAddedOffline": "-- Çevrimiçi olunca güncellenecek",
   "tracking.newRecord": "Yeni Rekor!",
   "home.easterEggPrize": "Ödül kilidi açıldı!",
   "home.easterEgg10Msg": "10 Easter Egg topladın!",

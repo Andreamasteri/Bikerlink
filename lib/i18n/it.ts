@@ -630,6 +630,8 @@ const it: Record<string, string> = {
   "tracking.routeNotCreatedError": "I dati del giro non possono essere salvati: il percorso non è mai stato creato sul server.",
   "tracking.autoSaveIn": "Salvataggio automatico tra",
   "tracking.syncWarning": "Giro non sincronizzato — premi Salva per riprovare.",
+  "tracking.kmAddedToTotal": "+{distance} al tuo totale",
+  "tracking.kmAddedOffline": "-- Verrà aggiornato al rientro in rete",
   "tracking.newRecord": "Nuovo Record!",
 
   "home.easterEggPrize": "Premio Sbloccato!",

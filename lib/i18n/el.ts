@@ -534,6 +534,8 @@ const el: Record<string, string> = {
   "tracking.routeNotCreatedError": "Τα δεδομένα της βόλτας δεν ήταν δυνατό να αποθηκευτούν: η διαδρομή δεν δημιουργήθηκε ποτέ στον server.",
   "tracking.autoSaveIn": "Αυτόματη αποθήκευση σε",
   "tracking.syncWarning": "Η βόλτα δεν συγχρονίστηκε — πάτησε Αποθήκευση για επανάληψη.",
+  "tracking.kmAddedToTotal": "+{distance} στο σύνολό σου",
+  "tracking.kmAddedOffline": "-- Θα ενημερωθεί όταν επιστρέψεις στο δίκτυο",
   "tracking.newRecord": "Νέο Ρεκόρ!",
   "home.easterEggPrize": "Ξεκλείδωσες Βραβείο!",
   "home.easterEgg10Msg": "Συνέλεξες 10 Easter Eggs!",

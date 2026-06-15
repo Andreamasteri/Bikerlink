@@ -610,6 +610,8 @@ const en: Record<string, string> = {
   "tracking.routeNotCreatedError": "The ride data could not be saved: the route was never created on the server.",
   "tracking.autoSaveIn": "Auto-saving in",
   "tracking.syncWarning": "Ride not synced — tap Save to retry.",
+  "tracking.kmAddedToTotal": "+{distance} added to your total",
+  "tracking.kmAddedOffline": "-- Will be updated when back online",
   "tracking.newRecord": "New Record!",
 
   "home.easterEggPrize": "Prize Unlocked!",

@@ -544,6 +544,8 @@ const fr: Record<string, string> = {
   "tracking.routeNotCreatedError": "Les données de sortie n'ont pas pu être sauvegardées : le parcours n'a jamais été créé sur le serveur.",
   "tracking.autoSaveIn": "Sauvegarde auto dans",
   "tracking.syncWarning": "Sortie non synchronisée — appuie sur Sauvegarder pour réessayer.",
+  "tracking.kmAddedToTotal": "+{distance} ajoutés à ton total",
+  "tracking.kmAddedOffline": "-- Mis à jour au retour en ligne",
   "tracking.newRecord": "Nouveau Record !",
   "home.easterEggPrize": "Prix débloqué !",
   "home.easterEgg10Msg": "Tu as collecté 10 Easter Eggs !",
