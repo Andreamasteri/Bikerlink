@@ -112,6 +112,16 @@ while [ $ATTEMPT -lt ${#DELAYS[@]} ]; do
 done
 
 if [ "$HEALTHY" -ne 1 ]; then
+  check_metro_alive
+  log "━━━ Log Metro al timeout backend (${METRO_LOG:-/tmp/metro.log}): ━━━"
+  if [ -f "${METRO_LOG:-/tmp/metro.log}" ] && [ -s "${METRO_LOG:-/tmp/metro.log}" ]; then
+    tail -n 20 "${METRO_LOG:-/tmp/metro.log}" | while IFS= read -r line; do
+      log "  │ $line"
+    done
+  else
+    log "  │ (log Metro non disponibile o vuoto)"
+  fi
+  log "━━━ Fine log Metro ━━━"
   fail "3/4" "backend non è healthy (HTTP 200 + status:ok) dopo ${MAX_HEALTH_SECS}s"
 fi
 
