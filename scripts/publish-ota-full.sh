@@ -136,6 +136,8 @@ log_ok "APPLIED_OTA_NUMBER pre-impostato → ${NEXT_OTA} (sarà incluso nel bund
 log_info "Fase 1/2 — Metro export (bundle Android, attendi 2-5 minuti)..."
 
 rm -rf "$DIST_DIR"
+# Pulisce cache Metro corrotta in /tmp (può accumularsi tra run diverse)
+rm -rf /tmp/metro-file-map-* 2>/dev/null || true
 _T0=$(date +%s)
 EXPO_TOKEN="${EAS_TOKEN}" npx expo export \
   --platform android \

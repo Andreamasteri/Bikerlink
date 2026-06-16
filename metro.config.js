@@ -82,7 +82,7 @@ config.server = {
 
 config.resolver.blockList = [
   /\/\.local\//,
-  /\/logs\//,
+  /(?<!node_modules.*)\/logs\//,
   /\/node_modules\/.cache\//,
   /\/\.metro-cache\//,
   /\/server_dist\//,
