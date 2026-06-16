@@ -33,6 +33,7 @@ const loginLimiter = rateLimit({
 });
 
 router.post("/login", loginLimiter, async (req: Request, res: Response) => {
+  console.log("[login] incoming", req.method, req.headers["content-type"]);
   try {
     const parsed = loginSchema.safeParse(req.body);
     if (!parsed.success) {

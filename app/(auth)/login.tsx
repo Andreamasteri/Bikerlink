@@ -93,14 +93,7 @@ export default function LoginScreen() {
         onError: (err: Error) => {
           sendStartupBeacon("login_5_error");
           setIsSubmitting(false);
-          const msg = err.message || t("auth.loginError");
-          const cleaned = msg.replace(/^\d+:\s*/, "");
-          try {
-            const parsed = JSON.parse(cleaned);
-            setError(parsed.message || cleaned);
-          } catch {
-            setError(cleaned);
-          }
+          setError(err.message || t("auth.loginError"));
         },
       }
     );

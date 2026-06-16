@@ -195,6 +195,14 @@ export async function apiRequest(
   }
 
   await throwIfResNotOk(res);
+
+  const ct = res.headers.get("content-type") || "";
+  if (!ct.includes("application/json")) {
+    const preview = await res.text().catch(() => "");
+    console.warn(`[apiRequest] risposta non-JSON da ${route} (Content-Type: ${ct || "assente"}):`, preview.slice(0, 120));
+    throw new Error("Risposta del server non valida. Riprova.");
+  }
+
   return res;
 }
 

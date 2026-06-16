@@ -81,7 +81,11 @@ function useLoginMutation() {
   return useMutation({
     mutationFn: async (data: { identifier: string; password: string; latitude?: number; longitude?: number; platform?: string }) => {
       const res = await apiRequest("POST", "/api/auth/login", { ...data, platform: Platform.OS });
-      return await res.json();
+      try {
+        return await res.json();
+      } catch {
+        throw new Error("Errore di connessione al server. Riprova.");
+      }
     },
     onSuccess: async (response: SafeUser & { sessionToken?: string }) => {
       // Persist Bearer token (mobile cookie-jar bypass) BEFORE any subsequent fetch
