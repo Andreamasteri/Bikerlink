@@ -5,6 +5,7 @@ import helmet from "helmet";
 import * as path from "path";
 import { storage } from "./storage";
 import { db } from "./db";
+import { sendError } from "./lib/api-response";
 import { 
   motorcyclePhotos, 
   userMotorcycles, 
@@ -61,7 +62,7 @@ export function enforceOrigin(req: Request, res: Response, next: NextFunction): 
     return next();
   }
 
-  res.status(403).json({ message: "Richiesta non autorizzata" });
+  sendError(res, 403, "Richiesta non autorizzata");
 }
 
 export function setupMiddleware(app: express.Application) {
@@ -249,12 +250,12 @@ export function setupStaticRoutes(app: express.Application) {
   app.get("/uploads/motorcycles/:filename", async (req: Request, res: Response, next: NextFunction) => {
     try {
       if (!req.session?.userId) {
-        return res.status(401).json({ message: "Non autenticato" });
+        return sendError(res, 401, "Non autenticato");
       }
       const requesterId = req.session.userId;
       const filename = req.params.filename;
       if (filename.includes("/") || filename.includes("..")) {
-        return res.status(404).json({ message: "Foto non trovata" });
+        return sendError(res, 404, "Foto non trovata");
       }
       const photoUrl = `/uploads/motorcycles/${filename}`;
       const [row] = await db
@@ -264,13 +265,13 @@ export function setupStaticRoutes(app: express.Application) {
         .where(eq(motorcyclePhotos.photoUrl, photoUrl))
         .limit(1);
       if (!row || row.ownerId !== requesterId) {
-        return res.status(404).json({ message: "Foto non trovata" });
+        return sendError(res, 404, "Foto non trovata");
       }
       res.set("Cache-Control", "private, max-age=3600");
       return next();
     } catch (err) {
       console.error("[uploads/motorcycles auth] error:", err);
-      return res.status(500).json({ message: "Errore interno del server" });
+      return sendError(res, 500, "Errore interno del server");
     }
   });
 
@@ -278,12 +279,12 @@ export function setupStaticRoutes(app: express.Application) {
   app.get("/uploads/photos/:filename", async (req: Request, res: Response, next: NextFunction) => {
     try {
       if (!req.session?.userId) {
-        return res.status(401).json({ message: "Non autenticato" });
+        return sendError(res, 401, "Non autenticato");
       }
       const requesterId = req.session.userId;
       const filename = req.params.filename;
       if (!filename || filename.includes("/") || filename.includes("..")) {
-        return res.status(404).json({ message: "Foto non trovata" });
+        return sendError(res, 404, "Foto non trovata");
       }
       const photoUrl = `/uploads/photos/${filename}`;
       const [row] = await db
@@ -292,23 +293,23 @@ export function setupStaticRoutes(app: express.Application) {
         .where(eq(userPhotos.photoUrl, photoUrl))
         .limit(1);
       if (!row) {
-        return res.status(404).json({ message: "Foto non trovata" });
+        return sendError(res, 404, "Foto non trovata");
       }
       const isOwner = row.userId === requesterId;
       if (!isOwner) {
         if (!row.isApproved) {
-          return res.status(404).json({ message: "Foto non trovata" });
+          return sendError(res, 404, "Foto non trovata");
         }
         const blocked = await storage.hasBlockedUser(row.userId, requesterId);
         if (blocked) {
-          return res.status(403).json({ message: "Non puoi visualizzare questa foto" });
+          return sendError(res, 403, "Non puoi visualizzare questa foto");
         }
       }
       res.set("Cache-Control", "private, max-age=3600");
       return next();
     } catch (err) {
       console.error("[uploads/photos auth] error:", err);
-      return res.status(500).json({ message: "Errore interno del server" });
+      return sendError(res, 500, "Errore interno del server");
     }
   });
 
@@ -316,12 +317,12 @@ export function setupStaticRoutes(app: express.Application) {
   app.get("/uploads/wishlist/:filename", async (req: Request, res: Response, next: NextFunction) => {
     try {
       if (!req.session?.userId) {
-        return res.status(401).json({ message: "Non autenticato" });
+        return sendError(res, 401, "Non autenticato");
       }
       const requesterId = req.session.userId;
       const filename = req.params.filename;
       if (!filename || filename.includes("/") || filename.includes("..")) {
-        return res.status(404).json({ message: "Foto non trovata" });
+        return sendError(res, 404, "Foto non trovata");
       }
       const photoUrl = `/uploads/wishlist/${filename}`;
       const [row] = await db
@@ -331,13 +332,13 @@ export function setupStaticRoutes(app: express.Application) {
         .where(eq(zavarrinaWishlistPhotos.photoUrl, photoUrl))
         .limit(1);
       if (!row || row.ownerId !== requesterId) {
-        return res.status(404).json({ message: "Foto non trovata" });
+        return sendError(res, 404, "Foto non trovata");
       }
       res.set("Cache-Control", "private, max-age=3600");
       return next();
     } catch (err) {
       console.error("[uploads/wishlist auth] error:", err);
-      return res.status(500).json({ message: "Errore interno del server" });
+      return sendError(res, 500, "Errore interno del server");
     }
   });
 

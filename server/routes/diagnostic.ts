@@ -1,13 +1,14 @@
 import { Router, type Request, type Response } from "express";
 import { db } from "../db";
 import { diagnosticReports } from "@shared/db";
+import { sendError } from "../lib/api-response";
 
 const router = Router();
 
 router.post("/report", async (req: Request, res: Response) => {
   try {
     if (!req.session.userId) {
-      return res.status(401).json({ message: "Non autenticato" });
+      return sendError(res, 401, "Non autenticato");
     }
     const {
       triggeredBy = "user",
@@ -44,7 +45,7 @@ router.post("/report", async (req: Request, res: Response) => {
     return res.json({ id: report?.id, ok: true });
   } catch (err) {
     console.error("[diagnostic/report] POST error:", err);
-    return res.status(500).json({ message: "Errore salvataggio report" });
+    return sendError(res, 500, "Errore salvataggio report");
   }
 });
 

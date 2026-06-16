@@ -4,6 +4,7 @@ import path from "path";
 import crypto from "crypto";
 import { Pool } from "pg";
 import { db } from "../db";
+import { sendError } from "../lib/api-response";
 import { messages, conversations } from "@shared/db/conversations";
 import { users } from "@shared/db/users";
 import { proposals } from "@shared/db/proposals";
@@ -33,19 +34,20 @@ function timingSafeCompare(a: string, b: string): boolean {
 function requireExportToken(req: Request, res: Response): boolean {
   const expectedToken = process.env.CHAT_EXPORT_TOKEN;
   if (!expectedToken) {
-    res.status(503).json({ message: "Export non configurato (CHAT_EXPORT_TOKEN mancante)" });
+    sendError(res, 503, "Export non configurato (CHAT_EXPORT_TOKEN mancante)");
     return false;
   }
 
   const authHeader = req.headers.authorization ?? "";
   if (!authHeader.startsWith("Bearer ")) {
-    res.status(401).set("WWW-Authenticate", "Bearer").json({ message: "Token richiesto" });
+    res.set("WWW-Authenticate", "Bearer");
+    sendError(res, 401, "Token richiesto");
     return false;
   }
 
   const providedToken = authHeader.substring(7).trim();
   if (!timingSafeCompare(providedToken, expectedToken)) {
-    res.status(401).json({ message: "Token non valido" });
+    sendError(res, 401, "Token non valido");
     return false;
   }
 
@@ -66,10 +68,7 @@ router.get("/tasks-export", (req: Request, res: Response) => {
   }
 
   if (!fs.existsSync(filePath)) {
-    return res.status(404).json({
-      message: "Export non trovato. Rigenera exports/bikerlink-tasks.md eseguendo lo script.",
-      requestedFile: path.basename(filePath),
-    });
+    return sendError(res, 404, "Export non trovato. Rigenera exports/bikerlink-tasks.md eseguendo lo script.");
   }
 
   const content = fs.readFileSync(filePath, "utf-8");
@@ -214,7 +213,7 @@ router.get("/chat-export", async (req: Request, res: Response) => {
     return res.send(markdown);
   } catch (err) {
     console.error("[chat-export] Errore:", err);
-    return res.status(500).json({ message: "Errore interno durante l'export" });
+    return sendError(res, 500, "Errore interno durante l'export");
   }
 });
 
@@ -279,7 +278,7 @@ router.post("/purge-fake-users", async (req: Request, res: Response) => {
     return res.json({ mode: "apply", deleted, remaining, scan: dryRunInfo });
   } catch (err) {
     console.error("[internal/purge-fake-users] ERROR:", err);
-    return res.status(500).json({ message: "Errore durante la purge" });
+    return sendError(res, 500, "Errore durante la purge");
   }
 });
 
