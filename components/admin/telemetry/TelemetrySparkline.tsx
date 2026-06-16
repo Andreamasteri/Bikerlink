@@ -14,6 +14,7 @@ export interface BucketItem {
 export interface BucketsData {
   minutes: number;
   buckets: BucketItem[];
+  versions?: string[];
 }
 
 const CHART_W = 280;

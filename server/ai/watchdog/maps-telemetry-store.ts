@@ -196,19 +196,24 @@ export async function cleanupMapsTelemetry(): Promise<number> {
 }
 
 // Conta eventi recenti per evento (24h) — usato per UI sparkline buckets.
+// eventType e appVersion sono filtri opzionali per drill-down per tipo/versione.
 export async function getMapsTelemetryBuckets(
   hours: number = 24,
   bucketMinutes: number = 60,
+  eventType?: string,
+  appVersion?: string,
 ): Promise<Array<{ bucketStart: string; at: string; events: number; total: number; errors: number }>> {
   try {
     const since = new Date(Date.now() - hours * 60 * 60_000);
+    const eventFilter = eventType ? sql` AND event = ${eventType}` : sql``;
+    const versionFilter = appVersion ? sql` AND app_version = ${appVersion}` : sql``;
     const rows = await db.execute<{ bucket: Date; total: string; errors: string }>(sql`
       SELECT
         date_trunc('hour', created_at) AS bucket,
         COUNT(*)::text AS total,
         COUNT(*) FILTER (WHERE event IN ('tile_load_error','webview_crash','routing_failed','map_init_failed','gps_lost'))::text AS errors
       FROM maps_telemetry_events
-      WHERE created_at >= ${since}
+      WHERE created_at >= ${since}${eventFilter}${versionFilter}
       GROUP BY bucket
       ORDER BY bucket ASC
     `);
@@ -220,6 +225,23 @@ export async function getMapsTelemetryBuckets(
     });
   } catch (err) {
     log.warn({ err: (err as Error).message, bucketMinutes }, "buckets query failed");
+    return [];
+  }
+}
+
+// Versioni app distinte nelle ultime 48h — usato per il picker filtro UI.
+export async function getDistinctAppVersions(hours: number = 48): Promise<string[]> {
+  try {
+    const since = new Date(Date.now() - hours * 60 * 60_000);
+    const rows = await db.selectDistinct({ appVersion: mapsTelemetryEvents.appVersion })
+      .from(mapsTelemetryEvents)
+      .where(gte(mapsTelemetryEvents.createdAt, since));
+    return rows
+      .map((r) => r.appVersion)
+      .filter((v): v is string => v !== null && v !== "")
+      .sort();
+  } catch (err) {
+    log.warn({ err: (err as Error).message }, "distinct app versions query failed");
     return [];
   }
 }

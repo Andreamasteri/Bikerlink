@@ -19,7 +19,7 @@ import {
 } from "../../ai/watchdog/maps-kill-switch";
 
 const MAPS_FLAGS: readonly MapsKillSwitchKey[] = ["telemetry", "collector", "llm", "alerts"] as const;
-import { getMapsTelemetryBuckets, aggregateMapsTelemetry, getMapsSummaryTelemetry } from "../../ai/watchdog/maps-telemetry-store";
+import { getMapsTelemetryBuckets, aggregateMapsTelemetry, getMapsSummaryTelemetry, getDistinctAppVersions } from "../../ai/watchdog/maps-telemetry-store";
 import { getLastHealthCheckResults, runMapsHealthChecks } from "../../ai/watchdog/maps-health-checks";
 import { getRoutingCounters } from "../../routing/routing-metrics";
 import { getAiTokenAuditStatus, clearAuditError } from "../../ai/audit";
@@ -205,8 +205,13 @@ router.post("/watchdog/maps/flags", async (req, res) => {
 router.get("/watchdog/maps/buckets", async (req, res) => {
   const minutes = Math.min(1440, Math.max(15, Number(req.query.minutes ?? 60)));
   const hours = Math.max(1, Math.ceil(minutes / 60));
-  const buckets = await getMapsTelemetryBuckets(hours);
-  return res.json({ minutes, buckets });
+  const eventType = typeof req.query.eventType === "string" && req.query.eventType ? req.query.eventType : undefined;
+  const appVersion = typeof req.query.appVersion === "string" && req.query.appVersion ? req.query.appVersion : undefined;
+  const [buckets, versions] = await Promise.all([
+    getMapsTelemetryBuckets(hours, 60, eventType, appVersion),
+    getDistinctAppVersions(),
+  ]);
+  return res.json({ minutes, buckets, versions });
 });
 
 router.get("/watchdog/maps/summary", async (_req, res) => {

@@ -12,7 +12,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
 import { getApiUrl, authFetchHeaders } from "@/lib/query-client";
-import { SparklineChart, BucketsData } from "./TelemetrySparkline";
+import { TelemetryBucketsSection } from "./TelemetryBucketsSection";
 
 interface DebugEvent {
   id: string;
@@ -126,14 +126,6 @@ export function TelemetryDebugCard() {
       queryFn: () => adminFetch("/api/admin/watchdog/maps/flags").then((r) => r.json()),
       staleTime: 8_000,
       refetchInterval: 15_000,
-    });
-
-  const { data: bucketsData, isLoading: loadingBuckets, refetch: refetchBuckets } =
-    useQuery<BucketsData>({
-      queryKey: ["/api/admin/watchdog/maps/buckets", 1440],
-      queryFn: () => adminFetch("/api/admin/watchdog/maps/buckets?minutes=1440").then((r) => r.json()),
-      staleTime: 60_000,
-      refetchInterval: 120_000,
     });
 
   const pingMutation = useMutation({
@@ -280,39 +272,8 @@ export function TelemetryDebugCard() {
         </View>
       </View>
 
-      {/* Trend 24h sparkline */}
-      <View style={s.section}>
-        <View style={s.feedHeader}>
-          <Text style={s.sectionTitle}>Trend 24h</Text>
-          <TouchableOpacity onPress={() => refetchBuckets()} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
-            {loadingBuckets ? (
-              <ActivityIndicator size="small" color={Colors.textSecondary} />
-            ) : (
-              <Ionicons name="refresh" size={14} color={Colors.textSecondary} />
-            )}
-          </TouchableOpacity>
-        </View>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-          <View style={s.sparkRow}>
-            <SparklineChart
-              buckets={bucketsData?.buckets ?? []}
-              color="#60a5fa"
-              valueKey="total"
-              label="Eventi totali / ora"
-              emptyText="Nessun dato nelle ultime 24h"
-            />
-            <View style={s.sparkDivider} />
-            <SparklineChart
-              buckets={bucketsData?.buckets ?? []}
-              color="#f87171"
-              valueKey="errors"
-              label="Errori / ora"
-              emptyText="Nessun errore nelle ultime 24h"
-            />
-          </View>
-        </ScrollView>
-        <Text style={s.refreshHint}>Auto-refresh ogni 2m</Text>
-      </View>
+      {/* Trend 24h sparkline con filtri */}
+      <TelemetryBucketsSection />
 
       {/* Live events feed */}
       <View style={s.section}>
@@ -541,17 +502,5 @@ const s = StyleSheet.create({
     color: Colors.textSecondary,
     textAlign: "right",
     marginTop: 6,
-  },
-  sparkRow: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 16,
-    paddingVertical: 4,
-  },
-  sparkDivider: {
-    width: 1,
-    height: 80,
-    backgroundColor: Colors.border,
-    alignSelf: "center",
   },
 });
