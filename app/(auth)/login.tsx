@@ -18,6 +18,7 @@ import { t } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth-context";
 import { sendStartupBeacon } from "@/lib/startup-beacon";
 import { SupportContactModal } from "@/components/SupportContactModal";
+import { parseApiError } from "@/lib/parse-api-error";
 
 const SAVED_IDENTIFIER_KEY = "bikerlink_saved_identifier";
 const SAVED_PASSWORD_KEY = "bikerlink_saved_password";
@@ -93,7 +94,7 @@ export default function LoginScreen() {
         onError: (err: Error) => {
           sendStartupBeacon("login_5_error");
           setIsSubmitting(false);
-          setError(err.message || t("auth.loginError"));
+          setError(parseApiError(err, t("auth.loginError")));
         },
       }
     );

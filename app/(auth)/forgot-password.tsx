@@ -18,6 +18,7 @@ import { apiRequest, setSessionToken } from "@/lib/query-client";
 import { queryClient } from "@/lib/query-client";
 import { useT } from "@/lib/language-context";
 import { SupportContactModal } from "@/components/SupportContactModal";
+import { parseApiError } from "@/lib/parse-api-error";
 
 const RESEND_COOLDOWN = 60;
 
@@ -69,7 +70,7 @@ export default function ForgotPasswordScreen() {
       setStep(2);
       startCooldown();
     } catch (err: unknown) {
-      setError(parseError(err, t("auth.sendErrorFP")));
+      setError(parseApiError(err, t("auth.sendErrorFP")));
     } finally {
       setLoading(false);
     }
@@ -86,7 +87,7 @@ export default function ForgotPasswordScreen() {
       setResendSuccess(true);
       startCooldown();
     } catch (err: unknown) {
-      setError(parseError(err, t("auth.sendErrorFP")));
+      setError(parseApiError(err, t("auth.sendErrorFP")));
     } finally {
       setResendLoading(false);
     }
@@ -127,7 +128,7 @@ export default function ForgotPasswordScreen() {
       queryClient.setQueryData(["/api/auth/me"], user);
       router.replace("/(tabs)");
     } catch (err: unknown) {
-      setError(parseError(err, t("auth.resetError")));
+      setError(parseApiError(err, t("auth.resetError")));
     } finally {
       setLoading(false);
     }
@@ -314,10 +315,6 @@ export default function ForgotPasswordScreen() {
       <SupportContactModal visible={showSupportModal} onClose={() => setShowSupportModal(false)} />
     </KeyboardAvoidingView>
   );
-}
-
-function parseError(err: unknown, fallback: string): string {
-  return (err instanceof Error ? err.message : null) || fallback;
 }
 
 const styles = StyleSheet.create({

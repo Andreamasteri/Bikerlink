@@ -34,6 +34,7 @@ import {
 } from "@/constants/register";
 import { useSupportSettings } from "@/lib/settings-context";
 import { SupportContactModal } from "@/components/SupportContactModal";
+import { parseApiError } from "@/lib/parse-api-error";
 
 export default function RegisterScreen() {
   const router = useRouter();
@@ -249,7 +250,7 @@ export default function RegisterScreen() {
         }
       },
       onError: (err: Error) => {
-        setError(err.message || t("auth.registerError"));
+        setError(parseApiError(err, t("auth.registerError")));
       },
     });
   };

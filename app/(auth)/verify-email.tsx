@@ -18,6 +18,7 @@ import Colors from "@/constants/colors";
 import { t as translate } from "@/lib/i18n";
 import { useT } from "@/lib/language-context";
 import { apiRequest, getApiUrl, setSessionToken } from "@/lib/query-client";
+import { parseApiError } from "@/lib/parse-api-error";
 
 const RESEND_COOLDOWN = 60;
 
@@ -99,8 +100,7 @@ export default function VerifyEmailScreen() {
       queryClient.setQueryData(["/api/auth/me"], user);
       router.replace("/(tabs)");
     } catch (err: unknown) {
-      const msg = (err instanceof Error ? err.message : "") || translate("auth.verifyError");
-      setError(friendlyError(msg));
+      setError(friendlyError(parseApiError(err, translate("auth.verifyError"))));
     } finally {
       setIsVerifying(false);
     }
@@ -115,8 +115,7 @@ export default function VerifyEmailScreen() {
       setResendSuccess(true);
       startCooldown();
     } catch (err: unknown) {
-      const msg = (err instanceof Error ? err.message : "") || translate("auth.sendError");
-      setError(friendlyError(msg));
+      setError(friendlyError(parseApiError(err, translate("auth.sendError"))));
     } finally {
       setIsResending(false);
     }
