@@ -64,7 +64,7 @@ export const matchZeroSnapshots = pgTable("match_zero_snapshots", {
   snapshotDate: date("snapshot_date").notNull(),
   totalUsers: integer("total_users").notNull().default(0),
   zeroMatchCount: integer("zero_match_count").notNull().default(0),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [
   uniqueIndex("match_zero_snapshots_date_idx").on(t.snapshotDate),
   index("match_zero_snapshots_created_idx").on(t.createdAt),
