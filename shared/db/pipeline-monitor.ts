@@ -6,6 +6,8 @@ import {
   timestamp,
   jsonb,
   index,
+  serial,
+  integer,
 } from "drizzle-orm/pg-core";
 
 export const pipelineFlowEvents = pgTable("pipeline_flow_events", {
@@ -25,3 +27,19 @@ export const pipelineFlowEvents = pgTable("pipeline_flow_events", {
 
 export type PipelineFlowEvent = typeof pipelineFlowEvents.$inferSelect;
 export type InsertPipelineFlowEvent = typeof pipelineFlowEvents.$inferInsert;
+
+// ── storico esiti probe ────────────────────────────────────────────────────────
+
+export const pipelineProbeHistory = pgTable("pipeline_probe_history", {
+  id: serial("id").primaryKey(),
+  pipeline: varchar("pipeline", { length: 60 }).notNull(),
+  overall: varchar("overall", { length: 20 }).notNull(),
+  steps: jsonb("steps").$type<Array<{ name: string; status: string; durationMs: number; message?: string }>>().notNull(),
+  durationMs: integer("duration_ms").notNull(),
+  runAt: timestamp("run_at").notNull().defaultNow(),
+}, (t) => [
+  index("pipeline_probe_history_pipeline_run_at_idx").on(t.pipeline, t.runAt),
+]);
+
+export type PipelineProbeHistory = typeof pipelineProbeHistory.$inferSelect;
+export type InsertPipelineProbeHistory = typeof pipelineProbeHistory.$inferInsert;

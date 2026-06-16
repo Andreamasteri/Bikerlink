@@ -6,8 +6,8 @@ import { runPipelineChecks, getLastPipelineRunResult, isPipelineRunInProgress } 
 import { detectPipelineHoles, getLastHoles } from "../../ai/pipeline-monitor/hole-detector";
 import type { PipelineName } from "../../ai/pipeline-monitor/types";
 import { db } from "../../db";
-import { diagnosticReports } from "@shared/db";
-import { desc } from "drizzle-orm";
+import { diagnosticReports, pipelineProbeHistory } from "@shared/db";
+import { desc, eq } from "drizzle-orm";
 
 const VALID_PIPELINES: PipelineName[] = [
   "telemetry_ride", "telemetry_maps", "matching", "campaigns",
@@ -43,6 +43,37 @@ router.post("/pipeline-check/run", async (req: Request, res: Response) => {
 router.get("/pipeline-check/last", (_req: Request, res: Response) => {
   const result = getLastPipelineRunResult();
   return res.json({ result, inProgress: isPipelineRunInProgress() });
+});
+
+// GET /api/admin/pipeline-check/history?pipeline=<name>&limit=<n>
+// Restituisce lo storico esiti di una pipeline (per sparkline).
+router.get("/pipeline-check/history", async (req: Request, res: Response) => {
+  const pipeline = (req.query as Record<string, string>).pipeline ?? "";
+  const limitRaw = parseInt((req.query as Record<string, string>).limit ?? "24", 10);
+  const limit = isNaN(limitRaw) || limitRaw < 1 ? 24 : Math.min(limitRaw, 100);
+
+  if (!VALID_PIPELINES.includes(pipeline as PipelineName)) {
+    return sendError(res, 400, "pipeline non valida");
+  }
+
+  try {
+    const rows = await db
+      .select({
+        id: pipelineProbeHistory.id,
+        overall: pipelineProbeHistory.overall,
+        durationMs: pipelineProbeHistory.durationMs,
+        runAt: pipelineProbeHistory.runAt,
+      })
+      .from(pipelineProbeHistory)
+      .where(eq(pipelineProbeHistory.pipeline, pipeline))
+      .orderBy(desc(pipelineProbeHistory.runAt))
+      .limit(limit);
+
+    return res.json({ pipeline, history: rows.reverse() });
+  } catch (err) {
+    console.error("[pipeline-check] history error:", err);
+    return sendError(res, 500, (err as Error).message ?? "Errore interno");
+  }
 });
 
 // GET /api/admin/pipeline-check/holes

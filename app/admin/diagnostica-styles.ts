@@ -76,6 +76,21 @@ const s = StyleSheet.create({
   stepMsg: { fontSize: 11, color: Colors.textSecondary, marginTop: 1 },
   stepDur: { fontSize: 11, minWidth: 48, textAlign: "right" },
 
+  sparklineRow: {
+    flexDirection: "row" as const,
+    alignItems: "center",
+    paddingHorizontal: 12,
+    paddingBottom: 8,
+    gap: 3,
+    flexWrap: "wrap" as const,
+  },
+  sparklinkDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+    opacity: 0.85,
+  },
+
   suggestedFix: {
     flexDirection: "row", gap: 6, alignItems: "flex-start",
     backgroundColor: "#f59e0b18", borderRadius: 6, padding: 8, marginTop: 4,

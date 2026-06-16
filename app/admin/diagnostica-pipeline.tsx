@@ -7,10 +7,40 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import Colors from "@/constants/colors";
 import s from "./diagnostica-styles";
 import {
-  PipelineStep, PipelineResult, PipelineRunResult,
+  PipelineStep, PipelineResult, PipelineRunResult, ProbeHistoryEntry, ProbeHistoryResult,
   adminFetch, overallColor, statusColor, overallIcon, timeAgo,
 } from "./diagnostica-types";
 import { TelemetryProbeCard } from "./diagnostica-monitor";
+
+// ─── sparkline ────────────────────────────────────────────────────────────────
+
+function PipelineSparkline({ pipeline }: { pipeline: string }) {
+  const { data } = useQuery<ProbeHistoryResult>({
+    queryKey: ["/api/admin/pipeline-check/history", pipeline],
+    queryFn: async () => {
+      const r = await adminFetch(`/api/admin/pipeline-check/history?pipeline=${encodeURIComponent(pipeline)}&limit=24`);
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      return r.json() as Promise<ProbeHistoryResult>;
+    },
+    staleTime: 60_000,
+  });
+
+  const entries: ProbeHistoryEntry[] = data?.history ?? [];
+  if (entries.length === 0) return null;
+
+  return (
+    <View style={s.sparklineRow}>
+      {entries.map((e) => (
+        <View
+          key={e.id}
+          style={[s.sparklinkDot, { backgroundColor: overallColor(e.overall) }]}
+        />
+      ))}
+    </View>
+  );
+}
+
+// ─── step row ─────────────────────────────────────────────────────────────────
 
 function StepRow({ step }: { step: PipelineStep }) {
   return (
@@ -24,6 +54,8 @@ function StepRow({ step }: { step: PipelineStep }) {
     </View>
   );
 }
+
+// ─── pipeline card ────────────────────────────────────────────────────────────
 
 function PipelineCard({ result }: { result: PipelineResult }) {
   const [expanded, setExpanded] = useState(result.overall !== "ok");
@@ -40,6 +72,9 @@ function PipelineCard({ result }: { result: PipelineResult }) {
         </View>
       </TouchableOpacity>
 
+      {/* Sparkline — ultimi 24 esiti */}
+      <PipelineSparkline pipeline={result.pipeline} />
+
       {expanded && (
         <View style={s.pipelineBody}>
           {result.steps.map((step, i) => <StepRow key={i} step={step} />)}
@@ -54,6 +89,8 @@ function PipelineCard({ result }: { result: PipelineResult }) {
     </View>
   );
 }
+
+// ─── tab radiografia ──────────────────────────────────────────────────────────
 
 export function TabRadiografia() {
   const qc = useQueryClient();
@@ -86,6 +123,7 @@ export function TabRadiografia() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["/api/admin/pipeline-check/last"] });
+      qc.invalidateQueries({ queryKey: ["/api/admin/pipeline-check/history"] });
       setPolling(false);
       if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
     },

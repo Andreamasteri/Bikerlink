@@ -49,6 +49,18 @@ export interface HolesResult {
   recent: PipelineHole[];
 }
 
+export interface ProbeHistoryEntry {
+  id: number;
+  overall: OverallStatus;
+  durationMs: number;
+  runAt: string;
+}
+
+export interface ProbeHistoryResult {
+  pipeline: string;
+  history: ProbeHistoryEntry[];
+}
+
 export interface DiagnosticReport {
   id: string;
   userId?: string | null;

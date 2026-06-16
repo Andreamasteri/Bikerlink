@@ -10,6 +10,8 @@ import {
   checkChat, checkRoadHazards, checkAiAssistant, checkSessionCrash,
 } from "./checks/misc";
 import type { PipelineName, PipelineRunResult, PipelineCheckResult } from "./types";
+import { db } from "../../db";
+import { pipelineProbeHistory } from "@shared/db";
 
 type CheckFn = () => Promise<PipelineCheckResult>;
 
@@ -43,6 +45,20 @@ export function getLastPipelineRunResult(): PipelineRunResult | null {
 
 export function isPipelineRunInProgress(): boolean {
   return _runInProgress;
+}
+
+async function savePipelineHistory(results: PipelineCheckResult[]): Promise<void> {
+  try {
+    const rows = results.map((r) => ({
+      pipeline: r.pipeline,
+      overall: r.overall,
+      steps: r.steps,
+      durationMs: r.durationMs,
+    }));
+    await db.insert(pipelineProbeHistory).values(rows);
+  } catch (err) {
+    console.error("[pipeline-check] history save error:", err);
+  }
 }
 
 export async function runPipelineChecks(opts: {
@@ -94,13 +110,16 @@ export async function runPipelineChecks(opts: {
 
     _lastRunResult = runResult;
 
-    await writeWatchdogLog({
-      kind: "report",
-      scope: "pipeline-check",
-      status: overall === "ok" ? "ok" : overall === "degraded" ? "warn" : "error",
-      summary: `Pipeline check (${scope}): ${overall} — ${results.length} pipeline in ${runResult.durationMs}ms (trigger=${triggeredBy})`,
-      details: runResult,
-    });
+    await Promise.all([
+      writeWatchdogLog({
+        kind: "report",
+        scope: "pipeline-check",
+        status: overall === "ok" ? "ok" : overall === "degraded" ? "warn" : "error",
+        summary: `Pipeline check (${scope}): ${overall} — ${results.length} pipeline in ${runResult.durationMs}ms (trigger=${triggeredBy})`,
+        details: runResult,
+      }),
+      savePipelineHistory(results),
+    ]);
 
     pipelineRunEmitter.emit("run-complete", runResult);
 
