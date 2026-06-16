@@ -9,7 +9,7 @@ import { onlineTracker } from "../../online-tracker";
 import { revokeSessionsByType } from "../../session-utils";
 import { notifySessionDisplaced } from "../../session-sse";
 import { sendSuccess, sendError } from "../../lib/api-response";
-import { withDbTimeout, DbTimeoutError } from "../../db";
+import { withDbTimeout, DbTimeoutError, isPoolHealthy } from "../../db";
 import { parseVisitorCookie, recordVisit } from "../../lib/visitor-tracking";
 import { createRegionalClubInvite } from "../motoclubs";
 import { addSessionSseClient, removeSessionSseClient } from "../../session-sse";
@@ -45,6 +45,11 @@ router.post("/login", loginLimiter, async (req: Request, res: Response) => {
 
     const { identifier: rawIdentifier, password, latitude: loginLat, longitude: loginLng, platform: loginPlatform } = parsed.data;
     const identifier = rawIdentifier.trim();
+
+    if (!isPoolHealthy()) {
+      console.warn("[login] DB pool saturated — short-circuiting before query");
+      return sendError(res, 503, "Servizio temporaneamente non disponibile. Riprova tra qualche secondo.");
+    }
 
     let user = await withDbTimeout(storage.getUserByEmail(identifier));
     if (!user) {

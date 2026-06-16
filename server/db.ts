@@ -50,3 +50,18 @@ export function withDbTimeout<T>(promise: Promise<T>, ms = 4500): Promise<T> {
   });
   return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
 }
+
+/**
+ * Fast pool-health check — no DB query involved.
+ * Returns false when the pool is saturated (all connections busy and at least
+ * one request already waiting), meaning any new query would queue and likely
+ * time out. Callers should return 503 immediately instead of touching the DB.
+ */
+export function isPoolHealthy(): boolean {
+  const { totalCount, idleCount, waitingCount, options } = pool as typeof pool & {
+    options: { max?: number };
+  };
+  const maxConns = options?.max ?? 10;
+  const saturated = totalCount >= maxConns && idleCount === 0 && waitingCount > 0;
+  return !saturated;
+}
