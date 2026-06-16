@@ -2,6 +2,7 @@
 import { db } from "../../../db";
 import { sql } from "drizzle-orm";
 import type { Signal } from "../types";
+import { recordSuccess as cbRecordSuccess, recordFailure as cbRecordFailure } from "../../../db-circuit-breaker";
 
 export async function collectDb(): Promise<Signal[]> {
   const signals: Signal[] = [];
@@ -10,6 +11,7 @@ export async function collectDb(): Promise<Signal[]> {
     // Ping
     await db.execute(sql`SELECT 1`);
     const pingMs = Date.now() - started;
+    cbRecordSuccess();
     if (pingMs > 5000) {
       try {
         const poolMod = await import("../../../db").catch(() => null);
@@ -73,6 +75,7 @@ export async function collectDb(): Promise<Signal[]> {
       }
     } catch { /* ignore */ }
   } catch (err) {
+    cbRecordFailure(err);
     signals.push({
       source: "db", metric: "collector.error", severity: "critical",
       details: { error: (err as Error).message },

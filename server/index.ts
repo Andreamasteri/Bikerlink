@@ -22,6 +22,7 @@ import { registerAllRoutes } from "./route-mounter";
 import { setupErrorHandler } from "./error-handler";
 import { initSentry, attachSentryErrorHandler } from "./sentry";
 import { runBootSequence } from "./boot-sequence";
+import { isOpen as dbCircuitOpen } from "./db-circuit-breaker";
 
 // ── Express app ──────────────────────────────────────────────────────────────
 const app = express();
@@ -54,6 +55,21 @@ app.use("/api", (req: Request, res: Response, next) => {
   if (!initState.initializing) return next();
   if (req.path === "/health") return next();
   return res.status(503).json({ status: "initializing", initializing: true });
+});
+
+// DB circuit breaker — fast-fail 503 JSON quando il DB è irraggiungibile.
+// Escluse: /api/health, /api/_internal (token-only, no DB gate), /api/metrics.
+app.use("/api", (req: Request, res: Response, next) => {
+  if (req.path === "/health" || req.path.startsWith("/_internal") || req.path === "/metrics") {
+    return next();
+  }
+  if (dbCircuitOpen()) {
+    return res.status(503).json({
+      success: false,
+      message: "Servizio temporaneamente non disponibile. Riprova tra qualche secondo.",
+    });
+  }
+  return next();
 });
 
 registerAllRoutes(app);
