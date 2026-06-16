@@ -32,8 +32,8 @@ import { protectedNicknamesSqlArray } from "./protection-filter";
  * lookup ripetuti per i neighbor restituiti da findSimilar.
  */
 
-const DEFAULT_K = 10;
-const DEFAULT_MIN_SIMILARITY = 0.55;
+const DEFAULT_K = 20;
+const DEFAULT_MIN_SIMILARITY = 0.40;
 const DEFAULT_W_TAG = 0.5;
 const DEFAULT_W_EMB = 0.5;
 
@@ -219,6 +219,8 @@ export async function runMusicAffinityMatching(): Promise<number> {
     let matchCount = 0;
     let attempted = 0;
     let skipped = 0;
+    let skippedBelowThreshold = 0;
+    let usersBlockedBySoglia = 0;
     let usersProcessed = 0;
     let batchIndex = 0;
 
@@ -239,6 +241,9 @@ export async function runMusicAffinityMatching(): Promise<number> {
         const neighbors = await findSimilar("user", "music_taste", vector, DEFAULT_K + 1, 0);
         const setA = tagSetsByUser.get(uidA) ?? new Set<string>();
 
+        let userMatchesThisRun = 0;
+        let userPairsBelowSoglia = 0;
+
         for (const hit of neighbors) {
           if (matchCount >= maxTotal) break outer;
           const uidB = hit.entityId;
@@ -252,7 +257,7 @@ export async function runMusicAffinityMatching(): Promise<number> {
           const embSim = Math.max(0, Math.min(1, hit.similarity));
           const combined = ov.jaccard * wTag + embSim * wEmb;
           attempted++;
-          if (combined < minCombined) { skipped++; continue; }
+          if (combined < minCombined) { skipped++; skippedBelowThreshold++; userPairsBelowSoglia++; continue; }
 
           const idA = uidA < uidB ? uidA : uidB;
           const idB = uidA < uidB ? uidB : uidA;
@@ -270,12 +275,18 @@ export async function runMusicAffinityMatching(): Promise<number> {
               })
               .onConflictDoNothing()
               .returning({ id: musicAffinityMatches.id });
-            if (inserted.length > 0) matchCount++;
+            if (inserted.length > 0) { matchCount++; userMatchesThisRun++; }
             else skipped++;
           } catch (err) {
             console.error("[MusicAffinity] insert err:", err);
             skipped++;
           }
+        }
+
+        // Utente bloccato dalla soglia: ha avuto candidati valutati ma
+        // nessun match prodotto e almeno una coppia scartata per soglia.
+        if (userMatchesThisRun === 0 && userPairsBelowSoglia > 0) {
+          usersBlockedBySoglia++;
         }
       }
 
@@ -288,7 +299,9 @@ export async function runMusicAffinityMatching(): Promise<number> {
     const usersSkipped = allUserIds.length - usersProcessed;
 
     console.log(
-      `[MusicAffinity] ${matchCount} match (cap=${maxTotal}, combined>=${minCombined}, w_tag=${wTag}, w_emb=${wEmb}); utenti_processati=${usersProcessed}, utenti_saltati=${usersSkipped}, valutati=${attempted}, saltati=${skipped}`,
+      `[MusicAffinity] ${matchCount} match (cap=${maxTotal}, combined>=${minCombined}, K=${DEFAULT_K}, w_tag=${wTag}, w_emb=${wEmb}); ` +
+      `utenti_processati=${usersProcessed}, utenti_saltati=${usersSkipped}, utenti_bloccati_da_soglia=${usersBlockedBySoglia}, ` +
+      `coppie_valutate=${attempted}, saltate_sotto_soglia=${skippedBelowThreshold}, saltate_altro=${skipped - skippedBelowThreshold}`,
     );
 
     if (capReached) {
