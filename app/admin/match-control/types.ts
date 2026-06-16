@@ -10,6 +10,11 @@ export const FRESHNESS_KEYS = {
   archiveAfter: "match_archive_after_days",
 } as const;
 
+export const MUSIC_KEYS = {
+  musicK: "match_music_k",
+  musicThreshold: "music_taste_combined",
+} as const;
+
 export interface MatchStat {
   typeKey: string;
   typeName: string;

@@ -25,6 +25,7 @@ import { EngineActionsCard } from "./match-control/EngineActionsCard";
 import {
   AppSettingRow,
   FRESHNESS_KEYS,
+  MUSIC_KEYS,
   MatchSettingsResponse,
   MatchingStatsResponse,
   LockStateResponse,
@@ -80,6 +81,18 @@ export default function MatchControlScreen() {
       halflifeGeneric: num(find(FRESHNESS_KEYS.halflifeGeneric), 7),
       halflifeProposal: num(find(FRESHNESS_KEYS.halflifeProposal), 2),
       archiveAfter: num(find(FRESHNESS_KEYS.archiveAfter), 30),
+    };
+  }, [allSettings]);
+
+  const musicAffinity = useMemo(() => {
+    const find = (k: string) => allSettings?.find((s) => s.key === k)?.value;
+    const num = (v: string | null | undefined, dflt: number) => {
+      const n = v != null ? Number(v) : NaN;
+      return Number.isFinite(n) ? n : dflt;
+    };
+    return {
+      musicK: num(find(MUSIC_KEYS.musicK), 5),
+      musicThreshold: num(find(MUSIC_KEYS.musicThreshold), 0.55),
     };
   }, [allSettings]);
 
@@ -188,6 +201,34 @@ export default function MatchControlScreen() {
           <Ionicons name="archive-outline" size={18} color={Colors.accent} />
           <Text style={styles.archiveLinkText}>Visualizza match archiviati</Text>
         </TouchableOpacity>
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Music Affinity</Text>
+        <View style={styles.freshnessCard}>
+          <Text style={styles.freshnessHelp}>
+            K = numero di vicini musicali confrontati per utente (min 1).{"\n"}
+            Soglia = similarità Jaccard minima per considerare due gusti compatibili (0–1).
+          </Text>
+          <FreshnessSlider
+            label="K vicini musicali (match_music_k)"
+            value={musicAffinity.musicK}
+            min={1}
+            max={50}
+            step={1}
+            unit=""
+            onCommit={(v) => settingMutation.mutate({ key: MUSIC_KEYS.musicK, value: Math.round(v) })}
+          />
+          <FreshnessSlider
+            label="Soglia affinità (music_taste_combined)"
+            value={musicAffinity.musicThreshold}
+            min={0}
+            max={1}
+            step={0.05}
+            unit=""
+            onCommit={(v) => settingMutation.mutate({ key: MUSIC_KEYS.musicThreshold, value: Math.round(v * 100) / 100 })}
+          />
+        </View>
       </View>
 
       <View style={styles.section}>

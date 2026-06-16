@@ -13,6 +13,7 @@ export function FreshnessSlider({
   step,
   unit,
   onCommit,
+  precision = 1,
 }: {
   label: string;
   value: number;
@@ -21,15 +22,20 @@ export function FreshnessSlider({
   step: number;
   unit: string;
   onCommit: (v: number) => void;
+  precision?: number;
 }) {
   const [local, setLocal] = useState(value);
   useEffect(() => setLocal(value), [value]);
+  const round = (v: number) => {
+    const factor = Math.pow(10, precision);
+    return Math.round(v * factor) / factor;
+  };
   return (
     <View style={styles.sliderRow}>
       <View style={styles.sliderLabelRow}>
         <Text style={styles.sliderLabel}>{label}</Text>
         <Text style={styles.sliderValue}>
-          {local} {unit}
+          {round(local)} {unit}
         </Text>
       </View>
       <Slider
@@ -39,7 +45,7 @@ export function FreshnessSlider({
         step={step}
         value={local}
         onValueChange={setLocal}
-        onSlidingComplete={(v) => onCommit(Math.round(v * 10) / 10)}
+        onSlidingComplete={(v) => onCommit(round(v))}
         minimumTrackTintColor={Colors.accent}
         maximumTrackTintColor={Colors.border}
         thumbTintColor={Colors.accent}
