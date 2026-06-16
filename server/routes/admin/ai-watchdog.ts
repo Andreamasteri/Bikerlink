@@ -3,7 +3,7 @@ import { Router, type Request, type Response } from "express";
 import { sendError } from "../../lib/api-response";
 import { db } from "../../db";
 import { aiWatchdogLog, weeklySystemReports } from "@shared/db";
-import { desc, eq } from "drizzle-orm";
+import { desc, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 import { getLatestSnapshot, runAggregatorCycle, getRecentSnapshots } from "../../ai/watchdog/aggregator";
 import { streamWatchdogChat } from "../../ai/watchdog/chat";
@@ -286,6 +286,82 @@ router.post("/watchdog/proposer/settings", async (req, res) => {
   if (!parsed.success) return sendError(res, 400, parsed.error.issues[0].message);
   await setProposerModel(parsed.data.model);
   return res.json({ model: parsed.data.model });
+});
+
+// === Crash Breakdown ===
+
+router.get("/watchdog/crash-breakdown", async (req, res) => {
+  const days = Math.min(30, Math.max(1, Number(req.query.days ?? 7)));
+  const limit = Math.min(50, Math.max(1, Number(req.query.limit ?? 15)));
+  const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+  try {
+    const result = await db.execute(sql`
+      SELECT
+        crash_type,
+        app_version,
+        LEFT(error_message, 200) AS error_summary,
+        COUNT(*)::int                AS total,
+        MAX(reported_at)             AS last_seen
+      FROM app_crash_logs
+      WHERE reported_at >= ${since}
+        AND crash_type IN ('crash_system', 'crash_js')
+      GROUP BY crash_type, app_version, LEFT(error_message, 200)
+      ORDER BY total DESC
+      LIMIT ${limit}
+    `);
+    return res.json({
+      days,
+      groups: (result.rows as Record<string, unknown>[]).map((r) => ({
+        crashType: r.crash_type,
+        appVersion: r.app_version ?? null,
+        errorSummary: r.error_summary ?? null,
+        total: Number(r.total),
+        lastSeen: r.last_seen instanceof Date ? r.last_seen.toISOString() : String(r.last_seen ?? ""),
+      })),
+    });
+  } catch (err) {
+    return sendError(res, 500, (err as Error).message);
+  }
+});
+
+router.get("/watchdog/crash-breakdown/samples", async (req, res) => {
+  const crashType = typeof req.query.crashType === "string" ? req.query.crashType : null;
+  const appVersion = typeof req.query.appVersion === "string" ? req.query.appVersion : null;
+  const errorSummary = typeof req.query.errorSummary === "string" ? req.query.errorSummary : null;
+  const limit = Math.min(20, Math.max(1, Number(req.query.limit ?? 5)));
+  const days = Math.min(30, Math.max(1, Number(req.query.days ?? 7)));
+  const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+  try {
+    const result = await db.execute(sql`
+      SELECT
+        id, crash_type, app_version, platform, os_version, device_model, device_brand,
+        error_message, stack_trace, reported_at, user_id
+      FROM app_crash_logs
+      WHERE reported_at >= ${since}
+        AND crash_type = ${crashType ?? "crash_js"}
+        AND (${appVersion ?? null} IS NULL OR app_version = ${appVersion ?? null})
+        AND (${errorSummary ?? null} IS NULL OR LEFT(error_message, 200) = ${errorSummary ?? null})
+      ORDER BY reported_at DESC
+      LIMIT ${limit}
+    `);
+    return res.json({
+      samples: (result.rows as Record<string, unknown>[]).map((r) => ({
+        id: r.id,
+        crashType: r.crash_type,
+        appVersion: r.app_version ?? null,
+        platform: r.platform ?? null,
+        osVersion: r.os_version ?? null,
+        deviceModel: r.device_model ?? null,
+        deviceBrand: r.device_brand ?? null,
+        errorMessage: r.error_message ?? null,
+        stackTrace: r.stack_trace ?? null,
+        reportedAt: r.reported_at instanceof Date ? r.reported_at.toISOString() : String(r.reported_at ?? ""),
+        userId: r.user_id ?? null,
+      })),
+    });
+  } catch (err) {
+    return sendError(res, 500, (err as Error).message);
+  }
 });
 
 export default router;
