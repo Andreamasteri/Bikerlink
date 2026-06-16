@@ -89,6 +89,16 @@ export function AiTokenAuditCard() {
     onError: (err: Error) => Alert.alert("Errore", err.message),
   });
 
+  const dismissError = useMutation({
+    mutationFn: async () => {
+      await apiRequest("DELETE", "/api/admin/ai/token-audit/error");
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["/api/admin/ai/token-audit"] });
+    },
+    onError: (err: Error) => Alert.alert("Errore", err.message),
+  });
+
   const subsystems = auditQ.data?.audit?.subsystems ?? {};
   const entries = Object.entries(subsystems).sort((a, b) => b[1].total - a[1].total);
   const grandTotal = entries.reduce((s, [, v]) => s + v.total, 0);
@@ -116,6 +126,15 @@ export function AiTokenAuditCard() {
             <Text style={styles.errorMsg} numberOfLines={3}>{lastError.message}</Text>
             <Text style={styles.errorAt}>Rilevato il {fmtDateTime(lastError.at)}</Text>
           </View>
+          <TouchableOpacity
+            style={styles.dismissBtn}
+            onPress={() => dismissError.mutate()}
+            disabled={dismissError.isPending}
+          >
+            <Text style={styles.dismissBtnText}>
+              {dismissError.isPending ? "…" : "Ignora"}
+            </Text>
+          </TouchableOpacity>
         </View>
       )}
 
@@ -239,6 +258,11 @@ const styles = StyleSheet.create({
   errorTitle: { color: "#fca5a5", fontSize: 12, fontWeight: "700" as const, marginBottom: 2 },
   errorMsg: { color: "#f87171", fontSize: 11, fontFamily: "monospace" as const },
   errorAt: { color: "#9ca3af", fontSize: 10, marginTop: 3 },
+  dismissBtn: {
+    backgroundColor: "#3f1212", borderWidth: 1, borderColor: "#7f1d1d",
+    borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4, alignSelf: "flex-start",
+  },
+  dismissBtnText: { color: "#fca5a5", fontSize: 11, fontWeight: "600" as const },
   // Stale banner (giallo)
   staleBanner: {
     flexDirection: "row", alignItems: "center", gap: 6,

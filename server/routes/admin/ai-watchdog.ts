@@ -22,7 +22,7 @@ const MAPS_FLAGS: readonly MapsKillSwitchKey[] = ["telemetry", "collector", "llm
 import { getMapsTelemetryBuckets, aggregateMapsTelemetry, getMapsSummaryTelemetry } from "../../ai/watchdog/maps-telemetry-store";
 import { getLastHealthCheckResults, runMapsHealthChecks } from "../../ai/watchdog/maps-health-checks";
 import { getRoutingCounters } from "../../routing/routing-metrics";
-import { getAiTokenAuditStatus } from "../../ai/audit";
+import { getAiTokenAuditStatus, clearAuditError } from "../../ai/audit";
 import { getProposerSettings, setProposerModel } from "../../ai/watchdog/proposer";
 import { getGroqTpdStatus, resetGroqTpd, setGroqTpdSoftCap } from "../../ai/groq-quota";
 
@@ -242,6 +242,11 @@ router.get("/ai/token-audit", async (req, res) => {
     stale: status.stale,
     lastError: status.lastError,
   });
+});
+
+router.delete("/ai/token-audit/error", async (_req, res) => {
+  await clearAuditError();
+  return res.json({ ok: true });
 });
 
 // === Groq quota management ===

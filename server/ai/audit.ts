@@ -33,6 +33,8 @@ export interface AiTokenAuditStatus {
 const AI_AUDIT_ERROR_KEY = "ai_audit_error_state";
 /** Ore senza aggiornamento prima di considerare il contatore stale */
 const STALE_HOURS = 6;
+/** Ore dopo le quali un errore persistito viene ignorato automaticamente (TTL) */
+const ERROR_TTL_HOURS = 24;
 
 function todayKey(): string {
   return `ai_token_audit_${new Date().toISOString().slice(0, 10)}`;
@@ -95,7 +97,7 @@ async function persistAuditError(message: string): Promise<void> {
  * Cancella lo stato di errore persistito dopo una scrittura riuscita.
  * Non lancia mai eccezioni.
  */
-async function clearAuditError(): Promise<void> {
+export async function clearAuditError(): Promise<void> {
   try {
     await db.execute(sql`DELETE FROM app_settings WHERE key = ${AI_AUDIT_ERROR_KEY}`);
   } catch {
@@ -105,6 +107,8 @@ async function clearAuditError(): Promise<void> {
 
 /**
  * Legge l'ultimo errore persistito, se presente.
+ * Applica un TTL di ERROR_TTL_HOURS: se l'errore è più vecchio lo cancella
+ * silenziosamente e restituisce null, così il banner sparisce automaticamente.
  */
 async function readAuditError(): Promise<{ message: string; at: string } | null> {
   try {
@@ -120,7 +124,14 @@ async function readAuditError(): Promise<{ message: string; at: string } | null>
       "message" in parsed &&
       "at" in parsed
     ) {
-      return parsed as { message: string; at: string };
+      const entry = parsed as { message: string; at: string };
+      const ageMs = Date.now() - new Date(entry.at).getTime();
+      if (ageMs > ERROR_TTL_HOURS * 60 * 60 * 1000) {
+        // Errore scaduto: rimuovilo in background e restituisci null
+        void clearAuditError();
+        return null;
+      }
+      return entry;
     }
     return null;
   } catch {
