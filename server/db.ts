@@ -34,3 +34,19 @@ pool.on("error", (err) => {
 });
 
 export const db = drizzle(pool, { schema });
+
+export class DbTimeoutError extends Error {
+  readonly isDbTimeout = true;
+  constructor(ms: number) {
+    super(`DB query timeout after ${ms}ms`);
+    this.name = "DbTimeoutError";
+  }
+}
+
+export function withDbTimeout<T>(promise: Promise<T>, ms = 4500): Promise<T> {
+  let timer: ReturnType<typeof setTimeout>;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new DbTimeoutError(ms)), ms);
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+}

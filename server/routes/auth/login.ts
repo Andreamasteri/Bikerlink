@@ -9,6 +9,7 @@ import { onlineTracker } from "../../online-tracker";
 import { revokeSessionsByType } from "../../session-utils";
 import { notifySessionDisplaced } from "../../session-sse";
 import { sendSuccess, sendError } from "../../lib/api-response";
+import { withDbTimeout, DbTimeoutError } from "../../db";
 import { parseVisitorCookie, recordVisit } from "../../lib/visitor-tracking";
 import { createRegionalClubInvite } from "../motoclubs";
 import { addSessionSseClient, removeSessionSseClient } from "../../session-sse";
@@ -45,9 +46,9 @@ router.post("/login", loginLimiter, async (req: Request, res: Response) => {
     const { identifier: rawIdentifier, password, latitude: loginLat, longitude: loginLng, platform: loginPlatform } = parsed.data;
     const identifier = rawIdentifier.trim();
 
-    let user = await storage.getUserByEmail(identifier);
+    let user = await withDbTimeout(storage.getUserByEmail(identifier));
     if (!user) {
-      user = await storage.getUserByNickname(identifier);
+      user = await withDbTimeout(storage.getUserByNickname(identifier));
     }
 
     if (!user) {
@@ -62,7 +63,7 @@ router.post("/login", loginLimiter, async (req: Request, res: Response) => {
       return sendError(res, 403, "Account sospeso o bloccato");
     }
 
-    const emailVerifSetting = await storage.getAppSetting("email_verification_enabled");
+    const emailVerifSetting = await withDbTimeout(storage.getAppSetting("email_verification_enabled"));
     if (emailVerifSetting?.value === "true" && !user.emailVerified && !user.isPrimal && user.role !== "admin") {
       return sendError(res, 403, "Verifica la tua email prima di accedere. Controlla la tua casella di posta.");
     }
@@ -76,7 +77,7 @@ router.post("/login", loginLimiter, async (req: Request, res: Response) => {
     if (!user.firstLoginAt) {
       updateData.firstLoginAt = new Date();
     }
-    await storage.updateUser(user.id, updateData);
+    await withDbTimeout(storage.updateUser(user.id, updateData));
 
     const effectiveRegion = user.region;
     const effectiveCountry = user.country;
@@ -184,6 +185,13 @@ router.post("/login", loginLimiter, async (req: Request, res: Response) => {
       sessionType,
     });
   } catch (error) {
+    const isPgStatementTimeout =
+      error instanceof Error &&
+      (error as unknown as { code?: string }).code === "57014";
+    if (error instanceof DbTimeoutError || isPgStatementTimeout) {
+      console.error("[login] DB timeout:", (error as Error).message);
+      return sendError(res, 503, "Servizio temporaneamente non disponibile. Riprova.");
+    }
     console.error("Login error:", error);
     return sendError(res, 500, "Errore interno del server");
   }
