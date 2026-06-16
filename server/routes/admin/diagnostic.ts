@@ -87,6 +87,44 @@ router.post("/diagnostic-reports/trigger/:userId", async (req: Request, res: Res
   }
 });
 
+router.post("/diagnostic/request", async (req: Request, res: Response) => {
+  try {
+    const userId = typeof req.body?.userId === "string" ? req.body.userId.trim() : null;
+    if (!userId) return sendError(res, 400, "userId obbligatorio");
+
+    const user = await storage.getUser(userId);
+    if (!user) return sendError(res, 404, "Utente non trovato");
+
+    const existing = await db.select({ id: diagnosticQueue.id })
+      .from(diagnosticQueue)
+      .where(
+        and(
+          eq(diagnosticQueue.userId, userId),
+          isNull(diagnosticQueue.executedAt),
+          gt(diagnosticQueue.expiresAt, new Date()),
+        )
+      )
+      .limit(1);
+
+    if (existing.length > 0) {
+      return sendError(res, 409, "Esiste già un comando pendente per questo utente");
+    }
+
+    const adminId = (req as Request & { currentUser?: { id: string } }).currentUser?.id;
+    await db.insert(diagnosticQueue).values({
+      userId,
+      commandedBy: adminId ?? null,
+      showBanner: false,
+      expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+    });
+
+    return res.json({ ok: true, message: "Comando in coda — l'app lo eseguirà al prossimo polling" });
+  } catch (err) {
+    console.error("[admin/diagnostic/request] POST error:", err);
+    return sendError(res, 500, "Errore creazione comando");
+  }
+});
+
 router.get("/diagnostic-reports/online-users", (_req: Request, res: Response) => {
   try {
     const onlineUsers = getOnlineUsers();

@@ -1,7 +1,8 @@
 import { Router, type Request, type Response } from "express";
 import { db } from "../db";
-import { diagnosticReports } from "@shared/db";
+import { diagnosticReports, diagnosticQueue } from "@shared/db";
 import { sendError } from "../lib/api-response";
+import { and, eq, gt, isNull } from "drizzle-orm";
 
 const router = Router();
 
@@ -28,7 +29,7 @@ router.post("/report", async (req: Request, res: Response) => {
       results?: unknown;
     };
 
-    const allowed = ["auto", "admin", "user"];
+    const allowed = ["auto", "admin", "remote", "user"];
     const safeTriggeredBy = allowed.includes(triggeredBy) ? triggeredBy : "user";
 
     const [report] = await db.insert(diagnosticReports).values({
@@ -42,10 +43,49 @@ router.post("/report", async (req: Request, res: Response) => {
       results: results as Record<string, unknown>[] ?? null,
     }).returning({ id: diagnosticReports.id });
 
+    if (safeTriggeredBy === "remote") {
+      try {
+        await db.update(diagnosticQueue)
+          .set({ executedAt: new Date() })
+          .where(
+            and(
+              eq(diagnosticQueue.userId, req.session.userId),
+              isNull(diagnosticQueue.executedAt),
+              gt(diagnosticQueue.expiresAt, new Date()),
+            )
+          );
+      } catch {
+        // best-effort: don't fail the report save
+      }
+    }
+
     return res.json({ id: report?.id, ok: true });
   } catch (err) {
     console.error("[diagnostic/report] POST error:", err);
     return sendError(res, 500, "Errore salvataggio report");
+  }
+});
+
+router.get("/pending", async (req: Request, res: Response) => {
+  try {
+    if (!req.session.userId) {
+      return sendError(res, 401, "Non autenticato");
+    }
+    const rows = await db.select({ id: diagnosticQueue.id })
+      .from(diagnosticQueue)
+      .where(
+        and(
+          eq(diagnosticQueue.userId, req.session.userId),
+          isNull(diagnosticQueue.executedAt),
+          gt(diagnosticQueue.expiresAt, new Date()),
+        )
+      )
+      .limit(1);
+
+    return res.json({ pending: rows.length > 0 });
+  } catch (err) {
+    console.error("[diagnostic/pending] GET error:", err);
+    return sendError(res, 500, "Errore verifica comando");
   }
 });
 
