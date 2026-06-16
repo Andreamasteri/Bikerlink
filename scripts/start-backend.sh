@@ -47,14 +47,14 @@ if [ -f "$LOCK_FILE" ]; then
   # potrebbe aver appena creato il file ma non aver ancora scritto il proprio PID.
   # NON rimuovere il lock in quel caso — altrimenti si genera la race EADDRINUSE.
   if [ -z "$LOCK_PID" ] || ! [[ "$LOCK_PID" =~ ^[0-9]+$ ]]; then
-    echo "Lock file trovato con PID vuoto/non numerico ('$LOCK_PID') — un'altra istanza sta partendo. Uscita."
+    echo "SKIP: lock file trovato con PID vuoto/non numerico ('$LOCK_PID') — un'altra istanza sta partendo. Uscita senza crash."
     trap - EXIT
-    exit 0
+    exit 2
   fi
   if kill -0 "$LOCK_PID" 2>/dev/null; then
-    echo "Un'altra istanza di start-backend.sh è già in esecuzione (PID: $LOCK_PID). Uscita."
+    echo "SKIP: un'altra istanza di start-backend.sh è già in esecuzione (PID: $LOCK_PID). Uscita senza crash."
     trap - EXIT
-    exit 0
+    exit 2
   else
     echo "Lock file obsoleto trovato (PID $LOCK_PID morto), rimuovo."
     rm -f "$LOCK_FILE"
