@@ -10,6 +10,7 @@ import {
   PipelineStep, PipelineResult, PipelineRunResult,
   adminFetch, overallColor, statusColor, overallIcon, timeAgo,
 } from "./diagnostica-types";
+import { TelemetryProbeCard } from "./diagnostica-monitor";
 
 function StepRow({ step }: { step: PipelineStep }) {
   return (
@@ -104,6 +105,8 @@ export function TabRadiografia() {
 
   return (
     <ScrollView contentContainerStyle={s.tabContent}>
+      <TelemetryProbeCard />
+
       <View style={s.controlRow}>
         <TouchableOpacity
           style={[s.runButton, inProgress && s.runButtonDisabled]}

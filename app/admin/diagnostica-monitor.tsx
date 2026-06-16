@@ -11,7 +11,7 @@ import {
   adminFetch, overallColor, statusColor, timeAgo, ageLabel,
 } from "./diagnostica-types";
 
-function TelemetryProbeCard() {
+export function TelemetryProbeCard() {
   const qc = useQueryClient();
   const [runningProbe, setRunningProbe] = useState(false);
 
