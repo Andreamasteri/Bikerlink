@@ -1,6 +1,12 @@
 #!/bin/bash
 set -e
 
+# ── LOCK PORTE .replit (merge=ours driver) ───────────────────
+# Ri-applica il merge driver ad ogni merge, anche se il git global
+# config è stato resettato da un restart Replit.
+git config --global merge.ours.driver true 2>/dev/null || true
+# ─────────────────────────────────────────────────────────────
+
 echo "Running post-merge setup..."
 
 # ── SYNC node_modules POST-MERGE (Task #2573) ────────────────

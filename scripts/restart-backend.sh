@@ -1,5 +1,9 @@
 #!/bin/bash
 # restart-backend.sh — Forza il riavvio del backend Express in isolamento.
+
+# ── LOCK PORTE .replit (merge=ours driver) ───────────────────
+git config --global merge.ours.driver true 2>/dev/null || true
+# ─────────────────────────────────────────────────────────────
 # Usare il workflow "Start Backend" nel pannello Replit per eseguirlo.
 # Non tocca Metro/Expo frontend.
 

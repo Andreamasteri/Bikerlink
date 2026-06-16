@@ -7,6 +7,13 @@
 
 set -uo pipefail
 
+# ── LOCK PORTE .replit (merge=ours driver) ───────────────────
+# Garantisce che il merge driver "ours" sia sempre configurato,
+# anche dopo restart Replit. Necessario per far funzionare
+# .gitattributes → .replit merge=ours (blocca sovrascrittura da task agent).
+git config --global merge.ours.driver true 2>/dev/null || true
+# ─────────────────────────────────────────────────────────────
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 TOTAL_START=$(date +%s)
