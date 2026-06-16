@@ -10,14 +10,14 @@ export function setupErrorHandler(app: express.Application) {
     };
 
     const status = error.status || error.statusCode || 500;
-    const message = error.message || "Internal Server Error";
 
-    console.error("Internal Server Error:", err);
+    console.error("[global-error-handler] unhandled error:", err);
 
     if (res.headersSent) {
       return next(err);
     }
 
-    return res.status(status).json({ message });
+    res.setHeader("Content-Type", "application/json; charset=utf-8");
+    return res.status(status).json({ success: false, message: "Errore interno del server" });
   });
 }

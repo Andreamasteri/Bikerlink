@@ -26,10 +26,12 @@ const router = Router();
 
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 5,
-  message: { message: "Troppi tentativi. Riprova più tardi." },
+  max: 15,
   standardHeaders: true,
   legacyHeaders: false,
+  handler: (_req, res) => {
+    sendError(res, 429, "Troppi tentativi. Riprova più tardi.");
+  },
 });
 
 router.post("/login", loginLimiter, async (req: Request, res: Response) => {
