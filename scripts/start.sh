@@ -40,7 +40,8 @@ log "[1/4] Build server — completato in $(elapsed_since $STEP_START)s"
 # ── Step 2/4: Avvio backend + frontend in parallelo ───────────────────────────
 STEP_START=$(date +%s)
 log "[2/4] Avvio backend — avvio..."
-bash "$SCRIPT_DIR/start-backend.sh" &
+BACKEND_LOG="/tmp/backend.log"
+bash "$SCRIPT_DIR/start-backend.sh" > "$BACKEND_LOG" 2>&1 &
 BACKEND_PID=$!
 log "[2/4] Backend avviato in background (PID: $BACKEND_PID)"
 
@@ -113,6 +114,15 @@ done
 
 if [ "$HEALTHY" -ne 1 ]; then
   check_metro_alive
+  log "━━━ Log Backend al timeout (${BACKEND_LOG:-/tmp/backend.log}): ━━━"
+  if [ -f "${BACKEND_LOG:-/tmp/backend.log}" ] && [ -s "${BACKEND_LOG:-/tmp/backend.log}" ]; then
+    tail -n 30 "${BACKEND_LOG:-/tmp/backend.log}" | while IFS= read -r line; do
+      log "  │ $line"
+    done
+  else
+    log "  │ (log backend non disponibile o vuoto)"
+  fi
+  log "━━━ Fine log Backend ━━━"
   log "━━━ Log Metro al timeout backend (${METRO_LOG:-/tmp/metro.log}): ━━━"
   if [ -f "${METRO_LOG:-/tmp/metro.log}" ] && [ -s "${METRO_LOG:-/tmp/metro.log}" ]; then
     tail -n 20 "${METRO_LOG:-/tmp/metro.log}" | while IFS= read -r line; do
