@@ -13,8 +13,9 @@ if (!process.env.DATABASE_URL) {
 export const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   keepAlive: true,
-  idleTimeoutMillis: 30000,
-  // Aumentato da 5s a 10s per dare più margine al pool sotto pressione.
+  // 10s < timeout lato Replit managed DB (~20s) → connessioni rilasciate prima
+  // che il server le droppi, evitando "Connection terminated unexpectedly".
+  idleTimeoutMillis: 10000,
   connectionTimeoutMillis: 10000,
   // Limite esplicito di connessioni — evita saturation burst.
   max: 10,

@@ -93,32 +93,35 @@ export async function runPhase5Schedulers(): Promise<void> {
 
   setImmediate(() => void import("./routing/valhalla-startup").then(m => m.validateValhallaStartup()));
 
-  setImmediate(async () => {
+  // Boot-time DB jobs scaglionati: evita saturazione pool (total=10) nei primi
+  // secondi di avvio quando tutti gli scheduler sparerebbero contemporaneamente.
+  // Ogni job è separato dal precedente di ~30s per dare tempo al pool di respirare.
+  setTimeout(async () => {
     try {
       const { warmUpSystemStatusCache } = await import("./routes/admin/system-probe");
       await warmUpSystemStatusCache();
     } catch (e) {
       console.warn("[INIT][BG] warmUpSystemStatusCache error:", e);
     }
-  });
+  }, 30_000); // +30s
 
   const { saveSchemaSnapshot } = await import("./scripts/snapshot-schema");
-  setImmediate(() => {
+  setTimeout(() => {
     saveSchemaSnapshot()
       .then(() => console.log("[INIT][BG] saveSchemaSnapshot — done"))
       .catch((e) => console.warn("[INIT][BG] saveSchemaSnapshot error:", e));
-  });
+  }, 60_000); // +60s
 
-  setImmediate(() => void import("./ai/db-integrity/boot-schema-check").then((m) => m.runBootSchemaDriftCheck()).catch((e) => console.warn("[INIT][BG] boot schema drift check error:", e)));
+  setTimeout(() => void import("./ai/db-integrity/boot-schema-check").then((m) => m.runBootSchemaDriftCheck()).catch((e) => console.warn("[INIT][BG] boot schema drift check error:", e)), 90_000); // +90s
 
   const FIFTEEN_MIN_MS = 15 * 60 * 1000;
   const { syncProductionUpdates } = await import("./routes/admin/ota");
-  setImmediate(() => {
+  setTimeout(() => {
     console.log("[INIT][BG] OTA sync: first run...");
     syncProductionUpdates()
       .then(() => console.log("[INIT][BG] OTA sync: first run done"))
       .catch((e) => console.warn("[INIT][BG] OTA sync error:", e));
-  });
+  }, 45_000); // +45s
   setInterval(() => {
     syncProductionUpdates().catch((e) => console.warn("[OTA-CRON] sync error:", e));
   }, FIFTEEN_MIN_MS);

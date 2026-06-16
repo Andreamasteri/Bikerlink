@@ -95,7 +95,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const sessionPool = new pg.Pool({
     connectionString: process.env.DATABASE_URL,
     keepAlive: true,
-    idleTimeoutMillis: 60000,
+    // 10s: allineato al pool principale, < timeout Replit managed DB.
+    idleTimeoutMillis: 10000,
     connectionTimeoutMillis: 10000,
     max: 3,
   });
