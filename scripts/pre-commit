@@ -75,15 +75,36 @@ if "$DETECT_SECRETS_HOOK" --baseline "$BASELINE" "${STAGED_FILES[@]}"; then
   # Gate "max 600 righe per file" — vedi replit.md "⛔ REGOLA FERREA".
   echo ""
   echo "🔍 Ratchet 600 righe per file..."
-  if bash scripts/check-large-files-ratchet.sh; then
-    echo "✅ Commit consentito."
-    exit 0
-  else
+  if ! bash scripts/check-large-files-ratchet.sh; then
     echo ""
     echo "❌ COMMIT BLOCCATO — gate 600 righe fallito."
     echo "   Vedi replit.md → \"⛔ REGOLA FERREA — Limite 600 righe per file\"."
     exit 1
   fi
+  echo "✅ Gate 600 righe OK."
+
+  # Gate "indici speciali nelle migration" — rileva DROP INDEX senza ricreazione.
+  echo ""
+  echo "🔍 Lint migration indexes (DROP INDEX su indici DESC/WHERE)..."
+  mapfile -t STAGED_MIGRATIONS < <(git diff --cached --name-only --diff-filter=ACM 2>/dev/null | \
+    grep -E '^migrations/.*\.sql$' || true)
+
+  if [[ ${#STAGED_MIGRATIONS[@]} -gt 0 ]]; then
+    if npx tsx scripts/lint-migration-indexes.ts "${STAGED_MIGRATIONS[@]}"; then
+      echo "✅ Nessun DROP di indice speciale senza ricreazione."
+    else
+      echo ""
+      echo "❌ COMMIT BLOCCATO — DROP INDEX su indice speciale senza ricreazione corretta."
+      echo "   Vedi l'output sopra per dettagli e fix suggeriti."
+      echo "   Bypass una-tantum (solo se sicuro): git commit --no-verify"
+      exit 1
+    fi
+  else
+    echo "✅ Nessuna migration .sql in staging — lint saltato."
+  fi
+
+  echo "✅ Commit consentito."
+  exit 0
 else
   echo ""
   echo "❌ COMMIT BLOCCATO — possibili segreti non approvati rilevati."
