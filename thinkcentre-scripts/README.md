@@ -10,6 +10,7 @@ I processi lunghi girano in `screen` e sopravvivono alla disconnessione SSH.
 ## Prerequisiti
 
 - Docker installato e in esecuzione
+- `screen` installato (`sudo apt install screen`)
 - PBF scaricato in `~/valhalla/data/europe-latest.osm.pbf`
   ```bash
   wget -c -P ~/valhalla/data/ https://download.geofabrik.de/europe-latest.osm.pbf
@@ -31,6 +32,7 @@ I processi lunghi girano in `screen` e sopravvivono alla disconnessione SSH.
 | `07.sh` | Prepara workspace Nominatim + crea docker-compose.yml      |
 | `08.sh` | Avvia import Nominatim in background (screen)              |
 | `09.sh` | Monitor import Nominatim: container, log, test HTTP        |
+| `99.sh` | **Boot check**: riavvia Valhalla (serve-only) e Nominatim dopo un reboot |
 
 ---
 
@@ -54,6 +56,15 @@ Se la build è fallita o vuoi ripartire da zero: `03.sh` poi `05.sh`.
 08.sh   ← avvia import (6–24h per Europe)
 09.sh   ← monitora (in un'altra sessione SSH)
 ```
+
+### Boot check dopo riavvio ThinkCentre
+
+```
+99.sh   ← avvia Valhalla (serve-only) + Nominatim e verifica HTTP
+```
+
+`99.sh` non esegue nessuna build. Usa i tiles già presenti su disco.
+Se i tiles non esistono, avvisa e salta Valhalla — esegui prima `05.sh`.
 
 ---
 
