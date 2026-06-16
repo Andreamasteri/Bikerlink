@@ -157,25 +157,17 @@ echo "════════════════════════�
 PORT_OK=true
 
 # 1. Mapping [[ports]] — verifica configurazione canonica
-# Strategia: normalizza il file (rimuovi spazi attorno a =) e cerca le coppie
-# su righe adiacenti usando grep -A1.
 _REPLIT_NORM=$(tr -d ' ' < .replit 2>/dev/null)
 
-# Cerca blocco [[ports]] con localPort=5000 seguito da externalPort=80
 if ! printf '%s\n' "$_REPLIT_NORM" | grep -A1 'localPort=5000' | grep -q 'externalPort=80$'; then
   echo "❌ ERRORE [[ports]]: localPort=5000 deve avere externalPort=80!"
-  echo "   (Express API deve ricevere il traffico pubblico HTTP)"
-  echo "   ⛔ REGOLA BLOCCANTE — modificare solo con autorizzazione esplicita utente."
   PORT_OK=false
 else
   echo "✅ [[ports]] localPort=5000 → externalPort=80: OK"
 fi
 
-# Cerca blocco [[ports]] con localPort=8081 seguito da externalPort=8081
 if ! printf '%s\n' "$_REPLIT_NORM" | grep -A1 'localPort=8081' | grep -q 'externalPort=8081$'; then
   echo "❌ ERRORE [[ports]]: localPort=8081 deve avere externalPort=8081!"
-  echo "   (probe deploy isolato, non deve ricevere traffico pubblico)"
-  echo "   ⛔ REGOLA BLOCCANTE — modificare solo con autorizzazione esplicita utente."
   PORT_OK=false
 else
   echo "✅ [[ports]] localPort=8081 → externalPort=8081: OK"
@@ -184,12 +176,10 @@ fi
 # 2. Comando [deployment] — PORT=5000 nel run
 if grep -q 'PORT=8081' .replit 2>/dev/null; then
   echo "❌ ERRORE deploy: .replit contiene PORT=8081 nel comando run!"
-  echo "   La porta di deploy DEVE essere PORT=5000."
   PORT_OK=false
 fi
 if ! grep -q 'PORT=5000' .replit 2>/dev/null; then
   echo "❌ ERRORE deploy: .replit non contiene PORT=5000 nel comando run!"
-  echo "   Verifica la sezione [deployment] → run."
   PORT_OK=false
 fi
 
@@ -197,13 +187,12 @@ if [ "$PORT_OK" = true ]; then
   echo "✅ Porte .replit corrette: [[ports]] canonico + deploy PORT=5000."
 else
   echo ""
-  echo "⛔ PORTE ERRATE — il deploy fallirà o le API non risponderanno."
+  echo "⛔ PORTE ERRATE — impossibile correggere automaticamente."
   echo "   Configurazione canonica richiesta:"
   echo "     [[ports]] localPort=5000  → externalPort=80"
   echo "     [[ports]] localPort=8081  → externalPort=8081"
   echo "     [[ports]] localPort=8082  → externalPort=6000"
   echo "     [deployment] run → PORT=5000"
-  echo "   Modificare SOLO con autorizzazione esplicita dell'utente."
 fi
 echo "════════════════════════════════════════"
 echo ""
