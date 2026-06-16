@@ -2,12 +2,15 @@ import React, { useState } from "react";
 import { View, Text, TouchableOpacity, Platform, Linking } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import { useQuery } from "@tanstack/react-query";
 import Colors from "@/constants/colors";
 import { getApiUrl } from "@/lib/query-client";
 import s from "./diagnostica-styles";
 import { TabRadiografia } from "./diagnostica-pipeline";
 import { TabMonitor } from "./diagnostica-monitor";
 import { TabDevice } from "./diagnostica-device";
+import { adminFetch } from "./diagnostica-types";
+import type { PipelineRunResult } from "./diagnostica-types";
 
 type Tab = "radiografia" | "monitor" | "device";
 
@@ -15,6 +18,21 @@ export default function DiagnosticaScreen() {
   const insets = useSafeAreaInsets();
   const [activeTab, setActiveTab] = useState<Tab>("radiografia");
   const [activeHoles, setActiveHoles] = useState(0);
+
+  const { data: lastData } = useQuery<{ result: PipelineRunResult | null; inProgress: boolean }>({
+    queryKey: ["/api/admin/pipeline-check/last"],
+    queryFn: async () => {
+      const r = await adminFetch("/api/admin/pipeline-check/last");
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      return r.json();
+    },
+    staleTime: 30_000,
+  });
+
+  const telemetryPipeline = lastData?.result?.pipelines.find(p => p.pipeline === "telemetry_ride") ?? null;
+  const telemetryDotColor = telemetryPipeline
+    ? (telemetryPipeline.overall === "ok" ? "#22c55e" : "#ef4444")
+    : null;
 
   const tabBarTop = Platform.OS === "web" ? insets.top + 67 : insets.top;
 
@@ -31,11 +49,16 @@ export default function DiagnosticaScreen() {
           >
             <View>
               {tab === "radiografia" && (
-                <MaterialCommunityIcons
-                  name="stethoscope"
-                  size={20}
-                  color={activeTab === tab ? Colors.accent : Colors.textSecondary}
-                />
+                <View>
+                  <MaterialCommunityIcons
+                    name="stethoscope"
+                    size={20}
+                    color={activeTab === tab ? Colors.accent : Colors.textSecondary}
+                  />
+                  {telemetryDotColor !== null && (
+                    <View style={[s.tabDot, { backgroundColor: telemetryDotColor }]} />
+                  )}
+                </View>
               )}
               {tab === "monitor" && (
                 <View>

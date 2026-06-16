@@ -25,6 +25,10 @@ const s = StyleSheet.create({
     paddingHorizontal: 3,
   },
   tabBadgeText: { color: "#fff", fontSize: 10, fontWeight: "700" },
+  tabDot: {
+    position: "absolute", top: -3, right: -5,
+    width: 8, height: 8, borderRadius: 4,
+  },
 
   tabContent2: { flex: 1 },
   tabContent: { padding: 12, gap: 10 },
