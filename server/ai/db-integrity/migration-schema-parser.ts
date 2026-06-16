@@ -63,6 +63,11 @@ const ALTER_HEAD = /^alter\s+table\s+("?[a-zA-Z0-9_."]+"?)/i;
 const ADD_COL_RE = /\badd\s+column\s+(?:if\s+not\s+exists\s+)?("?[a-zA-Z_][a-zA-Z0-9_]*"?)/gi;
 const DROP_COL_RE = /\bdrop\s+column\s+(?:if\s+exists\s+)?("?[a-zA-Z_][a-zA-Z0-9_]*"?)/gi;
 const RENAME_COL_RE = /\brename\s+column\s+("?[a-zA-Z0-9_]+"?)\s+to\s+("?[a-zA-Z0-9_]+"?)/gi;
+// ALTER TABLE old_name RENAME TO new_name
+// Matches only the RENAME TO clause (table name comes from ALTER_HEAD match above).
+const RENAME_TABLE_RE = /\brename\s+to\s+("?[a-zA-Z0-9_]+"?)/i;
+// DROP TABLE [IF EXISTS] "table_name"  — standalone statement (not inside CREATE).
+const DROP_TABLE_RE = /^\s*drop\s+table\s+(?:if\s+exists\s+)?("?[a-zA-Z0-9_."]+"?)/i;
 
 // Unique constraint/index patterns:
 // ALTER TABLE tbl ADD CONSTRAINT name UNIQUE (cols)  — possibilmente su più righe
@@ -106,6 +111,13 @@ export function buildMigrationSchema(files: string[]): Map<string, Set<string>> 
       const stmt = rawStmt.trim();
       if (!stmt) continue;
 
+      // DROP TABLE must be checked before CREATE TABLE to avoid mismatches.
+      const drop = stmt.match(DROP_TABLE_RE);
+      if (drop) {
+        schema.delete(norm(drop[1]));
+        continue;
+      }
+
       const create = stmt.match(CREATE_HEAD);
       if (create) {
         const table = norm(create[1]);
@@ -128,6 +140,21 @@ export function buildMigrationSchema(files: string[]): Map<string, Set<string>> 
       const head = alter.match(ALTER_HEAD);
       if (!head) continue;
       const table = norm(head[1]);
+
+      // ALTER TABLE old RENAME TO new — handle before column ops.
+      // A rename statement has no ADD/DROP/RENAME COLUMN so we can `continue`.
+      // We exclude RENAME COLUMN (which contains "column") from matching here
+      // because RENAME_TABLE_RE requires no "column" keyword before "to".
+      if (!/\brename\s+column\b/i.test(alter)) {
+        const renameTable = alter.match(RENAME_TABLE_RE);
+        if (renameTable) {
+          const newName = norm(renameTable[1]);
+          const cols = schema.get(table);
+          schema.delete(table);
+          schema.set(newName, cols ?? new Set<string>());
+          continue;
+        }
+      }
 
       let m: RegExpExecArray | null;
       RENAME_COL_RE.lastIndex = 0;

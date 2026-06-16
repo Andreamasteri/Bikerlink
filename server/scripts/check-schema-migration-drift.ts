@@ -18,7 +18,7 @@
 // esclusi dal registry, quindi non entrano nel confronto.
 import { readdirSync, readFileSync } from "fs";
 import { join } from "path";
-import { listDeclaredTables, listDeclaredUniqueIndexes, listDeclaredIndexes } from "../ai/db-integrity/registry-introspect";
+import { listDeclaredTables, listDeclaredUniqueIndexes, listDeclaredIndexes, EXCLUDED_TABLES } from "../ai/db-integrity/registry-introspect";
 import { buildMigrationSchema, buildMigrationUniqueIndexes, buildMigrationIndexes } from "../ai/db-integrity/migration-schema-parser";
 
 const MIGRATIONS_DIR = join(process.cwd(), "migrations");
@@ -62,6 +62,19 @@ const KNOWN_UNMIGRATED_INDEXES = new Set<string>([
   // mancanti andrebbero aggiunte quando si ha l'occasione.
 ]);
 
+// Baseline per il CONTROLLO INVERSO: colonne/tabelle presenti nella storia delle
+// migration ma assenti dal registry Drizzle SENZA una corrispondente DROP COLUMN
+// / ALTER TABLE RENAME in una migration. Queste situazioni preesistono al check e
+// sono già allineate in prod, quindi vengono allow-listate.
+// Formato: "table" per tabelle intere rimosse, "table.column" per singole colonne.
+const KNOWN_DROPPED_WITHOUT_MIGRATION = new Set<string>([
+  // Rimosso dal registry (shared/db/music.ts) senza DROP COLUMN migration.
+  // Probabilmente eliminato via drizzle-kit push storico; la colonna è presente
+  // nel baseline 0000 ma non in alcun file di migration successivo.
+  // La prod non la ha più (è stata rimossa con push), quindi non è critica.
+  "user_music_tokens.spotify_user_id",
+]);
+
 // ── Exported result type ────────────────────────────────────────────────────
 
 export interface DriftCheckResult {
@@ -82,6 +95,18 @@ export interface DriftCheckResult {
    * Format: "table.index_name".
    */
   newIndexes: string[];
+  /**
+   * Inverse check — columns present in migration history but absent from the
+   * Drizzle registry without a matching DROP COLUMN migration.
+   * Format: "table.column".
+   */
+  droppedColumns: string[];
+  /**
+   * Inverse check — tables present in migration history but absent from the
+   * Drizzle registry without a matching ALTER TABLE RENAME migration.
+   * Format: "table".
+   */
+  removedTables: string[];
   /** Known-baseline drift entries that were found (non-blocking). */
   knownHits: string[];
 }
@@ -134,10 +159,17 @@ export function runDriftCheck(): DriftCheckResult {
   const newColumns: string[] = [];
   const newUniqueIndexes: string[] = [];
   const newIndexes: string[] = [];
+  const droppedColumns: string[] = [];
+  const removedTables: string[] = [];
   const knownHits: string[] = [];
 
+  // ── Forward check: registry → migrations ──────────────────────────────────
+  // Build a lookup map of declared registry tables for the inverse check below.
+  const declaredMap = new Map<string, Set<string>>();
   for (const t of declared) {
     const tableName = t.name.toLowerCase();
+    declaredMap.set(tableName, new Set(t.columns.map((c) => c.name.toLowerCase())));
+
     const migCols = migrationSchema.get(tableName);
     if (!migCols) {
       if (KNOWN_UNMIGRATED.has(tableName)) knownHits.push(tableName);
@@ -152,7 +184,33 @@ export function runDriftCheck(): DriftCheckResult {
     }
   }
 
-  // Check uniqueIndex() declarations against migration DDL.
+  // ── Inverse check: migrations → registry ──────────────────────────────────
+  // Detects columns/tables removed from the registry without a DROP COLUMN /
+  // ALTER TABLE RENAME migration. migrationSchema already reflects all ADD/DROP/
+  // RENAME operations applied in order, so it represents the "expected" final
+  // schema after all migrations have run.
+  for (const [migTable, migCols] of migrationSchema) {
+    // Skip system/infra tables excluded from the registry by design.
+    if (EXCLUDED_TABLES.has(migTable)) continue;
+
+    const registryCols = declaredMap.get(migTable);
+    if (!registryCols) {
+      // Table exists in migration history but is absent from the registry.
+      const key = migTable;
+      if (KNOWN_DROPPED_WITHOUT_MIGRATION.has(key)) knownHits.push(key);
+      else removedTables.push(key);
+      continue;
+    }
+
+    for (const col of migCols) {
+      if (registryCols.has(col)) continue;
+      const key = `${migTable}.${col}`;
+      if (KNOWN_DROPPED_WITHOUT_MIGRATION.has(key)) knownHits.push(key);
+      else droppedColumns.push(key);
+    }
+  }
+
+  // ── uniqueIndex() forward check ───────────────────────────────────────────
   for (const { table, name } of declaredUniqueIndexes) {
     const tableName = table.toLowerCase();
     const indexName = name.toLowerCase();
@@ -177,11 +235,18 @@ export function runDriftCheck(): DriftCheckResult {
 
   return {
     // newIndexes intentionally excluded from ok: warning only, not a blocking drift.
-    ok: newTables.length === 0 && newColumns.length === 0 && newUniqueIndexes.length === 0,
+    ok:
+      newTables.length === 0 &&
+      newColumns.length === 0 &&
+      newUniqueIndexes.length === 0 &&
+      droppedColumns.length === 0 &&
+      removedTables.length === 0,
     newTables,
     newColumns,
     newUniqueIndexes,
     newIndexes,
+    droppedColumns,
+    removedTables,
     knownHits,
   };
 }
@@ -197,7 +262,7 @@ function main(): void {
     process.exit(2);
   }
 
-  const { ok, newTables, newColumns, newUniqueIndexes, newIndexes, knownHits } = result;
+  const { ok, newTables, newColumns, newUniqueIndexes, newIndexes, droppedColumns, removedTables, knownHits } = result;
 
   if (knownHits.length) {
     console.log(`[schema-drift] drift noto (baseline, non bloccante): ${knownHits.length}`);
@@ -227,11 +292,13 @@ function main(): void {
 
   console.error("──────────────────────────────────────────────────────────────");
   console.error("[schema-drift] NUOVO DRIFT REGISTRY ↔ MIGRATION RILEVATO");
-  console.error("Identificatori dichiarati in @shared/db ma non creati da alcuna");
-  console.error("migration numerata PER QUELLA TABELLA.");
-  console.error("Probabile causa: schema modificato (es. drizzle-kit push) senza creare");
-  console.error("il file di migration numerato corrispondente. La prod resterebbe indietro.");
   console.error("──────────────────────────────────────────────────────────────");
+
+  if (newTables.length || newColumns.length || newUniqueIndexes.length) {
+    console.error("\n[FORWARD] Identificatori in @shared/db NON coperti da migration:");
+    console.error("Probabile causa: schema modificato (es. drizzle-kit push) senza creare");
+    console.error("il file di migration numerato. La prod resterebbe indietro.");
+  }
   if (newTables.length) {
     console.error(`\nTabelle senza migration (${newTables.length}):`);
     for (const t of newTables) console.error(`  • ${t}`);
@@ -247,6 +314,26 @@ function main(): void {
     console.error("    o CREATE UNIQUE INDEX ... ON ... nella migration numerata.");
     console.error("  → Se già in prod, aggiungilo a KNOWN_UNMIGRATED_UNIQUE_INDEXES.");
   }
+
+  if (droppedColumns.length || removedTables.length) {
+    console.error("\n[INVERSE] Elementi presenti nella storia migration ma ASSENTI dal registry:");
+    console.error("Probabile causa: colonna/tabella rimossa da @shared/db senza");
+    console.error("creare la corrispondente DROP COLUMN / ALTER TABLE RENAME migration.");
+    console.error("La prod manterrebbe colonne/tabelle orfane non più gestite dall'ORM.");
+  }
+  if (removedTables.length) {
+    console.error(`\nTabelle rimosse dal registry senza migration (${removedTables.length}):`);
+    for (const t of removedTables) console.error(`  • ${t}`);
+    console.error("  → Crea ALTER TABLE old RENAME TO new oppure DROP TABLE nella migration.");
+    console.error("  → Se il drift è pre-esistente e già allineato, aggiungilo a KNOWN_DROPPED_WITHOUT_MIGRATION.");
+  }
+  if (droppedColumns.length) {
+    console.error(`\nColonne rimosse dal registry senza DROP COLUMN migration (${droppedColumns.length}):`);
+    for (const c of droppedColumns) console.error(`  • ${c}`);
+    console.error("  → Crea ALTER TABLE ... DROP COLUMN ... nella migration numerata.");
+    console.error("  → Se il drift è pre-esistente e già allineato, aggiungilo a KNOWN_DROPPED_WITHOUT_MIGRATION.");
+  }
+
   console.error("\nAzione: crea il file migrations/NNNN_*.sql con le DDL mancanti e ri-esegui.");
   console.error("(Se il drift è intenzionale e già in prod, aggiungilo alla baseline appropriata.)");
   process.exit(1);

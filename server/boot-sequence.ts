@@ -117,15 +117,26 @@ export async function runBootSequence(server: Server, errorHandlersReady: Promis
     if (!drift.ok) {
       console.error("──────────────────────────────────────────────────────────────");
       console.error("[BOOT] FATAL — Registry ↔ Migration drift rilevato al pre-boot.");
-      console.error("Tabelle o colonne dichiarate in @shared/db senza migration numerata.");
       console.error("──────────────────────────────────────────────────────────────");
       if (drift.newTables.length) {
-        console.error(`  Tabelle senza migration (${drift.newTables.length}):`);
+        console.error(`  [FORWARD] Tabelle senza migration (${drift.newTables.length}):`);
         for (const t of drift.newTables) console.error(`    • ${t}`);
       }
       if (drift.newColumns.length) {
-        console.error(`  Colonne senza migration (${drift.newColumns.length}):`);
+        console.error(`  [FORWARD] Colonne senza migration (${drift.newColumns.length}):`);
         for (const c of drift.newColumns) console.error(`    • ${c}`);
+      }
+      if (drift.newUniqueIndexes?.length) {
+        console.error(`  [FORWARD] uniqueIndex() senza migration (${drift.newUniqueIndexes.length}):`);
+        for (const u of drift.newUniqueIndexes) console.error(`    • ${u}`);
+      }
+      if (drift.removedTables?.length) {
+        console.error(`  [INVERSE] Tabelle rimosse dal registry senza migration (${drift.removedTables.length}):`);
+        for (const t of drift.removedTables) console.error(`    • ${t}`);
+      }
+      if (drift.droppedColumns?.length) {
+        console.error(`  [INVERSE] Colonne rimosse dal registry senza DROP COLUMN (${drift.droppedColumns.length}):`);
+        for (const c of drift.droppedColumns) console.error(`    • ${c}`);
       }
       console.error("  Azione: crea il file migrations/NNNN_*.sql con le DDL mancanti e riavvia.");
       process.exit(1);
