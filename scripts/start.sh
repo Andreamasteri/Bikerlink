@@ -3,7 +3,7 @@
 # Sequenza: [1/4] build → [2/4] backend + frontend in parallelo → [3/4] health check → [4/4] verifica Metro vivo → done
 # Metro parte subito dopo il backend, senza attendere il health check: riduce il blackout totale.
 # EXPO_PID è catturato al lancio di start-expo.sh; check_metro_alive() verifica che sia ancora
-# vivo ogni ~10 tentativi di health check e obbligatoriamente prima di dichiarare "Avvio completato".
+# vivo ogni ~3 tentativi di health check e obbligatoriamente prima di dichiarare "Avvio completato".
 
 set -uo pipefail
 
@@ -82,8 +82,8 @@ while [ $ATTEMPT -lt ${#DELAYS[@]} ]; do
     break
   fi
 
-  # Ogni ~10 tentativi controlla che Metro non sia già crashato durante il boot.
-  if [ $(( ATTEMPT % 10 )) -eq 0 ] && [ "$ATTEMPT" -gt 0 ]; then
+  # Ogni ~3 tentativi controlla che Metro non sia già crashato durante il boot.
+  if [ $(( ATTEMPT % 3 )) -eq 0 ] && [ "$ATTEMPT" -gt 0 ]; then
     check_metro_alive
   fi
 
