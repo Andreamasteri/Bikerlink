@@ -178,6 +178,16 @@ function deriveProblems(signals: Signal[]): Problem[] {
         title = `Pool DB sotto pressione: ${s.value} client in attesa da ${ticks} tick consecutivi`;
         suggestion = "Possibile accumulo di query lente o leak di connessioni. Verifica pg_stat_activity e monitora.";
       }
+    } else if (s.metric === "db.circuit_breaker") {
+      const det = s.details as { state?: string; openedAt?: string } | undefined;
+      const cbState = det?.state ?? "OPEN";
+      if (cbState === "OPEN") {
+        title = `Circuit breaker DB APERTO — richieste bloccate (${s.value} fallimenti consecutivi)`;
+        suggestion = "Il DB ha superato la soglia di fallimenti. Le API restituiscono 503. Verifica connettività DB e attendi il reset automatico (30s).";
+      } else {
+        title = `Circuit breaker DB in HALF_OPEN — verifica in corso`;
+        suggestion = "Il circuito si sta riaprendo dopo il timeout. La prossima query buona lo chiuderà.";
+      }
     } else if (s.metric === "db.pool.collector.error") {
       title = `Errore probe pool DB`;
       suggestion = "Verifica che pool sia correttamente inizializzato e accessibile dal collector.";

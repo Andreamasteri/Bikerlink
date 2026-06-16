@@ -48,3 +48,16 @@ export function getState(): CircuitState {
   isOpen();
   return state;
 }
+
+export function getCircuitStatus(): {
+  state: CircuitState;
+  consecutiveFailures: number;
+  openedAt: string | null;
+} {
+  isOpen();
+  return {
+    state,
+    consecutiveFailures,
+    openedAt: openedAt !== null ? new Date(openedAt).toISOString() : null,
+  };
+}

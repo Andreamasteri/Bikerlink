@@ -23,6 +23,16 @@ import { WhisperWatchdogBadge, type WhisperHealthData } from "@/components/admin
 import { EmbeddingUsageCard } from "@/components/admin/EmbeddingUsageCard";
 import { AiTokenAuditCard } from "@/components/admin/AiTokenAuditCard";
 
+interface DbCircuit {
+  state: "CLOSED" | "OPEN" | "HALF_OPEN";
+  consecutiveFailures: number;
+  openedAt: string | null;
+}
+interface HealthResp {
+  status: string;
+  initializing: boolean;
+  dbCircuit: DbCircuit;
+}
 interface Snapshot {
   status: "green" | "yellow" | "orange" | "red";
   score: number;
@@ -44,6 +54,12 @@ export default function SystemHealthScreen() {
   const insets = useSafeAreaInsets();
   const qc = useQueryClient();
   const [busyProposalId, setBusyProposalId] = useState<string | null>(null);
+
+  const healthQ = useQuery<HealthResp>({
+    queryKey: ["/api/health"],
+    refetchInterval: 15_000,
+    retry: false,
+  });
 
   const snapQ = useQuery<SnapshotResp>({
     queryKey: ["/api/admin/watchdog/snapshot"],
@@ -132,16 +148,40 @@ export default function SystemHealthScreen() {
   const snap = snapQ.data?.snapshot ?? null;
   const stats = snapQ.data?.stats;
 
+  const circuit = healthQ.data?.dbCircuit;
+
   return (
     <ScrollView
       style={styles.container}
       contentContainerStyle={{ padding: 14, paddingBottom: insets.bottom + 24 }}
       refreshControl={<RefreshControl
         refreshing={snapQ.isFetching}
-        onRefresh={() => { snapQ.refetch(); proposalsQ.refetch(); }}
+        onRefresh={() => { snapQ.refetch(); proposalsQ.refetch(); healthQ.refetch(); }}
         tintColor={Colors.accent}
       />}
     >
+      {/* Circuit breaker banner */}
+      {circuit && circuit.state !== "CLOSED" && (
+        <View style={[styles.circuitBanner, circuit.state === "OPEN" ? styles.circuitOpen : styles.circuitHalfOpen]}>
+          <MaterialCommunityIcons
+            name={circuit.state === "OPEN" ? "alert-octagon" : "alert"}
+            size={20}
+            color="#fff"
+          />
+          <View style={{ flex: 1, marginLeft: 10 }}>
+            <Text style={styles.circuitBannerTitle}>
+              Circuit Breaker DB: {circuit.state}
+            </Text>
+            <Text style={styles.circuitBannerBody}>
+              {circuit.state === "OPEN"
+                ? `${circuit.consecutiveFailures} fallimenti consecutivi — API restituiscono 503. Reset automatico tra 30s.`
+                : "Verifica in corso — il circuito si sta riaprendo."}
+              {circuit.openedAt ? `\nAperto: ${new Date(circuit.openedAt).toLocaleTimeString("it-IT")}` : ""}
+            </Text>
+          </View>
+        </View>
+      )}
+
       {/* Kill-switch */}
       <View style={styles.card}>
         <View style={styles.headerRow}>
@@ -288,4 +328,9 @@ const styles = StyleSheet.create({
   statLabel: { color: "#9ca3af", fontSize: 11, marginTop: 2 },
   sectionTitle: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 16, marginBottom: 8 },
   sectionText: { color: "#f3f4f6", fontSize: 15, fontWeight: "600" as const },
+  circuitBanner: { flexDirection: "row", alignItems: "flex-start", borderRadius: 10, padding: 12, marginBottom: 12 },
+  circuitOpen: { backgroundColor: "#7f1d1d", borderWidth: 1, borderColor: "#ef4444" },
+  circuitHalfOpen: { backgroundColor: "#78350f", borderWidth: 1, borderColor: "#f59e0b" },
+  circuitBannerTitle: { color: "#fff", fontSize: 13, fontWeight: "700" as const },
+  circuitBannerBody: { color: "#fca5a5", fontSize: 12, marginTop: 2, lineHeight: 18 },
 });

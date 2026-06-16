@@ -6,6 +6,7 @@ import { sql, desc, count } from "drizzle-orm";
 import { triggerMatchingRun, triggerMatchingForUser } from "../matching-engine";
 import { sendSuccess, sendError } from "../lib/api-response";
 import { initState } from "../init-state";
+import { getCircuitStatus } from "../db-circuit-breaker";
 
 async function requireAdmin(req: Request, res: Response, next: NextFunction) {
   if (!req.session?.userId) {
@@ -62,10 +63,11 @@ export function registerMoreRoutes(app: Express) {
   });
 
   app.get("/api/health", (_req, res) => {
+    const dbCircuit = getCircuitStatus();
     if (initState.initializing) {
-      return res.status(503).json({ status: "initializing", initializing: true });
+      return res.status(503).json({ status: "initializing", initializing: true, dbCircuit });
     }
-    res.json({ status: "ok", initializing: false });
+    res.json({ status: "ok", initializing: false, dbCircuit });
   });
 
   app.get("/api/admin/uptime", requireAdmin, async (_req, res) => {

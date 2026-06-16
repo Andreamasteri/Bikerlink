@@ -2,7 +2,7 @@
 import { db } from "../../../db";
 import { sql } from "drizzle-orm";
 import type { Signal } from "../types";
-import { recordSuccess as cbRecordSuccess, recordFailure as cbRecordFailure } from "../../../db-circuit-breaker";
+import { recordSuccess as cbRecordSuccess, recordFailure as cbRecordFailure, getCircuitStatus } from "../../../db-circuit-breaker";
 
 export async function collectDb(): Promise<Signal[]> {
   const signals: Signal[] = [];
@@ -81,5 +81,26 @@ export async function collectDb(): Promise<Signal[]> {
       details: { error: (err as Error).message },
     });
   }
+
+  // Circuit breaker state — always emitted so it appears in watchdog metrics
+  const circuit = getCircuitStatus();
+  if (circuit.state !== "CLOSED") {
+    signals.push({
+      source: "db",
+      metric: "db.circuit_breaker",
+      severity: circuit.state === "OPEN" ? "critical" : "warn",
+      value: circuit.consecutiveFailures,
+      details: { state: circuit.state, openedAt: circuit.openedAt },
+    });
+  } else {
+    signals.push({
+      source: "db",
+      metric: "db.circuit_breaker",
+      severity: "info",
+      value: 0,
+      details: { state: "CLOSED" },
+    });
+  }
+
   return signals;
 }
