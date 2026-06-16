@@ -4,7 +4,13 @@ import { Ionicons } from "@expo/vector-icons";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import Colors from "@/constants/colors";
 import { apiRequest, queryClient } from "@/lib/query-client";
-import { MATCH_PREF_ITEMS, DEFAULT_MATCH_PREFS, type MatchPrefsPayload } from "@/lib/match-pref-items";
+import {
+  MATCH_PREF_ITEMS,
+  MATCH_PREF_SECTIONS,
+  DEFAULT_MATCH_PREFS,
+  type MatchPrefsPayload,
+  type MatchPrefSection,
+} from "@/lib/match-pref-items";
 import { useAuth } from "@/lib/auth-context";
 import { useFocusEffect } from "expo-router";
 
@@ -51,6 +57,13 @@ export default function MatchPrefsPanel() {
 
   if (!matchPrefGateVisible) return null;
 
+  const itemsBySection = MATCH_PREF_SECTIONS.reduce<
+    Record<MatchPrefSection, typeof MATCH_PREF_ITEMS>
+  >((acc, section) => {
+    acc[section] = MATCH_PREF_ITEMS.filter((item) => item.section === section);
+    return acc;
+  }, {} as Record<MatchPrefSection, typeof MATCH_PREF_ITEMS>);
+
   return (
     <View style={styles.section}>
       <Pressable style={styles.accordionHeader} onPress={() => setMatchPrefsExpanded(v => !v)}>
@@ -58,97 +71,42 @@ export default function MatchPrefsPanel() {
         <Ionicons name={matchPrefsExpanded ? "chevron-up" : "chevron-down"} size={18} color={Colors.textSecondary} />
       </Pressable>
       {matchPrefsExpanded && (
-        <View style={{ paddingTop: 8, gap: 2 }}>
-          <Text style={{ fontSize: 11, color: Colors.textSecondary, fontFamily: "Inter_400Regular", marginBottom: 8 }}>
+        <View style={{ paddingTop: 8 }}>
+          <Text style={styles.introText}>
             Scegli i criteri con cui vuoi essere abbinato/a. Disabilitando un tipo di match non comparirai nei risultati di quella categoria.
           </Text>
-          <View
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              justifyContent: "space-between",
-              paddingVertical: 10,
-              marginBottom: 6,
-              borderBottomWidth: 1,
-              borderBottomColor: Colors.border,
-              backgroundColor: "transparent",
-            }}
-          >
-            <View style={{ flex: 1, marginRight: 12 }}>
-              <Text style={{ fontSize: 13, fontFamily: "Inter_600SemiBold", color: Colors.text }}>
-                Solo match top
-              </Text>
-              <Text style={{ fontSize: 11, fontFamily: "Inter_400Regular", color: Colors.textSecondary, marginTop: 2 }}>
-                Ricevi push solo per Supermatch o match prioritari (le altre confluiscono nei digest).
-              </Text>
-            </View>
-            <Switch
-              value={matchPrefs.topMatchesOnly}
-              onValueChange={(val) => toggleMatchPref("topMatchesOnly", val)}
-              trackColor={{ false: Colors.border, true: Colors.accent }}
-              thumbColor="#fff"
-              disabled={saveMatchPrefMutation.isPending}
-            />
-          </View>
-          <View
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              justifyContent: "space-between",
-              paddingVertical: 10,
-              marginBottom: 6,
-              borderBottomWidth: 1,
-              borderBottomColor: Colors.border,
-              backgroundColor: "transparent",
-            }}
-          >
-            <View style={{ flex: 1, marginRight: 12 }}>
-              <Text style={{ fontSize: 13, fontFamily: "Inter_600SemiBold", color: Colors.text }}>
-                Recap settimanale
-              </Text>
-              <Text style={{ fontSize: 11, fontFamily: "Inter_400Regular", color: Colors.textSecondary, marginTop: 2 }}>
-                Ogni lunedì alle 9:00 ricevi una push con i tuoi 5 migliori match della settimana.
-              </Text>
-            </View>
-            <Switch
-              value={matchPrefs.weeklyRecap}
-              onValueChange={(val) => toggleMatchPref("weeklyRecap", val)}
-              trackColor={{ false: Colors.border, true: Colors.accent }}
-              thumbColor="#fff"
-              disabled={saveMatchPrefMutation.isPending}
-            />
-          </View>
-          {MATCH_PREF_ITEMS.map((item) => (
-            <View
-              key={item.key}
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                justifyContent: "space-between",
-                paddingVertical: 10,
-                borderBottomWidth: 1,
-                borderBottomColor: Colors.border,
-              }}
-            >
-              <View style={{ flex: 1, marginRight: 12 }}>
-                <Text style={{ fontSize: 13, fontFamily: "Inter_400Regular", color: Colors.text }}>
-                  {item.label}
-                </Text>
-                {item.description ? (
-                  <Text style={{ fontSize: 11, fontFamily: "Inter_400Regular", color: Colors.textSecondary, marginTop: 2 }}>
-                    {item.description}
-                  </Text>
-                ) : null}
+          {MATCH_PREF_SECTIONS.map((section) => {
+            const items = itemsBySection[section];
+            if (!items || items.length === 0) return null;
+            return (
+              <View key={section} style={styles.sectionGroup}>
+                <Text style={styles.sectionLabel}>{section}</Text>
+                {items.map((item, idx) => (
+                  <View
+                    key={item.key}
+                    style={[
+                      styles.toggleRow,
+                      idx === items.length - 1 && styles.toggleRowLast,
+                    ]}
+                  >
+                    <View style={styles.toggleTextWrap}>
+                      <Text style={styles.toggleLabel}>{item.label}</Text>
+                      {item.description ? (
+                        <Text style={styles.toggleDescription}>{item.description}</Text>
+                      ) : null}
+                    </View>
+                    <Switch
+                      value={matchPrefs[item.key]}
+                      onValueChange={(val) => toggleMatchPref(item.key, val)}
+                      trackColor={{ false: Colors.border, true: Colors.accent }}
+                      thumbColor="#fff"
+                      disabled={saveMatchPrefMutation.isPending}
+                    />
+                  </View>
+                ))}
               </View>
-              <Switch
-                value={matchPrefs[item.key]}
-                onValueChange={(val) => toggleMatchPref(item.key, val)}
-                trackColor={{ false: Colors.border, true: Colors.accent }}
-                thumbColor="#fff"
-                disabled={saveMatchPrefMutation.isPending}
-              />
-            </View>
-          ))}
+            );
+          })}
         </View>
       )}
     </View>
@@ -171,5 +129,51 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_600SemiBold",
     color: Colors.text,
     marginBottom: 12,
+  },
+  introText: {
+    fontSize: 11,
+    color: Colors.textSecondary,
+    fontFamily: "Inter_400Regular",
+    marginBottom: 12,
+  },
+  sectionGroup: {
+    marginBottom: 16,
+  },
+  sectionLabel: {
+    fontSize: 12,
+    fontFamily: "Inter_600SemiBold",
+    color: Colors.accent,
+    textTransform: "uppercase",
+    letterSpacing: 0.8,
+    marginBottom: 4,
+    paddingBottom: 4,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+  },
+  toggleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+  },
+  toggleRowLast: {
+    borderBottomWidth: 0,
+  },
+  toggleTextWrap: {
+    flex: 1,
+    marginRight: 12,
+  },
+  toggleLabel: {
+    fontSize: 13,
+    fontFamily: "Inter_400Regular",
+    color: Colors.text,
+  },
+  toggleDescription: {
+    fontSize: 11,
+    fontFamily: "Inter_400Regular",
+    color: Colors.textSecondary,
+    marginTop: 2,
   },
 });
