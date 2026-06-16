@@ -29,6 +29,7 @@ export async function calcRoute(
   headingDeg?: number | null,
   language?: string,
   routingProfile?: RoutingProfile,
+  geocodingOk?: boolean,
 ): Promise<RouteResult> {
   const url = new URL("/api/planned-routes/calculate", getApiUrl());
   const resp = await fetch(url.toString(), {
@@ -39,6 +40,7 @@ export async function calcRoute(
       roundTripHours, isRoundTrip, language,
       ...(headingDeg !== null && headingDeg !== undefined ? { headingDeg } : {}),
       ...(routingProfile ? { routingProfile } : {}),
+      ...(geocodingOk === false ? { geocodingOk: false } : {}),
     }),
   });
   if (!resp.ok) {

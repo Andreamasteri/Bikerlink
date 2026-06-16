@@ -331,6 +331,9 @@ export function useGiriCreateState(language?: string) {
     const resolved = newWps.filter((wp) => wp.lat !== 0 || wp.lng !== 0);
     if (resolved.length < 2) return;
     const toCalc = aiPreview.isRoundTrip ? [...resolved, resolved[0]] : resolved;
+    // Il geocoding è riuscito solo se tutti gli item AI hanno lat/lng validi.
+    // Gli item non risolti (Nominatim down o luogo non trovato) restano lat=0,lng=0.
+    const allItemsResolved = aiPreview.items.every((item) => item.resolved);
     setCalculating(true);
     setRouteResult(null);
     setWeatherPreview(null);
@@ -339,7 +342,7 @@ export function useGiriCreateState(language?: string) {
         "/api/planned-routes/calculate", "POST",
         () => {
           const url = new URL("/api/planned-routes/calculate", getApiUrl());
-          return fetch(url.toString(), { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ waypoints: toCalc, style: aiPreview.style, drivingProfile, avoidHighways: aiPreview.avoidHighways, avoidTolls: false, isRoundTrip: aiPreview.isRoundTrip, roundTripDirection: aiPreview.roundTripDirection ?? null, language, ...(vehicleProfile === "auto_curvy" ? { routingProfile: "auto_curvy" } : {}) }) });
+          return fetch(url.toString(), { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ waypoints: toCalc, style: aiPreview.style, drivingProfile, avoidHighways: aiPreview.avoidHighways, avoidTolls: false, isRoundTrip: aiPreview.isRoundTrip, roundTripDirection: aiPreview.roundTripDirection ?? null, language, geocodingOk: allItemsResolved, ...(vehicleProfile === "auto_curvy" ? { routingProfile: "auto_curvy" } : {}) }) });
         },
         async (resp) => { if (!resp.ok) { const b = await resp.json().catch(() => ({})); throw new Error(b.message ?? "Calcolo fallito"); } return resp.json(); }
       );

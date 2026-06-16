@@ -354,6 +354,7 @@ router.post("/calculate", async (req: Request, res: Response) => {
     roundTripDirection,
     headingDeg,
     language: _language,
+    geocodingOk: clientGeocodingOk,
   } = parsedCalc.data;
 
   const normStyle = normalizeStyle(style);
@@ -417,6 +418,11 @@ router.post("/calculate", async (req: Request, res: Response) => {
     const { resolveRouterOpts } = await import("./waypoints.next");
     const routerOpts = await resolveRouterOpts(userId, body.points as [number, number][], normStyle);
 
+    // geocodingOk: il client informa il server se il geocoding è andato a buon
+    // fine per tutti i waypoint (es. Nominatim disponibile). Se assente, si
+    // assume true (coordinate già risolte o fornite direttamente via GPS/mappa).
+    const geocodingOk = clientGeocodingOk ?? true;
+
     const runRoute = (
       priorityRules: Array<{ if: string; multiply_by: number }>,
       areas?: Record<string, unknown>,
@@ -429,8 +435,7 @@ router.post("/calculate", async (req: Request, res: Response) => {
       if (geo.distanceInfluence !== undefined) customModel.distance_influence = geo.distanceInfluence;
       if (areas) customModel.areas = areas;
       if (Object.keys(customModel).length > 0) reqBody.custom_model = customModel;
-      // geocodingOk=true: i waypoint sono già coordinate lat/lng (nessun geocoding testuale upstream)
-      return getActiveRouter(reqBody as unknown as RouteRequest, routerOpts, res, true);
+      return getActiveRouter(reqBody as unknown as RouteRequest, routerOpts, res, geocodingOk);
     };
 
     // Percorso geometrico di base: è il risultato per il profilo "geometric" e

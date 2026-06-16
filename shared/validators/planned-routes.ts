@@ -129,6 +129,7 @@ export const calculateRouteRequestSchema = z.object({
   roundTripDirection: z.string().optional(),
   headingDeg: z.number().optional(),
   language: z.string().optional(),
+  geocodingOk: z.boolean().optional(),
 });
 export type CalculateRouteRequestInput = z.infer<typeof calculateRouteRequestSchema>;
 
