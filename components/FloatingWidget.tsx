@@ -176,11 +176,15 @@ export default function FloatingWidget() {
     return () => sub.remove();
   }, [closeMenu]);
 
+  const tapGesture = Gesture.Tap()
+    .runOnJS(true)
+    .onEnd((_e, success) => {
+      if (success) handleTapJS();
+    });
+
   const panGesture = Gesture.Pan()
     .runOnJS(true)
-    .minDistance(0)
-    // activateAfterLongPress(0) gives priority over tab navigator horizontal swipe
-    .activateAfterLongPress(0)
+    .minDistance(TAP_THRESHOLD + 1)
     .onStart(() => {
       startX.value = posX.value;
       startY.value = posY.value;
@@ -195,14 +199,14 @@ export default function FloatingWidget() {
         Math.min(rawY, screenH.value - WIDGET_SIZE - 8 - insetsBottom.value),
       );
     })
-    .onEnd((e) => {
-      const dist = Math.sqrt(e.translationX ** 2 + e.translationY ** 2);
+    .onEnd(() => {
       runOnJS(savePositionJS)(posX.value, posY.value);
       runOnJS(setIsTouching)(false);
-      if (dist <= TAP_THRESHOLD) {
-        runOnJS(handleTapJS)();
-      }
     });
+
+  const composedGesture = Platform.OS === "web"
+    ? panGesture
+    : Gesture.Race(tapGesture, panGesture);
 
   // Swipe-down-to-dismiss gesture on the menu panel
   const menuPanGesture = Gesture.Pan()
@@ -303,24 +307,29 @@ export default function FloatingWidget() {
         </Animated.View>
       )}
 
-      <GestureDetector gesture={panGesture}>
+      <GestureDetector gesture={composedGesture}>
         <Animated.View style={[styles.widgetContainer, widgetAnimatedStyle]}>
-          <View
-            style={[
-              styles.ball,
-              {
-                backgroundColor: colors.accent,
-                opacity: isTouching ? 1 : 0.9,
-              },
-            ]}
+          <Pressable
+            onPress={Platform.OS === "web" ? handleTapJS : undefined}
+            style={{ width: WIDGET_SIZE, height: WIDGET_SIZE }}
           >
-            <Ionicons name="notifications" size={22} color="#fff" />
-            {totalUnread > 0 && (
-              <View style={[styles.badge, { backgroundColor: colors.accentRed ?? "#FF3B30" }]}>
-                <Text style={styles.badgeText}>{totalUnread > 99 ? "99+" : totalUnread}</Text>
-              </View>
-            )}
-          </View>
+            <View
+              style={[
+                styles.ball,
+                {
+                  backgroundColor: colors.accent,
+                  opacity: isTouching ? 1 : 0.9,
+                },
+              ]}
+            >
+              <Ionicons name="notifications" size={22} color="#fff" />
+              {totalUnread > 0 && (
+                <View style={[styles.badge, { backgroundColor: colors.accentRed ?? "#FF3B30" }]}>
+                  <Text style={styles.badgeText}>{totalUnread > 99 ? "99+" : totalUnread}</Text>
+                </View>
+              )}
+            </View>
+          </Pressable>
         </Animated.View>
       </GestureDetector>
     </View>

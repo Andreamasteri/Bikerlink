@@ -284,7 +284,7 @@ export default function RootLayout() {
           <AdminUptimeOverlay />
           <BackgroundNotificationHandler />
           <PushTokenRegistrar />
-          <View style={{ flex: 1 }} key={useLanguage().renderKey}>
+          <View style={{ flex: 1 }} pointerEvents="box-none" key={useLanguage().renderKey}>
             <RootLayoutNav />
           </View>
           <MatchPopupAlert />
