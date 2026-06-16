@@ -19,6 +19,8 @@ interface AiUsageEntry {
 interface AuditResponse {
   date: string;
   audit: { subsystems: Record<string, AiUsageEntry> } | null;
+  stale: boolean;
+  lastError: { message: string; at: string } | null;
 }
 
 interface ProposerSettingsResponse {
@@ -43,6 +45,17 @@ function fmt(n: number): string {
 function fmtTime(iso: string): string {
   try {
     return new Date(iso).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" });
+  } catch {
+    return iso;
+  }
+}
+
+function fmtDateTime(iso: string): string {
+  try {
+    return new Date(iso).toLocaleString("it-IT", {
+      day: "2-digit", month: "2-digit",
+      hour: "2-digit", minute: "2-digit",
+    });
   } catch {
     return iso;
   }
@@ -81,6 +94,9 @@ export function AiTokenAuditCard() {
   const grandTotal = entries.reduce((s, [, v]) => s + v.total, 0);
   const grandCalls = entries.reduce((s, [, v]) => s + v.calls, 0);
 
+  const lastError = auditQ.data?.lastError ?? null;
+  const stale = auditQ.data?.stale ?? false;
+
   return (
     <View style={styles.card}>
       <View style={styles.headerRow}>
@@ -90,6 +106,28 @@ export function AiTokenAuditCard() {
       <Text style={styles.muted}>
         Data: {auditQ.data?.date ?? "—"} · Token totali: {fmt(grandTotal)} · Chiamate: {grandCalls}
       </Text>
+
+      {/* Errore aggiornamento contatore */}
+      {lastError && (
+        <View style={styles.errorBanner}>
+          <Text style={styles.errorIcon}>⚠</Text>
+          <View style={styles.errorBody}>
+            <Text style={styles.errorTitle}>Errore aggiornamento contatore</Text>
+            <Text style={styles.errorMsg} numberOfLines={3}>{lastError.message}</Text>
+            <Text style={styles.errorAt}>Rilevato il {fmtDateTime(lastError.at)}</Text>
+          </View>
+        </View>
+      )}
+
+      {/* Dati fermi (stale) senza errore esplicito */}
+      {stale && !lastError && (
+        <View style={styles.staleBanner}>
+          <Text style={styles.staleIcon}>⏱</Text>
+          <Text style={styles.staleText}>
+            Il contatore non si aggiorna da più di 6 ore — verifica i log del server.
+          </Text>
+        </View>
+      )}
 
       {auditQ.isLoading ? (
         <ActivityIndicator color={Colors.accent} style={{ marginTop: 12 }} />
@@ -190,4 +228,23 @@ const styles = StyleSheet.create({
   saveBtnText: { color: "#fff", fontSize: 12, fontWeight: "600" as const },
   cancelBtn: { backgroundColor: "#1f2937", paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6 },
   cancelBtnText: { color: "#9ca3af", fontSize: 12 },
+  // Error banner (rosso)
+  errorBanner: {
+    flexDirection: "row", alignItems: "flex-start", gap: 8,
+    backgroundColor: "#2d1515", borderWidth: 1, borderColor: "#7f1d1d",
+    borderRadius: 8, padding: 10, marginBottom: 10,
+  },
+  errorIcon: { color: "#f87171", fontSize: 16, lineHeight: 20 },
+  errorBody: { flex: 1 },
+  errorTitle: { color: "#fca5a5", fontSize: 12, fontWeight: "700" as const, marginBottom: 2 },
+  errorMsg: { color: "#f87171", fontSize: 11, fontFamily: "monospace" as const },
+  errorAt: { color: "#9ca3af", fontSize: 10, marginTop: 3 },
+  // Stale banner (giallo)
+  staleBanner: {
+    flexDirection: "row", alignItems: "center", gap: 6,
+    backgroundColor: "#2d2305", borderWidth: 1, borderColor: "#713f12",
+    borderRadius: 8, padding: 10, marginBottom: 10,
+  },
+  staleIcon: { color: "#fbbf24", fontSize: 15 },
+  staleText: { color: "#fde68a", fontSize: 11, flex: 1 },
 });

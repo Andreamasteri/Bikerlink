@@ -22,6 +22,18 @@ export interface AiTokenAuditData {
   subsystems: Record<string, AiUsageEntry>;
 }
 
+export interface AiTokenAuditStatus {
+  audit: AiTokenAuditData | null;
+  /** true se il contatore non si aggiorna da più di STALE_HOURS ore */
+  stale: boolean;
+  /** Ultimo errore catturato da logAiUsage, se presente */
+  lastError: { message: string; at: string } | null;
+}
+
+const AI_AUDIT_ERROR_KEY = "ai_audit_error_state";
+/** Ore senza aggiornamento prima di considerare il contatore stale */
+const STALE_HOURS = 6;
+
 function todayKey(): string {
   return `ai_token_audit_${new Date().toISOString().slice(0, 10)}`;
 }
@@ -58,6 +70,62 @@ function parseSafeAuditData(raw: unknown): AiTokenAuditData {
     return raw as AiTokenAuditData;
   }
   return { subsystems: {} };
+}
+
+/**
+ * Persiste l'ultimo errore di logAiUsage su app_settings in modo best-effort.
+ * Non lancia mai eccezioni.
+ */
+async function persistAuditError(message: string): Promise<void> {
+  try {
+    const payload = JSON.stringify({ message, at: new Date().toISOString() });
+    await db.execute(sql`
+      INSERT INTO app_settings (id, key, value, updated_at)
+      VALUES (gen_random_uuid(), ${AI_AUDIT_ERROR_KEY}, ${payload}, now())
+      ON CONFLICT (key) DO UPDATE SET
+        value = ${payload},
+        updated_at = now()
+    `);
+  } catch {
+    // silenzioso: se anche la scrittura dell'errore fallisce non c'è altro da fare
+  }
+}
+
+/**
+ * Cancella lo stato di errore persistito dopo una scrittura riuscita.
+ * Non lancia mai eccezioni.
+ */
+async function clearAuditError(): Promise<void> {
+  try {
+    await db.execute(sql`DELETE FROM app_settings WHERE key = ${AI_AUDIT_ERROR_KEY}`);
+  } catch {
+    // silenzioso
+  }
+}
+
+/**
+ * Legge l'ultimo errore persistito, se presente.
+ */
+async function readAuditError(): Promise<{ message: string; at: string } | null> {
+  try {
+    const rows = await db.execute<{ value: string }>(
+      sql`SELECT value FROM app_settings WHERE key = ${AI_AUDIT_ERROR_KEY} LIMIT 1`,
+    );
+    const raw = rows.rows?.[0]?.value;
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as unknown;
+    if (
+      parsed &&
+      typeof parsed === "object" &&
+      "message" in parsed &&
+      "at" in parsed
+    ) {
+      return parsed as { message: string; at: string };
+    }
+    return null;
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -127,8 +195,14 @@ export async function logAiUsage(
           updated_at = now()
       `);
     });
+
+    // Scrittura riuscita: cancella l'eventuale errore persistito
+    await clearAuditError();
   } catch (err) {
-    console.warn("[AI-AUDIT] error updating daily counter:", extractErrorMessage(err));
+    const message = extractErrorMessage(err);
+    console.warn("[AI-AUDIT] error updating daily counter:", message);
+    // Persisti l'errore su app_settings così l'admin lo vede nel pannello
+    await persistAuditError(message);
   }
 }
 
@@ -144,4 +218,30 @@ export async function getAiTokenAudit(date?: string): Promise<AiTokenAuditData |
   } catch {
     return null;
   }
+}
+
+/**
+ * Restituisce audit + lastError + stale in un unico oggetto.
+ * stale = true se almeno un subsistema è stato registrato oggi MA il più
+ * recente lastAt è più vecchio di STALE_HOURS ore.
+ */
+export async function getAiTokenAuditStatus(date?: string): Promise<AiTokenAuditStatus> {
+  const [audit, lastError] = await Promise.all([
+    getAiTokenAudit(date),
+    readAuditError(),
+  ]);
+
+  let stale = false;
+  if (audit && Object.keys(audit.subsystems).length > 0) {
+    const timestamps = Object.values(audit.subsystems)
+      .map((e) => new Date(e.lastAt).getTime())
+      .filter(Boolean);
+    if (timestamps.length > 0) {
+      const mostRecent = Math.max(...timestamps);
+      const ageMs = Date.now() - mostRecent;
+      stale = ageMs > STALE_HOURS * 60 * 60 * 1000;
+    }
+  }
+
+  return { audit, stale, lastError };
 }
