@@ -3,122 +3,122 @@ import { db } from "../db";
 import { systemAccountConditions } from "../lib/system-account-filter";
 import { PROTECTED_NICKNAMES } from "../constants";
 import {
-  zavarrinaWishlists, zavarrinaWishlistPhotos, zavarrinaWishlistMotos,
-  bikerZavarrinaMatches, users, userMotorcycles,
+  zavorrinaWishlists, zavorrinaWishlistPhotos, zavorrinaWishlistMotos,
+  bikerZavorrinaMatches, users, userMotorcycles,
   proposalProfileMatches,
-  type ZavarrinaWishlist,
-  type ZavarrinaWishlistPhoto, type InsertZavarrinaWishlistPhoto,
-  type ZavarrinaWishlistMoto, type InsertZavarrinaWishlistMoto,
-  type BikerZavarrinaMatch, type InsertBikerZavarrinaMatch,
+  type ZavorrinaWishlist,
+  type ZavorrinaWishlistPhoto, type InsertZavorrinaWishlistPhoto,
+  type ZavorrinaWishlistMoto, type InsertZavorrinaWishlistMoto,
+  type BikerZavorrinaMatch, type InsertBikerZavorrinaMatch,
   type ProposalProfileMatch, type InsertProposalProfileMatch,
 } from "@shared/db";
 import { ContestStorage } from "./contest";
 import { dynamicScoreSql, FRESHNESS_DEFAULTS } from "../matching/scoring";
 
 export class MatchingStorage extends ContestStorage {
-  async getWishlist(userId: string): Promise<ZavarrinaWishlist | undefined> {
-    const [wl] = await db.select().from(zavarrinaWishlists).where(eq(zavarrinaWishlists.userId, userId)).limit(1);
+  async getWishlist(userId: string): Promise<ZavorrinaWishlist | undefined> {
+    const [wl] = await db.select().from(zavorrinaWishlists).where(eq(zavorrinaWishlists.userId, userId)).limit(1);
     return wl;
   }
 
-  async createOrUpdateWishlist(userId: string, description: string): Promise<ZavarrinaWishlist> {
-    const [existing] = await db.select().from(zavarrinaWishlists).where(eq(zavarrinaWishlists.userId, userId)).limit(1);
+  async createOrUpdateWishlist(userId: string, description: string): Promise<ZavorrinaWishlist> {
+    const [existing] = await db.select().from(zavorrinaWishlists).where(eq(zavorrinaWishlists.userId, userId)).limit(1);
     if (existing) {
-      const [wl] = await db.update(zavarrinaWishlists).set({ description, updatedAt: new Date() }).where(eq(zavarrinaWishlists.id, existing.id)).returning();
+      const [wl] = await db.update(zavorrinaWishlists).set({ description, updatedAt: new Date() }).where(eq(zavorrinaWishlists.id, existing.id)).returning();
       return wl;
     }
-    const [wl] = await db.insert(zavarrinaWishlists).values({ userId, description }).returning();
+    const [wl] = await db.insert(zavorrinaWishlists).values({ userId, description }).returning();
     return wl;
   }
 
-  async getWishlistPhotos(wishlistId: string): Promise<ZavarrinaWishlistPhoto[]> {
-    return db.select().from(zavarrinaWishlistPhotos).where(eq(zavarrinaWishlistPhotos.wishlistId, wishlistId)).orderBy(asc(zavarrinaWishlistPhotos.sortOrder));
+  async getWishlistPhotos(wishlistId: string): Promise<ZavorrinaWishlistPhoto[]> {
+    return db.select().from(zavorrinaWishlistPhotos).where(eq(zavorrinaWishlistPhotos.wishlistId, wishlistId)).orderBy(asc(zavorrinaWishlistPhotos.sortOrder));
   }
 
-  async getWishlistPhoto(id: string): Promise<ZavarrinaWishlistPhoto | undefined> {
-    const [photo] = await db.select().from(zavarrinaWishlistPhotos).where(eq(zavarrinaWishlistPhotos.id, id)).limit(1);
+  async getWishlistPhoto(id: string): Promise<ZavorrinaWishlistPhoto | undefined> {
+    const [photo] = await db.select().from(zavorrinaWishlistPhotos).where(eq(zavorrinaWishlistPhotos.id, id)).limit(1);
     return photo;
   }
 
-  async addWishlistPhoto(data: InsertZavarrinaWishlistPhoto): Promise<ZavarrinaWishlistPhoto> {
-    const [photo] = await db.insert(zavarrinaWishlistPhotos).values(data).returning();
+  async addWishlistPhoto(data: InsertZavorrinaWishlistPhoto): Promise<ZavorrinaWishlistPhoto> {
+    const [photo] = await db.insert(zavorrinaWishlistPhotos).values(data).returning();
     return photo;
   }
 
   async deleteWishlistPhoto(id: string): Promise<void> {
-    await db.delete(zavarrinaWishlistPhotos).where(eq(zavarrinaWishlistPhotos.id, id));
+    await db.delete(zavorrinaWishlistPhotos).where(eq(zavorrinaWishlistPhotos.id, id));
   }
 
   async getWishlistPhotoCount(wishlistId: string): Promise<number> {
-    const result = await db.select({ count: sql<number>`count(*)` }).from(zavarrinaWishlistPhotos).where(eq(zavarrinaWishlistPhotos.wishlistId, wishlistId));
+    const result = await db.select({ count: sql<number>`count(*)` }).from(zavorrinaWishlistPhotos).where(eq(zavorrinaWishlistPhotos.wishlistId, wishlistId));
     return Number(result[0]?.count ?? 0);
   }
 
-  async getWishlistMoto(id: string): Promise<ZavarrinaWishlistMoto | undefined> {
-    const [moto] = await db.select().from(zavarrinaWishlistMotos).where(eq(zavarrinaWishlistMotos.id, id)).limit(1);
+  async getWishlistMoto(id: string): Promise<ZavorrinaWishlistMoto | undefined> {
+    const [moto] = await db.select().from(zavorrinaWishlistMotos).where(eq(zavorrinaWishlistMotos.id, id)).limit(1);
     return moto;
   }
 
-  async getWishlistMotos(wishlistId: string): Promise<ZavarrinaWishlistMoto[]> {
-    return db.select().from(zavarrinaWishlistMotos).where(eq(zavarrinaWishlistMotos.wishlistId, wishlistId));
+  async getWishlistMotos(wishlistId: string): Promise<ZavorrinaWishlistMoto[]> {
+    return db.select().from(zavorrinaWishlistMotos).where(eq(zavorrinaWishlistMotos.wishlistId, wishlistId));
   }
 
-  async addWishlistMoto(data: InsertZavarrinaWishlistMoto): Promise<ZavarrinaWishlistMoto> {
-    const [moto] = await db.insert(zavarrinaWishlistMotos).values(data).returning();
+  async addWishlistMoto(data: InsertZavorrinaWishlistMoto): Promise<ZavorrinaWishlistMoto> {
+    const [moto] = await db.insert(zavorrinaWishlistMotos).values(data).returning();
     return moto;
   }
 
-  async updateWishlistMoto(id: string, data: Partial<InsertZavarrinaWishlistMoto>): Promise<ZavarrinaWishlistMoto | undefined> {
-    const [moto] = await db.update(zavarrinaWishlistMotos).set(data).where(eq(zavarrinaWishlistMotos.id, id)).returning();
+  async updateWishlistMoto(id: string, data: Partial<InsertZavorrinaWishlistMoto>): Promise<ZavorrinaWishlistMoto | undefined> {
+    const [moto] = await db.update(zavorrinaWishlistMotos).set(data).where(eq(zavorrinaWishlistMotos.id, id)).returning();
     return moto;
   }
 
   async deleteWishlistMoto(id: string): Promise<void> {
-    await db.delete(zavarrinaWishlistMotos).where(eq(zavarrinaWishlistMotos.id, id));
+    await db.delete(zavorrinaWishlistMotos).where(eq(zavorrinaWishlistMotos.id, id));
   }
 
   async getWishlistMotoCount(wishlistId: string): Promise<number> {
-    const result = await db.select({ count: sql<number>`count(*)` }).from(zavarrinaWishlistMotos).where(eq(zavarrinaWishlistMotos.wishlistId, wishlistId));
+    const result = await db.select({ count: sql<number>`count(*)` }).from(zavorrinaWishlistMotos).where(eq(zavorrinaWishlistMotos.wishlistId, wishlistId));
     return Number(result[0]?.count ?? 0);
   }
 
-  async findMatchingWishlistMotos(brand: string, model: string, ridingStyle: string, motorcycleType: string): Promise<Array<ZavarrinaWishlistMoto & { userId: string }>> {
+  async findMatchingWishlistMotos(brand: string, model: string, ridingStyle: string, motorcycleType: string): Promise<Array<ZavorrinaWishlistMoto & { userId: string }>> {
     const brandModelMatch = and(
-      sql`${zavarrinaWishlistMotos.brand} IS NOT NULL AND ${zavarrinaWishlistMotos.brand} != ''`,
-      sql`${zavarrinaWishlistMotos.model} IS NOT NULL AND ${zavarrinaWishlistMotos.model} != ''`,
-      sql`LOWER(${zavarrinaWishlistMotos.brand}) = LOWER(${brand})`,
-      sql`(LOWER(${zavarrinaWishlistMotos.model}) LIKE '%' || LOWER(${model}) || '%' OR LOWER(${model}) LIKE '%' || LOWER(${zavarrinaWishlistMotos.model}) || '%')`,
-      sql`LOWER(${zavarrinaWishlistMotos.ridingStyle}) = LOWER(${ridingStyle})`,
+      sql`${zavorrinaWishlistMotos.brand} IS NOT NULL AND ${zavorrinaWishlistMotos.brand} != ''`,
+      sql`${zavorrinaWishlistMotos.model} IS NOT NULL AND ${zavorrinaWishlistMotos.model} != ''`,
+      sql`LOWER(${zavorrinaWishlistMotos.brand}) = LOWER(${brand})`,
+      sql`(LOWER(${zavorrinaWishlistMotos.model}) LIKE '%' || LOWER(${model}) || '%' OR LOWER(${model}) LIKE '%' || LOWER(${zavorrinaWishlistMotos.model}) || '%')`,
+      sql`LOWER(${zavorrinaWishlistMotos.ridingStyle}) = LOWER(${ridingStyle})`,
     );
     const typeMatch = and(
-      sql`(${zavarrinaWishlistMotos.brand} IS NULL OR ${zavarrinaWishlistMotos.brand} = '')`,
-      sql`(${zavarrinaWishlistMotos.model} IS NULL OR ${zavarrinaWishlistMotos.model} = '')`,
-      sql`${zavarrinaWishlistMotos.motorcycleType} IS NOT NULL AND ${zavarrinaWishlistMotos.motorcycleType} != ''`,
-      sql`LOWER(${zavarrinaWishlistMotos.motorcycleType}) = LOWER(${motorcycleType})`,
-      sql`LOWER(${zavarrinaWishlistMotos.ridingStyle}) = LOWER(${ridingStyle})`,
+      sql`(${zavorrinaWishlistMotos.brand} IS NULL OR ${zavorrinaWishlistMotos.brand} = '')`,
+      sql`(${zavorrinaWishlistMotos.model} IS NULL OR ${zavorrinaWishlistMotos.model} = '')`,
+      sql`${zavorrinaWishlistMotos.motorcycleType} IS NOT NULL AND ${zavorrinaWishlistMotos.motorcycleType} != ''`,
+      sql`LOWER(${zavorrinaWishlistMotos.motorcycleType}) = LOWER(${motorcycleType})`,
+      sql`LOWER(${zavorrinaWishlistMotos.ridingStyle}) = LOWER(${ridingStyle})`,
     );
     const results = await db.select({
-      id: zavarrinaWishlistMotos.id,
-      wishlistId: zavarrinaWishlistMotos.wishlistId,
-      brand: zavarrinaWishlistMotos.brand,
-      model: zavarrinaWishlistMotos.model,
-      motorcycleType: zavarrinaWishlistMotos.motorcycleType,
-      ridingStyle: zavarrinaWishlistMotos.ridingStyle,
-      createdAt: zavarrinaWishlistMotos.createdAt,
-      userId: zavarrinaWishlists.userId,
-    }).from(zavarrinaWishlistMotos)
-      .innerJoin(zavarrinaWishlists, eq(zavarrinaWishlistMotos.wishlistId, zavarrinaWishlists.id))
+      id: zavorrinaWishlistMotos.id,
+      wishlistId: zavorrinaWishlistMotos.wishlistId,
+      brand: zavorrinaWishlistMotos.brand,
+      model: zavorrinaWishlistMotos.model,
+      motorcycleType: zavorrinaWishlistMotos.motorcycleType,
+      ridingStyle: zavorrinaWishlistMotos.ridingStyle,
+      createdAt: zavorrinaWishlistMotos.createdAt,
+      userId: zavorrinaWishlists.userId,
+    }).from(zavorrinaWishlistMotos)
+      .innerJoin(zavorrinaWishlists, eq(zavorrinaWishlistMotos.wishlistId, zavorrinaWishlists.id))
       .where(or(brandModelMatch, typeMatch));
     return results;
   }
 
-  async getAllWishlistMotosWithUsers(countries?: string[]): Promise<{ wishlistMoto: import("@shared/db").ZavarrinaWishlistMoto; userId: string }[]> {
+  async getAllWishlistMotosWithUsers(countries?: string[]): Promise<{ wishlistMoto: import("@shared/db").ZavorrinaWishlistMoto; userId: string }[]> {
     const baseCondition = and(eq(users.isFake, false), eq(users.status, "active"), ...systemAccountConditions(users))!;
     const condition = countries && countries.length > 0 ? and(baseCondition, inArray(users.country, countries)) : baseCondition;
-    return db.select({ wishlistMoto: zavarrinaWishlistMotos, userId: zavarrinaWishlists.userId })
-      .from(zavarrinaWishlistMotos)
-      .innerJoin(zavarrinaWishlists, eq(zavarrinaWishlists.id, zavarrinaWishlistMotos.wishlistId))
-      .innerJoin(users, eq(users.id, zavarrinaWishlists.userId))
+    return db.select({ wishlistMoto: zavorrinaWishlistMotos, userId: zavorrinaWishlists.userId })
+      .from(zavorrinaWishlistMotos)
+      .innerJoin(zavorrinaWishlists, eq(zavorrinaWishlists.id, zavorrinaWishlistMotos.wishlistId))
+      .innerJoin(users, eq(users.id, zavorrinaWishlists.userId))
       .where(condition);
   }
 
@@ -139,9 +139,9 @@ export class MatchingStorage extends ContestStorage {
    * SQL so the JS engine only iterates plausible candidates.
    */
   async getCompatibleWishlistGaragePairs(countries?: string[]): Promise<Array<{
-    wishlistMoto: import("@shared/db").ZavarrinaWishlistMoto;
+    wishlistMoto: import("@shared/db").ZavorrinaWishlistMoto;
     motorcycle: import("@shared/db").UserMotorcycle;
-    zavarrinaId: string;
+    zavorrinaId: string;
     bikerId: string;
   }>> {
     const countryFilter = countries && countries.length > 0
@@ -158,7 +158,7 @@ export class MatchingStorage extends ContestStorage {
         m.riding_style AS m_riding_style, m.year AS m_year,
         m.displacement AS m_displacement, m.is_default AS m_is_default,
         m.created_at AS m_created_at,
-        wl.user_id AS zavarrina_id,
+        wl.user_id AS zavorrina_id,
         m.user_id AS biker_id
       FROM zavorrina_wishlist_motos w
       INNER JOIN zavorrina_wishlists wl ON wl.id = w.wishlist_id
@@ -184,13 +184,13 @@ export class MatchingStorage extends ContestStorage {
     `);
 
     return (rows.rows as Record<string, unknown>[]).map((r) => ({
-      zavarrinaId: r.zavarrina_id as string,
+      zavorrinaId: r.zavorrina_id as string,
       bikerId: r.biker_id as string,
       wishlistMoto: {
         id: r.w_id, wishlistId: r.w_wishlist_id, brand: r.w_brand,
         model: r.w_model, motorcycleType: r.w_motorcycle_type,
         ridingStyle: r.w_riding_style, createdAt: r.w_created_at,
-      } as unknown as import("@shared/db").ZavarrinaWishlistMoto,
+      } as unknown as import("@shared/db").ZavorrinaWishlistMoto,
       motorcycle: {
         id: r.m_id, userId: r.m_user_id, brand: r.m_brand, model: r.m_model,
         motorcycleType: r.m_motorcycle_type, ridingStyle: r.m_riding_style,
@@ -200,13 +200,13 @@ export class MatchingStorage extends ContestStorage {
     }));
   }
 
-  async createMatch(data: InsertBikerZavarrinaMatch): Promise<BikerZavarrinaMatch | null> {
+  async createMatch(data: InsertBikerZavorrinaMatch): Promise<BikerZavorrinaMatch | null> {
     const scoreBreakdownJson = JSON.stringify(data.scoreBreakdown ?? {});
     const result = await db.execute(sql`
       INSERT INTO biker_zavorrina_matches
         (id, biker_id, zavorrina_id, biker_motorcycle_id, wishlist_moto_id, status, is_supermatch, score_breakdown, notification_priority)
       VALUES
-        (gen_random_uuid(), ${data.bikerId}, ${data.zavarrinaId}, ${data.bikerMotorcycleId}, ${data.wishlistMotoId},
+        (gen_random_uuid(), ${data.bikerId}, ${data.zavorrinaId}, ${data.bikerMotorcycleId}, ${data.wishlistMotoId},
          ${data.status ?? 'new'}, ${data.isSupermatch ?? false}, ${scoreBreakdownJson}::jsonb, ${data.notificationPriority ?? 'normal'})
       ON CONFLICT (biker_id, zavorrina_id, biker_motorcycle_id, wishlist_moto_id)
       DO UPDATE SET
@@ -224,7 +224,7 @@ export class MatchingStorage extends ContestStorage {
     return {
       id: row.id as string,
       bikerId: row.biker_id as string,
-      zavarrinaId: row.zavorrina_id as string,
+      zavorrinaId: row.zavorrina_id as string,
       bikerMotorcycleId: row.biker_motorcycle_id as string,
       wishlistMotoId: row.wishlist_moto_id as string,
       status: row.status as string,
@@ -234,120 +234,120 @@ export class MatchingStorage extends ContestStorage {
       notifiedAt: (row.notified_at as Date | null) ?? null,
       archivedAt: (row.archived_at as Date | null) ?? null,
       createdAt: row.created_at as Date,
-    } as BikerZavarrinaMatch;
+    } as BikerZavorrinaMatch;
   }
 
-  async getMatchesForUser(userId: string, options?: { includeArchived?: boolean; halfLifeDays?: number }): Promise<BikerZavarrinaMatch[]> {
+  async getMatchesForUser(userId: string, options?: { includeArchived?: boolean; halfLifeDays?: number }): Promise<BikerZavorrinaMatch[]> {
     const halfLife = options?.halfLifeDays ?? FRESHNESS_DEFAULTS.halfLifeGenericDays;
     const archivedCond = options?.includeArchived
-      ? isNotNull(bikerZavarrinaMatches.archivedAt)
-      : isNull(bikerZavarrinaMatches.archivedAt);
-    return db.select().from(bikerZavarrinaMatches).where(
+      ? isNotNull(bikerZavorrinaMatches.archivedAt)
+      : isNull(bikerZavorrinaMatches.archivedAt);
+    return db.select().from(bikerZavorrinaMatches).where(
       and(
-        or(eq(bikerZavarrinaMatches.bikerId, userId), eq(bikerZavarrinaMatches.zavarrinaId, userId)),
+        or(eq(bikerZavorrinaMatches.bikerId, userId), eq(bikerZavorrinaMatches.zavorrinaId, userId)),
         archivedCond,
       )
     ).orderBy(
-      sql`CASE WHEN ${bikerZavarrinaMatches.status} = 'accepted' THEN 0 WHEN ${bikerZavarrinaMatches.status} = 'new' THEN 1 ELSE 2 END`,
+      sql`CASE WHEN ${bikerZavorrinaMatches.status} = 'accepted' THEN 0 WHEN ${bikerZavorrinaMatches.status} = 'new' THEN 1 ELSE 2 END`,
       desc(dynamicScoreSql(
-        sql`${bikerZavarrinaMatches.createdAt}`,
+        sql`${bikerZavorrinaMatches.createdAt}`,
         halfLife,
-        sql`CASE WHEN ${bikerZavarrinaMatches.isSupermatch} THEN 2.0 ELSE 1.0 END`,
+        sql`CASE WHEN ${bikerZavorrinaMatches.isSupermatch} THEN 2.0 ELSE 1.0 END`,
       )),
     ).limit(200);
   }
 
-  async archiveStaleBikerZavarrinaMatches(afterDays: number = FRESHNESS_DEFAULTS.archiveAfterDays): Promise<number> {
+  async archiveStaleBikerZavorrinaMatches(afterDays: number = FRESHNESS_DEFAULTS.archiveAfterDays): Promise<number> {
     const cutoff = new Date(Date.now() - afterDays * 24 * 60 * 60 * 1000);
-    const result = await db.update(bikerZavarrinaMatches)
+    const result = await db.update(bikerZavorrinaMatches)
       .set({ archivedAt: new Date() })
       .where(and(
-        eq(bikerZavarrinaMatches.status, "new"),
-        isNull(bikerZavarrinaMatches.archivedAt),
-        lt(bikerZavarrinaMatches.createdAt, cutoff),
+        eq(bikerZavorrinaMatches.status, "new"),
+        isNull(bikerZavorrinaMatches.archivedAt),
+        lt(bikerZavorrinaMatches.createdAt, cutoff),
       ))
-      .returning({ id: bikerZavarrinaMatches.id });
+      .returning({ id: bikerZavorrinaMatches.id });
     return result.length;
   }
 
   async reactivateGarageMatch(id: string, userId: string): Promise<boolean> {
-    const [match] = await db.select().from(bikerZavarrinaMatches).where(eq(bikerZavarrinaMatches.id, id));
+    const [match] = await db.select().from(bikerZavorrinaMatches).where(eq(bikerZavorrinaMatches.id, id));
     if (!match) return false;
-    if (match.bikerId !== userId && match.zavarrinaId !== userId) return false;
+    if (match.bikerId !== userId && match.zavorrinaId !== userId) return false;
     if (!match.archivedAt) return false;
-    await db.update(bikerZavarrinaMatches)
+    await db.update(bikerZavorrinaMatches)
       .set({ status: "new", archivedAt: null, createdAt: new Date() })
-      .where(and(eq(bikerZavarrinaMatches.id, id), isNotNull(bikerZavarrinaMatches.archivedAt)));
+      .where(and(eq(bikerZavorrinaMatches.id, id), isNotNull(bikerZavorrinaMatches.archivedAt)));
     return true;
   }
 
-  async getGarageMatch(id: string): Promise<BikerZavarrinaMatch | undefined> {
-    const [match] = await db.select().from(bikerZavarrinaMatches).where(eq(bikerZavarrinaMatches.id, id));
+  async getGarageMatch(id: string): Promise<BikerZavorrinaMatch | undefined> {
+    const [match] = await db.select().from(bikerZavorrinaMatches).where(eq(bikerZavorrinaMatches.id, id));
     return match;
   }
 
-  async updateGarageMatch(id: string, data: Partial<InsertBikerZavarrinaMatch>): Promise<BikerZavarrinaMatch | undefined> {
-    const [updated] = await db.update(bikerZavarrinaMatches).set(data).where(eq(bikerZavarrinaMatches.id, id)).returning();
+  async updateGarageMatch(id: string, data: Partial<InsertBikerZavorrinaMatch>): Promise<BikerZavorrinaMatch | undefined> {
+    const [updated] = await db.update(bikerZavorrinaMatches).set(data).where(eq(bikerZavorrinaMatches.id, id)).returning();
     return updated;
   }
 
   async deleteGarageMatch(id: string, userId: string): Promise<boolean> {
-    const [match] = await db.select().from(bikerZavarrinaMatches).where(eq(bikerZavarrinaMatches.id, id));
+    const [match] = await db.select().from(bikerZavorrinaMatches).where(eq(bikerZavorrinaMatches.id, id));
     if (!match) return false;
-    if (match.bikerId !== userId && match.zavarrinaId !== userId) return false;
-    await db.delete(bikerZavarrinaMatches).where(eq(bikerZavarrinaMatches.id, id));
+    if (match.bikerId !== userId && match.zavorrinaId !== userId) return false;
+    await db.delete(bikerZavorrinaMatches).where(eq(bikerZavorrinaMatches.id, id));
     return true;
   }
 
   async resetGarageMatchToNew(id: string, userId: string): Promise<boolean> {
-    const [match] = await db.select().from(bikerZavarrinaMatches).where(eq(bikerZavarrinaMatches.id, id));
+    const [match] = await db.select().from(bikerZavorrinaMatches).where(eq(bikerZavorrinaMatches.id, id));
     if (!match) return false;
-    if (match.bikerId !== userId && match.zavarrinaId !== userId) return false;
-    await db.update(bikerZavarrinaMatches).set({ status: "new" }).where(eq(bikerZavarrinaMatches.id, id));
+    if (match.bikerId !== userId && match.zavorrinaId !== userId) return false;
+    await db.update(bikerZavorrinaMatches).set({ status: "new" }).where(eq(bikerZavorrinaMatches.id, id));
     return true;
   }
 
   async deleteRejectedGarageMatches(userId: string): Promise<number> {
-    const rejected = await db.select().from(bikerZavarrinaMatches).where(
-      and(or(eq(bikerZavarrinaMatches.bikerId, userId), eq(bikerZavarrinaMatches.zavarrinaId, userId)), eq(bikerZavarrinaMatches.status, "rejected"))
+    const rejected = await db.select().from(bikerZavorrinaMatches).where(
+      and(or(eq(bikerZavorrinaMatches.bikerId, userId), eq(bikerZavorrinaMatches.zavorrinaId, userId)), eq(bikerZavorrinaMatches.status, "rejected"))
     );
     if (rejected.length === 0) return 0;
-    await db.delete(bikerZavarrinaMatches).where(
-      and(or(eq(bikerZavarrinaMatches.bikerId, userId), eq(bikerZavarrinaMatches.zavarrinaId, userId)), eq(bikerZavarrinaMatches.status, "rejected"))
+    await db.delete(bikerZavorrinaMatches).where(
+      and(or(eq(bikerZavorrinaMatches.bikerId, userId), eq(bikerZavorrinaMatches.zavorrinaId, userId)), eq(bikerZavorrinaMatches.status, "rejected"))
     );
     return rejected.length;
   }
 
   async deleteNewGarageMatches(userId: string): Promise<number> {
-    const newMatches = await db.select().from(bikerZavarrinaMatches).where(
-      and(or(eq(bikerZavarrinaMatches.bikerId, userId), eq(bikerZavarrinaMatches.zavarrinaId, userId)), eq(bikerZavarrinaMatches.status, "new"))
+    const newMatches = await db.select().from(bikerZavorrinaMatches).where(
+      and(or(eq(bikerZavorrinaMatches.bikerId, userId), eq(bikerZavorrinaMatches.zavorrinaId, userId)), eq(bikerZavorrinaMatches.status, "new"))
     );
     if (newMatches.length === 0) return 0;
-    await db.delete(bikerZavarrinaMatches).where(
-      and(or(eq(bikerZavarrinaMatches.bikerId, userId), eq(bikerZavarrinaMatches.zavarrinaId, userId)), eq(bikerZavarrinaMatches.status, "new"))
+    await db.delete(bikerZavorrinaMatches).where(
+      and(or(eq(bikerZavorrinaMatches.bikerId, userId), eq(bikerZavorrinaMatches.zavorrinaId, userId)), eq(bikerZavorrinaMatches.status, "new"))
     );
     return newMatches.length;
   }
 
-  async findExistingBikerZavarrinaMatch(bikerId: string, zavarrinaId: string, bikerMotorcycleId: string, wishlistMotoId: string): Promise<BikerZavarrinaMatch | undefined> {
-    const [match] = await db.select().from(bikerZavarrinaMatches).where(
+  async findExistingBikerZavorrinaMatch(bikerId: string, zavorrinaId: string, bikerMotorcycleId: string, wishlistMotoId: string): Promise<BikerZavorrinaMatch | undefined> {
+    const [match] = await db.select().from(bikerZavorrinaMatches).where(
       and(
-        eq(bikerZavarrinaMatches.bikerId, bikerId), eq(bikerZavarrinaMatches.zavarrinaId, zavarrinaId),
-        eq(bikerZavarrinaMatches.bikerMotorcycleId, bikerMotorcycleId), eq(bikerZavarrinaMatches.wishlistMotoId, wishlistMotoId),
-        isNull(bikerZavarrinaMatches.archivedAt),
+        eq(bikerZavorrinaMatches.bikerId, bikerId), eq(bikerZavorrinaMatches.zavorrinaId, zavorrinaId),
+        eq(bikerZavorrinaMatches.bikerMotorcycleId, bikerMotorcycleId), eq(bikerZavorrinaMatches.wishlistMotoId, wishlistMotoId),
+        isNull(bikerZavorrinaMatches.archivedAt),
       )
     ).limit(1);
     return match;
   }
 
-  async getAllExistingBikerZavarrinaMatchKeys(): Promise<Set<string>> {
+  async getAllExistingBikerZavorrinaMatchKeys(): Promise<Set<string>> {
     const rows = await db.select({
-      bikerId: bikerZavarrinaMatches.bikerId, zavarrinaId: bikerZavarrinaMatches.zavarrinaId,
-      bikerMotorcycleId: bikerZavarrinaMatches.bikerMotorcycleId, wishlistMotoId: bikerZavarrinaMatches.wishlistMotoId,
-    }).from(bikerZavarrinaMatches);
+      bikerId: bikerZavorrinaMatches.bikerId, zavorrinaId: bikerZavorrinaMatches.zavorrinaId,
+      bikerMotorcycleId: bikerZavorrinaMatches.bikerMotorcycleId, wishlistMotoId: bikerZavorrinaMatches.wishlistMotoId,
+    }).from(bikerZavorrinaMatches);
     const keys = new Set<string>();
     for (const r of rows) {
-      keys.add(`${r.bikerId}:${r.zavarrinaId}:${r.bikerMotorcycleId}:${r.wishlistMotoId}`);
+      keys.add(`${r.bikerId}:${r.zavorrinaId}:${r.bikerMotorcycleId}:${r.wishlistMotoId}`);
     }
     return keys;
   }
@@ -355,25 +355,25 @@ export class MatchingStorage extends ContestStorage {
   async getAllExistingProposalProfileMatchKeys(): Promise<Set<string>> {
     const rows = await db.select({
       proposalId: proposalProfileMatches.proposalId,
-      zavarrinaId: proposalProfileMatches.zavarrinaId,
+      zavorrinaId: proposalProfileMatches.zavorrinaId,
     }).from(proposalProfileMatches);
     const keys = new Set<string>();
     for (const r of rows) {
-      keys.add(`${r.proposalId}:${r.zavarrinaId}`);
+      keys.add(`${r.proposalId}:${r.zavorrinaId}`);
     }
     return keys;
   }
 
-  async getActedUponBikerZavarrinaPairs(): Promise<Set<string>> {
+  async getActedUponBikerZavorrinaPairs(): Promise<Set<string>> {
     const rows = await db.select({
-      bikerId: bikerZavarrinaMatches.bikerId,
-      zavarrinaId: bikerZavarrinaMatches.zavarrinaId,
-    }).from(bikerZavarrinaMatches).where(
-      notInArray(bikerZavarrinaMatches.status, ["new"])
+      bikerId: bikerZavorrinaMatches.bikerId,
+      zavorrinaId: bikerZavorrinaMatches.zavorrinaId,
+    }).from(bikerZavorrinaMatches).where(
+      notInArray(bikerZavorrinaMatches.status, ["new"])
     );
     const pairs = new Set<string>();
     for (const r of rows) {
-      pairs.add(`${r.bikerId}:${r.zavarrinaId}`);
+      pairs.add(`${r.bikerId}:${r.zavorrinaId}`);
     }
     return pairs;
   }
@@ -384,7 +384,7 @@ export class MatchingStorage extends ContestStorage {
         INSERT INTO proposal_profile_matches
           (id, proposal_id, biker_id, zavorrina_id, distance_km, status, notification_priority)
         VALUES
-          (gen_random_uuid(), ${data.proposalId}, ${data.bikerId}, ${data.zavarrinaId},
+          (gen_random_uuid(), ${data.proposalId}, ${data.bikerId}, ${data.zavorrinaId},
            ${data.distanceKm ?? null}, ${data.status ?? 'new'}, ${data.notificationPriority ?? 'normal'})
         ON CONFLICT (proposal_id, zavorrina_id)
         DO UPDATE SET
@@ -403,7 +403,7 @@ export class MatchingStorage extends ContestStorage {
         id: row.id as string,
         proposalId: row.proposal_id as string,
         bikerId: row.biker_id as string,
-        zavarrinaId: row.zavorrina_id as string,
+        zavorrinaId: row.zavorrina_id as string,
         distanceKm: row.distance_km as number | null,
         status: row.status as string,
         notificationPriority: row.notification_priority as string,
@@ -438,7 +438,7 @@ export class MatchingStorage extends ContestStorage {
       and(
         or(
           eq(proposalProfileMatches.bikerId, userId),
-          eq(proposalProfileMatches.zavarrinaId, userId),
+          eq(proposalProfileMatches.zavorrinaId, userId),
         ),
         archivedCond,
       )
@@ -464,7 +464,7 @@ export class MatchingStorage extends ContestStorage {
   async reactivateProposalProfileMatch(id: string, userId: string): Promise<boolean> {
     const [match] = await db.select().from(proposalProfileMatches).where(eq(proposalProfileMatches.id, id));
     if (!match) return false;
-    if (match.bikerId !== userId && match.zavarrinaId !== userId) return false;
+    if (match.bikerId !== userId && match.zavorrinaId !== userId) return false;
     if (!match.archivedAt) return false;
     await db.update(proposalProfileMatches)
       .set({ status: "new", archivedAt: null, createdAt: new Date() })
@@ -475,18 +475,18 @@ export class MatchingStorage extends ContestStorage {
   /**
    * Match con freshness > soglia (per badge "Nuovo!") — generic kind.
    */
-  async getFreshMatchesForUser(userId: string, options?: { threshold?: number; halfLifeDays?: number; limit?: number }): Promise<Array<BikerZavarrinaMatch & { freshness: number }>> {
+  async getFreshMatchesForUser(userId: string, options?: { threshold?: number; halfLifeDays?: number; limit?: number }): Promise<Array<BikerZavorrinaMatch & { freshness: number }>> {
     const threshold = options?.threshold ?? FRESHNESS_DEFAULTS.freshThreshold;
     const halfLife = options?.halfLifeDays ?? FRESHNESS_DEFAULTS.halfLifeGenericDays;
     const limit = options?.limit ?? 50;
-    const freshExpr = dynamicScoreSql(sql`${bikerZavarrinaMatches.createdAt}`, halfLife);
+    const freshExpr = dynamicScoreSql(sql`${bikerZavorrinaMatches.createdAt}`, halfLife);
     const rows = await db.select({
-      match: bikerZavarrinaMatches,
+      match: bikerZavorrinaMatches,
       freshness: sql<number>`${freshExpr}`.as("freshness"),
-    }).from(bikerZavarrinaMatches).where(and(
-      or(eq(bikerZavarrinaMatches.bikerId, userId), eq(bikerZavarrinaMatches.zavarrinaId, userId)),
-      isNull(bikerZavarrinaMatches.archivedAt),
-      eq(bikerZavarrinaMatches.status, "new"),
+    }).from(bikerZavorrinaMatches).where(and(
+      or(eq(bikerZavorrinaMatches.bikerId, userId), eq(bikerZavorrinaMatches.zavorrinaId, userId)),
+      isNull(bikerZavorrinaMatches.archivedAt),
+      eq(bikerZavorrinaMatches.status, "new"),
       sql`${freshExpr} > ${threshold}`,
     )).orderBy(desc(sql`${freshExpr}`)).limit(limit);
     return rows.map((r) => ({ ...r.match, freshness: Number(r.freshness) }));
@@ -501,7 +501,7 @@ export class MatchingStorage extends ContestStorage {
       match: proposalProfileMatches,
       freshness: sql<number>`${freshExpr}`.as("freshness"),
     }).from(proposalProfileMatches).where(and(
-      or(eq(proposalProfileMatches.bikerId, userId), eq(proposalProfileMatches.zavarrinaId, userId)),
+      or(eq(proposalProfileMatches.bikerId, userId), eq(proposalProfileMatches.zavorrinaId, userId)),
       isNull(proposalProfileMatches.archivedAt),
       eq(proposalProfileMatches.status, "new"),
       sql`${freshExpr} > ${threshold}`,

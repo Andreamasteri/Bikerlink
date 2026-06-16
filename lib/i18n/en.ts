@@ -1270,7 +1270,7 @@ const en: Record<string, string> = {
   "match.emptyPropProfileDesc": "Create a passenger search or ride proposal to find nearby pillions!",
   "match.propProfileLabel": "Proposal near your profile",
   "match.bikerProposal": "Biker's proposal",
-  "match.zavarrinaProfile": "Pillion profile",
+  "match.zavorrinaProfile": "Pillion profile",
 
   "tracking.mountCalib.title": "Mount Calibration",
   "tracking.mountCalib.introTitle": "Detect handlebar position",

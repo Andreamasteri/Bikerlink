@@ -89,7 +89,7 @@ export async function runFakeZavorrineRotation(): Promise<void> {
 
 // ─── Trigger fire-and-forget con debounce ───────────────────────────────────
 
-const lastZavarrinaProfileMatchAt = new Map<string, number>();
+const lastZavorrinaProfileMatchAt = new Map<string, number>();
 const ZAVORRINA_PROFILE_MATCH_DEBOUNCE_MS = 2 * 60 * 1000;
 
 /**
@@ -98,9 +98,9 @@ const ZAVORRINA_PROFILE_MATCH_DEBOUNCE_MS = 2 * 60 * 1000;
  */
 export function triggerProposalProfileMatchingForZavorrina(userId: string): void {
   const now = Date.now();
-  const last = lastZavarrinaProfileMatchAt.get(userId) ?? 0;
+  const last = lastZavorrinaProfileMatchAt.get(userId) ?? 0;
   if (now - last < ZAVORRINA_PROFILE_MATCH_DEBOUNCE_MS) return;
-  lastZavarrinaProfileMatchAt.set(userId, now);
+  lastZavorrinaProfileMatchAt.set(userId, now);
   setImmediate(async () => {
     try {
       const count = await runProposalToProfileMatching(undefined, userId);
@@ -150,9 +150,9 @@ export function triggerMatchingForUser(userId: string): void {
   lastUserMatchingAt.set(userId, now);
   (async () => {
     try {
-      const { bikerBiker, zavarrina } = await runMatchingForUser(userId);
-      if (bikerBiker > 0 || zavarrina > 0) {
-        console.log(`[MatchingForUser] completato per ${userId}: ${bikerBiker} bb + ${zavarrina} zav`);
+      const { bikerBiker, zavorrina } = await runMatchingForUser(userId);
+      if (bikerBiker > 0 || zavorrina > 0) {
+        console.log(`[MatchingForUser] completato per ${userId}: ${bikerBiker} bb + ${zavorrina} zav`);
       }
     } catch (err) {
       console.error("[MatchingForUser] errore background:", err);

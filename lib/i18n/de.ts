@@ -1204,7 +1204,7 @@ const de: Record<string, string> = {
   "match.emptyPropProfileDesc": "Erstelle einen Mitfahrsuche- oder Fahrtvorschlag, um Sozien in der Nähe zu finden!",
   "match.propProfileLabel": "Vorschlag nahe deinem Profil",
   "match.bikerProposal": "Biker-Vorschlag",
-  "match.zavarrinaProfile": "Sozia-Profil",
+  "match.zavorrinaProfile": "Sozia-Profil",
   "match.tabRoute": "Strecken",
   "match.emptyRouteTitle": "Keine GPS-Strecken-Matches",
   "match.emptyRouteDesc": "Sobald du genug GPS-Aufzeichnungen hast, zeigen wir dir Biker, die dieselben Straßen fahren.",

@@ -23,7 +23,7 @@ import { protectedNicknamesSqlArray } from "./protection-filter";
  * / `match_music_combined_weight_embedding`). Crea match quando il combined
  * supera la soglia `music_taste_combined` (default 0.55).
  *
- * Complementa — non sostituisce — `runMusicMatchBikerZavarrina` (tag-only).
+ * Complementa — non sostituisce — `runMusicMatchBikerZavorrina` (tag-only).
  *
  * Scalabilità (Task #3754): gli embedding vengono processati a batch di
  * EMBEDDING_BATCH_SIZE utenti alla volta anziché caricarli tutti in RAM.

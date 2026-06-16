@@ -22,7 +22,7 @@ export interface MatchStat {
 export interface CycleMeta {
   completedAt: string;
   durationMs: number;
-  zavarrinaMatchesNew: number;
+  zavorrinaMatchesNew: number;
   bikerBikerMatchesNew: number;
 }
 

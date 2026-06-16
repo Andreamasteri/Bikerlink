@@ -135,7 +135,7 @@ export default function MatchControlScreen() {
               <Text style={[styles.statsValue, { flex: 1 }]}>{matchingStats.bikerBiker.total}</Text>
             </View>
             <View style={[styles.statsDataRow, styles.statsDataRowAlt]}>
-              <Text style={[styles.statsLabel, { flex: 2 }]}>Biker-Zavarrina</Text>
+              <Text style={[styles.statsLabel, { flex: 2 }]}>Biker-Zavorrina</Text>
               <Text style={[styles.statsValue, { flex: 1 }]}>{matchingStats.bikerZavorrina.new}</Text>
               <Text style={[styles.statsValue, { flex: 1 }, styles.accepted]}>{matchingStats.bikerZavorrina.accepted}</Text>
               <Text style={[styles.statsValue, { flex: 1 }, styles.rejected]}>{matchingStats.bikerZavorrina.rejected}</Text>

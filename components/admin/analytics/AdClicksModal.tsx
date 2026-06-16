@@ -24,14 +24,14 @@ export const AdClicksModal: React.FC<AdClicksModalProps> = ({
   formatDate,
 }) => {
   const bikerCount = clicks.filter((c) => c.userType === "biker").length;
-  const zavarrinaCount = clicks.filter((c) => c.userType === "zavorrina").length;
+  const zavorrinaCount = clicks.filter((c) => c.userType === "zavorrina").length;
 
   return (
     <View style={{ flex: 1 }}>
       <View style={styles.adSummary}>
         <Text style={styles.adSummaryText}>Totale click: {clicks.length}</Text>
         <Text style={styles.adSummaryText}>
-          Biker: {bikerCount} | Zavorrina: {zavarrinaCount}
+          Biker: {bikerCount} | Zavorrina: {zavorrinaCount}
         </Text>
       </View>
       <FlatList

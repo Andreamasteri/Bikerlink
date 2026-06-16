@@ -132,7 +132,7 @@ export default function ArchivedMatchesScreen() {
         )}
         {garageRows.length > 0 && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Biker ↔ Zavarrina</Text>
+            <Text style={styles.sectionTitle}>Biker ↔ Zavorrina</Text>
             {garageRows.map((r) => renderRow(r, "garage"))}
           </View>
         )}

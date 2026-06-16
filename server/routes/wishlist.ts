@@ -159,7 +159,7 @@ router.post("/motos", requireAuth, async (req: Request, res: Response) => {
         if (!bikerMoto.userId) continue;
         const createdMatch = await storage.createMatch({
           bikerId: bikerMoto.userId,
-          zavarrinaId: userId,
+          zavorrinaId: userId,
           bikerMotorcycleId: bikerMoto.id,
           wishlistMotoId: moto.id,
           status: "new",

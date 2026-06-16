@@ -59,12 +59,12 @@ router.get("/garage-matches", requireAuth, async (req: Request, res: Response) =
         const globalOfflineRandomize = offlineRandomSetting?.value !== "false";
 
         const filteredMatches = garageMatches.filter((match) => {
-          const otherId = match.bikerId === userId ? match.zavarrinaId : match.bikerId;
+          const otherId = match.bikerId === userId ? match.zavorrinaId : match.bikerId;
           return !blockedIds.has(otherId);
         });
 
-        const allUserIds = [...new Set(filteredMatches.flatMap(m => [m.bikerId, m.zavarrinaId]))];
-        const otherUserIds = [...new Set(filteredMatches.map(m => m.bikerId === userId ? m.zavarrinaId : m.bikerId))];
+        const allUserIds = [...new Set(filteredMatches.flatMap(m => [m.bikerId, m.zavorrinaId]))];
+        const otherUserIds = [...new Set(filteredMatches.map(m => m.bikerId === userId ? m.zavorrinaId : m.bikerId))];
 
         const [bulkUsers, bulkProfiles] = await Promise.all([
           storage.getUsersByIds(allUserIds),
@@ -77,7 +77,7 @@ router.get("/garage-matches", requireAuth, async (req: Request, res: Response) =
         const results = await allLimited(
           filteredMatches.map((match) => async () => {
             const biker = userMap.get(match.bikerId);
-            const zavorrina = userMap.get(match.zavarrinaId);
+            const zavorrina = userMap.get(match.zavorrinaId);
             const bikerMoto = await storage.getUserMotorcycle(match.bikerMotorcycleId);
             const wishlistMoto = await storage.getWishlistMoto(match.wishlistMotoId);
 
@@ -129,8 +129,8 @@ router.get("/garage-matches", requireAuth, async (req: Request, res: Response) =
               isSupermatch: match.isSupermatch ?? false,
               bikerNickname: biker?.nickname,
               bikerType: biker?.userType,
-              zavarrinaNickname: zavorrina?.nickname,
-              zavarrinaType: zavorrina?.userType,
+              zavorrinaNickname: zavorrina?.nickname,
+              zavorrinaType: zavorrina?.userType,
               bikerMoto: bikerMoto ? { brand: bikerMoto.brand, model: bikerMoto.model, motorcycleType: bikerMoto.motorcycleType } : null,
               wishlistMoto: wishlistMoto ? { brand: wishlistMoto.brand, model: wishlistMoto.model, motorcycleType: wishlistMoto.motorcycleType } : null,
               otherLat,
@@ -148,7 +148,7 @@ router.get("/garage-matches", requireAuth, async (req: Request, res: Response) =
         const bestByUser = new Map<string, typeof enriched[number]>();
         for (const m of enriched) {
           const isBiker = m.bikerId === userId;
-          const otherUserId = isBiker ? m.zavarrinaId : m.bikerId;
+          const otherUserId = isBiker ? m.zavorrinaId : m.bikerId;
           const existing = bestByUser.get(otherUserId);
           if (!existing) {
             bestByUser.set(otherUserId, m);
@@ -214,7 +214,7 @@ router.post("/garage-matches/:id/accept", requireAuth, async (req: Request, res:
     if (!match) {
       return sendError(res, 404, "Match non trovato");
     }
-    if (match.bikerId !== userId && match.zavarrinaId !== userId) {
+    if (match.bikerId !== userId && match.zavorrinaId !== userId) {
       return sendError(res, 403, "Non autorizzato");
     }
     if (match.status !== "new") {
@@ -224,7 +224,7 @@ router.post("/garage-matches/:id/accept", requireAuth, async (req: Request, res:
     if (!updated) return sendError(res, 500, "Aggiornamento match fallito");
     recordMatchFeedbackFireAndForget({
       userId,
-      otherUserId: match.bikerId === userId ? match.zavarrinaId : match.bikerId,
+      otherUserId: match.bikerId === userId ? match.zavorrinaId : match.bikerId,
       matchKind: "garage",
       featureKey: featureKeyForKind("garage"),
       action: "accept",
@@ -246,7 +246,7 @@ router.post("/garage-matches/:id/reject", requireAuth, async (req: Request, res:
     if (!match) {
       return sendError(res, 404, "Match non trovato");
     }
-    if (match.bikerId !== userId && match.zavarrinaId !== userId) {
+    if (match.bikerId !== userId && match.zavorrinaId !== userId) {
       return sendError(res, 403, "Non autorizzato");
     }
     if (match.status !== "new") {
@@ -256,7 +256,7 @@ router.post("/garage-matches/:id/reject", requireAuth, async (req: Request, res:
     if (!updated) return sendError(res, 500, "Aggiornamento match fallito");
     recordMatchFeedbackFireAndForget({
       userId,
-      otherUserId: match.bikerId === userId ? match.zavarrinaId : match.bikerId,
+      otherUserId: match.bikerId === userId ? match.zavorrinaId : match.bikerId,
       matchKind: "garage",
       featureKey: featureKeyForKind("garage"),
       action: "reject",
@@ -276,7 +276,7 @@ router.get("/garage-matches/archived", requireAuth, async (req: Request, res: Re
     const enriched = await allLimited(
       matches.map((match) => async () => {
         const other = await storage.getUser(
-          match.bikerId === userId ? match.zavarrinaId : match.bikerId,
+          match.bikerId === userId ? match.zavorrinaId : match.bikerId,
         );
         if (!other || isSystemAccount(other)) return null;
         const bikerMoto = await storage.getUserMotorcycle(match.bikerMotorcycleId);

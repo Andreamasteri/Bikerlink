@@ -13,7 +13,7 @@ import Colors from "@/constants/colors";
 export interface CycleMeta {
   completedAt: string;
   durationMs: number;
-  zavarrinaMatchesNew: number;
+  zavorrinaMatchesNew: number;
   bikerBikerMatchesNew: number;
 }
 
@@ -67,7 +67,7 @@ export function CycleMetaCard({ autoMatchEnabled, cycleMeta, isLoading }: Props)
           <View style={styles.metaRow}>
             <Ionicons name="people-outline" size={14} color={Colors.textSecondary} />
             <Text style={styles.metaText}>
-              Nuovi: {cycleMeta.bikerBikerMatchesNew} biker-biker, {cycleMeta.zavarrinaMatchesNew} biker-zavarrina
+              Nuovi: {cycleMeta.bikerBikerMatchesNew} biker-biker, {cycleMeta.zavorrinaMatchesNew} biker-zavorrina
             </Text>
           </View>
         </View>

@@ -150,7 +150,7 @@ export const proposalProfileMatches = pgTable("proposal_profile_matches", {
   bikerId: varchar("biker_id", { length: 36 })
     .notNull()
     .references(() => users.id, { onDelete: "cascade" }),
-  zavarrinaId: varchar("zavorrina_id", { length: 36 })
+  zavorrinaId: varchar("zavorrina_id", { length: 36 })
     .notNull()
     .references(() => users.id, { onDelete: "cascade" }),
   distanceKm: doublePrecision("distance_km"),
@@ -162,12 +162,12 @@ export const proposalProfileMatches = pgTable("proposal_profile_matches", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (table) => [
   index("ppm_biker_id_idx").on(table.bikerId),
-  index("ppm_zavorrina_id_idx").on(table.zavarrinaId),
+  index("ppm_zavorrina_id_idx").on(table.zavorrinaId),
   index("ppm_proposal_id_idx").on(table.proposalId),
   index("ppm_notif_pending_idx").on(table.notificationPriority, table.notifiedAt),
-  uniqueIndex("ppm_proposal_zavorrina_unique_idx").on(table.proposalId, table.zavarrinaId),
+  uniqueIndex("ppm_proposal_zavorrina_unique_idx").on(table.proposalId, table.zavorrinaId),
   uniqueIndex("ppm_biker_zavorrina_active_idx")
-    .on(table.bikerId, table.zavarrinaId)
+    .on(table.bikerId, table.zavorrinaId)
     .where(sql`${table.status} = 'new'`),
   index("ppm_archived_at_idx").on(table.archivedAt),
 ]);

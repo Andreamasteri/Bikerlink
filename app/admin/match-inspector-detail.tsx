@@ -136,7 +136,7 @@ export default function MatchInspectorDetailScreen() {
       queryClient.invalidateQueries({ queryKey });
       Alert.alert(
         "Ricalcolo completato",
-        `Nuovi match: ${result.bikerBiker ?? 0} B-B + ${result.zavarrina ?? 0} B-Z`,
+        `Nuovi match: ${result.bikerBiker ?? 0} B-B + ${result.zavorrina ?? 0} B-Z`,
       );
     },
     onError: () => Alert.alert("Errore", "Ricalcolo fallito"),

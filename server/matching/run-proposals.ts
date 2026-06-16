@@ -44,7 +44,7 @@ export async function runProposalMatchingForUser(userId: string): Promise<number
         if (isBikerBikerProposal) {
           if (!bothPrefsEnabled(proposalPrefsMap, p1.userId, p2.userId, "bikerBikerDistance")) continue;
         } else {
-          if (!bothPrefsEnabled(proposalPrefsMap, p1.userId, p2.userId, "bikerZavarrinaDistance")) continue;
+          if (!bothPrefsEnabled(proposalPrefsMap, p1.userId, p2.userId, "bikerZavorrinaDistance")) continue;
         }
 
         if (!clubScopeAllows(p1, p2, membershipKeys)) continue;

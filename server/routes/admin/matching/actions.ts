@@ -1,7 +1,7 @@
 // Task #2603 — estratto da server/routes/admin/matching.ts (mechanical split)
 import { Router, type Request, type Response } from "express";
 import { db, pool } from "../../../db";
-import { bikerZavarrinaMatches, bikerBikerMatches, proposalProfileMatches, plannedRouteInvites, matchPreferences } from "@shared/db";
+import { bikerZavorrinaMatches, bikerBikerMatches, proposalProfileMatches, plannedRouteInvites, matchPreferences } from "@shared/db";
 import { MATCHING_REGISTRY } from "@shared/matching-registry";
 import { sendSuccess, sendError } from "../../../lib/api-response";
 import { sql, or, eq, isNull, and, inArray } from "drizzle-orm";
@@ -78,7 +78,7 @@ router.post("/matching/trigger", async (_req: Request, res: Response) => {
 
 router.delete("/reset-matches", async (_req: Request, res: Response) => {
   try {
-    const bzDeleted = await db.delete(bikerZavarrinaMatches).returning({ id: bikerZavarrinaMatches.id });
+    const bzDeleted = await db.delete(bikerZavorrinaMatches).returning({ id: bikerZavorrinaMatches.id });
     const bbDeleted = await db.delete(bikerBikerMatches).returning({ id: bikerBikerMatches.id });
     const unlock = forceUnlockMatching();
     console.log(
@@ -229,7 +229,7 @@ router.post("/users/:userId/matches/recalculate", async (req: Request, res: Resp
     const userId = req.params.userId as string;
     if (!userId) return sendError(res, 400, "userId mancante");
     const result = await runMatchingForUser(userId);
-    return res.json({ success: true, bikerBiker: result.bikerBiker, zavarrina: result.zavarrina });
+    return res.json({ success: true, bikerBiker: result.bikerBiker, zavorrina: result.zavorrina });
   } catch (error) {
     console.error("[admin/users/:userId/matches/recalculate] error:", error);
     return sendError(res, 500, "Errore ricalcolo match utente");
@@ -243,11 +243,11 @@ router.delete("/users/:userId/matches", async (req: Request, res: Response) => {
     const bbResult = await db.delete(bikerBikerMatches).where(
       or(eq(bikerBikerMatches.biker1Id, userId), eq(bikerBikerMatches.biker2Id, userId))
     ).returning({ id: bikerBikerMatches.id });
-    const bzResult = await db.delete(bikerZavarrinaMatches).where(
-      or(eq(bikerZavarrinaMatches.bikerId, userId), eq(bikerZavarrinaMatches.zavarrinaId, userId))
-    ).returning({ id: bikerZavarrinaMatches.id });
+    const bzResult = await db.delete(bikerZavorrinaMatches).where(
+      or(eq(bikerZavorrinaMatches.bikerId, userId), eq(bikerZavorrinaMatches.zavorrinaId, userId))
+    ).returning({ id: bikerZavorrinaMatches.id });
     const ppResult = await db.delete(proposalProfileMatches).where(
-      or(eq(proposalProfileMatches.bikerId, userId), eq(proposalProfileMatches.zavarrinaId, userId))
+      or(eq(proposalProfileMatches.bikerId, userId), eq(proposalProfileMatches.zavorrinaId, userId))
     ).returning({ id: proposalProfileMatches.id });
     console.log(`[admin/users/${userId}/matches] bb=${bbResult.length} bz=${bzResult.length} pp=${ppResult.length}`);
     return res.json({

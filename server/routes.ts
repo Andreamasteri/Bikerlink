@@ -236,7 +236,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/assets/onboarding/:filename", async (req: Request, res: Response) => {
     const filename = req.params.filename as string;
     if (!/^\d{2}-[a-z0-9-]+\.png$/.test(filename)) {
-      return res.status(400).send("Invalid filename");
+      return res.status(400).send("Nome file non valido");
     }
     try {
       const { downloadBuffer } = await import("./objectStorage");
@@ -245,7 +245,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
       return res.send(buffer);
     } catch {
-      return res.status(404).send("Not found");
+      return res.status(404).send("Non trovato");
     }
   });
 
@@ -527,7 +527,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     }
     if (!valid) {
-      return res.status(404).send("Not found");
+      return res.status(404).send("Non trovato");
     }
     const templatePath = path.resolve(
       process.cwd(),

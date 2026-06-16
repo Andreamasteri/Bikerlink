@@ -56,7 +56,7 @@ export const MATCHING_REGISTRY: ReadonlyArray<MatchingTypeDef> = [
   {
     id: 2,
     key: "bikerZavorrinaBrand",
-    label: "Biker-Zavarrina Brand",
+    label: "Biker-Zavorrina Brand",
     category: "garage",
     table: "biker_zavorrina_matches",
     brandPattern: "1=1",
@@ -77,8 +77,8 @@ export const MATCHING_REGISTRY: ReadonlyArray<MatchingTypeDef> = [
   },
   {
     id: 4,
-    key: "zavarrinaClubBrand",
-    label: "Zavarrina-Club Brand",
+    key: "zavorrinaClubBrand",
+    label: "Zavorrina-Club Brand",
     category: "club",
     table: "biker_biker_matches",
     brandPattern: "motorcycle_brand LIKE 'club_zav:%'",
@@ -99,8 +99,8 @@ export const MATCHING_REGISTRY: ReadonlyArray<MatchingTypeDef> = [
   },
   {
     id: 6,
-    key: "bikerZavarrinaTypeStyle",
-    label: "Biker-Zavarrina Type+Style",
+    key: "bikerZavorrinaTypeStyle",
+    label: "Biker-Zavorrina Type+Style",
     category: "garage",
     table: "biker_biker_matches",
     brandPattern: "motorcycle_brand LIKE 'tipo_zav:%'",
@@ -121,8 +121,8 @@ export const MATCHING_REGISTRY: ReadonlyArray<MatchingTypeDef> = [
   },
   {
     id: 8,
-    key: "bikerZavarrinaDistance",
-    label: "Biker-Zavarrina Distance",
+    key: "bikerZavorrinaDistance",
+    label: "Biker-Zavorrina Distance",
     category: "biker",
     table: "biker_biker_matches",
     brandPattern: "motorcycle_brand = 'distanza_zav'",
@@ -143,8 +143,8 @@ export const MATCHING_REGISTRY: ReadonlyArray<MatchingTypeDef> = [
   },
   {
     id: 10,
-    key: "bikerZavarrinaMusic",
-    label: "Biker-Zavarrina Music Affinity",
+    key: "bikerZavorrinaMusic",
+    label: "Biker-Zavorrina Music Affinity",
     category: "biker",
     table: "biker_biker_matches",
     brandPattern: "motorcycle_brand = 'musica_zav'",
@@ -176,8 +176,8 @@ export const MATCHING_REGISTRY: ReadonlyArray<MatchingTypeDef> = [
   },
   {
     id: 13,
-    key: "bikerZavarrinaRouteTypeZone",
-    label: "Biker-Zavarrina Route Type+Zone",
+    key: "bikerZavorrinaRouteTypeZone",
+    label: "Biker-Zavorrina Route Type+Zone",
     category: "biker",
     table: "biker_biker_matches",
     brandPattern: "motorcycle_brand LIKE 'zona_zav:%' OR motorcycle_brand LIKE 'percorso_zav:%'",
@@ -300,7 +300,7 @@ export const MATCHING_REGISTRY: ReadonlyArray<MatchingTypeDef> = [
   },
   {
     id: 24,
-    key: "bikerZavarrinaBase",
+    key: "bikerZavorrinaBase",
     label: "BZ Base",
     category: "garage",
     table: "biker_biker_matches",

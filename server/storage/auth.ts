@@ -39,6 +39,11 @@ export class AuthStorage extends UsersStorage {
     await db.update(passwordResetTokens).set({ used: true }).where(eq(passwordResetTokens.id, id));
   }
 
+  async markUserEmailVerified(userId: string): Promise<void> {
+    const { users } = await import("@shared/db");
+    await db.update(users).set({ emailVerified: true }).where(eq(users.id, userId));
+  }
+
   async deletePasswordResetTokens(userId: string): Promise<void> {
     await db.delete(passwordResetTokens).where(eq(passwordResetTokens.userId, userId));
   }

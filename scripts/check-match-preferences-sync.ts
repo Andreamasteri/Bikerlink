@@ -25,8 +25,8 @@ function camelToSnake(s: string): string {
 
 /**
  * Mappa camelCase TS key → snake_case nome colonna SQL (così come dichiarato
- * in drizzle). Necessario perché alcune proprietà TS hanno typo storico
- * "zavarrina" mentre la colonna DB è "zavorrina".
+ * in drizzle). Usa il nome colonna esplicito di Drizzle anziché la conversione
+ * automatica, così eventuali divergenze tra nome TS e nome SQL emergono nel check.
  */
 function getCamelToSnakeMap(): Map<string, string> {
   const map = new Map<string, string>();
@@ -47,7 +47,7 @@ function getSchemaColumns(): string[] {
 
 function getUiColumns(camelToSnakeMap: Map<string, string>): string[] {
   // Risolve ogni chiave UI nella colonna SQL effettiva via drizzle map,
-  // così evitiamo falsi positivi su typo storici (zavarrina vs zavorrina).
+  // così il confronto avviene sempre sul nome colonna fisico.
   return MATCH_PREF_ITEMS
     .map((it) => camelToSnakeMap.get(String(it.key)) ?? camelToSnake(String(it.key)))
     .filter((c) => !SOFT_EXCLUDED.has(c));

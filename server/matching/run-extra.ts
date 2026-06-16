@@ -4,8 +4,8 @@ import {
   users,
   routes,
   proposals,
-  zavarrinaWishlists,
-  zavarrinaWishlistMotos,
+  zavorrinaWishlists,
+  zavorrinaWishlistMotos,
   eventParticipants,
   entityTags,
   tags,
@@ -61,7 +61,7 @@ async function loadTagSetsByCategory(
 // can be extended to any matcher: read variant config, branch, then track events.
 const MUSIC_AFFINITY_EXPERIMENT = "bio_affinity_weight_v1";
 
-export async function runMusicMatchBikerZavarrina(): Promise<number> {
+export async function runMusicMatchBikerZavorrina(): Promise<number> {
   try {
     const prefsMap = await loadMatchPreferencesMap();
     const allBlockedPairs = await storage.getAllBlockedPairs();
@@ -114,7 +114,7 @@ export async function runMusicMatchBikerZavarrina(): Promise<number> {
         let musicPairType = "bb";
         if (isBikerPair && bothPrefsEnabled(prefsMap, uid1, uid2, "bikerBikerMusic")) {
           brand = "musica"; musicPairType = "bb";
-        } else if (isZavPair && bothPrefsEnabled(prefsMap, uid1, uid2, "bikerZavarrinaMusic")) {
+        } else if (isZavPair && bothPrefsEnabled(prefsMap, uid1, uid2, "bikerZavorrinaMusic")) {
           brand = "musica_zav"; musicPairType = "bz";
         } else { skipCount++; continue; }
 
@@ -401,7 +401,7 @@ export async function runEventMatching(): Promise<number> {
   }
 }
 
-export async function runBikerZavarrinaTypeStyleMatching(): Promise<number> {
+export async function runBikerZavorrinaTypeStyleMatching(): Promise<number> {
   try {
     const prefsMap = await loadMatchPreferencesMap();
     const allBlockedPairs = await storage.getAllBlockedPairs();
@@ -414,11 +414,11 @@ export async function runBikerZavarrinaTypeStyleMatching(): Promise<number> {
 
     const zavWishRows = await db
       .select({
-        wishId: zavarrinaWishlistMotos.id,
-        userId: zavarrinaWishlists.userId,
+        wishId: zavorrinaWishlistMotos.id,
+        userId: zavorrinaWishlists.userId,
       })
-      .from(zavarrinaWishlists)
-      .innerJoin(zavarrinaWishlistMotos, eq(zavarrinaWishlistMotos.wishlistId, zavarrinaWishlists.id));
+      .from(zavorrinaWishlists)
+      .innerJoin(zavorrinaWishlistMotos, eq(zavorrinaWishlistMotos.wishlistId, zavorrinaWishlists.id));
 
     if (zavWishRows.length === 0) return 0;
 
@@ -442,12 +442,12 @@ export async function runBikerZavarrinaTypeStyleMatching(): Promise<number> {
     const zavStileByUser = new Map<string, Set<string>>();
     const wishRowsFull = await db
       .select({
-        userId: zavarrinaWishlists.userId,
-        motorcycleType: zavarrinaWishlistMotos.motorcycleType,
-        ridingStyle: zavarrinaWishlistMotos.ridingStyle,
+        userId: zavorrinaWishlists.userId,
+        motorcycleType: zavorrinaWishlistMotos.motorcycleType,
+        ridingStyle: zavorrinaWishlistMotos.ridingStyle,
       })
-      .from(zavarrinaWishlists)
-      .innerJoin(zavarrinaWishlistMotos, eq(zavarrinaWishlistMotos.wishlistId, zavarrinaWishlists.id));
+      .from(zavorrinaWishlists)
+      .innerJoin(zavorrinaWishlistMotos, eq(zavorrinaWishlistMotos.wishlistId, zavorrinaWishlists.id));
     for (const r of wishRowsFull) {
       if (r.motorcycleType) {
         const s = zavTipoByUser.get(r.userId) ?? new Set<string>();
@@ -471,7 +471,7 @@ export async function runBikerZavarrinaTypeStyleMatching(): Promise<number> {
     for (const bm of bikerMotorcycles) {
       if (matchCount >= MAX) break;
       if (matchingDisabledSet.has(bm.userId)) continue;
-      if (!prefEnabled(prefsMap, bm.userId, "bikerZavarrinaTypeStyle")) continue;
+      if (!prefEnabled(prefsMap, bm.userId, "bikerZavorrinaTypeStyle")) continue;
       const motoTipo = motoTipoTags.get(bm.motorcycle.id) ?? new Set<string>();
       const motoStile = motoStileTags.get(bm.motorcycle.id) ?? new Set<string>();
       if (motoTipo.size === 0 && motoStile.size === 0) continue;
@@ -482,7 +482,7 @@ export async function runBikerZavarrinaTypeStyleMatching(): Promise<number> {
         if (zavId === bm.userId) continue;
         if (blockedSet.has(`${bm.userId}:${zavId}`)) { skipCount++; continue; }
         if (matchingDisabledSet.has(zavId)) { skipCount++; continue; }
-        if (!prefEnabled(prefsMap, zavId, "bikerZavarrinaTypeStyle")) { skipCount++; continue; }
+        if (!prefEnabled(prefsMap, zavId, "bikerZavorrinaTypeStyle")) { skipCount++; continue; }
 
         const zavTipo = zavTipoByUser.get(zavId) ?? new Set<string>();
         const zavStile = zavStileByUser.get(zavId) ?? new Set<string>();
@@ -524,7 +524,7 @@ export async function runBikerZavarrinaTypeStyleMatching(): Promise<number> {
       }
     }
 
-    console.log(`[ZavTypeStyleMatching] ${matchCount} biker-zavarrina type+style matches, saltati: ${skipCount}`);
+    console.log(`[ZavTypeStyleMatching] ${matchCount} biker-zavorrina type+style matches, saltati: ${skipCount}`);
     return matchCount;
   } catch (error) {
     console.error("[ZavTypeStyleMatching] error:", error);

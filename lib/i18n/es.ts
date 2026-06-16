@@ -1204,7 +1204,7 @@ const es: Record<string, string> = {
   "match.emptyPropProfileDesc": "¡Crea una propuesta de búsqueda de pasajero o ruta para encontrar pasajeras cercanas!",
   "match.propProfileLabel": "Propuesta cercana a tu perfil",
   "match.bikerProposal": "Propuesta del biker",
-  "match.zavarrinaProfile": "Perfil de pasajera",
+  "match.zavorrinaProfile": "Perfil de pasajera",
   "match.tabRoute": "Rutas",
   "match.emptyRouteTitle": "No hay matches de rutas GPS",
   "match.emptyRouteDesc": "Cuando registres suficientes trazas GPS, te mostraremos bikers que frecuentan las mismas carreteras.",

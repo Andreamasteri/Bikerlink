@@ -2,7 +2,7 @@ import bcrypt from "bcryptjs";
 import { db } from "../db";
 import { storage } from "../storage";
 import {
-  users, userProfiles, userMotorcycles, zavarrinaWishlists, zavarrinaWishlistMotos,
+  users, userProfiles, userMotorcycles, zavorrinaWishlists, zavorrinaWishlistMotos,
   conversations, conversationParticipants, messages,
 } from "@shared/db";
 import { eq, sql, inArray } from "drizzle-orm";
@@ -172,9 +172,9 @@ export async function cleanupOldSeedUsers(logError: (context: string, err: unkno
 
     for (const uid of ids) {
       try {
-        await db.delete(zavarrinaWishlistMotos)
-          .where(sql`${zavarrinaWishlistMotos.wishlistId} IN (SELECT id FROM zavorrina_wishlists WHERE user_id = ${uid})`);
-        await db.delete(zavarrinaWishlists).where(eq(zavarrinaWishlists.userId, uid));
+        await db.delete(zavorrinaWishlistMotos)
+          .where(sql`${zavorrinaWishlistMotos.wishlistId} IN (SELECT id FROM zavorrina_wishlists WHERE user_id = ${uid})`);
+        await db.delete(zavorrinaWishlists).where(eq(zavorrinaWishlists.userId, uid));
         await db.delete(userMotorcycles).where(eq(userMotorcycles.userId, uid));
 
         const userConvs = await db.select({ convId: conversationParticipants.conversationId })
@@ -220,9 +220,9 @@ export async function reconcileExistingUsers(officialId: string, logError: (cont
     db.select({ userId: userMotorcycles.userId })
       .from(userMotorcycles)
       .where(inArray(userMotorcycles.userId, taggedIds)),
-    db.select({ userId: zavarrinaWishlists.userId })
-      .from(zavarrinaWishlists)
-      .where(inArray(zavarrinaWishlists.userId, taggedIds)),
+    db.select({ userId: zavorrinaWishlists.userId })
+      .from(zavorrinaWishlists)
+      .where(inArray(zavorrinaWishlists.userId, taggedIds)),
     db.select({ convId: conversationParticipants.conversationId })
       .from(conversationParticipants)
       .where(eq(conversationParticipants.userId, officialId)),
@@ -312,7 +312,7 @@ export async function reconcileExistingUsers(officialId: string, logError: (cont
         motorcycleType: m.type,
         ridingStyle: m.style
       }));
-      await db.insert(zavarrinaWishlistMotos).values(wishlistMotoValues);
+      await db.insert(zavorrinaWishlistMotos).values(wishlistMotoValues);
     } catch (err: unknown) {
       logError(`reconcile-wishlist-${u.id}`, err);
     }

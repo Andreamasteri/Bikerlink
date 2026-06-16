@@ -4,7 +4,7 @@ import {
   matchFeedback,
   userMatchProfile,
   bikerBikerMatches,
-  bikerZavarrinaMatches,
+  bikerZavorrinaMatches,
   proposalMatches,
   proposalProfileMatches,
   type FeatureWeights,
@@ -314,10 +314,10 @@ export async function inferIgnoreFeedback(ignoreAfterDays = 7): Promise<number> 
   // garage matches
   const bzRows = await db
     .select()
-    .from(bikerZavarrinaMatches)
-    .where(and(eq(bikerZavarrinaMatches.status, "new"), lt(bikerZavarrinaMatches.createdAt, cutoff)));
+    .from(bikerZavorrinaMatches)
+    .where(and(eq(bikerZavorrinaMatches.status, "new"), lt(bikerZavorrinaMatches.createdAt, cutoff)));
   for (const m of bzRows) {
-    for (const [uid, oid] of [[m.bikerId, m.zavarrinaId], [m.zavarrinaId, m.bikerId]] as Array<[string, string]>) {
+    for (const [uid, oid] of [[m.bikerId, m.zavorrinaId], [m.zavorrinaId, m.bikerId]] as Array<[string, string]>) {
       const exists = await db
         .select({ id: matchFeedback.id })
         .from(matchFeedback)
@@ -369,7 +369,7 @@ export async function inferIgnoreFeedback(ignoreAfterDays = 7): Promise<number> 
     .from(proposalProfileMatches)
     .where(and(eq(proposalProfileMatches.status, "new"), lt(proposalProfileMatches.createdAt, cutoff)));
   for (const m of ppRows) {
-    for (const [uid, oid] of [[m.bikerId, m.zavarrinaId], [m.zavarrinaId, m.bikerId]] as Array<[string, string]>) {
+    for (const [uid, oid] of [[m.bikerId, m.zavorrinaId], [m.zavorrinaId, m.bikerId]] as Array<[string, string]>) {
       const exists = await db
         .select({ id: matchFeedback.id })
         .from(matchFeedback)

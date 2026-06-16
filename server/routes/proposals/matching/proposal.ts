@@ -261,14 +261,14 @@ router.get("/proposal-profile-matches", requireAuth, async (req: Request, res: R
         const proposal = await storage.getProposal(match.proposalId);
         if (proposal?.clubId && !memberClubIds.has(proposal.clubId)) return null;
         const biker = await storage.getUser(match.bikerId);
-        const zavorrina = await storage.getUser(match.zavarrinaId);
+        const zavorrina = await storage.getUser(match.zavorrinaId);
         if (!biker || !zavorrina) return null;
         if (isSystemAccount(biker ?? {})) return null;
         if (isSystemAccount(zavorrina ?? {})) return null;
         return {
           ...match,
           bikerNickname: biker.nickname,
-          zavarrinaNickname: zavorrina.nickname,
+          zavorrinaNickname: zavorrina.nickname,
           proposal: proposal ? { ...proposal, creatorNickname: biker.nickname } : null,
         };
       })
@@ -287,13 +287,13 @@ router.post("/proposal-profile-matches/:id/accept", requireAuth, async (req: Req
 
     const match = await storage.getProposalProfileMatch(matchId);
     if (!match) return sendError(res, 404, "Match non trovato");
-    if (match.bikerId !== userId && match.zavarrinaId !== userId) return sendError(res, 403, "Non autorizzato");
+    if (match.bikerId !== userId && match.zavorrinaId !== userId) return sendError(res, 403, "Non autorizzato");
     if (match.status !== "new") return sendError(res, 400, "Match già gestito");
 
     const updated = await storage.updateProposalProfileMatch(matchId, { status: "accepted" });
     recordMatchFeedbackFireAndForget({
       userId,
-      otherUserId: match.bikerId === userId ? match.zavarrinaId : match.bikerId,
+      otherUserId: match.bikerId === userId ? match.zavorrinaId : match.bikerId,
       matchKind: "propProfile",
       featureKey: featureKeyForKind("propProfile"),
       action: "accept",
@@ -312,13 +312,13 @@ router.post("/proposal-profile-matches/:id/reject", requireAuth, async (req: Req
 
     const match = await storage.getProposalProfileMatch(matchId);
     if (!match) return sendError(res, 404, "Match non trovato");
-    if (match.bikerId !== userId && match.zavarrinaId !== userId) return sendError(res, 403, "Non autorizzato");
+    if (match.bikerId !== userId && match.zavorrinaId !== userId) return sendError(res, 403, "Non autorizzato");
     if (match.status !== "new") return sendError(res, 400, "Match già gestito");
 
     const updated = await storage.updateProposalProfileMatch(matchId, { status: "rejected" });
     recordMatchFeedbackFireAndForget({
       userId,
-      otherUserId: match.bikerId === userId ? match.zavarrinaId : match.bikerId,
+      otherUserId: match.bikerId === userId ? match.zavorrinaId : match.bikerId,
       matchKind: "propProfile",
       featureKey: featureKeyForKind("propProfile"),
       action: "reject",
@@ -337,7 +337,7 @@ router.get("/proposal-profile-matches/archived", requireAuth, async (req: Reques
     const enriched = await allLimited(
       matches.map((match) => async () => {
         const other = await storage.getUser(
-          match.bikerId === userId ? match.zavarrinaId : match.bikerId,
+          match.bikerId === userId ? match.zavorrinaId : match.bikerId,
         );
         if (!other || isSystemAccount(other)) return null;
         return {

@@ -114,6 +114,10 @@ export class SocialStorage extends TextAliasesStorage {
     return result.length;
   }
 
+  async getWorkshopContactsByPeriod(startDate: Date, endDate: Date): Promise<WorkshopContact[]> {
+    return db.select().from(workshopContacts).where(and(sql`${workshopContacts.createdAt} >= ${startDate}`, sql`${workshopContacts.createdAt} <= ${endDate}`));
+  }
+
   async getPendingReportsCount(): Promise<number> {
     const result = await db.select({ count: sql<number>`count(*)::int` }).from(reports).where(eq(reports.status, "pending"));
     return result[0]?.count ?? 0;

@@ -245,7 +245,7 @@ export default function NegativePreferencesScreen() {
 
       <Section title="Escludi tipo utente" colors={colors}>
         <View style={styles.chipRow}>
-          {(["biker", "zavarrina"] as const).map((ut) => (
+          {(["biker", "zavorrina"] as const).map((ut) => (
             <TouchableOpacity
               key={ut}
               style={[styles.chip, { borderColor: colors.border }]}

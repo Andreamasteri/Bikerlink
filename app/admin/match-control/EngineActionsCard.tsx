@@ -113,7 +113,7 @@ export function EngineActionsCard({
               const wasRunning = json?.unlock?.wasRunning ?? false;
               Alert.alert(
                 "Match eliminati",
-                `Eliminati ${bb} biker-biker + ${bz} biker-zavarrina (totale ${bb + bz}).${
+                `Eliminati ${bb} biker-biker + ${bz} biker-zavorrina (totale ${bb + bz}).${
                   wasRunning ? "\nLock 'isMatchingRunning' rimosso." : ""
                 }`,
               );

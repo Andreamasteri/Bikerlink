@@ -168,17 +168,17 @@ const ALL_MATCHING_ROWS = [
     m_id: "m1", m_user_id: "user-real-biker", m_brand: "Honda", m_model: null,
     m_motorcycle_type: "sport", m_riding_style: null, m_year: 2020,
     m_displacement: 600, m_is_default: true, m_created_at: new Date(),
-    zavarrina_id: "user-real-zavarrina",
+    zavorrina_id: "user-real-zavorrina",
     biker_id: "user-real-biker",
   },
-  // ✗ protected as zavarrina — SQL filter must exclude this
+  // ✗ protected as zavorrina — SQL filter must exclude this
   {
     w_id: "w2", w_wishlist_id: "wl2", w_brand: "Honda", w_model: null,
     w_motorcycle_type: "sport", w_riding_style: null, w_created_at: new Date(),
     m_id: "m2", m_user_id: "user-real-biker", m_brand: "Honda", m_model: null,
     m_motorcycle_type: "sport", m_riding_style: null, m_year: 2021,
     m_displacement: 600, m_is_default: true, m_created_at: new Date(),
-    zavarrina_id: PROTECTED_USER_ID,
+    zavorrina_id: PROTECTED_USER_ID,
     biker_id: "user-real-biker",
   },
   // ✗ protected as biker — SQL filter must exclude this
@@ -188,7 +188,7 @@ const ALL_MATCHING_ROWS = [
     m_id: "m3", m_user_id: PROTECTED_USER_ID, m_brand: "Yamaha", m_model: null,
     m_motorcycle_type: "touring", m_riding_style: null, m_year: 2022,
     m_displacement: 900, m_is_default: true, m_created_at: new Date(),
-    zavarrina_id: "user-real-zavarrina",
+    zavorrina_id: "user-real-zavorrina",
     biker_id: PROTECTED_USER_ID,
   },
 ];
@@ -199,7 +199,7 @@ function matchingFilterAwareMock(): void {
     const hasFilter = sqlToJson(sqlObj).includes(PROTECTED_NICKNAME);
     const rows = hasFilter
       ? ALL_MATCHING_ROWS.filter(
-          (r) => r.zavarrina_id !== PROTECTED_USER_ID && r.biker_id !== PROTECTED_USER_ID
+          (r) => r.zavorrina_id !== PROTECTED_USER_ID && r.biker_id !== PROTECTED_USER_ID
         )
       : ALL_MATCHING_ROWS;
     return Promise.resolve(fakeQueryResult(rows));
@@ -325,14 +325,14 @@ beforeEach(() => {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe("MatchingStorage.getCompatibleWishlistGaragePairs — protected account exclusion", () => {
-  it("excludes the BikerLink_Official account (zavarrina role) and keeps real users", async () => {
+  it("excludes the BikerLink_Official account (zavorrina role) and keeps real users", async () => {
     matchingFilterAwareMock();
     const store = new MatchingStorage();
     const pairs = await store.getCompatibleWishlistGaragePairs();
 
-    const zavarrinaIds = pairs.map((p) => p.zavarrinaId);
-    expect(zavarrinaIds).not.toContain(PROTECTED_USER_ID);   // protected absent
-    expect(zavarrinaIds).toContain("user-real-zavarrina");   // control present
+    const zavorrinaIds = pairs.map((p) => p.zavorrinaId);
+    expect(zavorrinaIds).not.toContain(PROTECTED_USER_ID);   // protected absent
+    expect(zavorrinaIds).toContain("user-real-zavorrina");   // control present
   });
 
   it("excludes the BikerLink_Official account (biker role) and keeps real users", async () => {
@@ -352,7 +352,7 @@ describe("MatchingStorage.getCompatibleWishlistGaragePairs — protected account
 
     // 3 rows seeded (1 real + 2 protected-involved) → only 1 should survive
     expect(pairs).toHaveLength(1);
-    expect(pairs[0].zavarrinaId).toBe("user-real-zavarrina");
+    expect(pairs[0].zavorrinaId).toBe("user-real-zavorrina");
     expect(pairs[0].bikerId).toBe("user-real-biker");
   });
 
@@ -364,7 +364,7 @@ describe("MatchingStorage.getCompatibleWishlistGaragePairs — protected account
     const pairs = await store.getCompatibleWishlistGaragePairs();
 
     // Without SQL filtering, all 3 rows map through — protected IDs are present
-    const allIds = pairs.flatMap((p) => [p.zavarrinaId, p.bikerId]);
+    const allIds = pairs.flatMap((p) => [p.zavorrinaId, p.bikerId]);
     expect(allIds).toContain(PROTECTED_USER_ID);
   });
 
@@ -376,7 +376,7 @@ describe("MatchingStorage.getCompatibleWishlistGaragePairs — protected account
     expect(lastSqlHasProtectedFilter()).toBe(true);
   });
 
-  it("applies the filter to BOTH the zavarrina and biker sides of the join", async () => {
+  it("applies the filter to BOTH the zavorrina and biker sides of the join", async () => {
     matchingFilterAwareMock();
     const store = new MatchingStorage();
     await store.getCompatibleWishlistGaragePairs();

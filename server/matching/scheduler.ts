@@ -3,8 +3,8 @@ import { bootJobQueue } from "../lib/boot-job-queue";
 import { runMatching, runWishlistMatching, getLastProposalMatchingStats, getLastWishlistMatchingStats } from "./run-matching";
 import { runBikerBikerMatching, runBikerBikerTypeStyleMatching } from "./run-biker";
 import { runClubBrandMatching } from "./run-clubs";
-import { runMusicMatchBikerZavarrina, runGpsBasedMatching, runEventMatching, runBikerZavarrinaTypeStyleMatching } from "./run-extra";
-import { runBikerZavarrinaBase } from "./run-biker-zav-base";
+import { runMusicMatchBikerZavorrina, runGpsBasedMatching, runEventMatching, runBikerZavorrinaTypeStyleMatching } from "./run-extra";
+import { runBikerZavorrinaBase } from "./run-biker-zav-base";
 import { runMusicAffinityMatching } from "./run-music-affinity";
 import { runMusicEmbeddingsBackfill } from "./jobs/backfill-music-embeddings";
 import { runExtractRouteCellsJob } from "./jobs/extract-route-cells";
@@ -58,7 +58,7 @@ let lastCycleOutcome: "ok" | "error" | null = null;
 let lastCycleMeta: {
   completedAt: string;
   durationMs: number;
-  zavarrinaMatchesNew: number;
+  zavorrinaMatchesNew: number;
   bikerBikerMatchesNew: number;
 } | null = null;
 
@@ -177,14 +177,14 @@ export function triggerMatchingRun(): { started: boolean; reason?: string } {
         const safePhases: Array<[string, () => Promise<number | void>]> = [
           ["biker_biker_type_style", runBikerBikerTypeStyleMatching],
           ["club_brand", runClubBrandMatching],
-          ["music_biker_zav", runMusicMatchBikerZavarrina],
+          ["music_biker_zav", runMusicMatchBikerZavorrina],
           // Task #2516 — match per affinità musicale combinata (K=10/user).
           ["music_affinity", runMusicAffinityMatching],
           ["gps_based", runGpsBasedMatching],
           ["event_matching", runEventMatching],
           // Task #3917 — Biker↔Zav base (intento ruolo, nessun requisito moto/wishlist)
-          ["biker_zav_base", runBikerZavarrinaBase],
-          ["biker_zav_type_style", runBikerZavarrinaTypeStyleMatching],
+          ["biker_zav_base", runBikerZavorrinaBase],
+          ["biker_zav_type_style", runBikerZavorrinaTypeStyleMatching],
           ["distance_matching", runDistanceMatching],
           ["route_type_zone", runRouteTypeZoneMatching],
           ["proposal_to_profile", runProposalToProfileMatching],
@@ -255,7 +255,7 @@ export function triggerMatchingRun(): { started: boolean; reason?: string } {
       lastCycleMeta = {
         completedAt: cycleMetric.completedAt,
         durationMs: cycleMetric.durationMs,
-        zavarrinaMatchesNew: garageMatches,
+        zavorrinaMatchesNew: garageMatches,
         bikerBikerMatchesNew: bikerBikerMatchCount,
       };
 
@@ -376,7 +376,7 @@ export function startMatchingEngine(): void {
       const afterSetting = await storage.getAppSetting("match_archive_after_days");
       const afterDays = afterSetting?.value ? Math.max(1, parseInt(afterSetting.value, 10)) : 30;
       const [bz, bb, pp, pm] = await Promise.all([
-        storage.archiveStaleBikerZavarrinaMatches(afterDays),
+        storage.archiveStaleBikerZavorrinaMatches(afterDays),
         storage.archiveStaleBikerBikerMatches(afterDays),
         storage.archiveStaleProposalProfileMatches(afterDays),
         storage.archiveStaleProposalMatches(afterDays),

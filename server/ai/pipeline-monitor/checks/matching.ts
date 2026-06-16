@@ -24,7 +24,7 @@ export async function checkMatching(): Promise<PipelineCheckResult> {
     if (!meta) return "nessun ciclo eseguito ancora (server appena avviato)";
     if (outcome === "error") throw new Error("ultimo ciclo terminato in errore");
     const ageMin = Math.round((Date.now() - new Date(meta.completedAt).getTime()) / 60_000);
-    return `completato ${ageMin}min fa — ${meta.zavarrinaMatchesNew} zav + ${meta.bikerBikerMatchesNew} bb (${meta.durationMs}ms)`;
+    return `completato ${ageMin}min fa — ${meta.zavorrinaMatchesNew} zav + ${meta.bikerBikerMatchesNew} bb (${meta.durationMs}ms)`;
   }));
 
   // Step 2: verifica lock non bloccato

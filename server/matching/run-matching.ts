@@ -22,7 +22,7 @@ import {
 } from "./scoring";
 import { db } from "../db";
 import { sql } from "drizzle-orm";
-import { entityTags, tags as tagsTable, tagCategories, zavarrinaWishlistMotos } from "@shared/db";
+import { entityTags, tags as tagsTable, tagCategories, zavorrinaWishlistMotos } from "@shared/db";
 import { and, count, eq, inArray } from "drizzle-orm";
 import { bboxAround } from "../lib/geo-bbox";
 import { createUserLoader } from "../lib/user-loader";
@@ -150,7 +150,7 @@ export async function runMatching(): Promise<number> {
         if (isBikerBikerProposal) {
           if (!bothPrefsEnabled(proposalPrefsMap, p1.userId, p2.userId, "bikerBikerDistance")) continue;
         } else {
-          if (!bothPrefsEnabled(proposalPrefsMap, p1.userId, p2.userId, "bikerZavarrinaDistance")) continue;
+          if (!bothPrefsEnabled(proposalPrefsMap, p1.userId, p2.userId, "bikerZavorrinaDistance")) continue;
         }
 
         if (!clubScopeAllows(p1, p2, membershipKeys)) continue;
@@ -266,7 +266,7 @@ export async function runWishlistMatching(): Promise<number> {
     // This avoids a crash caused by a SQL/schema issue in the complex query
     // when there is no data to match on (which is the expected state until
     // real zavarrine populate their wishlists).
-    const [{ wishlistRowCount }] = await db.select({ wishlistRowCount: count() }).from(zavarrinaWishlistMotos);
+    const [{ wishlistRowCount }] = await db.select({ wishlistRowCount: count() }).from(zavorrinaWishlistMotos);
     if (wishlistRowCount === 0) {
       matchingLogger.info({ scope: "wishlist" }, "WishlistMatching: wishlist vuota, nessuna coppia possibile");
       return 0;
@@ -301,7 +301,7 @@ export async function runWishlistMatching(): Promise<number> {
     // Priorità notified_at: chi non riceve match da più tempo viene processato prima.
     // Carichiamo il MAX(notified_at) per utente dalla tabella dei match esistenti.
     const userIdSet = new Set<string>();
-    for (const p of compatiblePairs) { userIdSet.add(p.bikerId); userIdSet.add(p.zavarrinaId); }
+    for (const p of compatiblePairs) { userIdSet.add(p.bikerId); userIdSet.add(p.zavorrinaId); }
     const allUserIds = [...userIdSet];
     let lastNotifiedByUser = new Map<string, Date>();
     if (allUserIds.length > 0) {
@@ -327,9 +327,9 @@ export async function runWishlistMatching(): Promise<number> {
     }
 
     // Ordina le coppie per notified_at crescente (NULLS FIRST = chi non è mai stato notificato ha priorità).
-    const pairPriority = (p: { bikerId: string; zavarrinaId: string }): number => {
+    const pairPriority = (p: { bikerId: string; zavorrinaId: string }): number => {
       const bTs = lastNotifiedByUser.get(p.bikerId)?.getTime() ?? 0;
-      const zTs = lastNotifiedByUser.get(p.zavarrinaId)?.getTime() ?? 0;
+      const zTs = lastNotifiedByUser.get(p.zavorrinaId)?.getTime() ?? 0;
       // 0 = mai notificato (priorità massima); altrimenti il più recente dei due (chi ha aspettato meno)
       return Math.max(bTs, zTs);
     };
@@ -337,7 +337,7 @@ export async function runWishlistMatching(): Promise<number> {
 
     const prefsMap = await loadMatchPreferencesMap();
     const matchingDisabledSetWL = await loadMatchingDisabledSet();
-    const existingKeys = await storage.getAllExistingBikerZavarrinaMatchKeys();
+    const existingKeys = await storage.getAllExistingBikerZavorrinaMatchKeys();
 
     // Task #2513: precarica i tag delle moto biker coinvolte per
     // calcolare il breakdown jaccard senza N+1 query.
@@ -376,15 +376,15 @@ export async function runWishlistMatching(): Promise<number> {
       if (matchCount >= MAX_MATCHES_PER_RUN) break outer;
       usersProcessed++;
 
-      const { zavarrinaId, bikerId } = pair;
+      const { zavorrinaId, bikerId } = pair;
       const wish = pair.wishlistMoto;
       const moto = pair.motorcycle;
 
       {
-        if (!bothPrefsEnabled(prefsMap, bikerId, zavarrinaId, "bikerZavorrinaBrand")) { skipCount++; continue; }
-        if (!neitherMatchingDisabled(matchingDisabledSetWL, bikerId, zavarrinaId)) { skipCount++; continue; }
+        if (!bothPrefsEnabled(prefsMap, bikerId, zavorrinaId, "bikerZavorrinaBrand")) { skipCount++; continue; }
+        if (!neitherMatchingDisabled(matchingDisabledSetWL, bikerId, zavorrinaId)) { skipCount++; continue; }
 
-        const key = `${bikerId}:${zavarrinaId}:${moto.id}:${wish.id}`;
+        const key = `${bikerId}:${zavorrinaId}:${moto.id}:${wish.id}`;
         if (existingKeys.has(key)) { skipCount++; continue; }
 
         // Task #2513: il vecchio supermatch richiedeva match esatto su
@@ -413,7 +413,7 @@ export async function runWishlistMatching(): Promise<number> {
         try {
           const inserted = await storage.createMatch({
             bikerId,
-            zavarrinaId,
+            zavorrinaId,
             bikerMotorcycleId: moto.id,
             wishlistMotoId: wish.id,
             status: "new",
@@ -431,7 +431,7 @@ export async function runWishlistMatching(): Promise<number> {
               await dispatchMatchNotification({
                 table: "biker_zavorrina_matches",
                 matchId: inserted.id,
-                userIds: [bikerId, zavarrinaId],
+                userIds: [bikerId, zavorrinaId],
                 priority: notifPriority,
                 isSupermatch,
                 matchName,
@@ -455,8 +455,8 @@ export async function runWishlistMatching(): Promise<number> {
             }
           }
         } catch (pairErr) {
-          matchingLogger.warn({ err: pairErr, bikerId, zavarrinaId }, "WishlistMatching: coppia fallita (non-blocking)");
-          addMatchLog("WARN", "wishlist_matching", `Coppia fallita (${bikerId}↔${zavarrinaId}): ${pairErr instanceof Error ? pairErr.message : String(pairErr)}`);
+          matchingLogger.warn({ err: pairErr, bikerId, zavorrinaId }, "WishlistMatching: coppia fallita (non-blocking)");
+          addMatchLog("WARN", "wishlist_matching", `Coppia fallita (${bikerId}↔${zavorrinaId}): ${pairErr instanceof Error ? pairErr.message : String(pairErr)}`);
         }
       }
     }

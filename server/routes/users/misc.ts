@@ -247,7 +247,7 @@ router.get("/:id/match-summary", requireAuth, async (req: Request, res: Response
 
     const { db } = await import("../../db");
     const {
-      bikerBikerMatches, bikerZavarrinaMatches,
+      bikerBikerMatches, bikerZavorrinaMatches,
       routeAffinityMatches,
       proposalProfileMatches, proposalMatches,
     } = await import("@shared/db");
@@ -271,14 +271,14 @@ router.get("/:id/match-summary", requireAuth, async (req: Request, res: Response
         isNull(bikerBikerMatches.archivedAt),
         inArray(bikerBikerMatches.status, [...ACTIVE_STATUSES]),
       )).orderBy(statusOrder({ name: "status" }), desc(bikerBikerMatches.createdAt)).limit(1),
-      db.select().from(bikerZavarrinaMatches).where(and(
+      db.select().from(bikerZavorrinaMatches).where(and(
         or(
-          and(eq(bikerZavarrinaMatches.bikerId, me), eq(bikerZavarrinaMatches.zavarrinaId, other)),
-          and(eq(bikerZavarrinaMatches.bikerId, other), eq(bikerZavarrinaMatches.zavarrinaId, me)),
+          and(eq(bikerZavorrinaMatches.bikerId, me), eq(bikerZavorrinaMatches.zavorrinaId, other)),
+          and(eq(bikerZavorrinaMatches.bikerId, other), eq(bikerZavorrinaMatches.zavorrinaId, me)),
         ),
-        isNull(bikerZavarrinaMatches.archivedAt),
-        inArray(bikerZavarrinaMatches.status, [...ACTIVE_STATUSES]),
-      )).orderBy(statusOrder({ name: "status" }), desc(bikerZavarrinaMatches.createdAt)).limit(1),
+        isNull(bikerZavorrinaMatches.archivedAt),
+        inArray(bikerZavorrinaMatches.status, [...ACTIVE_STATUSES]),
+      )).orderBy(statusOrder({ name: "status" }), desc(bikerZavorrinaMatches.createdAt)).limit(1),
       db.select().from(proposalMatches).where(and(
         or(
           and(eq(proposalMatches.userId1, me), eq(proposalMatches.userId2, other)),
@@ -289,8 +289,8 @@ router.get("/:id/match-summary", requireAuth, async (req: Request, res: Response
       )).orderBy(statusOrder({ name: "status" }), desc(proposalMatches.createdAt)).limit(1),
       db.select().from(proposalProfileMatches).where(and(
         or(
-          and(eq(proposalProfileMatches.bikerId, me), eq(proposalProfileMatches.zavarrinaId, other)),
-          and(eq(proposalProfileMatches.bikerId, other), eq(proposalProfileMatches.zavarrinaId, me)),
+          and(eq(proposalProfileMatches.bikerId, me), eq(proposalProfileMatches.zavorrinaId, other)),
+          and(eq(proposalProfileMatches.bikerId, other), eq(proposalProfileMatches.zavorrinaId, me)),
         ),
         isNull(proposalProfileMatches.archivedAt),
         inArray(proposalProfileMatches.status, [...ACTIVE_STATUSES]),

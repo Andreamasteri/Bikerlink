@@ -25,8 +25,8 @@ export function ProposalProfileMatchCard({ match, currentUserId, onAccept, onRej
 }) {
   const cardRouter = useRouter();
   const isBiker = match.bikerId === currentUserId;
-  const otherNickname = isBiker ? match.zavarrinaNickname : match.bikerNickname;
-  const otherUserId = isBiker ? match.zavarrinaId : match.bikerId;
+  const otherNickname = isBiker ? match.zavorrinaNickname : match.bikerNickname;
+  const otherUserId = isBiker ? match.zavorrinaId : match.bikerId;
   const otherType = isBiker ? "zavorrina" : "biker";
   const otherColor = isBiker ? Colors.femaleIcon : Colors.maleIcon;
   const isNew = match.status === "new";

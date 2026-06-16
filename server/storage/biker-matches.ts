@@ -232,21 +232,21 @@ export class BikerMatchesStorage extends MatchingStorage {
     return result.length;
   }
 
-  async cleanupAdminMatches(): Promise<{ bikerZavarrina: number; bikerBiker: number }> {
+  async cleanupAdminMatches(): Promise<{ bikerZavorrina: number; bikerBiker: number }> {
     const adminUsers = await db.select({ id: users.id }).from(users).where(inArray(users.role, ["admin"]));
-    if (adminUsers.length === 0) return { bikerZavarrina: 0, bikerBiker: 0 };
+    if (adminUsers.length === 0) return { bikerZavorrina: 0, bikerBiker: 0 };
     const adminIds = adminUsers.map(u => u.id);
     console.log(`[AdminCleanup] Trovati ${adminIds.length} utenti admin da escludere dai match`);
     let bzDeleted = 0;
     let bbDeleted = 0;
-    const { bikerZavarrinaMatches: bzTable } = await import("@shared/db");
+    const { bikerZavorrinaMatches: bzTable } = await import("@shared/db");
     for (const adminId of adminIds) {
-      const bzResult = await db.delete(bzTable).where(or(eq(bzTable.bikerId, adminId), eq(bzTable.zavarrinaId, adminId))).returning();
+      const bzResult = await db.delete(bzTable).where(or(eq(bzTable.bikerId, adminId), eq(bzTable.zavorrinaId, adminId))).returning();
       bzDeleted += bzResult.length;
       const bbResult = await db.delete(bikerBikerMatches).where(or(eq(bikerBikerMatches.biker1Id, adminId), eq(bikerBikerMatches.biker2Id, adminId))).returning();
       bbDeleted += bbResult.length;
     }
     console.log(`[AdminCleanup] Rimossi ${bzDeleted} match biker-zavorrina e ${bbDeleted} match biker-biker con admin`);
-    return { bikerZavarrina: bzDeleted, bikerBiker: bbDeleted };
+    return { bikerZavorrina: bzDeleted, bikerBiker: bbDeleted };
   }
 }

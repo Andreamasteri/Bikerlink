@@ -1,7 +1,7 @@
 import { Router, type Request, type Response } from "express";
 import { db } from "../db";
 import {
-  bikerZavarrinaMatches,
+  bikerZavorrinaMatches,
   bikerBikerMatches,
   proposalMatches,
   directMatchRequests,
@@ -18,14 +18,14 @@ const router = Router();
 
 async function isFriendsWith(userId: string, otherId: string): Promise<boolean> {
   const bzMatch = await db
-    .select({ id: bikerZavarrinaMatches.id })
-    .from(bikerZavarrinaMatches)
+    .select({ id: bikerZavorrinaMatches.id })
+    .from(bikerZavorrinaMatches)
     .where(
       and(
-        eq(bikerZavarrinaMatches.status, "accepted"),
+        eq(bikerZavorrinaMatches.status, "accepted"),
         or(
-          and(eq(bikerZavarrinaMatches.bikerId, userId), eq(bikerZavarrinaMatches.zavarrinaId, otherId)),
-          and(eq(bikerZavarrinaMatches.bikerId, otherId), eq(bikerZavarrinaMatches.zavarrinaId, userId))
+          and(eq(bikerZavorrinaMatches.bikerId, userId), eq(bikerZavorrinaMatches.zavorrinaId, otherId)),
+          and(eq(bikerZavorrinaMatches.bikerId, otherId), eq(bikerZavorrinaMatches.zavorrinaId, userId))
         )
       )
     )
@@ -71,19 +71,19 @@ router.get("/", requireAuth, async (req: Request, res: Response) => {
 
     const bzMatches = await db
       .select()
-      .from(bikerZavarrinaMatches)
+      .from(bikerZavorrinaMatches)
       .where(
         and(
-          eq(bikerZavarrinaMatches.status, "accepted"),
+          eq(bikerZavorrinaMatches.status, "accepted"),
           or(
-            eq(bikerZavarrinaMatches.bikerId, userId),
-            eq(bikerZavarrinaMatches.zavarrinaId, userId)
+            eq(bikerZavorrinaMatches.bikerId, userId),
+            eq(bikerZavorrinaMatches.zavorrinaId, userId)
           )
         )
       );
 
     for (const m of bzMatches) {
-      const otherId = m.bikerId === userId ? m.zavarrinaId : m.bikerId;
+      const otherId = m.bikerId === userId ? m.zavorrinaId : m.bikerId;
       if (!friendMap.has(otherId)) {
         const other = await db
           .select({ id: users.id, nickname: users.nickname, userType: users.userType, sex: users.sex })

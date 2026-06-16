@@ -49,21 +49,21 @@ async function runMatchingInBackground(
     if (wm.userId === userId) continue;
     if (!wm.userId) continue;
     try {
-      const existing = await storage.findExistingBikerZavarrinaMatch(userId, wm.userId, motorcycleId, wm.id);
+      const existing = await storage.findExistingBikerZavorrinaMatch(userId, wm.userId, motorcycleId, wm.id);
       if (existing) continue;
       const createdMatch = await storage.createMatch({
         bikerId: userId,
-        zavarrinaId: wm.userId,
+        zavorrinaId: wm.userId,
         bikerMotorcycleId: motorcycleId,
         wishlistMotoId: wm.id,
         status: "new",
       });
       if (createdMatch) {
-        const zavarrinaUser = await storage.getUser(wm.userId);
+        const zavorrinaUser = await storage.getUser(wm.userId);
         await storage.createNotification({
           userId,
           title: "Here Comes Your Chance!!",
-          body: `Una zavorrina cerca proprio la tua moto: ${brand} ${model}! (${zavarrinaUser?.nickname || "Zavorrina"})`,
+          body: `Una zavorrina cerca proprio la tua moto: ${brand} ${model}! (${zavorrinaUser?.nickname || "Zavorrina"})`,
           notificationType: "match",
           referenceType: "user",
           referenceId: wm.userId,

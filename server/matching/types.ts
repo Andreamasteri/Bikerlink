@@ -11,5 +11,5 @@ export interface MatchRule {
 
 export interface MatchResult {
   bikerBiker: number;
-  zavarrina: number;
+  zavorrina: number;
 }

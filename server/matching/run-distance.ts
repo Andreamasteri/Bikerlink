@@ -91,7 +91,7 @@ export async function runDistanceMatching(): Promise<number> {
       let pairType = "bb";
       if (isBikerPair && bothPrefsEnabled(prefsMap, uid1, uid2, "bikerBikerDistance")) {
         brand = "distanza"; pairType = "bb";
-      } else if (isZavPair && bothPrefsEnabled(prefsMap, uid1, uid2, "bikerZavarrinaDistance")) {
+      } else if (isZavPair && bothPrefsEnabled(prefsMap, uid1, uid2, "bikerZavorrinaDistance")) {
         brand = "distanza_zav"; pairType = "bz";
       } else { skipCount++; continue; }
 
@@ -200,7 +200,7 @@ export async function runRouteTypeZoneMatching(): Promise<number> {
       let pairType = "bb";
       if (isBikerPair && bothPrefsEnabled(prefsMap, uid1, uid2, "bikerBikerTypeStyle")) {
         brand = `percorso:${profile1}`; pairType = "bb";
-      } else if (isZavPair && bothPrefsEnabled(prefsMap, uid1, uid2, "bikerZavarrinaTypeStyle")) {
+      } else if (isZavPair && bothPrefsEnabled(prefsMap, uid1, uid2, "bikerZavorrinaTypeStyle")) {
         brand = `percorso_zav:${profile1}`; pairType = "bz";
       } else { continue; }
 

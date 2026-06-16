@@ -2,7 +2,7 @@ import bcrypt from "bcryptjs";
 import { db, pool } from "./db";
 import { storage } from "./storage";
 import {
-  users, userProfiles, userMotorcycles, zavarrinaWishlistMotos,
+  users, userProfiles, userMotorcycles, zavorrinaWishlistMotos,
   conversations, conversationParticipants, messages,
   type User,
 } from "@shared/db";
@@ -281,7 +281,7 @@ export async function massSeedFakeUsers(): Promise<void> {
             motorcycleType: m.type,
             ridingStyle: m.style,
           }));
-          await db.insert(zavarrinaWishlistMotos).values(wishlistMotoValues);
+          await db.insert(zavorrinaWishlistMotos).values(wishlistMotoValues);
         } catch (err: unknown) {
           logSeedError(`wishlist-insert-${wl.userId}`, err);
         }

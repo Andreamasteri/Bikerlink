@@ -277,9 +277,9 @@ export default function FakeUsersAdmin() {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- force-matching response from API
     onSuccess: (data: any) => {
       const bb = data?.bikerBiker ?? 0;
-      const zav = data?.zavarrina ?? 0;
+      const zav = data?.zavorrina ?? 0;
       const total = bb + zav;
-      Alert.alert("Successo", total === 0 ? t("admin.noNewMatch") : `${bb} biker-biker + ${zav} zavarrina match creati`);
+      Alert.alert("Successo", total === 0 ? t("admin.noNewMatch") : `${bb} biker-biker + ${zav} zavorrina match creati`);
     }
   });
 

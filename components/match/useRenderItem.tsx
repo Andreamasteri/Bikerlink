@@ -70,7 +70,7 @@ export function useRenderItem(p: UseRenderItemParams): ({ item }: { item: any })
 
       if (p.activeTab === "propProfile") {
         const isBiker = item.bikerId === p.userId;
-        const otherUserId = isBiker ? item.zavarrinaId : item.bikerId;
+        const otherUserId = isBiker ? item.zavorrinaId : item.bikerId;
         return (
           <ProposalProfileMatchCard
             match={{ ...item, isFresh: p.freshIds.has(item.id) }}
@@ -129,7 +129,7 @@ export function useRenderItem(p: UseRenderItemParams): ({ item }: { item: any })
         }
         if (item._matchType === "garage") {
           const isBiker = item.bikerId === p.userId;
-          const otherUserId = isBiker ? item.zavarrinaId : item.bikerId;
+          const otherUserId = isBiker ? item.zavorrinaId : item.bikerId;
           return (
             <GarageMatchCard
               match={{ ...item, isFresh: p.freshIds.has(item.id) }}
@@ -145,7 +145,7 @@ export function useRenderItem(p: UseRenderItemParams): ({ item }: { item: any })
           );
         }
         if (item._matchType === "propProfile") {
-          const otherUserId = item.bikerId === p.userId ? item.zavarrinaId : item.bikerId;
+          const otherUserId = item.bikerId === p.userId ? item.zavorrinaId : item.bikerId;
           return (
             <ProposalProfileMatchCard
               match={{ ...item, isFresh: p.freshIds.has(item.id) }}
@@ -257,7 +257,7 @@ export function useRenderItem(p: UseRenderItemParams): ({ item }: { item: any })
 
       if (p.activeTab === "zavorrine") {
         const isBiker = item.bikerId === p.userId;
-        const otherUserId = isBiker ? item.zavarrinaId : item.bikerId;
+        const otherUserId = isBiker ? item.zavorrinaId : item.bikerId;
         return (
           <GarageMatchCard
             match={{ ...item, isFresh: p.freshIds.has(item.id) }}

@@ -57,12 +57,12 @@ const TYPE_LABELS: { key: string; label: string; color: string }[] = [
 // B-Z types shown in a separate visual section (including base_intent)
 const BZ_TYPE_LABELS: { key: string; label: string; color: string }[] = [
   { key: "bikerZavorrinaBrand",         label: "B-Z",     color: "#E91E8C" },
-  { key: "bikerZavarrinaBase",          label: "Intento", color: "#C2185B" },
-  { key: "zavarrinaClubBrand",          label: "Z-Club",  color: "#673AB7" },
-  { key: "bikerZavarrinaTypeStyle",     label: "Tipo BZ", color: "#03A9F4" },
-  { key: "bikerZavarrinaDistance",      label: "Dist BZ", color: "#66BB6A" },
-  { key: "bikerZavarrinaMusic",         label: "Mus BZ",  color: "#FF7043" },
-  { key: "bikerZavarrinaRouteTypeZone", label: "Zona BZ", color: "#78909C" },
+  { key: "bikerZavorrinaBase",          label: "Intento", color: "#C2185B" },
+  { key: "zavorrinaClubBrand",          label: "Z-Club",  color: "#673AB7" },
+  { key: "bikerZavorrinaTypeStyle",     label: "Tipo BZ", color: "#03A9F4" },
+  { key: "bikerZavorrinaDistance",      label: "Dist BZ", color: "#66BB6A" },
+  { key: "bikerZavorrinaMusic",         label: "Mus BZ",  color: "#FF7043" },
+  { key: "bikerZavorrinaRouteTypeZone", label: "Zona BZ", color: "#78909C" },
 ];
 
 function userTypeColor(userType: string): string {

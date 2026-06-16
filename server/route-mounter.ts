@@ -114,7 +114,7 @@ export function registerAllRoutes(app: express.Application) {
     if (platform && (platform === "ios" || platform === "android")) {
       return void serveExpoManifest(platform, req, res).catch((err) => {
         console.error("[manifest] error:", err);
-        if (!res.headersSent) res.status(500).json({ error: "Internal error" });
+        if (!res.headersSent) res.status(500).json({ error: "Errore interno" });
       });
     }
 

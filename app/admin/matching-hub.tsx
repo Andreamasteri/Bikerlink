@@ -34,7 +34,7 @@ interface LockState {
 }
 
 interface StatsResponse {
-  totalZavarrinaMatches: number;
+  totalZavorrinaMatches: number;
   totalBikerBikerMatches: number;
   totalMusicMatches: number;
   totalBikerZavBaseMatches: number;
@@ -147,7 +147,7 @@ export default function MatchingHubScreen() {
             <Text style={styles.statLabel}>Biker-Biker</Text>
           </View>
           <View style={styles.statCard}>
-            <Text style={styles.statValue}>{stats?.totalZavarrinaMatches ?? "—"}</Text>
+            <Text style={styles.statValue}>{stats?.totalZavorrinaMatches ?? "—"}</Text>
             <Text style={styles.statLabel}>Garage</Text>
           </View>
           <View style={styles.statCard}>

@@ -27,8 +27,8 @@ export function GarageMatchCard({ match, currentUserId, onAccept, onReject, onCh
 }) {
   const cardRouter = useRouter();
   const isBiker = match.bikerId === currentUserId;
-  const otherNickname = isBiker ? match.zavarrinaNickname : match.bikerNickname;
-  const otherUserId = isBiker ? match.zavarrinaId : match.bikerId;
+  const otherNickname = isBiker ? match.zavorrinaNickname : match.bikerNickname;
+  const otherUserId = isBiker ? match.zavorrinaId : match.bikerId;
   const otherType = isBiker ? "zavorrina" : "biker";
   const otherColor = otherType === "biker" ? Colors.maleIcon : Colors.femaleIcon;
   const motoInfo = match.bikerMoto;

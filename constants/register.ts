@@ -183,7 +183,7 @@ BikerLink es una plataforma que conecta motociclistas (bikers) y pasajeros (pill
 - Está prohibido compartir contenidos inapropiados
 - Los usuarios deben respetar el código de tráfico
 
-5. PRIVACY Y DATOS PERSONALES
+5. PRIVACIDAD Y DATOS PERSONALES
 - Los datos personales se tratan de conformidad con el RGPD
 - La ubicación GPS se utiliza únicamente para las funcionalidades de la app
 - Las fotos cargadas están sujetas a moderación
@@ -198,7 +198,7 @@ BikerLink es una plataforma que conecta motociclistas (bikers) y pasajeros (pill
 - Los contenidos publicitarios están claramente identificados
 
 8. MODIFICACIONES DE LOS TÉRMINOS
-BikerLink se reserva el diritto de modificar estos términos en cualquier momento.
+BikerLink se reserva el derecho de modificar estos términos en cualquier momento.
 
 9. CONTACTO
 Para preguntas o notificaciones: ${supportEmail}`,
@@ -209,7 +209,7 @@ Para preguntas o notificaciones: ${supportEmail}`,
 En utilisant l'app BikerLink, vous acceptez intégralement les présentes conditions générales.
 
 2. DESCRIPTION DU SERVICE
-BikerLink est una plateforme qui connecte des motocyclistes (bikers) et des passagers (passagers en tandem) pour partager des expériences de voyage en moto.
+BikerLink est une plateforme qui connecte des motocyclistes (bikers) et des passagers (passagers en tandem) pour partager des expériences de voyage en moto.
 
 3. INSCRIPTION ET COMPTE
 - L'utilisateur doit fournir des informations exactes lors de l'inscription
@@ -232,7 +232,7 @@ BikerLink est una plateforme qui connecte des motocyclistes (bikers) et des pass
 - Le port du casque et des équipements de protection est obligatoire
 
 7. SPONSORS ET PUBLICITÉ
-- L'app contiene des contenus sponsorisés par Syneco Lubrificanti
+- L'app contient des contenus sponsorisés par Syneco Lubrificanti
 - Les contenus publicitaires sont clairement identifiés
 
 8. MODIFICATIONS DES CONDITIONS

@@ -308,7 +308,7 @@ export function MatchingMonitorCard({ onStatus }: { onStatus?: (s: "ok" | "degra
                 {monitor.lastCycleMeta && (
                   <View style={styles.throughputSummary}>
                     <Text style={styles.throughputSummaryText}>
-                      Biker↔Biker: {monitor.lastCycleMeta.bikerBikerMatchesNew} · Wishlist: {monitor.lastCycleMeta.zavarrinaMatchesNew}
+                      Biker↔Biker: {monitor.lastCycleMeta.bikerBikerMatchesNew} · Wishlist: {monitor.lastCycleMeta.zavorrinaMatchesNew}
                     </Text>
                     <Text style={styles.throughputSummaryNote}>Src: ● OK · ● WARN · ● NO_DATA</Text>
                   </View>

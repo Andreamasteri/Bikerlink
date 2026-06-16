@@ -43,9 +43,9 @@ router.get("/matches/:id/explain", requireAuth, async (req: Request, res: Respon
     } else if (kind === "garage") {
       const m = await storage.getGarageMatch(matchId);
       if (!m) return sendError(res, 404, "Match non trovato");
-      if (m.bikerId !== userId && m.zavarrinaId !== userId) return sendError(res, 403, "Non autorizzato");
+      if (m.bikerId !== userId && m.zavorrinaId !== userId) return sendError(res, 403, "Non autorizzato");
       featureKey = featureKeyForKind("garage");
-      otherUserId = m.bikerId === userId ? m.zavarrinaId : m.bikerId;
+      otherUserId = m.bikerId === userId ? m.zavorrinaId : m.bikerId;
     } else if (kind === "proposal") {
       const m = await storage.getProposalMatch(matchId);
       if (!m) return sendError(res, 404, "Match non trovato");
@@ -55,9 +55,9 @@ router.get("/matches/:id/explain", requireAuth, async (req: Request, res: Respon
     } else if (kind === "propProfile") {
       const m = await storage.getProposalProfileMatch(matchId);
       if (!m) return sendError(res, 404, "Match non trovato");
-      if (m.bikerId !== userId && m.zavarrinaId !== userId) return sendError(res, 403, "Non autorizzato");
+      if (m.bikerId !== userId && m.zavorrinaId !== userId) return sendError(res, 403, "Non autorizzato");
       featureKey = featureKeyForKind("propProfile");
-      otherUserId = m.bikerId === userId ? m.zavarrinaId : m.bikerId;
+      otherUserId = m.bikerId === userId ? m.zavorrinaId : m.bikerId;
     }
 
     if (!featureKey) return sendError(res, 400, "Tipo match non valido");

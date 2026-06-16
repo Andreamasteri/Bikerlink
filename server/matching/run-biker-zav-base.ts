@@ -29,7 +29,7 @@ import {
   isExcludedByNegativePrefs,
 } from "./negative-filters";
 
-export async function runBikerZavarrinaBase(): Promise<number> {
+export async function runBikerZavorrinaBase(): Promise<number> {
   try {
     const prefsMap = await loadMatchPreferencesMap();
     const allBlockedPairs = await storage.getAllBlockedPairs?.() ?? [];

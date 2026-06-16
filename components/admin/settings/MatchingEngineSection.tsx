@@ -165,7 +165,7 @@ export function MatchingEngineSection({
   const t = useT();
 
   const { data: matchingStats } = useQuery<{
-    totalZavarrinaMatches: number;
+    totalZavorrinaMatches: number;
     totalBikerBikerMatches: number;
     totalMusicMatches: number;
     lastRunAt: string | null;
@@ -356,7 +356,7 @@ export function MatchingEngineSection({
             </View>
             <View style={styles.matchingStatsRow}>
               <View style={styles.matchingStatItem}>
-                <Text style={styles.matchingStatValue}>{matchingStats?.totalZavarrinaMatches ?? "—"}</Text>
+                <Text style={styles.matchingStatValue}>{matchingStats?.totalZavorrinaMatches ?? "—"}</Text>
                 <Text style={styles.matchingStatLabel}>Match Garage</Text>
               </View>
               <View style={styles.matchingStatDivider} />

@@ -19,11 +19,11 @@ import { dispatchMatchNotification } from "./notifications/dispatcher";
  * and create proposal_profile_matches records (idempotent via unique constraint).
  *
  * @param filterProposalId  when provided, only processes that single proposal
- * @param filterZavarrinaId when provided, only checks proposals near this zavorrina
+ * @param filterZavorrinaId when provided, only checks proposals near this zavorrina
  */
 export async function runProposalToProfileMatching(
   filterProposalId?: string,
-  filterZavarrinaId?: string,
+  filterZavorrinaId?: string,
 ): Promise<number> {
   try {
     const GUEST_TYPES = new Set(["find_a_guest", "hitcher"]);
@@ -46,7 +46,7 @@ export async function runProposalToProfileMatching(
     if (activeProposals.length === 0) return 0;
 
     const existingKeys = await storage.getAllExistingProposalProfileMatchKeys();
-    const actedUponPairs = await storage.getActedUponBikerZavarrinaPairs();
+    const actedUponPairs = await storage.getActedUponBikerZavorrinaPairs();
 
     const allZavorrine = await db
       .select({
@@ -69,8 +69,8 @@ export async function runProposalToProfileMatching(
       );
 
     let zavarrine = allZavorrine;
-    if (filterZavarrinaId) {
-      zavarrine = allZavorrine.filter((z) => z.userId === filterZavarrinaId);
+    if (filterZavorrinaId) {
+      zavarrine = allZavorrine.filter((z) => z.userId === filterZavorrinaId);
     }
     if (zavarrine.length === 0) return 0;
 
@@ -97,7 +97,7 @@ export async function runProposalToProfileMatching(
         const created = await storage.createProposalProfileMatch({
           proposalId: proposal.id,
           bikerId: proposal.userId,
-          zavarrinaId: zav.userId,
+          zavorrinaId: zav.userId,
           distanceKm: Math.round(distKm * 10) / 10,
           status: "new"
         });
@@ -141,7 +141,7 @@ export async function runProposalToProfileMatching(
               distanceKm: distKm,
             });
           } else {
-            console.log(`[ProposalProfileMatching] Notifica soppressa per match ripristinato (resetCount=${created.resetCount}): proposalId=${proposal.id} zavarrinaId=${zav.userId}`);
+            console.log(`[ProposalProfileMatching] Notifica soppressa per match ripristinato (resetCount=${created.resetCount}): proposalId=${proposal.id} zavorrinaId=${zav.userId}`);
           }
         }
       }

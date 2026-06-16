@@ -326,7 +326,7 @@ router.get("/stats", async (_req: Request, res: Response) => {
       return res.json({
         totalBikerBikerMatches: parseInt(bbRes.rows[0]?.cnt ?? "0", 10),
         totalMusicMatches: parseInt(musicRes.rows[0]?.cnt ?? "0", 10),
-        totalZavarrinaMatches: parseInt(bzRes.rows[0]?.cnt ?? "0", 10),
+        totalZavorrinaMatches: parseInt(bzRes.rows[0]?.cnt ?? "0", 10),
         totalBikerZavBaseMatches: parseInt(bzBaseRes.rows[0]?.cnt ?? "0", 10),
         bzBaseByPref: {
           zavorrina: parseInt(bzbd?.pref_zav ?? "0", 10),
@@ -383,7 +383,7 @@ router.get("/match-settings", async (_req: Request, res: Response) => {
         );
         const usersActive = parseInt(activeRes.rows[0]?.cnt ?? "0", 10);
 
-        const isBzBase = mt.key === "bikerZavarrinaBase";
+        const isBzBase = mt.key === "bikerZavorrinaBase";
 
         stats.push({
           typeKey: mt.key,

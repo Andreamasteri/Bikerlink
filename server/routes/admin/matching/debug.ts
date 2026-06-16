@@ -11,7 +11,7 @@ router.get("/matching/debug", async (req: Request, res: Response) => {
     const userId = typeof req.query.userId === "string" ? req.query.userId : null;
     if (!userId) return sendError(res, 400, "userId richiesto come query param");
 
-    const { users: usersTable, userMotorcycles, zavarrinaWishlists, zavarrinaWishlistMotos } = await import("@shared/db");
+    const { users: usersTable, userMotorcycles, zavorrinaWishlists, zavorrinaWishlistMotos } = await import("@shared/db");
     const { eq, and, isNotNull } = await import("drizzle-orm");
     const { systemAccountConditions } = await import("../../../lib/system-account-filter");
 
@@ -30,9 +30,9 @@ router.get("/matching/debug", async (req: Request, res: Response) => {
     const filters: Record<string, { passed: number; rejected: number; reason?: string }> = {};
 
     const myMotorcycles = await db.select().from(userMotorcycles).where(eq(userMotorcycles.userId, userId));
-    const myWishlistRows = await db.select().from(zavarrinaWishlists).where(eq(zavarrinaWishlists.userId, userId)).limit(1);
+    const myWishlistRows = await db.select().from(zavorrinaWishlists).where(eq(zavorrinaWishlists.userId, userId)).limit(1);
     const myWishlistMotos = myWishlistRows[0]
-      ? await db.select().from(zavarrinaWishlistMotos).where(eq(zavarrinaWishlistMotos.wishlistId, myWishlistRows[0].id))
+      ? await db.select().from(zavorrinaWishlistMotos).where(eq(zavorrinaWishlistMotos.wishlistId, myWishlistRows[0].id))
       : [];
 
     const allCandidatesRaw = await db.select({
@@ -117,7 +117,7 @@ router.get("/matching/debug", async (req: Request, res: Response) => {
     const top5 = [...top5BrandMatches, ...top5TypeMatches].slice(0, 5);
 
     const afterBrandPref = myPrefs.bikerBikerBrand || myPrefs.bikerZavorrinaBrand ? brandMatches.length : 0;
-    const afterTypePref = myPrefs.bikerBikerTypeStyle || myPrefs.bikerZavarrinaTypeStyle ? typeMatches.length : 0;
+    const afterTypePref = myPrefs.bikerBikerTypeStyle || myPrefs.bikerZavorrinaTypeStyle ? typeMatches.length : 0;
 
     filters["pref_brand_match"] = {
       passed: myPrefs.bikerBikerBrand || myPrefs.bikerZavorrinaBrand ? brandMatches.length : 0,
@@ -125,9 +125,9 @@ router.get("/matching/debug", async (req: Request, res: Response) => {
       reason: (!myPrefs.bikerBikerBrand && !myPrefs.bikerZavorrinaBrand) ? "bikerBikerBrand + bikerZavorrinaBrand disabled" : undefined,
     };
     filters["pref_type_style_match"] = {
-      passed: myPrefs.bikerBikerTypeStyle || myPrefs.bikerZavarrinaTypeStyle ? typeMatches.length : 0,
-      rejected: (!myPrefs.bikerBikerTypeStyle && !myPrefs.bikerZavarrinaTypeStyle) ? typeMatches.length : 0,
-      reason: (!myPrefs.bikerBikerTypeStyle && !myPrefs.bikerZavarrinaTypeStyle) ? "bikerBikerTypeStyle + bikerZavarrinaTypeStyle disabled" : undefined,
+      passed: myPrefs.bikerBikerTypeStyle || myPrefs.bikerZavorrinaTypeStyle ? typeMatches.length : 0,
+      rejected: (!myPrefs.bikerBikerTypeStyle && !myPrefs.bikerZavorrinaTypeStyle) ? typeMatches.length : 0,
+      reason: (!myPrefs.bikerBikerTypeStyle && !myPrefs.bikerZavorrinaTypeStyle) ? "bikerBikerTypeStyle + bikerZavorrinaTypeStyle disabled" : undefined,
     };
 
     return res.json({

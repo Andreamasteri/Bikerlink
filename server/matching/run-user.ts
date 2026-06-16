@@ -13,7 +13,7 @@ import { dispatchMatchNotification } from "./notifications/dispatcher";
 export async function runMatchingForUser(userId: string): Promise<MatchResult> {
   try {
     const matchingDisabledSet = await loadMatchingDisabledSet();
-    if (matchingDisabledSet.has(userId)) return { bikerBiker: 0, zavarrina: 0 };
+    if (matchingDisabledSet.has(userId)) return { bikerBiker: 0, zavorrina: 0 };
 
     const bikerMotorcycles = await storage.getUserMotorcycles(userId);
     const myMoto = bikerMotorcycles[0];
@@ -109,13 +109,13 @@ export async function runMatchingForUser(userId: string): Promise<MatchResult> {
         }
 
         if (!match && myMoto.motorcycleType && wm.wishlistMoto.motorcycleType && myMoto.motorcycleType.toLowerCase() === wm.wishlistMoto.motorcycleType.toLowerCase()) {
-          if (bothPrefsEnabled(prefsMap, userId, wm.userId, "bikerZavarrinaTypeStyle")) match = true;
+          if (bothPrefsEnabled(prefsMap, userId, wm.userId, "bikerZavorrinaTypeStyle")) match = true;
         }
 
         if (match) {
           const inserted = await storage.createMatch({
             bikerId: userId,
-            zavarrinaId: wm.userId,
+            zavorrinaId: wm.userId,
             bikerMotorcycleId: myMoto.id,
             wishlistMotoId: wm.wishlistMoto.id,
             status: "new",
@@ -153,13 +153,13 @@ export async function runMatchingForUser(userId: string): Promise<MatchResult> {
         }
 
         if (!match && myWish.motorcycleType && bm.motorcycle.motorcycleType && myWish.motorcycleType.toLowerCase() === bm.motorcycle.motorcycleType.toLowerCase()) {
-          if (bothPrefsEnabled(prefsMap, userId, bm.userId, "bikerZavarrinaTypeStyle")) match = true;
+          if (bothPrefsEnabled(prefsMap, userId, bm.userId, "bikerZavorrinaTypeStyle")) match = true;
         }
 
         if (match) {
           const inserted = await storage.createMatch({
             bikerId: bm.userId,
-            zavarrinaId: userId,
+            zavorrinaId: userId,
             bikerMotorcycleId: bm.motorcycle.id,
             wishlistMotoId: myWish.id,
             status: "new",
@@ -242,13 +242,13 @@ export async function runMatchingForUser(userId: string): Promise<MatchResult> {
         if (myProfile === otherProfile) {
           if (isBikerPair && bothPrefsEnabled(prefsMap, userId, row.userId, "bikerBikerTypeStyle")) {
             brand = `percorso:${myProfile}`; pairType = "bb";
-          } else if (isZavPair && bothPrefsEnabled(prefsMap, userId, row.userId, "bikerZavarrinaTypeStyle")) {
+          } else if (isZavPair && bothPrefsEnabled(prefsMap, userId, row.userId, "bikerZavorrinaTypeStyle")) {
             brand = `percorso_zav:${myProfile}`; pairType = "bz";
           }
         } else if (dist < 100) {
           if (isBikerPair && bothPrefsEnabled(prefsMap, userId, row.userId, "bikerBikerDistance")) {
             brand = "distanza"; pairType = "bb";
-          } else if (isZavPair && bothPrefsEnabled(prefsMap, userId, row.userId, "bikerZavarrinaDistance")) {
+          } else if (isZavPair && bothPrefsEnabled(prefsMap, userId, row.userId, "bikerZavorrinaDistance")) {
             brand = "distanza_zav"; pairType = "bz";
           }
         }
@@ -276,9 +276,9 @@ export async function runMatchingForUser(userId: string): Promise<MatchResult> {
       }
     }
 
-    return { bikerBiker: bikerBikerCount, zavarrina: zavCount };
+    return { bikerBiker: bikerBikerCount, zavorrina: zavCount };
   } catch (error) {
     console.error(`Error running matching for user ${userId}:`, error);
-    return { bikerBiker: 0, zavarrina: 0 };
+    return { bikerBiker: 0, zavorrina: 0 };
   }
 }

@@ -13,7 +13,7 @@
 import { Router, type Request, type Response } from "express";
 import { storage } from "../../storage";
 import { db } from "../../db";
-import { proposals, conversationParticipants, messages, reports, moderatorLogs, adClicks, adCampaigns, userDevices, userMotorcycles, zavarrinaWishlists, zavarrinaWishlistMotos, userSessions } from "@shared/db";
+import { proposals, conversationParticipants, messages, reports, moderatorLogs, adClicks, adCampaigns, userDevices, userMotorcycles, zavorrinaWishlists, zavorrinaWishlistMotos, userSessions } from "@shared/db";
 import { eq, sql, count } from "drizzle-orm";
 import { sendError, sendSuccess } from "../../lib/api-response";
 
@@ -208,10 +208,10 @@ router.get("/:id/profile-gaps", async (req: Request, res: Response) => {
       `),
 
       userType === "zavorrina"
-        ? db.select({ id: zavarrinaWishlistMotos.id })
-            .from(zavarrinaWishlistMotos)
-            .innerJoin(zavarrinaWishlists, eq(zavarrinaWishlistMotos.wishlistId, zavarrinaWishlists.id))
-            .where(eq(zavarrinaWishlists.userId, id))
+        ? db.select({ id: zavorrinaWishlistMotos.id })
+            .from(zavorrinaWishlistMotos)
+            .innerJoin(zavorrinaWishlists, eq(zavorrinaWishlistMotos.wishlistId, zavorrinaWishlists.id))
+            .where(eq(zavorrinaWishlists.userId, id))
             .limit(1)
         : Promise.resolve([]),
     ]);
@@ -306,10 +306,10 @@ router.get("/:id/zero-match-diagnosis", async (req: Request, res: Response) => {
 
     let hasWishlist = true;
     if (userType === "zavorrina") {
-      const wl = await db.select({ id: zavarrinaWishlistMotos.id })
-        .from(zavarrinaWishlistMotos)
-        .innerJoin(zavarrinaWishlists, eq(zavarrinaWishlistMotos.wishlistId, zavarrinaWishlists.id))
-        .where(eq(zavarrinaWishlists.userId, id))
+      const wl = await db.select({ id: zavorrinaWishlistMotos.id })
+        .from(zavorrinaWishlistMotos)
+        .innerJoin(zavorrinaWishlists, eq(zavorrinaWishlistMotos.wishlistId, zavorrinaWishlists.id))
+        .where(eq(zavorrinaWishlists.userId, id))
         .limit(1);
       hasWishlist = wl.length > 0;
     }

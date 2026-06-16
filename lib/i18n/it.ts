@@ -389,7 +389,7 @@ const it: Record<string, string> = {
   "match.emptyPropProfileDesc": "Crea una proposta cerca passeggero o passaggio per trovare zavorrine nelle vicinanze!",
   "match.propProfileLabel": "Proposta vicina al tuo profilo",
   "match.bikerProposal": "Proposta del biker",
-  "match.zavarrinaProfile": "Profilo zavorrina",
+  "match.zavorrinaProfile": "Profilo zavorrina",
   "match.emptyMusicTitle": "Nessun match musicale",
   "match.emptyMusicDesc": "Connetti Last.fm nel tab Musica per trovare biker con gusti simili ai tuoi.",
   "match.emptyMusicNoMatchTitle": "Nessun match musicale trovato",

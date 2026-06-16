@@ -129,7 +129,7 @@ export async function runZavTypeStyleMatching(): Promise<number> {
       const rstyle = bm.motorcycle.ridingStyle?.toLowerCase();
       if (!mtype || !rstyle) continue;
       if (matchingDisabledSet.has(bm.userId)) continue;
-      if (!prefEnabled(prefsMap, bm.userId, "bikerZavarrinaTypeStyle")) continue;
+      if (!prefEnabled(prefsMap, bm.userId, "bikerZavorrinaTypeStyle")) continue;
 
       const key = `${mtype}|${rstyle}`;
       const zavIds = zavByTypeStyle.get(key);
@@ -140,7 +140,7 @@ export async function runZavTypeStyleMatching(): Promise<number> {
         if (zavId === bm.userId) continue;
         if (blockedSet.has(`${bm.userId}:${zavId}`)) { skipCount++; continue; }
         if (matchingDisabledSet.has(zavId)) { skipCount++; continue; }
-        if (!prefEnabled(prefsMap, zavId, "bikerZavarrinaTypeStyle")) { skipCount++; continue; }
+        if (!prefEnabled(prefsMap, zavId, "bikerZavorrinaTypeStyle")) { skipCount++; continue; }
 
         const idA = bm.userId < zavId ? bm.userId : zavId;
         const idB = bm.userId < zavId ? zavId : bm.userId;
@@ -164,7 +164,7 @@ export async function runZavTypeStyleMatching(): Promise<number> {
       }
     }
 
-    console.log(`[ZavTypeStyleMatching] ${matchCount} biker-zavarrina type+style matches, saltati: ${skipCount}`);
+    console.log(`[ZavTypeStyleMatching] ${matchCount} biker-zavorrina type+style matches, saltati: ${skipCount}`);
     return matchCount;
   } catch (error) {
     console.error("[ZavTypeStyleMatching] error:", error);

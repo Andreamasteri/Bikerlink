@@ -10,8 +10,8 @@ import {
   motorcyclePhotos, 
   userMotorcycles, 
   userPhotos,
-  zavarrinaWishlistPhotos,
-  zavarrinaWishlists,
+  zavorrinaWishlistPhotos,
+  zavorrinaWishlists,
 } from "@shared/db";
 import { eq } from "drizzle-orm";
 
@@ -326,10 +326,10 @@ export function setupStaticRoutes(app: express.Application) {
       }
       const photoUrl = `/uploads/wishlist/${filename}`;
       const [row] = await db
-        .select({ ownerId: zavarrinaWishlists.userId })
-        .from(zavarrinaWishlistPhotos)
-        .innerJoin(zavarrinaWishlists, eq(zavarrinaWishlistPhotos.wishlistId, zavarrinaWishlists.id))
-        .where(eq(zavarrinaWishlistPhotos.photoUrl, photoUrl))
+        .select({ ownerId: zavorrinaWishlists.userId })
+        .from(zavorrinaWishlistPhotos)
+        .innerJoin(zavorrinaWishlists, eq(zavorrinaWishlistPhotos.wishlistId, zavorrinaWishlists.id))
+        .where(eq(zavorrinaWishlistPhotos.photoUrl, photoUrl))
         .limit(1);
       if (!row || row.ownerId !== requesterId) {
         return sendError(res, 404, "Foto non trovata");

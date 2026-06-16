@@ -2,16 +2,16 @@ export type MatchPrefsPayload = {
   bikerBikerBrand: boolean;
   bikerZavorrinaBrand: boolean;
   bikerClubBrand: boolean;
-  zavarrinaClubBrand: boolean;
+  zavorrinaClubBrand: boolean;
   bikerBikerTypeStyle: boolean;
-  bikerZavarrinaTypeStyle: boolean;
+  bikerZavorrinaTypeStyle: boolean;
   bikerBikerDistance: boolean;
-  bikerZavarrinaDistance: boolean;
+  bikerZavorrinaDistance: boolean;
   bikerBikerMusic: boolean;
-  bikerZavarrinaMusic: boolean;
+  bikerZavorrinaMusic: boolean;
   bikerBikerLeanAngle: boolean;
   bikerBikerRouteTypeZone: boolean;
-  bikerZavarrinaRouteTypeZone: boolean;
+  bikerZavorrinaRouteTypeZone: boolean;
   bikerBikerAvgSpeed: boolean;
   bikerBikerAvgDuration: boolean;
   bikerBikerDayTime: boolean;
@@ -31,16 +31,16 @@ export const DEFAULT_MATCH_PREFS: MatchPrefsPayload = {
   bikerBikerBrand: true,
   bikerZavorrinaBrand: true,
   bikerClubBrand: true,
-  zavarrinaClubBrand: true,
+  zavorrinaClubBrand: true,
   bikerBikerTypeStyle: true,
-  bikerZavarrinaTypeStyle: true,
+  bikerZavorrinaTypeStyle: true,
   bikerBikerDistance: true,
-  bikerZavarrinaDistance: true,
+  bikerZavorrinaDistance: true,
   bikerBikerMusic: true,
-  bikerZavarrinaMusic: true,
+  bikerZavorrinaMusic: true,
   bikerBikerLeanAngle: true,
   bikerBikerRouteTypeZone: true,
-  bikerZavarrinaRouteTypeZone: true,
+  bikerZavorrinaRouteTypeZone: true,
   bikerBikerAvgSpeed: true,
   bikerBikerAvgDuration: true,
   bikerBikerDayTime: true,
@@ -60,16 +60,16 @@ export const MATCH_PREF_ITEMS: { key: keyof MatchPrefsPayload; label: string }[]
   { key: "bikerBikerBrand", label: "Biker ↔ Biker — Marca moto" },
   { key: "bikerZavorrinaBrand", label: "Biker ↔ Zavorra — Marca moto" },
   { key: "bikerClubBrand", label: "Biker ↔ Club — Marca moto" },
-  { key: "zavarrinaClubBrand", label: "Zavorra ↔ Club — Marca moto" },
+  { key: "zavorrinaClubBrand", label: "Zavorra ↔ Club — Marca moto" },
   { key: "bikerBikerTypeStyle", label: "Biker ↔ Biker — Tipo + Stile guida" },
-  { key: "bikerZavarrinaTypeStyle", label: "Biker ↔ Zavorra — Tipo + Stile guida" },
+  { key: "bikerZavorrinaTypeStyle", label: "Biker ↔ Zavorra — Tipo + Stile guida" },
   { key: "bikerBikerDistance", label: "Biker ↔ Biker — Distanza giro" },
-  { key: "bikerZavarrinaDistance", label: "Biker ↔ Zavorra — Distanza giro" },
+  { key: "bikerZavorrinaDistance", label: "Biker ↔ Zavorra — Distanza giro" },
   { key: "bikerBikerMusic", label: "Biker ↔ Biker — Musica (≥65%)" },
-  { key: "bikerZavarrinaMusic", label: "Biker ↔ Zavorra — Musica (≥65%)" },
+  { key: "bikerZavorrinaMusic", label: "Biker ↔ Zavorra — Musica (≥65%)" },
   { key: "bikerBikerLeanAngle", label: "Biker ↔ Biker — Angolo piega" },
   { key: "bikerBikerRouteTypeZone", label: "Biker ↔ Biker — Tipo + Zona percorso" },
-  { key: "bikerZavarrinaRouteTypeZone", label: "Biker ↔ Zavorra — Tipo + Zona percorso" },
+  { key: "bikerZavorrinaRouteTypeZone", label: "Biker ↔ Zavorra — Tipo + Zona percorso" },
   { key: "bikerBikerAvgSpeed", label: "Biker ↔ Biker — Velocità media" },
   { key: "bikerBikerAvgDuration", label: "Biker ↔ Biker — Durata media uscita" },
   { key: "bikerBikerDayTime", label: "Biker ↔ Biker — Giorno/Fascia oraria" },

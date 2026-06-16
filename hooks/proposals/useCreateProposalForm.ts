@@ -33,7 +33,7 @@ export const TARGET_USER_TYPE_OPTIONS = [
   { key: "biker", labelKey: "proposal.targetBiker", icon: "motorbike", color: Colors.maleIcon },
   { key: "zavorrina", labelKey: "proposal.targetZavorrina", icon: "seat-passenger", color: Colors.femaleIcon },
   { key: "hitchhiker", labelKey: "proposal.targetHitchhiker", icon: "thumb-up", color: Colors.success },
-  { key: "hotcher", labelKey: "proposal.targetHotcher", icon: "account-arrow-right", color: Colors.accent },
+  { key: "hitcher", labelKey: "proposal.targetHitcher", icon: "account-arrow-right", color: Colors.accent },
 ];
 
 async function geocodeDeparture(address: string): Promise<{ lat: number; lng: number } | null> {
@@ -210,8 +210,8 @@ export function useCreateProposalForm() {
       find_a_friend: ["biker"],
       find_a_guest:  ["zavorrina"],
       hitcher:       ["hitchhiker"],
-      hitchhiker:    ["hotcher"],
-      find_a_biker:  ["biker", "hotcher"],
+      hitchhiker:    ["hitcher"],
+      find_a_biker:  ["biker", "hitcher"],
     };
     const derived = Array.from(
       new Set(selectedSearchTypes.flatMap((st) => mapping[st] ?? []))

@@ -1,7 +1,7 @@
 import bcrypt from "bcryptjs";
 import crypto from "node:crypto";
 import { db } from "./db";
-import { users, userProfiles, userMotorcycles, zavarrinaWishlists, zavarrinaWishlistMotos } from "@shared/db";
+import { users, userProfiles, userMotorcycles, zavorrinaWishlists, zavorrinaWishlistMotos } from "@shared/db";
 import { eq } from "drizzle-orm";
 import { pool } from "./db";
 
@@ -207,7 +207,7 @@ async function seedFakeUsers() {
       });
 
       const [wishlist] = await db
-        .insert(zavarrinaWishlists)
+        .insert(zavorrinaWishlists)
         .values({
           userId: user.id,
           description: zav.wishlistDesc,
@@ -215,7 +215,7 @@ async function seedFakeUsers() {
         .returning();
 
       for (const moto of zav.motos) {
-        await db.insert(zavarrinaWishlistMotos).values({
+        await db.insert(zavorrinaWishlistMotos).values({
           wishlistId: wishlist.id,
           brand: moto.brand,
           model: moto.model,
