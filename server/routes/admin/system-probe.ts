@@ -61,12 +61,34 @@ async function runProbe(): Promise<void> {
  * Called once at server boot (via setImmediate in boot-sequence.ts) to
  * populate the in-memory cache before the first admin request arrives.
  * Only runs when the cache is still at its cold-boot default (updatedAt === 0).
+ *
+ * Ha un timeout globale di 10 s: con ThinkCentre offline i singoli probe
+ * possono durare fino a 15 s ciascuno; questo cap garantisce che il boot
+ * prosegua comunque entro 10 s anche nel caso peggiore.
  */
+const WARM_UP_TIMEOUT_MS = 10_000;
+
 export async function warmUpSystemStatusCache(): Promise<void> {
   if (getSystemStatus().updatedAt !== 0) return;
   try {
-    await runProbe();
-    console.log("[system-probe] warm-up probe complete");
+    let timedOut = false;
+    let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
+
+    const timeoutPromise = new Promise<void>((resolve) => {
+      timeoutHandle = setTimeout(() => {
+        timedOut = true;
+        console.warn("[system-probe] warm-up timed out after 10 s — boot continues");
+        resolve();
+      }, WARM_UP_TIMEOUT_MS);
+    });
+
+    await Promise.race([runProbe(), timeoutPromise]);
+
+    clearTimeout(timeoutHandle);
+
+    if (!timedOut) {
+      console.log("[system-probe] warm-up probe complete");
+    }
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     console.warn("[system-probe] warm-up probe failed (non-fatal):", msg);
