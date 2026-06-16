@@ -55,6 +55,21 @@ async function loadWeight(key: string, fallback: number): Promise<number> {
   return fallback;
 }
 
+async function loadMatchingK(): Promise<number> {
+  try {
+    const [row] = await db
+      .select()
+      .from(appSettings)
+      .where(eq(appSettings.key, "match_music_k"))
+      .limit(1);
+    const v = parseInt(String(row?.value ?? ""), 10);
+    if (Number.isFinite(v) && v > 0) return v;
+  } catch {
+    /* fall through */
+  }
+  return DEFAULT_K;
+}
+
 async function loadCombinedThreshold(): Promise<number> {
   try {
     const thresholds = await loadMatchThresholds();
@@ -191,7 +206,7 @@ async function loadMusicMatchingCap(): Promise<number> {
 
 export async function runMusicAffinityMatching(): Promise<number> {
   try {
-    const [allUserIds, prefsMap, blocked, wTag, wEmb, minCombined, matchingDisabledSet, maxTotal] = await Promise.all([
+    const [allUserIds, prefsMap, blocked, wTag, wEmb, minCombined, matchingDisabledSet, maxTotal, k] = await Promise.all([
       loadMusicEmbeddingUserIds(),
       loadMatchPreferencesMap(),
       storage.getAllBlockedPairs(),
@@ -200,6 +215,7 @@ export async function runMusicAffinityMatching(): Promise<number> {
       loadCombinedThreshold(),
       loadMatchingDisabledSet(),
       loadMusicMatchingCap(),
+      loadMatchingK(),
     ]);
 
     if (allUserIds.length < 2) {
@@ -238,7 +254,7 @@ export async function runMusicAffinityMatching(): Promise<number> {
         const prefA = prefsMap.get(uidA);
         if (prefA && prefA.musicAffinity === false) continue;
 
-        const neighbors = await findSimilar("user", "music_taste", vector, DEFAULT_K + 1, 0);
+        const neighbors = await findSimilar("user", "music_taste", vector, k + 1, 0);
         const setA = tagSetsByUser.get(uidA) ?? new Set<string>();
 
         let userMatchesThisRun = 0;
@@ -299,7 +315,7 @@ export async function runMusicAffinityMatching(): Promise<number> {
     const usersSkipped = allUserIds.length - usersProcessed;
 
     console.log(
-      `[MusicAffinity] ${matchCount} match (cap=${maxTotal}, combined>=${minCombined}, K=${DEFAULT_K}, w_tag=${wTag}, w_emb=${wEmb}); ` +
+      `[MusicAffinity] ${matchCount} match (cap=${maxTotal}, combined>=${minCombined}, K=${k}, w_tag=${wTag}, w_emb=${wEmb}); ` +
       `utenti_processati=${usersProcessed}, utenti_saltati=${usersSkipped}, utenti_bloccati_da_soglia=${usersBlockedBySoglia}, ` +
       `coppie_valutate=${attempted}, saltate_sotto_soglia=${skippedBelowThreshold}, saltate_altro=${skipped - skippedBelowThreshold}`,
     );
