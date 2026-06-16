@@ -6,7 +6,7 @@ import { sendError, sendSuccess } from "../../lib/api-response";
 import { safeModLog } from "../../lib/safe-mod-log";
 import { storage } from "../../storage";
 import { objectExists } from "../../objectStorage";
-import { uploadBuffer, deleteObject } from "../../objectStorage";
+import { uploadBuffer, deleteObject, downloadBuffer } from "../../objectStorage";
 import crypto from "crypto";
 
 const router = Router();
@@ -115,6 +115,12 @@ router.post("/:id/reupload-image", adReuploadUpload.single("image"), async (req:
     const filename = `ad-${Date.now()}-${crypto.randomBytes(4).toString("hex")}-${req.file.originalname}`;
     const objectPath = `public/ads/${filename}`;
     await uploadBuffer(objectPath, req.file.buffer, req.file.mimetype);
+    // Backup automatico
+    try {
+      await uploadBuffer(`.private/ads-backup/${filename}`, req.file.buffer, req.file.mimetype);
+    } catch (e) {
+      console.warn(`[ads/backup] backup .private fallito per ${filename} (non bloccante):`, (e as Error)?.message);
+    }
     const newImageUrl = `/api/ads/images/${filename}`;
     const oldImageUrl = existing.imageUrl;
     const campaign = await storage.updateAdCampaign(id, {

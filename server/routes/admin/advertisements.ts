@@ -34,6 +34,12 @@ async function uploadAdImageToObjectStorage(buffer: Buffer, originalname: string
   const filename = `ad-${Date.now()}-${originalname}`;
   const objectPath = `public/ads/${filename}`;
   await uploadBuffer(objectPath, buffer, mimetype);
+  // Backup automatico: copia in .private/ads-backup/ per auto-restore al boot
+  try {
+    await uploadBuffer(`.private/ads-backup/${filename}`, buffer, mimetype);
+  } catch (e) {
+    console.warn(`[ads/backup] backup .private fallito per ${filename} (non bloccante):`, (e as Error)?.message);
+  }
   return `/api/ads/images/${filename}`;
 }
 

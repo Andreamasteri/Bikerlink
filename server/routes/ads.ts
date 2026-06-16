@@ -1,9 +1,11 @@
 import { Router, type Request, type Response } from "express";
 import { storage } from "../storage";
-import { downloadBuffer, deleteObject, listObjects } from "../objectStorage";
+import { downloadBuffer, deleteObject, listObjects, uploadBuffer } from "../objectStorage";
 import { sendSuccess, sendError } from "../lib/api-response";
 import path from "path";
 import fs from "fs";
+
+const ADS_BACKUP_PREFIX = ".private/ads-backup/";
 
 const router = Router();
 
@@ -55,12 +57,22 @@ export async function warmupAdImageCache(): Promise<void> {
         }
       }
       if (!ok) {
-        console.error(
-          `[ADS WARMUP] IMMAGINE ROTTA — campagna "${campaign.name}" (id=${campaign.id}): ` +
-          `il file ${filename} non esiste su Object Storage dopo ${WARMUP_BACKOFF_MS.length + 1} tentativi. ` +
-          `Vai su /admin/ads → modifica la campagna → ricarica l'immagine.`,
-          lastErr,
-        );
+        // Auto-restore dal backup .private/ads-backup/ se disponibile
+        try {
+          const backupBuffer = await downloadBuffer(`${ADS_BACKUP_PREFIX}${filename}`);
+          await uploadBuffer(`public/ads/${filename}`, backupBuffer, "image/jpeg");
+          fs.writeFileSync(localPath, backupBuffer);
+          downloaded++;
+          console.log(`[ADS WARMUP] AUTO-RESTORE da backup: ${filename} — campagna "${campaign.name}" ripristinata automaticamente`);
+          ok = true;
+        } catch (_backupErr) {
+          console.error(
+            `[ADS WARMUP] IMMAGINE ROTTA — campagna "${campaign.name}" (id=${campaign.id}): ` +
+            `il file ${filename} non esiste su Object Storage né nel backup .private/ads-backup/ dopo ${WARMUP_BACKOFF_MS.length + 1} tentativi. ` +
+            `Vai su /admin/ads → ricarica l'immagine.`,
+            lastErr,
+          );
+        }
       }
     }
 
@@ -88,7 +100,15 @@ export async function cacheAdImage(imageUrl: string | null | undefined): Promise
 
     if (fs.existsSync(localPath)) return;
 
-    const buffer = await downloadBuffer(`public/ads/${filename}`);
+    let buffer: Buffer;
+    try {
+      buffer = await downloadBuffer(`public/ads/${filename}`);
+    } catch (_primaryErr) {
+      // Fallback: tenta il backup .private/ads-backup/ e ripristina in public/ads/
+      buffer = await downloadBuffer(`${ADS_BACKUP_PREFIX}${filename}`);
+      await uploadBuffer(`public/ads/${filename}`, buffer, "image/jpeg");
+      console.log(`[ADS CACHE] AUTO-RESTORE da backup: ${filename}`);
+    }
     fs.writeFileSync(localPath, buffer);
     console.log(`[ADS CACHE] Cached on publish: ${filename}`);
   } catch (err) {
@@ -109,6 +129,13 @@ export async function cleanupOrphanedAdImages(): Promise<void> {
     // Temporarily disabled campaigns must remain reactivatable without requiring
     // the image to be re-uploaded.
     const allCampaigns = await storage.getAllCampaigns();
+
+    // SAFETY GUARD: se non ci sono campagne nel DB, salta il cleanup dell'object
+    // storage per evitare di cancellare tutte le immagini in caso di blip DB.
+    if (allCampaigns.length === 0) {
+      console.warn("[ADS CLEANUP] getAllCampaigns() ha restituito 0 campagne — cleanup object storage saltato per sicurezza (possibile blip DB).");
+      return;
+    }
 
     // Contract: campaign imageUrls for locally-cached images must match
     // /api/ads/images/<filename> — the same format used by warmupAdImageCache
