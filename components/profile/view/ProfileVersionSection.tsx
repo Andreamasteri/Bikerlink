@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useMemo, useRef, useCallback } from "react";
 import { View, Text, StyleSheet, TouchableOpacity, Vibration } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import Constants from "expo-constants";
 import { useQuery } from "@tanstack/react-query";
 import { useColors } from "@/hooks/useColors";
@@ -124,6 +125,17 @@ export const ProfileVersionSection: React.FC = () => {
           <Text style={[styles.adminValue, { color: "#3B82F6" }]}>#{APPLIED_OTA_NUMBER}</Text>
         </View>
       )}
+      {isAdmin && (
+        <TouchableOpacity
+          style={styles.diagBtn}
+          onPress={() => router.push("/admin/diagnostica" as never)}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="pulse" size={11} color="#F59E0B" />
+          <Text style={styles.diagBtnText}>Diagnostica</Text>
+          <Ionicons name="chevron-forward" size={10} color="#F59E0B" />
+        </TouchableOpacity>
+      )}
     </View>
   );
 };
@@ -175,5 +187,21 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_400Regular",
     fontWeight: "600",
     letterSpacing: 0.5,
+  },
+  diagBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    marginTop: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 10,
+    backgroundColor: "rgba(245,158,11,0.10)",
+  },
+  diagBtnText: {
+    fontSize: 11,
+    fontFamily: "Inter_500Medium",
+    color: "#F59E0B",
+    letterSpacing: 0.3,
   },
 });
