@@ -108,7 +108,6 @@ export default function MyStylePanel() {
 
         {!data.hasEnoughData ? (
           <View style={styles.emptyState}>
-            <Ionicons name="analytics-outline" size={28} color={colors.textSecondary} />
             <Text style={[styles.emptyTitle, { color: colors.text }]}>
               Dati ancora insufficienti
             </Text>
@@ -195,12 +194,12 @@ export default function MyStylePanel() {
 const styles = StyleSheet.create({
   section: {
     paddingHorizontal: 16,
-    marginTop: 4,
+    marginTop: 0,
   },
   card: {
     borderRadius: 12,
-    padding: 14,
-    gap: 8,
+    padding: 10,
+    gap: 4,
     borderWidth: 1,
   },
   headerRow: {
@@ -214,8 +213,8 @@ const styles = StyleSheet.create({
   },
   emptyState: {
     alignItems: "center",
-    gap: 8,
-    paddingVertical: 4,
+    gap: 4,
+    paddingVertical: 0,
   },
   emptyTitle: {
     fontSize: 13,
