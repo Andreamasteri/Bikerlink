@@ -55,9 +55,11 @@ const startupBeaconJson = express.json({ limit: "8kb" });
 const startupBeaconLimiter = rateLimit({
   windowMs: 5 * 60 * 1000,
   max: 30,
-  message: { message: "Too many startup beacons" },
   standardHeaders: true,
-  legacyHeaders: false
+  legacyHeaders: false,
+  handler: (_req, res) => {
+    sendError(res, 429, "Too many startup beacons");
+  },
 });
 
 
@@ -65,9 +67,11 @@ const clientErrorJson = express.json({ limit: "16kb" });
 const clientErrorLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 30,
-  message: { received: true },
   standardHeaders: true,
-  legacyHeaders: false
+  legacyHeaders: false,
+  handler: (_req, res) => {
+    res.status(429).json({ received: true });
+  },
 });
 
 const BEACON_DATA_MAX_KEYS = 20;

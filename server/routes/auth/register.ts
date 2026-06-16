@@ -23,9 +23,11 @@ const router = Router();
 const registerLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
   max: 3,
-  message: { message: "Troppi tentativi. Riprova più tardi." },
   standardHeaders: true,
   legacyHeaders: false,
+  handler: (_req, res) => {
+    sendError(res, 429, "Troppi tentativi. Riprova più tardi.");
+  },
 });
 
 export const verifyEmailStore = new MemoryStore();
@@ -38,19 +40,23 @@ export const RESEND_VERIFICATION_MAX = 5;
 const verifyEmailLimiter = rateLimit({
   windowMs: VERIFY_EMAIL_WINDOW_MS,
   max: VERIFY_EMAIL_MAX,
-  message: { message: "Troppi tentativi. Riprova più tardi." },
   standardHeaders: true,
   legacyHeaders: false,
   store: verifyEmailStore,
+  handler: (_req, res) => {
+    sendError(res, 429, "Troppi tentativi. Riprova più tardi.");
+  },
 });
 
 const resendVerificationLimiter = rateLimit({
   windowMs: RESEND_VERIFICATION_WINDOW_MS,
   max: RESEND_VERIFICATION_MAX,
-  message: { message: "Troppi tentativi. Riprova più tardi." },
   standardHeaders: true,
   legacyHeaders: false,
   store: resendVerificationStore,
+  handler: (_req, res) => {
+    sendError(res, 429, "Troppi tentativi. Riprova più tardi.");
+  },
 });
 
 export const VERIFY_MAX_ATTEMPTS = 5;

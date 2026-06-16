@@ -19,9 +19,11 @@ const mapsTelemetryJson = express.json({ limit: "64kb" });
 const mapsTelemetryLimiter = rateLimit({
   windowMs: 60_000,
   max: 60,
-  message: { received: true },
   standardHeaders: true,
   legacyHeaders: false,
+  handler: (_req, res) => {
+    res.status(429).json({ received: true });
+  },
 });
 
 const eventSchema = z.object({

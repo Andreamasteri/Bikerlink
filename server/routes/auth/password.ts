@@ -21,25 +21,31 @@ const router = Router();
 const forgotPasswordLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
   max: 3,
-  message: { message: "Troppi tentativi. Riprova più tardi." },
   standardHeaders: true,
   legacyHeaders: false,
+  handler: (_req, res) => {
+    sendError(res, 429, "Troppi tentativi. Riprova più tardi.");
+  },
 });
 
 const resetPasswordLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 10,
-  message: { message: "Troppi tentativi. Riprova più tardi." },
   standardHeaders: true,
   legacyHeaders: false,
+  handler: (_req, res) => {
+    sendError(res, 429, "Troppi tentativi. Riprova più tardi.");
+  },
 });
 
 const resendResetLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
   max: 5,
-  message: { message: "Troppi tentativi. Riprova più tardi." },
   standardHeaders: true,
   legacyHeaders: false,
+  handler: (_req, res) => {
+    sendError(res, 429, "Troppi tentativi. Riprova più tardi.");
+  },
 });
 
 router.post("/forgot-password", forgotPasswordLimiter, async (req: Request, res: Response) => {

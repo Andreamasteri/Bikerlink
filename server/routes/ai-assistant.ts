@@ -55,7 +55,9 @@ const messageLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   keyGenerator: (req) => (req.session as { userId?: string })?.userId ?? ipKeyGenerator(getTrustedClientIp(req) ?? ""),
-  message: { message: "Troppi messaggi all'AI Assistant — riprova tra un po'." },
+  handler: (_req, res) => {
+    sendError(res, 429, "Troppi messaggi all'AI Assistant — riprova tra un po'.");
+  },
 });
 
 const actionLimiter = rateLimit({
@@ -64,7 +66,9 @@ const actionLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   keyGenerator: (req) => (req.session as { userId?: string })?.userId ?? ipKeyGenerator(getTrustedClientIp(req) ?? ""),
-  message: { message: "Troppe azioni all'AI Assistant — riprova tra un po'." },
+  handler: (_req, res) => {
+    sendError(res, 429, "Troppe azioni all'AI Assistant — riprova tra un po'.");
+  },
 });
 
 // ── Helpers ───────────────────────────────────────────────────────────────

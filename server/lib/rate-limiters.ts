@@ -1,6 +1,7 @@
 import rateLimit, { ipKeyGenerator } from "express-rate-limit";
-import type { Request } from "express";
+import type { Request, Response } from "express";
 import { getTrustedClientIp } from "./abuse-rate-limit";
+import { sendError } from "./api-response";
 
 function userOrIpKey(req: Request): string {
   const sess = (req as Request & { session?: { userId?: string } }).session;
@@ -36,7 +37,9 @@ export const adminMatchingRateLimiter = rateLimit({
   legacyHeaders: false,
   keyGenerator: userOrIpKey,
   skip: isInternalMatchingRequest,
-  message: { error: "Too many matching admin requests, slow down." },
+  handler: (_req, res: Response) => {
+    sendError(res, 429, "Too many matching admin requests, slow down.");
+  },
 });
 
 // Reports — 3 per day per user (per target enforced elsewhere if needed).
@@ -46,7 +49,9 @@ export const reportsRateLimiter = rateLimit({
   standardHeaders: "draft-7",
   legacyHeaders: false,
   keyGenerator: userOrIpKey,
-  message: { error: "Hai raggiunto il limite di segnalazioni giornaliere." },
+  handler: (_req, res: Response) => {
+    sendError(res, 429, "Hai raggiunto il limite di segnalazioni giornaliere.");
+  },
 });
 
 // Text interpreter — 60/min per user.
@@ -56,5 +61,7 @@ export const textInterpreterRateLimiter = rateLimit({
   standardHeaders: "draft-7",
   legacyHeaders: false,
   keyGenerator: userOrIpKey,
-  message: { error: "Troppe richieste, attendi un attimo." },
+  handler: (_req, res: Response) => {
+    sendError(res, 429, "Troppe richieste, attendi un attimo.");
+  },
 });
