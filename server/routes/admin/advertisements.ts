@@ -42,6 +42,18 @@ async function deleteAdImageIfUnreferenced(filename: string, excludeIds: string[
     // Check DB: any campaign (excluding the ones being deleted/updated) still
     // referencing this filename? If yes, keep both the object and the local cache.
     const all = await storage.getAllCampaigns();
+
+    // SAFETY GUARD: se getAllCampaigns() restituisce 0 elementi ma stiamo
+    // escludendo solo 1-2 ID (operazione singola/piccola), potrebbe essere un
+    // problema DB temporaneo (connessione flaky, errore silenzioso). In quel
+    // caso NON cancellare il file — meglio lasciare un orfano che perdere tutte
+    // le immagini.  Solo quando il numero di esclusi copre tutta la lista
+    // (bulk delete totale) il risultato vuoto è attendibile.
+    if (all.length === 0 && excludeIds.length < 5) {
+      console.warn(`[ads/cleanup] SKIP delete ${filename} — getAllCampaigns() ha restituito 0 risultati (possibile blip DB). Riprova alla prossima operazione.`);
+      return;
+    }
+
     const referenced = all.some((c) => {
       if (excludeIds.includes(c.id)) return false;
       if (!c.imageUrl) return false;
@@ -56,9 +68,10 @@ async function deleteAdImageIfUnreferenced(filename: string, excludeIds: string[
     } catch (e) {
       console.warn(`[ads/cleanup] local unlink failed for ${filename}:`, e);
     }
-    // Remove object storage copy
+    // Remove object storage copy — log esplicito per tracciabilità
     try {
       await deleteObject(`public/ads/${filename}`);
+      console.log(`[ads/cleanup] eliminato da Object Storage: public/ads/${filename} (excludeIds=${excludeIds.join(",")})`);
     } catch (e) {
       console.warn(`[ads/cleanup] object delete failed for ${filename}:`, e);
     }
