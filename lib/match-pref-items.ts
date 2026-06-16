@@ -56,7 +56,7 @@ export const DEFAULT_MATCH_PREFS: MatchPrefsPayload = {
   weeklyRecap: true,
 };
 
-export const MATCH_PREF_ITEMS: { key: keyof MatchPrefsPayload; label: string }[] = [
+export const MATCH_PREF_ITEMS: { key: keyof MatchPrefsPayload; label: string; description?: string }[] = [
   { key: "bikerBikerBrand", label: "Biker ↔ Biker — Marca moto" },
   { key: "bikerZavorrinaBrand", label: "Biker ↔ Zavorra — Marca moto" },
   { key: "bikerClubBrand", label: "Biker ↔ Club — Marca moto" },
@@ -78,7 +78,7 @@ export const MATCH_PREF_ITEMS: { key: keyof MatchPrefsPayload; label: string }[]
   { key: "bioAffinity", label: "Biker ↔ Biker — Affinità bio (testo libero)" },
   { key: "musicAffinity", label: "Biker ↔ Biker — Affinità musicale (combinata)" },
   { key: "telemetryAffinity", label: "Biker ↔ Biker — Stile di guida simile (telemetria)" },
-  { key: "timeOverlap", label: "Biker ↔ Biker — Sovrapposizione fasce orarie" },
+  { key: "timeOverlap", label: "Biker ↔ Biker — Sovrapposizione fasce orarie", description: "Attiva il match basato sulla sovrapposizione degli orari abituali di uscita. Disattivando questa opzione non comparirai nei risultati per compatibilità di fascia oraria." },
   { key: "directMatch", label: "Match Diretto (Richiedi Match)" },
-  { key: "plannedRouteInvite", label: "Invito Percorso Pianificato" },
+  { key: "plannedRouteInvite", label: "Invito Percorso Pianificato", description: "Ricevi inviti a giri pianificati da biker compatibili con il tuo profilo. Disattivando non riceverai notifiche per percorsi condivisi da altri biker." },
 ];

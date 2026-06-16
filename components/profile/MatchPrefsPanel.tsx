@@ -130,9 +130,16 @@ export default function MatchPrefsPanel() {
                 borderBottomColor: Colors.border,
               }}
             >
-              <Text style={{ flex: 1, fontSize: 13, fontFamily: "Inter_400Regular", color: Colors.text, marginRight: 12 }}>
-                {item.label}
-              </Text>
+              <View style={{ flex: 1, marginRight: 12 }}>
+                <Text style={{ fontSize: 13, fontFamily: "Inter_400Regular", color: Colors.text }}>
+                  {item.label}
+                </Text>
+                {item.description ? (
+                  <Text style={{ fontSize: 11, fontFamily: "Inter_400Regular", color: Colors.textSecondary, marginTop: 2 }}>
+                    {item.description}
+                  </Text>
+                ) : null}
+              </View>
               <Switch
                 value={matchPrefs[item.key]}
                 onValueChange={(val) => toggleMatchPref(item.key, val)}
