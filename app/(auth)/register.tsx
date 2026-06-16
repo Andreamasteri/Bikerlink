@@ -249,14 +249,7 @@ export default function RegisterScreen() {
         }
       },
       onError: (err: Error) => {
-        const msg = err.message || t("auth.registerError");
-        const cleaned = msg.replace(/^\d+:\s*/, "");
-        try {
-          const parsed = JSON.parse(cleaned);
-          setError(parsed.message || cleaned);
-        } catch {
-          setError(cleaned);
-        }
+        setError(err.message || t("auth.registerError"));
       },
     });
   };

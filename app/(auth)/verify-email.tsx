@@ -100,12 +100,7 @@ export default function VerifyEmailScreen() {
       router.replace("/(tabs)");
     } catch (err: unknown) {
       const msg = (err instanceof Error ? err.message : "") || translate("auth.verifyError");
-      const cleaned = msg.replace(/^\d+:\s*/, "");
-      let finalMsg = cleaned;
-      try { finalMsg = JSON.parse(cleaned).message || cleaned; } catch {
-        // no-op: cleaned is already set as fallback
-      }
-      setError(friendlyError(finalMsg));
+      setError(friendlyError(msg));
     } finally {
       setIsVerifying(false);
     }
@@ -121,12 +116,7 @@ export default function VerifyEmailScreen() {
       startCooldown();
     } catch (err: unknown) {
       const msg = (err instanceof Error ? err.message : "") || translate("auth.sendError");
-      const cleaned = msg.replace(/^\d+:\s*/, "");
-      let finalMsg = cleaned;
-      try { finalMsg = JSON.parse(cleaned).message || cleaned; } catch {
-        // no-op: cleaned is already set as fallback
-      }
-      setError(friendlyError(finalMsg));
+      setError(friendlyError(msg));
     } finally {
       setIsResending(false);
     }
