@@ -162,6 +162,113 @@ export async function runBootPhase3DbInit(): Promise<void> {
     console.warn("[INIT] Phase 3: maps_telemetry_events ensure failed (non-fatal):", e);
   }
 
+  try {
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS "app_crash_logs" (
+        "id" varchar(36) PRIMARY KEY DEFAULT gen_random_uuid(),
+        "user_id" varchar(36) NOT NULL,
+        "session_id" varchar(64) NOT NULL,
+        "crash_type" varchar(20) NOT NULL,
+        "app_version" varchar(32),
+        "platform" varchar(16),
+        "os_version" varchar(50),
+        "device_model" varchar(100),
+        "device_brand" varchar(100),
+        "total_memory_mb" integer,
+        "error_message" text,
+        "stack_trace" text,
+        "session_started_at" timestamp,
+        "session_ended_at" timestamp,
+        "reported_at" timestamp NOT NULL DEFAULT now()
+      )
+    `);
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS "app_crash_logs_user_id_idx"
+        ON "app_crash_logs" ("user_id")
+    `);
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS "app_crash_logs_crash_type_idx"
+        ON "app_crash_logs" ("crash_type")
+    `);
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS "app_crash_logs_reported_at_idx"
+        ON "app_crash_logs" ("reported_at")
+    `);
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS "app_crash_logs_session_id_crash_type_idx"
+        ON "app_crash_logs" ("session_id", "crash_type")
+    `);
+    console.log("[INIT] app_crash_logs: table/index check OK");
+  } catch (e) {
+    console.warn("[INIT] Phase 3: app_crash_logs ensure failed (non-fatal):", e);
+  }
+
+  try {
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS "system_signals" (
+        "id" varchar(36) PRIMARY KEY DEFAULT gen_random_uuid(),
+        "source" varchar(40) NOT NULL,
+        "metric" varchar(80) NOT NULL,
+        "value" double precision,
+        "unit" varchar(20),
+        "severity" varchar(10) NOT NULL DEFAULT 'info',
+        "details" jsonb,
+        "created_at" timestamp NOT NULL DEFAULT now()
+      )
+    `);
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS "system_signals_source_metric_idx"
+        ON "system_signals" ("source", "metric")
+    `);
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS "system_signals_created_idx"
+        ON "system_signals" ("created_at")
+    `);
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS "system_signals_severity_created_idx"
+        ON "system_signals" ("severity", "created_at")
+    `);
+    console.log("[INIT] system_signals: table/index check OK");
+  } catch (e) {
+    console.warn("[INIT] Phase 3: system_signals ensure failed (non-fatal):", e);
+  }
+
+  try {
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS "ai_watchdog_log" (
+        "id" varchar(36) PRIMARY KEY DEFAULT gen_random_uuid(),
+        "kind" varchar(30) NOT NULL,
+        "scope" varchar(60),
+        "status" varchar(20) NOT NULL DEFAULT 'ok',
+        "summary" text,
+        "details" jsonb,
+        "proposal_id" varchar(36),
+        "accepted_by_admin_id" varchar(36),
+        "accepted_at" timestamp,
+        "rejected_by_admin_id" varchar(36),
+        "rejected_at" timestamp,
+        "reject_reason" varchar(300),
+        "cost_usd" double precision NOT NULL DEFAULT 0,
+        "created_at" timestamp NOT NULL DEFAULT now()
+      )
+    `);
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS "ai_watchdog_log_kind_idx"
+        ON "ai_watchdog_log" ("kind")
+    `);
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS "ai_watchdog_log_status_idx"
+        ON "ai_watchdog_log" ("status")
+    `);
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS "ai_watchdog_log_created_idx"
+        ON "ai_watchdog_log" ("created_at")
+    `);
+    console.log("[INIT] ai_watchdog_log: table/index check OK");
+  } catch (e) {
+    console.warn("[INIT] Phase 3: ai_watchdog_log ensure failed (non-fatal):", e);
+  }
+
   setImmediate(async () => {
     try {
       const { warmupAdImageCache } = await import("./routes/ads");
