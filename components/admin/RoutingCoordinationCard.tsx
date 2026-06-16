@@ -132,6 +132,7 @@ export function RoutingCoordinationCard({
   const [openFlow, setOpenFlow] = useState(true);
   const [openLog, setOpenLog] = useState(true);
   const [openAi, setOpenAi] = useState(false);
+  const [filterGeoFail, setFilterGeoFail] = useState(false);
 
   useEffect(() => {
     onCollapsedChange?.(collapsed);
@@ -257,6 +258,18 @@ export function RoutingCoordinationCard({
                 {summary ? `${Math.round(summary.fallbackRate * 100)}%` : "—"}
               </Text>
             </View>
+            {pipeline && (() => {
+              const geoFailCount = pipeline.events.filter((e) => !e.geocodingOk).length;
+              if (geoFailCount === 0) return null;
+              return (
+                <View style={styles.flowRow}>
+                  <Text style={styles.flowLabel}>Geocoding KO</Text>
+                  <Text style={[styles.flowValue, { color: "#f59e0b" }]}>
+                    {geoFailCount} eventi
+                  </Text>
+                </View>
+              );
+            })()}
             {status?.metrics && (
               <Text style={styles.metricsLine}>
                 Metriche engine (5 min):{" "}
@@ -271,41 +284,79 @@ export function RoutingCoordinationCard({
 
           {/* Sezione: Log eventi pipeline */}
           <Section title="Log eventi pipeline" icon="format-list-bulleted" open={openLog} onToggle={() => setOpenLog((v) => !v)}>
+            {pipeline && pipeline.events.some((e) => !e.geocodingOk) && (
+              <TouchableOpacity
+                style={[styles.geoFilterBtn, filterGeoFail && styles.geoFilterBtnActive]}
+                onPress={() => setFilterGeoFail((v) => !v)}
+                activeOpacity={0.7}
+                testID="filter-geocoding-fail"
+              >
+                <MaterialCommunityIcons
+                  name="map-marker-alert-outline"
+                  size={13}
+                  color={filterGeoFail ? "#f59e0b" : Colors.textSecondary}
+                />
+                <Text style={[styles.geoFilterText, filterGeoFail && { color: "#f59e0b" }]}>
+                  Solo geocoding KO
+                </Text>
+              </TouchableOpacity>
+            )}
             {pipeLoading && <ActivityIndicator size="small" color={Colors.textSecondary} />}
             {!pipeLoading && (!pipeline || pipeline.events.length === 0) && (
               <Text style={styles.emptyText}>Nessun evento di routing registrato.</Text>
             )}
-            {pipeline?.events.map((ev, i) => (
-              <View
-                key={`${ev.ts}-${i}`}
-                style={[
-                  styles.eventRow,
-                  (ev.outcome === "error" || ev.outcome === "fallback") && {
-                    backgroundColor: ev.outcome === "error" ? "rgba(239,68,68,0.08)" : "rgba(245,158,11,0.08)",
-                  },
-                ]}
-              >
-                <View style={[styles.eventDot, { backgroundColor: OUTCOME_COLOR[ev.outcome] }]} />
-                <View style={styles.eventBody}>
-                  <Text style={styles.eventLine}>
-                    <Text style={styles.eventTime}>{formatTime(ev.ts)}</Text>
-                    {"  "}
-                    {ev.areaCode ?? "fuori-area"} · {ev.engineSelected}
-                    {ev.engineUsed !== ev.engineSelected ? ` → ${ev.engineUsed}` : ""}
-                    {" · "}
-                    {ev.latencyMs} ms
-                  </Text>
-                  {ev.fallbackReason && (
-                    <Text style={[styles.eventSub, { color: "#f59e0b" }]}>{ev.fallbackReason}</Text>
-                  )}
-                  {ev.error && (
-                    <Text style={[styles.eventSub, { color: "#ef4444" }]} numberOfLines={2}>
-                      {ev.error}
-                    </Text>
-                  )}
+            {pipeline && (() => {
+              const visible = filterGeoFail
+                ? pipeline.events.filter((e) => !e.geocodingOk)
+                : pipeline.events;
+              if (filterGeoFail && visible.length === 0) {
+                return <Text style={styles.emptyText}>Nessun evento con geocoding KO.</Text>;
+              }
+              return visible.map((ev, i) => (
+                <View
+                  key={`${ev.ts}-${i}`}
+                  style={[
+                    styles.eventRow,
+                    ev.outcome === "fallback" && { backgroundColor: "rgba(245,158,11,0.08)" },
+                    ev.outcome === "error" && { backgroundColor: "rgba(239,68,68,0.08)" },
+                    !ev.geocodingOk && ev.outcome === "ok" && { backgroundColor: "rgba(245,158,11,0.06)" },
+                  ]}
+                >
+                  <View style={[styles.eventDot, { backgroundColor: OUTCOME_COLOR[ev.outcome] }]} />
+                  <View style={styles.eventBody}>
+                    <View style={styles.eventLineRow}>
+                      <Text style={styles.eventLine}>
+                        <Text style={styles.eventTime}>{formatTime(ev.ts)}</Text>
+                        {"  "}
+                        {ev.areaCode ?? "fuori-area"} · {ev.engineSelected}
+                        {ev.engineUsed !== ev.engineSelected ? ` → ${ev.engineUsed}` : ""}
+                        {" · "}
+                        {ev.latencyMs} ms
+                      </Text>
+                      {!ev.geocodingOk && (
+                        <View style={styles.geoBadge}>
+                          <MaterialCommunityIcons name="map-marker-alert-outline" size={11} color="#f59e0b" />
+                          <Text style={styles.geoBadgeText}>Geocoding KO</Text>
+                        </View>
+                      )}
+                    </View>
+                    {!ev.geocodingOk && (
+                      <Text style={[styles.eventSub, { color: "#f59e0b" }]}>
+                        Nominatim o AI lookup falliti — coordinate non risolte correttamente
+                      </Text>
+                    )}
+                    {ev.fallbackReason && (
+                      <Text style={[styles.eventSub, { color: "#f59e0b" }]}>{ev.fallbackReason}</Text>
+                    )}
+                    {ev.error && (
+                      <Text style={[styles.eventSub, { color: "#ef4444" }]} numberOfLines={2}>
+                        {ev.error}
+                      </Text>
+                    )}
+                  </View>
                 </View>
-              </View>
-            ))}
+              ));
+            })()}
             {pipeline?.volatile && (
               <Text style={styles.volatileNote}>
                 ⚠︎ Log volatile in memoria: si azzera al riavvio del server.
@@ -476,10 +527,40 @@ const styles = StyleSheet.create({
   eventRow: { flexDirection: "row", alignItems: "flex-start", gap: 8, borderRadius: 6, padding: 4 },
   eventDot: { width: 8, height: 8, borderRadius: 4, marginTop: 4 },
   eventBody: { flex: 1 },
+  eventLineRow: { flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 4 },
   eventLine: { fontFamily: "Inter_400Regular", fontSize: 11, color: Colors.text },
   eventTime: { fontFamily: "Inter_600SemiBold", color: Colors.textSecondary },
   eventSub: { fontFamily: "Inter_400Regular", fontSize: 10, marginTop: 1 },
   volatileNote: { fontFamily: "Inter_400Regular", fontSize: 10, color: Colors.textSecondary, marginTop: 4 },
+
+  geoBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 2,
+    backgroundColor: "rgba(245,158,11,0.15)",
+    borderRadius: 4,
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+  },
+  geoBadgeText: { fontFamily: "Inter_600SemiBold", fontSize: 9, color: "#f59e0b" },
+
+  geoFilterBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    alignSelf: "flex-start",
+    gap: 4,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    marginBottom: 4,
+  },
+  geoFilterBtnActive: {
+    borderColor: "#f59e0b",
+    backgroundColor: "rgba(245,158,11,0.08)",
+  },
+  geoFilterText: { fontFamily: "Inter_600SemiBold", fontSize: 11, color: Colors.textSecondary },
 
   aiRow: { gap: 1 },
   aiLine: { fontFamily: "Inter_400Regular", fontSize: 11, color: Colors.text },
