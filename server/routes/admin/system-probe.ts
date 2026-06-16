@@ -73,13 +73,28 @@ export async function warmUpSystemStatusCache(): Promise<void> {
   }
 }
 
+/**
+ * Timeout massimo per il probe inline su cold-cache: 4.5 s.
+ * PROBE_TIMEOUT_MS (nei singoli probe ThinkCentre) è 15 s; con ThinkCentre
+ * offline Promise.all aspetterebbe fino a 15 s prima di rispondere. Questo
+ * cap garantisce che il system-probe risponda entro 5 s anche su cold-cache,
+ * restituendo lo snapshot parziale (o vuoto) senza crashare il processo.
+ */
+const SYSTEM_PROBE_COLD_CACHE_TIMEOUT_MS = 4_500;
+
 router.get("/system-probe", async (_req: Request, res: Response) => {
   const cached = getSystemStatus();
 
   if (cached.updatedAt === 0) {
-    // Cold cache: probe inline so the very first response has real data.
+    // Cold cache: probe inline so the very first response has real data,
+    // but cap the wait so a fully-offline ThinkCentre doesn't stall the handler.
     try {
-      await runProbe();
+      await Promise.race([
+        runProbe(),
+        new Promise<void>((resolve) =>
+          setTimeout(resolve, SYSTEM_PROBE_COLD_CACHE_TIMEOUT_MS)
+        ),
+      ]);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       console.error("[admin/system-probe] cold-cache inline probe error:", msg);

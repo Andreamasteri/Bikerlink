@@ -35,7 +35,14 @@ export function registerClientSettingsExtraRoutes(app: Express) {
   // questo flag per mostrare/nascondere l'opzione nel pianificatore giri.
   app.get("/api/settings/valhalla-available", async (_req, res) => {
     try {
-      const available = await isValhallaAvailableCached();
+      // Hard cap a 4 s: isValhallaAvailableCached() usa internamente un timeout
+      // di 10 s via AbortController. Con ThinkCentre offline la fetch resta appesa
+      // per quei 10 s bloccando la diagnostica client. Promise.race garantisce una
+      // risposta entro 4 s anche se il server di routing non è raggiungibile.
+      const available = await Promise.race([
+        isValhallaAvailableCached(),
+        new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 4_000)),
+      ]);
       res.json({ available });
     } catch (err) {
       console.warn("[client-settings-extra] valhalla-available check failed:", err);

@@ -27,6 +27,42 @@ import { sendError } from "../../lib/api-response";
 
 const router = Router();
 
+/**
+ * GET /api/maps/tile-proxy-check
+ *
+ * Endpoint di diagnostica leggero che verifica la raggiungibilità del tile server
+ * di default (tile.openstreetmap.org). Usato dal runner di diagnostica client.
+ * Risponde entro 4 secondi: se il tile server non è raggiungibile restituisce
+ * HTTP 503 pulito invece di lasciare la connessione appesa.
+ */
+router.get("/maps/tile-proxy-check", requireAuth, async (_req: Request, res: Response) => {
+  const testUrl = "https://tile.openstreetmap.org/0/0/0.png";
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 4_000);
+  const t0 = Date.now();
+
+  try {
+    const upstream = await fetch(testUrl, {
+      headers: { "User-Agent": "BikerLink/1.0 tile-proxy-check" },
+      signal: controller.signal,
+    });
+
+    const latencyMs = Date.now() - t0;
+
+    if (!upstream.ok) {
+      return res.status(503).json({ ok: false, latencyMs, error: `HTTP ${upstream.status}` });
+    }
+
+    return res.json({ ok: true, latencyMs });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.warn("[tile-proxy-check] error:", msg);
+    return res.status(503).json({ ok: false, latencyMs: null, error: "Tile server non raggiungibile" });
+  } finally {
+    clearTimeout(timer);
+  }
+});
+
 router.get("/tiles/:providerId/:z/:x/:y", requireAuth, async (req: Request, res: Response) => {
   const userId = req.session.userId!;
   const ip = getTrustedClientIp(req);
