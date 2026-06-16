@@ -254,16 +254,25 @@ export default function FloatingWidget() {
   }));
 
   const handleChatPress = useCallback(() => {
+    if (Platform.OS !== "web") {
+      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }
     closeMenu();
     router.push("/(tabs)/chat");
   }, [closeMenu, router]);
 
   const handleNotificationsPress = useCallback(() => {
+    if (Platform.OS !== "web") {
+      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }
     closeMenu();
     router.push("/notifications" as Href);
   }, [closeMenu, router]);
 
   const handlePlayerPress = useCallback(() => {
+    if (Platform.OS !== "web") {
+      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }
     closeMenu();
     router.push("/(tabs)/music");
   }, [closeMenu, router]);
