@@ -47,7 +47,8 @@ log "[2/4] Backend avviato in background (PID: $BACKEND_PID)"
 # Metro parte subito in background: non aspettiamo il health check.
 # Metro è progettato per gestire una finestra senza backend disponibile.
 log "[2/4] Avvio frontend (Metro/Expo) in parallelo..."
-bash "$SCRIPT_DIR/start-expo.sh" &
+METRO_LOG="/tmp/metro.log"
+bash "$SCRIPT_DIR/start-expo.sh" > "$METRO_LOG" 2>&1 &
 EXPO_PID=$!
 log "[2/4] Frontend avviato in background (PID: $EXPO_PID)"
 
@@ -65,11 +66,24 @@ HEALTHY=0
 DELAYS=(0.3 0.5 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1)
 
 # Helper: controlla che Metro (EXPO_PID) sia ancora vivo; in caso contrario fail esplicito.
+# Se il crash è rilevato, stampa le ultime righe del log Metro per diagnostica immediata.
 check_metro_alive() {
   if [ -n "${EXPO_PID:-}" ] && ! kill -0 "$EXPO_PID" 2>/dev/null; then
     # Il processo è già terminato: wait ne recupera l'exit code (ritorna subito).
     wait "$EXPO_PID" 2>/dev/null; local EXPO_EXIT=$?
-    fail "2/4" "Metro/Expo (PID $EXPO_PID) è terminato durante il boot (exit code: $EXPO_EXIT)"
+    local CRASH_TS
+    CRASH_TS=$(date '+%Y-%m-%dT%H:%M:%S')
+    log "━━━ METRO CRASH — timestamp: $CRASH_TS — exit code: $EXPO_EXIT ━━━"
+    log "━━━ Ultime righe log Metro (${METRO_LOG:-/tmp/metro.log}): ━━━"
+    if [ -f "${METRO_LOG:-/tmp/metro.log}" ] && [ -s "${METRO_LOG:-/tmp/metro.log}" ]; then
+      tail -n 20 "${METRO_LOG:-/tmp/metro.log}" | while IFS= read -r line; do
+        log "  │ $line"
+      done
+    else
+      log "  │ (log Metro non disponibile o vuoto)"
+    fi
+    log "━━━ Fine log Metro ━━━"
+    fail "2/4" "Metro/Expo (PID $EXPO_PID) è terminato durante il boot — vedi log sopra"
   fi
 }
 
