@@ -27,6 +27,7 @@ import {
   moderatorLogs,
   siteVisits,
   pipelineProbeHistory,
+  pipelineFlowEvents,
 } from "@shared/db";
 import { withDbRetry } from "../lib/db-retry";
 
@@ -57,6 +58,7 @@ const RETENTION_TARGETS: RetentionTarget[] = [
   { name: "moderator_logs", table: moderatorLogs, tsColumn: moderatorLogs.createdAt, retentionDays: 30 },
   { name: "site_visits", table: siteVisits, tsColumn: siteVisits.createdAt, retentionDays: 30 },
   { name: "pipeline_probe_history", table: pipelineProbeHistory, tsColumn: pipelineProbeHistory.runAt, retentionDays: 30 },
+  { name: "pipeline_flow_events", table: pipelineFlowEvents, tsColumn: pipelineFlowEvents.ts, retentionDays: 30 },
 ];
 
 const GPS_ERRORS_FULL_PURGE_FLAG = "logRetention.gpsErrorsPurgedV1";
