@@ -1,6 +1,7 @@
 // Unexpected-restart detection: on every boot, records a server_boot signal
 // then checks if the previous boot was within the alert threshold. If so,
 // writes an unexpected_restart signal and sends an immediate push to admins.
+import fs from "fs";
 import { db } from "../../db";
 import { systemSignals } from "@shared/db";
 import { desc, eq, and, gt } from "drizzle-orm";
@@ -10,6 +11,9 @@ import { storage } from "../../storage";
 const SOURCE = "app" as const;
 const BOOT_METRIC = "server.boot";
 const RESTART_METRIC = "server.unexpected_restart";
+export const CRASH_REASON_METRIC = "server.crash_reason";
+const CRASH_LOG_PATH = "/tmp/server-crash.log";
+const CRASH_LOG_MAX_LINES = 50;
 
 const DEFAULT_THRESHOLD_MIN = 5;
 // How long an unexpected_restart signal is surfaced by the panel collector (min).
@@ -23,6 +27,75 @@ async function getThresholdMinutes(): Promise<number> {
     return Number.isFinite(n) && n > 0 ? n : DEFAULT_THRESHOLD_MIN;
   } catch {
     return DEFAULT_THRESHOLD_MIN;
+  }
+}
+
+// ── Crash log helpers ─────────────────────────────────────────────────────────
+
+interface CrashEntry {
+  at: Date;
+  type: string;
+  message: string;
+  stack: string;
+}
+
+function parseCrashEntries(content: string): CrashEntry[] {
+  const entries: CrashEntry[] = [];
+  const blocks = content.split(/^--- CRASH /m).filter(Boolean);
+  for (const block of blocks) {
+    const lines = block.split("\n");
+    const at = new Date(lines[0]?.replace(/ ---$/, "").trim() ?? "");
+    if (isNaN(at.getTime())) continue;
+    let type = "";
+    let message = "";
+    const stackLines: string[] = [];
+    let inStack = false;
+    for (let i = 1; i < lines.length; i++) {
+      const line = lines[i] ?? "";
+      if (line.startsWith("type: ")) { type = line.slice(6); inStack = false; }
+      else if (line.startsWith("message: ")) { message = line.slice(9); inStack = false; }
+      else if (line.startsWith("stack: ")) { stackLines.push(line.slice(7)); inStack = true; }
+      else if (inStack && line !== "") { stackLines.push(line); }
+      else { inStack = false; }
+    }
+    entries.push({ at, type, message, stack: stackLines.join("\n") });
+  }
+  return entries;
+}
+
+async function processCrashLog(lastBootAt: Date | null): Promise<void> {
+  try {
+    if (!fs.existsSync(CRASH_LOG_PATH)) return;
+    const content = fs.readFileSync(CRASH_LOG_PATH, "utf8");
+    const entries = parseCrashEntries(content);
+    if (!entries.length) return;
+
+    const newEntries = lastBootAt ? entries.filter((e) => e.at > lastBootAt) : entries;
+
+    for (const entry of newEntries) {
+      console.warn(
+        `[CRASH-REASON] ${entry.at.toISOString()} — type=${entry.type} — ${entry.message}\n${entry.stack}`,
+      );
+      await db.insert(systemSignals).values({
+        source: SOURCE,
+        metric: CRASH_REASON_METRIC,
+        severity: "critical",
+        details: {
+          type: entry.type,
+          message: entry.message.slice(0, 500),
+          stack: entry.stack.slice(0, 2000),
+          crashedAt: entry.at.toISOString(),
+        } as object,
+      });
+    }
+
+    // Tronca a max 50 righe (le più recenti)
+    const allLines = content.split("\n");
+    if (allLines.length > CRASH_LOG_MAX_LINES) {
+      fs.writeFileSync(CRASH_LOG_PATH, allLines.slice(-CRASH_LOG_MAX_LINES).join("\n"), "utf8");
+    }
+  } catch (err) {
+    console.warn("[restart-monitor] processCrashLog error (non-fatal):", err);
   }
 }
 
@@ -68,6 +141,9 @@ export async function recordBootSignal(): Promise<void> {
       severity: "info",
       details: { pid: process.pid, isUnexpected, thresholdMin } as object,
     });
+
+    // Leggi crash log del processo precedente (se esiste) e inserisci in system_signals
+    await processCrashLog(lastBoot);
 
     if (!isUnexpected) {
       if (minutesSinceLast !== null) {
@@ -146,6 +222,37 @@ export async function getRecentUnexpectedRestarts(): Promise<
       minutesSinceLast: typeof r.value === "number" ? r.value : null,
       createdAt: r.createdAt,
     }));
+  } catch {
+    return [];
+  }
+}
+
+// Query crash-reason signals per il collector (ultimi 30 min).
+export async function getRecentCrashReasons(): Promise<
+  Array<{ crashedAt: string | null; type: string | null; message: string | null; createdAt: Date }>
+> {
+  try {
+    const cutoff = new Date(Date.now() - RESTART_VISIBLE_WINDOW_MIN * 60_000);
+    const rows = await db
+      .select({ details: systemSignals.details, createdAt: systemSignals.createdAt })
+      .from(systemSignals)
+      .where(
+        and(
+          eq(systemSignals.source, SOURCE),
+          eq(systemSignals.metric, CRASH_REASON_METRIC),
+          gt(systemSignals.createdAt, cutoff),
+        ),
+      )
+      .orderBy(desc(systemSignals.createdAt));
+    return rows.map((r) => {
+      const d = r.details as Record<string, unknown> | null;
+      return {
+        crashedAt: typeof d?.crashedAt === "string" ? d.crashedAt : null,
+        type: typeof d?.type === "string" ? d.type : null,
+        message: typeof d?.message === "string" ? d.message : null,
+        createdAt: r.createdAt,
+      };
+    });
   } catch {
     return [];
   }

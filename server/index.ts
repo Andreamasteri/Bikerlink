@@ -8,6 +8,7 @@ console.error = (...args: unknown[]) => {
   _origConsoleError(...args);
 };
 
+import fs from "fs";
 import express from "express";
 import type { Request, Response } from "express";
 import { createServer } from "http";
@@ -143,6 +144,38 @@ function gracefulShutdown(signal: string) {
 process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
 process.on("SIGINT", () => gracefulShutdown("SIGINT"));
 
+// ── Crash capture ─────────────────────────────────────────────────────────────
+// Scrivi il motivo del crash in modo sincrono su /tmp/server-crash.log.
+// fs.appendFileSync sopravvive al crash; il file viene letto al prossimo boot
+// da restart-monitor.ts per inserire il segnale in system_signals.
+function writeCrashLog(type: string, err: unknown): void {
+  try {
+    const now = new Date().toISOString();
+    const error = err instanceof Error ? err : new Error(String(err));
+    const entry = [
+      `--- CRASH ${now} ---`,
+      `type: ${type}`,
+      `message: ${error.message}`,
+      `stack: ${error.stack ?? "(no stack)"}`,
+      "",
+    ].join("\n");
+    fs.appendFileSync("/tmp/server-crash.log", entry, "utf8");
+  } catch {
+    // nulla — siamo già in crash, non possiamo fare altro
+  }
+}
+
+process.on("uncaughtException", (err) => {
+  console.error("[CRASH] uncaughtException:", err);
+  writeCrashLog("uncaughtException", err);
+  process.exit(1);
+});
+
+process.on("unhandledRejection", (reason) => {
+  console.error("[CRASH] unhandledRejection:", reason);
+  writeCrashLog("unhandledRejection", reason);
+  process.exit(1);
+});
 
 runBootSequence(server, errorHandlersReady).catch((err) => {
   console.error("[INIT] Uncaught fatal error during startup:", err);
