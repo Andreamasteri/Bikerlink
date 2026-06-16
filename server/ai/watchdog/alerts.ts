@@ -51,9 +51,36 @@ export async function dispatchAlerts(snap: HealthSnapshot): Promise<{ sent: numb
     });
   }
 
-  // Problem-level (critical singoli)
+  // Pool exhaustion — dedicated alert (higher priority than generic critical loop)
+  const poolProblem = snap.problems.find(
+    (p) => p.id === "db.db.pool.waiting" && p.severity === "critical",
+  );
+  if (poolProblem) {
+    await emitWatchdogAlert({ problem: poolProblem, score: snap.score, status: snap.status });
+    if (shouldSend("db.pool.exhaustion")) {
+      let detail: { max?: number; total?: number; consecutiveWaiting?: number } = {};
+      try { detail = JSON.parse(poolProblem.detail ?? "{}"); } catch { /* use defaults */ }
+      const waiting = snap.metrics["db.db.pool.waiting"] ?? "?";
+      const max = detail.max ?? 10;
+      const consecutive = detail.consecutiveWaiting != null ? ` (${detail.consecutiveWaiting} tick consecutivi)` : "";
+      const n = await sendSystemAlertPushToAdmins(
+        `💀 Pool DB esaurito — ${waiting}/${max} client in attesa`,
+        `Il pool è completamente saturo${consecutive}. Controlla query lente/lock e valuta di aumentare pool.max.`,
+        { type: "watchdog_pool_exhaustion", waiting, max, score: snap.score },
+      );
+      sentCount += n;
+      await writeWatchdogLog({
+        kind: "alert", scope: "db.pool.exhaustion", status: "ok",
+        summary: `Alert pool DB esaurito: ${waiting}/${max} client in attesa`,
+        details: { sent: n, waiting, max, consecutive: detail.consecutiveWaiting },
+      });
+    }
+  }
+
+  // Problem-level (critical singoli — pool exhaustion già gestita sopra)
   for (const p of snap.problems) {
     if (p.severity !== "critical") continue;
+    if (p.id === "db.db.pool.waiting") continue; // già gestita nel blocco pool dedicato
     // Task #2654 — emit ogni problem critical anche se throttled (lo throttle è solo per push)
     await emitWatchdogAlert({ problem: p, score: snap.score, status: snap.status });
     // Task #2686 — kill-switch dedicato per push mappe.
