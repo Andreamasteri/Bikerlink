@@ -126,9 +126,7 @@ router.post("/reset-password", resetPasswordLimiter, async (req: Request, res: R
       revoked = await revokeAllUserSessions(user.id);
     } catch (e) {
       console.error("[PASSWORD RESET] revokeAllUserSessions failed — password NOT changed:", e);
-      return res.status(500).json({
-        message: "Errore temporaneo nella revoca delle sessioni. Riprova tra qualche istante.",
-      });
+      return sendError(res, 500, "Errore temporaneo nella revoca delle sessioni. Riprova tra qualche istante.");
     }
     closeSseClient(user.id);
     if (revoked > 0) {
