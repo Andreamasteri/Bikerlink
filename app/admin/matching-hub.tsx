@@ -51,6 +51,27 @@ interface EmbeddingCoverage {
   coverageThresholdPct: number;
 }
 
+interface MusicAffinityRunSnapshot {
+  timestamp: string;
+  matchCount: number;
+  skippedBelowThreshold: number;
+  usersBlockedBySoglia: number;
+  usersProcessed: number;
+  usersSkipped: number;
+  cap: number;
+  capReached: boolean;
+  skipReasons: { capReached: number; noCandidate: number };
+}
+
+interface MusicAffinityStats {
+  usersWithEmbedding: number;
+  totalActiveUsers: number;
+  coveragePct: number;
+  totalMatchesInDb: number;
+  lastRun: MusicAffinityRunSnapshot | null;
+  recentRuns: MusicAffinityRunSnapshot[];
+}
+
 interface QuickLink {
   key: string;
   label: string;
@@ -115,6 +136,11 @@ export default function MatchingHubScreen() {
     queryKey: ["/api/admin/embeddings/coverage"],
     refetchInterval: 60000,
     staleTime: 30000,
+  });
+  const { data: musicStats } = useQuery<MusicAffinityStats>({
+    queryKey: ["/api/admin/matching/music-affinity-stats"],
+    refetchInterval: 30000,
+    staleTime: 15000,
   });
 
   const forceUnlock = useMutation({
@@ -319,6 +345,102 @@ export default function MatchingHubScreen() {
         </TouchableOpacity>
       </View>
 
+      {/* Music Affinity Stats */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Music Affinity</Text>
+        <View style={styles.musicCard}>
+          {/* KPI row: embedding coverage */}
+          <View style={styles.musicRow}>
+            <View style={styles.musicKpi}>
+              <Text style={styles.musicKpiValue}>{musicStats?.usersWithEmbedding ?? "—"}</Text>
+              <Text style={styles.musicKpiLabel}>Embedding</Text>
+            </View>
+            <View style={styles.musicKpi}>
+              <Text
+                style={[
+                  styles.musicKpiValue,
+                  { color: (musicStats?.coveragePct ?? 0) < 50 ? Colors.warning : Colors.success },
+                ]}
+              >
+                {musicStats != null ? `${musicStats.coveragePct}%` : "—"}
+              </Text>
+              <Text style={styles.musicKpiLabel}>Copertura</Text>
+            </View>
+            <View style={styles.musicKpi}>
+              <Text style={styles.musicKpiValue}>{musicStats?.totalMatchesInDb ?? "—"}</Text>
+              <Text style={styles.musicKpiLabel}>Match DB</Text>
+            </View>
+          </View>
+          {/* Last run detail */}
+          {musicStats?.lastRun ? (
+            <View style={styles.musicLastRunBox}>
+              <View style={styles.musicRunRow}>
+                <MaterialCommunityIcons
+                  name={musicStats.lastRun.capReached ? "alert-circle-outline" : "check-circle-outline"}
+                  size={14}
+                  color={musicStats.lastRun.capReached ? Colors.warning : Colors.success}
+                />
+                <Text style={[styles.musicRunText, musicStats.lastRun.capReached && { color: Colors.warning }]}>
+                  Ultimo run{musicStats.lastRun.capReached ? " · CAP RAGGIUNTO" : ""}
+                </Text>
+                <Text style={styles.musicRunTimestamp}>
+                  {new Date(musicStats.lastRun.timestamp).toLocaleString("it-IT", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
+                </Text>
+              </View>
+              <View style={styles.musicRunKpiRow}>
+                <View style={styles.musicRunKpi}>
+                  <Text style={styles.musicRunKpiVal}>{musicStats.lastRun.matchCount}</Text>
+                  <Text style={styles.musicRunKpiLbl}>match</Text>
+                </View>
+                <View style={styles.musicRunKpi}>
+                  <Text style={[styles.musicRunKpiVal, musicStats.lastRun.skippedBelowThreshold > 0 && { color: Colors.warning }]}>
+                    {musicStats.lastRun.skippedBelowThreshold}
+                  </Text>
+                  <Text style={styles.musicRunKpiLbl}>sotto soglia</Text>
+                </View>
+                <View style={styles.musicRunKpi}>
+                  <Text style={styles.musicRunKpiVal}>{musicStats.lastRun.usersProcessed}</Text>
+                  <Text style={styles.musicRunKpiLbl}>processati</Text>
+                </View>
+                <View style={styles.musicRunKpi}>
+                  <Text style={[styles.musicRunKpiVal, musicStats.lastRun.usersSkipped > 0 && { color: Colors.warning }]}>
+                    {musicStats.lastRun.usersSkipped}
+                  </Text>
+                  <Text style={styles.musicRunKpiLbl}>saltati</Text>
+                </View>
+              </View>
+            </View>
+          ) : (
+            <View style={styles.musicRunRow}>
+              <MaterialCommunityIcons name="information-outline" size={14} color={Colors.textSecondary} />
+              <Text style={styles.musicRunText}>Nessun run completato in questa sessione</Text>
+            </View>
+          )}
+          {/* Recent runs mini-list (last 5) */}
+          {musicStats && musicStats.recentRuns.length > 1 && (
+            <View style={styles.musicHistoryBox}>
+              <Text style={styles.musicHistoryTitle}>Ultimi run</Text>
+              {musicStats.recentRuns.slice(0, 5).map((run, idx) => (
+                <View key={idx} style={styles.musicHistoryRow}>
+                  <MaterialCommunityIcons
+                    name={run.capReached ? "alert-circle-outline" : "check-circle-outline"}
+                    size={12}
+                    color={run.capReached ? Colors.warning : Colors.textSecondary}
+                  />
+                  <Text style={styles.musicHistoryTime}>
+                    {new Date(run.timestamp).toLocaleString("it-IT", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
+                  </Text>
+                  <Text style={styles.musicHistoryStat}>{run.matchCount} match</Text>
+                  {run.skippedBelowThreshold > 0 && (
+                    <Text style={[styles.musicHistoryStat, { color: Colors.warning }]}>· {run.skippedBelowThreshold} soglia</Text>
+                  )}
+                </View>
+              ))}
+            </View>
+          )}
+        </View>
+      </View>
+
       {/* Quick links */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Sezioni Matching</Text>
@@ -414,6 +536,39 @@ const styles = StyleSheet.create({
   warnBadgeText: {
     fontFamily: "Inter_700Bold", fontSize: 10, color: Colors.warning, letterSpacing: 0.5,
   },
+  musicCard: {
+    backgroundColor: Colors.surface, borderRadius: 12, padding: 14,
+    borderWidth: 1, borderColor: Colors.border,
+  },
+  musicRow: { flexDirection: "row", gap: 8, marginBottom: 12 },
+  musicKpi: {
+    flex: 1, alignItems: "center", padding: 10,
+    backgroundColor: Colors.background, borderRadius: 8,
+  },
+  musicKpiValue: { fontFamily: "Inter_700Bold", fontSize: 18, color: Colors.text },
+  musicKpiLabel: { fontFamily: "Inter_400Regular", fontSize: 10, color: Colors.textSecondary, marginTop: 2 },
+  musicLastRunBox: {
+    marginTop: 10, padding: 10, backgroundColor: Colors.background,
+    borderRadius: 8, gap: 8,
+  },
+  musicRunRow: { flexDirection: "row", alignItems: "center", gap: 6 },
+  musicRunText: { fontFamily: "Inter_400Regular", fontSize: 11, color: Colors.textSecondary, flex: 1 },
+  musicRunTimestamp: { fontFamily: "Inter_400Regular", fontSize: 10, color: Colors.textSecondary },
+  musicRunKpiRow: { flexDirection: "row", gap: 6 },
+  musicRunKpi: {
+    flex: 1, alignItems: "center", padding: 6, backgroundColor: Colors.surface,
+    borderRadius: 6, borderWidth: 1, borderColor: Colors.border,
+  },
+  musicRunKpiVal: { fontFamily: "Inter_700Bold", fontSize: 14, color: Colors.text },
+  musicRunKpiLbl: { fontFamily: "Inter_400Regular", fontSize: 9, color: Colors.textSecondary, marginTop: 2 },
+  musicHistoryBox: { marginTop: 10, borderTopWidth: 1, borderTopColor: Colors.border, paddingTop: 8, gap: 4 },
+  musicHistoryTitle: {
+    fontFamily: "Inter_600SemiBold", fontSize: 10, color: Colors.textSecondary,
+    textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 2,
+  },
+  musicHistoryRow: { flexDirection: "row", alignItems: "center", gap: 6 },
+  musicHistoryTime: { fontFamily: "Inter_400Regular", fontSize: 10, color: Colors.textSecondary, width: 80 },
+  musicHistoryStat: { fontFamily: "Inter_500Medium", fontSize: 10, color: Colors.text },
   linksGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   linkCard: {
     width: "31%", aspectRatio: 1, backgroundColor: Colors.surface,

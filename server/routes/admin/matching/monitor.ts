@@ -16,7 +16,7 @@ import { sendSuccess, sendError } from "../../../lib/api-response";
 import { getMatchingLockState, getMatchingLockStatus, getLastCycleOutcome } from "../../../matching/scheduler";
 import { getLastMatchingCycleMeta } from "../../../matching-engine";
 import { getNotificationCycleStats, getLastWishlistCapStatus } from "../../../matching/run-matching";
-import { getLastMusicAffinityCapStatus } from "../../../matching/run-music-affinity";
+import { getLastMusicAffinityCapStatus, getMusicAffinityRunHistory } from "../../../matching/run-music-affinity";
 import { getAggregate, getRecentCycles } from "../../../matching/perf-metrics";
 import { getRedisStatus } from "../../../cache/redis";
 import { getLimiterStats } from "../../../lib/throttle";
@@ -220,6 +220,55 @@ router.get("/matching/monitor", async (_req: Request, res: Response) => {
   } catch (error) {
     console.error("[admin/matching/monitor] error:", error);
     return sendError(res, 500, "Errore lettura monitor matching");
+  }
+});
+
+router.get("/matching/music-affinity-stats", async (_req: Request, res: Response) => {
+  try {
+    const capStatus = getLastMusicAffinityCapStatus();
+    const runHistory = getMusicAffinityRunHistory();
+
+    const [embeddingRow, activeUsersRow, matchCountRow] = await Promise.all([
+      db.execute<{ cnt: string }>(sql`
+        SELECT COUNT(*)::text AS cnt
+        FROM embeddings e
+        INNER JOIN users u ON u.id = e.entity_id
+        WHERE e.entity_type = 'user'
+          AND e.field = 'music_taste'
+          AND u.is_fake = false
+          AND u.status = 'active'
+      `),
+      db.execute<{ cnt: string }>(sql`
+        SELECT COUNT(*)::text AS cnt
+        FROM users
+        WHERE is_fake = false AND status = 'active'
+      `),
+      db.execute<{ cnt: string }>(sql`
+        SELECT COUNT(*)::text AS cnt FROM music_affinity_matches
+      `),
+    ]);
+
+    const usersWithEmbedding = parseInt(embeddingRow.rows[0]?.cnt ?? "0", 10);
+    const totalActiveUsers = parseInt(activeUsersRow.rows[0]?.cnt ?? "0", 10);
+    const totalMatchesInDb = parseInt(matchCountRow.rows[0]?.cnt ?? "0", 10);
+    const coveragePct = totalActiveUsers > 0
+      ? Math.round((usersWithEmbedding / totalActiveUsers) * 100)
+      : 0;
+
+    const lastRun = runHistory.length > 0 ? runHistory[runHistory.length - 1] : null;
+
+    return sendSuccess(res, {
+      usersWithEmbedding,
+      totalActiveUsers,
+      coveragePct,
+      totalMatchesInDb,
+      lastRun,
+      recentRuns: runHistory.slice().reverse(),
+      sessionCapStatus: capStatus,
+    });
+  } catch (error) {
+    console.error("[admin/matching/music-affinity-stats] error:", error);
+    return sendError(res, 500, "Errore lettura statistiche music affinity");
   }
 });
 

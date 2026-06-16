@@ -176,11 +176,20 @@ export type MusicAffinityCapStatus = {
   capReached: boolean;
   usersProcessed: number;
   usersSkipped: number;
+  matchCount: number;
+  skippedBelowThreshold: number;
+  usersBlockedBySoglia: number;
   skipReasons: {
     capReached: number;
     noCandidate: number;
   };
 };
+
+export type MusicAffinityRunSnapshot = MusicAffinityCapStatus & {
+  timestamp: string;
+};
+
+const MAX_RUN_HISTORY = 20;
 
 /** Fallback identico al vecchio hardcoded — music affinity era 1000. */
 const DEFAULT_MUSIC_CAP = 1000;
@@ -190,10 +199,16 @@ let lastMusicAffinityCapStatus: MusicAffinityCapStatus = {
   capReached: false,
   usersProcessed: 0,
   usersSkipped: 0,
+  matchCount: 0,
+  skippedBelowThreshold: 0,
+  usersBlockedBySoglia: 0,
   skipReasons: { capReached: 0, noCandidate: 0 },
 };
 
+const musicAffinityRunHistory: MusicAffinityRunSnapshot[] = [];
+
 export function getLastMusicAffinityCapStatus(): MusicAffinityCapStatus { return lastMusicAffinityCapStatus; }
+export function getMusicAffinityRunHistory(): MusicAffinityRunSnapshot[] { return musicAffinityRunHistory.slice(); }
 
 async function loadMusicMatchingCap(): Promise<number> {
   try {
@@ -331,8 +346,16 @@ export async function runMusicAffinityMatching(): Promise<number> {
       capReached,
       usersProcessed,
       usersSkipped,
+      matchCount,
+      skippedBelowThreshold,
+      usersBlockedBySoglia,
       skipReasons: { capReached: usersSkipped, noCandidate: skipped },
     };
+
+    musicAffinityRunHistory.push({ ...lastMusicAffinityCapStatus, timestamp: new Date().toISOString() });
+    if (musicAffinityRunHistory.length > MAX_RUN_HISTORY) {
+      musicAffinityRunHistory.splice(0, musicAffinityRunHistory.length - MAX_RUN_HISTORY);
+    }
 
     return matchCount;
   } catch (err) {
