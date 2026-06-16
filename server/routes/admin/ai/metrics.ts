@@ -12,6 +12,7 @@ import { Router, type Request, type Response } from "express";
 import { db } from "../../../db";
 import { aiCallLogs } from "@shared/db";
 import { gte, desc, sql, and } from "drizzle-orm";
+import { sendError } from "../../../lib/api-response";
 
 const router = Router();
 
@@ -137,7 +138,7 @@ router.get("/metrics", async (req: Request, res: Response) => {
     });
   } catch (err) {
     console.error("[admin/ai/metrics]", err);
-    return res.status(500).json({ error: "Errore metriche AI" });
+    return sendError(res, 500, "Errore metriche AI");
   }
 });
 

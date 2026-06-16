@@ -13,6 +13,7 @@
  */
 
 import { Router, type Request, type Response } from "express";
+import { sendError } from "../../../lib/api-response";
 import { SELF_HOSTED_BASE_URL, isSelfHosted } from "../../../graphhopper-client";
 import {
   getRoutingAreaMode,
@@ -142,10 +143,10 @@ router.patch("/:code/enabled", async (req: Request, res: Response) => {
   const code = String(req.params.code);
   const { enabled } = req.body ?? {};
   if (typeof enabled !== "boolean") {
-    return res.status(400).json({ ok: false, message: "Campo 'enabled' (boolean) richiesto." });
+    return sendError(res, 400, "Campo 'enabled' (boolean) richiesto.");
   }
   if (!getRoutingArea(code)) {
-    return res.status(404).json({ ok: false, message: `Area sconosciuta: ${code}` });
+    return sendError(res, 404, `Area sconosciuta: ${code}`);
   }
   const map = await setAreaEnabled(code as RoutingAreaCode, enabled);
   return res.json({ ok: true, code, enabled, areas: map });

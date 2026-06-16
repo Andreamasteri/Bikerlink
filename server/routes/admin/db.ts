@@ -184,7 +184,7 @@ router.get("/db/table-sizes", async (_req: Request, res: Response) => {
 router.post("/db/vacuum-full", async (_req: Request, res: Response) => {
   try {
     if (isVacuumRunning()) {
-      return res.status(409).json({ ok: false, message: "VACUUM già in corso" });
+      return sendError(res, 409, "VACUUM già in corso");
     }
     runVacuumFullAll().catch((err: unknown) => {
       console.error("[admin/db/vacuum-full] background error:", err);

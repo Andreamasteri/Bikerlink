@@ -1,5 +1,6 @@
 import { Router, type Request, type Response } from "express";
 import { db } from "../../db";
+import { sendError } from "../../lib/api-response";
 import { diagnosticReports, diagnosticQueue } from "@shared/db";
 import { and, desc, eq, gt, isNull, lt, or, sql } from "drizzle-orm";
 import { storage } from "../../storage";
@@ -54,7 +55,7 @@ router.get("/diagnostic-reports", async (req: Request, res: Response) => {
     return res.json({ reports: enriched, total, page, limit });
   } catch (err) {
     console.error("[admin/diagnostic-reports] GET error:", err);
-    return res.status(500).json({ message: "Errore lettura report" });
+    return sendError(res, 500, "Errore lettura report");
   }
 });
 
@@ -64,7 +65,7 @@ router.post("/diagnostic-reports/trigger/:userId", async (req: Request, res: Res
     const showBanner = req.body?.showBanner === true;
 
     const user = await storage.getUser(userId);
-    if (!user) return res.status(404).json({ message: "Utente non trovato" });
+    if (!user) return sendError(res, 404, "Utente non trovato");
 
     const delivered = sendDiagnosticCommand(userId, showBanner);
 
@@ -82,7 +83,7 @@ router.post("/diagnostic-reports/trigger/:userId", async (req: Request, res: Res
     return res.json({ status: "sent", message: "Comando inviato" });
   } catch (err) {
     console.error("[admin/diagnostic-reports] trigger error:", err);
-    return res.status(500).json({ message: "Errore invio comando" });
+    return sendError(res, 500, "Errore invio comando");
   }
 });
 
@@ -92,7 +93,7 @@ router.get("/diagnostic-reports/online-users", (_req: Request, res: Response) =>
     return res.json({ users: onlineUsers });
   } catch (err) {
     console.error("[admin/diagnostic-reports] online-users error:", err);
-    return res.status(500).json({ message: "Errore" });
+    return sendError(res, 500, "Errore");
   }
 });
 
@@ -110,7 +111,7 @@ router.delete("/diagnostic-reports/cleanup", async (_req: Request, res: Response
     return res.json({ deleted: rowCount ?? 0 });
   } catch (err) {
     console.error("[admin/diagnostic-reports] cleanup error:", err);
-    return res.status(500).json({ message: "Errore pulizia" });
+    return sendError(res, 500, "Errore pulizia");
   }
 });
 

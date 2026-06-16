@@ -41,6 +41,7 @@ import {
   type ErrorEvent,
 } from "./thinkcentre-health-gh-probes";
 import { updateSystemStatus, type DotStatus as CachedDotStatus } from "../../lib/system-status-cache";
+import { sendError } from "../../lib/api-response";
 
 export type {
   ServiceHealth,
@@ -80,7 +81,7 @@ router.get("/thinkcentre-events", async (_req: Request, res: ExpressResponse) =>
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error("[admin/thinkcentre-events] errore:", msg);
-    return res.status(500).json({ error: "Errore recupero eventi ThinkCentre" });
+    return sendError(res, 500, "Errore recupero eventi ThinkCentre");
   }
 });
 
@@ -293,7 +294,7 @@ router.get("/thinkcentre-health", async (_req: Request, res: ExpressResponse) =>
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error("[admin/thinkcentre-health] errore:", msg);
-    return res.status(500).json({ error: "Errore probe servizi ThinkCentre" });
+    return sendError(res, 500, "Errore probe servizi ThinkCentre");
   }
 });
 

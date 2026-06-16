@@ -40,6 +40,7 @@ import { SELF_HOSTED_TILES_URL, isTilesSelfHosted } from "../../../../lib/map-ti
 import { SELF_HOSTED_BASE_URL, isSelfHosted } from "../../../graphhopper-client";
 import { ROUTING_AREAS, routingAreaUrl } from "@shared/routing-areas";
 import { updateSystemStatus } from "../../../lib/system-status-cache";
+import { sendError } from "../../../lib/api-response";
 
 const router = Router();
 
@@ -155,13 +156,10 @@ router.get("/status", async (_req: Request, res: Response) => {
 router.put("/kill-switch", async (req: Request, res: Response) => {
   const { enabled } = req.body ?? {};
   if (typeof enabled !== "boolean") {
-    return res.status(400).json({ ok: false, message: "Campo 'enabled' (boolean) richiesto." });
+    return sendError(res, 400, "Campo 'enabled' (boolean) richiesto.");
   }
   if (HARD_OFF) {
-    return res.status(409).json({
-      ok: false,
-      message: "ROUTING_DISABLED forza il routing SPENTO via env: rimuovi la variabile d'ambiente per riabilitare il toggle.",
-    });
+    return sendError(res, 409, "ROUTING_DISABLED forza il routing SPENTO via env: rimuovi la variabile d'ambiente per riabilitare il toggle.");
   }
   await setRoutingEnabled(enabled);
   const state = await getRoutingKillSwitchState();
@@ -248,19 +246,19 @@ router.put("/function-engines", async (req: Request, res: Response) => {
   const body = (req.body ?? {}) as Record<string, unknown>;
   const partial = body.config ?? body;
   if (!partial || typeof partial !== "object" || Array.isArray(partial)) {
-    return res.status(400).json({ ok: false, message: "Payload non valido: atteso un oggetto config." });
+    return sendError(res, 400, "Payload non valido: atteso un oggetto config.");
   }
   const known = new Set(ROUTING_FUNCTIONS.map((f) => f.id as string));
   const unknownKeys = Object.keys(partial).filter((k) => !known.has(k));
   if (unknownKeys.length > 0) {
-    return res.status(400).json({ ok: false, message: `Funzioni sconosciute: ${unknownKeys.join(", ")}.` });
+    return sendError(res, 400, `Funzioni sconosciute: ${unknownKeys.join(", ")}.`);
   }
   try {
     const config = await setFunctionEngineConfig(partial as Record<string, unknown>);
     return res.json({ ok: true, config });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    return res.status(400).json({ ok: false, message: msg });
+    return sendError(res, 400, msg);
   }
 });
 

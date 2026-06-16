@@ -107,7 +107,7 @@ router.get("/time-profile-distribution", async (_req: Request, res: Response) =>
 
 router.post("/time-profile/run", async (_req: Request, res: Response) => {
   if (isTimeProfileJobRunning()) {
-    return res.status(409).json({ message: "Job profilo orario già in esecuzione." });
+    return sendError(res, 409, "Job profilo orario già in esecuzione.");
   }
   runUserTimeProfileJob().catch((err) =>
     console.error("[admin/time-profile/run] background error:", err)

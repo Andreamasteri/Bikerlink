@@ -305,11 +305,11 @@ router.put("/telemetry-target-km", async (req: Request, res: Response) => {
 
 router.post("/map-matching/run", async (_req: Request, res: Response) => {
   if (isMapMatchingRunning()) {
-    return res.status(409).json({ message: "Job map matching già in esecuzione." });
+    return sendError(res, 409, "Job map matching già in esecuzione.");
   }
   const ghConfigured = isSelfHosted || Boolean(process.env.GRAPHHOPPER_API_KEY);
   if (!ghConfigured) {
-    return res.status(503).json({ message: "GraphHopper non configurato (GRAPHHOPPER_URL o GRAPHHOPPER_API_KEY mancanti)." });
+    return sendError(res, 503, "GraphHopper non configurato (GRAPHHOPPER_URL o GRAPHHOPPER_API_KEY mancanti).");
   }
   runMapMatchingJob().catch((err) => {
     console.error("[admin/map-matching/run] background error:", err);
@@ -319,7 +319,7 @@ router.post("/map-matching/run", async (_req: Request, res: Response) => {
 
 router.post("/curvy-score/run", async (_req: Request, res: Response) => {
   if (isCurvyScoreJobRunning()) {
-    return res.status(409).json({ message: "Job curvy score già in esecuzione." });
+    return sendError(res, 409, "Job curvy score già in esecuzione.");
   }
   runCurvyScoreJob().catch((err) => {
     console.error("[admin/curvy-score/run] background error:", err);

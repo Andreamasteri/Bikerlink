@@ -1,5 +1,6 @@
 import { Router, Request, Response } from "express";
 import { TILE_PROVIDERS } from "../../../../lib/maps/tile-providers";
+import { sendError } from "../../../lib/api-response";
 
 const router = Router();
 
@@ -23,7 +24,7 @@ router.get("/tile-preview/:providerId/:z/:x/:y", async (req: Request, res: Respo
 
   const provider = TILE_PROVIDERS.find((p) => p.id === providerId);
   if (!provider) {
-    return res.status(404).json({ error: "Provider not found" });
+    return sendError(res, 404, "Provider not found");
   }
 
   let apiKey: string | undefined;
@@ -51,7 +52,7 @@ router.get("/tile-preview/:providerId/:z/:x/:y", async (req: Request, res: Respo
     });
 
     if (!upstream.ok) {
-      return res.status(502).json({ error: `Upstream ${upstream.status}` });
+      return sendError(res, 502, `Upstream ${upstream.status}`);
     }
 
     const contentType = upstream.headers.get("content-type") ?? "image/png";
@@ -63,7 +64,7 @@ router.get("/tile-preview/:providerId/:z/:x/:y", async (req: Request, res: Respo
     res.set("Cache-Control", "public, max-age=300");
     return res.send(buffer);
   } catch {
-    return res.status(502).json({ error: "Fetch failed" });
+    return sendError(res, 502, "Fetch failed");
   }
 });
 

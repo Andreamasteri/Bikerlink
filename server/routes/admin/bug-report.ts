@@ -4,6 +4,7 @@
 import { Router, type Request, type Response } from "express";
 import { db } from "../../db";
 import { sql } from "drizzle-orm";
+import { sendError } from "../../lib/api-response";
 
 const router = Router();
 
@@ -118,7 +119,7 @@ router.get("/bug-report/recent", async (_req: Request, res: Response) => {
   res.json({ items, total: items.length });
   } catch (err) {
     console.error("[bug-report] unexpected error:", err);
-    res.status(500).json({ error: "Errore interno" });
+    sendError(res, 500, "Errore interno");
   }
 });
 
@@ -150,7 +151,7 @@ router.delete("/bug-report/recent", async (_req: Request, res: Response) => {
     res.json({ ok: true, deleted });
   } catch (err) {
     console.error("[bug-report] delete error:", err);
-    res.status(500).json({ error: "Errore interno" });
+    sendError(res, 500, "Errore interno");
   }
 });
 
