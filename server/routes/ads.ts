@@ -10,25 +10,49 @@ const ADS_BACKUP_PREFIX = ".private/ads-backup/";
 const router = Router();
 
 /**
+ * Module-level promise that resolves once warmupAdImageCache() has finished
+ * (whether successfully or with an error). cleanupOrphanedAdImages() awaits
+ * this before performing any deletion, so the two operations are always
+ * sequenced correctly regardless of boot timing.
+ */
+let _warmupResolve: (() => void) | null = null;
+const _warmupDone: Promise<void> = new Promise<void>((resolve) => {
+  _warmupResolve = resolve;
+});
+
+/**
  * Pre-warm the local disk cache for ad images at server startup.
  * Downloads any active campaign image not already present in uploads/ads/.
  * Runs fully in the background — errors are logged but never thrown.
+ * Resolves the module-level _warmupDone promise when complete (even on error).
  */
 export async function warmupAdImageCache(): Promise<void> {
   try {
-    const campaigns = await storage.getActiveCampaigns();
+    const allCampaigns = await storage.getAllCampaigns();
+    const activeCampaigns = allCampaigns.filter((c) => c.isActive);
+    const withImage = activeCampaigns.filter((c) => !!c.imageUrl);
+    console.log(
+      `[ADS WARMUP] Start — campagne totali: ${allCampaigns.length}, attive: ${activeCampaigns.length}, con immagine: ${withImage.length}`,
+    );
+
     const localDir = path.resolve(process.cwd(), "uploads", "ads");
     fs.mkdirSync(localDir, { recursive: true });
 
     let downloaded = 0;
     let skipped = 0;
+    let failed = 0;
 
-    for (const campaign of campaigns) {
-      if (!campaign.imageUrl) continue;
-      const match = campaign.imageUrl.match(/\/api\/ads\/images\/([^?#]+)/);
-      if (!match) continue;
+    for (const campaign of withImage) {
+      const match = campaign.imageUrl!.match(/\/api\/ads\/images\/([^?#]+)/);
+      if (!match) {
+        console.warn(`[ADS WARMUP] Skip campagna "${campaign.name}" (id=${campaign.id}) — imageUrl non riconosciuto: ${campaign.imageUrl}`);
+        continue;
+      }
       const filename = match[1];
-      if (!filename || filename.includes("..") || filename.includes("/")) continue;
+      if (!filename || filename.includes("..") || filename.includes("/")) {
+        console.warn(`[ADS WARMUP] Skip filename non sicuro: "${filename}"`);
+        continue;
+      }
 
       const localPath = path.join(localDir, filename);
       if (fs.existsSync(localPath)) {
@@ -44,14 +68,17 @@ export async function warmupAdImageCache(): Promise<void> {
           const buffer = await downloadBuffer(`public/ads/${filename}`);
           fs.writeFileSync(localPath, buffer);
           downloaded++;
-          console.log(`[ADS WARMUP] Cached: ${filename}${attempt > 0 ? ` (attempt ${attempt + 1})` : ""}`);
+          console.log(`[ADS WARMUP] Ripristinata: ${filename} (campagna "${campaign.name}")${attempt > 0 ? ` al tentativo ${attempt + 1}` : ""}`);
           ok = true;
           break;
         } catch (err) {
           lastErr = err;
           if (attempt < WARMUP_BACKOFF_MS.length) {
             const delay = WARMUP_BACKOFF_MS[attempt];
-            console.warn(`[ADS WARMUP] Retry ${attempt + 1}/${WARMUP_BACKOFF_MS.length} per ${filename} tra ${delay}ms:`, (err as Error)?.message);
+            console.warn(
+              `[ADS WARMUP] Retry ${attempt + 1}/${WARMUP_BACKOFF_MS.length} per "${filename}" tra ${delay}ms:`,
+              (err as Error)?.message,
+            );
             await new Promise((r) => setTimeout(r, delay));
           }
         }
@@ -66,19 +93,25 @@ export async function warmupAdImageCache(): Promise<void> {
           console.log(`[ADS WARMUP] AUTO-RESTORE da backup: ${filename} — campagna "${campaign.name}" ripristinata automaticamente`);
           ok = true;
         } catch (_backupErr) {
+          failed++;
           console.error(
-            `[ADS WARMUP] IMMAGINE ROTTA — campagna "${campaign.name}" (id=${campaign.id}): ` +
-            `il file ${filename} non esiste su Object Storage né nel backup .private/ads-backup/ dopo ${WARMUP_BACKOFF_MS.length + 1} tentativi. ` +
-            `Vai su /admin/ads → ricarica l'immagine.`,
+            `[ADS WARMUP] IMMAGINE NON TROVATA IN OBJECT STORAGE — campagna "${campaign.name}" (id=${campaign.id}): ` +
+            `"${filename}" assente da Object Storage e da backup .private/ads-backup/ dopo ${WARMUP_BACKOFF_MS.length + 1} tentativi. ` +
+            `Vai su /admin/ads → modifica la campagna → ricarica l'immagine.`,
             lastErr,
           );
         }
       }
     }
 
-    console.log(`[ADS WARMUP] Done — downloaded: ${downloaded}, already cached: ${skipped}`);
+    console.log(
+      `[ADS WARMUP] Completato — ripristinate: ${downloaded}, già in cache: ${skipped}, fallite: ${failed}`,
+    );
   } catch (err) {
-    console.warn("[ADS WARMUP] Warmup failed (non-fatal):", err);
+    console.warn("[ADS WARMUP] Warmup fallito (non bloccante):", err);
+  } finally {
+    _warmupResolve?.();
+    _warmupResolve = null;
   }
 }
 
@@ -119,9 +152,23 @@ export async function cacheAdImage(imageUrl: string | null | undefined): Promise
 /**
  * Delete files in uploads/ads/ that are not referenced by any campaign in the DB.
  * Runs on a daily schedule — errors are logged but never thrown.
+ *
+ * BOOT-ORDER SAFETY: always awaits warmupAdImageCache() completion (with a
+ * 3-minute timeout) before performing any deletion. This prevents a race where
+ * the cleanup fires before warmup finishes restoring files from Object Storage.
+ *
+ * EMPTY-SET GUARD: if getAllCampaigns() returns 0 campaigns and there are files
+ * in Object Storage, the sweep is skipped entirely. An empty reference set most
+ * likely indicates a transient DB error, not a genuine "all campaigns deleted"
+ * state — better to leave a few orphans than to wipe real images.
  */
 export async function cleanupOrphanedAdImages(): Promise<void> {
   try {
+    // Wait for warmup to finish before we delete anything. Cap at 3 min so a
+    // stuck warmup doesn't block the cleanup job forever.
+    const warmupTimeout = new Promise<void>((resolve) => setTimeout(resolve, 3 * 60_000));
+    await Promise.race([_warmupDone, warmupTimeout]);
+
     const localDir = path.resolve(process.cwd(), "uploads", "ads");
 
     // Protect images from ALL campaigns (active + inactive). Only campaigns
@@ -153,6 +200,10 @@ export async function cleanupOrphanedAdImages(): Promise<void> {
       }
     }
 
+    console.log(
+      `[ADS CLEANUP] Start — campagne in DB: ${allCampaigns.length}, filename referenziati: ${referencedFilenames.size}`,
+    );
+
     // Local-cache sweep — skipped if the directory doesn't exist yet, but the
     // object-storage sweep below always runs regardless of local-dir state.
     if (fs.existsSync(localDir)) {
@@ -163,41 +214,59 @@ export async function cleanupOrphanedAdImages(): Promise<void> {
         try {
           fs.unlinkSync(path.join(localDir, file));
           removed++;
-          console.log(`[ADS CLEANUP] Removed orphaned local cache: ${file}`);
+          console.log(`[ADS CLEANUP] Rimosso cache locale orfana: ${file}`);
         } catch (unlinkErr) {
-          console.warn(`[ADS CLEANUP] Failed to remove local ${file} (non-fatal):`, unlinkErr);
+          console.warn(`[ADS CLEANUP] Impossibile rimuovere locale ${file} (non-fatal):`, unlinkErr);
         }
       }
-      console.log(`[ADS CLEANUP] Local cache — removed: ${removed}, kept: ${referencedFilenames.size} referenced`);
+      console.log(`[ADS CLEANUP] Cache locale — rimossi: ${removed}, mantenuti: ${referencedFilenames.size} referenziati`);
     } else {
-      console.log("[ADS CLEANUP] Local cache dir not found — skipping disk sweep, continuing with object storage");
+      console.log("[ADS CLEANUP] Directory locale non trovata — skip disk sweep, continuo con Object Storage");
     }
 
     // Also remove orphaned files from object storage (public/ads/).
     // This covers images replaced/deleted before the per-operation deleteObject
     // calls were added — those files were never cleaned from the primary store.
+    //
+    // SAFETY GUARD: if no campaigns are in DB and there are files to sweep,
+    // skip the object-storage deletion. An empty campaign list is almost always
+    // a transient DB issue — deleting everything would destroy real images that
+    // can never be recovered. Log a warning instead and retry on the next run.
     try {
       const objectFiles = await listObjects("public/ads/");
+      const sweepableFiles = objectFiles.filter((obj) => {
+        const filename = obj.name.slice("public/ads/".length);
+        return !!filename && !filename.includes("/") && !referencedFilenames.has(filename);
+      });
+
+      if (referencedFilenames.size === 0 && sweepableFiles.length > 0) {
+        console.warn(
+          `[ADS CLEANUP] SKIP Object Storage sweep — getAllCampaigns() ha restituito 0 campagne ma ci sono ` +
+          `${sweepableFiles.length} file orfani in Object Storage. ` +
+          `Probabilmente blip DB temporaneo: i file vengono preservati fino al prossimo ciclo.`,
+        );
+        return;
+      }
+
       let objectRemoved = 0;
       for (const obj of objectFiles) {
-        // obj.name is the full path, e.g. "public/ads/1234567890-abc123.webp"
         const filename = obj.name.slice("public/ads/".length);
         if (!filename || filename.includes("/")) continue; // skip sub-prefixes
         if (referencedFilenames.has(filename)) continue;
         try {
           await deleteObject(obj.name);
           objectRemoved++;
-          console.log(`[ADS CLEANUP] Removed orphaned object: ${obj.name}`);
+          console.log(`[ADS CLEANUP] Rimosso oggetto orfano: ${obj.name}`);
         } catch (deleteErr) {
-          console.warn(`[ADS CLEANUP] Failed to remove object ${obj.name} (non-fatal):`, deleteErr);
+          console.warn(`[ADS CLEANUP] Impossibile rimuovere oggetto ${obj.name} (non-fatal):`, deleteErr);
         }
       }
-      console.log(`[ADS CLEANUP] Object storage — removed: ${objectRemoved}`);
+      console.log(`[ADS CLEANUP] Object Storage — rimossi: ${objectRemoved}`);
     } catch (objErr) {
-      console.warn("[ADS CLEANUP] Object storage sweep failed (non-fatal):", objErr);
+      console.warn("[ADS CLEANUP] Object Storage sweep fallito (non-fatal):", objErr);
     }
   } catch (err) {
-    console.warn("[ADS CLEANUP] Cleanup failed (non-fatal):", err);
+    console.warn("[ADS CLEANUP] Cleanup fallito (non-fatal):", err);
   }
 }
 
