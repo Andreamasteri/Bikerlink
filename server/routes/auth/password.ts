@@ -5,6 +5,7 @@ import rateLimit from "express-rate-limit";
 // @ts-ignore
 import signature from "cookie-signature";
 import { storage } from "../../storage";
+import { withDbTimeout, DbTimeoutError } from "../../db";
 import { sendPasswordResetEmail, sendPasswordResetConfirmationEmail } from "../../email";
 import { revokeAllUserSessions } from "../../session-utils";
 import { closeSseClient } from "../../chat-sse";
@@ -55,19 +56,19 @@ router.post("/forgot-password", forgotPasswordLimiter, async (req: Request, res:
       return sendError(res, 400, "Inserisci un'email valida");
     }
 
-    const user = await storage.getUserByEmail(email.trim().toLowerCase());
+    const user = await withDbTimeout(storage.getUserByEmail(email.trim().toLowerCase()));
     if (!user) {
       return sendSuccess(res, undefined, "Se l'email è registrata, riceverai un codice di recupero");
     }
 
     const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
-    await storage.deletePasswordResetTokens(user.id);
+    await withDbTimeout(storage.deletePasswordResetTokens(user.id));
 
     let code = "";
     for (let attempt = 0; attempt < 5; attempt++) {
       code = String(crypto.randomInt(10000000, 100000000));
       try {
-        await storage.createPasswordResetToken(user.id, code, expiresAt);
+        await withDbTimeout(storage.createPasswordResetToken(user.id, code, expiresAt));
         break;
       } catch (e: unknown) {
         if (attempt === 4) throw e;
@@ -83,6 +84,13 @@ router.post("/forgot-password", forgotPasswordLimiter, async (req: Request, res:
 
     return sendSuccess(res, undefined, "Se l'email è registrata, riceverai un codice di recupero");
   } catch (error) {
+    const isPgStatementTimeout =
+      error instanceof Error &&
+      (error as unknown as { code?: string }).code === "57014";
+    if (error instanceof DbTimeoutError || isPgStatementTimeout) {
+      console.error("[forgot-password] DB timeout:", (error as Error).message);
+      return sendError(res, 503, "Servizio temporaneamente non disponibile. Riprova.");
+    }
     console.error("Forgot password error:", error);
     return sendError(res, 500, "Errore interno del server");
   }
@@ -103,7 +111,7 @@ router.post("/reset-password", resetPasswordLimiter, async (req: Request, res: R
       return sendError(res, 400, "La password deve avere almeno 8 caratteri");
     }
 
-    const user = await storage.getUserByEmail(email.trim().toLowerCase());
+    const user = await withDbTimeout(storage.getUserByEmail(email.trim().toLowerCase()));
     if (!user) {
       return sendError(res, 400, "Codice non valido o scaduto");
     }
@@ -112,7 +120,7 @@ router.post("/reset-password", resetPasswordLimiter, async (req: Request, res: R
       return sendError(res, 403, "Account sospeso o bloccato");
     }
 
-    const resetToken = await storage.getPasswordResetTokenByCode(user.id, String(code).trim());
+    const resetToken = await withDbTimeout(storage.getPasswordResetTokenByCode(user.id, String(code).trim()));
     if (!resetToken) {
       return sendError(res, 400, "Codice non valido o già utilizzato");
     }
@@ -134,8 +142,8 @@ router.post("/reset-password", resetPasswordLimiter, async (req: Request, res: R
     }
 
     const hashedPassword = await bcrypt.hash(password, 12);
-    await storage.updateUser(user.id, { password: hashedPassword });
-    await storage.markPasswordResetTokenUsedById(resetToken.id);
+    await withDbTimeout(storage.updateUser(user.id, { password: hashedPassword }));
+    await withDbTimeout(storage.markPasswordResetTokenUsedById(resetToken.id));
 
     req.session.userId = user.id;
     await new Promise<void>((resolve, reject) => {
@@ -149,6 +157,13 @@ router.post("/reset-password", resetPasswordLimiter, async (req: Request, res: R
     const { password: _, ...safeUser } = user;
     return res.json({ ...safeUser, passwordReset: true, sessionToken: buildSessionToken(req.sessionID) });
   } catch (error) {
+    const isPgStatementTimeout =
+      error instanceof Error &&
+      (error as unknown as { code?: string }).code === "57014";
+    if (error instanceof DbTimeoutError || isPgStatementTimeout) {
+      console.error("[reset-password] DB timeout:", (error as Error).message);
+      return sendError(res, 503, "Servizio temporaneamente non disponibile. Riprova.");
+    }
     console.error("Reset password error:", error);
     return sendError(res, 500, "Errore interno del server");
   }
@@ -161,19 +176,19 @@ router.post("/resend-reset-code", resendResetLimiter, async (req: Request, res: 
       return sendError(res, 400, "Email richiesta");
     }
 
-    const user = await storage.getUserByEmail(email.trim().toLowerCase());
+    const user = await withDbTimeout(storage.getUserByEmail(email.trim().toLowerCase()));
     if (!user) {
       return sendSuccess(res, undefined, "Se l'email è registrata, riceverai un nuovo codice");
     }
 
     const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
-    await storage.deletePasswordResetTokens(user.id);
+    await withDbTimeout(storage.deletePasswordResetTokens(user.id));
 
     let code = "";
     for (let attempt = 0; attempt < 5; attempt++) {
       code = String(crypto.randomInt(10000000, 100000000));
       try {
-        await storage.createPasswordResetToken(user.id, code, expiresAt);
+        await withDbTimeout(storage.createPasswordResetToken(user.id, code, expiresAt));
         break;
       } catch (e: unknown) {
         if (attempt === 4) throw e;
@@ -187,6 +202,13 @@ router.post("/resend-reset-code", resendResetLimiter, async (req: Request, res: 
 
     return sendSuccess(res, undefined, "Se l'email è registrata, riceverai un nuovo codice");
   } catch (error) {
+    const isPgStatementTimeout =
+      error instanceof Error &&
+      (error as unknown as { code?: string }).code === "57014";
+    if (error instanceof DbTimeoutError || isPgStatementTimeout) {
+      console.error("[resend-reset-code] DB timeout:", (error as Error).message);
+      return sendError(res, 503, "Servizio temporaneamente non disponibile. Riprova.");
+    }
     console.error("Resend reset code error:", error);
     return sendError(res, 500, "Errore interno del server");
   }

@@ -1,7 +1,7 @@
 import { sendError } from "../../lib/api-response";
 import { Router, type Request, type Response } from "express";
 import crypto from "crypto";
-import { db } from "../../db";
+import { db, withDbTimeout, DbTimeoutError } from "../../db";
 import { matchPreferences } from "@shared/db";
 import rateLimit, { MemoryStore } from "express-rate-limit";
 import { registerSchema } from "@shared/validators";
@@ -125,7 +125,7 @@ router.post("/register", registerLimiter, async (req: Request, res: Response) =>
       return sendError(res, 403, "Registrazione non consentita");
     }
 
-    const existingEmail = await storage.getUserByEmail(data.email);
+    const existingEmail = await withDbTimeout(storage.getUserByEmail(data.email));
     if (existingEmail) {
       return sendError(res, 409, "Email già registrata");
     }
@@ -135,7 +135,7 @@ router.post("/register", registerLimiter, async (req: Request, res: Response) =>
       return sendError(res, 400, "Nickname non disponibile");
     }
 
-    const existingNickname = await storage.getUserByNickname(data.nickname);
+    const existingNickname = await withDbTimeout(storage.getUserByNickname(data.nickname));
     if (existingNickname) {
       return sendError(res, 409, "Nickname già in uso");
     }
@@ -144,14 +144,14 @@ router.post("/register", registerLimiter, async (req: Request, res: Response) =>
     let invitationImageUrl: string | null = null;
     let invitationCodeStr: string | null = null;
     if (data.invitationCode) {
-      const invitation = await storage.getInvitationCode(data.invitationCode);
+      const invitation = await withDbTimeout(storage.getInvitationCode(data.invitationCode));
       if (!invitation || !invitation.isActive || invitation.currentUses >= invitation.maxUses) {
         return sendError(res, 400, "Codice invito non valido");
       }
       if (invitation.expiresAt && new Date(invitation.expiresAt) < new Date()) {
         return sendError(res, 400, "Codice invito scaduto");
       }
-      await storage.incrementInvitationCodeUses(invitation.id);
+      await withDbTimeout(storage.incrementInvitationCodeUses(invitation.id));
       invitationGiftMessage = invitation.giftMessage ?? null;
       invitationImageUrl = invitation.imageUrl ?? null;
       invitationCodeStr = invitation.code;
@@ -159,10 +159,10 @@ router.post("/register", registerLimiter, async (req: Request, res: Response) =>
 
     const hashedPassword = await bcrypt.hash(data.password, 12);
 
-    const primalSetting = await storage.getAppSetting("primal_user_enabled");
+    const primalSetting = await withDbTimeout(storage.getAppSetting("primal_user_enabled"));
     const isPrimal = primalSetting?.value === "true";
 
-    const user = await storage.createUser({
+    const user = await withDbTimeout(storage.createUser({
       nickname: data.nickname,
       email: data.email,
       phone: data.phone,
@@ -179,9 +179,9 @@ router.post("/register", registerLimiter, async (req: Request, res: Response) =>
       consentAcceptedAt: new Date(),
       invitationCode: data.invitationCode,
       isPrimal,
-    });
+    }));
 
-    await storage.createUserProfile({ userId: user.id });
+    await withDbTimeout(storage.createUserProfile({ userId: user.id }));
 
     // Crea subito la riga match_preferences con i valori di default: il motore
     // di matching vede il nuovo utente senza aspettare che salvi manualmente le
@@ -234,13 +234,13 @@ router.post("/register", registerLimiter, async (req: Request, res: Response) =>
       }
     }
 
-    const emailVerifSetting = await storage.getAppSetting("email_verification_enabled");
+    const emailVerifSetting = await withDbTimeout(storage.getAppSetting("email_verification_enabled"));
     const emailVerificationEnabled = emailVerifSetting?.value === "true";
 
     if (emailVerificationEnabled && !isPrimal) {
       const token = crypto.randomBytes(4).toString("hex").toUpperCase();
       const expiresAt = new Date(Date.now() + 30 * 60 * 1000);
-      await storage.createEmailVerificationToken(user.id, token, expiresAt);
+      await withDbTimeout(storage.createEmailVerificationToken(user.id, token, expiresAt));
       const emailSent = await sendVerificationEmail(user.email, user.nickname, token);
       if (emailSent) {
         console.log(`[EMAIL VERIFICATION] Email inviata a utente ${user.id}`);
@@ -250,8 +250,8 @@ router.post("/register", registerLimiter, async (req: Request, res: Response) =>
 
       let emailStatusMsg = " (email inviata)";
       if (!emailSent) {
-        const errCode = (await storage.getAppSetting("email_last_send_error_code").catch(() => undefined))?.value || "other";
-        const errMsg = (await storage.getAppSetting("email_last_send_error").catch(() => undefined))?.value || "errore sconosciuto";
+        const errCode = (await withDbTimeout(storage.getAppSetting("email_last_send_error_code")).catch(() => undefined))?.value || "other";
+        const errMsg = (await withDbTimeout(storage.getAppSetting("email_last_send_error")).catch(() => undefined))?.value || "errore sconosciuto";
         const codeLabel: Record<string, string> = {
           "no-credentials": "credenziali Gmail non configurate",
           "auth": "autenticazione Gmail rifiutata (App Password revocata o errata)",
@@ -262,16 +262,16 @@ router.post("/register", registerLimiter, async (req: Request, res: Response) =>
       }
 
       try {
-        const adminUser = await storage.getUserByNickname("admin");
+        const adminUser = await withDbTimeout(storage.getUserByNickname("admin"));
         if (adminUser) {
-          await storage.createNotification({
+          await withDbTimeout(storage.createNotification({
             userId: adminUser.id,
             title: "Nuova registrazione - Verifica Email",
             body: `L'utente ${user.nickname} (ID: ${user.id}) si è registrato. Codice verifica: ${token}${emailStatusMsg}`,
             notificationType: "system",
             referenceType: "user",
             referenceId: user.id,
-          });
+          }));
         }
       } catch (e) {
         console.error("Failed to notify admin about email verification:", e);
@@ -282,7 +282,7 @@ router.post("/register", registerLimiter, async (req: Request, res: Response) =>
     }
 
     if (isPrimal) {
-      await storage.markUserEmailVerified(user.id);
+      await withDbTimeout(storage.markUserEmailVerified(user.id));
     }
 
     req.session.userId = user.id;
@@ -298,6 +298,13 @@ router.post("/register", registerLimiter, async (req: Request, res: Response) =>
     const { password: _, ...safeUser } = user;
     return res.status(201).json({ ...safeUser, giftMessage: invitationGiftMessage, sessionToken: buildSessionToken(req.sessionID) });
   } catch (error) {
+    const isPgStatementTimeout =
+      error instanceof Error &&
+      (error as unknown as { code?: string }).code === "57014";
+    if (error instanceof DbTimeoutError || isPgStatementTimeout) {
+      console.error("[register] DB timeout:", (error as Error).message);
+      return sendError(res, 503, "Servizio temporaneamente non disponibile. Riprova.");
+    }
     console.error("Register error:", error);
     return sendError(res, 500, "Errore interno del server");
   }
@@ -314,7 +321,7 @@ router.post("/verify-email", verifyEmailLimiter, async (req: Request, res: Respo
       return sendError(res, 400, "Codice non valido");
     }
 
-    const user = await storage.getUserByEmail(email.trim().toLowerCase());
+    const user = await withDbTimeout(storage.getUserByEmail(email.trim().toLowerCase()));
     if (!user) {
       return sendError(res, 400, "Codice non valido");
     }
@@ -328,7 +335,7 @@ router.post("/verify-email", verifyEmailLimiter, async (req: Request, res: Respo
       return sendError(res, 429, "Troppi tentativi. Richiedi un nuovo codice.");
     }
 
-    const verif = await storage.getEmailVerificationToken(normalizedToken);
+    const verif = await withDbTimeout(storage.getEmailVerificationToken(normalizedToken));
     if (!verif || verif.userId !== user.id) {
       const attempts = recordVerifyFailure(user.id);
       if (attempts >= VERIFY_MAX_ATTEMPTS) {
@@ -342,8 +349,8 @@ router.post("/verify-email", verifyEmailLimiter, async (req: Request, res: Respo
       return sendError(res, 400, "Codice scaduto. Richiedi un nuovo codice.");
     }
 
-    await storage.markUserEmailVerified(user.id);
-    await storage.deleteEmailVerificationTokens(user.id);
+    await withDbTimeout(storage.markUserEmailVerified(user.id));
+    await withDbTimeout(storage.deleteEmailVerificationTokens(user.id));
     clearVerifyAttempts(user.id);
 
     db.insert(matchPreferences)
@@ -358,6 +365,13 @@ router.post("/verify-email", verifyEmailLimiter, async (req: Request, res: Respo
     const { password: _, ...safeUser } = user;
     return res.json({ ...safeUser, emailVerified: true, sessionToken: buildSessionToken(req.sessionID) });
   } catch (error) {
+    const isPgStatementTimeout =
+      error instanceof Error &&
+      (error as unknown as { code?: string }).code === "57014";
+    if (error instanceof DbTimeoutError || isPgStatementTimeout) {
+      console.error("[verify-email] DB timeout:", (error as Error).message);
+      return sendError(res, 503, "Servizio temporaneamente non disponibile. Riprova.");
+    }
     console.error("Verify email error:", error);
     return sendError(res, 500, "Errore interno del server");
   }
@@ -372,16 +386,16 @@ router.post("/resend-verification", resendVerificationLimiter, async (req: Reque
 
     const genericResponse = { message: "Se l'email è registrata e in attesa di verifica, riceverai un nuovo codice." };
 
-    const user = await storage.getUserByEmail(email.trim().toLowerCase());
+    const user = await withDbTimeout(storage.getUserByEmail(email.trim().toLowerCase()));
     if (!user || user.emailVerified) {
       return res.json(genericResponse);
     }
 
-    await storage.deleteEmailVerificationTokens(user.id);
+    await withDbTimeout(storage.deleteEmailVerificationTokens(user.id));
     clearVerifyAttempts(user.id);
     const token = crypto.randomBytes(4).toString("hex").toUpperCase();
     const expiresAt = new Date(Date.now() + 30 * 60 * 1000);
-    await storage.createEmailVerificationToken(user.id, token, expiresAt);
+    await withDbTimeout(storage.createEmailVerificationToken(user.id, token, expiresAt));
     const emailSent = await sendVerificationEmail(user.email, user.nickname, token);
     if (!emailSent) {
       console.warn(`[EMAIL VERIFICATION] Resend: email NON inviata a utente ${user.id}`);
@@ -389,6 +403,13 @@ router.post("/resend-verification", resendVerificationLimiter, async (req: Reque
 
     return res.json(genericResponse);
   } catch (error) {
+    const isPgStatementTimeout =
+      error instanceof Error &&
+      (error as unknown as { code?: string }).code === "57014";
+    if (error instanceof DbTimeoutError || isPgStatementTimeout) {
+      console.error("[resend-verification] DB timeout:", (error as Error).message);
+      return sendError(res, 503, "Servizio temporaneamente non disponibile. Riprova.");
+    }
     console.error("Resend verification error:", error);
     return sendError(res, 500, "Errore interno del server");
   }
