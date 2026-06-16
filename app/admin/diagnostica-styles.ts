@@ -119,6 +119,37 @@ const s = StyleSheet.create({
   deviceCardBody: { marginTop: 10, gap: 2, paddingTop: 10, borderTopWidth: 1, borderTopColor: Colors.border },
   deviceSummaryLine: { fontSize: 12, color: Colors.text },
 
+  probeCard: {
+    backgroundColor: Colors.card, borderRadius: 10,
+    borderLeftWidth: 4, overflow: "hidden", marginBottom: 4,
+  },
+  probeHeader: {
+    flexDirection: "row", justifyContent: "space-between", alignItems: "center",
+    padding: 12, paddingBottom: 8,
+  },
+  probeHeaderLeft: { flexDirection: "row", alignItems: "center", gap: 7 },
+  probeTitle: { fontSize: 15, fontWeight: "700", color: Colors.text },
+  probeRunBtn: {
+    flexDirection: "row", alignItems: "center", gap: 5,
+    paddingHorizontal: 10, paddingVertical: 5, borderRadius: 7,
+    borderWidth: 1, borderColor: Colors.accent,
+  },
+  probeRunBtnText: { fontSize: 12, color: Colors.accent, fontWeight: "600" },
+  probeStatusRow: {
+    flexDirection: "row", alignItems: "center", gap: 7,
+    paddingHorizontal: 12, paddingBottom: 10,
+  },
+  probeStatusText: { fontSize: 16, fontWeight: "800" },
+  probeDur: { fontSize: 12, color: Colors.textSecondary },
+  probeTimestamp: { fontSize: 12, color: Colors.textSecondary },
+  probeSteps: { paddingHorizontal: 12, paddingBottom: 12, gap: 6 },
+  probeStepRow: { flexDirection: "row", alignItems: "flex-start", gap: 8 },
+  probeStepDot: { width: 8, height: 8, borderRadius: 4, marginTop: 4 },
+  probeStepName: { fontSize: 12, fontWeight: "500", color: Colors.text },
+  probeStepMsg: { fontSize: 11, color: Colors.textSecondary, marginTop: 1 },
+  probeStepDur: { fontSize: 11, minWidth: 48, textAlign: "right" as const },
+  probeNoData: { fontSize: 12, color: Colors.textSecondary, padding: 12 },
+
   liveDashboardBtn: {
     flexDirection: "row", alignItems: "center", gap: 6,
     paddingHorizontal: 12, paddingVertical: 6,

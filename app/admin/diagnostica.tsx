@@ -265,6 +265,124 @@ function TabRadiografia() {
   );
 }
 
+// ─────────────────────── Telemetry Probe Card (Monitor tab) ──────────────────
+
+function TelemetryProbeCard() {
+  const qc = useQueryClient();
+  const [runningProbe, setRunningProbe] = useState(false);
+
+  const { data: lastData, isLoading } = useQuery<{ result: PipelineRunResult | null; inProgress: boolean }>({
+    queryKey: ["/api/admin/pipeline-check/last"],
+    queryFn: async () => {
+      const r = await adminFetch("/api/admin/pipeline-check/last");
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      return r.json();
+    },
+    refetchInterval: 30_000,
+  });
+
+  const runMutation = useMutation({
+    mutationFn: async () => {
+      const r = await adminFetch("/api/admin/pipeline-check/run", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ scope: "telemetry_ride" }),
+      });
+      if (!r.ok) {
+        const body = await r.json().catch(() => ({})) as { error?: string };
+        throw new Error(body.error ?? `HTTP ${r.status}`);
+      }
+      return r.json() as Promise<PipelineRunResult>;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["/api/admin/pipeline-check/last"] });
+      setRunningProbe(false);
+    },
+    onError: () => { setRunningProbe(false); },
+  });
+
+  const telemetryResult = lastData?.result?.pipelines.find(p => p.pipeline === "telemetry_ride") ?? null;
+  const runAt = lastData?.result?.generatedAt ?? null;
+  const inProgress = runningProbe || lastData?.inProgress || runMutation.isPending;
+
+  const borderColor = telemetryResult
+    ? overallColor(telemetryResult.overall)
+    : Colors.border;
+
+  return (
+    <View style={[s.probeCard, { borderLeftColor: borderColor }]}>
+      {/* Header */}
+      <View style={s.probeHeader}>
+        <View style={s.probeHeaderLeft}>
+          <MaterialCommunityIcons name="road-variant" size={18} color={Colors.accent} />
+          <Text style={s.probeTitle}>Telemetria Ride</Text>
+        </View>
+        <TouchableOpacity
+          style={[s.probeRunBtn, inProgress && s.runButtonDisabled]}
+          onPress={() => { setRunningProbe(true); runMutation.mutate(); }}
+          disabled={inProgress}
+          activeOpacity={0.75}
+        >
+          {inProgress
+            ? <ActivityIndicator color={Colors.accent} size="small" />
+            : <Ionicons name="refresh" size={14} color={Colors.accent} />}
+          <Text style={s.probeRunBtnText}>{inProgress ? "In corso…" : "Riesegui"}</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Status badge + timestamp */}
+      {isLoading && !telemetryResult ? (
+        <ActivityIndicator color={Colors.accent} style={{ alignSelf: "flex-start", margin: 8 }} />
+      ) : telemetryResult ? (
+        <>
+          <View style={s.probeStatusRow}>
+            {telemetryResult.overall === "ok"
+              ? <Ionicons name="checkmark-circle" size={22} color="#22c55e" />
+              : <Ionicons name="close-circle" size={22} color="#ef4444" />}
+            <Text style={[s.probeStatusText, { color: overallColor(telemetryResult.overall) }]}>
+              {telemetryResult.overall === "ok" ? "PASS" : telemetryResult.overall === "degraded" ? "DEGRADED" : "FAIL"}
+            </Text>
+            <Text style={s.probeDur}>{telemetryResult.durationMs}ms</Text>
+            {runAt && (
+              <Text style={s.probeTimestamp}>· {timeAgo(runAt)} fa</Text>
+            )}
+          </View>
+
+          {/* Steps */}
+          <View style={s.probeSteps}>
+            {telemetryResult.steps.map((step, i) => (
+              <View key={i} style={s.probeStepRow}>
+                <View style={[s.probeStepDot, { backgroundColor: statusColor(step.status) }]} />
+                <View style={{ flex: 1 }}>
+                  <Text style={s.probeStepName}>{step.name}</Text>
+                  {step.message ? (
+                    <Text style={[s.probeStepMsg, step.status === "error" && { color: "#ef4444" }]}>
+                      {step.message}
+                    </Text>
+                  ) : null}
+                </View>
+                <Text style={[s.probeStepDur, { color: statusColor(step.status) }]}>
+                  {step.durationMs}ms
+                </Text>
+              </View>
+            ))}
+          </View>
+
+          {/* Suggested fix */}
+          {telemetryResult.suggestedFix && (
+            <View style={s.suggestedFix}>
+              <Ionicons name="bulb-outline" size={13} color="#f59e0b" />
+              <Text style={s.suggestedFixText}>{telemetryResult.suggestedFix}</Text>
+            </View>
+          )}
+        </>
+      ) : (
+        <Text style={s.probeNoData}>Nessuna run disponibile — premi Riesegui</Text>
+      )}
+    </View>
+  );
+}
+
 // ─────────────────────────────────── Tab 2: Monitor in corsa ─────────────────
 
 function HoleRow({ hole }: { hole: PipelineHole }) {
@@ -319,6 +437,9 @@ function TabMonitor({ onActiveCount }: { onActiveCount: (n: number) => void }) {
       contentContainerStyle={s.tabContent}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={Colors.accent} />}
     >
+      {/* Telemetry probe card — pinned at top */}
+      <TelemetryProbeCard />
+
       {/* Active holes */}
       <View style={s.sectionHeader}>
         <MaterialCommunityIcons name="alert-circle" size={16} color={active.length > 0 ? "#ef4444" : Colors.textSecondary} />
