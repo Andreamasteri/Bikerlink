@@ -143,29 +143,67 @@ if [ "$RATCHET_EXIT" -ne 0 ]; then
   exit "$RATCHET_EXIT"
 fi
 
-# ── GUARD PORTA DEPLOY (.replit) ─────────────────────────────
-# La porta di deploy DEVE essere 5000. Se qualcuno la cambia (es. PORT=8081)
-# il container Replit non risponde all'healthcheck → deploy fallisce in silenzio.
+# ── GUARD PORTE .replit (MAPPING [[ports]] + DEPLOY) ─────────
+# REGOLA BLOCCANTE (replit.md § Preferenze utente):
+# Nessun agente può modificare [[ports]] senza autorizzazione esplicita utente.
+# Mapping canonico immutabile:
+#   localPort=5000  → externalPort=80    (Express API, traffico pubblico)
+#   localPort=8081  → externalPort=8081  (probe deploy interno)
+#   localPort=8082  → externalPort=6000  (invariato)
+# Il comando [deployment] run DEVE contenere PORT=5000.
 echo "════════════════════════════════════════"
-echo "  Guard porta deploy (.replit)"
+echo "  Guard porte .replit ([[ports]] + deploy)"
 echo "════════════════════════════════════════"
-DEPLOY_PORT_OK=true
+PORT_OK=true
+
+# 1. Mapping [[ports]] — verifica configurazione canonica
+# Strategia: normalizza il file (rimuovi spazi attorno a =) e cerca le coppie
+# su righe adiacenti usando grep -A1.
+_REPLIT_NORM=$(tr -d ' ' < .replit 2>/dev/null)
+
+# Cerca blocco [[ports]] con localPort=5000 seguito da externalPort=80
+if ! printf '%s\n' "$_REPLIT_NORM" | grep -A1 'localPort=5000' | grep -q 'externalPort=80$'; then
+  echo "❌ ERRORE [[ports]]: localPort=5000 deve avere externalPort=80!"
+  echo "   (Express API deve ricevere il traffico pubblico HTTP)"
+  echo "   ⛔ REGOLA BLOCCANTE — modificare solo con autorizzazione esplicita utente."
+  PORT_OK=false
+else
+  echo "✅ [[ports]] localPort=5000 → externalPort=80: OK"
+fi
+
+# Cerca blocco [[ports]] con localPort=8081 seguito da externalPort=8081
+if ! printf '%s\n' "$_REPLIT_NORM" | grep -A1 'localPort=8081' | grep -q 'externalPort=8081$'; then
+  echo "❌ ERRORE [[ports]]: localPort=8081 deve avere externalPort=8081!"
+  echo "   (probe deploy isolato, non deve ricevere traffico pubblico)"
+  echo "   ⛔ REGOLA BLOCCANTE — modificare solo con autorizzazione esplicita utente."
+  PORT_OK=false
+else
+  echo "✅ [[ports]] localPort=8081 → externalPort=8081: OK"
+fi
+
+# 2. Comando [deployment] — PORT=5000 nel run
 if grep -q 'PORT=8081' .replit 2>/dev/null; then
-  echo "❌ ERRORE: .replit contiene PORT=8081 nel comando di deploy!"
+  echo "❌ ERRORE deploy: .replit contiene PORT=8081 nel comando run!"
   echo "   La porta di deploy DEVE essere PORT=5000."
-  echo "   Fix: cambia la riga 'run' in [deployment] da PORT=8081 a PORT=5000."
-  DEPLOY_PORT_OK=false
+  PORT_OK=false
 fi
 if ! grep -q 'PORT=5000' .replit 2>/dev/null; then
-  echo "❌ ERRORE: .replit non contiene PORT=5000 nel comando di deploy!"
+  echo "❌ ERRORE deploy: .replit non contiene PORT=5000 nel comando run!"
   echo "   Verifica la sezione [deployment] → run."
-  DEPLOY_PORT_OK=false
+  PORT_OK=false
 fi
-if [ "$DEPLOY_PORT_OK" = true ]; then
-  echo "✅ Porta deploy corretta: PORT=5000 (deploy stabile)."
+
+if [ "$PORT_OK" = true ]; then
+  echo "✅ Porte .replit corrette: [[ports]] canonico + deploy PORT=5000."
 else
-  echo "⚠️  Porta deploy errata rilevata — il prossimo publish fallirà."
-  echo "   Usa deployConfig() per correggere (non editare .replit direttamente)."
+  echo ""
+  echo "⛔ PORTE ERRATE — il deploy fallirà o le API non risponderanno."
+  echo "   Configurazione canonica richiesta:"
+  echo "     [[ports]] localPort=5000  → externalPort=80"
+  echo "     [[ports]] localPort=8081  → externalPort=8081"
+  echo "     [[ports]] localPort=8082  → externalPort=6000"
+  echo "     [deployment] run → PORT=5000"
+  echo "   Modificare SOLO con autorizzazione esplicita dell'utente."
 fi
 echo "════════════════════════════════════════"
 echo ""
