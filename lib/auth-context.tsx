@@ -178,7 +178,11 @@ function useRegisterMutation() {
       invitationCode?: string;
     }) => {
       const res = await apiRequest("POST", "/api/auth/register", data);
-      return await res.json();
+      try {
+        return await res.json();
+      } catch {
+        throw new Error("Errore di connessione al server. Riprova.");
+      }
     },
     onSuccess: async (response: unknown) => {
       const res = response as { requiresEmailVerification?: boolean; sessionToken?: string; [key: string]: unknown };
