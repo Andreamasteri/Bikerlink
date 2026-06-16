@@ -60,8 +60,6 @@ const KNOWN_UNMIGRATED_INDEXES = new Set<string>([
   // Indici aggiunti via drizzle-kit push senza migration numerata corrispondente.
   // Probabilmente già presenti in prod; non causano boot failure ma le migration
   // mancanti andrebbero aggiunte quando si ha l'occasione.
-  "match_zero_snapshots.match_zero_snapshots_created_idx",
-  "ai_messages.ai_messages_content_trgm_idx",
 ]);
 
 // ── Exported result type ────────────────────────────────────────────────────
