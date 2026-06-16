@@ -8,6 +8,7 @@ import {
   Switch,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 import Colors from "@/constants/colors";
 import { apiRequest, queryClient } from "@/lib/query-client";
@@ -50,6 +51,7 @@ type Props = { telemetryStats: TelemetryStats };
 export default function TelemetryPanel({ telemetryStats }: Props) {
   const { isAutoRiding, isCalibrated: ctxCalibrated, alwaysActive: ctxAlwaysActive } = useAutoTelemetry();
   const { focusTelemetry } = useLocalSearchParams<{ focusTelemetry?: string }>();
+  const router = useRouter();
 
   const [telemetryExpanded, setTelemetryExpanded] = useState(false);
   const [idealLapResetKey, setIdealLapResetKey] = useState(0);
@@ -62,8 +64,11 @@ export default function TelemetryPanel({ telemetryStats }: Props) {
   const [relaxedMode, setRelaxedMode] = useState(false);
 
   useEffect(() => {
-    if (focusTelemetry === "1") setTelemetryExpanded(true);
-  }, [focusTelemetry]);
+    if (focusTelemetry === "1") {
+      setTelemetryExpanded(true);
+      router.setParams({ focusTelemetry: undefined });
+    }
+  }, [focusTelemetry, router]);
 
   useEffect(() => {
     loadTelemetryAlwaysActive().then(setAlwaysActive).catch(() => {});
