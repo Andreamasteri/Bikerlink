@@ -85,7 +85,7 @@ router.post("/route-providers/test", async (req: Request, res: Response) => {
   try {
     if (provider === "ollama") {
       if (!isOllamaConfigured) {
-        res.json({ ok: false, latency_ms: 0, error: "OLLAMA_URL non configurata." });
+        res.json({ success: false, ok: false, latency_ms: 0, error: "OLLAMA_URL non configurata." });
         return;
       }
       const reply = await callOllamaChat(
@@ -93,41 +93,41 @@ router.post("/route-providers/test", async (req: Request, res: Response) => {
         undefined,
         { temperature: 0, maxRetries: 0 },
       );
-      res.json({ ok: true, latency_ms: Date.now() - start, reply: typeof reply === "string" ? reply.trim().slice(0, 120) : null });
+      res.json({ success: true, ok: true, latency_ms: Date.now() - start, reply: typeof reply === "string" ? reply.trim().slice(0, 120) : null });
       return;
     }
 
     if (provider === "groq") {
       if (!isGroqConfigured) {
-        res.json({ ok: false, latency_ms: 0, error: "GROQ_API_KEY non configurata." });
+        res.json({ success: false, ok: false, latency_ms: 0, error: "GROQ_API_KEY non configurata." });
         return;
       }
       const model = getGroqModel();
       const { text } = await generateText({ model, prompt: "Reply with only the word: PONG", maxRetries: 0 });
-      res.json({ ok: true, latency_ms: Date.now() - start, reply: text.trim().slice(0, 120) });
+      res.json({ success: true, ok: true, latency_ms: Date.now() - start, reply: text.trim().slice(0, 120) });
       return;
     }
 
     if (provider === "gemini") {
       const apiKey = process.env.GEMINI_API_KEY ?? process.env.GOOGLE_API_KEY ?? "";
       if (!apiKey) {
-        res.json({ ok: false, latency_ms: 0, error: "GEMINI_API_KEY (o GOOGLE_API_KEY) non configurata." });
+        res.json({ success: false, ok: false, latency_ms: 0, error: "GEMINI_API_KEY (o GOOGLE_API_KEY) non configurata." });
         return;
       }
       const model = createGoogleGenerativeAI({ apiKey })("gemini-2.0-flash");
       const { text } = await generateText({ model, prompt: "Reply with only the word: PONG", maxRetries: 0 });
-      res.json({ ok: true, latency_ms: Date.now() - start, reply: text.trim().slice(0, 120) });
+      res.json({ success: true, ok: true, latency_ms: Date.now() - start, reply: text.trim().slice(0, 120) });
       return;
     }
 
     if (provider === "openai") {
       if (!isOpenAiRouteConfigured) {
-        res.json({ ok: false, latency_ms: 0, error: "OPENAI_API_KEY non configurata." });
+        res.json({ success: false, ok: false, latency_ms: 0, error: "OPENAI_API_KEY non configurata." });
         return;
       }
       const model = getOpenAiRouteModel();
       const { text } = await generateText({ model, prompt: "Reply with only the word: PONG", maxRetries: 0 });
-      res.json({ ok: true, latency_ms: Date.now() - start, reply: text.trim().slice(0, 120) });
+      res.json({ success: true, ok: true, latency_ms: Date.now() - start, reply: text.trim().slice(0, 120) });
       return;
     }
   } catch (err: unknown) {
@@ -136,7 +136,7 @@ router.post("/route-providers/test", async (req: Request, res: Response) => {
     console.error(`[admin/ai/route-providers/test] ${provider} errore:`, msg);
     // Sempre 200 con ok:false — così il client può leggere latency_ms + error senza
     // dover gestire eccezioni dalla fetch (apiRequest lancia su status >= 400).
-    res.json({ ok: false, latency_ms, error: sanitizeError(msg) });
+    res.json({ success: false, ok: false, latency_ms, error: sanitizeError(msg) });
     return;
   }
 });
@@ -167,7 +167,7 @@ router.post("/route-providers/config", async (req: Request, res: Response) => {
   try {
     await setRouteProviderChain(parsed.data.chain);
     const data = await getRouteProviderStatusList();
-    res.json({ ok: true, ...data });
+    res.json({ success: true, ok: true, ...data });
   } catch (err) {
     console.error("[admin/ai/route-providers/config] POST error:", err);
     sendError(res, 500, (err as Error).message);
