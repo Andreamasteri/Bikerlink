@@ -1,11 +1,8 @@
-import React, { Suspense } from "react";
+import React from "react";
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import WebView from "react-native-webview";
 import Colors from "@/constants/colors";
-import { useRendererSelector } from "@/lib/maps/renderer-selector";
-
-const MapLibre3DRoutePreviewMap = React.lazy(() => import("@/components/MapLibre3DRoutePreviewMap"));
 
 interface Waypoint { id?: string; name?: string; lat?: number; lng?: number; type?: string }
 interface RouteMapPreviewProps {
@@ -22,11 +19,8 @@ interface RouteMapPreviewProps {
 
 export const RouteMapPreview: React.FC<RouteMapPreviewProps> = ({
   waypoints, curvatureMapHtml, webviewRef, handleMapLoaded,
-  routeStyle, setRouteStyle, isCalculatingRoute, routeStats, trackPoints3D,
+  routeStyle, setRouteStyle, isCalculatingRoute, routeStats,
 }) => {
-  const { shouldUseFull3d } = useRendererSelector();
-  const use3DPreview = shouldUseFull3d("preview") && (trackPoints3D?.length ?? 0) > 1;
-
   if (waypoints.length < 2) return null;
 
   const styleMeta = {
@@ -65,18 +59,7 @@ export const RouteMapPreview: React.FC<RouteMapPreviewProps> = ({
         </View>
       </View>
 
-      {use3DPreview && (
-        <View style={styles.section}>
-          <Text style={styles.sectionLabel}>Anteprima percorso 3D</Text>
-          <View style={styles.mapContainer}>
-            <Suspense fallback={<ActivityIndicator style={{ flex: 1 }} />}>
-              <MapLibre3DRoutePreviewMap trackPoints={trackPoints3D} height={200} />
-            </Suspense>
-          </View>
-        </View>
-      )}
-
-      {!use3DPreview && curvatureMapHtml !== "" && (
+      {curvatureMapHtml !== "" && (
         <View style={styles.section}>
           <Text style={styles.sectionLabel}>Anteprima percorso (curvatura)</Text>
           <View style={styles.mapContainer}>
