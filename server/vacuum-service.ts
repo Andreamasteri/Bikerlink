@@ -1,4 +1,5 @@
-import { pool } from "./db";
+import { db, pool } from "./db";
+import { sql } from "drizzle-orm";
 import { storage } from "./storage";
 
 const VACUUM_LAST_RUN_KEY = "db_vacuum_full_v3";
@@ -134,6 +135,50 @@ function formatRomeTime(date: Date): string {
   });
 }
 
+const AI_AUDIT_RETENTION_KEY = "ai_audit_retention_days";
+const AI_AUDIT_DEFAULT_RETENTION = 30;
+
+/**
+ * Cancella le righe `ai_token_audit_YYYY-MM-DD` da app_settings
+ * più vecchie di `retentionDays` giorni (default: 30, configurabile
+ * tramite AppSetting `ai_audit_retention_days`).
+ *
+ * Il pattern di matching usa il prefisso fisso + il formato data ISO
+ * (10 caratteri), quindi non tocca mai altre chiavi.
+ */
+export async function purgeOldAiAuditRows(): Promise<number> {
+  let retentionDays = AI_AUDIT_DEFAULT_RETENTION;
+  try {
+    const setting = await storage.getAppSetting(AI_AUDIT_RETENTION_KEY);
+    if (setting?.value) {
+      const parsed = parseInt(setting.value, 10);
+      if (!isNaN(parsed) && parsed > 0) retentionDays = parsed;
+    }
+  } catch {
+    // usa il default
+  }
+
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - retentionDays);
+  const cutoffStr = cutoff.toISOString().slice(0, 10); // YYYY-MM-DD
+
+  try {
+    const result = await db.execute(sql`
+      DELETE FROM app_settings
+      WHERE key LIKE 'ai_token_audit_%'
+        AND substring(key FROM 16 FOR 10) < ${cutoffStr}
+    `);
+    const deleted = (result as { rowCount?: number }).rowCount ?? 0;
+    console.log(
+      `[AI-AUDIT-PURGE] Eliminate ${deleted} righe ai_token_audit_* più vecchie di ${retentionDays} giorni (cutoff: ${cutoffStr})`,
+    );
+    return deleted;
+  } catch (err) {
+    console.error("[AI-AUDIT-PURGE] Errore durante la pulizia dei contatori AI:", err);
+    return 0;
+  }
+}
+
 export function scheduleNightlyVacuum(): void {
   if (process.env.DISABLE_NIGHTLY_VACUUM === "1") {
     console.log("[VACUUM] Scheduler notturno disabilitato (DISABLE_NIGHTLY_VACUUM=1).");
@@ -149,6 +194,12 @@ export function scheduleNightlyVacuum(): void {
       } catch (err) {
         console.error("[VACUUM] Errore nel giro notturno:", err);
       }
+    }
+    // Pulizia contatori AI indipendente dal vacuum principale
+    try {
+      await purgeOldAiAuditRows();
+    } catch (err) {
+      console.error("[AI-AUDIT-PURGE] Errore nel giro notturno:", err);
     }
     // Recalculate next 03:00 Europe/Rome from now (handles DST transitions correctly)
     const delayMs = msUntilNextRomeThreeAM();
