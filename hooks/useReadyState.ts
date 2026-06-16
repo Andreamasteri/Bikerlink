@@ -7,6 +7,10 @@ import { useAuth } from "@/lib/auth-context";
 import { useT } from "@/lib/language-context";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { MapTarget } from "@/components/ready/FakeZoneCoordPanel";
+import {
+  GPS_PRECISION_STORAGE_KEY,
+  restartBackgroundLocationTaskWithPrecision,
+} from "@/lib/background-location-task";
 
 export function useReadyState() {
   const { user } = useAuth();
@@ -154,7 +158,9 @@ export function useReadyState() {
     setFakeWhateverLatitude(p.fakeWhateverLatitude ?? null);
     setFakeWhateverLongitude(p.fakeWhateverLongitude ?? null);
     setFakeWhateverRadius(p.fakeWhateverRadius ?? 2);
-    setGpsPrecision(p.gpsPrecision ?? "balanced");
+    const precision = p.gpsPrecision ?? "balanced";
+    setGpsPrecision(precision);
+    AsyncStorage.setItem(GPS_PRECISION_STORAGE_KEY, precision).catch(() => {});
     setFixedPositionEnabled(p.fixedPositionEnabled ?? false);
     setFixedPositionLat(p.fixedPositionLat ?? null);
     setFixedPositionLng(p.fixedPositionLng ?? null);
@@ -243,6 +249,11 @@ export function useReadyState() {
         variables.fakeWhateverEnabled === true
       ) {
         repushLocation();
+      }
+      if (typeof variables.gpsPrecision === "string") {
+        const newPrecision = variables.gpsPrecision;
+        AsyncStorage.setItem(GPS_PRECISION_STORAGE_KEY, newPrecision).catch(() => {});
+        restartBackgroundLocationTaskWithPrecision(newPrecision).catch(() => {});
       }
     },
     onError: (_err: Error, variables: Record<string, unknown>) => {

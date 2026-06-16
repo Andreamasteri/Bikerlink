@@ -11,7 +11,10 @@ import {
   startBackgroundLocationTask,
   stopBackgroundLocationTask,
   isBackgroundLocationSupported,
+  gpsPrecisionToAccuracy,
+  GPS_PRECISION_STORAGE_KEY,
 } from "@/lib/background-location-task";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import Constants from "expo-constants";
 import { getDeviceModel } from "@/lib/device-model";
 
@@ -245,7 +248,24 @@ export function AppStateHandler() {
           // no-op: use default settings if fetch fails
         }
 
-        await startBackgroundLocationTask(intervalSeconds, notificationText);
+        let gpsPrecision = await AsyncStorage.getItem(GPS_PRECISION_STORAGE_KEY).catch(() => null);
+        if (!gpsPrecision) {
+          try {
+            const domain = process.env.EXPO_PUBLIC_DOMAIN || "biker-link.replit.app";
+            const meRes = await fetch(`https://${domain}/api/users/me`, { credentials: "include" });
+            if (meRes.ok) {
+              const meData = await meRes.json();
+              gpsPrecision = meData?.profile?.gpsPrecision ?? null;
+              if (gpsPrecision) {
+                await AsyncStorage.setItem(GPS_PRECISION_STORAGE_KEY, gpsPrecision).catch(() => {});
+              }
+            }
+          } catch {
+            // no-op: fallback to default
+          }
+        }
+        const bgAccuracy = gpsPrecisionToAccuracy(gpsPrecision ?? "balanced");
+        await startBackgroundLocationTask(intervalSeconds, notificationText, bgAccuracy);
         sendStartupBeacon("bg_location_task_started");
       } catch {
         // no-op: ignore background task start failures

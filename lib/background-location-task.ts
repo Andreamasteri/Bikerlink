@@ -3,10 +3,21 @@ import type { LocationObject } from "expo-location";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 export const BACKGROUND_LOCATION_TASK_NAME = "bikerlink-background-location";
+export const GPS_PRECISION_STORAGE_KEY = "@bikerlink/gps_precision";
 
 const SETTINGS_CACHE_KEY = "@bikerlink/bg_location_settings_cache";
 const SETTINGS_CACHE_TS_KEY = "@bikerlink/bg_location_settings_ts";
 const SETTINGS_TTL_MS = 5 * 60 * 1000;
+
+export function gpsPrecisionToAccuracy(precision: string): import("expo-location").LocationAccuracy {
+  const Location = require("expo-location") as typeof import("expo-location");
+  if (precision === "lowest") return Location.Accuracy.Lowest;
+  if (precision === "low") return Location.Accuracy.Low;
+  if (precision === "high") return Location.Accuracy.High;
+  if (precision === "highest") return Location.Accuracy.Highest;
+  if (precision === "bestForNavigation") return Location.Accuracy.BestForNavigation;
+  return Location.Accuracy.Balanced;
+}
 
 export async function isBackgroundLocationSupported(): Promise<boolean> {
   try {
@@ -20,7 +31,8 @@ export async function isBackgroundLocationSupported(): Promise<boolean> {
 
 export async function startBackgroundLocationTask(
   intervalSeconds: number,
-  notificationText: string
+  notificationText: string,
+  accuracy?: import("expo-location").LocationAccuracy
 ): Promise<boolean> {
   try {
     const Location = require("expo-location") as typeof import("expo-location");
@@ -32,8 +44,10 @@ export async function startBackgroundLocationTask(
 
     const body = notificationText.replace("{motivo}", "monitoraggio attivo");
 
+    const resolvedAccuracy = accuracy ?? Location.Accuracy.Balanced;
+
     await Location.startLocationUpdatesAsync(BACKGROUND_LOCATION_TASK_NAME, {
-      accuracy: Location.Accuracy.Balanced,
+      accuracy: resolvedAccuracy,
       timeInterval: intervalSeconds * 1000,
       distanceInterval: 10,
       foregroundService: {
@@ -44,6 +58,22 @@ export async function startBackgroundLocationTask(
       showsBackgroundLocationIndicator: true,
     });
     return true;
+  } catch {
+    return false;
+  }
+}
+
+export async function restartBackgroundLocationTaskWithPrecision(
+  precision: string
+): Promise<boolean> {
+  try {
+    await stopBackgroundLocationTask();
+    const domain = process.env.EXPO_PUBLIC_DOMAIN || "biker-link.replit.app";
+    const cached = await getCachedSettings();
+    const config = cached || (await fetchAndCacheSettings(domain));
+    if (!config.enabled) return false;
+    const accuracy = gpsPrecisionToAccuracy(precision);
+    return await startBackgroundLocationTask(config.intervalSeconds, config.notificationText, accuracy);
   } catch {
     return false;
   }
