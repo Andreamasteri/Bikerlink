@@ -7,10 +7,12 @@ import {
   Pressable,
   Dimensions,
   useWindowDimensions,
+  BackHandler,
+  Platform,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter, type Href } from "expo-router";
+import { useRouter, usePathname, type Href } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
@@ -26,12 +28,15 @@ import { useTheme } from "@/lib/theme-context";
 const WIDGET_SIZE = 48;
 const POSITION_KEY = "floating_widget_position";
 const TAP_THRESHOLD = 5;
+const SWIPE_DISMISS_THRESHOLD = 60;
+const SWIPE_VELOCITY_THRESHOLD = 500;
 
 export default function FloatingWidget() {
   const { isVisible, unreadChat, unreadNotifications, refetchBadges } = useFloatingWidget();
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const pathname = usePathname();
 
   const { width, height } = useWindowDimensions();
   const defaultX = width - WIDGET_SIZE - 16;
@@ -88,6 +93,7 @@ export default function FloatingWidget() {
   const startX = useSharedValue(defaultX);
   const startY = useSharedValue(defaultY);
   const menuOpacity = useSharedValue(0);
+  const menuTranslateY = useSharedValue(0);
   const menuOpenRef = useRef(false);
 
   useEffect(() => {
@@ -108,13 +114,6 @@ export default function FloatingWidget() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const openMenu = useCallback(() => {
-    refetchBadgesRef.current();
-    menuOpenRef.current = true;
-    setMenuOpen(true);
-    menuOpacity.value = withTiming(1, { duration: 150, easing: Easing.out(Easing.ease) });
-  }, [menuOpacity]);
-
   const closeMenuJS = useCallback(() => {
     menuOpenRef.current = false;
     setMenuOpen(false);
@@ -126,6 +125,22 @@ export default function FloatingWidget() {
       if (finished) runOnJS(closeMenuJS)();
     });
   }, [menuOpacity, closeMenuJS]);
+
+  const closeMenuSlideDown = useCallback(() => {
+    menuOpenRef.current = false;
+    menuOpacity.value = withTiming(0, { duration: 180, easing: Easing.in(Easing.ease) });
+    menuTranslateY.value = withTiming(120, { duration: 200, easing: Easing.in(Easing.ease) }, (finished) => {
+      if (finished) runOnJS(closeMenuJS)();
+    });
+  }, [menuOpacity, menuTranslateY, closeMenuJS]);
+
+  const openMenu = useCallback(() => {
+    refetchBadgesRef.current();
+    menuTranslateY.value = 0;
+    menuOpenRef.current = true;
+    setMenuOpen(true);
+    menuOpacity.value = withTiming(1, { duration: 150, easing: Easing.out(Easing.ease) });
+  }, [menuOpacity, menuTranslateY]);
 
   const handleTapJS = useCallback(() => {
     if (menuOpenRef.current) {
@@ -139,11 +154,32 @@ export default function FloatingWidget() {
     AsyncStorage.setItem(POSITION_KEY, JSON.stringify({ x, y }));
   }, []);
 
+  // Close menu when route/tab changes
+  const pathnameRef = useRef(pathname);
+  useEffect(() => {
+    if (pathnameRef.current !== pathname && menuOpenRef.current) {
+      closeMenu();
+    }
+    pathnameRef.current = pathname;
+  }, [pathname, closeMenu]);
+
+  // Close menu on Android Back button
+  useEffect(() => {
+    if (Platform.OS !== "android") return;
+    const sub = BackHandler.addEventListener("hardwareBackPress", () => {
+      if (menuOpenRef.current) {
+        closeMenu();
+        return true;
+      }
+      return false;
+    });
+    return () => sub.remove();
+  }, [closeMenu]);
+
   const panGesture = Gesture.Pan()
     .runOnJS(true)
     .minDistance(0)
-    // Task #4080: activateAfterLongPress(0) dà priorità a questo gesture rispetto
-    // al pan del navigator tab evitando conflitti sullo swipe orizzontale.
+    // activateAfterLongPress(0) gives priority over tab navigator horizontal swipe
     .activateAfterLongPress(0)
     .onStart(() => {
       startX.value = posX.value;
@@ -168,13 +204,38 @@ export default function FloatingWidget() {
       }
     });
 
+  // Swipe-down-to-dismiss gesture on the menu panel
+  const menuPanGesture = Gesture.Pan()
+    .runOnJS(true)
+    .minDistance(8)
+    .onUpdate((e) => {
+      if (e.translationY > 0) {
+        menuTranslateY.value = e.translationY;
+        menuOpacity.value = Math.max(0, 1 - e.translationY / 160);
+      }
+    })
+    .onEnd((e) => {
+      const shouldDismiss =
+        e.translationY > SWIPE_DISMISS_THRESHOLD ||
+        e.velocityY > SWIPE_VELOCITY_THRESHOLD;
+      if (shouldDismiss) {
+        runOnJS(closeMenuSlideDown)();
+      } else {
+        menuTranslateY.value = withTiming(0, { duration: 150, easing: Easing.out(Easing.ease) });
+        menuOpacity.value = withTiming(1, { duration: 150, easing: Easing.out(Easing.ease) });
+      }
+    });
+
   const widgetAnimatedStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: posX.value }, { translateY: posY.value }],
   }));
 
   const menuAnimatedStyle = useAnimatedStyle(() => ({
     opacity: menuOpacity.value,
-    transform: [{ translateX: posX.value }, { translateY: posY.value }],
+    transform: [
+      { translateX: posX.value },
+      { translateY: posY.value + menuTranslateY.value },
+    ],
   }));
 
   const handleChatPress = useCallback(() => {
@@ -207,36 +268,38 @@ export default function FloatingWidget() {
           style={[styles.menuContainer, menuAnimatedStyle]}
           pointerEvents="box-none"
         >
-          <View style={[styles.menu, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            <TouchableOpacity style={styles.menuItem} onPress={handleChatPress} activeOpacity={0.7}>
-              <Ionicons name="chatbubbles" size={18} color={colors.accent} />
-              <Text style={[styles.menuLabel, { color: colors.text }]}>Chat</Text>
-              {unreadChat > 0 && (
-                <View style={[styles.menuBadge, { backgroundColor: colors.accent }]}>
-                  <Text style={styles.menuBadgeText}>{unreadChat > 99 ? "99+" : unreadChat}</Text>
-                </View>
-              )}
-            </TouchableOpacity>
+          <GestureDetector gesture={menuPanGesture}>
+            <View style={[styles.menu, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+              <TouchableOpacity style={styles.menuItem} onPress={handleChatPress} activeOpacity={0.7}>
+                <Ionicons name="chatbubbles" size={18} color={colors.accent} />
+                <Text style={[styles.menuLabel, { color: colors.text }]}>Chat</Text>
+                {unreadChat > 0 && (
+                  <View style={[styles.menuBadge, { backgroundColor: colors.accent }]}>
+                    <Text style={styles.menuBadgeText}>{unreadChat > 99 ? "99+" : unreadChat}</Text>
+                  </View>
+                )}
+              </TouchableOpacity>
 
-            <View style={[styles.menuDivider, { backgroundColor: colors.border }]} />
+              <View style={[styles.menuDivider, { backgroundColor: colors.border }]} />
 
-            <TouchableOpacity style={styles.menuItem} onPress={handleNotificationsPress} activeOpacity={0.7}>
-              <Ionicons name="notifications" size={18} color={colors.accent} />
-              <Text style={[styles.menuLabel, { color: colors.text }]}>Notifiche</Text>
-              {unreadNotifications > 0 && (
-                <View style={[styles.menuBadge, { backgroundColor: colors.accentRed ?? "#FF3B30" }]}>
-                  <Text style={styles.menuBadgeText}>{unreadNotifications > 99 ? "99+" : unreadNotifications}</Text>
-                </View>
-              )}
-            </TouchableOpacity>
+              <TouchableOpacity style={styles.menuItem} onPress={handleNotificationsPress} activeOpacity={0.7}>
+                <Ionicons name="notifications" size={18} color={colors.accent} />
+                <Text style={[styles.menuLabel, { color: colors.text }]}>Notifiche</Text>
+                {unreadNotifications > 0 && (
+                  <View style={[styles.menuBadge, { backgroundColor: colors.accentRed ?? "#FF3B30" }]}>
+                    <Text style={styles.menuBadgeText}>{unreadNotifications > 99 ? "99+" : unreadNotifications}</Text>
+                  </View>
+                )}
+              </TouchableOpacity>
 
-            <View style={[styles.menuDivider, { backgroundColor: colors.border }]} />
+              <View style={[styles.menuDivider, { backgroundColor: colors.border }]} />
 
-            <TouchableOpacity style={styles.menuItem} onPress={handlePlayerPress} activeOpacity={0.7}>
-              <Ionicons name="musical-notes" size={18} color={colors.accent} />
-              <Text style={[styles.menuLabel, { color: colors.text }]}>Player</Text>
-            </TouchableOpacity>
-          </View>
+              <TouchableOpacity style={styles.menuItem} onPress={handlePlayerPress} activeOpacity={0.7}>
+                <Ionicons name="musical-notes" size={18} color={colors.accent} />
+                <Text style={[styles.menuLabel, { color: colors.text }]}>Player</Text>
+              </TouchableOpacity>
+            </View>
+          </GestureDetector>
         </Animated.View>
       )}
 
