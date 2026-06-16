@@ -3,6 +3,7 @@
 // Visibile solo se admin enabled + utente non disabilitato + modes.fab on.
 import React, { useState } from "react";
 import { Pressable, StyleSheet, View, Platform } from "react-native";
+import * as Haptics from "expo-haptics";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
@@ -31,7 +32,12 @@ export default function AssistantFab() {
           accessibilityRole="button"
           accessibilityLabel="AI Assistant"
           testID="assistant-fab"
-          onPress={() => setOpen(true)}
+          onPress={() => {
+            if (Platform.OS !== "web") {
+              void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            }
+            setOpen(true);
+          }}
           style={({ pressed }) => [
             styles.fab,
             {

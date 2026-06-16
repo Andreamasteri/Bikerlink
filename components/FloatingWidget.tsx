@@ -10,6 +10,7 @@ import {
   BackHandler,
   Platform,
 } from "react-native";
+import * as Haptics from "expo-haptics";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter, usePathname, type Href } from "expo-router";
@@ -143,6 +144,9 @@ export default function FloatingWidget() {
   }, [menuOpacity, menuTranslateY]);
 
   const handleTapJS = useCallback(() => {
+    if (Platform.OS !== "web") {
+      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }
     if (menuOpenRef.current) {
       closeMenu();
     } else {
@@ -182,6 +186,12 @@ export default function FloatingWidget() {
       if (success) handleTapJS();
     });
 
+  const triggerDragHaptic = useCallback(() => {
+    if (Platform.OS !== "web") {
+      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    }
+  }, []);
+
   const panGesture = Gesture.Pan()
     .runOnJS(true)
     .minDistance(TAP_THRESHOLD + 1)
@@ -189,6 +199,7 @@ export default function FloatingWidget() {
       startX.value = posX.value;
       startY.value = posY.value;
       runOnJS(setIsTouching)(true);
+      runOnJS(triggerDragHaptic)();
     })
     .onUpdate((e) => {
       const rawX = startX.value + e.translationX;
