@@ -22,13 +22,15 @@ exec 9>"$LOCK_FILE"
 if ! flock -n 9; then
   LOCK_PID=$(cat "$LOCK_FILE" 2>/dev/null || true)
   if [ -z "$LOCK_PID" ] || ! [[ "$LOCK_PID" =~ ^[0-9]+$ ]]; then
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Metro startup già in corso (PID non ancora scritto nel lock) — skip"
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Metro startup già in corso (PID non ancora scritto nel lock) — skip (già in esecuzione)"
   elif ! kill -0 "$LOCK_PID" 2>/dev/null; then
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Metro startup detenuto da flock ma PID $LOCK_PID risulta morto — skip per sicurezza"
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Metro startup detenuto da flock ma PID $LOCK_PID risulta morto — skip per sicurezza (già in esecuzione)"
   else
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Metro startup già in corso (PID: $LOCK_PID) — skip"
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Metro startup già in corso (PID: $LOCK_PID) — skip (già in esecuzione)"
   fi
-  exit 0
+  # Exit code 2 = "saltato perché già in esecuzione" (NON un crash).
+  # start.sh usa questo codice per distinguere uno skip da un vero crash Metro.
+  exit 2
 fi
 # Scrivi il PID corrente nel file (utile per diagnostica e watchdog)
 : >&9

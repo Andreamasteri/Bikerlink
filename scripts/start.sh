@@ -49,6 +49,7 @@ log "[2/4] Backend avviato in background (PID: $BACKEND_PID)"
 # Metro è progettato per gestire una finestra senza backend disponibile.
 log "[2/4] Avvio frontend (Metro/Expo) in parallelo..."
 METRO_LOG="/tmp/metro.log"
+METRO_SKIPPED=0
 bash "$SCRIPT_DIR/start-expo.sh" > "$METRO_LOG" 2>&1 &
 EXPO_PID=$!
 log "[2/4] Frontend avviato in background (PID: $EXPO_PID)"
@@ -68,10 +69,36 @@ DELAYS=(0.3 0.5 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 
 
 # Helper: controlla che Metro (EXPO_PID) sia ancora vivo; in caso contrario fail esplicito.
 # Se il crash è rilevato, stampa le ultime righe del log Metro per diagnostica immediata.
+#
+# Exit code 2 = skip "già in esecuzione" (NON un crash):
+#   → verifica se la porta 8081 risponde.
+#   → se risponde: Metro è già up, ritorna 0 (OK).
+#   → se non risponde: fail esplicito "skip ma porta 8081 non risponde".
 check_metro_alive() {
+  # Idempotente: se lo skip è già stato confermato, evita di rifare wait su un
+  # PID già raccolto (wait su figlio già reaped ritorna 127, falsamente "crash").
+  if [ "$METRO_SKIPPED" -eq 1 ]; then
+    return 0
+  fi
+
   if [ -n "${EXPO_PID:-}" ] && ! kill -0 "$EXPO_PID" 2>/dev/null; then
     # Il processo è già terminato: wait ne recupera l'exit code (ritorna subito).
     wait "$EXPO_PID" 2>/dev/null; local EXPO_EXIT=$?
+
+    if [ "$EXPO_EXIT" -eq 2 ]; then
+      # start-expo.sh ha saltato l'avvio perché Metro era già in esecuzione (lock detenuto).
+      # Non è un crash: verifica che la porta 8081 risponda davvero.
+      if nc -z 127.0.0.1 8081 2>/dev/null || \
+         curl -s --max-time 3 http://localhost:8081 >/dev/null 2>&1; then
+        log "[check_metro] Metro già in esecuzione (skip exit 2) — porta 8081 risponde → OK"
+        METRO_SKIPPED=1
+        EXPO_PID=""   # azzera per sicurezza: evita wait ripetuti su PID già raccolto
+        return 0
+      else
+        fail "2/4" "Metro skippato (già in esecuzione, exit 2) ma porta 8081 non risponde — Metro non è attivo"
+      fi
+    fi
+
     local CRASH_TS
     CRASH_TS=$(date '+%Y-%m-%dT%H:%M:%S')
     log "━━━ METRO CRASH — timestamp: $CRASH_TS — exit code: $EXPO_EXIT ━━━"
@@ -151,8 +178,14 @@ log "[3/4] Backend healthy in $(elapsed_since $STEP_START)s"
 # sia ancora attivo. Se è crashato durante il boot del backend (es. porta già in
 # uso, errore Node, dipendenza mancante), il messaggio di errore include l'exit
 # code per rendere il debug immediato.
+# Se METRO_SKIPPED=1 (start-expo.sh ha saltato l'avvio perché Metro era già up),
+# check_metro_alive ha già verificato che la porta 8081 risponde → OK.
 check_metro_alive
-log "[4/4] Metro (PID $EXPO_PID) attivo — OK"
+if [ "$METRO_SKIPPED" -eq 1 ]; then
+  log "[4/4] Metro già in esecuzione (porta 8081 attiva) — OK"
+else
+  log "[4/4] Metro (PID $EXPO_PID) attivo — OK"
+fi
 
 TOTAL_ELAPSED=$(elapsed_since $TOTAL_START)
 log "=== Avvio completato in ${TOTAL_ELAPSED}s (Metro in parallelo su porta 8081) ==="
