@@ -5,7 +5,7 @@ import Colors from "@/constants/colors";
 import { useT } from "@/lib/language-context";
 
 const styles = StyleSheet.create({
-  synecoCard: {
+  sosCard: {
     backgroundColor: Colors.surface,
     borderRadius: 14,
     padding: 16,
@@ -13,23 +13,23 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.border,
   },
-  synecoHeader: {
+  sosHeader: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     marginBottom: 8,
   },
-  synecoInfo: {
+  sosInfo: {
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
   },
-  synecoLabel: {
+  sosLabel: {
     fontFamily: "Inter_600SemiBold",
     fontSize: 14,
     color: Colors.text,
   },
-  synecoDesc: {
+  sosDesc: {
     fontFamily: "Inter_400Regular",
     fontSize: 12,
     color: Colors.textSecondary,
@@ -46,11 +46,11 @@ interface SosBikerSectionProps {
 export function SosBikerSection({ enabled, onToggle, isPending }: SosBikerSectionProps) {
   const t = useT();
   return (
-    <View style={styles.synecoCard}>
-      <View style={styles.synecoHeader}>
-        <View style={styles.synecoInfo}>
+    <View style={styles.sosCard}>
+      <View style={styles.sosHeader}>
+        <View style={styles.sosInfo}>
           <Ionicons name="warning" size={20} color="#FF6600" />
-          <Text style={styles.synecoLabel}>SOS Biker</Text>
+          <Text style={styles.sosLabel}>SOS Biker</Text>
         </View>
         <Switch
           value={enabled}
@@ -60,7 +60,7 @@ export function SosBikerSection({ enabled, onToggle, isPending }: SosBikerSectio
           disabled={isPending}
         />
       </View>
-      <Text style={styles.synecoDesc}>
+      <Text style={styles.sosDesc}>
         {enabled ? t("admin.sosActive") : t("admin.sosInactive")}
       </Text>
     </View>

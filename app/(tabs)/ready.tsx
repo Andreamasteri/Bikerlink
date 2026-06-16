@@ -77,8 +77,7 @@ export default function ReadyToRideScreen() {
     openFixedPositionMapPicker,
   } = useReadyState();
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- SOS response shape from API
-  const mySosQuery = useQuery<any>({
+  const mySosQuery = useQuery<import("@shared/db/sos").SosRequest | null>({
     queryKey: ["/api/sos/my"],
     staleTime: 10000,
     refetchInterval: 10000,
@@ -270,26 +269,16 @@ export default function ReadyToRideScreen() {
           customRadius={customRadius}
           setCustomRadius={setCustomRadius}
           onSubmit={(finalRadius) => {
-            const sendSos = (coords: { latitude: number; longitude: number }) => {
-              createSosMutation.mutate({
-                reason: sosReason.trim(),
-                latitude: coords.latitude,
-                longitude: coords.longitude,
-                radiusKm: finalRadius,
-              });
-            };
-            if (location) {
-              sendSos(location);
-            } else {
-              Alert.alert(
-                t("tracking.gpsUnavailable"),
-                t("ready.approxLocationMsg"),
-                [
-                  { text: t("common.cancel"), style: "cancel" },
-                  { text: t("ready.sendAnyway"), onPress: () => sendSos({ latitude: 42.5, longitude: 12.5 }) },
-                ]
-              );
+            if (!location) {
+              Alert.alert(t("sos.gpsNotReady"), t("sos.gpsNotReadyMsg"));
+              return;
             }
+            createSosMutation.mutate({
+              reason: sosReason.trim(),
+              latitude: location.latitude,
+              longitude: location.longitude,
+              radiusKm: finalRadius,
+            });
           }}
           isPending={createSosMutation.isPending}
           location={location}

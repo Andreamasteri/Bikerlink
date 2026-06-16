@@ -1,6 +1,7 @@
 import React from "react";
 import { View, Text, Modal, KeyboardAvoidingView, Pressable, Image, TextInput, ActivityIndicator, Platform, StyleSheet } from "react-native";
-import Colors from "@/constants/colors";
+import { useColors } from "@/hooks/useColors";
+import type { ThemeColors } from "@/constants/colors";
 
 const sosLaunchIcon = require("@/assets/images/sos-launch-icon.png");
 
@@ -29,6 +30,9 @@ export function SosModal({
   location: { latitude: number; longitude: number } | null;
   t: (key: string) => string;
 }) {
+  const colors = useColors();
+  const styles = makeStyles(colors);
+
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <KeyboardAvoidingView
@@ -46,11 +50,11 @@ export function SosModal({
             <TextInput
               style={styles.sosInput}
               placeholder="Foratura, batteria, sequestro mezzo..."
-              placeholderTextColor={Colors.textSecondary + "80"}
+              placeholderTextColor={colors.textSecondary + "80"}
               value={sosReason}
               onChangeText={setSosReason}
               multiline
-              maxLength={200}
+              maxLength={500}
             />
             <Text style={styles.sosRadiusLabel}>Raggio d'azione</Text>
             <View style={styles.sosRadiusRow}>
@@ -68,7 +72,7 @@ export function SosModal({
               <TextInput
                 style={[styles.sosRadiusCustom, customRadius ? styles.sosRadiusCustomActive : null]}
                 placeholder="Altro"
-                placeholderTextColor={Colors.textSecondary + "80"}
+                placeholderTextColor={colors.textSecondary + "80"}
                 value={customRadius}
                 onChangeText={(text) => {
                   const num = text.replace(/[^0-9]/g, "");
@@ -92,7 +96,7 @@ export function SosModal({
               }}
             >
               {isPending ? (
-                <ActivityIndicator color={Colors.background} />
+                <ActivityIndicator color={colors.background} />
               ) : (
                 <Text style={styles.sosSubmitText}>Invia SOS</Text>
               )}
@@ -104,112 +108,114 @@ export function SosModal({
   );
 }
 
-const styles = StyleSheet.create({
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.6)",
-    justifyContent: "flex-start",
-  },
-  handle: {
-    width: 40,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: Colors.border,
-    alignSelf: "center",
-    marginBottom: 16,
-  },
-  sosSheet: {
-    backgroundColor: Colors.surface,
-    borderBottomLeftRadius: 20,
-    borderBottomRightRadius: 20,
-    padding: 20,
-    paddingBottom: 24,
-  },
-  sosSheetTitle: {
-    fontSize: 20,
-    fontFamily: "Inter_700Bold",
-    color: "#FF6600",
-    marginTop: 8,
-  },
-  sosSheetSubtitle: {
-    fontSize: 14,
-    fontFamily: "Inter_400Regular",
-    color: Colors.textSecondary,
-    marginTop: 4,
-  },
-  sosInput: {
-    backgroundColor: Colors.background,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    padding: 14,
-    fontSize: 15,
-    fontFamily: "Inter_400Regular",
-    color: Colors.text,
-    minHeight: 80,
-    textAlignVertical: "top" as const,
-    marginBottom: 16,
-  },
-  sosRadiusLabel: {
-    fontSize: 14,
-    fontFamily: "Inter_600SemiBold",
-    color: Colors.text,
-    marginTop: 12,
-    marginBottom: 8,
-  },
-  sosRadiusRow: {
-    flexDirection: "row" as const,
-    gap: 8,
-    marginBottom: 16,
-  },
-  sosRadiusChip: {
-    flex: 1,
-    paddingVertical: 10,
-    borderRadius: 10,
-    backgroundColor: Colors.background,
-    borderWidth: 1.5,
-    borderColor: Colors.border,
-    alignItems: "center" as const,
-  },
-  sosRadiusChipActive: {
-    backgroundColor: "#FF6600",
-    borderColor: "#FF6600",
-  },
-  sosRadiusChipText: {
-    fontSize: 14,
-    fontFamily: "Inter_600SemiBold",
-    color: Colors.textSecondary,
-  },
-  sosRadiusChipTextActive: {
-    color: Colors.background,
-  },
-  sosRadiusCustom: {
-    flex: 1,
-    paddingVertical: 8,
-    paddingHorizontal: 10,
-    borderRadius: 10,
-    backgroundColor: Colors.background,
-    borderWidth: 1.5,
-    borderColor: Colors.border,
-    fontSize: 14,
-    fontFamily: "Inter_600SemiBold",
-    color: Colors.text,
-    textAlign: "center" as const,
-  },
-  sosRadiusCustomActive: {
-    backgroundColor: "#FF6600",
-    borderColor: "#FF6600",
-    color: Colors.background,
-  },
-  sosSubmitBtn: {
-    backgroundColor: "#FF6600",
-    padding: 16,
-    borderRadius: 12,
-    alignItems: "center" as const,
-  },
-  sosSubmitText: {
-    fontSize: 16,
-    fontFamily: "Inter_700Bold",
-    color: Colors.background,
-  },
-});
+function makeStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    modalOverlay: {
+      flex: 1,
+      backgroundColor: "rgba(0,0,0,0.6)",
+      justifyContent: "flex-start",
+    },
+    handle: {
+      width: 40,
+      height: 4,
+      borderRadius: 2,
+      backgroundColor: colors.border,
+      alignSelf: "center",
+      marginBottom: 16,
+    },
+    sosSheet: {
+      backgroundColor: colors.surface,
+      borderBottomLeftRadius: 20,
+      borderBottomRightRadius: 20,
+      padding: 20,
+      paddingBottom: 24,
+    },
+    sosSheetTitle: {
+      fontSize: 20,
+      fontFamily: "Inter_700Bold",
+      color: colors.accent,
+      marginTop: 8,
+    },
+    sosSheetSubtitle: {
+      fontSize: 14,
+      fontFamily: "Inter_400Regular",
+      color: colors.textSecondary,
+      marginTop: 4,
+    },
+    sosInput: {
+      backgroundColor: colors.background,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: colors.border,
+      padding: 14,
+      fontSize: 15,
+      fontFamily: "Inter_400Regular",
+      color: colors.text,
+      minHeight: 80,
+      textAlignVertical: "top" as const,
+      marginBottom: 16,
+    },
+    sosRadiusLabel: {
+      fontSize: 14,
+      fontFamily: "Inter_600SemiBold",
+      color: colors.text,
+      marginTop: 12,
+      marginBottom: 8,
+    },
+    sosRadiusRow: {
+      flexDirection: "row" as const,
+      gap: 8,
+      marginBottom: 16,
+    },
+    sosRadiusChip: {
+      flex: 1,
+      paddingVertical: 10,
+      borderRadius: 10,
+      backgroundColor: colors.background,
+      borderWidth: 1.5,
+      borderColor: colors.border,
+      alignItems: "center" as const,
+    },
+    sosRadiusChipActive: {
+      backgroundColor: colors.accent,
+      borderColor: colors.accent,
+    },
+    sosRadiusChipText: {
+      fontSize: 14,
+      fontFamily: "Inter_600SemiBold",
+      color: colors.textSecondary,
+    },
+    sosRadiusChipTextActive: {
+      color: colors.background,
+    },
+    sosRadiusCustom: {
+      flex: 1,
+      paddingVertical: 8,
+      paddingHorizontal: 10,
+      borderRadius: 10,
+      backgroundColor: colors.background,
+      borderWidth: 1.5,
+      borderColor: colors.border,
+      fontSize: 14,
+      fontFamily: "Inter_600SemiBold",
+      color: colors.text,
+      textAlign: "center" as const,
+    },
+    sosRadiusCustomActive: {
+      backgroundColor: colors.accent,
+      borderColor: colors.accent,
+      color: colors.background,
+    },
+    sosSubmitBtn: {
+      backgroundColor: colors.accent,
+      padding: 16,
+      borderRadius: 12,
+      alignItems: "center" as const,
+    },
+    sosSubmitText: {
+      fontSize: 16,
+      fontFamily: "Inter_700Bold",
+      color: colors.background,
+    },
+  });
+}

@@ -4,6 +4,10 @@ import { storage } from "../storage";
 import { allLimited } from "../lib/concurrency";
 import { createSosSchema } from "@shared/validators";
 import { requireAuth } from "../lib/auth-middleware";
+import { db } from "../db";
+import { users, userProfiles } from "@shared/db";
+import { and, eq, isNotNull, gt, sql } from "drizzle-orm";
+import { sendSosPushNotifications } from "../push-notifications";
 
 const router = Router();
 
@@ -44,8 +48,35 @@ router.post("/", async (req: Request, res: Response) => {
         storage.updateUserProfile(userId, { isAvailable: true }),
         ...(currentUser?.ghostMode ? [storage.updateUser(userId, { ghostMode: false })] : []),
       ]);
+
+      // Notify nearby bikers via push
+      const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+      const radiusMeters = radius * 1000;
+      const nearbyRows = await db
+        .select({ userId: userProfiles.userId })
+        .from(userProfiles)
+        .innerJoin(users, eq(userProfiles.userId, users.id))
+        .where(
+          and(
+            isNotNull(userProfiles.latitude),
+            isNotNull(userProfiles.longitude),
+            gt(userProfiles.coordinatesUpdatedAt, sevenDaysAgo),
+            eq(users.status, "active"),
+            sql`${userProfiles.geom} IS NOT NULL`,
+            sql`ST_DWithin(${userProfiles.geom}, ST_SetSRID(ST_MakePoint(${longitude}, ${latitude}), 4326)::geography, ${radiusMeters})`,
+          )
+        );
+
+      const nearbyUserIds = nearbyRows
+        .map((r) => r.userId)
+        .filter((id) => id !== userId);
+
+      if (nearbyUserIds.length > 0) {
+        const requesterNickname = currentUser?.nickname ?? "Un biker";
+        sendSosPushNotifications(nearbyUserIds, { reason: reason.trim(), requesterNickname });
+      }
     } catch (updateErr) {
-      console.error("SOS availability update failed (non-fatal):", updateErr);
+      console.error("SOS post-create operations failed (non-fatal):", updateErr);
     }
 
     return res.status(201).json(sosRequest);

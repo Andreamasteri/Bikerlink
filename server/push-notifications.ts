@@ -526,4 +526,41 @@ export async function sendPlannedRouteInvitePushNotifications(
   }
 }
 
+export async function sendSosPushNotifications(
+  nearbyUserIds: string[],
+  opts: { reason: string; requesterNickname: string },
+): Promise<void> {
+  if (!nearbyUserIds.length) return;
+  try {
+    const filteredIds = await filterUserIdsByPreference(nearbyUserIds, "system_alerts");
+    if (!filteredIds.length) return;
+    const rows = await db
+      .select({ id: users.id, expoPushToken: users.expoPushToken })
+      .from(users)
+      .where(inArray(users.id, filteredIds));
+
+    const userIdByToken = new Map<string, string>();
+    const messages: ExpoPushMessage[] = [];
+
+    for (const row of rows) {
+      if (row.expoPushToken && isValidExpoPushToken(row.expoPushToken)) {
+        userIdByToken.set(row.expoPushToken, row.id);
+        messages.push({
+          to: row.expoPushToken,
+          title: "🆘 SOS Biker nelle vicinanze",
+          body: opts.reason,
+          sound: "default" as const,
+          data: { type: "sos", requesterNickname: opts.requesterNickname },
+          channelId: "matches",
+        });
+      }
+    }
+
+    if (messages.length === 0) return;
+    await sendExpoMessages(messages, userIdByToken);
+  } catch (err) {
+    console.warn("[Push] sendSosPushNotifications error (non-fatal):", err);
+  }
+}
+
 export { sendModeratorReportPush, sendGpsRejectionAlertToAdmins, sendSystemAlertPushToAdmins, sendOtaPendingApprovalPushToAdmins, sendAdminGpsAlertPush } from './push-notifications-admin';

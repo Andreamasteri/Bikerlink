@@ -1,6 +1,7 @@
 import React from "react";
 import { View, Text, Pressable, Image, Alert, StyleSheet } from "react-native";
 import { useT } from "@/lib/language-context";
+import { useColors } from "@/hooks/useColors";
 import { UseMutationResult } from "@tanstack/react-query";
 
 const sosLaunchIcon = require("@/assets/images/sos-launch-icon.png");
@@ -17,6 +18,7 @@ export function SosButton({
   cancelSosMutation,
 }: SosButtonProps) {
   const t = useT();
+  const colors = useColors();
 
   const handlePress = () => {
     if (mySosData) {
@@ -37,27 +39,21 @@ export function SosButton({
     }
   };
 
+  const iconTint = mySosData ? colors.error : colors.accentRed;
+
   return (
     <View style={styles.sosRow}>
       <Pressable
-        style={[styles.sosBtn, mySosData ? styles.sosBtnActive : null]}
+        style={styles.sosBtn}
         onPress={handlePress}
       >
         <Image
           source={sosLaunchIcon}
-          style={[
-            styles.sosIconLeft,
-            mySosData ? styles.sosIconLeftActive : null,
-          ]}
+          style={[styles.sosIconLeft, { tintColor: iconTint }]}
           resizeMode="contain"
         />
-        <Text
-          style={[
-            styles.sosLabelLeft,
-            mySosData ? styles.sosLabelLeftActive : null,
-          ]}
-        >
-          {mySosData ? "SOS ATTIVO" : "LANCIA SOS"}
+        <Text style={[styles.sosLabelLeft, { color: iconTint }]}>
+          {mySosData ? t("sos.active") : t("sos.launch")}
         </Text>
       </Pressable>
     </View>
@@ -75,24 +71,13 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 10,
   },
-  sosBtnActive: {
-    opacity: 1,
-  },
   sosIconLeft: {
     width: 187,
     height: 146,
-    tintColor: "#CC0000",
-  },
-  sosIconLeftActive: {
-    tintColor: "#990000",
   },
   sosLabelLeft: {
     fontSize: 21,
     fontFamily: "Inter_700Bold",
-    color: "#CC0000",
     textAlign: "center",
-  },
-  sosLabelLeftActive: {
-    color: "#990000",
   },
 });
