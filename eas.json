@@ -26,7 +26,7 @@
       },
       "android": {
         "buildType": "apk",
-        "gradleCommand": ":app:assembleRelease",
+        "gradleCommand": ":app:assembleRelease -Pandroid.enableProguardInReleaseBuilds=false -Pandroid.enableMinifyInReleaseBuilds=false -Pandroid.enableShrinkResourcesInReleaseBuilds=false",
         "image": "latest"
       }
     },

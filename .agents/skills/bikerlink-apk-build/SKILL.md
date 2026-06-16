@@ -128,7 +128,50 @@ bash scripts/eas.sh build \
 
 ---
 
-## Modalità 2 — Production APK (`release-apk`)
+## Modalità 2 — Diagnostic APK (`diagnostic-apk`)
+
+### Specifica JSON completa (copia esatta da `eas.json`)
+
+```json
+"diagnostic-apk": {
+  "distribution": "internal",
+  "channel": "production",
+  "credentialsSource": "remote",
+  "env": {
+    "NODE_OPTIONS": "--max_old_space_size=8192"
+  },
+  "android": {
+    "buildType": "apk",
+    "gradleCommand": ":app:assembleRelease -Pandroid.enableProguardInReleaseBuilds=false -Pandroid.enableMinifyInReleaseBuilds=false -Pandroid.enableShrinkResourcesInReleaseBuilds=false",
+    "image": "latest"
+  }
+}
+```
+
+### Caratteristiche specifiche
+
+- `assembleRelease` → comportamento release (firmato, ottimizzato) ma **senza offuscamento**
+- **ProGuard/R8 DISABILITATO** via `-P` flag Gradle: `enableProguardInReleaseBuilds=false`, `enableMinifyInReleaseBuilds=false`, `enableShrinkResourcesInReleaseBuilds=false`
+- Stack trace leggibili → indispensabile per diagnostica remota e crash reporting
+- `distribution: internal` → distribuzione interna EAS (non Play Store)
+- **versionCode: NON si incrementa** — è una build di test/diagnostica
+
+> ⚠️ **REGOLA OBBLIGATORIA:** le build `diagnostic-apk` devono SEMPRE avere ProGuard/minify/shrink disabilitati tramite i flag `-P` nel `gradleCommand`. NON usare `assembleRelease` senza questi flag per build diagnostiche — i crash log sarebbero illeggibili.
+
+### Comando di lancio
+
+```bash
+CI=1 EAS_NO_VCS=1 GIT_INDEX_FILE=/tmp/eas-build-index \
+bash scripts/eas.sh build \
+  --platform android \
+  --profile diagnostic-apk \
+  --non-interactive \
+  --no-wait
+```
+
+---
+
+## Modalità 3 — Production APK (`release-apk`)
 
 ### Specifica JSON completa (copia esatta da `eas.json`)
 
@@ -252,17 +295,18 @@ Riferimento ufficiale:
 
 ## Checklist unificata pre-build
 
-| Check | debug-apk | release-apk | production (AAB) |
-|---|---|---|---|
-| expo doctor eseguito e verde | ✓ obbligatorio | ✓ obbligatorio | ✓ obbligatorio |
-| Versioni lette dai file | ✓ | ✓ | ✓ |
-| 4 campi allineati (app.json + build.gradle) | ✓ verifica | ✓ verifica | ✓ verifica |
-| versionCode incrementato | ✗ NON toccare | ✓ obbligatorio | ✓ obbligatorio |
-| GATE user_query superato | ✓ obbligatorio | ✓ obbligatorio | ✓ obbligatorio |
-| `CI=1 EAS_NO_VCS=1 GIT_INDEX_FILE=...` presenti | ✓ | ✓ | ✓ |
-| `--no-wait` nel comando | ✓ | ✓ | ✓ |
-| Artefatto prodotto | APK | APK | AAB |
-| Distribuzione EAS | internal | internal | store |
+| Check | debug-apk | diagnostic-apk | release-apk | production (AAB) |
+|---|---|---|---|---|
+| expo doctor eseguito e verde | ✓ obbligatorio | ✓ obbligatorio | ✓ obbligatorio | ✓ obbligatorio |
+| Versioni lette dai file | ✓ | ✓ | ✓ | ✓ |
+| 4 campi allineati (app.json + build.gradle) | ✓ verifica | ✓ verifica | ✓ verifica | ✓ verifica |
+| versionCode incrementato | ✗ NON toccare | ✗ NON toccare | ✓ obbligatorio | ✓ obbligatorio |
+| ProGuard/minify/shrink | ✗ off (assembleDebug) | ✗ off (flag -P OBBLIGATORI) | ✓ on | ✓ on |
+| GATE user_query superato | ✓ obbligatorio | ✓ obbligatorio | ✓ obbligatorio | ✓ obbligatorio |
+| `CI=1 EAS_NO_VCS=1 GIT_INDEX_FILE=...` presenti | ✓ | ✓ | ✓ | ✓ |
+| `--no-wait` nel comando | ✓ | ✓ | ✓ | ✓ |
+| Artefatto prodotto | APK | APK | APK | AAB |
+| Distribuzione EAS | internal | internal | internal | store |
 
 ---
 
