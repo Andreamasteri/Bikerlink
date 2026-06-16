@@ -26,12 +26,17 @@ interface MiniChartProps {
   samples: ResourceSample[];
   width: number;
   height: number;
+  windowMinutes?: number;
 }
 
-export function MiniChart({ samples, width, height }: MiniChartProps) {
+function formatAxisTime(date: Date): string {
+  return date.toLocaleTimeString("it", { hour: "2-digit", minute: "2-digit" });
+}
+
+export function MiniChart({ samples, width, height, windowMinutes = 10 }: MiniChartProps) {
   if (samples.length < 2) return null;
 
-  const pad = { top: 10, bottom: 20, left: 28, right: 8 };
+  const pad = { top: 10, bottom: 28, left: 28, right: 8 };
   const chartW = width - pad.left - pad.right;
   const chartH = height - pad.top - pad.bottom;
 
@@ -72,6 +77,15 @@ export function MiniChart({ samples, width, height }: MiniChartProps) {
   const onlinePoints = toPointsAbsolute(onlineVals, maxOnline);
   const gridLines = [0, 25, 50, 75, 100];
 
+  const now = new Date();
+  const windowStart = new Date(now.getTime() - windowMinutes * 60 * 1000);
+  const midpoint = new Date((now.getTime() + windowStart.getTime()) / 2);
+
+  const xAxisY = pad.top + chartH + 14;
+  const xLeft = pad.left;
+  const xMid = pad.left + chartW / 2;
+  const xRight = pad.left + chartW;
+
   return (
     <Svg width={width} height={height}>
       {gridLines.map((pct) => {
@@ -88,6 +102,10 @@ export function MiniChart({ samples, width, height }: MiniChartProps) {
       {androidPoints ? <Polyline points={androidPoints} fill="none" stroke="#34C759" strokeWidth={1.5} strokeDasharray="3,2" /> : null}
       {battPoints ? <Polyline points={battPoints} fill="none" stroke="#22C55E" strokeWidth={1.5} strokeOpacity={0.5} /> : null}
       {onlinePoints ? <Polyline points={onlinePoints} fill="none" stroke="#6366F1" strokeWidth={1.5} strokeDasharray="4,2" /> : null}
+      <Line x1={xLeft} y1={pad.top + chartH} x2={xRight} y2={pad.top + chartH} stroke="#ffffff18" strokeWidth={1} />
+      <SvgText x={xLeft} y={xAxisY} fontSize={8} fill="#888" textAnchor="start">{formatAxisTime(windowStart)}</SvgText>
+      <SvgText x={xMid} y={xAxisY} fontSize={8} fill="#888" textAnchor="middle">{formatAxisTime(midpoint)}</SvgText>
+      <SvgText x={xRight} y={xAxisY} fontSize={8} fill="#888" textAnchor="end">{formatAxisTime(now)}</SvgText>
     </Svg>
   );
 }

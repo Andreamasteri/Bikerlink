@@ -62,7 +62,10 @@ async function getLogTableWeights(): Promise<LogTableRow[]> {
   return results.sort((a, b) => b.sizeMb - a.sizeMb);
 }
 
-router.get("/resource-monitor", async (_req: Request, res: Response) => {
+router.get("/resource-monitor", async (req: Request, res: Response) => {
+  const rawWindow = parseInt((req.query.windowMinutes as string) ?? "10", 10);
+  const windowMinutes = [10, 30, 60, 360].includes(rawWindow) ? rawWindow : 10;
+
   try {
     const [
       graphEnabled,
@@ -183,13 +186,14 @@ router.get("/resource-monitor", async (_req: Request, res: Response) => {
         const graphEnabledSetting = await storage.getAppSetting("resource_graph_enabled");
         const enabled = graphEnabledSetting?.valueJson === true || graphEnabledSetting?.value === "true";
         if (!enabled) return [];
-        const windowStart = new Date(Date.now() - 10 * 60 * 1000);
+        const windowStart = new Date(Date.now() - windowMinutes * 60 * 1000);
+        const sampleLimit = windowMinutes * 6 + 60;
         return db
           .select()
           .from(resourceSamples)
           .where(sql`sampled_at >= ${windowStart}`)
           .orderBy(desc(resourceSamples.sampledAt))
-          .limit(120);
+          .limit(sampleLimit);
       })(),
     ]);
 

@@ -14,7 +14,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { MaterialCommunityIcons, Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
-import { apiRequest, getApiUrl, authFetchHeaders } from "@/lib/query-client";
+import { apiRequest, getApiUrl, authFetchHeaders, getQueryFn } from "@/lib/query-client";
 import {
   Card,
   Row,
@@ -75,7 +75,13 @@ function formatUptime(seconds: number): string {
   return `${s}s`;
 }
 
-const QUERY_KEY = ["/api/admin/resource-monitor"];
+type WindowOption = { label: string; value: number };
+const WINDOW_OPTIONS: WindowOption[] = [
+  { label: "10 min", value: 10 },
+  { label: "30 min", value: 30 },
+  { label: "1 h", value: 60 },
+  { label: "6 h", value: 360 },
+];
 
 export default function ResourceMonitorScreen() {
   const colors = useColors();
@@ -84,9 +90,13 @@ export default function ResourceMonitorScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [localUptime, setLocalUptime] = useState(0);
   const [showTopSessions, setShowTopSessions] = useState(false);
+  const [windowMinutes, setWindowMinutes] = useState(10);
+
+  const queryKey = [`/api/admin/resource-monitor?windowMinutes=${windowMinutes}`];
 
   const { data, isLoading, isError, refetch } = useQuery<ResourceMonitorData>({
-    queryKey: QUERY_KEY,
+    queryKey,
+    queryFn: getQueryFn({ on401: "returnNull" }),
     refetchInterval: 30_000,
     staleTime: 25_000,
   });
@@ -105,7 +115,7 @@ export default function ResourceMonitorScreen() {
       const res = await apiRequest("POST", "/api/admin/resource-monitor/toggle-graph", { enabled });
       return res.json();
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: QUERY_KEY }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey }),
   });
 
   const handleRefresh = useCallback(async () => {
@@ -288,6 +298,30 @@ export default function ResourceMonitorScreen() {
           />
         </View>
 
+        {isGraphEnabled && (
+          <View style={styles.windowSelectorRow}>
+            {WINDOW_OPTIONS.map((opt) => {
+              const active = windowMinutes === opt.value;
+              return (
+                <TouchableOpacity
+                  key={opt.value}
+                  onPress={() => setWindowMinutes(opt.value)}
+                  style={[
+                    styles.windowBtn,
+                    { borderColor: active ? colors.accent : colors.border },
+                    active && { backgroundColor: colors.accent + "22" },
+                  ]}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[styles.windowBtnText, { color: active ? colors.accent : colors.textSecondary }]}>
+                    {opt.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        )}
+
         {isGraphEnabled && (d?.graph?.samples ?? []).length > 0 && (
           <>
             <View style={styles.legendRow}>
@@ -298,7 +332,7 @@ export default function ResourceMonitorScreen() {
               <Legend color="#6366F1" label="Online (--)" />
             </View>
             <View style={[styles.chartContainer, { borderColor: colors.border }]}>
-              <MiniChart samples={d.graph.samples} width={300} height={140} />
+              <MiniChart samples={d.graph.samples} width={300} height={156} windowMinutes={windowMinutes} />
             </View>
             {Platform.OS === "web" && (
               <TouchableOpacity onPress={handleExportCsv} style={[styles.csvBtn, { borderColor: colors.border }]}>
@@ -338,8 +372,11 @@ const styles = StyleSheet.create({
   graphToggleRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingVertical: 4 },
   toggleLabel: { fontFamily: "Inter_600SemiBold", fontSize: 14 },
   toggleSub: { fontFamily: "Inter_400Regular", fontSize: 11, marginTop: 2 },
-  legendRow: { flexDirection: "row", gap: 12, paddingTop: 4 },
-  chartContainer: { borderWidth: 1, borderRadius: 8, overflow: "hidden", marginTop: 4, alignSelf: "stretch", minHeight: 140 },
+  windowSelectorRow: { flexDirection: "row", gap: 6, paddingTop: 2, flexWrap: "wrap" },
+  windowBtn: { borderWidth: 1, borderRadius: 6, paddingHorizontal: 10, paddingVertical: 5 },
+  windowBtnText: { fontFamily: "Inter_600SemiBold", fontSize: 12 },
+  legendRow: { flexDirection: "row", gap: 12, paddingTop: 4, flexWrap: "wrap" },
+  chartContainer: { borderWidth: 1, borderRadius: 8, overflow: "hidden", marginTop: 4, alignSelf: "stretch", minHeight: 156 },
   csvBtn: { flexDirection: "row", alignItems: "center", gap: 6, borderWidth: 1, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8, alignSelf: "flex-start", marginTop: 8 },
   csvBtnText: { fontFamily: "Inter_600SemiBold", fontSize: 13 },
   graphInfo: { fontFamily: "Inter_400Regular", fontSize: 11, marginTop: 4 },
