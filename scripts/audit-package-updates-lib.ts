@@ -182,6 +182,26 @@ export function getRepoInfo(pkgName: string): RepoInfo | null {
     return { owner: "vitest-dev", repo: "vitest", changelogPath: "packages/vitest/CHANGELOG.md", ref: "main" };
   }
 
+  // undici (Node.js HTTP client)
+  if (pkgName === "undici") {
+    return { owner: "nodejs", repo: "undici", changelogPath: "CHANGELOG.md", ref: "main" };
+  }
+
+  // multer (Express multipart/form-data middleware)
+  if (pkgName === "multer") {
+    return { owner: "expressjs", repo: "multer", changelogPath: "CHANGELOG.md", ref: "master" };
+  }
+
+  // http-proxy-middleware
+  if (pkgName === "http-proxy-middleware") {
+    return { owner: "chimurai", repo: "http-proxy-middleware", changelogPath: "CHANGELOG.md", ref: "master" };
+  }
+
+  // fast-xml-parser
+  if (pkgName === "fast-xml-parser") {
+    return { owner: "NaturalIntelligence", repo: "fast-xml-parser", changelogPath: "CHANGELOG.md", ref: "master" };
+  }
+
   return null;
 }
 
