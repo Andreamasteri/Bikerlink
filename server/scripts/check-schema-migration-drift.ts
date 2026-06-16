@@ -18,8 +18,8 @@
 // esclusi dal registry, quindi non entrano nel confronto.
 import { readdirSync, readFileSync } from "fs";
 import { join } from "path";
-import { listDeclaredTables, listDeclaredUniqueIndexes } from "../ai/db-integrity/registry-introspect";
-import { buildMigrationSchema, buildMigrationUniqueIndexes } from "../ai/db-integrity/migration-schema-parser";
+import { listDeclaredTables, listDeclaredUniqueIndexes, listDeclaredIndexes } from "../ai/db-integrity/registry-introspect";
+import { buildMigrationSchema, buildMigrationUniqueIndexes, buildMigrationIndexes } from "../ai/db-integrity/migration-schema-parser";
 
 const MIGRATIONS_DIR = join(process.cwd(), "migrations");
 
@@ -50,6 +50,20 @@ const KNOWN_UNMIGRATED_UNIQUE_INDEXES = new Set<string>([
   // l'unico uniqueIndex() su app_crash_logs.
 ]);
 
+// Baseline per index() plain (non-unique) dichiarati nel registry ma non presenti
+// in alcuna migration numerata (CREATE INDEX).
+// Formato: "table.index_name" (il nome dell'indice come passato a index("name")).
+// Questi generano un WARNING non bloccante (non influenzano ok): l'assenza di un
+// indice non-unique non causa boot failure, ma può degradare le performance in prod.
+// Esempio: "users.users_email_idx"
+const KNOWN_UNMIGRATED_INDEXES = new Set<string>([
+  // Indici aggiunti via drizzle-kit push senza migration numerata corrispondente.
+  // Probabilmente già presenti in prod; non causano boot failure ma le migration
+  // mancanti andrebbero aggiunte quando si ha l'occasione.
+  "match_zero_snapshots.match_zero_snapshots_created_idx",
+  "ai_messages.ai_messages_content_trgm_idx",
+]);
+
 // ── Exported result type ────────────────────────────────────────────────────
 
 export interface DriftCheckResult {
@@ -64,6 +78,12 @@ export interface DriftCheckResult {
    * Format: "table.index_name".
    */
   newUniqueIndexes: string[];
+  /**
+   * index() (non-unique) declarations in the registry with no matching
+   * CREATE INDEX in any migration. WARNING only — does not affect `ok`.
+   * Format: "table.index_name".
+   */
+  newIndexes: string[];
   /** Known-baseline drift entries that were found (non-blocking). */
   knownHits: string[];
 }
@@ -107,12 +127,15 @@ export function runDriftCheck(): DriftCheckResult {
   const migrationContents = loadMigrationContents();
   const migrationSchema = buildMigrationSchema(migrationContents);
   const migrationUniqueIndexes = buildMigrationUniqueIndexes(migrationContents);
+  const migrationIndexes = buildMigrationIndexes(migrationContents);
   const declared = listDeclaredTables();
   const declaredUniqueIndexes = listDeclaredUniqueIndexes();
+  const declaredIndexes = listDeclaredIndexes();
 
   const newTables: string[] = [];
   const newColumns: string[] = [];
   const newUniqueIndexes: string[] = [];
+  const newIndexes: string[] = [];
   const knownHits: string[] = [];
 
   for (const t of declared) {
@@ -135,18 +158,32 @@ export function runDriftCheck(): DriftCheckResult {
   for (const { table, name } of declaredUniqueIndexes) {
     const tableName = table.toLowerCase();
     const indexName = name.toLowerCase();
-    const migIndexes = migrationUniqueIndexes.get(tableName);
-    if (migIndexes && migIndexes.has(indexName)) continue;
+    const migIdxs = migrationUniqueIndexes.get(tableName);
+    if (migIdxs && migIdxs.has(indexName)) continue;
     const key = `${tableName}.${indexName}`;
     if (KNOWN_UNMIGRATED_UNIQUE_INDEXES.has(key)) knownHits.push(key);
     else newUniqueIndexes.push(key);
   }
 
+  // Check index() (non-unique) declarations against migration DDL.
+  // Non-fatal: missing plain indexes degrade performance but don't cause boot failures.
+  for (const { table, name } of declaredIndexes) {
+    const tableName = table.toLowerCase();
+    const indexName = name.toLowerCase();
+    const migIdxs = migrationIndexes.get(tableName);
+    if (migIdxs && migIdxs.has(indexName)) continue;
+    const key = `${tableName}.${indexName}`;
+    if (KNOWN_UNMIGRATED_INDEXES.has(key)) knownHits.push(key);
+    else newIndexes.push(key);
+  }
+
   return {
+    // newIndexes intentionally excluded from ok: warning only, not a blocking drift.
     ok: newTables.length === 0 && newColumns.length === 0 && newUniqueIndexes.length === 0,
     newTables,
     newColumns,
     newUniqueIndexes,
+    newIndexes,
     knownHits,
   };
 }
@@ -162,11 +199,25 @@ function main(): void {
     process.exit(2);
   }
 
-  const { ok, newTables, newColumns, newUniqueIndexes, knownHits } = result;
+  const { ok, newTables, newColumns, newUniqueIndexes, newIndexes, knownHits } = result;
 
   if (knownHits.length) {
     console.log(`[schema-drift] drift noto (baseline, non bloccante): ${knownHits.length}`);
     for (const k of knownHits) console.log(`  • ${k}`);
+  }
+
+  // Non-unique index warnings — emitted regardless of ok status (non-blocking).
+  if (newIndexes.length) {
+    console.warn("──────────────────────────────────────────────────────────────");
+    console.warn("[schema-drift] AVVISO: index() non-unique senza CREATE INDEX in migration");
+    console.warn("Questi indici non causano boot failure ma potrebbero mancare in prod,");
+    console.warn("degradando le performance delle query corrispondenti.");
+    console.warn("──────────────────────────────────────────────────────────────");
+    console.warn(`\nindex() senza migration (${newIndexes.length}):`);
+    for (const i of newIndexes) console.warn(`  • ${i}`);
+    console.warn("  → Aggiungi CREATE INDEX name ON table (...) nella migration numerata.");
+    console.warn("  → Se già in prod, aggiungilo a KNOWN_UNMIGRATED_INDEXES.");
+    console.warn("");
   }
 
   if (ok) {

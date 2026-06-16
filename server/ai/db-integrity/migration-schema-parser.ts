@@ -70,6 +70,11 @@ const ADD_UNIQUE_CONSTRAINT_RE = /\badd\s+constraint\s+("?[a-zA-Z0-9_]+"?)\s+uni
 // CREATE UNIQUE INDEX name ON table (cols)
 const CREATE_UNIQUE_INDEX_RE =
   /create\s+unique\s+index\s+(?:if\s+not\s+exists\s+)?("?[a-zA-Z0-9_]+"?)\s+on\s+("?[a-zA-Z0-9_.]+"?)/gi;
+// CREATE INDEX (non-unique) name ON table (cols)
+// NB: "create unique index" è già catturato sopra; il lookahead negativo \b(?!unique\b)
+// garantisce che solo gli indici plain siano inclusi qui (case-insensitive tramite flag /gi).
+const CREATE_INDEX_RE =
+  /create\s+index\s+(?:if\s+not\s+exists\s+)?("?[a-zA-Z0-9_]+"?)\s+on\s+("?[a-zA-Z0-9_.]+"?)/gi;
 
 /**
  * Ricostruisce dalle migration la mappa tabella → set di colonne, applicando in
@@ -142,6 +147,43 @@ export function buildMigrationSchema(files: string[]): Map<string, Set<string>> 
   }
 
   return schema;
+}
+
+/**
+ * Ricostruisce dalle migration la mappa tabella → set di nomi di indici plain (non-unique).
+ * Copre la forma DDL:
+ *   - CREATE INDEX "name" ON "table" (...)
+ *
+ * Il confronto avviene PER NOME dell'indice, allineandosi a come Drizzle ORM
+ * dichiara i `index("name")` nel registro TS.
+ *
+ * NB: `CREATE UNIQUE INDEX` usa una parola chiave diversa (`create unique index`)
+ * e NON corrisponde alla regex CREATE_INDEX_RE — è già gestito da buildMigrationUniqueIndexes.
+ */
+export function buildMigrationIndexes(files: string[]): Map<string, Set<string>> {
+  const result = new Map<string, Set<string>>();
+  const ensure = (table: string): Set<string> => {
+    let s = result.get(table);
+    if (!s) {
+      s = new Set<string>();
+      result.set(table, s);
+    }
+    return s;
+  };
+
+  for (const file of files) {
+    const clean = file.replace(/--[^\n]*/g, "");
+
+    CREATE_INDEX_RE.lastIndex = 0;
+    let m: RegExpExecArray | null;
+    while ((m = CREATE_INDEX_RE.exec(clean))) {
+      const indexName = norm(m[1]);
+      const tableName = norm(m[2]);
+      ensure(tableName).add(indexName);
+    }
+  }
+
+  return result;
 }
 
 /**

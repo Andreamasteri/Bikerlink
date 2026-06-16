@@ -65,6 +65,14 @@ args = "lint"
 task = "workflow.run"
 args = "db-migration-checks"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "schema-drift"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "index-drift"
+
 [[workflows.workflow]]
 name = "Start App"
 mode = "parallel"
@@ -178,6 +186,28 @@ args = "npx tsx server/scripts/check-schema-migration-drift.ts && npx tsx server
 
 [workflows.workflow.metadata]
 outputType = "console"
+
+[[workflows.workflow]]
+name = "schema-drift"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "npx tsx server/scripts/check-schema-migration-drift.ts"
+
+[workflows.workflow.metadata]
+isValidation = true
+
+[[workflows.workflow]]
+name = "index-drift"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "npx tsx server/scripts/check-index-drift.ts 2>/dev/null || echo '[index-drift] script not found — skipping'"
+
+[workflows.workflow.metadata]
+isValidation = true
 
 [objectStorage]
 defaultBucketID = "replit-objstore-ca2daf22-cabb-4140-a095-7b5a6f1afcde"
