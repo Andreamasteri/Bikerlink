@@ -1,247 +1,248 @@
 entrypoint = "README.md"
-modules = ["javascript", "nodejs-20", "node", "python-3.11", "python3", "postgresql-16"]
+  modules = ["javascript", "nodejs-20", "node", "python-3.11", "python3", "postgresql-16"]
 
-[nix]
-channel = "stable-24_05"
-packages = ["freetype", "glibcLocales", "lcms2", "libimagequant", "libjpeg", "libtiff", "libwebp", "libxcrypt", "openjpeg", "tcl", "tk", "zlib"]
+  [nix]
+  channel = "stable-24_05"
+  packages = ["freetype", "glibcLocales", "lcms2", "libimagequant", "libjpeg", "libtiff", "libwebp", "libxcrypt", "openjpeg", "tcl", "tk", "zlib"]
 
-[deployment]
-deploymentTarget = "autoscale"
-build = ["bash", "scripts/deploy-build.sh"]
-run = ["bash", "-c", "PORT=5000 node server_dist/index.js"]
+  [deployment]
+  deploymentTarget = "autoscale"
+  build = ["bash", "scripts/deploy-build.sh"]
+  run = ["bash", "-c", "PORT=5000 node server_dist/index.js"]
 
-[env]
-PORT = "5000"
+  [env]
+  PORT = "5000"
 
-[agent]
-stack = "EXPO"
-integrations = ["javascript_database:1.0.0", "expo_object_storage:1.0.0", "google-drive:1.0.0"]
+  [agent]
+  stack = "EXPO"
+  integrations = ["javascript_database:1.0.0", "expo_object_storage:1.0.0", "google-drive:1.0.0"]
 
-[workflows]
-runButton = "Project"
+  [workflows]
+  runButton = "Project"
 
-[[workflows.workflow]]
-name = "Project"
-mode = "parallel"
-author = "agent"
+  [[workflows.workflow]]
+  name = "Project"
+  mode = "parallel"
+  author = "agent"
 
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "Start App"
+  [[workflows.workflow.tasks]]
+  task = "workflow.run"
+  args = "Start App"
 
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "Watchdog"
+  [[workflows.workflow.tasks]]
+  task = "workflow.run"
+  args = "Watchdog"
 
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "Error Monitor"
+  [[workflows.workflow.tasks]]
+  task = "workflow.run"
+  args = "Error Monitor"
 
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "Clean Metro"
+  [[workflows.workflow.tasks]]
+  task = "workflow.run"
+  args = "Clean Metro"
 
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "typecheck"
+  [[workflows.workflow.tasks]]
+  task = "workflow.run"
+  args = "typecheck"
 
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "typecheck-client"
+  [[workflows.workflow.tasks]]
+  task = "workflow.run"
+  args = "typecheck-client"
 
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "OTA Publish"
+  [[workflows.workflow.tasks]]
+  task = "workflow.run"
+  args = "OTA Publish"
 
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "Start Backend"
+  [[workflows.workflow.tasks]]
+  task = "workflow.run"
+  args = "Start Backend"
 
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "lint"
+  [[workflows.workflow.tasks]]
+  task = "workflow.run"
+  args = "lint"
 
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "db-migration-checks"
+  [[workflows.workflow.tasks]]
+  task = "workflow.run"
+  args = "db-migration-checks"
 
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "schema-drift"
+  [[workflows.workflow.tasks]]
+  task = "workflow.run"
+  args = "schema-drift"
 
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "index-drift"
+  [[workflows.workflow.tasks]]
+  task = "workflow.run"
+  args = "index-drift"
 
-[[workflows.workflow]]
-name = "Start App"
-mode = "parallel"
-author = "agent"
+  [[workflows.workflow]]
+  name = "Start App"
+  mode = "parallel"
+  author = "agent"
 
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "bash scripts/start.sh"
-waitForPort = 8081
+  [[workflows.workflow.tasks]]
+  task = "shell.exec"
+  args = "bash scripts/start.sh"
+  waitForPort = 8081
 
-[workflows.workflow.metadata]
-outputType = "console"
+  [workflows.workflow.metadata]
+  outputType = "console"
 
-[[workflows.workflow]]
-name = "Watchdog"
-author = "agent"
+  [[workflows.workflow]]
+  name = "Watchdog"
+  author = "agent"
 
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "bash scripts/watchdog.sh"
+  [[workflows.workflow.tasks]]
+  task = "shell.exec"
+  args = "bash scripts/watchdog.sh"
 
-[workflows.workflow.metadata]
-outputType = "console"
+  [workflows.workflow.metadata]
+  outputType = "console"
 
-[[workflows.workflow]]
-name = "Error Monitor"
-author = "agent"
+  [[workflows.workflow]]
+  name = "Error Monitor"
+  author = "agent"
 
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "bash scripts/error-monitor.sh"
+  [[workflows.workflow.tasks]]
+  task = "shell.exec"
+  args = "bash scripts/error-monitor.sh"
 
-[workflows.workflow.metadata]
-outputType = "console"
+  [workflows.workflow.metadata]
+  outputType = "console"
 
-[[workflows.workflow]]
-name = "Clean Metro"
-author = "agent"
+  [[workflows.workflow]]
+  name = "Clean Metro"
+  author = "agent"
 
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "bash scripts/clean-metro-restart.sh"
-waitForPort = 8081
+  [[workflows.workflow.tasks]]
+  task = "shell.exec"
+  args = "bash scripts/clean-metro-restart.sh"
+  waitForPort = 8081
 
-[workflows.workflow.metadata]
-outputType = "console"
+  [workflows.workflow.metadata]
+  outputType = "console"
 
-[[workflows.workflow]]
-name = "typecheck"
-author = "agent"
+  [[workflows.workflow]]
+  name = "typecheck"
+  author = "agent"
 
-[workflows.workflow.metadata]
-isValidation = true
+  [workflows.workflow.metadata]
+  isValidation = true
 
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "npx tsc --noEmit -p tsconfig.client.json && npx tsc --noEmit -p server/tsconfig.json"
+  [[workflows.workflow.tasks]]
+  task = "shell.exec"
+  args = "npx tsc --noEmit -p tsconfig.client.json && npx tsc --noEmit -p server/tsconfig.json"
 
-[[workflows.workflow]]
-name = "typecheck-client"
-author = "agent"
+  [[workflows.workflow]]
+  name = "typecheck-client"
+  author = "agent"
 
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "bash scripts/typecheck-client.sh"
+  [[workflows.workflow.tasks]]
+  task = "shell.exec"
+  args = "bash scripts/typecheck-client.sh"
 
-[workflows.workflow.metadata]
-isValidation = true
+  [workflows.workflow.metadata]
+  isValidation = true
 
-[[workflows.workflow]]
-name = "OTA Publish"
-author = "agent"
+  [[workflows.workflow]]
+  name = "OTA Publish"
+  author = "agent"
 
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "bash scripts/publish-ota-full.sh"
+  [[workflows.workflow.tasks]]
+  task = "shell.exec"
+  args = "bash scripts/publish-ota-full.sh"
 
-[workflows.workflow.metadata]
-outputType = "console"
+  [workflows.workflow.metadata]
+  outputType = "console"
 
-[[workflows.workflow]]
-name = "Start Backend"
-author = "agent"
+  [[workflows.workflow]]
+  name = "Start Backend"
+  author = "agent"
 
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "bash scripts/restart-backend.sh"
-waitForPort = 5000
+  [[workflows.workflow.tasks]]
+  task = "shell.exec"
+  args = "bash scripts/restart-backend.sh"
+  waitForPort = 5000
 
-[workflows.workflow.metadata]
-outputType = "console"
+  [workflows.workflow.metadata]
+  outputType = "console"
 
-[[workflows.workflow]]
-name = "lint"
-author = "agent"
+  [[workflows.workflow]]
+  name = "lint"
+  author = "agent"
 
-[workflows.workflow.metadata]
-isValidation = true
+  [workflows.workflow.metadata]
+  isValidation = true
 
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "npm run lint -- --max-warnings=0"
+  [[workflows.workflow.tasks]]
+  task = "shell.exec"
+  args = "npm run lint -- --max-warnings=0"
 
-[[workflows.workflow]]
-name = "db-migration-checks"
-author = "agent"
+  [[workflows.workflow]]
+  name = "db-migration-checks"
+  author = "agent"
 
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "npx tsx server/scripts/check-schema-migration-drift.ts && npx tsx server/scripts/check-migration-prefix-duplicates.ts && npx tsx scripts/check-index-drift.ts --static-only"
+  [[workflows.workflow.tasks]]
+  task = "shell.exec"
+  args = "npx tsx server/scripts/check-schema-migration-drift.ts && npx tsx server/scripts/check-migration-prefix-duplicates.ts && npx tsx scripts/check-index-drift.ts --static-only"
 
-[workflows.workflow.metadata]
-outputType = "console"
+  [workflows.workflow.metadata]
+  outputType = "console"
 
-[[workflows.workflow]]
-name = "schema-drift"
-author = "agent"
+  [[workflows.workflow]]
+  name = "schema-drift"
+  author = "agent"
 
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "npx tsx server/scripts/check-schema-migration-drift.ts"
+  [[workflows.workflow.tasks]]
+  task = "shell.exec"
+  args = "npx tsx server/scripts/check-schema-migration-drift.ts"
 
-[workflows.workflow.metadata]
-isValidation = true
+  [workflows.workflow.metadata]
+  isValidation = true
 
-[[workflows.workflow]]
-name = "index-drift"
-author = "agent"
+  [[workflows.workflow]]
+  name = "index-drift"
+  author = "agent"
 
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "npx tsx server/scripts/check-index-drift.ts 2>/dev/null || echo '[index-drift] script not found — skipping'"
+  [[workflows.workflow.tasks]]
+  task = "shell.exec"
+  args = "npx tsx server/scripts/check-index-drift.ts 2>/dev/null || echo '[index-drift] script not found — skipping'"
 
-[workflows.workflow.metadata]
-isValidation = true
+  [workflows.workflow.metadata]
+  isValidation = true
 
-[objectStorage]
-defaultBucketID = "replit-objstore-ca2daf22-cabb-4140-a095-7b5a6f1afcde"
+  [objectStorage]
+  defaultBucketID = "replit-objstore-ca2daf22-cabb-4140-a095-7b5a6f1afcde"
 
-[postMerge]
-path = "scripts/post-merge.sh"
-timeoutMs = 300000
+  [postMerge]
+  path = "scripts/post-merge.sh"
+  timeoutMs = 300000
 
-[userenv]
+  [userenv]
 
-[userenv.production]
-NODE_ENV = "production"
-EXPO_WEB_URL = "https://biker-link--8081.replit.app"
+  [userenv.production]
+  NODE_ENV = "production"
+  EXPO_WEB_URL = "https://biker-link--8081.replit.app"
 
-[userenv.shared]
-BIKERLINK_ADMIN_EMAIL = "admin@bikerlink.it"
-BIKERLINK_BACKEND_URL = "https://biker-link.replit.app"
-EXPO_PUBLIC_DOMAIN = "biker-link.replit.app"
-TILES_URL = "https://tiles.bikerlink.app"
-OLLAMA_URL = "https://ollama.bikerlink.duckdns.org"
-REDIS_PROBE_URL = "https://tc.bikerlink.duckdns.org/probe/redis"
+  [userenv.shared]
+  BIKERLINK_ADMIN_EMAIL = "admin@bikerlink.it"
+  BIKERLINK_BACKEND_URL = "https://biker-link.replit.app"
+  EXPO_PUBLIC_DOMAIN = "biker-link.replit.app"
+  TILES_URL = "https://tiles.bikerlink.app"
+  OLLAMA_URL = "https://ollama.bikerlink.duckdns.org"
+  REDIS_PROBE_URL = "https://tc.bikerlink.duckdns.org/probe/redis"
 
-[userenv.development]
-EXPO_WEB_URL = "http://localhost:8081"
-SMOKE_SEED_PASSWORD = "SmokeEQ_or56xnLYexcAg"
+  [userenv.development]
+  EXPO_WEB_URL = "http://localhost:8081"
+  SMOKE_SEED_PASSWORD = "SmokeEQ_or56xnLYexcAg"
 
-[[ports]]
-localPort = 5000
-externalPort = 5000
+  [[ports]]
+  localPort = 5000
+  externalPort = 80
 
-[[ports]]
-localPort = 8081
-externalPort = 80
+  [[ports]]
+  localPort = 8081
+  externalPort = 8081
 
-[[ports]]
-localPort = 8082
-externalPort = 6000
+  [[ports]]
+  localPort = 8082
+  externalPort = 6000
+  
