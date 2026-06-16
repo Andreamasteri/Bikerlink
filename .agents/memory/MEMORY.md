@@ -47,3 +47,4 @@
 - [Local embedding model projection](local-embedding-projection.md) — multilingual-e5-small produce 384 dim; client.ts proietta a 1536 (4× concat + L2-norm); model tag in DB = 'local:Xenova/multilingual-e5-small'; aggiungere alla whitelist db-integrity.
 - [AI audit logging pattern](ai-audit-logging.md) — logAiUsage() pattern, proposer Groq-only model routing fix, fingerprint+known-offline skip guards in proposer.ts.
 - [OnlineTracker touch() e restart server](online-tracker-touch-restart.md) — touch() restituisce false se user non nel tracker; heartbeat deve chiamare setOnline() via DB se touch()=false, altrimenti counter home restano a 0 dopo restart.
+- [Port mapping probe vs Express](port-mapping-probe-vs-express.md) — localPort=5000 DEVE avere externalPort=80; localPort=8081 (probe) externalPort=8081; inverso → tutto il traffico va al probe → text/plain "ok" → API rotte.
