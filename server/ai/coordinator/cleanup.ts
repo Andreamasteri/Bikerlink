@@ -1,6 +1,6 @@
 // Task #2649 — Retention notturna per ai_events / ai_decisions / ai_conflicts.
-// Retention configurabile via env `AI_AUDIT_RETENTION_DAYS` (default 90).
-// I conflitti restano 180g per audit storico.
+// Retention configurabile via env `AI_AUDIT_RETENTION_DAYS` (default 30).
+// Tutti e tre i tipi seguono la stessa finestra (nessun floor separato).
 import { Cron } from "croner";
 import { lt, sql } from "drizzle-orm";
 import { db } from "../../db";
@@ -14,15 +14,15 @@ let lastDeleted: { events: number; decisions: number; conflicts: number } | null
 
 function getRetentionDays(): number {
   const raw = process.env.AI_AUDIT_RETENTION_DAYS;
-  const n = raw ? parseInt(raw, 10) : 90;
-  if (!Number.isFinite(n) || n < 7) return 90;
+  const n = raw ? parseInt(raw, 10) : 30;
+  if (!Number.isFinite(n) || n < 7) return 30;
   return Math.min(3650, n);
 }
 
 export async function runCoordinatorCleanup(): Promise<{ events: number; decisions: number; conflicts: number }> {
   const retainDays = getRetentionDays();
   const cutoffEvents = new Date(Date.now() - retainDays * 86_400_000);
-  const cutoffConflicts = new Date(Date.now() - Math.max(retainDays, 180) * 86_400_000);
+  const cutoffConflicts = new Date(Date.now() - retainDays * 86_400_000);
 
   const evDel = await db.delete(aiEvents).where(lt(aiEvents.createdAt, cutoffEvents))
     .returning({ id: aiEvents.id });

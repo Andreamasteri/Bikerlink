@@ -21,6 +21,11 @@ import {
   mapsTelemetryEvents,
   embeddingCallLog,
   appSettings,
+  aiCallLogs,
+  aiWatchdogLog,
+  aiSuggestionsLog,
+  moderatorLogs,
+  siteVisits,
 } from "@shared/db";
 import { withDbRetry } from "../lib/db-retry";
 
@@ -45,6 +50,11 @@ const RETENTION_TARGETS: RetentionTarget[] = [
   { name: "system_signals", table: systemSignals, tsColumn: systemSignals.createdAt, retentionDays: 7 },
   { name: "maps_telemetry_events", table: mapsTelemetryEvents, tsColumn: mapsTelemetryEvents.createdAt, retentionDays: 7 },
   { name: "embedding_call_log", table: embeddingCallLog, tsColumn: embeddingCallLog.createdAt, retentionDays: 30 },
+  { name: "ai_call_logs", table: aiCallLogs, tsColumn: aiCallLogs.createdAt, retentionDays: 30 },
+  { name: "ai_suggestions_log", table: aiSuggestionsLog, tsColumn: aiSuggestionsLog.createdAt, retentionDays: 30 },
+  { name: "ai_watchdog_log", table: aiWatchdogLog, tsColumn: aiWatchdogLog.createdAt, retentionDays: 30 },
+  { name: "moderator_logs", table: moderatorLogs, tsColumn: moderatorLogs.createdAt, retentionDays: 30 },
+  { name: "site_visits", table: siteVisits, tsColumn: siteVisits.createdAt, retentionDays: 30 },
 ];
 
 const GPS_ERRORS_FULL_PURGE_FLAG = "logRetention.gpsErrorsPurgedV1";
