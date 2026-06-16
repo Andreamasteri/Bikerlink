@@ -12,6 +12,7 @@ interface AutoRecalculateProps {
   roundTripHours: number;
   headingDeg: number | null;
   language?: string;
+  geocodingOk?: boolean;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- timeout ref
   autoCalcTimeout: React.MutableRefObject<any>;
   setCalculating: (v: boolean) => void;
@@ -34,6 +35,7 @@ export const useAutoRecalculate = ({
   roundTripHours,
   headingDeg,
   language,
+  geocodingOk,
   autoCalcTimeout,
   setCalculating,
   setRouteResult,
@@ -49,7 +51,7 @@ export const useAutoRecalculate = ({
       const toCalc = isRoundTrip ? [...resolved, resolved[0]] : resolved;
       setCalculating(true);
       try {
-        const result = await calcRoute(toCalc, style, drivingProfile, avoidHighways, avoidTolls, false, false, roundTripHours, isRoundTrip, headingDeg, language);
+        const result = await calcRoute(toCalc, style, drivingProfile, avoidHighways, avoidTolls, false, false, false, roundTripHours, isRoundTrip, headingDeg, language, undefined, geocodingOk);
         setRouteResult(result);
         setDismissedWarnings(new Set());
       } catch {

@@ -337,6 +337,7 @@ export function useCreateProposalForm() {
 
     let finalLat = departureLat;
     let finalLng = departureLng;
+    let geocodingOk = true;
 
     if (!finalLat || !finalLng) {
       if (departureAddress.trim()) {
@@ -347,7 +348,9 @@ export function useCreateProposalForm() {
           setDepartureLat(finalLat);
           setDepartureLng(finalLng);
           setGpsSource("profile");
+          geocodingOk = true;
         } else {
+          geocodingOk = false;
           Alert.alert(
             "Indirizzo non trovato",
             "Non è stato possibile localizzare l'indirizzo inserito. Usa GPS o seleziona dalla mappa."
@@ -374,6 +377,7 @@ export function useCreateProposalForm() {
       departureAddress: departureAddress.trim() || "da qui....",
       departureLatitude: finalLat,
       departureLongitude: finalLng,
+      geocodingOk,
       scheduledAt: departureTimeFrom.toISOString(),
       departureTimeFrom: departureTimeFrom.toISOString(),
       departureTimeTo: departureTimeTo?.toISOString() || departureTimeFrom.toISOString(),
