@@ -84,6 +84,15 @@ check_metro_alive() {
       log "  │ (log Metro non disponibile o vuoto)"
     fi
     log "━━━ Fine log Metro ━━━"
+    log "━━━ Ultime righe log Backend (${BACKEND_LOG:-/tmp/backend.log}): ━━━"
+    if [ -f "${BACKEND_LOG:-/tmp/backend.log}" ] && [ -s "${BACKEND_LOG:-/tmp/backend.log}" ]; then
+      tail -n 20 "${BACKEND_LOG:-/tmp/backend.log}" | while IFS= read -r line; do
+        log "  │ $line"
+      done
+    else
+      log "  │ (log backend non disponibile o vuoto)"
+    fi
+    log "━━━ Fine log Backend ━━━"
     fail "2/4" "Metro/Expo (PID $EXPO_PID) è terminato durante il boot — vedi log sopra"
   fi
 }
