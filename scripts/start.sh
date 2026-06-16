@@ -1,7 +1,7 @@
 #!/bin/bash
-# start.sh — Orchestratore sequenziale BikerLink.
-# Sequenza: [1/4] build → [2/4] backend → [3/4] health check → [4/4] frontend
-# Se un passo fallisce, lo script si ferma immediatamente con un messaggio chiaro.
+# start.sh — Orchestratore BikerLink.
+# Sequenza: [1/4] build → [2/4] backend + frontend in parallelo → [3/4] health check → done
+# Metro parte subito dopo il backend, senza attendere il health check: riduce il blackout totale.
 
 set -uo pipefail
 
@@ -35,12 +35,18 @@ if ! bash "$SCRIPT_DIR/build-server.sh"; then
 fi
 log "[1/4] Build server — completato in $(elapsed_since $STEP_START)s"
 
-# ── Step 2/4: Avvio backend ───────────────────────────────────────────────────
+# ── Step 2/4: Avvio backend + frontend in parallelo ───────────────────────────
 STEP_START=$(date +%s)
 log "[2/4] Avvio backend — avvio..."
 bash "$SCRIPT_DIR/start-backend.sh" &
 BACKEND_PID=$!
 log "[2/4] Backend avviato in background (PID: $BACKEND_PID)"
+
+# Metro parte subito in background: non aspettiamo il health check.
+# Metro è progettato per gestire una finestra senza backend disponibile.
+log "[2/4] Avvio frontend (Metro/Expo) in parallelo..."
+bash "$SCRIPT_DIR/start-expo.sh" &
+log "[2/4] Frontend avviato in background"
 
 # ── Step 3/4: Health check polling ───────────────────────────────────────────
 STEP_START=$(date +%s)
@@ -80,35 +86,8 @@ fi
 
 log "[3/4] Backend healthy in $(elapsed_since $STEP_START)s"
 
-# ── Step 4/4: Avvio frontend + readiness poll ────────────────────────────────
-STEP_START=$(date +%s)
-log "[4/4] Avvio frontend (Metro/Expo) — avvio..."
-bash "$SCRIPT_DIR/start-expo.sh" &
-
-MAX_METRO_SECS=180
-METRO_READY=0
-
-log "[4/4] Attesa Metro su porta 8081 (max ${MAX_METRO_SECS}s)..."
-while true; do
-  ELAPSED=$(elapsed_since $STEP_START)
-  if [ "$ELAPSED" -ge "$MAX_METRO_SECS" ]; then
-    break
-  fi
-  if curl -s --max-time 2 "http://localhost:8081" >/dev/null 2>&1; then
-    METRO_READY=1
-    break
-  fi
-  sleep 1
-done
-
-if [ "$METRO_READY" -ne 1 ]; then
-  fail "4/4" "Metro non ready su porta 8081 dopo ${MAX_METRO_SECS}s"
-fi
-
-log "[4/4] Frontend (Metro) healthy in $(elapsed_since $STEP_START)s"
-
 TOTAL_ELAPSED=$(elapsed_since $TOTAL_START)
-log "=== Avvio completato in ${TOTAL_ELAPSED}s ==="
+log "=== Avvio completato in ${TOTAL_ELAPSED}s (Metro in parallelo su porta 8081) ==="
 
 # Mantieni lo script attivo per propagare i segnali
 wait

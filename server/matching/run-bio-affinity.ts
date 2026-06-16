@@ -24,7 +24,7 @@ import { haversineKm } from "../geo";
 import { protectedNicknamesSqlArray } from "./protection-filter";
 
 const TOP_K = 10;
-const SIM_THRESHOLD = Number(process.env.BIO_AFFINITY_THRESHOLD ?? 0.78);
+const SIM_THRESHOLD = Number(process.env.BIO_AFFINITY_THRESHOLD ?? 0.65);
 const MAX_NEW_MATCHES_PER_RUN = 500;
 const CANDIDATE_FETCH_MULTIPLIER = 4;
 

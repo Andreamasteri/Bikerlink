@@ -6,13 +6,24 @@ import { requireUserId } from "../lib/auth-middleware";
 import { sendSuccess, sendError } from "../lib/api-response";
 import { logTelemetryEvent } from "../lib/telemetry-error-log";
 import { storage } from "../storage";
+import { getInternalProbeToken, getInternalProbeHeaderName, isLoopback } from "../ai/watchdog/internal-token";
 
 const router = Router();
+
+function isInternalProbe(req: Request): boolean {
+  const headerVal = req.headers[getInternalProbeHeaderName()];
+  return (
+    typeof headerVal === "string" &&
+    headerVal === getInternalProbeToken() &&
+    isLoopback(req.ip)
+  );
+}
 
 const TARGET_KM = parseFloat(process.env.TELEMETRY_TARGET_KM ?? "1000");
 
 router.post("/batch", async (req: Request, res: Response) => {
-  const userId = requireUserId(req, res);
+  const probeMode = isInternalProbe(req);
+  const userId: string | null = probeMode ? "__probe__" : requireUserId(req, res);
   if (!userId) {
     const ua = String(req.headers["user-agent"] ?? "").slice(0, 80);
     console.warn(`[telemetry/batch] AUTH FAIL — ip=${req.ip} ua=${ua}`);

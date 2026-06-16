@@ -16,7 +16,7 @@ import { upsertEmbedding } from "../embeddings/store";
 import { limiters } from "../lib/throttle";
 
 export const TELEMETRY_STYLE_FIELD = "telemetry_style";
-export const MIN_SESSIONS_FOR_EMBED = 5;
+export const MIN_SESSIONS_FOR_EMBED = 2;
 
 /**
  * Etichette stile derivate dai bucket — usate sia nel testo descrittivo che

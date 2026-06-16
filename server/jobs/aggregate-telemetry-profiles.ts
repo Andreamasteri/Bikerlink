@@ -265,6 +265,10 @@ export async function aggregateTelemetryProfiles(): Promise<number> {
         } catch (err) {
           console.error(`[TelemetryAggregation] embedding fallito per ${r.user_id}:`, err);
         }
+      } else if (totalSessions < MIN_SESSIONS_FOR_EMBED) {
+        console.log(
+          `[TelemetryAggregation] skip embedding userId=${r.user_id} — sessioni=${totalSessions} < soglia=${MIN_SESSIONS_FOR_EMBED}`,
+        );
       }
     }
 

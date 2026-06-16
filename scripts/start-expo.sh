@@ -1,7 +1,8 @@
 #!/bin/bash
-# start-expo.sh — Avvia il dev server Expo con pulizia profonda Metro preventiva.
-# Esegue clean-metro.sh prima di lanciare expo start --reset-cache,
-# garantendo che ogni avvio parta da uno stato completamente pulito.
+# start-expo.sh — Avvia il dev server Expo con pulizia Metro condizionale.
+# Se package.json (e package-lock.json) non sono cambiati dall'ultimo avvio,
+# riusa la cache Metro esistente (nessun --reset-cache): startup più veloce.
+# Se il checksum è cambiato (nuovi pacchetti), esegue clean-metro.sh + --reset-cache.
 #
 # Lock file: /tmp/start-metro.lock — acquisizione atomica con flock(1).
 # Impedisce che il Watchdog lanci un secondo Metro mentre questo è ancora in avvio.
@@ -12,6 +13,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 METRO_PORT=8081
 LOCK_FILE="/tmp/start-metro.lock"
+CACHE_KEY_FILE="/tmp/.metro-cache-key"
 
 # ── Lock atomico con flock ────────────────────────────────────────────────────
 # fd 9 aperto in scrittura (crea il file se assente, non tronca se presente).
@@ -19,14 +21,9 @@ LOCK_FILE="/tmp/start-metro.lock"
 exec 9>"$LOCK_FILE"
 if ! flock -n 9; then
   LOCK_PID=$(cat "$LOCK_FILE" 2>/dev/null || true)
-  # Se il PID è vuoto o non numerico, validiamo che il lock sia realmente
-  # detenuto da un processo vivo. flock ha già fallito sopra: il lock è
-  # detenuto da qualcuno, ma se il PID nel file è inutilizzabile lo segnaliamo.
   if [ -z "$LOCK_PID" ] || ! [[ "$LOCK_PID" =~ ^[0-9]+$ ]]; then
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] Metro startup già in corso (PID non ancora scritto nel lock) — skip"
   elif ! kill -0 "$LOCK_PID" 2>/dev/null; then
-    # flock dice che il lock è attivo ma il PID scritto è morto: anomalia.
-    # Procediamo comunque a uscire per non duplicare l'avvio (flock è autorevole).
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] Metro startup detenuto da flock ma PID $LOCK_PID risulta morto — skip per sicurezza"
   else
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] Metro startup già in corso (PID: $LOCK_PID) — skip"
@@ -34,7 +31,6 @@ if ! flock -n 9; then
   exit 0
 fi
 # Scrivi il PID corrente nel file (utile per diagnostica e watchdog)
-# Tronca prima di scrivere per evitare PID residui dal lock precedente.
 : >&9
 echo $$ >&9
 
@@ -74,10 +70,44 @@ if [ "$PORT_FREE" -eq 0 ]; then
   exit 1
 fi
 
-# ── Pulizia Metro ─────────────────────────────────────────────────────────────
-echo "[$(date '+%Y-%m-%d %H:%M:%S')] Avvio frontend — pulizia Metro in corso..."
+# ── Checksum condizionale: reset-cache solo se le dipendenze sono cambiate ────
+# Calcola il checksum di package.json + package-lock.json (se presente).
+# Usa md5sum se disponibile, altrimenti sha1sum.
+compute_checksum() {
+  local files=()
+  [ -f "$PROJECT_ROOT/package.json" ] && files+=("$PROJECT_ROOT/package.json")
+  [ -f "$PROJECT_ROOT/package-lock.json" ] && files+=("$PROJECT_ROOT/package-lock.json")
+  [ -f "$PROJECT_ROOT/node_modules/.yarn-integrity" ] && files+=("$PROJECT_ROOT/node_modules/.yarn-integrity")
+  if [ ${#files[@]} -eq 0 ]; then
+    echo "no-files"
+    return
+  fi
+  if command -v md5sum >/dev/null 2>&1; then
+    cat "${files[@]}" | md5sum | awk '{print $1}'
+  elif command -v sha1sum >/dev/null 2>&1; then
+    cat "${files[@]}" | sha1sum | awk '{print $1}'
+  else
+    # Fallback: usa la data di modifica di package.json
+    stat -c '%Y' "$PROJECT_ROOT/package.json" 2>/dev/null || echo "no-stat"
+  fi
+}
 
-bash "$SCRIPT_DIR/clean-metro.sh"
+CURRENT_KEY=$(compute_checksum)
+SAVED_KEY=$(cat "$CACHE_KEY_FILE" 2>/dev/null || echo "")
+
+RESET_CACHE=0
+if [ "$CURRENT_KEY" != "$SAVED_KEY" ] || [ -z "$SAVED_KEY" ]; then
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')] Dipendenze cambiate (checksum: ${SAVED_KEY:-none} → $CURRENT_KEY) — reset cache Metro"
+  RESET_CACHE=1
+else
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')] Dipendenze invariate (checksum: $CURRENT_KEY) — riuso cache Metro"
+fi
+
+if [ "$RESET_CACHE" -eq 1 ]; then
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')] Avvio frontend — pulizia Metro in corso..."
+  bash "$SCRIPT_DIR/clean-metro.sh"
+  echo "$CURRENT_KEY" > "$CACHE_KEY_FILE"
+fi
 
 # ── Crea directory log Expo (evita ENOENT al primo avvio) ────────────────────
 mkdir -p "$PROJECT_ROOT/.expo/dev/logs"
@@ -85,6 +115,10 @@ mkdir -p "$PROJECT_ROOT/.expo/dev/logs"
 # ── Avvio Expo come processo figlio (non exec) ────────────────────────────────
 # Importante: NON usare exec qui. exec sostituisce la shell corrente e impedisce
 # l'esecuzione del trap EXIT, lasciando il lock file orfano.
-echo "[$(date '+%Y-%m-%d %H:%M:%S')] Avvio Expo dev server..."
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Avvio Expo dev server (reset_cache=$RESET_CACHE)..."
 cd "$PROJECT_ROOT"
-npx expo start --reset-cache
+if [ "$RESET_CACHE" -eq 1 ]; then
+  npx expo start --reset-cache
+else
+  npx expo start
+fi
