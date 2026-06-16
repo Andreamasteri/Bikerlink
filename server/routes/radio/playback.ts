@@ -11,6 +11,7 @@ import {
   STREAM_MAX_DURATION_MS,
   STREAM_MAX_CONTENT_LENGTH,
 } from "./utils";
+import { sendError } from "../../lib/api-response";
 
 const router = Router();
 
@@ -18,11 +19,11 @@ router.get("/stream", requireAuth, async (req: Request, res: Response) => {
   const userId = String((req as Request & { user?: { id?: unknown } }).user?.id ?? "unknown");
 
   if (!checkStreamRateLimit(userId)) {
-    return res.status(429).json({ error: "Too many stream requests, please slow down" });
+    return sendError(res, 429, "Too many stream requests, please slow down");
   }
 
   if (!acquireStreamSlot(userId)) {
-    return res.status(429).json({ error: "Too many concurrent streams" });
+    return sendError(res, 429, "Too many concurrent streams");
   }
 
   let slotReleased = false;
@@ -40,12 +41,12 @@ router.get("/stream", requireAuth, async (req: Request, res: Response) => {
 
   if (!streamUrl) {
     releaseSlot();
-    return res.status(400).json({ error: "url is required" });
+    return sendError(res, 400, "url is required");
   }
 
   if (!(await validateStreamUrl(streamUrl))) {
     releaseSlot();
-    return res.status(400).json({ error: "url is not valid or not allowed" });
+    return sendError(res, 400, "url is not valid or not allowed");
   }
 
   // controller1 covers the initial connection + optional redirect handshake (10s each).
@@ -83,18 +84,18 @@ router.get("/stream", requireAuth, async (req: Request, res: Response) => {
       const location = upstream.headers.get("location");
       if (!location) {
         cleanup();
-        return res.status(502).json({ error: "Redirect without Location header" });
+        return sendError(res, 502, "Redirect without Location header");
       }
       let redirectTarget: URL;
       try {
         redirectTarget = new URL(location, streamUrl);
       } catch {
         cleanup();
-        return res.status(400).json({ error: "Invalid redirect target" });
+        return sendError(res, 400, "Invalid redirect target");
       }
       if (!(await validateStreamUrl(redirectTarget.href))) {
         cleanup();
-        return res.status(400).json({ error: "Redirect target is not allowed" });
+        return sendError(res, 400, "Redirect target is not allowed");
       }
       const controller2 = new AbortController();
       const timer2 = setTimeout(() => controller2.abort(), 10000);
@@ -111,7 +112,7 @@ router.get("/stream", requireAuth, async (req: Request, res: Response) => {
         clearTimeout(timer2);
         if (finalResponse.status >= 300 && finalResponse.status < 400) {
           cleanup();
-          return res.status(400).json({ error: "Too many redirects" });
+          return sendError(res, 400, "Too many redirects");
         }
         // Redirect succeeded — streaming will use controller2, not controller1.
         activeController = controller2;
@@ -119,7 +120,7 @@ router.get("/stream", requireAuth, async (req: Request, res: Response) => {
         clearTimeout(timer2);
         cleanup();
         if (!res.headersSent) {
-          return res.status(502).json({ error: "Cannot connect to redirected stream" });
+          return sendError(res, 502, "Cannot connect to redirected stream");
         }
         return;
       }
@@ -127,7 +128,7 @@ router.get("/stream", requireAuth, async (req: Request, res: Response) => {
 
     if (!finalResponse.ok) {
       cleanup();
-      return res.status(502).json({ error: `Upstream error: ${finalResponse.status}` });
+      return sendError(res, 502, `Upstream error: ${finalResponse.status}`);
     }
 
     const contentType = finalResponse.headers.get("Content-Type") || "audio/mpeg";
@@ -135,7 +136,7 @@ router.get("/stream", requireAuth, async (req: Request, res: Response) => {
       // SSRF defense-in-depth: even if URL/IP validation were bypassed, this
       // prevents the proxy from returning HTML/JSON/etc. from internal services.
       cleanup();
-      return res.status(415).json({ error: "Upstream content-type is not an audio/video stream" });
+      return sendError(res, 415, "Upstream content-type is not an audio/video stream");
     }
 
     // Reject responses that declare a large finite body — legitimate radio streams
@@ -144,7 +145,7 @@ router.get("/stream", requireAuth, async (req: Request, res: Response) => {
     const declaredLength = parseInt(finalResponse.headers.get("Content-Length") ?? "", 10);
     if (!isNaN(declaredLength) && declaredLength > STREAM_MAX_CONTENT_LENGTH) {
       cleanup();
-      return res.status(413).json({ error: "Upstream response is too large for a radio stream" });
+      return sendError(res, 413, "Upstream response is too large for a radio stream");
     }
 
     const transferEncoding = finalResponse.headers.get("Transfer-Encoding");
@@ -157,7 +158,7 @@ router.get("/stream", requireAuth, async (req: Request, res: Response) => {
 
     if (!finalResponse.body) {
       cleanup();
-      return res.status(502).json({ error: "No response body from upstream" });
+      return sendError(res, 502, "No response body from upstream");
     }
 
     // Now that we know the active controller, wire up duration cap and client-close
@@ -201,7 +202,7 @@ router.get("/stream", requireAuth, async (req: Request, res: Response) => {
     const isTimeout = err instanceof Error && err.name === "AbortError";
     console.error(`[radio] stream proxy error${isTimeout ? " (timeout)" : ""}:`, err);
     if (!res.headersSent) {
-      return res.status(isTimeout ? 504 : 502).json({ error: isTimeout ? "Stream timeout" : "Cannot connect to stream" });
+      return sendError(res, isTimeout ? 504 : 502, isTimeout ? "Stream timeout" : "Cannot connect to stream");
     }
   }
 });

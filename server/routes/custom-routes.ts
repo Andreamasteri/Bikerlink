@@ -3,6 +3,7 @@ import { storage } from "../storage";
 import { allLimited } from "../lib/concurrency";
 import { haversineKm } from "../geo";
 import { createCustomRouteSchema, updateCustomRouteSchema, createWaypointSchema, updateWaypointSchema, gpxImportSchema } from "@shared/validators";
+import { sendError } from "../lib/api-response";
 
 const router = Router();
 
@@ -23,7 +24,7 @@ function resolveVisibility(visibility: unknown, isPublic: unknown): Visibility {
 router.get("/api/custom-routes", async (req, res) => {
   try {
     const userId = req.session.userId;
-    if (!userId) return res.status(401).json({ error: "Non autenticato" });
+    if (!userId) return sendError(res, 401, "Non autenticato");
 
     const featureSetting = await storage.getAppSetting("custom_routes_enabled");
     if (featureSetting?.value === "false") {
@@ -62,23 +63,23 @@ router.get("/api/custom-routes", async (req, res) => {
 
     res.json({ disabled: false, myRoutes, publicRoutes });
   } catch (error: unknown) {
-    res.status(500).json({ error: error instanceof Error ? error.message : "Errore interno" });
+    sendError(res, 500, error instanceof Error ? error.message : "Errore interno");
   }
 });
 
 router.post("/api/custom-routes", async (req, res) => {
   try {
     const userId = req.session.userId;
-    if (!userId) return res.status(401).json({ error: "Non autenticato" });
+    if (!userId) return sendError(res, 401, "Non autenticato");
 
     const featureSetting = await storage.getAppSetting("custom_routes_enabled");
     if (featureSetting?.value === "false") {
-      return res.status(403).json({ error: "Funzione disattivata" });
+      return sendError(res, 403, "Funzione disattivata");
     }
 
     const parsedCr = createCustomRouteSchema.safeParse(req.body);
     if (!parsedCr.success) {
-      return res.status(400).json({ error: parsedCr.error.issues[0].message });
+      return sendError(res, 400, parsedCr.error.issues[0].message);
     }
     const { title, description, isPublic, visibility } = parsedCr.data;
     const resolvedVis = resolveVisibility(visibility, isPublic);
@@ -93,17 +94,17 @@ router.post("/api/custom-routes", async (req, res) => {
 
     res.json(route);
   } catch (error: unknown) {
-    res.status(500).json({ error: error instanceof Error ? error.message : "Errore interno" });
+    sendError(res, 500, error instanceof Error ? error.message : "Errore interno");
   }
 });
 
 router.get("/api/custom-routes/:id", async (req, res) => {
   try {
     const userId = req.session.userId;
-    if (!userId) return res.status(401).json({ error: "Non autenticato" });
+    if (!userId) return sendError(res, 401, "Non autenticato");
 
     const route = await storage.getCustomRoute(req.params.id);
-    if (!route) return res.status(404).json({ error: "Percorso non trovato" });
+    if (!route) return sendError(res, 404, "Percorso non trovato");
 
     const rawVis: unknown = (route as Record<string, unknown>).visibility;
     const routeVisibility: Visibility = isValidVisibility(rawVis)
@@ -114,11 +115,11 @@ router.get("/api/custom-routes/:id", async (req, res) => {
 
     if (route.userId !== userId) {
       if (routeVisibility === "private") {
-        return res.status(403).json({ error: "Accesso negato" });
+        return sendError(res, 403, "Accesso negato");
       }
       if (routeVisibility === "friends") {
         const isFriend = await storage.isUserFriendOf(userId, route.userId);
-        if (!isFriend) return res.status(403).json({ error: "Accesso negato" });
+        if (!isFriend) return sendError(res, 403, "Accesso negato");
       }
     }
 
@@ -133,22 +134,22 @@ router.get("/api/custom-routes/:id", async (req, res) => {
       creatorNickname: creator?.nickname || "Sconosciuto",
     });
   } catch (error: unknown) {
-    res.status(500).json({ error: error instanceof Error ? error.message : "Errore interno" });
+    sendError(res, 500, error instanceof Error ? error.message : "Errore interno");
   }
 });
 
 router.put("/api/custom-routes/:id", async (req, res) => {
   try {
     const userId = req.session.userId;
-    if (!userId) return res.status(401).json({ error: "Non autenticato" });
+    if (!userId) return sendError(res, 401, "Non autenticato");
 
     const route = await storage.getCustomRoute(req.params.id);
-    if (!route) return res.status(404).json({ error: "Percorso non trovato" });
-    if (route.userId !== userId) return res.status(403).json({ error: "Non autorizzato" });
+    if (!route) return sendError(res, 404, "Percorso non trovato");
+    if (route.userId !== userId) return sendError(res, 403, "Non autorizzato");
 
     const parsedUpd = updateCustomRouteSchema.safeParse(req.body);
     if (!parsedUpd.success) {
-      return res.status(400).json({ error: parsedUpd.error.issues[0].message });
+      return sendError(res, 400, parsedUpd.error.issues[0].message);
     }
     const { title, description, isPublic, visibility, totalDistanceKm } = parsedUpd.data;
 
@@ -174,54 +175,54 @@ router.put("/api/custom-routes/:id", async (req, res) => {
 
     res.json(updated);
   } catch (error: unknown) {
-    res.status(500).json({ error: error instanceof Error ? error.message : "Errore interno" });
+    sendError(res, 500, error instanceof Error ? error.message : "Errore interno");
   }
 });
 
 router.delete("/api/custom-routes/:id", async (req, res) => {
   try {
     const userId = req.session.userId;
-    if (!userId) return res.status(401).json({ error: "Non autenticato" });
+    if (!userId) return sendError(res, 401, "Non autenticato");
 
     const route = await storage.getCustomRoute(req.params.id);
-    if (!route) return res.status(404).json({ error: "Percorso non trovato" });
-    if (route.userId !== userId) return res.status(403).json({ error: "Non autorizzato" });
+    if (!route) return sendError(res, 404, "Percorso non trovato");
+    if (route.userId !== userId) return sendError(res, 403, "Non autorizzato");
 
     await storage.deleteCustomRoute(req.params.id);
     res.json({ success: true });
   } catch (error: unknown) {
-    res.status(500).json({ error: error instanceof Error ? error.message : "Errore interno" });
+    sendError(res, 500, error instanceof Error ? error.message : "Errore interno");
   }
 });
 
 router.delete("/api/custom-routes/:id/waypoints", async (req, res) => {
   try {
     const userId = req.session.userId;
-    if (!userId) return res.status(401).json({ error: "Non autenticato" });
+    if (!userId) return sendError(res, 401, "Non autenticato");
 
     const route = await storage.getCustomRoute(req.params.id);
-    if (!route) return res.status(404).json({ error: "Percorso non trovato" });
-    if (route.userId !== userId) return res.status(403).json({ error: "Non autorizzato" });
+    if (!route) return sendError(res, 404, "Percorso non trovato");
+    if (route.userId !== userId) return sendError(res, 403, "Non autorizzato");
 
     await storage.deleteAllCustomRouteWaypoints(route.id);
     res.json({ success: true });
   } catch (error: unknown) {
-    res.status(500).json({ error: error instanceof Error ? error.message : "Errore interno" });
+    sendError(res, 500, error instanceof Error ? error.message : "Errore interno");
   }
 });
 
 router.post("/api/custom-routes/:id/waypoints", async (req, res) => {
   try {
     const userId = req.session.userId;
-    if (!userId) return res.status(401).json({ error: "Non autenticato" });
+    if (!userId) return sendError(res, 401, "Non autenticato");
 
     const route = await storage.getCustomRoute(req.params.id);
-    if (!route) return res.status(404).json({ error: "Percorso non trovato" });
-    if (route.userId !== userId) return res.status(403).json({ error: "Non autorizzato" });
+    if (!route) return sendError(res, 404, "Percorso non trovato");
+    if (route.userId !== userId) return sendError(res, 403, "Non autorizzato");
 
     const parsedWp = createWaypointSchema.safeParse(req.body);
     if (!parsedWp.success) {
-      return res.status(400).json({ error: parsedWp.error.issues[0].message });
+      return sendError(res, 400, parsedWp.error.issues[0].message);
     }
     const { name, description, latitude, longitude, waypointType, orderIndex } = parsedWp.data;
 
@@ -237,22 +238,22 @@ router.post("/api/custom-routes/:id/waypoints", async (req, res) => {
 
     res.json(waypoint);
   } catch (error: unknown) {
-    res.status(500).json({ error: error instanceof Error ? error.message : "Errore interno" });
+    sendError(res, 500, error instanceof Error ? error.message : "Errore interno");
   }
 });
 
 router.put("/api/custom-routes/:id/waypoints/:waypointId", async (req, res) => {
   try {
     const userId = req.session.userId;
-    if (!userId) return res.status(401).json({ error: "Non autenticato" });
+    if (!userId) return sendError(res, 401, "Non autenticato");
 
     const route = await storage.getCustomRoute(req.params.id);
-    if (!route) return res.status(404).json({ error: "Percorso non trovato" });
-    if (route.userId !== userId) return res.status(403).json({ error: "Non autorizzato" });
+    if (!route) return sendError(res, 404, "Percorso non trovato");
+    if (route.userId !== userId) return sendError(res, 403, "Non autorizzato");
 
     const parsedWpUpd = updateWaypointSchema.safeParse(req.body);
     if (!parsedWpUpd.success) {
-      return res.status(400).json({ error: parsedWpUpd.error.issues[0].message });
+      return sendError(res, 400, parsedWpUpd.error.issues[0].message);
     }
     const { name, description, latitude, longitude, waypointType, orderIndex } = parsedWpUpd.data;
     const updated = await storage.updateCustomRouteWaypoint(req.params.waypointId, {
@@ -266,23 +267,23 @@ router.put("/api/custom-routes/:id/waypoints/:waypointId", async (req, res) => {
 
     res.json(updated);
   } catch (error: unknown) {
-    res.status(500).json({ error: error instanceof Error ? error.message : "Errore interno" });
+    sendError(res, 500, error instanceof Error ? error.message : "Errore interno");
   }
 });
 
 router.delete("/api/custom-routes/:id/waypoints/:waypointId", async (req, res) => {
   try {
     const userId = req.session.userId;
-    if (!userId) return res.status(401).json({ error: "Non autenticato" });
+    if (!userId) return sendError(res, 401, "Non autenticato");
 
     const route = await storage.getCustomRoute(req.params.id);
-    if (!route) return res.status(404).json({ error: "Percorso non trovato" });
-    if (route.userId !== userId) return res.status(403).json({ error: "Non autorizzato" });
+    if (!route) return sendError(res, 404, "Percorso non trovato");
+    if (route.userId !== userId) return sendError(res, 403, "Non autorizzato");
 
     await storage.deleteCustomRouteWaypoint(req.params.waypointId);
     res.json({ success: true });
   } catch (error: unknown) {
-    res.status(500).json({ error: error instanceof Error ? error.message : "Errore interno" });
+    sendError(res, 500, error instanceof Error ? error.message : "Errore interno");
   }
 });
 
@@ -357,25 +358,25 @@ function gpxWaypointType(index: number, total: number): string {
 router.post("/api/custom-routes/import-gpx", async (req, res) => {
   try {
     const userId = req.session.userId;
-    if (!userId) return res.status(401).json({ error: "Non autenticato" });
+    if (!userId) return sendError(res, 401, "Non autenticato");
 
     const featureSetting = await storage.getAppSetting("custom_routes_enabled");
     if (featureSetting?.value === "false") {
-      return res.status(403).json({ error: "Funzione disattivata" });
+      return sendError(res, 403, "Funzione disattivata");
     }
 
     const parsedGpx = gpxImportSchema.safeParse(req.body);
     if (!parsedGpx.success) {
-      return res.status(400).json({ error: parsedGpx.error.issues[0].message });
+      return sendError(res, 400, parsedGpx.error.issues[0].message);
     }
     const { gpxData: gpxContent, title } = parsedGpx.data;
 
     const points = parseGpxServer(gpxContent);
     if (points.length === 0) {
-      return res.status(422).json({ error: "Nessuna tappa trovata nel file GPX" });
+      return sendError(res, 422, "Nessuna tappa trovata nel file GPX");
     }
     if (points.length < 2) {
-      return res.status(422).json({ error: "Il file GPX deve contenere almeno 2 tappe" });
+      return sendError(res, 422, "Il file GPX deve contenere almeno 2 tappe");
     }
 
     const routeTitle =
@@ -408,7 +409,7 @@ router.post("/api/custom-routes/import-gpx", async (req, res) => {
     res.json({ ...route, waypoints });
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : "Errore interno";
-    res.status(500).json({ error: msg });
+    sendError(res, 500, msg);
   }
 });
 
@@ -418,10 +419,10 @@ router.post("/api/custom-routes/import-gpx", async (req, res) => {
 router.get("/api/custom-routes/:id/elevation", async (req, res) => {
   try {
     const userId = req.session.userId;
-    if (!userId) return res.status(401).json({ error: "Non autenticato" });
+    if (!userId) return sendError(res, 401, "Non autenticato");
 
     const route = await storage.getCustomRoute(req.params.id);
-    if (!route) return res.status(404).json({ message: "Percorso non trovato" });
+    if (!route) return sendError(res, 404, "Percorso non trovato");
 
     const rawVis: unknown = (route as Record<string, unknown>).visibility;
     const routeVisibility = isValidVisibility(rawVis)
@@ -432,11 +433,11 @@ router.get("/api/custom-routes/:id/elevation", async (req, res) => {
 
     if (route.userId !== userId) {
       if (routeVisibility === "private") {
-        return res.status(403).json({ message: "Non autorizzato" });
+        return sendError(res, 403, "Non autorizzato");
       }
       if (routeVisibility === "friends") {
         const isFriend = await storage.isUserFriendOf(userId, route.userId);
-        if (!isFriend) return res.status(403).json({ message: "Non autorizzato" });
+        if (!isFriend) return sendError(res, 403, "Non autorizzato");
       }
     }
 
@@ -446,7 +447,7 @@ router.get("/api/custom-routes/:id/elevation", async (req, res) => {
       .filter((wp) => wp.latitude !== 0 || wp.longitude !== 0);
 
     if (validWps.length < 2) {
-      return res.status(422).json({ message: "Nessun punto disponibile per il profilo altimetrico" });
+      return sendError(res, 422, "Nessun punto disponibile per il profilo altimetrico");
     }
 
     const rawPoints: [number, number][] = validWps.map((wp) => [wp.latitude, wp.longitude]);
@@ -488,12 +489,12 @@ router.get("/api/custom-routes/:id/elevation", async (req, res) => {
       elevations = (topoData.results ?? []).map((r) => Math.round(r.elevation ?? 0));
     } catch (err) {
       console.error("[custom-routes elevation] OpenTopoData error:", err);
-      return res.status(502).json({ message: "Dati altimetrici non disponibili al momento" });
+      return sendError(res, 502, "Dati altimetrici non disponibili al momento");
     }
 
     const validEle = elevations.filter((e) => e != null && !isNaN(e));
     if (validEle.length === 0) {
-      return res.status(502).json({ message: "Dati altimetrici non disponibili al momento" });
+      return sendError(res, 502, "Dati altimetrici non disponibili al momento");
     }
 
     const minEle = Math.min(...validEle);
@@ -517,7 +518,7 @@ router.get("/api/custom-routes/:id/elevation", async (req, res) => {
     });
   } catch (err: unknown) {
     console.error("[custom-routes elevation] error:", err);
-    return res.status(500).json({ message: "Errore profilo altimetrico" });
+    return sendError(res, 500, "Errore profilo altimetrico");
   }
 });
 
@@ -525,7 +526,7 @@ router.get("/api/custom-routes/:id/elevation", async (req, res) => {
 router.get("/api/users/:userId/custom-routes", async (req, res) => {
   try {
     const sessionUserId = req.session.userId;
-    if (!sessionUserId) return res.status(401).json({ error: "Non autenticato" });
+    if (!sessionUserId) return sendError(res, 401, "Non autenticato");
 
     const { userId } = req.params;
     const routesRaw = await storage.getCustomRoutes(userId);
@@ -555,7 +556,7 @@ router.get("/api/users/:userId/custom-routes", async (req, res) => {
 
     res.json({ routes: enriched });
   } catch (error: unknown) {
-    res.status(500).json({ error: error instanceof Error ? error.message : "Errore interno" });
+    sendError(res, 500, error instanceof Error ? error.message : "Errore interno");
   }
 });
 

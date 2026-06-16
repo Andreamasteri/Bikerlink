@@ -7,6 +7,7 @@
 
 import { Router } from "express";
 import { storage } from "../storage";
+import { sendError } from "../lib/api-response";
 
 const router = Router();
 
@@ -16,11 +17,11 @@ const router = Router();
 router.post("/api/custom-routes/:id/duplicate", async (req, res) => {
   try {
     const userId = req.session.userId;
-    if (!userId) return res.status(401).json({ error: "Non autenticato" });
+    if (!userId) return sendError(res, 401, "Non autenticato");
 
     const { id } = req.params;
     const original = await storage.getCustomRoute(id);
-    if (!original) return res.status(404).json({ error: "Percorso non trovato" });
+    if (!original) return sendError(res, 404, "Percorso non trovato");
 
     const isOwner = original.userId === userId;
     const isPublic =
@@ -28,7 +29,7 @@ router.post("/api/custom-routes/:id/duplicate", async (req, res) => {
       (original.visibility !== "private" && original.isPublic);
 
     if (!isOwner && !isPublic) {
-      return res.status(403).json({ error: "Accesso non consentito" });
+      return sendError(res, 403, "Accesso non consentito");
     }
 
     const copy = await storage.createCustomRoute({
@@ -58,7 +59,7 @@ router.post("/api/custom-routes/:id/duplicate", async (req, res) => {
     return res.status(201).json({ route: copy, waypoints: copiedWaypoints });
   } catch (err: unknown) {
     console.error("[custom-routes2 duplicate] error:", err);
-    return res.status(500).json({ error: "Errore durante la duplicazione del percorso" });
+    return sendError(res, 500, "Errore durante la duplicazione del percorso");
   }
 });
 

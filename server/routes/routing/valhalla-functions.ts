@@ -14,6 +14,7 @@ import { Router, type Request, type Response } from "express";
 import { z } from "zod";
 import { requireAuth } from "../../lib/auth-middleware";
 import { getIsochrone, getMatrix } from "../../routing/valhalla-client";
+import { sendError } from "../../lib/api-response";
 
 const router = Router();
 
@@ -28,10 +29,8 @@ function handleValhallaError(err: unknown, res: Response, endpoint: string): Res
   console.error(`[routing/${endpoint}] Valhalla error:`, msg);
 
   if (!isValhallaConfigured() || msg.includes("VALHALLA_URL non configurato")) {
-    return res.status(503).json({
-      ok: false,
-      error: "Valhalla non configurato: impostare VALHALLA_URL per usare questa funzione.",
-    });
+    sendError(res, 503, "Valhalla non configurato: impostare VALHALLA_URL per usare questa funzione.");
+    return res;
   }
 
   const isOffline =
@@ -40,13 +39,12 @@ function handleValhallaError(err: unknown, res: Response, endpoint: string): Res
     /error 5\d{2}/.test(msg);
 
   if (isOffline) {
-    return res.status(503).json({
-      ok: false,
-      error: "Valhalla non raggiungibile. Riprovare più tardi.",
-    });
+    sendError(res, 503, "Valhalla non raggiungibile. Riprovare più tardi.");
+    return res;
   }
 
-  return res.status(502).json({ ok: false, error: msg.slice(0, 300) });
+  sendError(res, 502, msg.slice(0, 300));
+  return res;
 }
 
 // ─── Schemi di validazione ───────────────────────────────────────────────────
@@ -81,17 +79,14 @@ const matrixSchema = z.object({
  */
 router.post("/isochrone", requireAuth, async (req: Request, res: Response) => {
   if (!isValhallaConfigured()) {
-    return res.status(503).json({
-      ok: false,
-      error: "Valhalla non configurato: impostare VALHALLA_URL per usare questa funzione.",
-    });
+    return sendError(res, 503, "Valhalla non configurato: impostare VALHALLA_URL per usare questa funzione.");
   }
 
   const parsed = isochroneSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({
-      ok: false,
-      error: "Input non valido",
+      success: false,
+      message: "Input non valido",
       details: parsed.error.flatten().fieldErrors,
     });
   }
@@ -116,17 +111,14 @@ router.post("/isochrone", requireAuth, async (req: Request, res: Response) => {
  */
 router.post("/matrix", requireAuth, async (req: Request, res: Response) => {
   if (!isValhallaConfigured()) {
-    return res.status(503).json({
-      ok: false,
-      error: "Valhalla non configurato: impostare VALHALLA_URL per usare questa funzione.",
-    });
+    return sendError(res, 503, "Valhalla non configurato: impostare VALHALLA_URL per usare questa funzione.");
   }
 
   const parsed = matrixSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({
-      ok: false,
-      error: "Input non valido",
+      success: false,
+      message: "Input non valido",
       details: parsed.error.flatten().fieldErrors,
     });
   }

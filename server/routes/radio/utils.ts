@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 export { requireAuth } from "../../lib/auth-middleware";
+import { sendError } from "../../lib/api-response";
 import dnsPromises from "dns/promises";
 import net from "net";
 import { Agent } from "undici";
@@ -23,7 +24,7 @@ export function previewPlaylistRateLimiter(req: Request, res: Response, next: Ne
     return next();
   }
   if (entry.count >= PREVIEW_RATE_LIMIT_MAX) {
-    return res.status(429).json({ error: "Troppe richieste" });
+    return sendError(res, 429, "Troppe richieste");
   }
   entry.count++;
   return next();

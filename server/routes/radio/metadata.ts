@@ -5,6 +5,7 @@ import {
   PreviewApiItem, 
   PreviewResultItem 
 } from "./utils";
+import { sendError } from "../../lib/api-response";
 
 const router = Router();
 
@@ -12,7 +13,7 @@ router.get("/preview", async (req: Request, res: Response) => {
   const { track, artist } = req.query as { track?: string; artist?: string };
 
   if (!track) {
-    return res.status(400).json({ error: "track is required" });
+    return sendError(res, 400, "track is required");
   }
 
   const term = [track, artist].filter(Boolean).join(" ");
@@ -22,7 +23,7 @@ router.get("/preview", async (req: Request, res: Response) => {
     const resp = await fetch(url, buildFetchInit({ userAgent: "BikerLink/4.0.0", timeoutMs: 5000 }));
 
     if (!resp.ok) {
-      return res.status(502).json({ error: "iTunes API error" });
+      return sendError(res, 502, "iTunes API error");
     }
 
     const data = (await resp.json()) as { results?: PreviewApiItem[] };
@@ -43,7 +44,7 @@ router.get("/preview", async (req: Request, res: Response) => {
   } catch (err) {
     const isTimeout = err instanceof Error && err.name === "AbortError";
     console.error(`[radio] preview error${isTimeout ? " (timeout)" : ""}:`, err);
-    return res.status(504).json({ error: isTimeout ? "iTunes timeout" : "Impossibile caricare la preview" });
+    return sendError(res, 504, isTimeout ? "iTunes timeout" : "Impossibile caricare la preview");
   }
 });
 
@@ -53,14 +54,14 @@ router.get("/preview-playlist", previewPlaylistRateLimiter, async (req: Request,
   const { tracks } = req.query;
 
   if (!tracks) {
-    return res.status(400).json({ error: "tracks is required" });
+    return sendError(res, 400, "tracks is required");
   }
 
   let trackList: Array<{ trackName: string; artistName: string }> = [];
   try {
     trackList = JSON.parse(decodeURIComponent(tracks as string));
   } catch {
-    return res.status(400).json({ error: "tracks must be valid JSON array" });
+    return sendError(res, 400, "tracks must be valid JSON array");
   }
 
   const results: PreviewResultItem[] = [];

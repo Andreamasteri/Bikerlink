@@ -23,6 +23,7 @@ import {
   tileProxyRateLimiter,
   getTrustedClientIp,
 } from "../../lib/abuse-rate-limit";
+import { sendError } from "../../lib/api-response";
 
 const router = Router();
 
@@ -31,18 +32,18 @@ router.get("/tiles/:providerId/:z/:x/:y", requireAuth, async (req: Request, res:
   const ip = getTrustedClientIp(req);
 
   if (tileProxyRateLimiter.isOverLimit(userId, ip)) {
-    return res.status(429).json({ error: "Troppo richieste — riprova tra un momento" });
+    return sendError(res, 429, "Troppo richieste — riprova tra un momento");
   }
 
   const { providerId, z, x, y } = req.params as Record<string, string>;
 
   const provider = findTileProvider(providerId);
   if (!provider) {
-    return res.status(404).json({ error: "Provider sconosciuto" });
+    return sendError(res, 404, "Provider sconosciuto");
   }
 
   if (provider.archived) {
-    return res.status(404).json({ error: "Provider archiviato — non disponibile" });
+    return sendError(res, 404, "Provider archiviato — non disponibile");
   }
 
   let baseUrl = resolveTileUrl(provider);
@@ -60,13 +61,13 @@ router.get("/tiles/:providerId/:z/:x/:y", requireAuth, async (req: Request, res:
     if (upstream.status === 429) {
       await markQuotaExceeded(providerId);
       res.setHeader("X-Tile-Fallback-Needed", "true");
-      return res.status(503).json({ error: "Quota tile esaurita", fallbackNeeded: true });
+      return res.status(503).json({ success: false, message: "Quota tile esaurita", fallbackNeeded: true });
     }
 
     if (upstream.status >= 500) {
       await markUnreachable(providerId);
       res.setHeader("X-Tile-Fallback-Needed", "true");
-      return res.status(503).json({ error: "Provider irraggiungibile", fallbackNeeded: true });
+      return res.status(503).json({ success: false, message: "Provider irraggiungibile", fallbackNeeded: true });
     }
 
     if (!upstream.ok) {
@@ -82,7 +83,7 @@ router.get("/tiles/:providerId/:z/:x/:y", requireAuth, async (req: Request, res:
     console.error(`[tile-proxy] Fetch error for ${providerId} (${baseUrl}):`, err);
     await markUnreachable(providerId);
     res.setHeader("X-Tile-Fallback-Needed", "true");
-    return res.status(503).json({ error: "Provider irraggiungibile", fallbackNeeded: true });
+    return res.status(503).json({ success: false, message: "Provider irraggiungibile", fallbackNeeded: true });
   }
 });
 

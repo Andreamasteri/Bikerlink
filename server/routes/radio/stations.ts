@@ -1,5 +1,6 @@
 import { Router, Request, Response } from "express";
 import { fetchRadioBrowser, CURATED_GENRES, GENRE_TAG_MAP, RadioBrowserStation } from "./utils";
+import { sendError } from "../../lib/api-response";
 
 const router = Router();
 
@@ -17,7 +18,7 @@ router.get("/stations", async (req: Request, res: Response) => {
   const limit = Math.min(Number(req.query.limit) || 20, 50);
 
   if (!genre) {
-    return res.status(400).json({ error: "genre is required" });
+    return sendError(res, 400, "genre is required");
   }
 
   const tag = GENRE_TAG_MAP[genre] ?? genre;
@@ -53,7 +54,7 @@ router.get("/stations", async (req: Request, res: Response) => {
     return res.json(mapped);
   } catch (err) {
     console.error("[radio] stations error:", err);
-    return res.status(502).json({ error: "Impossibile caricare le stazioni radio" });
+    return sendError(res, 502, "Impossibile caricare le stazioni radio");
   }
 });
 
