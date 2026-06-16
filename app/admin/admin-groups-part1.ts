@@ -12,7 +12,7 @@ export const adminGroupsPart1: AdminGroup[] = [
         icon: "people",
         iconSet: "MaterialIcons",
         route: "/admin/users",
-        keywords: ["utente", "user", "account", "profilo", "profile", "ban", "sospendi", "sospensione", "blocca", "block", "registrazione", "lista utenti"],
+        keywords: ["utente", "user", "account", "profilo", "profile", "ban", "sospendi", "sospensione", "blocca", "block", "registrazione", "lista utenti", "elimina utente", "delete user", "verifica email", "email verification", "ruolo", "role", "modifica utente", "cerca utente", "search user"],
       },
       {
         key: "stregatti",
@@ -20,7 +20,7 @@ export const adminGroupsPart1: AdminGroup[] = [
         icon: "robot",
         iconSet: "MaterialCommunityIcons",
         route: "/admin/stregatti",
-        keywords: ["stregatto", "bot", "robot", "fake", "simulato", "utente finto", "seed"],
+        keywords: ["stregatto", "bot", "robot", "fake", "simulato", "utente finto", "seed", "automatico", "automated", "simulazione", "phantom", "dummy", "account finto", "test user", "utente test"],
       },
       {
         key: "blocks",
@@ -28,7 +28,7 @@ export const adminGroupsPart1: AdminGroup[] = [
         icon: "ban",
         iconSet: "Ionicons",
         route: "/admin/blocks",
-        keywords: ["blocco", "block", "ban", "sospensione", "bannato", "banned", "sospeso"],
+        keywords: ["blocco", "block", "ban", "sospensione", "bannato", "banned", "sospeso", "mute", "silenzia", "restrizione", "restriction", "kick", "rimuovi", "sanzione", "penalty"],
       },
     ],
   },
@@ -44,7 +44,7 @@ export const adminGroupsPart1: AdminGroup[] = [
         iconSet: "MaterialCommunityIcons",
         route: "/admin/reports-hub",
         accentColor: "#FF3B30",
-        keywords: ["segnalazione", "report", "hub", "dashboard", "reclamo", "abuso"],
+        keywords: ["segnalazione", "report", "hub", "dashboard", "reclamo", "abuso", "overview", "riepilogo", "violazione", "violation", "contenuto inappropriato", "moderazione"],
       },
       {
         key: "reports",
@@ -53,7 +53,7 @@ export const adminGroupsPart1: AdminGroup[] = [
         iconSet: "MaterialIcons",
         route: "/admin/reports",
         accentColor: "#FF9500",
-        keywords: ["segnalazione", "report", "coda", "queue", "flag", "revisione", "moderazione"],
+        keywords: ["segnalazione", "report", "coda", "queue", "flag", "revisione", "moderazione", "pending", "in attesa", "spam", "contenuto inappropriato", "inappropriate", "review", "approva", "rifiuta", "reject"],
       },
       {
         key: "reports-by-category",
@@ -62,7 +62,7 @@ export const adminGroupsPart1: AdminGroup[] = [
         iconSet: "MaterialCommunityIcons",
         route: "/admin/reports-by-category",
         accentColor: "#0EA5E9",
-        keywords: ["segnalazione", "report", "categoria", "category", "tipo", "type"],
+        keywords: ["segnalazione", "report", "categoria", "category", "tipo", "type", "filtro", "filter", "classificazione", "classification", "raggruppamento", "group", "odio", "hate", "violenza", "violence", "nudità", "nudity"],
       },
       {
         key: "reports-by-role",
@@ -71,7 +71,7 @@ export const adminGroupsPart1: AdminGroup[] = [
         iconSet: "MaterialCommunityIcons",
         route: "/admin/reports-by-role",
         accentColor: "#10B981",
-        keywords: ["segnalazione", "report", "ruolo", "role", "moderatore", "admin"],
+        keywords: ["segnalazione", "report", "ruolo", "role", "moderatore", "admin", "assegnazione", "assignment", "responsabile", "owner", "gestione", "management", "chi gestisce"],
       },
       {
         key: "reports-patterns",
@@ -80,7 +80,7 @@ export const adminGroupsPart1: AdminGroup[] = [
         iconSet: "MaterialCommunityIcons",
         route: "/admin/reports-patterns",
         accentColor: "#E91E63",
-        keywords: ["pattern", "analisi", "trend", "grafico", "chart", "segnalazione ricorrente"],
+        keywords: ["pattern", "analisi", "trend", "grafico", "chart", "segnalazione ricorrente", "frequenza", "frequency", "ripetuto", "repeated", "utente problematico", "serie temporale", "picco", "spike"],
       },
       {
         key: "false-reports",
@@ -89,7 +89,7 @@ export const adminGroupsPart1: AdminGroup[] = [
         iconSet: "MaterialCommunityIcons",
         route: "/admin/false-reports",
         accentColor: "#9C27B0",
-        keywords: ["falso", "false", "spam", "abuso segnalazione", "false report", "report errato"],
+        keywords: ["falso", "false", "spam", "abuso segnalazione", "false report", "report errato", "trolling", "in malafede", "sanzione", "penalty", "segnalazione abusiva", "bad faith"],
       },
       {
         key: "active-bans",
@@ -98,7 +98,7 @@ export const adminGroupsPart1: AdminGroup[] = [
         iconSet: "MaterialCommunityIcons",
         route: "/admin/active-bans",
         accentColor: "#FF3B30",
-        keywords: ["ban", "bannato", "sospeso", "sospensione", "blocco", "attivo", "active"],
+        keywords: ["ban", "bannato", "sospeso", "sospensione", "blocco", "attivo", "active", "scadenza", "expiry", "durata", "duration", "temporaneo", "temporary", "permanente", "permanent", "sanzione", "rimuovi ban"],
       },
       {
         key: "moderator-logs",
@@ -107,7 +107,7 @@ export const adminGroupsPart1: AdminGroup[] = [
         iconSet: "MaterialCommunityIcons",
         route: "/admin/moderator-logs",
         accentColor: "#6366F1",
-        keywords: ["log", "moderatore", "moderazione", "storico", "history", "audit", "azioni admin"],
+        keywords: ["log", "moderatore", "moderazione", "storico", "history", "audit", "azioni admin", "audit trail", "registro", "chi ha fatto cosa", "admin actions", "operazioni", "traccia moderazione"],
       },
       {
         key: "reports-thresholds",
@@ -116,7 +116,7 @@ export const adminGroupsPart1: AdminGroup[] = [
         iconSet: "MaterialCommunityIcons",
         route: "/admin/reports-thresholds",
         accentColor: "#22C55E",
-        keywords: ["soglia", "threshold", "policy", "regola", "rule", "limite", "limit", "configurazione moderazione"],
+        keywords: ["soglia", "threshold", "policy", "regola", "rule", "limite", "limit", "configurazione moderazione", "automatico", "auto-ban", "trigger", "impostazione", "auto-moderation", "parametri"],
       },
     ],
   },
@@ -131,7 +131,7 @@ export const adminGroupsPart1: AdminGroup[] = [
         icon: "store",
         iconSet: "MaterialIcons",
         route: "/admin/workshops",
-        keywords: ["officina", "workshop", "meccanico", "negozio", "shop", "riparazione", "garage"],
+        keywords: ["officina", "workshop", "meccanico", "negozio", "shop", "riparazione", "garage", "partner", "servizio", "service", "verificato", "verified", "moto", "motorcycle", "gommista", "carrozzeria"],
       },
       {
         key: "motoclubs",
@@ -139,7 +139,7 @@ export const adminGroupsPart1: AdminGroup[] = [
         icon: "shield",
         iconSet: "Ionicons",
         route: "/admin/motoclubs",
-        keywords: ["club", "motoclub", "gruppo", "community", "associazione", "gang", "biker"],
+        keywords: ["club", "motoclub", "gruppo", "community", "associazione", "gang", "biker", "organizzazione", "organization", "admin club", "gestione club", "modifica club", "approva club", "membro"],
       },
       {
         key: "eventi",
@@ -147,7 +147,7 @@ export const adminGroupsPart1: AdminGroup[] = [
         icon: "calendar",
         iconSet: "Ionicons",
         route: "/admin/eventi",
-        keywords: ["evento", "event", "raduno", "meeting", "incontro", "calendario", "gita", "uscita"],
+        keywords: ["evento", "event", "raduno", "meeting", "incontro", "calendario", "gita", "uscita", "approvazione", "approval", "cancella", "cancel", "partecipanti", "participants", "iscrizioni", "date", "data"],
       },
       {
         key: "easter-eggs",
@@ -155,7 +155,7 @@ export const adminGroupsPart1: AdminGroup[] = [
         icon: "egg-easter",
         iconSet: "MaterialCommunityIcons",
         route: "/admin/easter-eggs",
-        keywords: ["easter egg", "segreto", "hidden", "nascosto", "badge", "achievement", "premi"],
+        keywords: ["easter egg", "segreto", "hidden", "nascosto", "badge", "achievement", "premi", "gamification", "ricompensa", "reward", "sblocca", "unlock", "missione", "mission", "livello", "level"],
       },
       {
         key: "ads",
@@ -163,7 +163,7 @@ export const adminGroupsPart1: AdminGroup[] = [
         icon: "campaign",
         iconSet: "MaterialIcons",
         route: "/admin/ads",
-        keywords: ["campagna", "ads", "pubblicità", "advertising", "banner", "promozione", "sponsor"],
+        keywords: ["campagna", "ads", "pubblicità", "advertising", "banner", "promozione", "sponsor", "monetizzazione", "monetization", "impressioni", "impressions", "click", "ctr", "budget", "targeting", "annuncio", "annunci"],
       },
     ],
   },
@@ -178,7 +178,7 @@ export const adminGroupsPart1: AdminGroup[] = [
         icon: "analytics",
         iconSet: "MaterialIcons",
         route: "/admin/analytics",
-        keywords: ["analytics", "statistiche", "stats", "metriche", "dati", "grafico", "chart", "kpi"],
+        keywords: ["analytics", "statistiche", "stats", "metriche", "dati", "grafico", "chart", "kpi", "utenti attivi", "active users", "retention", "crescita", "growth", "dashboard", "andamento", "report analytics"],
       },
       {
         key: "performance",
@@ -186,7 +186,7 @@ export const adminGroupsPart1: AdminGroup[] = [
         icon: "speedometer",
         iconSet: "Ionicons",
         route: "/admin/performance",
-        keywords: ["performance", "prestazioni", "velocità", "speed", "latenza", "latency", "benchmark"],
+        keywords: ["performance", "prestazioni", "velocità", "speed", "latenza", "latency", "benchmark", "tempo risposta", "response time", "throughput", "server load", "ottimizzazione", "optimization", "api response", "slow"],
       },
       {
         key: "gps-errors",
@@ -194,7 +194,7 @@ export const adminGroupsPart1: AdminGroup[] = [
         icon: "location-sharp",
         iconSet: "Ionicons",
         route: "/admin/gps-errors",
-        keywords: ["gps", "errore", "error", "log", "posizione", "location", "geolocalizzazione"],
+        keywords: ["gps", "errore", "error", "log", "posizione", "location", "geolocalizzazione", "timeout", "segnale", "signal", "accuratezza", "accuracy", "coordinate", "satellite", "gnss", "fix gps"],
       },
       {
         key: "gps-rejections",
@@ -203,7 +203,7 @@ export const adminGroupsPart1: AdminGroup[] = [
         iconSet: "Ionicons",
         route: "/admin/gps-rejections",
         accentColor: "#FF9500",
-        keywords: ["gps", "rifiutato", "rejected", "scartato", "posizione scartata", "filtro gps"],
+        keywords: ["gps", "rifiutato", "rejected", "scartato", "posizione scartata", "filtro gps", "outlier", "anomalo", "anomaly", "spike", "jitter", "coordinate errate", "invalid position", "salto gps"],
       },
       {
         key: "db-debug",
@@ -211,7 +211,7 @@ export const adminGroupsPart1: AdminGroup[] = [
         icon: "database",
         iconSet: "MaterialCommunityIcons",
         route: "/admin/db-debug",
-        keywords: ["database", "db", "debug", "sql", "query", "postgres", "tabella"],
+        keywords: ["database", "db", "debug", "sql", "query", "postgres", "tabella", "schema", "indice", "index", "slow query", "explain", "piano esecuzione", "ottimizzazione query", "performance db", "postgresql"],
       },
       {
         key: "db-tables",
@@ -219,7 +219,7 @@ export const adminGroupsPart1: AdminGroup[] = [
         icon: "database-settings",
         iconSet: "MaterialCommunityIcons",
         route: "/admin/db-tables",
-        keywords: ["database", "db", "dimensione", "size", "spazio", "storage", "tabella", "peso"],
+        keywords: ["database", "db", "dimensione", "size", "spazio", "storage", "tabella", "peso", "ottimizzazione", "vacuum", "pulizia", "cleanup", "occupazione", "bloat", "gigabyte", "mb"],
       },
       {
         key: "system",
@@ -228,7 +228,7 @@ export const adminGroupsPart1: AdminGroup[] = [
         iconSet: "Ionicons",
         route: "/admin/system",
         accentColor: "#FF4444",
-        keywords: ["sistema", "system", "monitor", "cpu", "ram", "memoria", "server", "risorse", "health"],
+        keywords: ["sistema", "system", "monitor", "cpu", "ram", "memoria", "server", "risorse", "health", "load average", "disco", "disk", "io", "rete", "network", "uptime", "availability", "processo", "process"],
       },
       {
         key: "resource-monitor",
@@ -237,7 +237,7 @@ export const adminGroupsPart1: AdminGroup[] = [
         iconSet: "MaterialCommunityIcons",
         route: "/admin/resource-monitor",
         accentColor: "#8B5CF6",
-        keywords: ["risorse", "salute", "resource", "ram", "batteria", "battery", "crash", "riavvio", "restart", "grafico", "campionamento", "metriche dispositivo", "uptime", "logging weight"],
+        keywords: ["risorse", "salute", "resource", "ram", "batteria", "battery", "crash", "riavvio", "restart", "grafico", "campionamento", "metriche dispositivo", "uptime", "logging weight", "memoria", "cpu", "health"],
       },
       {
         key: "moderator-logs",
@@ -245,7 +245,7 @@ export const adminGroupsPart1: AdminGroup[] = [
         icon: "shield-account-outline",
         iconSet: "MaterialCommunityIcons",
         route: "/admin/moderator-logs",
-        keywords: ["log", "moderatore", "moderazione", "storico", "history", "audit", "azioni admin"],
+        keywords: ["log", "moderatore", "moderazione", "storico", "history", "audit", "azioni admin", "audit trail", "registro", "chi ha fatto cosa", "admin actions", "operazioni", "traccia"],
       },
       {
         key: "crash-logs",
@@ -254,7 +254,7 @@ export const adminGroupsPart1: AdminGroup[] = [
         iconSet: "MaterialCommunityIcons",
         route: "/admin/crash-logs",
         accentColor: "#FF6B35",
-        keywords: ["crash", "riavvio", "restart", "log", "errore app", "crash report", "stability"],
+        keywords: ["crash", "riavvio", "restart", "log", "errore app", "crash report", "stability", "eccezione", "exception", "stack trace", "traceback", "fatal", "oom", "out of memory", "freeze", "hang", "errore critico"],
       },
       {
         key: "visitatori",
@@ -263,7 +263,7 @@ export const adminGroupsPart1: AdminGroup[] = [
         iconSet: "MaterialCommunityIcons",
         route: "/admin/visitatori",
         accentColor: "#22C55E",
-        keywords: ["visitatore", "visitor", "sito", "web", "landing", "traffico", "traffic", "accessi"],
+        keywords: ["visitatore", "visitor", "sito", "web", "landing", "traffico", "traffic", "accessi", "sessione web", "bounce rate", "conversione", "conversion", "funnel", "registrati", "nuovo utente"],
       },
       {
         key: "device-stats",
@@ -272,7 +272,7 @@ export const adminGroupsPart1: AdminGroup[] = [
         iconSet: "MaterialCommunityIcons",
         route: "/admin/device-stats",
         accentColor: "#6366F1",
-        keywords: ["dispositivo", "device", "telefono", "phone", "ios", "android", "versione app", "client"],
+        keywords: ["dispositivo", "device", "telefono", "phone", "ios", "android", "versione app", "client", "sistema operativo", "os version", "modello", "model", "distribuzione", "app version", "screen", "schermo"],
       },
     ],
   },
@@ -288,7 +288,7 @@ export const adminGroupsPart1: AdminGroup[] = [
         iconSet: "MaterialCommunityIcons",
         route: "/admin/newsletter",
         accentColor: "#2196F3",
-        keywords: ["newsletter", "email", "mailing", "iscritti", "subscriber", "invio", "comunicazione"],
+        keywords: ["newsletter", "email", "mailing", "iscritti", "subscriber", "invio", "comunicazione", "campagna email", "template", "invio massivo", "mass mail", "open rate", "apertura", "disiscritto", "unsubscribe", "notifica email"],
       },
     ],
   },
@@ -304,7 +304,7 @@ export const adminGroupsPart1: AdminGroup[] = [
         iconSet: "MaterialCommunityIcons",
         route: "/admin/matching-hub",
         accentColor: "#0EA5E9",
-        keywords: ["matching", "hub", "dashboard", "accoppiamento", "suggerimenti", "recommendations"],
+        keywords: ["matching", "hub", "dashboard", "accoppiamento", "suggerimenti", "recommendations", "overview", "panoramica", "riepilogo matching", "statistiche match"],
       },
       {
         key: "match-engine",
@@ -313,7 +313,7 @@ export const adminGroupsPart1: AdminGroup[] = [
         iconSet: "MaterialCommunityIcons",
         route: "/admin/match-engine",
         accentColor: "#FF9500",
-        keywords: ["matching", "motore", "engine", "algoritmo", "algorithm", "ml", "intelligenza artificiale"],
+        keywords: ["matching", "motore", "engine", "algoritmo", "algorithm", "ml", "intelligenza artificiale", "ai matching", "score", "punteggio", "compatibilità", "compatibility", "configurazione motore"],
       },
       {
         key: "match-rules",
@@ -322,7 +322,7 @@ export const adminGroupsPart1: AdminGroup[] = [
         iconSet: "MaterialCommunityIcons",
         route: "/admin/match-rules",
         accentColor: "#10B981",
-        keywords: ["matching", "regola", "rule", "configurazione", "peso", "score", "criterio"],
+        keywords: ["matching", "regola", "rule", "configurazione", "peso", "score", "criterio", "parametro", "priorità", "priority", "filtro", "filter", "condizione"],
       },
       {
         key: "match-inspector",
@@ -331,7 +331,7 @@ export const adminGroupsPart1: AdminGroup[] = [
         iconSet: "MaterialCommunityIcons",
         route: "/admin/match-inspector",
         accentColor: "#2196F3",
-        keywords: ["matching", "inspector", "ispezione", "debug match", "coppia", "pair", "analisi match"],
+        keywords: ["matching", "inspector", "ispezione", "debug match", "coppia", "pair", "analisi match", "perché match", "why matched", "dettaglio", "detail", "spiegazione", "explanation"],
       },
       {
         key: "match-control",
@@ -340,7 +340,7 @@ export const adminGroupsPart1: AdminGroup[] = [
         iconSet: "MaterialCommunityIcons",
         route: "/admin/match-control",
         accentColor: "#9C27B0",
-        keywords: ["matching", "controllo", "control", "sistema", "toggle", "kill switch", "abilitazione"],
+        keywords: ["matching", "controllo", "control", "sistema", "toggle", "kill switch", "abilitazione", "disabilita", "abilita", "enable", "disable", "pausa matching", "reset matching"],
       },
       {
         key: "match-health",
@@ -349,7 +349,7 @@ export const adminGroupsPart1: AdminGroup[] = [
         iconSet: "MaterialCommunityIcons",
         route: "/admin/match-health",
         accentColor: "#4CAF50",
-        keywords: ["matching", "health", "salute", "stato", "status", "diagnostica"],
+        keywords: ["matching", "health", "salute", "stato", "status", "diagnostica", "disponibilità", "availability", "errore matching", "latenza matching", "anomalia"],
       },
       {
         key: "matching-telemetry",
@@ -358,7 +358,7 @@ export const adminGroupsPart1: AdminGroup[] = [
         iconSet: "MaterialCommunityIcons",
         route: "/admin/matching-telemetry",
         accentColor: "#22C55E",
-        keywords: ["matching", "telemetria", "telemetry", "metriche", "dati", "statistiche", "log matching"],
+        keywords: ["matching", "telemetria", "telemetry", "metriche", "dati", "statistiche", "log matching", "andamento", "trend", "grafico", "chart", "tempo reale"],
       },
       {
         key: "ab",
@@ -367,7 +367,7 @@ export const adminGroupsPart1: AdminGroup[] = [
         iconSet: "MaterialCommunityIcons",
         route: "/admin/ab",
         accentColor: "#E91E63",
-        keywords: ["ab test", "esperimento", "experiment", "split test", "variante", "variant", "test"],
+        keywords: ["ab test", "esperimento", "experiment", "split test", "variante", "variant", "test", "gruppo controllo", "control group", "risultati test", "significatività", "conversion test"],
       },
     ],
   },
