@@ -245,12 +245,11 @@ export default function FloatingWidget() {
     transform: [{ translateX: posX.value }, { translateY: posY.value }],
   }));
 
+  // Menu is nested inside widgetContainer so it inherits the parent transform.
+  // Only opacity and the swipe-dismiss translateY are needed here — no posX/posY.
   const menuAnimatedStyle = useAnimatedStyle(() => ({
     opacity: menuOpacity.value,
-    transform: [
-      { translateX: posX.value },
-      { translateY: posY.value + menuTranslateY.value },
-    ],
+    transform: [{ translateY: menuTranslateY.value }],
   }));
 
   const handleChatPress = useCallback(() => {
@@ -283,52 +282,52 @@ export default function FloatingWidget() {
 
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
+      {/* Backdrop: catches taps outside the menu at root level */}
       {menuOpen && (
         <Pressable style={StyleSheet.absoluteFill} onPress={closeMenu} />
       )}
 
-      {menuOpen && (
-        <Animated.View
-          style={[styles.menuContainer, menuAnimatedStyle]}
-          pointerEvents="box-none"
-        >
-          <GestureDetector gesture={menuPanGesture}>
-            <View style={[styles.menu, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-              <TouchableOpacity style={styles.menuItem} onPress={handleChatPress} activeOpacity={0.7}>
-                <Ionicons name="chatbubbles" size={18} color={colors.accent} />
-                <Text style={[styles.menuLabel, { color: colors.text }]}>Chat</Text>
-                {unreadChat > 0 && (
-                  <View style={[styles.menuBadge, { backgroundColor: colors.accent }]}>
-                    <Text style={styles.menuBadgeText}>{unreadChat > 99 ? "99+" : unreadChat}</Text>
-                  </View>
-                )}
-              </TouchableOpacity>
-
-              <View style={[styles.menuDivider, { backgroundColor: colors.border }]} />
-
-              <TouchableOpacity style={styles.menuItem} onPress={handleNotificationsPress} activeOpacity={0.7}>
-                <Ionicons name="notifications" size={18} color={colors.accent} />
-                <Text style={[styles.menuLabel, { color: colors.text }]}>Notifiche</Text>
-                {unreadNotifications > 0 && (
-                  <View style={[styles.menuBadge, { backgroundColor: colors.accentRed ?? "#FF3B30" }]}>
-                    <Text style={styles.menuBadgeText}>{unreadNotifications > 99 ? "99+" : unreadNotifications}</Text>
-                  </View>
-                )}
-              </TouchableOpacity>
-
-              <View style={[styles.menuDivider, { backgroundColor: colors.border }]} />
-
-              <TouchableOpacity style={styles.menuItem} onPress={handlePlayerPress} activeOpacity={0.7}>
-                <Ionicons name="musical-notes" size={18} color={colors.accent} />
-                <Text style={[styles.menuLabel, { color: colors.text }]}>Player</Text>
-              </TouchableOpacity>
-            </View>
-          </GestureDetector>
-        </Animated.View>
-      )}
-
       <GestureDetector gesture={composedGesture}>
         <Animated.View style={[styles.widgetContainer, widgetAnimatedStyle]}>
+          {/* Menu is a child of the widget container — it inherits the parent transform
+              so it always stays locked to the widget position. */}
+          {menuOpen && (
+            <GestureDetector gesture={menuPanGesture}>
+              <Animated.View style={[styles.menuWrapper, menuAnimatedStyle]}>
+                <View style={[styles.menu, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                  <TouchableOpacity style={styles.menuItem} onPress={handleChatPress} activeOpacity={0.7}>
+                    <Ionicons name="chatbubbles" size={18} color={colors.accent} />
+                    <Text style={[styles.menuLabel, { color: colors.text }]}>Chat</Text>
+                    {unreadChat > 0 && (
+                      <View style={[styles.menuBadge, { backgroundColor: colors.accent }]}>
+                        <Text style={styles.menuBadgeText}>{unreadChat > 99 ? "99+" : unreadChat}</Text>
+                      </View>
+                    )}
+                  </TouchableOpacity>
+
+                  <View style={[styles.menuDivider, { backgroundColor: colors.border }]} />
+
+                  <TouchableOpacity style={styles.menuItem} onPress={handleNotificationsPress} activeOpacity={0.7}>
+                    <Ionicons name="notifications" size={18} color={colors.accent} />
+                    <Text style={[styles.menuLabel, { color: colors.text }]}>Notifiche</Text>
+                    {unreadNotifications > 0 && (
+                      <View style={[styles.menuBadge, { backgroundColor: colors.accentRed ?? "#FF3B30" }]}>
+                        <Text style={styles.menuBadgeText}>{unreadNotifications > 99 ? "99+" : unreadNotifications}</Text>
+                      </View>
+                    )}
+                  </TouchableOpacity>
+
+                  <View style={[styles.menuDivider, { backgroundColor: colors.border }]} />
+
+                  <TouchableOpacity style={styles.menuItem} onPress={handlePlayerPress} activeOpacity={0.7}>
+                    <Ionicons name="musical-notes" size={18} color={colors.accent} />
+                    <Text style={[styles.menuLabel, { color: colors.text }]}>Player</Text>
+                  </TouchableOpacity>
+                </View>
+              </Animated.View>
+            </GestureDetector>
+          )}
+
           <Pressable
             onPress={Platform.OS === "web" ? handleTapJS : undefined}
             style={{ width: WIDGET_SIZE, height: WIDGET_SIZE }}
@@ -357,15 +356,11 @@ export default function FloatingWidget() {
 }
 
 const styles = StyleSheet.create({
-  menuContainer: {
-    position: "absolute",
-    width: WIDGET_SIZE,
-    height: WIDGET_SIZE,
-  },
   widgetContainer: {
     position: "absolute",
     width: WIDGET_SIZE,
     height: WIDGET_SIZE,
+    overflow: "visible",
     elevation: 20,
     zIndex: 9999,
   },
@@ -400,10 +395,15 @@ const styles = StyleSheet.create({
     fontWeight: "700" as const,
     lineHeight: 12,
   },
-  menu: {
+  // Absolutely positioned wrapper that anchors the menu above and right-aligned
+  // to the widget. Because it lives inside widgetContainer it automatically
+  // follows the widget's drag position — no duplicate posX/posY needed.
+  menuWrapper: {
     position: "absolute",
     right: 0,
     bottom: WIDGET_SIZE + 8,
+  },
+  menu: {
     borderRadius: 12,
     borderWidth: 1,
     minWidth: 160,
