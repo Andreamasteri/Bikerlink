@@ -11,6 +11,11 @@ function loc(): typeof import("expo-location") {
   return _expoLocation!;
 }
 
+export interface SharedPosition {
+  latitude: number;
+  longitude: number;
+}
+
 interface LocationContextType {
   hasLocationPermission: boolean;
   locationPermissionDenied: boolean;
@@ -23,6 +28,10 @@ interface LocationContextType {
   requestPermission: () => Promise<boolean>;
   requestBackgroundPermission: () => Promise<boolean>;
   positionReady: boolean;
+  currentPosition: SharedPosition | null;
+  positionLoading: boolean;
+  suspendSharedWatch: () => void;
+  resumeSharedWatch: () => void;
 }
 
 const LocationContext = createContext<LocationContextType>({
@@ -37,6 +46,10 @@ const LocationContext = createContext<LocationContextType>({
   requestPermission: async () => true,
   requestBackgroundPermission: async () => false,
   positionReady: true,
+  currentPosition: null,
+  positionLoading: true,
+  suspendSharedWatch: () => {},
+  resumeSharedWatch: () => {},
 });
 
 export function useLocationGate() {
@@ -54,8 +67,14 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
   const [backgroundPermissionChecked, setBackgroundPermissionChecked] = useState(false);
   const [backgroundPermissionRevoked, setBackgroundPermissionRevoked] = useState(false);
   const [positionReady] = useState(true);
+
+  const [currentPosition, setCurrentPosition] = useState<SharedPosition | null>(null);
+  const [positionLoading, setPositionLoading] = useState(true);
+
   const appState = useRef(AppState.currentState);
   const hadBackgroundPermissionRef = useRef(false);
+  const sharedWatchRef = useRef<import("expo-location").LocationSubscription | null>(null);
+  const suspendedRef = useRef(false);
 
   const { data: gpsData } = useQuery<{ required: boolean }>({
     queryKey: ["/api/settings/gps-required"],
@@ -126,6 +145,51 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  const startSharedWatch = useCallback(async () => {
+    if (sharedWatchRef.current) return;
+    if (suspendedRef.current) return;
+    try {
+      const { status } = await loc().getForegroundPermissionsAsync();
+      if (status !== "granted") {
+        setPositionLoading(false);
+        return;
+      }
+      sharedWatchRef.current = await loc().watchPositionAsync(
+        {
+          accuracy: loc().Accuracy.Balanced,
+          timeInterval: 5000,
+          distanceInterval: 10,
+        },
+        (locationObj) => {
+          setCurrentPosition({
+            latitude: locationObj.coords.latitude,
+            longitude: locationObj.coords.longitude,
+          });
+          setPositionLoading(false);
+        }
+      );
+    } catch {
+      setPositionLoading(false);
+    }
+  }, []);
+
+  const stopSharedWatch = useCallback(() => {
+    if (sharedWatchRef.current) {
+      sharedWatchRef.current.remove();
+      sharedWatchRef.current = null;
+    }
+  }, []);
+
+  const suspendSharedWatch = useCallback(() => {
+    suspendedRef.current = true;
+    stopSharedWatch();
+  }, [stopSharedWatch]);
+
+  const resumeSharedWatch = useCallback(() => {
+    suspendedRef.current = false;
+    startSharedWatch();
+  }, [startSharedWatch]);
+
   useEffect(() => {
     sendStartupBeacon("location_provider_mount");
   }, []);
@@ -134,6 +198,16 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
     checkPermission();
     checkBackgroundPermission();
   }, [checkPermission, checkBackgroundPermission]);
+
+  useEffect(() => {
+    if (hasPermission) {
+      startSharedWatch();
+    } else {
+      stopSharedWatch();
+      setPositionLoading(false);
+    }
+    return () => {};
+  }, [hasPermission, startSharedWatch, stopSharedWatch]);
 
   useEffect(() => {
     if (!gpsRequired) return;
@@ -158,6 +232,12 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
     return () => subscription.remove();
   }, [checkPermission, checkBackgroundPermission]);
 
+  useEffect(() => {
+    return () => {
+      stopSharedWatch();
+    };
+  }, [stopSharedWatch]);
+
   const isGpsGateActive = gpsRequired && !hasPermission;
 
   return (
@@ -173,6 +253,10 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
       requestPermission,
       requestBackgroundPermission,
       positionReady,
+      currentPosition,
+      positionLoading,
+      suspendSharedWatch,
+      resumeSharedWatch,
     }}>
       {children}
     </LocationContext.Provider>

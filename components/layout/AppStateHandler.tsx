@@ -1,13 +1,11 @@
 import { useEffect, useRef } from "react";
 import { AppState, Platform } from "react-native";
-import * as Location from "expo-location";
 import { useAuth } from "@/lib/auth-context";
 import { useLocationGate } from "@/lib/location-context";
 import { queryClient, apiRequest } from "@/lib/query-client";
 import { sendStartupBeacon } from "@/lib/startup-beacon";
 import { isTrackingActive, registerLayoutWatcherCallbacks } from "@/lib/tracking-active";
 import { initCrashLogger, markClean, resetCrashLogger } from "@/lib/crash-logger";
-import { emitGpsPosition } from "@/lib/shared-gps-position";
 import {
   startBackgroundLocationTask,
   stopBackgroundLocationTask,
@@ -25,6 +23,7 @@ import Constants from "expo-constants";
 import { getDeviceModel } from "@/lib/device-model";
 
 const HEARTBEAT_INTERVAL_MS = 2 * 60 * 1000;
+const SOCIAL_LOCATION_THROTTLE_MS = 30000;
 
 // Module-level export so auth-context can read the current session ID
 // before issuing the logout request (client-side per-session close).
@@ -76,79 +75,41 @@ async function endSession(sessionId: string, exitType: "background" | "logout" |
 
 export function AppStateHandler() {
   const { user } = useAuth();
-  const { hasBackgroundPermission } = useLocationGate();
+  const { hasBackgroundPermission, currentPosition } = useLocationGate();
   const appStateRef = useRef(AppState.currentState);
   const heartbeatTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const locationWatcherRef = useRef<Location.LocationSubscription | null>(null);
-  const nativeWatcherStartingRef = useRef(false);
   const sessionIdRef = useRef<string | null>(null);
+  const lastSocialUpdateRef = useRef<number>(0);
+  const socialPausedRef = useRef<boolean>(false);
 
   useEffect(() => {
-    if (hasBackgroundPermission && locationWatcherRef.current) {
-      locationWatcherRef.current.remove();
-      locationWatcherRef.current = null;
-    }
-  }, [hasBackgroundPermission]);
+    registerLayoutWatcherCallbacks(
+      () => { socialPausedRef.current = true; },
+      () => { socialPausedRef.current = false; }
+    );
+  }, []);
+
+  useEffect(() => {
+    if (!user || !currentPosition || hasBackgroundPermission) return;
+    if (isTrackingActive() || socialPausedRef.current) return;
+
+    const now = Date.now();
+    if (now - lastSocialUpdateRef.current < SOCIAL_LOCATION_THROTTLE_MS) return;
+
+    lastSocialUpdateRef.current = now;
+    const lat = currentPosition.latitude;
+    const lng = currentPosition.longitude;
+    (async () => {
+      const ghost = await AsyncStorage.getItem("@bikerlink/ghost_mode_active").catch(() => null);
+      if (ghost === "true") return;
+      await apiRequest("PUT", "/api/users/location", { latitude: lat, longitude: lng }).catch(() => {});
+    })();
+  }, [user, currentPosition, hasBackgroundPermission]);
 
   useEffect(() => {
     if (!user) return;
 
     let cancelled = false;
-
-    async function startNativeWatcher() {
-      if (locationWatcherRef.current) return;
-      if (hasBackgroundPermission) return;
-      if (nativeWatcherStartingRef.current) {
-        sendStartupBeacon("watch_position_concurrent_blocked");
-        return;
-      }
-      nativeWatcherStartingRef.current = true;
-      try {
-        sendStartupBeacon("gps_check_start");
-        const { status } = await Location.getForegroundPermissionsAsync();
-        if (status !== "granted" || cancelled) return;
-        if (isTrackingActive()) return;
-        sendStartupBeacon("watch_position_start");
-        let cbFired = false;
-        locationWatcherRef.current = await Location.watchPositionAsync(
-          {
-            accuracy: Location.Accuracy.Balanced,
-            timeInterval: 30000,
-            distanceInterval: 20,
-          },
-          async (loc) => {
-            if (!cbFired) {
-              cbFired = true;
-              sendStartupBeacon("watch_position_callback");
-            }
-            const coords = { latitude: loc.coords.latitude, longitude: loc.coords.longitude };
-            emitGpsPosition(coords);
-            try {
-              await apiRequest("PUT", "/api/users/location", coords);
-            } catch {
-              // no-op: ignore location update failures in foreground watcher
-            }
-          }
-        );
-      } catch {
-        // no-op: ignore GPS permission or watcher failures
-      } finally {
-        nativeWatcherStartingRef.current = false;
-      }
-    }
-
-    function stopNativeWatcher() {
-      if (locationWatcherRef.current) {
-        locationWatcherRef.current.remove();
-        locationWatcherRef.current = null;
-      }
-    }
-
-    registerLayoutWatcherCallbacks(stopNativeWatcher, () => {
-      if (!locationWatcherRef.current && !hasBackgroundPermission) {
-        startNativeWatcher();
-      }
-    });
 
     queryClient.prefetchQuery({ queryKey: ["/api/settings/music-provider"], staleTime: 120_000 }).catch(() => {});
     queryClient.prefetchQuery({ queryKey: ["/api/lastfm/status"], staleTime: 60_000 }).catch(() => {});
@@ -159,7 +120,6 @@ export function AppStateHandler() {
     heartbeatTimerRef.current = setInterval(sendHeartbeat, HEARTBEAT_INTERVAL_MS);
 
     sendStartupBeacon("app_state_handler_mount");
-    startNativeWatcher();
 
     startSession().then((id) => {
       if (!cancelled) {
@@ -190,10 +150,6 @@ export function AppStateHandler() {
         queryClient.invalidateQueries({ queryKey: ["/api/users/biker-available-list"] });
         queryClient.invalidateQueries({ queryKey: ["/api/users/zavorrine-available-list"] });
 
-        if (!locationWatcherRef.current && !hasBackgroundPermission) {
-          startNativeWatcher();
-        }
-
         startSession().then((id) => {
           sessionIdRef.current = id;
           _currentSessionId = id;
@@ -207,7 +163,6 @@ export function AppStateHandler() {
       cancelled = true;
       subscription.remove();
       if (heartbeatTimerRef.current) clearInterval(heartbeatTimerRef.current);
-      stopNativeWatcher();
       markClean().catch(() => {});
       const sid = sessionIdRef.current;
       if (sid) {
@@ -216,7 +171,6 @@ export function AppStateHandler() {
         endSession(sid, "background");
       }
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
   useEffect(() => {

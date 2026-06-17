@@ -15,6 +15,8 @@ import type { GpsPoint } from "@/components/tracking/useGpsTracking";
 
 const BACKGROUND_LOCATION_TASK = "bikerlink-bg-location";
 const BG_POINTS_KEY = "@bikerlink/bg_points_pending";
+const MAP_LAST_GPS_KEY = "map_last_gps";
+const GHOST_MODE_KEY = "@bikerlink/ghost_mode_active";
 
 interface TrackingHandlerDeps {
   t: ReturnType<typeof useT>;
@@ -186,6 +188,16 @@ export function useTrackingHandlers(deps: TrackingHandlerDeps) {
       } catch { /* ignore */ }
     }
 
+    const lastCoord = gps.lastPosRef.current;
+    if (lastCoord) {
+      try {
+        await AsyncStorage.setItem(
+          MAP_LAST_GPS_KEY,
+          JSON.stringify({ latitude: lastCoord.lat, longitude: lastCoord.lng })
+        );
+      } catch { /* ignore: cache write is best-effort */ }
+    }
+
     session.setCompletedRouteId(rId);
     mapState.setSummaryRoutePoints(gps.mapCoordsRef.current.map((c: any) => ({ lat: c.latitude, lng: c.longitude })));
 
@@ -240,3 +252,5 @@ export function useTrackingHandlers(deps: TrackingHandlerDeps) {
 
   return { startDeviceMotion, discardSprintAttempt, handleStart, handleStop, handlePause, handleRecalibrate };
 }
+
+export { GHOST_MODE_KEY };

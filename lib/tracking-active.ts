@@ -1,3 +1,7 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
+
+const TRACKING_ACTIVE_KEY = "@bikerlink/tracking_active";
+
 let _isTrackingActive = false;
 let _pauseWatcher: (() => void) | null = null;
 let _resumeWatcher: (() => void) | null = null;
@@ -21,6 +25,8 @@ export function setTrackingActive(value: boolean): void {
     _resumeWatcher?.();
   }
   _trackingActiveCallbacks.forEach((cb) => cb(value));
+
+  AsyncStorage.setItem(TRACKING_ACTIVE_KEY, value ? "true" : "false").catch(() => {});
 }
 
 export function isTrackingActive(): boolean {

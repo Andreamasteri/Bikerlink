@@ -168,6 +168,11 @@ TaskManager.defineTask(
 
     if (!settings.enabled) return;
 
+    const trackingActive = await AsyncStorage.getItem("@bikerlink/tracking_active");
+    if (trackingActive === "true") {
+      return;
+    }
+
     if (!settings.ghostModeContinue) {
       const ghostMode = await AsyncStorage.getItem("@bikerlink/ghost_mode_active");
       if (ghostMode === "true") return;

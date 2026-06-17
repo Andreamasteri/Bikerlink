@@ -187,6 +187,17 @@ export function useTrackingState() {
       await apiRequest("POST", `/api/routes/${rId}/points`, { points: toSend });
       stats.totalPointsSentRef.current += toSend.length;
       stats.setPointsSent(stats.totalPointsSentRef.current);
+
+      const lastPt = toSend[toSend.length - 1];
+      if (lastPt) {
+        const ghostMode = await AsyncStorage.getItem("@bikerlink/ghost_mode_active").catch(() => null);
+        if (ghostMode !== "true") {
+          apiRequest("PUT", "/api/users/location", {
+            latitude: lastPt.latitude,
+            longitude: lastPt.longitude,
+          }).catch(() => {});
+        }
+      }
     } catch (e) {
       logGpsError(e, "flushPoints", { routeId: rId ?? undefined });
       refs.pointsBufferRef.current = [...toSend, ...refs.pointsBufferRef.current];

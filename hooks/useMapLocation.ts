@@ -6,6 +6,8 @@ import { apiRequest } from "@/lib/query-client";
 import { getRegionCoordinates } from "@/constants/regions";
 import { subscribeGpsPosition } from "@/lib/shared-gps-position";
 
+const GHOST_MODE_KEY = "@bikerlink/ghost_mode_active";
+
 type Coords = { latitude: number; longitude: number };
 
 type Props = {
@@ -37,8 +39,11 @@ export function useMapLocation({ userRegion, userCountry, profileLat, profileLng
       try { await AsyncStorage.setItem("map_last_gps", JSON.stringify(coords)); } catch {
         // no-op: ignore storage write failures
       }
-      try { await apiRequest("PUT", "/api/users/location", coords); } catch {
-        // no-op: ignore location update failures
+      const ghost = await AsyncStorage.getItem(GHOST_MODE_KEY).catch(() => null);
+      if (ghost !== "true") {
+        try { await apiRequest("PUT", "/api/users/location", coords); } catch {
+          // no-op: ignore location update failures
+        }
       }
       return coords;
     } catch {

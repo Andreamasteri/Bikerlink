@@ -22,6 +22,7 @@ import {
 } from "@/app/navigate/[id].helpers";
 import type { NavWeatherZone } from "@/components/navigate/NavigationWeather";
 import { useWhisperRecorder } from "@/hooks/useWhisperRecorder";
+import { useLocationGate } from "@/lib/location-context";
 
 const ANNOUNCE_DISTANCE_FAR = 200;
 const ANNOUNCE_DISTANCE_NEAR = 50;
@@ -40,6 +41,7 @@ export function useNavigateState() {
   const locale = useLocale();
   const t = useT();
   const whisper = useWhisperRecorder();
+  const { suspendSharedWatch, resumeSharedWatch } = useLocationGate();
 
   const topPad = insets.top;
   const bottomPad = insets.bottom;
@@ -145,6 +147,8 @@ export function useNavigateState() {
   useEffect(() => {
     if (!hasPermission || !route || polylinePoints.length === 0) return;
 
+    suspendSharedWatch();
+
     let sub: Location.LocationSubscription | null = null;
     (async () => {
       sub = await Location.watchPositionAsync(
@@ -159,6 +163,7 @@ export function useNavigateState() {
     return () => {
       sub?.remove();
       locationSubRef.current = null;
+      resumeSharedWatch();
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hasPermission, route?.id, polylinePoints.length]);
