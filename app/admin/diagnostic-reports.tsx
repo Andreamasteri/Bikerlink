@@ -188,7 +188,7 @@ export default function DiagnosticReportsScreen() {
           Alert.alert("File salvato", `Il file è stato salvato nella cache: ${fileUri}`);
         }
       }
-    } catch (e) {
+    } catch (_e) {
       Alert.alert("Errore download", "Impossibile scaricare il file. Riprova.");
     } finally {
       setDownloadingFile(null);
