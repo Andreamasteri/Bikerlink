@@ -5,6 +5,7 @@ interface DiagClient {
   ws: WebSocket;
   userId: string;
   role: string;
+  nickname: string | null;
 }
 
 const clients = new Map<string, DiagClient>(); // userId → client
@@ -26,14 +27,16 @@ export function attachDiagnosticWS(server: HttpServer): void {
         return;
       }
       let role = "user";
+      let nickname: string | null = null;
       try {
         const { storage } = await import("./storage");
         const user = await storage.getUser(userId);
         role = user?.role ?? "user";
+        nickname = user?.nickname ?? null;
       } catch {/* noop */}
 
       wss!.handleUpgrade(req, socket, head, (ws) => {
-        const client: DiagClient = { ws, userId, role };
+        const client: DiagClient = { ws, userId, role, nickname };
         clients.set(userId, client);
         broadcastToAdmins({ type: "diag:online-update" });
         ws.on("message", (raw) => {
@@ -121,6 +124,6 @@ export function sendDiagnosticCommand(userId: string, showBanner = false): boole
   }
 }
 
-export function getOnlineUsers(): Array<{ userId: string; role: string }> {
-  return Array.from(clients.values()).map(c => ({ userId: c.userId, role: c.role }));
+export function getOnlineUsers(): Array<{ userId: string; role: string; nickname: string | null }> {
+  return Array.from(clients.values()).map(c => ({ userId: c.userId, role: c.role, nickname: c.nickname }));
 }

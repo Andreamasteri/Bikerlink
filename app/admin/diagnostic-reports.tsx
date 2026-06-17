@@ -15,7 +15,7 @@ import { DiagnosticReportCard } from "@/components/admin/DiagnosticReportCard";
 import type { Filters } from "@/components/admin/DiagnosticFilterPanel";
 import type { DiagReport, RemoteReqStatus } from "@/components/admin/DiagnosticReportCard";
 
-interface OnlineUser { userId: string; role: string }
+interface OnlineUser { userId: string; role: string; nickname: string | null }
 interface ReportsResponse { reports: DiagReport[]; total: number; page: number; limit: number }
 
 type DiagStatus = "idle" | "pending" | "running" | "done" | "failed";
@@ -201,13 +201,14 @@ export default function DiagnosticReportsScreen() {
         {!onlineLoading && !onlineError && onlineUsers.length === 0 && (
           <Text style={styles.emptyText}>Nessun utente connesso via WS</Text>
         )}
-        {onlineUsers.map(({ userId }) => {
+        {onlineUsers.map(({ userId, nickname }) => {
           const st: DiagStatus = triggeredStatus[userId] ?? "idle";
           const isPending = st === "pending" || st === "running";
+          const displayName = nickname ?? `${userId.slice(0, 8)}…`;
           return (
             <View key={userId} style={styles.userRow}>
               <Ionicons name="ellipse" size={10} color="#22C55E" />
-              <Text style={styles.userId} numberOfLines={1}>{userId.slice(0, 8)}…</Text>
+              <Text style={styles.userId} numberOfLines={1}>{displayName}</Text>
               {st !== "idle" && <Text style={styles.statusText}>{statusMap[st]}</Text>}
               <TouchableOpacity style={[styles.triggerBtn, isPending && styles.triggerBtnDisabled]} disabled={isPending} onPress={() => triggerMutation.mutate(userId)}>
                 {isPending ? <ActivityIndicator size="small" color="#fff" /> : <Text style={styles.triggerBtnText}>Avvia WS</Text>}
