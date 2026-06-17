@@ -114,11 +114,16 @@ export async function checkGps(): Promise<PipelineCheckResult> {
   const t0 = Date.now();
   const steps: PipelineCheckStep[] = [];
 
-  steps.push(await runStep("sessioni GPS aperte da >4h", async () => {
-    const res = await db.execute(sql`
-      SELECT COUNT(*) AS cnt FROM gps_sessions
-      WHERE ended_at IS NULL AND started_at < NOW() - INTERVAL '4 hours'
-    `);
+  steps.push(await warnStep("sessioni GPS aperte da >4h", async () => {
+    let res;
+    try {
+      res = await db.execute(sql`
+        SELECT COUNT(*) AS cnt FROM user_sessions
+        WHERE ended_at IS NULL AND started_at < NOW() - INTERVAL '4 hours'
+      `);
+    } catch (sqlErr) {
+      throw new Error(`impossibile leggere user_sessions: ${(sqlErr as Error).message?.slice(0, 200)}`);
+    }
     const cnt = parseInt((res.rows[0] as { cnt: string }).cnt ?? "0", 10);
     if (cnt > 0) throw new Error(`${cnt} sessioni GPS bloccate (aperte >4h senza chiusura)`);
     return "nessuna sessione aperta da troppo tempo";
@@ -291,12 +296,17 @@ export async function checkSessionCrash(): Promise<PipelineCheckResult> {
   const t0 = Date.now();
   const steps: PipelineCheckStep[] = [];
 
-  steps.push(await runStep("sessioni crash non chiuse", async () => {
-    const res = await db.execute(sql`
-      SELECT COUNT(*) AS cnt FROM gps_sessions
-      WHERE ended_at IS NULL
-        AND started_at < NOW() - INTERVAL '8 hours'
-    `);
+  steps.push(await warnStep("sessioni crash non chiuse", async () => {
+    let res;
+    try {
+      res = await db.execute(sql`
+        SELECT COUNT(*) AS cnt FROM user_sessions
+        WHERE ended_at IS NULL
+          AND started_at < NOW() - INTERVAL '8 hours'
+      `);
+    } catch (sqlErr) {
+      throw new Error(`impossibile leggere user_sessions: ${(sqlErr as Error).message?.slice(0, 200)}`);
+    }
     const cnt = parseInt((res.rows[0] as { cnt: string }).cnt ?? "0", 10);
     if (cnt > 0) throw new Error(`${cnt} sessioni aperte da >8h (cleanup job non le ha chiuse)`);
     return "nessuna sessione crash irrisolta";
