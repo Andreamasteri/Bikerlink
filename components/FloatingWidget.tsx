@@ -262,7 +262,10 @@ export default function FloatingWidget() {
         e.translationY > SWIPE_DISMISS_THRESHOLD ||
         e.velocityY > SWIPE_VELOCITY_THRESHOLD;
       if (shouldDismiss) {
-        runOnJS(closeMenuSlideDown)();
+        // menuPanGesture runs on the JS thread (.runOnJS(true)), so call the
+        // JS closer directly — wrapping it in runOnJS() here caused a
+        // double-dispatch that produced phantom dismiss animations.
+        closeMenuSlideDown();
       } else {
         menuTranslateY.value = withTiming(0, { duration: 150, easing: Easing.out(Easing.ease) });
         menuOpacity.value = withTiming(1, { duration: 150, easing: Easing.out(Easing.ease) });
@@ -315,53 +318,61 @@ export default function FloatingWidget() {
         <Pressable style={StyleSheet.absoluteFill} onPress={closeMenu} />
       )}
 
-      <GestureDetector gesture={composedGesture}>
-        <Animated.View style={[styles.widgetContainer, widgetAnimatedStyle]}>
-          {/* Menu is a child of the widget container — it inherits the parent transform
-              so it always stays locked to the widget position. */}
-          {menuOpen && (
-            <GestureDetector gesture={menuPanGesture}>
-              <Animated.View style={[styles.menuWrapper, menuAnimatedStyle]}>
-                <View style={[styles.menu, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                  <GestureDetector gesture={chatTapGesture}>
-                    <View style={styles.menuItem}>
-                      <Ionicons name="chatbubbles" size={18} color={colors.accent} />
-                      <Text style={[styles.menuLabel, { color: colors.text }]}>Chat</Text>
-                      {unreadChat > 0 && (
-                        <View style={[styles.menuBadge, { backgroundColor: colors.accent }]}>
-                          <Text style={styles.menuBadgeText}>{unreadChat > 99 ? "99+" : unreadChat}</Text>
-                        </View>
-                      )}
-                    </View>
-                  </GestureDetector>
+      {/* Position-following container. `box-none` lets touches pass through the
+          empty area between the ball and the menu; composedGesture is scoped to
+          the ball only (below) so the menu's nested GestureDetectors are never
+          shadowed by the parent drag/tap gesture. */}
+      <Animated.View
+        style={[styles.widgetContainer, widgetAnimatedStyle]}
+        pointerEvents="box-none"
+      >
+        {/* Menu lives inside the position-following container so it inherits the
+            transform and stays locked to the widget position, but it sits
+            OUTSIDE the ball's GestureDetector so each menu item receives touch. */}
+        {menuOpen && (
+          <GestureDetector gesture={menuPanGesture}>
+            <Animated.View style={[styles.menuWrapper, menuAnimatedStyle]}>
+              <View style={[styles.menu, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                <GestureDetector gesture={chatTapGesture}>
+                  <View style={styles.menuItem}>
+                    <Ionicons name="chatbubbles" size={18} color={colors.accent} />
+                    <Text style={[styles.menuLabel, { color: colors.text }]}>Chat</Text>
+                    {unreadChat > 0 && (
+                      <View style={[styles.menuBadge, { backgroundColor: colors.accent }]}>
+                        <Text style={styles.menuBadgeText}>{unreadChat > 99 ? "99+" : unreadChat}</Text>
+                      </View>
+                    )}
+                  </View>
+                </GestureDetector>
 
-                  <View style={[styles.menuDivider, { backgroundColor: colors.border }]} />
+                <View style={[styles.menuDivider, { backgroundColor: colors.border }]} />
 
-                  <GestureDetector gesture={notificationsTapGesture}>
-                    <View style={styles.menuItem}>
-                      <Ionicons name="notifications" size={18} color={colors.accent} />
-                      <Text style={[styles.menuLabel, { color: colors.text }]}>Notifiche</Text>
-                      {unreadNotifications > 0 && (
-                        <View style={[styles.menuBadge, { backgroundColor: colors.accentRed ?? "#FF3B30" }]}>
-                          <Text style={styles.menuBadgeText}>{unreadNotifications > 99 ? "99+" : unreadNotifications}</Text>
-                        </View>
-                      )}
-                    </View>
-                  </GestureDetector>
+                <GestureDetector gesture={notificationsTapGesture}>
+                  <View style={styles.menuItem}>
+                    <Ionicons name="notifications" size={18} color={colors.accent} />
+                    <Text style={[styles.menuLabel, { color: colors.text }]}>Notifiche</Text>
+                    {unreadNotifications > 0 && (
+                      <View style={[styles.menuBadge, { backgroundColor: colors.accentRed ?? "#FF3B30" }]}>
+                        <Text style={styles.menuBadgeText}>{unreadNotifications > 99 ? "99+" : unreadNotifications}</Text>
+                      </View>
+                    )}
+                  </View>
+                </GestureDetector>
 
-                  <View style={[styles.menuDivider, { backgroundColor: colors.border }]} />
+                <View style={[styles.menuDivider, { backgroundColor: colors.border }]} />
 
-                  <GestureDetector gesture={playerTapGesture}>
-                    <View style={styles.menuItem}>
-                      <Ionicons name="musical-notes" size={18} color={colors.accent} />
-                      <Text style={[styles.menuLabel, { color: colors.text }]}>Player</Text>
-                    </View>
-                  </GestureDetector>
-                </View>
-              </Animated.View>
-            </GestureDetector>
-          )}
+                <GestureDetector gesture={playerTapGesture}>
+                  <View style={styles.menuItem}>
+                    <Ionicons name="musical-notes" size={18} color={colors.accent} />
+                    <Text style={[styles.menuLabel, { color: colors.text }]}>Player</Text>
+                  </View>
+                </GestureDetector>
+              </View>
+            </Animated.View>
+          </GestureDetector>
+        )}
 
+        <GestureDetector gesture={composedGesture}>
           <View style={{ width: WIDGET_SIZE, height: WIDGET_SIZE }}>
             <View
               style={[
@@ -380,8 +391,8 @@ export default function FloatingWidget() {
               )}
             </View>
           </View>
-        </Animated.View>
-      </GestureDetector>
+        </GestureDetector>
+      </Animated.View>
     </View>
   );
 }

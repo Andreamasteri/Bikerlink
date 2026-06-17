@@ -1,6 +1,6 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { AppState, AppStateStatus, Platform } from "react-native";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth-context";
 
 let Notifications: typeof import("expo-notifications") | null = null;
@@ -100,6 +100,9 @@ export function FloatingWidgetProvider({ children }: { children: React.ReactNode
     queryKey: ["/api/settings/floating-widget"],
     staleTime: 60_000,
     refetchInterval: 60_000,
+    // Keep the last known value during brief backend restarts so visibility
+    // doesn't flip on a transient network failure.
+    placeholderData: keepPreviousData,
   });
   const adminEnabled = adminWidgetData?.enabled !== false;
 
@@ -109,12 +112,16 @@ export function FloatingWidgetProvider({ children }: { children: React.ReactNode
     queryKey: ["/api/chat/conversations/unread-total"],
     enabled: isVisible,
     refetchInterval: isVisible ? 5_000 : false,
+    // Keep the previous badge count if a refetch fails during a backend
+    // restart instead of flashing to 0.
+    placeholderData: keepPreviousData,
   });
 
   const { data: notificationsData, refetch: refetchNotif } = useQuery<Array<{ isRead: boolean }>>({
     queryKey: ["/api/notifications"],
     enabled: isVisible,
     refetchInterval: isVisible ? 5_000 : false,
+    placeholderData: keepPreviousData,
   });
 
   const refetchBadges = useCallback(() => {

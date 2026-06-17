@@ -97,7 +97,9 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 4,
     shadowOffset: { width: 0, height: 2 },
-    elevation: 6,
-    zIndex: 9000,
+    elevation: 21,
+    // zIndex above the FloatingWidget container (9999) and its full-screen
+    // backdrop so the FAB stays tappable while the FloatingWidget menu is open.
+    zIndex: 10000,
   },
 });
