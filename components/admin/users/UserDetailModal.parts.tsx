@@ -201,3 +201,78 @@ export const statsStyles = StyleSheet.create({
     marginLeft: 8,
   },
 });
+
+export const privacyStyles = StyleSheet.create({
+  collapseHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 4,
+    marginBottom: 4,
+  },
+  settingRow: {
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border + "33",
+  },
+  settingTop: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 4,
+  },
+  settingName: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 13,
+    color: Colors.text,
+    flex: 1,
+    marginRight: 8,
+  },
+  badgeOn: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
+    backgroundColor: Colors.success + "22",
+    borderWidth: 1,
+    borderColor: Colors.success + "66",
+  },
+  badgeOff: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
+    backgroundColor: Colors.border,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  badgeText: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 11,
+  },
+  badgeParam: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 11,
+    color: Colors.textSecondary,
+    marginLeft: 6,
+  },
+  timelineItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingVertical: 2,
+    paddingLeft: 4,
+  },
+  timelineText: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 11,
+    color: Colors.textSecondary,
+    flex: 1,
+  },
+  noEvents: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 11,
+    color: Colors.textSecondary,
+    fontStyle: "italic" as const,
+    paddingLeft: 4,
+    marginTop: 2,
+  },
+});

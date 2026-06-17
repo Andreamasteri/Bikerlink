@@ -11,6 +11,7 @@ import type { InsertUser, InsertUserProfile } from "@shared/db";
 
 import { requireAuth } from "../../lib/auth-middleware";
 import { sendSuccess, sendError } from "../../lib/api-response";
+import { logPrivacySettingFireAndForget, type PrivacySettingKey } from "../../lib/privacy-log";
 
 const router = Router();
 
@@ -304,6 +305,7 @@ router.put("/me/ghost-mode", requireAuth, async (req: Request, res: Response) =>
     }
     await storage.updateUser(userId, { ghostMode: enabled });
     onlineTracker.setGhostMode(userId, enabled);
+    logPrivacySettingFireAndForget(userId, "ghost_mode", enabled);
     return sendSuccess(res, { enabled });
   } catch (error) {
     console.error("Ghost mode update error:", error);
@@ -358,6 +360,23 @@ router.put("/me/privacy", requireAuth, async (req: Request, res: Response) => {
     } else {
       await storage.createUserProfile({ userId, ...updateData } as InsertUserProfile);
     }
+
+    const boolKeys: Array<[boolean | undefined, PrivacySettingKey]> = [
+      [hideFromMap, "hide_from_map"],
+      [positionFuzz, "position_fuzz"],
+      [fakeHomeEnabled, "fake_home_enabled"],
+      [fakeWorkEnabled, "fake_work_enabled"],
+      [fakeWhateverEnabled, "fake_whatever_enabled"],
+      [offlinePositionRandomize, "offline_position_randomize"],
+      [fixedPositionEnabled, "fixed_position_enabled"],
+    ];
+    for (const [val, key] of boolKeys) {
+      if (val !== undefined) logPrivacySettingFireAndForget(userId, key, val);
+    }
+    if (gpsPrecision !== undefined) {
+      logPrivacySettingFireAndForget(userId, "continuous_gps", gpsPrecision === "continuous");
+    }
+
     return sendSuccess(res);
   } catch (error) {
     console.error("Privacy settings update error:", error);

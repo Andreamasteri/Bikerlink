@@ -1,7 +1,7 @@
 import { Router, type Request, type Response } from "express";
 import { db } from "../../db";
-import { users, userProfiles } from "@shared/db";
-import { eq, sql } from "drizzle-orm";
+import { users, userProfiles, userPrivacyLog } from "@shared/db";
+import { eq, sql, and, gte, desc } from "drizzle-orm";
 import { sendError } from "../../lib/api-response";
 import { storage } from "../../storage";
 
@@ -104,6 +104,63 @@ router.delete("/:userId/calibration", async (req: Request, res: Response) => {
   } catch (err) {
     console.error("[admin/users/:userId/calibration DELETE] error:", err);
     return sendError(res, 500, "Errore reset calibrazione");
+  }
+});
+
+router.get("/:userId/privacy-overview", async (req: Request, res: Response) => {
+  try {
+    const userId = String(req.params.userId);
+    const [userRow, profile] = await Promise.all([
+      storage.getUser(userId),
+      storage.getUserProfile(userId),
+    ]);
+    if (!userRow) return sendError(res, 404, "Utente non trovato");
+
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    const logRows = await db
+      .select({
+        settingKey: userPrivacyLog.settingKey,
+        newValue: userPrivacyLog.newValue,
+        changedAt: userPrivacyLog.changedAt,
+      })
+      .from(userPrivacyLog)
+      .where(
+        and(
+          eq(userPrivacyLog.userId, userId),
+          gte(userPrivacyLog.changedAt, sevenDaysAgo),
+        ),
+      )
+      .orderBy(desc(userPrivacyLog.changedAt))
+      .limit(200);
+
+    const logByKey: Record<string, Array<{ newValue: boolean; changedAt: string }>> = {};
+    for (const row of logRows) {
+      if (!logByKey[row.settingKey]) logByKey[row.settingKey] = [];
+      logByKey[row.settingKey].push({
+        newValue: row.newValue,
+        changedAt: row.changedAt.toISOString(),
+      });
+    }
+
+    return res.json({
+      currentSettings: {
+        ghost_mode: userRow.ghostMode,
+        hide_from_map: profile?.hideFromMap ?? false,
+        position_fuzz: profile?.positionFuzz ?? false,
+        position_fuzz_km: profile?.positionFuzzKm ?? 1,
+        fixed_position_enabled: profile?.fixedPositionEnabled ?? false,
+        fake_home_enabled: profile?.fakeHomeEnabled ?? false,
+        fake_work_enabled: profile?.fakeWorkEnabled ?? false,
+        fake_whatever_enabled: profile?.fakeWhateverEnabled ?? false,
+        offline_position_randomize: profile?.offlinePositionRandomize ?? true,
+        continuous_gps: (profile?.gpsPrecision ?? "balanced") === "continuous",
+        gps_precision: profile?.gpsPrecision ?? "balanced",
+      },
+      log: logByKey,
+    });
+  } catch (err) {
+    console.error("[admin/users/:userId/privacy-overview] error:", err);
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 
