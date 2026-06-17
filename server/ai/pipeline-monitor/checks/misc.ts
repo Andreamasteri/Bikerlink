@@ -89,8 +89,8 @@ export async function checkOta(): Promise<PipelineCheckResult> {
   const t0 = Date.now();
   const steps: PipelineCheckStep[] = [];
 
-  steps.push(await runStep("GET /api/admin/ota/updates (sync <5s)", async () => {
-    const r = await httpProbe("GET", "/api/admin/ota/updates");
+  steps.push(await runStep("GET /api/admin/ota/releases (sync <5s)", async () => {
+    const r = await httpProbe("GET", "/api/admin/ota/releases");
     if (r.status !== 200) throw new Error(`status ${r.status}`);
     if (r.durationMs > 5_000) throw new Error(`risposta lenta ${r.durationMs}ms (soglia: 5000ms)`);
     return `${r.durationMs}ms`;
@@ -104,7 +104,7 @@ export async function checkOta(): Promise<PipelineCheckResult> {
     label: "OTA Update",
     overall,
     steps,
-    suggestedFix: overall !== "ok" ? "Verifica /api/admin/ota/updates e la connessione a EAS." : null,
+    suggestedFix: overall !== "ok" ? "Verifica /api/admin/ota/releases e la connessione a EAS." : null,
     durationMs: Date.now() - t0,
   };
 }
