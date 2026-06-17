@@ -22,7 +22,8 @@ export const ProfileSupportSection: React.FC = () => {
     setDiagRunning(true);
     try {
       const report = await runAllTests({ isAdmin });
-      await apiRequest("POST", "/api/diagnostic/report", {
+      // Fire-and-forget: invio silenzioso al server, errori ignorati.
+      apiRequest("POST", "/api/diagnostic/report", {
         triggeredBy: "user",
         appVersion: report.appVersion,
         platform: report.platform,
@@ -30,12 +31,12 @@ export const ProfileSupportSection: React.FC = () => {
         sentryEventId: report.sentryEventId,
         summary: report.summary,
         results: report.results,
-      });
+      }).catch(() => {});
 
       if (isAdminOrMod) {
         router.push({
           pathname: "/diagnostica-risultati",
-          params: { reportJson: JSON.stringify(report) },
+          params: { reportJson: JSON.stringify(report), isAdmin: isAdmin ? "true" : "" },
         } as never);
       } else {
         const { failed, warned, passed } = report.summary;

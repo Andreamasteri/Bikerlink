@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useState } from "react";
 import {
   View,
   Text,
@@ -6,11 +6,13 @@ import {
   TouchableOpacity,
   StyleSheet,
   Share,
+  ActivityIndicator,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useColors } from "@/hooks/useColors";
+import { apiRequest } from "@/lib/query-client";
 import type { DiagnosticReport, DiagnosticTestResult, DiagnosticStatus } from "@/lib/diagnostic/runner";
 
 const STATUS_ICON: Record<DiagnosticStatus, string> = {
@@ -95,7 +97,9 @@ export default function DiagnosticaRisultati() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const colors = useColors();
-  const { reportJson } = useLocalSearchParams<{ reportJson: string }>();
+  const { reportJson, isAdmin } = useLocalSearchParams<{ reportJson: string; isAdmin?: string }>();
+  const showAdminSend = isAdmin === "true";
+  const [sendState, setSendState] = useState<"idle" | "sending" | "sent" | "error">("idle");
 
   const report = useMemo<DiagnosticReport | null>(() => {
     if (!reportJson) return null;
@@ -120,6 +124,25 @@ export default function DiagnosticaRisultati() {
       });
     } catch {
       // noop
+    }
+  };
+
+  const handleSendToServer = async () => {
+    if (!report || sendState === "sending" || sendState === "sent") return;
+    setSendState("sending");
+    try {
+      await apiRequest("POST", "/api/diagnostic/report", {
+        triggeredBy: "admin",
+        appVersion: report.appVersion,
+        platform: report.platform,
+        deviceModel: report.deviceModel,
+        sentryEventId: report.sentryEventId,
+        summary: report.summary,
+        results: report.results,
+      });
+      setSendState("sent");
+    } catch {
+      setSendState("error");
     }
   };
 
@@ -157,6 +180,45 @@ export default function DiagnosticaRisultati() {
             ))}
           </View>
         ))}
+
+        {showAdminSend && (
+          <TouchableOpacity
+            style={[
+              styles.sendButton,
+              sendState === "sent" && styles.sendButtonSent,
+              sendState === "error" && styles.sendButtonError,
+              sendState === "sending" && styles.sendButtonDisabled,
+            ]}
+            onPress={handleSendToServer}
+            disabled={sendState === "sending" || sendState === "sent"}
+            activeOpacity={0.8}
+          >
+            {sendState === "sending" ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <Ionicons
+                name={
+                  sendState === "sent"
+                    ? "checkmark-circle-outline"
+                    : sendState === "error"
+                    ? "alert-circle-outline"
+                    : "cloud-upload-outline"
+                }
+                size={18}
+                color="#fff"
+              />
+            )}
+            <Text style={styles.sendButtonText}>
+              {sendState === "sending"
+                ? "Invio…"
+                : sendState === "sent"
+                ? "Inviato ✓"
+                : sendState === "error"
+                ? "Errore — riprova"
+                : "Invia al server"}
+            </Text>
+          </TouchableOpacity>
+        )}
 
         <TouchableOpacity style={styles.shareButton} onPress={handleShare}>
           <Ionicons name="share-outline" size={18} color="#fff" />
@@ -254,6 +316,24 @@ const styles = StyleSheet.create({
     marginTop: 2,
     minWidth: 42,
     textAlign: "right",
+  },
+  sendButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#16A34A",
+    borderRadius: 12,
+    padding: 14,
+    gap: 8,
+    marginTop: 8,
+  },
+  sendButtonSent: { backgroundColor: "#15803D" },
+  sendButtonError: { backgroundColor: "#DC2626" },
+  sendButtonDisabled: { opacity: 0.7 },
+  sendButtonText: {
+    fontSize: 15,
+    fontFamily: "Inter_600SemiBold",
+    color: "#fff",
   },
   shareButton: {
     flexDirection: "row",

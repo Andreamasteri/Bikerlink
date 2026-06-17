@@ -10,7 +10,7 @@
  *   npx tsx scripts/dump-diagnostic-report.ts --limit 3  # ultimi 3 report
  */
 
-import { desc, eq } from "drizzle-orm";
+import { desc, eq, inArray } from "drizzle-orm";
 import { db } from "../server/db";
 import { diagnosticReports } from "../shared/db/diagnostic";
 import { users } from "../shared/db/users";
@@ -76,6 +76,7 @@ async function main() {
       sentryEventId: diagnosticReports.sentryEventId,
       summary: diagnosticReports.summary,
       results: diagnosticReports.results,
+      reviewedByAgent: diagnosticReports.reviewedByAgent,
     })
     .from(diagnosticReports)
     .leftJoin(users, eq(diagnosticReports.userId, users.id))
@@ -91,13 +92,17 @@ async function main() {
   console.log(`  DIAGNOSTIC REPORT DUMP  (${rows.length} report)`);
   console.log(`${"═".repeat(60)}`);
 
+  const unreviewedIds: string[] = [];
+
   for (let i = 0; i < rows.length; i++) {
     const r = rows[i];
     const summary = r.summary as DiagnosticSummary | null;
     const results = r.results as DiagnosticTestResult[] | null;
+    const isNew = r.reviewedByAgent == null;
+    if (isNew) unreviewedIds.push(r.id);
 
     console.log(`\n${"─".repeat(60)}`);
-    console.log(`  Report ${i + 1} / ${rows.length}`);
+    console.log(`  ${isNew ? "🆕 " : ""}Report ${i + 1} / ${rows.length}${isNew ? "  (NON ANCORA VISTO)" : ""}`);
     console.log(`${"─".repeat(60)}`);
     console.log(`  ID:          ${r.id}`);
     console.log(`  UserId:      ${r.userId ?? "—"}`);
@@ -121,6 +126,19 @@ async function main() {
       console.log(formatResults(results));
     } else {
       console.log("\n  (nessun risultato dettagliato)");
+    }
+  }
+
+  // Mark the reports just shown (previously unseen) as reviewed by the agent.
+  if (unreviewedIds.length > 0) {
+    try {
+      await db
+        .update(diagnosticReports)
+        .set({ reviewedByAgent: new Date() })
+        .where(inArray(diagnosticReports.id, unreviewedIds));
+      console.log(`  🆕 ${unreviewedIds.length} nuovo/i report marcato/i come visto/i.`);
+    } catch (e) {
+      console.warn("  ⚠️  Impossibile marcare i report come visti:", e);
     }
   }
 

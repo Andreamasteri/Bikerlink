@@ -2,7 +2,7 @@ import { Router, type Request, type Response } from "express";
 import fs from "fs";
 import path from "path";
 import { db } from "../db";
-import { diagnosticReports, diagnosticQueue } from "@shared/db";
+import { diagnosticReports, diagnosticQueue, users } from "@shared/db";
 import { sendError } from "../lib/api-response";
 import { and, eq, gt, isNull } from "drizzle-orm";
 
@@ -114,6 +114,36 @@ router.post("/report", async (req: Request, res: Response) => {
           console.warn("[diagnostic/report] Email error:", e);
         });
       }).catch(() => {});
+    });
+
+    // Fire-and-forget: push notification to admins for EVERY report.
+    const userId = req.session.userId;
+    setImmediate(async () => {
+      try {
+        const s = summary as Record<string, number> | undefined;
+        const passed = s?.passed ?? 0;
+        const failed = s?.failed ?? 0;
+        const warned = s?.warned ?? 0;
+        let nickname = "Sconosciuto";
+        try {
+          const [row] = await db
+            .select({ nickname: users.nickname })
+            .from(users)
+            .where(eq(users.id, userId))
+            .limit(1);
+          if (row?.nickname) nickname = row.nickname;
+        } catch {
+          // best-effort: keep fallback nickname
+        }
+        const { sendSystemAlertPushToAdmins } = await import("../push-notifications");
+        await sendSystemAlertPushToAdmins(
+          "📋 Report diagnostico",
+          `Report diagnostico da ${nickname} — ${passed} OK · ${failed} errori · ${warned} avvisi`,
+          { type: "diagnostic_report", reportId },
+        );
+      } catch (e) {
+        console.warn("[diagnostic/report] Push error:", e);
+      }
     });
 
     return res.json({ id: reportId, ok: true });

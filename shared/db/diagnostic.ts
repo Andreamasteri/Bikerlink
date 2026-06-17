@@ -24,6 +24,7 @@ export const diagnosticReports = pgTable("diagnostic_reports", {
   sentryEventId: varchar("sentry_event_id", { length: 100 }),
   summary: jsonb("summary"),
   results: jsonb("results"),
+  reviewedByAgent: timestamp("reviewed_by_agent"),
 }, (table) => [
   index("diagnostic_reports_user_id_idx").on(table.userId),
   index("diagnostic_reports_run_at_idx").on(table.runAt),
