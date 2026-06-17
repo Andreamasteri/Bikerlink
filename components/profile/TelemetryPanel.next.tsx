@@ -150,25 +150,40 @@ export default function TelemetryPanel({ telemetryStats }: Props) {
         >
           <View style={styles.telemetryHeaderLeft}>
             <Ionicons name="speedometer-outline" size={16} color={Colors.accent} />
-            <Text style={styles.telemetryTitle}>
-              Telemetria raccolta
-              <Text style={styles.telemetryTitlePct}> · {telemetryStats.progress_pct}%</Text>
-            </Text>
-            <TouchableOpacity
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              onPress={(e) => {
-                e.stopPropagation();
-                setShowInfoModal(true);
-              }}
-            >
-              <Ionicons name="information-circle-outline" size={14} color={Colors.textSecondary} />
-            </TouchableOpacity>
+            <View style={{ flex: 1 }}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                <Text style={styles.telemetryTitle}>
+                  Telemetria raccolta
+                  <Text style={styles.telemetryTitlePct}> · {telemetryStats.progress_pct}%</Text>
+                </Text>
+                <TouchableOpacity
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  onPress={(e) => {
+                    e.stopPropagation();
+                    setShowInfoModal(true);
+                  }}
+                >
+                  <Ionicons name="information-circle-outline" size={14} color={Colors.textSecondary} />
+                </TouchableOpacity>
+              </View>
+              {!telemetryExpanded && (
+                <Text style={styles.telemetryHeaderMeta}>
+                  {telemetryStats.km_collected.toFixed(1)} km · {telemetryStats.session_count}{" "}
+                  {telemetryStats.session_count === 1 ? "sessione" : "sessioni"}
+                </Text>
+              )}
+            </View>
           </View>
-          <Ionicons
-            name={telemetryExpanded ? "chevron-up" : "chevron-down"}
-            size={18}
-            color={Colors.accent}
-          />
+          <View style={styles.telemetryChevronGroup}>
+            {!telemetryExpanded && (
+              <Text style={styles.telemetryChevronLabel}>Dettagli</Text>
+            )}
+            <Ionicons
+              name={telemetryExpanded ? "chevron-up" : "chevron-down"}
+              size={18}
+              color={Colors.accent}
+            />
+          </View>
         </TouchableOpacity>
 
         {/* ── Barra progresso ── */}
@@ -363,6 +378,9 @@ const styles = StyleSheet.create({
   telemetryHeaderLeft: { flexDirection: "row", alignItems: "center", gap: 6, flex: 1 },
   telemetryTitle: { fontSize: 13, fontFamily: "Inter_600SemiBold", color: Colors.text },
   telemetryTitlePct: { fontSize: 13, fontFamily: "Inter_700Bold", color: Colors.accent },
+  telemetryHeaderMeta: { fontSize: 11, fontFamily: "Inter_400Regular", color: Colors.textSecondary, marginTop: 2 },
+  telemetryChevronGroup: { flexDirection: "row", alignItems: "center", gap: 4 },
+  telemetryChevronLabel: { fontSize: 11, fontFamily: "Inter_500Medium", color: Colors.accent },
   telemetryBarBg: { height: 6, backgroundColor: Colors.border, borderRadius: 3, overflow: "hidden" },
   telemetryBarFill: { height: 6, backgroundColor: Colors.accent, borderRadius: 3 },
   telemetryFooter: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
