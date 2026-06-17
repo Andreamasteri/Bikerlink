@@ -5,7 +5,7 @@ import Constants from "expo-constants";
 import { useQuery } from "@tanstack/react-query";
 import { useColors } from "@/hooks/useColors";
 import { useAuth } from "@/lib/auth-context";
-import { APPLIED_OTA_NUMBER, OTA_BUNDLED_COUNT } from "@/constants/buildInfo";
+import { APPLIED_OTA_NUMBER } from "@/constants/buildInfo";
 import { loadAppliedOtaNumber, saveAppliedOtaNumber } from "@/lib/otaStorage";
 import { useRouter } from "expo-router";
 
@@ -78,7 +78,7 @@ export const ProfileVersionSection: React.FC = () => {
     return null;
   }, [releases]);
 
-  const { apk, runtime } = parseAppVersion();
+  const { apk, runtime, ota } = parseAppVersion();
 
   const displayOta = isAdmin && lastApprovedOtaNum !== null ? lastApprovedOtaNum : appliedOta;
 
@@ -107,7 +107,7 @@ export const ProfileVersionSection: React.FC = () => {
           <View style={styles.item}>
             <Text style={[styles.label, { color: colors.textSecondary }]}>Build</Text>
             <Text style={[styles.value, { color: colors.textSecondary }]}>
-              V{apk}.{runtime}.{OTA_BUNDLED_COUNT}
+              V{apk}.{runtime}.{ota}
             </Text>
           </View>
           <Text style={[styles.dot, { color: colors.textSecondary }]}>·</Text>
