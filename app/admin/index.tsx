@@ -16,6 +16,7 @@ import { RoutingCoordinationCard } from "@/components/admin/RoutingCoordinationC
 import { RoutingCloudBanner } from "@/components/admin/RoutingCloudBanner";
 import { WhisperChainCard } from "@/components/admin/WhisperChainCard";
 import { MatchingMonitorCard } from "@/components/admin/MatchingMonitorCard";
+import { DbPoolCard } from "@/components/admin/DbPoolCard";
 import { SystemHealthContainer } from "@/components/admin/SystemHealthContainer";
 import type { SystemStatuses, DotStatus } from "@/components/admin/SystemHealthContainer";
 import { adminGroups, OPEN_BY_DEFAULT } from "./admin-groups";
@@ -355,6 +356,7 @@ export default function AdminDashboard() {
           <RoutingCloudBanner onPress={() => router.push("/admin/routing-health" as never)} />
           <SystemHealthContainer statuses={systemStatuses} onDotPress={handleDotPress}>
             <ServerEfficiencyCard />
+            <DbPoolCard />
             <ThinkCentreEfficiencyCard />
             <View ref={thinkcentreRef}>
               <ThinkCentreCard onStatuses={handleThinkCentreStatuses} />

@@ -65,3 +65,31 @@ export function isPoolHealthy(): boolean {
   const saturated = totalCount >= maxConns && idleCount === 0 && waitingCount > 0;
   return !saturated;
 }
+
+export interface PoolStats {
+  total: number;
+  idle: number;
+  waiting: number;
+  max: number;
+  activePct: number;
+}
+
+/**
+ * Snapshot of pg.Pool counters — zero I/O, instant read.
+ * active = total − idle (connections currently executing a query).
+ * activePct = active / max * 100 (saturation gauge, 0–100).
+ */
+export function getPoolStats(): PoolStats {
+  const { totalCount, idleCount, waitingCount, options } = pool as typeof pool & {
+    options: { max?: number };
+  };
+  const max = options?.max ?? 10;
+  const active = Math.max(0, totalCount - idleCount);
+  return {
+    total: totalCount,
+    idle: idleCount,
+    waiting: waitingCount,
+    max,
+    activePct: max > 0 ? Math.round((active / max) * 100) : 0,
+  };
+}

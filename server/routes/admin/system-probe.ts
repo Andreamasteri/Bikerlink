@@ -24,6 +24,7 @@ import { getRoutingCounters } from "../../routing/routing-metrics";
 import { getLastCycleOutcome, getMatchingLockState } from "../../matching/scheduler";
 import { getRecentErrorCount } from "../../matching/match-log-buffer";
 import { updateSystemStatus, getSystemStatus, type DotStatus } from "../../lib/system-status-cache";
+import { getPoolStats } from "../../db";
 
 const router = Router();
 
@@ -103,6 +104,16 @@ export async function warmUpSystemStatusCache(): Promise<void> {
  * restituendo lo snapshot parziale (o vuoto) senza crashare il processo.
  */
 const SYSTEM_PROBE_COLD_CACHE_TIMEOUT_MS = 4_500;
+
+/**
+ * GET /api/admin/db-pool-stats
+ *
+ * Instant read of pg.Pool counters — zero I/O, always available.
+ * Used by the admin dashboard pool-saturation gauge.
+ */
+router.get("/db-pool-stats", (_req: Request, res: Response) => {
+  return res.json(getPoolStats());
+});
 
 router.get("/system-probe", async (_req: Request, res: Response) => {
   const cached = getSystemStatus();
