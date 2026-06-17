@@ -133,26 +133,49 @@ sed -i "s/^export const APPLIED_OTA_NUMBER:.*$/export const APPLIED_OTA_NUMBER: 
 log_ok "APPLIED_OTA_NUMBER pre-impostato → ${NEXT_OTA} (sarà incluso nel bundle; rollback a ${OLD_OTA_NUMBER} se EAS fallisce)"
 
 # ── 4a. Metro export (atomico: se fallisce, ripristina buildInfo) ────────────
-log_info "Fase 1/2 — Metro export (bundle Android, attendi 2-5 minuti)..."
+# Auto-detection cache corrotta: se expo export fallisce con pattern noti di
+# corruzione cache (ENOENT, Cannot resolve module, ecc.), pulisce automaticamente
+# /tmp/metro-file-map-* e .metro-cache/ e riprova una volta sola. Zero flag manuali.
+log_info "Fase 1/3 — Metro export (bundle Android)..."
 
 rm -rf "$DIST_DIR"
-# Metro file-map cache (/tmp/metro-file-map-*): NON cancellare automaticamente.
-# La pulizia sistematica era necessaria per un bug della blockList regex (lookbehind
-# mancante) — fixato. Cancellarla ad ogni run forza Metro a riscansionare ~70k file
-# da zero (+30-40s). Usa CLEAN_METRO_CACHE=1 solo se la cache è corrotta.
-if [[ "${CLEAN_METRO_CACHE:-0}" == "1" ]]; then
-  rm -rf /tmp/metro-file-map-* 2>/dev/null || true
-  log_info "Cache Metro /tmp/metro-file-map-* pulita (CLEAN_METRO_CACHE=1)"
-fi
-_T0=$(date +%s)
-EXPO_TOKEN="${EAS_TOKEN}" npx expo export \
-  --platform android \
-  --output-dir "$DIST_DIR" \
-  2>&1 || {
-  sed -i "s/^export const APPLIED_OTA_NUMBER:.*$/export const APPLIED_OTA_NUMBER: number | null = ${OLD_OTA_NUMBER};/" "$BUILD_INFO"
-  log_error "expo export fallito — buildInfo ripristinato a ${OLD_OTA_NUMBER}, git NON aggiornato"
-  exit 1
+_EXPORT_LOG=$(mktemp /tmp/expo-export-XXXXXX.log)
+
+_run_expo_export() {
+  set +e
+  EXPO_TOKEN="${EAS_TOKEN}" npx expo export \
+    --platform android \
+    --output-dir "$DIST_DIR" \
+    2>&1 | tee "$_EXPORT_LOG"
+  _EXPO_RC=${PIPESTATUS[0]}
+  set -e
+  return $_EXPO_RC
 }
+
+_T0=$(date +%s)
+if ! _run_expo_export; then
+  # Controlla se il fallimento è riconducibile a cache Metro corrotta
+  _CACHE_ERRORS="ENOENT|Cannot resolve module|Metro has encountered an error|Cannot find module|bundling failed|file-map|ENOTFOUND"
+  if grep -qiE "$_CACHE_ERRORS" "$_EXPORT_LOG" 2>/dev/null; then
+    log_warn "Cache Metro corrotta rilevata — pulizia automatica e retry (1 tentativo)..."
+    rm -rf /tmp/metro-file-map-* 2>/dev/null || true
+    rm -rf .metro-cache/ 2>/dev/null || true
+    rm -rf "$DIST_DIR"
+    if ! _run_expo_export; then
+      rm -f "$_EXPORT_LOG"
+      sed -i "s/^export const APPLIED_OTA_NUMBER:.*$/export const APPLIED_OTA_NUMBER: number | null = ${OLD_OTA_NUMBER};/" "$BUILD_INFO"
+      log_error "expo export fallito anche dopo pulizia cache — buildInfo ripristinato a ${OLD_OTA_NUMBER}"
+      exit 1
+    fi
+    log_ok "Export riuscito dopo pulizia automatica cache"
+  else
+    rm -f "$_EXPORT_LOG"
+    sed -i "s/^export const APPLIED_OTA_NUMBER:.*$/export const APPLIED_OTA_NUMBER: number | null = ${OLD_OTA_NUMBER};/" "$BUILD_INFO"
+    log_error "expo export fallito — buildInfo ripristinato a ${OLD_OTA_NUMBER}, git NON aggiornato"
+    exit 1
+  fi
+fi
+rm -f "$_EXPORT_LOG"
 T_EXPORT=$(( $(date +%s) - _T0 ))
 log_ok "⏱ Metro export completato in ${T_EXPORT}s"
 

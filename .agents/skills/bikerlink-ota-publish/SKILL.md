@@ -27,9 +27,9 @@ Attivare questa skill quando l'utente dice una delle seguenti (o varianti):
 | Campo | Valore corrente |
 |-------|----------------|
 | `versionCode` APK | **70** |
-| `versionName` | **70.10.108** |
+| `versionName` | **70.10.110** |
 | `runtimeVersion` | **10.0.0** |
-| Ultima OTA nel ciclo v70 | **OTA-109** → la prossima sarà **OTA-110** |
+| Ultima OTA nel ciclo v70 | **OTA-110** → la prossima sarà **OTA-111** |
 
 > ⚠️ Aggiornare questa tabella ad ogni nuovo APK (e dopo ogni OTA pubblicata), in lockstep con la tabella storica in `bikerlink-versioning/SKILL.md`.
 > I valori correnti sono sempre la fonte di verità: `node -e "const a=require('./app.json'); console.log(a.expo.android.versionCode, a.expo.runtimeVersion, a.expo.version)"`
@@ -79,7 +79,11 @@ Sostituire `<N>` con il numero OTA nel ciclo corrente (vedi tabella "Contesto fi
 bash scripts/publish-ota-full.sh 2>&1; echo "EXIT=$?"
 ```
 
-Impostare il timeout del tool a **120000ms** (il bundle Android cold-cache impiega ~3–5 minuti in totale).
+Impostare il timeout del tool a **120000ms** (export ~40-90s + upload ~15-50s = totale ~90-120s tipico).
+
+> **Cache Metro**: lo script rileva automaticamente la corruzione della cache (pattern ENOENT,
+> "Cannot resolve module", ecc.) e fa pulizia + retry senza intervento manuale. Non serve
+> alcun flag. Se il retry riesce, la pubblicazione continua normalmente.
 
 Se il comando supera il timeout, lanciarlo in background con polling:
 
