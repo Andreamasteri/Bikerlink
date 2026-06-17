@@ -147,22 +147,24 @@ export async function checkEmbeddingBio(): Promise<PipelineCheckResult> {
   const t0 = Date.now();
   const steps: PipelineCheckStep[] = [];
 
-  steps.push(await warnStep("utenti con bio >48h senza embedding", async () => {
+  steps.push(await warnStep("utenti con bio senza embedding", async () => {
     const res = await db.execute(sql`
-      SELECT COUNT(*) AS cnt FROM users u
-      WHERE u.bio IS NOT NULL
-        AND u.bio <> ''
-        AND u.updated_at < NOW() - INTERVAL '48 hours'
+      SELECT COUNT(*) AS cnt FROM user_profiles up
+      JOIN users u ON u.id = up.user_id
+      WHERE u.status = 'active'
+        AND up.bio IS NOT NULL
+        AND trim(up.bio) != ''
         AND NOT EXISTS (
-          SELECT 1 FROM user_embeddings ue
-          WHERE ue.user_id = u.id AND ue.embedding_type = 'bio'
-            AND ue.updated_at > u.updated_at - INTERVAL '1 hour'
+          SELECT 1 FROM embeddings e
+          WHERE e.entity_type = 'user'
+            AND e.entity_id = up.user_id
+            AND e.field = 'bio'
         )
       LIMIT 1
     `);
     const cnt = parseInt((res.rows[0] as { cnt: string }).cnt ?? "0", 10);
-    if (cnt > 0) throw new Error(`${cnt} utenti con bio aggiornata >48h fa senza embedding`);
-    return "tutti gli utenti hanno embedding aggiornato";
+    if (cnt > 0) throw new Error(`${cnt} utenti con bio senza embedding`);
+    return "tutti gli utenti hanno embedding bio aggiornato";
   }));
 
   const overall = steps.some(s => s.status === "error") ? "broken"
@@ -183,17 +185,34 @@ export async function checkEmbeddingMusic(): Promise<PipelineCheckResult> {
   const t0 = Date.now();
   const steps: PipelineCheckStep[] = [];
 
-  steps.push(await warnStep("utenti con tracce senza embedding musicale", async () => {
+  steps.push(await warnStep("utenti con dati musicali senza embedding music_taste", async () => {
     const res = await db.execute(sql`
-      SELECT COUNT(DISTINCT umt.user_id) AS cnt
-      FROM user_music_tracks umt
-      WHERE NOT EXISTS (
-        SELECT 1 FROM user_embeddings ue
-        WHERE ue.user_id = umt.user_id AND ue.embedding_type = 'music_taste'
-      )
+      SELECT COUNT(*) AS cnt
+      FROM users u
+      LEFT JOIN user_profiles p ON p.user_id = u.id
+      WHERE u.is_fake = false
+        AND u.status = 'active'
+        AND (
+          COALESCE(p.music_taste_text, '') <> ''
+          OR EXISTS (
+            SELECT 1
+            FROM entity_tags et
+            INNER JOIN tags t ON t.id = et.tag_id
+            INNER JOIN tag_categories tc ON tc.id = t.category_id
+            WHERE et.entity_type = 'user'
+              AND et.entity_id = u.id
+              AND tc.slug = 'musica'
+          )
+        )
+        AND NOT EXISTS (
+          SELECT 1 FROM embeddings e
+          WHERE e.entity_type = 'user'
+            AND e.entity_id = u.id
+            AND e.field = 'music_taste'
+        )
     `);
     const cnt = parseInt((res.rows[0] as { cnt: string }).cnt ?? "0", 10);
-    if (cnt > 10) throw new Error(`${cnt} utenti con tracce musicali senza embedding`);
+    if (cnt > 10) throw new Error(`${cnt} utenti con dati musicali senza embedding music_taste`);
     if (cnt > 0) return `${cnt} utenti in attesa di embedding (sotto soglia)`;
     return "tutti gli utenti hanno embedding musicale";
   }));
