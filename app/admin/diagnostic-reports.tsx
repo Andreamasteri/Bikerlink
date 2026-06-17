@@ -9,7 +9,7 @@ import { useRouter } from "expo-router";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useColors } from "@/hooks/useColors";
 import { apiRequest, queryClient, getApiUrl, authFetchHeaders } from "@/lib/query-client";
-import * as FileSystem from "expo-file-system";
+import * as FileSystem from "expo-file-system/legacy";
 import * as Sharing from "expo-sharing";
 import { addDiagnosticEventListener, removeDiagnosticEventListener } from "@/lib/diagnostic/ws-client";
 import { DiagnosticFilterPanel, EMPTY_FILTERS } from "@/components/admin/DiagnosticFilterPanel";
