@@ -164,6 +164,29 @@ router.post("/diagnostic/request", async (req: Request, res: Response) => {
   }
 });
 
+router.get("/diagnostic/search-users", async (req: Request, res: Response) => {
+  try {
+    const q = typeof req.query.q === "string" ? req.query.q.trim() : "";
+    if (!q || q.length < 2) return res.json({ users: [] });
+
+    const rows = await db
+      .select({ id: users.id, nickname: users.nickname })
+      .from(users)
+      .where(
+        or(
+          ilike(users.nickname, `%${q}%`),
+          sql`lower(${users.id}) like lower(${"%" + q + "%"})`
+        )
+      )
+      .limit(20);
+
+    return res.json({ users: rows });
+  } catch (err) {
+    console.error("[admin/diagnostic/search-users] error:", err);
+    return sendError(res, 500, "Errore ricerca utenti");
+  }
+});
+
 router.get("/diagnostic-reports/online-users", (_req: Request, res: Response) => {
   try {
     const onlineUsers = getOnlineUsers();

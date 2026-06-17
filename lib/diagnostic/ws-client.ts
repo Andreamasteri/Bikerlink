@@ -7,6 +7,26 @@ let _reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 let _isAdmin = false;
 let _enabled = false;
 
+// ── Admin event listener registry ──────────────────────────────────────────
+// Allows the admin panel to subscribe to diag:progress / diag:result events
+// that the server broadcasts to admin connections, without opening a second WS.
+export type DiagAdminEventType = "diag:progress" | "diag:result";
+export type DiagAdminEventListener = (msg: Record<string, unknown>) => void;
+const _listeners = new Map<DiagAdminEventType, Set<DiagAdminEventListener>>();
+
+export function addDiagnosticEventListener(type: DiagAdminEventType, cb: DiagAdminEventListener): void {
+  if (!_listeners.has(type)) _listeners.set(type, new Set());
+  _listeners.get(type)!.add(cb);
+}
+
+export function removeDiagnosticEventListener(type: DiagAdminEventType, cb: DiagAdminEventListener): void {
+  _listeners.get(type)?.delete(cb);
+}
+
+function emitDiagnosticEvent(type: DiagAdminEventType, msg: Record<string, unknown>): void {
+  _listeners.get(type)?.forEach(cb => { try { cb(msg); } catch {/* noop */} });
+}
+
 function clearReconnect() {
   if (_reconnectTimer) { clearTimeout(_reconnectTimer); _reconnectTimer = null; }
 }
@@ -34,9 +54,11 @@ function connect() {
 
     ws.onmessage = async (event) => {
       try {
-        const msg = JSON.parse(typeof event.data === "string" ? event.data : "") as { type: string; showBanner?: boolean };
+        const msg = JSON.parse(typeof event.data === "string" ? event.data : "") as { type: string; showBanner?: boolean; [k: string]: unknown };
         if (msg.type === "diagnostic:run") {
           await handleRunCommand(msg.showBanner ?? false);
+        } else if (msg.type === "diag:progress" || msg.type === "diag:result") {
+          emitDiagnosticEvent(msg.type, msg as Record<string, unknown>);
         }
       } catch {/* noop */}
     };

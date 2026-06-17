@@ -8,7 +8,8 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useColors } from "@/hooks/useColors";
-import { apiRequest, getApiUrl, getSessionToken, queryClient } from "@/lib/query-client";
+import { apiRequest, queryClient, getApiUrl, authFetchHeaders } from "@/lib/query-client";
+import { addDiagnosticEventListener, removeDiagnosticEventListener } from "@/lib/diagnostic/ws-client";
 import type { DiagnosticSummary, DiagnosticTestResult } from "@/lib/diagnostic/runner";
 
 interface OnlineUser { userId: string; role: string }
@@ -85,47 +86,61 @@ export default function DiagnosticReportsScreen() {
   const [pendingFilters, setPendingFilters] = useState<Filters>(EMPTY_FILTERS);
   const [page, setPage] = useState(1);
 
-  const wsRef = useRef<WebSocket | null>(null);
   const reportsUrlRef = useRef<string>("/api/admin/diagnostic-reports");
 
+  // Subscribe to admin events via the shared ws-client instead of opening a second WS.
   useEffect(() => {
-    const token = getSessionToken();
-    if (!token) return;
-    const apiUrl = getApiUrl();
-    const wsUrl = apiUrl.replace(/^https?:\/\//, (m) => m === "https://" ? "wss://" : "ws://") + "/ws/diagnostic";
-    let ws: WebSocket;
-    try {
-      ws = new WebSocket(wsUrl);
-      wsRef.current = ws;
-      ws.onmessage = (event) => {
-        try {
-          const msg = JSON.parse(typeof event.data === "string" ? event.data : "") as { type: string; userId?: string; summary?: DiagnosticSummary; done?: number; total?: number };
-          if (msg.type === "diag:progress" && msg.userId) {
-            setTriggeredStatus(prev => ({ ...prev, [msg.userId!]: "running" }));
-          } else if (msg.type === "diag:result" && msg.userId) {
-            setTriggeredStatus(prev => ({ ...prev, [msg.userId!]: "done" }));
-            queryClient.invalidateQueries({ queryKey: [reportsUrlRef.current] });
-          }
-        } catch {/* noop */}
-      };
-      ws.onerror = () => { wsRef.current = null; };
-      ws.onclose = () => { wsRef.current = null; };
-    } catch {/* noop */}
-    return () => { try { wsRef.current?.close(); wsRef.current = null; } catch {/* noop */} };
+    const onProgress = (msg: Record<string, unknown>) => {
+      const userId = msg.userId as string | undefined;
+      if (userId) setTriggeredStatus(prev => ({ ...prev, [userId]: "running" }));
+    };
+    const onResult = (msg: Record<string, unknown>) => {
+      const userId = msg.userId as string | undefined;
+      if (userId) {
+        setTriggeredStatus(prev => ({ ...prev, [userId]: "done" }));
+        queryClient.invalidateQueries({ queryKey: [reportsUrlRef.current] });
+      }
+    };
+    addDiagnosticEventListener("diag:progress", onProgress);
+    addDiagnosticEventListener("diag:result", onResult);
+    return () => {
+      removeDiagnosticEventListener("diag:progress", onProgress);
+      removeDiagnosticEventListener("diag:result", onResult);
+    };
   }, []);
 
   const reportsUrl = buildReportsUrl(filters, page);
   reportsUrlRef.current = reportsUrl;
 
-  const { data: onlineData, isLoading: onlineLoading } = useQuery<{ users: OnlineUser[] }>({
+  const { data: onlineData, isLoading: onlineLoading, isError: onlineError, refetch: refetchOnline } = useQuery<{ users: OnlineUser[] }>({
     queryKey: ["/api/admin/diagnostic-reports/online-users"],
     refetchInterval: 15000,
   });
 
-  const { data: reportsData, isLoading: reportsLoading, refetch } = useQuery<ReportsResponse>({
+  const { data: reportsData, isLoading: reportsLoading, isError: reportsError, refetch } = useQuery<ReportsResponse>({
     queryKey: [reportsUrl],
     refetchInterval: 30000,
     select: (data) => data,
+  });
+
+  // User search for the POLLING section
+  const [userSearchQuery, setUserSearchQuery] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(userSearchQuery.trim()), 400);
+    return () => clearTimeout(t);
+  }, [userSearchQuery]);
+
+  const { data: searchUsersData, isLoading: searchUsersLoading, isError: searchUsersError } = useQuery<{ users: Array<{ id: string; nickname: string | null }> }>({
+    queryKey: ["/api/admin/diagnostic/search-users", debouncedSearch],
+    enabled: debouncedSearch.length >= 2,
+    queryFn: async () => {
+      const url = new URL("/api/admin/diagnostic/search-users", getApiUrl());
+      url.searchParams.set("q", debouncedSearch);
+      const res = await fetch(url.toString(), { headers: authFetchHeaders(), credentials: "include" });
+      if (!res.ok) throw new Error("Errore ricerca utenti");
+      return res.json() as Promise<{ users: Array<{ id: string; nickname: string | null }> }>;
+    },
   });
 
   useEffect(() => {
@@ -192,18 +207,7 @@ export default function DiagnosticReportsScreen() {
   const reports = reportsData?.reports ?? [];
   const totalPages = reportsData ? Math.ceil(reportsData.total / 20) : 1;
   const active = hasActiveFilters(filters);
-
-  const usersFromReports = React.useMemo(() => {
-    const seen = new Set<string>();
-    const result: { userId: string; nickname?: string }[] = [];
-    for (const r of reportsData?.reports ?? []) {
-      if (r.userId && !seen.has(r.userId)) {
-        seen.add(r.userId);
-        result.push({ userId: r.userId, nickname: r.nickname });
-      }
-    }
-    return result;
-  }, [reportsData?.reports]);
+  const searchResults = searchUsersData?.users ?? [];
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -340,7 +344,15 @@ export default function DiagnosticReportsScreen() {
       >
         <Text style={styles.sectionLabel}>UTENTI ONLINE (WS)</Text>
         {onlineLoading && <ActivityIndicator style={{ margin: 16 }} />}
-        {!onlineLoading && onlineUsers.length === 0 && (
+        {onlineError && !onlineLoading && (
+          <View style={styles.errorBox}>
+            <Text style={styles.errorText}>Errore caricamento utenti online</Text>
+            <TouchableOpacity style={styles.retryBtn} onPress={() => refetchOnline()}>
+              <Text style={styles.retryBtnText}>Riprova</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+        {!onlineLoading && !onlineError && onlineUsers.length === 0 && (
           <Text style={styles.emptyText}>Nessun utente connesso via WS</Text>
         )}
         {onlineUsers.map(({ userId }) => {
@@ -365,17 +377,44 @@ export default function DiagnosticReportsScreen() {
         <View style={styles.divider} />
         <Text style={styles.sectionLabel}>RICHIEDI DIAGNOSTICA (POLLING)</Text>
         <Text style={styles.hintText}>L'app dell'utente eseguirà la diagnostica al prossimo polling (~60s)</Text>
-        {usersFromReports.length === 0 && !reportsLoading && (
-          <Text style={styles.emptyText}>Nessun utente con report precedenti</Text>
+        <View style={styles.searchRow}>
+          <Ionicons name="search" size={16} color="#6B7280" style={styles.searchIcon} />
+          <TextInput
+            style={styles.searchInput}
+            value={userSearchQuery}
+            onChangeText={setUserSearchQuery}
+            placeholder="Cerca per nickname o ID utente…"
+            placeholderTextColor="#4B5563"
+            autoCapitalize="none"
+            autoCorrect={false}
+          />
+          {userSearchQuery.length > 0 && (
+            <TouchableOpacity onPress={() => { setUserSearchQuery(""); setDebouncedSearch(""); }}>
+              <Ionicons name="close-circle" size={16} color="#6B7280" />
+            </TouchableOpacity>
+          )}
+        </View>
+        {searchUsersLoading && <ActivityIndicator style={{ marginVertical: 8 }} />}
+        {searchUsersError && !searchUsersLoading && (
+          <View style={styles.errorBox}>
+            <Text style={styles.errorText}>Errore nella ricerca utenti</Text>
+          </View>
         )}
-        {usersFromReports.map(({ userId, nickname }) => {
+        {debouncedSearch.length >= 2 && !searchUsersLoading && !searchUsersError && searchResults.length === 0 && (
+          <Text style={styles.emptyText}>Nessun utente trovato</Text>
+        )}
+        {debouncedSearch.length < 2 && (
+          <Text style={[styles.hintText, { marginTop: 0 }]}>Digita almeno 2 caratteri per cercare</Text>
+        )}
+        {searchResults.map((u) => {
+          const userId = u.id;
           const req = remoteReqStatus[userId];
           const st = req?.status ?? "idle";
           const isPending = st === "pending";
           return (
             <View key={userId} style={styles.userRow}>
               <Text style={styles.userId} numberOfLines={1}>
-                {nickname ?? userId.slice(0, 8) + "…"}
+                {u.nickname ?? userId.slice(0, 8) + "…"}
               </Text>
               {st === "pending" && <Text style={styles.statusText}>⏳ In attesa…</Text>}
               {st === "received" && <Text style={[styles.statusText, { color: "#22C55E" }]}>✅ Ricevuto</Text>}
@@ -407,7 +446,15 @@ export default function DiagnosticReportsScreen() {
         </View>
 
         {reportsLoading && <ActivityIndicator style={{ margin: 16 }} />}
-        {!reportsLoading && reports.length === 0 && (
+        {reportsError && !reportsLoading && (
+          <View style={styles.errorBox}>
+            <Text style={styles.errorText}>Errore caricamento report</Text>
+            <TouchableOpacity style={styles.retryBtn} onPress={() => refetch()}>
+              <Text style={styles.retryBtnText}>Riprova</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+        {!reportsLoading && !reportsError && reports.length === 0 && (
           <Text style={styles.emptyText}>
             {active ? "Nessun report corrisponde ai filtri" : "Nessun report ancora"}
           </Text>
@@ -584,4 +631,13 @@ const styles = StyleSheet.create({
   pageBtn: { width: 36, height: 36, borderRadius: 8, backgroundColor: "#1C1C1E", alignItems: "center", justifyContent: "center" },
   pageBtnDisabled: { opacity: 0.4 },
   pageLabel: { color: "#9CA3AF", fontSize: 13 },
+
+  errorBox: { marginHorizontal: 16, marginVertical: 8, backgroundColor: "#1C1C1E", borderRadius: 10, padding: 14, borderWidth: 1, borderColor: "#374151", alignItems: "center", gap: 8 },
+  errorText: { color: "#EF4444", fontSize: 13, textAlign: "center" },
+  retryBtn: { backgroundColor: "#1D4ED8", borderRadius: 6, paddingHorizontal: 16, paddingVertical: 6 },
+  retryBtnText: { color: "#fff", fontWeight: "600", fontSize: 13 },
+
+  searchRow: { flexDirection: "row", alignItems: "center", marginHorizontal: 16, marginBottom: 8, backgroundColor: "#1C1C1E", borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, borderWidth: 1, borderColor: "#374151", gap: 8 },
+  searchIcon: {},
+  searchInput: { flex: 1, color: "#E5E7EB", fontSize: 14 },
 });
