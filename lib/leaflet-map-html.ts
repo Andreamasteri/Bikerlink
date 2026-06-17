@@ -65,6 +65,8 @@ ${LIVE_MAP_STYLES}
   var pulseLayer = L.layerGroup().addTo(map);
   var hazardsLayer = L.layerGroup().addTo(map); var vesselsLayer = L.layerGroup().addTo(map);
   var userDotMarker = null;
+  var meSelfMarker = null;
+  var meSelfAnimFrame = null;
   var userPositions = {};
   var speedProfileUserPositions = [];
 
@@ -285,6 +287,33 @@ ${LIVE_MAP_STYLES}
     markersLayer.clearLayers();
   }
 
+  /* Smooth animation for the "me" pin — lerps from current position to the
+     new position over ME_ANIM_MS milliseconds using an ease-out cubic curve.
+     The meSelfMarker lives outside markersLayer so it is never destroyed by
+     clearAllMarkers(); only its position and icon are updated in-place. */
+  var ME_ANIM_MS = 300;
+  function animateMeMarkerTo(toLat, toLng) {
+    if (!meSelfMarker) return;
+    if (meSelfAnimFrame) { cancelAnimationFrame(meSelfAnimFrame); meSelfAnimFrame = null; }
+    var from = meSelfMarker.getLatLng();
+    var fromLat = from.lat;
+    var fromLng = from.lng;
+    if (fromLat === toLat && fromLng === toLng) return;
+    var startTime = null;
+    function step(ts) {
+      if (!startTime) startTime = ts;
+      var t = Math.min((ts - startTime) / ME_ANIM_MS, 1);
+      var ease = 1 - Math.pow(1 - t, 3);
+      meSelfMarker.setLatLng([fromLat + (toLat - fromLat) * ease, fromLng + (toLng - fromLng) * ease]);
+      if (t < 1) {
+        meSelfAnimFrame = requestAnimationFrame(step);
+      } else {
+        meSelfAnimFrame = null;
+      }
+    }
+    meSelfAnimFrame = requestAnimationFrame(step);
+  }
+
   /* ── Bridge ───────────────────────────────────────────────────────── */
   window.leafletBridge = {
 
@@ -359,6 +388,7 @@ ${LIVE_MAP_STYLES}
       }
 
       /* Users — registrati con OMS per spiderfy su sovrapposizione */
+      var meSelfSeen = false;
       (m.users || []).forEach(function(u) {
         userPositions[u.id] = { lat: u.lat, lng: u.lng };
         var color = getUserColor(u.userType, u.sex, u.speedProfile);
@@ -369,6 +399,7 @@ ${LIVE_MAP_STYLES}
         var hasSpeed = !!speedBadge;
         var html;
         if (u.isCurrentUser) {
+          meSelfSeen = true;
           var lockBadge = state.fixedPositionEnabled
             ? "<div style=\\"margin-top:2px;background:#FF6F00;" +
               "padding:1px 6px;border-radius:7px;font-size:9px;font-weight:800;color:#fff;" +
@@ -382,7 +413,16 @@ ${LIVE_MAP_STYLES}
             "font-size:10px;font-weight:700;color:#fff;margin-bottom:2px;" +
             "box-shadow:0 1px 4px rgba(0,0,0,0.4);border:1.5px solid rgba(255,255,255,0.8)\\">Tu</div>" +
             iconBadge(color, svg, 36) + lockBadge + "</div>";
-          addMarker(u.lat, u.lng, html, [52, meIconH], [26, meIconH], null, omsData);
+          var meIcon = L.divIcon({ html: html, className: "", iconSize: [52, meIconH], iconAnchor: [26, meIconH] });
+          if (!meSelfMarker) {
+            meSelfMarker = L.marker([u.lat, u.lng], { icon: meIcon, zIndexOffset: 2500, interactive: true }).addTo(map);
+            meSelfMarker.on("click", (function(uid, nick) {
+              return function() { postMsg({ type: "markerPress", markerType: "user", id: uid }); };
+            })(u.id, u.nickname || ""));
+          } else {
+            meSelfMarker.setIcon(meIcon);
+            animateMeMarkerTo(u.lat, u.lng);
+          }
         } else if (globalChip) {
           var rawNick2 = u.nickname || "";
           var truncNick2 = rawNick2.length > 10 ? rawNick2.substring(0, 10) + "\u2026" : rawNick2;
@@ -422,6 +462,14 @@ ${LIVE_MAP_STYLES}
           addMarker(u.lat, u.lng, html, [90, totalH], [45, 35], null, omsData);
         }
       });
+
+      /* Remove stale "me" pin if current user is absent from this payload
+         (e.g. during a loading frame or temporary filter). */
+      if (!meSelfSeen && meSelfMarker) {
+        if (meSelfAnimFrame) { cancelAnimationFrame(meSelfAnimFrame); meSelfAnimFrame = null; }
+        map.removeLayer(meSelfMarker);
+        meSelfMarker = null;
+      }
 
       /* Speed legend — update positions and recheck viewport visibility */
       speedProfileUserPositions = (m.users || [])
