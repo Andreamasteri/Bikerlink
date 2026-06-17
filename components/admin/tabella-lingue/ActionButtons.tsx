@@ -1,6 +1,5 @@
 import React, { type ComponentProps } from "react";
 import {
-  View,
   Text,
   StyleSheet,
   ActivityIndicator,
