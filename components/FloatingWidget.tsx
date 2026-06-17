@@ -3,7 +3,6 @@ import {
   View,
   Text,
   StyleSheet,
-  TouchableOpacity,
   Pressable,
   Dimensions,
   useWindowDimensions,
@@ -226,6 +225,28 @@ export default function FloatingWidget() {
   // tap fires only when pan threshold is never reached.
   const composedGesture = Gesture.Exclusive(panGesture, tapGesture);
 
+  // Menu item tap gestures — Gesture.Tap() keeps all touch handling in the
+  // RNGH native layer, eliminating conflicts with the parent Exclusive gesture
+  // on Android (TouchableOpacity runs in the JS touch system and could be
+  // swallowed by the parent GestureDetector before reaching the item).
+  const chatTapGesture = Gesture.Tap()
+    .onEnd((_e, success) => {
+      "worklet";
+      if (success) runOnJS(handleChatPress)();
+    });
+
+  const notificationsTapGesture = Gesture.Tap()
+    .onEnd((_e, success) => {
+      "worklet";
+      if (success) runOnJS(handleNotificationsPress)();
+    });
+
+  const playerTapGesture = Gesture.Tap()
+    .onEnd((_e, success) => {
+      "worklet";
+      if (success) runOnJS(handlePlayerPress)();
+    });
+
   // Swipe-down-to-dismiss gesture on the menu panel
   const menuPanGesture = Gesture.Pan()
     .runOnJS(true)
@@ -302,34 +323,40 @@ export default function FloatingWidget() {
             <GestureDetector gesture={menuPanGesture}>
               <Animated.View style={[styles.menuWrapper, menuAnimatedStyle]}>
                 <View style={[styles.menu, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                  <TouchableOpacity style={styles.menuItem} onPress={handleChatPress} activeOpacity={0.7}>
-                    <Ionicons name="chatbubbles" size={18} color={colors.accent} />
-                    <Text style={[styles.menuLabel, { color: colors.text }]}>Chat</Text>
-                    {unreadChat > 0 && (
-                      <View style={[styles.menuBadge, { backgroundColor: colors.accent }]}>
-                        <Text style={styles.menuBadgeText}>{unreadChat > 99 ? "99+" : unreadChat}</Text>
-                      </View>
-                    )}
-                  </TouchableOpacity>
+                  <GestureDetector gesture={chatTapGesture}>
+                    <View style={styles.menuItem}>
+                      <Ionicons name="chatbubbles" size={18} color={colors.accent} />
+                      <Text style={[styles.menuLabel, { color: colors.text }]}>Chat</Text>
+                      {unreadChat > 0 && (
+                        <View style={[styles.menuBadge, { backgroundColor: colors.accent }]}>
+                          <Text style={styles.menuBadgeText}>{unreadChat > 99 ? "99+" : unreadChat}</Text>
+                        </View>
+                      )}
+                    </View>
+                  </GestureDetector>
 
                   <View style={[styles.menuDivider, { backgroundColor: colors.border }]} />
 
-                  <TouchableOpacity style={styles.menuItem} onPress={handleNotificationsPress} activeOpacity={0.7}>
-                    <Ionicons name="notifications" size={18} color={colors.accent} />
-                    <Text style={[styles.menuLabel, { color: colors.text }]}>Notifiche</Text>
-                    {unreadNotifications > 0 && (
-                      <View style={[styles.menuBadge, { backgroundColor: colors.accentRed ?? "#FF3B30" }]}>
-                        <Text style={styles.menuBadgeText}>{unreadNotifications > 99 ? "99+" : unreadNotifications}</Text>
-                      </View>
-                    )}
-                  </TouchableOpacity>
+                  <GestureDetector gesture={notificationsTapGesture}>
+                    <View style={styles.menuItem}>
+                      <Ionicons name="notifications" size={18} color={colors.accent} />
+                      <Text style={[styles.menuLabel, { color: colors.text }]}>Notifiche</Text>
+                      {unreadNotifications > 0 && (
+                        <View style={[styles.menuBadge, { backgroundColor: colors.accentRed ?? "#FF3B30" }]}>
+                          <Text style={styles.menuBadgeText}>{unreadNotifications > 99 ? "99+" : unreadNotifications}</Text>
+                        </View>
+                      )}
+                    </View>
+                  </GestureDetector>
 
                   <View style={[styles.menuDivider, { backgroundColor: colors.border }]} />
 
-                  <TouchableOpacity style={styles.menuItem} onPress={handlePlayerPress} activeOpacity={0.7}>
-                    <Ionicons name="musical-notes" size={18} color={colors.accent} />
-                    <Text style={[styles.menuLabel, { color: colors.text }]}>Player</Text>
-                  </TouchableOpacity>
+                  <GestureDetector gesture={playerTapGesture}>
+                    <View style={styles.menuItem}>
+                      <Ionicons name="musical-notes" size={18} color={colors.accent} />
+                      <Text style={[styles.menuLabel, { color: colors.text }]}>Player</Text>
+                    </View>
+                  </GestureDetector>
                 </View>
               </Animated.View>
             </GestureDetector>
