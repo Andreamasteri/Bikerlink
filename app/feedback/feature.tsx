@@ -130,17 +130,6 @@ export default function FeatureRequestScreen() {
             </View>
           </View>
           <View style={styles.plannedCard}>
-            {/* eslint-disable-next-line @typescript-eslint/no-explicit-any -- Ionicons name not in type union */}
-            <Ionicons name={"logo-spotify" as any} size={20} color="#1DB954" />
-            <View style={styles.plannedInfo}>
-              <Text style={styles.plannedName}>Integrazione playlist Spotify</Text>
-              <Text style={styles.plannedDesc}>Condividi e scopri playlist con altri biker</Text>
-            </View>
-            <View style={styles.plannedBadge}>
-              <Text style={styles.plannedBadgeText}>Pianificato</Text>
-            </View>
-          </View>
-          <View style={styles.plannedCard}>
             <Ionicons name="logo-youtube" size={20} color="#FF0000" />
             <View style={styles.plannedInfo}>
               <Text style={styles.plannedName}>Integrazione playlist YouTube</Text>

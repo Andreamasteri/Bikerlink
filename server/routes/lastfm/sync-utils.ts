@@ -74,7 +74,6 @@ export async function syncLastfmTracks(userId: string, sessionKey: string, usern
       if (snapshot && Array.isArray(snapshot.tracksJson) && (snapshot.tracksJson as unknown[]).length > 0) {
         const snapshotTracks = snapshot.tracksJson as Array<{
           lastfmTrackId?: string;
-          spotifyTrackId?: string;
           trackName: string;
           artistId: string;
           artistName: string;
@@ -85,7 +84,7 @@ export async function syncLastfmTracks(userId: string, sessionKey: string, usern
           provider?: string;
         }>;
         for (const st of snapshotTracks) {
-          const resolvedTrackId = st.lastfmTrackId ?? st.spotifyTrackId;
+          const resolvedTrackId = st.lastfmTrackId;
           if (!resolvedTrackId) continue;
           try {
             await db

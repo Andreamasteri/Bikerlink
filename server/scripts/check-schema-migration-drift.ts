@@ -67,13 +67,7 @@ const KNOWN_UNMIGRATED_INDEXES = new Set<string>([
 // / ALTER TABLE RENAME in una migration. Queste situazioni preesistono al check e
 // sono già allineate in prod, quindi vengono allow-listate.
 // Formato: "table" per tabelle intere rimosse, "table.column" per singole colonne.
-const KNOWN_DROPPED_WITHOUT_MIGRATION = new Set<string>([
-  // Rimosso dal registry (shared/db/music.ts) senza DROP COLUMN migration.
-  // Probabilmente eliminato via drizzle-kit push storico; la colonna è presente
-  // nel baseline 0000 ma non in alcun file di migration successivo.
-  // La prod non la ha più (è stata rimossa con push), quindi non è critica.
-  "user_music_tokens.spotify_user_id",
-]);
+const KNOWN_DROPPED_WITHOUT_MIGRATION = new Set<string>([]);
 
 // ── Exported result type ────────────────────────────────────────────────────
 
