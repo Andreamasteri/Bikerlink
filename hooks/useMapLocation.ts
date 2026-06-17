@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import * as Location from "expo-location";
 import { AppState, AppStateStatus } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -8,6 +8,19 @@ import { getRegionCoordinates } from "@/constants/regions";
 import type { SharedPosition } from "@/lib/location-context";
 
 const GHOST_MODE_KEY = "@bikerlink/ghost_mode_active";
+
+const MAP_MARKER_MIN_DISTANCE_M = 15;
+const MAP_MARKER_MAX_STALE_MS = 30_000;
+
+function haversineMeters(a: { latitude: number; longitude: number }, b: { latitude: number; longitude: number }): number {
+  const R = 6_371_000;
+  const dLat = ((b.latitude - a.latitude) * Math.PI) / 180;
+  const dLon = ((b.longitude - a.longitude) * Math.PI) / 180;
+  const lat1 = (a.latitude * Math.PI) / 180;
+  const lat2 = (b.latitude * Math.PI) / 180;
+  const x = Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(x), Math.sqrt(1 - x));
+}
 
 type Coords = { latitude: number; longitude: number };
 
@@ -30,6 +43,9 @@ type Result = {
 export function useMapLocation({ userRegion, userCountry, profileLat, profileLng, currentPosition }: Props): Result {
   const [location, setLocation] = useState<Coords | null>(null);
   const [locationLoading, setLocationLoading] = useState(true);
+
+  const lastAppliedPositionRef = useRef<Coords | null>(null);
+  const lastAppliedAtRef = useRef<number>(0);
 
   const fetchGPSLocation = useCallback(async (): Promise<Coords | null> => {
     try {
@@ -59,10 +75,25 @@ export function useMapLocation({ userRegion, userCountry, profileLat, profileLng
   }, [userRegion, userCountry]);
 
   // Sync live position from the shared LocationContext watch — no extra GPS stream opened.
+  // Throttle: only move the marker if the user has travelled ≥ MAP_MARKER_MIN_DISTANCE_M
+  // OR MAP_MARKER_MAX_STALE_MS have elapsed since the last accepted update. This prevents
+  // GPS noise from jittering the pin when the user is standing still.
   useEffect(() => {
     if (!currentPosition) return;
-    setLocation({ latitude: currentPosition.latitude, longitude: currentPosition.longitude });
-    setLocationLoading(false);
+
+    const now = Date.now();
+    const prev = lastAppliedPositionRef.current;
+    const elapsed = now - lastAppliedAtRef.current;
+    const forceUpdate = elapsed >= MAP_MARKER_MAX_STALE_MS;
+
+    if (!prev || forceUpdate || haversineMeters(prev, currentPosition) >= MAP_MARKER_MIN_DISTANCE_M) {
+      lastAppliedPositionRef.current = { latitude: currentPosition.latitude, longitude: currentPosition.longitude };
+      lastAppliedAtRef.current = now;
+      setLocation({ latitude: currentPosition.latitude, longitude: currentPosition.longitude });
+      setLocationLoading(false);
+    } else {
+      setLocationLoading(false);
+    }
   }, [currentPosition]);
 
   // Persist context position to map_last_gps cache when the app goes to background/inactive.
