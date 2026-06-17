@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect, useRef } from "react";
 import * as Location from "expo-location";
 import { AppState, AppStateStatus } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useQuery } from "@tanstack/react-query";
 import { sendStartupBeacon } from "@/lib/startup-beacon";
 import { apiRequest } from "@/lib/query-client";
 import { getRegionCoordinates } from "@/constants/regions";
@@ -9,8 +10,25 @@ import type { SharedPosition } from "@/lib/location-context";
 
 const GHOST_MODE_KEY = "@bikerlink/ghost_mode_active";
 
-const MAP_MARKER_MIN_DISTANCE_M = 15;
-const MAP_MARKER_MAX_STALE_MS = 30_000;
+const DEFAULT_MAP_MARKER_MIN_DISTANCE_M = 15;
+const DEFAULT_MAP_MARKER_MAX_STALE_MS = 30_000;
+
+interface GpsNoiseFilterSettings {
+  minDistanceM: number;
+  maxStaleMs: number;
+}
+
+function useGpsNoiseFilter(): GpsNoiseFilterSettings {
+  const { data } = useQuery<GpsNoiseFilterSettings>({
+    queryKey: ["/api/settings/gps-noise-filter"],
+    staleTime: 300_000,
+    retry: false,
+  });
+  return {
+    minDistanceM: data?.minDistanceM ?? DEFAULT_MAP_MARKER_MIN_DISTANCE_M,
+    maxStaleMs: data?.maxStaleMs ?? DEFAULT_MAP_MARKER_MAX_STALE_MS,
+  };
+}
 
 function haversineMeters(a: { latitude: number; longitude: number }, b: { latitude: number; longitude: number }): number {
   const R = 6_371_000;
@@ -44,6 +62,8 @@ export function useMapLocation({ userRegion, userCountry, profileLat, profileLng
   const [location, setLocation] = useState<Coords | null>(null);
   const [locationLoading, setLocationLoading] = useState(true);
 
+  const { minDistanceM, maxStaleMs } = useGpsNoiseFilter();
+
   const lastAppliedPositionRef = useRef<Coords | null>(null);
   const lastAppliedAtRef = useRef<number>(0);
 
@@ -75,18 +95,20 @@ export function useMapLocation({ userRegion, userCountry, profileLat, profileLng
   }, [userRegion, userCountry]);
 
   // Sync live position from the shared LocationContext watch — no extra GPS stream opened.
-  // Throttle: only move the marker if the user has travelled ≥ MAP_MARKER_MIN_DISTANCE_M
-  // OR MAP_MARKER_MAX_STALE_MS have elapsed since the last accepted update. This prevents
+  // Throttle: only move the marker if the user has travelled ≥ minDistanceM
+  // OR maxStaleMs have elapsed since the last accepted update. This prevents
   // GPS noise from jittering the pin when the user is standing still.
+  // Both thresholds are tunable via admin AppSettings (map_marker_min_distance_m /
+  // map_marker_max_stale_ms) and default to 15 m / 30 000 ms when unset.
   useEffect(() => {
     if (!currentPosition) return;
 
     const now = Date.now();
     const prev = lastAppliedPositionRef.current;
     const elapsed = now - lastAppliedAtRef.current;
-    const forceUpdate = elapsed >= MAP_MARKER_MAX_STALE_MS;
+    const forceUpdate = elapsed >= maxStaleMs;
 
-    if (!prev || forceUpdate || haversineMeters(prev, currentPosition) >= MAP_MARKER_MIN_DISTANCE_M) {
+    if (!prev || forceUpdate || haversineMeters(prev, currentPosition) >= minDistanceM) {
       lastAppliedPositionRef.current = { latitude: currentPosition.latitude, longitude: currentPosition.longitude };
       lastAppliedAtRef.current = now;
       setLocation({ latitude: currentPosition.latitude, longitude: currentPosition.longitude });
@@ -94,7 +116,7 @@ export function useMapLocation({ userRegion, userCountry, profileLat, profileLng
     } else {
       setLocationLoading(false);
     }
-  }, [currentPosition]);
+  }, [currentPosition, minDistanceM, maxStaleMs]);
 
   // Persist context position to map_last_gps cache when the app goes to background/inactive.
   useEffect(() => {

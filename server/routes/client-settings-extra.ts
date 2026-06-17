@@ -134,6 +134,24 @@ export function registerClientSettingsExtraRoutes(app: Express) {
     }
   });
 
+  app.get("/api/settings/gps-noise-filter", async (_req, res) => {
+    try {
+      const [minDist, maxStale] = await Promise.all([
+        storage.getAppSetting("map_marker_min_distance_m"),
+        storage.getAppSetting("map_marker_max_stale_ms"),
+      ]);
+      const minDistanceM = minDist?.value ? parseInt(minDist.value, 10) : 15;
+      const maxStaleMs = maxStale?.value ? parseInt(maxStale.value, 10) : 30000;
+      return res.json({
+        minDistanceM: isNaN(minDistanceM) || minDistanceM < 1 ? 15 : minDistanceM,
+        maxStaleMs: isNaN(maxStaleMs) || maxStaleMs < 1000 ? 30000 : maxStaleMs,
+      });
+    } catch (err) {
+      console.warn("[client-settings-extra] Failed to fetch gps-noise-filter:", err);
+      return res.json({ minDistanceM: 15, maxStaleMs: 30000 });
+    }
+  });
+
   app.get("/api/settings/tile-providers", async (req: Request, res) => {
     try {
       const { getStatus } = await import("./maps/provider-status");

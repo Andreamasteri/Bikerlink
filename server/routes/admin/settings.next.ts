@@ -186,6 +186,55 @@ router.put("/ais-config", async (req: Request, res: Response) => {
 });
 
 /**
+ * GET /gps-noise-filter
+ * Legge i parametri del filtro antirumore GPS: min distanza (m) e max stale (ms).
+ */
+router.get("/gps-noise-filter", async (_req: Request, res: Response) => {
+  try {
+    const [minDist, maxStale] = await Promise.all([
+      storage.getAppSetting("map_marker_min_distance_m"),
+      storage.getAppSetting("map_marker_max_stale_ms"),
+    ]);
+    const minDistanceM = minDist?.value ? parseInt(minDist.value, 10) : 15;
+    const maxStaleMs = maxStale?.value ? parseInt(maxStale.value, 10) : 30000;
+    return res.json({
+      minDistanceM: isNaN(minDistanceM) || minDistanceM < 1 ? 15 : minDistanceM,
+      maxStaleMs: isNaN(maxStaleMs) || maxStaleMs < 1000 ? 30000 : maxStaleMs,
+    });
+  } catch (_error) {
+    return sendError(res, 500, "Errore lettura filtro GPS");
+  }
+});
+
+/**
+ * PUT /gps-noise-filter
+ * Body: { minDistanceM?: number, maxStaleMs?: number }
+ * Salva i parametri del filtro antirumore GPS come AppSetting.
+ */
+router.put("/gps-noise-filter", async (req: Request, res: Response) => {
+  try {
+    const { minDistanceM, maxStaleMs } = req.body as { minDistanceM?: number; maxStaleMs?: number };
+    if (minDistanceM !== undefined) {
+      if (typeof minDistanceM !== "number" || !Number.isInteger(minDistanceM) || minDistanceM < 1 || minDistanceM > 10000) {
+        return sendError(res, 400, "minDistanceM deve essere un intero tra 1 e 10000");
+      }
+    }
+    if (maxStaleMs !== undefined) {
+      if (typeof maxStaleMs !== "number" || !Number.isInteger(maxStaleMs) || maxStaleMs < 1000 || maxStaleMs > 600000) {
+        return sendError(res, 400, "maxStaleMs deve essere un intero tra 1000 e 600000");
+      }
+    }
+    const upserts: Promise<unknown>[] = [];
+    if (minDistanceM !== undefined) upserts.push(storage.upsertAppSetting("map_marker_min_distance_m", String(minDistanceM)));
+    if (maxStaleMs !== undefined) upserts.push(storage.upsertAppSetting("map_marker_max_stale_ms", String(maxStaleMs)));
+    await Promise.all(upserts);
+    return res.json({ ok: true });
+  } catch (_error) {
+    return sendError(res, 500, "Errore salvataggio filtro GPS");
+  }
+});
+
+/**
  * POST /ais-reconnect
  * Riconnette il WebSocket AIS senza modificare la configurazione.
  */
