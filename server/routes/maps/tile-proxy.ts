@@ -32,13 +32,13 @@ const router = Router();
  *
  * Endpoint di diagnostica leggero che verifica la raggiungibilità del tile server
  * di default (tile.openstreetmap.org). Usato dal runner di diagnostica client.
- * Risponde entro 4 secondi: se il tile server non è raggiungibile restituisce
+ * Risponde entro 3 secondi: se il tile server non è raggiungibile restituisce
  * HTTP 503 pulito invece di lasciare la connessione appesa.
  */
 router.get("/maps/tile-proxy-check", requireAuth, async (_req: Request, res: Response) => {
   const testUrl = "https://tile.openstreetmap.org/0/0/0.png";
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 4_000);
+  const timer = setTimeout(() => controller.abort(), 3_000);
   const t0 = Date.now();
 
   try {

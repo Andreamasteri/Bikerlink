@@ -106,8 +106,8 @@ async function testApiCore(): Promise<DiagnosticTestResult[]> {
   const endpoints: Array<{ name: string; path: string }> = [
     { name: "Friends", path: "/api/friends" },
     { name: "Conversations", path: "/api/chat/conversations" },
-    { name: "Motoclubs", path: "/api/motoclubs/discovery" },
-    { name: "Events", path: "/api/eventi" },
+    { name: "Motoclubs", path: "/api/motoclubs" },
+    { name: "Events", path: "/api/events" },
     { name: "Road Hazards", path: "/api/road-hazards" },
     { name: "Sprints", path: "/api/sprints" },
   ];
