@@ -122,20 +122,28 @@ export async function runAnomalyScan(): Promise<{ created: number; scannedCatego
   return { created, scannedCategories: current.size };
 }
 
+function scheduleNextTick(): void {
+  const jitter = TICK_MS * 0.1 * (Math.random() * 2 - 1);
+  const delay = TICK_MS + jitter;
+  timer = setTimeout(async () => {
+    await runAnomalyScan().catch((err) => console.warn("[ai-anomaly] scan error:", err));
+    if (timer !== null) scheduleNextTick();
+  }, delay);
+  timer.unref?.();
+}
+
 export function startAnomalyScheduler(): void {
   if (timer) return;
-  // Primo run dopo 1 min, poi ogni 10 min. Corre ogni 10min quindi non contribuisce
-  // al thundering herd dei worker a 5min — offset minimo sufficiente.
-  setTimeout(() => {
-    runAnomalyScan().catch((err) => console.warn("[ai-anomaly] first scan error:", err));
+  // Primo run dopo 1 min, poi ogni 10 min ±10% jitter (anti-thundering-herd).
+  timer = setTimeout(() => {
+    runAnomalyScan()
+      .catch((err) => console.warn("[ai-anomaly] first scan error:", err))
+      .finally(() => { if (timer !== null) scheduleNextTick(); });
   }, 60_000);
-  timer = setInterval(() => {
-    runAnomalyScan().catch((err) => console.warn("[ai-anomaly] scan error:", err));
-  }, TICK_MS);
   timer.unref?.();
-  console.log("[ai-anomaly] scheduler started, tick=10min");
+  console.log("[ai-anomaly] scheduler started, initial-delay=1min, tick=10min±10%");
 }
 
 export function stopAnomalyScheduler(): void {
-  if (timer) { clearInterval(timer); timer = null; }
+  if (timer) { clearTimeout(timer); timer = null; }
 }
