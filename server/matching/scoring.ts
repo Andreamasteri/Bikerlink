@@ -46,16 +46,23 @@ const DEFAULT_THRESHOLDS: ThresholdsMap = new Map([
   ["tipo_moto",   { jaccardThreshold: 0.30, minCommonTags: 1 }],
 ]);
 
+const THRESHOLDS_CACHE_TTL_MS = 5 * 60 * 1000;
+
 let thresholdsCache: ThresholdsMap | null = null;
+let thresholdsCachedAt = 0;
 let supermatchMinCategoriesCache: number | null = null;
+let supermatchMinCategoriesCachedAt = 0;
 
 export function invalidateMatchThresholdsCache(): void {
   thresholdsCache = null;
+  thresholdsCachedAt = 0;
   supermatchMinCategoriesCache = null;
+  supermatchMinCategoriesCachedAt = 0;
 }
 
 export async function loadMatchThresholds(): Promise<ThresholdsMap> {
-  if (thresholdsCache) return thresholdsCache;
+  const now = Date.now();
+  if (thresholdsCache && now - thresholdsCachedAt < THRESHOLDS_CACHE_TTL_MS) return thresholdsCache;
   try {
     const rows = await db.select().from(matchThresholds);
     const map: ThresholdsMap = new Map(DEFAULT_THRESHOLDS);
@@ -66,6 +73,7 @@ export async function loadMatchThresholds(): Promise<ThresholdsMap> {
       });
     }
     thresholdsCache = map;
+    thresholdsCachedAt = now;
     return map;
   } catch {
     return DEFAULT_THRESHOLDS;
@@ -77,14 +85,17 @@ export function getThresholdSync(category: string, thresholds: ThresholdsMap): C
 }
 
 export async function getSupermatchMinCategories(): Promise<number> {
-  if (supermatchMinCategoriesCache != null) return supermatchMinCategoriesCache;
+  const now = Date.now();
+  if (supermatchMinCategoriesCache != null && now - supermatchMinCategoriesCachedAt < THRESHOLDS_CACHE_TTL_MS) return supermatchMinCategoriesCache;
   try {
     const [row] = await db.select().from(appSettings).where(eq(appSettings.key, "match_supermatch_min_categories")).limit(1);
     const raw = row?.value ?? "3";
     const parsed = parseInt(String(raw), 10);
     supermatchMinCategoriesCache = Number.isFinite(parsed) && parsed >= 1 ? parsed : 3;
+    supermatchMinCategoriesCachedAt = now;
   } catch {
     supermatchMinCategoriesCache = 3;
+    supermatchMinCategoriesCachedAt = now;
   }
   return supermatchMinCategoriesCache;
 }

@@ -70,7 +70,7 @@ export const ProfileVersionSection: React.FC = () => {
     return null;
   }, [releases]);
 
-  const { apk, runtime, ota } = parseAppVersion();
+  const { apk, runtime } = parseAppVersion();
 
   const displayOta = isAdmin && lastApprovedOtaNum !== null ? lastApprovedOtaNum : appliedOta;
 

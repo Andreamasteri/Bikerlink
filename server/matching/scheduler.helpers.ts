@@ -41,24 +41,16 @@ export async function runCleanup(): Promise<number> {
 
 export async function pruneStaleProposalProfileMatches(): Promise<number> {
   try {
-    const activeProposalIds = await db
-      .select({ id: proposals.id })
-      .from(proposals)
-      .where(eq(proposals.status, "active"));
-    const activeIds = activeProposalIds.map((r) => r.id);
-    if (activeIds.length === 0) {
-      const result = await db
-        .delete(proposalProfileMatches)
-        .returning({ id: proposalProfileMatches.id });
-      return result.length;
-    }
-    const result = await db
-      .delete(proposalProfileMatches)
-      .where(
-        sql`${proposalProfileMatches.proposalId} NOT IN (${sql.join(activeIds.map((id) => sql`${id}`), sql`, `)})`
+    const result = await db.execute<{ id: string }>(sql`
+      DELETE FROM proposal_profile_matches
+      WHERE NOT EXISTS (
+        SELECT 1 FROM proposals
+        WHERE proposals.id = proposal_profile_matches.proposal_id
+          AND proposals.status = 'active'
       )
-      .returning({ id: proposalProfileMatches.id });
-    return result.length;
+      RETURNING id
+    `);
+    return (result.rows ?? []).length;
   } catch (error) {
     console.error("[Cleanup] Errore pulizia proposal_profile_matches stale:", error);
     return 0;

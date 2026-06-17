@@ -76,11 +76,18 @@ export async function runBikerZavorrinaBase(): Promise<number> {
     const allIds = [...bikerIds, ...zavIds];
 
     // Deduplication: coppie già in biker_biker_matches (pair_type='bz')
+    // Scoped to bikerIds × zavIds to avoid full-table load in memory.
     const existingBbRes = await db.execute<{ a: string; b: string }>(sql`
       SELECT LEAST(biker1_id, biker2_id)::text AS a,
              GREATEST(biker1_id, biker2_id)::text AS b
       FROM biker_biker_matches
-      WHERE pair_type = 'bz' AND archived_at IS NULL
+      WHERE pair_type = 'bz'
+        AND archived_at IS NULL
+        AND (
+          (biker1_id = ANY(${bikerIds}::text[]) AND biker2_id = ANY(${zavIds}::text[]))
+          OR
+          (biker1_id = ANY(${zavIds}::text[]) AND biker2_id = ANY(${bikerIds}::text[]))
+        )
     `);
     const existingPairSet = new Set<string>();
     for (const row of (existingBbRes.rows ?? []) as Array<{ a: string; b: string }>) {
@@ -88,10 +95,13 @@ export async function runBikerZavorrinaBase(): Promise<number> {
     }
 
     // Deduplication: coppie già in biker_zavorrina_matches (wishlist-based)
+    // Scoped to bikerIds × zavIds to avoid full-table load in memory.
     const existingBzRes = await db.execute<{ bid: string; zid: string }>(sql`
       SELECT biker_id::text AS bid, zavorrina_id::text AS zid
       FROM biker_zavorrina_matches
       WHERE archived_at IS NULL
+        AND biker_id = ANY(${bikerIds}::text[])
+        AND zavorrina_id = ANY(${zavIds}::text[])
     `);
     const existingWishlistSet = new Set<string>();
     for (const row of (existingBzRes.rows ?? []) as Array<{ bid: string; zid: string }>) {

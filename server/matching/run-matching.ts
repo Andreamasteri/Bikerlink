@@ -24,7 +24,7 @@ import { db } from "../db";
 import { sql } from "drizzle-orm";
 import { entityTags, tags as tagsTable, tagCategories, zavorrinaWishlistMotos } from "@shared/db";
 import { and, count, eq, inArray } from "drizzle-orm";
-import { bboxAround } from "../lib/geo-bbox";
+import { haversineDistance } from "../geo";
 import { createUserLoader } from "../lib/user-loader";
 import { matchingLogger } from "../lib/logger";
 import { addMatchLog } from "./match-log-buffer";
@@ -103,15 +103,6 @@ export async function runMatching(): Promise<number> {
     };
     if (activeProposals.length < 2) return 0;
 
-    // Bbox pre-compute (each proposal's reachable bbox at BBOX_RADIUS_KM) so we
-    // can cheaply skip pairs that cannot possibly overlap geographically
-    // before invoking areCompatible / Haversine in scoring.
-    const bboxes = activeProposals.map((p) => {
-      const lat = p.departureLatitude as number | null;
-      const lon = p.departureLongitude as number | null;
-      return lat != null && lon != null ? bboxAround(lat, lon, BBOX_RADIUS_KM) : null;
-    });
-
     // DataLoader: batch-load author user records once per cycle for any
     // downstream code that needs them (avoids N+1 in scoring extensions).
     const userLoader = createUserLoader();
@@ -136,8 +127,6 @@ export async function runMatching(): Promise<number> {
     const proposalsById = new Map(activeProposals.map((p) => [p.id, p] as const));
     const pairsConsidered = activeProposals.length * (activeProposals.length - 1) / 2;
     const pairsAfterBbox = candidatePairs.length;
-    // Suppress unused warning while keeping bboxes ready for future hybrid use.
-    void bboxes;
 
     for (const { id1, id2 } of candidatePairs) {
       const p1 = proposalsById.get(id1);
@@ -158,6 +147,14 @@ export async function runMatching(): Promise<number> {
         if (!neitherMatchingDisabled(matchingDisabledSet, p1.userId, p2.userId)) continue;
 
         if (existingKeys.has(`${p1.id}:${p2.id}`)) continue;
+
+        const distanceKm = (
+          p1.departureLatitude != null && p1.departureLongitude != null &&
+          p2.departureLatitude != null && p2.departureLongitude != null
+        ) ? haversineDistance(
+          p1.departureLatitude as number, p1.departureLongitude as number,
+          p2.departureLatitude as number, p2.departureLongitude as number,
+        ) : null;
 
         const newMatch = await storage.createProposalMatch({
           proposalId1: p1.id,
@@ -221,7 +218,8 @@ export async function runMatching(): Promise<number> {
             table: "proposal_matches",
             matchId: newMatch.id,
             userIds: [p1.userId, p2.userId],
-            priority: classifyMatch({ isFreshProposal: true }),
+            priority: classifyMatch({ isFreshProposal: true, distanceKm }),
+            distanceKm,
           });
         } catch (dispatchErr) {
           // dispatch is a secondary/priority channel; direct createNotification
@@ -285,7 +283,7 @@ export async function runWishlistMatching(): Promise<number> {
 
     lastWishlistStats = {
       candidatesPre: compatiblePairs.length,
-      candidatesPost: compatiblePairs.length,
+      candidatesPost: 0,
       pairsConsidered: compatiblePairs.length,
       pairsAfterBbox: compatiblePairs.length,
       matchesCreated: 0,
@@ -370,6 +368,7 @@ export async function runWishlistMatching(): Promise<number> {
     let matchCount = 0;
     let skipCount = 0;
     let usersProcessed = 0;
+    let candidatesPassedFilters = 0;
 
     outer:
     for (const pair of sortedPairs) {
@@ -410,6 +409,7 @@ export async function runWishlistMatching(): Promise<number> {
         // suppress "unused" warning until thresholds in supermatch fully wired
         void getThresholdSync;
 
+        candidatesPassedFilters++;
         try {
           const inserted = await storage.createMatch({
             bikerId,
@@ -471,6 +471,8 @@ export async function runWishlistMatching(): Promise<number> {
     matchingLogger.info(
       {
         matchCount,
+        candidatesPre: compatiblePairs.length,
+        candidatesPost: candidatesPassedFilters,
         usersProcessed,
         usersSkippedByCap,
         usersSkippedNoCandidate,
@@ -498,7 +500,7 @@ export async function runWishlistMatching(): Promise<number> {
 
     lastWishlistStats = {
       candidatesPre: compatiblePairs.length,
-      candidatesPost: compatiblePairs.length,
+      candidatesPost: candidatesPassedFilters,
       pairsConsidered: compatiblePairs.length,
       pairsAfterBbox: compatiblePairs.length,
       matchesCreated: matchCount,
