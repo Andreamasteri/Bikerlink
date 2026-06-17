@@ -67,7 +67,7 @@ export function useHomeMapState() {
   const { focusLat: focusLatParam, focusLng: focusLngParam } = useLocalSearchParams<{ focusLat?: string; focusLng?: string }>();
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
   const t = useT();
-  const { positionReady: contextPositionReady, requestPermission } = useLocationGate();
+  const { positionReady: contextPositionReady, requestPermission, currentPosition } = useLocationGate();
 
   const [mapFullscreen, setMapFullscreen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<MapUser | null>(null);
@@ -128,6 +128,7 @@ export function useHomeMapState() {
     userCountry: user?.country,
     profileLat: typedUser?.profileLatitude,
     profileLng: typedUser?.profileLongitude,
+    currentPosition,
   });
 
   const countriesQueryParam = useMemo(() => {

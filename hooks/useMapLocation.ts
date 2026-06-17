@@ -1,10 +1,11 @@
 import { useState, useCallback, useEffect } from "react";
 import * as Location from "expo-location";
+import { AppState, AppStateStatus } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { sendStartupBeacon } from "@/lib/startup-beacon";
 import { apiRequest } from "@/lib/query-client";
 import { getRegionCoordinates } from "@/constants/regions";
-import { subscribeGpsPosition } from "@/lib/shared-gps-position";
+import type { SharedPosition } from "@/lib/location-context";
 
 const GHOST_MODE_KEY = "@bikerlink/ghost_mode_active";
 
@@ -15,6 +16,7 @@ type Props = {
   userCountry?: string | null;
   profileLat?: number | null;
   profileLng?: number | null;
+  currentPosition?: SharedPosition | null;
 };
 
 type Result = {
@@ -25,7 +27,7 @@ type Result = {
   handleCenterPosition: () => Promise<void>;
 };
 
-export function useMapLocation({ userRegion, userCountry, profileLat, profileLng }: Props): Result {
+export function useMapLocation({ userRegion, userCountry, profileLat, profileLng, currentPosition }: Props): Result {
   const [location, setLocation] = useState<Coords | null>(null);
   const [locationLoading, setLocationLoading] = useState(true);
 
@@ -56,15 +58,29 @@ export function useMapLocation({ userRegion, userCountry, profileLat, profileLng
     return null;
   }, [userRegion, userCountry]);
 
+  // Sync live position from the shared LocationContext watch — no extra GPS stream opened.
+  useEffect(() => {
+    if (!currentPosition) return;
+    setLocation({ latitude: currentPosition.latitude, longitude: currentPosition.longitude });
+    setLocationLoading(false);
+  }, [currentPosition]);
+
+  // Persist context position to map_last_gps cache when the app goes to background/inactive.
+  useEffect(() => {
+    const subscription = AppState.addEventListener("change", (nextState: AppStateStatus) => {
+      if ((nextState === "background" || nextState === "inactive") && currentPosition) {
+        AsyncStorage.setItem(
+          "map_last_gps",
+          JSON.stringify({ latitude: currentPosition.latitude, longitude: currentPosition.longitude })
+        ).catch(() => {});
+      }
+    });
+    return () => subscription.remove();
+  }, [currentPosition]);
+
+  // One-time init: show cached or region/profile coords instantly while the shared watch warms up.
   useEffect(() => {
     let cancelled = false;
-
-    const unsubscribe = subscribeGpsPosition((coords) => {
-      if (cancelled) return;
-      setLocation(coords);
-      setLocationLoading(false);
-      AsyncStorage.setItem("map_last_gps", JSON.stringify(coords)).catch(() => {});
-    });
 
     async function initMapLocation() {
       try {
@@ -85,33 +101,28 @@ export function useMapLocation({ userRegion, userCountry, profileLat, profileLng
         if (userRegion) {
           if (!cancelled) setLocation((prev) => prev ?? getRegionCoordinates(userRegion!, userCountry));
           if (!cancelled) setLocationLoading(false);
-          const gps = await fetchGPSLocation();
-          if (gps && !cancelled) setLocation(gps);
           return;
         }
         if (profileLat != null && profileLng != null && !isNaN(Number(profileLat)) && !isNaN(Number(profileLng))) {
           if (!cancelled) setLocation((prev) => prev ?? { latitude: Number(profileLat), longitude: Number(profileLng) });
           if (!cancelled) setLocationLoading(false);
-          const gps = await fetchGPSLocation();
-          if (gps && !cancelled) setLocation(gps);
           return;
         }
 
-        const gps = await fetchGPSLocation();
-        if (cancelled) return;
-        if (gps) { setLocation(gps); setLocationLoading(false); }
-        else { const fallback = getRegionFallback(); if (fallback) setLocation((prev) => prev ?? fallback); setLocationLoading(false); }
+        const fallback = getRegionFallback();
+        if (!cancelled) {
+          if (fallback) setLocation((prev) => prev ?? fallback);
+          setLocationLoading(false);
+        }
       } catch (err) {
         console.warn("[index] initMapLocation fallita:", err);
         if (!cancelled) setLocationLoading(false);
       }
     }
+
     initMapLocation();
-    return () => {
-      cancelled = true;
-      unsubscribe();
-    };
-  }, [fetchGPSLocation, getRegionFallback, userRegion, userCountry, profileLat, profileLng]);
+    return () => { cancelled = true; };
+  }, [userRegion, userCountry, profileLat, profileLng, getRegionFallback]);
 
   const handleCenterPosition = useCallback(async () => {
     const gps = await fetchGPSLocation();
