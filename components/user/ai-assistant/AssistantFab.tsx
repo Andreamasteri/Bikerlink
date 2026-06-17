@@ -1,8 +1,14 @@
 // Task #2698 — FAB AI Assistant utente. Posizionato bottom-LEFT (admin FAB
 // arancione è bottom-right), colore primary, icona sparkles, NON draggable.
 // Visibile solo se admin enabled + utente non disabilitato + modes.fab on.
+//
+// FIX gesture conflict: il precedente wrapper View (position:absolute, full-screen,
+// zIndex:9000) creava un native view layer che interferiva con il GestureDetector
+// di FloatingWidget su Android (RNGH processa i touch a livello nativo e un view
+// intermedio a schermo intero ne altera il routing, anche con pointerEvents="box-none").
+// Soluzione: il Pressable è posizionato direttamente in absolute senza wrapper View.
 import React, { useState } from "react";
-import { Pressable, StyleSheet, View, Platform } from "react-native";
+import { Pressable, StyleSheet, Platform } from "react-native";
 import * as Haptics from "expo-haptics";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -24,49 +30,37 @@ export default function AssistantFab() {
 
   return (
     <>
-      <View
-        pointerEvents="box-none"
-        style={[styles.layer, { paddingLeft: 16, paddingBottom: bottom }]}
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="AI Assistant"
+        testID="assistant-fab"
+        onPress={() => {
+          if (Platform.OS !== "web") {
+            void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+          }
+          setOpen(true);
+        }}
+        style={({ pressed }) => [
+          styles.fab,
+          {
+            bottom,
+            backgroundColor: colors.primary,
+            shadowColor: colors.text,
+            opacity: pressed ? 0.85 : 1,
+          },
+        ]}
       >
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="AI Assistant"
-          testID="assistant-fab"
-          onPress={() => {
-            if (Platform.OS !== "web") {
-              void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            }
-            setOpen(true);
-          }}
-          style={({ pressed }) => [
-            styles.fab,
-            {
-              backgroundColor: colors.primary,
-              shadowColor: colors.text,
-              opacity: pressed ? 0.85 : 1,
-            },
-          ]}
-        >
-          <Ionicons name="sparkles" size={26} color="#FFFFFF" />
-        </Pressable>
-      </View>
+        <Ionicons name="sparkles" size={26} color="#FFFFFF" />
+      </Pressable>
       <AssistantChatSheet visible={open} onClose={() => setOpen(false)} />
     </>
   );
 }
 
 const styles = StyleSheet.create({
-  layer: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    bottom: 0,
-    top: 0,
-    justifyContent: "flex-end",
-    alignItems: "flex-start",
-    zIndex: 9000,
-  },
   fab: {
+    position: "absolute",
+    left: 16,
     width: FAB_SIZE,
     height: FAB_SIZE,
     borderRadius: FAB_SIZE / 2,
@@ -76,5 +70,6 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     shadowOffset: { width: 0, height: 2 },
     elevation: 6,
+    zIndex: 9000,
   },
 });
