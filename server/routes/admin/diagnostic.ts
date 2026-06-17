@@ -1,4 +1,6 @@
 import { Router, type Request, type Response } from "express";
+import fs from "fs";
+import path from "path";
 import { db } from "../../db";
 import { sendError } from "../../lib/api-response";
 import { diagnosticReports, diagnosticQueue } from "@shared/db";
@@ -6,6 +8,49 @@ import { users } from "@shared/db";
 import { and, desc, eq, gte, gt, ilike, isNull, lt, lte, or, sql } from "drizzle-orm";
 import { storage } from "../../storage";
 import { sendDiagnosticCommand, getOnlineUsers } from "../../diagnostic-ws";
+
+const REPORTS_DIR = path.join(process.cwd(), "server", "diagnostics", "reports");
+
+function ensureReportsDir() {
+  try { fs.mkdirSync(REPORTS_DIR, { recursive: true }); } catch { /* already exists */ }
+}
+
+interface DiagFileEntry {
+  filename: string;
+  userId: string;
+  timestamp: string;
+  sizeBytes: number;
+}
+
+function parseFilename(filename: string): { userId: string; timestamp: string } | null {
+  const match = /^diag_([a-f0-9-]{36})_(.+)_[a-f0-9]{8}\.json$/.exec(filename);
+  if (!match) return null;
+  const rawTs = (match[2] ?? "").replace(/T(\d{2})-(\d{2})-(\d{2})-(\d{3})Z$/, "T$1:$2:$3.$4Z");
+  return { userId: match[1] ?? "unknown", timestamp: rawTs };
+}
+
+export function cleanupOldDiagFiles(): void {
+  try {
+    ensureReportsDir();
+    const cutoffMs = Date.now() - 30 * 24 * 60 * 60 * 1000;
+    const entries = fs.readdirSync(REPORTS_DIR);
+    let deleted = 0;
+    for (const name of entries) {
+      if (!name.endsWith(".json")) continue;
+      const filepath = path.join(REPORTS_DIR, name);
+      try {
+        const stat = fs.statSync(filepath);
+        if (stat.mtimeMs < cutoffMs) {
+          fs.unlinkSync(filepath);
+          deleted++;
+        }
+      } catch { /* skip unreadable files */ }
+    }
+    if (deleted > 0) console.log(`[diagnostic/files] Cleanup: rimossi ${deleted} file più vecchi di 30 giorni`);
+  } catch (e) {
+    console.warn("[diagnostic/files] Cleanup error:", e);
+  }
+}
 
 const router = Router();
 
@@ -194,6 +239,84 @@ router.get("/diagnostic-reports/online-users", (_req: Request, res: Response) =>
   } catch (err) {
     console.error("[admin/diagnostic-reports] online-users error:", err);
     return sendError(res, 500, "Errore");
+  }
+});
+
+router.get("/diagnostic/files", (req: Request, res: Response) => {
+  try {
+    ensureReportsDir();
+    const page = Math.max(1, parseInt(String(req.query.page ?? "1"), 10));
+    const limit = Math.min(50, Math.max(1, parseInt(String(req.query.limit ?? "20"), 10)));
+
+    const allFiles: DiagFileEntry[] = [];
+    try {
+      const entries = fs.readdirSync(REPORTS_DIR);
+      for (const name of entries) {
+        if (!name.endsWith(".json")) continue;
+        const filepath = path.join(REPORTS_DIR, name);
+        let stat: fs.Stats;
+        try { stat = fs.statSync(filepath); } catch { continue; }
+        const parsed = parseFilename(name);
+        allFiles.push({
+          filename: name,
+          userId: parsed?.userId ?? "unknown",
+          timestamp: parsed?.timestamp ?? stat.mtime.toISOString(),
+          sizeBytes: stat.size,
+        });
+      }
+    } catch { /* directory may not exist yet */ }
+
+    allFiles.sort((a, b) => b.timestamp.localeCompare(a.timestamp));
+    const total = allFiles.length;
+    const files = allFiles.slice((page - 1) * limit, page * limit);
+
+    return res.json({ files, total, page, limit });
+  } catch (err) {
+    console.error("[admin/diagnostic/files] GET error:", err);
+    return sendError(res, 500, "Errore lettura file diagnostica");
+  }
+});
+
+router.get("/diagnostic/files/:filename", (req: Request, res: Response) => {
+  try {
+    const { filename } = req.params as { filename: string };
+    if (!/^diag_[a-f0-9-]+_.+_[a-f0-9]{8}\.json$/.test(filename) || filename.includes("/") || filename.includes("\\")) {
+      return sendError(res, 400, "Nome file non valido");
+    }
+    const filepath = path.resolve(REPORTS_DIR, filename);
+    if (!filepath.startsWith(REPORTS_DIR + path.sep) && filepath !== REPORTS_DIR) {
+      return sendError(res, 400, "Percorso non valido");
+    }
+    if (!fs.existsSync(filepath)) {
+      return sendError(res, 404, "File non trovato");
+    }
+    res.setHeader("Content-Type", "application/json");
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    return res.sendFile(filepath);
+  } catch (err) {
+    console.error("[admin/diagnostic/files] download error:", err);
+    return sendError(res, 500, "Errore download file");
+  }
+});
+
+router.delete("/diagnostic/files/:filename", (req: Request, res: Response) => {
+  try {
+    const { filename } = req.params as { filename: string };
+    if (!/^diag_[a-f0-9-]+_.+_[a-f0-9]{8}\.json$/.test(filename) || filename.includes("/") || filename.includes("\\")) {
+      return sendError(res, 400, "Nome file non valido");
+    }
+    const filepath = path.resolve(REPORTS_DIR, filename);
+    if (!filepath.startsWith(REPORTS_DIR + path.sep) && filepath !== REPORTS_DIR) {
+      return sendError(res, 400, "Percorso non valido");
+    }
+    if (!fs.existsSync(filepath)) {
+      return sendError(res, 404, "File non trovato");
+    }
+    fs.unlinkSync(filepath);
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error("[admin/diagnostic/files] delete error:", err);
+    return sendError(res, 500, "Errore eliminazione file");
   }
 });
 

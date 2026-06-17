@@ -60,6 +60,17 @@ export async function runPhase5Schedulers(): Promise<void> {
     setInterval(cleanupOrphanedAdImages, 24 * 60 * 60 * 1000);
   }, 5 * 60 * 1000);
 
+  // Pulizia file diagnostica su filesystem: rimuove file JSON più vecchi di 30 giorni
+  setTimeout(async () => {
+    try {
+      const { cleanupOldDiagFiles } = await import("./routes/admin/diagnostic");
+      cleanupOldDiagFiles();
+      setInterval(cleanupOldDiagFiles, 24 * 60 * 60 * 1000);
+    } catch (e) {
+      console.warn("[INIT] cleanupOldDiagFiles error:", e);
+    }
+  }, 7 * 60 * 1000);
+
   // Delay di 2 min al boot: health-check leggero ma accede al DB; evita contesa sul pool.
   setTimeout(async () => {
     try {

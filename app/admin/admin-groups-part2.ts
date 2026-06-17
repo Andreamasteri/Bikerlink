@@ -252,7 +252,7 @@ export const adminGroupsPart2: AdminGroup[] = [
         iconSet: "MaterialCommunityIcons",
         route: "/admin/diagnostic-reports",
         accentColor: "#3B82F6",
-        keywords: ["diagnostica", "remota", "report", "utenti", "online", "debug remoto", "trigger", "dispositivo remoto", "remote device", "crash remoto", "feedback", "segnalazione tecnica", "bug report", "invio diagnostica"],
+        keywords: ["diagnostica", "remota", "report", "utenti", "online", "debug remoto", "trigger", "dispositivo remoto", "remote device", "crash remoto", "feedback", "segnalazione tecnica", "bug report", "invio diagnostica", "file json", "report file", "scarica report", "download diagnostica", "file diagnostica", "report su file", "json files", "esplora report", "filesystem diagnostica"],
       },
     ],
   },
