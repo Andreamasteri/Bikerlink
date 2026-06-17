@@ -132,7 +132,37 @@ OLD_OTA_NUMBER=$(grep -oP 'APPLIED_OTA_NUMBER: number \| null = \K[0-9]+' "$BUIL
 sed -i "s/^export const APPLIED_OTA_NUMBER:.*$/export const APPLIED_OTA_NUMBER: number | null = ${NEXT_OTA};/" "$BUILD_INFO"
 log_ok "APPLIED_OTA_NUMBER pre-impostato → ${NEXT_OTA} (sarà incluso nel bundle; rollback a ${OLD_OTA_NUMBER} se EAS fallisce)"
 
-# ── 4a. Metro export (atomico: se fallisce, ripristina buildInfo) ────────────
+# ── 4a. Pre-export: ferma Watchdog + start-expo.sh + libera 8081 ─────────────
+# Problema noto: Watchdog lancia start-expo.sh in background; anche dopo che il
+# Watchdog viene fermato, start-expo.sh sopravvive come processo orfano. Al suo
+# interno esegue `lsof -ti:8081 | xargs kill -9` che colpisce il Metro avviato
+# da `expo export` mid-bundle → export muore senza EXIT né rollback.
+# Fix: kill Watchdog + start-expo.sh + libera 8081 PRIMA di avviare l'export.
+log_info "Pre-export: libero porta 8081 da Watchdog/start-expo.sh..."
+# 1. Ferma watchdog.sh (se in esecuzione)
+pkill -TERM -f "watchdog.sh" 2>/dev/null || true
+sleep 1
+pkill -9 -f "watchdog.sh" 2>/dev/null || true
+# 2. Ferma start-expo.sh (anche orfano, anche se avviato dal Watchdog)
+pkill -TERM -f "start-expo.sh" 2>/dev/null || true
+sleep 1
+pkill -9 -f "start-expo.sh" 2>/dev/null || true
+# 3. Libera porta 8081: SIGTERM poi SIGKILL su qualsiasi processo Metro/Expo dev
+_PIDS_8081=$(lsof -ti:8081 2>/dev/null || true)
+if [[ -n "$_PIDS_8081" ]]; then
+  log_info "Processo(i) su 8081: ${_PIDS_8081} — SIGTERM..."
+  echo "$_PIDS_8081" | xargs kill -TERM 2>/dev/null || true
+  sleep 2
+  _PIDS_8081=$(lsof -ti:8081 2>/dev/null || true)
+  if [[ -n "$_PIDS_8081" ]]; then
+    log_info "Ancora su 8081: ${_PIDS_8081} — SIGKILL..."
+    echo "$_PIDS_8081" | xargs kill -9 2>/dev/null || true
+    sleep 1
+  fi
+fi
+log_ok "Pre-export: porta 8081 libera — Metro esclusivo per l'export"
+
+# ── 4b. Metro export (atomico: se fallisce, ripristina buildInfo) ────────────
 # Auto-detection cache corrotta: se expo export fallisce con pattern noti di
 # corruzione cache (ENOENT, Cannot resolve module, ecc.), pulisce automaticamente
 # /tmp/metro-file-map-* e .metro-cache/ e riprova una volta sola. Zero flag manuali.

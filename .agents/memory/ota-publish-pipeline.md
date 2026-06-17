@@ -1,7 +1,19 @@
 ---
 name: OTA publish pipeline quirks
-description: Comportamenti non ovvi del workflow OTA Publish (messaggio stale dal DB, accoppiamento client/server) per evitare release mal-etichettate o rotte.
+description: Comportamenti non ovvi del workflow OTA Publish (messaggio stale dal DB, accoppiamento client/server, killer start-expo.sh orfano) per evitare release mal-etichettate o rotte.
 ---
+
+## start-expo.sh orfano uccide expo export mid-bundle ← CAUSA PRINCIPALE DI HANG/CRASH OTA
+
+**Sintomo:** `expo export` raggiunge 200-300% CPU (bundla davvero), poi muore senza EXIT, senza rollback, dist-ota vuoto.
+
+**Causa:** Watchdog lancia `start-expo.sh` in background come processo figlio. Anche dopo SIGTERM al Watchdog, `start-expo.sh` sopravvive come orfano. Al suo avvio esegue `lsof -ti:8081 | xargs kill -9` — che colpisce il Metro di `expo export` mid-bundle. Il processo Metro riceve SIGKILL → `set -euo pipefail` del publish script non può intrappolarlo → no EXIT, no rollback buildInfo.
+
+**Fix applicato** in `publish-ota-full.sh` (sezione pre-export): blocco che fa `pkill watchdog.sh`, `pkill start-expo.sh`, libera 8081 con SIGTERM→SIGKILL prima di avviare l'export.
+
+**Why:** export Metro e dev Metro competono sulla porta 8081; il dev-starter vince con kill -9.
+
+**Come applicarlo:** il fix è già nello script — non rimuoverlo. Se l'export continua a morire mid-bundle senza errori nel log, controllare per prima cosa i processi orfani start-expo.sh (`pgrep -f start-expo.sh`).
 
 ## Messaggio stale dal fallback DB
 
