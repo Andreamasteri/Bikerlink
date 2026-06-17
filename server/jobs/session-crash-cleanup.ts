@@ -4,6 +4,8 @@ import { sql, eq } from "drizzle-orm";
 
 const TEN_MIN_MS = 10 * 60 * 1000;
 const FIFTEEN_MIN_AGO = "NOW() - INTERVAL '15 minutes'";
+// Jitter ±10%: evita risincronizzazione con altri worker ogni 10 min.
+const jitteredInterval = () => TEN_MIN_MS * (0.90 + Math.random() * 0.20);
 
 export async function runSessionCrashCleanup(): Promise<void> {
   try {
@@ -40,6 +42,17 @@ export async function runSessionCrashCleanup(): Promise<void> {
 }
 
 export function scheduleSessionCrashCleanup(): void {
-  setInterval(() => { void runSessionCrashCleanup(); }, TEN_MIN_MS);
-  void runSessionCrashCleanup();
+  // Primo run dopo 70s: evita di contendere il pool DB con gli altri worker
+  // che partono al boot (thundering herd). Usa un chain auto-rischedulante
+  // con jitter ±10% per evitare la risincronizzazione dopo ogni restart.
+  const scheduleNext = () => {
+    setTimeout(() => {
+      void runSessionCrashCleanup();
+      scheduleNext();
+    }, jitteredInterval());
+  };
+  setTimeout(() => {
+    void runSessionCrashCleanup();
+    scheduleNext();
+  }, 70_000);
 }

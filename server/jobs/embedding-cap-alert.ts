@@ -107,26 +107,35 @@ export async function checkEmbeddingCapAlert(): Promise<void> {
   }
 }
 
-let _intervalId: ReturnType<typeof setInterval> | null = null;
+let _timerId: ReturnType<typeof setTimeout> | null = null;
+
+// Jitter ±10%: evita risincronizzazione con altri worker ogni 30 min.
+const jitteredInterval = () => INTERVAL_MS * (0.90 + Math.random() * 0.20);
 
 export function startEmbeddingCapAlertJob(): void {
-  if (_intervalId) return;
-  setImmediate(() => {
+  if (_timerId) return;
+  // Primo run dopo 120s: evita di contendere il pool DB con gli altri worker
+  // al boot (thundering herd). Chain auto-rischedulante con jitter ±10%.
+  const scheduleNext = () => {
+    _timerId = setTimeout(() => {
+      checkEmbeddingCapAlert().catch((e) =>
+        console.warn("[embed-cap-alert] check error:", e),
+      );
+      scheduleNext();
+    }, jitteredInterval());
+  };
+  _timerId = setTimeout(() => {
     checkEmbeddingCapAlert().catch((e) =>
       console.warn("[embed-cap-alert] boot check error:", e),
     );
-  });
-  _intervalId = setInterval(() => {
-    checkEmbeddingCapAlert().catch((e) =>
-      console.warn("[embed-cap-alert] check error:", e),
-    );
-  }, INTERVAL_MS);
+    scheduleNext();
+  }, 120_000);
   console.log("[INIT] Embedding cap alert job scheduled (ogni 30 min)");
 }
 
 export function stopEmbeddingCapAlertJob(): void {
-  if (_intervalId) {
-    clearInterval(_intervalId);
-    _intervalId = null;
+  if (_timerId) {
+    clearTimeout(_timerId);
+    _timerId = null;
   }
 }

@@ -68,9 +68,24 @@ async function tick(): Promise<void> {
 
 export function startWatchdogScheduler(): void {
   if (tickTimer) return;
-  // Primo tick dopo 5s per consentire al server di stabilizzarsi.
-  setTimeout(() => { tick().catch(() => {}); }, 5_000);
-  tickTimer = setInterval(() => { tick().catch(() => {}); }, TICK_MS);
+  // Primo tick dopo 90s: il watchdog fa query DB ad ogni ciclo; ritardarlo
+  // evita di contribuire al thundering herd durante il burst di avvio.
+  // Usiamo un chain di setTimeout auto-rischedulante con ±15% di jitter
+  // (51–69s) per evitare la risincronizzazione tra worker dopo ogni restart.
+  // clearTimeout e clearInterval condividono lo stesso namespace in Node.js,
+  // quindi stopWatchdogScheduler() può usare clearTimeout(tickTimer) sul timer.
+  const jitter = () => TICK_MS * (0.85 + Math.random() * 0.30);
+  const scheduleNext = () => {
+    tickTimer = setTimeout(() => {
+      tick().catch(() => {});
+      scheduleNext();
+    }, jitter());
+    tickTimer.unref?.();
+  };
+  tickTimer = setTimeout(() => {
+    tick().catch(() => {});
+    scheduleNext();
+  }, 90_000);
   tickTimer.unref?.();
   cleanupTimer = setInterval(() => {
     cleanupOldSignals().then((n) => {
@@ -89,7 +104,7 @@ export function startWatchdogScheduler(): void {
 }
 
 export function stopWatchdogScheduler(): void {
-  if (tickTimer) { clearInterval(tickTimer); tickTimer = null; }
+  if (tickTimer) { clearTimeout(tickTimer); tickTimer = null; }
   if (cleanupTimer) { clearInterval(cleanupTimer); cleanupTimer = null; }
 }
 
