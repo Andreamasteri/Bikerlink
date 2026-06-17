@@ -94,6 +94,12 @@ export default function FloatingWidget() {
   const startY = useSharedValue(defaultY);
   const menuOpacity = useSharedValue(0);
   const menuTranslateY = useSharedValue(0);
+  // Measured menu size, used to anchor the panel's bottom-right corner just
+  // above-right of the ball when it is rendered at the root level (see
+  // menuAnimatedStyle). Seeded with sensible estimates to minimise the first
+  // open's positioning jump before onLayout reports the real size.
+  const menuW = useSharedValue(160);
+  const menuH = useSharedValue(158);
   const menuOpenRef = useRef(false);
 
   useEffect(() => {
@@ -276,12 +282,24 @@ export default function FloatingWidget() {
     transform: [{ translateX: posX.value }, { translateY: posY.value }],
   }));
 
-  // Menu is nested inside widgetContainer so it inherits the parent transform.
-  // Only opacity and the swipe-dismiss translateY are needed here — no posX/posY.
-  const menuAnimatedStyle = useAnimatedStyle(() => ({
-    opacity: menuOpacity.value,
-    transform: [{ translateY: menuTranslateY.value }],
-  }));
+  // Menu now lives at the ROOT absoluteFill level (not nested inside the 48×48
+  // widgetContainer), so it must reproduce the widget-follow + above/right
+  // anchoring itself. We position its top-left corner with an explicit transform
+  // derived from the ball position and the measured menu size, clamping to the
+  // screen so the panel stays fully on-screen (and therefore tappable on
+  // Android, where out-of-bounds views never receive touch). menuTranslateY adds
+  // the swipe-to-dismiss offset.
+  const menuAnimatedStyle = useAnimatedStyle(() => {
+    const minX = 8;
+    const maxX = Math.max(minX, screenW.value - menuW.value - 8);
+    let tx = posX.value + WIDGET_SIZE - menuW.value;
+    tx = Math.min(Math.max(tx, minX), maxX);
+    const ty = Math.max(insetsTop.value + 8, posY.value - 8 - menuH.value);
+    return {
+      opacity: menuOpacity.value,
+      transform: [{ translateX: tx }, { translateY: ty + menuTranslateY.value }],
+    };
+  });
 
   const handleChatPress = useCallback(() => {
     if (Platform.OS !== "web") {
@@ -318,60 +336,70 @@ export default function FloatingWidget() {
         <Pressable style={StyleSheet.absoluteFill} onPress={closeMenu} />
       )}
 
-      {/* Position-following container. `box-none` lets touches pass through the
-          empty area between the ball and the menu; composedGesture is scoped to
-          the ball only (below) so the menu's nested GestureDetectors are never
-          shadowed by the parent drag/tap gesture. */}
+      {/* Menu rendered at the ROOT absoluteFill level (a sibling of the ball),
+          NOT nested inside the 48×48 widgetContainer. On Android a child
+          rendered outside its parent's bounds does not receive touches, which is
+          why the menu items were dead in the native APK (the panel sits ~56px
+          above the ball, well outside the 48×48 container). Living directly under
+          the root View and positioning itself via menuAnimatedStyle keeps the
+          whole hitbox inside its parent, so each item's GestureDetector receives
+          taps reliably. */}
+      {menuOpen && (
+        <GestureDetector gesture={menuPanGesture}>
+          <Animated.View style={[styles.menuWrapper, menuAnimatedStyle]}>
+            <View
+              style={[styles.menu, { backgroundColor: colors.surface, borderColor: colors.border }]}
+              onLayout={(e) => {
+                menuW.value = e.nativeEvent.layout.width;
+                menuH.value = e.nativeEvent.layout.height;
+              }}
+            >
+              <GestureDetector gesture={chatTapGesture}>
+                <View style={styles.menuItem}>
+                  <Ionicons name="chatbubbles" size={18} color={colors.accent} />
+                  <Text style={[styles.menuLabel, { color: colors.text }]}>Chat</Text>
+                  {unreadChat > 0 && (
+                    <View style={[styles.menuBadge, { backgroundColor: colors.accent }]}>
+                      <Text style={styles.menuBadgeText}>{unreadChat > 99 ? "99+" : unreadChat}</Text>
+                    </View>
+                  )}
+                </View>
+              </GestureDetector>
+
+              <View style={[styles.menuDivider, { backgroundColor: colors.border }]} />
+
+              <GestureDetector gesture={notificationsTapGesture}>
+                <View style={styles.menuItem}>
+                  <Ionicons name="notifications" size={18} color={colors.accent} />
+                  <Text style={[styles.menuLabel, { color: colors.text }]}>Notifiche</Text>
+                  {unreadNotifications > 0 && (
+                    <View style={[styles.menuBadge, { backgroundColor: colors.accentRed ?? "#FF3B30" }]}>
+                      <Text style={styles.menuBadgeText}>{unreadNotifications > 99 ? "99+" : unreadNotifications}</Text>
+                    </View>
+                  )}
+                </View>
+              </GestureDetector>
+
+              <View style={[styles.menuDivider, { backgroundColor: colors.border }]} />
+
+              <GestureDetector gesture={playerTapGesture}>
+                <View style={styles.menuItem}>
+                  <Ionicons name="musical-notes" size={18} color={colors.accent} />
+                  <Text style={[styles.menuLabel, { color: colors.text }]}>Player</Text>
+                </View>
+              </GestureDetector>
+            </View>
+          </Animated.View>
+        </GestureDetector>
+      )}
+
+      {/* Position-following container holds ONLY the ball now. `box-none` lets
+          touches pass through the empty area; composedGesture is scoped to the
+          ball so drag/tap never shadow the menu's GestureDetectors. */}
       <Animated.View
         style={[styles.widgetContainer, widgetAnimatedStyle]}
         pointerEvents="box-none"
       >
-        {/* Menu lives inside the position-following container so it inherits the
-            transform and stays locked to the widget position, but it sits
-            OUTSIDE the ball's GestureDetector so each menu item receives touch. */}
-        {menuOpen && (
-          <GestureDetector gesture={menuPanGesture}>
-            <Animated.View style={[styles.menuWrapper, menuAnimatedStyle]}>
-              <View style={[styles.menu, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                <GestureDetector gesture={chatTapGesture}>
-                  <View style={styles.menuItem}>
-                    <Ionicons name="chatbubbles" size={18} color={colors.accent} />
-                    <Text style={[styles.menuLabel, { color: colors.text }]}>Chat</Text>
-                    {unreadChat > 0 && (
-                      <View style={[styles.menuBadge, { backgroundColor: colors.accent }]}>
-                        <Text style={styles.menuBadgeText}>{unreadChat > 99 ? "99+" : unreadChat}</Text>
-                      </View>
-                    )}
-                  </View>
-                </GestureDetector>
-
-                <View style={[styles.menuDivider, { backgroundColor: colors.border }]} />
-
-                <GestureDetector gesture={notificationsTapGesture}>
-                  <View style={styles.menuItem}>
-                    <Ionicons name="notifications" size={18} color={colors.accent} />
-                    <Text style={[styles.menuLabel, { color: colors.text }]}>Notifiche</Text>
-                    {unreadNotifications > 0 && (
-                      <View style={[styles.menuBadge, { backgroundColor: colors.accentRed ?? "#FF3B30" }]}>
-                        <Text style={styles.menuBadgeText}>{unreadNotifications > 99 ? "99+" : unreadNotifications}</Text>
-                      </View>
-                    )}
-                  </View>
-                </GestureDetector>
-
-                <View style={[styles.menuDivider, { backgroundColor: colors.border }]} />
-
-                <GestureDetector gesture={playerTapGesture}>
-                  <View style={styles.menuItem}>
-                    <Ionicons name="musical-notes" size={18} color={colors.accent} />
-                    <Text style={[styles.menuLabel, { color: colors.text }]}>Player</Text>
-                  </View>
-                </GestureDetector>
-              </View>
-            </Animated.View>
-          </GestureDetector>
-        )}
-
         <GestureDetector gesture={composedGesture}>
           <View style={{ width: WIDGET_SIZE, height: WIDGET_SIZE }}>
             <View
@@ -437,13 +465,15 @@ const styles = StyleSheet.create({
     fontWeight: "700" as const,
     lineHeight: 12,
   },
-  // Absolutely positioned wrapper that anchors the menu above and right-aligned
-  // to the widget. Because it lives inside widgetContainer it automatically
-  // follows the widget's drag position — no duplicate posX/posY needed.
+  // Root-level wrapper whose top-left corner is placed by menuAnimatedStyle's
+  // transform (widget position + above/right offset + measured size). High
+  // elevation/zIndex keep it above the backdrop on Android.
   menuWrapper: {
     position: "absolute",
-    right: 0,
-    bottom: WIDGET_SIZE + 8,
+    left: 0,
+    top: 0,
+    elevation: 30,
+    zIndex: 10000,
   },
   menu: {
     borderRadius: 12,
