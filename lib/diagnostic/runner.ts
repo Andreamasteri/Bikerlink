@@ -175,8 +175,8 @@ async function testApiRouting(): Promise<DiagnosticTestResult[]> {
 async function testMatchingPipeline(isAdmin: boolean): Promise<DiagnosticTestResult[]> {
   const section = "Pipeline Matching";
   const tests: Array<() => Promise<DiagnosticTestResult>> = [
-    () => runTest(section, "GET /api/matches", async () => {
-      const url = new URL("/api/matches", getApiUrl()).toString();
+    () => runTest(section, "GET /api/proposals", async () => {
+      const url = new URL("/api/proposals", getApiUrl()).toString();
       const res = await fetch(url, { headers: authFetchHeaders(), credentials: "include" });
       if (!res.ok) return { status: "FAIL", message: `HTTP ${res.status}` };
       const data = await res.json();
@@ -185,8 +185,8 @@ async function testMatchingPipeline(isAdmin: boolean): Promise<DiagnosticTestRes
     }, 6000),
   ];
   if (isAdmin) {
-    tests.push(() => runTest(section, "GET /api/match-health (admin)", async () => {
-      const url = new URL("/api/match-health", getApiUrl()).toString();
+    tests.push(() => runTest(section, "GET /api/admin/match-health (admin)", async () => {
+      const url = new URL("/api/admin/match-health", getApiUrl()).toString();
       const res = await fetch(url, { headers: authFetchHeaders(), credentials: "include" });
       if (res.status === 403) return { status: "SKIP", message: "Non admin" };
       if (!res.ok) return { status: "FAIL", message: `HTTP ${res.status}` };
@@ -356,15 +356,15 @@ async function testGpsReading(): Promise<DiagnosticTestResult[]> {
 async function testRoutingReal(): Promise<DiagnosticTestResult[]> {
   const section = "Routing Reale";
   return [
-    await runTest(section, "Calcolo percorso Valhalla (Milano → Monza)", async () => {
-      const url = new URL("/api/routing/route", getApiUrl()).toString();
+    await runTest(section, "Calcolo percorso (Milano → Monza)", async () => {
+      const url = new URL("/api/planned-routes/waypoints/calculate", getApiUrl()).toString();
       const body = {
-        locations: [
-          { lat: 45.4654, lon: 9.1866 },
-          { lat: 45.5845, lon: 9.2745 },
+        waypoints: [
+          { lat: 45.4654, lng: 9.1866, name: "Milano" },
+          { lat: 45.5845, lng: 9.2745, name: "Monza" },
         ],
-        costing: "motorcycle",
-        engine: "valhalla",
+        style: "direct",
+        drivingProfile: "geometric",
       };
       const res = await fetch(url, {
         method: "POST",
@@ -373,11 +373,11 @@ async function testRoutingReal(): Promise<DiagnosticTestResult[]> {
         body: JSON.stringify(body),
       });
       if (res.status === 502 || res.status === 503) {
-        return { status: "WARN", message: "Valhalla non raggiungibile" };
+        return { status: "WARN", message: "Motore di routing non raggiungibile" };
       }
       if (!res.ok) return { status: "WARN", message: `HTTP ${res.status}` };
       const data = await res.json();
-      const hasRoute = data?.trip?.legs?.length > 0 || data?.routes?.length > 0 || data?.route;
+      const hasRoute = data?.trip?.legs?.length > 0 || data?.routes?.length > 0 || data?.route || data?.geometry;
       if (!hasRoute) return { status: "WARN", message: "Risposta senza percorso" };
       return { status: "PASS" };
     }, 10000),
