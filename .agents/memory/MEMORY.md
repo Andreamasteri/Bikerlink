@@ -49,3 +49,4 @@
 - [AI audit logging pattern](ai-audit-logging.md) — logAiUsage() pattern, proposer Groq-only model routing fix, fingerprint+known-offline skip guards in proposer.ts.
 - [OnlineTracker touch() e restart server](online-tracker-touch-restart.md) — touch() restituisce false se user non nel tracker; heartbeat deve chiamare setOnline() via DB se touch()=false, altrimenti counter home restano a 0 dopo restart.
 - [Port mapping probe vs Express](port-mapping-probe-vs-express.md) — localPort=5000 DEVE avere externalPort=80; localPort=8081 (probe) externalPort=8081; inverso → tutto il traffico va al probe → text/plain "ok" → API rotte.
+- [Promemoria skill diagnostic-report-dump](diagnostic-report-skill-reminder.md) — ricordare all'utente ogni 14gg (dal 17 giu 2026) che esiste la skill per dumpare i report diagnostici dal DB.

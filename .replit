@@ -18,60 +18,64 @@ modules = ["javascript", "nodejs-20", "node", "python-3.11", "python3", "postgre
   integrations = ["javascript_database:1.0.0", "expo_object_storage:1.0.0", "google-drive:1.0.0"]
 
   [workflows]
-  runButton = "Project"
+runButton = "Project"
 
   [[workflows.workflow]]
-  name = "Project"
-  mode = "parallel"
-  author = "agent"
+name = "Project"
+mode = "parallel"
+author = "agent"
 
-  [[workflows.workflow.tasks]]
-  task = "workflow.run"
-  args = "Start App"
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Start App"
 
-  [[workflows.workflow.tasks]]
-  task = "workflow.run"
-  args = "Watchdog"
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Watchdog"
 
-  [[workflows.workflow.tasks]]
-  task = "workflow.run"
-  args = "Error Monitor"
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Error Monitor"
 
-  [[workflows.workflow.tasks]]
-  task = "workflow.run"
-  args = "Clean Metro"
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Clean Metro"
 
-  [[workflows.workflow.tasks]]
-  task = "workflow.run"
-  args = "typecheck"
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "typecheck"
 
-  [[workflows.workflow.tasks]]
-  task = "workflow.run"
-  args = "typecheck-client"
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "typecheck-client"
 
-  [[workflows.workflow.tasks]]
-  task = "workflow.run"
-  args = "OTA Publish"
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "OTA Publish"
 
-  [[workflows.workflow.tasks]]
-  task = "workflow.run"
-  args = "Start Backend"
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Start Backend"
 
-  [[workflows.workflow.tasks]]
-  task = "workflow.run"
-  args = "lint"
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "lint"
 
-  [[workflows.workflow.tasks]]
-  task = "workflow.run"
-  args = "db-migration-checks"
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "db-migration-checks"
 
-  [[workflows.workflow.tasks]]
-  task = "workflow.run"
-  args = "schema-drift"
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "schema-drift"
 
-  [[workflows.workflow.tasks]]
-  task = "workflow.run"
-  args = "index-drift"
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "index-drift"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Diagnostic Report"
 
   [[workflows.workflow]]
   name = "Start App"
@@ -208,6 +212,17 @@ modules = ["javascript", "nodejs-20", "node", "python-3.11", "python3", "postgre
 
   [workflows.workflow.metadata]
   isValidation = true
+
+[[workflows.workflow]]
+name = "Diagnostic Report"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "npx tsx scripts/dump-diagnostic-report.ts"
+
+[workflows.workflow.metadata]
+outputType = "console"
 
   [objectStorage]
   defaultBucketID = "replit-objstore-ca2daf22-cabb-4140-a095-7b5a6f1afcde"
