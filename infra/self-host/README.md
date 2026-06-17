@@ -28,7 +28,7 @@ il repository Docker corretto (`download.docker.com/linux/ubuntu` o `.../debian`
 
 | Risorsa | Minimo | Raccomandato |
 |---------|--------|--------------|
-| RAM     | 32 GB  | 32 GB+       |
+| RAM     | **16 GB + swap 32–48 GB** (vedi nota) | 32 GB+       |
 | Disco   | 150 GB SSD | 300 GB SSD (NVMe) |
 | CPU     | 4 core | 8 core       |
 | Rete    | — | connessione veloce per il download dei .pbf per area |
@@ -36,6 +36,14 @@ il repository Docker corretto (`download.docker.com/linux/ubuntu` o `.../debian`
 Lo spazio serve per: .pbf nazionali (~15 GB per i 4 gruppi core) + .pbf per-gruppo
 (~8 GB) + grafi GraphHopper (~6-25 GB per gruppo, ~50 GB totale 4 core) +
 tile Valhalla (~25 GB) + DB/varie.
+
+> **Build Valhalla Europa su 16 GB (PC fisso i5-14400):** la build dei tile Europa è un
+> **blocco unico** con picchi RAM **oltre i 16 GB** (parsing iniziale + `graphenhancer`).
+> Su 16 GB **senza swap** il container viene ucciso dall'OOM-killer a metà build. Poiché
+> Valhalla usa file memory-mapped, su **SSD** uno **swapfile da 32–48 GB** permette di
+> completare la build con un rallentamento tollerabile. Crea/verifica lo swap **prima**
+> della build con `thinkcentre-scripts/swap.sh` (idempotente, persistente al reboot).
+> Con 32+ GB di RAM lo swap resta consigliato come rete di sicurezza ma non è critico.
 
 ## Stima tempi (prima esecuzione)
 
@@ -45,7 +53,7 @@ tile Valhalla (~25 GB) + DB/varie.
 | Download .pbf nazionali (4 gruppi core) | 30–90 min (dipende dalla banda) |
 | Merge PBF per gruppo (osmium) | 5–15 min per gruppo |
 | Build grafo GraphHopper per gruppo | 20–60 min per gruppo (RAM-dipendente) |
-| Build tile Valhalla | ~3 h |
+| Build tile Valhalla (Europa) | ~3 h su 32 GB; **più lenta su 16 GB + swap** (I/O su SSD) |
 
 > I grafi vengono buildati **in sequenza** (uno alla volta) da `setup.sh` prima
 > di avviare i container. Postgres, Redis e pgAdmin partono in meno di un minuto.

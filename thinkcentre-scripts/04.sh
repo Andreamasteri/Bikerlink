@@ -5,6 +5,7 @@ PBF="$HOME/valhalla/data/europe-latest.osm.pbf"
 TILES="$HOME/valhalla/data/valhalla_tiles"
 MIN_PBF_GB=1
 MIN_DISK_GB=80
+MIN_SWAP_GB=32   # swap minimo per la build Europa su 16 GB (evita OOM-kill)
 
 ok()   { echo "[OK]   $1"; }
 warn() { echo "[WARN] $1"; }
@@ -57,6 +58,34 @@ if [ "$DISK_FREE_GB" -ge "$MIN_DISK_GB" ]; then
   ok "Spazio disco libero: ${DISK_FREE_GB} GB (>= ${MIN_DISK_GB} GB consigliati)"
 else
   warn "Spazio disco libero: ${DISK_FREE_GB} GB — consigliati almeno ${MIN_DISK_GB} GB per Europe. Procedi con cautela."
+fi
+
+# 6. RAM totale (scenario target: i5-14400 16 GB)
+RAM_GB=$(awk '/MemTotal/{printf "%d", $2/1048576}' /proc/meminfo)
+if [ "$RAM_GB" -ge 30 ]; then
+  ok "RAM totale: ${RAM_GB} GB — abbondante (swap consigliato ma non critico)"
+elif [ "$RAM_GB" -ge 14 ]; then
+  ok "RAM totale: ${RAM_GB} GB — scenario 16 GB: lo swap è OBBLIGATORIO per evitare OOM-kill"
+else
+  warn "RAM totale: ${RAM_GB} GB — molto bassa per Europe; swap capiente indispensabile e build lenta"
+fi
+
+# 7. Swap attivo e dimensione (su 16 GB la build muore senza swap)
+SWAP_GB=$(awk '/SwapTotal/{printf "%d", $2/1048576}' /proc/meminfo)
+if [ "$SWAP_GB" -ge "$MIN_SWAP_GB" ]; then
+  ok "Swap attivo: ${SWAP_GB} GB (>= ${MIN_SWAP_GB} GB)"
+elif [ "$SWAP_GB" -gt 0 ]; then
+  if [ "$RAM_GB" -ge 30 ]; then
+    warn "Swap attivo ma piccolo: ${SWAP_GB} GB (consigliati >= ${MIN_SWAP_GB} GB). Con 32+ GB di RAM può bastare."
+  else
+    fail "Swap troppo piccolo: ${SWAP_GB} GB (servono >= ${MIN_SWAP_GB} GB su 16 GB di RAM). Esegui ./swap.sh"
+  fi
+else
+  if [ "$RAM_GB" -ge 30 ]; then
+    warn "Nessuno swap attivo. Con 32+ GB può bastare, ma è consigliato per i picchi dell'enhancer. Esegui ./swap.sh"
+  else
+    fail "Nessuno swap attivo: su 16 GB la build verrà uccisa dall'OOM-killer. Esegui ./swap.sh prima di procedere."
+  fi
 fi
 
 echo ""
