@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  ActivityIndicator, RefreshControl,
+  ActivityIndicator, RefreshControl, TextInput,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -28,6 +28,49 @@ const statusMap: Record<DiagStatus, string> = {
 type RemoteReqStatus = "idle" | "pending" | "received" | "failed";
 
 const STATUS_COLOR: Record<string, string> = { PASS: "#22C55E", FAIL: "#EF4444", WARN: "#F59E0B", SKIP: "#6B7280" };
+const PLATFORMS = ["", "ios", "android", "web"] as const;
+const PLATFORM_LABELS: Record<string, string> = { "": "Tutti", ios: "iOS", android: "Android", web: "Web" };
+
+interface Filters {
+  nickname: string;
+  userId: string;
+  platform: string;
+  dateFrom: string;
+  dateTo: string;
+  appVersion: string;
+  onlyFailed: boolean;
+  onlyRemote: boolean;
+}
+
+const EMPTY_FILTERS: Filters = {
+  nickname: "",
+  userId: "",
+  platform: "",
+  dateFrom: "",
+  dateTo: "",
+  appVersion: "",
+  onlyFailed: false,
+  onlyRemote: false,
+};
+
+function buildReportsUrl(filters: Filters, page: number): string {
+  const params = new URLSearchParams();
+  params.set("page", String(page));
+  params.set("limit", "20");
+  if (filters.nickname) params.set("nickname", filters.nickname);
+  if (filters.userId) params.set("userId", filters.userId);
+  if (filters.platform) params.set("platform", filters.platform);
+  if (filters.dateFrom) params.set("dateFrom", filters.dateFrom);
+  if (filters.dateTo) params.set("dateTo", filters.dateTo);
+  if (filters.appVersion) params.set("appVersion", filters.appVersion);
+  if (filters.onlyFailed) params.set("onlyFailed", "true");
+  if (filters.onlyRemote) params.set("onlyRemote", "true");
+  return `/api/admin/diagnostic-reports?${params.toString()}`;
+}
+
+function hasActiveFilters(f: Filters): boolean {
+  return !!(f.nickname || f.platform || f.dateFrom || f.dateTo || f.appVersion || f.onlyFailed || f.onlyRemote);
+}
 
 export default function DiagnosticReportsScreen() {
   const insets = useSafeAreaInsets();
@@ -36,10 +79,14 @@ export default function DiagnosticReportsScreen() {
 
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [triggeredStatus, setTriggeredStatus] = useState<Record<string, DiagStatus>>({});
-  // Polling-based remote requests: userId → { status, requestedAt }
   const [remoteReqStatus, setRemoteReqStatus] = useState<Record<string, { status: RemoteReqStatus; requestedAt: number }>>({});
+  const [showFilters, setShowFilters] = useState(false);
+  const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
+  const [pendingFilters, setPendingFilters] = useState<Filters>(EMPTY_FILTERS);
+  const [page, setPage] = useState(1);
 
   const wsRef = useRef<WebSocket | null>(null);
+  const reportsUrlRef = useRef<string>("/api/admin/diagnostic-reports");
 
   useEffect(() => {
     const token = getSessionToken();
@@ -57,7 +104,7 @@ export default function DiagnosticReportsScreen() {
             setTriggeredStatus(prev => ({ ...prev, [msg.userId!]: "running" }));
           } else if (msg.type === "diag:result" && msg.userId) {
             setTriggeredStatus(prev => ({ ...prev, [msg.userId!]: "done" }));
-            queryClient.invalidateQueries({ queryKey: ["/api/admin/diagnostic-reports"] });
+            queryClient.invalidateQueries({ queryKey: [reportsUrlRef.current] });
           }
         } catch {/* noop */}
       };
@@ -67,18 +114,20 @@ export default function DiagnosticReportsScreen() {
     return () => { try { wsRef.current?.close(); wsRef.current = null; } catch {/* noop */} };
   }, []);
 
+  const reportsUrl = buildReportsUrl(filters, page);
+  reportsUrlRef.current = reportsUrl;
+
   const { data: onlineData, isLoading: onlineLoading } = useQuery<{ users: OnlineUser[] }>({
     queryKey: ["/api/admin/diagnostic-reports/online-users"],
     refetchInterval: 15000,
   });
 
   const { data: reportsData, isLoading: reportsLoading, refetch } = useQuery<ReportsResponse>({
-    queryKey: ["/api/admin/diagnostic-reports"],
+    queryKey: [reportsUrl],
     refetchInterval: 30000,
     select: (data) => data,
   });
 
-  // Detect when a remote-requested diagnostic report arrives
   useEffect(() => {
     if (!reportsData?.reports) return;
     setRemoteReqStatus(prev => {
@@ -126,10 +175,24 @@ export default function DiagnosticReportsScreen() {
     },
   });
 
+  const applyFilters = useCallback(() => {
+    setFilters(pendingFilters);
+    setPage(1);
+    setShowFilters(false);
+  }, [pendingFilters]);
+
+  const resetFilters = useCallback(() => {
+    setPendingFilters(EMPTY_FILTERS);
+    setFilters(EMPTY_FILTERS);
+    setPage(1);
+    setShowFilters(false);
+  }, []);
+
   const onlineUsers = onlineData?.users ?? [];
   const reports = reportsData?.reports ?? [];
+  const totalPages = reportsData ? Math.ceil(reportsData.total / 20) : 1;
+  const active = hasActiveFilters(filters);
 
-  // Unique users from reports for the "Richiedi diagnostica" section
   const usersFromReports = React.useMemo(() => {
     const seen = new Set<string>();
     const result: { userId: string; nickname?: string }[] = [];
@@ -149,7 +212,127 @@ export default function DiagnosticReportsScreen() {
           <Ionicons name="arrow-back" size={24} color={colors.text} />
         </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: colors.text }]}>Diagnostica Remota</Text>
+        <TouchableOpacity
+          style={[styles.filterToggle, active && styles.filterToggleActive]}
+          onPress={() => {
+            setPendingFilters(filters);
+            setShowFilters(v => !v);
+          }}
+        >
+          <Ionicons name="filter" size={18} color={active ? "#fff" : "#9CA3AF"} />
+          {active && <View style={styles.filterDot} />}
+        </TouchableOpacity>
       </View>
+
+      {showFilters && (
+        <View style={styles.filterPanel}>
+          <Text style={styles.filterPanelTitle}>FILTRI</Text>
+
+          <Text style={styles.filterLabel}>Nickname utente</Text>
+          <TextInput
+            style={styles.filterInput}
+            value={pendingFilters.nickname}
+            onChangeText={(v) => setPendingFilters(p => ({ ...p, nickname: v }))}
+            placeholder="Cerca per nickname…"
+            placeholderTextColor="#4B5563"
+            autoCapitalize="none"
+            autoCorrect={false}
+          />
+
+          <Text style={styles.filterLabel}>User ID (esatto)</Text>
+          <TextInput
+            style={styles.filterInput}
+            value={pendingFilters.userId}
+            onChangeText={(v) => setPendingFilters(p => ({ ...p, userId: v.trim() }))}
+            placeholder="es. a1b2c3d4-…"
+            placeholderTextColor="#4B5563"
+            autoCapitalize="none"
+            autoCorrect={false}
+          />
+
+          <Text style={styles.filterLabel}>Piattaforma</Text>
+          <View style={styles.platformRow}>
+            {PLATFORMS.map((p) => (
+              <TouchableOpacity
+                key={p || "all"}
+                style={[styles.platformBtn, pendingFilters.platform === p && styles.platformBtnActive]}
+                onPress={() => setPendingFilters(prev => ({ ...prev, platform: p }))}
+              >
+                <Text style={[styles.platformBtnText, pendingFilters.platform === p && styles.platformBtnTextActive]}>
+                  {PLATFORM_LABELS[p]}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          <View style={styles.dateRow}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.filterLabel}>Dal (YYYY-MM-DD)</Text>
+              <TextInput
+                style={styles.filterInput}
+                value={pendingFilters.dateFrom}
+                onChangeText={(v) => setPendingFilters(p => ({ ...p, dateFrom: v }))}
+                placeholder="2025-01-01"
+                placeholderTextColor="#4B5563"
+                autoCapitalize="none"
+                autoCorrect={false}
+                keyboardType="numbers-and-punctuation"
+              />
+            </View>
+            <View style={{ width: 8 }} />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.filterLabel}>Al (YYYY-MM-DD)</Text>
+              <TextInput
+                style={styles.filterInput}
+                value={pendingFilters.dateTo}
+                onChangeText={(v) => setPendingFilters(p => ({ ...p, dateTo: v }))}
+                placeholder="2025-12-31"
+                placeholderTextColor="#4B5563"
+                autoCapitalize="none"
+                autoCorrect={false}
+                keyboardType="numbers-and-punctuation"
+              />
+            </View>
+          </View>
+
+          <Text style={styles.filterLabel}>Versione app</Text>
+          <TextInput
+            style={styles.filterInput}
+            value={pendingFilters.appVersion}
+            onChangeText={(v) => setPendingFilters(p => ({ ...p, appVersion: v }))}
+            placeholder="es. 1.2.3"
+            placeholderTextColor="#4B5563"
+            autoCapitalize="none"
+            autoCorrect={false}
+          />
+
+          <View style={styles.toggleRow}>
+            <TouchableOpacity
+              style={[styles.toggleBtn, pendingFilters.onlyFailed && styles.toggleBtnActive]}
+              onPress={() => setPendingFilters(p => ({ ...p, onlyFailed: !p.onlyFailed }))}
+            >
+              <Ionicons name={pendingFilters.onlyFailed ? "checkbox" : "square-outline"} size={16} color={pendingFilters.onlyFailed ? "#EF4444" : "#6B7280"} />
+              <Text style={[styles.toggleBtnText, pendingFilters.onlyFailed && { color: "#EF4444" }]}>Solo con FAIL</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.toggleBtn, pendingFilters.onlyRemote && styles.toggleBtnActive]}
+              onPress={() => setPendingFilters(p => ({ ...p, onlyRemote: !p.onlyRemote }))}
+            >
+              <Ionicons name={pendingFilters.onlyRemote ? "checkbox" : "square-outline"} size={16} color={pendingFilters.onlyRemote ? "#7C3AED" : "#6B7280"} />
+              <Text style={[styles.toggleBtnText, pendingFilters.onlyRemote && { color: "#A78BFA" }]}>Solo REMOTI</Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.filterActions}>
+            <TouchableOpacity style={styles.resetBtn} onPress={resetFilters}>
+              <Text style={styles.resetBtnText}>Azzera</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.applyBtn} onPress={applyFilters}>
+              <Text style={styles.applyBtnText}>Applica filtri</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
 
       <ScrollView
         contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}
@@ -212,10 +395,22 @@ export default function DiagnosticReportsScreen() {
         })}
 
         <View style={styles.divider} />
-        <Text style={styles.sectionLabel}>REPORT RICEVUTI ({reportsData?.total ?? 0})</Text>
+
+        <View style={styles.reportsSectionHeader}>
+          <Text style={styles.sectionLabel}>REPORT RICEVUTI ({reportsData?.total ?? 0})</Text>
+          {active && (
+            <View style={styles.activeFilterBadge}>
+              <Ionicons name="funnel" size={10} color="#60A5FA" />
+              <Text style={styles.activeFilterBadgeText}>Filtri attivi</Text>
+            </View>
+          )}
+        </View>
+
         {reportsLoading && <ActivityIndicator style={{ margin: 16 }} />}
         {!reportsLoading && reports.length === 0 && (
-          <Text style={styles.emptyText}>Nessun report ancora</Text>
+          <Text style={styles.emptyText}>
+            {active ? "Nessun report corrisponde ai filtri" : "Nessun report ancora"}
+          </Text>
         )}
         {reports.map((r) => {
           const isExpanded = expandedId === r.id;
@@ -269,11 +464,23 @@ export default function DiagnosticReportsScreen() {
                   {r.sentryEventId && (
                     <Text style={styles.sentryId}>Sentry: {r.sentryEventId}</Text>
                   )}
+                  {r.summary && (
+                    <View style={styles.summaryRow}>
+                      <Text style={styles.summaryItem}>✅ {r.summary.passed}P</Text>
+                      <Text style={[styles.summaryItem, { color: "#EF4444" }]}>❌ {r.summary.failed}F</Text>
+                      <Text style={[styles.summaryItem, { color: "#F59E0B" }]}>⚠️ {r.summary.warned}W</Text>
+                      <Text style={[styles.summaryItem, { color: "#6B7280" }]}>⏭ {r.summary.skipped}S</Text>
+                      <Text style={[styles.summaryItem, { color: "#9CA3AF" }]}>{r.summary.durationMs}ms</Text>
+                    </View>
+                  )}
                   {(r.results ?? []).map((res, i) => (
                     <View key={i} style={styles.testRow}>
                       <View style={[styles.dot, { backgroundColor: STATUS_COLOR[res.status] ?? "#6B7280" }]} />
-                      <Text style={styles.testName} numberOfLines={1}>{res.section} · {res.name}</Text>
-                      {res.message ? <Text style={styles.testMessage} numberOfLines={2}>{res.message}</Text> : null}
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.testName} numberOfLines={1}>{res.section} · {res.name}</Text>
+                        {res.message ? <Text style={styles.testMessage} numberOfLines={3}>{res.message}</Text> : null}
+                      </View>
+                      <Text style={[styles.testStatus, { color: STATUS_COLOR[res.status] ?? "#6B7280" }]}>{res.status}</Text>
                     </View>
                   ))}
                 </View>
@@ -281,6 +488,26 @@ export default function DiagnosticReportsScreen() {
             </TouchableOpacity>
           );
         })}
+
+        {totalPages > 1 && (
+          <View style={styles.paginationRow}>
+            <TouchableOpacity
+              style={[styles.pageBtn, page <= 1 && styles.pageBtnDisabled]}
+              disabled={page <= 1}
+              onPress={() => setPage(p => Math.max(1, p - 1))}
+            >
+              <Ionicons name="chevron-back" size={16} color={page <= 1 ? "#374151" : "#9CA3AF"} />
+            </TouchableOpacity>
+            <Text style={styles.pageLabel}>Pagina {page} / {totalPages}</Text>
+            <TouchableOpacity
+              style={[styles.pageBtn, page >= totalPages && styles.pageBtnDisabled]}
+              disabled={page >= totalPages}
+              onPress={() => setPage(p => Math.min(totalPages, p + 1))}
+            >
+              <Ionicons name="chevron-forward" size={16} color={page >= totalPages ? "#374151" : "#9CA3AF"} />
+            </TouchableOpacity>
+          </View>
+        )}
       </ScrollView>
     </View>
   );
@@ -291,6 +518,30 @@ const styles = StyleSheet.create({
   header: { flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingBottom: 8 },
   backBtn: { width: 36, height: 36, alignItems: "center", justifyContent: "center" },
   headerTitle: { flex: 1, fontSize: 18, fontWeight: "600", textAlign: "center" },
+  filterToggle: { width: 36, height: 36, alignItems: "center", justifyContent: "center", borderRadius: 8, backgroundColor: "#1C1C1E" },
+  filterToggleActive: { backgroundColor: "#3B82F6" },
+  filterDot: { position: "absolute", top: 6, right: 6, width: 6, height: 6, borderRadius: 3, backgroundColor: "#EF4444" },
+
+  filterPanel: { backgroundColor: "#111827", marginHorizontal: 12, marginBottom: 8, borderRadius: 12, padding: 14, borderWidth: 1, borderColor: "#1F2937" },
+  filterPanelTitle: { color: "#6B7280", fontSize: 10, fontWeight: "700", letterSpacing: 1, textTransform: "uppercase", marginBottom: 10 },
+  filterLabel: { color: "#9CA3AF", fontSize: 11, fontWeight: "600", marginBottom: 4, marginTop: 8 },
+  filterInput: { backgroundColor: "#1C1C1E", borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8, color: "#E5E7EB", fontSize: 14, borderWidth: 1, borderColor: "#374151" },
+  platformRow: { flexDirection: "row", gap: 6, flexWrap: "wrap" },
+  platformBtn: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 6, backgroundColor: "#1C1C1E", borderWidth: 1, borderColor: "#374151" },
+  platformBtnActive: { backgroundColor: "#1D4ED8", borderColor: "#3B82F6" },
+  platformBtnText: { color: "#9CA3AF", fontSize: 13, fontWeight: "500" },
+  platformBtnTextActive: { color: "#fff" },
+  dateRow: { flexDirection: "row" },
+  toggleRow: { flexDirection: "row", gap: 8, marginTop: 10 },
+  toggleBtn: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6, backgroundColor: "#1C1C1E", borderWidth: 1, borderColor: "#374151" },
+  toggleBtnActive: { borderColor: "#4B5563" },
+  toggleBtnText: { color: "#6B7280", fontSize: 12, fontWeight: "500" },
+  filterActions: { flexDirection: "row", gap: 8, marginTop: 12 },
+  resetBtn: { flex: 1, paddingVertical: 10, borderRadius: 8, borderWidth: 1, borderColor: "#374151", alignItems: "center" },
+  resetBtnText: { color: "#9CA3AF", fontWeight: "600", fontSize: 14 },
+  applyBtn: { flex: 2, paddingVertical: 10, borderRadius: 8, backgroundColor: "#3B82F6", alignItems: "center" },
+  applyBtnText: { color: "#fff", fontWeight: "700", fontSize: 14 },
+
   sectionLabel: { color: "#6B7280", fontSize: 11, fontWeight: "700", textTransform: "uppercase", marginHorizontal: 16, marginTop: 16, marginBottom: 4, letterSpacing: 0.8 },
   hintText: { color: "#4B5563", fontSize: 11, marginHorizontal: 16, marginBottom: 8 },
   emptyText: { color: "#4B5563", fontSize: 14, textAlign: "center", marginVertical: 8 },
@@ -302,6 +553,11 @@ const styles = StyleSheet.create({
   triggerBtnDisabled: { opacity: 0.5 },
   triggerBtnText: { color: "#fff", fontWeight: "600", fontSize: 13 },
   divider: { height: 1, backgroundColor: "#374151", marginHorizontal: 16, marginVertical: 8 },
+
+  reportsSectionHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingRight: 16 },
+  activeFilterBadge: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: "#1E3A5F", borderRadius: 10, paddingHorizontal: 8, paddingVertical: 3 },
+  activeFilterBadgeText: { color: "#60A5FA", fontSize: 10, fontWeight: "600" },
+
   reportCard: { marginHorizontal: 16, marginBottom: 8, backgroundColor: "#1C1C1E", borderRadius: 10, overflow: "hidden" },
   reportCardHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", padding: 14 },
   reportTitleRow: { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 1 },
@@ -316,8 +572,16 @@ const styles = StyleSheet.create({
   requestInlineBtn: { flexDirection: "row", alignItems: "center", gap: 5, marginBottom: 8 },
   requestInlineBtnText: { color: "#60A5FA", fontSize: 12 },
   sentryId: { color: "#6B7280", fontSize: 11, marginBottom: 4 },
-  testRow: { flexDirection: "row", alignItems: "flex-start", gap: 8 },
-  dot: { width: 8, height: 8, borderRadius: 4, marginTop: 4 },
-  testName: { flex: 1, color: "#D1D5DB", fontSize: 12 },
-  testMessage: { color: "#9CA3AF", fontSize: 11, flex: 1 },
+  summaryRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, paddingVertical: 4, marginBottom: 4 },
+  summaryItem: { color: "#22C55E", fontSize: 12, fontWeight: "600" },
+  testRow: { flexDirection: "row", alignItems: "flex-start", gap: 8, paddingVertical: 2 },
+  dot: { width: 8, height: 8, borderRadius: 4, marginTop: 4, flexShrink: 0 },
+  testName: { color: "#D1D5DB", fontSize: 12 },
+  testMessage: { color: "#9CA3AF", fontSize: 11, marginTop: 1 },
+  testStatus: { fontSize: 10, fontWeight: "700", marginTop: 3, flexShrink: 0 },
+
+  paginationRow: { flexDirection: "row", alignItems: "center", justifyContent: "center", paddingVertical: 16, gap: 16 },
+  pageBtn: { width: 36, height: 36, borderRadius: 8, backgroundColor: "#1C1C1E", alignItems: "center", justifyContent: "center" },
+  pageBtnDisabled: { opacity: 0.4 },
+  pageLabel: { color: "#9CA3AF", fontSize: 13 },
 });

@@ -2,7 +2,8 @@ import { Router, type Request, type Response } from "express";
 import { db } from "../../db";
 import { sendError } from "../../lib/api-response";
 import { diagnosticReports, diagnosticQueue } from "@shared/db";
-import { and, desc, eq, gt, isNull, lt, or, sql } from "drizzle-orm";
+import { users } from "@shared/db";
+import { and, desc, eq, gte, gt, ilike, isNull, lt, lte, or, sql } from "drizzle-orm";
 import { storage } from "../../storage";
 import { sendDiagnosticCommand, getOnlineUsers } from "../../diagnostic-ws";
 
@@ -13,13 +14,20 @@ router.get("/diagnostic-reports", async (req: Request, res: Response) => {
     const page = Math.max(1, parseInt(String(req.query.page ?? "1"), 10));
     const limit = Math.min(50, Math.max(1, parseInt(String(req.query.limit ?? "20"), 10)));
     const offset = (page - 1) * limit;
+
     const onlyFailed = req.query.onlyFailed === "true";
     const onlyRemote = req.query.onlyRemote === "true";
-    const appVersion = typeof req.query.appVersion === "string" ? req.query.appVersion : undefined;
+    const appVersion = typeof req.query.appVersion === "string" && req.query.appVersion ? req.query.appVersion : undefined;
+    const userId = typeof req.query.userId === "string" && req.query.userId ? req.query.userId.trim() : undefined;
+    const nickname = typeof req.query.nickname === "string" && req.query.nickname ? req.query.nickname.trim() : undefined;
+    const platform = typeof req.query.platform === "string" && req.query.platform ? req.query.platform.trim() : undefined;
+    const dateFrom = typeof req.query.dateFrom === "string" && req.query.dateFrom ? req.query.dateFrom.trim() : undefined;
+    const dateTo = typeof req.query.dateTo === "string" && req.query.dateTo ? req.query.dateTo.trim() : undefined;
 
     const conditions = [];
+
     if (onlyFailed) {
-      conditions.push(sql`(summary->>'failed')::int > 0`);
+      conditions.push(sql`(${diagnosticReports.summary}->>'failed')::int > 0`);
     }
     if (onlyRemote) {
       conditions.push(eq(diagnosticReports.triggeredBy, "admin"));
@@ -27,32 +35,64 @@ router.get("/diagnostic-reports", async (req: Request, res: Response) => {
     if (appVersion) {
       conditions.push(eq(diagnosticReports.appVersion, appVersion));
     }
+    if (userId) {
+      conditions.push(eq(diagnosticReports.userId, userId));
+    }
+    if (platform) {
+      conditions.push(eq(diagnosticReports.platform, platform));
+    }
+    if (nickname) {
+      conditions.push(ilike(users.nickname, `%${nickname}%`));
+    }
+    if (dateFrom) {
+      try {
+        const from = new Date(dateFrom);
+        if (!isNaN(from.getTime())) {
+          conditions.push(gte(diagnosticReports.runAt, from));
+        }
+      } catch {/* invalid date — ignore */}
+    }
+    if (dateTo) {
+      try {
+        const to = new Date(dateTo);
+        if (!isNaN(to.getTime())) {
+          to.setHours(23, 59, 59, 999);
+          conditions.push(lte(diagnosticReports.runAt, to));
+        }
+      } catch {/* invalid date — ignore */}
+    }
 
     const where = conditions.length > 0 ? and(...conditions) : undefined;
 
     const [rows, countRows] = await Promise.all([
-      db.select().from(diagnosticReports)
+      db.select({
+        id: diagnosticReports.id,
+        userId: diagnosticReports.userId,
+        triggeredBy: diagnosticReports.triggeredBy,
+        appVersion: diagnosticReports.appVersion,
+        platform: diagnosticReports.platform,
+        deviceModel: diagnosticReports.deviceModel,
+        runAt: diagnosticReports.runAt,
+        sentryEventId: diagnosticReports.sentryEventId,
+        summary: diagnosticReports.summary,
+        results: diagnosticReports.results,
+        nickname: users.nickname,
+      })
+        .from(diagnosticReports)
+        .leftJoin(users, eq(diagnosticReports.userId, users.id))
         .where(where)
         .orderBy(desc(diagnosticReports.runAt))
         .limit(limit)
         .offset(offset),
-      db.select({ count: sql<number>`count(*)::int` }).from(diagnosticReports).where(where),
+      db.select({ count: sql<number>`count(*)::int` })
+        .from(diagnosticReports)
+        .leftJoin(users, eq(diagnosticReports.userId, users.id))
+        .where(where),
     ]);
 
     const total = countRows[0]?.count ?? 0;
 
-    const enriched = await Promise.all(rows.map(async (r) => {
-      let nickname = null;
-      if (r.userId) {
-        try {
-          const u = await storage.getUser(r.userId);
-          nickname = u?.nickname ?? null;
-        } catch {/* noop */}
-      }
-      return { ...r, nickname };
-    }));
-
-    return res.json({ reports: enriched, total, page, limit });
+    return res.json({ reports: rows, total, page, limit });
   } catch (err) {
     console.error("[admin/diagnostic-reports] GET error:", err);
     return sendError(res, 500, "Errore lettura report");
@@ -70,7 +110,6 @@ router.post("/diagnostic-reports/trigger/:userId", async (req: Request, res: Res
     const delivered = sendDiagnosticCommand(userId, showBanner);
 
     if (!delivered) {
-      // Queue for offline delivery
       await db.insert(diagnosticQueue).values({
         userId,
         commandedBy: (req as Request & { currentUser?: { id: string } }).currentUser?.id,
@@ -139,7 +178,6 @@ router.delete("/diagnostic-reports/cleanup", async (_req: Request, res: Response
   try {
     const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
     const { rowCount } = await db.delete(diagnosticReports).where(lt(diagnosticReports.runAt, cutoff));
-    // Also clean up expired queue entries
     await db.delete(diagnosticQueue).where(
       or(
         lt(diagnosticQueue.expiresAt, new Date()),
