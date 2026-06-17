@@ -2,68 +2,29 @@ import { db } from "./db";
 import { users, userProfiles, appSettings, matchPreferences } from "@shared/db";
 import { inArray, eq, sql } from "drizzle-orm";
 import it from "../lib/i18n/it";
-
-type NotificationPrefKey = "matches" | "zoneProposals" | "chat" | "motoclub" | "eventi" | "system_alerts";
-
-async function filterUserIdsByPreference(
-  userIds: string[],
-  prefKey: NotificationPrefKey,
-): Promise<string[]> {
-  if (!userIds.length) return [];
-  try {
-    const rows = await db
-      .select({
-        userId: userProfiles.userId,
-        prefs: userProfiles.notificationPreferences,
-        pushNotificationsEnabled: userProfiles.pushNotificationsEnabled,
-      })
-      .from(userProfiles)
-      .where(inArray(userProfiles.userId, userIds));
-
-    // Only opt-out is honored. Users without a profile row (legacy/edge cases)
-    // or with no stored prefs default to allowed, matching the column default
-    // {matches:true, zoneProposals:true, chat:true, motoclub:true, eventi:true}.
-    // Only explicit `false` skips the push.
-    // pushNotificationsEnabled=false (master toggle) also blocks all categories.
-    const prefByUser = new Map<string, typeof rows[number]>();
-    for (const r of rows) {
-      prefByUser.set(r.userId, r);
-    }
-    return userIds.filter((id) => {
-      const row = prefByUser.get(id);
-      if (!row) return true;
-      if (row.pushNotificationsEnabled === false) return false;
-      const p = row.prefs;
-      if (!p) return true;
-      return p[prefKey] !== false;
-    });
-  } catch (err) {
-    console.warn("[Push] filterUserIdsByPreference error — failing closed, no push sent:", err);
-    return [];
-  }
-}
+import {
+  ExpoPushMessage,
+  isValidExpoPushToken,
+  sendExpoMessages,
+  filterUserIdsByPreference,
+} from "./push-notifications-internal";
 
 const EXPO_PUSH_URL = "https://exp.host/--/api/v2/push/send";
 
-interface ExpoPushMessage {
-  to: string;
-  title: string;
-  body: string;
-  data?: Record<string, unknown>;
-  sound?: "default" | null;
-  badge?: number;
-  channelId?: string;
-}
-
-interface ExpoPushTicket {
-  status: "ok" | "error";
-  id?: string;
-  message?: string;
-  details?: { error?: string };
-}
-
-function isValidExpoPushToken(token: string): boolean {
-  return token.startsWith("ExponentPushToken[") || token.startsWith("ExpoPushToken[");
+async function recordNotificationHistory(
+  rows: Array<{ userId: string | null; notificationType: string; token: string; status: string; errorMessage?: string }>,
+): Promise<void> {
+  if (!rows.length) return;
+  try {
+    for (const v of rows) {
+      await db.execute(sql`
+        INSERT INTO notification_history (user_id, notification_type, token, status, error_message)
+        VALUES (${v.userId}, ${v.notificationType}, ${v.token}, ${v.status}, ${v.errorMessage ?? null})
+      `);
+    }
+  } catch (err) {
+    console.warn("[Push] recordNotificationHistory failed (non-fatal):", err);
+  }
 }
 
 async function clearStaleToken(userId: string): Promise<void> {
@@ -72,83 +33,6 @@ async function clearStaleToken(userId: string): Promise<void> {
     console.warn(`[Push] Cleared stale token for user ${userId} (DeviceNotRegistered)`);
   } catch (err) {
     console.warn("[Push] Failed to clear stale token (non-fatal):", err);
-  }
-}
-
-async function recordNotificationHistory(
-  rows: Array<{ userId: string | null; notificationType: string; token: string; status: string; errorMessage?: string }>,
-): Promise<void> {
-  if (!rows.length) return;
-  try {
-    const values = rows.map(r => ({
-      userId: r.userId,
-      notificationType: r.notificationType,
-      token: r.token,
-      status: r.status,
-      errorMessage: r.errorMessage ?? null,
-    }));
-    for (const v of values) {
-      await db.execute(sql`
-        INSERT INTO notification_history (user_id, notification_type, token, status, error_message)
-        VALUES (${v.userId}, ${v.notificationType}, ${v.token}, ${v.status}, ${v.errorMessage})
-      `);
-    }
-  } catch (err) {
-    console.warn("[Push] recordNotificationHistory failed (non-fatal):", err);
-  }
-}
-
-async function sendExpoMessages(
-  messages: ExpoPushMessage[],
-  userIdByToken: Map<string, string>,
-): Promise<void> {
-  try {
-    const resp = await fetch(EXPO_PUSH_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json",
-      },
-      body: JSON.stringify(messages),
-    });
-    if (!resp.ok) {
-      console.warn("[Push] Expo push HTTP error:", resp.status, await resp.text().catch(() => ""));
-      const historyRows = messages.map(m => ({
-        userId: userIdByToken.get(m.to) ?? null,
-        notificationType: String(m.data?.type ?? "unknown"),
-        token: m.to,
-        status: "failed",
-        errorMessage: `HTTP ${resp.status}`,
-      }));
-      void recordNotificationHistory(historyRows);
-      return;
-    }
-    const result = await resp.json() as { data?: ExpoPushTicket[] };
-    const tickets = result.data ?? [];
-    const historyRows: Array<{ userId: string | null; notificationType: string; token: string; status: string; errorMessage?: string }> = [];
-    for (let i = 0; i < tickets.length; i++) {
-      const ticket = tickets[i];
-      const msg = messages[i];
-      const token = msg?.to ?? "";
-      const userId = userIdByToken.get(token) ?? null;
-      const notificationType = String(msg?.data?.type ?? "unknown");
-      if (ticket.status === "error") {
-        if (ticket.details?.error === "DeviceNotRegistered") {
-          if (token) {
-            if (userId) clearStaleToken(userId);
-          }
-          historyRows.push({ userId, notificationType, token, status: "failed", errorMessage: "DeviceNotRegistered" });
-        } else {
-          console.warn("[Push] Expo push ticket error:", ticket.message, ticket.details?.error);
-          historyRows.push({ userId, notificationType, token, status: "failed", errorMessage: ticket.details?.error ?? ticket.message ?? "unknown error" });
-        }
-      } else {
-        historyRows.push({ userId, notificationType, token, status: "sent" });
-      }
-    }
-    if (historyRows.length > 0) void recordNotificationHistory(historyRows);
-  } catch (err) {
-    console.warn("[Push] Failed to send Expo push notification (non-fatal):", err);
   }
 }
 
@@ -351,7 +235,6 @@ export async function getGpsRejectionThreshold(): Promise<number> {
   return 100;
 }
 
-
 export async function sendEventiPushNotifications(
   userIds: string[],
   opts: { title: string; body: string; eventId?: string },
@@ -392,9 +275,6 @@ export async function sendEventiPushNotifications(
 export async function sendWeeklyRecapPushNotifications(userIds: string[]): Promise<number> {
   if (!userIds.length) return 0;
   try {
-    // Riusa la preferenza "matches" come canale; weeklyRecap viene già filtrato
-    // a monte dal job (match_preferences.weekly_recap). Qui rispettiamo solo il
-    // master toggle pushNotificationsEnabled.
     const rows = await db
       .select({
         id: users.id,
@@ -448,16 +328,14 @@ export async function sendDrivingStyleChangePushNotification(
 
     const userIdByToken = new Map([[row.expoPushToken, row.id]]);
     await sendExpoMessages(
-      [
-        {
-          to: row.expoPushToken,
-          title: opts.title,
-          body: opts.body,
-          sound: "default" as const,
-          data: { type: "driving_style_changed" },
-          channelId: "matches",
-        },
-      ],
+      [{
+        to: row.expoPushToken,
+        title: opts.title,
+        body: opts.body,
+        sound: "default" as const,
+        data: { type: "driving_style_changed" },
+        channelId: "matches",
+      }],
       userIdByToken,
     );
     return 1;
@@ -467,37 +345,21 @@ export async function sendDrivingStyleChangePushNotification(
   }
 }
 
-
-/**
- * Sends a push notification to bikers suggested as companions for a planned route.
- * Returns the list of userIds for which the push was successfully transported to Expo
- * (HTTP 2xx response). Callers use this list to update notifiedAt and budget counts.
- *
- * Enforces two preference layers:
- *  1. userProfiles.notificationPreferences.matches (master push category toggle)
- *  2. matchPreferences.plannedRouteInvite (route-invite-specific toggle)
- *
- * The HTTP send is done inline (not via sendExpoMessages) so that transport failures
- * propagate and the caller never marks notifiedAt for unsent messages.
- */
 export async function sendPlannedRouteInvitePushNotifications(
   userIds: string[],
   opts: { routeId: string },
 ): Promise<string[]> {
   if (!userIds.length) return [];
   try {
-    // Layer 1: master push + category preference
     const afterMatchesPref = await filterUserIdsByPreference(userIds, "matches");
     if (!afterMatchesPref.length) return [];
 
-    // Layer 2: planned_route_invite toggle in match_preferences
     const prefRows = await db
       .select({ userId: matchPreferences.userId, allowed: matchPreferences.plannedRouteInvite })
       .from(matchPreferences)
       .where(inArray(matchPreferences.userId, afterMatchesPref));
     const allowMap = new Map<string, boolean>();
     for (const r of prefRows) allowMap.set(r.userId, r.allowed);
-    // Users with no row default to allowed (column default = true)
     const filteredIds = afterMatchesPref.filter((id) => allowMap.get(id) !== false);
     if (!filteredIds.length) return [];
 
@@ -527,8 +389,6 @@ export async function sendPlannedRouteInvitePushNotifications(
 
     if (messages.length === 0) return [];
 
-    // Inline HTTP send — intentionally NOT using sendExpoMessages() so that
-    // transport failures throw and the caller skips notifiedAt / budget updates.
     const resp = await fetch(EXPO_PUSH_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json", Accept: "application/json" },
@@ -539,8 +399,7 @@ export async function sendPlannedRouteInvitePushNotifications(
       return [];
     }
 
-    // Parse per-message tickets; clear stale tokens on DeviceNotRegistered
-    const result = await resp.json() as { data?: ExpoPushTicket[] };
+    const result = await resp.json() as { data?: Array<{ status: "ok" | "error"; details?: { error?: string } }> };
     const tickets = result.data ?? [];
     const sentUserIds: string[] = [];
     for (let i = 0; i < tickets.length; i++) {
@@ -552,12 +411,10 @@ export async function sendPlannedRouteInvitePushNotifications(
           if (uid) clearStaleToken(uid);
         }
       } else {
-        // ok or other error: still count as attempted — Expo accepted the message
         const uid = userIdByToken.get(messages[i]?.to ?? "");
         if (uid) sentUserIds.push(uid);
       }
     }
-    // Fallback: if Expo returned no tickets, treat candidateUserIds as sent
     return sentUserIds.length > 0 ? sentUserIds : candidateUserIds;
   } catch (err) {
     console.warn("[Push] sendPlannedRouteInvitePushNotifications error (non-fatal):", err);
