@@ -235,14 +235,16 @@ export async function checkChat(): Promise<PipelineCheckResult> {
   const t0 = Date.now();
   const steps: PipelineCheckStep[] = [];
 
-  steps.push(await warnStep("messaggi pending >5min", async () => {
+  // N.B.: la tabella "messages" non ha colonna "status" — il check usa
+  // messaggi recenti (ultime 24h) come proxy di attività della chat.
+  steps.push(await warnStep("messaggi recenti (ultime 24h)", async () => {
     const res = await db.execute(sql`
       SELECT COUNT(*) AS cnt FROM messages
-      WHERE status = 'pending' AND created_at < NOW() - INTERVAL '5 minutes'
+      WHERE created_at > NOW() - INTERVAL '24 hours'
     `);
     const cnt = parseInt((res.rows[0] as { cnt: string }).cnt ?? "0", 10);
-    if (cnt > 0) throw new Error(`${cnt} messaggi pending da >5min`);
-    return "nessun messaggio bloccato";
+    if (cnt === 0) throw new Error("nessun messaggio nelle ultime 24h — chat potenzialmente inattiva");
+    return `${cnt} messaggi nelle ultime 24h`;
   }));
 
   const overall = steps.some(s => s.status === "error") ? "broken"
@@ -288,13 +290,15 @@ export async function checkAiAssistant(): Promise<PipelineCheckResult> {
   const t0 = Date.now();
   const steps: PipelineCheckStep[] = [];
 
-  steps.push(await warnStep("sessioni AI assistant recenti", async () => {
+  // N.B.: "ai_assistant_sessions" non esiste nel DB — usa ai_conversation_turns
+  // (tabella reale, contiene turni conversazionali utente↔AI).
+  steps.push(await warnStep("turni AI assistant recenti", async () => {
     const res = await db.execute(sql`
-      SELECT COUNT(*) AS cnt FROM ai_assistant_sessions
-      WHERE updated_at > NOW() - INTERVAL '24 hours'
+      SELECT COUNT(*) AS cnt FROM ai_conversation_turns
+      WHERE created_at > NOW() - INTERVAL '24 hours'
     `);
     const cnt = parseInt((res.rows[0] as { cnt: string }).cnt ?? "0", 10);
-    return `${cnt} sessioni aggiornate nelle ultime 24h`;
+    return `${cnt} turni AI nelle ultime 24h`;
   }));
 
   const overall = steps.some(s => s.status === "error") ? "broken"
