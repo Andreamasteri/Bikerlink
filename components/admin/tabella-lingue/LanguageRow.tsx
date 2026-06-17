@@ -18,6 +18,7 @@ interface LanguageRowProps {
   recentlySaved: Set<string>;
   onOpenModal: (row: TableRow, lang: { code: string; label: string }) => void;
   onDeleteRow: (key: string) => void;
+  activeLangList?: { code: string; label: string }[];
 }
 
 export const LanguageRow: React.FC<LanguageRowProps> = ({
@@ -26,7 +27,9 @@ export const LanguageRow: React.FC<LanguageRowProps> = ({
   recentlySaved,
   onOpenModal,
   onDeleteRow,
+  activeLangList,
 }) => {
+  const langList = activeLangList ?? TABLE_LANGS;
   const hasMissing = TABLE_LANGS.some(
     (l) => !(item[l.code as keyof TableRow] as string)?.trim()
   );
@@ -84,7 +87,7 @@ export const LanguageRow: React.FC<LanguageRowProps> = ({
             {item.it || "—"}
           </Text>
         </View>
-        {TABLE_LANGS.map((l) => {
+        {langList.map((l) => {
           const val = (item[l.code as keyof TableRow] as string) ?? "";
           const cellKey = `${item.key}:${l.code}`;
           const status = getCellStatus(val, item.it);

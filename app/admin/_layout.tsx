@@ -40,7 +40,6 @@ export default function AdminLayout() {
         <Stack.Screen name="system" options={{ title: "System Monitor" }} />
         <Stack.Screen name="resource-monitor" options={{ title: "Risorse & Salute App" }} />
         <Stack.Screen name="eventi" options={{ title: "Raduni — Moderazione" }} />
-        <Stack.Screen name="traduzioni" options={{ title: "Sistema Traduzioni" }} />
         <Stack.Screen name="tabella-lingue" options={{ title: "Tabella Lingue" }} />
         <Stack.Screen name="gps-errors" options={{ title: "GPS Error Log" }} />
         <Stack.Screen name="gps-rejections" options={{ title: "GPS Rifiutati" }} />

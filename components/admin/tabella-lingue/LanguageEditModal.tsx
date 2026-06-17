@@ -1,10 +1,11 @@
-import React from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   View,
   Text,
   TextInput,
   TouchableOpacity,
   Modal,
+  ScrollView,
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
@@ -12,6 +13,7 @@ import {
 } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
+import { TableRow, TABLE_LANGS } from "./types";
 
 export type EditModalData = {
   key: string;
@@ -22,34 +24,65 @@ export type EditModalData = {
   currentValue: string;
 };
 
-interface LanguageEditModalProps {
+interface LanguageRowEditModalProps {
   visible: boolean;
-  data: EditModalData | null;
-  draftValue: string;
-  onDraftValueChange: (value: string) => void;
+  row: TableRow | null;
+  focusLang?: string;
   onClose: () => void;
-  onSave: () => void;
+  onSave: (updates: Record<string, string>) => Promise<void>;
   saving: boolean;
 }
 
-export const LanguageEditModal: React.FC<LanguageEditModalProps> = ({
+export const LanguageEditModal: React.FC<LanguageRowEditModalProps> = ({
   visible,
-  data,
-  draftValue,
-  onDraftValueChange,
+  row,
+  focusLang,
   onClose,
   onSave,
   saving,
 }) => {
+  const [drafts, setDrafts] = useState<Record<string, string>>({});
+  const focusRef = useRef<TextInput | null>(null);
+
+  useEffect(() => {
+    if (visible && row) {
+      const initial: Record<string, string> = {};
+      TABLE_LANGS.forEach((l) => {
+        initial[l.code] = (row[l.code as keyof TableRow] as string) ?? "";
+      });
+      setDrafts(initial);
+    }
+  }, [visible, row]);
+
+  const hasChanges = useMemo(() => {
+    if (!row) return false;
+    return TABLE_LANGS.some(
+      (l) => drafts[l.code] !== ((row[l.code as keyof TableRow] as string) ?? "")
+    );
+  }, [drafts, row]);
+
+  if (!row) return null;
+
+  const handleSave = async () => {
+    const updates: Record<string, string> = {};
+    TABLE_LANGS.forEach((l) => {
+      const orig = (row[l.code as keyof TableRow] as string) ?? "";
+      if (drafts[l.code] !== orig) {
+        updates[l.code] = drafts[l.code] ?? "";
+      }
+    });
+    await onSave(updates);
+  };
+
   return (
     <Modal
       visible={visible}
       transparent
-      animationType="fade"
+      animationType="slide"
       onRequestClose={onClose}
     >
       <KeyboardAvoidingView
-        style={styles.modalOverlay}
+        style={styles.overlay}
         behavior={Platform.OS === "ios" ? "padding" : "height"}
       >
         <TouchableOpacity
@@ -57,45 +90,53 @@ export const LanguageEditModal: React.FC<LanguageEditModalProps> = ({
           onPress={onClose}
           activeOpacity={1}
         />
-        <View style={styles.modalBox}>
-          <View style={styles.modalHeader}>
+        <View style={styles.sheet}>
+          <View style={styles.handle} />
+
+          <View style={styles.header}>
             <View style={{ flex: 1 }}>
-              <Text style={styles.modalTitle}>
-                {data?.langLabel} — {data?.position || data?.key}
+              <Text style={styles.title} numberOfLines={1}>
+                {row.position || row.key}
               </Text>
-              <Text style={styles.modalSubtitle} numberOfLines={1}>
-                {data?.key}
-              </Text>
+              <Text style={styles.subtitle} numberOfLines={1}>{row.key}</Text>
             </View>
             <TouchableOpacity onPress={onClose} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
               <MaterialIcons name="close" size={22} color={Colors.textSecondary} />
             </TouchableOpacity>
           </View>
 
-          <View style={styles.modalItRow}>
-            <Text style={styles.modalItLabel}>Italiano (riferimento):</Text>
-            <Text style={styles.modalItValue}>{data?.itValue || "—"}</Text>
-          </View>
+          <ScrollView style={styles.scroll} keyboardShouldPersistTaps="handled">
+            <View style={styles.itBlock}>
+              <Text style={styles.fieldLabel}>IT — Italiano (riferimento)</Text>
+              <Text style={styles.itText}>{row.it || "—"}</Text>
+            </View>
 
-          <Text style={styles.modalInputLabel}>Traduzione {data?.langLabel}:</Text>
-          <TextInput
-            style={styles.modalInput}
-            value={draftValue}
-            onChangeText={onDraftValueChange}
-            multiline
-            autoFocus
-            placeholder="Inserisci la traduzione..."
-            placeholderTextColor={Colors.textSecondary}
-          />
+            {TABLE_LANGS.map((l) => (
+              <View key={l.code} style={styles.fieldBlock}>
+                <Text style={styles.fieldLabel}>{l.label}</Text>
+                <TextInput
+                  ref={l.code === focusLang ? focusRef : undefined}
+                  style={styles.input}
+                  value={drafts[l.code] ?? ""}
+                  onChangeText={(v) => setDrafts((prev) => ({ ...prev, [l.code]: v }))}
+                  multiline
+                  autoFocus={l.code === (focusLang ?? TABLE_LANGS[0].code)}
+                  placeholder={`Traduzione in ${l.label}...`}
+                  placeholderTextColor={Colors.textSecondary}
+                />
+              </View>
+            ))}
+            <View style={{ height: 16 }} />
+          </ScrollView>
 
-          <View style={styles.modalActions}>
+          <View style={styles.footer}>
             <TouchableOpacity style={styles.cancelBtn} onPress={onClose} disabled={saving}>
               <Text style={styles.cancelBtnText}>Annulla</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.saveBtn, (saving || !draftValue.trim()) && styles.saveBtnDisabled]}
-              onPress={onSave}
-              disabled={saving || !draftValue.trim()}
+              style={[styles.saveBtn, (!hasChanges || saving) && styles.saveBtnDisabled]}
+              onPress={handleSave}
+              disabled={!hasChanges || saving}
             >
               {saving ? (
                 <ActivityIndicator size="small" color="#fff" />
@@ -111,88 +152,100 @@ export const LanguageEditModal: React.FC<LanguageEditModalProps> = ({
 };
 
 const styles = StyleSheet.create({
-  modalOverlay: {
+  overlay: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.6)",
-    justifyContent: "center",
-    alignItems: "center",
-    padding: 20,
+    justifyContent: "flex-end",
+    backgroundColor: "rgba(0,0,0,0.55)",
   },
-  modalBox: {
+  sheet: {
     backgroundColor: Colors.surface,
-    borderRadius: 14,
-    padding: 20,
-    width: "100%",
-    maxWidth: 480,
+    borderTopLeftRadius: 18,
+    borderTopRightRadius: 18,
+    maxHeight: "88%",
     shadowColor: "#000",
-    shadowOpacity: 0.4,
-    shadowRadius: 20,
-    shadowOffset: { width: 0, height: 8 },
-    elevation: 12,
+    shadowOpacity: 0.5,
+    shadowRadius: 24,
+    shadowOffset: { width: 0, height: -4 },
+    elevation: 24,
   },
-  modalHeader: {
+  handle: {
+    width: 38,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: Colors.border ?? "#555",
+    alignSelf: "center",
+    marginTop: 10,
+    marginBottom: 4,
+  },
+  header: {
     flexDirection: "row",
     alignItems: "flex-start",
-    marginBottom: 14,
+    paddingHorizontal: 18,
+    paddingTop: 12,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border ?? "#2a2a2a",
     gap: 10,
   },
-  modalTitle: {
+  title: {
     color: Colors.text,
-    fontSize: 16,
+    fontSize: 15,
     fontFamily: "Inter_600SemiBold",
   },
-  modalSubtitle: {
+  subtitle: {
     color: Colors.textSecondary,
-    fontSize: 12,
+    fontSize: 11,
     fontFamily: "Inter_400Regular",
     marginTop: 2,
   },
-  modalItRow: {
+  scroll: {
+    paddingHorizontal: 18,
+    paddingTop: 14,
+  },
+  itBlock: {
     backgroundColor: Colors.background,
-    borderRadius: 8,
-    padding: 10,
+    borderRadius: 10,
+    padding: 12,
     marginBottom: 14,
   },
-  modalItLabel: {
-    color: Colors.textSecondary,
-    fontSize: 11,
-    fontFamily: "Inter_600SemiBold",
-    textTransform: "uppercase",
-    letterSpacing: 0.4,
-    marginBottom: 4,
-  },
-  modalItValue: {
+  itText: {
     color: Colors.text,
     fontSize: 14,
     fontFamily: "Inter_400Regular",
     lineHeight: 20,
   },
-  modalInputLabel: {
+  fieldBlock: {
+    marginBottom: 14,
+  },
+  fieldLabel: {
     color: Colors.textSecondary,
     fontSize: 11,
     fontFamily: "Inter_600SemiBold",
     textTransform: "uppercase",
-    letterSpacing: 0.4,
+    letterSpacing: 0.5,
     marginBottom: 6,
   },
-  modalInput: {
+  input: {
     backgroundColor: Colors.background,
     borderRadius: 8,
-    padding: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
     color: Colors.text,
     fontSize: 14,
     fontFamily: "Inter_400Regular",
-    minHeight: 90,
+    minHeight: 70,
     textAlignVertical: "top",
     borderWidth: 1,
-    borderColor: Colors.accent,
+    borderColor: Colors.border ?? "#333",
     lineHeight: 20,
   },
-  modalActions: {
+  footer: {
     flexDirection: "row",
     justifyContent: "flex-end",
     gap: 10,
-    marginTop: 16,
+    padding: 16,
+    borderTopWidth: 1,
+    borderTopColor: Colors.border ?? "#2a2a2a",
   },
   cancelBtn: {
     paddingHorizontal: 18,
@@ -208,15 +261,13 @@ const styles = StyleSheet.create({
   },
   saveBtn: {
     backgroundColor: Colors.accent,
-    paddingHorizontal: 22,
+    paddingHorizontal: 24,
     paddingVertical: 10,
     borderRadius: 8,
     minWidth: 80,
     alignItems: "center",
   },
-  saveBtnDisabled: {
-    opacity: 0.6,
-  },
+  saveBtnDisabled: { opacity: 0.5 },
   saveBtnText: {
     color: "#fff",
     fontSize: 14,

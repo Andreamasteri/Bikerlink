@@ -17,6 +17,7 @@ interface LanguageTableProps {
   onOpenModal: (row: TableRow, lang: { code: string; label: string }) => void;
   onDeleteRow: (key: string) => void;
   headerRowHeight: number;
+  activeLangs: Set<string>;
 }
 
 export const LanguageTable: React.FC<LanguageTableProps> = ({
@@ -26,8 +27,10 @@ export const LanguageTable: React.FC<LanguageTableProps> = ({
   onOpenModal,
   onDeleteRow,
   headerRowHeight,
+  activeLangs,
 }) => {
-  const totalWidth = COL_POSITION + COL_IT + TABLE_LANGS.length * COL_LANG;
+  const activeLangList = TABLE_LANGS.filter((l) => activeLangs.has(l.code));
+  const totalWidth = COL_POSITION + COL_IT + activeLangList.length * COL_LANG;
 
   const renderHeader = () => (
     <View style={[styles.tableRow, styles.tableHeaderRow, { width: totalWidth }]}>
@@ -37,7 +40,7 @@ export const LanguageTable: React.FC<LanguageTableProps> = ({
       <View style={[styles.tableHeaderCell, { width: COL_IT }]}>
         <Text style={styles.tableHeaderText}>Italiano</Text>
       </View>
-      {TABLE_LANGS.map((l) => (
+      {activeLangList.map((l) => (
         <View key={l.code} style={[styles.tableHeaderCell, { width: COL_LANG }]}>
           <Text style={styles.tableHeaderText}>{l.label}</Text>
         </View>
@@ -61,6 +64,7 @@ export const LanguageTable: React.FC<LanguageTableProps> = ({
                   recentlySaved={recentlySaved}
                   onOpenModal={onOpenModal}
                   onDeleteRow={onDeleteRow}
+                  activeLangList={activeLangList}
                 />
               )}
               nestedScrollEnabled

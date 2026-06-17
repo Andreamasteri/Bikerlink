@@ -1,10 +1,11 @@
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useState, useCallback, useEffect, useMemo, type ComponentProps } from "react";
 import {
   View,
   Text,
   StyleSheet,
   ActivityIndicator,
   TouchableOpacity,
+  Alert,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { MaterialCommunityIcons, MaterialIcons } from "@expo/vector-icons";
@@ -18,11 +19,14 @@ import {
 } from "@/components/admin/tabella-lingue/types";
 import { LanguageTable } from "@/components/admin/tabella-lingue/LanguageTable";
 import { LanguageFilters } from "@/components/admin/tabella-lingue/LanguageFilters";
-import { LanguageAiStats } from "@/components/admin/tabella-lingue/LanguageAiStats";
-import { LanguageEditModal, EditModalData } from "@/components/admin/tabella-lingue/LanguageEditModal";
+import { LanguageEditModal } from "@/components/admin/tabella-lingue/LanguageEditModal";
 import { AddKeyModal, AddKeyFormData } from "@/components/admin/tabella-lingue/AddKeyModal";
 
+type MCIconName = ComponentProps<typeof MaterialCommunityIcons>["name"];
+
 const HEADER_ROW_HEIGHT = 36;
+
+type ActionState = "idle" | "loading" | "ok" | "error";
 
 export default function TabellaLingue() {
   const insets = useSafeAreaInsets();
@@ -31,17 +35,29 @@ export default function TabellaLingue() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [searchText, setSearchText] = useState("");
-  const [editModal, setEditModal] = useState<EditModalData | null>(null);
-  const [draftValue, setDraftValue] = useState("");
+
+  const [editRow, setEditRow] = useState<TableRow | null>(null);
+  const [editFocusLang, setEditFocusLang] = useState<string | undefined>(undefined);
   const [saving, setSaving] = useState(false);
-  const [saveError, setSaveError] = useState("");
   const [recentlySaved, setRecentlySaved] = useState<Set<string>>(new Set());
-  const [aiLoading, setAiLoading] = useState(false);
-  const [aiResult, setAiResult] = useState<{ ok: boolean; msg: string } | null>(null);
+  const [saveError, setSaveError] = useState("");
+
+  const [activeLangs, setActiveLangs] = useState<Set<string>>(
+    new Set(TABLE_LANGS.map((l) => l.code))
+  );
+  const [activeCategory, setActiveCategory] = useState<string | null>(null);
+  const [showMissingOnly, setShowMissingOnly] = useState(false);
 
   const [addModalVisible, setAddModalVisible] = useState(false);
   const [addSaving, setAddSaving] = useState(false);
   const [addError, setAddError] = useState("");
+
+  const [syncState, setSyncState] = useState<ActionState>("idle");
+  const [syncMsg, setSyncMsg] = useState("");
+  const [aiState, setAiState] = useState<ActionState>("idle");
+  const [aiMsg, setAiMsg] = useState("");
+  const [applyState, setApplyState] = useState<ActionState>("idle");
+  const [applyMsg, setApplyMsg] = useState("");
 
   const loadTable = useCallback(async () => {
     setLoading(true);
@@ -52,7 +68,7 @@ export default function TabellaLingue() {
       const data: TableRow[] = await resp.json();
       setTableData(data);
     } catch (e: unknown) {
-      setError(e instanceof Error ? (e as Error).message : "Errore nel caricamento");
+      setError(e instanceof Error ? e.message : "Errore nel caricamento");
     } finally {
       setLoading(false);
     }
@@ -62,107 +78,111 @@ export default function TabellaLingue() {
     loadTable();
   }, [loadTable]);
 
-  const handleAiComplete = useCallback(async () => {
-    setAiLoading(true);
-    setAiResult(null);
-    try {
-      const resp = await apiRequest("POST", "/api/admin/translations/ai-complete", {});
-      const data = await resp.json();
-      if (!resp.ok) throw new Error(data?.message || "Errore AI");
-      setAiResult({ ok: true, msg: data.message || "Completamento AI riuscito" });
-      loadTable();
-    } catch (e: unknown) {
-      const msg = isAiKeyMissingError(e)
-        ? AI_KEY_MISSING_MESSAGE
-        : e instanceof Error ? (e as Error).message : "Errore AI";
-      setAiResult({ ok: false, msg });
-    } finally {
-      setAiLoading(false);
-    }
-  }, [loadTable]);
+  const handleToggleLang = useCallback((code: string) => {
+    setActiveLangs((prev) => {
+      const next = new Set(prev);
+      if (next.has(code)) next.delete(code);
+      else next.add(code);
+      return next;
+    });
+  }, []);
 
-  const filteredData = React.useMemo(() => {
-    const q = searchText.trim().toLowerCase();
-    if (!q) return tableData;
-    return tableData.filter(
-      (row) =>
-        row.key.toLowerCase().includes(q) ||
-        (row.position ?? "").toLowerCase().includes(q) ||
-        (row.it ?? "").toLowerCase().includes(q)
-    );
-  }, [tableData, searchText]);
-
-  const totalMissing = React.useMemo(() => {
-    return tableData.reduce((acc, row) => {
-      const hasMissing = TABLE_LANGS.some((l) => !(row[l.code as keyof TableRow] as string)?.trim());
-      return hasMissing ? acc + 1 : acc;
-    }, 0);
+  const categories = useMemo(() => {
+    const prefixSet = new Set<string>();
+    tableData.forEach((row) => {
+      const prefix = row.key.split(/[._]/)[0];
+      if (prefix) prefixSet.add(prefix);
+    });
+    return Array.from(prefixSet).sort();
   }, [tableData]);
 
-  const openModal = useCallback((row: TableRow, lang: { code: string; label: string }) => {
-    setEditModal({
-      key: row.key,
-      lang: lang.code,
-      langLabel: lang.label,
-      position: row.position,
-      itValue: row.it ?? "",
-      currentValue: (row[lang.code as keyof TableRow] as string) ?? "",
+  const rowHasMissing = useCallback(
+    (row: TableRow) => TABLE_LANGS.some((l) => !(row[l.code as keyof TableRow] as string)?.trim()),
+    []
+  );
+
+  const totalMissing = useMemo(
+    () => tableData.filter(rowHasMissing).length,
+    [tableData, rowHasMissing]
+  );
+
+  const filteredData = useMemo(() => {
+    const q = searchText.trim().toLowerCase();
+    return tableData.filter((row) => {
+      const matchCat = activeCategory
+        ? row.key.startsWith(activeCategory + ".") ||
+          row.key.startsWith(activeCategory + "_") ||
+          row.key.split(/[._]/)[0] === activeCategory
+        : true;
+      if (!matchCat) return false;
+      if (showMissingOnly && !rowHasMissing(row)) return false;
+      if (!q) return true;
+      return (
+        row.key.toLowerCase().includes(q) ||
+        (row.it ?? "").toLowerCase().includes(q) ||
+        (row.position ?? "").toLowerCase().includes(q)
+      );
     });
-    setDraftValue((row[lang.code as keyof TableRow] as string) ?? "");
-    setSaveError("");
+  }, [tableData, searchText, activeCategory, showMissingOnly, rowHasMissing]);
+
+  const openModal = useCallback((row: TableRow, lang: { code: string; label: string }) => {
+    setEditRow(row);
+    setEditFocusLang(lang.code);
   }, []);
 
   const closeModal = useCallback(() => {
-    setEditModal(null);
-    setDraftValue("");
-    setSaveError("");
+    setEditRow(null);
+    setEditFocusLang(undefined);
   }, []);
 
-  const handleSave = useCallback(async () => {
-    if (!editModal) return;
-    const savedKey = editModal.key;
-    const savedLang = editModal.lang;
-    const savedValue = draftValue.trim();
-    const previousValue = editModal.currentValue;
+  const handleSave = useCallback(async (updates: Record<string, string>) => {
+    if (!editRow) return;
+    const rowKey = editRow.key;
+    const snapshots: Record<string, string> = {};
+    TABLE_LANGS.forEach((l) => {
+      snapshots[l.code] = (editRow[l.code as keyof TableRow] as string) ?? "";
+    });
 
     setSaving(true);
-    setSaveError("");
-
     setTableData((prev) =>
-      prev.map((row) =>
-        row.key === savedKey ? { ...row, [savedLang]: savedValue } : row
-      )
+      prev.map((row) => (row.key === rowKey ? { ...row, ...updates } : row))
     );
     closeModal();
 
+    const savedLangs: string[] = [];
     try {
-      const resp = await apiRequest("PATCH", "/api/admin/translations/key", {
-        key: savedKey,
-        lang: savedLang,
-        value: savedValue,
-      });
-      if (!resp.ok) throw new Error("Errore nel salvataggio");
-      const cellKey = `${savedKey}:${savedLang}`;
-      setRecentlySaved((prev) => new Set(prev).add(cellKey));
-      setTimeout(() => {
-        setRecentlySaved((prev) => {
-          const next = new Set(prev);
-          next.delete(cellKey);
-          return next;
+      for (const [lang, value] of Object.entries(updates)) {
+        const resp = await apiRequest("PATCH", "/api/admin/translations/key", {
+          key: rowKey,
+          lang,
+          value,
         });
-      }, 2500);
+        if (!resp.ok) throw new Error(`Errore nel salvataggio [${lang}]`);
+        savedLangs.push(lang);
+        const cellKey = `${rowKey}:${lang}`;
+        setRecentlySaved((prev) => new Set(prev).add(cellKey));
+        setTimeout(() => {
+          setRecentlySaved((prev) => {
+            const next = new Set(prev);
+            next.delete(cellKey);
+            return next;
+          });
+        }, 2500);
+      }
     } catch {
+      const restore: Record<string, string> = {};
+      TABLE_LANGS.forEach((l) => {
+        if (updates[l.code] !== undefined) restore[l.code] = snapshots[l.code];
+      });
       setTableData((prev) =>
-        prev.map((row) =>
-          row.key === savedKey ? { ...row, [savedLang]: previousValue } : row
-        )
+        prev.map((row) => (row.key === rowKey ? { ...row, ...restore } : row))
       );
-      setSaveError(`Salvataggio fallito per "${savedKey}" [${savedLang}]. Riprova.`);
+      setSaveError(`Salvataggio fallito per "${rowKey}". Riprova.`);
       setTimeout(() => setSaveError(""), 5000);
     } finally {
       setSaving(false);
     }
-  }, [editModal, draftValue, closeModal]);
+  }, [editRow, closeModal]);
 
   const handleAddKey = useCallback(async (data: AddKeyFormData) => {
     setAddSaving(true);
@@ -187,7 +207,7 @@ export default function TabellaLingue() {
       });
       setAddModalVisible(false);
     } catch (e: unknown) {
-      setAddError(e instanceof Error ? (e as Error).message : "Errore sconosciuto");
+      setAddError(e instanceof Error ? e.message : "Errore sconosciuto");
     } finally {
       setAddSaving(false);
     }
@@ -199,15 +219,12 @@ export default function TabellaLingue() {
     setTableData((prev) => prev.filter((r) => r.key !== key));
     try {
       const resp = await apiRequest("DELETE", `/api/admin/translations/keys/${encodeURIComponent(key)}`);
-      if (!resp.ok) {
-        throw new Error(`Errore ${resp.status}`);
-      }
+      if (!resp.ok) throw new Error(`Errore ${resp.status}`);
     } catch {
       if (snapshot) {
         setTableData((prev) => {
           const next = [...prev];
-          const insertAt = Math.min(snapshotIndex, next.length);
-          next.splice(insertAt, 0, snapshot);
+          next.splice(Math.min(snapshotIndex, next.length), 0, snapshot);
           return next;
         });
       }
@@ -215,6 +232,69 @@ export default function TabellaLingue() {
       setTimeout(() => setSaveError(""), 5000);
     }
   }, [tableData]);
+
+  const handleSyncFromFiles = useCallback(async () => {
+    setSyncState("loading");
+    setSyncMsg("");
+    try {
+      const resp = await apiRequest("POST", "/api/admin/translations/sync-from-files", {});
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(data?.message || "Errore sincronizzazione");
+      setSyncState("ok");
+      setSyncMsg(data.message || "Sincronizzazione completata");
+      loadTable();
+    } catch (e: unknown) {
+      setSyncState("error");
+      setSyncMsg(e instanceof Error ? e.message : "Errore sincronizzazione");
+    }
+  }, [loadTable]);
+
+  const handleAiComplete = useCallback(async () => {
+    setAiState("loading");
+    setAiMsg("");
+    try {
+      const resp = await apiRequest("POST", "/api/admin/translations/ai-complete", {});
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(data?.message || "Errore AI");
+      setAiState("ok");
+      setAiMsg(data.message || "Completamento AI riuscito");
+      loadTable();
+    } catch (e: unknown) {
+      const msg = isAiKeyMissingError(e)
+        ? AI_KEY_MISSING_MESSAGE
+        : e instanceof Error ? e.message : "Errore AI";
+      setAiState("error");
+      setAiMsg(msg);
+    }
+  }, [loadTable]);
+
+  const handleApplyToFiles = useCallback(() => {
+    Alert.alert(
+      "Applica ai file",
+      "Sovrascrive lib/i18n/*.ts con i valori dal database e riavvia il backend. Continuare?",
+      [
+        { text: "Annulla", style: "cancel" },
+        {
+          text: "Applica e riavvia",
+          style: "destructive",
+          onPress: async () => {
+            setApplyState("loading");
+            setApplyMsg("");
+            try {
+              const resp = await apiRequest("POST", "/api/admin/translations/apply-to-files", {});
+              const data = await resp.json();
+              if (!resp.ok) throw new Error(data?.message || "Errore scrittura file");
+              setApplyState("ok");
+              setApplyMsg((data.message || "File aggiornati") + " — backend in riavvio…");
+            } catch (e: unknown) {
+              setApplyState("error");
+              setApplyMsg(e instanceof Error ? e.message : "Errore scrittura file");
+            }
+          },
+        },
+      ]
+    );
+  }, []);
 
   if (loading) {
     return (
@@ -245,13 +325,42 @@ export default function TabellaLingue() {
         filteredCount={filteredData.length}
         totalCount={tableData.length}
         totalMissing={totalMissing}
+        activeLangs={activeLangs}
+        onToggleLang={handleToggleLang}
+        categories={categories}
+        activeCategory={activeCategory}
+        onSetCategory={setActiveCategory}
+        showMissingOnly={showMissingOnly}
+        onToggleMissingOnly={() => setShowMissingOnly((v) => !v)}
       />
 
-      <LanguageAiStats
-        aiLoading={aiLoading}
-        aiResult={aiResult}
-        onAiComplete={handleAiComplete}
-      />
+      <View style={styles.actionsRow}>
+        <ActionButton
+          label="Sincronizza da file"
+          icon="sync"
+          state={syncState}
+          onPress={handleSyncFromFiles}
+          color="#2196F3"
+        />
+        <ActionButton
+          label="Completa con AI"
+          icon="auto-fix"
+          state={aiState}
+          onPress={handleAiComplete}
+          color="#9C27B0"
+        />
+        <ActionButton
+          label="Applica ai file"
+          icon="file-export-outline"
+          state={applyState}
+          onPress={handleApplyToFiles}
+          color="#FF5722"
+        />
+      </View>
+
+      {syncMsg ? <ActionResultBanner msg={syncMsg} state={syncState} onDismiss={() => setSyncMsg("")} /> : null}
+      {aiMsg ? <ActionResultBanner msg={aiMsg} state={aiState} onDismiss={() => setAiMsg("")} /> : null}
+      {applyMsg ? <ActionResultBanner msg={applyMsg} state={applyState} onDismiss={() => setApplyMsg("")} /> : null}
 
       <View style={styles.addKeyRow}>
         <TouchableOpacity
@@ -287,14 +396,14 @@ export default function TabellaLingue() {
           onOpenModal={openModal}
           onDeleteRow={handleDeleteRow}
           headerRowHeight={HEADER_ROW_HEIGHT}
+          activeLangs={activeLangs}
         />
       </View>
 
       <LanguageEditModal
-        visible={editModal !== null}
-        data={editModal}
-        draftValue={draftValue}
-        onDraftValueChange={setDraftValue}
+        visible={editRow !== null}
+        row={editRow}
+        focusLang={editFocusLang}
         onClose={closeModal}
         onSave={handleSave}
         saving={saving}
@@ -308,6 +417,72 @@ export default function TabellaLingue() {
         onSave={handleAddKey}
       />
     </View>
+  );
+}
+
+function ActionButton({
+  label,
+  icon,
+  state,
+  onPress,
+  color,
+}: {
+  label: string;
+  icon: MCIconName;
+  state: ActionState;
+  onPress: () => void;
+  color: string;
+}) {
+  const isLoading = state === "loading";
+  return (
+    <TouchableOpacity
+      style={[styles.actionBtn, { borderColor: color }, isLoading && styles.actionBtnDisabled]}
+      onPress={onPress}
+      disabled={isLoading}
+      activeOpacity={0.75}
+    >
+      {isLoading ? (
+        <ActivityIndicator size="small" color={color} />
+      ) : (
+        <MaterialCommunityIcons
+          name={icon}
+          size={15}
+          color={state === "ok" ? "#4CAF50" : state === "error" ? "#F44336" : color}
+        />
+      )}
+      <Text style={[styles.actionBtnText, { color: state === "ok" ? "#4CAF50" : state === "error" ? "#F44336" : color }]}>
+        {label}
+      </Text>
+    </TouchableOpacity>
+  );
+}
+
+function ActionResultBanner({
+  msg,
+  state,
+  onDismiss,
+}: {
+  msg: string;
+  state: ActionState;
+  onDismiss: () => void;
+}) {
+  const isOk = state === "ok";
+  return (
+    <TouchableOpacity
+      style={[styles.resultBanner, isOk ? styles.resultBannerOk : styles.resultBannerErr]}
+      onPress={onDismiss}
+      activeOpacity={0.8}
+    >
+      <MaterialCommunityIcons
+        name={isOk ? "check-circle-outline" : "alert-circle-outline"}
+        size={14}
+        color={isOk ? "#4CAF50" : "#F44336"}
+      />
+      <Text style={[styles.resultBannerText, { color: isOk ? "#4CAF50" : "#F44336" }]} numberOfLines={2}>
+        {msg}
+      </Text>
+      <MaterialIcons name="close" size={14} color={isOk ? "#4CAF50" : "#F44336"} />
+    </TouchableOpacity>
   );
 }
 
@@ -345,6 +520,54 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontFamily: "Inter_600SemiBold",
     fontSize: 14,
+  },
+  actionsRow: {
+    flexDirection: "row",
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    gap: 6,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border ?? "#2a2a2a",
+    backgroundColor: Colors.surface,
+  },
+  actionBtn: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 7,
+    paddingHorizontal: 4,
+    borderRadius: 8,
+    borderWidth: 1.5,
+    gap: 4,
+  },
+  actionBtnDisabled: {
+    opacity: 0.55,
+  },
+  actionBtnText: {
+    fontSize: 10,
+    fontFamily: "Inter_600SemiBold",
+    textAlign: "center",
+  },
+  resultBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    gap: 6,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border ?? "#2a2a2a",
+  },
+  resultBannerOk: {
+    backgroundColor: "#4CAF5012",
+  },
+  resultBannerErr: {
+    backgroundColor: "#F4433612",
+  },
+  resultBannerText: {
+    flex: 1,
+    fontSize: 12,
+    fontFamily: "Inter_400Regular",
   },
   addKeyRow: {
     flexDirection: "row",

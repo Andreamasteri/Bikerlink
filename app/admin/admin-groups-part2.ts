@@ -123,19 +123,10 @@ export const adminGroupsPart2: AdminGroup[] = [
     ],
   },
   {
-    title: "Traduzioni",
+    title: "Lingue",
     headerIcon: "translate",
     headerIconSet: "MaterialIcons",
     items: [
-      {
-        key: "traduzioni",
-        label: "Traduzioni",
-        icon: "translate",
-        iconSet: "MaterialIcons",
-        route: "/admin/traduzioni",
-        accentColor: "#9C27B0",
-        keywords: ["traduzione", "translate", "lingua", "language", "localizzazione", "i18n", "l10n", "internazionalizzazione", "stringa", "string", "chiave", "key", "testo", "en", "it", "de", "fr", "es", "multi-lingua"],
-      },
       {
         key: "tabella-lingue",
         label: "Tabella Lingue",
@@ -143,7 +134,7 @@ export const adminGroupsPart2: AdminGroup[] = [
         iconSet: "MaterialCommunityIcons",
         route: "/admin/tabella-lingue",
         accentColor: "#9C27B0",
-        keywords: ["lingua", "language", "tabella", "table", "locale", "paese", "country", "flag", "codice lingua", "language code", "iso", "supportato", "supported", "attivo", "active", "aggiungi lingua"],
+        keywords: ["traduzione", "translate", "lingua", "language", "localizzazione", "i18n", "l10n", "internazionalizzazione", "stringa", "string", "chiave", "key", "testo", "en", "it", "de", "fr", "es", "multi-lingua", "tabella", "table", "locale", "sincronizza", "sync", "ai complete", "applica", "mancanti"],
       },
     ],
   },
