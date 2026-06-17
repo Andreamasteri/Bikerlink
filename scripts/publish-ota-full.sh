@@ -136,8 +136,14 @@ log_ok "APPLIED_OTA_NUMBER pre-impostato → ${NEXT_OTA} (sarà incluso nel bund
 log_info "Fase 1/2 — Metro export (bundle Android, attendi 2-5 minuti)..."
 
 rm -rf "$DIST_DIR"
-# Pulisce cache Metro corrotta in /tmp (può accumularsi tra run diverse)
-rm -rf /tmp/metro-file-map-* 2>/dev/null || true
+# Metro file-map cache (/tmp/metro-file-map-*): NON cancellare automaticamente.
+# La pulizia sistematica era necessaria per un bug della blockList regex (lookbehind
+# mancante) — fixato. Cancellarla ad ogni run forza Metro a riscansionare ~70k file
+# da zero (+30-40s). Usa CLEAN_METRO_CACHE=1 solo se la cache è corrotta.
+if [[ "${CLEAN_METRO_CACHE:-0}" == "1" ]]; then
+  rm -rf /tmp/metro-file-map-* 2>/dev/null || true
+  log_info "Cache Metro /tmp/metro-file-map-* pulita (CLEAN_METRO_CACHE=1)"
+fi
 _T0=$(date +%s)
 EXPO_TOKEN="${EAS_TOKEN}" npx expo export \
   --platform android \

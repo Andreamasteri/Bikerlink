@@ -173,7 +173,7 @@ config.resolver.resolveRequest = (context, moduleName, platform) => {
   return context.resolveRequest(context, moduleName, platform);
 };
 
-config.maxWorkers = 1;
+config.maxWorkers = 4;
 
 config.cacheVersion = "v10";
 
