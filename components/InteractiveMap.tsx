@@ -55,6 +55,7 @@ const InteractiveMap = forwardRef<InteractiveMapHandle, InteractiveMapProps>(fun
   filterVessels = false,
   onToggleFilterVessels,
   aisEnabled = false,
+  showRouteDetailPanel = false,
 }: InteractiveMapProps, ref) {
   const { enabled: mapsEnabled } = useMapConfig();
   const webViewRef = useRef<WebView>(null);
@@ -297,7 +298,7 @@ const InteractiveMap = forwardRef<InteractiveMapHandle, InteractiveMapProps>(fun
           aisEnabled={aisEnabled}
         />
       )}
-      {selectedVesselMmsi == null && selectedHazardId == null && !showHazardReport && (
+      {selectedVesselMmsi == null && selectedHazardId == null && !showHazardReport && !showRouteDetailPanel && (
         <MapControls
           isAvailable={isAvailable} ghostMode={ghostMode}
           onCenterOnUser={centerOnUser}
@@ -307,7 +308,7 @@ const InteractiveMap = forwardRef<InteractiveMapHandle, InteractiveMapProps>(fun
           hideAvailability={filterBarTopOffset == null}
         />
       )}
-      {mapReady && selectedVesselMmsi == null && selectedHazardId == null && !showHazardReport && (
+      {mapReady && selectedVesselMmsi == null && selectedHazardId == null && !showHazardReport && !showRouteDetailPanel && (
         <MapStyleToggle
           currentStyleId={styleId}
           onSelectStyle={setStyle}
@@ -316,7 +317,7 @@ const InteractiveMap = forwardRef<InteractiveMapHandle, InteractiveMapProps>(fun
           compact={filterBarTopOffset == null}
         />
       )}
-      {mapReady && filterBarTopOffset != null && selectedVesselMmsi == null && selectedHazardId == null && !showHazardReport && (
+      {mapReady && filterBarTopOffset != null && selectedVesselMmsi == null && selectedHazardId == null && !showHazardReport && !showRouteDetailPanel && (
         <MapZoomSlider
           zoom={viewState.zoom}
           minZoom={viewState.minZoom}

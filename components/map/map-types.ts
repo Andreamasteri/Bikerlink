@@ -97,6 +97,7 @@ export interface InteractiveMapProps {
   filterVessels?: boolean;
   onToggleFilterVessels?: () => void;
   aisEnabled?: boolean;
+  showRouteDetailPanel?: boolean;
 }
 
 export interface InteractiveMapHandle {

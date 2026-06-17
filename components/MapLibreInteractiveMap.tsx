@@ -30,6 +30,7 @@ const MapLibreInteractiveMap = forwardRef<InteractiveMapHandle, InteractiveMapPr
       filterEvents = true, onToggleFilterEvents,
       onRegionChangeComplete, initialCenterOverride,
       onFatalError,
+      showRouteDetailPanel = false,
     }: InteractiveMapProps,
     ref
   ) {
@@ -195,21 +196,23 @@ const MapLibreInteractiveMap = forwardRef<InteractiveMapHandle, InteractiveMapPr
             <ActivityIndicator size="small" color={Colors.accent} />
           </View>
         )}
-        <MapControls
-          isAvailable={isAvailable}
-          ghostMode={ghostMode}
-          onCenterOnUser={handleCenterOnUser}
-          availabilityBottomOffset={filterBarTopOffset != null ? 100 : undefined}
-          locationButtonBottomOffset={filterBarTopOffset != null ? 205 : undefined}
-        />
-        {mapReady && (
+        {!showRouteDetailPanel && (
+          <MapControls
+            isAvailable={isAvailable}
+            ghostMode={ghostMode}
+            onCenterOnUser={handleCenterOnUser}
+            availabilityBottomOffset={filterBarTopOffset != null ? 100 : undefined}
+            locationButtonBottomOffset={filterBarTopOffset != null ? 205 : undefined}
+          />
+        )}
+        {mapReady && !showRouteDetailPanel && (
           <MapStyleToggle
             currentStyleId={styleId}
             onSelectStyle={setStyle}
             bottomOffset={filterBarTopOffset != null ? 160 : undefined}
           />
         )}
-        {mapReady && filterBarTopOffset != null && (
+        {mapReady && filterBarTopOffset != null && !showRouteDetailPanel && (
           <MapZoomSlider
             zoom={viewState.zoom}
             minZoom={viewState.minZoom}
