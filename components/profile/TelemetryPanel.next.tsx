@@ -6,6 +6,9 @@ import {
   StyleSheet,
   Alert,
   Switch,
+  LayoutAnimation,
+  Platform,
+  UIManager,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
@@ -33,6 +36,10 @@ import { GateDots } from "./TelemetryGateDots";
 import { AutoRidingIndicator } from "./TelemetryAutoIndicator";
 import { SavedLapsSection } from "./TelemetrySavedLaps";
 import { useLocalSearchParams } from "expo-router";
+
+if (Platform.OS === "android" && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 
 const LAP_TARGETS_KM = [10, 30, 50, 100];
 
@@ -65,6 +72,7 @@ export default function TelemetryPanel({ telemetryStats }: Props) {
 
   useEffect(() => {
     if (focusTelemetry === "1") {
+      LayoutAnimation.easeInEaseOut();
       setTelemetryExpanded(true);
       router.setParams({ focusTelemetry: undefined });
     }
@@ -99,6 +107,11 @@ export default function TelemetryPanel({ telemetryStats }: Props) {
     await setTelemetryAlwaysActive(value);
   };
 
+  const handleToggleExpanded = () => {
+    LayoutAnimation.easeInEaseOut();
+    setTelemetryExpanded((v) => !v);
+  };
+
   const { data: idealLapsData } = useQuery<{ laps: IdealLap[] }>({
     queryKey: ["/api/telemetry/ideal-laps"],
     enabled: telemetryExpanded,
@@ -129,14 +142,18 @@ export default function TelemetryPanel({ telemetryStats }: Props) {
 
         {isAutoRiding && <AutoRidingIndicator />}
 
+        {/* ── Header principale — tap per espandere ── */}
         <TouchableOpacity
           activeOpacity={0.7}
-          onPress={() => setTelemetryExpanded((v) => !v)}
+          onPress={handleToggleExpanded}
           style={styles.telemetryHeader}
         >
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+          <View style={styles.telemetryHeaderLeft}>
             <Ionicons name="speedometer-outline" size={16} color={Colors.accent} />
-            <Text style={styles.telemetryTitle}>Telemetria raccolta</Text>
+            <Text style={styles.telemetryTitle}>
+              Telemetria raccolta
+              <Text style={styles.telemetryTitlePct}> · {telemetryStats.progress_pct}%</Text>
+            </Text>
             <TouchableOpacity
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               onPress={(e) => {
@@ -147,16 +164,14 @@ export default function TelemetryPanel({ telemetryStats }: Props) {
               <Ionicons name="information-circle-outline" size={14} color={Colors.textSecondary} />
             </TouchableOpacity>
           </View>
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-            <Text style={styles.telemetryPct}>{telemetryStats.progress_pct}%</Text>
-            <Ionicons
-              name={telemetryExpanded ? "chevron-up" : "chevron-down"}
-              size={14}
-              color={Colors.textSecondary}
-            />
-          </View>
+          <Ionicons
+            name={telemetryExpanded ? "chevron-up" : "chevron-down"}
+            size={18}
+            color={Colors.accent}
+          />
         </TouchableOpacity>
 
+        {/* ── Barra progresso ── */}
         <View style={styles.telemetryBarBg}>
           <View
             style={[
@@ -165,6 +180,8 @@ export default function TelemetryPanel({ telemetryStats }: Props) {
             ]}
           />
         </View>
+
+        {/* ── km raccolti + sessioni ── */}
         <View style={styles.telemetryFooter}>
           <Text style={styles.telemetryKm}>
             {telemetryStats.km_collected.toFixed(1)} km
@@ -203,6 +220,20 @@ export default function TelemetryPanel({ telemetryStats }: Props) {
           </View>
         )}
 
+        {/* ── Affordance espansione (solo quando chiuso) ── */}
+        {!telemetryExpanded && (
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={handleToggleExpanded}
+            style={styles.expandHint}
+          >
+            <Ionicons name="options-outline" size={13} color={Colors.textSecondary} />
+            <Text style={styles.expandHintText}>Giri ideali & impostazioni</Text>
+            <Ionicons name="chevron-forward" size={13} color={Colors.textSecondary} />
+          </TouchableOpacity>
+        )}
+
+        {/* ── Contenuto espanso ── */}
         {telemetryExpanded && (
           <View style={styles.telemetryExpanded}>
             <TouchableOpacity
@@ -329,8 +360,9 @@ const styles = StyleSheet.create({
   calibBadgeText: { fontSize: 11, fontFamily: "Inter_500Medium" },
   telemetryCard: { backgroundColor: Colors.surface, borderRadius: 12, padding: 14, gap: 10, borderWidth: 1, borderColor: Colors.accent + "33" },
   telemetryHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  telemetryHeaderLeft: { flexDirection: "row", alignItems: "center", gap: 6, flex: 1 },
   telemetryTitle: { fontSize: 13, fontFamily: "Inter_600SemiBold", color: Colors.text },
-  telemetryPct: { fontSize: 13, fontFamily: "Inter_700Bold", color: Colors.accent },
+  telemetryTitlePct: { fontSize: 13, fontFamily: "Inter_700Bold", color: Colors.accent },
   telemetryBarBg: { height: 6, backgroundColor: Colors.border, borderRadius: 3, overflow: "hidden" },
   telemetryBarFill: { height: 6, backgroundColor: Colors.accent, borderRadius: 3 },
   telemetryFooter: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
@@ -340,6 +372,8 @@ const styles = StyleSheet.create({
   trackKmRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingTop: 8, borderTopWidth: 1, borderTopColor: Colors.border },
   trackKmLabel: { fontSize: 12, fontFamily: "Inter_600SemiBold", color: "#e67e22" },
   trackKmValue: { fontSize: 13, fontFamily: "Inter_700Bold", color: "#e67e22" },
+  expandHint: { flexDirection: "row", alignItems: "center", gap: 5, paddingTop: 8, borderTopWidth: 1, borderTopColor: Colors.border },
+  expandHintText: { flex: 1, fontSize: 11, fontFamily: "Inter_500Medium", color: Colors.textSecondary },
   telemetryExpanded: { borderTopWidth: 1, borderTopColor: Colors.border, paddingTop: 12, gap: 10 },
   telemetryExpandedHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   telemetryExpandedTitle: { fontSize: 13, fontFamily: "Inter_600SemiBold", color: Colors.text },
