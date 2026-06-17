@@ -140,10 +140,20 @@ router.put("/me", requireAuth, async (req: Request, res: Response) => {
 
     if (Object.keys(profileUpdate).length > 0) {
       const existingProfileMe = await storage.getUserProfile(userId);
-      if (existingProfileMe?.positionFuzz && existingProfileMe.positionFuzzKm > 0 && profileUpdate.latitude != null && profileUpdate.longitude != null) {
-        const fuzzed = applyPositionFuzz(profileUpdate.latitude as number, profileUpdate.longitude as number, existingProfileMe.positionFuzzKm);
-        profileUpdate.latitude = fuzzed.lat;
-        profileUpdate.longitude = fuzzed.lng;
+      if (profileUpdate.latitude != null && profileUpdate.longitude != null) {
+        let fLat = profileUpdate.latitude as number;
+        let fLng = profileUpdate.longitude as number;
+        const fakeResult = applyFakeZones(fLat, fLng, existingProfileMe);
+        if (fakeResult.applied) {
+          fLat = fakeResult.lat;
+          fLng = fakeResult.lng;
+        } else if (existingProfileMe?.positionFuzz && existingProfileMe.positionFuzzKm > 0) {
+          const fuzzed = applyPositionFuzz(fLat, fLng, existingProfileMe.positionFuzzKm);
+          fLat = fuzzed.lat;
+          fLng = fuzzed.lng;
+        }
+        profileUpdate.latitude = fLat;
+        profileUpdate.longitude = fLng;
       }
       if (existingProfileMe) {
         await storage.updateUserProfile(userId, profileUpdate);
@@ -218,9 +228,11 @@ router.put("/profile/dynamic", requireAuth, async (req: Request, res: Response) 
     const existingProfile = await storage.getUserProfile(userId);
     const updateData: Partial<InsertUserProfile> = {};
     if (typeof isAvailable === "boolean") updateData.isAvailable = isAvailable;
+    let fLat: number | null | undefined = latitude;
+    let fLng: number | null | undefined = longitude;
     if (latitude !== undefined || longitude !== undefined) {
-      let fLat = latitude;
-      let fLng = longitude;
+      fLat = latitude;
+      fLng = longitude;
       if (latitude != null && longitude != null) {
         const fakeResult = applyFakeZones(latitude, longitude, existingProfile);
         if (fakeResult.applied) {
@@ -263,7 +275,7 @@ router.put("/profile/dynamic", requireAuth, async (req: Request, res: Response) 
     if (isAvailable === true) {
       await storage.updateUser(userId, { ghostMode: false });
       onlineTracker.setGhostMode(userId, false);
-      await captureFirstAvailabilityLocation(userId, latitude, longitude, existingProfile?.latitude, existingProfile?.longitude);
+      await captureFirstAvailabilityLocation(userId, fLat ?? latitude, fLng ?? longitude, existingProfile?.latitude, existingProfile?.longitude);
     }
 
     if (existingProfile) {
@@ -392,9 +404,9 @@ router.put("/me/availability", requireAuth, async (req: Request, res: Response) 
     const { isAvailable, latitude, longitude } = parsed.data;
     const existing = await storage.getUserProfile(userId);
     const updateData: Partial<InsertUserProfile> = { isAvailable };
+    let fLat: number | null | undefined = latitude;
+    let fLng: number | null | undefined = longitude;
     if (latitude != null && longitude != null) {
-      let fLat = latitude;
-      let fLng = longitude;
       const fakeResult = applyFakeZones(latitude, longitude, existing);
       if (fakeResult.applied) {
         fLat = fakeResult.lat;
@@ -412,7 +424,7 @@ router.put("/me/availability", requireAuth, async (req: Request, res: Response) 
     if (isAvailable === true) {
       await storage.updateUser(userId, { ghostMode: false });
       onlineTracker.setGhostMode(userId, false);
-      await captureFirstAvailabilityLocation(userId, latitude, longitude, existing?.latitude, existing?.longitude);
+      await captureFirstAvailabilityLocation(userId, fLat ?? latitude, fLng ?? longitude, existing?.latitude, existing?.longitude);
     }
 
     if (existing) {

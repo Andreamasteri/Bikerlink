@@ -61,8 +61,12 @@ router.post("/app-close", requireAuth, async (req: Request, res: Response) => {
   try {
     const userId = req.session.userId!;
     await storage.updateUser(userId, { lastAppCloseAt: new Date() });
-    const profile = await storage.getUserProfile(userId);
-    if (profile?.offlinePositionRandomize !== false && profile?.latitude != null && profile?.longitude != null) {
+    const [profile, globalSetting] = await Promise.all([
+      storage.getUserProfile(userId),
+      storage.getAppSetting("offline_position_randomize_default"),
+    ]);
+    const globalOfflineRandomize = globalSetting?.value !== "false";
+    if (globalOfflineRandomize && profile?.offlinePositionRandomize !== false && profile?.latitude != null && profile?.longitude != null) {
       const fuzzed = applyPositionFuzz(profile.latitude, profile.longitude, 20);
       await storage.updateUserProfile(userId, {
         lastOfflineLat: fuzzed.lat,

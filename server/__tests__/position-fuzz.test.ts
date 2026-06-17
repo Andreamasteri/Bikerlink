@@ -537,11 +537,11 @@ describe("GET /api/users/search — positionFuzz hides exact coords", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Cross-endpoint canary: fuzzedCoordsForViewer is referenced in users.ts source
+// Cross-endpoint canary: fuzzedCoordsForViewer is referenced in all sub-router sources
 // ---------------------------------------------------------------------------
 
-describe("Canary — fuzzedCoordsForViewer is present in all 5 endpoint code paths", () => {
-  it("users.ts source contains fuzzedCoordsForViewer references for all 5 endpoints", async () => {
+describe("Canary — fuzzedCoordsForViewer is present in all coordinate-returning sub-routers", () => {
+  it("users.ts root contains fuzzedCoordsForViewer references", async () => {
     const fs = await import("fs");
     const path = await import("path");
     const src = fs.readFileSync(path.resolve(__dirname, "../routes/users.ts"), "utf-8");
@@ -551,6 +551,45 @@ describe("Canary — fuzzedCoordsForViewer is present in all 5 endpoint code pat
       .join("\n");
 
     const count = (executableLines.match(/fuzzedCoordsForViewer/g) || []).length;
-    expect(count).toBeGreaterThanOrEqual(5);
+    expect(count).toBeGreaterThanOrEqual(2);
+  });
+
+  it("discovery.ts sub-router contains fuzzedCoordsForViewer references", async () => {
+    const fs = await import("fs");
+    const path = await import("path");
+    const src = fs.readFileSync(path.resolve(__dirname, "../routes/users/discovery.ts"), "utf-8");
+    const executableLines = src
+      .split("\n")
+      .filter((line) => !line.trimStart().startsWith("//"))
+      .join("\n");
+
+    const count = (executableLines.match(/fuzzedCoordsForViewer/g) || []).length;
+    expect(count).toBeGreaterThanOrEqual(2);
+  });
+
+  it("discovery-available.ts sub-router contains fuzzedCoordsForViewer references", async () => {
+    const fs = await import("fs");
+    const path = await import("path");
+    const src = fs.readFileSync(path.resolve(__dirname, "../routes/users/discovery-available.ts"), "utf-8");
+    const executableLines = src
+      .split("\n")
+      .filter((line) => !line.trimStart().startsWith("//"))
+      .join("\n");
+
+    const count = (executableLines.match(/fuzzedCoordsForViewer/g) || []).length;
+    expect(count).toBeGreaterThanOrEqual(2);
+  });
+
+  it("misc.ts sub-router contains fuzzedCoordsForViewer references", async () => {
+    const fs = await import("fs");
+    const path = await import("path");
+    const src = fs.readFileSync(path.resolve(__dirname, "../routes/users/misc.ts"), "utf-8");
+    const executableLines = src
+      .split("\n")
+      .filter((line) => !line.trimStart().startsWith("//"))
+      .join("\n");
+
+    const count = (executableLines.match(/fuzzedCoordsForViewer/g) || []).length;
+    expect(count).toBeGreaterThanOrEqual(1);
   });
 });
