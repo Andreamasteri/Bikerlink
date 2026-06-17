@@ -180,28 +180,31 @@ export default function FloatingWidget() {
     return () => sub.remove();
   }, [closeMenu]);
 
-  const tapGesture = Gesture.Tap()
-    .runOnJS(true)
-    .onEnd((_e, success) => {
-      if (success) handleTapJS();
-    });
-
   const triggerDragHaptic = useCallback(() => {
     if (Platform.OS !== "web") {
       void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     }
   }, []);
 
+  // Tap gesture — fires only if pan doesn't activate (Exclusive gives pan priority)
+  const tapGesture = Gesture.Tap()
+    .onEnd((_e, success) => {
+      "worklet";
+      if (success) runOnJS(handleTapJS)();
+    });
+
+  // Pan gesture — runs on UI thread for smooth drag; JS calls via runOnJS
   const panGesture = Gesture.Pan()
-    .runOnJS(true)
     .minDistance(TAP_THRESHOLD + 1)
     .onStart(() => {
+      "worklet";
       startX.value = posX.value;
       startY.value = posY.value;
       runOnJS(setIsTouching)(true);
       runOnJS(triggerDragHaptic)();
     })
     .onUpdate((e) => {
+      "worklet";
       const rawX = startX.value + e.translationX;
       const rawY = startY.value + e.translationY;
       posX.value = Math.max(0, Math.min(rawX, screenW.value - WIDGET_SIZE));
@@ -211,13 +214,17 @@ export default function FloatingWidget() {
       );
     })
     .onEnd(() => {
+      "worklet";
       runOnJS(savePositionJS)(posX.value, posY.value);
+    })
+    .onFinalize(() => {
+      "worklet";
       runOnJS(setIsTouching)(false);
     });
 
-  const composedGesture = Platform.OS === "web"
-    ? panGesture
-    : Gesture.Race(tapGesture, panGesture);
+  // Exclusive: pan has priority on all platforms (including web);
+  // tap fires only when pan threshold is never reached.
+  const composedGesture = Gesture.Exclusive(panGesture, tapGesture);
 
   // Swipe-down-to-dismiss gesture on the menu panel
   const menuPanGesture = Gesture.Pan()
@@ -328,10 +335,7 @@ export default function FloatingWidget() {
             </GestureDetector>
           )}
 
-          <Pressable
-            onPress={Platform.OS === "web" ? handleTapJS : undefined}
-            style={{ width: WIDGET_SIZE, height: WIDGET_SIZE }}
-          >
+          <View style={{ width: WIDGET_SIZE, height: WIDGET_SIZE }}>
             <View
               style={[
                 styles.ball,
@@ -348,7 +352,7 @@ export default function FloatingWidget() {
                 </View>
               )}
             </View>
-          </Pressable>
+          </View>
         </Animated.View>
       </GestureDetector>
     </View>

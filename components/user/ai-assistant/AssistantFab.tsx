@@ -2,16 +2,21 @@
 // arancione è bottom-right), colore primary, icona sparkles, NON draggable.
 // Visibile solo se admin enabled + utente non disabilitato + modes.fab on.
 //
-// FIX gesture conflict: il precedente wrapper View (position:absolute, full-screen,
-// zIndex:9000) creava un native view layer che interferiva con il GestureDetector
-// di FloatingWidget su Android (RNGH processa i touch a livello nativo e un view
-// intermedio a schermo intero ne altera il routing, anche con pointerEvents="box-none").
-// Soluzione: il Pressable è posizionato direttamente in absolute senza wrapper View.
+// FIX gesture conflict: usa GestureDetector + Gesture.Tap() invece di Pressable
+// per operare sullo stesso layer nativo di RNGH del FloatingWidget, eliminando
+// il conflitto di touch routing su Android tra Pressable e GestureDetector.
 import React, { useState } from "react";
-import { Pressable, StyleSheet, Platform } from "react-native";
+import { StyleSheet, Platform } from "react-native";
 import * as Haptics from "expo-haptics";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { Gesture, GestureDetector } from "react-native-gesture-handler";
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  runOnJS,
+  withTiming,
+} from "react-native-reanimated";
 import { useColors } from "@/hooks/useColors";
 import { useAssistantEnabled } from "@/hooks/useAssistantEnabled";
 import AssistantChatSheet from "./AssistantChatSheet";
@@ -24,34 +29,57 @@ export default function AssistantFab() {
   const { fabEnabled } = useAssistantEnabled();
   const [open, setOpen] = useState(false);
 
+  const pressed = useSharedValue(0);
+
+  const handleOpen = () => {
+    if (Platform.OS !== "web") {
+      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }
+    setOpen(true);
+  };
+
+  const tapGesture = Gesture.Tap()
+    .onBegin(() => {
+      "worklet";
+      pressed.value = withTiming(1, { duration: 80 });
+    })
+    .onFinalize(() => {
+      "worklet";
+      pressed.value = withTiming(0, { duration: 120 });
+    })
+    .onEnd((_e, success) => {
+      "worklet";
+      if (success) runOnJS(handleOpen)();
+    });
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    opacity: 1 - pressed.value * 0.15,
+  }));
+
   if (!fabEnabled) return null;
 
   const bottom = Platform.OS === "web" ? 34 + 16 : insets.bottom + 16;
 
   return (
     <>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="AI Assistant"
-        testID="assistant-fab"
-        onPress={() => {
-          if (Platform.OS !== "web") {
-            void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-          }
-          setOpen(true);
-        }}
-        style={({ pressed }) => [
-          styles.fab,
-          {
-            bottom,
-            backgroundColor: colors.primary,
-            shadowColor: colors.text,
-            opacity: pressed ? 0.85 : 1,
-          },
-        ]}
-      >
-        <Ionicons name="sparkles" size={26} color="#FFFFFF" />
-      </Pressable>
+      <GestureDetector gesture={tapGesture}>
+        <Animated.View
+          accessibilityRole="button"
+          accessibilityLabel="AI Assistant"
+          testID="assistant-fab"
+          style={[
+            styles.fab,
+            {
+              bottom,
+              backgroundColor: colors.primary,
+              shadowColor: colors.text,
+            },
+            animatedStyle,
+          ]}
+        >
+          <Ionicons name="sparkles" size={26} color="#FFFFFF" />
+        </Animated.View>
+      </GestureDetector>
       <AssistantChatSheet visible={open} onClose={() => setOpen(false)} />
     </>
   );
