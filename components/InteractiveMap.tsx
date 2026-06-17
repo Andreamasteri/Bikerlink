@@ -142,18 +142,24 @@ const InteractiveMap = forwardRef<InteractiveMapHandle, InteractiveMapProps>(fun
 
   type VesselData = { mmsi: number; lat: number; lng: number; cog: number; sog: number; name: string; shipType: number; updatedAt: number; trueHeading: number };
   const { data: aisVesselsRaw } = useQuery<VesselData[]>({
-    queryKey: ["/api/ais/vessels"],
+    queryKey: ["/api/ais/vessels", userLocation?.latitude, userLocation?.longitude],
     queryFn: async () => {
-      const res = await apiRequest("GET", "/api/ais/vessels");
+      if (!userLocation) return [];
+      const url = new URL("/api/ais/vessels", getApiUrl());
+      url.searchParams.set("lat", String(userLocation.latitude));
+      url.searchParams.set("lng", String(userLocation.longitude));
+      url.searchParams.set("radiusNm", "20");
+      const res = await apiRequest("GET", url.pathname + url.search);
       if (!res.ok) return [];
       return res.json();
     },
-    enabled: mapReady && !!aisEnabled && filterVessels,
+    enabled: mapReady && !!aisEnabled && filterVessels && !!userLocation,
     staleTime: 25000,
     refetchInterval: 30000,
     retry: false,
   });
   const aisVessels = aisVesselsRaw ?? [];
+  const showNoVesselsHint = !!aisEnabled && filterVessels && !!userLocation && aisVessels.length === 0 && aisVesselsRaw !== undefined;
 
   useEffect(() => {
     if (!mapReady) return;
@@ -354,6 +360,11 @@ const InteractiveMap = forwardRef<InteractiveMapHandle, InteractiveMapProps>(fun
           : null}
         onClose={() => setSelectedVesselMmsi(null)}
       />
+      {showNoVesselsHint && (
+        <View style={styles.noVesselsBanner} pointerEvents="none">
+          <Text style={styles.noVesselsText}>⚓ Nessuna nave nelle vicinanze (20 nm)</Text>
+        </View>
+      )}
     </View>
   );
 });
@@ -400,5 +411,22 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     overflow: "hidden",
     letterSpacing: 0.2,
+  },
+  noVesselsBanner: {
+    position: "absolute",
+    bottom: 80,
+    left: 0,
+    right: 0,
+    alignItems: "center",
+  },
+  noVesselsText: {
+    backgroundColor: "rgba(2,132,199,0.88)",
+    color: "#fff",
+    fontSize: 12,
+    fontWeight: "600",
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 16,
+    overflow: "hidden",
   },
 });

@@ -24,6 +24,11 @@ const vesselCache = new Map<number, VesselData>();
 const VESSEL_TTL_MS = 5 * 60 * 1000;
 
 let runtimeMaxVessels: number | null = null;
+let lastMessageAt: number | null = null;
+let activeBbox: [[number, number], [number, number]] | null = null;
+
+const HEARTBEAT_SILENCE_MS = 2 * 60 * 1000;
+const RECONNECT_DELAY_MS = 10_000;
 
 function getMaxVessels(): number {
   if (runtimeMaxVessels !== null) return runtimeMaxVessels;
@@ -55,7 +60,7 @@ async function getSubscriptionBbox(): Promise<[[number, number], [number, number
       const setting = await storage.getAppSetting("aisstream_bbox");
       if (setting !== undefined) {
         if (!setting.value) {
-          console.log("[ais-relay] bbox explicitly cleared in DB — using Mediterranean default");
+          console.log("[ais-relay] bbox explicitly cleared in DB — using Italy/Adriatic default");
           break;
         }
         const bbox = parseBbox(setting.value);
@@ -84,11 +89,11 @@ async function getSubscriptionBbox(): Promise<[[number, number], [number, number
       console.log(`[ais-relay] using bbox from env: ${envRaw}`);
       return bbox;
     }
-    console.warn("[ais-relay] AISSTREAM_BBOX malformed, falling back to Mediterranean");
+    console.warn("[ais-relay] AISSTREAM_BBOX malformed, falling back to Italy/Adriatic default");
   }
-  // Default: Mediterranean + Italian coasts (minLat, minLon, maxLat, maxLon)
-  console.log("[ais-relay] using default bbox: Mediterranean");
-  return [[30, -10], [47, 42]];
+  // Default: Italy + Adriatic + Tyrrhenian (minLat, minLon, maxLat, maxLon) — reduced from full Mediterranean
+  console.log("[ais-relay] using default bbox: Italy/Adriatic");
+  return [[35, 6], [47, 20]];
 }
 
 async function loadRuntimeMaxVessels(): Promise<void> {
@@ -114,8 +119,39 @@ function evictOldestVessels() {
   }
 }
 
+function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLng = (lng2 - lng1) * Math.PI / 180;
+  const a = Math.sin(dLat / 2) * Math.sin(dLat / 2)
+    + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180)
+    * Math.sin(dLng / 2) * Math.sin(dLng / 2);
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
 let wsClient: WebSocket | null = null;
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
+
+function scheduleReconnect(delaySuffix = "") {
+  if (reconnectTimer) clearTimeout(reconnectTimer);
+  console.log(`[ais-relay] scheduling reconnect in ${RECONNECT_DELAY_MS / 1000}s${delaySuffix}`);
+  reconnectTimer = setTimeout(connectAisStream, RECONNECT_DELAY_MS);
+}
+
+function startHeartbeatWatch() {
+  if (heartbeatTimer) clearInterval(heartbeatTimer);
+  heartbeatTimer = setInterval(() => {
+    if (!wsClient || wsClient.readyState !== WebSocket.OPEN) return;
+    if (lastMessageAt !== null && Date.now() - lastMessageAt > HEARTBEAT_SILENCE_MS) {
+      console.warn("[ais-relay] heartbeat: no messages for 2min — forcing reconnect");
+      wsClient.removeAllListeners();
+      wsClient.terminate();
+      wsClient = null;
+      scheduleReconnect(" (heartbeat timeout)");
+    }
+  }, 30_000);
+}
 
 async function connectAisStream() {
   const apiKey = process.env.AISSTREAM_API_KEY;
@@ -134,6 +170,7 @@ async function connectAisStream() {
     wsClient.on("open", async () => {
       console.log("[ais-relay] connected to aisstream.io");
       const bbox = await getSubscriptionBbox();
+      activeBbox = bbox;
       if (!wsClient || wsClient.readyState !== WebSocket.OPEN) return;
       const sub = {
         APIKey: apiKey,
@@ -141,6 +178,7 @@ async function connectAisStream() {
         FilterMessageTypes: ["PositionReport"],
       };
       wsClient.send(JSON.stringify(sub));
+      startHeartbeatWatch();
     });
 
     wsClient.on("message", (raw: Buffer) => {
@@ -168,6 +206,8 @@ async function connectAisStream() {
           console.warn(`[ais-relay] non-PositionReport message received: type="${msg.MessageType ?? "unknown"}" raw=${raw.toString().slice(0, 300)}`);
           return;
         }
+
+        lastMessageAt = Date.now();
 
         const pr = msg.Message?.PositionReport;
         const meta = msg.MetaData;
@@ -197,10 +237,10 @@ async function connectAisStream() {
     });
 
     wsClient.on("close", (code) => {
-      console.warn(`[ais-relay] disconnected (code=${code}) — reconnecting in 30s`);
+      console.warn(`[ais-relay] disconnected (code=${code}) — reconnecting in ${RECONNECT_DELAY_MS / 1000}s`);
       wsClient = null;
-      if (reconnectTimer) clearTimeout(reconnectTimer);
-      reconnectTimer = setTimeout(connectAisStream, 30_000);
+      if (heartbeatTimer) { clearInterval(heartbeatTimer); heartbeatTimer = null; }
+      scheduleReconnect(` (code=${code})`);
     });
 
     wsClient.on("error", (err) => {
@@ -224,6 +264,14 @@ function getVesselCount(): number {
   return vesselCache.size;
 }
 
+function getLastMessageAt(): number | null {
+  return lastMessageAt;
+}
+
+function getActiveBbox(): [[number, number], [number, number]] | null {
+  return activeBbox;
+}
+
 async function reconnectAisStream(newBbox?: string, newMaxVessels?: number): Promise<void> {
   if (newBbox !== undefined) runtimeBbox = newBbox;
   if (newMaxVessels !== undefined) runtimeMaxVessels = newMaxVessels;
@@ -232,6 +280,10 @@ async function reconnectAisStream(newBbox?: string, newMaxVessels?: number): Pro
     clearTimeout(reconnectTimer);
     reconnectTimer = null;
   }
+  if (heartbeatTimer) {
+    clearInterval(heartbeatTimer);
+    heartbeatTimer = null;
+  }
 
   if (wsClient) {
     wsClient.removeAllListeners();
@@ -239,6 +291,7 @@ async function reconnectAisStream(newBbox?: string, newMaxVessels?: number): Pro
     wsClient = null;
   }
 
+  activeBbox = null;
   await connectAisStream();
 }
 
@@ -269,13 +322,27 @@ router.get("/vessels", async (req: Request, res: Response) => {
       return sendError(res, 403, "Accesso AIS non autorizzato");
     }
 
-    const { bbox } = req.query as { bbox?: string };
+    const { bbox, lat, lng, radiusNm } = req.query as {
+      bbox?: string;
+      lat?: string;
+      lng?: string;
+      radiusNm?: string;
+    };
     const now = Date.now();
     let vessels = Array.from(vesselCache.values()).filter(
       (v) => now - v.updatedAt <= VESSEL_TTL_MS
     );
 
-    if (bbox) {
+    const userLat = lat !== undefined ? parseFloat(lat) : NaN;
+    const userLng = lng !== undefined ? parseFloat(lng) : NaN;
+    const radiusNmVal = radiusNm !== undefined ? parseFloat(radiusNm) : 20;
+    const radiusKm = radiusNmVal * 1.852;
+
+    if (!isNaN(userLat) && !isNaN(userLng)) {
+      vessels = vessels.filter(
+        (v) => haversineKm(userLat, userLng, v.lat, v.lng) <= radiusKm
+      );
+    } else if (bbox) {
       const parts = bbox.split(",").map(Number);
       if (parts.length === 4 && parts.every((n) => !isNaN(n))) {
         const [minLon, minLat, maxLon, maxLat] = parts;
@@ -293,4 +360,4 @@ router.get("/vessels", async (req: Request, res: Response) => {
 });
 
 export default router;
-export { connectAisStream, reconnectAisStream, getAisStatus, getVesselCount };
+export { connectAisStream, reconnectAisStream, getAisStatus, getVesselCount, getLastMessageAt, getActiveBbox };

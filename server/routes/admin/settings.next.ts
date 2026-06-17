@@ -118,16 +118,19 @@ router.put("/thinkcentre-service-push", async (req: Request, res: Response) => {
  */
 router.get("/ais-config", async (_req: Request, res: Response) => {
   try {
-    const { getAisStatus, getVesselCount } = await import("../ais/relay");
+    const { getAisStatus, getVesselCount, getLastMessageAt, getActiveBbox } = await import("../ais/relay");
     const [bboxSetting, maxVesselsSetting] = await Promise.all([
       storage.getAppSetting("aisstream_bbox"),
       storage.getAppSetting("ais_max_vessels"),
     ]);
+    const ab = getActiveBbox();
     return res.json({
       bbox: bboxSetting?.value ?? process.env.AISSTREAM_BBOX ?? "",
       maxVessels: maxVesselsSetting?.value ?? process.env.MAX_VESSELS ?? "2000",
       status: getAisStatus(),
       vesselCount: getVesselCount(),
+      lastMessageAt: getLastMessageAt(),
+      activeBbox: ab ? `${ab[0][0]},${ab[0][1]},${ab[1][0]},${ab[1][1]}` : null,
     });
   } catch (_error) {
     return sendError(res, 500, "Errore lettura config AIS");

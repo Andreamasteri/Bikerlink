@@ -11,6 +11,8 @@ interface AisConfig {
   maxVessels: string;
   status: "connected" | "connecting" | "disconnected";
   vesselCount: number;
+  lastMessageAt: number | null;
+  activeBbox: string | null;
 }
 
 const STATUS_COLOR: Record<AisConfig["status"], string> = {
@@ -150,6 +152,20 @@ export function AisSection() {
             )}
             <Text style={styles.reconnectText}>Riconnetti</Text>
           </TouchableOpacity>
+        </View>
+      )}
+      {data && (
+        <View style={styles.metaRow}>
+          <Text style={styles.metaText}>
+            {data.lastMessageAt
+              ? `Ultimo msg: ${new Date(data.lastMessageAt).toLocaleTimeString("it-IT")}`
+              : "Nessun messaggio ricevuto"}
+          </Text>
+          {data.activeBbox && (
+            <Text style={styles.metaText}>
+              Bbox attiva: {data.activeBbox}
+            </Text>
+          )}
         </View>
       )}
 
@@ -324,6 +340,15 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_500Medium",
     fontSize: 12,
     color: "#0ea5e9",
+  },
+  metaRow: {
+    marginBottom: 8,
+    gap: 2,
+  },
+  metaText: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 11,
+    color: Colors.textSecondary,
   },
   desc: {
     fontFamily: "Inter_400Regular",

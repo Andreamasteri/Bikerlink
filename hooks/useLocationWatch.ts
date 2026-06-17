@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import * as Location from "expo-location";
+import { emitGpsPosition, subscribeGpsPosition } from "@/lib/shared-gps-position";
 
 interface LocationState {
   userLocation: { latitude: number; longitude: number } | null;
@@ -14,6 +15,12 @@ export function useLocationWatch(): LocationState {
     let cancelled = false;
     let watchSub: Location.LocationSubscription | null = null;
 
+    const unsubscribe = subscribeGpsPosition((coords) => {
+      if (cancelled) return;
+      setUserLocation(coords);
+      setLocationLoading(false);
+    });
+
     (async () => {
       try {
         const { status } = await Location.requestForegroundPermissionsAsync();
@@ -23,8 +30,10 @@ export function useLocationWatch(): LocationState {
             { accuracy: Location.Accuracy.Balanced, timeInterval: 5000, distanceInterval: 10 },
             (loc) => {
               if (cancelled) return;
-              setUserLocation({ latitude: loc.coords.latitude, longitude: loc.coords.longitude });
+              const coords = { latitude: loc.coords.latitude, longitude: loc.coords.longitude };
+              setUserLocation(coords);
               setLocationLoading(false);
+              emitGpsPosition(coords);
             }
           );
         } else {
@@ -37,6 +46,7 @@ export function useLocationWatch(): LocationState {
 
     return () => {
       cancelled = true;
+      unsubscribe();
       watchSub?.remove();
     };
   }, []);

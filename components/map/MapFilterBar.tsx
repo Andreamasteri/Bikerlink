@@ -161,7 +161,7 @@ export function MapFilterBar({
             size={16}
             color={filterVessels ? "#fff" : "#0284c7"}
           />
-          <Text style={[styles.filterText, filterVessels && styles.filterTextActive]}>Navi</Text>
+          <Text style={[styles.filterText, filterVessels && styles.filterTextActive]}>Navi (20 nm)</Text>
         </TouchableOpacity>
       )}
 

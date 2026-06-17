@@ -7,6 +7,7 @@ import { queryClient, apiRequest } from "@/lib/query-client";
 import { sendStartupBeacon } from "@/lib/startup-beacon";
 import { isTrackingActive, registerLayoutWatcherCallbacks } from "@/lib/tracking-active";
 import { initCrashLogger, markClean, resetCrashLogger } from "@/lib/crash-logger";
+import { emitGpsPosition } from "@/lib/shared-gps-position";
 import {
   startBackgroundLocationTask,
   stopBackgroundLocationTask,
@@ -115,11 +116,10 @@ export function AppStateHandler() {
               cbFired = true;
               sendStartupBeacon("watch_position_callback");
             }
+            const coords = { latitude: loc.coords.latitude, longitude: loc.coords.longitude };
+            emitGpsPosition(coords);
             try {
-              await apiRequest("PUT", "/api/users/location", {
-                latitude: loc.coords.latitude,
-                longitude: loc.coords.longitude,
-              });
+              await apiRequest("PUT", "/api/users/location", coords);
             } catch {
               // no-op: ignore location update failures in foreground watcher
             }

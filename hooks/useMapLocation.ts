@@ -4,6 +4,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { sendStartupBeacon } from "@/lib/startup-beacon";
 import { apiRequest } from "@/lib/query-client";
 import { getRegionCoordinates } from "@/constants/regions";
+import { subscribeGpsPosition } from "@/lib/shared-gps-position";
 
 type Coords = { latitude: number; longitude: number };
 
@@ -52,6 +53,14 @@ export function useMapLocation({ userRegion, userCountry, profileLat, profileLng
 
   useEffect(() => {
     let cancelled = false;
+
+    const unsubscribe = subscribeGpsPosition((coords) => {
+      if (cancelled) return;
+      setLocation(coords);
+      setLocationLoading(false);
+      AsyncStorage.setItem("map_last_gps", JSON.stringify(coords)).catch(() => {});
+    });
+
     async function initMapLocation() {
       try {
         try {
@@ -93,7 +102,10 @@ export function useMapLocation({ userRegion, userCountry, profileLat, profileLng
       }
     }
     initMapLocation();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+      unsubscribe();
+    };
   }, [fetchGPSLocation, getRegionFallback, userRegion, userCountry, profileLat, profileLng]);
 
   const handleCenterPosition = useCallback(async () => {
