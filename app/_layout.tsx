@@ -293,9 +293,12 @@ export default function RootLayout() {
           {/* Task #2698 — AI Assistant utente (FAB + onboarding tour). */}
           <AssistantFab />
           <AssistantOnboardingTour />
+          {/* FloatingWidget reso figlio di MapReadyGate (dentro GestureHandlerRootView,
+              stesso layer RNGH del FAB funzionante) così i gesti Exclusive(Pan, Tap)
+              ricevono il contesto necessario per drag e tap. */}
+          <FloatingWidget />
         </MapReadyGate>
       </StartupGate>
-      <FloatingWidget />
     </RootProviders>
   );
 }

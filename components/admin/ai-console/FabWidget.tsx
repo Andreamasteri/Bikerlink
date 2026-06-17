@@ -182,7 +182,6 @@ export default function FabWidget() {
   return (
     <>
       <Animated.View
-        pointerEvents="box-none"
         style={[styles.wrap, { left: pos.x, top: pos.y }, animStyle]}
         {...panResponder.panHandlers}
         accessibilityRole="button"
