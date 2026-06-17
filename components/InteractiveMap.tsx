@@ -297,15 +297,17 @@ const InteractiveMap = forwardRef<InteractiveMapHandle, InteractiveMapProps>(fun
           aisEnabled={aisEnabled}
         />
       )}
-      <MapControls
-        isAvailable={isAvailable} ghostMode={ghostMode}
-        onCenterOnUser={centerOnUser}
-        availabilityBottomOffset={filterBarTopOffset != null ? 110 : undefined}
-        locationButtonBottomOffset={filterBarTopOffset != null ? 205 : undefined}
-        compact={filterBarTopOffset == null}
-        hideAvailability={filterBarTopOffset == null}
-      />
-      {mapReady && (
+      {selectedVesselMmsi == null && (
+        <MapControls
+          isAvailable={isAvailable} ghostMode={ghostMode}
+          onCenterOnUser={centerOnUser}
+          availabilityBottomOffset={filterBarTopOffset != null ? 110 : undefined}
+          locationButtonBottomOffset={filterBarTopOffset != null ? 205 : undefined}
+          compact={filterBarTopOffset == null}
+          hideAvailability={filterBarTopOffset == null}
+        />
+      )}
+      {mapReady && selectedVesselMmsi == null && (
         <MapStyleToggle
           currentStyleId={styleId}
           onSelectStyle={setStyle}
@@ -314,7 +316,7 @@ const InteractiveMap = forwardRef<InteractiveMapHandle, InteractiveMapProps>(fun
           compact={filterBarTopOffset == null}
         />
       )}
-      {mapReady && filterBarTopOffset != null && (
+      {mapReady && filterBarTopOffset != null && selectedVesselMmsi == null && (
         <MapZoomSlider
           zoom={viewState.zoom}
           minZoom={viewState.minZoom}

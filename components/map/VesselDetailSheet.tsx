@@ -116,7 +116,7 @@ export function VesselDetailSheet({ vessel, onClose }: VesselDetailSheetProps) {
       onRequestClose={onClose}
     >
       <TouchableOpacity style={styles.backdrop} activeOpacity={1} onPress={onClose} />
-      <View style={[styles.sheet, { backgroundColor: colors.card, paddingBottom: insets.bottom + 16 }]}>
+      <View style={[styles.sheet, { backgroundColor: colors.card, paddingBottom: insets.bottom + 16, elevation: 20, zIndex: 9999 }]}>
         <View style={[styles.handle, { backgroundColor: colors.border }]} />
 
         {vessel && (
