@@ -7,7 +7,8 @@ import { translationKeys } from "@shared/db";
 import { translationKeySchema } from "@shared/db";
 import { sendError } from "../../lib/api-response";
 import { generateText } from "ai";
-import { createOpenAI } from "@ai-sdk/openai";
+import { runWithFallback } from "../../ai/moderation/provider";
+import { isOllamaConfigured, isOllamaReachable, getOllamaModel } from "../../lib/ollama-client";
 
 const router = Router();
 
@@ -226,11 +227,6 @@ router.post("/sync-from-files", async (_req: Request, res: Response) => {
 
 router.post("/ai-complete", async (_req: Request, res: Response) => {
   try {
-    const openaiKey = process.env.OPENAI_API_KEY;
-    if (!openaiKey) {
-      return sendError(res, 503, "Servizio AI non disponibile: chiave OPENAI_API_KEY mancante");
-    }
-
     const allRows = await db.select().from(translationKeys).orderBy(translationKeys.key);
 
     const rowsWithMissing = allRows.filter((row) =>
@@ -245,9 +241,6 @@ router.post("/ai-complete", async (_req: Request, res: Response) => {
       });
     }
 
-    const openai = createOpenAI({ apiKey: openaiKey });
-    const model = openai("gpt-4o-mini");
-
     const GLOSSARY = `
 Glossario BikerLink (NON tradurre questi termini):
 - "BikerLink" → rimane "BikerLink"
@@ -261,6 +254,12 @@ Glossario BikerLink (NON tradurre questi termini):
     const BATCH_SIZE = 30;
     const summary: Record<string, number> = Object.fromEntries(TRANS_LANGS.map((l) => [l, 0]));
     let totalProcessed = 0;
+    let usedProviderName = "ai";
+
+    // Decide provider once: probe Ollama first (no cost, self-hosted).
+    // If reachable use it directly for all batches; otherwise delegate to runWithFallback
+    // which follows the standard chain Groq → Gemini → OpenAI.
+    const ollamaReachable = isOllamaConfigured && (await isOllamaReachable());
 
     for (let i = 0; i < rowsWithMissing.length; i += BATCH_SIZE) {
       const batch = rowsWithMissing.slice(i, i + BATCH_SIZE);
@@ -301,8 +300,39 @@ ${missingLangsPerRow.map((r) =>
 
       let responseText = "";
       try {
-        const result = await generateText({ model, prompt, maxRetries: 1 });
-        responseText = result.text.trim();
+        if (ollamaReachable) {
+          // Ollama-first: self-hosted, no cost, no rate limits.
+          // On failure, fall through to cloud chain below (no silently skipping).
+          try {
+            const ollamaModel = getOllamaModel();
+            const result = await generateText({ model: ollamaModel, prompt, maxRetries: 1 });
+            responseText = result.text.trim();
+            usedProviderName = "ollama";
+          } catch (ollamaErr) {
+            console.warn("[translations] ai-complete: Ollama fallito, scalo a cloud:", (ollamaErr as Error).message);
+            // Fall through to cloud chain.
+            const { value: cloudText, model: resolvedModel } = await runWithFallback(
+              { role: "brain", skipOllama: true },
+              (m) => m.scheduler(() =>
+                generateText({ model: m.model as Parameters<typeof generateText>[0]["model"], prompt, maxRetries: 1 })
+                  .then((r) => r.text.trim())
+              ),
+            );
+            responseText = cloudText;
+            usedProviderName = resolvedModel.providerName;
+          }
+        } else {
+          // Cloud fallback chain: Groq → Gemini → OpenAI via runWithFallback.
+          const { value: cloudText, model: resolvedModel } = await runWithFallback(
+            { role: "brain", skipOllama: true },
+            (m) => m.scheduler(() =>
+              generateText({ model: m.model as Parameters<typeof generateText>[0]["model"], prompt, maxRetries: 1 })
+                .then((r) => r.text.trim())
+            ),
+          );
+          responseText = cloudText;
+          usedProviderName = resolvedModel.providerName;
+        }
       } catch (aiErr) {
         console.error("[translations] ai-complete batch error:", aiErr);
         continue;
@@ -349,7 +379,7 @@ ${missingLangsPerRow.map((r) =>
     const summaryStr = TRANS_LANGS.map((l) => `${l.toUpperCase()}: ${summary[l]}`).join(", ");
     return res.json({
       ok: true,
-      message: `Completamento AI: ${totalProcessed} chiavi aggiornate. ${summaryStr}`,
+      message: `Completate ${totalProcessed} chiavi via ${usedProviderName}. ${summaryStr}`,
       summary,
     });
   } catch (err) {

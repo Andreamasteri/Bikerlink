@@ -52,6 +52,8 @@ export default function TabellaLingue() {
   const [aiMsg, setAiMsg] = useState("");
   const [applyState, setApplyState] = useState<ActionState>("idle");
   const [applyMsg, setApplyMsg] = useState("");
+  const [restartState, setRestartState] = useState<ActionState>("idle");
+  const [restartMsg, setRestartMsg] = useState("");
 
   const loadTable = useCallback(async () => {
     setLoading(true);
@@ -188,6 +190,24 @@ export default function TabellaLingue() {
     }
   }, [loadTable]);
 
+  const handleRestartBackend = useCallback(() => {
+    Alert.alert("Riavvia backend", "Riavvia il processo server Express. L'app sarà irraggiungibile per qualche secondo. Continuare?", [
+      { text: "Annulla", style: "cancel" },
+      {
+        text: "Riavvia", style: "destructive",
+        onPress: async () => {
+          setRestartState("loading"); setRestartMsg("");
+          try {
+            const resp = await apiRequest("POST", "/api/admin/restart", {});
+            const data = await resp.json();
+            if (!resp.ok) throw new Error(data?.message || "Errore riavvio");
+            setRestartState("ok"); setRestartMsg(data.message || "Backend in riavvio…");
+          } catch (e: unknown) { setRestartState("error"); setRestartMsg(e instanceof Error ? e.message : "Errore riavvio"); }
+        },
+      },
+    ]);
+  }, []);
+
   const handleApplyToFiles = useCallback(() => {
     Alert.alert("Applica ai file", "Sovrascrive lib/i18n/*.ts con i valori dal database e riavvia il backend. Continuare?", [
       { text: "Annulla", style: "cancel" },
@@ -248,11 +268,13 @@ export default function TabellaLingue() {
         <ActionButton label="Sincronizza da file" icon="sync" state={syncState} onPress={handleSyncFromFiles} color="#2196F3" />
         <ActionButton label="Completa con AI" icon="auto-fix" state={aiState} onPress={handleAiComplete} color="#9C27B0" />
         <ActionButton label="Applica ai file" icon="file-export-outline" state={applyState} onPress={handleApplyToFiles} color="#FF5722" />
+        <ActionButton label="Riavvia backend" icon="restart" state={restartState} onPress={handleRestartBackend} color="#607D8B" />
       </View>
 
       {syncMsg ? <ActionResultBanner msg={syncMsg} state={syncState} onDismiss={() => setSyncMsg("")} /> : null}
       {aiMsg ? <ActionResultBanner msg={aiMsg} state={aiState} onDismiss={() => setAiMsg("")} /> : null}
       {applyMsg ? <ActionResultBanner msg={applyMsg} state={applyState} onDismiss={() => setApplyMsg("")} /> : null}
+      {restartMsg ? <ActionResultBanner msg={restartMsg} state={restartState} onDismiss={() => setRestartMsg("")} /> : null}
 
       <View style={styles.addKeyRow}>
         <TouchableOpacity style={styles.addKeyBtn} onPress={() => { setAddError(""); setAddModalVisible(true); }} activeOpacity={0.8}>

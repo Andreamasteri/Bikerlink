@@ -379,6 +379,14 @@ router.patch('/privacy-rules', _requireAdmin, async (req: Request, res: Response
   }
 });
 
+router.post('/restart', _requireAdmin, (_req: Request, res: Response) => {
+  res.json({ ok: true, message: "Backend in riavvio…" });
+  setTimeout(() => {
+    console.log("[admin] restart: processo terminato per riavvio backend");
+    process.exit(0);
+  }, 200);
+});
+
 router.use('/translations', _requireAdmin, translationsRouter);
 router.use('/tags', _requireAdmin, tagsRouter);
 router.use('/', _requireAdmin, textAliasesRouter);
