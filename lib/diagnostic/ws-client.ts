@@ -10,7 +10,7 @@ let _enabled = false;
 // ── Admin event listener registry ──────────────────────────────────────────
 // Allows the admin panel to subscribe to diag:progress / diag:result events
 // that the server broadcasts to admin connections, without opening a second WS.
-export type DiagAdminEventType = "diag:progress" | "diag:result";
+export type DiagAdminEventType = "diag:progress" | "diag:result" | "diag:online-update";
 export type DiagAdminEventListener = (msg: Record<string, unknown>) => void;
 const _listeners = new Map<DiagAdminEventType, Set<DiagAdminEventListener>>();
 
@@ -57,7 +57,7 @@ function connect() {
         const msg = JSON.parse(typeof event.data === "string" ? event.data : "") as { type: string; showBanner?: boolean; [k: string]: unknown };
         if (msg.type === "diagnostic:run") {
           await handleRunCommand(msg.showBanner ?? false);
-        } else if (msg.type === "diag:progress" || msg.type === "diag:result") {
+        } else if (msg.type === "diag:progress" || msg.type === "diag:result" || msg.type === "diag:online-update") {
           emitDiagnosticEvent(msg.type, msg as Record<string, unknown>);
         }
       } catch {/* noop */}

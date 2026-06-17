@@ -68,11 +68,16 @@ export default function DiagnosticReportsScreen() {
         queryClient.invalidateQueries({ queryKey: [reportsUrlRef.current] });
       }
     };
+    const onOnlineUpdate = () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/diagnostic-reports/online-users"] });
+    };
     addDiagnosticEventListener("diag:progress", onProgress);
     addDiagnosticEventListener("diag:result", onResult);
+    addDiagnosticEventListener("diag:online-update", onOnlineUpdate);
     return () => {
       removeDiagnosticEventListener("diag:progress", onProgress);
       removeDiagnosticEventListener("diag:result", onResult);
+      removeDiagnosticEventListener("diag:online-update", onOnlineUpdate);
     };
   }, []);
 

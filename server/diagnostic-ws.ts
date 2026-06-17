@@ -35,14 +35,15 @@ export function attachDiagnosticWS(server: HttpServer): void {
       wss!.handleUpgrade(req, socket, head, (ws) => {
         const client: DiagClient = { ws, userId, role };
         clients.set(userId, client);
+        broadcastToAdmins({ type: "diag:online-update" });
         ws.on("message", (raw) => {
           try {
             const msg = JSON.parse(raw.toString()) as { type: string; [k: string]: unknown };
             handleClientMessage(client, msg);
           } catch {/* invalid JSON */}
         });
-        ws.on("close", () => clients.delete(userId));
-        ws.on("error", () => clients.delete(userId));
+        ws.on("close", () => { clients.delete(userId); broadcastToAdmins({ type: "diag:online-update" }); });
+        ws.on("error", () => { clients.delete(userId); broadcastToAdmins({ type: "diag:online-update" }); });
         try { ws.send(JSON.stringify({ type: "diag:hello", at: new Date().toISOString() })); } catch {/* noop */}
         // Deliver any pending queued command immediately on connect
         void deliverQueuedCommand(userId, ws);
