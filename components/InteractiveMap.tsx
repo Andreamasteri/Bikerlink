@@ -297,7 +297,7 @@ const InteractiveMap = forwardRef<InteractiveMapHandle, InteractiveMapProps>(fun
           aisEnabled={aisEnabled}
         />
       )}
-      {selectedVesselMmsi == null && (
+      {selectedVesselMmsi == null && selectedHazardId == null && !showHazardReport && (
         <MapControls
           isAvailable={isAvailable} ghostMode={ghostMode}
           onCenterOnUser={centerOnUser}
@@ -307,7 +307,7 @@ const InteractiveMap = forwardRef<InteractiveMapHandle, InteractiveMapProps>(fun
           hideAvailability={filterBarTopOffset == null}
         />
       )}
-      {mapReady && selectedVesselMmsi == null && (
+      {mapReady && selectedVesselMmsi == null && selectedHazardId == null && !showHazardReport && (
         <MapStyleToggle
           currentStyleId={styleId}
           onSelectStyle={setStyle}
@@ -316,7 +316,7 @@ const InteractiveMap = forwardRef<InteractiveMapHandle, InteractiveMapProps>(fun
           compact={filterBarTopOffset == null}
         />
       )}
-      {mapReady && filterBarTopOffset != null && selectedVesselMmsi == null && (
+      {mapReady && filterBarTopOffset != null && selectedVesselMmsi == null && selectedHazardId == null && !showHazardReport && (
         <MapZoomSlider
           zoom={viewState.zoom}
           minZoom={viewState.minZoom}
