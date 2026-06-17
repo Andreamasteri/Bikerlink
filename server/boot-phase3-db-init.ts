@@ -316,6 +316,35 @@ export async function runBootPhase3DbInit(): Promise<void> {
   }
 
   try {
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS "notification_history" (
+        "id" varchar(36) PRIMARY KEY DEFAULT gen_random_uuid(),
+        "user_id" varchar(36),
+        "notification_type" varchar(60) NOT NULL DEFAULT 'unknown',
+        "token" text,
+        "status" varchar(20) NOT NULL DEFAULT 'sent',
+        "error_message" text,
+        "created_at" timestamp NOT NULL DEFAULT now()
+      )
+    `);
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS "notification_history_created_at_idx"
+        ON "notification_history" ("created_at")
+    `);
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS "notification_history_status_created_idx"
+        ON "notification_history" ("status", "created_at")
+    `);
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS "notification_history_user_id_idx"
+        ON "notification_history" ("user_id")
+    `);
+    console.log("[INIT] notification_history: table/index check OK");
+  } catch (e) {
+    console.warn("[INIT] Phase 3: notification_history ensure failed (non-fatal):", e);
+  }
+
+  try {
     const redisUrl = process.env.REDIS_URL ?? process.env.REDIS_URI;
     if (!redisUrl) {
       console.log("[boot] Redis: REDIS_URL non impostato — fallback in-memory attivo");

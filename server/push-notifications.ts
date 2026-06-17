@@ -1,6 +1,6 @@
 import { db } from "./db";
 import { users, userProfiles, appSettings, matchPreferences } from "@shared/db";
-import { inArray, eq } from "drizzle-orm";
+import { inArray, eq, sql } from "drizzle-orm";
 import it from "../lib/i18n/it";
 
 type NotificationPrefKey = "matches" | "zoneProposals" | "chat" | "motoclub" | "eventi" | "system_alerts";
@@ -75,6 +75,29 @@ async function clearStaleToken(userId: string): Promise<void> {
   }
 }
 
+async function recordNotificationHistory(
+  rows: Array<{ userId: string | null; notificationType: string; token: string; status: string; errorMessage?: string }>,
+): Promise<void> {
+  if (!rows.length) return;
+  try {
+    const values = rows.map(r => ({
+      userId: r.userId,
+      notificationType: r.notificationType,
+      token: r.token,
+      status: r.status,
+      errorMessage: r.errorMessage ?? null,
+    }));
+    for (const v of values) {
+      await db.execute(sql`
+        INSERT INTO notification_history (user_id, notification_type, token, status, error_message)
+        VALUES (${v.userId}, ${v.notificationType}, ${v.token}, ${v.status}, ${v.errorMessage})
+      `);
+    }
+  } catch (err) {
+    console.warn("[Push] recordNotificationHistory failed (non-fatal):", err);
+  }
+}
+
 async function sendExpoMessages(
   messages: ExpoPushMessage[],
   userIdByToken: Map<string, string>,
@@ -90,24 +113,40 @@ async function sendExpoMessages(
     });
     if (!resp.ok) {
       console.warn("[Push] Expo push HTTP error:", resp.status, await resp.text().catch(() => ""));
+      const historyRows = messages.map(m => ({
+        userId: userIdByToken.get(m.to) ?? null,
+        notificationType: String(m.data?.type ?? "unknown"),
+        token: m.to,
+        status: "failed",
+        errorMessage: `HTTP ${resp.status}`,
+      }));
+      void recordNotificationHistory(historyRows);
       return;
     }
     const result = await resp.json() as { data?: ExpoPushTicket[] };
     const tickets = result.data ?? [];
+    const historyRows: Array<{ userId: string | null; notificationType: string; token: string; status: string; errorMessage?: string }> = [];
     for (let i = 0; i < tickets.length; i++) {
       const ticket = tickets[i];
+      const msg = messages[i];
+      const token = msg?.to ?? "";
+      const userId = userIdByToken.get(token) ?? null;
+      const notificationType = String(msg?.data?.type ?? "unknown");
       if (ticket.status === "error") {
         if (ticket.details?.error === "DeviceNotRegistered") {
-          const token = messages[i]?.to;
           if (token) {
-            const userId = userIdByToken.get(token);
             if (userId) clearStaleToken(userId);
           }
+          historyRows.push({ userId, notificationType, token, status: "failed", errorMessage: "DeviceNotRegistered" });
         } else {
           console.warn("[Push] Expo push ticket error:", ticket.message, ticket.details?.error);
+          historyRows.push({ userId, notificationType, token, status: "failed", errorMessage: ticket.details?.error ?? ticket.message ?? "unknown error" });
         }
+      } else {
+        historyRows.push({ userId, notificationType, token, status: "sent" });
       }
     }
+    if (historyRows.length > 0) void recordNotificationHistory(historyRows);
   } catch (err) {
     console.warn("[Push] Failed to send Expo push notification (non-fatal):", err);
   }
