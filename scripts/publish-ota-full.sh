@@ -155,7 +155,10 @@ _run_expo_export() {
 _T0=$(date +%s)
 if ! _run_expo_export; then
   # Controlla se il fallimento è riconducibile a cache Metro corrotta
-  _CACHE_ERRORS="ENOENT|Cannot resolve module|Metro has encountered an error|Cannot find module|bundling failed|file-map|ENOTFOUND"
+  # Solo segnali specifici di corruzione cache/file-map Metro. Pattern generici
+  # (ENOTFOUND=rete, Cannot find module=dipendenza mancante, bundling failed=sintassi)
+  # esclusi: causerebbero retry inutili su fallimenti non legati alla cache.
+  _CACHE_ERRORS="ENOENT|Cannot resolve module|Metro has encountered an error|file-map|metro-file-map|haste"
   if grep -qiE "$_CACHE_ERRORS" "$_EXPORT_LOG" 2>/dev/null; then
     log_warn "Cache Metro corrotta rilevata — pulizia automatica e retry (1 tentativo)..."
     rm -rf /tmp/metro-file-map-* 2>/dev/null || true
