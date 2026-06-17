@@ -1,10 +1,12 @@
 import { AppState } from "react-native";
+import { router } from "expo-router";
 import { getApiUrl, authFetchHeaders, getSessionToken } from "@/lib/query-client";
 import { runAllTests } from "@/lib/diagnostic/runner";
 
 let _ws: WebSocket | null = null;
 let _reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 let _isAdmin = false;
+let _isModerator = false;
 let _enabled = false;
 
 // ── Admin event listener registry ──────────────────────────────────────────
@@ -101,6 +103,15 @@ async function handleRunCommand(showBanner: boolean) {
       summary: report.summary,
       results: report.results,
     });
+
+    if (_isAdmin || _isModerator) {
+      try {
+        router.push({
+          pathname: "/diagnostica-risultati",
+          params: { reportJson: JSON.stringify(report) },
+        } as never);
+      } catch {/* noop: navigazione best-effort */}
+    }
   } catch (err) {
     send({ type: "diagnostic:result", error: err instanceof Error ? err.message : String(err) });
   }
@@ -108,8 +119,9 @@ async function handleRunCommand(showBanner: boolean) {
 
 let _appStateSub: { remove: () => void } | null = null;
 
-export function initDiagnosticWS(options: { isAdmin?: boolean }) {
+export function initDiagnosticWS(options: { isAdmin?: boolean; isModerator?: boolean }) {
   _isAdmin = options.isAdmin ?? false;
+  _isModerator = options.isModerator ?? false;
   _enabled = true;
   connect();
   if (!_appStateSub) {

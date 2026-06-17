@@ -136,6 +136,82 @@ export async function sendNewEventNotificationEmail(evt: {
   }
 }
 
+export async function sendDiagnosticReportEmail(opts: {
+  reportId: string;
+  userId: string;
+  appVersion: string;
+  platform: string;
+  deviceModel: string;
+  triggeredBy: string;
+  summary?: Record<string, number> | null;
+}): Promise<void> {
+  const { reportId, userId, appVersion, platform, deviceModel, triggeredBy, summary } = opts;
+  const adminEmail = "bikerlinkapp@gmail.com";
+  const now = new Date();
+  const sentAt = now.toLocaleString("it-IT", {
+    day: "2-digit", month: "2-digit", year: "numeric",
+    hour: "2-digit", minute: "2-digit", second: "2-digit",
+    timeZone: "Europe/Rome",
+  });
+
+  const passed = summary?.passed ?? 0;
+  const warned = summary?.warned ?? 0;
+  const failed = summary?.failed ?? 0;
+  const skipped = summary?.skipped ?? 0;
+  const totalTests = summary?.totalTests ?? (passed + warned + failed + skipped);
+  const durationMs = summary?.durationMs ?? 0;
+
+  const statusColor = failed > 0 ? "#EF4444" : warned > 0 ? "#F59E0B" : "#22C55E";
+  const statusLabel = failed > 0 ? "❌ Con errori" : warned > 0 ? "⚠️ Con avvisi" : "✅ OK";
+
+  const rows = [
+    ["ID Report", escapeHtml(reportId)],
+    ["Utente ID", escapeHtml(userId)],
+    ["Versione App", escapeHtml(appVersion)],
+    ["Piattaforma", escapeHtml(platform)],
+    ["Dispositivo", escapeHtml(deviceModel)],
+    ["Avviata da", escapeHtml(triggeredBy)],
+    ["Inviata il", escapeHtml(sentAt)],
+    ["Test totali", String(totalTests)],
+    ["Durata", `${(durationMs / 1000).toFixed(1)}s`],
+  ];
+
+  const tableRows = rows
+    .map(([label, value]) =>
+      `<tr><td style="padding:8px 12px;color:#aaa;white-space:nowrap;font-size:14px;">${label}</td><td style="padding:8px 12px;color:#fff;font-size:14px;">${value}</td></tr>`
+    )
+    .join("");
+
+  const subject = `[BikerLink] Diagnostica — ${statusLabel} (${passed} OK · ${warned} ⚠ · ${failed} ✗)`;
+  const html = `
+    <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;max-width:520px;margin:0 auto;padding:20px;">
+      <div style="text-align:center;margin-bottom:24px;">
+        <h1 style="color:#FF6B35;margin:0;font-size:26px;">🏍️ BikerLink</h1>
+        <p style="color:#888;font-size:13px;margin-top:4px;">Report Diagnostico</p>
+      </div>
+      <div style="background:#1a1a2e;border-radius:12px;padding:24px;color:#fff;">
+        <h2 style="margin-top:0;font-size:18px;color:${statusColor};">🩺 Diagnostica ${statusLabel}</h2>
+        <div style="display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap;">
+          <span style="background:#14532d;color:#22C55E;padding:6px 12px;border-radius:8px;font-size:14px;font-weight:600;">${passed} OK</span>
+          <span style="background:#78350f;color:#F59E0B;padding:6px 12px;border-radius:8px;font-size:14px;font-weight:600;">${warned} avvisi</span>
+          <span style="background:#7f1d1d;color:#EF4444;padding:6px 12px;border-radius:8px;font-size:14px;font-weight:600;">${failed} errori</span>
+          ${skipped > 0 ? `<span style="background:#1f2937;color:#6B7280;padding:6px 12px;border-radius:8px;font-size:14px;font-weight:600;">${skipped} skip</span>` : ""}
+        </div>
+        <table style="width:100%;border-collapse:collapse;">
+          ${tableRows}
+        </table>
+      </div>
+      <p style="text-align:center;color:#666;font-size:11px;margin-top:16px;">
+        © ${now.getFullYear()} BikerLink — notifica automatica
+      </p>
+    </div>
+  `;
+
+  sendEmail(adminEmail, subject, html).catch((e) =>
+    console.warn("[EMAIL] sendDiagnosticReportEmail error:", e)
+  );
+}
+
 export interface OtaStuckAlertResult {
   sent: string[];
   failed: string[];

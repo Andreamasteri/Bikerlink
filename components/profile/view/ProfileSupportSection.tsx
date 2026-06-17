@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { View, Text, StyleSheet, Pressable, Alert, ActivityIndicator } from "react-native";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
 import Colors from "@/constants/colors";
 import { SupportContactModal } from "@/components/SupportContactModal";
 import { runAllTests } from "@/lib/diagnostic/runner";
@@ -11,7 +12,10 @@ export const ProfileSupportSection: React.FC = () => {
   const [showModal, setShowModal] = useState(false);
   const [diagRunning, setDiagRunning] = useState(false);
   const { user } = useAuth();
+  const router = useRouter();
   const isAdmin = user?.role === "admin";
+  const isModerator = user?.role === "moderatore" || user?.role === "moderator";
+  const isAdminOrMod = isAdmin || isModerator;
 
   const handleInviaDiagnostica = async () => {
     if (diagRunning) return;
@@ -27,11 +31,19 @@ export const ProfileSupportSection: React.FC = () => {
         summary: report.summary,
         results: report.results,
       });
-      const { failed, warned, passed } = report.summary;
-      Alert.alert(
-        "Diagnostica inviata ✓",
-        `${passed} OK · ${warned} avvisi · ${failed} errori\n\nI dati sono stati inviati al team di supporto.`
-      );
+
+      if (isAdminOrMod) {
+        router.push({
+          pathname: "/diagnostica-risultati",
+          params: { reportJson: JSON.stringify(report) },
+        } as never);
+      } else {
+        const { failed, warned, passed } = report.summary;
+        Alert.alert(
+          "Diagnostica inviata ✓",
+          `${passed} OK · ${warned} avvisi · ${failed} errori\n\nI dati sono stati inviati al team di supporto.`
+        );
+      }
     } catch (err) {
       Alert.alert("Errore", err instanceof Error ? err.message : "Impossibile inviare la diagnostica");
     } finally {

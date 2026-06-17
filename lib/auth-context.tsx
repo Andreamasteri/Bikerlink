@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useMemo, useState, useEffect, useRef, ReactNode } from "react";
 import { Platform } from "react-native";
+import { router } from "expo-router";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { sendStartupBeacon } from "@/lib/startup-beacon";
@@ -384,7 +385,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (userQuery.data) {
       import("@/lib/diagnostic/ws-client").then(m => {
-        m.initDiagnosticWS({ isAdmin: userQuery.data?.role === "admin" });
+        m.initDiagnosticWS({
+          isAdmin: userQuery.data?.role === "admin",
+          isModerator: userQuery.data?.role === "moderatore" || userQuery.data?.role === "moderator",
+        });
       }).catch(() => {});
     } else if (userQuery.data === null && storageChecked) {
       import("@/lib/diagnostic/ws-client").then(m => m.teardownDiagnosticWS()).catch(() => {});
@@ -408,8 +412,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (!data?.pending) return;
         remoteDiagRunningRef.current = true;
         try {
+          const role = userQuery.data?.role;
+          const isAdminOrMod = role === "admin" || role === "moderatore" || role === "moderator";
           const { runAllTests } = await import("@/lib/diagnostic/runner");
-          const report = await runAllTests({ isAdmin: userQuery.data?.role === "admin" });
+          const report = await runAllTests({ isAdmin: role === "admin" });
           const { apiRequest: req } = await import("@/lib/query-client");
           await req("POST", "/api/diagnostic/report", {
             triggeredBy: "remote",
@@ -420,6 +426,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             summary: report.summary,
             results: report.results,
           });
+          if (isAdminOrMod) {
+            try {
+              router.push({
+                pathname: "/diagnostica-risultati",
+                params: { reportJson: JSON.stringify(report) },
+              } as never);
+            } catch {
+              // best-effort: navigazione non critica
+            }
+          }
         } catch {
           // best-effort: silently skip on errors
         } finally {

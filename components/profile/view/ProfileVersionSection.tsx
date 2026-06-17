@@ -1,16 +1,11 @@
-import React, { useEffect, useState, useMemo, useRef, useCallback } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, Vibration } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import React, { useEffect, useState, useMemo } from "react";
+import { View, Text, StyleSheet } from "react-native";
 import Constants from "expo-constants";
 import { useQuery } from "@tanstack/react-query";
 import { useColors } from "@/hooks/useColors";
 import { useAuth } from "@/lib/auth-context";
-import { APPLIED_OTA_NUMBER } from "@/constants/buildInfo";
+import { APPLIED_OTA_NUMBER, OTA_BUNDLED_COUNT } from "@/constants/buildInfo";
 import { loadAppliedOtaNumber, saveAppliedOtaNumber } from "@/lib/otaStorage";
-import { useRouter } from "expo-router";
-
-const HIDDEN_TAP_TARGET = 7;
-const HIDDEN_TAP_WINDOW_MS = 4000;
 
 function parseAppVersion(): { apk: string; runtime: string; ota: string } {
   const version = Constants.expoConfig?.version ?? "";
@@ -34,12 +29,9 @@ interface OtaReleaseSummary {
 export const ProfileVersionSection: React.FC = () => {
   const colors = useColors();
   const { user } = useAuth();
-  const router = useRouter();
   const isAdmin = user?.role === "admin";
 
   const [appliedOta, setAppliedOta] = useState<number | null>(APPLIED_OTA_NUMBER);
-  const tapCountRef = useRef(0);
-  const tapTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     const syncOtaNumber = async () => {
@@ -88,53 +80,28 @@ export const ProfileVersionSection: React.FC = () => {
     lastApprovedOtaNum !== null &&
     APPLIED_OTA_NUMBER !== lastApprovedOtaNum;
 
-  const handleVersionTap = useCallback(() => {
-    tapCountRef.current += 1;
-    if (tapTimerRef.current) clearTimeout(tapTimerRef.current);
-    if (tapCountRef.current >= HIDDEN_TAP_TARGET) {
-      tapCountRef.current = 0;
-      try { Vibration.vibrate(80); } catch {/* noop */}
-      router.push("/admin/diagnostic" as never);
-      return;
-    }
-    tapTimerRef.current = setTimeout(() => { tapCountRef.current = 0; }, HIDDEN_TAP_WINDOW_MS);
-  }, [router]);
-
   return (
     <View style={styles.container}>
-      <TouchableOpacity onPress={handleVersionTap} activeOpacity={0.7}>
-        <View style={styles.row}>
-          <View style={styles.item}>
-            <Text style={[styles.label, { color: colors.textSecondary }]}>Build</Text>
-            <Text style={[styles.value, { color: colors.textSecondary }]}>
-              V{apk}.{runtime}.{ota}
-            </Text>
-          </View>
-          <Text style={[styles.dot, { color: colors.textSecondary }]}>·</Text>
-          <View style={styles.item}>
-            <Text style={[styles.label, { color: colors.textSecondary }]}>OTA applicata</Text>
-            <Text style={[styles.value, { color: colors.textSecondary }]}>
-              {displayOta != null ? `#${displayOta}` : "—"}
-            </Text>
-          </View>
+      <View style={styles.row}>
+        <View style={styles.item}>
+          <Text style={[styles.label, { color: colors.textSecondary }]}>Build</Text>
+          <Text style={[styles.value, { color: colors.textSecondary }]}>
+            V{apk}.{runtime}.{OTA_BUNDLED_COUNT}
+          </Text>
         </View>
-      </TouchableOpacity>
+        <Text style={[styles.dot, { color: colors.textSecondary }]}>·</Text>
+        <View style={styles.item}>
+          <Text style={[styles.label, { color: colors.textSecondary }]}>OTA applicata</Text>
+          <Text style={[styles.value, { color: colors.textSecondary }]}>
+            {displayOta != null ? `#${displayOta}` : "—"}
+          </Text>
+        </View>
+      </View>
       {showAdminOta && (
         <View style={styles.adminRow}>
           <Text style={[styles.adminLabel, { color: "#3B82F6" }]}>Admin OTA in test</Text>
           <Text style={[styles.adminValue, { color: "#3B82F6" }]}>#{APPLIED_OTA_NUMBER}</Text>
         </View>
-      )}
-      {isAdmin && (
-        <TouchableOpacity
-          style={styles.diagBtn}
-          onPress={() => router.push("/admin/diagnostica" as never)}
-          activeOpacity={0.7}
-        >
-          <Ionicons name="pulse" size={11} color="#F59E0B" />
-          <Text style={styles.diagBtnText}>Diagnostica</Text>
-          <Ionicons name="chevron-forward" size={10} color="#F59E0B" />
-        </TouchableOpacity>
       )}
     </View>
   );
@@ -187,21 +154,5 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_400Regular",
     fontWeight: "600",
     letterSpacing: 0.5,
-  },
-  diagBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    marginTop: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 10,
-    backgroundColor: "rgba(245,158,11,0.10)",
-  },
-  diagBtnText: {
-    fontSize: 11,
-    fontFamily: "Inter_500Medium",
-    color: "#F59E0B",
-    letterSpacing: 0.3,
   },
 });

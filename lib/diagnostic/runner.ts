@@ -39,6 +39,30 @@ export interface DiagnosticReport {
 
 export type ProgressCallback = (done: number, total: number, lastResult: DiagnosticTestResult) => void;
 
+// ── Build capability detection ───────────────────────────────────────────────
+
+export interface BuildCapabilities {
+  isNative: boolean;
+  isDiagnosticApk: boolean;
+}
+
+export function detectBuildCapabilities(): BuildCapabilities {
+  const isNative =
+    Platform.OS !== "web" &&
+    Constants.appOwnership !== "expo";
+
+  const buildProfile =
+    process.env.EXPO_PUBLIC_BUILD_PROFILE ??
+    (Constants.expoConfig?.extra as Record<string, unknown> | undefined)?.buildProfile ??
+    "";
+
+  const isDiagnosticApk = isNative && buildProfile === "diagnostic";
+
+  return { isNative, isDiagnosticApk };
+}
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
 async function runWithTimeout<T>(fn: () => Promise<T>, timeoutMs: number): Promise<T> {
   return new Promise<T>((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error(`Timeout after ${timeoutMs}ms`)), timeoutMs);
@@ -146,6 +170,289 @@ async function testApiRouting(): Promise<DiagnosticTestResult[]> {
   ]);
 }
 
+// ── SECTION: MATCHING ────────────────────────────────────────────────────────
+
+async function testMatchingPipeline(isAdmin: boolean): Promise<DiagnosticTestResult[]> {
+  const section = "Pipeline Matching";
+  const tests: Array<() => Promise<DiagnosticTestResult>> = [
+    () => runTest(section, "GET /api/matches", async () => {
+      const url = new URL("/api/matches", getApiUrl()).toString();
+      const res = await fetch(url, { headers: authFetchHeaders(), credentials: "include" });
+      if (!res.ok) return { status: "FAIL", message: `HTTP ${res.status}` };
+      const data = await res.json();
+      if (typeof data !== "object" || data === null) return { status: "WARN", message: "Risposta inattesa" };
+      return { status: "PASS" };
+    }, 6000),
+  ];
+  if (isAdmin) {
+    tests.push(() => runTest(section, "GET /api/match-health (admin)", async () => {
+      const url = new URL("/api/match-health", getApiUrl()).toString();
+      const res = await fetch(url, { headers: authFetchHeaders(), credentials: "include" });
+      if (res.status === 403) return { status: "SKIP", message: "Non admin" };
+      if (!res.ok) return { status: "FAIL", message: `HTTP ${res.status}` };
+      const data = await res.json();
+      if (typeof data !== "object" || data === null) return { status: "WARN", message: "Risposta inattesa" };
+      return { status: "PASS" };
+    }, 6000));
+  }
+  return Promise.all(tests.map(t => t()));
+}
+
+// ── SECTION: CHAT ────────────────────────────────────────────────────────────
+
+async function testChatPipeline(): Promise<DiagnosticTestResult[]> {
+  const section = "Pipeline Chat";
+  return Promise.all([
+    runTest(section, "Chat endpoint vivo (POST /api/chat/conversations)", async () => {
+      const url = new URL("/api/chat/conversations", getApiUrl()).toString();
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { ...authFetchHeaders(), "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({}),
+      });
+      if (res.status === 502 || res.status === 503) {
+        return { status: "FAIL", message: `Server non raggiungibile: HTTP ${res.status}` };
+      }
+      return { status: "PASS", message: `HTTP ${res.status}` };
+    }, 6000),
+    runTest(section, "WebSocket diagnostico — ping/response", async () => {
+      if (Platform.OS === "web") return { status: "SKIP", message: "Test WS non disponibile su web" };
+      return new Promise<{ status: DiagnosticStatus; message?: string }>((resolve) => {
+        const apiUrl = getApiUrl();
+        const wsUrl = apiUrl.replace(/^https?:\/\//, (m) => m === "https://" ? "wss://" : "ws://") + "/ws/diagnostic";
+        let settled = false;
+        const settle = (result: { status: DiagnosticStatus; message?: string }) => {
+          if (!settled) { settled = true; resolve(result); }
+        };
+        const outerTimer = setTimeout(() => {
+          try { ws?.close(); } catch { /* noop */ }
+          settle({ status: "WARN", message: "Timeout connessione WS (5s)" });
+        }, 5000);
+        let ws: WebSocket;
+        try {
+          ws = new WebSocket(wsUrl);
+          ws.onopen = () => {
+            try { ws.send(JSON.stringify({ type: "ping" })); } catch { /* noop */ }
+            const pingTimer = setTimeout(() => {
+              clearTimeout(outerTimer);
+              try { ws.close(); } catch { /* noop */ }
+              settle({ status: "PASS", message: "Connessione aperta (ping inviato)" });
+            }, 2000);
+            ws.onmessage = () => {
+              clearTimeout(outerTimer);
+              clearTimeout(pingTimer);
+              try { ws.close(); } catch { /* noop */ }
+              settle({ status: "PASS", message: "Connessione aperta, risposta ricevuta" });
+            };
+          };
+          ws.onerror = () => {
+            clearTimeout(outerTimer);
+            settle({ status: "WARN", message: "Connessione WS fallita" });
+          };
+          ws.onclose = (e) => {
+            clearTimeout(outerTimer);
+            if (!settled) settle({ status: e.wasClean ? "PASS" : "WARN", message: e.wasClean ? "Chiusura pulita" : "Chiusura non pulita" });
+          };
+        } catch (e) {
+          clearTimeout(outerTimer);
+          settle({ status: "WARN", message: e instanceof Error ? e.message : "Errore WS" });
+        }
+      });
+    }, 7000),
+  ]);
+}
+
+// ── SECTION: OTA ─────────────────────────────────────────────────────────────
+
+async function testOtaPipeline(isAdmin: boolean): Promise<DiagnosticTestResult[]> {
+  const section = "Pipeline OTA";
+  const tests: Array<() => Promise<DiagnosticTestResult>> = [
+    () => runTest(section, "Confronto OTA bundled vs applicata", async () => {
+      try {
+        const { APPLIED_OTA_NUMBER, OTA_BUNDLED_COUNT } = await import("@/constants/buildInfo");
+        const { loadAppliedOtaNumber } = await import("@/lib/otaStorage");
+        const stored = await loadAppliedOtaNumber();
+        const bundled = APPLIED_OTA_NUMBER ?? OTA_BUNDLED_COUNT;
+        const applied = stored ?? bundled;
+        if (bundled !== null && applied !== null && bundled !== applied) {
+          return { status: "WARN", message: `Bundled OTA ${bundled} ≠ applicata ${applied}` };
+        }
+        return { status: "PASS" };
+      } catch {
+        return { status: "SKIP", message: "Informazioni OTA non disponibili" };
+      }
+    }, 3000),
+  ];
+  if (isAdmin) {
+    tests.push(() => runTest(section, "GET /api/admin/ota/releases (admin)", async () => {
+      const url = new URL("/api/admin/ota/releases", getApiUrl()).toString();
+      const res = await fetch(url, { headers: authFetchHeaders(), credentials: "include" });
+      if (res.status === 403) return { status: "SKIP", message: "Non admin" };
+      if (!res.ok) return { status: "FAIL", message: `HTTP ${res.status}` };
+      const data = await res.json();
+      if (!Array.isArray(data)) return { status: "WARN", message: "Risposta non è un array" };
+      return { status: "PASS", message: `${data.length} release` };
+    }, 6000));
+  }
+  return Promise.all(tests.map(t => t()));
+}
+
+// ── SECTION: PUSH NOTIFICATIONS ─────────────────────────────────────────────
+
+async function testPushToken(): Promise<DiagnosticTestResult[]> {
+  const section = "Push Notifications";
+  return [
+    await runTest(section, "Push token registrato", async () => {
+      if (Platform.OS === "web") return { status: "SKIP", message: "Web non supportato" };
+      const url = new URL("/api/users/me", getApiUrl()).toString();
+      const res = await fetch(url, { headers: authFetchHeaders(), credentials: "include" });
+      if (!res.ok) return { status: "WARN", message: `Non recuperabile: HTTP ${res.status}` };
+      const data = await res.json();
+      const pushToken = data?.profile?.expoPushToken ?? data?.expoPushToken ?? null;
+      if (!pushToken) return { status: "WARN", message: "Push token non registrato nel profilo" };
+      return { status: "PASS" };
+    }, 5000),
+  ];
+}
+
+// ── SECTION: GPS ─────────────────────────────────────────────────────────────
+
+async function testGpsReading(): Promise<DiagnosticTestResult[]> {
+  const section = "GPS";
+  if (Platform.OS === "web") {
+    return [{ section, name: "Lettura GPS reale", status: "SKIP", message: "Solo dispositivo nativo", durationMs: 0 }];
+  }
+  return [
+    await runTest(section, "Lettura GPS reale (getCurrentPosition)", async () => {
+      const { status } = await Location.getForegroundPermissionsAsync();
+      if (status !== "granted") {
+        return { status: "SKIP", message: `Permesso GPS non concesso (${status})` };
+      }
+      // Use internal timeout to distinguish WARN (timeout) from FAIL (error)
+      const GPS_TIMEOUT_MS = 6000;
+      const TIMEOUT_SENTINEL = "GPS_TIMEOUT";
+      try {
+        const loc = await new Promise<Location.LocationObject>((resolve, reject) => {
+          const timer = setTimeout(() => reject(new Error(TIMEOUT_SENTINEL)), GPS_TIMEOUT_MS);
+          Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced })
+            .then(l => { clearTimeout(timer); resolve(l); })
+            .catch(e => { clearTimeout(timer); reject(e); });
+        });
+        if (!loc?.coords) return { status: "WARN", message: "Nessuna posizione ricevuta" };
+        return { status: "PASS", message: `lat=${loc.coords.latitude.toFixed(4)}, lon=${loc.coords.longitude.toFixed(4)}` };
+      } catch (e) {
+        if (e instanceof Error && e.message === TIMEOUT_SENTINEL) {
+          return { status: "WARN", message: "Timeout GPS (6s) — fix non ottenuto" };
+        }
+        throw e;
+      }
+    }, 8000),
+  ];
+}
+
+// ── SECTION: ROUTING REALE ───────────────────────────────────────────────────
+
+async function testRoutingReal(): Promise<DiagnosticTestResult[]> {
+  const section = "Routing Reale";
+  return [
+    await runTest(section, "Calcolo percorso Valhalla (Milano → Monza)", async () => {
+      const url = new URL("/api/routing/route", getApiUrl()).toString();
+      const body = {
+        locations: [
+          { lat: 45.4654, lon: 9.1866 },
+          { lat: 45.5845, lon: 9.2745 },
+        ],
+        costing: "motorcycle",
+        engine: "valhalla",
+      };
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { ...authFetchHeaders(), "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(body),
+      });
+      if (res.status === 502 || res.status === 503) {
+        return { status: "WARN", message: "Valhalla non raggiungibile" };
+      }
+      if (!res.ok) return { status: "WARN", message: `HTTP ${res.status}` };
+      const data = await res.json();
+      const hasRoute = data?.trip?.legs?.length > 0 || data?.routes?.length > 0 || data?.route;
+      if (!hasRoute) return { status: "WARN", message: "Risposta senza percorso" };
+      return { status: "PASS" };
+    }, 10000),
+  ];
+}
+
+// ── SECTION: SENSORI HARDWARE ────────────────────────────────────────────────
+
+async function testHardwareSensors(isDiagnosticApk: boolean, isNative: boolean): Promise<DiagnosticTestResult[]> {
+  const section = "Sensori Hardware";
+
+  if (!isNative) {
+    return [
+      { section, name: "Accelerometro", status: "SKIP", message: "Solo dispositivo nativo", durationMs: 0 },
+      { section, name: "Pedometro (iOS)", status: "SKIP", message: "Solo dispositivo nativo", durationMs: 0 },
+    ];
+  }
+  if (!isDiagnosticApk) {
+    return [
+      { section, name: "Accelerometro", status: "SKIP", message: "Solo APK diagnostica", durationMs: 0 },
+      { section, name: "Pedometro (iOS)", status: "SKIP", message: "Solo APK diagnostica", durationMs: 0 },
+    ];
+  }
+
+  const results: DiagnosticTestResult[] = [];
+
+  results.push(
+    await runTest(section, "Accelerometro (1s campionamento)", async () => {
+      try {
+        const Accelerometer = (await import("expo-sensors")).Accelerometer;
+        const isAvailable = await Accelerometer.isAvailableAsync();
+        if (!isAvailable) return { status: "SKIP", message: "Accelerometro non disponibile" };
+        return new Promise<{ status: DiagnosticStatus; message?: string }>((resolve) => {
+          let received = false;
+          const sub = Accelerometer.addListener(() => {
+            if (!received) {
+              received = true;
+              sub.remove();
+              resolve({ status: "PASS" });
+            }
+          });
+          Accelerometer.setUpdateInterval(100);
+          setTimeout(() => {
+            sub.remove();
+            resolve(received
+              ? { status: "PASS" }
+              : { status: "WARN", message: "Nessun campione ricevuto in 1s" }
+            );
+          }, 1000);
+        });
+      } catch {
+        return { status: "SKIP", message: "expo-sensors non disponibile" };
+      }
+    }, 5000)
+  );
+
+  results.push(
+    await runTest(section, "Pedometro (iOS)", async () => {
+      if (Platform.OS !== "ios") {
+        return { status: "SKIP", message: "Solo iOS" };
+      }
+      try {
+        const Pedometer = (await import("expo-sensors")).Pedometer;
+        const isAvailable = await Pedometer.isAvailableAsync();
+        if (!isAvailable) return { status: "WARN", message: "Pedometro non disponibile su questo dispositivo" };
+        return { status: "PASS" };
+      } catch {
+        return { status: "SKIP", message: "expo-sensors/Pedometer non disponibile" };
+      }
+    }, 5000)
+  );
+
+  return results;
+}
+
 // ── SECTION: ADMIN (solo admin) ─────────────────────────────────────────────
 
 async function testAdmin(): Promise<DiagnosticTestResult[]> {
@@ -226,6 +533,7 @@ export async function runAllTests(
   options: { isAdmin?: boolean; onProgress?: ProgressCallback } = {}
 ): Promise<DiagnosticReport> {
   const { isAdmin = false, onProgress } = options;
+  const caps = detectBuildCapabilities();
   const allResults: DiagnosticTestResult[] = [];
   const start = Date.now();
 
@@ -235,8 +543,17 @@ export async function runAllTests(
     testApiRouting,
     testStorage,
     testPermissions,
+    () => testMatchingPipeline(isAdmin),
+    testChatPipeline,
+    () => testOtaPipeline(isAdmin),
+    testPushToken,
+    testGpsReading,
+    testRoutingReal,
+    () => testHardwareSensors(caps.isDiagnosticApk, caps.isNative),
   ];
-  if (isAdmin) sections.push(testAdmin);
+  if (isAdmin) {
+    sections.push(testAdmin);
+  }
 
   let done = 0;
   const estimated = sections.length * 3;

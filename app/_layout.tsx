@@ -206,6 +206,7 @@ function RootLayoutNav() {
       <Stack.Screen name="feedback/index" options={{ headerShown: true, headerTitle: "Feedback", headerStyle: { backgroundColor: colors.surface }, headerTintColor: colors.text }} />
       <Stack.Screen name="notifications" options={{ headerShown: true, headerTitle: "Notifiche", headerStyle: { backgroundColor: colors.surface }, headerTintColor: colors.text }} />
       <Stack.Screen name="sprint-history" options={{ headerShown: false }} />
+      <Stack.Screen name="diagnostica-risultati" options={{ headerShown: false }} />
     </Stack>
   );
 }

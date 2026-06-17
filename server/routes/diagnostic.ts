@@ -1,10 +1,34 @@
 import { Router, type Request, type Response } from "express";
+import fs from "fs";
+import path from "path";
 import { db } from "../db";
 import { diagnosticReports, diagnosticQueue } from "@shared/db";
 import { sendError } from "../lib/api-response";
 import { and, eq, gt, isNull } from "drizzle-orm";
 
 const router = Router();
+
+const REPORTS_DIR = path.join(process.cwd(), "server", "diagnostics", "reports");
+
+function ensureReportsDir() {
+  try {
+    fs.mkdirSync(REPORTS_DIR, { recursive: true });
+  } catch {
+    // noop: dir may already exist
+  }
+}
+
+function writeReportFile(reportId: string, userId: string, body: Record<string, unknown>): void {
+  try {
+    ensureReportsDir();
+    const ts = new Date().toISOString().replace(/[:.]/g, "-");
+    const filename = `diag_${userId}_${ts}_${reportId.slice(0, 8)}.json`;
+    const filepath = path.join(REPORTS_DIR, filename);
+    fs.writeFileSync(filepath, JSON.stringify({ id: reportId, userId, ...body }, null, 2), "utf8");
+  } catch (e) {
+    console.warn("[diagnostic/report] File write error:", e);
+  }
+}
 
 router.post("/report", async (req: Request, res: Response) => {
   try {
@@ -59,7 +83,40 @@ router.post("/report", async (req: Request, res: Response) => {
       }
     }
 
-    return res.json({ id: report?.id, ok: true });
+    const reportId = report?.id ?? "unknown";
+
+    // Fire-and-forget: save to file
+    setImmediate(() => {
+      writeReportFile(reportId, req.session.userId!, {
+        triggeredBy: safeTriggeredBy,
+        appVersion,
+        platform,
+        deviceModel,
+        sentryEventId,
+        summary,
+        results,
+        runAt: new Date().toISOString(),
+      });
+    });
+
+    // Fire-and-forget: send email to admin
+    setImmediate(() => {
+      import("../email/notifications").then(({ sendDiagnosticReportEmail }) => {
+        sendDiagnosticReportEmail({
+          reportId,
+          userId: req.session.userId!,
+          appVersion: appVersion ? String(appVersion) : "?",
+          platform: platform ? String(platform) : "?",
+          deviceModel: deviceModel ? String(deviceModel) : "?",
+          triggeredBy: safeTriggeredBy,
+          summary: summary as Record<string, number> | undefined,
+        }).catch((e: unknown) => {
+          console.warn("[diagnostic/report] Email error:", e);
+        });
+      }).catch(() => {});
+    });
+
+    return res.json({ id: reportId, ok: true });
   } catch (err) {
     console.error("[diagnostic/report] POST error:", err);
     return sendError(res, 500, "Errore salvataggio report");
