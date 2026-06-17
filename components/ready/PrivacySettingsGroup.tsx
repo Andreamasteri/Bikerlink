@@ -1,8 +1,14 @@
-import React from "react";
-import { View, Text, Switch, StyleSheet, useWindowDimensions, TouchableOpacity, ActivityIndicator } from "react-native";
+import React, { useState, useEffect } from "react";
+import { View, Text, Switch, StyleSheet, useWindowDimensions, TouchableOpacity, ActivityIndicator, Platform } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import Colors, { ThemeColors } from "@/constants/colors";
 import { UseMutationResult } from "@tanstack/react-query";
+import {
+  startForegroundLocationService,
+  stopForegroundLocationService,
+  FOREGROUND_SERVICE_DISABLED_KEY,
+} from "@/lib/foreground-location-service";
 
 interface PrivacySettingsGroupProps {
   t: (key: string) => string;
@@ -39,6 +45,30 @@ export function PrivacySettingsGroup({
 }: PrivacySettingsGroupProps) {
   const { width } = useWindowDimensions();
   const isTablet = width > 768;
+
+  const [foregroundServiceEnabled, setForegroundServiceEnabled] = useState(true);
+
+  useEffect(() => {
+    if (Platform.OS !== "android") return;
+    AsyncStorage.getItem(FOREGROUND_SERVICE_DISABLED_KEY)
+      .then((val) => setForegroundServiceEnabled(val !== "true"))
+      .catch(() => {});
+  }, []);
+
+  const handleForegroundServiceToggle = async (val: boolean) => {
+    setForegroundServiceEnabled(val);
+    try {
+      if (val) {
+        await AsyncStorage.removeItem(FOREGROUND_SERVICE_DISABLED_KEY);
+        await startForegroundLocationService();
+      } else {
+        await AsyncStorage.setItem(FOREGROUND_SERVICE_DISABLED_KEY, "true");
+        await stopForegroundLocationService();
+      }
+    } catch {
+      // no-op: best-effort toggle
+    }
+  };
   const hasFixedCoord = fixedPositionLat != null && fixedPositionLng != null;
 
   return (
@@ -168,6 +198,31 @@ export function PrivacySettingsGroup({
           />
         </View>
       </View>
+
+      {Platform.OS === "android" && (
+        <View style={[styles.settingCard, { backgroundColor: colors.surface }]}>
+          <View style={styles.privacyRow}>
+            <Ionicons
+              name="navigate-outline"
+              size={20}
+              color={foregroundServiceEnabled ? Colors.accent : Colors.textSecondary}
+              style={styles.privacyRowIcon}
+            />
+            <View style={styles.privacyRowText}>
+              <Text style={styles.privacyRowLabel}>GPS continuo (Android)</Text>
+              <Text style={styles.privacyRowDesc}>
+                Mantiene il GPS attivo in background tramite notifica discreta. Disattivalo per risparmiare batteria.
+              </Text>
+            </View>
+            <Switch
+              value={foregroundServiceEnabled}
+              onValueChange={handleForegroundServiceToggle}
+              trackColor={{ false: Colors.border, true: Colors.accent }}
+              thumbColor="#fff"
+            />
+          </View>
+        </View>
+      )}
     </View>
   );
 }

@@ -15,6 +15,11 @@ import {
   gpsPrecisionToAccuracy,
   GPS_PRECISION_STORAGE_KEY,
 } from "@/lib/background-location-task";
+import {
+  startForegroundLocationService,
+  stopForegroundLocationService,
+  FOREGROUND_SERVICE_DISABLED_KEY,
+} from "@/lib/foreground-location-service";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import Constants from "expo-constants";
 import { getDeviceModel } from "@/lib/device-model";
@@ -219,6 +224,26 @@ export function AppStateHandler() {
       resetCrashLogger();
     }
   }, [user]);
+
+  useEffect(() => {
+    if (!user || Platform.OS !== "android" || hasBackgroundPermission) {
+      stopForegroundLocationService().catch(() => {});
+      return;
+    }
+
+    AsyncStorage.getItem(FOREGROUND_SERVICE_DISABLED_KEY)
+      .then((disabled) => {
+        if (disabled !== "true") {
+          startForegroundLocationService().catch(() => {});
+          sendStartupBeacon("foreground_location_service_started");
+        }
+      })
+      .catch(() => {});
+
+    return () => {
+      stopForegroundLocationService().catch(() => {});
+    };
+  }, [user, hasBackgroundPermission]);
 
   useEffect(() => {
     if (!user || !hasBackgroundPermission) {
