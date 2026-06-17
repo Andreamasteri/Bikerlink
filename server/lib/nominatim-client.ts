@@ -310,14 +310,14 @@ export async function geocode(query: string): Promise<GeocodeResult[]> {
  * @param lon   Longitudine
  * @returns     Indirizzo strutturato (campi opzionali null se assenti)
  */
-export async function reverseGeocode(lat: number, lon: number): Promise<ReverseGeocodeResult> {
+export async function reverseGeocode(lat: number, lon: number, zoom = 14): Promise<ReverseGeocodeResult> {
   const rLat = lat.toFixed(COORD_DECIMALS);
   const rLon = lon.toFixed(COORD_DECIMALS);
-  const cacheKey = `${rLat},${rLon}`;
+  const cacheKey = `${rLat},${rLon},z${zoom}`;
   const cached = reverseCache.get(cacheKey);
   if (cached !== undefined) return cached;
 
-  const path = `/reverse?format=json&lat=${lat}&lon=${lon}&zoom=14&accept-language=it`;
+  const path = `/reverse?format=json&lat=${lat}&lon=${lon}&zoom=${zoom}&accept-language=it`;
   const res = await nominatimFetch(path);
   if (!res.ok) {
     throw new Error(`Nominatim reverse HTTP ${res.status}`);

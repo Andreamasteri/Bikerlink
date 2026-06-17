@@ -337,14 +337,16 @@ export async function* streamRouteText(opts: StreamRouteOptions): AsyncGenerator
 export const geocodeRouter = Router();
 
 geocodeRouter.get("/reverse", async (req: Request, res: Response) => {
-  const { lat, lon } = req.query as { lat?: string; lon?: string };
+  const { lat, lon, zoom } = req.query as { lat?: string; lon?: string; zoom?: string };
   if (!lat || !lon) return sendError(res, 400, "Parametri lat e lon obbligatori");
   const latNum = parseFloat(lat);
   const lonNum = parseFloat(lon);
   if (isNaN(latNum) || isNaN(lonNum)) return sendError(res, 400, "lat e lon devono essere numeri validi");
+  const zoomNum = zoom !== undefined ? parseInt(zoom, 10) : 14;
+  const safeZoom = isNaN(zoomNum) ? 14 : Math.max(0, Math.min(18, zoomNum));
   try {
     const { reverseGeocode } = await import("../../lib/nominatim-client");
-    const result = await reverseGeocode(latNum, lonNum);
+    const result = await reverseGeocode(latNum, lonNum, safeZoom);
     return res.json(result);
   } catch (err) {
     console.error("[reverse-geocode] error:", err);

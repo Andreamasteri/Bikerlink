@@ -1,6 +1,7 @@
 import React from "react";
 import { View, Text, ScrollView, StyleSheet, Pressable } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useQuery } from "@tanstack/react-query";
 import Colors from "@/constants/colors";
 import { useT } from "@/lib/language-context";
 import { getCountryFlag, getCountryName } from "@/lib/countries-regions";
@@ -11,6 +12,7 @@ import UserPhotoStrip from "@/components/map/UserPhotoStrip";
 import UserGarage from "@/components/map/UserGarage";
 import UserProposals from "@/components/map/UserProposals";
 import UserActionRow from "@/components/map/UserActionRow";
+import { apiRequest } from "@/lib/query-client";
 import type { UserSummary, UserDetail, Proposal, OrganizedEvent } from "@/components/map/userDetailTypes";
 
 type Props = {
@@ -24,6 +26,24 @@ type Props = {
   onInvitePress: () => void;
 };
 
+interface ReverseGeocodeResult {
+  displayName: string;
+  road: string | null;
+  suburb: string | null;
+  town: string | null;
+  city: string | null;
+  county: string | null;
+  country: string | null;
+}
+
+function formatAddress(r: ReverseGeocodeResult): string | null {
+  const place = r.town ?? r.city ?? r.county ?? null;
+  if (r.road && place) return `${r.road}, ${place}`;
+  if (r.road) return r.road;
+  if (place) return place;
+  return null;
+}
+
 export default function UserDetailContent({
   selectedUser,
   selectedUserDetail,
@@ -35,6 +55,23 @@ export default function UserDetailContent({
   onInvitePress,
 }: Props) {
   const t = useT();
+
+  const lat = selectedUser?.latitude != null ? Number(selectedUser.latitude) : null;
+  const lon = selectedUser?.longitude != null ? Number(selectedUser.longitude) : null;
+  const hasCoords = lat != null && lon != null && !isNaN(lat) && !isNaN(lon);
+
+  const { data: addressData, isLoading: addressLoading } = useQuery<ReverseGeocodeResult>({
+    queryKey: ["/api/geocode/reverse", lat, lon],
+    queryFn: async () => {
+      const res = await apiRequest("GET", `/api/geocode/reverse?lat=${lat}&lon=${lon}&zoom=10`);
+      return res.json();
+    },
+    enabled: hasCoords,
+    staleTime: 10 * 60 * 1000,
+    retry: false,
+  });
+
+  const addressText = addressData ? formatAddress(addressData) : null;
 
   return (
     <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 400 }}>
@@ -61,6 +98,16 @@ export default function UserDetailContent({
                   .join(", ")}
               </Text>
             </View>
+          )}
+          {hasCoords && (
+            addressLoading ? (
+              <View style={styles.addressSkeleton} />
+            ) : addressText ? (
+              <View style={styles.locationRow}>
+                <Ionicons name="navigate-outline" size={12} color={Colors.textSecondary} />
+                <Text style={styles.addressText} numberOfLines={1}>{addressText}</Text>
+              </View>
+            ) : null
           )}
           <UserStatusBadges userDetail={selectedUserDetail} />
         </View>
@@ -104,5 +151,13 @@ const styles = StyleSheet.create({
   type: { fontSize: 13, fontFamily: "Inter_400Regular", color: Colors.textSecondary },
   locationRow: { flexDirection: "row", alignItems: "center", gap: 3, marginTop: 2 },
   locationText: { fontSize: 11, color: Colors.textSecondary, fontFamily: "Inter_400Regular" },
+  addressText: { fontSize: 11, color: Colors.textSecondary, fontFamily: "Inter_400Regular", flex: 1 },
+  addressSkeleton: {
+    marginTop: 4,
+    height: 10,
+    width: 120,
+    borderRadius: 5,
+    backgroundColor: Colors.border,
+  },
   bio: { fontSize: 14, fontFamily: "Inter_400Regular", color: Colors.textSecondary, marginBottom: 12 },
 });

@@ -5,6 +5,8 @@ export interface UserSummary {
   sex?: string;
   country?: string;
   region?: string;
+  latitude?: number | null;
+  longitude?: number | null;
 }
 
 export interface Photo {
