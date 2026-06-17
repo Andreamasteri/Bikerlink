@@ -71,6 +71,11 @@ router.post("/batch", async (req: Request, res: Response) => {
       return sendError(res, 400, "samples[] obbligatorio e non vuoto");
     }
 
+    // Probe dry-run: payload valido ma nessun insert — __probe__ non è una FK valida.
+    if (probeMode) {
+      return res.status(200).json({ inserted: (samples as unknown[]).length, session_id, probe: true });
+    }
+
     // Task #3115 — nome custom per i giri secondari (solo ideal_lap).
     // Se il nome è già usato dall'utente per un altro giro, appende la data per
     // distinguere i file (es. "casa-lavoro 03/06/2026").

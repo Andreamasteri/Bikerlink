@@ -141,6 +141,10 @@ describe("POST /api/telemetry/batch — probe auth bypass", () => {
     expect(res.status).toBe(200);
     expect(res.body.inserted).toBe(1);
     expect(res.body.session_id).toBe(VALID_BATCH_BODY.session_id);
+    expect(res.body.probe).toBe(true);
+
+    // Verifica che in probe mode il DB non venga mai scritto.
+    expect(vi.mocked(db.insert)).not.toHaveBeenCalled();
 
     const logCalls = vi.mocked(logTelemetryEvent).mock.calls;
     const authFailLogs = logCalls.filter(([entry]) =>
