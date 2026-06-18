@@ -22,6 +22,18 @@ import { useAssistantEnabled } from "@/hooks/useAssistantEnabled";
 import AssistantChatSheet from "./AssistantChatSheet";
 
 const FAB_SIZE = 56;
+export const ASSISTANT_FAB_TAB_BAR_HEIGHT = 60;
+export const ASSISTANT_FAB_BOTTOM_MARGIN = 16;
+export const ASSISTANT_FAB_WEB_INSET = 34;
+
+/**
+ * Calcola la posizione `bottom` del FAB.
+ * Exported per consentire test unitari senza montare il componente.
+ */
+export function computeAssistantFabBottom(insetsBottom: number, isWeb: boolean): number {
+  const base = isWeb ? ASSISTANT_FAB_WEB_INSET : insetsBottom;
+  return base + ASSISTANT_FAB_TAB_BAR_HEIGHT + ASSISTANT_FAB_BOTTOM_MARGIN;
+}
 
 export default function AssistantFab() {
   const colors = useColors();
@@ -58,11 +70,7 @@ export default function AssistantFab() {
 
   if (!fabEnabled) return null;
 
-  const TAB_BAR_HEIGHT = 60;
-  const bottom =
-    Platform.OS === "web"
-      ? 34 + TAB_BAR_HEIGHT + 16
-      : insets.bottom + TAB_BAR_HEIGHT + 16;
+  const bottom = computeAssistantFabBottom(insets.bottom, Platform.OS === "web");
 
   return (
     <>

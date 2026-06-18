@@ -8,6 +8,7 @@ export default defineConfig({
     include: [
       "server/__tests__/**/*.test.ts",
       "hooks/__tests__/**/*.test.ts",
+      "components/__tests__/**/*.test.ts",
     ],
   },
   resolve: {

@@ -26,9 +26,9 @@ import { useTheme } from "@/lib/theme-context";
 
 const WIDGET_SIZE = 48;
 const POSITION_KEY = "floating_widget_position";
-const TAP_THRESHOLD = 5;
-const SWIPE_DISMISS_THRESHOLD = 60;
-const SWIPE_VELOCITY_THRESHOLD = 500;
+export const TAP_THRESHOLD = 5;
+export const SWIPE_DISMISS_THRESHOLD = 60;
+export const SWIPE_VELOCITY_THRESHOLD = 500;
 
 export default function FloatingWidget() {
   const { isVisible, unreadChat, unreadNotifications, refetchBadges } = useFloatingWidget();
