@@ -118,6 +118,7 @@ router.get("/diagnostic-reports", async (req: Request, res: Response) => {
         appVersion: diagnosticReports.appVersion,
         platform: diagnosticReports.platform,
         deviceModel: diagnosticReports.deviceModel,
+        buildProfile: diagnosticReports.buildProfile,
         runAt: diagnosticReports.runAt,
         sentryEventId: diagnosticReports.sentryEventId,
         summary: diagnosticReports.summary,

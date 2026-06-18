@@ -135,10 +135,12 @@ bash scripts/eas.sh build \
 ```json
 "diagnostic-apk": {
   "distribution": "internal",
-  "channel": "production",
+  "channel": "diagnostic",
   "credentialsSource": "remote",
   "env": {
-    "NODE_OPTIONS": "--max_old_space_size=8192"
+    "NODE_OPTIONS": "--max_old_space_size=8192",
+    "EXPO_PUBLIC_DOMAIN": "biker-link.replit.app",
+    "EXPO_PUBLIC_BUILD_PROFILE": "diagnostic"
   },
   "android": {
     "buildType": "apk",

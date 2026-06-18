@@ -53,3 +53,4 @@
 - [Gesture test CI gate](gesture-test-ci-gate.md) — `npx vitest run components/__tests__` è un gate bloccante in post-merge.sh; 2 file, 38 test (gesture + bottom position).
 - [Radiografia probe pool](radiografia-probe-pool.md) — probe diagnostiche in batch ≤3 + dbq() statement_timeout 5s (mai Promise.all globale); trap su notifiche/road-hazards/OTA dentro.
 - [AI Assistant config contract](ai-assistant-config-contract.md) — config endpoint è PER-PLATFORM ({platform,config}); UI admin deve fetch+PUT android/ios separati; client default-safe `enabled !== false`; FloatingWidget handler sopra i gesture (Hermes TDZ); FAB dopo FloatingWidget nel layout.
+- [Diagnostica OTA-proof](diagnostic-ota-proof.md) — camera=metodo statico Camera.getCameraPermissionsAsync; sensori girano su ogni build nativa; isDiagnosticApk via Updates.channel (env baked si perde via OTA); canale OTA dedicato `diagnostic`.

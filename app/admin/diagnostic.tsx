@@ -89,6 +89,7 @@ export default function DiagnosticScreen() {
         appVersion: result.appVersion,
         platform: result.platform,
         deviceModel: result.deviceModel,
+        buildProfile: result.buildProfile,
         sentryEventId: result.sentryEventId,
         summary: result.summary,
         results: result.results,

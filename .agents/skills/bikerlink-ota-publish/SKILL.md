@@ -136,6 +136,31 @@ Dopo la pubblicazione: aggiorna la tabella "Contesto fisso" (campo "Ultima OTA n
 
 ---
 
+## Canale `diagnostic` (OTA per le diagnostic-apk)
+
+Le build `diagnostic-apk` (vedi skill `bikerlink-apk-build`) sono pubblicate sul canale
+EAS **`diagnostic`**, isolato da `staging`/`production`. Gli OTA diagnostici NON devono
+raggiungere gli utenti di produzione: usa sempre il canale dedicato.
+
+> Perché serve: il segnale `EXPO_PUBLIC_BUILD_PROFILE` viene baked al build EAS ma cancellato
+> da ogni bundle OTA. Per far sopravvivere il riconoscimento "diagnostic" agli OTA, la
+> diagnostica `detectBuildCapabilities()` legge `Updates.channel`: una build pubblicata sul
+> canale `diagnostic` resta riconosciuta come diagnostic APK anche dopo aggiornamenti OTA.
+
+Per pubblicare un OTA sul canale diagnostico usa il flag `--diagnostic` di `publish-ota.sh`
+(imposta sia `--channel diagnostic` sia `EXPO_PUBLIC_BUILD_PROFILE=diagnostic` nell'`expo export`):
+
+```bash
+EXPO_TOKEN="${EAS_TOKEN}" bash scripts/publish-ota.sh \
+  --message "OTA<N> diagnostic: <descrizione>" \
+  --diagnostic 2>&1; echo "EXIT=$?"
+```
+
+Il riepilogo finale dello script mostra `Canale: diagnostic`. Senza `--diagnostic` lo script
+pubblica sul canale `staging` (flusso produzione/staging standard) come prima.
+
+---
+
 ## Flusso manuale (fallback)
 
 > Usare **solo** quando `DATABASE_URL` non è disponibile nell'ambiente e `publish-ota-full.sh` non può girare.

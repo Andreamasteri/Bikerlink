@@ -20,6 +20,7 @@ export const diagnosticReports = pgTable("diagnostic_reports", {
   appVersion: varchar("app_version", { length: 50 }),
   platform: varchar("platform", { length: 20 }),
   deviceModel: varchar("device_model", { length: 100 }),
+  buildProfile: varchar("build_profile", { length: 20 }),
   runAt: timestamp("run_at").notNull().defaultNow(),
   sentryEventId: varchar("sentry_event_id", { length: 100 }),
   summary: jsonb("summary"),

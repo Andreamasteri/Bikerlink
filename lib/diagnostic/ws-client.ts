@@ -128,6 +128,7 @@ async function handleRunCommand(showBanner: boolean) {
       appVersion: report.appVersion,
       platform: report.platform,
       deviceModel: report.deviceModel,
+      buildProfile: report.buildProfile,
       sentryEventId: report.sentryEventId,
       summary: report.summary,
       results: report.results,

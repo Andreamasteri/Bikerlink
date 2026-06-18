@@ -40,6 +40,7 @@ router.post("/report", async (req: Request, res: Response) => {
       appVersion,
       platform,
       deviceModel,
+      buildProfile,
       sentryEventId,
       summary,
       results,
@@ -48,6 +49,7 @@ router.post("/report", async (req: Request, res: Response) => {
       appVersion?: string;
       platform?: string;
       deviceModel?: string;
+      buildProfile?: string;
       sentryEventId?: string;
       summary?: unknown;
       results?: unknown;
@@ -62,6 +64,7 @@ router.post("/report", async (req: Request, res: Response) => {
       appVersion: appVersion ? String(appVersion).substring(0, 50) : null,
       platform: platform ? String(platform).substring(0, 20) : null,
       deviceModel: deviceModel ? String(deviceModel).substring(0, 100) : null,
+      buildProfile: buildProfile ? String(buildProfile).substring(0, 20) : null,
       sentryEventId: sentryEventId ? String(sentryEventId).substring(0, 100) : null,
       summary: summary as Record<string, unknown> ?? null,
       results: results as Record<string, unknown>[] ?? null,

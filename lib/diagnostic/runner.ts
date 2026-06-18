@@ -5,6 +5,7 @@ import * as Location from "expo-location";
 import * as Notifications from "expo-notifications";
 import Constants from "expo-constants";
 import * as Device from "expo-device";
+import * as Updates from "expo-updates";
 import { getApiUrl, authFetchHeaders } from "@/lib/query-client";
 import { lastEventId } from "@/lib/sentry";
 
@@ -34,6 +35,7 @@ export interface DiagnosticReport {
   appVersion: string;
   platform: string;
   deviceModel: string;
+  buildProfile: string;
   runAt: string;
 }
 
@@ -44,6 +46,7 @@ export type ProgressCallback = (done: number, total: number, lastResult: Diagnos
 export interface BuildCapabilities {
   isNative: boolean;
   isDiagnosticApk: boolean;
+  buildProfile: string;
 }
 
 export function detectBuildCapabilities(): BuildCapabilities {
@@ -51,14 +54,23 @@ export function detectBuildCapabilities(): BuildCapabilities {
     Platform.OS !== "web" &&
     Constants.appOwnership !== "expo";
 
-  const buildProfile =
+  const envProfile =
     process.env.EXPO_PUBLIC_BUILD_PROFILE ??
     (Constants.expoConfig?.extra as Record<string, unknown> | undefined)?.buildProfile ??
     "";
 
-  const isDiagnosticApk = isNative && buildProfile === "diagnostic";
+  // EXPO_PUBLIC_BUILD_PROFILE viene baked al build EAS ma cancellato da ogni bundle
+  // OTA → diventa "" dopo il primo OTA. Updates.channel invece sopravvive agli OTA
+  // (è il canale su cui la build è stata pubblicata), quindi è il segnale affidabile
+  // per riconoscere una diagnostic APK anche dopo aggiornamenti OTA successivi.
+  const channel = (typeof Updates.channel === "string" ? Updates.channel : "") || "";
 
-  return { isNative, isDiagnosticApk };
+  const isDiagnosticApk =
+    isNative && (envProfile === "diagnostic" || channel === "diagnostic");
+
+  const buildProfile = isDiagnosticApk ? "diagnostic" : (isNative ? "standard" : "expo-go");
+
+  return { isNative, isDiagnosticApk, buildProfile };
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -386,7 +398,7 @@ async function testRoutingReal(): Promise<DiagnosticTestResult[]> {
 
 // ── SECTION: SENSORI HARDWARE ────────────────────────────────────────────────
 
-async function testHardwareSensors(isDiagnosticApk: boolean, isNative: boolean): Promise<DiagnosticTestResult[]> {
+async function testHardwareSensors(isNative: boolean): Promise<DiagnosticTestResult[]> {
   const section = "Sensori Hardware";
 
   if (!isNative) {
@@ -395,17 +407,11 @@ async function testHardwareSensors(isDiagnosticApk: boolean, isNative: boolean):
       { section, name: "Pedometro (iOS)", status: "SKIP", message: "Solo dispositivo nativo", durationMs: 0 },
     ];
   }
-  if (!isDiagnosticApk) {
-    return [
-      { section, name: "Accelerometro", status: "SKIP", message: "Solo APK diagnostica", durationMs: 0 },
-      { section, name: "Pedometro (iOS)", status: "SKIP", message: "Solo APK diagnostica", durationMs: 0 },
-    ];
-  }
 
   const results: DiagnosticTestResult[] = [];
 
   results.push(
-    await runTest(section, "Accelerometro (1s campionamento)", async () => {
+    await runTest(section, "Accelerometro", async () => {
       try {
         const Accelerometer = (await import("expo-sensors")).Accelerometer;
         const isAvailable = await Accelerometer.isAvailableAsync();
@@ -484,10 +490,10 @@ async function testPermissions(): Promise<DiagnosticTestResult[]> {
     }, 5000),
     runTest(section, "Camera", async () => {
       try {
-        const CameraModule = await import("expo-camera");
-        const permFn = (CameraModule as Record<string, unknown>)["getCameraPermissionsAsync"] as (() => Promise<{ status: string }>) | undefined;
-        if (!permFn) return { status: "SKIP", message: "API non disponibile" };
-        const { status } = await permFn();
+        // In SDK 56 getCameraPermissionsAsync è un metodo statico della classe Camera,
+        // non un named export top-level del modulo.
+        const { Camera } = await import("expo-camera");
+        const { status } = await Camera.getCameraPermissionsAsync();
         if (status === "granted") return { status: "PASS" };
         return { status: "WARN", message: `Stato: ${status}` };
       } catch {
@@ -549,7 +555,7 @@ export async function runAllTests(
     testPushToken,
     testGpsReading,
     testRoutingReal,
-    () => testHardwareSensors(caps.isDiagnosticApk, caps.isNative),
+    () => testHardwareSensors(caps.isNative),
   ];
   if (isAdmin) {
     sections.push(testAdmin);
@@ -585,6 +591,7 @@ export async function runAllTests(
     appVersion: Constants.expoConfig?.version ?? "?",
     platform: Platform.OS,
     deviceModel: Device.modelName ?? Device.deviceName ?? "?",
+    buildProfile: caps.buildProfile,
     runAt: new Date().toISOString(),
   };
 }

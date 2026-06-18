@@ -5,7 +5,7 @@ import type { DiagnosticSummary, DiagnosticTestResult } from "@/lib/diagnostic/r
 
 export interface DiagReport {
   id: string; userId?: string; nickname?: string; triggeredBy: string;
-  appVersion?: string; platform?: string; deviceModel?: string;
+  appVersion?: string; platform?: string; deviceModel?: string; buildProfile?: string;
   runAt: string; sentryEventId?: string; summary?: DiagnosticSummary;
   results?: DiagnosticTestResult[];
 }
@@ -41,8 +41,13 @@ export function DiagnosticReportCard({ report: r, isExpanded, onToggle, remoteRe
                 <Text style={styles.remoteBadgeText}>REMOTO</Text>
               </View>
             )}
+            {r.buildProfile === "diagnostic" && (
+              <View style={styles.diagnosticBadge}>
+                <Text style={styles.diagnosticBadgeText}>DIAGNOSTIC</Text>
+              </View>
+            )}
           </View>
-          <Text style={styles.reportMeta}>{r.appVersion ?? "?"} · {r.platform ?? "?"} · {r.triggeredBy}</Text>
+          <Text style={styles.reportMeta}>{r.appVersion ?? "?"} · {r.platform ?? "?"} · {r.triggeredBy} · {r.buildProfile ?? "?"}</Text>
           <Text style={styles.reportDate}>{new Date(r.runAt).toLocaleString("it-IT")}</Text>
         </View>
         <View style={styles.reportBadges}>
@@ -98,6 +103,8 @@ const styles = StyleSheet.create({
   reportNickname: { color: "#E5E7EB", fontSize: 14, fontWeight: "600" },
   remoteBadge: { backgroundColor: "#4C1D95", borderRadius: 4, paddingHorizontal: 5, paddingVertical: 2 },
   remoteBadgeText: { color: "#A78BFA", fontSize: 9, fontWeight: "700", letterSpacing: 0.4 },
+  diagnosticBadge: { backgroundColor: "#1E3A8A", borderRadius: 4, paddingHorizontal: 5, paddingVertical: 2 },
+  diagnosticBadgeText: { color: "#93C5FD", fontSize: 9, fontWeight: "700", letterSpacing: 0.4 },
   reportMeta: { color: "#9CA3AF", fontSize: 12, marginTop: 1 },
   reportDate: { color: "#6B7280", fontSize: 11, marginTop: 1 },
   reportBadges: { flexDirection: "row", alignItems: "center", gap: 6 },

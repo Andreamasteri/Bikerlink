@@ -31,6 +31,11 @@ log_error()   { echo -e "${RED}[OTA ERROR]${NC} $*" >&2; }
 
 # ── Parsing argomenti ──
 MESSAGE=""
+# Canale OTA di default: staging (flusso produzione/staging esistente).
+# Con --diagnostic si pubblica sul canale isolato "diagnostic", riservato alle
+# build diagnostic-apk, così gli OTA diagnostici non raggiungono gli utenti prod.
+OTA_CHANNEL="staging"
+BUILD_PROFILE=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -38,9 +43,14 @@ while [[ $# -gt 0 ]]; do
       MESSAGE="$2"
       shift 2
       ;;
+    --diagnostic)
+      OTA_CHANNEL="diagnostic"
+      BUILD_PROFILE="diagnostic"
+      shift
+      ;;
     *)
       log_error "Argomento sconosciuto: $1"
-      echo "Uso: $0 --message \"Descrizione aggiornamento\"" >&2
+      echo "Uso: $0 --message \"Descrizione aggiornamento\" [--diagnostic]" >&2
       exit 1
       ;;
   esac
@@ -133,7 +143,7 @@ fi
 log_info "Fase 1/2 — Metro export (bundle Android, attendi 2-5 minuti)..."
 rm -rf "$DIST_DIR"
 _T0=$(date +%s)
-EXPO_TOKEN="${EAS_TOKEN}" npx expo export \
+EXPO_TOKEN="${EAS_TOKEN}" EXPO_PUBLIC_BUILD_PROFILE="${BUILD_PROFILE}" npx expo export \
   --platform android \
   --output-dir "$DIST_DIR" \
   2>&1 || {
@@ -145,10 +155,10 @@ log_success "⏱ Metro export completato in ${T_EXPORT}s"
 
 # ── Pubblica su staging (usa il bundle pre-compilato) ──
 # T_UPLOAD misura il trasferimento CDN; il record EAS è incluso (T_PUBLISH=0).
-log_info "Fase 2/2 — EAS upload bundle su CDN (canale staging)..."
+log_info "Fase 2/2 — EAS upload bundle su CDN (canale ${OTA_CHANNEL})..."
 _T0=$(date +%s)
 EAS_OUTPUT=$(EAS_NO_VCS=1 EAS_SKIP_AUTO_FINGERPRINT=1 EXPO_TOKEN="${EAS_TOKEN}" bash scripts/eas.sh update \
-  --channel staging \
+  --channel "${OTA_CHANNEL}" \
   --message "${MESSAGE}" \
   --environment production \
   --input-dir "$DIST_DIR" \
@@ -183,7 +193,7 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 log_success "OTA pubblicata con successo!"
 echo -e "  ${BLUE}Versione OTA${NC}: ${VERSION}"
 echo -e "  ${BLUE}Update ID${NC}:    ${UPDATE_ID:-"(vedi output eas sopra)"}"
-echo -e "  ${BLUE}Canale${NC}:       staging"
+echo -e "  ${BLUE}Canale${NC}:       ${OTA_CHANNEL}"
 echo -e "  ${BLUE}Messaggio${NC}:    ${MESSAGE}"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
