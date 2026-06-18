@@ -96,6 +96,43 @@ La versione OTA segue la formula `<build>.<updateNumber>.<ciclo>` — lo script 
 
 ---
 
+## Build Diagnostic (suffisso `D`)
+
+Le build di tipo **diagnostic** sono APK non destinati al Play Store, usati per raccogliere log/telemetria in campo. Hanno una convenzione di versionName dedicata.
+
+### Convenzione
+
+- Al **numero di build** del `versionName` si aggiunge il suffisso letterale `D` — **e solo lì**.
+- Il formato diventa: `<build>D.<ota_inglobata>.<ciclo>`
+- Il `versionCode` numerico **rimane senza suffisso** (deve restare un intero valido per Android).
+
+### Esempio concreto
+
+Partendo da una build normale `70.10.114`, la corrispondente build diagnostic è:
+
+| File | Campo | Valore diagnostic |
+|---|---|---|
+| `app.json` | `expo.version` | `70D.10.114` |
+| `app.json` | `expo.android.versionCode` | `70` (invariato, senza `D`) |
+| `android/app/build.gradle` | `versionName` | `"70D.10.114"` |
+| `android/app/build.gradle` | `versionCode` | `70` (invariato, senza `D`) |
+
+### Cosa NON cambia rispetto a una build normale
+
+Rispetto allo schema standard, una build diagnostic **non** modifica:
+
+- `versionCode` → resta il numero intero, identico alla build normale corrispondente
+- `runtimeVersion` / `expo_runtime_version` → invariati (stesso ciclo OTA)
+- contatore OTA (`APPLIED_OTA_NUMBER` in `constants/buildInfo.ts` e OTA per-ciclo) → invariati
+- formula di `scripts/publish-ota.sh` → invariata
+
+### ⚠️ Note
+
+- Una build diagnostic **non va pubblicata sul Play Store**.
+- Il suffisso `D` è puramente identificativo nel `versionName` per riconoscere a colpo d'occhio una build diagnostic sul dispositivo.
+
+---
+
 ## Tabella storica dei cicli
 
 | APK | versionCode | versionName | runtimeVersion | Ciclo | OTA nel ciclo | Note |
@@ -155,5 +192,6 @@ Checklist rapida per i task di bump versione:
 - [ ] `constants/buildInfo.ts` → `RELEASE_NUMBER` (allinearlo al nuovo versionCode)
 - [ ] `.agents/skills/bikerlink-ota-publish/SKILL.md` → sezione "Contesto fisso" e "Cicli precedenti"
 - [ ] Questa skill → tabella storica dei cicli
+- [ ] **Se build diagnostic**: `versionName` usa il formato `<build>D.<ota>.<ciclo>` (es. `70D.10.114`) in `app.json` e `build.gradle`; il `versionCode` resta intero senza `D` (vedi sezione "Build Diagnostic")
 
 > `scripts/publish-ota.sh` **non va toccato**: legge `versionCode` e `runtimeVersion` dinamicamente da `app.json` a ogni esecuzione OTA.
