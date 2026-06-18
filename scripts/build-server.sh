@@ -35,8 +35,13 @@ log_phase "Controllo scope direct-eval..."
 bash "$SCRIPT_DIR/check-direct-eval-scope.sh"
 
 compute_checksum() {
-  find server/ shared/ -name '*.ts' -not -path '*/node_modules/*' 2>/dev/null \
-    | sort | xargs sha256sum 2>/dev/null | sha256sum | awk '{print $1}'
+  # Include package-lock.json so dependency-only updates (npm install) also
+  # invalidate the cache and trigger a fresh esbuild run.
+  {
+    find server/ shared/ -name '*.ts' -not -path '*/node_modules/*' 2>/dev/null \
+      | sort | xargs sha256sum 2>/dev/null
+    sha256sum package-lock.json 2>/dev/null || true
+  } | sha256sum | awk '{print $1}'
 }
 
 CURRENT_CHECKSUM=$(compute_checksum)
