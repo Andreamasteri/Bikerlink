@@ -71,7 +71,12 @@ vi.mock("react-native", () => ({
 vi.mock("expo-haptics", () => ({ impactAsync: vi.fn(), ImpactFeedbackStyle: { Light: "light", Medium: "medium" } }));
 vi.mock("react-native-safe-area-context", () => ({ useSafeAreaInsets: () => ({ top: 47, bottom: 34 }) }));
 vi.mock("@expo/vector-icons", () => ({ Ionicons: () => null }));
-vi.mock("expo-router", () => ({ useRouter: () => ({ push: vi.fn() }), usePathname: () => "/" }));
+// useRouter DEVE restituire una referenza STABILE (come il vero expo-router):
+// è dep dei useCallback handler (handleChatPress/...), a loro volta dep dei
+// useMemo dei gesti del menu. Un `() => ({ push })` nuovo a ogni render
+// invaliderebbe quei gesti per costruzione, mascherando la memoizzazione reale.
+const stableRouter = { push: vi.fn() };
+vi.mock("expo-router", () => ({ useRouter: () => stableRouter, usePathname: () => "/" }));
 vi.mock("@react-native-async-storage/async-storage", () => ({
   default: { getItem: vi.fn().mockResolvedValue(null), setItem: vi.fn() },
 }));
@@ -114,6 +119,27 @@ function lastExclusive(): Builder | undefined {
     if (h.captures[i]?._type === "Exclusive") return h.captures[i];
   }
   return undefined;
+}
+
+// Snapshot dei gesti del MENU dai captures correnti. Quando il menu è aperto i
+// GestureDetector di primo livello vengono spinti in quest'ordine fisso:
+//   backdrop(Tap) → menuPan(Pan) → chat(Tap) → notifiche(Tap) → player(Tap) → composed(Exclusive)
+// I gesti figli della pallina (panGesture/tapGesture) NON finiscono in captures:
+// stanno dentro composed.gestures, non vengono passati a un GestureDetector
+// proprio. Quindi gli unici Tap/Pan di primo livello sono quelli del menu.
+// IMPORTANTE: chiamare solo dopo aver svuotato h.captures, così i filtri vedono
+// esattamente un render (altrimenti i Tap si accumulano e l'ordine si rompe).
+function menuSnapshot() {
+  const taps = h.captures.filter((c) => c?._type === "Tap");
+  const pans = h.captures.filter((c) => c?._type === "Pan");
+  return {
+    backdrop: taps[0],
+    chat: taps[1],
+    notifications: taps[2],
+    player: taps[3],
+    menuPan: pans[0],
+    composed: lastExclusive(),
+  };
 }
 
 describe("FloatingWidget — gesti RNGH memoizzati (stabilità tra re-render)", () => {
@@ -181,6 +207,104 @@ describe("FloatingWidget — gesti RNGH memoizzati (stabilità tra re-render)", 
     expect(last).toBe(first);
     expect(last?.gestures?.[0]).toBe(firstPan);
     expect(last?.gestures?.[1]).toBe(firstTap);
+
+    await act(async () => {
+      renderer.unmount();
+    });
+  });
+
+  // Apre il menu della pallina simulando il tap reale: il tapGesture della
+  // pallina (Exclusive.gestures[1]) chiama onEnd(success=true) → runOnJS(handleTapJS)
+  // → openMenu() → setMenuOpen(true). Ritorna il gesto Pan della pallina (per
+  // innescare i re-render successivi via setIsTouching senza riaprire/chiudere il menu).
+  async function openMenu(): Promise<Builder | undefined> {
+    const composed = lastExclusive();
+    const ballTap = composed?.gestures?.[1];
+    expect(ballTap?._type).toBe("Tap");
+    await act(async () => {
+      ballTap?._cb.onEnd?.({}, true);
+    });
+    const ballPan = lastExclusive()?.gestures?.[0];
+    expect(ballPan?._type).toBe("Pan");
+    return ballPan;
+  }
+
+  it("i gesti del menu aperto (chat/notifiche/player/backdrop/menuPan) restano la STESSA referenza dopo setIsTouching", async () => {
+    let renderer: TestRenderer.ReactTestRenderer;
+    await act(async () => {
+      renderer = TestRenderer.create(createElement(FloatingWidget));
+    });
+
+    const ballPan = await openMenu();
+
+    // Snapshot dei gesti del menu dopo l'apertura. Svuoto prima i captures e
+    // forzo un re-render (setIsTouching false→true) così menuSnapshot vede
+    // esattamente un render pulito con tutti i GestureDetector del menu.
+    h.captures.length = 0;
+    await act(async () => {
+      ballPan?._cb.onStart?.();
+    });
+    const before = menuSnapshot();
+
+    expect(before.backdrop?._type, "il backdrop dovrebbe essere un Tap").toBe("Tap");
+    expect(before.menuPan?._type, "il menuPan dovrebbe essere un Pan").toBe("Pan");
+    expect(before.chat?._type).toBe("Tap");
+    expect(before.notifications?._type).toBe("Tap");
+    expect(before.player?._type).toBe("Tap");
+    expect(before.composed?._type).toBe("Exclusive");
+
+    // Re-render innescato da setState (setIsTouching true→false), menu ancora aperto.
+    h.captures.length = 0;
+    await act(async () => {
+      ballPan?._cb.onFinalize?.();
+    });
+    const after = menuSnapshot();
+
+    // Cuore del test: ogni gesto del menu deve restare la STESSA referenza.
+    // Se uno torna inline (useMemo rimosso) il re-render lo ricrea ⇒ ref diversa
+    // ⇒ RNGH ri-registra l'handler nativo e il pulsante smette di rispondere.
+    expect(after.chat, "chatTapGesture de-memoizzato").toBe(before.chat);
+    expect(after.notifications, "notificationsTapGesture de-memoizzato").toBe(before.notifications);
+    expect(after.player, "playerTapGesture de-memoizzato").toBe(before.player);
+    expect(after.backdrop, "backdropTapGesture de-memoizzato").toBe(before.backdrop);
+    expect(after.menuPan, "menuPanGesture de-memoizzato").toBe(before.menuPan);
+    expect(after.composed, "composedGesture de-memoizzato").toBe(before.composed);
+
+    await act(async () => {
+      renderer.unmount();
+    });
+  });
+
+  it("i gesti del menu restano stabili su più re-render consecutivi", async () => {
+    let renderer: TestRenderer.ReactTestRenderer;
+    await act(async () => {
+      renderer = TestRenderer.create(createElement(FloatingWidget));
+    });
+
+    const ballPan = await openMenu();
+
+    h.captures.length = 0;
+    await act(async () => {
+      ballPan?._cb.onStart?.();
+    });
+    const first = menuSnapshot();
+
+    // Tre re-render consecutivi da setState: le referenze non devono mai cambiare.
+    for (let i = 0; i < 3; i++) {
+      h.captures.length = 0;
+      await act(async () => {
+        ballPan?._cb.onFinalize?.();
+      });
+      await act(async () => {
+        ballPan?._cb.onStart?.();
+      });
+      const snap = menuSnapshot();
+      expect(snap.chat).toBe(first.chat);
+      expect(snap.notifications).toBe(first.notifications);
+      expect(snap.player).toBe(first.player);
+      expect(snap.backdrop).toBe(first.backdrop);
+      expect(snap.menuPan).toBe(first.menuPan);
+    }
 
     await act(async () => {
       renderer.unmount();
