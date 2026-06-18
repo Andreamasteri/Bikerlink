@@ -69,7 +69,7 @@ record_backend_crash_session() {
   BACKEND_CRASH_TIMES=("${new_times[@]}" "$now")
 
   local count=${#BACKEND_CRASH_TIMES[@]}
-  if [ "$count" -gt "$MAX_CRASHES_IN_WINDOW" ]; then
+  if [ "$count" -ge "$MAX_CRASHES_IN_WINDOW" ]; then
     BACKEND_CRASH_SESSIONS=$((BACKEND_CRASH_SESSIONS + 1))
     local step=$((BACKEND_CRASH_SESSIONS - 1))
     local max_step=$(( ${#BACKOFF_STEPS[@]} - 1 ))
@@ -136,7 +136,7 @@ record_metro_crash_session() {
   METRO_CRASH_TIMES=("${new_times[@]}" "$now")
 
   local count=${#METRO_CRASH_TIMES[@]}
-  if [ "$count" -gt "$MAX_CRASHES_IN_WINDOW" ]; then
+  if [ "$count" -ge "$MAX_CRASHES_IN_WINDOW" ]; then
     METRO_CRASH_SESSIONS=$((METRO_CRASH_SESSIONS + 1))
     local step=$((METRO_CRASH_SESSIONS - 1))
     local max_step=$(( ${#BACKOFF_STEPS[@]} - 1 ))
