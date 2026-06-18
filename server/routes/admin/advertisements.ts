@@ -55,7 +55,7 @@ async function deleteAdImageIfUnreferenced(filename: string, excludeIds: string[
     // caso NON cancellare il file — meglio lasciare un orfano che perdere tutte
     // le immagini.  Solo quando il numero di esclusi copre tutta la lista
     // (bulk delete totale) il risultato vuoto è attendibile.
-    if (all.length === 0 && excludeIds.length < 5) {
+    if (all.length === 0 && excludeIds.length === 0) {
       console.warn(`[ads/cleanup] SKIP delete ${filename} — getAllCampaigns() ha restituito 0 risultati (possibile blip DB). Riprova alla prossima operazione.`);
       return;
     }
