@@ -58,7 +58,11 @@ export default function AssistantFab() {
 
   if (!fabEnabled) return null;
 
-  const bottom = Platform.OS === "web" ? 34 + 16 : insets.bottom + 16;
+  const TAB_BAR_HEIGHT = 60;
+  const bottom =
+    Platform.OS === "web"
+      ? 34 + TAB_BAR_HEIGHT + 16
+      : insets.bottom + TAB_BAR_HEIGHT + 16;
 
   return (
     <>

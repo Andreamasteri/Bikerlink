@@ -3,7 +3,6 @@ import {
   View,
   Text,
   StyleSheet,
-  Pressable,
   Dimensions,
   useWindowDimensions,
   BackHandler,
@@ -253,6 +252,17 @@ export default function FloatingWidget() {
       if (success) runOnJS(handlePlayerPress)();
     });
 
+  // Backdrop tap gesture — lives in the same RNGH native layer as the menu item
+  // gestures, so on Android the two systems (RNGH vs JS Pressable) can no longer
+  // fire simultaneously. Touches that land on the menu panel never reach this
+  // gesture because the panel is rendered on top (higher z-order) and RNGH's hit
+  // test routes the touch to the topmost view.
+  const backdropTapGesture = Gesture.Tap()
+    .onEnd((_e, success) => {
+      "worklet";
+      if (success) runOnJS(closeMenu)();
+    });
+
   // Swipe-down-to-dismiss gesture on the menu panel
   const menuPanGesture = Gesture.Pan()
     .runOnJS(true)
@@ -331,9 +341,17 @@ export default function FloatingWidget() {
 
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
-      {/* Backdrop: catches taps outside the menu at root level */}
+      {/* Backdrop: catches taps outside the menu at root level.
+          Uses GestureDetector+Gesture.Tap() (RNGH native layer) so it lives in
+          the same gesture system as the menu item GestureDetectors. On Android
+          a Pressable (JS touch layer) would fire simultaneously with the RNGH
+          item gestures, causing a navigation conflict that closes/resets the
+          screen. Sharing the RNGH layer means RNGH's native hit-test routes the
+          touch to exactly ONE target — either the backdrop or a menu item. */}
       {menuOpen && (
-        <Pressable style={StyleSheet.absoluteFill} onPress={closeMenu} />
+        <GestureDetector gesture={backdropTapGesture}>
+          <Animated.View style={StyleSheet.absoluteFill} />
+        </GestureDetector>
       )}
 
       {/* Menu rendered at the ROOT absoluteFill level (a sibling of the ball),
