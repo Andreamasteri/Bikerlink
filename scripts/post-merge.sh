@@ -304,6 +304,27 @@ fi
 echo "════════════════════════════════════════"
 echo ""
 
+# ── GATE TEST GESTURE COMPONENTI ────────────────────────────
+# Esegue i test automatici in components/__tests__/ (gesture + layout).
+# Se fallisce, il merge è bloccato — un refactor che rompe FloatingWidget
+# o AssistantFab viene rilevato qui prima di raggiungere produzione.
+echo "════════════════════════════════════════"
+echo "  Gate test gesture componenti"
+echo "════════════════════════════════════════"
+GESTURE_TEST_EXIT=0
+npx vitest run components/__tests__ 2>&1 || GESTURE_TEST_EXIT=$?
+if [ "$GESTURE_TEST_EXIT" -eq 0 ]; then
+  echo "✅ Gesture tests: tutti i test passati."
+else
+  echo "❌ Gesture tests FALLITI (exit ${GESTURE_TEST_EXIT}) — verificare components/__tests__/ prima di procedere."
+  echo "   Eseguire 'npx vitest run components/__tests__' localmente per i dettagli."
+  echo "════════════════════════════════════════"
+  echo ""
+  exit "$GESTURE_TEST_EXIT"
+fi
+echo "════════════════════════════════════════"
+echo ""
+
 # ── CLEANUP UTENTI SMOKE RESIDUI POST-MERGE ──────────────────
 echo "════════════════════════════════════════"
 echo "  Cleanup utenti smoke residui"
