@@ -9,11 +9,13 @@ import { CreateUserPayload } from "@/components/admin/users/CreateUserModal";
 export function useAdminUsers() {
   const { data: users = [], isLoading } = useQuery<AdminUser[]>({
     queryKey: ["/api/admin/users"],
+    staleTime: 60_000,
   });
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: summary } = useQuery<any>({
     queryKey: ["/api/admin/users/stats/summary"],
+    staleTime: 60_000,
   });
 
   const { data: matchabilityData } = useQuery<{

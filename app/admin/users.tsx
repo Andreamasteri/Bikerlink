@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { View, Text, StyleSheet, FlatList, Alert, TouchableOpacity } from "react-native";
+import { View, Text, StyleSheet, FlatList, Alert, TouchableOpacity, ActivityIndicator } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 import { useT } from "@/lib/language-context";
@@ -185,6 +185,25 @@ export default function AdminUsers() {
     ]);
   }
 
+  if (isLoading && users.length === 0) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={Colors.accent} />
+        <Text style={styles.loadingText}>Caricamento utenti...</Text>
+        {[0, 1, 2].map((i) => (
+          <View key={i} style={styles.skeletonCard}>
+            <View style={styles.skeletonAvatar} />
+            <View style={styles.skeletonLines}>
+              <View style={[styles.skeletonLine, { width: "55%" }]} />
+              <View style={[styles.skeletonLine, { width: "75%", marginTop: 6 }]} />
+              <View style={[styles.skeletonLine, { width: "40%", marginTop: 6 }]} />
+            </View>
+          </View>
+        ))}
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
       <FlatList
@@ -257,7 +276,7 @@ export default function AdminUsers() {
         }
         contentContainerStyle={{ padding: 16, paddingTop: 0 }}
         ListEmptyComponent={
-          <Text style={styles.emptyText}>{isLoading ? "Caricamento utenti..." : "Nessun utente trovato"}</Text>
+          <Text style={styles.emptyText}>{"Nessun utente trovato"}</Text>
         }
       />
 
@@ -350,6 +369,12 @@ export default function AdminUsers() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
+  loadingContainer: { flex: 1, backgroundColor: Colors.background, alignItems: "center", paddingTop: 48, paddingHorizontal: 16 },
+  loadingText: { fontFamily: "Inter_400Regular", fontSize: 14, color: Colors.textSecondary, marginTop: 12, marginBottom: 24 },
+  skeletonCard: { flexDirection: "row", alignItems: "center", width: "100%", backgroundColor: Colors.card ?? Colors.background, borderRadius: 12, padding: 14, marginBottom: 12, opacity: 0.6 },
+  skeletonAvatar: { width: 44, height: 44, borderRadius: 22, backgroundColor: Colors.textSecondary, opacity: 0.25 },
+  skeletonLines: { flex: 1, marginLeft: 12 },
+  skeletonLine: { height: 12, borderRadius: 6, backgroundColor: Colors.textSecondary, opacity: 0.25 },
   emptyText: { fontFamily: "Inter_400Regular", fontSize: 14, color: Colors.textSecondary, textAlign: "center", marginTop: 40 },
   filtersRow: { flexDirection: "row", alignItems: "flex-end", gap: 8 },
   createBtn: {
