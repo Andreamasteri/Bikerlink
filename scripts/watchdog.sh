@@ -176,26 +176,73 @@ record_metro_crash_session() {
 
 METRO_LOCK_FILE="/tmp/start-metro.lock"
 
-restart_metro() {
-  log "METRO CRASH: porta $METRO_PORT non risponde. Pulizia cache e riavvio..."
-
-  # Controlla se start-expo.sh è già in avvio tramite lock file (simmetrico al backend).
-  # Usa flock -n per verificare se il lock è ancora detenuto, eliminando i falsi
-  # positivi da PID reuse: se flock -n fallisce, il lock è realmente attivo.
+# Restituisce 0 (true) se un avvio Metro è realmente in corso:
+#   - processo scripts/start-expo.sh attivo (pgrep), OPPURE
+#   - lock /tmp/start-metro.lock ancora detenuto (flock -n fallisce).
+# Usa un fd dedicato (200), MAI fd 9 che appartiene a start-expo.sh. Il lock
+# viene solo sondato e rilasciato subito: non lo deteniamo né lo rimuoviamo qui.
+metro_starting() {
+  if pgrep -f "scripts/start-expo.sh" >/dev/null 2>&1; then
+    return 0
+  fi
   if [ -f "$METRO_LOCK_FILE" ]; then
-    LOCK_PID=$(cat "$METRO_LOCK_FILE" 2>/dev/null || echo "?")
-    if ! flock -n "$METRO_LOCK_FILE" true 2>/dev/null; then
-      log "Metro startup già in corso (PID: $LOCK_PID) — skip restart"
+    exec 200>>"$METRO_LOCK_FILE"
+    if ! flock -n 200; then
+      exec 200>&-
       return 0
     fi
-    # Il lock non è più detenuto: file stale, rimuovi
-    rm -f "$METRO_LOCK_FILE"
+    flock -u 200 2>/dev/null || true
+    exec 200>&-
+  fi
+  return 1
+}
+
+# Kill mirato della SOLA porta Metro: SIGTERM → attesa → SIGKILL se ancora viva.
+# Mai pkill per nome (colpirebbe processi non correlati).
+kill_metro_port() {
+  lsof -ti:"$METRO_PORT" 2>/dev/null | xargs -r kill -TERM 2>/dev/null || true
+  sleep 2
+  lsof -ti:"$METRO_PORT" 2>/dev/null | xargs -r kill -KILL 2>/dev/null || true
+}
+
+restart_metro() {
+  # Doppio cancello PRIMA di qualsiasi kill: se un avvio è in corso (lock tenuto
+  # o start-expo.sh attivo) non toccare nulla. Un blind kill qui ucciderebbe il
+  # Metro in fase di boot → exit 143 → start.sh lo classifica come crash → loop.
+  if metro_starting; then
+    log "METRO: skip — avvio in corso (lock/start-expo attivo), nessun kill"
+    return 0
   fi
 
-  lsof -ti:"$METRO_PORT" 2>/dev/null | xargs kill -9 2>/dev/null || true
-  pkill -f "expo start" 2>/dev/null || true
-  pkill -f "react-native/cli" 2>/dev/null || true
-  sleep 2
+  log "METRO CRASH: porta $METRO_PORT non risponde. Pulizia cache e riavvio..."
+
+  # Rimozione lock SOLO se davvero stale. Tra il gate metro_starting e questo
+  # punto un start-expo.sh potrebbe essere appena partito e aver acquisito il
+  # lock (finestra TOCTOU): se rimuovessimo il file alla cieca cancelleremmo un
+  # lock attivo → due Metro in avvio concorrente. Riacquisiamo con flock -n su
+  # fd 200: se riesce il lock NON è detenuto → stale → lo rimuoviamo mentre lo
+  # teniamo; se fallisce qualcuno ha appena avviato Metro → bail senza toccare.
+  if [ -f "$METRO_LOCK_FILE" ]; then
+    exec 200>>"$METRO_LOCK_FILE"
+    if flock -n 200; then
+      rm -f "$METRO_LOCK_FILE"
+      flock -u 200 2>/dev/null || true
+      exec 200>&-
+    else
+      exec 200>&-
+      log "METRO: skip — lock acquisito durante il restart (avvio appena partito), nessun kill"
+      return 0
+    fi
+  fi
+
+  # Doppio controllo immediatamente prima del kill: restringe ulteriormente la
+  # finestra TOCTOU se un avvio è partito dopo la verifica/rimozione del lock.
+  if metro_starting; then
+    log "METRO: skip — avvio rilevato prima del kill, nessun kill"
+    return 0
+  fi
+
+  kill_metro_port
 
   log "METRO CLEAN: esecuzione clean-metro.sh prima del riavvio..."
   if bash /home/runner/workspace/scripts/clean-metro.sh >> "$LOG_FILE" 2>&1; then
@@ -231,6 +278,12 @@ backend_crash_session_counted=0
 last_metro_restart=0
 metro_down_since=0
 metro_crash_session_counted=0
+
+# Grace window: nei primi METRO_GRACE_SECS dal boot un Metro non ancora su è
+# normale (cache rebuild, avvio lento). In questa finestra: solo warning, mai
+# restart/backoff — evita di uccidere il Metro in boot e innescare crash loop.
+METRO_GRACE_SECS=180
+BOOT_TS=$(date +%s)
 
 while [ "$RUNNING" -eq 1 ]; do
   now=$(date +%s)
@@ -292,26 +345,31 @@ while [ "$RUNNING" -eq 1 ]; do
       metro_down_since=$now
       metro_healthy_since=0
     fi
-    time_since_last_metro_restart=$((now - last_metro_restart))
-    if [ "$time_since_last_metro_restart" -ge "$METRO_RESTART_COOLDOWN" ]; then
-      if [ "$METRO_BACKOFF_UNTIL" -gt "$now" ]; then
-        remaining=$((METRO_BACKOFF_UNTIL - now))
-        log "METRO GIU': crash loop backoff attivo — attendo ancora ${remaining}s"
-      else
-        if [ "$metro_crash_session_counted" -eq 0 ]; then
-          metro_crash_session_counted=1
-          if ! record_metro_crash_session "$now"; then
-            log "METRO GIU': backoff appena attivato — skip restart questo ciclo"
-            last_metro_restart=$now
-            sleep "$CHECK_INTERVAL"
-            continue
-          fi
-        fi
-        restart_metro
-        last_metro_restart=$now
-      fi
+    metro_uptime=$((now - BOOT_TS))
+    if [ "$metro_uptime" -lt "$METRO_GRACE_SECS" ]; then
+      log "METRO non ancora attivo — in grace window (${metro_uptime}s/${METRO_GRACE_SECS}s), nessun restart"
     else
-      log "METRO ANCORA GIU': prossimo tentativo di riavvio tra $((METRO_RESTART_COOLDOWN - time_since_last_metro_restart))s"
+      time_since_last_metro_restart=$((now - last_metro_restart))
+      if [ "$time_since_last_metro_restart" -ge "$METRO_RESTART_COOLDOWN" ]; then
+        if [ "$METRO_BACKOFF_UNTIL" -gt "$now" ]; then
+          remaining=$((METRO_BACKOFF_UNTIL - now))
+          log "METRO GIU': crash loop backoff attivo — attendo ancora ${remaining}s"
+        else
+          if [ "$metro_crash_session_counted" -eq 0 ]; then
+            metro_crash_session_counted=1
+            if ! record_metro_crash_session "$now"; then
+              log "METRO GIU': backoff appena attivato — skip restart questo ciclo"
+              last_metro_restart=$now
+              sleep "$CHECK_INTERVAL"
+              continue
+            fi
+          fi
+          restart_metro
+          last_metro_restart=$now
+        fi
+      else
+        log "METRO ANCORA GIU': prossimo tentativo di riavvio tra $((METRO_RESTART_COOLDOWN - time_since_last_metro_restart))s"
+      fi
     fi
   fi
 

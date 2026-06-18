@@ -92,17 +92,28 @@ check_metro_alive() {
     # Il processo è già terminato: wait ne recupera l'exit code (ritorna subito).
     wait "$EXPO_PID" 2>/dev/null; local EXPO_EXIT=$?
 
-    if [ "$EXPO_EXIT" -eq 2 ]; then
-      # start-expo.sh ha saltato l'avvio perché Metro era già in esecuzione (lock detenuto).
+    # Exit 2   = start-expo.sh ha saltato l'avvio (lock detenuto, Metro già up).
+    # Exit 143 = Metro interrotto da segnale esterno (SIGTERM = 128+15). NON è un
+    #            crash né un guasto: è un'interruzione. Va trattato esattamente
+    #            come exit 2 — niente "METRO CRASH", niente restart loop/backoff.
+    if [ "$EXPO_EXIT" -eq 2 ] || [ "$EXPO_EXIT" -eq 143 ]; then
       # Non è un crash: verifica che la porta 8081 risponda davvero.
       if nc -z 127.0.0.1 8081 2>/dev/null || \
          curl -s --max-time 3 http://localhost:8081 >/dev/null 2>&1; then
-        log "[check_metro] Metro già in esecuzione (skip exit 2) — porta 8081 risponde → OK"
+        if [ "$EXPO_EXIT" -eq 143 ]; then
+          log "[check_metro] Metro interrotto da segnale esterno (SIGTERM, exit 143) — porta 8081 risponde → OK (nessun restart loop)"
+        else
+          log "[check_metro] Metro già in esecuzione (skip exit 2) — porta 8081 risponde → OK"
+        fi
         METRO_SKIPPED=1
         EXPO_PID=""   # azzera per sicurezza: evita wait ripetuti su PID già raccolto
         return 0
       else
-        fail "2/4" "Metro skippato (già in esecuzione, exit 2) ma porta 8081 non risponde — Metro non è attivo"
+        if [ "$EXPO_EXIT" -eq 143 ]; then
+          fail "2/4" "Metro interrotto da segnale esterno (SIGTERM, exit 143) ma porta 8081 non risponde — Metro non è attivo"
+        else
+          fail "2/4" "Metro skippato (già in esecuzione, exit 2) ma porta 8081 non risponde — Metro non è attivo"
+        fi
       fi
     fi
 
