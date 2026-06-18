@@ -69,9 +69,6 @@ vi.mock("@/lib/floating-widget-context", () => ({
 vi.mock("@/lib/theme-context", () => ({
   useTheme: vi.fn(() => ({ colors: { primary: "#000", text: "#FFF" } })),
 }));
-vi.mock("@/lib/assistant-fab-gesture-context", () => ({
-  useAssistantFabGestureRef: vi.fn(() => ({ current: undefined })),
-}));
 vi.mock("react", () => ({
   useRef: (v: unknown) => ({ current: v }),
   useState: (v: unknown) => [v, vi.fn()],

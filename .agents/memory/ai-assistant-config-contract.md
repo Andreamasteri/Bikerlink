@@ -53,19 +53,22 @@ setters are already stable) and wrap the gesture in `useMemo([callback, sharedVa
 This was the suspected cause of the AssistantFab (bottom-left AI FAB) not responding
 to taps while the FloatingWidget ball worked fine.
 
-## FAB ↔ FloatingWidget backdrop gesture coordination (Task #4449 secondary fix)
-The FloatingWidget renders a full-screen `Gesture.Tap()` backdrop while its menu is
-open; it overlaps the FAB corner and on Android RNGH's native hit-test could route a
-FAB tap to the backdrop instead. Fixed by sharing the FAB gesture via
-`lib/assistant-fab-gesture-context.tsx` (context whose default is a module-level
-fallback ref `{current:undefined}` so consumers never crash without a provider). The
-FAB attaches `.withRef(fabGestureRef)`; the backdrop declares
-`.simultaneousWithExternalGesture(fabGestureRef)`. Provider mounts in RootProviders
-INSIDE `GestureHandlerRootView`, wrapping both consumers.
+## DO NOT coordinate FAB ↔ FloatingWidget via cross-tree gesture refs
+Tried sharing the FAB's `Gesture.Tap()` through a React context ref so the
+FloatingWidget's full-screen backdrop could declare it
+`.simultaneousWithExternalGesture(ref)` (and FAB `.withRef(ref)`). On a real Android
+APK this REGRESSED the FloatingWidget: the ball could no longer be dragged and its
+menu rendered detached from the ball — even though the backdrop only mounts while the
+menu is open. Reverted completely (removed the context module, the `.withRef`, the
+`.simultaneousWithExternalGesture`, and the provider).
 
-**Why:** `simultaneousWithExternalGesture` is additive — it never blocks the
-backdrop's own recognition, so the working FloatingWidget is unchanged; it only stops
-the backdrop from winning the FAB's touch. Tapping the FAB while the menu is open now
-opens the AI sheet AND closes the menu (coherent). `simultaneousWithExternalGesture`
-lives on `BaseGesture`, so apply it to the inner `Gesture.Tap()`/`Pan()`, NOT to a
-`Gesture.Exclusive(...)` ComposedGesture (the ball's composed gesture).
+**Why:** a cross-GestureDetector relation resolved from a context ref appears to
+corrupt RNGH's gesture-tree registration under `GestureHandlerRootView`, breaking
+sibling gestures (the ball's pan/menu), not just the intended pair. It is NOT the
+clean additive op the docs imply for refs that live in a different detector subtree.
+
+**How to apply:** keep the FAB tappable over the FloatingWidget backdrop with
+PAINT ORDER / z-order only (FAB rendered after FloatingWidget, `zIndex 10000` above
+the backdrop). Do not reach for `withRef`/`simultaneousWithExternalGesture` across
+separate components. If FAB-tap-while-menu-open ever needs to also close the menu,
+solve it locally (backdrop hitbox bounds that exclude the FAB corner), not globally.

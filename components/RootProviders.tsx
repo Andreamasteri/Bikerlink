@@ -15,7 +15,6 @@ import { TaskbarStyleProvider } from "@/lib/taskbar-style-context";
 import { UnitsProvider } from "@/lib/units-context";
 import { PlayerProvider } from "@/lib/player-context";
 import { FloatingWidgetProvider } from "@/lib/floating-widget-context";
-import { AssistantFabGestureProvider } from "@/lib/assistant-fab-gesture-context";
 import { AutoTelemetryProvider } from "@/lib/auto-telemetry-context";
 import { UptimeWidgetProvider } from "@/lib/uptime-widget-context";
 import { queryClient } from "@/lib/query-client";
@@ -80,13 +79,11 @@ export function RootProviders({
                           <FloatingWidgetProvider>
                             <UptimeWidgetProvider>
                               <GestureHandlerRootView style={{ flex: 1 }}>
-                                <AssistantFabGestureProvider>
-                                  <KeyboardProvider>
-                                    <AutoTelemetryProvider>
-                                      {children}
-                                    </AutoTelemetryProvider>
-                                  </KeyboardProvider>
-                                </AssistantFabGestureProvider>
+                                <KeyboardProvider>
+                                  <AutoTelemetryProvider>
+                                    {children}
+                                  </AutoTelemetryProvider>
+                                </KeyboardProvider>
                               </GestureHandlerRootView>
                             </UptimeWidgetProvider>
                           </FloatingWidgetProvider>

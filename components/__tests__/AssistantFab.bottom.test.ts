@@ -21,8 +21,7 @@ vi.mock("react-native", () => ({ Platform: { OS: "ios" }, StyleSheet: { create: 
 vi.mock("expo-haptics", () => ({ impactAsync: vi.fn(), ImpactFeedbackStyle: { Light: "light" } }));
 vi.mock("@expo/vector-icons", () => ({ Ionicons: {} }));
 vi.mock("react-native-safe-area-context", () => ({ useSafeAreaInsets: vi.fn(() => ({ bottom: 0, top: 0 })) }));
-vi.mock("react-native-gesture-handler", () => ({ Gesture: { Tap: () => ({ onBegin: () => ({ onFinalize: () => ({ onEnd: () => ({ withRef: () => ({}) }) }) }) }) }, GestureDetector: {} }));
-vi.mock("@/lib/assistant-fab-gesture-context", () => ({ useAssistantFabGestureRef: vi.fn(() => ({ current: undefined })) }));
+vi.mock("react-native-gesture-handler", () => ({ Gesture: { Tap: () => ({ onBegin: () => ({ onFinalize: () => ({ onEnd: () => ({}) }) }) }) }, GestureDetector: {} }));
 vi.mock("react-native-reanimated", () => ({
   useSharedValue: (v: unknown) => ({ value: v }),
   useAnimatedStyle: (fn: () => unknown) => fn(),
