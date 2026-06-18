@@ -1,4 +1,4 @@
-import React, { useRef, useState, useCallback, useEffect } from "react";
+import React, { useRef, useState, useCallback, useEffect, useMemo } from "react";
 import {
   View,
   Text,
@@ -190,45 +190,62 @@ export default function FloatingWidget() {
     }
   }, []);
 
-  // Tap gesture — fires only if pan doesn't activate (Exclusive gives pan priority)
-  const tapGesture = Gesture.Tap()
-    .onEnd((_e, success) => {
-      "worklet";
-      if (success) runOnJS(handleTapJS)();
-    });
+  // Tap gesture — fires only if pan doesn't activate (Exclusive gives pan priority).
+  // MEMOIZED: un gesto creato inline verrebbe ricreato a ogni render; GestureDetector
+  // ri-registrerebbe l'handler nativo RNGH (update asincrono) e i touch che cadono
+  // nella finestra di update verrebbero persi. Vedi memoria ai-assistant-config-contract.
+  const tapGesture = useMemo(
+    () =>
+      Gesture.Tap()
+        .onEnd((_e, success) => {
+          "worklet";
+          if (success) runOnJS(handleTapJS)();
+        }),
+    [handleTapJS],
+  );
 
-  // Pan gesture — runs on UI thread for smooth drag; JS calls via runOnJS
-  const panGesture = Gesture.Pan()
-    .minDistance(TAP_THRESHOLD + 1)
-    .onStart(() => {
-      "worklet";
-      startX.value = posX.value;
-      startY.value = posY.value;
-      runOnJS(setIsTouching)(true);
-      runOnJS(triggerDragHaptic)();
-    })
-    .onUpdate((e) => {
-      "worklet";
-      const rawX = startX.value + e.translationX;
-      const rawY = startY.value + e.translationY;
-      posX.value = Math.max(0, Math.min(rawX, screenW.value - WIDGET_SIZE));
-      posY.value = Math.max(
-        insetsTop.value + 8,
-        Math.min(rawY, screenH.value - WIDGET_SIZE - 8 - insetsBottom.value),
-      );
-    })
-    .onEnd(() => {
-      "worklet";
-      runOnJS(savePositionJS)(posX.value, posY.value);
-    })
-    .onFinalize(() => {
-      "worklet";
-      runOnJS(setIsTouching)(false);
-    });
+  // Pan gesture — runs on UI thread for smooth drag; JS calls via runOnJS.
+  // MEMOIZED: `onStart` chiama setIsTouching → re-render. Senza memoizzazione il
+  // re-render ricreava il gesto a metà trascinamento, RNGH ri-registrava l'handler
+  // nativo e il pan veniva interrotto (la pallina NON si spostava). Causa radice del bug.
+  const panGesture = useMemo(
+    () =>
+      Gesture.Pan()
+        .minDistance(TAP_THRESHOLD + 1)
+        .onStart(() => {
+          "worklet";
+          startX.value = posX.value;
+          startY.value = posY.value;
+          runOnJS(setIsTouching)(true);
+          runOnJS(triggerDragHaptic)();
+        })
+        .onUpdate((e) => {
+          "worklet";
+          const rawX = startX.value + e.translationX;
+          const rawY = startY.value + e.translationY;
+          posX.value = Math.max(0, Math.min(rawX, screenW.value - WIDGET_SIZE));
+          posY.value = Math.max(
+            insetsTop.value + 8,
+            Math.min(rawY, screenH.value - WIDGET_SIZE - 8 - insetsBottom.value),
+          );
+        })
+        .onEnd(() => {
+          "worklet";
+          runOnJS(savePositionJS)(posX.value, posY.value);
+        })
+        .onFinalize(() => {
+          "worklet";
+          runOnJS(setIsTouching)(false);
+        }),
+    [posX, posY, startX, startY, screenW, screenH, insetsTop, insetsBottom, triggerDragHaptic, savePositionJS],
+  );
 
   // Exclusive: pan has priority on all platforms (including web);
-  // tap fires only when pan threshold is never reached.
-  const composedGesture = Gesture.Exclusive(panGesture, tapGesture);
+  // tap fires only when pan threshold is never reached. MEMOIZED.
+  const composedGesture = useMemo(
+    () => Gesture.Exclusive(panGesture, tapGesture),
+    [panGesture, tapGesture],
+  );
 
   // Navigation handlers — DECLARED BEFORE the gesture objects below. The
   // gesture worklets capture these via runOnJS(); under Hermes a `const`
@@ -265,59 +282,79 @@ export default function FloatingWidget() {
   // RNGH native layer, eliminating conflicts with the parent Exclusive gesture
   // on Android (TouchableOpacity runs in the JS touch system and could be
   // swallowed by the parent GestureDetector before reaching the item).
-  const chatTapGesture = Gesture.Tap()
-    .onEnd((_e, success) => {
-      "worklet";
-      if (success) runOnJS(handleChatPress)();
-    });
+  const chatTapGesture = useMemo(
+    () =>
+      Gesture.Tap()
+        .onEnd((_e, success) => {
+          "worklet";
+          if (success) runOnJS(handleChatPress)();
+        }),
+    [handleChatPress],
+  );
 
-  const notificationsTapGesture = Gesture.Tap()
-    .onEnd((_e, success) => {
-      "worklet";
-      if (success) runOnJS(handleNotificationsPress)();
-    });
+  const notificationsTapGesture = useMemo(
+    () =>
+      Gesture.Tap()
+        .onEnd((_e, success) => {
+          "worklet";
+          if (success) runOnJS(handleNotificationsPress)();
+        }),
+    [handleNotificationsPress],
+  );
 
-  const playerTapGesture = Gesture.Tap()
-    .onEnd((_e, success) => {
-      "worklet";
-      if (success) runOnJS(handlePlayerPress)();
-    });
+  const playerTapGesture = useMemo(
+    () =>
+      Gesture.Tap()
+        .onEnd((_e, success) => {
+          "worklet";
+          if (success) runOnJS(handlePlayerPress)();
+        }),
+    [handlePlayerPress],
+  );
 
   // Backdrop tap gesture — lives in the same RNGH native layer as the menu item
   // gestures, so on Android the two systems (RNGH vs JS Pressable) can no longer
   // fire simultaneously. Touches that land on the menu panel never reach this
   // gesture because the panel is rendered on top (higher z-order) and RNGH's hit
   // test routes the touch to the topmost view.
-  const backdropTapGesture = Gesture.Tap()
-    .onEnd((_e, success) => {
-      "worklet";
-      if (success) runOnJS(closeMenu)();
-    });
+  const backdropTapGesture = useMemo(
+    () =>
+      Gesture.Tap()
+        .onEnd((_e, success) => {
+          "worklet";
+          if (success) runOnJS(closeMenu)();
+        }),
+    [closeMenu],
+  );
 
-  // Swipe-down-to-dismiss gesture on the menu panel
-  const menuPanGesture = Gesture.Pan()
-    .runOnJS(true)
-    .minDistance(8)
-    .onUpdate((e) => {
-      if (e.translationY > 0) {
-        menuTranslateY.value = e.translationY;
-        menuOpacity.value = Math.max(0, 1 - e.translationY / 160);
-      }
-    })
-    .onEnd((e) => {
-      const shouldDismiss =
-        e.translationY > SWIPE_DISMISS_THRESHOLD ||
-        e.velocityY > SWIPE_VELOCITY_THRESHOLD;
-      if (shouldDismiss) {
-        // menuPanGesture runs on the JS thread (.runOnJS(true)), so call the
-        // JS closer directly — wrapping it in runOnJS() here caused a
-        // double-dispatch that produced phantom dismiss animations.
-        closeMenuSlideDown();
-      } else {
-        menuTranslateY.value = withTiming(0, { duration: 150, easing: Easing.out(Easing.ease) });
-        menuOpacity.value = withTiming(1, { duration: 150, easing: Easing.out(Easing.ease) });
-      }
-    });
+  // Swipe-down-to-dismiss gesture on the menu panel. MEMOIZED.
+  const menuPanGesture = useMemo(
+    () =>
+      Gesture.Pan()
+        .runOnJS(true)
+        .minDistance(8)
+        .onUpdate((e) => {
+          if (e.translationY > 0) {
+            menuTranslateY.value = e.translationY;
+            menuOpacity.value = Math.max(0, 1 - e.translationY / 160);
+          }
+        })
+        .onEnd((e) => {
+          const shouldDismiss =
+            e.translationY > SWIPE_DISMISS_THRESHOLD ||
+            e.velocityY > SWIPE_VELOCITY_THRESHOLD;
+          if (shouldDismiss) {
+            // menuPanGesture runs on the JS thread (.runOnJS(true)), so call the
+            // JS closer directly — wrapping it in runOnJS() here caused a
+            // double-dispatch that produced phantom dismiss animations.
+            closeMenuSlideDown();
+          } else {
+            menuTranslateY.value = withTiming(0, { duration: 150, easing: Easing.out(Easing.ease) });
+            menuOpacity.value = withTiming(1, { duration: 150, easing: Easing.out(Easing.ease) });
+          }
+        }),
+    [menuTranslateY, menuOpacity, closeMenuSlideDown],
+  );
 
   const widgetAnimatedStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: posX.value }, { translateY: posY.value }],
