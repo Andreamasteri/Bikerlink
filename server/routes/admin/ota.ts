@@ -138,16 +138,35 @@ async function syncProductionUpdates(): Promise<void> {
   }
 }
 
+// Cache TTL in-memory di 60s sul sync EAS, con dedup delle richieste in volo.
+// La GET /releases (usata anche dalla Radiografia) prima faceva una GraphQL EAS
+// sincrona (lenta, anche >5s) ad ogni run → la probe OTA andava in timeout.
+const SYNC_TTL_MS = 60_000;
+let _lastSyncAt = 0;
+let _syncInFlight: Promise<void> | null = null;
+
+// Innesca il sync EAS in background senza bloccare il chiamante: se è già
+// avvenuto da meno di 60s (o è già in corso) non fa nulla. Non viene mai
+// awaitato dal request path, così GET /releases risponde subito dal DB.
+function triggerSyncInBackground(): void {
+  if (Date.now() - _lastSyncAt < SYNC_TTL_MS) return;
+  if (_syncInFlight) return;
+  _syncInFlight = syncProductionUpdates()
+    .then(() => { _lastSyncAt = Date.now(); })
+    .catch((err) => { console.warn("[ota] background sync warning:", err); })
+    .finally(() => { _syncInFlight = null; });
+}
+
 // GET /api/admin/ota/releases — restituisce tutto lo storico release con telemetria
 router.get("/releases", async (req: Request, res: Response) => {
   try {
     const status = typeof req.query.status === "string" ? req.query.status : undefined;
     const syncFirst = req.query.sync !== "false";
 
+    // Non-blocking: serviamo subito il DB e lasciamo il sync EAS in background.
+    // I nuovi update appariranno alla chiamata successiva (entro la finestra TTL).
     if (syncFirst) {
-      await syncProductionUpdates().catch((err) => {
-        console.warn("[ota] sync warning:", err);
-      });
+      triggerSyncInBackground();
     }
 
     const rows = await db.select().from(otaReleases).orderBy(desc(otaReleases.publishedAt));

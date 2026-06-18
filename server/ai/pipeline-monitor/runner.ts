@@ -78,22 +78,32 @@ export async function runPipelineChecks(opts: {
       ? ALL_CHECKS
       : ALL_CHECKS.filter(([name]) => name === scope);
 
-    const results = await Promise.all(
-      toRun.map(async ([, fn]) => {
-        try {
-          return await fn();
-        } catch (err) {
-          return {
-            pipeline: "session_crash" as PipelineName,
-            label: "Errore interno",
-            overall: "broken" as const,
-            steps: [{ name: "check", status: "error" as const, durationMs: 0, message: (err as Error).message }],
-            suggestedFix: "Errore imprevisto nel check — controlla i log del backend.",
-            durationMs: 0,
-          };
-        }
-      }),
-    );
+    // Task #4436: le probe diagnostiche girano in piccoli batch (max 3 in
+    // parallelo) invece che tutte insieme, per non saturare il pool DB da 10
+    // connessioni — le probe lente (user_sessions, ai_conversation_turns)
+    // mandavano in timeout a cascata gli altri check.
+    const runOne = async ([, fn]: [PipelineName, CheckFn]): Promise<PipelineCheckResult> => {
+      try {
+        return await fn();
+      } catch (err) {
+        return {
+          pipeline: "session_crash" as PipelineName,
+          label: "Errore interno",
+          overall: "broken" as const,
+          steps: [{ name: "check", status: "error" as const, durationMs: 0, message: (err as Error).message }],
+          suggestedFix: "Errore imprevisto nel check — controlla i log del backend.",
+          durationMs: 0,
+        };
+      }
+    };
+
+    const BATCH_SIZE = 3;
+    const results: PipelineCheckResult[] = [];
+    for (let i = 0; i < toRun.length; i += BATCH_SIZE) {
+      const batch = toRun.slice(i, i + BATCH_SIZE);
+      const batchResults = await Promise.all(batch.map(runOne));
+      results.push(...batchResults);
+    }
 
     const overall = results.some(r => r.overall === "broken") ? "broken"
       : results.some(r => r.overall === "degraded") ? "degraded" : "ok";

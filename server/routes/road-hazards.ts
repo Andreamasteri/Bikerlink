@@ -7,7 +7,7 @@ import {
   HAZARD_ICONS,
   createHazardSchema
 } from "@shared/db";
-import { eq, and, isNull, or, gt, desc } from "drizzle-orm";
+import { eq, and, isNull, or, gt, gte, lte, desc } from "drizzle-orm";
 import { requireUserId } from "../lib/auth-middleware";
 import { sendError, sendSuccess } from "../lib/api-response";
 import { storage } from "../storage";
@@ -36,28 +36,48 @@ router.get("/", async (req: Request, res: Response) => {
     }
 
     const userLat = req.query.lat ? parseFloat(req.query.lat as string) : null;
-    const userLng = req.query.lng ? parseFloat(req.query.lng as string) : null;
+    // Accetta sia `lng` che l'alias `lon` (alcuni client/probe usano lon) —
+    // senza questo la longitudine restava null e il bounding-box veniva saltato.
+    const lngRaw = (req.query.lng ?? req.query.lon) as string | undefined;
+    const userLng = lngRaw ? parseFloat(lngRaw) : null;
     const radiusKm = req.query.radius ? parseFloat(req.query.radius as string) : NEARBY_RADIUS_KM;
 
     const now = new Date();
+
+    // Task #4436: quando ho lat/lng filtro con un bounding-box in SQL PRIMA del
+    // LIMIT, così il DB scansiona solo i hazard nell'area invece di restituirne
+    // 500 a caso (su tutto il mondo) per poi filtrarli in JS — la query era >2s.
+    const conditions = [
+      isNull(roadHazards.deletedAt),
+      or(
+        isNull(roadHazards.expiresAt),
+        gt(roadHazards.expiresAt, now)
+      ),
+      eq(roadHazards.isApproved, true),
+    ];
+
+    if (userLat !== null && userLng !== null) {
+      const latDelta = radiusKm / 111.32;
+      const cosLat = Math.cos((userLat * Math.PI) / 180);
+      const lngDelta = radiusKm / (111.32 * (Math.abs(cosLat) < 1e-6 ? 1e-6 : cosLat));
+      conditions.push(
+        gte(roadHazards.lat, userLat - latDelta),
+        lte(roadHazards.lat, userLat + latDelta),
+        gte(roadHazards.lng, userLng - Math.abs(lngDelta)),
+        lte(roadHazards.lng, userLng + Math.abs(lngDelta)),
+      );
+    }
+
     const rows = await db
       .select()
       .from(roadHazards)
-      .where(
-        and(
-          isNull(roadHazards.deletedAt),
-          or(
-            isNull(roadHazards.expiresAt),
-            gt(roadHazards.expiresAt, now)
-          ),
-          eq(roadHazards.isApproved, true)
-        )
-      )
+      .where(and(...conditions))
       .orderBy(desc(roadHazards.createdAt))
       .limit(500);
 
     let hazards = rows;
     if (userLat !== null && userLng !== null) {
+      // Raffinamento circolare sul set già ridotto dal bounding-box.
       hazards = rows.filter((h) => {
         const dlat = (h.lat - userLat) * 111.32;
         const dlng = (h.lng - userLng) * 111.32 * Math.cos((userLat * Math.PI) / 180);

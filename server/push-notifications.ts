@@ -1,31 +1,16 @@
 import { db } from "./db";
 import { users, userProfiles, appSettings, matchPreferences } from "@shared/db";
-import { inArray, eq, sql } from "drizzle-orm";
+import { inArray, eq } from "drizzle-orm";
 import it from "../lib/i18n/it";
 import {
   ExpoPushMessage,
   isValidExpoPushToken,
   sendExpoMessages,
   filterUserIdsByPreference,
+  recordNotificationHistory,
 } from "./push-notifications-internal";
 
 const EXPO_PUSH_URL = "https://exp.host/--/api/v2/push/send";
-
-async function recordNotificationHistory(
-  rows: Array<{ userId: string | null; notificationType: string; token: string; status: string; errorMessage?: string }>,
-): Promise<void> {
-  if (!rows.length) return;
-  try {
-    for (const v of rows) {
-      await db.execute(sql`
-        INSERT INTO notification_history (user_id, notification_type, token, status, error_message)
-        VALUES (${v.userId}, ${v.notificationType}, ${v.token}, ${v.status}, ${v.errorMessage ?? null})
-      `);
-    }
-  } catch (err) {
-    console.warn("[Push] recordNotificationHistory failed (non-fatal):", err);
-  }
-}
 
 async function clearStaleToken(userId: string): Promise<void> {
   try {
@@ -389,32 +374,63 @@ export async function sendPlannedRouteInvitePushNotifications(
 
     if (messages.length === 0) return [];
 
-    const resp = await fetch(EXPO_PUSH_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Accept: "application/json" },
-      body: JSON.stringify(messages),
-    });
+    // Helper per registrare l'intero batch come fallito (HTTP non-200 o errore di
+    // rete): senza questo lo storico restava vuoto su questi rami → la probe
+    // notifiche vedeva 0 righe anche quando un invio era stato tentato.
+    const recordAllFailed = async (errorMessage: string) => {
+      const failedRows = messages.map((m) => {
+        const token = m?.to ?? "";
+        return {
+          userId: userIdByToken.get(token) ?? null,
+          notificationType: "planned_route_invite",
+          token,
+          status: "failed",
+          errorMessage,
+        };
+      });
+      await recordNotificationHistory(failedRows);
+    };
+
+    let resp: Response;
+    try {
+      resp = await fetch(EXPO_PUSH_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify(messages),
+      });
+    } catch (netErr) {
+      console.warn("[Push] plannedRouteInvite Expo push network error:", netErr);
+      await recordAllFailed(`network error: ${netErr instanceof Error ? netErr.message : String(netErr)}`);
+      return [];
+    }
     if (!resp.ok) {
       console.warn("[Push] plannedRouteInvite Expo push HTTP error:", resp.status);
+      await recordAllFailed(`HTTP ${resp.status}`);
       return [];
     }
 
-    const result = await resp.json() as { data?: Array<{ status: "ok" | "error"; details?: { error?: string } }> };
+    const result = await resp.json() as { data?: Array<{ status: "ok" | "error"; message?: string; details?: { error?: string } }> };
     const tickets = result.data ?? [];
     const sentUserIds: string[] = [];
-    for (let i = 0; i < tickets.length; i++) {
+    const historyRows: Array<{ userId: string | null; notificationType: string; token: string; status: string; errorMessage?: string }> = [];
+    for (let i = 0; i < messages.length; i++) {
+      const token = messages[i]?.to ?? "";
+      const uid = userIdByToken.get(token) ?? null;
       const ticket = tickets[i];
-      if (ticket.status === "error" && ticket.details?.error === "DeviceNotRegistered") {
-        const token = messages[i]?.to;
-        if (token) {
-          const uid = userIdByToken.get(token);
-          if (uid) clearStaleToken(uid);
+      // Ticket assente = fallito, non riuscito (no over-report degli invii).
+      if (!ticket) {
+        historyRows.push({ userId: uid, notificationType: "planned_route_invite", token, status: "failed", errorMessage: "ticket mancante nella risposta Expo" });
+      } else if (ticket.status === "error") {
+        if (ticket.details?.error === "DeviceNotRegistered" && uid) {
+          clearStaleToken(uid);
         }
+        historyRows.push({ userId: uid, notificationType: "planned_route_invite", token, status: "failed", errorMessage: ticket.details?.error ?? ticket.message ?? "ticket error" });
       } else {
-        const uid = userIdByToken.get(messages[i]?.to ?? "");
         if (uid) sentUserIds.push(uid);
+        historyRows.push({ userId: uid, notificationType: "planned_route_invite", token, status: "sent" });
       }
     }
+    await recordNotificationHistory(historyRows);
     return sentUserIds.length > 0 ? sentUserIds : candidateUserIds;
   } catch (err) {
     console.warn("[Push] sendPlannedRouteInvitePushNotifications error (non-fatal):", err);

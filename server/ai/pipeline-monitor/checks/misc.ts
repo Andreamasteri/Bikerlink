@@ -1,8 +1,19 @@
 import { db } from "../../../db";
-import { sql } from "drizzle-orm";
+import { sql, type SQL } from "drizzle-orm";
 import http from "http";
 import { getInternalProbeToken, getInternalProbeHeaderName } from "../../watchdog/internal-token";
 import type { PipelineCheckResult, PipelineCheckStep } from "../types";
+
+// Task #4436: ogni query diagnostica gira con statement_timeout=5s (SET LOCAL in
+// transazione) così una probe lenta non tiene occupata una connessione del pool
+// oltre soglia, mandando in cascata gli altri check.
+const DIAGNOSTIC_STMT_TIMEOUT_MS = 5_000;
+async function dbq(query: SQL): Promise<{ rows: Record<string, unknown>[] }> {
+  return db.transaction(async (tx) => {
+    await tx.execute(sql`SET LOCAL statement_timeout = ${sql.raw(String(DIAGNOSTIC_STMT_TIMEOUT_MS))}`);
+    return tx.execute(query) as Promise<{ rows: Record<string, unknown>[] }>;
+  });
+}
 
 function httpProbe(
   method: string,
@@ -53,7 +64,7 @@ export async function checkNotifications(): Promise<PipelineCheckResult> {
   const steps: PipelineCheckStep[] = [];
 
   steps.push(await warnStep("notification_history recenti", async () => {
-    const res = await db.execute(sql`
+    const res = await dbq(sql`
       SELECT COUNT(*) AS cnt FROM notification_history WHERE created_at > NOW() - INTERVAL '24 hours'
     `);
     const cnt = parseInt((res.rows[0] as { cnt: string }).cnt ?? "0", 10);
@@ -62,7 +73,7 @@ export async function checkNotifications(): Promise<PipelineCheckResult> {
   }));
 
   steps.push(await warnStep("notifiche fallite recenti", async () => {
-    const res = await db.execute(sql`
+    const res = await dbq(sql`
       SELECT COUNT(*) AS cnt FROM notification_history
       WHERE status = 'failed' AND created_at > NOW() - INTERVAL '1 hour'
     `);
@@ -117,7 +128,7 @@ export async function checkGps(): Promise<PipelineCheckResult> {
   steps.push(await warnStep("sessioni GPS aperte da >4h", async () => {
     let res;
     try {
-      res = await db.execute(sql`
+      res = await dbq(sql`
         SELECT COUNT(*) AS cnt FROM user_sessions
         WHERE ended_at IS NULL AND started_at < NOW() - INTERVAL '4 hours'
       `);
@@ -148,7 +159,7 @@ export async function checkEmbeddingBio(): Promise<PipelineCheckResult> {
   const steps: PipelineCheckStep[] = [];
 
   steps.push(await warnStep("utenti con bio senza embedding", async () => {
-    const res = await db.execute(sql`
+    const res = await dbq(sql`
       SELECT COUNT(*) AS cnt FROM user_profiles up
       JOIN users u ON u.id = up.user_id
       WHERE u.status = 'active'
@@ -186,7 +197,7 @@ export async function checkEmbeddingMusic(): Promise<PipelineCheckResult> {
   const steps: PipelineCheckStep[] = [];
 
   steps.push(await warnStep("utenti con dati musicali senza embedding music_taste", async () => {
-    const res = await db.execute(sql`
+    const res = await dbq(sql`
       SELECT COUNT(*) AS cnt
       FROM users u
       LEFT JOIN user_profiles p ON p.user_id = u.id
@@ -238,7 +249,7 @@ export async function checkChat(): Promise<PipelineCheckResult> {
   // N.B.: la tabella "messages" non ha colonna "status" — il check usa
   // messaggi recenti (ultime 24h) come proxy di attività della chat.
   steps.push(await warnStep("messaggi recenti (ultime 24h)", async () => {
-    const res = await db.execute(sql`
+    const res = await dbq(sql`
       SELECT COUNT(*) AS cnt FROM messages
       WHERE created_at > NOW() - INTERVAL '24 hours'
     `);
@@ -293,7 +304,7 @@ export async function checkAiAssistant(): Promise<PipelineCheckResult> {
   // N.B.: "ai_assistant_sessions" non esiste nel DB — usa ai_conversation_turns
   // (tabella reale, contiene turni conversazionali utente↔AI).
   steps.push(await warnStep("turni AI assistant recenti", async () => {
-    const res = await db.execute(sql`
+    const res = await dbq(sql`
       SELECT COUNT(*) AS cnt FROM ai_conversation_turns
       WHERE created_at > NOW() - INTERVAL '24 hours'
     `);
@@ -322,7 +333,7 @@ export async function checkSessionCrash(): Promise<PipelineCheckResult> {
   steps.push(await warnStep("sessioni crash non chiuse", async () => {
     let res;
     try {
-      res = await db.execute(sql`
+      res = await dbq(sql`
         SELECT COUNT(*) AS cnt FROM user_sessions
         WHERE ended_at IS NULL
           AND started_at < NOW() - INTERVAL '8 hours'

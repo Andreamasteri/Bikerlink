@@ -345,6 +345,21 @@ export async function runBootPhase3DbInit(): Promise<void> {
   }
 
   try {
+    // Task #4436: indice parziale composito per la GET /api/road-hazards.
+    // Copre il where attivo (deleted_at IS NULL, expires_at, is_approved) così
+    // il bounding-box scansiona pochi record invece di filtrare in JS — la query
+    // passa da >2s a millisecondi.
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS "road_hazards_active_idx"
+        ON "road_hazards" ("is_approved", "expires_at", "lat", "lng")
+        WHERE "deleted_at" IS NULL
+    `);
+    console.log("[INIT] road_hazards_active_idx: index check OK");
+  } catch (e) {
+    console.warn("[INIT] Phase 3: road_hazards_active_idx ensure failed (non-fatal):", e);
+  }
+
+  try {
     const redisUrl = process.env.REDIS_URL ?? process.env.REDIS_URI;
     if (!redisUrl) {
       console.log("[boot] Redis: REDIS_URL non impostato — fallback in-memory attivo");
