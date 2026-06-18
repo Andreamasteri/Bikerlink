@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useColors } from "@/hooks/useColors";
+import { useDiagnosticWS } from "@/hooks/useDiagnosticWS";
 import { useAuth } from "@/lib/auth-context";
 import { runAllTests, type DiagnosticReport, type DiagnosticTestResult } from "@/lib/diagnostic/runner";
 import { apiRequest } from "@/lib/query-client";
@@ -67,6 +68,7 @@ export default function DiagnosticScreen() {
   const router = useRouter();
   const { user } = useAuth();
   const isAdmin = user?.role === "admin";
+  const wsState = useDiagnosticWS();
 
   const [running, setRunning] = useState(false);
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
@@ -128,11 +130,17 @@ export default function DiagnosticScreen() {
           <Ionicons name="arrow-back" size={24} color={colors.text} />
         </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: colors.text }]}>Diagnostica Locale</Text>
-        {report && (
-          <TouchableOpacity onPress={exportReport} style={styles.backBtn}>
-            <Ionicons name="share-outline" size={22} color={colors.text} />
-          </TouchableOpacity>
-        )}
+        <View style={styles.headerRight}>
+          <View style={styles.wsBadge}>
+            <Ionicons name="ellipse" size={9} color={wsState === "connected" ? "#22C55E" : "#EAB308"} />
+            <Text style={styles.wsBadgeText}>{wsState === "connected" ? "WS" : "Poll"}</Text>
+          </View>
+          {report && (
+            <TouchableOpacity onPress={exportReport} style={styles.backBtn}>
+              <Ionicons name="share-outline" size={22} color={colors.text} />
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
 
       <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}>
@@ -200,6 +208,9 @@ const styles = StyleSheet.create({
   header: { flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingBottom: 8 },
   backBtn: { width: 36, height: 36, alignItems: "center", justifyContent: "center" },
   headerTitle: { flex: 1, fontSize: 18, fontWeight: "600", textAlign: "center" },
+  headerRight: { flexDirection: "row", alignItems: "center", gap: 6 },
+  wsBadge: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: "#1F2937", borderRadius: 10, paddingHorizontal: 8, paddingVertical: 4 },
+  wsBadgeText: { color: "#9CA3AF", fontSize: 11, fontWeight: "600" },
   summaryBox: { margin: 16, padding: 16, borderRadius: 12, backgroundColor: "#1C1C1E" },
   summaryHint: { color: "#9CA3AF", fontSize: 14, textAlign: "center" },
   summaryRunning: { color: "#F59E0B", fontSize: 14, marginBottom: 8 },

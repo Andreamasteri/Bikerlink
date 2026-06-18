@@ -9,6 +9,33 @@ let _isAdmin = false;
 let _isModerator = false;
 let _enabled = false;
 
+// ── Connection state tracking ───────────────────────────────────────────────
+// Tracks whether the diagnostic WS is live ("connected", 🟢) or the client is
+// falling back to the 60s remote polling loop ("polling", 🟡). Exposed so the
+// user-facing diagnostic screen can render the same badge the admin panel shows,
+// and logged for debug regardless of whether any screen is mounted.
+export type DiagWSConnState = "connected" | "polling";
+let _connState: DiagWSConnState = "polling";
+const _connListeners = new Set<(state: DiagWSConnState) => void>();
+
+function setConnState(state: DiagWSConnState) {
+  if (_connState === state) return;
+  _connState = state;
+  console.log(`[DiagWS] connection state → ${state === "connected" ? "🟢 connected" : "🟡 polling"}`);
+  _connListeners.forEach(cb => { try { cb(state); } catch {/* noop */} });
+}
+
+export function getDiagnosticWSConnState(): DiagWSConnState {
+  return _connState;
+}
+
+export function subscribeDiagnosticWSConnState(cb: (state: DiagWSConnState) => void): () => void {
+  _connListeners.add(cb);
+  // Emit current state immediately so subscribers don't wait for the next change.
+  try { cb(_connState); } catch {/* noop */}
+  return () => { _connListeners.delete(cb); };
+}
+
 // ── Admin event listener registry ──────────────────────────────────────────
 // Allows the admin panel to subscribe to diag:progress / diag:result events
 // that the server broadcasts to admin connections, without opening a second WS.
@@ -52,6 +79,7 @@ function connect() {
 
     ws.onopen = () => {
       clearReconnect();
+      setConnState("connected");
     };
 
     ws.onmessage = async (event) => {
@@ -65,9 +93,10 @@ function connect() {
       } catch {/* noop */}
     };
 
-    ws.onerror = () => { scheduleReconnect(); };
-    ws.onclose = () => { _ws = null; if (_enabled) scheduleReconnect(); };
+    ws.onerror = () => { setConnState("polling"); scheduleReconnect(); };
+    ws.onclose = () => { _ws = null; setConnState("polling"); if (_enabled) scheduleReconnect(); };
   } catch {
+    setConnState("polling");
     scheduleReconnect();
   }
 }
