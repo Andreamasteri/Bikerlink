@@ -120,19 +120,26 @@ export default function AssistantFab() {
 
   // Carica la posizione salvata; default bottom-left se assente o malformata.
   useEffect(() => {
-    AsyncStorage.getItem(POSITION_KEY).then((val) => {
-      if (val) {
-        try {
-          const { x, y } = JSON.parse(val);
-          const clamped = clampAssistantFabPosition(x, y, width, height, insets.top, insets.bottom);
-          posX.value = clamped.x;
-          posY.value = clamped.y;
-        } catch {
-          // no-op: mantiene la posizione di default
+    AsyncStorage.getItem(POSITION_KEY)
+      .then((val) => {
+        if (val) {
+          try {
+            const { x, y } = JSON.parse(val);
+            const clamped = clampAssistantFabPosition(x, y, width, height, insets.top, insets.bottom);
+            posX.value = clamped.x;
+            posY.value = clamped.y;
+          } catch {
+            // no-op: mantiene la posizione di default
+          }
         }
-      }
-      setPositionLoaded(true);
-    });
+      })
+      .catch(() => {
+        // no-op: se la lettura fallisce mantiene la posizione di default
+      })
+      .finally(() => {
+        // garantisce che la FAB diventi visibile anche se getItem va in rejection
+        setPositionLoaded(true);
+      });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
