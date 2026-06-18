@@ -24,9 +24,9 @@
     "ios": "expo run:ios"
   },
   "dependencies": {
-    "@ai-sdk/google": "^3.0.82",
-    "@ai-sdk/groq": "^3.0.41",
-    "@ai-sdk/openai": "^3.0.71",
+    "@ai-sdk/google": "^3.0.83",
+    "@ai-sdk/groq": "^3.0.42",
+    "@ai-sdk/openai": "^3.0.73",
     "@bull-board/api": "^8.0.0",
     "@bull-board/express": "^8.0.0",
     "@emnapi/runtime": "^1.11.1",
@@ -59,7 +59,7 @@
     "@typescript-eslint/eslint-plugin": "^8.61.0",
     "@typescript-eslint/parser": "^8.61.0",
     "@xmldom/xmldom": "^0.9.10",
-    "ai": "^6.0.205",
+    "ai": "^6.0.207",
     "archiver": "^8.0.0",
     "bcryptjs": "^3.0.3",
     "bottleneck": "^2.19.5",
