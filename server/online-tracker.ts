@@ -40,7 +40,11 @@ export class OnlineTracker {
   }
 
   private cleanup(): void {
-    const cutoff = new Date(Date.now() - 15 * 60 * 1000);
+    // TTL 30 min: Android sospende JS in background, il heartbeat (ogni 2 min) si ferma.
+    // Con 15 min l'utente veniva rimosso già dopo poco tempo in background.
+    // 30 min riduce i falsi "offline" per app iconizzate senza Firebase.
+    // Quando torna in foreground, il heartbeat immediato (AppStateHandler) la reidrata.
+    const cutoff = new Date(Date.now() - 30 * 60 * 1000);
     for (const [userId, entry] of this.users) {
       if (entry.lastSeen < cutoff) {
         this.users.delete(userId);

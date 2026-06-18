@@ -106,6 +106,12 @@ const PRIVACY_SETTINGS: Array<{ key: string; label: string; paramKey?: string; p
   { key: "continuous_gps", label: "GPS Continuo" },
 ];
 
+function minutesAgo(dateStr: string | null): number | null {
+  if (!dateStr) return null;
+  const diff = Date.now() - new Date(dateStr).getTime();
+  return Math.floor(diff / 60_000);
+}
+
 function formatTimelineDate(iso: string): string {
   const d = new Date(iso);
   const day = d.getDate();
@@ -273,9 +279,26 @@ export const UserDetailModal: React.FC<UserDetailModalProps> = ({
               </View>
               <View style={statsStyles.row}>
                 <Text style={statsStyles.label}>Status</Text>
-                <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
-                  <MaterialIcons name={stats.user.isOnline ? "wifi" : "wifi-off"} size={16} color={stats.user.isOnline ? Colors.success : Colors.error} />
-                  <Text style={[statsStyles.value, { color: stats.user.isOnline ? Colors.success : Colors.error }]}>{stats.user.isOnline ? "Online" : "Offline"}</Text>
+                <View style={{ alignItems: "flex-end", gap: 2 }}>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                    <MaterialIcons name={stats.user.isOnline ? "wifi" : "wifi-off"} size={16} color={stats.user.isOnline ? Colors.success : Colors.error} />
+                    <Text style={[statsStyles.value, { color: stats.user.isOnline ? Colors.success : Colors.error }]}>{stats.user.isOnline ? "Online" : "Offline"}</Text>
+                  </View>
+                  {!stats.user.isOnline && (() => {
+                    const mins = minutesAgo(stats.user.lastLoginAt);
+                    if (mins === null) return null;
+                    const label = mins < 60
+                      ? `ultimo heartbeat ${mins} min fa`
+                      : mins < 24 * 60
+                        ? `ultimo heartbeat ${Math.floor(mins / 60)}h fa`
+                        : `ultimo heartbeat ${Math.floor(mins / 1440)}gg fa`;
+                    const likelybg = mins < 60;
+                    return (
+                      <Text style={{ fontSize: 10, color: likelybg ? Colors.warning : Colors.textSecondary, textAlign: "right" }}>
+                        {label}{likelybg ? " — app in background" : ""}
+                      </Text>
+                    );
+                  })()}
                 </View>
               </View>
               <View style={statsStyles.row}>
