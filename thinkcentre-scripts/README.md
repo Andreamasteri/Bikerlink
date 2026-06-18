@@ -36,21 +36,23 @@ persistente al reboot).
 
 ## Script
 
-| Script   | Cosa fa                                                                  |
-|----------|--------------------------------------------------------------------------|
-| `00.sh`  | `git pull` con stash automatico delle modifiche locali                   |
-| `01.sh`  | Monitor CPU + RAM + disco (aggiorna ogni 2s)                             |
-| `02.sh`  | Monitor build Valhalla: container, tiles, log (ogni 5s)                  |
-| `03.sh`  | Pulizia Valhalla: ferma container, rimuove tiles e log                   |
-| `04.sh`  | Check pre-build: PBF, Docker, disco, **RAM + swap** (OK/WARN/FAIL)       |
-| `05.sh`  | Avvia build grafo Valhalla in background (screen), `--shm-size=8g`        |
-| `swap.sh`| Crea/verifica swapfile 32–48 GB su SSD (idempotente, persistente fstab)  |
-| `cpu.sh` | CPU governor → `performance`, persistente al reboot (riusa la unit systemd) |
-| `06.sh`  | Verifica post-build: tiles, container, test HTTP /status                 |
-| `07.sh`  | Prepara workspace Nominatim + crea docker-compose.yml                    |
-| `08.sh`  | Avvia import Nominatim in background (screen)                            |
-| `09.sh`  | Monitor import Nominatim: container, log, test HTTP                      |
-| `99.sh`  | **Boot check**: riavvia Valhalla (serve-only) e Nominatim dopo un reboot |
+| Script    | Cosa fa                                                                  |
+|-----------|--------------------------------------------------------------------------|
+| `00.sh`   | `git pull` con stash automatico delle modifiche locali                   |
+| `01.sh`   | Monitor CPU + RAM + disco (aggiorna ogni 2s)                             |
+| `02.sh`   | Monitor build Valhalla: container, tiles, log (ogni 5s)                  |
+| `03.sh`   | Pulizia Valhalla: ferma container, rimuove tiles e log                   |
+| `04.sh`   | Check pre-build: PBF, Docker, disco, **RAM + swap** (OK/WARN/FAIL)       |
+| `05.sh`   | Avvia build grafo Valhalla in background (screen), `--shm-size=8g`       |
+| `06.sh`   | Verifica post-build: tiles, container, test HTTP /status                 |
+| `07.sh`   | Prepara workspace Nominatim + crea docker-compose.yml                    |
+| `08.sh`   | Avvia import Nominatim in background (screen)                            |
+| `09.sh`   | Monitor import Nominatim: container, log, test HTTP                      |
+| `reset.sh`| **Reset completo**: ferma container, elimina `~/valhalla/` intera        |
+| `usb.sh`  | Copia `europe-latest.osm.pbf` dalla pennetta USB a `~/valhalla/data/`    |
+| `swap.sh` | Crea/verifica swapfile 32–48 GB su SSD (idempotente, persistente fstab)  |
+| `cpu.sh`  | CPU governor → `performance`, persistente al reboot (riusa la unit systemd) |
+| `99.sh`   | **Boot check**: riavvia Valhalla (serve-only) e Nominatim dopo un reboot |
 
 ---
 
@@ -58,23 +60,32 @@ persistente al reboot).
 
 ### Valhalla (build grafo routing — Europa su 16 GB)
 
+#### Prima build (o ripartenza da zero)
+
 ```
-swap.sh ← crea/verifica swapfile 32–48 GB (OBBLIGATORIO su 16 GB)
-cpu.sh  ← governor performance (opzionale ma consigliato, persistente al reboot)
-04.sh   ← check pre-build (PBF, Docker, disco, RAM + swap)
-05.sh   ← avvia build (dura ore; con swap su SSD è più lenta ma non viene uccisa)
-02.sh   ← monitora (in un'altra sessione SSH)
-06.sh   ← verifica quando il monitor mostra "TERMINATO"
+reset.sh  ← elimina ~/valhalla/ intera (partenza pulita, chiede conferma)
+usb.sh    ← copia europe-latest.osm.pbf dalla pennetta USB
+swap.sh   ← crea/verifica swapfile 32–48 GB (OBBLIGATORIO su 16 GB)
+cpu.sh    ← governor performance (opzionale ma consigliato, persistente al reboot)
+04.sh     ← check pre-build (PBF, Docker, disco, RAM + swap)
+05.sh     ← avvia build (dura ore; con swap su SSD è più lenta ma non viene uccisa)
+02.sh     ← monitora (in un'altra sessione SSH)
+06.sh     ← verifica quando il monitor mostra "TERMINATO"
 ```
 
 `swap.sh` e `cpu.sh` vanno eseguiti **una sola volta** (sono idempotenti e persistono
 al reboot): alle build successive puoi ripartire da `04.sh`.
 
+> ⚠ `reset.sh` elimina anche il PBF: dopo il reset devi sempre eseguire `usb.sh`
+> per ricopiarlo dalla USB prima di avviare la build.
+
 > ⚠ Su 16 GB di RAM senza swap la build Europa viene uccisa dall'OOM-killer a metà
 > lavoro. `04.sh` segnala FAIL se lo swap manca o è troppo piccolo. La build con swap
 > su SSD impiega più tempo (file memory-mapped) ma arriva in fondo.
 
-Se la build è fallita o vuoi ripartire da zero: `03.sh` poi `05.sh`.
+#### Ripartenza parziale (tiles rotti, build incompleta — PBF già presente)
+
+Se la build è fallita ma il PBF è già in `~/valhalla/data/`: `03.sh` poi `05.sh`.
 
 ### Nominatim (geocoding self-hosted)
 
