@@ -49,7 +49,7 @@ export default function AdminUsers() {
 
   const {
     users, isLoading, summary, matchabilityMap,
-    statusMutation, roleMutation, emailMutation, passwordMutation,
+    statusMutation, roleMutation, emailMutation, passwordMutation, profileMutation,
     deleteMutation, createUserMutation, primalMutation, mapTesterMutation,
     telemetryDisabledMutation, matchingDisabledMutation, aisMutation,
     clearLastfmMutation, revokeSessionMutation, useUserStats, useUserSessions,
@@ -309,6 +309,11 @@ export default function AdminUsers() {
           onMakeModerator={handleMakeModerator}
           onDeleteUser={handleDeleteUser}
           getStatusColor={getStatusColor}
+          onSaveProfile={(payload) => {
+            if (!selectedUser) return;
+            profileMutation.mutate({ id: selectedUser.id, ...payload });
+          }}
+          isSavingProfile={profileMutation.isPending}
         />
       </ErrorBoundary>
 

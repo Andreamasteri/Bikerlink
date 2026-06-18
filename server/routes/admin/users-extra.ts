@@ -164,6 +164,51 @@ router.get("/:userId/privacy-overview", async (req: Request, res: Response) => {
   }
 });
 
+router.put("/:userId/profile", async (req: Request, res: Response) => {
+  try {
+    const userId = String(req.params.userId);
+    const { userType, sex, birthYear, region } = req.body as {
+      userType?: unknown;
+      sex?: unknown;
+      birthYear?: unknown;
+      region?: unknown;
+    };
+
+    const validUserTypes = ["biker", "zavorrina", "coppia"];
+    if (userType !== undefined && !validUserTypes.includes(userType as string)) {
+      return sendError(res, 400, "Tipo utente non valido");
+    }
+    if (sex !== undefined && sex !== null && sex !== "M" && sex !== "F") {
+      return sendError(res, 400, "Sesso non valido (M / F)");
+    }
+    if (birthYear !== undefined && birthYear !== null) {
+      const by = Number(birthYear);
+      if (!Number.isInteger(by) || by < 1920 || by > new Date().getFullYear()) {
+        return sendError(res, 400, "Anno di nascita non valido");
+      }
+    }
+
+    const rows = await db.select({ id: users.id }).from(users).where(eq(users.id, userId)).limit(1);
+    if (!rows.length) return sendError(res, 404, "Utente non trovato");
+
+    await db.update(users).set({
+      ...(userType !== undefined ? { userType: userType as "biker" | "zavorrina" | "coppia" } : {}),
+      ...(sex !== undefined ? { sex: (sex as "M" | "F" | null) ?? null } : {}),
+      ...(birthYear !== undefined ? { birthYear: birthYear !== null ? Number(birthYear) : null } : {}),
+      ...(region !== undefined ? { region: typeof region === "string" ? region.trim() || null : null } : {}),
+      updatedAt: new Date(),
+    }).where(eq(users.id, userId));
+
+    const updated = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+    if (!updated.length) return sendError(res, 404, "Utente non trovato");
+    const { password: _, ...safe } = updated[0];
+    return res.json(safe);
+  } catch (err) {
+    console.error("[admin/users/:userId/profile PUT] error:", err);
+    return sendError(res, 500, "Errore aggiornamento profilo");
+  }
+});
+
 router.patch("/:userId/ais", async (req: Request, res: Response) => {
   try {
     const userId = String(req.params.userId);

@@ -103,6 +103,28 @@ export function useAdminUsers() {
     onError: () => Alert.alert("Errore", "Impossibile eliminare il profilo"),
   });
 
+  const profileMutation = useMutation({
+    mutationFn: async ({ id, userType, sex, birthYear, region }: {
+      id: string;
+      userType: "biker" | "zavorrina" | "coppia";
+      sex?: "M" | "F" | null;
+      birthYear?: number | null;
+      region?: string | null;
+    }) => {
+      const res = await apiRequest("PUT", `/api/admin/users/${id}/profile`, { userType, sex, birthYear, region });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error((body as { message?: string }).message ?? `HTTP ${res.status}`);
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      Alert.alert("Successo", "Profilo aggiornato");
+    },
+    onError: (err: Error) => Alert.alert("Errore", err.message || "Impossibile aggiornare il profilo"),
+  });
+
   const createUserMutation = useMutation({
     mutationFn: async (payload: CreateUserPayload) => {
       const res = await apiRequest("POST", "/api/admin/users", payload);
@@ -227,6 +249,7 @@ export function useAdminUsers() {
     roleMutation,
     emailMutation,
     passwordMutation,
+    profileMutation,
     deleteMutation,
     createUserMutation,
     primalMutation,

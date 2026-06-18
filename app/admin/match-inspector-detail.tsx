@@ -197,6 +197,27 @@ export default function MatchInspectorDetailScreen() {
     onError: () => Alert.alert("Errore", "Impossibile reimpostare la password."),
   });
 
+  const saveProfileMutation = useMutation({
+    mutationFn: async (payload: {
+      userType: "biker" | "zavorrina" | "coppia";
+      sex?: "M" | "F" | null;
+      birthYear?: number | null;
+      region?: string | null;
+    }) => {
+      const res = await apiRequest("PUT", `/api/admin/users/${userId}/profile`, payload);
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error((body as { message?: string }).message ?? `HTTP ${res.status}`);
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users", userId, "detail"] });
+      Alert.alert("Successo", "Profilo aggiornato");
+    },
+    onError: (err: Error) => Alert.alert("Errore", err.message || "Impossibile aggiornare il profilo"),
+  });
+
   const handleDeleteMatches = () => {
     Alert.alert(
       "Elimina tutti i match",
@@ -433,6 +454,8 @@ export default function MatchInspectorDetailScreen() {
         onMakeModerator={handleMakeModerator}
         onDeleteUser={handleDeleteUser}
         getStatusColor={getStatusColorForModal}
+        onSaveProfile={(payload) => saveProfileMutation.mutate(payload)}
+        isSavingProfile={saveProfileMutation.isPending}
       />
     </>
   );
