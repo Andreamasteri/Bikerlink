@@ -38,11 +38,23 @@ metro_starting() {
   return 1
 }
 
+# Restituisce 0 (true) se la porta Metro risponde già (Metro su e funzionante).
+# Stesso metodo usato da watchdog/start.sh (curl, fallback nc).
+metro_port_healthy() {
+  curl -s --max-time 2 "http://localhost:$METRO_PORT" >/dev/null 2>&1 || \
+  nc -z -w2 localhost "$METRO_PORT" >/dev/null 2>&1
+}
+
 log "=== Clean Metro: avvio pulizia on-demand ==="
 
-# On-demand: se un avvio è già in corso, uscire pulito senza interferire.
-if metro_starting; then
-  log "skip — avvio già in corso. Riprova tra qualche secondo."
+# Gate anti-race: saltare SOLO se un avvio è davvero in corso E la porta non è
+# ancora pronta (cold boot, start-expo sta avviando Metro). Nota: start-expo.sh
+# resta vivo e tiene il lock per tutta la vita di Metro, quindi metro_starting
+# è vero anche a regime — da solo bloccherebbe ogni clean manuale. La porta sana
+# distingue "avvio in corso" (porta giù → skip) da "Metro già su" (porta su →
+# clean+restart manuale legittimo).
+if metro_starting && ! metro_port_healthy; then
+  log "skip — avvio in corso e porta $METRO_PORT non ancora pronta. Riprova tra qualche secondo."
   exit 0
 fi
 
