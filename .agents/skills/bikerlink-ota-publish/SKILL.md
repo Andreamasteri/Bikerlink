@@ -27,9 +27,9 @@ Attivare questa skill quando l'utente dice una delle seguenti (o varianti):
 | Campo | Valore corrente |
 |-------|----------------|
 | `versionCode` APK | **70** |
-| `versionName` | **70.10.110** |
+| `versionName` | **70.10.112** |
 | `runtimeVersion` | **10.0.0** |
-| Ultima OTA nel ciclo v70 | **OTA-111** → la prossima sarà **OTA-112** |
+| Ultima OTA nel ciclo v70 | **OTA-112** → la prossima sarà **OTA-113** |
 
 > ⚠️ Aggiornare questa tabella ad ogni nuovo APK (e dopo ogni OTA pubblicata), in lockstep con la tabella storica in `bikerlink-versioning/SKILL.md`.
 > I valori correnti sono sempre la fonte di verità: `node -e "const a=require('./app.json'); console.log(a.expo.android.versionCode, a.expo.runtimeVersion, a.expo.version)"`
