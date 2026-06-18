@@ -53,5 +53,6 @@
 - [Promemoria skill diagnostic-report-dump](diagnostic-report-skill-reminder.md) — ricordare all'utente ogni 14gg (dal 17 giu 2026) che esiste la skill per dumpare i report diagnostici dal DB.
 - [Gesture test CI gate](gesture-test-ci-gate.md) — `npx vitest run components/__tests__` è un gate bloccante in post-merge.sh; 2 file, 38 test (gesture + bottom position).
 - [Radiografia probe pool](radiografia-probe-pool.md) — probe diagnostiche in batch ≤3 + dbq() statement_timeout 5s (mai Promise.all globale); trap su notifiche/road-hazards/OTA dentro.
+- [Cerbero guardiano porte](cerbero-guardian.md) — watchdog.sh ora shim→cerbero.sh; restart backend SOLO se /api/health irraggiungibile (503 init=vivo, no loop); counter crash backend/Metro separati; Clean Metro fast-clean default, FORCE_RESET=1 deep.
 - [AI Assistant config contract](ai-assistant-config-contract.md) — config endpoint è PER-PLATFORM ({platform,config}); UI admin deve fetch+PUT android/ios separati; client default-safe `enabled !== false`; FloatingWidget handler sopra i gesture (Hermes TDZ); FAB dopo FloatingWidget nel layout.
 - [Diagnostica OTA-proof](diagnostic-ota-proof.md) — camera=metodo statico Camera.getCameraPermissionsAsync; sensori girano su ogni build nativa; isDiagnosticApk via Updates.channel (env baked si perde via OTA); canale OTA dedicato `diagnostic`.
