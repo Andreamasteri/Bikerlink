@@ -14,6 +14,58 @@ interface RouteStyleSectionProps {
 const NOTCH = 18;
 const TRACK_H = 44;
 
+/**
+ * Converte la posizione X del touch (px) nell'indice di stile [0, n-1].
+ * Esportata per i test di regressione: se la formula cambia, i test si rompono.
+ */
+export function resolveRouteStyleIndex(x: number, trackWidth: number, n: number): number {
+  return Math.round(Math.max(0, Math.min(n - 1, (x / Math.max(trackWidth, 1)) * (n - 1))));
+}
+
+/**
+ * Factory che restituisce i due handler PanResponder del drag handle del
+ * route-planner slider. Esportata per i test di regressione: se la logica
+ * grant/move cambia, i test che importano questa factory si rompono.
+ *
+ * @param styleKeys  Array ordinato delle chiavi di stile (es. ["direct", …, "extra_curvy"])
+ * @param getTrackWidth  Getter che restituisce la larghezza corrente della track
+ * @param setStyle  Callback chiamata quando cambia lo stile selezionato
+ */
+export function createRouteStylePanHandlers<K extends string>(
+  styleKeys: readonly K[],
+  getTrackWidth: () => number,
+  setStyle: (key: K) => void
+): {
+  onStartShouldSetPanResponder: () => boolean;
+  onMoveShouldSetPanResponder: () => boolean;
+  onGrant: (locationX: number) => void;
+  onMove: (locationX: number) => void;
+} {
+  const n = styleKeys.length;
+  const lastIdxRef = { current: 0 };
+
+  function resolve(x: number): number {
+    return resolveRouteStyleIndex(x, getTrackWidth(), n);
+  }
+
+  return {
+    onStartShouldSetPanResponder: () => true,
+    onMoveShouldSetPanResponder: () => true,
+    onGrant(locationX: number) {
+      const idx = resolve(locationX);
+      lastIdxRef.current = idx;
+      setStyle(styleKeys[idx]);
+    },
+    onMove(locationX: number) {
+      const idx = resolve(locationX);
+      if (idx !== lastIdxRef.current) {
+        lastIdxRef.current = idx;
+        setStyle(styleKeys[idx]);
+      }
+    },
+  };
+}
+
 export const RouteStyleSection: React.FC<RouteStyleSectionProps> = ({
   style,
   setStyle,
@@ -43,27 +95,21 @@ export const RouteStyleSection: React.FC<RouteStyleSectionProps> = ({
   }, [activeIndex, scaleAnims]);
 
   const trackWidthRef = useRef(0);
-  const lastIdxRef = useRef(activeIndex);
 
-  const resolveIndex = (x: number) =>
-    Math.round(Math.max(0, Math.min(n - 1, (x / Math.max(trackWidthRef.current, 1)) * (n - 1))));
+  const panHandlers = useRef(
+    createRouteStylePanHandlers(
+      STYLE_LEVELS.map((sl) => sl.key),
+      () => trackWidthRef.current,
+      setStyle
+    )
+  ).current;
 
   const panResponder = useRef(
     PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: () => true,
-      onPanResponderGrant: (evt) => {
-        const idx = resolveIndex(evt.nativeEvent.locationX);
-        lastIdxRef.current = idx;
-        setStyle(STYLE_LEVELS[idx].key);
-      },
-      onPanResponderMove: (evt) => {
-        const idx = resolveIndex(evt.nativeEvent.locationX);
-        if (idx !== lastIdxRef.current) {
-          lastIdxRef.current = idx;
-          setStyle(STYLE_LEVELS[idx].key);
-        }
-      },
+      onStartShouldSetPanResponder: panHandlers.onStartShouldSetPanResponder,
+      onMoveShouldSetPanResponder: panHandlers.onMoveShouldSetPanResponder,
+      onPanResponderGrant: (evt) => { panHandlers.onGrant(evt.nativeEvent.locationX); },
+      onPanResponderMove: (evt) => { panHandlers.onMove(evt.nativeEvent.locationX); },
     })
   ).current;
 
