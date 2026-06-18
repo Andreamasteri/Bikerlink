@@ -11,6 +11,7 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
+import RegionPicker from "@/components/RegionPicker";
 
 const USER_TYPES = [
   { value: "biker", label: "Biker" },
@@ -53,6 +54,7 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({
   const [sex, setSex] = useState<"M" | "F" | null>(null);
   const [birthYearStr, setBirthYearStr] = useState("");
   const [region, setRegion] = useState("");
+  const [showRegionPicker, setShowRegionPicker] = useState(false);
 
   useEffect(() => {
     if (!visible) {
@@ -63,6 +65,7 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({
       setSex(null);
       setBirthYearStr("");
       setRegion("");
+      setShowRegionPicker(false);
     }
   }, [visible]);
 
@@ -74,6 +77,7 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({
     setSex(null);
     setBirthYearStr("");
     setRegion("");
+    setShowRegionPicker(false);
   }
 
   function handleClose() {
@@ -113,124 +117,141 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({
   }
 
   return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={handleClose}>
-      <View style={styles.overlay}>
-        <View style={styles.container}>
-          <View style={styles.header}>
-            <Text style={styles.title}>Crea Utente</Text>
-            <TouchableOpacity onPress={handleClose} hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}>
-              <Ionicons name="close" size={24} color={Colors.text} />
-            </TouchableOpacity>
+    <>
+      <Modal visible={visible} animationType="slide" transparent onRequestClose={handleClose}>
+        <View style={styles.overlay}>
+          <View style={styles.container}>
+            <View style={styles.header}>
+              <Text style={styles.title}>Crea Utente</Text>
+              <TouchableOpacity onPress={handleClose} hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}>
+                <Ionicons name="close" size={24} color={Colors.text} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={styles.body} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+              <Text style={styles.fieldLabel}>Nickname *</Text>
+              <TextInput
+                style={styles.input}
+                value={nickname}
+                onChangeText={setNickname}
+                placeholder="es. Moto_Marco"
+                placeholderTextColor={Colors.textSecondary}
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+
+              <Text style={styles.fieldLabel}>Email *</Text>
+              <TextInput
+                style={styles.input}
+                value={email}
+                onChangeText={setEmail}
+                placeholder="es. marco@email.it"
+                placeholderTextColor={Colors.textSecondary}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+
+              <Text style={styles.fieldLabel}>Password temporanea * (min 8 caratteri)</Text>
+              <TextInput
+                style={styles.input}
+                value={password}
+                onChangeText={setPassword}
+                placeholder="Password iniziale"
+                placeholderTextColor={Colors.textSecondary}
+                secureTextEntry
+              />
+
+              <View style={styles.inlineRow}>
+                <Text style={[styles.fieldLabel, styles.inlineLabel]}>Tipo utente *</Text>
+                <View style={styles.chipRowInline}>
+                  {USER_TYPES.map((t) => (
+                    <TouchableOpacity
+                      key={t.value}
+                      style={[styles.chip, userType === t.value && styles.chipActive]}
+                      onPress={() => setUserType(t.value)}
+                    >
+                      <Text style={[styles.chipText, userType === t.value && styles.chipTextActive]}>
+                        {t.label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+
+              <View style={styles.inlineRow}>
+                <Text style={[styles.fieldLabel, styles.inlineLabel]}>Sesso</Text>
+                <View style={styles.chipRowInline}>
+                  {SEX_OPTIONS.map((s) => (
+                    <TouchableOpacity
+                      key={s.value}
+                      style={[styles.chip, sex === s.value && styles.chipActive]}
+                      onPress={() => setSex(sex === s.value ? null : s.value)}
+                    >
+                      <Text style={[styles.chipText, sex === s.value && styles.chipTextActive]}>
+                        {s.label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+
+              <View style={styles.inlineRow}>
+                <Text style={[styles.fieldLabel, styles.inlineLabel]}>Anno di nascita</Text>
+                <TextInput
+                  style={[styles.input, styles.inputCompact]}
+                  value={birthYearStr}
+                  onChangeText={setBirthYearStr}
+                  placeholder="es. 1990"
+                  placeholderTextColor={Colors.textSecondary}
+                  keyboardType="number-pad"
+                  maxLength={4}
+                />
+              </View>
+
+              <Text style={styles.fieldLabel}>Regione</Text>
+              <TouchableOpacity
+                style={styles.regionSelector}
+                onPress={() => setShowRegionPicker(true)}
+                activeOpacity={0.7}
+              >
+                <Text style={region ? styles.regionText : styles.regionPlaceholder}>
+                  {region || "Seleziona regione"}
+                </Text>
+                <Ionicons name="chevron-down" size={18} color={Colors.textSecondary} />
+              </TouchableOpacity>
+
+              <View style={styles.infoBox}>
+                <Ionicons name="information-circle-outline" size={16} color={Colors.textSecondary} />
+                <Text style={styles.infoText}>
+                  L'utente viene creato attivo senza verifica email. Potrà accedere subito con le credenziali impostate.
+                </Text>
+              </View>
+
+              <TouchableOpacity
+                style={[styles.submitBtn, isLoading && styles.submitBtnDisabled]}
+                onPress={handleSubmit}
+                disabled={isLoading}
+              >
+                <Ionicons name="person-add-outline" size={18} color="#0D0D0D" />
+                <Text style={styles.submitBtnText}>
+                  {isLoading ? "Creazione in corso..." : "Crea Utente"}
+                </Text>
+              </TouchableOpacity>
+
+              <View style={{ height: 24 }} />
+            </ScrollView>
           </View>
-
-          <ScrollView style={styles.body} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-            <Text style={styles.fieldLabel}>Nickname *</Text>
-            <TextInput
-              style={styles.input}
-              value={nickname}
-              onChangeText={setNickname}
-              placeholder="es. Moto_Marco"
-              placeholderTextColor={Colors.textSecondary}
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
-
-            <Text style={styles.fieldLabel}>Email *</Text>
-            <TextInput
-              style={styles.input}
-              value={email}
-              onChangeText={setEmail}
-              placeholder="es. marco@email.it"
-              placeholderTextColor={Colors.textSecondary}
-              keyboardType="email-address"
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
-
-            <Text style={styles.fieldLabel}>Password temporanea * (min 8 caratteri)</Text>
-            <TextInput
-              style={styles.input}
-              value={password}
-              onChangeText={setPassword}
-              placeholder="Password iniziale"
-              placeholderTextColor={Colors.textSecondary}
-              secureTextEntry
-            />
-
-            <Text style={styles.fieldLabel}>Tipo utente *</Text>
-            <View style={styles.chipRow}>
-              {USER_TYPES.map((t) => (
-                <TouchableOpacity
-                  key={t.value}
-                  style={[styles.chip, userType === t.value && styles.chipActive]}
-                  onPress={() => setUserType(t.value)}
-                >
-                  <Text style={[styles.chipText, userType === t.value && styles.chipTextActive]}>
-                    {t.label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-
-            <Text style={styles.fieldLabel}>Sesso</Text>
-            <View style={styles.chipRow}>
-              {SEX_OPTIONS.map((s) => (
-                <TouchableOpacity
-                  key={s.value}
-                  style={[styles.chip, sex === s.value && styles.chipActive]}
-                  onPress={() => setSex(sex === s.value ? null : s.value)}
-                >
-                  <Text style={[styles.chipText, sex === s.value && styles.chipTextActive]}>
-                    {s.label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-
-            <Text style={styles.fieldLabel}>Anno di nascita</Text>
-            <TextInput
-              style={styles.input}
-              value={birthYearStr}
-              onChangeText={setBirthYearStr}
-              placeholder="es. 1990"
-              placeholderTextColor={Colors.textSecondary}
-              keyboardType="number-pad"
-              maxLength={4}
-            />
-
-            <Text style={styles.fieldLabel}>Regione</Text>
-            <TextInput
-              style={styles.input}
-              value={region}
-              onChangeText={setRegion}
-              placeholder="es. Lombardia"
-              placeholderTextColor={Colors.textSecondary}
-              autoCorrect={false}
-            />
-
-            <View style={styles.infoBox}>
-              <Ionicons name="information-circle-outline" size={16} color={Colors.textSecondary} />
-              <Text style={styles.infoText}>
-                L'utente viene creato attivo senza verifica email. Potrà accedere subito con le credenziali impostate.
-              </Text>
-            </View>
-
-            <TouchableOpacity
-              style={[styles.submitBtn, isLoading && styles.submitBtnDisabled]}
-              onPress={handleSubmit}
-              disabled={isLoading}
-            >
-              <Ionicons name="person-add-outline" size={18} color="#0D0D0D" />
-              <Text style={styles.submitBtnText}>
-                {isLoading ? "Creazione in corso..." : "Crea Utente"}
-              </Text>
-            </TouchableOpacity>
-
-            <View style={{ height: 24 }} />
-          </ScrollView>
         </View>
-      </View>
-    </Modal>
+      </Modal>
+
+      <RegionPicker
+        visible={showRegionPicker}
+        selectedRegion={region}
+        onSelect={(r) => setRegion(r)}
+        onClose={() => setShowRegionPicker(false)}
+      />
+    </>
   );
 };
 
@@ -283,14 +304,34 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.border,
   },
-  chipRow: {
+  inlineRow: {
     flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginTop: 14,
     gap: 8,
+  },
+  inlineLabel: {
+    marginTop: 0,
+    marginBottom: 0,
+    flexShrink: 0,
+  },
+  chipRowInline: {
+    flexDirection: "row",
+    gap: 6,
     flexWrap: "wrap",
+    justifyContent: "flex-end",
+    flex: 1,
+  },
+  inputCompact: {
+    width: 90,
+    textAlign: "center",
+    paddingHorizontal: 10,
+    paddingVertical: 8,
   },
   chip: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 7,
     borderRadius: 20,
     backgroundColor: Colors.background,
     borderWidth: 1,
@@ -307,6 +348,27 @@ const styles = StyleSheet.create({
   },
   chipTextActive: {
     color: "#0D0D0D",
+  },
+  regionSelector: {
+    backgroundColor: Colors.background,
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  regionText: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 14,
+    color: Colors.text,
+  },
+  regionPlaceholder: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 14,
+    color: Colors.textSecondary,
   },
   infoBox: {
     flexDirection: "row",
