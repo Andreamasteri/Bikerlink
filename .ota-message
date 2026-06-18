@@ -1,1 +1,1 @@
-
+OTA114: Fix widget AI (non più disabilitato al cold start), schermata admin AI bianca, crash FloatingWidget, badge WS diagnostica utenti, fix Telemetry Health Panel, skeleton admin utenti, TTL presenza 15→30min
