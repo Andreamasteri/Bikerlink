@@ -5,9 +5,10 @@ import { db } from "../../db";
 import { sendError } from "../../lib/api-response";
 import { diagnosticReports, diagnosticQueue } from "@shared/db";
 import { users } from "@shared/db";
-import { and, desc, eq, gte, gt, ilike, isNull, lt, lte, or, sql } from "drizzle-orm";
+import { and, desc, eq, gte, gt, ilike, inArray, isNull, lt, lte, or, sql } from "drizzle-orm";
 import { storage } from "../../storage";
 import { sendDiagnosticCommand, getOnlineUsers } from "../../diagnostic-ws";
+import { onlineTracker } from "../../online-tracker";
 
 const REPORTS_DIR = path.join(process.cwd(), "server", "diagnostics", "reports");
 
@@ -239,6 +240,34 @@ router.get("/diagnostic-reports/online-users", (_req: Request, res: Response) =>
   } catch (err) {
     console.error("[admin/diagnostic-reports] online-users error:", err);
     return sendError(res, 500, "Errore");
+  }
+});
+
+router.get("/diagnostic/active-users", async (_req: Request, res: Response) => {
+  try {
+    const userIds = onlineTracker.getOnlineUserIds();
+    if (userIds.length === 0) return res.json({ users: [] });
+
+    const wsUsers = getOnlineUsers();
+    const wsSet = new Set(wsUsers.map(u => u.userId));
+
+    const rows = await db
+      .select({ id: users.id, nickname: users.nickname })
+      .from(users)
+      .where(inArray(users.id, userIds));
+
+    const nicknameMap = new Map(rows.map(r => [r.id, r.nickname]));
+
+    const result = userIds.map(userId => ({
+      userId,
+      nickname: nicknameMap.get(userId) ?? null,
+      wsConnected: wsSet.has(userId),
+    }));
+
+    return res.json({ users: result });
+  } catch (err) {
+    console.error("[admin/diagnostic/active-users] error:", err);
+    return sendError(res, 500, "Errore caricamento utenti attivi");
   }
 });
 

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  ActivityIndicator, RefreshControl, TextInput, Alert, Platform,
+  ActivityIndicator, RefreshControl, Alert, Platform,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -17,7 +17,7 @@ import { DiagnosticReportCard } from "@/components/admin/DiagnosticReportCard";
 import type { Filters } from "@/components/admin/DiagnosticFilterPanel";
 import type { DiagReport, RemoteReqStatus } from "@/components/admin/DiagnosticReportCard";
 
-interface OnlineUser { userId: string; role: string; nickname: string | null }
+interface ActiveUser { userId: string; nickname: string | null; wsConnected: boolean }
 interface ReportsResponse { reports: DiagReport[]; total: number; page: number; limit: number }
 interface DiagFileEntry { filename: string; userId: string; timestamp: string; sizeBytes: number }
 interface FilesResponse { files: DiagFileEntry[]; total: number; page: number; limit: number }
@@ -73,7 +73,7 @@ export default function DiagnosticReportsScreen() {
       }
     };
     const onOnlineUpdate = () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/diagnostic-reports/online-users"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/diagnostic/active-users"] });
     };
     addDiagnosticEventListener("diag:progress", onProgress);
     addDiagnosticEventListener("diag:result", onResult);
@@ -88,8 +88,8 @@ export default function DiagnosticReportsScreen() {
   const reportsUrl = buildReportsUrl(filters, page);
   reportsUrlRef.current = reportsUrl;
 
-  const { data: onlineData, isLoading: onlineLoading, isError: onlineError, refetch: refetchOnline } = useQuery<{ users: OnlineUser[] }>({
-    queryKey: ["/api/admin/diagnostic-reports/online-users"],
+  const { data: activeUsersData, isLoading: activeUsersLoading, isError: activeUsersError, refetch: refetchActiveUsers } = useQuery<{ users: ActiveUser[] }>({
+    queryKey: ["/api/admin/diagnostic/active-users"],
     refetchInterval: 15000,
   });
 
@@ -97,25 +97,6 @@ export default function DiagnosticReportsScreen() {
     queryKey: [reportsUrl],
     refetchInterval: 30000,
     select: (data) => data,
-  });
-
-  const [userSearchQuery, setUserSearchQuery] = useState("");
-  const [debouncedSearch, setDebouncedSearch] = useState("");
-  useEffect(() => {
-    const t = setTimeout(() => setDebouncedSearch(userSearchQuery.trim()), 400);
-    return () => clearTimeout(t);
-  }, [userSearchQuery]);
-
-  const { data: searchUsersData, isLoading: searchUsersLoading, isError: searchUsersError } = useQuery<{ users: Array<{ id: string; nickname: string | null }> }>({
-    queryKey: ["/api/admin/diagnostic/search-users", debouncedSearch],
-    enabled: debouncedSearch.length >= 2,
-    queryFn: async () => {
-      const url = new URL("/api/admin/diagnostic/search-users", getApiUrl());
-      url.searchParams.set("q", debouncedSearch);
-      const res = await fetch(url.toString(), { headers: authFetchHeaders(), credentials: "include" });
-      if (!res.ok) throw new Error("Errore ricerca utenti");
-      return res.json() as Promise<{ users: Array<{ id: string; nickname: string | null }> }>;
-    },
   });
 
   useEffect(() => {
@@ -207,11 +188,10 @@ export default function DiagnosticReportsScreen() {
   const applyFilters = useCallback(() => { setFilters(pendingFilters); setPage(1); setShowFilters(false); }, [pendingFilters]);
   const resetFilters = useCallback(() => { setPendingFilters(EMPTY_FILTERS); setFilters(EMPTY_FILTERS); setPage(1); setShowFilters(false); }, []);
 
-  const onlineUsers = onlineData?.users ?? [];
+  const activeUsers = activeUsersData?.users ?? [];
   const reports = reportsData?.reports ?? [];
   const totalPages = reportsData ? Math.ceil(reportsData.total / 20) : 1;
   const active = hasActiveFilters(filters);
-  const searchResults = searchUsersData?.users ?? [];
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -240,86 +220,76 @@ export default function DiagnosticReportsScreen() {
 
       <ScrollView
         contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}
-        refreshControl={<RefreshControl refreshing={onlineLoading || reportsLoading} onRefresh={refetch} />}
+        refreshControl={<RefreshControl refreshing={activeUsersLoading || reportsLoading} onRefresh={() => { void refetchActiveUsers(); void refetch(); }} />}
       >
-        <Text style={styles.sectionLabel}>UTENTI ONLINE (WS)</Text>
-        {onlineLoading && <ActivityIndicator style={{ margin: 16 }} />}
-        {onlineError && !onlineLoading && (
+        <View style={styles.reportsSectionHeader}>
+          <Text style={styles.sectionLabel}>UTENTI ATTIVI ({activeUsers.length})</Text>
+          <TouchableOpacity onPress={() => refetchActiveUsers()} style={styles.refreshBtn}>
+            <Ionicons name="refresh" size={14} color="#9CA3AF" />
+          </TouchableOpacity>
+        </View>
+        <Text style={styles.hintText}>Aggiornato ogni 15s · 🟢 WS connesso · 🟡 solo polling</Text>
+        {activeUsersLoading && <ActivityIndicator style={{ margin: 16 }} />}
+        {activeUsersError && !activeUsersLoading && (
           <View style={styles.errorBox}>
-            <Text style={styles.errorText}>Errore caricamento utenti online</Text>
-            <TouchableOpacity style={styles.retryBtn} onPress={() => refetchOnline()}>
+            <Text style={styles.errorText}>Errore caricamento utenti attivi</Text>
+            <TouchableOpacity style={styles.retryBtn} onPress={() => refetchActiveUsers()}>
               <Text style={styles.retryBtnText}>Riprova</Text>
             </TouchableOpacity>
           </View>
         )}
-        {!onlineLoading && !onlineError && onlineUsers.length === 0 && (
-          <Text style={styles.emptyText}>Nessun utente connesso via WS</Text>
+        {!activeUsersLoading && !activeUsersError && activeUsers.length === 0 && (
+          <Text style={styles.emptyText}>Nessun utente attivo al momento</Text>
         )}
-        {onlineUsers.map(({ userId, nickname }) => {
-          const st: DiagStatus = triggeredStatus[userId] ?? "idle";
-          const isPending = st === "pending" || st === "running";
-          const displayName = nickname ?? `${userId.slice(0, 8)}…`;
-          return (
-            <View key={userId} style={styles.userRow}>
-              <Ionicons name="ellipse" size={10} color="#22C55E" />
-              <Text style={styles.userId} numberOfLines={1}>{displayName}</Text>
-              {st !== "idle" && <Text style={styles.statusText}>{statusMap[st]}</Text>}
-              <TouchableOpacity style={[styles.triggerBtn, isPending && styles.triggerBtnDisabled]} disabled={isPending} onPress={() => triggerMutation.mutate(userId)}>
-                {isPending ? <ActivityIndicator size="small" color="#fff" /> : <Text style={styles.triggerBtnText}>Avvia WS</Text>}
-              </TouchableOpacity>
-            </View>
-          );
-        })}
+        {activeUsers.map(({ userId, nickname, wsConnected }) => {
+          const wsSt: DiagStatus = triggeredStatus[userId] ?? "idle";
+          const pollReq = remoteReqStatus[userId];
+          const pollSt = pollReq?.status ?? "idle";
 
-        <View style={styles.divider} />
-        <Text style={styles.sectionLabel}>RICHIEDI DIAGNOSTICA (POLLING)</Text>
-        <Text style={styles.hintText}>L'app dell'utente eseguirà la diagnostica al prossimo polling (~60s)</Text>
-        <View style={styles.searchRow}>
-          <Ionicons name="search" size={16} color="#6B7280" />
-          <TextInput
-            style={styles.searchInput}
-            value={userSearchQuery}
-            onChangeText={setUserSearchQuery}
-            placeholder="Cerca per nickname o ID utente…"
-            placeholderTextColor="#4B5563"
-            autoCapitalize="none"
-            autoCorrect={false}
-          />
-          {userSearchQuery.length > 0 && (
-            <TouchableOpacity onPress={() => { setUserSearchQuery(""); setDebouncedSearch(""); }}>
-              <Ionicons name="close-circle" size={16} color="#6B7280" />
-            </TouchableOpacity>
-          )}
-        </View>
-        {searchUsersLoading && <ActivityIndicator style={{ marginVertical: 8 }} />}
-        {searchUsersError && !searchUsersLoading && (
-          <View style={styles.errorBox}><Text style={styles.errorText}>Errore nella ricerca utenti</Text></View>
-        )}
-        {debouncedSearch.length >= 2 && !searchUsersLoading && !searchUsersError && searchResults.length === 0 && (
-          <Text style={styles.emptyText}>Nessun utente trovato</Text>
-        )}
-        {debouncedSearch.length < 2 && (
-          <Text style={[styles.hintText, { marginTop: 0 }]}>Digita almeno 2 caratteri per cercare</Text>
-        )}
-        {searchResults.map((u) => {
-          const userId = u.id;
-          const req = remoteReqStatus[userId];
-          const st = req?.status ?? "idle";
-          const isPending = st === "pending";
+          const isWsPending = wsSt === "pending" || wsSt === "running";
+          const isPollPending = pollSt === "pending";
+          const isPending = wsConnected ? isWsPending : isPollPending;
+
+          const displayName = nickname ?? `${userId.slice(0, 8)}…`;
+
+          let statusLabel: string | null = null;
+          if (wsConnected) {
+            if (wsSt !== "idle") statusLabel = statusMap[wsSt];
+          } else {
+            if (pollSt === "pending") statusLabel = "⏳ In attesa…";
+            else if (pollSt === "received") statusLabel = "✅ Ricevuto";
+            else if (pollSt === "failed") statusLabel = "❌ Errore";
+          }
+
+          const handleAvvia = () => {
+            if (wsConnected) {
+              triggerMutation.mutate(userId);
+            } else {
+              remoteRequestMutation.mutate(userId);
+            }
+          };
+
+          const btnDisabled = wsConnected
+            ? isWsPending
+            : (isPollPending || pollSt === "received");
+
           return (
             <View key={userId} style={styles.userRow}>
-              <Text style={styles.userId} numberOfLines={1}>{u.nickname ?? userId.slice(0, 8) + "…"}</Text>
-              {st === "pending" && <Text style={styles.statusText}>⏳ In attesa…</Text>}
-              {st === "received" && <Text style={[styles.statusText, { color: "#22C55E" }]}>✅ Ricevuto</Text>}
-              {st === "failed" && <Text style={[styles.statusText, { color: "#EF4444" }]}>❌ Errore</Text>}
+              <Ionicons name="ellipse" size={10} color={wsConnected ? "#22C55E" : "#EAB308"} />
+              <Text style={styles.userId} numberOfLines={1}>{displayName}</Text>
+              {statusLabel != null && (
+                <Text style={[styles.statusText, pollSt === "received" && { color: "#22C55E" }, (wsSt === "failed" || pollSt === "failed") && { color: "#EF4444" }]}>
+                  {statusLabel}
+                </Text>
+              )}
               <TouchableOpacity
-                style={[styles.triggerBtn, styles.triggerBtnRemote, (isPending || st === "received") && styles.triggerBtnDisabled]}
-                disabled={isPending || st === "received"}
-                onPress={() => remoteRequestMutation.mutate(userId)}
+                style={[styles.triggerBtn, !wsConnected && styles.triggerBtnRemote, btnDisabled && styles.triggerBtnDisabled]}
+                disabled={btnDisabled}
+                onPress={handleAvvia}
               >
                 {isPending
                   ? <ActivityIndicator size="small" color="#fff" />
-                  : <Text style={styles.triggerBtnText}>{st === "received" ? "Inviato" : "Richiedi"}</Text>}
+                  : <Text style={styles.triggerBtnText}>Avvia</Text>}
               </TouchableOpacity>
             </View>
           );
@@ -480,8 +450,6 @@ const styles = StyleSheet.create({
   errorText: { color: "#EF4444", fontSize: 13, textAlign: "center" },
   retryBtn: { backgroundColor: "#1D4ED8", borderRadius: 6, paddingHorizontal: 16, paddingVertical: 6 },
   retryBtnText: { color: "#fff", fontWeight: "600", fontSize: 13 },
-  searchRow: { flexDirection: "row", alignItems: "center", marginHorizontal: 16, marginBottom: 8, backgroundColor: "#1C1C1E", borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, borderWidth: 1, borderColor: "#374151", gap: 8 },
-  searchInput: { flex: 1, color: "#E5E7EB", fontSize: 14 },
   refreshBtn: { width: 30, height: 30, alignItems: "center", justifyContent: "center", marginRight: 16 },
   fileRow: { flexDirection: "row", alignItems: "center", marginHorizontal: 16, marginBottom: 8, backgroundColor: "#1C1C1E", padding: 10, borderRadius: 10, gap: 8 },
   fileInfo: { flex: 1, gap: 3 },
