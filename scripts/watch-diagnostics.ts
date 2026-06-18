@@ -1,14 +1,12 @@
 /**
- * dump-diagnostic-report.ts
+ * watch-diagnostics.ts
  *
- * Modalità di esecuzione:
- *   npx tsx scripts/dump-diagnostic-report.ts            # watch continuo (default)
- *   npx tsx scripts/dump-diagnostic-report.ts --once     # one-shot, ultimo report
- *   npx tsx scripts/dump-diagnostic-report.ts --limit 3  # one-shot, ultimi 3 report
+ * Gira in loop continuo: ogni 30 secondi controlla se sono arrivati nuovi
+ * report diagnostici (reviewedByAgent IS NULL) e li stampa su stdout in
+ * formato strutturato, così `refresh_all_logs` li cattura in tempo reale.
  *
- * In modalità watch (default) gira in loop ogni 30s e stampa solo i report
- * NON ancora visti (reviewedByAgent IS NULL), così `refresh_all_logs` li cattura
- * in tempo reale appena arrivano.
+ * Usa lo stesso formato di dump-diagnostic-report.ts ma si auto-riavvia
+ * senza uscire, rendendo visibile ogni nuova diagnostica appena arriva.
  */
 
 import { desc, eq, inArray, isNull } from "drizzle-orm";
@@ -25,20 +23,6 @@ const STATUS_ICON: Record<string, string> = {
   WARN: "⚠️ ",
   SKIP: "⏭️ ",
 };
-
-function parseArgs(): { mode: "watch" | "once"; limit: number } {
-  const args = process.argv.slice(2);
-  if (args.includes("--once") || args.includes("--limit")) {
-    const idx = args.indexOf("--limit");
-    let limit = 1;
-    if (idx !== -1 && args[idx + 1]) {
-      const n = parseInt(args[idx + 1], 10);
-      if (!isNaN(n) && n > 0) limit = n;
-    }
-    return { mode: "once", limit };
-  }
-  return { mode: "watch", limit: 10 };
-}
 
 function formatSummary(summary: DiagnosticSummary): string {
   return [
@@ -65,8 +49,8 @@ function formatResults(results: DiagnosticTestResult[]): string {
   return lines.join("\n");
 }
 
-async function fetchAndPrint(opts: { onlyNew: boolean; limit: number }): Promise<void> {
-  const query = db
+async function checkNewReports(): Promise<void> {
+  const rows = await db
     .select({
       id: diagnosticReports.id,
       userId: diagnosticReports.userId,
@@ -79,41 +63,29 @@ async function fetchAndPrint(opts: { onlyNew: boolean; limit: number }): Promise
       sentryEventId: diagnosticReports.sentryEventId,
       summary: diagnosticReports.summary,
       results: diagnosticReports.results,
-      reviewedByAgent: diagnosticReports.reviewedByAgent,
     })
     .from(diagnosticReports)
     .leftJoin(users, eq(diagnosticReports.userId, users.id))
+    .where(isNull(diagnosticReports.reviewedByAgent))
     .orderBy(desc(diagnosticReports.runAt))
-    .limit(opts.limit);
+    .limit(10);
 
-  const rows = opts.onlyNew
-    ? await (query as typeof query).where(isNull(diagnosticReports.reviewedByAgent))
-    : await query;
+  if (rows.length === 0) return;
 
-  if (rows.length === 0) {
-    if (!opts.onlyNew) console.log("Nessun report diagnostico trovato nel DB.");
-    return;
-  }
-
-  const unreviewedIds = rows.filter(r => r.reviewedByAgent == null).map(r => r.id);
+  const ids = rows.map(r => r.id);
 
   console.log(`\n${"═".repeat(60)}`);
-  if (opts.onlyNew) {
-    console.log(`  🆕 NUOVA DIAGNOSTICA  (${rows.length} non ancora visti)`);
-    console.log(`  Rilevato alle: ${new Date().toISOString()}`);
-  } else {
-    console.log(`  DIAGNOSTIC REPORT DUMP  (${rows.length} report)`);
-  }
+  console.log(`  🆕 NUOVA DIAGNOSTICA  (${rows.length} non ancora visti)`);
+  console.log(`  Rilevato alle: ${new Date().toISOString()}`);
   console.log(`${"═".repeat(60)}`);
 
   for (let i = 0; i < rows.length; i++) {
     const r = rows[i];
     const summary = r.summary as DiagnosticSummary | null;
     const results = r.results as DiagnosticTestResult[] | null;
-    const isNew = r.reviewedByAgent == null;
 
     console.log(`\n${"─".repeat(60)}`);
-    console.log(`  ${isNew ? "🆕 " : ""}Report ${i + 1} / ${rows.length}${isNew ? "  (NON ANCORA VISTO)" : ""}`);
+    console.log(`  Report ${i + 1} / ${rows.length}`);
     console.log(`${"─".repeat(60)}`);
     console.log(`  ID:          ${r.id}`);
     console.log(`  Utente:      ${r.nickname ?? r.userId ?? "—"}`);
@@ -132,34 +104,24 @@ async function fetchAndPrint(opts: { onlyNew: boolean; limit: number }): Promise
     if (results && results.length > 0) {
       console.log("\n  ── Risultati ──");
       console.log(formatResults(results));
-    } else if (!opts.onlyNew) {
-      console.log("\n  (nessun risultato dettagliato)");
-    }
-  }
-
-  if (unreviewedIds.length > 0) {
-    try {
-      await db
-        .update(diagnosticReports)
-        .set({ reviewedByAgent: new Date() })
-        .where(inArray(diagnosticReports.id, unreviewedIds));
-      if (!opts.onlyNew) {
-        console.log(`\n  🆕 ${unreviewedIds.length} nuovo/i report marcato/i come visto/i.`);
-      }
-    } catch (e) {
-      console.warn("  ⚠️  Impossibile marcare i report come visti:", e);
     }
   }
 
   console.log(`\n${"═".repeat(60)}\n`);
+
+  await db
+    .update(diagnosticReports)
+    .set({ reviewedByAgent: new Date() })
+    .where(inArray(diagnosticReports.id, ids));
 }
 
-async function runWatch(): Promise<void> {
+async function main() {
   console.log(`[watch-diagnostics] Avviato — polling ogni ${POLL_INTERVAL_MS / 1000}s`);
   console.log(`[watch-diagnostics] In attesa di nuovi report diagnostici...\n`);
+
   while (true) {
     try {
-      await fetchAndPrint({ onlyNew: true, limit: 10 });
+      await checkNewReports();
     } catch (e) {
       console.error("[watch-diagnostics] Errore durante il check:", e);
     }
@@ -167,21 +129,7 @@ async function runWatch(): Promise<void> {
   }
 }
 
-async function runOnce(limit: number): Promise<void> {
-  await fetchAndPrint({ onlyNew: false, limit });
-  process.exit(0);
-}
-
-async function main() {
-  const { mode, limit } = parseArgs();
-  if (mode === "watch") {
-    await runWatch();
-  } else {
-    await runOnce(limit);
-  }
-}
-
 main().catch(err => {
-  console.error("[dump-diagnostic-report] Errore:", err);
+  console.error("[watch-diagnostics] Errore fatale:", err);
   process.exit(1);
 });

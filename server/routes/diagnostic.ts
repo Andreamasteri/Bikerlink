@@ -2,7 +2,7 @@ import { Router, type Request, type Response } from "express";
 import fs from "fs";
 import path from "path";
 import { db } from "../db";
-import { diagnosticReports, diagnosticQueue, users } from "@shared/db";
+import { diagnosticReports, diagnosticQueue, users, notifications } from "@shared/db";
 import { sendError } from "../lib/api-response";
 import { and, eq, gt, isNull } from "drizzle-orm";
 
@@ -114,6 +114,44 @@ router.post("/report", async (req: Request, res: Response) => {
           console.warn("[diagnostic/report] Email error:", e);
         });
       }).catch(() => {});
+    });
+
+    // Fire-and-forget: in-app notification to all admin users.
+    setImmediate(async () => {
+      try {
+        const s = summary as Record<string, number> | undefined;
+        const passed = s?.passed ?? 0;
+        const failed = s?.failed ?? 0;
+        const warned = s?.warned ?? 0;
+        const icon = failed > 0 ? "❌" : warned > 0 ? "⚠️" : "✅";
+        let nickname = "Sconosciuto";
+        try {
+          const [row] = await db
+            .select({ nickname: users.nickname })
+            .from(users)
+            .where(eq(users.id, req.session.userId!))
+            .limit(1);
+          if (row?.nickname) nickname = row.nickname;
+        } catch { /* best-effort */ }
+        const adminUsers = await db
+          .select({ id: users.id })
+          .from(users)
+          .where(eq(users.role, "admin"));
+        if (adminUsers.length > 0) {
+          await db.insert(notifications).values(
+            adminUsers.map(a => ({
+              userId: a.id,
+              title: `${icon} Report diagnostico`,
+              body: `Da ${nickname} — ${passed} OK · ${warned} avvisi · ${failed} errori`,
+              notificationType: "diagnostic_report",
+              referenceType: "diagnostic_report",
+              referenceId: reportId,
+            }))
+          );
+        }
+      } catch (e) {
+        console.warn("[diagnostic/report] In-app notification error:", e);
+      }
     });
 
     // Fire-and-forget: push notification to admins for EVERY report.
