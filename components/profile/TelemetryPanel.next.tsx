@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   View,
   Text,
@@ -11,7 +11,7 @@ import {
   UIManager,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 import Colors from "@/constants/colors";
 import { apiRequest, queryClient } from "@/lib/query-client";
@@ -70,6 +70,9 @@ export default function TelemetryPanel({ telemetryStats }: Props) {
   const [showInfoModal, setShowInfoModal] = useState(false);
   const [relaxedMode, setRelaxedMode] = useState(false);
 
+  const focusTelemetryRef = useRef(focusTelemetry);
+  focusTelemetryRef.current = focusTelemetry;
+
   useEffect(() => {
     if (focusTelemetry === "1") {
       LayoutAnimation.easeInEaseOut();
@@ -77,6 +80,14 @@ export default function TelemetryPanel({ telemetryStats }: Props) {
       router.setParams({ focusTelemetry: undefined });
     }
   }, [focusTelemetry, router]);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (focusTelemetryRef.current !== "1") {
+        setTelemetryExpanded(false);
+      }
+    }, [])
+  );
 
   useEffect(() => {
     loadTelemetryAlwaysActive().then(setAlwaysActive).catch(() => {});
@@ -108,7 +119,6 @@ export default function TelemetryPanel({ telemetryStats }: Props) {
   };
 
   const handleToggleExpanded = () => {
-    LayoutAnimation.easeInEaseOut();
     setTelemetryExpanded((v) => !v);
   };
 
