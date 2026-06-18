@@ -5,7 +5,7 @@
 // FIX gesture conflict: usa GestureDetector + Gesture.Tap() invece di Pressable
 // per operare sullo stesso layer nativo di RNGH del FloatingWidget, eliminando
 // il conflitto di touch routing su Android tra Pressable e GestureDetector.
-import React, { useState } from "react";
+import React, { useState, useCallback, useMemo } from "react";
 import { StyleSheet, Platform } from "react-native";
 import * as Haptics from "expo-haptics";
 import { Ionicons } from "@expo/vector-icons";
@@ -43,26 +43,38 @@ export default function AssistantFab() {
 
   const pressed = useSharedValue(0);
 
-  const handleOpen = () => {
+  // useCallback con deps vuote: setOpen è stabile (React garantisce la stabilità
+  // dei setter useState), quindi handleOpen mantiene la stessa ref tra i render.
+  // Necessario perché runOnJS(handleOpen) cattura il ref alla creazione del
+  // worklet — una ref instabile causa stale closure in Reanimated+Hermes.
+  const handleOpen = useCallback(() => {
     if (Platform.OS !== "web") {
       void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
     setOpen(true);
-  };
+  }, []);
 
-  const tapGesture = Gesture.Tap()
-    .onBegin(() => {
-      "worklet";
-      pressed.value = withTiming(1, { duration: 80 });
-    })
-    .onFinalize(() => {
-      "worklet";
-      pressed.value = withTiming(0, { duration: 120 });
-    })
-    .onEnd((_e, success) => {
-      "worklet";
-      if (success) runOnJS(handleOpen)();
-    });
+  // useMemo con dep [handleOpen]: handleOpen è stabile, quindi tapGesture NON
+  // viene ricreato a ogni render. Evita che GestureDetector riceva di continuo
+  // un nuovo gesture prop (RNGH aggiorna il native handler in modo asincrono:
+  // durante la finestra di update il tap può andare perso).
+  const tapGesture = useMemo(
+    () =>
+      Gesture.Tap()
+        .onBegin(() => {
+          "worklet";
+          pressed.value = withTiming(1, { duration: 80 });
+        })
+        .onFinalize(() => {
+          "worklet";
+          pressed.value = withTiming(0, { duration: 120 });
+        })
+        .onEnd((_e, success) => {
+          "worklet";
+          if (success) runOnJS(handleOpen)();
+        }),
+    [handleOpen, pressed],
+  );
 
   const animatedStyle = useAnimatedStyle(() => ({
     opacity: 1 - pressed.value * 0.15,

@@ -39,3 +39,18 @@ removed immediately.
 AssistantFab is rendered AFTER FloatingWidget in app/_layout.tsx so the FAB paints
 above the FloatingWidget's full-screen backdrop and stays tappable while the menu is
 open. The onboarding tour uses a Modal, so sibling order around it is irrelevant.
+
+## RNGH gesture objects must be memoized (lost taps)
+A `Gesture.Tap()` (or any RNGH gesture) created inline in a component body is rebuilt
+every render. `GestureDetector` then re-registers the native handler on each new
+object, and RNGH applies that update asynchronously — taps that land during the
+re-registration window are silently dropped. The runOnJS callback inside the worklet
+also captures its JS function ref at gesture-creation time, so an unstable callback
+risks a stale closure under Hermes.
+
+**How to apply:** wrap the JS callback in `useCallback` (deps minimal — useState
+setters are already stable) and wrap the gesture in `useMemo([callback, sharedValue])`.
+This was the suspected cause of the AssistantFab (bottom-left AI FAB) not responding
+to taps while the FloatingWidget ball worked fine. Note: this is hardening of ONE
+cause; the full-screen FloatingWidget backdrop competing for the same touch on Android
+is a separate, still-open contention path.
