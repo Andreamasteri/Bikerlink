@@ -19,6 +19,7 @@ import Animated, {
 } from "react-native-reanimated";
 import { useColors } from "@/hooks/useColors";
 import { useAssistantEnabled } from "@/hooks/useAssistantEnabled";
+import { useAssistantFabGestureRef } from "@/lib/assistant-fab-gesture-context";
 import AssistantChatSheet from "./AssistantChatSheet";
 
 const FAB_SIZE = 56;
@@ -39,6 +40,10 @@ export default function AssistantFab() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { fabEnabled } = useAssistantEnabled();
+  // Ref condiviso col FloatingWidget: il suo backdrop fullscreen (quando il menu
+  // è aperto) dichiara simultaneousWithExternalGesture(fabGestureRef) così il tap
+  // sul FAB non viene mai "rubato" dal backdrop su Android.
+  const fabGestureRef = useAssistantFabGestureRef();
   const [open, setOpen] = useState(false);
 
   const pressed = useSharedValue(0);
@@ -72,8 +77,10 @@ export default function AssistantFab() {
         .onEnd((_e, success) => {
           "worklet";
           if (success) runOnJS(handleOpen)();
-        }),
-    [handleOpen, pressed],
+        })
+        // Espone questo gesture al backdrop del FloatingWidget via ref condiviso.
+        .withRef(fabGestureRef),
+    [handleOpen, pressed, fabGestureRef],
   );
 
   const animatedStyle = useAnimatedStyle(() => ({

@@ -51,6 +51,21 @@ risks a stale closure under Hermes.
 **How to apply:** wrap the JS callback in `useCallback` (deps minimal — useState
 setters are already stable) and wrap the gesture in `useMemo([callback, sharedValue])`.
 This was the suspected cause of the AssistantFab (bottom-left AI FAB) not responding
-to taps while the FloatingWidget ball worked fine. Note: this is hardening of ONE
-cause; the full-screen FloatingWidget backdrop competing for the same touch on Android
-is a separate, still-open contention path.
+to taps while the FloatingWidget ball worked fine.
+
+## FAB ↔ FloatingWidget backdrop gesture coordination (Task #4449 secondary fix)
+The FloatingWidget renders a full-screen `Gesture.Tap()` backdrop while its menu is
+open; it overlaps the FAB corner and on Android RNGH's native hit-test could route a
+FAB tap to the backdrop instead. Fixed by sharing the FAB gesture via
+`lib/assistant-fab-gesture-context.tsx` (context whose default is a module-level
+fallback ref `{current:undefined}` so consumers never crash without a provider). The
+FAB attaches `.withRef(fabGestureRef)`; the backdrop declares
+`.simultaneousWithExternalGesture(fabGestureRef)`. Provider mounts in RootProviders
+INSIDE `GestureHandlerRootView`, wrapping both consumers.
+
+**Why:** `simultaneousWithExternalGesture` is additive — it never blocks the
+backdrop's own recognition, so the working FloatingWidget is unchanged; it only stops
+the backdrop from winning the FAB's touch. Tapping the FAB while the menu is open now
+opens the AI sheet AND closes the menu (coherent). `simultaneousWithExternalGesture`
+lives on `BaseGesture`, so apply it to the inner `Gesture.Tap()`/`Pan()`, NOT to a
+`Gesture.Exclusive(...)` ComposedGesture (the ball's composed gesture).

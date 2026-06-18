@@ -23,6 +23,7 @@ import Animated, {
 } from "react-native-reanimated";
 import { useFloatingWidget } from "@/lib/floating-widget-context";
 import { useTheme } from "@/lib/theme-context";
+import { useAssistantFabGestureRef } from "@/lib/assistant-fab-gesture-context";
 
 const WIDGET_SIZE = 48;
 const POSITION_KEY = "floating_widget_position";
@@ -36,6 +37,9 @@ export default function FloatingWidget() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const pathname = usePathname();
+  // Ref del gesture dell'AssistantFab: il backdrop fullscreen lo dichiara come
+  // simultaneo per non intercettare i tap destinati al FAB (vedi sotto).
+  const fabGestureRef = useAssistantFabGestureRef();
 
   const { width, height } = useWindowDimensions();
   const defaultX = width - WIDGET_SIZE - 16;
@@ -289,6 +293,11 @@ export default function FloatingWidget() {
   // gesture because the panel is rendered on top (higher z-order) and RNGH's hit
   // test routes the touch to the topmost view.
   const backdropTapGesture = Gesture.Tap()
+    // Il backdrop copre tutto lo schermo (incluso l'angolo dell'AssistantFab).
+    // Dichiarando il gesture del FAB come simultaneo, un tap sul FAB apre la
+    // chat AI E chiude questo menu, invece di essere assorbito dal backdrop su
+    // Android (RNGH altrimenti potrebbe instradare il tocco al backdrop).
+    .simultaneousWithExternalGesture(fabGestureRef)
     .onEnd((_e, success) => {
       "worklet";
       if (success) runOnJS(closeMenu)();
