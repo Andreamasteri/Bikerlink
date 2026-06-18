@@ -69,6 +69,7 @@ router.post("/", async (req: Request, res: Response) => {
 router.put("/toggle-all", async (req: Request, res: Response) => {
   try {
     const { enabled } = req.body;
+    await storage.upsertAppSetting("fake_users_enabled", enabled ? "true" : "false");
     await db.update(users).set({ 
       lastLoginAt: enabled ? new Date() : sql`last_login_at` 
     }).where(eq(users.isFake, true));

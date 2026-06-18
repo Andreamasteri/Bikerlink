@@ -170,6 +170,16 @@ router.put("/primal_user_enabled", async (req: Request, res: Response) => {
   }
 });
 
+router.put("/chatbot_enabled", async (req: Request, res: Response) => {
+  try {
+    const val = req.body.value === true || req.body.value === "true";
+    const setting = await storage.upsertAppSetting("chatbot_enabled", val ? "true" : "false");
+    return res.json(setting);
+  } catch (_error) {
+    return sendError(res, 500, "Errore salvataggio setting");
+  }
+});
+
 router.put("/maps_provider", async (req: Request, res: Response) => {
   try {
     const parsed = mapsProviderSchema.safeParse(req.body);
