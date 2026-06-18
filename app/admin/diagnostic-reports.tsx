@@ -220,11 +220,11 @@ export default function DiagnosticReportsScreen() {
 
       <ScrollView
         contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}
-        refreshControl={<RefreshControl refreshing={activeUsersLoading || reportsLoading} onRefresh={() => { void refetchActiveUsers(); void refetch(); }} />}
+        refreshControl={<RefreshControl refreshing={activeUsersLoading || reportsLoading} onRefresh={() => { void refetchActiveUsers(); void refetch(); void refetchFiles(); }} />}
       >
         <View style={styles.reportsSectionHeader}>
           <Text style={styles.sectionLabel}>UTENTI ATTIVI ({activeUsers.length})</Text>
-          <TouchableOpacity onPress={() => refetchActiveUsers()} style={styles.refreshBtn}>
+          <TouchableOpacity onPress={() => { void refetchActiveUsers(); void refetch(); void refetchFiles(); }} style={styles.refreshBtn}>
             <Ionicons name="refresh" size={14} color="#9CA3AF" />
           </TouchableOpacity>
         </View>

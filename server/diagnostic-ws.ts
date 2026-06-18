@@ -19,8 +19,8 @@ export function attachDiagnosticWS(server: HttpServer): void {
     try {
       const url = req.url ?? "";
       if (!url.startsWith("/ws/diagnostic")) return;
-      const { validateSessionForUpgrade } = await import("./matching/notifications/ws-auth");
-      const userId = await validateSessionForUpgrade(req);
+      const { validateAnyUserForUpgrade } = await import("./matching/notifications/ws-auth");
+      const userId = await validateAnyUserForUpgrade(req);
       if (!userId) {
         socket.write("HTTP/1.1 401 Unauthorized\r\n\r\n");
         socket.destroy();
