@@ -463,11 +463,11 @@ router.get("/telemetry-health", async (_req: Request, res: Response) => {
       }>(sql`
         SELECT
           (SELECT COUNT(*)::text FROM maps_telemetry_events WHERE created_at >= NOW() - INTERVAL '24 hours') AS maps_count,
-          (SELECT MAX(created_at)::text FROM maps_telemetry_events) AS maps_last,
+          (SELECT REPLACE(MAX(created_at)::text, ' ', 'T') || 'Z' FROM maps_telemetry_events) AS maps_last,
           (SELECT COUNT(*)::text FROM device_metrics WHERE recorded_at >= NOW() - INTERVAL '24 hours') AS device_count,
-          (SELECT MAX(recorded_at)::text FROM device_metrics) AS device_last,
+          (SELECT REPLACE(MAX(recorded_at)::text, ' ', 'T') || 'Z' FROM device_metrics) AS device_last,
           (SELECT COUNT(*)::text FROM ota_boot_events WHERE created_at >= NOW() - INTERVAL '24 hours') AS ota_count,
-          (SELECT MAX(created_at)::text FROM ota_boot_events) AS ota_last,
+          (SELECT REPLACE(MAX(created_at)::text, ' ', 'T') || 'Z' FROM ota_boot_events) AS ota_last,
           (SELECT COUNT(*)::text FROM ota_boot_events WHERE event_type = 'boot_success') AS ota_boot_success
       `),
       getAllMapsFlags(),

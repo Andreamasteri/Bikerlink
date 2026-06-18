@@ -56,7 +56,7 @@ function PipelineRow({
   extra?: string;
   killSwitchOff?: boolean;
 }) {
-  const isStale = !lastEvent || Date.now() - new Date(lastEvent).getTime() > 60 * 60_000;
+  const isStale = count24h === 0;
   const statusColor = killSwitchOff ? "#f59e0b" : isStale ? "#ef4444" : "#22c55e";
   const statusLabel = killSwitchOff ? "Kill-switch OFF" : isStale ? "⚠ Nessun dato recente" : "OK";
 
