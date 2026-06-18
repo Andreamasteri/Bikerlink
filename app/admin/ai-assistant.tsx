@@ -40,9 +40,20 @@ export default function AiAssistantAdminScreen() {
   const qc = useQueryClient();
   const [tab, setTab] = useState<Platform>("android");
 
+  // L'endpoint admin restituisce la config di UNA piattaforma per volta
+  // ({ platform, config }). La UI invece ragiona su entrambe (tab Android/iOS),
+  // quindi carichiamo le due piattaforme in parallelo e le combiniamo in un
+  // unico AdminConfig. Senza questo, `config.android`/`config.ios` erano
+  // undefined → `cur` undefined → spinner infinito (schermata bianca).
   const cfgQ = useQuery<{ config: AdminConfig }>({
     queryKey: ["/api/admin/ai/assistant/config"],
-    queryFn: async () => (await apiRequest("GET", "/api/admin/ai/assistant/config")).json(),
+    queryFn: async () => {
+      const [android, ios] = await Promise.all([
+        apiRequest("GET", "/api/admin/ai/assistant/config?platform=android").then((r) => r.json()),
+        apiRequest("GET", "/api/admin/ai/assistant/config?platform=ios").then((r) => r.json()),
+      ]);
+      return { config: { android: android.config, ios: ios.config } };
+    },
     staleTime: 15_000,
   });
   const metaQ = useQuery<AdminMeta>({
@@ -61,8 +72,11 @@ export default function AiAssistantAdminScreen() {
 
   const save = useMutation({
     mutationFn: async (cfg: AdminConfig) => {
-      const res = await apiRequest("PUT", "/api/admin/ai/assistant/config", { config: cfg });
-      return res.json();
+      // L'endpoint PUT salva UNA piattaforma per volta: il body è la config di
+      // piattaforma (non { config }) e la piattaforma va nel query param.
+      await apiRequest("PUT", "/api/admin/ai/assistant/config?platform=android", cfg.android);
+      await apiRequest("PUT", "/api/admin/ai/assistant/config?platform=ios", cfg.ios);
+      return { ok: true };
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["/api/admin/ai/assistant/config"] });

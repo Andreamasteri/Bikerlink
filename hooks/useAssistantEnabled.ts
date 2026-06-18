@@ -24,8 +24,13 @@ export function useAssistantEnabled(): AssistantEnabledState {
 
   return useMemo<AssistantEnabledState>(() => {
     const loading = cfgQ.isLoading || prefsQ.isLoading;
-    const adminEnabled = !!cfgQ.data?.config?.enabled;
-    const modes = cfgQ.data?.config?.modes ?? { fab: false, selective: false, onboarding: false };
+    // Default-safe: l'assistente è considerato abilitato a meno che l'admin non
+    // l'abbia ESPLICITAMENTE disabilitato (config.enabled === false). Quando la
+    // config non è ancora caricata (cfgQ.data undefined) o non è mai stata
+    // salvata nel DB, adminEnabled resta true così il profilo non mostra
+    // erroneamente "Disabilitato dall'amministratore" e i widget compaiono.
+    const adminEnabled = cfgQ.data?.config?.enabled !== false;
+    const modes = cfgQ.data?.config?.modes ?? { fab: true, selective: false, onboarding: false };
     const proactiveRules = cfgQ.data?.config?.proactive ?? {};
     const prefs = prefsQ.data?.prefs ?? {};
     const userDisabled = !!prefs.disabled;

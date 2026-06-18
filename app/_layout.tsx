@@ -290,13 +290,17 @@ export default function RootLayout() {
           </View>
           <MatchPopupAlert />
           <UpdateNudgeWrapper />
-          {/* Task #2698 — AI Assistant utente (FAB + onboarding tour). */}
-          <AssistantFab />
           <AssistantOnboardingTour />
           {/* FloatingWidget reso figlio di MapReadyGate (dentro GestureHandlerRootView,
               stesso layer RNGH del FAB funzionante) così i gesti Exclusive(Pan, Tap)
-              ricevono il contesto necessario per drag e tap. */}
+              ricevono il contesto necessario per drag e tap.
+              È renderizzato PRIMA dell'AssistantFab così il suo backdrop a tutto
+              schermo (quando il menu è aperto) resta SOTTO il FAB nel paint order
+              e non ne intercetta i tap. */}
           <FloatingWidget />
+          {/* Task #2698 — FAB AI Assistant: ultimo sibling → dipinto sopra il
+              backdrop del FloatingWidget, sempre toccabile. */}
+          <AssistantFab />
         </MapReadyGate>
       </StartupGate>
     </RootProviders>

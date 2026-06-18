@@ -230,6 +230,37 @@ export default function FloatingWidget() {
   // tap fires only when pan threshold is never reached.
   const composedGesture = Gesture.Exclusive(panGesture, tapGesture);
 
+  // Navigation handlers — DECLARED BEFORE the gesture objects below. The
+  // gesture worklets capture these via runOnJS(); under Hermes a `const`
+  // referenced before its declaration is in the Temporal Dead Zone, so having
+  // them above the gestures avoids a ReferenceError (e.g. on "Notifiche").
+  // They close the menu SYNCHRONOUSLY (closeMenuJS) before navigating so the
+  // full-screen backdrop is removed immediately and can't swallow touches or
+  // linger during the route transition.
+  const handleChatPress = useCallback(() => {
+    if (Platform.OS !== "web") {
+      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }
+    closeMenuJS();
+    router.push("/(tabs)/chat");
+  }, [closeMenuJS, router]);
+
+  const handleNotificationsPress = useCallback(() => {
+    if (Platform.OS !== "web") {
+      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }
+    closeMenuJS();
+    router.push("/notifications" as Href);
+  }, [closeMenuJS, router]);
+
+  const handlePlayerPress = useCallback(() => {
+    if (Platform.OS !== "web") {
+      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }
+    closeMenuJS();
+    router.push("/(tabs)/music");
+  }, [closeMenuJS, router]);
+
   // Menu item tap gestures — Gesture.Tap() keeps all touch handling in the
   // RNGH native layer, eliminating conflicts with the parent Exclusive gesture
   // on Android (TouchableOpacity runs in the JS touch system and could be
@@ -310,30 +341,6 @@ export default function FloatingWidget() {
       transform: [{ translateX: tx }, { translateY: ty + menuTranslateY.value }],
     };
   });
-
-  const handleChatPress = useCallback(() => {
-    if (Platform.OS !== "web") {
-      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    }
-    closeMenu();
-    router.push("/(tabs)/chat");
-  }, [closeMenu, router]);
-
-  const handleNotificationsPress = useCallback(() => {
-    if (Platform.OS !== "web") {
-      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    }
-    closeMenu();
-    router.push("/notifications" as Href);
-  }, [closeMenu, router]);
-
-  const handlePlayerPress = useCallback(() => {
-    if (Platform.OS !== "web") {
-      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    }
-    closeMenu();
-    router.push("/(tabs)/music");
-  }, [closeMenu, router]);
 
   if (!isVisible || !positionLoaded) return null;
 

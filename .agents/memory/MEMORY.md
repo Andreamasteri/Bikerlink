@@ -51,3 +51,4 @@
 - [Port mapping probe vs Express](port-mapping-probe-vs-express.md) — localPort=5000 DEVE avere externalPort=80; localPort=8081 (probe) externalPort=8081; inverso → tutto il traffico va al probe → text/plain "ok" → API rotte.
 - [Promemoria skill diagnostic-report-dump](diagnostic-report-skill-reminder.md) — ricordare all'utente ogni 14gg (dal 17 giu 2026) che esiste la skill per dumpare i report diagnostici dal DB.
 - [Gesture test CI gate](gesture-test-ci-gate.md) — `npx vitest run components/__tests__` è un gate bloccante in post-merge.sh; 2 file, 38 test (gesture + bottom position).
+- [AI Assistant config contract](ai-assistant-config-contract.md) — config endpoint è PER-PLATFORM ({platform,config}); UI admin deve fetch+PUT android/ios separati; client default-safe `enabled !== false`; FloatingWidget handler sopra i gesture (Hermes TDZ); FAB dopo FloatingWidget nel layout.
