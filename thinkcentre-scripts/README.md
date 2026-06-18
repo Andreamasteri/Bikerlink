@@ -49,7 +49,9 @@ persistente al reboot).
 | `08.sh`   | Avvia import Nominatim in background (screen)                            |
 | `09.sh`   | Monitor import Nominatim: container, log, test HTTP                      |
 | `reset.sh`| **Reset completo**: ferma container, elimina `~/valhalla/` intera        |
-| `usb.sh`  | Copia `europe-latest.osm.pbf` dalla pennetta USB a `~/valhalla/data/`    |
+| `install-valhalla.sh` | Installa Docker (repo ufficiale) + `docker pull` immagine Valhalla (idempotente) |
+| `config-valhalla.sh`  | Fonte unica dei parametri di serve (porta `8002`, tiles/data); sorgeabile da `05.sh`/`99.sh` |
+| `usb.sh`  | **Monta** la USB raw, **copia** `europe-latest.osm.pbf` in `~/valhalla/data/`, **smonta** |
 | `swap.sh` | Crea/verifica swapfile 32–48 GB su SSD (idempotente, persistente fstab)  |
 | `cpu.sh`  | CPU governor → `performance`, persistente al reboot (riusa la unit systemd) |
 | `99.sh`   | **Boot check**: riavvia Valhalla (serve-only) e Nominatim dopo un reboot |
@@ -60,21 +62,33 @@ persistente al reboot).
 
 ### Valhalla (build grafo routing — Europa su 16 GB)
 
-#### Prima build (o ripartenza da zero)
+#### Da Ubuntu pulito (primo setup → prima build)
+
+Ordine consigliato: **install → config → usb → build**.
 
 ```
-reset.sh  ← elimina ~/valhalla/ intera (partenza pulita, chiede conferma)
-usb.sh    ← copia europe-latest.osm.pbf dalla pennetta USB
-swap.sh   ← crea/verifica swapfile 32–48 GB (OBBLIGATORIO su 16 GB)
-cpu.sh    ← governor performance (opzionale ma consigliato, persistente al reboot)
-04.sh     ← check pre-build (PBF, Docker, disco, RAM + swap)
-05.sh     ← avvia build (dura ore; con swap su SSD è più lenta ma non viene uccisa)
-02.sh     ← monitora (in un'altra sessione SSH)
-06.sh     ← verifica quando il monitor mostra "TERMINATO"
+install-valhalla.sh ← installa Docker (repo ufficiale) + pull immagine Valhalla
+config-valhalla.sh  ← (verifica) parametri di serve: porta 8002, tiles/data dir
+usb.sh              ← monta la USB raw, copia europe-latest.osm.pbf, smonta
+swap.sh             ← crea/verifica swapfile 32–48 GB (OBBLIGATORIO su 16 GB)
+cpu.sh              ← governor performance (opzionale ma consigliato)
+04.sh               ← check pre-build (PBF, Docker, disco, RAM + swap)
+05.sh               ← avvia build (dura ore; con swap su SSD è più lenta ma non viene uccisa)
+02.sh               ← monitora (in un'altra sessione SSH)
+06.sh               ← verifica quando il monitor mostra "TERMINATO"
 ```
+
+`install-valhalla.sh` va eseguito **una sola volta** sul setup iniziale (idempotente:
+se Docker e l'immagine ci sono già non rifà nulla). `config-valhalla.sh` non va
+"eseguito": è un file sorgeabile che `05.sh` e `99.sh` leggono in automatico — lo si
+lancia direttamente solo per **stampare** la config effettiva (override via env, es.
+`VALHALLA_PORT=9002 ./05.sh`).
 
 `swap.sh` e `cpu.sh` vanno eseguiti **una sola volta** (sono idempotenti e persistono
 al reboot): alle build successive puoi ripartire da `04.sh`.
+
+> Se Docker è già installato dal vecchio PC/setup, puoi saltare `install-valhalla.sh`
+> e ripartire da `usb.sh` (o, su ripartenza da zero, da `reset.sh`).
 
 > ⚠ `reset.sh` elimina anche il PBF: dopo il reset devi sempre eseguire `usb.sh`
 > per ricopiarlo dalla USB prima di avviare la build.

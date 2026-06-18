@@ -2,7 +2,19 @@
 # 05 — avvio build grafo Valhalla (in screen, sopravvive al disconnect SSH)
 set -euo pipefail
 
-PBF="$HOME/valhalla/data/europe-latest.osm.pbf"
+# Config condivisa: parametri di serve (porta, data dir, immagine) — fonte unica
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+CONFIG_FILE="$SCRIPT_DIR/config-valhalla.sh"
+if [ -f "$CONFIG_FILE" ]; then
+  # shellcheck source=/dev/null
+  source "$CONFIG_FILE"
+fi
+# Fallback (retro-compatibilità se il config manca)
+VALHALLA_DATA_DIR="${VALHALLA_DATA_DIR:-$HOME/valhalla/data}"
+VALHALLA_PORT="${VALHALLA_PORT:-8002}"
+VALHALLA_IMAGE="${VALHALLA_IMAGE:-ghcr.io/gis-ops/docker-valhalla/valhalla:latest}"
+
+PBF="$VALHALLA_DATA_DIR/europe-latest.osm.pbf"
 LOG="/tmp/valhalla-build.log"
 CONTAINER="bikerlink-valhalla-build"
 SCREEN_NAME="valhalla-build"
@@ -53,15 +65,15 @@ echo ""
 # SWAP capiente su SSD (vedi ./swap.sh e il check in 04.sh), non la concurrency.
 screen -dmS "$SCREEN_NAME" bash -c "
   docker run --rm --name $CONTAINER --shm-size=8g \
-    -v \"$HOME/valhalla/data:/custom_files\" \
-    -p 8002:8002 \
+    -v \"$VALHALLA_DATA_DIR:/custom_files\" \
+    -p $VALHALLA_PORT:8002 \
     -e use_tiles_ignore_pbf=False \
     -e serve_tiles=True \
     -e build_admins=True \
     -e build_time_zones=True \
     -e build_elevation=False \
     -e force_rebuild=True \
-    ghcr.io/gis-ops/docker-valhalla/valhalla:latest \
+    $VALHALLA_IMAGE \
     2>&1 | tee $LOG
   echo '=== VALHALLA BUILD TERMINATO: '\$(date)' ===' >> $LOG
 "

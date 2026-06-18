@@ -4,12 +4,24 @@
 #      NON esegue rebuild — usa i dati già presenti su disco.
 set -euo pipefail
 
-VALHALLA_DATA="$HOME/valhalla/data"
-TILES="$VALHALLA_DATA/valhalla_tiles"
+# Config condivisa: parametri di serve (porta, data dir, tiles, immagine) — fonte unica
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+CONFIG_FILE="$SCRIPT_DIR/config-valhalla.sh"
+if [ -f "$CONFIG_FILE" ]; then
+  # shellcheck source=/dev/null
+  source "$CONFIG_FILE"
+fi
+# Fallback (retro-compatibilità se il config manca)
+VALHALLA_DATA="${VALHALLA_DATA_DIR:-$HOME/valhalla/data}"
+TILES="${VALHALLA_TILES_DIR:-$VALHALLA_DATA/valhalla_tiles}"
+VALHALLA_PORT="${VALHALLA_PORT:-8002}"
+VALHALLA_IMAGE="${VALHALLA_IMAGE:-ghcr.io/gis-ops/docker-valhalla/valhalla:latest}"
+# Boot-check sempre su localhost (NON usare un eventuale VALHALLA_URL pubblico)
+VALHALLA_URL="http://localhost:$VALHALLA_PORT"
+
 VALHALLA_CONTAINER="bikerlink-valhalla-serve"
 VALHALLA_SCREEN="valhalla-serve"
 VALHALLA_LOG="/tmp/valhalla-serve.log"
-VALHALLA_URL="http://localhost:8002"
 
 NOM_DIR="$HOME/nominatim"
 NOM_COMPOSE="$NOM_DIR/docker-compose.yml"
@@ -61,14 +73,14 @@ if [ "$VALHALLA_SKIP" = false ]; then
     screen -dmS "$VALHALLA_SCREEN" bash -c "
       docker run --name $VALHALLA_CONTAINER --shm-size=4g \
         -v \"$VALHALLA_DATA:/custom_files\" \
-        -p 8002:8002 \
+        -p $VALHALLA_PORT:8002 \
         -e use_tiles_ignore_pbf=True \
         -e serve_tiles=True \
         -e build_admins=False \
         -e build_time_zones=False \
         -e build_elevation=False \
         -e force_rebuild=False \
-        ghcr.io/gis-ops/docker-valhalla/valhalla:latest \
+        $VALHALLA_IMAGE \
         2>&1 | tee $VALHALLA_LOG
       echo '=== VALHALLA SERVE TERMINATO: '\$(date)' ===' >> $VALHALLA_LOG
     "
