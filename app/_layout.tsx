@@ -168,7 +168,7 @@ function AdminUptimeOverlay() {
   const { user } = useAuth();
   const { enabled } = useUptimeWidget();
 
-  if (user?.role !== "admin" || !enabled) return null;
+  if (user?.role !== "admin" || enabled !== true) return null;
   return <UptimeWidget />;
 }
 

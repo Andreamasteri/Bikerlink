@@ -15,7 +15,7 @@ const styles = RNStyleSheet.create({
 });
 
 interface UptimeSectionProps {
-  uptimeWidgetEnabled: boolean;
+  uptimeWidgetEnabled: boolean | null;
   onUptimeToggle: (val: boolean) => void;
 }
 
@@ -23,6 +23,7 @@ export function UptimeSection({
   uptimeWidgetEnabled,
   onUptimeToggle,
 }: UptimeSectionProps) {
+  const isEnabled = uptimeWidgetEnabled === true;
   return (
     <RNView style={styles.paidCard}>
       <RNView style={styles.synecoHeader}>
@@ -31,14 +32,14 @@ export function UptimeSection({
           <RNText style={styles.synecoLabel}>Widget Uptime</RNText>
         </RNView>
         <RNSwitch
-          value={uptimeWidgetEnabled}
+          value={isEnabled}
           onValueChange={onUptimeToggle}
           trackColor={{ false: Colors.border, true: Colors.accent }}
-          thumbColor={uptimeWidgetEnabled ? Colors.text : Colors.textSecondary}
+          thumbColor={isEnabled ? Colors.text : Colors.textSecondary}
         />
       </RNView>
       <RNText style={styles.synecoDesc}>
-        {uptimeWidgetEnabled
+        {isEnabled
           ? "Pannello fluttuante uptime attivo — visibile solo agli admin"
           : "Pannello fluttuante uptime nascosto"}
       </RNText>

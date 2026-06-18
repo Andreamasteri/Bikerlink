@@ -4,17 +4,17 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 const STORAGE_KEY = "uptime_widget_enabled";
 
 interface UptimeWidgetContextValue {
-  enabled: boolean;
+  enabled: boolean | null;
   setEnabled: (val: boolean) => void;
 }
 
 const UptimeWidgetContext = createContext<UptimeWidgetContextValue>({
-  enabled: true,
+  enabled: null,
   setEnabled: () => {},
 });
 
 export function UptimeWidgetProvider({ children }: { children: React.ReactNode }) {
-  const [enabled, setEnabledState] = useState<boolean>(true);
+  const [enabled, setEnabledState] = useState<boolean | null>(null);
 
   useEffect(() => {
     AsyncStorage.getItem(STORAGE_KEY).then((val) => {

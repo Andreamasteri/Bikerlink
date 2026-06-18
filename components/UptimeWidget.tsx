@@ -1,13 +1,18 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef } from "react";
 import {
   View,
   Text,
   StyleSheet,
-  PanResponder,
-
+  useWindowDimensions,
 } from "react-native";
 import { useQuery } from "@tanstack/react-query";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { Gesture, GestureDetector } from "react-native-gesture-handler";
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+} from "react-native-reanimated";
+import { useState } from "react";
 
 interface UptimeData {
   backendStartedAt: number;
@@ -25,13 +30,22 @@ function formatUptime(elapsedMs: number): string {
   return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}.${d}`;
 }
 
+const WIDGET_W = 110;
+const WIDGET_H = 32;
+
 export default function UptimeWidget() {
   const insets = useSafeAreaInsets();
-  const [pos, setPos] = useState({ x: 0, y: 0 });
-  const posRef = useRef({ x: 0, y: 0 });
-  const startPosRef = useRef({ x: 0, y: 0 });
+  const { width, height } = useWindowDimensions();
   const [, setTick] = useState(0);
   const fetchTimeRef = useRef<number>(Date.now());
+
+  const defaultX = width - WIDGET_W - 16;
+  const defaultY = height - WIDGET_H - 84 - insets.bottom;
+
+  const posX = useSharedValue(defaultX);
+  const posY = useSharedValue(defaultY);
+  const startX = useSharedValue(defaultX);
+  const startY = useSharedValue(defaultY);
 
   const { data } = useQuery<UptimeData>({
     queryKey: ["/api/admin/uptime"],
@@ -48,32 +62,23 @@ export default function UptimeWidget() {
     return () => clearInterval(id);
   }, []);
 
-  const panResponder = useRef(
-    PanResponder.create({
-      // Task #4080: true per catturare subito il gesto e trascinare fluido al primo tocco.
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: () => true,
-      onPanResponderGrant: () => {
-        startPosRef.current = { ...posRef.current };
-      },
-      onPanResponderMove: (_, gs) => {
-        const newPos = {
-          x: startPosRef.current.x + gs.dx,
-          y: startPosRef.current.y + gs.dy,
-        };
-        posRef.current = newPos;
-        setPos(newPos);
-      },
-      onPanResponderRelease: (_, gs) => {
-        const newPos = {
-          x: startPosRef.current.x + gs.dx,
-          y: startPosRef.current.y + gs.dy,
-        };
-        posRef.current = newPos;
-        setPos(newPos);
-      },
+  const panGesture = Gesture.Pan()
+    .onStart(() => {
+      "worklet";
+      startX.value = posX.value;
+      startY.value = posY.value;
     })
-  ).current;
+    .onUpdate((e) => {
+      "worklet";
+      const rawX = startX.value + e.translationX;
+      const rawY = startY.value + e.translationY;
+      posX.value = Math.max(0, Math.min(rawX, width - WIDGET_W));
+      posY.value = Math.max(insets.top + 8, Math.min(rawY, height - WIDGET_H - 8));
+    });
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: posX.value }, { translateY: posY.value }],
+  }));
 
   const now = Date.now();
   const fetchAge = now - fetchTimeRef.current;
@@ -83,37 +88,34 @@ export default function UptimeWidget() {
       ? data.serverNow - data.backendStartedAt + fetchAge
       : -1;
 
-  const bottomBase =
-    84 + insets.bottom;
-
   const crashCount = data?.crashCount24h ?? 0;
 
   return (
-    <View
-      style={[
-        styles.container,
-        {
-          bottom: bottomBase - pos.y,
-          right: 16 - pos.x,
-        },
-      ]}
-      {...panResponder.panHandlers}
-    >
-      <Text style={styles.label}>
-        {"⏱ "}
-        {frontendElapsed >= 0 ? formatUptime(frontendElapsed) : "00:00.0"}
-        {crashCount > 0 ? (
-          <Text style={styles.crashLabel}>{`  💥 ${crashCount}`}</Text>
-        ) : null}
-      </Text>
-    </View>
+    <Animated.View style={[styles.container, animatedStyle]}>
+      <GestureDetector gesture={panGesture}>
+        <View style={styles.inner}>
+          <Text style={styles.label}>
+            {"⏱ "}
+            {frontendElapsed >= 0 ? formatUptime(frontendElapsed) : "00:00.0"}
+            {crashCount > 0 ? (
+              <Text style={styles.crashLabel}>{`  💥 ${crashCount}`}</Text>
+            ) : null}
+          </Text>
+        </View>
+      </GestureDetector>
+    </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     position: "absolute",
+    top: 0,
+    left: 0,
     zIndex: 9999,
+    elevation: 20,
+  },
+  inner: {
     backgroundColor: "rgba(10, 10, 10, 0.88)",
     borderRadius: 8,
     borderWidth: 1,
@@ -124,7 +126,6 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.5,
     shadowRadius: 6,
-    elevation: 20,
   },
   label: {
     color: "#00ff88",
