@@ -63,7 +63,11 @@ vi.mock("react-native", () => {
 });
 vi.mock("expo-haptics", () => ({ impactAsync: vi.fn().mockResolvedValue(undefined), ImpactFeedbackStyle: { Light: "light" } }));
 vi.mock("react-native-safe-area-context", () => ({ useSafeAreaInsets: vi.fn(() => ({ top: 47, bottom: 34 })) }));
-vi.mock("@expo/vector-icons", () => ({ Ionicons: () => null }));
+// Ionicons reso come host identificabile: così il test può verificare il `name`
+// dell'icona effettivamente renderizzata nella voce di menu.
+vi.mock("@expo/vector-icons", () => ({
+  Ionicons: (props: Record<string, unknown>) => React.createElement("IconMock", props),
+}));
 vi.mock("expo-router", () => ({ useRouter: vi.fn(() => ({ push: vi.fn() })), usePathname: vi.fn(() => "/") }));
 vi.mock("@react-native-async-storage/async-storage", () => ({ default: { getItem: vi.fn().mockResolvedValue(null), setItem: vi.fn().mockResolvedValue(undefined) } }));
 vi.mock("@/hooks/useColors", () => ({
@@ -139,5 +143,33 @@ describe("FloatingWidget — gate admin (render reale)", () => {
   it("non-admin: AdminConsoleSection (FabDrawer) NON è montata", async () => {
     const renderer = await renderWithRole("user");
     expect(countByTestID(renderer, "fab-drawer")).toBe(0);
+  });
+
+  it("admin: la voce 'AI Console' renderizza etichetta e icona corrette", async () => {
+    const renderer = await renderWithRole("admin");
+    await openMenu(renderer);
+    // La TouchableOpacity host con il testID della voce
+    const item = renderer.root.findAll(
+      (n) =>
+        typeof n.type === "string" &&
+        (n.props as { testID?: string })?.testID === "floating-widget-item-ai-console",
+    )[0];
+    expect(item).toBeTruthy();
+    // Etichetta: un nodo Text discendente con il testo "AI Console"
+    const hasLabel = item.findAll(
+      (n) => typeof n.type === "string" && (n.type as string) === "Text",
+    ).some((n) => {
+      const c = (n.props as { children?: unknown }).children;
+      return c === "AI Console";
+    });
+    expect(hasLabel).toBe(true);
+    // Icona: l'IconMock discendente con name="hardware-chip"
+    const hasIcon = item.findAll(
+      (n) =>
+        typeof n.type === "string" &&
+        (n.type as string) === "IconMock" &&
+        (n.props as { name?: string }).name === "hardware-chip",
+    ).length;
+    expect(hasIcon).toBe(1);
   });
 });
