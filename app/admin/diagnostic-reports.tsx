@@ -5,13 +5,18 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
+import { useRouter, useFocusEffect } from "expo-router";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useColors } from "@/hooks/useColors";
 import { apiRequest, queryClient, getApiUrl, authFetchHeaders } from "@/lib/query-client";
 import * as FileSystem from "expo-file-system/legacy";
 import * as Sharing from "expo-sharing";
-import { addDiagnosticEventListener, removeDiagnosticEventListener } from "@/lib/diagnostic/ws-client";
+import {
+  addDiagnosticEventListener,
+  removeDiagnosticEventListener,
+  setDiagnosticScreenFocused,
+} from "@/lib/diagnostic/ws-client";
+import { useDiagnosticWS } from "@/hooks/useDiagnosticWS";
 import { DiagnosticFilterPanel, EMPTY_FILTERS } from "@/components/admin/DiagnosticFilterPanel";
 import { DiagnosticReportCard } from "@/components/admin/DiagnosticReportCard";
 import type { Filters } from "@/components/admin/DiagnosticFilterPanel";
@@ -59,6 +64,27 @@ export default function DiagnosticReportsScreen() {
   const [pendingFilters, setPendingFilters] = useState<Filters>(EMPTY_FILTERS);
   const [page, setPage] = useState(1);
   const reportsUrlRef = useRef<string>("/api/admin/diagnostic-reports");
+  const wsState = useDiagnosticWS();
+  const prevWsStateRef = useRef(wsState);
+
+  // Drive the diagnostic WS reconnect loop only while this screen is focused.
+  // On focus we reset the backoff and reconnect immediately; on blur the
+  // exponential reconnect loop stops (off-screen clients use the 60s polling).
+  useFocusEffect(
+    useCallback(() => {
+      setDiagnosticScreenFocused(true);
+      return () => setDiagnosticScreenFocused(false);
+    }, [])
+  );
+
+  // When the WS transitions back to "connected", refresh the active-users list
+  // immediately so the green dots reflect reality without a manual refresh.
+  useEffect(() => {
+    if (prevWsStateRef.current !== "connected" && wsState === "connected") {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/diagnostic/active-users"] });
+    }
+    prevWsStateRef.current = wsState;
+  }, [wsState]);
 
   useEffect(() => {
     const onProgress = (msg: Record<string, unknown>) => {
@@ -228,7 +254,9 @@ export default function DiagnosticReportsScreen() {
             <Ionicons name="refresh" size={14} color="#9CA3AF" />
           </TouchableOpacity>
         </View>
-        <Text style={styles.hintText}>Aggiornato ogni 15s · 🟢 WS connesso · 🟡 solo polling</Text>
+        <Text style={styles.hintText}>
+          Aggiornato ogni 15s · {wsState === "connected" ? "🟢 WS connesso" : "🟡 riconnessione…"}
+        </Text>
         {activeUsersLoading && <ActivityIndicator style={{ margin: 16 }} />}
         {activeUsersError && !activeUsersLoading && (
           <View style={styles.errorBox}>

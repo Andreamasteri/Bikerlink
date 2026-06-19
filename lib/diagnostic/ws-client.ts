@@ -9,6 +9,18 @@ let _isAdmin = false;
 let _isModerator = false;
 let _enabled = false;
 
+// ── Reconnect backoff ───────────────────────────────────────────────────────
+// Exponential backoff: 2s → 4s → 8s … capped at 60s. The backoff resets to the
+// initial delay on a successful connection. The active reconnect loop only runs
+// while a diagnostic screen is focused (_screenActive); leaving the screen stops
+// it so we don't drain battery retrying in the background. Remote diagnostic
+// commands still reach off-screen clients via the independent 60s polling loop
+// in auth-context.
+const INITIAL_BACKOFF_MS = 2000;
+const MAX_BACKOFF_MS = 60000;
+let _backoffMs = INITIAL_BACKOFF_MS;
+let _screenActive = false;
+
 // ── Connection state tracking ───────────────────────────────────────────────
 // Tracks whether the diagnostic WS is live ("connected", 🟢) or the client is
 // falling back to the 60s remote polling loop ("polling", 🟡). Exposed so the
@@ -60,9 +72,20 @@ function clearReconnect() {
   if (_reconnectTimer) { clearTimeout(_reconnectTimer); _reconnectTimer = null; }
 }
 
-function scheduleReconnect(delayMs = 10000) {
+function resetBackoff() {
+  _backoffMs = INITIAL_BACKOFF_MS;
+}
+
+function scheduleReconnect() {
   clearReconnect();
-  _reconnectTimer = setTimeout(() => connect(), delayMs);
+  // Only retry while enabled AND a diagnostic screen is focused. Off-screen
+  // clients rely on the 60s polling fallback; this prevents endless background
+  // reconnect attempts after the user leaves the diagnostic screen.
+  if (!_enabled || !_screenActive) return;
+  const delay = _backoffMs;
+  _backoffMs = Math.min(_backoffMs * 2, MAX_BACKOFF_MS);
+  console.log(`[DiagWS] reconnect in ${Math.round(delay / 1000)}s`);
+  _reconnectTimer = setTimeout(() => connect(), delay);
 }
 
 function connect() {
@@ -79,6 +102,7 @@ function connect() {
 
     ws.onopen = () => {
       clearReconnect();
+      resetBackoff();
       setConnState("connected");
     };
 
@@ -163,7 +187,24 @@ export function initDiagnosticWS(options: { isAdmin?: boolean; isModerator?: boo
 
 export function teardownDiagnosticWS() {
   _enabled = false;
+  _screenActive = false;
   _appStateSub?.remove();
   _appStateSub = null;
   disconnect();
+}
+
+/**
+ * Called by the diagnostic screen on focus/blur. While focused, the WS retries
+ * with exponential backoff after a drop and reconnects immediately on re-entry.
+ * On blur the active reconnect loop is stopped (off-screen clients fall back to
+ * the 60s polling loop in auth-context).
+ */
+export function setDiagnosticScreenFocused(focused: boolean) {
+  _screenActive = focused;
+  if (focused) {
+    resetBackoff();
+    connect();
+  } else {
+    clearReconnect();
+  }
 }
