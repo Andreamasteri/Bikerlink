@@ -13,7 +13,17 @@ import {
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const SAMPLE_INTERVAL_MS  = 1000;   // 1 Hz
-const GPS_SILENCE_MS      = 5000;   // no GPS fix for this long → record sensor-only
+export const GPS_SILENCE_MS = 5000; // no GPS fix for this long → record sensor-only
+
+/**
+ * Returns true when the sensor-only timer SHOULD add a sample.
+ * Condition: no GPS fix has arrived for longer than GPS_SILENCE_MS.
+ * Called by the sensorTimer inside startForegroundSubs; exported so tests
+ * exercise the same production function without reimplementing the logic.
+ */
+export function shouldAddSensorSample(lastGpsTsMs: number, nowMs: number = Date.now()): boolean {
+  return nowMs - lastGpsTsMs > GPS_SILENCE_MS;
+}
 const FLUSH_INTERVAL_MS   = 30_000; // periodic flush every 30 s (was 90 s)
 const FLUSH_MIN_SAMPLES   = 5;      // min samples before a periodic flush fires (was 50)
 const FLUSH_MAX_SAMPLES   = 200;    // hard cap — flush immediately at this count
@@ -345,7 +355,7 @@ export function useTelemetry(isActive: boolean, externalGps = false) {
     // richer sample, so we skip to avoid duplicates.
     sensorTimerRef.current = setInterval(() => {
       if (!activeRef.current || inBackgroundRef.current) return;
-      if (Date.now() - lastGpsTsRef.current <= GPS_SILENCE_MS) return;
+      if (!shouldAddSensorSample(lastGpsTsRef.current)) return;
       bufferRef.current.push(buildSensorSample());
       if (bufferRef.current.length >= FLUSH_MAX_SAMPLES) {
         flush(true);

@@ -116,9 +116,11 @@ router.post("/batch", async (req: Request, res: Response) => {
 
     const rows: typeof rideTelemetry.$inferInsert[] = [];
     for (const s of samples as RawSample[]) {
-      const ts = typeof s.ts === "number" ? s.ts : Number(s.ts);
-      const latNum = typeof s.lat === "number" ? s.lat : Number(s.lat);
-      const lonNum = typeof s.lon === "number" ? s.lon : Number(s.lon);
+      // ts: null/undefined are treated as invalid (NaN) — JSON null is not a valid timestamp.
+      const ts = (s.ts == null) ? NaN : (typeof s.ts === "number" ? s.ts : Number(s.ts));
+      // lat/lon: null/undefined mean "no GPS fix" (sensor-only sample), not 0.
+      const latNum = (s.lat == null) ? NaN : (typeof s.lat === "number" ? s.lat : Number(s.lat));
+      const lonNum = (s.lon == null) ? NaN : (typeof s.lon === "number" ? s.lon : Number(s.lon));
 
       // ts is mandatory; lat/lon are optional (sensor-only samples have no GPS fix).
       if (!Number.isFinite(ts)) continue;

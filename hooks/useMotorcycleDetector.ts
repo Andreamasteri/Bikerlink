@@ -37,11 +37,86 @@ const ACCEL_INTERVAL_MS = 2000;
 // ─── Accelerometer-only fallback (no GPS) ─────────────────────────────────────
 // When GPS permission is denied or the location subscription fails we cannot use
 // speed, so motion is inferred from accelerometer variance instead.
-const FALLBACK_INTERVAL_MS       = 500;    // sample/eval rate while in fallback
-const ACCEL_WINDOW               = 6;      // ~3s of samples at 500 ms
-const ACCEL_VARIANCE_THRESHOLD_G = 0.3;    // mean |magnitude − mean| above this = motion
-const FALLBACK_START_DURATION_MS = 3000;   // sustained motion for ≥3s → riding
-const FALLBACK_STOP_DURATION_MS  = 60000;  // sustained stillness for >60s → stopped
+const FALLBACK_INTERVAL_MS              = 500;    // sample/eval rate while in fallback
+const ACCEL_WINDOW                      = 6;      // ~3s of samples at 500 ms
+const ACCEL_VARIANCE_THRESHOLD_G        = 0.3;    // mean |magnitude − mean| above this = motion
+const FALLBACK_START_DURATION_MS        = 3000;   // sustained motion for ≥3s → riding
+const FALLBACK_STOP_DURATION_MS         = 60000;  // sustained stillness for >60s → stopped
+
+// Exported for unit tests — pure helpers that mirror the production logic exactly.
+export const ACCEL_VARIANCE_THRESHOLD   = ACCEL_VARIANCE_THRESHOLD_G;
+export const ACCEL_FALLBACK_WINDOW_SIZE = ACCEL_WINDOW;
+export const ACCEL_FALLBACK_START_MS    = FALLBACK_START_DURATION_MS;
+export const ACCEL_FALLBACK_STOP_MS     = FALLBACK_STOP_DURATION_MS;
+export const ACCEL_FALLBACK_INTERVAL_MS = FALLBACK_INTERVAL_MS;
+
+/**
+ * Computes mean absolute deviation of magnitude values in the window.
+ * Called by both startAccelFallback (production) and unit tests.
+ * Returns 0 when the window has fewer than 2 entries (not enough data).
+ */
+export function computeAccelSpread(magWindow: number[]): number {
+  if (magWindow.length < 2) return 0;
+  const mean = magWindow.reduce((a, b) => a + b, 0) / magWindow.length;
+  let spread = 0;
+  for (const m of magWindow) spread += Math.abs(m - mean);
+  return spread / magWindow.length;
+}
+
+/**
+ * Pure state for the accelerometer-only fallback hysteresis machine.
+ * Exported so tests can simulate the state machine tick-by-tick without
+ * running a real setInterval or mounting the hook.
+ */
+export interface AccelFallbackState {
+  isRiding:     boolean;
+  aboveStartAt: number | null;
+  belowStopAt:  number | null;
+}
+
+/**
+ * Processes one timer tick of the accelerometer fallback state machine.
+ * Returns the next state (immutable — does NOT mutate the input).
+ * This is the exact transition logic used by startAccelFallback; both
+ * production and tests share this single implementation.
+ */
+export function accelFallbackTick(
+  state: AccelFallbackState,
+  magWindow: number[],
+  now: number,
+): AccelFallbackState {
+  const spread = computeAccelSpread(magWindow);
+  const moving = magWindow.length >= 2 && spread > ACCEL_VARIANCE_THRESHOLD_G;
+  const next: AccelFallbackState = { ...state };
+
+  if (!state.isRiding) {
+    if (moving) {
+      if (state.aboveStartAt === null) {
+        next.aboveStartAt = now;
+      } else if (now - state.aboveStartAt >= FALLBACK_START_DURATION_MS) {
+        next.isRiding     = true;
+        next.aboveStartAt = null;
+        next.belowStopAt  = null;
+      }
+    } else {
+      next.aboveStartAt = null;
+    }
+  } else {
+    if (!moving) {
+      if (state.belowStopAt === null) {
+        next.belowStopAt = now;
+      } else if (now - state.belowStopAt > FALLBACK_STOP_DURATION_MS) {
+        next.isRiding    = false;
+        next.belowStopAt  = null;
+        next.aboveStartAt = null;
+      }
+    } else {
+      next.belowStopAt = null;
+    }
+  }
+
+  return next;
+}
 
 // ─── Mount orientation check ──────────────────────────────────────────────────
 // The calibrated vertAxis should carry the majority of the gravity signal when
@@ -113,40 +188,20 @@ export function useMotorcycleDetector({ enabled, relaxedMode = false }: Options)
       magWindow.push(mag);
       if (magWindow.length > ACCEL_WINDOW) magWindow.shift();
 
-      const mean = magWindow.reduce((a, b) => a + b, 0) / magWindow.length;
-      let spread = 0;
-      for (const m of magWindow) spread += Math.abs(m - mean);
-      spread /= magWindow.length;
+      const now = Date.now();
+      const prev: AccelFallbackState = {
+        isRiding:     isRidingRef.current,
+        aboveStartAt: aboveStartAtRef.current,
+        belowStopAt:  belowStopAtRef.current,
+      };
+      const next = accelFallbackTick(prev, magWindow, now);
 
-      const now    = Date.now();
-      const moving = magWindow.length >= 2 && spread > ACCEL_VARIANCE_THRESHOLD_G;
-
-      if (!isRidingRef.current) {
-        if (moving) {
-          if (aboveStartAtRef.current === null) {
-            aboveStartAtRef.current = now;
-          } else if (now - aboveStartAtRef.current >= FALLBACK_START_DURATION_MS) {
-            isRidingRef.current     = true;
-            setIsRiding(true);
-            aboveStartAtRef.current = null;
-            belowStopAtRef.current  = null;
-          }
-        } else {
-          aboveStartAtRef.current = null;
-        }
-      } else {
-        if (!moving) {
-          if (belowStopAtRef.current === null) {
-            belowStopAtRef.current = now;
-          } else if (now - belowStopAtRef.current > FALLBACK_STOP_DURATION_MS) {
-            isRidingRef.current     = false;
-            setIsRiding(false);
-            belowStopAtRef.current  = null;
-            aboveStartAtRef.current = null;
-          }
-        } else {
-          belowStopAtRef.current = null;
-        }
+      // Apply mutations and emit React state change only on isRiding flip
+      aboveStartAtRef.current = next.aboveStartAt;
+      belowStopAtRef.current  = next.belowStopAt;
+      if (next.isRiding !== isRidingRef.current) {
+        isRidingRef.current = next.isRiding;
+        setIsRiding(next.isRiding);
       }
     }, FALLBACK_INTERVAL_MS);
   }, [resetTimers]);
