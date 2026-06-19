@@ -18,6 +18,7 @@ import { apiRequest, getApiUrl, queryClient } from "@/lib/query-client";
 import { InlineMiniPlayer } from "@/components/MiniPlayer";
 import { useTaskbarStyle } from "@/lib/taskbar-style-context";
 import { useUnits } from "@/lib/units-context";
+import { useAutoTelemetry } from "@/lib/auto-telemetry-context";
 
 import type { ProfileData } from "@/components/profile/types";
 import TelemetryPanel from "@/components/profile/TelemetryPanel.next";
@@ -66,6 +67,7 @@ export default function ProfileScreen() {
   const locale = useLocale();
   const { taskbarStyle, setTaskbarStyle } = useTaskbarStyle();
   const { distanceUnit, applyCountryDefault } = useUnits();
+  const { isAutoRiding } = useAutoTelemetry();
 
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [localFloatingWidget, setLocalFloatingWidget] = useState<boolean>(true);
@@ -110,7 +112,8 @@ export default function ProfileScreen() {
   }>({
     queryKey: ["/api/telemetry/stats"],
     enabled: !!user,
-    staleTime: 60_000
+    staleTime: 60_000,
+    refetchInterval: isAutoRiding ? 30_000 : undefined
   });
 
   const searchPreference = profile?.profile?.searchPreference ?? "both";

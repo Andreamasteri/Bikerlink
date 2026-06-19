@@ -3,7 +3,7 @@ import { AppState, type AppStateStatus } from "react-native";
 import * as Location from "expo-location";
 import { Accelerometer } from "expo-sensors";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { apiRequest } from "@/lib/query-client";
+import { apiRequest, queryClient } from "@/lib/query-client";
 import {
   BG_TELEMETRY_SESSION_KEY,
   startTelemetryBackgroundTask,
@@ -110,6 +110,8 @@ export function useTelemetry(isActive: boolean, externalGps = false) {
         session_type: "ride",
         samples:      toSend,
       });
+      // Refresh km counter right after samples are persisted
+      queryClient.invalidateQueries({ queryKey: ["/api/telemetry/stats"] });
     } catch (err) {
       // Re-queue on network/auth failure to avoid data loss
       bufferRef.current = [...toSend, ...bufferRef.current];
