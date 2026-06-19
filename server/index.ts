@@ -13,7 +13,7 @@ import express from "express";
 import type { Request, Response } from "express";
 import { createServer } from "http";
 import { createServer as createProbeServer } from "http";
-import { initState } from "./init-state";
+import { initState, initGate } from "./init-state";
 import { stopMatchingEngine } from "./matching-engine";
 import { pool } from "./db";
 import { stopMetroMonitor } from "./uptime";
@@ -51,26 +51,10 @@ app.get("/api/metrics", (_req: Request, res: Response) => {
 });
 
 // Task #2789 / #4455 — Gate: 503 su /api/* mentre initState.initializing=true.
-// Eccezioni:
-//   • /api/health (initializing-aware) e /api/metrics (montato sopra, fuori gate).
-//   • rotte auth essenziali (login, me, logout): appena le migration sono
-//     applicate (initState.dbReady=true) lo schema + la tabella session sono
-//     pronti, quindi queste rotte leggere possono procedere senza attendere la
-//     fine dell'intero boot. Così l'utente non vede "Server occupato" durante
-//     la finestra di init di una nuova istanza autoscale. Il DB circuit breaker
-//     sottostante continua a proteggere se il DB è davvero down.
-const INIT_ESSENTIAL_PATHS = new Set<string>([
-  "/auth/login",
-  "/auth/me",
-  "/auth/logout",
-]);
-app.use("/api", (req: Request, res: Response, next) => {
-  if (!initState.initializing) return next();
-  if (req.path === "/health") return next();
-  if (initState.dbReady && INIT_ESSENTIAL_PATHS.has(req.path)) return next();
-  res.setHeader("Retry-After", "3");
-  return res.status(503).json({ status: "initializing", initializing: true });
-});
+// Logica + eccezioni (auth essenziali, /health) estratte in init-state.ts
+// (initGate) così il test di regressione può esercitare il gate reale.
+// /api/metrics è montato sopra (fuori dal gate).
+app.use("/api", initGate);
 
 // DB circuit breaker — fast-fail 503 JSON quando il DB è irraggiungibile.
 // Escluse: /api/health, /api/_internal (token-only, no DB gate), /api/metrics.

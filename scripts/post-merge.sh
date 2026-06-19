@@ -325,6 +325,31 @@ fi
 echo "════════════════════════════════════════"
 echo ""
 
+# ── GATE TEST INIT-GATE LOGIN (Task #4458) ──────────────────
+# Blocca la regressione del blanket-503: il gate /api/* deve lasciar passare le
+# rotte auth essenziali appena dbReady=true (login senza "Server occupato"), e
+# il client deve ritentare sui 503 transitori senza ritentare gli altri errori.
+echo "════════════════════════════════════════"
+echo "  Gate test gate di init (login)"
+echo "════════════════════════════════════════"
+INIT_GATE_TEST_EXIT=0
+npx vitest run server/__tests__/init-gate.test.ts 2>&1 || INIT_GATE_TEST_EXIT=$?
+if [ "$INIT_GATE_TEST_EXIT" -eq 0 ]; then
+  npx vitest run --config vitest.config.lib.ts lib/__tests__/init-retry.test.ts 2>&1 || INIT_GATE_TEST_EXIT=$?
+fi
+if [ "$INIT_GATE_TEST_EXIT" -eq 0 ]; then
+  echo "✅ Init-gate tests: gate server + retry client OK."
+else
+  echo "❌ Init-gate tests FALLITI (exit ${INIT_GATE_TEST_EXIT}) — il login potrebbe mostrare 'Server occupato' al boot."
+  echo "   Eseguire 'npx vitest run server/__tests__/init-gate.test.ts' e"
+  echo "   'npx vitest run --config vitest.config.lib.ts lib/__tests__/init-retry.test.ts' localmente."
+  echo "════════════════════════════════════════"
+  echo ""
+  exit "$INIT_GATE_TEST_EXIT"
+fi
+echo "════════════════════════════════════════"
+echo ""
+
 # ── CLEANUP UTENTI SMOKE RESIDUI POST-MERGE ──────────────────
 echo "════════════════════════════════════════"
 echo "  Cleanup utenti smoke residui"
