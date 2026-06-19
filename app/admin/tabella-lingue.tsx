@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useMemo } from "react";
+import React, { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import {
   View,
   Text,
@@ -18,7 +18,8 @@ import { LanguageTable } from "@/components/admin/tabella-lingue/LanguageTable";
 import { LanguageFilters } from "@/components/admin/tabella-lingue/LanguageFilters";
 import { LanguageEditModal } from "@/components/admin/tabella-lingue/LanguageEditModal";
 import { AddKeyModal, AddKeyFormData } from "@/components/admin/tabella-lingue/AddKeyModal";
-import { ActionButton, ActionResultBanner, ActionState } from "@/components/admin/tabella-lingue/ActionButtons";
+import { ActionButton, ActionResultBanner, ActionState, AiProgressBar } from "@/components/admin/tabella-lingue/ActionButtons";
+import { streamAiComplete } from "@/lib/admin/ai-complete-stream";
 
 const HEADER_ROW_HEIGHT = 36;
 
@@ -50,6 +51,13 @@ export default function TabellaLingue() {
   const [syncMsg, setSyncMsg] = useState("");
   const [aiState, setAiState] = useState<ActionState>("idle");
   const [aiMsg, setAiMsg] = useState("");
+  const [aiProgress, setAiProgress] = useState<{
+    batchIndex: number;
+    totalBatches: number;
+    totalKeysUpdated: number;
+    summary: Record<string, number>;
+  } | null>(null);
+  const aiAbortRef = useRef<AbortController | null>(null);
   const [applyState, setApplyState] = useState<ActionState>("idle");
   const [applyMsg, setApplyMsg] = useState("");
   const [restartState, setRestartState] = useState<ActionState>("idle");
@@ -177,18 +185,58 @@ export default function TabellaLingue() {
     } catch (e: unknown) { setSyncState("error"); setSyncMsg(e instanceof Error ? e.message : "Errore sincronizzazione"); }
   }, [loadTable]);
 
+  const handleAiCancel = useCallback(() => {
+    aiAbortRef.current?.abort();
+    aiAbortRef.current = null;
+    setAiState("idle");
+    setAiProgress(null);
+    setAiMsg("Completamento AI annullato");
+  }, []);
+
   const handleAiComplete = useCallback(async () => {
-    setAiState("loading"); setAiMsg("");
-    try {
-      const resp = await apiRequest("POST", "/api/admin/translations/ai-complete", {});
-      const data = await resp.json();
-      if (!resp.ok) throw new Error(data?.message || "Errore AI");
-      setAiState("ok"); setAiMsg(data.message || "Completamento AI riuscito"); loadTable();
-    } catch (e: unknown) {
-      const msg = isAiKeyMissingError(e) ? AI_KEY_MISSING_MESSAGE : e instanceof Error ? e.message : "Errore AI";
-      setAiState("error"); setAiMsg(msg);
+    // Annulla mid-run se il bottone viene premuto mentre è in corso.
+    if (aiState === "loading") {
+      handleAiCancel();
+      return;
     }
-  }, [loadTable]);
+    const controller = new AbortController();
+    aiAbortRef.current = controller;
+    setAiState("loading"); setAiMsg(""); setAiProgress(null);
+    try {
+      await streamAiComplete({
+        signal: controller.signal,
+        onStart: ({ totalBatches }) => {
+          setAiProgress({ batchIndex: 0, totalBatches, totalKeysUpdated: 0, summary: {} });
+        },
+        onBatch: ({ batchIndex, totalBatches, totalKeysUpdated, summary }) => {
+          setAiProgress({ batchIndex, totalBatches, totalKeysUpdated, summary });
+        },
+        onDone: (data) => {
+          aiAbortRef.current = null;
+          setAiState("ok");
+          setAiMsg(data.message || "Completamento AI riuscito");
+          setAiProgress(null);
+          loadTable();
+        },
+        onError: (err) => {
+          aiAbortRef.current = null;
+          setAiState("error");
+          setAiProgress(null);
+          setAiMsg(err.aiKeyMissing ? AI_KEY_MISSING_MESSAGE : err.message || "Errore AI");
+        },
+      });
+    } catch (e: unknown) {
+      // AbortError (annullamento utente) è già gestito in handleAiCancel.
+      if (controller.signal.aborted) return;
+      aiAbortRef.current = null;
+      const msg = isAiKeyMissingError(e) ? AI_KEY_MISSING_MESSAGE : e instanceof Error ? e.message : "Errore AI";
+      setAiState("error"); setAiProgress(null); setAiMsg(msg);
+    }
+  }, [aiState, handleAiCancel, loadTable]);
+
+  useEffect(() => {
+    return () => { aiAbortRef.current?.abort(); };
+  }, []);
 
   const handleRestartBackend = useCallback(() => {
     Alert.alert("Riavvia backend", "Riavvia il processo server Express. L'app sarà irraggiungibile per qualche secondo. Continuare?", [
@@ -266,12 +314,20 @@ export default function TabellaLingue() {
 
       <View style={styles.actionsRow}>
         <ActionButton label="Sincronizza da file" icon="sync" state={syncState} onPress={handleSyncFromFiles} color="#2196F3" />
-        <ActionButton label="Completa con AI" icon="auto-fix" state={aiState} onPress={handleAiComplete} color="#9C27B0" />
+        <ActionButton label="Completa con AI" icon="auto-fix" state={aiState} onPress={handleAiComplete} color="#9C27B0" cancellable loadingLabel="Annulla" />
         <ActionButton label="Applica ai file" icon="file-export-outline" state={applyState} onPress={handleApplyToFiles} color="#FF5722" />
         <ActionButton label="Riavvia backend" icon="restart" state={restartState} onPress={handleRestartBackend} color="#607D8B" />
       </View>
 
       {syncMsg ? <ActionResultBanner msg={syncMsg} state={syncState} onDismiss={() => setSyncMsg("")} /> : null}
+      {aiState === "loading" && aiProgress ? (
+        <AiProgressBar
+          batchIndex={aiProgress.batchIndex}
+          totalBatches={aiProgress.totalBatches}
+          totalKeysUpdated={aiProgress.totalKeysUpdated}
+          summary={aiProgress.summary}
+        />
+      ) : null}
       {aiMsg ? <ActionResultBanner msg={aiMsg} state={aiState} onDismiss={() => setAiMsg("")} /> : null}
       {applyMsg ? <ActionResultBanner msg={applyMsg} state={applyState} onDismiss={() => setApplyMsg("")} /> : null}
       {restartMsg ? <ActionResultBanner msg={restartMsg} state={restartState} onDismiss={() => setRestartMsg("")} /> : null}

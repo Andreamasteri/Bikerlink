@@ -225,23 +225,63 @@ router.post("/sync-from-files", async (_req: Request, res: Response) => {
   }
 });
 
-router.post("/ai-complete", async (_req: Request, res: Response) => {
-  try {
-    const allRows = await db.select().from(translationKeys).orderBy(translationKeys.key);
+// Lanciato quando la chain provider AI non ha alcun provider disponibile:
+// permette di distinguere "nessuna chiave AI" (503) da un errore generico (500).
+class AiProviderUnavailableError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "AiProviderUnavailableError";
+  }
+}
 
-    const rowsWithMissing = allRows.filter((row) =>
-      TRANS_LANGS.some((l) => !(row[l as keyof typeof row] as string)?.trim())
-    );
+interface AiCompletionStartInfo {
+  totalMissing: number;
+  totalBatches: number;
+}
 
-    if (rowsWithMissing.length === 0) {
-      return res.json({
-        ok: true,
-        message: "Tutte le traduzioni sono già complete.",
-        summary: Object.fromEntries(TRANS_LANGS.map((l) => [l, 0])),
-      });
-    }
+interface AiCompletionBatchInfo {
+  batchIndex: number;
+  totalBatches: number;
+  keysUpdatedThisBatch: number;
+  totalKeysUpdated: number;
+  summary: Record<string, number>;
+  provider: string;
+}
 
-    const GLOSSARY = `
+interface AiCompletionResult {
+  empty: boolean;
+  totalProcessed: number;
+  summary: Record<string, number>;
+  provider: string;
+  aborted: boolean;
+}
+
+interface AiCompletionCallbacks {
+  onStart?: (info: AiCompletionStartInfo) => void;
+  onBatch?: (info: AiCompletionBatchInfo) => void;
+  isAborted?: () => boolean;
+}
+
+/**
+ * Esegue il completamento AI batch-per-batch. Condiviso tra il path JSON
+ * (one-shot) e il path SSE (streaming progress). I callback opzionali
+ * notificano l'avvio e il termine di ogni batch; isAborted() permette di
+ * interrompere il run a metà (usato dalla cancellazione client via SSE).
+ */
+async function runAiCompletion(callbacks: AiCompletionCallbacks = {}): Promise<AiCompletionResult> {
+  const allRows = await db.select().from(translationKeys).orderBy(translationKeys.key);
+
+  const rowsWithMissing = allRows.filter((row) =>
+    TRANS_LANGS.some((l) => !(row[l as keyof typeof row] as string)?.trim())
+  );
+
+  const summary: Record<string, number> = Object.fromEntries(TRANS_LANGS.map((l) => [l, 0]));
+
+  if (rowsWithMissing.length === 0) {
+    return { empty: true, totalProcessed: 0, summary, provider: "ai", aborted: false };
+  }
+
+  const GLOSSARY = `
 Glossario BikerLink (NON tradurre questi termini):
 - "BikerLink" → rimane "BikerLink"
 - "zavorrina" → rimane "zavorrina" (in EN puoi usare "pillion" se già presente, ma in EL/TR usa "zavorrina")
@@ -251,35 +291,49 @@ Glossario BikerLink (NON tradurre questi termini):
 - Testo con "→" in percorsi → rimane
 `.trim();
 
-    const BATCH_SIZE = 30;
-    const summary: Record<string, number> = Object.fromEntries(TRANS_LANGS.map((l) => [l, 0]));
-    let totalProcessed = 0;
-    let usedProviderName = "ai";
+  const BATCH_SIZE = 30;
+  const totalBatches = Math.ceil(rowsWithMissing.length / BATCH_SIZE);
+  let totalProcessed = 0;
+  let usedProviderName = "ai";
 
-    // Decide provider once: probe Ollama first (no cost, self-hosted).
-    // If reachable use it directly for all batches; otherwise delegate to runWithFallback
-    // which follows the standard chain Groq → Gemini → OpenAI.
-    const ollamaReachable = isOllamaConfigured && (await isOllamaReachable());
+  callbacks.onStart?.({ totalMissing: rowsWithMissing.length, totalBatches });
 
-    for (let i = 0; i < rowsWithMissing.length; i += BATCH_SIZE) {
-      const batch = rowsWithMissing.slice(i, i + BATCH_SIZE);
+  // Decide provider once: probe Ollama first (no cost, self-hosted).
+  // If reachable use it directly for all batches; otherwise delegate to runWithFallback
+  // which follows the standard chain Groq → Gemini → OpenAI.
+  const ollamaReachable = isOllamaConfigured && (await isOllamaReachable());
 
-      const missingLangsPerRow = batch.map((row) => ({
-        key: row.key,
-        it: row.it ?? "",
-        missing: TRANS_LANGS.filter((l) => !(row[l as keyof typeof row] as string)?.trim()),
-        existing: Object.fromEntries(
-          TRANS_LANGS
-            .filter((l) => !!(row[l as keyof typeof row] as string)?.trim())
-            .map((l) => [l, row[l as keyof typeof row] as string])
-        ),
-      })).filter((r) => r.missing.length > 0 && r.it.trim());
+  let batchIndex = 0;
+  for (let i = 0; i < rowsWithMissing.length; i += BATCH_SIZE) {
+    if (callbacks.isAborted?.()) {
+      return { empty: false, totalProcessed, summary, provider: usedProviderName, aborted: true };
+    }
+    batchIndex++;
+    const batch = rowsWithMissing.slice(i, i + BATCH_SIZE);
+    let keysUpdatedThisBatch = 0;
 
-      if (missingLangsPerRow.length === 0) continue;
+    const missingLangsPerRow = batch.map((row) => ({
+      key: row.key,
+      it: row.it ?? "",
+      missing: TRANS_LANGS.filter((l) => !(row[l as keyof typeof row] as string)?.trim()),
+      existing: Object.fromEntries(
+        TRANS_LANGS
+          .filter((l) => !!(row[l as keyof typeof row] as string)?.trim())
+          .map((l) => [l, row[l as keyof typeof row] as string])
+      ),
+    })).filter((r) => r.missing.length > 0 && r.it.trim());
 
-      const allMissingLangs = [...new Set(missingLangsPerRow.flatMap((r) => r.missing))];
+    if (missingLangsPerRow.length === 0) {
+      callbacks.onBatch?.({
+        batchIndex, totalBatches, keysUpdatedThisBatch: 0,
+        totalKeysUpdated: totalProcessed, summary: { ...summary }, provider: usedProviderName,
+      });
+      continue;
+    }
 
-      const prompt = `Sei un traduttore professionale per l'app BikerLink, una community di motociclisti italiani.
+    const allMissingLangs = [...new Set(missingLangsPerRow.flatMap((r) => r.missing))];
+
+    const prompt = `Sei un traduttore professionale per l'app BikerLink, una community di motociclisti italiani.
 
 ${GLOSSARY}
 
@@ -298,31 +352,19 @@ ${missingLangsPerRow.map((r) =>
   `"${r.key}": { "it": ${JSON.stringify(r.it)}, "missing": ${JSON.stringify(r.missing)} }`
 ).join("\n")}`;
 
-      let responseText = "";
-      try {
-        if (ollamaReachable) {
-          // Ollama-first: self-hosted, no cost, no rate limits.
-          // On failure, fall through to cloud chain below (no silently skipping).
-          try {
-            const ollamaModel = getOllamaModel();
-            const result = await generateText({ model: ollamaModel, prompt, maxRetries: 1 });
-            responseText = result.text.trim();
-            usedProviderName = "ollama";
-          } catch (ollamaErr) {
-            console.warn("[translations] ai-complete: Ollama fallito, scalo a cloud:", (ollamaErr as Error).message);
-            // Fall through to cloud chain.
-            const { value: cloudText, model: resolvedModel } = await runWithFallback(
-              { role: "brain", skipOllama: true },
-              (m) => m.scheduler(() =>
-                generateText({ model: m.model as Parameters<typeof generateText>[0]["model"], prompt, maxRetries: 1 })
-                  .then((r) => r.text.trim())
-              ),
-            );
-            responseText = cloudText;
-            usedProviderName = resolvedModel.providerName;
-          }
-        } else {
-          // Cloud fallback chain: Groq → Gemini → OpenAI via runWithFallback.
+    let responseText = "";
+    try {
+      if (ollamaReachable) {
+        // Ollama-first: self-hosted, no cost, no rate limits.
+        // On failure, fall through to cloud chain below (no silently skipping).
+        try {
+          const ollamaModel = getOllamaModel();
+          const result = await generateText({ model: ollamaModel, prompt, maxRetries: 1 });
+          responseText = result.text.trim();
+          usedProviderName = "ollama";
+        } catch (ollamaErr) {
+          console.warn("[translations] ai-complete: Ollama fallito, scalo a cloud:", (ollamaErr as Error).message);
+          // Fall through to cloud chain.
           const { value: cloudText, model: resolvedModel } = await runWithFallback(
             { role: "brain", skipOllama: true },
             (m) => m.scheduler(() =>
@@ -333,56 +375,154 @@ ${missingLangsPerRow.map((r) =>
           responseText = cloudText;
           usedProviderName = resolvedModel.providerName;
         }
-      } catch (aiErr) {
-        console.error("[translations] ai-complete batch error:", aiErr);
-        continue;
+      } else {
+        // Cloud fallback chain: Groq → Gemini → OpenAI via runWithFallback.
+        const { value: cloudText, model: resolvedModel } = await runWithFallback(
+          { role: "brain", skipOllama: true },
+          (m) => m.scheduler(() =>
+            generateText({ model: m.model as Parameters<typeof generateText>[0]["model"], prompt, maxRetries: 1 })
+              .then((r) => r.text.trim())
+          ),
+        );
+        responseText = cloudText;
+        usedProviderName = resolvedModel.providerName;
       }
+    } catch (aiErr) {
+      const aiMsg = (aiErr as Error)?.message ?? "";
+      // Nessun provider AI disponibile: inutile insistere sui batch successivi,
+      // interrompi subito e fai emergere l'errore al chiamante (503).
+      if (aiMsg.includes("AI_PROVIDER_UNAVAILABLE")) {
+        throw new AiProviderUnavailableError(aiMsg);
+      }
+      console.error("[translations] ai-complete batch error:", aiErr);
+      callbacks.onBatch?.({
+        batchIndex, totalBatches, keysUpdatedThisBatch: 0,
+        totalKeysUpdated: totalProcessed, summary: { ...summary }, provider: usedProviderName,
+      });
+      continue;
+    }
 
-      const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) continue;
-
-      let parsed: Record<string, Record<string, string>>;
+    const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      let parsed: Record<string, Record<string, string>> | null = null;
       try {
         parsed = JSON.parse(jsonMatch[0]) as Record<string, Record<string, string>>;
       } catch {
-        continue;
+        parsed = null;
       }
 
-      for (const [key, translations] of Object.entries(parsed)) {
-        if (!translations || typeof translations !== "object") continue;
-        const allowedMissingLangs = new Set<string>(
-          missingLangsPerRow.find((r) => r.key === key)?.missing ?? []
-        );
-        if (allowedMissingLangs.size === 0) continue;
-        const updateData: Record<string, string> = {};
-        for (const [lang, value] of Object.entries(translations)) {
-          if (
-            allowedMissingLangs.has(lang) &&
-            (TRANS_LANGS as readonly string[]).includes(lang) &&
-            typeof value === "string" &&
-            value.trim()
-          ) {
-            updateData[lang] = value.trim();
-            summary[lang] = (summary[lang] ?? 0) + 1;
+      if (parsed) {
+        for (const [key, translations] of Object.entries(parsed)) {
+          if (!translations || typeof translations !== "object") continue;
+          const allowedMissingLangs = new Set<string>(
+            missingLangsPerRow.find((r) => r.key === key)?.missing ?? []
+          );
+          if (allowedMissingLangs.size === 0) continue;
+          const updateData: Record<string, string> = {};
+          for (const [lang, value] of Object.entries(translations)) {
+            if (
+              allowedMissingLangs.has(lang) &&
+              (TRANS_LANGS as readonly string[]).includes(lang) &&
+              typeof value === "string" &&
+              value.trim()
+            ) {
+              updateData[lang] = value.trim();
+              summary[lang] = (summary[lang] ?? 0) + 1;
+            }
           }
-        }
-        if (Object.keys(updateData).length > 0) {
-          await db
-            .update(translationKeys)
-            .set(updateData)
-            .where(sql`${translationKeys.key} = ${key}`);
-          totalProcessed++;
+          if (Object.keys(updateData).length > 0) {
+            await db
+              .update(translationKeys)
+              .set(updateData)
+              .where(sql`${translationKeys.key} = ${key}`);
+            totalProcessed++;
+            keysUpdatedThisBatch++;
+          }
         }
       }
     }
 
-    const summaryStr = TRANS_LANGS.map((l) => `${l.toUpperCase()}: ${summary[l]}`).join(", ");
+    callbacks.onBatch?.({
+      batchIndex, totalBatches, keysUpdatedThisBatch,
+      totalKeysUpdated: totalProcessed, summary: { ...summary }, provider: usedProviderName,
+    });
+  }
+
+  return { empty: false, totalProcessed, summary, provider: usedProviderName, aborted: false };
+}
+
+function buildDoneMessage(result: AiCompletionResult): string {
+  if (result.empty) return "Tutte le traduzioni sono già complete.";
+  const summaryStr = TRANS_LANGS.map((l) => `${l.toUpperCase()}: ${result.summary[l]}`).join(", ");
+  return `Completate ${result.totalProcessed} chiavi via ${result.provider}. ${summaryStr}`;
+}
+
+router.post("/ai-complete", async (req: Request, res: Response) => {
+  const wantsStream = (req.headers.accept ?? "").includes("text/event-stream");
+
+  // ── SSE streaming path: emette start/batch/done/error e supporta l'annullamento. ──
+  if (wantsStream) {
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Connection", "keep-alive");
+    res.setHeader("X-Accel-Buffering", "no");
+    res.flushHeaders();
+
+    let aborted = false;
+    const onAbort = () => { aborted = true; };
+    req.on("close", onAbort);
+    req.on("aborted", onAbort);
+
+    const sseWrite = (event: string, data: unknown) => {
+      try { res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`); } catch { /* connessione chiusa */ }
+    };
+
+    try {
+      const result = await runAiCompletion({
+        onStart: (info) => sseWrite("start", info),
+        onBatch: (info) => sseWrite("batch", info),
+        isAborted: () => aborted,
+      });
+
+      if (aborted || result.aborted) {
+        // Client ha annullato: la connessione è già chiusa, chiudi e basta.
+        try { res.end(); } catch { /* noop */ }
+        return;
+      }
+
+      sseWrite("done", {
+        ok: true,
+        message: buildDoneMessage(result),
+        summary: result.summary,
+        totalProcessed: result.totalProcessed,
+      });
+    } catch (err) {
+      const aiKeyMissing = err instanceof AiProviderUnavailableError;
+      if (!aiKeyMissing) console.error("[translations] POST /ai-complete (SSE) error:", err);
+      sseWrite("error", {
+        message: aiKeyMissing
+          ? (err as Error).message
+          : "Errore completamento AI",
+        aiKeyMissing,
+      });
+    } finally {
+      try { res.end(); } catch { /* noop */ }
+    }
+    return;
+  }
+
+  // ── JSON one-shot path (retrocompatibile). ──
+  try {
+    const result = await runAiCompletion();
     return res.json({
       ok: true,
-      message: `Completate ${totalProcessed} chiavi via ${usedProviderName}. ${summaryStr}`,
-      summary,
+      message: buildDoneMessage(result),
+      summary: result.summary,
     });
   } catch (err) {
+    if (err instanceof AiProviderUnavailableError) {
+      return sendError(res, 503, err.message);
+    }
     console.error("[translations] POST /ai-complete error:", err);
     return sendError(res, 500, "Errore completamento AI");
   }
