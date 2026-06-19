@@ -36,7 +36,6 @@ import { AppStateHandler } from "@/components/layout/AppStateHandler";
 import { BackgroundNotificationHandler } from "@/components/layout/BackgroundNotificationHandler";
 import { PushTokenRegistrar } from "@/components/layout/PushTokenRegistrar";
 // Task #2698 — AI Assistant utente.
-import AssistantFab from "@/components/user/ai-assistant/AssistantFab";
 import AssistantOnboardingTour from "@/components/user/ai-assistant/AssistantOnboardingTour";
 import { useOtaStagingBanner } from "@/hooks/useOtaStagingBanner";
 import { useDeviceMetrics } from "@/hooks/useDeviceMetrics";
@@ -291,16 +290,10 @@ export default function RootLayout() {
           <MatchPopupAlert />
           <UpdateNudgeWrapper />
           <AssistantOnboardingTour />
-          {/* FloatingWidget reso figlio di MapReadyGate (dentro GestureHandlerRootView,
-              stesso layer RNGH del FAB funzionante) così i gesti Exclusive(Pan, Tap)
-              ricevono il contesto necessario per drag e tap.
-              È renderizzato PRIMA dell'AssistantFab così il suo backdrop a tutto
-              schermo (quando il menu è aperto) resta SOTTO il FAB nel paint order
-              e non ne intercetta i tap. */}
+          {/* Task #4456 — Pallino flottante UNICO (drag + menu a 5 voci, incl.
+              Assistente AI). PanResponder-only, nessun RNGH: drag e tap robusti
+              su Android reale. Sostituisce i vecchi FloatingWidget + AssistantFab. */}
           <FloatingWidget />
-          {/* Task #2698 — FAB AI Assistant: ultimo sibling → dipinto sopra il
-              backdrop del FloatingWidget, sempre toccabile. */}
-          <AssistantFab />
         </MapReadyGate>
       </StartupGate>
     </RootProviders>

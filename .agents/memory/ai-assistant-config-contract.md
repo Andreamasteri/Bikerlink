@@ -27,48 +27,24 @@ config was never saved → profile shows "Disabilitato dall'amministratore" and 
 the switches even though the admin never disabled anything. Only an explicit
 `enabled === false` should disable.
 
-## FloatingWidget handler ordering (Hermes TDZ)
-The menu-item navigation handlers (handleChatPress/Notifications/Player) MUST be
-declared ABOVE the Gesture.Tap() objects that capture them via runOnJS(). Under
-Hermes a `const` referenced before its declaration is in the Temporal Dead Zone →
-ReferenceError when the gesture fires (crashed on "Notifiche"). They also close the
-menu synchronously (closeMenuJS) before router.push so the full-screen backdrop is
-removed immediately.
+## ONE floating ball, PanResponder only — NOT RNGH, NOT two widgets
+The floating UI is a SINGLE `components/FloatingWidget.tsx` ball that uses
+react-native `PanResponder` (Animated.ValueXY) for drag/tap — deliberately NOT
+react-native-gesture-handler. Its tap opens one overlay menu (Assistente AI, Chat,
+Notifiche, Nuovi Match, Player); the AI item is gated by `useAssistantEnabled().fabEnabled`.
+There is NO separate AssistantFab anymore.
 
-## FAB vs FloatingWidget backdrop paint order
-AssistantFab is rendered AFTER FloatingWidget in app/_layout.tsx so the FAB paints
-above the FloatingWidget's full-screen backdrop and stays tappable while the menu is
-open. The onboarding tour uses a Modal, so sibling order around it is irrelevant.
+**Why:** the previous design had TWO floating components (orange FloatingWidget +
+purple AssistantFab) both built on RNGH. On real Android APKs this was chronically
+broken: inline `Gesture.Tap()` objects re-registered asynchronously and dropped taps;
+menu handlers hit Hermes TDZ if declared below the gesture; and any attempt to
+coordinate the two via cross-tree gesture refs (`withRef` /
+`simultaneousWithExternalGesture` through a context ref) corrupted RNGH's gesture-tree
+registration under `GestureHandlerRootView`, breaking the ball's own drag/menu. Two
+overlapping floating components also caused touch-routing conflicts.
 
-## RNGH gesture objects must be memoized (lost taps)
-A `Gesture.Tap()` (or any RNGH gesture) created inline in a component body is rebuilt
-every render. `GestureDetector` then re-registers the native handler on each new
-object, and RNGH applies that update asynchronously — taps that land during the
-re-registration window are silently dropped. The runOnJS callback inside the worklet
-also captures its JS function ref at gesture-creation time, so an unstable callback
-risks a stale closure under Hermes.
-
-**How to apply:** wrap the JS callback in `useCallback` (deps minimal — useState
-setters are already stable) and wrap the gesture in `useMemo([callback, sharedValue])`.
-This was the suspected cause of the AssistantFab (bottom-left AI FAB) not responding
-to taps while the FloatingWidget ball worked fine.
-
-## DO NOT coordinate FAB ↔ FloatingWidget via cross-tree gesture refs
-Tried sharing the FAB's `Gesture.Tap()` through a React context ref so the
-FloatingWidget's full-screen backdrop could declare it
-`.simultaneousWithExternalGesture(ref)` (and FAB `.withRef(ref)`). On a real Android
-APK this REGRESSED the FloatingWidget: the ball could no longer be dragged and its
-menu rendered detached from the ball — even though the backdrop only mounts while the
-menu is open. Reverted completely (removed the context module, the `.withRef`, the
-`.simultaneousWithExternalGesture`, and the provider).
-
-**Why:** a cross-GestureDetector relation resolved from a context ref appears to
-corrupt RNGH's gesture-tree registration under `GestureHandlerRootView`, breaking
-sibling gestures (the ball's pan/menu), not just the intended pair. It is NOT the
-clean additive op the docs imply for refs that live in a different detector subtree.
-
-**How to apply:** keep the FAB tappable over the FloatingWidget backdrop with
-PAINT ORDER / z-order only (FAB rendered after FloatingWidget, `zIndex 10000` above
-the backdrop). Do not reach for `withRef`/`simultaneousWithExternalGesture` across
-separate components. If FAB-tap-while-menu-open ever needs to also close the menu,
-solve it locally (backdrop hitbox bounds that exclude the FAB corner), not globally.
+**How to apply:** keep gestures on this ball in PanResponder. Tap-vs-drag is decided
+by a `TAP_THRESHOLD` movement check (drag past threshold suppresses the tap-toggle).
+Position persists in AsyncStorage key `floating_widget_position`, clamped on-screen.
+Do not reintroduce RNGH here, do not split the AI action back into a second floating
+component, and do not coordinate floating gestures across separate components.

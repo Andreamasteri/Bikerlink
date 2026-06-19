@@ -306,8 +306,8 @@ echo ""
 
 # ── GATE TEST GESTURE COMPONENTI ────────────────────────────
 # Esegue i test automatici in components/__tests__/ (gesture + layout).
-# Se fallisce, il merge è bloccato — un refactor che rompe FloatingWidget
-# o AssistantFab viene rilevato qui prima di raggiungere produzione.
+# Se fallisce, il merge è bloccato — un refactor che rompe il pallino flottante
+# (FloatingWidget, Task #4456) viene rilevato qui prima di raggiungere produzione.
 echo "════════════════════════════════════════"
 echo "  Gate test gesture componenti"
 echo "════════════════════════════════════════"

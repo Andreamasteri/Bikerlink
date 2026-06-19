@@ -150,28 +150,33 @@ dell'app (frontend Expo + backend Express) siano funzionanti dopo merge, deploy 
 | 12.4 | Heartbeat ping | BLOCKER | ⚙️ | `POST /api/heartbeat` | 200, `lastSeen` aggiornato |
 | 12.5 | Invite code validate | MAJOR | ⚙️ | `GET /api/invitations/preview/:code` | 200 con codice di test |
 
-## 13. FloatingWidget & AssistantFab — touch behavior (Android device)
+## 13. Pallino flottante UNICO — touch behavior (Android device)
 
 > Questi test devono essere eseguiti su un **dispositivo Android fisico** (non emulatore).
 > I crash e i conflitti di touch routing si manifestano in modo affidabile solo su hardware reale,
 > in particolare su dispositivi con `insets.bottom = 0` (es. Android senza gesture bar).
 >
-> **Contesto tecnico:** il backdrop usa `GestureDetector` (layer RNGH nativo) invece di `Pressable`
-> (layer JS), e il menu è reso al livello root `absoluteFill` anziché annidato nel container 48×48.
-> Queste due correzioni eliminano i conflitti di touch routing Android-specifici.
+> **Contesto tecnico (Task #4456):** un SOLO pallino flottante sostituisce i due vecchi widget
+> (FloatingWidget arancione + AssistantFab viola). Gesti gestiti SOLO con `PanResponder` di
+> react-native (NIENTE react-native-gesture-handler): drag e tap erano i punti di rottura su
+> Android reale. Il menu è reso al livello root `absoluteFill` con `Pressable`/`TouchableOpacity`
+> semplici — essendo l'unico componente flottante non c'è più conflitto di routing dei touch.
 
 | # | Voce | Severità | Auto | Passi | Risultato atteso |
 |---|------|----------|------|-------|------------------|
-| 13.1 | FloatingWidget — apertura menu | BLOCKER | — | Tap sulla pallina widget | menu (Chat / Notifiche / Player) si apre senza crash |
-| 13.2 | FloatingWidget — tap Chat | BLOCKER | — | Menu aperto → tap "Chat" | naviga alla tab Chat; app non si chiude né si resetta |
-| 13.3 | FloatingWidget — tap Notifiche | BLOCKER | — | Menu aperto → tap "Notifiche" | naviga alla schermata Notifiche; nessun crash |
-| 13.4 | FloatingWidget — tap Player | BLOCKER | — | Menu aperto → tap "Player" | naviga alla tab Music; nessun crash |
-| 13.5 | FloatingWidget — chiusura backdrop | MAJOR | — | Menu aperto → tap fuori dal menu | menu si chiude; nessuna navigazione indesiderata |
-| 13.6 | FloatingWidget — swipe-down dismiss | MINOR | — | Menu aperto → swipe verso il basso | menu si chiude con animazione slide-down |
-| 13.7 | FloatingWidget — drag | MAJOR | — | Long-press + drag pallina | pallina segue il dito; tap post-drag non triggera menu se threshold superato |
-| 13.8 | AssistantFab — visibilità (insets.bottom = 0) | BLOCKER | — | Dispositivo Android senza gesture bar | FAB sparkles visibile in basso a sinistra, sopra la tab bar |
-| 13.9 | AssistantFab — tap (insets.bottom = 0) | BLOCKER | — | Tap FAB sparkles | chat AI si apre; nessun conflitto con FloatingWidget |
-| 13.10 | AssistantFab — nessuna regressione iOS | MAJOR | — | Dispositivo iOS (notch/Dynamic Island) | FAB visibile e tappabile sopra la tab bar; `insets.bottom > 0` → offset corretto |
+| 13.1 | Pallino — apertura menu | BLOCKER | — | Tap sul pallino | menu a 5 voci (Assistente AI / Chat / Notifiche / Nuovi Match / Player) si apre senza crash |
+| 13.2 | Pallino — tap Assistente AI | BLOCKER | — | Menu aperto → tap "Assistente AI" | si apre la chat AI (AssistantChatSheet); nessun crash |
+| 13.3 | Pallino — tap Chat | BLOCKER | — | Menu aperto → tap "Chat" | naviga alla tab Chat; app non si chiude né si resetta |
+| 13.4 | Pallino — tap Notifiche | BLOCKER | — | Menu aperto → tap "Notifiche" | naviga alla schermata Notifiche; nessun crash |
+| 13.5 | Pallino — tap Nuovi Match | BLOCKER | — | Menu aperto → tap "Nuovi Match" | naviga alla tab Match; nessun crash |
+| 13.6 | Pallino — tap Player | BLOCKER | — | Menu aperto → tap "Player" | naviga alla tab Music; nessun crash |
+| 13.7 | Pallino — chiusura backdrop | MAJOR | — | Menu aperto → tap fuori dal menu | menu si chiude; nessuna navigazione indesiderata |
+| 13.8 | Pallino — drag + persistenza | BLOCKER | — | Drag pallino in nuova posizione, riavvia app | pallino segue il dito, resta dentro lo schermo, e ricompare nella posizione salvata |
+| 13.9 | Pallino — tap dopo drag | MAJOR | — | Drag oltre soglia, poi tap | il drag NON apre il menu; un tap successivo apre il menu |
+| 13.10 | Pallino — badge combinato | MAJOR | — | Avere chat/notifiche/match non letti | badge sul pallino = somma; per-voce badge corretti nel menu |
+| 13.11 | Pallino — gating Assistente AI | MAJOR | — | Disabilitare assistente (admin/utente) | la voce "Assistente AI" sparisce dal menu; restano 4 voci |
+| 13.12 | Pallino — soppressione arcade | MAJOR | — | Avviare un gioco arcade | il pallino sparisce durante il gioco e riappare all'uscita |
+| 13.13 | Pallino — nessuna regressione iOS | MAJOR | — | Dispositivo iOS (notch/Dynamic Island) | pallino visibile, draggabile e clampato sopra la tab bar; `insets` rispettati |
 
 ## 14. Web platform
 
