@@ -1,14 +1,10 @@
 import React from "react";
 import { View } from "react-native";
-import { Stack, usePathname } from "expo-router";
+import { Stack } from "expo-router";
 import { useColors } from "@/hooks/useColors";
-import FabWidget from "@/components/admin/ai-console/FabWidget";
 
 export default function AdminLayout() {
   const colors = useColors();
-  const pathname = usePathname();
-  // Nasconde il FAB nella schermata stessa di AI Console per evitare overlap.
-  const showFab = !pathname?.startsWith("/admin/ai-console");
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <Stack
@@ -91,7 +87,6 @@ export default function AdminLayout() {
         <Stack.Screen name="telemetry-users" options={{ title: "Sessioni Utenti" }} />
         <Stack.Screen name="telemetry-user/[userId]" options={{ title: "Dettaglio Sessioni" }} />
       </Stack>
-      {showFab ? <FabWidget /> : null}
     </View>
   );
 }

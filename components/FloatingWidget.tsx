@@ -32,7 +32,11 @@ import { useColors } from "@/hooks/useColors";
 import { useFloatingWidget } from "@/lib/floating-widget-context";
 import { useNewMatchAlert } from "@/hooks/useNewMatchAlert";
 import { useAssistantEnabled } from "@/hooks/useAssistantEnabled";
+import { useAuth } from "@/lib/auth-context";
 import AssistantChatSheet from "@/components/user/ai-assistant/AssistantChatSheet";
+import FabDrawer from "@/components/admin/ai-console/FabDrawer";
+import { useAiActionQueue } from "@/hooks/admin/ai-console/useAiActionQueue";
+import { useAiAlertsState, useAiAlertsSubscriber } from "@/hooks/admin/ai-console/useAiAlerts";
 
 // ── costanti (esportate per i test di regressione) ───────────────────────────
 export const BALL_SIZE = 56;
@@ -87,6 +91,34 @@ type MenuItem = {
   onPress: () => void;
 };
 
+/**
+ * Sezione admin: monta i soli hook dell'AI Console (alert + coda azioni) e il
+ * FabDrawer. È un componente separato così i suoi hook girano SOLO per gli admin
+ * (gli hook React non possono essere chiamati condizionalmente nel componente
+ * principale). Riporta il badge al parent via onBadgeChange.
+ */
+function AdminConsoleSection({
+  visible,
+  onClose,
+  onBadgeChange,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  onBadgeChange: (n: number) => void;
+}) {
+  useAiAlertsSubscriber({ enabled: true });
+  const alerts = useAiAlertsState();
+  const { data: queue } = useAiActionQueue();
+  // Stessa logica del vecchio FabWidget: coda azioni + alert AI non letti.
+  const total = (queue?.items?.length ?? 0) + alerts.unread;
+
+  useEffect(() => {
+    onBadgeChange(total);
+  }, [total, onBadgeChange]);
+
+  return <FabDrawer visible={visible} onClose={onClose} />;
+}
+
 export default function FloatingWidget() {
   const { width, height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
@@ -97,6 +129,8 @@ export default function FloatingWidget() {
   const { isVisible, unreadChat, unreadNotifications, refetchBadges } = useFloatingWidget();
   const { newMatchCount } = useNewMatchAlert();
   const { fabEnabled } = useAssistantEnabled();
+  const { user } = useAuth();
+  const isAdmin = user?.role === "admin";
 
   const isWeb = Platform.OS === "web";
   const insetTop = isWeb ? WEB_INSET_TOP : insets.top;
@@ -106,6 +140,8 @@ export default function FloatingWidget() {
   const [positionLoaded, setPositionLoaded] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [assistantOpen, setAssistantOpen] = useState(false);
+  const [adminDrawerOpen, setAdminDrawerOpen] = useState(false);
+  const [adminBadge, setAdminBadge] = useState(0);
   const [anchor, setAnchor] = useState({ x: 0, y: 0 });
   const [menuSize, setMenuSize] = useState({ w: 200, h: 280 });
 
@@ -259,8 +295,19 @@ export default function FloatingWidget() {
     setAssistantOpen(true);
   }, []);
 
+  const openAdminConsole = useCallback(() => {
+    if (Platform.OS !== "web") {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    }
+    setMenuOpen(false);
+    setAdminDrawerOpen(true);
+  }, []);
+
   const menuItems = useMemo<MenuItem[]>(() => {
     const items: MenuItem[] = [];
+    if (isAdmin) {
+      items.push({ key: "ai-console", label: "AI Console", icon: "hardware-chip", color: colors.accent, badge: adminBadge, onPress: openAdminConsole });
+    }
     if (fabEnabled) {
       items.push({ key: "ai", label: "Assistente AI", icon: "sparkles", color: colors.accent, badge: 0, onPress: openAssistant });
     }
@@ -269,9 +316,9 @@ export default function FloatingWidget() {
     items.push({ key: "match", label: "Nuovi Match", icon: "heart", color: colors.accentRed, badge: newMatchCount, onPress: () => navigate(MENU_ROUTES.match as Href) });
     items.push({ key: "music", label: "Player", icon: "musical-notes", color: colors.accent, badge: 0, onPress: () => navigate(MENU_ROUTES.music as Href) });
     return items;
-  }, [fabEnabled, colors.accent, colors.accentRed, unreadChat, unreadNotifications, newMatchCount, openAssistant, navigate]);
+  }, [isAdmin, adminBadge, openAdminConsole, fabEnabled, colors.accent, colors.accentRed, unreadChat, unreadNotifications, newMatchCount, openAssistant, navigate]);
 
-  const totalBadge = unreadChat + unreadNotifications + newMatchCount;
+  const totalBadge = unreadChat + unreadNotifications + newMatchCount + (isAdmin ? adminBadge : 0);
 
   // ── posizione del menu (ancorata al pallino, clampata a schermo) ─────────────
   const menuPos = useMemo(() => {
@@ -342,6 +389,14 @@ export default function FloatingWidget() {
       </Animated.View>
 
       <AssistantChatSheet visible={assistantOpen} onClose={() => setAssistantOpen(false)} />
+
+      {isAdmin && (
+        <AdminConsoleSection
+          visible={adminDrawerOpen}
+          onClose={() => setAdminDrawerOpen(false)}
+          onBadgeChange={setAdminBadge}
+        />
+      )}
     </View>
   );
 }
