@@ -62,6 +62,39 @@ export function isDragGesture(dx: number, dy: number): boolean {
   return Math.abs(dx) > TAP_THRESHOLD || Math.abs(dy) > TAP_THRESHOLD;
 }
 
+/**
+ * Ordine + presenza delle voci di menu in base ai gate (esportata per i test).
+ * - "ai-console" appare SOLO per gli admin (Task #4468).
+ * - "ai" (Assistente AI) appare solo se l'assistente è abilitato.
+ * Le voci base (chat/notifiche/match/music) sono sempre presenti.
+ */
+export function buildMenuKeys(opts: { isAdmin: boolean; fabEnabled: boolean }): string[] {
+  const keys: string[] = [];
+  if (opts.isAdmin) keys.push("ai-console");
+  if (opts.fabEnabled) keys.push("ai");
+  keys.push("chat", "notifications", "match", "music");
+  return keys;
+}
+
+/**
+ * Badge combinato mostrato sul pallino (esportata per i test). Il badge admin
+ * (coda azioni + alert AI) contribuisce SOLO per gli admin.
+ */
+export function computeTotalBadge(opts: {
+  unreadChat: number;
+  unreadNotifications: number;
+  newMatchCount: number;
+  adminBadge: number;
+  isAdmin: boolean;
+}): number {
+  return (
+    opts.unreadChat +
+    opts.unreadNotifications +
+    opts.newMatchCount +
+    (opts.isAdmin ? opts.adminBadge : 0)
+  );
+}
+
 /** Mantiene il pallino dentro i bordi visibili (rispetta status/tab bar + insets). */
 export function clampPosition(
   x: number,
@@ -304,21 +337,18 @@ export default function FloatingWidget() {
   }, []);
 
   const menuItems = useMemo<MenuItem[]>(() => {
-    const items: MenuItem[] = [];
-    if (isAdmin) {
-      items.push({ key: "ai-console", label: "AI Console", icon: "hardware-chip", color: colors.accent, badge: adminBadge, onPress: openAdminConsole });
-    }
-    if (fabEnabled) {
-      items.push({ key: "ai", label: "Assistente AI", icon: "sparkles", color: colors.accent, badge: 0, onPress: openAssistant });
-    }
-    items.push({ key: "chat", label: "Chat", icon: "chatbubbles", color: colors.accent, badge: unreadChat, onPress: () => navigate(MENU_ROUTES.chat as Href) });
-    items.push({ key: "notifications", label: "Notifiche", icon: "notifications", color: colors.accent, badge: unreadNotifications, onPress: () => navigate(MENU_ROUTES.notifications as Href) });
-    items.push({ key: "match", label: "Nuovi Match", icon: "heart", color: colors.accentRed, badge: newMatchCount, onPress: () => navigate(MENU_ROUTES.match as Href) });
-    items.push({ key: "music", label: "Player", icon: "musical-notes", color: colors.accent, badge: 0, onPress: () => navigate(MENU_ROUTES.music as Href) });
-    return items;
+    const byKey: Record<string, MenuItem> = {
+      "ai-console": { key: "ai-console", label: "AI Console", icon: "hardware-chip", color: colors.accent, badge: adminBadge, onPress: openAdminConsole },
+      ai: { key: "ai", label: "Assistente AI", icon: "sparkles", color: colors.accent, badge: 0, onPress: openAssistant },
+      chat: { key: "chat", label: "Chat", icon: "chatbubbles", color: colors.accent, badge: unreadChat, onPress: () => navigate(MENU_ROUTES.chat as Href) },
+      notifications: { key: "notifications", label: "Notifiche", icon: "notifications", color: colors.accent, badge: unreadNotifications, onPress: () => navigate(MENU_ROUTES.notifications as Href) },
+      match: { key: "match", label: "Nuovi Match", icon: "heart", color: colors.accentRed, badge: newMatchCount, onPress: () => navigate(MENU_ROUTES.match as Href) },
+      music: { key: "music", label: "Player", icon: "musical-notes", color: colors.accent, badge: 0, onPress: () => navigate(MENU_ROUTES.music as Href) },
+    };
+    return buildMenuKeys({ isAdmin, fabEnabled }).map((k) => byKey[k]);
   }, [isAdmin, adminBadge, openAdminConsole, fabEnabled, colors.accent, colors.accentRed, unreadChat, unreadNotifications, newMatchCount, openAssistant, navigate]);
 
-  const totalBadge = unreadChat + unreadNotifications + newMatchCount + (isAdmin ? adminBadge : 0);
+  const totalBadge = computeTotalBadge({ unreadChat, unreadNotifications, newMatchCount, adminBadge, isAdmin });
 
   // ── posizione del menu (ancorata al pallino, clampata a schermo) ─────────────
   const menuPos = useMemo(() => {

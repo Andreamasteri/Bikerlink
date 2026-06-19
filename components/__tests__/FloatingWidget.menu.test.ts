@@ -37,12 +37,12 @@ vi.mock("@/lib/floating-widget-context", () => ({ useFloatingWidget: vi.fn(() =>
 vi.mock("@/hooks/useNewMatchAlert", () => ({ useNewMatchAlert: vi.fn(() => ({ newMatchCount: 0 })) }));
 vi.mock("@/hooks/useAssistantEnabled", () => ({ useAssistantEnabled: vi.fn(() => ({ fabEnabled: true })) }));
 vi.mock("@/components/user/ai-assistant/AssistantChatSheet", () => ({ default: () => null }));
-vi.mock("@/components/admin/ai-console/FabDrawer", () => ({ default: () => null }));
-vi.mock("@/hooks/admin/ai-console/useAiActionQueue", () => ({ useAiActionQueue: vi.fn(() => ({ queue: [], clearQueue: vi.fn() })) }));
-vi.mock("@/hooks/admin/ai-console/useAiAlerts", () => ({ useAiAlertsState: vi.fn(() => ({ alerts: [], unreadCount: 0 })), useAiAlertsSubscriber: vi.fn() }));
 vi.mock("@/lib/auth-context", () => ({ useAuth: vi.fn(() => ({ user: null })) }));
+vi.mock("@/components/admin/ai-console/FabDrawer", () => ({ default: () => null }));
+vi.mock("@/hooks/admin/ai-console/useAiActionQueue", () => ({ useAiActionQueue: vi.fn(() => ({ data: undefined })) }));
+vi.mock("@/hooks/admin/ai-console/useAiAlerts", () => ({ useAiAlertsState: vi.fn(() => ({ unread: 0 })), useAiAlertsSubscriber: vi.fn() }));
 
-import { MENU_ROUTES } from "@/components/FloatingWidget";
+import { MENU_ROUTES, buildMenuKeys, computeTotalBadge } from "@/components/FloatingWidget";
 
 // ── rotte ─────────────────────────────────────────────────────────────────────
 
@@ -141,38 +141,65 @@ describe("FloatingWidget — item menu: chiude prima di navigare", () => {
   });
 });
 
-// ── gating voce Assistente AI ──────────────────────────────────────────────────
+// ── gating voce Assistente AI (buildMenuKeys reale dal sorgente) ───────────────
 
 describe("FloatingWidget — gating voce Assistente AI (fabEnabled)", () => {
-  /** Replica della costruzione menuItems: la voce AI esiste solo se fabEnabled. */
-  function buildKeys(fabEnabled: boolean): string[] {
-    const keys: string[] = [];
-    if (fabEnabled) keys.push("ai");
-    keys.push("chat", "notifications", "match", "music");
-    return keys;
-  }
-
-  it("fabEnabled=true → 5 voci con 'ai' in testa", () => {
-    const keys = buildKeys(true);
+  it("fabEnabled=true → 'ai' presente in testa (prima delle voci base)", () => {
+    const keys = buildMenuKeys({ isAdmin: false, fabEnabled: true });
     expect(keys).toEqual(["ai", "chat", "notifications", "match", "music"]);
   });
 
-  it("fabEnabled=false → 4 voci senza 'ai'", () => {
-    const keys = buildKeys(false);
+  it("fabEnabled=false → nessuna voce 'ai'", () => {
+    const keys = buildMenuKeys({ isAdmin: false, fabEnabled: false });
     expect(keys).toEqual(["chat", "notifications", "match", "music"]);
     expect(keys).not.toContain("ai");
   });
 });
 
-// ── badge combinato del pallino ────────────────────────────────────────────────
+// ── gating voce AI Console (Task #4468): SOLO admin ────────────────────────────
+
+describe("FloatingWidget — gating voce 'AI Console' (solo admin)", () => {
+  it("admin → la voce 'ai-console' è presente ed è la prima del menu", () => {
+    const keys = buildMenuKeys({ isAdmin: true, fabEnabled: true });
+    expect(keys).toContain("ai-console");
+    expect(keys[0]).toBe("ai-console");
+  });
+
+  it("admin con assistente disabilitato → 'ai-console' resta, 'ai' no", () => {
+    const keys = buildMenuKeys({ isAdmin: true, fabEnabled: false });
+    expect(keys).toEqual(["ai-console", "chat", "notifications", "match", "music"]);
+  });
+
+  it("non-admin → la voce 'ai-console' NON è presente", () => {
+    const withFab = buildMenuKeys({ isAdmin: false, fabEnabled: true });
+    const withoutFab = buildMenuKeys({ isAdmin: false, fabEnabled: false });
+    expect(withFab).not.toContain("ai-console");
+    expect(withoutFab).not.toContain("ai-console");
+  });
+  // Il gate di mount reale (`{isAdmin && <AdminConsoleSection/>}`) + il rendering
+  // effettivo della voce sono verificati a livello di componente in
+  // FloatingWidget.admin.test.ts (render con react-test-renderer).
+});
+
+// ── badge combinato del pallino (computeTotalBadge reale dal sorgente) ──────────
 
 describe("FloatingWidget — badge combinato sul pallino", () => {
-  const total = (chat: number, notif: number, match: number) => chat + notif + match;
-
-  it("somma chat + notifiche + nuovi match", () => {
-    expect(total(2, 3, 1)).toBe(6);
+  it("somma chat + notifiche + nuovi match (non-admin)", () => {
+    expect(
+      computeTotalBadge({ unreadChat: 2, unreadNotifications: 3, newMatchCount: 1, adminBadge: 0, isAdmin: false }),
+    ).toBe(6);
   });
+
   it("zero quando non c'è nulla di non letto", () => {
-    expect(total(0, 0, 0)).toBe(0);
+    expect(
+      computeTotalBadge({ unreadChat: 0, unreadNotifications: 0, newMatchCount: 0, adminBadge: 0, isAdmin: false }),
+    ).toBe(0);
+  });
+
+  it("il badge admin contribuisce SOLO per gli admin", () => {
+    const args = { unreadChat: 1, unreadNotifications: 1, newMatchCount: 1, adminBadge: 5 };
+    expect(computeTotalBadge({ ...args, isAdmin: true })).toBe(8);
+    // Stesso adminBadge ma non-admin → i 5 non vengono sommati.
+    expect(computeTotalBadge({ ...args, isAdmin: false })).toBe(3);
   });
 });
