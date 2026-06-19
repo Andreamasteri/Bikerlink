@@ -70,7 +70,6 @@ export default function ProfileScreen() {
   const { isAutoRiding } = useAutoTelemetry();
 
   const [showLogoutModal, setShowLogoutModal] = useState(false);
-  const [localFloatingWidget, setLocalFloatingWidget] = useState<boolean>(true);
   const [failedPhotos, setFailedPhotos] = useState<Set<string>>(new Set());
   const [replacingSlot, setReplacingSlot] = useState<string | null>(null);
 
@@ -79,13 +78,6 @@ export default function ProfileScreen() {
     enabled: !!user
   });
   const profile = profileQuery.data;
-
-  const { data: adminWidgetData } = useQuery<{ enabled: boolean }>({
-    queryKey: ["/api/settings/floating-widget"],
-    staleTime: 60_000,
-    enabled: !!user
-  });
-  const adminWidgetEnabled = adminWidgetData?.enabled !== false;
 
   const { data: donationData } = useQuery<{ enabled: boolean; text: string; paypalEmail: string }>({
     queryKey: ["/api/settings/donation"]
@@ -125,23 +117,6 @@ export default function ProfileScreen() {
   useEffect(() => {
     if (profile?.country) applyCountryDefault(profile.country);
   }, [profile?.country, applyCountryDefault]);
-
-  useEffect(() => {
-    if (profile) setLocalFloatingWidget(profile.floatingWidgetEnabled !== false);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [profile?.floatingWidgetEnabled]);
-
-  const floatingWidgetMutation = useMutation({
-    mutationFn: async (enabled: boolean) => {
-      const res = await apiRequest("PUT", "/api/users/me", { floatingWidgetEnabled: enabled });
-      return await res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/users/me"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
-    },
-    onError: (error: Error) => Alert.alert("Errore", error.message)
-  });
 
   const uploadPhotoMutation = useMutation({
     mutationFn: async (uri: string) => {
@@ -326,10 +301,6 @@ export default function ProfileScreen() {
         <ProfileActionsBar
           isAdmin={isAdmin}
           isModerator={isModerator}
-          adminWidgetEnabled={adminWidgetEnabled}
-          localFloatingWidget={localFloatingWidget}
-          setLocalFloatingWidget={setLocalFloatingWidget}
-          onFloatingWidgetChange={(val) => floatingWidgetMutation.mutate(val)}
           taskbarStyle={taskbarStyle}
           setTaskbarStyle={setTaskbarStyle}
           t={t}

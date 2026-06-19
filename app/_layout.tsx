@@ -17,7 +17,6 @@ import { useLocationGate } from "@/lib/location-context";
 import { useLanguage } from "@/lib/language-context";
 import { useMapConfig } from "@/lib/map-context";
 import { useTheme } from "@/lib/theme-context";
-import FloatingWidget from "@/components/FloatingWidget";
 import UptimeWidget from "@/components/UptimeWidget";
 import { sendStartupBeacon } from "@/lib/startup-beacon";
 import { loadTelemetryAlwaysActive } from "@/lib/telemetry-prefs";
@@ -303,10 +302,6 @@ export default function RootLayout() {
           <MatchPopupAlert />
           <UpdateNudgeWrapper />
           <AssistantOnboardingTour />
-          {/* Task #4456 — Pallino flottante UNICO (drag + menu a 5 voci, incl.
-              Assistente AI). PanResponder-only, nessun RNGH: drag e tap robusti
-              su Android reale. Sostituisce i vecchi FloatingWidget + AssistantFab. */}
-          <FloatingWidget />
         </MapReadyGate>
       </StartupGate>
     </RootProviders>

@@ -1163,7 +1163,6 @@ const en: Record<string, string> = {
   "admin.maxRecordsPerUser": "How many records to keep per user. Older records are deleted automatically (default 60)",
   "admin.adModeLabel": "Mode",
   "admin.triggerMode": "Trigger Mode",
-  "admin.floatingWidgetDesc": "The floating widget is a draggable dot visible above every screen (native app only). It shows badges for unread messages and notifications and provides quick access to Chat and Notifications. If disabled here, no user will see it regardless of their own preference.",
   "profile.blockConfirm": "Are you sure you want to block {name}?\n\nThe user will disappear from matches, profile and chat.",
   "profile.reportSuccess": "Thank you for helping us keep the community safe. We will review it as soon as possible.",
   "routes.publishConfirm": "Yes, publish",

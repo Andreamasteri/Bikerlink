@@ -1,5 +1,5 @@
 import React from "react";
-import { View, Text, StyleSheet, Pressable, Switch } from "react-native";
+import { View, Text, StyleSheet, Pressable } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
 import { useRouter } from "expo-router";
@@ -8,10 +8,6 @@ import type { TaskbarStyle } from "@/lib/taskbar-style-context";
 interface ProfileActionsBarProps {
   isAdmin: boolean;
   isModerator: boolean;
-  adminWidgetEnabled: boolean;
-  localFloatingWidget: boolean;
-  setLocalFloatingWidget: (val: boolean) => void;
-  onFloatingWidgetChange: (val: boolean) => void;
   taskbarStyle: TaskbarStyle;
   setTaskbarStyle: (style: TaskbarStyle) => void;
   t: (key: string) => string;
@@ -20,10 +16,6 @@ interface ProfileActionsBarProps {
 export const ProfileActionsBar: React.FC<ProfileActionsBarProps> = ({
   isAdmin,
   isModerator,
-  adminWidgetEnabled,
-  localFloatingWidget,
-  setLocalFloatingWidget,
-  onFloatingWidgetChange,
   taskbarStyle,
   setTaskbarStyle,
   t,
@@ -48,7 +40,7 @@ export const ProfileActionsBar: React.FC<ProfileActionsBarProps> = ({
         </Pressable>
       </View>
 
-      {/* ── Taskbar & Widget ───────────────────────────── */}
+      {/* ── Taskbar ────────────────────────────────────── */}
       <View style={styles.section}>
         <View style={taskbarStyles.inlineRow}>
           <Text style={taskbarStyles.inlineLabel}>Taskbar</Text>
@@ -72,20 +64,6 @@ export const ProfileActionsBar: React.FC<ProfileActionsBarProps> = ({
             })}
           </View>
         </View>
-        {adminWidgetEnabled && (
-          <View style={taskbarStyles.inlineRow}>
-            <Text style={taskbarStyles.inlineLabel}>Widget</Text>
-            <Switch
-              value={localFloatingWidget}
-              onValueChange={(val) => {
-                setLocalFloatingWidget(val);
-                onFloatingWidgetChange(val);
-              }}
-              trackColor={{ false: Colors.border, true: Colors.accent }}
-              thumbColor="#fff"
-            />
-          </View>
-        )}
       </View>
 
       {/* ── Feedback / Admin ───────────────────────────── */}

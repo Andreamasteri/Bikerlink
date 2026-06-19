@@ -12,7 +12,6 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useLocalSearchParams } from "expo-router";
 import { apiRequest, queryClient } from "@/lib/query-client";
 import Colors from "@/constants/colors";
-import { useFloatingWidget } from "@/lib/floating-widget-context";
 
 import EndlessBiker from "@/components/arcade/EndlessBiker";
 import TrafficRacer from "@/components/arcade/TrafficRacer";
@@ -44,7 +43,6 @@ export default function ArcadeScreen() {
   const GAMES = getGames(t);
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{ tab?: string; game?: string }>();
-  const { suppressWidget } = useFloatingWidget();
   const [hubTab, setHubTab] = useState<HubTab>(
     params.tab === "leaderboard" ? "leaderboard" : params.tab === "hof" ? "hof" : "games"
   );
@@ -56,11 +54,6 @@ export default function ArcadeScreen() {
   );
   const [gameKey, setGameKey] = useState(0);
   const [gameOver, setGameOver] = useState<{ score: number; prevBest: number } | null>(null);
-
-  useEffect(() => {
-    suppressWidget(!!activeGame);
-    return () => { suppressWidget(false); };
-  }, [activeGame, suppressWidget]);
 
   useEffect(() => {
     if (params.tab === "leaderboard") {

@@ -54,7 +54,6 @@ export function useAdminSettingsState({ isAdmin, t, setTheme }: UseAdminSettings
   const [mapsExpanded, setMapsExpanded] = useState(false);
   const [docsExpanded, setDocsExpanded] = useState(false);
   const [bgLocationExpanded, setBgLocationExpanded] = useState(false);
-  const [floatingWidgetExpanded, setFloatingWidgetExpanded] = useState(false);
   const [distanceCounterExpanded, setDistanceCounterExpanded] = useState(false);
 
   // Initialize sub-hooks
@@ -132,8 +131,6 @@ export function useAdminSettingsState({ isAdmin, t, setTheme }: UseAdminSettings
     setDocsExpanded,
     bgLocationExpanded,
     setBgLocationExpanded,
-    floatingWidgetExpanded,
-    setFloatingWidgetExpanded,
     distanceCounterExpanded,
     setDistanceCounterExpanded,
     adsEnabled: featureFlags.adsEnabled,

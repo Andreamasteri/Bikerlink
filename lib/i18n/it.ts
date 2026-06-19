@@ -1183,7 +1183,6 @@ const it: Record<string, string> = {
   "admin.maxRecordsPerUser": "Quanti record mantenere per utente. Record più vecchi vengono eliminati automaticamente (default 60)",
   "admin.adModeLabel": "Modalità",
   "admin.triggerMode": "Modalità Trigger",
-  "admin.floatingWidgetDesc": "Il widget flottante è un pallino draggabile visibile sopra ogni schermata (solo su app nativa). Mostra badge con messaggi e notifiche non letti e permette accesso rapido a Chat e Notifiche. Se disabilitato qui, nessun utente lo vedrà indipendentemente dalla propria preferenza.",
   "profile.blockConfirm": "Sei sicuro di voler bloccare {name}?\n\nL'utente scomparirà dai match, dal profilo e dalla chat.",
   "profile.reportSuccess": "Grazie per averci aiutato a mantenere la community sicura. La esamineremo al più presto.",
   "routes.publishConfirm": "Sì, pubblica",

@@ -14,7 +14,6 @@ import { MapSettingsProvider } from "@/lib/map-context";
 import { TaskbarStyleProvider } from "@/lib/taskbar-style-context";
 import { UnitsProvider } from "@/lib/units-context";
 import { PlayerProvider } from "@/lib/player-context";
-import { FloatingWidgetProvider } from "@/lib/floating-widget-context";
 import { AutoTelemetryProvider } from "@/lib/auto-telemetry-context";
 import { UptimeWidgetProvider } from "@/lib/uptime-widget-context";
 import { queryClient } from "@/lib/query-client";
@@ -76,17 +75,15 @@ export function RootProviders({
                     <UnitsProvider>
                       <LocationProvider>
                         <PlayerProvider>
-                          <FloatingWidgetProvider>
-                            <UptimeWidgetProvider>
-                              <GestureHandlerRootView style={{ flex: 1 }}>
-                                <KeyboardProvider>
-                                  <AutoTelemetryProvider>
-                                    {children}
-                                  </AutoTelemetryProvider>
-                                </KeyboardProvider>
-                              </GestureHandlerRootView>
-                            </UptimeWidgetProvider>
-                          </FloatingWidgetProvider>
+                          <UptimeWidgetProvider>
+                            <GestureHandlerRootView style={{ flex: 1 }}>
+                              <KeyboardProvider>
+                                <AutoTelemetryProvider>
+                                  {children}
+                                </AutoTelemetryProvider>
+                              </KeyboardProvider>
+                            </GestureHandlerRootView>
+                          </UptimeWidgetProvider>
                         </PlayerProvider>
                       </LocationProvider>
                     </UnitsProvider>

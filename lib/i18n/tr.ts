@@ -1079,7 +1079,6 @@ const tr: Record<string, string> = {
   "admin.maxRecordsPerUser": "Kullanıcı başına kaç kayıt tutulacak. Daha eski kayıtlar otomatik silinir (varsayılan 60)",
   "admin.adModeLabel": "Mod",
   "admin.triggerMode": "Tetikleyici Mod",
-  "admin.floatingWidgetDesc": "Kayan widget, her ekranın üzerinde görünen sürüklenebilir bir balonodur (yalnızca native uygulamada). Okunmamış mesaj ve bildirim rozeti gösterir ve Chat ile Bildirimlere hızlı erişim sağlar. Burada devre dışı bırakılırsa kullanıcılar kendi tercihlerinden bağımsız olarak göremez.",
   "profile.blockConfirm": "{name}'i engellemek istediğinden emin misin?\n\nKullanıcı eşleşmelerden, profilden ve sohbetten kaybolacak.",
   "profile.reportSuccess": "Topluluğu güvende tutmamıza yardım ettiğin için teşekkürler. En kısa sürede inceleyeceğiz.",
   "routes.publishConfirm": "Evet, yayınla",

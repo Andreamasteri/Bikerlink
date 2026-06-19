@@ -13,7 +13,6 @@ export interface ProfileData {
   role: string;
   status: string;
   isPrimal?: boolean;
-  floatingWidgetEnabled?: boolean;
   deletionRequestedAt?: string;
   gpsPrecision?: string;
   profile?: {

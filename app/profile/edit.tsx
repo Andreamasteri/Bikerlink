@@ -43,7 +43,6 @@ interface ProfileData {
   region?: string;
   country?: string;
   avatarUrl?: string;
-  floatingWidgetEnabled?: boolean;
   profile?: {
     bio?: string;
     maxPickupDistance?: number;
@@ -133,14 +132,9 @@ export default function EditProfileScreen() {
 
   const {
     updateProfileMutation,
-    updateFloatingWidgetMutation,
-    updateAssistantPrefsMutation,
     addMotoMutation,
     deletePhotoMutation,
     requestDeletionMutation,
-    adminWidgetEnabled,
-    assistantPrefsQ,
-    assistantAdminDisabled,
   } = useEditProfileMutations();
 
   const uploadPhotoMutation = useMutation({
@@ -407,16 +401,6 @@ export default function EditProfileScreen() {
           setLanguage={setLanguage}
           showLanguageDropdown={showLanguageDropdown}
           setShowLanguageDropdown={setShowLanguageDropdown}
-          floatingWidgetEnabled={profile?.floatingWidgetEnabled ?? true}
-          onToggleFloatingWidget={(enabled) => updateFloatingWidgetMutation.mutate(enabled)}
-          isUpdatingFloatingWidget={updateFloatingWidgetMutation.isPending}
-          adminWidgetEnabled={adminWidgetEnabled}
-          assistantWidgetEnabled={!(assistantPrefsQ.data?.prefs?.disabled ?? false)}
-          onToggleAssistantWidget={(enabled) =>
-            updateAssistantPrefsMutation.mutate({ disabled: !enabled })
-          }
-          isUpdatingAssistantWidget={updateAssistantPrefsMutation.isPending}
-          assistantAdminDisabled={assistantAdminDisabled}
           handleDeleteAccount={handleDeleteAccount}
           setShowRevokeConsentModal={setShowRevokeConsentModal}
         />

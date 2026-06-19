@@ -1088,7 +1088,6 @@ const de: Record<string, string> = {
   "admin.maxRecordsPerUser": "Wie viele Datensätze pro Nutzer behalten. Ältere Datensätze werden automatisch gelöscht (Standard 60)",
   "admin.adModeLabel": "Modus",
   "admin.triggerMode": "Trigger-Modus",
-  "admin.floatingWidgetDesc": "Das schwebende Widget ist ein ziebbares Bällchen, das über jedem Bildschirm sichtbar ist (nur in der nativen App). Es zeigt Abzeichen mit ungelesenen Nachrichten und Benachrichtigungen und ermöglicht schnellen Zugriff auf Chat und Benachrichtigungen. Wenn es hier deaktiviert wird, sieht kein Nutzer es unabhängig von seiner eigenen Präferenz.",
   "profile.blockConfirm": "Bist du sicher, dass du {name} blockieren möchtest?\n\nDer Nutzer verschwindet aus Matches, Profil und Chat.",
   "profile.reportSuccess": "Danke, dass du uns dabei hilfst, die Community sicher zu halten. Wir werden es so schnell wie möglich prüfen.",
   "routes.publishConfirm": "Ja, veröffentlichen",
