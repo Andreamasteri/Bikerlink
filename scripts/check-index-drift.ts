@@ -119,6 +119,132 @@ function getSchemaSpecialIndexes(): Map<string, SchemaSpecialIndex> {
   return result;
 }
 
+/**
+ * Come getSchemaSpecialIndexes, ma restituisce TUTTI gli indici dello schema
+ * (inclusi quelli ASC plain senza DESC/WHERE). Usato per rilevare l'inverse
+ * drift: migration ha DESC/WHERE ma schema TS è ASC/senza-clausola.
+ */
+function getSchemaAllIndexes(): Map<string, SchemaSpecialIndex> {
+  const result = new Map<string, SchemaSpecialIndex>();
+
+  for (const value of Object.values(schema)) {
+    if (!value || typeof value !== "object" || Array.isArray(value) || value instanceof SQL || value instanceof Function) {
+      continue;
+    }
+
+    let tableConfig: ReturnType<typeof getTableConfig>;
+    try {
+      tableConfig = getTableConfig(value as PgTable);
+      if (!tableConfig?.name || !tableConfig.indexes) continue;
+    } catch {
+      continue;
+    }
+
+    const tableName = tableConfig.name;
+
+    for (const idx of tableConfig.indexes) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const cfg = (idx as any).config as {
+        name?: string;
+        columns?: Array<{ indexConfig?: { order?: string }; name?: string } | SQL>;
+        where?: SQL;
+        unique?: boolean;
+      };
+
+      if (!cfg?.name) continue;
+
+      const descColumns: string[] = [];
+      for (const col of (cfg.columns ?? [])) {
+        if (col instanceof SQL) continue;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const order = (col as any)?.indexConfig?.order;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const colName = (col as any)?.name ?? "(sql)";
+        if (order === "desc") descColumns.push(colName);
+      }
+
+      result.set(cfg.name, {
+        indexName: cfg.name,
+        tableName,
+        hasDesc: descColumns.length > 0,
+        hasWhere: cfg.where != null,
+        descColumns,
+      });
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Rileva l'inverse drift: indice che nelle migration SQL è creato con DESC o
+ * WHERE, ma nello schema Drizzle TS è definito come ASC plain / senza WHERE.
+ *
+ * Questa è la causa del loop DROP+CREATE a ogni deploy: Replit confronta lo
+ * schema (ASC) con la prod (DESC) e rigenera DROP+CREATE senza mai convergere.
+ *
+ * Nota: vengono segnalati solo gli indici presenti in ENTRAMBE le fonti
+ * (migration E schema TS). Indici presenti solo in migration e non nello schema
+ * (es. HNSW, indici manuali) non vengono segnalati.
+ */
+function detectInverseDrift(
+  schemaAll: Map<string, SchemaSpecialIndex>,
+): Array<{ indexName: string; migration: string; migrationHasDesc: boolean; migrationHasWhere: boolean }> {
+  const files = readdirSync(MIGRATIONS_DIR)
+    .filter((f) => f.endsWith(".sql"))
+    .sort();
+
+  const migState = new Map<string, { hasDesc: boolean; hasWhere: boolean; migration: string; dropped: boolean }>();
+
+  for (const file of files) {
+    const content = readFileSync(join(MIGRATIONS_DIR, file), "utf-8");
+    const dropped = extractDroppedIndexNames(content);
+    const creates = extractCreatedIndexes(content, file);
+
+    for (const name of dropped) {
+      const s = migState.get(name);
+      if (s) migState.set(name, { ...s, dropped: true });
+    }
+    for (const c of creates) {
+      migState.set(c.indexName, {
+        hasDesc: c.hasDesc,
+        hasWhere: c.hasWhere,
+        migration: c.migration,
+        dropped: false,
+      });
+    }
+  }
+
+  const results: Array<{
+    indexName: string;
+    migration: string;
+    migrationHasDesc: boolean;
+    migrationHasWhere: boolean;
+  }> = [];
+
+  for (const [name, migInfo] of migState) {
+    if (migInfo.dropped) continue;
+    if (!migInfo.hasDesc && !migInfo.hasWhere) continue; // migration plain → skip
+
+    const schemaInfo = schemaAll.get(name);
+    if (!schemaInfo) continue; // non dichiarato nel registry TS → indice esterno/manuale
+
+    const inversedDesc = migInfo.hasDesc && !schemaInfo.hasDesc;
+    const inversedWhere = migInfo.hasWhere && !schemaInfo.hasWhere;
+
+    if (inversedDesc || inversedWhere) {
+      results.push({
+        indexName: name,
+        migration: migInfo.migration,
+        migrationHasDesc: migInfo.hasDesc,
+        migrationHasWhere: migInfo.hasWhere,
+      });
+    }
+  }
+
+  return results;
+}
+
 // ─── Fase 2: Migration SQL — rilevamento regressioni ─────────────────────────
 
 function normalizeSql(sql: string): string {
@@ -318,6 +444,7 @@ export async function runIndexDriftCheck(): Promise<IndexDriftResult> {
 
   // Fase 1: Drizzle TS schema
   const schemaSpecial = getSchemaSpecialIndexes();
+  const schemaAll = getSchemaAllIndexes();
 
   if (schemaSpecial.size === 0) {
     console.log("[INDEX-DRIFT]   Nessun indice speciale (DESC/WHERE) trovato nello schema Drizzle TS.");
@@ -336,7 +463,7 @@ export async function runIndexDriftCheck(): Promise<IndexDriftResult> {
   let exitCode: 0 | 1 | 2 = 0;
   const allIssues: string[] = [];
 
-  // Fase 2: Migration SQL — regressioni
+  // Fase 2: Migration SQL — regressioni (schema vuole DESC ma migration ha perso DESC)
   console.log("\n[INDEX-DRIFT]   Analisi migration SQL per regressioni...");
   const regressions = detectMigrationRegressions(schemaSpecial);
   if (regressions.length === 0) {
@@ -348,6 +475,24 @@ export async function runIndexDriftCheck(): Promise<IndexDriftResult> {
       if (r.lostDesc) lost.push("DESC perso");
       if (r.lostWhere) lost.push("WHERE perso");
       const msg = `"${r.indexName}": regressione in ${r.migration} — ${lost.join(", ")}`;
+      console.log(`[INDEX-DRIFT]   ✖  ${msg}`);
+      allIssues.push(msg);
+    }
+  }
+
+  // Fase 2b: Inverse drift — migration ha DESC/WHERE ma schema TS è ASC/senza-clausola
+  // Questa è la causa del loop DROP+CREATE a ogni deploy di Replit.
+  console.log("[INDEX-DRIFT]   Analisi inverse drift (migration DESC ≠ schema ASC)...");
+  const inverseDrifts = detectInverseDrift(schemaAll);
+  if (inverseDrifts.length === 0) {
+    console.log("[INDEX-DRIFT]   ✔  Nessun inverse drift rilevato");
+  } else {
+    exitCode = 1;
+    for (const d of inverseDrifts) {
+      const gained: string[] = [];
+      if (d.migrationHasDesc) gained.push("migration DESC ma schema ASC");
+      if (d.migrationHasWhere) gained.push("migration WHERE ma schema senza clausola");
+      const msg = `"${d.indexName}": inverse drift in ${d.migration} — ${gained.join(", ")} → DROP+CREATE loop al deploy`;
       console.log(`[INDEX-DRIFT]   ✖  ${msg}`);
       allIssues.push(msg);
     }
@@ -442,6 +587,7 @@ export async function runStaticIndexDriftCheck(): Promise<IndexDriftResult> {
   console.log("[INDEX-DRIFT] ══════════════════════════════════════════════\n");
 
   const schemaSpecial = getSchemaSpecialIndexes();
+  const schemaAll = getSchemaAllIndexes();
 
   if (schemaSpecial.size === 0) {
     console.log("[INDEX-DRIFT]   Nessun indice speciale (DESC/WHERE) trovato nello schema Drizzle TS.");
@@ -457,27 +603,47 @@ export async function runStaticIndexDriftCheck(): Promise<IndexDriftResult> {
     console.log(`[INDEX-DRIFT]     • ${idx.indexName} (${idx.tableName}) [${tags.join(",")}]`);
   }
 
+  const issues: string[] = [];
+
+  // Fase 2: regressioni (schema vuole DESC ma migration ha perso DESC)
   console.log("\n[INDEX-DRIFT]   Analisi migration SQL per regressioni...");
   const regressions = detectMigrationRegressions(schemaSpecial);
   if (regressions.length === 0) {
     console.log("[INDEX-DRIFT]   ✔  Nessuna regressione nelle migration SQL");
-    console.log("[INDEX-DRIFT] ══════════════════════════════════════════════");
-    console.log(`[INDEX-DRIFT]   RESULT: OK — nessuna regressione, verifica live al boot`);
+  } else {
+    for (const r of regressions) {
+      const lost: string[] = [];
+      if (r.lostDesc) lost.push("DESC perso");
+      if (r.lostWhere) lost.push("WHERE perso");
+      const msg = `"${r.indexName}": regressione in ${r.migration} — ${lost.join(", ")}`;
+      console.log(`[INDEX-DRIFT]   ✖  ${msg}`);
+      issues.push(msg);
+    }
+  }
+
+  // Fase 2b: inverse drift (migration DESC ma schema ASC → loop DROP+CREATE al deploy)
+  console.log("[INDEX-DRIFT]   Analisi inverse drift (migration DESC ≠ schema ASC)...");
+  const inverseDrifts = detectInverseDrift(schemaAll);
+  if (inverseDrifts.length === 0) {
+    console.log("[INDEX-DRIFT]   ✔  Nessun inverse drift rilevato");
+  } else {
+    for (const d of inverseDrifts) {
+      const gained: string[] = [];
+      if (d.migrationHasDesc) gained.push("migration DESC ma schema ASC");
+      if (d.migrationHasWhere) gained.push("migration WHERE ma schema senza clausola");
+      const msg = `"${d.indexName}": inverse drift in ${d.migration} — ${gained.join(", ")} → DROP+CREATE loop al deploy`;
+      console.log(`[INDEX-DRIFT]   ✖  ${msg}`);
+      issues.push(msg);
+    }
+  }
+
+  console.log("[INDEX-DRIFT] ══════════════════════════════════════════════");
+  if (issues.length === 0) {
+    console.log(`[INDEX-DRIFT]   RESULT: OK — nessuna regressione e nessun inverse drift, verifica live al boot`);
     console.log("[INDEX-DRIFT] ══════════════════════════════════════════════");
     return { exitCode: 0, issues: [] };
   }
-
-  const issues: string[] = [];
-  for (const r of regressions) {
-    const lost: string[] = [];
-    if (r.lostDesc) lost.push("DESC perso");
-    if (r.lostWhere) lost.push("WHERE perso");
-    const msg = `"${r.indexName}": regressione in ${r.migration} — ${lost.join(", ")}`;
-    console.log(`[INDEX-DRIFT]   ✖  ${msg}`);
-    issues.push(msg);
-  }
-  console.log("[INDEX-DRIFT] ══════════════════════════════════════════════");
-  console.log(`[INDEX-DRIFT]   RESULT: REGRESSIONE (${issues.length}) — migration correttiva richiesta`);
+  console.log(`[INDEX-DRIFT]   RESULT: PROBLEMI (${issues.length}) — migration correttiva o fix schema TS richiesti`);
   console.log("[INDEX-DRIFT] ══════════════════════════════════════════════");
   return { exitCode: 1, issues };
 }

@@ -12,16 +12,31 @@ Non interrogare mai il DB live (pg_indexes) durante la Phase 2 del deploy-build.
 
 **How to apply:**
 - In deploy-build.sh: `npx tsx scripts/check-index-drift.ts --static-only`
-  - Fase 1+2 only: schema TS + regressioni migration SQL
-  - Exit 0 = OK · Exit 1 = regressione trovata nelle migration (gate duro)
+  - Fase 1+2 only: schema TS + regressioni migration SQL + inverse drift
+  - Exit 0 = OK · Exit 1 = regressione o inverse drift trovato nelle migration (gate duro)
   - NON connette al DB
-- In server/boot-sequence.ts (Task #4052): `runIndexDriftCheck()` completo (con DB live) gira in background post-READY, dopo che migrate.ts ha già applicato tutte le migration
+- In server/boot-sequence.ts: `runIndexDriftCheck()` completo (con DB live) gira in background post-READY, dopo che migrate.ts ha già applicato tutte le migration
 - Il gate in CI (workflow `index-drift`) usa il check completo (con DB live) perché ci si connette al dev DB che è sempre aggiornato
 
 ## Separazione delle responsabilità
 
 | Dove | Funzione | DB live | Blocca |
 |------|----------|---------|--------|
-| deploy-build.sh Phase 2 | `--static-only` | NO | Sì se regressione migration |
+| deploy-build.sh Phase 2 | `--static-only` | NO | Sì se regressione o inverse drift |
 | boot-sequence.ts (BG) | `runIndexDriftCheck()` | SÌ | Mai (solo log/alert) |
 | workflow `index-drift` | CLI completa | SÌ | N/A (CI check) |
+
+## Causa del loop DROP+CREATE a ogni deploy (inverse drift)
+
+Il loop DROP+CREATE si genera quando **la migration SQL crea un indice con DESC/WHERE
+ma lo schema Drizzle TS lo dichiara ASC/senza-clausola**. Replit confronta schema (ASC)
+con prod (DESC) e rigenera DROP+CREATE senza mai convergere.
+
+**Fix:** allineare lo schema TS alla migration aggiungendo `.desc()` o `.where(sql...)`.
+NON serve una migration correttiva: prod è già corretto (ha DESC), va sistemato solo il registry TS.
+
+**Guardia:** `detectInverseDrift()` in `scripts/check-index-drift.ts` rileva questa direzione
+(migration DESC ma schema ASC) e la segnala con exit 1 nel check statico, PRIMA del deploy.
+Il check ora copre entrambe le direzioni:
+- **Regressione forward**: schema vuole DESC, migration l'ha perso → deploy porta ASC in prod
+- **Inverse drift**: migration ha DESC, schema dice ASC → loop DROP+CREATE a ogni deploy

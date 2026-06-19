@@ -38,7 +38,7 @@ export const pipelineProbeHistory = pgTable("pipeline_probe_history", {
   durationMs: integer("duration_ms").notNull(),
   runAt: timestamp("run_at").notNull().defaultNow(),
 }, (t) => [
-  index("pipeline_probe_history_pipeline_run_at_idx").on(t.pipeline, t.runAt),
+  index("pipeline_probe_history_pipeline_run_at_idx").on(t.pipeline, t.runAt.desc()),
 ]);
 
 export type PipelineProbeHistory = typeof pipelineProbeHistory.$inferSelect;

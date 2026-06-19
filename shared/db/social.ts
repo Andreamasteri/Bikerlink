@@ -124,7 +124,7 @@ export const reports = pgTable("reports", {
   index("reports_reported_user_idx").on(table.reportedUserId),
   index("reports_severity_status_idx").on(table.severity, table.status),
   index("reports_reporter_idx").on(table.reporterId),
-  index("reports_assigned_moderator_idx").on(table.assignedModeratorId),
+  index("reports_assigned_moderator_idx").on(table.assignedModeratorId).where(sql`"assigned_moderator_id" IS NOT NULL`),
   index("reports_ai_analyzed_at_idx").on(table.aiAnalyzedAt),
 ]);
 

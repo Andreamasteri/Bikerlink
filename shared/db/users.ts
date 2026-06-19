@@ -499,7 +499,7 @@ export const userPrivacyLog = pgTable("user_privacy_log", {
   newValue: boolean("new_value").notNull(),
   changedAt: timestamp("changed_at").notNull().defaultNow(),
 }, (table) => [
-  index("user_privacy_log_user_id_changed_at_idx").on(table.userId, table.changedAt),
+  index("user_privacy_log_user_id_changed_at_idx").on(table.userId, table.changedAt.desc()),
 ]);
 
 export type UserPrivacyLog = typeof userPrivacyLog.$inferSelect;

@@ -40,7 +40,7 @@ export const aiConversationTurns = pgTable("ai_conversation_turns", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (t) => [
   index("ai_conversation_turns_user_id_idx").on(t.userId, t.createdAt.desc()),
-  index("ai_conversation_turns_summary_of_idx").on(t.summaryOf),
+  index("ai_conversation_turns_summary_of_idx").on(t.summaryOf).where(sql`"summary_of" IS NOT NULL`),
 ]);
 
 export type AiConversationTurn = typeof aiConversationTurns.$inferSelect;
