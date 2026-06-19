@@ -6,33 +6,19 @@ import { sql } from "drizzle-orm";
 import { translationKeys } from "@shared/db";
 import { translationKeySchema } from "@shared/db";
 import { sendError } from "../../lib/api-response";
-import { generateText } from "ai";
-import { runWithFallback } from "../../ai/moderation/provider";
-import { isOllamaConfigured, isOllamaReachable, getOllamaModel } from "../../lib/ollama-client";
+import {
+  runAiCompletion,
+  buildDoneMessage,
+  AiProviderUnavailableError,
+} from "./translations-ai";
 
 const router = Router();
 
 const VALID_LANGS = new Set(["it", "en", "de", "es", "fr", "el", "tr"]);
 const ALL_LANGS = ["it", "en", "de", "es", "fr", "el", "tr"] as const;
-const TRANS_LANGS = ["en", "de", "es", "fr", "el", "tr"] as const;
-
-const LANG_NAMES: Record<string, string> = {
-  it: "Italian",
-  en: "English",
-  de: "German",
-  es: "Spanish",
-  fr: "French",
-  el: "Greek",
-  tr: "Turkish",
-};
 
 const I18N_DIR = path.resolve(__dirname, "../../../lib/i18n");
 
-/**
- * Parses a lib/i18n/*.ts file as text and extracts all key-value pairs.
- * Uses regex instead of require() so it works in both tsx (dev) and compiled-JS (prod).
- * Format: `  "key": "value",` — one entry per line, values may contain escape sequences.
- */
 function loadI18nFile(lang: string): Record<string, string> {
   const filePath = path.join(I18N_DIR, `${lang}.ts`);
   const content = fs.readFileSync(filePath, "utf8");
@@ -152,7 +138,6 @@ router.post("/sync-from-files", async (_req: Request, res: Response) => {
       langData[lang] = loadI18nFile(lang);
     }
 
-    // Union of keys across ALL language files (not just IT)
     const allKeys = [
       ...new Set(Object.values(langData).flatMap((d) => Object.keys(d))),
     ].sort();
@@ -163,7 +148,6 @@ router.post("/sync-from-files", async (_req: Request, res: Response) => {
     for (let i = 0; i < allKeys.length; i += BATCH) {
       const batch = allKeys.slice(i, i + BATCH);
       for (const key of batch) {
-        // Build file values for each language (empty string = not in that file)
         const vals: Record<string, string> = {};
         for (const lang of ALL_LANGS) {
           vals[lang] = (langData[lang][key] ?? "").trim();
@@ -192,8 +176,6 @@ router.post("/sync-from-files", async (_req: Request, res: Response) => {
         } else {
           const row = existing[0];
           const keepPosition = row.position || position;
-          // For each language: file value wins if non-empty; otherwise keep existing DB value.
-          // Semantics: "sync from files" imports what the files know; doesn't erase manual edits.
           const updateSet: Record<string, string> = { position: keepPosition };
           for (const lang of ALL_LANGS) {
             if (vals[lang]) {
@@ -225,242 +207,9 @@ router.post("/sync-from-files", async (_req: Request, res: Response) => {
   }
 });
 
-// Lanciato quando la chain provider AI non ha alcun provider disponibile:
-// permette di distinguere "nessuna chiave AI" (503) da un errore generico (500).
-class AiProviderUnavailableError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "AiProviderUnavailableError";
-  }
-}
-
-interface AiCompletionStartInfo {
-  totalMissing: number;
-  totalBatches: number;
-}
-
-interface AiCompletionBatchInfo {
-  batchIndex: number;
-  totalBatches: number;
-  keysUpdatedThisBatch: number;
-  totalKeysUpdated: number;
-  summary: Record<string, number>;
-  provider: string;
-}
-
-interface AiCompletionResult {
-  empty: boolean;
-  totalProcessed: number;
-  summary: Record<string, number>;
-  provider: string;
-  aborted: boolean;
-}
-
-interface AiCompletionCallbacks {
-  onStart?: (info: AiCompletionStartInfo) => void;
-  onBatch?: (info: AiCompletionBatchInfo) => void;
-  isAborted?: () => boolean;
-}
-
-/**
- * Esegue il completamento AI batch-per-batch. Condiviso tra il path JSON
- * (one-shot) e il path SSE (streaming progress). I callback opzionali
- * notificano l'avvio e il termine di ogni batch; isAborted() permette di
- * interrompere il run a metà (usato dalla cancellazione client via SSE).
- */
-async function runAiCompletion(callbacks: AiCompletionCallbacks = {}): Promise<AiCompletionResult> {
-  const allRows = await db.select().from(translationKeys).orderBy(translationKeys.key);
-
-  const rowsWithMissing = allRows.filter((row) =>
-    TRANS_LANGS.some((l) => !(row[l as keyof typeof row] as string)?.trim())
-  );
-
-  const summary: Record<string, number> = Object.fromEntries(TRANS_LANGS.map((l) => [l, 0]));
-
-  if (rowsWithMissing.length === 0) {
-    return { empty: true, totalProcessed: 0, summary, provider: "ai", aborted: false };
-  }
-
-  const GLOSSARY = `
-Glossario BikerLink (NON tradurre questi termini):
-- "BikerLink" → rimane "BikerLink"
-- "zavorrina" → rimane "zavorrina" (in EN puoi usare "pillion" se già presente, ma in EL/TR usa "zavorrina")
-- "biker" → rimane "biker"
-- "moto" → puoi tradurre (motorcycle/Motorrad/moto/μοτοσυκλέτα/motosiklet)
-- Variabili come {nickname}, {count}, {n} → rimangono invariate
-- Testo con "→" in percorsi → rimane
-`.trim();
-
-  const BATCH_SIZE = 30;
-  const totalBatches = Math.ceil(rowsWithMissing.length / BATCH_SIZE);
-  let totalProcessed = 0;
-  let usedProviderName = "ai";
-
-  callbacks.onStart?.({ totalMissing: rowsWithMissing.length, totalBatches });
-
-  // Decide provider once: probe Ollama first (no cost, self-hosted).
-  // If reachable use it directly for all batches; otherwise delegate to runWithFallback
-  // which follows the standard chain Groq → Gemini → OpenAI.
-  const ollamaReachable = isOllamaConfigured && (await isOllamaReachable());
-
-  let batchIndex = 0;
-  for (let i = 0; i < rowsWithMissing.length; i += BATCH_SIZE) {
-    if (callbacks.isAborted?.()) {
-      return { empty: false, totalProcessed, summary, provider: usedProviderName, aborted: true };
-    }
-    batchIndex++;
-    const batch = rowsWithMissing.slice(i, i + BATCH_SIZE);
-    let keysUpdatedThisBatch = 0;
-
-    const missingLangsPerRow = batch.map((row) => ({
-      key: row.key,
-      it: row.it ?? "",
-      missing: TRANS_LANGS.filter((l) => !(row[l as keyof typeof row] as string)?.trim()),
-      existing: Object.fromEntries(
-        TRANS_LANGS
-          .filter((l) => !!(row[l as keyof typeof row] as string)?.trim())
-          .map((l) => [l, row[l as keyof typeof row] as string])
-      ),
-    })).filter((r) => r.missing.length > 0 && r.it.trim());
-
-    if (missingLangsPerRow.length === 0) {
-      callbacks.onBatch?.({
-        batchIndex, totalBatches, keysUpdatedThisBatch: 0,
-        totalKeysUpdated: totalProcessed, summary: { ...summary }, provider: usedProviderName,
-      });
-      continue;
-    }
-
-    const allMissingLangs = [...new Set(missingLangsPerRow.flatMap((r) => r.missing))];
-
-    const prompt = `Sei un traduttore professionale per l'app BikerLink, una community di motociclisti italiani.
-
-${GLOSSARY}
-
-Traduci le seguenti stringhe dell'interfaccia utente dall'italiano verso le lingue mancanti indicate.
-Rispondi SOLO con un JSON valido nel formato:
-{
-  "chiave": {
-    "lang_code": "traduzione"
-  }
-}
-
-Lingue da tradurre: ${allMissingLangs.map((l) => `${l} (${LANG_NAMES[l]})`).join(", ")}
-
-Stringhe da tradurre:
-${missingLangsPerRow.map((r) =>
-  `"${r.key}": { "it": ${JSON.stringify(r.it)}, "missing": ${JSON.stringify(r.missing)} }`
-).join("\n")}`;
-
-    let responseText = "";
-    try {
-      if (ollamaReachable) {
-        // Ollama-first: self-hosted, no cost, no rate limits.
-        // On failure, fall through to cloud chain below (no silently skipping).
-        try {
-          const ollamaModel = getOllamaModel();
-          const result = await generateText({ model: ollamaModel, prompt, maxRetries: 1 });
-          responseText = result.text.trim();
-          usedProviderName = "ollama";
-        } catch (ollamaErr) {
-          console.warn("[translations] ai-complete: Ollama fallito, scalo a cloud:", (ollamaErr as Error).message);
-          // Fall through to cloud chain.
-          const { value: cloudText, model: resolvedModel } = await runWithFallback(
-            { role: "brain", skipOllama: true },
-            (m) => m.scheduler(() =>
-              generateText({ model: m.model as Parameters<typeof generateText>[0]["model"], prompt, maxRetries: 1 })
-                .then((r) => r.text.trim())
-            ),
-          );
-          responseText = cloudText;
-          usedProviderName = resolvedModel.providerName;
-        }
-      } else {
-        // Cloud fallback chain: Groq → Gemini → OpenAI via runWithFallback.
-        const { value: cloudText, model: resolvedModel } = await runWithFallback(
-          { role: "brain", skipOllama: true },
-          (m) => m.scheduler(() =>
-            generateText({ model: m.model as Parameters<typeof generateText>[0]["model"], prompt, maxRetries: 1 })
-              .then((r) => r.text.trim())
-          ),
-        );
-        responseText = cloudText;
-        usedProviderName = resolvedModel.providerName;
-      }
-    } catch (aiErr) {
-      const aiMsg = (aiErr as Error)?.message ?? "";
-      // Nessun provider AI disponibile: inutile insistere sui batch successivi,
-      // interrompi subito e fai emergere l'errore al chiamante (503).
-      if (aiMsg.includes("AI_PROVIDER_UNAVAILABLE")) {
-        throw new AiProviderUnavailableError(aiMsg);
-      }
-      console.error("[translations] ai-complete batch error:", aiErr);
-      callbacks.onBatch?.({
-        batchIndex, totalBatches, keysUpdatedThisBatch: 0,
-        totalKeysUpdated: totalProcessed, summary: { ...summary }, provider: usedProviderName,
-      });
-      continue;
-    }
-
-    const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-      let parsed: Record<string, Record<string, string>> | null = null;
-      try {
-        parsed = JSON.parse(jsonMatch[0]) as Record<string, Record<string, string>>;
-      } catch {
-        parsed = null;
-      }
-
-      if (parsed) {
-        for (const [key, translations] of Object.entries(parsed)) {
-          if (!translations || typeof translations !== "object") continue;
-          const allowedMissingLangs = new Set<string>(
-            missingLangsPerRow.find((r) => r.key === key)?.missing ?? []
-          );
-          if (allowedMissingLangs.size === 0) continue;
-          const updateData: Record<string, string> = {};
-          for (const [lang, value] of Object.entries(translations)) {
-            if (
-              allowedMissingLangs.has(lang) &&
-              (TRANS_LANGS as readonly string[]).includes(lang) &&
-              typeof value === "string" &&
-              value.trim()
-            ) {
-              updateData[lang] = value.trim();
-              summary[lang] = (summary[lang] ?? 0) + 1;
-            }
-          }
-          if (Object.keys(updateData).length > 0) {
-            await db
-              .update(translationKeys)
-              .set(updateData)
-              .where(sql`${translationKeys.key} = ${key}`);
-            totalProcessed++;
-            keysUpdatedThisBatch++;
-          }
-        }
-      }
-    }
-
-    callbacks.onBatch?.({
-      batchIndex, totalBatches, keysUpdatedThisBatch,
-      totalKeysUpdated: totalProcessed, summary: { ...summary }, provider: usedProviderName,
-    });
-  }
-
-  return { empty: false, totalProcessed, summary, provider: usedProviderName, aborted: false };
-}
-
-function buildDoneMessage(result: AiCompletionResult): string {
-  if (result.empty) return "Tutte le traduzioni sono già complete.";
-  const summaryStr = TRANS_LANGS.map((l) => `${l.toUpperCase()}: ${result.summary[l]}`).join(", ");
-  return `Completate ${result.totalProcessed} chiavi via ${result.provider}. ${summaryStr}`;
-}
-
 router.post("/ai-complete", async (req: Request, res: Response) => {
   const wantsStream = (req.headers.accept ?? "").includes("text/event-stream");
 
-  // ── SSE streaming path: emette start/batch/done/error e supporta l'annullamento. ──
   if (wantsStream) {
     res.setHeader("Content-Type", "text/event-stream");
     res.setHeader("Cache-Control", "no-cache");
@@ -485,7 +234,6 @@ router.post("/ai-complete", async (req: Request, res: Response) => {
       });
 
       if (aborted || result.aborted) {
-        // Client ha annullato: la connessione è già chiusa, chiudi e basta.
         try { res.end(); } catch { /* noop */ }
         return;
       }
@@ -511,7 +259,6 @@ router.post("/ai-complete", async (req: Request, res: Response) => {
     return;
   }
 
-  // ── JSON one-shot path (retrocompatibile). ──
   try {
     const result = await runAiCompletion();
     return res.json({
@@ -548,8 +295,6 @@ router.post("/apply-to-files", async (_req: Request, res: Response) => {
       const header = originalContent.slice(0, openBrace);
       const footer = originalContent.slice(closeBrace);
 
-      // Collect // @manual markers from the original object body.
-      // A marker applies to the NEXT key entry that follows it.
       const manualKeys = new Set<string>();
       const bodyLines = originalContent.slice(openBrace + 1, closeBrace).split("\n");
       let nextIsManual = false;
