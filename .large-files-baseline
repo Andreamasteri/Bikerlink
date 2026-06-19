@@ -13,7 +13,7 @@ LEGACY scripts/verify-matching-integration.ts 746
 LEGACY server/motion-simulator.ts 935
 LOCKED app/admin/ai-route-providers.tsx 342
 LOCKED components/admin/ads/useAdAdmin.ts 587
-LOCKED components/profile/TelemetryPanel.tsx 689
+LOCKED components/profile/TelemetryPanel.tsx 699
 LOCKED server/routes/client-settings.ts 567
 LOCKED server/routes/planned-routes/extras.ts 209
 LOCKED server/routes/planned-routes/sharing.ts 246
