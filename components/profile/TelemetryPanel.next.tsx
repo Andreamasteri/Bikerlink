@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -70,9 +70,6 @@ export default function TelemetryPanel({ telemetryStats }: Props) {
   const [showInfoModal, setShowInfoModal] = useState(false);
   const [relaxedMode, setRelaxedMode] = useState(false);
 
-  const focusTelemetryRef = useRef(focusTelemetry);
-  focusTelemetryRef.current = focusTelemetry;
-
   useEffect(() => {
     if (focusTelemetry === "1") {
       LayoutAnimation.easeInEaseOut();
@@ -83,9 +80,7 @@ export default function TelemetryPanel({ telemetryStats }: Props) {
 
   useFocusEffect(
     useCallback(() => {
-      if (focusTelemetryRef.current !== "1") {
-        setTelemetryExpanded(false);
-      }
+      setTelemetryExpanded(false);
     }, [])
   );
 
@@ -225,42 +220,28 @@ export default function TelemetryPanel({ telemetryStats }: Props) {
           onCalibratePress={() => setShowCalibWizard(true)}
         />
 
-        {telemetryStats.track_km > 0 && (
-          <View style={styles.trackKmRow}>
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
-              <Ionicons name="flag-outline" size={13} color="#e67e22" />
-              <Text style={styles.trackKmLabel}>Km in pista</Text>
-            </View>
-            <Text style={styles.trackKmValue}>{telemetryStats.track_km.toFixed(1)} km</Text>
-          </View>
-        )}
-
-        {telemetryStats.ideal_lap_km > 0 && (
-          <View style={styles.trackKmRow}>
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
-              <Ionicons name="navigate-outline" size={13} color="#8e44ad" />
-              <Text style={[styles.trackKmLabel, { color: "#8e44ad" }]}>Km Giro Ideale</Text>
-            </View>
-            <Text style={[styles.trackKmValue, { color: "#8e44ad" }]}>{telemetryStats.ideal_lap_km.toFixed(1)} km</Text>
-          </View>
-        )}
-
-        {/* ── Affordance espansione (solo quando chiuso) ── */}
-        {!telemetryExpanded && (
-          <TouchableOpacity
-            activeOpacity={0.7}
-            onPress={handleToggleExpanded}
-            style={styles.expandHint}
-          >
-            <Ionicons name="options-outline" size={13} color={Colors.textSecondary} />
-            <Text style={styles.expandHintText}>Giri ideali & impostazioni</Text>
-            <Ionicons name="chevron-forward" size={13} color={Colors.textSecondary} />
-          </TouchableOpacity>
-        )}
-
         {/* ── Contenuto espanso ── */}
         {telemetryExpanded && (
           <View style={styles.telemetryExpanded}>
+            {telemetryStats.track_km > 0 && (
+              <View style={styles.trackKmRow}>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
+                  <Ionicons name="flag-outline" size={13} color="#e67e22" />
+                  <Text style={styles.trackKmLabel}>Km in pista</Text>
+                </View>
+                <Text style={styles.trackKmValue}>{telemetryStats.track_km.toFixed(1)} km</Text>
+              </View>
+            )}
+
+            {telemetryStats.ideal_lap_km > 0 && (
+              <View style={styles.trackKmRow}>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
+                  <Ionicons name="navigate-outline" size={13} color="#8e44ad" />
+                  <Text style={[styles.trackKmLabel, { color: "#8e44ad" }]}>Km Giro Ideale</Text>
+                </View>
+                <Text style={[styles.trackKmValue, { color: "#8e44ad" }]}>{telemetryStats.ideal_lap_km.toFixed(1)} km</Text>
+              </View>
+            )}
             <TouchableOpacity
               style={styles.settingRow}
               activeOpacity={0.7}
@@ -400,8 +381,6 @@ const styles = StyleSheet.create({
   trackKmRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingTop: 8, borderTopWidth: 1, borderTopColor: Colors.border },
   trackKmLabel: { fontSize: 12, fontFamily: "Inter_600SemiBold", color: "#e67e22" },
   trackKmValue: { fontSize: 13, fontFamily: "Inter_700Bold", color: "#e67e22" },
-  expandHint: { flexDirection: "row", alignItems: "center", gap: 5, paddingTop: 8, borderTopWidth: 1, borderTopColor: Colors.border },
-  expandHintText: { flex: 1, fontSize: 11, fontFamily: "Inter_500Medium", color: Colors.textSecondary },
   telemetryExpanded: { borderTopWidth: 1, borderTopColor: Colors.border, paddingTop: 12, gap: 10 },
   telemetryExpandedHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   telemetryExpandedTitle: { fontSize: 13, fontFamily: "Inter_600SemiBold", color: Colors.text },
