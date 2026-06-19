@@ -353,6 +353,29 @@ fi
 echo "════════════════════════════════════════"
 echo ""
 
+# ── GATE STRESS RACE AVVIO METRO ─────────────────────────────
+# Test deterministico (start-expo mockato) che prova in modo ripetibile che il
+# guardiano (cerbero.sh / cerbero-lib.sh) e clean-metro-restart.sh NON uccidano
+# mai un Metro in avvio né rimuovano un lock attivo (/tmp/start-metro.lock).
+# Blocca la regressione silenziosa della race se watchdog/clean-metro vengono
+# modificati. Vedi .agents/memory/metro-startup-race.md.
+echo "════════════════════════════════════════"
+echo "  Gate stress race avvio Metro"
+echo "════════════════════════════════════════"
+METRO_RACE_EXIT=0
+bash scripts/__tests__/metro-startup-race.test.sh 2>&1 || METRO_RACE_EXIT=$?
+if [ "$METRO_RACE_EXIT" -eq 0 ]; then
+  echo "✅ Stress race avvio Metro: gate verde."
+else
+  echo "❌ Stress race avvio Metro FALLITO (exit ${METRO_RACE_EXIT}) — watchdog/clean-metro potrebbero uccidere un Metro in avvio."
+  echo "   Eseguire 'bash scripts/__tests__/metro-startup-race.test.sh' localmente per i dettagli."
+  echo "════════════════════════════════════════"
+  echo ""
+  exit "$METRO_RACE_EXIT"
+fi
+echo "════════════════════════════════════════"
+echo ""
+
 # ── CLEANUP UTENTI SMOKE RESIDUI POST-MERGE ──────────────────
 echo "════════════════════════════════════════"
 echo "  Cleanup utenti smoke residui"

@@ -12,9 +12,12 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
-METRO_PORT=8081
-METRO_LOCK_FILE="/tmp/start-metro.lock"
-METRO_CACHE_KEY_FILE="/tmp/.metro-cache-key"
+# Override possibile via env (default invariati in produzione) — usato dai test
+# di stress race in scripts/__tests__/metro-startup-race.test.sh per restare
+# isolati (lock temporaneo + porta libera) senza toccare il Metro reale.
+METRO_PORT="${METRO_PORT:-8081}"
+METRO_LOCK_FILE="${METRO_LOCK_FILE:-/tmp/start-metro.lock}"
+METRO_CACHE_KEY_FILE="${METRO_CACHE_KEY_FILE:-/tmp/.metro-cache-key}"
 # FORCE_RESET=1 → pulizia profonda + expo --reset-cache (lento, ~minuti).
 # Default (0) → fast clean: solo .expo/ e .metro-cache/ (~3s), riuso cache Metro
 # → la porta 8081 si apre in fretta e il workflow non scade in DIDNT_OPEN_A_PORT.
