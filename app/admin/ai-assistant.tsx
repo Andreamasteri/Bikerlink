@@ -35,6 +35,32 @@ interface TelemetrySummary {
   tipsShown: number;
 }
 
+// Combina le due risposte per-piattaforma dell'endpoint admin ({ platform,
+// config }) in un unico AdminConfig { android, ios }. La GET admin restituisce
+// UNA piattaforma per volta, quindi ogni risposta espone la propria `config`.
+// Mappare la config sbagliata sulla piattaforma sbagliata, o restituire un
+// oggetto senza `android`/`ios`, faceva diventare `cur` undefined → spinner
+// infinito (schermata bianca). Esportata per essere coperta da test.
+export function combineAssistantAdminConfig(
+  android: { config: PlatformConfig },
+  ios: { config: PlatformConfig },
+): { config: AdminConfig } {
+  return { config: { android: android.config, ios: ios.config } };
+}
+
+// Costruisce le richieste PUT di salvataggio: una per piattaforma, con la
+// config di piattaforma come body DIRETTO (non wrappato in { config }). Il
+// server PUT salva una piattaforma per volta e si aspetta il body grezzo;
+// wrapparlo in { config } salverebbe una struttura errata. Esportata per test.
+export function buildAssistantSaveRequests(
+  cfg: AdminConfig,
+): Array<{ platform: Platform; body: PlatformConfig }> {
+  return [
+    { platform: "android", body: cfg.android },
+    { platform: "ios", body: cfg.ios },
+  ];
+}
+
 export default function AiAssistantAdminScreen() {
   const insets = useSafeAreaInsets();
   const qc = useQueryClient();
@@ -52,7 +78,7 @@ export default function AiAssistantAdminScreen() {
         apiRequest("GET", "/api/admin/ai/assistant/config?platform=android").then((r) => r.json()),
         apiRequest("GET", "/api/admin/ai/assistant/config?platform=ios").then((r) => r.json()),
       ]);
-      return { config: { android: android.config, ios: ios.config } };
+      return combineAssistantAdminConfig(android, ios);
     },
     staleTime: 15_000,
   });
@@ -74,8 +100,9 @@ export default function AiAssistantAdminScreen() {
     mutationFn: async (cfg: AdminConfig) => {
       // L'endpoint PUT salva UNA piattaforma per volta: il body è la config di
       // piattaforma (non { config }) e la piattaforma va nel query param.
-      await apiRequest("PUT", "/api/admin/ai/assistant/config?platform=android", cfg.android);
-      await apiRequest("PUT", "/api/admin/ai/assistant/config?platform=ios", cfg.ios);
+      for (const { platform, body } of buildAssistantSaveRequests(cfg)) {
+        await apiRequest("PUT", `/api/admin/ai/assistant/config?platform=${platform}`, body);
+      }
       return { ok: true };
     },
     onSuccess: () => {
