@@ -16,11 +16,16 @@
  *    venga passato come header Authorization al manifest fetch.
  */
 
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 // ── helpers ────────────────────────────────────────────────────────────────
-/** Drena la coda delle microtask e i Promise già risolti. */
-const flushPromises = () => new Promise<void>((resolve) => setTimeout(resolve, 20));
+// Il check OTA Step B aspetta che l'app sia interattiva (waitUntilInteractive:
+// InteractionManager.runAfterInteractions + OTA_STARTUP_DELAY_MS = 4s) prima di
+// toccare EAS o chiamare reloadAsync. Con i fake timers avanziamo oltre quel
+// ritardo per far completare il flusso, drenando le microtask tra i timer.
+const OTA_STARTUP_DELAY_MS = 4000;
+/** Avanza i timer oltre il gate "interactive" e drena le microtask in mezzo. */
+const flushPromises = () => vi.advanceTimersByTimeAsync(OTA_STARTUP_DELAY_MS + 1000);
 
 // ── mock: expo-updates ─────────────────────────────────────────────────────
 const checkForUpdateAsync = vi.hoisted(() => vi.fn());
@@ -37,8 +42,18 @@ vi.mock("expo-updates", () => ({
 }));
 
 // ── mock: react-native ─────────────────────────────────────────────────────
+// InteractionManager.runAfterInteractions pianifica il callback su un
+// setTimeout(0) controllato dai fake timers: combinato con il successivo
+// OTA_STARTUP_DELAY_MS questo rende osservabile il gate "interactive" del
+// check OTA Step B (deve attendere prima di toccare EAS / reloadAsync).
 vi.mock("react-native", () => ({
   Platform: { OS: "ios" },
+  InteractionManager: {
+    runAfterInteractions: (cb: () => void) => {
+      const id = setTimeout(cb, 0);
+      return { cancel: () => clearTimeout(id) };
+    },
+  },
 }));
 
 // ── mock: expo-device ─────────────────────────────────────────────────────
@@ -109,6 +124,9 @@ function makeNotOkFetch() {
 
 // ── setup ──────────────────────────────────────────────────────────────────
 beforeEach(() => {
+  // Fake timers: il gate "interactive" (runAfterInteractions + delay 4s) e i
+  // setTimeout interni (boot_success 8s) sono così controllabili e deterministici.
+  vi.useFakeTimers();
   vi.clearAllMocks();
 
   // Valori di default per i mock di expo-updates
@@ -126,6 +144,35 @@ beforeEach(() => {
   asyncStorageGetItem.mockResolvedValue(null);
   asyncStorageSetItem.mockResolvedValue(undefined);
   asyncStorageRemoveItem.mockResolvedValue(undefined);
+});
+
+afterEach(() => {
+  vi.useRealTimers();
+});
+
+// ══════════════════════════════════════════════════════════════════════════
+// Test 0 — Step B aspetta che l'app sia interattiva prima di toccare EAS
+//          (anti-crash cold start: niente check/fetch/reload durante lo splash).
+// ══════════════════════════════════════════════════════════════════════════
+describe("useOtaAutoUpdate — Step B aspetta 'interactive' prima di EAS/reload", () => {
+  it("non contatta manifest/EAS prima dello scadere del ritardo interactive", async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue(makeManifestResponse({ status: "approved" }));
+    checkForUpdateAsync.mockResolvedValue({ isAvailable: false });
+
+    useOtaAutoUpdate(true);
+
+    // Fa girare runAfterInteractions (setTimeout 0) ma NON il ritardo di 4s:
+    // a questo punto il check OTA non deve ancora aver toccato la rete o EAS.
+    await vi.advanceTimersByTimeAsync(0);
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+    expect(checkForUpdateAsync).not.toHaveBeenCalled();
+    expect(reloadAsync).not.toHaveBeenCalled();
+
+    // Allo scadere del ritardo interactive il flusso riprende e contatta EAS.
+    await vi.advanceTimersByTimeAsync(OTA_STARTUP_DELAY_MS + 100);
+    expect(globalThis.fetch).toHaveBeenCalledTimes(1);
+    expect(checkForUpdateAsync).toHaveBeenCalledTimes(1);
+  });
 });
 
 // ══════════════════════════════════════════════════════════════════════════

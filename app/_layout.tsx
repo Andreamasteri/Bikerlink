@@ -2,7 +2,7 @@ import { Stack, useRouter } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import React, { useEffect, useRef, useState } from "react";
 import { getApiUrl } from "@/lib/query-client";
-import { Platform, ActivityIndicator, View, Text, StyleSheet } from "react-native";
+import { Platform, View, Text, StyleSheet } from "react-native";
 import NativeUpdateChecker from "@/components/NativeUpdateChecker";
 import MatchPopupAlert from "@/components/MatchPopupAlert";
 import UpdateNudgeModal from "@/components/UpdateNudgeModal";
@@ -15,12 +15,11 @@ import { useUptimeWidget } from "@/lib/uptime-widget-context";
 
 import { useLocationGate } from "@/lib/location-context";
 import { useLanguage } from "@/lib/language-context";
-import { useMapConfig } from "@/lib/map-context";
 import { useTheme } from "@/lib/theme-context";
 import UptimeWidget from "@/components/UptimeWidget";
 import FloatingWidget from "@/components/FloatingWidget";
 import { sendStartupBeacon } from "@/lib/startup-beacon";
-import { loadTelemetryAlwaysActive } from "@/lib/telemetry-prefs";
+import { MapReadyGate } from "@/components/layout/MapReadyGate";
 import {
   stopBackgroundLocationTask,
 } from "@/lib/background-location-task";
@@ -99,55 +98,6 @@ function StartupGate({ ready, children }: { ready: boolean; children: React.Reac
     }
   }, [ready]);
   if (!ready) return null;
-  return <>{children}</>;
-}
-
-function MapReadyGate({ children }: { children: React.ReactNode }) {
-  const { user } = useAuth();
-  const { isLoading } = useMapConfig();
-  const { colors } = useTheme();
-  const beaconState = useRef<string>("");
-  // Anti-blocco: se la config mappe tarda troppo, sblocchiamo comunque la UI in
-  // stato degradato. map-context ha già default sicuri (tile di fallback), quindi
-  // l'app resta usabile invece di restare appesa sul loader al cold start.
-  const [forcePass, setForcePass] = useState(false);
-
-  useEffect(() => {
-    sendStartupBeacon("map_ready_gate_enter", { hasUser: !!user, mapLoading: isLoading });
-    // Idrata la preferenza "Telemetria sempre attiva" al bootstrap così che il
-    // kill-switch venga rispettato/ignorato in modo coerente già dai primi eventi.
-    void loadTelemetryAlwaysActive();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  useEffect(() => {
-    if (user && isLoading) {
-      if (beaconState.current !== "loading") {
-        beaconState.current = "loading";
-        sendStartupBeacon("map_ready_gate_loading");
-      }
-    } else if (beaconState.current !== "pass") {
-      beaconState.current = "pass";
-      sendStartupBeacon("map_ready_gate_pass", { hasUser: !!user });
-    }
-  }, [user, isLoading]);
-
-  useEffect(() => {
-    if (!user || !isLoading || forcePass) return;
-    const timeout = setTimeout(() => {
-      sendStartupBeacon("map_ready_gate_timeout");
-      setForcePass(true);
-    }, 6000);
-    return () => clearTimeout(timeout);
-  }, [user, isLoading, forcePass]);
-
-  if (user && isLoading && !forcePass) {
-    return (
-      <View style={[styles.mapGateLoader, { backgroundColor: colors.background }]}>
-        <ActivityIndicator size="large" color={colors.primary} />
-      </View>
-    );
-  }
   return <>{children}</>;
 }
 
@@ -310,14 +260,6 @@ export default function RootLayout() {
   );
 }
 
-
-const styles = StyleSheet.create({
-  mapGateLoader: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-});
 
 const revocationBannerStyles = StyleSheet.create({
   banner: {
