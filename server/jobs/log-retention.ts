@@ -66,6 +66,13 @@ const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 const FIVE_DAYS_MS = 5 * ONE_DAY_MS;
 const INITIAL_DELAY_MS = 2 * 60 * 1000;
 
+// notification_history non è una tabella drizzle (è creata via SQL raw in
+// boot-phase3-db-init.ts), quindi ha un purge dedicato con SQL grezzo. La
+// finestra di retention è configurabile tramite AppSetting (default 60gg,
+// range consigliato 30-90gg) per non avere la soglia hardcoded.
+const NOTIFICATION_HISTORY_RETENTION_KEY = "notification_history_retention_days";
+const NOTIFICATION_HISTORY_DEFAULT_RETENTION = 60;
+
 async function countOlderThan(target: RetentionTarget, cutoff: Date): Promise<number> {
   const [row] = await withDbRetry(`[log-retention:${target.name}]`, () =>
     db
@@ -120,6 +127,41 @@ export async function runOneTimeGpsErrorsPurge(): Promise<void> {
   }
 }
 
+// Purge di notification_history (tabella raw SQL, non drizzle). La retention
+// è letta dall'AppSetting `notification_history_retention_days`; se assente o
+// non valida ricade sul default. Usa la colonna indicizzata created_at.
+async function purgeNotificationHistory(): Promise<number> {
+  let retentionDays = NOTIFICATION_HISTORY_DEFAULT_RETENTION;
+  try {
+    const setting = await storage.getAppSetting(NOTIFICATION_HISTORY_RETENTION_KEY);
+    if (setting?.value) {
+      const parsed = parseInt(setting.value, 10);
+      if (!isNaN(parsed) && parsed > 0) retentionDays = parsed;
+    }
+  } catch {
+    // usa il default
+  }
+
+  const cutoff = new Date(Date.now() - retentionDays * ONE_DAY_MS);
+  try {
+    const result = await withDbRetry("[log-retention:notification_history]", () =>
+      db.execute(sql`
+        DELETE FROM notification_history WHERE created_at < ${cutoff}
+      `),
+    );
+    const deleted = (result as { rowCount?: number }).rowCount ?? 0;
+    if (deleted > 0) {
+      console.log(
+        `[LOG-RETENTION] notification_history: rimosse ${deleted} righe più vecchie di ${retentionDays}gg`,
+      );
+    }
+    return deleted;
+  } catch (err) {
+    console.warn("[LOG-RETENTION] Errore purge notification_history:", err);
+    return 0;
+  }
+}
+
 export async function runLogRetention(): Promise<void> {
   await runOneTimeGpsErrorsPurge();
   let totalDeleted = 0;
@@ -130,6 +172,7 @@ export async function runLogRetention(): Promise<void> {
       console.warn(`[LOG-RETENTION] Errore purge ${target.name}:`, err);
     }
   }
+  totalDeleted += await purgeNotificationHistory();
   console.log(`[LOG-RETENTION] Completato — totale righe rimosse: ${totalDeleted}`);
 }
 

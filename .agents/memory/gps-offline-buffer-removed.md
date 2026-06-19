@@ -36,3 +36,9 @@ a 7 giorni — nel job di retention sono allineati a 7gg come safety net, non ab
 o si rischia di cancellare dati che il watchdog si aspetta. Il purge una-tantum TOTALE di `gps_errors`
 è gated dal flag AppSetting `logRetention.gpsErrorsPurgedV1` ed esegue delete+set-flag nella stessa
 transazione (atomico) per non ripetersi cancellando di continuo la telemetria.
+
+**Eccezione `notification_history`:** NON è una tabella drizzle (creata via SQL raw in
+`boot-phase3-db-init.ts`), quindi non può stare in `RETENTION_TARGETS`. Ha un purge dedicato
+`purgeNotificationHistory()` con DELETE SQL grezza su `created_at`; soglia configurabile via
+AppSetting `notification_history_retention_days` (default 60gg) — stesso pattern di
+`ai_audit_retention_days` in vacuum-service.ts.
