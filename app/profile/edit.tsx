@@ -31,6 +31,7 @@ import { EditPreferences } from "@/components/profile/edit/EditPreferences";
 import { EditAssistantPrefs } from "@/components/profile/edit/EditAssistantPrefs";
 import { EditTags } from "@/components/profile/edit/EditTags";
 import { useEditProfileMutations } from "@/hooks/useEditProfileMutations";
+import { useFloatingWidget } from "@/lib/floating-widget-context";
 
 interface ProfileData {
   id: string;
@@ -136,6 +137,14 @@ export default function EditProfileScreen() {
     deletePhotoMutation,
     requestDeletionMutation,
   } = useEditProfileMutations();
+
+  const { enabled: widgetEnabled, setEnabled: setWidgetEnabled, isUpdating: isUpdatingWidget } = useFloatingWidget();
+
+  const { data: adminWidgetData } = useQuery<{ enabled: boolean }>({
+    queryKey: ["/api/settings/floating-widget"],
+    staleTime: 60_000,
+  });
+  const adminWidgetEnabled = adminWidgetData?.enabled !== false;
 
   const uploadPhotoMutation = useMutation({
     mutationFn: async ({ uri, replacePhotoId }: { uri: string; replacePhotoId?: string }) => {
@@ -401,6 +410,10 @@ export default function EditProfileScreen() {
           setLanguage={setLanguage}
           showLanguageDropdown={showLanguageDropdown}
           setShowLanguageDropdown={setShowLanguageDropdown}
+          widgetEnabled={widgetEnabled}
+          onToggleWidget={setWidgetEnabled}
+          adminWidgetEnabled={adminWidgetEnabled}
+          isUpdatingWidget={isUpdatingWidget}
           handleDeleteAccount={handleDeleteAccount}
           setShowRevokeConsentModal={setShowRevokeConsentModal}
         />

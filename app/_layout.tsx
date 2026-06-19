@@ -18,6 +18,7 @@ import { useLanguage } from "@/lib/language-context";
 import { useMapConfig } from "@/lib/map-context";
 import { useTheme } from "@/lib/theme-context";
 import UptimeWidget from "@/components/UptimeWidget";
+import FloatingWidget from "@/components/FloatingWidget";
 import { sendStartupBeacon } from "@/lib/startup-beacon";
 import { loadTelemetryAlwaysActive } from "@/lib/telemetry-prefs";
 import {
@@ -302,6 +303,7 @@ export default function RootLayout() {
           <MatchPopupAlert />
           <UpdateNudgeWrapper />
           <AssistantOnboardingTour />
+          <FloatingWidget />
         </MapReadyGate>
       </StartupGate>
     </RootProviders>
