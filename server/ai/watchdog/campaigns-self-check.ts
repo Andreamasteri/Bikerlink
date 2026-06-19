@@ -12,6 +12,7 @@ import { logAiUsage } from "../audit";
 import { uploadBuffer, deleteObject, objectExists } from "../../objectStorage";
 import { getInternalProbeToken, getInternalProbeHeaderName, getInternalProbeModeratorHeaderName } from "./internal-token";
 import { storage } from "../../storage";
+import { cleanupOrphanAdImages } from "../../ads/cleanup-orphan-images";
 
 export type CheckStatus = "ok" | "warn" | "error";
 export type OverallStatus = "ok" | "degraded" | "broken";
@@ -406,6 +407,34 @@ export async function runCampaignsSelfCheck(opts: RunSelfCheckOpts): Promise<Cam
         if (r.status !== 200) throw new Error(`status ${r.status} body=${r.body.slice(0, 200)}`);
         return { message: "update ok" };
       }));
+    }
+
+    // 13. Pulizia periodica immagini pubblicitarie orfane su Object Storage.
+    //     A questo punto la campagna probe admin è già stata eliminata (step 9)
+    //     e la sua immagine pubblica rimossa (step 10); la campagna moderatore
+    //     non ha immagine. Quindi la sweep non tocca file della probe in corso.
+    //     Step non bloccante: errori parziali → warn, sweep saltata → warn.
+    {
+      const cleanupStart = Date.now();
+      try {
+        const res = await cleanupOrphanAdImages();
+        const msg = res.skipped
+          ? `sweep saltata: ${res.reason}`
+          : `${res.scanned} file scansionati, ${res.orphans} orfani, ${res.deleted} eliminati, ${res.errors} errori`;
+        checks.push({
+          name: "cleanup_orphan_ad_images",
+          status: res.skipped || res.errors > 0 ? "warn" : "ok",
+          durationMs: Date.now() - cleanupStart,
+          message: msg,
+        });
+      } catch (err) {
+        checks.push({
+          name: "cleanup_orphan_ad_images",
+          status: "warn",
+          durationMs: Date.now() - cleanupStart,
+          message: `cleanup fallito (non bloccante): ${(err as Error)?.message?.slice(0, 300)}`,
+        });
+      }
     }
 
   } finally {
