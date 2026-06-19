@@ -376,6 +376,28 @@ fi
 echo "════════════════════════════════════════"
 echo ""
 
+# ── GATE STRESS RACE AVVIO BACKEND ───────────────────────────
+# Test deterministico (start-backend mockato) che prova in modo ripetibile che il
+# guardiano (cerbero.sh / cerbero-lib.sh) NON riavvii mai un backend che sta
+# inizializzando (503 {status:initializing}) o il cui start-backend.sh è attivo.
+# Blocca la regressione silenziosa della race se cerbero.sh viene modificato.
+echo "════════════════════════════════════════"
+echo "  Gate stress race avvio Backend"
+echo "════════════════════════════════════════"
+BACKEND_RACE_EXIT=0
+bash scripts/__tests__/backend-startup-race.test.sh 2>&1 || BACKEND_RACE_EXIT=$?
+if [ "$BACKEND_RACE_EXIT" -eq 0 ]; then
+  echo "✅ Stress race avvio Backend: gate verde."
+else
+  echo "❌ Stress race avvio Backend FALLITO (exit ${BACKEND_RACE_EXIT}) — cerbero potrebbe riavviare un backend in fase di init."
+  echo "   Eseguire 'bash scripts/__tests__/backend-startup-race.test.sh' localmente per i dettagli."
+  echo "════════════════════════════════════════"
+  echo ""
+  exit "$BACKEND_RACE_EXIT"
+fi
+echo "════════════════════════════════════════"
+echo ""
+
 # ── CLEANUP UTENTI SMOKE RESIDUI POST-MERGE ──────────────────
 echo "════════════════════════════════════════"
 echo "  Cleanup utenti smoke residui"
