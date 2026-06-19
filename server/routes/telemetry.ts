@@ -117,10 +117,14 @@ router.post("/batch", async (req: Request, res: Response) => {
     const rows: typeof rideTelemetry.$inferInsert[] = [];
     for (const s of samples as RawSample[]) {
       const ts = typeof s.ts === "number" ? s.ts : Number(s.ts);
-      const lat = typeof s.lat === "number" ? s.lat : Number(s.lat);
-      const lon = typeof s.lon === "number" ? s.lon : Number(s.lon);
+      const latNum = typeof s.lat === "number" ? s.lat : Number(s.lat);
+      const lonNum = typeof s.lon === "number" ? s.lon : Number(s.lon);
 
-      if (!Number.isFinite(ts) || !Number.isFinite(lat) || !Number.isFinite(lon)) continue;
+      // ts is mandatory; lat/lon are optional (sensor-only samples have no GPS fix).
+      if (!Number.isFinite(ts)) continue;
+
+      const lat = Number.isFinite(latNum) ? latNum : null;
+      const lon = Number.isFinite(lonNum) ? lonNum : null;
 
       rows.push({
         userId,
@@ -152,7 +156,7 @@ router.post("/batch", async (req: Request, res: Response) => {
         userId,
         sessionId: session_id,
       });
-      return sendError(res, 400, "Nessun campione valido (ts, lat, lon obbligatori per ogni campione)");
+      return sendError(res, 400, "Nessun campione valido (ts obbligatorio; lat/lon opzionali per campioni sensor-only)");
     }
 
     const CHUNK = 500;
@@ -190,7 +194,7 @@ router.post("/batch", async (req: Request, res: Response) => {
         ts: new Date().toISOString(),
         type: "WARN",
         context: "telemetry/batch",
-        message: `Campioni scartati (ts/lat/lon non validi) — received=${received} valid=${rows.length} discarded=${discarded}`,
+        message: `Campioni scartati (ts non valido) — received=${received} valid=${rows.length} discarded=${discarded}`,
         userId,
         sessionId: session_id,
       });

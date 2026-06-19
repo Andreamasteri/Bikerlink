@@ -34,6 +34,15 @@ const STOP_DURATION_MS  = 60000; // speed < 15 km/h for >60s continuous (strictl
 const GPS_INTERVAL_MS   = 2000;
 const ACCEL_INTERVAL_MS = 2000;
 
+// ─── Accelerometer-only fallback (no GPS) ─────────────────────────────────────
+// When GPS permission is denied or the location subscription fails we cannot use
+// speed, so motion is inferred from accelerometer variance instead.
+const FALLBACK_INTERVAL_MS       = 500;    // sample/eval rate while in fallback
+const ACCEL_WINDOW               = 6;      // ~3s of samples at 500 ms
+const ACCEL_VARIANCE_THRESHOLD_G = 0.3;    // mean |magnitude − mean| above this = motion
+const FALLBACK_START_DURATION_MS = 3000;   // sustained motion for ≥3s → riding
+const FALLBACK_STOP_DURATION_MS  = 60000;  // sustained stillness for >60s → stopped
+
 // ─── Mount orientation check ──────────────────────────────────────────────────
 // The calibrated vertAxis should carry the majority of the gravity signal when
 // the phone is seated in the mount.  We require it to contribute at least 50%
@@ -67,6 +76,7 @@ export function useMotorcycleDetector({ enabled, relaxedMode = false }: Options)
 
   const locationSubRef       = useRef<Location.LocationSubscription | null>(null);
   const accelSubRef          = useRef<ReturnType<typeof Accelerometer.addListener> | null>(null);
+  const fallbackTimerRef     = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const resetTimers = useCallback(() => {
     aboveStartAtRef.current = null;
@@ -78,7 +88,67 @@ export function useMotorcycleDetector({ enabled, relaxedMode = false }: Options)
     locationSubRef.current = null;
     accelSubRef.current?.remove();
     accelSubRef.current = null;
+    if (fallbackTimerRef.current) {
+      clearInterval(fallbackTimerRef.current);
+      fallbackTimerRef.current = null;
+    }
     resetTimers();
+  }, [resetTimers]);
+
+  // ── accelerometer-only motion detection (used when GPS is unavailable) ──────
+  // Infers motion from the variance of the accelerometer magnitude: a still
+  // phone reads a near-constant ~1g, while a moving motorcycle adds vibration
+  // and acceleration that raise the spread. Reuses the same sustained-duration
+  // start/stop hysteresis as the GPS path.
+  const startAccelFallback = useCallback(() => {
+    if (fallbackTimerRef.current) return; // already running
+    // Faster accelerometer updates so the 500 ms variance window is meaningful.
+    Accelerometer.setUpdateInterval(FALLBACK_INTERVAL_MS);
+    const magWindow: number[] = [];
+    resetTimers();
+
+    fallbackTimerRef.current = setInterval(() => {
+      const { x, y, z } = accelRef.current;
+      const mag = Math.sqrt(x * x + y * y + z * z);
+      magWindow.push(mag);
+      if (magWindow.length > ACCEL_WINDOW) magWindow.shift();
+
+      const mean = magWindow.reduce((a, b) => a + b, 0) / magWindow.length;
+      let spread = 0;
+      for (const m of magWindow) spread += Math.abs(m - mean);
+      spread /= magWindow.length;
+
+      const now    = Date.now();
+      const moving = magWindow.length >= 2 && spread > ACCEL_VARIANCE_THRESHOLD_G;
+
+      if (!isRidingRef.current) {
+        if (moving) {
+          if (aboveStartAtRef.current === null) {
+            aboveStartAtRef.current = now;
+          } else if (now - aboveStartAtRef.current >= FALLBACK_START_DURATION_MS) {
+            isRidingRef.current     = true;
+            setIsRiding(true);
+            aboveStartAtRef.current = null;
+            belowStopAtRef.current  = null;
+          }
+        } else {
+          aboveStartAtRef.current = null;
+        }
+      } else {
+        if (!moving) {
+          if (belowStopAtRef.current === null) {
+            belowStopAtRef.current = now;
+          } else if (now - belowStopAtRef.current > FALLBACK_STOP_DURATION_MS) {
+            isRidingRef.current     = false;
+            setIsRiding(false);
+            belowStopAtRef.current  = null;
+            aboveStartAtRef.current = null;
+          }
+        } else {
+          belowStopAtRef.current = null;
+        }
+      }
+    }, FALLBACK_INTERVAL_MS);
   }, [resetTimers]);
 
   // ── Sync relaxedRef whenever the prop changes (immediate, no restart needed) ─
@@ -104,17 +174,25 @@ export function useMotorcycleDetector({ enabled, relaxedMode = false }: Options)
       if (cancelled) return;
       calibRef.current = calib;
 
-      const { status } = await Location.getForegroundPermissionsAsync();
-      if (status !== "granted" || cancelled) return;
-
-      // Accelerometer at 2 Hz — keeps latest reading for orientation check
+      // Accelerometer at 2 Hz — keeps latest reading for orientation check and
+      // doubles as the source for the accelerometer-only fallback below.
       Accelerometer.setUpdateInterval(ACCEL_INTERVAL_MS);
       accelSubRef.current = Accelerometer.addListener((data) => {
         accelRef.current = data;
       });
 
+      const { status } = await Location.getForegroundPermissionsAsync();
+      if (cancelled) return;
+      if (status !== "granted") {
+        // GPS permission denied → infer motion from accelerometer variance only.
+        startAccelFallback();
+        return;
+      }
+
       // GPS at 2 Hz — primary speed signal
-      const sub = await Location.watchPositionAsync(
+      let sub: Location.LocationSubscription;
+      try {
+        sub = await Location.watchPositionAsync(
         {
           accuracy:         Location.Accuracy.Balanced,
           timeInterval:     GPS_INTERVAL_MS,
@@ -161,7 +239,13 @@ export function useMotorcycleDetector({ enabled, relaxedMode = false }: Options)
             }
           }
         }
-      );
+        );
+      } catch (err) {
+        // GPS subscription failed → fall back to accelerometer-only detection.
+        console.warn("[useMotorcycleDetector] GPS subscription failed, using accelerometer fallback", err);
+        if (!cancelled) startAccelFallback();
+        return;
+      }
 
       if (cancelled) {
         sub.remove();

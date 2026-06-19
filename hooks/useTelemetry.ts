@@ -13,6 +13,7 @@ import {
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const SAMPLE_INTERVAL_MS  = 1000;   // 1 Hz
+const GPS_SILENCE_MS      = 5000;   // no GPS fix for this long → record sensor-only
 const FLUSH_INTERVAL_MS   = 30_000; // periodic flush every 30 s (was 90 s)
 const FLUSH_MIN_SAMPLES   = 5;      // min samples before a periodic flush fires (was 50)
 const FLUSH_MAX_SAMPLES   = 200;    // hard cap — flush immediately at this count
@@ -23,8 +24,8 @@ const UNSENT_PREFIX = "@bikerlink/telemetry_unsent_";
 // ─── Types ────────────────────────────────────────────────────────────────────
 export interface TelemetrySample {
   ts:          number;
-  lat:         number;
-  lon:         number;
+  lat:         number | null;
+  lon:         number | null;
   speed_kmh?:  number;
   lean_angle?: number;
   gforce_x?:   number;
@@ -80,6 +81,12 @@ export function useTelemetry(isActive: boolean, externalGps = false) {
   const locationSubRef = useRef<Location.LocationSubscription | null>(null);
   const accelSubRef    = useRef<ReturnType<typeof Accelerometer.addListener> | null>(null);
   const flushTimerRef  = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Independent 1 Hz timer that records sensor-only samples when GPS is silent.
+  const sensorTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Last known GPS fix coords — reused when no fresh fix is available.
+  const lastKnownLocRef = useRef<{ lat: number; lon: number } | null>(null);
+  // Timestamp (ms) of the most recent GPS fix, used to detect GPS silence.
+  const lastGpsTsRef    = useRef<number>(0);
   const isFlushing      = useRef(false);
   const activeRef       = useRef(false); // mirrors isActive without re-render closure issues
   const inBackgroundRef = useRef(false); // true while background task is handling collection
@@ -152,6 +159,10 @@ export function useTelemetry(isActive: boolean, externalGps = false) {
     if (flushTimerRef.current) {
       clearInterval(flushTimerRef.current);
       flushTimerRef.current = null;
+    }
+    if (sensorTimerRef.current) {
+      clearInterval(sensorTimerRef.current);
+      sensorTimerRef.current = null;
     }
     if (locationSubRef.current) {
       locationSubRef.current.remove();
@@ -236,6 +247,10 @@ export function useTelemetry(isActive: boolean, externalGps = false) {
     const { latitude, longitude, altitude, speed, heading } = loc.coords;
     const accel = accelRef.current;
 
+    // Remember this fix so sensor-only samples can reuse the last known coords.
+    lastKnownLocRef.current = { lat: latitude, lon: longitude };
+    lastGpsTsRef.current    = Date.now();
+
     const sample: TelemetrySample = {
       ts:  loc.timestamp,
       lat: latitude,
@@ -257,6 +272,23 @@ export function useTelemetry(isActive: boolean, externalGps = false) {
     sample.lean_angle = calcLeanAngle(accel.x, accel.z);
 
     return sample;
+  }, []);
+
+  // ── build a sensor-only sample (no fresh GPS fix) ─────────────────────────
+  // Uses the last known GPS coords if any (else null) + current accelerometer.
+  const buildSensorSample = useCallback((): TelemetrySample => {
+    const accel = accelRef.current;
+    const last  = lastKnownLocRef.current;
+
+    return {
+      ts:        Date.now(),
+      lat:       last ? last.lat : null,
+      lon:       last ? last.lon : null,
+      gforce_x:  accel.x,
+      gforce_y:  accel.y,
+      gforce_z:  accel.z,
+      lean_angle: calcLeanAngle(accel.x, accel.z),
+    };
   }, []);
 
   // ── accept an externally-provided location update ─────────────────────────
@@ -307,11 +339,24 @@ export function useTelemetry(isActive: boolean, externalGps = false) {
       }
     }
 
+    // Independent 1 Hz sensor timer — guarantees sensor data is always recorded
+    // even when GPS is silent (tunnel, lost signal, permission denied). If a GPS
+    // fix arrived within the last GPS_SILENCE_MS the GPS path already produced a
+    // richer sample, so we skip to avoid duplicates.
+    sensorTimerRef.current = setInterval(() => {
+      if (!activeRef.current || inBackgroundRef.current) return;
+      if (Date.now() - lastGpsTsRef.current <= GPS_SILENCE_MS) return;
+      bufferRef.current.push(buildSensorSample());
+      if (bufferRef.current.length >= FLUSH_MAX_SAMPLES) {
+        flush(true);
+      }
+    }, SAMPLE_INTERVAL_MS);
+
     // Periodic min-gated flush
     flushTimerRef.current = setInterval(() => {
       flush(false); // respects FLUSH_MIN_SAMPLES
     }, FLUSH_INTERVAL_MS);
-  }, [flush, buildSample]);
+  }, [flush, buildSample, buildSensorSample]);
 
   // ── drain samples persisted by a previous failed stopSession flush ────────
   // Runs at session start so no data is permanently stranded.
@@ -366,6 +411,10 @@ export function useTelemetry(isActive: boolean, externalGps = false) {
     inBackgroundRef.current = false;
     sessionIdRef.current = makeUUID();
     bufferRef.current    = [];
+    // Reset GPS fallback state so a new session never reuses the previous
+    // session's last fix — sensor-only samples must be null until a fresh fix.
+    lastKnownLocRef.current = null;
+    lastGpsTsRef.current    = 0;
 
     // Drain any samples persisted from a previous failed stopSession flush.
     // Fire before startForegroundSubs so auth is more likely valid.
