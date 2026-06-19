@@ -414,6 +414,9 @@ export async function runCampaignsSelfCheck(opts: RunSelfCheckOpts): Promise<Cam
     //     e la sua immagine pubblica rimossa (step 10); la campagna moderatore
     //     non ha immagine. Quindi la sweep non tocca file della probe in corso.
     //     Step non bloccante: errori parziali → warn, sweep saltata → warn.
+    //     Se gli orfani trovati superano la soglia configurabile
+    //     `ads_orphan_alert_threshold` (default 10), viene emesso un segnale
+    //     "high" al proposer AI per segnalare un possibile bug a monte.
     {
       const cleanupStart = Date.now();
       try {
@@ -427,6 +430,24 @@ export async function runCampaignsSelfCheck(opts: RunSelfCheckOpts): Promise<Cam
           durationMs: Date.now() - cleanupStart,
           message: msg,
         });
+
+        // Persiste il risultato della sweep come AppSetting (valueJson) in modo
+        // che il collector del watchdog aggregator possa leggerlo al prossimo
+        // tick e, se gli orfani superano la soglia, emettere un segnale "high"
+        // visibile al proposer AI.
+        if (!res.skipped) {
+          await storage.upsertAppSetting(
+            "ads_orphan_last_cleanup",
+            undefined,
+            { scanned: res.scanned, orphans: res.orphans, deleted: res.deleted, errors: res.errors, runAt: new Date().toISOString() },
+          );
+          if (res.orphans > 0) {
+            // Log immediato; il segnale formale arriva dall'aggregator al tick successivo.
+            console.warn(
+              `[campaigns-self-check] ${res.orphans} immagini orfane trovate — il collector watchdog emetterà il segnale se supera la soglia configurabile.`,
+            );
+          }
+        }
       } catch (err) {
         checks.push({
           name: "cleanup_orphan_ad_images",

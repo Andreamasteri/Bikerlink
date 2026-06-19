@@ -46,6 +46,61 @@ async function collectDbIntegritySignals(): Promise<Signal[]> {
   }
 }
 
+// Collector per immagini pubblicitarie orfane. Legge il risultato dell'ultimo
+// run di cleanupOrphanAdImages (persistito come AppSetting "ads_orphan_last_cleanup"
+// dalla campaigns-self-check) e confronta il conteggio degli orfani con la soglia
+// configurabile "ads_orphan_alert_threshold" (default 10). Se superata, emette un
+// segnale "high" che il proposer AI leggerà al prossimo tick.
+//
+// Edge-trigger: il segnale è emesso solo una volta per ogni run di cleanup
+// (identificato da "runAt"). Se il collector viene richiamato tra un cleanup e
+// l'altro, i dati stantii non riproducono il segnale, evitando proposer spam.
+let lastAdsOrphanAlertedRunAt: string | null = null;
+
+async function collectAdsOrphanSignals(): Promise<Signal[]> {
+  try {
+    const lastCleanup = await storage.getAppSetting("ads_orphan_last_cleanup");
+    if (!lastCleanup?.valueJson) return [];
+    const data = lastCleanup.valueJson as {
+      scanned?: number; orphans?: number; deleted?: number; errors?: number; runAt?: string;
+    };
+    const orphans = typeof data.orphans === "number" ? data.orphans : 0;
+    const runAt = data.runAt ?? null;
+
+    if (orphans <= 0) return [];
+
+    const thresholdSetting = await storage.getAppSetting("ads_orphan_alert_threshold");
+    const threshold = thresholdSetting?.value
+      ? Math.max(1, parseInt(thresholdSetting.value, 10) || 10)
+      : 10;
+    if (orphans <= threshold) return [];
+
+    // Deduplication: non emettere lo stesso run più di una volta.
+    if (runAt && runAt === lastAdsOrphanAlertedRunAt) return [];
+    lastAdsOrphanAlertedRunAt = runAt;
+
+    return [{
+      source: "app",
+      metric: "ads_orphan_images_high_count",
+      value: orphans,
+      unit: "files",
+      severity: "high",
+      details: {
+        scanned: data.scanned ?? null,
+        orphans,
+        deleted: data.deleted ?? null,
+        errors: data.errors ?? null,
+        threshold,
+        runAt,
+        hint: "Possibile bug a monte nel guard upload o nella cancellazione parziale delle campagne pubblicitarie.",
+      },
+    }];
+  } catch (err) {
+    return [{ source: "app", metric: "collector.error", severity: "warn",
+      details: { collector: "ads-orphan", error: (err as Error).message?.slice(0, 200) } }];
+  }
+}
+
 async function collectEmbeddingSignals(): Promise<Signal[]> {
   try {
     const setting = await storage.getAppSetting("embedding_daily_report");
@@ -191,6 +246,10 @@ function deriveProblems(signals: Signal[]): Problem[] {
     } else if (s.metric === "db.pool.collector.error") {
       title = `Errore probe pool DB`;
       suggestion = "Verifica che pool sia correttamente inizializzato e accessibile dal collector.";
+    } else if (s.metric === "ads_orphan_images_high_count") {
+      const det = s.details as { orphans?: number; threshold?: number; runAt?: string } | undefined;
+      title = `Immagini pubblicitarie orfane: ${s.value} file trovati (soglia: ${det?.threshold ?? 10})`;
+      suggestion = "Possibile bug a monte nel guard upload o nella cancellazione parziale delle campagne. Verifica cleanup-orphan-images e il flusso di cancellazione campagna.";
     } else if (s.metric === "server.restart_alert") {
       const count = s.value ?? 1;
       const det = s.details as { minutesSinceLast?: number; latestAt?: string } | undefined;
@@ -235,6 +294,7 @@ export async function runAggregatorCycle(): Promise<HealthSnapshot> {
     collectDbIntegritySignals(), collectMaps(),
     collectEmbeddingSignals(), collectRestarts(),
     Promise.resolve(collectPool()),
+    collectAdsOrphanSignals(),
   ]);
   const signals: Signal[] = [];
   for (const r of collectors) {
