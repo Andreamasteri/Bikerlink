@@ -353,6 +353,28 @@ fi
 echo "════════════════════════════════════════"
 echo ""
 
+# ── GATE TEST HOOK AVVIO (useAppBootstrap / useOtaAutoUpdate) ────────────────
+# Blocca regressioni sui timeout di cold-start e OTA update: qualsiasi modifica
+# agli hook di avvio (useAppBootstrap, useOtaAutoUpdate) viene verificata prima
+# del merge. Senza questo gate, un errore nei timeout di boot passerebbe
+# inosservato perché hooks/__tests__/ non era in nessun gate bloccante.
+echo "════════════════════════════════════════"
+echo "  Gate test hook di avvio (hooks/__tests__)"
+echo "════════════════════════════════════════"
+HOOKS_TEST_EXIT=0
+npx vitest run hooks/__tests__ 2>&1 || HOOKS_TEST_EXIT=$?
+if [ "$HOOKS_TEST_EXIT" -eq 0 ]; then
+  echo "✅ Hook tests: useAppBootstrap + useOtaAutoUpdate OK."
+else
+  echo "❌ Hook tests FALLITI (exit ${HOOKS_TEST_EXIT}) — verificare hooks/__tests__/ prima di procedere."
+  echo "   Eseguire 'npx vitest run hooks/__tests__' localmente per i dettagli."
+  echo "════════════════════════════════════════"
+  echo ""
+  exit "$HOOKS_TEST_EXIT"
+fi
+echo "════════════════════════════════════════"
+echo ""
+
 # ── GATE STRESS RACE AVVIO METRO ─────────────────────────────
 # Test deterministico (start-expo mockato) che prova in modo ripetibile che il
 # guardiano (cerbero.sh / cerbero-lib.sh) e clean-metro-restart.sh NON uccidano
