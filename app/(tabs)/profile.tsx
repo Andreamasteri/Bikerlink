@@ -96,6 +96,7 @@ export default function ProfileScreen() {
     km_collected: number;
     sample_count: number;
     session_count: number;
+    sensor_only_count?: number;
     progress_pct: number;
     target_km: number;
     track_km: number;

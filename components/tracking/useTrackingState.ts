@@ -288,6 +288,8 @@ export function useTrackingState() {
       currentSpeed: gps.currentSpeed, gpsAccuracy: gps.gpsAccuracy, gpsLost: gps.gpsLost,
       totalKm: gps.totalKm, maxSpeed: gps.maxSpeed, maxAltitude: gps.maxAltitude,
       mapCoords: gps.mapCoords, currentCoord: gps.currentCoord,
+      gpsBlackoutCount: gps.gpsBlackoutCountRef.current,
+      gpsBlackoutSeconds: Math.floor(gps.gpsBlackoutSecondsRef.current / 1000),
       totalMs: stats.totalMs, displayIdleMs: stats.displayIdleMs,
       currentG: sensors.currentG, currentLateralG: sensors.currentLateralG, currentTiltDeg: sensors.currentTiltDeg,
       maxAccelG: sensors.maxAccelG, maxDecelG: sensors.maxDecelG, maxLateralG: sensors.maxLateralG, maxTiltDeg: sensors.maxTiltDeg,

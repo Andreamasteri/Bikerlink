@@ -32,6 +32,7 @@ type TelemetryStats = {
   km_collected: number;
   sample_count: number;
   session_count: number;
+  sensor_only_count?: number;
   progress_pct: number;
   target_km: number;
   track_km: number;
@@ -145,6 +146,15 @@ export default function TelemetryPanel({ telemetryStats }: Props) {
             {telemetryStats.session_count} {telemetryStats.session_count === 1 ? "sessione" : "sessioni"}
           </Text>
         </View>
+        {(telemetryStats.sensor_only_count ?? 0) > 0 && (
+          <View style={styles.trackKmRow}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
+              <Ionicons name="warning-outline" size={13} color={Colors.warning} />
+              <Text style={[styles.trackKmLabel, { color: Colors.warning }]}>{"Campioni senza GPS"}</Text>
+            </View>
+            <Text style={[styles.trackKmValue, { color: Colors.warning }]}>{telemetryStats.sensor_only_count}</Text>
+          </View>
+        )}
         {telemetryStats.track_km > 0 && (
           <View style={styles.trackKmRow}>
             <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>

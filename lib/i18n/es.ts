@@ -1128,6 +1128,8 @@ const es: Record<string, string> = {
   "tracking.gpsBlackoutLabel": "Señal GPS perdida",
   "tracking.gpsBlackoutTimes": "veces",
   "tracking.gpsBlackoutTotal": "en total",
+  "tracking.sensorOnlyIncluded": "datos de sensor registrados incluso sin GPS",
+  "tracking.sensorOnlyRow": "Muestras sin GPS",
   "tracking.exportGpxError": "No se pudo exportar la ruta. Inténtalo de nuevo.",
   "ready.privacy.title": "Privacidad",
   "ready.privacy.visibleOnMap": "Eres visible en el mapa",

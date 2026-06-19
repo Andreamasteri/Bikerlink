@@ -1119,6 +1119,8 @@ const tr: Record<string, string> = {
   "tracking.gpsBlackoutLabel": "GPS sinyali kayboldu",
   "tracking.gpsBlackoutTimes": "kez",
   "tracking.gpsBlackoutTotal": "toplam",
+  "tracking.sensorOnlyIncluded": "GPS olmasa bile sensör verileri kaydedildi",
+  "tracking.sensorOnlyRow": "GPS'siz örnekler",
   "tracking.exportGpxError": "Rota dışa aktarılamadı. Lütfen tekrar deneyin.",
   "ready.privacy.title": "Gizlilik",
   "ready.privacy.visibleOnMap": "Haritada görünüyorsun",

@@ -44,6 +44,8 @@ interface SummaryModalProps {
   onSave: () => void;
   onDelete: () => void;
   patchFailed?: boolean;
+  gpsBlackoutCount?: number;
+  gpsBlackoutSeconds?: number;
   t: (key: string) => string;
 }
 
@@ -73,6 +75,8 @@ export function SummaryModal({
   onSave,
   onDelete,
   patchFailed = false,
+  gpsBlackoutCount = 0,
+  gpsBlackoutSeconds = 0,
   t
 }: SummaryModalProps) {
   const [countdown, setCountdown] = useState(AUTO_SAVE_SECONDS);
@@ -247,6 +251,14 @@ export function SummaryModal({
                   />
                   <View style={[styles.statCardPlaceholder, { opacity: 0 }]} />
                 </View>
+                {gpsBlackoutCount > 0 && (
+                  <View style={styles.sensorOnlyBadge}>
+                    <Ionicons name="warning-outline" size={13} color={Colors.warning} />
+                    <Text style={styles.sensorOnlyBadgeText}>
+                      {t("tracking.gpsBlackoutLabel")}: {gpsBlackoutCount} {t("tracking.gpsBlackoutTimes")} ({gpsBlackoutSeconds} s {t("tracking.gpsBlackoutTotal")}) — {t("tracking.sensorOnlyIncluded")}
+                    </Text>
+                  </View>
+                )}
               </>
             )}
             {is0100Enabled && sprint0to100Ms !== null && (
@@ -553,5 +565,24 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     fontSize: 15,
     fontFamily: "Inter_600SemiBold"
-  }
+  },
+  sensorOnlyBadge: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 6,
+    backgroundColor: Colors.warning + "12",
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: Colors.warning + "35",
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    marginTop: 2,
+  },
+  sensorOnlyBadgeText: {
+    flex: 1,
+    fontSize: 11,
+    fontFamily: "Inter_400Regular",
+    color: Colors.warning,
+    lineHeight: 15,
+  },
 });

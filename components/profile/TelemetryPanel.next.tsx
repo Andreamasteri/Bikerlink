@@ -36,6 +36,7 @@ import { GateDots } from "./TelemetryGateDots";
 import { AutoRidingIndicator } from "./TelemetryAutoIndicator";
 import { SavedLapsSection } from "./TelemetrySavedLaps";
 import { useLocalSearchParams } from "expo-router";
+import { useT } from "@/lib/language-context";
 
 if (Platform.OS === "android" && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -47,6 +48,7 @@ type TelemetryStats = {
   km_collected: number;
   sample_count: number;
   session_count: number;
+  sensor_only_count?: number;
   progress_pct: number;
   target_km: number;
   track_km: number;
@@ -56,6 +58,7 @@ type TelemetryStats = {
 type Props = { telemetryStats: TelemetryStats };
 
 export default function TelemetryPanel({ telemetryStats }: Props) {
+  const t = useT();
   const { isAutoRiding, isCalibrated: ctxCalibrated, alwaysActive: ctxAlwaysActive } = useAutoTelemetry();
   const { focusTelemetry } = useLocalSearchParams<{ focusTelemetry?: string }>();
   const router = useRouter();
@@ -223,6 +226,16 @@ export default function TelemetryPanel({ telemetryStats }: Props) {
         {/* ── Contenuto espanso ── */}
         {telemetryExpanded && (
           <View style={styles.telemetryExpanded}>
+            {(telemetryStats.sensor_only_count ?? 0) > 0 && (
+              <View style={styles.trackKmRow}>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
+                  <Ionicons name="warning-outline" size={13} color={Colors.warning} />
+                  <Text style={[styles.trackKmLabel, { color: Colors.warning }]}>{t("tracking.sensorOnlyRow")}</Text>
+                </View>
+                <Text style={[styles.trackKmValue, { color: Colors.warning }]}>{telemetryStats.sensor_only_count}</Text>
+              </View>
+            )}
+
             {telemetryStats.track_km > 0 && (
               <View style={styles.trackKmRow}>
                 <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>

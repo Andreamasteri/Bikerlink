@@ -1223,6 +1223,8 @@ const it: Record<string, string> = {
   "tracking.gpsBlackoutLabel": "Segnale GPS perso",
   "tracking.gpsBlackoutTimes": "volte",
   "tracking.gpsBlackoutTotal": "totali",
+  "tracking.sensorOnlyIncluded": "dati sensore registrati anche senza GPS",
+  "tracking.sensorOnlyRow": "Campioni senza GPS",
   "tracking.exportGpxError": "Impossibile esportare il percorso. Riprova.",
   "tracking.gLateral": "G laterale",
   "tracking.gLong": "G long.",

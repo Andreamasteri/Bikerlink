@@ -1118,6 +1118,8 @@ const el: Record<string, string> = {
   "tracking.gpsBlackoutLabel": "Σήμα GPS χάθηκε",
   "tracking.gpsBlackoutTimes": "φορές",
   "tracking.gpsBlackoutTotal": "συνολικά",
+  "tracking.sensorOnlyIncluded": "δεδομένα αισθητήρα καταγράφηκαν ακόμα και χωρίς GPS",
+  "tracking.sensorOnlyRow": "Δείγματα χωρίς GPS",
   "tracking.exportGpxError": "Αδύνατη εξαγωγή διαδρομής. Δοκίμασε ξανά.",
   "ready.privacy.title": "Απόρρητο",
   "ready.privacy.visibleOnMap": "Είσαι ορατός/ή στον χάρτη",

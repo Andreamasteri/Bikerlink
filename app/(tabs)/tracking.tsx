@@ -279,6 +279,8 @@ function TrackingScreenInner() {
         showMyRoute={state.showMyRoute}
         summaryRoutePoints={state.summaryRoutePoints}
         setRouteMapVisible={handlers.setRouteMapVisible}
+        gpsBlackoutCount={state.gpsBlackoutCount}
+        gpsBlackoutSeconds={state.gpsBlackoutSeconds}
         patchFailed={state.summaryPatchFailed}
         onSave={async () => {
           if (state.completedRouteId) {

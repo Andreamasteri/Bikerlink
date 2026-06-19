@@ -226,15 +226,17 @@ router.get("/stats", async (req: Request, res: Response) => {
     const statsResult = await db.execute(sql`
       SELECT
         COUNT(*) AS sample_count,
-        COUNT(DISTINCT session_id) AS session_count
+        COUNT(DISTINCT session_id) AS session_count,
+        COUNT(*) FILTER (WHERE lat IS NULL AND lon IS NULL) AS sensor_only_count
       FROM ride_telemetry
       WHERE user_id = ${userId}
         AND session_type NOT IN ('ideal_lap')
     `);
 
-    const row = statsResult.rows[0] as { sample_count: string; session_count: string } | undefined;
+    const row = statsResult.rows[0] as { sample_count: string; session_count: string; sensor_only_count: string } | undefined;
     const sampleCount = parseInt(row?.sample_count ?? "0", 10);
     const sessionCount = parseInt(row?.session_count ?? "0", 10);
+    const sensorOnlyCount = parseInt(row?.sensor_only_count ?? "0", 10);
     logTelemetryEvent({
       ts: new Date().toISOString(),
       type: sampleCount === 0 ? "WARN" : "INFO",
@@ -353,6 +355,7 @@ router.get("/stats", async (req: Request, res: Response) => {
       km_collected: kmCollected,
       sample_count: sampleCount,
       session_count: sessionCount,
+      sensor_only_count: sensorOnlyCount,
       progress_pct: progressPct,
       target_km: TARGET_KM,
       track_km: trackKm,
