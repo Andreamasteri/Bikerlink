@@ -50,11 +50,25 @@ app.get("/api/metrics", (_req: Request, res: Response) => {
   });
 });
 
-// Task #2789 — Gate: 503 su /api/* mentre initState.initializing=true.
-// Eccezioni: /api/health (initializing-aware) e /api/metrics (montato sopra, fuori gate).
+// Task #2789 / #4455 — Gate: 503 su /api/* mentre initState.initializing=true.
+// Eccezioni:
+//   • /api/health (initializing-aware) e /api/metrics (montato sopra, fuori gate).
+//   • rotte auth essenziali (login, me, logout): appena le migration sono
+//     applicate (initState.dbReady=true) lo schema + la tabella session sono
+//     pronti, quindi queste rotte leggere possono procedere senza attendere la
+//     fine dell'intero boot. Così l'utente non vede "Server occupato" durante
+//     la finestra di init di una nuova istanza autoscale. Il DB circuit breaker
+//     sottostante continua a proteggere se il DB è davvero down.
+const INIT_ESSENTIAL_PATHS = new Set<string>([
+  "/auth/login",
+  "/auth/me",
+  "/auth/logout",
+]);
 app.use("/api", (req: Request, res: Response, next) => {
   if (!initState.initializing) return next();
   if (req.path === "/health") return next();
+  if (initState.dbReady && INIT_ESSENTIAL_PATHS.has(req.path)) return next();
+  res.setHeader("Retry-After", "3");
   return res.status(503).json({ status: "initializing", initializing: true });
 });
 

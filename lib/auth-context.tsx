@@ -7,6 +7,7 @@ import { sendStartupBeacon } from "@/lib/startup-beacon";
 import {
   queryClient,
   apiRequest,
+  apiRequestWithInitRetry,
   getApiUrl,
   setSessionToken,
   clearSessionToken,
@@ -81,7 +82,10 @@ interface AuthContextValue {
 function useLoginMutation() {
   return useMutation({
     mutationFn: async (data: { identifier: string; password: string; latitude?: number; longitude?: number; platform?: string }) => {
-      const res = await apiRequest("POST", "/api/auth/login", { ...data, platform: Platform.OS });
+      // apiRequestWithInitRetry ritenta in modo trasparente sui 503 di init/boot
+      // (ServerBusyError) rispettando il Retry-After, così durante la finestra di
+      // avvio di una nuova istanza l'utente non vede "Server occupato".
+      const res = await apiRequestWithInitRetry("POST", "/api/auth/login", { ...data, platform: Platform.OS });
       try {
         return await res.json();
       } catch {

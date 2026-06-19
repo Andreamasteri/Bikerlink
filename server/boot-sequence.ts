@@ -105,6 +105,10 @@ export async function runBootSequence(server: Server, errorHandlersReady: Promis
   try {
     await withPhaseTimeout("Migrations", runMigrations(), MIGRATION_TIMEOUT_MS);
     bootLog(2, TOTAL, "Migrations", "done");
+    // Schema + tabella session pronti: il gate /api/* può ora lasciar passare
+    // le rotte auth essenziali (login, me, logout) anche se initializing=true,
+    // così gli utenti non vedono "Server occupato" durante la finestra di boot.
+    initState.dbReady = true;
   } catch (err) {
     console.error("[startup] FATAL — Migrations failed, aborting:", err);
     process.exit(1);

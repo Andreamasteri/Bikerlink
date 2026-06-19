@@ -206,6 +206,41 @@ export async function apiRequest(
   return res;
 }
 
+/**
+ * Task #4455 — Variante di apiRequest che ritenta in modo trasparente sui 503
+ * transitori di init/boot (ServerBusyError). Durante la finestra di init di una
+ * nuova istanza autoscale il gate /api/* risponde 503 con Retry-After; invece di
+ * mostrare subito "Server occupato" all'utente, riproviamo qualche volta
+ * rispettando il Retry-After. Tutti gli altri errori (incluso AiKeyMissingError)
+ * vengono propagati immediatamente. Usato dal login (auth-context).
+ */
+export async function apiRequestWithInitRetry(
+  method: string,
+  route: string,
+  data?: unknown,
+  opts?: { maxRetries?: number; maxTotalMs?: number },
+): Promise<Response> {
+  const maxRetries = opts?.maxRetries ?? 5;
+  const maxTotalMs = opts?.maxTotalMs ?? 20000;
+  const start = Date.now();
+  let attempt = 0;
+  for (;;) {
+    try {
+      return await apiRequest(method, route, data);
+    } catch (err) {
+      const canRetry =
+        err instanceof ServerBusyError &&
+        attempt < maxRetries &&
+        Date.now() - start < maxTotalMs;
+      if (!canRetry) throw err;
+      // Retry-After è in secondi; clamp 1–5s per non bloccare troppo la UI.
+      const waitMs = Math.min(Math.max(err.retryAfter, 1), 5) * 1000;
+      await new Promise((resolve) => setTimeout(resolve, waitMs));
+      attempt++;
+    }
+  }
+}
+
 type UnauthorizedBehavior = "returnNull" | "throw";
 export const getQueryFn: <T>(options: {
   on401: UnauthorizedBehavior;
