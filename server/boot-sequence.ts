@@ -180,12 +180,27 @@ export async function runBootSequence(server: Server, errorHandlersReady: Promis
       needsFakeSeed = true;
     }
 
-    await withPhaseTimeout("autoSeedEssentialUsers", autoSeedEssentialUsers());
-    await withPhaseTimeout("seedAppleReviewerAccount", seedAppleReviewerAccount());
-    await withPhaseTimeout("seedGooglePlayReviewerAccount", seedGooglePlayReviewerAccount());
-    await withPhaseTimeout("ensureBikerLinkOfficialOnBoot", ensureBikerLinkOfficialOnBoot());
-    await withPhaseTimeout("seedTranslationKeys", seedTranslationKeys());
-    await withPhaseTimeout("seedTagsAtStartup", seedTagsAtStartup());
+    const isDeployedProd = process.env.REPLIT_DEPLOYMENT === "1";
+    if (!skipSeed || !isDeployedProd) {
+      await withPhaseTimeout("autoSeedEssentialUsers", autoSeedEssentialUsers(), 90_000);
+    } else {
+      console.log("[INIT] Phase 4: skipSeed=true in production — skipping autoSeedEssentialUsers");
+    }
+    await withPhaseTimeout("ensureBikerLinkOfficialOnBoot", ensureBikerLinkOfficialOnBoot(), 90_000);
+
+    for (const [name, fn] of [
+      ["seedAppleReviewerAccount", seedAppleReviewerAccount()],
+      ["seedGooglePlayReviewerAccount", seedGooglePlayReviewerAccount()],
+      ["seedTranslationKeys", seedTranslationKeys()],
+      ["seedTagsAtStartup", seedTagsAtStartup()],
+    ] as [string, Promise<unknown>][]) {
+      try {
+        await withPhaseTimeout(name, fn, 60_000);
+      } catch (e) {
+        console.warn(`[INIT] Phase 4: ${name} failed (non-fatal):`, e);
+      }
+    }
+
     await withPhaseTimeout("seedMotoclubs", seedMotoclubs(), 60_000);
     await withPhaseTimeout("seedClubMembershipsOnBoot", seedClubMembershipsOnBoot(), 60_000);
     startMatchingEngine();
