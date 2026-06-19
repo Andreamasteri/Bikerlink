@@ -9,6 +9,9 @@ export interface AdminUser {
   email: string;
   phone?: string;
   userType: string;
+  sex?: "M" | "F" | null;
+  birthYear?: number | null;
+  region?: string | null;
   role: string;
   status: string;
   createdAt: string;

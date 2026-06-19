@@ -77,9 +77,9 @@ export const UserEditModal: React.FC<UserEditModalProps> = ({
   useEffect(() => {
     if (user && visible) {
       setEditUserType((user.userType as "biker" | "zavorrina" | "coppia") || "biker");
-      setEditSex(null);
-      setEditBirthYearStr("");
-      setEditRegion("");
+      setEditSex(user.sex === "M" || user.sex === "F" ? user.sex : null);
+      setEditBirthYearStr(user.birthYear != null ? String(user.birthYear) : "");
+      setEditRegion(user.region ?? "");
       setDirty({ userType: false, sex: false, birthYear: false, region: false });
     }
   }, [user, visible]);
