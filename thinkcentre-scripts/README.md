@@ -57,14 +57,39 @@ persistente al reboot).
 | `99.sh`   | **Boot check**: riavvia Valhalla (serve-only) e Nominatim dopo un reboot |
 | `diag-system.sh` | **Diagnostica sistema post-crash**: RAM, swap, disco, carico CPU, container Docker, temperatura CPU |
 | `diag-build.sh`  | **Diagnostica build post-crash**: causa del crash, conteggio errori, durata, ultime righe log, stato container |
+| `recover.sh`     | **Recovery guidato post-crash**: esegue entrambe le diagnostiche, interpreta i `[FAIL]` e propone/esegue le azioni correttive passo-passo |
 
 ---
 
-## Diagnostica post-crash
+## Recovery guidato
 
-Da eseguire dopo un crash o un'interruzione inattesa della build Valhalla.
+Il modo più rapido per riprendersi da un crash è usare `recover.sh`, che esegue
+automaticamente entrambe le diagnostiche, interpreta i `[FAIL]` e guida passo-passo
+verso il ripristino:
 
-Ordine consigliato:
+```bash
+./recover.sh                        # legge /tmp/valhalla-build.log (default)
+./recover.sh /tmp/altro-log.log    # log alternativo
+```
+
+Lo script:
+1. Esegue `diag-system.sh` (RAM, swap, disco, CPU, Docker, temperatura)
+2. Esegue `diag-build.sh` (causa crash, errori, durata, ultime righe)
+3. Interpreta tutti i `[FAIL]` rilevati e propone le azioni correttive:
+   - **Swap assente/insufficiente** → offre di eseguire `./swap.sh`
+   - **Docker non in esecuzione** → offre di eseguire `sudo systemctl start docker`
+   - **Crash critico** (double free, SIGABRT, container terminato con errore) → offre di eseguire `./03.sh` per pulire tiles e log
+   - **Spazio disco critico** → mostra suggerimenti manuali
+4. Chiede conferma esplicita prima di ogni azione distruttiva (`03.sh`)
+5. Al termine, offre di eseguire `./04.sh` per il check pre-build
+
+Usa gli stessi prefissi `[OK]` / `[WARN]` / `[FAIL]` / `[INFO]` degli altri script.
+
+---
+
+## Diagnostica manuale post-crash
+
+Se preferisci eseguire le diagnostiche singolarmente senza azioni guidate:
 
 ```
 diag-system.sh   ← fotografia dello stato del sistema (RAM, swap, disco, CPU, Docker)
