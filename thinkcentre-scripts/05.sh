@@ -57,14 +57,14 @@ echo "[>] Avvio build in screen '$SCREEN_NAME'..."
 echo "[>] Log: $LOG"
 echo ""
 
-# --shm-size=8g: alzato per i 16 GB. Valhalla usa /dev/shm per i file temporanei
+# --shm-size=16g: alzato per i 32 GB. Valhalla usa /dev/shm per i file temporanei
 # delle fasi di parsing/enhancer; uno shm più capiente riduce la pressione su /tmp.
 # NOTA concurrency: l'immagine ghcr.io/gis-ops/docker-valhalla NON espone una env
 # per ridurre i thread di build (la concurrency è hardcoded in valhalla.json,
 # generato dall'entrypoint). La mitigazione universale dei picchi RAM è quindi lo
 # SWAP capiente su SSD (vedi ./swap.sh e il check in 04.sh), non la concurrency.
 screen -dmS "$SCREEN_NAME" bash -c "
-  docker run --rm --name $CONTAINER --shm-size=8g \
+  docker run --rm --name $CONTAINER --shm-size=16g \
     -v \"$VALHALLA_DATA_DIR:/custom_files\" \
     -p $VALHALLA_PORT:8002 \
     -e use_tiles_ignore_pbf=False \

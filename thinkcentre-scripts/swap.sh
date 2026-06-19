@@ -1,29 +1,29 @@
 #!/usr/bin/env bash
-# swap — crea/verifica uno swapfile capiente su SSD per la build Valhalla Europa su 16 GB
+# swap — crea/verifica uno swapfile capiente su SSD per la build Valhalla Europa su 32 GB
 #
-# La build Europa (blocco unico) ha picchi RAM oltre i 16 GB nelle fasi di parsing
-# iniziale e graphenhancer: senza swap il kernel uccide il container (OOM-kill) a
-# metà build. Valhalla usa file memory-mapped, quindi su SSD lo swap degrada in modo
-# graceful: la build completa, accettando un rallentamento tollerabile.
+# La build Europa (blocco unico) ha picchi RAM elevati nelle fasi di parsing
+# iniziale e graphenhancer. Su 32 GB di RAM lo swap è una rete di sicurezza
+# consigliata (non obbligatoria): Valhalla usa file memory-mapped, quindi su SSD
+# lo swap degrada in modo graceful se i picchi superano la RAM fisica.
 #
 # Idempotente: se lo swapfile esiste già della dimensione giusta non lo ricrea.
 set -euo pipefail
 
 SWAP_FILE="${SWAP_FILE:-/swapfile}"
-SWAP_SIZE_GB="${SWAP_SIZE_GB:-40}"   # target consigliato 32–48 GB
-MIN_SWAP_GB="${MIN_SWAP_GB:-32}"
+SWAP_SIZE_GB="${SWAP_SIZE_GB:-16}"   # target consigliato 16 GB (scenario 32 GB)
+MIN_SWAP_GB="${MIN_SWAP_GB:-8}"
 
 ok()   { echo "[OK]   $1"; }
 warn() { echo "[WARN] $1"; }
 fail() { echo "[FAIL] $1"; }
 
-echo "=== SWAPFILE PER BUILD VALHALLA EUROPA (scenario 16 GB) ==="
+echo "=== SWAPFILE PER BUILD VALHALLA EUROPA (scenario 32 GB) ==="
 echo ""
 
 # sudo helper (gli altri script usano sudo inline; qui idem)
 if [ "$(id -u)" -eq 0 ]; then SUDO=""; else SUDO="sudo"; fi
 
-# Valida la dimensione richiesta (32–48 GB)
+# Valida la dimensione richiesta (>= MIN_SWAP_GB)
 if [ "$SWAP_SIZE_GB" -lt "$MIN_SWAP_GB" ]; then
   warn "SWAP_SIZE_GB=${SWAP_SIZE_GB} è sotto il minimo consigliato (${MIN_SWAP_GB} GB). Lo alzo a ${MIN_SWAP_GB} GB."
   SWAP_SIZE_GB="$MIN_SWAP_GB"

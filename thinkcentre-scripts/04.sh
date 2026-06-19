@@ -5,7 +5,7 @@ PBF="$HOME/valhalla/data/europe-latest.osm.pbf"
 TILES="$HOME/valhalla/data/valhalla_tiles"
 MIN_PBF_GB=1
 MIN_DISK_GB=80
-MIN_SWAP_GB=32   # swap minimo per la build Europa su 16 GB (evita OOM-kill)
+MIN_SWAP_GB=8    # swap minimo per la build Europa su 32 GB (rete di sicurezza)
 
 ok()   { echo "[OK]   $1"; }
 warn() { echo "[WARN] $1"; }
@@ -60,7 +60,7 @@ else
   warn "Spazio disco libero: ${DISK_FREE_GB} GB — consigliati almeno ${MIN_DISK_GB} GB per Europe. Procedi con cautela."
 fi
 
-# 6. RAM totale (scenario target: i5-14400 16 GB)
+# 6. RAM totale (scenario target: i5-14400 32 GB)
 RAM_GB=$(awk '/MemTotal/{printf "%d", $2/1048576}' /proc/meminfo)
 if [ "$RAM_GB" -ge 30 ]; then
   ok "RAM totale: ${RAM_GB} GB — abbondante (swap consigliato ma non critico)"
