@@ -149,6 +149,17 @@ export default function FloatingWidget() {
               style={styles.menuItem}
               onPress={() => {
                 setMenuOpen(false);
+                router.push("/(tabs)/tracking" as never);
+              }}
+            >
+              <Ionicons name="speedometer-outline" size={22} color={Colors.accent} />
+              <Text style={styles.menuItemText}>Telemetria live</Text>
+            </Pressable>
+
+            <Pressable
+              style={styles.menuItem}
+              onPress={() => {
+                setMenuOpen(false);
                 router.push("/(tabs)" as never);
               }}
             >

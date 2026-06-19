@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/query-client";
 
 const STORAGE_KEY = "floating_widget_enabled";
@@ -25,16 +25,36 @@ export function FloatingWidgetProvider({ children }: { children: React.ReactNode
   const [enabled, setEnabledState] = useState(true);
   const [suppressed, setSuppressed] = useState(false);
   const mountedRef = useRef(true);
+  const serverHydratedRef = useRef(false);
+  const enabledRef = useRef(true);
 
   useEffect(() => {
     mountedRef.current = true;
     AsyncStorage.getItem(STORAGE_KEY).then((val) => {
       if (mountedRef.current && val !== null) {
-        setEnabledState(val === "true");
+        const parsed = val === "true";
+        setEnabledState(parsed);
+        enabledRef.current = parsed;
       }
     });
     return () => { mountedRef.current = false; };
   }, []);
+
+  const profileQ = useQuery<{ floatingWidgetEnabled?: boolean }>({
+    queryKey: ["/api/users/me"],
+    staleTime: 60_000,
+  });
+
+  useEffect(() => {
+    if (serverHydratedRef.current) return;
+    if (!profileQ.data) return;
+    const serverEnabled = profileQ.data.floatingWidgetEnabled;
+    if (serverEnabled === undefined || serverEnabled === null) return;
+    serverHydratedRef.current = true;
+    setEnabledState(serverEnabled);
+    enabledRef.current = serverEnabled;
+    AsyncStorage.setItem(STORAGE_KEY, serverEnabled ? "true" : "false").catch(() => {});
+  }, [profileQ.data]);
 
   const updateMutation = useMutation({
     mutationFn: async (val: boolean) => {
@@ -48,9 +68,20 @@ export function FloatingWidgetProvider({ children }: { children: React.ReactNode
   });
 
   const setEnabled = useCallback((val: boolean) => {
+    const prev = enabledRef.current;
     setEnabledState(val);
+    enabledRef.current = val;
+    serverHydratedRef.current = true;
     AsyncStorage.setItem(STORAGE_KEY, val ? "true" : "false").catch(() => {});
-    updateMutation.mutate(val);
+    updateMutation.mutate(val, {
+      onError: () => {
+        if (mountedRef.current) {
+          setEnabledState(prev);
+          enabledRef.current = prev;
+          AsyncStorage.setItem(STORAGE_KEY, prev ? "true" : "false").catch(() => {});
+        }
+      },
+    });
   }, [updateMutation]);
 
   const suppressWidget = useCallback((val: boolean) => {
