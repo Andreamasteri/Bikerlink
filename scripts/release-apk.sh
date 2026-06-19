@@ -60,10 +60,9 @@ echo "      strings.xml  expo_runtime_version = ${RUNTIME_VERSION}"
 
 # ── 3. Aggiorna constants/buildInfo.ts ────────────────────
 # RELEASE_NUMBER e RUNTIME_VERSION sono derivati a runtime da app.json — non serve aggiornarli.
-# Aggiorniamo solo OTA_BUNDLED_COUNT e APPLIED_OTA_NUMBER.
+# Aggiorniamo solo APPLIED_OTA_NUMBER.
 echo "[3/5] Aggiornamento constants/buildInfo.ts..."
 sed -i.bak \
-  -e "s/export const OTA_BUNDLED_COUNT = [0-9]*/export const OTA_BUNDLED_COUNT = ${OTA_BUNDLED}/" \
   -e "s/export const APPLIED_OTA_NUMBER.*$/export const APPLIED_OTA_NUMBER: number | null = null;/" \
   constants/buildInfo.ts
 rm -f constants/buildInfo.ts.bak

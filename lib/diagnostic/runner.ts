@@ -282,10 +282,10 @@ async function testOtaPipeline(isAdmin: boolean): Promise<DiagnosticTestResult[]
   const tests: Array<() => Promise<DiagnosticTestResult>> = [
     () => runTest(section, "Confronto OTA bundled vs applicata", async () => {
       try {
-        const { APPLIED_OTA_NUMBER, OTA_BUNDLED_COUNT } = await import("@/constants/buildInfo");
+        const { APPLIED_OTA_NUMBER } = await import("@/constants/buildInfo");
         const { loadAppliedOtaNumber } = await import("@/lib/otaStorage");
         const stored = await loadAppliedOtaNumber();
-        const bundled = APPLIED_OTA_NUMBER ?? OTA_BUNDLED_COUNT;
+        const bundled = APPLIED_OTA_NUMBER;
         const applied = stored ?? bundled;
         if (bundled !== null && applied !== null && bundled !== applied) {
           return { status: "WARN", message: `Bundled OTA ${bundled} ≠ applicata ${applied}` };
