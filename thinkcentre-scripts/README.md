@@ -55,6 +55,33 @@ persistente al reboot).
 | `swap.sh` | Crea/verifica swapfile su SSD, default 16 GB su 32 GB RAM (idempotente)  |
 | `cpu.sh`  | CPU governor → `performance`, persistente al reboot (riusa la unit systemd) |
 | `99.sh`   | **Boot check**: riavvia Valhalla (serve-only) e Nominatim dopo un reboot |
+| `diag-system.sh` | **Diagnostica sistema post-crash**: RAM, swap, disco, carico CPU, container Docker, temperatura CPU |
+| `diag-build.sh`  | **Diagnostica build post-crash**: causa del crash, conteggio errori, durata, ultime righe log, stato container |
+
+---
+
+## Diagnostica post-crash
+
+Da eseguire dopo un crash o un'interruzione inattesa della build Valhalla.
+
+Ordine consigliato:
+
+```
+diag-system.sh   ← fotografia dello stato del sistema (RAM, swap, disco, CPU, Docker)
+diag-build.sh    ← analisi del log di build (causa crash, errori, durata, ultime 40 righe)
+```
+
+`diag-system.sh` non richiede argomenti. `diag-build.sh` accetta opzionalmente il percorso
+del log come primo argomento (default: `/tmp/valhalla-build.log`):
+
+```bash
+./diag-build.sh                        # legge /tmp/valhalla-build.log
+./diag-build.sh /tmp/altro-log.log    # log alternativo
+```
+
+Entrambi gli script usano i prefissi `[OK]` / `[WARN]` / `[FAIL]` / `[INFO]`.
+Non eseguono repair automatico: servono solo per capire cosa è andato storto.
+Se la causa è OOM-kill, esegui `./swap.sh` prima di ritentare la build.
 
 ---
 
