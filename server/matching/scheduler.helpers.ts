@@ -28,6 +28,77 @@ import { runProposalToProfileMatching } from "./run-profile";
 import { runProposalMatchingForUser, runProposalZoneNotifications } from "./run-proposals";
 import { runMatchingForUser } from "./run-user";
 
+// ─── Per-cycle timeout (Task #4374) ─────────────────────────────────────────
+//
+// Ogni fase di matching (runMatching, runWishlistMatching, runBikerZavorrinaBase,
+// …) può bloccarsi su una query DB lenta o un dataset enorme. Senza un tetto di
+// wall-clock il ciclo terrebbe il lock all'infinito, ritardando tutti i job
+// successivi (cleanup, retry, pruning). withCycleTimeout() corre la fase contro
+// un timer: se scade, la race rigetta con CycleTimeoutError e lo scheduler passa
+// oltre. NB: Promise.race NON interrompe il lavoro sottostante (JS non ha
+// cancellazione hard senza AbortSignal); smette solo di attenderlo.
+
+export const DEFAULT_MATCHING_CYCLE_TIMEOUT_MS = 90_000;
+// Clamp bounds: sotto 1s ogni fase fallirebbe subito; sopra ~30min non ha senso
+// e valori enormi (> ~24.8gg) farebbero overfloware setTimeout → fire immediato.
+const MIN_MATCHING_CYCLE_TIMEOUT_MS = 1_000;
+const MAX_MATCHING_CYCLE_TIMEOUT_MS = 30 * 60 * 1000;
+
+export class CycleTimeoutError extends Error {
+  constructor(
+    public readonly cycleName: string,
+    public readonly elapsedMs: number,
+    public readonly timeoutMs: number,
+  ) {
+    super(`Ciclo "${cycleName}" interrotto per timeout dopo ${elapsedMs}ms (limite ${timeoutMs}ms)`);
+    this.name = "CycleTimeoutError";
+  }
+}
+
+/**
+ * Legge il timeout per-ciclo configurabile da AppSetting `matching_cycle_timeout_ms`.
+ * Valori non numerici o <= 0 ricadono sul default (90s). Best-effort: qualsiasi
+ * errore di lettura ritorna il default senza far fallire il ciclo.
+ */
+export async function getMatchingCycleTimeoutMs(): Promise<number> {
+  try {
+    const setting = await storage.getAppSetting("matching_cycle_timeout_ms");
+    const parsed = setting?.value ? parseInt(setting.value, 10) : NaN;
+    if (Number.isFinite(parsed) && parsed > 0) {
+      // Clamp per evitare valori patologici (overflow setTimeout / fail immediato).
+      return Math.min(MAX_MATCHING_CYCLE_TIMEOUT_MS, Math.max(MIN_MATCHING_CYCLE_TIMEOUT_MS, parsed));
+    }
+  } catch (err) {
+    console.error("[Matching] Errore lettura matching_cycle_timeout_ms — uso default:", err);
+  }
+  return DEFAULT_MATCHING_CYCLE_TIMEOUT_MS;
+}
+
+/**
+ * Esegue `fn` con un tetto di wall-clock. Se scade prima del completamento,
+ * rigetta con CycleTimeoutError(name, elapsed, timeoutMs). Il timer è sempre
+ * ripulito (anche su successo/errore) per non lasciare handle pendenti.
+ */
+export async function withCycleTimeout<T>(
+  name: string,
+  timeoutMs: number,
+  fn: () => Promise<T>,
+): Promise<T> {
+  const start = Date.now();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(
+      () => reject(new CycleTimeoutError(name, Date.now() - start, timeoutMs)),
+      timeoutMs,
+    );
+  });
+  try {
+    return await Promise.race([fn(), timeout]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
 // ─── Cleanup helpers ────────────────────────────────────────────────────────
 
 export async function runCleanup(): Promise<number> {

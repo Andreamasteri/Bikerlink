@@ -41,6 +41,9 @@ import {
   triggerProposalProfileMatchingForZavorrina,
   triggerProposalCreatedMatching,
   triggerMatchingForUser,
+  withCycleTimeout,
+  getMatchingCycleTimeoutMs,
+  CycleTimeoutError,
 } from "./scheduler.helpers";
 
 export { triggerProposalProfileMatchingForZavorrina, triggerProposalCreatedMatching, triggerMatchingForUser };
@@ -137,7 +140,30 @@ export function triggerMatchingRun(): { started: boolean; reason?: string } {
       const autoMatchEnabled = autoMatchSetting?.value !== "false";
 
       if (autoMatchEnabled) {
-        const matches = await recorder.time("proposal_matching", () => runMatching());
+        // Task #4374 — tetto di wall-clock per ogni fase: una query lenta o un
+        // dataset enorme non può più bloccare il ciclo (e il lock) all'infinito.
+        const cycleTimeoutMs = await getMatchingCycleTimeoutMs();
+
+        // Esegue una fase "core" con timeout: su scadenza logga WARN e prosegue
+        // (ritorna 0); gli altri errori propagano al catch cycle_root come prima.
+        const runCorePhase = async (name: string, fn: () => Promise<number>): Promise<number> => {
+          try {
+            return await recorder.time(name, () => withCycleTimeout(name, cycleTimeoutMs, fn));
+          } catch (err) {
+            if (err instanceof CycleTimeoutError) {
+              schedulerLogger.warn(
+                { phase: name, elapsedMs: err.elapsedMs, timeoutMs: cycleTimeoutMs },
+                "phase timed out — aborted, continuing",
+              );
+              addMatchLog("WARN", name, `Fase "${name}" interrotta per timeout dopo ${err.elapsedMs}ms (limite ${cycleTimeoutMs}ms) — proseguo`);
+              void recordCycleError(`${name}_timeout`);
+              return 0;
+            }
+            throw err;
+          }
+        };
+
+        const matches = await runCorePhase("proposal_matching", () => runMatching());
         const propStats = getLastProposalMatchingStats();
         recorder.updateLastPhase({
           candidatesPre: propStats.candidatesPre,
@@ -150,7 +176,7 @@ export function triggerMatchingRun(): { started: boolean; reason?: string } {
           addMatchLog("INFO", "proposal_matching", `Proposte: ${matches} match — candidati: ${propStats.candidatesPre ?? "?"}→${propStats.candidatesPost ?? "?"}`);
         }
 
-        garageMatches = await recorder.time("wishlist_matching", () => runWishlistMatching());
+        garageMatches = await runCorePhase("wishlist_matching", () => runWishlistMatching());
         const wishStats = getLastWishlistMatchingStats();
         recorder.updateLastPhase({
           candidatesPre: wishStats.candidatesPre,
@@ -163,7 +189,7 @@ export function triggerMatchingRun(): { started: boolean; reason?: string } {
           addMatchLog("INFO", "wishlist_matching", `Wishlist/garage: ${garageMatches} match`);
         }
 
-        bikerBikerMatchCount = await recorder.time("biker_biker_matching", () => runBikerBikerMatching());
+        bikerBikerMatchCount = await runCorePhase("biker_biker_matching", () => runBikerBikerMatching());
         totalMatches += bikerBikerMatchCount;
         if (bikerBikerMatchCount > 0) {
           schedulerLogger.info({ bikerBikerMatchCount }, "new biker-biker matches");
@@ -192,7 +218,7 @@ export function triggerMatchingRun(): { started: boolean; reason?: string } {
 
         for (const [name, fn] of safePhases) {
           try {
-            const count = await recorder.time(name, async () => (await fn()) ?? 0);
+            const count = await recorder.time(name, () => withCycleTimeout(name, cycleTimeoutMs, async () => (await fn()) ?? 0));
             if (typeof count === "number" && count > 0) {
               totalMatches += count;
               schedulerLogger.info({ phase: name, count }, "phase produced matches");
@@ -201,6 +227,16 @@ export function triggerMatchingRun(): { started: boolean; reason?: string } {
               void recordMatchesCreated(name, count);
             }
           } catch (err) {
+            if (err instanceof CycleTimeoutError) {
+              // Task #4374 — timeout: WARN (non ERROR) e prosegui col matcher dopo.
+              schedulerLogger.warn(
+                { phase: name, elapsedMs: err.elapsedMs, timeoutMs: cycleTimeoutMs },
+                "phase timed out — aborted, continuing",
+              );
+              addMatchLog("WARN", name, `Fase "${name}" interrotta per timeout dopo ${err.elapsedMs}ms (limite ${cycleTimeoutMs}ms) — proseguo`);
+              void recordCycleError(`${name}_timeout`);
+              continue;
+            }
             schedulerLogger.error({ err, phase: name }, "phase failed (non-blocking)");
             void captureMatchingError(err, { phase: name, trigger: "on-demand" }).then((eid) => {
               addMatchLog("ERROR", name, `Fase fallita: ${err instanceof Error ? err.message : String(err)}`, undefined, eid);
@@ -210,29 +246,38 @@ export function triggerMatchingRun(): { started: boolean; reason?: string } {
         }
 
         try {
-          const fpResult = await runExtractRouteCellsJob();
+          const fpResult = await withCycleTimeout("route_cells", cycleTimeoutMs, () => runExtractRouteCellsJob());
           if (fpResult.usersProcessed > 0) {
             console.log(`[Matching] Route fingerprint aggiornata: ${fpResult.usersProcessed} utenti, ${fpResult.cellsTotal} celle`);
             addMatchLog("INFO", "route_cells", `Route fingerprint: ${fpResult.usersProcessed} utenti, ${fpResult.cellsTotal} celle`);
           }
-          const raCount = await runRouteSimilarityMatching();
+          const raCount = await withCycleTimeout("route_similarity", cycleTimeoutMs, () => runRouteSimilarityMatching());
           if (raCount > 0) {
             console.log(`[Matching] Found ${raCount} new route-affinity matches`);
             addMatchLog("INFO", "route_similarity", `Route affinity: ${raCount} match`);
           }
-          const priResult = await runPlannedRouteAffinity();
+          const priResult = await withCycleTimeout("planned_route_invite", cycleTimeoutMs, () => runPlannedRouteAffinity());
           if (priResult.invitesCreated > 0) {
             console.log(`[Matching] Planned route invites: ${priResult.invitesCreated} nuovi inviti su ${priResult.routesProcessed} route`);
             addMatchLog("INFO", "planned_route_invite", `Planned route invite: ${priResult.invitesCreated} inviti su ${priResult.routesProcessed} route`);
             void recordMatchesCreated("planned_route_invite", priResult.invitesCreated);
           }
         } catch (err) {
-          console.error("[Matching] RouteAffinity matching error (non-blocking):", err);
-          addMatchLog("ERROR", "route_affinity", `Route affinity errore: ${err instanceof Error ? err.message : String(err)}`);
+          if (err instanceof CycleTimeoutError) {
+            schedulerLogger.warn(
+              { phase: err.cycleName, elapsedMs: err.elapsedMs, timeoutMs: cycleTimeoutMs },
+              "phase timed out — aborted, continuing",
+            );
+            addMatchLog("WARN", err.cycleName, `Fase "${err.cycleName}" interrotta per timeout dopo ${err.elapsedMs}ms (limite ${cycleTimeoutMs}ms) — proseguo`);
+            void recordCycleError(`${err.cycleName}_timeout`);
+          } else {
+            console.error("[Matching] RouteAffinity matching error (non-blocking):", err);
+            addMatchLog("ERROR", "route_affinity", `Route affinity errore: ${err instanceof Error ? err.message : String(err)}`);
+          }
         }
 
         try {
-          const enrichResult = await enrichBikerMatchBreakdowns();
+          const enrichResult = await withCycleTimeout("enrich_breakdowns", cycleTimeoutMs, () => enrichBikerMatchBreakdowns());
           const enrichTotal = enrichResult.bbMusicUpdated + enrichResult.bbTelemetryUpdated
             + enrichResult.bzMusicUpdated + enrichResult.bzTelemetryUpdated;
           const enrichCleared = enrichResult.bbMusicCleared + enrichResult.bbTelemetryCleared
@@ -243,8 +288,17 @@ export function triggerMatchingRun(): { started: boolean; reason?: string } {
               `Breakdown — scritto bb musica:${enrichResult.bbMusicUpdated} stile:${enrichResult.bbTelemetryUpdated} bz musica:${enrichResult.bzMusicUpdated} stile:${enrichResult.bzTelemetryUpdated} | rimosso bb musica:${enrichResult.bbMusicCleared} stile:${enrichResult.bbTelemetryCleared} bz musica:${enrichResult.bzMusicCleared} stile:${enrichResult.bzTelemetryCleared}`);
           }
         } catch (err) {
-          console.error("[Matching] EnrichBreakdowns error (non-blocking):", err);
-          addMatchLog("ERROR", "enrich_breakdowns", `Errore arricchimento breakdown: ${err instanceof Error ? err.message : String(err)}`);
+          if (err instanceof CycleTimeoutError) {
+            schedulerLogger.warn(
+              { phase: err.cycleName, elapsedMs: err.elapsedMs, timeoutMs: cycleTimeoutMs },
+              "phase timed out — aborted, continuing",
+            );
+            addMatchLog("WARN", err.cycleName, `Fase "${err.cycleName}" interrotta per timeout dopo ${err.elapsedMs}ms (limite ${cycleTimeoutMs}ms) — proseguo`);
+            void recordCycleError(`${err.cycleName}_timeout`);
+          } else {
+            console.error("[Matching] EnrichBreakdowns error (non-blocking):", err);
+            addMatchLog("ERROR", "enrich_breakdowns", `Errore arricchimento breakdown: ${err instanceof Error ? err.message : String(err)}`);
+          }
         }
       } else {
         schedulerLogger.info("Auto matching disabilitato dall'admin, skip");
@@ -538,13 +592,20 @@ export function startMatchingEngine(): void {
   // Task #2515 — Bio Affinity matching: lower frequency (30 min)
   // perché basato su embeddings (più costoso/lento).
   const runBioAffinitySafe = async () => {
+    const timeoutMs = await getMatchingCycleTimeoutMs();
     try {
-      const count = await runBioAffinityMatching();
+      const count = await withCycleTimeout("bio_affinity", timeoutMs, () => runBioAffinityMatching());
       if (count > 0) {
         console.log(`[Matching] BioAffinity ciclo: ${count} nuovi match`);
       }
     } catch (err) {
-      console.error("[Matching] BioAffinity ciclo errore:", err);
+      if (err instanceof CycleTimeoutError) {
+        console.warn(`[Matching] BioAffinity ciclo interrotto per timeout dopo ${err.elapsedMs}ms (limite ${timeoutMs}ms)`);
+        addMatchLog("WARN", "bio_affinity", `BioAffinity interrotto per timeout dopo ${err.elapsedMs}ms (limite ${timeoutMs}ms)`);
+        void recordCycleError("bio_affinity_timeout");
+      } else {
+        console.error("[Matching] BioAffinity ciclo errore:", err);
+      }
     }
   };
   // Registered in bootJobQueue to avoid overlapping with other heavy boot jobs.
@@ -558,17 +619,18 @@ export function startMatchingEngine(): void {
   // lo stile di guida evolve lentamente ed è costoso (embeddings).
   const runTelemetryAffinitySafe = async () => {
     addMatchLog("INFO", "telemetry_affinity", "TelemetryAffinity avviato");
+    const timeoutMs = await getMatchingCycleTimeoutMs();
     try {
-      const profiles = await aggregateTelemetryProfiles();
+      const profiles = await withCycleTimeout("telemetry_aggregate", timeoutMs, () => aggregateTelemetryProfiles());
       if (profiles > 0) {
         console.log(`[Matching] TelemetryAffinity: ${profiles} profili aggregati`);
       }
-      const count = await runTelemetryAffinityMatching();
+      const count = await withCycleTimeout("telemetry_affinity", timeoutMs, () => runTelemetryAffinityMatching());
       if (count > 0) {
         console.log(`[Matching] TelemetryAffinity ciclo: ${count} nuovi match`);
       }
       addMatchLog("INFO", "telemetry_affinity", `TelemetryAffinity completato: ${profiles} profili aggregati, ${count} nuovi match`);
-      const enrichResult = await enrichBikerMatchBreakdowns();
+      const enrichResult = await withCycleTimeout("enrich_breakdowns", timeoutMs, () => enrichBikerMatchBreakdowns());
       const enrichTotal = enrichResult.bbTelemetryUpdated + enrichResult.bzTelemetryUpdated;
       const enrichCleared = enrichResult.bbTelemetryCleared + enrichResult.bzTelemetryCleared;
       if (enrichTotal > 0 || enrichCleared > 0) {
@@ -576,8 +638,14 @@ export function startMatchingEngine(): void {
           `Breakdown stile_guida post-telemetry — scritto bb:${enrichResult.bbTelemetryUpdated} bz:${enrichResult.bzTelemetryUpdated} | rimosso bb:${enrichResult.bbTelemetryCleared} bz:${enrichResult.bzTelemetryCleared}`);
       }
     } catch (err) {
-      console.error("[Matching] TelemetryAffinity ciclo errore:", err);
-      addMatchLog("ERROR", "telemetry_affinity", `Errore TelemetryAffinity: ${err instanceof Error ? err.message : String(err)}`);
+      if (err instanceof CycleTimeoutError) {
+        console.warn(`[Matching] TelemetryAffinity "${err.cycleName}" interrotto per timeout dopo ${err.elapsedMs}ms (limite ${timeoutMs}ms)`);
+        addMatchLog("WARN", err.cycleName, `Fase "${err.cycleName}" interrotta per timeout dopo ${err.elapsedMs}ms (limite ${timeoutMs}ms)`);
+        void recordCycleError(`${err.cycleName}_timeout`);
+      } else {
+        console.error("[Matching] TelemetryAffinity ciclo errore:", err);
+        addMatchLog("ERROR", "telemetry_affinity", `Errore TelemetryAffinity: ${err instanceof Error ? err.message : String(err)}`);
+      }
     }
   };
   // Registered in bootJobQueue to avoid overlapping with other heavy boot jobs.
