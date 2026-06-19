@@ -95,7 +95,7 @@ vi.mock("../embeddings", () => ({
 // ---------------------------------------------------------------------------
 
 import { storage } from "../storage";
-import usersRouter from "../routes/users";
+import usersRouter, { applyFakeZones } from "../routes/users";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -166,6 +166,72 @@ function makeUser(overrides: Record<string, unknown> = {}): Record<string, unkno
     ...overrides,
   };
 }
+
+// ---------------------------------------------------------------------------
+// Task #4367 — applyFakeZones applica correttamente fakeWhateverRadius
+// ---------------------------------------------------------------------------
+
+describe("Task #4367 — applyFakeZones rispetta fakeWhateverRadius", () => {
+  const WHATEVER_LAT = 41.9;
+  const WHATEVER_LNG = 12.5;
+  const FAKE_WHATEVER_LAT = 40.85;
+  const FAKE_WHATEVER_LNG = 14.27;
+
+  function makeWhateverProfile(overrides: Record<string, unknown> = {}) {
+    return {
+      fakeHomeEnabled: false,
+      fakeWorkEnabled: false,
+      fakeWhateverEnabled: true,
+      whateverLatitude: WHATEVER_LAT,
+      whateverLongitude: WHATEVER_LNG,
+      fakeWhateverLatitude: FAKE_WHATEVER_LAT,
+      fakeWhateverLongitude: FAKE_WHATEVER_LNG,
+      fakeWhateverRadius: 2,
+      ...overrides,
+    };
+  }
+
+  it("sostituisce le coordinate quando l'utente è entro fakeWhateverRadius", () => {
+    // ~0.8 km dal centro whatever → dentro il raggio di default (2 km)
+    const profile = makeWhateverProfile();
+    const res = applyFakeZones(WHATEVER_LAT + 0.007, WHATEVER_LNG, profile);
+
+    expect(res.applied).toBe(true);
+    expect(res.lat).toBe(FAKE_WHATEVER_LAT);
+    expect(res.lng).toBe(FAKE_WHATEVER_LNG);
+  });
+
+  it("NON sostituisce le coordinate quando l'utente è oltre fakeWhateverRadius", () => {
+    // ~5.5 km dal centro whatever → fuori dal raggio di default (2 km)
+    const profile = makeWhateverProfile();
+    const inputLat = WHATEVER_LAT + 0.05;
+    const res = applyFakeZones(inputLat, WHATEVER_LNG, profile);
+
+    expect(res.applied).toBe(false);
+    expect(res.lat).toBe(inputLat);
+    expect(res.lng).toBe(WHATEVER_LNG);
+  });
+
+  it("rispetta un fakeWhateverRadius personalizzato più ampio", () => {
+    // ~5.5 km dal centro: fuori dai 2 km di default, dentro un raggio custom di 10 km
+    const profile = makeWhateverProfile({ fakeWhateverRadius: 10 });
+    const res = applyFakeZones(WHATEVER_LAT + 0.05, WHATEVER_LNG, profile);
+
+    expect(res.applied).toBe(true);
+    expect(res.lat).toBe(FAKE_WHATEVER_LAT);
+    expect(res.lng).toBe(FAKE_WHATEVER_LNG);
+  });
+
+  it("usa il fallback di 2 km quando fakeWhateverRadius è null", () => {
+    // ~0.8 km dal centro → dentro il fallback di 2 km
+    const profile = makeWhateverProfile({ fakeWhateverRadius: null });
+    const res = applyFakeZones(WHATEVER_LAT + 0.007, WHATEVER_LNG, profile);
+
+    expect(res.applied).toBe(true);
+    expect(res.lat).toBe(FAKE_WHATEVER_LAT);
+    expect(res.lng).toBe(FAKE_WHATEVER_LNG);
+  });
+});
 
 // ---------------------------------------------------------------------------
 // BUG 1 — PUT /me deve applicare applyFakeZones prima di salvare
