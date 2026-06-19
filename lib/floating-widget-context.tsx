@@ -84,6 +84,12 @@ export function FloatingWidgetProvider({ children }: { children: React.ReactNode
     });
   }, [updateMutation]);
 
+  // Soppressione temporanea del pallino. SCELTA INTENZIONALE: solo i giochi arcade
+  // (app/(tabs)/arcade.tsx) lo usano, perché sono Modal fullscreen che catturano
+  // tutti i tocchi e un pallino flottante interferirebbe col gameplay. Le altre
+  // schermate fullscreen (route planner, giro detail) NON sopprimono il widget di
+  // proposito: il suo menu di navigazione resta utile lì e non cattura i tocchi
+  // del contenuto sottostante (è un piccolo Animated.View con il solo handle).
   const suppressWidget = useCallback((val: boolean) => {
     setSuppressed(val);
   }, []);

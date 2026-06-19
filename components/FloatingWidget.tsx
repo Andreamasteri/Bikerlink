@@ -8,6 +8,7 @@ import {
   StyleSheet,
   Dimensions,
   Modal,
+  Platform,
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -19,11 +20,13 @@ import { useAssistantEnabled } from "@/hooks/useAssistantEnabled";
 import { useAuth } from "@/lib/auth-context";
 import AssistantChatSheet from "@/components/user/ai-assistant/AssistantChatSheet";
 
-const WIDGET_SIZE = 54;
-const TAP_THRESHOLD = 8; // pixel di movimento oltre cui il gesto è un drag
+export const WIDGET_SIZE = 54;
+export const TAP_THRESHOLD = 8; // pixel di movimento oltre cui il gesto è un drag
 const POS_KEY = "floating_widget_position";
 
-function clampPos(
+// Funzione pura esportata per i test: mantiene il pallino dentro i bordi dello
+// schermo rispettando il padding superiore (notch) e inferiore (home indicator).
+export function clampPos(
   x: number,
   y: number,
   screenW: number,
@@ -35,6 +38,16 @@ function clampPos(
     x: Math.max(0, Math.min(x, screenW - WIDGET_SIZE)),
     y: Math.max(minY, Math.min(y, screenH - WIDGET_SIZE - maxYPad)),
   };
+}
+
+// Funzione pura esportata per i test: discrimina tap da drag. Restituisce true
+// (= drag) se lo spostamento su un asse supera la soglia TAP_THRESHOLD.
+export function isDragGesture(
+  dx: number,
+  dy: number,
+  threshold: number = TAP_THRESHOLD,
+): boolean {
+  return Math.abs(dx) > threshold || Math.abs(dy) > threshold;
 }
 
 export default function FloatingWidget() {
@@ -54,6 +67,11 @@ export default function FloatingWidget() {
   const pan = useRef(new Animated.ValueXY({ x: defaultX, y: defaultY })).current;
   const panOffset = useRef({ x: defaultX, y: defaultY });
   const hasDragged = useRef(false);
+  // insetsRef tiene gli insets correnti dentro il closure del PanResponder (che
+  // viene creato una sola volta). Così il clamp post-drag rispetta notch e home
+  // indicator esattamente come il load path, invece del vecchio hardcoded (8, 8).
+  const insetsRef = useRef(insets);
+  insetsRef.current = insets;
 
   // Carica posizione persistita
   useEffect(() => {
@@ -88,7 +106,7 @@ export default function FloatingWidget() {
         pan.stopAnimation();
       },
       onPanResponderMove: (_, gs) => {
-        if (Math.abs(gs.dx) > TAP_THRESHOLD || Math.abs(gs.dy) > TAP_THRESHOLD) {
+        if (isDragGesture(gs.dx, gs.dy)) {
           hasDragged.current = true;
         }
         pan.setValue({
@@ -100,7 +118,10 @@ export default function FloatingWidget() {
         const newX = panOffset.current.x + gs.dx;
         const newY = panOffset.current.y + gs.dy;
         const d = Dimensions.get("window");
-        const clamped = clampPos(newX, newY, d.width, d.height, 8, 8);
+        const clamped = clampPos(
+          newX, newY, d.width, d.height,
+          insetsRef.current.top + 8, insetsRef.current.bottom + 8,
+        );
         pan.setValue(clamped);
         panOffset.current = clamped;
         savePosition(clamped.x, clamped.y);
@@ -111,12 +132,19 @@ export default function FloatingWidget() {
     })
   ).current;
 
-  if (!user || !enabled || suppressed) return null;
+  // Il widget non serve sulla web preview: PanResponder/Animated.ValueXY su RN-Web
+  // possono produrre comportamenti visivi anomali e non c'è un caso d'uso reale.
+  if (!user || !enabled || suppressed || Platform.OS === "web") return null;
 
   return (
     <>
       <Animated.View
-        style={[styles.widget, { left: pan.x, top: pan.y }]}
+        style={[
+          styles.widget,
+          { left: pan.x, top: pan.y },
+          aiOpen && styles.widgetHidden,
+        ]}
+        pointerEvents={aiOpen ? "none" : "auto"}
         {...panResponder.panHandlers}
       >
         <View style={styles.widgetInner}>
@@ -202,6 +230,9 @@ const styles = StyleSheet.create({
     width: WIDGET_SIZE,
     height: WIDGET_SIZE,
     zIndex: 9000,
+  },
+  widgetHidden: {
+    opacity: 0,
   },
   widgetInner: {
     width: WIDGET_SIZE,

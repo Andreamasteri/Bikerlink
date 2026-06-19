@@ -305,9 +305,12 @@ echo "════════════════════════�
 echo ""
 
 # ── GATE TEST GESTURE COMPONENTI ────────────────────────────
-# Esegue i test automatici in components/__tests__/ (gesture + layout).
+# Esegue TUTTI i test automatici in components/__tests__/ (glob a livello di
+# cartella: nuovi file di test vengono inclusi automaticamente). Coperti oggi:
+#   - RoutePlannerSheet.gesture.test.ts  (slider stile percorso)
+#   - FloatingWidget.logic.test.ts       (clampPos + isDragGesture tap-vs-drag)
 # Se fallisce, il merge è bloccato — un refactor che rompe il pallino flottante
-# (FloatingWidget, Task #4456) viene rilevato qui prima di raggiungere produzione.
+# (FloatingWidget) viene rilevato qui prima di raggiungere produzione.
 echo "════════════════════════════════════════"
 echo "  Gate test gesture componenti"
 echo "════════════════════════════════════════"
