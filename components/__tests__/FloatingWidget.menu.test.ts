@@ -37,6 +37,10 @@ vi.mock("@/lib/floating-widget-context", () => ({ useFloatingWidget: vi.fn(() =>
 vi.mock("@/hooks/useNewMatchAlert", () => ({ useNewMatchAlert: vi.fn(() => ({ newMatchCount: 0 })) }));
 vi.mock("@/hooks/useAssistantEnabled", () => ({ useAssistantEnabled: vi.fn(() => ({ fabEnabled: true })) }));
 vi.mock("@/components/user/ai-assistant/AssistantChatSheet", () => ({ default: () => null }));
+vi.mock("@/components/admin/ai-console/FabDrawer", () => ({ default: () => null }));
+vi.mock("@/hooks/admin/ai-console/useAiActionQueue", () => ({ useAiActionQueue: vi.fn(() => ({ queue: [], clearQueue: vi.fn() })) }));
+vi.mock("@/hooks/admin/ai-console/useAiAlerts", () => ({ useAiAlertsState: vi.fn(() => ({ alerts: [], unreadCount: 0 })), useAiAlertsSubscriber: vi.fn() }));
+vi.mock("@/lib/auth-context", () => ({ useAuth: vi.fn(() => ({ user: null })) }));
 
 import { MENU_ROUTES } from "@/components/FloatingWidget";
 
