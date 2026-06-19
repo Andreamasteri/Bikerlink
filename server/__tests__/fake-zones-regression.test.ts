@@ -234,6 +234,240 @@ describe("Task #4367 — applyFakeZones rispetta fakeWhateverRadius", () => {
 });
 
 // ---------------------------------------------------------------------------
+// applyFakeZones — zona CASA (fakeHomeRadius)
+// ---------------------------------------------------------------------------
+
+describe("applyFakeZones — zona casa (fakeHomeRadius)", () => {
+  const HOME_LAT = 45.464;
+  const HOME_LNG = 9.19;
+  const FAKE_HOME_SNAP_LAT = 44.4;
+  const FAKE_HOME_SNAP_LNG = 8.9;
+
+  function makeHomeProfile(overrides: Record<string, unknown> = {}) {
+    return {
+      fakeHomeEnabled: true,
+      homeLatitude: HOME_LAT,
+      homeLongitude: HOME_LNG,
+      fakeHomeLatitude: FAKE_HOME_SNAP_LAT,
+      fakeHomeLongitude: FAKE_HOME_SNAP_LNG,
+      fakeHomeRadius: 2,
+      fakeWorkEnabled: false,
+      fakeWhateverEnabled: false,
+      ...overrides,
+    };
+  }
+
+  it("sostituisce le coordinate quando l'utente è entro fakeHomeRadius", () => {
+    // ~0.8 km dal centro home → dentro il raggio di default (2 km)
+    const profile = makeHomeProfile();
+    const res = applyFakeZones(HOME_LAT + 0.007, HOME_LNG, profile);
+
+    expect(res.applied).toBe(true);
+    expect(res.lat).toBe(FAKE_HOME_SNAP_LAT);
+    expect(res.lng).toBe(FAKE_HOME_SNAP_LNG);
+  });
+
+  it("NON sostituisce le coordinate quando l'utente è oltre fakeHomeRadius", () => {
+    // ~5.5 km dal centro home → fuori dal raggio di default (2 km)
+    const profile = makeHomeProfile();
+    const inputLat = HOME_LAT + 0.05;
+    const res = applyFakeZones(inputLat, HOME_LNG, profile);
+
+    expect(res.applied).toBe(false);
+    expect(res.lat).toBe(inputLat);
+    expect(res.lng).toBe(HOME_LNG);
+  });
+
+  it("rispetta un fakeHomeRadius personalizzato più ampio", () => {
+    // ~5.5 km dal centro: fuori dai 2 km di default, dentro un raggio custom di 10 km
+    const profile = makeHomeProfile({ fakeHomeRadius: 10 });
+    const res = applyFakeZones(HOME_LAT + 0.05, HOME_LNG, profile);
+
+    expect(res.applied).toBe(true);
+    expect(res.lat).toBe(FAKE_HOME_SNAP_LAT);
+    expect(res.lng).toBe(FAKE_HOME_SNAP_LNG);
+  });
+
+  it("usa il fallback di 2 km quando fakeHomeRadius è null", () => {
+    // ~0.8 km dal centro → dentro il fallback di 2 km
+    const profile = makeHomeProfile({ fakeHomeRadius: null });
+    const res = applyFakeZones(HOME_LAT + 0.007, HOME_LNG, profile);
+
+    expect(res.applied).toBe(true);
+    expect(res.lat).toBe(FAKE_HOME_SNAP_LAT);
+    expect(res.lng).toBe(FAKE_HOME_SNAP_LNG);
+  });
+
+  it("NON applica la zona casa quando fakeHomeEnabled è false", () => {
+    const profile = makeHomeProfile({ fakeHomeEnabled: false });
+    const res = applyFakeZones(HOME_LAT + 0.007, HOME_LNG, profile);
+
+    expect(res.applied).toBe(false);
+    expect(res.lat).toBe(HOME_LAT + 0.007);
+  });
+
+  it("NON applica la zona casa quando homeLatitude è null", () => {
+    const profile = makeHomeProfile({ homeLatitude: null });
+    const res = applyFakeZones(HOME_LAT + 0.007, HOME_LNG, profile);
+
+    expect(res.applied).toBe(false);
+  });
+
+  it("NON applica la zona casa quando fakeHomeLatitude è null", () => {
+    const profile = makeHomeProfile({ fakeHomeLatitude: null });
+    const res = applyFakeZones(HOME_LAT + 0.007, HOME_LNG, profile);
+
+    expect(res.applied).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// applyFakeZones — zona LAVORO (fakeWorkRadius)
+// ---------------------------------------------------------------------------
+
+describe("applyFakeZones — zona lavoro (fakeWorkRadius)", () => {
+  const WORK_LAT = 45.465;
+  const WORK_LNG = 9.191;
+  const FAKE_WORK_LAT = 44.5;
+  const FAKE_WORK_LNG = 8.95;
+
+  function makeWorkProfile(overrides: Record<string, unknown> = {}) {
+    return {
+      fakeHomeEnabled: false,
+      fakeWorkEnabled: true,
+      workLatitude: WORK_LAT,
+      workLongitude: WORK_LNG,
+      fakeWorkLatitude: FAKE_WORK_LAT,
+      fakeWorkLongitude: FAKE_WORK_LNG,
+      fakeWorkRadius: 2,
+      fakeWhateverEnabled: false,
+      ...overrides,
+    };
+  }
+
+  it("sostituisce le coordinate quando l'utente è entro fakeWorkRadius", () => {
+    // ~0.8 km dal centro work → dentro il raggio di default (2 km)
+    const profile = makeWorkProfile();
+    const res = applyFakeZones(WORK_LAT + 0.007, WORK_LNG, profile);
+
+    expect(res.applied).toBe(true);
+    expect(res.lat).toBe(FAKE_WORK_LAT);
+    expect(res.lng).toBe(FAKE_WORK_LNG);
+  });
+
+  it("NON sostituisce le coordinate quando l'utente è oltre fakeWorkRadius", () => {
+    // ~5.5 km dal centro work → fuori dal raggio di default (2 km)
+    const profile = makeWorkProfile();
+    const inputLat = WORK_LAT + 0.05;
+    const res = applyFakeZones(inputLat, WORK_LNG, profile);
+
+    expect(res.applied).toBe(false);
+    expect(res.lat).toBe(inputLat);
+    expect(res.lng).toBe(WORK_LNG);
+  });
+
+  it("rispetta un fakeWorkRadius personalizzato più ampio", () => {
+    // ~5.5 km dal centro: fuori dai 2 km di default, dentro un raggio custom di 10 km
+    const profile = makeWorkProfile({ fakeWorkRadius: 10 });
+    const res = applyFakeZones(WORK_LAT + 0.05, WORK_LNG, profile);
+
+    expect(res.applied).toBe(true);
+    expect(res.lat).toBe(FAKE_WORK_LAT);
+    expect(res.lng).toBe(FAKE_WORK_LNG);
+  });
+
+  it("usa il fallback di 2 km quando fakeWorkRadius è null", () => {
+    // ~0.8 km dal centro → dentro il fallback di 2 km
+    const profile = makeWorkProfile({ fakeWorkRadius: null });
+    const res = applyFakeZones(WORK_LAT + 0.007, WORK_LNG, profile);
+
+    expect(res.applied).toBe(true);
+    expect(res.lat).toBe(FAKE_WORK_LAT);
+    expect(res.lng).toBe(FAKE_WORK_LNG);
+  });
+
+  it("NON applica la zona lavoro quando fakeWorkEnabled è false", () => {
+    const profile = makeWorkProfile({ fakeWorkEnabled: false });
+    const res = applyFakeZones(WORK_LAT + 0.007, WORK_LNG, profile);
+
+    expect(res.applied).toBe(false);
+    expect(res.lat).toBe(WORK_LAT + 0.007);
+  });
+
+  it("NON applica la zona lavoro quando workLatitude è null", () => {
+    const profile = makeWorkProfile({ workLatitude: null });
+    const res = applyFakeZones(WORK_LAT + 0.007, WORK_LNG, profile);
+
+    expect(res.applied).toBe(false);
+  });
+
+  it("NON applica la zona lavoro quando fakeWorkLatitude è null", () => {
+    const profile = makeWorkProfile({ fakeWorkLatitude: null });
+    const res = applyFakeZones(WORK_LAT + 0.007, WORK_LNG, profile);
+
+    expect(res.applied).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// applyFakeZones — priorità tra zone (casa > lavoro > qualsiasi)
+// ---------------------------------------------------------------------------
+
+describe("applyFakeZones — priorità casa > lavoro > qualsiasi", () => {
+  const CENTER_LAT = 45.464;
+  const CENTER_LNG = 9.19;
+
+  it("applica la zona CASA anche se fakeWork è attivo e l'utente è nel raggio di entrambe", () => {
+    const profile = {
+      fakeHomeEnabled: true,
+      homeLatitude: CENTER_LAT,
+      homeLongitude: CENTER_LNG,
+      fakeHomeLatitude: 44.1,
+      fakeHomeLongitude: 8.8,
+      fakeHomeRadius: 2,
+      fakeWorkEnabled: true,
+      workLatitude: CENTER_LAT,
+      workLongitude: CENTER_LNG,
+      fakeWorkLatitude: 44.2,
+      fakeWorkLongitude: 8.9,
+      fakeWorkRadius: 2,
+      fakeWhateverEnabled: false,
+    };
+
+    // utente praticamente sul centro → dentro entrambi i raggi
+    const res = applyFakeZones(CENTER_LAT + 0.001, CENTER_LNG, profile);
+
+    expect(res.applied).toBe(true);
+    expect(res.lat).toBe(44.1);
+    expect(res.lng).toBe(8.8);
+  });
+
+  it("applica la zona LAVORO quando casa non scatta ma lavoro sì", () => {
+    const profile = {
+      fakeHomeEnabled: true,
+      homeLatitude: CENTER_LAT + 1.0, // distante
+      homeLongitude: CENTER_LNG,
+      fakeHomeLatitude: 44.1,
+      fakeHomeLongitude: 8.8,
+      fakeHomeRadius: 2,
+      fakeWorkEnabled: true,
+      workLatitude: CENTER_LAT,
+      workLongitude: CENTER_LNG,
+      fakeWorkLatitude: 44.2,
+      fakeWorkLongitude: 8.9,
+      fakeWorkRadius: 2,
+      fakeWhateverEnabled: false,
+    };
+
+    const res = applyFakeZones(CENTER_LAT + 0.001, CENTER_LNG, profile);
+
+    expect(res.applied).toBe(true);
+    expect(res.lat).toBe(44.2);
+    expect(res.lng).toBe(8.9);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // BUG 1 — PUT /me deve applicare applyFakeZones prima di salvare
 // ---------------------------------------------------------------------------
 
