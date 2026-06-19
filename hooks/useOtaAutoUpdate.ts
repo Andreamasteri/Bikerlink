@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import * as Updates from "expo-updates";
-import { Platform } from "react-native";
+import { Platform, InteractionManager } from "react-native";
 import * as Device from "expo-device";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { getApiUrl, authFetchHeaders, getSessionToken } from "@/lib/query-client";
@@ -9,6 +9,19 @@ const DEVICE_ID_KEY = "bikerlink:ota:device-id:v1";
 const DEVICE_ID_LEGACY_KEY = "@bikerlink/ota_device_id";
 const PENDING_RELEASE_KEY = "@bikerlink/ota_pending_release_id";
 const BOOT_SUCCESS_DELAY_MS = 8000;
+// Ritardo prima di avviare il check OTA che può sfociare in reloadAsync.
+// Un reload durante il primo mount / splash può saturare il bridge e far
+// chiudere l'app al cold start: aspettiamo che l'app sia montata e interattiva.
+const OTA_STARTUP_DELAY_MS = 4000;
+
+/** Risolve dopo che le interazioni iniziali si sono assestate + un ritardo. */
+function waitUntilInteractive(delayMs: number): Promise<void> {
+  return new Promise<void>((resolve) => {
+    InteractionManager.runAfterInteractions(() => {
+      setTimeout(resolve, delayMs);
+    });
+  });
+}
 
 async function getOrCreateDeviceId(): Promise<string> {
   try {
@@ -110,6 +123,8 @@ export function useOtaAutoUpdate(tokenReady = false): { checking: boolean } {
     if (ranRef.current) return;
     ranRef.current = true;
 
+    let cancelled = false;
+
     (async () => {
       // Step A: telemetria boot_success per il bundle attualmente in esecuzione.
       // Se al boot precedente abbiamo applicato una OTA, segnalo che ha bootato senza crash dopo 8s.
@@ -139,6 +154,14 @@ export function useOtaAutoUpdate(tokenReady = false): { checking: boolean } {
       if (Platform.OS === "web") return;
       if (!Updates.isEnabled) return;
       if (__DEV__) return;
+
+      // Aspetta che l'app sia montata e interattiva prima di toccare EAS o
+      // chiamare reloadAsync: un reload durante lo splash / primo mount può
+      // saturare il bridge e far chiudere l'app al cold start.
+      await waitUntilInteractive(OTA_STARTUP_DELAY_MS);
+      // Se il root layout è stato smontato durante l'attesa, non eseguire più
+      // il check/fetch/reload OTA: evitiamo lavoro stantio dopo lifecycle change.
+      if (cancelled) return;
 
       try {
         const manifest = await fetchManifest();
@@ -230,6 +253,10 @@ export function useOtaAutoUpdate(tokenReady = false): { checking: boolean } {
         console.warn("[useOtaAutoUpdate] OTA check/fetch failed:", err);
       }
     })();
+
+    return () => {
+      cancelled = true;
+    };
   }, [tokenReady]);
 
   return { checking: false };

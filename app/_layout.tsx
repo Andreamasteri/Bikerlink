@@ -107,6 +107,10 @@ function MapReadyGate({ children }: { children: React.ReactNode }) {
   const { isLoading } = useMapConfig();
   const { colors } = useTheme();
   const beaconState = useRef<string>("");
+  // Anti-blocco: se la config mappe tarda troppo, sblocchiamo comunque la UI in
+  // stato degradato. map-context ha già default sicuri (tile di fallback), quindi
+  // l'app resta usabile invece di restare appesa sul loader al cold start.
+  const [forcePass, setForcePass] = useState(false);
 
   useEffect(() => {
     sendStartupBeacon("map_ready_gate_enter", { hasUser: !!user, mapLoading: isLoading });
@@ -128,7 +132,16 @@ function MapReadyGate({ children }: { children: React.ReactNode }) {
     }
   }, [user, isLoading]);
 
-  if (user && isLoading) {
+  useEffect(() => {
+    if (!user || !isLoading || forcePass) return;
+    const timeout = setTimeout(() => {
+      sendStartupBeacon("map_ready_gate_timeout");
+      setForcePass(true);
+    }, 6000);
+    return () => clearTimeout(timeout);
+  }, [user, isLoading, forcePass]);
+
+  if (user && isLoading && !forcePass) {
     return (
       <View style={[styles.mapGateLoader, { backgroundColor: colors.background }]}>
         <ActivityIndicator size="large" color={colors.primary} />
