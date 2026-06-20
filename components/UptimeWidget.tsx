@@ -1,18 +1,24 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useCallback } from "react";
 import {
   View,
   Text,
   StyleSheet,
   useWindowDimensions,
 } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useQuery } from "@tanstack/react-query";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
+  runOnJS,
 } from "react-native-reanimated";
+import { useRouter } from "expo-router";
 import { useState } from "react";
+// Riusa la logica di discriminazione tap/drag del pallino flottante: stessa
+// soglia, stesso comportamento, zero duplicazione (regression guard condiviso).
+import { isDragGesture, TAP_THRESHOLD } from "@/components/FloatingWidget";
 
 interface UptimeData {
   backendStartedAt: number;
@@ -32,10 +38,31 @@ function formatUptime(elapsedMs: number): string {
 
 const WIDGET_W = 110;
 const WIDGET_H = 32;
+const POS_KEY = "uptime_widget_position";
+
+// Clamp dedicato al widget uptime: a differenza di clampPos di FloatingWidget
+// (pallino quadrato WIDGET_SIZE), qui larghezza e altezza sono diverse, quindi
+// servono limiti distinti per asse. È `"worklet"` così può girare sia sul thread
+// JS (load/persist) sia nei callback gesto RNGH sul thread UI.
+export function clampUptimePos(
+  x: number,
+  y: number,
+  screenW: number,
+  screenH: number,
+  minY: number,
+  maxYPad: number,
+): { x: number; y: number } {
+  "worklet";
+  return {
+    x: Math.max(0, Math.min(x, screenW - WIDGET_W)),
+    y: Math.max(minY, Math.min(y, screenH - WIDGET_H - maxYPad)),
+  };
+}
 
 export default function UptimeWidget() {
   const insets = useSafeAreaInsets();
   const { width, height } = useWindowDimensions();
+  const router = useRouter();
   const [, setTick] = useState(0);
   const fetchTimeRef = useRef<number>(Date.now());
 
@@ -62,7 +89,52 @@ export default function UptimeWidget() {
     return () => clearInterval(id);
   }, []);
 
+  // Carica la posizione persistita (thread JS), riportandola dentro i limiti
+  // visibili correnti così non compare mai fuori schermo.
+  useEffect(() => {
+    AsyncStorage.getItem(POS_KEY).then((raw) => {
+      if (!raw) return;
+      try {
+        const parsed = JSON.parse(raw) as { x: number; y: number };
+        const clamped = clampUptimePos(
+          parsed.x, parsed.y, width, height,
+          insets.top + 8, insets.bottom + 8,
+        );
+        posX.value = clamped.x;
+        posY.value = clamped.y;
+      } catch {
+        // ignora
+      }
+    });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Ad ogni cambio dimensioni/inset (rotazione, resize) riporta la posizione
+  // corrente dentro i nuovi limiti, così il widget non finisce mai fuori schermo.
+  useEffect(() => {
+    const clamped = clampUptimePos(
+      posX.value, posY.value, width, height,
+      insets.top + 8, insets.bottom + 8,
+    );
+    posX.value = clamped.x;
+    posY.value = clamped.y;
+  }, [width, height, insets.top, insets.bottom]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const savePosition = useCallback((x: number, y: number) => {
+    AsyncStorage.setItem(POS_KEY, JSON.stringify({ x, y })).catch(() => {});
+  }, []);
+
+  const openHistory = useCallback(() => {
+    router.push("/admin/restart-history" as never);
+  }, [router]);
+
+  // Gesture.Pan() di RNGH: onStart fissa l'origine, onUpdate trascina (clampato
+  // in tempo reale), onEnd persiste la posizione e — se lo spostamento è sotto
+  // la soglia di tap — naviga allo storico riavvii. minDistance(0) garantisce
+  // che anche un tap puro (zero movimento) porti il gesto in ACTIVE e scateni
+  // onEnd. clampUptimePos/isDragGesture girano come worklet sul thread UI;
+  // savePosition e la navigazione tornano sul thread JS via runOnJS.
   const panGesture = Gesture.Pan()
+    .minDistance(0)
     .onStart(() => {
       "worklet";
       startX.value = posX.value;
@@ -70,10 +142,21 @@ export default function UptimeWidget() {
     })
     .onUpdate((e) => {
       "worklet";
-      const rawX = startX.value + e.translationX;
-      const rawY = startY.value + e.translationY;
-      posX.value = Math.max(0, Math.min(rawX, width - WIDGET_W));
-      posY.value = Math.max(insets.top + 8, Math.min(rawY, height - WIDGET_H - 8));
+      const clamped = clampUptimePos(
+        startX.value + e.translationX,
+        startY.value + e.translationY,
+        width, height,
+        insets.top + 8, insets.bottom + 8,
+      );
+      posX.value = clamped.x;
+      posY.value = clamped.y;
+    })
+    .onEnd((e) => {
+      "worklet";
+      runOnJS(savePosition)(posX.value, posY.value);
+      if (!isDragGesture(e.translationX, e.translationY, TAP_THRESHOLD)) {
+        runOnJS(openHistory)();
+      }
     });
 
   const animatedStyle = useAnimatedStyle(() => ({

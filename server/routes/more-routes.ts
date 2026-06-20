@@ -226,13 +226,36 @@ export function registerMoreRoutes(app: Express) {
       withDbRetry(() => db.select({ count: count() }).from(serverRestarts)),
       withDbRetry(() => db.select().from(serverRestarts).orderBy(desc(serverRestarts.startedAt)).limit(50)),
     ]);
+
+    // Mappa il valore grezzo di reason in una categoria normalizzata + etichetta
+    // leggibile in italiano. I dati storici contengono solo "cold_start" e
+    // "restart"; il nuovo valore "crash" distingue i riavvii inattesi.
+    const categorize = (reason: string): { category: string; reasonLabel: string; isCrash: boolean } => {
+      switch (reason) {
+        case "cold_start":
+          return { category: "cold_start", reasonLabel: "Primo avvio (cold start)", isCrash: false };
+        case "restart":
+          return { category: "restart", reasonLabel: "Riavvio voluto", isCrash: false };
+        case "crash":
+          return { category: "crash", reasonLabel: "Crash / riavvio inatteso", isCrash: true };
+        default:
+          return { category: "unknown", reasonLabel: reason || "Sconosciuto", isCrash: false };
+      }
+    };
+
     res.json({
       total: countResult[0]?.count ?? 0,
-      restarts: rows.map((r) => ({
-        id: r.id,
-        startedAt: r.startedAt instanceof Date ? r.startedAt.toISOString() : r.startedAt,
-        reason: r.reason,
-      })),
+      restarts: rows.map((r) => {
+        const { category, reasonLabel, isCrash } = categorize(r.reason);
+        return {
+          id: r.id,
+          startedAt: r.startedAt instanceof Date ? r.startedAt.toISOString() : r.startedAt,
+          reason: r.reason,
+          category,
+          reasonLabel,
+          isCrash,
+        };
+      }),
     });
   });
 

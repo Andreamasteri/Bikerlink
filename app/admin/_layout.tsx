@@ -50,6 +50,7 @@ export default function AdminLayout() {
         <Stack.Screen name="reports-thresholds" options={{ title: "Soglie & Policy" }} />
         <Stack.Screen name="blocks" options={{ title: "Blocchi tra utenti" }} />
         <Stack.Screen name="crash-logs" options={{ title: "Log Riavvii App" }} />
+        <Stack.Screen name="restart-history" options={{ title: "Storico Riavvii" }} />
         <Stack.Screen name="newsletter" options={{ title: "Iscritti Newsletter" }} />
         <Stack.Screen name="visitatori" options={{ title: "Counter Visitatori Sito" }} />
         <Stack.Screen name="matching-hub" options={{ title: "Hub Matching" }} />

@@ -16,7 +16,7 @@ import { createServer as createProbeServer } from "http";
 import { initState, initGate } from "./init-state";
 import { stopMatchingEngine } from "./matching-engine";
 import { pool } from "./db";
-import { stopMetroMonitor } from "./uptime";
+import { stopMetroMonitor, markCleanShutdown } from "./uptime";
 import { matchEnrichmentSemaphore, MATCH_ENRICHMENT_GLOBAL_LIMIT } from "./lib/concurrency";
 import { setupMiddleware, setupStaticRoutes } from "./middleware";
 import { registerAllRoutes } from "./route-mounter";
@@ -113,6 +113,10 @@ server.on("connection", (socket) => {
 function gracefulShutdown(signal: string) {
   console.log(`\n${signal} received. Starting graceful shutdown...`);
   initState.initializing = false;
+
+  // Marca lo spegnimento come pulito (sincrono): al boot successivo il riavvio
+  // sarà classificato come intenzionale invece che come crash.
+  markCleanShutdown();
 
   stopMatchingEngine();
   stopMetroMonitor();

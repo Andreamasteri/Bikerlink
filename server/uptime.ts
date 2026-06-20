@@ -38,40 +38,65 @@ export function appendUptimeLog(line: string) {
   } catch (err) { console.warn("[uptime] Failed to write uptime log:", err); }
 }
 
-function readLastStartTime(): number | null {
+interface UptimeStateFile {
+  startedAt: number;
+  // true se l'ultimo processo è stato chiuso in modo pulito (SIGTERM/SIGINT
+  // gestiti da gracefulShutdown). Al boot successivo questo distingue un
+  // riavvio voluto da un crash/riavvio inatteso.
+  cleanShutdown?: boolean;
+}
+
+function readState(): UptimeStateFile | null {
   try {
     if (!fs.existsSync(STATE_FILE)) return null;
     const raw = fs.readFileSync(STATE_FILE, "utf-8");
     const parsed = JSON.parse(raw);
-    if (typeof parsed.startedAt === "number") return parsed.startedAt;
+    if (typeof parsed.startedAt === "number") return parsed as UptimeStateFile;
     return null;
   } catch {
     return null;
   }
 }
 
-function writeStartTime(ts: number) {
+function writeState(state: UptimeStateFile) {
   try {
     ensureLogsDir();
-    fs.writeFileSync(STATE_FILE, JSON.stringify({ startedAt: ts }), "utf-8");
-  } catch (err) { console.warn("[uptime] Failed to write start-time state file:", err); }
+    fs.writeFileSync(STATE_FILE, JSON.stringify(state), "utf-8");
+  } catch (err) { console.warn("[uptime] Failed to write uptime state file:", err); }
+}
+
+// Chiamata (sincrona) dal gracefulShutdown alla ricezione di SIGTERM/SIGINT:
+// marca lo state file come "spegnimento pulito" così che al boot successivo il
+// riavvio sia classificato come intenzionale e non come crash.
+export function markCleanShutdown(): void {
+  const state = readState();
+  if (state) {
+    writeState({ ...state, cleanShutdown: true });
+  }
 }
 
 export function initUptimeTracking() {
   const now = SERVER_START_TIME;
-  const lastStart = readLastStartTime();
+  const prev = readState();
 
-  let reason: "cold_start" | "restart";
-  if (lastStart !== null) {
-    const prevUptime = formatDuration(now - lastStart);
-    appendUptimeLog(`BACKEND RESTART — previous uptime: ${prevUptime}`);
-    reason = "restart";
-  } else {
+  let reason: "cold_start" | "restart" | "crash";
+  if (prev === null) {
     appendUptimeLog("BACKEND UP (cold start)");
     reason = "cold_start";
+  } else {
+    const prevUptime = formatDuration(now - prev.startedAt);
+    if (prev.cleanShutdown) {
+      appendUptimeLog(`BACKEND RESTART (intenzionale) — previous uptime: ${prevUptime}`);
+      reason = "restart";
+    } else {
+      appendUptimeLog(`BACKEND CRASH/RIAVVIO INATTESO — previous uptime: ${prevUptime}`);
+      reason = "crash";
+    }
   }
 
-  writeStartTime(now);
+  // Reset del marker: il processo corrente è considerato "in crash" finché un
+  // gracefulShutdown non riscrive cleanShutdown=true.
+  writeState({ startedAt: now, cleanShutdown: false });
 
   db.insert(serverRestarts).values({ startedAt: new Date(now), reason }).catch((err) => {
     console.warn("[uptime] Could not record server restart:", err);
