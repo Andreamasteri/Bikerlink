@@ -1,4 +1,6 @@
 import { storage } from "../storage";
+import { withDbRetry } from "../db";
+import { dedupWarn } from "../lib/dedup-logger";
 import { bootJobQueue } from "../lib/boot-job-queue";
 import { runMusicEmbeddingsBackfill } from "./jobs/backfill-music-embeddings";
 import { runWeeklyRecapJob } from "./jobs/weekly-recap";
@@ -69,14 +71,17 @@ export function startMatchingEngine(): void {
   const runArchiveStaleMatches = async () => {
     addMatchLog("INFO", "archive_stale", "Archiviazione match stale avviata");
     try {
-      const afterSetting = await storage.getAppSetting("match_archive_after_days");
-      const afterDays = afterSetting?.value ? Math.max(1, parseInt(afterSetting.value, 10)) : 30;
-      const [bz, bb, pp, pm] = await Promise.all([
-        storage.archiveStaleBikerZavorrinaMatches(afterDays),
-        storage.archiveStaleBikerBikerMatches(afterDays),
-        storage.archiveStaleProposalProfileMatches(afterDays),
-        storage.archiveStaleProposalMatches(afterDays),
-      ]);
+      const { bz, bb, pp, pm, afterDays } = await withDbRetry(async () => {
+        const afterSetting = await storage.getAppSetting("match_archive_after_days");
+        const days = afterSetting?.value ? Math.max(1, parseInt(afterSetting.value, 10)) : 30;
+        const [bz, bb, pp, pm] = await Promise.all([
+          storage.archiveStaleBikerZavorrinaMatches(days),
+          storage.archiveStaleBikerBikerMatches(days),
+          storage.archiveStaleProposalProfileMatches(days),
+          storage.archiveStaleProposalMatches(days),
+        ]);
+        return { bz, bb, pp, pm, afterDays: days };
+      });
       const total = bz + bb + pp + pm;
       if (total > 0) {
         console.log(`[Archive] Archiviati ${total} match 'new'/'pending' più vecchi di ${afterDays}gg (bz=${bz}, bb=${bb}, pp=${pp}, pm=${pm})`);
@@ -85,7 +90,7 @@ export function startMatchingEngine(): void {
         addMatchLog("INFO", "archive_stale", `Archiviazione completata — nessun match stale da archiviare (soglia ${afterDays}gg)`);
       }
     } catch (err) {
-      console.error("[Archive] Errore archiviazione match stale:", err);
+      dedupWarn("matching/archive-stale", "errore archiviazione match stale (non-fatal)", err);
       addMatchLog("ERROR", "archive_stale", `Errore archiviazione match stale: ${err instanceof Error ? err.message : String(err)}`);
     }
   };
@@ -123,16 +128,19 @@ export function startMatchingEngine(): void {
 
   _engineTimers.push(setInterval(async () => {
     try {
-      const expired = await runCleanup();
+      const { expired, deleted, prunedZoneNotifs, prunedStaleMatches } = await withDbRetry(async () => {
+        const expired = await runCleanup();
+        const deleted = await storage.deleteExpiredProposals();
+        const prunedZoneNotifs = await pruneOldZoneNotifications();
+        const prunedStaleMatches = await pruneStaleProposalProfileMatches();
+        return { expired, deleted, prunedZoneNotifs, prunedStaleMatches };
+      });
       if (expired > 0) console.log(`[Cleanup] Scadute ${expired} proposte`);
-      const deleted = await storage.deleteExpiredProposals();
       if (deleted > 0) console.log(`[Cleanup] Eliminate ${deleted} proposte scadute`);
-      const prunedZoneNotifs = await pruneOldZoneNotifications();
       if (prunedZoneNotifs > 0) console.log(`[Cleanup] Eliminate ${prunedZoneNotifs} zone notifications più vecchie di 30 giorni`);
-      const prunedStaleMatches = await pruneStaleProposalProfileMatches();
       if (prunedStaleMatches > 0) console.log(`[Cleanup] Eliminate ${prunedStaleMatches} proposal-profile matches di proposte non attive`);
     } catch (err) {
-      console.error("[Cleanup] Errore pulizia oraria:", err);
+      dedupWarn("matching/hourly-cleanup", "errore pulizia oraria (non-fatal)", err);
     }
 
     const cutoff = Date.now() - 2 * 60 * 60 * 1000;
@@ -180,39 +188,39 @@ export function startMatchingEngine(): void {
 
   setTimeout(() => {
     import("../services/reportingService").then(({ recomputeAllTrustScores }) =>
-      recomputeAllTrustScores()
+      withDbRetry(() => recomputeAllTrustScores())
         .then((r) => {
           if (r.updated > 0) console.log(`[Reports] trust score startup: ${r.updated} report aggiornati`);
         })
-        .catch((err) => console.error("[Reports] trust recompute startup failed:", err)),
-    ).catch((err) => console.error("[Reports] trust import failed:", err));
+        .catch((err) => dedupWarn("reports/trust-startup", "trust recompute startup failed (non-fatal)", err)),
+    ).catch((err) => dedupWarn("reports/trust-import", "trust import failed (non-fatal)", err));
   }, 7 * 60 * 1000);
   _engineTimers.push(setInterval(() => {
     import("../services/reportingService").then(({ recomputeAllTrustScores }) =>
-      recomputeAllTrustScores()
+      withDbRetry(() => recomputeAllTrustScores())
         .then((r) => {
           if (r.updated > 0) console.log(`[Reports] daily trust score: ${r.updated} report aggiornati`);
         })
-        .catch((err) => console.error("[Reports] daily trust recompute failed:", err)),
+        .catch((err) => dedupWarn("reports/trust-daily", "daily trust recompute failed (non-fatal)", err)),
     ).catch(() => {});
   }, 24 * 60 * 60 * 1000));
   console.log("[Matching] Daily reporter trust-score recompute scheduled");
 
   setTimeout(() => {
     addMatchLog("INFO", "profile_recompute", "Ricalcolo profili utente avviato (startup)");
-    recomputeAllUserMatchProfiles()
+    withDbRetry(() => recomputeAllUserMatchProfiles())
       .then(() => addMatchLog("INFO", "profile_recompute", "Ricalcolo profili utente completato (startup)"))
       .catch((err: unknown) => {
-        console.error("[ProfileRecompute] startup run failed:", err);
+        dedupWarn("matching/profile-recompute-startup", "errore ricalcolo profili utente (non-fatal)", err);
         addMatchLog("ERROR", "profile_recompute", `Errore ricalcolo profili utente (startup): ${err instanceof Error ? err.message : String(err)}`);
       });
   }, 5 * 60 * 1000);
   _engineTimers.push(setInterval(() => {
     addMatchLog("INFO", "profile_recompute", "Ricalcolo profili utente avviato (giornaliero)");
-    recomputeAllUserMatchProfiles()
+    withDbRetry(() => recomputeAllUserMatchProfiles())
       .then(() => addMatchLog("INFO", "profile_recompute", "Ricalcolo profili utente completato (giornaliero)"))
       .catch((err: unknown) => {
-        console.error("[ProfileRecompute] daily run failed:", err);
+        dedupWarn("matching/profile-recompute-daily", "errore ricalcolo profili utente (non-fatal)", err);
         addMatchLog("ERROR", "profile_recompute", `Errore ricalcolo profili utente (giornaliero): ${err instanceof Error ? err.message : String(err)}`);
       });
   }, 24 * 60 * 60 * 1000));

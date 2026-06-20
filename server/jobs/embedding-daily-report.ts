@@ -14,8 +14,9 @@
  */
 import { Cron } from "croner";
 import { sql } from "drizzle-orm";
-import { db } from "../db";
+import { db, withDbRetry } from "../db";
 import { storage } from "../storage";
+import { dedupWarn } from "../lib/dedup-logger";
 
 export interface EmbeddingDailyReport {
   generatedAt: string;
@@ -45,7 +46,7 @@ async function generateReport(): Promise<EmbeddingDailyReport> {
   const eightDaysAgo = new Date(now.getTime() - 8 * 24 * 60 * 60 * 1000);
 
   // Aggregate by model and field for last 24h
-  const rows24h = await db.execute<{
+  const rows24h = await withDbRetry(() => db.execute<{
     field: string;
     model: string;
     cached: boolean;
@@ -56,10 +57,10 @@ async function generateReport(): Promise<EmbeddingDailyReport> {
     WHERE created_at >= ${from.toISOString()}::timestamptz
       AND created_at < ${to.toISOString()}::timestamptz
     GROUP BY field, model, cached
-  `);
+  `));
 
   // Daily breakdown for last 8 days
-  const rows8d = await db.execute<{
+  const rows8d = await withDbRetry(() => db.execute<{
     day: string;
     model: string;
     cached: boolean;
@@ -75,7 +76,7 @@ async function generateReport(): Promise<EmbeddingDailyReport> {
       AND created_at < ${to.toISOString()}::timestamptz
     GROUP BY day, model, cached
     ORDER BY day
-  `);
+  `));
 
   const todayStr = now.toISOString().slice(0, 10);
 
@@ -136,10 +137,12 @@ async function generateReport(): Promise<EmbeddingDailyReport> {
   // Cap check from AppSetting
   let capReached = false;
   try {
-    const capSetting = await storage.getAppSetting("embedding_daily_cap");
+    const capSetting = await withDbRetry(() => storage.getAppSetting("embedding_daily_cap"));
     const cap = capSetting?.value ? parseInt(capSetting.value, 10) : 500;
     capReached = Number.isFinite(cap) && todayApiCalls >= cap;
-  } catch { /* non-fatal */ }
+  } catch (err) {
+    dedupWarn("embed-report/cap-read", "lettura cap embedding fallita (non-fatal)", err);
+  }
 
   return {
     generatedAt: now.toISOString(),
@@ -194,7 +197,7 @@ export function scheduleEmbeddingDailyReport(): void {
   try {
     new Cron("15 8 * * *", { timezone: TIMEZONE, protect: true }, () => {
       runEmbeddingDailyReport().catch((e) =>
-        console.error("[EmbedReport] Scheduled run error:", e),
+        dedupWarn("embed-daily-report", "scheduled run error (non-fatal)", e),
       );
     });
   } catch (cronErr) {

@@ -1,6 +1,7 @@
-import { db } from "../db";
+import { db, withDbRetry } from "../db";
 import { userSessions } from "@shared/db";
 import { sql, eq } from "drizzle-orm";
+import { dedupWarn } from "../lib/dedup-logger";
 
 const TEN_MIN_MS = 10 * 60 * 1000;
 const FIFTEEN_MIN_AGO = "NOW() - INTERVAL '15 minutes'";
@@ -11,7 +12,7 @@ export async function runSessionCrashCleanup(): Promise<void> {
   try {
     // Use per-session last_heartbeat_at as the liveness signal.
     // Falls back to started_at when no heartbeat has been recorded yet.
-    const stale = await db.execute(sql`
+    const stale = await withDbRetry(() => db.execute(sql`
       SELECT
         s.id,
         s.started_at,
@@ -19,7 +20,7 @@ export async function runSessionCrashCleanup(): Promise<void> {
       FROM user_sessions s
       WHERE s.ended_at IS NULL
         AND COALESCE(s.last_heartbeat_at, s.started_at) < ${sql.raw(FIFTEEN_MIN_AGO)}
-    `);
+    `));
 
     if (stale.rows.length === 0) return;
 
@@ -29,15 +30,15 @@ export async function runSessionCrashCleanup(): Promise<void> {
       const rawEnd = row.last_heartbeat_at ? new Date(row.last_heartbeat_at) : startedAt;
       const endedAt = rawEnd >= startedAt ? rawEnd : startedAt;
       const dur = Math.floor((endedAt.getTime() - startedAt.getTime()) / 1000);
-      await db
+      await withDbRetry(() => db
         .update(userSessions)
         .set({ endedAt, durationSeconds: dur, exitType: "crash" })
-        .where(eq(userSessions.id, row.id));
+        .where(eq(userSessions.id, row.id)));
     }
 
     console.log(`[session-crash-cleanup] Marked ${stale.rows.length} stale session(s) as crash`);
   } catch (err) {
-    console.warn("[session-crash-cleanup] error:", err);
+    dedupWarn("session-crash-cleanup", "error (non-fatal)", err);
   }
 }
 

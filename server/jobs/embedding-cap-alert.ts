@@ -6,11 +6,12 @@
  * critical-reports-notifier.ts). Throttle: one alert per day per threshold
  * crossing (85 % and 100 %). Resets at midnight UTC when the date changes.
  */
-import { db } from "../db";
+import { db, withDbRetry } from "../db";
 import { users } from "@shared/db";
 import { and, eq, inArray } from "drizzle-orm";
 import { getTodayEmbeddingApiCallCount } from "../embeddings/store";
 import { storage } from "../storage";
+import { dedupWarn } from "../lib/dedup-logger";
 
 const EXPO_PUSH_URL = "https://exp.host/--/api/v2/push/send";
 const THRESHOLD_WARN = 0.85;
@@ -36,22 +37,23 @@ function _resetIfNewDay(): void {
 
 async function _getDailyCap(): Promise<number> {
   try {
-    const setting = await storage.getAppSetting("embedding_daily_cap");
+    const setting = await withDbRetry(() => storage.getAppSetting("embedding_daily_cap"));
     const n = setting?.value ? parseInt(setting.value, 10) : NaN;
     return Number.isFinite(n) && n > 0 ? n : 500;
-  } catch {
+  } catch (err) {
+    dedupWarn("embed-cap-alert/get-cap", "errore lettura cap (non-fatal, default 500)", err);
     return 500;
   }
 }
 
 async function _pushAdmins(title: string, body: string, data: Record<string, unknown>): Promise<number> {
   try {
-    const rows = await db.select({ token: users.expoPushToken })
+    const rows = await withDbRetry(() => db.select({ token: users.expoPushToken })
       .from(users)
       .where(and(
         eq(users.status, "active"),
         inArray(users.role, ["admin", "moderator"]),
-      ));
+      )));
     const msgs = rows
       .map((r) => r.token)
       .filter((t): t is string => !!t && (t.startsWith("ExponentPushToken[") || t.startsWith("ExpoPushToken[")))
@@ -65,7 +67,7 @@ async function _pushAdmins(title: string, body: string, data: Record<string, unk
     if (!resp.ok) console.warn("[embed-cap-alert] push HTTP", resp.status);
     return msgs.length;
   } catch (err) {
-    console.warn("[embed-cap-alert] push error:", err);
+    dedupWarn("embed-cap-alert/push", "push error (non-fatal)", err);
     return 0;
   }
 }

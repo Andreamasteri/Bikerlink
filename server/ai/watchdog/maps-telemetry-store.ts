@@ -1,9 +1,10 @@
 // Task #2686 — Helpers persistenza eventi telemetria mappe + aggregati per
 // collector. Retention 7 giorni allineato a system_signals.
-import { db } from "../../db";
+import { db, withDbRetry } from "../../db";
 import { mapsTelemetryEvents } from "@shared/db";
 import { gte, lt, sql } from "drizzle-orm";
 import { logger } from "../../lib/logger";
+import { dedupWarn } from "../../lib/dedup-logger";
 
 const RETENTION_DAYS = 7;
 const log = logger.child({ scope: "maps-watchdog" });
@@ -185,12 +186,12 @@ export async function aggregateMapsTelemetry(windowMs: number = 5 * 60_000): Pro
 export async function cleanupMapsTelemetry(): Promise<number> {
   try {
     const cutoff = new Date(Date.now() - RETENTION_DAYS * 24 * 60 * 60 * 1000);
-    const out = await db.delete(mapsTelemetryEvents)
+    const out = await withDbRetry(() => db.delete(mapsTelemetryEvents)
       .where(lt(mapsTelemetryEvents.createdAt, cutoff))
-      .returning({ id: mapsTelemetryEvents.id });
+      .returning({ id: mapsTelemetryEvents.id }));
     return out.length;
   } catch (err) {
-    log.warn({ err: (err as Error).message }, "cleanup maps telemetry failed");
+    dedupWarn("maps-watchdog/cleanup", "cleanup maps telemetry failed (non-fatal)", err);
     return 0;
   }
 }

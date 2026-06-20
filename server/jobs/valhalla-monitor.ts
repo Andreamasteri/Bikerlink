@@ -18,6 +18,8 @@
 import { getInfo as getValhallaInfo } from "../routing/valhalla-client";
 import { storage } from "../storage";
 import { sendSystemAlertPushToAdmins } from "../push-notifications";
+import { withDbRetry } from "../db";
+import { dedupWarn } from "../lib/dedup-logger";
 
 // ── Config ─────────────────────────────────────────────────────────────────────
 const PROBE_INTERVAL_MS = 5 * 60 * 1000;    // ogni 5 min
@@ -44,9 +46,10 @@ function shouldNotify(eventKey: string): boolean {
 // ── Controlla se Valhalla è l'engine attivo ───────────────────────────────────
 async function isValhallaActive(): Promise<boolean> {
   try {
-    const setting = await storage.getAppSetting("maps_routing_engine");
+    const setting = await withDbRetry(() => storage.getAppSetting("maps_routing_engine"));
     return (setting?.value ?? "graphhopper") === "valhalla";
-  } catch {
+  } catch (err) {
+    dedupWarn("valhalla-monitor/active-check", "errore lettura engine attivo (non-fatal)", err);
     return false;
   }
 }
@@ -116,7 +119,7 @@ export async function runValhallaProbe(): Promise<void> {
       }
     }
   } catch (err) {
-    console.warn("[valhalla-monitor] probe error (non-fatal):", err);
+    dedupWarn("valhalla-monitor/probe", "probe error (non-fatal)", err);
   }
 }
 

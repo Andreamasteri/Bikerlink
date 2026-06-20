@@ -111,13 +111,13 @@ async function recordHealthEvent(
   transitionTo: string,
 ): Promise<void> {
   try {
-    await db.insert(thinkcentreHealthEvents).values({
+    await withDbRetry(() => db.insert(thinkcentreHealthEvents).values({
       serviceKey: serviceKey ?? undefined,
       transitionFrom,
       transitionTo,
-    });
+    }));
   } catch (err) {
-    console.warn("[thinkcentre-monitor] errore registrazione health event (non-fatal):", err);
+    dedupWarn("thinkcentre-monitor/health-event", "errore registrazione health event (non-fatal)", err);
   }
 }
 

@@ -16,7 +16,8 @@
  */
 
 import { sql, inArray } from "drizzle-orm";
-import { db } from "../db";
+import { db, withDbRetry } from "../db";
+import { dedupWarn } from "../lib/dedup-logger";
 import { userTelemetryProfile, notifications } from "@shared/db";
 import type { InsertUserTelemetryProfile } from "@shared/db";
 import {
@@ -110,7 +111,7 @@ export async function aggregateTelemetryProfiles(): Promise<number> {
     // Aggregazione per-sessione poi per-utente. Una "sessione" = session_id.
     // Durata sessione = (max(ts)-min(ts)) in minuti; ts è epoch ms.
     // Fascia oraria della sessione basata sull'ora di inizio (min ts) in Europe/Rome.
-    const rowsRes = await db.execute<AggRow>(sql`
+    const rowsRes = await withDbRetry(() => db.execute<AggRow>(sql`
       WITH sessions AS (
         SELECT
           user_id,
@@ -137,14 +138,14 @@ export async function aggregateTelemetryProfiles(): Promise<number> {
         AVG(CASE WHEN start_hour >= 18 AND start_hour < 24 THEN 1.0 ELSE 0.0 END) AS fraction_evening
       FROM sessions
       GROUP BY user_id
-    `);
+    `));
     const rows = (rowsRes.rows ?? rowsRes) as AggRow[];
 
     // Carica i profili esistenti in batch per rilevare i cambi di bucket senza N+1 query.
     const existingUserIds = rows.map((r) => r.user_id);
     const existingProfilesMap = new Map<string, { speedBucket: string; leanBucket: string; durationBucket: string }>();
     if (existingUserIds.length > 0) {
-      const existing = await db
+      const existing = await withDbRetry(() => db
         .select({
           userId: userTelemetryProfile.userId,
           speedBucket: userTelemetryProfile.speedBucket,
@@ -152,7 +153,7 @@ export async function aggregateTelemetryProfiles(): Promise<number> {
           durationBucket: userTelemetryProfile.durationBucket,
         })
         .from(userTelemetryProfile)
-        .where(inArray(userTelemetryProfile.userId, existingUserIds));
+        .where(inArray(userTelemetryProfile.userId, existingUserIds)));
       for (const p of existing) {
         existingProfilesMap.set(p.userId, {
           speedBucket: p.speedBucket,
@@ -192,7 +193,7 @@ export async function aggregateTelemetryProfiles(): Promise<number> {
         updatedAt: new Date(),
       };
 
-      const upserted = await db
+      const upserted = await withDbRetry(() => db
         .insert(userTelemetryProfile)
         .values(profile)
         .onConflictDoUpdate({
@@ -214,7 +215,7 @@ export async function aggregateTelemetryProfiles(): Promise<number> {
             updatedAt: profile.updatedAt,
           },
         })
-        .returning();
+        .returning());
       profilesUpserted++;
 
       // Rileva cambio di bucket rispetto al profilo precedente.
@@ -238,14 +239,14 @@ export async function aggregateTelemetryProfiles(): Promise<number> {
           newDuration,
         );
         try {
-          await db.insert(notifications).values({
+          await withDbRetry(() => db.insert(notifications).values({
             userId: r.user_id,
             title: it["push.drivingStyleChanged.title"] ?? "Il tuo stile di guida è cambiato! 🏍️",
             body: changeDesc,
             notificationType: "driving_style_changed",
-          });
+          }));
         } catch (err) {
-          console.warn(`[TelemetryAggregation] notifica in-app fallita per ${r.user_id} (non fatale):`, err);
+          dedupWarn("telemetry-aggregation/notif", "notifica in-app fallita (non-fatal)", err);
         }
         try {
           const sent = await sendDrivingStyleChangePushNotification(r.user_id, {
@@ -281,7 +282,7 @@ export async function aggregateTelemetryProfiles(): Promise<number> {
     );
     return profilesUpserted;
   } catch (err) {
-    console.error("[TelemetryAggregation] errore:", err);
+    dedupWarn("telemetry-aggregation", "errore aggregazione profili (non-fatal)", err);
     lastStats = { profilesUpserted, embeddingsGenerated, durationMs: Date.now() - startedAt };
     return profilesUpserted;
   }
