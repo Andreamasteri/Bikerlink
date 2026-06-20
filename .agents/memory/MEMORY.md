@@ -59,3 +59,4 @@
 - [DB background-cycle resilience](db-background-resilience.md) — withDbRetry assorbe blip transitori; db-collector escala high/critical solo dopo 3 campioni consecutivi; dedupWarn contro le storm di log.
 - [Diagnostica OTA-proof](diagnostic-ota-proof.md) — camera=metodo statico Camera.getCameraPermissionsAsync; sensori girano su ogni build nativa; isDiagnosticApk via Updates.channel (env baked si perde via OTA); canale OTA dedicato `diagnostic`.
 - [Tracking fusion gate](tracking-fusion-gate.md) — km distance: shared/tracking-fusion.evaluateSegment è l'UNICO gate (client+server); 3 timestamp GPS distinti (raw-event=heartbeat, usable-fix=freshness, anchor=accept); il reject NON tocca l'anchor o si auto-blocca.
+- [Resume-path async crash hardening](resume-path-async-crash.md) — ErrorBoundary NON copre le rejection dei listener AppState; ogni body va in try/catch + apiRequest({timeoutMs}); markAsyncError per errori async non fatali.

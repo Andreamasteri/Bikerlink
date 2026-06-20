@@ -537,16 +537,23 @@ export function useTelemetry(isActive: boolean, externalGps = false) {
   // prevent spurious background task churn on brief interruptions.
   useEffect(() => {
     const handleAppState = (nextState: AppStateStatus) => {
-      if (nextState === "background") {
-        if (activeRef.current && !inBackgroundRef.current) {
-          handoffToBackground();
+      // Guarded: the async handoff/resume work is already serialized and
+      // .catch()-ed inside enqueueTransition, but the dispatch itself is wrapped
+      // so this native callback can never throw on resume from background.
+      try {
+        if (nextState === "background") {
+          if (activeRef.current && !inBackgroundRef.current) {
+            handoffToBackground();
+          }
+        } else if (nextState === "active") {
+          if (activeRef.current && inBackgroundRef.current) {
+            resumeFromBackground();
+          }
         }
-      } else if (nextState === "active") {
-        if (activeRef.current && inBackgroundRef.current) {
-          resumeFromBackground();
-        }
+        // "inactive" intentionally not handled.
+      } catch {
+        // no-op: never let the telemetry AppState callback crash the app
       }
-      // "inactive" intentionally not handled.
     };
 
     const sub = AppState.addEventListener("change", handleAppState);

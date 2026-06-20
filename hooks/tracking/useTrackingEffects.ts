@@ -4,6 +4,7 @@ import * as Location from "expo-location";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 import { apiRequest } from "@/lib/query-client";
+import { markAsyncError } from "@/lib/crash-logger";
 import { emitMapsTelemetry } from "@/hooks/useMapTelemetry";
 import { evaluateSegment, TRACKING_FUSION } from "@shared/tracking-fusion";
 import { setHandsOffBroadcast, setSprintMeasuringBroadcast } from "@/lib/tracking-active";
@@ -130,6 +131,11 @@ export function useTrackingEffects(deps: EffectDeps) {
   // AppState: background → start bg location; active → replay bg points
   useEffect(() => {
     const sub = AppState.addEventListener("change", async (next) => {
+      // Whole body guarded: this is an async listener, so any unguarded rejection
+      // (native location call failing on poor network, corrupted JSON, etc.)
+      // would otherwise surface as an unhandled rejection that can close the app
+      // on resume from background. We catch, record, and degrade gracefully.
+      try {
       if (session.phaseRef.current !== "active") return;
       if (next === "background") {
         bg.bgStartGenRef.current += 1; const gen = bg.bgStartGenRef.current;
@@ -175,6 +181,9 @@ export function useTrackingEffects(deps: EffectDeps) {
             }
           }
         }
+      }
+      } catch (e) {
+        markAsyncError("tracking_app_state", e).catch(() => {});
       }
     });
     return () => sub.remove();

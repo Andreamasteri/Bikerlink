@@ -5,7 +5,7 @@ import { useLocationGate } from "@/lib/location-context";
 import { queryClient, apiRequest } from "@/lib/query-client";
 import { sendStartupBeacon } from "@/lib/startup-beacon";
 import { isTrackingActive, registerLayoutWatcherCallbacks } from "@/lib/tracking-active";
-import { initCrashLogger, markClean, resetCrashLogger } from "@/lib/crash-logger";
+import { initCrashLogger, markClean, resetCrashLogger, markAsyncError } from "@/lib/crash-logger";
 import {
   startBackgroundLocationTask,
   stopBackgroundLocationTask,
@@ -24,6 +24,10 @@ import { getReliableAppVersion } from "@/lib/device-info";
 
 const HEARTBEAT_INTERVAL_MS = 2 * 60 * 1000;
 const SOCIAL_LOCATION_THROTTLE_MS = 30000;
+// Resume-path network calls must never hang on poor/absent network. Each is
+// given an explicit timeout so a stalled request fails fast and silently
+// instead of leaving a dangling promise that can surface as a crash.
+const RESUME_NET_TIMEOUT_MS = 8000;
 
 // Module-level export so auth-context can read the current session ID
 // before issuing the logout request (client-side per-session close).
@@ -43,9 +47,9 @@ async function sendHeartbeat() {
     // Include current sessionId so the server can update last_heartbeat_at per-session
     const sid = _currentSessionId;
     if (sid) payload.sessionId = sid;
-    await apiRequest("POST", "/api/auth/heartbeat", payload);
+    await apiRequest("POST", "/api/auth/heartbeat", payload, { timeoutMs: RESUME_NET_TIMEOUT_MS });
   } catch {
-    // no-op: ignore heartbeat failures
+    // no-op: ignore heartbeat failures (network down/slow → retried on next interval)
   }
 }
 
@@ -58,7 +62,7 @@ async function startSession(): Promise<string | null> {
       appVersion,
       platform,
       deviceModel: deviceModel ?? null,
-    }) as { sessionId?: string };
+    }, { timeoutMs: RESUME_NET_TIMEOUT_MS }) as { sessionId?: string };
     return result?.sessionId ?? null;
   } catch {
     return null;
@@ -129,34 +133,51 @@ export function AppStateHandler() {
     });
 
     const subscription = AppState.addEventListener("change", (nextAppState) => {
-      const prev = appStateRef.current;
+      // The whole handler is wrapped so a synchronous throw can never escape the
+      // native AppState callback (which the React ErrorBoundary cannot catch).
+      try {
+        const prev = appStateRef.current;
 
-      if (nextAppState.match(/inactive|background/) && prev === "active") {
-        apiRequest("POST", "/api/users/app-close").catch(() => {});
-        const sid = sessionIdRef.current;
-        if (sid) {
-          sessionIdRef.current = null;
-          _currentSessionId = null;
-          endSession(sid, "background");
+        if (nextAppState.match(/inactive|background/) && prev === "active") {
+          apiRequest("POST", "/api/users/app-close", undefined, { timeoutMs: RESUME_NET_TIMEOUT_MS }).catch(() => {});
+          const sid = sessionIdRef.current;
+          if (sid) {
+            sessionIdRef.current = null;
+            _currentSessionId = null;
+            endSession(sid, "background");
+          }
         }
+
+        if (prev.match(/inactive|background/) && nextAppState === "active") {
+          // Every resume operation is individually guarded so a single failure
+          // (network timeout, rejected refetch) degrades silently and is retried
+          // on the next interval/resume, rather than propagating as a fatal
+          // unhandled rejection that closes the app.
+          sendHeartbeat().catch(() => {});
+
+          const invalidate = (queryKey: string[]) =>
+            queryClient.invalidateQueries({ queryKey }).catch(() => {});
+          invalidate(["/api/users/profile"]);
+          invalidate(["/api/users/online-count"]);
+          invalidate(["/api/users/biker-available-count"]);
+          invalidate(["/api/users/zavorrine-available-count"]);
+          invalidate(["/api/users/biker-available-list"]);
+          invalidate(["/api/users/zavorrine-available-list"]);
+
+          startSession()
+            .then((id) => {
+              sessionIdRef.current = id;
+              _currentSessionId = id;
+            })
+            .catch(() => {});
+        }
+
+        appStateRef.current = nextAppState;
+      } catch (e) {
+        // Last-resort safety net: record and swallow so the app stays alive.
+        appStateRef.current = nextAppState;
+        markAsyncError("app_state_handler", e).catch(() => {});
       }
-
-      if (prev.match(/inactive|background/) && nextAppState === "active") {
-        sendHeartbeat();
-        queryClient.invalidateQueries({ queryKey: ["/api/users/profile"] });
-        queryClient.invalidateQueries({ queryKey: ["/api/users/online-count"] });
-        queryClient.invalidateQueries({ queryKey: ["/api/users/biker-available-count"] });
-        queryClient.invalidateQueries({ queryKey: ["/api/users/zavorrine-available-count"] });
-        queryClient.invalidateQueries({ queryKey: ["/api/users/biker-available-list"] });
-        queryClient.invalidateQueries({ queryKey: ["/api/users/zavorrine-available-list"] });
-
-        startSession().then((id) => {
-          sessionIdRef.current = id;
-          _currentSessionId = id;
-        });
-      }
-
-      appStateRef.current = nextAppState;
     });
 
     return () => {

@@ -169,6 +169,41 @@ export async function markJsError(error: Error, stack?: string): Promise<void> {
   await enqueueCrashEntry(entry);
 }
 
+/**
+ * Records a NON-FATAL async error (caught promise rejection / exception from an
+ * AppState listener, drain/replay, or other resume-path work that the React
+ * ErrorBoundary cannot see). The entry is queued like a JS crash but tagged with
+ * a `[resume:<context>]` prefix so it stays distinguishable from real fatal JS
+ * crashes. This NEVER throws and NEVER terminates the app.
+ */
+export async function markAsyncError(context: string, error: unknown): Promise<void> {
+  try {
+    if (!_currentUserId) return;
+    const err = error instanceof Error ? error : new Error(String(error));
+    const rawMsg = (err.message ?? "").slice(0, 460);
+    const errMsg = `[resume:${context}] ${rawMsg}`.slice(0, 500);
+    const errStack = (err.stack ?? "").slice(0, 3000);
+    const entry: CrashLogEntry = {
+      userId: _currentUserId,
+      sessionId: _currentSession?.sessionId ?? "no-session",
+      crashType: "crash_js",
+      appVersion: getAppVersion(),
+      platform: Platform.OS,
+      osVersion: getOsVersion(),
+      deviceModel: getDeviceModel(),
+      deviceBrand: getDeviceBrand(),
+      totalMemoryMB: getTotalMemoryMB(),
+      errorMessage: errMsg,
+      stackTrace: errStack || null,
+      sessionStartedAt: _currentSession?.startedAt ?? new Date().toISOString(),
+      sessionEndedAt: new Date().toISOString(),
+    };
+    await enqueueCrashEntry(entry);
+  } catch {
+    // never throw from the crash logger
+  }
+}
+
 export async function flushQueue(): Promise<void> {
   if (!_currentUserId) return;
   const uid = _currentUserId;
@@ -245,18 +280,24 @@ export async function initCrashLogger(userId: string): Promise<void> {
     _appStateSubscription = null;
   }
   _appStateSubscription = AppState.addEventListener("change", async (state) => {
-    if (state === "background" || state === "inactive") {
-      if (_currentSession && !_currentSession.clean && !_currentSession.jsError) {
-        _currentSession.clean = true;
-        await saveCurrentSession();
+    // Async listener: guard the whole body so a rejection (e.g. flushQueue
+    // network failure on resume) can never become an unhandled rejection.
+    try {
+      if (state === "background" || state === "inactive") {
+        if (_currentSession && !_currentSession.clean && !_currentSession.jsError) {
+          _currentSession.clean = true;
+          await saveCurrentSession();
+        }
       }
-    }
-    if (state === "active") {
-      if (_currentSession) {
-        _currentSession.clean = false;
-        await saveCurrentSession();
+      if (state === "active") {
+        if (_currentSession) {
+          _currentSession.clean = false;
+          await saveCurrentSession();
+        }
+        await flushQueue();
       }
-      await flushQueue();
+    } catch {
+      // no-op: crash logger must never crash the app
     }
   });
 

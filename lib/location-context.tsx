@@ -223,9 +223,15 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const subscription = AppState.addEventListener("change", (nextState: AppStateStatus) => {
-      if (appState.current.match(/inactive|background/) && nextState === "active") {
-        checkPermission();
-        checkBackgroundPermission();
+      try {
+        if (appState.current.match(/inactive|background/) && nextState === "active") {
+          // Both checks are internally guarded and non-blocking; the try/catch
+          // is a belt-and-braces guard so this native callback can never throw.
+          checkPermission().catch(() => {});
+          checkBackgroundPermission().catch(() => {});
+        }
+      } catch {
+        // no-op: never let the AppState callback crash the app on resume
       }
       appState.current = nextState;
     });

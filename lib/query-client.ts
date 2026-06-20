@@ -176,6 +176,7 @@ export async function apiRequest(
   method: string,
   route: string,
   data?: unknown | undefined,
+  opts?: { timeoutMs?: number; signal?: AbortSignal },
 ): Promise<Response> {
   const baseUrl = getApiUrl();
   const url = new URL(route, baseUrl);
@@ -183,27 +184,54 @@ export async function apiRequest(
   const baseHeaders: Record<string, string> = data ? { "Content-Type": "application/json" } : {};
   const headers = buildAuthHeaders(baseHeaders);
 
-  const res = await fetch(url.toString(), {
-    method,
-    headers,
-    body: data ? JSON.stringify(data) : undefined,
-    credentials: "include",
-  });
-
-  if (res.status === 401 && !route.includes("/api/auth/")) {
-    scheduleAuthRecheck();
+  // Optional explicit timeout: aborts the underlying fetch when the server is
+  // slow/unreachable (typical on resume from background with poor network) so
+  // the promise rejects instead of hanging forever. Honours an externally
+  // provided signal as well.
+  let controller: AbortController | undefined;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  let signal: AbortSignal | undefined = opts?.signal;
+  if (opts?.timeoutMs && opts.timeoutMs > 0) {
+    controller = new AbortController();
+    const ms = opts.timeoutMs;
+    timer = setTimeout(() => controller!.abort(new Error(`Request timeout after ${ms}ms`)), ms);
+    if (opts.signal) {
+      const ext = opts.signal as AbortSignal & { reason?: unknown };
+      if (ext.aborted) {
+        controller.abort(ext.reason);
+      } else {
+        ext.addEventListener("abort", () => controller!.abort(ext.reason), { once: true });
+      }
+    }
+    signal = controller.signal;
   }
 
-  await throwIfResNotOk(res);
+  try {
+    const res = await fetch(url.toString(), {
+      method,
+      headers,
+      body: data ? JSON.stringify(data) : undefined,
+      credentials: "include",
+      signal,
+    });
 
-  const ct = res.headers.get("content-type") || "";
-  if (!ct.includes("application/json")) {
-    const preview = await res.text().catch(() => "");
-    console.warn(`[apiRequest] risposta non-JSON da ${route} (Content-Type: ${ct || "assente"}):`, preview.slice(0, 120));
-    throw new Error("Risposta del server non valida. Riprova.");
+    if (res.status === 401 && !route.includes("/api/auth/")) {
+      scheduleAuthRecheck();
+    }
+
+    await throwIfResNotOk(res);
+
+    const ct = res.headers.get("content-type") || "";
+    if (!ct.includes("application/json")) {
+      const preview = await res.text().catch(() => "");
+      console.warn(`[apiRequest] risposta non-JSON da ${route} (Content-Type: ${ct || "assente"}):`, preview.slice(0, 120));
+      throw new Error("Risposta del server non valida. Riprova.");
+    }
+
+    return res;
+  } finally {
+    if (timer) clearTimeout(timer);
   }
-
-  return res;
 }
 
 /**
