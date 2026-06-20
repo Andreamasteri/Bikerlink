@@ -190,14 +190,24 @@ export async function collectMaps(): Promise<Signal[]> {
     const mm = await getMapMatchingStats();
     const lastRunAt = mm.lastRun ? new Date(mm.lastRun).getTime() : null;
     const ageH = lastRunAt ? Math.round((Date.now() - lastRunAt) / 3_600_000) : null;
+    // Backlog = campioni che il job dovrà ancora processare (pending + retry).
+    const backlog = mm.pending + mm.retry;
     signals.push({
       source: "maps", metric: "matching.last_run_h", value: ageH ?? -1, unit: "h",
       severity: ageH != null && ageH > TH.mapMatchingStaleHours ? "warn" : "info",
-      details: { lastRun: mm.lastRun, pending: mm.pending, matched: mm.matched, isRunning: mm.isRunning },
+      details: {
+        lastRun: mm.lastRun,
+        pending: mm.pending,
+        retry: mm.retry,
+        matched: mm.matched,
+        unmatchable: mm.unmatchable,
+        isRunning: mm.isRunning,
+      },
     });
     signals.push({
-      source: "maps", metric: "matching.pending", value: mm.pending, unit: "rides",
-      severity: mm.pending > 10000 ? "high" : mm.pending > 2000 ? "warn" : "info",
+      source: "maps", metric: "matching.pending", value: backlog, unit: "rides",
+      severity: backlog > 10000 ? "high" : backlog > 2000 ? "warn" : "info",
+      details: { pending: mm.pending, retry: mm.retry },
     });
   } catch (err) {
     signals.push({

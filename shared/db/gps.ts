@@ -108,11 +108,18 @@ export const rideTelemetry = pgTable("ride_telemetry", {
   heading: real("heading"),
   altitudeM: real("altitude_m"),
   matched: boolean("matched").notNull().default(false),
+  // Stato di re-processabilità del map-matching (Task #4589):
+  //   pending | retry | matched | unmatchable
+  // `matched` (legacy) resta sincronizzato: true solo quando matchStatus = 'matched'.
+  matchStatus: varchar("match_status", { length: 12 }).notNull().default("pending"),
+  matchAttempts: integer("match_attempts").notNull().default(0),
+  lastMatchAttemptAt: timestamp("last_match_attempt_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
   index("ride_telemetry_user_id_idx").on(table.userId),
   index("ride_telemetry_session_id_idx").on(table.sessionId),
   index("ride_telemetry_ts_idx").on(table.ts),
+  index("ride_telemetry_match_status_idx").on(table.matchStatus),
 ]);
 
 export const segmentTelemetry = pgTable("segment_telemetry", {

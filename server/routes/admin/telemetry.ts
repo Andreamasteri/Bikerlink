@@ -8,6 +8,7 @@ import {
   isMapMatchingRunning,
   runMapMatchingJob,
   getMapMatchingStats,
+  requeueUnmatchable,
 } from "../../map-matching-job";
 import {
   isCurvyScoreJobRunning,
@@ -315,6 +316,26 @@ router.post("/map-matching/run", async (_req: Request, res: Response) => {
     console.error("[admin/map-matching/run] background error:", err);
   });
   return res.json({ started: true });
+});
+
+// Riaccoda le sessioni non matchabili (+ retry al cap) per un nuovo tentativo.
+router.post("/map-matching/rematch", async (_req: Request, res: Response) => {
+  try {
+    const result = await requeueUnmatchable();
+    return res.json({ success: true, ...result });
+  } catch (err) {
+    const cause = (err as any)?.cause?.message ?? "";
+    const errMsg = err instanceof Error ? err.message : String(err);
+    console.error("[admin/map-matching/rematch] error:", err, cause ? `| PG: ${cause}` : "");
+    logTelemetryEvent({
+      ts: new Date().toISOString(),
+      type: "ERROR",
+      context: "admin/map-matching/rematch",
+      message: errMsg,
+      detail: cause || (err instanceof Error ? err.stack : undefined),
+    });
+    return sendError(res, 500, "Errore nel riaccodamento delle sessioni non matchabili");
+  }
 });
 
 router.post("/curvy-score/run", async (_req: Request, res: Response) => {

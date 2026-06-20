@@ -37,7 +37,9 @@ interface TelemetryAdminStats {
 
 interface MapMatchingStats {
   pending: number;
+  retry: number;
   matched: number;
+  unmatchable: number;
   segments: number;
   lastRun: string | null;
   isRunning: boolean;
@@ -71,6 +73,7 @@ export default function AdminTelemetryScreen() {
   const [saving, setSaving] = useState(false);
   const [savingSensors, setSavingSensors] = useState(false);
   const [runningJob, setRunningJob] = useState(false);
+  const [rematchingJob, setRematchingJob] = useState(false);
   const [runningCurvyJob, setRunningCurvyJob] = useState(false);
   const [showInfo, setShowInfo] = useState(false);
   const [showErrorLog, setShowErrorLog] = useState(false);
@@ -200,6 +203,28 @@ export default function AdminTelemetryScreen() {
     }
   };
 
+  const handleRematchMapMatching = async () => {
+    if (rematchingJob || runningJob || mmStats?.isRunning) return;
+    setRematchingJob(true);
+    try {
+      const res = await fetch(
+        new URL("/api/admin/map-matching/rematch", getApiUrl()).toString(),
+        { method: "POST", headers: { ...(await authFetchHeaders()) }, credentials: "include" }
+      );
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      Alert.alert(
+        "Riaccodate",
+        `${(data.requeuedSessions ?? 0).toLocaleString("it-IT")} sessioni (${(data.requeuedSamples ?? 0).toLocaleString("it-IT")} campioni) riportate in coda. Verranno riprocessate alla prossima esecuzione.`,
+      );
+      setTimeout(() => refetchMm(), 1_000);
+    } catch {
+      Alert.alert("Errore", "Impossibile riaccodare le sessioni.");
+    } finally {
+      setRematchingJob(false);
+    }
+  };
+
   const progressPct = stats
     ? Math.min(100, Math.round((stats.kmCollected / stats.targetKm) * 100))
     : 0;
@@ -280,7 +305,9 @@ export default function AdminTelemetryScreen() {
         <MapMatchingSection
           stats={mmStats}
           onRunJob={handleRunMapMatching}
+          onRematch={handleRematchMapMatching}
           isRunning={runningJob}
+          isRematching={rematchingJob}
           formatLastRun={formatLastRun}
         />
 

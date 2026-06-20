@@ -6,7 +6,9 @@ import { StatCard } from "./StatCard";
 
 interface MapMatchingStats {
   pending: number;
+  retry: number;
   matched: number;
+  unmatchable: number;
   segments: number;
   lastRun: string | null;
   isRunning: boolean;
@@ -16,16 +18,21 @@ interface MapMatchingStats {
 interface MapMatchingSectionProps {
   stats: MapMatchingStats | undefined;
   onRunJob: () => void;
+  onRematch: () => void;
   isRunning: boolean;
+  isRematching: boolean;
   formatLastRun: (iso: string | null | undefined) => string;
 }
 
 export function MapMatchingSection({
   stats,
   onRunJob,
+  onRematch,
   isRunning,
+  isRematching,
   formatLastRun,
 }: MapMatchingSectionProps) {
+  const hasUnmatchable = (stats?.unmatchable ?? 0) > 0;
   return (
     <View style={styles.section}>
       <View style={styles.mmHeader}>
@@ -45,10 +52,22 @@ export function MapMatchingSection({
             color="#f59e0b"
           />
           <StatCard
+            label="Da ritentare"
+            value={stats.retry.toLocaleString("it-IT")}
+            icon="reload-alert"
+            color="#eab308"
+          />
+          <StatCard
             label="Campioni matchati"
             value={stats.matched.toLocaleString("it-IT")}
             icon="check-circle"
             color="#22c55e"
+          />
+          <StatCard
+            label="Non matchabili"
+            value={stats.unmatchable.toLocaleString("it-IT")}
+            icon="map-marker-off"
+            color="#ef4444"
           />
           <StatCard
             label="Segmenti OSM noti"
@@ -107,6 +126,26 @@ export function MapMatchingSection({
           <MaterialCommunityIcons name="play-circle" size={18} color="#000" />
         )}
         <Text style={styles.runJobBtnText}>Esegui ora</Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        style={[
+          styles.rematchBtn,
+          (isRematching || isRunning || stats?.isRunning || !hasUnmatchable) && { opacity: 0.5 },
+        ]}
+        onPress={onRematch}
+        disabled={isRematching || isRunning || stats?.isRunning || !hasUnmatchable}
+        activeOpacity={0.8}
+      >
+        {isRematching ? (
+          <ActivityIndicator size="small" color={Colors.accent} />
+        ) : (
+          <MaterialCommunityIcons name="reload" size={18} color={Colors.accent} />
+        )}
+        <Text style={styles.rematchBtnText}>
+          Riprova non matchabili
+          {hasUnmatchable ? ` (${(stats?.unmatchable ?? 0).toLocaleString("it-IT")})` : ""}
+        </Text>
       </TouchableOpacity>
     </View>
   );
@@ -167,5 +206,23 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_600SemiBold",
     fontSize: 14,
     color: "#000",
+  },
+  rematchBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    backgroundColor: "transparent",
+    borderWidth: 1,
+    borderColor: Colors.accent,
+    borderRadius: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    marginTop: 10,
+  },
+  rematchBtnText: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 14,
+    color: Colors.accent,
   },
 });
