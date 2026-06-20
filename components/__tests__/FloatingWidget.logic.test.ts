@@ -26,14 +26,35 @@ import { describe, it, expect, vi } from "vitest";
 // ── mock: dipendenze necessarie solo per caricare il modulo ──────────────────
 vi.mock("react-native", () => ({
   StyleSheet: { create: (s: unknown) => s },
-  Animated: { ValueXY: class { setValue() {} stopAnimation() {} } },
-  PanResponder: { create: (cfg: unknown) => cfg },
   View: {},
   Text: {},
   Pressable: {},
-  Dimensions: { get: () => ({ width: 400, height: 800 }) },
+  useWindowDimensions: () => ({ width: 400, height: 800 }),
   Modal: {},
   Platform: { OS: "ios" },
+}));
+// RNGH e reanimated: mock minimi solo per caricare il modulo (le funzioni pure
+// clampPos/isDragGesture non usano questi import).
+vi.mock("react-native-gesture-handler", () => ({
+  Gesture: {
+    Pan: () => {
+      const g: Record<string, () => unknown> = {};
+      g.minDistance = () => g;
+      g.onStart = () => g;
+      g.onUpdate = () => g;
+      g.onEnd = () => g;
+      g.onBegin = () => g;
+      g.onFinalize = () => g;
+      return g;
+    },
+  },
+  GestureDetector: {},
+}));
+vi.mock("react-native-reanimated", () => ({
+  default: { View: {} },
+  useSharedValue: (v: unknown) => ({ value: v }),
+  useAnimatedStyle: (fn: () => unknown) => fn(),
+  runOnJS: (fn: unknown) => fn,
 }));
 vi.mock("@react-native-async-storage/async-storage", () => ({ default: {} }));
 vi.mock("react-native-safe-area-context", () => ({ useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }) }));

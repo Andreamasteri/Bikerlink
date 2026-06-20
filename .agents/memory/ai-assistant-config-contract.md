@@ -27,24 +27,39 @@ config was never saved → profile shows "Disabilitato dall'amministratore" and 
 the switches even though the admin never disabled anything. Only an explicit
 `enabled === false` should disable.
 
-## ONE floating ball, PanResponder only — NOT RNGH, NOT two widgets
-The floating UI is a SINGLE `components/FloatingWidget.tsx` ball that uses
-react-native `PanResponder` (Animated.ValueXY) for drag/tap — deliberately NOT
-react-native-gesture-handler. Its tap opens one overlay menu (Assistente AI, Chat,
-Notifiche, Nuovi Match, Player); the AI item is gated by `useAssistantEnabled().fabEnabled`.
-There is NO separate AssistantFab anymore.
+## ONE floating ball, RNGH Gesture.Pan() (not PanResponder), NOT two widgets
+The floating UI is a SINGLE `components/FloatingWidget.tsx` ball. It uses
+react-native-gesture-handler `Gesture.Pan()` + reanimated shared values
+(`useSharedValue` posX/posY/startX/startY + `useAnimatedStyle` transform) for
+drag/tap. Its tap opens one overlay menu (Assistente AI, Chat, Notifiche, Nuovi
+Match, Player); the AI item is gated by `useAssistantEnabled().fabEnabled`. There
+is NO separate AssistantFab anymore. The admin `components/admin/ai-console/FabWidget.tsx`
+uses the same RNGH+reanimated pattern (tap/long-press still discriminated via
+`Date.now()` timing in `onBegin`/`onEnd`, drag via translation).
 
-**Why:** the previous design had TWO floating components (orange FloatingWidget +
-purple AssistantFab) both built on RNGH. On real Android APKs this was chronically
-broken: inline `Gesture.Tap()` objects re-registered asynchronously and dropped taps;
-menu handlers hit Hermes TDZ if declared below the gesture; and any attempt to
-coordinate the two via cross-tree gesture refs (`withRef` /
-`simultaneousWithExternalGesture` through a context ref) corrupted RNGH's gesture-tree
-registration under `GestureHandlerRootView`, breaking the ball's own drag/menu. Two
-overlapping floating components also caused touch-routing conflicts.
+**Why (PanResponder → RNGH):** Expo Router mounts everything under
+`GestureHandlerRootView` and uses RNGH natively, so RNGH reclaims gestures before
+the JS `PanResponder` ever sees them — the ball was neither tappable nor draggable
+on real Expo Router screens. The fix is to speak RNGH's own language
+(`Gesture.Pan()` driven by reanimated shared values on the UI thread), the exact
+pattern `components/UptimeWidget.tsx` already uses and which works on real devices.
 
-**How to apply:** keep gestures on this ball in PanResponder. Tap-vs-drag is decided
-by a `TAP_THRESHOLD` movement check (drag past threshold suppresses the tap-toggle).
+**Why NOT the old broken RNGH design:** an EARLIER attempt had TWO floating
+components (orange FloatingWidget + purple AssistantFab) both on RNGH and was
+chronically broken on Android APKs — but the cause was NOT `Gesture.Pan()` itself.
+It was: inline `Gesture.Tap()` objects re-registering asynchronously and dropping
+taps; menu handlers hitting Hermes TDZ when declared below the gesture; and
+cross-tree gesture coordination (`withRef` / `simultaneousWithExternalGesture`
+through a context ref) corrupting RNGH's gesture-tree registration. Two overlapping
+floating components also caused touch-routing conflicts.
+
+**How to apply:** keep this ball on a SINGLE `Gesture.Pan()` recreated each render
+(like UptimeWidget). Position via `transform` translateX/translateY (NOT left/top —
+on Android animating left/top leaves the touch hitbox at the original layout spot).
+Tap-vs-drag is decided by a `TAP_THRESHOLD` translation check in `onEnd` (drag past
+threshold suppresses the tap-toggle). Use `runOnJS` to cross back to JS for
+`setMenuOpen`/AsyncStorage. Clamp/drag worklets carry a `"worklet"` directive
+(no-op string under vitest, so `clampPos`/`isDragGesture` stay pure and testable).
 Position persists in AsyncStorage key `floating_widget_position`, clamped on-screen.
-Do not reintroduce RNGH here, do not split the AI action back into a second floating
-component, and do not coordinate floating gestures across separate components.
+Do NOT reintroduce `Gesture.Tap()`, do NOT split the AI action into a second floating
+component, and do NOT coordinate floating gestures across separate components.

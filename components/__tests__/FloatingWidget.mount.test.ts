@@ -78,22 +78,41 @@ vi.mock("react", async (importOriginal) => {
 // ── Mock: react-native ────────────────────────────────────────────────────────
 vi.mock("react-native", () => ({
   StyleSheet: { create: (s: unknown) => s },
-  Animated: {
-    ValueXY: class {
-      x = 0;
-      y = 0;
-      setValue(_v: unknown) {}
-      stopAnimation() {}
-    },
-    View: "AnimatedView",
-  },
-  PanResponder: { create: (_cfg: unknown) => ({ panHandlers: {} }) },
   View: "View",
   Text: "Text",
   Pressable: "Pressable",
-  Dimensions: { get: () => ({ width: 400, height: 800 }) },
+  useWindowDimensions: () => ({ width: 400, height: 800 }),
   Modal: "Modal",
   Platform: { get OS() { return mocks.platformOS; } },
+}));
+
+// ── Mock: react-native-reanimated ─────────────────────────────────────────────
+// Animated.View è il container esterno del pallino; useAnimatedStyle restituisce
+// uno style con il transform translateX/translateY così i test (f1) lo vedono.
+vi.mock("react-native-reanimated", () => ({
+  default: { View: "AnimatedView" },
+  useSharedValue: (v: unknown) => ({ value: v }),
+  useAnimatedStyle: () => ({ transform: [{ translateX: 0 }, { translateY: 0 }] }),
+  runOnJS: (fn: unknown) => fn,
+}));
+
+// ── Mock: react-native-gesture-handler ────────────────────────────────────────
+// GestureDetector è un passthrough che rende i suoi figli; Gesture.Pan() è una
+// catena fluente no-op (i worklet non vengono eseguiti in fase di mount).
+vi.mock("react-native-gesture-handler", () => ({
+  Gesture: {
+    Pan: () => {
+      const g: Record<string, () => unknown> = {};
+      g.minDistance = () => g;
+      g.onStart = () => g;
+      g.onUpdate = () => g;
+      g.onEnd = () => g;
+      g.onBegin = () => g;
+      g.onFinalize = () => g;
+      return g;
+    },
+  },
+  GestureDetector: ({ children }: { children: unknown }) => children,
 }));
 
 vi.mock("@react-native-async-storage/async-storage", () => ({
