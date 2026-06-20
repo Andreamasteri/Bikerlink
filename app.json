@@ -2,7 +2,7 @@
   "expo": {
     "name": "BikerLink",
     "slug": "bikerlink",
-    "version": "71D.10.123",
+    "version": "71D.10.125",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "bikerlink",
