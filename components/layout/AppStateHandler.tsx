@@ -19,8 +19,8 @@ import {
   FOREGROUND_SERVICE_DISABLED_KEY,
 } from "@/lib/foreground-location-service";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import Constants from "expo-constants";
 import { getDeviceModel } from "@/lib/device-model";
+import { getReliableAppVersion } from "@/lib/device-info";
 
 const HEARTBEAT_INTERVAL_MS = 2 * 60 * 1000;
 const SOCIAL_LOCATION_THROTTLE_MS = 30000;
@@ -33,7 +33,7 @@ export function clearCurrentSessionId(): void { _currentSessionId = null; }
 
 async function sendHeartbeat() {
   try {
-    const appVersion = Constants.expoConfig?.version ?? "0.0.0";
+    const appVersion = getReliableAppVersion();
     const platform = Platform.OS;
     const deviceModel = getDeviceModel();
     const osVersion = Platform.Version != null ? String(Platform.Version) : null;
@@ -51,7 +51,7 @@ async function sendHeartbeat() {
 
 async function startSession(): Promise<string | null> {
   try {
-    const appVersion = Constants.expoConfig?.version ?? "0.0.0";
+    const appVersion = getReliableAppVersion();
     const platform = Platform.OS;
     const deviceModel = getDeviceModel();
     const result = await apiRequest("POST", "/api/sessions/start", {
