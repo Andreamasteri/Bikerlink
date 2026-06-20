@@ -228,11 +228,28 @@ function deriveProblems(signals: Signal[]): Problem[] {
       if (s.severity === "critical") {
         title = `Pool DB esaurito: ${s.value} client in attesa (max=${det?.max ?? 10})`;
         suggestion = "Il pool è completamente saturo. Controlla query lente/lock e valuta di aumentare pool.max o ridurre la concorrenza.";
+      } else if (s.severity === "high") {
+        const ticks = det?.consecutiveWaiting ?? 3;
+        title = `Pool DB sotto forte pressione: ${s.value} client in attesa da ${ticks} tick consecutivi`;
+        suggestion = "Pressione persistente sul pool. Probabile accumulo di query lente o leak di connessioni: verifica pg_stat_activity e valuta di ridurre la concorrenza dei job interni.";
       } else {
         const ticks = det?.consecutiveWaiting ?? 2;
         title = `Pool DB sotto pressione: ${s.value} client in attesa da ${ticks} tick consecutivi`;
         suggestion = "Possibile accumulo di query lente o leak di connessioni. Verifica pg_stat_activity e monitora.";
       }
+    } else if (s.metric === "db.bg_limiter.queued") {
+      const det = s.details as { active?: number; max?: number; consecutiveQueued?: number } | undefined;
+      const ticks = det?.consecutiveQueued ?? 0;
+      if (s.severity === "high") {
+        title = `Limiter job DB in background congestionato: ${s.value} job in coda da ${ticks} campioni consecutivi`;
+        suggestion = "I job in background restano in coda per uno slot DB: il budget riservato è saturo a lungo, segnale di pressione persistente sul pool. Verifica query lente/lock e la concorrenza dei job interni.";
+      } else {
+        title = `Limiter job DB in background: ${s.value} job in coda (${ticks} campioni)`;
+        suggestion = "Accumulo temporaneo di job in background in attesa di uno slot connessione. Monitora.";
+      }
+    } else if (s.metric === "db.bg_limiter.collector.error") {
+      title = `Errore probe limiter job DB`;
+      suggestion = "Verifica che bg-db-limiter sia accessibile dal collector.";
     } else if (s.metric === "db.circuit_breaker") {
       const det = s.details as { state?: string; openedAt?: string } | undefined;
       const cbState = det?.state ?? "OPEN";
