@@ -8,13 +8,14 @@ import { db } from "../../db";
 import { users } from "@shared/db";
 import { and, eq, lte, isNotNull } from "drizzle-orm";
 import { withDbRetry } from "../../lib/db-retry";
+import { withBgDbSlot } from "../../lib/bg-db-limiter";
 import { Cron } from "croner";
 
 let cron: Cron | null = null;
 
 export async function runUnbanScan(): Promise<{ unbanned: number }> {
   const now = new Date();
-  const result = await withDbRetry("[ai-unban]", () =>
+  const result = await withBgDbSlot(() => withDbRetry("[ai-unban]", () =>
     db.update(users)
       .set({ status: "active", suspendedUntil: null })
       .where(and(
@@ -23,7 +24,7 @@ export async function runUnbanScan(): Promise<{ unbanned: number }> {
         lte(users.suspendedUntil, now),
       ))
       .returning({ id: users.id }),
-  );
+  ));
   if (result.length > 0) {
     console.log(`[ai-unban] auto-unban ${result.length} utenti scaduti`);
   }

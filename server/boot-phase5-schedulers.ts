@@ -1,6 +1,7 @@
-import { db } from "./db";
+import { db, withDbRetry } from "./db";
 import { sql } from "drizzle-orm";
 import { bootJobQueue } from "./lib/boot-job-queue";
+import { withBgDbSlot } from "./lib/bg-db-limiter";
 
 /**
  * Phase 5 of the boot sequence: schedulers + maintenance jobs.
@@ -21,7 +22,9 @@ export async function runPhase5Schedulers(): Promise<void> {
     try {
       const { userMusicTracks: umt, userPlaylistSnapshots } = await import("@shared/db");
       const { eq: eqSnap } = await import("drizzle-orm");
-      const usersWithTracks = await db.execute(sql`SELECT DISTINCT user_id FROM user_music_tracks`);
+      // Solo la discovery passa dal budget connessioni dei job in background; il
+      // loop per-utente è sequenziale (1 connessione alla volta) e non va avvolto.
+      const usersWithTracks = await withBgDbSlot(() => withDbRetry(() => db.execute(sql`SELECT DISTINCT user_id FROM user_music_tracks`)));
       let saved = 0;
       for (const row of usersWithTracks.rows as { user_id: string }[]) {
         const tracks = await db.select().from(umt).where(eqSnap(umt.userId, row.user_id));

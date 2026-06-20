@@ -1,7 +1,8 @@
-import { db } from "../../db";
+import { db, withDbRetry } from "../../db";
 import { pipelineFlowEvents } from "@shared/db";
 import { and, eq, isNull, lt, or, sql } from "drizzle-orm";
 import { writeWatchdogLog } from "../watchdog/log";
+import { withBgDbSlot } from "../../lib/bg-db-limiter";
 
 export interface PipelineHole {
   id: string;
@@ -43,7 +44,10 @@ export async function detectPipelineHoles(): Promise<HolesResult> {
     // Active: traces not resolved and older than their pipeline threshold
     const now = new Date();
 
-    const rows = await db.select().from(pipelineFlowEvents);
+    // Lettura full-table ricorrente (ogni 5 min): passa dal budget connessioni
+    // dei job in background così non compete col traffico utente e ritenta i blip
+    // transitori invece di emettere rumore a ogni tick.
+    const rows = await withBgDbSlot(() => withDbRetry(() => db.select().from(pipelineFlowEvents)));
     const active: PipelineHole[] = [];
     const recent: PipelineHole[] = [];
 

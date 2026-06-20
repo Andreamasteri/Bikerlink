@@ -24,9 +24,10 @@
  *   DISABLE_CURVY_SCORE_JOB    — Se "1", disabilita il job
  */
 
-import { db } from "./db";
+import { db, withDbRetry } from "./db";
 import { sql } from "drizzle-orm";
 import { storage } from "./storage";
+import { withBgDbSlot } from "./lib/bg-db-limiter";
 
 const LAST_RUN_KEY = "curvy_score_last_run";
 const LAST_RUN_STATS_KEY = "curvy_score_last_stats";
@@ -88,10 +89,12 @@ export async function runCurvyScoreJob(): Promise<CurvyScoreJobResult> {
   try {
     const { weightLean, weightGforce, minSamples } = getCurvyScoreWeights();
 
-    // Leggi avg score attuale prima dell'aggiornamento
-    const beforeResult = await db.execute<{ avg_score: string }>(
+    // Job periodico con aggregate pesanti su segment_telemetry: ogni query passa
+    // dal budget connessioni dei job in background così non compete col traffico
+    // utente, con retry sui blip transitori di connessione.
+    const beforeResult = await withBgDbSlot(() => withDbRetry(() => db.execute<{ avg_score: string }>(
       sql`SELECT AVG(curvy_score)::text AS avg_score FROM segment_telemetry WHERE curvy_score IS NOT NULL`
-    );
+    )));
     const avgScoreBefore = beforeResult.rows[0]?.avg_score
       ? Math.round(parseFloat(beforeResult.rows[0].avg_score) * 100) / 100
       : null;
@@ -102,7 +105,7 @@ export async function runCurvyScoreJob(): Promise<CurvyScoreJobResult> {
     //    + COALESCE(avg_gforce, 0) / 3.0 * 100 * peso_gforce)
     //   * LEAST(1.0, sample_count::float / min_samples)
     // ))
-    const updateResult = await db.execute<{ updated_count: string }>(
+    const updateResult = await withBgDbSlot(() => withDbRetry(() => db.execute<{ updated_count: string }>(
       sql`
         WITH updated AS (
           UPDATE segment_telemetry
@@ -117,14 +120,14 @@ export async function runCurvyScoreJob(): Promise<CurvyScoreJobResult> {
         )
         SELECT COUNT(*)::text AS updated_count FROM updated
       `
-    );
+    )));
 
     const updated = parseInt(updateResult.rows[0]?.updated_count ?? "0", 10);
 
     // Leggi avg score dopo l'aggiornamento
-    const afterResult = await db.execute<{ avg_score: string }>(
+    const afterResult = await withBgDbSlot(() => withDbRetry(() => db.execute<{ avg_score: string }>(
       sql`SELECT AVG(curvy_score)::text AS avg_score FROM segment_telemetry WHERE curvy_score IS NOT NULL`
-    );
+    )));
     const avgScoreAfter = afterResult.rows[0]?.avg_score
       ? Math.round(parseFloat(afterResult.rows[0].avg_score) * 100) / 100
       : null;

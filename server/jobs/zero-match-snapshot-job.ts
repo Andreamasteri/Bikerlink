@@ -3,6 +3,7 @@ import { sql } from "drizzle-orm";
 import { matchZeroSnapshots } from "@shared/db";
 import { Cron } from "croner";
 import { dedupWarn } from "../lib/dedup-logger";
+import { withBgDbSlot } from "../lib/bg-db-limiter";
 
 let schedulerHandle: { stop?: () => void } | null = null;
 let started = false;
@@ -15,7 +16,7 @@ export async function runZeroMatchSnapshot(): Promise<{
   zeroMatchCount: number;
   inserted: boolean;
 }> {
-  const countResult = await withDbRetry(() => db.execute(sql`
+  const countResult = await withBgDbSlot(() => withDbRetry(() => db.execute(sql`
     SELECT
       COUNT(*) FILTER (WHERE is_fake = false AND role NOT IN ('admin', 'moderator')) AS total_users,
       COUNT(*) FILTER (
@@ -30,7 +31,7 @@ export async function runZeroMatchSnapshot(): Promise<{
           ) = 0
       ) AS zero_match_count
     FROM users
-  `));
+  `)));
 
   type Row = { total_users: string; zero_match_count: string };
   const row = countResult.rows[0] as Row;
@@ -38,14 +39,14 @@ export async function runZeroMatchSnapshot(): Promise<{
   const zeroMatchCount = parseInt(row.zero_match_count ?? "0", 10);
   const today = new Date().toISOString().split("T")[0];
 
-  const result = await withDbRetry(() => db.execute(sql`
+  const result = await withBgDbSlot(() => withDbRetry(() => db.execute(sql`
     INSERT INTO match_zero_snapshots (snapshot_date, total_users, zero_match_count)
     VALUES (${today}::date, ${totalUsers}, ${zeroMatchCount})
     ON CONFLICT (snapshot_date) DO UPDATE
       SET total_users = EXCLUDED.total_users,
           zero_match_count = EXCLUDED.zero_match_count
     RETURNING (xmax = 0) AS inserted
-  `));
+  `)));
 
   type InsertRow = { inserted: boolean };
   const inserted = !!((result.rows[0] as InsertRow)?.inserted);

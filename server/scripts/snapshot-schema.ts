@@ -1,4 +1,5 @@
-import { pool } from "../db";
+import { pool, withDbRetry } from "../db";
+import { withBgDbSlot } from "../lib/bg-db-limiter";
 import fs from "fs";
 import path from "path";
 
@@ -58,7 +59,11 @@ export async function captureSchemaSnapshot(): Promise<SchemaSnapshot> {
 
 export async function saveSchemaSnapshot(): Promise<void> {
   try {
-    const snapshot = await captureSchemaSnapshot();
+    // Job di boot/manutenzione: la query su information_schema è pesante in prod
+    // (vedi db-integrity schema-registry). Passa dal budget connessioni dei job
+    // in background così non compete col traffico utente, e ritenta i blip
+    // transitori invece di fallire al primo errore di connessione.
+    const snapshot = await withBgDbSlot(() => withDbRetry(() => captureSchemaSnapshot()));
     const dataDir = path.resolve(process.cwd(), "server", "data");
     if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
     const snapshotPath = path.join(dataDir, "schema-snapshot.json");

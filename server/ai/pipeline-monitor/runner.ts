@@ -12,6 +12,7 @@ import {
 import type { PipelineName, PipelineRunResult, PipelineCheckResult } from "./types";
 import { db } from "../../db";
 import { pipelineProbeHistory } from "@shared/db";
+import { withBgDbSlot } from "../../lib/bg-db-limiter";
 
 type CheckFn = () => Promise<PipelineCheckResult>;
 
@@ -55,7 +56,7 @@ async function savePipelineHistory(results: PipelineCheckResult[]): Promise<void
       steps: r.steps,
       durationMs: r.durationMs,
     }));
-    await db.insert(pipelineProbeHistory).values(rows);
+    await withBgDbSlot(() => db.insert(pipelineProbeHistory).values(rows));
   } catch (err) {
     console.error("[pipeline-check] history save error:", err);
   }
@@ -82,9 +83,14 @@ export async function runPipelineChecks(opts: {
     // parallelo) invece che tutte insieme, per non saturare il pool DB da 10
     // connessioni — le probe lente (user_sessions, ai_conversation_turns)
     // mandavano in timeout a cascata gli altri check.
+    // Ogni probe passa dal budget connessioni dei job in background: con
+    // BATCH_SIZE=3 e budget=3 il batch interno resta limitato, ma ora condivide
+    // gli slot con gli altri scheduler invece di poter saturare il pool insieme a
+    // loro. Le probe lente (user_sessions, ai_conversation_turns) non possono più
+    // affamare il traffico utente.
     const runOne = async ([, fn]: [PipelineName, CheckFn]): Promise<PipelineCheckResult> => {
       try {
-        return await fn();
+        return await withBgDbSlot(() => fn());
       } catch (err) {
         return {
           pipeline: "session_crash" as PipelineName,

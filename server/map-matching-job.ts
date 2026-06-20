@@ -21,7 +21,8 @@
  * Setup Oracle Cloud Free Tier: graphhopper/setup-oracle.sh
  */
 
-import { db } from "./db";
+import { db, withDbRetry } from "./db";
+import { withBgDbSlot } from "./lib/bg-db-limiter";
 import { rideTelemetry } from "@shared/db";
 import { eq, sql, and } from "drizzle-orm";
 import { mapMatch, isSelfHosted, GHPoint } from "./graphhopper-client";
@@ -74,8 +75,12 @@ export async function runMapMatchingJob(): Promise<{
   const startedAt = Date.now();
 
   try {
-    // Recupera i ride_id distinti con campioni non ancora matchati
-    const pendingRides = await db.execute<{ session_id: string; sample_count: string }>(
+    // Recupera i ride_id distinti con campioni non ancora matchati.
+    // Solo la query di discovery passa dal budget connessioni dei job in
+    // background: il loop per-sessione successivo alterna chiamate di rete a
+    // GraphHopper, quindi non va avvolto (terrebbe uno slot per tutta la durata
+    // della richiesta HTTP, riducendo il parallelismo degli altri job).
+    const pendingRides = await withBgDbSlot(() => withDbRetry(() => db.execute<{ session_id: string; sample_count: string }>(
       sql`
         SELECT session_id, COUNT(*) AS sample_count
         FROM ride_telemetry
@@ -84,7 +89,7 @@ export async function runMapMatchingJob(): Promise<{
         ORDER BY MIN(ts) ASC
         LIMIT ${batchSize}
       `,
-    );
+    )));
 
     console.log(`[MAP-MATCH] ${pendingRides.rows.length} ride da processare`);
 

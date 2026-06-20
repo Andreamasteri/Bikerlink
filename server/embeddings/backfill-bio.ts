@@ -1,5 +1,6 @@
 import type { PoolClient } from "pg";
-import { pool } from "../db";
+import { pool, withDbRetry } from "../db";
+import { withBgDbSlot } from "../lib/bg-db-limiter";
 import { upsertEmbedding } from "./store";
 import { storage } from "../storage";
 import { logAiUsage } from "../ai/audit";
@@ -91,13 +92,22 @@ export async function backfillBioEmbeddings(): Promise<{
     ` (batchSize=${batchSize}, delayMs=${delayMs})`,
   );
 
-  const client = await pool.connect();
-  let rows: Array<{ user_id: string; bio: string }>;
-  try {
-    rows = await findUsersNeedingEmbedding(client, batchSize);
-  } finally {
-    client.release();
-  }
+  // La query di discovery (JOIN su user_profiles/users/embeddings + sha256) è
+  // pesante: passa dal budget connessioni dei job in background così non compete
+  // col traffico utente. Il loop di embedding successivo NON è avvolto: è
+  // sequenziale (1 connessione alla volta), intervallato da chiamate all'API di
+  // embedding e da delayMs — tenere uno slot per tutta la sua durata ridurrebbe
+  // inutilmente il parallelismo degli altri job.
+  const rows: Array<{ user_id: string; bio: string }> = await withBgDbSlot(() =>
+    withDbRetry(async () => {
+      const client = await pool.connect();
+      try {
+        return await findUsersNeedingEmbedding(client, batchSize);
+      } finally {
+        client.release();
+      }
+    }),
+  );
 
   if (rows.length === 0) {
     console.log("[EMBED BACKFILL] No users need bio embedding back-fill — coverage is up to date.");

@@ -4,7 +4,8 @@
 // Persiste su moderator_digests e manda push con preview.
 import { Cron } from "croner";
 import { generateText } from "ai";
-import { db } from "../../db";
+import { db, withDbRetry } from "../../db";
+import { withBgDbSlot } from "../../lib/bg-db-limiter";
 import { reports, users, moderatorDigests, anomalyEvents } from "@shared/db";
 import { and, eq, gte, desc, or, inArray, sql } from "drizzle-orm";
 import { sendDigestPush } from "./push";
@@ -37,23 +38,26 @@ interface DigestPayload {
 
 async function gatherForModerator(modId: string) {
   const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
+  // Burst di 4 query concorrenti per moderatore: ogni query prende uno slot dal
+  // budget connessioni dei job in background, così il fan-out resta limitato dal
+  // budget globale (max 3) e non può saturare il pool insieme agli altri job.
   const [pending, claimed, recent, anomalies] = await Promise.all([
-    db.select({ id: reports.id }).from(reports).where(eq(reports.status, "pending")),
-    db.select().from(reports).where(and(
+    withBgDbSlot(() => withDbRetry(() => db.select({ id: reports.id }).from(reports).where(eq(reports.status, "pending")))),
+    withBgDbSlot(() => withDbRetry(() => db.select().from(reports).where(and(
       eq(reports.assignedModeratorId, modId), eq(reports.status, "pending"),
-    )).orderBy(desc(reports.severity), desc(reports.createdAt)).limit(5),
-    db.select({ id: reports.id }).from(reports).where(gte(reports.createdAt, since)),
-    db.select().from(anomalyEvents).where(gte(anomalyEvents.createdAt, since)),
+    )).orderBy(desc(reports.severity), desc(reports.createdAt)).limit(5))),
+    withBgDbSlot(() => withDbRetry(() => db.select({ id: reports.id }).from(reports).where(gte(reports.createdAt, since)))),
+    withBgDbSlot(() => withDbRetry(() => db.select().from(anomalyEvents).where(gte(anomalyEvents.createdAt, since)))),
   ]);
 
   let topRows = claimed;
   if (topRows.length < 5) {
-    const filled = await db.select().from(reports)
+    const filled = await withBgDbSlot(() => withDbRetry(() => db.select().from(reports)
       .where(and(eq(reports.status, "pending"), or(
         eq(reports.severity, "critical"), eq(reports.severity, "high"),
       )))
       .orderBy(desc(reports.createdAt))
-      .limit(5);
+      .limit(5)));
     topRows = [...claimed, ...filled.filter((r) => !claimed.find((c) => c.id === r.id))].slice(0, 5);
   }
 
@@ -135,9 +139,9 @@ export async function runDigestForAll(): Promise<{ moderators: number; skipped?:
   // Skip se non ci sono abbastanza dati rilevanti nelle ultime 24h.
   const MIN_REPORTS_THRESHOLD = 5;
   const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
-  const [recentCount] = await db.select({ cnt: sql<number>`count(*)::int` })
+  const [recentCount] = await withBgDbSlot(() => withDbRetry(() => db.select({ cnt: sql<number>`count(*)::int` })
     .from(reports)
-    .where(gte(reports.createdAt, since));
+    .where(gte(reports.createdAt, since))));
   const recentTotal = Number(recentCount?.cnt ?? 0);
   if (recentTotal < MIN_REPORTS_THRESHOLD) {
     console.info(
@@ -146,9 +150,9 @@ export async function runDigestForAll(): Promise<{ moderators: number; skipped?:
     return { moderators: 0, skipped: true };
   }
 
-  const mods = await db.select({ id: users.id, expoPushToken: users.expoPushToken })
+  const mods = await withBgDbSlot(() => withDbRetry(() => db.select({ id: users.id, expoPushToken: users.expoPushToken })
     .from(users)
-    .where(and(eq(users.status, "active"), inArray(users.role, ["admin", "moderator"])));
+    .where(and(eq(users.status, "active"), inArray(users.role, ["admin", "moderator"])))));
   const today = new Date().toISOString().slice(0, 10);
   let count = 0;
   for (const mod of mods) {
