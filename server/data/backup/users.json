@@ -3,7 +3,7 @@
     "_example": true,
     "user": "nickname_utente",
     "email": "utente@esempio.it",
-    "password": "passwordInChiaro123",
+    "password": "<placeholder-non-committare-password-reali>",
     "country": "Italia"
   }
 ]
