@@ -201,6 +201,99 @@ describe("FloatingWidget — null-render guards", () => {
   });
 });
 
+// ── (f) Posizionamento via transform — guard regressione Android hitbox ───────
+//
+// Su Android, animare `left`/`top` sposta il pixel ma lascia l'hitbox del touch
+// nella posizione di layout originale ("si vede ma non si tocca"). Il fix usa
+// `transform: [{translateX},{translateY}]` + `left:0/top:0` fissi nel foglio di
+// stile + `elevation` sul container. Questo test fallisce se qualcuno ripristina
+// il posizionamento via `left`/`top` dinamici nel componente.
+describe("FloatingWidget — posizionamento Android-safe (transform, no left/top dinamici)", () => {
+  beforeEach(() => {
+    mocks.platformOS = "android";
+    mocks.user = { id: "1" };
+    mocks.enabled = true;
+    mocks.suppressed = false;
+    ctrl.forceAiOpen = false;
+  });
+
+  it("(f1) lo stile del pallino contiene transform con translateX e translateY", () => {
+    const comp = mount();
+    const json = comp.toJSON() as unknown;
+    const ball = (Array.isArray(json) ? json[0] : json) as {
+      type: string;
+      props: Record<string, unknown>;
+    };
+
+    expect(ball.type).toBe("AnimatedView");
+
+    const style = flattenStyle(ball.props.style);
+    const transform = style.transform as Array<Record<string, unknown>> | undefined;
+
+    // Deve esistere un array transform
+    expect(Array.isArray(transform)).toBe(true);
+
+    // Deve contenere un oggetto con translateX
+    const hasTranslateX = (transform ?? []).some(
+      (entry) => "translateX" in entry,
+    );
+    expect(hasTranslateX).toBe(true);
+
+    // Deve contenere un oggetto con translateY
+    const hasTranslateY = (transform ?? []).some(
+      (entry) => "translateY" in entry,
+    );
+    expect(hasTranslateY).toBe(true);
+  });
+
+  it("(f2) lo stile del pallino NON usa left/top dinamici — left e top sono 0 fissi nel foglio di stile", () => {
+    const comp = mount();
+    const json = comp.toJSON() as unknown;
+    const ball = (Array.isArray(json) ? json[0] : json) as {
+      type: string;
+      props: Record<string, unknown>;
+    };
+
+    expect(ball.type).toBe("AnimatedView");
+
+    // Gli stili inline (secondo elemento dell'array se presente) non devono
+    // portare left/top: devono essere assenti o rimanere undefined nell'oggetto
+    // inline, così la posizione visiva è controllata solo da transform.
+    const styleArray = Array.isArray(ball.props.style)
+      ? (ball.props.style as unknown[])
+      : [ball.props.style];
+
+    // Il secondo elemento è l'oggetto inline; se non c'è, nessun left/top dinamico.
+    const inlineStyle =
+      styleArray.length > 1 &&
+      styleArray[1] != null &&
+      typeof styleArray[1] === "object"
+        ? (styleArray[1] as Record<string, unknown>)
+        : {};
+
+    // Nell'oggetto inline non devono comparire left né top
+    expect("left" in inlineStyle).toBe(false);
+    expect("top" in inlineStyle).toBe(false);
+  });
+
+  it("(f3) il container esterno ha elevation ≥ 1 — garantisce priorità touch su Android", () => {
+    const comp = mount();
+    const json = comp.toJSON() as unknown;
+    const ball = (Array.isArray(json) ? json[0] : json) as {
+      type: string;
+      props: Record<string, unknown>;
+    };
+
+    expect(ball.type).toBe("AnimatedView");
+
+    const style = flattenStyle(ball.props.style);
+    const elevation = style.elevation as number | undefined;
+
+    expect(typeof elevation).toBe("number");
+    expect((elevation ?? 0) >= 1).toBe(true);
+  });
+});
+
 // ── (e) aiOpen=true → pallino nascosto e non interattivo ─────────────────────
 describe("FloatingWidget — pallino nascosto quando la chat AI è aperta", () => {
   beforeEach(() => {
