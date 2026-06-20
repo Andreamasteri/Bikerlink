@@ -44,6 +44,7 @@ interface StregattaMapProps {
   motionStatus: MotionStatus | null;
   onToggleMotion: (val: boolean) => void;
   isTogglingMotion: boolean;
+  allEnabled: boolean;
 }
 
 const MAP_HTML = `<!DOCTYPE html>
@@ -180,7 +181,8 @@ const MAP_HTML = `<!DOCTYPE html>
 export function StregattaMap({
   motionStatus,
   onToggleMotion,
-  isTogglingMotion
+  isTogglingMotion,
+  allEnabled
 }: StregattaMapProps) {
   const webViewRef = useRef<WebView>(null);
   const mapReadyRef = useRef(false);
@@ -248,7 +250,9 @@ export function StregattaMap({
 
   const movingNow = motionStatus?.movingNow ?? 0;
   const restingNow = motionStatus?.restingNow ?? 0;
-  const motionEnabled = motionStatus?.enabled ?? false;
+  // Cascade: activity is forced OFF and locked while global visibility is OFF.
+  const motionEnabled = allEnabled && (motionStatus?.enabled ?? false);
+  const controlLocked = !allEnabled;
 
   const formatLastCycle = (iso: string | null): string => {
     if (!iso) return "—";
@@ -324,18 +328,18 @@ export function StregattaMap({
             color={motionEnabled ? "#FF6B35" : Colors.textSecondary}
           />
           <Text style={[styles.controlLabel, motionEnabled && { color: "#FF6B35" }]}>
-            {motionEnabled ? "Simulatore attivo" : "Simulatore in pausa"}
+            {controlLocked ? "Visibilità Globale OFF" : motionEnabled ? "Simulatore attivo" : "Simulatore in pausa"}
           </Text>
-          {motionStatus?.lastCycleAt && (
+          {!controlLocked && motionStatus?.lastCycleAt && (
             <Text style={styles.cycleText}>
               · ciclo {formatLastCycle(motionStatus.lastCycleAt)}
             </Text>
           )}
         </View>
         <TouchableOpacity
-          style={[styles.toggleBtn, motionEnabled ? styles.toggleBtnOn : styles.toggleBtnOff]}
+          style={[styles.toggleBtn, motionEnabled ? styles.toggleBtnOn : styles.toggleBtnOff, controlLocked && styles.toggleBtnDisabled]}
           onPress={() => onToggleMotion(!motionEnabled)}
-          disabled={isTogglingMotion}
+          disabled={isTogglingMotion || controlLocked}
         >
           {isTogglingMotion ? (
             <ActivityIndicator size="small" color="#fff" />
@@ -456,6 +460,10 @@ const styles = StyleSheet.create({
   },
   toggleBtnOff: {
     backgroundColor: "#FF6B35"
+  },
+  toggleBtnDisabled: {
+    backgroundColor: "#3A3A4A",
+    opacity: 0.5
   },
   toggleBtnText: {
     fontFamily: "Inter_700Bold",

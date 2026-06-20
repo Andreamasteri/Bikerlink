@@ -90,7 +90,9 @@ export function StregattaActions({
   isResettingMatches,
   totalCount,
 }: StregattaActionsProps) {
-  const motionEnabled = motionStatus?.enabled ?? false;
+  // Cascade: sub-options are forced OFF and locked while global visibility is OFF.
+  const motionEnabled = allEnabled && (motionStatus?.enabled ?? false);
+  const subOptionsLocked = !allEnabled;
   const bboxEnabled = bboxData?.enabled ?? true;
 
   const formatLastCycle = (iso: string | null): string => {
@@ -128,6 +130,7 @@ export function StregattaActions({
           <Switch
             value={chatbotEnabled}
             onValueChange={onToggleChatbot}
+            disabled={subOptionsLocked}
             trackColor={{ false: "#767577", true: Colors.accent }}
             thumbColor={Platform.OS === "ios" ? "#fff" : chatbotEnabled ? "#fff" : "#f4f3f4"}
           />
@@ -141,7 +144,7 @@ export function StregattaActions({
         <View style={styles.controlRow}>
           <View style={styles.controlInfo}>
             <Ionicons name="navigate" size={24} color={Colors.accent} />
-            <Text style={styles.controlLabel}>Falli muovere</Text>
+            <Text style={styles.controlLabel}>Attività stregatti</Text>
           </View>
           {isTogglingMotion ? (
             <ActivityIndicator size="small" color={Colors.accent} />
@@ -149,14 +152,21 @@ export function StregattaActions({
             <Switch
               value={motionEnabled}
               onValueChange={onToggleMotion}
+              disabled={subOptionsLocked}
               trackColor={{ false: "#767577", true: Colors.accent }}
               thumbColor={Platform.OS === "ios" ? "#fff" : motionEnabled ? "#fff" : "#f4f3f4"}
             />
           )}
         </View>
         <Text style={styles.controlDesc}>
-          Simula spostamenti GPS realistici (giri brevi + trasferimenti lunghi, comitive).
+          Un solo interruttore per movimento + rotazione disponibilità: simula spostamenti GPS
+          realistici (giri brevi, trasferimenti lunghi, comitive) e ruota chi è disponibile.
         </Text>
+        {subOptionsLocked && (
+          <Text style={styles.lockedHint}>
+            Attiva la Visibilità Globale per abilitare l'attività.
+          </Text>
+        )}
 
         {motionStatus && (
           <View style={styles.motionStats}>
@@ -377,6 +387,12 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: Colors.textSecondary,
     marginTop: 6,
+  },
+  lockedHint: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 11,
+    color: Colors.error,
+    marginTop: 4,
   },
   controlDivider: {
     height: 1,

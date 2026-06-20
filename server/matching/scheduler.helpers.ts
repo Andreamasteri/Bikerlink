@@ -150,6 +150,34 @@ export async function runFakeZavorrineRotation(): Promise<void> {
   }
 }
 
+// ─── Fake availability rotation lifecycle ───────────────────────────────────
+// Dedicated start/stop with its own timer handle so the unified activity
+// toggle can tear it down without restarting the whole matching engine.
+// (No more boot-once interval buried in _engineTimers → no ghost 5-min timer.)
+
+const FAKE_ROTATION_INTERVAL_MS = 5 * 60 * 1000;
+let _fakeRotationTimer: ReturnType<typeof setInterval> | null = null;
+
+export function isFakeRotationRunning(): boolean {
+  return _fakeRotationTimer !== null;
+}
+
+export function startFakeZavorrineRotation(): void {
+  if (_fakeRotationTimer) return; // idempotent — already running
+  void runFakeZavorrineRotation(); // run immediately on enable
+  _fakeRotationTimer = setInterval(() => {
+    void runFakeZavorrineRotation();
+  }, FAKE_ROTATION_INTERVAL_MS);
+  console.log("[Matching] Fake zavorrine availability rotation started (5min interval)");
+}
+
+export function stopFakeZavorrineRotation(): void {
+  if (!_fakeRotationTimer) return;
+  clearInterval(_fakeRotationTimer);
+  _fakeRotationTimer = null;
+  console.log("[Matching] Fake zavorrine availability rotation stopped");
+}
+
 // ─── Trigger fire-and-forget con debounce ───────────────────────────────────
 
 const lastZavorrinaProfileMatchAt = new Map<string, number>();

@@ -7,7 +7,8 @@ import { eq, sql, and } from "drizzle-orm";
 import { sendSuccess, sendError } from "../../lib/api-response";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
-import { setMotionEnabled, getMotionStatus, getPositions, getBoundingBox, setBoundingBox, getUserSpeedMap, removeUserFromSimulator, clearSimulatorUsers, addUserToSimulator } from "../../motion-simulator";
+import { getMotionStatus, getPositions, getBoundingBox, setBoundingBox, getUserSpeedMap, removeUserFromSimulator, clearSimulatorUsers, addUserToSimulator } from "../../motion-simulator";
+import { setFakeActivityEnabled, cascadeGlobalVisibilityOff } from "../../fake-activity";
 import { systemAccountConditions } from "../../lib/system-account-filter";
 
 const router = Router();
@@ -73,6 +74,11 @@ router.put("/toggle-all", async (req: Request, res: Response) => {
     await db.update(users).set({ 
       lastLoginAt: enabled ? new Date() : sql`last_login_at` 
     }).where(eq(users.isFake, true));
+    // Cascade: when global visibility goes OFF, force every sub-option OFF
+    // (unified activity + chatbot) and tear down their timers.
+    if (!enabled) {
+      await cascadeGlobalVisibilityOff();
+    }
     return sendSuccess(res);
   } catch (_error) {
     return sendError(res, 500, "Errore toggle globale");
@@ -155,17 +161,22 @@ router.get("/motion/status", (_req: Request, res: Response) => {
   }
 });
 
+// Unified "attività stregatti" toggle — controls BOTH motion GPS simulation
+// and fake-availability rotation via a single source of truth (fake_motion_enabled).
 router.post("/motion/toggle", async (req: Request, res: Response) => {
   try {
     const { enabled } = req.body;
     if (typeof enabled !== "boolean") {
       return sendError(res, 400, "Campo 'enabled' booleano richiesto");
     }
-    await setMotionEnabled(enabled);
+    const effective = await setFakeActivityEnabled(enabled);
+    if (enabled && !effective) {
+      return sendError(res, 409, "Attiva prima la Visibilità Globale per abilitare l'attività stregatti");
+    }
     return res.json(getMotionStatus());
   } catch (_error) {
     console.error("[MOTION] toggle error:", _error);
-    return sendError(res, 500, "Errore toggle motion");
+    return sendError(res, 500, "Errore toggle attività stregatti");
   }
 });
 

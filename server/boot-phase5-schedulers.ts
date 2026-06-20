@@ -263,9 +263,9 @@ export async function runPhase5Schedulers(): Promise<void> {
     .then(({ startZeroMatchSnapshotScheduler }) => startZeroMatchSnapshotScheduler())
     .catch((e) => console.warn("[INIT] Zero-match snapshot scheduler failed (non-fatal):", e));
 
-  import("./motion-simulator")
-    .then(({ startMotionSimulator }) => startMotionSimulator())
-    .catch((e) => console.warn("[INIT] Background: motion simulator error:", e));
+  import("./fake-activity")
+    .then(({ initFakeActivityOnBoot }) => initFakeActivityOnBoot())
+    .catch((e) => console.warn("[INIT] Background: fake activity init error:", e));
 
   // Bio embedding back-fill: runs once at boot (via bootJobQueue), then every 24h.
   // Catches users whose bio changed or whose embedding was missed due to API errors.

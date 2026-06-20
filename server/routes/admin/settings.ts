@@ -8,6 +8,7 @@ import multer from "multer";
 import path from "path";
 import fs from "fs";
 import { sendSuccess, sendError } from "../../lib/api-response";
+import { isGlobalVisibilityOn } from "../../fake-activity";
 
 const router = Router();
 
@@ -173,6 +174,11 @@ router.put("/primal_user_enabled", async (req: Request, res: Response) => {
 router.put("/chatbot_enabled", async (req: Request, res: Response) => {
   try {
     const val = req.body.value === true || req.body.value === "true";
+    // Cascade invariant: chatbot is a stregatti sub-option — it cannot be
+    // enabled while "Visibilità Globale" (fake_users_enabled) is OFF.
+    if (val && !(await isGlobalVisibilityOn())) {
+      return sendError(res, 409, "Attiva prima la Visibilità Globale per abilitare il chatbot stregatti");
+    }
     const setting = await storage.upsertAppSetting("chatbot_enabled", val ? "true" : "false");
     return res.json(setting);
   } catch (_error) {

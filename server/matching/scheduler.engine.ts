@@ -10,7 +10,7 @@ import { runBioAffinityMatching } from "./run-bio-affinity";
 import { runTelemetryAffinityMatching } from "./run-telemetry-affinity";
 import { enrichBikerMatchBreakdowns } from "./enrich-breakdowns";
 import { aggregateTelemetryProfiles } from "../jobs/aggregate-telemetry-profiles";
-import { runCleanup, pruneStaleProposalProfileMatches, pruneOldZoneNotifications, runFakeZavorrineRotation, lastUserMatchingAt, withCycleTimeout, getMatchingCycleTimeoutMs, CycleTimeoutError } from "./scheduler.helpers";
+import { runCleanup, pruneStaleProposalProfileMatches, pruneOldZoneNotifications, stopFakeZavorrineRotation, lastUserMatchingAt, withCycleTimeout, getMatchingCycleTimeoutMs, CycleTimeoutError } from "./scheduler.helpers";
 import { recomputeAllUserMatchProfiles } from "./recompute-profiles";
 import { addMatchLog } from "./match-log-buffer";
 import { recordCycleError } from "./metrics";
@@ -39,21 +39,11 @@ export function startMatchingEngine(): void {
     );
   });
 
-  setTimeout(async () => {
-    try {
-      const fakeUsersSetting = await storage.getAppSetting("fake_users_enabled");
-      const fakeUsersEnabled = fakeUsersSetting?.value === "true";
-      if (!fakeUsersEnabled) {
-        console.log("[Matching] Fake zavorrine rotation skipped (fake users disabled)");
-      } else {
-        runFakeZavorrineRotation();
-        _engineTimers.push(setInterval(runFakeZavorrineRotation, 5 * 60 * 1000));
-        console.log("[Matching] Fake zavorrine availability rotation started (5min interval)");
-      }
-    } catch (err) {
-      console.error("[Matching] Error checking fake_users_enabled for rotation — skipped:", err);
-    }
-  }, 3 * 60_000);
+  // NOTE: Fake zavorrine availability rotation is NOT started here anymore.
+  // It is part of the unified "attività stregatti" toggle and its lifecycle
+  // is owned by server/fake-activity.ts (start/stop with its own timer handle),
+  // initialised at boot by initFakeActivityOnBoot(). This avoids a ghost 5-min
+  // timer running whenever the matching engine is up.
 
   _engineTimers.push(setInterval(() => {
     try {
@@ -284,6 +274,7 @@ export function startMatchingEngine(): void {
 }
 
 export function stopMatchingEngine(): void {
+  stopFakeZavorrineRotation();
   for (const timer of _engineTimers) {
     clearInterval(timer);
   }

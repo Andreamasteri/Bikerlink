@@ -7,7 +7,7 @@ import { motoClubs, motoClubRequests } from "@shared/db";
 import { workshopSchema, easterEggSchema, reportResolveSchema } from "@shared/validators";
 import { eq } from "drizzle-orm";
 import { massSeedFakeUsers, getMassSeedStatus } from "../../mass-seed";
-import { setMotionEnabled, getMotionStatus } from "../../motion-simulator";
+import { getMotionStatus } from "../../motion-simulator";
 import { getServerInfo, isSelfHosted, ACTIVE_PROFILE, GH_BASE_URL, isRoutingEnabled } from "../../graphhopper-client";
 
 const router = Router();
@@ -398,18 +398,8 @@ router.get("/motion/status", (_req: Request, res: Response) => {
   }
 });
 
-router.post("/motion/toggle", async (req: Request, res: Response) => {
-  try {
-    const { enabled } = req.body;
-    if (typeof enabled !== "boolean") {
-      return sendError(res, 400, "Campo 'enabled' booleano richiesto");
-    }
-    await setMotionEnabled(enabled);
-    return res.json(getMotionStatus());
-  } catch (err) {
-    console.error("[MOTION] toggle error:", err);
-    return sendError(res, 500, "Errore toggle motion");
-  }
-});
+// NOTE: The "/motion/toggle" endpoint was a duplicate of the one in
+// routes/admin/stregatti.ts. It has been removed and consolidated there
+// (now the unified "attività stregatti" toggle: motion + availability rotation).
 
 export default router;

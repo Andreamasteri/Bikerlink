@@ -150,6 +150,9 @@ export default function FakeUsersAdmin() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/stregatti"] });
       queryClient.invalidateQueries({ queryKey: ["/api/settings/fake-users-enabled"] });
+      // Cascade: global visibility OFF forces activity + chatbot OFF on the server.
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/stregatti/motion/status"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/settings/chatbot-enabled"] });
     }
   });
 
@@ -504,6 +507,7 @@ export default function FakeUsersAdmin() {
           motionStatus={motionStatus ?? null}
           onToggleMotion={(v) => toggleMotionMutation.mutate(v)}
           isTogglingMotion={toggleMotionMutation.isPending}
+          allEnabled={allEnabled}
         />
       ) : (
       <FlatList
