@@ -1,1 +1,1 @@
-
+Fix push Android/iOS (FCM+APNs configurati), causa mancato token visibile in-app e nel pannello admin (drill-down per causa e piattaforma), fix pallino flottante non toccabile su Android (transform invece di left/top).
