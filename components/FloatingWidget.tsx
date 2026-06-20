@@ -20,7 +20,7 @@ import { useAssistantEnabled } from "@/hooks/useAssistantEnabled";
 import { useAuth } from "@/lib/auth-context";
 import AssistantChatSheet from "@/components/user/ai-assistant/AssistantChatSheet";
 
-export const WIDGET_SIZE = 54;
+export const WIDGET_SIZE = 40;
 export const TAP_THRESHOLD = 8; // pixel di movimento oltre cui il gesto è un drag
 const POS_KEY = "floating_widget_position";
 
@@ -103,18 +103,21 @@ export default function FloatingWidget() {
         Math.abs(gs.dx) > 2 || Math.abs(gs.dy) > 2,
       onPanResponderGrant: () => {
         hasDragged.current = false;
-        pan.stopAnimation();
+        // Sposta il valore corrente nell'offset così in move usiamo direttamente
+        // gs.dx/gs.dy relativi al punto di inizio del gesto — il pattern standard
+        // RN per il drag con posizione assoluta.
+        pan.setOffset(panOffset.current);
+        pan.setValue({ x: 0, y: 0 });
       },
       onPanResponderMove: (_, gs) => {
         if (isDragGesture(gs.dx, gs.dy)) {
           hasDragged.current = true;
         }
-        pan.setValue({
-          x: panOffset.current.x + gs.dx,
-          y: panOffset.current.y + gs.dy,
-        });
+        pan.setValue({ x: gs.dx, y: gs.dy });
       },
       onPanResponderRelease: (_, gs) => {
+        // Unisce offset e valore in un unico valore assoluto, poi clampa e salva.
+        pan.flattenOffset();
         const newX = panOffset.current.x + gs.dx;
         const newY = panOffset.current.y + gs.dy;
         const d = Dimensions.get("window");
@@ -148,7 +151,7 @@ export default function FloatingWidget() {
         {...panResponder.panHandlers}
       >
         <View style={styles.widgetInner}>
-          <MaterialCommunityIcons name="compass-outline" size={26} color="#fff" />
+          <MaterialCommunityIcons name="compass-outline" size={19} color="#fff" />
         </View>
       </Animated.View>
 
