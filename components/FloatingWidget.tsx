@@ -135,7 +135,7 @@ export default function FloatingWidget() {
           toggleMenu();
         }
       },
-      onPanResponderTerminate: (_, gs) => {
+      onPanResponderTerminate: (_) => {
         savePosition(posX.value, posY.value);
       },
     })

@@ -91,7 +91,6 @@ export default function EditProfileScreen() {
   const [region, setRegion] = useState("");
   const [birthYear, setBirthYear] = useState("");
   const [bio, setBio] = useState("");
-  const [maxPickupDistance, setMaxPickupDistance] = useState("50");
   const [showRegionPicker, setShowRegionPicker] = useState(false);
   const [showAddMoto, setShowAddMoto] = useState(params.addMoto === "true");
 
@@ -123,11 +122,6 @@ export default function EditProfileScreen() {
       setRegion(profile.region ?? "");
       setBirthYear(profile.birthYear ? String(profile.birthYear) : "");
       setBio(profile.profile?.bio ?? "");
-      setMaxPickupDistance(
-        profile.profile?.maxPickupDistance
-          ? String(profile.profile.maxPickupDistance)
-          : "50"
-      );
     }
   }, [profile]);
 
@@ -253,10 +247,6 @@ export default function EditProfileScreen() {
       data.birthYear = birthYear ? parseInt(birthYear, 10) : null;
     }
     if (bio !== (profile?.profile?.bio ?? "")) data.bio = bio || null;
-    const dist = parseInt(maxPickupDistance, 10);
-    if (!isNaN(dist) && dist !== (profile?.profile?.maxPickupDistance ?? 50)) {
-      data.maxPickupDistance = dist;
-    }
 
     if (Object.keys(data).length === 0) {
       router.back();
@@ -404,8 +394,6 @@ export default function EditProfileScreen() {
         />
 
         <EditPreferences
-          maxPickupDistance={maxPickupDistance}
-          setMaxPickupDistance={setMaxPickupDistance}
           language={language}
           setLanguage={setLanguage}
           showLanguageDropdown={showLanguageDropdown}

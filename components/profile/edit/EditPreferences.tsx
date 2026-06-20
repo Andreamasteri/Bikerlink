@@ -4,7 +4,6 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  TextInput,
   Switch,
 } from "react-native";
 import { Feather, Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
@@ -13,8 +12,6 @@ import { useT } from "@/lib/language-context";
 import { type AppLanguage } from "@/lib/i18n";
 
 interface EditPreferencesProps {
-  maxPickupDistance: string;
-  setMaxPickupDistance: (dist: string) => void;
   language: string;
   setLanguage: (lang: AppLanguage) => void;
   showLanguageDropdown: boolean;
@@ -38,8 +35,6 @@ const LANGUAGES: Array<{ label: string; value: AppLanguage; flag: string }> = [
 ];
 
 export function EditPreferences({
-  maxPickupDistance,
-  setMaxPickupDistance,
   language,
   setLanguage,
   showLanguageDropdown,
@@ -55,23 +50,6 @@ export function EditPreferences({
 
   return (
     <>
-      <View style={styles.fieldGroup}>
-        <Text style={styles.groupTitle}>Preferenze Match</Text>
-        <View style={styles.field}>
-          <Text style={styles.fieldLabel}>
-            Distanza massima per notifiche (km)
-          </Text>
-          <TextInput
-            style={styles.input}
-            value={maxPickupDistance}
-            onChangeText={setMaxPickupDistance}
-            keyboardType="number-pad"
-            placeholder="50"
-            placeholderTextColor={Colors.textSecondary}
-          />
-        </View>
-      </View>
-
       <View style={styles.fieldGroup}>
         <Text style={styles.groupTitle}>Lingua applicazione</Text>
         <View style={styles.langSection}>
@@ -191,25 +169,6 @@ const styles = StyleSheet.create({
     fontWeight: "600" as const,
     color: Colors.text,
     marginBottom: 16,
-  },
-  field: {
-    marginBottom: 16,
-  },
-  fieldLabel: {
-    fontSize: 14,
-    color: Colors.textSecondary,
-    marginBottom: 8,
-    fontWeight: "500" as const,
-  },
-  input: {
-    backgroundColor: Colors.surfaceLight,
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    fontSize: 16,
-    color: Colors.text,
-    borderWidth: 1,
-    borderColor: Colors.border,
   },
   langSection: {
     marginBottom: 4,
