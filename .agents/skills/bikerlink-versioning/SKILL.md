@@ -62,11 +62,11 @@ Il progetto usa il bare workflow (directory `android/` committata). I tre file d
 
 | File | Campo | Valore corrente |
 |---|---|---|
-| `app.json` | `expo.version` | `72D.10.125` |
-| `app.json` | `expo.android.versionCode` | `72` |
+| `app.json` | `expo.version` | `73D.10.126` |
+| `app.json` | `expo.android.versionCode` | `73` |
 | `app.json` | `expo.runtimeVersion` | `10.0.0` |
-| `android/app/build.gradle` | `versionCode` | `72` |
-| `android/app/build.gradle` | `versionName` | `"72D.10.125"` |
+| `android/app/build.gradle` | `versionCode` | `73` |
+| `android/app/build.gradle` | `versionName` | `"73D.10.126"` |
 | `android/app/src/main/res/values/strings.xml` | `expo_runtime_version` | `10.0.0` |
 
 ⚠️ **Aggiornare sempre tutti e tre i file contemporaneamente.** Un disallineamento causa errori di update check a runtime.
@@ -153,7 +153,8 @@ Rispetto allo schema standard, una build diagnostic **non** modifica:
 | v56–v66 | 56–66 | — | 10.0.0 | 10.x | — | Build intermedie ciclo 10 |
 | v67 | 67 | 67.10.103 | 10.0.0 | 10.x | OTA-10 inglobata | debug-apk build |
 | v68–v71 | 68–71 | — | 10.0.0 | 10.x | — | Build intermedie ciclo 10 (diagnostic) |
-| v72 | 72 | 72D.10.125 | 10.0.0 | 10.x | OTA-125 inglobata | **Corrente** — diagnostic build |
+| v72 | 72 | 72D.10.125 | 10.0.0 | 10.x | OTA-125 inglobata | diagnostic build |
+| v73 | 73 | 73D.10.126 | 10.0.0 | 10.x | OTA-126 inglobata | **Corrente** — diagnostic build |
 
 > **Cicli precedenti** (schema vecchio `major.minor.patch` senza significato semantico):
 > - Ciclo 2.x: rv 2.0.0

@@ -93,5 +93,9 @@ perché la sandbox Replit blocca `.git/index.lock`. Questo prefisso è SEMPRE ne
 Basta aggiornare `app.json` + `build.gradle` per il bump APK; lo script OTA si adegua automaticamente.
 Non toccare la formula VERSION nello script: è già dinamica.
 
+## Nota sull'OTA publish in background — causa kill identificata
+
+I processi `nohup`/`&`/`setsid` di `publish-ota-full.sh` vengono killati durante `npx expo export` (Metro bundle) **non da Cerbero né da OOM**, ma dal tool bash stesso che chiude il process-group al termine della chiamata. La soluzione è eseguire il publish in **foreground** con timeout adeguato (come la build EAS). Non rilanciare mai l'OTA in background.
+
 **Why:** L'utente installa l'APK direttamente sui propri dispositivi via EAS internal distribution.
 Non usa il Play Store per i cicli di test/sviluppo.
