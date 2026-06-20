@@ -61,6 +61,34 @@ export const trackingStyles = StyleSheet.create({
     fontSize: 12,
     fontFamily: "Inter_600SemiBold",
   },
+  gpsAcquiringBanner: {
+    backgroundColor: Colors.accent,
+  },
+  fusionChipRow: {
+    flexDirection: "row",
+    justifyContent: "center",
+    paddingTop: 8,
+  },
+  fusionChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    backgroundColor: Colors.surface,
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  fusionChipSensors: {
+    backgroundColor: Colors.warning,
+  },
+  fusionChipAcquiring: {
+    backgroundColor: Colors.accent,
+  },
+  fusionChipText: {
+    color: "#fff",
+    fontSize: 11,
+    fontFamily: "Inter_600SemiBold",
+  },
   activeScroll: {
     padding: 16,
     gap: 16,

@@ -95,6 +95,8 @@ function TrackingScreenInner() {
           handlePause={handlers.handlePause}
           handleStop={handlers.handleStop}
           gpsLost={state.gpsLost}
+          gpsAcquiring={!state.gpsFixAcquired}
+          fusionMode={state.fusionMode}
           isFermo={isFermo}
           accuracyTier={accuracyTier}
           currentSpeed={state.currentSpeed}

@@ -1,7 +1,7 @@
 import { Router, type Request, type Response } from "express";
 import { storage } from "../../storage";
 import { routeStatsSchema, stopRouteSchema, updateRouteTitleSchema } from "@shared/validators";
-import { haversineKm } from "../../geo";
+import { evaluateSegment, TRACKING_FUSION } from "@shared/tracking-fusion";
 import { requireUserId } from "../../lib/auth-middleware";
 import { sendSuccess, sendError } from "../../lib/api-response";
 
@@ -82,6 +82,11 @@ router.put("/:id/stop", async (req: Request, res: Response) => {
       maxAltitude = 0;
       let idleTimeSec = 0;
 
+      // Mirror the client live accumulation (useTrackingEffects.onNativeLocation):
+      // advance the reference point ONLY when a segment is accepted, so rejected
+      // jitter doesn't move the origin and sub-floor moves in curves accumulate
+      // across fixes. Idle time is still measured per consecutive pair.
+      let lastAccepted: { lat: number; lng: number; timeMs: number } | null = null;
       for (let i = 0; i < allPoints.length; i++) {
         const pt = allPoints[i];
         if (pt.speedKmh !== null && pt.speedKmh !== undefined) {
@@ -90,15 +95,31 @@ router.put("/:id/stop", async (req: Request, res: Response) => {
         if (pt.altitude !== null && pt.altitude !== undefined) {
           if (pt.altitude > maxAltitude) maxAltitude = pt.altitude;
         }
+        const ptTimeMs = new Date(pt.timestamp).getTime();
         if (i > 0) {
           const prev = allPoints[i - 1];
-          totalDistanceKm += haversineKm(prev.latitude, prev.longitude, pt.latitude, pt.longitude);
-          const intervalSec = Math.abs(new Date(pt.timestamp).getTime() - new Date(prev.timestamp).getTime()) / 1000;
+          const intervalSec = Math.abs(ptTimeMs - new Date(prev.timestamp).getTime()) / 1000;
           const speed = pt.speedKmh ?? 0;
-          if (speed < 2) {
+          if (speed < TRACKING_FUSION.IDLE_THRESHOLD_KMH) {
             idleTimeSec += intervalSec;
           }
         }
+        if (lastAccepted === null) {
+          lastAccepted = { lat: pt.latitude, lng: pt.longitude, timeMs: ptTimeMs };
+          continue;
+        }
+        const decision = evaluateSegment({
+          prevLat: lastAccepted.lat, prevLng: lastAccepted.lng, prevTimeMs: lastAccepted.timeMs,
+          lat: pt.latitude, lng: pt.longitude, timeMs: ptTimeMs,
+          accuracyM: null, // route points don't persist accuracy → floor-only gate
+        });
+        if (decision.accept) {
+          totalDistanceKm += decision.distanceKm;
+          lastAccepted = { lat: pt.latitude, lng: pt.longitude, timeMs: ptTimeMs };
+        }
+        // Reject: leave the accepted anchor (position AND time) untouched, exactly
+        // like the client. Mutating the anchor time would shrink dt for the next
+        // candidate and diverge from the live total (speed-jump self-lock).
       }
 
       durationSeconds = Math.floor((stoppedAt.getTime() - new Date(route.startedAt).getTime()) / 1000);

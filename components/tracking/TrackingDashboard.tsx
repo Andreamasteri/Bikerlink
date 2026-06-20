@@ -23,6 +23,8 @@ interface TrackingDashboardProps {
   handlePause: () => void;
   handleStop: () => void;
   gpsLost: boolean;
+  gpsAcquiring: boolean;
+  fusionMode: "acquiring" | "gps_only" | "gps_sensors" | "sensors_only";
   isFermo: boolean;
   accuracyTier: { labelKey: string; color: string; value: string } | null;
   currentSpeed: number;
@@ -71,6 +73,8 @@ export function TrackingDashboard({
   handlePause,
   handleStop,
   gpsLost,
+  gpsAcquiring,
+  fusionMode,
   isFermo,
   accuracyTier,
   currentSpeed,
@@ -143,6 +147,14 @@ export function TrackingDashboard({
         </TouchableOpacity>
       </View>
 
+      {/* GPS acquiring banner — shown while waiting for the first fix */}
+      {gpsAcquiring && !gpsLost && (
+        <View style={[styles.gpsBanner, styles.gpsAcquiringBanner]}>
+          <Ionicons name="locate-outline" size={16} color="#fff" />
+          <Text style={styles.gpsBannerText}>{t("tracking.gpsAcquiring")}</Text>
+        </View>
+      )}
+
       {/* GPS signal lost banner */}
       {gpsLost && (
         <View style={styles.gpsBanner}>
@@ -150,6 +162,32 @@ export function TrackingDashboard({
           <Text style={styles.gpsBannerText}>{t("tracking.gpsLost")}</Text>
         </View>
       )}
+
+      {/* Fusion mode chip — observable telemetry source */}
+      <View style={styles.fusionChipRow}>
+        <View
+          style={[
+            styles.fusionChip,
+            fusionMode === "sensors_only" && styles.fusionChipSensors,
+            fusionMode === "acquiring" && styles.fusionChipAcquiring,
+          ]}
+        >
+          <Ionicons
+            name={
+              fusionMode === "acquiring"
+                ? "locate-outline"
+                : fusionMode === "sensors_only"
+                ? "speedometer-outline"
+                : fusionMode === "gps_sensors"
+                ? "git-merge-outline"
+                : "navigate-outline"
+            }
+            size={12}
+            color="#fff"
+          />
+          <Text style={styles.fusionChipText}>{t(`tracking.fusion.${fusionMode}`)}</Text>
+        </View>
+      </View>
 
       <ScrollView
         style={{ flex: 1 }}

@@ -21,6 +21,13 @@ export function useSensorTracking() {
   const currentAccelGRef = useRef(0);
   const currentLateralGRef = useRef(0);
   const currentTiltDegRef = useRef(0);
+  // Gravity-compensated forward linear acceleration (m/s²), used to integrate
+  // dead-reckoning speed during GPS blackouts. Kept separate from currentAccelGRef
+  // (which still includes gravity for the lean/G overlay).
+  const linearAccelFwdRef = useRef(0);
+  // Low-pass gravity estimate per axis (m/s²) for the complementary filter that
+  // removes gravity from accelerationIncludingGravity on every device.
+  const gravityEstRef = useRef<{ x: number; y: number; z: number } | null>(null);
   const maxLateralGRef = useRef(0);
   const sensorStartingRef = useRef(false);
   const sensorSourceRef = useRef<"deviceMotion" | "accelerometer" | "none">("none");
@@ -56,6 +63,8 @@ export function useSensorTracking() {
     currentAccelGRef,
     currentLateralGRef,
     currentTiltDegRef,
+    linearAccelFwdRef,
+    gravityEstRef,
     maxLateralGRef,
     sensorStartingRef,
     sensorSourceRef,

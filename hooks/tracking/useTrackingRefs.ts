@@ -11,6 +11,10 @@ export function useTrackingRefs() {
   const routeIdRef = useRef<string | null>(null);
   const countdownTickRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const countdownGoTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Task #4560 — fusion timer (1Hz sensor cadence) + progressive-watch upgrade.
+  const fusionTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const watchUpgradeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastFusionTickRef = useRef<number>(0);
 
   const pointsBufferRef = useRef<GpsPoint[]>([]);
   const telemetryAccumRef = useRef<Array<{
@@ -20,6 +24,7 @@ export function useTrackingRefs() {
     leanAngle?: number;
     gForceX?: number;
     speedKmh?: number;
+    mode?: string;
   }>>([]);
 
   return {
@@ -31,6 +36,9 @@ export function useTrackingRefs() {
     routeIdRef,
     countdownTickRef,
     countdownGoTimeoutRef,
+    fusionTimerRef,
+    watchUpgradeTimeoutRef,
+    lastFusionTickRef,
     pointsBufferRef,
     telemetryAccumRef,
   };

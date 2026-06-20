@@ -44,12 +44,14 @@ interface TrackingHandlerDeps {
 export function buildCleanupTracking(deps: Pick<TrackingHandlerDeps, "bg" | "gps" | "refs">) {
   return function cleanupTracking() {
     const { bg, gps, refs } = deps;
-    [refs.timerRef, refs.flushTimerRef, refs.gpsHeartbeatTimerRef, refs.countdownTickRef].forEach((r: any) => {
+    [refs.timerRef, refs.flushTimerRef, refs.gpsHeartbeatTimerRef, refs.countdownTickRef, refs.fusionTimerRef].forEach((r: any) => {
       if (r.current) clearInterval(r.current);
       r.current = null;
     });
     if (refs.countdownGoTimeoutRef.current) clearTimeout(refs.countdownGoTimeoutRef.current);
     refs.countdownGoTimeoutRef.current = null;
+    if (refs.watchUpgradeTimeoutRef.current) clearTimeout(refs.watchUpgradeTimeoutRef.current);
+    refs.watchUpgradeTimeoutRef.current = null;
     if (refs.watchSubRef.current) refs.watchSubRef.current.remove();
     refs.watchSubRef.current = null;
     if (refs.accelSubRef.current) refs.accelSubRef.current.remove();
@@ -70,12 +72,17 @@ export function buildResetTrackingState(deps: Pick<TrackingHandlerDeps, "gps" | 
   return function resetTrackingState() {
     const { gps, sensors, sprint, stats, bg, refs } = deps;
     gps.setCurrentSpeed(0); gps.setTotalKm(0); gps.setMaxSpeed(0); gps.setMaxAltitude(0); gps.setMapCoords([]); gps.setCurrentCoord(null);
+    gps.setGpsFixAcquired(false); gps.setFusionMode("acquiring");
+    gps.gpsFixAcquiredRef.current = false; gps.fusionModeRef.current = "acquiring"; gps.lastAccuracyRef.current = null;
+    gps.lastGpsEventMsRef.current = 0; gps.lastUsableFixMsRef.current = 0;
+    gps.drSpeedKmhRef.current = 0; gps.drGapKmRef.current = 0; gps.divergenceCountRef.current = 0;
     stats.setTotalMs(0); stats.setDisplayIdleMs(0); stats.setPointsBuffered(0); stats.setPointsSent(0); stats.setAvgSpeedDisplayKmh(0);
     sensors.setCurrentG(0); sensors.setCurrentLateralG(0); sensors.setCurrentTiltDeg(0); sensors.setMaxAccelG(0); sensors.setMaxDecelG(0); sensors.setMaxLateralG(0); sensors.setMaxTiltDeg(0); sensors.setShowSensorOverlay(false);
     sprint.setSprintPhase("waiting"); sprint.setSprint0to100Ms(null); sprint.setIsNewRecord(false); sprint.recordAnim.setValue(0);
     gps.totalKmRef.current = 0; gps.maxSpeedRef.current = 0; gps.maxAltRef.current = 0; gps.lastPosRef.current = null; gps.mapCoordsRef.current = [];
     refs.routeIdRef.current = null; stats.totalPointsSentRef.current = 0; stats.idleMsRef.current = 0; stats.idleStartRef.current = null; stats.isIdleRef.current = false;
     sensors.accelBaselineRef.current = null; sensors.accelCalibSamples.current = []; sensors.maxAccelGRef.current = 0; sensors.maxDecelGRef.current = 0; sensors.maxTiltDegRef.current = 0; sensors.maxLateralGRef.current = 0; sensors.sensorStartingRef.current = false;
+    sensors.linearAccelFwdRef.current = 0; sensors.gravityEstRef.current = null; sensors.currentAccelGRef.current = 0; sensors.currentLateralGRef.current = 0; sensors.currentTiltDegRef.current = 0;
     sprint.sprintStartTimeRef.current = null; sprint.sprintPhaseRef.current = "waiting"; sprint.setSprintGoFired(false); sprint.sprint0to100MsRef.current = null;
     gps.emaSpeedRef.current = 0; stats.lastAvgSpeedUpdateRef.current = 0; stats.pausedMsRef.current = 0; stats.isPausedRef.current = false;
     sensors.setIsCalibrating(false);
@@ -116,6 +123,27 @@ export function useTrackingHandlers(deps: TrackingHandlerDeps) {
             accelG = y / 9.81; lateralG = x / 9.81; tiltDeg = ((data.rotation as { roll?: number }).roll || 0) * (180 / Math.PI);
           }
           sensors.currentAccelGRef.current = accelG; sensors.currentLateralGRef.current = lateralG; sensors.currentTiltDegRef.current = tiltDeg;
+          // Gravity-compensated forward linear acceleration (m/s²) for dead reckoning.
+          // Prefer the OS-fused linear acceleration; otherwise estimate gravity with a
+          // low-pass complementary filter and subtract it from the raw vector.
+          let lin = data.acceleration as { x: number; y: number; z: number } | null | undefined;
+          if (!lin) {
+            const g = sensors.gravityEstRef.current ?? { x, y, z };
+            const a = 0.9; // smoothing → gravity is the slow-moving component
+            g.x = a * g.x + (1 - a) * x; g.y = a * g.y + (1 - a) * y; g.z = a * g.z + (1 - a) * z;
+            sensors.gravityEstRef.current = g;
+            lin = { x: x - g.x, y: y - g.y, z: z - g.z };
+          }
+          let linFwd: number;
+          if (sensors.mountAxisCalibRef.current) {
+            const { forward } = sensors.mountAxisCalibRef.current as MountAxisCalibration & { forward: { x: number; y: number; z: number } };
+            linFwd = lin.x * forward.x + lin.y * forward.y + lin.z * forward.z;
+          } else {
+            linFwd = lin.y;
+          }
+          // Zero-velocity-update clamp: ignore sub-threshold noise so a stationary
+          // device doesn't drift speed/distance upward during a GPS blackout.
+          sensors.linearAccelFwdRef.current = Math.abs(linFwd) < 0.3 ? 0 : linFwd;
           sensors.setCurrentLateralG(lateralG); sensors.setCurrentTiltDeg(tiltDeg);
           if (accelG > sensors.maxAccelGRef.current) { sensors.maxAccelGRef.current = accelG; sensors.setMaxAccelG(accelG); }
           if (accelG < sensors.maxDecelGRef.current) { sensors.maxDecelGRef.current = accelG; sensors.setMaxDecelG(accelG); }

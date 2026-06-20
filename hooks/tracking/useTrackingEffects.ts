@@ -5,7 +5,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 
 import { apiRequest } from "@/lib/query-client";
 import { emitMapsTelemetry } from "@/hooks/useMapTelemetry";
-import { haversineKm } from "@/lib/geo";
+import { evaluateSegment, TRACKING_FUSION } from "@shared/tracking-fusion";
 import { setHandsOffBroadcast, setSprintMeasuringBroadcast } from "@/lib/tracking-active";
 import { logGpsError } from "@/lib/gps-logger";
 import type { GpsPoint } from "@/components/tracking/useGpsTracking";
@@ -65,19 +65,57 @@ export function useOnNativeLocation(deps: Omit<EffectDeps, "onNativeLocation" | 
         sprint.sprintPhaseRef.current = "completed"; sprint.sprint0to100MsRef.current = diff; sprint.setSprintPhase("completed"); sprint.setSprint0to100Ms(diff); setSprintMeasuringBroadcast(false);
       }
     }
+    gps.lastAccuracyRef.current = accuracy ?? null;
+    // A fix only counts as "acquired" / usable as a distance reference once it
+    // passes the accuracy gate. A noisy first fix must NOT flip us out of the
+    // acquiring state nor seed lastPosRef, or the next good fix produces a large
+    // plausible-speed segment = phantom km.
+    const fixUsable = accuracy == null || accuracy <= TRACKING_FUSION.ACCURACY_GATE_M;
+    // A raw callback (any quality) keeps the blackout heartbeat alive. Only a
+    // quality fix marks GPS as "fresh" for fusion and is allowed to anchor distance.
+    gps.lastGpsEventMsRef.current = now;
+    if (fixUsable) {
+      gps.lastUsableFixMsRef.current = now;
+      if (!gps.gpsFixAcquiredRef.current) { gps.gpsFixAcquiredRef.current = true; gps.setGpsFixAcquired(true); }
+    }
     if (gps.lastPosRef.current) {
-      const dist = haversineKm(gps.lastPosRef.current.lat, gps.lastPosRef.current.lng, latitude, longitude);
-      if (dist > 0.005) {
-        gps.totalKmRef.current += dist; gps.setTotalKm(gps.totalKmRef.current);
-        if (settings.showMyRoute) { gps.mapCoordsRef.current = [...gps.mapCoordsRef.current, { latitude, longitude }]; gps.setMapCoords(gps.mapCoordsRef.current); }
+      if (gps.drGapKmRef.current > 0) {
+        // Dead reckoning covered the GPS blackout. Only a QUALITY fix is trusted to
+        // reseed the anchor + clear the gap (without adding the bridging segment, so
+        // the gap isn't double-counted). A poor recovery fix keeps us in DR.
+        if (fixUsable) {
+          gps.drGapKmRef.current = 0;
+          gps.lastPosRef.current = { lat: latitude, lng: longitude, time: now };
+          if (settings.showMyRoute) { gps.mapCoordsRef.current = [...gps.mapCoordsRef.current, { latitude, longitude }]; gps.setMapCoords(gps.mapCoordsRef.current); }
+        }
+      } else {
+        const decision = evaluateSegment({
+          prevLat: gps.lastPosRef.current.lat, prevLng: gps.lastPosRef.current.lng,
+          prevTimeMs: gps.lastPosRef.current.time,
+          lat: latitude, lng: longitude, timeMs: now, accuracyM: accuracy,
+        });
+        if (decision.accept) {
+          gps.totalKmRef.current += decision.distanceKm; gps.setTotalKm(gps.totalKmRef.current);
+          if (settings.showMyRoute) { gps.mapCoordsRef.current = [...gps.mapCoordsRef.current, { latitude, longitude }]; gps.setMapCoords(gps.mapCoordsRef.current); }
+          // Advance the reference ONLY on an accepted segment, so sub-floor moves in
+          // tight curves accumulate across fixes instead of being silently dropped.
+          gps.lastPosRef.current = { lat: latitude, lng: longitude, time: now };
+        }
+        // Reject (jitter / jump / low-accuracy): do NOT touch lastPosRef. Keeping the
+        // last ACCEPTED position+time lets dt grow so the next good fix is plausible
+        // (no speed-jump self-lock); the heartbeat uses lastGpsEventMsRef instead.
       }
-    } else { gps.setMapCoords([{ latitude, longitude }]); gps.mapCoordsRef.current = [{ latitude, longitude }]; }
-    gps.lastPosRef.current = { lat: latitude, lng: longitude, time: now };
+    } else if (fixUsable) {
+      // Seed the distance reference only from a quality fix, so the first counted
+      // segment starts from a trustworthy origin (no phantom km).
+      gps.setMapCoords([{ latitude, longitude }]); gps.mapCoordsRef.current = [{ latitude, longitude }];
+      gps.lastPosRef.current = { lat: latitude, lng: longitude, time: now };
+    }
     if (smoothedSpeed > gps.maxSpeedRef.current) { gps.maxSpeedRef.current = smoothedSpeed; gps.setMaxSpeed(smoothedSpeed); }
     if (altitude != null && altitude > gps.maxAltRef.current) { gps.maxAltRef.current = altitude; gps.setMaxAltitude(altitude); }
     const point: GpsPoint = { latitude, longitude, altitude: altitude ?? 0, speedKmh: smoothedSpeed, timestamp: new Date(now).toISOString(), accelG: sensors.currentAccelGRef.current, tiltDeg: sensors.currentTiltDegRef.current };
     refs.pointsBufferRef.current.push(point); stats.setPointsBuffered(refs.pointsBufferRef.current.length);
-    if (settings.sensorsEnabledRef.current) refs.telemetryAccumRef.current.push({ timestamp: point.timestamp, lat: latitude, lon: longitude, leanAngle: sensors.currentTiltDegRef.current, gForceX: sensors.currentAccelGRef.current, speedKmh: smoothedSpeed });
+    if (settings.sensorsEnabledRef.current) refs.telemetryAccumRef.current.push({ timestamp: point.timestamp, lat: latitude, lon: longitude, leanAngle: sensors.currentTiltDegRef.current, gForceX: sensors.currentAccelGRef.current, speedKmh: smoothedSpeed, mode: gps.fusionModeRef.current });
     if (settings.handsOffEnabledRef.current && !handsOffDismissedForRideRef.current) {
       if (smoothedSpeed >= settings.handsOffSpeedRef.current) {
         if (!handsOffActive) { setHandsOffActive(true); setHandsOffBroadcast(true); setVolumeUI(false); }
