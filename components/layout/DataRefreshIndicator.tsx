@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { View, Text, ActivityIndicator, StyleSheet, Platform } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useIsFetching, onlineManager } from "@tanstack/react-query";
+import { useIsFetching } from "@tanstack/react-query";
 import { useColors } from "@/hooks/useColors";
 
 // ──────────────────────────────────────────────────────────────────────
@@ -9,38 +9,30 @@ import { useColors } from "@/hooks/useColors";
 //
 // A lightweight, non-invasive pill shown when the app is refreshing data after
 // a resume/reconnect on poor network — driven by React Query's `isFetching`
-// counter plus the online state from `onlineManager`. With good network normal
-// fetches resolve quickly and the pill never appears (a small show-delay filters
-// them out); on degraded network the in-flight fetches linger and the pill
-// surfaces, then disappears once data is fresh. A short hide-linger avoids
-// flicker between back-to-back refetches.
+// counter. With good network normal fetches resolve quickly and the pill never
+// appears (a small show-delay filters them out); on degraded network the
+// in-flight fetches linger and the pill surfaces, then disappears once data is
+// fresh. A short hide-linger avoids flicker between back-to-back refetches.
+//
+// The offline state itself is owned by `OfflineBanner` (Task #4596), which
+// surfaces an explicit, dismissible banner with a manual "Riprova" action — so
+// this pill is intentionally fetch-only and never reacts to `onlineManager`.
 // ──────────────────────────────────────────────────────────────────────
 
 const SHOW_DELAY_MS = 700;
 const HIDE_LINGER_MS = 400;
 
-function useOnline(): boolean {
-  const [online, setOnline] = useState(onlineManager.isOnline());
-  useEffect(() => {
-    const unsub = onlineManager.subscribe(() => setOnline(onlineManager.isOnline()));
-    return unsub;
-  }, []);
-  return online;
-}
-
 export function DataRefreshIndicator() {
   const insets = useSafeAreaInsets();
   const colors = useColors();
   const isFetching = useIsFetching();
-  const online = useOnline();
 
   const [visible, setVisible] = useState(false);
   const showTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Show while offline (queries are paused, data may be stale) OR while a fetch
-  // has been in flight long enough to indicate a slow network.
-  const shouldShow = !online || isFetching > 0;
+  // Show while a fetch has been in flight long enough to indicate a slow network.
+  const shouldShow = isFetching > 0;
 
   useEffect(() => {
     if (shouldShow) {
@@ -49,13 +41,12 @@ export function DataRefreshIndicator() {
         hideTimerRef.current = null;
       }
       if (!visible && !showTimerRef.current) {
-        // Offline is shown immediately; a slow fetch waits out the show-delay so
-        // fast/normal fetches on good network never flash the indicator.
-        const delay = !online ? 0 : SHOW_DELAY_MS;
+        // A slow fetch waits out the show-delay so fast/normal fetches on good
+        // network never flash the indicator.
         showTimerRef.current = setTimeout(() => {
           showTimerRef.current = null;
           setVisible(true);
-        }, delay);
+        }, SHOW_DELAY_MS);
       }
     } else {
       if (showTimerRef.current) {
@@ -69,7 +60,7 @@ export function DataRefreshIndicator() {
         }, HIDE_LINGER_MS);
       }
     }
-  }, [shouldShow, online, visible]);
+  }, [shouldShow, visible]);
 
   useEffect(() => {
     return () => {
@@ -82,18 +73,13 @@ export function DataRefreshIndicator() {
 
   const topInset =
     Platform.OS === "web" ? Math.max(insets.top, 67) : insets.top;
-  const label = !online ? "Offline — in attesa di rete" : "Aggiornamento dati…";
 
   return (
     <View pointerEvents="none" style={[styles.wrap, { top: topInset + 6 }]}>
       <View style={[styles.pill, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-        {online ? (
-          <ActivityIndicator size="small" color={colors.accent as string} />
-        ) : (
-          <View style={[styles.dot, { backgroundColor: colors.textSecondary as string }]} />
-        )}
+        <ActivityIndicator size="small" color={colors.accent as string} />
         <Text style={[styles.label, { color: colors.text as string }]} numberOfLines={1}>
-          {label}
+          Aggiornamento dati…
         </Text>
       </View>
     </View>
@@ -121,11 +107,6 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     shadowOffset: { width: 0, height: 2 },
     elevation: 3,
-  },
-  dot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
   },
   label: {
     fontFamily: "Inter_500Medium",

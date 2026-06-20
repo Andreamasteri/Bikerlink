@@ -35,6 +35,7 @@ import { AppStateHandler } from "@/components/layout/AppStateHandler";
 import { BackgroundNotificationHandler } from "@/components/layout/BackgroundNotificationHandler";
 import { PushTokenRegistrar } from "@/components/layout/PushTokenRegistrar";
 import { DataRefreshIndicator } from "@/components/layout/DataRefreshIndicator";
+import { OfflineBanner } from "@/components/layout/OfflineBanner";
 // Task #2698 — AI Assistant utente.
 import AssistantOnboardingTour from "@/components/user/ai-assistant/AssistantOnboardingTour";
 import { useOtaStagingBanner } from "@/hooks/useOtaStagingBanner";
@@ -251,6 +252,7 @@ export default function RootLayout() {
           <GpsAlwaysGateWrapper />
           <OtaPendingBanner />
           <DataRefreshIndicator />
+          <OfflineBanner />
           <AdminUptimeOverlay />
           <BackgroundNotificationHandler />
           <PushTokenRegistrar />

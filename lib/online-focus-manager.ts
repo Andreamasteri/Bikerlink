@@ -45,9 +45,23 @@ export function subscribeReconnect(listener: ReconnectListener): () => void {
   };
 }
 
+// Keys that MUST be fresh the moment the network returns (online counts,
+// profile, available lists). Shared by the reconnect-always defaults below and
+// by `retryConnection()` so the manual "Riprova" button refetches the exact
+// same set as an automatic reconnect.
+export const RECONNECT_KEYS: readonly string[] = [
+  "/api/users/profile",
+  "/api/users/online-count",
+  "/api/users/biker-available-count",
+  "/api/users/zavorrine-available-count",
+  "/api/users/biker-available-list",
+  "/api/users/zavorrine-available-list",
+];
+
 let _wired = false;
 let _lastOnline = true;
 let _reconnectDebounce: ReturnType<typeof setTimeout> | null = null;
+let _retryInFlight = false;
 
 function notifyReconnect() {
   if (_reconnectDebounce) clearTimeout(_reconnectDebounce);
@@ -103,15 +117,55 @@ export function initOnlineFocusManager(): void {
   // MUST be fresh the moment the network returns (online counts, profile), set
   // `refetchOnReconnect: "always"` selectively — NOT globally — so they refresh
   // on reconnect even though they're never marked stale.
-  const reconnectAlwaysKeys: string[] = [
-    "/api/users/profile",
-    "/api/users/online-count",
-    "/api/users/biker-available-count",
-    "/api/users/zavorrine-available-count",
-    "/api/users/biker-available-list",
-    "/api/users/zavorrine-available-list",
-  ];
-  for (const key of reconnectAlwaysKeys) {
+  for (const key of RECONNECT_KEYS) {
     queryClient.setQueryDefaults([key], { refetchOnReconnect: "always" });
+  }
+}
+
+/**
+ * Manual "retry now" used by the offline banner. Forces a fresh connectivity
+ * probe via NetInfo, syncs `onlineManager` with the result and — if back online —
+ * relaunches the non-query resume flows and refetches the targeted reconnect
+ * keys. Returns `true` when connectivity was regained.
+ *
+ * Probe-failure fallback is platform-aware: on web (where NetInfo may be
+ * unavailable) we optimistically assume online and let the refetches surface any
+ * real failure, rather than trapping the user behind the banner; on native a
+ * probe error keeps the current offline state instead of falsely hiding it.
+ *
+ * Re-entrancy guarded: a concurrent tap while a probe is in flight is a no-op
+ * and returns the current online state (the UI also disables the button while
+ * retrying).
+ */
+export async function retryConnection(): Promise<boolean> {
+  if (_retryInFlight) return onlineManager.isOnline();
+  _retryInFlight = true;
+  try {
+    let online: boolean;
+    try {
+      const state = await NetInfo.refresh();
+      online = isStateOnline(state.isConnected);
+    } catch {
+      // NetInfo unavailable/threw: optimistic-online on web (probe may not
+      // exist), but keep the real offline state on native.
+      online = Platform.OS === "web" ? true : onlineManager.isOnline();
+    }
+
+    onlineManager.setOnline(online);
+
+    if (online) {
+      // Relaunch heartbeat/session resume flows (same path as an auto-reconnect).
+      notifyReconnect();
+      try {
+        await queryClient.refetchQueries({
+          predicate: (q) => RECONNECT_KEYS.includes(q.queryKey?.[0] as string),
+        });
+      } catch {
+        // Refetch failures surface through each query's own error state.
+      }
+    }
+    return online;
+  } finally {
+    _retryInFlight = false;
   }
 }
