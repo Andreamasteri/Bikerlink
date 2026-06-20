@@ -85,6 +85,13 @@ interface EssentialUserDef {
    * sempre presenti in dev (es. moderatore).
    */
   allowFirstBootSeed?: boolean;
+  /**
+   * Se true, in ambiente di sviluppo (REPLIT_DEPLOYMENT !== "1") quando la
+   * password env var manca viene stampato un avviso esplicito che spiega che
+   * l'utente di test non sarà disponibile e come ripristinarlo via Secret.
+   * Usato per gli account impiegati nei test manuali (es. smoke, mendo).
+   */
+  devTestUser?: boolean;
 }
 
 const essentialUsers: EssentialUserDef[] = [
@@ -112,6 +119,7 @@ const essentialUsers: EssentialUserDef[] = [
     role: "admin",
     userType: "biker",
     sex: "M",
+    devTestUser: true,
   },
   {
     nickname: "smoke",
@@ -120,6 +128,7 @@ const essentialUsers: EssentialUserDef[] = [
     role: "user",
     userType: "biker",
     sex: "M",
+    devTestUser: true,
   },
 ];
 
@@ -136,9 +145,18 @@ export async function autoSeedEssentialUsers() {
         // da start-backend.sh, rendendolo inutilizzabile come discriminante).
         const isDeployed = process.env.REPLIT_DEPLOYMENT === "1";
         if (!userData.allowFirstBootSeed || isDeployed) {
-          console.warn(
-            `[auto-seed] Skipping ${userData.role} seed: ${userData.passwordEnvVar} env var not set`,
-          );
+          if (userData.devTestUser && !isDeployed) {
+            console.warn(
+              `[auto-seed] Utente di test "${userData.nickname}" (${userData.email}) NON disponibile: ` +
+                `${userData.passwordEnvVar} non è impostata. ` +
+                `Per abilitarlo aggiungi ${userData.passwordEnvVar} (min ${MIN_SEED_PASSWORD_LENGTH} caratteri) ` +
+                `come Secret nel pannello Secrets e riavvia il backend.`,
+            );
+          } else {
+            console.warn(
+              `[auto-seed] Skipping ${userData.role} seed: ${userData.passwordEnvVar} env var not set`,
+            );
+          }
           continue;
         }
 
