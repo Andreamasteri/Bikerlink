@@ -1,6 +1,6 @@
 import { Router, type Request, type Response } from "express";
 import { storage } from "../../storage";
-import { db } from "../../db";
+import { db, withDbRetry } from "../../db";
 import { motoClubMembers, proposalParticipants, users, userMotorcycles, type UserMotorcycle } from "@shared/db";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { triggerProposalCreatedMatching } from "../../matching-engine";
@@ -21,9 +21,9 @@ router.get("/", requireAuth, async (req: Request, res: Response) => {
     const userId = req.session.userId!;
     let allProposals = await storage.getProposals(status ? { status } : undefined);
 
-    const userMemberships = await db.select({ clubId: motoClubMembers.clubId })
+    const userMemberships = await withDbRetry(() => db.select({ clubId: motoClubMembers.clubId })
       .from(motoClubMembers)
-      .where(and(eq(motoClubMembers.userId, userId), eq(motoClubMembers.status, "active")));
+      .where(and(eq(motoClubMembers.userId, userId), eq(motoClubMembers.status, "active"))));
     const memberClubIds = new Set(userMemberships.map(m => m.clubId));
 
     allProposals = allProposals.filter(p => {
@@ -58,19 +58,19 @@ router.get("/", requireAuth, async (req: Request, res: Response) => {
 
     const [participantCountRows, creatorRows, motorcycleRows] = await Promise.all([
       proposalIds.length > 0
-        ? db.select({
+        ? withDbRetry(() => db.select({
             proposalId: proposalParticipants.proposalId,
             count: sql<number>`count(*)::int`,
           })
           .from(proposalParticipants)
           .where(inArray(proposalParticipants.proposalId, proposalIds))
-          .groupBy(proposalParticipants.proposalId)
+          .groupBy(proposalParticipants.proposalId))
         : Promise.resolve([] as { proposalId: string; count: number }[]),
       uniqueUserIds.length > 0
-        ? db.select().from(users).where(inArray(users.id, uniqueUserIds))
+        ? withDbRetry(() => db.select().from(users).where(inArray(users.id, uniqueUserIds)))
         : Promise.resolve([] as (typeof users.$inferSelect)[]),
       motoUserIds.length > 0
-        ? db.select().from(userMotorcycles).where(inArray(userMotorcycles.userId, motoUserIds))
+        ? withDbRetry(() => db.select().from(userMotorcycles).where(inArray(userMotorcycles.userId, motoUserIds)))
         : Promise.resolve([] as UserMotorcycle[]),
     ]);
 
@@ -154,15 +154,15 @@ router.get("/:id", requireAuth, async (req: Request, res: Response) => {
 
     const userId = req.session.userId!;
     if (proposal.clubId) {
-      const [membership] = await db
+      const [membership] = await withDbRetry(() => db
         .select({ userId: motoClubMembers.userId })
         .from(motoClubMembers)
         .where(and(
-          eq(motoClubMembers.clubId, proposal.clubId),
+          eq(motoClubMembers.clubId, proposal.clubId!),
           eq(motoClubMembers.userId, userId),
           eq(motoClubMembers.status, "active"),
         ))
-        .limit(1);
+        .limit(1));
       if (!membership) {
         return sendError(res, 403, "Questa proposta è riservata ai membri del club");
       }

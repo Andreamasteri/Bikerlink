@@ -1,5 +1,5 @@
 import { Router, type Request, type Response } from "express";
-import { db, pool } from "../db";
+import { db, pool, withDbRetry } from "../db";
 import {
   roadHazards,
   RECURRING_TYPES,
@@ -68,12 +68,12 @@ router.get("/", async (req: Request, res: Response) => {
       );
     }
 
-    const rows = await db
+    const rows = await withDbRetry(() => db
       .select()
       .from(roadHazards)
       .where(and(...conditions))
       .orderBy(desc(roadHazards.createdAt))
-      .limit(500);
+      .limit(500));
 
     let hazards = rows;
     if (userLat !== null && userLng !== null) {
@@ -98,7 +98,7 @@ router.get("/:id", async (req: Request, res: Response) => {
   try {
     const hazardId = String(req.params.id);
 
-    const [hazard] = await db
+    const [hazard] = await withDbRetry(() => db
       .select()
       .from(roadHazards)
       .where(
@@ -107,11 +107,11 @@ router.get("/:id", async (req: Request, res: Response) => {
           isNull(roadHazards.deletedAt)
         )
       )
-      .limit(1);
+      .limit(1));
 
     if (!hazard) return sendError(res, 404, "Segnalazione non trovata");
 
-    const commentsRaw = await pool.query<{
+    const commentsRaw = await withDbRetry(() => pool.query<{
       id: string;
       user_id: string;
       text: string;
@@ -126,7 +126,7 @@ router.get("/:id", async (req: Request, res: Response) => {
         WHERE c.hazard_id = $1
         ORDER BY c.created_at ASC`,
       [hazardId]
-    );
+    ));
 
     const comments = commentsRaw.rows.map((r) => ({
       id: r.id,

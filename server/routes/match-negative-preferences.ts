@@ -1,5 +1,5 @@
 import { Router, type Request, type Response } from "express";
-import { db } from "../db";
+import { db, withDbRetry } from "../db";
 import {
   matchNegativePreferences,
   pendingAutoSuggestions,
@@ -16,11 +16,11 @@ const router = Router();
 router.get("/", requireAuth, async (req: Request, res: Response) => {
   try {
     const userId = req.session.userId!;
-    const rows = await db
+    const rows = await withDbRetry(() => db
       .select()
       .from(matchNegativePreferences)
       .where(eq(matchNegativePreferences.userId, userId))
-      .orderBy(desc(matchNegativePreferences.createdAt));
+      .orderBy(desc(matchNegativePreferences.createdAt)));
     return res.json({ preferences: rows });
   } catch (err) {
     console.error("[MatchNegPrefs] GET error:", err);
@@ -78,11 +78,11 @@ router.delete("/:id", requireAuth, async (req: Request, res: Response) => {
 router.get("/suggestions", requireAuth, async (req: Request, res: Response) => {
   try {
     const userId = req.session.userId!;
-    const rows = await db
+    const rows = await withDbRetry(() => db
       .select()
       .from(pendingAutoSuggestions)
       .where(and(eq(pendingAutoSuggestions.userId, userId), eq(pendingAutoSuggestions.status, "pending")))
-      .orderBy(desc(pendingAutoSuggestions.rejectCount));
+      .orderBy(desc(pendingAutoSuggestions.rejectCount)));
     return res.json({ suggestions: rows });
   } catch (err) {
     console.error("[MatchNegPrefs] suggestions GET error:", err);

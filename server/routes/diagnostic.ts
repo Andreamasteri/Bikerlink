@@ -1,7 +1,7 @@
 import { Router, type Request, type Response } from "express";
 import fs from "fs";
 import path from "path";
-import { db } from "../db";
+import { db, withDbRetry } from "../db";
 import { diagnosticReports, diagnosticQueue, users, notifications } from "@shared/db";
 import { sendError } from "../lib/api-response";
 import { and, eq, gt, isNull } from "drizzle-orm";
@@ -199,16 +199,17 @@ router.get("/pending", async (req: Request, res: Response) => {
     if (!req.session.userId) {
       return sendError(res, 401, "Non autenticato");
     }
-    const rows = await db.select({ id: diagnosticQueue.id })
+    const userId = req.session.userId;
+    const rows = await withDbRetry(() => db.select({ id: diagnosticQueue.id })
       .from(diagnosticQueue)
       .where(
         and(
-          eq(diagnosticQueue.userId, req.session.userId),
+          eq(diagnosticQueue.userId, userId),
           isNull(diagnosticQueue.executedAt),
           gt(diagnosticQueue.expiresAt, new Date()),
         )
       )
-      .limit(1);
+      .limit(1));
 
     return res.json({ pending: rows.length > 0 });
   } catch (err) {

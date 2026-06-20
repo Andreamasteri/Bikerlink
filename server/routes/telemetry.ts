@@ -1,5 +1,5 @@
 import { Router, type Request, type Response } from "express";
-import { db } from "../db";
+import { db, withDbRetry } from "../db";
 import { sql } from "drizzle-orm";
 import { rideTelemetry } from "@shared/db";
 import { requireUserId } from "../lib/auth-middleware";
@@ -225,7 +225,7 @@ router.get("/stats", async (req: Request, res: Response) => {
 
   const startMs = Date.now();
   try {
-    const statsResult = await db.execute(sql`
+    const statsResult = await withDbRetry(() => db.execute(sql`
       SELECT
         COUNT(*) AS sample_count,
         COUNT(DISTINCT session_id) AS session_count,
@@ -233,7 +233,7 @@ router.get("/stats", async (req: Request, res: Response) => {
       FROM ride_telemetry
       WHERE user_id = ${userId}
         AND session_type NOT IN ('ideal_lap')
-    `);
+    `));
 
     const row = statsResult.rows[0] as { sample_count: string; session_count: string; sensor_only_count: string } | undefined;
     const sampleCount = parseInt(row?.sample_count ?? "0", 10);
@@ -247,7 +247,7 @@ router.get("/stats", async (req: Request, res: Response) => {
       userId,
     });
 
-    const kmResult = await db.execute(sql`
+    const kmResult = await withDbRetry(() => db.execute(sql`
       WITH ordered AS (
         SELECT
           session_id,
@@ -277,13 +277,13 @@ router.get("/stats", async (req: Request, res: Response) => {
       )
       SELECT COALESCE(SUM(dist_km), 0) AS km_collected
       FROM distances
-    `);
+    `));
 
     const kmRow = kmResult.rows[0] as { km_collected: string } | undefined;
     const kmCollected = Math.round(parseFloat(kmRow?.km_collected ?? "0") * 10) / 10;
     const progressPct = Math.min(100, Math.round((kmCollected / TARGET_KM) * 100));
 
-    const trackKmResult = await db.execute(sql`
+    const trackKmResult = await withDbRetry(() => db.execute(sql`
       WITH ordered AS (
         SELECT
           session_id,
@@ -312,12 +312,12 @@ router.get("/stats", async (req: Request, res: Response) => {
       )
       SELECT COALESCE(SUM(dist_km), 0) AS track_km
       FROM distances
-    `);
+    `));
 
     const trackKmRow = trackKmResult.rows[0] as { track_km: string } | undefined;
     const trackKm = Math.round(parseFloat(trackKmRow?.track_km ?? "0") * 10) / 10;
 
-    const idealLapKmResult = await db.execute(sql`
+    const idealLapKmResult = await withDbRetry(() => db.execute(sql`
       WITH ordered AS (
         SELECT
           session_id,
@@ -348,7 +348,7 @@ router.get("/stats", async (req: Request, res: Response) => {
       )
       SELECT COALESCE(SUM(dist_km), 0) AS ideal_lap_km
       FROM distances
-    `);
+    `));
 
     const idealLapKmRow = idealLapKmResult.rows[0] as { ideal_lap_km: string } | undefined;
     const idealLapKm = Math.round(parseFloat(idealLapKmRow?.ideal_lap_km ?? "0") * 10) / 10;
@@ -385,7 +385,7 @@ router.get("/ideal-laps", async (req: Request, res: Response) => {
   if (!userId) return;
 
   try {
-    const result = await db.execute(sql`
+    const result = await withDbRetry(() => db.execute(sql`
       SELECT
         session_id,
         MAX(lap_name) AS lap_name,
@@ -405,7 +405,7 @@ router.get("/ideal-laps", async (req: Request, res: Response) => {
         AND session_type = 'ideal_lap'
       GROUP BY session_id
       ORDER BY MIN(ts) DESC
-    `);
+    `));
 
     type LapRow = {
       session_id: string;
@@ -463,7 +463,7 @@ router.get("/sensor-settings", async (req: Request, res: Response) => {
   try {
     const [globalSetting, userRow] = await Promise.all([
       storage.getAppSetting("telemetry_sensors_global_enabled"),
-      db.execute(sql`SELECT telemetry_disabled FROM users WHERE id = ${userId} LIMIT 1`),
+      withDbRetry(() => db.execute(sql`SELECT telemetry_disabled FROM users WHERE id = ${userId} LIMIT 1`)),
     ]);
 
     const globalEnabled = globalSetting?.value !== "false";
@@ -483,9 +483,9 @@ router.get("/calibration", async (req: Request, res: Response) => {
   if (!userId) return;
 
   try {
-    const result = await db.execute(sql`
+    const result = await withDbRetry(() => db.execute(sql`
       SELECT mount_calibration FROM users WHERE id = ${userId} LIMIT 1
-    `);
+    `));
     const row = result.rows[0] as { mount_calibration: unknown } | undefined;
     return res.json({ calibration: row?.mount_calibration ?? null });
   } catch (err) {

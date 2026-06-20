@@ -2,7 +2,7 @@ import { sendError } from "../lib/api-response";
 import { Router, type Request, type Response } from "express";
 import { storage } from "../storage";
 import { haversineKm } from "../geo";
-import { db } from "../db";
+import { db, withDbRetry } from "../db";
 import { events, eventImages, users, type InsertEvent } from "@shared/db";
 import { createEventSchema } from "@shared/validators";
 import {
@@ -56,12 +56,12 @@ router.get("/images/:filename", async (req: Request, res: Response) => {
     }
 
     const imageUrl = `/api/events/images/${filename}`;
-    const [parent] = await db
+    const [parent] = await withDbRetry(() => db
       .select({ status: events.status, creatorId: events.creatorId })
       .from(eventImages)
       .innerJoin(events, eq(events.id, eventImages.eventId))
       .where(eq(eventImages.imageUrl, imageUrl))
-      .limit(1);
+      .limit(1));
 
     if (!parent) {
       return sendError(res, 404, "Immagine non trovata");
@@ -110,7 +110,7 @@ router.get("/", async (req: Request, res: Response) => {
       conditions.push(lte(events.eventDate, new Date(to)));
     }
 
-    const rows: EventRow[] = await db.select({
+    const rows: EventRow[] = await withDbRetry(() => db.select({
       id: events.id,
       title: events.title,
       description: events.description,
@@ -139,7 +139,7 @@ router.get("/", async (req: Request, res: Response) => {
       .from(events)
       .leftJoin(users, eq(users.id, events.creatorId))
       .where(and(...conditions, ...systemAccountConditions(users)))
-      .orderBy(asc(events.eventDate));
+      .orderBy(asc(events.eventDate)));
 
     let filtered = rows;
     if (lat && lng && radius) {

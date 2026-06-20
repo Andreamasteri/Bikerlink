@@ -1,6 +1,6 @@
 import type { Express, Request, Response, NextFunction } from "express";
 import { storage } from "../storage";
-import { db } from "../db";
+import { db, withDbRetry } from "../db";
 import { serverRestarts } from "@shared/db";
 import { sql, desc, count } from "drizzle-orm";
 import { triggerMatchingRun, triggerMatchingForUser } from "../matching-engine";
@@ -76,12 +76,12 @@ export function registerMoreRoutes(app: Express) {
     try {
       const { appCrashLogs } = await import("@shared/db");
       const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
-      const rows = await db
+      const rows = await withDbRetry(() => db
         .select({ count: count() })
         .from(appCrashLogs)
         .where(
           sql`${appCrashLogs.crashType} IN ('crash_system', 'crash_js') AND ${appCrashLogs.reportedAt} >= ${since}`
-        );
+        ));
       crashCount24h = Number(rows[0]?.count ?? 0);
     } catch {
       // no-op: non-critical
@@ -223,8 +223,8 @@ export function registerMoreRoutes(app: Express) {
 
   app.get("/api/admin/restart-history", requireAdmin, async (_req, res) => {
     const [countResult, rows] = await Promise.all([
-      db.select({ count: count() }).from(serverRestarts),
-      db.select().from(serverRestarts).orderBy(desc(serverRestarts.startedAt)).limit(50),
+      withDbRetry(() => db.select({ count: count() }).from(serverRestarts)),
+      withDbRetry(() => db.select().from(serverRestarts).orderBy(desc(serverRestarts.startedAt)).limit(50)),
     ]);
     res.json({
       total: countResult[0]?.count ?? 0,
@@ -273,12 +273,12 @@ export function registerMoreRoutes(app: Express) {
   app.get("/api/stats/public", async (_req, res) => {
     try {
       const fiveMinAgo = new Date(Date.now() - 5 * 60 * 1000);
-      const result = await db.execute(sql`
+      const result = await withDbRetry(() => db.execute(sql`
         SELECT
           COUNT(*) FILTER (WHERE is_fake = false AND status = 'active' AND COALESCE(role, 'user') != 'admin') AS total,
           COUNT(*) FILTER (WHERE is_fake = false AND status = 'active' AND COALESCE(role, 'user') != 'admin' AND last_login_at >= ${fiveMinAgo}) AS online
         FROM users
-      `);
+      `));
       const row = result.rows[0] as { total: string; online: string } | undefined;
       res.json({
         total: parseInt(row?.total ?? "0", 10),
@@ -292,14 +292,14 @@ export function registerMoreRoutes(app: Express) {
 
   app.get("/api/stats/global", async (_req, res) => {
     try {
-      const result = await db.execute(sql`
+      const result = await withDbRetry(() => db.execute(sql`
         SELECT
           COUNT(*) AS total,
           COUNT(*) FILTER (WHERE user_type = 'biker') AS bikers,
           COUNT(*) FILTER (WHERE user_type = 'zavorrina') AS zavorrine
         FROM users
         WHERE role != 'admin'
-      `);
+      `));
       const row = result.rows[0] as { total: string; bikers: string; zavorrine: string } | undefined;
       res.json({
         total: parseInt(row?.total ?? "0", 10),

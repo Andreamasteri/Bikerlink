@@ -1,5 +1,5 @@
 import { Router, type Request, type Response } from "express";
-import { db } from "../db";
+import { db, withDbRetry } from "../db";
 import { arcadeScores } from "@shared/db";
 import { arcadeScoreSchema } from "@shared/validators";
 import { eq, sql, max, and } from "drizzle-orm";
@@ -67,7 +67,7 @@ router.get("/leaderboard/:game", async (req: Request, res: Response) => {
   }
 
   try {
-    const result = await db.execute<{
+    const result = await withDbRetry(() => db.execute<{
       user_id: string;
       best_score: number;
       best_at: Date;
@@ -94,7 +94,7 @@ router.get("/leaderboard/:game", async (req: Request, res: Response) => {
       JOIN users u ON bt.user_id = u.id
       ORDER BY bt.best_score DESC, bt.best_at ASC
       LIMIT 10
-    `);
+    `));
 
     const rows = result.rows.map((r) => ({
       userId: r.user_id,
@@ -112,7 +112,7 @@ router.get("/leaderboard/:game", async (req: Request, res: Response) => {
 
 router.get("/hall-of-fame", async (_req: Request, res: Response) => {
   try {
-    const result = await db.execute<{
+    const result = await withDbRetry(() => db.execute<{
       game: string;
       user_id: string;
       score: number;
@@ -150,7 +150,7 @@ router.get("/hall-of-fame", async (_req: Request, res: Response) => {
       SELECT game, user_id, score, created_at, nickname, avatar_url
       FROM ranked
       WHERE rn = 1
-    `);
+    `));
 
     const results: Record<string, { game: string; userId: string; nickname: string; avatarUrl: string | null; score: number; date: string }> = {};
     for (const row of result.rows) {

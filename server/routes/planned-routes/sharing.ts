@@ -24,7 +24,7 @@ router.get("/compatible-bikers/:id", async (req: Request, res: Response) => {
     const originWp = waypoints.find((wp) => wp.lat !== 0 && wp.lng !== 0);
     if (!originWp) return res.json({ bikers: [], count: 0 });
 
-    const { db } = await import("../../db");
+    const { db, withDbRetry } = await import("../../db");
     const { sql } = await import("drizzle-orm");
 
     const styleToRiderStyles: Record<string, string[]> = {
@@ -34,7 +34,7 @@ router.get("/compatible-bikers/:id", async (req: Request, res: Response) => {
     };
     const compatibleStyles = styleToRiderStyles[route.style ?? "balanced"] ?? [];
 
-    const nearbyProfiles = await db.execute(sql`
+    const nearbyProfiles = await withDbRetry(() => db.execute(sql`
       SELECT up.user_id, up.latitude, up.longitude, u.nickname, u.user_type,
              u.avatar_url, up.riding_style, up.is_available, up.hide_from_map,
              u.last_login_at,
@@ -73,7 +73,7 @@ router.get("/compatible-bikers/:id", async (req: Request, res: Response) => {
         CASE WHEN up.is_available IS TRUE THEN 20 ELSE 0 END
       ) DESC
       LIMIT 15
-    `);
+    `));
 
     type BikerRow = { user_id: string; nickname: string; user_type: string; avatar_url: string | null; riding_style: string | null; is_available: boolean; latitude: number; longitude: number; proximity_score: number; style_score: number; avail_score: number };
     const bikers = (nearbyProfiles.rows as BikerRow[]).map((r) => ({

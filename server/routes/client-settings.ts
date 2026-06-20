@@ -3,7 +3,7 @@
 
 import type { Express, Request, Response } from "express";
 import { storage } from "../storage";
-import { db } from "../db";
+import { db, withDbRetry } from "../db";
 import { users } from "@shared/db";
 import { sql } from "drizzle-orm";
 import { sendSuccess, sendError } from "../lib/api-response";
@@ -308,7 +308,7 @@ export function registerClientSettingsRoutes(app: Express) {
         .normalize("NFD")
         .replace(/\p{Diacritic}/gu, "")
         .toLowerCase();
-      const results = await db
+      const results = await withDbRetry(() => db
         .select({
           id: users.id,
           nickname: users.nickname,
@@ -321,7 +321,7 @@ export function registerClientSettingsRoutes(app: Express) {
                OR ${users.nickname} ILIKE ${"%" + query + "%"})`,
         )
         .orderBy(sql`similarity(normalize_text(${users.nickname}), ${normalized}) DESC`)
-        .limit(30);
+        .limit(30));
       return res.json(results);
     } catch (err) {
       console.error("[client-settings] User search failed:", err);

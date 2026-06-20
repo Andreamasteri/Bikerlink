@@ -7,7 +7,7 @@
  */
 
 import { Router, type Request, type Response } from "express";
-import { db } from "../db";
+import { db, withDbRetry } from "../db";
 import { sendError } from "../lib/api-response";
 import { plannedRouteInvites, users, plannedRoutes } from "@shared/db";
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
@@ -27,7 +27,7 @@ router.get("/mine", async (req: Request, res: Response) => {
   if (!userId) return;
 
   try {
-    const rows = await db
+    const rows = await withDbRetry(() => db
       .select({
         id: plannedRouteInvites.id,
         routeId: plannedRouteInvites.routeId,
@@ -55,7 +55,7 @@ router.get("/mine", async (req: Request, res: Response) => {
         ),
       )
       .orderBy(desc(plannedRouteInvites.score))
-      .limit(30);
+      .limit(30));
 
     return res.json({
       count: rows.length,

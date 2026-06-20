@@ -1,6 +1,6 @@
 import { sendError } from "../../lib/api-response";
 import { Router, type Request, type Response } from "express";
-import { db } from "../../db";
+import { db, withDbRetry } from "../../db";
 import { events, users } from "@shared/db";
 import { requireAuth, eq, desc, allLimited, enrichEvent } from "../events-helpers";
 
@@ -12,7 +12,7 @@ router.get("/", async (req: Request, res: Response) => {
     const userId = requireAuth(req, res);
     if (!userId) return;
 
-    const rows = await db.select({
+    const rows = await withDbRetry(() => db.select({
       id: events.id,
       title: events.title,
       description: events.description,
@@ -41,7 +41,7 @@ router.get("/", async (req: Request, res: Response) => {
       .from(events)
       .leftJoin(users, eq(users.id, events.creatorId))
       .where(eq(events.creatorId, userId))
-      .orderBy(desc(events.createdAt));
+      .orderBy(desc(events.createdAt)));
 
     const enriched = await allLimited(rows.map((r) => () => enrichEvent(r, userId)));
     return res.json(enriched);

@@ -1,7 +1,7 @@
 import { sendError } from "../../lib/api-response";
 import { Router, type Request, type Response } from "express";
 import { storage } from "../../storage";
-import { db } from "../../db";
+import { db, withDbRetry } from "../../db";
 import { users, conversationParticipants, messages, motoClubs, motoClubMembers } from "@shared/db";
 import { createConversationSchema } from "@shared/validators";
 import { inArray, desc, eq, and, sql } from "drizzle-orm";
@@ -23,14 +23,14 @@ router.get("/unread-total", async (req: Request, res: Response) => {
     if (convIds.length === 0) return res.json({ count: 0 });
 
     const [allParticipants, lastMsgs] = await Promise.all([
-      db.select().from(conversationParticipants).where(inArray(conversationParticipants.conversationId, convIds)),
-      db.selectDistinctOn([messages.conversationId], {
+      withDbRetry(() => db.select().from(conversationParticipants).where(inArray(conversationParticipants.conversationId, convIds))),
+      withDbRetry(() => db.selectDistinctOn([messages.conversationId], {
         conversationId: messages.conversationId,
         senderId: messages.senderId,
         createdAt: messages.createdAt,
       }).from(messages)
         .where(inArray(messages.conversationId, convIds))
-        .orderBy(messages.conversationId, desc(messages.createdAt)),
+        .orderBy(messages.conversationId, desc(messages.createdAt))),
     ]);
 
     const participantsByConv = new Map<string, typeof allParticipants>();
@@ -44,7 +44,7 @@ router.get("/unread-total", async (req: Request, res: Response) => {
       allParticipants.filter(p => p.userId !== userId).map(p => p.userId)
     )];
     const existingUsersResult = allOtherParticipantIds.length > 0
-      ? await db.select({ id: users.id }).from(users).where(inArray(users.id, allOtherParticipantIds))
+      ? await withDbRetry(() => db.select({ id: users.id }).from(users).where(inArray(users.id, allOtherParticipantIds)))
       : [];
     const existingUserSet = new Set(existingUsersResult.map(r => r.id));
 
@@ -121,8 +121,8 @@ router.get("/", async (req: Request, res: Response) => {
     const convIds = convs.map(c => c.id);
 
     const [allParticipants, lastMsgs] = await Promise.all([
-      db.select().from(conversationParticipants).where(inArray(conversationParticipants.conversationId, convIds)),
-      db.selectDistinctOn([messages.conversationId], {
+      withDbRetry(() => db.select().from(conversationParticipants).where(inArray(conversationParticipants.conversationId, convIds))),
+      withDbRetry(() => db.selectDistinctOn([messages.conversationId], {
         id: messages.id,
         conversationId: messages.conversationId,
         senderId: messages.senderId,
@@ -137,13 +137,13 @@ router.get("/", async (req: Request, res: Response) => {
       })
         .from(messages)
         .where(inArray(messages.conversationId, convIds))
-        .orderBy(messages.conversationId, desc(messages.createdAt)),
+        .orderBy(messages.conversationId, desc(messages.createdAt))),
     ]);
 
     const allUserIds = [...new Set(allParticipants.map(p => p.userId))];
     const allUsers = allUserIds.length > 0
-      ? await db.select({ id: users.id, nickname: users.nickname, avatarUrl: users.avatarUrl, userType: users.userType, sex: users.sex })
-          .from(users).where(inArray(users.id, allUserIds))
+      ? await withDbRetry(() => db.select({ id: users.id, nickname: users.nickname, avatarUrl: users.avatarUrl, userType: users.userType, sex: users.sex })
+          .from(users).where(inArray(users.id, allUserIds)))
       : [];
     const userMap = new Map(allUsers.map(u => [u.id, u]));
     const lastMsgMap = new Map(lastMsgs.map(m => [m.conversationId, m]));
@@ -341,10 +341,10 @@ router.get("/:id", async (req: Request, res: Response) => {
       return sendError(res, 404, "Conversazione non trovata");
     }
 
-    const participants = await db
+    const participants = await withDbRetry(() => db
       .select({ userId: conversationParticipants.userId })
       .from(conversationParticipants)
-      .where(eq(conversationParticipants.conversationId, conversationId));
+      .where(eq(conversationParticipants.conversationId, conversationId)));
 
     const isMember = participants.some((p) => p.userId === userId);
     if (!isMember) {
@@ -353,10 +353,10 @@ router.get("/:id", async (req: Request, res: Response) => {
 
     const participantUserIds = participants.map((p) => p.userId);
     const participantUsers = participantUserIds.length > 0
-      ? await db
+      ? await withDbRetry(() => db
           .select({ id: users.id, nickname: users.nickname, avatarUrl: users.avatarUrl, userType: users.userType })
           .from(users)
-          .where(inArray(users.id, participantUserIds))
+          .where(inArray(users.id, participantUserIds)))
       : [];
 
     return res.json({
@@ -393,10 +393,10 @@ router.get("/:id/presence", async (req: Request, res: Response) => {
 
     const conversationId = req.params.id as string;
 
-    const participants = await db
+    const participants = await withDbRetry(() => db
       .select({ userId: conversationParticipants.userId })
       .from(conversationParticipants)
-      .where(eq(conversationParticipants.conversationId, conversationId));
+      .where(eq(conversationParticipants.conversationId, conversationId)));
 
     const isMember = participants.some((p) => p.userId === userId);
     if (!isMember) {
@@ -409,10 +409,10 @@ router.get("/:id/presence", async (req: Request, res: Response) => {
 
     const otherParticipantIds = participantUserIds.filter((uid) => uid !== userId);
     const lastSeenRows = otherParticipantIds.length > 0
-      ? await db
+      ? await withDbRetry(() => db
           .select({ id: users.id, lastLoginAt: users.lastLoginAt })
           .from(users)
-          .where(inArray(users.id, otherParticipantIds))
+          .where(inArray(users.id, otherParticipantIds)))
       : [];
 
     const participantLastSeenAt: Record<string, string | null> = {};

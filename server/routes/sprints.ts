@@ -1,6 +1,6 @@
 import { sendError } from "../lib/api-response";
 import { Router, type Request, type Response } from "express";
-import { db } from "../db";
+import { db, withDbRetry } from "../db";
 import { sprintResults, users, userMotorcycles } from "@shared/db";
 import { createSprintSchema } from "@shared/validators";
 import { eq, asc, and, gte, lte, sql } from "drizzle-orm";
@@ -46,12 +46,12 @@ router.get("/", async (req: Request, res: Response) => {
     const userId = requireUserId(req, res);
     if (!userId) return;
 
-    const sprints = await db
+    const sprints = await withDbRetry(() => db
       .select()
       .from(sprintResults)
       .where(eq(sprintResults.userId, userId))
       .orderBy(asc(sprintResults.sprint0to100Ms))
-      .limit(100);
+      .limit(100));
 
     return res.json(sprints);
   } catch (error) {
@@ -130,9 +130,10 @@ router.get("/leaderboard", async (req: Request, res: Response) => {
       ? req.query.includeUserId
       : null;
 
-    const rows = await withMoto
+    const leaderboardQuery = withMoto
       .orderBy(asc(bestPerUser.sprint0to100Ms), asc(bestPerUser.createdAt), asc(bestPerUser.id))
       .limit(limit);
+    const rows = await withDbRetry(() => leaderboardQuery);
 
     const leaderboard = rows.map((r, idx) => ({
       rank: idx + 1,
@@ -172,21 +173,22 @@ router.get("/leaderboard", async (req: Request, res: Response) => {
         .innerJoin(users, eq(users.id, bestPerUser.userId))
         .where(eq(bestPerUser.userId, includeUserId));
 
-      const focusRows = needsMotoFilter
-        ? await focusBaseQuery.innerJoin(userMotorcycles, and(...motoConditions))
-        : await focusBaseQuery.leftJoin(userMotorcycles, and(...motoConditions));
+      const focusQuery = needsMotoFilter
+        ? focusBaseQuery.innerJoin(userMotorcycles, and(...motoConditions))
+        : focusBaseQuery.leftJoin(userMotorcycles, and(...motoConditions));
+      const focusRows = await withDbRetry(() => focusQuery);
 
       if (focusRows.length > 0) {
         const fr = focusRows[0];
         // Compute rank for this user
-        const [countRow] = await db
+        const [countRow] = await withDbRetry(() => db
           .select({ count: sql<number>`count(*)::int` })
           .from(bestPerUser)
           .where(
             sql`${bestPerUser.sprint0to100Ms} < ${fr.sprint0to100Ms}
               OR (${bestPerUser.sprint0to100Ms} = ${fr.sprint0to100Ms} AND ${bestPerUser.createdAt} < ${fr.createdAt})
               OR (${bestPerUser.sprint0to100Ms} = ${fr.sprint0to100Ms} AND ${bestPerUser.createdAt} = ${fr.createdAt} AND ${bestPerUser.id} < ${fr.id})`
-          );
+          ));
         const focusRank = (countRow?.count ?? 0) + 1;
         leaderboard.push({
           rank: focusRank,
@@ -242,11 +244,11 @@ router.get("/leaderboard/rank/:userId", async (req: Request, res: Response) => {
       )
       .as("best_per_user");
 
-    const targetRow = await db
+    const targetRow = await withDbRetry(() => db
       .select({ sprint0to100Ms: bestPerUser.sprint0to100Ms, createdAt: bestPerUser.createdAt, id: bestPerUser.id })
       .from(bestPerUser)
       .where(eq(bestPerUser.userId, userId!))
-      .limit(1);
+      .limit(1));
 
     if (targetRow.length === 0) {
       return res.json({ rank: null, sprint0to100Ms: null });
@@ -254,14 +256,14 @@ router.get("/leaderboard/rank/:userId", async (req: Request, res: Response) => {
 
     const { sprint0to100Ms: targetMs, createdAt: targetCreatedAt, id: targetId } = targetRow[0];
 
-    const [countRow] = await db
+    const [countRow] = await withDbRetry(() => db
       .select({ count: sql<number>`count(*)::int` })
       .from(bestPerUser)
       .where(
         sql`${bestPerUser.sprint0to100Ms} < ${targetMs}
           OR (${bestPerUser.sprint0to100Ms} = ${targetMs} AND ${bestPerUser.createdAt} < ${targetCreatedAt})
           OR (${bestPerUser.sprint0to100Ms} = ${targetMs} AND ${bestPerUser.createdAt} = ${targetCreatedAt} AND ${bestPerUser.id} < ${targetId})`
-      );
+      ));
 
     const rank = (countRow?.count ?? 0) + 1;
     return res.json({ rank, sprint0to100Ms: targetMs });

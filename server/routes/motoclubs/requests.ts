@@ -1,5 +1,5 @@
 import { Router, type Request, type Response } from "express";
-import { db } from "../../db";
+import { db, withDbRetry } from "../../db";
 import { storage } from "../../storage";
 import { motoClubs, motoClubMembers, motoClubInvites, motoClubRequests, feedbackTickets } from "@shared/db";
 import { respondToInviteSchema, createMotoClubSchema } from "@shared/validators";
@@ -15,13 +15,13 @@ const router = Router();
 router.get("/invites", requireAuth, async (req: Request, res: Response) => {
   try {
     const userId = req.session.userId!;
-    const invites = await db.select({
+    const invites = await withDbRetry(() => db.select({
       invite: motoClubInvites,
       club: motoClubs,
     })
       .from(motoClubInvites)
       .innerJoin(motoClubs, eq(motoClubs.id, motoClubInvites.clubId))
-      .where(and(eq(motoClubInvites.userId, userId), eq(motoClubInvites.status, "pending")));
+      .where(and(eq(motoClubInvites.userId, userId), eq(motoClubInvites.status, "pending"))));
 
     return res.json(invites.map(r => ({ ...r.invite, club: r.club })));
   } catch (_e) {
@@ -187,12 +187,12 @@ router.post("/creation-request", requireAuth, async (req: Request, res: Response
 router.get("/creation-request/status", requireAuth, async (req: Request, res: Response) => {
   try {
     const userId = req.session.userId!;
-    const [request] = await db
+    const [request] = await withDbRetry(() => db
       .select()
       .from(motoClubRequests)
       .where(and(eq(motoClubRequests.requestedBy, userId), eq(motoClubRequests.clubType, "custom")))
       .orderBy(desc(motoClubRequests.createdAt))
-      .limit(1);
+      .limit(1));
 
     if (!request) return res.json(null);
     return res.json({

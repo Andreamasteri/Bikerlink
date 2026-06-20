@@ -11,7 +11,7 @@ import { z } from "zod";
 import rateLimit, { ipKeyGenerator } from "express-rate-limit";
 import { getTrustedClientIp } from "../lib/abuse-rate-limit";
 import { eq } from "drizzle-orm";
-import { db } from "../db";
+import { db, withDbRetry } from "../db";
 import { storage } from "../storage";
 import { sendError } from "../lib/api-response";
 import { users as usersTable } from "@shared/db";
@@ -314,8 +314,8 @@ router.post("/ai/assistant/action/:id", requireUser, actionLimiter, async (req: 
 // ── User prefs ────────────────────────────────────────────────────────────
 router.get("/users/me/assistant-prefs", requireUser, async (req: Request, res: Response) => {
   const userId = (req.session as { userId?: string }).userId as string;
-  const [row] = await db.select({ assistantPrefs: usersTable.assistantPrefs })
-    .from(usersTable).where(eq(usersTable.id, userId)).limit(1);
+  const [row] = await withDbRetry(() => db.select({ assistantPrefs: usersTable.assistantPrefs })
+    .from(usersTable).where(eq(usersTable.id, userId)).limit(1));
   res.json({ prefs: row?.assistantPrefs ?? {} });
 });
 

@@ -1,5 +1,5 @@
 import { Router, type Request, type Response } from "express";
-import { db } from "../../db";
+import { db, withDbRetry } from "../../db";
 import { motoClubs, motoClubMembers, motoClubInvites, users, conversationParticipants } from "@shared/db";
 import { eq, and, sql } from "drizzle-orm";
 import { systemAccountConditions } from "../../lib/system-account-filter";
@@ -14,13 +14,13 @@ const router = Router();
 router.get("/me/clubs", requireAuth, async (req: Request, res: Response) => {
   try {
     const userId = req.session.userId!;
-    const clubs = await db.select({
+    const clubs = await withDbRetry(() => db.select({
       club: motoClubs,
       member: motoClubMembers,
     })
       .from(motoClubMembers)
       .innerJoin(motoClubs, eq(motoClubs.id, motoClubMembers.clubId))
-      .where(and(eq(motoClubMembers.userId, userId), eq(motoClubMembers.status, "active")));
+      .where(and(eq(motoClubMembers.userId, userId), eq(motoClubMembers.status, "active"))));
 
     return res.json(clubs.map(r => ({ ...r.club, joinedAt: r.member.joinedAt, role: r.member.role })));
   } catch (_e) {
@@ -120,7 +120,7 @@ router.get("/:id", requireAuth, async (req: Request, res: Response) => {
     const clubId = req.params.id;
     const userId = req.session.userId!;
 
-    const [clubRow] = await db.select({
+    const [clubRow] = await withDbRetry(() => db.select({
       id: motoClubs.id,
       name: motoClubs.name,
       clubType: motoClubs.clubType,
@@ -143,28 +143,28 @@ router.get("/:id", requireAuth, async (req: Request, res: Response) => {
       createdAt: motoClubs.createdAt,
       updatedAt: motoClubs.updatedAt,
       _proposedLatitude: motoClubs.proposedLatitude,
-    }).from(motoClubs).where(eq(motoClubs.id, clubId as string)).limit(1);
+    }).from(motoClubs).where(eq(motoClubs.id, clubId as string)).limit(1));
     if (!clubRow) return sendError(res, 404, "Club non trovato");
     const { _proposedLatitude, ...club } = clubRow;
     const hasPendingLocationProposal = _proposedLatitude != null;
 
-    const [membership] = await db.select({ id: motoClubMembers.id })
+    const [membership] = await withDbRetry(() => db.select({ id: motoClubMembers.id })
       .from(motoClubMembers)
       .where(and(
         eq(motoClubMembers.clubId, clubId as string),
         eq(motoClubMembers.userId, userId),
         eq(motoClubMembers.status, "active"),
       ))
-      .limit(1);
+      .limit(1));
     if (!membership) return sendError(res, 403, "Non sei membro di questo club");
 
-    const membersRaw = await db.select({
+    const membersRaw = await withDbRetry(() => db.select({
       member: motoClubMembers,
       user: users,
     })
       .from(motoClubMembers)
       .innerJoin(users, eq(users.id, motoClubMembers.userId))
-      .where(and(eq(motoClubMembers.clubId, clubId as string), eq(motoClubMembers.status, "active"), ...systemAccountConditions(users)));
+      .where(and(eq(motoClubMembers.clubId, clubId as string), eq(motoClubMembers.status, "active"), ...systemAccountConditions(users))));
 
     const members = membersRaw.map(r => ({
       userId: r.user.id,
@@ -188,7 +188,7 @@ router.get("/:id/detail", requireAuth, async (req: Request, res: Response) => {
     const limit = Math.min(parseInt(String(req.query.limit ?? "30"), 10) || 30, 50);
     const offset = Math.max(parseInt(String(req.query.offset ?? "0"), 10) || 0, 0);
 
-    const [clubRow] = await db.select({
+    const [clubRow] = await withDbRetry(() => db.select({
       id: motoClubs.id,
       name: motoClubs.name,
       clubType: motoClubs.clubType,
@@ -211,22 +211,22 @@ router.get("/:id/detail", requireAuth, async (req: Request, res: Response) => {
       createdAt: motoClubs.createdAt,
       updatedAt: motoClubs.updatedAt,
       _proposedLatitude: motoClubs.proposedLatitude,
-    }).from(motoClubs).where(eq(motoClubs.id, clubId as string)).limit(1);
+    }).from(motoClubs).where(eq(motoClubs.id, clubId as string)).limit(1));
     if (!clubRow) return sendError(res, 404, "Club non trovato");
     const { _proposedLatitude, ...club } = clubRow;
     const hasPendingLocationProposal = _proposedLatitude != null;
 
-    const [membership] = await db.select({ id: motoClubMembers.id })
+    const [membership] = await withDbRetry(() => db.select({ id: motoClubMembers.id })
       .from(motoClubMembers)
       .where(and(
         eq(motoClubMembers.clubId, clubId as string),
         eq(motoClubMembers.userId, userId),
         eq(motoClubMembers.status, "active"),
       ))
-      .limit(1);
+      .limit(1));
     if (!membership) return sendError(res, 403, "Non sei membro di questo club");
 
-    const memberships = await db
+    const memberships = await withDbRetry(() => db
       .select({
         profileId: motoClubMembers.userId,
         role: motoClubMembers.role,
@@ -241,13 +241,13 @@ router.get("/:id/detail", requireAuth, async (req: Request, res: Response) => {
       .where(and(eq(motoClubMembers.clubId, clubId as string), eq(motoClubMembers.status, "active"), ...systemAccountConditions(users)))
       .orderBy(motoClubMembers.joinedAt)
       .limit(limit)
-      .offset(offset);
+      .offset(offset));
 
-    const [{ totalCount }] = await db
+    const [{ totalCount }] = await withDbRetry(() => db
       .select({ totalCount: sql<number>`count(${motoClubMembers.id})::int` })
       .from(motoClubMembers)
       .innerJoin(users, eq(motoClubMembers.userId, users.id))
-      .where(and(eq(motoClubMembers.clubId, clubId as string), eq(motoClubMembers.status, "active"), ...systemAccountConditions(users)));
+      .where(and(eq(motoClubMembers.clubId, clubId as string), eq(motoClubMembers.status, "active"), ...systemAccountConditions(users))));
 
     const total = Number(totalCount);
     return res.json({ ...club, hasPendingLocationProposal, members: memberships, totalCount: total, hasMore: offset + limit < total });

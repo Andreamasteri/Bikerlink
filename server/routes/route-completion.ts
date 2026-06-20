@@ -5,7 +5,7 @@
 
 import { Router, type Request, type Response } from "express";
 import { eq, asc, sql } from "drizzle-orm";
-import { db } from "../db";
+import { db, withDbRetry } from "../db";
 import { storage } from "../storage";
 import { requireAuth } from "../lib/auth-middleware";
 import { sendError } from "../lib/api-response";
@@ -29,13 +29,13 @@ router.get("/routes/:id/points", requireAuth, async (req: Request, res: Response
       const { isAdminOrModUser } = await import("./events-helpers");
       if (!(await isAdminOrModUser(userId))) return sendError(res, 403, "Non autorizzato");
     }
-    const pts = await db.select({
+    const pts = await withDbRetry(() => db.select({
       latitude: routePoints.latitude,
       longitude: routePoints.longitude,
       altitude: routePoints.altitude,
       speedKmh: routePoints.speedKmh,
       timestamp: routePoints.timestamp,
-    }).from(routePoints).where(eq(routePoints.routeId, id)).orderBy(asc(routePoints.timestamp));
+    }).from(routePoints).where(eq(routePoints.routeId, id)).orderBy(asc(routePoints.timestamp)));
     return res.json({ points: pts });
   } catch (err) {
     console.error("[routes/:id/points GET]", err);
@@ -188,11 +188,11 @@ router.get("/routes/:id/voice-notes", requireAuth, async (req: Request, res: Res
     if (!route) return sendError(res, 404, "Route non trovata");
     if (route.userId !== userId) return sendError(res, 403, "Non autorizzato");
 
-    const notes = await db
+    const notes = await withDbRetry(() => db
       .select()
       .from(routeVoiceNotes)
       .where(eq(routeVoiceNotes.routeId, id))
-      .orderBy(asc(routeVoiceNotes.createdAt));
+      .orderBy(asc(routeVoiceNotes.createdAt)));
 
     return res.json({ notes });
   } catch (err) {

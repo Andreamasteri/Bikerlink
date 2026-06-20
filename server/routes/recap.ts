@@ -1,5 +1,5 @@
 import { Router, type Request, type Response } from "express";
-import { db } from "../db";
+import { db, withDbRetry } from "../db";
 import { weeklyRecaps } from "@shared/db";
 import { eq, desc, sql } from "drizzle-orm";
 import { requireAuth } from "../lib/auth-middleware";
@@ -12,11 +12,11 @@ router.get("/current", requireAuth, async (req: Request, res: Response) => {
   try {
     const userId = req.session.userId!;
     const weekStart = getWeekStartUtc();
-    const [row] = await db
+    const [row] = await withDbRetry(() => db
       .select()
       .from(weeklyRecaps)
       .where(sql`${weeklyRecaps.userId} = ${userId} AND ${weeklyRecaps.weekStart} = ${weekStart.toISOString()}`)
-      .limit(1);
+      .limit(1));
     if (!row) {
       return res.json({ recap: null, weekStart: weekStart.toISOString() });
     }
@@ -38,12 +38,12 @@ router.get("/history", requireAuth, async (req: Request, res: Response) => {
   try {
     const userId = req.session.userId!;
     const limit = Math.min(Math.max(parseInt(String(req.query.limit ?? "8"), 10) || 8, 1), 24);
-    const rows = await db
+    const rows = await withDbRetry(() => db
       .select()
       .from(weeklyRecaps)
       .where(eq(weeklyRecaps.userId, userId))
       .orderBy(desc(weeklyRecaps.weekStart))
-      .limit(limit);
+      .limit(limit));
     return res.json({ recaps: rows });
   } catch (error) {
     console.error("[Recap] GET /history error:", error);
@@ -91,7 +91,7 @@ router.get("/admin/stats", requireAuth, async (req: Request, res: Response) => {
     if (user?.role !== "admin") return sendError(res, 403, "Solo admin");
     const days = Math.min(Math.max(parseInt(String(req.query.days ?? "28"), 10) || 28, 7), 180);
     const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
-    const rows = await db.execute<{
+    const rows = await withDbRetry(() => db.execute<{
       total: number;
       push_sent: number;
       opened: number;
@@ -104,7 +104,7 @@ router.get("/admin/stats", requireAuth, async (req: Request, res: Response) => {
         COUNT(*) FILTER (WHERE match_clicked_at IS NOT NULL)::int AS clicked
       FROM ${weeklyRecaps}
       WHERE created_at >= ${cutoff.toISOString()}
-    `);
+    `));
     const s = rows.rows?.[0] ?? { total: 0, push_sent: 0, opened: 0, clicked: 0 };
     const openRate = s.push_sent > 0 ? Math.round((s.opened / s.push_sent) * 1000) / 10 : 0;
     const clickRate = s.opened > 0 ? Math.round((s.clicked / s.opened) * 1000) / 10 : 0;

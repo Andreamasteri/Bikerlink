@@ -1,6 +1,6 @@
 import { sendError } from "../../lib/api-response";
 import { Router, type Request, type Response } from "express";
-import { db } from "../../db";
+import { db, withDbRetry } from "../../db";
 import { storage } from "../../storage";
 import {
   userMusicTracks,
@@ -96,16 +96,16 @@ router.post("/share-playlist", requireAuth, async (req: Request, res: Response) 
 router.get("/shared-playlists", requireAuth, async (req: Request, res: Response) => {
   try {
     const userId = req.session.userId!;
-    const playlists = await db
+    const playlists = await withDbRetry(() => db
       .select()
       .from(sharedPlaylists)
       .where(eq(sharedPlaylists.toUserId, userId))
-      .orderBy(sql`${sharedPlaylists.sharedAt} DESC`);
+      .orderBy(sql`${sharedPlaylists.sharedAt} DESC`));
 
     const fromUserIds = [...new Set(playlists.map((p) => p.fromUserId))];
     const fromUsersData =
       fromUserIds.length > 0
-        ? await db.select().from(users).where(inArray(users.id, fromUserIds))
+        ? await withDbRetry(() => db.select().from(users).where(inArray(users.id, fromUserIds)))
         : [];
 
     const fromUserMap = new Map(fromUsersData.map((u) => [u.id, u]));
@@ -146,11 +146,11 @@ router.get("/shared-playlists/:id", requireAuth, async (req: Request, res: Respo
       return sendError(res, 400, "ID non valido");
     }
 
-    const [playlist] = await db
+    const [playlist] = await withDbRetry(() => db
       .select()
       .from(sharedPlaylists)
       .where(and(eq(sharedPlaylists.id, playlistId), eq(sharedPlaylists.toUserId, userId)))
-      .limit(1);
+      .limit(1));
 
     if (!playlist) {
       return sendError(res, 404, "Playlist non trovata");

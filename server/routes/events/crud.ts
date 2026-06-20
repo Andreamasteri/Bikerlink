@@ -1,6 +1,6 @@
 import { sendError } from "../../lib/api-response";
 import { Router, type Request, type Response } from "express";
-import { db } from "../../db";
+import { db, withDbRetry } from "../../db";
 import { users, events, type InsertEvent } from "@shared/db";
 import { updateEventSchema } from "@shared/validators";
 import { eq, and, requireAuth, isAdminOrModUser, enrichEvent, type EventRow, systemAccountConditions } from "../events-helpers";
@@ -15,7 +15,7 @@ router.get("/:id", async (req: Request, res: Response) => {
 
     const id = req.params.id as string;
 
-    const [row] = await db.select({
+    const [row] = await withDbRetry(() => db.select({
       id: events.id,
       title: events.title,
       description: events.description,
@@ -43,7 +43,7 @@ router.get("/:id", async (req: Request, res: Response) => {
     })
       .from(events)
       .leftJoin(users, eq(users.id, events.creatorId))
-      .where(and(eq(events.id, id), ...systemAccountConditions(users)));
+      .where(and(eq(events.id, id), ...systemAccountConditions(users))));
 
     if (!row) return sendError(res, 404, "Evento non trovato");
 

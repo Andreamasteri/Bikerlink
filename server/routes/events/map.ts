@@ -1,6 +1,6 @@
 import { sendError } from "../../lib/api-response";
 import { Router, type Request, type Response } from "express";
-import { db } from "../../db";
+import { db, withDbRetry } from "../../db";
 import { events, users } from "@shared/db";
 import { requireAuth, eq, and, asc, systemAccountConditions } from "../events-helpers";
 
@@ -13,7 +13,7 @@ router.get("/", async (req: Request, res: Response) => {
     if (!userId) return;
 
     const now = new Date();
-    const rows = await db.select({
+    const rows = await withDbRetry(() => db.select({
       id: events.id,
       title: events.title,
       eventType: events.eventType,
@@ -31,7 +31,7 @@ router.get("/", async (req: Request, res: Response) => {
         ...systemAccountConditions(users),
       ))
       .orderBy(asc(events.eventDate))
-      .limit(200);
+      .limit(200));
 
     // post-query filter for date
     const filteredRows = rows.filter(r => r.eventDate && new Date(r.eventDate) >= now);

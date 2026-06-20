@@ -1,5 +1,5 @@
 import { Router, type Request, type Response } from "express";
-import { db } from "../../db";
+import { db, withDbRetry } from "../../db";
 import { storage } from "../../storage";
 import { motoClubs, motoClubMembers } from "@shared/db";
 import { proposeLocationSchema } from "@shared/validators";
@@ -19,7 +19,7 @@ router.get("/map/pending-locations", requireAuth, async (req: Request, res: Resp
       return sendError(res, 403, "Accesso non autorizzato");
     }
 
-    const clubs = await db.select({
+    const clubs = await withDbRetry(() => db.select({
       id: motoClubs.id,
       name: motoClubs.name,
       clubType: motoClubs.clubType,
@@ -36,7 +36,7 @@ router.get("/map/pending-locations", requireAuth, async (req: Request, res: Resp
         eq(motoClubs.isApproved, true),
         sql`${motoClubs.proposedLatitude} IS NOT NULL`,
       ))
-      .orderBy(desc(motoClubs.updatedAt));
+      .orderBy(desc(motoClubs.updatedAt)));
 
     const enriched = await allLimited(clubs.map((c) => async () => {
       let proposerNickname: string | null = null;
