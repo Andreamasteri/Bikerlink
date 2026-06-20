@@ -15,6 +15,11 @@ const BACKGROUND_LOCATION_TASK = "bikerlink-bg-location";
 const BG_POINTS_KEY = "@bikerlink/bg_points_pending";
 const BG_NOTIF_CONFIG_KEY = "@bikerlink/bg_notif_config";
 const IDLE_THRESHOLD_KMH = 2;
+// Resume-path caps for the pending-points recovery (Task #4585): bound each POST
+// and the whole recovery pass so a slow network on mount/resume can't keep the
+// loop running indefinitely. Untried keys simply retry on the next mount.
+const PENDING_POINTS_REQUEST_TIMEOUT_MS = 8_000;
+const PENDING_POINTS_BUDGET_MS = 15_000;
 
 interface EffectDeps {
   t: (key: string) => string;
@@ -214,13 +219,15 @@ export function useTrackingEffects(deps: EffectDeps) {
       try {
         const keys = await AsyncStorage.getAllKeys();
         const pendingKeys = keys.filter((k) => k.startsWith("@bikerlink/pending_points_"));
+        const deadline = Date.now() + PENDING_POINTS_BUDGET_MS;
         for (const key of pendingKeys) {
+          if (Date.now() > deadline) break; // budget exceeded — remaining keys retry next mount
           const raw = await AsyncStorage.getItem(key);
           if (!raw) { await AsyncStorage.removeItem(key).catch(() => {}); continue; }
           const routeId = key.replace("@bikerlink/pending_points_", "");
           try {
             const points: GpsPoint[] = JSON.parse(raw);
-            if (points.length > 0) await apiRequest("POST", `/api/routes/${routeId}/points`, { points });
+            if (points.length > 0) await apiRequest("POST", `/api/routes/${routeId}/points`, { points }, { timeoutMs: PENDING_POINTS_REQUEST_TIMEOUT_MS });
             await AsyncStorage.removeItem(key);
           } catch { /* network still unavailable — retry next mount */ }
         }

@@ -116,8 +116,14 @@ export default function ChatScreen() {
 
   useEffect(() => {
     const sub = AppState.addEventListener("change", (state) => {
-      if (state === "active") {
-        queryClient.invalidateQueries({ queryKey: ["/api/chat/conversations"] });
+      // Guard the listener body so a rejected invalidate (paused/offline) can
+      // never escape this native callback as a fatal unhandled rejection.
+      try {
+        if (state === "active") {
+          queryClient.invalidateQueries({ queryKey: ["/api/chat/conversations"] }).catch(() => {});
+        }
+      } catch {
+        // no-op: never let the resume AppState callback crash the app
       }
     });
     return () => sub.remove();

@@ -5,6 +5,9 @@ import { apiRequest, queryClient } from "@/lib/query-client";
 
 const QUEUE_KEY = "@bikerlink/offline_patch_queue";
 const MAX_QUEUE_SIZE = 30;
+// Cap each retry request so a slow network on resume can't stall the queue drain
+// (Task #4585). A timed-out entry stays queued and retries on the next resume.
+const RETRY_REQUEST_TIMEOUT_MS = 8_000;
 
 export interface OfflineQueueEntry {
   routeId: string;
@@ -89,10 +92,10 @@ export function useOfflineQueue() {
             // "complete" entries must use PUT /stop (updates profile km + fingerprint).
             // "title" entries use PATCH as before.
             if (entry.type === "complete") {
-              await apiRequest("PUT", `/api/routes/${entry.routeId}/stop`, entry.payload);
+              await apiRequest("PUT", `/api/routes/${entry.routeId}/stop`, entry.payload, { timeoutMs: RETRY_REQUEST_TIMEOUT_MS });
               queryClient.invalidateQueries({ queryKey: ["/api/routes"] });
             } else {
-              await apiRequest("PATCH", `/api/routes/${entry.routeId}`, entry.payload);
+              await apiRequest("PATCH", `/api/routes/${entry.routeId}`, entry.payload, { timeoutMs: RETRY_REQUEST_TIMEOUT_MS });
             }
             synced += 1;
           } catch {
@@ -119,8 +122,16 @@ export function useOfflineQueue() {
 
   useEffect(() => {
     const sub = AppState.addEventListener("change", (nextState) => {
-      if (nextState === "active") {
-        retryQueue();
+      // Guard the resume callback: retryQueue is async and a thrown/rejected
+      // path here would surface as an unhandled rejection inside a native
+      // AppState callback. retryQueue already swallows per-entry errors via the
+      // lock chain, but keep the listener body defensive regardless.
+      try {
+        if (nextState === "active") {
+          retryQueue().catch(() => {});
+        }
+      } catch {
+        // no-op: never let the resume AppState callback crash the app
       }
     });
     return () => sub.remove();

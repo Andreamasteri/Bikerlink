@@ -28,6 +28,11 @@ const FLUSH_INTERVAL_MS   = 30_000; // periodic flush every 30 s (was 90 s)
 const FLUSH_MIN_SAMPLES   = 5;      // min samples before a periodic flush fires (was 50)
 const FLUSH_MAX_SAMPLES   = 200;    // hard cap — flush immediately at this count
 const STOP_RETRY_DELAY_MS = 1_500;  // pause before retry flush on stopSession failure
+// Resume-path caps for the background buffer drain (Task #4585): bound the whole
+// drain and each individual chunk POST so a slow network on resume cannot stall
+// the foreground resume sequence indefinitely.
+const BG_DRAIN_BUDGET_MS         = 12_000;
+const BG_DRAIN_REQUEST_TIMEOUT_MS = 8_000;
 // AsyncStorage key prefix for samples persisted across sessions on flush failure.
 const UNSENT_PREFIX = "@bikerlink/telemetry_unsent_";
 
@@ -146,9 +151,19 @@ export function useTelemetry(isActive: boolean, externalGps = false) {
     const sessionId = sessionIdRef.current;
     if (!sessionId) return;
 
+    // Overall duration cap: on a slow/resuming network this drain runs inside
+    // the resume sequence — without a deadline a large backlog of chunks could
+    // keep the resume blocked for tens of seconds. Each chunk POST is also
+    // bounded so one wedged request can't stall the whole drain.
+    const deadline = Date.now() + BG_DRAIN_BUDGET_MS;
+
     // Send in FLUSH_MAX_SAMPLES chunks
     let offset = 0;
     while (offset < bgSamples.length) {
+      if (Date.now() > deadline) {
+        console.warn("[useTelemetry] background buffer drain budget exceeded, deferring rest");
+        break;
+      }
       const chunk = bgSamples.slice(offset, offset + FLUSH_MAX_SAMPLES);
       offset += FLUSH_MAX_SAMPLES;
       try {
@@ -156,7 +171,7 @@ export function useTelemetry(isActive: boolean, externalGps = false) {
           session_id:   sessionId,
           session_type: "ride",
           samples:      chunk,
-        });
+        }, { timeoutMs: BG_DRAIN_REQUEST_TIMEOUT_MS });
       } catch (err) {
         console.warn("[useTelemetry] background buffer flush failed", err);
         break; // stop on first error; remaining samples will be lost (acceptable trade-off)

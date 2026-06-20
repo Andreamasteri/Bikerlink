@@ -3,6 +3,7 @@ import { AppState, Platform } from "react-native";
 import { useAuth } from "@/lib/auth-context";
 import { useLocationGate } from "@/lib/location-context";
 import { queryClient, apiRequest } from "@/lib/query-client";
+import { subscribeReconnect } from "@/lib/online-focus-manager";
 import { sendStartupBeacon } from "@/lib/startup-beacon";
 import { isTrackingActive, registerLayoutWatcherCallbacks } from "@/lib/tracking-active";
 import { initCrashLogger, markClean, resetCrashLogger, markAsyncError } from "@/lib/crash-logger";
@@ -192,6 +193,31 @@ export function AppStateHandler() {
         endSession(sid, "background");
       }
     };
+  }, [user]);
+
+  // Relaunch the NON-React-Query resume flows (heartbeat, session start) on the
+  // offline→online transition. onlineManager pauses/resumes React Query but does
+  // not touch these imperative flows, so they need an explicit reconnect trigger.
+  useEffect(() => {
+    if (!user) return;
+    const unsub = subscribeReconnect(() => {
+      // Only relaunch foreground resume flows when the app is actually in the
+      // foreground — a reconnect while backgrounded must not churn heartbeat/
+      // session-start (the background task / next resume handles that path).
+      if (AppState.currentState !== "active") return;
+      try {
+        sendHeartbeat().catch(() => {});
+        startSession()
+          .then((id) => {
+            sessionIdRef.current = id;
+            _currentSessionId = id;
+          })
+          .catch(() => {});
+      } catch (e) {
+        markAsyncError("app_state_reconnect", e).catch(() => {});
+      }
+    });
+    return unsub;
   }, [user]);
 
   useEffect(() => {

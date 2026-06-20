@@ -2,6 +2,11 @@ import React, { createContext, useContext, useState, useEffect, useCallback, use
 import { AppState, AppStateStatus } from "react-native";
 import { useQuery } from "@tanstack/react-query";
 import { sendStartupBeacon } from "@/lib/startup-beacon";
+import { withTimeout } from "@/lib/resume-utils";
+
+// Native permission bridge calls can wedge on resume; cap them so a stalled
+// bridge rejects into the existing catch instead of hanging the resume sequence.
+const PERMISSION_CHECK_TIMEOUT_MS = 5000;
 
 let _expoLocation: typeof import("expo-location") | null = null;
 function loc(): typeof import("expo-location") {
@@ -84,7 +89,11 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
 
   const checkPermission = useCallback(async () => {
     try {
-      const { status } = await loc().getForegroundPermissionsAsync();
+      const { status } = await withTimeout(
+        loc().getForegroundPermissionsAsync(),
+        PERMISSION_CHECK_TIMEOUT_MS,
+        "getForegroundPermissions",
+      );
       setHasPermission(status === "granted");
       setPermissionDenied(status === "denied");
       setPermissionPrompt(status === "undetermined");
@@ -97,7 +106,11 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
 
   const checkBackgroundPermission = useCallback(async () => {
     try {
-      const { status } = await loc().getBackgroundPermissionsAsync();
+      const { status } = await withTimeout(
+        loc().getBackgroundPermissionsAsync(),
+        PERMISSION_CHECK_TIMEOUT_MS,
+        "getBackgroundPermissions",
+      );
       const granted = status === "granted";
       setHasBackgroundPermission(granted);
 

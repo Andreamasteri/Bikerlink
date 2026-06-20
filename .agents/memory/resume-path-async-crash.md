@@ -25,3 +25,25 @@ direttamente come listener fa sì che ogni await che rifiuta diventi rejection t
   retry su prossimo interval/resume, mai fatale.
 - Errori async inattesi (non di rete): `markAsyncError(context, error)` in crash-logger.ts
   li registra come crash_js con prefisso `[resume:<context>]` (filtrabile, non lancia mai).
+
+## Centralizzazione onlineManager/focusManager
+
+RN non ha `navigator.onLine` né `visibilitychange`: senza wiring esplicito React
+Query continua a "fetchare nel vuoto" da offline (causa principale dei fallimenti
+di resume su rete scarsa). Si wira UNA volta per tutta la vita dell'app:
+`onlineManager` ← NetInfo e `focusManager` ← AppState.
+
+**Why / regole durature:**
+- Stato sconosciuto (`isConnected === null`, emesso brevemente all'avvio) va trattato
+  come ONLINE; solo `false` esplicito = offline. Mettere in pausa su stato ignoto
+  blocca le query al cold start.
+- `refetchOnReconnect:"always"` va impostato SELETTIVAMENTE per-key, MAI globale:
+  il default globale è `staleTime:Infinity`, quindi un refetchOnReconnect normale non
+  scatterebbe mai, e uno globale "always" farebbe uno storm a ogni reconnect.
+- `focusManager` coi default globali (`staleTime:Infinity` + `refetchOnWindowFocus:false`)
+  NON causa storm al resume — solo le query esplicitamente stale rifetchano.
+- I flussi NON-React-Query (heartbeat, startSession) NON sono coperti da onlineManager:
+  vanno riagganciati esplicitamente sull'evento offline→online, e solo se l'app è in
+  foreground (`AppState.currentState === "active"`), altrimenti si crea churn in background.
+- Il listener `focusManager` non si disiscrive di proposito: wiring singleton a vita-app
+  (guard di idempotenza), nessuno scope ne possiede il teardown.
