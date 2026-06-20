@@ -306,7 +306,14 @@ export default function OtaPanel() {
           [{ text: "Riavvia", onPress: () => Updates.reloadAsync() }]
         );
       } else {
-        Alert.alert("Nessun aggiornamento", "Bundle già presente o gating server non autorizza il download.");
+        Alert.alert(
+          "Bundle già scaricato",
+          "L'aggiornamento era già stato scaricato in background. Riavvio per applicarlo.",
+          [
+            { text: "Riavvia ora", onPress: () => Updates.reloadAsync() },
+            { text: "Annulla", style: "cancel" },
+          ]
+        );
       }
     } catch (err: unknown) {
       Alert.alert("Errore", err instanceof Error ? err.message : "Impossibile scaricare l'OTA");
