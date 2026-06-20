@@ -2,7 +2,7 @@
   "expo": {
     "name": "BikerLink",
     "slug": "bikerlink",
-    "version": "71D.10.125",
+    "version": "72D.10.125",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "bikerlink",
@@ -29,7 +29,7 @@
     "android": {
       "package": "com.bikerlink.app",
       "googleServicesFile": "./google-services.json",
-      "versionCode": 71,
+      "versionCode": 72,
       "permissions": [
         "android.permission.CAMERA",
         "android.permission.RECORD_AUDIO",
