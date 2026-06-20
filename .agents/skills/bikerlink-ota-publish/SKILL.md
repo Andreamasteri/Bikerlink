@@ -26,8 +26,8 @@ Attivare questa skill quando l'utente dice una delle seguenti (o varianti):
 
 | Campo | Valore corrente |
 |-------|----------------|
-| `versionCode` APK | **70** |
-| `versionName` | **70.10.112** |
+| `versionCode` APK | **71** |
+| `versionName` | **71D.10.123** |
 | `runtimeVersion` | **10.0.0** |
 | Ultima OTA nel ciclo v70 | **OTA-113** → la prossima sarà **OTA-114** |
 
