@@ -144,7 +144,11 @@ export default function FloatingWidget() {
       <Animated.View
         style={[
           styles.widget,
-          { left: pan.x, top: pan.y },
+          // Posizionamento via transform invece di left/top: su Android animare
+          // left/top sposta il pixel ma lascia l'hitbox del touch alla posizione
+          // di layout originale (il pallino "si vede ma non si tocca"). Con
+          // translateX/translateY l'area di tocco segue la posizione visiva.
+          { transform: [{ translateX: pan.x }, { translateY: pan.y }] },
           aiOpen && styles.widgetHidden,
         ]}
         pointerEvents={aiOpen ? "none" : "auto"}
@@ -230,9 +234,18 @@ export default function FloatingWidget() {
 const styles = StyleSheet.create({
   widget: {
     position: "absolute",
+    // Ancorato all'origine: la posizione effettiva è data dal transform
+    // (translateX/translateY). Senza left/top espliciti, su Android l'hitbox
+    // del touch resterebbe a una posizione di layout indeterminata.
+    left: 0,
+    top: 0,
     width: WIDGET_SIZE,
     height: WIDGET_SIZE,
     zIndex: 9000,
+    // elevation sul container esterno: su Android l'elevation governa anche
+    // l'hit-testing tra fratelli sovrapposti, non solo l'ombra. Garantisce che
+    // il pallino abbia priorità di tocco sopra le viste fratello a schermo.
+    elevation: 12,
   },
   widgetHidden: {
     opacity: 0,
