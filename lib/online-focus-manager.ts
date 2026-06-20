@@ -26,7 +26,7 @@ import { queryClient } from "@/lib/query-client";
 // Online decision: treat the NetInfo `null`/unknown state (briefly emitted at
 // startup) as ONLINE, not offline, so we never pause queries on an unknown
 // state. Only an explicit `isConnected === false` flips us offline.
-function isStateOnline(isConnected: boolean | null): boolean {
+export function isStateOnline(isConnected: boolean | null): boolean {
   return isConnected !== false;
 }
 
