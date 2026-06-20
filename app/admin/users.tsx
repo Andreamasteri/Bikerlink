@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from "react";
 import { View, Text, StyleSheet, FlatList, Alert, TouchableOpacity, ActivityIndicator } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import Colors from "@/constants/colors";
 import { useT } from "@/lib/language-context";
 import { useAdminUsers } from "@/hooks/useAdminUsers";
+import { apiRequest } from "@/lib/query-client";
 
 import { AdminUser, UserCard } from "@/components/admin/users/UserCard";
 import { UserFilters } from "@/components/admin/users/UserFilters";
@@ -47,6 +49,28 @@ function getRoleColor(role: string) {
 export default function AdminUsers() {
   const t = useT();
   const insets = useSafeAreaInsets();
+  const queryClient = useQueryClient();
+
+  const fixSystemAccounts = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/admin/users/fix-system-accounts");
+      return res.json() as Promise<{ success: boolean; updated: number; accounts: string[] }>;
+    },
+    onSuccess: (data) => {
+      void queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      if (data.updated === 0) {
+        Alert.alert("Già corretti", "Tutti gli account di servizio hanno già is_system = true.");
+      } else {
+        Alert.alert(
+          "Flag aggiornato",
+          `${data.updated} account marcati is_system = true:\n${data.accounts.join("\n")}`
+        );
+      }
+    },
+    onError: () => {
+      Alert.alert("Errore", "Correzione flag is_system fallita. Riprova.");
+    },
+  });
 
   const {
     users, isLoading, summary, matchabilityMap,
@@ -255,6 +279,29 @@ export default function AdminUsers() {
         ListHeaderComponent={
           <>
             <UserSummary summary={summary} />
+            <TouchableOpacity
+              style={styles.fixSystemBtn}
+              onPress={() => {
+                Alert.alert(
+                  "Correggi flag account di sistema",
+                  "Marca is_system = true per i 6 account di servizio noti. Operazione idempotente.",
+                  [
+                    { text: "Annulla", style: "cancel" },
+                    { text: "Esegui", onPress: () => fixSystemAccounts.mutate() },
+                  ]
+                );
+              }}
+              disabled={fixSystemAccounts.isPending}
+              activeOpacity={0.75}
+            >
+              {fixSystemAccounts.isPending
+                ? <ActivityIndicator size="small" color={Colors.accent} />
+                : <Ionicons name="shield-checkmark-outline" size={16} color={Colors.accent} />
+              }
+              <Text style={styles.fixSystemBtnText}>
+                {fixSystemAccounts.isPending ? "In corso…" : "Correggi flag account di sistema"}
+              </Text>
+            </TouchableOpacity>
             <View style={styles.filtersRow}>
               <View style={{ flex: 1 }}>
                 <UserFilters
@@ -387,5 +434,15 @@ const styles = StyleSheet.create({
     width: 52, height: 52, borderRadius: 26,
     backgroundColor: Colors.accent, alignItems: "center", justifyContent: "center",
     shadowColor: "#000", shadowOpacity: 0.2, shadowRadius: 6, shadowOffset: { width: 0, height: 3 }, elevation: 4,
+  },
+  fixSystemBtn: {
+    flexDirection: "row", alignItems: "center", gap: 8,
+    backgroundColor: Colors.card ?? Colors.background,
+    borderWidth: 1, borderColor: Colors.accent + "55",
+    borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10,
+    marginBottom: 12,
+  },
+  fixSystemBtnText: {
+    fontFamily: "Inter_500Medium", fontSize: 13, color: Colors.accent,
   },
 });

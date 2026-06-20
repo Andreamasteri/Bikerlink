@@ -3,6 +3,7 @@ import { Router, type Request, type Response } from "express";
 import { db, pool } from "../../../db";
 import { bikerZavorrinaMatches, bikerBikerMatches, proposalProfileMatches, plannedRouteInvites, matchPreferences } from "@shared/db";
 import { MATCHING_REGISTRY } from "@shared/matching-registry";
+import { SERVICE_EMAILS } from "@shared/service-emails";
 import { sendSuccess, sendError } from "../../../lib/api-response";
 import { sql, or, eq, isNull, and, inArray } from "drizzle-orm";
 import { triggerMatchingRun } from "../../../matching-engine";
@@ -301,14 +302,6 @@ router.post("/matching/backfill-real-users", async (_req: Request, res: Response
   try {
     // --- step 0: marca gli account di servizio noti come is_system=true ---
     // Idempotente: non tocca account già marcati.
-    const SERVICE_EMAILS = [
-      "admin@bikerlink.it",
-      "mod@bikerlink.it",
-      "smoke@bikerlink.test",
-      "noreply-system@bikerlink.internal",
-      "applereview@bikerlink.it",
-      "googlereview@bikerlink.it",
-    ];
     const serviceMarked = await client.query(`
       UPDATE users SET is_system = true
       WHERE LOWER(email) = ANY($1::text[])

@@ -1,9 +1,10 @@
 import { Router, type Request, type Response } from "express";
-import { db } from "../../db";
+import { db, pool } from "../../db";
 import { users, userProfiles, userPrivacyLog } from "@shared/db";
 import { eq, sql, and, gte, desc } from "drizzle-orm";
 import { sendError } from "../../lib/api-response";
 import { storage } from "../../storage";
+import { SERVICE_EMAILS } from "@shared/service-emails";
 
 const router = Router();
 
@@ -206,6 +207,27 @@ router.put("/:userId/profile", async (req: Request, res: Response) => {
   } catch (err) {
     console.error("[admin/users/:userId/profile PUT] error:", err);
     return sendError(res, 500, "Errore aggiornamento profilo");
+  }
+});
+
+router.post("/fix-system-accounts", async (_req: Request, res: Response) => {
+  const client = await pool.connect();
+  try {
+    const result = await client.query<{ email: string }>(`
+      UPDATE users SET is_system = true
+      WHERE LOWER(email) = ANY($1::text[])
+        AND is_system = false
+      RETURNING email
+    `, [SERVICE_EMAILS]);
+    const updated = result.rows.map((r) => r.email);
+    const count = result.rowCount ?? 0;
+    console.log(`[admin/fix-system-accounts] aggiornati ${count} account:`, updated);
+    return res.json({ success: true, updated: count, accounts: updated });
+  } catch (err) {
+    console.error("[admin/fix-system-accounts] error:", err);
+    return sendError(res, 500, "Errore correzione flag is_system");
+  } finally {
+    client.release();
   }
 });
 
