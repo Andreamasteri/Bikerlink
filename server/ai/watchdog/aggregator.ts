@@ -17,6 +17,7 @@ import { recordSignals } from "./signals";
 import type { HealthSnapshot, Problem, Severity, Signal } from "./types";
 import { collectDbIntegrity } from "../db-integrity/collector";
 import { storage } from "../../storage";
+import { withBgDbSlot } from "../../lib/bg-db-limiter";
 import type { EmbeddingDailyReport } from "../../jobs/embedding-daily-report";
 
 // Task #2536 — wrapper che traduce lo snapshot db-integrity in Signal[] per
@@ -260,6 +261,9 @@ function deriveProblems(signals: Signal[]): Problem[] {
         title = `Circuit breaker DB in HALF_OPEN — verifica in corso`;
         suggestion = "Il circuito si sta riaprendo dopo il timeout. La prossima query buona lo chiuderà.";
       }
+    } else if (s.metric === "db.ping_saturated") {
+      title = `Ping DB non eseguito: pool saturo`;
+      suggestion = "Il SELECT 1 non ha ottenuto una connessione perché il pool è saturo (non perché il DB è giù). Il circuit breaker NON è stato aperto; le richieste utente degradano con 503 veloce. Verifica la pressione sul pool e i job concorrenti.";
     } else if (s.metric === "db.pool.collector.error") {
       title = `Errore probe pool DB`;
       suggestion = "Verifica che pool sia correttamente inizializzato e accessibile dal collector.";
@@ -305,13 +309,33 @@ export function subscribeSnapshot(cb: (s: HealthSnapshot) => void): () => void {
 }
 
 export async function runAggregatorCycle(): Promise<HealthSnapshot> {
+  // Saturazione pool (incidente 20 giu): l'aggregator faceva girare ~12 collector
+  // TUTTI in parallelo ogni 60s; 7 di questi colpiscono il DB e NESSUNO passava
+  // dal budget cooperativo `withBgDbSlot`. Quel burst da solo poteva afferrare la
+  // maggior parte delle 10 connessioni del pool (peggio quando le query sono
+  // lente, es. Redis/ThinkCentre down → event-loop sotto pressione), saturandolo.
+  //
+  // Strategia: i collector di SOLE query DB condividono ora il budget bg (≤3
+  // connessioni concorrenti, ≥7 sempre riservate al traffico utente). Restano
+  // FUORI dal budget:
+  //  - collectDb: il ping SELECT 1 DEVE osservare la latenza/saturazione reale
+  //    del pool (se finisse in coda al budget riporterebbe falsi fallimenti);
+  //  - collectPool: zero-I/O (legge solo i contatori del pool);
+  //  - collectBullMq / collectRedis / collectLatency: non toccano il DB.
+  //  - collectMaps: tocca il DB ma fa anche health-check di rete lenti; il budget
+  //    è applicato internamente alle sole query (vedi maps-collector), non qui,
+  //    per non trattenere uno slot durante l'I/O di rete.
   const collectors = await Promise.allSettled([
-    collectBullMq(), collectScheduler(), collectDb(),
-    collectRedis(), collectLatency(), collectErrors(),
-    collectDbIntegritySignals(), collectMaps(),
-    collectEmbeddingSignals(), collectRestarts(),
-    Promise.resolve(collectPool()),
-    collectAdsOrphanSignals(),
+    // Osservabilità / no-DB — girano liberi, fuori dal budget bg.
+    collectBullMq(), collectDb(), collectRedis(), collectLatency(),
+    Promise.resolve(collectPool()), collectMaps(),
+    // Sole query DB — condividono il budget cooperativo bg (≤3 concorrenti).
+    withBgDbSlot(() => collectScheduler()),
+    withBgDbSlot(() => collectErrors()),
+    withBgDbSlot(() => collectDbIntegritySignals()),
+    withBgDbSlot(() => collectEmbeddingSignals()),
+    withBgDbSlot(() => collectRestarts()),
+    withBgDbSlot(() => collectAdsOrphanSignals()),
   ]);
   const signals: Signal[] = [];
   for (const r of collectors) {

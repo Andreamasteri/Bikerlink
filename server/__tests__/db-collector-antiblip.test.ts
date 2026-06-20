@@ -3,16 +3,21 @@ import type { Signal } from "../ai/watchdog/types";
 
 // db.execute pilotabile per simulare ping veloci/lenti/falliti.
 const executeMock = vi.hoisted(() => vi.fn());
+// isPoolHealthy pilotabile: distingue "pool saturo" da "DB irraggiungibile".
+const isPoolHealthyMock = vi.hoisted(() => vi.fn(() => true));
 
 vi.mock("../db", () => ({
   db: { execute: executeMock },
   pool: { totalCount: 0, idleCount: 0, waitingCount: 0 },
+  isPoolHealthy: isPoolHealthyMock,
 }));
 
-// Circuit breaker neutralizzato: non deve interferire con l'anti-blip del collector.
+// Circuit breaker: spy hoisted così possiamo asserire che la saturazione NON lo arma.
+const recordSuccessMock = vi.hoisted(() => vi.fn());
+const recordFailureMock = vi.hoisted(() => vi.fn());
 vi.mock("../db-circuit-breaker", () => ({
-  recordSuccess: vi.fn(),
-  recordFailure: vi.fn(),
+  recordSuccess: recordSuccessMock,
+  recordFailure: recordFailureMock,
   getCircuitStatus: vi.fn(() => ({ state: "CLOSED", consecutiveFailures: 0, openedAt: null })),
 }));
 
@@ -37,6 +42,10 @@ describe("db-collector anti-blip gating", () => {
     nowIdx = 0;
     pingMs = 0;
     executeMock.mockReset();
+    isPoolHealthyMock.mockReset();
+    isPoolHealthyMock.mockReturnValue(true); // default: pool sano (un fallimento = DB down)
+    recordSuccessMock.mockReset();
+    recordFailureMock.mockReset();
     dateSpy = vi.spyOn(Date, "now").mockImplementation(() => {
       const isStart = nowIdx % 2 === 0;
       nowIdx++;
@@ -111,5 +120,50 @@ describe("db-collector anti-blip gating", () => {
     executeMock.mockReset();
     executeMock.mockRejectedValue(new Error("boom"));
     expect(collectorErr(await collectDb())?.severity).toBe("warn"); // riparte da 1
+  });
+
+  // ── Distinzione pool-saturo vs DB-irraggiungibile (incidente 20 giu) ──────────
+  const saturated = (s: Signal[]) => s.find((x) => x.metric === "db.ping_saturated");
+
+  it("ping fallito con pool SATURO non apre il breaker e resta 'warn' (saturazione, non escala)", async () => {
+    isPoolHealthyMock.mockReturnValue(false); // pool saturo: il SELECT 1 non ha ottenuto una connessione
+    executeMock.mockRejectedValue(new Error("timeout exceeded when trying to connect"));
+    const collectDb = await loadCollector();
+
+    // Anche dopo molti tick consecutivi la saturazione NON diventa mai 'critical'
+    // e NON viene contata come collector.error né come fallimento del breaker.
+    for (let i = 0; i < 4; i++) {
+      const s = await collectDb();
+      expect(saturated(s)?.severity).toBe("warn");
+      expect(collectorErr(s)).toBeUndefined();
+    }
+    expect(recordFailureMock).not.toHaveBeenCalled();
+  });
+
+  it("ping fallito con pool SANO conta come fallimento del breaker (DB irraggiungibile)", async () => {
+    isPoolHealthyMock.mockReturnValue(true); // pool con capacità libera → guasto reale
+    executeMock.mockRejectedValue(
+      Object.assign(new Error("connection terminated unexpectedly"), { code: "08006" }),
+    );
+    const collectDb = await loadCollector();
+
+    const s = await collectDb();
+    expect(collectorErr(s)?.severity).toBe("warn");
+    expect(saturated(s)).toBeUndefined();
+    expect(recordFailureMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("la saturazione NON inquina il contatore: un guasto DB successivo riparte da 1 (warn)", async () => {
+    const collectDb = await loadCollector();
+
+    // 2 tick saturi (non contano)
+    isPoolHealthyMock.mockReturnValue(false);
+    executeMock.mockRejectedValue(new Error("connect timeout"));
+    await collectDb();
+    await collectDb();
+
+    // pool torna sano ma il DB è giù → riparte da 1 (warn, non critical)
+    isPoolHealthyMock.mockReturnValue(true);
+    expect(collectorErr(await collectDb())?.severity).toBe("warn");
   });
 });

@@ -32,6 +32,25 @@ durevole: cercare i burst di apertura concorrente, non i leak.
 - NON mettere nel budget i job che DEVONO osservare la salute del pool
   (watchdog db-collector ha già un circuit breaker). Vacuum nightly (1 conn,
   lock-bound) non serve avvolgerlo.
+- **Trappola aggregator (incidente 20 giu 2026):** `runAggregatorCycle`
+  (`server/ai/watchdog/aggregator.ts`) lancia ~12 collector in
+  `Promise.allSettled` ogni 60s; quelli con query DB bypassavano TOTALMENTE il
+  budget → un singolo tick poteva afferrare quasi tutte le 10 conn (amplificato
+  dal lag dell'event-loop con Redis/ThinkCentre giù: le query tengono le conn
+  più a lungo). Lezione: il budget va applicato anche dentro l'aggregator. I
+  collector solo-DB vanno avvolti in `withBgDbSlot`; per quelli misti
+  (es. maps-collector fa health-check di rete lenti) NON avvolgere l'intero
+  collector ma le singole chiamate DB. Lasciare FUORI dal budget: `collectDb`
+  (il SELECT 1 DEVE osservare il pool reale), `collectPool` (zero-IO) e i
+  collector senza DB (redis/bullmq/latency).
+- **Breaker vs shedding sotto saturazione:** il db-collector distingue "pool
+  saturo" da "DB irraggiungibile" via `!isPoolHealthy()` nel catch del ping: se
+  saturo emette `db.ping_saturated` (warn) e NON chiama `cbRecordFailure` (era la
+  causa del flapping OPEN↔HALF_OPEN). Rimuovendo il breaker come load-shedder di
+  fatto, lo shedding lo fa il gate `/api` in `server/index.ts` via
+  `isPoolSaturatedSustained()` (in `server/db.ts`, grace 500ms continui) → 503 +
+  `Retry-After`. **I due fix DEVONO viaggiare insieme:** il fix al breaker toglie
+  lo shedding implicito, il gate lo rimpiazza esplicitamente.
 - `withDbRetry` esiste in DUE posti: `server/db.ts` (transient-only, backoff —
   questo per i job background) e `server/lib/db-retry.ts` (signature
   label-based, diversa). Non confonderli.

@@ -15,7 +15,7 @@ import { createServer } from "http";
 import { createServer as createProbeServer } from "http";
 import { initState, initGate } from "./init-state";
 import { stopMatchingEngine } from "./matching-engine";
-import { pool } from "./db";
+import { pool, isPoolSaturatedSustained } from "./db";
 import { stopMetroMonitor, markCleanShutdown } from "./uptime";
 import { matchEnrichmentSemaphore, MATCH_ENRICHMENT_GLOBAL_LIMIT } from "./lib/concurrency";
 import { setupMiddleware, setupStaticRoutes } from "./middleware";
@@ -66,6 +66,19 @@ app.use("/api", (req: Request, res: Response, next) => {
     return res.status(503).json({
       success: false,
       message: "Servizio temporaneamente non disponibile. Riprova tra qualche secondo.",
+    });
+  }
+  // Backpressure pool (incidente 20 giu): se il pool è saturo in modo sostenuto
+  // (≥500ms continui, vedi isPoolSaturatedSustained) degrada con un 503 veloce +
+  // Retry-After invece di lasciare la richiesta in coda per
+  // connectionTimeoutMillis (3s) e poi fallire con 500. Sheddare il carico fa
+  // drenare il pool ed evita il pile-up. Il circuit breaker NON si apre più sulla
+  // sola saturazione (vedi db-collector), quindi questo è lo shedding dedicato.
+  if (isPoolSaturatedSustained()) {
+    res.setHeader("Retry-After", "2");
+    return res.status(503).json({
+      success: false,
+      message: "Servizio momentaneamente sovraccarico. Riprova tra qualche secondo.",
     });
   }
   return next();

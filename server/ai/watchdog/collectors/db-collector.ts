@@ -1,5 +1,5 @@
 // Task #2533 — Collector DB Postgres. Connessioni, query lente, dimensione, IOPS approssimate.
-import { db } from "../../../db";
+import { db, isPoolHealthy } from "../../../db";
 import { sql } from "drizzle-orm";
 import type { Signal } from "../types";
 import { recordSuccess as cbRecordSuccess, recordFailure as cbRecordFailure, getCircuitStatus } from "../../../db-circuit-breaker";
@@ -103,18 +103,37 @@ export async function collectDb(): Promise<Signal[]> {
       }
     } catch { /* ignore */ }
   } catch (err) {
-    cbRecordFailure(err);
     consecutiveSlowPings = 0;
-    consecutivePingFailures++;
-    // Un singolo ping fallito è quasi sempre un blip transitorio: lo segnaliamo
-    // come "warn" e lo escaliamo a "critical" solo dopo N fallimenti consecutivi
-    // (guasto persistente). Evita che un singolo blip porti subito a stato red.
-    const errSeverity: Signal["severity"] =
-      consecutivePingFailures >= CONSECUTIVE_FAIL_FOR_CRITICAL ? "critical" : "warn";
-    signals.push({
-      source: "db", metric: "collector.error", severity: errSeverity,
-      details: { error: (err as Error).message, consecutiveFailures: consecutivePingFailures },
-    });
+    // Distingui "pool saturo" da "DB irraggiungibile" (incidente 20 giu).
+    // Quando il pool è saturo (tutte le connessioni occupate + client in attesa)
+    // il SELECT 1 fallisce perché non riesce ad ACQUISIRE una connessione entro
+    // connectionTimeoutMillis, NON perché il DB è giù. In quel caso NON contiamo
+    // il fallimento contro il circuit breaker: la saturazione transitoria non
+    // deve aprirlo (era la causa del flapping OPEN↔HALF_OPEN in produzione). La
+    // pressione è già segnalata da pool-collector (db.pool.waiting) e la richiesta
+    // utente degrada con un 503 veloce via isPoolSaturatedSustained nel gate /api.
+    // Il breaker resta riservato al caso "DB davvero irraggiungibile": pool con
+    // capacità libera ma query comunque fallita.
+    if (!isPoolHealthy()) {
+      // Reset del contatore: una futura caduta DB reale ripartirà da 1.
+      consecutivePingFailures = 0;
+      signals.push({
+        source: "db", metric: "db.ping_saturated", severity: "warn",
+        details: { error: (err as Error).message?.slice(0, 200), reason: "pool_saturated" },
+      });
+    } else {
+      cbRecordFailure(err);
+      consecutivePingFailures++;
+      // Un singolo ping fallito è quasi sempre un blip transitorio: lo segnaliamo
+      // come "warn" e lo escaliamo a "critical" solo dopo N fallimenti consecutivi
+      // (guasto persistente). Evita che un singolo blip porti subito a stato red.
+      const errSeverity: Signal["severity"] =
+        consecutivePingFailures >= CONSECUTIVE_FAIL_FOR_CRITICAL ? "critical" : "warn";
+      signals.push({
+        source: "db", metric: "collector.error", severity: errSeverity,
+        details: { error: (err as Error).message, consecutiveFailures: consecutivePingFailures },
+      });
+    }
   }
 
   // Circuit breaker state — always emitted so it appears in watchdog metrics

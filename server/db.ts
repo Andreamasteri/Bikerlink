@@ -150,6 +150,38 @@ export function isPoolHealthy(): boolean {
   return !saturated;
 }
 
+/**
+ * Backpressure veloce per il gate /api. Il pool è considerato "saturo in modo
+ * sostenuto" solo se isPoolHealthy() resta false per almeno
+ * POOL_SATURATION_GRACE_MS millisecondi CONTINUI. Un singolo istante di
+ * saturazione (burst di pochi ms a regime) NON deve restituire 503: il grace
+ * window evita falsi positivi sul percorso richiesta.
+ *
+ * Campionato a ogni chiamata: il gate lo invoca per richiesta, quindi sotto
+ * carico è ben campionato; senza traffico non c'è comunque nulla da sheddare.
+ *
+ * Perché serve: con il fix al circuit breaker (db-collector) la sola saturazione
+ * NON apre più il breaker, quindi questo è il meccanismo che degrada le
+ * richieste con un 503 veloce + Retry-After invece di lasciarle in coda per
+ * connectionTimeoutMillis e fallire poi con 500. Sheddare il carico fa drenare
+ * il pool ed evita il pile-up che il 20 giu ha tenuto il pool a 10/10.
+ */
+const POOL_SATURATION_GRACE_MS = 500;
+let poolSaturatedSince: number | null = null;
+
+export function isPoolSaturatedSustained(): boolean {
+  if (isPoolHealthy()) {
+    poolSaturatedSince = null;
+    return false;
+  }
+  const now = Date.now();
+  if (poolSaturatedSince === null) {
+    poolSaturatedSince = now;
+    return false;
+  }
+  return now - poolSaturatedSince >= POOL_SATURATION_GRACE_MS;
+}
+
 export interface PoolStats {
   total: number;
   idle: number;

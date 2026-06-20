@@ -13,6 +13,7 @@ import { getMapMatchingStats } from "../../../map-matching-job";
 import { getRoutingCounters } from "../../../routing/routing-metrics";
 import { runMapsHealthChecks } from "../maps-health-checks";
 import { logger } from "../../../lib/logger";
+import { withBgDbSlot } from "../../../lib/bg-db-limiter";
 
 const log = logger.child({ scope: "maps-watchdog", collector: "maps" });
 
@@ -44,7 +45,10 @@ export async function collectMaps(): Promise<Signal[]> {
 
   // ─── 1. Aggregato eventi telemetria client ────────────────────────────
   try {
-    const agg = await aggregateMapsTelemetry(WINDOW_MS);
+    // Query DB sotto il budget cooperativo bg: il collector maps gira fuori dal
+    // budget nell'aggregator (fa health-check di rete lenti), ma le sue query DB
+    // devono comunque rispettare il limite ≤3 connessioni concorrenti.
+    const agg = await withBgDbSlot(() => aggregateMapsTelemetry(WINDOW_MS));
     signals.push({
       source: "maps", metric: "client.events_5min", value: agg.total, unit: "events",
       severity: "info", details: { byEvent: agg.byEvent, uniqueUsers: agg.uniqueUsers },
@@ -187,7 +191,7 @@ export async function collectMaps(): Promise<Signal[]> {
 
   // ─── 4. Map-matching job stats ────────────────────────────────────────
   try {
-    const mm = await getMapMatchingStats();
+    const mm = await withBgDbSlot(() => getMapMatchingStats());
     const lastRunAt = mm.lastRun ? new Date(mm.lastRun).getTime() : null;
     const ageH = lastRunAt ? Math.round((Date.now() - lastRunAt) / 3_600_000) : null;
     // Backlog = campioni che il job dovrà ancora processare (pending + retry).
