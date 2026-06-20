@@ -168,6 +168,23 @@ export default function DiagnosticReportsScreen() {
     queryKey: [filesUrl],
   });
 
+  const [manualRefreshing, setManualRefreshing] = useState(false);
+  const handleManualRefresh = useCallback(async () => {
+    setManualRefreshing(true);
+    try {
+      await Promise.all([refetchActiveUsers(), refetch(), refetchFiles()]);
+    } finally {
+      setManualRefreshing(false);
+    }
+  }, [refetchActiveUsers, refetch, refetchFiles]);
+
+  const showStatusInfo = useCallback(() => {
+    Alert.alert(
+      "Stato utente",
+      "Il pallino indica lo stato di connessione dell'utente:\n\n🟢 Verde = utente online (WebSocket connesso)\n🟡 Giallo = riconnessione / polling\n🔴 Rosso = offline / errore",
+    );
+  }, []);
+
   const downloadFile = useCallback(async (filename: string) => {
     setDownloadingFile(filename);
     try {
@@ -250,8 +267,15 @@ export default function DiagnosticReportsScreen() {
       >
         <View style={styles.reportsSectionHeader}>
           <Text style={styles.sectionLabel}>UTENTI ATTIVI ({activeUsers.length})</Text>
-          <TouchableOpacity onPress={() => { void refetchActiveUsers(); void refetch(); void refetchFiles(); }} style={styles.refreshBtn}>
-            <Ionicons name="refresh" size={14} color="#9CA3AF" />
+          <TouchableOpacity
+            onPress={() => { void handleManualRefresh(); }}
+            disabled={manualRefreshing}
+            style={styles.refreshBtnLarge}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            {manualRefreshing
+              ? <ActivityIndicator size="small" color="#9CA3AF" />
+              : <Ionicons name="refresh" size={24} color="#9CA3AF" />}
           </TouchableOpacity>
         </View>
         <Text style={styles.hintText}>
@@ -303,7 +327,13 @@ export default function DiagnosticReportsScreen() {
 
           return (
             <View key={userId} style={styles.userRow}>
-              <Ionicons name="ellipse" size={10} color={wsConnected ? "#22C55E" : "#EAB308"} />
+              <TouchableOpacity
+                onPress={showStatusInfo}
+                style={styles.statusDotBtn}
+                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+              >
+                <Ionicons name="ellipse" size={12} color={wsConnected ? "#22C55E" : "#EAB308"} />
+              </TouchableOpacity>
               <Text style={styles.userId} numberOfLines={1}>{displayName}</Text>
               {statusLabel != null && (
                 <Text style={[styles.statusText, pollSt === "received" && { color: "#22C55E" }, (wsSt === "failed" || pollSt === "failed") && { color: "#EF4444" }]}>
@@ -460,6 +490,7 @@ const styles = StyleSheet.create({
   hintText: { color: "#4B5563", fontSize: 11, marginHorizontal: 16, marginBottom: 8 },
   emptyText: { color: "#4B5563", fontSize: 14, textAlign: "center", marginVertical: 8 },
   userRow: { flexDirection: "row", alignItems: "center", marginHorizontal: 16, marginBottom: 8, backgroundColor: "#1C1C1E", padding: 12, borderRadius: 10, gap: 8 },
+  statusDotBtn: { alignItems: "center", justifyContent: "center", padding: 2 },
   userId: { flex: 1, color: "#D1D5DB", fontSize: 13 },
   statusText: { color: "#9CA3AF", fontSize: 12 },
   triggerBtn: { backgroundColor: "#3B82F6", borderRadius: 6, paddingHorizontal: 12, paddingVertical: 6, minWidth: 60, alignItems: "center" },
@@ -479,6 +510,7 @@ const styles = StyleSheet.create({
   retryBtn: { backgroundColor: "#1D4ED8", borderRadius: 6, paddingHorizontal: 16, paddingVertical: 6 },
   retryBtnText: { color: "#fff", fontWeight: "600", fontSize: 13 },
   refreshBtn: { width: 30, height: 30, alignItems: "center", justifyContent: "center", marginRight: 16 },
+  refreshBtnLarge: { width: 51, height: 51, alignItems: "center", justifyContent: "center", marginRight: 16 },
   fileRow: { flexDirection: "row", alignItems: "center", marginHorizontal: 16, marginBottom: 8, backgroundColor: "#1C1C1E", padding: 10, borderRadius: 10, gap: 8 },
   fileInfo: { flex: 1, gap: 3 },
   fileNameText: { color: "#D1D5DB", fontSize: 12, fontFamily: "monospace" },
