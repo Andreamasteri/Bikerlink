@@ -120,13 +120,6 @@ export const adminGroupsPart2: AdminGroup[] = [
         accentColor: "#FF9800",
         keywords: ["alias", "testo", "text", "sinonimo", "abbreviazione", "shortcut", "sostituzione", "soprannome", "nickname", "parola chiave", "keyword", "mappatura", "mapping", "dizionario", "replace"],
       },
-    ],
-  },
-  {
-    title: "Lingue",
-    headerIcon: "translate",
-    headerIconSet: "MaterialIcons",
-    items: [
       {
         key: "tabella-lingue",
         label: "Tabella Lingue",
@@ -136,13 +129,6 @@ export const adminGroupsPart2: AdminGroup[] = [
         accentColor: "#9C27B0",
         keywords: ["traduzione", "translate", "lingua", "language", "localizzazione", "i18n", "l10n", "internazionalizzazione", "stringa", "string", "chiave", "key", "testo", "en", "it", "de", "fr", "es", "multi-lingua", "tabella", "table", "locale", "sincronizza", "sync", "ai complete", "applica", "mancanti"],
       },
-    ],
-  },
-  {
-    title: "Sistema Mappe",
-    headerIcon: "map-outline",
-    headerIconSet: "Ionicons",
-    items: [
       {
         key: "maps",
         label: "Sistema Mappe",
@@ -220,6 +206,15 @@ export const adminGroupsPart2: AdminGroup[] = [
         accentColor: "#22C55E",
         keywords: ["telemetria", "telemetry", "dati moto", "sensori", "log dati", "metriche", "curva", "inclinazione", "analytics moto", "sessione moto", "log viaggio", "trip log", "velocità", "speed", "accelerazione", "frenata"],
       },
+      {
+        key: "ota",
+        label: "Aggiornamenti OTA",
+        icon: "cloud-download",
+        iconSet: "MaterialCommunityIcons",
+        route: "/admin/ota",
+        accentColor: "#0EA5E9",
+        keywords: ["ota", "aggiornamento", "update", "over the air", "deploy", "versione", "release", "publish", "expo update", "bundle", "js bundle", "patch", "hotfix", "canale", "channel", "rollout", "distribuzione", "rollback"],
+      },
     ],
   },
   {
@@ -253,22 +248,6 @@ export const adminGroupsPart2: AdminGroup[] = [
         route: "/admin/diagnostic-reports",
         accentColor: "#3B82F6",
         keywords: ["diagnostica", "remota", "report", "utenti", "online", "debug remoto", "trigger", "dispositivo remoto", "remote device", "crash remoto", "feedback", "segnalazione tecnica", "bug report", "invio diagnostica", "file json", "report file", "scarica report", "download diagnostica", "file diagnostica", "report su file", "json files", "esplora report", "filesystem diagnostica"],
-      },
-    ],
-  },
-  {
-    title: "Controllo OTA",
-    headerIcon: "cloud-download",
-    headerIconSet: "MaterialCommunityIcons",
-    items: [
-      {
-        key: "ota",
-        label: "Aggiornamenti OTA",
-        icon: "cloud-download",
-        iconSet: "MaterialCommunityIcons",
-        route: "/admin/ota",
-        accentColor: "#0EA5E9",
-        keywords: ["ota", "aggiornamento", "update", "over the air", "deploy", "versione", "release", "publish", "expo update", "bundle", "js bundle", "patch", "hotfix", "canale", "channel", "rollout", "distribuzione", "rollback"],
       },
     ],
   },
