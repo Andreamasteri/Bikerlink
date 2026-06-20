@@ -9,6 +9,23 @@ export type CompassDir = "N" | "NE" | "E" | "SE" | "S" | "SO" | "O" | "NO";
 
 export interface Waypoint { lat: number; lng: number; name: string; }
 export interface GeoResult { name: string; lat: number; lng: number; }
+export type TelemetryCoverageReason =
+  | "not_applicable"
+  | "no_community_data"
+  | "route_coverage_insufficient"
+  | "user_km_below_target"
+  | "engine_unsupported"
+  | "applied";
+
+export interface TelemetryCoverage {
+  reason: TelemetryCoverageReason;
+  coveredSegments: number;
+  requiredSegments: number;
+  routeSegments: number;
+  userKm: number | null;
+  targetKm: number | null;
+}
+
 export interface RouteResult {
   encoded?: string | null;
   rawPoints?: Array<{ lat: number; lng: number }> | null;
@@ -17,6 +34,7 @@ export interface RouteResult {
   bikerScore: number;
   approximate?: boolean;
   warning?: string | null;
+  telemetryCoverage?: TelemetryCoverage | null;
   weatherWarning?: string | null;
   navigationSteps?: Array<{ sign: number; text: string; distance: number; interval: [number, number]; streetName?: string }> | null;
   elevationProfile?: Array<{ distanceKm: number; altitudeM: number }> | null;

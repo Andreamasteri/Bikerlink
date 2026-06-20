@@ -5,6 +5,23 @@ import ElevationProfile from "@/components/ElevationProfile";
 import { useColors } from "@/hooks/useColors";
 import type { ThemeColors } from "@/constants/colors";
 
+type TelemetryCoverageReason =
+  | "not_applicable"
+  | "no_community_data"
+  | "route_coverage_insufficient"
+  | "user_km_below_target"
+  | "engine_unsupported"
+  | "applied";
+
+interface TelemetryCoverage {
+  reason: TelemetryCoverageReason;
+  coveredSegments: number;
+  requiredSegments: number;
+  routeSegments: number;
+  userKm: number | null;
+  targetKm: number | null;
+}
+
 interface RouteResult {
   encoded?: string | null;
   rawPoints?: Array<{ lat: number; lng: number }> | null;
@@ -13,6 +30,7 @@ interface RouteResult {
   bikerScore: number;
   approximate?: boolean;
   warning?: string | null;
+  telemetryCoverage?: TelemetryCoverage | null;
   weatherWarning?: string | null;
   navigationSteps?: Array<{ sign: number; text: string; distance: number; interval: [number, number]; streetName?: string }> | null;
   elevationProfile?: Array<{ distanceKm: number; altitudeM: number }> | null;
@@ -68,16 +86,13 @@ export const RouteResultCard: React.FC<RouteResultCardProps> = ({
           </Pressable>
         </View>
       )}
-      {routeResult.warning === "insufficient_data" && !dismissedWarnings.has("insufficient_data") && (
-        <View style={s.fallbackRow}>
-          <Ionicons name="warning-outline" size={15} color="#f59e0b" />
-          <Text style={s.fallbackText}>
-            Dati telemetria insufficienti — usato il profilo geometrico
-          </Text>
-          <Pressable onPress={() => onDismissWarning("insufficient_data")} hitSlop={8}>
-            <Ionicons name="close" size={15} color="#f59e0b" />
-          </Pressable>
-        </View>
+      {routeResult.telemetryCoverage && (
+        <TelemetryCoverageBanner
+          coverage={routeResult.telemetryCoverage}
+          dismissed={dismissedWarnings}
+          onDismiss={onDismissWarning}
+          s={s}
+        />
       )}
       <Text style={s.resultTitle}>Percorso calcolato</Text>
       <View style={s.resultStats}>
@@ -194,12 +209,103 @@ export const RouteResultCard: React.FC<RouteResultCardProps> = ({
   );
 };
 
+type CardStyles = ReturnType<typeof styles>;
+
+/**
+ * Banner cold-start telemetria: rende esplicito *perché* il percorso usa (o non
+ * usa) la telemetria, con un progresso verso la soglia quando ha senso.
+ * Sostituisce il vecchio warning binario `insufficient_data`.
+ */
+const TelemetryCoverageBanner: React.FC<{
+  coverage: TelemetryCoverage;
+  dismissed: Set<string>;
+  onDismiss: (key: string) => void;
+  s: CardStyles;
+}> = ({ coverage, dismissed, onDismiss, s }) => {
+  // Profilo geometrico: telemetria non pertinente, nessun banner.
+  if (coverage.reason === "not_applicable") return null;
+
+  const key = `telemetry:${coverage.reason}`;
+  if (dismissed.has(key)) return null;
+
+  // Stato positivo: telemetria applicata.
+  if (coverage.reason === "applied") {
+    return (
+      <View style={s.telemetryOkRow}>
+        <Ionicons name="checkmark-circle-outline" size={15} color="#22c55e" />
+        <Text style={s.telemetryOkText}>
+          Telemetria attiva · {coverage.coveredSegments}/{coverage.routeSegments} segmenti del percorso
+        </Text>
+        <Pressable onPress={() => onDismiss(key)} hitSlop={8}>
+          <Ionicons name="close" size={15} color="#22c55e" />
+        </Pressable>
+      </View>
+    );
+  }
+
+  // Stati di fallback: messaggio specifico + eventuale progresso verso la soglia.
+  let message = "Dati telemetria insufficienti — usato il profilo geometrico";
+  let progress: { value: number; label: string } | null = null;
+
+  if (coverage.reason === "no_community_data") {
+    message = "Nessun dato telemetrico dalla community — usato il profilo geometrico";
+  } else if (coverage.reason === "engine_unsupported") {
+    message = "Telemetria non supportata dal motore di routing — usato il profilo geometrico";
+  } else if (coverage.reason === "route_coverage_insufficient") {
+    const required = Math.max(1, coverage.requiredSegments);
+    message = `Telemetria scarsa su questo percorso (${coverage.coveredSegments}/${required} segmenti) — usato il profilo geometrico`;
+    progress = {
+      value: Math.min(1, coverage.coveredSegments / required),
+      label: `Copertura ${coverage.coveredSegments}/${required} segmenti`,
+    };
+  } else if (coverage.reason === "user_km_below_target") {
+    const userKm = Math.round(coverage.userKm ?? 0);
+    const targetKm = Math.max(1, Math.round(coverage.targetKm ?? 0));
+    const remaining = Math.max(0, targetKm - userKm);
+    message = "Stile personale non ancora pronto — usato il profilo geometrico";
+    progress = {
+      value: Math.min(1, userKm / targetKm),
+      label: remaining > 0
+        ? `Telemetria personale tra ~${remaining} km (${userKm}/${targetKm} km)`
+        : `${userKm}/${targetKm} km`,
+    };
+  }
+
+  return (
+    <View style={s.telemetryFallback}>
+      <View style={s.telemetryFallbackHeader}>
+        <Ionicons name="information-circle-outline" size={15} color="#f59e0b" />
+        <Text style={s.fallbackText}>{message}</Text>
+        <Pressable onPress={() => onDismiss(key)} hitSlop={8}>
+          <Ionicons name="close" size={15} color="#f59e0b" />
+        </Pressable>
+      </View>
+      {progress && (
+        <View style={s.telemetryProgressWrap}>
+          <View style={s.telemetryProgressBg}>
+            <View style={[s.telemetryProgressFill, { width: `${Math.round(progress.value * 100)}%` }]} />
+          </View>
+          <Text style={s.telemetryProgressLabel}>{progress.label}</Text>
+        </View>
+      )}
+    </View>
+  );
+};
+
 const styles = (colors: ThemeColors) => StyleSheet.create({
   resultCard: { backgroundColor: colors.surface, borderRadius: 16, padding: 16, marginBottom: 20, borderWidth: 1, borderColor: colors.border },
   warningRow: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "#ef444422", borderRadius: 8, padding: 8, borderWidth: 1, borderColor: "#ef444444", marginBottom: 4 },
   warningText: { fontFamily: "Inter_400Regular", fontSize: 12, color: "#ef4444", flex: 1 },
   fallbackRow: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "#f59e0b22", borderRadius: 8, padding: 8, borderWidth: 1, borderColor: "#f59e0b44", marginBottom: 4 },
   fallbackText: { fontFamily: "Inter_400Regular", fontSize: 12, color: "#f59e0b", flex: 1 },
+  telemetryOkRow: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "#22c55e1f", borderRadius: 8, padding: 8, borderWidth: 1, borderColor: "#22c55e44", marginBottom: 4 },
+  telemetryOkText: { fontFamily: "Inter_400Regular", fontSize: 12, color: "#22c55e", flex: 1 },
+  telemetryFallback: { backgroundColor: "#f59e0b22", borderRadius: 8, padding: 8, borderWidth: 1, borderColor: "#f59e0b44", marginBottom: 4, gap: 8 },
+  telemetryFallbackHeader: { flexDirection: "row", alignItems: "center", gap: 8 },
+  telemetryProgressWrap: { gap: 4 },
+  telemetryProgressBg: { height: 6, backgroundColor: "#f59e0b33", borderRadius: 3, overflow: "hidden" },
+  telemetryProgressFill: { height: "100%", borderRadius: 3, backgroundColor: "#f59e0b" },
+  telemetryProgressLabel: { fontFamily: "Inter_500Medium", fontSize: 11, color: "#f59e0b" },
   resultTitle: { fontFamily: "Inter_700Bold", fontSize: 15, color: colors.text, marginBottom: 16 },
   resultStats: { flexDirection: "row", justifyContent: "space-between", marginBottom: 20 },
   resultStat: { alignItems: "center", flex: 1 },

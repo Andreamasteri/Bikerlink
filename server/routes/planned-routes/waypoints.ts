@@ -26,6 +26,7 @@ import {
   normalizeStyle,
   normalizeDrivingProfile,
 } from "../../routing/route-weights";
+import type { TelemetryCoverage } from "../../routing/route-weights";
 import {
   fetchWeatherForWaypoints,
   samplePointsAlongPath,
@@ -391,6 +392,7 @@ router.post("/calculate", async (req: Request, res: Response) => {
   }
 
   let myStyleWarning: string | null = null;
+  let telemetryCoverage: TelemetryCoverage | null = null;
 
   try {
     const body: Record<string, unknown> = {
@@ -455,6 +457,7 @@ router.post("/calculate", async (req: Request, res: Response) => {
     if (!isAutoCurvy && normProfile !== "geometric") {
       const routeWayIds = extractRouteWayIds(path as { details?: Record<string, unknown> });
       const telemetry = await buildTelemetryWeightsForRoute(normProfile, userId, routeWayIds);
+      telemetryCoverage = telemetry.coverage;
       if (telemetry.applied) {
         try {
           const boosted = await runRoute([...basePriority, ...telemetry.priority]);
@@ -463,9 +466,10 @@ router.post("/calculate", async (req: Request, res: Response) => {
         } catch (telemetryErr: unknown) {
           // Lo strato telemetrico (regole su osm_way_id) può non essere supportato
           // dal motore di routing: mantieni il geometrico (fallback stabile) e
-          // segnala il warning all'utente.
+          // segnala lo stato strutturato all'utente.
           console.warn("[routing] telemetry layer failed, keep geometric:", (telemetryErr as Error)?.message ?? telemetryErr);
           myStyleWarning = "insufficient_data";
+          telemetryCoverage = { ...telemetry.coverage, reason: "engine_unsupported" };
         }
       } else {
         myStyleWarning = telemetry.warning;
@@ -527,6 +531,7 @@ router.post("/calculate", async (req: Request, res: Response) => {
       elevation: extractElevationProfile(path.points as string, (path as { points_encoded?: boolean; points?: { coordinates?: number[][] } }).points_encoded === false ? (path.points as { coordinates?: number[][] })?.coordinates : undefined),
       warning: myStyleWarning,
       weatherWarning,
+      telemetryCoverage,
     });
   } catch (err: unknown) {
     // Esiti bloccanti del routing ad aree: risposta 422 tipizzata { code, message }

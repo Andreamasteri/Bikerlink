@@ -47,6 +47,39 @@ export interface GeometricWeights {
   distanceInfluence?: number;
 }
 
+/**
+ * Motivo esplicito dello stato del cold-start telemetrico. Separa nettamente i
+ * casi che prima erano collassati nel binario `insufficient_data`:
+ *  - `not_applicable`            — profilo geometrico (telemetria non richiesta)
+ *  - `no_community_data`         — non esiste ALCUN dato curvy_score nella community
+ *  - `route_coverage_insufficient` — esistono dati, ma non abbastanza su QUESTA rotta
+ *  - `user_km_below_target`      — (my_style) l'utente non ha ancora i km richiesti
+ *  - `engine_unsupported`        — il motore di routing ha rifiutato le regole telemetriche
+ *  - `applied`                   — strato telemetrico effettivamente applicato
+ */
+export type TelemetryCoverageReason =
+  | "not_applicable"
+  | "no_community_data"
+  | "route_coverage_insufficient"
+  | "user_km_below_target"
+  | "engine_unsupported"
+  | "applied";
+
+/** Stato di copertura strutturato per surfacing del cold-start lato client. */
+export interface TelemetryCoverage {
+  reason: TelemetryCoverageReason;
+  /** Segmenti del percorso con telemetria valida (curvy_score qualificato). */
+  coveredSegments: number;
+  /** Segmenti coperti necessari perché lo strato si applichi. */
+  requiredSegments: number;
+  /** Segmenti totali del percorso considerati (osm_way_id univoci). */
+  routeSegments: number;
+  /** my_style: km accumulati dall'utente (null se non pertinente). */
+  userKm: number | null;
+  /** my_style: km target da raggiungere (null se non pertinente). */
+  targetKm: number | null;
+}
+
 export interface TelemetryWeights {
   /** Regole di boost per-segmento da unire alla priority geometrica. */
   priority: PriorityRule[];
@@ -54,6 +87,8 @@ export interface TelemetryWeights {
   applied: boolean;
   /** "insufficient_data" quando si ricade sul geometrico, altrimenti null. */
   warning: string | null;
+  /** Stato di copertura strutturato (cold-start esplicito). */
+  coverage: TelemetryCoverage;
 }
 
 const STYLE_FALLBACK: RouteStyle = "curvy";
@@ -207,7 +242,12 @@ export async function buildTelemetryWeightsForRoute(
   routeWayIds: number[],
 ): Promise<TelemetryWeights> {
   if (profile === "geometric") {
-    return { priority: [], applied: false, warning: null };
+    return {
+      priority: [],
+      applied: false,
+      warning: null,
+      coverage: emptyCoverage("not_applicable"),
+    };
   }
 
   const minScore = envInt("TELEMETRY_ROUTING_MIN_SCORE", 45);
@@ -216,27 +256,59 @@ export async function buildTelemetryWeightsForRoute(
   const maxSegments = envInt("TELEMETRY_ROUTING_MAX_SEGMENTS", 80);
   const { minSamples } = getCurvyScoreWeights();
 
+  // Metriche di copertura del percorso (note prima di interrogare il DB).
+  const ids = routeWayIds.filter((n) => Number.isFinite(n)).map((n) => Math.trunc(n));
+  const routeSegments = ids.length;
+  const required = Math.max(minRouteSegments, Math.ceil(routeSegments * minCoverage));
+
   // Scala del boost: per "real" è neutra (1.0). Per "my_style" dipende dallo
   // stile del biker (lean angle medio) ed è gated sulla soglia km.
   let styleScale = 1.0;
+  let userKm: number | null = null;
+  let targetKm: number | null = null;
   if (profile === "my_style") {
     const [uProfile, targetKmSetting] = await Promise.all([
       getUserStyleProfile(userId),
       storage.getAppSetting("telemetry_target_km"),
     ]);
-    const targetKm = parseInt(targetKmSetting?.value ?? "400", 10);
-    const userKm = uProfile?.totalKm ?? 0;
+    targetKm = parseInt(targetKmSetting?.value ?? "400", 10);
+    userKm = uProfile?.totalKm ?? 0;
     if (userKm < targetKm || !uProfile?.avgLeanAngle) {
-      return { priority: [], applied: false, warning: "insufficient_data" };
+      // Soglia km utente non raggiunta: stato esplicito col progresso verso il target.
+      return {
+        priority: [],
+        applied: false,
+        warning: "insufficient_data",
+        coverage: {
+          reason: "user_km_below_target",
+          coveredSegments: 0,
+          requiredSegments: required,
+          routeSegments,
+          userKm,
+          targetKm,
+        },
+      };
     }
     // Biker aggressivo (lean alto) → boost più marcato sui tratti curvy reali.
     styleScale = Math.min(1.4, Math.max(0.9, uProfile.avgLeanAngle / 25));
   }
 
-  // Nessun segmento nel percorso (es. details non disponibili) → fallback.
-  const ids = routeWayIds.filter((n) => Number.isFinite(n)).map((n) => Math.trunc(n));
-  if (ids.length === 0) {
-    return { priority: [], applied: false, warning: "insufficient_data" };
+  // Nessun segmento nel percorso (es. details non disponibili): non possiamo
+  // valutare la copertura → fallback geometrico esplicito.
+  if (routeSegments === 0) {
+    return {
+      priority: [],
+      applied: false,
+      warning: "insufficient_data",
+      coverage: {
+        reason: "route_coverage_insufficient",
+        coveredSegments: 0,
+        requiredSegments: required,
+        routeSegments: 0,
+        userKm,
+        targetKm,
+      },
+    };
   }
 
   let rows: { osm_way_id: string; curvy_score: string }[] = [];
@@ -256,13 +328,43 @@ export async function buildTelemetryWeightsForRoute(
     rows = result.rows;
   } catch (err) {
     console.error("[route-weights] errore lettura segment_telemetry:", err);
-    return { priority: [], applied: false, warning: "insufficient_data" };
+    return {
+      priority: [],
+      applied: false,
+      warning: "insufficient_data",
+      coverage: {
+        reason: "route_coverage_insufficient",
+        coveredSegments: 0,
+        requiredSegments: required,
+        routeSegments,
+        userKm,
+        targetKm,
+      },
+    };
   }
 
   // Copertura del percorso: serve un minimo assoluto E una frazione dei segmenti.
-  const required = Math.max(minRouteSegments, Math.ceil(ids.length * minCoverage));
   if (rows.length < required) {
-    return { priority: [], applied: false, warning: "insufficient_data" };
+    // Distingui "nessun dato community" da "dati presenti ma non su questa rotta":
+    // se la rotta non copre nulla, verifica se esiste ALCUN curvy_score qualificato.
+    let reason: TelemetryCoverageReason = "route_coverage_insufficient";
+    if (rows.length === 0) {
+      const hasCommunityData = await communityDataExists(minScore, minSamples);
+      reason = hasCommunityData ? "route_coverage_insufficient" : "no_community_data";
+    }
+    return {
+      priority: [],
+      applied: false,
+      warning: "insufficient_data",
+      coverage: {
+        reason,
+        coveredSegments: rows.length,
+        requiredSegments: required,
+        routeSegments,
+        userKm,
+        targetKm,
+      },
+    };
   }
 
   const priority: PriorityRule[] = rows.map((r) => {
@@ -273,5 +375,49 @@ export async function buildTelemetryWeightsForRoute(
     return { if: `osm_way_id == ${r.osm_way_id}`, multiply_by: boost };
   });
 
-  return { priority, applied: true, warning: null };
+  return {
+    priority,
+    applied: true,
+    warning: null,
+    coverage: {
+      reason: "applied",
+      coveredSegments: rows.length,
+      requiredSegments: required,
+      routeSegments,
+      userKm,
+      targetKm,
+    },
+  };
+}
+
+/** Coverage neutro per gli stati senza metriche (es. profilo geometrico). */
+function emptyCoverage(reason: TelemetryCoverageReason): TelemetryCoverage {
+  return {
+    reason,
+    coveredSegments: 0,
+    requiredSegments: 0,
+    routeSegments: 0,
+    userKm: null,
+    targetKm: null,
+  };
+}
+
+/** True se esiste almeno un segmento con curvy_score qualificato nella community. */
+async function communityDataExists(minScore: number, minSamples: number): Promise<boolean> {
+  try {
+    const r = await db.execute<{ one: number }>(
+      sql`
+        SELECT 1 AS one
+        FROM segment_telemetry
+        WHERE curvy_score IS NOT NULL
+          AND curvy_score >= ${minScore}
+          AND sample_count >= ${minSamples}
+        LIMIT 1
+      `,
+    );
+    return r.rows.length > 0;
+  } catch (err) {
+    console.error("[route-weights] errore verifica community data:", err);
+    return false;
+  }
 }
