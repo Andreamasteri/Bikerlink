@@ -46,8 +46,23 @@ export function PushTokenRegistrar() {
         }
 
         if (Platform.OS === "android") {
+          // Tutti i canali usati dal server (server/push-notifications.ts):
+          // matches, motoclub, eventi. Devono esistere lato client o le push
+          // inviate su quel channelId vengono silenziosamente scartate.
           await Notifications.setNotificationChannelAsync("matches", {
             name: "Match notifications",
+            importance: Notifications.AndroidImportance.HIGH,
+            sound: "default",
+            vibrationPattern: [0, 250, 250, 250],
+          });
+          await Notifications.setNotificationChannelAsync("motoclub", {
+            name: "MotoClub",
+            importance: Notifications.AndroidImportance.HIGH,
+            sound: "default",
+            vibrationPattern: [0, 250, 250, 250],
+          });
+          await Notifications.setNotificationChannelAsync("eventi", {
+            name: "Eventi e raduni",
             importance: Notifications.AndroidImportance.HIGH,
             sound: "default",
             vibrationPattern: [0, 250, 250, 250],
@@ -60,20 +75,46 @@ export function PushTokenRegistrar() {
           const { status } = await Notifications.requestPermissionsAsync();
           finalStatus = status;
         }
-        if (finalStatus !== "granted") return;
+        if (finalStatus !== "granted") {
+          // Causa esplicita: permessi negati dall'utente/SO. Non è un errore FCM.
+          console.error(
+            `[PushTokenRegistrar] PERMESSI_NEGATI: notifiche non concesse (status=${finalStatus}) — token non registrato`,
+          );
+          return;
+        }
 
         const projectId = Constants.expoConfig?.extra?.eas?.projectId as string | undefined;
         if (!projectId) {
-          console.warn("[PushTokenRegistrar] projectId non trovato in Constants.expoConfig.extra.eas.projectId — token non registrato");
+          console.error(
+            "[PushTokenRegistrar] PROJECT_ID_MANCANTE: Constants.expoConfig.extra.eas.projectId assente — token non registrato",
+          );
           return;
         }
-        const tokenData = await Notifications.getExpoPushTokenAsync({ projectId });
-        const token = tokenData.data;
-        if (!token) return;
+
+        let token: string | null = null;
+        try {
+          const tokenData = await Notifications.getExpoPushTokenAsync({ projectId });
+          token = tokenData.data;
+        } catch (tokenErr) {
+          // Permessi OK ma il token non arriva: quasi sempre FCM non configurato
+          // (google-services.json/credenziale FCM mancante) oppure offline.
+          console.error(
+            "[PushTokenRegistrar] TOKEN_NON_OTTENUTO: getExpoPushTokenAsync fallito nonostante i permessi concessi. " +
+              "Causa probabile: FCM/APNs non configurato o dispositivo offline. Dettaglio:",
+            tokenErr,
+          );
+          return;
+        }
+        if (!token) {
+          console.error(
+            "[PushTokenRegistrar] TOKEN_VUOTO: getExpoPushTokenAsync ha restituito un token vuoto nonostante i permessi concessi",
+          );
+          return;
+        }
 
         await apiRequest("PUT", "/api/users/me/push-token", { token });
       } catch (err) {
-        console.warn("[PushTokenRegistrar] Registrazione token push fallita:", err);
+        console.error("[PushTokenRegistrar] ERRORE_REGISTRAZIONE: registrazione token push fallita:", err);
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps

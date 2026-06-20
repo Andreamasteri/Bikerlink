@@ -1,6 +1,14 @@
 apply plugin: "com.android.application"
 apply plugin: "org.jetbrains.kotlin.android"
 apply plugin: "com.facebook.react"
+apply plugin: "com.google.gms.google-services"
+
+// Task #4391: FCM v1. Disabilita il controllo versione play-services per evitare
+// falsi positivi del plugin google-services (FCM è fornito transitivamente da
+// expo-notifications, non aggiungiamo firebase-bom).
+googleServices {
+    disableVersionCheck = true
+}
 
 def projectRoot = rootDir.getAbsoluteFile().getParentFile().getAbsolutePath()
 

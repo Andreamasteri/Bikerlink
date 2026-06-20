@@ -322,8 +322,19 @@ async function testPushToken(): Promise<DiagnosticTestResult[]> {
       if (!res.ok) return { status: "WARN", message: `Non recuperabile: HTTP ${res.status}` };
       const data = await res.json();
       const pushToken = data?.profile?.expoPushToken ?? data?.expoPushToken ?? null;
-      if (!pushToken) return { status: "WARN", message: "Push token non registrato nel profilo" };
-      return { status: "PASS" };
+      if (pushToken) return { status: "PASS" };
+      // Token assente: distingui permessi negati da token non ottenuto nonostante i permessi.
+      let permission = "unknown";
+      try {
+        const { status } = await Notifications.getPermissionsAsync();
+        permission = status;
+      } catch {
+        // no-op: se la lettura permessi fallisce restiamo su "unknown"
+      }
+      if (permission !== "granted") {
+        return { status: "WARN", message: `Permessi notifiche non concessi (${permission}) — token non registrato` };
+      }
+      return { status: "WARN", message: "Permessi concessi ma token non ottenuto (FCM/APNs non configurato o offline)" };
     }, 5000),
   ];
 }
