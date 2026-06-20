@@ -119,19 +119,19 @@ export default function FloatingWidget() {
         dragStartX.current = posX.value;
         dragStartY.current = posY.value;
       },
-      onPanResponderMove: (_, gs) => {
+      onPanResponderMove: (_, _gs) => {
         const clamped = clampPos(
-          dragStartX.current + gs.dx,
-          dragStartY.current + gs.dy,
+          dragStartX.current + _gs.dx,
+          dragStartY.current + _gs.dy,
           width, height,
           insets.top + 8, insets.bottom + 8,
         );
         posX.value = clamped.x;
         posY.value = clamped.y;
       },
-      onPanResponderRelease: (_, gs) => {
+      onPanResponderRelease: (_, _gs) => {
         savePosition(posX.value, posY.value);
-        if (!isDragGesture(gs.dx, gs.dy)) {
+        if (!isDragGesture(_gs.dx, _gs.dy)) {
           toggleMenu();
         }
       },
