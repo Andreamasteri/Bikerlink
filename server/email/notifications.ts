@@ -139,13 +139,15 @@ export async function sendNewEventNotificationEmail(evt: {
 export async function sendDiagnosticReportEmail(opts: {
   reportId: string;
   userId: string;
+  nickname?: string | null;
+  userEmail?: string | null;
   appVersion: string;
   platform: string;
   deviceModel: string;
   triggeredBy: string;
   summary?: Record<string, number> | null;
 }): Promise<void> {
-  const { reportId, userId, appVersion, platform, deviceModel, triggeredBy, summary } = opts;
+  const { reportId, userId, nickname, userEmail, appVersion, platform, deviceModel, triggeredBy, summary } = opts;
   const adminEmail = "bikerlinkapp@gmail.com";
   const now = new Date();
   const sentAt = now.toLocaleString("it-IT", {
@@ -166,6 +168,8 @@ export async function sendDiagnosticReportEmail(opts: {
 
   const rows = [
     ["ID Report", escapeHtml(reportId)],
+    ["Nickname", nickname ? escapeHtml(nickname) : "—"],
+    ["Email", userEmail ? escapeHtml(userEmail) : "—"],
     ["Utente ID", escapeHtml(userId)],
     ["Versione App", escapeHtml(appVersion)],
     ["Piattaforma", escapeHtml(platform)],

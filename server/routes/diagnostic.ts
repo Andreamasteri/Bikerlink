@@ -103,20 +103,37 @@ router.post("/report", async (req: Request, res: Response) => {
     });
 
     // Fire-and-forget: send email to admin
-    setImmediate(() => {
-      import("../email/notifications").then(({ sendDiagnosticReportEmail }) => {
-        sendDiagnosticReportEmail({
+    const emailUserId = req.session.userId!;
+    setImmediate(async () => {
+      let nickname: string | null = null;
+      let userEmail: string | null = null;
+      try {
+        const [row] = await db
+          .select({ nickname: users.nickname, email: users.email })
+          .from(users)
+          .where(eq(users.id, emailUserId))
+          .limit(1);
+        if (row) {
+          nickname = row.nickname ?? null;
+          userEmail = row.email ?? null;
+        }
+      } catch { /* best-effort */ }
+      try {
+        const { sendDiagnosticReportEmail } = await import("../email/notifications");
+        await sendDiagnosticReportEmail({
           reportId,
-          userId: req.session.userId!,
+          userId: emailUserId,
+          nickname,
+          userEmail,
           appVersion: appVersion ? String(appVersion) : "?",
           platform: platform ? String(platform) : "?",
           deviceModel: deviceModel ? String(deviceModel) : "?",
           triggeredBy: safeTriggeredBy,
           summary: summary as Record<string, number> | undefined,
-        }).catch((e: unknown) => {
-          console.warn("[diagnostic/report] Email error:", e);
         });
-      }).catch(() => {});
+      } catch (e: unknown) {
+        console.warn("[diagnostic/report] Email error:", e);
+      }
     });
 
     // Fire-and-forget: in-app notification to all admin users.
