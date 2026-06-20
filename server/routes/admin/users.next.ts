@@ -352,4 +352,75 @@ router.get("/stats/push-tokens", async (_req: Request, res: Response) => {
   }
 });
 
+// GET /stats/push-tokens/users — Lista paginata degli utenti senza push token per causa.
+// Query params: cause (stringa, default 'NESSUNA_CAUSA'), page (default 1), limit (default 20, max 100).
+router.get("/stats/push-tokens/users", async (req: Request, res: Response) => {
+  try {
+    const cause = (req.query.cause as string) || "NESSUNA_CAUSA";
+    const rawPage = parseInt((req.query.page as string) || "1", 10);
+    const rawLimit = parseInt((req.query.limit as string) || "20", 10);
+    const page = Number.isFinite(rawPage) ? Math.max(1, rawPage) : 1;
+    const limit = Number.isFinite(rawLimit) ? Math.min(100, Math.max(1, rawLimit)) : 20;
+    const offset = (page - 1) * limit;
+
+    const causeCondition =
+      cause === "NESSUNA_CAUSA"
+        ? sql`push_token_error IS NULL`
+        : sql`push_token_error = ${cause}`;
+
+    const countResult = await db.execute(sql`
+      SELECT COUNT(*) AS total
+      FROM users
+      WHERE is_fake = false
+        AND role NOT IN ('admin', 'moderator')
+        AND (expo_push_token IS NULL OR expo_push_token = '')
+        AND ${causeCondition}
+    `);
+
+    const usersResult = await db.execute(sql`
+      SELECT
+        id,
+        nickname,
+        push_token_error_platform AS platform,
+        push_token_error_detail   AS detail,
+        push_token_error_at       AS error_at
+      FROM users
+      WHERE is_fake = false
+        AND role NOT IN ('admin', 'moderator')
+        AND (expo_push_token IS NULL OR expo_push_token = '')
+        AND ${causeCondition}
+      ORDER BY push_token_error_at DESC NULLS LAST, id DESC
+      LIMIT ${limit} OFFSET ${offset}
+    `);
+
+    type UserRow = {
+      id: string;
+      nickname: string;
+      platform: string | null;
+      detail: string | null;
+      error_at: string | null;
+    };
+
+    const total = parseInt((countResult.rows[0] as { total: string }).total ?? "0", 10);
+
+    return res.json({
+      cause,
+      page,
+      limit,
+      total,
+      totalPages: Math.max(1, Math.ceil(total / limit)),
+      users: (usersResult.rows as UserRow[]).map((r) => ({
+        id: r.id,
+        nickname: r.nickname,
+        platform: r.platform ?? null,
+        detail: r.detail ?? null,
+        errorAt: r.error_at ?? null,
+      })),
+    });
+  } catch (err) {
+    console.error("[admin] push-tokens users error:", err);
+    return sendError(res, 500, "Errore lista utenti push token");
+  }
+});
+
 export default router;
