@@ -30,16 +30,28 @@ Ad ogni `git commit`, il hook:
 2. Confronta il risultato con la baseline approvata (`.secrets.baseline`).
 3. Blocca il commit se vengono trovati nuovi segreti non in baseline.
 
-**Livello 2 — CI/CD (GitHub Actions)**
+**Livello 2 — CI / validation step (sempre attivo, anche senza hook locale)**
 
-Ad ogni `push` e `pull_request` verso `main`, il job **Secrets Scan** nella
-pipeline CI esegue `detect-secrets-hook --baseline .secrets.baseline` su tutti i
-file tracciati dal repository. Il processo esce con codice 1 e la pipeline fallisce
-se vengono trovati segreti non presenti nella baseline, bloccando il merge anche
-quando il pre-commit hook è stato aggirato con `--no-verify` o non era attivo in
-locale.
+La stessa scansione gira automaticamente in CI tramite lo script condiviso
+`scripts/ci-secrets-scan.sh`, così il gate è garantito anche quando il pre-commit
+hook è stato aggirato con `--no-verify` o non è mai stato installato in locale:
 
-Il risultato è visibile nella sezione **Checks** di ogni PR.
+- **GitHub Actions** — ad ogni `push` e `pull_request` verso `main`, il job
+  **Secrets Scan** esegue `bash scripts/ci-secrets-scan.sh --all`, che lancia
+  `detect-secrets-hook --baseline .secrets.baseline` su **tutti** i file tracciati.
+  Il risultato è visibile nella sezione **Checks** di ogni PR.
+- **Replit validation step** — la validation `secrets-scan` esegue
+  `bash scripts/ci-secrets-scan.sh` (modalità rapida: solo i file modificati
+  rispetto a `main`) e blocca il completamento/merge del task se trova segreti
+  non presenti nella baseline.
+
+In entrambi i casi il processo esce con codice 1 e la pipeline fallisce se vengono
+trovati segreti non approvati. Per eseguire la scansione manualmente in locale:
+
+```bash
+bash scripts/ci-secrets-scan.sh         # solo file modificati (veloce)
+bash scripts/ci-secrets-scan.sh --all   # tutti i file tracciati (completo)
+```
 
 ### Falsi positivi
 

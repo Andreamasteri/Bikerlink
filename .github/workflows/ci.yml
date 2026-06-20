@@ -24,7 +24,7 @@ jobs:
         run: pip install detect-secrets==1.5.0
 
       - name: Scan for secrets
-        run: git ls-files -z | xargs -0 detect-secrets-hook --baseline .secrets.baseline
+        run: bash scripts/ci-secrets-scan.sh --all
 
   ci:
     name: Typecheck & Lint

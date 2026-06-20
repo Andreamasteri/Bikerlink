@@ -65,6 +65,10 @@ args = "db-migration-checks"
 task = "workflow.run"
 args = "Diagnostic Report"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "secrets-scan"
+
   [[workflows.workflow]]
   name = "Start App"
   mode = "parallel"
@@ -175,6 +179,17 @@ author = "agent"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "npx tsx scripts/dump-diagnostic-report.ts"
+
+[[workflows.workflow]]
+name = "secrets-scan"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "bash scripts/ci-secrets-scan.sh"
+
+[workflows.workflow.metadata]
+isValidation = true
 
   [objectStorage]
   defaultBucketID = "replit-objstore-ca2daf22-cabb-4140-a095-7b5a6f1afcde"
