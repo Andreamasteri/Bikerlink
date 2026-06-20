@@ -47,6 +47,17 @@ segment = phantom km, and prematurely drops the acquiring state.
 **Telemetry mode:** GPS-tick telemetry must tag the LIVE fusion mode, never a
 hardcoded value, or gps_only (sensor-divergence) rides get mislabeled.
 
+**Telemetry sample classification also lives here.** `shared/tracking-fusion.ts`
+owns the canonical `TelemetrySample` type plus the pure helpers
+`classifyTelemetrySample({ts,lat,lon})` (→ drop|gps_valid|sensor_only),
+`coerceFiniteNumber`, and `shouldRecordSensorSample(lastGpsTsMs, nowMs)` gated by
+`TRACKING_FUSION.GPS_SILENCE_MS`. Server `/batch` ingestion and the client hooks
+(`useTelemetry`, `lib/background-telemetry-task`) all consume these — never
+re-implement sample classification or finite-number coercion in a route or hook.
+sensor-only samples carry `lat/lon = null` (hence the shared type allows null).
+Property-based invariants are pinned in
+`server/__tests__/tracking-fusion-properties.test.ts` (fast-check).
+
 ## Fast start + fusion timer
 
 - Fast start: last-known-position seeds the DISPLAY only (never the anchor — stale

@@ -10,19 +10,27 @@ import {
   stopTelemetryBackgroundTask,
   drainBackgroundTelemetryBuffer,
 } from "@/lib/background-telemetry-task";
+import {
+  TRACKING_FUSION,
+  shouldRecordSensorSample,
+  type TelemetrySample,
+} from "@shared/tracking-fusion";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const SAMPLE_INTERVAL_MS  = 1000;   // 1 Hz
-export const GPS_SILENCE_MS = 5000; // no GPS fix for this long → record sensor-only
+// Single source of truth: shared/tracking-fusion.ts. Re-exported so existing
+// callers/tests keep importing GPS_SILENCE_MS from this module.
+export const GPS_SILENCE_MS = TRACKING_FUSION.GPS_SILENCE_MS; // no GPS fix this long → record sensor-only
 
 /**
  * Returns true when the sensor-only timer SHOULD add a sample.
  * Condition: no GPS fix has arrived for longer than GPS_SILENCE_MS.
  * Called by the sensorTimer inside startForegroundSubs; exported so tests
  * exercise the same production function without reimplementing the logic.
+ * Delegates to the shared fusion module (single source of truth).
  */
 export function shouldAddSensorSample(lastGpsTsMs: number, nowMs: number = Date.now()): boolean {
-  return nowMs - lastGpsTsMs > GPS_SILENCE_MS;
+  return shouldRecordSensorSample(lastGpsTsMs, nowMs);
 }
 const FLUSH_INTERVAL_MS   = 30_000; // periodic flush every 30 s (was 90 s)
 const FLUSH_MIN_SAMPLES   = 5;      // min samples before a periodic flush fires (was 50)
@@ -37,18 +45,9 @@ const BG_DRAIN_REQUEST_TIMEOUT_MS = 8_000;
 const UNSENT_PREFIX = "@bikerlink/telemetry_unsent_";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-export interface TelemetrySample {
-  ts:          number;
-  lat:         number | null;
-  lon:         number | null;
-  speed_kmh?:  number;
-  lean_angle?: number;
-  gforce_x?:   number;
-  gforce_y?:   number;
-  gforce_z?:   number;
-  heading?:    number;
-  altitude_m?: number;
-}
+// TelemetrySample is the canonical shape from @shared/tracking-fusion (imported
+// above). Re-exported so existing callers can keep importing it from this module.
+export type { TelemetrySample };
 
 interface AccelReading {
   x: number;

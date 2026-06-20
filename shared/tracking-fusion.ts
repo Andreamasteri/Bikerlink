@@ -21,6 +21,10 @@ export const TRACKING_FUSION = {
   IDLE_THRESHOLD_KMH: 2,
   /** A GPS fix older than this (ms) is considered stale → no live GPS. */
   GPS_STALE_MS: 6000,
+  /** No GPS fix for longer than this (ms) → the collector records a sensor-only
+   * sample so a tunnel/blackout still produces telemetry. Distinct from
+   * GPS_STALE_MS (fusion freshness): this drives the telemetry sensor sampler. */
+  GPS_SILENCE_MS: 5000,
   /** Grace period (ms) after Start with no usable GPS fix before sensors-only
    * recording engages, so a cold/absent GPS start still records via sensors. */
   ACQUIRING_GRACE_MS: 8000,
@@ -100,4 +104,72 @@ export function evaluateSegment(input: SegmentInput): SegmentDecision {
     return { accept: false, distanceKm: 0, reason: "speed_jump" };
   }
   return { accept: true, distanceKm: distKm };
+}
+
+// ─── Telemetry sample — canonical shape + classification ──────────────────────
+// Single source of truth for the telemetry sample form and the decision of
+// whether an incoming sample is GPS-valid / sensor-only / to be dropped. Reused
+// by the client collector (hooks/useTelemetry.ts, lib/background-telemetry-task.ts)
+// and the server ingestion (server/routes/telemetry.ts).
+
+/**
+ * Canonical telemetry sample. `lat`/`lon` are `null` for sensor-only samples
+ * (no GPS fix, e.g. inside a tunnel) — never 0, which would be a real position.
+ */
+export interface TelemetrySample {
+  ts:          number;
+  lat:         number | null;
+  lon:         number | null;
+  speed_kmh?:  number;
+  lean_angle?: number;
+  gforce_x?:   number;
+  gforce_y?:   number;
+  gforce_z?:   number;
+  heading?:    number;
+  altitude_m?: number;
+}
+
+/**
+ * Coerce an unknown field to a finite number, or `null` when it is absent
+ * (`null`/`undefined`) or not a finite number (NaN, Infinity, non-numeric
+ * string). This is the exact normalisation the server ingestion applies to
+ * every numeric field of a sample.
+ */
+export function coerceFiniteNumber(v: unknown): number | null {
+  if (v == null) return null;
+  const n = typeof v === "number" ? v : Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+
+/**
+ * Classification of an incoming telemetry sample:
+ * - `drop`: no valid timestamp → not storable.
+ * - `gps_valid`: valid ts AND both lat and lon are finite numbers.
+ * - `sensor_only`: valid ts but lat/lon absent/non-finite (dead-reckoning sample).
+ */
+export type TelemetrySampleClass = "gps_valid" | "sensor_only" | "drop";
+
+/**
+ * Decide how a raw incoming sample should be treated. Pure and shared so the
+ * client collector and the server ingestion never diverge on what counts as a
+ * valid GPS fix vs a sensor-only sample vs garbage.
+ */
+export function classifyTelemetrySample(sample: {
+  ts?: unknown;
+  lat?: unknown;
+  lon?: unknown;
+}): TelemetrySampleClass {
+  if (coerceFiniteNumber(sample.ts) === null) return "drop";
+  const lat = coerceFiniteNumber(sample.lat);
+  const lon = coerceFiniteNumber(sample.lon);
+  return lat !== null && lon !== null ? "gps_valid" : "sensor_only";
+}
+
+/**
+ * Whether the sensor-only sampler SHOULD emit a sample: true once no GPS fix has
+ * arrived for longer than GPS_SILENCE_MS. Shared so client live collection and
+ * any server-side reasoning use the same silence threshold.
+ */
+export function shouldRecordSensorSample(lastGpsTsMs: number, nowMs: number): boolean {
+  return nowMs - lastGpsTsMs > TRACKING_FUSION.GPS_SILENCE_MS;
 }

@@ -5,6 +5,7 @@ import { rideTelemetry } from "@shared/db";
 import { requireUserId } from "../lib/auth-middleware";
 import { sendSuccess, sendError } from "../lib/api-response";
 import { logTelemetryEvent } from "../lib/telemetry-error-log";
+import { classifyTelemetrySample, coerceFiniteNumber } from "@shared/tracking-fusion";
 import { storage } from "../storage";
 import { getInternalProbeToken, getInternalProbeHeaderName, isLoopback } from "../ai/watchdog/internal-token";
 
@@ -116,17 +117,14 @@ router.post("/batch", async (req: Request, res: Response) => {
 
     const rows: typeof rideTelemetry.$inferInsert[] = [];
     for (const s of samples as RawSample[]) {
-      // ts: null/undefined are treated as invalid (NaN) — JSON null is not a valid timestamp.
-      const ts = (s.ts == null) ? NaN : (typeof s.ts === "number" ? s.ts : Number(s.ts));
-      // lat/lon: null/undefined mean "no GPS fix" (sensor-only sample), not 0.
-      const latNum = (s.lat == null) ? NaN : (typeof s.lat === "number" ? s.lat : Number(s.lat));
-      const lonNum = (s.lon == null) ? NaN : (typeof s.lon === "number" ? s.lon : Number(s.lon));
+      // Shared classification (shared/tracking-fusion.ts) is the single source of
+      // truth: "drop" = no valid ts; "gps_valid"/"sensor_only" both stored, the
+      // latter with lat/lon null (no GPS fix, e.g. inside a tunnel) — not 0.
+      const klass = classifyTelemetrySample(s);
+      if (klass === "drop") continue;
 
-      // ts is mandatory; lat/lon are optional (sensor-only samples have no GPS fix).
-      if (!Number.isFinite(ts)) continue;
-
-      const lat = Number.isFinite(latNum) ? latNum : null;
-      const lon = Number.isFinite(lonNum) ? lonNum : null;
+      // ts is guaranteed finite here (not "drop"). lat/lon stay null for sensor-only.
+      const ts = coerceFiniteNumber(s.ts) as number;
 
       rows.push({
         userId,
@@ -134,15 +132,15 @@ router.post("/batch", async (req: Request, res: Response) => {
         sessionType: resolvedType,
         lapName: resolvedLapName,
         ts,
-        lat,
-        lon,
-        speedKmh: s.speed_kmh != null && Number.isFinite(Number(s.speed_kmh)) ? Number(s.speed_kmh) : null,
-        leanAngle: s.lean_angle != null && Number.isFinite(Number(s.lean_angle)) ? Number(s.lean_angle) : null,
-        gforceX: s.gforce_x != null && Number.isFinite(Number(s.gforce_x)) ? Number(s.gforce_x) : null,
-        gforceY: s.gforce_y != null && Number.isFinite(Number(s.gforce_y)) ? Number(s.gforce_y) : null,
-        gforceZ: s.gforce_z != null && Number.isFinite(Number(s.gforce_z)) ? Number(s.gforce_z) : null,
-        heading: s.heading != null && Number.isFinite(Number(s.heading)) ? Number(s.heading) : null,
-        altitudeM: s.altitude_m != null && Number.isFinite(Number(s.altitude_m)) ? Number(s.altitude_m) : null,
+        lat: coerceFiniteNumber(s.lat),
+        lon: coerceFiniteNumber(s.lon),
+        speedKmh: coerceFiniteNumber(s.speed_kmh),
+        leanAngle: coerceFiniteNumber(s.lean_angle),
+        gforceX: coerceFiniteNumber(s.gforce_x),
+        gforceY: coerceFiniteNumber(s.gforce_y),
+        gforceZ: coerceFiniteNumber(s.gforce_z),
+        heading: coerceFiniteNumber(s.heading),
+        altitudeM: coerceFiniteNumber(s.altitude_m),
       });
     }
 

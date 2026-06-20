@@ -1,6 +1,7 @@
 import * as TaskManager from "expo-task-manager";
 import type { LocationObject } from "expo-location";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import type { TelemetrySample } from "@shared/tracking-fusion";
 
 export const TASK_TELEMETRY = "bikerlink-telemetry-bg";
 
@@ -11,20 +12,10 @@ export const BG_TELEMETRY_SESSION_KEY = "@bikerlink/telemetry_bg_session";
 // Cap background buffer at ~8 min (500 samples @ 1 Hz) to avoid unbounded growth
 const BG_BUFFER_MAX = 500;
 
-// ── Minimal sample type (mirrors TelemetrySample in useTelemetry.ts) ──────────
-// Defined locally to avoid a circular import.
-interface BgTelemetrySample {
-  ts:          number;
-  lat:         number;
-  lon:         number;
-  speed_kmh?:  number;
-  lean_angle?: number;
-  gforce_x?:   number;
-  gforce_y?:   number;
-  gforce_z?:   number;
-  heading?:    number;
-  altitude_m?: number;
-}
+// Canonical telemetry sample shape from @shared/tracking-fusion (single source
+// of truth). The background task always writes a GPS fix, so lat/lon are numbers
+// here even though the shared type allows null for sensor-only samples.
+type BgTelemetrySample = TelemetrySample;
 
 // ── Start / stop helpers called from useTelemetry ──────────────────────────────
 
