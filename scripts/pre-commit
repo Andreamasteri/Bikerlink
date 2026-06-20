@@ -83,18 +83,20 @@ if "$DETECT_SECRETS_HOOK" --baseline "$BASELINE" "${STAGED_FILES[@]}"; then
   fi
   echo "✅ Gate 600 righe OK."
 
-  # Gate "indici speciali nelle migration" — rileva DROP INDEX senza ricreazione.
+  # Gate "indici speciali nelle migration" — rileva due pattern a rischio:
+  #   A) DROP INDEX su indice DESC/WHERE senza ricreazione corretta.
+  #   B) CREATE INDEX IF NOT EXISTS DESC/WHERE senza DROP precedente (drift silenzioso).
   echo ""
-  echo "🔍 Lint migration indexes (DROP INDEX su indici DESC/WHERE)..."
+  echo "🔍 Lint migration indexes (indici DESC/WHERE: DROP senza ricreazione / CREATE IF NOT EXISTS senza DROP)..."
   mapfile -t STAGED_MIGRATIONS < <(git diff --cached --name-only --diff-filter=ACM 2>/dev/null | \
     grep -E '^migrations/.*\.sql$' || true)
 
   if [[ ${#STAGED_MIGRATIONS[@]} -gt 0 ]]; then
     if npx tsx scripts/lint-migration-indexes.ts "${STAGED_MIGRATIONS[@]}"; then
-      echo "✅ Nessun DROP di indice speciale senza ricreazione."
+      echo "✅ Nessun pattern indice speciale a rischio (DROP senza ricreazione / CREATE IF NOT EXISTS senza DROP)."
     else
       echo ""
-      echo "❌ COMMIT BLOCCATO — DROP INDEX su indice speciale senza ricreazione corretta."
+      echo "❌ COMMIT BLOCCATO — pattern indice speciale a rischio (DROP senza ricreazione corretta, oppure CREATE INDEX IF NOT EXISTS DESC/WHERE senza DROP precedente)."
       echo "   Vedi l'output sopra per dettagli e fix suggeriti."
       echo "   Bypass una-tantum (solo se sicuro): git commit --no-verify"
       exit 1

@@ -112,6 +112,29 @@ else
   exit 1
 fi
 
+# ── Gate Lint Migration Indexes (drift silenzioso CREATE IF NOT EXISTS) ──────
+# check-index-drift --static-only NON cattura il drift "silenzioso": una migration
+# che crea un indice speciale con `CREATE INDEX IF NOT EXISTS ... DESC` SENZA un
+# DROP precedente. L'SQL sembra corretto, ma se l'indice già esiste (anche da
+# auto-push del diff schema in prod) IF NOT EXISTS salta la CREATE e DESC/WHERE
+# non vengono mai applicati → "🔴 Index Drift rilevato" ad ogni boot.
+#
+# Questo lint (modalità --all) impone il pattern idempotente DROP IF EXISTS +
+# CREATE per OGNI indice speciale. Le violazioni storiche già in prod sono
+# grandfathered nelle baseline dello script; ogni NUOVA violazione blocca qui.
+# Non tocca il DB live (legge solo schema TS + file .sql) → safe in FASE 2.
+LINT_IDX_EXIT=0
+npx tsx scripts/lint-migration-indexes.ts --all 2>&1 || LINT_IDX_EXIT=$?
+if [ "$LINT_IDX_EXIT" -eq 0 ]; then
+  log "  ✅ Lint Migration Indexes OK — nessun CREATE IF NOT EXISTS speciale senza DROP."
+else
+  log "  ❌ DEPLOY BLOCCATO — pattern indice speciale a rischio nelle migration (exit ${LINT_IDX_EXIT})."
+  log "     Una migration crea un indice DESC/WHERE con IF NOT EXISTS senza DROP precedente."
+  log "     Fix: usa il pattern idempotente DROP INDEX IF EXISTS + CREATE INDEX."
+  log "     Dettagli: npx tsx scripts/lint-migration-indexes.ts --all"
+  exit 1
+fi
+
 log "=== [1d/3] Gate Dedup Pattern (DELETE…NOT IN → ROW_NUMBER CTE) ==="
 # Verifica che nessuna migration SQL usi il pattern NULL-unsafe
 # `DELETE FROM <t> WHERE id NOT IN (SELECT id FROM <t>)` per deduplicare

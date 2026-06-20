@@ -62,4 +62,5 @@
 - [DB pool background budget](db-pool-bg-budget.md) — pool max=10 fisso (DB managed Replit); contro la saturazione si riduce la contesa con withBgDbSlot (job bg ≤3 conn, ≥7 riservate al traffico utente), non si ingrandisce il pool.
 - [Resume-path async crash hardening](resume-path-async-crash.md) — ErrorBoundary NON copre le rejection dei listener AppState; ogni body va in try/catch + apiRequest({timeoutMs}); markAsyncError per errori async non fatali.
 - [Stregatti unified activity toggle](stregatti-activity-toggle.md) — motion+rotation = ONE function via fake_motion_enabled (server/fake-activity.ts); global-visibility OFF cascades+409-locks; single /motion/toggle in stregatti.ts.
+- [Silent DESC index drift lint](silent-desc-index-drift-lint.md) — CREATE IF NOT EXISTS DESC/WHERE senza DROP = drift silenzioso; Check B in lint-migration-indexes + gate in deploy-build.sh (no DB).
 - [Telemetry collector state machine](telemetry-collector-machine.md) — useTelemetry guidato da macchina pura (lib/telemetry-collector-machine.ts); invariante "una sola sorgente" SOLO lì; transizioni serializzate; AppState listener solo steera.
