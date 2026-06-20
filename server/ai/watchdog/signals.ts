@@ -1,8 +1,9 @@
 // Task #2533 — Helper per scrivere signals nel DB + cleanup retention.
-import { db } from "../../db";
+import { db, withDbRetry } from "../../db";
 import { systemSignals } from "@shared/db";
 import { lt } from "drizzle-orm";
 import type { Signal } from "./types";
+import { dedupWarn } from "../../lib/dedup-logger";
 
 const RETENTION_DAYS = 7;
 
@@ -11,7 +12,7 @@ export async function recordSignals(signals: Signal[]): Promise<void> {
   const valid = signals.filter((s) => s.source && s.metric && s.severity);
   if (!valid.length) return;
   try {
-    await db.insert(systemSignals).values(
+    await withDbRetry(() => db.insert(systemSignals).values(
       valid.map((s) => ({
         source: s.source,
         metric: String(s.metric).substring(0, 80),
@@ -20,9 +21,9 @@ export async function recordSignals(signals: Signal[]): Promise<void> {
         severity: s.severity,
         details: (s.details ?? null) as object | null,
       })),
-    ).onConflictDoNothing();
+    ).onConflictDoNothing());
   } catch (err) {
-    console.warn("[watchdog/signals] insert error (non-fatal):", err);
+    dedupWarn("watchdog/signals", "insert error (non-fatal)", err);
   }
 }
 

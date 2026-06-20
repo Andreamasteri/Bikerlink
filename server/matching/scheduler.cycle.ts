@@ -1,4 +1,5 @@
 import { storage } from "../storage";
+import { withDbRetry } from "../db";
 import { runMatching, runWishlistMatching, getLastProposalMatchingStats, getLastWishlistMatchingStats } from "./run-matching";
 import { runBikerBikerMatching, runBikerBikerTypeStyleMatching } from "./run-biker";
 import { runClubBrandMatching } from "./run-clubs";
@@ -104,7 +105,7 @@ export function triggerMatchingRun(): { started: boolean; reason?: string } {
         addMatchLog("ERROR", "cleanup_delete_expired", `Errore eliminazione proposte scadute: ${err instanceof Error ? err.message : String(err)}`);
       }
 
-      const autoMatchSetting = await storage.getAppSetting("auto_matching_enabled");
+      const autoMatchSetting = await withDbRetry(() => storage.getAppSetting("auto_matching_enabled"));
       const autoMatchEnabled = autoMatchSetting?.value !== "false";
 
       if (autoMatchEnabled) {

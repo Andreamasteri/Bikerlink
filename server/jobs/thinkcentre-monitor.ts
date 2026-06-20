@@ -26,9 +26,10 @@
  * Throttle globale: min 10 min tra notifiche dello stesso tipo.
  */
 
-import { db } from "../db";
+import { db, withDbRetry } from "../db";
 import { appSettings, thinkcentreHealthEvents } from "@shared/db";
 import { eq } from "drizzle-orm";
+import { dedupWarn } from "../lib/dedup-logger";
 import { sendSystemAlertPushToAdmins } from "../push-notifications";
 import { getNominatimHealthSnapshot } from "../lib/nominatim-client";
 import { ACTIVE_PROFILE, fetchSelfHostedProfiles, isSelfHosted } from "../graphhopper-client";
@@ -75,14 +76,14 @@ let intervalHandle: ReturnType<typeof setInterval> | null = null;
  */
 async function isServicePushEnabled(): Promise<boolean> {
   try {
-    const [row] = await db
+    const [row] = await withDbRetry(() => db
       .select({ value: appSettings.value })
       .from(appSettings)
       .where(eq(appSettings.key, "thinkcentre_service_push_enabled"))
-      .limit(1);
+      .limit(1));
     if (row?.value === "false") return false;
   } catch (err) {
-    console.warn("[thinkcentre-monitor] errore lettura AppSetting (non-fatal):", err);
+    dedupWarn("thinkcentre-monitor", "errore lettura AppSetting (non-fatal)", err);
   }
   return true;
 }

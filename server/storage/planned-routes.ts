@@ -1,5 +1,6 @@
 import { eq, sql, desc } from "drizzle-orm";
-import { db } from "../db";
+import { db, withDbRetry } from "../db";
+import { dedupWarn } from "../lib/dedup-logger";
 import {
   coordinateHistory, plannedRoutes, routeWeatherCache,
   type CoordinateHistory,
@@ -68,13 +69,13 @@ export class PlannedRoutesStorage extends SystemStorage {
 
   async cleanupOldCoordinateHistory(): Promise<number> {
     try {
-      const maxRecordsSetting = await this.getAppSetting("coordinate_history_max_records");
+      const maxRecordsSetting = await withDbRetry(() => this.getAppSetting("coordinate_history_max_records"));
       const maxRecords = maxRecordsSetting?.value ? parseInt(maxRecordsSetting.value, 10) : 60;
       const limit = isNaN(maxRecords) || maxRecords < 1 ? 60 : maxRecords;
-      const result = await db.execute(sql`DELETE FROM coordinate_history WHERE id IN (SELECT id FROM (SELECT id, ROW_NUMBER() OVER (PARTITION BY user_id ORDER BY created_at DESC) as rn FROM coordinate_history) ranked WHERE rn > ${limit}) RETURNING id`);
+      const result = await withDbRetry(() => db.execute(sql`DELETE FROM coordinate_history WHERE id IN (SELECT id FROM (SELECT id, ROW_NUMBER() OVER (PARTITION BY user_id ORDER BY created_at DESC) as rn FROM coordinate_history) ranked WHERE rn > ${limit}) RETURNING id`));
       return result.rows.length;
     } catch (err) {
-      console.error("[CoordinateHistory] cleanup error:", err);
+      dedupWarn("CoordinateHistory", "cleanup error", err);
       return 0;
     }
   }

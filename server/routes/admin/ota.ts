@@ -3,7 +3,7 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { readFileSync, existsSync } from "node:fs";
 import { resolve } from "node:path";
-import { db } from "../../db";
+import { db, withDbRetry } from "../../db";
 import { otaReleases, otaBootEvents } from "@shared/db";
 import { eq, desc, isNull, and, sql, ne, inArray } from "drizzle-orm";
 import { sendError } from "../../lib/api-response";
@@ -76,16 +76,16 @@ async function syncProductionUpdates(): Promise<void> {
   if (updates.length === 0) return;
 
   for (const upd of updates) {
-    const existing = await db.select({ id: otaReleases.id })
+    const existing = await withDbRetry(() => db.select({ id: otaReleases.id })
       .from(otaReleases)
       .where(eq(otaReleases.easUpdateId, upd.id))
-      .limit(1);
+      .limit(1));
 
     if (existing.length > 0) continue;
 
     // Task #2503: i nuovi update vengono sempre inseriti come `pending`.
     // L'admin li testa via cold-start su account admin e poi approva dal pannello.
-    await db.insert(otaReleases).values({
+    await withDbRetry(() => db.insert(otaReleases).values({
       easUpdateId: upd.id,
       easGroupId: upd.group ?? null,
       channel: "production",
@@ -93,19 +93,19 @@ async function syncProductionUpdates(): Promise<void> {
       message: upd.message ?? null,
       status: "pending",
       publishedAt: upd.createdAt ? new Date(upd.createdAt) : new Date(),
-    }).onConflictDoNothing();
+    }).onConflictDoNothing());
   }
 
   // Backfill groupId per record vecchi che ne erano sprovvisti
   for (const upd of updates) {
     if (!upd.group) continue;
-    await db.update(otaReleases)
+    await withDbRetry(() => db.update(otaReleases)
       .set({ easGroupId: upd.group })
-      .where(and(eq(otaReleases.easUpdateId, upd.id), isNull(otaReleases.easGroupId)));
+      .where(and(eq(otaReleases.easUpdateId, upd.id), isNull(otaReleases.easGroupId))));
   }
 
   // Backfill otaVersion: copia dal record Android (stesso gruppo) ai record iOS che non ce l'hanno
-  await db.execute(sql`
+  await withDbRetry(() => db.execute(sql`
     UPDATE ota_releases r
     SET ota_version = src.ota_version
     FROM ota_releases src
@@ -113,27 +113,28 @@ async function syncProductionUpdates(): Promise<void> {
       AND r.eas_group_id IS NOT NULL
       AND src.eas_group_id = r.eas_group_id
       AND src.ota_version IS NOT NULL
-  `);
+  `));
 
   // Backfill otaVersion dal messaggio EAS — formato "[OTA:54.10.27] testo utente"
   // Imposta automaticamente ota_version per tutti i record nello stesso gruppo
-  const noVersionRecords = await db
+  const noVersionRecords = await withDbRetry(() => db
     .select({ id: otaReleases.id, message: otaReleases.message, easGroupId: otaReleases.easGroupId })
     .from(otaReleases)
-    .where(isNull(otaReleases.otaVersion));
+    .where(isNull(otaReleases.otaVersion)));
 
   for (const rec of noVersionRecords) {
     const match = rec.message?.match(/^\[OTA:([\d.]+)\]/);
     if (!match) continue;
     const parsed = match[1];
-    if (rec.easGroupId) {
-      await db.update(otaReleases)
+    const groupId = rec.easGroupId;
+    if (groupId) {
+      await withDbRetry(() => db.update(otaReleases)
         .set({ otaVersion: parsed })
-        .where(eq(otaReleases.easGroupId, rec.easGroupId));
+        .where(eq(otaReleases.easGroupId, groupId)));
     } else {
-      await db.update(otaReleases)
+      await withDbRetry(() => db.update(otaReleases)
         .set({ otaVersion: parsed })
-        .where(eq(otaReleases.id, rec.id));
+        .where(eq(otaReleases.id, rec.id)));
     }
   }
 }

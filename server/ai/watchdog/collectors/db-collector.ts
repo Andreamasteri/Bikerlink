@@ -4,6 +4,22 @@ import { sql } from "drizzle-orm";
 import type { Signal } from "../types";
 import { recordSuccess as cbRecordSuccess, recordFailure as cbRecordFailure, getCircuitStatus } from "../../../db-circuit-breaker";
 
+// ── Anti-blip (Task #4546) ────────────────────────────────────────────────────
+// Un singolo campione lento o un singolo ping fallito è quasi sempre un blip
+// transitorio (timeout/disconnessione che rientra subito). Far scattare lo stato
+// "red" del watchdog su un evento isolato genera falsi allarmi. Richiediamo
+// quindi che la latenza alta / il fallimento siano PERSISTENTI (N campioni
+// consecutivi) prima di escalare la severità.
+const SLOW_PING_THRESHOLD_MS = 500;
+const WARN_PING_THRESHOLD_MS = 150;
+// Numero di campioni consecutivi oltre soglia richiesti per escalare a "high".
+const CONSECUTIVE_SLOW_FOR_HIGH = 3;
+// Numero di ping falliti consecutivi richiesti per escalare a "critical".
+const CONSECUTIVE_FAIL_FOR_CRITICAL = 3;
+
+let consecutiveSlowPings = 0;
+let consecutivePingFailures = 0;
+
 export async function collectDb(): Promise<Signal[]> {
   const signals: Signal[] = [];
   const started = Date.now();
@@ -12,6 +28,7 @@ export async function collectDb(): Promise<Signal[]> {
     await db.execute(sql`SELECT 1`);
     const pingMs = Date.now() - started;
     cbRecordSuccess();
+    consecutivePingFailures = 0;
     if (pingMs > 5000) {
       try {
         const poolMod = await import("../../../db").catch(() => null);
@@ -22,9 +39,20 @@ export async function collectDb(): Promise<Signal[]> {
         );
       } catch { /* best-effort */ }
     }
+    // Latenza alta: escala a "high" solo dopo N campioni lenti consecutivi.
+    // Un singolo spike resta "warn" (non spinge lo stato globale a red).
+    let pingSeverity: Signal["severity"];
+    if (pingMs > SLOW_PING_THRESHOLD_MS) {
+      consecutiveSlowPings++;
+      pingSeverity = consecutiveSlowPings >= CONSECUTIVE_SLOW_FOR_HIGH ? "high" : "warn";
+    } else {
+      consecutiveSlowPings = 0;
+      pingSeverity = pingMs > WARN_PING_THRESHOLD_MS ? "warn" : "info";
+    }
     signals.push({
       source: "db", metric: "db.ping_ms", value: pingMs, unit: "ms",
-      severity: pingMs > 500 ? "high" : pingMs > 150 ? "warn" : "info",
+      severity: pingSeverity,
+      details: { consecutiveSlow: consecutiveSlowPings },
     });
 
     // Connessioni attive
@@ -76,9 +104,16 @@ export async function collectDb(): Promise<Signal[]> {
     } catch { /* ignore */ }
   } catch (err) {
     cbRecordFailure(err);
+    consecutiveSlowPings = 0;
+    consecutivePingFailures++;
+    // Un singolo ping fallito è quasi sempre un blip transitorio: lo segnaliamo
+    // come "warn" e lo escaliamo a "critical" solo dopo N fallimenti consecutivi
+    // (guasto persistente). Evita che un singolo blip porti subito a stato red.
+    const errSeverity: Signal["severity"] =
+      consecutivePingFailures >= CONSECUTIVE_FAIL_FOR_CRITICAL ? "critical" : "warn";
     signals.push({
-      source: "db", metric: "collector.error", severity: "critical",
-      details: { error: (err as Error).message },
+      source: "db", metric: "collector.error", severity: errSeverity,
+      details: { error: (err as Error).message, consecutiveFailures: consecutivePingFailures },
     });
   }
 
