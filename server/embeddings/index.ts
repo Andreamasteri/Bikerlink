@@ -9,6 +9,7 @@ export {
   upsertEmbedding,
   findSimilar,
   deleteEmbedding,
+  hnswIndexExists,
   type UpsertEmbeddingResult,
   type SimilarHit,
 } from "./store";

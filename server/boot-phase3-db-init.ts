@@ -122,6 +122,30 @@ export async function runBootPhase3DbInit(): Promise<void> {
   }
 
   try {
+    // Task #4548 — registra le chiavi configurabili del BioAffinity matcher così
+    // che siano visibili e modificabili dal pannello Admin senza deploy. Scrive
+    // solo i default mancanti: non sovrascrive eventuali valori già impostati.
+    const { storage: bioStorage } = await import("./storage");
+    const bioDefaults: { key: string; value: string }[] = [
+      { key: "bio_affinity_budget_ms", value: "75000" },
+      { key: "bio_affinity_top_k", value: "10" },
+      { key: "bio_affinity_threshold", value: "0.65" },
+      { key: "bio_affinity_batch_size", value: "0" },
+      { key: "bio_affinity_require_hnsw", value: "false" },
+      { key: "bio_affinity_cursor_user_id", value: "" },
+    ];
+    for (const d of bioDefaults) {
+      const existing = await bioStorage.getAppSetting(d.key);
+      if (existing === undefined) {
+        await bioStorage.upsertAppSetting(d.key, d.value);
+        console.log(`[BIOAFFINITY BOOTSTRAP] ${d.key} impostato al default "${d.value}"`);
+      }
+    }
+  } catch (e) {
+    console.warn("[INIT] Phase 3: BioAffinity settings bootstrap failed (non-fatal):", e);
+  }
+
+  try {
     const { initProviderHealth } = await import("./ai/moderation/provider");
     await initProviderHealth();
   } catch (e) {

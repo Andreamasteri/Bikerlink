@@ -50,6 +50,31 @@ async function warnIfHnswIndexMissing(
 }
 
 /**
+ * One-shot check (no per-process memo) for whether the HNSW cosine index
+ * exists on the embeddings table. Used by batch jobs (e.g. BioAffinity) that
+ * want to decide up-front whether to run, instead of discovering the missing
+ * index as a slow sequential-scan side-effect of the first findSimilar().
+ * Returns true/false; never throws (a failed check resolves to true so the
+ * job is not blocked by a transient pg_indexes read error).
+ */
+export async function hnswIndexExists(): Promise<boolean> {
+  try {
+    const res = await db.execute<{ exists: boolean }>(sql`
+      SELECT EXISTS (
+        SELECT 1 FROM pg_indexes
+        WHERE schemaname = 'public'
+          AND tablename = 'embeddings'
+          AND indexname = ${HNSW_INDEX_NAME}
+      ) AS exists
+    `);
+    const row = (res.rows ?? res)[0] as { exists: boolean } | undefined;
+    return row?.exists ?? true;
+  } catch {
+    return true;
+  }
+}
+
+/**
  * Read hnsw.ef_search from AppSetting `embedding_ef_search`.
  * Falls back to 64 if the setting is absent or invalid.
  */
