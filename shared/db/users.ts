@@ -73,6 +73,14 @@ export const users = pgTable("users", {
   lastPlatform: varchar("last_platform", { length: 16 }),
   lastDeviceModel: varchar("last_device_model", { length: 100 }),
   expoPushToken: text("expo_push_token"),
+  // Causa reale dell'ultimo fallimento di registrazione del push token,
+  // persistita dal client per renderla visibile nel diagnostic in-app senza
+  // accesso ai log (PERMESSI_NEGATI / PROJECT_ID_MANCANTE / TOKEN_NON_OTTENUTO /
+  // TOKEN_VUOTO / ERRORE_REGISTRAZIONE). NULL = nessun errore noto.
+  pushTokenError: varchar("push_token_error", { length: 48 }),
+  pushTokenErrorDetail: text("push_token_error_detail"),
+  pushTokenErrorPlatform: varchar("push_token_error_platform", { length: 16 }),
+  pushTokenErrorAt: timestamp("push_token_error_at"),
   // Task #2645 — preferenze admin (onboarding console, hint dismissed, ecc.)
   adminPrefs: jsonb("admin_prefs").$type<Record<string, unknown>>().default({}),
   // Task #2698 — preferenze AI Assistant per utenti normali (opt-out per-user)

@@ -12,7 +12,7 @@
 
 import { Router, type Request, type Response } from "express";
 import { storage } from "../../storage";
-import { pushTokenSchema } from "@shared/validators";
+import { pushTokenSchema, pushTokenErrorSchema } from "@shared/validators";
 import { requireAuth } from "../../lib/auth-middleware";
 import { sendSuccess, sendError } from "../../lib/api-response";
 
@@ -44,10 +44,40 @@ router.put("/me/push-token", requireAuth, async (req: Request, res: Response) =>
     if (!isValidToken) {
       return sendError(res, 400, "Token Expo push non valido");
     }
-    await storage.updateUser(userId, { expoPushToken: token });
+    // Token registrato con successo: azzera l'eventuale causa di fallimento
+    // precedente così il diagnostic in-app non mostra più un errore stantio.
+    await storage.updateUser(userId, {
+      expoPushToken: token,
+      pushTokenError: null,
+      pushTokenErrorDetail: null,
+      pushTokenErrorPlatform: null,
+      pushTokenErrorAt: null,
+    });
     return sendSuccess(res);
   } catch (error) {
     console.error("Push token update error:", error);
+    return sendError(res, 500, "Errore interno del server");
+  }
+});
+
+// Registra la causa reale del mancato push token (permessi negati, FCM/APNs non
+// configurato, offline, ...). Persistita lato server per renderla visibile nel
+// diagnostic in-app senza accesso ai log.
+router.put("/me/push-token-error", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const userId = req.session.userId!;
+    const parsed = pushTokenErrorSchema.safeParse(req.body ?? {});
+    if (!parsed.success) return sendError(res, 400, parsed.error.issues[0].message);
+    const { cause, detail, platform } = parsed.data;
+    await storage.updateUser(userId, {
+      pushTokenError: cause,
+      pushTokenErrorDetail: detail ?? null,
+      pushTokenErrorPlatform: platform ?? null,
+      pushTokenErrorAt: new Date(),
+    });
+    return sendSuccess(res);
+  } catch (error) {
+    console.error("Push token error report failed:", error);
     return sendError(res, 500, "Errore interno del server");
   }
 });

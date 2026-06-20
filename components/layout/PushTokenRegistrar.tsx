@@ -13,6 +13,27 @@ try {
   // no-op: expo-notifications is optional or missing
 }
 
+type PushTokenErrorCause =
+  | "PERMESSI_NEGATI"
+  | "PROJECT_ID_MANCANTE"
+  | "TOKEN_NON_OTTENUTO"
+  | "TOKEN_VUOTO"
+  | "ERRORE_REGISTRAZIONE";
+
+// Persiste lato backend la causa reale del mancato token push, così il
+// diagnostic in-app può mostrarla senza accesso ai log.
+async function reportPushTokenError(cause: PushTokenErrorCause, detail?: string) {
+  try {
+    await apiRequest("PUT", "/api/users/me/push-token-error", {
+      cause,
+      detail: detail ? detail.slice(0, 500) : null,
+      platform: Platform.OS,
+    });
+  } catch {
+    // no-op: la segnalazione è best-effort; resta comunque in console.error
+  }
+}
+
 export function PushTokenRegistrar() {
   const { user } = useAuth();
 
@@ -80,6 +101,7 @@ export function PushTokenRegistrar() {
           console.error(
             `[PushTokenRegistrar] PERMESSI_NEGATI: notifiche non concesse (status=${finalStatus}) — token non registrato`,
           );
+          await reportPushTokenError("PERMESSI_NEGATI", `status=${finalStatus}`);
           return;
         }
 
@@ -88,6 +110,7 @@ export function PushTokenRegistrar() {
           console.error(
             "[PushTokenRegistrar] PROJECT_ID_MANCANTE: Constants.expoConfig.extra.eas.projectId assente — token non registrato",
           );
+          await reportPushTokenError("PROJECT_ID_MANCANTE");
           return;
         }
 
@@ -103,18 +126,27 @@ export function PushTokenRegistrar() {
               "Causa probabile: FCM/APNs non configurato o dispositivo offline. Dettaglio:",
             tokenErr,
           );
+          await reportPushTokenError(
+            "TOKEN_NON_OTTENUTO",
+            tokenErr instanceof Error ? tokenErr.message : String(tokenErr),
+          );
           return;
         }
         if (!token) {
           console.error(
             "[PushTokenRegistrar] TOKEN_VUOTO: getExpoPushTokenAsync ha restituito un token vuoto nonostante i permessi concessi",
           );
+          await reportPushTokenError("TOKEN_VUOTO");
           return;
         }
 
         await apiRequest("PUT", "/api/users/me/push-token", { token });
       } catch (err) {
         console.error("[PushTokenRegistrar] ERRORE_REGISTRAZIONE: registrazione token push fallita:", err);
+        await reportPushTokenError(
+          "ERRORE_REGISTRAZIONE",
+          err instanceof Error ? err.message : String(err),
+        );
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps

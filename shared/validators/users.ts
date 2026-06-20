@@ -52,6 +52,19 @@ export const pushTokenSchema = z.object({
 });
 export type PushTokenInput = z.infer<typeof pushTokenSchema>;
 
+export const pushTokenErrorSchema = z.object({
+  cause: z.enum([
+    "PERMESSI_NEGATI",
+    "PROJECT_ID_MANCANTE",
+    "TOKEN_NON_OTTENUTO",
+    "TOKEN_VUOTO",
+    "ERRORE_REGISTRAZIONE",
+  ]),
+  detail: z.string().max(500).nullable().optional(),
+  platform: z.string().max(16).nullable().optional(),
+});
+export type PushTokenErrorInput = z.infer<typeof pushTokenErrorSchema>;
+
 export const motorcycleSchema = z.object({
   brand: z.string().min(1, "Marca obbligatoria").max(100),
   model: z.string().min(1, "Modello obbligatorio").max(100),

@@ -217,6 +217,25 @@ export async function testPushToken(): Promise<DiagnosticTestResult[]> {
       const data = await res.json();
       const pushToken = data?.profile?.expoPushToken ?? data?.expoPushToken ?? null;
       if (pushToken) return { status: "PASS" };
+      // Token assente: usa la causa reale persistita lato server dal
+      // PushTokenRegistrar (visibile senza accesso ai log) se disponibile.
+      const cause: string | null = data?.pushTokenError ?? data?.profile?.pushTokenError ?? null;
+      const causeDetail: string | null = data?.pushTokenErrorDetail ?? data?.profile?.pushTokenErrorDetail ?? null;
+      const causeAt: string | null = data?.pushTokenErrorAt ?? data?.profile?.pushTokenErrorAt ?? null;
+      if (cause) {
+        const labels: Record<string, string> = {
+          PERMESSI_NEGATI: "Permessi notifiche negati dall'utente/SO",
+          PROJECT_ID_MANCANTE: "EAS projectId mancante nella configurazione",
+          TOKEN_NON_OTTENUTO: "FCM/APNs non configurato o dispositivo offline",
+          TOKEN_VUOTO: "Token vuoto restituito nonostante i permessi concessi",
+          ERRORE_REGISTRAZIONE: "Errore generico in fase di registrazione",
+        };
+        const label = labels[cause] ?? cause;
+        const when = causeAt ? ` — ${new Date(causeAt).toLocaleString()}` : "";
+        const detail = causeDetail ? ` (${causeDetail})` : "";
+        return { status: "WARN", message: `${cause}: ${label}${detail}${when}` };
+      }
+      // Nessuna causa persistita: fallback alla lettura permessi locale.
       let permission = "unknown";
       try {
         const { status } = await Notifications.getPermissionsAsync();
