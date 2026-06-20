@@ -22,7 +22,7 @@ import { DiagnosticReportCard } from "@/components/admin/DiagnosticReportCard";
 import type { Filters } from "@/components/admin/DiagnosticFilterPanel";
 import type { DiagReport, RemoteReqStatus } from "@/components/admin/DiagnosticReportCard";
 
-interface ActiveUser { userId: string; nickname: string | null; wsConnected: boolean }
+interface ActiveUser { userId: string; nickname: string | null; wsConnected: boolean; status?: "online" | "polling" | "offline" }
 interface ReportsResponse { reports: DiagReport[]; total: number; page: number; limit: number }
 interface DiagFileEntry { filename: string; userId: string; timestamp: string; sizeBytes: number }
 interface FilesResponse { files: DiagFileEntry[]; total: number; page: number; limit: number }
@@ -293,7 +293,7 @@ export default function DiagnosticReportsScreen() {
         {!activeUsersLoading && !activeUsersError && activeUsers.length === 0 && (
           <Text style={styles.emptyText}>Nessun utente attivo al momento</Text>
         )}
-        {activeUsers.map(({ userId, nickname, wsConnected }) => {
+        {activeUsers.map(({ userId, nickname, wsConnected, status }) => {
           const wsSt: DiagStatus = triggeredStatus[userId] ?? "idle";
           const pollReq = remoteReqStatus[userId];
           const pollSt = pollReq?.status ?? "idle";
@@ -325,6 +325,17 @@ export default function DiagnosticReportsScreen() {
             ? isWsPending
             : (isPollPending || pollSt === "received");
 
+          // Colore pallino allineato alla spiegazione (showStatusInfo):
+          // 🟢 verde = online (WS connesso) · 🟡 giallo = riconnessione/polling
+          // 🔴 rosso = offline (né WS né polling) o ultimo report in errore.
+          const hasError = wsSt === "failed" || pollSt === "failed";
+          const effectiveStatus = status ?? (wsConnected ? "online" : "polling");
+          const dotColor = hasError || effectiveStatus === "offline"
+            ? "#EF4444"
+            : effectiveStatus === "polling"
+            ? "#EAB308"
+            : "#22C55E";
+
           return (
             <View key={userId} style={styles.userRow}>
               <TouchableOpacity
@@ -332,7 +343,7 @@ export default function DiagnosticReportsScreen() {
                 style={styles.statusDotBtn}
                 hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
               >
-                <Ionicons name="ellipse" size={12} color={wsConnected ? "#22C55E" : "#EAB308"} />
+                <Ionicons name="ellipse" size={12} color={dotColor} />
               </TouchableOpacity>
               <Text style={styles.userId} numberOfLines={1}>{displayName}</Text>
               {statusLabel != null && (

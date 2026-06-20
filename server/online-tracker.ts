@@ -102,6 +102,10 @@ export class OnlineTracker {
     return this.users.has(userId);
   }
 
+  getLastSeen(userId: string): Date | null {
+    return this.users.get(userId)?.lastSeen ?? null;
+  }
+
   countOnlineUsers(countries?: string[]): number {
     let count = 0;
     for (const entry of this.users.values()) {

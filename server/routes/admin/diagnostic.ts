@@ -259,11 +259,27 @@ router.get("/diagnostic/active-users", async (_req: Request, res: Response) => {
 
     const nicknameMap = new Map(rows.map(r => [r.id, r.nickname]));
 
-    const result = userIds.map(userId => ({
-      userId,
-      nickname: nicknameMap.get(userId) ?? null,
-      wsConnected: wsSet.has(userId),
-    }));
+    // Threshold oltre il quale, senza WS attivo, consideriamo il polling/heartbeat
+    // inattivo (utente di fatto offline/in errore). Il heartbeat client gira ogni
+    // ~2 min e il polling diagnostico ogni 60s, quindi 5 min senza segnali = rosso.
+    const STALE_MS = 5 * 60 * 1000;
+    const now = Date.now();
+
+    const result = userIds.map(userId => {
+      const wsConnected = wsSet.has(userId);
+      const lastSeen = onlineTracker.getLastSeen(userId);
+      const staleMs = lastSeen ? now - lastSeen.getTime() : Number.POSITIVE_INFINITY;
+      let status: "online" | "polling" | "offline";
+      if (wsConnected) status = "online";
+      else if (staleMs <= STALE_MS) status = "polling";
+      else status = "offline";
+      return {
+        userId,
+        nickname: nicknameMap.get(userId) ?? null,
+        wsConnected,
+        status,
+      };
+    });
 
     return res.json({ users: result });
   } catch (err) {
