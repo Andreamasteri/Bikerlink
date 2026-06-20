@@ -19,6 +19,7 @@ const HANDLE_WIDTH = 22;
 const HANDLE_THICKNESS = 3;
 const TRACK_WIDTH = 1.5;
 const DEFAULT_TRACK_HEIGHT = 200;
+const BTN_SIZE = 32;
 
 function formatScale(zoom: number, lat: number): string {
   const mPerPx =
@@ -34,6 +35,18 @@ function formatScale(zoom: number, lat: number): string {
   }
   if (chosen >= 1000) return `${chosen / 1000} km`;
   return `${chosen} m`;
+}
+
+function makeButtonPanResponder(onTap: () => void) {
+  return PanResponder.create({
+    onStartShouldSetPanResponderCapture: () => true,
+    onMoveShouldSetPanResponderCapture: () => false,
+    onPanResponderGrant: () => {
+      onTap();
+    },
+    onPanResponderRelease: () => {},
+    onPanResponderTerminate: () => {},
+  });
 }
 
 export function MapZoomSlider({
@@ -69,7 +82,7 @@ export function MapZoomSlider({
     onZoomChangeRef.current = onZoomChange;
   }, [onZoomChange]);
 
-  const panResponder = useRef(
+  const sliderPanResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponderCapture: () => true,
       onMoveShouldSetPanResponderCapture: () => true,
@@ -89,6 +102,26 @@ export function MapZoomSlider({
     }),
   ).current;
 
+  const zoomInPanResponder = useRef(
+    makeButtonPanResponder(() => {
+      const next = Math.min(
+        maxZoomRef.current,
+        Math.floor(latestZoomRef.current) + 1,
+      );
+      onZoomChangeRef.current(next);
+    }),
+  ).current;
+
+  const zoomOutPanResponder = useRef(
+    makeButtonPanResponder(() => {
+      const next = Math.max(
+        minZoomRef.current,
+        Math.ceil(latestZoomRef.current) - 1,
+      );
+      onZoomChangeRef.current(next);
+    }),
+  ).current;
+
   const range = maxZoom - minZoom;
   const clampedZoom = Math.max(minZoom, Math.min(maxZoom, zoom));
   const handleY =
@@ -104,22 +137,35 @@ export function MapZoomSlider({
         leftOffset != null && { left: leftOffset },
       ]}
       pointerEvents="box-none"
-      onLayout={(e) => setTrackHeight(e.nativeEvent.layout.height)}
     >
-      <View style={styles.trackLine} pointerEvents="none" />
-      <View
-        style={[styles.hitArea, { top: handleY - HIT_HEIGHT / 2 }]}
-        {...panResponder.panHandlers}
-      >
-        <View style={styles.handle} />
+      <View style={styles.btn} {...zoomInPanResponder.panHandlers}>
+        <Text style={styles.btnText}>+</Text>
       </View>
-      <Text
-        style={[styles.label, { top: handleY - 7 }]}
-        numberOfLines={1}
-        pointerEvents="none"
+
+      <View
+        style={styles.trackArea}
+        pointerEvents="box-none"
+        onLayout={(e) => setTrackHeight(e.nativeEvent.layout.height)}
       >
-        {scaleLabel}
-      </Text>
+        <View style={styles.trackLine} pointerEvents="none" />
+        <View
+          style={[styles.hitArea, { top: handleY - HIT_HEIGHT / 2 }]}
+          {...sliderPanResponder.panHandlers}
+        >
+          <View style={styles.handle} />
+        </View>
+        <Text
+          style={[styles.label, { top: handleY - 7 }]}
+          numberOfLines={1}
+          pointerEvents="none"
+        >
+          {scaleLabel}
+        </Text>
+      </View>
+
+      <View style={styles.btn} {...zoomOutPanResponder.panHandlers}>
+        <Text style={styles.btnText}>−</Text>
+      </View>
     </View>
   );
 }
@@ -130,6 +176,31 @@ const styles = StyleSheet.create({
     left: 12,
     width: HIT_WIDTH,
     zIndex: 10,
+    alignItems: "center",
+  },
+  btn: {
+    width: BTN_SIZE,
+    height: BTN_SIZE,
+    borderRadius: BTN_SIZE / 2,
+    backgroundColor: "rgba(255,255,255,0.85)",
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+    elevation: 3,
+  },
+  btnText: {
+    fontSize: 20,
+    fontWeight: "600" as const,
+    color: Colors.text,
+    lineHeight: 22,
+  },
+  trackArea: {
+    flex: 1,
+    width: HIT_WIDTH,
+    marginVertical: 6,
   },
   trackLine: {
     position: "absolute",
