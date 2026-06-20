@@ -48,6 +48,13 @@ export function useOnNativeLocation(deps: Omit<EffectDeps, "onNativeLocation" | 
     lastLowAccuracyTelemetryRef, handsOffDismissedForRideRef } = deps;
 
   return function onNativeLocation(loc: Location.LocationObject) {
+    // Per-fix error isolation (Task #4612): a throw while processing a single
+    // (possibly malformed) GPS fix must NOT propagate out of this callback —
+    // that would bubble through the watchPositionAsync listener and can tear
+    // down the whole GPS path. Catch + log here so GPS degrades cleanly and the
+    // sensors/dead-reckoning fusion loop keeps recording. The fusion timer in
+    // useTrackingState already falls back to sensors_only when GPS goes stale.
+    try {
     if (stats.isPausedRef.current || session.phaseRef.current !== "active") return;
     const { latitude, longitude, altitude, speed, accuracy } = loc.coords;
     const now = loc.timestamp, speedKmh = speed != null && speed >= 0 ? speed * 3.6 : 0;
@@ -126,6 +133,18 @@ export function useOnNativeLocation(deps: Omit<EffectDeps, "onNativeLocation" | 
       if (smoothedSpeed >= settings.handsOffSpeedRef.current) {
         if (!handsOffActive) { setHandsOffActive(true); setHandsOffBroadcast(true); setVolumeUI(false); }
       } else if (handsOffActive) { setHandsOffActive(false); setHandsOffBroadcast(false); setVolumeUI(true); }
+    }
+    } catch (e) {
+      // GPS fix processing failed — degrade GPS cleanly without propagating, so
+      // the throw can't bubble through watchPositionAsync and tear down the GPS
+      // path. Explicitly invalidate this fix's freshness marker so the fusion
+      // loop downgrades immediately (gpsFresh -> false => sensors_only when
+      // sensors are active, else gps_only) instead of waiting for the staleness
+      // timeout. A subsequent clean fix re-arms lastUsableFixMs and restores
+      // gps_sensors. Routed through logGpsError (same pipeline flushPoints uses)
+      // with a recognizable tag so it stays visible in diagnostics.
+      try { gps.lastUsableFixMsRef.current = 0; } catch {}
+      logGpsError(e, "tracking_gps_fix");
     }
   };
 }

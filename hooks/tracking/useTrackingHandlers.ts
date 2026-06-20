@@ -105,50 +105,78 @@ export function useTrackingHandlers(deps: TrackingHandlerDeps) {
     try {
       if (await DeviceMotion.isAvailableAsync()) {
         sensors.sensorSourceRef.current = "deviceMotion"; DeviceMotion.setUpdateInterval(100);
+        // Consecutive sample-failure streak (Task #4612): a single transient throw
+        // must not drop sensors, but a sustained run of failures means the source
+        // is unreliable. After SENSOR_ERROR_DROP_THRESHOLD straight failures we
+        // explicitly mark the sensor source unavailable so the fusion loop
+        // deterministically degrades to gps_only instead of trusting a broken
+        // source. The streak resets on the first clean sample.
+        let sensorErrorStreak = 0;
+        const SENSOR_ERROR_DROP_THRESHOLD = 10;
         refs.accelSubRef.current = DeviceMotion.addListener((data: any) => {
-          if (!data.accelerationIncludingGravity || stats.isPausedRef.current) return;
-          const { x, y, z } = data.accelerationIncludingGravity;
-          const totalG = Math.sqrt(x * x + y * y + z * z) / 9.81;
-          sensors.setCurrentG(totalG);
-          let tiltDeg = 0, lateralG = 0, accelG = 0;
-          if (sensors.mountAxisCalibRef.current) {
-            const { x: ax, y: ay, z: az } = data.accelerationIncludingGravity;
-            interface CalibVectors { up: { x: number; y: number; z: number }; forward: { x: number; y: number; z: number } }
-            const { up, forward } = sensors.mountAxisCalibRef.current as MountAxisCalibration & CalibVectors;
-            const right = { x: up.y * forward.z - up.z * forward.y, y: up.z * forward.x - up.x * forward.z, z: up.x * forward.y - up.y * forward.x };
-            accelG = (ax * forward.x + ay * forward.y + az * forward.z) / 9.81;
-            lateralG = (ax * right.x + ay * right.y + az * right.z) / 9.81;
-            tiltDeg = Math.atan2(lateralG, (ax * up.x + ay * up.y + az * up.z) / 9.81) * (180 / Math.PI);
-          } else {
-            accelG = y / 9.81; lateralG = x / 9.81; tiltDeg = ((data.rotation as { roll?: number }).roll || 0) * (180 / Math.PI);
+          // Per-sample error isolation (Task #4612): a throw on a single sensor
+          // sample must NOT propagate out of the listener — that would tear down
+          // the DeviceMotion subscription and silently kill the sensors source
+          // mid-ride. Catch + log here so the GPS path keeps recording and the
+          // next sample is processed cleanly. This is separate from the setup
+          // try/catch below (which guards subscription creation, not samples).
+          try {
+            if (!data.accelerationIncludingGravity || stats.isPausedRef.current) return;
+            const { x, y, z } = data.accelerationIncludingGravity;
+            const totalG = Math.sqrt(x * x + y * y + z * z) / 9.81;
+            sensors.setCurrentG(totalG);
+            let tiltDeg = 0, lateralG = 0, accelG = 0;
+            if (sensors.mountAxisCalibRef.current) {
+              const { x: ax, y: ay, z: az } = data.accelerationIncludingGravity;
+              interface CalibVectors { up: { x: number; y: number; z: number }; forward: { x: number; y: number; z: number } }
+              const { up, forward } = sensors.mountAxisCalibRef.current as MountAxisCalibration & CalibVectors;
+              const right = { x: up.y * forward.z - up.z * forward.y, y: up.z * forward.x - up.x * forward.z, z: up.x * forward.y - up.y * forward.x };
+              accelG = (ax * forward.x + ay * forward.y + az * forward.z) / 9.81;
+              lateralG = (ax * right.x + ay * right.y + az * right.z) / 9.81;
+              tiltDeg = Math.atan2(lateralG, (ax * up.x + ay * up.y + az * up.z) / 9.81) * (180 / Math.PI);
+            } else {
+              accelG = y / 9.81; lateralG = x / 9.81; tiltDeg = ((data.rotation as { roll?: number }).roll || 0) * (180 / Math.PI);
+            }
+            sensors.currentAccelGRef.current = accelG; sensors.currentLateralGRef.current = lateralG; sensors.currentTiltDegRef.current = tiltDeg;
+            // Gravity-compensated forward linear acceleration (m/s²) for dead reckoning.
+            // Prefer the OS-fused linear acceleration; otherwise estimate gravity with a
+            // low-pass complementary filter and subtract it from the raw vector.
+            let lin = data.acceleration as { x: number; y: number; z: number } | null | undefined;
+            if (!lin) {
+              const g = sensors.gravityEstRef.current ?? { x, y, z };
+              const a = 0.9; // smoothing → gravity is the slow-moving component
+              g.x = a * g.x + (1 - a) * x; g.y = a * g.y + (1 - a) * y; g.z = a * g.z + (1 - a) * z;
+              sensors.gravityEstRef.current = g;
+              lin = { x: x - g.x, y: y - g.y, z: z - g.z };
+            }
+            let linFwd: number;
+            if (sensors.mountAxisCalibRef.current) {
+              const { forward } = sensors.mountAxisCalibRef.current as MountAxisCalibration & { forward: { x: number; y: number; z: number } };
+              linFwd = lin.x * forward.x + lin.y * forward.y + lin.z * forward.z;
+            } else {
+              linFwd = lin.y;
+            }
+            // Zero-velocity-update clamp: ignore sub-threshold noise so a stationary
+            // device doesn't drift speed/distance upward during a GPS blackout.
+            sensors.linearAccelFwdRef.current = Math.abs(linFwd) < 0.3 ? 0 : linFwd;
+            sensors.setCurrentLateralG(lateralG); sensors.setCurrentTiltDeg(tiltDeg);
+            if (accelG > sensors.maxAccelGRef.current) { sensors.maxAccelGRef.current = accelG; sensors.setMaxAccelG(accelG); }
+            if (accelG < sensors.maxDecelGRef.current) { sensors.maxDecelGRef.current = accelG; sensors.setMaxDecelG(accelG); }
+            if (Math.abs(tiltDeg) > sensors.maxTiltDegRef.current) { sensors.maxTiltDegRef.current = Math.abs(tiltDeg); sensors.setMaxTiltDeg(Math.abs(tiltDeg)); }
+            if (Math.abs(lateralG) > sensors.maxLateralGRef.current) { sensors.maxLateralGRef.current = Math.abs(lateralG); sensors.setMaxLateralG(Math.abs(lateralG)); }
+            sensorErrorStreak = 0;
+          } catch (e) {
+            logGpsError(e, "tracking_sensor_sample");
+            sensorErrorStreak += 1;
+            // Sustained sample failures → drop sensors as a source. sensorsActive
+            // (settings + sensorSourceRef !== "none") then goes false, so the
+            // fusion loop falls back to gps_only on its next tick and publishes it
+            // via setFusionMode — deterministic degradation, not timeout-driven.
+            if (sensorErrorStreak >= SENSOR_ERROR_DROP_THRESHOLD && sensors.sensorSourceRef.current !== "none") {
+              sensors.sensorSourceRef.current = "none";
+              sensors.linearAccelFwdRef.current = 0;
+            }
           }
-          sensors.currentAccelGRef.current = accelG; sensors.currentLateralGRef.current = lateralG; sensors.currentTiltDegRef.current = tiltDeg;
-          // Gravity-compensated forward linear acceleration (m/s²) for dead reckoning.
-          // Prefer the OS-fused linear acceleration; otherwise estimate gravity with a
-          // low-pass complementary filter and subtract it from the raw vector.
-          let lin = data.acceleration as { x: number; y: number; z: number } | null | undefined;
-          if (!lin) {
-            const g = sensors.gravityEstRef.current ?? { x, y, z };
-            const a = 0.9; // smoothing → gravity is the slow-moving component
-            g.x = a * g.x + (1 - a) * x; g.y = a * g.y + (1 - a) * y; g.z = a * g.z + (1 - a) * z;
-            sensors.gravityEstRef.current = g;
-            lin = { x: x - g.x, y: y - g.y, z: z - g.z };
-          }
-          let linFwd: number;
-          if (sensors.mountAxisCalibRef.current) {
-            const { forward } = sensors.mountAxisCalibRef.current as MountAxisCalibration & { forward: { x: number; y: number; z: number } };
-            linFwd = lin.x * forward.x + lin.y * forward.y + lin.z * forward.z;
-          } else {
-            linFwd = lin.y;
-          }
-          // Zero-velocity-update clamp: ignore sub-threshold noise so a stationary
-          // device doesn't drift speed/distance upward during a GPS blackout.
-          sensors.linearAccelFwdRef.current = Math.abs(linFwd) < 0.3 ? 0 : linFwd;
-          sensors.setCurrentLateralG(lateralG); sensors.setCurrentTiltDeg(tiltDeg);
-          if (accelG > sensors.maxAccelGRef.current) { sensors.maxAccelGRef.current = accelG; sensors.setMaxAccelG(accelG); }
-          if (accelG < sensors.maxDecelGRef.current) { sensors.maxDecelGRef.current = accelG; sensors.setMaxDecelG(accelG); }
-          if (Math.abs(tiltDeg) > sensors.maxTiltDegRef.current) { sensors.maxTiltDegRef.current = Math.abs(tiltDeg); sensors.setMaxTiltDeg(Math.abs(tiltDeg)); }
-          if (Math.abs(lateralG) > sensors.maxLateralGRef.current) { sensors.maxLateralGRef.current = Math.abs(lateralG); sensors.setMaxLateralG(Math.abs(lateralG)); }
         });
       }
     } catch (e) { logGpsError(e, "startDeviceMotion"); } finally { sensors.sensorStartingRef.current = false; }

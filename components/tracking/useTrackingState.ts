@@ -229,22 +229,36 @@ export function useTrackingState() {
       battery.rideStartBatteryLevelRef.current = level; battery.rideStartBatteryTimeRef.current = Date.now(); battery.rideBatteryProfileRef.current = settings.profileRef.current;
     }
     refs.timerRef.current = setInterval(() => {
-      if (stats.isPausedRef.current) return;
-      const now = Date.now(); const activeMs = now - stats.startTimeRef.current - stats.pausedMsRef.current;
-      stats.setDisplayIdleMs(stats.idleMsRef.current + (stats.idleStartRef.current ? now - stats.idleStartRef.current : 0));
-      stats.setTotalMs(activeMs);
-      if (now - stats.lastAvgSpeedUpdateRef.current > 5000) {
-        stats.lastAvgSpeedUpdateRef.current = now; const hours = activeMs / 3600000;
-        if (hours > 0) stats.setAvgSpeedDisplayKmh(gps.totalKmRef.current / hours);
-      }
+      // Per-tick error isolation (Task #4612): a transient throw inside the
+      // display/stats tick must not kill the loop — log it and let the next
+      // tick run. The other tracking loops keep running independently.
+      try {
+        if (stats.isPausedRef.current) return;
+        const now = Date.now(); const activeMs = now - stats.startTimeRef.current - stats.pausedMsRef.current;
+        stats.setDisplayIdleMs(stats.idleMsRef.current + (stats.idleStartRef.current ? now - stats.idleStartRef.current : 0));
+        stats.setTotalMs(activeMs);
+        if (now - stats.lastAvgSpeedUpdateRef.current > 5000) {
+          stats.lastAvgSpeedUpdateRef.current = now; const hours = activeMs / 3600000;
+          if (hours > 0) stats.setAvgSpeedDisplayKmh(gps.totalKmRef.current / hours);
+        }
+      } catch (e) { logGpsError(e, "tracking_tick_display"); }
     }, 1000);
-    refs.flushTimerRef.current = setInterval(() => !stats.isPausedRef.current && flushPoints(), 15000);
+    refs.flushTimerRef.current = setInterval(() => {
+      // Per-tick error isolation (Task #4612): a throw here must not stop the
+      // periodic flush loop nor the other tracking loops.
+      try { if (!stats.isPausedRef.current) flushPoints(); }
+      catch (e) { logGpsError(e, "tracking_tick_flush"); }
+    }, 15000);
     refs.gpsHeartbeatTimerRef.current = setInterval(() => {
-      if (stats.isPausedRef.current) return;
-      const now = Date.now(), last = gps.lastGpsEventMsRef.current || stats.startTimeRef.current, lost = now - last > 15000;
-      if (lost && !gps.gpsWasLostRef.current) { gps.gpsWasLostRef.current = true; gps.gpsBlackoutCountRef.current += 1; gps.gpsBlackoutStartRef.current = now; }
-      else if (!lost && gps.gpsWasLostRef.current) { gps.gpsWasLostRef.current = false; if (gps.gpsBlackoutStartRef.current != null) { gps.gpsBlackoutSecondsRef.current += now - gps.gpsBlackoutStartRef.current; gps.gpsBlackoutStartRef.current = null; } }
-      gps.setGpsLost(lost);
+      // Per-tick error isolation (Task #4612): a throw here must not stop the
+      // GPS blackout heartbeat nor the other tracking loops.
+      try {
+        if (stats.isPausedRef.current) return;
+        const now = Date.now(), last = gps.lastGpsEventMsRef.current || stats.startTimeRef.current, lost = now - last > 15000;
+        if (lost && !gps.gpsWasLostRef.current) { gps.gpsWasLostRef.current = true; gps.gpsBlackoutCountRef.current += 1; gps.gpsBlackoutStartRef.current = now; }
+        else if (!lost && gps.gpsWasLostRef.current) { gps.gpsWasLostRef.current = false; if (gps.gpsBlackoutStartRef.current != null) { gps.gpsBlackoutSecondsRef.current += now - gps.gpsBlackoutStartRef.current; gps.gpsBlackoutStartRef.current = null; } }
+        gps.setGpsLost(lost);
+      } catch (e) { logGpsError(e, "tracking_tick_gps_heartbeat"); }
     }, 5000);
     // Fusion timer (Task #4560): runs at a fixed 1Hz cadence independent of the GPS
     // fix rate. Maintains the dead-reckoning speed estimate + divergence check,
@@ -252,56 +266,63 @@ export function useTrackingState() {
     // distance + telemetry from sensors alone.
     refs.lastFusionTickRef.current = Date.now();
     refs.fusionTimerRef.current = setInterval(() => {
-      if (stats.isPausedRef.current || session.phaseRef.current !== "active") return;
-      const now = Date.now();
-      const dt = Math.min(Math.max((now - refs.lastFusionTickRef.current) / 1000, 0.001), 5);
-      refs.lastFusionTickRef.current = now;
+      // Per-tick error isolation (Task #4612): the fusion loop drives the
+      // dead-reckoning estimate, the observable fusion mode AND the sensors-only
+      // distance/telemetry recording. A transient throw here must NOT stop the
+      // loop (which would silently halt distance recording during a GPS
+      // blackout) — log it and let the next 1 Hz tick recover.
+      try {
+        if (stats.isPausedRef.current || session.phaseRef.current !== "active") return;
+        const now = Date.now();
+        const dt = Math.min(Math.max((now - refs.lastFusionTickRef.current) / 1000, 0.001), 5);
+        refs.lastFusionTickRef.current = now;
 
-      const lastFix = gps.lastUsableFixMsRef.current || 0;
-      const gpsFresh = gps.gpsFixAcquiredRef.current && lastFix > 0 && now - lastFix < TRACKING_FUSION.GPS_STALE_MS;
-      const sensorsActive = settings.sensorsEnabledRef.current && sensors.sensorSourceRef.current !== "none";
+        const lastFix = gps.lastUsableFixMsRef.current || 0;
+        const gpsFresh = gps.gpsFixAcquiredRef.current && lastFix > 0 && now - lastFix < TRACKING_FUSION.GPS_STALE_MS;
+        const sensorsActive = settings.sensorsEnabledRef.current && sensors.sensorSourceRef.current !== "none";
 
-      // Integrate gravity-compensated linear forward acceleration (m/s²) → km/h.
-      const linAccel = sensors.linearAccelFwdRef.current || 0;
-      let dr = gps.drSpeedKmhRef.current + linAccel * dt * 3.6;
-      // Bleed speed toward zero while coasting (no measured accel) so integration
-      // drift can't keep phantom speed alive through a long blackout.
-      if (linAccel === 0) dr *= 0.95;
-      if (dr < 0) dr = 0;
-      if (dr > TRACKING_FUSION.MAX_PLAUSIBLE_KMH) dr = TRACKING_FUSION.MAX_PLAUSIBLE_KMH;
-      if (gpsFresh) {
-        const gpsSpeed = gps.emaSpeedRef.current;
-        if (Math.abs(dr - gpsSpeed) > TRACKING_FUSION.DIVERGENCE_KMH) gps.divergenceCountRef.current += 1;
-        else gps.divergenceCountRef.current = 0;
-        dr = gpsSpeed; // GPS is authoritative whenever a fresh fix exists
-      }
-      gps.drSpeedKmhRef.current = dr;
-      const divergent = gps.divergenceCountRef.current >= TRACKING_FUSION.DIVERGENCE_SAMPLES;
-
-      let mode: FusionMode;
-      if (!gps.gpsFixAcquiredRef.current) {
-        // No usable GPS fix yet. Once the startup grace elapses, fall back to
-        // sensors-only so a cold/absent GPS start still records distance; until
-        // then keep showing "acquiring".
-        const elapsed = now - (stats.startTimeRef.current || now);
-        mode = sensorsActive && elapsed > TRACKING_FUSION.ACQUIRING_GRACE_MS ? "sensors_only" : "acquiring";
-      } else if (gpsFresh) mode = sensorsActive && !divergent ? "gps_sensors" : "gps_only";
-      else mode = sensorsActive ? "sensors_only" : "gps_only";
-      if (gps.fusionModeRef.current !== mode) { gps.fusionModeRef.current = mode; gps.setFusionMode(mode); }
-
-      if (mode === "sensors_only") {
-        const distKm = (dr / 3600) * dt;
-        if (distKm > 0) {
-          gps.totalKmRef.current += distKm; gps.setTotalKm(gps.totalKmRef.current);
-          gps.drGapKmRef.current += distKm; // reconciled by onNativeLocation on GPS recovery
+        // Integrate gravity-compensated linear forward acceleration (m/s²) → km/h.
+        const linAccel = sensors.linearAccelFwdRef.current || 0;
+        let dr = gps.drSpeedKmhRef.current + linAccel * dt * 3.6;
+        // Bleed speed toward zero while coasting (no measured accel) so integration
+        // drift can't keep phantom speed alive through a long blackout.
+        if (linAccel === 0) dr *= 0.95;
+        if (dr < 0) dr = 0;
+        if (dr > TRACKING_FUSION.MAX_PLAUSIBLE_KMH) dr = TRACKING_FUSION.MAX_PLAUSIBLE_KMH;
+        if (gpsFresh) {
+          const gpsSpeed = gps.emaSpeedRef.current;
+          if (Math.abs(dr - gpsSpeed) > TRACKING_FUSION.DIVERGENCE_KMH) gps.divergenceCountRef.current += 1;
+          else gps.divergenceCountRef.current = 0;
+          dr = gpsSpeed; // GPS is authoritative whenever a fresh fix exists
         }
-        const pos = gps.lastPosRef.current;
-        refs.telemetryAccumRef.current.push({
-          timestamp: new Date(now).toISOString(), lat: pos?.lat ?? 0, lon: pos?.lng ?? 0,
-          leanAngle: sensors.currentTiltDegRef.current, gForceX: sensors.currentAccelGRef.current,
-          speedKmh: dr, mode,
-        });
-      }
+        gps.drSpeedKmhRef.current = dr;
+        const divergent = gps.divergenceCountRef.current >= TRACKING_FUSION.DIVERGENCE_SAMPLES;
+
+        let mode: FusionMode;
+        if (!gps.gpsFixAcquiredRef.current) {
+          // No usable GPS fix yet. Once the startup grace elapses, fall back to
+          // sensors-only so a cold/absent GPS start still records distance; until
+          // then keep showing "acquiring".
+          const elapsed = now - (stats.startTimeRef.current || now);
+          mode = sensorsActive && elapsed > TRACKING_FUSION.ACQUIRING_GRACE_MS ? "sensors_only" : "acquiring";
+        } else if (gpsFresh) mode = sensorsActive && !divergent ? "gps_sensors" : "gps_only";
+        else mode = sensorsActive ? "sensors_only" : "gps_only";
+        if (gps.fusionModeRef.current !== mode) { gps.fusionModeRef.current = mode; gps.setFusionMode(mode); }
+
+        if (mode === "sensors_only") {
+          const distKm = (dr / 3600) * dt;
+          if (distKm > 0) {
+            gps.totalKmRef.current += distKm; gps.setTotalKm(gps.totalKmRef.current);
+            gps.drGapKmRef.current += distKm; // reconciled by onNativeLocation on GPS recovery
+          }
+          const pos = gps.lastPosRef.current;
+          refs.telemetryAccumRef.current.push({
+            timestamp: new Date(now).toISOString(), lat: pos?.lat ?? 0, lon: pos?.lng ?? 0,
+            leanAngle: sensors.currentTiltDegRef.current, gForceX: sensors.currentAccelGRef.current,
+            speedKmh: dr, mode,
+          });
+        }
+      } catch (e) { logGpsError(e, "tracking_tick_fusion"); }
     }, 1000);
 
     const p = settings.profileRef.current;
