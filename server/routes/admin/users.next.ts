@@ -295,8 +295,7 @@ router.get("/stats/devices", async (req: Request, res: Response) => {
 // GET /match-summary e GET /zero-match-snapshots → users.next-match-summary.ts
 
 // GET /stats/push-tokens — Diagnostica aggregata: quanti/quali utenti reali
-// non hanno un expoPushToken e perché (raggruppato per push_token_error).
-// Task #4527 — vista admin sopra ai dati persistiti da Task #4526.
+// non hanno un expoPushToken e perché (raggruppato per push_token_error e piattaforma).
 router.get("/stats/push-tokens", async (_req: Request, res: Response) => {
   try {
     const summaryResult = await db.execute(sql`
@@ -318,25 +317,61 @@ router.get("/stats/push-tokens", async (_req: Request, res: Response) => {
     const causesResult = await db.execute(sql`
       SELECT
         COALESCE(push_token_error, 'NESSUNA_CAUSA') AS cause,
+        COALESCE(push_token_error_platform, 'unknown') AS platform,
         COUNT(*) AS cnt,
         MAX(push_token_error_at) AS last_at
       FROM users
       WHERE is_fake = false
         AND role NOT IN ('admin', 'moderator')
         AND (expo_push_token IS NULL OR expo_push_token = '')
-      GROUP BY COALESCE(push_token_error, 'NESSUNA_CAUSA')
-      ORDER BY cnt DESC
+      GROUP BY
+        COALESCE(push_token_error, 'NESSUNA_CAUSA'),
+        COALESCE(push_token_error_platform, 'unknown')
+      ORDER BY cause, cnt DESC
     `);
 
     type SummaryRow = { total_real: string; with_token: string; without_token: string };
-    type CauseRow = { cause: string; cnt: string; last_at: string | null };
+    type CausePlatformRow = {
+      cause: string;
+      platform: string;
+      cnt: string;
+      last_at: string | null;
+    };
 
     const s = summaryResult.rows[0] as SummaryRow | undefined;
-    const causes = (causesResult.rows as CauseRow[]).map((r) => ({
-      cause: r.cause,
-      count: parseInt(r.cnt ?? "0", 10),
-      lastAt: r.last_at,
-    }));
+
+    type CauseEntry = {
+      cause: string;
+      count: number;
+      lastAt: string | null;
+      byPlatform: { ios: number; android: number; web: number; unknown: number };
+    };
+
+    const causeMap = new Map<string, CauseEntry>();
+    for (const row of causesResult.rows as CausePlatformRow[]) {
+      const cnt = parseInt(row.cnt ?? "0", 10);
+      let entry = causeMap.get(row.cause);
+      if (!entry) {
+        entry = {
+          cause: row.cause,
+          count: 0,
+          lastAt: row.last_at,
+          byPlatform: { ios: 0, android: 0, web: 0, unknown: 0 },
+        };
+        causeMap.set(row.cause, entry);
+      }
+      entry.count += cnt;
+      if (row.last_at && (!entry.lastAt || row.last_at > entry.lastAt)) {
+        entry.lastAt = row.last_at;
+      }
+      const p = row.platform.toLowerCase();
+      if (p === "ios") entry.byPlatform.ios += cnt;
+      else if (p === "android") entry.byPlatform.android += cnt;
+      else if (p === "web") entry.byPlatform.web += cnt;
+      else entry.byPlatform.unknown += cnt;
+    }
+
+    const causes = [...causeMap.values()].sort((a, b) => b.count - a.count);
 
     return res.json({
       summary: {
