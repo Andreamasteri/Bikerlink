@@ -32,6 +32,9 @@ vi.mock("react-native", () => ({
   useWindowDimensions: () => ({ width: 400, height: 800 }),
   Modal: {},
   Platform: { OS: "ios" },
+  PanResponder: {
+    create: () => ({ panHandlers: {} }),
+  },
 }));
 // RNGH e reanimated: mock minimi solo per caricare il modulo (le funzioni pure
 // clampPos/isDragGesture non usano questi import).

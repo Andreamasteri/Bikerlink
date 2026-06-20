@@ -84,6 +84,9 @@ vi.mock("react-native", () => ({
   useWindowDimensions: () => ({ width: 400, height: 800 }),
   Modal: "Modal",
   Platform: { get OS() { return mocks.platformOS; } },
+  PanResponder: {
+    create: () => ({ panHandlers: {} }),
+  },
 }));
 
 // ── Mock: react-native-reanimated ─────────────────────────────────────────────

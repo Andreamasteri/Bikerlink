@@ -27,39 +27,30 @@ config was never saved → profile shows "Disabilitato dall'amministratore" and 
 the switches even though the admin never disabled anything. Only an explicit
 `enabled === false` should disable.
 
-## ONE floating ball, RNGH Gesture.Pan() (not PanResponder), NOT two widgets
+## ONE floating ball, PanResponder (NOT RNGH), NOT two widgets
 The floating UI is a SINGLE `components/FloatingWidget.tsx` ball. It uses
-react-native-gesture-handler `Gesture.Pan()` + reanimated shared values
-(`useSharedValue` posX/posY/startX/startY + `useAnimatedStyle` transform) for
-drag/tap. Its tap opens one overlay menu (Assistente AI, Chat, Notifiche, Nuovi
-Match, Player); the AI item is gated by `useAssistantEnabled().fabEnabled`. There
-is NO separate AssistantFab anymore. The admin `components/admin/ai-console/FabWidget.tsx`
-uses the same RNGH+reanimated pattern (tap/long-press still discriminated via
-`Date.now()` timing in `onBegin`/`onEnd`, drag via translation).
+**PanResponder** from react-native + reanimated `useSharedValue` + `useAnimatedStyle`
+for drag/tap. PanResponder handles gestures (JS thread); reanimated shared values
+hold posX/posY for the transform animation. Its tap opens one overlay menu; the AI
+item is gated by `useAssistantEnabled().fabEnabled`. There is NO separate AssistantFab.
 
-**Why (PanResponder → RNGH):** Expo Router mounts everything under
-`GestureHandlerRootView` and uses RNGH natively, so RNGH reclaims gestures before
-the JS `PanResponder` ever sees them — the ball was neither tappable nor draggable
-on real Expo Router screens. The fix is to speak RNGH's own language
-(`Gesture.Pan()` driven by reanimated shared values on the UI thread), the exact
-pattern `components/UptimeWidget.tsx` already uses and which works on real devices.
+**Why PanResponder, NOT RNGH Gesture.Pan():**
+`Gesture.Pan()` with `minDistance(0)` competes with Expo Router's native RNGH
+gesture handlers on Android and crashes the app on the first tap. PanResponder runs
+on the JS thread and does not participate in RNGH's native gesture recognition
+system → no conflict.
 
-**Why NOT the old broken RNGH design:** an EARLIER attempt had TWO floating
-components (orange FloatingWidget + purple AssistantFab) both on RNGH and was
-chronically broken on Android APKs — but the cause was NOT `Gesture.Pan()` itself.
-It was: inline `Gesture.Tap()` objects re-registering asynchronously and dropping
-taps; menu handlers hitting Hermes TDZ when declared below the gesture; and
-cross-tree gesture coordination (`withRef` / `simultaneousWithExternalGesture`
-through a context ref) corrupting RNGH's gesture-tree registration. Two overlapping
-floating components also caused touch-routing conflicts.
+**Why the previous "hitbox invisible" bug does NOT reoccur with PanResponder:**
+That bug was caused by using dynamic `left`/`top` style props for positioning (the
+pixel moved but the touch hitbox stayed at the original layout spot). The fix is
+`transform: [{translateX}, {translateY}]` with fixed `left:0, top:0` — this was
+already applied and must be kept regardless of gesture system.
 
-**How to apply:** keep this ball on a SINGLE `Gesture.Pan()` recreated each render
-(like UptimeWidget). Position via `transform` translateX/translateY (NOT left/top —
-on Android animating left/top leaves the touch hitbox at the original layout spot).
-Tap-vs-drag is decided by a `TAP_THRESHOLD` translation check in `onEnd` (drag past
-threshold suppresses the tap-toggle). Use `runOnJS` to cross back to JS for
-`setMenuOpen`/AsyncStorage. Clamp/drag worklets carry a `"worklet"` directive
-(no-op string under vitest, so `clampPos`/`isDragGesture` stay pure and testable).
-Position persists in AsyncStorage key `floating_widget_position`, clamped on-screen.
-Do NOT reintroduce `Gesture.Tap()`, do NOT split the AI action into a second floating
-component, and do NOT coordinate floating gestures across separate components.
+**How to apply:** position via `transform` translateX/translateY (NOT left/top
+dynamic). Tap-vs-drag discriminated by `TAP_THRESHOLD` on `gestureState.dx/dy` in
+`onPanResponderRelease`. Start position saved in `dragStartX/dragStartY` refs at
+`onPanResponderGrant`. Position persists in AsyncStorage key `floating_widget_position`,
+clamped on-screen via `clampPos` (pure JS, "worklet" directive is a no-op in tests).
+Do NOT migrate to RNGH Gesture.Pan() — it crashes on Android. Do NOT split into two
+floating components. The mount test uses `vi.mock("react-native", …)` and must
+include `PanResponder: { create: () => ({ panHandlers: {} }) }` or the test crashes.

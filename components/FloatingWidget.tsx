@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   View,
   Text,
@@ -7,14 +7,13 @@ import {
   useWindowDimensions,
   Modal,
   Platform,
+  PanResponder,
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
-  runOnJS,
 } from "react-native-reanimated";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
@@ -30,10 +29,9 @@ const POS_KEY = "floating_widget_position";
 
 // Funzione pura esportata per i test: mantiene il pallino dentro i bordi dello
 // schermo rispettando il padding superiore (notch) e inferiore (home indicator).
-// È marcata `"worklet"` così può essere chiamata sia sul thread JS (load/persist)
-// sia dentro i callback gesto di RNGH che girano sul thread UI (drag in tempo
-// reale). In ambiente test (senza il plugin reanimated) la direttiva è una
-// semplice stringa no-op, quindi la funzione resta pura e testabile.
+// È marcata `"worklet"` così può essere richiamata anche da worklet reanimated
+// (es. animazioni future). In ambiente test la direttiva è una semplice stringa
+// no-op, quindi la funzione resta pura e testabile.
 export function clampPos(
   x: number,
   y: number,
@@ -50,9 +48,7 @@ export function clampPos(
 }
 
 // Funzione pura esportata per i test: discrimina tap da drag. Restituisce true
-// (= drag) se lo spostamento su un asse supera la soglia TAP_THRESHOLD. Anche
-// questa è `"worklet"` perché viene usata in `onEnd` di Gesture.Pan() (thread UI)
-// per decidere se aprire il menu.
+// (= drag) se lo spostamento su un asse supera la soglia TAP_THRESHOLD.
 export function isDragGesture(
   dx: number,
   dy: number,
@@ -76,16 +72,16 @@ export default function FloatingWidget() {
   const defaultX = width - WIDGET_SIZE - 20;
   const defaultY = height * 0.45;
 
-  // Posizione del pallino come shared values reanimated (thread UI): lo stesso
-  // sistema usato internamente da Expo Router (RNGH + reanimated), quindi i gesti
-  // non vengono surclassati dai gesture handler nativi come accadeva col vecchio
-  // PanResponder JS. startX/startY memorizzano l'origine del gesto in onStart.
+  // Posizione corrente del pallino come shared values Reanimated — il transform
+  // usa questi valori per posizionare il widget sullo schermo.
   const posX = useSharedValue(defaultX);
   const posY = useSharedValue(defaultY);
-  const startX = useSharedValue(defaultX);
-  const startY = useSharedValue(defaultY);
 
-  // Carica posizione persistita (thread JS).
+  // Origine del drag corrente (salvata a onPanResponderGrant sul JS thread).
+  const dragStartX = useRef(defaultX);
+  const dragStartY = useRef(defaultY);
+
+  // Carica posizione persistita (AsyncStorage → JS thread).
   useEffect(() => {
     AsyncStorage.getItem(POS_KEY).then((raw) => {
       if (!raw) return;
@@ -111,47 +107,44 @@ export default function FloatingWidget() {
     setMenuOpen((prev) => !prev);
   }, []);
 
-  // Gesture.Pan() di RNGH al posto del PanResponder. onStart fissa l'origine,
-  // onUpdate aggiorna la posizione (clampata in tempo reale così il pallino non
-  // esce mai dai bordi), onEnd persiste la posizione e — se lo spostamento è
-  // sotto la soglia di tap — apre/chiude il menu. clampPos/isDragGesture girano
-  // come worklet sul thread UI; setMenuOpen e AsyncStorage tornano sul thread JS
-  // via runOnJS.
-  const panGesture = Gesture.Pan()
-    // minDistance(0): la Pan si attiva già al touch-down invece di richiedere uno
-    // spostamento minimo. Senza questo un tap puro (dito giù+su, zero movimento)
-    // non porterebbe mai il gesto allo stato ACTIVE → onStart/onEnd non
-    // verrebbero chiamati e il tap non aprirebbe il menu. Con 0, onEnd scatta
-    // sempre e la discriminazione tap/drag avviene sulla translation.
-    .minDistance(0)
-    .onStart(() => {
-      "worklet";
-      startX.value = posX.value;
-      startY.value = posY.value;
+  // PanResponder — gira completamente sul thread JS, nessun conflitto con i
+  // gesture handler nativi di Expo Router (RNGH). onGrant registra l'origine,
+  // onMove aggiorna la posizione in tempo reale (clampata ai bordi), onRelease
+  // persiste e discrimina tap da drag tramite isDragGesture.
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderGrant: () => {
+        dragStartX.current = posX.value;
+        dragStartY.current = posY.value;
+      },
+      onPanResponderMove: (_, gs) => {
+        const clamped = clampPos(
+          dragStartX.current + gs.dx,
+          dragStartY.current + gs.dy,
+          width, height,
+          insets.top + 8, insets.bottom + 8,
+        );
+        posX.value = clamped.x;
+        posY.value = clamped.y;
+      },
+      onPanResponderRelease: (_, gs) => {
+        savePosition(posX.value, posY.value);
+        if (!isDragGesture(gs.dx, gs.dy)) {
+          toggleMenu();
+        }
+      },
+      onPanResponderTerminate: (_, gs) => {
+        savePosition(posX.value, posY.value);
+      },
     })
-    .onUpdate((e) => {
-      "worklet";
-      const clamped = clampPos(
-        startX.value + e.translationX,
-        startY.value + e.translationY,
-        width, height,
-        insets.top + 8, insets.bottom + 8,
-      );
-      posX.value = clamped.x;
-      posY.value = clamped.y;
-    })
-    .onEnd((e) => {
-      "worklet";
-      runOnJS(savePosition)(posX.value, posY.value);
-      if (!isDragGesture(e.translationX, e.translationY)) {
-        runOnJS(toggleMenu)();
-      }
-    });
+  ).current;
 
   // Posizionamento via transform (translateX/translateY) invece di left/top: su
   // Android animare left/top sposta il pixel ma lascia l'hitbox del touch alla
-  // posizione di layout originale (il pallino "si vede ma non si tocca"). Con il
-  // transform l'area di tocco segue la posizione visiva.
+  // posizione di layout originale. Con il transform l'area di tocco segue la
+  // posizione visiva.
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: posX.value }, { translateY: posY.value }],
   }));
@@ -165,11 +158,9 @@ export default function FloatingWidget() {
         style={[styles.widget, animatedStyle, aiOpen && styles.widgetHidden]}
         pointerEvents={aiOpen ? "none" : "auto"}
       >
-        <GestureDetector gesture={panGesture}>
-          <View style={styles.widgetInner}>
-            <MaterialCommunityIcons name="compass-outline" size={19} color="#fff" />
-          </View>
-        </GestureDetector>
+        <View {...panResponder.panHandlers} style={styles.widgetInner}>
+          <MaterialCommunityIcons name="compass-outline" size={19} color="#fff" />
+        </View>
       </Animated.View>
 
       <Modal
