@@ -8,6 +8,7 @@ import {
   StyleSheet,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 
 interface Props {
@@ -16,6 +17,7 @@ interface Props {
 }
 
 export function TelemetryInfoModal({ visible, onClose }: Props) {
+  const insets = useSafeAreaInsets();
   return (
     <Modal
       visible={visible}
@@ -24,7 +26,7 @@ export function TelemetryInfoModal({ visible, onClose }: Props) {
       presentationStyle="overFullScreen"
       onRequestClose={onClose}
     >
-      <View style={styles.overlay}>
+      <View style={[styles.overlay, { paddingTop: insets.top + 24 }]}>
         <View style={styles.sheet}>
           <View style={styles.header}>
             <Ionicons name="speedometer-outline" size={20} color={Colors.accent} />
@@ -98,7 +100,7 @@ export function TelemetryInfoModal({ visible, onClose }: Props) {
             </Section>
           </ScrollView>
 
-          <View style={styles.footer}>
+          <View style={[styles.footer, { paddingBottom: 16 + insets.bottom }]}>
             <TouchableOpacity style={styles.closeBtn} onPress={onClose} activeOpacity={0.85}>
               <Text style={styles.closeBtnText}>Capito</Text>
             </TouchableOpacity>
@@ -138,10 +140,10 @@ const styles = StyleSheet.create({
     justifyContent: "flex-end",
   },
   sheet: {
+    flex: 1,
     backgroundColor: Colors.background,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
-    maxHeight: "82%",
   },
   header: {
     flexDirection: "row",

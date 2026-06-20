@@ -18,37 +18,58 @@ export function GateDots({
   const dot3Color = riding ? "#27ae60" : "#e74c3c";
 
   const handleDotPress = (gate: 1 | 2 | 3) => {
-    if (gate === 1 && toggle) return;
-    if (gate === 2 && calibrated) return;
-    if (gate === 3 && riding) return;
     if (gate === 1) {
-      Alert.alert("Toggle spento", "Attiva 'Telemetria sempre attiva' per abilitare la raccolta automatica.");
+      if (toggle) {
+        Alert.alert(
+          "Telemetria sempre attiva ✓",
+          "Il toggle è attivo: l'app raccoglie automaticamente i dati quando riconosce che sei in moto. Tutto ok."
+        );
+      } else {
+        Alert.alert(
+          "Telemetria sempre attiva",
+          "Stato: spento. Attiva 'Telemetria sempre attiva' per abilitare la raccolta automatica senza avviare il tracking a mano."
+        );
+      }
     } else if (gate === 2) {
-      Alert.alert(
-        "Non calibrato",
-        "Esegui la calibrazione supporto per permettere al rilevamento automatico di riconoscere che il telefono è montato sulla moto.",
-        [
-          { text: "Annulla", style: "cancel" },
-          { text: "Calibra ora", onPress: onCalibratePress },
-        ]
-      );
+      if (calibrated) {
+        Alert.alert(
+          "Supporto calibrato ✓",
+          "La calibrazione del supporto è completata: il rilevamento automatico può riconoscere che il telefono è montato sulla moto. Tutto ok."
+        );
+      } else {
+        Alert.alert(
+          "Supporto calibrato",
+          "Stato: da calibrare. Esegui la calibrazione supporto così il rilevamento automatico può riconoscere che il telefono è montato sulla moto.",
+          [
+            { text: "Annulla", style: "cancel" },
+            { text: "Calibra ora", onPress: onCalibratePress },
+          ]
+        );
+      }
     } else {
-      Alert.alert(
-        "Moto non rilevata",
-        "Monta il telefono e supera i 20 km/h per almeno 3 secondi, oppure attiva la modalità rilassata ('Non uso un supporto fisso') per ignorare il check orientamento."
-      );
+      if (riding) {
+        Alert.alert(
+          "Moto rilevata ✓",
+          "L'app ha riconosciuto che sei in moto: la raccolta automatica della telemetria è in corso. Tutto ok."
+        );
+      } else {
+        Alert.alert(
+          "Moto rilevata",
+          "Stato: non rilevata. Monta il telefono e supera i 20 km/h per almeno 3 secondi, oppure attiva la modalità rilassata ('Non uso un supporto fisso') per ignorare il check orientamento."
+        );
+      }
     }
   };
 
   return (
     <View style={styles.row}>
-      <TouchableOpacity onPress={() => handleDotPress(1)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+      <TouchableOpacity onPress={() => handleDotPress(1)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
         <View style={[styles.dot, { backgroundColor: dot1Color }]} />
       </TouchableOpacity>
-      <TouchableOpacity onPress={() => handleDotPress(2)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+      <TouchableOpacity onPress={() => handleDotPress(2)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
         <View style={[styles.dot, { backgroundColor: dot2Color }]} />
       </TouchableOpacity>
-      <TouchableOpacity onPress={() => handleDotPress(3)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+      <TouchableOpacity onPress={() => handleDotPress(3)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
         <View style={[styles.dot, { backgroundColor: dot3Color }]} />
       </TouchableOpacity>
     </View>
@@ -59,11 +80,11 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
+    gap: 8,
   },
   dot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+    width: 10,
+    height: 10,
+    borderRadius: 5,
   },
 });
