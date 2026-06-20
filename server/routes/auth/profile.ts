@@ -8,6 +8,20 @@ import { sql } from "drizzle-orm";
 
 const router = Router();
 
+/**
+ * Normalizza/sanitizza il versionName ricevuto dal client.
+ * Accetta il formato reale ("72D.10.125") e i formati legacy ("70.10.123", "1.0.0"):
+ * segmenti alfanumerici separati da punto, lunghezza massima 32 caratteri.
+ * Restituisce "unknown" solo quando il dato è davvero assente o non valido.
+ */
+function sanitizeAppVersion(raw: unknown): string {
+  if (typeof raw !== "string") return "unknown";
+  const v = raw.trim();
+  if (v.length === 0 || v.length > 32) return "unknown";
+  if (!/^[A-Za-z0-9]+(\.[A-Za-z0-9]+)*$/.test(v)) return "unknown";
+  return v;
+}
+
 router.get("/me", async (req: Request, res: Response) => {
   try {
     if (!req.session.userId) {
@@ -40,12 +54,12 @@ router.post("/heartbeat", async (req: Request, res: Response) => {
     const userId = req.session?.userId;
     if (!userId) return sendError(res, 401, "Non autenticato");
     const body = (req.body ?? {}) as { appVersion?: unknown; platform?: unknown; deviceModel?: unknown; osVersion?: unknown; sessionId?: unknown };
-    const semverRe = /^\d+\.\d+\.\d+$/;
     const platformAllowed = new Set(["android", "ios", "web"]);
-    const lastAppVersion =
-      typeof body.appVersion === "string" && semverRe.test(body.appVersion)
-        ? body.appVersion
-        : "unknown";
+    // Accetta il versionName reale dell'app (es. "72D.10.125": primo segmento con
+    // eventuale suffisso lettera) oltre ai formati semver legacy ("70.10.123").
+    // Sanitizzazione robusta: solo segmenti alfanumerici separati da punto, max 32 char,
+    // per evitare input malevoli. Solo se davvero assente/non valido salviamo "unknown".
+    const lastAppVersion = sanitizeAppVersion(body.appVersion);
     const lastPlatform =
       typeof body.platform === "string" && platformAllowed.has(body.platform)
         ? body.platform

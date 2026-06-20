@@ -17,8 +17,9 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import AiCopilotDrawer from "@/components/admin/ai/AiCopilotDrawer";
 import { MaterialCommunityIcons, Ionicons } from "@expo/vector-icons";
 import { getApiUrl } from "@/lib/query-client";
+import Constants from "expo-constants";
 
-const CURRENT_APP_VERSION = "1.0.0";
+const CURRENT_APP_VERSION = Constants.expoConfig?.version ?? "";
 
 function formatDateIT(dateStr: string | null): string {
   if (!dateStr) return "Mai";

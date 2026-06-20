@@ -17,6 +17,20 @@ import { sendSuccess, sendError } from "../../lib/api-response";
 
 const router = Router();
 
+/**
+ * Estrae il contatore sequenziale OTA dal terzo segmento di un versionName.
+ * Es. "72D.10.125" → 125, "70.10.123" → 123. Restituisce null se assente/non valido.
+ */
+function otaNumberFromVersion(v?: string | null): number | null {
+  if (!v || v === "unknown") return null;
+  const parts = v.split(".");
+  if (parts.length < 3) return null;
+  const seg = parts[2];
+  // Solo terzo segmento puramente numerico (es. "125"); evita "125abc" → 125.
+  if (!/^\d+$/.test(seg)) return null;
+  return parseInt(seg, 10);
+}
+
 router.get("/", async (_req: Request, res: Response) => {
   try {
     const usersList = await storage.getAllUsers();
@@ -54,11 +68,20 @@ router.get("/", async (_req: Request, res: Response) => {
       }
     }
 
-    const safeUsers = usersList.map(({ password: _password, ...u }) => ({
-      ...u,
-      hasLastfmData: lastfmUserIds.has(u.id),
-      lastOtaVersion: otaByUserId[u.id] ?? null,
-    }));
+    const safeUsers = usersList.map(({ password: _password, ...u }) => {
+      const bootOta = otaByUserId[u.id] ?? null;
+      // OTA "corrente" del dispositivo = terzo segmento del versionName realmente
+      // riportato dall'heartbeat (lo stesso contatore sequenziale mostrato nel Profilo,
+      // es. "72D.10.125" → #125). Non dipendiamo più esclusivamente dal join su
+      // boot_success, che resta solo come fallback per dispositivi legacy.
+      const lastOtaNumber = otaNumberFromVersion(u.lastAppVersion) ?? otaNumberFromVersion(bootOta);
+      return {
+        ...u,
+        hasLastfmData: lastfmUserIds.has(u.id),
+        lastOtaVersion: bootOta,
+        lastOtaNumber,
+      };
+    });
     return res.json(safeUsers);
   } catch (_error) {
     console.error("Admin get users error:", _error);

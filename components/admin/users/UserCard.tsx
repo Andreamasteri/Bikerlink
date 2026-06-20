@@ -18,6 +18,7 @@ export interface AdminUser {
   lastLoginAt?: string | null;
   lastAppVersion?: string | null;
   lastOtaVersion?: string | null;
+  lastOtaNumber?: number | null;
   lastPlatform?: string | null;
   lastDeviceModel?: string | null;
   isFake?: boolean;
@@ -36,6 +37,16 @@ export interface MatchabilityInfo {
   hasCoords: boolean;
   hasMotos: boolean;
   hasTags: boolean;
+}
+
+/**
+ * Etichetta build = primi due segmenti del versionName (es. "72D.10.125" → "72D.10").
+ * Restituisce null quando il dato è assente o "unknown".
+ */
+function buildLabelOf(v?: string | null): string | null {
+  if (!v || v === "unknown") return null;
+  const p = v.split(".");
+  return p.length >= 2 ? `${p[0]}.${p[1]}` : v;
 }
 
 const REASON_LABELS: Record<string, string> = {
@@ -176,8 +187,8 @@ export const UserCard: React.FC<UserCardProps> = ({
         </Text>
         {(() => {
           const hasVer = !!item.lastAppVersion && item.lastAppVersion !== "unknown";
-          const hasOta = !!item.lastOtaVersion && item.lastOtaVersion !== "unknown";
-          const otaText = hasOta ? `OTA ${item.lastOtaVersion}` : null;
+          // OTA mostrata con la stessa convenzione del Profilo (contatore sequenziale #N).
+          const otaText = item.lastOtaNumber != null ? `#${item.lastOtaNumber}` : null;
           if (!hasVer) {
             return (
               <View style={styles.versionRow}>
@@ -186,12 +197,20 @@ export const UserCard: React.FC<UserCardProps> = ({
               </View>
             );
           }
-          const verOk = item.lastAppVersion === currentAppVersion;
-          const color = verOk ? Colors.success : Colors.error;
+          // Etichetta build = primi due segmenti del versionName (APK), come nel Profilo
+          // (es. "72D.10.125" → "72D.10"). Il colore confronta il build, non la singola OTA.
+          const userBuild = buildLabelOf(item.lastAppVersion);
+          const currentBuild = buildLabelOf(currentAppVersion);
+          // Se la versione corrente dell'admin non è disponibile, non possiamo
+          // confrontare: usiamo un colore neutro invece di marcare tutto come errore.
+          const canCompare = !!currentBuild;
+          const verOk = !!userBuild && canCompare && userBuild === currentBuild;
+          const color = !canCompare ? Colors.textSecondary : verOk ? Colors.success : Colors.error;
+          const underline = canCompare && !verOk;
           return (
             <View style={styles.versionRow}>
-              <Text style={[styles.versionBadge, { color, textDecorationLine: verOk ? "none" : "underline" as const }]}>
-                {`v${item.lastAppVersion}`}
+              <Text style={[styles.versionBadge, { color, textDecorationLine: underline ? "underline" : "none" as const }]}>
+                {`v${userBuild ?? item.lastAppVersion}`}
               </Text>
               {otaText && <Text style={styles.otaBadge}>{otaText}</Text>}
             </View>
