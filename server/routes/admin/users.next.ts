@@ -294,4 +294,62 @@ router.get("/stats/devices", async (req: Request, res: Response) => {
 
 // GET /match-summary e GET /zero-match-snapshots → users.next-match-summary.ts
 
+// GET /stats/push-tokens — Diagnostica aggregata: quanti/quali utenti reali
+// non hanno un expoPushToken e perché (raggruppato per push_token_error).
+// Task #4527 — vista admin sopra ai dati persistiti da Task #4526.
+router.get("/stats/push-tokens", async (_req: Request, res: Response) => {
+  try {
+    const summaryResult = await db.execute(sql`
+      SELECT
+        COUNT(*) FILTER (
+          WHERE is_fake = false AND role NOT IN ('admin', 'moderator')
+        ) AS total_real,
+        COUNT(*) FILTER (
+          WHERE is_fake = false AND role NOT IN ('admin', 'moderator')
+            AND expo_push_token IS NOT NULL AND expo_push_token <> ''
+        ) AS with_token,
+        COUNT(*) FILTER (
+          WHERE is_fake = false AND role NOT IN ('admin', 'moderator')
+            AND (expo_push_token IS NULL OR expo_push_token = '')
+        ) AS without_token
+      FROM users
+    `);
+
+    const causesResult = await db.execute(sql`
+      SELECT
+        COALESCE(push_token_error, 'NESSUNA_CAUSA') AS cause,
+        COUNT(*) AS cnt,
+        MAX(push_token_error_at) AS last_at
+      FROM users
+      WHERE is_fake = false
+        AND role NOT IN ('admin', 'moderator')
+        AND (expo_push_token IS NULL OR expo_push_token = '')
+      GROUP BY COALESCE(push_token_error, 'NESSUNA_CAUSA')
+      ORDER BY cnt DESC
+    `);
+
+    type SummaryRow = { total_real: string; with_token: string; without_token: string };
+    type CauseRow = { cause: string; cnt: string; last_at: string | null };
+
+    const s = summaryResult.rows[0] as SummaryRow | undefined;
+    const causes = (causesResult.rows as CauseRow[]).map((r) => ({
+      cause: r.cause,
+      count: parseInt(r.cnt ?? "0", 10),
+      lastAt: r.last_at,
+    }));
+
+    return res.json({
+      summary: {
+        totalReal: parseInt(s?.total_real ?? "0", 10),
+        withToken: parseInt(s?.with_token ?? "0", 10),
+        withoutToken: parseInt(s?.without_token ?? "0", 10),
+      },
+      causes,
+    });
+  } catch (err) {
+    console.error("[admin] push-tokens stats error:", err);
+    return sendError(res, 500, "Errore statistiche push token");
+  }
+});
+
 export default router;

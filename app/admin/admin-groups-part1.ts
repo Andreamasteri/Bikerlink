@@ -274,6 +274,15 @@ export const adminGroupsPart1: AdminGroup[] = [
         accentColor: "#6366F1",
         keywords: ["dispositivo", "device", "telefono", "phone", "ios", "android", "versione app", "client", "sistema operativo", "os version", "modello", "model", "distribuzione", "app version", "screen", "schermo"],
       },
+      {
+        key: "push-diagnostics",
+        label: "Diagnostica Push",
+        icon: "bell-alert",
+        iconSet: "MaterialCommunityIcons",
+        route: "/admin/push-diagnostics",
+        accentColor: "#EF4444",
+        keywords: ["notifica", "notifiche", "push", "push notification", "token", "expo push token", "fcm", "apns", "permessi negati", "permission denied", "perché non ricevo notifiche", "mancato token", "copertura push", "delivery", "avviso"],
+      },
     ],
   },
   {
