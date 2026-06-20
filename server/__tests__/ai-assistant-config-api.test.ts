@@ -79,7 +79,7 @@ function buildPublicApp(userId: string): express.Application {
   app.use(express.json());
   // Inject a fake session so requireUser can find userId.
   app.use((req: Request, _res: Response, next: NextFunction) => {
-    (req as Request & { session: Record<string, unknown> }).session = { userId };
+    (req as Request).session = { userId } as unknown as Request["session"];
     next();
   });
   app.use("/api", publicAssistantRouter);
@@ -390,7 +390,7 @@ describe("Public GET /api/ai/assistant/config — reflects enabled:false when ex
     const bareApp = express();
     bareApp.use(express.json());
     bareApp.use((req: Request, _res: Response, next: NextFunction) => {
-      (req as Request & { session: Record<string, unknown> }).session = {};
+      (req as Request).session = {} as unknown as Request["session"];
       next();
     });
     bareApp.use("/api", publicAssistantRouter);
