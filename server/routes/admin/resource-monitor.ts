@@ -1,9 +1,11 @@
 import { Router, type Request, type Response } from "express";
-import { db, pool } from "../../db";
-import { deviceMetrics, resourceSamples, appCrashLogs } from "@shared/db";
+import type { PoolClient } from "pg";
+import { db, pool, withDbRetry } from "../../db";
+import { resourceSamples } from "@shared/db";
 import { sql, desc } from "drizzle-orm";
 import { storage } from "../../storage";
 import { onlineTracker } from "../../online-tracker";
+import { withBgDbSlot } from "../../lib/bg-db-limiter";
 import { sendError } from "../../lib/api-response";
 
 const router = Router();
@@ -33,33 +35,37 @@ const LOG_TABLES = [
   "user_sessions",
 ];
 
-async function getLogTableWeights(): Promise<LogTableRow[]> {
-  const results: LogTableRow[] = [];
-  for (const tableName of LOG_TABLES) {
-    try {
-      const client = await pool.connect();
-      try {
-        const sizeRes = await client.query(
-          `SELECT
-            (SELECT COUNT(*) FROM "${tableName}") AS row_count,
-            pg_total_relation_size('"${tableName}"') AS size_bytes`
-        );
-        const row = sizeRes.rows[0];
-        if (row) {
-          results.push({
-            name: tableName,
-            rowCount: Number(row.row_count ?? 0),
-            sizeMb: Math.round(Number(row.size_bytes ?? 0) / 1024 / 1024 * 100) / 100,
-          });
-        }
-      } finally {
-        client.release();
-      }
-    } catch {
-      results.push({ name: tableName, rowCount: 0, sizeMb: 0 });
-    }
+// Una SOLA query per tutte le tabelle di log, sul client già acquisito dal
+// chiamante. Prima versione: 16 cicli connect/release + 16 COUNT(*) esatti su
+// tabelle potenzialmente enormi (ognuno fino a statement_timeout=5s) → un solo
+// load del monitor poteva tenere occupate molte connessioni a lungo e saturare
+// il pool. Ora usiamo la stima `reltuples` di pg_class (aggiornata da
+// ANALYZE/VACUUM): per un monitor di "peso" tabelle la stima è adeguata ed evita
+// la scansione completa. GREATEST(...,0) neutralizza il -1 di pg_class quando la
+// tabella non è mai stata analizzata.
+async function getLogTableWeights(client: PoolClient): Promise<LogTableRow[]> {
+  try {
+    const res = await client.query<{ name: string; row_count: string; size_bytes: string }>(
+      `SELECT c.relname AS name,
+              GREATEST(c.reltuples, 0)::bigint AS row_count,
+              pg_total_relation_size(c.oid) AS size_bytes
+       FROM pg_class c
+       JOIN pg_namespace n ON n.oid = c.relnamespace
+       WHERE n.nspname = 'public' AND c.relname = ANY($1)`,
+      [LOG_TABLES]
+    );
+    const byName = new Map(res.rows.map((r) => [r.name, r]));
+    return LOG_TABLES.map((name) => {
+      const row = byName.get(name);
+      return {
+        name,
+        rowCount: row ? Number(row.row_count) : 0,
+        sizeMb: row ? Math.round(Number(row.size_bytes) / 1024 / 1024 * 100) / 100 : 0,
+      };
+    }).sort((a, b) => b.sizeMb - a.sizeMb);
+  } catch {
+    return LOG_TABLES.map((name) => ({ name, rowCount: 0, sizeMb: 0 }));
   }
-  return results.sort((a, b) => b.sizeMb - a.sizeMb);
 }
 
 router.get("/resource-monitor", async (req: Request, res: Response) => {
@@ -67,8 +73,16 @@ router.get("/resource-monitor", async (req: Request, res: Response) => {
   const windowMinutes = [10, 30, 60, 360].includes(rawWindow) ? rawWindow : 10;
 
   try {
-    const [
-      graphEnabled,
+    const graphEnabled = await storage.getAppSetting("resource_graph_enabled");
+    const isGraphEnabled = graphEnabled?.valueJson === true || graphEnabled?.value === "true";
+
+    // Pagina di monitoraggio interna: tutta la lettura SQL gira su UN solo client
+    // dedicato in sequenza, non su 7 client concorrenti come prima. Così un load
+    // del monitor occupa al più 1 connessione del pool (più gli slot drizzle
+    // transitori), invece di poterne afferrare 7/10 in un colpo e affamare le
+    // route utente. Il tutto passa dal budget connessioni dei job in background e
+    // ritenta i blip transitori (degrado pulito → 500 solo su errore reale).
+    const {
       deviceAgg,
       topDeviceSessions,
       crashStats7d,
@@ -76,14 +90,16 @@ router.get("/resource-monitor", async (req: Request, res: Response) => {
       restartLoops7d,
       logTables,
       dbSizeRow,
-      recentSamples,
-    ] = await Promise.all([
-      storage.getAppSetting("resource_graph_enabled"),
-      (async () => {
-        const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000);
+    } = await withBgDbSlot(() =>
+      withDbRetry(async () => {
+        const now = Date.now();
+        const twoHoursAgo = new Date(now - 2 * 60 * 60 * 1000);
+        const sevenDaysAgo = new Date(now - 7 * 24 * 60 * 60 * 1000);
+        const thirtyDaysAgo = new Date(now - 30 * 24 * 60 * 60 * 1000);
+
         const client = await pool.connect();
         try {
-          const r = await client.query(
+          const aggRes = await client.query(
             `SELECT
               COUNT(*) AS sample_count,
               ROUND(AVG(CASE WHEN memory_total_mb > 0 THEN memory_used_mb::float / memory_total_mb * 100 ELSE NULL END))::int AS avg_ram_pct,
@@ -95,16 +111,8 @@ router.get("/resource-monitor", async (req: Request, res: Response) => {
             WHERE recorded_at >= $1`,
             [twoHoursAgo]
           );
-          return r.rows[0] ?? {};
-        } finally {
-          client.release();
-        }
-      })(),
-      (async () => {
-        const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000);
-        const client = await pool.connect();
-        try {
-          const r = await client.query(
+
+          const topRes = await client.query(
             `SELECT user_id_anon, platform, memory_used_mb, battery_level, recorded_at
             FROM (
               SELECT DISTINCT ON (user_id)
@@ -122,82 +130,56 @@ router.get("/resource-monitor", async (req: Request, res: Response) => {
             LIMIT 20`,
             [twoHoursAgo]
           );
-          return r.rows as Array<{
-            user_id_anon: string;
-            platform: string | null;
-            memory_used_mb: string | number;
-            battery_level: string | number | null;
-            recorded_at: string;
-          }>;
-        } finally {
-          client.release();
-        }
-      })(),
-      (async () => {
-        const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-        const client = await pool.connect();
-        try {
-          const r = await client.query(
-            "SELECT COUNT(*) AS cnt FROM app_crash_logs WHERE crash_type IN ('crash_system','crash_js') AND reported_at >= $1",
-            [sevenDaysAgo]
-          );
-          return Number((r.rows[0] as { cnt?: string | number })?.cnt ?? 0);
-        } finally {
-          client.release();
-        }
-      })(),
-      (async () => {
-        const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-        const client = await pool.connect();
-        try {
-          const r = await client.query(
-            "SELECT COUNT(*) AS cnt FROM app_crash_logs WHERE crash_type IN ('crash_system','crash_js') AND reported_at >= $1",
-            [thirtyDaysAgo]
-          );
-          return Number((r.rows[0] as { cnt?: string | number })?.cnt ?? 0);
-        } finally {
-          client.release();
-        }
-      })(),
-      (async () => {
-        const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-        const client = await pool.connect();
-        try {
-          const r = await client.query(
-            "SELECT COUNT(*) AS cnt FROM app_crash_logs WHERE crash_type = 'restart_loop' AND reported_at >= $1",
-            [sevenDaysAgo]
-          );
-          return Number((r.rows[0] as { cnt?: string | number })?.cnt ?? 0);
-        } finally {
-          client.release();
-        }
-      })(),
-      getLogTableWeights(),
-      (async () => {
-        const client = await pool.connect();
-        try {
-          const r = await client.query("SELECT pg_database_size(current_database()) AS size_bytes");
-          return r.rows[0];
-        } finally {
-          client.release();
-        }
-      })(),
-      (async () => {
-        const graphEnabledSetting = await storage.getAppSetting("resource_graph_enabled");
-        const enabled = graphEnabledSetting?.valueJson === true || graphEnabledSetting?.value === "true";
-        if (!enabled) return [];
-        const windowStart = new Date(Date.now() - windowMinutes * 60 * 1000);
-        const sampleLimit = windowMinutes * 6 + 60;
-        return db
-          .select()
-          .from(resourceSamples)
-          .where(sql`sampled_at >= ${windowStart}`)
-          .orderBy(desc(resourceSamples.sampledAt))
-          .limit(sampleLimit);
-      })(),
-    ]);
 
-    const isGraphEnabled = graphEnabled?.valueJson === true || graphEnabled?.value === "true";
+          // Tre conteggi crash fusi in una sola query (FILTER) invece di 3 round-trip.
+          const crashRes = await client.query(
+            `SELECT
+              COUNT(*) FILTER (WHERE crash_type IN ('crash_system','crash_js') AND reported_at >= $1) AS c7,
+              COUNT(*) FILTER (WHERE crash_type IN ('crash_system','crash_js') AND reported_at >= $2) AS c30,
+              COUNT(*) FILTER (WHERE crash_type = 'restart_loop' AND reported_at >= $1) AS rl7
+            FROM app_crash_logs
+            WHERE reported_at >= $2`,
+            [sevenDaysAgo, thirtyDaysAgo]
+          );
+          const crashRow = crashRes.rows[0] as { c7?: string | number; c30?: string | number; rl7?: string | number } | undefined;
+
+          const tables = await getLogTableWeights(client);
+
+          const dbSizeRes = await client.query("SELECT pg_database_size(current_database()) AS size_bytes");
+
+          return {
+            deviceAgg: aggRes.rows[0] ?? {},
+            topDeviceSessions: topRes.rows as Array<{
+              user_id_anon: string;
+              platform: string | null;
+              memory_used_mb: string | number;
+              battery_level: string | number | null;
+              recorded_at: string;
+            }>,
+            crashStats7d: Number(crashRow?.c7 ?? 0),
+            crashStats30d: Number(crashRow?.c30 ?? 0),
+            restartLoops7d: Number(crashRow?.rl7 ?? 0),
+            logTables: tables,
+            dbSizeRow: dbSizeRes.rows[0] as { size_bytes?: string | number } | undefined,
+          };
+        } finally {
+          client.release();
+        }
+      })
+    );
+
+    let recentSamples: Array<typeof resourceSamples.$inferSelect> = [];
+    if (isGraphEnabled) {
+      const windowStart = new Date(Date.now() - windowMinutes * 60 * 1000);
+      const sampleLimit = windowMinutes * 6 + 60;
+      recentSamples = await db
+        .select()
+        .from(resourceSamples)
+        .where(sql`sampled_at >= ${windowStart}`)
+        .orderBy(desc(resourceSamples.sampledAt))
+        .limit(sampleLimit);
+    }
+
     const agd = deviceAgg as Record<string, string | number | null>;
     const onlineCount = onlineTracker.countOnlineUsers();
     const mem = process.memoryUsage();

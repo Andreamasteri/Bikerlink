@@ -21,6 +21,14 @@ export const pool = new Pool({
   // login handler il worst-case è 12s — ben sotto il proxy timeout (~30s).
   connectionTimeoutMillis: 3000,
   // Limite esplicito di connessioni — evita saturation burst.
+  // NOTA TUNING (saturazione pool): max resta 10 — coerente con i limiti del DB
+  // managed di Replit; alzarlo sposterebbe solo la contesa lato server DB. La
+  // soluzione adottata NON è ingrandire il pool ma ridurre la contesa: i job in
+  // background pesanti passano da un budget connessioni cooperativo
+  // (server/lib/bg-db-limiter.ts) che li tiene a ≤3 connessioni concorrenti,
+  // lasciando sempre ≥7 connessioni libere per il traffico utente. Vedi anche la
+  // route admin resource-monitor (refactor da 7+16 connect → 1 client) e il
+  // resource-graph-sampler (ogni 10s, ora retry+budget).
   max: 10,
   // 5s: le query non tengono connessioni appese indefinitamente in caso di
   // query lente o lock. Ridotto da 15s → 5s per il login hardening: il
