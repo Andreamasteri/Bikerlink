@@ -210,6 +210,17 @@ export function ThinkCentreCard({
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       return res.json();
     },
+    onMutate: async (enabled: boolean) => {
+      await queryClient.cancelQueries({ queryKey: ["/api/admin/settings/thinkcentre-service-push"] });
+      const previous = queryClient.getQueryData<{ enabled: boolean }>(["/api/admin/settings/thinkcentre-service-push"]);
+      queryClient.setQueryData(["/api/admin/settings/thinkcentre-service-push"], { enabled });
+      return { previous };
+    },
+    onError: (_err, _enabled, context) => {
+      if (context?.previous !== undefined) {
+        queryClient.setQueryData(["/api/admin/settings/thinkcentre-service-push"], context.previous);
+      }
+    },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["/api/admin/settings/thinkcentre-service-push"] });
     },
@@ -462,16 +473,16 @@ export function ThinkCentreCard({
             <View style={styles.pushToggleLeft}>
               <Ionicons name="notifications-outline" size={15} color={Colors.textSecondary} />
               <Text style={styles.pushToggleLabel}>Push per servizio offline</Text>
-              <Text style={styles.pushToggleSub}>15 min debounce · solo transizioni ok→ko</Text>
+              <Text style={styles.pushToggleSub}>Notifiche per singolo servizio (es. Ollama offline) con debounce 15 min — le notifiche globali ThinkCentre escono sempre</Text>
             </View>
-            {pushLoading || pushMutation.isPending ? (
+            {pushLoading || pushData === undefined ? (
               <ActivityIndicator size="small" color={Colors.textSecondary} />
             ) : (
               <Switch
-                value={pushData?.enabled ?? true}
+                value={pushData.enabled}
                 onValueChange={(val) => pushMutation.mutate(val)}
                 trackColor={{ false: Colors.border, true: "#f59e0b" }}
-                thumbColor={(pushData?.enabled ?? true) ? Colors.text : Colors.textSecondary}
+                thumbColor={pushData.enabled ? Colors.text : Colors.textSecondary}
               />
             )}
           </View>
