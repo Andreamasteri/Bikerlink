@@ -4,7 +4,6 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  Switch,
 } from "react-native";
 import { Feather, Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
@@ -16,10 +15,6 @@ interface EditPreferencesProps {
   setLanguage: (lang: AppLanguage) => void;
   showLanguageDropdown: boolean;
   setShowLanguageDropdown: (show: boolean) => void;
-  widgetEnabled: boolean;
-  onToggleWidget: (val: boolean) => void;
-  adminWidgetEnabled: boolean;
-  isUpdatingWidget?: boolean;
   handleDeleteAccount: () => void;
   setShowRevokeConsentModal: (show: boolean) => void;
 }
@@ -39,10 +34,6 @@ export function EditPreferences({
   setLanguage,
   showLanguageDropdown,
   setShowLanguageDropdown,
-  widgetEnabled,
-  onToggleWidget,
-  adminWidgetEnabled,
-  isUpdatingWidget,
   handleDeleteAccount,
   setShowRevokeConsentModal,
 }: EditPreferencesProps) {
@@ -101,29 +92,6 @@ export function EditPreferences({
               ))}
             </View>
           )}
-        </View>
-      </View>
-
-      <View style={styles.fieldGroup}>
-        <Text style={styles.groupTitle}>Impostazioni</Text>
-        <View style={styles.toggleRow}>
-          <View style={{ flex: 1 }}>
-            <Text style={[styles.toggleLabel, !adminWidgetEnabled && styles.toggleLabelDisabled]}>
-              Widget di navigazione
-            </Text>
-            <Text style={styles.toggleSub}>
-              {adminWidgetEnabled
-                ? "Pallino flottante con bussola e accesso rapido durante la navigazione"
-                : "Disabilitato dall'amministratore"}
-            </Text>
-          </View>
-          <Switch
-            value={adminWidgetEnabled ? widgetEnabled : false}
-            onValueChange={onToggleWidget}
-            trackColor={{ false: Colors.border, true: Colors.accent }}
-            thumbColor="#fff"
-            disabled={!adminWidgetEnabled || isUpdatingWidget}
-          />
         </View>
       </View>
 
@@ -224,24 +192,6 @@ const styles = StyleSheet.create({
   langDropdownItemLabelActive: {
     color: Colors.accent,
     fontWeight: "600" as const,
-  },
-  toggleRow: {
-    flexDirection: "row" as const,
-    alignItems: "center" as const,
-    gap: 12,
-  },
-  toggleLabel: {
-    fontSize: 16,
-    fontWeight: "500" as const,
-    color: Colors.text,
-  },
-  toggleLabelDisabled: {
-    color: Colors.textSecondary,
-  },
-  toggleSub: {
-    fontSize: 12,
-    color: Colors.textSecondary,
-    marginTop: 2,
   },
   dangerMenuItem: {
     flexDirection: "row" as const,
