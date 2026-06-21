@@ -16,6 +16,7 @@ import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useColors } from "@/hooks/useColors";
 import { apiRequest } from "@/lib/query-client";
 import type { IdealLap } from "@/components/profile/types";
+import GpsLapTrackMap from "@/components/GpsLapTrackMap";
 
 const PAGE_SIZE = 100;
 
@@ -267,6 +268,15 @@ export default function IdealLapDetailScreen() {
         {/* Sparkline */}
         {samplesData && samplesData.length > 0 && (
           <SpeedSparkline samples={samplesData} />
+        )}
+
+        {/* GPS track map */}
+        {!samplesLoading && !samplesError && (
+          <GpsLapTrackMap
+            points={(samplesData ?? [])
+              .filter((s) => s.lat != null && s.lon != null)
+              .map((s) => ({ lat: s.lat as number, lon: s.lon as number }))}
+          />
         )}
 
         {/* Sample table */}
