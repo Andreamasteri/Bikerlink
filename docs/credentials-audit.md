@@ -51,7 +51,7 @@
 | `VALHALLA_API_KEY` | No | ❌ No | — | — | Non necessaria con `VALHALLA_URL` vuota |
 | `TOMTOM_API_KEY` | ✅ Sì (map match) | ✅ Sì | ✅ HTTP 200 routing API | — | Aggiunta durante audit; snap-to-roads operativo |
 | `MAPBOX_ACCESS_TOKEN` | ✅ Sì (emergency fb) | ⚠️ Invalido | ❌ 401 token malformed | — | Token inserito non è formato `pk./sk.eyJ1...`; server lancia errore quando invocato |
-| `ROUTING_DISABLED` | No (flag) | ✅ Sì (`"0"`) | — | — | `"0"` = routing abilitato |
+| `ROUTING_DISABLED` | No (flag) | ❌ No (rimossa) | — | — | Override emergenza — **NON impostare**: il routing è gestito dal pannello admin → Hub Routing (soft toggle DB) |
 
 ---
 
@@ -113,7 +113,7 @@
 |---|---|---|
 | **`OLLAMA_TOKE`** (typo) | Secret nel pannello con N mancante; nessun codice lo legge | Eliminare dal pannello Secrets |
 | **`GOOGLE_API_KEY`** | Alias ridondante di `GEMINI_API_KEY`; il codice usa `GEMINI_API_KEY ?? GOOGLE_API_KEY` | Non necessario; si può ignorare |
-| **Duplicati env+secret** | `GRAPHHOPPER_URL`, `ROUTING_DISABLED`, `BIKERLINK_ADMIN_EMAIL` esistono sia in `userenv.shared` (.replit) sia come Secrets — i Secrets sovrascrivono silenziosamente gli env var | Scegliere uno dei due canali per ciascuno |
+| **Duplicati env+secret** | `GRAPHHOPPER_URL`, `BIKERLINK_ADMIN_EMAIL` esistono sia in `userenv.shared` (.replit) sia come Secrets — i Secrets sovrascrivono silenziosamente gli env var | Scegliere uno dei due canali per ciascuno |
 | **`MAPBOX_ACCESS_TOKEN` invalido** | Token inserito non è nel formato Mapbox (`pk./sk.eyJ1...`) — 401 su ogni chiamata | Sostituire con token valido da account.mapbox.com |
 | **GraphHopper self-hosted offline** | `gh.bikerlink.app` DNS non risolve (ENOTFOUND) | Verificare stato server; il cloud API key copre il fallback |
 | **Tiles server offline** | `tiles.bikerlink.app` DNS non risolve | Verificare stato server |

@@ -37,7 +37,7 @@ di reject in App Store review per Expo Launch.
 
 ```
 shared/         BIKERLINK_ADMIN_EMAIL, BIKERLINK_BACKEND_URL, EXPO_PUBLIC_DOMAIN,
-                VALHALLA_URL, GRAPHHOPPER_URL, TILES_URL, ROUTING_DISABLED
+                VALHALLA_URL, GRAPHHOPPER_URL, TILES_URL
 development/    EXPO_WEB_URL=http://localhost:8081
 production/     NODE_ENV=production, EXPO_WEB_URL=https://biker-link--8081.replit.app
 ```
