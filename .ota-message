@@ -1,1 +1,1 @@
-
+Fix drag widget uptime (no salto pannelli, hitbox corretta). Toggle ThinkCentre in cima alla card. Fix score watchdog 0/100 su blip DB. Vacuum smart ANALYZE/FULL per tabella. Label versione BUILD completa (V73D.10.X).
