@@ -4,15 +4,14 @@ import {
   Text,
   StyleSheet,
   useWindowDimensions,
+  PanResponder,
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useQuery } from "@tanstack/react-query";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
-  runOnJS,
 } from "react-native-reanimated";
 import { useRouter } from "expo-router";
 import { useState } from "react";
@@ -42,8 +41,7 @@ const POS_KEY = "uptime_widget_position";
 
 // Clamp dedicato al widget uptime: a differenza di clampPos di FloatingWidget
 // (pallino quadrato WIDGET_SIZE), qui larghezza e altezza sono diverse, quindi
-// servono limiti distinti per asse. È `"worklet"` così può girare sia sul thread
-// JS (load/persist) sia nei callback gesto RNGH sul thread UI.
+// servono limiti distinti per asse.
 export function clampUptimePos(
   x: number,
   y: number,
@@ -52,7 +50,6 @@ export function clampUptimePos(
   minY: number,
   maxYPad: number,
 ): { x: number; y: number } {
-  "worklet";
   return {
     x: Math.max(0, Math.min(x, screenW - WIDGET_W)),
     y: Math.max(minY, Math.min(y, screenH - WIDGET_H - maxYPad)),
@@ -69,10 +66,14 @@ export default function UptimeWidget() {
   const defaultX = width - WIDGET_W - 16;
   const defaultY = height - WIDGET_H - 84 - insets.bottom;
 
+  // Posizione corrente del widget come shared values Reanimated — il transform
+  // usa questi valori per posizionare il widget sullo schermo.
   const posX = useSharedValue(defaultX);
   const posY = useSharedValue(defaultY);
-  const startX = useSharedValue(defaultX);
-  const startY = useSharedValue(defaultY);
+
+  // Origine del drag corrente (salvata a onPanResponderGrant sul JS thread).
+  const dragStartX = useRef(defaultX);
+  const dragStartY = useRef(defaultY);
 
   const { data } = useQuery<UptimeData>({
     queryKey: ["/api/admin/uptime"],
@@ -127,38 +128,46 @@ export default function UptimeWidget() {
     router.push("/admin/restart-history" as never);
   }, [router]);
 
-  // Gesture.Pan() di RNGH: onStart fissa l'origine, onUpdate trascina (clampato
-  // in tempo reale), onEnd persiste la posizione e — se lo spostamento è sotto
-  // la soglia di tap — naviga allo storico riavvii. minDistance(0) garantisce
-  // che anche un tap puro (zero movimento) porti il gesto in ACTIVE e scateni
-  // onEnd. clampUptimePos/isDragGesture girano come worklet sul thread UI;
-  // savePosition e la navigazione tornano sul thread JS via runOnJS.
-  const panGesture = Gesture.Pan()
-    .minDistance(0)
-    .onStart(() => {
-      "worklet";
-      startX.value = posX.value;
-      startY.value = posY.value;
+  // PanResponder — gira completamente sul thread JS, nessun conflitto con i
+  // gesture handler nativi di Expo Router (RNGH). onGrant registra l'origine,
+  // onMove aggiorna la posizione in tempo reale (clampata ai bordi), onRelease
+  // persiste e discrimina tap da drag tramite isDragGesture. Nessun Pressable
+  // interno: la navigazione parte esclusivamente da onRelease, così il click
+  // non può essere intercettato da un handler separato.
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderGrant: () => {
+        dragStartX.current = posX.value;
+        dragStartY.current = posY.value;
+      },
+      onPanResponderMove: (_, gs) => {
+        const clamped = clampUptimePos(
+          dragStartX.current + gs.dx,
+          dragStartY.current + gs.dy,
+          width, height,
+          insets.top + 8, insets.bottom + 8,
+        );
+        posX.value = clamped.x;
+        posY.value = clamped.y;
+      },
+      onPanResponderRelease: (_, gs) => {
+        savePosition(posX.value, posY.value);
+        if (!isDragGesture(gs.dx, gs.dy, TAP_THRESHOLD)) {
+          openHistory();
+        }
+      },
+      onPanResponderTerminate: () => {
+        savePosition(posX.value, posY.value);
+      },
     })
-    .onUpdate((e) => {
-      "worklet";
-      const clamped = clampUptimePos(
-        startX.value + e.translationX,
-        startY.value + e.translationY,
-        width, height,
-        insets.top + 8, insets.bottom + 8,
-      );
-      posX.value = clamped.x;
-      posY.value = clamped.y;
-    })
-    .onEnd((e) => {
-      "worklet";
-      runOnJS(savePosition)(posX.value, posY.value);
-      if (!isDragGesture(e.translationX, e.translationY, TAP_THRESHOLD)) {
-        runOnJS(openHistory)();
-      }
-    });
+  ).current;
 
+  // Posizionamento via transform (translateX/translateY) invece di left/top: su
+  // Android animare left/top sposta il pixel ma lascia l'hitbox del touch alla
+  // posizione di layout originale. Con il transform l'area di tocco segue la
+  // posizione visiva.
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: posX.value }, { translateY: posY.value }],
   }));
@@ -175,17 +184,15 @@ export default function UptimeWidget() {
 
   return (
     <Animated.View style={[styles.container, animatedStyle]}>
-      <GestureDetector gesture={panGesture}>
-        <View style={styles.inner}>
-          <Text style={styles.label}>
-            {"⏱ "}
-            {frontendElapsed >= 0 ? formatUptime(frontendElapsed) : "00:00.0"}
-            {crashCount > 0 ? (
-              <Text style={styles.crashLabel}>{`  💥 ${crashCount}`}</Text>
-            ) : null}
-          </Text>
-        </View>
-      </GestureDetector>
+      <View {...panResponder.panHandlers} style={styles.inner}>
+        <Text style={styles.label}>
+          {"⏱ "}
+          {frontendElapsed >= 0 ? formatUptime(frontendElapsed) : "00:00.0"}
+          {crashCount > 0 ? (
+            <Text style={styles.crashLabel}>{`  💥 ${crashCount}`}</Text>
+          ) : null}
+        </Text>
+      </View>
     </Animated.View>
   );
 }
