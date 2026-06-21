@@ -5,7 +5,6 @@ import {
   Pressable,
   StyleSheet,
   useWindowDimensions,
-  Modal,
   Platform,
   PanResponder,
 } from "react-native";
@@ -145,6 +144,9 @@ export default function FloatingWidget() {
   // gesture handler nativi di Expo Router (RNGH). onGrant registra l'origine,
   // onMove aggiorna la posizione in tempo reale (clampata ai bordi), onRelease
   // persiste e discrimina tap da drag tramite isDragGesture.
+  // NOTA: il menu viene aperto direttamente da onPanResponderRelease senza
+  // usare Modal — così il sistema touch è già rilasciato prima che la UI
+  // del menu venga montata, eliminando il crash Android PanResponder↔Modal.
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
@@ -218,12 +220,7 @@ export default function FloatingWidget() {
         </View>
       </Animated.View>
 
-      <Modal
-        visible={menuOpen}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setMenuOpen(false)}
-      >
+      {menuOpen && (
         <Pressable style={styles.overlay} onPress={() => setMenuOpen(false)}>
           <Pressable style={styles.menu} onPress={() => {}}>
             <Text style={styles.menuTitle}>Widget navigazione</Text>
@@ -283,9 +280,9 @@ export default function FloatingWidget() {
             </Pressable>
           </Pressable>
         </Pressable>
-      </Modal>
+      )}
 
-      <AssistantChatSheet visible={aiOpen} onClose={() => setAiOpen(false)} />
+      {aiOpen && <AssistantChatSheet visible={aiOpen} onClose={() => setAiOpen(false)} />}
     </>
   );
 }
@@ -323,10 +320,16 @@ const styles = StyleSheet.create({
     elevation: 12,
   },
   overlay: {
-    flex: 1,
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     backgroundColor: "rgba(0,0,0,0.55)",
     justifyContent: "center",
     alignItems: "center",
+    zIndex: 9500,
+    elevation: 16,
   },
   menu: {
     backgroundColor: Colors.surface,
