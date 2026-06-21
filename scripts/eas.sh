@@ -115,6 +115,23 @@ if [[ "$FIRST_ARG" == "build" ]]; then
   else
     exit 1
   fi
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  #  PRE-FLIGHT: fix URL proxy Replit → registry.npmjs.org in package-lock.json
+  #
+  #  Ogni `npm install` eseguito in Replit riscrive le URL "resolved" nel
+  #  package-lock.json puntando a package-firewall.replit.local, che non è
+  #  raggiungibile dall'ambiente di build EAS (cloud esterno).
+  #  Questo sed ripristina le URL pubbliche prima che EAS esegua `npm ci`.
+  # ─────────────────────────────────────────────────────────────────────────────
+  LOCK_FILE="$ROOT_DIR/package-lock.json"
+  if grep -q "package-firewall.replit.local" "$LOCK_FILE" 2>/dev/null; then
+    echo "  ⚙  Fix package-lock.json: sostituisco URL proxy Replit → registry.npmjs.org ..." >&2
+    sed -i 's|http://package-firewall\.replit\.local/npm/|https://registry.npmjs.org/|g' "$LOCK_FILE"
+    echo "  ✔  package-lock.json aggiornato (URL proxy rimossi)" >&2
+  else
+    echo "  ✔  package-lock.json OK (nessuna URL proxy trovata)" >&2
+  fi
 fi
 
 if [[ "$_USE_NPX" == "true" ]]; then
