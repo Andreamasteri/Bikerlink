@@ -22,6 +22,31 @@ set -e
 log()  { echo "[deploy $(date -u '+%H:%M:%SZ')] $*"; }
 size() { [ -e "$1" ] && du -sh "$1" 2>/dev/null | cut -f1 || echo "-"; }
 
+# ── Gate ROUTING_DISABLED ────────────────────────────────────────────────────
+# ROUTING_DISABLED non deve mai essere impostata nei Secrets di produzione.
+# Se presente (qualunque valore), il container la fotografia e la bake nel
+# runtime: il toggle admin diventa inoperante e nessuna OTA può rimuoverla.
+# Il gate blocca il deploy prima che ciò avvenga.
+if [ -n "${ROUTING_DISABLED+x}" ]; then
+  log "════════════════════════════════════════════════════════════"
+  log "❌ DEPLOY BLOCCATO — ROUTING_DISABLED è impostata nell'ambiente."
+  log "   Valore attuale: \"${ROUTING_DISABLED}\""
+  log ""
+  log "   Questa variabile è DEPRECATA e NON va mai impostata in produzione."
+  log "   Se presente, bypassa il toggle admin (Hub Routing) rendendolo"
+  log "   inoperante, e non può essere rimossa via OTA."
+  log ""
+  log "   Azione richiesta:"
+  log "     1. Apri il pannello Secrets di Replit."
+  log "     2. Elimina la variabile ROUTING_DISABLED."
+  log "     3. Riavvia il deploy."
+  log ""
+  log "   Per abilitare/disabilitare il routing usa invece:"
+  log "     Admin → Hub Routing → kill-switch (soft toggle DB)"
+  log "════════════════════════════════════════════════════════════"
+  exit 1
+fi
+
 BUILD_START=$(date -u '+%H:%M:%SZ')
 log "════════════════════════════════════════════════════════════"
 log " DEPLOY/PUBLISH — mappa delle 4 fasi:"

@@ -358,8 +358,15 @@ function checkMonitoringAndFlags() {
     dsn ? "Configurata" : "Non configurata (opzionale) — error tracking disabilitato");
 
   const routing = process.env.ROUTING_DISABLED;
-  record("Flag routing", "ROUTING_DISABLED", "flag", routing !== undefined, null,
-    `Valore: "${routing ?? "(non impostato)"}" — ${routing === "0" ? "routing ABILITATO" : routing ? "routing DISABILITATO" : "routing ABILITATO (default)"}`);
+  if (routing !== undefined) {
+    record("Flag routing", "ROUTING_DISABLED", "mandatory", true, false,
+      `⛔ DEPRECATA — NON deve essere impostata in produzione (valore attuale: "${routing}"). ` +
+      `Se presente bake nel container e bypassa il toggle admin (Hub Routing) rendendolo inoperante. ` +
+      `Rimuoverla dai Secrets. Il routing si gestisce da Admin → Hub Routing → kill-switch.`);
+  } else {
+    record("Flag routing", "ROUTING_DISABLED", "flag", false, null,
+      "Non impostata (corretto) — routing gestito dal pannello admin → Hub Routing");
+  }
 
   const coord = process.env.COORDINATOR_DISABLED;
   record("Flag coordinator", "COORDINATOR_DISABLED", "flag", !!coord, null,

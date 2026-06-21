@@ -51,7 +51,7 @@
 | `VALHALLA_API_KEY` | No | ❌ No | — | — | Non necessaria con `VALHALLA_URL` vuota |
 | `TOMTOM_API_KEY` | ✅ Sì (map match) | ✅ Sì | ✅ HTTP 200 routing API | — | Aggiunta durante audit; snap-to-roads operativo |
 | `MAPBOX_ACCESS_TOKEN` | ✅ Sì (emergency fb) | ⚠️ Invalido | ❌ 401 token malformed | — | Token inserito non è formato `pk./sk.eyJ1...`; server lancia errore quando invocato |
-| `ROUTING_DISABLED` | No (flag) | ❌ No (rimossa) | — | — | Override emergenza — **NON impostare**: il routing è gestito dal pannello admin → Hub Routing (soft toggle DB) |
+| `ROUTING_DISABLED` | ⛔ VIETATA | ❌ No (corretto) | — | — | **DEPRECATA — NON impostare mai**: se presente blocca il deploy e bypassa il toggle admin rendendolo inoperante. Gestire il routing da Admin → Hub Routing → kill-switch |
 
 ---
 

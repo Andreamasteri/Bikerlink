@@ -214,7 +214,9 @@ GRAPHHOPPER_URL=<INSERIRE>   # URL base del reverse proxy nginx (es. https://gh.
 VALHALLA_URL=http://localhost:8002
 REDIS_URL=redis://localhost:6379
 DATABASE_URL=postgresql://<user>:<password>@localhost:5432/bikerlink
-# NON impostare ROUTING_DISABLED: il routing si abilita/disabilita dal pannello admin → Hub Routing
+# ⛔ NON impostare ROUTING_DISABLED — variabile DEPRECATA/VIETATA in produzione.
+# Se presente blocca il deploy (gate in scripts/deploy-build.sh) e bypassa
+# il toggle admin rendendolo inoperante. Usa sempre Admin → Hub Routing → kill-switch.
 ```
 
 **`GRAPHHOPPER_URL`** deve puntare alla **base del reverse proxy** che espone le 7

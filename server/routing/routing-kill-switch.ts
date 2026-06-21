@@ -1,19 +1,27 @@
 /**
  * Soft Kill-Switch Routing — BikerLink (Task #2824)
  *
- * Gestisce l'abilitazione/disabilitazione del routing combinando un hard
- * override via env var con un soft toggle persistito nel DB (`app_settings`).
+ * Gestisce l'abilitazione/disabilitazione del routing tramite un soft toggle
+ * persistito nel DB (`app_settings`), modificabile dall'admin senza toccare
+ * i Secrets. Il valore DB è cache-ato in memoria; `setRoutingEnabled` aggiorna
+ * sia il DB sia la cache in-memory.
  *
- * Logica (precedenza dall'alto):
- *   1. env `ROUTING_DISABLED="0"`        → routing FORZATO ON  (override emergenza, prevale sempre)
- *   2. env `ROUTING_DISABLED` = altro    → routing FORZATO OFF (kill emergenza, prevale sempre)
- *      (qualunque valore non vuoto diverso da "0", es: "1", "true")
- *   3. env `ROUTING_DISABLED` non settata → soft toggle DB `routing_kill_switch`
- *      (default: disabilitato — comportamento storico invariato)
+ * ⚠️  ROUTING_DISABLED (env var) — DEPRECATA, NON IMPOSTARE IN PRODUZIONE
  *
- * Il soft toggle è modificabile dall'admin senza toccare i Secrets. Il valore
- * DB è cache-ato in memoria per evitare una query ad ogni chiamata di routing;
- * `setRoutingEnabled` aggiorna sia il DB sia la cache in-memory.
+ *   La logica env var è mantenuta per retrocompatibilità di emergenza estrema,
+ *   ma la variabile NON va mai impostata nei Secrets di Replit:
+ *   - Se baked nel container bypassa il soft toggle admin rendendolo inoperante.
+ *   - Non può essere rimossa via OTA (vive nel server, non nel bundle JS).
+ *   - scripts/deploy-build.sh blocca il deploy se la variabile è presente.
+ *   - scripts/validate-credentials.ts la segnala come errore critico.
+ *
+ *   Per abilitare/disabilitare il routing usa SEMPRE:
+ *     Admin → Hub Routing → kill-switch (soft toggle DB)
+ *
+ * Logica env residua (precedenza dall'alto, solo se var è presente):
+ *   1. env `ROUTING_DISABLED="0"`     → routing FORZATO ON  (prevale sul DB)
+ *   2. env `ROUTING_DISABLED` = altro → routing FORZATO OFF (prevale sul DB)
+ *   3. env non settata (corretto)     → soft toggle DB `routing_kill_switch`
  */
 
 import { storage } from "../storage";
