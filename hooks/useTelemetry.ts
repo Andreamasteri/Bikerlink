@@ -25,6 +25,7 @@ import {
   FLUSH_MAX_SAMPLES,
   UPLOAD_EVERY_KM,
   STOP_RETRY_DELAY_MS,
+  CHECKPOINT_INTERVAL_MS,
 } from "@/hooks/useTelemetryUpload";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -61,9 +62,10 @@ export function useTelemetry(isActive: boolean, externalGps = false) {
   const sessionIdRef    = useRef<string | null>(null);
   const bufferRef       = useRef<TelemetrySample[]>([]);
   const accelRef        = useRef<AccelReading>({ x: 0, y: 0, z: 1 });
-  const locationSubRef  = useRef<Location.LocationSubscription | null>(null);
-  const accelSubRef     = useRef<ReturnType<typeof Accelerometer.addListener> | null>(null);
-  const sensorTimerRef  = useRef<ReturnType<typeof setInterval> | null>(null);
+  const locationSubRef      = useRef<Location.LocationSubscription | null>(null);
+  const accelSubRef         = useRef<ReturnType<typeof Accelerometer.addListener> | null>(null);
+  const sensorTimerRef      = useRef<ReturnType<typeof setInterval> | null>(null);
+  const checkpointTimerRef  = useRef<ReturnType<typeof setInterval> | null>(null);
   const lastKnownLocRef = useRef<{ lat: number; lon: number } | null>(null);
   const lastGpsTsRef    = useRef<number>(0);
 
@@ -84,6 +86,8 @@ export function useTelemetry(isActive: boolean, externalGps = false) {
     maybeUploadByDistance,
     drainAndFlushBackgroundBuffer,
     persistUnsentSamples,
+    checkpointBuffer,
+    clearCrashRecovery,
     drainUnsentStorage,
   } = useTelemetryUpload(sessionIdRef, bufferRef, totalKmRef, kmAtLastUploadRef);
 
@@ -94,10 +98,11 @@ export function useTelemetry(isActive: boolean, externalGps = false) {
 
   // ── internal teardown ───────────────────────────────────────────────────────
   const teardown = useCallback(() => {
-    if (sensorTimerRef.current)  { clearInterval(sensorTimerRef.current); sensorTimerRef.current = null; }
-    if (locationSubRef.current)  { locationSubRef.current.remove(); locationSubRef.current = null; }
-    if (accelSubRef.current)     { accelSubRef.current.remove(); accelSubRef.current = null; }
-    if (motionSubRef.current)    { motionSubRef.current.remove(); motionSubRef.current = null; }
+    if (sensorTimerRef.current)     { clearInterval(sensorTimerRef.current); sensorTimerRef.current = null; }
+    if (checkpointTimerRef.current) { clearInterval(checkpointTimerRef.current); checkpointTimerRef.current = null; }
+    if (locationSubRef.current)     { locationSubRef.current.remove(); locationSubRef.current = null; }
+    if (accelSubRef.current)        { accelSubRef.current.remove(); accelSubRef.current = null; }
+    if (motionSubRef.current)       { motionSubRef.current.remove(); motionSubRef.current = null; }
   }, []);
 
   // ── build a sample from a GPS fix + current accelerometer ──────────────────
@@ -231,7 +236,11 @@ export function useTelemetry(isActive: boolean, externalGps = false) {
       if (bufferRef.current.length >= FLUSH_MAX_SAMPLES) flush(true);
       else maybeUploadByDistance();
     }, SAMPLE_INTERVAL_MS);
-  }, [flush, buildSample, buildSensorSample, maybeUploadByDistance, canRecordForeground]);
+
+    checkpointTimerRef.current = setInterval(() => {
+      checkpointBuffer().catch(() => {});
+    }, CHECKPOINT_INTERVAL_MS);
+  }, [flush, buildSample, buildSensorSample, maybeUploadByDistance, canRecordForeground, checkpointBuffer]);
 
   // ── begin session ───────────────────────────────────────────────────────────
   const beginSession = useCallback(async () => {
@@ -250,6 +259,7 @@ export function useTelemetry(isActive: boolean, externalGps = false) {
 
   // ── finish session ──────────────────────────────────────────────────────────
   const finishSession = useCallback(async () => {
+    const sessionId = sessionIdRef.current;
     await AsyncStorage.removeItem(BG_TELEMETRY_SESSION_KEY);
     await flush(true);
     if (bufferRef.current.length > 0) {
@@ -258,14 +268,22 @@ export function useTelemetry(isActive: boolean, externalGps = false) {
       await flush(true);
     }
     if (bufferRef.current.length > 0) {
-      const sessionId = sessionIdRef.current;
       const stranded  = [...bufferRef.current];
-      if (sessionId) await persistUnsentSamples(sessionId, stranded);
-      else console.warn(`[useTelemetry] stop: ${stranded.length} campioni persi — sessionId già null.`);
+      if (sessionId) {
+        await persistUnsentSamples(sessionId, stranded);
+        // Remove the crash-recovery key so only the UNSENT key survives.
+        // Both keys contain the same unsent samples; keeping both would cause
+        // drainUnsentStorage to POST duplicates on the next session start.
+        await clearCrashRecovery(sessionId);
+      } else {
+        console.warn(`[useTelemetry] stop: ${stranded.length} campioni persi — sessionId già null.`);
+      }
+    } else if (sessionId) {
+      await clearCrashRecovery(sessionId);
     }
     sessionIdRef.current = null;
     bufferRef.current    = [];
-  }, [flush, persistUnsentSamples]);
+  }, [flush, persistUnsentSamples, clearCrashRecovery]);
 
   // ── lazily build the collector machine ─────────────────────────────────────
   const getMachine = useCallback((): TelemetryCollectorMachine => {

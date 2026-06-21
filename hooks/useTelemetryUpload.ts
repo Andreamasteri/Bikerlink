@@ -8,6 +8,13 @@
  *  - drainAndFlushBackgroundBuffer() — drain AsyncStorage bg buffer on resume
  *  - persistUnsentSamples()       — save unsent samples on stop failure
  *  - drainUnsentStorage()         — recover samples from previous failed flush
+ *  - checkpointBuffer()           — periodic crash-recovery checkpoint during ride
+ *  - clearCrashRecovery()         — remove crash-recovery key on clean session stop
+ *
+ * Pure helpers (exported for direct testing):
+ *  - writeCheckpoint()            — write crash-recovery key to AsyncStorage
+ *  - removeCrashCheckpoint()      — remove crash-recovery key from AsyncStorage
+ *  - drainRecoverableKeys()       — drain both UNSENT and CRASH_RECOVERY keys
  */
 import { useRef, useCallback } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -23,6 +30,101 @@ export const STOP_RETRY_DELAY_MS      = 1_500;
 export const BG_DRAIN_BUDGET_MS       = 12_000;
 export const BG_DRAIN_REQUEST_TIMEOUT = 8_000;
 export const UNSENT_PREFIX            = "@bikerlink/telemetry_unsent_";
+export const CRASH_RECOVERY_PREFIX    = "@bikerlink/telemetry_crash_";
+export const CHECKPOINT_INTERVAL_MS   = 30_000;
+
+// ─── Stored payload shape ──────────────────────────────────────────────────────
+interface StoredPayload {
+  sessionId: string;
+  samples:   TelemetrySample[];
+}
+
+// ─── Pure helpers (no React, fully testable) ───────────────────────────────────
+
+/**
+ * Write (or clear) the crash-recovery checkpoint for a session.
+ * If `samples` is empty the key is removed to avoid replaying stale data.
+ */
+export async function writeCheckpoint(
+  sessionId: string,
+  samples: TelemetrySample[]
+): Promise<void> {
+  const key = `${CRASH_RECOVERY_PREFIX}${sessionId}`;
+  try {
+    if (samples.length === 0) {
+      await AsyncStorage.removeItem(key);
+    } else {
+      await AsyncStorage.setItem(key, JSON.stringify({ sessionId, samples }));
+    }
+  } catch (e) {
+    console.warn("[useTelemetry] checkpoint: errore scrittura crash-recovery (non bloccante)", e);
+  }
+}
+
+/**
+ * Remove the crash-recovery checkpoint for a session (called on clean stop or
+ * when persistUnsentSamples takes over so only one key exists per session).
+ */
+export async function removeCrashCheckpoint(sessionId: string): Promise<void> {
+  try {
+    await AsyncStorage.removeItem(`${CRASH_RECOVERY_PREFIX}${sessionId}`);
+  } catch (e) {
+    console.warn("[useTelemetry] removeCrashCheckpoint: errore rimozione chiave (non bloccante)", e);
+  }
+}
+
+/**
+ * Drain all recoverable keys (UNSENT + CRASH_RECOVERY) from AsyncStorage.
+ * For each key the caller-supplied `postFn` is invoked; on any error the key
+ * is still removed so we never block future sessions with unresolvable data.
+ *
+ * Returns the list of session IDs that were drained (for logging / testing).
+ */
+export async function drainRecoverableKeys(
+  postFn: (sessionId: string, samples: TelemetrySample[]) => Promise<void>
+): Promise<string[]> {
+  const drained: string[] = [];
+  try {
+    const keys = [...(await AsyncStorage.getAllKeys())] as string[];
+    const recoverableKeys = keys.filter(
+      (k) => k.startsWith(UNSENT_PREFIX) || k.startsWith(CRASH_RECOVERY_PREFIX)
+    );
+    for (const key of recoverableKeys) {
+      const raw = await AsyncStorage.getItem(key);
+      if (!raw) { await AsyncStorage.removeItem(key); continue; }
+      let parsed: StoredPayload;
+      try {
+        parsed = JSON.parse(raw) as StoredPayload;
+      } catch {
+        await AsyncStorage.removeItem(key);
+        continue;
+      }
+      if (!parsed.samples || parsed.samples.length === 0) {
+        await AsyncStorage.removeItem(key);
+        continue;
+      }
+      const isCrashKey = key.startsWith(CRASH_RECOVERY_PREFIX);
+      try {
+        await postFn(parsed.sessionId, parsed.samples);
+        console.log(
+          `[useTelemetry] startSession: drained ${parsed.samples.length} campioni ` +
+          `${isCrashKey ? "(crash-recovery)" : "(unsent)"} dalla sessione ${parsed.sessionId}.`
+        );
+        drained.push(parsed.sessionId);
+      } catch (e) {
+        console.warn(
+          `[useTelemetry] startSession: drain di ${parsed.samples.length} campioni ` +
+          `${isCrashKey ? "(crash-recovery)" : "(unsent)"} fallito — dati persi definitivamente.`,
+          e
+        );
+      }
+      await AsyncStorage.removeItem(key);
+    }
+  } catch (e) {
+    console.warn("[useTelemetry] drainRecoverableKeys: errore (non bloccante)", e);
+  }
+  return drained;
+}
 
 // ─── Hook ─────────────────────────────────────────────────────────────────────
 export function useTelemetryUpload(
@@ -34,9 +136,6 @@ export function useTelemetryUpload(
   const isFlushing = useRef(false);
 
   // ── flush foreground buffer to server ───────────────────────────────────────
-  // Returns true when a batch was actually sent, false otherwise (already
-  // flushing, empty buffer, no session, or POST failed). The boolean lets the
-  // distance-based uploader advance its marker ONLY on a real success.
   const flush = useCallback(async (_force: boolean): Promise<boolean> => {
     if (isFlushing.current) return false;
     const buf = bufferRef.current;
@@ -66,9 +165,6 @@ export function useTelemetryUpload(
   }, [sessionIdRef, bufferRef]);
 
   // ── distance-based background upload ────────────────────────────────────────
-  // Fire-and-forget: uploads every UPLOAD_EVERY_KM km travelled. Never blocks
-  // sampling; the marker only advances on success so a failed upload is retried
-  // at the next sample.
   const maybeUploadByDistance = useCallback(() => {
     applyDistanceUpload(
       totalKmRef.current,
@@ -127,52 +223,42 @@ export function useTelemetryUpload(
     }
   }, []);
 
-  // ── drain samples persisted by a previous failed finishSession flush ─────────
-  const drainUnsentStorage = useCallback(async () => {
-    try {
-      const keys = [...(await AsyncStorage.getAllKeys())] as string[];
-      const unsentKeys = keys.filter((k) => k.startsWith(UNSENT_PREFIX));
-      for (const key of unsentKeys) {
-        const raw = await AsyncStorage.getItem(key);
-        if (!raw) { await AsyncStorage.removeItem(key); continue; }
-        let parsed: { sessionId: string; samples: TelemetrySample[] };
-        try {
-          parsed = JSON.parse(raw) as { sessionId: string; samples: TelemetrySample[] };
-        } catch {
-          await AsyncStorage.removeItem(key);
-          continue;
-        }
-        if (!parsed.samples || parsed.samples.length === 0) {
-          await AsyncStorage.removeItem(key);
-          continue;
-        }
-        try {
-          await apiRequest("POST", "/api/telemetry/batch", {
-            session_id:   parsed.sessionId,
-            session_type: "ride",
-            samples:      parsed.samples,
-          });
-          console.log(
-            `[useTelemetry] startSession: drained ${parsed.samples.length} campioni non inviati dalla sessione precedente (${parsed.sessionId}).`
-          );
-        } catch (e) {
-          console.warn(
-            `[useTelemetry] startSession: drain di ${parsed.samples.length} campioni fallito — dati persi definitivamente.`,
-            e
-          );
-        }
-        await AsyncStorage.removeItem(key);
-      }
-    } catch (e) {
-      console.warn("[useTelemetry] drainUnsentStorage: errore (non bloccante)", e);
-    }
+  // ── checkpoint buffer to AsyncStorage (crash recovery) ───────────────────────
+  const checkpointBuffer = useCallback(async () => {
+    const sessionId = sessionIdRef.current;
+    if (!sessionId) return;
+    await writeCheckpoint(sessionId, bufferRef.current);
+  }, [sessionIdRef, bufferRef]);
+
+  // ── remove crash-recovery key after a clean session stop ────────────────────
+  const clearCrashRecovery = useCallback(async (sessionId: string) => {
+    await removeCrashCheckpoint(sessionId);
   }, []);
+
+  // ── drain samples persisted by previous failed flush or crash ────────────────
+  // Uses the pure drainRecoverableKeys helper — both UNSENT and CRASH_RECOVERY
+  // keys are handled in a single pass to avoid dual-replay of the same session.
+  const drainUnsentStorage = useCallback(async () => {
+    const sessionId = sessionIdRef.current;
+    await drainRecoverableKeys(async (sid, samples) => {
+      await apiRequest("POST", "/api/telemetry/batch", {
+        session_id:   sid,
+        session_type: "ride",
+        samples,
+      });
+      if (sessionId) {
+        queryClient.invalidateQueries({ queryKey: ["/api/telemetry/stats"] });
+      }
+    });
+  }, [sessionIdRef]);
 
   return {
     flush,
     maybeUploadByDistance,
     drainAndFlushBackgroundBuffer,
     persistUnsentSamples,
+    checkpointBuffer,
+    clearCrashRecovery,
     drainUnsentStorage,
   };
 }
