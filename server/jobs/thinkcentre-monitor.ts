@@ -558,7 +558,7 @@ export async function runThinkCentreProbe(): Promise<void> {
     return;
   }
 
-  // ── Degradato (green → yellow) ────────────────────────────────────────────
+  // Degradato (green → yellow)
   if (prev === "green" && current === "yellow") {
     if (shouldNotify("degraded")) {
       const n = await sendSystemAlertPushToAdmins(
@@ -570,7 +570,6 @@ export async function runThinkCentreProbe(): Promise<void> {
     }
     return;
   }
-
   // Recupero parziale (yellow → green): nessuna notifica necessaria
 }
 
