@@ -181,6 +181,42 @@ router.get("/db/table-sizes", async (_req: Request, res: Response) => {
   }
 });
 
+router.get("/db/activity", async (_req: Request, res: Response) => {
+  let client: import("pg").PoolClient | null = null;
+  try {
+    client = await pool.connect();
+    const result = await client.query<{
+      pid: number;
+      state: string;
+      wait_event_type: string | null;
+      wait_event: string | null;
+      duration_ms: number | null;
+      query_short: string;
+      application_name: string;
+    }>(`
+      SELECT
+        pid,
+        state,
+        wait_event_type,
+        wait_event,
+        EXTRACT(EPOCH FROM (now() - query_start)) * 1000 AS duration_ms,
+        LEFT(query, 200) AS query_short,
+        application_name
+      FROM pg_stat_activity
+      WHERE datname = current_database()
+        AND pid <> pg_backend_pid()
+      ORDER BY duration_ms DESC NULLS LAST
+      LIMIT 25
+    `);
+    return res.json({ ok: true, rows: result.rows, ts: new Date().toISOString() });
+  } catch (err) {
+    console.error("[admin/db/activity] error:", err);
+    return sendError(res, 500, "Errore lettura pg_stat_activity");
+  } finally {
+    if (client) client.release();
+  }
+});
+
 router.post("/db/vacuum-full", async (_req: Request, res: Response) => {
   try {
     if (isVacuumRunning()) {

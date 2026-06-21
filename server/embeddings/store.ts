@@ -1,6 +1,7 @@
 import { createHash } from "crypto";
 import { sql } from "drizzle-orm";
 import { db, pool } from "../db";
+import { withBgDbSlot } from "../lib/bg-db-limiter";
 import { embeddings, embeddingCallLog } from "@shared/db";
 import {
   generateEmbedding,
@@ -303,7 +304,7 @@ export async function findSimilar(
   const maxDistance = 1 - Math.max(0, Math.min(1, minSimilarity));
   const efSearch = await getEfSearch();
 
-  const client = await pool.connect();
+  const client = await withBgDbSlot(() => pool.connect());
   try {
     await warnIfHnswIndexMissing(client);
     await client.query("BEGIN");
