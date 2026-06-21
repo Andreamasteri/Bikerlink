@@ -122,17 +122,38 @@ export async function collectDb(): Promise<Signal[]> {
         details: { error: (err as Error).message?.slice(0, 200), reason: "pool_saturated" },
       });
     } else {
-      cbRecordFailure(err);
-      consecutivePingFailures++;
-      // Un singolo ping fallito è quasi sempre un blip transitorio: lo segnaliamo
-      // come "warn" e lo escaliamo a "critical" solo dopo N fallimenti consecutivi
-      // (guasto persistente). Evita che un singolo blip porti subito a stato red.
-      const errSeverity: Signal["severity"] =
-        consecutivePingFailures >= CONSECUTIVE_FAIL_FOR_CRITICAL ? "critical" : "warn";
-      signals.push({
-        source: "db", metric: "collector.error", severity: errSeverity,
-        details: { error: (err as Error).message, consecutiveFailures: consecutivePingFailures },
-      });
+      // Errori di connessione infrastrutturale (es. "Connection terminated due to
+      // connection timeout", "Connection terminated unexpectedly") indicano pressione
+      // sul pool / blip di rete, NON DB irraggiungibile. Dal punto di vista del
+      // collector sono indistinguibili dalla saturazione del pool: non armiamo il
+      // circuit breaker e non incrementiamo il contatore consecutivo. Segnaliamo
+      // come db.ping_saturated (warn) esattamente come il ramo pool-saturo.
+      const errMsg = (err as Error).message ?? "";
+      const isTransitoryConnectionError =
+        /connection terminated/i.test(errMsg) ||
+        /connection timeout/i.test(errMsg);
+
+      if (isTransitoryConnectionError) {
+        // Reset del contatore: un futuro guasto DB reale ripartirà da 1.
+        consecutivePingFailures = 0;
+        signals.push({
+          source: "db", metric: "db.ping_saturated", severity: "warn",
+          details: { error: errMsg.slice(0, 200), reason: "transitory_connection_error" },
+        });
+      } else {
+        cbRecordFailure(err);
+        consecutivePingFailures++;
+        // Un singolo ping fallito è quasi sempre un blip transitorio: lo segnaliamo
+        // come "warn" e lo escaliamo a "high" solo dopo N fallimenti consecutivi.
+        // Il circuit breaker emette già "critical" quando il DB è davvero giù:
+        // non aggiungere un secondo −40 con collector.error "critical" (doppia penalità).
+        const errSeverity: Signal["severity"] =
+          consecutivePingFailures >= CONSECUTIVE_FAIL_FOR_CRITICAL ? "high" : "warn";
+        signals.push({
+          source: "db", metric: "collector.error", severity: errSeverity,
+          details: { error: (err as Error).message, consecutiveFailures: consecutivePingFailures },
+        });
+      }
     }
   }
 

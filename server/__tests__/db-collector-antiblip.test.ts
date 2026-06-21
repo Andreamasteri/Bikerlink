@@ -92,16 +92,17 @@ describe("db-collector anti-blip gating", () => {
     }
   });
 
-  it("un singolo ping fallito resta 'warn', escala a 'critical' solo dopo 3 consecutivi", async () => {
+  it("un singolo ping fallito resta 'warn', escala a 'high' solo dopo 3 consecutivi (non 'critical' — doppia penalità)", async () => {
+    // Errore non-transitorio (ECONNREFUSED non matcha /connection terminated/)
     executeMock.mockRejectedValue(
-      Object.assign(new Error("connection terminated unexpectedly"), { code: "08006" }),
+      Object.assign(new Error("ECONNREFUSED 127.0.0.1:5432"), { code: "ECONNREFUSED" }),
     );
     const collectDb = await loadCollector();
 
     expect(collectorErr(await collectDb())?.severity).toBe("warn"); // 1
     expect(collectorErr(await collectDb())?.severity).toBe("warn"); // 2
-    const s3 = await collectDb(); // 3 → critical
-    expect(collectorErr(s3)?.severity).toBe("critical");
+    const s3 = await collectDb(); // 3 → high (mai critical: circuit breaker è già "critical")
+    expect(collectorErr(s3)?.severity).toBe("high");
     expect((collectorErr(s3)?.details as { consecutiveFailures: number }).consecutiveFailures).toBe(3);
   });
 
@@ -140,10 +141,11 @@ describe("db-collector anti-blip gating", () => {
     expect(recordFailureMock).not.toHaveBeenCalled();
   });
 
-  it("ping fallito con pool SANO conta come fallimento del breaker (DB irraggiungibile)", async () => {
+  it("ping fallito con pool SANO e errore non-transitorio conta come fallimento del breaker (DB irraggiungibile)", async () => {
     isPoolHealthyMock.mockReturnValue(true); // pool con capacità libera → guasto reale
+    // Errore non-transitorio: non matcha /connection terminated/ né /connection timeout/
     executeMock.mockRejectedValue(
-      Object.assign(new Error("connection terminated unexpectedly"), { code: "08006" }),
+      Object.assign(new Error("ECONNREFUSED 127.0.0.1:5432"), { code: "ECONNREFUSED" }),
     );
     const collectDb = await loadCollector();
 
@@ -165,5 +167,48 @@ describe("db-collector anti-blip gating", () => {
     // pool torna sano ma il DB è giù → riparte da 1 (warn, non critical)
     isPoolHealthyMock.mockReturnValue(true);
     expect(collectorErr(await collectDb())?.severity).toBe("warn");
+  });
+
+  // ── Errori di connessione transitoria (Task #4675) ────────────────────────
+
+  it("'Connection terminated due to connection timeout' con pool sano → ping_saturated warn, NON collector.error", async () => {
+    isPoolHealthyMock.mockReturnValue(true); // pool sano, ma errore transitorio
+    executeMock.mockRejectedValue(new Error("Connection terminated due to connection timeout"));
+    const collectDb = await loadCollector();
+
+    const s = await collectDb();
+    expect(saturated(s)?.severity).toBe("warn");
+    expect((saturated(s)?.details as { reason?: string })?.reason).toBe("transitory_connection_error");
+    expect(collectorErr(s)).toBeUndefined();
+    expect(recordFailureMock).not.toHaveBeenCalled();
+  });
+
+  it("'Connection terminated unexpectedly' con pool sano → ping_saturated warn, NON collector.error", async () => {
+    isPoolHealthyMock.mockReturnValue(true);
+    executeMock.mockRejectedValue(new Error("Connection terminated unexpectedly"));
+    const collectDb = await loadCollector();
+
+    const s = await collectDb();
+    expect(saturated(s)?.severity).toBe("warn");
+    expect(collectorErr(s)).toBeUndefined();
+    expect(recordFailureMock).not.toHaveBeenCalled();
+  });
+
+  it("collector.error non supera mai severity 'critical' indipendentemente da consecutivePingFailures", async () => {
+    isPoolHealthyMock.mockReturnValue(true);
+    executeMock.mockRejectedValue(new Error("ECONNREFUSED — host definitivamente giù"));
+    const collectDb = await loadCollector();
+
+    // Eseguiamo 10 cicli consecutivi: collector.error deve restare ≤ "high"
+    for (let i = 0; i < 10; i++) {
+      const s = await collectDb();
+      const ce = collectorErr(s);
+      expect(ce).toBeDefined();
+      expect(ce?.severity).not.toBe("critical");
+      // Dopo CONSECUTIVE_FAIL_FOR_CRITICAL (3) dev'essere "high"
+      if (i >= 2) {
+        expect(ce?.severity).toBe("high");
+      }
+    }
   });
 });

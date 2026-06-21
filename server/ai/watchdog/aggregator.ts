@@ -351,7 +351,33 @@ export async function runAggregatorCycle(): Promise<HealthSnapshot> {
   await recordSignals(signals.filter((s) => s.severity !== "info"));
 
   const problems = deriveProblems(signals);
-  const { status, score } = computeStatus(problems);
+  let { status, score } = computeStatus(problems);
+
+  // Score damping: impedisce che un singolo ciclo con evento transitorio faccia
+  // precipitare lo score di più di 35 punti rispetto allo snapshot precedente.
+  // Il punteggio scende comunque (il problema è visibile), ma gradualmente —
+  // non da 75→0 in un colpo solo. Attivo solo se lo snapshot precedente è
+  // recente (≤5 minuti), cioè il watchdog sta girando regolarmente.
+  const MAX_SCORE_DROP_PER_CYCLE = 35;
+  if (latest !== null) {
+    const ageMs = Date.now() - new Date(latest.generatedAt).getTime();
+    if (ageMs <= 5 * 60 * 1000) {
+      const lastScore = latest.score;
+      if (lastScore - score > MAX_SCORE_DROP_PER_CYCLE) {
+        const clampedScore = Math.max(0, lastScore - MAX_SCORE_DROP_PER_CYCLE);
+        console.warn(
+          `[watchdog/aggregator] score damping attivo: ${score}→${clampedScore} ` +
+          `(drop ${lastScore - score} > ${MAX_SCORE_DROP_PER_CYCLE}, last=${lastScore})`,
+        );
+        score = clampedScore;
+        status =
+          score >= 90 ? "green" :
+          score >= 70 ? "yellow" :
+          score >= 40 ? "orange" : "red";
+      }
+    }
+  }
+
   const metrics: Record<string, number> = {};
   for (const s of signals) if (typeof s.value === "number") metrics[`${s.source}.${s.metric}`] = s.value;
 
