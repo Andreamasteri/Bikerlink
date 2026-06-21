@@ -211,6 +211,7 @@ timeoutMs = 420000
   TILES_URL = "https://tiles.bikerlink.app"
   OLLAMA_URL = "https://ollama.bikerlink.duckdns.org"
   REDIS_PROBE_URL = "https://tc.bikerlink.duckdns.org/probe/redis"
+TC_SSH_PORT = "6380"
 
   [userenv.development]
   EXPO_WEB_URL = "http://localhost:8081"

@@ -59,14 +59,13 @@ function execSsh(command: string, timeoutMs = 30_000): Promise<{ stdout: string;
   return new Promise((resolve, reject) => {
     const host = (process.env.TC_SSH_HOST ?? "").replace(/^https?:\/\//i, "").trim();
     const username = process.env.TC_SSH_USER;
-    const privateKey = process.env.TC_SSH_KEY;
     const password = process.env.TC_SSH_PASSWORD;
 
     if (!host || !username) {
       return reject(new Error("TC_SSH_HOST e TC_SSH_USER non configurati"));
     }
-    if (!privateKey && !password) {
-      return reject(new Error("TC_SSH_KEY o TC_SSH_PASSWORD deve essere configurato"));
+    if (!password) {
+      return reject(new Error("TC_SSH_PASSWORD deve essere configurato"));
     }
 
     const conn = new SshClient();
@@ -120,16 +119,9 @@ function execSsh(command: string, timeoutMs = 30_000): Promise<{ stdout: string;
       host,
       port: parseInt(process.env.TC_SSH_PORT ?? "22", 10),
       username,
+      password,
       readyTimeout: timeoutMs,
     };
-
-    const normalizedKey = privateKey?.replace(/\\n/g, "\n").trim();
-    const isValidKey = normalizedKey && normalizedKey.startsWith("-----BEGIN");
-    if (isValidKey) {
-      connectOpts.privateKey = normalizedKey;
-    } else {
-      connectOpts.password = password;
-    }
 
     conn.connect(connectOpts);
   });
@@ -138,14 +130,16 @@ function execSsh(command: string, timeoutMs = 30_000): Promise<{ stdout: string;
 const router = Router();
 
 function authMiddleware(req: Request, res: Response, next: () => void) {
-  const token = req.headers["x-ssh-token"];
-  const expected = process.env.SSH_EXEC_TOKEN;
+  const user = req.headers["x-ssh-user"];
+  const password = req.headers["x-ssh-password"];
+  const expectedUser = process.env.TC_SSH_USER;
+  const expectedPassword = process.env.TC_SSH_PASSWORD;
 
-  if (!expected) {
-    return res.status(503).json({ error: "SSH_EXEC_TOKEN non configurato sul server" });
+  if (!expectedUser || !expectedPassword) {
+    return res.status(503).json({ error: "TC_SSH_USER e TC_SSH_PASSWORD non configurati sul server" });
   }
-  if (!token || token !== expected) {
-    return res.status(401).json({ error: "Token non valido o mancante" });
+  if (!user || !password || user !== expectedUser || password !== expectedPassword) {
+    return res.status(401).json({ error: "Credenziali non valide o mancanti" });
   }
   next();
 }
