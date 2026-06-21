@@ -1,6 +1,5 @@
 // Task #2533 — Collector DB Postgres. Connessioni, query lente, dimensione, IOPS approssimate.
-import { db, isPoolHealthy } from "../../../db";
-import { sql } from "drizzle-orm";
+import { pool, isPoolHealthy } from "../../../db";
 import type { Signal } from "../types";
 import { recordSuccess as cbRecordSuccess, recordFailure as cbRecordFailure, getCircuitStatus } from "../../../db-circuit-breaker";
 
@@ -22,22 +21,42 @@ let consecutivePingFailures = 0;
 
 export async function collectDb(): Promise<Signal[]> {
   const signals: Signal[] = [];
+
+  // Early-exit (Task #4679): se il pool è saturo NON acquisiamo nessuna
+  // connessione. Aggiungere pressione proprio quando il pool è pieno peggiora
+  // la saturazione; emettiamo solo un segnale informativo e usciamo. La
+  // pressione reale è già coperta da pool-collector (db.pool.waiting).
+  if (!isPoolHealthy()) {
+    return [{
+      source: "db", metric: "db.ping_saturated", severity: "warn",
+      details: { reason: "pool_saturated_skip" },
+    }];
+  }
+
+  // Connessione dedicata (Task #4679): acquisiamo UNA sola connessione dal pool
+  // e vi eseguiamo tutte le query, rilasciandola nel finally. Prima usavamo 4
+  // `db.execute()` separati → 4 acquisizioni/rilasci dal pool nello stesso giro.
+  let client: import("pg").PoolClient | null = null;
   const started = Date.now();
   try {
+    client = await pool.connect();
+    // Timeout di sicurezza per le query diagnostiche del collector (3s). Usiamo
+    // SET (non SET LOCAL): fuori da una transazione SET LOCAL sarebbe un no-op.
+    // Ripristiniamo il default del pool (5s) nel finally prima del release per
+    // non lasciare il timeout ridotto su una connessione che torna nel pool.
+    try { await client.query("SET statement_timeout = '3000'"); } catch { /* best-effort */ }
+
     // Ping
-    await db.execute(sql`SELECT 1`);
+    await client.query("SELECT 1");
     const pingMs = Date.now() - started;
     cbRecordSuccess();
     consecutivePingFailures = 0;
     if (pingMs > 5000) {
-      try {
-        const poolMod = await import("../../../db").catch(() => null);
-        const poolInfo = poolMod ? (poolMod.pool as { totalCount?: number; idleCount?: number; waitingCount?: number }) : null;
-        console.warn(
-          `[watchdog/db] ping spike: ${pingMs}ms` +
-          (poolInfo ? ` — pool: total=${poolInfo.totalCount ?? "?"} idle=${poolInfo.idleCount ?? "?"} waiting=${poolInfo.waitingCount ?? "?"}` : ""),
-        );
-      } catch { /* best-effort */ }
+      const poolInfo = pool as { totalCount?: number; idleCount?: number; waitingCount?: number };
+      console.warn(
+        `[watchdog/db] ping spike: ${pingMs}ms` +
+        ` — pool: total=${poolInfo.totalCount ?? "?"} idle=${poolInfo.idleCount ?? "?"} waiting=${poolInfo.waitingCount ?? "?"}`,
+      );
     }
     // Latenza alta: escala a "high" solo dopo N campioni lenti consecutivi.
     // Un singolo spike resta "warn" (non spinge lo stato globale a red).
@@ -57,14 +76,14 @@ export async function collectDb(): Promise<Signal[]> {
 
     // Connessioni attive
     try {
-      const r = await db.execute<{ active: number; total: number }>(sql`
+      const r = await client.query<{ active: number; total: number }>(`
         SELECT
           COUNT(*) FILTER (WHERE state = 'active')::int AS active,
           COUNT(*)::int AS total
         FROM pg_stat_activity
         WHERE datname = current_database()
       `);
-      const row = (r as { rows?: Array<{ active: number; total: number }> }).rows?.[0];
+      const row = r.rows[0];
       if (row) {
         signals.push({
           source: "db", metric: "db.connections.active", value: Number(row.active), unit: "conn",
@@ -76,12 +95,12 @@ export async function collectDb(): Promise<Signal[]> {
 
     // Query lente: pg_stat_statements (se installato)
     try {
-      const r = await db.execute<{ slow_count: number }>(sql`
+      const r = await client.query<{ slow_count: number }>(`
         SELECT COUNT(*)::int AS slow_count
         FROM pg_stat_statements
         WHERE mean_exec_time > 500
       `);
-      const row = (r as { rows?: Array<{ slow_count: number }> }).rows?.[0];
+      const row = r.rows[0];
       if (row) {
         signals.push({
           source: "db", metric: "db.slow_queries", value: Number(row.slow_count), unit: "queries",
@@ -92,10 +111,10 @@ export async function collectDb(): Promise<Signal[]> {
 
     // Size DB (informativo)
     try {
-      const r = await db.execute<{ size_mb: number }>(sql`
+      const r = await client.query<{ size_mb: number }>(`
         SELECT (pg_database_size(current_database()) / 1024.0 / 1024.0)::float AS size_mb
       `);
-      const row = (r as { rows?: Array<{ size_mb: number }> }).rows?.[0];
+      const row = r.rows[0];
       if (row) {
         signals.push({
           source: "db", metric: "db.size_mb", value: Number(row.size_mb), unit: "MB", severity: "info",
@@ -154,6 +173,13 @@ export async function collectDb(): Promise<Signal[]> {
           details: { error: (err as Error).message, consecutiveFailures: consecutivePingFailures },
         });
       }
+    }
+  } finally {
+    if (client) {
+      // Ripristina il default del pool prima di restituire la connessione e
+      // rilasciala sempre, anche sui rami d'errore.
+      try { await client.query("SET statement_timeout = '5000'"); } catch { /* best-effort */ }
+      client.release();
     }
   }
 

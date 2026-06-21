@@ -4,7 +4,7 @@ import { pool } from "../../db";
 import { storage } from "../../storage";
 import {
   isVacuumRunning,
-  runVacuumFullAll,
+  runVacuumSmart,
   VACUUM_LAST_RUN_SETTING_KEY,
   VACUUM_DETAIL_SETTING_KEY,
   VACUUM_TABLES,
@@ -186,10 +186,10 @@ router.post("/db/vacuum-full", async (_req: Request, res: Response) => {
     if (isVacuumRunning()) {
       return sendError(res, 409, "VACUUM già in corso");
     }
-    runVacuumFullAll().catch((err: unknown) => {
+    runVacuumSmart().catch((err: unknown) => {
       console.error("[admin/db/vacuum-full] background error:", err);
     });
-    return res.json({ ok: true, message: "VACUUM FULL avviato in background" });
+    return res.json({ ok: true, message: "VACUUM smart avviato in background" });
   } catch (err) {
     console.error("[admin/db/vacuum-full] error:", err);
     return sendError(res, 500, "Errore avvio VACUUM FULL");

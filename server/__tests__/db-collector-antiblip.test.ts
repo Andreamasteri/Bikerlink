@@ -1,14 +1,19 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import type { Signal } from "../ai/watchdog/types";
 
-// db.execute pilotabile per simulare ping veloci/lenti/falliti.
-const executeMock = vi.hoisted(() => vi.fn());
+// client.query pilotabile per simulare ping veloci/lenti/falliti. Il collector
+// ora acquisisce UNA sola connessione via pool.connect() ed esegue tutte le
+// query su quel client (Task #4679).
+const queryMock = vi.hoisted(() => vi.fn());
+const releaseMock = vi.hoisted(() => vi.fn());
+const connectMock = vi.hoisted(() =>
+  vi.fn(async () => ({ query: queryMock, release: releaseMock })),
+);
 // isPoolHealthy pilotabile: distingue "pool saturo" da "DB irraggiungibile".
 const isPoolHealthyMock = vi.hoisted(() => vi.fn(() => true));
 
 vi.mock("../db", () => ({
-  db: { execute: executeMock },
-  pool: { totalCount: 0, idleCount: 0, waitingCount: 0 },
+  pool: { totalCount: 0, idleCount: 0, waitingCount: 0, connect: connectMock },
   isPoolHealthy: isPoolHealthyMock,
 }));
 
@@ -41,7 +46,7 @@ describe("db-collector anti-blip gating", () => {
     vi.resetModules(); // azzera lo stato modulo (consecutiveSlow/Fail)
     nowIdx = 0;
     pingMs = 0;
-    executeMock.mockReset();
+    queryMock.mockReset();
     isPoolHealthyMock.mockReset();
     isPoolHealthyMock.mockReturnValue(true); // default: pool sano (un fallimento = DB down)
     recordSuccessMock.mockReset();
@@ -59,7 +64,7 @@ describe("db-collector anti-blip gating", () => {
 
   it("un singolo ping lento resta 'warn', escala a 'high' solo dopo 3 consecutivi", async () => {
     pingMs = 600; // > SLOW_PING_THRESHOLD_MS (500)
-    executeMock.mockResolvedValue({ rows: [] });
+    queryMock.mockResolvedValue({ rows: [] });
     const collectDb = await loadCollector();
 
     expect(ping(await collectDb())?.severity).toBe("warn"); // 1
@@ -68,7 +73,7 @@ describe("db-collector anti-blip gating", () => {
   });
 
   it("un ping veloce resetta il contatore dei lenti consecutivi", async () => {
-    executeMock.mockResolvedValue({ rows: [] });
+    queryMock.mockResolvedValue({ rows: [] });
     const collectDb = await loadCollector();
 
     pingMs = 600;
@@ -84,7 +89,7 @@ describe("db-collector anti-blip gating", () => {
 
   it("latenza intermedia (>150ms, <=500ms) è 'warn' senza escalation", async () => {
     pingMs = 200;
-    executeMock.mockResolvedValue({ rows: [] });
+    queryMock.mockResolvedValue({ rows: [] });
     const collectDb = await loadCollector();
 
     for (let i = 0; i < 5; i++) {
@@ -94,7 +99,7 @@ describe("db-collector anti-blip gating", () => {
 
   it("un singolo ping fallito resta 'warn', escala a 'high' solo dopo 3 consecutivi (non 'critical' — doppia penalità)", async () => {
     // Errore non-transitorio (ECONNREFUSED non matcha /connection terminated/)
-    executeMock.mockRejectedValue(
+    queryMock.mockRejectedValue(
       Object.assign(new Error("ECONNREFUSED 127.0.0.1:5432"), { code: "ECONNREFUSED" }),
     );
     const collectDb = await loadCollector();
@@ -109,17 +114,17 @@ describe("db-collector anti-blip gating", () => {
   it("un ping riuscito resetta il contatore dei fallimenti consecutivi", async () => {
     const collectDb = await loadCollector();
 
-    executeMock.mockRejectedValue(new Error("boom"));
+    queryMock.mockRejectedValue(new Error("boom"));
     await collectDb(); // fail #1
     await collectDb(); // fail #2
 
-    executeMock.mockReset();
-    executeMock.mockResolvedValue({ rows: [] });
+    queryMock.mockReset();
+    queryMock.mockResolvedValue({ rows: [] });
     pingMs = 100;
     await collectDb(); // success → reset
 
-    executeMock.mockReset();
-    executeMock.mockRejectedValue(new Error("boom"));
+    queryMock.mockReset();
+    queryMock.mockRejectedValue(new Error("boom"));
     expect(collectorErr(await collectDb())?.severity).toBe("warn"); // riparte da 1
   });
 
@@ -128,7 +133,7 @@ describe("db-collector anti-blip gating", () => {
 
   it("ping fallito con pool SATURO non apre il breaker e resta 'warn' (saturazione, non escala)", async () => {
     isPoolHealthyMock.mockReturnValue(false); // pool saturo: il SELECT 1 non ha ottenuto una connessione
-    executeMock.mockRejectedValue(new Error("timeout exceeded when trying to connect"));
+    queryMock.mockRejectedValue(new Error("timeout exceeded when trying to connect"));
     const collectDb = await loadCollector();
 
     // Anche dopo molti tick consecutivi la saturazione NON diventa mai 'critical'
@@ -144,7 +149,7 @@ describe("db-collector anti-blip gating", () => {
   it("ping fallito con pool SANO e errore non-transitorio conta come fallimento del breaker (DB irraggiungibile)", async () => {
     isPoolHealthyMock.mockReturnValue(true); // pool con capacità libera → guasto reale
     // Errore non-transitorio: non matcha /connection terminated/ né /connection timeout/
-    executeMock.mockRejectedValue(
+    queryMock.mockRejectedValue(
       Object.assign(new Error("ECONNREFUSED 127.0.0.1:5432"), { code: "ECONNREFUSED" }),
     );
     const collectDb = await loadCollector();
@@ -160,7 +165,7 @@ describe("db-collector anti-blip gating", () => {
 
     // 2 tick saturi (non contano)
     isPoolHealthyMock.mockReturnValue(false);
-    executeMock.mockRejectedValue(new Error("connect timeout"));
+    queryMock.mockRejectedValue(new Error("connect timeout"));
     await collectDb();
     await collectDb();
 
@@ -173,7 +178,7 @@ describe("db-collector anti-blip gating", () => {
 
   it("'Connection terminated due to connection timeout' con pool sano → ping_saturated warn, NON collector.error", async () => {
     isPoolHealthyMock.mockReturnValue(true); // pool sano, ma errore transitorio
-    executeMock.mockRejectedValue(new Error("Connection terminated due to connection timeout"));
+    queryMock.mockRejectedValue(new Error("Connection terminated due to connection timeout"));
     const collectDb = await loadCollector();
 
     const s = await collectDb();
@@ -185,7 +190,7 @@ describe("db-collector anti-blip gating", () => {
 
   it("'Connection terminated unexpectedly' con pool sano → ping_saturated warn, NON collector.error", async () => {
     isPoolHealthyMock.mockReturnValue(true);
-    executeMock.mockRejectedValue(new Error("Connection terminated unexpectedly"));
+    queryMock.mockRejectedValue(new Error("Connection terminated unexpectedly"));
     const collectDb = await loadCollector();
 
     const s = await collectDb();
@@ -196,7 +201,7 @@ describe("db-collector anti-blip gating", () => {
 
   it("collector.error non supera mai severity 'critical' indipendentemente da consecutivePingFailures", async () => {
     isPoolHealthyMock.mockReturnValue(true);
-    executeMock.mockRejectedValue(new Error("ECONNREFUSED — host definitivamente giù"));
+    queryMock.mockRejectedValue(new Error("ECONNREFUSED — host definitivamente giù"));
     const collectDb = await loadCollector();
 
     // Eseguiamo 10 cicli consecutivi: collector.error deve restare ≤ "high"

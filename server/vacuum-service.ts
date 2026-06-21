@@ -1,9 +1,15 @@
 import { db, pool } from "./db";
 import { sql } from "drizzle-orm";
 import { storage } from "./storage";
+import { withBgDbSlot } from "./lib/bg-db-limiter";
 
-const VACUUM_LAST_RUN_KEY = "db_vacuum_full_v3";
-const VACUUM_DETAIL_KEY = "db_vacuum_full_v3_detail";
+const VACUUM_LAST_RUN_KEY = "db_vacuum_smart_v1";
+const VACUUM_DETAIL_KEY = "db_vacuum_smart_v1_detail";
+
+// Soglia di bloat (dead tuple ratio) oltre la quale si esegue VACUUM FULL ANALYZE
+// invece del semplice VACUUM ANALYZE. Configurabile via AppSetting.
+const VACUUM_FULL_BLOAT_THRESHOLD_KEY = "vacuum_full_bloat_threshold";
+const DEFAULT_BLOAT_THRESHOLD = 0.2;
 
 export const VACUUM_LAST_RUN_SETTING_KEY = VACUUM_LAST_RUN_KEY;
 export const VACUUM_DETAIL_SETTING_KEY = VACUUM_DETAIL_KEY;
@@ -30,54 +36,129 @@ export function isVacuumRunning(): boolean {
   return isRunning;
 }
 
-/** Returns "executed" if the run completed, "skipped" if another run was already active. */
-export async function runVacuumFullAll(): Promise<"executed" | "skipped"> {
+/**
+ * Legge il dead-tuple ratio di una tabella da `pg_stat_user_tables`.
+ * ratio = n_dead_tup / (n_dead_tup + n_live_tup), nell'intervallo 0–1.
+ * Se la tabella non compare nelle stats (o la query fallisce) ritorna 0,
+ * così la tabella riceve solo un VACUUM ANALYZE (nessun FULL inutile).
+ */
+async function getTableBloatRatio(
+  client: import("pg").PoolClient,
+  table: string,
+): Promise<number> {
+  try {
+    const r = await client.query<{ dead: string; live: string }>(
+      `SELECT n_dead_tup AS dead, n_live_tup AS live
+         FROM pg_stat_user_tables
+        WHERE schemaname = 'public' AND relname = $1`,
+      [table],
+    );
+    const row = r.rows[0];
+    if (!row) return 0;
+    const dead = parseInt(row.dead ?? "0", 10);
+    const live = parseInt(row.live ?? "0", 10);
+    const total = dead + live;
+    if (total <= 0) return 0;
+    return dead / total;
+  } catch {
+    return 0;
+  }
+}
+
+/** Legge la soglia di bloat (0–1) dall'AppSetting `vacuum_full_bloat_threshold`. */
+async function getBloatThreshold(): Promise<number> {
+  try {
+    const setting = await storage.getAppSetting(VACUUM_FULL_BLOAT_THRESHOLD_KEY);
+    if (setting?.value) {
+      const parsed = parseFloat(setting.value);
+      if (!isNaN(parsed) && parsed > 0 && parsed < 1) return parsed;
+    }
+  } catch {
+    // usa il default
+  }
+  return DEFAULT_BLOAT_THRESHOLD;
+}
+
+/**
+ * VACUUM smart: per ogni tabella esegue `VACUUM ANALYZE` (nessun lock esclusivo);
+ * solo le tabelle con bloat (dead-tuple ratio) oltre la soglia ricevono il
+ * `VACUUM FULL ANALYZE` (lock esclusivo, più lento). L'intera esecuzione passa
+ * da `withBgDbSlot` per non affamare il pool del traffico utente.
+ *
+ * Returns "executed" if the run completed, "skipped" if another run was already active.
+ */
+export async function runVacuumSmart(): Promise<"executed" | "skipped"> {
   if (isRunning) {
     console.warn("[VACUUM] Giro già in corso — skip.");
     return "skipped";
   }
   isRunning = true;
   const startTotal = Date.now();
-  console.log("[VACUUM] Avvio VACUUM FULL ANALYZE su tutte le tabelle principali...");
-  let client: import("pg").PoolClient | null = null;
-  type TableDetail = { table: string; bytesBefore: number; bytesAfter: number };
+  type TableDetail = {
+    table: string;
+    mode: "analyze" | "full";
+    bloatRatio: number;
+    bytesBefore: number;
+    bytesAfter: number;
+  };
   const tableDetails: TableDetail[] = [];
   try {
-    client = await pool.connect();
-    for (const table of VACUUM_TABLES) {
-      let sizeBefore = 0;
-      let sizeAfter = 0;
+    const threshold = await getBloatThreshold();
+    console.log(
+      `[VACUUM] Avvio VACUUM smart sulle tabelle principali (soglia bloat FULL: ${(threshold * 100).toFixed(0)}%)...`,
+    );
+    await withBgDbSlot(async () => {
+      let client: import("pg").PoolClient | null = null;
       try {
-        const r = await client.query<{ size: string }>(
-          `SELECT pg_total_relation_size($1::regclass) AS size`,
-          [table],
-        );
-        sizeBefore = parseInt(r.rows[0]?.size ?? "0", 10);
-      } catch {
-        sizeBefore = 0;
+        client = await pool.connect();
+        for (const table of VACUUM_TABLES) {
+          let sizeBefore = 0;
+          let sizeAfter = 0;
+          try {
+            const r = await client.query<{ size: string }>(
+              `SELECT pg_total_relation_size($1::regclass) AS size`,
+              [table],
+            );
+            sizeBefore = parseInt(r.rows[0]?.size ?? "0", 10);
+          } catch {
+            sizeBefore = 0;
+          }
+          const bloatRatio = await getTableBloatRatio(client, table);
+          const mode: "analyze" | "full" = bloatRatio > threshold ? "full" : "analyze";
+          const t0 = Date.now();
+          if (mode === "full") {
+            await client.query(`VACUUM FULL ANALYZE ${table}`);
+          } else {
+            await client.query(`VACUUM ANALYZE ${table}`);
+          }
+          const elapsed = Date.now() - t0;
+          try {
+            const r = await client.query<{ size: string }>(
+              `SELECT pg_total_relation_size($1::regclass) AS size`,
+              [table],
+            );
+            sizeAfter = parseInt(r.rows[0]?.size ?? "0", 10);
+          } catch {
+            sizeAfter = 0;
+          }
+          tableDetails.push({ table, mode, bloatRatio, bytesBefore: sizeBefore, bytesAfter: sizeAfter });
+          const savedMB = ((sizeBefore - sizeAfter) / 1024 / 1024).toFixed(2);
+          const beforeMB = (sizeBefore / 1024 / 1024).toFixed(2);
+          const afterMB = (sizeAfter / 1024 / 1024).toFixed(2);
+          const bloatPct = (bloatRatio * 100).toFixed(1);
+          console.log(
+            `[VACUUM] ${table}: mode=${mode.toUpperCase()} bloat=${bloatPct}% ${beforeMB}MB → ${afterMB}MB (risparmio ${savedMB}MB) in ${elapsed}ms`,
+          );
+        }
+      } finally {
+        if (client) client.release();
       }
-      const t0 = Date.now();
-      await client.query(`VACUUM FULL ANALYZE ${table}`);
-      const elapsed = Date.now() - t0;
-      try {
-        const r = await client.query<{ size: string }>(
-          `SELECT pg_total_relation_size($1::regclass) AS size`,
-          [table],
-        );
-        sizeAfter = parseInt(r.rows[0]?.size ?? "0", 10);
-      } catch {
-        sizeAfter = 0;
-      }
-      tableDetails.push({ table, bytesBefore: sizeBefore, bytesAfter: sizeAfter });
-      const savedMB = ((sizeBefore - sizeAfter) / 1024 / 1024).toFixed(2);
-      const beforeMB = (sizeBefore / 1024 / 1024).toFixed(2);
-      const afterMB = (sizeAfter / 1024 / 1024).toFixed(2);
-      console.log(
-        `[VACUUM] ${table}: ${beforeMB}MB → ${afterMB}MB (risparmio ${savedMB}MB) in ${elapsed}ms`,
-      );
-    }
+    });
     const totalElapsed = Date.now() - startTotal;
-    console.log(`[VACUUM] Completato in ${totalElapsed}ms — spazio recuperato.`);
+    const fullCount = tableDetails.filter((d) => d.mode === "full").length;
+    console.log(
+      `[VACUUM] Completato in ${totalElapsed}ms — ${fullCount}/${tableDetails.length} tabelle in VACUUM FULL.`,
+    );
     try {
       await storage.upsertAppSetting(VACUUM_LAST_RUN_KEY, new Date().toISOString());
     } catch (err) {
@@ -90,10 +171,9 @@ export async function runVacuumFullAll(): Promise<"executed" | "skipped"> {
     }
     return "executed";
   } catch (err) {
-    console.error("[VACUUM] Errore durante VACUUM FULL:", err);
+    console.error("[VACUUM] Errore durante VACUUM smart:", err);
     throw err;
   } finally {
-    if (client) client.release();
     isRunning = false;
   }
 }
@@ -190,7 +270,7 @@ export function scheduleNightlyVacuum(): void {
       console.warn("[VACUUM] Esecuzione notturna saltata: giro precedente ancora in corso.");
     } else {
       try {
-        await runVacuumFullAll();
+        await runVacuumSmart();
       } catch (err) {
         console.error("[VACUUM] Errore nel giro notturno:", err);
       }
