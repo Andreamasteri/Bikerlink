@@ -46,7 +46,6 @@ interface ProfileData {
   avatarUrl?: string;
   profile?: {
     bio?: string;
-    maxPickupDistance?: number;
   };
   photos?: Array<{
     id: string;

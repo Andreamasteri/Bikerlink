@@ -21,7 +21,6 @@ export interface ProfileData {
     totalKm: number;
     totalRides: number;
     easterEggsCollected: number;
-    maxPickupDistance?: number;
     searchPreference?: string;
     preferredMapStyle?: string | null;
     hideFromMap?: boolean;
