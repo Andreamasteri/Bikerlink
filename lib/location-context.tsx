@@ -5,8 +5,13 @@ import { sendStartupBeacon } from "@/lib/startup-beacon";
 import { markAsyncError } from "@/lib/crash-logger";
 import { withTimeout } from "@/lib/resume-utils";
 
-const GPS_FLOOD_WINDOW_MS = 30000;
-const GPS_FLOOD_MAX_FIXES = 10;
+// GPS flood = ricezione anomala di fix mentre l'utente è fermo (sintomo di un
+// loop di watch impazzito che può saturare il JS thread). Finestra scorrevole di
+// 1s: se arrivano >5 fix/sec con velocità <2 km/h (fermo) → `gps_flood`.
+const GPS_FLOOD_WINDOW_MS = 1000;
+const GPS_FLOOD_MAX_FIXES_PER_SEC = 5;
+// 2 km/h in m/s (coords.speed è in m/s). Sotto questa soglia consideriamo l'utente fermo.
+const GPS_FLOOD_STATIONARY_MAX_SPEED_MS = 2 / 3.6;
 
 // Native permission bridge calls can wedge on resume; cap them so a stalled
 // bridge rejects into the existing catch instead of hanging the resume sequence.
@@ -183,20 +188,27 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
           gpsFixTimestampsRef.current = gpsFixTimestampsRef.current
             .filter((t) => now - t < GPS_FLOOD_WINDOW_MS)
             .concat(now);
-          const fixCount = gpsFixTimestampsRef.current.length;
-          if (fixCount > GPS_FLOOD_MAX_FIXES) {
-            const speed = locationObj.coords.speed ?? 0;
+          // fix nell'ultimo secondo = fix/sec (la finestra è di 1s).
+          const fixPerSec = gpsFixTimestampsRef.current.length;
+          const rawSpeed = locationObj.coords.speed ?? 0;
+          // expo può restituire speed negativa (sconosciuta): la trattiamo come fermo.
+          const speed = rawSpeed < 0 ? 0 : rawSpeed;
+          if (
+            fixPerSec > GPS_FLOOD_MAX_FIXES_PER_SEC &&
+            speed < GPS_FLOOD_STATIONARY_MAX_SPEED_MS
+          ) {
+            const accuracy = locationObj.coords.accuracy ?? null;
             markAsyncError(
               "gps_flood",
               new Error(
-                `GPS flood: ${fixCount} fix in ${GPS_FLOOD_WINDOW_MS / 1000}s, speed=${speed.toFixed(2)}m/s, accuracy=${locationObj.coords.accuracy ?? "?"}m`
+                `GPS flood: ${fixPerSec} fix/sec da fermo (speed=${speed.toFixed(2)}m/s), accuracy=${accuracy ?? "?"}m`
               )
             ).catch(() => {});
             sendStartupBeacon("gps_flood_detected", {
-              fixCount,
+              fixPerSec,
               windowMs: GPS_FLOOD_WINDOW_MS,
               speed,
-              accuracy: locationObj.coords.accuracy,
+              accuracy,
             });
           }
           setCurrentPosition({

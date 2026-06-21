@@ -145,6 +145,20 @@ export function AppStateHandler() {
         const transitionId = ++stateTransitionCountRef.current;
         const transitionAt = new Date().toISOString();
 
+        // Canonical transition beacon (task contract: prev/new state + foreground
+        // duration) emitted for every change so a freeze can be correlated with an
+        // AppState switch. Computed before the branches reset fgStartRef.
+        const leavingForeground = !!nextAppState.match(/inactive|background/) && prev === "active";
+        const transitionFgDurationMs =
+          leavingForeground && fgStartRef.current ? Date.now() - fgStartRef.current : null;
+        sendStartupBeacon("appstate_transition", {
+          prevState: prev,
+          newState: nextAppState,
+          transitionId,
+          transitionAt,
+          fgDurationMs: transitionFgDurationMs,
+        });
+
         if (nextAppState.match(/inactive|background/) && prev === "active") {
           const fgDurationMs = fgStartRef.current ? Date.now() - fgStartRef.current : null;
           fgStartRef.current = null;

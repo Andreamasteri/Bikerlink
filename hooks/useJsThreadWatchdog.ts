@@ -4,7 +4,7 @@ import { markAsyncError } from "@/lib/crash-logger";
 import { sendStartupBeacon } from "@/lib/startup-beacon";
 
 const TICK_INTERVAL_MS = 2000;
-const FREEZE_THRESHOLD_MS = 5000;
+const FREEZE_THRESHOLD_MS = 3000;
 const HEAP_PRESSURE_RATIO = 0.8;
 // Isteresi: il warning heap si riarma solo quando l'uso scende sotto 72%
 // (0.8 * 0.9), per non oscillare attorno alla soglia ad ogni tick.
@@ -21,7 +21,7 @@ interface PerfWithMemory {
  * Watchdog per il JS thread + pressione di memoria.
  *
  * 1. JS thread freeze: un setInterval che batte ogni 2s. Se il tick arriva con
- *    gap > 5s, il JS thread era bloccato → `js_thread_freeze`.
+ *    gap > 3s, il JS thread era bloccato → `js_thread_freeze`.
  * 2. Memory pressure (Android/runtime): se `performance.memory` è disponibile
  *    (raro in Hermes, presente in alcuni runtime) e l'heap JS supera l'80% del
  *    limite → `memory_pressure` (una sola volta per superamento, con isteresi).
