@@ -3,11 +3,12 @@ import { db, withDbRetry } from "../db";
 import { sql } from "drizzle-orm";
 import { rideTelemetry } from "@shared/db";
 import { requireUserId } from "../lib/auth-middleware";
-import { sendSuccess, sendError } from "../lib/api-response";
+import { sendError } from "../lib/api-response";
 import { logTelemetryEvent } from "../lib/telemetry-error-log";
 import { classifyTelemetrySample, coerceFiniteNumber } from "@shared/tracking-fusion";
-import { storage } from "../storage";
 import { getInternalProbeToken, getInternalProbeHeaderName, isLoopback } from "../ai/watchdog/internal-token";
+import idealLapsRouter from "./telemetry-ideal-laps";
+import calibrationRouter from "./telemetry-calibration";
 
 const router = Router();
 
@@ -78,8 +79,6 @@ router.post("/batch", async (req: Request, res: Response) => {
     }
 
     // Task #3115 — nome custom per i giri secondari (solo ideal_lap).
-    // Se il nome è già usato dall'utente per un altro giro, appende la data per
-    // distinguere i file (es. "casa-lavoro 03/06/2026").
     let resolvedLapName: string | null = null;
     if (resolvedType === "ideal_lap" && typeof lap_name === "string" && lap_name.trim()) {
       const base = lap_name.trim().slice(0, 40);
@@ -117,13 +116,9 @@ router.post("/batch", async (req: Request, res: Response) => {
 
     const rows: typeof rideTelemetry.$inferInsert[] = [];
     for (const s of samples as RawSample[]) {
-      // Shared classification (shared/tracking-fusion.ts) is the single source of
-      // truth: "drop" = no valid ts; "gps_valid"/"sensor_only" both stored, the
-      // latter with lat/lon null (no GPS fix, e.g. inside a tunnel) — not 0.
       const klass = classifyTelemetrySample(s);
       if (klass === "drop") continue;
 
-      // ts is guaranteed finite here (not "drop"). lat/lon stay null for sensor-only.
       const ts = coerceFiniteNumber(s.ts) as number;
 
       rows.push({
@@ -248,11 +243,7 @@ router.get("/stats", async (req: Request, res: Response) => {
     const kmResult = await withDbRetry(() => db.execute(sql`
       WITH ordered AS (
         SELECT
-          session_id,
-          lat,
-          lon,
-          ts,
-          speed_kmh,
+          session_id, lat, lon, ts, speed_kmh,
           LAG(lat) OVER (PARTITION BY session_id ORDER BY ts) AS prev_lat,
           LAG(lon) OVER (PARTITION BY session_id ORDER BY ts) AS prev_lon
         FROM ride_telemetry
@@ -284,10 +275,7 @@ router.get("/stats", async (req: Request, res: Response) => {
     const trackKmResult = await withDbRetry(() => db.execute(sql`
       WITH ordered AS (
         SELECT
-          session_id,
-          lat,
-          lon,
-          ts,
+          session_id, lat, lon, ts,
           LAG(lat) OVER (PARTITION BY session_id ORDER BY ts) AS prev_lat,
           LAG(lon) OVER (PARTITION BY session_id ORDER BY ts) AS prev_lon
         FROM ride_telemetry
@@ -318,11 +306,7 @@ router.get("/stats", async (req: Request, res: Response) => {
     const idealLapKmResult = await withDbRetry(() => db.execute(sql`
       WITH ordered AS (
         SELECT
-          session_id,
-          lat,
-          lon,
-          ts,
-          speed_kmh,
+          session_id, lat, lon, ts, speed_kmh,
           LAG(lat) OVER (PARTITION BY session_id ORDER BY ts) AS prev_lat,
           LAG(lon) OVER (PARTITION BY session_id ORDER BY ts) AS prev_lon
         FROM ride_telemetry
@@ -378,263 +362,7 @@ router.get("/stats", async (req: Request, res: Response) => {
   }
 });
 
-router.get("/ideal-laps", async (req: Request, res: Response) => {
-  const userId = requireUserId(req, res);
-  if (!userId) return;
-
-  try {
-    const [result, distResult] = await Promise.all([
-      withDbRetry(() => db.execute(sql`
-        SELECT
-          session_id,
-          MAX(lap_name) AS lap_name,
-          MIN(ts) AS started_at_ms,
-          COUNT(*) AS sample_count,
-          MAX(speed_kmh) AS max_speed_kmh,
-          MAX(ABS(lean_angle)) AS max_lean_deg,
-          MAX(
-            SQRT(
-              COALESCE(gforce_x, 0) * COALESCE(gforce_x, 0)
-              + COALESCE(gforce_y, 0) * COALESCE(gforce_y, 0)
-              + COALESCE(gforce_z, 0) * COALESCE(gforce_z, 0)
-            )
-          ) AS max_gforce
-        FROM ride_telemetry
-        WHERE user_id = ${userId}
-          AND session_type = 'ideal_lap'
-        GROUP BY session_id
-        ORDER BY MIN(ts) DESC
-      `)),
-      withDbRetry(() => db.execute(sql`
-        SELECT session_id, SUM(seg_km) AS distance_km
-        FROM (
-          SELECT
-            session_id,
-            CASE
-              WHEN next_lat IS NOT NULL AND lat IS NOT NULL AND lon IS NOT NULL AND next_lon IS NOT NULL
-              THEN 2 * 6371 * ASIN(SQRT(
-                POWER(SIN((next_lat - lat) * PI() / 360), 2)
-                + COS(lat * PI() / 180) * COS(next_lat * PI() / 180)
-                  * POWER(SIN((next_lon - lon) * PI() / 360), 2)
-              ))
-              ELSE 0
-            END AS seg_km
-          FROM (
-            SELECT
-              session_id, lat, lon,
-              LEAD(lat) OVER (PARTITION BY session_id ORDER BY ts) AS next_lat,
-              LEAD(lon) OVER (PARTITION BY session_id ORDER BY ts) AS next_lon
-            FROM ride_telemetry
-            WHERE user_id = ${userId}
-              AND session_type = 'ideal_lap'
-              AND lat IS NOT NULL AND lon IS NOT NULL
-          ) pts
-        ) segs
-        GROUP BY session_id
-      `)),
-    ]);
-
-    type LapRow = {
-      session_id: string;
-      lap_name: string | null;
-      started_at_ms: string;
-      sample_count: string;
-      max_speed_kmh: string | null;
-      max_lean_deg: string | null;
-      max_gforce: string | null;
-    };
-
-    type DistRow = { session_id: string; distance_km: string | null };
-
-    const distMap = new Map<string, number | null>();
-    for (const d of distResult.rows as DistRow[]) {
-      distMap.set(d.session_id, d.distance_km != null ? Math.round(parseFloat(d.distance_km) * 100) / 100 : null);
-    }
-
-    const laps = (result.rows as LapRow[]).map((r, idx) => ({
-      sessionId: r.session_id,
-      lapName: r.lap_name ?? null,
-      startedAt: new Date(Number(r.started_at_ms)).toISOString(),
-      sampleCount: parseInt(r.sample_count, 10),
-      maxSpeedKmh: r.max_speed_kmh != null ? Math.round(parseFloat(r.max_speed_kmh) * 10) / 10 : null,
-      maxLeanDeg: r.max_lean_deg != null ? Math.round(parseFloat(r.max_lean_deg) * 10) / 10 : null,
-      maxGforce: r.max_gforce != null ? Math.round(parseFloat(r.max_gforce) * 100) / 100 : null,
-      lapNumber: (result.rows as LapRow[]).length - idx,
-      distanceKm: distMap.get(r.session_id) ?? null,
-    }));
-
-    return res.json({ laps });
-  } catch (err) {
-    console.error("[telemetry/ideal-laps] error:", err);
-    return sendError(res, 500, "Errore interno del server");
-  }
-});
-
-router.get("/ideal-laps/:sessionId/samples", async (req: Request, res: Response) => {
-  const userId = requireUserId(req, res);
-  if (!userId) return;
-
-  const { sessionId } = req.params;
-  if (!sessionId) return sendError(res, 400, "sessionId obbligatorio");
-
-  try {
-    const result = await withDbRetry(() => db.execute(sql`
-      SELECT
-        ts,
-        speed_kmh,
-        lean_angle,
-        SQRT(
-          COALESCE(gforce_x, 0) * COALESCE(gforce_x, 0)
-          + COALESCE(gforce_y, 0) * COALESCE(gforce_y, 0)
-          + COALESCE(gforce_z, 0) * COALESCE(gforce_z, 0)
-        ) AS gforce,
-        lat,
-        lon
-      FROM ride_telemetry
-      WHERE user_id = ${userId}
-        AND session_id = ${sessionId}
-        AND session_type = 'ideal_lap'
-      ORDER BY ts ASC
-      LIMIT 2000
-    `));
-
-    type SampleRow = {
-      ts: string;
-      speed_kmh: string | null;
-      lean_angle: string | null;
-      gforce: string | null;
-      lat: string | null;
-      lon: string | null;
-    };
-
-    const samples = (result.rows as SampleRow[]).map((r) => ({
-      ts: parseInt(r.ts, 10),
-      speedKmh: r.speed_kmh != null ? Math.round(parseFloat(r.speed_kmh) * 10) / 10 : null,
-      leanAngle: r.lean_angle != null ? Math.round(parseFloat(r.lean_angle) * 10) / 10 : null,
-      gforce: r.gforce != null ? Math.round(parseFloat(r.gforce) * 100) / 100 : null,
-      lat: r.lat != null ? parseFloat(r.lat) : null,
-      lon: r.lon != null ? parseFloat(r.lon) : null,
-    }));
-
-    return res.json({ samples });
-  } catch (err) {
-    console.error("[telemetry/ideal-laps/samples] error:", err);
-    return sendError(res, 500, "Errore interno del server");
-  }
-});
-
-router.delete("/ideal-laps/:sessionId", async (req: Request, res: Response) => {
-  const userId = requireUserId(req, res);
-  if (!userId) return;
-
-  const { sessionId } = req.params;
-  if (!sessionId) return sendError(res, 400, "sessionId obbligatorio");
-
-  try {
-    await db.execute(sql`
-      DELETE FROM ride_telemetry
-      WHERE user_id = ${userId}
-        AND session_id = ${sessionId}
-        AND session_type = 'ideal_lap'
-    `);
-    return sendSuccess(res);
-  } catch (err) {
-    console.error("[telemetry/ideal-laps DELETE] error:", err);
-    return sendError(res, 500, "Errore interno del server");
-  }
-});
-
-router.get("/sensor-settings", async (req: Request, res: Response) => {
-  const userId = requireUserId(req, res);
-  if (!userId) return;
-
-  try {
-    const [globalSetting, userRow] = await Promise.all([
-      storage.getAppSetting("telemetry_sensors_global_enabled"),
-      withDbRetry(() => db.execute(sql`SELECT telemetry_disabled FROM users WHERE id = ${userId} LIMIT 1`)),
-    ]);
-
-    const globalEnabled = globalSetting?.value !== "false";
-    const userRow0 = userRow.rows[0] as { telemetry_disabled?: boolean } | undefined;
-    const userEnabled = !(userRow0?.telemetry_disabled ?? false);
-
-    return res.json({ globalEnabled, userEnabled });
-  } catch (err) {
-    console.error("[telemetry/sensor-settings] error:", err);
-    return sendError(res, 500, "Errore lettura impostazioni sensori");
-  }
-});
-
-// ── GET /api/telemetry/calibration ───────────────────────────────────────────
-router.get("/calibration", async (req: Request, res: Response) => {
-  const userId = requireUserId(req, res);
-  if (!userId) return;
-
-  try {
-    const result = await withDbRetry(() => db.execute(sql`
-      SELECT mount_calibration FROM users WHERE id = ${userId} LIMIT 1
-    `));
-    const row = result.rows[0] as { mount_calibration: unknown } | undefined;
-    return res.json({ calibration: row?.mount_calibration ?? null });
-  } catch (err) {
-    console.error("[telemetry/calibration GET] error:", err);
-    return sendError(res, 500, "Errore lettura calibrazione");
-  }
-});
-
-// ── PUT /api/telemetry/calibration ───────────────────────────────────────────
-router.put("/calibration", async (req: Request, res: Response) => {
-  const userId = requireUserId(req, res);
-  if (!userId) return;
-
-  try {
-    const { calibration } = req.body as { calibration: unknown };
-
-    if (calibration !== null && calibration !== undefined) {
-      const c = calibration as Record<string, unknown>;
-      const validAxes = ["x", "y", "z"];
-      if (
-        !validAxes.includes(c.longAxis as string) ||
-        !validAxes.includes(c.latAxis as string) ||
-        !validAxes.includes(c.vertAxis as string) ||
-        (c.longSign !== 1 && c.longSign !== -1) ||
-        typeof c.timestamp !== "number"
-      ) {
-        return sendError(res, 400, "Payload calibrazione non valido");
-      }
-    }
-
-    const value = calibration == null ? null : JSON.stringify(calibration);
-    await db.execute(sql`
-      UPDATE users
-      SET mount_calibration = ${value}::jsonb, updated_at = NOW()
-      WHERE id = ${userId}
-    `);
-
-    return res.json({ ok: true });
-  } catch (err) {
-    console.error("[telemetry/calibration PUT] error:", err);
-    return sendError(res, 500, "Errore salvataggio calibrazione");
-  }
-});
-
-router.delete("/reset", async (req: Request, res: Response) => {
-  const userId = requireUserId(req, res);
-  if (!userId) return;
-
-  try {
-    const result = await db.execute(sql`
-      DELETE FROM ride_telemetry
-      WHERE user_id = ${userId}
-        AND session_type NOT IN ('ideal_lap')
-    `);
-
-    const deleted = result.rowCount ?? 0;
-    return res.json({ deleted });
-  } catch (err) {
-    console.error("[telemetry/reset] error:", err);
-    return sendError(res, 500, "Errore interno del server");
-  }
-});
+router.use(idealLapsRouter);
+router.use(calibrationRouter);
 
 export default router;
