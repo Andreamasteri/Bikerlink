@@ -13,6 +13,9 @@ import { describe, it, expect } from "vitest";
 import {
   computeDestinationPoint,
   haversineKm,
+  evaluateSegment,
+  accuracyAwareMinSegmentKm,
+  TRACKING_FUSION,
 } from "@shared/tracking-fusion";
 
 // ─── Tolerance ────────────────────────────────────────────────────────────────
@@ -115,5 +118,202 @@ describe("haversineKm — invariants", () => {
     const d = haversineKm(45.4642, 9.1900, 41.9028, 12.4964);
     expect(d).toBeGreaterThan(472);
     expect(d).toBeLessThan(482);
+  });
+});
+
+// ─── (4) accuracyAwareMinSegmentKm — clamping behaviour ──────────────────────
+
+describe("accuracyAwareMinSegmentKm — floor clamping", () => {
+  it("perfect accuracy (0 m) clamps to MIN_SEGMENT_FLOOR_M", () => {
+    const minKm = accuracyAwareMinSegmentKm(0);
+    expect(minKm).toBeCloseTo(TRACKING_FUSION.MIN_SEGMENT_FLOOR_M / 1000, 6);
+  });
+
+  it("accuracy below 2×MIN produces same floor (scale factor 0.5 keeps it at min)", () => {
+    // acc=4 → 4*0.5=2 < MIN_SEGMENT_FLOOR_M(3) → clamps to 3 m
+    const minKm = accuracyAwareMinSegmentKm(4);
+    expect(minKm).toBeCloseTo(TRACKING_FUSION.MIN_SEGMENT_FLOOR_M / 1000, 6);
+  });
+
+  it("null accuracy falls back to MIN_SEGMENT_FLOOR_M floor", () => {
+    const minKm = accuracyAwareMinSegmentKm(null);
+    expect(minKm).toBeCloseTo(TRACKING_FUSION.MIN_SEGMENT_FLOOR_M / 1000, 6);
+  });
+
+  it("undefined accuracy falls back to MIN_SEGMENT_FLOOR_M floor", () => {
+    const minKm = accuracyAwareMinSegmentKm(undefined);
+    expect(minKm).toBeCloseTo(TRACKING_FUSION.MIN_SEGMENT_FLOOR_M / 1000, 6);
+  });
+
+  it("accuracy that would exceed MAX_SEGMENT_FLOOR_M clamps to MAX_SEGMENT_FLOOR_M", () => {
+    // acc=100 → 100*0.5=50 > MAX_SEGMENT_FLOOR_M(8) → clamps to 8 m
+    const minKm = accuracyAwareMinSegmentKm(100);
+    expect(minKm).toBeCloseTo(TRACKING_FUSION.MAX_SEGMENT_FLOOR_M / 1000, 6);
+  });
+
+  it("accuracy at exactly 2×MAX_SEGMENT_FLOOR_M clamps to MAX_SEGMENT_FLOOR_M", () => {
+    // acc=16 → 16*0.5=8 === MAX_SEGMENT_FLOOR_M(8) → stays at 8 m
+    const minKm = accuracyAwareMinSegmentKm(TRACKING_FUSION.MAX_SEGMENT_FLOOR_M * 2);
+    expect(minKm).toBeCloseTo(TRACKING_FUSION.MAX_SEGMENT_FLOOR_M / 1000, 6);
+  });
+
+  it("accuracy between the two floors scales linearly", () => {
+    // acc=10 → 10*0.5=5; MIN=3, MAX=8 → result is 5 m = 0.005 km
+    const minKm = accuracyAwareMinSegmentKm(10);
+    expect(minKm).toBeCloseTo(0.005, 6);
+  });
+});
+
+// ─── (5) evaluateSegment — rejection paths ───────────────────────────────────
+
+const BASE_LAT = 45.4642;
+const BASE_LNG = 9.1900;
+const BASE_TIME_MS = 1_700_000_000_000;
+
+describe("evaluateSegment — speed_jump rejection", () => {
+  it("segment implying > MAX_PLAUSIBLE_KMH is rejected with reason speed_jump", () => {
+    // 1 km in 1 second → 3 600 km/h >> 360 km/h limit
+    const dest = computeDestinationPoint(BASE_LAT, BASE_LNG, 1, 0);
+    const result = evaluateSegment({
+      prevLat: BASE_LAT,
+      prevLng: BASE_LNG,
+      prevTimeMs: BASE_TIME_MS,
+      lat: dest.lat,
+      lng: dest.lng,
+      timeMs: BASE_TIME_MS + 1_000,
+      accuracyM: 5,
+    });
+    expect(result.accept).toBe(false);
+    expect(result.reason).toBe("speed_jump");
+    expect(result.distanceKm).toBe(0);
+  });
+
+  it("segment well below MAX_PLAUSIBLE_KMH (200 km/h) is NOT rejected for speed", () => {
+    // 200 km/h for 10 s → ~0.556 km — clearly within the plausible range
+    const distKm = (200 / 3600) * 10;
+    const dest = computeDestinationPoint(BASE_LAT, BASE_LNG, distKm, 0);
+    const result = evaluateSegment({
+      prevLat: BASE_LAT,
+      prevLng: BASE_LNG,
+      prevTimeMs: BASE_TIME_MS,
+      lat: dest.lat,
+      lng: dest.lng,
+      timeMs: BASE_TIME_MS + 10_000,
+      accuracyM: 5,
+    });
+    expect(result.reason).not.toBe("speed_jump");
+  });
+});
+
+describe("evaluateSegment — low_accuracy rejection", () => {
+  it("accuracyM > ACCURACY_GATE_M (35 m) is rejected with reason low_accuracy", () => {
+    const dest = computeDestinationPoint(BASE_LAT, BASE_LNG, 0.5, 90);
+    const result = evaluateSegment({
+      prevLat: BASE_LAT,
+      prevLng: BASE_LNG,
+      prevTimeMs: BASE_TIME_MS,
+      lat: dest.lat,
+      lng: dest.lng,
+      timeMs: BASE_TIME_MS + 30_000,
+      accuracyM: TRACKING_FUSION.ACCURACY_GATE_M + 1,
+    });
+    expect(result.accept).toBe(false);
+    expect(result.reason).toBe("low_accuracy");
+    expect(result.distanceKm).toBe(0);
+  });
+
+  it("accuracyM exactly at ACCURACY_GATE_M (35 m) is NOT rejected for low_accuracy", () => {
+    const dest = computeDestinationPoint(BASE_LAT, BASE_LNG, 0.5, 90);
+    const result = evaluateSegment({
+      prevLat: BASE_LAT,
+      prevLng: BASE_LNG,
+      prevTimeMs: BASE_TIME_MS,
+      lat: dest.lat,
+      lng: dest.lng,
+      timeMs: BASE_TIME_MS + 30_000,
+      accuracyM: TRACKING_FUSION.ACCURACY_GATE_M,
+    });
+    expect(result.reason).not.toBe("low_accuracy");
+  });
+
+  it("null accuracyM bypasses the accuracy gate entirely", () => {
+    const dest = computeDestinationPoint(BASE_LAT, BASE_LNG, 0.5, 90);
+    const result = evaluateSegment({
+      prevLat: BASE_LAT,
+      prevLng: BASE_LNG,
+      prevTimeMs: BASE_TIME_MS,
+      lat: dest.lat,
+      lng: dest.lng,
+      timeMs: BASE_TIME_MS + 30_000,
+      accuracyM: null,
+    });
+    expect(result.reason).not.toBe("low_accuracy");
+  });
+});
+
+describe("evaluateSegment — below_floor rejection", () => {
+  it("sub-noise-floor jitter (1 m movement) is rejected with reason below_floor", () => {
+    // 1 m north → 0.001 km < MIN_SEGMENT_FLOOR_M/1000 (0.003 km)
+    const dest = computeDestinationPoint(BASE_LAT, BASE_LNG, 0.001, 0);
+    const result = evaluateSegment({
+      prevLat: BASE_LAT,
+      prevLng: BASE_LNG,
+      prevTimeMs: BASE_TIME_MS,
+      lat: dest.lat,
+      lng: dest.lng,
+      timeMs: BASE_TIME_MS + 5_000,
+      accuracyM: 5,
+    });
+    expect(result.accept).toBe(false);
+    expect(result.reason).toBe("below_floor");
+    expect(result.distanceKm).toBe(0);
+  });
+
+  it("movement just above the floor is accepted", () => {
+    // 5 m north → 0.005 km > MIN_SEGMENT_FLOOR_M/1000 (0.003 km) at good accuracy
+    const dest = computeDestinationPoint(BASE_LAT, BASE_LNG, 0.005, 0);
+    const result = evaluateSegment({
+      prevLat: BASE_LAT,
+      prevLng: BASE_LNG,
+      prevTimeMs: BASE_TIME_MS,
+      lat: dest.lat,
+      lng: dest.lng,
+      timeMs: BASE_TIME_MS + 5_000,
+      accuracyM: 5,
+    });
+    expect(result.accept).toBe(true);
+    expect(result.distanceKm).toBeGreaterThan(0);
+  });
+
+  it("same coordinates rejected as below_floor (zero distance)", () => {
+    const result = evaluateSegment({
+      prevLat: BASE_LAT,
+      prevLng: BASE_LNG,
+      prevTimeMs: BASE_TIME_MS,
+      lat: BASE_LAT,
+      lng: BASE_LNG,
+      timeMs: BASE_TIME_MS + 5_000,
+      accuracyM: 5,
+    });
+    expect(result.accept).toBe(false);
+    expect(result.reason).toBe("below_floor");
+  });
+});
+
+describe("evaluateSegment — happy path (accepted segment)", () => {
+  it("100 m segment in 10 s at good accuracy is accepted", () => {
+    const dest = computeDestinationPoint(BASE_LAT, BASE_LNG, 0.1, 90);
+    const result = evaluateSegment({
+      prevLat: BASE_LAT,
+      prevLng: BASE_LNG,
+      prevTimeMs: BASE_TIME_MS,
+      lat: dest.lat,
+      lng: dest.lng,
+      timeMs: BASE_TIME_MS + 10_000,
+      accuracyM: 10,
+    });
+    expect(result.accept).toBe(true);
+    expect(result.distanceKm).toBeCloseTo(0.1, 3);
+    expect(result.reason).toBeUndefined();
   });
 });
