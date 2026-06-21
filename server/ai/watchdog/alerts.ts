@@ -77,7 +77,30 @@ export async function dispatchAlerts(snap: HealthSnapshot): Promise<{ sent: numb
     }
   }
 
-  // Problem-level (critical singoli — pool exhaustion già gestita sopra)
+  // Instabilità di rete — alert dedicato per ≥2 engine down contemporaneamente.
+  // Severity "high" (non critical) per evitare rumore eccessivo ma comunque notificato.
+  const netInstabilityProblem = snap.problems.find(
+    (p) => p.id === "maps.health.network_instability",
+  );
+  if (netInstabilityProblem) {
+    await emitWatchdogAlert({ problem: netInstabilityProblem, score: snap.score, status: snap.status });
+    const mapsAlertsOn = await isMapsFlagEnabled("alerts");
+    if (mapsAlertsOn && shouldSend("maps.network_instability")) {
+      const n = await sendSystemAlertPushToAdmins(
+        `🌐 ${netInstabilityProblem.title}`,
+        netInstabilityProblem.suggestion ?? "Verifica connettività Replit.",
+        { type: "watchdog_network_instability", score: snap.score, status: snap.status },
+      );
+      sentCount += n;
+      await writeWatchdogLog({
+        kind: "alert", scope: "maps.network_instability", status: "ok",
+        summary: `Alert instabilità di rete: ${netInstabilityProblem.title}`,
+        details: { sent: n, suggestion: netInstabilityProblem.suggestion },
+      });
+    }
+  }
+
+  // Problem-level (critical singoli — pool exhaustion e network_instability già gestite sopra)
   for (const p of snap.problems) {
     if (p.severity !== "critical") continue;
     if (p.id === "db.db.pool.waiting") continue; // già gestita nel blocco pool dedicato

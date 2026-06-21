@@ -209,6 +209,11 @@ function deriveProblems(signals: Signal[]): Problem[] {
       const tile = s.metric.split(".")[2];
       title = `Tile provider ${tile} non raggiungibile`;
       suggestion = "Verifica disponibilità CDN tile e fallback configurato.";
+    } else if (s.metric === "health.network_instability") {
+      const det = s.details as { engines?: string[]; description?: string } | undefined;
+      const engineList = det?.engines?.join(", ") ?? "sconosciuti";
+      title = `Instabilità di rete: ${s.value} engine irraggiungibili (${engineList})`;
+      suggestion = "Verifica connettività Replit. Se ThinkCentre è offline, usa powered-off mode per sopprimere i relativi alert.";
     } else if (s.metric.startsWith("health.engine.")) {
       const engine = s.metric.split(".")[2];
       title = `Routing engine ${engine} health-check KO`;

@@ -25,9 +25,11 @@ export interface HealthCheckResult {
   statusCode?: number;
   error?: string;
   severity?: "warn" | "high" | "critical";
+  /** true per engine cloud supplementari (TomTom, Mapbox) — non bloccanti. */
+  cloudEngine?: boolean;
 }
 
-interface Target { kind: "tile" | "engine"; id: string; url: string; headers?: Record<string, string>; }
+interface Target { kind: "tile" | "engine"; id: string; url: string; headers?: Record<string, string>; cloudEngine?: boolean; }
 
 /**
  * Classifica un errore di rete in un messaggio leggibile (italiano).
@@ -69,10 +71,16 @@ function engineTargets(): Target[] {
     out.push({ kind: "engine", id: "valhalla", url: `${valhalla.replace(/\/$/, "")}/status` });
   }
   if (process.env.MAPBOX_ACCESS_TOKEN) {
-    out.push({ kind: "engine", id: "mapbox", url: "https://api.mapbox.com/" });
+    out.push({ kind: "engine", id: "mapbox", url: "https://api.mapbox.com/", cloudEngine: true });
   }
   if (process.env.TOMTOM_API_KEY) {
-    out.push({ kind: "engine", id: "tomtom", url: "https://api.tomtom.com/" });
+    // Routing minimale: verifica anche l'autenticazione, non solo la raggiungibilità del dominio.
+    const key = process.env.TOMTOM_API_KEY;
+    out.push({
+      kind: "engine", id: "tomtom",
+      url: `https://api.tomtom.com/routing/1/calculateRoute/0,0:1,1/json?key=${key}&routeType=fastest&travelMode=motorcycle`,
+      cloudEngine: true,
+    });
   }
   return out;
 }
@@ -128,15 +136,21 @@ async function pingOne(t: Target): Promise<HealthCheckResult> {
     });
     const latencyMs = Date.now() - started;
     const ok = resp.status < 500 && (t.kind === "engine" || resp.status < 400);
+    const failSeverity: "high" | "critical" =
+      t.kind !== "engine" ? "high" : t.cloudEngine ? "high" : "critical";
     return {
       kind: t.kind, id: t.id, url: t.url, ok, latencyMs, statusCode: resp.status,
-      severity: !ok ? (t.kind === "engine" ? "critical" : "high") : undefined,
+      severity: !ok ? failSeverity : undefined,
+      cloudEngine: t.cloudEngine,
     };
   } catch (err) {
+    const failSeverity: "high" | "critical" =
+      t.kind !== "engine" ? "high" : t.cloudEngine ? "high" : "critical";
     return {
       kind: t.kind, id: t.id, url: t.url, ok: false, latencyMs: null,
       error: classifyNetworkError(err),
-      severity: t.kind === "engine" ? "critical" : "high",
+      severity: failSeverity,
+      cloudEngine: t.cloudEngine,
     };
   } finally {
     clearTimeout(timer);

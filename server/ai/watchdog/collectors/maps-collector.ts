@@ -15,6 +15,20 @@ import { runMapsHealthChecks } from "../maps-health-checks";
 import { logger } from "../../../lib/logger";
 import { withBgDbSlot } from "../../../lib/bg-db-limiter";
 
+/**
+ * Rimuove parametri sensibili (es. key=) da URL prima di persistere nei dettagli
+ * del segnale. Evita che le API key vengano scritte nel DB/log.
+ */
+function redactUrl(url: string): string {
+  try {
+    const u = new URL(url);
+    if (u.searchParams.has("key")) u.searchParams.set("key", "[REDACTED]");
+    return u.toString();
+  } catch {
+    return url;
+  }
+}
+
 const log = logger.child({ scope: "maps-watchdog", collector: "maps" });
 
 const WINDOW_MS = 5 * 60_000;
@@ -223,13 +237,43 @@ export async function collectMaps(): Promise<Signal[]> {
   // ─── 5. Health-check tile servers + routing engines ───────────────────
   try {
     const hc = await runMapsHealthChecks();
+
+    // Correlazione multi-engine: se ≥2 engine falliscono nello stesso ciclo,
+    // è probabile un micro-outage di rete, non guasti separati. In quel caso:
+    // - i segnali individuali vengono retrocessi a "warn" (ridurre il rumore);
+    // - viene aggiunto un segnale aggregato "health.network_instability" high.
+    const failedEngines = hc.filter((r) => r.kind === "engine" && !r.ok);
+    const networkInstability = failedEngines.length >= 2;
+
     for (const r of hc) {
+      let severity: Signal["severity"] =
+        r.ok ? (r.latencyMs && r.latencyMs > 2500 ? "warn" : "info")
+             : r.severity ?? "high";
+
+      // Retrocedi il segnale individuale a "warn" in caso di instabilità di rete
+      // (il segnale aggregato è già a "high" e contiene il dettaglio completo).
+      if (!r.ok && r.kind === "engine" && networkInstability) {
+        severity = "warn";
+      }
+
       signals.push({
         source: "maps", metric: `health.${r.kind}.${r.id}`,
         value: r.latencyMs ?? null, unit: "ms",
-        severity: r.ok ? (r.latencyMs && r.latencyMs > 2500 ? "warn" : "info")
-                       : r.severity ?? "high",
-        details: { url: r.url, error: r.error ?? null, statusCode: r.statusCode ?? null },
+        severity,
+        details: { url: redactUrl(r.url), error: r.error ?? null, statusCode: r.statusCode ?? null },
+      });
+    }
+
+    if (networkInstability) {
+      const engineList = failedEngines.map((r) => r.id).join(", ");
+      signals.push({
+        source: "maps", metric: "health.network_instability",
+        value: failedEngines.length, unit: "engines",
+        severity: "high",
+        details: {
+          engines: failedEngines.map((r) => r.id),
+          description: `${failedEngines.length} engine irraggiungibili contemporaneamente: ${engineList}`,
+        },
       });
     }
   } catch (err) {
