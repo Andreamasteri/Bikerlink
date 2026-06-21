@@ -230,7 +230,7 @@ export default function UptimeWidget() {
   const crashCount = data?.crashCount24h ?? 0;
 
   return (
-    <Animated.View style={[styles.container, animatedStyle]}>
+    <Animated.View testID="uptime-widget" style={[styles.container, animatedStyle]}>
       <View {...panResponder.panHandlers} style={styles.inner}>
         <Text style={styles.label}>
           {"⏱ "}

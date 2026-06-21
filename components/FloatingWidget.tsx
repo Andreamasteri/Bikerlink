@@ -208,6 +208,7 @@ export default function FloatingWidget() {
   return (
     <>
       <Animated.View
+        testID="floating-widget"
         style={[styles.widget, animatedStyle, aiOpen && styles.widgetHidden]}
         pointerEvents={aiOpen ? "none" : "auto"}
       >
