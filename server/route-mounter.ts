@@ -8,6 +8,7 @@ import { registerSiteRoutes } from "./site/routes";
 import { registerLeafletMapRoutes } from "./routes/leaflet-maps";
 import tileProxyRouter from "./routes/maps/tile-proxy";
 import { storage } from "./storage";
+import sshExecRouter from "./routes/ssh-exec";
 
 const log = console.log;
 
@@ -93,6 +94,9 @@ export function registerAllRoutes(app: express.Application) {
   
   // API Routes
   registerRoutes(expressApp);
+
+  // SSH exec — token-auth only, no session, no DB required
+  app.use("/api/ssh", sshExecRouter);
 
   // Tile proxy — forwards tile requests, detects 429/5xx from upstream
   app.use("/api", tileProxyRouter);
@@ -301,6 +305,14 @@ export function registerAllRoutes(app: express.Application) {
     res.setHeader("Content-Type", "text/html; charset=utf-8");
     res.setHeader("Cache-Control", "no-store");
     res.sendFile(pianificaPath);
+  });
+
+  // SSH Terminal page — token-authenticated via x-ssh-token header (no session needed)
+  const sshTerminalPath = path.resolve(process.cwd(), "server", "templates", "ssh-terminal.html");
+  app.get("/ssh-terminal", (_req, res) => {
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
+    res.setHeader("Cache-Control", "no-store");
+    res.sendFile(sshTerminalPath);
   });
 
   // Live diagnostics dashboard (admin only — requires active admin session)
