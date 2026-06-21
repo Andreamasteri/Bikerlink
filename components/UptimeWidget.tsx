@@ -79,6 +79,9 @@ export default function UptimeWidget() {
   // (frozen al mount) e non riesce a leggere i valori più recenti dalla
   // closure. Usando ref aggiornati garantiamo che clampUptimePos usi sempre
   // le dimensioni e gli inset correnti, anche dopo rotazione o resize.
+  // openHistoryRef segue lo stesso pattern: evita che la closure stantia
+  // catturi il router prima che la navigazione sia pronta (causa principale
+  // del tap silenzioso al primo mount).
   const widthRef = useRef(width);
   const heightRef = useRef(height);
   const insetsRef = useRef(insets);
@@ -156,6 +159,11 @@ export default function UptimeWidget() {
     router.push("/admin/restart-history" as never);
   }, [router]);
 
+  // Ref aggiornato a ogni render così il PanResponder frozen al mount chiama
+  // sempre la versione corrente di openHistory (router già pronto).
+  const openHistoryRef = useRef(openHistory);
+  openHistoryRef.current = openHistory;
+
   // PanResponder — gira completamente sul thread JS, nessun conflitto con i
   // gesture handler nativi di Expo Router (RNGH). onGrant registra l'origine,
   // onMove aggiorna la posizione in tempo reale (clampata ai bordi), onRelease
@@ -202,7 +210,7 @@ export default function UptimeWidget() {
         posY.value = clamped.y;
         savePosition(clamped.x, clamped.y);
         if (!isDragGesture(gs.dx, gs.dy, TAP_THRESHOLD)) {
-          openHistory();
+          openHistoryRef.current();
         }
       },
       onPanResponderTerminate: () => {
