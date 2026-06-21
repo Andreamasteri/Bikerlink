@@ -32,6 +32,7 @@ import { eq } from "drizzle-orm";
 import { dedupWarn } from "../lib/dedup-logger";
 import { isThinkCentreInMaintenance } from "../lib/thinkcentre-maintenance";
 import { isThinkCentrePoweredOff } from "../lib/thinkcentre-powered-off";
+import { isThinkCentreIgnoredForTests } from "../lib/thinkcentre-ignore-tests";
 import { sendSystemAlertPushToAdmins } from "../push-notifications";
 import { getNominatimHealthSnapshot } from "../lib/nominatim-client";
 import { ACTIVE_PROFILE, fetchSelfHostedProfiles, isSelfHosted } from "../graphhopper-client";
@@ -131,6 +132,10 @@ async function recordHealthEvent(
  */
 export async function checkMotorcycleProfile(): Promise<void> {
   if (!isSelfHosted) return;
+  if (await isThinkCentreIgnoredForTests()) {
+    console.log("[thinkcentre-monitor] ignore_for_tests attivo — motorcycle profile check saltato");
+    return;
+  }
   try {
     const result = await fetchSelfHostedProfiles();
     if (!result.reachable) {
@@ -481,6 +486,10 @@ async function handlePerServiceNotifications(
 
 // ── Ciclo principale ──────────────────────────────────────────────────────────
 export async function runThinkCentreProbe(): Promise<void> {
+  if (await isThinkCentreIgnoredForTests()) {
+    console.log("[thinkcentre-monitor] ignore_for_tests attivo — probe e notifiche soppresse");
+    return;
+  }
   if (await isThinkCentrePoweredOff()) {
     console.log("[thinkcentre-monitor] ThinkCentre spento (override manuale) — probe e notifiche saltate");
     return;

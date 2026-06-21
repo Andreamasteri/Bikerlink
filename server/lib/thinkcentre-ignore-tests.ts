@@ -1,9 +1,10 @@
 /**
  * Helper condiviso — legge il flag "thinkcentre_ignore_for_tests" da AppSettings.
  * Default: false (alerting normale attivo).
- * Quando true: il proposer AI watchdog salta tutte le segnalazioni relative al ThinkCentre.
+ * Quando true: il proposer AI watchdog, il monitor ThinkCentre e le push notifiche
+ * per servizi offline saltano tutte le segnalazioni relative al ThinkCentre.
  * Il routing cloud fallback rimane invariato — solo gli alert vengono soppressi.
- * Utilizzato da: watchdog/proposer, route admin thinkcentre-health.
+ * Utilizzato da: watchdog/proposer, jobs/thinkcentre-monitor, route admin thinkcentre-health.
  */
 import { db, withDbRetry } from "../db";
 import { appSettings } from "@shared/db";
