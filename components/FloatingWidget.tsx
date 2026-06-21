@@ -149,6 +149,7 @@ export default function FloatingWidget() {
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder: () => true,
+      onPanResponderTerminationRequest: () => false,
       onPanResponderGrant: () => {
         isDragging.current = true;
         dragStartX.current = posX.value;

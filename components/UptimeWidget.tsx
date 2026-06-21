@@ -166,6 +166,7 @@ export default function UptimeWidget() {
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder: () => true,
+      onPanResponderTerminationRequest: () => false,
       onPanResponderGrant: () => {
         isDragging.current = true;
         dragStartX.current = posX.value;
