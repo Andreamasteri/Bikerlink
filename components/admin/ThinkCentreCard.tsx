@@ -261,8 +261,75 @@ export function ThinkCentreCard({
 
   const maintenanceActive = maintenanceData?.enabled ?? false;
 
+  const poweredOffKey = ["/api/admin/thinkcentre/powered-off"] as const;
+
+  const { data: poweredOffData, isLoading: poweredOffLoading } = useQuery<{ enabled: boolean }>({
+    queryKey: poweredOffKey,
+    queryFn: async () => {
+      const res = await fetch(
+        new URL("/api/admin/thinkcentre/powered-off", getApiUrl()).toString(),
+        { headers: { ...(await authFetchHeaders()) }, credentials: "include" },
+      );
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return res.json();
+    },
+    staleTime: 30_000,
+  });
+
+  const poweredOffMutation = useMutation<{ ok: boolean; enabled: boolean }, Error, boolean, { prev: { enabled: boolean } | undefined }>({
+    mutationFn: async (enabled: boolean) => {
+      const res = await fetch(
+        new URL("/api/admin/thinkcentre/powered-off", getApiUrl()).toString(),
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...(await authFetchHeaders()) },
+          credentials: "include",
+          body: JSON.stringify({ enabled }),
+        },
+      );
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return res.json();
+    },
+    onMutate: async (enabled) => {
+      await queryClient.cancelQueries({ queryKey: poweredOffKey });
+      const prev = queryClient.getQueryData<{ enabled: boolean }>(poweredOffKey);
+      queryClient.setQueryData(poweredOffKey, { enabled });
+      return { prev };
+    },
+    onError: (_err, _enabled, context) => {
+      if (context?.prev !== undefined) {
+        queryClient.setQueryData(poweredOffKey, context.prev);
+      }
+    },
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: poweredOffKey });
+      void queryClient.invalidateQueries({ queryKey: ["/api/admin/thinkcentre-health"] });
+    },
+  });
+
+  const poweredOffActive = poweredOffData?.enabled ?? false;
+
   useEffect(() => {
-    if (!data || !onStatuses) return;
+    if (!onStatuses) return;
+    // ThinkCentre spento: tutti "unknown" immediatamente, senza attendere le probe.
+    if (poweredOffActive) {
+      onStatuses({
+        thinkcentre: "unknown",
+        graphhopper: "unknown",
+        valhalla: "unknown",
+        nominatim: "unknown",
+        ollama: "unknown",
+        whisper: "unknown",
+        ufw: "unknown",
+        redis: "unknown",
+        postgres: "unknown",
+        pgadmin: "unknown",
+        nginx: "unknown",
+        uptimeKuma: "unknown",
+      });
+      return;
+    }
+    if (!data) return;
     // In manutenzione il ThinkCentre non contribuisce allo stato globale: tutti "unknown".
     if (data.maintenanceMode) {
       onStatuses({
@@ -296,7 +363,7 @@ export function ThinkCentreCard({
       nginx: serviceToStatus(findSvc("nginx")),
       uptimeKuma: serviceToStatus(findSvc("uptimekuma")),
     });
-  }, [data, onStatuses]);
+  }, [data, onStatuses, poweredOffActive]);
 
   const headerColor = data ? OVERALL_COLOR[data.overall] : "#6b7280";
   const fp = data?.tokenFingerprints;
@@ -309,9 +376,15 @@ export function ThinkCentreCard({
         activeOpacity={0.7}
         testID="thinkcentre-card-header"
       >
-        <MaterialCommunityIcons name="home-assistant" size={18} color={headerColor} />
+        <MaterialCommunityIcons name="home-assistant" size={18} color={poweredOffActive ? "#6b7280" : headerColor} />
         <Text style={styles.cardTitle}>ThinkCentre</Text>
-        {maintenanceActive && (
+        {poweredOffActive && (
+          <View style={styles.poweredOffBadge}>
+            <Ionicons name="power-outline" size={11} color="#ef4444" />
+            <Text style={styles.poweredOffBadgeText}>OFF</Text>
+          </View>
+        )}
+        {!poweredOffActive && maintenanceActive && (
           <View style={styles.maintenanceBadge}>
             <Ionicons name="build-outline" size={11} color="#f97316" />
             <Text style={styles.maintenanceBadgeText}>MNT</Text>
@@ -353,14 +426,15 @@ export function ThinkCentreCard({
         </View>
       </TouchableOpacity>
 
-      {data && <ServiceBadgeStrip data={data} />}
+      {data && !poweredOffActive && <ServiceBadgeStrip data={data} />}
 
       {!collapsed && (
         <View style={styles.list}>
-          {error && !isLoading && (
+          {/* Service detail blocks — nascosti quando ThinkCentre è spento */}
+          {!poweredOffActive && error && !isLoading && (
             <Text style={styles.errorText}>Impossibile leggere lo stato dei servizi.</Text>
           )}
-          {data && data.graphhopperConfigured && (
+          {!poweredOffActive && data && data.graphhopperConfigured && (
             <GraphHopperBlock
               areas={data.graphhopperAreas}
               fingerprint={fp?.graphhopper ?? null}
@@ -368,64 +442,82 @@ export function ThinkCentreCard({
               tokenMissing={data.graphhopperTokenMissing}
             />
           )}
+          {!poweredOffActive && (
+            <ValhallaBlock
+              detail={error ? null : (data?.valhallaDetail ?? null)}
+              fingerprint={error ? null : (fp?.valhalla ?? null)}
+              isLoading={isLoading}
+              hasError={!!error}
+            />
+          )}
+          {!poweredOffActive && (
+            <NominatimBlock
+              detail={error ? null : (data?.nominatimDetail ?? null)}
+              fingerprint={error ? null : (fp?.nominatim ?? null)}
+              isLoading={isLoading}
+              hasError={!!error}
+            />
+          )}
+          {!poweredOffActive && (
+            <UfwBlock
+              detail={error ? null : (data?.ufwDetail ?? null)}
+              isLoading={isLoading}
+              hasError={!!error}
+            />
+          )}
+          {!poweredOffActive && (
+            <OllamaBlock
+              service={error ? undefined : data?.services.find((s) => s.key === "ollama")}
+              fingerprint={error ? null : (fp?.ollama ?? null)}
+              isLoading={isLoading}
+              hasError={!!error}
+            />
+          )}
+          {!poweredOffActive && (
+            <WhisperBlock
+              service={error ? undefined : data?.services.find((s) => s.key === "whisper")}
+              fingerprint={error ? null : (fp?.whisper ?? null)}
+              isLoading={isLoading}
+              hasError={!!error}
+            />
+          )}
+          {!poweredOffActive && (
+            <RedisBlock
+              service={error ? undefined : data?.services.find((s) => s.key === "redis")}
+              isLoading={isLoading}
+              hasError={!!error}
+            />
+          )}
+          {!poweredOffActive && (
+            <PostgresBlock
+              service={error ? undefined : data?.services.find((s) => s.key === "postgres")}
+              isLoading={isLoading}
+              hasError={!!error}
+            />
+          )}
+          {!poweredOffActive && (
+            <PgAdminBlock
+              service={error ? undefined : data?.services.find((s) => s.key === "pgadmin")}
+              isLoading={isLoading}
+              hasError={!!error}
+            />
+          )}
+          {!poweredOffActive && (
+            <NginxBlock
+              service={error ? undefined : data?.services.find((s) => s.key === "nginx")}
+              isLoading={isLoading}
+              hasError={!!error}
+            />
+          )}
+          {!poweredOffActive && (
+            <UptimeKumaBlock
+              service={error ? undefined : data?.services.find((s) => s.key === "uptimekuma")}
+              isLoading={isLoading}
+              hasError={!!error}
+            />
+          )}
 
-          <ValhallaBlock
-            detail={error ? null : (data?.valhallaDetail ?? null)}
-            fingerprint={error ? null : (fp?.valhalla ?? null)}
-            isLoading={isLoading}
-            hasError={!!error}
-          />
-          <NominatimBlock
-            detail={error ? null : (data?.nominatimDetail ?? null)}
-            fingerprint={error ? null : (fp?.nominatim ?? null)}
-            isLoading={isLoading}
-            hasError={!!error}
-          />
-          <UfwBlock
-            detail={error ? null : (data?.ufwDetail ?? null)}
-            isLoading={isLoading}
-            hasError={!!error}
-          />
-
-          <OllamaBlock
-            service={error ? undefined : data?.services.find((s) => s.key === "ollama")}
-            fingerprint={error ? null : (fp?.ollama ?? null)}
-            isLoading={isLoading}
-            hasError={!!error}
-          />
-          <WhisperBlock
-            service={error ? undefined : data?.services.find((s) => s.key === "whisper")}
-            fingerprint={error ? null : (fp?.whisper ?? null)}
-            isLoading={isLoading}
-            hasError={!!error}
-          />
-          <RedisBlock
-            service={error ? undefined : data?.services.find((s) => s.key === "redis")}
-            isLoading={isLoading}
-            hasError={!!error}
-          />
-          <PostgresBlock
-            service={error ? undefined : data?.services.find((s) => s.key === "postgres")}
-            isLoading={isLoading}
-            hasError={!!error}
-          />
-          <PgAdminBlock
-            service={error ? undefined : data?.services.find((s) => s.key === "pgadmin")}
-            isLoading={isLoading}
-            hasError={!!error}
-          />
-          <NginxBlock
-            service={error ? undefined : data?.services.find((s) => s.key === "nginx")}
-            isLoading={isLoading}
-            hasError={!!error}
-          />
-          <UptimeKumaBlock
-            service={error ? undefined : data?.services.find((s) => s.key === "uptimekuma")}
-            isLoading={isLoading}
-            hasError={!!error}
-          />
-
-          {data && data.configuredCount > 0 && data.onlineCount < data.configuredCount && (
+          {!poweredOffActive && data && data.configuredCount > 0 && data.onlineCount < data.configuredCount && (
             <TouchableOpacity
               style={[styles.retryButton, isFetching && styles.retryButtonBusy]}
               onPress={() => { if (!isFetching) void refetch(); }}
@@ -443,7 +535,7 @@ export function ThinkCentreCard({
               </Text>
             </TouchableOpacity>
           )}
-          {data && data.configuredCount > 0 && (
+          {!poweredOffActive && data && data.configuredCount > 0 && (
             <View style={styles.note}>
               <Ionicons name="information-circle-outline" size={14} color={Colors.textSecondary} />
               <View style={styles.noteBody}>
@@ -465,10 +557,22 @@ export function ThinkCentreCard({
             </View>
           )}
 
-          {eventsData && eventsData.events.length > 0 && (
+          {!poweredOffActive && eventsData && eventsData.events.length > 0 && (
             <EventLog events={eventsData.events} />
           )}
 
+          {/* Overlay powered-off — appare al posto dei blocchi servizio */}
+          {poweredOffActive && (
+            <View style={styles.poweredOffOverlay}>
+              <Ionicons name="power-outline" size={22} color="#ef4444" />
+              <Text style={styles.poweredOffOverlayTitle}>ThinkCentre spento</Text>
+              <Text style={styles.poweredOffOverlaySub}>
+                Override manuale attivo — tutti i servizi offline, probe e notifiche sospesi
+              </Text>
+            </View>
+          )}
+
+          {/* Toggles — sempre visibili quando la card è espansa */}
           <View style={styles.pushToggleRow}>
             <View style={styles.pushToggleLeft}>
               <Ionicons name="notifications-outline" size={15} color={Colors.textSecondary} />
@@ -503,6 +607,26 @@ export function ThinkCentreCard({
                 onValueChange={(val) => maintenanceMutation.mutate(val)}
                 trackColor={{ false: Colors.border, true: "#f97316" }}
                 thumbColor={maintenanceActive ? Colors.text : Colors.textSecondary}
+              />
+            )}
+          </View>
+
+          <View style={styles.pushToggleRow}>
+            <View style={styles.pushToggleLeft}>
+              <Ionicons name="power-outline" size={15} color={poweredOffActive ? "#ef4444" : Colors.textSecondary} />
+              <Text style={[styles.pushToggleLabel, poweredOffActive && styles.poweredOffLabelActive]}>
+                ThinkCentre spento
+              </Text>
+              <Text style={styles.pushToggleSub}>Tutti i servizi offline · nessuna notifica · routing su cloud</Text>
+            </View>
+            {poweredOffLoading || poweredOffMutation.isPending ? (
+              <ActivityIndicator size="small" color={Colors.textSecondary} />
+            ) : (
+              <Switch
+                value={poweredOffActive}
+                onValueChange={(val) => poweredOffMutation.mutate(val)}
+                trackColor={{ false: Colors.border, true: "#ef4444" }}
+                thumbColor={poweredOffActive ? Colors.text : Colors.textSecondary}
               />
             )}
           </View>
@@ -571,6 +695,43 @@ const styles = StyleSheet.create({
   pushToggleLabel: { fontFamily: "Inter_500Medium", fontSize: 13, color: Colors.text },
   pushToggleSub: { fontFamily: "Inter_400Regular", fontSize: 12, color: Colors.textSecondary },
   maintenanceLabelActive: { color: "#f97316" },
+  poweredOffLabelActive: { color: "#ef4444" },
+  poweredOffOverlay: {
+    alignItems: "center",
+    paddingVertical: 22,
+    paddingHorizontal: 12,
+    gap: 8,
+    marginTop: 10,
+  },
+  poweredOffOverlayTitle: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 15,
+    color: "#ef4444",
+  },
+  poweredOffOverlaySub: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 13,
+    color: Colors.textSecondary,
+    textAlign: "center",
+    lineHeight: 18,
+  },
+  poweredOffBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    backgroundColor: "rgba(239, 68, 68, 0.12)",
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: "rgba(239, 68, 68, 0.35)",
+  },
+  poweredOffBadgeText: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 10,
+    color: "#ef4444",
+    letterSpacing: 0.5,
+  },
   ufwBadge: { justifyContent: "center", alignItems: "center" },
   maintenanceBadge: {
     flexDirection: "row",

@@ -17,6 +17,7 @@ import {
   type ProbeLogEntry,
 } from "./thinkcentre-health-utils";
 import { isThinkCentreInMaintenance } from "../../lib/thinkcentre-maintenance";
+import { isThinkCentrePoweredOff } from "../../lib/thinkcentre-powered-off";
 import {
   probeValhallaDetailed,
   probeNominatimDetailed,
@@ -110,6 +111,47 @@ router.post("/thinkcentre/maintenance", async (req: Request, res: ExpressRespons
   }
 });
 
+/**
+ * GET /api/admin/thinkcentre/powered-off
+ * Legge il flag "thinkcentre_powered_off". Default: false.
+ */
+router.get("/thinkcentre/powered-off", async (_req: Request, res: ExpressResponse) => {
+  try {
+    const enabled = await isThinkCentrePoweredOff();
+    return res.json({ enabled });
+  } catch (_err) {
+    return sendError(res, 500, "Errore lettura stato ThinkCentre spento");
+  }
+});
+
+/**
+ * POST /api/admin/thinkcentre/powered-off
+ * Body: { enabled: boolean }
+ * Attiva/disattiva il flag "ThinkCentre spento". Si applica immediatamente senza restart.
+ * Quando attivo: probe saltate, push bloccate, routing su cloud.
+ */
+router.post("/thinkcentre/powered-off", async (req: Request, res: ExpressResponse) => {
+  try {
+    const { enabled } = req.body as { enabled?: unknown };
+    if (typeof enabled !== "boolean") {
+      return sendError(res, 400, "Campo 'enabled' deve essere un booleano");
+    }
+    await withDbRetry(() =>
+      db
+        .insert(appSettings)
+        .values({ key: "thinkcentre_powered_off", value: enabled ? "true" : "false" })
+        .onConflictDoUpdate({
+          target: appSettings.key,
+          set: { value: enabled ? "true" : "false", updatedAt: new Date() },
+        }),
+    );
+    console.log(`[admin/thinkcentre-powered-off] ThinkCentre ${enabled ? "SPENTO (override attivo)" : "acceso (override rimosso)"}`);
+    return res.json({ ok: true, enabled });
+  } catch (_err) {
+    return sendError(res, 500, "Errore salvataggio stato ThinkCentre spento");
+  }
+});
+
 router.get("/thinkcentre-events", async (_req: Request, res: ExpressResponse) => {
   try {
     const limit = 20;
@@ -128,6 +170,27 @@ router.get("/thinkcentre-events", async (_req: Request, res: ExpressResponse) =>
 
 router.get("/thinkcentre-health", async (_req: Request, res: ExpressResponse) => {
   try {
+    // ThinkCentre spento: risposta sintetica immediata, zero probe di rete.
+    if (await isThinkCentrePoweredOff()) {
+      return res.json({
+        overall: "idle",
+        onlineCount: 0,
+        configuredCount: 0,
+        services: [],
+        graphhopperConfigured: false,
+        graphhopperUrl: null,
+        graphhopperTokenMissing: false,
+        graphhopperAreas: [],
+        valhallaDetail: null,
+        nominatimDetail: null,
+        ufwDetail: null,
+        tokenFingerprints: { graphhopper: null, valhalla: null, ollama: null, whisper: null, nominatim: null },
+        maintenanceMode: false,
+        poweredOff: true,
+        checkedAt: Date.now(),
+      });
+    }
+
     const [
       maintenance,
       graphhopper,
@@ -376,6 +439,26 @@ export async function probeThinkCentreStatusSnapshot(): Promise<
     | "redis" | "postgres" | "pgadmin" | "nginx" | "uptimeKuma"
   >
 > {
+  // ThinkCentre spento: snapshot sintetico immediato, zero probe di rete.
+  if (await isThinkCentrePoweredOff()) {
+    const snap = {
+      thinkcentre: "unknown" as CachedDotStatus,
+      graphhopper: "unknown" as CachedDotStatus,
+      valhalla: "unknown" as CachedDotStatus,
+      nominatim: "unknown" as CachedDotStatus,
+      ollama: "unknown" as CachedDotStatus,
+      whisper: "unknown" as CachedDotStatus,
+      ufw: "unknown" as CachedDotStatus,
+      redis: "unknown" as CachedDotStatus,
+      postgres: "unknown" as CachedDotStatus,
+      pgadmin: "unknown" as CachedDotStatus,
+      nginx: "unknown" as CachedDotStatus,
+      uptimeKuma: "unknown" as CachedDotStatus,
+    };
+    updateSystemStatus(snap);
+    return snap;
+  }
+
   if (await isThinkCentreInMaintenance()) {
     const snap = {
       thinkcentre: "unknown" as CachedDotStatus,

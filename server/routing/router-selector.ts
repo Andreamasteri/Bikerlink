@@ -9,6 +9,7 @@ import { checkQuota } from "./mapbox/quota-guard";
 import { checkQuota as checkTomTomQuota } from "./tomtom/quota-guard";
 import { recordRoutingFallback, recordRoutingFailure, recordRoutingSuccess } from "./routing-metrics";
 import { isRoutingEnabled } from "./routing-kill-switch";
+import { isThinkCentrePoweredOff } from "../lib/thinkcentre-powered-off";
 import { isAreaRoutingActive } from "./routing-area-mode";
 import { resolveRoutingArea } from "./routing-area-resolver";
 import { ROUTING_AREA_OUTCOMES, findRoutingAreasForPoint, type RoutingAreaCode } from "@shared/routing-areas";
@@ -351,6 +352,31 @@ async function getActiveRouterInner(
 ): Promise<RouteResult> {
   if (!(await isRoutingEnabled())) {
     throw new RoutingDisabledError();
+  }
+
+  // ThinkCentre spento: tutti i servizi self-hosted (GH, Valhalla) sono offline.
+  // Tutti i profili — compreso auto_curvy — vengono instradati sulla catena cloud
+  // Mapbox → TomTom senza errori. Il profilo panoramico perde la semantica curvy
+  // ma l'utente ottiene comunque un percorso piuttosto che un errore.
+  if (await isThinkCentrePoweredOff()) {
+    console.log("[RouterSelector] ThinkCentre spento — routing su cloud");
+    // Catena cloud resiliente: Mapbox → TomTom, con fallback su errore runtime.
+    if (process.env.MAPBOX_ACCESS_TOKEN) {
+      try {
+        if (res && !res.headersSent) res.setHeader("X-Routing-Fallback", "mapbox");
+        recordRoutingFallback("graphhopper", "mapbox");
+        return await wrapMetrics("mapbox", () => mapboxCalculateRoute(req), res);
+      } catch (mapboxErr) {
+        const msg = mapboxErr instanceof Error ? mapboxErr.message : String(mapboxErr);
+        console.warn(`[RouterSelector] Mapbox fallito (${msg}) — provo TomTom`);
+      }
+    }
+    if (process.env.TOMTOM_API_KEY) {
+      if (res && !res.headersSent) res.setHeader("X-Routing-Fallback", "tomtom");
+      recordRoutingFallback("graphhopper", "tomtom");
+      return wrapMetrics("tomtom", () => tomtomCalculateRoute(req), res);
+    }
+    throw new Error("ThinkCentre spento — nessun engine cloud configurato come fallback");
   }
 
   // Profilo "auto panoramica" (auto_curvy): instradato SEMPRE a Valhalla con

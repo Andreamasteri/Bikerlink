@@ -31,6 +31,7 @@ import { appSettings, thinkcentreHealthEvents } from "@shared/db";
 import { eq } from "drizzle-orm";
 import { dedupWarn } from "../lib/dedup-logger";
 import { isThinkCentreInMaintenance } from "../lib/thinkcentre-maintenance";
+import { isThinkCentrePoweredOff } from "../lib/thinkcentre-powered-off";
 import { sendSystemAlertPushToAdmins } from "../push-notifications";
 import { getNominatimHealthSnapshot } from "../lib/nominatim-client";
 import { ACTIVE_PROFILE, fetchSelfHostedProfiles, isSelfHosted } from "../graphhopper-client";
@@ -480,6 +481,10 @@ async function handlePerServiceNotifications(
 
 // ── Ciclo principale ──────────────────────────────────────────────────────────
 export async function runThinkCentreProbe(): Promise<void> {
+  if (await isThinkCentrePoweredOff()) {
+    console.log("[thinkcentre-monitor] ThinkCentre spento (override manuale) — probe e notifiche saltate");
+    return;
+  }
   if (await isThinkCentreInMaintenance()) {
     console.log("[thinkcentre-monitor] manutenzione programmata — probe saltate");
     return;

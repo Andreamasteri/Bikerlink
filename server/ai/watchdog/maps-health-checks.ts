@@ -10,6 +10,7 @@ import { getRoutingAreaMode } from "../../routing/routing-area-mode";
 import { getAreaEnabledMap } from "../../routing/routing-area-state";
 import { ROUTING_AREAS, routingAreaUrl } from "@shared/routing-areas";
 import { isThinkCentreInMaintenance } from "../../lib/thinkcentre-maintenance";
+import { isThinkCentrePoweredOff } from "../../lib/thinkcentre-powered-off";
 
 const log = logger.child({ scope: "maps-watchdog", check: "health" });
 
@@ -85,6 +86,7 @@ function engineTargets(): Target[] {
  */
 export async function areaEngineTargets(): Promise<Target[]> {
   if (!isSelfHosted || !SELF_HOSTED_BASE_URL) return [];
+  if (await isThinkCentrePoweredOff()) return [];
   if (await isThinkCentreInMaintenance()) return [];
   let mode: string;
   try {
@@ -196,25 +198,33 @@ async function pingGraphHopper(t: Target): Promise<HealthCheckResult> {
 let lastRunAt = 0;
 let cachedResults: HealthCheckResult[] = [];
 const CACHE_TTL_MS = 5 * 60_000;
-/** Stato manutenzione nell'ultimo ciclo — undefined = prima esecuzione. */
+/** Stato manutenzione/powered-off nell'ultimo ciclo — undefined = prima esecuzione. */
 let lastMaintenanceState: boolean | undefined = undefined;
+let lastPoweredOffState: boolean | undefined = undefined;
 
 export async function runMapsHealthChecks(force = false): Promise<HealthCheckResult[]> {
   const now = Date.now();
-  // La manutenzione viene valutata PRIMA della cache: se il flag cambia (in
-  // entrambe le direzioni) la cache viene ignorata per effetto immediato del toggle.
-  const inMaintenance = await isThinkCentreInMaintenance();
-  const maintenanceChanged = lastMaintenanceState !== undefined && lastMaintenanceState !== inMaintenance;
-  if (!force && !maintenanceChanged && now - lastRunAt < CACHE_TTL_MS && cachedResults.length > 0) {
+  // Manutenzione e powered-off vengono valutati PRIMA della cache: se un flag
+  // cambia (in entrambe le direzioni) la cache viene ignorata per effetto immediato.
+  const [inMaintenance, poweredOff] = await Promise.all([
+    isThinkCentreInMaintenance(),
+    isThinkCentrePoweredOff(),
+  ]);
+  const stateChanged =
+    (lastMaintenanceState !== undefined && lastMaintenanceState !== inMaintenance) ||
+    (lastPoweredOffState !== undefined && lastPoweredOffState !== poweredOff);
+  if (!force && !stateChanged && now - lastRunAt < CACHE_TTL_MS && cachedResults.length > 0) {
     return cachedResults;
   }
   const tiles = tileTargets();
-  // Quando la manutenzione ThinkCentre è attiva, si saltano i target self-hosted
+  // Quando powered-off O manutenzione, si saltano i target self-hosted
   // (graphhopper, valhalla, aree); i target cloud (mapbox, tomtom, tile) continuano.
+  const skipSelfHosted = poweredOff || inMaintenance;
   const engines = engineTargets().filter(
-    (t) => !inMaintenance || (t.id !== "graphhopper" && t.id !== "valhalla"),
+    (t) => !skipSelfHosted || (t.id !== "graphhopper" && t.id !== "valhalla"),
   );
-  const areaEngines = inMaintenance ? [] : await areaEngineTargets();
+  // areaEngineTargets controlla internamente powered-off e maintenance
+  const areaEngines = skipSelfHosted ? [] : await areaEngineTargets();
   const allEngines = [...engines, ...areaEngines];
 
   const tileResults = await Promise.all(tiles.map(pingOne));
@@ -226,6 +236,7 @@ export async function runMapsHealthChecks(force = false): Promise<HealthCheckRes
   cachedResults = results;
   lastRunAt = now;
   lastMaintenanceState = inMaintenance;
+  lastPoweredOffState = poweredOff;
 
   const downs = results.filter((r) => !r.ok);
   if (downs.length > 0) {
