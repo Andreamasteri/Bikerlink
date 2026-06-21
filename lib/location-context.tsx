@@ -12,6 +12,8 @@ const GPS_FLOOD_WINDOW_MS = 1000;
 const GPS_FLOOD_MAX_FIXES_PER_SEC = 5;
 // 2 km/h in m/s (coords.speed è in m/s). Sotto questa soglia consideriamo l'utente fermo.
 const GPS_FLOOD_STATIONARY_MAX_SPEED_MS = 2 / 3.6;
+// Cooldown tra due eventi gps_flood per non saturare la coda crash durante un loop.
+const GPS_FLOOD_COOLDOWN_MS = 30000;
 
 // Native permission bridge calls can wedge on resume; cap them so a stalled
 // bridge rejects into the existing catch instead of hanging the resume sequence.
@@ -90,6 +92,10 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
   const sharedWatchRef = useRef<import("expo-location").LocationSubscription | null>(null);
   const suspendedRef = useRef(false);
   const gpsFixTimestampsRef = useRef<number[]>([]);
+  // Cooldown anti-auto-flood: una volta rilevato un gps_flood, non rilogghiamo per
+  // GPS_FLOOD_COOLDOWN_MS, così il logger stesso non satura la coda crash (e non
+  // peggiora il freeze) durante un loop di watch persistente.
+  const gpsFloodLastLoggedRef = useRef<number>(0);
 
   const { data: gpsData } = useQuery<{ required: boolean }>({
     queryKey: ["/api/settings/gps-required"],
@@ -195,8 +201,10 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
           const speed = rawSpeed < 0 ? 0 : rawSpeed;
           if (
             fixPerSec > GPS_FLOOD_MAX_FIXES_PER_SEC &&
-            speed < GPS_FLOOD_STATIONARY_MAX_SPEED_MS
+            speed < GPS_FLOOD_STATIONARY_MAX_SPEED_MS &&
+            now - gpsFloodLastLoggedRef.current > GPS_FLOOD_COOLDOWN_MS
           ) {
+            gpsFloodLastLoggedRef.current = now;
             const accuracy = locationObj.coords.accuracy ?? null;
             markAsyncError(
               "gps_flood",
