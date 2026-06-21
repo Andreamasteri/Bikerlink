@@ -9,8 +9,8 @@ let consecutiveFailures = 0;
 const FAILURES_BEFORE_HIGH = 3;
 
 // True dopo il primo ping riuscito in questa sessione.
-// L'escalation a "high" richiede che Redis fosse stato raggiungibile in precedenza.
-// Se mai connesso in questa sessione → severity "info" (fallback in-memory attivo fin dal boot, nessuna regressione).
+// L'escalation a "high" richiede che Redis fosse stato raggiungibile in precedenza:
+// un Redis mai configurato/raggiungibile resta sempre "warn" (fallback in-memory).
 let hadSuccessfulConnection = false;
 
 export async function collectRedis(): Promise<Signal[]> {
@@ -56,11 +56,10 @@ export async function collectRedis(): Promise<Signal[]> {
     await client.quit().catch(() => {});
   } catch (err) {
     consecutiveFailures += 1;
-    // mai connesso = fallback in-memory attivo fin dal boot = info (nessuna regressione).
-    // era connesso e ha smesso = warn; dopo N fallimenti consecutivi scala a high.
-    const severity = !hadSuccessfulConnection
-      ? "info"
-      : consecutiveFailures >= FAILURES_BEFORE_HIGH ? "high" : "warn";
+    // Scala a high solo se Redis era raggiungibile in precedenza (hadSuccessfulConnection)
+    // e sono accumulati N fallimenti consecutivi. Un Redis mai disponibile in questa
+    // sessione resta sempre warn: il fallback in-memory è già attivo e non c'è regressione.
+    const severity = (hadSuccessfulConnection && consecutiveFailures >= FAILURES_BEFORE_HIGH) ? "high" : "warn";
     signals.push({
       source: "redis", metric: "redis.unreachable", severity,
       details: {

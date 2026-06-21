@@ -18,28 +18,6 @@ export function SavedLapsSection({
   onCompareToggle: () => void;
   onSelectLap: (id: string) => void;
 }) {
-  const confirmDelete = (lap: IdealLap) => {
-    Alert.alert(
-      `Elimina ${lap.lapName ?? `Giro ${lap.lapNumber}`}`,
-      "Vuoi eliminare questo giro ideale salvato?",
-      [
-        { text: "Annulla", style: "cancel" },
-        {
-          text: "Elimina",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              await apiRequest("DELETE", `/api/telemetry/ideal-laps/${encodeURIComponent(lap.sessionId)}`);
-              queryClient.invalidateQueries({ queryKey: ["/api/telemetry/ideal-laps"] });
-            } catch {
-              Alert.alert("Errore", "Impossibile eliminare il giro.");
-            }
-          },
-        },
-      ]
-    );
-  };
-
   return (
     <View style={styles.savedLapsSection}>
       <View style={styles.savedLapsHeader}>
@@ -73,6 +51,26 @@ export function SavedLapsSection({
             style={[styles.savedLapCard, isSelected && styles.savedLapCardSelected]}
             activeOpacity={compareMode ? 0.7 : 1}
             onPress={compareMode ? () => onSelectLap(lap.sessionId) : undefined}
+            onLongPress={!compareMode ? () => {
+              Alert.alert(
+                `Elimina ${lap.lapName ?? `Giro ${lap.lapNumber}`}`,
+                "Vuoi eliminare questo giro ideale salvato?",
+                [
+                  { text: "Annulla", style: "cancel" },
+                  {
+                    text: "Elimina", style: "destructive",
+                    onPress: async () => {
+                      try {
+                        await apiRequest("DELETE", `/api/telemetry/ideal-laps/${encodeURIComponent(lap.sessionId)}`);
+                        queryClient.invalidateQueries({ queryKey: ["/api/telemetry/ideal-laps"] });
+                      } catch {
+                        Alert.alert("Errore", "Impossibile eliminare il giro.");
+                      }
+                    },
+                  },
+                ]
+              );
+            } : undefined}
           >
             <View style={styles.savedLapCardLeft}>
               {compareMode && (
@@ -102,18 +100,6 @@ export function SavedLapsSection({
                 <Text style={styles.savedLapStatVal}>{lap.maxGforce != null ? `${lap.maxGforce}g` : "—"}</Text>
               </View>
               <Text style={styles.savedLapSamples}>{lap.sampleCount} c.</Text>
-              {!compareMode && (
-                <TouchableOpacity
-                  style={styles.savedLapDeleteBtn}
-                  onPress={() => confirmDelete(lap)}
-                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                  testID={`delete-lap-${lap.sessionId}`}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Elimina ${lap.lapName ?? `Giro ${lap.lapNumber}`}`}
-                >
-                  <Ionicons name="trash-outline" size={14} color="#e74c3c" />
-                </TouchableOpacity>
-              )}
             </View>
           </TouchableOpacity>
         );
@@ -190,5 +176,4 @@ const styles = StyleSheet.create({
   savedLapStatVal: { fontSize: 11, fontFamily: "Inter_600SemiBold", color: Colors.text },
   savedLapStatUnit: { fontSize: 9, fontFamily: "Inter_400Regular", color: Colors.textSecondary },
   savedLapSamples: { fontSize: 10, fontFamily: "Inter_400Regular", color: Colors.textSecondary },
-  savedLapDeleteBtn: { padding: 4, marginLeft: 2 },
 });

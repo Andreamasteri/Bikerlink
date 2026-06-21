@@ -445,7 +445,6 @@ export default function TabLayout() {
           name="giri"
           options={{
             title: "Giri",
-            href: null,
             tabBarIcon: ({ color, size, focused }) => (
               <TabIcon name="giri" color={color} size={size} focused={focused} />
             ),

@@ -397,18 +397,17 @@ export default function EditProfileScreen() {
           setLanguage={setLanguage}
           showLanguageDropdown={showLanguageDropdown}
           setShowLanguageDropdown={setShowLanguageDropdown}
+          widgetEnabled={widgetEnabled}
+          onToggleWidget={setWidgetEnabled}
+          adminWidgetEnabled={adminWidgetEnabled}
+          isUpdatingWidget={isUpdatingWidget}
           handleDeleteAccount={handleDeleteAccount}
           setShowRevokeConsentModal={setShowRevokeConsentModal}
         />
 
         <EditTags />
 
-        <EditAssistantPrefs
-          widgetEnabled={widgetEnabled}
-          onToggleWidget={setWidgetEnabled}
-          adminWidgetEnabled={adminWidgetEnabled}
-          isUpdatingWidget={isUpdatingWidget}
-        />
+        <EditAssistantPrefs />
 
         <View style={{ height: 40 }} />
       </KeyboardAwareScrollViewCompat>

@@ -223,7 +223,7 @@ export default function FloatingWidget() {
       {menuOpen && (
         <Pressable style={styles.overlay} onPress={() => setMenuOpen(false)}>
           <Pressable style={styles.menu} onPress={() => {}}>
-            <Text style={styles.menuTitle}>Navigazione & Assistente AI</Text>
+            <Text style={styles.menuTitle}>Widget navigazione</Text>
 
             <Pressable
               style={styles.menuItem}

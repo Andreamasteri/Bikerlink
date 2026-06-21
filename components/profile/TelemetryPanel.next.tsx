@@ -120,12 +120,7 @@ export default function TelemetryPanel({ telemetryStats }: Props) {
     setTelemetryExpanded((v) => !v);
   };
 
-  const {
-    data: idealLapsData,
-    isError: idealLapsError,
-    isLoading: idealLapsLoading,
-    refetch: refetchIdealLaps,
-  } = useQuery<{ laps: IdealLap[] | null }>({
+  const { data: idealLapsData } = useQuery<{ laps: IdealLap[] }>({
     queryKey: ["/api/telemetry/ideal-laps"],
     enabled: telemetryExpanded,
     staleTime: 30_000,
@@ -343,7 +338,7 @@ export default function TelemetryPanel({ telemetryStats }: Props) {
               />
             ))}
 
-            {idealLapsData?.laps?.length ? (
+            {idealLapsData && idealLapsData.laps.length > 0 && (
               <SavedLapsSection
                 laps={idealLapsData.laps}
                 compareMode={compareMode}
@@ -357,28 +352,6 @@ export default function TelemetryPanel({ telemetryStats }: Props) {
                   });
                 }}
               />
-            ) : idealLapsError ? (
-              <TouchableOpacity
-                style={styles.idealLapsStatus}
-                onPress={() => refetchIdealLaps()}
-                activeOpacity={0.7}
-              >
-                <Ionicons name="cloud-offline-outline" size={16} color="#e74c3c" />
-                <View style={styles.idealLapsStatusTextCol}>
-                  <Text style={styles.idealLapsStatusTitle}>Impossibile caricare i Giri Ideali</Text>
-                  <Text style={styles.idealLapsStatusHint}>Tocca per riprovare</Text>
-                </View>
-              </TouchableOpacity>
-            ) : idealLapsLoading ? (
-              <View style={styles.idealLapsStatus}>
-                <Ionicons name="hourglass-outline" size={16} color={Colors.textSecondary} />
-                <Text style={styles.idealLapsStatusTitle}>Caricamento Giri Ideali…</Text>
-              </View>
-            ) : (
-              <View style={styles.idealLapsStatus}>
-                <Ionicons name="flag-outline" size={16} color={Colors.textSecondary} />
-                <Text style={styles.idealLapsStatusTitle}>Nessun giro salvato</Text>
-              </View>
             )}
           </View>
         )}
@@ -418,10 +391,6 @@ const styles = StyleSheet.create({
   telemetryKm: { fontSize: 13, fontFamily: "Inter_700Bold", color: Colors.text },
   telemetryTarget: { fontSize: 12, fontFamily: "Inter_400Regular", color: Colors.textSecondary },
   telemetrySessions: { fontSize: 11, fontFamily: "Inter_400Regular", color: Colors.textSecondary },
-  idealLapsStatus: { flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 12, paddingHorizontal: 12, borderRadius: 10, backgroundColor: Colors.background, borderWidth: 1, borderColor: Colors.border },
-  idealLapsStatusTextCol: { flex: 1, gap: 2 },
-  idealLapsStatusTitle: { fontSize: 12, fontFamily: "Inter_500Medium", color: Colors.textSecondary },
-  idealLapsStatusHint: { fontSize: 10, fontFamily: "Inter_400Regular", color: "#e74c3c" },
   trackKmRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingTop: 8, borderTopWidth: 1, borderTopColor: Colors.border },
   trackKmLabel: { fontSize: 12, fontFamily: "Inter_600SemiBold", color: "#e67e22" },
   trackKmValue: { fontSize: 13, fontFamily: "Inter_700Bold", color: "#e67e22" },

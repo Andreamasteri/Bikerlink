@@ -307,13 +307,7 @@ export default function ProposalsScreen() {
         </View>
       ) : activeHub === "pianificati" ? (
         <View style={{ flex: 1 }}>
-          {typeof GiriScreen === "function" ? (
-            <GiriScreen />
-          ) : (
-            <View style={styles.emptyHub}>
-              <Text style={styles.emptyHubText}>{t("Sezione non disponibile")}</Text>
-            </View>
-          )}
+          <GiriScreen />
         </View>
       ) : (
         <>
@@ -485,17 +479,5 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontFamily: "Inter_600SemiBold",
     color: Colors.accent
-  },
-  emptyHub: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    padding: 24
-  },
-  emptyHubText: {
-    fontSize: 15,
-    fontFamily: "Inter_500Medium",
-    color: Colors.textSecondary,
-    textAlign: "center"
   }
 });
