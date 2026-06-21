@@ -25,6 +25,7 @@ import TelemetryPanel from "@/components/profile/TelemetryPanel.next";
 import MyStylePanel from "@/components/profile/MyStylePanel";
 import PhotoGrid from "@/components/profile/PhotoGrid";
 import NotificationsPanel from "@/components/profile/NotificationsPanel";
+import MatchPrefsPanel from "@/components/profile/MatchPrefsPanel";
 import ThemePanel from "@/components/profile/ThemePanel";
 import UnitsPanel from "@/components/profile/UnitsPanel";
 
@@ -291,6 +292,8 @@ export default function ProfileScreen() {
           serverPushEnabled={profile?.profile?.pushNotificationsEnabled}
           serverNotifPrefs={profile?.profile?.notificationPreferences}
         />
+
+        <MatchPrefsPanel />
 
         <ThemePanel />
         <UnitsPanel />
