@@ -409,6 +409,28 @@ fi
 echo "════════════════════════════════════════"
 echo ""
 
+# ── GATE SOPPRESSIONE ALLARMI TC SPENTO (aggregator E2E) ─────────────────────
+# Verifica che runAggregatorCycle() applichi correttamente la soppressione
+# downstream quando ThinkCentre è powered-off: db.db.ping_ms e
+# maps.health.network_instability NON devono superare "warn" nello snapshot
+# finale. Blocca regressioni su OUTAGE_DOWNSTREAM_IDS o sulla logica E2E.
+echo "════════════════════════════════════════"
+echo "  Gate soppressione allarmi TC spento (aggregator E2E)"
+echo "════════════════════════════════════════"
+TC_SUPPRESSION_EXIT=0
+npx vitest run --config vitest.config.server.ts server/__tests__/aggregator-downstream-suppression.test.ts 2>&1 || TC_SUPPRESSION_EXIT=$?
+if [ "$TC_SUPPRESSION_EXIT" -eq 0 ]; then
+  echo "✅ Aggregator TC-suppression: unit + E2E OK."
+else
+  echo "❌ Aggregator TC-suppression FALLITO (exit ${TC_SUPPRESSION_EXIT}) — verificare la soppressione downstream in aggregator.ts."
+  echo "   Eseguire 'npx vitest run --config vitest.config.server.ts server/__tests__/aggregator-downstream-suppression.test.ts' localmente."
+  echo "════════════════════════════════════════"
+  echo ""
+  exit "$TC_SUPPRESSION_EXIT"
+fi
+echo "════════════════════════════════════════"
+echo ""
+
 # ── GATE STRESS RACE AVVIO METRO ─────────────────────────────
 # Test deterministico (start-expo mockato) che prova in modo ripetibile che il
 # guardiano (cerbero.sh / cerbero-lib.sh) e clean-metro-restart.sh NON uccidano
