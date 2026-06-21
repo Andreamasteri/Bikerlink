@@ -176,19 +176,19 @@ function _requireAdmin(req: Request, res: Response, next: Function) {
       return next();
     }
   } catch {/* token module non disponibile: ignora bypass */}
-  if (!req.session.userId) {
+  if (!req.session?.userId) {
     console.warn(`[admin-auth] 401 reason=no-session path=${path} sid=${sid}`);
     return sendError(res, 401, "Sessione scaduta. Effettua di nuovo l'accesso.");
   }
-  const cacheKey = req.session.userId;
+  const cacheKey = req.session?.userId;
   const cached = _adminAuthCache.get(cacheKey);
   if (cached && cached.expiresAt > Date.now()) {
     (req as Request & { currentUser?: unknown }).currentUser = cached.user;
     return next();
   }
-  storage.getUser(req.session.userId).then((user) => {
+  storage.getUser(req.session?.userId).then((user) => {
     if (!user) {
-      console.warn(`[admin-auth] 403 reason=user-not-found path=${path} sid=${sid} userId=${req.session.userId}`);
+      console.warn(`[admin-auth] 403 reason=user-not-found path=${path} sid=${sid} userId=${req.session?.userId}`);
       return sendError(res, 403, "Account non trovato.");
     }
     if (user.role !== "admin") {
@@ -206,7 +206,7 @@ function _requireAdmin(req: Request, res: Response, next: Function) {
     (req as Request & { currentUser?: unknown }).currentUser = user;
     next();
   }).catch((err) => {
-    console.error(`[admin-auth] 500 reason=db-error path=${path} sid=${sid} userId=${req.session.userId}`, err);
+    console.error(`[admin-auth] 500 reason=db-error path=${path} sid=${sid} userId=${req.session?.userId}`, err);
     return sendError(res, 500, "Errore autenticazione admin");
   });
 }
