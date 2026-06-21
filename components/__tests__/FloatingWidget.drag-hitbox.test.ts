@@ -190,19 +190,29 @@ function tap() {
   renderer.act(() => { panCapture.config!.onPanResponderRelease({}, { dx: 0, dy: 0, vx: 0, vy: 0 }); });
 }
 
-// Helper: trova il Modal nel JSON del componente e restituisce le sue props.
-function findModalProps(json: unknown): Record<string, unknown> | null {
+// Helper: trova l'overlay del menu nel JSON del componente.
+// Il FloatingWidget usa ora un overlay assoluto (position:"absolute", zIndex:9500)
+// anziché un Modal — lo cerchiamo tramite zIndex nello stile.
+function findOverlay(json: unknown): Record<string, unknown> | null {
   const nodes = Array.isArray(json) ? json : [json];
   for (const node of nodes) {
     if (node == null || typeof node !== "object") continue;
-    const n = node as { type: string; props: Record<string, unknown>; children?: unknown };
-    if (n.type === "Modal") return n.props;
+    const n = node as { type?: string; props?: Record<string, unknown>; children?: unknown };
+    const style = n.props?.style as Record<string, unknown> | undefined;
+    if (style?.zIndex === 9500) return n.props ?? null;
     if (n.children) {
-      const found = findModalProps(n.children);
+      const found = findOverlay(n.children);
       if (found) return found;
     }
   }
   return null;
+}
+
+// Compatibilità con i test esistenti: "visible:false" = overlay assente,
+// "visible:true" = overlay presente nel tree.
+function findModalProps(json: unknown): { visible: boolean } {
+  const overlay = findOverlay(json);
+  return { visible: overlay !== null };
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
