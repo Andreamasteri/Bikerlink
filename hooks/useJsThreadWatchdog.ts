@@ -5,16 +5,64 @@ import { sendStartupBeacon } from "@/lib/startup-beacon";
 
 const TICK_INTERVAL_MS = 2000;
 const FREEZE_THRESHOLD_MS = 3000;
-const HEAP_PRESSURE_RATIO = 0.8;
+export const HEAP_PRESSURE_RATIO = 0.8;
 // Isteresi: il warning heap si riarma solo quando l'uso scende sotto 72%
 // (0.8 * 0.9), per non oscillare attorno alla soglia ad ogni tick.
-const HEAP_REARM_RATIO = HEAP_PRESSURE_RATIO * 0.9;
+export const HEAP_REARM_RATIO = HEAP_PRESSURE_RATIO * 0.9;
 
 interface PerfWithMemory {
   memory?: {
     usedJSHeapSize?: number;
     jsHeapSizeLimit?: number;
   };
+}
+
+/**
+ * Risultato dell'ispezione heap per un singolo tick.
+ *
+ * - `action: "warn"` → ratio ha superato HEAP_PRESSURE_RATIO e heapWarned era
+ *   false; il chiamante deve emettere l'allarme e impostare heapWarned=true.
+ * - `action: "rearm"` → ratio è sceso sotto HEAP_REARM_RATIO; il chiamante
+ *   deve reimpostare heapWarned=false.
+ * - `action: "none"` → nessuna transizione (ratio nella fascia neutra o non
+ *   disponibile).
+ */
+export type HeapCheckResult =
+  | { action: "warn"; ratioPercent: number; usedMb: number; limitMb: number }
+  | { action: "rearm" }
+  | { action: "none" };
+
+/**
+ * Legge `performance.memory` (disponibile solo su alcuni runtime — raro in
+ * Hermes) e calcola la transizione di stato per il watchdog heap.
+ *
+ * È una funzione pura rispetto all'input `heapWarned`: non muta nulla, non
+ * chiama markAsyncError, non dipende da React. Esportata per i test.
+ *
+ * @param heapWarned - valore corrente di heapWarnedRef.current
+ */
+export function checkHeapPressure(heapWarned: boolean): HeapCheckResult {
+  try {
+    const mem = (globalThis as { performance?: PerfWithMemory }).performance?.memory;
+    const used = mem?.usedJSHeapSize;
+    const limit = mem?.jsHeapSizeLimit;
+    if (typeof used !== "number" || typeof limit !== "number" || limit <= 0) {
+      return { action: "none" };
+    }
+    const ratio = used / limit;
+    if (ratio > HEAP_PRESSURE_RATIO && !heapWarned) {
+      const usedMb = Math.round(used / (1024 * 1024));
+      const limitMb = Math.round(limit / (1024 * 1024));
+      return { action: "warn", ratioPercent: Math.round(ratio * 100), usedMb, limitMb };
+    }
+    if (ratio < HEAP_REARM_RATIO) {
+      return { action: "rearm" };
+    }
+    return { action: "none" };
+  } catch {
+    // no-op: la probe heap è best-effort, non deve mai lanciare
+    return { action: "none" };
+  }
 }
 
 /**
@@ -58,34 +106,23 @@ export function useJsThreadWatchdog(enabled: boolean = true) {
         });
       }
 
-      // JS heap pressure: performance.memory esiste solo su alcuni runtime
-      // (raro in Hermes). Probe difensiva, log una sola volta per superamento.
-      try {
-        const mem = (globalThis as { performance?: PerfWithMemory }).performance?.memory;
-        const used = mem?.usedJSHeapSize;
-        const limit = mem?.jsHeapSizeLimit;
-        if (typeof used === "number" && typeof limit === "number" && limit > 0) {
-          const ratio = used / limit;
-          if (ratio > HEAP_PRESSURE_RATIO && !heapWarnedRef.current) {
-            heapWarnedRef.current = true;
-            const usedMb = Math.round(used / (1024 * 1024));
-            const limitMb = Math.round(limit / (1024 * 1024));
-            markAsyncError(
-              "memory_pressure",
-              new Error(`JS heap ${Math.round(ratio * 100)}% (${usedMb}/${limitMb}MB)`)
-            ).catch(() => {});
-            sendStartupBeacon("memory_pressure_detected", {
-              source: "js_heap",
-              usedMb,
-              limitMb,
-              ratio: Math.round(ratio * 100) / 100,
-            });
-          } else if (ratio < HEAP_REARM_RATIO) {
-            heapWarnedRef.current = false;
-          }
-        }
-      } catch {
-        // no-op: la probe heap è best-effort, non deve mai lanciare
+      const heapResult = checkHeapPressure(heapWarnedRef.current);
+      if (heapResult.action === "warn") {
+        heapWarnedRef.current = true;
+        markAsyncError(
+          "memory_pressure",
+          new Error(
+            `JS heap ${heapResult.ratioPercent}% (${heapResult.usedMb}/${heapResult.limitMb}MB)`
+          )
+        ).catch(() => {});
+        sendStartupBeacon("memory_pressure_detected", {
+          source: "js_heap",
+          usedMb: heapResult.usedMb,
+          limitMb: heapResult.limitMb,
+          ratio: Math.round(heapResult.ratioPercent) / 100,
+        });
+      } else if (heapResult.action === "rearm") {
+        heapWarnedRef.current = false;
       }
 
       lastTickRef.current = now;
