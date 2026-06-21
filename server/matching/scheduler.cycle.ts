@@ -1,5 +1,7 @@
 import { storage } from "../storage";
-import { withDbRetry } from "../db";
+import { withDbRetry, isPoolHealthy } from "../db";
+import { withBgDbSlot } from "../lib/bg-db-limiter";
+import { dedupWarn } from "../lib/dedup-logger";
 import { runMatching, runWishlistMatching, getLastProposalMatchingStats, getLastWishlistMatchingStats } from "./run-matching";
 import { runBikerBikerMatching, runBikerBikerTypeStyleMatching } from "./run-biker";
 import { runClubBrandMatching } from "./run-clubs";
@@ -68,6 +70,10 @@ export function forceUnlockMatching(): { wasRunning: boolean; lastStartAt: numbe
 }
 
 export function triggerMatchingRun(): { started: boolean; reason?: string } {
+  if (!isPoolHealthy()) {
+    dedupWarn("matching/pool-saturated", "[Matching] Pool saturo — ciclo saltato (verrà riprovato al prossimo tick)");
+    return { started: false, reason: "pool_saturated" };
+  }
   if (cycleInFlight) {
     return { started: false, reason: "already_running" };
   }
@@ -98,18 +104,18 @@ export function triggerMatchingRun(): { started: boolean; reason?: string } {
       if (expired > 0) schedulerLogger.info({ expired }, "Scadute proposte");
 
       try {
-        const deleted = await recorder.time("cleanup_delete_expired", () => storage.deleteExpiredProposals());
+        const deleted = await recorder.time("cleanup_delete_expired", () => withBgDbSlot(() => withDbRetry(() => storage.deleteExpiredProposals())));
         if (deleted > 0) schedulerLogger.info({ deleted }, "Eliminate proposte scadute");
       } catch (err) {
         schedulerLogger.error({ err }, "Errore eliminazione proposte scadute");
         addMatchLog("ERROR", "cleanup_delete_expired", `Errore eliminazione proposte scadute: ${err instanceof Error ? err.message : String(err)}`);
       }
 
-      const autoMatchSetting = await withDbRetry(() => storage.getAppSetting("auto_matching_enabled"));
+      const autoMatchSetting = await withBgDbSlot(() => withDbRetry(() => storage.getAppSetting("auto_matching_enabled")));
       const autoMatchEnabled = autoMatchSetting?.value !== "false";
 
       if (autoMatchEnabled) {
-        const cycleTimeoutMs = await getMatchingCycleTimeoutMs();
+        const cycleTimeoutMs = await withBgDbSlot(() => getMatchingCycleTimeoutMs());
 
         const runCorePhase = async (name: string, fn: () => Promise<number>): Promise<number> => {
           try {
@@ -273,14 +279,14 @@ export function triggerMatchingRun(): { started: boolean; reason?: string } {
         bikerBikerMatchesNew: bikerBikerMatchCount,
       };
 
-      storage.getAppSetting("matching_scheduler_state")
+      withBgDbSlot(() => storage.getAppSetting("matching_scheduler_state"))
         .then((existing) => {
           const prev = (existing?.valueJson as Record<string, unknown>) ?? {};
-          return storage.upsertAppSetting("matching_scheduler_state", undefined, {
+          return withBgDbSlot(() => storage.upsertAppSetting("matching_scheduler_state", undefined, {
             ...prev,
             lastRunAt: cycleMetric.completedAt,
             lastRunDurationMs: cycleMetric.durationMs,
-          });
+          }));
         })
         .catch((err) => schedulerLogger.warn({ err }, "matching_scheduler_state persist failed (non-blocking)"));
 

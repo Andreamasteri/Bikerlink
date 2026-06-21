@@ -54,5 +54,15 @@ durevole: cercare i burst di apertura concorrente, non i leak.
 - `withDbRetry` esiste in DUE posti: `server/db.ts` (transient-only, backoff —
   questo per i job background) e `server/lib/db-retry.ts` (signature
   label-based, diversa). Non confonderli.
+- **Matching cycle pool gate (incidente 20 giu 2026):** `triggerMatchingRun()` in
+  `server/matching/scheduler.cycle.ts` andava in timeout su
+  `getAppSetting("auto_matching_enabled")` quando il pool era saturo. Fix in tre
+  punti: (a) pre-check `isPoolHealthy()` all'ingresso di `triggerMatchingRun()`
+  — se saturo, `dedupWarn` + return `{ started:false, reason:"pool_saturated" }`
+  senza acquisire il lock né fare DB call; (b) le chiamate DB esplicite nel corpo
+  del ciclo (`deleteExpiredProposals`, `getAppSetting "auto_matching_enabled"`)
+  ora usano `withBgDbSlot(() => withDbRetry(...))`. Poiché il gate è dentro
+  `triggerMatchingRun()`, tutti i caller (scheduler periodico e route admin)
+  ereditano automaticamente la protezione senza modifiche aggiuntive.
 - Statistiche per le sonde: `getBgDbLimiterStats()` (limiter) e
   `getPoolStats()`/`isPoolHealthy()` (pool) in `server/db.ts`.
