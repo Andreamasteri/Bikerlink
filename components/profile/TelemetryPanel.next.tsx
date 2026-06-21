@@ -338,7 +338,7 @@ export default function TelemetryPanel({ telemetryStats }: Props) {
               />
             ))}
 
-            {idealLapsData && idealLapsData.laps.length > 0 && (
+            {idealLapsData?.laps?.length ? (
               <SavedLapsSection
                 laps={idealLapsData.laps}
                 compareMode={compareMode}
@@ -352,7 +352,7 @@ export default function TelemetryPanel({ telemetryStats }: Props) {
                   });
                 }}
               />
-            )}
+            ) : null}
           </View>
         )}
       </View>
