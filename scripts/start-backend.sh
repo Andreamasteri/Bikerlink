@@ -122,6 +122,13 @@ for retry in $(seq 1 $MAX_RETRIES); do
     echo "Build completata."
   fi
   START_TIME=$(date +%s)
+  # ROUTING_DISABLED è DEPRECATA — unset prima di avviare Node così il soft
+  # toggle DB (Admin → Hub Routing) è l'unica sorgente di verità.
+  if [ -n "${ROUTING_DISABLED+x}" ]; then
+    echo "[$(date '+%Y-%m-%dT%H:%M:%S')] ⚠️  ROUTING_DISABLED trovata nell'env (valore: \"${ROUTING_DISABLED}\") — rimossa prima dell'avvio Node."
+    unset ROUTING_DISABLED
+    echo "[$(date '+%Y-%m-%dT%H:%M:%S')] ✅ ROUTING_DISABLED rimossa — il toggle routing è controllato dal DB."
+  fi
   NODE_ENV=production node --max-old-space-size=512 server_dist/index.js &
   SERVER_PID=$!
 
