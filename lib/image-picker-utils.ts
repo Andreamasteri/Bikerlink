@@ -26,6 +26,7 @@ import { requireOptionalNativeModule } from "expo-modules-core";
 import { Alert, Platform, ActionSheetIOS } from "react-native";
 import { File as EFSFile } from "expo-file-system";
 import { sendStartupBeacon } from "@/lib/startup-beacon";
+import { markAsyncError } from "@/lib/crash-logger";
 
 /**
  * expo-image-manipulator espone solo un wrapper JS attorno al modulo nativo
@@ -47,6 +48,10 @@ import { sendStartupBeacon } from "@/lib/startup-beacon";
 const hasImageManipulatorNativeModule =
   Platform.OS === "web" ||
   requireOptionalNativeModule("ExpoImageManipulator") != null;
+
+// One-shot: il log `native_module_missing` va emesso una sola volta per sessione
+// per non floodare il crash-logger ad ogni upload quando il modulo è assente.
+let nativeModuleMissingLogged = false;
 
 export interface BulkImageAsset {
   uri: string;
@@ -112,6 +117,16 @@ export async function optimizeImageForUpload(
     // dobbiamo) toccare ImageManipulator, altrimenti lancia e crasha l'app.
     // L'immagine del picker è già compressa via `quality`: la usiamo così.
     sendStartupBeacon("img_manipulate_skipped_no_native");
+    // Log diagnostico (una sola volta) sul crash-logger: il modulo nativo è
+    // assente nell'APK installato (build precedente all'aggiunta della dep).
+    // Serve a distinguere il degrado controllato da un crash silenzioso.
+    if (!nativeModuleMissingLogged) {
+      nativeModuleMissingLogged = true;
+      markAsyncError(
+        "native_module_missing",
+        new Error("ExpoImageManipulator non presente nel binario installato")
+      ).catch(() => {});
+    }
     return uri;
   }
   try {

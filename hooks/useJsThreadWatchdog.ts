@@ -1,19 +1,39 @@
 import { useEffect, useRef } from "react";
-import { Platform } from "react-native";
+import { AppState, Platform } from "react-native";
 import { markAsyncError } from "@/lib/crash-logger";
 import { sendStartupBeacon } from "@/lib/startup-beacon";
 
 const TICK_INTERVAL_MS = 2000;
 const FREEZE_THRESHOLD_MS = 5000;
+const HEAP_PRESSURE_RATIO = 0.8;
+// Isteresi: il warning heap si riarma solo quando l'uso scende sotto 72%
+// (0.8 * 0.9), per non oscillare attorno alla soglia ad ogni tick.
+const HEAP_REARM_RATIO = HEAP_PRESSURE_RATIO * 0.9;
+
+interface PerfWithMemory {
+  memory?: {
+    usedJSHeapSize?: number;
+    jsHeapSizeLimit?: number;
+  };
+}
 
 /**
- * Watchdog per il JS thread: un setInterval che batte ogni 2s.
- * Se il tick arriva con gap > 5s, il JS thread era bloccato.
- * Logga su crash-logger + startup-beacon per rendere il freeze visibile
+ * Watchdog per il JS thread + pressione di memoria.
+ *
+ * 1. JS thread freeze: un setInterval che batte ogni 2s. Se il tick arriva con
+ *    gap > 5s, il JS thread era bloccato → `js_thread_freeze`.
+ * 2. Memory pressure (Android/runtime): se `performance.memory` è disponibile
+ *    (raro in Hermes, presente in alcuni runtime) e l'heap JS supera l'80% del
+ *    limite → `memory_pressure` (una sola volta per superamento, con isteresi).
+ * 3. Memory pressure (iOS/OS): l'evento AppState `memoryWarning` viene inoltrato
+ *    al crash-logger come `memory_pressure`.
+ *
+ * Tutto va su crash-logger + startup-beacon per rendere freeze e OOM visibili
  * anche senza ErrorBoundary o Diagnostic Report.
  */
 export function useJsThreadWatchdog(enabled: boolean = true) {
   const lastTickRef = useRef(Date.now());
+  const heapWarnedRef = useRef(false);
 
   useEffect(() => {
     if (!enabled || Platform.OS === "web") return;
@@ -38,9 +58,49 @@ export function useJsThreadWatchdog(enabled: boolean = true) {
         });
       }
 
+      // JS heap pressure: performance.memory esiste solo su alcuni runtime
+      // (raro in Hermes). Probe difensiva, log una sola volta per superamento.
+      try {
+        const mem = (globalThis as { performance?: PerfWithMemory }).performance?.memory;
+        const used = mem?.usedJSHeapSize;
+        const limit = mem?.jsHeapSizeLimit;
+        if (typeof used === "number" && typeof limit === "number" && limit > 0) {
+          const ratio = used / limit;
+          if (ratio > HEAP_PRESSURE_RATIO && !heapWarnedRef.current) {
+            heapWarnedRef.current = true;
+            const usedMb = Math.round(used / (1024 * 1024));
+            const limitMb = Math.round(limit / (1024 * 1024));
+            markAsyncError(
+              "memory_pressure",
+              new Error(`JS heap ${Math.round(ratio * 100)}% (${usedMb}/${limitMb}MB)`)
+            ).catch(() => {});
+            sendStartupBeacon("memory_pressure_detected", {
+              source: "js_heap",
+              usedMb,
+              limitMb,
+              ratio: Math.round(ratio * 100) / 100,
+            });
+          } else if (ratio < HEAP_REARM_RATIO) {
+            heapWarnedRef.current = false;
+          }
+        }
+      } catch {
+        // no-op: la probe heap è best-effort, non deve mai lanciare
+      }
+
       lastTickRef.current = now;
     }, TICK_INTERVAL_MS);
 
-    return () => clearInterval(interval);
+    // iOS (e talvolta Android) emette "memoryWarning" via AppState quando il
+    // sistema è sotto pressione di memoria: lo inoltriamo al crash-logger.
+    const memSub = AppState.addEventListener("memoryWarning", () => {
+      markAsyncError("memory_pressure", new Error("OS memoryWarning")).catch(() => {});
+      sendStartupBeacon("memory_pressure_detected", { source: "os_warning" });
+    });
+
+    return () => {
+      clearInterval(interval);
+      memSub.remove();
+    };
   }, [enabled]);
 }
