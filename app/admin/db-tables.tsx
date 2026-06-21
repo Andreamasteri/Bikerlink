@@ -25,6 +25,8 @@ interface VacuumTableDetail {
   table: string;
   bytesBefore: number;
   bytesAfter: number;
+  mode?: "analyze" | "full";
+  bloatRatio?: number;
 }
 
 interface TableSizesData {
@@ -248,18 +250,25 @@ export default function DbTablesScreen() {
                 Risparmio
               </Text>
             )}
+            {hasDetail && (
+              <Text style={[styles.colLabel, styles.colMode]}>
+                Modo
+              </Text>
+            )}
           </View>
           {tables
             .slice()
             .sort((a, b) => b.totalSizeBytes - a.totalSizeBytes)
             .map((row, idx) => {
               const detail = detailMap.get(row.name);
+              const isFull = detail?.mode === "full";
               return (
                 <View
                   key={row.name}
                   style={[
                     styles.tableRow,
                     idx % 2 === 1 && { backgroundColor: colors.surface + "88" },
+                    isFull && styles.tableRowFull,
                   ]}
                 >
                   <Text style={[styles.tableName, { flex: 2 }]} numberOfLines={1}>
@@ -285,6 +294,37 @@ export default function DbTablesScreen() {
                         ? formatSaved(detail.bytesBefore, detail.bytesAfter)
                         : "—"}
                     </Text>
+                  )}
+                  {hasDetail && (
+                    <View style={styles.colMode}>
+                      {detail ? (
+                        detail.mode ? (
+                          <View style={[
+                            styles.modeBadge,
+                            isFull ? styles.modeBadgeFull : styles.modeBadgeAnalyze,
+                          ]}>
+                            <Text style={[
+                              styles.modeBadgeText,
+                              isFull ? styles.modeBadgeTextFull : styles.modeBadgeTextAnalyze,
+                            ]}>
+                              {isFull ? "FULL" : "ANALYZE"}
+                            </Text>
+                            {detail.bloatRatio !== undefined && (
+                              <Text style={[
+                                styles.bloatText,
+                                isFull ? styles.bloatTextFull : styles.bloatTextAnalyze,
+                              ]}>
+                                {(detail.bloatRatio * 100).toFixed(1)}%
+                              </Text>
+                            )}
+                          </View>
+                        ) : (
+                          <Text style={styles.savedNeutral}>—</Text>
+                        )
+                      ) : (
+                        <Text style={styles.savedNeutral}>—</Text>
+                      )}
+                    </View>
                   )}
                 </View>
               );
@@ -451,6 +491,53 @@ function makeStyles(colors: ReturnType<typeof import("@/hooks/useColors").useCol
     },
     savedNeutral: {
       color: colors.textSecondary,
+    },
+    tableRowFull: {
+      backgroundColor: (colors.error ?? "#FF4444") + "18",
+    },
+    colMode: {
+      width: 72,
+      alignItems: "center" as const,
+      justifyContent: "center" as const,
+    },
+    modeBadge: {
+      borderRadius: 5,
+      paddingHorizontal: 5,
+      paddingVertical: 2,
+      alignItems: "center" as const,
+      minWidth: 44,
+    },
+    modeBadgeFull: {
+      backgroundColor: (colors.error ?? "#FF4444") + "30",
+      borderWidth: 1,
+      borderColor: (colors.error ?? "#FF4444") + "88",
+    },
+    modeBadgeAnalyze: {
+      backgroundColor: (colors.accent) + "20",
+      borderWidth: 1,
+      borderColor: (colors.accent) + "55",
+    },
+    modeBadgeText: {
+      fontSize: 10,
+      fontFamily: "Inter_700Bold" as const,
+      letterSpacing: 0.3,
+    },
+    modeBadgeTextFull: {
+      color: colors.error ?? "#FF4444",
+    },
+    modeBadgeTextAnalyze: {
+      color: colors.accent,
+    },
+    bloatText: {
+      fontSize: 9,
+      fontFamily: "Inter_500Medium" as const,
+      marginTop: 1,
+    },
+    bloatTextFull: {
+      color: (colors.error ?? "#FF4444") + "CC",
+    },
+    bloatTextAnalyze: {
+      color: colors.accent + "99",
     },
     errorBox: {
       alignItems: "center",
