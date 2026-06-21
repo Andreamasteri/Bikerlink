@@ -16,6 +16,16 @@ export function useTrackingRefs() {
   const watchUpgradeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastFusionTickRef = useRef<number>(0);
 
+  // Compass heading (degrees, 0 = north, clockwise) sourced from DeviceMotion's
+  // rotation.alpha — used as the travel direction for dead reckoning while GPS is
+  // absent. null until the first DeviceMotion sample arrives.
+  const headingRef = useRef<number | null>(null);
+  // Chained dead-reckoning position estimate, advanced from the last GPS anchor
+  // while in sensors_only mode. Kept SEPARATE from gps.lastPosRef so the GPS-
+  // recovery reconciliation (which freezes the anchor during a blackout) is
+  // unchanged. Reset to null whenever GPS is fresh again.
+  const drEstPosRef = useRef<{ lat: number; lon: number } | null>(null);
+
   const pointsBufferRef = useRef<GpsPoint[]>([]);
   const telemetryAccumRef = useRef<Array<{
     timestamp: string;
@@ -25,6 +35,7 @@ export function useTrackingRefs() {
     gForceX?: number;
     speedKmh?: number;
     mode?: string;
+    estimated?: boolean;
   }>>([]);
 
   return {
@@ -39,6 +50,8 @@ export function useTrackingRefs() {
     fusionTimerRef,
     watchUpgradeTimeoutRef,
     lastFusionTickRef,
+    headingRef,
+    drEstPosRef,
     pointsBufferRef,
     telemetryAccumRef,
   };

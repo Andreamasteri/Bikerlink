@@ -67,3 +67,4 @@
 - [Telemetry collector state machine](telemetry-collector-machine.md) — useTelemetry guidato da macchina pura (lib/telemetry-collector-machine.ts); invariante "una sola sorgente" SOLO lì; transizioni serializzate; AppState listener solo steera.
 - [Vacuum smart + collector dedicated conn](vacuum-smart-collector.md) — vacuum notturno: ANALYZE default, FULL solo su bloat>soglia (AppSetting vacuum_full_bloat_threshold, key db_vacuum_smart_v1); db-collector usa 1 sola conn pool.connect()+early-exit se !isPoolHealthy; SET LOCAL è no-op fuori da txn.
 - [react-native-webview TypeScript regression](webview-type-regression.md) — 13.17.0 index.d.ts: WebView<P=undefined> → WebViewProps & undefined = never in TS6 strict; patch P={} + baked in post-merge.sh.
+- [Telemetry offline-first](telemetry-offline-first.md) — upload by distance (5km) non a timer; marker avanza solo su flush ok; DR anchor frozen, drEstPosRef separato.

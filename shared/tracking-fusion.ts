@@ -55,6 +55,40 @@ export function haversineKm(lat1: number, lng1: number, lat2: number, lng2: numb
 }
 
 /**
+ * Destination point reached by travelling `distanceKm` from (lat,lng) along the
+ * compass `bearingDeg` (0 = north, 90 = east, clockwise). This is the inverse of
+ * haversineKm — the pure building block for dead-reckoning a position when GPS is
+ * absent (estimate where the rider moved using heading + travelled distance).
+ * Longitude is normalised to [-180, 180). No external deps; safe on client+server.
+ */
+export function computeDestinationPoint(
+  lat: number,
+  lng: number,
+  distanceKm: number,
+  bearingDeg: number,
+): { lat: number; lng: number } {
+  const R = 6371;
+  const angular = distanceKm / R;
+  const brng = (bearingDeg * Math.PI) / 180;
+  const lat1 = (lat * Math.PI) / 180;
+  const lng1 = (lng * Math.PI) / 180;
+  const lat2 = Math.asin(
+    Math.sin(lat1) * Math.cos(angular) +
+      Math.cos(lat1) * Math.sin(angular) * Math.cos(brng),
+  );
+  const lng2 =
+    lng1 +
+    Math.atan2(
+      Math.sin(brng) * Math.sin(angular) * Math.cos(lat1),
+      Math.cos(angular) - Math.sin(lat1) * Math.sin(lat2),
+    );
+  return {
+    lat: (lat2 * 180) / Math.PI,
+    lng: ((((lng2 * 180) / Math.PI + 540) % 360) - 180),
+  };
+}
+
+/**
  * Minimum segment length (km) required to count, scaled by reported accuracy so
  * noisy fixes need to move more before they register. `null` accuracy (e.g. server
  * route points that don't store accuracy) falls back to the floor.
@@ -127,6 +161,8 @@ export interface TelemetrySample {
   gforce_z?:   number;
   heading?:    number;
   altitude_m?: number;
+  // True when lat/lon are dead-reckoning estimates (GPS absent), not real fixes.
+  estimated?:  boolean;
 }
 
 /**

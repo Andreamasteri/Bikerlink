@@ -1,7 +1,7 @@
 import { useEffect, useRef, useCallback } from "react";
 import { AppState, type AppStateStatus } from "react-native";
 import * as Location from "expo-location";
-import { Accelerometer } from "expo-sensors";
+import { Accelerometer, DeviceMotion } from "expo-sensors";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { apiRequest, queryClient } from "@/lib/query-client";
 import {
@@ -17,6 +17,8 @@ import {
 import {
   TRACKING_FUSION,
   shouldRecordSensorSample,
+  evaluateSegment,
+  computeDestinationPoint,
   type TelemetrySample,
 } from "@shared/tracking-fusion";
 
@@ -36,9 +38,18 @@ export const GPS_SILENCE_MS = TRACKING_FUSION.GPS_SILENCE_MS; // no GPS fix this
 export function shouldAddSensorSample(lastGpsTsMs: number, nowMs: number = Date.now()): boolean {
   return shouldRecordSensorSample(lastGpsTsMs, nowMs);
 }
-const FLUSH_INTERVAL_MS   = 30_000; // periodic flush every 30 s (was 90 s)
-const FLUSH_MIN_SAMPLES   = 5;      // min samples before a periodic flush fires (was 50)
 const FLUSH_MAX_SAMPLES   = 200;    // hard cap — flush immediately at this count
+// Offline-first upload cadence (Task #4705): instead of a wall-clock timer, the
+// foreground buffer is uploaded in the background only every UPLOAD_EVERY_KM of
+// travelled distance. Uploads are fire-and-forget so they never block sampling;
+// a force flush still happens on stop/background/buffer-cap.
+const UPLOAD_EVERY_KM     = 5;
+// EMA smoothing factor for the locally-derived speed estimate (0..1, higher =
+// snappier). Mirrors the gentle smoothing used by the live tracking fusion.
+const SPEED_EMA_ALPHA     = 0.3;
+// Per-tick decay applied to the EMA speed while dead-reckoning with no fresh GPS
+// fix, so a stale speed bleeds toward zero instead of running forever.
+const DR_SPEED_DECAY      = 0.98;
 const STOP_RETRY_DELAY_MS = 1_500;  // pause before retry flush on stopSession failure
 // Resume-path caps for the background buffer drain (Task #4585): bound the whole
 // drain and each individual chunk POST so a slow network on resume cannot stall
@@ -104,7 +115,6 @@ export function useTelemetry(isActive: boolean, externalGps = false) {
   const accelRef       = useRef<AccelReading>({ x: 0, y: 0, z: 1 });
   const locationSubRef = useRef<Location.LocationSubscription | null>(null);
   const accelSubRef    = useRef<ReturnType<typeof Accelerometer.addListener> | null>(null);
-  const flushTimerRef  = useRef<ReturnType<typeof setInterval> | null>(null);
   // Independent 1 Hz timer that records sensor-only samples when GPS is silent.
   const sensorTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   // Last known GPS fix coords — reused when no fresh fix is available.
@@ -112,6 +122,26 @@ export function useTelemetry(isActive: boolean, externalGps = false) {
   // Timestamp (ms) of the most recent GPS fix, used to detect GPS silence.
   const lastGpsTsRef    = useRef<number>(0);
   const isFlushing      = useRef(false);
+
+  // ── Offline-first local processing state (Task #4705) ──────────────────────
+  // Running total distance (km) accumulated locally from accepted GPS segments
+  // plus dead-reckoned sensor-only movement. Drives the distance-based upload.
+  const totalKmRef        = useRef<number>(0);
+  // Distance marker (km) at the last successful upload — a new upload fires once
+  // totalKm - kmAtLastUpload >= UPLOAD_EVERY_KM, and only advances on success.
+  const kmAtLastUploadRef = useRef<number>(0);
+  // Previous accepted position + timestamp for incremental distance via
+  // evaluateSegment (same gate the live tracking system uses).
+  const lastDistPosRef    = useRef<{ lat: number; lon: number; ts: number } | null>(null);
+  // Locally-smoothed speed estimate (km/h) — EMA of GPS speed, decayed while
+  // dead-reckoning. Used to advance the DR position when GPS is silent.
+  const emaSpeedRef       = useRef<number>(0);
+  // Compass heading (deg, 0 = north) from DeviceMotion.rotation.alpha — the
+  // travel direction used to dead-reckon position during GPS silence.
+  const headingRef        = useRef<number | null>(null);
+  // DeviceMotion subscription (heading source) — independent of the Accelerometer
+  // sub so the existing g-force/lean sampling is unchanged.
+  const motionSubRef      = useRef<ReturnType<typeof DeviceMotion.addListener> | null>(null);
   // The collector state machine — single source of truth for the lifecycle.
   // Created lazily (once) so the injected effects close over the stable refs.
   const machineRef      = useRef<TelemetryCollectorMachine | null>(null);
@@ -130,16 +160,18 @@ export function useTelemetry(isActive: boolean, externalGps = false) {
   }, []);
 
   // ── flush foreground buffer to server ─────────────────────────────────────
-  // force=true → send even when below FLUSH_MIN_SAMPLES (used for stop/background)
-  // force=false → respect FLUSH_MIN_SAMPLES gate (used for periodic timer)
-  const flush = useCallback(async (force: boolean) => {
-    if (isFlushing.current) return;
+  // Returns true when a batch was actually sent and acknowledged, false otherwise
+  // (already flushing, empty buffer, no session, or the POST failed). The boolean
+  // lets the distance-based uploader advance its marker ONLY on a real success.
+  // The `force` arg is retained for call-site clarity; with the periodic gate
+  // removed every flush now sends whatever is buffered.
+  const flush = useCallback(async (_force: boolean): Promise<boolean> => {
+    if (isFlushing.current) return false;
     const buf = bufferRef.current;
-    if (buf.length === 0) return;
-    if (!force && buf.length < FLUSH_MIN_SAMPLES) return;
+    if (buf.length === 0) return false;
 
     const sessionId = sessionIdRef.current;
-    if (!sessionId) return;
+    if (!sessionId) return false;
 
     const toSend = bufferRef.current.splice(0, FLUSH_MAX_SAMPLES);
     isFlushing.current = true;
@@ -152,14 +184,29 @@ export function useTelemetry(isActive: boolean, externalGps = false) {
       });
       // Refresh km counter right after samples are persisted
       queryClient.invalidateQueries({ queryKey: ["/api/telemetry/stats"] });
+      return true;
     } catch (err) {
       // Re-queue on network/auth failure to avoid data loss
       bufferRef.current = [...toSend, ...bufferRef.current];
       console.warn("[useTelemetry] flush failed, re-queued", err);
+      return false;
     } finally {
       isFlushing.current = false;
     }
   }, []);
+
+  // ── distance-based background upload (Task #4705) ─────────────────────────
+  // Fire-and-forget: when at least UPLOAD_EVERY_KM has been travelled since the
+  // last successful upload, kick a background flush. Non-blocking so sampling is
+  // never stalled; the distance marker only advances when the flush succeeds, so
+  // a failed upload is retried at the next sample rather than silently skipped.
+  const maybeUploadByDistance = useCallback(() => {
+    if (totalKmRef.current - kmAtLastUploadRef.current < UPLOAD_EVERY_KM) return;
+    const markAt = totalKmRef.current;
+    void flush(true).then((sent) => {
+      if (sent) kmAtLastUploadRef.current = markAt;
+    });
+  }, [flush]);
 
   // ── drain AsyncStorage background buffer and flush to server ───────────────
   const drainAndFlushBackgroundBuffer = useCallback(async () => {
@@ -199,10 +246,6 @@ export function useTelemetry(isActive: boolean, externalGps = false) {
 
   // ── internal teardown (subscriptions + timer, foreground only) ────────────
   const teardown = useCallback(() => {
-    if (flushTimerRef.current) {
-      clearInterval(flushTimerRef.current);
-      flushTimerRef.current = null;
-    }
     if (sensorTimerRef.current) {
       clearInterval(sensorTimerRef.current);
       sensorTimerRef.current = null;
@@ -214,6 +257,10 @@ export function useTelemetry(isActive: boolean, externalGps = false) {
     if (accelSubRef.current) {
       accelSubRef.current.remove();
       accelSubRef.current = null;
+    }
+    if (motionSubRef.current) {
+      motionSubRef.current.remove();
+      motionSubRef.current = null;
     }
   }, []);
 
@@ -240,12 +287,31 @@ export function useTelemetry(isActive: boolean, externalGps = false) {
 
   // ── build a sample from a Location.LocationObject + current accelerometer ──
   const buildSample = useCallback((loc: Location.LocationObject): TelemetrySample => {
-    const { latitude, longitude, altitude, speed, heading } = loc.coords;
+    const { latitude, longitude, altitude, speed, heading, accuracy } = loc.coords;
     const accel = accelRef.current;
+    const nowMs = Date.now();
+
+    // Local distance accumulation (Task #4705): gate each segment with the same
+    // accuracy/floor/speed-jump rules the live tracking system uses, then add the
+    // accepted distance to the running total that drives the 5-km upload cadence.
+    const prev = lastDistPosRef.current;
+    if (prev) {
+      const seg = evaluateSegment({
+        prevLat: prev.lat, prevLng: prev.lon, prevTimeMs: prev.ts,
+        lat: latitude, lng: longitude, timeMs: loc.timestamp,
+        accuracyM: accuracy ?? null,
+      });
+      if (seg.accept) {
+        totalKmRef.current += seg.distanceKm;
+        lastDistPosRef.current = { lat: latitude, lon: longitude, ts: loc.timestamp };
+      }
+    } else {
+      lastDistPosRef.current = { lat: latitude, lon: longitude, ts: loc.timestamp };
+    }
 
     // Remember this fix so sensor-only samples can reuse the last known coords.
     lastKnownLocRef.current = { lat: latitude, lon: longitude };
-    lastGpsTsRef.current    = Date.now();
+    lastGpsTsRef.current    = nowMs;
 
     const sample: TelemetrySample = {
       ts:  loc.timestamp,
@@ -254,13 +320,20 @@ export function useTelemetry(isActive: boolean, externalGps = false) {
     };
 
     if (speed != null && speed >= 0) {
-      sample.speed_kmh = speed * 3.6;
+      const kmh = speed * 3.6;
+      sample.speed_kmh = kmh;
+      // EMA-smooth the GPS speed locally so the dead-reckoning fallback has a
+      // believable starting velocity when GPS goes silent.
+      emaSpeedRef.current = emaSpeedRef.current === 0
+        ? kmh
+        : SPEED_EMA_ALPHA * kmh + (1 - SPEED_EMA_ALPHA) * emaSpeedRef.current;
     }
     if (altitude != null) {
       sample.altitude_m = altitude;
     }
     if (heading != null && heading >= 0) {
       sample.heading = heading;
+      headingRef.current = heading; // seed DR heading from the authoritative GPS course
     }
     sample.gforce_x   = accel.x;
     sample.gforce_y   = accel.y;
@@ -271,20 +344,48 @@ export function useTelemetry(isActive: boolean, externalGps = false) {
   }, []);
 
   // ── build a sensor-only sample (no fresh GPS fix) ─────────────────────────
-  // Uses the last known GPS coords if any (else null) + current accelerometer.
+  // Dead-reckons position locally (Task #4705): from the last known coords, walk
+  // forward by (decayed EMA speed × 1 s) along the DeviceMotion heading using
+  // computeDestinationPoint, mark the sample `estimated`, and feed the estimate
+  // back as the new last-known so the chain advances. When there is no prior fix
+  // at all, lat/lon stay null (preserving the existing sensor-only contract).
   const buildSensorSample = useCallback((): TelemetrySample => {
     const accel = accelRef.current;
     const last  = lastKnownLocRef.current;
 
-    return {
+    // Bleed the speed estimate down so a stale velocity can't run forever.
+    emaSpeedRef.current *= DR_SPEED_DECAY;
+
+    let lat: number | null = last ? last.lat : null;
+    let lon: number | null = last ? last.lon : null;
+    let estimated = false;
+
+    const heading = headingRef.current;
+    if (last && typeof heading === "number" && emaSpeedRef.current > 0.5) {
+      const stepKm = (emaSpeedRef.current / 3600) * (SAMPLE_INTERVAL_MS / 1000);
+      if (stepKm > 0) {
+        const next = computeDestinationPoint(last.lat, last.lon, stepKm, heading);
+        lat = next.lat; lon = next.lng;
+        // Advance the chain + count the dead-reckoned movement toward distance.
+        lastKnownLocRef.current = { lat: next.lat, lon: next.lng };
+        totalKmRef.current += stepKm;
+        estimated = true;
+      }
+    }
+
+    const sample: TelemetrySample = {
       ts:        Date.now(),
-      lat:       last ? last.lat : null,
-      lon:       last ? last.lon : null,
+      lat,
+      lon,
       gforce_x:  accel.x,
       gforce_y:  accel.y,
       gforce_z:  accel.z,
       lean_angle: calcLeanAngle(accel.x, accel.z),
     };
+    if (emaSpeedRef.current > 0) sample.speed_kmh = emaSpeedRef.current;
+    if (typeof heading === "number") sample.heading = heading;
+    if (estimated) sample.estimated = true;
+    return sample;
   }, []);
 
   // ── accept an externally-provided location update ─────────────────────────
@@ -298,8 +399,10 @@ export function useTelemetry(isActive: boolean, externalGps = false) {
 
     if (bufferRef.current.length >= FLUSH_MAX_SAMPLES) {
       flush(true);
+    } else {
+      maybeUploadByDistance();
     }
-  }, [buildSample, flush, canRecordForeground]);
+  }, [buildSample, flush, maybeUploadByDistance, canRecordForeground]);
 
   // ── start foreground location + accelerometer subscriptions ───────────────
   const startForegroundSubs = useCallback(async () => {
@@ -326,6 +429,8 @@ export function useTelemetry(isActive: boolean, externalGps = false) {
             bufferRef.current.push(sample);
             if (bufferRef.current.length >= FLUSH_MAX_SAMPLES) {
               flush(true);
+            } else {
+              maybeUploadByDistance();
             }
           }
         );
@@ -333,6 +438,29 @@ export function useTelemetry(isActive: boolean, externalGps = false) {
       } catch (err) {
         console.warn("[useTelemetry] location subscription failed", err);
       }
+    }
+
+    // DeviceMotion at 1 Hz — heading source for dead reckoning (Task #4705).
+    // rotation.alpha is radians, 0 = north; converted to degrees in [0,360).
+    // Kept separate from the Accelerometer sub so g-force/lean sampling is
+    // unchanged. Per-sample errors are isolated so one bad sample can't tear the
+    // subscription down mid-ride.
+    try {
+      if (await DeviceMotion.isAvailableAsync()) {
+        DeviceMotion.setUpdateInterval(SAMPLE_INTERVAL_MS);
+        motionSubRef.current = DeviceMotion.addListener((data) => {
+          try {
+            const alpha = (data?.rotation as { alpha?: number } | undefined)?.alpha;
+            if (typeof alpha === "number" && Number.isFinite(alpha)) {
+              headingRef.current = (((alpha * 180) / Math.PI) % 360 + 360) % 360;
+            }
+          } catch {
+            // never let a single motion sample crash the listener
+          }
+        });
+      }
+    } catch (err) {
+      console.warn("[useTelemetry] DeviceMotion subscription failed", err);
     }
 
     // Independent 1 Hz sensor timer — guarantees sensor data is always recorded
@@ -345,14 +473,14 @@ export function useTelemetry(isActive: boolean, externalGps = false) {
       bufferRef.current.push(buildSensorSample());
       if (bufferRef.current.length >= FLUSH_MAX_SAMPLES) {
         flush(true);
+      } else {
+        maybeUploadByDistance();
       }
     }, SAMPLE_INTERVAL_MS);
-
-    // Periodic min-gated flush
-    flushTimerRef.current = setInterval(() => {
-      flush(false); // respects FLUSH_MIN_SAMPLES
-    }, FLUSH_INTERVAL_MS);
-  }, [flush, buildSample, buildSensorSample, canRecordForeground]);
+    // No periodic wall-clock flush (Task #4705): uploads are now driven purely by
+    // travelled distance (maybeUploadByDistance) plus force flushes on
+    // stop/background/buffer-cap, so the app uploads sparingly and offline-first.
+  }, [flush, buildSample, buildSensorSample, maybeUploadByDistance, canRecordForeground]);
 
   // ── drain samples persisted by a previous failed finishSession flush ──────
   // Runs at session start so no data is permanently stranded.
@@ -412,6 +540,12 @@ export function useTelemetry(isActive: boolean, externalGps = false) {
     // session's last fix — sensor-only samples must be null until a fresh fix.
     lastKnownLocRef.current = null;
     lastGpsTsRef.current    = 0;
+    // Reset offline-first local processing state (Task #4705).
+    totalKmRef.current        = 0;
+    kmAtLastUploadRef.current = 0;
+    lastDistPosRef.current    = null;
+    emaSpeedRef.current       = 0;
+    headingRef.current        = null;
 
     // Drain any samples persisted from a previous failed finishSession flush.
     // Fire before foreground subs start so auth is more likely valid.

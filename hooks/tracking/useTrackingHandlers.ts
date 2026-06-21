@@ -87,6 +87,7 @@ export function buildResetTrackingState(deps: Pick<TrackingHandlerDeps, "gps" | 
     gps.emaSpeedRef.current = 0; stats.lastAvgSpeedUpdateRef.current = 0; stats.pausedMsRef.current = 0; stats.isPausedRef.current = false;
     sensors.setIsCalibrating(false);
     gps.gpsWasLostRef.current = false; refs.telemetryAccumRef.current = []; gps.gpsBlackoutCountRef.current = 0; gps.gpsBlackoutSecondsRef.current = 0;
+    refs.headingRef.current = null; refs.drEstPosRef.current = null;
     bg.pendingBgToastCountRef.current = 0; gps.gpsBlackoutStartRef.current = null;
     refs.pointsBufferRef.current = [];
     if (sprint.sprintTimeoutRef.current) clearTimeout(sprint.sprintTimeoutRef.current);
@@ -138,6 +139,13 @@ export function useTrackingHandlers(deps: TrackingHandlerDeps) {
               accelG = y / 9.81; lateralG = x / 9.81; tiltDeg = ((data.rotation as { roll?: number }).roll || 0) * (180 / Math.PI);
             }
             sensors.currentAccelGRef.current = accelG; sensors.currentLateralGRef.current = lateralG; sensors.currentTiltDegRef.current = tiltDeg;
+            // Compass heading for dead reckoning (Task #4705): rotation.alpha is in
+            // radians, 0 = north. Convert to degrees in [0,360). Used as the travel
+            // direction to estimate position while GPS is silent.
+            const alpha = (data.rotation as { alpha?: number } | undefined)?.alpha;
+            if (typeof alpha === "number" && Number.isFinite(alpha)) {
+              refs.headingRef.current = (((alpha * 180) / Math.PI) % 360 + 360) % 360;
+            }
             // Gravity-compensated forward linear acceleration (m/s²) for dead reckoning.
             // Prefer the OS-fused linear acceleration; otherwise estimate gravity with a
             // low-pass complementary filter and subtract it from the raw vector.

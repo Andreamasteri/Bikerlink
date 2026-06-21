@@ -46,8 +46,11 @@ export interface CollectorEffects {
   startForeground: () => Promise<void>;
   /** Remove subscriptions and clear timers (synchronous, best-effort). */
   stopForeground: () => void;
-  /** Flush the foreground buffer; `force` ignores the min-sample gate. */
-  flush: (force: boolean) => Promise<void>;
+  /**
+   * Flush the foreground buffer. `force` is retained for call-site clarity.
+   * The resolved value (true when a batch was sent) is ignored by the machine.
+   */
+  flush: (force: boolean) => Promise<unknown>;
   /** Start the expo-location background task. Returns true if it started. */
   startBackground: () => Promise<boolean>;
   /** Stop the expo-location background task (best-effort). */

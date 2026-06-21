@@ -12,7 +12,7 @@ import { useApiDebugLog } from "@/hooks/useApiDebugLog";
 import { apiRequest, getQueryFn } from "@/lib/query-client";
 import { setTrackingActive } from "@/lib/tracking-active";
 import { logGpsError } from "@/lib/gps-logger";
-import { TRACKING_FUSION, type FusionMode } from "@shared/tracking-fusion";
+import { TRACKING_FUSION, computeDestinationPoint, type FusionMode } from "@shared/tracking-fusion";
 
 import * as Haptics from "expo-haptics";
 import * as TaskManager from "expo-task-manager";
@@ -315,12 +315,32 @@ export function useTrackingState() {
             gps.totalKmRef.current += distKm; gps.setTotalKm(gps.totalKmRef.current);
             gps.drGapKmRef.current += distKm; // reconciled by onNativeLocation on GPS recovery
           }
-          const pos = gps.lastPosRef.current;
+          // Dead-reckon an ESTIMATED position from the frozen GPS anchor using the
+          // compass heading + travelled distance (Task #4705). The GPS anchor
+          // (gps.lastPosRef) stays frozen so GPS-recovery reconciliation in
+          // onNativeLocation is unaffected; we advance only our own drEstPosRef.
+          const heading = refs.headingRef.current;
+          let estLat: number | null = null, estLon: number | null = null;
+          const base = refs.drEstPosRef.current ?? (gps.lastPosRef.current
+            ? { lat: gps.lastPosRef.current.lat, lon: gps.lastPosRef.current.lng }
+            : null);
+          if (base && distKm > 0 && typeof heading === "number") {
+            const next = computeDestinationPoint(base.lat, base.lon, distKm, heading);
+            refs.drEstPosRef.current = { lat: next.lat, lon: next.lng };
+            estLat = next.lat; estLon = next.lng;
+          } else if (base) {
+            refs.drEstPosRef.current = base;
+            estLat = base.lat; estLon = base.lon;
+          }
           refs.telemetryAccumRef.current.push({
-            timestamp: new Date(now).toISOString(), lat: pos?.lat ?? 0, lon: pos?.lng ?? 0,
+            timestamp: new Date(now).toISOString(), lat: estLat ?? 0, lon: estLon ?? 0,
             leanAngle: sensors.currentTiltDegRef.current, gForceX: sensors.currentAccelGRef.current,
-            speedKmh: dr, mode,
+            speedKmh: dr, mode, estimated: estLat !== null,
           });
+        } else {
+          // GPS authoritative (or acquiring): drop any stale DR estimate so the next
+          // blackout re-seeds from the current frozen anchor, not an old chain.
+          refs.drEstPosRef.current = null;
         }
       } catch (e) { logGpsError(e, "tracking_tick_fusion"); }
     }, 1000);
