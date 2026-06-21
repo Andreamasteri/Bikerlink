@@ -24,6 +24,24 @@ if [ -f "package-lock.json" ]; then
     echo "❌ npm install fallito (exit ${NPM_EXIT}) — abort post-merge per evitare stato incoerente."
     exit "${NPM_EXIT}"
   fi
+
+  # ── PATCH react-native-webview index.d.ts ────────────────────
+  # react-native-webview 13.17.0 dichiara WebView<P = undefined> in index.d.ts.
+  # Con TypeScript 6.x strict, WebViewProps & undefined = never → tutti i JSX
+  # <WebView> falliscono il typecheck. Fix: P = {} invece di P = undefined.
+  RNWV_DTS="node_modules/react-native-webview/index.d.ts"
+  if [ -f "$RNWV_DTS" ] && grep -q "declare class WebView<P = undefined>" "$RNWV_DTS" 2>/dev/null; then
+    sed -i 's/declare class WebView<P = undefined>/declare class WebView<P = {}>/' "$RNWV_DTS"
+    echo "✅ Patch react-native-webview/index.d.ts applicata (P=undefined → P={})."
+  fi
+  # ─────────────────────────────────────────────────────────────
+
+  # ── FIX package-lock.json proxy Replit ───────────────────────
+  if [ -f "package-lock.json" ] && grep -q "package-firewall.replit.local" package-lock.json 2>/dev/null; then
+    sed -i 's|http://package-firewall\.replit\.local/npm/|https://registry.npmjs.org/|g' package-lock.json
+    echo "✅ Fix package-lock.json proxy Replit applicato."
+  fi
+  # ─────────────────────────────────────────────────────────────
 else
   echo "⚠️  package-lock.json mancante — sync node_modules saltato."
 fi
