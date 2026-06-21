@@ -7,9 +7,16 @@ import { useAuth } from "@/lib/auth-context";
 import { APPLIED_OTA_NUMBER } from "@/constants/buildInfo";
 import { loadAppliedOtaNumber, saveAppliedOtaNumber } from "@/lib/otaStorage";
 
-function parseAppVersion(): { apk: string; runtime: string; ota: string } {
-  const version = Constants.expoConfig?.version ?? "";
-  const parts = version.split(".");
+export interface OtaReleaseSummary {
+  status: string;
+  otaVersion: string | null;
+  publishedAt: string;
+  message?: string | null;
+}
+
+export function parseAppVersion(version?: string): { apk: string; runtime: string; ota: string } {
+  const v = version ?? Constants.expoConfig?.version ?? "";
+  const parts = v.split(".");
   if (parts.length >= 3) {
     return { apk: parts[0], runtime: parts[1], ota: parts[2] };
   }
@@ -19,11 +26,22 @@ function parseAppVersion(): { apk: string; runtime: string; ota: string } {
   return { apk: "—", runtime: "—", ota: "—" };
 }
 
-interface OtaReleaseSummary {
-  status: string;
-  otaVersion: string | null;
-  publishedAt: string;
-  message?: string | null;
+export function computeLastApprovedOtaNum(releases: OtaReleaseSummary[] | undefined): number | null {
+  if (!releases) return null;
+  const approved = releases
+    .filter((r) => r.status === "approved")
+    .sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime());
+  if (!approved.length) return null;
+  const top = approved[0];
+  const fromVersion = top.otaVersion?.match(/^\d+\.\d+\.(\d+)$/);
+  if (fromVersion) return Number(fromVersion[1]);
+  const fromMessage = top.message?.match(/^\[OTA:\d+\.\d+\.(\d+)\]/);
+  if (fromMessage) return Number(fromMessage[1]);
+  return null;
+}
+
+export function computeShowAdminOta(appliedOtaNumber: number | null, lastApprovedOtaNum: number | null): boolean {
+  return appliedOtaNumber !== null && lastApprovedOtaNum !== null && appliedOtaNumber > lastApprovedOtaNum;
 }
 
 export const ProfileVersionSection: React.FC = () => {
@@ -56,29 +74,13 @@ export const ProfileVersionSection: React.FC = () => {
     enabled: isAdmin,
   });
 
-  const lastApprovedOtaNum = useMemo(() => {
-    if (!releases) return null;
-    const approved = releases
-      .filter((r) => r.status === "approved")
-      .sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime());
-    if (!approved.length) return null;
-    const top = approved[0];
-    const fromVersion = top.otaVersion?.match(/^\d+\.\d+\.(\d+)$/);
-    if (fromVersion) return Number(fromVersion[1]);
-    const fromMessage = top.message?.match(/^\[OTA:\d+\.\d+\.(\d+)\]/);
-    if (fromMessage) return Number(fromMessage[1]);
-    return null;
-  }, [releases]);
+  const lastApprovedOtaNum = useMemo(() => computeLastApprovedOtaNum(releases), [releases]);
 
   const { apk, runtime, ota } = parseAppVersion();
 
   const displayOta = isAdmin && lastApprovedOtaNum !== null ? lastApprovedOtaNum : appliedOta;
 
-  const showAdminOta =
-    isAdmin &&
-    APPLIED_OTA_NUMBER !== null &&
-    lastApprovedOtaNum !== null &&
-    APPLIED_OTA_NUMBER > lastApprovedOtaNum;
+  const showAdminOta = isAdmin && computeShowAdminOta(APPLIED_OTA_NUMBER, lastApprovedOtaNum);
 
   return (
     <View style={styles.container}>
