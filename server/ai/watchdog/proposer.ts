@@ -11,6 +11,7 @@ import { z } from "zod";
 import type { AiCallMeta } from "../moderation/types";
 import { isWatchdogEnabled } from "./kill-switch";
 import { isMapsFlagEnabled } from "./maps-kill-switch";
+import { isThinkCentreIgnoredForTests } from "../../lib/thinkcentre-ignore-tests";
 import { storage } from "../../storage";
 import { logAiUsage } from "../audit";
 
@@ -123,10 +124,27 @@ export interface ProposerResult {
 export async function runProposer(snap: HealthSnapshot): Promise<ProposerResult | null> {
   if (!(await isWatchdogEnabled())) return null;
   const mapsLlmEnabled = await isMapsFlagEnabled("llm");
-  const hiSev = snap.problems
+  let hiSev = snap.problems
     .filter((p) => p.severity === "high" || p.severity === "critical")
     .filter((p) => mapsLlmEnabled || p.source !== "maps");
   if (hiSev.length === 0) return null;
+
+  // Se il flag "ThinkCentre offline per test" è attivo, rimuovi i problemi ThinkCentre
+  // da hiSev prima di qualsiasi analisi: vengono soppressi silenziosamente.
+  // Differenza rispetto ad allKnownOffline: qui si filtrano i singoli problemi TC anche
+  // in presenza di problemi misti (i non-TC vengono comunque proposti all'AI).
+  if (await isThinkCentreIgnoredForTests()) {
+    const tcProblems = hiSev.filter((p) => isKnownOfflineProblem(p.id));
+    if (tcProblems.length > 0) {
+      hiSev = hiSev.filter((p) => !isKnownOfflineProblem(p.id));
+      console.info(
+        `[watchdog/proposer] ThinkCentre offline per test: rimossi ${tcProblems.length} probl. TC/routing` +
+        ` (${tcProblems.map((p) => p.id).join(", ")})` +
+        (hiSev.length > 0 ? ` — ${hiSev.length} problemi non-TC rimangono` : " — nessun problema rimanente, skip"),
+      );
+      if (hiSev.length === 0) return null;
+    }
+  }
 
   // Skip se tutti i problemi attivi sono "noti offline" (ThinkCentre/GraphHopper/Valhalla):
   // non c'è niente che possiamo fare automaticamente, evita di bruciare quota AI.

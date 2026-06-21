@@ -18,6 +18,7 @@ import {
 } from "./thinkcentre-health-utils";
 import { isThinkCentreInMaintenance } from "../../lib/thinkcentre-maintenance";
 import { isThinkCentrePoweredOff } from "../../lib/thinkcentre-powered-off";
+import { isThinkCentreIgnoredForTests } from "../../lib/thinkcentre-ignore-tests";
 import {
   probeValhallaDetailed,
   probeNominatimDetailed,
@@ -149,6 +150,46 @@ router.post("/thinkcentre/powered-off", async (req: Request, res: ExpressRespons
     return res.json({ ok: true, enabled });
   } catch (_err) {
     return sendError(res, 500, "Errore salvataggio stato ThinkCentre spento");
+  }
+});
+
+/**
+ * GET /api/admin/thinkcentre/ignore-for-tests
+ * Legge il flag "thinkcentre_ignore_for_tests". Default: false.
+ */
+router.get("/thinkcentre/ignore-for-tests", async (_req: Request, res: ExpressResponse) => {
+  try {
+    const enabled = await isThinkCentreIgnoredForTests();
+    return res.json({ enabled });
+  } catch (_err) {
+    return sendError(res, 500, "Errore lettura flag ignore-for-tests ThinkCentre");
+  }
+});
+
+/**
+ * POST /api/admin/thinkcentre/ignore-for-tests
+ * Body: { enabled: boolean }
+ * Attiva/disattiva la soppressione degli alert ThinkCentre nel proposer AI watchdog.
+ */
+router.post("/thinkcentre/ignore-for-tests", async (req: Request, res: ExpressResponse) => {
+  try {
+    const { enabled } = req.body as { enabled?: unknown };
+    if (typeof enabled !== "boolean") {
+      return sendError(res, 400, "Campo 'enabled' deve essere un booleano");
+    }
+    await withDbRetry(() =>
+      db
+        .insert(appSettings)
+        .values({ key: "thinkcentre_ignore_for_tests", value: enabled ? "true" : "false" })
+        .onConflictDoUpdate({
+          target: appSettings.key,
+          set: { value: enabled ? "true" : "false", updatedAt: new Date() },
+        }),
+    );
+    console.log(`[admin/thinkcentre-ignore-tests] soppressione alert ${enabled ? "ATTIVATA" : "disattivata"}`);
+    return res.json({ ok: true, enabled });
+  } catch (_err) {
+    return sendError(res, 500, "Errore salvataggio flag ignore-for-tests ThinkCentre");
   }
 });
 

@@ -18,6 +18,7 @@ async function apiFetch(path: string, method = "GET", body?: object) {
 const PUSH_KEY = ["/api/admin/settings/thinkcentre-service-push"] as const;
 const MAINT_KEY = ["/api/admin/thinkcentre/maintenance"] as const;
 const POWERED_OFF_KEY = ["/api/admin/thinkcentre/powered-off"] as const;
+const IGNORE_TESTS_KEY = ["/api/admin/thinkcentre/ignore-for-tests"] as const;
 
 export function useThinkCentreToggles() {
   const { data: pushData, isLoading: pushLoading } = useQuery<{ enabled: boolean }>({
@@ -86,6 +87,31 @@ export function useThinkCentreToggles() {
     },
   });
 
+  const { data: ignoreTestsData, isLoading: ignoreTestsLoading } = useQuery<{ enabled: boolean }>({
+    queryKey: IGNORE_TESTS_KEY,
+    queryFn: () => apiFetch("/api/admin/thinkcentre/ignore-for-tests"),
+    staleTime: 30_000,
+  });
+
+  const ignoreTestsMutation = useMutation<{ ok: boolean; enabled: boolean }, Error, boolean, { prev: { enabled: boolean } | undefined }>({
+    mutationFn: (enabled: boolean) =>
+      apiFetch("/api/admin/thinkcentre/ignore-for-tests", "POST", { enabled }),
+    onMutate: async (enabled) => {
+      await queryClient.cancelQueries({ queryKey: IGNORE_TESTS_KEY });
+      const prev = queryClient.getQueryData<{ enabled: boolean }>(IGNORE_TESTS_KEY);
+      queryClient.setQueryData(IGNORE_TESTS_KEY, { enabled });
+      return { prev };
+    },
+    onError: (_err, _enabled, context) => {
+      if (context?.prev !== undefined) {
+        queryClient.setQueryData(IGNORE_TESTS_KEY, context.prev);
+      }
+    },
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: IGNORE_TESTS_KEY });
+    },
+  });
+
   return {
     pushData,
     pushLoading,
@@ -98,5 +124,9 @@ export function useThinkCentreToggles() {
     poweredOffLoading,
     poweredOffMutation,
     poweredOffActive: poweredOffData?.enabled ?? false,
+    ignoreTestsData,
+    ignoreTestsLoading,
+    ignoreTestsMutation,
+    ignoreTestsActive: ignoreTestsData?.enabled ?? false,
   };
 }

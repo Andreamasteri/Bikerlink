@@ -204,6 +204,7 @@ export function ThinkCentreCard({
     pushData, pushLoading, pushMutation,
     maintenanceLoading, maintenanceMutation, maintenanceActive,
     poweredOffLoading, poweredOffMutation, poweredOffActive,
+    ignoreTestsLoading, ignoreTestsMutation, ignoreTestsActive,
   } = useThinkCentreToggles();
 
   useEffect(() => {
@@ -449,6 +450,28 @@ export function ThinkCentreCard({
                 onValueChange={(val) => pushMutation.mutate(val)}
                 trackColor={{ false: Colors.border, true: "#f59e0b" }}
                 thumbColor={pushData.enabled ? Colors.text : Colors.textSecondary}
+              />
+            )}
+          </View>
+
+          <View style={styles.pushToggleRow}>
+            <View style={styles.pushToggleLeft}>
+              <Ionicons name="flask-outline" size={15} color={ignoreTestsActive ? "#f97316" : Colors.textSecondary} />
+              <Text style={[styles.pushToggleLabel, ignoreTestsActive && { color: "#f97316" }]}>
+                ThinkCentre offline per test
+              </Text>
+              <Text style={styles.pushToggleSub}>
+                Sopprime errori e alert legati al ThinkCentre — routing cloud attivo
+              </Text>
+            </View>
+            {ignoreTestsLoading || ignoreTestsMutation.isPending ? (
+              <ActivityIndicator size="small" color={Colors.textSecondary} />
+            ) : (
+              <Switch
+                value={ignoreTestsActive}
+                onValueChange={(val) => ignoreTestsMutation.mutate(val)}
+                trackColor={{ false: Colors.border, true: "#f97316" }}
+                thumbColor={ignoreTestsActive ? Colors.text : Colors.textSecondary}
               />
             )}
           </View>
