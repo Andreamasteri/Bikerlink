@@ -25,6 +25,7 @@ import { PublishModal } from "@/components/tracking/PublishModal";
 import { IdleConfigScreen } from "@/components/tracking/IdleConfigScreen";
 import { TrackingDashboard } from "@/components/tracking/TrackingDashboard";
 import { MountCalibWizard } from "@/components/MountCalibWizard";
+import { SavedLapsArchive } from "@/components/giri/list/SavedLapsArchive";
 
 function TrackingScreenInner() {
   const t = useT();
@@ -238,22 +239,25 @@ function TrackingScreenInner() {
           calibrationTimestamp={state.mountAxisCalib?.timestamp ?? null}
           t={t}
           renderHistory={() => (
-            <View style={styles.recordsSection}>
-              <Text style={styles.sectionTitle}>{t("tracking.history")}</Text>
-              {(state.records || []).map((r) => (
-                <RecordCard
-                  key={r.id}
-                  item={r}
-                  onPublish={() => handlers.setPublishRecord(r)}
-                  onDelete={() => handlers.handleDeleteRecord(r.id)}
-                  onViewRoute={() => handlers.handleViewHistoricalRoute(r)}
-                  onExportGpx={() => handlers.handleExportGpx(r.id)}
-                />
-              ))}
-              {(state.records || []).length === 0 && (
-                <Text style={styles.emptyText}>{t("tracking.noRecords")}</Text>
-              )}
-            </View>
+            <>
+              <View style={styles.recordsSection}>
+                <Text style={styles.sectionTitle}>{t("tracking.history")}</Text>
+                {(state.records || []).map((r) => (
+                  <RecordCard
+                    key={r.id}
+                    item={r}
+                    onPublish={() => handlers.setPublishRecord(r)}
+                    onDelete={() => handlers.handleDeleteRecord(r.id)}
+                    onViewRoute={() => handlers.handleViewHistoricalRoute(r)}
+                    onExportGpx={() => handlers.handleExportGpx(r.id)}
+                  />
+                ))}
+                {(state.records || []).length === 0 && (
+                  <Text style={styles.emptyText}>{t("tracking.noRecords")}</Text>
+                )}
+              </View>
+              <SavedLapsArchive />
+            </>
           )}
         />
       )}

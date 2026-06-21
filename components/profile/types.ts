@@ -79,4 +79,5 @@ export type IdealLap = {
   maxGforce: number | null;
   lapNumber: number;
   lapName: string | null;
+  distanceKm: number | null;
 };
