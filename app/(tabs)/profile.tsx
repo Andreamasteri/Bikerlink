@@ -293,7 +293,9 @@ export default function ProfileScreen() {
           serverNotifPrefs={profile?.profile?.notificationPreferences}
         />
 
-        <MatchPrefsPanel />
+        {(currentUserType === "biker" || currentUserType === "coppia") && (
+          <MatchPrefsPanel />
+        )}
 
         <ThemePanel />
         <UnitsPanel />
