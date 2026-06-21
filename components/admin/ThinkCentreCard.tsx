@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from "react";
-import { View, Text, StyleSheet, ActivityIndicator, TouchableOpacity, Switch } from "react-native";
+import { View, Text, ActivityIndicator, TouchableOpacity, Switch } from "react-native";
 import { MaterialCommunityIcons, Ionicons } from "@expo/vector-icons";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
+import { getApiUrl, authFetchHeaders } from "@/lib/query-client";
 import Colors from "@/constants/colors";
-import { getApiUrl, authFetchHeaders, queryClient } from "@/lib/query-client";
+import { styles } from "./ThinkCentreCardStyles";
 import { EventLog, GraphHopperBlock } from "./ThinkCentreCardParts";
 import type { HealthEvent, AreaServiceHealth, ProbeLogEntry } from "./ThinkCentreCardParts";
 import { ServiceBadgeStrip } from "./ThinkCentreServiceBadge";
@@ -19,6 +20,7 @@ import {
   UptimeKumaBlock,
 } from "./ThinkCentreInfraBlocks";
 import type { DotStatus, SystemStatuses } from "./SystemHealthContainer";
+import { useThinkCentreToggles } from "./ThinkCentreCardToggles";
 
 type ServiceKey =
   | "valhalla"
@@ -134,6 +136,21 @@ type ThinkCentreStatusKeys =
   | "nginx"
   | "uptimeKuma";
 
+const ALL_UNKNOWN: Pick<SystemStatuses, ThinkCentreStatusKeys> = {
+  thinkcentre: "unknown",
+  graphhopper: "unknown",
+  valhalla: "unknown",
+  nominatim: "unknown",
+  ollama: "unknown",
+  whisper: "unknown",
+  ufw: "unknown",
+  redis: "unknown",
+  postgres: "unknown",
+  pgadmin: "unknown",
+  nginx: "unknown",
+  uptimeKuma: "unknown",
+};
+
 export function ThinkCentreCard({
   onStatuses,
 }: {
@@ -183,171 +200,17 @@ export function ThinkCentreCard({
     enabled: !collapsed,
   });
 
-  const { data: pushData, isLoading: pushLoading } = useQuery<{ enabled: boolean }>({
-    queryKey: ["/api/admin/settings/thinkcentre-service-push"],
-    queryFn: async () => {
-      const res = await fetch(
-        new URL("/api/admin/settings/thinkcentre-service-push", getApiUrl()).toString(),
-        { headers: { ...(await authFetchHeaders()) }, credentials: "include" },
-      );
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      return res.json();
-    },
-    staleTime: 60_000,
-  });
-
-  const pushMutation = useMutation({
-    mutationFn: async (enabled: boolean) => {
-      const res = await fetch(
-        new URL("/api/admin/settings/thinkcentre-service-push", getApiUrl()).toString(),
-        {
-          method: "PUT",
-          headers: { "Content-Type": "application/json", ...(await authFetchHeaders()) },
-          credentials: "include",
-          body: JSON.stringify({ enabled }),
-        },
-      );
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      return res.json();
-    },
-    onMutate: async (enabled: boolean) => {
-      await queryClient.cancelQueries({ queryKey: ["/api/admin/settings/thinkcentre-service-push"] });
-      const previous = queryClient.getQueryData<{ enabled: boolean }>(["/api/admin/settings/thinkcentre-service-push"]);
-      queryClient.setQueryData(["/api/admin/settings/thinkcentre-service-push"], { enabled });
-      return { previous };
-    },
-    onError: (_err, _enabled, context) => {
-      if (context?.previous !== undefined) {
-        queryClient.setQueryData(["/api/admin/settings/thinkcentre-service-push"], context.previous);
-      }
-    },
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ["/api/admin/settings/thinkcentre-service-push"] });
-    },
-  });
-
-  const { data: maintenanceData, isLoading: maintenanceLoading } = useQuery<{ enabled: boolean }>({
-    queryKey: ["/api/admin/thinkcentre/maintenance"],
-    queryFn: async () => {
-      const res = await fetch(
-        new URL("/api/admin/thinkcentre/maintenance", getApiUrl()).toString(),
-        { headers: { ...(await authFetchHeaders()) }, credentials: "include" },
-      );
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      return res.json();
-    },
-    staleTime: 30_000,
-  });
-
-  const maintenanceMutation = useMutation({
-    mutationFn: async (enabled: boolean) => {
-      const res = await fetch(
-        new URL("/api/admin/thinkcentre/maintenance", getApiUrl()).toString(),
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json", ...(await authFetchHeaders()) },
-          credentials: "include",
-          body: JSON.stringify({ enabled }),
-        },
-      );
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      return res.json();
-    },
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ["/api/admin/thinkcentre/maintenance"] });
-      void queryClient.invalidateQueries({ queryKey: ["/api/admin/thinkcentre-health"] });
-    },
-  });
-
-  const maintenanceActive = maintenanceData?.enabled ?? false;
-
-  const poweredOffKey = ["/api/admin/thinkcentre/powered-off"] as const;
-
-  const { data: poweredOffData, isLoading: poweredOffLoading } = useQuery<{ enabled: boolean }>({
-    queryKey: poweredOffKey,
-    queryFn: async () => {
-      const res = await fetch(
-        new URL("/api/admin/thinkcentre/powered-off", getApiUrl()).toString(),
-        { headers: { ...(await authFetchHeaders()) }, credentials: "include" },
-      );
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      return res.json();
-    },
-    staleTime: 30_000,
-  });
-
-  const poweredOffMutation = useMutation<{ ok: boolean; enabled: boolean }, Error, boolean, { prev: { enabled: boolean } | undefined }>({
-    mutationFn: async (enabled: boolean) => {
-      const res = await fetch(
-        new URL("/api/admin/thinkcentre/powered-off", getApiUrl()).toString(),
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json", ...(await authFetchHeaders()) },
-          credentials: "include",
-          body: JSON.stringify({ enabled }),
-        },
-      );
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      return res.json();
-    },
-    onMutate: async (enabled) => {
-      await queryClient.cancelQueries({ queryKey: poweredOffKey });
-      const prev = queryClient.getQueryData<{ enabled: boolean }>(poweredOffKey);
-      queryClient.setQueryData(poweredOffKey, { enabled });
-      return { prev };
-    },
-    onError: (_err, _enabled, context) => {
-      if (context?.prev !== undefined) {
-        queryClient.setQueryData(poweredOffKey, context.prev);
-      }
-    },
-    onSettled: () => {
-      void queryClient.invalidateQueries({ queryKey: poweredOffKey });
-      void queryClient.invalidateQueries({ queryKey: ["/api/admin/thinkcentre-health"] });
-    },
-  });
-
-  const poweredOffActive = poweredOffData?.enabled ?? false;
+  const {
+    pushData, pushLoading, pushMutation,
+    maintenanceLoading, maintenanceMutation, maintenanceActive,
+    poweredOffLoading, poweredOffMutation, poweredOffActive,
+  } = useThinkCentreToggles();
 
   useEffect(() => {
     if (!onStatuses) return;
-    // ThinkCentre spento: tutti "unknown" immediatamente, senza attendere le probe.
-    if (poweredOffActive) {
-      onStatuses({
-        thinkcentre: "unknown",
-        graphhopper: "unknown",
-        valhalla: "unknown",
-        nominatim: "unknown",
-        ollama: "unknown",
-        whisper: "unknown",
-        ufw: "unknown",
-        redis: "unknown",
-        postgres: "unknown",
-        pgadmin: "unknown",
-        nginx: "unknown",
-        uptimeKuma: "unknown",
-      });
-      return;
-    }
+    if (poweredOffActive) { onStatuses(ALL_UNKNOWN); return; }
     if (!data) return;
-    // In manutenzione il ThinkCentre non contribuisce allo stato globale: tutti "unknown".
-    if (data.maintenanceMode) {
-      onStatuses({
-        thinkcentre: "unknown",
-        graphhopper: "unknown",
-        valhalla: "unknown",
-        nominatim: "unknown",
-        ollama: "unknown",
-        whisper: "unknown",
-        ufw: "unknown",
-        redis: "unknown",
-        postgres: "unknown",
-        pgadmin: "unknown",
-        nginx: "unknown",
-        uptimeKuma: "unknown",
-      });
-      return;
-    }
+    if (data.maintenanceMode) { onStatuses(ALL_UNKNOWN); return; }
     const findSvc = (key: ServiceKey) => data.services.find((s) => s.key === key);
     onStatuses({
       thinkcentre: overallToStatus(data.overall),
@@ -430,7 +293,6 @@ export function ThinkCentreCard({
 
       {!collapsed && (
         <View style={styles.list}>
-          {/* Service detail blocks — nascosti quando ThinkCentre è spento */}
           {!poweredOffActive && error && !isLoading && (
             <Text style={styles.errorText}>Impossibile leggere lo stato dei servizi.</Text>
           )}
@@ -535,14 +397,14 @@ export function ThinkCentreCard({
               </Text>
             </TouchableOpacity>
           )}
+
           {!poweredOffActive && data && data.configuredCount > 0 && (
             <View style={styles.note}>
               <Ionicons name="information-circle-outline" size={14} color={Colors.textSecondary} />
               <View style={styles.noteBody}>
                 <Text style={styles.noteText}>
                   Il fingerprint del token Replit è sempre visibile per confronto preventivo — utile
-                  per verificare che una modifica ai secret sia stata applicata prima che scatti un
-                  401.
+                  per verificare che una modifica ai secret sia stata applicata prima che scatti un 401.
                   {data.onlineCount === 0
                     ? "\nTutti i servizi risultano offline: verifica che il ThinkCentre sia acceso e il tunnel configurato."
                     : ""}
@@ -561,7 +423,6 @@ export function ThinkCentreCard({
             <EventLog events={eventsData.events} />
           )}
 
-          {/* Overlay powered-off — appare al posto dei blocchi servizio */}
           {poweredOffActive && (
             <View style={styles.poweredOffOverlay}>
               <Ionicons name="power-outline" size={22} color="#ef4444" />
@@ -572,12 +433,13 @@ export function ThinkCentreCard({
             </View>
           )}
 
-          {/* Toggles — sempre visibili quando la card è espansa */}
           <View style={styles.pushToggleRow}>
             <View style={styles.pushToggleLeft}>
               <Ionicons name="notifications-outline" size={15} color={Colors.textSecondary} />
               <Text style={styles.pushToggleLabel}>Push per servizio offline</Text>
-              <Text style={styles.pushToggleSub}>Notifiche per singolo servizio (es. Ollama offline) con debounce 15 min — le notifiche globali ThinkCentre escono sempre</Text>
+              <Text style={styles.pushToggleSub}>
+                Notifiche per singolo servizio (es. Ollama offline) con debounce 15 min — le notifiche globali ThinkCentre escono sempre
+              </Text>
             </View>
             {pushLoading || pushData === undefined ? (
               <ActivityIndicator size="small" color={Colors.textSecondary} />
@@ -617,7 +479,9 @@ export function ThinkCentreCard({
               <Text style={[styles.pushToggleLabel, poweredOffActive && styles.poweredOffLabelActive]}>
                 ThinkCentre spento
               </Text>
-              <Text style={styles.pushToggleSub}>Tutti i servizi offline · nessuna notifica · routing su cloud</Text>
+              <Text style={styles.pushToggleSub}>
+                Tutti i servizi offline · nessuna notifica · routing su cloud
+              </Text>
             </View>
             {poweredOffLoading || poweredOffMutation.isPending ? (
               <ActivityIndicator size="small" color={Colors.textSecondary} />
@@ -636,118 +500,3 @@ export function ThinkCentreCard({
   );
 }
 
-const styles = StyleSheet.create({
-  card: {
-    backgroundColor: Colors.surface,
-    borderRadius: 16,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  cardHeader: { flexDirection: "row", alignItems: "center", gap: 8 },
-  cardTitle: { fontFamily: "Inter_700Bold", fontSize: 15, color: Colors.text },
-  headerRight: { marginLeft: "auto", flexDirection: "row", alignItems: "center", gap: 8 },
-  headerCount: { fontFamily: "Inter_600SemiBold", fontSize: 14, color: Colors.textSecondary },
-  healthDot: { width: 10, height: 10, borderRadius: 5 },
-  list: { marginTop: 14, gap: 10 },
-  errorText: { fontFamily: "Inter_400Regular", fontSize: 14, color: "#ef4444" },
-  note: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 6,
-    backgroundColor: Colors.background,
-    borderRadius: 8,
-    padding: 10,
-    marginTop: 4,
-  },
-  noteBody: { flex: 1, gap: 4 },
-  noteText: { fontFamily: "Inter_400Regular", fontSize: 13, color: Colors.textSecondary, lineHeight: 16 },
-  legend: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 2 },
-  legendText: { fontFamily: "Inter_400Regular", fontSize: 12, color: Colors.textSecondary },
-  mono: { fontFamily: "Inter_400Regular", fontSize: 12, color: "#9ca3af" },
-  retryButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-    alignSelf: "flex-start",
-    paddingVertical: 5,
-    paddingHorizontal: 10,
-    backgroundColor: "rgba(96, 165, 250, 0.1)",
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: "rgba(96, 165, 250, 0.25)",
-    marginTop: 2,
-  },
-  retryButtonBusy: { opacity: 0.55 },
-  retryText: { fontFamily: "Inter_600SemiBold", fontSize: 14, color: "#60a5fa" },
-  pushToggleRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingTop: 10,
-    marginTop: 6,
-    borderTopWidth: 1,
-    borderTopColor: Colors.border,
-  },
-  pushToggleLeft: { flex: 1, gap: 2, flexDirection: "column" },
-  pushToggleLabel: { fontFamily: "Inter_500Medium", fontSize: 13, color: Colors.text },
-  pushToggleSub: { fontFamily: "Inter_400Regular", fontSize: 12, color: Colors.textSecondary },
-  maintenanceLabelActive: { color: "#f97316" },
-  poweredOffLabelActive: { color: "#ef4444" },
-  poweredOffOverlay: {
-    alignItems: "center",
-    paddingVertical: 22,
-    paddingHorizontal: 12,
-    gap: 8,
-    marginTop: 10,
-  },
-  poweredOffOverlayTitle: {
-    fontFamily: "Inter_700Bold",
-    fontSize: 15,
-    color: "#ef4444",
-  },
-  poweredOffOverlaySub: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 13,
-    color: Colors.textSecondary,
-    textAlign: "center",
-    lineHeight: 18,
-  },
-  poweredOffBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 3,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    backgroundColor: "rgba(239, 68, 68, 0.12)",
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: "rgba(239, 68, 68, 0.35)",
-  },
-  poweredOffBadgeText: {
-    fontFamily: "Inter_700Bold",
-    fontSize: 10,
-    color: "#ef4444",
-    letterSpacing: 0.5,
-  },
-  ufwBadge: { justifyContent: "center", alignItems: "center" },
-  maintenanceBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 3,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    backgroundColor: "rgba(249, 115, 22, 0.12)",
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: "rgba(249, 115, 22, 0.35)",
-  },
-  maintenanceBadgeText: {
-    fontFamily: "Inter_700Bold",
-    fontSize: 10,
-    color: "#f97316",
-    letterSpacing: 0.5,
-  },
-});
