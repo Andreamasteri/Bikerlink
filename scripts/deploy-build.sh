@@ -23,28 +23,17 @@ log()  { echo "[deploy $(date -u '+%H:%M:%SZ')] $*"; }
 size() { [ -e "$1" ] && du -sh "$1" 2>/dev/null | cut -f1 || echo "-"; }
 
 # ── Gate ROUTING_DISABLED ────────────────────────────────────────────────────
-# ROUTING_DISABLED non deve mai essere impostata nei Secrets di produzione.
-# Se presente (qualunque valore), il container la fotografia e la bake nel
-# runtime: il toggle admin diventa inoperante e nessuna OTA può rimuoverla.
-# Il gate blocca il deploy prima che ciò avvenga.
+# ROUTING_DISABLED è DEPRECATA e non va mai impostata in produzione.
+# Se presente nell'ambiente di build (es. residuo baked-in da un deploy
+# precedente che Replit inietta automaticamente), la unsettiamo qui così
+# NON viene baked nel nuovo container runtime.
+# Il toggle routing è controllato esclusivamente dal kill-switch DB (Admin → Hub Routing).
 if [ -n "${ROUTING_DISABLED+x}" ]; then
-  log "════════════════════════════════════════════════════════════"
-  log "❌ DEPLOY BLOCCATO — ROUTING_DISABLED è impostata nell'ambiente."
-  log "   Valore attuale: \"${ROUTING_DISABLED}\""
-  log ""
-  log "   Questa variabile è DEPRECATA e NON va mai impostata in produzione."
-  log "   Se presente, bypassa il toggle admin (Hub Routing) rendendolo"
-  log "   inoperante, e non può essere rimossa via OTA."
-  log ""
-  log "   Azione richiesta:"
-  log "     1. Apri il pannello Secrets di Replit."
-  log "     2. Elimina la variabile ROUTING_DISABLED."
-  log "     3. Riavvia il deploy."
-  log ""
-  log "   Per abilitare/disabilitare il routing usa invece:"
-  log "     Admin → Hub Routing → kill-switch (soft toggle DB)"
-  log "════════════════════════════════════════════════════════════"
-  exit 1
+  log "⚠️  ROUTING_DISABLED trovata nell'ambiente di build (valore: \"${ROUTING_DISABLED}\")."
+  log "   È una variabile DEPRECATA — la rimuoviamo dal processo prima del build"
+  log "   così non viene baked nel container. Usa Admin → Hub Routing per il toggle."
+  unset ROUTING_DISABLED
+  log "   ✅ ROUTING_DISABLED rimossa dall'ambiente di build — deploy continua."
 fi
 
 BUILD_START=$(date -u '+%H:%M:%SZ')
