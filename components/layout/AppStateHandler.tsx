@@ -86,6 +86,8 @@ export function AppStateHandler() {
   const sessionIdRef = useRef<string | null>(null);
   const lastSocialUpdateRef = useRef<number>(0);
   const socialPausedRef = useRef<boolean>(false);
+  const fgStartRef = useRef<number | null>(null);
+  const stateTransitionCountRef = useRef<number>(0);
 
   useEffect(() => {
     registerLayoutWatcherCallbacks(
@@ -133,13 +135,26 @@ export function AppStateHandler() {
       }
     });
 
+    fgStartRef.current = Date.now();
+
     const subscription = AppState.addEventListener("change", (nextAppState) => {
       // The whole handler is wrapped so a synchronous throw can never escape the
       // native AppState callback (which the React ErrorBoundary cannot catch).
       try {
         const prev = appStateRef.current;
+        const transitionId = ++stateTransitionCountRef.current;
+        const transitionAt = new Date().toISOString();
 
         if (nextAppState.match(/inactive|background/) && prev === "active") {
+          const fgDurationMs = fgStartRef.current ? Date.now() - fgStartRef.current : null;
+          fgStartRef.current = null;
+          sendStartupBeacon("appstate_to_background", {
+            prev,
+            next: nextAppState,
+            transitionId,
+            transitionAt,
+            fgDurationMs,
+          });
           apiRequest("POST", "/api/users/app-close", undefined, { timeoutMs: RESUME_NET_TIMEOUT_MS }).catch(() => {});
           const sid = sessionIdRef.current;
           if (sid) {
@@ -150,6 +165,13 @@ export function AppStateHandler() {
         }
 
         if (prev.match(/inactive|background/) && nextAppState === "active") {
+          fgStartRef.current = Date.now();
+          sendStartupBeacon("appstate_to_foreground", {
+            prev,
+            next: nextAppState,
+            transitionId,
+            transitionAt,
+          });
           // Every resume operation is individually guarded so a single failure
           // (network timeout, rejected refetch) degrades silently and is retried
           // on the next interval/resume, rather than propagating as a fatal

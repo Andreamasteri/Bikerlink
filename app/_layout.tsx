@@ -40,6 +40,7 @@ import { OfflineBanner } from "@/components/layout/OfflineBanner";
 import AssistantOnboardingTour from "@/components/user/ai-assistant/AssistantOnboardingTour";
 import { useOtaStagingBanner } from "@/hooks/useOtaStagingBanner";
 import { useDeviceMetrics } from "@/hooks/useDeviceMetrics";
+import { useJsThreadWatchdog } from "@/hooks/useJsThreadWatchdog";
 import { initOnlineFocusManager } from "@/lib/online-focus-manager";
 SplashScreen.preventAutoHideAsync();
 
@@ -51,6 +52,7 @@ initOnlineFocusManager();
 
 function DeviceMetricsReporter({ tokenReady }: { tokenReady: boolean }) {
   useDeviceMetrics(tokenReady);
+  useJsThreadWatchdog(true);
   return null;
 }
 

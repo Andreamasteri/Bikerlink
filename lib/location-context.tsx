@@ -2,7 +2,11 @@ import React, { createContext, useContext, useState, useEffect, useCallback, use
 import { AppState, AppStateStatus } from "react-native";
 import { useQuery } from "@tanstack/react-query";
 import { sendStartupBeacon } from "@/lib/startup-beacon";
+import { markAsyncError } from "@/lib/crash-logger";
 import { withTimeout } from "@/lib/resume-utils";
+
+const GPS_FLOOD_WINDOW_MS = 30000;
+const GPS_FLOOD_MAX_FIXES = 10;
 
 // Native permission bridge calls can wedge on resume; cap them so a stalled
 // bridge rejects into the existing catch instead of hanging the resume sequence.
@@ -80,6 +84,7 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
   const hadBackgroundPermissionRef = useRef(false);
   const sharedWatchRef = useRef<import("expo-location").LocationSubscription | null>(null);
   const suspendedRef = useRef(false);
+  const gpsFixTimestampsRef = useRef<number[]>([]);
 
   const { data: gpsData } = useQuery<{ required: boolean }>({
     queryKey: ["/api/settings/gps-required"],
@@ -174,6 +179,26 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
           distanceInterval: 10,
         },
         (locationObj) => {
+          const now = Date.now();
+          gpsFixTimestampsRef.current = gpsFixTimestampsRef.current
+            .filter((t) => now - t < GPS_FLOOD_WINDOW_MS)
+            .concat(now);
+          const fixCount = gpsFixTimestampsRef.current.length;
+          if (fixCount > GPS_FLOOD_MAX_FIXES) {
+            const speed = locationObj.coords.speed ?? 0;
+            markAsyncError(
+              "gps_flood",
+              new Error(
+                `GPS flood: ${fixCount} fix in ${GPS_FLOOD_WINDOW_MS / 1000}s, speed=${speed.toFixed(2)}m/s, accuracy=${locationObj.coords.accuracy ?? "?"}m`
+              )
+            ).catch(() => {});
+            sendStartupBeacon("gps_flood_detected", {
+              fixCount,
+              windowMs: GPS_FLOOD_WINDOW_MS,
+              speed,
+              accuracy: locationObj.coords.accuracy,
+            });
+          }
           setCurrentPosition({
             latitude: locationObj.coords.latitude,
             longitude: locationObj.coords.longitude,
