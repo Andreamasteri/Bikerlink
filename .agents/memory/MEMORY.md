@@ -68,3 +68,4 @@
 - [Vacuum smart + collector dedicated conn](vacuum-smart-collector.md) — vacuum notturno: ANALYZE default, FULL solo su bloat>soglia (AppSetting vacuum_full_bloat_threshold, key db_vacuum_smart_v1); db-collector usa 1 sola conn pool.connect()+early-exit se !isPoolHealthy; SET LOCAL è no-op fuori da txn.
 - [react-native-webview TypeScript regression](webview-type-regression.md) — 13.17.0 index.d.ts: WebView<P=undefined> → WebViewProps & undefined = never in TS6 strict; patch P={} + baked in post-merge.sh.
 - [Telemetry offline-first](telemetry-offline-first.md) — upload by distance (5km) non a timer; marker avanza solo su flush ok; DR anchor frozen, drEstPosRef separato.
+- [DB managed-Postgres slowness vs pool leak](db-managed-slowness.md) — ping>8s con waiting=0 = lentezza managed Replit (non leak); allarmi downstream soppressi quando ThinkCentre spento; backlog map-matching → stato terminale 'exhausted'.

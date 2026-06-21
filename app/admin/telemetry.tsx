@@ -74,6 +74,7 @@ export default function AdminTelemetryScreen() {
   const [savingSensors, setSavingSensors] = useState(false);
   const [runningJob, setRunningJob] = useState(false);
   const [rematchingJob, setRematchingJob] = useState(false);
+  const [drainingJob, setDrainingJob] = useState(false);
   const [runningCurvyJob, setRunningCurvyJob] = useState(false);
   const [showInfo, setShowInfo] = useState(false);
   const [showErrorLog, setShowErrorLog] = useState(false);
@@ -213,6 +214,13 @@ export default function AdminTelemetryScreen() {
       );
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
+      if (data.skipped) {
+        Alert.alert(
+          "Saltato",
+          "ThinkCentre in modalità spento (engine offline): riaccodare ora ricreerebbe solo il backlog. Riaccendi il ThinkCentre prima di riprovare.",
+        );
+        return;
+      }
       Alert.alert(
         "Riaccodate",
         `${(data.requeuedSessions ?? 0).toLocaleString("it-IT")} sessioni (${(data.requeuedSamples ?? 0).toLocaleString("it-IT")} campioni) riportate in coda. Verranno riprocessate alla prossima esecuzione.`,
@@ -222,6 +230,28 @@ export default function AdminTelemetryScreen() {
       Alert.alert("Errore", "Impossibile riaccodare le sessioni.");
     } finally {
       setRematchingJob(false);
+    }
+  };
+
+  const handleDrainMapMatching = async () => {
+    if (drainingJob || rematchingJob || runningJob || mmStats?.isRunning) return;
+    setDrainingJob(true);
+    try {
+      const res = await fetch(
+        new URL("/api/admin/map-matching/drain-backlog", getApiUrl()).toString(),
+        { method: "POST", headers: { ...(await authFetchHeaders()) }, credentials: "include" }
+      );
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      Alert.alert(
+        "Backlog drenato",
+        `${(data.drainedSessions ?? 0).toLocaleString("it-IT")} sessioni (${(data.drainedSamples ?? 0).toLocaleString("it-IT")} campioni) bloccate oltre il cap segnate come esaurite. L'allarme backlog si calmerà.`,
+      );
+      setTimeout(() => refetchMm(), 1_000);
+    } catch {
+      Alert.alert("Errore", "Impossibile drenare il backlog.");
+    } finally {
+      setDrainingJob(false);
     }
   };
 
@@ -306,8 +336,10 @@ export default function AdminTelemetryScreen() {
           stats={mmStats}
           onRunJob={handleRunMapMatching}
           onRematch={handleRematchMapMatching}
+          onDrain={handleDrainMapMatching}
           isRunning={runningJob}
           isRematching={rematchingJob}
+          isDraining={drainingJob}
           formatLastRun={formatLastRun}
         />
 

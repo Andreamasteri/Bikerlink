@@ -53,9 +53,19 @@ export async function collectDb(): Promise<Signal[]> {
     consecutivePingFailures = 0;
     if (pingMs > 5000) {
       const poolInfo = pool as { totalCount?: number; idleCount?: number; waitingCount?: number };
+      // NB diagnostica (Task #4706): un ping lento (>8s) con `waiting=0` NON è una
+      // saturazione del nostro pool né una connection leak — il pool ha conn libere
+      // e nessuna richiesta in coda. È lentezza del Postgres managed di Replit
+      // (compute autoscaling/cold, manutenzione lato piattaforma). Distinzione:
+      //   - waiting>0  → contesa REALE sul nostro pool (indaga i job/leak)
+      //   - waiting=0 + ping alto → lentezza managed lato server, non agire sul pool
+      // Per questo db.db.pool.waiting e db.db.ping_saturated sono soppressi quando il
+      // ThinkCentre è spento (vedi aggregator.suppressDownstreamWhenPoweredOff), mentre
+      // db.ping_ms resta visibile come segnale informativo.
       console.warn(
         `[watchdog/db] ping spike: ${pingMs}ms` +
-        ` — pool: total=${poolInfo.totalCount ?? "?"} idle=${poolInfo.idleCount ?? "?"} waiting=${poolInfo.waitingCount ?? "?"}`,
+        ` — pool: total=${poolInfo.totalCount ?? "?"} idle=${poolInfo.idleCount ?? "?"} waiting=${poolInfo.waitingCount ?? "?"}` +
+        ((poolInfo.waitingCount ?? 0) === 0 ? " (waiting=0 → lentezza managed-Postgres, non leak)" : ""),
       );
     }
     // Latenza alta: escala a "high" solo dopo N campioni lenti consecutivi.

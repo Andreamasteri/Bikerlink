@@ -18,6 +18,7 @@ import type { HealthSnapshot, Problem, Severity, Signal } from "./types";
 import { collectDbIntegrity } from "../db-integrity/collector";
 import { storage } from "../../storage";
 import { withBgDbSlot } from "../../lib/bg-db-limiter";
+import { isThinkCentrePoweredOff } from "../../lib/thinkcentre-powered-off";
 import type { EmbeddingDailyReport } from "../../jobs/embedding-daily-report";
 
 // Task #2536 — wrapper che traduce lo snapshot db-integrity in Signal[] per
@@ -293,6 +294,58 @@ function deriveProblems(signals: Signal[]): Problem[] {
   return problems;
 }
 
+// Problemi che sono CONSEGUENZA diretta del ThinkCentre offline — lista
+// ESPLICITA e ristretta, mai per prefisso (un prefisso largo sopprimerebbe anche
+// guasti indipendenti):
+//  - Redis non raggiungibile (self-hosted sul ThinkCentre);
+//  - backlog map-matching che cresce perché GraphHopper non risponde;
+//  - routing engine SELF-HOSTED down (graphhopper/valhalla). I cloud engine
+//    (mapbox/tomtom) sono ESCLUSI: un loro down è indipendente dal ThinkCentre
+//    e deve restare azionabile;
+//  - pressione del pool conseguente (event-loop ingolfato dalle chiamate lente
+//    verso il ThinkCentre → SELECT 1 non ottiene slot, limiter bg in coda).
+// NON inclusi (restano allarmi pieni anche a ThinkCentre spento):
+//  - maps.health.* (tile CDN pubblici, engine cloud, instabilità di rete): a
+//    ThinkCentre spento gli health-check self-hosted vengono già saltati a monte,
+//    quindi ciò che resta è di natura cloud/CDN, indipendente dall'outage;
+//  - db.circuit_breaker (DB realmente giù) e db.ping_ms (lentezza del Postgres
+//    gestito, vedi db-collector).
+const OUTAGE_DOWNSTREAM_IDS = new Set<string>([
+  "redis.redis.unreachable",
+  "maps.matching.pending",
+  "maps.routing.engine_down.graphhopper",
+  "maps.routing.engine_down.valhalla",
+  "db.db.pool.waiting",
+  "db.db.ping_saturated",
+  "db.db.bg_limiter.queued",
+]);
+
+function isOutageDownstreamProblem(id: string): boolean {
+  return OUTAGE_DOWNSTREAM_IDS.has(id);
+}
+
+// Quando il ThinkCentre è in modalità "spento", retrocede i problemi a valle
+// dell'outage da critical/high a "warn": restano VISIBILI in dashboard (così
+// l'admin sa che ci sono) ma non scatenano escalation critica né push, perché
+// sono attesi e non azionabili finché il ThinkCentre è offline.
+export function suppressDownstreamWhenPoweredOff(problems: Problem[]): Problem[] {
+  return problems.map((p) => {
+    if (
+      isOutageDownstreamProblem(p.id) &&
+      (p.severity === "critical" || p.severity === "high")
+    ) {
+      return {
+        ...p,
+        severity: "warn" as Severity,
+        title: `${p.title} — soppresso (ThinkCentre spento)`,
+        suggestion:
+          "Allarme atteso mentre il ThinkCentre è in modalità spento: escalation e push soppresse, ma il problema resta visibile in dashboard. Riaccendi il ThinkCentre o disattiva la modalità powered-off per ripristinare gli alert.",
+      };
+    }
+    return p;
+  });
+}
+
 function computeStatus(problems: Problem[]): { status: HealthSnapshot["status"]; score: number } {
   let penalty = 0;
   for (const p of problems) penalty += SEVERITY_WEIGHT[p.severity] ?? 0;
@@ -350,7 +403,18 @@ export async function runAggregatorCycle(): Promise<HealthSnapshot> {
   // persisti solo signals non-info (ridurre noise nel DB)
   await recordSignals(signals.filter((s) => s.severity !== "info"));
 
-  const problems = deriveProblems(signals);
+  let problems = deriveProblems(signals);
+
+  // Task #4706 — Soppressione allarmi a valle quando il ThinkCentre è spento:
+  // retrocede i problemi conseguenti (engine/tile down, backlog matching, pressione
+  // pool, Redis) a "warn" così non scatenano escalation/push ma restano visibili.
+  // Letto sotto il budget bg (query indicizzata limit 1); fail-safe a false.
+  try {
+    if (await withBgDbSlot(() => isThinkCentrePoweredOff())) {
+      problems = suppressDownstreamWhenPoweredOff(problems);
+    }
+  } catch { /* fail-safe: in caso di errore non sopprimere nulla */ }
+
   let { status, score } = computeStatus(problems);
 
   // Score damping: impedisce che un singolo ciclo con evento transitorio faccia

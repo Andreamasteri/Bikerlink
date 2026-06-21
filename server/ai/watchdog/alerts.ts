@@ -79,10 +79,16 @@ export async function dispatchAlerts(snap: HealthSnapshot): Promise<{ sent: numb
 
   // Instabilità di rete — alert dedicato per ≥2 engine down contemporaneamente.
   // Severity "high" (non critical) per evitare rumore eccessivo ma comunque notificato.
+  // Gate sulla severity: questo path dedicato bypassa il loop critical-only sotto,
+  // quindi se la severity viene declassata (es. soppressione downstream a "warn")
+  // NON deve comunque emettere push. Solo high/critical notificano.
   const netInstabilityProblem = snap.problems.find(
     (p) => p.id === "maps.health.network_instability",
   );
-  if (netInstabilityProblem) {
+  if (
+    netInstabilityProblem &&
+    (netInstabilityProblem.severity === "high" || netInstabilityProblem.severity === "critical")
+  ) {
     await emitWatchdogAlert({ problem: netInstabilityProblem, score: snap.score, status: snap.status });
     const mapsAlertsOn = await isMapsFlagEnabled("alerts");
     if (mapsAlertsOn && shouldSend("maps.network_instability")) {

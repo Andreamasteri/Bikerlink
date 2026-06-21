@@ -9,6 +9,7 @@ import {
   runMapMatchingJob,
   getMapMatchingStats,
   requeueUnmatchable,
+  drainStuckRetryBacklog,
 } from "../../map-matching-job";
 import {
   isCurvyScoreJobRunning,
@@ -335,6 +336,29 @@ router.post("/map-matching/rematch", async (_req: Request, res: Response) => {
       detail: cause || (err instanceof Error ? err.stack : undefined),
     });
     return sendError(res, 500, "Errore nel riaccodamento delle sessioni non matchabili");
+  }
+});
+
+// Task #4706 — Drena il backlog "fantasma": le sessioni 'retry' rimaste oltre il
+// cap tentativi (scritte prima dello stato terminale 'exhausted') le marca come
+// 'exhausted' così escono dal conteggio pending+retry e l'allarme matching.pending
+// si calma. One-shot, idempotente.
+router.post("/map-matching/drain-backlog", async (_req: Request, res: Response) => {
+  try {
+    const result = await drainStuckRetryBacklog();
+    return res.json({ success: true, ...result });
+  } catch (err) {
+    const cause = (err as any)?.cause?.message ?? "";
+    const errMsg = err instanceof Error ? err.message : String(err);
+    console.error("[admin/map-matching/drain-backlog] error:", err, cause ? `| PG: ${cause}` : "");
+    logTelemetryEvent({
+      ts: new Date().toISOString(),
+      type: "ERROR",
+      context: "admin/map-matching/drain-backlog",
+      message: errMsg,
+      detail: cause || (err instanceof Error ? err.stack : undefined),
+    });
+    return sendError(res, 500, "Errore nel drenaggio del backlog map-matching");
   }
 });
 

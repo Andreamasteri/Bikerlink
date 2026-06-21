@@ -9,6 +9,7 @@ interface MapMatchingStats {
   retry: number;
   matched: number;
   unmatchable: number;
+  exhausted?: number;
   segments: number;
   lastRun: string | null;
   isRunning: boolean;
@@ -19,8 +20,10 @@ interface MapMatchingSectionProps {
   stats: MapMatchingStats | undefined;
   onRunJob: () => void;
   onRematch: () => void;
+  onDrain: () => void;
   isRunning: boolean;
   isRematching: boolean;
+  isDraining: boolean;
   formatLastRun: (iso: string | null | undefined) => string;
 }
 
@@ -28,11 +31,14 @@ export function MapMatchingSection({
   stats,
   onRunJob,
   onRematch,
+  onDrain,
   isRunning,
   isRematching,
+  isDraining,
   formatLastRun,
 }: MapMatchingSectionProps) {
-  const hasUnmatchable = (stats?.unmatchable ?? 0) > 0;
+  const hasUnmatchable = ((stats?.unmatchable ?? 0) + (stats?.exhausted ?? 0)) > 0;
+  const hasStuckRetry = (stats?.retry ?? 0) > 0;
   return (
     <View style={styles.section}>
       <View style={styles.mmHeader}>
@@ -68,6 +74,12 @@ export function MapMatchingSection({
             value={stats.unmatchable.toLocaleString("it-IT")}
             icon="map-marker-off"
             color="#ef4444"
+          />
+          <StatCard
+            label="Tentativi esauriti"
+            value={(stats.exhausted ?? 0).toLocaleString("it-IT")}
+            icon="alert-octagon-outline"
+            color="#a855f7"
           />
           <StatCard
             label="Segmenti OSM noti"
@@ -144,7 +156,26 @@ export function MapMatchingSection({
         )}
         <Text style={styles.rematchBtnText}>
           Riprova non matchabili
-          {hasUnmatchable ? ` (${(stats?.unmatchable ?? 0).toLocaleString("it-IT")})` : ""}
+          {hasUnmatchable ? ` (${((stats?.unmatchable ?? 0) + (stats?.exhausted ?? 0)).toLocaleString("it-IT")})` : ""}
+        </Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        style={[
+          styles.rematchBtn,
+          (isDraining || isRematching || isRunning || stats?.isRunning || !hasStuckRetry) && { opacity: 0.5 },
+        ]}
+        onPress={onDrain}
+        disabled={isDraining || isRematching || isRunning || stats?.isRunning || !hasStuckRetry}
+        activeOpacity={0.8}
+      >
+        {isDraining ? (
+          <ActivityIndicator size="small" color={Colors.accent} />
+        ) : (
+          <MaterialCommunityIcons name="broom" size={18} color={Colors.accent} />
+        )}
+        <Text style={styles.rematchBtnText}>
+          Drena backlog bloccato
         </Text>
       </TouchableOpacity>
     </View>

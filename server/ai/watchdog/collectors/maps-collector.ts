@@ -9,7 +9,7 @@ import { aggregateMapsTelemetry } from "../maps-telemetry-store";
 import { isMapsFlagEnabled } from "../maps-kill-switch";
 import { checkQuota as checkMapboxQuota } from "../../../routing/mapbox/quota-guard";
 import { checkQuota as checkTomTomQuota } from "../../../routing/tomtom/quota-guard";
-import { getMapMatchingStats } from "../../../map-matching-job";
+import { getMatchingBacklogEstimate } from "../../../map-matching-job";
 import { getRoutingCounters } from "../../../routing/routing-metrics";
 import { runMapsHealthChecks } from "../maps-health-checks";
 import { logger } from "../../../lib/logger";
@@ -203,13 +203,15 @@ export async function collectMaps(): Promise<Signal[]> {
     });
   }
 
-  // ─── 4. Map-matching job stats ────────────────────────────────────────
+  // ─── 4. Map-matching backlog (stima economica) ────────────────────────
+  // Task #4706: NON usare getMapMatchingStats() qui (GROUP BY su tutta la tabella
+  // ad ogni tick a 60s, contende il pool). getMatchingBacklogEstimate conta solo
+  // pending+retry via indice parziale, sotto budget bg + statement_timeout breve,
+  // e degrada (backlog -1) senza alzare falsi allarmi quando il DB è lento.
   try {
-    const mm = await withBgDbSlot(() => getMapMatchingStats());
+    const mm = await getMatchingBacklogEstimate();
     const lastRunAt = mm.lastRun ? new Date(mm.lastRun).getTime() : null;
     const ageH = lastRunAt ? Math.round((Date.now() - lastRunAt) / 3_600_000) : null;
-    // Backlog = campioni che il job dovrà ancora processare (pending + retry).
-    const backlog = mm.pending + mm.retry;
     signals.push({
       source: "maps", metric: "matching.last_run_h", value: ageH ?? -1, unit: "h",
       severity: ageH != null && ageH > TH.mapMatchingStaleHours ? "warn" : "info",
@@ -217,16 +219,23 @@ export async function collectMaps(): Promise<Signal[]> {
         lastRun: mm.lastRun,
         pending: mm.pending,
         retry: mm.retry,
-        matched: mm.matched,
-        unmatchable: mm.unmatchable,
-        isRunning: mm.isRunning,
+        degraded: mm.degraded,
       },
     });
-    signals.push({
-      source: "maps", metric: "matching.pending", value: backlog, unit: "rides",
-      severity: backlog > 10000 ? "high" : backlog > 2000 ? "warn" : "info",
-      details: { pending: mm.pending, retry: mm.retry },
-    });
+    if (mm.degraded) {
+      // Stima non disponibile (DB lento/timeout): segnale info, niente allarme.
+      signals.push({
+        source: "maps", metric: "matching.pending", value: -1, unit: "rides",
+        severity: "info", details: { degraded: true, reason: "estimate_timeout" },
+      });
+    } else {
+      const backlog = mm.backlog;
+      signals.push({
+        source: "maps", metric: "matching.pending", value: backlog, unit: "rides",
+        severity: backlog > 10000 ? "high" : backlog > 2000 ? "warn" : "info",
+        details: { pending: mm.pending, retry: mm.retry },
+      });
+    }
   } catch (err) {
     signals.push({
       source: "maps", metric: "collector.error", severity: "warn",

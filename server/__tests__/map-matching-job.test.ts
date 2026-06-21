@@ -64,6 +64,10 @@ vi.mock("../routing/routing-kill-switch", () => ({
   isRoutingEnabled: vi.fn(async () => true),
 }));
 
+vi.mock("../lib/thinkcentre-powered-off", () => ({
+  isThinkCentrePoweredOff: vi.fn(async () => false),
+}));
+
 vi.mock("../storage", () => ({
   storage: {
     upsertAppSetting: vi.fn(async () => undefined),
@@ -74,14 +78,16 @@ vi.mock("../storage", () => ({
 import { db } from "../db";
 import { mapMatch } from "../graphhopper-client";
 import { isRoutingEnabled } from "../routing/routing-kill-switch";
-import { runMapMatchingJob, requeueUnmatchable } from "../map-matching-job";
+import { runMapMatchingJob, requeueUnmatchable, drainStuckRetryBacklog } from "../map-matching-job";
+import { isThinkCentrePoweredOff } from "../lib/thinkcentre-powered-off";
 
 const dbExecute = vi.mocked(db.execute);
 const mapMatchMock = vi.mocked(mapMatch);
 const isRoutingEnabledMock = vi.mocked(isRoutingEnabled);
+const isPoweredOffMock = vi.mocked(isThinkCentrePoweredOff);
 const dialect = new PgDialect();
 
-type Row = { session_id: string; sample_count: string };
+type Row = { session_id: string; sample_count: string; attempts?: number };
 
 /** Imposta il risultato della query di discovery (primo db.execute del job). */
 function setDiscovery(rows: Row[]): void {
@@ -113,6 +119,8 @@ beforeEach(() => {
   dbExecute.mockResolvedValue({ rows: [] } as unknown as Awaited<ReturnType<typeof db.execute>>);
   mapMatchMock.mockReset();
   isRoutingEnabledMock.mockResolvedValue(true);
+  isPoweredOffMock.mockReset();
+  isPoweredOffMock.mockResolvedValue(false);
   process.env.MAP_MATCHING_MAX_ATTEMPTS = "5";
   process.env.MAP_MATCHING_RETRY_BASE_MIN = "60";
   process.env.MAP_MATCHING_BATCH_RIDE = "50";
@@ -155,6 +163,35 @@ describe("runMapMatchingJob — classificazione esito", () => {
     expect(payload.matched).toBe(false);
     // match_attempts = match_attempts + 1 → espressione SQL drizzle
     expect(render(payload.matchAttempts).sql).toContain("+ 1");
+  });
+
+  it("errore GraphHopper al cap tentativi → stato terminale 'exhausted'", async () => {
+    // attempts=4 con cap=5: il prossimo errore porta a 4+1=5 ≥ cap → 'exhausted'
+    // (esce dal backlog pending+retry, non viene più ritentato in automatico).
+    setDiscovery([{ session_id: "s-cap", sample_count: "2", attempts: 4 }]);
+    setSamples([sample(1), sample(2)]);
+    mapMatchMock.mockRejectedValue(new Error("GraphHopper 503 unavailable"));
+
+    const res = await runMapMatchingJob();
+
+    expect(mapMatchMock).toHaveBeenCalledTimes(1);
+    expect(res.processed).toBe(0);
+    // Lo stato PERSISTITO è terminale 'exhausted' (esce dal backlog pending+retry):
+    // è questa la differenza chiave dal caso retry, non il contatore di esito.
+    expect(updateSetCalls).toHaveLength(1);
+    expect(updateSetCalls[0]).toMatchObject({ matchStatus: "exhausted", matched: false });
+  });
+
+  it("errore GraphHopper sotto al cap → resta 'retry' (non esaurito)", async () => {
+    // attempts=3 con cap=5: 3+1=4 < cap → ancora 'retry'.
+    setDiscovery([{ session_id: "s-sub", sample_count: "2", attempts: 3 }]);
+    setSamples([sample(1), sample(2)]);
+    mapMatchMock.mockRejectedValue(new Error("GraphHopper 503 unavailable"));
+
+    const res = await runMapMatchingJob();
+
+    expect(res.retry).toBe(1);
+    expect(updateSetCalls[0]).toMatchObject({ matchStatus: "retry", matched: false });
   });
 
   it("match con segmenti OSM → matched + upsert in segment_telemetry", async () => {
@@ -208,6 +245,9 @@ describe("runMapMatchingJob — idempotenza", () => {
     const discoverySql = render(dbExecute.mock.calls[0]?.[0]).sql.toLowerCase();
     expect(discoverySql).toContain("from ride_telemetry");
     expect(discoverySql).toContain("match_status in ('pending', 'retry')");
+    // Task #4706: la discovery riporta anche il MAX(match_attempts) per decidere
+    // se al prossimo errore la sessione va 'retry' o terminale 'exhausted'.
+    expect(discoverySql).toContain("max(match_attempts)");
   });
 
   it("batch vuoto (tutte le sessioni già matched) → nessuna aggregazione né update", async () => {
@@ -317,6 +357,65 @@ describe("runMapMatchingJob — cap tentativi e backoff", () => {
 
     expect(res.requeuedSamples).toBe(0);
     expect(res.requeuedSessions).toBe(0);
+  });
+
+  it("requeueUnmatchable() include anche lo stato 'exhausted'", async () => {
+    process.env.MAP_MATCHING_MAX_ATTEMPTS = "5";
+    dbExecute.mockReset();
+    dbExecute.mockResolvedValueOnce({ rows: [{ session_id: "x" }] } as unknown as Awaited<ReturnType<typeof db.execute>>);
+
+    await requeueUnmatchable();
+
+    const lower = render(dbExecute.mock.calls[0]?.[0]).sql.toLowerCase();
+    expect(lower).toContain("match_status = 'exhausted'");
+    expect(lower).toContain("match_status = 'unmatchable'");
+  });
+
+  it("requeueUnmatchable() saltato quando il ThinkCentre è spento (no query)", async () => {
+    isPoweredOffMock.mockResolvedValue(true);
+    dbExecute.mockReset();
+
+    const res = await requeueUnmatchable();
+
+    expect(res).toMatchObject({ requeuedSamples: 0, requeuedSessions: 0, skipped: true, reason: "engine_offline" });
+    // Guardia: nessuna scrittura sul DB quando l'engine è offline (eviterebbe solo
+    // di ricreare il backlog).
+    expect(dbExecute).not.toHaveBeenCalled();
+  });
+});
+
+// ─── Drain backlog "fantasma" (Task #4706) ──────────────────────────────────
+describe("drainStuckRetryBacklog", () => {
+  it("porta a 'exhausted' le sessioni 'retry' oltre il cap (RETURNING session_id)", async () => {
+    process.env.MAP_MATCHING_MAX_ATTEMPTS = "5";
+    dbExecute.mockReset();
+    dbExecute.mockResolvedValueOnce({
+      rows: [{ session_id: "a" }, { session_id: "a" }, { session_id: "b" }],
+    } as unknown as Awaited<ReturnType<typeof db.execute>>);
+
+    const res = await drainStuckRetryBacklog();
+
+    expect(res.drainedSamples).toBe(3);
+    expect(res.drainedSessions).toBe(2);
+
+    const { sql, params } = render(dbExecute.mock.calls[0]?.[0]);
+    const lower = sql.toLowerCase();
+    expect(lower).toContain("update ride_telemetry");
+    expect(lower).toContain("match_status = 'exhausted'");
+    expect(lower).toContain("match_status = 'retry'");
+    expect(lower).toContain("match_attempts >=");
+    // Idempotente: usa il cap configurato.
+    expect(params).toContain(5);
+  });
+
+  it("nessuna sessione bloccata → 0 drained", async () => {
+    dbExecute.mockReset();
+    dbExecute.mockResolvedValueOnce({ rows: [] } as unknown as Awaited<ReturnType<typeof db.execute>>);
+
+    const res = await drainStuckRetryBacklog();
+
+    expect(res.drainedSamples).toBe(0);
+    expect(res.drainedSessions).toBe(0);
   });
 });
 
