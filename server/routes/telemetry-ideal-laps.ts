@@ -151,6 +151,36 @@ router.get("/ideal-laps/:sessionId/samples", async (req: Request, res: Response)
   }
 });
 
+router.patch("/ideal-laps/:sessionId", async (req: Request, res: Response) => {
+  const userId = requireUserId(req, res);
+  if (!userId) return;
+
+  const { sessionId } = req.params;
+  if (!sessionId) return sendError(res, 400, "sessionId obbligatorio");
+
+  const { lap_name } = req.body as { lap_name?: unknown };
+  if (typeof lap_name !== "string" || !lap_name.trim()) {
+    return sendError(res, 400, "lap_name obbligatorio e non vuoto");
+  }
+  const name = lap_name.trim().slice(0, 40);
+
+  try {
+    const result = await withDbRetry(() => db.execute(sql`
+      UPDATE ride_telemetry
+      SET lap_name = ${name}
+      WHERE user_id = ${userId}
+        AND session_id = ${sessionId}
+        AND session_type = 'ideal_lap'
+    `));
+    const count = (result as { rowCount?: number }).rowCount ?? 0;
+    if (count === 0) return sendError(res, 404, "Giro non trovato");
+    return sendSuccess(res, { lapName: name });
+  } catch (err) {
+    console.error("[telemetry/ideal-laps PATCH] error:", err);
+    return sendError(res, 500, "Errore interno del server");
+  }
+});
+
 router.delete("/ideal-laps/:sessionId", async (req: Request, res: Response) => {
   const userId = requireUserId(req, res);
   if (!userId) return;

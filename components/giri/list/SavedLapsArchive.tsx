@@ -1,4 +1,4 @@
-import React, { useCallback } from "react";
+import React, { useCallback, useState } from "react";
 import {
   View,
   Text,
@@ -6,6 +6,10 @@ import {
   Alert,
   StyleSheet,
   ActivityIndicator,
+  Modal,
+  TextInput,
+  KeyboardAvoidingView,
+  Platform,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -32,11 +36,26 @@ export function SavedLapsArchive() {
   const qc = useQueryClient();
   const { data: laps, isLoading, isError } = useIdealLaps();
 
+  const [renamingLap, setRenamingLap] = useState<IdealLap | null>(null);
+  const [renameText, setRenameText] = useState("");
+
   const deleteMutation = useMutation({
     mutationFn: (sessionId: string) =>
       apiRequest("DELETE", `/api/telemetry/ideal-laps/${encodeURIComponent(sessionId)}`),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["/api/telemetry/ideal-laps"] });
+    },
+  });
+
+  const renameMutation = useMutation({
+    mutationFn: ({ sessionId, name }: { sessionId: string; name: string }) =>
+      apiRequest("PATCH", `/api/telemetry/ideal-laps/${encodeURIComponent(sessionId)}`, { lap_name: name }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["/api/telemetry/ideal-laps"] });
+      setRenamingLap(null);
+    },
+    onError: () => {
+      Alert.alert("Errore", "Impossibile rinominare il giro. Riprova.");
     },
   });
 
@@ -55,6 +74,21 @@ export function SavedLapsArchive() {
       ]
     );
   }, [deleteMutation]);
+
+  const openRename = useCallback((lap: IdealLap) => {
+    setRenameText(lap.lapName ?? `Giro ${lap.lapNumber}`);
+    setRenamingLap(lap);
+  }, []);
+
+  const handleRenameConfirm = () => {
+    if (!renamingLap) return;
+    const trimmed = renameText.trim();
+    if (!trimmed) {
+      Alert.alert("Nome non valido", "Inserisci un nome per il giro.");
+      return;
+    }
+    renameMutation.mutate({ sessionId: renamingLap.sessionId, name: trimmed });
+  };
 
   const s = styles(colors);
 
@@ -142,7 +176,14 @@ export function SavedLapsArchive() {
                 <Ionicons name="chevron-forward" size={16} color={colors.textSecondary} style={{ paddingLeft: 4 }} />
               </TouchableOpacity>
               <TouchableOpacity
-                style={s.deleteBtn}
+                style={s.actionBtn}
+                onPress={() => openRename(lap)}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Ionicons name="pencil-outline" size={16} color={colors.accent} />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={s.actionBtn}
                 onPress={() => handleDelete(lap)}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               >
@@ -152,6 +193,55 @@ export function SavedLapsArchive() {
           );
         })
       )}
+
+      {/* Rename Modal */}
+      <Modal
+        visible={!!renamingLap}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setRenamingLap(null)}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          style={s.modalOverlay}
+        >
+          <View style={s.modalCard}>
+            <Text style={s.modalTitle}>Rinomina giro</Text>
+            <TextInput
+              style={s.modalInput}
+              value={renameText}
+              onChangeText={setRenameText}
+              placeholder="Nome del giro"
+              placeholderTextColor={colors.textSecondary}
+              maxLength={40}
+              autoFocus
+              returnKeyType="done"
+              onSubmitEditing={handleRenameConfirm}
+            />
+            <Text style={s.modalCounter}>{renameText.length}/40</Text>
+            <View style={s.modalBtns}>
+              <TouchableOpacity
+                style={[s.modalBtn, s.modalBtnCancel]}
+                onPress={() => setRenamingLap(null)}
+                disabled={renameMutation.isPending}
+              >
+                <Text style={s.modalBtnCancelText}>Annulla</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[s.modalBtn, s.modalBtnConfirm]}
+                onPress={handleRenameConfirm}
+                disabled={renameMutation.isPending || !renameText.trim()}
+              >
+                {renameMutation.isPending ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Text style={s.modalBtnConfirmText}>Salva</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </View>
   );
 }
@@ -262,7 +352,74 @@ const styles = (colors: ReturnType<typeof useColors>) =>
       fontFamily: "Inter_400Regular",
       color: colors.textSecondary,
     },
-    deleteBtn: {
+    actionBtn: {
       padding: 4,
+    },
+    modalOverlay: {
+      flex: 1,
+      backgroundColor: "rgba(0,0,0,0.55)",
+      justifyContent: "center",
+      alignItems: "center",
+      paddingHorizontal: 24,
+    },
+    modalCard: {
+      backgroundColor: colors.surface,
+      borderRadius: 14,
+      padding: 20,
+      width: "100%",
+    },
+    modalTitle: {
+      fontSize: 16,
+      fontFamily: "Inter_700Bold",
+      color: colors.text,
+      marginBottom: 14,
+    },
+    modalInput: {
+      backgroundColor: colors.background,
+      borderRadius: 8,
+      borderWidth: 1,
+      borderColor: colors.border,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      fontSize: 15,
+      fontFamily: "Inter_400Regular",
+      color: colors.text,
+    },
+    modalCounter: {
+      fontSize: 11,
+      fontFamily: "Inter_400Regular",
+      color: colors.textSecondary,
+      textAlign: "right",
+      marginTop: 4,
+      marginBottom: 16,
+    },
+    modalBtns: {
+      flexDirection: "row",
+      gap: 10,
+    },
+    modalBtn: {
+      flex: 1,
+      borderRadius: 8,
+      paddingVertical: 12,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    modalBtnCancel: {
+      backgroundColor: colors.background,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    modalBtnCancelText: {
+      fontSize: 14,
+      fontFamily: "Inter_600SemiBold",
+      color: colors.text,
+    },
+    modalBtnConfirm: {
+      backgroundColor: colors.accent,
+    },
+    modalBtnConfirmText: {
+      fontSize: 14,
+      fontFamily: "Inter_600SemiBold",
+      color: "#fff",
     },
   });
