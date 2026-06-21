@@ -17,7 +17,6 @@ import { apiRequest } from "@/lib/query-client";
 import type { IdealLap } from "@/components/profile/types";
 import GpsLapTrackMap from "@/components/GpsLapTrackMap";
 import {
-  PAGE_SIZE,
   SpeedSparkline,
   SampleTable,
   StatTile,
