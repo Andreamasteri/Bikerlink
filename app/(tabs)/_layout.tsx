@@ -449,7 +449,6 @@ export default function TabLayout() {
               <TabIcon name="giri" color={color} size={size} focused={focused} />
             ),
             headerShown: false,
-            href: null,
           }}
         />
         <Tabs.Screen
