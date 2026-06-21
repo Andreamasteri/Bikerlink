@@ -304,13 +304,15 @@ fi
 echo "════════════════════════════════════════"
 echo ""
 
-# ── GATE TEST GESTURE COMPONENTI ────────────────────────────
+# ── GATE TEST COMPONENTI ────────────────────────────────────
 # Esegue TUTTI i test automatici in components/__tests__/ (glob a livello di
-# cartella: nuovi file di test vengono inclusi automaticamente). Coperti oggi:
-#   - RoutePlannerSheet.gesture.test.ts  (slider stile percorso)
-#   - FloatingWidget.logic.test.ts       (clampPos + isDragGesture tap-vs-drag)
-# Se fallisce, il merge è bloccato — un refactor che rompe il pallino flottante
-# (FloatingWidget) viene rilevato qui prima di raggiungere produzione.
+# cartella: ogni nuovo file *.test.ts viene incluso automaticamente, senza
+# bisogno di modificare questo script). La directory copre gesture, logica
+# widget, comportamento UI e qualunque altro test di componente aggiunto in
+# futuro.
+# Se fallisce, il merge è bloccato: regressioni sui componenti critici
+# (FloatingWidget, RoutePlannerSheet, ProfileVersionSection, ecc.) vengono
+# rilevate qui prima di raggiungere produzione.
 echo "════════════════════════════════════════"
 echo "  Gate test gesture componenti"
 echo "════════════════════════════════════════"

@@ -12,7 +12,5 @@ description: Gate bloccante post-merge per i test automatici gesture/componenti 
 
 **How to apply:** Qualunque nuovo file `*.test.ts` in `components/__tests__/` viene automaticamente incluso dal gate (vitest usa la directory intera). Non serve modificare post-merge.sh per aggiungere nuovi test.
 
-## Stato attuale (18 giu 2026)
-- 2 file di test: `FloatingWidget.gesture.test.ts`, `AssistantFab.bottom.test.ts`
-- 38 test, tutti passanti (1.17s)
-- vitest.config.ts già include `components/__tests__/**/*.test.ts`
+## Convenzione commento (21 giu 2026)
+Il commento del gate in post-merge.sh NON elenca i singoli file di test (lista volatile); descrive invece il comportamento del glob ("tutti i *.test.ts in components/__tests__/ vengono inclusi automaticamente") con solo pochi esempi non esaustivi. Questo evita che il commento diventi stale a ogni nuovo file aggiunto.
