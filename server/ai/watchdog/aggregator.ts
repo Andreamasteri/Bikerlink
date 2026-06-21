@@ -303,13 +303,14 @@ function deriveProblems(signals: Signal[]): Problem[] {
 //    (mapbox/tomtom) sono ESCLUSI: un loro down è indipendente dal ThinkCentre
 //    e deve restare azionabile;
 //  - pressione del pool conseguente (event-loop ingolfato dalle chiamate lente
-//    verso il ThinkCentre → SELECT 1 non ottiene slot, limiter bg in coda).
+//    verso il ThinkCentre → SELECT 1 non ottiene slot, limiter bg in coda);
+//  - instabilità di rete (N engine irraggiungibili): con TC spento i self-hosted
+//    risultano giù, gonfiando il contatore — il rumore non è azionabile;
+//  - DB ping lento (db.db.ping_ms): i job di map-matching girano a vuoto senza
+//    GH/Valhalla e saturano il pool → il ping rallenta come effetto collaterale.
 // NON inclusi (restano allarmi pieni anche a ThinkCentre spento):
-//  - maps.health.* (tile CDN pubblici, engine cloud, instabilità di rete): a
-//    ThinkCentre spento gli health-check self-hosted vengono già saltati a monte,
-//    quindi ciò che resta è di natura cloud/CDN, indipendente dall'outage;
-//  - db.circuit_breaker (DB realmente giù) e db.ping_ms (lentezza del Postgres
-//    gestito, vedi db-collector).
+//  - maps.routing.engine_down.mapbox/tomtom (cloud, indipendenti dall'outage);
+//  - db.db.circuit_breaker (DB realmente giù — sempre azionabile).
 const OUTAGE_DOWNSTREAM_IDS = new Set<string>([
   "redis.redis.unreachable",
   "maps.matching.pending",
@@ -318,6 +319,8 @@ const OUTAGE_DOWNSTREAM_IDS = new Set<string>([
   "db.db.pool.waiting",
   "db.db.ping_saturated",
   "db.db.bg_limiter.queued",
+  "maps.health.network_instability",
+  "db.db.ping_ms",
 ]);
 
 function isOutageDownstreamProblem(id: string): boolean {

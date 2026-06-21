@@ -3,10 +3,11 @@
  *
  * suppressDownstreamWhenPoweredOff() retrocede a "warn" SOLO i problemi che sono
  * conseguenza diretta del ThinkCentre offline (Redis self-hosted, backlog
- * map-matching, routing engine self-hosted, pressione del pool), lasciandoli
- * comunque visibili in dashboard. Gli allarmi indipendenti (engine cloud, tile
- * CDN, instabilità di rete, DB realmente giù) NON devono essere toccati, così
- * restano azionabili anche mentre il ThinkCentre è spento.
+ * map-matching, routing engine self-hosted, pressione del pool, instabilità di
+ * rete gonfiata dai self-hosted giù, DB ping lento per job map-matching a vuoto),
+ * lasciandoli comunque visibili in dashboard. Gli allarmi indipendenti (engine
+ * cloud, tile CDN, DB realmente giù) NON devono essere toccati, così restano
+ * azionabili anche mentre il ThinkCentre è spento.
  *
  * Verifica anche che, una volta declassato a "warn", un problema downstream non
  * scateni più il path di push dedicato in alerts.ts (gate sulla severity).
@@ -33,6 +34,10 @@ describe("suppressDownstreamWhenPoweredOff — problemi a valle", () => {
       prob("db.db.pool.waiting", "critical", "db"),
       prob("db.db.ping_saturated", "high", "db"),
       prob("db.db.bg_limiter.queued", "high", "db"),
+      // Aggiunti: conseguenza del TC spento (self-hosted giù → contatore rete alto;
+      // job map-matching a vuoto → pool saturo → ping lento).
+      prob("maps.health.network_instability", "high", "maps"),
+      prob("db.db.ping_ms", "high", "db"),
     ];
 
     const out = suppressDownstreamWhenPoweredOff(input);
@@ -52,11 +57,8 @@ describe("suppressDownstreamWhenPoweredOff — problemi a valle", () => {
       prob("maps.health.engine.mapbox", "high", "maps"),
       // Tile CDN pubblici.
       prob("maps.health.tile.osm-standard", "high", "maps"),
-      // Instabilità di rete (cloud/CDN a ThinkCentre spento).
-      prob("maps.health.network_instability", "high", "maps"),
-      // DB realmente giù / lentezza Postgres gestito.
+      // DB realmente giù — sempre azionabile indipendentemente dal TC.
       prob("db.db.circuit_breaker", "critical", "db"),
-      prob("db.ping_ms", "high", "db"),
     ];
 
     const out = suppressDownstreamWhenPoweredOff(independent);
@@ -80,8 +82,9 @@ describe("suppressDownstreamWhenPoweredOff — problemi a valle", () => {
 
   it("un problema downstream soppresso scende sotto la soglia di push dedicata", () => {
     // alerts.ts emette il push dedicato network_instability solo se high/critical.
-    // (network_instability NON è downstream, ma il gate severity protegge da
-    //  qualunque declassamento futuro: qui simuliamo un problema declassato.)
+    // Ora network_instability È downstream (soppresso con TC spento), quindi il
+    // gate severity in alerts.ts lo blocca automaticamente. Qui lo verifichiamo
+    // con graphhopper (stessa logica di declassamento).
     const downstream = prob("maps.routing.engine_down.graphhopper", "critical", "maps");
     const [suppressed] = suppressDownstreamWhenPoweredOff([downstream]);
 
