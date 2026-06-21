@@ -58,20 +58,13 @@
       align-items: center;
     }
 
-    .token-row {
-      display: flex;
-      gap: 8px;
-      align-items: center;
-      margin-bottom: 4px;
-    }
-
     label {
       color: #8b949e;
       font-size: 11px;
       white-space: nowrap;
     }
 
-    input[type="password"], input[type="text"] {
+    input[type="text"] {
       background: #161b22;
       border: 1px solid #30363d;
       border-radius: 6px;
@@ -82,12 +75,10 @@
       outline: none;
       transition: border-color .15s;
     }
-    input[type="password"]:focus, input[type="text"]:focus {
+    input[type="text"]:focus {
       border-color: #58a6ff;
     }
 
-    #userInput { width: 160px; }
-    #passwordInput { width: 200px; }
     #cmdInput { flex: 1; }
 
     button {
@@ -235,15 +226,6 @@
   </header>
 
   <div class="main">
-    <div class="token-row">
-      <label for="userInput">Utente:</label>
-      <input type="text" id="userInput" placeholder="andrea" autocomplete="username" />
-      <label for="passwordInput">Password:</label>
-      <input type="password" id="passwordInput" placeholder="Password SSH" autocomplete="current-password" />
-      <button id="saveCredsBtn">Salva</button>
-      <span id="credsStatus" style="font-size:11px; color:#8b949e"></span>
-    </div>
-
     <div class="input-row">
       <span style="color:#3fb950; font-size:14px;">$</span>
       <input type="text" id="cmdInput" placeholder="Inserisci un comando..." autocomplete="off" />
@@ -252,17 +234,13 @@
     </div>
 
     <div class="history" id="history">
-      <div class="empty-state" id="emptyState">Nessun comando eseguito. Configura le credenziali e digita un comando.</div>
+      <div class="empty-state" id="emptyState">Nessun comando eseguito. Digita un comando e premi Invio.</div>
     </div>
   </div>
 
   <div id="statusBar">Pronto</div>
 
   <script>
-    const userInput = document.getElementById('userInput');
-    const passwordInput = document.getElementById('passwordInput');
-    const saveCredsBtn = document.getElementById('saveCredsBtn');
-    const credsStatus = document.getElementById('credsStatus');
     const cmdInput = document.getElementById('cmdInput');
     const runBtn = document.getElementById('runBtn');
     const clearBtn = document.getElementById('clearBtn');
@@ -271,42 +249,9 @@
     const statusBar = document.getElementById('statusBar');
     const hostLabel = document.getElementById('hostLabel');
 
-    let sshUser = localStorage.getItem('ssh_exec_user') || '';
-    let sshPassword = localStorage.getItem('ssh_exec_password') || '';
     let running = false;
 
-    function updateCredsState() {
-      if (sshUser && sshPassword) {
-        userInput.value = sshUser;
-        passwordInput.value = sshPassword;
-        credsStatus.textContent = '✓ salvato';
-        credsStatus.style.color = '#3fb950';
-        runBtn.disabled = false;
-      } else {
-        credsStatus.textContent = '';
-        runBtn.disabled = true;
-      }
-    }
-
-    saveCredsBtn.addEventListener('click', () => {
-      const u = userInput.value.trim();
-      const p = passwordInput.value;
-      if (!u || !p) {
-        credsStatus.textContent = 'Utente e password obbligatori';
-        credsStatus.style.color = '#f85149';
-        return;
-      }
-      sshUser = u;
-      sshPassword = p;
-      localStorage.setItem('ssh_exec_user', u);
-      localStorage.setItem('ssh_exec_password', p);
-      updateCredsState();
-      loadLog();
-    });
-
-    passwordInput.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') saveCredsBtn.click();
-    });
+    runBtn.disabled = false;
 
     function formatTime(iso) {
       const d = new Date(iso);
@@ -382,11 +327,7 @@
       try {
         const res = await fetch('/api/ssh/exec', {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-ssh-user': sshUser,
-            'x-ssh-password': sshPassword,
-          },
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ command: cmd }),
         });
 
@@ -435,18 +376,15 @@
         setStatus(`Errore di rete: ${err.message}`, '#f85149');
       } finally {
         running = false;
-        runBtn.disabled = !(sshUser && sshPassword);
+        runBtn.disabled = false;
         cmdInput.disabled = false;
         cmdInput.focus();
       }
     }
 
     async function loadLog() {
-      if (!sshUser || !sshPassword) return;
       try {
-        const res = await fetch('/api/ssh/log', {
-          headers: { 'x-ssh-user': sshUser, 'x-ssh-password': sshPassword },
-        });
+        const res = await fetch('/api/ssh/log');
         if (!res.ok) return;
         const entries = await res.json();
         history.innerHTML = '';
@@ -475,11 +413,7 @@
       setStatus('Storico pulito (solo visivo — il log server è invariato)');
     });
 
-    const savedHost = localStorage.getItem('ssh_exec_host') || '';
-    if (savedHost) hostLabel.textContent = `host: ${savedHost}`;
-
-    updateCredsState();
-    if (sshUser && sshPassword) loadLog();
+    loadLog();
   </script>
 </body>
 </html>

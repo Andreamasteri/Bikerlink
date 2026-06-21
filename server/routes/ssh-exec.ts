@@ -1,5 +1,6 @@
 import { Router, type Request, type Response } from "express";
 import { Client as SshClient } from "ssh2";
+import { storage } from "../storage";
 
 export interface SshLogEntry {
   id: number;
@@ -129,22 +130,23 @@ function execSsh(command: string, timeoutMs = 30_000): Promise<{ stdout: string;
 
 const router = Router();
 
-function authMiddleware(req: Request, res: Response, next: () => void) {
-  const user = req.headers["x-ssh-user"];
-  const password = req.headers["x-ssh-password"];
-  const expectedUser = process.env.TC_SSH_USER;
-  const expectedPassword = process.env.TC_SSH_PASSWORD;
-
-  if (!expectedUser || !expectedPassword) {
-    return res.status(503).json({ error: "TC_SSH_USER e TC_SSH_PASSWORD non configurati sul server" });
+async function requireAdminSession(req: Request, res: Response, next: () => void) {
+  const session = req.session as { userId?: string } | undefined;
+  if (!session?.userId) {
+    return res.status(401).json({ error: "Sessione scaduta. Effettua di nuovo l'accesso." });
   }
-  if (!user || !password || user !== expectedUser || password !== expectedPassword) {
-    return res.status(401).json({ error: "Credenziali non valide o mancanti" });
+  try {
+    const user = await storage.getUser(session.userId);
+    if (!user) return res.status(403).json({ error: "Account non trovato." });
+    if (user.role !== "admin") return res.status(403).json({ error: "Accesso riservato agli amministratori." });
+    if (user.status !== "active") return res.status(403).json({ error: "Account non attivo." });
+  } catch {
+    return res.status(500).json({ error: "Errore autenticazione." });
   }
   next();
 }
 
-router.post("/exec", authMiddleware, async (req: Request, res: Response) => {
+router.post("/exec", requireAdminSession, async (req: Request, res: Response) => {
   const command = extractCommand(req.body);
   if (!command || !command.trim()) {
     return res.status(400).json({ error: "Campo 'command' obbligatorio" });
@@ -176,7 +178,7 @@ router.post("/exec", authMiddleware, async (req: Request, res: Response) => {
   }
 });
 
-router.get("/log", authMiddleware, (_req: Request, res: Response) => {
+router.get("/log", requireAdminSession, (_req: Request, res: Response) => {
   return res.json(getSshLog());
 });
 

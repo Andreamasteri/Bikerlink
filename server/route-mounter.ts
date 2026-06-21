@@ -307,9 +307,25 @@ export function registerAllRoutes(app: express.Application) {
     res.sendFile(pianificaPath);
   });
 
-  // SSH Terminal page — token-authenticated via x-ssh-token header (no session needed)
+  // SSH Terminal page — admin session required
   const sshTerminalPath = path.resolve(process.cwd(), "server", "templates", "ssh-terminal.html");
-  app.get("/ssh-terminal", (_req, res) => {
+  app.get("/ssh-terminal", async (req, res) => {
+    const userId = (req.session as { userId?: string })?.userId;
+    if (!userId) {
+      return res.redirect(302, "/accedi?next=/ssh-terminal");
+    }
+    try {
+      const { storage: appStorage } = await import("./storage");
+      const user = await appStorage.getUser(userId);
+      if (!user || user.role !== "admin") {
+        return res.status(403).send("Accesso riservato agli amministratori.");
+      }
+      if (user.status !== "active") {
+        return res.status(403).send("Account non attivo.");
+      }
+    } catch {
+      return res.status(500).send("Errore interno.");
+    }
     res.setHeader("Content-Type", "text/html; charset=utf-8");
     res.setHeader("Cache-Control", "no-store");
     res.sendFile(sshTerminalPath);
