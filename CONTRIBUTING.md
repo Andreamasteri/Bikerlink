@@ -85,6 +85,35 @@ git commit --no-verify -m "..."
 
 ---
 
+## Test di componente
+
+I test automatici dei componenti si trovano in `components/__tests__/` e vengono
+eseguiti dal gate **"Gate test gesture componenti"** in `scripts/post-merge.sh`.
+
+### Aggiungere un nuovo test
+
+1. Crea il file `components/__tests__/<nome>.test.ts` (o `.test.tsx`).
+2. **Non modificare `post-merge.sh`** — il gate usa un glob (`*.test.ts`) che include
+   automaticamente ogni nuovo file nella directory.
+3. Verifica che il tuo file compaia nell'elenco **"File di test rilevati"** che il gate
+   stampa all'avvio. Se non compare, controlla l'estensione e il percorso del file.
+
+### Convenzioni
+
+- Il nome del file deve descrivere il componente e il tipo di test:
+  `FloatingWidget.gesture.test.ts`, `MapReadyGate.test.ts`, ecc.
+- Usa `vitest` + `react-test-renderer` per i test che montano componenti.
+- Ogni test file deve essere autonomo: nessuna dipendenza da ordine di esecuzione
+  con gli altri file della directory.
+
+### Esecuzione locale
+
+```bash
+npx vitest run components/__tests__
+```
+
+---
+
 ## Variabili d'ambiente e segreti
 
 - **Non committare mai** file `.env`, `.env.local` o qualsiasi file

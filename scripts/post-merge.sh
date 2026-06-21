@@ -311,11 +311,25 @@ echo ""
 # widget, comportamento UI e qualunque altro test di componente aggiunto in
 # futuro.
 # Se fallisce, il merge è bloccato: regressioni sui componenti critici
-# (FloatingWidget, RoutePlannerSheet, ProfileVersionSection, ecc.) vengono
-# rilevate qui prima di raggiungere produzione.
+# vengono rilevate qui prima di raggiungere produzione.
+#
+# ⚠ CONTRIBUTOR: quando aggiungi un nuovo file in components/__tests__/,
+#   NON serve modificare questo script — il glob lo include automaticamente.
+#   Verifica che il file appaia nell'elenco "File di test rilevati" qui sotto.
+#   Consulta CONTRIBUTING.md → "Test di componente" per le convenzioni.
 echo "════════════════════════════════════════"
 echo "  Gate test gesture componenti"
 echo "════════════════════════════════════════"
+COMPONENT_TEST_FILES=()
+for _glob in components/__tests__/*.test.ts components/__tests__/*.test.tsx; do
+  [ -f "$_glob" ] && COMPONENT_TEST_FILES+=("$_glob")
+done
+COMPONENT_TEST_COUNT=${#COMPONENT_TEST_FILES[@]}
+echo "  File di test rilevati (${COMPONENT_TEST_COUNT}):"
+for _f in "${COMPONENT_TEST_FILES[@]}"; do
+  echo "    • $(basename "$_f")"
+done
+echo ""
 GESTURE_TEST_EXIT=0
 npx vitest run components/__tests__ 2>&1 || GESTURE_TEST_EXIT=$?
 if [ "$GESTURE_TEST_EXIT" -eq 0 ]; then
