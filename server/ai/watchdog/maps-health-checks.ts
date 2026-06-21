@@ -9,6 +9,7 @@ import { SELF_HOSTED_BASE_URL, isSelfHosted } from "../../graphhopper-client";
 import { getRoutingAreaMode } from "../../routing/routing-area-mode";
 import { getAreaEnabledMap } from "../../routing/routing-area-state";
 import { ROUTING_AREAS, routingAreaUrl } from "@shared/routing-areas";
+import { isThinkCentreInMaintenance } from "../../lib/thinkcentre-maintenance";
 
 const log = logger.child({ scope: "maps-watchdog", check: "health" });
 
@@ -80,9 +81,11 @@ function engineTargets(): Target[] {
  * Solo quando il self-hosting è attivo, il master toggle non è "disabled" e il
  * gruppo è abilitato (probare istanze spente sarebbe rumore inutile).
  * id = `area-<codice>`, così maps-collector emette `health.engine.area-<codice>`.
+ * Saltate quando la manutenzione programmata del ThinkCentre è attiva.
  */
 export async function areaEngineTargets(): Promise<Target[]> {
   if (!isSelfHosted || !SELF_HOSTED_BASE_URL) return [];
+  if (await isThinkCentreInMaintenance()) return [];
   let mode: string;
   try {
     mode = await getRoutingAreaMode();
@@ -193,15 +196,25 @@ async function pingGraphHopper(t: Target): Promise<HealthCheckResult> {
 let lastRunAt = 0;
 let cachedResults: HealthCheckResult[] = [];
 const CACHE_TTL_MS = 5 * 60_000;
+/** Stato manutenzione nell'ultimo ciclo — undefined = prima esecuzione. */
+let lastMaintenanceState: boolean | undefined = undefined;
 
 export async function runMapsHealthChecks(force = false): Promise<HealthCheckResult[]> {
   const now = Date.now();
-  if (!force && now - lastRunAt < CACHE_TTL_MS && cachedResults.length > 0) {
+  // La manutenzione viene valutata PRIMA della cache: se il flag cambia (in
+  // entrambe le direzioni) la cache viene ignorata per effetto immediato del toggle.
+  const inMaintenance = await isThinkCentreInMaintenance();
+  const maintenanceChanged = lastMaintenanceState !== undefined && lastMaintenanceState !== inMaintenance;
+  if (!force && !maintenanceChanged && now - lastRunAt < CACHE_TTL_MS && cachedResults.length > 0) {
     return cachedResults;
   }
   const tiles = tileTargets();
-  const engines = engineTargets();
-  const areaEngines = await areaEngineTargets();
+  // Quando la manutenzione ThinkCentre è attiva, si saltano i target self-hosted
+  // (graphhopper, valhalla, aree); i target cloud (mapbox, tomtom, tile) continuano.
+  const engines = engineTargets().filter(
+    (t) => !inMaintenance || (t.id !== "graphhopper" && t.id !== "valhalla"),
+  );
+  const areaEngines = inMaintenance ? [] : await areaEngineTargets();
   const allEngines = [...engines, ...areaEngines];
 
   const tileResults = await Promise.all(tiles.map(pingOne));
@@ -212,6 +225,7 @@ export async function runMapsHealthChecks(force = false): Promise<HealthCheckRes
   const results = [...tileResults, ...engineResults];
   cachedResults = results;
   lastRunAt = now;
+  lastMaintenanceState = inMaintenance;
 
   const downs = results.filter((r) => !r.ok);
   if (downs.length > 0) {

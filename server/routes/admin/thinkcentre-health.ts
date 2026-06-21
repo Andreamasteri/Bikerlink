@@ -8,14 +8,15 @@
  */
 
 import { Router, type Request, type Response as ExpressResponse } from "express";
-import { db } from "../../db";
-import { thinkcentreHealthEvents } from "@shared/db";
-import { desc } from "drizzle-orm";
+import { db, withDbRetry } from "../../db";
+import { appSettings, thinkcentreHealthEvents } from "@shared/db";
+import { desc, eq } from "drizzle-orm";
 import {
   isStartingUp,
   tokenFingerprint,
   type ProbeLogEntry,
 } from "./thinkcentre-health-utils";
+import { isThinkCentreInMaintenance } from "../../lib/thinkcentre-maintenance";
 import {
   probeValhallaDetailed,
   probeNominatimDetailed,
@@ -69,6 +70,46 @@ type ServiceKey =
 
 const router = Router();
 
+/**
+ * GET /api/admin/thinkcentre/maintenance
+ * Legge il flag "thinkcentre_maintenance_mode". Default: false.
+ */
+router.get("/thinkcentre/maintenance", async (_req: Request, res: ExpressResponse) => {
+  try {
+    const enabled = await isThinkCentreInMaintenance();
+    return res.json({ enabled });
+  } catch (_err) {
+    return sendError(res, 500, "Errore lettura modalità manutenzione ThinkCentre");
+  }
+});
+
+/**
+ * POST /api/admin/thinkcentre/maintenance
+ * Body: { enabled: boolean }
+ * Attiva/disattiva la modalità manutenzione. Si applica immediatamente senza restart.
+ */
+router.post("/thinkcentre/maintenance", async (req: Request, res: ExpressResponse) => {
+  try {
+    const { enabled } = req.body as { enabled?: unknown };
+    if (typeof enabled !== "boolean") {
+      return sendError(res, 400, "Campo 'enabled' deve essere un booleano");
+    }
+    await withDbRetry(() =>
+      db
+        .insert(appSettings)
+        .values({ key: "thinkcentre_maintenance_mode", value: enabled ? "true" : "false" })
+        .onConflictDoUpdate({
+          target: appSettings.key,
+          set: { value: enabled ? "true" : "false", updatedAt: new Date() },
+        }),
+    );
+    console.log(`[admin/thinkcentre-maintenance] manutenzione ${enabled ? "ATTIVATA" : "disattivata"}`);
+    return res.json({ ok: true, enabled });
+  } catch (_err) {
+    return sendError(res, 500, "Errore salvataggio modalità manutenzione ThinkCentre");
+  }
+});
+
 router.get("/thinkcentre-events", async (_req: Request, res: ExpressResponse) => {
   try {
     const limit = 20;
@@ -88,6 +129,7 @@ router.get("/thinkcentre-events", async (_req: Request, res: ExpressResponse) =>
 router.get("/thinkcentre-health", async (_req: Request, res: ExpressResponse) => {
   try {
     const [
+      maintenance,
       graphhopper,
       valhallaDetail,
       nominatimDetail,
@@ -100,6 +142,7 @@ router.get("/thinkcentre-health", async (_req: Request, res: ExpressResponse) =>
       nginxInfra,
       uptimeKumaInfra,
     ] = await Promise.all([
+      isThinkCentreInMaintenance(),
       probeGraphHopperAreas(),
       probeValhallaDetailed(),
       probeNominatimDetailed(),
@@ -261,20 +304,39 @@ router.get("/thinkcentre-health", async (_req: Request, res: ExpressResponse) =>
       overall === "green" ? "ok" : overall === "yellow" ? "degraded" : overall === "red" ? "offline" : "unknown";
 
     const svcMap = new Map(services.map((s) => [s.key, s]));
-    updateSystemStatus({
-      thinkcentre: tcDot,
-      graphhopper: ghDot(),
-      valhalla: svcDot(svcMap.get("valhalla")),
-      nominatim: svcDot(svcMap.get("nominatim")),
-      ollama: svcDot(svcMap.get("ollama")),
-      whisper: svcDot(svcMap.get("whisper")),
-      ufw: ufwDot(),
-      redis: svcDot(svcMap.get("redis")),
-      postgres: svcDot(svcMap.get("postgres")),
-      pgadmin: svcDot(svcMap.get("pgadmin")),
-      nginx: svcDot(svcMap.get("nginx")),
-      uptimeKuma: svcDot(svcMap.get("uptimekuma")),
-    });
+    // In manutenzione: ThinkCentre non contribuisce allo stato globale ("unknown" = escluso).
+    // Le probe sono comunque eseguite per mostrare i dati all'admin.
+    if (maintenance) {
+      updateSystemStatus({
+        thinkcentre: "unknown",
+        graphhopper: "unknown",
+        valhalla: "unknown",
+        nominatim: "unknown",
+        ollama: "unknown",
+        whisper: "unknown",
+        ufw: "unknown",
+        redis: "unknown",
+        postgres: "unknown",
+        pgadmin: "unknown",
+        nginx: "unknown",
+        uptimeKuma: "unknown",
+      });
+    } else {
+      updateSystemStatus({
+        thinkcentre: tcDot,
+        graphhopper: ghDot(),
+        valhalla: svcDot(svcMap.get("valhalla")),
+        nominatim: svcDot(svcMap.get("nominatim")),
+        ollama: svcDot(svcMap.get("ollama")),
+        whisper: svcDot(svcMap.get("whisper")),
+        ufw: ufwDot(),
+        redis: svcDot(svcMap.get("redis")),
+        postgres: svcDot(svcMap.get("postgres")),
+        pgadmin: svcDot(svcMap.get("pgadmin")),
+        nginx: svcDot(svcMap.get("nginx")),
+        uptimeKuma: svcDot(svcMap.get("uptimekuma")),
+      });
+    }
 
     return res.json({
       overall,
@@ -289,6 +351,7 @@ router.get("/thinkcentre-health", async (_req: Request, res: ExpressResponse) =>
       nominatimDetail,
       ufwDetail,
       tokenFingerprints,
+      maintenanceMode: maintenance,
       checkedAt: Date.now(),
     });
   } catch (err: unknown) {
@@ -302,6 +365,8 @@ router.get("/thinkcentre-health", async (_req: Request, res: ExpressResponse) =>
  * Runs all ThinkCentre probes in parallel and returns a compact status
  * snapshot. Exported so /api/admin/system-probe can call it independently,
  * keeping dot colours fresh even when the dashboard cards are collapsed.
+ * When maintenance mode is active, skips all probes and returns "unknown"
+ * for every ThinkCentre key so the global health is not affected.
  */
 export async function probeThinkCentreStatusSnapshot(): Promise<
   Pick<
@@ -311,6 +376,25 @@ export async function probeThinkCentreStatusSnapshot(): Promise<
     | "redis" | "postgres" | "pgadmin" | "nginx" | "uptimeKuma"
   >
 > {
+  if (await isThinkCentreInMaintenance()) {
+    const snap = {
+      thinkcentre: "unknown" as CachedDotStatus,
+      graphhopper: "unknown" as CachedDotStatus,
+      valhalla: "unknown" as CachedDotStatus,
+      nominatim: "unknown" as CachedDotStatus,
+      ollama: "unknown" as CachedDotStatus,
+      whisper: "unknown" as CachedDotStatus,
+      ufw: "unknown" as CachedDotStatus,
+      redis: "unknown" as CachedDotStatus,
+      postgres: "unknown" as CachedDotStatus,
+      pgadmin: "unknown" as CachedDotStatus,
+      nginx: "unknown" as CachedDotStatus,
+      uptimeKuma: "unknown" as CachedDotStatus,
+    };
+    updateSystemStatus(snap);
+    return snap;
+  }
+
   const [
     graphhopper,
     valhallaDetail,

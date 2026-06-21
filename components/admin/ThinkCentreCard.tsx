@@ -65,6 +65,7 @@ interface ThinkCentreHealth {
     whisper: string | null;
     nominatim: string | null;
   };
+  maintenanceMode?: boolean;
   checkedAt: number;
 }
 
@@ -214,8 +215,61 @@ export function ThinkCentreCard({
     },
   });
 
+  const { data: maintenanceData, isLoading: maintenanceLoading } = useQuery<{ enabled: boolean }>({
+    queryKey: ["/api/admin/thinkcentre/maintenance"],
+    queryFn: async () => {
+      const res = await fetch(
+        new URL("/api/admin/thinkcentre/maintenance", getApiUrl()).toString(),
+        { headers: { ...(await authFetchHeaders()) }, credentials: "include" },
+      );
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return res.json();
+    },
+    staleTime: 30_000,
+  });
+
+  const maintenanceMutation = useMutation({
+    mutationFn: async (enabled: boolean) => {
+      const res = await fetch(
+        new URL("/api/admin/thinkcentre/maintenance", getApiUrl()).toString(),
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...(await authFetchHeaders()) },
+          credentials: "include",
+          body: JSON.stringify({ enabled }),
+        },
+      );
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return res.json();
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["/api/admin/thinkcentre/maintenance"] });
+      void queryClient.invalidateQueries({ queryKey: ["/api/admin/thinkcentre-health"] });
+    },
+  });
+
+  const maintenanceActive = maintenanceData?.enabled ?? false;
+
   useEffect(() => {
     if (!data || !onStatuses) return;
+    // In manutenzione il ThinkCentre non contribuisce allo stato globale: tutti "unknown".
+    if (data.maintenanceMode) {
+      onStatuses({
+        thinkcentre: "unknown",
+        graphhopper: "unknown",
+        valhalla: "unknown",
+        nominatim: "unknown",
+        ollama: "unknown",
+        whisper: "unknown",
+        ufw: "unknown",
+        redis: "unknown",
+        postgres: "unknown",
+        pgadmin: "unknown",
+        nginx: "unknown",
+        uptimeKuma: "unknown",
+      });
+      return;
+    }
     const findSvc = (key: ServiceKey) => data.services.find((s) => s.key === key);
     onStatuses({
       thinkcentre: overallToStatus(data.overall),
@@ -246,6 +300,12 @@ export function ThinkCentreCard({
       >
         <MaterialCommunityIcons name="home-assistant" size={18} color={headerColor} />
         <Text style={styles.cardTitle}>ThinkCentre</Text>
+        {maintenanceActive && (
+          <View style={styles.maintenanceBadge}>
+            <Ionicons name="build-outline" size={11} color="#f97316" />
+            <Text style={styles.maintenanceBadgeText}>MNT</Text>
+          </View>
+        )}
         <View style={styles.headerRight}>
           {isLoading && <ActivityIndicator size="small" color={headerColor} />}
           {error && !isLoading && (
@@ -415,6 +475,26 @@ export function ThinkCentreCard({
               />
             )}
           </View>
+
+          <View style={styles.pushToggleRow}>
+            <View style={styles.pushToggleLeft}>
+              <Ionicons name="build-outline" size={15} color={maintenanceActive ? "#f97316" : Colors.textSecondary} />
+              <Text style={[styles.pushToggleLabel, maintenanceActive && styles.maintenanceLabelActive]}>
+                Manutenzione programmata
+              </Text>
+              <Text style={styles.pushToggleSub}>Probe e alert sospesi</Text>
+            </View>
+            {maintenanceLoading || maintenanceMutation.isPending ? (
+              <ActivityIndicator size="small" color={Colors.textSecondary} />
+            ) : (
+              <Switch
+                value={maintenanceActive}
+                onValueChange={(val) => maintenanceMutation.mutate(val)}
+                trackColor={{ false: Colors.border, true: "#f97316" }}
+                thumbColor={maintenanceActive ? Colors.text : Colors.textSecondary}
+              />
+            )}
+          </View>
         </View>
       )}
     </View>
@@ -479,5 +559,23 @@ const styles = StyleSheet.create({
   pushToggleLeft: { flex: 1, gap: 2, flexDirection: "column" },
   pushToggleLabel: { fontFamily: "Inter_500Medium", fontSize: 13, color: Colors.text },
   pushToggleSub: { fontFamily: "Inter_400Regular", fontSize: 12, color: Colors.textSecondary },
+  maintenanceLabelActive: { color: "#f97316" },
   ufwBadge: { justifyContent: "center", alignItems: "center" },
+  maintenanceBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    backgroundColor: "rgba(249, 115, 22, 0.12)",
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: "rgba(249, 115, 22, 0.35)",
+  },
+  maintenanceBadgeText: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 10,
+    color: "#f97316",
+    letterSpacing: 0.5,
+  },
 });
