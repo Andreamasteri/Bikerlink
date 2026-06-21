@@ -70,7 +70,7 @@ export const ProfileVersionSection: React.FC = () => {
     return null;
   }, [releases]);
 
-  const { apk, runtime } = parseAppVersion();
+  const { apk, runtime, ota } = parseAppVersion();
 
   const displayOta = isAdmin && lastApprovedOtaNum !== null ? lastApprovedOtaNum : appliedOta;
 
@@ -78,7 +78,7 @@ export const ProfileVersionSection: React.FC = () => {
     isAdmin &&
     APPLIED_OTA_NUMBER !== null &&
     lastApprovedOtaNum !== null &&
-    APPLIED_OTA_NUMBER !== lastApprovedOtaNum;
+    APPLIED_OTA_NUMBER > lastApprovedOtaNum;
 
   return (
     <View style={styles.container}>
@@ -86,7 +86,7 @@ export const ProfileVersionSection: React.FC = () => {
         <View style={styles.item}>
           <Text style={[styles.label, { color: colors.textSecondary }]}>Build</Text>
           <Text style={[styles.value, { color: colors.textSecondary }]}>
-            V{apk}.{runtime}
+            V{apk}.{runtime}.{ota}
           </Text>
         </View>
         <Text style={[styles.dot, { color: colors.textSecondary }]}>·</Text>
