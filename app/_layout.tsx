@@ -253,7 +253,6 @@ export default function RootLayout() {
           <OtaPendingBanner />
           <DataRefreshIndicator />
           <OfflineBanner />
-          <AdminUptimeOverlay />
           <BackgroundNotificationHandler />
           <PushTokenRegistrar />
           <View style={{ flex: 1 }} pointerEvents="box-none" key={useLanguage().renderKey}>
@@ -263,6 +262,7 @@ export default function RootLayout() {
           <UpdateNudgeWrapper />
           <AssistantOnboardingTour />
           <FloatingWidget />
+          <AdminUptimeOverlay />
         </MapReadyGate>
       </StartupGate>
     </RootProviders>
