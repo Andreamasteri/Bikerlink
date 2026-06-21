@@ -572,7 +572,6 @@ export async function runThinkCentreProbe(): Promise<void> {
   }
   // Recupero parziale (yellow → green): nessuna notifica necessaria
 }
-
 // ── Start / Stop ──────────────────────────────────────────────────────────────
 export function startThinkCentreMonitor(): void {
   if (intervalHandle) return;
