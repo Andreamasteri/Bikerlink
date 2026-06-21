@@ -4,7 +4,7 @@
 // - POST /api/ota/event    : telemetria boot (downloaded | boot_success | boot_failure) per device.
 import { Router, type Request, type Response } from "express";
 import { db, pool } from "../db";
-import { otaReleases, otaBootEvents, users } from "@shared/db";
+import { otaReleases, otaBootEvents, users, appSettings } from "@shared/db";
 import { eq, desc, sql, and, or, inArray } from "drizzle-orm";
 import { sendError } from "../lib/api-response";
 
@@ -47,6 +47,12 @@ async function getUserRole(userId: string | undefined): Promise<string | null> {
 // utenti normali e anonimi solo approved. Risposta usata dal client prima di parlare con EAS.
 router.get("/manifest", async (req: Request, res: Response) => {
   try {
+    // Kill switch globale: se ota_channel_locked=true, nessuna OTA viene distribuita a nessuno.
+    const [lockRow] = await db.select({ value: appSettings.value }).from(appSettings).where(eq(appSettings.key, "ota_channel_locked")).limit(1);
+    if (lockRow?.value === "true") {
+      return res.json({ allowed: false, reason: "channel_locked" });
+    }
+
     const userId = req.session?.userId;
     const role = await getUserRole(userId);
     const isAdmin = role === "admin";
