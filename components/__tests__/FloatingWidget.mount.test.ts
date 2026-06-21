@@ -33,7 +33,7 @@
  *   - Rimuovere pointerEvents={aiOpen ? "none" : "auto"} → intercetta tap AI.
  */
 
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import * as React from "react";
 import renderer from "react-test-renderer";
 
@@ -50,6 +50,8 @@ const mocks = vi.hoisted(() => ({
   user: { id: "1" } as Record<string, string> | null,
   enabled: true,
   suppressed: false,
+  screenW: 400,
+  screenH: 800,
 }));
 
 // ── Mock: react — wrappa useState per controllare aiOpen senza act() ──────────
@@ -81,7 +83,7 @@ vi.mock("react-native", () => ({
   View: "View",
   Text: "Text",
   Pressable: "Pressable",
-  useWindowDimensions: () => ({ width: 400, height: 800 }),
+  useWindowDimensions: () => ({ width: mocks.screenW, height: mocks.screenH }),
   Modal: "Modal",
   Platform: { get OS() { return mocks.platformOS; } },
   PanResponder: {
@@ -167,7 +169,7 @@ vi.mock("@/components/user/ai-assistant/AssistantChatSheet", () => ({
   default: () => null,
 }));
 
-import FloatingWidget from "@/components/FloatingWidget";
+import FloatingWidget, { clampPos, WIDGET_SIZE } from "@/components/FloatingWidget";
 
 // ── Helper: unisce uno style array in un oggetto piatto ───────────────────────
 function flattenStyle(style: unknown): Record<string, unknown> {
@@ -362,5 +364,57 @@ describe("FloatingWidget — pallino nascosto quando la chat AI è aperta", () =
 
     expect(flattenStyle(ball.props.style).opacity).not.toBe(0);
     expect(ball.props.pointerEvents).not.toBe("none");
+  });
+});
+
+// ── (g) Schermo stretto 320px — clamping nei bordi ───────────────────────────
+//
+// Dispositivi narrow (es. iPhone SE 320pt, alcuni Android entry-level) hanno
+// una larghezza inferiore ai 400px su cui girano i test baseline. Una regressione
+// nella logica di clamp potrebbe posizionare il pallino fuori schermo o causare
+// un crash al mount — entrambi i casi invisibili ai test (a-f) esistenti.
+//
+// Questi test coprono:
+//   (g1) Il componente monta correttamente (non null) su schermo 320×568.
+//   (g2) clampPos porta in bounds una x che andrebbe fuori dal bordo destro su
+//        uno schermo da 320px (p.es. x=350 — valido su 400px, out-of-bounds su 320).
+//   (g3) La posizione default calcolata dal componente (width-WIDGET_SIZE-20)
+//        su 320px è già in bounds e clampPos la lascia invariata.
+describe("FloatingWidget — schermo stretto 320px — clamping nei bordi", () => {
+  beforeEach(() => {
+    mocks.platformOS = "ios";
+    mocks.user = { id: "1" };
+    mocks.enabled = true;
+    mocks.suppressed = false;
+    ctrl.forceAiOpen = false;
+    mocks.screenW = 320;
+    mocks.screenH = 568;
+  });
+
+  afterEach(() => {
+    mocks.screenW = 400;
+    mocks.screenH = 800;
+  });
+
+  it("(g1) il widget monta senza crash su schermo 320×568 — non null", () => {
+    expect(mount().toJSON()).not.toBeNull();
+  });
+
+  it("(g2) clampPos mantiene x nel range [0, screenW-WIDGET_SIZE] su schermo 320px", () => {
+    // x=350 è valido su schermo 400px ma supera il bordo destro su 320px
+    const maxX = 320 - WIDGET_SIZE;
+    const { x } = clampPos(350, 200, 320, 568, 8, 8);
+    expect(x).toBeGreaterThanOrEqual(0);
+    expect(x).toBeLessThanOrEqual(maxX);
+  });
+
+  it("(g3) la posizione default (width-WIDGET_SIZE-20) è già in bounds su 320px e non viene clamped", () => {
+    // Replica il calcolo di defaultX usato dal componente
+    const defaultX = 320 - WIDGET_SIZE - 20; // = 260
+    const { x } = clampPos(defaultX, 200, 320, 568, 8, 8);
+    // Deve uscire invariata: 260 è già dentro [0, 280]
+    expect(x).toBe(defaultX);
+    expect(x).toBeGreaterThanOrEqual(0);
+    expect(x).toBeLessThanOrEqual(320 - WIDGET_SIZE);
   });
 });
