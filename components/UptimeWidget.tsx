@@ -75,6 +75,23 @@ export default function UptimeWidget() {
   const dragStartX = useRef(defaultX);
   const dragStartY = useRef(defaultY);
 
+  // Ref aggiornati ad ogni render: il PanResponder è creato in un useRef
+  // (frozen al mount) e non riesce a leggere i valori più recenti dalla
+  // closure. Usando ref aggiornati garantiamo che clampUptimePos usi sempre
+  // le dimensioni e gli inset correnti, anche dopo rotazione o resize.
+  const widthRef = useRef(width);
+  const heightRef = useRef(height);
+  const insetsRef = useRef(insets);
+  widthRef.current = width;
+  heightRef.current = height;
+  insetsRef.current = insets;
+
+  // Flag che indica se un drag è in corso. Viene settato a true in
+  // onPanResponderGrant e a false in onPanResponderRelease/Terminate.
+  // Qualsiasi logica di re-clamp deve controllare questo flag e saltare
+  // l'aggiornamento se il drag è attivo.
+  const isDragging = useRef(false);
+
   const { data } = useQuery<UptimeData>({
     queryKey: ["/api/admin/uptime"],
     refetchInterval: 10_000,
@@ -109,15 +126,26 @@ export default function UptimeWidget() {
     });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Ad ogni cambio dimensioni/inset (rotazione, resize) riporta la posizione
-  // corrente dentro i nuovi limiti, così il widget non finisce mai fuori schermo.
+  // Re-clamp condizionale per rotazione schermo / resize.
+  // Differisce dalla versione originale su due punti critici:
+  //   1. Salta completamente se isDragging è true — mai interrompere un drag.
+  //   2. Scrive posX/posY solo se il widget si trova realmente fuori dai nuovi
+  //      limiti — così l'apertura di un pannello (che cambia insets ma non
+  //      sposta il widget fuori schermo) non provoca alcun "salto".
   useEffect(() => {
-    const clamped = clampUptimePos(
-      posX.value, posY.value, width, height,
-      insets.top + 8, insets.bottom + 8,
-    );
-    posX.value = clamped.x;
-    posY.value = clamped.y;
+    if (isDragging.current) return;
+    const minY = insets.top + 8;
+    const maxYPad = insets.bottom + 8;
+    const maxX = width - WIDGET_W;
+    const maxY = height - WIDGET_H - maxYPad;
+    const curX = posX.value;
+    const curY = posY.value;
+    const clampedX = Math.max(0, Math.min(curX, maxX));
+    const clampedY = Math.max(minY, Math.min(curY, maxY));
+    if (clampedX !== curX || clampedY !== curY) {
+      posX.value = clampedX;
+      posY.value = clampedY;
+    }
   }, [width, height, insets.top, insets.bottom]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const savePosition = useCallback((x: number, y: number) => {
@@ -139,26 +167,45 @@ export default function UptimeWidget() {
       onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder: () => true,
       onPanResponderGrant: () => {
+        isDragging.current = true;
         dragStartX.current = posX.value;
         dragStartY.current = posY.value;
       },
       onPanResponderMove: (_, gs) => {
+        // Legge sempre i ref aggiornati a ogni render, mai la closure stantia
+        // catturata al momento della creazione del PanResponder.
+        const w = widthRef.current;
+        const h = heightRef.current;
+        const ins = insetsRef.current;
         const clamped = clampUptimePos(
           dragStartX.current + gs.dx,
           dragStartY.current + gs.dy,
-          width, height,
-          insets.top + 8, insets.bottom + 8,
+          w, h,
+          ins.top + 8, ins.bottom + 8,
         );
         posX.value = clamped.x;
         posY.value = clamped.y;
       },
       onPanResponderRelease: (_, gs) => {
-        savePosition(posX.value, posY.value);
+        isDragging.current = false;
+        // Re-clamp al rilascio: copre il caso di rotazione schermo avvenuta
+        // mentre il widget era fuori uso, senza mai intervenire mid-drag.
+        const w = widthRef.current;
+        const h = heightRef.current;
+        const ins = insetsRef.current;
+        const clamped = clampUptimePos(
+          posX.value, posY.value, w, h,
+          ins.top + 8, ins.bottom + 8,
+        );
+        posX.value = clamped.x;
+        posY.value = clamped.y;
+        savePosition(clamped.x, clamped.y);
         if (!isDragGesture(gs.dx, gs.dy, TAP_THRESHOLD)) {
           openHistory();
         }
       },
       onPanResponderTerminate: () => {
+        isDragging.current = false;
         savePosition(posX.value, posY.value);
       },
     })

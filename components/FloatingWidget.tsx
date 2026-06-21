@@ -81,6 +81,40 @@ export default function FloatingWidget() {
   const dragStartX = useRef(defaultX);
   const dragStartY = useRef(defaultY);
 
+  // Ref aggiornati ad ogni render: il PanResponder è frozen al mount e non
+  // riesce a leggere i valori più recenti dalla closure. Usando ref aggiornati
+  // garantiamo che clampPos usi sempre le dimensioni e gli inset correnti.
+  const widthRef = useRef(width);
+  const heightRef = useRef(height);
+  const insetsRef = useRef(insets);
+  widthRef.current = width;
+  heightRef.current = height;
+  insetsRef.current = insets;
+
+  // Flag che indica se un drag è in corso. Qualsiasi logica di re-clamp deve
+  // controllare questo flag e saltare l'aggiornamento se il drag è attivo.
+  const isDragging = useRef(false);
+
+  // Re-clamp condizionale per rotazione schermo / resize.
+  // Salta se isDragging è true e scrive solo se il widget è realmente fuori
+  // dai nuovi limiti, così l'apertura di un pannello (che cambia insets ma
+  // non sposta il pallino fuori schermo) non causa alcun "salto".
+  useEffect(() => {
+    if (isDragging.current) return;
+    const minY = insets.top + 8;
+    const maxYPad = insets.bottom + 8;
+    const maxX = width - WIDGET_SIZE;
+    const maxY = height - WIDGET_SIZE - maxYPad;
+    const curX = posX.value;
+    const curY = posY.value;
+    const clampedX = Math.max(0, Math.min(curX, maxX));
+    const clampedY = Math.max(minY, Math.min(curY, maxY));
+    if (clampedX !== curX || clampedY !== curY) {
+      posX.value = clampedX;
+      posY.value = clampedY;
+    }
+  }, [width, height, insets.top, insets.bottom]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Carica posizione persistita (AsyncStorage → JS thread).
   useEffect(() => {
     AsyncStorage.getItem(POS_KEY).then((raw) => {
@@ -116,26 +150,45 @@ export default function FloatingWidget() {
       onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder: () => true,
       onPanResponderGrant: () => {
+        isDragging.current = true;
         dragStartX.current = posX.value;
         dragStartY.current = posY.value;
       },
       onPanResponderMove: (_, _gs) => {
+        // Legge sempre i ref aggiornati a ogni render, mai la closure stantia
+        // catturata al momento della creazione del PanResponder.
+        const w = widthRef.current;
+        const h = heightRef.current;
+        const ins = insetsRef.current;
         const clamped = clampPos(
           dragStartX.current + _gs.dx,
           dragStartY.current + _gs.dy,
-          width, height,
-          insets.top + 8, insets.bottom + 8,
+          w, h,
+          ins.top + 8, ins.bottom + 8,
         );
         posX.value = clamped.x;
         posY.value = clamped.y;
       },
       onPanResponderRelease: (_, _gs) => {
-        savePosition(posX.value, posY.value);
+        isDragging.current = false;
+        // Re-clamp al rilascio: copre il caso di rotazione schermo avvenuta
+        // mentre il widget era fuori uso, senza mai intervenire mid-drag.
+        const w = widthRef.current;
+        const h = heightRef.current;
+        const ins = insetsRef.current;
+        const clamped = clampPos(
+          posX.value, posY.value, w, h,
+          ins.top + 8, ins.bottom + 8,
+        );
+        posX.value = clamped.x;
+        posY.value = clamped.y;
+        savePosition(clamped.x, clamped.y);
         if (!isDragGesture(_gs.dx, _gs.dy)) {
           toggleMenu();
         }
       },
-      onPanResponderTerminate: (_) => {
+      onPanResponderTerminate: () => {
+        isDragging.current = false;
         savePosition(posX.value, posY.value);
       },
     })
