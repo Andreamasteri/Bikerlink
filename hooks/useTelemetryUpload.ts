@@ -13,6 +13,7 @@ import { useRef, useCallback } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { apiRequest, queryClient } from "@/lib/query-client";
 import { drainBackgroundTelemetryBuffer } from "@/lib/background-telemetry-task";
+import { applyDistanceUpload } from "@shared/tracking-fusion";
 import type { TelemetrySample } from "@shared/tracking-fusion";
 
 // ─── Constants (shared with useTelemetry) ─────────────────────────────────────
@@ -69,11 +70,12 @@ export function useTelemetryUpload(
   // sampling; the marker only advances on success so a failed upload is retried
   // at the next sample.
   const maybeUploadByDistance = useCallback(() => {
-    if (totalKmRef.current - kmAtLastUploadRef.current < UPLOAD_EVERY_KM) return;
-    const markAt = totalKmRef.current;
-    void flush(true).then((sent) => {
-      if (sent) kmAtLastUploadRef.current = markAt;
-    });
+    applyDistanceUpload(
+      totalKmRef.current,
+      kmAtLastUploadRef.current,
+      () => flush(true),
+      (at) => { kmAtLastUploadRef.current = at; },
+    );
   }, [flush, totalKmRef, kmAtLastUploadRef]);
 
   // ── drain AsyncStorage background buffer and flush to server ─────────────────

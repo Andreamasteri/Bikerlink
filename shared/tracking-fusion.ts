@@ -209,3 +209,49 @@ export function classifyTelemetrySample(sample: {
 export function shouldRecordSensorSample(lastGpsTsMs: number, nowMs: number): boolean {
   return nowMs - lastGpsTsMs > TRACKING_FUSION.GPS_SILENCE_MS;
 }
+
+/**
+ * Distance-gate upload logic extracted as a pure function so unit tests can
+ * exercise the real production code path without importing React hook modules.
+ *
+ * Fires `flush()` when `totalKm − kmAtLastUpload >= uploadEveryKm`.
+ * Calls `setKmAtLastUpload(totalKm)` ONLY when flush resolves to `true` — a
+ * failed upload is retried on the next sample rather than silently skipped.
+ * The `uploadEveryKm` parameter defaults to 5 (km) when omitted.
+ */
+export function applyDistanceUpload(
+  totalKm: number,
+  kmAtLastUpload: number,
+  flush: () => Promise<boolean>,
+  setKmAtLastUpload: (at: number) => void,
+  uploadEveryKm = 5,
+): void {
+  if (totalKm - kmAtLastUpload < uploadEveryKm) return;
+  const markAt = totalKm;
+  void flush().then((sent) => {
+    if (sent) setKmAtLastUpload(markAt);
+  });
+}
+
+/**
+ * Dead-reckoning step: given the last known position, the current compass heading,
+ * the EMA speed (km/h), and the sample interval (ms), returns the estimated next
+ * position plus the distance travelled. Returns `null` when the speed is too low
+ * to produce a meaningful step (≤ 0.5 km/h) or the step rounds to zero.
+ *
+ * Pure and exported so the useTelemetry hook and unit tests share the same
+ * implementation — a regression in the formula is caught by tests against this
+ * export, not by a local copy.
+ */
+export function deadReckonStep(
+  last: { lat: number; lon: number },
+  heading: number,
+  emaSpeedKmh: number,
+  sampleIntervalMs: number,
+): { lat: number; lon: number; stepKm: number; estimated: true } | null {
+  if (emaSpeedKmh <= 0.5) return null;
+  const stepKm = (emaSpeedKmh / 3600) * (sampleIntervalMs / 1000);
+  if (stepKm <= 0) return null;
+  const dest = computeDestinationPoint(last.lat, last.lon, stepKm, heading);
+  return { lat: dest.lat, lon: dest.lng, stepKm, estimated: true };
+}

@@ -17,7 +17,7 @@ import {
   TRACKING_FUSION,
   shouldRecordSensorSample,
   evaluateSegment,
-  computeDestinationPoint,
+  deadReckonStep,
   type TelemetrySample,
 } from "@shared/tracking-fusion";
 import {
@@ -155,13 +155,12 @@ export function useTelemetry(isActive: boolean, externalGps = false) {
     let estimated = false;
 
     const heading = headingRef.current;
-    if (last && typeof heading === "number" && emaSpeedRef.current > 0.5) {
-      const stepKm = (emaSpeedRef.current / 3600) * (SAMPLE_INTERVAL_MS / 1000);
-      if (stepKm > 0) {
-        const next = computeDestinationPoint(last.lat, last.lon, stepKm, heading);
-        lat = next.lat; lon = next.lng;
-        lastKnownLocRef.current = { lat: next.lat, lon: next.lng };
-        totalKmRef.current += stepKm;
+    if (last && typeof heading === "number") {
+      const dr = deadReckonStep(last, heading, emaSpeedRef.current, SAMPLE_INTERVAL_MS);
+      if (dr) {
+        lat = dr.lat; lon = dr.lon;
+        lastKnownLocRef.current = { lat: dr.lat, lon: dr.lon };
+        totalKmRef.current += dr.stepKm;
         estimated = true;
       }
     }
