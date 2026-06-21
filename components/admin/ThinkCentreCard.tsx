@@ -294,6 +294,90 @@ export function ThinkCentreCard({
 
       {!collapsed && (
         <View style={styles.list}>
+          <View style={styles.pushToggleRow}>
+            <View style={styles.pushToggleLeft}>
+              <Ionicons name="notifications-outline" size={15} color={Colors.textSecondary} />
+              <Text style={styles.pushToggleLabel}>Push per servizio offline</Text>
+              <Text style={styles.pushToggleSub}>
+                Notifiche per singolo servizio (es. Ollama offline) con debounce 15 min — le notifiche globali ThinkCentre escono sempre
+              </Text>
+            </View>
+            {pushLoading || pushData === undefined ? (
+              <ActivityIndicator size="small" color={Colors.textSecondary} />
+            ) : (
+              <Switch
+                value={pushData.enabled}
+                onValueChange={(val) => pushMutation.mutate(val)}
+                trackColor={{ false: Colors.border, true: "#f59e0b" }}
+                thumbColor={pushData.enabled ? Colors.text : Colors.textSecondary}
+              />
+            )}
+          </View>
+
+          <View style={styles.pushToggleRow}>
+            <View style={styles.pushToggleLeft}>
+              <Ionicons name="flask-outline" size={15} color={ignoreTestsActive ? "#f97316" : Colors.textSecondary} />
+              <Text style={[styles.pushToggleLabel, ignoreTestsActive && { color: "#f97316" }]}>
+                ThinkCentre offline per test
+              </Text>
+              <Text style={styles.pushToggleSub}>
+                Sopprime errori e alert legati al ThinkCentre — routing cloud attivo
+              </Text>
+            </View>
+            {ignoreTestsLoading || ignoreTestsMutation.isPending ? (
+              <ActivityIndicator size="small" color={Colors.textSecondary} />
+            ) : (
+              <Switch
+                value={ignoreTestsActive}
+                onValueChange={(val) => ignoreTestsMutation.mutate(val)}
+                trackColor={{ false: Colors.border, true: "#f97316" }}
+                thumbColor={ignoreTestsActive ? Colors.text : Colors.textSecondary}
+              />
+            )}
+          </View>
+
+          <View style={styles.pushToggleRow}>
+            <View style={styles.pushToggleLeft}>
+              <Ionicons name="build-outline" size={15} color={maintenanceActive ? "#f97316" : Colors.textSecondary} />
+              <Text style={[styles.pushToggleLabel, maintenanceActive && styles.maintenanceLabelActive]}>
+                Manutenzione programmata
+              </Text>
+              <Text style={styles.pushToggleSub}>Probe e alert sospesi</Text>
+            </View>
+            {maintenanceLoading || maintenanceMutation.isPending ? (
+              <ActivityIndicator size="small" color={Colors.textSecondary} />
+            ) : (
+              <Switch
+                value={maintenanceActive}
+                onValueChange={(val) => maintenanceMutation.mutate(val)}
+                trackColor={{ false: Colors.border, true: "#f97316" }}
+                thumbColor={maintenanceActive ? Colors.text : Colors.textSecondary}
+              />
+            )}
+          </View>
+
+          <View style={styles.pushToggleRow}>
+            <View style={styles.pushToggleLeft}>
+              <Ionicons name="power-outline" size={15} color={poweredOffActive ? "#ef4444" : Colors.textSecondary} />
+              <Text style={[styles.pushToggleLabel, poweredOffActive && styles.poweredOffLabelActive]}>
+                ThinkCentre spento
+              </Text>
+              <Text style={styles.pushToggleSub}>
+                Tutti i servizi offline · nessuna notifica · routing su cloud
+              </Text>
+            </View>
+            {poweredOffLoading || poweredOffMutation.isPending ? (
+              <ActivityIndicator size="small" color={Colors.textSecondary} />
+            ) : (
+              <Switch
+                value={poweredOffActive}
+                onValueChange={(val) => poweredOffMutation.mutate(val)}
+                trackColor={{ false: Colors.border, true: "#ef4444" }}
+                thumbColor={poweredOffActive ? Colors.text : Colors.textSecondary}
+              />
+            )}
+          </View>
+
           {!poweredOffActive && error && !isLoading && (
             <Text style={styles.errorText}>Impossibile leggere lo stato dei servizi.</Text>
           )}
@@ -434,89 +518,6 @@ export function ThinkCentreCard({
             </View>
           )}
 
-          <View style={styles.pushToggleRow}>
-            <View style={styles.pushToggleLeft}>
-              <Ionicons name="notifications-outline" size={15} color={Colors.textSecondary} />
-              <Text style={styles.pushToggleLabel}>Push per servizio offline</Text>
-              <Text style={styles.pushToggleSub}>
-                Notifiche per singolo servizio (es. Ollama offline) con debounce 15 min — le notifiche globali ThinkCentre escono sempre
-              </Text>
-            </View>
-            {pushLoading || pushData === undefined ? (
-              <ActivityIndicator size="small" color={Colors.textSecondary} />
-            ) : (
-              <Switch
-                value={pushData.enabled}
-                onValueChange={(val) => pushMutation.mutate(val)}
-                trackColor={{ false: Colors.border, true: "#f59e0b" }}
-                thumbColor={pushData.enabled ? Colors.text : Colors.textSecondary}
-              />
-            )}
-          </View>
-
-          <View style={styles.pushToggleRow}>
-            <View style={styles.pushToggleLeft}>
-              <Ionicons name="flask-outline" size={15} color={ignoreTestsActive ? "#f97316" : Colors.textSecondary} />
-              <Text style={[styles.pushToggleLabel, ignoreTestsActive && { color: "#f97316" }]}>
-                ThinkCentre offline per test
-              </Text>
-              <Text style={styles.pushToggleSub}>
-                Sopprime errori e alert legati al ThinkCentre — routing cloud attivo
-              </Text>
-            </View>
-            {ignoreTestsLoading || ignoreTestsMutation.isPending ? (
-              <ActivityIndicator size="small" color={Colors.textSecondary} />
-            ) : (
-              <Switch
-                value={ignoreTestsActive}
-                onValueChange={(val) => ignoreTestsMutation.mutate(val)}
-                trackColor={{ false: Colors.border, true: "#f97316" }}
-                thumbColor={ignoreTestsActive ? Colors.text : Colors.textSecondary}
-              />
-            )}
-          </View>
-
-          <View style={styles.pushToggleRow}>
-            <View style={styles.pushToggleLeft}>
-              <Ionicons name="build-outline" size={15} color={maintenanceActive ? "#f97316" : Colors.textSecondary} />
-              <Text style={[styles.pushToggleLabel, maintenanceActive && styles.maintenanceLabelActive]}>
-                Manutenzione programmata
-              </Text>
-              <Text style={styles.pushToggleSub}>Probe e alert sospesi</Text>
-            </View>
-            {maintenanceLoading || maintenanceMutation.isPending ? (
-              <ActivityIndicator size="small" color={Colors.textSecondary} />
-            ) : (
-              <Switch
-                value={maintenanceActive}
-                onValueChange={(val) => maintenanceMutation.mutate(val)}
-                trackColor={{ false: Colors.border, true: "#f97316" }}
-                thumbColor={maintenanceActive ? Colors.text : Colors.textSecondary}
-              />
-            )}
-          </View>
-
-          <View style={styles.pushToggleRow}>
-            <View style={styles.pushToggleLeft}>
-              <Ionicons name="power-outline" size={15} color={poweredOffActive ? "#ef4444" : Colors.textSecondary} />
-              <Text style={[styles.pushToggleLabel, poweredOffActive && styles.poweredOffLabelActive]}>
-                ThinkCentre spento
-              </Text>
-              <Text style={styles.pushToggleSub}>
-                Tutti i servizi offline · nessuna notifica · routing su cloud
-              </Text>
-            </View>
-            {poweredOffLoading || poweredOffMutation.isPending ? (
-              <ActivityIndicator size="small" color={Colors.textSecondary} />
-            ) : (
-              <Switch
-                value={poweredOffActive}
-                onValueChange={(val) => poweredOffMutation.mutate(val)}
-                trackColor={{ false: Colors.border, true: "#ef4444" }}
-                thumbColor={poweredOffActive ? Colors.text : Colors.textSecondary}
-              />
-            )}
-          </View>
         </View>
       )}
     </View>
