@@ -1,3 +1,4 @@
+- [ThinkCentre SSH access](thinkcentre-ssh-access.md) — credenziali in env: TC_SSH_HOST/USER/PASSWORD/PORT; usa paramiko + `echo $pwd | sudo -S` per i comandi sudo.
 - [zavarrina→zavorrina rename](zavorrina-rename.md) — rename globale completato in 57 file; SQL già corretto, solo nomi TS ORM/DTO allineati; typecheck EXIT:0.
 - [Deploy probe porta 8081 + GET / boot guard](deploy-probe-8081.md) — stack=EXPO → piattaforma attende Metro su 8081; GET / chiama DB durante init → 500. Fix: probe server 8081 + initState guard.
 - [Vite/Vitest upgrade audit](vite-vitest-upgrade-audit.md) — vitest 4.1.8 già supporta vite 8.x (peerDep `^6||^7||^8`); solo vite va aggiornato (6.4.3→8.0.16); zero modifiche ai 3 config.
