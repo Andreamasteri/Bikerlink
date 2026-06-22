@@ -169,33 +169,40 @@ fi
 
 # ── GATE ROTTE FANTASMA app/(tabs)/ ──────────────────────────
 # Expo Router registra OGNI file in app/(tabs)/ come rotta.
-# Un file helper (.ts senza prefisso _) diventa una tab rotta al boot.
-# Regola: solo .tsx (screens) e file con prefisso _ (privati) sono ammessi.
-# Qualsiasi .ts senza _ deve essere spostato in components/ o lib/.
+# Regola STRETTA:
+#   - .tsx senza prefisso _ → screen legittimi (es. index.tsx, music.tsx)
+#   - _layout.tsx e _layout.part2.tsx → ammessi (layout Expo Router)
+#   - QUALSIASI altro file (.ts, .tsx con prefisso _, ecc.) → VIETATO
+#     → spostare in components/ o lib/
 # Vedi .agents/memory/expo-tabs-route-pollution.md
 echo "════════════════════════════════════════"
-echo "  Gate rotte fantasma app/(tabs)/"
+echo "  Gate rotte fantasma app/(tabs)/  [strict]"
 echo "════════════════════════════════════════"
 PHANTOM_ROUTES=()
-for _f in "app/(tabs)/"*.ts; do
+for _f in "app/(tabs)/"*; do
   [ -f "$_f" ] || continue
   _bn=$(basename "$_f")
-  if [[ "$_bn" != _* ]]; then
-    PHANTOM_ROUTES+=("$_bn")
+  # ammetti solo screen .tsx senza prefisso _
+  if [[ "$_bn" == _layout.tsx || "$_bn" == _layout.part2.tsx ]]; then
+    continue
   fi
+  if [[ "$_bn" == *.tsx && "$_bn" != _* ]]; then
+    continue
+  fi
+  # tutto il resto è proibito: .ts, .tsx con _, ecc.
+  PHANTOM_ROUTES+=("$_bn")
 done
 if [ ${#PHANTOM_ROUTES[@]} -eq 0 ]; then
-  echo "✅ Nessun file helper non protetto in app/(tabs)/."
+  echo "✅ app/(tabs)/ pulita: solo screen .tsx e _layout ammessi."
 else
-  echo "❌ File helper senza prefisso _ rilevati in app/(tabs)/:"
+  echo "❌ File non ammessi rilevati in app/(tabs)/:"
   for _pf in "${PHANTOM_ROUTES[@]}"; do
     echo "   ⚠️  app/(tabs)/$_pf"
   done
   echo ""
-  echo "   Questi file vengono registrati da Expo Router come rotte,"
-  echo "   causando tab fantasma o crash al boot."
-  echo "   → Rinominare con prefisso _ (es. _proposals.styles.ts)"
-  echo "     oppure spostare in components/ o lib/."
+  echo "   Solo screen .tsx (senza prefisso _) e _layout.tsx sono ammessi."
+  echo "   File helper, stili e utility DEVONO stare in components/ o lib/."
+  echo "   Expo Router trasforma ogni file in questa cartella in una rotta."
   echo "════════════════════════════════════════"
   echo ""
   exit 1

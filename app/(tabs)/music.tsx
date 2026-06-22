@@ -35,7 +35,7 @@ import { SharedPlaylistsTab } from "@/components/music/SharedPlaylistsTab";
 import { MusicRadioTab } from "@/components/music/MusicRadioTab";
 import { TelefonoTab } from "@/components/music/TelefonoTab";
 import { LastfmLoginModal } from "@/components/music/LastfmLoginModal";
-import { MusicPart2 } from "./_music.part2";
+import { MusicPart2 } from "@/components/music/MusicTabPart2";
 
 export default function MusicScreen() {
   const t = useT();

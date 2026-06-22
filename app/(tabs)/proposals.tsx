@@ -30,8 +30,8 @@ import {
   getTypeLabelKey,
   MatchBanner,
   ProposalHeader,
-} from "./_proposals.part2";
-import { styles } from "./_proposals.styles";
+} from "@/components/proposals/ProposalsTabPart2";
+import { styles } from "@/components/proposals/tab-proposals.styles";
 
 interface ProposalItem {
   id: string;
