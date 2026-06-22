@@ -6,7 +6,7 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
-import { styles } from "./proposals.styles";
+import { styles } from "./_proposals.styles";
 
 export function MatchBanner({ count, onPress, t }: { count: number; onPress: () => void; t: (k: string) => string }) {
   return (

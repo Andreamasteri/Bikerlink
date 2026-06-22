@@ -31,7 +31,7 @@ import {
   MatchBanner,
   ProposalHeader,
 } from "./_proposals.part2";
-import { styles } from "./proposals.styles";
+import { styles } from "./_proposals.styles";
 
 interface ProposalItem {
   id: string;
