@@ -167,6 +167,42 @@ if [ "$RATCHET_EXIT" -ne 0 ]; then
   exit "$RATCHET_EXIT"
 fi
 
+# ── GATE ROTTE FANTASMA app/(tabs)/ ──────────────────────────
+# Expo Router registra OGNI file in app/(tabs)/ come rotta.
+# Un file helper (.ts senza prefisso _) diventa una tab rotta al boot.
+# Regola: solo .tsx (screens) e file con prefisso _ (privati) sono ammessi.
+# Qualsiasi .ts senza _ deve essere spostato in components/ o lib/.
+# Vedi .agents/memory/expo-tabs-route-pollution.md
+echo "════════════════════════════════════════"
+echo "  Gate rotte fantasma app/(tabs)/"
+echo "════════════════════════════════════════"
+PHANTOM_ROUTES=()
+for _f in "app/(tabs)/"*.ts; do
+  [ -f "$_f" ] || continue
+  _bn=$(basename "$_f")
+  if [[ "$_bn" != _* ]]; then
+    PHANTOM_ROUTES+=("$_bn")
+  fi
+done
+if [ ${#PHANTOM_ROUTES[@]} -eq 0 ]; then
+  echo "✅ Nessun file helper non protetto in app/(tabs)/."
+else
+  echo "❌ File helper senza prefisso _ rilevati in app/(tabs)/:"
+  for _pf in "${PHANTOM_ROUTES[@]}"; do
+    echo "   ⚠️  app/(tabs)/$_pf"
+  done
+  echo ""
+  echo "   Questi file vengono registrati da Expo Router come rotte,"
+  echo "   causando tab fantasma o crash al boot."
+  echo "   → Rinominare con prefisso _ (es. _proposals.styles.ts)"
+  echo "     oppure spostare in components/ o lib/."
+  echo "════════════════════════════════════════"
+  echo ""
+  exit 1
+fi
+echo "════════════════════════════════════════"
+echo ""
+
 # ── GUARD PORTE .replit (MAPPING [[ports]] + DEPLOY) ─────────
 # REGOLA BLOCCANTE (replit.md § Preferenze utente):
 # Nessun agente può modificare [[ports]] senza autorizzazione esplicita utente.

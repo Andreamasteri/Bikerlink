@@ -11,4 +11,6 @@ Any `.ts`/`.tsx` file placed directly in `app/(tabs)/` is auto-registered as a r
 
 **How to apply:** Never co-locate helper files (`*.styles.ts`, `*.types.ts`, `*.helpers.ts`) directly in `app/(tabs)/`. Put them in `components/`, `lib/`, etc. and import via `@/`.
 
+**Automated gate:** `scripts/post-merge.sh` contains a blocking gate ("Gate rotte fantasma app/(tabs)/") that scans `app/(tabs)/*.ts` and fails if any `.ts` file without `_` prefix is found. Gate added 2026-06-22. All files in app/(tabs)/ are currently clean (all helpers use `_` prefix).
+
 **Latent issue (not yet fixed):** the same co-location pattern exists in non-tab route folders (`app/route/[id].styles.ts`, `app/profile/[id].styles.ts`, `app/giri/[id].styles.ts`, `app/navigate/[id].styles.ts`, `app/proposals/create.styles.ts`, `app/admin/analytics.styles.ts`). These are latent broken routes/deeplinks but invisible because those navigators are stacks, not the custom tab bar. Clean up if navigation weirdness appears.
