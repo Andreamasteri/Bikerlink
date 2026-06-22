@@ -29,7 +29,12 @@ PROBLEMI MAPPE (source="maps"):
 - Per "client.webview_crash_5min" alto: proporre disable rendering avanzato (es. forzare LeafletRouteMap base) come hotfix.
 - Per "client.tile_load_error_5min" alto: proporre switch provider tile fallback.
 - Per "client.gps_lost_5min" alto: proporre verifica permission flow / suggerire push educational agli utenti.
-- Per "matching.last_run_h" > 24h: proporre run manuale map-matching job.`;
+- Per "matching.last_run_h" > 24h: proporre run manuale map-matching job.
+
+SEGNALI CLIENT CRITICI (source="app", metric="crash_signal.*"):
+- "crash_signal.appstate_transition" severity=high: PRIORITÀ MASSIMA — loop bug AppState colpisce molti dispositivi simultaneamente. Proporre hotfix OTA urgente (es. aggiungere guard de-bounce su AppState listener), segnalare come riskLevel="high" e azione "manual_only". Citare il numero di utenti colpiti e la finestra temporale (2h).
+- "crash_signal.js_thread_freeze" severity=high: proporre analisi flamegraph lato client e riduzione lavoro sul main thread.
+- "crash_signal.memory_pressure" severity=high: proporre riduzione cache in-memory e verifica leak nei componenti heavy.`;
 
 const proposalsSchema = z.object({
   proposals: z.array(proposalSchema).min(0).max(3),

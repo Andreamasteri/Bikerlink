@@ -9,6 +9,7 @@ import { isWatchdogEnabled } from "./kill-switch";
 import { startWeeklyReportScheduler } from "./weekly-report";
 import { cleanupMapsTelemetry } from "./maps-telemetry-store";
 import { runMapsHealthChecks } from "./maps-health-checks";
+import { sendSystemAlertPushToAdmins } from "../../push-notifications-admin";
 
 const TICK_MS = 60_000;
 const CLEANUP_MS = 60 * 60_000;
@@ -19,6 +20,9 @@ const PROPOSER_COOLDOWN_MS = 60 * 60_000;
 let tickTimer: NodeJS.Timeout | null = null;
 let cleanupTimer: NodeJS.Timeout | null = null;
 let lastProposerRunAt = 0;
+// Cooldown push appstate_transition: condivide la stessa durata del proposer
+// per evitare spam notifiche durante un loop-bug prolungato.
+let lastAppstateAlertSentAt = 0;
 
 let lastError: { at: string; message: string } | null = null;
 let totalCycles = 0;
@@ -54,6 +58,49 @@ async function tick(): Promise<void> {
       } else {
         console.log(
           `[watchdog/proposer] skip cooldown — problemi rilevati ma AI non richiamata (riprova tra ${cooldownRemainingSec}s)`,
+        );
+      }
+    }
+
+    // Push admin proattiva per loop appstate_transition: se il segnale supera
+    // la soglia "high" (≥500 eventi, ≥20 utenti in 2h) notifica subito gli admin
+    // senza aspettare che aprano il pannello System Health.
+    // Cooldown: 1 notifica ogni PROPOSER_COOLDOWN_MS (60 min) per evitare spam.
+    const appstateHighProblem = snap.problems.find(
+      (p) => p.id === "app.crash_signal.appstate_transition" && p.severity === "high",
+    );
+    if (appstateHighProblem) {
+      const now = Date.now();
+      if (now - lastAppstateAlertSentAt >= PROPOSER_COOLDOWN_MS) {
+        try {
+          const sent = await sendSystemAlertPushToAdmins(
+            "🔴 Loop AppState rilevato",
+            appstateHighProblem.title,
+            {
+              type: "watchdog_appstate_loop",
+              problemId: appstateHighProblem.id,
+              severity: appstateHighProblem.severity,
+            },
+          );
+          // Aggiorna il cooldown indipendentemente da `sent`: anche se nessun
+          // admin ha un token push attivo, non ha senso riprovare ogni tick.
+          lastAppstateAlertSentAt = now;
+          if (sent > 0) {
+            console.warn(
+              `[watchdog/scheduler] push appstate_loop inviata a ${sent} admin`,
+            );
+          } else {
+            console.log(
+              "[watchdog/scheduler] push appstate_loop: nessun admin con token push attivo",
+            );
+          }
+        } catch (pushErr) {
+          console.warn("[watchdog/scheduler] push appstate_loop error (non-fatal):", pushErr);
+        }
+      } else {
+        const remainSec = Math.ceil((PROPOSER_COOLDOWN_MS - (now - lastAppstateAlertSentAt)) / 1000);
+        console.log(
+          `[watchdog/scheduler] push appstate_loop in cooldown — riprova tra ${remainSec}s`,
         );
       }
     }
