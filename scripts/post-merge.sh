@@ -731,6 +731,22 @@ else
   echo "✅ ESLint rule no-part-nav presente (copertura template-literal)."
 fi
 
+# Self-check E: run the no-part-nav unit test suite to verify the rule itself.
+if [ ! -f "scripts/eslint-rules/no-part-nav.test.js" ]; then
+  echo "⚠️  Guard self-check E FALLITO — scripts/eslint-rules/no-part-nav.test.js mancante."
+  echo "   Il test della regola ESLint no-part-nav non è presente."
+  echo "   Ripristinare il file dal repo."
+  exit 1
+fi
+if ! node scripts/eslint-rules/no-part-nav.test.js; then
+  echo "❌ Guard self-check E FALLITO — no-part-nav.test.js ha riportato errori."
+  echo "   La regola ESLint no-part-nav potrebbe essere rotta."
+  echo "   Correggere scripts/eslint-rules/no-part-nav.js prima del merge."
+  exit 1
+else
+  echo "✅ ESLint rule no-part-nav: tutti i test passati."
+fi
+
 # Self-check A: the guard regex must detect router.push form.
 _SELFCHECK_LINE_A='  router.push("/giri/1.part2");'
 _SELFCHECK_HIT_A=$(printf '%s\n' "$_SELFCHECK_LINE_A" | grep -E '(router\.(push|replace|navigate)|href=|Linking\.(open|openURL)|[^a-zA-Z_](push|replace|navigate)\()' | grep -E '\.part[0-9]' || true)
