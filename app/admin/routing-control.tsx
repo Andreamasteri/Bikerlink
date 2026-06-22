@@ -70,7 +70,6 @@ export default function RoutingControlScreen() {
   });
 
   const enabled = data?.killSwitch.enabled ?? false;
-  const envOverride = data?.killSwitch.envOverride ?? null;
   const m = data?.metrics;
 
   return (
@@ -104,25 +103,9 @@ export default function RoutingControlScreen() {
             onValueChange={(val) => killSwitchMutation.mutate(val)}
             trackColor={{ false: Colors.border, true: Colors.success + "88" }}
             thumbColor={enabled ? Colors.success : Colors.textSecondary}
-            disabled={killSwitchMutation.isPending || isLoading || envOverride === "forced-off"}
+            disabled={killSwitchMutation.isPending || isLoading}
           />
         </View>
-        {envOverride === "forced-on" && (
-          <View style={styles.envBannerInfo}>
-            <MaterialCommunityIcons name="information-outline" size={14} color={Colors.accent} />
-            <Text style={styles.envBannerInfoText}>
-              Env ROUTING_DISABLED=0 — routing forzato ON. Il toggle imposta il valore DB (ha effetto dopo la rimozione dell'env).
-            </Text>
-          </View>
-        )}
-        {envOverride === "forced-off" && (
-          <View style={styles.envBannerWarn}>
-            <MaterialCommunityIcons name="alert" size={14} color={Colors.error} />
-            <Text style={styles.envBannerWarnText}>
-              Env ROUTING_DISABLED forza il routing SPENTO. Rimuovi la variabile d'ambiente per riabilitare il toggle.
-            </Text>
-          </View>
-        )}
       </View>
 
       {/* Test routing */}

@@ -9,7 +9,7 @@ import React from "react";
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from "react-native";
 import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
-import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 import { ValhallaBenchCard } from "@/components/admin/ValhallaBenchCard";
@@ -63,13 +63,7 @@ export default function RoutingHubScreen() {
           <View style={{ flex: 1 }}>
             <Text style={styles.killTitle}>{enabled ? "ATTIVO" : "DISABILITATO"}</Text>
             <Text style={styles.killSub}>
-              {data?.killSwitch.envOverride === "forced-on"
-                ? "Forzato ON via env ROUTING_DISABLED=0"
-                : data?.killSwitch.envOverride === "forced-off"
-                ? "Forzato OFF via env ROUTING_DISABLED"
-                : enabled
-                ? "Routing operativo (toggle soft)"
-                : "Routing bloccato (toggle soft)"}
+              {enabled ? "Routing operativo (toggle soft)" : "Routing bloccato (toggle soft)"}
             </Text>
           </View>
           {isLoading && <ActivityIndicator color={Colors.accent} />}
@@ -152,16 +146,6 @@ export default function RoutingHubScreen() {
         </View>
       </View>
 
-      {data?.killSwitch.envOverride && (
-        <View style={styles.section}>
-          <View style={styles.warnCard}>
-            <Ionicons name="information-circle" size={18} color={Colors.warning} />
-            <Text style={styles.warnText}>
-              È attivo un override env ROUTING_DISABLED: il toggle soft è ignorato finché l'env resta impostata.
-            </Text>
-          </View>
-        </View>
-      )}
     </ScrollView>
   );
 }
