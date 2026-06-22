@@ -68,15 +68,33 @@ Esempio corretto: `NOMINATIM_URL=https://bikerlink.duckdns.org/nominatim`
 
 **Fix confermato:** usare un singolo `europe-latest.osm.pbf` scaricato direttamente da geofabrik. Stesso file riusabile per Nominatim.
 
-**Build command (struttura validata con test grecia OK):**
+**Build command (validato per europa 33GB PBF):**
 ```bash
-docker run --rm --name bikerlink-valhalla-build --shm-size=4g \
-  -v "$(pwd)/data:/custom_files" -p 8002:8002 \
-  -e use_tiles_ignore_pbf=False -e serve_tiles=True \
-  -e build_admins=True -e build_time_zones=True \
-  -e build_elevation=False -e force_rebuild=True \
-  ghcr.io/gis-ops/docker-valhalla/valhalla:latest
+# SEMPRE in screen (sopravvive al disconnect SSH):
+screen -dmS valhalla-europe bash -c '
+  docker run --rm --name valhalla-europe-build \
+    --shm-size=8g \
+    -v /home/andrea/valhalla/data:/custom_files \
+    -p 8003:8002 \
+    -e tile_urls="file:///custom_files/europe-latest.osm.pbf" \
+    -e serve_tiles=True \
+    -e build_admins=True -e build_time_zones=True \
+    -e build_elevation=False \
+    -e force_rebuild=True \
+    -e update_existing_config=True \
+    -e use_tiles_ignore_pbf=False \
+    ghcr.io/gis-ops/docker-valhalla/valhalla:latest 2>&1 | tee /tmp/valhalla-europe-build.log
+'
 ```
-I tiles vengono scritti in `./data/valhalla_tiles/`. Se la build precedente è crashata: `sudo rm -rf data/valhalla_tiles` prima di ripartire.
+Monitor: `tail -f /tmp/valhalla-europe-build.log` — Stato: `screen -ls` / `docker ps | grep valhalla-europe`
+
+**⚠️ SHM critico:** `--shm-size=8g` obbligatorio per build europa (default 64MB → OOM con 33GB PBF e 16 thread).
+
+**Pulizia tile parziali (file owned da root — NO sudo interattivo via SSH):**
+```bash
+docker run --rm -v /home/andrea/valhalla/data/valhalla_tiles:/tiles alpine sh -c 'rm -rf /tiles/*'
+```
+
+**Produzione** (`bikerlink-valhalla`, port 8002): `cd /home/andrea/bikerlink-valhalla && docker compose -f docker-compose.valhalla.yml up -d`
 
 **GH containers usano profiles ("areas", codice)** — NON partono con `docker compose up -d` generico; specificarli per nome o usare `docker compose up -d graphhopper-<codice>`.
