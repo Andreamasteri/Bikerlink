@@ -10,7 +10,7 @@ import * as FileSystem from "expo-file-system/legacy";
 import * as Sharing from "expo-sharing";
 import Colors from "@/constants/colors";
 import { getApiUrl, queryClient, apiRequest, authFetchHeaders } from "@/lib/query-client";
-import { ExportProgressCard, ExportHistoryList } from "./exports.part2";
+import { ExportProgressCard, ExportHistoryList } from "./_exports.part2";
 import { styles } from "@/components/admin/exports.styles";
 
 export type ExportSchedule = "off" | "daily" | "weekly";

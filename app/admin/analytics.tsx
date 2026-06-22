@@ -14,7 +14,7 @@ import { PendingReportsModal } from "@/components/admin/analytics/PendingReports
 import { UserStatsContent } from "@/components/admin/analytics/UserStatsContent";
 import { styles } from "@/components/admin/analytics.styles";
 import { SessionsSection } from "@/components/admin/analytics/SessionsSection";
-import { FunnelContent, SkipCharts } from "./analytics.part2";
+import { FunnelContent, SkipCharts } from "./_analytics.part2";
 
 interface Analytics {
   totalUsers: number;

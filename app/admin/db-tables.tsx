@@ -13,7 +13,7 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
 import { apiRequest, queryClient } from "@/lib/query-client";
-import { DbTableRow } from "./db-tables.part2";
+import { DbTableRow } from "./_db-tables.part2";
 import { makeStyles } from "@/components/admin/db-tables.styles";
 
 export interface TableSizeRow {

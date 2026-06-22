@@ -14,7 +14,7 @@ import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 import { apiRequest } from "@/lib/query-client";
-import { MusicAffinityStatsContent } from "./matching-hub.part2";
+import { MusicAffinityStatsContent } from "./_matching-hub.part2";
 import { styles } from "@/components/admin/matching-hub.styles";
 
 export interface AuditIssue {

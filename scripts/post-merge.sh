@@ -220,6 +220,8 @@ echo ""
 #           app/admin/telemetry-user/) sono ammessi SOLO:
 #             index.tsx, _layout.tsx, file che matchano [param].tsx
 #           Tutto il resto (Card.tsx, Row.tsx, ecc.) va in components/.
+# REGOLA 3: nessun file *.part[0-9]*.tsx o *.next.tsx senza prefisso _ in app/
+#           (pattern overflow/continuazione screen) — rinominarli _*.part*.tsx.
 # Vedi .agents/memory/expo-tabs-route-pollution.md
 echo "════════════════════════════════════════"
 echo "  Gate rotte fantasma stack app/**"
@@ -249,6 +251,16 @@ done < <(find app -mindepth 3 -maxdepth 4 -type f -name '*.tsx' \
            ! -path 'app/(tabs)/*' \
            ! -path 'app/(auth)/*')
 
+# Regola 3 — file *.part[0-9]*.tsx e *.next.tsx senza prefisso _ in TUTTA app/
+#   Questi file di overflow/continuazione devono avere prefisso _ per essere
+#   ignorati da Expo Router come route. Es: _analytics.part2.tsx, _[id].part3.tsx
+while IFS= read -r _f; do
+  _bn=$(basename "$_f")
+  # già prefissati con _ → OK
+  [[ "$_bn" == _* ]] && continue
+  STACK_PHANTOM+=("$_f")
+done < <(find app -type f \( -name '*.part[0-9]*.tsx' -o -name '*.next.tsx' \))
+
 if [ ${#STACK_PHANTOM[@]} -eq 0 ]; then
   echo "✅ Nessun file helper nelle cartelle stack di app/."
 else
@@ -258,7 +270,8 @@ else
   done
   echo ""
   echo "   Expo Router registra QUALSIASI .ts/.tsx in app/ come rotta."
-  echo "   → Spostare il file in components/ o lib/ e aggiornare gli import."
+  echo "   → File .part*.tsx/.next.tsx: rinominare con prefisso _ (es. _foo.part2.tsx)."
+  echo "   → Altri helper: spostare in components/ o lib/ e aggiornare gli import."
   echo "════════════════════════════════════════"
   echo ""
   exit 1

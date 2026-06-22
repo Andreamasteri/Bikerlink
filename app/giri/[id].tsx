@@ -23,14 +23,14 @@ import { decodePolyline } from "@/lib/polyline";
 
 // Components
 import { GiriHeader } from "@/components/giri/detail/GiriHeader";
-import { GiriMap, GiriStats, GiriElevation, GiriWeather, GiriParticipants } from "./[id].part3";
-import { GiriActions, GiriOfflineCard, GiriMultiDayInfo } from "./[id].part4";
+import { GiriMap, GiriStats, GiriElevation, GiriWeather, GiriParticipants } from "./_[id].part3";
+import { GiriActions, GiriOfflineCard, GiriMultiDayInfo } from "./_[id].part4";
 import {
   makeStyles as styles,
   weatherIcon,
   bikerScoreColor,
   styleLabel,
-} from "./[id].part2";
+} from "./_[id].part2";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 

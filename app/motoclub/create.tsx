@@ -19,7 +19,7 @@ import Colors from "@/constants/colors";
 import { getApiUrl } from "@/lib/query-client";
 import LeafletPickerMap from "@/components/LeafletPickerMap";
 import { t } from "@/lib/i18n";
-import { InviteStep, SummaryStep } from "./create.part2";
+import { InviteStep, SummaryStep } from "./_create.part2";
 
 export type Club = { id: string; name: string; clubType: string };
 export type UserResult = { id: string; nickname: string; userType: string };

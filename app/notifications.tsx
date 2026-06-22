@@ -15,7 +15,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
 import { apiRequest } from "@/lib/query-client";
 import { useT } from "@/lib/language-context";
-import { NotificationItem } from "./notifications.part2";
+import { NotificationItem } from "./_notifications.part2";
 import { styles } from "@/components/notifications/notifications-styles";
 
 export interface AppNotification {

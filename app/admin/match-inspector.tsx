@@ -21,7 +21,7 @@ import {
   userTypeColor,
   userTypeLabel,
   userRoleText,
-} from "./match-inspector.part2";
+} from "./_match-inspector.part2";
 
 interface InspectorUser {
   id: string;

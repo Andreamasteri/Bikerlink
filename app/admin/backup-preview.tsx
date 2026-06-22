@@ -13,7 +13,7 @@ import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
 import { getApiUrl } from "@/lib/query-client";
 import { AdminUser, UserCard } from "@/components/admin/users/UserCard";
-import { BackupBanner, BackupUserDetailModal } from "./backup-preview.part2";
+import { BackupBanner, BackupUserDetailModal } from "./_backup-preview.part2";
 import { styles } from "@/components/admin/backup-preview.styles";
 
 export interface BackupSummaryItem {

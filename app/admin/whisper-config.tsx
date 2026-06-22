@@ -15,7 +15,7 @@ import { getApiUrl, authFetchHeaders } from "@/lib/query-client";
 import Colors from "@/constants/colors";
 import { styles } from "@/components/admin/whisper-config.styles";
 import { WhisperWatchdogBadge, type WhisperHealthData } from "@/components/admin/WhisperWatchdogBadge";
-import { WhisperDiagSteps } from "./whisper-config.part2";
+import { WhisperDiagSteps } from "./_whisper-config.part2";
 
 export type SttProviderId = "home" | "groq" | "openai";
 

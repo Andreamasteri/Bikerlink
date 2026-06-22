@@ -15,7 +15,7 @@ import Colors from "@/constants/colors";
 import { apiRequest, queryClient } from "@/lib/query-client";
 import { useAuth } from "@/lib/auth-context";
 import { useT, useLocale } from "@/lib/language-context";
-import { ProposalActions } from "./[id].part2";
+import { ProposalActions } from "./_[id].part2";
 import { styles } from "@/components/proposals/proposal-styles";
 
 export interface Participant {

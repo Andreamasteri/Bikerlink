@@ -21,7 +21,7 @@ import { useT } from "@/lib/language-context";
 import { updateUserSchema } from "@shared/validators";
 import { useMutation } from "@tanstack/react-query";
 import { useColors } from "@/hooks/useColors";
-import { RevokeConsentModal } from "./edit.part2";
+import { RevokeConsentModal } from "./_edit.part2";
 import { makeStyles } from "@/components/profile/edit.styles";
 
 import { EditBasicInfo } from "@/components/profile/edit/EditBasicInfo";

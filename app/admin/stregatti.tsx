@@ -3,8 +3,8 @@ import { View, Text, TouchableOpacity, Alert } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
 import { getApiUrl, queryClient } from "@/lib/query-client";
-import { StregattiPart2 } from "./stregatti.part2";
-import { StregattaList } from "./stregatti.part4";
+import { StregattiPart2 } from "./_stregatti.part2";
+import { StregattaList } from "./_stregatti.part4";
 import { StregattaMap } from "@/components/admin/stregatti/StregattaMap";
 import { styles } from "@/components/admin/stregatti/stregatti.styles";
 import { 
@@ -12,7 +12,7 @@ import {
   useStregattiQueries, 
   useStregattiMutations,
   useMassSeed
-} from "./stregatti.part5";
+} from "./_stregatti.part5";
 
 export default function FakeUsersAdmin() {
   const {

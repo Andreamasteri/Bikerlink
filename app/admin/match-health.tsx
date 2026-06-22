@@ -372,4 +372,4 @@ export default function MatchHealthScreen() {
   );
 }
 
-import { styles } from "./match-health.part2";
+import { styles } from "./_match-health.part2";

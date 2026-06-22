@@ -16,7 +16,7 @@ import Colors from "@/constants/colors";
 import { t, getCurrentLocale } from "@/lib/i18n";
 import { useUnits } from "@/lib/units-context";
 import { formatDistance, formatSpeed, formatDateTime, convertSpeed } from "@/lib/units";
-import { StatCard, SparklineChart } from "./[id].part2";
+import { StatCard, SparklineChart } from "./_[id].part2";
 import { styles } from "@/components/route/route-styles";
 
 interface RouteDetail {
