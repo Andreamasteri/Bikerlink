@@ -310,7 +310,7 @@ services:
     restart: unless-stopped
     profiles: ["whisper"]
     environment:
-      ASR_MODEL: ${WHISPER_MODEL:-small}
+      ASR_MODEL: ${WHISPER_MODEL:-large-v2}
       ASR_ENGINE: ${WHISPER_ENGINE:-faster_whisper}
     ports:
       - "127.0.0.1:8080:9000"
