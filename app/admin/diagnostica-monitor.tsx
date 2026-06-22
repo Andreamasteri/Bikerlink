@@ -5,7 +5,7 @@ import {
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import Colors from "@/constants/colors";
-import s from "./diagnostica-styles";
+import s from "./_diagnostica-styles";
 import {
   PipelineHole, HolesResult, PipelineRunResult,
   adminFetch, overallColor, statusColor, timeAgo, ageLabel,

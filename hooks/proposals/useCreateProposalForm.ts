@@ -13,7 +13,7 @@ import {
   formatTimeInput,
   autoCompleteTime,
   parseDateAndTime,
-} from "@/app/proposals/create.helpers";
+} from "@/app/proposals/_create.helpers";
 import type { AiRouteResult } from "@/components/proposals/create/AiPlanModal";
 import type { LoadedRouteResult } from "@/components/proposals/create/LoadRouteModal";
 

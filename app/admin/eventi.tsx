@@ -20,7 +20,7 @@ import { apiRequest, queryClient, getApiUrl } from "@/lib/query-client";
 import type { EventDTO, EventStatus } from "@/shared/event-types";
 import { useT } from "@/lib/language-context";
 import { EventAdminCard } from "./eventi.part2";
-import { styles } from "./eventi.styles";
+import { styles } from "./_eventi.styles";
 
 function getStatusLabels(t: (k: string) => string): Record<EventStatus, string> {
   return {

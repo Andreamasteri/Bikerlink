@@ -2,7 +2,7 @@ import React from "react";
 import { View, Text, TouchableOpacity } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
-import { styles } from "./whisper-config.styles";
+import { styles } from "./_whisper-config.styles";
 import type { DiagStep } from "./whisper-config";
 
 export function WhisperDiagSteps({

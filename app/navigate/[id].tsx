@@ -5,7 +5,7 @@ import { NavigationInstruction } from "@/components/navigate/NavigationInstructi
 import { NavigationWeather } from "@/components/navigate/NavigationWeather";
 import { NavigationFinished } from "@/components/navigate/NavigationFinished";
 import { NavigationOfflineBanners } from "@/components/navigate/NavigationOfflineBanners";
-import { signToIcon, formatDistance, formatDuration } from "./[id].helpers";
+import { signToIcon, formatDistance, formatDuration } from "./_[id].helpers";
 import { makeStyles } from "@/components/navigate/[id].styles";
 import { useNavigateState } from "@/hooks/navigate/useNavigateState";
 import { useRouter } from "expo-router";

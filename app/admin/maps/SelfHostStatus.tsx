@@ -4,7 +4,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
 import Colors from "@/constants/colors";
 import { apiRequest } from "@/lib/query-client";
-import { styles } from "./SelfHostStatus.styles";
+import { styles } from "./_SelfHostStatus.styles";
 import { formatTime, ErrorTypeIcon, ErrorTypeLabel, formatDuration } from "./SelfHostStatus.part2";
 
 interface RoutingHistoryResponse {

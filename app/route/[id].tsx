@@ -17,7 +17,7 @@ import { t, getCurrentLocale } from "@/lib/i18n";
 import { useUnits } from "@/lib/units-context";
 import { formatDistance, formatSpeed, formatDateTime, convertSpeed } from "@/lib/units";
 import { StatCard, SparklineChart } from "./[id].part2";
-import { styles } from "./[id].styles";
+import { styles } from "./_[id].styles";
 
 interface RouteDetail {
   id: string;

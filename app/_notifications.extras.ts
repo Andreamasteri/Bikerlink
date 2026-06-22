@@ -6,7 +6,7 @@
 //
 // Come usarlo:
 //   1. Definire qui la nuova funzione/componente/stile con `export`.
-//   2. Importarla in notifications.tsx: import { ... } from "./notifications.extras".
+//   2. Importarla in notifications.tsx: import { ... } from "./_notifications.extras".
 //   3. notifications.tsx rimane sotto soglia; questo file cresce al suo posto.
 
 export {};

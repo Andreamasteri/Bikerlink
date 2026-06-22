@@ -14,7 +14,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
 import { apiRequest, queryClient } from "@/lib/query-client";
 import { DbTableRow } from "./db-tables.part2";
-import { makeStyles } from "./db-tables.styles";
+import { makeStyles } from "./_db-tables.styles";
 
 export interface TableSizeRow {
   name: string;

@@ -2,7 +2,7 @@ import React from "react";
 import { View, Text, TouchableOpacity, ScrollView, TextInput, ActivityIndicator } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
-import { styles } from "./create.styles";
+import { styles } from "./_create.styles";
 import type { UserResult } from "./create";
 
 export function SummaryStep({ 

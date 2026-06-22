@@ -28,7 +28,7 @@ import { apiRequest } from "@/lib/query-client";
 import type {
   FunctionEnginesResponse,
   RoutingFunctionId,
-} from "./routing-control/types";
+} from "./routing-control/_types";
 
 const ENGINE_LABELS: Record<string, string> = {
   graphhopper: "GraphHopper",

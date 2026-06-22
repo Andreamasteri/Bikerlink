@@ -3,7 +3,7 @@ import { View, Text } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import Svg, { Polyline } from "react-native-svg";
 import Colors from "@/constants/colors";
-import { styles } from "./[id].styles";
+import { styles } from "./_[id].styles";
 
 export function SparklineChart({
   values,

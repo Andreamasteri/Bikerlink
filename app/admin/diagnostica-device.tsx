@@ -8,7 +8,7 @@ import * as FileSystem from "expo-file-system/legacy";
 import * as Sharing from "expo-sharing";
 import Colors from "@/constants/colors";
 import { getApiUrl, authFetchHeaders } from "@/lib/query-client";
-import s from "./diagnostica-styles";
+import s from "./_diagnostica-styles";
 import { DiagnosticReport, adminFetch, timeAgo } from "./diagnostica-types";
 
 async function downloadDiagnosticsExport(): Promise<void> {

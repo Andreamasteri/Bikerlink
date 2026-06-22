@@ -19,7 +19,7 @@ import { apiRequest } from "@/lib/query-client";
 import { CycleMetaCard } from "@/components/admin/matching/CycleMetaCard";
 import { LockCard } from "@/components/admin/matching/LockCard";
 import { StatsTable } from "@/components/admin/matching/StatsTable";
-import { styles } from "./match-control/styles";
+import { styles } from "./match-control/_styles";
 import { FreshnessSlider } from "./match-control/FreshnessSlider";
 import { EngineActionsCard } from "./match-control/EngineActionsCard";
 import {
@@ -29,7 +29,7 @@ import {
   MatchSettingsResponse,
   MatchingStatsResponse,
   LockStateResponse,
-} from "./match-control/types";
+} from "./match-control/_types";
 
 export default function MatchControlScreen() {
   const insets = useSafeAreaInsets();

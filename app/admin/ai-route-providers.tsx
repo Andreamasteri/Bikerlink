@@ -25,8 +25,8 @@ import {
   RouteProviderId, StatusResp, PingResult,
   ProviderPing, ProviderStat, PROVIDER_ICONS, PROVIDER_COLORS, PROVIDER_DESC,
   ALL_PROVIDERS,
-} from './ai-route-providers.constants';
-import { styles } from './ai-route-providers.styles';
+} from './_ai-route-providers.constants';
+import { styles } from './_ai-route-providers.styles';
 
 export default function AiRouteProvidersScreen() {
   const insets = useSafeAreaInsets();

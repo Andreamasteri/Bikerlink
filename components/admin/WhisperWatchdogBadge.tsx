@@ -1,7 +1,7 @@
 import React from "react";
 import { View, Text } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { styles } from "@/app/admin/whisper-config.styles";
+import { styles } from "@/app/admin/_whisper-config.styles";
 
 export type WatchdogStatus = "OK" | "DEGRADED" | "DOWN" | "UNKNOWN";
 

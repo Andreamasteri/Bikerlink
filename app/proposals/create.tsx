@@ -6,7 +6,7 @@ import { MaterialCommunityIcons, Ionicons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
 import MapPickerContent from "@/components/MapPickerModal";
 import { styles } from "@/components/proposals/create.styles";
-import { formatDateDDMMYYYY } from "./create.helpers";
+import { formatDateDDMMYYYY } from "./_create.helpers";
 import { ProposalTypeSelector } from "@/components/proposals/create/ProposalTypeSelector";
 import { ProposalBasicInfo } from "@/components/proposals/create/ProposalBasicInfo";
 import { ProposalLocation } from "@/components/proposals/create/ProposalLocation";

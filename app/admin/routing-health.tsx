@@ -18,7 +18,7 @@ import { MaterialCommunityIcons, Ionicons, MaterialIcons } from "@expo/vector-ic
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 import { RoutingCloudBanner } from "@/components/admin/RoutingCloudBanner";
-import type { RoutingStatus } from "./routing-control/types";
+import type { RoutingStatus } from "./routing-control/_types";
 import { copyLogToClipboard } from "@/lib/copyAdminLog";
 
 function statusColor(ok: boolean | null, down: boolean): string {

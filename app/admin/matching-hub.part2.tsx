@@ -3,7 +3,7 @@ import React from "react";
 import { View, Text } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
-import { styles } from "./matching-hub.styles";
+import { styles } from "./_matching-hub.styles";
 
 interface MusicAffinityRunSnapshot {
   timestamp: string;

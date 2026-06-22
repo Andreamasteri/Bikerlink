@@ -2,7 +2,7 @@ import React from "react";
 import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
 import { MaterialCommunityIcons, Ionicons } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
-import type { RoutingStatus } from "@/app/admin/routing-control/types";
+import type { RoutingStatus } from "@/app/admin/routing-control/_types";
 
 interface Props {
   onPress?: () => void;

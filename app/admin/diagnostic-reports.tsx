@@ -23,7 +23,7 @@ import { DiagnosticReportCard } from "@/components/admin/DiagnosticReportCard";
 import type { Filters } from "@/components/admin/DiagnosticFilterPanel";
 import type { DiagReport, RemoteReqStatus } from "@/components/admin/DiagnosticReportCard";
 import { DiagFilesList } from "./diagnostic-reports.part2";
-import { styles } from "./diagnostic-reports.styles";
+import { styles } from "./_diagnostic-reports.styles";
 
 export interface ActiveUser { userId: string; nickname: string | null; wsConnected: boolean; status?: "online" | "polling" | "offline" }
 export interface ReportsResponse { reports: DiagReport[]; total: number; page: number; limit: number }

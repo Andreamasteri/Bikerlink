@@ -1,6 +1,6 @@
 import React from "react";
 import { Text } from "react-native";
-import { styles } from "./match-inspector-detail.styles";
+import { styles } from "./_match-inspector-detail.styles";
 import type { MatchTypeSection } from "./match-inspector-detail";
 import { MatchTypeCard } from "@/components/admin/match-inspector/MatchTypeCard";
 

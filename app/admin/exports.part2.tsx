@@ -2,7 +2,7 @@ import React from "react";
 import { View, Text, TouchableOpacity, ActivityIndicator } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
-import { styles } from "./exports.styles";
+import { styles } from "./_exports.styles";
 import type { ExportMeta, ExportProgress, ProgressPhase } from "./exports";
 
 export function ExportProgressCard({

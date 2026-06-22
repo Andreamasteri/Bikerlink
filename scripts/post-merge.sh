@@ -203,6 +203,41 @@ fi
 echo "════════════════════════════════════════"
 echo ""
 
+# ── GATE ROTTE FANTASMA cartelle stack app/**/*.ts ───────────
+# Expo Router registra OGNI file .ts/.tsx in app/ come rotta, in modo
+# RICORSIVO (anche nelle cartelle stack: app/profile, app/giri, app/admin…).
+# Un file helper (.ts senza prefisso _) co-locato in queste cartelle non
+# crea una tab visibile, ma diventa un deeplink rotto / rotta senza default
+# export (warning "missing the required default export").
+# Regola: solo .tsx (screens) e file con prefisso _ (privati) sono ammessi.
+# Qualsiasi .ts senza _ deve avere prefisso _ oppure stare in components/lib.
+# Vedi .agents/memory/expo-tabs-route-pollution.md
+echo "════════════════════════════════════════"
+echo "  Gate rotte fantasma stack app/**"
+echo "════════════════════════════════════════"
+STACK_PHANTOM=()
+while IFS= read -r _f; do
+  [ -n "$_f" ] && STACK_PHANTOM+=("$_f")
+done < <(find app -type f -name '*.ts' ! -name '*.tsx' ! -path 'app/(tabs)/*' ! -name '_*')
+if [ ${#STACK_PHANTOM[@]} -eq 0 ]; then
+  echo "✅ Nessun file helper non protetto nelle cartelle stack di app/."
+else
+  echo "❌ File helper senza prefisso _ rilevati in app/ (fuori da (tabs)):"
+  for _pf in "${STACK_PHANTOM[@]}"; do
+    echo "   ⚠️  $_pf"
+  done
+  echo ""
+  echo "   Expo Router li registra come rotte (ricorsivo), causando"
+  echo "   deeplink rotti o errori 'no default export'."
+  echo "   → Rinominare con prefisso _ (es. _edit.styles.ts)"
+  echo "     oppure spostare in components/ o lib/."
+  echo "════════════════════════════════════════"
+  echo ""
+  exit 1
+fi
+echo "════════════════════════════════════════"
+echo ""
+
 # ── GUARD PORTE .replit (MAPPING [[ports]] + DEPLOY) ─────────
 # REGOLA BLOCCANTE (replit.md § Preferenze utente):
 # Nessun agente può modificare [[ports]] senza autorizzazione esplicita utente.

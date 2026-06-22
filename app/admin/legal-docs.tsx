@@ -10,7 +10,7 @@ import {
   Modal,
   Linking,
 } from "react-native";
-import { styles } from "./legal-docs.styles";
+import { styles } from "./_legal-docs.styles";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as DocumentPicker from "expo-document-picker";

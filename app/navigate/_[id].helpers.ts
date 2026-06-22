@@ -1,6 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Ionicons } from "@expo/vector-icons";
-import type { NavigationStep, PlannedRoute } from "./[id].types";
+import type { NavigationStep, PlannedRoute } from "./_[id].types";
 
 // ─── Route cache helpers ───────────────────────────────────────────────────────
 

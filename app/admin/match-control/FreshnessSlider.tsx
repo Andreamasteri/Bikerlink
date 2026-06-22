@@ -3,7 +3,7 @@ import React, { useEffect, useState } from "react";
 import { View, Text } from "react-native";
 import Slider from "@react-native-community/slider";
 import Colors from "@/constants/colors";
-import { styles } from "./styles";
+import { styles } from "./_styles";
 
 export function FreshnessSlider({
   label,

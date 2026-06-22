@@ -19,8 +19,8 @@ import { MatchingMonitorCard } from "@/components/admin/MatchingMonitorCard";
 import { DbPoolCard } from "@/components/admin/DbPoolCard";
 import { SystemHealthContainer } from "@/components/admin/SystemHealthContainer";
 import type { SystemStatuses, DotStatus } from "@/components/admin/SystemHealthContainer";
-import { adminGroups, OPEN_BY_DEFAULT } from "./admin-groups";
-import type { AdminItem, AdminGroup } from "./admin-types";
+import { adminGroups, OPEN_BY_DEFAULT } from "./_admin-groups";
+import type { AdminItem, AdminGroup } from "./_admin-types";
 
 function renderIcon(item: AdminItem, size = 28, color = Colors.accent) {
   switch (item.iconSet) {
