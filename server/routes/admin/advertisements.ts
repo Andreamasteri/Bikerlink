@@ -43,7 +43,7 @@ async function uploadAdImageToObjectStorage(buffer: Buffer, originalname: string
   return `/api/ads/images/${filename}`;
 }
 
-async function deleteAdImageIfUnreferenced(filename: string, excludeIds: string[]): Promise<void> {
+export async function deleteAdImageIfUnreferenced(filename: string, excludeIds: string[]): Promise<void> {
   try {
     // Check DB: any campaign (excluding the ones being deleted/updated) still
     // referencing this filename? If yes, keep both the object and the local cache.

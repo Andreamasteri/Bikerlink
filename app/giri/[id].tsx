@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useState, useMemo } from "react";
 import {
   View,
@@ -83,16 +84,14 @@ export default function GiriDetailScreen() {
 
   const [weather, setWeather] = useState<WeatherWaypoint[] | null>(null);
   const [weatherLoading, setWeatherLoading] = useState(false);
-  const [pois, setPois] = useState<POI[] | null>(null);
-  const [poisLoading, setPoisLoading] = useState(false);
-  const [selectedPOI, setSelectedPOI] = useState<POI | null>(null);
+  const [_pois, setPois] = useState<POI[] | null>(null);
+  const [_poisLoading, setPoisLoading] = useState(false);
+  const [_selectedPOI, _setSelectedPOI] = useState<POI | null>(null);
   const [matchBikers, setMatchBikers] = useState<CompatibleBiker[] | null>(null);
   const [matchLoading, setMatchLoading] = useState(false);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- hotel data from API
   const [hotels, setHotels] = useState<any[] | null>(null);
   const [hotelsLoading, setHotelsLoading] = useState(false);
   const [matchBannerDismissed, setMatchBannerDismissed] = useState(false);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- elevation data from API
   const [elevation, setElevation] = useState<any | null>(null);
   const [elevationLoading, setElevationLoading] = useState(false);
   const [elevationError, setElevationError] = useState(false);
@@ -139,7 +138,6 @@ export default function GiriDetailScreen() {
     mutationFn: () => apiRequest("DELETE", `/api/planned-routes/${id}`),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["/api/planned-routes"] });
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- dynamic route path
       router.replace("/(tabs)/giri" as any);
     },
     onError: () => Alert.alert("Errore", "Impossibile eliminare il giro."),
@@ -181,7 +179,6 @@ export default function GiriDetailScreen() {
     });
   }, [route]);
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- WebView message event
   const handleWebViewMessage = (event: any) => {
     try {
       const msg = JSON.parse(event.nativeEvent.data);
@@ -233,7 +230,7 @@ export default function GiriDetailScreen() {
     } finally { setWeatherLoading(false); }
   };
 
-  const handleLoadPOI = async () => {
+  const _handleLoadPOI = async () => {
     if (!route?.waypoints?.length) return;
     setPoisLoading(true);
     try {

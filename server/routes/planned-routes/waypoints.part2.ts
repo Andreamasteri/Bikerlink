@@ -1,5 +1,6 @@
 
 import { Request, Response } from "express";
+import { requireAuth } from "./utils";
 import { sendError } from "../../lib/api-response";
 import { calculateRouteRequestSchema } from "@shared/validators";
 import { extractElevationProfile } from "./waypoints-helpers";

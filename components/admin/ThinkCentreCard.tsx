@@ -5,7 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { getApiUrl, authFetchHeaders } from "@/lib/query-client";
 import Colors from "@/constants/colors";
 import { styles } from "./ThinkCentreCardStyles";
-import { EventLog, GraphHopperBlock } from "./ThinkCentreCardParts";
+import { GraphHopperBlock } from "./ThinkCentreCardParts";
 import type { HealthEvent, AreaServiceHealth, ProbeLogEntry } from "./ThinkCentreCardParts";
 import { ServiceBadgeStrip } from "./ThinkCentreServiceBadge";
 import { ValhallaBlock, NominatimBlock, UfwBlock } from "./ThinkCentreValhallaNominatimBlocks";
@@ -19,7 +19,7 @@ import {
   NginxBlock,
   UptimeKumaBlock,
 } from "./ThinkCentreInfraBlocks";
-import type { DotStatus, SystemStatuses } from "./SystemHealthContainer";
+import type { SystemStatuses } from "./SystemHealthContainer";
 import { useThinkCentreToggles } from "./ThinkCentreCardToggles";
 import {
   ThinkCentreFooter,

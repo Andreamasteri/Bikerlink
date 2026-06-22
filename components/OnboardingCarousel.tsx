@@ -2,11 +2,10 @@ import React, { useRef, useState, useCallback, useEffect } from "react";
 import {
   View,
   Text,
-  StyleSheet,
+
   FlatList,
   Image,
   Pressable,
-  Platform,
   useWindowDimensions,
   ListRenderItemInfo,
 } from "react-native";

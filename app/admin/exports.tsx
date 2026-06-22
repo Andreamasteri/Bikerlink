@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import {
-  View, Text, StyleSheet, TouchableOpacity, ScrollView,
+  View, Text, TouchableOpacity, ScrollView,
   ActivityIndicator, Alert, Switch,
 } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";

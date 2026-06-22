@@ -39,6 +39,10 @@ export function setMotionEnabled(enabled: boolean) {
   _enabled = enabled;
 }
 
+export function isMotionEnabled(): boolean {
+  return _enabled;
+}
+
 export function getMotionStats() {
   return { _lastCycleAt, _totalCycles, _lastCycleDurationMs };
 }

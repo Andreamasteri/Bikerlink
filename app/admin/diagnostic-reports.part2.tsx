@@ -1,7 +1,6 @@
 import React from "react";
 import { View, Text, TouchableOpacity, ActivityIndicator } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import Colors from "@/constants/colors";
 import { styles } from "./diagnostic-reports.styles";
 import type { DiagFileEntry } from "./diagnostic-reports";
 

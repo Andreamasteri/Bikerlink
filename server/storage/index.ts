@@ -391,6 +391,15 @@ export interface IStorage {
   deleteTextAlias(id: string): Promise<boolean>;
 }
 
-export class DatabaseStorage extends FakeUsersStorage implements IStorage {}
+export class DatabaseStorage extends FakeUsersStorage implements IStorage {
+  async archiveStaleProposalProfileMatches(afterDays?: number): Promise<number> {
+    const { archiveStaleProposalProfileMatches } = await import("./matching.part2");
+    return archiveStaleProposalProfileMatches(afterDays);
+  }
+  async reactivateProposalProfileMatch(id: string, userId: string): Promise<boolean> {
+    const { reactivateProposalProfileMatch } = await import("./matching.part2");
+    return reactivateProposalProfileMatch(id, userId);
+  }
+}
 
 export const storage: IStorage = new DatabaseStorage();

@@ -1,9 +1,9 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import React from "react";
-import { View, Text, TouchableOpacity, ScrollView, ActivityIndicator, Pressable, Share, Alert } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import { View, Text, TouchableOpacity } from "react-native";
 import Colors from "@/constants/colors";
 
-export function GiriActions({ onNavigate, onOpenGoogleMaps, onOpenWaze, onOpenAppleMaps, onExportGPX, onExportKML, onShare }: any) {
+export function GiriActions({ onNavigate, onOpenGoogleMaps, _onOpenWaze, _onOpenAppleMaps, _onExportGPX, _onExportKML, onShare }: any) {
   return (
     <View style={{ gap: 12, marginBottom: 16 }}>
        <TouchableOpacity onPress={onNavigate} style={{ backgroundColor: Colors.accent, padding: 16, borderRadius: 12, alignItems: "center" }}>
@@ -21,7 +21,7 @@ export function GiriActions({ onNavigate, onOpenGoogleMaps, onOpenWaze, onOpenAp
   );
 }
 
-export function GiriOfflineCard({ status, progress, onDownload, onCancel, onDelete }: any) {
+export function GiriOfflineCard({ status, _progress, onDownload, _onCancel, _onDelete }: any) {
   return (
     <View style={{ padding: 16, backgroundColor: Colors.surface, borderRadius: 12, marginBottom: 16 }}>
        <Text style={{ fontWeight: "bold" }}>Mappe Offline</Text>
@@ -31,7 +31,7 @@ export function GiriOfflineCard({ status, progress, onDownload, onCancel, onDele
   );
 }
 
-export function GiriMultiDayInfo({ days, hotels, hotelsLoading, onLoadHotels }: any) {
+export function GiriMultiDayInfo({ days, _hotels, _hotelsLoading, _onLoadHotels }: any) {
   return (
     <View style={{ padding: 16, backgroundColor: Colors.surface, borderRadius: 12 }}>
        <Text style={{ fontWeight: "bold" }}>Giro Multigiorno</Text>

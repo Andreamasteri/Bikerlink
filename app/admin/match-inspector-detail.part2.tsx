@@ -1,7 +1,5 @@
 import React from "react";
-import { View, Text, TouchableOpacity, ScrollView, ActivityIndicator } from "react-native";
-import { MaterialCommunityIcons } from "@expo/vector-icons";
-import Colors from "@/constants/colors";
+import { Text } from "react-native";
 import { styles } from "./match-inspector-detail.styles";
 import type { MatchTypeSection } from "./match-inspector-detail";
 import { MatchTypeCard } from "@/components/admin/match-inspector/MatchTypeCard";

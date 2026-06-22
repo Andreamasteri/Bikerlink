@@ -2,6 +2,7 @@ import type { Response } from "express";
 import type { MapsRollout, RoutingEngineId } from "@shared/maps-config";
 import { ARCHIVED_ROUTING_ENGINES } from "@shared/maps-config";
 import { routeViaGraphHopper, type RouteRequest, type RouteResult } from "./graphhopper-adapter";
+export type { RouteRequest, RouteResult } from "./graphhopper-adapter";
 import { calculateRoute as valhallaCalculateRoute } from "./valhalla-client";
 import { calculateRoute as mapboxCalculateRoute } from "./mapbox-directions-client";
 import { calculateRoute as tomtomCalculateRoute } from "./tomtom-routing-client";
@@ -153,7 +154,7 @@ function isTransientMapboxError(err: unknown): boolean {
 /**
  * Tenta il routing via Valhalla con fallback automatico a GraphHopper.
  */
-async function routeViaValhallaWithFallback(
+export async function routeViaValhallaWithFallback(
   req: RouteRequest,
   isMapTester: boolean,
   res?: Response

@@ -1,6 +1,7 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
-  View, Text, ScrollView, TouchableOpacity, StyleSheet,
+  View, Text, ScrollView, TouchableOpacity,
   ActivityIndicator, RefreshControl, Alert, Platform,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";

@@ -1,4 +1,5 @@
-import { useState, useMemo, Animated, Linking, Alert } from "react-native";
+import { useState, useMemo } from "react";
+import { Animated, Linking, Alert } from "react-native";
 import { InteractiveMapHandle } from "@/components/InteractiveMap";
 import { apiRequest, queryClient } from "@/lib/query-client";
 import { CONTINENT_MAP, getCountryByCode } from "@/lib/countries-regions";
@@ -12,7 +13,7 @@ export function handleFocusAnimation(nickname: string, setFocusToast: (v: string
   ]).start(() => setFocusToast(null));
 }
 
-export function focusMap(mapRef: React.RefObject<InteractiveMapHandle>, lat: number, lng: number, userId?: string) {
+export function focusMap(mapRef: React.RefObject<InteractiveMapHandle | null>, lat: number, lng: number, userId?: string) {
   mapRef.current?.focusOnCoordinate({ latitude: lat, longitude: lng, userId });
 }
 

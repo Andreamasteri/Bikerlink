@@ -1,6 +1,8 @@
 import React from "react";
 import { View, Text, TouchableOpacity, Modal, Pressable } from "react-native";
-import { styles } from "./edit.styles";
+import Colors from "@/constants/colors";
+import { makeStyles } from "./edit.styles";
+const styles = makeStyles(Colors);
 
 export function RevokeConsentModal({
   visible,

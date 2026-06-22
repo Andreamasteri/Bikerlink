@@ -1,6 +1,4 @@
-import { useState, useCallback, useMemo, useRef } from "react";
-import { Alert } from "react-native";
-import { apiRequest, queryClient } from "@/lib/query-client";
+/* eslint-disable @typescript-eslint/no-explicit-any */
 
 export function useAdRotationLogic(allCampaigns: any[], settingsDuration: string, settingsMode: any, setShowSettingsModal: any, updateRotationMutation: any, saveRotationSettings: any) {
   const handleSaveRotation = () => {

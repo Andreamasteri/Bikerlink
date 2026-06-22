@@ -343,6 +343,11 @@ export function getUserSpeedMap() {
   return result;
 }
 
+export function isMotionEnabled(): boolean {
+  const { isMotionEnabled: _isEnabled } = require("./motion-simulator.part2") as { isMotionEnabled: () => boolean };
+  return _isEnabled();
+}
+
 export function getMotionStatus() {
   const { getMotionStates, getMotionStats } = require("./motion-simulator.part2");
   const { _userStates } = getMotionStates();
@@ -358,7 +363,7 @@ export function getMotionStatus() {
     const slot = s.schedule[s.currentSlotIdx];
     if (slot && slot.kind === "drive") {
       movingCount++;
-      profileCounts[s.speedProfile]++;
+      profileCounts[(s as UserMotionState).speedProfile]++;
       speedSum += s.currentSpeedKph;
       speedCount++;
       if (s.offsetLat !== 0 || s.offsetLng !== 0) convoiRiders++;
@@ -421,7 +426,7 @@ export function getPositions() {
   const { getMotionStates } = require("./motion-simulator.part2");
   const { _userStates, _nicknames } = getMotionStates();
   const nowMs = Date.now();
-  return Array.from(_userStates.values()).map(state => {
+  return (Array.from(_userStates.values()) as UserMotionState[]).map((state) => {
     const slotIdx = resolveSlotIdx(state, nowMs);
     const slot = state.schedule[slotIdx];
     const isMoving = !!slot && slot.kind === "drive";

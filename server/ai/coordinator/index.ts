@@ -18,6 +18,7 @@ import {
   type Severity,
 } from "./types";
 import { evaluateConflict as policyEvaluateConflict, evaluateEvent as policyEvaluateEvent } from "./policy-engine";
+import { isAiPaused } from "./index.part2";
 
 type EventCallback = (evt: AiEventBroadcast) => void | Promise<void>;
 

@@ -1,12 +1,10 @@
-import React, { useState, useEffect, useRef } from "react";
+import React from "react";
 import { View, Text, TouchableOpacity, Alert } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { useMutation, useQuery } from "@tanstack/react-query";
 import Colors from "@/constants/colors";
-import { getApiUrl, queryClient, apiRequest } from "@/lib/query-client";
+import { getApiUrl, queryClient } from "@/lib/query-client";
 import { StregattiPart2 } from "./stregatti.part2";
-import { StregattaActions } from "@/components/admin/stregatti/StregattaActions";
-import { StregattaFilters } from "@/components/admin/stregatti/StregattaFilters";
+import { StregattaList } from "./stregatti.part4";
 import { StregattaMap } from "@/components/admin/stregatti/StregattaMap";
 import { styles } from "@/components/admin/stregatti/stregatti.styles";
 import { 
@@ -196,7 +194,7 @@ export default function FakeUsersAdmin() {
           allEnabled={allEnabled}
         />
       ) : (
-        <StregattiPart2.List
+        <StregattaList
           flatListRef={flatListRef}
           users={users}
           insets={insets}

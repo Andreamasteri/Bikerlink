@@ -1,11 +1,44 @@
 import React from "react";
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from "react-native";
+import { View, Text, TouchableOpacity, ActivityIndicator } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
 import Colors from "@/constants/colors";
 import { apiRequest } from "@/lib/query-client";
 import { styles } from "./SelfHostStatus.styles";
 import { formatTime, ErrorTypeIcon, ErrorTypeLabel, formatDuration } from "./SelfHostStatus.part2";
+
+interface RoutingHistoryResponse {
+  events: Array<{ type: string; ts: string; error_type?: string; duration_ms?: number }>;
+}
+interface TestRoutingResult {
+  ok: boolean;
+  error?: string;
+  latency_ms?: number;
+  engine?: string;
+  distanceKm?: number;
+  durationMinutes?: number;
+}
+export interface RoutingHealth {
+  self_hosted: boolean;
+  routing_disabled: boolean;
+  degraded: boolean;
+  message?: string;
+  cloud_fallback_active?: boolean;
+  graphhopper: {
+    healthy: boolean;
+    error_type?: string;
+    profiles?: string[] | null;
+    last_check_at?: string | null;
+    last_failure_at?: string | null;
+    error?: string;
+    latency_ms?: number;
+    consecutive_failures?: number;
+    available_profiles?: string[] | null;
+    profiles_reachable?: boolean;
+    profiles_error_reason?: string;
+  };
+}
+
 
 function ProfilesSection({
   profiles,
@@ -239,8 +272,8 @@ export function SelfHostStatus() {
     ? "ThinkCentre: routing disabilitato"
     : `ThinkCentre: ${down ? "OFFLINE" : "online"}`;
 
-  const lastCheck = formatTime(gh.last_check_at);
-  const lastFailure = formatTime(gh.last_failure_at);
+  const lastCheck = formatTime(gh.last_check_at ? new Date(gh.last_check_at).getTime() : null);
+  const lastFailure = formatTime(gh.last_failure_at ? new Date(gh.last_failure_at).getTime() : null);
 
   return (
     <View style={[styles.healthBox, { borderColor: color }]}>
@@ -266,14 +299,14 @@ export function SelfHostStatus() {
       <Text style={styles.healthMeta}>
         Ultimo check: {lastCheck}
         {gh.latency_ms != null && !down ? ` · ${gh.latency_ms}ms` : ""}
-        {down && gh.consecutive_failures > 0 ? ` · ${gh.consecutive_failures} fallimenti consecutivi` : ""}
+        {down && (gh.consecutive_failures ?? 0) > 0 ? ` · ${gh.consecutive_failures} fallimenti consecutivi` : ""}
         {down && gh.last_failure_at ? ` · ultimo errore: ${lastFailure}` : ""}
         {data.cloud_fallback_active ? " · fallback Cloud attivo" : ""}
       </Text>
 
       {data.self_hosted && (
         <ProfilesSection
-          profiles={gh.available_profiles}
+          profiles={gh.available_profiles ?? null}
           profilesReachable={gh.profiles_reachable ?? false}
           profilesErrorReason={gh.profiles_error_reason ?? null}
         />
@@ -286,140 +319,3 @@ export function SelfHostStatus() {
   );
 }
 
-const styles = StyleSheet.create({
-  healthBox: {
-    backgroundColor: Colors.background,
-    borderRadius: 8,
-    borderWidth: 1,
-    padding: 10,
-    marginBottom: 10,
-    gap: 6,
-  },
-  healthHeader: { flexDirection: "row", alignItems: "center", gap: 6 },
-  healthTitle: { fontFamily: "Inter_600SemiBold", fontSize: 13 },
-  healthMsg: { fontFamily: "Inter_400Regular", fontSize: 12, color: Colors.text },
-  healthMeta: { fontFamily: "Inter_400Regular", fontSize: 11, color: Colors.textSecondary },
-  errorDetailBox: {
-    backgroundColor: Colors.error + "12",
-    borderRadius: 6,
-    padding: 8,
-    gap: 4,
-  },
-  errorTypeRow: { flexDirection: "row", alignItems: "center", gap: 5 },
-  errorTypeLabel: { fontFamily: "Inter_500Medium", fontSize: 11, color: Colors.error },
-  errorDetailText: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 11,
-    color: Colors.error,
-    opacity: 0.85,
-  },
-  profilesBox: {
-    backgroundColor: Colors.surface,
-    borderRadius: 6,
-    padding: 8,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    gap: 6,
-  },
-  profilesTitle: { fontFamily: "Inter_500Medium", fontSize: 11, color: Colors.textSecondary },
-  profilesList: { gap: 3 },
-  profileRow: { flexDirection: "row", alignItems: "center", gap: 6 },
-  profileName: { fontFamily: "Inter_400Regular", fontSize: 11, color: Colors.text },
-  profileNameMoto: { fontFamily: "Inter_600SemiBold", color: Colors.success },
-  profileNameMissing: { fontFamily: "Inter_600SemiBold", color: Colors.error },
-  profileMotoLabel: { fontFamily: "Inter_400Regular", fontSize: 10, color: Colors.success },
-  profileMotoLabelErr: { fontFamily: "Inter_600SemiBold", fontSize: 10, color: Colors.error },
-  profilesWarning: { flexDirection: "row", alignItems: "flex-start", gap: 5, marginTop: 2 },
-  profilesWarningText: { fontFamily: "Inter_400Regular", fontSize: 11, color: "#f59e0b", flex: 1 },
-  profilesUnavailable: { fontFamily: "Inter_400Regular", fontSize: 11, color: Colors.textSecondary, flex: 1 },
-  testBox: {
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    overflow: "hidden",
-  },
-  testHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    padding: 8,
-    backgroundColor: Colors.surface,
-  },
-  testTitle: { fontFamily: "Inter_500Medium", fontSize: 12, color: Colors.text, flex: 1 },
-  testBtn: {
-    backgroundColor: Colors.accent,
-    paddingHorizontal: 12,
-    paddingVertical: 5,
-    borderRadius: 6,
-    minWidth: 72,
-    alignItems: "center",
-  },
-  testBtnDisabled: { opacity: 0.6 },
-  testBtnText: { fontFamily: "Inter_600SemiBold", fontSize: 12, color: "#fff" },
-  testResult: { padding: 8, gap: 3 },
-  testResultOk: { backgroundColor: Colors.success + "14" },
-  testResultErr: { backgroundColor: Colors.error + "12" },
-  testResultRow: { flexDirection: "row", alignItems: "flex-start", gap: 5 },
-  testResultText: { fontFamily: "Inter_500Medium", fontSize: 12, color: Colors.text, flex: 1 },
-  testResultErrText: { color: Colors.error },
-  testResultMeta: { fontFamily: "Inter_400Regular", fontSize: 11, color: Colors.textSecondary, marginLeft: 18 },
-  historyBox: {
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    overflow: "hidden",
-    marginTop: 2,
-  },
-  historyToggle: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    padding: 8,
-    backgroundColor: Colors.surface,
-  },
-  historyToggleText: {
-    fontFamily: "Inter_500Medium",
-    fontSize: 12,
-    color: Colors.textSecondary,
-    flex: 1,
-  },
-  historyContent: {
-    backgroundColor: Colors.background,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    gap: 5,
-  },
-  historyEmpty: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 11,
-    color: Colors.textSecondary,
-    paddingVertical: 4,
-  },
-  historyRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-    paddingVertical: 2,
-  },
-  historyDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-  },
-  historyTime: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 11,
-    minWidth: 40,
-  },
-  historyArrow: {
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 13,
-    minWidth: 14,
-    textAlign: "center",
-  },
-  historyLabel: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 11,
-    flex: 1,
-  },
-});

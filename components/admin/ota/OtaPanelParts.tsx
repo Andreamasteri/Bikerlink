@@ -1,5 +1,6 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useState } from "react";
-import { View, Text, TextInput, Switch, TouchableOpacity, ActivityIndicator } from "react-native";
+import { View, Text, TextInput, Switch, TouchableOpacity } from "react-native";
 import { styles } from "./OtaPanel.styles";
 import { OtaRelease, bootSuccessRate, formatDate } from "./OtaPanel.helpers";
 

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useRef, useCallback } from "react";
 import { Alert, Animated } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -8,10 +9,10 @@ import { useApiDebugLog } from "@/hooks/useApiDebugLog";
 
 import { 
   Waypoint, Style, DrivingProfile, VehicleProfile, Mode, RouteResult, 
-  WeatherWaypoint, AiPreviewState, AiPreviewItem,
+  WeatherWaypoint, AiPreviewState,
   ResolvedPoiStop, PoiResult, GeoResult
 } from "./types";
-import { calcRoute, fetchWeatherPreview } from "./api";
+import { calcRoute } from "./api";
 import { handleImportGpxHelper, autoLoadWeatherHelper } from "./useGiriCreateState.part2";
 import { handleAiParseHelper, regeocodePillItemHelper, handleConfirmPreviewHelper } from "./useGiriCreateState.part3";
 
@@ -71,7 +72,6 @@ export function useGiriCreateState(language?: string) {
 
   const [waypoints, setWaypoints] = useState<Waypoint[]>([{ lat: 0, lng: 0, name: "" }, { lat: 0, lng: 0, name: "" }]);
   const [wpInputs, setWpInputs] = useState<string[]>(["", ""]);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- geocoding suggestion results from API
   const [wpSuggestions, setWpSuggestions] = useState<{ index: number; results: any[]; error?: boolean } | null>(null);
   const [wpLoading, setWpLoading] = useState(false);
 
@@ -89,6 +89,7 @@ export function useGiriCreateState(language?: string) {
 
   const suggestionTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const bikerScoreAnim = useRef(new Animated.Value(0)).current;
+  const lastFittedWaypointSig = useRef<string>('');
   const geocodeCache = useRef<Map<string, GeoResult[]>>(new Map());
 
   const handleTitleTap = useCallback(() => {
@@ -240,14 +241,12 @@ export function useGiriCreateState(language?: string) {
   };
 
   const saveMutation = useMutation({
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- route data payload
     mutationFn: async (data: any) => {
       const resp = await apiRequest("POST", "/api/planned-routes", data);
       return resp.json();
     },
     onSuccess: (data) => {
       qc.invalidateQueries({ queryKey: ["/api/planned-routes"] });
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- dynamic route path
       router.replace(`/giri/${data.id}` as any);
     },
     onError: () => Alert.alert("Errore", "Impossibile salvare il giro.")
@@ -299,6 +298,7 @@ export function useGiriCreateState(language?: string) {
         setPendingMapTap({ lat, lng, name });
       }
     } catch {
+      // intentional: geocoding failure is non-fatal
     } finally {
       if (mapTapRequestId.current === myId) {
         setMapTapGeocoding(false);
@@ -353,6 +353,10 @@ export function useGiriCreateState(language?: string) {
     pendingMapTap, mapTapGeocoding, handleMapTap, confirmMapTap, dismissMapTap,
     resolvedPoiStops, selectPoiOption, clearPoiOption, aiProviderUsed,
     aiFallbackBanner, setAiFallbackBanner, aiBannerReason, aiSuccessBanner,
+    setAiSuccessBanner, aiSuccessTimer,
+    setRouteResult, setCalculating, bikerScoreAnim,
+    lastFittedWaypointSig,
+    saveMutationPending: saveMutation.isPending,
     dismissedWarnings, setDismissedWarnings, vehicleProfile, setVehicleProfile,
   };
 }

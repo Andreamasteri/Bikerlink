@@ -1,10 +1,11 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import React from "react";
-import { View, Text, TouchableOpacity, ScrollView, ActivityIndicator } from "react-native";
+import { View, Text, TouchableOpacity, ActivityIndicator } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
 import WebView from "react-native-webview";
 
-export function GiriMap({ mapUri, style, distanceKm, offlineStatus, streetViewTip, onMessage }: any) {
+export function GiriMap({ mapUri, _style, distanceKm, _offlineStatus, _streetViewTip, onMessage }: any) {
   return (
     <View style={{ height: 250, borderRadius: 16, overflow: "hidden", marginBottom: 16 }}>
       {mapUri ? (
@@ -21,7 +22,7 @@ export function GiriMap({ mapUri, style, distanceKm, offlineStatus, streetViewTi
   );
 }
 
-export function GiriStats({ distanceKm, durationMinutes, bikerScore, scoreColor, styleLabel, isMultiDay, elevationGainM, altitudeMinM, altitudeMaxM, realCurvatureScore, onLoadElevation, elevationLoading }: any) {
+export function GiriStats({ distanceKm, durationMinutes, bikerScore, scoreColor, _styleLabel, _isMultiDay, _elevationGainM, _altitudeMinM, _altitudeMaxM, _realCurvatureScore, _onLoadElevation, _elevationLoading }: any) {
   return (
     <View style={{ backgroundColor: Colors.surface, borderRadius: 16, padding: 16, marginBottom: 16, gap: 16 }}>
        <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
@@ -73,7 +74,7 @@ export function GiriWeather({ weather, weatherIcon }: any) {
   );
 }
 
-export function GiriParticipants({ matchBikers, matchLoading, matchBannerDismissed, onDismissBanner, onFindBikers, onPressBiker }: any) {
+export function GiriParticipants({ _matchBikers, matchLoading, _matchBannerDismissed, _onDismissBanner, onFindBikers, _onPressBiker }: any) {
   return (
     <View style={{ marginBottom: 16 }}>
        <Text style={{ fontSize: 16, fontWeight: "bold", marginBottom: 8 }}>Partecipanti suggeriti</Text>

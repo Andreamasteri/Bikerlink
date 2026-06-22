@@ -1,6 +1,6 @@
-import { useInfiniteQuery, useMutation, useQuery } from "@tanstack/react-query";
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import { useInfiniteQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/query-client";
-import { useState } from "react";
 
 export function useStregattiData() {
   const {

@@ -53,7 +53,77 @@ interface HttpProbeResp {
   json: unknown | null;
 }
 
-import { httpProbe, deleteProbeWithRetry } from "./campaigns-self-check.part2";
+import { httpProbe } from "./campaigns-self-check.part2";
+
+export interface RunSelfCheckOpts {
+  triggeredBy: "manual" | "scheduler" | "startup";
+  withAi?: boolean;
+}
+
+async function runStep(
+  name: string,
+  fn: () => Promise<{ message?: string } | void>,
+): Promise<SelfCheckEntry> {
+  const t = Date.now();
+  try {
+    const r = await fn();
+    const res = r as ({ message?: string } | null | undefined);
+    return { name, status: "ok", durationMs: Date.now() - t, message: res?.message };
+  } catch (e) {
+    return {
+      name,
+      status: "error",
+      durationMs: Date.now() - t,
+      message: (e as Error)?.message?.slice(0, 400) ?? "errore sconosciuto",
+    };
+  }
+}
+
+async function ensureSelfCheckModerator(): Promise<string> {
+  const SELFCHECK_EMAIL = "selfcheck-mod@bikerlink.internal";
+  const existing = await storage.getUserByEmail(SELFCHECK_EMAIL);
+  if (existing) return existing.id;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const created = await storage.createUser({
+    email: SELFCHECK_EMAIL,
+    username: "selfcheck-mod",
+    password: crypto.randomBytes(32).toString("hex"),
+    role: "moderator",
+  } as any);
+  return created.id;
+}
+
+function deriveOverall(checks: SelfCheckEntry[]): OverallStatus {
+  if (checks.some((c) => c.status === "error")) return "broken";
+  if (checks.some((c) => c.status === "warn")) return "degraded";
+  return "ok";
+}
+
+function deriveSuggestedFix(checks: SelfCheckEntry[]): string | null {
+  const first = checks.find((c) => c.status === "error");
+  if (!first) return null;
+  return `Controlla il passo "${first.name}": ${first.message ?? "errore sconosciuto"}`;
+}
+
+async function buildAiBrief(
+  checks: SelfCheckEntry[],
+  overall: OverallStatus,
+): Promise<{ brief: string; meta: { provider: string; model: string } } | null> {
+  if (overall === "ok") return null;
+  try {
+    const prompt = `Self-check campagne BikerLink: stato ${overall}.\n${checks
+      .map((c) => `${c.name}: ${c.status}${c.message ? ` (${c.message})` : ""}`)
+      .join("\n")}\nSuggerisci la causa più probabile in 1-2 frasi.`;
+    const { value: generated, model: resolvedModel } = await runWithFallback({ role: "brain" }, (m) =>
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      generateText({ model: m.model as any, prompt }),
+    );
+    await logAiUsage("campaigns-self-check", resolvedModel.modelId, { tokensIn: 0, tokensOut: 150 });
+    return { brief: generated.text, meta: { provider: resolvedModel.providerName, model: resolvedModel.modelId } };
+  } catch {
+    return null;
+  }
+}
 
 export async function runCampaignsSelfCheck(opts: RunSelfCheckOpts): Promise<CampaignsSelfCheckResult> {
   const t0 = Date.now();

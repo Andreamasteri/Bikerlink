@@ -2,12 +2,9 @@ import React, { useState, useEffect, useCallback, useMemo, useRef } from "react"
 import {
   View,
   Text,
-  StyleSheet,
   TouchableOpacity,
   Alert,
   ActivityIndicator,
-  Modal,
-  Pressable,
 } from "react-native";
 import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollViewCompat";
 import { useSafeAreaInsets } from "react-native-safe-area-context";

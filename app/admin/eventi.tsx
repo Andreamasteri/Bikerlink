@@ -11,7 +11,6 @@ import {
 
   RefreshControl,
 } from "react-native";
-import { Image } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -19,7 +18,6 @@ import { useRouter } from "expo-router";
 import Colors from "@/constants/colors";
 import { apiRequest, queryClient, getApiUrl } from "@/lib/query-client";
 import type { EventDTO, EventStatus } from "@/shared/event-types";
-import { EVENT_TYPE_LABELS, EVENT_TYPE_COLORS } from "@/shared/event-types";
 import { useT } from "@/lib/language-context";
 import { EventAdminCard } from "./eventi.part2";
 import { styles } from "./eventi.styles";
@@ -33,7 +31,7 @@ function getStatusLabels(t: (k: string) => string): Record<EventStatus, string> 
   };
 }
 
-function formatDate(dateStr: string): string {
+function _formatDate(dateStr: string): string {
   try {
     const d = new Date(dateStr);
     return `${d.getDate()}/${d.getMonth() + 1}/${d.getFullYear()}`;
@@ -42,87 +40,13 @@ function formatDate(dateStr: string): string {
   }
 }
 
-function resolveImageUrl(imageUrl: string): string {
+function _resolveImageUrl(imageUrl: string): string {
   if (imageUrl.startsWith("http")) return imageUrl;
   return `${getApiUrl()}${imageUrl}`;
 }
 
-function EventAdminCard({
-  event,
-  onApprove,
-  onReject,
-  onView,
-  isPending,
-}: {
-  event: EventDTO;
-  onApprove?: () => void;
-  onReject?: () => void;
-  onView: () => void;
-  isPending?: boolean;
-}) {
-  const typeColor = EVENT_TYPE_COLORS[event.eventType] ?? Colors.accent;
-  const cover = event.images?.[0];
 
-  return (
-    <View style={card.container}>
-      <Pressable onPress={onView} style={card.pressable}>
-        {cover ? (
-          <Image
-            source={{ uri: resolveImageUrl(cover.imageUrl) }}
-            style={card.image}
-            contentFit="cover"
-          />
-        ) : (
-          <View style={[card.image, card.imageFallback]}>
-            <Ionicons name="calendar-outline" size={24} color={Colors.textSecondary} />
-          </View>
-        )}
-        <View style={card.body}>
-          <View style={card.row}>
-            <View style={[card.typeBadge, { backgroundColor: typeColor }]}>
-              <Text style={card.typeText}>{EVENT_TYPE_LABELS[event.eventType]}</Text>
-            </View>
-            <Text style={card.date}>{formatDate(event.eventDate)}</Text>
-          </View>
-          <Text style={card.title} numberOfLines={2}>{event.title}</Text>
-          {event.locationName && (
-            <Text style={card.location} numberOfLines={1}>
-              <Ionicons name="location" size={11} color={Colors.textSecondary} /> {event.locationName}
-            </Text>
-          )}
-          <Text style={card.creator}>@{event.creatorNickname ?? "utente"}</Text>
-        </View>
-      </Pressable>
-
-      {(onApprove || onReject) && (
-        <View style={card.actions}>
-          {onApprove && (
-            <Pressable
-              style={[card.btn, card.approveBtn, isPending && card.btnDisabled]}
-              onPress={onApprove}
-              disabled={isPending}
-            >
-              <Ionicons name="checkmark" size={16} color="#fff" />
-              <Text style={card.btnText}>Approva</Text>
-            </Pressable>
-          )}
-          {onReject && (
-            <Pressable
-              style={[card.btn, card.rejectBtn, isPending && card.btnDisabled]}
-              onPress={onReject}
-              disabled={isPending}
-            >
-              <Ionicons name="close" size={16} color="#fff" />
-              <Text style={card.btnText}>Rifiuta</Text>
-            </Pressable>
-          )}
-        </View>
-      )}
-    </View>
-  );
-}
-
-const card = StyleSheet.create({
+const _card = StyleSheet.create({
   container: {
     backgroundColor: Colors.surface,
     borderRadius: 10,

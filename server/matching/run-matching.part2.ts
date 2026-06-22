@@ -116,7 +116,7 @@ export async function runWishlistMatching(): Promise<number> {
     const existingKeys = await storage.getAllExistingBikerZavorrinaMatchKeys();
 
     const { entityTags, tagCategories, tags: tagsTable } = await import("@shared/db");
-    const { inArray, eq } = await import("drizzle-orm");
+    const { inArray, eq, and } = await import("drizzle-orm");
 
     const motoIds = [...new Set(sortedPairs.map(p => p.motorcycle.id))];
     const tagsByMoto = await (async () => {

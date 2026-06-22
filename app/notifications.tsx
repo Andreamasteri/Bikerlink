@@ -43,7 +43,7 @@ interface IncomingMatchRequest {
   } | null;
 }
 
-function getNotifIcon(type: string): { name: React.ComponentProps<typeof Ionicons>["name"]; color: string } {
+function _getNotifIcon(type: string): { name: React.ComponentProps<typeof Ionicons>["name"]; color: string } {
   switch (type) {
     case "direct_match_request":
       return { name: "person-add", color: "#FF6600" };

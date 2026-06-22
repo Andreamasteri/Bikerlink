@@ -20,7 +20,6 @@ import { getApiUrl } from "@/lib/query-client";
 import LeafletPickerMap from "@/components/LeafletPickerMap";
 import { t } from "@/lib/i18n";
 import { InviteStep, SummaryStep } from "./create.part2";
-import { styles } from "./create.styles";
 
 export type Club = { id: string; name: string; clubType: string };
 export type UserResult = { id: string; nickname: string; userType: string };

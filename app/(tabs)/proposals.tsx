@@ -2,13 +2,10 @@ import React, { useState, useCallback } from "react";
 import {
   View,
   Text,
-  StyleSheet,
   FlatList,
   Pressable,
   ActivityIndicator,
   RefreshControl,
-  Platform,
-  TouchableOpacity,
 } from "react-native";
 import { useRouter, useFocusEffect } from "expo-router";
 import { useQuery } from "@tanstack/react-query";

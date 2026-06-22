@@ -1,7 +1,6 @@
-import React from "react";
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { StyleSheet } from "react-native";
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any -- colors from useColors hook
 export const makeStyles = (colors: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   emptyText: { fontFamily: "Inter_400Regular", fontSize: 14, color: colors.textSecondary, textAlign: "center", paddingVertical: 8 },
@@ -22,7 +21,6 @@ export function weatherIcon(code: number): any {
   return "cloud-outline";
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any -- colors from useColors hook
 export function bikerScoreColor(score: number, colors: any): string {
   if (score >= 0.7) return "#22c55e";
   if (score >= 0.4) return colors.accent;

@@ -14,6 +14,7 @@
 
 const SELF_HOSTED_URL = process.env.GRAPHHOPPER_URL?.replace(/\/$/, "");
 export const CLOUD_API_KEY = process.env.GRAPHHOPPER_API_KEY ?? "";
+export const SELF_HOSTED_TOKEN = process.env.GRAPHHOPPER_TOKEN ?? "";
 export const CLOUD_URL = "https://graphhopper.com/api/1";
 
 export const GH_BASE_URL = SELF_HOSTED_URL ?? CLOUD_URL;
@@ -330,6 +331,40 @@ export function isSelfHostDown(err: unknown): boolean {
 }
 
 // ─── Types ────────────────────────────────────────────────────────────────────
+
+export interface RouteRequest {
+  points: [number, number][];
+  profile?: string;
+  instructions?: boolean;
+  calc_points?: boolean;
+  points_encoded?: boolean;
+  elevation?: boolean;
+  details?: string[];
+  custom_model?: Record<string, unknown>;
+  optimize?: boolean;
+  heading?: number;
+  language?: string;
+}
+
+export interface RouteResult {
+  paths: Array<{
+    distance: number;
+    time: number;
+    weight?: number;
+    points: unknown;
+    points_encoded?: boolean;
+    instructions?: Array<{
+      text: string;
+      distance: number;
+      time: number;
+      interval: [number, number];
+      sign?: number;
+      street_name?: string;
+    }>;
+    details?: Record<string, unknown>;
+  }>;
+  info?: Record<string, unknown>;
+}
 
 export interface GHPoint {
   lat: number;

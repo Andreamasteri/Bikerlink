@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import React from "react";
 import { Tabs } from "expo-router";
 import { TabIcon } from "@/components/TabIcons";

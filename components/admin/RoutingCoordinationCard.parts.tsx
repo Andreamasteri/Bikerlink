@@ -1,7 +1,6 @@
 import React from "react";
 import { View, Text, StyleSheet } from "react-native";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
-import { styles } from "./RoutingCoordinationCard.styles";
 import Colors from "@/constants/colors";
 export function CollapseChevron({ collapsed }: { collapsed: boolean }) {
   return (

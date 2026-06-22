@@ -1,4 +1,4 @@
-import { StyleSheet, Platform } from "react-native";
+import { StyleSheet } from "react-native";
 import Colors from "@/constants/colors";
 
 export const styles = StyleSheet.create({
@@ -15,6 +15,12 @@ export const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
+  },
+  headerRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    marginLeft: "auto",
   },
   cardTitle: {
     fontFamily: "Inter_700Bold",

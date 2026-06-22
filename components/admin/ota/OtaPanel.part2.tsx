@@ -1,8 +1,8 @@
-import React, { useState, useCallback } from "react";
-import { View, Text, TouchableOpacity, Switch, ActivityIndicator, Alert } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import React from "react";
+import { View, Text, TouchableOpacity, ActivityIndicator } from "react-native";
 import { styles } from "./OtaPanel.styles";
-import { OtaRelease, getStatusColor, getStatusLabel, formatDate, bootSuccessRate } from "./OtaPanel.helpers";
+import { OtaRelease, getStatusColor, getStatusLabel, formatDate } from "./OtaPanel.helpers";
 import { ReleaseCounters, AutoRollbackSection } from "./OtaPanelParts";
 import OtaFailureDevices from "./OtaFailureDevices";
 

@@ -15,7 +15,6 @@ import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 import { getApiUrl } from "@/lib/query-client";
-import { styles } from "./match-inspector.styles";
 import {
   TYPE_LABELS,
   BZ_TYPE_LABELS,
@@ -24,7 +23,26 @@ import {
   userRoleText,
 } from "./match-inspector.part2";
 
-type MatchCounts = Record<string, number>;
+interface InspectorUser {
+  id: string;
+  nickname: string;
+  email?: string;
+  userType: string;
+  role?: string;
+  avatarUrl?: string | null;
+  matchCounts: Record<string, number>;
+  totalMatches?: number;
+  hasNoMatches?: boolean;
+  criticalGaps?: number;
+}
+interface UsersResponse {
+  users: InspectorUser[];
+  total: number;
+  zeroMatchCount: number;
+  hasMore?: boolean;
+}
+
+type _MatchCounts = Record<string, number>;
 
 export default function MatchInspectorScreen() {
   const router = useRouter();

@@ -1,8 +1,7 @@
 import React, { useRef, useEffect, useState } from "react";
 import { Tabs, useRouter, type Href } from "expo-router";
-import { Ionicons } from "@expo/vector-icons";
 import { useColors } from "@/hooks/useColors";
-import { Pressable, Animated } from "react-native";
+import { Animated } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -15,7 +14,6 @@ import CustomTabBar, { type TabItem } from "@/components/CustomTabBar";
 type BottomTabBarProps = Parameters<NonNullable<React.ComponentProps<typeof Tabs>["tabBar"]>>[0];
 import { useTabBadges } from "@/hooks/useTabBadges";
 import { useNewMatchAlert } from "@/hooks/useNewMatchAlert";
-import { TabIcon } from "@/components/TabIcons";
 import { getTabScreens } from "./_layout.part2";
 import { GpsBanner } from "@/components/layout/GpsBanner";
 import { sendStartupBeacon } from "@/lib/startup-beacon";

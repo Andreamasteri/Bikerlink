@@ -10,16 +10,10 @@ import { useT } from "@/lib/language-context";
 import { showImagePickerMenu, pickMultipleImages, BulkImageAsset, appendFileToForm } from "@/lib/image-picker-utils";
 import { Campaign } from "./AdCard";
 import { ListItem } from "./AdGroupList";
-import { handleBulkSummary, confirmDeleteAll, confirmDeleteSingle, useAdAdminInternal, handleBulkCreateInternal, BulkUploadResponse, useAdAdminMutations } from "./useAdAdmin.part2";
+import { confirmDeleteSingle, useAdAdminInternal, handleBulkCreateInternal, useAdAdminMutations } from "./useAdAdmin.part2";
 
 type TabKey = "biker" | "zavorrina" | "coppia" | "tutti";
 
-interface BulkUploadResponse {
-  created: number;
-  failed: number;
-  campaigns: { id: string; name: string; imageUrl: string | null; isActive: boolean }[];
-  failedFiles: string[];
-}
 
 export function useAdAdmin() {
   const t = useT();
@@ -250,7 +244,7 @@ export function useAdAdmin() {
     setShowBulkModal,
     setBulkBaseName,
     setBulkImages,
-    setBulkTarget,
+    setBulkTarget as (val: string) => void,
     setBulkDuration,
     setBulkLinkUrl,
   );

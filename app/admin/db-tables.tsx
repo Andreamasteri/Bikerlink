@@ -2,7 +2,6 @@ import React, { useEffect, useRef, useState } from "react";
 import {
   View,
   Text,
-  StyleSheet,
   ScrollView,
   TouchableOpacity,
   ActivityIndicator,
@@ -45,7 +44,7 @@ function formatBytes(bytes: number): string {
   return `${(bytes / 1024 / 1024).toFixed(2)} MB`;
 }
 
-function formatSaved(bytesBefore: number, bytesAfter: number): string {
+function _formatSaved(bytesBefore: number, bytesAfter: number): string {
   const saved = bytesBefore - bytesAfter;
   if (saved <= 0) return "—";
   return `−${formatBytes(saved)}`;

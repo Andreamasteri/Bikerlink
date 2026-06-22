@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from "react";
-import { View, Text, StyleSheet, ActivityIndicator, TouchableOpacity } from "react-native";
-import { MaterialCommunityIcons, Ionicons } from "@expo/vector-icons";
+import { View, Text, ActivityIndicator, TouchableOpacity } from "react-native";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import Colors from "@/constants/colors";
 import { getApiUrl, authFetchHeaders } from "@/lib/query-client";
 import type { DotStatus } from "./SystemHealthContainer";
+import { styles } from "./RoutingCoordinationCard.styles";
 
 type PipelineOutcome = "ok" | "fallback" | "error";
 
@@ -385,7 +386,6 @@ export function RoutingCoordinationCard({
   );
 }
 
-import { Section } from "./RoutingCoordinationCard.parts";
 
 function CoherenceResult({ data }: { data: CoherenceResponse }) {
   const { comparison: c, graphhopper: gh, valhalla: val } = data;
@@ -430,4 +430,3 @@ function CoherenceLegView({ name, leg }: { name: string; leg: CoherenceLeg }) {
   );
 }
 
-import { styles } from "./RoutingCoordinationCard.styles";

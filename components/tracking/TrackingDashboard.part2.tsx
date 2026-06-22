@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import React from "react";
 import { View, Text, Animated, Switch, TouchableOpacity } from "react-native";
 import { Ionicons } from "@expo/vector-icons";

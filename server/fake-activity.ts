@@ -2,7 +2,7 @@ import { storage } from "./storage";
 import {
   setMotionEnabled,
   startMotionSimulator,
-  getMotionStatus,
+  isMotionEnabled,
 } from "./motion-simulator";
 import {
   startFakeZavorrineRotation,
@@ -60,13 +60,13 @@ export async function initFakeActivityOnBoot(): Promise<void> {
     // Cascade invariant at boot: sub-options cannot remain active while global
     // visibility is OFF. Force activity OFF even if a stale `fake_motion_enabled`
     // is true in the DB, so no motion cron / rotation leaks past a global-OFF state.
-    if (getMotionStatus().enabled) {
+    if (isMotionEnabled()) {
       await setMotionEnabled(false);
     }
     stopFakeZavorrineRotation();
     return;
   }
-  if (getMotionStatus().enabled) {
+  if (isMotionEnabled()) {
     startFakeZavorrineRotation();
   }
 }

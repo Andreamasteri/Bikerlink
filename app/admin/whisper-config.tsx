@@ -124,7 +124,7 @@ export default function WhisperConfigScreen() {
     onError: (e: Error) => Alert.alert("Errore", e.message),
   });
 
-  const resetMutation = useMutation({
+  const _resetMutation = useMutation({
     mutationFn: () =>
       apiFetch("/api/admin/whisper-config/reset", { method: "POST" }),
     onSuccess: () => {

@@ -1,6 +1,6 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import React from "react";
-import { View, Text, TouchableOpacity, Switch, ActivityIndicator } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import { View, Text, TouchableOpacity, Switch } from "react-native";
 import Colors from "@/constants/colors";
 
 export function StregattaActions({
@@ -8,29 +8,29 @@ export function StregattaActions({
   onToggleChatbot,
   allEnabled,
   onToggleAll,
-  motionStatus,
-  onToggleMotion,
-  isTogglingMotion,
-  bboxData,
-  onToggleBbox,
-  isTogglingBbox,
+  _motionStatus,
+  _onToggleMotion,
+  _isTogglingMotion,
+  _bboxData,
+  _onToggleBbox,
+  _isTogglingBbox,
   onMassSeed,
   onWakeAll,
-  onDistribute,
-  onForceMatching,
-  onResetMatches,
+  _onDistribute,
+  _onForceMatching,
+  _onResetMatches,
   onDeleteAll,
-  onCreateNew,
+  _onCreateNew,
   isMassSeedRunning,
   massSeedCreated,
   massSeedTotal,
-  massSeedError,
+  _massSeedError,
   isWakingAll,
-  isDistributing,
-  isForcingMatching,
-  isResettingMatches,
+  _isDistributing,
+  _isForcingMatching,
+  _isResettingMatches,
   totalCount,
-  t
+  _t
 }: any) {
   return (
     <View style={{ padding: 16, backgroundColor: Colors.surface, borderRadius: 12, marginBottom: 16, gap: 12 }}>

@@ -94,7 +94,7 @@ export function mapValhallaResponse(raw: ValhallaRouteResponse): RouteResult {
 
   const coords = mergeLegsShape(legs);
 
-  const instructions: unknown[] = [];
+  const instructions: any[] = [];
   let shapeOffset = 0;
 
   for (const leg of legs) {

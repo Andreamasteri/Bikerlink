@@ -1,13 +1,11 @@
-import React, { useState } from "react";
+import React from "react";
 import { View, Text, Modal, TouchableOpacity, ScrollView, Platform } from "react-native";
 import { Ionicons, MaterialIcons } from "@expo/vector-icons";
-import { useQuery } from "@tanstack/react-query";
 import Colors from "@/constants/colors";
 import { AdminUser } from "./UserCard";
 import { SessionStats } from "@/components/admin/analytics/UserStatsContent";
 import { UserSessionStatsBlock } from "./UserSessionStatsBlock";
-import { statsStyles, privacyStyles, sessionStyles, fzStyles } from "./UserDetailModal.parts";
-import { getApiUrl } from "@/lib/query-client";
+import { statsStyles, sessionStyles, fzStyles } from "./UserDetailModal.parts";
 import { PrivacySection } from "./UserDetailModal.part2";
 
 export interface GeoZone {
@@ -90,12 +88,12 @@ interface UserDetailModalProps {
 }
 
 type PrivacyLogEntry = { newValue: boolean; changedAt: string };
-type PrivacyOverview = {
+type _PrivacyOverview = {
   currentSettings: Record<string, boolean | number | string>;
   log: Record<string, PrivacyLogEntry[]>;
 };
 
-const PRIVACY_SETTINGS: Array<{ key: string; label: string; paramKey?: string; paramLabel?: string }> = [
+const _PRIVACY_SETTINGS: Array<{ key: string; label: string; paramKey?: string; paramLabel?: string }> = [
   { key: "ghost_mode", label: "Ghost Mode" },
   { key: "hide_from_map", label: "Non visibile sulla mappa" },
   { key: "position_fuzz", label: "Altera Posizione", paramKey: "position_fuzz_km", paramLabel: "km" },

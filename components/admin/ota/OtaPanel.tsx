@@ -7,12 +7,9 @@ import {
   View,
   Text,
   TouchableOpacity,
-  Switch,
-  StyleSheet,
   Alert,
   ActivityIndicator,
   Platform,
-  TextInput,
 } from "react-native";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import * as Updates from "expo-updates";
@@ -20,18 +17,12 @@ import { useTheme } from "@/lib/theme-context";
 import { apiRequest } from "@/lib/query-client";
 import { performDirectOtaUpdate } from "@/hooks/useOtaAutoUpdate";
 import OtaAssistantChat from "./OtaAssistantChat";
-import OtaFailureDevices from "./OtaFailureDevices";
 import {
   type OtaRelease,
   extractOtaNumber,
-  getStatusColor,
-  getStatusLabel,
-  formatDate,
-  bootSuccessRate,
 } from "./OtaPanel.helpers";
 
 import { styles } from "./OtaPanel.styles";
-import { AutoRollbackField, ReleaseCounters, AutoRollbackSection } from "./OtaPanelParts";
 import { PendingReleaseCard, HistoryReleaseCard } from "./OtaPanel.part2";
 
 export default function OtaPanel() {
@@ -395,5 +386,3 @@ export default function OtaPanel() {
 }
 
 
-import { styles } from "./OtaPanel.styles";
-import { AutoRollbackField, ReleaseCounters, AutoRollbackSection } from "./OtaPanelParts";

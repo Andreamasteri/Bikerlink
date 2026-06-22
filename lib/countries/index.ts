@@ -1,6 +1,6 @@
 import { AFRICA_COUNTRIES } from './africa';
 import { ASIA_COUNTRIES } from './asia';
-import { EUROPE_COUNTRIES } from './europe';
+import EUROPE_COUNTRIES from './europe';
 import { AMERICAS_COUNTRIES } from './americas';
 import { OCEANIA_COUNTRIES } from './oceania';
 import { CountryData, ContinentData, RegionData } from './types';
@@ -8,7 +8,7 @@ import { CountryData, ContinentData, RegionData } from './types';
 export * from './types';
 export { AFRICA_COUNTRIES } from './africa';
 export { ASIA_COUNTRIES } from './asia';
-export { EUROPE_COUNTRIES } from './europe';
+export { default as EUROPE_COUNTRIES } from './europe';
 export { AMERICAS_COUNTRIES } from './americas';
 export { OCEANIA_COUNTRIES } from './oceania';
 

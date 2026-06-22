@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import React from "react";
 import {
   View,
@@ -13,7 +14,6 @@ import { SensorOverlayPanel } from "./SensorOverlayPanel";
 import TrackingMap from "@/components/TrackingMap";
 import { DistanceUnit, SpeedUnit } from "@/lib/units-context";
 import { MountAxisCalibration } from "@/components/MountCalibWizard";
-import { useRouter } from "expo-router";
 import { UpdateProfile, formatHMS, convertSpeed, speedUnitLabel, convertDistance, distanceUnitLabel } from "./tracking-utils";
 import { SprintOverlay, BufferIndicator } from "./TrackingDashboard.part2";
 
@@ -63,7 +63,6 @@ interface TrackingDashboardProps {
   sprintGoFired: boolean;
   t: (key: string) => string;
   router: any;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- StyleSheet object, typed by caller
   styles: Record<string, any>;
 }
 

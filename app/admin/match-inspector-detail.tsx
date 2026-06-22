@@ -2,7 +2,6 @@ import React, { useState, useCallback } from "react";
 import {
   View,
   Text,
-  StyleSheet,
   ScrollView,
   TouchableOpacity,
   Pressable,
@@ -18,7 +17,6 @@ import Colors from "@/constants/colors";
 import { apiRequest, getApiUrl } from "@/lib/query-client";
 import { MatchUserCard } from "@/components/admin/match-inspector/MatchUserCard";
 import { PreferencesDiffCard } from "@/components/admin/match-inspector/PreferencesDiffCard";
-import { MatchTypeCard } from "@/components/admin/match-inspector/MatchTypeCard";
 import { ProfileGapsCard } from "@/components/admin/match-inspector/ProfileGapsCard";
 import { UserEditModal } from "@/components/admin/users/UserEditModal";
 import type { AdminUser } from "@/components/admin/users/UserCard";
