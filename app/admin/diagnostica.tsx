@@ -11,8 +11,9 @@ import { TabMonitor } from "./diagnostica-monitor";
 import { TabDevice } from "./diagnostica-device";
 import { adminFetch } from "./diagnostica-types";
 import type { PipelineRunResult } from "./diagnostica-types";
+import { ThinkCentreSystemMonitor } from "@/components/admin/ThinkCentreSystemMonitor";
 
-type Tab = "radiografia" | "monitor" | "device";
+type Tab = "radiografia" | "monitor" | "device" | "server";
 
 export default function DiagnosticaScreen() {
   const insets = useSafeAreaInsets();
@@ -40,7 +41,7 @@ export default function DiagnosticaScreen() {
     <View style={[s.root, { paddingTop: tabBarTop }]}>
       {/* Tab bar */}
       <View style={s.tabBar}>
-        {(["radiografia", "monitor", "device"] as Tab[]).map((tab) => (
+        {(["radiografia", "monitor", "device", "server"] as Tab[]).map((tab) => (
           <TouchableOpacity
             key={tab}
             style={[s.tabItem, activeTab === tab && s.tabItemActive]}
@@ -81,9 +82,22 @@ export default function DiagnosticaScreen() {
                   color={activeTab === tab ? Colors.accent : Colors.textSecondary}
                 />
               )}
+              {tab === "server" && (
+                <Ionicons
+                  name="server-outline"
+                  size={20}
+                  color={activeTab === tab ? Colors.accent : Colors.textSecondary}
+                />
+              )}
             </View>
             <Text style={[s.tabLabel, activeTab === tab && s.tabLabelActive]}>
-              {tab === "radiografia" ? "Radiografia" : tab === "monitor" ? "Monitor" : "Device"}
+              {tab === "radiografia"
+                ? "Radiografia"
+                : tab === "monitor"
+                  ? "Monitor"
+                  : tab === "device"
+                    ? "Device"
+                    : "Server"}
             </Text>
           </TouchableOpacity>
         ))}
@@ -108,6 +122,7 @@ export default function DiagnosticaScreen() {
         {activeTab === "radiografia" && <TabRadiografia />}
         {activeTab === "monitor" && <TabMonitor onActiveCount={setActiveHoles} />}
         {activeTab === "device" && <TabDevice />}
+        {activeTab === "server" && <ThinkCentreSystemMonitor />}
       </View>
     </View>
   );
