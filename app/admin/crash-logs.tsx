@@ -24,8 +24,11 @@ import {
   getAlertDominantType,
   getAlertAccentColor,
   getAlertDominantLabel,
+  getTypeMeta,
   RestartLoopSummaryResponse,
   RestartLoopSummaryItem,
+  SignalFrequencyResponse,
+  SignalFrequencyItem,
 } from "@/components/admin/crash-logs/CrashLogTypes";
 import { CrashLogCard } from "@/components/admin/crash-logs/CrashLogCard";
 import { CrashLogFilters } from "@/components/admin/crash-logs/CrashLogFilters";
@@ -139,6 +142,15 @@ export default function CrashLogsScreen() {
     staleTime: 60_000,
   });
 
+  const { data: signalFreqData } = useQuery<SignalFrequencyResponse>({
+    queryKey: ["/api/admin/crash-logs/signal-frequency"],
+    queryFn: async () => {
+      const res = await apiRequest("GET", "/api/admin/crash-logs/signal-frequency?hours=24&minCount=3");
+      return res.json() as Promise<SignalFrequencyResponse>;
+    },
+    staleTime: 60_000,
+  });
+
   const logs = data?.logs ?? [];
   const total = data?.total ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / LIMIT));
@@ -166,6 +178,11 @@ export default function CrashLogsScreen() {
     if (!isNaN(n) && n > 0) setThreshold(n);
     setShowThresholdEdit(false);
     setThresholdInput("");
+  }
+
+  function getFilterLabel(type: "" | CrashType): string {
+    if (!type) return "";
+    return getTypeMeta(type).label;
   }
 
   return (
@@ -233,6 +250,7 @@ export default function CrashLogsScreen() {
               statsData={statsData}
               total={total}
               filterType={filterType}
+              filterTypeLabel={getFilterLabel(filterType)}
               filterVersion={filterVersion}
               filterDevice={filterDevice}
               brandStats={brandStats}
@@ -240,6 +258,7 @@ export default function CrashLogsScreen() {
               deviceTab={deviceTab}
               setDeviceTab={setDeviceTab}
               restartSummaryData={restartSummaryData}
+              signalFreqData={signalFreqData}
             />
           }
           ListEmptyComponent={
@@ -289,6 +308,7 @@ interface CrashLogsHeaderProps {
   statsData: CrashStatsResponse | undefined;
   total: number;
   filterType: "" | CrashType;
+  filterTypeLabel: string;
   filterVersion: string;
   filterDevice: string;
   brandStats: BrandStat[];
@@ -296,14 +316,15 @@ interface CrashLogsHeaderProps {
   deviceTab: "model" | "brand";
   setDeviceTab: (tab: "model" | "brand") => void;
   restartSummaryData?: RestartLoopSummaryResponse;
+  signalFreqData?: SignalFrequencyResponse;
 }
 
 function CrashLogsHeader({
   alerts, threshold, showThresholdEdit, thresholdInput,
   setShowThresholdEdit, setThresholdInput, handleThresholdSubmit,
-  applyDeviceFilter, statsData, total, filterType, filterVersion,
+  applyDeviceFilter, statsData, total, filterType, filterTypeLabel, filterVersion,
   filterDevice, brandStats, deviceStats, deviceTab, setDeviceTab,
-  restartSummaryData,
+  restartSummaryData, signalFreqData,
 }: CrashLogsHeaderProps) {
   const colors = useColors();
 
@@ -353,7 +374,7 @@ function CrashLogsHeader({
             const dominant = getAlertDominantType(alert);
             const accentColor = getAlertAccentColor(dominant);
             const dominantLabel = getAlertDominantLabel(dominant);
-            const iconName = dominant === "restart_loop" ? "restart" : dominant === "crash_js" ? "code-braces" : "phone-alert";
+            const meta = getTypeMeta(dominant === "mixed" ? "crash_system" : dominant);
             return (
               <TouchableOpacity
                 key={i}
@@ -362,22 +383,26 @@ function CrashLogsHeader({
                 activeOpacity={0.7}
               >
                 <View style={styles.alertLeft}>
-                  <MaterialCommunityIcons name={iconName} size={16} color={accentColor} />
+                  <MaterialCommunityIcons name={meta.icon} size={16} color={accentColor} />
                   <View>
                     <Text style={[styles.alertModel, { color: colors.text }]} numberOfLines={1}>
                       {alert.device_model}{alert.device_brand ? ` · ${alert.device_brand}` : ""}
                     </Text>
                     <View style={styles.alertCountRow}>
-                      <Text style={[styles.alertCount, { color: accentColor }]}>{alert.cnt} crash nelle ultime 24h</Text>
+                      <Text style={[styles.alertCount, { color: accentColor }]}>{alert.cnt} eventi nelle ultime 24h</Text>
                       <View style={[styles.alertTypeBadge, { backgroundColor: `${accentColor}22` }]}>
                         <Text style={[styles.alertTypeBadgeText, { color: accentColor }]}>{dominantLabel}</Text>
                       </View>
                     </View>
                     {dominant === "mixed" && (
                       <Text style={[styles.alertBreakdown, { color: colors.textSecondary }]}>
-                        {alert.crash_system > 0 ? `Sistema: ${alert.crash_system}  ` : ""}
+                        {alert.crash_system > 0 ? `Sis: ${alert.crash_system}  ` : ""}
                         {alert.crash_js > 0 ? `JS: ${alert.crash_js}  ` : ""}
-                        {alert.restart_loop > 0 ? `Loop: ${alert.restart_loop}` : ""}
+                        {alert.restart_loop > 0 ? `Loop: ${alert.restart_loop}  ` : ""}
+                        {(alert.js_thread_freeze ?? 0) > 0 ? `Freeze: ${alert.js_thread_freeze}  ` : ""}
+                        {(alert.gps_flood ?? 0) > 0 ? `GPS: ${alert.gps_flood}  ` : ""}
+                        {(alert.memory_pressure ?? 0) > 0 ? `RAM: ${alert.memory_pressure}  ` : ""}
+                        {(alert.native_module_missing ?? 0) > 0 ? `Mod: ${alert.native_module_missing}` : ""}
                       </Text>
                     )}
                   </View>
@@ -433,10 +458,15 @@ function CrashLogsHeader({
         </View>
       )}
 
+      {/* Signal Frequency — high-frequency anomaly summary */}
+      {signalFreqData && signalFreqData.items.length > 0 && (
+        <SignalFrequencySection items={signalFreqData.items} />
+      )}
+
       {statsData && <CrashLogStats stats={statsData} />}
       <Text style={[styles.totalText, { color: colors.textSecondary, marginTop: statsData ? 12 : 4 }]}>
-        {total} crash
-        {filterType ? ` · ${filterType === "crash_js" ? "JS Error" : filterType === "restart_loop" ? "Restart Loop" : "Sistema"}` : ""}
+        {total} eventi
+        {filterType && filterTypeLabel ? ` · ${filterTypeLabel}` : ""}
         {filterVersion.trim() ? ` · v${filterVersion.trim()}` : ""}
         {filterDevice.trim() ? ` · ${filterDevice.trim()}` : ""}
       </Text>
@@ -507,3 +537,124 @@ function CrashLogsHeader({
     </View>
   );
 }
+
+function formatWindowSec(sec: number): string {
+  if (sec < 60) return `${sec}s`;
+  const m = Math.floor(sec / 60);
+  if (m < 60) return `${m}min`;
+  return `${Math.floor(m / 60)}h ${m % 60}m`;
+}
+
+function SignalFrequencySection({ items }: { items: SignalFrequencyItem[] }) {
+  const colors = useColors();
+  const [expanded, setExpanded] = useState(false);
+  const shown = expanded ? items : items.slice(0, 5);
+
+  return (
+    <View style={[freqStyles.container, { backgroundColor: colors.surface, borderColor: "#F59E0B40" }]}>
+      <View style={freqStyles.header}>
+        <MaterialCommunityIcons name="chart-timeline-variant-shimmer" size={14} color="#F59E0B" />
+        <Text style={[freqStyles.title, { color: colors.textSecondary }]}>
+          Ripetizione anomala (24h, min 3×)
+        </Text>
+        <View style={[freqStyles.countBadge, { backgroundColor: "#F59E0B22" }]}>
+          <Text style={[freqStyles.countBadgeText, { color: "#F59E0B" }]}>{items.length}</Text>
+        </View>
+      </View>
+      <Text style={[freqStyles.subtitle, { color: colors.textSecondary }]}>
+        Pattern a mitragliatrice — stesso segnale per utente/sessione
+      </Text>
+      {shown.map((item, i) => {
+        const meta = (() => {
+          const m: Record<string, { label: string; color: string }> = {
+            js_thread_freeze:      { label: "Thread Freeze", color: "#F59E0B" },
+            gps_flood:             { label: "GPS Flood",     color: "#3B82F6" },
+            memory_pressure:       { label: "RAM",           color: "#EF4444" },
+            native_module_missing: { label: "Modulo Nativo", color: "#8B5CF6" },
+          };
+          return m[item.signal_type] ?? { label: item.signal_type, color: "#6B7280" };
+        })();
+        return (
+          <View key={`${item.userId}-${item.sessionId ?? ""}-${i}`} style={freqStyles.row}>
+            <View style={[freqStyles.typeDot, { backgroundColor: meta.color + "33", borderColor: meta.color }]}>
+              <Text style={[freqStyles.typeDotText, { color: meta.color }]}>{meta.label}</Text>
+            </View>
+            <View style={freqStyles.info}>
+              <Text style={[freqStyles.user, { color: colors.text }]} numberOfLines={1}>
+                {item.nickname ?? item.userId.slice(0, 10)}
+              </Text>
+              <Text style={[freqStyles.sub, { color: colors.textSecondary }]} numberOfLines={1}>
+                {[item.platform, item.appVersion ? `v${item.appVersion}` : null, item.deviceModel]
+                  .filter(Boolean).join(" · ") || "—"}
+              </Text>
+              {item.window_sec > 0 && (
+                <Text style={[freqStyles.window, { color: colors.textSecondary }]}>
+                  finestra: {formatWindowSec(item.window_sec)}
+                </Text>
+              )}
+            </View>
+            <View style={[freqStyles.badge, { backgroundColor: meta.color + "22" }]}>
+              <Text style={[freqStyles.badgeCount, { color: meta.color }]}>{item.occurrences}×</Text>
+            </View>
+          </View>
+        );
+      })}
+      {items.length > 5 && (
+        <TouchableOpacity style={freqStyles.expandBtn} onPress={() => setExpanded((v) => !v)}>
+          <Text style={[freqStyles.expandBtnText, { color: colors.accent }]}>
+            {expanded ? "Mostra meno" : `Mostra tutti (${items.length})`}
+          </Text>
+          <Ionicons name={expanded ? "chevron-up" : "chevron-down"} size={14} color={colors.accent} />
+        </TouchableOpacity>
+      )}
+    </View>
+  );
+}
+
+import { StyleSheet } from "react-native";
+
+const freqStyles = StyleSheet.create({
+  container: {
+    borderRadius: 10,
+    borderWidth: 1,
+    padding: 12,
+    marginBottom: 10,
+    gap: 8,
+  },
+  header: { flexDirection: "row", alignItems: "center", gap: 6 },
+  title: { fontFamily: "Inter_600SemiBold", fontSize: 12, flex: 1 },
+  countBadge: { borderRadius: 10, paddingHorizontal: 6, paddingVertical: 2 },
+  countBadgeText: { fontFamily: "Inter_700Bold", fontSize: 11 },
+  subtitle: { fontFamily: "Inter_400Regular", fontSize: 11, marginTop: -4 },
+  row: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingVertical: 4,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: "#ffffff15",
+  },
+  typeDot: {
+    borderRadius: 4,
+    borderWidth: 1,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    minWidth: 70,
+    alignItems: "center",
+  },
+  typeDotText: { fontFamily: "Inter_600SemiBold", fontSize: 10 },
+  info: { flex: 1, gap: 1 },
+  user: { fontFamily: "Inter_600SemiBold", fontSize: 12 },
+  sub: { fontFamily: "Inter_400Regular", fontSize: 11 },
+  window: { fontFamily: "Inter_400Regular", fontSize: 10 },
+  badge: { borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4, alignItems: "center" },
+  badgeCount: { fontFamily: "Inter_700Bold", fontSize: 14 },
+  expandBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 4,
+    paddingTop: 6,
+  },
+  expandBtnText: { fontFamily: "Inter_600SemiBold", fontSize: 12 },
+});

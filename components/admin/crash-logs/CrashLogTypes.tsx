@@ -2,23 +2,60 @@ import React from "react";
 import { View, Text, StyleSheet } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 
-export type CrashType = "crash_system" | "crash_js" | "restart_loop";
+// Core stored crash types
+export type StoredCrashType = "crash_system" | "crash_js" | "restart_loop" | "clean_close";
 
-export function CrashTypeBadge({ type }: { type: CrashType }) {
-  const isJs = type === "crash_js";
-  const isLoop = type === "restart_loop";
-  const bg = isJs ? "#FF444422" : isLoop ? "#9B59B622" : "#FF6B3522";
-  const color = isJs ? "#FF4444" : isLoop ? "#9B59B6" : "#FF6B35";
+// Signal types derived from [resume:X] errorMessage prefix
+export type SignalType =
+  | "js_thread_freeze"
+  | "gps_flood"
+  | "memory_pressure"
+  | "native_module_missing"
+  | "appstate_transition";
+
+// All types visible in the admin UI
+export type CrashType = StoredCrashType | SignalType;
+
+// Signal types that are high-frequency diagnostic signals (NOT real crashes)
+export const DIAGNOSTIC_SIGNAL_TYPES: SignalType[] = [
+  "js_thread_freeze",
+  "gps_flood",
+  "memory_pressure",
+  "native_module_missing",
+];
+// Context-only signals (very noisy, excluded from crash counts)
+export const CONTEXT_SIGNAL_TYPES: SignalType[] = ["appstate_transition"];
+export const ALL_SIGNAL_TYPES: SignalType[] = [...DIAGNOSTIC_SIGNAL_TYPES, ...CONTEXT_SIGNAL_TYPES];
+
+interface TypeMeta {
+  label: string;
+  color: string;
+  icon: React.ComponentProps<typeof MaterialCommunityIcons>["name"];
+}
+
+export const CRASH_TYPE_META: Record<string, TypeMeta> = {
+  crash_system: { label: "Sistema",          color: "#FF6B35", icon: "phone-alert" },
+  crash_js:     { label: "JS Error",         color: "#FF4444", icon: "code-braces" },
+  restart_loop: { label: "Restart Loop",     color: "#9B59B6", icon: "restart" },
+  // Diagnostic signals
+  js_thread_freeze:      { label: "Thread Freeze",   color: "#F59E0B", icon: "timer-alert-outline" },
+  gps_flood:             { label: "GPS Flood",       color: "#3B82F6", icon: "map-marker-alert" },
+  memory_pressure:       { label: "Pressione RAM",   color: "#EF4444", icon: "memory" },
+  native_module_missing: { label: "Modulo Nativo",   color: "#8B5CF6", icon: "puzzle-remove" },
+  // Context signals (very noisy)
+  appstate_transition:   { label: "Transizione App", color: "#6B7280", icon: "transit-connection" },
+};
+
+export function getTypeMeta(type: string): TypeMeta {
+  return CRASH_TYPE_META[type] ?? { label: type, color: "#6B7280", icon: "help-circle-outline" };
+}
+
+export function CrashTypeBadge({ type }: { type: string }) {
+  const meta = getTypeMeta(type);
   return (
-    <View style={[badgeStyles.badge, { backgroundColor: bg }]}>
-      <MaterialCommunityIcons
-        name={isJs ? "code-braces" : isLoop ? "restart" : "phone-alert"}
-        size={12}
-        color={color}
-      />
-      <Text style={[badgeStyles.text, { color }]}>
-        {isJs ? "JS Error" : isLoop ? "Restart Loop" : "Sistema"}
-      </Text>
+    <View style={[badgeStyles.badge, { backgroundColor: meta.color + "22" }]}>
+      <MaterialCommunityIcons name={meta.icon} size={12} color={meta.color} />
+      <Text style={[badgeStyles.text, { color: meta.color }]}>{meta.label}</Text>
     </View>
   );
 }
@@ -40,7 +77,8 @@ export interface CrashLogRow {
   id: string;
   userId: string;
   sessionId: string;
-  crashType: CrashType;
+  crashType: string;
+  derivedType: string;
   appVersion: string | null;
   platform: string | null;
   osVersion: string | null;
@@ -75,33 +113,37 @@ export interface CrashAlert {
   crash_system: number;
   crash_js: number;
   restart_loop: number;
+  js_thread_freeze: number;
+  gps_flood: number;
+  memory_pressure: number;
+  native_module_missing: number;
 }
 
-export type AlertDominantType = "restart_loop" | "crash_js" | "crash_system" | "mixed";
+export type AlertDominantType = string;
 
 export function getAlertDominantType(alert: CrashAlert): AlertDominantType {
-  if (alert.restart_loop === alert.cnt) return "restart_loop";
-  if (alert.crash_js === alert.cnt) return "crash_js";
-  if (alert.crash_system === alert.cnt) return "crash_system";
+  const buckets: [string, number][] = [
+    ["crash_system",         alert.crash_system],
+    ["crash_js",             alert.crash_js],
+    ["restart_loop",         alert.restart_loop],
+    ["js_thread_freeze",     alert.js_thread_freeze ?? 0],
+    ["gps_flood",            alert.gps_flood ?? 0],
+    ["memory_pressure",      alert.memory_pressure ?? 0],
+    ["native_module_missing",alert.native_module_missing ?? 0],
+  ];
+  const total = buckets.reduce((s, [, n]) => s + n, 0);
+  const top = buckets.reduce((best, cur) => (cur[1] > best[1] ? cur : best), ["mixed", 0]);
+  if (top[1] === total && total > 0) return top[0] as AlertDominantType;
   return "mixed";
 }
 
-export function getAlertAccentColor(dominant: AlertDominantType): string {
-  switch (dominant) {
-    case "restart_loop": return "#9B59B6";
-    case "crash_js":     return "#FF4444";
-    case "crash_system": return "#FF6B35";
-    default:             return "#FF6B35";
-  }
+export function getAlertAccentColor(dominant: string): string {
+  const meta = CRASH_TYPE_META[dominant];
+  return meta?.color ?? "#FF6B35";
 }
 
-export function getAlertDominantLabel(dominant: AlertDominantType): string {
-  switch (dominant) {
-    case "restart_loop": return "Restart Loop";
-    case "crash_js":     return "JS Error";
-    case "crash_system": return "Sistema";
-    default:             return "Misto";
-  }
+export function getAlertDominantLabel(dominant: string): string {
+  return CRASH_TYPE_META[dominant]?.label ?? "Misto";
 }
 
 export interface CrashAlertsResponse {
@@ -123,6 +165,10 @@ export interface VersionStat {
   crash_system: number;
   crash_js: number;
   restart_loop: number;
+  js_thread_freeze: number;
+  gps_flood: number;
+  memory_pressure: number;
+  native_module_missing: number;
   total: number;
 }
 
@@ -131,14 +177,48 @@ export interface DayTrend {
   crash_system: number;
   crash_js: number;
   restart_loop: number;
+  js_thread_freeze: number;
+  gps_flood: number;
+  memory_pressure: number;
+  native_module_missing: number;
 }
 
 export interface CrashStatsResponse {
-  byType: { crash_system: number; crash_js: number; restart_loop: number };
+  byType: {
+    crash_system: number;
+    crash_js: number;
+    restart_loop: number;
+    js_thread_freeze: number;
+    gps_flood: number;
+    memory_pressure: number;
+    native_module_missing: number;
+    appstate_transition: number;
+  };
   byVersion: VersionStat[];
   dailyTrend: DayTrend[];
   crashFreeRate24h: number | null;
   ramMedianCrashMb: number | null;
+}
+
+// High-frequency signal anomaly summary
+export interface SignalFrequencyItem {
+  signal_type: string;
+  userId: string;
+  nickname: string | null;
+  sessionId: string | null;
+  appVersion: string | null;
+  platform: string | null;
+  deviceModel: string | null;
+  occurrences: number;
+  first_seen: string;
+  last_seen: string;
+  window_sec: number;
+}
+
+export interface SignalFrequencyResponse {
+  hours: number;
+  minCount: number;
+  items: SignalFrequencyItem[];
 }
 
 export interface RestartLoopSummaryItem {

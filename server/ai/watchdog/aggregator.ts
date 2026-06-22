@@ -12,6 +12,7 @@ import { collectLatency } from "./collectors/latency-collector";
 import { collectErrors } from "./collectors/error-collector";
 import { collectMaps } from "./collectors/maps-collector";
 import { collectRestarts } from "./collectors/restart-collector";
+import { collectCrashSignals } from "./collectors/crash-signals-collector";
 import { collectPool } from "./collectors/pool-collector";
 import { recordSignals } from "./signals";
 import type { HealthSnapshot, Problem, Severity, Signal } from "./types";
@@ -285,6 +286,17 @@ function deriveProblems(signals: Signal[]): Problem[] {
         ? `Server riavviato ${count} volte di recente (ultimo: ${minAgo} min dopo il boot precedente)`
         : `Server riavviato inaspettatamente (${minAgo} min dopo il boot precedente)`;
       suggestion = "Possibile crash loop o deploy ripetuto. Verifica i log di avvio e Sentry.";
+    } else if (s.metric.startsWith("crash_signal.")) {
+      const det = s.details as {
+        label?: string; total?: number; distinctUsers?: number; windowH?: number;
+      } | undefined;
+      const label = det?.label ?? s.metric.split(".")[1];
+      const users = det?.distinctUsers ?? "?";
+      const windowH = det?.windowH ?? 2;
+      title = `Segnale client "${label}": ${s.value} eventi da ${users} utenti (${windowH}h)`;
+      suggestion = s.severity === "high"
+        ? `Alto volume di "${label}" rilevato. Verifica i crash log e filtra per questo tipo nel pannello diagnostici.`
+        : `Frequenza anomala di "${label}" rilevata. Monitora la tendenza nei crash log.`;
     }
     problems.push({
       id, severity: s.severity, source: s.source, title, suggestion,
@@ -397,6 +409,7 @@ export async function runAggregatorCycle(): Promise<HealthSnapshot> {
     withBgDbSlot(() => collectEmbeddingSignals()),
     withBgDbSlot(() => collectRestarts()),
     withBgDbSlot(() => collectAdsOrphanSignals()),
+    withBgDbSlot(() => collectCrashSignals()),
   ]);
   const signals: Signal[] = [];
   for (const r of collectors) {

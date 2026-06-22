@@ -1,14 +1,25 @@
 import React from "react";
-import { View, Text, StyleSheet, TextInput, TouchableOpacity } from "react-native";
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useColors } from "@/hooks/useColors";
 import { CrashType } from "./CrashLogTypes";
 
-export const TYPE_FILTERS: { label: string; value: "" | CrashType }[] = [
+interface FilterOption {
+  label: string;
+  value: "" | CrashType;
+  color?: string;
+}
+
+export const TYPE_FILTERS: FilterOption[] = [
   { label: "Tutti", value: "" },
-  { label: "Sistema", value: "crash_system" },
-  { label: "JS Error", value: "crash_js" },
-  { label: "Restart Loop", value: "restart_loop" },
+  { label: "Sistema", value: "crash_system", color: "#FF6B35" },
+  { label: "JS Error", value: "crash_js", color: "#FF4444" },
+  { label: "Restart Loop", value: "restart_loop", color: "#9B59B6" },
+  { label: "Thread Freeze", value: "js_thread_freeze", color: "#F59E0B" },
+  { label: "GPS Flood", value: "gps_flood", color: "#3B82F6" },
+  { label: "RAM", value: "memory_pressure", color: "#EF4444" },
+  { label: "Modulo Nativo", value: "native_module_missing", color: "#8B5CF6" },
+  { label: "Transizione", value: "appstate_transition", color: "#6B7280" },
 ];
 
 interface CrashLogFiltersProps {
@@ -53,26 +64,34 @@ export function CrashLogFilters({
 
   return (
     <View>
-      <View style={[styles.typeBar, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-        {TYPE_FILTERS.map((f) => (
-          <TouchableOpacity
-            key={f.value}
-            style={[
-              styles.typeBtn,
-              filterType === f.value && { backgroundColor: colors.accent + "22" },
-            ]}
-            onPress={() => { setFilterType(f.value); setPage(1); }}
-          >
-            <Text style={[styles.typeBtnText, { color: filterType === f.value ? colors.accent : colors.textSecondary }]}>
-              {f.label}
-            </Text>
-          </TouchableOpacity>
-        ))}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={[styles.typeBar, { backgroundColor: colors.surface, borderColor: colors.border }]}
+        contentContainerStyle={styles.typeBarContent}
+      >
+        {TYPE_FILTERS.map((f) => {
+          const isActive = filterType === f.value;
+          const activeColor = f.color ?? colors.accent;
+          return (
+            <TouchableOpacity
+              key={f.value}
+              style={[
+                styles.typeBtn,
+                isActive && { backgroundColor: activeColor + "22" },
+              ]}
+              onPress={() => { setFilterType(f.value); setPage(1); }}
+            >
+              <Text style={[styles.typeBtnText, { color: isActive ? activeColor : colors.textSecondary }]}>
+                {f.label}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
         <TouchableOpacity
           style={[
             styles.typeBtn,
             showFilters && { backgroundColor: colors.accent + "22" },
-            { marginLeft: "auto" },
           ]}
           onPress={() => setShowFilters((v) => !v)}
         >
@@ -82,7 +101,7 @@ export function CrashLogFilters({
             color={hasActiveFilters ? colors.accent : colors.textSecondary}
           />
         </TouchableOpacity>
-      </View>
+      </ScrollView>
 
       {showFilters && (
         <View style={[styles.filtersPanel, { backgroundColor: colors.surface, borderColor: colors.border }]}>
@@ -161,13 +180,15 @@ export function CrashLogFilters({
 
 const styles = StyleSheet.create({
   typeBar: {
+    borderBottomWidth: 1,
+  },
+  typeBarContent: {
     flexDirection: "row",
     gap: 4,
     padding: 10,
-    borderBottomWidth: 1,
     alignItems: "center",
   },
-  typeBtn: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20 },
+  typeBtn: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 20 },
   typeBtnText: { fontFamily: "Inter_600SemiBold", fontSize: 13 },
   filtersPanel: {
     borderBottomWidth: 1,
