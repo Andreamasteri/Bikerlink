@@ -691,30 +691,55 @@ echo "════════════════════════�
 echo ""
 
 # ── GUARD: no navigation strings referencing .part* paths ────
-# router.push / href / Linking calls must never use .part2,
-# .part3, etc. as path segments — those files are helper modules
+# Files named *.part2.tsx, *.part3.tsx, etc. are helper modules
 # prefixed with _ and are intentionally excluded from Expo Router.
 # A navigation target pointing to one would silently 404.
+#
+# Navigation patterns covered by this guard:
+#   • router.push/replace/navigate(...)    – direct router object calls
+#   • <Link href="...">                    – JSX Link component (matched via href=)
+#   • href="..."                           – generic href= attributes in JSX/HTML
+#   • Linking.open / Linking.openURL(...)  – deep-link calls
+#   • push(...) / replace(...) / navigate(...)
+#                                          – destructured useRouter() hooks
+#                                            e.g. const { push } = useRouter(); push("/x.part2")
 echo "════════════════════════════════════════"
 echo "  Guard: navigation strings ↔ .part paths"
 echo "════════════════════════════════════════"
-# Self-check: the guard regex must detect a synthetic bad line.
-# If the self-check itself fails to detect the bad pattern, we warn
-# rather than giving a false green — prevents silent regex regressions.
-_SELFCHECK_LINE='  router.push("/giri/1.part2");'
-_SELFCHECK_HIT=$(printf '%s\n' "$_SELFCHECK_LINE" | grep -E '(router\.(push|replace|navigate)|href=|Linking\.(open|openURL))' | grep -E '\.part[0-9]' || true)
-if [ -z "$_SELFCHECK_HIT" ]; then
-  echo "⚠️  Guard self-check FALLITO — il pattern grep non funziona come atteso."
-  echo "   Il guard potrebbe non rilevare path .part* nelle chiamate di navigazione."
+
+# Self-check A: the guard regex must detect router.push form.
+_SELFCHECK_LINE_A='  router.push("/giri/1.part2");'
+_SELFCHECK_HIT_A=$(printf '%s\n' "$_SELFCHECK_LINE_A" | grep -E '(router\.(push|replace|navigate)|href=|Linking\.(open|openURL)|[^a-zA-Z_](push|replace|navigate)\()' | grep -E '\.part[0-9]' || true)
+if [ -z "$_SELFCHECK_HIT_A" ]; then
+  echo "⚠️  Guard self-check A FALLITO — il pattern grep non funziona come atteso."
+  echo "   Il guard potrebbe non rilevare path .part* nelle chiamate router.push."
+fi
+
+# Self-check B: the guard regex must detect destructured-router push form (indented).
+_SELFCHECK_LINE_B='  push("/giri/1.part2");'
+_SELFCHECK_HIT_B=$(printf '%s\n' "$_SELFCHECK_LINE_B" | grep -E '(router\.(push|replace|navigate)|href=|Linking\.(open|openURL)|(^|[^a-zA-Z_])(push|replace|navigate)\()' | grep -E '\.part[0-9]' || true)
+if [ -z "$_SELFCHECK_HIT_B" ]; then
+  echo "⚠️  Guard self-check B FALLITO — il pattern grep non funziona come atteso."
+  echo "   Il guard potrebbe non rilevare path .part* nelle chiamate push() destructured."
+fi
+
+# Self-check C: the guard regex must detect destructured-router push at start-of-line.
+_SELFCHECK_LINE_C='push("/giri/1.part2");'
+_SELFCHECK_HIT_C=$(printf '%s\n' "$_SELFCHECK_LINE_C" | grep -E '(router\.(push|replace|navigate)|href=|Linking\.(open|openURL)|(^|[^a-zA-Z_])(push|replace|navigate)\()' | grep -E '\.part[0-9]' || true)
+if [ -z "$_SELFCHECK_HIT_C" ]; then
+  echo "⚠️  Guard self-check C FALLITO — il pattern grep non funziona come atteso."
+  echo "   Il guard potrebbe non rilevare path .part* in push() a inizio riga."
 fi
 
 # Two-pass approach:
-# 1. Find lines that contain navigation call patterns (router.push etc.)
+# 1. Find lines that contain any navigation call pattern (router.push, href=, push(...), etc.)
 # 2. Strip "filepath:linenum:" prefix with awk and filter content for .partN
 #    (a plain grep pipe would false-positive on filenames like _[id].part2.tsx)
+# Note: (^|[^a-zA-Z_]) covers both start-of-line and non-letter prefix so that
+# bare push()/replace()/navigate() calls are caught regardless of indentation.
 NAV_PART_HITS=$(grep -rn \
   --include="*.ts" --include="*.tsx" \
-  -E "(router\.(push|replace|navigate)|href=|Linking\.(open|openURL))" \
+  -E "(router\.(push|replace|navigate)|href=|Linking\.(open|openURL)|(^|[^a-zA-Z_])(push|replace|navigate)\()" \
   app/ components/ hooks/ lib/ 2>/dev/null \
   | awk -F: '{ content=$0; sub(/^[^:]+:[0-9]+:/, "", content); if (content ~ /\.part[0-9]/) print $0 }' \
   || true)
