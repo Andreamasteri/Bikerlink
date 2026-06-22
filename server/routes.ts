@@ -418,12 +418,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   }).catch(() => {});
 
-  import("./export-service").then(({ startExportScheduler }) => {
-    startExportScheduler().catch((err: unknown) => {
-      console.error("[export-service] Failed to start scheduler:", err);
-    });
-  }).catch(() => {});
-
   import("./sync-service").then(({ startSyncScheduler }) => {
     startSyncScheduler();
   }).catch(() => {});

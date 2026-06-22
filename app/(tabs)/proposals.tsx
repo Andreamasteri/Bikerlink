@@ -59,6 +59,10 @@ interface ProposalItem {
   motoInfo?: { brand: string; model: string; motorcycleType: string; ridingStyle: string } | null;
 }
 
+function ProposalCard({ item, onPress, t, locale }: { item: ProposalItem; onPress: () => void; t: (key: string) => string; locale: string }) {
+  const typeInfo = getTypeIcon(item.proposalType);
+  const scheduledDate = item.scheduledAt
+    ? new Date(item.scheduledAt).toLocaleDateString(locale, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })
     : null;
 
   return (

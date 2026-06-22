@@ -317,6 +317,14 @@ export async function runPhase5Schedulers(): Promise<void> {
   }
 
   try {
+    const { startExportScheduler } = await import("./export-service");
+    await startExportScheduler();
+    console.log("[INIT] Export scheduler started");
+  } catch (e) {
+    console.warn("[INIT] Export scheduler failed to start (non-fatal):", e);
+  }
+
+  try {
     const { startHoleDetectorScheduler } = await import("./ai/pipeline-monitor/hole-detector");
     startHoleDetectorScheduler();
     console.log("[INIT] Pipeline hole detector scheduler started (5min interval)");
