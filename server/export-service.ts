@@ -453,6 +453,36 @@ export async function runExport(options: Partial<ExportOptions> = {}): Promise<E
   }
 }
 
+export async function startExportScheduler(): Promise<void> {
+  stopExportScheduler();
+  const schedule = await getExportSchedule();
+  const intervalMs = getScheduleIntervalMs(schedule);
+  if (!intervalMs) return;
+
+  nextAt = addMs(intervalMs);
+
+  function scheduleNext(delayMs: number): void {
+    schedulerTimer = setTimeout(async () => {
+      schedulerTimer = null;
+      nextAt = null;
+      try {
+        await runExport({});
+      } catch (err) {
+        console.error("[export-service] scheduled export failed:", err);
+      }
+      const sched = await getExportSchedule();
+      const ms = getScheduleIntervalMs(sched);
+      if (ms) {
+        nextAt = addMs(ms);
+        scheduleNext(ms);
+      }
+    }, delayMs);
+    schedulerTimer.unref?.();
+  }
+
+  scheduleNext(intervalMs);
+}
+
 export * from "./export-service.part2";
 
 async function restartScheduler() {
