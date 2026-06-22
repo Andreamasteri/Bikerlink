@@ -690,4 +690,47 @@ fi
 echo "════════════════════════════════════════"
 echo ""
 
+# ── GUARD: no navigation strings referencing .part* paths ────
+# router.push / href / Linking calls must never use .part2,
+# .part3, etc. as path segments — those files are helper modules
+# prefixed with _ and are intentionally excluded from Expo Router.
+# A navigation target pointing to one would silently 404.
+echo "════════════════════════════════════════"
+echo "  Guard: navigation strings ↔ .part paths"
+echo "════════════════════════════════════════"
+# Self-check: the guard regex must detect a synthetic bad line.
+# If the self-check itself fails to detect the bad pattern, we warn
+# rather than giving a false green — prevents silent regex regressions.
+_SELFCHECK_LINE='  router.push("/giri/1.part2");'
+_SELFCHECK_HIT=$(printf '%s\n' "$_SELFCHECK_LINE" | grep -E '(router\.(push|replace|navigate)|href=|Linking\.(open|openURL))' | grep -E '\.part[0-9]' || true)
+if [ -z "$_SELFCHECK_HIT" ]; then
+  echo "⚠️  Guard self-check FALLITO — il pattern grep non funziona come atteso."
+  echo "   Il guard potrebbe non rilevare path .part* nelle chiamate di navigazione."
+fi
+
+# Two-pass approach:
+# 1. Find lines that contain navigation call patterns (router.push etc.)
+# 2. Strip "filepath:linenum:" prefix with awk and filter content for .partN
+#    (a plain grep pipe would false-positive on filenames like _[id].part2.tsx)
+NAV_PART_HITS=$(grep -rn \
+  --include="*.ts" --include="*.tsx" \
+  -E "(router\.(push|replace|navigate)|href=|Linking\.(open|openURL))" \
+  app/ components/ hooks/ lib/ 2>/dev/null \
+  | awk -F: '{ content=$0; sub(/^[^:]+:[0-9]+:/, "", content); if (content ~ /\.part[0-9]/) print $0 }' \
+  || true)
+if [ -n "$NAV_PART_HITS" ]; then
+  echo "❌ ERRORE: trovate stringhe di navigazione con path .part*"
+  echo "   I file .partN.tsx sono helper module (prefissati _) e non"
+  echo "   sono route Expo Router. Un push/href a questi path causa 404."
+  echo ""
+  echo "$NAV_PART_HITS"
+  echo ""
+  echo "   → Correggere i path di navigazione prima del merge."
+  exit 1
+else
+  echo "✅ Nessuna stringa di navigazione punta a path .part*."
+fi
+echo "════════════════════════════════════════"
+echo ""
+
 exit 0
