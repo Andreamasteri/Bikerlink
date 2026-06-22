@@ -4,13 +4,17 @@
 # Uso:
 #   ./services.sh stop    — ferma tutto tranne Valhalla, Postgres, Redis
 #   ./services.sh start   — riavvia tutto
-#   ./services.sh status  — mostra stato di tutti i container
+#   ./services.sh status  — mostra stato di tutti i container/servizi
 
 ok()   { echo "[OK]   $1"; }
 info() { echo "[INFO] $1"; }
+warn() { echo "[WARN] $1"; }
 
-HEAVY=(
-  bikerlink-ollama
+# Ollama gira come servizio systemd (non Docker)
+SYSTEMD_HEAVY=(ollama)
+
+# Servizi pesanti Docker
+DOCKER_HEAVY=(
   bikerlink-whisper
   bikerlink-nominatim
   bikerlink-gh-balcani
@@ -22,7 +26,7 @@ HEAVY=(
   bikerlink-gh-germania-centro
 )
 
-ALWAYS_ON=(
+DOCKER_ALWAYS_ON=(
   bikerlink-valhalla
   bikerlink-postgres
   bikerlink-redis
@@ -32,16 +36,30 @@ ALWAYS_ON=(
 
 ACTION="${1:-status}"
 
+docker_action() {
+  local action="$1" c="$2"
+  if docker inspect "$c" &>/dev/null; then
+    docker "$action" "$c" 2>/dev/null \
+      && ok "$action: $c" \
+      || info "Già ${action}pato o errore: $c"
+  else
+    info "Container non esiste: $c"
+  fi
+}
+
 case "$ACTION" in
 
   stop)
     echo "=== STOP servizi pesanti ($(date '+%H:%M:%S')) ==="
-    for c in "${HEAVY[@]}"; do
-      if docker inspect "$c" &>/dev/null; then
-        docker stop "$c" 2>/dev/null && ok "Fermato: $c" || info "Non in esecuzione: $c"
+    for svc in "${SYSTEMD_HEAVY[@]}"; do
+      if systemctl is-active --quiet "$svc" 2>/dev/null; then
+        sudo systemctl stop "$svc" && ok "Fermato (systemd): $svc" || warn "Stop fallito: $svc"
       else
-        info "Non esiste: $c"
+        info "Già fermo (systemd): $svc"
       fi
+    done
+    for c in "${DOCKER_HEAVY[@]}"; do
+      docker_action stop "$c"
     done
     echo ""
     info "Valhalla, Postgres, Redis: rimasti accesi."
@@ -49,20 +67,24 @@ case "$ACTION" in
 
   start)
     echo "=== START servizi ($(date '+%H:%M:%S')) ==="
-    for c in "${HEAVY[@]}" "${ALWAYS_ON[@]}"; do
-      if docker inspect "$c" &>/dev/null; then
-        docker start "$c" 2>/dev/null && ok "Avviato: $c" || info "Già in esecuzione o errore: $c"
-      else
-        info "Non esiste: $c"
-      fi
+    for svc in "${SYSTEMD_HEAVY[@]}"; do
+      sudo systemctl start "$svc" && ok "Avviato (systemd): $svc" || warn "Start fallito: $svc"
+    done
+    for c in "${DOCKER_HEAVY[@]}" "${DOCKER_ALWAYS_ON[@]}"; do
+      docker_action start "$c"
     done
     ;;
 
   status)
-    echo "=== STATUS container BikerLink ($(date '+%H:%M:%S')) ==="
-    printf "%-42s %s\n" "CONTAINER" "STATO"
+    echo "=== STATUS servizi BikerLink ($(date '+%H:%M:%S')) ==="
+    echo ""
+    printf "%-42s %s\n" "SERVIZIO" "STATO"
     printf "%-42s %s\n" "-----------------------------------------" "------"
-    for c in "${HEAVY[@]}" "${ALWAYS_ON[@]}"; do
+    for svc in "${SYSTEMD_HEAVY[@]}"; do
+      STATE=$(systemctl is-active "$svc" 2>/dev/null || echo "assente")
+      printf "%-42s %s\n" "$svc (systemd)" "$STATE"
+    done
+    for c in "${DOCKER_HEAVY[@]}" "${DOCKER_ALWAYS_ON[@]}"; do
       STATE=$(docker inspect --format='{{.State.Status}}' "$c" 2>/dev/null || echo "assente")
       printf "%-42s %s\n" "$c" "$STATE"
     done
