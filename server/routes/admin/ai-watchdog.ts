@@ -2,6 +2,7 @@
 import { Router, type Request, type Response } from "express";
 import { sendError } from "../../lib/api-response";
 import { db } from "../../db";
+import { storage } from "../../storage";
 import { aiWatchdogLog, weeklySystemReports } from "@shared/db";
 import { desc, eq, sql } from "drizzle-orm";
 import { z } from "zod";
@@ -286,6 +287,84 @@ router.post("/watchdog/proposer/settings", async (req, res) => {
   if (!parsed.success) return sendError(res, 400, parsed.error.issues[0].message);
   await setProposerModel(parsed.data.model);
   return res.json({ model: parsed.data.model });
+});
+
+// === Signal Thresholds ===
+
+const DEFAULT_SIGNAL_CONFIG_BACKEND = {
+  js_thread_freeze:      { warnCount: 10,  warnUsers: 2, highCount: 50,  highUsers: 3, label: "JS thread freeze" },
+  gps_flood:             { warnCount: 15,  warnUsers: 2, highCount: 60,  highUsers: 3, label: "GPS flood" },
+  memory_pressure:       { warnCount: 5,   warnUsers: 2, highCount: 20,  highUsers: 3, label: "pressione RAM" },
+  native_module_missing: { warnCount: 3,   warnUsers: 1, highCount: 999, highUsers: 999, label: "modulo nativo mancante" },
+} as const;
+
+router.get("/watchdog/signal-thresholds", async (_req, res) => {
+  try {
+    const setting = await storage.getAppSetting("watchdog_signal_thresholds");
+    const overrides = (setting?.valueJson ?? {}) as Record<string, Partial<{ warnCount: number; warnUsers: number; highCount: number; highUsers: number }>>;
+    const effective: Record<string, { warnCount: number; warnUsers: number; highCount: number; highUsers: number; label: string }> = {};
+    for (const [key, defaults] of Object.entries(DEFAULT_SIGNAL_CONFIG_BACKEND)) {
+      const ov = overrides[key] ?? {};
+      effective[key] = {
+        label: defaults.label,
+        warnCount:  typeof ov.warnCount  === "number" ? Math.max(1, ov.warnCount)  : defaults.warnCount,
+        warnUsers:  typeof ov.warnUsers  === "number" ? Math.max(1, ov.warnUsers)  : defaults.warnUsers,
+        highCount:  typeof ov.highCount  === "number" ? Math.max(1, ov.highCount)  : defaults.highCount,
+        highUsers:  typeof ov.highUsers  === "number" ? Math.max(1, ov.highUsers)  : defaults.highUsers,
+      };
+    }
+    return res.json({
+      defaults: DEFAULT_SIGNAL_CONFIG_BACKEND,
+      overrides,
+      effective,
+    });
+  } catch (err) {
+    return sendError(res, 500, (err as Error).message);
+  }
+});
+
+const signalThresholdSchema = z.object({
+  signal: z.enum(["js_thread_freeze", "gps_flood", "memory_pressure", "native_module_missing"]),
+  warnCount:  z.number().int().min(1).max(10_000).optional(),
+  warnUsers:  z.number().int().min(1).max(10_000).optional(),
+  highCount:  z.number().int().min(1).max(10_000).optional(),
+  highUsers:  z.number().int().min(1).max(10_000).optional(),
+});
+
+router.put("/watchdog/signal-thresholds", async (req, res) => {
+  const parsed = signalThresholdSchema.safeParse(req.body);
+  if (!parsed.success) return sendError(res, 400, parsed.error.issues[0].message);
+  const { signal, warnCount, warnUsers, highCount, highUsers } = parsed.data;
+  try {
+    const setting = await storage.getAppSetting("watchdog_signal_thresholds");
+    const current = (setting?.valueJson ?? {}) as Record<string, Partial<{ warnCount: number; warnUsers: number; highCount: number; highUsers: number }>>;
+    const prev = current[signal] ?? {};
+    const next: Record<string, number> = { ...prev };
+    if (typeof warnCount === "number") next.warnCount = warnCount;
+    if (typeof warnUsers === "number") next.warnUsers = warnUsers;
+    if (typeof highCount === "number") next.highCount = highCount;
+    if (typeof highUsers === "number") next.highUsers = highUsers;
+    const updated = { ...current, [signal]: next };
+    await storage.upsertAppSetting("watchdog_signal_thresholds", undefined, updated);
+    return res.json({ ok: true, signal, thresholds: next });
+  } catch (err) {
+    return sendError(res, 500, (err as Error).message);
+  }
+});
+
+router.delete("/watchdog/signal-thresholds/:signal", async (req, res) => {
+  const signal = req.params.signal;
+  if (!(signal in DEFAULT_SIGNAL_CONFIG_BACKEND)) return sendError(res, 400, "Segnale non valido");
+  try {
+    const setting = await storage.getAppSetting("watchdog_signal_thresholds");
+    const current = (setting?.valueJson ?? {}) as Record<string, unknown>;
+    const updated = { ...current };
+    delete updated[signal];
+    await storage.upsertAppSetting("watchdog_signal_thresholds", undefined, updated);
+    return res.json({ ok: true, signal, reset: true });
+  } catch (err) {
+    return sendError(res, 500, (err as Error).message);
+  }
 });
 
 // === Crash Breakdown ===

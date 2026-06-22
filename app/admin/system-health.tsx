@@ -23,6 +23,7 @@ import { WhisperWatchdogBadge, type WhisperHealthData } from "@/components/admin
 import { EmbeddingUsageCard } from "@/components/admin/EmbeddingUsageCard";
 import { AiTokenAuditCard } from "@/components/admin/AiTokenAuditCard";
 import { CrashBreakdownCard } from "@/components/admin/system-health/CrashBreakdownCard";
+import { SignalThresholdsCard } from "@/components/admin/system-health/SignalThresholdsCard";
 
 interface DbCircuit {
   state: "CLOSED" | "OPEN" | "HALF_OPEN";
@@ -288,6 +289,9 @@ export default function SystemHealthScreen() {
 
           <SectionTitle icon="bug-outline">Crash Breakdown</SectionTitle>
           <CrashBreakdownCard />
+
+          <SectionTitle icon="tune-variant">Soglie segnali diagnostici</SectionTitle>
+          <SignalThresholdsCard />
 
           <SectionTitle icon="chart-bar">Consumo AI oggi</SectionTitle>
           <AiTokenAuditCard />
