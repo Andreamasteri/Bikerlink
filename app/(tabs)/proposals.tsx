@@ -30,7 +30,7 @@ import {
   getTypeLabelKey,
   MatchBanner,
   ProposalHeader,
-} from "./proposals.part2";
+} from "./_proposals.part2";
 import { styles } from "./proposals.styles";
 
 interface ProposalItem {
