@@ -1,6 +1,7 @@
 // Task #2533 — Lista problemi del watchdog.
 import React from "react";
 import { View, Text, StyleSheet } from "react-native";
+import { CrashTypeBadge } from "@/components/admin/crash-logs/CrashLogTypes";
 
 export interface Problem {
   id: string;
@@ -15,25 +16,39 @@ const SEV_COLOR: Record<Problem["severity"], string> = {
   info: "#3b82f6", warn: "#eab308", high: "#f97316", critical: "#ef4444",
 };
 
+function extractCrashSignalType(id: string): string | null {
+  // id format: "app.crash_signal.{signal_type}"
+  const prefix = "app.crash_signal.";
+  if (id.startsWith(prefix)) return id.slice(prefix.length);
+  return null;
+}
+
 export function ProblemsList({ problems }: { problems: Problem[] }) {
   if (!problems.length) {
     return <Text style={styles.empty}>Nessun problema rilevato.</Text>;
   }
   return (
     <View>
-      {problems.map((p) => (
-        <View key={p.id} style={[styles.row, { borderLeftColor: SEV_COLOR[p.severity] }]}>
-          <View style={styles.headerRow}>
-            <Text style={[styles.sev, { color: SEV_COLOR[p.severity] }]}>
-              {p.severity.toUpperCase()}
-            </Text>
-            <Text style={styles.source}>{p.source}</Text>
+      {problems.map((p) => {
+        const signalType = extractCrashSignalType(p.id);
+        return (
+          <View key={p.id} style={[styles.row, { borderLeftColor: SEV_COLOR[p.severity] }]}>
+            <View style={styles.headerRow}>
+              <Text style={[styles.sev, { color: SEV_COLOR[p.severity] }]}>
+                {p.severity.toUpperCase()}
+              </Text>
+              {signalType ? (
+                <CrashTypeBadge type={signalType} />
+              ) : (
+                <Text style={styles.source}>{p.source}</Text>
+              )}
+            </View>
+            <Text style={styles.title}>{p.title}</Text>
+            {p.detail ? <Text style={styles.detail} numberOfLines={2}>{p.detail}</Text> : null}
+            {p.suggestion ? <Text style={styles.sugg}>→ {p.suggestion}</Text> : null}
           </View>
-          <Text style={styles.title}>{p.title}</Text>
-          {p.detail ? <Text style={styles.detail} numberOfLines={2}>{p.detail}</Text> : null}
-          {p.suggestion ? <Text style={styles.sugg}>→ {p.suggestion}</Text> : null}
-        </View>
-      ))}
+        );
+      })}
     </View>
   );
 }

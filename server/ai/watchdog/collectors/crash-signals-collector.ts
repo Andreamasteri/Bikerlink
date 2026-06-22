@@ -3,15 +3,20 @@
 // watchdog aggregator. These signals are stored as crash_js rows with a
 // [resume:X] prefix in error_message (written by lib/crash-logger.ts).
 //
-// Thresholds (over a 2h rolling window):
+// Default thresholds (over a 2h rolling window):
 //   js_thread_freeze:      ≥10 total from ≥2 distinct users → warn; ≥50/≥3 → high
 //   gps_flood:             ≥15 total from ≥2 distinct users → warn; ≥60/≥3 → high
 //   memory_pressure:       ≥5 total from ≥2 distinct users → warn; ≥20/≥3 → high
 //   native_module_missing: ≥3 total from ≥1 distinct user  → warn (rare, serious)
 //
+// Thresholds are configurable via AppSetting key "watchdog_signal_thresholds"
+// (valueJson — partial overrides merged over the defaults above).
+// Example: { "gps_flood": { "warnCount": 30, "highCount": 100 } }
+//
 // appstate_transition is intentionally excluded: too noisy to be actionable.
 import { db } from "../../../db";
 import { sql } from "drizzle-orm";
+import { storage } from "../../../storage";
 import type { Signal } from "../types";
 
 interface SignalRow {
@@ -21,41 +26,70 @@ interface SignalRow {
   [key: string]: unknown;
 }
 
-const SIGNAL_CONFIG: Record<string, {
-  warnCount: number; warnUsers: number;
-  highCount: number; highUsers: number;
-  label: string;
-}> = {
+interface SignalThreshold {
+  warnCount: number;
+  warnUsers: number;
+  highCount: number;
+  highUsers: number;
+}
+
+const DEFAULT_SIGNAL_CONFIG: Record<string, SignalThreshold & { label: string }> = {
   js_thread_freeze:      { warnCount: 10,  warnUsers: 2, highCount: 50,  highUsers: 3, label: "JS thread freeze" },
   gps_flood:             { warnCount: 15,  warnUsers: 2, highCount: 60,  highUsers: 3, label: "GPS flood" },
   memory_pressure:       { warnCount: 5,   warnUsers: 2, highCount: 20,  highUsers: 3, label: "pressione RAM" },
   native_module_missing: { warnCount: 3,   warnUsers: 1, highCount: 999, highUsers: 999, label: "modulo nativo mancante" },
 };
 
+async function resolveSignalConfig(): Promise<typeof DEFAULT_SIGNAL_CONFIG> {
+  try {
+    const setting = await storage.getAppSetting("watchdog_signal_thresholds");
+    if (!setting?.valueJson) return DEFAULT_SIGNAL_CONFIG;
+    const overrides = setting.valueJson as Record<string, Partial<SignalThreshold>>;
+    const merged = { ...DEFAULT_SIGNAL_CONFIG };
+    for (const [key, override] of Object.entries(overrides)) {
+      if (merged[key] && override && typeof override === "object") {
+        merged[key] = {
+          ...merged[key],
+          ...(typeof override.warnCount  === "number" ? { warnCount:  Math.max(1, override.warnCount)  } : {}),
+          ...(typeof override.warnUsers  === "number" ? { warnUsers:  Math.max(1, override.warnUsers)  } : {}),
+          ...(typeof override.highCount  === "number" ? { highCount:  Math.max(1, override.highCount)  } : {}),
+          ...(typeof override.highUsers  === "number" ? { highUsers:  Math.max(1, override.highUsers)  } : {}),
+        };
+      }
+    }
+    return merged;
+  } catch {
+    return DEFAULT_SIGNAL_CONFIG;
+  }
+}
+
 export async function collectCrashSignals(): Promise<Signal[]> {
   try {
-    const result = await db.execute<SignalRow>(sql`
-      SELECT
-        CASE
-          WHEN error_message LIKE '[resume:js_thread_freeze]%'      THEN 'js_thread_freeze'
-          WHEN error_message LIKE '[resume:gps_flood]%'             THEN 'gps_flood'
-          WHEN error_message LIKE '[resume:memory_pressure]%'       THEN 'memory_pressure'
-          WHEN error_message LIKE '[resume:native_module_missing]%' THEN 'native_module_missing'
-        END AS signal_type,
-        COUNT(*)::int            AS total,
-        COUNT(DISTINCT user_id)::int AS distinct_users
-      FROM app_crash_logs
-      WHERE error_message LIKE '[resume:%]%'
-        AND error_message NOT LIKE '[resume:appstate_transition]%'
-        AND reported_at >= NOW() - INTERVAL '2 hours'
-      GROUP BY signal_type
-      HAVING signal_type IS NOT NULL
-    `);
+    const [result, config] = await Promise.all([
+      db.execute<SignalRow>(sql`
+        SELECT
+          CASE
+            WHEN error_message LIKE '[resume:js_thread_freeze]%'      THEN 'js_thread_freeze'
+            WHEN error_message LIKE '[resume:gps_flood]%'             THEN 'gps_flood'
+            WHEN error_message LIKE '[resume:memory_pressure]%'       THEN 'memory_pressure'
+            WHEN error_message LIKE '[resume:native_module_missing]%' THEN 'native_module_missing'
+          END AS signal_type,
+          COUNT(*)::int            AS total,
+          COUNT(DISTINCT user_id)::int AS distinct_users
+        FROM app_crash_logs
+        WHERE error_message LIKE '[resume:%]%'
+          AND error_message NOT LIKE '[resume:appstate_transition]%'
+          AND reported_at >= NOW() - INTERVAL '2 hours'
+        GROUP BY signal_type
+        HAVING signal_type IS NOT NULL
+      `),
+      resolveSignalConfig(),
+    ]);
 
     const signals: Signal[] = [];
 
     for (const row of result.rows) {
-      const cfg = SIGNAL_CONFIG[row.signal_type];
+      const cfg = config[row.signal_type];
       if (!cfg) continue;
 
       const isHigh = row.total >= cfg.highCount && row.distinct_users >= cfg.highUsers;
