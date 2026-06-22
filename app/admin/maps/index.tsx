@@ -8,12 +8,12 @@ import Colors from "@/constants/colors";
 import { apiRequest, queryClient, getApiUrl, authFetchHeaders } from "@/lib/query-client";
 import type { MapsRollout, MapsRendererId, MapsTileId, RoutingEngineId, RoutingProfileId } from "@shared/maps-config";
 import { RENDERER_OPTIONS, TILE_OPTIONS, ROUTING_OPTIONS } from "@shared/maps-config";
-import { RolloutCard } from "./RolloutCard";
-import { RendererCard } from "./RendererCard";
-import { RoutingCard } from "./RoutingCard";
-import { TileProvidersCard } from "./TileProvidersCard";
-import { GeocodingCard } from "./GeocodingCard";
-import type { NominatimHealth } from "./GeocodingCard";
+import { RolloutCard } from "@/components/admin/maps/RolloutCard";
+import { RendererCard } from "@/components/admin/maps/RendererCard";
+import { RoutingCard } from "@/components/admin/maps/RoutingCard";
+import { TileProvidersCard } from "@/components/admin/maps/TileProvidersCard";
+import { GeocodingCard } from "@/components/admin/maps/GeocodingCard";
+import type { NominatimHealth } from "@/components/admin/maps/GeocodingCard";
 
 interface AdminMapsConfig {
   rollout: MapsRollout;

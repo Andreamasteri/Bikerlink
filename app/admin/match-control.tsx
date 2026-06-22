@@ -1,5 +1,4 @@
-// Task #2603 — split mechanical: stili, types, FreshnessSlider e EngineActionsCard
-// estratti in app/admin/match-control/.
+// FreshnessSlider e EngineActionsCard estratti in components/admin/match-control/.
 import React, { useMemo } from "react";
 import {
   View,
@@ -20,8 +19,8 @@ import { CycleMetaCard } from "@/components/admin/matching/CycleMetaCard";
 import { LockCard } from "@/components/admin/matching/LockCard";
 import { StatsTable } from "@/components/admin/matching/StatsTable";
 import { styles } from "@/components/admin/match-control/styles";
-import { FreshnessSlider } from "./match-control/FreshnessSlider";
-import { EngineActionsCard } from "./match-control/EngineActionsCard";
+import { FreshnessSlider } from "@/components/admin/match-control/FreshnessSlider";
+import { EngineActionsCard } from "@/components/admin/match-control/EngineActionsCard";
 import {
   AppSettingRow,
   FRESHNESS_KEYS,

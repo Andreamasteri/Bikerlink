@@ -23,7 +23,7 @@ import {
   RenameModal,
   lapDetailStyles,
   type LapSample,
-} from "./LapDetailParts";
+} from "@/components/giro/LapDetailParts";
 
 export default function IdealLapDetailScreen() {
   const { sessionId } = useLocalSearchParams<{ sessionId: string }>();

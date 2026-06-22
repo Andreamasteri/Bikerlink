@@ -32,7 +32,7 @@ import {
   parseHashtagsFromInput,
   messageMatchesHashtags,
   MotoclubWelcomeBanner,
-} from "@/app/chat/chat-id-types";
+} from "@/components/chat/chat-id-types";
 import { useChatImageUpload } from "@/hooks/useChatImageUpload";
 import { useChatConversationActions } from "@/hooks/useChatConversationActions";
 

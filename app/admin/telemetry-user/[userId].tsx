@@ -15,8 +15,8 @@ import { useLocalSearchParams } from "expo-router";
 import Colors from "@/constants/colors";
 import { getApiUrl, authFetchHeaders } from "@/lib/query-client";
 import { type Session } from "@/components/admin/telemetry/SessionMapModal";
-import { SessionCard } from "./SessionCard";
-import { CalibrationCard, type MountCalibration } from "./CalibrationCard";
+import { SessionCard } from "@/components/admin/telemetry-user/SessionCard";
+import { CalibrationCard, type MountCalibration } from "@/components/admin/telemetry-user/CalibrationCard";
 
 type UserDetail = {
   mountCalibration: MountCalibration;

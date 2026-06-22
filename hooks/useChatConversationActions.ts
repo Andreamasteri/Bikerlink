@@ -2,7 +2,7 @@ import { useCallback } from "react";
 import { Alert } from "react-native";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/query-client";
-import type { ConversationDetail } from "@/app/chat/chat-id-types";
+import type { ConversationDetail } from "@/components/chat/chat-id-types";
 
 interface CurrentUser {
   id: string;

@@ -210,31 +210,54 @@ fi
 echo "════════════════════════════════════════"
 echo ""
 
-# ── GATE ROTTE FANTASMA cartelle stack app/**/*.ts ───────────
+# ── GATE ROTTE FANTASMA cartelle stack app/**/*.ts e .tsx componenti ────────
 # Expo Router registra OGNI file .ts/.tsx in app/ come rotta, in modo
 # RICORSIVO (anche nelle cartelle stack: app/profile, app/giri, app/admin…).
-# Qualsiasi file helper .ts co-locato in queste cartelle genera un route node
-# (deeplink rotto / warning "missing the required default export").
-# FIX DEFINITIVO (2026-06-22): tutti i file helper sono stati spostati in
-# components/ o lib/. La regola ora è: NESSUN .ts (non-_layout) in app/
-# nelle cartelle stack — né con né senza prefisso _.
+# Qualsiasi file helper co-locato genera un route node (deeplink rotto /
+# warning "missing the required default export").
+# REGOLA 1: nessun .ts (non-.tsx) in app/ fuori da (tabs)/
+# REGOLA 2: nelle sotto-sotto-cartelle di app/ (es. app/admin/maps/,
+#           app/admin/telemetry-user/) sono ammessi SOLO:
+#             index.tsx, _layout.tsx, file che matchano [param].tsx
+#           Tutto il resto (Card.tsx, Row.tsx, ecc.) va in components/.
 # Vedi .agents/memory/expo-tabs-route-pollution.md
 echo "════════════════════════════════════════"
 echo "  Gate rotte fantasma stack app/**"
 echo "════════════════════════════════════════"
 STACK_PHANTOM=()
+
+# Regola 1 — .ts puri (non-.tsx) in qualsiasi cartella di app/ tranne (tabs)/
 while IFS= read -r _f; do
   [ -n "$_f" ] && STACK_PHANTOM+=("$_f")
 done < <(find app -type f -name '*.ts' ! -name '*.tsx' ! -path 'app/(tabs)/*')
+
+# Regola 2 — .tsx in sotto-sotto-cartelle di app/ (profondità ≥ 3)
+#   Se la cartella ha un _layout.tsx → è uno stack legittimo, tutti i .tsx ammessi.
+#   Altrimenti ammessi solo: index.tsx, _layout.tsx, _layout.part2.tsx, [param].tsx
+while IFS= read -r _f; do
+  _bn=$(basename "$_f")
+  _dir=$(dirname "$_f")
+  # se la cartella ha _layout.tsx → stack legittimo, tutti i file screen ammessi
+  [ -f "$_dir/_layout.tsx" ] && continue
+  # ammetti route di base
+  [[ "$_bn" == "index.tsx" ]]         && continue
+  [[ "$_bn" == "_layout.tsx" ]]       && continue
+  [[ "$_bn" == "_layout.part2.tsx" ]] && continue
+  [[ "$_bn" =~ ^\[.+\]\.tsx$ ]]       && continue
+  STACK_PHANTOM+=("$_f")
+done < <(find app -mindepth 3 -maxdepth 4 -type f -name '*.tsx' \
+           ! -path 'app/(tabs)/*' \
+           ! -path 'app/(auth)/*')
+
 if [ ${#STACK_PHANTOM[@]} -eq 0 ]; then
-  echo "✅ Nessun file .ts helper nelle cartelle stack di app/."
+  echo "✅ Nessun file helper nelle cartelle stack di app/."
 else
-  echo "❌ File .ts rilevati in app/ (fuori da (tabs)) — generano route node fantasma:"
+  echo "❌ File helper rilevati in app/ — generano route node fantasma:"
   for _pf in "${STACK_PHANTOM[@]}"; do
     echo "   ⚠️  $_pf"
   done
   echo ""
-  echo "   Expo Router registra QUALSIASI .ts in app/ come rotta (con o senza _)."
+  echo "   Expo Router registra QUALSIASI .ts/.tsx in app/ come rotta."
   echo "   → Spostare il file in components/ o lib/ e aggiornare gli import."
   echo "════════════════════════════════════════"
   echo ""
