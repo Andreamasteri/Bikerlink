@@ -1,8 +1,8 @@
 /**
  * ESLint rule: no-part-nav
  *
- * Catches navigation calls where a template-literal argument contains a
- * ".partN" segment (e.g. `push(\`/giri/${id}.part2\`)`).
+ * Catches navigation calls where an argument contains a ".partN" segment,
+ * whether expressed as a template literal or via string concatenation.
  *
  * Static string literals are already covered by the grep gate in
  * scripts/post-merge.sh.  This rule closes the gap for dynamically-
@@ -13,8 +13,15 @@
  *   push(...)  replace(...)  navigate(...)   (destructured useRouter)
  *   <Link href={`...`}>
  *
+ * Detected expression forms:
+ *   - Template literals:   push(`/giri/${id}.part2`)
+ *   - Binary concatenation: push("/giri/" + id + ".part2")
+ *
  * A template literal matches when at least one of its string parts
  * (quasis / cooked text) contains ".part" followed by a digit.
+ *
+ * A binary expression (+) matches when any Literal leaf in the
+ * concatenation chain contains ".part" followed by a digit.
  */
 
 "use strict";
@@ -28,12 +35,27 @@ function templateLiteralHasPart(node) {
   );
 }
 
+/**
+ * Recursively walk a BinaryExpression (+) chain and return true if any
+ * string Literal leaf contains ".partN".
+ */
+function binaryExpressionHasPart(node) {
+  if (!node) return false;
+  if (node.type === "Literal") {
+    return typeof node.value === "string" && PART_RE.test(node.value);
+  }
+  if (node.type === "BinaryExpression" && node.operator === "+") {
+    return binaryExpressionHasPart(node.left) || binaryExpressionHasPart(node.right);
+  }
+  return false;
+}
+
 module.exports = {
   meta: {
     type: "problem",
     docs: {
       description:
-        'Warn when a navigation call uses a template literal containing ".partN". ' +
+        'Warn when a navigation call uses a path containing ".partN". ' +
         "Files named *.partN.tsx are helper modules excluded from Expo Router; " +
         "navigating to them causes a silent 404.",
     },
@@ -47,7 +69,14 @@ module.exports = {
 
   create(context) {
     function checkArg(argNode) {
-      if (argNode && argNode.type === "TemplateLiteral" && templateLiteralHasPart(argNode)) {
+      if (!argNode) return;
+
+      if (argNode.type === "TemplateLiteral" && templateLiteralHasPart(argNode)) {
+        context.report({ node: argNode, messageId: "noPartNav" });
+        return;
+      }
+
+      if (argNode.type === "BinaryExpression" && binaryExpressionHasPart(argNode)) {
         context.report({ node: argNode, messageId: "noPartNav" });
       }
     }
