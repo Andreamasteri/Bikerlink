@@ -431,6 +431,28 @@ fi
 echo "════════════════════════════════════════"
 echo ""
 
+# ── GATE FLAG PULIZIA NOTTURNA METRO ─────────────────────────
+# Verifica che metro-cache-check.sh (sourciato da start-expo.sh):
+#   - flag PRESENTE → FORCE_RESET=1 e flag rimosso
+#   - flag ASSENTE  → FORCE_RESET=0
+# Blocca la regressione del meccanismo di pulizia automatica 01:00 UTC.
+echo "════════════════════════════════════════"
+echo "  Gate flag pulizia notturna Metro"
+echo "════════════════════════════════════════"
+METRO_CACHE_FLAG_EXIT=0
+bash scripts/__tests__/metro-cache-flag.test.sh 2>&1 || METRO_CACHE_FLAG_EXIT=$?
+if [ "$METRO_CACHE_FLAG_EXIT" -eq 0 ]; then
+  echo "✅ Flag pulizia notturna Metro: gate verde."
+else
+  echo "❌ Flag pulizia notturna Metro FALLITO (exit ${METRO_CACHE_FLAG_EXIT}) — metro-cache-check.sh o start-expo.sh hanno regressioni."
+  echo "   Eseguire 'bash scripts/__tests__/metro-cache-flag.test.sh' localmente per i dettagli."
+  echo "════════════════════════════════════════"
+  echo ""
+  exit "$METRO_CACHE_FLAG_EXIT"
+fi
+echo "════════════════════════════════════════"
+echo ""
+
 # ── GATE STRESS RACE AVVIO METRO ─────────────────────────────
 # Test deterministico (start-expo mockato) che prova in modo ripetibile che il
 # guardiano (cerbero.sh / cerbero-lib.sh) e clean-metro-restart.sh NON uccidano

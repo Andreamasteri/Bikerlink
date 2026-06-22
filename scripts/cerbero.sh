@@ -48,11 +48,25 @@ if ! flock -n 9; then
 fi
 
 RUNNING=1
+NIGHTLY_PID=""
 graceful_shutdown() {
   cerbero_log "CERBERO: ricevuto segnale di arresto, uscita pulita..."
   RUNNING=0
+  if [ -n "$NIGHTLY_PID" ] && kill -0 "$NIGHTLY_PID" 2>/dev/null; then
+    kill -TERM "$NIGHTLY_PID" 2>/dev/null || true
+  fi
 }
 trap graceful_shutdown SIGTERM SIGINT
+
+# ── Job notturno pulizia .metro-cache/ ────────────────────────────────────────
+# Lanciato una sola volta all'avvio di Cerbero. Il loop interno dorme fino alle
+# 01:00 UTC ogni notte, cancella .metro-cache/ e scrive il flag
+# /tmp/.metro-cache-purged che start-expo.sh legge al prossimo avvio.
+# Deve vivere in Cerbero (non in start-expo.sh) per sopravvivere ai riavvii
+# di Metro e girare indipendentemente dal ciclo di vita del dev server.
+bash "$SCRIPT_DIR/metro-cache-nightly.sh" &
+NIGHTLY_PID=$!
+cerbero_log "Job notturno Metro cache avviato (PID: $NIGHTLY_PID)"
 
 # ══ TESTA 1 — Backend: crash tracking + restart ═══════════════════════════════
 declare -a BACKEND_CRASH_TIMES=()

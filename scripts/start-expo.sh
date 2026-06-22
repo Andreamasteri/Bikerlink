@@ -42,6 +42,13 @@ cleanup_lock() {
 }
 trap cleanup_lock EXIT
 
+# ── Verifica flag pulizia notturna (prima della logica checksum) ──────────────
+# Se il job notturno (lanciato da cerbero.sh) ha cancellato .metro-cache/ e
+# scritto il flag, imposta FORCE_RESET=1 così da passare --reset-cache a Expo
+# indipendentemente dal checksum delle dipendenze.
+# shellcheck source=scripts/metro-cache-check.sh
+source "$SCRIPT_DIR/metro-cache-check.sh"
+
 # ── Kill porta 8081 se già occupata ──────────────────────────────────────────
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Pulizia porta $METRO_PORT in corso..."
 PIDS_ON_PORT=$(lsof -ti:"$METRO_PORT" 2>/dev/null || true)
@@ -103,6 +110,14 @@ if [ "$CURRENT_KEY" != "$SAVED_KEY" ] || [ -z "$SAVED_KEY" ]; then
   RESET_CACHE=1
 else
   echo "[$(date '+%Y-%m-%d %H:%M:%S')] Dipendenze invariate (checksum: $CURRENT_KEY) — riuso cache Metro"
+fi
+
+# OR logic: FORCE_RESET=1 (flag notturno) forza il reset anche se le dipendenze
+# non sono cambiate. FORCE_RESET è già impostato da metro-cache-check.sh (sourced
+# sopra) e vale 1 solo se il flag /tmp/.metro-cache-purged era presente.
+if [ "${FORCE_RESET:-0}" -eq 1 ] && [ "$RESET_CACHE" -eq 0 ]; then
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')] FORCE_RESET=1 da pulizia notturna — reset cache Metro forzato"
+  RESET_CACHE=1
 fi
 
 if [ "$RESET_CACHE" -eq 1 ]; then
