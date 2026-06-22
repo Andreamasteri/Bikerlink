@@ -1,19 +1,20 @@
 // Surfaces high-frequency diagnostic signals (js_thread_freeze, gps_flood,
-// memory_pressure, native_module_missing) from the crash_logs table to the
-// watchdog aggregator. These signals are stored as crash_js rows with a
-// [resume:X] prefix in error_message (written by lib/crash-logger.ts).
+// memory_pressure, native_module_missing, appstate_transition) from the
+// crash_logs table to the watchdog aggregator. These signals are stored as
+// crash_js rows with a [resume:X] prefix in error_message (written by
+// lib/crash-logger.ts).
 //
 // Default thresholds (over a 2h rolling window):
-//   js_thread_freeze:      ≥10 total from ≥2 distinct users → warn; ≥50/≥3 → high
-//   gps_flood:             ≥15 total from ≥2 distinct users → warn; ≥60/≥3 → high
-//   memory_pressure:       ≥5 total from ≥2 distinct users → warn; ≥20/≥3 → high
+//   js_thread_freeze:      ≥10 total from ≥2 distinct users → warn; ≥50/≥3  → high
+//   gps_flood:             ≥15 total from ≥2 distinct users → warn; ≥60/≥3  → high
+//   memory_pressure:       ≥5 total from ≥2 distinct users → warn; ≥20/≥3  → high
 //   native_module_missing: ≥3 total from ≥1 distinct user  → warn (rare, serious)
+//   appstate_transition:   ≥200 total from ≥10 distinct users → warn; ≥500/≥20 → high
+//                          (very noisy in normal use; high thresholds catch loop bugs only)
 //
 // Thresholds are configurable via AppSetting key "watchdog_signal_thresholds"
 // (valueJson — partial overrides merged over the defaults above).
-// Example: { "gps_flood": { "warnCount": 30, "highCount": 100 } }
-//
-// appstate_transition is intentionally excluded: too noisy to be actionable.
+// Example: { "appstate_transition": { "warnCount": 300, "warnUsers": 15 } }
 import { db } from "../../../db";
 import { sql } from "drizzle-orm";
 import { storage } from "../../../storage";
@@ -34,10 +35,14 @@ interface SignalThreshold {
 }
 
 const DEFAULT_SIGNAL_CONFIG: Record<string, SignalThreshold & { label: string }> = {
-  js_thread_freeze:      { warnCount: 10,  warnUsers: 2, highCount: 50,  highUsers: 3, label: "JS thread freeze" },
-  gps_flood:             { warnCount: 15,  warnUsers: 2, highCount: 60,  highUsers: 3, label: "GPS flood" },
-  memory_pressure:       { warnCount: 5,   warnUsers: 2, highCount: 20,  highUsers: 3, label: "pressione RAM" },
-  native_module_missing: { warnCount: 3,   warnUsers: 1, highCount: 999, highUsers: 999, label: "modulo nativo mancante" },
+  js_thread_freeze:      { warnCount: 10,  warnUsers: 2,  highCount: 50,  highUsers: 3,   label: "JS thread freeze" },
+  gps_flood:             { warnCount: 15,  warnUsers: 2,  highCount: 60,  highUsers: 3,   label: "GPS flood" },
+  memory_pressure:       { warnCount: 5,   warnUsers: 2,  highCount: 20,  highUsers: 3,   label: "pressione RAM" },
+  native_module_missing: { warnCount: 3,   warnUsers: 1,  highCount: 999, highUsers: 999, label: "modulo nativo mancante" },
+  // High thresholds: normal foreground/background cycling is expected. Only
+  // fire when volume is extreme (hundreds of transitions from many devices)
+  // which indicates a likely app-state loop bug.
+  appstate_transition:   { warnCount: 200, warnUsers: 10, highCount: 500, highUsers: 20,  label: "loop transizioni app" },
 };
 
 async function resolveSignalConfig(): Promise<typeof DEFAULT_SIGNAL_CONFIG> {
@@ -73,12 +78,12 @@ export async function collectCrashSignals(): Promise<Signal[]> {
             WHEN error_message LIKE '[resume:gps_flood]%'             THEN 'gps_flood'
             WHEN error_message LIKE '[resume:memory_pressure]%'       THEN 'memory_pressure'
             WHEN error_message LIKE '[resume:native_module_missing]%' THEN 'native_module_missing'
+            WHEN error_message LIKE '[resume:appstate_transition]%'   THEN 'appstate_transition'
           END AS signal_type,
-          COUNT(*)::int            AS total,
+          COUNT(*)::int                AS total,
           COUNT(DISTINCT user_id)::int AS distinct_users
         FROM app_crash_logs
         WHERE error_message LIKE '[resume:%]%'
-          AND error_message NOT LIKE '[resume:appstate_transition]%'
           AND reported_at >= NOW() - INTERVAL '2 hours'
         GROUP BY signal_type
         HAVING signal_type IS NOT NULL

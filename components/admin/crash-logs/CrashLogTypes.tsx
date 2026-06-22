@@ -22,9 +22,12 @@ export const DIAGNOSTIC_SIGNAL_TYPES: SignalType[] = [
   "gps_flood",
   "memory_pressure",
   "native_module_missing",
+  // appstate_transition uses much higher thresholds (≥200/≥10 → warn; ≥500/≥20 → high)
+  // to avoid false positives from normal foreground/background cycling.
+  "appstate_transition",
 ];
-// Context-only signals (very noisy, excluded from crash counts)
-export const CONTEXT_SIGNAL_TYPES: SignalType[] = ["appstate_transition"];
+// Reserved for future context-only signals (no entries currently)
+export const CONTEXT_SIGNAL_TYPES: SignalType[] = [];
 export const ALL_SIGNAL_TYPES: SignalType[] = [...DIAGNOSTIC_SIGNAL_TYPES, ...CONTEXT_SIGNAL_TYPES];
 
 interface TypeMeta {
