@@ -33,7 +33,7 @@ CONFIG_FILE="${CONFIG_FILE:-${SCRIPT_DIR}/graphhopper/config.yml}"
 
 # Immagine GraphHopper PINNATA per digest (deve combaciare con docker-compose.yml).
 # latest = GH 12 (non esiste un tag 12.0). Aggiornare il pin: vedi README.md.
-GH_IMAGE="${GRAPHHOPPER_IMAGE:-israelhikingmap/graphhopper@sha256:ca307b8952e5e1e662c150c2d14f1fe0c4a7761b998bb9a36d97ffcd1e99f1c8}"
+GH_IMAGE="${GRAPHHOPPER_IMAGE:-israelhikingmap/graphhopper@sha256:3e79eb33862028cfc58f9d6c162630b68638d6aad790b5a698c854dbbaa7fe32}"
 
 # Heap/GC per il BUILD (RAM-hungry): import in RAM, poi una sola volta su disco.
 # RAM_STORE forzato via sysprop perché il config.yml condiviso ha MMAP (serving).

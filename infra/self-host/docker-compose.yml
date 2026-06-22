@@ -45,7 +45,7 @@ x-gh-area: &gh-area
   # Immagine PINNATA per digest = riproducibilità. latest = GH 12 (NON esiste un
   # tag semver 12.0 su Docker Hub: si pinna il manifest multi-arch per digest).
   # Lo STESSO pin va usato in build-regions.sh. Aggiornare il pin: vedi README.md.
-  image: israelhikingmap/graphhopper@sha256:ca307b8952e5e1e662c150c2d14f1fe0c4a7761b998bb9a36d97ffcd1e99f1c8
+  image: israelhikingmap/graphhopper@sha256:3e79eb33862028cfc58f9d6c162630b68638d6aad790b5a698c854dbbaa7fe32
   restart: unless-stopped
   # Override entrypoint: l'immagine usa per default "./graphhopper.sh -c config-example.yml"
   # (path relativo → legge il file bundled car/foot/bike ignorando il nostro mount).
@@ -261,7 +261,7 @@ services:
   #   NOMINATIM_REPLICATION_URL  URL aggiornamenti OSM (disabilitato se FREEZE=true)
   # ---------------------------------------------------------------------------
   nominatim:
-    image: mediagis/nominatim:4.4
+    image: mediagis/nominatim:5.3
     container_name: bikerlink-nominatim
     restart: unless-stopped
     profiles: ["nominatim"]
@@ -305,7 +305,7 @@ services:
   #   docker compose --env-file .env up -d whisper
   # ---------------------------------------------------------------------------
   whisper:
-    image: onerahmet/openai-whisper-asr-webservice:latest-cpu
+    image: onerahmet/openai-whisper-asr-webservice:latest
     container_name: bikerlink-whisper
     restart: unless-stopped
     profiles: ["whisper"]
