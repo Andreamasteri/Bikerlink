@@ -1,4 +1,4 @@
-import { SensorScreen } from "./_sensor-screen";
+import { SensorScreen } from "@/components/admin/sensors/sensor-screen";
 
 export default function MagnetometerScreen() {
   return (

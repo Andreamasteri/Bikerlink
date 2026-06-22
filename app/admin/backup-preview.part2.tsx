@@ -2,7 +2,7 @@ import React from "react";
 import { View, Text, Modal, Platform, TouchableOpacity, ScrollView } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
-import { styles } from "./_backup-preview.styles";
+import { styles } from "@/components/admin/backup-preview.styles";
 import type { BackupUser } from "./backup-preview";
 import type { AdminUser } from "@/components/admin/users/UserCard";
 

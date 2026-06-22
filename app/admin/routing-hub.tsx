@@ -14,7 +14,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 import { ValhallaBenchCard } from "@/components/admin/ValhallaBenchCard";
 import { AiDecisionsCard } from "@/components/admin/AiDecisionsCard";
-import type { RoutingStatus } from "./routing-control/_types";
+import type { RoutingStatus } from "@/components/admin/routing-control/types";
 
 interface QuickLink {
   key: string;

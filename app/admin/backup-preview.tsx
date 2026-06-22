@@ -14,7 +14,7 @@ import Colors from "@/constants/colors";
 import { getApiUrl } from "@/lib/query-client";
 import { AdminUser, UserCard } from "@/components/admin/users/UserCard";
 import { BackupBanner, BackupUserDetailModal } from "./backup-preview.part2";
-import { styles } from "./_backup-preview.styles";
+import { styles } from "@/components/admin/backup-preview.styles";
 
 export interface BackupSummaryItem {
   table: string;

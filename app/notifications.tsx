@@ -16,7 +16,7 @@ import { useColors } from "@/hooks/useColors";
 import { apiRequest } from "@/lib/query-client";
 import { useT } from "@/lib/language-context";
 import { NotificationItem } from "./notifications.part2";
-import { styles } from "./_notifications.styles";
+import { styles } from "@/components/notifications/notifications-styles";
 
 export interface AppNotification {
   id: string;

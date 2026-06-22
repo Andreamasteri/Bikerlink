@@ -20,7 +20,7 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 import { apiRequest } from "@/lib/query-client";
-import type { RoutingStatus, RoutingTestResult } from "./routing-control/_types";
+import type { RoutingStatus, RoutingTestResult } from "@/components/admin/routing-control/types";
 
 const ENGINES: { id: string; label: string }[] = [
   { id: "graphhopper", label: "GraphHopper" },

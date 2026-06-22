@@ -19,7 +19,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
 import { apiRequest } from "@/lib/query-client";
-import type { ValhallaBenchResult, ValhallaBenchRow } from "@/app/admin/routing-control/_types";
+import type { ValhallaBenchResult, ValhallaBenchRow } from "@/components/admin/routing-control/types";
 
 interface ValhallaStatus {
   configured: boolean;

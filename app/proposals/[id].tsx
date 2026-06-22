@@ -16,7 +16,7 @@ import { apiRequest, queryClient } from "@/lib/query-client";
 import { useAuth } from "@/lib/auth-context";
 import { useT, useLocale } from "@/lib/language-context";
 import { ProposalActions } from "./[id].part2";
-import { styles } from "./_[id].styles";
+import { styles } from "@/components/proposals/proposal-styles";
 
 export interface Participant {
   id: string;

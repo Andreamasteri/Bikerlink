@@ -22,7 +22,7 @@ import { UserEditModal } from "@/components/admin/users/UserEditModal";
 import type { AdminUser } from "@/components/admin/users/UserCard";
 import { ZeroMatchDiagnosisCard } from "@/components/admin/match-inspector/ZeroMatchDiagnosisCard";
 import { MatchTypeSectionsList } from "./match-inspector-detail.part2";
-import { styles } from "./_match-inspector-detail.styles";
+import { styles } from "@/components/admin/match-inspector-detail.styles";
 
 export interface MatchItem {
   id: string;

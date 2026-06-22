@@ -3,7 +3,7 @@ import React from "react";
 import { Text } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
-import { styles } from "./_SelfHostStatus.styles";
+import { styles } from "@/components/admin/maps/SelfHostStatus.styles";
 
 export function formatTime(ts: number | null): string {
   if (!ts) return "—";

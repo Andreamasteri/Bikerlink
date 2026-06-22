@@ -25,7 +25,7 @@ import { ChatHeader } from "@/components/chat/ChatHeader";
 import { ChatInput } from "@/components/chat/ChatInput";
 import { ChatMembersModal } from "@/components/chat/ChatMembersModal";
 import { HashtagPanel } from "@/components/chat/HashtagPanel";
-import { styles } from "@/app/chat/_chat-id-styles";
+import { styles } from "@/components/chat/chat-id-styles";
 import {
   ConversationDetail,
   MotoClub,

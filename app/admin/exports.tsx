@@ -11,7 +11,7 @@ import * as Sharing from "expo-sharing";
 import Colors from "@/constants/colors";
 import { getApiUrl, queryClient, apiRequest, authFetchHeaders } from "@/lib/query-client";
 import { ExportProgressCard, ExportHistoryList } from "./exports.part2";
-import { styles } from "./_exports.styles";
+import { styles } from "@/components/admin/exports.styles";
 
 export type ExportSchedule = "off" | "daily" | "weekly";
 

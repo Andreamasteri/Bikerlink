@@ -2,7 +2,7 @@ import React from "react";
 import { View, Text } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
-import { styles } from "@/app/chat/_chat-id-styles";
+import { styles } from "@/components/chat/chat-id-styles";
 
 export interface ConversationDetail {
   id: string;

@@ -206,11 +206,11 @@ echo ""
 # ── GATE ROTTE FANTASMA cartelle stack app/**/*.ts ───────────
 # Expo Router registra OGNI file .ts/.tsx in app/ come rotta, in modo
 # RICORSIVO (anche nelle cartelle stack: app/profile, app/giri, app/admin…).
-# Un file helper (.ts senza prefisso _) co-locato in queste cartelle non
-# crea una tab visibile, ma diventa un deeplink rotto / rotta senza default
-# export (warning "missing the required default export").
-# Regola: solo .tsx (screens) e file con prefisso _ (privati) sono ammessi.
-# Qualsiasi .ts senza _ deve avere prefisso _ oppure stare in components/lib.
+# Qualsiasi file helper .ts co-locato in queste cartelle genera un route node
+# (deeplink rotto / warning "missing the required default export").
+# FIX DEFINITIVO (2026-06-22): tutti i file helper sono stati spostati in
+# components/ o lib/. La regola ora è: NESSUN .ts (non-_layout) in app/
+# nelle cartelle stack — né con né senza prefisso _.
 # Vedi .agents/memory/expo-tabs-route-pollution.md
 echo "════════════════════════════════════════"
 echo "  Gate rotte fantasma stack app/**"
@@ -218,19 +218,17 @@ echo "════════════════════════�
 STACK_PHANTOM=()
 while IFS= read -r _f; do
   [ -n "$_f" ] && STACK_PHANTOM+=("$_f")
-done < <(find app -type f -name '*.ts' ! -name '*.tsx' ! -path 'app/(tabs)/*' ! -name '_*')
+done < <(find app -type f -name '*.ts' ! -name '*.tsx' ! -path 'app/(tabs)/*')
 if [ ${#STACK_PHANTOM[@]} -eq 0 ]; then
-  echo "✅ Nessun file helper non protetto nelle cartelle stack di app/."
+  echo "✅ Nessun file .ts helper nelle cartelle stack di app/."
 else
-  echo "❌ File helper senza prefisso _ rilevati in app/ (fuori da (tabs)):"
+  echo "❌ File .ts rilevati in app/ (fuori da (tabs)) — generano route node fantasma:"
   for _pf in "${STACK_PHANTOM[@]}"; do
     echo "   ⚠️  $_pf"
   done
   echo ""
-  echo "   Expo Router li registra come rotte (ricorsivo), causando"
-  echo "   deeplink rotti o errori 'no default export'."
-  echo "   → Rinominare con prefisso _ (es. _edit.styles.ts)"
-  echo "     oppure spostare in components/ o lib/."
+  echo "   Expo Router registra QUALSIASI .ts in app/ come rotta (con o senza _)."
+  echo "   → Spostare il file in components/ o lib/ e aggiornare gli import."
   echo "════════════════════════════════════════"
   echo ""
   exit 1

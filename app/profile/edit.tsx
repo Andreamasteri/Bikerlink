@@ -22,7 +22,7 @@ import { updateUserSchema } from "@shared/validators";
 import { useMutation } from "@tanstack/react-query";
 import { useColors } from "@/hooks/useColors";
 import { RevokeConsentModal } from "./edit.part2";
-import { makeStyles } from "./_edit.styles";
+import { makeStyles } from "@/components/profile/edit.styles";
 
 import { EditBasicInfo } from "@/components/profile/edit/EditBasicInfo";
 import { EditMoto } from "@/components/profile/edit/EditMoto";

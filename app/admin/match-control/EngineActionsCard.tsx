@@ -9,7 +9,7 @@ import type { QueryClient } from "@tanstack/react-query";
 import Colors from "@/constants/colors";
 import { apiRequest } from "@/lib/query-client";
 import { AnomalyAlerts } from "@/components/admin/matching/AnomalyAlerts";
-import { styles } from "./_styles";
+import { styles } from "@/components/admin/match-control/styles";
 
 export function EngineActionsCard({
   anomaliesCount,

@@ -5,7 +5,7 @@ import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
 import Colors from "@/constants/colors";
 import { getApiUrl } from "@/lib/query-client";
-import s from "./_diagnostica-styles";
+import s from "@/components/admin/diagnostica-styles";
 import { TabRadiografia } from "./diagnostica-pipeline";
 import { TabMonitor } from "./diagnostica-monitor";
 import { TabDevice } from "./diagnostica-device";

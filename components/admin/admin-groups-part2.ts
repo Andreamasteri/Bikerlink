@@ -1,4 +1,4 @@
-import type { AdminGroup } from "./_admin-types";
+import type { AdminGroup } from "@/components/admin/admin-types";
 
 export const adminGroupsPart2: AdminGroup[] = [
   {

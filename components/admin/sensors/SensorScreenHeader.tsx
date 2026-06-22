@@ -3,7 +3,7 @@ import { View, Text, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
 import { useT } from "@/lib/language-context";
-import { SensorDefinition } from "@/app/admin/sensors/_sensor-screen";
+import { SensorDefinition } from "@/components/admin/sensors/sensor-screen";
 
 interface SensorScreenHeaderProps {
   def: SensorDefinition;

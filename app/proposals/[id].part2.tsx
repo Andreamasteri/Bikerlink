@@ -4,7 +4,7 @@ import { View, Text, TouchableOpacity, Alert, ActivityIndicator } from "react-na
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
 import { apiRequest, queryClient } from "@/lib/query-client";
-import { styles } from "./_[id].styles";
+import { styles } from "@/components/proposals/proposal-styles";
 
 export function ProposalActions({
   isCreator,

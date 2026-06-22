@@ -8,7 +8,7 @@ import {
   Platform,
   ScrollView,
 } from "react-native";
-import { styles } from "@/app/admin/_ads-styles";
+import { styles } from "@/components/admin/ads-styles";
 import { KeyboardAvoidingView } from "react-native";
 import { MaterialIcons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";

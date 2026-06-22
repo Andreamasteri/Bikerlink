@@ -38,7 +38,7 @@ import {
   parseCpu,
   parseMemMb,
 } from "@/hooks/useRoutingAreas";
-import { styles } from "./_routing-areas.styles";
+import { styles } from "@/components/admin/routing-areas.styles";
 
 const MODES: { id: "disabled" | "tester" | "enabled"; label: string; icon: string }[] = [
   { id: "disabled", label: "Disattivo", icon: "power-off" },

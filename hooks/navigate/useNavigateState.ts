@@ -14,12 +14,12 @@ import { haversineM, closestPointIndexOnPolyline } from "@/lib/geo";
 import { useMapConfig } from "@/lib/map-context";
 import { useLocale, useT } from "@/lib/language-context";
 import { decodePolylineTuples as decodePolyline } from "@/lib/polyline";
-import type { NavigationStep, PlannedRoute } from "@/app/navigate/_[id].types";
+import type { NavigationStep, PlannedRoute } from "@/components/navigate/navigate-types";
 import {
   saveRouteToCache,
   loadRouteFromCache,
   activeStepIndex,
-} from "@/app/navigate/_[id].helpers";
+} from "@/components/navigate/navigate-helpers";
 import type { NavWeatherZone } from "@/components/navigate/NavigationWeather";
 import { useWhisperRecorder } from "@/hooks/useWhisperRecorder";
 import { useLocationGate } from "@/lib/location-context";

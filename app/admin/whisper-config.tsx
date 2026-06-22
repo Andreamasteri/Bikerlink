@@ -13,7 +13,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import * as Clipboard from "expo-clipboard";
 import { getApiUrl, authFetchHeaders } from "@/lib/query-client";
 import Colors from "@/constants/colors";
-import { styles } from "./_whisper-config.styles";
+import { styles } from "@/components/admin/whisper-config.styles";
 import { WhisperWatchdogBadge, type WhisperHealthData } from "@/components/admin/WhisperWatchdogBadge";
 import { WhisperDiagSteps } from "./whisper-config.part2";
 
