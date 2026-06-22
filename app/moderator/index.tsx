@@ -11,7 +11,7 @@ import {
 
 } from "react-native";
 import { KeyboardAvoidingView } from "react-native";
-import { useRouter } from "expo-router";
+import { useRouter, type Href } from "expo-router";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
@@ -143,7 +143,7 @@ export default function ModeratorPhotosScreen() {
     <KeyboardAvoidingView behavior="padding" style={{ flex: 1 }}>
       <View style={[styles.container, { paddingTop: Math.max(insets.top, webTopInset) }]}>
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.canGoBack() ? router.back() : router.replace("/(tabs)/profile")}>
+          <TouchableOpacity onPress={() => router.canGoBack() ? router.back() : router.replace("/(tabs)/profile" as Href)}>
             <Ionicons name="arrow-back" size={24} color={Colors.text} />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Moderazione Foto</Text>

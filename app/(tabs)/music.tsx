@@ -437,7 +437,7 @@ export default function MusicScreen() {
         setSendModalVisible={setSendModalVisible}
         sendingToConv={sendingToConv}
         conversationsQuery={conversationsQuery}
-        currentUser={currentUser}
+        currentUser={currentUser ?? null}
         handleSendPlaylist={handleSendPlaylist}
       />
     </>

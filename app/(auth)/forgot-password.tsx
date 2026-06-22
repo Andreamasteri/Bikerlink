@@ -10,7 +10,7 @@ import {
   Platform,
   ScrollView,
 } from "react-native";
-import { useRouter } from "expo-router";
+import { useRouter, type Href } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
@@ -126,7 +126,7 @@ export default function ForgotPasswordScreen() {
       const { sessionToken: _omit, ...user } = userData ?? {};
       void _omit;
       queryClient.setQueryData(["/api/auth/me"], user);
-      router.replace("/(tabs)");
+      router.replace("/(tabs)" as Href);
     } catch (err: unknown) {
       setError(parseApiError(err, t("auth.resetError")));
     } finally {

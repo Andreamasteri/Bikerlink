@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { View, ActivityIndicator, StyleSheet } from "react-native";
-import { Redirect } from "expo-router";
+import { Redirect, type Href } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { ONBOARDING_STORAGE_KEY } from "@/constants/onboarding";
 import Colors from "@/constants/colors";
@@ -32,7 +32,7 @@ export default function Index() {
   }
 
   if (isAuthenticated) {
-    return <Redirect href="/(tabs)" />;
+    return <Redirect href={"/(tabs)" as Href} />;
   }
 
   if (onboardingDone) {

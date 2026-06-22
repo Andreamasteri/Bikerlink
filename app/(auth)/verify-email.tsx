@@ -10,7 +10,7 @@ import {
   Platform,
   ScrollView,
 } from "react-native";
-import { useRouter, useLocalSearchParams } from "expo-router";
+import { useRouter, useLocalSearchParams, type Href } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useQueryClient } from "@tanstack/react-query";
@@ -98,7 +98,7 @@ export default function VerifyEmailScreen() {
       const { sessionToken: _omit, ...user } = userData ?? {};
       void _omit;
       queryClient.setQueryData(["/api/auth/me"], user);
-      router.replace("/(tabs)");
+      router.replace("/(tabs)" as Href);
     } catch (err: unknown) {
       setError(friendlyError(parseApiError(err, translate("auth.verifyError"))));
     } finally {

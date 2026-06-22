@@ -2,7 +2,7 @@ import React from "react";
 import { View, Text, StyleSheet, ScrollView, Pressable, Image } from "react-native";
 import { useQuery } from "@tanstack/react-query";
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
+import { useRouter, type Href } from "expo-router";
 import Colors from "@/constants/colors";
 import { useT } from "@/lib/language-context";
 
@@ -37,7 +37,7 @@ export function ContestLeaderboard() {
             <Pressable
               key={gameId}
               style={arcadeStyles.card}
-              onPress={() => router.push({ pathname: "/(tabs)/arcade" as const, params: { tab: "leaderboard", game: gameId } })}
+              onPress={() => router.push({ pathname: "/(tabs)/arcade", params: { tab: "leaderboard", game: gameId } } as unknown as Href)}
             >
               <Text style={arcadeStyles.cardEmoji}>{info.emoji}</Text>
               <Text style={arcadeStyles.cardGame}>{info.title}</Text>

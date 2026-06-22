@@ -302,7 +302,7 @@ export default function ProposalDetailScreen() {
 
         <ProposalActions
           isCreator={isCreator}
-          isParticipant={isParticipant}
+          isParticipant={isParticipant ?? false}
           canJoin={canJoin}
           joinMutation={joinMutation}
           id={id}

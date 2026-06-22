@@ -7,7 +7,7 @@ import {
   Alert,
 } from "react-native";
 import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollViewCompat";
-import { useRouter, useLocalSearchParams } from "expo-router";
+import { useRouter, useLocalSearchParams, type Href } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -131,7 +131,7 @@ export default function RegisterScreen() {
     if (pendingNavigation === "verify") {
       router.replace({ pathname: "/(auth)/verify-email", params: { email: verifyEmail } });
     } else {
-      router.replace("/(tabs)");
+      router.replace("/(tabs)" as Href);
     }
     setPendingNavigation(null);
   };
@@ -246,7 +246,7 @@ export default function RegisterScreen() {
         } else if (res?.requiresEmailVerification) {
           router.replace({ pathname: "/(auth)/verify-email", params: { email: data.email } });
         } else {
-          router.replace("/(tabs)");
+          router.replace("/(tabs)" as Href);
         }
       },
       onError: (err: Error) => {

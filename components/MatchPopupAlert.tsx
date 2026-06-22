@@ -14,7 +14,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
 import { useNewMatchAlert } from "@/hooks/useNewMatchAlert";
 
-const MATCH_ROUTE: Href = "/(tabs)/match";
+const MATCH_ROUTE = "/(tabs)/match" as Href;
 
 export default function MatchPopupAlert() {
   const { visible, payload, dismiss } = useNewMatchAlert();

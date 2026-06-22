@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import { Linking } from "react-native";
-import { useRouter, useRootNavigationState } from "expo-router";
+import { useRouter, useRootNavigationState, type Href } from "expo-router";
 import { emitMatchNotification } from "@/lib/match-alert-emitter";
 
 let Notifications: typeof import("expo-notifications") | null = null;
@@ -16,7 +16,7 @@ function navigateFromNotifData(data: { type?: string; unreadChat?: number; route
     return;
   }
   if (data?.type === "match") {
-    router.push("/(tabs)/match");
+    router.push("/(tabs)/match" as Href);
     return;
   }
   if (data?.type === "planned_route_invite") {
@@ -25,7 +25,7 @@ function navigateFromNotifData(data: { type?: string; unreadChat?: number; route
   }
   if (data?.type !== "background_badge") return;
   if ((data?.unreadChat ?? 0) > 0) {
-    router.push("/(tabs)/chat");
+    router.push("/(tabs)/chat" as Href);
   } else {
     router.push("/notifications");
   }

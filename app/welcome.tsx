@@ -11,7 +11,7 @@ import {
   Linking,
   ActivityIndicator,
 } from "react-native";
-import { useRouter } from "expo-router";
+import { useRouter, type Href } from "expo-router";
 import { useAuth } from "@/lib/auth-context";
 import { getApiUrl } from "@/lib/query-client";
 import { useSynecoVisible } from "@/lib/syneco-context";
@@ -57,7 +57,7 @@ export default function WelcomeScreen() {
 
   useEffect(() => {
     if (!isLoading && isAuthenticated) {
-      router.replace("/(tabs)");
+      router.replace("/(tabs)" as Href);
       return;
     }
 
