@@ -695,7 +695,7 @@ echo ""
 # prefixed with _ and are intentionally excluded from Expo Router.
 # A navigation target pointing to one would silently 404.
 #
-# Navigation patterns covered by this guard:
+# Navigation patterns covered by this guard (static grep):
 #   • router.push/replace/navigate(...)    – direct router object calls
 #   • <Link href="...">                    – JSX Link component (matched via href=)
 #   • href="..."                           – generic href= attributes in JSX/HTML
@@ -703,9 +703,33 @@ echo ""
 #   • push(...) / replace(...) / navigate(...)
 #                                          – destructured useRouter() hooks
 #                                            e.g. const { push } = useRouter(); push("/x.part2")
+#
+# ⚠️  SCOPE LIMITATION — dynamic / template-literal paths:
+#   This grep guard detects STATIC string literals only.
+#   Paths built at runtime — e.g. push(`/giri/${id}.part2`) or
+#   const seg = ".part2"; push("/giri/" + seg) — are INVISIBLE to grep.
+#
+#   The gap is closed at the lint layer:
+#     scripts/eslint-rules/no-part-nav.js  (ESLint custom rule)
+#   That rule catches TemplateLiteral arguments in push/replace/navigate
+#   calls whose quasis contain ".partN", and fires a warning during
+#   `npx eslint` (also runs in the lint workflow).
+#   A string-concatenation pattern is still out of scope for static
+#   analysis — keep helper-screen paths as non-exported constants and
+#   avoid constructing them dynamically.
 echo "════════════════════════════════════════"
 echo "  Guard: navigation strings ↔ .part paths"
 echo "════════════════════════════════════════"
+
+# Self-check D: ESLint rule file must exist.
+if [ ! -f "scripts/eslint-rules/no-part-nav.js" ]; then
+  echo "⚠️  Guard self-check D FALLITO — scripts/eslint-rules/no-part-nav.js mancante."
+  echo "   La regola ESLint che copre i template-literal non è presente."
+  echo "   Ripristinare il file dal repo."
+  exit 1
+else
+  echo "✅ ESLint rule no-part-nav presente (copertura template-literal)."
+fi
 
 # Self-check A: the guard regex must detect router.push form.
 _SELFCHECK_LINE_A='  router.push("/giri/1.part2");'

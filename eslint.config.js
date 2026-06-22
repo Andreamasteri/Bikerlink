@@ -3,6 +3,13 @@ const tsParser = require('@typescript-eslint/parser');
 const tsPlugin = require('@typescript-eslint/eslint-plugin');
 const reactHooksPlugin = require('eslint-plugin-react-hooks');
 const unusedImportsPlugin = require('eslint-plugin-unused-imports');
+const noPartNavRule = require('./scripts/eslint-rules/no-part-nav');
+
+const localRulesPlugin = {
+  rules: {
+    'no-part-nav': noPartNavRule,
+  },
+};
 
 module.exports = defineConfig([
   {
@@ -41,8 +48,16 @@ module.exports = defineConfig([
       "@typescript-eslint": tsPlugin,
       "react-hooks": reactHooksPlugin,
       "unused-imports": unusedImportsPlugin,
+      "local-rules": localRulesPlugin,
     },
     rules: {
+      // ── navigazione verso path .partN ─────────────────────
+      // Cattura template-literal in chiamate push/replace/navigate/href
+      // che contengono ".partN".  I path statici sono già coperti dal
+      // grep gate in scripts/post-merge.sh; questa regola chiude il
+      // gap per i path costruiti dinamicamente (template literal).
+      "local-rules/no-part-nav": "warn",
+
       // ── variabili inutilizzate ──────────────────────────────
       "no-unused-vars": "off",
       "@typescript-eslint/no-unused-vars": "off",
