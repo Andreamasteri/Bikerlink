@@ -35,7 +35,7 @@ export const SITE_TRANSLATIONS_IT1: Record<string, string> = {
   'footer.tagline': 'Made for riders, by riders.',
 
   // ── HOME ─────────────────────────────────────────────────────────────────
-  'home.hero.eyebrow': 'La community italiana dei biker',
+  'home.hero.eyebrow': 'La community mondiale dei biker',
   'home.hero.subtitle': 'APP PER MOTOCICLISTI',
   'home.hero.sub': "U'll Never Ride Alone",
   'home.hero.desc': 'La prima piattaforma verticale per motociclisti. Mappa live, MotoClub, SOS d\'emergenza e contest fotografici — tutto gratis, per sempre.',
@@ -115,7 +115,7 @@ export const SITE_TRANSLATIONS_IT1: Record<string, string> = {
   'home.trust.card3.meta': '24/7',
   'home.seo.title': 'Perché un\'app dedicata ai motociclisti',
   'home.cta.title': 'Pronto a non guidare più da solo?',
-  'home.cta.desc': 'Iscriviti gratis, completa il profilo, e in 60 secondi sei sulla mappa con la rete italiana.',
+  'home.cta.desc': 'Iscriviti gratis, completa il profilo, e in 60 secondi sei sulla mappa con rider da tutto il mondo.',
   'home.cta.btn1': 'Scarica BikerLink',
   'home.cta.btn2': 'Domande frequenti',
 
@@ -125,7 +125,7 @@ export const SITE_TRANSLATIONS_IT1: Record<string, string> = {
   'community.hero.h1.main': 'COMMUNITY',
   'features.hero.title.main': 'FUNZIONALITÀ',
   'features.hero.title.sub': 'PER MOTOCICLISTI',
-  'features.hero.lead': 'Sei moduli costruiti per il motociclista italiano. Niente filler — ogni feature risolve un problema reale.',
+  'features.hero.lead': 'Sei moduli costruiti per il motociclista. Niente filler — ogni feature risolve un problema reale.',
   'features.f1.tag': 'Mappa',
   'features.f1.title': 'Vedi i biker vicino a te, in tempo reale',
   'features.f1.text': 'Mappa interattiva con posizione live degli utenti online. Filtri per modello, brand, disponibilità a un giro. Heartbeat ogni 30 secondi per visibilità affidabile.',
@@ -152,7 +152,7 @@ export const SITE_TRANSLATIONS_IT1: Record<string, string> = {
   'features.f6.cta': 'Come funziona il matching',
   'features.cta.title': 'Provala adesso.',
   'features.cta.title.free': 'È gratis.',
-  'features.cta.desc': 'Scarica BikerLink e in un minuto sei dentro con tutta la community italiana.',
+  'features.cta.desc': 'Scarica BikerLink e in un minuto sei dentro con rider da tutto il mondo.',
   'features.cta.btn': "Scarica l'app",
   'features.cta.heading': 'Provala adesso. <span style="color:var(--accent)">È gratis.</span>',
 
@@ -238,7 +238,7 @@ export const SITE_TRANSLATIONS_IT1: Record<string, string> = {
   'community.c6.title': 'Moderazione attiva',
   'community.c6.desc': 'Segnalazioni con risposta entro 24h. Block list e mute personali sempre disponibili.',
   'community.cta.title': 'Unisciti.',
-  'community.cta.desc': 'Oltre 5.000 iscritti italiani sono già dentro. Tocca a te.',
+  'community.cta.desc': 'Oltre 5.000 rider da tutto il mondo sono già dentro. Tocca a te.',
   'community.cta.btn': 'Scarica BikerLink',
 
   // ── DOWNLOAD ─────────────────────────────────────────────────────────────
@@ -285,7 +285,7 @@ export const SITE_TRANSLATIONS_IT1: Record<string, string> = {
   'faq.q8': 'Posso eliminare il mio account?',
   'faq.a8': 'Sì, in qualsiasi momento. Dall\'app: Profilo → Modifica profilo → Elimina account. In alternativa scrivi a bikerlinkapp@gmail.com. I dati vengono eliminati entro 30 giorni (esclusi i log che dobbiamo conservare per obblighi di legge).',
   'faq.q9': "Funziona fuori dall'Italia?",
-  'faq.a9': "Sì, l'app è disponibile in tutto il mondo. La community più attiva è italiana (siamo nati qui), ma utenti europei e nordafricani stanno crescendo. Le mappe e il routing curvy funzionano in tutta Europa.",
+  'faq.a9': "Sì, l'app è disponibile in tutto il mondo. BikerLink è nata in Italia e qui ha la community più attiva, ma rider da tutta Europa, dal Nord Africa e da oltre continuano ad aumentare ogni mese. Le mappe e il routing curvy funzionano in tutta Europa.",
   'faq.q10': 'Posso contattarvi per una partnership o per i media?',
   'faq.a10': "Certo. Scrivici a bikerlinkapp@gmail.com indicando 'Partnership' o 'Press' nell'oggetto. Per gli investitori c'è una pagina dedicata su <a href='/matching/per-investitori'>metriche per investitori</a> con architettura tecnica, modello di business e contatti.",
   'faq.cta.title': 'Tutto chiaro?',

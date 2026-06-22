@@ -235,7 +235,7 @@ export const ONBOARDING_SLIDES: OnboardingSlide[] = [
     image: { uri: ONBOARDING_BASE + "30-bikerlink-benvenuto.png" },
     section: "Benvenuto",
     title: "Benvenuto in BikerLink",
-    description: "La community dei biker italiani ti aspetta. Pronto a partire?",
+    description: "Riders from all across the globe ti aspettano. Pronto a partire?",
   },
 ];
 

@@ -165,7 +165,7 @@ export const SITE_TRANSLATIONS_EN2: Record<string, string> = {
   'about.team.p2': "If you're interested in contributing (development, design, translations, moderation, partnerships) write to us. We're looking for people, not CVs.",
   'about.principles.li1': '<strong>Privacy by design.</strong> Ghost Mode, GPS fuzzing, Fake Home, location shared only when actively chosen.',
   'about.principles.li2': '<strong>Free for real.</strong> No paywall, no trial, no "premium" that limits basic features.',
-  'about.principles.li3': '<strong>Italian-first.</strong> Developed in Italy, optimised for Italian roads and community — but open to everyone.',
+  'about.principles.li3': '<strong>Rider-first.</strong> Built in Italy, designed for riders everywhere.',
   'about.principles.li4': '<strong>No invasive ads.</strong> No banners covering the map, no pop-ups, no forced videos.',
   'about.principles.li5': '<strong>Open feedback.</strong> Every user can write directly, and we read everything.',
   'about.contacts.p1': 'For anything — bugs, partnerships, press, investments — write to <a href="mailto:bikerlinkapp@gmail.com">bikerlinkapp@gmail.com</a>. We reply within 48 hours.',
@@ -238,7 +238,7 @@ export const SITE_TRANSLATIONS_EN2: Record<string, string> = {
   'match.inv.moat.c3.title': 'Feedback loop + historical data',
   'match.inv.moat.c3.desc': 'Every interaction improves the model. A new competitor would start from zero — we have months of learning signals. The advantage grows over time.',
   'match.inv.moat.c4.title': 'Motorcycle vertical — zero distraction',
-  'match.inv.moat.c4.desc': 'Tinder and generalist apps will never optimise for the Italian biker. BikerLink is the only platform where the "motorcyclist" context is native in every feature, including matching.',
+  'match.inv.moat.c4.desc': 'Tinder and generalist apps will never truly optimise for motorcyclists. BikerLink is the only platform where the "rider" context is native in every feature, including matching — built for bikers, not adapted for them.',
   'match.inv.ai.lead': 'For the complete technical detail of the AI architecture, see the <a href="/matching/intelligenza-artificiale">dedicated page</a>.',
 
   // ── MATCHING LEARNING — PROSE ─────────────────────────────────────────────

@@ -198,7 +198,7 @@ export function buildHome(baseUrl: string, images?: LandingImages): { meta: Page
   <img class="home-hero-bg" src="${img.hero_main_url}" srcset="${img.hero_main_sm_url} 800w, ${img.hero_main_url} 1600w" sizes="100vw" alt="Motociclista su strada forestale — luce filtrata tra gli alberi" width="1600" height="900" fetchpriority="high" />
   <div class="home-hero-overlay" aria-hidden="true"></div>
   <div class="home-hero-inner">
-    <div class="home-hero-eyebrow" data-i18n="home.hero.eyebrow">La community italiana dei biker</div>
+    <div class="home-hero-eyebrow" data-i18n="home.hero.eyebrow">La community mondiale dei biker</div>
     <h1 class="home-hero-title">BIKER<span class="dot">·</span>LINK<span style="display:block;font-size:0.27em;letter-spacing:5px;font-weight:700;color:rgba(255,255,255,0.5);margin-top:14px" data-i18n="home.hero.subtitle">APP PER MOTOCICLISTI</span></h1>
     <p class="home-hero-sub" data-i18n="home.hero.sub">U'll Never Ride Alone</p>
     <p class="home-hero-desc" data-i18n="home.hero.desc">La prima piattaforma verticale per motociclisti. Mappa live, MotoClub, SOS d'emergenza e contest fotografici — tutto gratis, per sempre.</p>
@@ -518,7 +518,7 @@ ${COMP_SECTION}
 <!-- ── CTA ── -->
 <section class="cta-block" aria-label="Call to action">
   <h2 data-i18n="home.cta.title">Pronto a non <span style="color:var(--accent)">guidare più da solo?</span></h2>
-  <p data-i18n="home.cta.desc">Iscriviti gratis, completa il profilo, e in 60 secondi sei sulla mappa con la rete italiana.</p>
+  <p data-i18n="home.cta.desc">Iscriviti gratis, completa il profilo, e in 60 secondi sei sulla mappa con rider da tutto il mondo.</p>
   <div class="btn-row">
     <a class="btn btn-primary" href="/download" data-i18n="home.cta.btn1">Scarica BikerLink</a>
     <a class="btn btn-outline" href="/faq" data-i18n="home.cta.btn2">Domande frequenti</a>

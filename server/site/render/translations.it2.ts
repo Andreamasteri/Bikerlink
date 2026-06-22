@@ -169,7 +169,7 @@ export const SITE_TRANSLATIONS_IT2: Record<string, string> = {
   'about.team.p2': "Se ti interessa contribuire (sviluppo, design, traduzioni, moderazione, partnership) scrivici. Cerchiamo persone, non CV.",
   'about.principles.li1': '<strong>Privacy by design.</strong> Ghost Mode, fuzzing GPS, Fake Home, posizione condivisa solo quando attivamente scelto.',
   'about.principles.li2': '<strong>Gratis sul serio.</strong> Niente paywall, niente trial, niente "premium" che limita features di base.',
-  'about.principles.li3': '<strong>Italian-first.</strong> Sviluppato in Italia, ottimizzato per le strade e la community italiana — anche se aperto a tutti.',
+  'about.principles.li3': '<strong>Rider-first.</strong> Costruito in Italia, pensato per i rider di tutto il mondo.',
   'about.principles.li4': '<strong>No ads invasive.</strong> Mai banner che coprono la mappa, mai pop-up, mai video forzati.',
   'about.principles.li5': '<strong>Open feedback.</strong> Ogni utente può scrivere direttamente, e leggiamo tutto.',
   'about.contacts.p1': 'Per qualsiasi cosa — bug, partnership, stampa, investimenti — scrivici a <a href="mailto:bikerlinkapp@gmail.com">bikerlinkapp@gmail.com</a>. Rispondiamo in 48h max.',
@@ -242,7 +242,7 @@ export const SITE_TRANSLATIONS_IT2: Record<string, string> = {
   'match.inv.moat.c3.title': 'Feedback loop + dati storici',
   'match.inv.moat.c3.desc': 'Ogni interazione migliora il modello. Un nuovo competitor partirebbe da zero — noi abbiamo mesi di segnali di apprendimento. Il vantaggio cresce nel tempo.',
   'match.inv.moat.c4.title': 'Verticale moto — zero distrazione',
-  'match.inv.moat.c4.desc': 'Tinder e app generaliste non ottimizzeranno mai per il biker italiano. BikerLink è l\'unica piattaforma dove il contesto "motociclista" è nativo in ogni feature, compreso il matching.',
+  'match.inv.moat.c4.desc': 'Tinder e app generaliste non ottimizzeranno mai davvero per i motociclisti. BikerLink è l\'unica piattaforma dove il contesto "rider" è nativo in ogni feature, compreso il matching — costruita per i biker, non adattata per loro.',
   'match.inv.ai.lead': 'Per il dettaglio tecnico completo dell\'architettura AI, vedi la <a href="/matching/intelligenza-artificiale">pagina dedicata</a>.',
 
   // ── MATCHING LEARNING — PROSE ─────────────────────────────────────────────
@@ -285,7 +285,7 @@ export const SITE_TRANSLATIONS_IT2: Record<string, string> = {
 
   // ── HOME — SEO PROSE ──────────────────────────────────────────────────────
   'home.seo.h2': 'Perché un\'app dedicata ai motociclisti',
-  'home.seo.p1': 'I motociclisti italiani sono oltre 6 milioni, ma sui social tradizionali si perdono nel rumore. Forum verticali esistono da decenni e restano utili per le discussioni tecniche, però mancavano di mobilità: niente mappa live, niente coordinamento in tempo reale, niente notifiche di prossimità. BikerLink colma quel vuoto con un\'app pensata da chi guida una moto, non da chi disegna prodotti generici.',
+  'home.seo.p1': 'Nel mondo esistono oltre 500 milioni di motociclisti, eppure nessuna piattaforma social è mai stata costruita davvero per loro. Forum verticali esistono da decenni e restano utili per le discussioni tecniche, però mancavano di mobilità: niente mappa live, niente coordinamento in tempo reale, niente notifiche di prossimità. BikerLink nasce in Italia e colma quel vuoto a livello globale — un\'app pensata da chi guida una moto, non da chi disegna prodotti generici.',
   'home.seo.p2': 'Il focus è sulla strada vera: organizzare un giro la domenica mattina, trovare qualcuno con la stessa moto per un confronto tecnico, condividere foto di un passo di montagna, ricevere aiuto se rimani a piedi. Tutte attività che già avvengono nei gruppi WhatsApp e nei forum, ma in modo frammentato. Avere uno strumento unico cambia l\'esperienza quotidiana di chi vive la moto come passione, non come semplice mezzo di trasporto.',
   'home.seo.p3': 'Per saperne di più sulla nostra storia e sulla mission, leggi <a href="/about">chi siamo</a>. Per domande pratiche su privacy, costi e gestione account vai alle <a href="/faq">domande frequenti</a>.',
 

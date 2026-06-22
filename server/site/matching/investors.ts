@@ -191,7 +191,7 @@ flowchart TB
       </div>
       <div class="card">
         <h3 data-i18n="match.inv.moat.c4.title">Verticale moto — zero distrazione</h3>
-        <p data-i18n="match.inv.moat.c4.desc">Tinder e app generaliste non ottimizzeranno mai per il biker italiano. BikerLink è l'unica piattaforma dove il contesto "motociclista" è nativo in ogni feature, compreso il matching.</p>
+        <p data-i18n="match.inv.moat.c4.desc">Tinder e app generaliste non ottimizzeranno mai davvero per i motociclisti. BikerLink è l'unica piattaforma dove il contesto "rider" è nativo in ogni feature, compreso il matching — costruita per i biker, non adattata per loro.</p>
       </div>
     </div>
   </div>

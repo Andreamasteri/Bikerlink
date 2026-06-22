@@ -75,7 +75,7 @@ export function buildFeatures(
 <section class="page-hero">
   <div class="breadcrumb"><a href="/">Home</a> &nbsp;/&nbsp; <span data-i18n="features.hero.breadcrumb">Funzionalità</span></div>
   <h1><span data-i18n="features.hero.h1.main">FUNZIONALITÀ</span> <span class="accent">BIKERLINK</span><span style="display:block;font-size:0.38em;letter-spacing:3px;font-weight:700;color:var(--text3);margin-top:10px" data-i18n="features.hero.title.sub">PER MOTOCICLISTI</span></h1>
-  <p class="lead" data-i18n="features.hero.lead">Sei moduli costruiti per il motociclista italiano. Niente filler — ogni feature risolve un problema reale.</p>
+  <p class="lead" data-i18n="features.hero.lead">Sei moduli costruiti per il motociclista. Niente filler — ogni feature risolve un problema reale.</p>
 </section>
 
 <section class="section">
@@ -93,7 +93,7 @@ ${COMP_SECTION}
 
 <section class="cta-block">
   <h2 data-i18n-html="features.cta.heading">Provala adesso. <span style="color:var(--accent)">È gratis.</span></h2>
-  <p data-i18n="features.cta.desc">Scarica BikerLink e in un minuto sei dentro con tutta la community italiana.</p>
+  <p data-i18n="features.cta.desc">Scarica BikerLink e in un minuto sei dentro con rider da tutto il mondo.</p>
   <div class="btn-row"><a class="btn btn-primary" href="/download" data-i18n="features.cta.btn">Scarica l'app</a></div>
 </section>
 `;

@@ -34,7 +34,7 @@ export const SITE_TRANSLATIONS_EN1: Record<string, string> = {
   'footer.tagline': 'Made for riders, by riders.',
 
   // ── HOME ─────────────────────────────────────────────────────────────────
-  'home.hero.eyebrow': 'The Italian biker community',
+  'home.hero.eyebrow': 'The World Biker Community',
   'home.hero.subtitle': 'APP FOR MOTORCYCLISTS',
   'home.hero.sub': "You'll Never Ride Alone",
   'home.hero.desc': 'The first vertical platform for motorcyclists. Live map, MotoClub, emergency SOS and photo contests — all free, forever.',
@@ -114,7 +114,7 @@ export const SITE_TRANSLATIONS_EN1: Record<string, string> = {
   'home.trust.card3.meta': '24/7',
   'home.seo.title': 'Why a dedicated app for motorcyclists',
   'home.cta.title': 'Ready to stop riding alone?',
-  'home.cta.desc': 'Sign up free, complete your profile, and in 60 seconds you are on the map with the Italian community.',
+  'home.cta.desc': 'Sign up free, complete your profile, and in 60 seconds you are on the map with riders from all across the globe.',
   'home.cta.btn1': 'Download BikerLink',
   'home.cta.btn2': 'FAQ',
 
@@ -151,7 +151,7 @@ export const SITE_TRANSLATIONS_EN1: Record<string, string> = {
   'features.f6.cta': 'How matching works',
   'features.cta.title': 'Try it now.',
   'features.cta.title.free': "It's free.",
-  'features.cta.desc': 'Download BikerLink and in one minute you are in with the whole Italian community.',
+  'features.cta.desc': 'Download BikerLink and in one minute you are in with riders from all across the globe.',
   'features.cta.btn': 'Download app',
 
   // ── SOS ──────────────────────────────────────────────────────────────────
@@ -236,7 +236,7 @@ export const SITE_TRANSLATIONS_EN1: Record<string, string> = {
   'community.c6.title': 'Active moderation',
   'community.c6.desc': 'Reports answered within 24h. Personal block list and mute always available.',
   'community.cta.title': 'Join.',
-  'community.cta.desc': 'Over 5,000 Italian subscribers are already in. Your turn.',
+  'community.cta.desc': 'Over 5,000 riders from all across the globe are already in. Your turn.',
   'community.cta.btn': 'Download BikerLink',
 
   // ── DOWNLOAD ─────────────────────────────────────────────────────────────
@@ -283,7 +283,7 @@ export const SITE_TRANSLATIONS_EN1: Record<string, string> = {
   'faq.q8': 'Can I delete my account?',
   'faq.a8': 'Yes, at any time. From the app: Profile → Edit profile → Delete account. Alternatively write to bikerlinkapp@gmail.com. Data is deleted within 30 days (excluding logs we must keep for legal obligations).',
   'faq.q9': 'Does it work outside Italy?',
-  'faq.a9': "Yes, the app is available worldwide. The most active community is Italian (we were born here), but European and North African users are growing. Maps and curvy routing work throughout Europe.",
+  'faq.a9': "Yes, the app is available worldwide. BikerLink was born in Italy and has its strongest community there, but riders from across Europe, North Africa, and beyond are growing every month. Maps and curvy routing work throughout Europe.",
   'faq.q10': 'Can I contact you for a partnership or media inquiry?',
   'faq.a10': "Of course. Write to us at bikerlinkapp@gmail.com with 'Partnership' or 'Press' in the subject. For investors there is a dedicated page at <a href='/matching/per-investitori'>investor metrics</a> with technical architecture, business model and contacts.",
   'faq.cta.title': 'All clear?',

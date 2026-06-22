@@ -43,7 +43,7 @@ export function buildAbout(baseUrl: string): { meta: PageMeta; body: string } {
     <ul>
       <li data-i18n-html="about.principles.li1"><strong>Privacy by design.</strong> Ghost Mode, fuzzing GPS, Fake Home, posizione condivisa solo quando attivamente scelto.</li>
       <li data-i18n-html="about.principles.li2"><strong>Gratis sul serio.</strong> Niente paywall, niente trial, niente "premium" che limita features di base.</li>
-      <li data-i18n-html="about.principles.li3"><strong>Italian-first.</strong> Sviluppato in Italia, ottimizzato per le strade e la community italiana — anche se aperto a tutti.</li>
+      <li data-i18n-html="about.principles.li3"><strong>Rider-first.</strong> Costruito in Italia, pensato per i rider di tutto il mondo.</li>
       <li data-i18n-html="about.principles.li4"><strong>No ads invasive.</strong> Mai banner che coprono la mappa, mai pop-up, mai video forzati.</li>
       <li data-i18n-html="about.principles.li5"><strong>Open feedback.</strong> Ogni utente può scrivere direttamente, e leggiamo tutto.</li>
     </ul>

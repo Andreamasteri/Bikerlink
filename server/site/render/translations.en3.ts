@@ -34,7 +34,7 @@ export const SITE_TRANSLATIONS_EN3: Record<string, string> = {
 
   // ── HOME — SEO PROSE ──────────────────────────────────────────────────────
   'home.seo.h2': 'Why an app dedicated to motorcyclists',
-  'home.seo.p1': 'Italian motorcyclists number over 6 million, but on traditional social networks they get lost in the noise. Vertical forums have existed for decades and remain useful for technical discussions, yet they lacked mobility: no live map, no real-time coordination, no proximity notifications. BikerLink fills that gap with an app built by people who ride motorcycles, not by those who design generic products.',
+  'home.seo.p1': 'There are over 500 million motorcyclists worldwide, yet no dedicated social platform has ever been built for them. Vertical forums have existed for decades and remain useful for technical discussions, yet they lacked mobility: no live map, no real-time coordination, no proximity notifications. BikerLink was born in Italy and fills that gap globally — an app built by people who ride motorcycles, not by those who design generic products.',
   'home.seo.p2': 'The focus is on real roads: organising a Sunday morning ride, finding someone with the same bike for a technical chat, sharing photos of a mountain pass, getting help if you break down. All activities that already happen in WhatsApp groups and forums, but in a fragmented way. Having a single tool changes the daily experience of those who live motorcycling as a passion, not just a means of transport.',
   'home.seo.p3': 'To learn more about our story and mission, read <a href="/about">about us</a>. For practical questions on privacy, costs and account management, visit the <a href="/faq">FAQ</a>.',
 

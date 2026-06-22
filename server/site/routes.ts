@@ -385,9 +385,9 @@ code{background:#f0f0f0;padding:1px 5px;border-radius:2px;font-size:11px;font-fa
 <h2>5. Vantaggio Competitivo (Moat)</h2>
 <ul>
 <li><strong>Telemetria reale</strong> — Lean angle e G-force da giroscopio/accelerometro. Nessun competitor usa questo dato per matching. Richiede anni di raccolta per essere significativo.</li>
-<li><strong>Embeddings su corpus biker italiano</strong> — Il nostro corpus di bio e gusti musicali di motociclisti italiani è unico. Un modello generico fa peggio su questo dominio specifico.</li>
+<li><strong>Embeddings su corpus motociclisti</strong> — Il nostro corpus di bio e gusti musicali di motociclisti è unico nel dominio verticale. Un modello generico fa peggio su questo contesto specifico.</li>
 <li><strong>Feedback loop + dati storici</strong> — Ogni interazione migliora il modello. Un nuovo competitor partirebbe da zero.</li>
-<li><strong>Verticale moto — zero distrazione</strong> — Il contesto "motociclista" è nativo in ogni feature. Tinder e app generaliste non ottimizzeranno mai per il biker italiano.</li>
+<li><strong>Verticale moto — zero distrazione</strong> — Il contesto "rider" è nativo in ogni feature. Tinder e app generaliste non ottimizzeranno mai davvero per i motociclisti.</li>
 </ul>
 </div>
 

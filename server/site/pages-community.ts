@@ -93,7 +93,7 @@ export function buildCommunity(
 
 <section class="cta-block">
   <h2 data-i18n="community.cta.title">Unisciti.</h2>
-  <p data-i18n="community.cta.desc">Oltre 5.000 iscritti italiani sono già dentro. Tocca a te.</p>
+  <p data-i18n="community.cta.desc">Oltre 5.000 rider da tutto il mondo sono già dentro. Tocca a te.</p>
   <div class="btn-row"><a class="btn btn-primary" href="/download" data-i18n="community.cta.btn">Scarica BikerLink</a></div>
 </section>
 
