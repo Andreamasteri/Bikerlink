@@ -179,6 +179,26 @@ else
   exit 1
 fi
 
+log "=== [1e/3] Gate Undefined Route Handlers (.next.ts stubs) ==="
+# Rileva file .next.ts senza `export default` che siano importati come handler
+# di default in un file router. Questi causano:
+#   TypeError: argument handler must be a function
+# all'avvio di Express, crashando il server in produzione.
+#
+# Exit code:
+#   0 → nessun handler non definito trovato → OK
+#   1 → trovato import default di uno stub senza export default → GATE DURO
+UNDEF_HANDLER_EXIT=0
+bash scripts/check-undefined-handlers.sh 2>&1 || UNDEF_HANDLER_EXIT=$?
+if [ "$UNDEF_HANDLER_EXIT" -eq 0 ]; then
+  log "  ✅ Undefined Handlers OK — nessun .next.ts stub importato come default senza export."
+else
+  log "  ❌ DEPLOY BLOCCATO — uno o più .next.ts stub sono importati come router ma non hanno 'export default'."
+  log "     Fix: aggiungere 'export default router;' al file stub, oppure rimuovere l'import."
+  log "     Dettagli: bash scripts/check-undefined-handlers.sh"
+  exit 1
+fi
+
 log "=== [2/3] Build server TypeScript ==="
 node scripts/server-build.js
 log "  server_dist/ prodotto → $(size server_dist) ($(size server_dist/index.js 2>/dev/null) il bundle)"
