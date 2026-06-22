@@ -17,6 +17,13 @@ const RED = "#EF4444";
 const BAR_MAX_HEIGHT = 36;
 const BAR_WIDTH = 12;
 
+type ChartFilterKey = keyof Omit<DayTrend, "day">;
+
+const CHART_FILTER_KEYS = new Set<string>([
+  "crash_system", "crash_js", "restart_loop",
+  "js_thread_freeze", "gps_flood", "memory_pressure", "native_module_missing",
+]);
+
 function crashFreeColor(rate: number): string {
   if (rate < 90) return RED;
   if (rate < 95) return YELLOW;
@@ -39,7 +46,12 @@ function totalSignals(d: DayTrend): number {
   );
 }
 
-export function CrashLogStats({ stats }: { stats: CrashStatsResponse }) {
+interface CrashLogStatsProps {
+  stats: CrashStatsResponse;
+  filterType?: string;
+}
+
+export function CrashLogStats({ stats, filterType }: CrashLogStatsProps) {
   const colors = useColors();
   const totalSystem = stats.byType.crash_system ?? 0;
   const totalJs = stats.byType.crash_js ?? 0;
@@ -52,6 +64,11 @@ export function CrashLogStats({ stats }: { stats: CrashStatsResponse }) {
 
   const grandCrashes = totalSystem + totalJs + totalLoop;
   const grandSignals = totalFreeze + totalGps + totalMem + totalMod;
+
+  const chartFilterKey: ChartFilterKey | null =
+    filterType && CHART_FILTER_KEYS.has(filterType)
+      ? (filterType as ChartFilterKey)
+      : null;
 
   const rawTrend = React.useMemo(() => stats.dailyTrend ?? [], [stats.dailyTrend]);
 
@@ -72,9 +89,14 @@ export function CrashLogStats({ stats }: { stats: CrashStatsResponse }) {
     return days;
   }, [rawTrend]);
 
-  const maxDay = Math.max(1, ...trend.map((d) =>
-    d.crash_system + d.crash_js + (d.restart_loop ?? 0) + totalSignals(d)
-  ));
+  const maxDay = React.useMemo(() => {
+    if (chartFilterKey) {
+      return Math.max(1, ...trend.map((d) => (d[chartFilterKey] as number) ?? 0));
+    }
+    return Math.max(1, ...trend.map((d) =>
+      d.crash_system + d.crash_js + (d.restart_loop ?? 0) + totalSignals(d)
+    ));
+  }, [trend, chartFilterKey]);
 
   const shortDay = (iso: string) => {
     const d = new Date(iso + "T00:00:00Z");
@@ -213,28 +235,63 @@ export function CrashLogStats({ stats }: { stats: CrashStatsResponse }) {
         <View style={[statsStyles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <View style={statsStyles.cardHeader}>
             <MaterialCommunityIcons name="chart-bar" size={14} color={colors.textSecondary} />
-            <Text style={[statsStyles.cardTitle, { color: colors.textSecondary }]}>Trend 14 giorni</Text>
+            <Text style={[statsStyles.cardTitle, { color: colors.textSecondary }]}>
+              Trend 14 giorni{chartFilterKey ? ` · ${filterType}` : ""}
+            </Text>
           </View>
           <View style={statsStyles.chartRow}>
             {trend.map((d, i) => {
               const loopCount = d.restart_loop ?? 0;
-              const sigTotal = totalSignals(d);
-              const total = d.crash_system + d.crash_js + loopCount + sigTotal;
-              const barH = Math.max(2, Math.round((total / maxDay) * BAR_MAX_HEIGHT));
-              const sysH = total > 0 ? Math.round((d.crash_system / total) * barH) : 0;
-              const jsH = total > 0 ? Math.round((d.crash_js / total) * barH) : 0;
-              const loopH = total > 0 ? Math.round((loopCount / total) * barH) : 0;
-              const sigH = Math.max(0, barH - sysH - jsH - loopH);
+              const freezeCount = d.js_thread_freeze ?? 0;
+              const gpsCount = d.gps_flood ?? 0;
+              const memCount = d.memory_pressure ?? 0;
+              const modCount = d.native_module_missing ?? 0;
+
+              let sysH = 0, jsH = 0, loopH = 0, freezeH = 0, gpsH = 0, memH = 0, modH = 0;
+
+              if (chartFilterKey) {
+                const val = (d[chartFilterKey] as number) ?? 0;
+                const h = Math.max(val > 0 ? 2 : 0, Math.round((val / maxDay) * BAR_MAX_HEIGHT));
+                if (chartFilterKey === "crash_system") sysH = h;
+                else if (chartFilterKey === "crash_js") jsH = h;
+                else if (chartFilterKey === "restart_loop") loopH = h;
+                else if (chartFilterKey === "js_thread_freeze") freezeH = h;
+                else if (chartFilterKey === "gps_flood") gpsH = h;
+                else if (chartFilterKey === "memory_pressure") memH = h;
+                else if (chartFilterKey === "native_module_missing") modH = h;
+              } else {
+                const total = d.crash_system + d.crash_js + loopCount + freezeCount + gpsCount + memCount + modCount;
+                const barH = Math.max(total > 0 ? 2 : 0, Math.round((total / maxDay) * BAR_MAX_HEIGHT));
+                sysH = total > 0 ? Math.round((d.crash_system / total) * barH) : 0;
+                jsH = total > 0 ? Math.round((d.crash_js / total) * barH) : 0;
+                loopH = total > 0 ? Math.round((loopCount / total) * barH) : 0;
+                freezeH = total > 0 ? Math.round((freezeCount / total) * barH) : 0;
+                gpsH = total > 0 ? Math.round((gpsCount / total) * barH) : 0;
+                memH = total > 0 ? Math.round((memCount / total) * barH) : 0;
+                modH = Math.max(0, barH - sysH - jsH - loopH - freezeH - gpsH - memH);
+              }
+
+              const totalBarH = sysH + jsH + loopH + freezeH + gpsH + memH + modH;
               const isLast = i === trend.length - 1;
+
               return (
                 <View key={d.day} style={[statsStyles.barWrapper, isLast && statsStyles.barWrapperLast]}>
                   <View style={[statsStyles.barContainer, { height: BAR_MAX_HEIGHT }]}>
-                    <View style={{ width: BAR_WIDTH, height: barH, justifyContent: "flex-end" }}>
-                      {sigH > 0 && (
-                        <View style={{ width: BAR_WIDTH, height: sigH, backgroundColor: FREEZE_COLOR, borderTopLeftRadius: 2, borderTopRightRadius: 2 }} />
+                    <View style={{ width: BAR_WIDTH, height: totalBarH, justifyContent: "flex-end" }}>
+                      {modH > 0 && (
+                        <View style={{ width: BAR_WIDTH, height: modH, backgroundColor: MOD_COLOR, borderTopLeftRadius: 2, borderTopRightRadius: 2 }} />
+                      )}
+                      {memH > 0 && (
+                        <View style={{ width: BAR_WIDTH, height: memH, backgroundColor: MEM_COLOR, borderTopLeftRadius: modH > 0 ? 0 : 2, borderTopRightRadius: modH > 0 ? 0 : 2 }} />
+                      )}
+                      {gpsH > 0 && (
+                        <View style={{ width: BAR_WIDTH, height: gpsH, backgroundColor: GPS_COLOR, borderTopLeftRadius: (modH + memH) > 0 ? 0 : 2, borderTopRightRadius: (modH + memH) > 0 ? 0 : 2 }} />
+                      )}
+                      {freezeH > 0 && (
+                        <View style={{ width: BAR_WIDTH, height: freezeH, backgroundColor: FREEZE_COLOR, borderTopLeftRadius: (modH + memH + gpsH) > 0 ? 0 : 2, borderTopRightRadius: (modH + memH + gpsH) > 0 ? 0 : 2 }} />
                       )}
                       {loopH > 0 && (
-                        <View style={{ width: BAR_WIDTH, height: loopH, backgroundColor: LOOP_COLOR, borderTopLeftRadius: sigH > 0 ? 0 : 2, borderTopRightRadius: sigH > 0 ? 0 : 2 }} />
+                        <View style={{ width: BAR_WIDTH, height: loopH, backgroundColor: LOOP_COLOR, borderTopLeftRadius: (modH + memH + gpsH + freezeH) > 0 ? 0 : 2, borderTopRightRadius: (modH + memH + gpsH + freezeH) > 0 ? 0 : 2 }} />
                       )}
                       {jsH > 0 && (
                         <View style={{ width: BAR_WIDTH, height: jsH, backgroundColor: JS_COLOR }} />
@@ -252,22 +309,48 @@ export function CrashLogStats({ stats }: { stats: CrashStatsResponse }) {
             })}
           </View>
           <View style={statsStyles.chartLegend}>
-            <View style={statsStyles.legendItem}>
-              <View style={[statsStyles.legendDot, { backgroundColor: SYS_COLOR }]} />
-              <Text style={[statsStyles.legendText, { color: colors.textSecondary }]}>Sistema</Text>
-            </View>
-            <View style={statsStyles.legendItem}>
-              <View style={[statsStyles.legendDot, { backgroundColor: JS_COLOR }]} />
-              <Text style={[statsStyles.legendText, { color: colors.textSecondary }]}>JS</Text>
-            </View>
-            <View style={statsStyles.legendItem}>
-              <View style={[statsStyles.legendDot, { backgroundColor: LOOP_COLOR }]} />
-              <Text style={[statsStyles.legendText, { color: colors.textSecondary }]}>Loop</Text>
-            </View>
-            <View style={statsStyles.legendItem}>
-              <View style={[statsStyles.legendDot, { backgroundColor: FREEZE_COLOR }]} />
-              <Text style={[statsStyles.legendText, { color: colors.textSecondary }]}>Segnali</Text>
-            </View>
+            {(!chartFilterKey || chartFilterKey === "crash_system") && (
+              <View style={statsStyles.legendItem}>
+                <View style={[statsStyles.legendDot, { backgroundColor: SYS_COLOR }]} />
+                <Text style={[statsStyles.legendText, { color: colors.textSecondary }]}>Sistema</Text>
+              </View>
+            )}
+            {(!chartFilterKey || chartFilterKey === "crash_js") && (
+              <View style={statsStyles.legendItem}>
+                <View style={[statsStyles.legendDot, { backgroundColor: JS_COLOR }]} />
+                <Text style={[statsStyles.legendText, { color: colors.textSecondary }]}>JS</Text>
+              </View>
+            )}
+            {(!chartFilterKey || chartFilterKey === "restart_loop") && (
+              <View style={statsStyles.legendItem}>
+                <View style={[statsStyles.legendDot, { backgroundColor: LOOP_COLOR }]} />
+                <Text style={[statsStyles.legendText, { color: colors.textSecondary }]}>Loop</Text>
+              </View>
+            )}
+            {(!chartFilterKey || chartFilterKey === "js_thread_freeze") && (
+              <View style={statsStyles.legendItem}>
+                <View style={[statsStyles.legendDot, { backgroundColor: FREEZE_COLOR }]} />
+                <Text style={[statsStyles.legendText, { color: colors.textSecondary }]}>Freeze</Text>
+              </View>
+            )}
+            {(!chartFilterKey || chartFilterKey === "gps_flood") && (
+              <View style={statsStyles.legendItem}>
+                <View style={[statsStyles.legendDot, { backgroundColor: GPS_COLOR }]} />
+                <Text style={[statsStyles.legendText, { color: colors.textSecondary }]}>GPS</Text>
+              </View>
+            )}
+            {(!chartFilterKey || chartFilterKey === "memory_pressure") && (
+              <View style={statsStyles.legendItem}>
+                <View style={[statsStyles.legendDot, { backgroundColor: MEM_COLOR }]} />
+                <Text style={[statsStyles.legendText, { color: colors.textSecondary }]}>RAM</Text>
+              </View>
+            )}
+            {(!chartFilterKey || chartFilterKey === "native_module_missing") && (
+              <View style={statsStyles.legendItem}>
+                <View style={[statsStyles.legendDot, { backgroundColor: MOD_COLOR }]} />
+                <Text style={[statsStyles.legendText, { color: colors.textSecondary }]}>Modulo</Text>
+              </View>
+            )}
           </View>
         </View>
       )}
@@ -385,7 +468,7 @@ const statsStyles = StyleSheet.create({
   barWrapperLast: {},
   barContainer: { justifyContent: "flex-end", alignItems: "center" },
   barLabel: { fontFamily: "Inter_400Regular", fontSize: 9 },
-  chartLegend: { flexDirection: "row", gap: 12, flexWrap: "wrap" },
+  chartLegend: { flexDirection: "row", gap: 10, flexWrap: "wrap" },
   legendItem: { flexDirection: "row", alignItems: "center", gap: 4 },
   legendDot: { width: 8, height: 8, borderRadius: 4 },
   legendText: { fontFamily: "Inter_400Regular", fontSize: 11 },

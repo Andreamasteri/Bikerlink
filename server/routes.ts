@@ -567,7 +567,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   }).catch(() => {});
 
   const { publicRouter: crashLogsPublic, adminRouter: crashLogsAdmin } = await import("./routes/crash-logs");
+  const { adminStatsRouter: crashLogsAdminStats } = await import("./routes/crash-logs-admin-stats");
   app.use("/api/crash-logs", crashLogsPublic);
+  app.use("/api/admin/crash-logs", crashLogsAdminStats);
   app.use("/api/admin/crash-logs", crashLogsAdmin);
 
   return httpServer;

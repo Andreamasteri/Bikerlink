@@ -184,7 +184,7 @@ export function CrashLogsHeader({
         <SignalFrequencySection items={signalFreqData.items} />
       )}
 
-      {statsData && <CrashLogStats stats={statsData} />}
+      {statsData && <CrashLogStats stats={statsData} filterType={filterType || undefined} />}
       <Text style={[styles.totalText, { color: colors.textSecondary, marginTop: statsData ? 12 : 4 }]}>
         {total} eventi
         {filterType && filterTypeLabel ? ` · ${filterTypeLabel}` : ""}

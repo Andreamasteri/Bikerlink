@@ -16,7 +16,7 @@ function trunc(s: unknown, max: number): string {
   return str.length > max ? str.slice(0, max) : str;
 }
 
-const requireAdmin: RequestHandler = (req, res, next) => {
+export const requireAdmin: RequestHandler = (req, res, next) => {
   if (!req.session.userId) {
     sendError(res, 401, "Non autenticato");
     return;
@@ -50,6 +50,29 @@ interface CrashLogEntryInput {
   sessionStartedAt?: unknown;
   sessionEndedAt?: unknown;
 }
+
+// SQL expression that derives a signal type from the errorMessage [resume:X] prefix.
+export const DERIVED_TYPE_EXPR = sql`
+  CASE
+    WHEN error_message LIKE '[resume:js_thread_freeze]%'     THEN 'js_thread_freeze'
+    WHEN error_message LIKE '[resume:gps_flood]%'            THEN 'gps_flood'
+    WHEN error_message LIKE '[resume:memory_pressure]%'      THEN 'memory_pressure'
+    WHEN error_message LIKE '[resume:native_module_missing]%' THEN 'native_module_missing'
+    WHEN error_message LIKE '[resume:appstate_transition]%'  THEN 'appstate_transition'
+    ELSE crash_type
+  END
+`;
+
+// The signal types that are high-frequency but NOT real crashes
+export const SIGNAL_TYPES_CONTEXT = ["appstate_transition"];
+// The signal types treated as diagnostic (shown in panel but excluded from crash-free rate)
+export const SIGNAL_TYPES_DIAGNOSTIC = [
+  "js_thread_freeze",
+  "gps_flood",
+  "memory_pressure",
+  "native_module_missing",
+];
+
 
 export const publicRouter = Router();
 
@@ -111,6 +134,7 @@ publicRouter.post("/", (req: Request, res: Response): void => {
 export const adminRouter = Router();
 
 registerCrashAnalyticsRoutes(adminRouter, requireAdmin);
+
 
 adminRouter.get("/", requireAdmin, (req: Request, res: Response): void => {
   const page = Math.max(1, parseInt(String(req.query.page ?? "1"), 10));
