@@ -2,26 +2,30 @@
  * ESLint rule: no-part-nav
  *
  * Catches navigation calls where an argument contains a ".partN" segment,
- * whether expressed as a template literal or via string concatenation.
- *
- * Static string literals are already covered by the grep gate in
- * scripts/post-merge.sh.  This rule closes the gap for dynamically-
- * constructed paths that grep cannot see.
+ * whether expressed as a plain string literal, a template literal, or via
+ * string concatenation.
  *
  * Covered call shapes:
  *   router.push(...)  router.replace(...)  router.navigate(...)
  *   push(...)  replace(...)  navigate(...)   (destructured useRouter)
- *   <Link href={`...`}>
+ *   <Link href="...">  <Link href={`...`}>
  *
  * Detected expression forms:
- *   - Template literals:   push(`/giri/${id}.part2`)
- *   - Binary concatenation: push("/giri/" + id + ".part2")
+ *   - Static string literals:  push("/giri/detail.part2")
+ *   - Template literals:       push(`/giri/${id}.part2`)
+ *   - Binary concatenation:    push("/giri/" + id + ".part2")
+ *
+ * A static string literal matches when its value contains ".part" followed
+ * by a digit.
  *
  * A template literal matches when at least one of its string parts
  * (quasis / cooked text) contains ".part" followed by a digit.
  *
  * A binary expression (+) matches when any Literal leaf in the
  * concatenation chain contains ".part" followed by a digit.
+ *
+ * The grep gate in scripts/post-merge.sh is retained as belt-and-suspenders
+ * for any edge cases the AST rule may not reach (e.g. generated code).
  */
 
 "use strict";
@@ -71,6 +75,15 @@ module.exports = {
     function checkArg(argNode) {
       if (!argNode) return;
 
+      if (
+        argNode.type === "Literal" &&
+        typeof argNode.value === "string" &&
+        PART_RE.test(argNode.value)
+      ) {
+        context.report({ node: argNode, messageId: "noPartNav" });
+        return;
+      }
+
       if (argNode.type === "TemplateLiteral" && templateLiteralHasPart(argNode)) {
         context.report({ node: argNode, messageId: "noPartNav" });
         return;
@@ -101,15 +114,24 @@ module.exports = {
         }
       },
 
-      // <Link href={`...`}> and href={`...`} JSX attributes
+      // <Link href="/screen.part2"> (plain string) and
+      // <Link href={`...`}> / <Link href={expr}> (expression container)
       JSXAttribute(node) {
         if (
-          node.name &&
-          node.name.type === "JSXIdentifier" &&
-          node.name.name === "href" &&
-          node.value &&
-          node.value.type === "JSXExpressionContainer"
+          !node.name ||
+          node.name.type !== "JSXIdentifier" ||
+          node.name.name !== "href" ||
+          !node.value
         ) {
+          return;
+        }
+
+        if (node.value.type === "Literal") {
+          checkArg(node.value);
+          return;
+        }
+
+        if (node.value.type === "JSXExpressionContainer") {
           checkArg(node.value.expression);
         }
       },

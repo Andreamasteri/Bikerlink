@@ -709,11 +709,14 @@ echo ""
 #   Paths built at runtime — e.g. push(`/giri/${id}.part2`) or
 #   const seg = ".part2"; push("/giri/" + seg) — are INVISIBLE to grep.
 #
-#   The gap is closed at the lint layer:
+#   The gap for dynamic paths is closed at the lint layer:
 #     scripts/eslint-rules/no-part-nav.js  (ESLint custom rule)
-#   That rule catches TemplateLiteral arguments in push/replace/navigate
-#   calls whose quasis contain ".partN", and fires a warning during
+#   That rule catches Literal strings, TemplateLiteral arguments, and
+#   binary-concatenation (+) chains in push/replace/navigate calls
+#   whose value contains ".partN", and fires a warning during
 #   `npx eslint` (also runs in the lint workflow).
+#   This grep gate is retained as belt-and-suspenders for edge cases
+#   (generated code, unusual AST shapes) that the ESLint rule cannot see.
 #   A string-concatenation pattern is still out of scope for static
 #   analysis — keep helper-screen paths as non-exported constants and
 #   avoid constructing them dynamically.

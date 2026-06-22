@@ -22,6 +22,11 @@ tester.run("no-part-nav", rule, {
     { code: 'push("/club/" + id)' },
     { code: 'push(`/giri/${id}`)' },
 
+    // Static strings without .partN — safe
+    { code: 'router.push("/giri/detail")' },
+    { code: 'push("/club/overview")' },
+    { code: '<Link href="/giri/123" />' },
+
     // Template literal without .partN quasis
     { code: 'router.push(`/giri/${id}/dettaglio`)' },
 
@@ -30,12 +35,42 @@ tester.run("no-part-nav", rule, {
 
     // Unrelated JSX attribute — not href, should not trigger
     { code: '<Link to={`/giri/${id}.part2`} />' },
+    { code: '<Link to="/giri/1.part2" />' },
 
     // Assignment, not a navigation call
     { code: 'const s = "/giri/" + id + ".part2"' },
+    { code: 'const url = "/screen.part2"' },
   ],
 
   invalid: [
+    // ── Static string literal cases (new coverage) ────────────────────────
+
+    {
+      code: 'router.push("/giri/detail.part2")',
+      errors: [{ messageId: "noPartNav" }],
+    },
+    {
+      code: 'router.replace("/club/members.part3")',
+      errors: [{ messageId: "noPartNav" }],
+    },
+    {
+      code: 'navigate("/impostazioni.part1")',
+      errors: [{ messageId: "noPartNav" }],
+    },
+    {
+      code: 'push("/screen.part2")',
+      errors: [{ messageId: "noPartNav" }],
+    },
+    // plain string JSX href
+    {
+      code: '<Link href="/giri/detail.part2" />',
+      errors: [{ messageId: "noPartNav" }],
+    },
+    {
+      code: '<Link href="/club.part3" />',
+      errors: [{ messageId: "noPartNav" }],
+    },
+
     // ── Template-literal cases (pre-existing coverage) ────────────────────
 
     {
