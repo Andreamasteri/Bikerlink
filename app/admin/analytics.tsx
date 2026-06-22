@@ -14,6 +14,7 @@ import { PendingReportsModal } from "@/components/admin/analytics/PendingReports
 import { UserStatsContent } from "@/components/admin/analytics/UserStatsContent";
 import { styles } from "@/components/admin/analytics.styles";
 import { SessionsSection } from "@/components/admin/analytics/SessionsSection";
+import { FunnelContent, SkipCharts } from "./analytics.part2";
 
 interface Analytics {
   totalUsers: number;
@@ -333,59 +334,7 @@ export default function AdminAnalytics() {
             {onboardingTagsQuery.isLoading ? (
               <Text style={styles.loadingText}>Caricamento...</Text>
             ) : (
-              (() => {
-                const f = onboardingTagsQuery.data?.funnel;
-                const started = f?.started ?? 0;
-                const carouselCompleted = f?.carouselCompleted ?? 0;
-                const tagsShown = f?.tagsShown ?? 0;
-                const tagsSaved = f?.tagsSaved ?? 0;
-                const finishN = f?.carouselCompletedFinish ?? 0;
-                const skipN = f?.carouselCompletedSkip ?? 0;
-                const d = f?.dropOff;
-                return (
-                  <View style={styles.onboardingRows}>
-                    <View style={styles.onboardingRow}>
-                      <Text style={styles.onboardingLabel}>1. Onboarding avviato</Text>
-                      <Text style={styles.onboardingValue}>{started}</Text>
-                    </View>
-                    <View style={styles.onboardingRow}>
-                      <Text style={styles.onboardingLabel}>↓ → 2. Carousel completato</Text>
-                      <Text style={styles.onboardingValue}>
-                        {carouselCompleted}{" "}
-                        <Text style={styles.funnelPct}>({(d?.startedToCarousel ?? 0).toFixed(1)}%)</Text>
-                      </Text>
-                    </View>
-                    <View style={[styles.onboardingRow, styles.onboardingSubRow]}>
-                      <Text style={styles.onboardingSubLabel}>   • Finiti (Continua)</Text>
-                      <Text style={styles.onboardingSubValue}>{finishN}</Text>
-                    </View>
-                    <View style={[styles.onboardingRow, styles.onboardingSubRow]}>
-                      <Text style={styles.onboardingSubLabel}>   • Skip</Text>
-                      <Text style={styles.onboardingSubValue}>{skipN}</Text>
-                    </View>
-                    <View style={styles.onboardingRow}>
-                      <Text style={styles.onboardingLabel}>↓ → 3. Tag mostrati</Text>
-                      <Text style={styles.onboardingValue}>
-                        {tagsShown}{" "}
-                        <Text style={styles.funnelPct}>({(d?.carouselToTagsShown ?? 0).toFixed(1)}%)</Text>
-                      </Text>
-                    </View>
-                    <View style={styles.onboardingRow}>
-                      <Text style={styles.onboardingLabel}>↓ → 4. Tag salvati</Text>
-                      <Text style={[styles.onboardingValue, { color: Colors.success }]}>
-                        {tagsSaved}{" "}
-                        <Text style={styles.funnelPct}>({(d?.tagsShownToSaved ?? 0).toFixed(1)}%)</Text>
-                      </Text>
-                    </View>
-                    <View style={styles.onboardingRow}>
-                      <Text style={styles.onboardingLabel}>Conversione totale (start → saved)</Text>
-                      <Text style={[styles.onboardingValue, { color: Colors.accent }]}>
-                        {(d?.startedToSaved ?? 0).toFixed(1)}%
-                      </Text>
-                    </View>
-                  </View>
-                );
-              })()
+              <FunnelContent f={onboardingTagsQuery.data?.funnel} />
             )}
           </View>
 
@@ -394,62 +343,10 @@ export default function AdminAnalytics() {
             {onboardingTagsQuery.isLoading ? (
               <Text style={styles.loadingText}>Caricamento...</Text>
             ) : (
-              (() => {
-                const skipBySlide = onboardingTagsQuery.data?.funnel?.skipBySlide ?? [];
-                const topSkipSlides = onboardingTagsQuery.data?.funnel?.topSkipSlides ?? [];
-                const totalSkips = skipBySlide.reduce((s, x) => s + x.count, 0);
-                if (totalSkips === 0) {
-                  return (
-                    <Text style={styles.loadingText}>
-                      Nessun abbandono registrato.
-                    </Text>
-                  );
-                }
-                const maxCount = Math.max(...skipBySlide.map((s) => s.count), 1);
-                return (
-                  <View style={styles.onboardingRows}>
-                    <Text style={styles.skipHint}>
-                      Top 5 slide con più abbandoni ({totalSkips} skip totali)
-                    </Text>
-                    {topSkipSlides.map((s) => (
-                      <View key={`top-${s.index}`} style={styles.skipRow}>
-                        <Text style={styles.skipLabel}>Slide {s.index + 1}</Text>
-                        <View style={styles.skipBarTrack}>
-                          <View
-                            style={[
-                              styles.skipBarFill,
-                              { width: `${(s.count / maxCount) * 100}%` },
-                            ]}
-                          />
-                        </View>
-                        <Text style={styles.skipValue}>
-                          {s.count} <Text style={styles.funnelPct}>({s.pct.toFixed(1)}%)</Text>
-                        </Text>
-                      </View>
-                    ))}
-                    <Text style={[styles.skipHint, { marginTop: 8 }]}>
-                      Distribuzione completa
-                    </Text>
-                    {skipBySlide.map((s) => (
-                      <View key={`all-${s.index}`} style={styles.skipRow}>
-                        <Text style={styles.skipLabel}>Slide {s.index + 1}</Text>
-                        <View style={styles.skipBarTrack}>
-                          <View
-                            style={[
-                              styles.skipBarFill,
-                              {
-                                width: `${(s.count / maxCount) * 100}%`,
-                                backgroundColor: Colors.textSecondary,
-                              },
-                            ]}
-                          />
-                        </View>
-                        <Text style={styles.skipValue}>{s.count}</Text>
-                      </View>
-                    ))}
-                  </View>
-                );
-              })()
+              <SkipCharts 
+                skipBySlide={onboardingTagsQuery.data?.funnel?.skipBySlide ?? []} 
+                topSkipSlides={onboardingTagsQuery.data?.funnel?.topSkipSlides ?? []} 
+              />
             )}
           </View>
 

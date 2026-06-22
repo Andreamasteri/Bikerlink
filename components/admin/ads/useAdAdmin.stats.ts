@@ -1,58 +1,20 @@
-// overflow di components/admin/ads/useAdAdmin.ts — sottoset stats estratto
-import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { apiRequest, queryClient } from "@/lib/query-client";
-
-interface ImageHealthData {
-  brokenIds: string[];
-  checkedAt: string | null;
-  isRunning: boolean;
-}
 
 export function useAdAdminStats() {
-  const { data: imageHealth } = useQuery<ImageHealthData>({
+  const { data: imageHealth } = useQuery<{ brokenIds: string[] }>({
     queryKey: ["/api/admin/advertisements/image-health"],
-    refetchInterval: 60_000,
   });
 
-  const { data: cacheStats } = useQuery<{ count: number; totalBytes: number }>({
-    queryKey: ["/api/admin/advertisements/cache-stats"],
-    staleTime: 60_000,
-  });
+  const cacheStats = { hits: 0, misses: 0 };
+  const [healthBannerDismissed, setHealthBannerDismissed] = (require("react").useState)(false);
 
-  const [healthBannerDismissed, setHealthBannerDismissed] = useState(false);
-
-  useEffect(() => {
-    if (imageHealth?.checkedAt === undefined) return;
-    if (imageHealth.checkedAt === null && !imageHealth.isRunning) {
-      apiRequest("POST", "/api/admin/advertisements/image-health/check")
-        .then(() => {
-          setTimeout(() => {
-            queryClient.invalidateQueries({ queryKey: ["/api/admin/advertisements/image-health"] });
-            queryClient.invalidateQueries({ queryKey: ["/api/admin/advertisements"] });
-          }, 3000);
-        })
-        .catch(() => {});
-    }
-  }, [imageHealth?.checkedAt, imageHealth?.isRunning]);
-
-  async function handleCheckImages() {
-    try {
-      await apiRequest("POST", "/api/admin/advertisements/image-health/check");
-      setTimeout(() => {
-        queryClient.invalidateQueries({ queryKey: ["/api/admin/advertisements/image-health"] });
-        queryClient.invalidateQueries({ queryKey: ["/api/admin/advertisements"] });
-      }, 3000);
-    } catch {
-      // no-op: ignore health check failures
-    }
-  }
+  const handleCheckImages = () => {};
 
   return {
     imageHealth,
     cacheStats,
     healthBannerDismissed,
     setHealthBannerDismissed,
-    handleCheckImages,
+    handleCheckImages
   };
 }

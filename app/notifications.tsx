@@ -15,8 +15,10 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
 import { apiRequest } from "@/lib/query-client";
 import { useT } from "@/lib/language-context";
+import { NotificationItem } from "./notifications.part2";
+import { styles } from "./notifications.styles";
 
-interface AppNotification {
+export interface AppNotification {
   id: string;
   title: string;
   body: string | null;
@@ -365,53 +367,14 @@ export default function NotificationsScreen() {
   const hasContent = notifications.length > 0 || incomingRequests.length > 0;
 
   const renderItem = ({ item }: { item: AppNotification }) => {
-    const icon = getNotifIcon(item.notificationType);
-    const isDeleting = deleteOneMutation.isPending && deleteOneMutation.variables === item.id;
     return (
-      <TouchableOpacity
-        style={[
-          styles.item,
-          {
-            backgroundColor: item.isRead ? colors.surface : (colors.background ?? colors.surface),
-            borderBottomColor: colors.border,
-          },
-          !item.isRead && { borderLeftWidth: 3, borderLeftColor: colors.accent },
-        ]}
+      <NotificationItem
+        item={item}
         onPress={() => handleItemPress(item)}
-        activeOpacity={0.7}
-      >
-        <View style={[styles.iconWrap, { backgroundColor: icon.color + "22" }]}>
-          <Ionicons name={icon.name} size={20} color={icon.color} />
-        </View>
-        <View style={styles.textWrap}>
-          <Text style={[styles.title, { color: colors.text }, !item.isRead && { fontWeight: "700" }]} numberOfLines={2}>
-            {item.title}
-          </Text>
-          {!!item.body && (
-            <Text style={[styles.body, { color: colors.textSecondary ?? colors.text }]} numberOfLines={2}>
-              {item.body}
-            </Text>
-          )}
-          <Text style={[styles.time, { color: colors.textSecondary ?? colors.text }]}>
-            {timeAgo(item.createdAt)}
-          </Text>
-        </View>
-        {!item.isRead && (
-          <View style={[styles.unreadDot, { backgroundColor: colors.accent }]} />
-        )}
-        <TouchableOpacity
-          onPress={() => handleDeleteOne(item.id)}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          disabled={isDeleting}
-          style={styles.deleteBtn}
-        >
-          <Ionicons
-            name="trash-outline"
-            size={18}
-            color={isDeleting ? (colors.textSecondary ?? "#999") : "#E63946"}
-          />
-        </TouchableOpacity>
-      </TouchableOpacity>
+        onDelete={() => handleDeleteOne(item.id)}
+        isDeleting={deleteOneMutation.isPending && deleteOneMutation.variables === item.id}
+        colors={colors}
+      />
     );
   };
 
@@ -489,77 +452,3 @@ export default function NotificationsScreen() {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  item: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    gap: 12,
-  },
-  iconWrap: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: "center",
-    justifyContent: "center",
-    flexShrink: 0,
-  },
-  textWrap: {
-    flex: 1,
-    gap: 2,
-  },
-  title: {
-    fontSize: 14,
-    fontWeight: "500",
-  },
-  body: {
-    fontSize: 13,
-  },
-  time: {
-    fontSize: 12,
-    marginTop: 2,
-  },
-  unreadDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    flexShrink: 0,
-  },
-  deleteBtn: {
-    flexShrink: 0,
-    paddingLeft: 4,
-  },
-  empty: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 12,
-  },
-  emptyText: {
-    fontSize: 16,
-  },
-  headerBtn: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-  },
-  sectionLabel: {
-    fontSize: 13,
-    fontWeight: "700",
-    paddingHorizontal: 16,
-    paddingTop: 14,
-    paddingBottom: 4,
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
-  },
-  sectionDivider: {
-    borderTopWidth: StyleSheet.hairlineWidth,
-    marginHorizontal: 16,
-    marginTop: 16,
-  },
-});

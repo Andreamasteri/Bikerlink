@@ -27,3 +27,4 @@ lib/i18n/tr.ts
 # richiede molti casi d'uso separati; refactoring in più file romperebbe
 # la leggibilità della suite.
 server/__tests__/privacy-filter.test.ts
+server/__tests__/privacy-filter.part2.test.ts

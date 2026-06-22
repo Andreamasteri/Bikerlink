@@ -88,11 +88,7 @@ async function authGet<T>(path: string): Promise<T> {
   return res.json() as Promise<T>;
 }
 
-function CollapseChevron({ collapsed }: { collapsed: boolean }) {
-  return (
-    <Ionicons name={collapsed ? "chevron-down" : "chevron-up"} size={16} color={Colors.textSecondary} />
-  );
-}
+import { Section, CollapseChevron } from "./RoutingCoordinationCard.parts";
 
 const OUTCOME_COLOR: Record<PipelineOutcome, string> = {
   ok: "#22c55e",
@@ -389,32 +385,7 @@ export function RoutingCoordinationCard({
   );
 }
 
-function Section({
-  title,
-  icon,
-  open,
-  onToggle,
-  children,
-}: {
-  title: string;
-  icon: keyof typeof MaterialCommunityIcons.glyphMap;
-  open: boolean;
-  onToggle: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <View style={styles.section}>
-      <TouchableOpacity style={styles.sectionHeader} onPress={onToggle} activeOpacity={0.7}>
-        <MaterialCommunityIcons name={icon} size={15} color={Colors.textSecondary} />
-        <Text style={styles.sectionTitle}>{title}</Text>
-        <View style={styles.sectionChevron}>
-          <CollapseChevron collapsed={!open} />
-        </View>
-      </TouchableOpacity>
-      {open && <View style={styles.sectionBody}>{children}</View>}
-    </View>
-  );
-}
+import { Section } from "./RoutingCoordinationCard.parts";
 
 function CoherenceResult({ data }: { data: CoherenceResponse }) {
   const { comparison: c, graphhopper: gh, valhalla: val } = data;
@@ -459,110 +430,4 @@ function CoherenceLegView({ name, leg }: { name: string; leg: CoherenceLeg }) {
   );
 }
 
-const styles = StyleSheet.create({
-  card: {
-    backgroundColor: Colors.surface,
-    borderRadius: 16,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  cardHeader: { flexDirection: "row", alignItems: "center", gap: 8 },
-  cardTitle: { fontFamily: "Inter_700Bold", fontSize: 15, color: Colors.text },
-  headerRight: { marginLeft: "auto", flexDirection: "row", alignItems: "center", gap: 8 },
-  headerCount: { fontFamily: "Inter_600SemiBold", fontSize: 12, color: Colors.textSecondary },
-  healthDot: { width: 10, height: 10, borderRadius: 5 },
-  body: { marginTop: 14, gap: 12 },
-  errorText: { fontFamily: "Inter_400Regular", fontSize: 12, color: "#ef4444" },
-  emptyText: { fontFamily: "Inter_400Regular", fontSize: 12, color: Colors.textSecondary },
-
-  coherenceBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
-    paddingVertical: 9,
-    paddingHorizontal: 12,
-    backgroundColor: "rgba(96, 165, 250, 0.1)",
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: "rgba(96, 165, 250, 0.25)",
-  },
-  coherenceBtnBusy: { opacity: 0.6 },
-  coherenceBtnText: { fontFamily: "Inter_600SemiBold", fontSize: 13, color: "#60a5fa" },
-
-  coherenceResult: {
-    borderWidth: 1,
-    borderRadius: 10,
-    padding: 10,
-    gap: 8,
-    backgroundColor: Colors.background,
-  },
-  coherenceHeader: { flexDirection: "row", alignItems: "center", gap: 6, flexWrap: "wrap" },
-  coherenceLabel: { fontFamily: "Inter_700Bold", fontSize: 13 },
-  coherenceRoute: { fontFamily: "Inter_400Regular", fontSize: 11, color: Colors.textSecondary, marginLeft: "auto" },
-  coherenceLegs: { flexDirection: "row", gap: 8 },
-  legBox: { flex: 1, gap: 2 },
-  legName: { fontFamily: "Inter_600SemiBold", fontSize: 11, color: Colors.text },
-  legValue: { fontFamily: "Inter_400Regular", fontSize: 11, color: Colors.textSecondary },
-  coherenceDiff: { fontFamily: "Inter_400Regular", fontSize: 11, color: Colors.textSecondary },
-
-  section: {
-    borderTopWidth: 1,
-    borderTopColor: Colors.border,
-    paddingTop: 8,
-  },
-  sectionHeader: { flexDirection: "row", alignItems: "center", gap: 6 },
-  sectionTitle: { fontFamily: "Inter_600SemiBold", fontSize: 13, color: Colors.text },
-  sectionChevron: { marginLeft: "auto" },
-  sectionBody: { marginTop: 8, gap: 6 },
-
-  flowRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  flowLabel: { fontFamily: "Inter_400Regular", fontSize: 12, color: Colors.textSecondary },
-  flowValue: { fontFamily: "Inter_600SemiBold", fontSize: 12, color: Colors.text },
-  metricsLine: { fontFamily: "Inter_400Regular", fontSize: 10, color: Colors.textSecondary, marginTop: 2 },
-
-  eventRow: { flexDirection: "row", alignItems: "flex-start", gap: 8, borderRadius: 6, padding: 4 },
-  eventDot: { width: 8, height: 8, borderRadius: 4, marginTop: 4 },
-  eventBody: { flex: 1 },
-  eventLineRow: { flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 4 },
-  eventLine: { fontFamily: "Inter_400Regular", fontSize: 11, color: Colors.text },
-  eventTime: { fontFamily: "Inter_600SemiBold", color: Colors.textSecondary },
-  eventSub: { fontFamily: "Inter_400Regular", fontSize: 10, marginTop: 1 },
-  volatileNote: { fontFamily: "Inter_400Regular", fontSize: 10, color: Colors.textSecondary, marginTop: 4 },
-
-  geoBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 2,
-    backgroundColor: "rgba(245,158,11,0.15)",
-    borderRadius: 4,
-    paddingHorizontal: 4,
-    paddingVertical: 1,
-  },
-  geoBadgeText: { fontFamily: "Inter_600SemiBold", fontSize: 9, color: "#f59e0b" },
-
-  geoFilterBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    alignSelf: "flex-start",
-    gap: 4,
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    marginBottom: 4,
-  },
-  geoFilterBtnActive: {
-    borderColor: "#f59e0b",
-    backgroundColor: "rgba(245,158,11,0.08)",
-  },
-  geoFilterText: { fontFamily: "Inter_600SemiBold", fontSize: 11, color: Colors.textSecondary },
-
-  aiRow: { gap: 1 },
-  aiLine: { fontFamily: "Inter_400Regular", fontSize: 11, color: Colors.text },
-  aiReason: { fontFamily: "Inter_400Regular", fontSize: 10, color: Colors.textSecondary },
-});
+import { styles } from "./RoutingCoordinationCard.styles";

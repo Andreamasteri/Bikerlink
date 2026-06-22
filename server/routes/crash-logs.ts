@@ -134,7 +134,10 @@ publicRouter.post("/", (req: Request, res: Response): void => {
 export const adminRouter = Router();
 
 registerCrashAnalyticsRoutes(adminRouter, requireAdmin);
+<<<<<<< HEAD
 
+=======
+>>>>>>> 51314c75 (fix: restore backend after file-split regressions (Task #4748 followup))
 
 adminRouter.get("/", requireAdmin, (req: Request, res: Response): void => {
   const page = Math.max(1, parseInt(String(req.query.page ?? "1"), 10));

@@ -4,79 +4,8 @@ import { Ionicons } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
 import Colors from "@/constants/colors";
 import { apiRequest } from "@/lib/query-client";
-
-export type GHErrorType = "tunnel_down" | "profile_missing" | "routing_error" | "ok";
-
-interface RoutingHistoryEvent {
-  ts: number;
-  type: "up" | "down";
-  error_type?: "tunnel_down" | "profile_missing" | "routing_error";
-  error?: string;
-  duration_ms?: number;
-}
-
-interface RoutingHistoryResponse {
-  events: RoutingHistoryEvent[];
-  self_hosted: boolean;
-}
-
-interface GHHealth {
-  ok: boolean;
-  status: string;
-  latency_ms: number | null;
-  last_check_at: number | null;
-  last_failure_at: number | null;
-  consecutive_failures: number;
-  error: string | null;
-  error_detail: string | null;
-  error_type: GHErrorType;
-  version: string | null;
-  available_profiles: string[] | null;
-  profiles_reachable: boolean;
-  profiles_error_reason: string | null;
-}
-
-export interface RoutingHealth {
-  self_hosted: boolean;
-  graphhopper: GHHealth;
-  cloud_fallback_available: boolean;
-  cloud_fallback_active: boolean;
-  routing_disabled: boolean;
-  degraded: boolean;
-  message: string;
-}
-
-interface TestRoutingResult {
-  ok: boolean;
-  engine?: string;
-  latency_ms?: number | null;
-  distanceKm?: number | null;
-  durationMinutes?: number | null;
-  error?: string;
-  source?: string;
-}
-
-function formatTime(ts: number | null): string {
-  if (!ts) return "—";
-  return new Date(ts).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
-}
-
-function ErrorTypeIcon({ type, size = 14 }: { type: GHErrorType; size?: number }) {
-  if (type === "tunnel_down") return <Ionicons name="cloud-offline-outline" size={size} color={Colors.error} />;
-  if (type === "profile_missing") return <Ionicons name="settings-outline" size={size} color="#f59e0b" />;
-  if (type === "routing_error") return <Ionicons name="warning-outline" size={size} color={Colors.error} />;
-  return <Ionicons name="checkmark-circle" size={size} color={Colors.success} />;
-}
-
-function ErrorTypeLabel({ type }: { type: GHErrorType }) {
-  const labels: Record<GHErrorType, string> = {
-    tunnel_down: "Tunnel DuckDNS non raggiungibile",
-    profile_missing: "Profilo motorcycle mancante",
-    routing_error: "Errore di routing",
-    ok: "Operativo",
-  };
-  return <Text style={styles.errorTypeLabel}>{labels[type]}</Text>;
-}
+import { styles } from "./SelfHostStatus.styles";
+import { formatTime, ErrorTypeIcon, ErrorTypeLabel, formatDuration } from "./SelfHostStatus.part2";
 
 function ProfilesSection({
   profiles,
@@ -150,22 +79,6 @@ function ProfilesSection({
   );
 }
 
-function formatDuration(ms: number): string {
-  const s = Math.round(ms / 1000);
-  if (s < 60) return `${s}s`;
-  const m = Math.round(s / 60);
-  if (m < 60) return `${m}min`;
-  const h = Math.floor(m / 60);
-  const rem = m % 60;
-  return rem > 0 ? `${h}h ${rem}min` : `${h}h`;
-}
-
-const ERROR_TYPE_LABELS: Record<string, string> = {
-  tunnel_down: "tunnel_down",
-  profile_missing: "profile_missing",
-  routing_error: "routing_error",
-};
-
 function RoutingHistorySection() {
   const [expanded, setExpanded] = React.useState(false);
   const { data, isLoading } = useQuery<RoutingHistoryResponse>({
@@ -213,7 +126,7 @@ function RoutingHistorySection() {
                 minute: "2-digit",
               });
               const label = isDown
-                ? `${ev.error_type ? ERROR_TYPE_LABELS[ev.error_type] ?? ev.error_type : "offline"}`
+                ? `${ev.error_type ?? "offline"}`
                 : `online${ev.duration_ms != null ? ` (down ${formatDuration(ev.duration_ms)})` : ""}`;
 
               return (

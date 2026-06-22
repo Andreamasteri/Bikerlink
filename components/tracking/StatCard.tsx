@@ -1,28 +1,25 @@
 import React from "react";
 import { View, Text, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import Colors from "@/constants/colors";
 
 interface StatCardProps {
-  icon: string;
+  icon: keyof typeof Ionicons.glyphMap;
   color: string;
   value: string;
   label: string;
 }
 
-export function StatCard({
-  icon,
-  color,
-  value,
-  label,
-}: StatCardProps) {
+export function StatCard({ icon, color, value, label }: StatCardProps) {
   return (
     <View style={styles.statCard}>
-      {/* eslint-disable-next-line @typescript-eslint/no-explicit-any -- icon name from data */}
-      <Ionicons name={icon as any} size={16} color={color} />
-      <Text style={styles.statValue} numberOfLines={1} adjustsFontSizeToFit>
-        {value}
-      </Text>
-      <Text style={styles.statLabel}>{label}</Text>
+      <View style={[styles.statIconContainer, { backgroundColor: color + "15" }]}>
+        <Ionicons name={icon} size={20} color={color} />
+      </View>
+      <View style={styles.statInfo}>
+        <Text style={styles.statValue}>{value}</Text>
+        <Text style={styles.statLabel}>{label}</Text>
+      </View>
     </View>
   );
 }
@@ -30,24 +27,34 @@ export function StatCard({
 const styles = StyleSheet.create({
   statCard: {
     flex: 1,
-    backgroundColor: "rgba(255, 255, 255, 0.05)",
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: Colors.surface,
+    borderRadius: 16,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    gap: 12,
+  },
+  statIconContainer: {
+    width: 40,
+    height: 40,
     borderRadius: 12,
-    padding: 10,
     alignItems: "center",
     justifyContent: "center",
-    minHeight: 70,
+  },
+  statInfo: {
+    flex: 1,
   },
   statValue: {
-    color: "#FFFFFF",
-    fontSize: 18,
+    fontSize: 16,
     fontFamily: "Inter_700Bold",
-    marginTop: 4,
+    color: Colors.text,
   },
   statLabel: {
-    color: "rgba(255, 255, 255, 0.6)",
-    fontSize: 10,
-    fontFamily: "Inter_400Regular",
-    marginTop: 2,
-    textTransform: "uppercase",
+    fontSize: 11,
+    fontFamily: "Inter_500Medium",
+    color: Colors.textSecondary,
+    marginTop: 1,
   },
 });

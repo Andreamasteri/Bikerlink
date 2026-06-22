@@ -19,9 +19,11 @@ import Colors from "@/constants/colors";
 import { getApiUrl } from "@/lib/query-client";
 import LeafletPickerMap from "@/components/LeafletPickerMap";
 import { t } from "@/lib/i18n";
+import { InviteStep, SummaryStep } from "./create.part2";
+import { styles } from "./create.styles";
 
-type Club = { id: string; name: string; clubType: string };
-type UserResult = { id: string; nickname: string; userType: string };
+export type Club = { id: string; name: string; clubType: string };
+export type UserResult = { id: string; nickname: string; userType: string };
 
 const STEPS = ["Tipo", "Posizione", "Inviti", "Riepilogo"];
 
@@ -261,141 +263,38 @@ export default function CreateMotoclub() {
       )}
 
       {step === 2 && (
-        <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent}>
-          <Text style={styles.sectionTitle}>Inviti automatici</Text>
-
-          <TouchableOpacity style={styles.checkRow} onPress={() => setUseRadius((v) => !v)}>
-            <View style={[styles.checkbox, useRadius && styles.checkboxChecked]}>
-              {useRadius && <Ionicons name="checkmark" size={14} color="#fff" />}
-            </View>
-            <Text style={styles.checkLabel}>Per raggio geografico</Text>
-          </TouchableOpacity>
-          {useRadius && (
-            <View style={styles.radiusRow}>
-              <Text style={styles.radiusLabel}>Utenti entro</Text>
-              <TextInput
-                style={styles.radiusInput}
-                value={radiusKm}
-                onChangeText={setRadiusKm}
-                keyboardType="number-pad"
-                maxLength={4}
-                selectTextOnFocus
-              />
-              <Text style={styles.radiusLabel}>km dalla posizione del club</Text>
-            </View>
-          )}
-
-          <TouchableOpacity style={[styles.checkRow, { marginTop: 16 }]} onPress={() => setUseManual((v) => !v)}>
-            <View style={[styles.checkbox, useManual && styles.checkboxChecked]}>
-              {useManual && <Ionicons name="checkmark" size={14} color="#fff" />}
-            </View>
-            <Text style={styles.checkLabel}>Selezione manuale per nickname</Text>
-          </TouchableOpacity>
-
-          {useManual && (
-            <View>
-              <TextInput
-                style={[styles.textInput, { marginTop: 10 }]}
-                value={userSearch}
-                onChangeText={handleSearchChange}
-                placeholder={t("motoclub.searchNickname")}
-                placeholderTextColor={Colors.textSecondary}
-                onFocus={() => setSearchFocused(true)}
-                onBlur={() => setTimeout(() => setSearchFocused(false), 150)}
-              />
-              {searchFocused && debouncedSearch.length >= 2 && searchResults.length > 0 && (
-                <View style={styles.searchDropdown}>
-                  {searchResults.filter((u) => !selectedUsers.find((s) => s.id === u.id)).slice(0, 8).map((u) => (
-                    <TouchableOpacity key={u.id} style={styles.searchItem} onPress={() => { toggleUser(u); setUserSearch(""); setDebouncedSearch(""); }}>
-                      <Ionicons name="person" size={16} color={Colors.textSecondary} />
-                      <Text style={styles.searchItemText}>{u.nickname}</Text>
-                      <Ionicons name="add-circle" size={18} color={Colors.accent} />
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              )}
-              {selectedUsers.length > 0 && (
-                <View style={styles.selectedUsersBox}>
-                  <Text style={styles.selectedUsersTitle}>Selezionati ({selectedUsers.length})</Text>
-                  {selectedUsers.map((u) => (
-                    <View key={u.id} style={styles.selectedUserRow}>
-                      <Ionicons name="person" size={14} color={Colors.accent} />
-                      <Text style={styles.selectedUserName}>{u.nickname}</Text>
-                      <TouchableOpacity onPress={() => toggleUser(u)}>
-                        <Ionicons name="close-circle" size={18} color={Colors.accentRed} />
-                      </TouchableOpacity>
-                    </View>
-                  ))}
-                </View>
-              )}
-            </View>
-          )}
-
-          {!useRadius && !useManual && (
-            <Text style={styles.noInviteText}>Nessun invito automatico. Puoi invitare membri in seguito.</Text>
-          )}
-        </ScrollView>
+        <InviteStep
+          useRadius={useRadius}
+          setUseRadius={setUseRadius}
+          radiusKm={radiusKm}
+          setRadiusKm={setRadiusKm}
+          useManual={useManual}
+          setUseManual={setUseManual}
+          userSearch={userSearch}
+          handleSearchChange={handleSearchChange}
+          t={t}
+          searchFocused={searchFocused}
+          setSearchFocused={setSearchFocused}
+          debouncedSearch={debouncedSearch}
+          searchResults={searchResults}
+          selectedUsers={selectedUsers}
+          toggleUser={toggleUser}
+        />
       )}
 
       {step === 3 && (
-        <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent}>
-          <Text style={styles.sectionTitle}>Riepilogo richiesta</Text>
-
-          <View style={styles.summaryCard}>
-            <View style={styles.summaryRow}>
-              <Ionicons name="people-circle" size={20} color={Colors.accent} />
-              <Text style={styles.summaryLabel}>Nome</Text>
-              <Text style={styles.summaryValue}>{clubName}</Text>
-            </View>
-            <View style={styles.summaryRow}>
-              <Ionicons name="list" size={20} color={Colors.accent} />
-              <Text style={styles.summaryLabel}>Tipo</Text>
-              <Text style={styles.summaryValue}>
-                {parentType === "main" ? "Elenco principale" : `Sub-club di "${parentClubName}"`}
-              </Text>
-            </View>
-            <View style={styles.summaryRow}>
-              <Ionicons name="location" size={20} color={Colors.accent} />
-              <Text style={styles.summaryLabel}>Posizione</Text>
-              <Text style={styles.summaryValue}>
-                {pin ? `${pin.latitude.toFixed(3)}, ${pin.longitude.toFixed(3)}` : "Non impostata"}
-              </Text>
-            </View>
-            {useRadius && (
-              <View style={styles.summaryRow}>
-                <Ionicons name="radio-button-on" size={20} color={Colors.accent} />
-                <Text style={styles.summaryLabel}>Raggio inviti</Text>
-                <Text style={styles.summaryValue}>{radiusKm} km</Text>
-              </View>
-            )}
-            {useManual && selectedUsers.length > 0 && (
-              <View style={styles.summaryRow}>
-                <Ionicons name="people" size={20} color={Colors.accent} />
-                <Text style={styles.summaryLabel}>Inviti manuali</Text>
-                <Text style={styles.summaryValue}>{selectedUsers.length} utenti</Text>
-              </View>
-            )}
-          </View>
-
-          <Text style={styles.summaryNote}>
-            {t("motoclub.requestSentDesc")}
-          </Text>
-
-          <TouchableOpacity
-            style={[styles.submitBtn, submitMutation.isPending && { opacity: 0.6 }]}
-            onPress={() => submitMutation.mutate()}
-            disabled={submitMutation.isPending}
-          >
-            {submitMutation.isPending ? (
-              <ActivityIndicator size="small" color="#fff" />
-            ) : (
-              <>
-                <Ionicons name="paper-plane" size={18} color="#fff" />
-                <Text style={styles.submitBtnText}>Invia Richiesta</Text>
-              </>
-            )}
-          </TouchableOpacity>
-        </ScrollView>
+        <SummaryStep
+          clubName={clubName}
+          parentType={parentType}
+          parentClubName={parentClubName}
+          pin={pin}
+          useRadius={useRadius}
+          radiusKm={radiusKm}
+          useManual={useManual}
+          selectedUsers={selectedUsers}
+          submitMutation={submitMutation}
+          t={t}
+        />
       )}
 
       {step < 3 && (

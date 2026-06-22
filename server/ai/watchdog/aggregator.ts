@@ -24,7 +24,7 @@ import type { EmbeddingDailyReport } from "../../jobs/embedding-daily-report";
 
 // Task #2536 — wrapper che traduce lo snapshot db-integrity in Signal[] per
 // l'aggregator. Mappa severity → watchdog severity (info/warn/high/critical).
-async function collectDbIntegritySignals(): Promise<Signal[]> {
+export async function collectDbIntegritySignals(): Promise<Signal[]> {
   try {
     const snap = await collectDbIntegrity();
     if (!snap.hasRun) return [];
@@ -60,7 +60,7 @@ async function collectDbIntegritySignals(): Promise<Signal[]> {
 // l'altro, i dati stantii non riproducono il segnale, evitando proposer spam.
 let lastAdsOrphanAlertedRunAt: string | null = null;
 
-async function collectAdsOrphanSignals(): Promise<Signal[]> {
+export async function collectAdsOrphanSignals(): Promise<Signal[]> {
   try {
     const lastCleanup = await storage.getAppSetting("ads_orphan_last_cleanup");
     if (!lastCleanup?.valueJson) return [];
@@ -104,7 +104,7 @@ async function collectAdsOrphanSignals(): Promise<Signal[]> {
   }
 }
 
-async function collectEmbeddingSignals(): Promise<Signal[]> {
+export async function collectEmbeddingSignals(): Promise<Signal[]> {
   try {
     const setting = await storage.getAppSetting("embedding_daily_report");
     if (!setting?.valueJson) return [];
@@ -139,9 +139,9 @@ async function collectEmbeddingSignals(): Promise<Signal[]> {
   }
 }
 
-const SEVERITY_WEIGHT: Record<Severity, number> = { info: 0, warn: 5, high: 18, critical: 40 };
+export const SEVERITY_WEIGHT: Record<Severity, number> = { info: 0, warn: 5, high: 18, critical: 40 };
 
-function deriveProblems(signals: Signal[]): Problem[] {
+export function deriveProblems(signals: Signal[]): Problem[] {
   const problems: Problem[] = [];
   for (const s of signals) {
     if (s.severity === "info") continue;
@@ -372,134 +372,4 @@ function computeStatus(problems: Problem[]): { status: HealthSnapshot["status"];
   return { status, score };
 }
 
-let latest: HealthSnapshot | null = null;
-const subscribers = new Set<(s: HealthSnapshot) => void>();
-
-export function getLatestSnapshot(): HealthSnapshot | null { return latest; }
-export function subscribeSnapshot(cb: (s: HealthSnapshot) => void): () => void {
-  subscribers.add(cb);
-  return () => subscribers.delete(cb);
-}
-
-export async function runAggregatorCycle(): Promise<HealthSnapshot> {
-  // Saturazione pool (incidente 20 giu): l'aggregator faceva girare ~12 collector
-  // TUTTI in parallelo ogni 60s; 7 di questi colpiscono il DB e NESSUNO passava
-  // dal budget cooperativo `withBgDbSlot`. Quel burst da solo poteva afferrare la
-  // maggior parte delle 10 connessioni del pool (peggio quando le query sono
-  // lente, es. Redis/ThinkCentre down → event-loop sotto pressione), saturandolo.
-  //
-  // Strategia: i collector di SOLE query DB condividono ora il budget bg (≤3
-  // connessioni concorrenti, ≥7 sempre riservate al traffico utente). Restano
-  // FUORI dal budget:
-  //  - collectDb: il ping SELECT 1 DEVE osservare la latenza/saturazione reale
-  //    del pool (se finisse in coda al budget riporterebbe falsi fallimenti);
-  //  - collectPool: zero-I/O (legge solo i contatori del pool);
-  //  - collectBullMq / collectRedis / collectLatency: non toccano il DB.
-  //  - collectMaps: tocca il DB ma fa anche health-check di rete lenti; il budget
-  //    è applicato internamente alle sole query (vedi maps-collector), non qui,
-  //    per non trattenere uno slot durante l'I/O di rete.
-  const collectors = await Promise.allSettled([
-    // Osservabilità / no-DB — girano liberi, fuori dal budget bg.
-    collectBullMq(), collectDb(), collectRedis(), collectLatency(),
-    Promise.resolve(collectPool()), collectMaps(),
-    // Sole query DB — condividono il budget cooperativo bg (≤3 concorrenti).
-    withBgDbSlot(() => collectScheduler()),
-    withBgDbSlot(() => collectErrors()),
-    withBgDbSlot(() => collectDbIntegritySignals()),
-    withBgDbSlot(() => collectEmbeddingSignals()),
-    withBgDbSlot(() => collectRestarts()),
-    withBgDbSlot(() => collectAdsOrphanSignals()),
-    withBgDbSlot(() => collectCrashSignals()),
-  ]);
-  const signals: Signal[] = [];
-  for (const r of collectors) {
-    if (r.status === "fulfilled") signals.push(...r.value);
-    else signals.push({ source: "app", metric: "collector.crash", severity: "warn", details: { error: String(r.reason) } });
-  }
-  // persisti solo signals non-info (ridurre noise nel DB)
-  await recordSignals(signals.filter((s) => s.severity !== "info"));
-
-  let problems = deriveProblems(signals);
-
-  // Task #4706 — Soppressione allarmi a valle quando il ThinkCentre è spento:
-  // retrocede i problemi conseguenti (engine/tile down, backlog matching, pressione
-  // pool, Redis) a "warn" così non scatenano escalation/push ma restano visibili.
-  // Letto sotto il budget bg (query indicizzata limit 1); fail-safe a false.
-  try {
-    if (await withBgDbSlot(() => isThinkCentrePoweredOff())) {
-      problems = suppressDownstreamWhenPoweredOff(problems);
-    }
-  } catch { /* fail-safe: in caso di errore non sopprimere nulla */ }
-
-  let { status, score } = computeStatus(problems);
-
-  // Score damping: impedisce che un singolo ciclo con evento transitorio faccia
-  // precipitare lo score di più di 35 punti rispetto allo snapshot precedente.
-  // Il punteggio scende comunque (il problema è visibile), ma gradualmente —
-  // non da 75→0 in un colpo solo. Attivo solo se lo snapshot precedente è
-  // recente (≤5 minuti), cioè il watchdog sta girando regolarmente.
-  const MAX_SCORE_DROP_PER_CYCLE = 35;
-  if (latest !== null) {
-    const ageMs = Date.now() - new Date(latest.generatedAt).getTime();
-    if (ageMs <= 5 * 60 * 1000) {
-      const lastScore = latest.score;
-      if (lastScore - score > MAX_SCORE_DROP_PER_CYCLE) {
-        const clampedScore = Math.max(0, lastScore - MAX_SCORE_DROP_PER_CYCLE);
-        console.warn(
-          `[watchdog/aggregator] score damping attivo: ${score}→${clampedScore} ` +
-          `(drop ${lastScore - score} > ${MAX_SCORE_DROP_PER_CYCLE}, last=${lastScore})`,
-        );
-        score = clampedScore;
-        status =
-          score >= 90 ? "green" :
-          score >= 70 ? "yellow" :
-          score >= 40 ? "orange" : "red";
-      }
-    }
-  }
-
-  const metrics: Record<string, number> = {};
-  for (const s of signals) if (typeof s.value === "number") metrics[`${s.source}.${s.metric}`] = s.value;
-
-  const snap: HealthSnapshot = {
-    status, score, problems, metrics, generatedAt: new Date().toISOString(),
-  };
-  latest = snap;
-  // persist snapshot (best-effort)
-  try {
-    // Sanitize: strip undefined/circular refs that break JSONB serialization.
-    const safeProblems = JSON.parse(JSON.stringify(problems)) as typeof problems;
-    const safeMetrics = JSON.parse(JSON.stringify(metrics)) as typeof metrics;
-    await db.insert(systemHealthSnapshot).values({
-      status,
-      score: Math.round(score),
-      problems: safeProblems as unknown as typeof systemHealthSnapshot.$inferInsert["problems"],
-      metrics: safeMetrics as object,
-    });
-  } catch (err) {
-    const msg = (err as Error).message ?? "unknown";
-    console.warn(`[watchdog/aggregator] persist snapshot error (status=${status} score=${score} problems=${problems.length}): ${msg}`);
-  }
-  for (const cb of subscribers) { try { cb(snap); } catch { /* ignore */ } }
-  return snap;
-}
-
-export async function getRecentSnapshots(limit = 60): Promise<Array<{
-  status: string; score: number; createdAt: string;
-}>> {
-  try {
-    const rows = await db.select({
-      status: systemHealthSnapshot.status,
-      score: systemHealthSnapshot.score,
-      createdAt: systemHealthSnapshot.createdAt,
-    }).from(systemHealthSnapshot)
-      .orderBy(desc(systemHealthSnapshot.createdAt))
-      .limit(limit);
-    return rows.map((r) => ({
-      status: r.status, score: r.score,
-      createdAt: r.createdAt instanceof Date ? r.createdAt.toISOString() : String(r.createdAt),
-    }));
-  } catch {
-    return [];
-  }
-}
+export { runAggregatorCycle, getRecentSnapshots, getLatestSnapshot, subscribeSnapshot } from "./aggregator.part2";

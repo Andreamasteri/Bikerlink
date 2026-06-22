@@ -1,8 +1,6 @@
 import { useState, useRef, useCallback } from "react";
 import { Alert, Animated } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import * as DocumentPicker from "expo-document-picker";
-import * as FileSystem from "expo-file-system/legacy";
 import { useRouter } from "expo-router";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest, getApiUrl } from "@/lib/query-client";
@@ -10,10 +8,12 @@ import { useApiDebugLog } from "@/hooks/useApiDebugLog";
 
 import { 
   Waypoint, Style, DrivingProfile, VehicleProfile, Mode, RouteResult, 
-  WeatherWaypoint, AiPreviewState, AiPreviewItem, COMPASS_DIRECTIONS,
+  WeatherWaypoint, AiPreviewState, AiPreviewItem,
   ResolvedPoiStop, PoiResult, GeoResult
 } from "./types";
-import { calcRoute, parseAI, clientFallbackAiParse, fetchWeatherPreview, AiKeyMissingError } from "./api";
+import { calcRoute, fetchWeatherPreview } from "./api";
+import { handleImportGpxHelper, autoLoadWeatherHelper } from "./useGiriCreateState.part2";
+import { handleAiParseHelper, regeocodePillItemHelper, handleConfirmPreviewHelper } from "./useGiriCreateState.part3";
 
 export const SELECTED_MOTO_STORAGE_KEY = "bikerlink_giri_selected_moto_id";
 
@@ -40,7 +40,6 @@ export function useGiriCreateState(language?: string) {
   const [title, setTitle] = useState("Giro in moto");
   const [style, setStyle] = useState<Style>("curvy");
   const [drivingProfile, setDrivingProfile] = useState<DrivingProfile>("geometric");
-  // Profilo veicolo: "moto" (default) o "auto_curvy" (auto panoramica via Valhalla).
   const [vehicleProfile, setVehicleProfile] = useState<VehicleProfile>("moto");
   const [isRoundTrip, setIsRoundTrip] = useState(false);
   const [roundTripHours, setRoundTripHours] = useState(3);
@@ -89,7 +88,6 @@ export function useGiriCreateState(language?: string) {
   const mapTapRequestId = useRef(0);
 
   const suggestionTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const lastFittedWaypointSig = useRef<string>("");
   const bikerScoreAnim = useRef(new Animated.Value(0)).current;
   const geocodeCache = useRef<Map<string, GeoResult[]>>(new Map());
 
@@ -104,148 +102,16 @@ export function useGiriCreateState(language?: string) {
     titleTapTimer.current = setTimeout(() => { titleTapCount.current = 0; }, 1500);
   }, []);
 
-  const autoLoadWeather = async (wps: Waypoint[]) => {
-    setWeatherLoading(true);
-    try {
-      const data = await fetchWeatherPreview(wps);
-      setWeatherPreview(data.length > 0 ? data : null);
-    } catch {
-      setWeatherPreview(null);
-    } finally {
-      setWeatherLoading(false);
-    }
-  };
+  const autoLoadWeather = (wps: Waypoint[]) => autoLoadWeatherHelper(wps, setWeatherLoading, setWeatherPreview);
 
-  const handleImportGpx = useCallback(async () => {
-    try {
-      setIsImportingGpx(true);
-      const result = await DocumentPicker.getDocumentAsync({
-        type: ["application/gpx+xml", "application/octet-stream", "*/*"],
-        copyToCacheDirectory: true
-      });
-      if (result.canceled || !result.assets?.[0]) return;
-      const asset = result.assets[0];
-      const gpxContent = await FileSystem.readAsStringAsync(asset.uri);
-      const rawName = asset.name ?? "";
-      const guessedTitle = rawName.replace(/\.gpx$/i, "").replace(/[_-]+/g, " ").trim();
-      const url = new URL("/api/planned-routes/import-gpx", getApiUrl());
-      const resp = await fetch(url.toString(), {
-        method: "POST", credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ gpxContent, title: guessedTitle || undefined })
-      });
-      if (!resp.ok) {
-        const err = await resp.json().catch(() => ({}));
-        throw new Error((err as Error).message ?? "Importazione fallita");
-      }
-      const route = await resp.json() as { id: string };
-      qc.invalidateQueries({ queryKey: ["/api/planned-routes"] });
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- dynamic route path
-      router.replace(`/giri/${route.id}` as any);
-    } catch (err: unknown) {
-      Alert.alert("Errore GPX", err instanceof Error ? (err as Error).message : "Impossibile leggere il file GPX.");
-    } finally {
-      setIsImportingGpx(false);
-    }
-  }, [router, qc]);
+  const handleImportGpx = useCallback(() => handleImportGpxHelper(qc, router, setIsImportingGpx), [router, qc]);
 
-  const handleAiParse = async () => {
-    if (!aiPrompt.trim()) return;
-    setAiLoading(true);
-    try {
-      const result = await parseAI(aiPrompt);
-
-      // Salva i poiStops risolti restituiti dal server (risultati Overpass + opzioni)
-      if (result.resolvedPoiStops && Array.isArray(result.resolvedPoiStops)) {
-        setResolvedPoiStops(
-          result.resolvedPoiStops.map((s: { near: string; query: string; category: string; options: PoiResult[] }) => ({
-            near: s.near,
-            query: s.query,
-            category: s.category,
-            options: Array.isArray(s.options) ? s.options : [],
-            selectedOption: s.options?.length === 1 ? s.options[0] : null,
-          }))
-        );
-      } else {
-        setResolvedPoiStops([]);
-      }
-
-      const rawLocations: Array<{ role: AiPreviewItem["role"]; name: string }> = [];
-      if (result.startLocation) rawLocations.push({ role: "start", name: result.startLocation });
-      for (const wp of (result.waypoints ?? [])) rawLocations.push({ role: "waypoint", name: wp });
-      if (result.endLocation && result.endLocation !== result.startLocation) {
-        rawLocations.push({ role: "end", name: result.endLocation });
-      } else if (rawLocations.length > 0) {
-        rawLocations.push({ role: "end", name: rawLocations[0].name });
-      } else {
-        rawLocations.push({ role: "end", name: "" });
-      }
-      if (rawLocations.length < 2) rawLocations.push({ role: "end", name: "" });
-
-      const initialItems: AiPreviewItem[] = rawLocations.map((loc) => ({
-        role: loc.role, name: loc.name, editedName: loc.name,
-        lat: 0, lng: 0, geocoding: !!loc.name, resolved: false
-      }));
-
-      const preview: AiPreviewState = {
-        title: result.title ?? "Giro in moto",
-        style: result.style ?? "curvy",
-        isRoundTrip: result.isRoundTrip ?? false,
-        roundTripDirection: null,
-        isMultiDay: result.isMultiDay ?? false,
-        daysEstimate: result.daysEstimate ?? 2,
-        avoidHighways: result.avoidHighways ?? false,
-        items: initialItems,
-        poiStops: Array.isArray(result.poiStops) ? result.poiStops : null,
-      };
-      if (result.provider_used) setAiProviderUsed(result.provider_used);
-      setAiPreview(preview);
-      setMode("ai-preview");
-      if (aiSuccessTimer.current) clearTimeout(aiSuccessTimer.current);
-      setAiSuccessBanner(true);
-      aiSuccessTimer.current = setTimeout(() => setAiSuccessBanner(false), 3000);
-
-      initialItems.forEach((item, idx) => {
-        if (!item.name) return;
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- geocode results from API
-        logFetch<any[]>(
-          "/api/planned-routes/geocode", "GET",
-          () => { const url = new URL("/api/planned-routes/geocode", getApiUrl()); url.searchParams.set("q", item.name); return fetch(url.toString(), { credentials: "include" }); },
-          async (resp) => { if (!resp.ok) return []; return resp.json(); }
-        ).then((results) => {
-          const best = results[0];
-          setAiPreview((prev) => {
-            if (!prev) return prev;
-            const updatedItems = [...prev.items];
-            updatedItems[idx] = { ...updatedItems[idx], lat: best ? best.lat : 0, lng: best ? best.lng : 0, geocoding: false, resolved: !!best };
-            return { ...prev, items: updatedItems };
-          });
-        }).catch(() => {
-          setAiPreview((prev) => {
-            if (!prev) return prev;
-            const updatedItems = [...prev.items];
-            updatedItems[idx] = { ...updatedItems[idx], geocoding: false, resolved: false };
-            return { ...prev, items: updatedItems };
-          });
-        });
-      });
-    } catch (err: unknown) {
-      console.warn("[AI parse] fallback attivato:", (err instanceof Error ? err.message : null));
-      setAiProviderUsed(null);
-      const fallback = clientFallbackAiParse(aiPrompt);
-      setTitle(fallback.title);
-      setStyle(fallback.style as Style);
-      setIsRoundTrip(fallback.isRoundTrip);
-      setIsMultiDay(fallback.isMultiDay);
-      setDaysCount(fallback.daysEstimate);
-      setAvoidHighways(fallback.avoidHighways);
-      setAiBannerReason(err instanceof AiKeyMissingError || (err as { code?: string })?.code === "AI_KEY_MISSING" ? "key_missing" : "generic");
-      setAiFallbackBanner(true);
-      setMode("manual");
-    } finally {
-      setAiLoading(false);
-    }
-  };
+  const handleAiParse = () => handleAiParseHelper(
+    aiPrompt, setAiLoading, setResolvedPoiStops, setAiProviderUsed, setAiPreview,
+    setMode, setAiSuccessBanner, aiSuccessTimer, logFetch, setTitle, setStyle,
+    setIsRoundTrip, setIsMultiDay, setDaysCount, setAvoidHighways, setAiBannerReason,
+    setAiFallbackBanner
+  );
 
   const updatePreviewItemName = useCallback((idx: number, newName: string) => {
     setAiPreview((prev) => {
@@ -256,36 +122,7 @@ export function useGiriCreateState(language?: string) {
     });
   }, []);
 
-  const regeocodePillItem = useCallback((idx: number, name: string) => {
-    if (!name.trim()) return;
-    setAiPreview((prev) => {
-      if (!prev) return prev;
-      const items = [...prev.items];
-      items[idx] = { ...items[idx], geocoding: true };
-      return { ...prev, items };
-    });
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- geocode results from API
-    logFetch<any[]>(
-      "/api/planned-routes/geocode", "GET",
-      () => { const url = new URL("/api/planned-routes/geocode", getApiUrl()); url.searchParams.set("q", name); return fetch(url.toString(), { credentials: "include" }); },
-      async (resp) => { if (!resp.ok) return []; return resp.json(); }
-    ).then((results) => {
-      const best = results[0];
-      setAiPreview((prev) => {
-        if (!prev) return prev;
-        const items = [...prev.items];
-        items[idx] = { ...items[idx], lat: best ? best.lat : 0, lng: best ? best.lng : 0, geocoding: false, resolved: !!best };
-        return { ...prev, items };
-      });
-    }).catch(() => {
-      setAiPreview((prev) => {
-        if (!prev) return prev;
-        const items = [...prev.items];
-        items[idx] = { ...items[idx], geocoding: false, resolved: false };
-        return { ...prev, items };
-      });
-    });
-  }, [logFetch]);
+  const regeocodePillItem = useCallback((idx: number, name: string) => regeocodePillItemHelper(idx, name, setAiPreview, logFetch), [logFetch]);
 
   const selectPoiOption = useCallback((stopIdx: number, option: PoiResult) => {
     setResolvedPoiStops((prev) => {
@@ -303,71 +140,18 @@ export function useGiriCreateState(language?: string) {
     });
   }, []);
 
-  const handleConfirmPreview = async () => {
-    if (!aiPreview) return;
-    const geoWps: Waypoint[] = aiPreview.items.map((item) => ({
-      lat: item.lat, lng: item.lng, name: item.editedName || item.name
-    }));
-    // Inserisce i POI selezionati come waypoint intermedi (prima dell'arrivo)
-    const poiWps: Waypoint[] = resolvedPoiStops
-      .filter((s) => s.selectedOption !== null)
-      .map((s) => ({ lat: s.selectedOption!.lat, lng: s.selectedOption!.lng, name: s.selectedOption!.name }));
-    const newWps: Waypoint[] = geoWps.length >= 2
-      ? [...geoWps.slice(0, -1), ...poiWps, geoWps[geoWps.length - 1]]
-      : [...geoWps, ...poiWps];
-    const newInputs = newWps.map((wp) => wp.name);
-    setTitle(aiPreview.title);
-    setStyle(aiPreview.style);
-    setIsRoundTrip(aiPreview.isRoundTrip);
-    const dirDeg = COMPASS_DIRECTIONS.find((d) => d.label === (aiPreview.roundTripDirection ?? ""))?.deg ?? null;
-    setHeadingDeg(dirDeg);
-    setIsMultiDay(aiPreview.isMultiDay);
-    setDaysCount(aiPreview.daysEstimate);
-    setAvoidHighways(aiPreview.avoidHighways);
-    setWaypoints(newWps);
-    setWpInputs(newInputs);
-    setMode("manual");
-
-    const resolved = newWps.filter((wp) => wp.lat !== 0 || wp.lng !== 0);
-    if (resolved.length < 2) return;
-    const toCalc = aiPreview.isRoundTrip ? [...resolved, resolved[0]] : resolved;
-    // Il geocoding è riuscito solo se tutti gli item AI hanno lat/lng validi.
-    // Gli item non risolti (Nominatim down o luogo non trovato) restano lat=0,lng=0.
-    const allItemsResolved = aiPreview.items.every((item) => item.resolved);
-    setCalculating(true);
-    setRouteResult(null);
-    setWeatherPreview(null);
-    try {
-      const result = await logFetch<RouteResult>(
-        "/api/planned-routes/calculate", "POST",
-        () => {
-          const url = new URL("/api/planned-routes/calculate", getApiUrl());
-          return fetch(url.toString(), { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ waypoints: toCalc, style: aiPreview.style, drivingProfile, avoidHighways: aiPreview.avoidHighways, avoidTolls: false, isRoundTrip: aiPreview.isRoundTrip, roundTripDirection: aiPreview.roundTripDirection ?? null, language, geocodingOk: allItemsResolved, ...(vehicleProfile === "auto_curvy" ? { routingProfile: "auto_curvy" } : {}) }) });
-        },
-        async (resp) => { if (!resp.ok) { const b = await resp.json().catch(() => ({})); throw new Error(b.message ?? "Calcolo fallito"); } return resp.json(); }
-      );
-      setRouteResult(result);
-      setDismissedWarnings(new Set());
-      if (result.durationMinutes > 480 && !aiPreview.isMultiDay) {
-        const suggestedDays = Math.max(2, Math.min(14, Math.ceil(result.durationMinutes / (maxHoursPerDay * 60))));
-        setIsMultiDay(true);
-        setDaysCount(suggestedDays);
-        Alert.alert("Giro Multi-giorno", `Il percorso dura più di 8 ore.\nAbbiamo attivato il piano multi-giorno su ${suggestedDays} giorni.`, [{ text: "OK" }]);
-      }
-      autoLoadWeather(toCalc);
-    } catch (err: unknown) {
-      Alert.alert("Calcolo automatico fallito", `${(err instanceof Error ? err.message : null) ?? "Errore"}\nModifica le tappe e premi "Calcola percorso" manualmente.`);
-    } finally {
-      setCalculating(false);
-    }
-  };
+  const handleConfirmPreview = () => handleConfirmPreviewHelper(
+    aiPreview, resolvedPoiStops, setTitle, setStyle, setIsRoundTrip, setHeadingDeg,
+    setIsMultiDay, setDaysCount, setAvoidHighways, setWaypoints, setWpInputs,
+    setMode, setCalculating, setRouteResult, setWeatherPreview, setDismissedWarnings,
+    logFetch, drivingProfile, language, vehicleProfile, maxHoursPerDay, autoLoadWeather
+  );
 
   const handleWpInput = (text: string, index: number) => {
     const newInputs = [...wpInputs]; newInputs[index] = text; setWpInputs(newInputs);
     const newWps = [...waypoints]; newWps[index] = { ...newWps[index], name: text, lat: 0, lng: 0 }; setWaypoints(newWps);
     setRouteResult(null);
     if (suggestionTimeout.current) clearTimeout(suggestionTimeout.current);
-    // Evict stale cache entries for this waypoint slot when the user types new text
     for (const key of geocodeCache.current.keys()) {
       if (key.startsWith(`${index}::`)) geocodeCache.current.delete(key);
     }
@@ -383,10 +167,10 @@ export function useGiriCreateState(language?: string) {
       setWpSuggestions(null);
       suggestionTimeout.current = setTimeout(async () => {
         try {
-          const results = await logFetch<GeoResult[]>(
+          const results = await logFetch(
             "/api/planned-routes/geocode", "GET",
             () => { const url = new URL("/api/planned-routes/geocode", getApiUrl()); url.searchParams.set("q", text); return fetch(url.toString(), { credentials: "include" }); },
-            async (resp) => {
+            async (resp: Response) => {
               if (!resp.ok) throw new Error(`geocode HTTP ${resp.status}`);
               return resp.json();
             }
@@ -405,7 +189,6 @@ export function useGiriCreateState(language?: string) {
     }
   };
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- geo suggestion from geocode API
   const selectSuggestion = (index: number, geo: any) => {
     const newWps = [...waypoints]; newWps[index] = { lat: geo.lat, lng: geo.lng, name: geo.name.split(",")[0] }; setWaypoints(newWps);
     const newInputs = [...wpInputs]; newInputs[index] = geo.name.split(",")[0]; setWpInputs(newInputs);
@@ -516,7 +299,6 @@ export function useGiriCreateState(language?: string) {
         setPendingMapTap({ lat, lng, name });
       }
     } catch {
-      // keep coordName as fallback (only if still the latest request)
     } finally {
       if (mapTapRequestId.current === myId) {
         setMapTapGeocoding(false);
@@ -554,32 +336,23 @@ export function useGiriCreateState(language?: string) {
   }, []);
 
   return {
-    debugLogs, clearDebugLogs, debugVisible, setDebugVisible, handleTitleTap,
-    isImportingGpx, handleImportGpx,
-    mode, setMode, aiPrompt, setAiPrompt, aiLoading, handleAiParse,
-    aiPreview, setAiPreview, aiFallbackBanner, setAiFallbackBanner, aiBannerReason,
-    aiSuccessBanner, setAiSuccessBanner, aiSuccessTimer,
+    mode, setMode, aiPrompt, setAiPrompt, aiLoading, aiPreview, setAiPreview,
     title, setTitle, style, setStyle, drivingProfile, setDrivingProfile,
-    vehicleProfile, setVehicleProfile,
     isRoundTrip, setIsRoundTrip, roundTripHours, setRoundTripHours,
-    headingDeg, setHeadingDeg, isMultiDay, setIsMultiDay,
-    daysCount, setDaysCount, maxHoursPerDay, setMaxHoursPerDay,
-    avoidHighways, setAvoidHighways, avoidTolls, setAvoidTolls,
-    avoidFerries, setAvoidFerries, avoidUnpaved, setAvoidUnpaved,
-    avoidWeather, setAvoidWeather,
-    visibility, setVisibility, selectedMotoId, setSelectedMotoId,
-    fuelLevel, setFuelLevel, waypoints, setWaypoints,
-    wpInputs, setWpInputs, wpSuggestions, setWpSuggestions, wpLoading,
-    routeResult, setRouteResult, calculating, setCalculating,
-    dismissedWarnings, setDismissedWarnings,
-    weatherPreview, setWeatherPreview, weatherLoading, setWeatherLoading,
-    lastFittedWaypointSig, bikerScoreAnim,
-    updatePreviewItemName, regeocodePillItem, handleConfirmPreview,
-    handleWpInput, selectSuggestion, addWaypoint, removeWaypoint,
-    handleCalculate, handleSave, saveMutationPending: saveMutation.isPending,
-    handleMapTap, aiProviderUsed,
-    routeError, setRouteError,
-    resolvedPoiStops, selectPoiOption, clearPoiOption,
-    pendingMapTap, mapTapGeocoding, confirmMapTap, dismissMapTap,
+    headingDeg, setHeadingDeg, isMultiDay, setIsMultiDay, daysCount, setDaysCount,
+    maxHoursPerDay, setMaxHoursPerDay, avoidHighways, setAvoidHighways,
+    avoidTolls, setAvoidTolls, avoidFerries, setAvoidFerries,
+    avoidUnpaved, setAvoidUnpaved, avoidWeather, setAvoidWeather,
+    visibility, setVisibility, waypoints, setWaypoints, wpInputs, setWpInputs,
+    wpSuggestions, setWpSuggestions, wpLoading, routeResult, calculating,
+    routeError, weatherPreview, weatherLoading, handleAiParse,
+    updatePreviewItemName, regeocodePillItem, handleConfirmPreview, handleWpInput,
+    selectSuggestion, addWaypoint, removeWaypoint, handleCalculate, handleSave,
+    handleImportGpx, isImportingGpx, debugVisible, debugLogs, handleTitleTap,
+    clearDebugLogs, fuelLevel, setFuelLevel, selectedMotoId, setSelectedMotoId,
+    pendingMapTap, mapTapGeocoding, handleMapTap, confirmMapTap, dismissMapTap,
+    resolvedPoiStops, selectPoiOption, clearPoiOption, aiProviderUsed,
+    aiFallbackBanner, setAiFallbackBanner, aiBannerReason, aiSuccessBanner,
+    dismissedWarnings, setDismissedWarnings, vehicleProfile, setVehicleProfile,
   };
 }

@@ -30,6 +30,10 @@ import {
   bootSuccessRate,
 } from "./OtaPanel.helpers";
 
+import { styles } from "./OtaPanel.styles";
+import { AutoRollbackField, ReleaseCounters, AutoRollbackSection } from "./OtaPanelParts";
+import { PendingReleaseCard, HistoryReleaseCard } from "./OtaPanel.part2";
+
 export default function OtaPanel() {
   const { colors } = useTheme();
   const qc = useQueryClient();
@@ -55,30 +59,6 @@ export default function OtaPanel() {
       .sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime())[0];
     if (first) setExpandedHistoryId(first.id);
   }, [releases]);
-
-  const handleSync = useCallback(async () => {
-    Alert.alert(
-      "☁ Sync con server Expo (EAS)",
-      "Questa operazione contatta i server Expo per recuperare le nuove release OTA pubblicate. Potrebbe richiedere qualche secondo.",
-      [
-        { text: "Annulla", style: "cancel" },
-        {
-          text: "Sincronizza",
-          onPress: async () => {
-            setSyncing(true);
-            try {
-              await apiRequest("POST", "/api/admin/ota/sync");
-              await qc.invalidateQueries({ queryKey: ["/api/admin/ota/releases"] });
-            } catch (err: unknown) {
-              Alert.alert("Errore sync", err instanceof Error ? err.message : "Impossibile sincronizzare con EAS");
-            } finally {
-              setSyncing(false);
-            }
-          },
-        },
-      ]
-    );
-  }, [qc]);
 
   const approveMutation = useMutation({
     mutationFn: (id: string) => apiRequest("POST", `/api/admin/ota/${id}/approve`),
@@ -134,6 +114,30 @@ export default function OtaPanel() {
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["/api/admin/ota/releases"] }); },
     onError: (err: Error) => { Alert.alert("Errore versione", err.message || "Impossibile impostare versione"); },
   });
+
+  const handleSync = useCallback(async () => {
+    Alert.alert(
+      "☁ Sync con server Expo (EAS)",
+      "Questa operazione contatta i server Expo per recuperare le nuove release OTA pubblicate. Potrebbe richiedere qualche secondo.",
+      [
+        { text: "Annulla", style: "cancel" },
+        {
+          text: "Sincronizza",
+          onPress: async () => {
+            setSyncing(true);
+            try {
+              await apiRequest("POST", "/api/admin/ota/sync");
+              await qc.invalidateQueries({ queryKey: ["/api/admin/ota/releases"] });
+            } catch (err: unknown) {
+              Alert.alert("Errore sync", err instanceof Error ? err.message : "Impossibile sincronizzare con EAS");
+            } finally {
+              setSyncing(false);
+            }
+          },
+        },
+      ]
+    );
+  }, [qc]);
 
   const handleApprove = useCallback((release: OtaRelease) => {
     Alert.alert(
@@ -291,97 +295,6 @@ export default function OtaPanel() {
     .filter((r) => r.status !== "pending")
     .sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime());
 
-  const renderCounters = (release: OtaRelease) => {
-    const rate = bootSuccessRate(release);
-    return (
-      <View style={styles.countersRow}>
-        <View style={[styles.counterChip, { backgroundColor: colors.surfaceLight, borderColor: colors.border }]}>
-          <Text style={[styles.counterLabel, { color: colors.textSecondary }]}>Download</Text>
-          <Text style={[styles.counterValue, { color: colors.text }]}>{release.downloadCount}</Text>
-        </View>
-        <View style={[styles.counterChip, { backgroundColor: colors.surfaceLight, borderColor: colors.border }]}>
-          <Text style={[styles.counterLabel, { color: colors.textSecondary }]}>Boot OK</Text>
-          <Text style={[styles.counterValue, { color: colors.success }]}>{release.bootSuccessCount}</Text>
-        </View>
-        <View style={[styles.counterChip, { backgroundColor: colors.surfaceLight, borderColor: colors.border }]}>
-          <Text style={[styles.counterLabel, { color: colors.textSecondary }]}>Boot FAIL</Text>
-          <Text style={[styles.counterValue, { color: release.bootFailureCount > 0 ? colors.error : colors.text }]}>{release.bootFailureCount}</Text>
-        </View>
-        <View style={[styles.counterChip, { backgroundColor: colors.surfaceLight, borderColor: colors.border }]}>
-          <Text style={[styles.counterLabel, { color: colors.textSecondary }]}>Success rate</Text>
-          <Text style={[styles.counterValue, { color: rate == null ? colors.textSecondary : rate >= 70 ? colors.success : colors.error }]}>
-            {rate == null ? "—" : `${rate}%`}
-          </Text>
-        </View>
-      </View>
-    );
-  };
-
-  const renderAutoRollback = (release: OtaRelease) => {
-    const expanded = expandedAutoId === release.id;
-    return (
-      <View style={[styles.autoRollbackBox, { backgroundColor: colors.surfaceLight, borderColor: colors.border }]}>
-        <View style={styles.autoRollbackHeader}>
-          <View style={{ flex: 1 }}>
-            <Text style={[styles.autoRollbackTitle, { color: colors.text }]}>Auto-rollback</Text>
-            <Text style={[styles.autoRollbackHint, { color: colors.textSecondary }]}>
-              {release.autoRollbackEnabled
-                ? `ATTIVO — se boot success <${release.autoRollbackThreshold}% con ≥${release.autoRollbackMinDownloads} download dopo ${release.autoRollbackWindowMinutes}min → auto-reject`
-                : "OFF — rollback solo manuale da questo pannello"}
-            </Text>
-            {release.autoRolledBackAt && (
-              <Text style={[styles.autoRollbackHint, { color: colors.error }]}>
-                ⚠ Auto-rollback eseguito il {formatDate(release.autoRolledBackAt)}
-              </Text>
-            )}
-          </View>
-          <Switch
-            value={release.autoRollbackEnabled}
-            onValueChange={(val) => autoRollbackMutation.mutate({ id: release.id, patch: { enabled: val } })}
-            disabled={autoRollbackMutation.isPending}
-            trackColor={{ false: colors.border, true: colors.success }}
-            thumbColor={release.autoRollbackEnabled ? "#fff" : colors.textSecondary}
-          />
-        </View>
-        {release.autoRollbackEnabled && (
-          <>
-            <TouchableOpacity onPress={() => setExpandedAutoId(expanded ? null : release.id)} style={styles.expandToggle}>
-              <Text style={[styles.expandToggleText, { color: colors.accent }]}>{expanded ? "▲ Nascondi parametri" : "▼ Modifica parametri"}</Text>
-            </TouchableOpacity>
-            {expanded && (
-              <View style={styles.autoRollbackFields}>
-                <AutoRollbackField
-                  label="Soglia % boot success"
-                  value={release.autoRollbackThreshold}
-                  onCommit={(n) => autoRollbackMutation.mutate({ id: release.id, patch: { threshold: n } })}
-                  min={1}
-                  max={100}
-                  suffix="%"
-                  colors={colors}
-                />
-                <AutoRollbackField
-                  label="Min downloads"
-                  value={release.autoRollbackMinDownloads}
-                  onCommit={(n) => autoRollbackMutation.mutate({ id: release.id, patch: { minDownloads: n } })}
-                  min={1}
-                  max={1000}
-                  colors={colors}
-                />
-                <AutoRollbackField
-                  label="Finestra (min)"
-                  value={release.autoRollbackWindowMinutes}
-                  onCommit={(n) => autoRollbackMutation.mutate({ id: release.id, patch: { windowMinutes: n } })}
-                  min={1}
-                  max={1440}
-                  colors={colors}
-                />
-              </View>
-            )}
-          </>
-        )}
-      </View>
-    );
-  };
 
   return (
     <View>
@@ -438,330 +351,49 @@ export default function OtaPanel() {
         </View>
       )}
 
-      {pending.map((release) => {
-        const hasGroupId = !!release.easGroupId;
-        const otaNum = otaNumberMap.get(release.id) ?? "?";
-        return (
-          <View key={release.id} style={[styles.card, { backgroundColor: colors.surface, borderColor: hasGroupId ? colors.accent + "44" : colors.error + "55" }]}>
-            <View style={styles.cardHeader}>
-              <View style={styles.badgeRow}>
-                <View style={[styles.numBadge, { backgroundColor: colors.accent }]}>
-                  <Text style={styles.numBadgeText}>OTA {otaNum}</Text>
-                </View>
-                <View style={[styles.badge, { backgroundColor: colors.accent + "22" }]}>
-                  <Text style={[styles.badgeText, { color: colors.accent }]}>IN ATTESA</Text>
-                </View>
-                {hasGroupId
-                  ? (
-                    <View style={[styles.badge, { backgroundColor: colors.success + "22", marginLeft: 6 }]}>
-                      <Text style={[styles.badgeText, { color: colors.success }]}>● GroupID OK</Text>
-                    </View>
-                  )
-                  : (
-                    <View style={[styles.badge, { backgroundColor: colors.error + "22", marginLeft: 6 }]}>
-                      <Text style={[styles.badgeText, { color: colors.error }]}>⚠ RISINCRONIZZA</Text>
-                    </View>
-                  )}
-              </View>
-              <Text style={[styles.dateText, { color: colors.textSecondary }]}>{formatDate(release.publishedAt)}</Text>
-            </View>
-
-            {release.otaVersion
-              ? <Text style={[styles.versionText, { color: colors.text }]}>{release.otaVersion}</Text>
-              : (
-                <TouchableOpacity onPress={() => handleSetVersion(release)} style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                  <Text style={[styles.versionText, { color: colors.textSecondary, fontStyle: "italic" }]}>— versione non impostata</Text>
-                  <Text style={[styles.badgeText, { color: colors.accent }]}>Imposta ›</Text>
-                </TouchableOpacity>
-              )}
-
-            {release.message
-              ? <Text style={[styles.messageText, { color: colors.text }]}>{release.message}</Text>
-              : <Text style={[styles.messageText, { color: colors.textSecondary, fontStyle: "italic" }]}>Nessun messaggio</Text>}
-
-            <Text selectable style={[styles.metaText, { color: colors.textSecondary }]}>
-              ID: {release.easUpdateId}
-            </Text>
-            {release.runtimeVersion && (
-              <Text style={[styles.metaText, { color: colors.textSecondary }]}>Runtime: {release.runtimeVersion}</Text>
-            )}
-
-            {renderCounters(release)}
-            {release.bootFailureCount > 0 && <OtaFailureDevices releaseId={release.id} />}
-            {renderAutoRollback(release)}
-            {!hasGroupId && (
-              <View style={[styles.warningBox, { backgroundColor: colors.error + "11", borderColor: colors.error + "44" }]}>
-                <Text style={[styles.warningText, { color: colors.error }]}>
-                  Questa release non ha un GroupID EAS valido. Premi "☁ Sync EAS" in alto per risincronizzare, poi riprova ad approvare.
-                </Text>
-              </View>
-            )}
-
-            <View style={styles.actions}>
-              <TouchableOpacity
-                style={[styles.actionBtn, { backgroundColor: colors.surfaceLight, borderColor: colors.border }]}
-                onPress={() => handleTryOta(release)}
-                disabled={tryingId === release.id}
-              >
-                {tryingId === release.id
-                  ? <ActivityIndicator size="small" color={colors.text} />
-                  : <Text style={[styles.actionBtnText, { color: colors.text }]}>🔬 Prova OTA</Text>}
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.actionBtn, {
-                  backgroundColor: hasGroupId ? colors.success : colors.textSecondary + "33",
-                  borderColor: hasGroupId ? colors.success : colors.textSecondary + "55",
-                  opacity: hasGroupId ? 1 : 0.5,
-                }]}
-                onPress={() => handleApprove(release)}
-                disabled={!hasGroupId || approvingId === release.id}
-                accessibilityState={{ disabled: !hasGroupId || approvingId === release.id }}
-              >
-                {approvingId === release.id
-                  ? <ActivityIndicator size="small" color="#fff" />
-                  : <Text style={[styles.actionBtnText, { color: hasGroupId ? "#fff" : colors.textSecondary }]}>
-                      {hasGroupId ? "✓ Approva e Distribuisci" : "✗ Approva (GroupID mancante)"}
-                    </Text>}
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.actionBtn, { backgroundColor: "transparent", borderColor: colors.error }]}
-                onPress={() => handleReject(release)}
-                disabled={rejectingId === release.id}
-              >
-                {rejectingId === release.id
-                  ? <ActivityIndicator size="small" color={colors.error} />
-                  : <Text style={[styles.actionBtnText, { color: colors.error }]}>✗ Rifiuta</Text>}
-              </TouchableOpacity>
-            </View>
-          </View>
-        );
-      })}
+      {pending.map((release) => (
+        <PendingReleaseCard
+          key={release.id}
+          release={release}
+          otaNum={otaNumberMap.get(release.id) ?? "?"}
+          colors={colors}
+          tryingId={tryingId}
+          approvingId={approvingId}
+          rejectingId={rejectingId}
+          handleTryOta={handleTryOta}
+          handleApprove={handleApprove}
+          handleReject={handleReject}
+          handleSetVersion={handleSetVersion}
+          expandedAutoId={expandedAutoId}
+          setExpandedAutoId={setExpandedAutoId}
+          autoRollbackMutation={autoRollbackMutation}
+        />
+      ))}
 
       {history.length > 0 && (
         <>
           <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>Storico</Text>
-          {history.map((release) => {
-            const isObsolete = release.status === "rejected" && release.rejectedBy === null;
-            const sc = getStatusColor(release.status, colors);
-            const otaNum = otaNumberMap.get(release.id) ?? "?";
-
-            if (isObsolete) {
-              return (
-                <View key={release.id} style={[styles.obsoleteRow, { backgroundColor: colors.surfaceLight, borderColor: colors.border }]}>
-                  <View style={[styles.numBadge, { backgroundColor: colors.textSecondary + "99" }]}>
-                    <Text style={styles.numBadgeText}>OTA {otaNum}</Text>
-                  </View>
-                  <Text style={[styles.dateText, { color: colors.textSecondary, flex: 1 }]}>{formatDate(release.publishedAt)}</Text>
-                  <Text style={[styles.badgeText, { color: colors.textSecondary }]}>OBSOLETA</Text>
-                </View>
-              );
-            }
-
-            const isExpanded = expandedHistoryId === release.id;
-            return (
-              <View key={release.id} style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                <TouchableOpacity
-                  style={styles.cardHeader}
-                  onPress={() => setExpandedHistoryId(isExpanded ? null : release.id)}
-                  activeOpacity={0.7}
-                >
-                  <View style={styles.badgeRow}>
-                    <View style={[styles.numBadge, { backgroundColor: colors.accent }]}>
-                      <Text style={styles.numBadgeText}>OTA {otaNum}</Text>
-                    </View>
-                    <View style={[styles.badge, { backgroundColor: sc + "22" }]}>
-                      <Text style={[styles.badgeText, { color: sc }]}>
-                        {getStatusLabel(release.status).toUpperCase()}
-                      </Text>
-                    </View>
-                  </View>
-                  <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                    <Text style={[styles.dateText, { color: colors.textSecondary }]}>{formatDate(release.publishedAt)}</Text>
-                    <Text style={{ color: colors.textSecondary, fontSize: 12 }}>{isExpanded ? "▲" : "▼"}</Text>
-                  </View>
-                </TouchableOpacity>
-
-                {isExpanded && (
-                  <>
-                    <Text style={[styles.versionText, { color: colors.text }]}>{release.otaVersion ?? "—"}</Text>
-                    {release.message && (
-                      <Text style={[styles.messageText, { color: colors.text }]}>{release.message}</Text>
-                    )}
-                    {release.approvedAt && <Text style={[styles.metaText, { color: colors.textSecondary }]}>Approvata: {formatDate(release.approvedAt)}</Text>}
-                    {release.rejectedAt && <Text style={[styles.metaText, { color: colors.textSecondary }]}>Rifiutata: {formatDate(release.rejectedAt)}</Text>}
-                    {renderCounters(release)}
-                    {release.bootFailureCount > 0 && <OtaFailureDevices releaseId={release.id} />}
-                    {release.status === "approved" && renderAutoRollback(release)}
-                    {release.status === "approved" && (
-                      <TouchableOpacity
-                        style={[styles.rollbackBtn, { borderColor: colors.accent }]}
-                        onPress={() => handleRollback(release)}
-                        disabled={rollingBackId === release.id}
-                      >
-                        {rollingBackId === release.id
-                          ? <ActivityIndicator size="small" color={colors.accent} />
-                          : <Text style={[styles.rollbackBtnText, { color: colors.accent }]}>↩ Rollback (eas update --republish)</Text>}
-                      </TouchableOpacity>
-                    )}
-                  </>
-                )}
-              </View>
-            );
-          })}
+          {history.map((release) => (
+            <HistoryReleaseCard
+              key={release.id}
+              release={release}
+              otaNum={otaNumberMap.get(release.id) ?? "?"}
+              colors={colors}
+              rollingBackId={rollingBackId}
+              handleRollback={handleRollback}
+              expandedHistoryId={expandedHistoryId}
+              setExpandedHistoryId={setExpandedHistoryId}
+              expandedAutoId={expandedAutoId}
+              setExpandedAutoId={setExpandedAutoId}
+              autoRollbackMutation={autoRollbackMutation}
+            />
+          ))}
         </>
       )}
     </View>
   );
 }
-interface AutoRollbackFieldProps {
-  label: string;
-  value: number;
-  onCommit: (n: number) => void;
-  min: number;
-  max: number;
-  suffix?: string;
-  colors: { text: string; textSecondary: string; surface: string; border: string };
-}
 
-function AutoRollbackField({ label, value, onCommit, min, max, suffix, colors }: AutoRollbackFieldProps) {
-  const [draft, setDraft] = useState(String(value));
-  return (
-    <View style={styles.autoFieldRow}>
-      <Text style={[styles.autoFieldLabel, { color: colors.textSecondary }]}>{label}</Text>
-      <View style={[styles.autoFieldInputWrap, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-        <TextInput
-          style={[styles.autoFieldInput, { color: colors.text }]}
-          value={draft}
-          onChangeText={setDraft}
-          onBlur={() => {
-            const n = parseInt(draft, 10);
-            if (Number.isFinite(n) && n >= min && n <= max && n !== value) {
-              onCommit(n);
-            } else {
-              setDraft(String(value));
-            }
-          }}
-          keyboardType="number-pad"
-          returnKeyType="done"
-        />
-        {suffix ? <Text style={[styles.autoFieldSuffix, { color: colors.textSecondary }]}>{suffix}</Text> : null}
-      </View>
-    </View>
-  );
-}
 
-const styles = StyleSheet.create({
-  center: { flex: 1, alignItems: "center", justifyContent: "center", padding: 24 },
-  header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 16 },
-  title: { fontSize: 17, fontWeight: "700" },
-  headerActions: { flexDirection: "row", alignItems: "center", gap: 6 },
-  syncBtn: { borderRadius: 6, borderWidth: 1.5, paddingHorizontal: 10, paddingVertical: 6 },
-  syncBtnText: { fontSize: 12, fontWeight: "700" as const },
-  listBtn: { borderRadius: 6, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 6 },
-  listBtnText: { fontSize: 12, fontWeight: "600" as const },
-  numBadge: { borderRadius: 4, paddingHorizontal: 7, paddingVertical: 3, marginRight: 4 },
-  numBadgeText: { fontSize: 11, fontWeight: "800" as const, color: "#fff", letterSpacing: 0.3 },
-  badgeRow: { flexDirection: "row", alignItems: "center", flexWrap: "wrap", flex: 1, gap: 4 },
-  warningBox: { borderRadius: 6, borderWidth: 1, padding: 10, marginTop: 8, marginBottom: 4 },
-  warningText: { fontSize: 12, lineHeight: 17 },
-  emptyBox: { borderRadius: 8, padding: 20, alignItems: "center", borderWidth: 1, marginBottom: 12 },
-  emptyText: { fontSize: 14, fontWeight: "600", marginBottom: 4 },
-  emptySubtext: { fontSize: 11, fontFamily: Platform.OS === "ios" ? "Courier" : "monospace", textAlign: "center" },
-  card: { borderRadius: 8, padding: 16, marginBottom: 12, borderWidth: 1 },
-  cardHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 10 },
-  badge: { borderRadius: 4, paddingHorizontal: 8, paddingVertical: 3 },
-  badgeText: { fontSize: 10, fontWeight: "800" as const, letterSpacing: 0.5 },
-  dateText: { fontSize: 11 },
-  versionText: {
-    fontSize: 16,
-    fontWeight: "700" as const,
-    marginBottom: 4,
-    fontFamily: Platform.OS === "ios" ? "Courier" : "monospace",
-  },
-  messageText: { fontSize: 13, marginBottom: 8, lineHeight: 18 },
-  metaText: {
-    fontSize: 11,
-    marginBottom: 2,
-    fontFamily: Platform.OS === "ios" ? "Courier" : "monospace",
-  },
-  actions: { flexDirection: "column", gap: 8, marginTop: 12 },
-  actionBtn: { borderRadius: 6, paddingVertical: 10, paddingHorizontal: 16, alignItems: "center", borderWidth: 1 },
-  actionBtnText: { fontSize: 13, fontWeight: "700" as const },
-  rollbackBtn: { marginTop: 10, borderRadius: 6, paddingVertical: 8, paddingHorizontal: 12, alignItems: "center", borderWidth: 1, borderStyle: "dashed" as const },
-  rollbackBtnText: { fontSize: 12, fontWeight: "600" as const },
-  sectionTitle: {
-    fontSize: 12,
-    fontWeight: "700" as const,
-    letterSpacing: 0.5,
-    textTransform: "uppercase",
-    marginBottom: 12,
-    marginTop: 8,
-  },
-  forceUpdateBtn: {
-    borderRadius: 8,
-    paddingVertical: 13,
-    paddingHorizontal: 16,
-    alignItems: "center" as const,
-    justifyContent: "center" as const,
-    marginBottom: 12,
-    minHeight: 46,
-  },
-  forceUpdateText: { color: "#fff", fontSize: 14, fontWeight: "700" as const },
-  infoBanner: {
-    borderRadius: 8,
-    borderWidth: 1,
-    padding: 12,
-    marginBottom: 12,
-  },
-  infoBannerText: { fontSize: 12, lineHeight: 17 },
-  countersRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 6,
-    marginTop: 10,
-    marginBottom: 4,
-  },
-  counterChip: {
-    flexGrow: 1,
-    minWidth: 70,
-    borderRadius: 6,
-    borderWidth: 1,
-    paddingHorizontal: 8,
-    paddingVertical: 6,
-    alignItems: "center",
-  },
-  counterLabel: { fontSize: 10, fontWeight: "600" as const, letterSpacing: 0.3, textTransform: "uppercase" },
-  counterValue: { fontSize: 16, fontWeight: "700" as const, marginTop: 2 },
-  autoRollbackBox: {
-    borderRadius: 6,
-    borderWidth: 1,
-    padding: 10,
-    marginTop: 10,
-  },
-  autoRollbackHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  autoRollbackTitle: { fontSize: 13, fontWeight: "700" as const },
-  autoRollbackHint: { fontSize: 11, marginTop: 2, lineHeight: 15 },
-  expandToggle: { marginTop: 8 },
-  expandToggleText: { fontSize: 12, fontWeight: "600" as const },
-  autoRollbackFields: { marginTop: 8, gap: 6 },
-  autoFieldRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 },
-  autoFieldLabel: { fontSize: 12, flex: 1 },
-  autoFieldInputWrap: {
-    flexDirection: "row",
-    alignItems: "center",
-    borderRadius: 5,
-    borderWidth: 1,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    minWidth: 80,
-  },
-  autoFieldInput: { fontSize: 13, padding: 0, minWidth: 40, textAlign: "right" },
-  autoFieldSuffix: { fontSize: 11, marginLeft: 4 },
-  obsoleteRow: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 10, paddingVertical: 7, borderRadius: 6, borderWidth: 1, marginBottom: 4 },
-} as const);
+import { styles } from "./OtaPanel.styles";
+import { AutoRollbackField, ReleaseCounters, AutoRollbackSection } from "./OtaPanelParts";

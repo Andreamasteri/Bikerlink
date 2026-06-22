@@ -186,6 +186,8 @@ async function getCommunityStats() {
   }
 }
 
+import { registerLegacyRedirects, registerStaticLegalPages, registerRobotsAndSitemap, registerLlmGuide } from "./routes.part2";
+
 export function registerSiteRoutes(app: Express) {
   // Task #1524: counter visitatori. Tracking middleware for marketing pages.
   // Esegue PRIMA delle route delle pagine, ma filtra strettamente per evitare
@@ -402,153 +404,18 @@ code{background:#f0f0f0;padding:1px 5px;border-radius:2px;font-size:11px;font-fa
   });
 
   // 301 redirects for legacy URLs.
-  for (const [from, to] of Object.entries(PERMANENT_REDIRECTS)) {
-    app.get(from, (_req: Request, res: Response) => res.redirect(301, to));
-  }
+  registerLegacyRedirects(app, PERMANENT_REDIRECTS);
 
-  // Static legal/special HTML pages — read once into memory, then per request
-  // substitute {{BASE_URL}} with the current host so canonical/og:url are
-  // host-dynamic (Task #1520 requirement) instead of hardcoded.
+  // Static legal/special HTML pages
   const staticTemplates: Record<string, string> = {};
   for (const [route, file] of Object.entries(STATIC_HTML_PAGES)) {
     const filePath = path.resolve(process.cwd(), "server", "templates", file);
-    // Fail-fast: if a static template can't be read at boot, throw so the
-    // process exits with a clear deployment error instead of silently
-    // serving a stub later.
     staticTemplates[route] = fs.readFileSync(filePath, "utf-8");
-    app.get(route, (req: Request, res: Response, next) => {
-      try {
-        const baseUrl = getBaseUrl(req);
-        const html = staticTemplates[route].replace(/\{\{BASE_URL\}\}/g, baseUrl);
-        res.setHeader("Content-Type", "text/html; charset=utf-8");
-        res.setHeader("Cache-Control", "public, max-age=300");
-        res.status(200).send(html);
-      } catch (err) {
-        console.error(`[site] error serving static template ${route}:`, err);
-        next(err);
-      }
-    });
   }
+  registerStaticLegalPages(app, STATIC_HTML_PAGES, staticTemplates);
 
-  // robots.txt — dynamic, references the current host.
-  app.get("/robots.txt", (req: Request, res: Response) => {
-    const baseUrl = getBaseUrl(req);
-    res.setHeader("Content-Type", "text/plain; charset=utf-8");
-    res.setHeader("Cache-Control", "public, max-age=86400");
-    // Task #1520: allow all public pages (incl. /delete-account, a public
-    // legal page reachable from the privacy policy). Only block server-only
-    // surfaces and protected user areas, per task spec.
-    res.send(
-      [
-        "User-agent: *",
-        "Allow: /",
-        "Disallow: /api/",
-        "Disallow: /admin",
-        "Disallow: /admin/",
-        "Disallow: /apple-review",
-        "Disallow: /investors",
-        "Disallow: /uploads/",
-        "Disallow: /registrati",
-        "Disallow: /accedi",
-        "Disallow: /area-utente",
-        "Disallow: /media",
-        "",
-        `Sitemap: ${baseUrl}/sitemap.xml`,
-        "",
-      ].join("\n"),
-    );
-  });
+  registerRobotsAndSitemap(app, PAGES, STATIC_HTML_PAGES);
+  registerLlmGuide(app);
 
-  // sitemap.xml — dynamic host, all public pages.
-  app.get("/sitemap.xml", (req: Request, res: Response) => {
-    const baseUrl = getBaseUrl(req);
-    const entries = [
-      ...PAGES.map((p) => ({
-        loc: `${baseUrl}${p.route}`,
-        priority: p.sitemap.priority,
-        changefreq: p.sitemap.changefreq,
-      })),
-      { loc: `${baseUrl}/docs`, priority: 0.7, changefreq: "monthly" },
-      { loc: `${baseUrl}/docs/matching`, priority: 0.6, changefreq: "monthly" },
-      { loc: `${baseUrl}/docs/sos`, priority: 0.6, changefreq: "monthly" },
-      { loc: `${baseUrl}/docs/motoclub`, priority: 0.6, changefreq: "monthly" },
-      { loc: `${baseUrl}/docs/percorsi`, priority: 0.6, changefreq: "monthly" },
-      { loc: `${baseUrl}/docs/telemetria`, priority: 0.6, changefreq: "monthly" },
-      { loc: `${baseUrl}/docs/api`, priority: 0.5, changefreq: "monthly" },
-      { loc: `${baseUrl}/privacy`, priority: 0.3, changefreq: "yearly" },
-      { loc: `${baseUrl}/terms`, priority: 0.3, changefreq: "yearly" },
-      { loc: `${baseUrl}/delete-account`, priority: 0.3, changefreq: "yearly" },
-    ];
-    const body =
-      `<?xml version="1.0" encoding="UTF-8"?>\n` +
-      `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n` +
-      entries
-        .map(
-          (e) =>
-            `  <url>\n    <loc>${e.loc}</loc>\n    <changefreq>${e.changefreq}</changefreq>\n    <priority>${e.priority.toFixed(1)}</priority>\n  </url>`,
-        )
-        .join("\n") +
-      `\n</urlset>\n`;
-    res.setHeader("Content-Type", "application/xml; charset=utf-8");
-    res.setHeader("Cache-Control", "public, max-age=86400");
-    res.send(body);
-  });
-
-  // llms.txt — machine-readable site guide for AI crawlers.
-  app.get("/llms.txt", (req: Request, res: Response) => {
-    const baseUrl = getBaseUrl(req);
-    res.setHeader("Content-Type", "text/plain; charset=utf-8");
-    res.setHeader("Cache-Control", "public, max-age=86400");
-    res.send(
-      [
-        "# BikerLink",
-        "",
-        "> BikerLink è l'app di social matching per motociclisti. Connette biker in base a stile di guida, moto, percorsi e passioni, usando telemetria reale e intelligenza artificiale.",
-        "",
-        "## Sezioni principali",
-        "",
-        `- Home: ${baseUrl}/`,
-        `- Funzionalità: ${baseUrl}/features`,
-        `- Sistema SOS: ${baseUrl}/sos`,
-        `- MotoClub: ${baseUrl}/motoclub`,
-        `- Community: ${baseUrl}/community`,
-        `- Documentazione (indice): ${baseUrl}/docs`,
-        `- Download app: ${baseUrl}/download`,
-        `- Chi siamo: ${baseUrl}/about`,
-        `- FAQ: ${baseUrl}/faq`,
-        `- Contatti: ${baseUrl}/contact`,
-        "",
-        "## Matching AI",
-        "",
-        `- Panoramica matching: ${baseUrl}/matching`,
-        `- Come funziona: ${baseUrl}/matching/come-funziona`,
-        `- Tipi di match: ${baseUrl}/matching/tipi-di-match`,
-        `- Come impara: ${baseUrl}/matching/come-impara`,
-        `- Intelligenza artificiale: ${baseUrl}/matching/intelligenza-artificiale`,
-        `- Privacy matching: ${baseUrl}/matching/privacy`,
-        "",
-        "## Documentazione",
-        "",
-        `- Indice documentazione: ${baseUrl}/docs`,
-        `- Matching AI — come funziona il matching: ${baseUrl}/docs/matching`,
-        `- SOS Biker — sistema emergenze stradali: ${baseUrl}/docs/sos`,
-        `- MotoClub — club, membri e chat di gruppo: ${baseUrl}/docs/motoclub`,
-        `- Percorsi — navigazione GPS e curvy routing: ${baseUrl}/docs/percorsi`,
-        `- Telemetria — dati di guida reali e loro uso: ${baseUrl}/docs/telemetria`,
-        `- API — riferimento tecnico per sviluppatori: ${baseUrl}/docs/api`,
-        "",
-        "## Pagine legali e supporto",
-        "",
-        `- Privacy Policy: ${baseUrl}/privacy`,
-        `- Termini di Servizio: ${baseUrl}/terms`,
-        `- Elimina account: ${baseUrl}/delete-account`,
-        "",
-        "## Contatto",
-        "",
-        "- Supporto: support@bikerlink.app",
-        "- Privacy: privacy@bikerlink.app",
-        "",
-      ].join("\n"),
-    );
-  });
+  // Fallback /docs index (dynamic).
 }

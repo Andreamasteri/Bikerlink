@@ -4,8 +4,6 @@ import {
   Text,
   TouchableOpacity,
   ScrollView,
-  Switch,
-  Animated,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
@@ -17,6 +15,7 @@ import { DistanceUnit, SpeedUnit } from "@/lib/units-context";
 import { MountAxisCalibration } from "@/components/MountCalibWizard";
 import { useRouter } from "expo-router";
 import { UpdateProfile, formatHMS, convertSpeed, speedUnitLabel, convertDistance, distanceUnitLabel } from "./tracking-utils";
+import { SprintOverlay, BufferIndicator } from "./TrackingDashboard.part2";
 
 interface TrackingDashboardProps {
   phase: "active" | "paused";
@@ -56,14 +55,14 @@ interface TrackingDashboardProps {
   discardSprintAttempt: () => void;
   sprint0to100Ms: number | null;
   isNewRecord: boolean;
-  recordAnim: Animated.Value;
+  recordAnim: any;
   showSensorOverlay: boolean;
   setShowSensorOverlay: (v: boolean) => void;
   pointsBuffered: number;
   pointsSent: number;
   sprintGoFired: boolean;
   t: (key: string) => string;
-  router: ReturnType<typeof useRouter>;
+  router: any;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- StyleSheet object, typed by caller
   styles: Record<string, any>;
 }
@@ -147,7 +146,7 @@ export function TrackingDashboard({
         </TouchableOpacity>
       </View>
 
-      {/* GPS acquiring banner — shown while waiting for the first fix */}
+      {/* GPS acquiring banner */}
       {gpsAcquiring && !gpsLost && (
         <View style={[styles.gpsBanner, styles.gpsAcquiringBanner]}>
           <Ionicons name="locate-outline" size={16} color="#fff" />
@@ -163,7 +162,7 @@ export function TrackingDashboard({
         </View>
       )}
 
-      {/* Fusion mode chip — observable telemetry source */}
+      {/* Fusion mode chip */}
       <View style={styles.fusionChipRow}>
         <View
           style={[
@@ -243,7 +242,7 @@ export function TrackingDashboard({
           <Text style={styles.speedUnit}>{speedUnitLabel(speedUnit)}</Text>
         </View>
 
-        {/* Map (standard mode only) — tap to open fullscreen */}
+        {/* Map (standard mode only) */}
         {!is0100Enabled && currentCoord !== null && (
           <TouchableOpacity activeOpacity={0.95} onPress={() => setMapModalVisible(true)}>
             <View style={styles.mapCard}>
@@ -252,7 +251,7 @@ export function TrackingDashboard({
           </TouchableOpacity>
         )}
 
-        {/* ── Race Mode sensor overlay (always visible below map) ───── */}
+        {/* Race Mode sensor overlay */}
         {profile === "race" && !is0100Enabled && sensorsEnabled && !isCalibrating && (
           <SensorOverlayPanel
             currentG={currentG}
@@ -262,7 +261,7 @@ export function TrackingDashboard({
             mountAxisCalib={mountAxisCalib}
             sensorsEnabled={sensorsEnabled}
             colors={Colors}
-            styles={styles as { sensorOverlayPanel: object; sensorOverlayItem: object; sensorOverlayValue: object; sensorOverlayLabel: object; sensorOverlaySep: object }}
+            styles={styles as any}
             t={t}
           />
         )}
@@ -315,7 +314,6 @@ export function TrackingDashboard({
                 value={maxAltitude.toFixed(0)}
                 label={t("tracking.maxAlt")}
               />
-              {/* G max card — only when sensors enabled */}
               {sensorsEnabled && <View style={styles.statCard}>
                 <Ionicons name="pulse-outline" size={16} color={Colors.accentRed} />
                 {isCalibrating ? (
@@ -329,7 +327,6 @@ export function TrackingDashboard({
                 )}
                 <Text style={styles.statLabel}>G max</Text>
               </View>}
-              {/* Calibration banner — shown below G max when sensors enabled */}
               {sensorsEnabled && !isCalibrating && (
                 <CalibrationBanner
                   isCalibrated={mountAxisCalib !== null}
@@ -350,191 +347,39 @@ export function TrackingDashboard({
 
         {/* Stats — 0-100 sprint mode */}
         {is0100Enabled && (
-          <View style={styles.sprintContainer}>
-            {/* Sprint header with history button */}
-            <View style={styles.sprintHeaderRow}>
-              <Text style={styles.sprintHeaderLabel}>Sprint 0-100</Text>
-              <TouchableOpacity
-                onPress={() => router.push("/sprint-history" as const)}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                style={styles.sprintHistoryBtn}
-              >
-                <Ionicons name="trophy-outline" size={18} color={Colors.accent} />
-                <Text style={styles.sprintHistoryBtnText}>Storico</Text>
-              </TouchableOpacity>
-            </View>
-            <View
-              style={[
-                styles.sprintPhaseBadge,
-                {
-                  backgroundColor:
-                    sprintPhase === "waiting"
-                      ? Colors.success + "20"
-                      : sprintPhase === "measuring"
-                      ? Colors.accentRed + "20"
-                      : Colors.accent + "20",
-                  borderColor:
-                    sprintPhase === "waiting"
-                      ? Colors.success
-                      : sprintPhase === "measuring"
-                      ? Colors.accentRed
-                      : Colors.accent,
-                },
-              ]}
-            >
-              <Text
-                style={[
-                  styles.sprintPhaseLabel,
-                  {
-                    color:
-                      sprintPhase === "waiting"
-                        ? Colors.success
-                        : sprintPhase === "measuring"
-                        ? Colors.accentRed
-                        : Colors.accent,
-                  },
-                ]}
-              >
-                {sprintPhase === "waiting"
-                  ? t("tracking.sprintAccelerate")
-                  : sprintPhase === "measuring"
-                  ? t("tracking.sprintMeasuring")
-                  : t("tracking.sprintCompleted")}
-              </Text>
-            </View>
-
-            {/* Annulla button when waiting for rider to start moving */}
-            {sprintPhase === "waiting" && (
-              <TouchableOpacity
-                style={styles.sprintCancelBtn}
-                onPress={discardSprintAttempt}
-                activeOpacity={0.8}
-              >
-                <Ionicons name="close-circle-outline" size={18} color={Colors.accentRed} />
-                <Text style={styles.sprintCancelText}>Annulla</Text>
-              </TouchableOpacity>
-            )}
-
-            {sprint0to100Ms !== null && (
-              <Text style={styles.sprint0100Time}>
-                0→{convertSpeed(100, speedUnit).toFixed(0)} {speedUnitLabel(speedUnit)} in {(sprint0to100Ms / 1000).toFixed(2)}s
-              </Text>
-            )}
-
-            {isNewRecord && (
-              <Animated.View
-                style={[
-                  styles.newRecordBadge,
-                  {
-                    opacity: recordAnim,
-                    transform: [{ scale: recordAnim }],
-                  },
-                ]}
-              >
-                <Ionicons name="trophy" size={16} color="#FFD700" />
-                <Text style={styles.newRecordText}>Nuovo Record!</Text>
-              </Animated.View>
-            )}
-
-            {/* Sensor overlay toggle — 0-100 sprint (only after GO!) */}
-            {(sprintGoFired || sprintPhase !== "waiting") && (
-              <>
-                <TouchableOpacity
-                  style={styles.sensorOverlayToggleRow}
-                  onPress={() => setShowSensorOverlay(!showSensorOverlay)}
-                  activeOpacity={0.7}
-                >
-                  <Ionicons
-                    name="pulse-outline"
-                    size={16}
-                    color={showSensorOverlay ? Colors.accentRed : Colors.textSecondary}
-                  />
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.sensorOverlayToggleLabel}>
-                      {t("tracking.sensorOverlay")}
-                    </Text>
-                    <Text style={styles.sensorOverlayToggleHint}>
-                      {t("tracking.sensorOverlayHint")}
-                    </Text>
-                  </View>
-                  <Switch
-                    value={showSensorOverlay}
-                    onValueChange={setShowSensorOverlay}
-                    trackColor={{ false: Colors.border, true: Colors.accentRed + "80" }}
-                    thumbColor={showSensorOverlay ? Colors.accentRed : Colors.textSecondary}
-                  />
-                </TouchableOpacity>
-
-                {showSensorOverlay && !isCalibrating && (
-                  <SensorOverlayPanel
-                    currentG={currentG}
-                    currentLateralG={currentLateralG}
-                    currentTiltDeg={currentTiltDeg}
-                    maxAccelG={maxAccelG}
-                    mountAxisCalib={mountAxisCalib}
-                    sensorsEnabled={sensorsEnabled}
-                    colors={Colors}
-                    styles={styles as { sensorOverlayPanel: object; sensorOverlayItem: object; sensorOverlayValue: object; sensorOverlayLabel: object; sensorOverlaySep: object }}
-                    t={t}
-                  />
-                )}
-              </>
-            )}
-
-            {sensorsEnabled && (sprintGoFired || sprintPhase !== "waiting") && (
-              <View style={styles.statsRow}>
-                <StatCard
-                  icon="trending-up-outline"
-                  color={Colors.success}
-                  value={`${currentG.toFixed(2)} G`}
-                  label={t("tracking.gInstant")}
-                />
-                <StatCard
-                  icon="pulse-outline"
-                  color={Colors.accentRed}
-                  value={`${maxAccelG.toFixed(2)} G`}
-                  label={t("tracking.gMaxAccel")}
-                />
-              </View>
-            )}
-            <View style={styles.statsRow}>
-              {sensorsEnabled && (sprintGoFired || sprintPhase !== "waiting") && (
-                <StatCard
-                  icon="trending-down-outline"
-                  color={Colors.warning}
-                  value={`${maxDecelG.toFixed(2)} G`}
-                  label={t("tracking.gMaxBrake")}
-                />
-              )}
-              {sensorsEnabled && !isCalibrating && (sprintGoFired || sprintPhase !== "waiting") && (
-                <StatCard
-                  icon="compass-outline"
-                  color={Colors.accent}
-                  value={`${maxTiltDeg.toFixed(1)}°`}
-                  label={t("tracking.tiltMax")}
-                />
-              )}
-              {accuracyTier ? (
-                <StatCard
-                  icon="locate-outline"
-                  color={accuracyTier.color}
-                  value={accuracyTier.value}
-                  label={t(accuracyTier.labelKey)}
-                />
-              ) : (
-                <View style={[styles.statCard, { opacity: 0 }]} />
-              )}
-            </View>
-          </View>
+          <SprintOverlay
+            sprintPhase={sprintPhase}
+            discardSprintAttempt={discardSprintAttempt}
+            sprint0to100Ms={sprint0to100Ms}
+            speedUnit={speedUnit}
+            isNewRecord={isNewRecord}
+            recordAnim={recordAnim}
+            sprintGoFired={sprintGoFired}
+            showSensorOverlay={showSensorOverlay}
+            setShowSensorOverlay={setShowSensorOverlay}
+            sensorsEnabled={sensorsEnabled}
+            isCalibrating={isCalibrating}
+            currentG={currentG}
+            currentLateralG={currentLateralG}
+            currentTiltDeg={currentTiltDeg}
+            maxAccelG={maxAccelG}
+            maxDecelG={maxDecelG}
+            maxTiltDeg={maxTiltDeg}
+            mountAxisCalib={mountAxisCalib}
+            accuracyTier={accuracyTier}
+            t={t}
+            styles={styles}
+            router={router}
+          />
         )}
 
         {/* Buffer indicator */}
-        <View style={styles.bufferRow}>
-          <Ionicons name="cloud-upload-outline" size={14} color={Colors.accent} />
-          <Text style={styles.bufferText}>
-            {pointsBuffered}/{pointsSent} {t("tracking.bufferSent")}
-          </Text>
-        </View>
+        <BufferIndicator
+          pointsBuffered={pointsBuffered}
+          pointsSent={pointsSent}
+          t={t}
+          styles={styles}
+        />
       </ScrollView>
     </View>
   );

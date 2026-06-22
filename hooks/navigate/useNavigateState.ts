@@ -23,6 +23,7 @@ import {
 import type { NavWeatherZone } from "@/components/navigate/NavigationWeather";
 import { useWhisperRecorder } from "@/hooks/useWhisperRecorder";
 import { useLocationGate } from "@/lib/location-context";
+import { announceStep, calculateRemainingDist, useVoiceCommandInternal, useNavigateStates, useWeatherHandlers } from "./useNavigateState.part2";
 
 const ANNOUNCE_DISTANCE_FAR = 200;
 const ANNOUNCE_DISTANCE_NEAR = 50;
@@ -58,21 +59,23 @@ export function useNavigateState() {
   const activeTotalKmRef = useRef<number | null>(null);
   const activeTotalMinRef = useRef<number | null>(null);
 
-  const [mapReady, setMapReady] = useState(false);
-  const [currentStep, setCurrentStep] = useState(0);
-  const [distanceToNext, setDistanceToNext] = useState<number | null>(null);
-  const [progressPct, setProgressPct] = useState(0);
-  const [remainingKm, setRemainingKm] = useState<number | null>(null);
-  const [remainingMin, setRemainingMin] = useState<number | null>(null);
-  const [isFinished, setIsFinished] = useState(false);
-  const [polylinePoints, setPolylinePoints] = useState<Array<[number, number]>>([]);
-  const [hasPermission, setHasPermission] = useState(false);
-  const [isRerouting, setIsRerouting] = useState(false);
-  const [isOffline, setIsOffline] = useState(false);
+  const {
+    mapReady, setMapReady,
+    currentStep, setCurrentStep,
+    distanceToNext, setDistanceToNext,
+    progressPct, setProgressPct,
+    remainingKm, setRemainingKm,
+    remainingMin, setRemainingMin,
+    isFinished, setIsFinished,
+    polylinePoints, setPolylinePoints,
+    hasPermission, setHasPermission,
+    isRerouting, setIsRerouting,
+    isOffline, setIsOffline,
+    weatherLoading, setWeatherLoading,
+    currentWeather, setCurrentWeather,
+    aheadWeather, setAheadWeather,
+  } = useNavigateStates();
 
-  const [weatherLoading, setWeatherLoading] = useState(false);
-  const [currentWeather, setCurrentWeather] = useState<NavWeatherZone | null>(null);
-  const [aheadWeather, setAheadWeather] = useState<NavWeatherZone | null>(null);
   const lastWeatherFetchRef = useRef<number>(0);
   const lastWeatherAheadPtRef = useRef<{ lat: number; lng: number } | null>(null);
   const isFetchingWeatherRef = useRef(false);
@@ -267,49 +270,18 @@ export function useNavigateState() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [route]);
 
-  const fetchNavWeather = useCallback(async (lat: number, lng: number, closestIdx: number) => {
-    if (isFetchingWeatherRef.current || polylinePoints.length === 0) return;
-
-    let aheadPt: [number, number] = polylinePoints[polylinePoints.length - 1];
-    let acc = 0;
-    for (let i = closestIdx + 1; i < polylinePoints.length; i++) {
-      acc += haversineM(polylinePoints[i - 1][0], polylinePoints[i - 1][1], polylinePoints[i][0], polylinePoints[i][1]);
-      if (acc >= WEATHER_AHEAD_KM * 1000) { aheadPt = polylinePoints[i]; break; }
-    }
-
-    const now = Date.now();
-    const prevAhead = lastWeatherAheadPtRef.current;
-    const aheadMoved = prevAhead
-      ? haversineM(prevAhead.lat, prevAhead.lng, aheadPt[0], aheadPt[1])
-      : Infinity;
-    if (now - lastWeatherFetchRef.current < WEATHER_THROTTLE_MS && aheadMoved < WEATHER_AHEAD_REFETCH_M) {
-      return;
-    }
-
-    isFetchingWeatherRef.current = true;
-    lastWeatherFetchRef.current = now;
-    lastWeatherAheadPtRef.current = { lat: aheadPt[0], lng: aheadPt[1] };
-    setWeatherLoading(true);
-    try {
-      const resp = await apiRequest("POST", "/api/planned-routes/weather", {
-        waypoints: [
-          { lat, lng, name: "Posizione attuale" },
-          { lat: aheadPt[0], lng: aheadPt[1], name: "Prossima zona" },
-        ],
-        departureIso: new Date().toISOString(),
-      });
-      const data: NavWeatherZone[] = await resp.json();
-      if (Array.isArray(data) && data.length > 0) {
-        setCurrentWeather(data[0] ?? null);
-        setAheadWeather(data[1] ?? null);
-      }
-    } catch (e) {
-      console.warn("[NavWeather] fetch failed:", e);
-    } finally {
-      isFetchingWeatherRef.current = false;
-      setWeatherLoading(false);
-    }
-  }, [polylinePoints]);
+  const { fetchNavWeather } = useWeatherHandlers(
+    isFetchingWeatherRef,
+    lastWeatherFetchRef,
+    lastWeatherAheadPtRef,
+    setWeatherLoading,
+    setCurrentWeather,
+    setAheadWeather,
+    polylinePoints,
+    WEATHER_AHEAD_KM,
+    WEATHER_THROTTLE_MS,
+    WEATHER_AHEAD_REFETCH_M
+  );
 
   const fetchNavWeatherRef = useRef(fetchNavWeather);
   useEffect(() => { fetchNavWeatherRef.current = fetchNavWeather; }, [fetchNavWeather]);
@@ -405,11 +377,7 @@ export function useNavigateState() {
         const distM = haversineM(lat, lng, polylinePoints[nextPtIdx][0], polylinePoints[nextPtIdx][1]);
         setDistanceToNext(distM);
 
-        const remainingPts = polylinePoints.slice(closestIdx);
-        let remDist = 0;
-        for (let i = 1; i < remainingPts.length; i++) {
-          remDist += haversineM(remainingPts[i-1][0], remainingPts[i-1][1], remainingPts[i][0], remainingPts[i][1]);
-        }
+        const remDist = calculateRemainingDist(polylinePoints, closestIdx);
         const remKm = Math.round(remDist / 100) / 10;
         setRemainingKm(remKm);
 
@@ -419,19 +387,7 @@ export function useNavigateState() {
           setRemainingMin(Math.round((remKm / totalKm) * totalMin));
         }
 
-        if (distM <= ANNOUNCE_DISTANCE_FAR && !announcedFarRef.current.has(stepIdx)) {
-          announcedFarRef.current.add(stepIdx);
-          const streetPart = nextStep.streetName
-            ? ` ${t("nav.announce.via").replace("{street}", nextStep.streetName)}`
-            : "";
-          const announcement = t("nav.announce.far")
-            .replace("{distance}", String(Math.round(distM)))
-            .replace("{instruction}", nextStep.text) + streetPart;
-          Speech.speak(announcement, { language: locale });
-        } else if (distM <= ANNOUNCE_DISTANCE_NEAR && !announcedNearRef.current.has(stepIdx)) {
-          announcedNearRef.current.add(stepIdx);
-          Speech.speak(nextStep.text, { language: locale });
-        }
+        announceStep(distM, stepIdx, nextStep, announcedFarRef.current, announcedNearRef.current, t, locale);
       }
     } else if (stepIdx === steps.length - 1 && pct >= 95) {
       if (!isFinished) {
@@ -454,37 +410,7 @@ export function useNavigateState() {
 
   const [voiceCmdToast, setVoiceCmdToast] = useState<string | null>(null);
 
-  const handleVoiceCommand = useCallback(async () => {
-    const text = await whisper.stopAndTranscribe();
-    if (!text) {
-      setVoiceCmdToast(whisper.error ?? "Trascrizione fallita");
-      setTimeout(() => setVoiceCmdToast(null), 3000);
-      return;
-    }
-
-    setVoiceCmdToast(`🎤 "${text}" — geocodifica...`);
-
-    try {
-      const geocodeUrl = new URL("/api/planned-routes/geocode", getApiUrl());
-      geocodeUrl.searchParams.set("q", text);
-      const geocodeRes = await apiRequest("GET", geocodeUrl.pathname + geocodeUrl.search);
-      const results = await geocodeRes.json() as Array<{ lat: number; lon: number; display_name?: string }>;
-
-      if (!Array.isArray(results) || results.length === 0) {
-        setVoiceCmdToast("Destinazione non trovata");
-        setTimeout(() => setVoiceCmdToast(null), 3000);
-        return;
-      }
-
-      const { lat, lon } = results[0];
-      setVoiceCmdToast(`Ricalcolo verso ${results[0].display_name ?? text}...`);
-      await triggerRerouteToDestination(lat, lon);
-      setTimeout(() => setVoiceCmdToast(null), 4000);
-    } catch {
-      setVoiceCmdToast("Errore geocodifica");
-      setTimeout(() => setVoiceCmdToast(null), 3000);
-    }
-  }, [whisper, triggerRerouteToDestination]);
+  const { handleVoiceCommand } = useVoiceCommandInternal(whisper, setVoiceCmdToast, triggerRerouteToDestination);
 
   const handleClose = useCallback(() => {
     Speech.stop();
@@ -501,12 +427,7 @@ export function useNavigateState() {
       return idx < polylinePoints.length ? polylinePoints[idx] : polylinePoints[0];
     });
     const base = getApiUrl() + "/leaflet-navigation-map.html";
-    let uri =
-      base +
-      "?tileUrl=" + encodeURIComponent(activeTileUrl) +
-      "&maxZoom=" + activeTileMaxZoom +
-      "&routeCoords=" + encodeURIComponent(JSON.stringify(polylinePoints)) +
-      "&stepCoords=" + encodeURIComponent(JSON.stringify(stepPoints));
+    let uri = base + "?tileUrl=" + encodeURIComponent(activeTileUrl) + "&maxZoom=" + activeTileMaxZoom + "&routeCoords=" + encodeURIComponent(JSON.stringify(polylinePoints)) + "&stepCoords=" + encodeURIComponent(JSON.stringify(stepPoints));
     if (offline.status === "available" && offline.offlineTileBasePath) {
       uri += "&offlinePath=" + encodeURIComponent(offline.offlineTileBasePath);
     }

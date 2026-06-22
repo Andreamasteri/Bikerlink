@@ -15,8 +15,9 @@ import { getApiUrl, authFetchHeaders } from "@/lib/query-client";
 import Colors from "@/constants/colors";
 import { styles } from "./whisper-config.styles";
 import { WhisperWatchdogBadge, type WhisperHealthData } from "@/components/admin/WhisperWatchdogBadge";
+import { WhisperDiagSteps } from "./whisper-config.part2";
 
-type SttProviderId = "home" | "groq" | "openai";
+export type SttProviderId = "home" | "groq" | "openai";
 
 interface SttProviderStatus {
   id: SttProviderId;
@@ -53,7 +54,7 @@ interface TestResult {
   m4a?: FormatProbeResult;
 }
 
-interface DiagStep {
+export interface DiagStep {
   label: string;
   ok: boolean;
   latency_ms: number | null;
@@ -489,66 +490,7 @@ export default function WhisperConfigScreen() {
       </TouchableOpacity>
 
       {diagSteps != null && (
-        <View style={styles.diagReport}>
-          <View style={styles.diagReportHeader}>
-            <MaterialCommunityIcons name="clipboard-list-outline" size={16} color={Colors.text} />
-            <Text style={styles.diagReportTitle}>Report diagnostica</Text>
-            <TouchableOpacity style={styles.copyLogBtn} onPress={copyDiagLog}>
-              <MaterialCommunityIcons name="content-copy" size={14} color={Colors.textSecondary} />
-              <Text style={styles.copyLogText}>Copia log</Text>
-            </TouchableOpacity>
-          </View>
-          {diagSteps.map((step, idx) => (
-            <View key={idx} style={[styles.diagStep, idx > 0 && styles.diagStepBorder]}>
-              <Text style={[styles.diagStepIcon, { color: step.ok ? "#22C55E" : "#ef4444" }]}>
-                {step.ok ? "✅" : "❌"}
-              </Text>
-              <View style={styles.diagStepBody}>
-                <Text style={styles.diagStepLabel}>
-                  {step.label}
-                  {step.latency_ms != null ? (
-                    <Text style={styles.diagStepLatency}> — {step.latency_ms}ms</Text>
-                  ) : null}
-                </Text>
-                <Text style={styles.diagStepDetail}>{step.detail}</Text>
-              </View>
-            </View>
-          ))}
-          {diagSteps.length === 0 && (
-            <Text style={styles.diagStepDetail}>Nessun dato restituito.</Text>
-          )}
-        </View>
-      )}
-
-      <TouchableOpacity
-        style={[styles.resetBtn, resetMutation.isPending && styles.resetBtnDisabled]}
-        onPress={() => {
-          Alert.alert(
-            "Ripristina default",
-            "Riporta la chain a home → groq → openai?",
-            [
-              { text: "Annulla", style: "cancel" },
-              { text: "Ripristina", style: "destructive", onPress: () => resetMutation.mutate() },
-            ]
-          );
-        }}
-        disabled={resetMutation.isPending || !!envOverride}
-      >
-        {resetMutation.isPending ? (
-          <ActivityIndicator size="small" color={Colors.textSecondary} />
-        ) : (
-          <>
-            <MaterialCommunityIcons name="restore" size={16} color={Colors.textSecondary} />
-            <Text style={styles.resetBtnText}>Ripristina default</Text>
-          </>
-        )}
-      </TouchableOpacity>
-
-      {saveMutation.isPending && (
-        <View style={styles.savingBanner}>
-          <ActivityIndicator size="small" color={Colors.accent} />
-          <Text style={styles.savingText}>Salvataggio…</Text>
-        </View>
+        <WhisperDiagSteps diagSteps={diagSteps} copyDiagLog={copyDiagLog} />
       )}
     </ScrollView>
   );

@@ -25,6 +25,16 @@ import {
   loadMountCalibration
 } from "@/components/MountCalibWizard";
 import { CalibrationBanner } from "@/components/CalibrationBanner";
+import {
+  HUB_SECTIONS,
+  FILTER_KEYS,
+  SEARCH_TYPE_I18N,
+  getTypeIcon,
+  getTypeLabelKey,
+  MatchBanner,
+  ProposalHeader,
+} from "./proposals.part2";
+import { styles } from "./proposals.styles";
 
 interface ProposalItem {
   id: string;
@@ -49,58 +59,6 @@ interface ProposalItem {
   motoInfo?: { brand: string; model: string; motorcycleType: string; ridingStyle: string } | null;
 }
 
-const FILTER_KEYS = [
-  { key: "all", i18nKey: "proposals.filter.all" },
-  { key: "giro", i18nKey: "proposals.filter.bikers" },
-  { key: "con_zavorrina", i18nKey: "proposals.filter.passenger" },
-  { key: "passaggio_al_volo", i18nKey: "proposals.filter.ride" },
-  { key: "richieste", i18nKey: "proposals.filter.requests" },
-];
-
-const SEARCH_TYPE_I18N: Record<string, string> = {
-  find_a_friend: "FindAFriend",
-  find_a_guest: "proposals.searchType.findPassenger",
-  hitcher: "Hitcher",
-  hitchhiker: "HitchHiker",
-  find_a_biker: "FindABiker"
-};
-
-function getTypeIcon(type: string): { name: keyof typeof Ionicons.glyphMap; color: string; dual?: boolean } {
-  switch (type) {
-    case "giro":
-    case "find_a_friend": return { name: "people", color: Colors.maleIcon };
-    case "con_zavorrina":
-    case "find_a_guest": return { name: "bicycle", color: Colors.maleIcon, dual: true };
-    case "passaggio_al_volo":
-    case "hitcher":
-    case "hitchhiker": return { name: "car", color: Colors.success };
-    case "richieste": return { name: "thumbs-up", color: Colors.femaleIcon };
-    case "find_a_biker": return { name: "bicycle", color: Colors.maleIcon };
-    default: return { name: "megaphone", color: Colors.textSecondary };
-  }
-}
-
-function getTypeLabelKey(type: string): string {
-  switch (type) {
-    case "giro":
-    case "find_a_friend": return "proposals.type.bikers";
-    case "con_zavorrina":
-    case "find_a_guest": return "proposals.type.passenger";
-    case "passaggio_al_volo":
-    case "hitcher":
-    case "hitchhiker": return "proposals.type.quickride";
-    case "richieste": return "proposals.type.requests";
-    case "find_a_biker": return "proposals.type.bikerSearch";
-    default: return type;
-  }
-}
-
-function ProposalCard({ item, onPress, t, locale }: { item: ProposalItem; onPress: () => void; t: (key: string) => string; locale: string }) {
-  const typeInfo = getTypeIcon(item.proposalType);
-  const scheduledDate = item.scheduledAt
-    ? new Date(item.scheduledAt).toLocaleDateString(locale, {
-        day: "numeric", month: "short", hour: "2-digit", minute: "2-digit"
-      })
     : null;
 
   return (
@@ -179,13 +137,6 @@ function ProposalCard({ item, onPress, t, locale }: { item: ProposalItem; onPres
     </Pressable>
   );
 }
-
-const HUB_SECTIONS = [
-  { key: "proposte", i18nKey: "proposals.hub.proposalsRequests" },
-  { key: "giri", i18nKey: "proposals.hub.ridesPerformance" },
-  { key: "percorsi", i18nKey: "proposals.hub.myRoutes" },
-  { key: "pianificati", i18nKey: "proposals.hub.myRides" },
-] as const;
 
 export default function ProposalsScreen() {
   const router = useRouter();
@@ -352,24 +303,16 @@ export default function ProposalsScreen() {
           renderItem={({ item }) => {
             if (item.type === "matchBanner") {
               return (
-                <TouchableOpacity
-                  style={styles.matchBannerCard}
+                <MatchBanner
+                  count={totalPendingCount}
                   onPress={() => router.push("/(tabs)/match" as never)}
-                >
-                  <Ionicons name="flash" size={20} color={Colors.accent} />
-                  <Text style={styles.matchBannerText}>
-                    {totalPendingCount} {t("match.pendingBanner")}
-                  </Text>
-                  <Ionicons name="chevron-forward" size={18} color={Colors.accent} />
-                </TouchableOpacity>
+                  t={t}
+                />
               );
             }
             if (item.type === "proposalHeader") {
               return (
-                <View style={styles.sectionHeader}>
-                  <Ionicons name="megaphone" size={18} color={Colors.text} />
-                  <Text style={styles.sectionTitle}>{t("proposals.title")}</Text>
-                </View>
+                <ProposalHeader title={t("proposals.title")} />
               );
             }
             return (
@@ -398,104 +341,3 @@ export default function ProposalsScreen() {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.background },
-  hubRow: { flexDirection: "row", paddingHorizontal: 8, paddingTop: 8, paddingBottom: 4, gap: 6 },
-  hubBtn: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 8,
-    paddingHorizontal: 4,
-    borderRadius: 10,
-    borderWidth: 1.5,
-    borderColor: Colors.border,
-    backgroundColor: Colors.surface,
-    minHeight: 48
-  },
-  hubBtnActive: {
-    borderColor: Colors.accent,
-    backgroundColor: Colors.accent + "18"
-  },
-  hubText: {
-    fontSize: 12,
-    fontFamily: "Inter_600SemiBold",
-    color: Colors.textSecondary,
-    textAlign: "center"
-  },
-  hubTextActive: {
-    color: Colors.accent
-  },
-  filterRow: { flexDirection: "row", flexWrap: "wrap", padding: 6, paddingHorizontal: 8, gap: 4 },
-  filterBtn: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: Colors.surface, paddingVertical: 6, paddingHorizontal: 10, borderRadius: 16, height: 32 },
-  filterBtnActive: { backgroundColor: Colors.accent + "20" },
-  filterText: { fontSize: 14, fontFamily: "Inter_500Medium", color: Colors.textSecondary },
-  filterTextActive: { color: Colors.accent },
-  matchBadge: { backgroundColor: Colors.accentRed, borderRadius: 10, width: 20, height: 20, justifyContent: "center", alignItems: "center" },
-  matchBadgeText: { color: "#fff", fontSize: 11, fontWeight: "700" as const },
-  loading: { flex: 1, justifyContent: "center", alignItems: "center" },
-  list: { padding: 8, paddingBottom: 80 },
-  sectionHeader: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 6 },
-  sectionTitle: { fontSize: 16, fontFamily: "Inter_600SemiBold", color: Colors.text },
-  card: { backgroundColor: Colors.surface, borderRadius: 12, padding: 10, marginBottom: 6 },
-  cardHeader: { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 8 },
-  cardHeaderInfo: { flex: 1 },
-  nickname: { fontSize: 16, fontFamily: "Inter_600SemiBold", color: Colors.text },
-  type: { fontSize: 13, fontFamily: "Inter_400Regular", color: Colors.textSecondary },
-  badge: { paddingVertical: 4, paddingHorizontal: 10, borderRadius: 12 },
-  badgeText: { fontSize: 12, fontFamily: "Inter_500Medium" },
-  cardTitle: { fontSize: 17, fontFamily: "Inter_600SemiBold", color: Colors.text, marginBottom: 4 },
-  description: { fontSize: 15, fontFamily: "Inter_400Regular", color: Colors.text, marginBottom: 8 },
-  infoRow: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 4 },
-  infoText: { fontSize: 13, fontFamily: "Inter_400Regular", color: Colors.textSecondary },
-  cardFooter: { flexDirection: "row", alignItems: "center", gap: 16, marginTop: 4 },
-  empty: { alignItems: "center", paddingTop: 60, gap: 12 },
-  emptyText: { fontSize: 16, fontFamily: "Inter_400Regular", color: Colors.textSecondary },
-  fab: {
-    position: "absolute",
-    bottom: 16,
-    right: 20,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: Colors.accent,
-    alignItems: "center",
-    justifyContent: "center",
-    elevation: 4,
-    ...Platform.select({
-      ios: { shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.3, shadowRadius: 4 },
-      android: {},
-      web: { boxShadow: "0px 2px 4px rgba(0,0,0,0.3)" }
-    })
-  },
-  matchBannerCard: {
-    flexDirection: "row" as const,
-    alignItems: "center" as const,
-    gap: 10,
-    backgroundColor: Colors.accent + "15",
-    borderRadius: 12,
-    padding: 14,
-    marginBottom: 10,
-    borderWidth: 1,
-    borderColor: Colors.accent + "30"
-  },
-  matchBannerText: {
-    flex: 1,
-    fontSize: 15,
-    fontFamily: "Inter_600SemiBold",
-    color: Colors.accent
-  },
-  emptyHub: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    padding: 24
-  },
-  emptyHubText: {
-    fontSize: 15,
-    fontFamily: "Inter_500Medium",
-    color: Colors.textSecondary,
-    textAlign: "center"
-  }
-});

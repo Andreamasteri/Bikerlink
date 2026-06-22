@@ -3,7 +3,6 @@ import { storage } from "../storage";
 import { haversineKm } from "../geo";
 import { users } from "@shared/db";
 import profileRouter from "./users/profile";
-import profileNextRouter from "./users/profile.next";
 import discoveryRouter from "./users/discovery";
 import discoveryNextRouter from "./users/discovery.next";
 import actionsRouter from "./users/actions";
@@ -106,7 +105,6 @@ export const _discoveryCapabilities = {
 
 // Sub-routers
 router.use("/", profileRouter);
-router.use("/", profileNextRouter);
 router.use("/", discoveryRouter);
 router.use("/", discoveryNextRouter);
 router.use("/", actionsRouter);

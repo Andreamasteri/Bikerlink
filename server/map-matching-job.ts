@@ -53,18 +53,21 @@ const LAST_RUN_KEY = "map_matching_last_run";
 const _JOB_RUNNING_KEY = "map_matching_job_running";
 
 /** Tentativi massimi per una sessione in retry prima di smettere di selezionarla. */
-function getMaxAttempts(): number {
+export function getMaxAttempts(): number {
   const v = parseInt(process.env.MAP_MATCHING_MAX_ATTEMPTS ?? "5", 10);
   return Number.isFinite(v) && v > 0 ? v : 5;
 }
 
-/** Minuti base del backoff esponenziale tra un retry e il successivo. */
-function getRetryBaseMinutes(): number {
+export function getRetryBaseMinutes(): number {
   const v = parseInt(process.env.MAP_MATCHING_RETRY_BASE_MIN ?? "60", 10);
   return Number.isFinite(v) && v > 0 ? v : 60;
 }
 
 let isRunning = false;
+
+export function isRunningState(): boolean {
+  return isRunning;
+}
 
 export function isMapMatchingRunning(): boolean {
   return isRunning;
@@ -355,185 +358,11 @@ export async function runMapMatchingJob(): Promise<{
 
 // ─── Re-match (requeue) ────────────────────────────────────────────────────────
 
-/**
- * Riaccoda le sessioni bloccate per un nuovo tentativo di map-matching.
- * Azione admin esplicita: utile quando la copertura GraphHopper/OSM migliora.
- *
- * Riporta a 'pending' (attempts=0, matched=false, lastAttempt=NULL):
- *   - tutti i campioni 'unmatchable' (fallimento permanente per il vecchio motore);
- *   - tutti i campioni 'exhausted' (retry che hanno raggiunto il cap tentativi);
- *   - i campioni 'retry' che hanno raggiunto il cap tentativi (difesa: dovrebbero
- *     già essere 'exhausted', ma teniamo il caso legacy per le righe pre-Task #4706).
- * I campioni grezzi non vengono toccati: cambia solo lo stato.
- *
- * GUARD ThinkCentre spento (Task #4706): se la modalità powered-off è attiva,
- * l'engine self-hosted è offline → riaccodare ricreerebbe solo il backlog
- * fantasma che verrebbe ri-esaurito al prossimo giro. In quel caso NON tocchiamo
- * nulla e ritorniamo skipped:true così l'admin sa perché.
- */
-export async function requeueUnmatchable(): Promise<{ requeuedSamples: number; requeuedSessions: number; skipped?: boolean; reason?: string }> {
-  if (await isThinkCentrePoweredOff()) {
-    console.log("[MAP-MATCH] Requeue saltato: ThinkCentre in modalità spento (engine offline).");
-    return { requeuedSamples: 0, requeuedSessions: 0, skipped: true, reason: "engine_offline" };
-  }
-  const maxAttempts = getMaxAttempts();
-  return withBgDbSlot(() => withDbRetry(async () => {
-    const result = await db.execute<{ session_id: string }>(
-      sql`
-        UPDATE ride_telemetry
-        SET match_status = 'pending',
-            match_attempts = 0,
-            matched = false,
-            last_match_attempt_at = NULL
-        WHERE match_status = 'unmatchable'
-           OR match_status = 'exhausted'
-           OR (match_status = 'retry' AND match_attempts >= ${maxAttempts})
-        RETURNING session_id
-      `,
-    );
-    const requeuedSamples = result.rows.length;
-    const requeuedSessions = new Set(result.rows.map((r) => r.session_id)).size;
-    console.log(
-      `[MAP-MATCH] Requeue — ${requeuedSamples} campioni / ${requeuedSessions} sessioni riportati a 'pending'`,
-    );
-    return { requeuedSamples, requeuedSessions };
-  }));
-}
-
-/**
- * Drena il backlog "fantasma" (Task #4706): le sessioni rimaste 'retry' che hanno
- * già raggiunto il cap tentativi ma sono state scritte PRIMA dell'introduzione
- * dello stato terminale 'exhausted'. Restavano nel conteggio pending+retry a vita
- * (la discovery le esclude via `match_attempts < cap`, ma il collector le contava)
- * tenendo alto l'allarme matching.pending anche quando non c'era nulla da fare.
- *
- * Le porta a 'exhausted' (terminale) → escono dal backlog. Non tocca i raw:
- * restano ri-accodabili via requeueUnmatchable() quando l'engine torna online.
- * Azione one-shot esplicita (admin), idempotente: rilanciarla non ha effetti
- * collaterali (la seconda volta trova 0 righe da drenare).
- */
-export async function drainStuckRetryBacklog(): Promise<{ drainedSamples: number; drainedSessions: number }> {
-  const maxAttempts = getMaxAttempts();
-  return withBgDbSlot(() => withDbRetry(async () => {
-    const result = await db.execute<{ session_id: string }>(
-      sql`
-        UPDATE ride_telemetry
-        SET match_status = 'exhausted',
-            matched = false
-        WHERE match_status = 'retry'
-          AND match_attempts >= ${maxAttempts}
-        RETURNING session_id
-      `,
-    );
-    const drainedSamples = result.rows.length;
-    const drainedSessions = new Set(result.rows.map((r) => r.session_id)).size;
-    console.log(
-      `[MAP-MATCH] Drain backlog — ${drainedSamples} campioni / ${drainedSessions} sessioni 'retry' oltre il cap → 'exhausted'`,
-    );
-    return { drainedSamples, drainedSessions };
-  }));
-}
+// Re-exported from part2
 
 // ─── Stats helpers ─────────────────────────────────────────────────────────────
 
-export async function getMapMatchingStats(): Promise<{
-  pending: number;
-  retry: number;
-  matched: number;
-  unmatchable: number;
-  exhausted: number;
-  segments: number;
-  lastRun: string | null;
-  isRunning: boolean;
-  ghConfigured: boolean;
-}> {
-  const [countsResult, segResult, lastRunSetting] = await Promise.all([
-    db.execute<{ match_status: string; total: string }>(
-      sql`
-        SELECT
-          match_status,
-          COUNT(*)::text AS total
-        FROM ride_telemetry
-        GROUP BY match_status
-      `,
-    ),
-    db.execute<{ count: string }>(sql`SELECT COUNT(*)::text AS count FROM segment_telemetry`),
-    storage.getAppSetting(LAST_RUN_KEY),
-  ]);
-
-  let pending = 0;
-  let retry = 0;
-  let matched = 0;
-  let unmatchable = 0;
-  let exhausted = 0;
-  for (const row of countsResult.rows) {
-    const n = parseInt(row.total, 10);
-    switch (row.match_status) {
-      case "pending": pending += n; break;
-      case "retry": retry += n; break;
-      case "matched": matched += n; break;
-      case "unmatchable": unmatchable += n; break;
-      case "exhausted": exhausted += n; break;
-      default: pending += n; break;
-    }
-  }
-
-  const segments = parseInt(segResult.rows[0]?.count ?? "0", 10);
-  const lastRun = lastRunSetting?.value ?? null;
-  const ghConfigured = isSelfHosted || Boolean(process.env.GRAPHHOPPER_API_KEY);
-
-  return { pending, retry, matched, unmatchable, exhausted, segments, lastRun, isRunning, ghConfigured };
-}
-
-/**
- * Stima ECONOMICA del backlog per il collector watchdog (Task #4706).
- *
- * Il collector gira ogni 60s: usare getMapMatchingStats() (GROUP BY su TUTTI gli
- * stati, incl. milioni di righe 'matched') ad ogni tick è costoso e contende il
- * pool. Qui contiamo solo gli stati attivi (pending+retry) — il filtro
- * `match_status IN ('pending','retry')` usa l'indice parziale su match_status,
- * quindi è O(backlog), non O(tabella).
- *
- * Difese pool (Task #4706): gira sotto withBgDbSlot (≤3 conn bg) con un
- * statement_timeout breve via SET LOCAL in transazione. Se la query va in timeout
- * o fallisce, ritorna degraded:true con backlog -1 invece di propagare l'errore →
- * il collector emette un segnale "info" (nessun falso allarme quando il DB è lento).
- */
-export async function getMatchingBacklogEstimate(): Promise<{
-  backlog: number;
-  pending: number;
-  retry: number;
-  lastRun: string | null;
-  degraded: boolean;
-}> {
-  const lastRunSetting = await storage.getAppSetting(LAST_RUN_KEY).catch(() => null);
-  const lastRun = lastRunSetting?.value ?? null;
-  try {
-    const result = await withBgDbSlot(() => withDbRetry(() => db.transaction(async (tx) => {
-      await tx.execute(sql`SET LOCAL statement_timeout = '3000'`);
-      return tx.execute<{ match_status: string; total: string }>(
-        sql`
-          SELECT match_status, COUNT(*)::text AS total
-          FROM ride_telemetry
-          WHERE match_status IN ('pending', 'retry')
-          GROUP BY match_status
-        `,
-      );
-    })));
-    let pending = 0;
-    let retry = 0;
-    for (const row of result.rows) {
-      const n = parseInt(row.total, 10);
-      if (row.match_status === "pending") pending += n;
-      else if (row.match_status === "retry") retry += n;
-    }
-    return { backlog: pending + retry, pending, retry, lastRun, degraded: false };
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    console.warn(`[MAP-MATCH] getMatchingBacklogEstimate degradato (DB lento/timeout): ${msg.slice(0, 120)}`);
-    return { backlog: -1, pending: -1, retry: -1, lastRun, degraded: true };
-  }
-}
+export { getMapMatchingStats, getMatchingBacklogEstimate, requeueUnmatchable, drainStuckRetryBacklog } from "./map-matching-job.part2";
 
 // ─── Nightly scheduler ─────────────────────────────────────────────────────────
 

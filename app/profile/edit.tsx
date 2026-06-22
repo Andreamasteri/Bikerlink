@@ -23,6 +23,9 @@ import { showImagePickerMenu, appendFileToForm } from "@/lib/image-picker-utils"
 import { useT } from "@/lib/language-context";
 import { updateUserSchema } from "@shared/validators";
 import { useMutation } from "@tanstack/react-query";
+import { useColors } from "@/hooks/useColors";
+import { RevokeConsentModal } from "./edit.part2";
+import { makeStyles } from "./edit.styles";
 
 import { EditBasicInfo } from "@/components/profile/edit/EditBasicInfo";
 import { EditMoto } from "@/components/profile/edit/EditMoto";
@@ -66,11 +69,14 @@ interface ProfileData {
 
 export default function EditProfileScreen() {
   const t = useT();
+  const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const params = useLocalSearchParams();
   const { user, logoutMutation } = useAuth();
   const { language, setLanguage } = useLanguage();
+
+  const styles = makeStyles(colors);
 
   const profileQuery = useQuery<ProfileData>({
     queryKey: ["/api/users/me"],
@@ -413,122 +419,15 @@ export default function EditProfileScreen() {
         <View style={{ height: 40 }} />
       </KeyboardAwareScrollViewCompat>
 
-      <Modal
+      <RevokeConsentModal
         visible={showRevokeConsentModal}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowRevokeConsentModal(false)}
-      >
-        <Pressable
-          style={styles.modalOverlay}
-          onPress={() => setShowRevokeConsentModal(false)}
-        >
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Revoca consensi privacy</Text>
-            <Text style={styles.modalBody}>
-              Questa azione revocherà i consensi obbligatori per l'uso dell'app.
-              Verrai disconnesso e il tuo account verrà programmato per la
-              cancellazione automatica tra 30 giorni.
-            </Text>
-            <View style={styles.modalButtons}>
-              <TouchableOpacity
-                style={styles.modalBtnCancel}
-                onPress={() => setShowRevokeConsentModal(false)}
-              >
-                <Text style={styles.modalBtnCancelText}>{t("common.cancel")}</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.modalBtnConfirm}
-                onPress={() => {
-                  setShowRevokeConsentModal(false);
-                  handleRequestDeletion();
-                }}
-              >
-                <Text style={styles.modalBtnConfirmText}>Revoca e disconnetti</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </Pressable>
-      </Modal>
+        onClose={() => setShowRevokeConsentModal(false)}
+        onConfirm={() => {
+          setShowRevokeConsentModal(false);
+          handleRequestDeletion();
+        }}
+        t={t}
+      />
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.background,
-  },
-  headerBar: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 20,
-    paddingBottom: 12,
-    backgroundColor: Colors.background,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: "700" as const,
-    color: Colors.text,
-  },
-  scrollContent: {
-    padding: 20,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.6)",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  modalContent: {
-    backgroundColor: Colors.surface,
-    borderRadius: 16,
-    padding: 24,
-    alignItems: "center",
-    width: 300,
-    gap: 16,
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: "600" as const,
-    color: Colors.text,
-    textAlign: "center",
-  },
-  modalBody: {
-    fontSize: 14,
-    color: Colors.textSecondary,
-    textAlign: "center",
-  },
-  modalButtons: {
-    flexDirection: "row",
-    gap: 12,
-    width: "100%",
-  },
-  modalBtnCancel: {
-    flex: 1,
-    backgroundColor: Colors.background,
-    borderRadius: 10,
-    padding: 12,
-    alignItems: "center",
-  },
-  modalBtnCancelText: {
-    fontSize: 16,
-    fontWeight: "600" as const,
-    color: Colors.textSecondary,
-  },
-  modalBtnConfirm: {
-    flex: 1,
-    backgroundColor: Colors.accentRed,
-    borderRadius: 10,
-    padding: 12,
-    alignItems: "center",
-  },
-  modalBtnConfirmText: {
-    fontSize: 16,
-    fontWeight: "600" as const,
-    color: "#fff",
-  },
-});

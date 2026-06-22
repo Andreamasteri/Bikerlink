@@ -14,8 +14,10 @@ import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 import { apiRequest } from "@/lib/query-client";
+import { MusicAffinityStatsContent } from "./matching-hub.part2";
+import { styles } from "./matching-hub.styles";
 
-interface AuditIssue {
+export interface AuditIssue {
   severity: "error" | "warn" | "info";
   category: string;
   message: string;
@@ -348,97 +350,7 @@ export default function MatchingHubScreen() {
       {/* Music Affinity Stats */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Music Affinity</Text>
-        <View style={styles.musicCard}>
-          {/* KPI row: embedding coverage */}
-          <View style={styles.musicRow}>
-            <View style={styles.musicKpi}>
-              <Text style={styles.musicKpiValue}>{musicStats?.usersWithEmbedding ?? "—"}</Text>
-              <Text style={styles.musicKpiLabel}>Embedding</Text>
-            </View>
-            <View style={styles.musicKpi}>
-              <Text
-                style={[
-                  styles.musicKpiValue,
-                  { color: (musicStats?.coveragePct ?? 0) < 50 ? Colors.warning : Colors.success },
-                ]}
-              >
-                {musicStats != null ? `${musicStats.coveragePct}%` : "—"}
-              </Text>
-              <Text style={styles.musicKpiLabel}>Copertura</Text>
-            </View>
-            <View style={styles.musicKpi}>
-              <Text style={styles.musicKpiValue}>{musicStats?.totalMatchesInDb ?? "—"}</Text>
-              <Text style={styles.musicKpiLabel}>Match DB</Text>
-            </View>
-          </View>
-          {/* Last run detail */}
-          {musicStats?.lastRun ? (
-            <View style={styles.musicLastRunBox}>
-              <View style={styles.musicRunRow}>
-                <MaterialCommunityIcons
-                  name={musicStats.lastRun.capReached ? "alert-circle-outline" : "check-circle-outline"}
-                  size={14}
-                  color={musicStats.lastRun.capReached ? Colors.warning : Colors.success}
-                />
-                <Text style={[styles.musicRunText, musicStats.lastRun.capReached && { color: Colors.warning }]}>
-                  Ultimo run{musicStats.lastRun.capReached ? " · CAP RAGGIUNTO" : ""}
-                </Text>
-                <Text style={styles.musicRunTimestamp}>
-                  {new Date(musicStats.lastRun.timestamp).toLocaleString("it-IT", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
-                </Text>
-              </View>
-              <View style={styles.musicRunKpiRow}>
-                <View style={styles.musicRunKpi}>
-                  <Text style={styles.musicRunKpiVal}>{musicStats.lastRun.matchCount}</Text>
-                  <Text style={styles.musicRunKpiLbl}>match</Text>
-                </View>
-                <View style={styles.musicRunKpi}>
-                  <Text style={[styles.musicRunKpiVal, musicStats.lastRun.skippedBelowThreshold > 0 && { color: Colors.warning }]}>
-                    {musicStats.lastRun.skippedBelowThreshold}
-                  </Text>
-                  <Text style={styles.musicRunKpiLbl}>sotto soglia</Text>
-                </View>
-                <View style={styles.musicRunKpi}>
-                  <Text style={styles.musicRunKpiVal}>{musicStats.lastRun.usersProcessed}</Text>
-                  <Text style={styles.musicRunKpiLbl}>processati</Text>
-                </View>
-                <View style={styles.musicRunKpi}>
-                  <Text style={[styles.musicRunKpiVal, musicStats.lastRun.usersSkipped > 0 && { color: Colors.warning }]}>
-                    {musicStats.lastRun.usersSkipped}
-                  </Text>
-                  <Text style={styles.musicRunKpiLbl}>saltati</Text>
-                </View>
-              </View>
-            </View>
-          ) : (
-            <View style={styles.musicRunRow}>
-              <MaterialCommunityIcons name="information-outline" size={14} color={Colors.textSecondary} />
-              <Text style={styles.musicRunText}>Nessun run completato in questa sessione</Text>
-            </View>
-          )}
-          {/* Recent runs mini-list (last 5) */}
-          {musicStats && musicStats.recentRuns.length > 1 && (
-            <View style={styles.musicHistoryBox}>
-              <Text style={styles.musicHistoryTitle}>Ultimi run</Text>
-              {musicStats.recentRuns.slice(0, 5).map((run, idx) => (
-                <View key={idx} style={styles.musicHistoryRow}>
-                  <MaterialCommunityIcons
-                    name={run.capReached ? "alert-circle-outline" : "check-circle-outline"}
-                    size={12}
-                    color={run.capReached ? Colors.warning : Colors.textSecondary}
-                  />
-                  <Text style={styles.musicHistoryTime}>
-                    {new Date(run.timestamp).toLocaleString("it-IT", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
-                  </Text>
-                  <Text style={styles.musicHistoryStat}>{run.matchCount} match</Text>
-                  {run.skippedBelowThreshold > 0 && (
-                    <Text style={[styles.musicHistoryStat, { color: Colors.warning }]}>· {run.skippedBelowThreshold} soglia</Text>
-                  )}
-                </View>
-              ))}
-            </View>
-          )}
-        </View>
+        <MusicAffinityStatsContent musicStats={musicStats} />
       </View>
 
       {/* Quick links */}
@@ -465,115 +377,3 @@ export default function MatchingHubScreen() {
     </ScrollView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.background },
-  section: { marginHorizontal: 12, marginTop: 16 },
-  sectionHeaderRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 10 },
-  sectionTitle: {
-    fontFamily: "Inter_700Bold", fontSize: 13, color: Colors.textSecondary,
-    textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 10,
-  },
-  cardRow: { flexDirection: "row", gap: 8 },
-  statCard: {
-    flex: 1, backgroundColor: Colors.surface, borderRadius: 12, padding: 14,
-    alignItems: "center", borderWidth: 1, borderColor: Colors.border,
-  },
-  statValue: { fontFamily: "Inter_700Bold", fontSize: 20, color: Colors.text },
-  statLabel: { fontFamily: "Inter_400Regular", fontSize: 11, color: Colors.textSecondary, marginTop: 4 },
-  bzBaseBreakdownRow: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 6 },
-  bzBaseBreakdownItem: { fontFamily: "Inter_400Regular", fontSize: 10, color: Colors.textSecondary },
-  bzBaseBreakdownDot: { fontFamily: "Inter_400Regular", fontSize: 10, color: Colors.textSecondary },
-  lastRun: { fontFamily: "Inter_400Regular", fontSize: 11, color: Colors.textSecondary, marginTop: 8, textAlign: "center" },
-  lockCard: {
-    flexDirection: "row", alignItems: "center", gap: 12, padding: 14,
-    backgroundColor: Colors.surface, borderRadius: 12, borderWidth: 1, borderColor: Colors.border,
-  },
-  lockCardStale: {
-    borderColor: Colors.error, backgroundColor: Colors.error + "0D",
-  },
-  lockTitle: { fontFamily: "Inter_600SemiBold", fontSize: 14, color: Colors.text },
-  lockSub: { fontFamily: "Inter_400Regular", fontSize: 11, color: Colors.textSecondary, marginTop: 2 },
-  unlockBtn: {
-    backgroundColor: Colors.warning, borderRadius: 8, padding: 8,
-    alignItems: "center", justifyContent: "center",
-  },
-  unlockBtnStale: {
-    backgroundColor: Colors.error,
-  },
-  statusBadge: { borderRadius: 6, paddingHorizontal: 10, paddingVertical: 4 },
-  statusBadgeText: { fontFamily: "Inter_700Bold", fontSize: 11, letterSpacing: 0.5 },
-  okCard: {
-    flexDirection: "row", alignItems: "center", gap: 8, padding: 12,
-    backgroundColor: Colors.success + "11", borderRadius: 10,
-  },
-  okText: { fontFamily: "Inter_500Medium", fontSize: 13, color: Colors.text, flex: 1 },
-  issueCard: {
-    padding: 12, backgroundColor: Colors.surface, borderRadius: 10,
-    borderLeftWidth: 4, marginBottom: 8, borderWidth: 1, borderColor: Colors.border,
-  },
-  issueCat: { fontFamily: "Inter_700Bold", fontSize: 10, letterSpacing: 0.5, marginBottom: 4 },
-  issueMsg: { fontFamily: "Inter_400Regular", fontSize: 13, color: Colors.text },
-  embeddingTile: {
-    flexDirection: "row", alignItems: "center", gap: 12, padding: 14,
-    backgroundColor: Colors.surface, borderRadius: 12, borderWidth: 1, borderColor: Colors.border,
-  },
-  embeddingTileWarn: {
-    borderColor: Colors.warning, backgroundColor: Colors.warning + "0D",
-  },
-  embeddingLabel: {
-    fontFamily: "Inter_400Regular", fontSize: 11, color: Colors.textSecondary,
-  },
-  embeddingValue: {
-    fontFamily: "Inter_700Bold", fontSize: 20, color: Colors.text, marginTop: 2,
-  },
-  warnBadge: {
-    flexDirection: "row", alignItems: "center", gap: 4,
-    backgroundColor: Colors.warning + "22", borderRadius: 6,
-    paddingHorizontal: 8, paddingVertical: 3,
-    borderWidth: 1, borderColor: Colors.warning,
-  },
-  warnBadgeText: {
-    fontFamily: "Inter_700Bold", fontSize: 10, color: Colors.warning, letterSpacing: 0.5,
-  },
-  musicCard: {
-    backgroundColor: Colors.surface, borderRadius: 12, padding: 14,
-    borderWidth: 1, borderColor: Colors.border,
-  },
-  musicRow: { flexDirection: "row", gap: 8, marginBottom: 12 },
-  musicKpi: {
-    flex: 1, alignItems: "center", padding: 10,
-    backgroundColor: Colors.background, borderRadius: 8,
-  },
-  musicKpiValue: { fontFamily: "Inter_700Bold", fontSize: 18, color: Colors.text },
-  musicKpiLabel: { fontFamily: "Inter_400Regular", fontSize: 10, color: Colors.textSecondary, marginTop: 2 },
-  musicLastRunBox: {
-    marginTop: 10, padding: 10, backgroundColor: Colors.background,
-    borderRadius: 8, gap: 8,
-  },
-  musicRunRow: { flexDirection: "row", alignItems: "center", gap: 6 },
-  musicRunText: { fontFamily: "Inter_400Regular", fontSize: 11, color: Colors.textSecondary, flex: 1 },
-  musicRunTimestamp: { fontFamily: "Inter_400Regular", fontSize: 10, color: Colors.textSecondary },
-  musicRunKpiRow: { flexDirection: "row", gap: 6 },
-  musicRunKpi: {
-    flex: 1, alignItems: "center", padding: 6, backgroundColor: Colors.surface,
-    borderRadius: 6, borderWidth: 1, borderColor: Colors.border,
-  },
-  musicRunKpiVal: { fontFamily: "Inter_700Bold", fontSize: 14, color: Colors.text },
-  musicRunKpiLbl: { fontFamily: "Inter_400Regular", fontSize: 9, color: Colors.textSecondary, marginTop: 2 },
-  musicHistoryBox: { marginTop: 10, borderTopWidth: 1, borderTopColor: Colors.border, paddingTop: 8, gap: 4 },
-  musicHistoryTitle: {
-    fontFamily: "Inter_600SemiBold", fontSize: 10, color: Colors.textSecondary,
-    textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 2,
-  },
-  musicHistoryRow: { flexDirection: "row", alignItems: "center", gap: 6 },
-  musicHistoryTime: { fontFamily: "Inter_400Regular", fontSize: 10, color: Colors.textSecondary, width: 80 },
-  musicHistoryStat: { fontFamily: "Inter_500Medium", fontSize: 10, color: Colors.text },
-  linksGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  linkCard: {
-    width: "31%", aspectRatio: 1, backgroundColor: Colors.surface,
-    borderRadius: 12, alignItems: "center", justifyContent: "center", gap: 6,
-    borderWidth: 1, borderColor: Colors.border,
-  },
-  linkLabel: { fontFamily: "Inter_500Medium", fontSize: 11, color: Colors.text, textAlign: "center" },
-});

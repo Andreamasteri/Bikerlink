@@ -1,44 +1,17 @@
 /**
  * Task #2566 — Verifica Finale Integrazione Matching System.
- *
- * Script idempotente, riusabile, che esegue una serie di check incrociati
- * sul sistema di matching e produce un report `.local/verification/verification-report.{md,json}`.
- *
- * Usage:
- *   npx tsx scripts/verify-matching-integration.ts                # esegue tutti i check
- *   npx tsx scripts/verify-matching-integration.ts --check=registry,schema
- *   npx tsx scripts/verify-matching-integration.ts --json-only    # solo output JSON
- *
- * I gap NON sono auto-corretti: lo script è puramente diagnostico.
- * Per fix automatici aprire ticket dedicati (vedi report → "Suggerimenti").
- *
- * Scope intenzionale (vedi commit message #2566):
- *  - Check 1 Registry vs Schema (tabelle + colonne match_preferences)
- *  - Check 2 Registry vs Preferences columns
- *  - Check 3 Registry vs UI (grep match-control / match-health / matching-hub)
- *  - Check 4 Registry vs Manuale (grep server/site, content manuale)
- *  - Check 5 Npm packages declared in .local/tasks/*.md vs package.json
- *  - Check 6 i18n coverage IT vs EN (top-level keys)
- *  - Check 7 Endpoint admin: presenza di middleware admin sui file route
- *  - Check 8 replit.md: sezioni attese per cambi architetturali principali
- *
- * Check fuori scope di questo task (proposti come follow-up):
- *  - UI admin dedicata "Verifica Integrazione"
- *  - Esecuzione cron notturna via BullMQ
- *  - Auto-fix in place (i18n stubs, bump versioni)
- *  - Endpoint POST /api/admin/verify/* e generazione task PROPOSED
  */
 import { promises as fs } from "node:fs";
 import * as path from "node:path";
 
-const ROOT = process.cwd();
-const OUT_DIR = path.join(ROOT, ".local", "verification");
-const REPORT_MD = path.join(OUT_DIR, "verification-report.md");
-const REPORT_JSON = path.join(OUT_DIR, "verification-report.json");
+export const ROOT = process.cwd();
+export const OUT_DIR = path.join(ROOT, ".local", "verification");
+export const REPORT_MD = path.join(OUT_DIR, "verification-report.md");
+export const REPORT_JSON = path.join(OUT_DIR, "verification-report.json");
 
-type Severity = "critical" | "high" | "medium" | "low" | "info";
+export type Severity = "critical" | "high" | "medium" | "low" | "info";
 
-interface Gap {
+export interface Gap {
   severity: Severity;
   check: string;
   what: string;
@@ -46,7 +19,7 @@ interface Gap {
   suggestion?: string;
 }
 
-interface CheckResult {
+export interface CheckResult {
   id: string;
   name: string;
   status: "ok" | "warn" | "fail" | "skipped";
@@ -55,7 +28,7 @@ interface CheckResult {
   durationMs: number;
 }
 
-const sevOrder: Record<Severity, number> = {
+export const sevOrder: Record<Severity, number> = {
   critical: 0,
   high: 1,
   medium: 2,
@@ -63,7 +36,7 @@ const sevOrder: Record<Severity, number> = {
   info: 4,
 };
 
-async function readFileSafe(p: string): Promise<string | null> {
+export async function readFileSafe(p: string): Promise<string | null> {
   try {
     return await fs.readFile(p, "utf8");
   } catch {
@@ -71,7 +44,7 @@ async function readFileSafe(p: string): Promise<string | null> {
   }
 }
 
-async function listFiles(dir: string, exts: string[]): Promise<string[]> {
+export async function listFiles(dir: string, exts: string[]): Promise<string[]> {
   const out: string[] = [];
   async function walk(d: string) {
     let entries;
@@ -91,7 +64,7 @@ async function listFiles(dir: string, exts: string[]): Promise<string[]> {
   return out;
 }
 
-async function runCheck(
+export async function runCheck(
   id: string,
   name: string,
   fn: () => Promise<{ status: CheckResult["status"]; gaps: Gap[]; meta?: Record<string, unknown> }>
@@ -117,9 +90,6 @@ async function runCheck(
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────
-// Check 1 — Registry vs Schema (tabelle dichiarate)
-// ─────────────────────────────────────────────────────────────────────────
 async function checkRegistryVsSchema() {
   const { MATCHING_REGISTRY } = await import("../shared/matching-registry");
   const matchingSchema = await readFileSafe(path.join(ROOT, "shared/db/matching.ts")) ?? "";
@@ -145,9 +115,6 @@ async function checkRegistryVsSchema() {
   };
 }
 
-// ─────────────────────────────────────────────────────────────────────────
-// Check 2 — Registry vs match_preferences columns
-// ─────────────────────────────────────────────────────────────────────────
 async function checkRegistryVsPreferences() {
   const { getRegistryPrefColumns } = await import("../shared/matching-registry");
   const { matchPreferences } = await import("../shared/db/matching");
@@ -190,9 +157,6 @@ async function checkRegistryVsPreferences() {
   };
 }
 
-// ─────────────────────────────────────────────────────────────────────────
-// Check 3 — Registry vs UI references
-// ─────────────────────────────────────────────────────────────────────────
 async function checkRegistryVsUi() {
   const { MATCHING_REGISTRY } = await import("../shared/matching-registry");
   const uiFiles = [
@@ -210,7 +174,7 @@ async function checkRegistryVsUi() {
   const aggregate = Object.values(contents).join("\n");
   const gaps: Gap[] = [];
   for (const t of MATCHING_REGISTRY) {
-    if (t.table === null) continue; // affinity-only: no UI control required
+    if (t.table === null) continue;
     const referenced = aggregate.includes(t.key) || aggregate.includes(t.prefColumn);
     if (!referenced) {
       gaps.push({
@@ -229,12 +193,8 @@ async function checkRegistryVsUi() {
   };
 }
 
-// ─────────────────────────────────────────────────────────────────────────
-// Check 4 — Registry vs Manuale (sito + pagine matching)
-// ─────────────────────────────────────────────────────────────────────────
 async function checkRegistryVsManual() {
   const { MATCHING_REGISTRY } = await import("../shared/matching-registry");
-  // Cerca riferimenti nei file del sito / manuale / contenuti markdown.
   const candidates = await listFiles(path.join(ROOT, "server", "site"), [".ts", ".tsx", ".md", ".html"]).catch(() => []);
   const manualFiles = await listFiles(path.join(ROOT, "content"), [".md", ".mdx"]).catch(() => []);
   const files = [...candidates, ...manualFiles];
@@ -274,9 +234,6 @@ async function checkRegistryVsManual() {
   };
 }
 
-// ─────────────────────────────────────────────────────────────────────────
-// Check 5 — Npm packages dichiarati nei task vs package.json
-// ─────────────────────────────────────────────────────────────────────────
 async function checkPackages() {
   const pkgRaw = await readFileSafe(path.join(ROOT, "package.json"));
   if (!pkgRaw) return { status: "skipped" as const, gaps: [], meta: { reason: "package.json not found" } };
@@ -285,8 +242,6 @@ async function checkPackages() {
     ...Object.keys(pkg.dependencies ?? {}),
     ...Object.keys(pkg.devDependencies ?? {}),
   ]);
-  // Falsi positivi #2581: i pacchetti elencati negli "overrides" (o "resolutions")
-  // possono non comparire come dependency diretta ma sono comunque versioni gestite.
   const overrideNames = new Set<string>();
   const collectOverrides = (obj: unknown) => {
     if (!obj || typeof obj !== "object") return;
@@ -300,26 +255,19 @@ async function checkPackages() {
 
   const tasksDir = path.join(ROOT, ".local", "tasks");
   const taskFiles = await listFiles(tasksDir, [".md"]).catch(() => []);
-  const declared = new Map<string, string[]>(); // package -> task files
-  // Falsi positivi #2581: estrai SOLO dalle sezioni dichiarative ("## Versioni e
-  // compatibilità" oppure "## npm da installare"); le altre menzioni in changelog
-  // o note storiche non rappresentano una richiesta di installazione.
+  const declared = new Map<string, string[]>();
   const ALLOWED_SECTIONS = /^##\s+(versioni\s+e\s+compatibilit[àa]|npm\s+da\s+installare)\b/i;
   const SECTION_BOUNDARY = /^##\s+/;
   const re = /`([a-z0-9._-]+(?:\/[a-z0-9._-]+)?)@\^[\d.]+`/gi;
   for (const f of taskFiles) {
     const c = await readFileSafe(f);
     if (!c) continue;
-    // Estrai i blocchi sezione interessanti
     const lines = c.split(/\r?\n/);
     const buckets: string[] = [];
     let active: string[] | null = null;
     for (const ln of lines) {
       if (SECTION_BOUNDARY.test(ln)) {
-        if (active) {
-          buckets.push(active.join("\n"));
-          active = null;
-        }
+        if (active) { buckets.push(active.join("\n")); active = null; }
         if (ALLOWED_SECTIONS.test(ln)) active = [];
         continue;
       }
@@ -339,8 +287,7 @@ async function checkPackages() {
   }
   const gaps: Gap[] = [];
   for (const [name, sources] of declared.entries()) {
-    if (installed.has(name)) continue;
-    if (overrideNames.has(name)) continue; // gestito da overrides/resolutions
+    if (installed.has(name) || overrideNames.has(name)) continue;
     gaps.push({
       severity: "high",
       check: "packages",
@@ -349,40 +296,15 @@ async function checkPackages() {
       suggestion: `Installare con il packager tool oppure rimuovere riferimento dai task`,
     });
   }
-  return {
-    status: gaps.length ? ("warn" as const) : ("ok" as const),
-    gaps,
-    meta: {
-      declaredCount: declared.size,
-      installedCount: installed.size,
-      overrideCount: overrideNames.size,
-      taskFilesScanned: taskFiles.length,
-    },
-  };
+  return { status: gaps.length ? ("warn" as const) : ("ok" as const), gaps, meta: { declaredCount: declared.size, installedCount: installed.size, overrideCount: overrideNames.size, taskFilesScanned: taskFiles.length } };
 }
 
-// ─────────────────────────────────────────────────────────────────────────
-// Check 6 — i18n coverage IT vs EN (top-level keys)
-// ─────────────────────────────────────────────────────────────────────────
 async function checkI18n() {
   const itPath = path.join(ROOT, "lib/i18n/it.ts");
   const enPath = path.join(ROOT, "lib/i18n/en.ts");
   const it = await readFileSafe(itPath);
   const en = await readFileSafe(enPath);
-  if (!it || !en) {
-    return {
-      status: "skipped" as const,
-      gaps: [
-        {
-          severity: "info" as const,
-          check: "i18n",
-          what: "Lingue it.ts/en.ts non trovate in lib/i18n",
-        },
-      ],
-      meta: {},
-    };
-  }
-  // Top-level keys: estrai pattern ^  key: o "key":
+  if (!it || !en) return { status: "skipped" as const, gaps: [{ severity: "info" as const, check: "i18n", what: "Lingue it.ts/en.ts non trovate in lib/i18n" }], meta: {} };
   const extractKeys = (src: string): Set<string> => {
     const keys = new Set<string>();
     const re = /^\s{2}["']?([A-Za-z0-9_]+)["']?\s*:/gm;
@@ -393,238 +315,13 @@ async function checkI18n() {
   const itKeys = extractKeys(it);
   const enKeys = extractKeys(en);
   const gaps: Gap[] = [];
-  for (const k of itKeys) {
-    if (!enKeys.has(k)) {
-      gaps.push({
-        severity: "low",
-        check: "i18n",
-        what: `Chiave i18n '${k}' presente in IT ma assente in EN`,
-        suggestion: "Aggiungere traduzione (placeholder __TODO__ accettabile)",
-      });
-    }
-  }
-  for (const k of enKeys) {
-    if (!itKeys.has(k)) {
-      gaps.push({
-        severity: "low",
-        check: "i18n",
-        what: `Chiave i18n '${k}' presente in EN ma assente in IT`,
-        suggestion: "Aggiungere traduzione italiana",
-      });
-    }
-  }
-  return {
-    status: gaps.length ? ("warn" as const) : ("ok" as const),
-    gaps,
-    meta: { itKeyCount: itKeys.size, enKeyCount: enKeys.size, diffCount: gaps.length },
-  };
+  for (const k of itKeys) { if (!enKeys.has(k)) gaps.push({ severity: "low", check: "i18n", what: `Chiave i18n '${k}' presente in IT ma assente in EN`, suggestion: "Aggiungere traduzione" }); }
+  for (const k of enKeys) { if (!itKeys.has(k)) gaps.push({ severity: "low", check: "i18n", what: `Chiave i18n '${k}' presente in EN ma assente in IT`, suggestion: "Aggiungere traduzione" }); }
+  return { status: gaps.length ? ("warn" as const) : ("ok" as const), gaps, meta: { itKeyCount: itKeys.size, enKeyCount: enKeys.size, diffCount: gaps.length } };
 }
 
-// ─────────────────────────────────────────────────────────────────────────
-// Check 7 — Endpoint admin: middleware admin presente
-// ─────────────────────────────────────────────────────────────────────────
-async function checkAdminEndpoints() {
-  const adminDir = path.join(ROOT, "server", "routes", "admin");
-  const files = await listFiles(adminDir, [".ts"]).catch(() => []);
-  const fileSet = new Set(files);
+import { checkAdminEndpoints, checkReplitMd, renderMd } from "./verify-matching-integration.part2";
 
-  // Falsi positivi #2581: la maggior parte dei sub-router admin è montata da
-  // `server/routes/admin.ts` (oppure `server/routes/admin/index.ts`) tramite
-  // `router.use(<path>, _requireAdmin, xRouter)`. Quei file ereditano la
-  // guardia dal parent e non devono essere segnalati. Segnaliamo HIGH solo i
-  // file route con mount diretto su `app` (senza middleware admin).
-  //
-  // Calcoliamo ricorsivamente la "chiusura protetta": partendo da admin.ts come
-  // radice protetta, ogni sub-router montato con `_requireAdmin` viene marcato
-  // protetto e visitato a sua volta per risolvere le sue mount.
-  type ParsedRouter = {
-    imports: Map<string, string>;
-    mounts: Array<{ symbol: string; hasGuard: boolean }>;
-    rootGuard: boolean;
-  };
-  const parseCache = new Map<string, ParsedRouter | null>();
-  const parseRouterFile = async (filePath: string): Promise<ParsedRouter | null> => {
-    if (parseCache.has(filePath)) return parseCache.get(filePath)!;
-    const src = await readFileSafe(filePath);
-    if (!src) {
-      parseCache.set(filePath, null);
-      return null;
-    }
-    const dir = path.dirname(filePath);
-    const imports = new Map<string, string>();
-    const importRe = /import\s+(\w+)\s+from\s+['"](\.[^'"]+)['"]/g;
-    let im: RegExpExecArray | null;
-    while ((im = importRe.exec(src)) !== null) {
-      const sym = im[1];
-      const rel = im[2];
-      const base = path.resolve(dir, rel);
-      for (const tp of [base + ".ts", path.join(base, "index.ts")]) {
-        if (fileSet.has(tp) || tp === path.join(ROOT, "server", "routes", "admin.ts")) {
-          imports.set(sym, tp);
-          break;
-        }
-        // Anche router non sotto admin/ possono essere referenziati ma non li
-        // tracciamo (es. mediaLibrary in server/routes/media-library.ts).
-      }
-    }
-    const rootGuard = /router\.use\(\s*_requireAdmin\s*\)/.test(src);
-    const mounts: Array<{ symbol: string; hasGuard: boolean }> = [];
-    // router.use('<path>', _requireAdmin, xRouter)  o  router.use('<path>', xRouter)
-    const mountRe = /router\.use\(\s*['"][^'"]*['"]\s*,\s*([^)]+)\)/g;
-    let mm: RegExpExecArray | null;
-    while ((mm = mountRe.exec(src)) !== null) {
-      const args = mm[1];
-      const hasGuard = /_requireAdmin|requireAdmin\b/.test(args);
-      for (const sym of args.split(",").map((s) => s.trim())) {
-        if (/^[A-Za-z_]\w*$/.test(sym)) mounts.push({ symbol: sym, hasGuard });
-      }
-    }
-    const parsed = { imports, mounts, rootGuard };
-    parseCache.set(filePath, parsed);
-    return parsed;
-  };
-
-  const protectedFiles = new Set<string>();
-  const adminTs = path.join(ROOT, "server", "routes", "admin.ts");
-  const adminIndex = path.join(ROOT, "server", "routes", "admin", "index.ts");
-  const queue: string[] = [];
-  for (const root of [adminTs, adminIndex]) {
-    if (await readFileSafe(root)) {
-      protectedFiles.add(root);
-      queue.push(root);
-    }
-  }
-  while (queue.length) {
-    const cur = queue.shift()!;
-    const parsed = await parseRouterFile(cur);
-    if (!parsed) continue;
-    for (const { symbol, hasGuard } of parsed.mounts) {
-      if (!hasGuard && !parsed.rootGuard) continue;
-      const target = parsed.imports.get(symbol);
-      if (!target) continue;
-      if (protectedFiles.has(target)) continue;
-      protectedFiles.add(target);
-      queue.push(target);
-    }
-  }
-
-  // Scan dei mount diretti su `app` per identificare file route esposti
-  // direttamente senza passare per il router admin.
-  const entrypoints = [
-    path.join(ROOT, "server", "routes.ts"),
-    path.join(ROOT, "server", "index.ts"),
-  ];
-  // file path -> { hasGuard: bool, mountPath: string }
-  const appMounts = new Map<string, { hasGuard: boolean; mountPath: string }>();
-  for (const ep of entrypoints) {
-    const src = await readFileSafe(ep);
-    if (!src) continue;
-    const dir = path.dirname(ep);
-    const imports = new Map<string, string>();
-    const importRe = /import\s+(?:(\w+)|\{\s*([^}]+)\s*\})\s+from\s+['"](\.[^'"]+)['"]/g;
-    let im: RegExpExecArray | null;
-    while ((im = importRe.exec(src)) !== null) {
-      const rel = im[3];
-      const base = path.resolve(dir, rel);
-      const resolved =
-        [base + ".ts", path.join(base, "index.ts")].find((p) => fileSet.has(p)) ?? null;
-      if (!resolved) continue;
-      if (im[1]) imports.set(im[1], resolved);
-      if (im[2]) {
-        for (const part of im[2].split(",").map((s) => s.trim())) {
-          const sym = part.split(/\s+as\s+/i).pop()!.trim();
-          if (sym) imports.set(sym, resolved);
-        }
-      }
-    }
-    const appRe = /app\.use\(\s*['"]([^'"]+)['"]\s*,\s*([^)]+)\)/g;
-    let am: RegExpExecArray | null;
-    while ((am = appRe.exec(src)) !== null) {
-      const mountPath = am[1];
-      const args = am[2];
-      const hasGuard = /_requireAdmin|requireAdmin\b/.test(args);
-      for (const sym of args.split(",").map((s) => s.trim())) {
-        const resolved = imports.get(sym);
-        if (!resolved) continue;
-        const prev = appMounts.get(resolved);
-        // Se almeno un mount ha la guard, consideriamo coperto.
-        if (!prev || (hasGuard && !prev.hasGuard)) {
-          appMounts.set(resolved, { hasGuard, mountPath });
-        }
-      }
-    }
-  }
-
-  const gaps: Gap[] = [];
-  let checkedCount = 0;
-  for (const f of files) {
-    const c = await readFileSafe(f);
-    if (!c) continue;
-    if (!/Router\(|router\.(get|post|put|patch|delete)/i.test(c)) continue;
-    checkedCount++;
-    const hasAdminGuard = /_requireAdmin|requireAdmin|isAdmin|adminMiddleware|adminOnly/i.test(c);
-    if (hasAdminGuard) continue;
-    if (protectedFiles.has(f)) continue; // protetto per ereditarietà dal parent
-    const direct = appMounts.get(f);
-    if (direct && !direct.hasGuard) {
-      gaps.push({
-        severity: "high",
-        check: "admin-endpoints",
-        what: `Route admin con mount diretto su 'app' (${direct.mountPath}) senza middleware admin`,
-        where: path.relative(ROOT, f),
-        suggestion:
-          "Aggiungere _requireAdmin al mount in server/routes.ts oppure router.use(_requireAdmin) in cima al file",
-      });
-    }
-    // Negli altri casi (router montato da sub-router non protetto) non
-    // segnaliamo per evitare i falsi positivi descritti nel task #2581.
-  }
-  return {
-    status: gaps.length ? ("warn" as const) : ("ok" as const),
-    gaps,
-    meta: {
-      adminRouteFiles: files.length,
-      adminRouteFilesChecked: checkedCount,
-      protectedByParent: protectedFiles.size,
-      directAppMounts: appMounts.size,
-    },
-  };
-}
-
-// ─────────────────────────────────────────────────────────────────────────
-// Check 8 — replit.md: sezioni attese
-// ─────────────────────────────────────────────────────────────────────────
-async function checkReplitMd() {
-  const md = await readFileSafe(path.join(ROOT, "replit.md"));
-  if (!md) return { status: "fail" as const, gaps: [{ severity: "high" as const, check: "replit-md", what: "replit.md mancante" }], meta: {} };
-  const expectedSections = [
-    "Redis",
-    "Embeddings",
-    "Preferenze Negative",
-    "Sistema OTA",
-    "A/B Testing",
-  ];
-  const gaps: Gap[] = [];
-  for (const s of expectedSections) {
-    if (!new RegExp(s, "i").test(md)) {
-      gaps.push({
-        severity: "low",
-        check: "replit-md",
-        what: `Sezione attesa '${s}' non trovata in replit.md`,
-        suggestion: "Aggiungere sezione documentando il sotto-sistema",
-      });
-    }
-  }
-  return {
-    status: gaps.length ? ("warn" as const) : ("ok" as const),
-    gaps,
-    meta: { expectedSections, length: md.length },
-  };
-}
-
-// ─────────────────────────────────────────────────────────────────────────
-// Runner
-// ─────────────────────────────────────────────────────────────────────────
 type CheckSpec = { id: string; name: string; fn: () => Promise<{ status: CheckResult["status"]; gaps: Gap[]; meta?: Record<string, unknown> }> };
 
 const ALL_CHECKS: CheckSpec[] = [
@@ -634,77 +331,18 @@ const ALL_CHECKS: CheckSpec[] = [
   { id: "registry-vs-manual", name: "Registry → Manuale", fn: checkRegistryVsManual },
   { id: "packages", name: "Npm packages dichiarati vs installati", fn: checkPackages },
   { id: "i18n", name: "i18n coverage IT vs EN", fn: checkI18n },
-  { id: "admin-endpoints", name: "Endpoint admin con middleware", fn: checkAdminEndpoints },
-  { id: "replit-md", name: "Sezioni replit.md attese", fn: checkReplitMd },
+  { id: "admin-endpoints", name: "Endpoint admin con middleware", fn: checkAdminEndpoints as any },
+  { id: "replit-md", name: "Sezioni replit.md attese", fn: checkReplitMd as any },
 ];
 
-function parseArgs(argv: string[]): { only: Set<string> | null; jsonOnly: boolean } {
+async function main() {
+  const argv = process.argv.slice(2);
   let only: Set<string> | null = null;
   let jsonOnly = false;
   for (const a of argv) {
     if (a.startsWith("--check=")) only = new Set(a.slice("--check=".length).split(","));
     else if (a === "--json-only") jsonOnly = true;
   }
-  return { only, jsonOnly };
-}
-
-function renderMd(results: CheckResult[]): string {
-  const total = results.length;
-  const ok = results.filter((r) => r.status === "ok").length;
-  const warn = results.filter((r) => r.status === "warn").length;
-  const fail = results.filter((r) => r.status === "fail").length;
-  const skipped = results.filter((r) => r.status === "skipped").length;
-  const allGaps = results.flatMap((r) => r.gaps).sort((a, b) => sevOrder[a.severity] - sevOrder[b.severity]);
-
-  const lines: string[] = [];
-  lines.push(`# Verifica Integrazione Matching System`);
-  lines.push("");
-  lines.push(`_Generato: ${new Date().toISOString()}_`);
-  lines.push("");
-  lines.push(`## Sommario`);
-  lines.push("");
-  lines.push(`- Check eseguiti: **${total}**`);
-  lines.push(`- ✅ OK: **${ok}** · ⚠️ Warn: **${warn}** · ❌ Fail: **${fail}** · ⏭️ Skipped: **${skipped}**`);
-  lines.push(`- Gap totali: **${allGaps.length}**`);
-  lines.push("");
-  const bySev: Record<Severity, number> = { critical: 0, high: 0, medium: 0, low: 0, info: 0 };
-  for (const g of allGaps) bySev[g.severity]++;
-  lines.push(`  - critical: ${bySev.critical}, high: ${bySev.high}, medium: ${bySev.medium}, low: ${bySev.low}, info: ${bySev.info}`);
-  lines.push("");
-  lines.push(`## Dettaglio per check`);
-  lines.push("");
-  for (const r of results) {
-    const icon = r.status === "ok" ? "✅" : r.status === "warn" ? "⚠️" : r.status === "fail" ? "❌" : "⏭️";
-    lines.push(`### ${icon} ${r.id} — ${r.name} _(${r.durationMs}ms)_`);
-    if (r.meta) lines.push("```\n" + JSON.stringify(r.meta, null, 2) + "\n```");
-    if (r.gaps.length === 0) {
-      lines.push("_Nessun gap rilevato._");
-    } else {
-      for (const g of r.gaps) {
-        lines.push(`- **[${g.severity}]** ${g.what}${g.where ? ` _(${g.where})_` : ""}`);
-        if (g.suggestion) lines.push(`  - 💡 ${g.suggestion}`);
-      }
-    }
-    lines.push("");
-  }
-  if (allGaps.length > 0) {
-    lines.push(`## Gap aggregati per severity`);
-    lines.push("");
-    for (const sev of ["critical", "high", "medium", "low", "info"] as Severity[]) {
-      const subset = allGaps.filter((g) => g.severity === sev);
-      if (subset.length === 0) continue;
-      lines.push(`### ${sev} (${subset.length})`);
-      for (const g of subset) {
-        lines.push(`- [${g.check}] ${g.what}${g.where ? ` — ${g.where}` : ""}`);
-      }
-      lines.push("");
-    }
-  }
-  return lines.join("\n");
-}
-
-async function main() {
-  const { only, jsonOnly } = parseArgs(process.argv.slice(2));
   const toRun = ALL_CHECKS.filter((c) => !only || only.has(c.id));
   const results: CheckResult[] = [];
   for (const c of toRun) {
@@ -717,29 +355,12 @@ async function main() {
     }
   }
   await fs.mkdir(OUT_DIR, { recursive: true });
-  const json = {
-    generatedAt: new Date().toISOString(),
-    checks: results,
-    summary: {
-      total: results.length,
-      ok: results.filter((r) => r.status === "ok").length,
-      warn: results.filter((r) => r.status === "warn").length,
-      fail: results.filter((r) => r.status === "fail").length,
-      skipped: results.filter((r) => r.status === "skipped").length,
-      totalGaps: results.reduce((acc, r) => acc + r.gaps.length, 0),
-    },
-  };
+  const json = { generatedAt: new Date().toISOString(), checks: results, summary: { total: results.length, ok: results.filter((r) => r.status === "ok").length, warn: results.filter((r) => r.status === "warn").length, fail: results.filter((r) => r.status === "fail").length, skipped: results.filter((r) => r.status === "skipped").length, totalGaps: results.reduce((acc, r) => acc + r.gaps.length, 0) } };
   await fs.writeFile(REPORT_JSON, JSON.stringify(json, null, 2));
   await fs.writeFile(REPORT_MD, renderMd(results));
-  if (!jsonOnly) {
-    process.stdout.write(`\nReport scritto in:\n  ${path.relative(ROOT, REPORT_MD)}\n  ${path.relative(ROOT, REPORT_JSON)}\n`);
-  }
-  // Exit code: 1 se almeno un check è "fail" o gap critical/high
+  if (!jsonOnly) { process.stdout.write(`\nReport scritto in:\n  ${path.relative(ROOT, REPORT_MD)}\n  ${path.relative(ROOT, REPORT_JSON)}\n`); }
   const hasFail = results.some((r) => r.status === "fail");
   const hasCritical = results.some((r) => r.gaps.some((g) => g.severity === "critical" || g.severity === "high"));
   process.exit(hasFail || hasCritical ? 1 : 0);
 }
-main().catch((err) => {
-  console.error("[verify] uncaught:", err);
-  process.exit(2);
-});
+main().catch((err) => { console.error("[verify] uncaught:", err); process.exit(2); });

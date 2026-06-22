@@ -21,11 +21,13 @@ import { DiagnosticFilterPanel, EMPTY_FILTERS } from "@/components/admin/Diagnos
 import { DiagnosticReportCard } from "@/components/admin/DiagnosticReportCard";
 import type { Filters } from "@/components/admin/DiagnosticFilterPanel";
 import type { DiagReport, RemoteReqStatus } from "@/components/admin/DiagnosticReportCard";
+import { DiagFilesList } from "./diagnostic-reports.part2";
+import { styles } from "./diagnostic-reports.styles";
 
-interface ActiveUser { userId: string; nickname: string | null; wsConnected: boolean; status?: "online" | "polling" | "offline" }
-interface ReportsResponse { reports: DiagReport[]; total: number; page: number; limit: number }
-interface DiagFileEntry { filename: string; userId: string; timestamp: string; sizeBytes: number }
-interface FilesResponse { files: DiagFileEntry[]; total: number; page: number; limit: number }
+export interface ActiveUser { userId: string; nickname: string | null; wsConnected: boolean; status?: "online" | "polling" | "offline" }
+export interface ReportsResponse { reports: DiagReport[]; total: number; page: number; limit: number }
+export interface DiagFileEntry { filename: string; userId: string; timestamp: string; sizeBytes: number }
+export interface FilesResponse { files: DiagFileEntry[]; total: number; page: number; limit: number }
 
 type DiagStatus = "idle" | "pending" | "running" | "done" | "failed";
 const statusMap: Record<DiagStatus, string> = {
@@ -431,43 +433,12 @@ export default function DiagnosticReportsScreen() {
         {!filesLoading && !filesError && (filesData?.files ?? []).length === 0 && (
           <Text style={styles.emptyText}>Nessun file JSON presente</Text>
         )}
-        {(filesData?.files ?? []).map((f) => {
-          const sizeKb = (f.sizeBytes / 1024).toFixed(1);
-          const ts = new Date(f.timestamp).toLocaleString("it-IT", { dateStyle: "short", timeStyle: "short" });
-          const shortUser = f.userId.slice(0, 8) + "…";
-          const isDeleting = deleteFileMutation.isPending && deleteFileMutation.variables === f.filename;
-          return (
-            <View key={f.filename} style={styles.fileRow}>
-              <View style={styles.fileInfo}>
-                <Text style={styles.fileNameText} numberOfLines={1}>{f.filename}</Text>
-                <Text style={styles.fileMeta}>👤 {shortUser} · 🕐 {ts} · 📦 {sizeKb} KB</Text>
-              </View>
-              <TouchableOpacity
-                style={[styles.downloadBtn, downloadingFile === f.filename && styles.triggerBtnDisabled]}
-                disabled={downloadingFile === f.filename}
-                onPress={() => downloadFile(f.filename)}
-              >
-                {downloadingFile === f.filename
-                  ? <ActivityIndicator size="small" color="#fff" />
-                  : <Ionicons name="download-outline" size={16} color="#fff" />}
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.deleteFileBtn, isDeleting && styles.triggerBtnDisabled]}
-                disabled={isDeleting}
-                onPress={() => {
-                  Alert.alert("Elimina file", `Eliminare ${f.filename}?`, [
-                    { text: "Annulla", style: "cancel" },
-                    { text: "Elimina", style: "destructive", onPress: () => deleteFileMutation.mutate(f.filename) },
-                  ]);
-                }}
-              >
-                {isDeleting
-                  ? <ActivityIndicator size="small" color="#fff" />
-                  : <Ionicons name="trash-outline" size={16} color="#fff" />}
-              </TouchableOpacity>
-            </View>
-          );
-        })}
+        <DiagFilesList
+          files={filesData?.files ?? []}
+          downloadingFile={downloadingFile}
+          downloadFile={downloadFile}
+          deleteFileMutation={deleteFileMutation as any}
+        />
 
         {(filesData?.total ?? 0) > 20 && (
           <View style={styles.paginationRow}>
@@ -488,44 +459,3 @@ export default function DiagnosticReportsScreen() {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: { flex: 1 },
-  header: { flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingBottom: 8 },
-  backBtn: { width: 36, height: 36, alignItems: "center", justifyContent: "center" },
-  headerTitle: { flex: 1, fontSize: 18, fontWeight: "600", textAlign: "center" },
-  filterToggle: { width: 36, height: 36, alignItems: "center", justifyContent: "center", borderRadius: 8, backgroundColor: "#1C1C1E" },
-  filterToggleActive: { backgroundColor: "#3B82F6" },
-  filterDot: { position: "absolute", top: 6, right: 6, width: 6, height: 6, borderRadius: 3, backgroundColor: "#EF4444" },
-  sectionLabel: { color: "#6B7280", fontSize: 11, fontWeight: "700", textTransform: "uppercase", marginHorizontal: 16, marginTop: 16, marginBottom: 4, letterSpacing: 0.8 },
-  hintText: { color: "#4B5563", fontSize: 11, marginHorizontal: 16, marginBottom: 8 },
-  emptyText: { color: "#4B5563", fontSize: 14, textAlign: "center", marginVertical: 8 },
-  userRow: { flexDirection: "row", alignItems: "center", marginHorizontal: 16, marginBottom: 8, backgroundColor: "#1C1C1E", padding: 12, borderRadius: 10, gap: 8 },
-  statusDotBtn: { alignItems: "center", justifyContent: "center", padding: 2 },
-  userId: { flex: 1, color: "#D1D5DB", fontSize: 13 },
-  statusText: { color: "#9CA3AF", fontSize: 12 },
-  triggerBtn: { backgroundColor: "#3B82F6", borderRadius: 6, paddingHorizontal: 12, paddingVertical: 6, minWidth: 60, alignItems: "center" },
-  triggerBtnRemote: { backgroundColor: "#7C3AED" },
-  triggerBtnDisabled: { opacity: 0.5 },
-  triggerBtnText: { color: "#fff", fontWeight: "600", fontSize: 13 },
-  divider: { height: 1, backgroundColor: "#374151", marginHorizontal: 16, marginVertical: 8 },
-  reportsSectionHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingRight: 16 },
-  activeFilterBadge: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: "#1E3A5F", borderRadius: 10, paddingHorizontal: 8, paddingVertical: 3 },
-  activeFilterBadgeText: { color: "#60A5FA", fontSize: 10, fontWeight: "600" },
-  paginationRow: { flexDirection: "row", alignItems: "center", justifyContent: "center", paddingVertical: 16, gap: 16 },
-  pageBtn: { width: 36, height: 36, borderRadius: 8, backgroundColor: "#1C1C1E", alignItems: "center", justifyContent: "center" },
-  pageBtnDisabled: { opacity: 0.4 },
-  pageLabel: { color: "#9CA3AF", fontSize: 13 },
-  errorBox: { marginHorizontal: 16, marginVertical: 8, backgroundColor: "#1C1C1E", borderRadius: 10, padding: 14, borderWidth: 1, borderColor: "#374151", alignItems: "center", gap: 8 },
-  errorText: { color: "#EF4444", fontSize: 13, textAlign: "center" },
-  retryBtn: { backgroundColor: "#1D4ED8", borderRadius: 6, paddingHorizontal: 16, paddingVertical: 6 },
-  retryBtnText: { color: "#fff", fontWeight: "600", fontSize: 13 },
-  refreshBtn: { width: 30, height: 30, alignItems: "center", justifyContent: "center", marginRight: 16 },
-  refreshBtnLarge: { width: 51, height: 51, alignItems: "center", justifyContent: "center", marginRight: 16 },
-  fileRow: { flexDirection: "row", alignItems: "center", marginHorizontal: 16, marginBottom: 8, backgroundColor: "#1C1C1E", padding: 10, borderRadius: 10, gap: 8 },
-  fileInfo: { flex: 1, gap: 3 },
-  fileNameText: { color: "#D1D5DB", fontSize: 12, fontFamily: "monospace" },
-  fileMeta: { color: "#6B7280", fontSize: 11 },
-  downloadBtn: { backgroundColor: "#0D9488", borderRadius: 6, padding: 8, alignItems: "center", justifyContent: "center" },
-  deleteFileBtn: { backgroundColor: "#DC2626", borderRadius: 6, padding: 8, alignItems: "center", justifyContent: "center" },
-});

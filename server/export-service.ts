@@ -35,6 +35,14 @@ let schedulerTimer: NodeJS.Timeout | null = null;
 let nextAt: Date | null = null;
 let isExporting = false;
 
+export function stopExportScheduler(): void {
+  if (schedulerTimer) {
+    clearTimeout(schedulerTimer);
+    schedulerTimer = null;
+    nextAt = null;
+  }
+}
+
 export interface ExportProgressTable {
   table: string;
   rows: number;
@@ -146,6 +154,12 @@ export async function getExportSchedule(): Promise<ExportSchedule> {
   const val = await readSetting("exports.schedule");
   if (val === "daily" || val === "weekly") return val;
   return "off";
+}
+
+export function getScheduleIntervalMs(schedule: ExportSchedule): number | null {
+  if (schedule === "daily") return 24 * 60 * 60 * 1000;
+  if (schedule === "weekly") return 7 * 24 * 60 * 60 * 1000;
+  return null;
 }
 
 export async function setExportSchedule(schedule: ExportSchedule): Promise<void> {
@@ -439,55 +453,7 @@ export async function runExport(options: Partial<ExportOptions> = {}): Promise<E
   }
 }
 
-export async function downloadExport(fileName: string): Promise<Buffer> {
-  const objectPath = `${EXPORT_OBJECT_PREFIX}/${fileName}`;
-  return downloadBuffer(objectPath);
-}
-
-export async function listExportFiles() {
-  return listObjects(EXPORT_OBJECT_PREFIX + "/");
-}
-
-function getScheduleIntervalMs(schedule: ExportSchedule): number | null {
-  if (schedule === "daily") return 24 * 60 * 60 * 1000;
-  if (schedule === "weekly") return 7 * 24 * 60 * 60 * 1000;
-  return null;
-}
-
-async function runScheduledExport() {
-  const schedule = await getExportSchedule();
-  const intervalMs = getScheduleIntervalMs(schedule);
-  if (!intervalMs) { stopExportScheduler(); return; }
-
-  try {
-    console.log("[export-service] Avvio export schedulato...");
-    await runExport({ excludeFake: true });
-    nextAt = addMs(intervalMs);
-  } catch (err) {
-    console.error("[export-service] Export schedulato fallito:", err);
-    nextAt = addMs(intervalMs);
-  }
-}
-
-export function stopExportScheduler() {
-  if (schedulerTimer) {
-    clearInterval(schedulerTimer);
-    schedulerTimer = null;
-    nextAt = null;
-    console.log("[export-service] Scheduler export fermato");
-  }
-}
-
-export async function startExportScheduler() {
-  stopExportScheduler();
-  const schedule = await getExportSchedule();
-  const intervalMs = getScheduleIntervalMs(schedule);
-  if (!intervalMs) return;
-
-  nextAt = addMs(intervalMs);
-  schedulerTimer = setInterval(runScheduledExport, intervalMs);
-  console.log(`[export-service] Scheduler export avviato (${schedule}, ogni ${intervalMs / 3600000}h)`);
-}
+export * from "./export-service.part2";
 
 async function restartScheduler() {
   const schedule = await getExportSchedule();

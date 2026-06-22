@@ -23,8 +23,10 @@ import { ProfileGapsCard } from "@/components/admin/match-inspector/ProfileGapsC
 import { UserEditModal } from "@/components/admin/users/UserEditModal";
 import type { AdminUser } from "@/components/admin/users/UserCard";
 import { ZeroMatchDiagnosisCard } from "@/components/admin/match-inspector/ZeroMatchDiagnosisCard";
+import { MatchTypeSectionsList } from "./match-inspector-detail.part2";
+import { styles } from "./match-inspector-detail.styles";
 
-interface MatchItem {
+export interface MatchItem {
   id: string;
   matchedUserId: string;
   matchedNickname: string;
@@ -35,7 +37,7 @@ interface MatchItem {
   createdAt: string;
 }
 
-interface MatchTypeSection {
+export interface MatchTypeSection {
   typeKey: string;
   typeName: string;
   count: number;
@@ -424,20 +426,15 @@ export default function MatchInspectorDetailScreen() {
 
         <PreferencesDiffCard sections={matchesByType} userId={userId!} nickname={user.nickname} />
 
-        <Text style={styles.sectionTitle}>{matchesByType.length} Tipi di Match</Text>
-
-        {matchesByType.map((section) => (
-          <MatchTypeCard
-            key={section.typeKey}
-            section={section}
-            expanded={expandedTypes.has(section.typeKey)}
-            onToggle={() => toggleType(section.typeKey)}
-            formatDate={formatDate}
-            statusColor={statusColor}
-            currentUserId={userId}
-            currentNickname={user.nickname}
-          />
-        ))}
+        <MatchTypeSectionsList
+          matchesByType={matchesByType}
+          expandedTypes={expandedTypes}
+          toggleType={toggleType}
+          formatDate={formatDate}
+          statusColor={statusColor}
+          userId={userId!}
+          nickname={user.nickname}
+        />
       </ScrollView>
 
       <UserEditModal
@@ -460,81 +457,3 @@ export default function MatchInspectorDetailScreen() {
     </>
   );
 }
-
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.background },
-  loadingContainer: { flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: Colors.background },
-  errorText: { fontFamily: "Inter_400Regular", fontSize: 15, color: Colors.textSecondary },
-  actionsRow: {
-    flexDirection: "row",
-    gap: 10,
-    paddingHorizontal: 16,
-    marginTop: 16,
-    marginBottom: 16,
-  },
-  refreshBtn: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
-    paddingVertical: 10,
-    backgroundColor: Colors.surface,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  refreshText: { fontFamily: "Inter_600SemiBold", fontSize: 13, color: Colors.accent },
-  recalcBtn: {
-    flex: 2,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
-    paddingVertical: 10,
-    backgroundColor: Colors.accent,
-    borderRadius: 12,
-  },
-  recalcText: { fontFamily: "Inter_600SemiBold", fontSize: 13, color: "#fff" },
-  deleteMatchesRow: {
-    paddingHorizontal: 16,
-    marginBottom: 16,
-    gap: 8,
-  },
-  deleteMatchesTop: {},
-  deleteMatchesBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
-    paddingVertical: 10,
-    backgroundColor: Colors.surface,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: Colors.error,
-  },
-  deleteMatchesText: { fontFamily: "Inter_600SemiBold", fontSize: 13, color: Colors.error },
-  autoRecalcRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    paddingVertical: 6,
-    paddingHorizontal: 4,
-  },
-  autoRecalcSwitch: { transform: [{ scaleX: 0.85 }, { scaleY: 0.85 }] },
-  autoRecalcLabel: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 13,
-    color: Colors.textSecondary,
-    flex: 1,
-  },
-  sectionTitle: {
-    fontFamily: "Inter_700Bold",
-    fontSize: 13,
-    color: Colors.textSecondary,
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
-    paddingHorizontal: 16,
-    marginBottom: 8,
-  },
-});

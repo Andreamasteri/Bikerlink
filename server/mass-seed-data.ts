@@ -469,33 +469,58 @@ const WELCOME_MESSAGES: Record<string, string[]> = {
 };
 
 export function randOffset(): number {
-  return (Math.random() - 0.5) * 2.0;
+  return (Math.random() - 0.5) * 0.5;
 }
 
-export function randBirthYear(): number {
-  return 1970 + Math.floor(Math.random() * 36);
-}
-
-export function pickRandom<T>(arr: T[]): T {
+export function pickRandom<T>(arr: readonly T[]): T {
   return arr[Math.floor(Math.random() * arr.length)];
 }
 
-export function pickRandomN<T>(arr: T[], n: number): T[] {
+export function pickRandomN<T>(arr: readonly T[], n: number): T[] {
   const shuffled = [...arr].sort(() => Math.random() - 0.5);
-  return shuffled.slice(0, n);
+  return shuffled.slice(0, Math.min(n, arr.length));
 }
 
 export function getMotoYear(): number {
-  return 2016 + Math.floor(Math.random() * 9);
+  const cur = new Date().getFullYear();
+  return cur - Math.floor(Math.random() * 15);
 }
 
-export function getBio(type: string, sex?: string | null): string {
-  if (type === "biker" && sex === "M") return pickRandom(BIKER_M_BIOS);
-  if (type === "biker" && sex === "F") return pickRandom(BIKER_F_BIOS);
-  if (type === "zavorrina" && sex === "F") return pickRandom(ZAV_F_BIOS);
-  if (type === "zavorrina" && sex === "M") return pickRandom(ZAV_M_BIOS);
-  return pickRandom(COUPLE_BIOS);
+export function randBirthYear(): number {
+  return 1970 + Math.floor(Math.random() * 35);
 }
+
+const BIOS_BIKER_M = [
+  "Motociclista appassionato, giro ogni weekend alla scoperta di nuove strade.",
+  "In sella da 20 anni, conosco ogni curva della mia regione. Sempre pronto per un nuovo giro!",
+  "La moto è la mia libertà. Cerco compagni di viaggio con la stessa passione.",
+  "Biker del weekend ma con l'anima da viaggiatore. Nessuna strada è troppo lontana.",
+  "Ogni giro è un'avventura. Mi piace esplorare strade nuove e scoprire borghi nascosti.",
+];
+
+const BIOS_BIKER_F = [
+  "Biker appassionata, la moto è la mia libertà. Cerco compagni di viaggio!",
+  "In sella da anni, amo le strade di montagna e i tramonti sul mare.",
+  "La moto mi ha cambiato la vita. Giro ogni weekend e non mi fermo mai.",
+  "Pilotessa convinta, adoro i tornanti e le strade panoramiche.",
+  "Donne in moto: più di quante pensi! Cerco compagnia per i giri del weekend.",
+];
+
+const BIOS_ZAV = [
+  "Non guido ma adoro la velocità! Cerco un biker con cui esplorare le strade più belle.",
+  "Sogno di girare in moto da sempre. Qualcuno mi porta a scoprire le strade panoramiche?",
+  "Il vento tra i capelli e il paesaggio che scorre... cerco la mia prima esperienza in moto.",
+  "Mi fido di chi conosce la strada. Cerco un biker affidabile per un'avventura su due ruote.",
+  "Pronta per la mia prima avventura in moto! Cerco qualcuno di paziente e simpatico.",
+];
+
+export function getBio(userType: string, sex?: string | null): string {
+  if (userType === "biker" && sex === "F") return pickRandom(BIOS_BIKER_F);
+  if (userType === "biker") return pickRandom(BIOS_BIKER_M);
+  return pickRandom(BIOS_ZAV);
+}
+
+export * from "./mass-seed-data.part2";
 
 export function getWelcomeMessage(type: string, sex?: string | null): string {
   if (type === "biker" && sex === "F") return pickRandom(WELCOME_MESSAGES.biker_f);

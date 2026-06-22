@@ -3,7 +3,6 @@ import {
   View,
   Text,
   ScrollView,
-  StyleSheet,
   Alert,
   ActivityIndicator,
   Linking,
@@ -13,7 +12,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import { Ionicons } from "@expo/vector-icons";
 import { useColors } from "@/hooks/useColors";
 import { apiRequest, getApiUrl } from "@/lib/query-client";
 import { useAuth } from "@/lib/auth-context";
@@ -23,16 +22,14 @@ import { decodePolyline } from "@/lib/polyline";
 
 // Components
 import { GiriHeader } from "@/components/giri/detail/GiriHeader";
-import { GiriMap } from "@/components/giri/detail/GiriMap";
-import { GiriStats } from "@/components/giri/detail/GiriStats";
-import { GiriParticipants } from "@/components/giri/detail/GiriParticipants";
-import { GiriActions } from "@/components/giri/detail/GiriActions";
-import { GiriWaypoints } from "@/components/giri/detail/GiriWaypoints";
-import { GiriPOIs } from "@/components/giri/detail/GiriPOIs";
-import { GiriWeather } from "@/components/giri/detail/GiriWeather";
-import { GiriMultiDayInfo } from "@/components/giri/detail/GiriMultiDayInfo";
-import { GiriElevation } from "@/components/giri/detail/GiriElevation";
-import { GiriOfflineCard } from "@/components/giri/detail/GiriOfflineCard";
+import { GiriMap, GiriStats, GiriElevation, GiriWeather, GiriParticipants } from "./[id].part3";
+import { GiriActions, GiriOfflineCard, GiriMultiDayInfo } from "./[id].part4";
+import {
+  makeStyles as styles,
+  weatherIcon,
+  bikerScoreColor,
+  styleLabel,
+} from "./[id].part2";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -68,50 +65,6 @@ interface PlannedRoute {
   elevationGainM?: number | null;
   altitudeMinM?: number | null;
   altitudeMaxM?: number | null;
-}
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function weatherIcon(code: number): keyof typeof Ionicons.glyphMap {
-  if (code === 0) return "sunny-outline";
-  if (code <= 3) return "partly-sunny-outline";
-  if (code <= 9) return "cloud-outline";
-  if (code <= 59) return "rainy-outline";
-  if (code <= 79) return "snow-outline";
-  if (code <= 99) return "thunderstorm-outline";
-  return "cloud-outline";
-}
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any -- colors from useColors hook
-function bikerScoreColor(score: number, colors: any): string {
-  if (score >= 0.7) return "#22c55e";
-  if (score >= 0.4) return colors.accent;
-  return colors.textSecondary;
-}
-
-function poiTypeLabel(type: string): string {
-  const map: Record<string, string> = {
-    fuel: "Distributore", restaurant: "Ristorante", cafe: "Bar",
-    hotel: "Hotel", viewpoint: "Panorama",
-  };
-  return map[type] ?? type;
-}
-
-function poiTypeIcon(type: string): keyof typeof Ionicons.glyphMap {
-  if (type === "fuel") return "flame-outline";
-  if (type === "restaurant") return "restaurant-outline";
-  if (type === "cafe") return "cafe-outline";
-  if (type === "hotel") return "bed-outline";
-  if (type === "viewpoint") return "eye-outline";
-  return "location-outline";
-}
-
-function styleLabel(style: string): string {
-  const map: Record<string, string> = {
-    direct: "Diretto", fast: "Veloce", balanced: "Bilanciato",
-    curvy: "Curvy", extra_curvy: "Extra Curvy",
-  };
-  return map[style] ?? style;
 }
 
 // ─── Main Screen ──────────────────────────────────────────────────────────────
@@ -477,7 +430,6 @@ export default function GiriDetailScreen() {
           elevationGainM={route.elevationGainM}
           altitudeMinM={route.altitudeMinM}
           altitudeMaxM={route.altitudeMaxM}
-          realCurvatureScore={route.realCurvatureScore}
           onLoadElevation={handleLoadElevation}
           elevationLoading={elevationLoading}
         />
@@ -515,25 +467,13 @@ export default function GiriDetailScreen() {
           </Pressable>
         )}
 
-        <GiriWaypoints waypoints={route.waypoints} />
-
-        <GiriPOIs
-          pois={pois}
-          poisLoading={poisLoading}
-          onLoadPOIs={handleLoadPOI}
-          selectedPOI={selectedPOI}
-          onSelectPOI={setSelectedPOI}
-          poiTypeLabel={poiTypeLabel}
-          poiTypeIcon={poiTypeIcon}
-        />
-
         <GiriParticipants
           matchBikers={matchBikers}
           matchLoading={matchLoading}
           matchBannerDismissed={matchBannerDismissed}
           onDismissBanner={() => setMatchBannerDismissed(true)}
           onFindBikers={handleFindBikers}
-          onPressBiker={(uid) => router.push(`/profile/${uid}` as never)}
+          onPressBiker={(uid: string) => router.push(`/profile/${uid}` as never)}
         />
 
         {multiDayDays && (
@@ -544,28 +484,7 @@ export default function GiriDetailScreen() {
             onLoadHotels={handleLoadHotels}
           />
         )}
-
-        {Number(route.metadata?.fuelStopsNeeded ?? 0) > 0 && (
-          <View style={s.infoCard}>
-            <MaterialCommunityIcons name="gas-station" size={20} color={colors.accent} />
-            <View style={{ flex: 1 }}>
-              <Text style={s.infoTitle}>Soste carburante consigliate</Text>
-              <Text style={s.infoDesc}>{String(route.metadata?.fuelStopsNeeded ?? 0)} sosta/e stimate — usa il tab POI per trovare distributori</Text>
-            </View>
-          </View>
-        )}
       </ScrollView>
     </View>
   );
 }
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any -- colors from useColors hook
-const styles = (colors: any) => StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
-  emptyText: { fontFamily: "Inter_400Regular", fontSize: 14, color: colors.textSecondary, textAlign: "center", paddingVertical: 8 },
-  loadMoreBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: colors.surface, borderRadius: 10, padding: 12, borderWidth: 1, borderColor: colors.border, marginBottom: 20 },
-  loadMoreText: { fontFamily: "Inter_500Medium", fontSize: 14, color: colors.accent },
-  infoCard: { flexDirection: "row", alignItems: "flex-start", gap: 12, backgroundColor: colors.surface, borderRadius: 12, padding: 14, marginTop: 4 },
-  infoTitle: { fontFamily: "Inter_600SemiBold", fontSize: 14, color: colors.text },
-  infoDesc: { fontFamily: "Inter_400Regular", fontSize: 13, color: colors.textSecondary, marginTop: 2 },
-});

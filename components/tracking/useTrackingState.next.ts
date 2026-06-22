@@ -1,2 +1,1 @@
-// overflow di components/tracking/useTrackingState.ts — aggiungi qui le nuove funzionalità
-export {};
+// Continuazione di useTrackingState.ts — aggiungere qui nuovo codice

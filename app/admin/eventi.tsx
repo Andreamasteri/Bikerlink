@@ -21,6 +21,8 @@ import { apiRequest, queryClient, getApiUrl } from "@/lib/query-client";
 import type { EventDTO, EventStatus } from "@/shared/event-types";
 import { EVENT_TYPE_LABELS, EVENT_TYPE_COLORS } from "@/shared/event-types";
 import { useT } from "@/lib/language-context";
+import { EventAdminCard } from "./eventi.part2";
+import { styles } from "./eventi.styles";
 
 function getStatusLabels(t: (k: string) => string): Record<EventStatus, string> {
   return {
@@ -339,6 +341,7 @@ export default function AdminEventiScreen() {
               onApprove={item.status === "pending" ? () => approveMutation.mutate(item.id) : undefined}
               onReject={item.status === "pending" ? () => setRejectModal({ id: item.id }) : undefined}
               isPending={approveMutation.isPending || rejectMutation.isPending}
+              apiUrl={getApiUrl()}
             />
           )}
           contentContainerStyle={[
@@ -401,173 +404,3 @@ export default function AdminEventiScreen() {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.background,
-  },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-    backgroundColor: Colors.surface,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: Colors.border,
-  },
-  backBtn: {
-    padding: 4,
-  },
-  title: {
-    fontFamily: "Inter_700Bold",
-    fontSize: 18,
-    color: Colors.text,
-  },
-  tabs: {
-    flexDirection: "row",
-    backgroundColor: Colors.surface,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: Colors.border,
-  },
-  tabBtn: {
-    flex: 1,
-    paddingVertical: 12,
-    alignItems: "center",
-  },
-  tabBtnActive: {
-    borderBottomWidth: 2,
-    borderBottomColor: Colors.accent,
-  },
-  tabText: {
-    fontFamily: "Inter_500Medium",
-    fontSize: 14,
-    color: Colors.textSecondary,
-  },
-  tabTextActive: {
-    color: Colors.accent,
-    fontFamily: "Inter_600SemiBold",
-  },
-  filterRow: {
-    flexDirection: "row",
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    gap: 6,
-    backgroundColor: Colors.surface,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: Colors.border,
-  },
-  filterChip: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-    backgroundColor: Colors.background,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  filterChipActive: {
-    backgroundColor: Colors.accent,
-    borderColor: Colors.accent,
-  },
-  filterText: {
-    fontSize: 11,
-    fontFamily: "Inter_500Medium",
-    color: Colors.textSecondary,
-  },
-  filterTextActive: {
-    color: "#000",
-    fontFamily: "Inter_600SemiBold",
-  },
-  centered: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  list: {
-    paddingTop: 12,
-  },
-  listEmpty: {
-    flex: 1,
-  },
-  emptyState: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingTop: 60,
-    gap: 12,
-  },
-  emptyText: {
-    fontFamily: "Inter_500Medium",
-    fontSize: 15,
-    color: Colors.textSecondary,
-  },
-  modalOverlay: {
-    position: "absolute",
-    top: 0,
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: "rgba(0,0,0,0.6)",
-    justifyContent: "center",
-    padding: 24,
-  },
-  modalCard: {
-    backgroundColor: Colors.surface,
-    borderRadius: 14,
-    padding: 20,
-    gap: 12,
-  },
-  modalTitle: {
-    fontFamily: "Inter_700Bold",
-    fontSize: 17,
-    color: Colors.text,
-  },
-  modalHint: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 13,
-    color: Colors.textSecondary,
-  },
-  modalInput: {
-    backgroundColor: Colors.background,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    color: Colors.text,
-    fontFamily: "Inter_400Regular",
-    fontSize: 14,
-    height: 100,
-    textAlignVertical: "top",
-  },
-  modalActions: {
-    flexDirection: "row",
-    gap: 10,
-    marginTop: 4,
-  },
-  modalCancelBtn: {
-    flex: 1,
-    paddingVertical: 12,
-    borderRadius: 8,
-    alignItems: "center",
-    backgroundColor: Colors.surfaceLight,
-  },
-  modalCancelText: {
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 14,
-    color: Colors.text,
-  },
-  modalRejectBtn: {
-    flex: 1,
-    paddingVertical: 12,
-    borderRadius: 8,
-    alignItems: "center",
-    backgroundColor: Colors.error,
-  },
-  modalRejectText: {
-    fontFamily: "Inter_700Bold",
-    fontSize: 14,
-    color: "#fff",
-  },
-});
