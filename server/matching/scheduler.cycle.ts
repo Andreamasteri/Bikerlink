@@ -32,6 +32,17 @@ export { getMatchingLockStatus };
 
 const MATCH_DEBOUNCE_MS = 10_000;
 
+// Zombie-cycle recovery (Task #4798): `cycleInFlight` è una guardia in-process
+// che blocca i tick sovrapposti. Se l'IIFE del ciclo non si risolve mai (una
+// fase appesa, una promise che non rigetta), resterebbe true per sempre e ogni
+// tick successivo verrebbe saltato come "already_running" finché il processo non
+// riparte — esattamente lo stallo da centinaia di minuti osservato di notte.
+// Il lock distribuito (redis/memory) ha già un TTL di 5min, ma questo booleano
+// no. Se cycleInFlight è true da oltre CYCLE_STALE_MS lo consideriamo zombie e
+// lo resettiamo (a quel punto il lock sottostante è certamente scaduto), così il
+// tick può ripartire da solo.
+const CYCLE_STALE_MS = 10 * 60 * 1000;
+
 let cycleInFlight = false;
 let lastMatchingStart: number | null = null;
 let lastCycleOutcome: "ok" | "error" | null = null;
@@ -69,18 +80,64 @@ export function forceUnlockMatching(): { wasRunning: boolean; lastStartAt: numbe
   return { wasRunning, lastStartAt };
 }
 
+// ─── Scheduler heartbeat (Task #4798) ───────────────────────────────────────
+//
+// `lastRunAt` viene scritto SOLO al completamento di un ciclo riuscito, quindi
+// quando i cicli vengono saltati (pool saturo) o falliscono, il collector vede
+// `scheduler.last_run_min_ago` crescere all'infinito e non distingue "scheduler
+// morto" da "scheduler vivo che salta legittimamente". Il heartbeat registra
+// che il LOOP è vivo a ogni tick, qualunque sia l'esito, così un salto
+// intenzionale non è più indistinguibile da uno stallo.
+let lastHeartbeatPersistAt = 0;
+const HEARTBEAT_PERSIST_THROTTLE_MS = 30_000;
+
+function recordSchedulerHeartbeat(tickResult: string): void {
+  const now = Date.now();
+  // Throttle: triggerMatchingRun può essere invocato on-demand (login/admin)
+  // oltre che dal tick orario; evitiamo un upsert per ogni chiamata.
+  if (now - lastHeartbeatPersistAt < HEARTBEAT_PERSIST_THROTTLE_MS) return;
+  lastHeartbeatPersistAt = now;
+  const tickAtIso = new Date(now).toISOString();
+  withBgDbSlot(() => storage.getAppSetting("matching_scheduler_state"))
+    .then((existing) => {
+      const prev = (existing?.valueJson as Record<string, unknown>) ?? {};
+      return withBgDbSlot(() => storage.upsertAppSetting("matching_scheduler_state", undefined, {
+        ...prev,
+        lastTickAt: tickAtIso,
+        lastTickResult: tickResult,
+      }));
+    })
+    .catch((err) => schedulerLogger.warn({ err }, "scheduler heartbeat persist failed (non-blocking)"));
+}
+
 export function triggerMatchingRun(): { started: boolean; reason?: string } {
+  // Zombie-cycle recovery: se la guardia in-process è bloccata da troppo tempo,
+  // l'IIFE del ciclo precedente non si è risolto (fase appesa). Il lock
+  // sottostante è ormai scaduto (TTL 5min < CYCLE_STALE_MS), quindi resettiamo
+  // così il tick può ripartire invece di saltare per sempre.
+  if (cycleInFlight && lastMatchingStart && Date.now() - lastMatchingStart > CYCLE_STALE_MS) {
+    const stuckForMin = Math.floor((Date.now() - lastMatchingStart) / 60_000);
+    schedulerLogger.warn({ stuckForMin, lastStartAt: lastMatchingStart }, "Ciclo zombie rilevato — reset forzato della guardia in-process");
+    addMatchLog("WARN", "lock", `Ciclo zombie rilevato (bloccato da ${stuckForMin} min) — reset forzato, riparto`);
+    cycleInFlight = false;
+    lastMatchingStart = null;
+    forceUnlockMatchingLock();
+  }
   if (!isPoolHealthy()) {
     dedupWarn("matching/pool-saturated", "[Matching] Pool saturo — ciclo saltato (verrà riprovato al prossimo tick)");
+    recordSchedulerHeartbeat("skip:pool_saturated");
     return { started: false, reason: "pool_saturated" };
   }
   if (cycleInFlight) {
+    recordSchedulerHeartbeat("skip:already_running");
     return { started: false, reason: "already_running" };
   }
   if (lastMatchingStart && Date.now() - lastMatchingStart < MATCH_DEBOUNCE_MS) {
     const ago = Math.floor((Date.now() - lastMatchingStart) / 1000);
+    recordSchedulerHeartbeat("skip:debounced");
     return { started: false, reason: `debounced — last run ${ago}s ago` };
   }
+  recordSchedulerHeartbeat("started");
   cycleInFlight = true;
   lastMatchingStart = Date.now();
   const owner = `${process.pid}@${new Date().toISOString()}`;
