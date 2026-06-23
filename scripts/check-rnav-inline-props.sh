@@ -79,6 +79,11 @@ check_pattern_multiline 'header(Left|Right):[^\n]*\n\s*\?\s*\(\)\s*=>' \
 check_pattern 'tabBar=\{\s*\(' \
   "tabBar con funzione arrow inline → usare useCallback (vedi rnav-memo-guard)"
 
+# screenOptions={{...}} con oggetto annidato *Style:{} — causa loop useLayoutEffect
+# Pattern: screenOptions={{ ... xStyle: { ... } — rilevato via rg multiline
+check_pattern_multiline 'screenOptions=\{\{[^}]{0,300}\w+Style:\s*\{' \
+  "screenOptions={{}} con nested object (xStyle:{}) → wrappare con useMemo (vedi rnav-memo-guard)"
+
 if [ $FAIL -eq 1 ]; then
   echo ""
   echo "💥 check-rnav-inline-props FALLITO"

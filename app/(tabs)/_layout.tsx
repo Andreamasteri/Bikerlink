@@ -293,6 +293,27 @@ export default function TabLayout() {
      showCalibrationBadge, isBikerOrCoppia]
   );
 
+  const tabsScreenOptions = useMemo(() => ({
+    tabBarActiveTintColor: colors.accent as string,
+    tabBarInactiveTintColor: colors.textSecondary as string,
+    tabBarStyle: {
+      backgroundColor: colors.surface,
+      borderTopColor: colors.border,
+      height: tabBarHeight,
+      paddingBottom: tabBarPaddingBottom,
+    },
+    tabBarLabelStyle: {
+      fontSize: 11,
+      fontFamily: "Inter_500Medium",
+    },
+    headerStyle: {
+      backgroundColor: colors.surface,
+    },
+    headerTintColor: colors.text,
+    headerTitleStyle: { fontFamily: "Inter_600SemiBold" },
+  }), [colors.accent, colors.textSecondary, colors.surface, colors.border,
+       colors.text, tabBarHeight, tabBarPaddingBottom]);
+
   return (
     <>
       {isGpsGateActive && (
@@ -300,25 +321,7 @@ export default function TabLayout() {
       )}
       <Tabs
         tabBar={renderCustomTabBar}
-        screenOptions={{
-          tabBarActiveTintColor: colors.accent as string,
-          tabBarInactiveTintColor: colors.textSecondary as string,
-          tabBarStyle: {
-            backgroundColor: colors.surface,
-            borderTopColor: colors.border,
-            height: tabBarHeight,
-            paddingBottom: tabBarPaddingBottom,
-          },
-          tabBarLabelStyle: {
-            fontSize: 11,
-            fontFamily: "Inter_500Medium",
-          },
-          headerStyle: {
-            backgroundColor: colors.surface,
-          },
-          headerTintColor: colors.text,
-          headerTitleStyle: { fontFamily: "Inter_600SemiBold" },
-        }}
+        screenOptions={tabsScreenOptions}
       >
         {tabScreens}
       </Tabs>

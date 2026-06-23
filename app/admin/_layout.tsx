@@ -5,17 +5,16 @@ import { useColors } from "@/hooks/useColors";
 
 export default function AdminLayout() {
   const colors = useColors();
+  const adminScreenOptions = React.useMemo(() => ({
+    headerShown: true,
+    headerStyle: { backgroundColor: colors.surface },
+    headerTintColor: colors.accent,
+    headerTitleStyle: { color: colors.text, fontFamily: "Inter_600SemiBold" },
+    contentStyle: { backgroundColor: colors.background },
+  }), [colors.surface, colors.accent, colors.text, colors.background]);
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <Stack
-        screenOptions={{
-          headerShown: true,
-          headerStyle: { backgroundColor: colors.surface },
-          headerTintColor: colors.accent,
-          headerTitleStyle: { color: colors.text, fontFamily: "Inter_600SemiBold" },
-          contentStyle: { backgroundColor: colors.background },
-        }}
-      >
+      <Stack screenOptions={adminScreenOptions}>
         <Stack.Screen name="index" options={{ title: "Pannello Admin" }} />
         <Stack.Screen name="users" options={{ title: "Gestione Utenti" }} />
         <Stack.Screen name="workshops" options={{ title: "Gestione Officine" }} />

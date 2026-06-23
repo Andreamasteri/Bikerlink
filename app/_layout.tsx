@@ -176,13 +176,20 @@ function UpdateNudgeWrapper() {
 
 function RootLayoutNav() {
   const { colors } = useTheme();
+  const stackScreenOptions = React.useMemo(
+    () => ({ headerShown: false, contentStyle: { backgroundColor: colors.background } }),
+    [colors.background]
+  );
+  const feedbackOptions = React.useMemo(
+    () => ({ headerShown: true, headerTitle: "Feedback", headerStyle: { backgroundColor: colors.surface }, headerTintColor: colors.text }),
+    [colors.surface, colors.text]
+  );
+  const notificationsOptions = React.useMemo(
+    () => ({ headerShown: true, headerTitle: "Notifiche", headerStyle: { backgroundColor: colors.surface }, headerTintColor: colors.text }),
+    [colors.surface, colors.text]
+  );
   return (
-    <Stack
-      screenOptions={{
-        headerShown: false,
-        contentStyle: { backgroundColor: colors.background },
-      }}
-    >
+    <Stack screenOptions={stackScreenOptions}>
       <Stack.Screen name="welcome" />
       <Stack.Screen name="onboarding" options={{ headerShown: false, gestureEnabled: false, animation: "fade" }} />
       <Stack.Screen name="(auth)" />
@@ -197,8 +204,8 @@ function RootLayoutNav() {
       <Stack.Screen name="moderator" options={{ headerShown: false }} />
       <Stack.Screen name="contest" options={{ headerShown: false }} />
       <Stack.Screen name="privacy-policy" options={{ headerShown: false }} />
-      <Stack.Screen name="feedback/index" options={{ headerShown: true, headerTitle: "Feedback", headerStyle: { backgroundColor: colors.surface }, headerTintColor: colors.text }} />
-      <Stack.Screen name="notifications" options={{ headerShown: true, headerTitle: "Notifiche", headerStyle: { backgroundColor: colors.surface }, headerTintColor: colors.text }} />
+      <Stack.Screen name="feedback/index" options={feedbackOptions} />
+      <Stack.Screen name="notifications" options={notificationsOptions} />
       <Stack.Screen name="sprint-history" options={{ headerShown: false }} />
       <Stack.Screen name="diagnostica-risultati" options={{ headerShown: false }} />
     </Stack>
