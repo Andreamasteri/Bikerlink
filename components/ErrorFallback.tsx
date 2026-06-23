@@ -210,6 +210,18 @@ export function ErrorFallback({
     </Modal>
   ) : null;
 
+  const prodErrorBox = !__DEV__ && !networkError ? (
+    <ScrollView
+      style={[styles.prodErrorScroll, { backgroundColor: theme.backgroundSecondary }]}
+      contentContainerStyle={styles.prodErrorContent}
+      showsVerticalScrollIndicator
+    >
+      <Text style={[styles.errorText, { color: theme.text, fontFamily: monoFont }]} selectable>
+        {`${error.name}: ${error.message}\n\n${(error.stack ?? "").split("\n").slice(0, 12).join("\n")}`}
+      </Text>
+    </ScrollView>
+  ) : null;
+
   if (canAutoRetry) {
     return (
       <View style={[styles.container, { backgroundColor: theme.background }]}>
@@ -258,6 +270,7 @@ export function ErrorFallback({
             ? "Controlla la connessione e riprova."
             : "Ricarica l'app per continuare."}
         </Text>
+        {prodErrorBox}
         <Pressable
           onPress={handleRestart}
           style={({ pressed }) => [
@@ -389,5 +402,13 @@ const styles = StyleSheet.create({
     fontSize: 12,
     lineHeight: 18,
     width: "100%",
+  },
+  prodErrorScroll: {
+    width: "100%",
+    maxHeight: 220,
+    borderRadius: 8,
+  },
+  prodErrorContent: {
+    padding: 12,
   },
 });
