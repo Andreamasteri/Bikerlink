@@ -716,6 +716,31 @@ fi
 echo "════════════════════════════════════════"
 echo ""
 
+# ── GATE VITEST boot-exit-backoff-wiring ─────────────────────
+# Complementa il gate grep sopra: dove grep usa una finestra empirica di 8 righe
+# e un'allow-list statica, il test Vitest usa finestre di contesto più ampie,
+# logica di allow-list completa (ALLOWLIST_CONTEXT, EXCLUDED_FILES) e
+# asserzioni di auto-coerenza (es. il test si auto-verifica). Eseguirli
+# entrambi garantisce copertura belt-and-suspenders: grep è veloce e fallisce
+# per primo; Vitest valida i casi limite che grep non può rilevare.
+echo "════════════════════════════════════════"
+echo "  Gate Vitest boot-exit-backoff-wiring"
+echo "════════════════════════════════════════"
+BOOT_EXIT_TEST_EXIT=0
+npx vitest run --config vitest.config.server.ts server/__tests__/boot-exit-backoff-wiring.test.ts 2>&1 || BOOT_EXIT_TEST_EXIT=$?
+if [ "$BOOT_EXIT_TEST_EXIT" -eq 0 ]; then
+  echo "✅ boot-exit-backoff-wiring: tutti i process.exit(1) risultano protetti da applyCrashBackoff()."
+else
+  echo "❌ boot-exit-backoff-wiring FALLITO (exit ${BOOT_EXIT_TEST_EXIT}) — uno o più process.exit(1) non sono preceduti da applyCrashBackoff()."
+  echo "   Eseguire 'npx vitest run --config vitest.config.server.ts server/__tests__/boot-exit-backoff-wiring.test.ts' localmente per i dettagli."
+  echo "   Consultare i commenti in cima al file di test per le istruzioni su come aggiungere eccezioni consapevoli."
+  echo "════════════════════════════════════════"
+  echo ""
+  exit "$BOOT_EXIT_TEST_EXIT"
+fi
+echo "════════════════════════════════════════"
+echo ""
+
 # ── CLEANUP UTENTI SMOKE RESIDUI POST-MERGE ──────────────────
 echo "════════════════════════════════════════"
 echo "  Cleanup utenti smoke residui"
