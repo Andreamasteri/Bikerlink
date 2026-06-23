@@ -20,6 +20,7 @@ import UptimeWidget from "@/components/UptimeWidget";
 import FloatingWidget from "@/components/FloatingWidget";
 import { sendStartupBeacon } from "@/lib/startup-beacon";
 import { MapReadyGate } from "@/components/layout/MapReadyGate";
+import { useMapConfig } from "@/lib/map-context";
 import {
   stopBackgroundLocationTask,
 } from "@/lib/background-location-task";
@@ -96,6 +97,28 @@ function BackgroundRevocationBanner() {
       </Text>
     </View>
   );
+}
+
+function PermissionGrantBeacon() {
+  const { hasLocationPermission } = useLocationGate();
+  const { isLoading: mapLoading } = useMapConfig();
+  const { user } = useAuth();
+  const prevGranted = useRef(hasLocationPermission);
+
+  useEffect(() => {
+    // Emette il beacon nel momento esatto in cui il permesso passa da
+    // non-concesso a concesso (es. l'utente accetta il dialog OS), così da
+    // correlare il grant con lo stato del gate mappe.
+    if (!prevGranted.current && hasLocationPermission) {
+      sendStartupBeacon("permission_granted_gate_state", {
+        mapLoading,
+        hasUser: !!user,
+      });
+    }
+    prevGranted.current = hasLocationPermission;
+  }, [hasLocationPermission, mapLoading, user]);
+
+  return null;
 }
 
 function StartupGate({ ready, children }: { ready: boolean; children: React.ReactNode }) {
@@ -249,6 +272,7 @@ export default function RootLayout() {
       <StartupGate ready={ready}>
         <NativeUpdateChecker />
         <MapReadyGate>
+          <PermissionGrantBeacon />
           <DeviceMetricsReporter tokenReady={tokenReady} />
           <AppStateHandler />
           <GpsAlwaysGateWrapper />

@@ -1,23 +1,31 @@
-import React, { useEffect, useRef, useState } from "react";
-import { ActivityIndicator, StyleSheet, View } from "react-native";
+import React, { useCallback, useEffect, useRef } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { useMapConfig } from "@/lib/map-context";
-import { useTheme } from "@/lib/theme-context";
 import { sendStartupBeacon } from "@/lib/startup-beacon";
 import { loadTelemetryAlwaysActive } from "@/lib/telemetry-prefs";
 
-// Anti-blocco: se la config mappe tarda troppo, sblocchiamo comunque la UI dopo
-// questo timeout. map-context ha già default sicuri (tile di fallback), quindi
-// l'app resta usabile in stato degradato invece di restare appesa sul loader al
-// cold start (causa potenziale di chiusura automatica sullo splash).
+// Anti-blocco: il gate è pass-through immediato. map-context ha già default
+// sicuri (tile di fallback), quindi l'app resta usabile mentre le 3 query di
+// configurazione mappe si risolvono in background. In precedenza un overlay
+// opaco bloccava l'interazione finché le query non erano pronte: dopo il grant
+// della posizione l'utente percepiva uno schermo bloccato (spinner full-screen)
+// perché il timeout di sicurezza si azzerava ad ogni cambio di dependency.
+// Manteniamo SOLO i beacon per il monitoring delle regressioni.
 export const MAP_READY_GATE_TIMEOUT_MS = 6000;
+
+type UnblockReason = "queries_resolved" | "timeout" | "no_user";
 
 export function MapReadyGate({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
   const { isLoading } = useMapConfig();
-  const { colors } = useTheme();
   const beaconState = useRef<string>("");
-  const [forcePass, setForcePass] = useState(false);
+  const unblockEmitted = useRef(false);
+
+  const emitUnblock = useCallback((reason: UnblockReason) => {
+    if (unblockEmitted.current) return;
+    unblockEmitted.current = true;
+    sendStartupBeacon("map_ready_gate_unblock_reason", { reason });
+  }, []);
 
   useEffect(() => {
     sendStartupBeacon("map_ready_gate_enter", { hasUser: !!user, mapLoading: isLoading });
@@ -39,45 +47,26 @@ export function MapReadyGate({ children }: { children: React.ReactNode }) {
     }
   }, [user, isLoading]);
 
+  // Registra perché il gate è "sbloccato" (passa i children senza attese
+  // percepibili): nessun utente, oppure le query sono già risolte.
   useEffect(() => {
-    if (!user || !isLoading || forcePass) return;
+    if (!user) {
+      emitUnblock("no_user");
+    } else if (!isLoading) {
+      emitUnblock("queries_resolved");
+    }
+  }, [user, isLoading, emitUnblock]);
+
+  // Beacon di timeout per monitoring: se le query restano in loading oltre la
+  // soglia registriamo l'evento (il gate non blocca comunque la UI).
+  useEffect(() => {
+    if (!user || !isLoading) return;
     const timeout = setTimeout(() => {
       sendStartupBeacon("map_ready_gate_timeout");
-      setForcePass(true);
+      emitUnblock("timeout");
     }, MAP_READY_GATE_TIMEOUT_MS);
     return () => clearTimeout(timeout);
-  }, [user, isLoading, forcePass]);
+  }, [user, isLoading, emitUnblock]);
 
-  const showOverlay = user && isLoading && !forcePass;
-
-  // Rendiamo SEMPRE i children (inclusa la Stack di navigazione) così che
-  // Expo Router possa risolvere le route durante il caricamento della config
-  // mappe. L'overlay opaco blocca l'interazione finché non siamo pronti.
-  // FIX: in precedenza children non venivano renderizzati durante il loading →
-  // la Stack veniva smontata → Expo Router mostrava +not-found e non tornava
-  // automaticamente alla route corretta quando la Stack rimontava.
-  return (
-    <View style={styles.container}>
-      {children}
-      {showOverlay && (
-        <View
-          style={[styles.overlay, { backgroundColor: colors.background }]}
-          pointerEvents="box-only"
-        >
-          <ActivityIndicator size="large" color={colors.primary} />
-        </View>
-      )}
-    </View>
-  );
+  return <>{children}</>;
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  overlay: {
-    ...StyleSheet.absoluteFill,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-});
