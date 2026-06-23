@@ -9,6 +9,7 @@ import {
   getActiveRouter,
   CrossGroupRoutingError,
   AreaNotEnabledError,
+  AutoCurvyOfflineError,
 } from "../../routing/router-selector";
 import type { RouteRequest } from "../../routing/graphhopper-adapter";
 import { ROUTING_AREA_OUTCOME_MESSAGES } from "@shared/routing-areas";
@@ -236,6 +237,10 @@ export async function handleCalculateRoute(req: Request, res: Response) {
         code: err.code,
         message: ROUTING_AREA_OUTCOME_MESSAGES[err.code],
       });
+    }
+    // Auto Panoramica + ThinkCentre offline: errore immediato (nessun timeout).
+    if (err instanceof AutoCurvyOfflineError) {
+      return sendError(res, 503, err.message);
     }
     const errMsg = (err as Error)?.message ?? "Errore di routing";
     console.error("[routing] error:", errMsg);

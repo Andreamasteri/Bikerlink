@@ -29,6 +29,19 @@ export class RoutingDisabledError extends Error {
 }
 
 /**
+ * Errore specifico per il profilo Auto Panoramica (auto_curvy) quando il
+ * ThinkCentre è dichiarato offline. Restituito immediatamente senza attendere
+ * il timeout di Valhalla — il profilo richiede il server locale ed è impossibile
+ * degradarlo su cloud (GraphHopper Cloud non è panoramico).
+ */
+export class AutoCurvyOfflineError extends Error {
+  constructor() {
+    super("Profilo non disponibile — servizio locale offline");
+    this.name = "AutoCurvyOfflineError";
+  }
+}
+
+/**
  * Errore: i waypoint non condividono una singola area di routing (rotta tra
  * gruppi diversi). Esito bloccante quando il routing ad aree è attivo.
  */
@@ -356,10 +369,14 @@ async function getActiveRouterInner(
   }
 
   // ThinkCentre spento: tutti i servizi self-hosted (GH, Valhalla) sono offline.
-  // Tutti i profili — compreso auto_curvy — vengono instradati sulla catena cloud
-  // Mapbox → TomTom senza errori. Il profilo panoramico perde la semantica curvy
-  // ma l'utente ottiene comunque un percorso piuttosto che un errore.
+  // Il profilo auto_curvy richiede Valhalla locale e NON può essere degradato su
+  // cloud (GH Cloud produce solo percorso diretto, non panoramico): restituiamo
+  // subito un errore chiaro senza attendere il timeout del server locale.
+  // Gli altri profili vengono instradati sulla catena cloud Mapbox → TomTom.
   if (await isThinkCentrePoweredOff()) {
+    if (req.profile === "auto_curvy") {
+      throw new AutoCurvyOfflineError();
+    }
     console.log("[RouterSelector] ThinkCentre spento — routing su cloud");
     // Catena cloud resiliente: Mapbox → TomTom, con fallback su errore runtime.
     if (process.env.MAPBOX_ACCESS_TOKEN) {

@@ -270,6 +270,9 @@ async function geocodePhoton(query: string): Promise<GeocodeResult[]> {
  * Photon (Komoot) come fallback se il primo fallisce. I risultati sono
  * cachati per 5 minuti. Lancia eccezione solo se entrambi i provider falliscono.
  *
+ * Quando il ThinkCentre è dichiarato offline e il server è self-hosted, salta
+ * direttamente a Photon senza attendere il timeout del server locale.
+ *
  * @param query   Stringa di ricerca (es: "Milano", "Via Roma, Roma")
  * @returns       Array di risultati con nome e coordinate
  */
@@ -277,6 +280,23 @@ export async function geocode(query: string): Promise<GeocodeResult[]> {
   const cacheKey = query.trim().toLowerCase();
   const cached = geocodeCache.get(cacheKey);
   if (cached !== undefined) return cached;
+
+  // ThinkCentre offline: se il geocoder è self-hosted, salta il tentativo locale
+  // e vai direttamente a Photon senza attendere il timeout da 10 secondi.
+  if (isSelfHosted) {
+    const { isThinkCentrePoweredOff } = await import("./thinkcentre-powered-off");
+    if (await isThinkCentrePoweredOff()) {
+      console.log(`[Nominatim] geocode: ThinkCentre offline — fallback diretto a Photon per "${query}"`);
+      try {
+        const results = await geocodePhoton(query);
+        geocodeCache.set(cacheKey, results, GEOCODE_TTL_MS);
+        return results;
+      } catch (photonErr) {
+        console.error(`[Nominatim] geocode: Photon fallito per "${query}": ${(photonErr as Error).message}`);
+        throw new Error("Geocoding non disponibile: ThinkCentre offline e Photon ha fallito");
+      }
+    }
+  }
 
   let results: GeocodeResult[] | null = null;
   const primaryProvider = isSelfHosted ? "Nominatim self-hosted" : "Nominatim pubblico";
@@ -302,9 +322,45 @@ export async function geocode(query: string): Promise<GeocodeResult[]> {
 // ─── Reverse Geocode ──────────────────────────────────────────────────────────
 
 /**
+ * Effettua una chiamata di reverse geocoding verso un URL base specifico.
+ * Usato internamente per selezionare il provider (self-hosted o pubblico).
+ *
+ * @param includeAuthToken  Se true, include X-Nominatim-Token nell'header
+ *                          (solo per il server self-hosted). Deve essere false
+ *                          quando il target è un endpoint pubblico di terze parti,
+ *                          per evitare di trasmettere credenziali private esternamente.
+ */
+async function reverseGeocodeViaUrl(
+  baseUrl: string,
+  lat: number,
+  lon: number,
+  zoom: number,
+  includeAuthToken: boolean,
+): Promise<Response> {
+  const path = `/reverse?format=json&lat=${lat}&lon=${lon}&zoom=${zoom}&accept-language=it`;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), DEFAULT_TIMEOUT_MS);
+  const headers: Record<string, string> = { "User-Agent": USER_AGENT };
+  if (includeAuthToken && SELF_HOSTED_TOKEN) {
+    headers["X-Nominatim-Token"] = SELF_HOSTED_TOKEN;
+  }
+  try {
+    return await fetch(`${baseUrl}${path}`, {
+      headers,
+      signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
  * Reverse geocoding: coordinate → indirizzo leggibile.
  * Le coordinate sono arrotondate a 4 decimali (~11 m) per chiave di cache,
  * con TTL di 10 minuti. Riduce chiamate ripetute per posizioni quasi identiche.
+ *
+ * Quando il ThinkCentre è dichiarato offline e il server è self-hosted, salta
+ * il server locale e usa nominatim.openstreetmap.org direttamente.
  *
  * @param lat   Latitudine
  * @param lon   Longitudine
@@ -317,8 +373,22 @@ export async function reverseGeocode(lat: number, lon: number, zoom = 14): Promi
   const cached = reverseCache.get(cacheKey);
   if (cached !== undefined) return cached;
 
-  const path = `/reverse?format=json&lat=${lat}&lon=${lon}&zoom=${zoom}&accept-language=it`;
-  const res = await nominatimFetch(path);
+  // ThinkCentre offline: se il geocoder è self-hosted, salta il server locale
+  // e usa direttamente il Nominatim pubblico (nominatim.openstreetmap.org).
+  // IMPORTANTE: quando il target è PUBLIC_URL, includeAuthToken=false per evitare
+  // di trasmettere il token privato self-hosted a un endpoint di terze parti.
+  let effectiveUrl = BASE_URL;
+  let useAuthToken = isSelfHosted;
+  if (isSelfHosted) {
+    const { isThinkCentrePoweredOff } = await import("./thinkcentre-powered-off");
+    if (await isThinkCentrePoweredOff()) {
+      console.log(`[Nominatim] reverseGeocode: ThinkCentre offline — fallback a ${PUBLIC_URL}`);
+      effectiveUrl = PUBLIC_URL;
+      useAuthToken = false;
+    }
+  }
+
+  const res = await reverseGeocodeViaUrl(effectiveUrl, lat, lon, zoom, useAuthToken);
   if (!res.ok) {
     throw new Error(`Nominatim reverse HTTP ${res.status}`);
   }
