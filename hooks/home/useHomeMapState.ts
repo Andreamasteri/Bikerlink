@@ -67,6 +67,9 @@ interface ProposalItem {
 }
 export function useHomeMapState() {
   const router = useRouter();
+  const routerRef = useRef(router);
+  routerRef.current = router;
+  const didRedirectRef = useRef(false);
   const { focusLat: focusLatParam, focusLng: focusLngParam } = useLocalSearchParams<{ focusLat?: string; focusLng?: string }>();
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
   const t = useT();
@@ -162,10 +165,11 @@ export function useHomeMapState() {
   });
 
   useEffect(() => {
-    if (!authLoading && !isAuthenticated) {
-      router.replace("/welcome");
+    if (!authLoading && !isAuthenticated && !didRedirectRef.current) {
+      didRedirectRef.current = true;
+      routerRef.current.replace("/welcome");
     }
-  }, [authLoading, isAuthenticated, router]);
+  }, [authLoading, isAuthenticated]);
 
   useEffect(() => {
     if (mapReady) return;
