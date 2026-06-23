@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useRef } from "react";
 import { View, Text, StyleSheet } from "react-native";
 import { useRouter } from "expo-router";
 import { useAuth } from "@/lib/auth-context";
@@ -8,13 +8,15 @@ import { useT } from "@/lib/language-context";
 export default function ModeratorLogsRedirect() {
   const t = useT();
   const router = useRouter();
+  const routerRef = useRef(router);
+  routerRef.current = router;
   const { user } = useAuth();
 
   useEffect(() => {
     if (user?.role === "admin") {
-      router.replace("/admin/moderator-logs");
+      routerRef.current.replace("/admin/moderator-logs");
     }
-  }, [user, router]);
+  }, [user]);
 
   return (
     <View style={styles.container}>

@@ -51,25 +51,36 @@ export function BackgroundNotificationHandler() {
   const isNavReady = !!(navState?.key);
   const pendingNavRef = useRef<{ type?: string; unreadChat?: number } | null>(null);
   const isNavReadyRef = useRef(isNavReady);
+  const routerRef = useRef(router);
 
+  // Sync both refs whenever isNavReady or router changes — no navigation here, safe.
   useEffect(() => {
     isNavReadyRef.current = isNavReady;
-  }, [isNavReady]);
+    routerRef.current = router;
+  }, [isNavReady, router]);
 
+  // Process any pending notification/deep-link navigation once the navigator is ready.
+  // router removed from deps: use routerRef.current to avoid re-firing on every navigation.
   useEffect(() => {
     if (!isNavReady) return;
     if (pendingNavRef.current) {
       const data = pendingNavRef.current;
       pendingNavRef.current = null;
-      navigateFromNotifData(data, router);
+      navigateFromNotifData(data, routerRef.current);
     }
-  }, [isNavReady, router]);
+  }, [isNavReady]);
 
+  // Register notification and deep-link listeners once on mount.
+  // Empty deps: avoids re-registering on every navigation (which caused a loop when
+  // router changed → effect re-ran → getLastNotificationResponseAsync re-fetched →
+  // router.push → router changed again → …).
+  // All navigation uses routerRef.current which is always kept up-to-date by the
+  // sync effect above.
   useEffect(() => {
     function handleNavData(data: { type?: string; unreadChat?: number } | undefined) {
       if (!data) return;
       if (isNavReadyRef.current) {
-        navigateFromNotifData(data, router);
+        navigateFromNotifData(data, routerRef.current);
       } else {
         pendingNavRef.current = data;
       }
@@ -123,7 +134,7 @@ export function BackgroundNotificationHandler() {
 
     const linkingSub = Linking.addEventListener("url", ({ url }) => {
       const parsed = parseDeepLink(url);
-      if (parsed) navigateFromNotifData(parsed, router);
+      if (parsed) navigateFromNotifData(parsed, routerRef.current);
     });
 
     return () => {
@@ -131,7 +142,7 @@ export function BackgroundNotificationHandler() {
       foregroundSub?.remove();
       linkingSub.remove();
     };
-  }, [router]);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return null;
 }
