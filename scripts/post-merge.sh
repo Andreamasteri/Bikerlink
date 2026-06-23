@@ -610,6 +610,112 @@ fi
 echo "════════════════════════════════════════"
 echo ""
 
+# ── GATE process.exit(1) NON PROTETTO DA applyCrashBackoff ───
+# Analisi statica grep: verifica che ogni process.exit(1) nei file server/
+# (escluse __tests__/, scripts/ e i seed standalone) sia preceduto da
+# applyCrashBackoff() nelle 8 righe immediatamente precedenti.
+#
+# Perché questo gate esiste:
+#   Un DB managed lento produceva restart ravvicinati: crash → exit immediato →
+#   restart → DB ancora lento → ricrash → loop. La correzione (applyCrashBackoff)
+#   richiede che OGNI uscita fatale del daemon chiami il backoff prima di
+#   process.exit(1) così il delay distanzia i restart. Questo gate grep cattura
+#   la regressione ad ogni merge (senza dover lanciare la suite Vitest),
+#   complementando il guardrail statico in:
+#   server/__tests__/boot-exit-backoff-wiring.test.ts
+#
+# Esclusioni (allineate al test Vitest corrispondente):
+#   server/__tests__/          — fixture sintetici usati dal test stesso;
+#                                non sono codice daemon eseguito in produzione.
+#   server/scripts/            — CLI tool standalone: comunicano il risultato
+#                                alla shell tramite exit code (0/1/2) e non
+#                                fanno parte del processo server in esecuzione.
+#   server/seed.ts             — script di seeding one-shot, non importato dal
+#   server/seed-fake-users.ts    boot-sequence né da index; il suo process.exit
+#   server/seed-tags-runtime.ts  termina il processo di seeding, non il daemon.
+#
+# Allow-list di contesto (allineata a ALLOWLIST_CONTEXT nel test Vitest):
+#   "Could not close connections in time"
+#     → timeout forzato di gracefulShutdown (SIGTERM/SIGINT non risolto entro
+#       10 s): è uno shutdown volontario che non ha terminato in tempo, non un
+#       crash. Non deve contribuire al contatore crash-loop.
+#
+# Come aggiungere un'eccezione consapevole:
+#   1. Tool/script standalone → spostarlo in server/scripts/ o aggiungerlo a
+#      EXCLUDED_FILES nel test Vitest (e all'elenco --exclude qui sotto).
+#   2. Shutdown graceful intenzionale senza backoff → aggiungere una stringa
+#      univoca del contesto a ALLOWLIST_CONTEXT nel test Vitest con un commento,
+#      e replicare la stessa stringa nel grep -F sotto (sezione allow-list).
+echo "════════════════════════════════════════"
+echo "  Gate process.exit(1) non protetto da applyCrashBackoff"
+echo "════════════════════════════════════════"
+
+EXIT_GATE_VIOLATIONS=()
+
+while IFS= read -r _hit; do
+  # Formato hit: "server/foo/bar.ts:42:  process.exit(1);"
+  _eg_file=$(echo "$_hit" | cut -d: -f1)
+  _eg_linenum=$(echo "$_hit" | cut -d: -f2)
+  _eg_content=$(echo "$_hit" | cut -d: -f3-)
+
+  # Skip righe commentate (// o asterisco leading — es. JSDoc * o /**)
+  _eg_trimmed=$(echo "$_eg_content" | sed 's/^[[:space:]]*//')
+  if [[ "$_eg_trimmed" == //* || "$_eg_trimmed" == \** ]]; then
+    continue
+  fi
+
+  # Allow-list: finestra ±5 righe attorno al process.exit(1) — stessa logica del test.
+  _eg_win_start=$(( _eg_linenum - 5 ))
+  [ "$_eg_win_start" -lt 1 ] && _eg_win_start=1
+  _eg_win_end=$(( _eg_linenum + 2 ))
+  _eg_window=$(sed -n "${_eg_win_start},${_eg_win_end}p" "$_eg_file" 2>/dev/null)
+  if echo "$_eg_window" | grep -qF "Could not close connections in time"; then
+    continue
+  fi
+
+  # Verifica: applyCrashBackoff( nelle 8 righe precedenti (finestra empirica).
+  _eg_look_start=$(( _eg_linenum - 8 ))
+  [ "$_eg_look_start" -lt 1 ] && _eg_look_start=1
+  _eg_preceding=$(sed -n "${_eg_look_start},$(( _eg_linenum - 1 ))p" "$_eg_file" 2>/dev/null)
+  if echo "$_eg_preceding" | grep -qF "applyCrashBackoff("; then
+    continue
+  fi
+
+  EXIT_GATE_VIOLATIONS+=("$_eg_file:$_eg_linenum — $_eg_content")
+
+done < <(grep -rn \
+  --include="*.ts" \
+  --exclude-dir="__tests__" \
+  --exclude-dir="scripts" \
+  --exclude="seed.ts" \
+  --exclude="seed-fake-users.ts" \
+  --exclude="seed-tags-runtime.ts" \
+  -F "process.exit(1)" \
+  server/ \
+  2>/dev/null)
+
+if [ ${#EXIT_GATE_VIOLATIONS[@]} -eq 0 ]; then
+  echo "✅ Gate process.exit(1): nessun exit non protetto rilevato."
+else
+  echo "❌ REGRESSIONE: ${#EXIT_GATE_VIOLATIONS[@]} process.exit(1) senza applyCrashBackoff():"
+  for _v in "${EXIT_GATE_VIOLATIONS[@]}"; do
+    echo "   ⚠️  $_v"
+    echo "      ↳ aggiungere applyCrashBackoff('<label>') nelle righe precedenti,"
+    echo "        oppure spostare il file in server/scripts/ se è un tool standalone."
+  done
+  echo ""
+  echo "   Azioni possibili:"
+  echo "   1. Crash path nel daemon → chiama applyCrashBackoff('<label>') prima di process.exit(1)."
+  echo "   2. Script/tool standalone → spostarlo in server/scripts/ o aggiungere --exclude nel gate."
+  echo "   3. Shutdown graceful intenzionale → aggiungere stringa univoca a ALLOWLIST_CONTEXT"
+  echo "      in server/__tests__/boot-exit-backoff-wiring.test.ts con un commento."
+  echo "════════════════════════════════════════"
+  echo ""
+  exit 1
+fi
+echo "════════════════════════════════════════"
+echo ""
+
 # ── CLEANUP UTENTI SMOKE RESIDUI POST-MERGE ──────────────────
 echo "════════════════════════════════════════"
 echo "  Cleanup utenti smoke residui"
