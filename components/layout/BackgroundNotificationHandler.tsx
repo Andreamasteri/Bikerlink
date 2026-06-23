@@ -142,7 +142,7 @@ export function BackgroundNotificationHandler() {
       foregroundSub?.remove();
       linkingSub.remove();
     };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
 
   return null;
 }
