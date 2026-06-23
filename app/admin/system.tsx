@@ -318,19 +318,25 @@ export default function SystemScreen() {
     refetch();
   }, [refetch]);
 
+  // headerRight è memoizzato con useCallback per evitare che navigation.setOptions
+  // riceva una nuova funzione a ogni render → loop "Maximum update depth exceeded".
+  // L'effect si riattiva solo quando isFetching o handleRefresh cambiano davvero.
+  const headerRight = useCallback(
+    () => (
+      <TouchableOpacity onPress={handleRefresh} style={{ marginRight: 16 }}>
+        {isFetching ? (
+          <ActivityIndicator size="small" color={Colors.accent} />
+        ) : (
+          <Ionicons name="refresh" size={22} color={Colors.accent} />
+        )}
+      </TouchableOpacity>
+    ),
+    [handleRefresh, isFetching],
+  );
+
   useEffect(() => {
-    navigation.setOptions({
-      headerRight: () => (
-        <TouchableOpacity onPress={handleRefresh} style={{ marginRight: 16 }}>
-          {isFetching ? (
-            <ActivityIndicator size="small" color={Colors.accent} />
-          ) : (
-            <Ionicons name="refresh" size={22} color={Colors.accent} />
-          )}
-        </TouchableOpacity>
-      )
-    });
-  }, [navigation, handleRefresh, isFetching]);
+    navigation.setOptions({ headerRight });
+  }, [navigation, headerRight]);
 
   const topPadding = 0;
   const bottomPadding = insets.bottom;
