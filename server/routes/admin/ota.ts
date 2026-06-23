@@ -5,7 +5,7 @@ import { readFileSync, existsSync } from "node:fs";
 import { resolve } from "node:path";
 import { db, withDbRetry } from "../../db";
 import { otaReleases, otaBootEvents } from "@shared/db";
-import { eq, desc, isNull, and, sql, ne, inArray } from "drizzle-orm";
+import { eq, desc, isNull, and, sql, ne, inArray, type SQL } from "drizzle-orm";
 import { sendError } from "../../lib/api-response";
 
 const execFileAsync = promisify(execFile);
@@ -164,11 +164,13 @@ function triggerSyncInBackground(): void {
     .finally(() => { _syncInFlight = null; });
 }
 
-// GET /api/admin/ota/releases — restituisce tutto lo storico release con telemetria
+// GET /api/admin/ota/releases — restituisce lo storico release con telemetria (ultimi 50 di default)
 router.get("/releases", async (req: Request, res: Response) => {
   try {
     const status = typeof req.query.status === "string" ? req.query.status : undefined;
     const syncFirst = req.query.sync !== "false";
+    const limitParam = typeof req.query.limit === "string" ? parseInt(req.query.limit, 10) : 50;
+    const limit = Number.isFinite(limitParam) && limitParam > 0 ? Math.min(limitParam, 500) : 50;
 
     // Non-blocking: serviamo subito il DB e lasciamo il sync EAS in background.
     // I nuovi update appariranno alla chiamata successiva (entro la finestra TTL).
@@ -176,16 +178,115 @@ router.get("/releases", async (req: Request, res: Response) => {
       triggerSyncInBackground();
     }
 
-    const rows = await db.select().from(otaReleases).orderBy(desc(otaReleases.publishedAt));
+    // Filtra per status direttamente in SQL (prima del LIMIT) per garantire risultati completi.
+    // Le release archiviate (soft-delete) sono escluse di default; ?status=archived per vederle.
+    const showArchived = status === "archived";
+    const statusWhere = showArchived
+      ? eq(otaReleases.status, "archived")
+      : status
+        ? and(ne(otaReleases.status, "archived"), eq(otaReleases.status, status))
+        : ne(otaReleases.status, "archived");
 
-    const filtered = status
-      ? rows.filter((r) => r.status === status)
-      : rows;
+    const rows = await db.select().from(otaReleases)
+      .where(statusWhere)
+      .orderBy(desc(otaReleases.publishedAt))
+      .limit(limit);
+
+    const filtered = rows;
 
     return res.json(filtered);
   } catch (err) {
     console.error("[ota] GET /releases error:", err);
     return sendError(res, 500, "Errore recupero OTA releases");
+  }
+});
+
+// POST /api/admin/ota/prune — archivia release rejected e pending obsolete (soft-delete via status='archived').
+// Usa soft-delete invece di DELETE per preservare l'integrità referenziale con ota_boot_events
+// (onDelete: cascade). Solo record con telemetria zero vengono archiviati.
+// Deve stare PRIMA di /:id/... per non essere catturata dal parametro dinamico.
+router.post("/prune", async (_req: Request, res: Response) => {
+  try {
+    const now = new Date();
+
+    // Trova la release approved più recente sul canale production come baseline.
+    // Se non esiste, usiamo un cutoff fisso: mantieni le 20 pending più recenti.
+    const [latestApproved] = await withDbRetry(() => db
+      .select({ publishedAt: otaReleases.publishedAt })
+      .from(otaReleases)
+      .where(and(eq(otaReleases.status, "approved"), eq(otaReleases.channel, "production")))
+      .orderBy(desc(otaReleases.publishedAt))
+      .limit(1));
+
+    // Baseline timestamp: se esiste una release approved su production, archivia tutto ciò che è più vecchio.
+    // Altrimenti: per i rejected archivia tutto; per i pending teniamo i 20 più recenti.
+    const baselineTs = latestApproved?.publishedAt ?? null;
+
+    // Archivia rejected sul canale production con telemetria zero.
+    // Con baseline: solo quelli più vecchi della release approvata.
+    // Senza baseline: tutti i rejected con telemetria zero.
+    let rejectedQuery: SQL<unknown>;
+    if (baselineTs) {
+      rejectedQuery = sql`
+        UPDATE ota_releases
+        SET status = 'archived'
+        WHERE status = 'rejected'
+          AND channel = 'production'
+          AND boot_success_count = 0
+          AND boot_failure_count = 0
+          AND published_at < ${baselineTs}
+      `;
+    } else {
+      rejectedQuery = sql`
+        UPDATE ota_releases
+        SET status = 'archived'
+        WHERE status = 'rejected'
+          AND channel = 'production'
+          AND boot_success_count = 0
+          AND boot_failure_count = 0
+      `;
+    }
+    const rejectedResult = await withDbRetry(() => db.execute(rejectedQuery));
+    const archivedRejected = (rejectedResult as { rowCount?: number }).rowCount ?? 0;
+
+    // Archivia pending obsolete con telemetria zero.
+    // Con baseline: più vecchi della release approvata.
+    // Senza baseline: tutti eccetto i 20 più recenti per canale production.
+    let pendingQuery: SQL<unknown>;
+    if (baselineTs) {
+      pendingQuery = sql`
+        UPDATE ota_releases
+        SET status = 'archived'
+        WHERE status = 'pending'
+          AND channel = 'production'
+          AND boot_success_count = 0
+          AND boot_failure_count = 0
+          AND published_at < ${baselineTs}
+      `;
+    } else {
+      pendingQuery = sql`
+        UPDATE ota_releases
+        SET status = 'archived'
+        WHERE status = 'pending'
+          AND channel = 'production'
+          AND boot_success_count = 0
+          AND boot_failure_count = 0
+          AND id NOT IN (
+            SELECT id FROM ota_releases
+            WHERE status = 'pending' AND channel = 'production'
+            ORDER BY published_at DESC
+            LIMIT 20
+          )
+      `;
+    }
+    const pendingResult = await withDbRetry(() => db.execute(pendingQuery));
+    const archivedOldPending = (pendingResult as { rowCount?: number }).rowCount ?? 0;
+
+    console.log(`[ota][PRUNE] archived ${archivedRejected} rejected + ${archivedOldPending} old pending (soft-delete, telemetry=0 only, baseline=${latestApproved?.publishedAt?.toISOString() ?? "none"})`);
+    return res.json({ ok: true, archivedRejected, archivedOldPending, archivedAt: now.toISOString() });
+  } catch (err) {
+    console.error("[ota] POST /prune error:", err);
+    return sendError(res, 500, "Errore pulizia OTA releases");
   }
 });
 

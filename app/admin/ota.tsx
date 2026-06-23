@@ -4,6 +4,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ScrollView } from "react-native";
 import Colors from "@/constants/colors";
 import OtaPanel from "@/components/admin/ota/OtaPanel";
+import OtaPanelExtra from "@/components/admin/ota/OtaPanelExtra";
 
 export default function AdminOta() {
   const insets = useSafeAreaInsets();
@@ -14,6 +15,7 @@ export default function AdminOta() {
     >
       <View style={styles.card}>
         <OtaPanel />
+        <OtaPanelExtra />
       </View>
     </ScrollView>
   );
