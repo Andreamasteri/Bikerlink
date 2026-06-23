@@ -117,8 +117,12 @@ export default function OtaPanel() {
           onPress: async () => {
             setSyncing(true);
             try {
-              await apiRequest("POST", "/api/admin/ota/sync");
+              const result = await apiRequest("POST", "/api/admin/ota/sync") as { ok: boolean; inserted: number; backfilled: number; syncedAt: string };
               await qc.invalidateQueries({ queryKey: ["/api/admin/ota/releases"] });
+              const msg = result.inserted > 0
+                ? `${result.inserted} nuova/e release sincronizzata/e da EAS.`
+                : "Nessuna nuova release su EAS. Lista aggiornata.";
+              Alert.alert("Sync completato", msg);
             } catch (err: unknown) {
               Alert.alert("Errore sync", err instanceof Error ? err.message : "Impossibile sincronizzare con EAS");
             } finally {

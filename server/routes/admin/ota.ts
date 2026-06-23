@@ -41,7 +41,7 @@ async function easGraphQL(query: string, variables?: Record<string, unknown>): P
 // Sincronizza il branch EAS `production` nel DB locale per tracking admin.
 // Task #2503: i nuovi update sincronizzati da EAS finiscono come `pending` —
 // l'admin li approva poi manualmente dal pannello.
-async function syncProductionUpdates(): Promise<void> {
+async function syncProductionUpdates(): Promise<{ inserted: number; backfilled: number }> {
   const query = `
     query GetBranchUpdates($appId: String!) {
       app {
@@ -67,14 +67,15 @@ async function syncProductionUpdates(): Promise<void> {
     data = await easGraphQL(query, { appId: EAS_PROJECT_ID }) as typeof data;
   } catch (err) {
     console.warn("[ota-sync] EAS GraphQL error:", err);
-    return;
+    throw err;
   }
 
   const branches = data?.app?.byId?.updateBranches ?? [];
   const productionBranch = branches.find((b) => b.name === "production");
   const updates = productionBranch?.updates ?? [];
-  if (updates.length === 0) return;
+  if (updates.length === 0) return { inserted: 0, backfilled: 0 };
 
+  let inserted = 0;
   for (const upd of updates) {
     const existing = await withDbRetry(() => db.select({ id: otaReleases.id })
       .from(otaReleases)
@@ -94,6 +95,7 @@ async function syncProductionUpdates(): Promise<void> {
       status: "pending",
       publishedAt: upd.createdAt ? new Date(upd.createdAt) : new Date(),
     }).onConflictDoNothing());
+    inserted++;
   }
 
   // Backfill groupId per record vecchi che ne erano sprovvisti
@@ -122,6 +124,7 @@ async function syncProductionUpdates(): Promise<void> {
     .from(otaReleases)
     .where(isNull(otaReleases.otaVersion)));
 
+  let backfilled = 0;
   for (const rec of noVersionRecords) {
     const match = rec.message?.match(/^\[OTA:([\d.]+)\]/);
     if (!match) continue;
@@ -136,7 +139,10 @@ async function syncProductionUpdates(): Promise<void> {
         .set({ otaVersion: parsed })
         .where(eq(otaReleases.id, rec.id)));
     }
+    backfilled++;
   }
+
+  return { inserted, backfilled };
 }
 
 // Cache TTL in-memory di 60s sul sync EAS, con dedup delle richieste in volo.
@@ -144,7 +150,7 @@ async function syncProductionUpdates(): Promise<void> {
 // sincrona (lenta, anche >5s) ad ogni run → la probe OTA andava in timeout.
 const SYNC_TTL_MS = 60_000;
 let _lastSyncAt = 0;
-let _syncInFlight: Promise<void> | null = null;
+let _syncInFlight: Promise<{ inserted: number; backfilled: number }> | null = null;
 
 // Innesca il sync EAS in background senza bloccare il chiamante: se è già
 // avvenuto da meno di 60s (o è già in corso) non fa nulla. Non viene mai
@@ -153,8 +159,8 @@ function triggerSyncInBackground(): void {
   if (Date.now() - _lastSyncAt < SYNC_TTL_MS) return;
   if (_syncInFlight) return;
   _syncInFlight = syncProductionUpdates()
-    .then(() => { _lastSyncAt = Date.now(); })
-    .catch((err) => { console.warn("[ota] background sync warning:", err); })
+    .then(() => { _lastSyncAt = Date.now(); return { inserted: 0, backfilled: 0 }; })
+    .catch((err) => { console.warn("[ota] background sync warning:", err); return { inserted: 0, backfilled: 0 }; })
     .finally(() => { _syncInFlight = null; });
 }
 
@@ -180,6 +186,27 @@ router.get("/releases", async (req: Request, res: Response) => {
   } catch (err) {
     console.error("[ota] GET /releases error:", err);
     return sendError(res, 500, "Errore recupero OTA releases");
+  }
+});
+
+// POST /api/admin/ota/sync — forza una sincronizzazione sincrona con EAS e restituisce JSON con il risultato.
+// Questa route DEVE stare PRIMA di /:id/... per non essere catturata dal parametro dinamico.
+router.post("/sync", async (_req: Request, res: Response) => {
+  if (!process.env.EAS_TOKEN) {
+    return res.status(503).json({ ok: false, message: "EAS_TOKEN non configurato sul server. Impossibile contattare EAS." });
+  }
+  // Azzera la cache TTL così il sync effettua davvero la chiamata GraphQL
+  _lastSyncAt = 0;
+  _syncInFlight = null;
+  try {
+    const { inserted, backfilled } = await syncProductionUpdates();
+    _lastSyncAt = Date.now();
+    console.log(`[ota][SYNC] sync manuale completato: ${inserted} nuove, ${backfilled} backfill`);
+    return res.json({ ok: true, inserted, backfilled, syncedAt: new Date().toISOString() });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error("[ota] POST /sync error:", err);
+    return res.status(502).json({ ok: false, message: `Errore sincronizzazione EAS: ${msg}` });
   }
 });
 
