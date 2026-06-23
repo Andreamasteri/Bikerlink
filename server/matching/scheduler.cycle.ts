@@ -91,7 +91,9 @@ export function forceUnlockMatching(): { wasRunning: boolean; lastStartAt: numbe
 let lastHeartbeatPersistAt = 0;
 const HEARTBEAT_PERSIST_THROTTLE_MS = 30_000;
 
-function recordSchedulerHeartbeat(tickResult: string): void {
+// Esportato per la copertura di test diretta (Task #4804): verifica che ogni
+// path di skip scriva lastTickAt/lastTickResult e rispetti il throttle 30s.
+export function recordSchedulerHeartbeat(tickResult: string): void {
   const now = Date.now();
   // Throttle: triggerMatchingRun può essere invocato on-demand (login/admin)
   // oltre che dal tick orario; evitiamo un upsert per ogni chiamata.
