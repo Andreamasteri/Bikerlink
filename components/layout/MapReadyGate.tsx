@@ -48,19 +48,35 @@ export function MapReadyGate({ children }: { children: React.ReactNode }) {
     return () => clearTimeout(timeout);
   }, [user, isLoading, forcePass]);
 
-  if (user && isLoading && !forcePass) {
-    return (
-      <View style={[styles.mapGateLoader, { backgroundColor: colors.background }]}>
-        <ActivityIndicator size="large" color={colors.primary} />
-      </View>
-    );
-  }
-  return <>{children}</>;
+  const showOverlay = user && isLoading && !forcePass;
+
+  // Rendiamo SEMPRE i children (inclusa la Stack di navigazione) così che
+  // Expo Router possa risolvere le route durante il caricamento della config
+  // mappe. L'overlay opaco blocca l'interazione finché non siamo pronti.
+  // FIX: in precedenza children non venivano renderizzati durante il loading →
+  // la Stack veniva smontata → Expo Router mostrava +not-found e non tornava
+  // automaticamente alla route corretta quando la Stack rimontava.
+  return (
+    <View style={styles.container}>
+      {children}
+      {showOverlay && (
+        <View
+          style={[styles.overlay, { backgroundColor: colors.background }]}
+          pointerEvents="box-only"
+        >
+          <ActivityIndicator size="large" color={colors.primary} />
+        </View>
+      )}
+    </View>
+  );
 }
 
 const styles = StyleSheet.create({
-  mapGateLoader: {
+  container: {
     flex: 1,
+  },
+  overlay: {
+    ...StyleSheet.absoluteFill,
     alignItems: "center",
     justifyContent: "center",
   },
