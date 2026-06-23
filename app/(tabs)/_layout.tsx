@@ -128,11 +128,16 @@ export default function TabLayout() {
     return () => clearTimeout(timer);
   }, []);
 
+  const didRedirectRef = useRef(false);
+  const routerRef = useRef(router);
+  routerRef.current = router;
+
   useEffect(() => {
-    if (!isLoading && hasWaited && user === null) {
-      router.replace("/(auth)/login");
+    if (!isLoading && hasWaited && user === null && !didRedirectRef.current) {
+      didRedirectRef.current = true;
+      routerRef.current.replace("/(auth)/login" as Href);
     }
-  }, [user, isLoading, hasWaited, router]);
+  }, [user, isLoading, hasWaited]);
 
   const isBikerOrCoppia = user?.userType === "biker" || user?.userType === "coppia";
   const isZavorrina = user?.userType === "zavorrina";
