@@ -56,7 +56,7 @@ module.exports = defineConfig([
       // che contengono ".partN".  I path statici sono già coperti dal
       // grep gate in scripts/post-merge.sh; questa regola chiude il
       // gap per i path costruiti dinamicamente (template literal).
-      "local-rules/no-part-nav": "warn",
+      "local-rules/no-part-nav": "error",
 
       // ── variabili inutilizzate ──────────────────────────────
       "no-unused-vars": "off",
