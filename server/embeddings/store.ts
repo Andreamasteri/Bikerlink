@@ -304,7 +304,18 @@ export async function findSimilar(
   const maxDistance = 1 - Math.max(0, Math.min(1, minSimilarity));
   const efSearch = await getEfSearch();
 
-  const client = await withBgDbSlot(() => pool.connect());
+  // Budget connessioni bg: lo slot DEVE coprire l'INTERA vita della connessione
+  // (connect + query HNSW + release), non la sola acquisizione. findSimilar è
+  // chiamata in loop dai matcher di affinità (Bio/Music/Telemetry); la query
+  // pgvector può essere lenta (sequential scan se l'indice HNSW manca). Il
+  // pattern precedente `withBgDbSlot(() => pool.connect())` rilasciava lo slot
+  // SUBITO dopo il connect, lasciando la query a trattenere una connessione
+  // FUORI dal budget → un burst di chiamate concorrenti satura le 10 connessioni
+  // del pool e affama il traffico utente (sintomo prod: "pool saturo ma 0 query
+  // attive", connessioni estratte e tenute mentre il thread elabora). NON
+  // avvolgere i chiamanti in withBgDbSlot: l'annidamento può andare in deadlock.
+  return await withBgDbSlot(async () => {
+  const client = await pool.connect();
   try {
     await warnIfHnswIndexMissing(client);
     await client.query("BEGIN");
@@ -360,6 +371,7 @@ export async function findSimilar(
   } finally {
     client.release();
   }
+  });
 }
 
 /**
