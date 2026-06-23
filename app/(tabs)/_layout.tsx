@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState } from "react";
+import React, { useRef, useEffect, useState, useCallback, useMemo } from "react";
 import { Tabs, useRouter, type Href } from "expo-router";
 import { useColors } from "@/hooks/useColors";
 import { Animated } from "react-native";
@@ -177,8 +177,9 @@ export default function TabLayout() {
     enabled: !!user,
   });
   const tabBarPaddingBottom = insets.bottom;
+  const tabBarHeight = 60 + insets.bottom;
 
-  const renderCustomTabBar = (props: BottomTabBarProps) => {
+  const renderCustomTabBar = useCallback((props: BottomTabBarProps) => {
     const { state, descriptors, navigation } = props;
 
     const tabs: TabItem[] = state.routes
@@ -236,7 +237,7 @@ export default function TabLayout() {
         tabBarPaddingBottom={tabBarPaddingBottom}
       />
     );
-  };
+  }, [showCalibrationBadge, taskbarStyle, tabBarHeight, tabBarPaddingBottom]);
   const gpsTabHref: Href | null | undefined = undefined;
 
   const garageIsEmpty: boolean | undefined = isBikerOrCoppia
@@ -275,7 +276,22 @@ export default function TabLayout() {
   // ── Stato disponibilità (per icona cromatica "Status") ──────────────────
   const statusIsAvailable = profileData?.isAvailable || false;
 
-  const tabBarHeight = 60 + insets.bottom;
+  const tabScreens = useMemo(
+    () => getTabScreens(t, {
+      gpsTabHref,
+      globalTrackingActive,
+      globalSprintMeasuring,
+      hasActiveMatches,
+      statusIsAvailable,
+      newMatchCount,
+      unreadCount,
+      showCalibrationBadge,
+      isBikerOrCoppia,
+    }),
+    [t, gpsTabHref, globalTrackingActive, globalSprintMeasuring,
+     hasActiveMatches, statusIsAvailable, newMatchCount, unreadCount,
+     showCalibrationBadge, isBikerOrCoppia]
+  );
 
   return (
     <>
@@ -304,17 +320,7 @@ export default function TabLayout() {
           headerTitleStyle: { fontFamily: "Inter_600SemiBold" },
         }}
       >
-        {getTabScreens(t, {
-          gpsTabHref,
-          globalTrackingActive,
-          globalSprintMeasuring,
-          hasActiveMatches,
-          statusIsAvailable,
-          newMatchCount,
-          unreadCount,
-          showCalibrationBadge,
-          isBikerOrCoppia
-        })}
+        {tabScreens}
       </Tabs>
 
       {globalSprintMeasuring && (

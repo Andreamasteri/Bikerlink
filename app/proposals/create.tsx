@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useCallback, useMemo } from "react";
 import { View, Text, TextInput, TouchableOpacity, ActivityIndicator } from "react-native";
 import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollViewCompat";
 import { Stack } from "expo-router";
@@ -54,21 +54,23 @@ export default function CreateProposalScreen() {
     formatDateInput, formatTimeInput, autoCompleteTime,
   } = useCreateProposalForm();
 
+  const headerLeft = useCallback(() => (
+    <TouchableOpacity onPress={() => router.back()}>
+      <Ionicons name="close" size={24} color={Colors.text} />
+    </TouchableOpacity>
+  ), [router]);
+
+  const screenOptions = useMemo(() => ({
+    headerShown: true as const,
+    title: isZavorrina ? "Richieste" : "Nuova Proposta",
+    headerStyle: { backgroundColor: Colors.surface },
+    headerTintColor: Colors.text,
+    headerLeft,
+  }), [isZavorrina, headerLeft]);
+
   return (
     <>
-      <Stack.Screen
-        options={{
-          headerShown: true,
-          title: isZavorrina ? "Richieste" : "Nuova Proposta",
-          headerStyle: { backgroundColor: Colors.surface },
-          headerTintColor: Colors.text,
-          headerLeft: () => (
-            <TouchableOpacity onPress={() => router.back()}>
-              <Ionicons name="close" size={24} color={Colors.text} />
-            </TouchableOpacity>
-          ),
-        }}
-      />
+      <Stack.Screen options={screenOptions} />
       <KeyboardAwareScrollViewCompat
         style={styles.container}
         contentContainerStyle={styles.content}

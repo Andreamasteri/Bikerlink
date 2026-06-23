@@ -90,6 +90,7 @@ Controlla:
 - [ ] Versioni pinned critiche rispettate (`react-native-maps@1.18.0`, ecc.)
 - [ ] Platform checks (`Platform.OS`) presenti dove richiesto dalla skill expo
 - [ ] Safe area e insets web gestiti su tutte le schermate toccate
+- [ ] **React Navigation prop inline** (skill `rnav-memo-guard`): nessuna funzione arrow inline su `tabBar`, `tabBarIcon`, `headerLeft`, `headerRight`, `header` — verificare con `bash scripts/check-rnav-inline-props.sh`
 
 **Sistema B:**
 - [ ] Metro risponde su porta 8081

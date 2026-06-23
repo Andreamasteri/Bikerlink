@@ -279,6 +279,23 @@ fi
 echo "════════════════════════════════════════"
 echo ""
 
+# ── GATE REACT NAVIGATION INLINE PROP FUNCTIONS ───────────────
+# Funzioni inline passate a tabBar, tabBarIcon, headerLeft, headerRight
+# causano "Maximum update depth exceeded" — crash globale al login.
+# Fix: useCallback per le funzioni, useMemo per gli oggetti options.
+# Vedi: .agents/skills/rnav-memo-guard/SKILL.md
+echo "════════════════════════════════════════"
+echo "  Gate React Navigation inline props"
+echo "════════════════════════════════════════"
+RNAV_EXIT=0
+bash scripts/check-rnav-inline-props.sh || RNAV_EXIT=$?
+echo "════════════════════════════════════════"
+echo ""
+if [ "$RNAV_EXIT" -ne 0 ]; then
+  echo "❌ Gate rnav-inline-props fallito — correggere prima di procedere."
+  exit "$RNAV_EXIT"
+fi
+
 # ── GUARD PORTE .replit (MAPPING [[ports]] + DEPLOY) ─────────
 # REGOLA BLOCCANTE (replit.md § Preferenze utente):
 # Nessun agente può modificare [[ports]] senza autorizzazione esplicita utente.
