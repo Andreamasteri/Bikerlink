@@ -73,7 +73,87 @@ const RETRY_DELAYS = [2000, 5000, 10000];
 // appesa all'infinito → userQuery.isLoading resta true → schermo nero +
 // spinner. Allo scadere abortiamo: l'abort-per-timeout è ritentabile, l'abort
 // per cancellazione della query (unmount) no.
-const AUTH_FETCH_TIMEOUT_MS = 13000;
+export const AUTH_FETCH_TIMEOUT_MS = 13000;
+
+interface AuthQueryFnDeps {
+  hadSessionRef: { current: boolean };
+  setSessionExpired: (v: boolean) => void;
+}
+
+/**
+ * Factory del queryFn di bootstrap (/api/auth/me). Estratto come funzione pura
+ * (parametrizzata sulle sole dipendenze stateful: hadSessionRef e
+ * setSessionExpired) così da poterlo testare in isolamento — in particolare il
+ * timeout dedicato e la distinzione abort-per-timeout (ritentabile) vs
+ * abort-per-cancellazione (AbortError ri-lanciato, niente retry).
+ */
+export function createAuthQueryFn({ hadSessionRef, setSessionExpired }: AuthQueryFnDeps) {
+  // Custom queryFn: returns null on 401 (triggers no retry), throws on network errors (triggers retry)
+  return async ({ signal }: { signal?: AbortSignal }) => {
+    const baseUrl = getApiUrl();
+    const url = new URL("/api/auth/me", baseUrl);
+
+    // Timeout dedicato: se /api/auth/me non risponde entro AUTH_FETCH_TIMEOUT_MS
+    // abortiamo il fetch così la query va in errore (e può ritentare) invece di
+    // restare appesa per sempre tenendo l'app sullo spinner su sfondo nero.
+    const controller = new AbortController();
+    let timedOut = false;
+    const timer = setTimeout(() => {
+      timedOut = true;
+      controller.abort(new Error(`auth_timeout_${AUTH_FETCH_TIMEOUT_MS}ms`));
+    }, AUTH_FETCH_TIMEOUT_MS);
+    // Inoltra l'eventuale cancellazione di React Query (es. unmount) al nostro
+    // controller, così la query cancellata aborta come prima.
+    if (signal) {
+      const ext = signal as AbortSignal & { reason?: unknown };
+      if (ext.aborted) {
+        controller.abort(ext.reason);
+      } else {
+        ext.addEventListener("abort", () => controller.abort(ext.reason), { once: true });
+      }
+    }
+
+    let res: Response;
+    try {
+      res = await fetch(url.toString(), {
+        headers: authFetchHeaders(),
+        credentials: "include",
+        signal: controller.signal
+      });
+    } catch (err: unknown) {
+      if (err instanceof Error && err.name === "AbortError") {
+        // Timeout → trattalo come errore di rete così scatta il retry.
+        // Cancellazione query (unmount) → ri-lancia AbortError: niente retry.
+        if (timedOut) throw new Error("network_unavailable");
+        throw err;
+      }
+      // Network error / ECONNREFUSED → throw to trigger React Query retry
+      throw new Error("network_unavailable");
+    } finally {
+      clearTimeout(timer);
+    }
+
+    if (res.status === 401) {
+      // Session expired or never logged in — return null (no retry needed)
+      if (hadSessionRef.current) {
+        setSessionExpired(true);
+      }
+      return null;
+    }
+
+    if (!res.ok) {
+      // 5xx or other server errors → throw to trigger retry
+      throw new Error(`server_error_${res.status}`);
+    }
+
+    const user = await res.json();
+    // Successful auth — save marker and clear any expired flag
+    hadSessionRef.current = true;
+    AsyncStorage.setItem(HAD_SESSION_KEY, "true").catch(() => {});
+    setSessionExpired(false);
+    return user as SafeUser;
+  };
+}
 
 interface AuthContextValue {
   user: SafeUser | null | undefined;
@@ -332,71 +412,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
   }, []);
 
-  // Custom queryFn: returns null on 401 (triggers no retry), throws on network errors (triggers retry)
-  const authQueryFn = async ({ signal }: { signal?: AbortSignal }) => {
-    const baseUrl = getApiUrl();
-    const url = new URL("/api/auth/me", baseUrl);
-
-    // Timeout dedicato: se /api/auth/me non risponde entro AUTH_FETCH_TIMEOUT_MS
-    // abortiamo il fetch così la query va in errore (e può ritentare) invece di
-    // restare appesa per sempre tenendo l'app sullo spinner su sfondo nero.
-    const controller = new AbortController();
-    let timedOut = false;
-    const timer = setTimeout(() => {
-      timedOut = true;
-      controller.abort(new Error(`auth_timeout_${AUTH_FETCH_TIMEOUT_MS}ms`));
-    }, AUTH_FETCH_TIMEOUT_MS);
-    // Inoltra l'eventuale cancellazione di React Query (es. unmount) al nostro
-    // controller, così la query cancellata aborta come prima.
-    if (signal) {
-      const ext = signal as AbortSignal & { reason?: unknown };
-      if (ext.aborted) {
-        controller.abort(ext.reason);
-      } else {
-        ext.addEventListener("abort", () => controller.abort(ext.reason), { once: true });
-      }
-    }
-
-    let res: Response;
-    try {
-      res = await fetch(url.toString(), {
-        headers: authFetchHeaders(),
-        credentials: "include",
-        signal: controller.signal
-      });
-    } catch (err: unknown) {
-      if (err instanceof Error && err.name === "AbortError") {
-        // Timeout → trattalo come errore di rete così scatta il retry.
-        // Cancellazione query (unmount) → ri-lancia AbortError: niente retry.
-        if (timedOut) throw new Error("network_unavailable");
-        throw err;
-      }
-      // Network error / ECONNREFUSED → throw to trigger React Query retry
-      throw new Error("network_unavailable");
-    } finally {
-      clearTimeout(timer);
-    }
-
-    if (res.status === 401) {
-      // Session expired or never logged in — return null (no retry needed)
-      if (hadSessionRef.current) {
-        setSessionExpired(true);
-      }
-      return null;
-    }
-
-    if (!res.ok) {
-      // 5xx or other server errors → throw to trigger retry
-      throw new Error(`server_error_${res.status}`);
-    }
-
-    const user = await res.json();
-    // Successful auth — save marker and clear any expired flag
-    hadSessionRef.current = true;
-    AsyncStorage.setItem(HAD_SESSION_KEY, "true").catch(() => {});
-    setSessionExpired(false);
-    return user as SafeUser;
-  };
+  // queryFn estratto in createAuthQueryFn (vedi sopra) per testabilità: stessa
+  // logica di timeout/abort, parametrizzata su hadSessionRef e setSessionExpired.
+  const authQueryFn = createAuthQueryFn({ hadSessionRef, setSessionExpired });
 
   const userQuery = useQuery<SafeUser | null>({
     queryKey: ["/api/auth/me"],
