@@ -1,1 +1,1 @@
-Fix crash schermata Admin › Sistema — loop infinito "Maximum update depth exceeded": navigation.setOptions riceveva una nuova funzione inline a ogni render (headerRight creato sul posto nel useEffect), causando un ciclo render→effect→render. Fix: headerRight estratto in useCallback con deps [handleRefresh, isFetching] — setOptions riceve un nuovo riferimento solo quando cambia davvero qualcosa.
+
