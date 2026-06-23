@@ -117,7 +117,8 @@ export default function OtaPanel() {
           onPress: async () => {
             setSyncing(true);
             try {
-              const result = await apiRequest("POST", "/api/admin/ota/sync") as { ok: boolean; inserted: number; backfilled: number; syncedAt: string };
+              const res = await apiRequest("POST", "/api/admin/ota/sync");
+              const result = await res.json() as { ok: boolean; inserted: number; backfilled: number; syncedAt: string };
               await qc.invalidateQueries({ queryKey: ["/api/admin/ota/releases"] });
               const msg = result.inserted > 0
                 ? `${result.inserted} nuova/e release sincronizzata/e da EAS.`
