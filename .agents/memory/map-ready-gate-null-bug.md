@@ -32,10 +32,19 @@ return <>{children}</>;
 //  restano solo come monitoring e non cambiano mai il render)
 ```
 
-## Safety net aggiuntivo
+## Safety net aggiuntivo — `app/+not-found.tsx` DEVE essere dichiarativo
 
-`app/+not-found.tsx` usa `useAuth()` per redirect automatico:
-- Utente autenticato → `router.replace("/(tabs)")` immediato
-- Utente non autenticato → `router.replace("/")` dopo 2 secondi
+`app/+not-found.tsx` reindirizza con `<Redirect>` di expo-router basandosi su `useAuth()`:
 
-Questo rompe il loop anche se il gate si comporta male in futuro.
+```tsx
+const { isAuthenticated, isLoading } = useAuth();
+if (isLoading) return <View style={{ flex: 1 }} />; // attendi auth, no schermata rotta
+return <Redirect href={(isAuthenticated ? "/(tabs)" : "/") as Href} />;
+```
+
+**Why (regressione reale, OTA 152/153):** la versione precedente combinava `router.replace(...)` imperativo dentro `useEffect` + un `<Stack.Screen options={{ title: "Oops!" }} />`. L'oggetto `options` veniva ricreato a ogni render → expo-router chiamava `navigation.setOptions` in un mount-effect in loop → **"Maximum update depth exceeded"** → ErrorBoundary ("Qualcosa è andato storto"). Il crash NON appariva in `app_crash_logs` (il prod riporta a `/api/admin/client-error` che fa solo console.log); diagnosi via `fetch_deployment_logs` filtrando `Maximum update depth`.
+
+**How to apply:**
+- In `+not-found.tsx` (e in qualsiasi schermo di redirect) usa `<Redirect>` dichiarativo, MAI `router.replace`/`router.push` dentro `useEffect`, e MAI `<Stack.Screen options={{...}}>` con literal inline (ricrea l'oggetto ogni render).
+- Il cast `as Href` serve perché `"/(tabs)"` (group route) non è nel tipo `Href` generato; è runtime-safe finché la route esiste.
+- Attendi `isLoading === false` prima di decidere il redirect, così eviti decisioni premature (al massimo un frame bianco, mai un loop).
