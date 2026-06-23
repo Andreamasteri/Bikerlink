@@ -303,8 +303,11 @@ export async function runBootPhase3DbInit(): Promise<void> {
   });
 
   try {
-    const { recordBootSignal } = await import("./ai/watchdog/restart-monitor");
+    const { recordBootSignal, checkAndAlertDbSlowBoot } = await import("./ai/watchdog/restart-monitor");
     await recordBootSignal();
+    // Se il backoff anti crash-loop è scattato ≥N volte di fila (DB managed lento
+    // al boot), allerta gli admin. Throttlato internamente per non spammare.
+    await checkAndAlertDbSlowBoot();
   } catch (e) {
     console.warn("[INIT] Phase 3: recordBootSignal failed (non-fatal):", e);
   }

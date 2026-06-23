@@ -7,10 +7,12 @@ import { systemSignals } from "@shared/db";
 import { desc, eq, and, gt } from "drizzle-orm";
 import { sendSystemAlertPushToAdmins } from "../../push-notifications";
 import { storage } from "../../storage";
+import { evaluateCrashBackoffAlert } from "../../lib/crash-backoff";
 
 const SOURCE = "app" as const;
 const BOOT_METRIC = "server.boot";
 const RESTART_METRIC = "server.unexpected_restart";
+const DB_SLOW_BOOT_METRIC = "server.db_slow_boot";
 export const CRASH_REASON_METRIC = "server.crash_reason";
 const CRASH_LOG_PATH = "/tmp/server-crash.log";
 const CRASH_LOG_MAX_LINES = 50;
@@ -194,6 +196,62 @@ export async function recordBootSignal(): Promise<void> {
     }
   } catch (err) {
     console.warn("[restart-monitor] recordBootSignal error (non-fatal):", err);
+  }
+}
+
+// ── DB-slow-boot alert ────────────────────────────────────────────────────────
+// Il backoff anti crash-loop (lib/crash-backoff.ts) sopravvive a un Postgres
+// managed lento al boot, ma se la lentezza persiste il server resta degradato in
+// silenzio. Qui, a boot avvenuto (DB pronto), controlliamo se il backoff è
+// scattato ≥N volte nella finestra recente: in tal caso emettiamo un alert
+// (system_signal + push admin), throttlato a monte da evaluateCrashBackoffAlert.
+export async function checkAndAlertDbSlowBoot(): Promise<void> {
+  try {
+    const decision = evaluateCrashBackoffAlert();
+    if (!decision.emit) return;
+
+    const { crashCount, windowMinutes, threshold } = decision;
+    console.warn(
+      `[restart-monitor] ⚠️  DB lento al boot — backoff anti crash-loop scattato ${crashCount} volte ` +
+        `negli ultimi ${windowMinutes} min (soglia ${threshold}). Postgres managed probabilmente degradato.`,
+    );
+
+    try {
+      await db.insert(systemSignals).values({
+        source: SOURCE,
+        metric: DB_SLOW_BOOT_METRIC,
+        severity: "high",
+        value: crashCount,
+        unit: "crash",
+        details: {
+          crashCount,
+          windowMinutes,
+          threshold,
+          pid: process.pid,
+        } as object,
+      });
+    } catch (sigErr) {
+      console.warn("[restart-monitor] insert db_slow_boot signal fallito (non-fatal):", sigErr);
+    }
+
+    try {
+      const n = await sendSystemAlertPushToAdmins(
+        "🐢 DB lento al boot — backoff attivo",
+        `Il backoff anti crash-loop è scattato ${crashCount} volte negli ultimi ${windowMinutes} min. ` +
+          `Il Postgres managed sembra degradato all'avvio — da indagare.`,
+        {
+          type: "db_slow_boot",
+          crashCount,
+          windowMinutes,
+          threshold,
+        },
+      );
+      if (n > 0) console.log(`[restart-monitor] alert DB lento al boot inviato a ${n} admin`);
+    } catch (pushErr) {
+      console.warn("[restart-monitor] push DB lento al boot fallita (non-fatal):", pushErr);
+    }
+  } catch (err) {
+    console.warn("[restart-monitor] checkAndAlertDbSlowBoot error (non-fatal):", err);
   }
 }
 
