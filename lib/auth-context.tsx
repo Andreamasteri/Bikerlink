@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useMemo, useState, useEffect, useRef, ReactNode } from "react";
+import React, { createContext, useContext, useMemo, useState, useEffect, useRef, useCallback, ReactNode } from "react";
 import { Platform } from "react-native";
 import { router } from "expo-router";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -68,12 +68,21 @@ async function drainPendingOnboardingTags(): Promise<void> {
 // Retry delays: 2s, 5s, 10s
 const RETRY_DELAYS = [2000, 5000, 10000];
 
+// Timeout sul fetch di bootstrap /api/auth/me: se il server di produzione è
+// saturo/lento (pool DB saturo, ping multi-secondo) la richiesta verrebbe
+// appesa all'infinito → userQuery.isLoading resta true → schermo nero +
+// spinner. Allo scadere abortiamo: l'abort-per-timeout è ritentabile, l'abort
+// per cancellazione della query (unmount) no.
+const AUTH_FETCH_TIMEOUT_MS = 13000;
+
 interface AuthContextValue {
   user: SafeUser | null | undefined;
   isLoading: boolean;
   isAuthenticated: boolean;
   sessionExpired: boolean;
   isReconnecting: boolean;
+  authFailed: boolean;
+  retryAuth: () => void;
   loginMutation: ReturnType<typeof useLoginMutation>;
   registerMutation: ReturnType<typeof useRegisterMutation>;
   logoutMutation: ReturnType<typeof useLogoutMutation>;
@@ -328,18 +337,44 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const baseUrl = getApiUrl();
     const url = new URL("/api/auth/me", baseUrl);
 
+    // Timeout dedicato: se /api/auth/me non risponde entro AUTH_FETCH_TIMEOUT_MS
+    // abortiamo il fetch così la query va in errore (e può ritentare) invece di
+    // restare appesa per sempre tenendo l'app sullo spinner su sfondo nero.
+    const controller = new AbortController();
+    let timedOut = false;
+    const timer = setTimeout(() => {
+      timedOut = true;
+      controller.abort(new Error(`auth_timeout_${AUTH_FETCH_TIMEOUT_MS}ms`));
+    }, AUTH_FETCH_TIMEOUT_MS);
+    // Inoltra l'eventuale cancellazione di React Query (es. unmount) al nostro
+    // controller, così la query cancellata aborta come prima.
+    if (signal) {
+      const ext = signal as AbortSignal & { reason?: unknown };
+      if (ext.aborted) {
+        controller.abort(ext.reason);
+      } else {
+        ext.addEventListener("abort", () => controller.abort(ext.reason), { once: true });
+      }
+    }
+
     let res: Response;
     try {
       res = await fetch(url.toString(), {
         headers: authFetchHeaders(),
         credentials: "include",
-        signal
+        signal: controller.signal
       });
     } catch (err: unknown) {
-      // AbortError = query was cancelled, re-throw as-is
-      if (err instanceof Error && err.name === "AbortError") throw err;
-      // Network error / ECONNREFUSED / timeout → throw to trigger React Query retry
+      if (err instanceof Error && err.name === "AbortError") {
+        // Timeout → trattalo come errore di rete così scatta il retry.
+        // Cancellazione query (unmount) → ri-lancia AbortError: niente retry.
+        if (timedOut) throw new Error("network_unavailable");
+        throw err;
+      }
+      // Network error / ECONNREFUSED → throw to trigger React Query retry
       throw new Error("network_unavailable");
+    } finally {
+      clearTimeout(timer);
     }
 
     if (res.status === 401) {
@@ -462,6 +497,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setIsReconnecting(userQuery.isLoading && hadSessionRef.current && storageChecked);
   }, [userQuery.isLoading, storageChecked]);
 
+  // Bootstrap auth fallito (rete/server) e nessun utente in cache: l'app deve
+  // mostrare un fallback con "Riprova" invece di restare appesa sullo spinner.
+  const authFailed = storageChecked && userQuery.isError && !userQuery.data;
+  const retryAuth = useCallback(() => {
+    userQuery.refetch();
+  }, [userQuery.refetch]);
+
   const loginMutation = useLoginMutation();
   const registerMutation = useRegisterMutation();
   const logoutMutation = useLogoutMutation();
@@ -473,11 +515,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isAuthenticated: !!userQuery.data,
       sessionExpired,
       isReconnecting,
+      authFailed,
+      retryAuth,
       loginMutation,
       registerMutation,
       logoutMutation
     }),
-    [userQuery.data, userQuery.isLoading, storageChecked, sessionExpired, isReconnecting, loginMutation, registerMutation, logoutMutation]
+    [userQuery.data, userQuery.isLoading, storageChecked, sessionExpired, isReconnecting, authFailed, retryAuth, loginMutation, registerMutation, logoutMutation]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
