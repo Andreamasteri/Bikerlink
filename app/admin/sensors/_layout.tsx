@@ -1,18 +1,21 @@
 import { Stack } from "expo-router";
+import { useMemo } from "react";
 import { useColors } from "@/hooks/useColors";
 
 export default function SensorsLayout() {
   const colors = useColors();
+  const screenOptions = useMemo(
+    () => ({
+      headerShown: true,
+      headerStyle: { backgroundColor: colors.surface },
+      headerTintColor: colors.accent,
+      headerTitleStyle: { color: colors.text, fontFamily: "Inter_600SemiBold" },
+      contentStyle: { backgroundColor: colors.background },
+    }),
+    [colors.surface, colors.accent, colors.text, colors.background],
+  );
   return (
-    <Stack
-      screenOptions={{
-        headerShown: true,
-        headerStyle: { backgroundColor: colors.surface },
-        headerTintColor: colors.accent,
-        headerTitleStyle: { color: colors.text, fontFamily: "Inter_600SemiBold" },
-        contentStyle: { backgroundColor: colors.background },
-      }}
-    >
+    <Stack screenOptions={screenOptions}>
       <Stack.Screen name="index" options={{ title: "Sensori — Diagnostica" }} />
       <Stack.Screen name="raw" options={{ title: "Dati Grezzi" }} />
       <Stack.Screen name="final" options={{ title: "Dati Finali" }} />

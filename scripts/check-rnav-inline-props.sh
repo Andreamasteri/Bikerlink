@@ -84,6 +84,11 @@ check_pattern 'tabBar=\{\s*\(' \
 check_pattern_multiline 'screenOptions=\{\{[^}]{0,300}\w+Style:\s*\{' \
   "screenOptions={{}} con nested object (xStyle:{}) → wrappare con useMemo (vedi rnav-memo-guard)"
 
+# Stack.Screen options={{...}} con oggetto annidato *Style:{} — stesso loop in screen individuali
+# Pattern: options={{ ... headerStyle/contentStyle: { ... }
+check_pattern_multiline '<Stack\.Screen[^>]{0,200}options=\{\{[^}]{0,300}\w+Style:\s*\{' \
+  "Stack.Screen options={{}} con nested object (xStyle:{}) → usare useMemo o costante module-level"
+
 if [ $FAIL -eq 1 ]; then
   echo ""
   echo "💥 check-rnav-inline-props FALLITO"

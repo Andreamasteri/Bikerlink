@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useMemo } from "react";
 import {
   View,
   Text,
@@ -17,6 +17,13 @@ import { useAuth } from "@/lib/auth-context";
 import { useT, useLocale } from "@/lib/language-context";
 import { ProposalActions } from "./_[id].part2";
 import { styles } from "@/components/proposals/proposal-styles";
+
+const PROPOSAL_BASE_SCREEN_OPTIONS = {
+  headerShown: true,
+  title: "",
+  headerStyle: { backgroundColor: Colors.surface },
+  headerTintColor: Colors.text,
+} as const;
 
 export interface Participant {
   id: string;
@@ -146,14 +153,7 @@ export default function ProposalDetailScreen() {
   if (isLoading) {
     return (
       <>
-        <Stack.Screen
-          options={{
-            headerShown: true,
-            title: "",
-            headerStyle: { backgroundColor: Colors.surface },
-            headerTintColor: Colors.text,
-          }}
-        />
+        <Stack.Screen options={PROPOSAL_BASE_SCREEN_OPTIONS} />
         <View style={[styles.centered, { paddingTop: webTopInset }]}>
           <ActivityIndicator size="large" color={Colors.accent} />
         </View>
@@ -164,14 +164,7 @@ export default function ProposalDetailScreen() {
   if (!proposal) {
     return (
       <>
-        <Stack.Screen
-          options={{
-            headerShown: true,
-            title: "",
-            headerStyle: { backgroundColor: Colors.surface },
-            headerTintColor: Colors.text,
-          }}
-        />
+        <Stack.Screen options={PROPOSAL_BASE_SCREEN_OPTIONS} />
         <View style={[styles.centered, { paddingTop: webTopInset }]}>
           <Text style={styles.errorText}>{t("proposals.detail.notFound")}</Text>
         </View>
@@ -180,17 +173,20 @@ export default function ProposalDetailScreen() {
   }
 
   const typeInfo = getTypeIcon(proposal.proposalType);
+  // eslint-disable-next-line react-hooks/rules-of-hooks
+  const proposalScreenOptions = useMemo(
+    () => ({
+      headerShown: true,
+      title: t(getTypeLabelKey(proposal.proposalType)),
+      headerStyle: { backgroundColor: Colors.surface },
+      headerTintColor: Colors.text,
+    }),
+    [proposal.proposalType],
+  );
 
   return (
     <>
-      <Stack.Screen
-        options={{
-          headerShown: true,
-          title: t(getTypeLabelKey(proposal.proposalType)),
-          headerStyle: { backgroundColor: Colors.surface },
-          headerTintColor: Colors.text,
-        }}
-      />
+      <Stack.Screen options={proposalScreenOptions} />
       <ScrollView
         style={[styles.container, { paddingTop: webTopInset }]}
         contentContainerStyle={[

@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useMemo } from "react";
 import {
   View,
   Text,
@@ -26,6 +26,13 @@ import { ProfileDetailActions } from "@/components/profile/detail/ProfileDetailA
 import { ProfileReportModal } from "@/components/profile/detail/ProfileReportModal";
 import { MatchReasonChips } from "@/components/profile/detail/MatchReasonChips";
 import { styles } from "@/components/profile/[id].styles";
+
+const PROFILE_BASE_SCREEN_OPTIONS = {
+  headerShown: true,
+  title: "",
+  headerStyle: { backgroundColor: Colors.surface },
+  headerTintColor: Colors.text,
+} as const;
 
 function formatLastSeen(dateStr: string | null): string {
   if (!dateStr) return "";
@@ -324,7 +331,7 @@ export default function PublicProfileScreen() {
   if (isLoading) {
     return (
       <>
-        <Stack.Screen options={{ headerShown: true, title: "", headerStyle: { backgroundColor: Colors.surface }, headerTintColor: Colors.text }} />
+        <Stack.Screen options={PROFILE_BASE_SCREEN_OPTIONS} />
         <View style={[styles.centered, { paddingTop: webTopInset }]}>
           <ActivityIndicator size="large" color={Colors.accent} />
         </View>
@@ -335,7 +342,7 @@ export default function PublicProfileScreen() {
   if (!profile) {
     return (
       <>
-        <Stack.Screen options={{ headerShown: true, title: "", headerStyle: { backgroundColor: Colors.surface }, headerTintColor: Colors.text }} />
+        <Stack.Screen options={PROFILE_BASE_SCREEN_OPTIONS} />
         <View style={[styles.centered, { paddingTop: webTopInset }]}>
           <Ionicons name="person-outline" size={48} color={Colors.textSecondary} />
           <Text style={styles.emptyText}>Questo profilo non è più disponibile</Text>
@@ -352,17 +359,20 @@ export default function PublicProfileScreen() {
 
   const color = getUserColor(profile.userType);
 
+  const profileScreenOptions = useMemo(
+    () => ({
+      headerShown: true,
+      title: profile.nickname,
+      headerStyle: { backgroundColor: Colors.surface },
+      headerTintColor: Colors.text,
+      headerRight: isSelf ? undefined : headerRight,
+    }),
+    [profile.nickname, isSelf, headerRight],
+  );
+
   return (
     <>
-      <Stack.Screen
-        options={{
-          headerShown: true,
-          title: profile.nickname,
-          headerStyle: { backgroundColor: Colors.surface },
-          headerTintColor: Colors.text,
-          headerRight: isSelf ? undefined : headerRight
-        }}
-      />
+      <Stack.Screen options={profileScreenOptions} />
       <ScrollView
         style={styles.container}
         contentContainerStyle={{ paddingTop: webTopInset, paddingBottom: 40 }}

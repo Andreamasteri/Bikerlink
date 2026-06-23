@@ -6,18 +6,66 @@ description: screenOptions/options con oggetti annidati causano loop Maximum upd
 ## Regola
 `screenOptions={{...}}` o `options={{...}}` con oggetti annidati (`headerStyle:{...}`, `contentStyle:{...}`, `tabBarStyle:{...}`) inline in JSX = nuovi riferimenti a ogni render → React Navigation chiama `navigation.setOptions` via `useLayoutEffect` → navigation state update → re-render → loop.
 
-**Fix**: avvolgere con `useMemo` e dichiarare come deps i valori `colors.*` usati:
+Colpisce TUTTI i file tsx: non solo `_layout.tsx` ma anche screen individuali che usano `<Stack.Screen options={{...headerStyle:{...}}} />`.
+
+## Fix
+
+**Layout file con `useColors()` hook** → `useMemo` con deps `colors.*`:
 ```tsx
-const myScreenOptions = useMemo(() => ({
+const screenOptions = useMemo(() => ({
   headerStyle: { backgroundColor: colors.surface },
-  headerTintColor: colors.text,
-}), [colors.surface, colors.text]);
-<Stack screenOptions={myScreenOptions}>
+}), [colors.surface]);
+<Stack screenOptions={screenOptions}>
 ```
 
-**Why**: `commitLayoutEffectOnFiber` → `commitHookEffectListMount` nel stack trace = useLayoutEffect che chiama setState in loop; React limita a 50 iterazioni → "Maximum update depth exceeded".
+**Layout file con `Colors` statico (import costante)** → costante module-level (creata una volta, non cambia mai):
+```tsx
+const LAYOUT_OPTIONS = {
+  headerStyle: { backgroundColor: Colors.surface },
+  contentStyle: { backgroundColor: Colors.background },
+} as const;
+export default function XxxLayout() {
+  return <Stack screenOptions={LAYOUT_OPTIONS} />;
+}
+```
+
+**Screen individuale con titolo statico** → costante module-level:
+```tsx
+const SCREEN_OPTIONS = {
+  headerShown: true,
+  title: "Testo fisso",
+  headerStyle: { backgroundColor: Colors.surface },
+} as const;
+// In componente:
+<Stack.Screen options={SCREEN_OPTIONS} />
+```
+
+**Screen individuale con titolo dinamico** → `useMemo` con deps sul valore dinamico:
+```tsx
+const screenOpts = useMemo(() => ({
+  headerShown: true,
+  title: profile.nickname,
+  headerStyle: { backgroundColor: Colors.surface },
+  headerRight: isSelf ? undefined : headerRight,
+}), [profile.nickname, isSelf, headerRight]);
+<Stack.Screen options={screenOpts} />
+```
+
+**Why**: `commitLayoutEffectOnFiber` → `commitHookEffectListMount` nel stack trace = `useLayoutEffect` che chiama setState in loop; React limita a 50 iterazioni → "Maximum update depth exceeded". Il loop avviene anche con valori identici: è la REFERENZA dell'oggetto a triggerare il `useLayoutEffect`.
 
 **How to apply**:
-- Ogni `_layout.tsx` che usa `useColors()` E ha `screenOptions={{` o `options={{` con oggetti annidati
-- Colpisce: `app/(tabs)/_layout.tsx`, `app/_layout.tsx`, `app/admin/_layout.tsx`, `app/giro/_layout.tsx`, `app/navigate/_layout.tsx`, `app/giri/_layout.tsx`
-- Gate CI: `scripts/check-rnav-inline-props.sh` → `check_pattern_multiline 'screenOptions=\{\{[^}]{0,300}\w+Style:\s*\{'`
+- Qualsiasi file in `app/` (layout o screen) che passa `screenOptions={{...}}` o `options={{...}}` con almeno un oggetto annidato (es. `headerStyle:{...}`) inline in JSX
+- Se il componente usa navigation hooks (`useLocalSearchParams`, `useNavigation`, `useRouter`), il rischio di loop è alto perché re-renderà a ogni `setOptions`
+- Gate CI: `scripts/check-rnav-inline-props.sh` cattura entrambi i pattern (`screenOptions` e `Stack.Screen options`)
+
+## File fixati (audit completo)
+Layout file:
+- `app/(tabs)/_layout.tsx`, `app/_layout.tsx`, `app/admin/_layout.tsx`, `app/giro/_layout.tsx`, `app/navigate/_layout.tsx`, `app/giri/_layout.tsx` → `useMemo` (usano `useColors()`)
+- `app/route/_layout.tsx`, `app/routes/_layout.tsx`, `app/profile/_layout.tsx`, `app/proposals/_layout.tsx`, `app/motoclub/_layout.tsx`, `app/evento/_layout.tsx`, `app/moderator/_layout.tsx`, `app/contest/_layout.tsx`, `app/(auth)/_layout.tsx` → costante module-level (usano `Colors` statico)
+- `app/admin/sensors/_layout.tsx` → `useMemo` (usa `useColors()`)
+
+Screen individuali:
+- `app/profile/[id].tsx` → costante per loading/not-found, `useMemo` per main (title dinamico)
+- `app/proposals/[id].tsx` → costante per loading/not-found, `useMemo` per main (title dinamico)
+- `app/contest/winners.tsx` → `useMemo` (title con `t()`)
+- `app/routes/user/[userId].tsx` → costante module-level

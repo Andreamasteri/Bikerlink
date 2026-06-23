@@ -14,6 +14,7 @@ import { Stack } from "expo-router";
 import Colors from "@/constants/colors";
 import { t } from "@/lib/i18n";
 
+
 interface PhotoWinner {
   id: string;
   entryId: string;
@@ -63,17 +64,19 @@ export default function WinnersScreen() {
   const { data, isLoading, refetch } = useQuery<PhotoWinner[]>({
     queryKey: ["/api/contest/winners"],
   });
+  const screenOptions = React.useMemo(
+    () => ({
+      headerShown: true,
+      title: t("contest.winners"),
+      headerStyle: { backgroundColor: Colors.surface },
+      headerTintColor: Colors.text,
+    }),
+    [],
+  );
 
   return (
     <>
-      <Stack.Screen
-        options={{
-          headerShown: true,
-          title: t("contest.winners"),
-          headerStyle: { backgroundColor: Colors.surface },
-          headerTintColor: Colors.text,
-        }}
-      />
+      <Stack.Screen options={screenOptions} />
       <View style={styles.container}>
         {isLoading ? (
           <View style={styles.center}>

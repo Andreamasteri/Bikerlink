@@ -16,6 +16,13 @@ import Colors from "@/constants/colors";
 import { getApiUrl } from "@/lib/query-client";
 import { getCurrentLocale } from "@/lib/i18n";
 
+const USER_ROUTES_SCREEN_OPTIONS = {
+  headerShown: true,
+  title: "Percorsi pubblici",
+  headerStyle: { backgroundColor: Colors.surface },
+  headerTintColor: Colors.text,
+} as const;
+
 interface PublicRoute {
   id: string;
   userId: string;
@@ -62,14 +69,7 @@ export default function UserPublicRoutesScreen() {
 
   return (
     <>
-      <Stack.Screen
-        options={{
-          headerShown: true,
-          title: "Percorsi pubblici",
-          headerStyle: { backgroundColor: Colors.surface },
-          headerTintColor: Colors.text,
-        }}
-      />
+      <Stack.Screen options={USER_ROUTES_SCREEN_OPTIONS} />
       <View style={[styles.container, { paddingTop: webTopInset }]}>
         {isLoading ? (
           <View style={styles.centered}>
