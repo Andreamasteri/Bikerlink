@@ -24,6 +24,7 @@ import { setupErrorHandler } from "./error-handler";
 import { initSentry, attachSentryErrorHandler } from "./sentry";
 import { runBootSequence } from "./boot-sequence";
 import { isOpen as dbCircuitOpen } from "./db-circuit-breaker";
+import { applyCrashBackoff } from "./lib/crash-backoff";
 
 // ── Express app ──────────────────────────────────────────────────────────────
 const app = express();
@@ -180,19 +181,24 @@ function writeCrashLog(type: string, err: unknown): void {
   }
 }
 
-process.on("uncaughtException", (err) => {
-  console.error("[CRASH] uncaughtException:", err);
-  writeCrashLog("uncaughtException", err);
+// Anti crash-loop: prima dell'exit applichiamo un backoff crescente basato sul
+// numero di crash recenti (vedi lib/crash-backoff.ts). Un DB managed lento non
+// produce più una raffica di restart ravvicinati: il primo crash attende poco,
+// una raffica viene progressivamente distanziata fino al cap. Il crash log
+// esistente viene scritto comunque, prima del delay.
+function crashExit(type: string, err: unknown): void {
+  console.error(`[CRASH] ${type}:`, err);
+  writeCrashLog(type, err);
+  applyCrashBackoff(type);
   process.exit(1);
-});
+}
 
-process.on("unhandledRejection", (reason) => {
-  console.error("[CRASH] unhandledRejection:", reason);
-  writeCrashLog("unhandledRejection", reason);
-  process.exit(1);
-});
+process.on("uncaughtException", (err) => crashExit("uncaughtException", err));
+
+process.on("unhandledRejection", (reason) => crashExit("unhandledRejection", reason));
 
 runBootSequence(server, errorHandlersReady).catch((err) => {
   console.error("[INIT] Uncaught fatal error during startup:", err);
+  applyCrashBackoff("boot-fatal");
   process.exit(1);
 });

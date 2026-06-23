@@ -11,13 +11,15 @@
  *  - fast-path basato sulla presenza dei canonical slugs (non sui count
  *    totali), così non skippa per errore se qualcuno ha aggiunto tag
  *    custom ma manca uno dei canonici
- *  - propaga gli errori al chiamante: server/index.ts lo invoca dentro
- *    withPhaseTimeout("seedTagsAtStartup", ...) in Phase 4, quindi una
- *    failure FERMA il boot — coerente con il requisito "deployment
- *    sempre pronto" del task.
+ *  - NON-FATALE al boot: `seedTagsAtStartup()` cattura ogni errore e non
+ *    propaga mai. Su errore DB transitorio pianifica UN retry differito
+ *    (vedi sotto), su errore applicativo logga. Questo evita che un DB
+ *    managed lento al boot generi un'`unhandledRejection` → crash-loop
+ *    (Task resilienza avvio). Per un seed forzato che propaga gli errori
+ *    usare lo script standalone scripts/seed-tags.ts.
  */
 
-import { db } from "./db";
+import { db, withDbRetry, isTransientDbError } from "./db";
 import { tagCategories, tags, TAG_CATEGORY_SLUGS } from "../shared/db/tags";
 import { sql, inArray } from "drizzle-orm";
 
@@ -94,14 +96,15 @@ const EXPECTED_CANONICAL_PAIRS = CATEGORIES.flatMap((c) =>
 );
 
 /**
- * Esegue il seed in modo idempotente. Gli errori sono lasciati propagare
- * al chiamante (server/index.ts li avvolge in withPhaseTimeout in Phase 4):
- * se il seed fallisce, il boot deve fermarsi, perché un'app senza tag
- * canonici non è "pronta a servire traffico".
+ * Esegue UNA passata del seed in modo idempotente. Ogni query DB è avvolta in
+ * withDbRetry così un singolo blip transitorio del DB managed (timeout /
+ * disconnessione) viene assorbito senza far fallire la passata. Gli errori NON
+ * transitori (constraint, ecc.) o un guasto prolungato vengono propagati al
+ * chiamante seedTagsAtStartup(), che li degrada (mai propaga al boot).
  */
-export async function seedTagsAtStartup(): Promise<void> {
+async function runSeedTagsOnce(): Promise<void> {
   // 1. Fast-path: verifica presenza canonica (non solo count).
-  const existingCats = await db.select().from(tagCategories);
+  const existingCats = await withDbRetry(() => db.select().from(tagCategories));
   const catBySlug = new Map(existingCats.map((c) => [c.slug, c]));
 
   const canonicalCatSlugs = CATEGORIES.map((c) => c.slug);
@@ -109,10 +112,12 @@ export async function seedTagsAtStartup(): Promise<void> {
 
   if (allCanonicalCatsPresent) {
     const catIds = canonicalCatSlugs.map((s) => catBySlug.get(s)!.id);
-    const existingTags = await db
-      .select({ categoryId: tags.categoryId, slug: tags.slug })
-      .from(tags)
-      .where(inArray(tags.categoryId, catIds));
+    const existingTags = await withDbRetry(() =>
+      db
+        .select({ categoryId: tags.categoryId, slug: tags.slug })
+        .from(tags)
+        .where(inArray(tags.categoryId, catIds))
+    );
     const presentPairs = new Set(
       existingTags.map((t) => {
         const cat = existingCats.find((c) => c.id === t.categoryId);
@@ -134,11 +139,13 @@ export async function seedTagsAtStartup(): Promise<void> {
 
   // 2. Upsert categorie
   for (const cat of CATEGORIES) {
-    await db.insert(tagCategories).values(cat).onConflictDoNothing({ target: tagCategories.slug });
+    await withDbRetry(() =>
+      db.insert(tagCategories).values(cat).onConflictDoNothing({ target: tagCategories.slug })
+    );
   }
 
   // 3. Recupera categorie aggiornate per ottenere gli ID
-  const refreshedCats = await db.select().from(tagCategories);
+  const refreshedCats = await withDbRetry(() => db.select().from(tagCategories));
   const refreshedBySlug = new Map(refreshedCats.map((c) => [c.slug, c]));
 
   // 4. Upsert tag
@@ -150,17 +157,72 @@ export async function seedTagsAtStartup(): Promise<void> {
     }
     const tagList = TAGS_BY_SLUG[cat.slug] ?? [];
     for (const tag of tagList) {
-      const result = await db
-        .insert(tags)
-        .values({ categoryId: category.id, slug: tag.slug, label: tag.label })
-        .onConflictDoNothing({ target: [tags.categoryId, tags.slug] })
-        .returning({ id: tags.id });
+      const result = await withDbRetry(() =>
+        db
+          .insert(tags)
+          .values({ categoryId: category.id, slug: tag.slug, label: tag.label })
+          .onConflictDoNothing({ target: [tags.categoryId, tags.slug] })
+          .returning({ id: tags.id })
+      );
       if (result.length > 0) inserted++;
     }
   }
 
   // 5. Riepilogo finale
-  const finalCat = (await db.select({ c: sql<number>`count(*)::int` }).from(tagCategories))[0]?.c ?? 0;
-  const finalTag = (await db.select({ c: sql<number>`count(*)::int` }).from(tags))[0]?.c ?? 0;
+  const finalCat = (await withDbRetry(() => db.select({ c: sql<number>`count(*)::int` }).from(tagCategories)))[0]?.c ?? 0;
+  const finalTag = (await withDbRetry(() => db.select({ c: sql<number>`count(*)::int` }).from(tags)))[0]?.c ?? 0;
   console.log(`[seed-tags] Done — inseriti ${inserted} nuovi tag (totale DB: ${finalCat} categorie, ${finalTag} tag)`);
+}
+
+/** Ritardo del retry differito quando il seed fallisce per blip DB al boot. */
+const DEFERRED_RETRY_DELAY_MS = Number(process.env.SEED_TAGS_RETRY_DELAY_MS) || 60_000;
+let deferredRetryScheduled = false;
+
+/**
+ * Pianifica UN solo retry differito del seed dopo un fallimento transitorio al
+ * boot. Avvolto in async-IIFE con try/catch interno e `void`: non può MAI
+ * generare una unhandledRejection (la firma di crash osservata). Idempotente:
+ * un retry alla volta.
+ */
+function scheduleDeferredSeedRetry(): void {
+  if (deferredRetryScheduled) return;
+  deferredRetryScheduled = true;
+  setTimeout(() => {
+    void (async () => {
+      try {
+        console.log("[seed-tags] Retry differito del seed dopo blip DB al boot...");
+        await runSeedTagsOnce();
+        console.log("[seed-tags] Retry differito riuscito.");
+      } catch (e) {
+        console.warn("[seed-tags] Retry differito fallito (non-fatal, riproverà al prossimo boot):", e);
+      } finally {
+        deferredRetryScheduled = false;
+      }
+    })();
+  }, DEFERRED_RETRY_DELAY_MS).unref?.();
+}
+
+/**
+ * Entry-point di boot del seed tag. È volutamente NON-FATALE: qualsiasi errore
+ * viene assorbito e degrada (log + eventuale retry differito), mai propagato.
+ *
+ * Perché: in produzione un blip del DB managed durante il boot generava una
+ * rejection asincrona che sfuggiva al try/catch del chiamante → process.exit(1)
+ * → crash-loop. Qui catturiamo TUTTO: un guasto transitorio pianifica un retry
+ * differito, un guasto applicativo viene loggato come errore. Il boot prosegue.
+ */
+export async function seedTagsAtStartup(): Promise<void> {
+  try {
+    await runSeedTagsOnce();
+  } catch (err) {
+    if (isTransientDbError(err)) {
+      console.warn(
+        `[seed-tags] DB transitorio durante il seed — degrado e ritento tra ${Math.round(DEFERRED_RETRY_DELAY_MS / 1000)}s:`,
+        err instanceof Error ? err.message : err
+      );
+      scheduleDeferredSeedRetry();
+    } else {
+      console.error("[seed-tags] Seed fallito (non-fatal, il boot prosegue):", err);
+    }
+  }
 }

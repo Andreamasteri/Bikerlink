@@ -18,6 +18,7 @@ import { runMigrations } from "./migrate";
 import { initMissingClubConversations, ensureCompetitorAnalysisPdf } from "./init-helpers";
 import { enrichBikerMatchBreakdowns } from "./matching/enrich-breakdowns";
 import { runBootPhase3DbInit } from "./boot-phase3-db-init";
+import { resetCrashBackoff, applyCrashBackoff } from "./lib/crash-backoff";
 import type { Server } from "http";
 
 // ── Phase timeout helper ─────────────────────────────────────────────────────
@@ -111,6 +112,7 @@ export async function runBootSequence(server: Server, errorHandlersReady: Promis
     initState.dbReady = true;
   } catch (err) {
     console.error("[startup] FATAL — Migrations failed, aborting:", err);
+    applyCrashBackoff("migrations-fatal");
     process.exit(1);
   }
 
@@ -143,6 +145,7 @@ export async function runBootSequence(server: Server, errorHandlersReady: Promis
         for (const c of drift.droppedColumns) console.error(`    • ${c}`);
       }
       console.error("  Azione: crea il file migrations/NNNN_*.sql con le DDL mancanti e riavvia.");
+      applyCrashBackoff("drift-fatal");
       process.exit(1);
     }
     const baselineNote = drift.knownHits.length > 0
@@ -188,14 +191,21 @@ export async function runBootSequence(server: Server, errorHandlersReady: Promis
     }
     await withPhaseTimeout("ensureBikerLinkOfficialOnBoot", ensureBikerLinkOfficialOnBoot(), 90_000);
 
-    for (const [name, fn] of [
-      ["seedAppleReviewerAccount", seedAppleReviewerAccount()],
-      ["seedGooglePlayReviewerAccount", seedGooglePlayReviewerAccount()],
-      ["seedTranslationKeys", seedTranslationKeys()],
-      ["seedTagsAtStartup", seedTagsAtStartup()],
-    ] as [string, Promise<unknown>][]) {
+    // IMPORTANTE: registriamo THUNK (() => Promise), non promise già avviate.
+    // Costruire l'array con `seedTagsAtStartup()` ecc. avvierebbe TUTTE le seed
+    // in parallelo subito: se una (es. seedTagsAtStartup) rejecta mentre il loop
+    // sta ancora awaitando una precedente, nessun handler è attaccato → diventa
+    // una `unhandledRejection` non gestita → process.exit(1) (la firma di crash
+    // osservata). Con i thunk ogni seed parte solo quando il loop la raggiunge,
+    // sempre dentro il try/catch + withPhaseTimeout.
+    for (const [name, makeFn] of [
+      ["seedAppleReviewerAccount", seedAppleReviewerAccount],
+      ["seedGooglePlayReviewerAccount", seedGooglePlayReviewerAccount],
+      ["seedTranslationKeys", seedTranslationKeys],
+      ["seedTagsAtStartup", seedTagsAtStartup],
+    ] as [string, () => Promise<unknown>][]) {
       try {
-        await withPhaseTimeout(name, fn, 60_000);
+        await withPhaseTimeout(name, makeFn(), 60_000);
       } catch (e) {
         console.warn(`[INIT] Phase 4: ${name} failed (non-fatal):`, e);
       }
@@ -224,6 +234,7 @@ export async function runBootSequence(server: Server, errorHandlersReady: Promis
     }
   } catch (err) {
     console.error("[INIT] FATAL — Phase 4 failed:", err);
+    applyCrashBackoff("phase4-fatal");
     process.exit(1);
   }
   bootLog(4, TOTAL, "Seed + Engine", "done");
@@ -235,12 +246,17 @@ export async function runBootSequence(server: Server, errorHandlersReady: Promis
     await runPhase5Schedulers();
   } catch (err) {
     console.error("[INIT] FATAL — Phase 5 failed:", err);
+    applyCrashBackoff("phase5-fatal");
     process.exit(1);
   }
   bootLog(5, TOTAL, "Schedulers", "done");
 
   // ── Boot complete ─────────────────────────────────────────────────────────
   initState.initializing = false;
+  // Boot riuscito: azzera il conteggio crash recenti così un crash isolato dopo
+  // un periodo sano attende solo il delay base, senza ereditare un backoff alto
+  // di una raffica passata (vedi lib/crash-backoff.ts).
+  resetCrashBackoff();
   const totalElapsed = ((Date.now() - BOOT_START) / 1000).toFixed(1);
   console.log(`[INIT] All startup phases completed in ${totalElapsed}s — server is READY`);
 
