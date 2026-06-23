@@ -9,7 +9,7 @@ import { useAuth } from "@/lib/auth-context";
 export default function Index() {
   const [checked, setChecked] = useState(false);
   const [onboardingDone, setOnboardingDone] = useState(false);
-  const { isLoading: authIsLoading, isAuthenticated, authFailed, retryAuth } = useAuth();
+  const { isLoading: authIsLoading, isAuthenticated, authFailed, retryAuth, hadPreviousSession } = useAuth();
 
   useEffect(() => {
     AsyncStorage.getItem(ONBOARDING_STORAGE_KEY)
@@ -23,7 +23,25 @@ export default function Index() {
       });
   }, []);
 
-  if (!checked || authIsLoading) {
+  // Se non abbiamo ancora letto AsyncStorage locale, spinner brevissimo (ms)
+  if (!checked) {
+    return (
+      <View style={styles.loader}>
+        <ActivityIndicator size="large" color={Colors.accent} />
+      </View>
+    );
+  }
+
+  // Redirect ottimistico: se il device aveva già una sessione attiva, vai
+  // subito alle tabs senza aspettare la verifica server (che può richiedere
+  // 13-50s con DB lento). L'auth si risolve in background; se la sessione è
+  // scaduta, il server risponde 401 → sessionExpired → redirect a /welcome.
+  if (authIsLoading && hadPreviousSession) {
+    return <Redirect href={"/(tabs)" as Href} />;
+  }
+
+  // Spinner solo per utenti nuovi (nessuna sessione salvata) — dura pochi secondi
+  if (authIsLoading) {
     return (
       <View style={styles.loader}>
         <ActivityIndicator size="large" color={Colors.accent} />

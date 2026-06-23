@@ -26,6 +26,7 @@ import TestRenderer, { act } from "react-test-renderer";
 const authState = vi.hoisted(() => ({
   isLoading: false,
   isAuthenticated: false,
+  hadPreviousSession: false,
   authFailed: false,
   retryAuth: vi.fn(),
 }));
@@ -88,6 +89,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   authState.isLoading = false;
   authState.isAuthenticated = false;
+  authState.hadPreviousSession = false;
   authState.authFailed = false;
   getItem.mockResolvedValue("true"); // onboarding già completato
   renderer = null;

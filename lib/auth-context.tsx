@@ -159,6 +159,7 @@ interface AuthContextValue {
   user: SafeUser | null | undefined;
   isLoading: boolean;
   isAuthenticated: boolean;
+  hadPreviousSession: boolean;
   sessionExpired: boolean;
   isReconnecting: boolean;
   authFailed: boolean;
@@ -531,6 +532,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       user: userQuery.data,
       isLoading: userQuery.isLoading || !storageChecked,
       isAuthenticated: !!userQuery.data,
+      hadPreviousSession: storageChecked && hadSessionRef.current,
       sessionExpired,
       isReconnecting,
       authFailed,
