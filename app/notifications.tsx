@@ -366,6 +366,29 @@ export default function NotificationsScreen() {
   const isLoadingAny = isLoading || loadingRequests;
   const hasContent = notifications.length > 0 || incomingRequests.length > 0;
 
+  const headerRight = useCallback(() => (
+    <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+      {unreadCount > 0 && (
+        <TouchableOpacity onPress={markAllRead} style={styles.headerBtn}>
+          <Ionicons name="checkmark-done-outline" size={22} color={colors.accent} />
+        </TouchableOpacity>
+      )}
+      {notifications.length > 0 && (
+        <TouchableOpacity
+          onPress={handleDeleteAll}
+          style={styles.headerBtn}
+          disabled={deleteAllMutation.isPending}
+        >
+          <Ionicons
+            name="trash-outline"
+            size={20}
+            color={deleteAllMutation.isPending ? (colors.textSecondary ?? "#999") : "#E63946"}
+          />
+        </TouchableOpacity>
+      )}
+    </View>
+  ), [unreadCount, markAllRead, notifications.length, handleDeleteAll, deleteAllMutation.isPending, colors]);
+
   const renderItem = ({ item }: { item: AppNotification }) => {
     return (
       <NotificationItem
@@ -382,30 +405,7 @@ export default function NotificationsScreen() {
     <View style={[styles.container, { backgroundColor: colors.background ?? colors.surface }]}>
       <Stack.Screen
         options={{
-          headerRight: hasContent
-            ? () => (
-                <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
-                  {unreadCount > 0 && (
-                    <TouchableOpacity onPress={markAllRead} style={styles.headerBtn}>
-                      <Ionicons name="checkmark-done-outline" size={22} color={colors.accent} />
-                    </TouchableOpacity>
-                  )}
-                  {notifications.length > 0 && (
-                    <TouchableOpacity
-                      onPress={handleDeleteAll}
-                      style={styles.headerBtn}
-                      disabled={deleteAllMutation.isPending}
-                    >
-                      <Ionicons
-                        name="trash-outline"
-                        size={20}
-                        color={deleteAllMutation.isPending ? (colors.textSecondary ?? "#999") : "#E63946"}
-                      />
-                    </TouchableOpacity>
-                  )}
-                </View>
-              )
-            : undefined,
+          headerRight: hasContent ? headerRight : undefined,
         }}
       />
 

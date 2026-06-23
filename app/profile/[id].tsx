@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useCallback } from "react";
 import {
   View,
   Text,
@@ -177,6 +177,16 @@ export default function PublicProfileScreen() {
   };
 
   const [menuVisible, setMenuVisible] = useState(false);
+
+  const headerRight = useCallback(() => (
+    <TouchableOpacity
+      onPress={() => setMenuVisible(true)}
+      style={{ marginRight: 4, padding: 6 }}
+      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+    >
+      <Ionicons name="ellipsis-vertical" size={22} color={Colors.text} />
+    </TouchableOpacity>
+  ), [setMenuVisible]);
   const [reportVisible, setReportVisible] = useState(false);
   const [selectedReason, setSelectedReason] = useState<string>("");
   const [reportDescription, setReportDescription] = useState("");
@@ -350,15 +360,7 @@ export default function PublicProfileScreen() {
           title: profile.nickname,
           headerStyle: { backgroundColor: Colors.surface },
           headerTintColor: Colors.text,
-          headerRight: !isSelf ? () => (
-            <TouchableOpacity
-              onPress={() => setMenuVisible(true)}
-              style={{ marginRight: 4, padding: 6 }}
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-            >
-              <Ionicons name="ellipsis-vertical" size={22} color={Colors.text} />
-            </TouchableOpacity>
-          ) : undefined
+          headerRight: isSelf ? undefined : headerRight
         }}
       />
       <ScrollView

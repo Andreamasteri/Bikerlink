@@ -14,20 +14,35 @@ FAIL=0
 
 echo "🔍 Controllo React Navigation inline prop functions..."
 
+RG_FLAGS=(
+  --type-add 'tsx:*.tsx' --type tsx
+  --type-add 'ts_:*.ts' --type ts_
+  --glob '!*.styles.ts'
+  --glob '!*.styles.tsx'
+  --glob '!node_modules/**'
+  --glob '!.local/**'
+  --glob '!.agents/**'
+  --glob '!scripts/**'
+)
+
 check_pattern() {
   local pattern="$1"
   local label="$2"
   local results
-  results=$(rg "$pattern" \
-    --type-add 'tsx:*.tsx' --type tsx \
-    --type-add 'ts_:*.ts' --type ts_ \
-    --glob '!*.styles.ts' \
-    --glob '!*.styles.tsx' \
-    --glob '!node_modules/**' \
-    --glob '!.local/**' \
-    --glob '!.agents/**' \
-    --glob '!scripts/**' \
-    -n 2>/dev/null || true)
+  results=$(rg "$pattern" "${RG_FLAGS[@]}" -n 2>/dev/null || true)
+  if [ -n "$results" ]; then
+    echo ""
+    echo "❌ TROVATO — $label"
+    echo "$results"
+    FAIL=1
+  fi
+}
+
+check_pattern_multiline() {
+  local pattern="$1"
+  local label="$2"
+  local results
+  results=$(rg -U "$pattern" "${RG_FLAGS[@]}" -n 2>/dev/null || true)
   if [ -n "$results" ]; then
     echo ""
     echo "❌ TROVATO — $label"
@@ -40,13 +55,25 @@ check_pattern() {
 check_pattern 'tabBarIcon:\s*\(\{' \
   "tabBarIcon con funzione arrow inline → usare useMemo sul componente parent (vedi rnav-memo-guard)"
 
-# headerLeft inline in navigation options
+# headerLeft inline (senza params): headerLeft: () =>
 check_pattern 'headerLeft:\s*\(\)\s*=>' \
   "headerLeft con funzione arrow inline → usare useCallback (vedi rnav-memo-guard)"
 
-# headerRight inline in navigation options
+# headerRight inline (senza params): headerRight: () =>
 check_pattern 'headerRight:\s*\(\)\s*=>' \
   "headerRight con funzione arrow inline → usare useCallback (vedi rnav-memo-guard)"
+
+# headerLeft inline (ternary, stessa riga): headerLeft: expr ? () =>
+check_pattern 'headerLeft:\s*\S[^\n]*\?\s*\(\)\s*=>' \
+  "headerLeft con ternario inline (stessa riga) → usare useCallback (vedi rnav-memo-guard)"
+
+# headerRight inline (ternary, stessa riga): headerRight: expr ? () =>
+check_pattern 'headerRight:\s*\S[^\n]*\?\s*\(\)\s*=>' \
+  "headerRight con ternario inline (stessa riga) → usare useCallback (vedi rnav-memo-guard)"
+
+# headerLeft/headerRight inline (ternary, riga successiva): prop:\n  ? () =>
+check_pattern_multiline 'header(Left|Right):[^\n]*\n\s*\?\s*\(\)\s*=>' \
+  "headerLeft/headerRight con ternario inline (riga successiva) → usare useCallback (vedi rnav-memo-guard)"
 
 # tabBar inline: tabBar={(  oppure tabBar={ (
 check_pattern 'tabBar=\{\s*\(' \
