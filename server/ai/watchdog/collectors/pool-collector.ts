@@ -30,9 +30,24 @@ const CONSECUTIVE_FOR_HIGH = 3;
 // probe via a direct Client (not from the pool) to identify blocking queries.
 const CONSECUTIVE_FOR_ACTIVITY_PROBE = 5;
 
+// Drops scartati IN UN SINGOLO TICK oltre i quali la crescita è "anomala" e va
+// segnalata subito con un warn, senza attendere la conferma anti-blip. Un burst
+// di scarti in una sola finestra di 60s è già di per sé un segnale di pressione
+// acuta sul pool (la valvola di sfogo della coda sta buttando via lavoro).
+const DROP_BURST_FOR_WARN = 10;
+
 // Module-level state: consecutive ticks under pressure for each gauge.
 let consecutiveWaiting = 0;
 let consecutiveLimiterQueued = 0;
+
+// Totali cumulativi (dal boot) degli scarti del bg-db-limiter visti all'ultimo
+// tick: servono a calcolare il DELTA per finestra (quanti job sono stati
+// scartati negli ultimi ~60s) invece di guardare solo il totale che cresce
+// monotòno. consecutiveLimiterDrops conta i tick consecutivi con almeno uno
+// scarto, per distinguere un blip isolato da una perdita persistente.
+let prevDroppedOverflowTotal = 0;
+let prevDroppedTimeoutTotal = 0;
+let consecutiveLimiterDrops = 0;
 
 // --- pg_stat_activity probe (out-of-band connection, not from pool) -----------
 // Runs async — does NOT block the synchronous collectPool() return.
@@ -163,7 +178,7 @@ export function collectPool(): Signal[] {
 
   // ── bg-db-limiter (cooperative background-job semaphore) ──────────────────
   try {
-    const { active, queued, max } = getBgDbLimiterStats();
+    const { active, queued, max, droppedOverflowTotal, droppedTimeoutTotal } = getBgDbLimiterStats();
 
     // Active slots in use (always emit for the metrics dashboard).
     signals.push({
@@ -199,6 +214,72 @@ export function collectPool(): Signal[] {
       unit: "jobs",
       severity: queuedSeverity,
       details: { active, max, consecutiveQueued: consecutiveLimiterQueued },
+    });
+
+    // Job scartati dalla valvola di sfogo della coda (Task #4798): overflow =
+    // coda piena al momento dell'acquisizione; timeout = job rimasto in coda
+    // oltre il limite ed è ormai stantio. Sono contatori cumulativi dal boot:
+    // li emettiamo SEMPRE come metriche (info) così la dashboard mostra i due
+    // totali a colpo d'occhio.
+    signals.push({
+      source: "db",
+      metric: "db.bg_limiter.dropped_overflow",
+      value: droppedOverflowTotal,
+      unit: "jobs",
+      severity: "info",
+    });
+    signals.push({
+      source: "db",
+      metric: "db.bg_limiter.dropped_timeout",
+      value: droppedTimeoutTotal,
+      unit: "jobs",
+      severity: "info",
+    });
+
+    // Delta per finestra: quanti scarti sono avvenuti dall'ultimo tick. Il
+    // totale cresce monotòno, quindi il segnale d'allarme utile è la CRESCITA,
+    // non il valore assoluto. Math.max(0, …) protegge dal reset dei contatori
+    // (es. dopo un restart il modulo limiter riazzera i totali).
+    const deltaOverflow = Math.max(0, droppedOverflowTotal - prevDroppedOverflowTotal);
+    const deltaTimeout = Math.max(0, droppedTimeoutTotal - prevDroppedTimeoutTotal);
+    prevDroppedOverflowTotal = droppedOverflowTotal;
+    prevDroppedTimeoutTotal = droppedTimeoutTotal;
+    const deltaDropped = deltaOverflow + deltaTimeout;
+
+    if (deltaDropped > 0) {
+      consecutiveLimiterDrops++;
+    } else {
+      consecutiveLimiterDrops = 0;
+    }
+
+    // Severità: warn quando la crescita è anomala (burst in un singolo tick o
+    // scarti per 2 tick consecutivi), high quando la perdita è persistente
+    // (3+ tick consecutivi con scarti) — stesso schema anti-blip degli altri
+    // gauge. Senza scarti nell'ultima finestra resta info (solo metrica).
+    let droppedSeverity: Signal["severity"];
+    if (consecutiveLimiterDrops >= CONSECUTIVE_FOR_HIGH) {
+      droppedSeverity = "high";
+    } else if (
+      deltaDropped > 0 &&
+      (deltaDropped >= DROP_BURST_FOR_WARN || consecutiveLimiterDrops >= CONSECUTIVE_FOR_WARN)
+    ) {
+      droppedSeverity = "warn";
+    } else {
+      droppedSeverity = "info";
+    }
+    signals.push({
+      source: "db",
+      metric: "db.bg_limiter.dropped",
+      value: deltaDropped,
+      unit: "jobs",
+      severity: droppedSeverity,
+      details: {
+        deltaOverflow,
+        deltaTimeout,
+        overflowTotal: droppedOverflowTotal,
+        timeoutTotal: droppedTimeoutTotal,
+        consecutiveDrops: consecutiveLimiterDrops,
+      },
     });
   } catch (err) {
     signals.push({

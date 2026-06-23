@@ -20,6 +20,8 @@ const NICE_LABELS: Record<string, string> = {
   "scheduler.scheduler.lock_age_min": "Lock scheduler (min)",
   "redis.redis.ping_ms": "Redis ping (ms)",
   "redis.redis.used_memory_mb": "Redis RAM (MB)",
+  "db.db.bg_limiter.dropped_overflow": "Job bg scartati (coda piena)",
+  "db.db.bg_limiter.dropped_timeout": "Job bg scartati (scaduti)",
 };
 
 export function MetricsGrid({ metrics }: { metrics: Props["metrics"] }) {

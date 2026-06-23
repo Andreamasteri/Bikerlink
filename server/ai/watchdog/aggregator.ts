@@ -255,6 +255,22 @@ export function deriveProblems(signals: Signal[]): Problem[] {
         title = `Limiter job DB in background: ${s.value} job in coda (${ticks} campioni)`;
         suggestion = "Accumulo temporaneo di job in background in attesa di uno slot connessione. Monitora.";
       }
+    } else if (s.metric === "db.bg_limiter.dropped") {
+      const det = s.details as {
+        deltaOverflow?: number; deltaTimeout?: number;
+        overflowTotal?: number; timeoutTotal?: number; consecutiveDrops?: number;
+      } | undefined;
+      const dOv = det?.deltaOverflow ?? 0;
+      const dTo = det?.deltaTimeout ?? 0;
+      const totOv = det?.overflowTotal ?? 0;
+      const totTo = det?.timeoutTotal ?? 0;
+      if (s.severity === "high") {
+        title = `Job DB in background scartati di continuo: ${s.value} nell'ultimo intervallo (coda piena ${dOv}, scaduti ${dTo})`;
+        suggestion = `La valvola di sfogo del bg-db-limiter butta via lavoro a ogni ciclo: pressione persistente sul pool. Verifica query lente/lock e la concorrenza dei job interni. Totali dal boot: ${totOv} overflow + ${totTo} timeout. I job rieseguono al tick successivo, ma stai perdendo cicli notturni.`;
+      } else {
+        title = `Job DB in background scartati: ${s.value} nell'ultimo intervallo (coda piena ${dOv}, scaduti ${dTo})`;
+        suggestion = `Il bg-db-limiter ha scartato job di background (coda piena o attesa troppo lunga): accumulo temporaneo, i job rieseguono al tick successivo. Totali dal boot: ${totOv} overflow + ${totTo} timeout. Monitora se cresce.`;
+      }
     } else if (s.metric === "db.bg_limiter.collector.error") {
       title = `Errore probe limiter job DB`;
       suggestion = "Verifica che bg-db-limiter sia accessibile dal collector.";
@@ -331,6 +347,7 @@ const OUTAGE_DOWNSTREAM_IDS = new Set<string>([
   "db.db.pool.waiting",
   "db.db.ping_saturated",
   "db.db.bg_limiter.queued",
+  "db.db.bg_limiter.dropped",
   "maps.health.network_instability",
   "db.db.ping_ms",
 ]);
