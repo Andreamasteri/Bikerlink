@@ -59,6 +59,16 @@ const screenOpts = useMemo(() => ({
 - Gate CI: `scripts/check-rnav-inline-props.sh` cattura tutti i pattern: `screenOptions`, `Stack.Screen options`, `Tabs.Screen options`, `header/headerLeft/headerRight` inline, `router` in hook deps senza `routerRef`
 - Gate complementare: `scripts/check-router-in-effect-deps.sh` (Python) — rileva `useEffect/useCallback` con `router.replace/push` nel corpo + `[router]` nelle deps
 
+## Caso speciale: tabBarIcon inline in funzioni helper (non in JSX diretto)
+
+`_layout.part2.tsx` conteneva 15 funzioni `tabBarIcon: ({ color, size, focused }) => (...)` dentro `options={{...}}` di `Tabs.Screen`. Anche se `getTabScreens()` era chiamata dentro un `useMemo` in `_layout.tsx`, ogni re-evaluation del useMemo (al cambio di `newMatchCount`, `unreadCount`, ecc.) creava NUOVE arrow function → `setOptions` → loop.
+
+**Fix definitivo**: spostare il rendering delle icone tab nel `renderCustomTabBar` (useCallback), che riceve tutti i dati dinamici nelle sue deps. Le `options` dei `Tabs.Screen` diventano solo valori primitivi stabili (title stringhe, href, headerShown). Il `tabScreens` useMemo passa da 9 deps a 3 deps (`t`, `gpsTabHref`, `isBikerOrCoppia`).
+
+**Why**: il loop del custom tab bar si origina da `tabBarIcon` nelle options, non dal rendering visivo: React Navigation legge le options internamente via `useLayoutEffect` e chiama `setOptions`. Anche se il custom tab bar usa `options.tabBarIcon` per filtrare route, la soluzione è spostare il rendering direttamente nel custom tab bar e usare una logica di filtro alternativa (come il flag `tabBarButton` già settato da Expo Router per `href:null`).
+
+**Gate miss**: il gate `check-rnav-inline-props.sh` con `rg 'tabBarIcon:\s*\(\{'` trova correttamente il pattern in `_layout.part2.tsx` se eseguito direttamente. Il miss era dovuto a un bug di scope nell'esecuzione del gate come workflow CI — ora risolto fixando il codice.
+
 ## File fixati (audit completo)
 Layout file:
 - `app/(tabs)/_layout.tsx`, `app/_layout.tsx`, `app/admin/_layout.tsx`, `app/giro/_layout.tsx`, `app/navigate/_layout.tsx`, `app/giri/_layout.tsx` → `useMemo` (usano `useColors()`)

@@ -15,6 +15,7 @@ type BottomTabBarProps = Parameters<NonNullable<React.ComponentProps<typeof Tabs
 import { useTabBadges } from "@/hooks/useTabBadges";
 import { useNewMatchAlert } from "@/hooks/useNewMatchAlert";
 import { getTabScreens } from "./_layout.part2";
+import { TabIcon } from "@/components/TabIcons";
 import { GpsBanner } from "@/components/layout/GpsBanner";
 import { sendStartupBeacon } from "@/lib/startup-beacon";
 import { useAutoTelemetry } from "@/lib/auto-telemetry-context";
@@ -178,6 +179,7 @@ export default function TabLayout() {
   });
   const tabBarPaddingBottom = insets.bottom;
   const tabBarHeight = 60 + insets.bottom;
+  const statusIsAvailable = profileData?.isAvailable || false;
 
   const renderCustomTabBar = useCallback((props: BottomTabBarProps) => {
     const { state, descriptors, navigation } = props;
@@ -185,10 +187,8 @@ export default function TabLayout() {
     const tabs: TabItem[] = state.routes
       .filter((route) => {
         const options = descriptors[route.key].options as Record<string, unknown>;
-        // Exclude href:null screens (tabBarButton is a null-returning function)
+        // Exclude href:null screens (Expo Router sets tabBarButton to a null fn)
         if (typeof options.tabBarButton === "function") return false;
-        // Exclude auto-discovered / phantom routes that have no icon configured
-        if (!options.tabBarIcon) return false;
         return true;
       })
       .map((route) => {
@@ -215,15 +215,25 @@ export default function TabLayout() {
           }
         };
 
-        const iconRenderer = options.tabBarIcon as
-          | ((args: { color: string; size: number; focused: boolean }) => React.ReactNode)
-          | undefined;
-
         return {
           name: route.name,
           title: (options.title as string | undefined) || route.name,
-          icon: (color: string, size: number) =>
-            iconRenderer ? iconRenderer({ color, size, focused: isFocused }) : null,
+          icon: (color: string, size: number) => (
+            <TabIcon
+              name={route.name}
+              color={color}
+              size={size}
+              focused={isFocused}
+              globalTrackingActive={globalTrackingActive}
+              globalSprintMeasuring={globalSprintMeasuring}
+              hasActiveMatches={hasActiveMatches}
+              statusIsAvailable={statusIsAvailable}
+              newMatchCount={newMatchCount}
+              unreadCount={unreadCount}
+              showCalibrationBadge={showCalibrationBadge}
+              isBikerOrCoppia={isBikerOrCoppia}
+            />
+          ),
           isFocused,
           onPress,
         } satisfies TabItem;
@@ -237,7 +247,11 @@ export default function TabLayout() {
         tabBarPaddingBottom={tabBarPaddingBottom}
       />
     );
-  }, [showCalibrationBadge, taskbarStyle, tabBarHeight, tabBarPaddingBottom]);
+  }, [
+    showCalibrationBadge, taskbarStyle, tabBarHeight, tabBarPaddingBottom,
+    globalTrackingActive, globalSprintMeasuring, hasActiveMatches,
+    statusIsAvailable, newMatchCount, unreadCount, isBikerOrCoppia,
+  ]);
   const gpsTabHref: Href | null | undefined = undefined;
 
   const garageIsEmpty: boolean | undefined = isBikerOrCoppia
@@ -273,24 +287,9 @@ export default function TabLayout() {
     setFakeHomeDontShowGlobal,
   } = useLayoutGating(user, meData as LayoutGatingMeData | null | undefined);
 
-  // ── Stato disponibilità (per icona cromatica "Status") ──────────────────
-  const statusIsAvailable = profileData?.isAvailable || false;
-
   const tabScreens = useMemo(
-    () => getTabScreens(t, {
-      gpsTabHref,
-      globalTrackingActive,
-      globalSprintMeasuring,
-      hasActiveMatches,
-      statusIsAvailable,
-      newMatchCount,
-      unreadCount,
-      showCalibrationBadge,
-      isBikerOrCoppia,
-    }),
-    [t, gpsTabHref, globalTrackingActive, globalSprintMeasuring,
-     hasActiveMatches, statusIsAvailable, newMatchCount, unreadCount,
-     showCalibrationBadge, isBikerOrCoppia]
+    () => getTabScreens(t, { gpsTabHref, isBikerOrCoppia }),
+    [t, gpsTabHref, isBikerOrCoppia]
   );
 
   const tabsScreenOptions = useMemo(() => ({

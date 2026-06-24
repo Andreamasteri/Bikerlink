@@ -1,30 +1,12 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React from "react";
 import { Tabs } from "expo-router";
-import { TabIcon } from "@/components/TabIcons";
 
 export function getTabScreens(t: (key: string) => string, config: {
   gpsTabHref: any;
-  globalTrackingActive: boolean;
-  globalSprintMeasuring: boolean;
-  hasActiveMatches: boolean;
-  statusIsAvailable: boolean;
-  newMatchCount: number;
-  unreadCount: number;
-  showCalibrationBadge: boolean;
   isBikerOrCoppia: boolean;
 }) {
-  const {
-    gpsTabHref,
-    globalTrackingActive,
-    globalSprintMeasuring,
-    hasActiveMatches,
-    statusIsAvailable,
-    newMatchCount,
-    unreadCount,
-    showCalibrationBadge,
-    isBikerOrCoppia
-  } = config;
+  const { gpsTabHref, isBikerOrCoppia } = config;
 
   return [
     <Tabs.Screen
@@ -32,9 +14,6 @@ export function getTabScreens(t: (key: string) => string, config: {
       name="index"
       options={{
         title: t("map.title"),
-        tabBarIcon: ({ color, size, focused }) => (
-          <TabIcon name="index" color={color} size={size} focused={focused} />
-        ),
         headerShown: false,
         href: gpsTabHref,
       }}
@@ -44,17 +23,6 @@ export function getTabScreens(t: (key: string) => string, config: {
       name="proposals"
       options={{
         title: t("proposals.hub.tabTitle"),
-        tabBarIcon: ({ color, size, focused }) => (
-          <TabIcon
-            name="proposals"
-            color={color}
-            size={size}
-            focused={focused}
-            globalTrackingActive={globalTrackingActive}
-            globalSprintMeasuring={globalSprintMeasuring}
-            hasActiveMatches={hasActiveMatches}
-          />
-        ),
         headerTitle: t("proposals.hub.headerTitle"),
         href: gpsTabHref,
       }}
@@ -64,15 +32,6 @@ export function getTabScreens(t: (key: string) => string, config: {
       name="ready"
       options={{
         title: "Status",
-        tabBarIcon: ({ color, size, focused }) => (
-          <TabIcon
-            name="ready"
-            color={color}
-            size={size}
-            focused={focused}
-            statusIsAvailable={statusIsAvailable}
-          />
-        ),
         headerShown: false,
         href: gpsTabHref,
       }}
@@ -82,9 +41,6 @@ export function getTabScreens(t: (key: string) => string, config: {
       name="motoclub"
       options={{
         title: "Clubs",
-        tabBarIcon: ({ color, size, focused }) => (
-          <TabIcon name="motoclub" color={color} size={size} focused={focused} />
-        ),
         headerShown: false,
         href: gpsTabHref,
       }}
@@ -94,9 +50,6 @@ export function getTabScreens(t: (key: string) => string, config: {
       name="eventi"
       options={{
         title: t("events.tabTitle"),
-        tabBarIcon: ({ color, size, focused }) => (
-          <TabIcon name="eventi" color={color} size={size} focused={focused} />
-        ),
         headerShown: false,
         href: gpsTabHref,
       }}
@@ -106,9 +59,6 @@ export function getTabScreens(t: (key: string) => string, config: {
       name="match"
       options={{
         title: "Match",
-        tabBarIcon: ({ color, size, focused }) => (
-          <TabIcon name="match" color={color} size={size} focused={focused} newMatchCount={newMatchCount} />
-        ),
         headerShown: false,
         href: gpsTabHref,
       }}
@@ -118,9 +68,6 @@ export function getTabScreens(t: (key: string) => string, config: {
       name="music"
       options={{
         title: t("music.tabTitle"),
-        tabBarIcon: ({ color, size, focused }) => (
-          <TabIcon name="music" color={color} size={size} focused={focused} />
-        ),
         headerShown: false,
         href: gpsTabHref,
       }}
@@ -130,15 +77,6 @@ export function getTabScreens(t: (key: string) => string, config: {
       name="chat"
       options={{
         title: "Chat",
-        tabBarIcon: ({ color, size, focused }) => (
-          <TabIcon
-            name="chat"
-            color={color}
-            size={size}
-            focused={focused}
-            unreadCount={unreadCount}
-          />
-        ),
         headerShown: false,
         href: gpsTabHref,
       }}
@@ -148,9 +86,6 @@ export function getTabScreens(t: (key: string) => string, config: {
       name="contest"
       options={{
         title: "Pic!",
-        tabBarIcon: ({ color, size, focused }) => (
-          <TabIcon name="contest" color={color} size={size} focused={focused} />
-        ),
         headerTitle: "Pic!",
         href: gpsTabHref,
       }}
@@ -160,9 +95,6 @@ export function getTabScreens(t: (key: string) => string, config: {
       name="arcade"
       options={{
         title: "Arcade",
-        tabBarIcon: ({ color, size, focused }) => (
-          <TabIcon name="arcade" color={color} size={size} focused={focused} />
-        ),
         headerTitle: "Arcade",
         href: gpsTabHref,
       }}
@@ -172,9 +104,6 @@ export function getTabScreens(t: (key: string) => string, config: {
       name="ride"
       options={{
         title: "Privacy & GPS",
-        tabBarIcon: ({ color, size, focused }) => (
-          <TabIcon name="ride" color={color} size={size} focused={focused} />
-        ),
         headerTitle: "Privacy & GPS",
         href: null,
       }}
@@ -185,9 +114,6 @@ export function getTabScreens(t: (key: string) => string, config: {
       options={{
         title: "Giri",
         href: null,
-        tabBarIcon: ({ color, size, focused }) => (
-          <TabIcon name="giri" color={color} size={size} focused={focused} />
-        ),
         headerShown: false,
       }}
     />,
@@ -196,9 +122,6 @@ export function getTabScreens(t: (key: string) => string, config: {
       name="tracking"
       options={{
         title: t("tracking.tabTitle"),
-        tabBarIcon: ({ color, size, focused }) => (
-          <TabIcon name="tracking" color={color} size={size} focused={focused} />
-        ),
         headerTitle: t("tracking.recordRide"),
         href: null,
       }}
@@ -208,15 +131,6 @@ export function getTabScreens(t: (key: string) => string, config: {
       name="garage"
       options={{
         title: isBikerOrCoppia ? t("garage.tabTitle") : t("garage.tabWishlist"),
-        tabBarIcon: ({ color, size, focused }) => (
-          <TabIcon
-            name="garage"
-            color={color}
-            size={size}
-            focused={focused}
-            isBikerOrCoppia={isBikerOrCoppia}
-          />
-        ),
         headerTitle: isBikerOrCoppia ? t("garage.myGarage") : t("garage.myWishlist"),
         href: null,
       }}
@@ -226,15 +140,6 @@ export function getTabScreens(t: (key: string) => string, config: {
       name="profile"
       options={{
         title: t("profile.title"),
-        tabBarIcon: ({ color, size, focused }) => (
-          <TabIcon
-            name="profile"
-            color={color}
-            size={size}
-            focused={focused}
-            showCalibrationBadge={showCalibrationBadge}
-          />
-        ),
         headerTitle: t("profile.myProfile"),
       }}
     />,
