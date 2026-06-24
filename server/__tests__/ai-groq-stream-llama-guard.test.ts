@@ -80,7 +80,12 @@ vi.mock("../ai/route-provider-config", () => ({
 // ---------------------------------------------------------------------------
 
 import plannedRoutesRouter from "../routes/planned-routes";
-import { VALID_ROUTE } from "./helpers/route-fixtures";
+import {
+  VALID_ROUTE,
+  BROKEN_STREAM_SENTINEL,
+  ROUTE_JSON_TRUNCATED_MID,
+  ROUTE_JSON_TRUNCATED_SHORT,
+} from "./helpers/route-fixtures";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -230,7 +235,7 @@ describe("streamRouteText — Groq streaming JSON non valido → fallback Gemini
   });
 
   it("Groq produce JSON troncato → Gemini emette output valido, nessun frammento Groq nel client", async () => {
-    const broken = '{"title":"GROQ_BROKEN","startLoc';
+    const broken = ROUTE_JSON_TRUNCATED_MID;
     const valid = JSON.stringify(VALID_ROUTE);
 
     aiMocks.streamText.mockImplementation(({ model }: { model: { __provider?: string; __role?: string } }) => {
@@ -244,7 +249,7 @@ describe("streamRouteText — Groq streaming JSON non valido → fallback Gemini
     const sse = parseSse(res.text);
 
     expect(res.status).toBe(200);
-    expect(sse.text).not.toContain("GROQ_BROKEN");
+    expect(sse.text).not.toContain(BROKEN_STREAM_SENTINEL);
     expect(sse.text).toBe(valid);
     expect(sse.done).toMatchObject({ title: "Giro sulle Alpi" });
     const roles = aiMocks.streamText.mock.calls.map((c) => c[0].model?.__role ?? c[0].model?.__provider);
@@ -259,7 +264,7 @@ describe("streamRouteText — Groq streaming JSON non valido → fallback Gemini
       if (model?.__role === "stream") {
         return {
           textStream: (async function* () {
-            yield '{"title":"GROQ_PARTIAL"';
+            yield ROUTE_JSON_TRUNCATED_SHORT;
             throw new Error("ECONNRESET groq");
           })(),
         };
@@ -273,7 +278,7 @@ describe("streamRouteText — Groq streaming JSON non valido → fallback Gemini
     const sse = parseSse(res.text);
 
     expect(res.status).toBe(200);
-    expect(sse.text).not.toContain("GROQ_PARTIAL");
+    expect(sse.text).not.toContain(BROKEN_STREAM_SENTINEL);
     expect(sse.text).toBe(valid);
     expect(sse.done).toMatchObject({ title: "Giro sulle Alpi" });
   });
@@ -351,7 +356,7 @@ describe("streamRouteText — Groq come provider finale (senza Gemini)", () => {
   });
 
   it("Groq produce JSON non valido e nessun fallback → evento error SSE, nessun testo corrotto", async () => {
-    const broken = '{"title":"GROQ_BROKEN"';
+    const broken = ROUTE_JSON_TRUNCATED_SHORT;
     aiMocks.streamText.mockImplementation(({ model }: { model: { __role?: string } }) => {
       if (model?.__role === "stream") return streamFrom(chunkify(broken));
       throw new Error("Gemini non configurato");
@@ -363,7 +368,7 @@ describe("streamRouteText — Groq come provider finale (senza Gemini)", () => {
     const sse = parseSse(res.text);
 
     expect(res.status).toBe(200);
-    expect(sse.text).not.toContain("GROQ_BROKEN");
+    expect(sse.text).not.toContain(BROKEN_STREAM_SENTINEL);
     expect(sse.text).toBe("");
     expect(typeof sse.error).toBe("string");
     expect(sse.error!.length).toBeGreaterThan(0);

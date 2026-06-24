@@ -61,7 +61,12 @@ vi.mock("../ai/route-provider-stats", () => ({ incrementProviderStat: vi.fn() })
 
 import plannedRoutesRouter from "../routes/planned-routes";
 import { generateRouteObject } from "../routes/planned-routes/waypoints.next";
-import { VALID_ROUTE } from "./helpers/route-fixtures";
+import {
+  VALID_ROUTE,
+  BROKEN_STREAM_SENTINEL,
+  ROUTE_JSON_TRUNCATED_MID,
+  ROUTE_JSON_TRUNCATED_SHORT,
+} from "./helpers/route-fixtures";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -213,7 +218,7 @@ describe("POST /api/planned-routes/ai-stream — Groq fallback (Task #2930)", ()
   });
 
   it("JSON Ollama corrotto → Groq valido viene emesso, nessun output Gemini", async () => {
-    const broken = '{"title":"OLLAMA_BROKEN","startLoc';
+    const broken = ROUTE_JSON_TRUNCATED_MID;
     const valid = JSON.stringify(VALID_ROUTE);
     aiMocks.streamText.mockImplementation(({ model }: { model: { __provider?: string } }) => {
       if (model?.__provider === "ollama") return streamFrom(chunkify(broken));
@@ -225,7 +230,7 @@ describe("POST /api/planned-routes/ai-stream — Groq fallback (Task #2930)", ()
     const sse = parseSse(res.text);
 
     expect(res.status).toBe(200);
-    expect(sse.text).not.toContain("OLLAMA_BROKEN");
+    expect(sse.text).not.toContain(BROKEN_STREAM_SENTINEL);
     expect(sse.text).toBe(valid);
     expect(sse.done).toMatchObject({ title: "Giro sulle Alpi", style: "curvy" });
     const providers = aiMocks.streamText.mock.calls.map((c) => c[0].model.__provider);
@@ -237,8 +242,8 @@ describe("POST /api/planned-routes/ai-stream — Groq fallback (Task #2930)", ()
   it("Ollama corrotto + Groq corrotto → ricade su Gemini valido", async () => {
     const valid = JSON.stringify(VALID_ROUTE);
     aiMocks.streamText.mockImplementation(({ model }: { model: { __provider?: string } }) => {
-      if (model?.__provider === "ollama") return streamFrom(chunkify('{"title":"OLLAMA_BROKEN"'));
-      if (model?.__provider === "groq") return streamFrom(chunkify('{"title":"GROQ_BROKEN"'));
+      if (model?.__provider === "ollama") return streamFrom(chunkify(ROUTE_JSON_TRUNCATED_SHORT));
+      if (model?.__provider === "groq") return streamFrom(chunkify(ROUTE_JSON_TRUNCATED_SHORT));
       return streamFrom(chunkify(valid));
     });
 
@@ -246,8 +251,7 @@ describe("POST /api/planned-routes/ai-stream — Groq fallback (Task #2930)", ()
     const sse = parseSse(res.text);
 
     expect(res.status).toBe(200);
-    expect(sse.text).not.toContain("OLLAMA_BROKEN");
-    expect(sse.text).not.toContain("GROQ_BROKEN");
+    expect(sse.text).not.toContain(BROKEN_STREAM_SENTINEL);
     expect(sse.text).toBe(valid);
     const providers = aiMocks.streamText.mock.calls.map((c) => c[0].model.__provider);
     expect(providers).toEqual(["ollama", "groq", "google"]);

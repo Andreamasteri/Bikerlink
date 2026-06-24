@@ -45,7 +45,13 @@ vi.mock("../lib/groq-client", () => ({
 }));
 
 import plannedRoutesRouter from "../routes/planned-routes";
-import { VALID_ROUTE } from "./helpers/route-fixtures";
+import {
+  VALID_ROUTE,
+  BROKEN_STREAM_SENTINEL,
+  ROUTE_JSON_TRUNCATED_MID,
+  ROUTE_JSON_TRUNCATED_SHORT,
+  ROUTE_JSON_UNKNOWN_FIELDS,
+} from "./helpers/route-fixtures";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -151,7 +157,7 @@ describe("POST /api/planned-routes/ai-stream — resilienza JSON Ollama (Task #2
   });
 
   it("scarta il JSON corrotto di Ollama a metà stream e ricade su Gemini senza output corrotto", async () => {
-    const broken = '{"title":"OLLAMA_BROKEN","startLoc'; // JSON troncato/malformato
+    const broken = ROUTE_JSON_TRUNCATED_MID;
     const valid = JSON.stringify(VALID_ROUTE);
     aiMocks.streamText.mockImplementation(({ model }: { model: { __provider?: string } }) => {
       if (model?.__provider === "ollama") return streamFrom(chunkify(broken));
@@ -163,7 +169,7 @@ describe("POST /api/planned-routes/ai-stream — resilienza JSON Ollama (Task #2
 
     expect(res.status).toBe(200);
     // Nessun frammento corrotto di Ollama raggiunge il client.
-    expect(sse.text).not.toContain("OLLAMA_BROKEN");
+    expect(sse.text).not.toContain(BROKEN_STREAM_SENTINEL);
     // Il client riceve il JSON valido di Gemini.
     expect(sse.text).toBe(valid);
     expect(sse.done).toMatchObject({ title: "Giro sulle Alpi" });
@@ -176,7 +182,7 @@ describe("POST /api/planned-routes/ai-stream — resilienza JSON Ollama (Task #2
     const valid = JSON.stringify(VALID_ROUTE);
     aiMocks.streamText.mockImplementation(({ model }: { model: { __provider?: string } }) => {
       if (model?.__provider === "ollama") {
-        return streamThatThrows(['{"title":"OLLAMA_PARTIAL"'], new Error("ECONNRESET"));
+        return streamThatThrows([ROUTE_JSON_TRUNCATED_SHORT], new Error("ECONNRESET"));
       }
       return streamFrom(chunkify(valid));
     });
@@ -185,7 +191,7 @@ describe("POST /api/planned-routes/ai-stream — resilienza JSON Ollama (Task #2
     const sse = parseSse(res.text);
 
     expect(res.status).toBe(200);
-    expect(sse.text).not.toContain("OLLAMA_PARTIAL");
+    expect(sse.text).not.toContain(BROKEN_STREAM_SENTINEL);
     expect(sse.text).toBe(valid);
     expect(sse.done).toMatchObject({ title: "Giro sulle Alpi" });
   });
@@ -193,7 +199,7 @@ describe("POST /api/planned-routes/ai-stream — resilienza JSON Ollama (Task #2
   it("JSON Ollama corrotto e nessuna GEMINI_API_KEY → evento error, niente output corrotto", async () => {
     delete process.env.GEMINI_API_KEY;
     app = buildApp();
-    const broken = '{"title":"OLLAMA_BROKEN"'; // troncato
+    const broken = ROUTE_JSON_TRUNCATED_SHORT;
     aiMocks.streamText.mockImplementation(({ model }: { model: { __provider?: string } }) => {
       if (model?.__provider === "ollama") return streamFrom(chunkify(broken));
       throw new Error("Gemini non disponibile");
@@ -203,7 +209,7 @@ describe("POST /api/planned-routes/ai-stream — resilienza JSON Ollama (Task #2
     const sse = parseSse(res.text);
 
     expect(res.status).toBe(200); // headers già inviati: l'errore arriva come evento SSE
-    expect(sse.text).not.toContain("OLLAMA_BROKEN");
+    expect(sse.text).not.toContain(BROKEN_STREAM_SENTINEL);
     expect(sse.text).toBe("");
     expect(typeof sse.error).toBe("string");
     expect(sse.error!.length).toBeGreaterThan(0);
@@ -261,9 +267,9 @@ describe("POST /api/planned-routes/ai-stream — resilienza JSON Gemini (Task #2
   });
 
   it("JSON Gemini corrotto → evento error SSE, nessun output corrotto emesso", async () => {
-    const brokenGemini = '{"title":"GEMINI_BROKEN","startLoc'; // JSON troncato
+    const brokenGemini = ROUTE_JSON_TRUNCATED_MID;
     aiMocks.streamText.mockImplementation(({ model }: { model: { __provider?: string } }) => {
-      if (model?.__provider === "ollama") return streamFrom(chunkify('{"bad":"ollama"}'));
+      if (model?.__provider === "ollama") return streamFrom(chunkify(ROUTE_JSON_UNKNOWN_FIELDS));
       // Gemini restituisce JSON malformato
       return streamFrom(chunkify(brokenGemini));
     });
@@ -273,7 +279,7 @@ describe("POST /api/planned-routes/ai-stream — resilienza JSON Gemini (Task #2
 
     expect(res.status).toBe(200); // headers già inviati: errore come evento SSE
     // Nessun frammento corrotto raggiunge il client
-    expect(sse.text).not.toContain("GEMINI_BROKEN");
+    expect(sse.text).not.toContain(BROKEN_STREAM_SENTINEL);
     expect(sse.text).toBe("");
     // Deve esserci un evento error con messaggio non vuoto
     expect(typeof sse.error).toBe("string");
@@ -285,7 +291,7 @@ describe("POST /api/planned-routes/ai-stream — resilienza JSON Gemini (Task #2
   });
 
   it("Ollama non disponibile + Gemini corrotto → evento error SSE, nessun output corrotto", async () => {
-    const brokenGemini = '{"title":"GEMINI_BROKEN"'; // troncato
+    const brokenGemini = ROUTE_JSON_TRUNCATED_SHORT;
     aiMocks.streamText.mockImplementation(({ model }: { model: { __provider?: string } }) => {
       if (model?.__provider === "ollama") throw new Error("ECONNREFUSED");
       return streamFrom(chunkify(brokenGemini));
@@ -295,14 +301,14 @@ describe("POST /api/planned-routes/ai-stream — resilienza JSON Gemini (Task #2
     const sse = parseSse(res.text);
 
     expect(res.status).toBe(200);
-    expect(sse.text).not.toContain("GEMINI_BROKEN");
+    expect(sse.text).not.toContain(BROKEN_STREAM_SENTINEL);
     expect(sse.text).toBe("");
     expect(typeof sse.error).toBe("string");
     expect(sse.error!.length).toBeGreaterThan(0);
   });
 
   it("Gemini valido dopo fallback Ollama → output pulito, nessun evento error", async () => {
-    const brokenOllama = '{"bad":"json"'; // JSON invalido per lo schema
+    const brokenOllama = ROUTE_JSON_TRUNCATED_SHORT;
     const validGemini = JSON.stringify(VALID_ROUTE);
     aiMocks.streamText.mockImplementation(({ model }: { model: { __provider?: string } }) => {
       if (model?.__provider === "ollama") return streamFrom(chunkify(brokenOllama));
