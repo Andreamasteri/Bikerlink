@@ -100,7 +100,34 @@ elif [[ "$LAST_OTA_NUMBER" -eq 0 ]]; then
 else
   log_info "Ultima OTA in DB: '${LAST_OTA_VERSION}' → numero estratto: ${LAST_OTA_NUMBER} → NEXT=$(( LAST_OTA_NUMBER + 1 ))"
 fi
+# ── 3d. Floor guard: NEXT_OTA non può regredire sotto buildInfo.ts + 1 ──────────
+# Allineato a publish-ota.sh (fix anti-regressione #4841):
+# Se il DB ha un numero inferiore a quello già baked in buildInfo.ts
+# (es. DB non sincronizzato, restore parziale), si usa buildInfo come base.
+BUILD_INFO_CURRENT=$(node -e "
+  try {
+    const fs = require('fs');
+    const src = fs.readFileSync('constants/buildInfo.ts', 'utf8');
+    const m = src.match(/APPLIED_OTA_NUMBER[^=]*=\s*(\d+)/);
+    console.log(m ? m[1] : '0');
+  } catch { console.log('0'); }
+" 2>/dev/null || echo "0")
+log_info "APPLIED_OTA_NUMBER corrente in buildInfo.ts: ${BUILD_INFO_CURRENT}"
+
+if [[ "$BUILD_INFO_CURRENT" =~ ^[0-9]+$ ]] && [[ "$LAST_OTA_NUMBER" -lt "$BUILD_INFO_CURRENT" ]]; then
+  log_warn "⚠️  DB ha OTA ${LAST_OTA_NUMBER} < buildInfo.ts ${BUILD_INFO_CURRENT} — possibile DB non sincronizzato."
+  log_warn "   Uso buildInfo.ts come base per evitare regressione del numero OTA."
+  LAST_OTA_NUMBER="$BUILD_INFO_CURRENT"
+fi
+
 NEXT_OTA=$(( LAST_OTA_NUMBER + 1 ))
+
+# Salvaguardia finale: NEXT_OTA non deve mai scendere sotto BUILD_INFO_CURRENT + 1.
+MIN_NEXT_OTA=$(( BUILD_INFO_CURRENT + 1 ))
+if [[ "$NEXT_OTA" -lt "$MIN_NEXT_OTA" ]]; then
+  log_warn "⚠️  NEXT_OTA calcolato (${NEXT_OTA}) < floor minimo (${MIN_NEXT_OTA}) — forzato a ${MIN_NEXT_OTA}."
+  NEXT_OTA="$MIN_NEXT_OTA"
+fi
 
 BUILD_NUM=$(node -e "const a=require('./app.json'); console.log(a.expo.android.versionCode || 53)" 2>/dev/null || echo "53")
 RUNTIME_FULL=$(node -e "const a=require('./app.json'); console.log(a.expo.runtimeVersion||'10.0.0')" 2>/dev/null || echo "10.0.0")

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import {
   View,
   Text,
@@ -9,10 +9,12 @@ import {
   Switch,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useQuery } from "@tanstack/react-query";
 import { usePlayer, RadioStation } from "@/lib/player-context";
 import Colors from "@/constants/colors";
 import { ArtworkImage } from "./ArtworkImage";
+import { LASTFM_SUGGEST_KEY } from "../types";
 
 interface Genre {
   id: string;
@@ -29,11 +31,22 @@ export function RadioTab({ onPlayStation }: RadioTabProps) {
     usePlayer();
   const [useLastFm, setUseLastFm] = useState(false);
 
-  // check-unstable-query-defaults: safe — questo componente non ha useEffect.
-  // genres, suggestedGenreIds e stations con default = [] sono usati solo nel
-  // render JSX (displayedGenres è derivato, non finisce mai in deps di useEffect).
-  // Se in futuro si aggiunge un useEffect che usa queste variabili nei deps,
-  // rimuovere il default = [] e usare `data ?? []` stabilizzato con useMemo.
+  useEffect(() => {
+    AsyncStorage.getItem(LASTFM_SUGGEST_KEY).then((v) => {
+      if (v === "true") setUseLastFm(true);
+    });
+  }, []);
+
+  const handleToggle = useCallback((val: boolean) => {
+    setUseLastFm(val);
+    AsyncStorage.setItem(LASTFM_SUGGEST_KEY, String(val)).catch(() => {});
+  }, []);
+
+  // check-unstable-query-defaults: safe — genres, suggestedGenreIds e stations
+  // con default = [] sono usati solo nel render JSX e in displayedGenres (derivato).
+  // Nessuna di queste variabili finisce nei deps di useEffect.
+  // Se in futuro si aggiunge un useEffect che le usa, rimuovere il default = []
+  // e usare `data ?? []` stabilizzato con useMemo.
   const { data: genres = [] } = useQuery<Genre[]>({
     queryKey: ["/api/music/radio/genres"],
   });
@@ -68,7 +81,7 @@ export function RadioTab({ onPlayStation }: RadioTabProps) {
         </View>
         <Switch
           value={useLastFm}
-          onValueChange={setUseLastFm}
+          onValueChange={handleToggle}
           trackColor={{ false: Colors.border, true: Colors.accent + "66" }}
           thumbColor={useLastFm ? Colors.accent : Colors.textSecondary}
         />
