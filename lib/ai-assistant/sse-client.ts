@@ -8,8 +8,9 @@ export interface AssistantStreamEvent {
 }
 
 export interface AssistantStreamOpts {
+  // Task #4842 — "admin" abilita la chat assistant del pannello admin.
   message: string;
-  platform: "android" | "ios" | "web";
+  platform: "android" | "ios" | "web" | "admin";
   history?: Array<{ role: "user" | "assistant"; content: string }>;
   signal?: AbortSignal;
   onEvent: (ev: AssistantStreamEvent) => void;

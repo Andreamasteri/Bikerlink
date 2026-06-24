@@ -98,7 +98,8 @@ router.get("/ai/assistant/config", requireUser, async (req: Request, res: Respon
 // ── POST /message — SSE streaming ─────────────────────────────────────────
 const MessageBody = z.object({
   message: z.string().min(1).max(2000),
-  platform: z.enum(["android", "ios", "web"]).optional(),
+  // Task #4842 — "admin" abilita la chat assistant embeddata nel pannello admin.
+  platform: z.enum(["android", "ios", "web", "admin"]).optional(),
   history: z.array(z.object({
     role: z.enum(["user", "assistant"]),
     content: z.string().min(1).max(4000),
@@ -110,17 +111,34 @@ router.post("/ai/assistant/message", requireUser, messageLimiter, async (req: Re
   if (!parsed.success) { sendError(res, 400, parsed.error.issues[0].message); return; }
   const user = (req as Request & { sessionUser?: { id: string; role?: string | null; assistantPrefs?: { disabled?: boolean } | null } }).sessionUser!;
 
-  if (user.assistantPrefs?.disabled) {
-    sendError(res, 403, "Assistente disattivato dalle tue preferenze");
+  const rawPlatform = parsed.data.platform ?? "android";
+  // Task #4842 — Modalità admin: solo per utenti con ruolo admin. Bypassa il
+  // gating per-piattaforma (prefs utente, config.enabled) perché è una feature
+  // operativa del pannello admin, non l'assistente utente.
+  const isAdminMode = rawPlatform === "admin";
+  if (isAdminMode && user.role !== "admin") {
+    sendError(res, 403, "Accesso riservato agli amministratori");
     return;
   }
 
-  const rawPlatform = parsed.data.platform ?? "android";
-  const platformForConfig = parsePlatform(rawPlatform);
-  const config = await loadAssistantConfig(platformForConfig);
-  if (!config.enabled) {
-    sendError(res, 403, "Assistente disattivato dall'amministratore");
-    return;
+  let allowedActions: string[] = [];
+  let customFaqs: KnowledgeEntry[] = [];
+
+  if (!isAdminMode) {
+    if (user.assistantPrefs?.disabled) {
+      sendError(res, 403, "Assistente disattivato dalle tue preferenze");
+      return;
+    }
+    const platformForConfig = parsePlatform(rawPlatform);
+    const config = await loadAssistantConfig(platformForConfig);
+    if (!config.enabled) {
+      sendError(res, 403, "Assistente disattivato dall'amministratore");
+      return;
+    }
+    allowedActions = Object.entries(config.actions)
+      .filter(([, on]) => on)
+      .map(([id]) => id);
+    customFaqs = await loadCustomFaqs(config.customFaqKeys);
   }
 
   // Task #2825 — Nessun provider AI configurato: rispondi 503 con il nome delle
@@ -130,10 +148,17 @@ router.post("/ai/assistant/message", requireUser, messageLimiter, async (req: Re
     return;
   }
 
-  const allowedActions = Object.entries(config.actions)
-    .filter(([, on]) => on)
-    .map(([id]) => id);
-  const customFaqs = await loadCustomFaqs(config.customFaqKeys);
+  // Task #4842 — Snapshot admin sintetico iniettato nel system prompt.
+  let adminContext: string | undefined;
+  if (isAdminMode) {
+    try {
+      const { buildAdminContextSnapshot } = await import("../ai/assistant/admin-context");
+      adminContext = await buildAdminContextSnapshot();
+    } catch (e) {
+      console.warn("[ai-assistant/admin-context]", (e as Error).message);
+      adminContext = "(snapshot piattaforma non disponibile al momento)";
+    }
+  }
 
   // SSE
   res.setHeader("Content-Type", "text/event-stream; charset=utf-8");
@@ -158,10 +183,15 @@ router.post("/ai/assistant/message", requireUser, messageLimiter, async (req: Re
   try {
     const result = await runAssistantAgent({
       message: parsed.data.message,
-      platform: rawPlatform as "android" | "ios" | "web",
+      platform: rawPlatform as "android" | "ios" | "web" | "admin",
       allowedActions,
       customFaqs,
       history: parsed.data.history ?? [],
+      // Task #4842 — userId solo in modalità admin (per il logging ai_call_logs).
+      // Per gli utenti normali resta omesso, preservando il comportamento esistente
+      // (nessuna persistenza di memoria conversazionale via questa route).
+      userId: isAdminMode ? user.id : undefined,
+      adminContext,
       signal: abort.signal,
       onTextDelta: (delta) => send("delta", { text: delta }),
     });

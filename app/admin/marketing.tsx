@@ -8,6 +8,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 import { apiRequest, queryClient } from "@/lib/query-client";
 import { useT } from "@/lib/language-context";
+import AdminChatWidget from "@/components/admin/AdminChatWidget";
 
 interface Business {
   id: string;
@@ -257,6 +258,7 @@ export default function AdminMarketing() {
 
   const ListHeader = (
     <View>
+      <AdminChatWidget />
       <View style={styles.configCard}>
         <Text style={styles.configTitle}>Passaggi qualificati</Text>
         <Text style={styles.configHint}>

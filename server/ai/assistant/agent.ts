@@ -9,7 +9,7 @@
 // Logging: ogni chiamata viene loggata in ai_call_logs (fire-and-forget).
 import { streamText, stepCountIs } from "ai";
 import { runWithFallback, estimateCostUsd, type ResolvedModel } from "../moderation/provider";
-import { buildSystemPrompt, type KnowledgeEntry } from "./knowledge";
+import { buildSystemPrompt, buildAdminSystemPrompt, type KnowledgeEntry } from "./knowledge";
 import { getOllamaModel, isOllamaConfigured } from "../../lib/ollama-client";
 import { retrieveContext, formatRagContext, indexKnowledge } from "./rag";
 import { OLLAMA_TOOLS } from "./tools";
@@ -23,13 +23,16 @@ const OLLAMA_FALLBACK_MODEL_ID = process.env.OLLAMA_MODEL ?? "llama3.1:8b";
 
 export interface AssistantAgentOpts {
   message: string;
-  platform: "android" | "ios" | "web";
+  platform: "android" | "ios" | "web" | "admin";
   allowedActions: string[];
   customFaqs?: KnowledgeEntry[];
   history?: Array<{ role: "user" | "assistant"; content: string }>;
   userId?: string | null;
   signal?: AbortSignal;
   onTextDelta?: (delta: string) => void;
+  // Task #4842 — Contesto admin sintetico (snapshot piattaforma) iniettato nel
+  // system prompt quando platform === "admin".
+  adminContext?: string;
 }
 
 export interface AssistantAgentResult {
@@ -89,27 +92,37 @@ async function maybeSummarize(userId: string): Promise<void> {
 
 export async function runAssistantAgent(opts: AssistantAgentOpts): Promise<AssistantAgentResult> {
   const startTs = Date.now();
+  const isAdmin = opts.platform === "admin";
 
-  // Task #3017 — RAG: assicuriamoci che l'indice sia aggiornato e recuperiamo contesto
-  indexKnowledge(opts.customFaqs ?? []);
-  const ragSnippets = retrieveContext(opts.message, {
-    k: 3,
-    threshold: 0.05,
-    extra: opts.customFaqs ?? [],
-  });
-  const ragContext = formatRagContext(ragSnippets);
+  let system: string;
+  if (isAdmin) {
+    // Task #4842 — Modalità admin: system prompt dedicato con snapshot piattaforma.
+    // Nessun RAG/FAQ utente, nessuna azione strutturata.
+    system = buildAdminSystemPrompt(opts.adminContext ?? "");
+  } else {
+    // Task #3017 — RAG: assicuriamoci che l'indice sia aggiornato e recuperiamo contesto
+    indexKnowledge(opts.customFaqs ?? []);
+    const ragSnippets = retrieveContext(opts.message, {
+      k: 3,
+      threshold: 0.05,
+      extra: opts.customFaqs ?? [],
+    });
+    const ragContext = formatRagContext(ragSnippets);
 
-  const system = buildSystemPrompt({
-    platform: opts.platform,
-    customFaqs: opts.customFaqs,
-    allowedActions: opts.allowedActions,
-    ragContext,
-    // Task #3090 — passa userId così Ollama lo usa nei tool call (getUserPlannedRoutes, getBikerStats)
-    userId: opts.userId,
-  });
+    system = buildSystemPrompt({
+      platform: opts.platform as "android" | "ios" | "web",
+      customFaqs: opts.customFaqs,
+      allowedActions: opts.allowedActions,
+      ragContext,
+      // Task #3090 — passa userId così Ollama lo usa nei tool call (getUserPlannedRoutes, getBikerStats)
+      userId: opts.userId,
+    });
+  }
 
-  // Task #3017 — Memoria: carica turni precedenti dal DB se userId è disponibile
-  const memoryTurns = opts.userId
+  // Task #3017 — Memoria: carica turni precedenti dal DB se userId è disponibile.
+  // Task #4842 — La chat admin è in-sessione (nessuna persistenza cross-sessione):
+  // non carichiamo né salviamo la memoria conversazionale per la modalità admin.
+  const memoryTurns = (opts.userId && !isAdmin)
     ? await loadMemoryTurns(opts.userId)
     : [];
 
@@ -227,7 +240,8 @@ export async function runAssistantAgent(opts: AssistantAgentOpts): Promise<Assis
   });
 
   // Task #3017 — Salva in memoria conversazionale (solo se non degraded e userId disponibile)
-  if (!degraded && opts.userId && finalText) {
+  // Task #4842 — La chat admin è in-sessione: non persistiamo i turni.
+  if (!degraded && opts.userId && finalText && !isAdmin) {
     saveTurns(opts.userId, opts.message, finalText).catch(() => {});
   }
 
