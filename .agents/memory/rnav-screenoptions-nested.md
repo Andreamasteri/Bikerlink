@@ -56,7 +56,8 @@ const screenOpts = useMemo(() => ({
 **How to apply**:
 - Qualsiasi file in `app/` (layout o screen) che passa `screenOptions={{...}}` o `options={{...}}` con almeno un oggetto annidato (es. `headerStyle:{...}`) inline in JSX
 - Se il componente usa navigation hooks (`useLocalSearchParams`, `useNavigation`, `useRouter`), il rischio di loop è alto perché re-renderà a ogni `setOptions`
-- Gate CI: `scripts/check-rnav-inline-props.sh` cattura entrambi i pattern (`screenOptions` e `Stack.Screen options`)
+- Gate CI: `scripts/check-rnav-inline-props.sh` cattura tutti i pattern: `screenOptions`, `Stack.Screen options`, `Tabs.Screen options`, `header/headerLeft/headerRight` inline, `router` in hook deps senza `routerRef`
+- Gate complementare: `scripts/check-router-in-effect-deps.sh` (Python) — rileva `useEffect/useCallback` con `router.replace/push` nel corpo + `[router]` nelle deps
 
 ## File fixati (audit completo)
 Layout file:
