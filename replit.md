@@ -10,6 +10,37 @@ La pubblicazione OTA è un'operazione separata e dedicata, eseguita **solo su is
 
 **Regola**: se un task include modifiche al codice e l'utente non ha esplicitamente detto "pubblica anche l'OTA" come istruzione separata, il task termina **senza** pubblicare alcuna OTA. L'agente deve proporre la pubblicazione OTA come follow-up distinto, non eseguirla autonomamente.
 
+## Gate pre-commit — generateObject con schema diretto
+
+Il check `scripts/check-ai-direct-generateobject.sh` rileva chiamate `generateObject({ schema: … })` fuori dal gateway approvato (`server/ai/moderation/provider.ts`). Queste chiamate crashano silenziosamente in produzione quando il modello risolve a llama-3.x su Groq (che non supporta `json_schema` nativo).
+
+Il check è eseguito come gate **pre-commit** (e in `post-merge.sh`): il commit è bloccato se viene trovata una violazione.
+
+### Installazione hook locale
+
+```bash
+bash scripts/setup-hooks.sh
+```
+
+Il pre-commit installa in `.git/hooks/pre-commit` e include questi gate nell'ordine:
+1. `detect-secrets` — blocca token/segreti non approvati
+2. `check-large-files-ratchet.sh` — ratchet 600 righe per file
+3. `lint-migration-indexes.ts` — indici DESC/WHERE a rischio nelle migration
+4. `check-ai-direct-generateobject.sh` — bypass `generateStructured` rilevato
+
+### Soppressione (solo se il modello è verificato non-llama)
+
+```ts
+// check-ai-direct-generateobject: safe
+const result = await generateObject({ schema, … });
+```
+
+### Fix standard
+
+Sostituire `generateObject({ model, schema, prompt })` con `generateStructured(resolvedModel, { schema, prompt })` dove `resolvedModel` viene da `runWithFallback` in `server/ai/moderation/provider.ts`.
+
+---
+
 ## Policy ESLint CI — Gate Obbligatorio (Ratchet)
 
 La regola `react-hooks/exhaustive-deps` è impostata su **`"warn"`** in `eslint.config.js`. Il gate CI usa un meccanismo **ratchet**: fallisce se il conteggio delle violazioni **aumenta** rispetto alla baseline, impedendo regressioni pur non bloccando il lavoro sul debito tecnico esistente.

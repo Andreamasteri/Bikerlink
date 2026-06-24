@@ -105,6 +105,17 @@ if "$DETECT_SECRETS_HOOK" --baseline "$BASELINE" "${STAGED_FILES[@]}"; then
     echo "✅ Nessuna migration .sql in staging — lint saltato."
   fi
 
+  # Gate "generateObject con schema diretto fuori dal gateway" — vedi ai-strict-schema.md
+  echo ""
+  echo "🔍 Controllo generateObject con schema diretto (bypass generateStructured)..."
+  if ! bash scripts/check-ai-direct-generateobject.sh; then
+    echo ""
+    echo "❌ COMMIT BLOCCATO — chiamata generateObject con schema diretto rilevata."
+    echo "   Usa generateStructured (server/ai/moderation/provider.ts)."
+    echo "   Bypass una-tantum (solo se sicuro): git commit --no-verify"
+    exit 1
+  fi
+
   echo "✅ Commit consentito."
   exit 0
 else
