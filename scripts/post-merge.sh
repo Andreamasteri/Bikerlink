@@ -644,6 +644,28 @@ fi
 echo "════════════════════════════════════════"
 echo ""
 
+# ── GATE TEST CLASSIFICAZIONE SAFE-FIX (Task #4920) ──────────────────────────
+# Blocca la regressione della logica 🟢 safe-fix / 🔴 review in
+# scripts/health-check/classify.ts: la distinzione è deterministica e guida il
+# pulsante "Crea tutti i task sicuri". Un errore qui creerebbe task automatici
+# per fix rischiosi (override critici/pattern rischiosi/allowlist categorie).
+echo "════════════════════════════════════════"
+echo "  Gate test classificazione safe-fix"
+echo "════════════════════════════════════════"
+SAFEFIX_TEST_EXIT=0
+npx vitest run scripts/health-check/__tests__/classify.test.ts 2>&1 || SAFEFIX_TEST_EXIT=$?
+if [ "$SAFEFIX_TEST_EXIT" -eq 0 ]; then
+  echo "✅ Safe-fix classify tests: allowlist + override critici/rischiosi OK."
+else
+  echo "❌ Safe-fix classify tests FALLITI (exit ${SAFEFIX_TEST_EXIT}) — la logica 🟢/🔴 è regredita."
+  echo "   Eseguire 'npx vitest run scripts/health-check/__tests__/classify.test.ts' localmente."
+  echo "════════════════════════════════════════"
+  echo ""
+  exit "$SAFEFIX_TEST_EXIT"
+fi
+echo "════════════════════════════════════════"
+echo ""
+
 # ── GATE TEST REVOCA PERMESSO BACKGROUND ─────────────────────────────────────
 # Blocca regressioni su checkBackgroundPermission e evaluateBackgroundRevocation:
 # verifica la logica pura di revoca, l'infrastruttura di polling (setInterval),
