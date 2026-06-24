@@ -18,9 +18,11 @@ const EF_SEARCH_MAX = 1000;
 const HNSW_INDEX_NAME = "embeddings_vec_hnsw_cosine_idx";
 
 /**
- * Once-per-process guard: query pg_indexes once to verify the HNSW index
- * exists. If it is missing we emit a clear warning so operators know that
- * findSimilar() is silently falling back to a sequential scan.
+ * Once-per-process guard: query pg_index once to verify the HNSW index
+ * exists AND is valid (indisvalid=true). Emits a clear warning so operators
+ * know when findSimilar() is silently falling back to a sequential scan.
+ * An invalid index (left by an interrupted CREATE INDEX CONCURRENTLY) is
+ * treated the same as a missing index — it won't be used by pgvector.
  */
 let _hnswIndexChecked = false;
 async function warnIfHnswIndexMissing(
@@ -28,21 +30,40 @@ async function warnIfHnswIndexMissing(
 ): Promise<void> {
   if (_hnswIndexChecked) return;
   try {
-    const res = await client.query<{ exists: boolean }>(
-      `SELECT EXISTS (
-         SELECT 1 FROM pg_indexes
-         WHERE schemaname = 'public'
-           AND tablename = 'embeddings'
-           AND indexname = $1
-       ) AS exists`,
+    const res = await client.query<{ exists: boolean; valid: boolean }>(
+      `SELECT
+         EXISTS (
+           SELECT 1 FROM pg_indexes
+           WHERE schemaname = 'public'
+             AND tablename = 'embeddings'
+             AND indexname = $1
+         ) AS exists,
+         COALESCE(
+           (SELECT i.indisvalid
+            FROM pg_class c
+            JOIN pg_index i ON i.indrelid = c.oid
+            JOIN pg_class ic ON ic.oid = i.indexrelid
+            WHERE c.relname = 'embeddings'
+              AND ic.relname = $1
+              AND c.relnamespace = (SELECT oid FROM pg_namespace WHERE nspname = 'public')
+           ),
+           false
+         ) AS valid`,
       [HNSW_INDEX_NAME],
     );
     _hnswIndexChecked = true;
-    if (!(res.rows[0]?.exists ?? false)) {
+    const exists = res.rows[0]?.exists ?? false;
+    const valid = res.rows[0]?.valid ?? false;
+    if (!exists) {
       console.warn(
         `[embeddings] WARNING: HNSW index '${HNSW_INDEX_NAME}' non trovato — ` +
           "findSimilar() userà un sequential scan (molto lento a scala). " +
           "Riavviare il server per il self-heal automatico o eseguire la migration manualmente.",
+      );
+    } else if (!valid) {
+      console.warn(
+        `[embeddings] WARNING: HNSW index '${HNSW_INDEX_NAME}' esiste ma è INVALIDO (build interrotta?) — ` +
+          "findSimilar() userà un sequential scan. Riavviare il server per il self-heal automatico.",
       );
     }
   } catch {
@@ -52,24 +73,39 @@ async function warnIfHnswIndexMissing(
 
 /**
  * One-shot check (no per-process memo) for whether the HNSW cosine index
- * exists on the embeddings table. Used by batch jobs (e.g. BioAffinity) that
- * want to decide up-front whether to run, instead of discovering the missing
- * index as a slow sequential-scan side-effect of the first findSimilar().
- * Returns true/false; never throws (a failed check resolves to true so the
- * job is not blocked by a transient pg_indexes read error).
+ * exists on the embeddings table AND is valid (indisvalid=true).
+ * Used by batch jobs (e.g. BioAffinity) that want to decide up-front whether
+ * to run, instead of discovering the missing/invalid index as a slow
+ * sequential-scan side-effect of the first findSimilar().
+ * Returns true only when the index exists AND pg_index.indisvalid=true.
+ * Never throws (a failed check resolves to true so the job is not blocked
+ * by a transient catalog read error).
  */
 export async function hnswIndexExists(): Promise<boolean> {
   try {
-    const res = await db.execute<{ exists: boolean }>(sql`
-      SELECT EXISTS (
-        SELECT 1 FROM pg_indexes
-        WHERE schemaname = 'public'
-          AND tablename = 'embeddings'
-          AND indexname = ${HNSW_INDEX_NAME}
-      ) AS exists
+    const res = await db.execute<{ exists: boolean; valid: boolean }>(sql`
+      SELECT
+        EXISTS (
+          SELECT 1 FROM pg_indexes
+          WHERE schemaname = 'public'
+            AND tablename = 'embeddings'
+            AND indexname = ${HNSW_INDEX_NAME}
+        ) AS exists,
+        COALESCE(
+          (SELECT i.indisvalid
+           FROM pg_class c
+           JOIN pg_index i ON i.indrelid = c.oid
+           JOIN pg_class ic ON ic.oid = i.indexrelid
+           WHERE c.relname = 'embeddings'
+             AND ic.relname = ${HNSW_INDEX_NAME}
+             AND c.relnamespace = (SELECT oid FROM pg_namespace WHERE nspname = 'public')
+          ),
+          false
+        ) AS valid
     `);
-    const row = (res.rows ?? res)[0] as { exists: boolean } | undefined;
-    return row?.exists ?? true;
+    const row = (res.rows ?? res)[0] as { exists: boolean; valid: boolean } | undefined;
+    if (!row) return true;
+    return (row.exists ?? false) && (row.valid ?? false);
   } catch {
     return true;
   }

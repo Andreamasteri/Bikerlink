@@ -4,6 +4,14 @@ import type { Signal } from "../types";
 import { recordSuccess as cbRecordSuccess, recordFailure as cbRecordFailure, getCircuitStatus } from "../../../db-circuit-breaker";
 import { setDbSlowPingsConsecutive } from "../../../lib/bg-db-limiter";
 
+// ── HNSW index health probe (throttled) ───────────────────────────────────────
+// Checked at most once every 5 minutes per process (not every collector tick)
+// to avoid hammering pg_catalog on every heartbeat.
+const HNSW_INDEX_NAME = "embeddings_vec_hnsw_cosine_idx";
+const HNSW_CHECK_INTERVAL_MS = 5 * 60 * 1000;
+let _lastHnswCheckAt = 0;
+let _lastHnswSignal: Signal | null = null;
+
 // ── Anti-blip (Task #4546) ────────────────────────────────────────────────────
 // Un singolo campione lento o un singolo ping fallito è quasi sempre un blip
 // transitorio (timeout/disconnessione che rientra subito). Far scattare lo stato
@@ -173,6 +181,56 @@ export async function collectDb(): Promise<Signal[]> {
         });
       }
     } catch { /* ignore */ }
+
+    // HNSW index health (throttled — once every 5 min)
+    try {
+      const now = Date.now();
+      if (now - _lastHnswCheckAt >= HNSW_CHECK_INTERVAL_MS) {
+        _lastHnswCheckAt = now;
+        const r = await client.query<{ exists: boolean; valid: boolean }>(`
+          SELECT
+            EXISTS (
+              SELECT 1 FROM pg_indexes
+              WHERE schemaname = 'public'
+                AND tablename = 'embeddings'
+                AND indexname = $1
+            ) AS exists,
+            COALESCE(
+              (SELECT i.indisvalid
+               FROM pg_class c
+               JOIN pg_index i ON i.indrelid = c.oid
+               JOIN pg_class ic ON ic.oid = i.indexrelid
+               WHERE c.relname = 'embeddings'
+                 AND ic.relname = $1
+                 AND c.relnamespace = (SELECT oid FROM pg_namespace WHERE nspname = 'public')
+              ),
+              false
+            ) AS valid
+        `, [HNSW_INDEX_NAME]);
+        const row = r.rows[0];
+        const exists = row?.exists ?? false;
+        const valid = row?.valid ?? false;
+        const hnswSeverity: Signal["severity"] =
+          !exists ? "high" : !valid ? "high" : "info";
+        const sig: Signal = {
+          source: "db",
+          metric: "embeddings.hnsw_index",
+          value: exists && valid ? 1 : 0,
+          severity: hnswSeverity,
+          details: { exists, valid, indexName: HNSW_INDEX_NAME },
+        };
+        _lastHnswSignal = sig;
+        signals.push(sig);
+        if (!exists) {
+          console.warn("[watchdog/db] 🔴 HNSW index mancante — findSimilar userà sequential scan");
+        } else if (!valid) {
+          console.warn("[watchdog/db] 🔴 HNSW index invalido (build interrotta?) — findSimilar userà sequential scan");
+        }
+      } else if (_lastHnswSignal) {
+        // Re-emit the cached signal so it's always present in watchdog metrics
+        signals.push(_lastHnswSignal);
+      }
+    } catch { /* non-fatal — catalog read failure */ }
   } catch (err) {
     consecutiveSlowPings = 0;
     setDbSlowPingsConsecutive(0);
