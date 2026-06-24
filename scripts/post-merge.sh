@@ -296,6 +296,25 @@ if [ "$RNAV_EXIT" -ne 0 ]; then
   exit "$RNAV_EXIT"
 fi
 
+# ── GATE useQuery DEFAULT INSTABILI IN useEffect DEPS ─────────
+# Default inline = [] o = {} in useQuery creano un nuovo riferimento
+# array/oggetto ad ogni render quando data è undefined (loading).
+# Se la variabile finisce nei deps di useEffect, scatta ad ogni render
+# → loop infinito "Maximum update depth exceeded".
+# Caso reale: crash OTA 166 su MusicRadioTab (suggestedGenreIds = []).
+# Vedi: scripts/check-unstable-query-defaults.sh
+echo "════════════════════════════════════════"
+echo "  Gate useQuery default instabili in useEffect deps"
+echo "════════════════════════════════════════"
+UNSTABLE_DEFAULTS_EXIT=0
+bash scripts/check-unstable-query-defaults.sh || UNSTABLE_DEFAULTS_EXIT=$?
+echo "════════════════════════════════════════"
+echo ""
+if [ "$UNSTABLE_DEFAULTS_EXIT" -ne 0 ]; then
+  echo "❌ Gate unstable-query-defaults fallito — correggere prima di procedere."
+  exit "$UNSTABLE_DEFAULTS_EXIT"
+fi
+
 # ── GUARD PORTE .replit (MAPPING [[ports]] + DEPLOY) ─────────
 # REGOLA BLOCCANTE (replit.md § Preferenze utente):
 # Nessun agente può modificare [[ports]] senza autorizzazione esplicita utente.

@@ -29,6 +29,11 @@ export function RadioTab({ onPlayStation }: RadioTabProps) {
     usePlayer();
   const [useLastFm, setUseLastFm] = useState(false);
 
+  // check-unstable-query-defaults: safe — questo componente non ha useEffect.
+  // genres, suggestedGenreIds e stations con default = [] sono usati solo nel
+  // render JSX (displayedGenres è derivato, non finisce mai in deps di useEffect).
+  // Se in futuro si aggiunge un useEffect che usa queste variabili nei deps,
+  // rimuovere il default = [] e usare `data ?? []` stabilizzato con useMemo.
   const { data: genres = [] } = useQuery<Genre[]>({
     queryKey: ["/api/music/radio/genres"],
   });

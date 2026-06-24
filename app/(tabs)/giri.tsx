@@ -65,6 +65,9 @@ export default function GiriScreen() {
   }, [refreshOfflineIndex]);
 
   // Re-check after routes load so new route IDs are evaluated
+  // check-unstable-query-defaults: safe — la guardia `if (!routes.length) return`
+  // previene qualsiasi setState quando routes è [] (loading): nessun loop infinito.
+  // Il side-effect (refreshOfflineIndex) è idempotente e non modifica routes.
   useEffect(() => {
     if (!routes.length) return;
     if (offlineCheckScheduled.current) return;

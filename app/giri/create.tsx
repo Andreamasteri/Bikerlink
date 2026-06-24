@@ -126,6 +126,10 @@ export default function GiriCreateScreen() {
       .catch(() => setStoredMotoId(null));
   }, []);
 
+  // check-unstable-query-defaults: safe — la guardia `if (motorcycles.length === 0) return`
+  // previene qualsiasi setState quando motorcycles è [] (loading): nessun loop infinito.
+  // Inoltre `motoHydratedRef.current` assicura che setSelectedMotoId venga chiamato
+  // al massimo una volta, rendendo l'effect idempotente.
   useEffect(() => {
     if (motoHydratedRef.current) return; // already initialized — protect in-session manual choices
     if (motorcycles.length === 0) return;
