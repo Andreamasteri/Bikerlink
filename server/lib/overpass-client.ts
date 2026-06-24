@@ -5,9 +5,16 @@
  * Usato dal flusso AI per risolvere poiStops non geocodificabili con Nominatim.
  *
  * TTL cache: 10 min | Timeout: 8 s | Max risultati: 10
+ *
+ * Self-hosting: impostare OVERPASS_URL per puntare a un'istanza locale
+ * (es. su ThinkCentre). Se ThinkCentre è offline, la ricerca salta
+ * automaticamente all'endpoint pubblico senza attendere il timeout.
  */
 
-const OVERPASS_URL = "https://overpass-api.de/api/interpreter";
+const PUBLIC_URL = "https://overpass-api.de/api/interpreter";
+const SELF_HOSTED_URL = process.env.OVERPASS_URL?.trim().replace(/\/$/, "") || undefined;
+const isSelfHosted = Boolean(SELF_HOSTED_URL);
+
 const TIMEOUT_MS = 8_000;
 const CACHE_TTL_MS = 10 * 60 * 1000;
 const MAX_RESULTS = 10;
@@ -184,6 +191,17 @@ export async function searchPoi(
   const cached = getCache(cacheKey);
   if (cached !== undefined) return cached;
 
+  // ThinkCentre offline: se Overpass è self-hosted, salta il server locale
+  // e usa direttamente l'endpoint pubblico (overpass-api.de) senza attendere il timeout.
+  let effectiveUrl = SELF_HOSTED_URL ?? PUBLIC_URL;
+  if (isSelfHosted) {
+    const { isThinkCentrePoweredOff } = await import("./thinkcentre-powered-off");
+    if (await isThinkCentrePoweredOff()) {
+      console.log(`[overpass] ThinkCentre offline — fallback diretto a ${PUBLIC_URL} per "${query}"`);
+      effectiveUrl = PUBLIC_URL;
+    }
+  }
+
   const tags = resolveOsmTags(query);
   const oQuery = buildOverpassQuery(tags, lat, lng, radiusM);
 
@@ -191,7 +209,7 @@ export async function searchPoi(
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
 
   try {
-    const resp = await fetch(OVERPASS_URL, {
+    const resp = await fetch(effectiveUrl, {
       method: "POST",
       body: "data=" + encodeURIComponent(oQuery),
       headers: { "Content-Type": "application/x-www-form-urlencoded", "User-Agent": "BikerLink/4.0" },
