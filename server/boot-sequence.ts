@@ -286,30 +286,64 @@ export async function runBootSequence(server: Server, errorHandlersReady: Promis
   ensureCompetitorAnalysisPdf();
 
   setImmediate(() => {
-    if (process.env.NODE_ENV === "production") (async () => {
+    (async () => {
       try {
+        const { storage: s } = await import("./storage");
+        const modeSetting = await s.getAppSetting("index_drift_check_mode");
+        const VALID_MODES = ["warn", "block", "disabled"] as const;
+        type DriftMode = typeof VALID_MODES[number];
+        const rawMode = (modeSetting?.value ?? "warn").trim().toLowerCase();
+        const mode: DriftMode = (VALID_MODES as readonly string[]).includes(rawMode)
+          ? rawMode as DriftMode
+          : (() => {
+              console.warn(
+                `[BOOT][INDEX-DRIFT] Valore AppSetting non riconosciuto (index_drift_check_mode="${rawMode}") — fallback a "warn".`,
+              );
+              return "warn" as DriftMode;
+            })();
+
+        if (mode === "disabled") {
+          console.log("[BOOT][INDEX-DRIFT] Check disabilitato via AppSetting (index_drift_check_mode=disabled).");
+          return;
+        }
+
         const { runIndexDriftCheck } = await import("../scripts/check-index-drift");
         const result = await runIndexDriftCheck();
+
         if (result.exitCode === 1) {
           const summary = result.issues.slice(0, 3).join("; ") +
             (result.issues.length > 3 ? ` (+${result.issues.length - 3} altri)` : "");
-          console.error(
-            `[BOOT][INDEX-DRIFT] CRITICAL — drift rilevato al boot (${result.issues.length} problema/i): ${summary}. ` +
-            `Correggere con migration o fix schema TS prima del prossimo deploy.`,
-          );
-          try {
-            const { sendSystemAlertPushToAdmins } = await import("./push-notifications");
-            await sendSystemAlertPushToAdmins(
-              "🔴 Index Drift rilevato al boot",
-              `${result.issues.length} indice/i speciale/i non allineato/i col DB. Correzione richiesta. ${summary}`,
-              { type: "index_drift_boot", issueCount: result.issues.length },
+
+          if (mode === "block") {
+            console.error(
+              `[BOOT][INDEX-DRIFT] FATAL (mode=block) — drift rilevato al boot (${result.issues.length} problema/i): ${summary}. ` +
+              `Correggere con migration o fix schema TS e riavviare.`,
             );
-          } catch (alertErr) {
-            console.warn("[BOOT][INDEX-DRIFT] Invio push alert fallito (non-fatal):", alertErr);
+            applyCrashBackoff("index-drift-block");
+            process.exit(1);
+          } else {
+            // mode === "warn" (default)
+            console.error(
+              `[BOOT][INDEX-DRIFT] CRITICAL (mode=warn) — drift rilevato al boot (${result.issues.length} problema/i): ${summary}. ` +
+              `Correggere con migration o fix schema TS prima del prossimo deploy.`,
+            );
+            // Push alert solo in produzione per evitare rumore in ambienti di sviluppo
+            if (process.env.NODE_ENV === "production") {
+              try {
+                const { sendSystemAlertPushToAdmins } = await import("./push-notifications");
+                await sendSystemAlertPushToAdmins(
+                  "🔴 Index Drift rilevato al boot",
+                  `${result.issues.length} indice/i speciale/i non allineato/i col DB. Correzione richiesta. ${summary}`,
+                  { type: "index_drift_boot", issueCount: result.issues.length },
+                );
+              } catch (alertErr) {
+                console.warn("[BOOT][INDEX-DRIFT] Invio push alert fallito (non-fatal):", alertErr);
+              }
+            }
           }
         } else if (result.exitCode === 2) {
           console.warn(
-            "[BOOT][INDEX-DRIFT] DB non raggiungibile durante il check post-boot — verifica skippata (insolito in prod).",
+            "[BOOT][INDEX-DRIFT] DB non raggiungibile durante il check post-boot — verifica skippata.",
           );
         } else {
           console.log("[BOOT][INDEX-DRIFT] OK — nessun drift di indici speciali rilevato.");
