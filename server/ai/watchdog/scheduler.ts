@@ -7,6 +7,7 @@ import { dispatchAlerts } from "./alerts";
 import { cleanupOldSignals } from "./signals";
 import { isWatchdogEnabled } from "./kill-switch";
 import { startWeeklyReportScheduler } from "./weekly-report";
+import { startMetroCrashDiagScheduler } from "../../jobs/metro-crash-diag-job";
 import { cleanupMapsTelemetry } from "./maps-telemetry-store";
 import { runMapsHealthChecks } from "./maps-health-checks";
 import { sendSystemAlertPushToAdmins } from "../../push-notifications-admin";
@@ -147,6 +148,7 @@ export function startWatchdogScheduler(): void {
   }, CLEANUP_MS);
   cleanupTimer.unref?.();
   startWeeklyReportScheduler();
+  startMetroCrashDiagScheduler();
   console.log("[watchdog/scheduler] avviato (tick=60s)");
 }
 
