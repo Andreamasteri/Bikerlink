@@ -13,6 +13,16 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import Colors from "@/constants/colors";
 import { streamAssistantMessage } from "@/lib/ai-assistant/sse-client";
 import { useAuth } from "@/lib/auth-context";
+import { apiRequest, queryClient } from "@/lib/query-client";
+
+// Task #4922 — Azione admin proposta dall'assistente (eseguita server-side dopo conferma).
+interface AdminProposedAction {
+  actionId: string;
+  params?: Record<string, unknown>;
+  confirmLabel: string;
+}
+
+type ActionState = "pending" | "running" | "done" | "rejected" | "error";
 
 interface ChatMsg {
   id: string;
@@ -20,6 +30,10 @@ interface ChatMsg {
   content: string;
   provider?: string;
   costUsd?: number;
+  // Task #4922 — azioni admin proposte + esito locale per il rendering.
+  actions?: AdminProposedAction[];
+  actionState?: Record<string, ActionState>;
+  actionResult?: Record<string, string>;
 }
 
 // Persistenza locale (AsyncStorage) della conversazione, keyed per admin.
@@ -126,6 +140,7 @@ export default function AdminChatWidget() {
     setStreaming(true);
     const abort = new AbortController();
     abortRef.current = abort;
+    const collectedActions: AdminProposedAction[] = [];
     try {
       await streamAssistantMessage({
         message: text,
@@ -136,11 +151,18 @@ export default function AdminChatWidget() {
           if (ev.event === "delta") {
             const d = (ev.data as { text?: string }).text ?? "";
             setMessages((prev) => prev.map((m) => (m.id === asstId ? { ...m, content: m.content + d } : m)));
+          } else if (ev.event === "action") {
+            const a = ev.data as AdminProposedAction;
+            if (a?.actionId) collectedActions.push(a);
           } else if (ev.event === "done") {
             const d = ev.data as { text?: string; provider?: string; costUsd?: number };
+            const actions = collectedActions.length ? [...collectedActions] : undefined;
+            const actionState = actions
+              ? Object.fromEntries(actions.map((a) => [a.actionId, "pending" as ActionState]))
+              : undefined;
             setMessages((prev) => prev.map((m) =>
               m.id === asstId
-                ? { ...m, content: d.text ?? m.content, provider: d.provider, costUsd: d.costUsd }
+                ? { ...m, content: d.text ?? m.content, provider: d.provider, costUsd: d.costUsd, actions, actionState }
                 : m,
             ));
           } else if (ev.event === "error") {
@@ -160,6 +182,38 @@ export default function AdminChatWidget() {
       abortRef.current = null;
     }
   }, [input, messages, streaming]);
+
+  const setActionState = useCallback((msgId: string, actionId: string, state: ActionState, resultText?: string) => {
+    setMessages((prev) => prev.map((m) => {
+      if (m.id !== msgId) return m;
+      return {
+        ...m,
+        actionState: { ...(m.actionState ?? {}), [actionId]: state },
+        actionResult: resultText != null ? { ...(m.actionResult ?? {}), [actionId]: resultText } : m.actionResult,
+      };
+    }));
+  }, []);
+
+  const confirmAction = useCallback(async (msgId: string, action: AdminProposedAction) => {
+    setActionState(msgId, action.actionId, "running");
+    try {
+      const res = await apiRequest("POST", `/api/ai/assistant/admin-action/${encodeURIComponent(action.actionId)}`, {
+        confirmed: true,
+        params: action.params ?? {},
+      });
+      const json = (await res.json()) as { summary?: string };
+      setActionState(msgId, action.actionId, "done", json.summary ?? "Azione eseguita.");
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/business"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/business/report"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/business/config"] });
+    } catch (e) {
+      setActionState(msgId, action.actionId, "error", (e as Error).message);
+    }
+  }, [setActionState]);
+
+  const rejectAction = useCallback((msgId: string, action: AdminProposedAction) => {
+    setActionState(msgId, action.actionId, "rejected");
+  }, [setActionState]);
 
   const resetConversation = useCallback(() => {
     abortRef.current?.abort();
@@ -211,6 +265,62 @@ export default function AdminChatWidget() {
                       {m.content || (streaming && m.role === "assistant" ? "…" : "")}
                     </Text>
                   </View>
+                  {m.role === "assistant" && m.actions?.length ? (
+                    <View style={styles.actionsBox}>
+                      {m.actions.map((a, ai) => {
+                        const state = m.actionState?.[a.actionId] ?? "pending";
+                        const resultText = m.actionResult?.[a.actionId];
+                        return (
+                          <View key={`${a.actionId}-${ai}`} style={styles.actionCard} testID={`admin-action-${a.actionId}`}>
+                            <View style={styles.actionHeader}>
+                              <MaterialIcons name="bolt" size={16} color={ACCENT} />
+                              <Text style={styles.actionLabel}>{a.confirmLabel}</Text>
+                            </View>
+                            {state === "pending" ? (
+                              <View style={styles.actionBtnRow}>
+                                <TouchableOpacity
+                                  testID={`admin-action-confirm-${a.actionId}`}
+                                  style={[styles.actionBtn, styles.actionConfirm]}
+                                  onPress={() => confirmAction(m.id, a)}
+                                >
+                                  <MaterialIcons name="check" size={15} color="#fff" />
+                                  <Text style={styles.actionConfirmText}>Conferma</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                  testID={`admin-action-reject-${a.actionId}`}
+                                  style={[styles.actionBtn, styles.actionReject]}
+                                  onPress={() => rejectAction(m.id, a)}
+                                >
+                                  <MaterialIcons name="close" size={15} color={Colors.textSecondary} />
+                                  <Text style={styles.actionRejectText}>Annulla</Text>
+                                </TouchableOpacity>
+                              </View>
+                            ) : state === "running" ? (
+                              <View style={styles.actionStatusRow}>
+                                <ActivityIndicator color={ACCENT} size="small" />
+                                <Text style={styles.actionStatusText}>Esecuzione…</Text>
+                              </View>
+                            ) : state === "done" ? (
+                              <View style={styles.actionStatusRow}>
+                                <MaterialIcons name="check-circle" size={15} color="#2E7D32" />
+                                <Text style={[styles.actionStatusText, { color: "#2E7D32" }]}>{resultText ?? "Eseguita."}</Text>
+                              </View>
+                            ) : state === "rejected" ? (
+                              <View style={styles.actionStatusRow}>
+                                <MaterialIcons name="block" size={15} color={Colors.textSecondary} />
+                                <Text style={styles.actionStatusText}>Annullata</Text>
+                              </View>
+                            ) : (
+                              <View style={styles.actionStatusRow}>
+                                <MaterialIcons name="error-outline" size={15} color="#C62828" />
+                                <Text style={[styles.actionStatusText, { color: "#C62828" }]}>{resultText ?? "Errore"}</Text>
+                              </View>
+                            )}
+                          </View>
+                        );
+                      })}
+                    </View>
+                  ) : null}
                   {m.role === "assistant" && m.content && (m.provider || m.costUsd != null) ? (
                     <View style={styles.metaRow}>
                       <View style={styles.providerBadge}>
@@ -289,6 +399,18 @@ const styles = StyleSheet.create({
   asstBubble: { backgroundColor: Colors.background, borderWidth: 1, borderColor: Colors.border },
   userText: { fontFamily: "Inter_400Regular", fontSize: 14, color: "#fff" },
   asstText: { fontFamily: "Inter_400Regular", fontSize: 14, color: Colors.text, lineHeight: 20 },
+  actionsBox: { marginTop: 8, gap: 8, alignSelf: "stretch", maxWidth: "90%" },
+  actionCard: { backgroundColor: ACCENT + "0F", borderRadius: 10, borderWidth: 1, borderColor: ACCENT + "33", padding: 10, gap: 8 },
+  actionHeader: { flexDirection: "row", alignItems: "center", gap: 6 },
+  actionLabel: { flex: 1, fontFamily: "Inter_500Medium", fontSize: 13, color: Colors.text, lineHeight: 18 },
+  actionBtnRow: { flexDirection: "row", gap: 8 },
+  actionBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 4, borderRadius: 8, paddingVertical: 8, paddingHorizontal: 12, flex: 1 },
+  actionConfirm: { backgroundColor: ACCENT },
+  actionConfirmText: { fontFamily: "Inter_600SemiBold", fontSize: 13, color: "#fff" },
+  actionReject: { backgroundColor: Colors.background, borderWidth: 1, borderColor: Colors.border },
+  actionRejectText: { fontFamily: "Inter_500Medium", fontSize: 13, color: Colors.textSecondary },
+  actionStatusRow: { flexDirection: "row", alignItems: "center", gap: 6 },
+  actionStatusText: { flex: 1, fontFamily: "Inter_400Regular", fontSize: 12, color: Colors.textSecondary, lineHeight: 17 },
   metaRow: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 4, marginLeft: 2 },
   providerBadge: { backgroundColor: ACCENT + "22", borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 },
   providerText: { fontFamily: "Inter_600SemiBold", fontSize: 10, color: ACCENT },

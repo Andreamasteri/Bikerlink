@@ -14,11 +14,16 @@ import type { ProbeLogEntry } from "../../routes/admin/thinkcentre-health-utils"
 
 const PROBE_LOG_SNAPSHOT_KEY = "probe_log_snapshot";
 
+interface BusinessRef { id: string; name: string; isApproved: boolean; isActive: boolean }
+
 interface AdminSnapshot {
   activeUsers24h: number | null;
   businessApproved: number | null;
   businessPending: number | null;
   businessActive: number | null;
+  // Task #4922 — Business candidati ad azioni (in attesa di approvazione o
+  // approvati ma nascosti): l'assistente li referenzia per id nelle azioni admin.
+  actionableBusinesses: BusinessRef[];
   lastOtaVersion: string | null;
   lastOtaPublishedAt: string | null;
   thinkCentre: Array<{ service: string; ok: boolean; ageMin: number | null }>;
@@ -26,13 +31,14 @@ interface AdminSnapshot {
 
 async function loadDbStats(): Promise<Pick<
   AdminSnapshot,
-  "activeUsers24h" | "businessApproved" | "businessPending" | "businessActive" | "lastOtaVersion" | "lastOtaPublishedAt"
+  "activeUsers24h" | "businessApproved" | "businessPending" | "businessActive" | "actionableBusinesses" | "lastOtaVersion" | "lastOtaPublishedAt"
 >> {
   const result = {
     activeUsers24h: null as number | null,
     businessApproved: null as number | null,
     businessPending: null as number | null,
     businessActive: null as number | null,
+    actionableBusinesses: [] as BusinessRef[],
     lastOtaVersion: null as string | null,
     lastOtaPublishedAt: null as string | null,
   };
@@ -58,6 +64,23 @@ async function loadDbStats(): Promise<Pick<
         result.businessApproved = r.rows[0]?.approved ?? 0;
         result.businessPending = r.rows[0]?.pending ?? 0;
         result.businessActive = r.rows[0]?.active ?? 0;
+      } catch { /* sorgente opzionale */ }
+      try {
+        // Business su cui l'admin può agire: non approvati OPPURE approvati ma
+        // non visibili. Limit 10 per non gonfiare il prompt.
+        const r = await client.query(
+          `SELECT id, name, is_approved AS "isApproved", is_active AS "isActive"
+           FROM businesses
+           WHERE is_approved = false OR is_active = false
+           ORDER BY is_approved ASC, created_at DESC
+           LIMIT 10`,
+        );
+        result.actionableBusinesses = (r.rows as BusinessRef[]).map((b) => ({
+          id: String(b.id),
+          name: String(b.name),
+          isApproved: !!b.isApproved,
+          isActive: !!b.isActive,
+        }));
       } catch { /* sorgente opzionale */ }
       try {
         const r = await client.query(
@@ -111,6 +134,17 @@ function formatSnapshot(snap: AdminSnapshot): string {
     );
   } else {
     lines.push("- Business: dato non disponibile");
+  }
+  if (snap.actionableBusinesses.length > 0) {
+    lines.push("- Business su cui puoi agire (usa questi ID nelle azioni):");
+    for (const b of snap.actionableBusinesses) {
+      const stato = !b.isApproved
+        ? "in attesa di approvazione"
+        : (!b.isActive ? "approvato ma nascosto" : "attivo");
+      lines.push(`    · id=${b.id} "${b.name}" — ${stato}`);
+    }
+  } else {
+    lines.push("- Business su cui agire: nessuno (tutti approvati e visibili)");
   }
   if (snap.lastOtaVersion) {
     const when = snap.lastOtaPublishedAt

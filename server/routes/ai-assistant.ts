@@ -30,6 +30,13 @@ import {
 } from "../ai/assistant/actions";
 import { ASSISTANT_KNOWLEDGE, type KnowledgeEntry } from "../ai/assistant/knowledge";
 import { logAssistantEvent } from "../ai/assistant/telemetry";
+import {
+  ADMIN_ASSISTANT_ACTIONS,
+  isWhitelistedAdminAction,
+  validateAdminActionParams,
+  executeAdminAction,
+  type AdminAssistantActionId,
+} from "../ai/assistant/admin-actions";
 
 const router = Router();
 
@@ -197,17 +204,31 @@ router.post("/ai/assistant/message", requireUser, messageLimiter, async (req: Re
     });
 
     const { cleanText, actions } = extractActions(result.text);
-    // Filtra azioni: devono essere whitelisted globalmente E abilitate dall'admin.
-    const safeActions = actions.filter((a) =>
-      isWhitelistedAction(a.actionId) && allowedActions.includes(a.actionId),
-    );
+    // Filtra azioni in base alla modalità:
+    // - admin: whitelist azioni admin (eseguite server-side dopo conferma)
+    // - utente: whitelist globale E abilitate dall'admin per la piattaforma
+    const safeActions = isAdminMode
+      ? actions.filter((a) => isWhitelistedAdminAction(a.actionId))
+      : actions.filter((a) =>
+          isWhitelistedAction(a.actionId) && allowedActions.includes(a.actionId),
+        );
     for (const a of safeActions) {
-      const def = ASSISTANT_ACTIONS[a.actionId as AssistantActionId];
-      send("action", {
-        actionId: a.actionId,
-        params: a.params,
-        confirmKey: def.confirmKey,
-      });
+      if (isAdminMode) {
+        const def = ADMIN_ASSISTANT_ACTIONS[a.actionId as AdminAssistantActionId];
+        send("action", {
+          actionId: a.actionId,
+          params: a.params,
+          confirmLabel: def.confirmLabel,
+          scope: "admin",
+        });
+      } else {
+        const def = ASSISTANT_ACTIONS[a.actionId as AssistantActionId];
+        send("action", {
+          actionId: a.actionId,
+          params: a.params,
+          confirmKey: def.confirmKey,
+        });
+      }
       await logAssistantEvent({
         eventType: "action_proposed",
         platform: rawPlatform,
@@ -339,6 +360,54 @@ router.post("/ai/assistant/action/:id", requireUser, actionLimiter, async (req: 
   }
 
   res.json({ ok: true, actionId: id, params: v.params });
+});
+
+// ── Task #4922 — POST /admin-action/:id — esegue azione admin (server-side) ──
+// Permission-check (role === admin) + validazione params + audit log.
+const AdminActionBody = z.object({
+  params: z.unknown().optional(),
+  confirmed: z.literal(true),
+});
+
+router.post("/ai/assistant/admin-action/:id", requireUser, actionLimiter, async (req: Request, res: Response) => {
+  const user = (req as Request & { sessionUser?: { id: string; role?: string | null } }).sessionUser!;
+  if (user.role !== "admin") { sendError(res, 403, "Accesso riservato agli amministratori"); return; }
+
+  const id = String(req.params.id ?? "");
+  if (!isWhitelistedAdminAction(id)) { sendError(res, 400, "Azione admin non in whitelist"); return; }
+
+  const parsed = AdminActionBody.safeParse(req.body ?? {});
+  if (!parsed.success) { sendError(res, 400, parsed.error.issues[0].message); return; }
+
+  const v = validateAdminActionParams(id as AdminAssistantActionId, parsed.data.params);
+  if (!v.ok) { sendError(res, 400, v.error); return; }
+
+  let result;
+  try {
+    result = await executeAdminAction(id as AdminAssistantActionId, v.params);
+  } catch (err) {
+    console.error("[ai-assistant/admin-action]", err);
+    await logAssistantEvent({
+      eventType: "action_rejected",
+      platform: "admin",
+      userRole: user.role ?? null,
+      userId: user.id,
+      payload: { actionId: id, params: v.params, error: (err as Error).message },
+    });
+    sendError(res, 500, "Errore esecuzione azione admin");
+    return;
+  }
+
+  await logAssistantEvent({
+    eventType: result.ok ? "action_executed" : "action_rejected",
+    platform: "admin",
+    userRole: user.role ?? null,
+    userId: user.id,
+    payload: { actionId: id, params: v.params, ok: result.ok },
+  });
+
+  if (!result.ok) { sendError(res, result.httpStatus, result.error); return; }
+  res.json({ ok: true, actionId: id, summary: result.summary, data: result.data });
 });
 
 // ── User prefs ────────────────────────────────────────────────────────────
