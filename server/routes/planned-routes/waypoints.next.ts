@@ -68,6 +68,7 @@ async function groqGenerateObject<T>(params: {
     const object = params.schema.parse(res.object);
     return { object };
   }
+  // check-ai-direct-generateobject: safe — only reached when _GROQ_PARSE_NEEDS_JSON_MODE=false (non-llama model)
   const { object } = await generateObject({
     model, schema: params.schema, prompt: params.prompt,
     temperature: params.temperature, maxRetries: params.maxRetries, abortSignal: params.abortSignal,
@@ -131,6 +132,7 @@ export async function generateRouteObject<T>(opts: RouteAiOptions<T>): Promise<{
         continue;
       }
       try {
+        // check-ai-direct-generateobject: safe — Ollama supports json_schema natively
         const { object } = await generateObject({
           model: getOllamaModel(), schema, prompt: fullPrompt,
           maxRetries: 0, temperature, abortSignal,
@@ -158,6 +160,7 @@ export async function generateRouteObject<T>(opts: RouteAiOptions<T>): Promise<{
     } else if (providerId === "gemini") {
       if (!apiKey) continue;
       try {
+        // check-ai-direct-generateobject: safe — Gemini supports json_schema natively
         const { object } = await generateObject({
           model: geminiModel(apiKey), schema, prompt: fullPrompt,
           maxRetries: 0, temperature, abortSignal,
@@ -173,6 +176,7 @@ export async function generateRouteObject<T>(opts: RouteAiOptions<T>): Promise<{
     } else if (providerId === "openai") {
       if (!isOpenAiRouteConfigured) continue;
       try {
+        // check-ai-direct-generateobject: safe — OpenAI supports json_schema natively
         const { object } = await generateObject({
           model: getOpenAiRouteModel(), schema, prompt: fullPrompt,
           maxRetries: 0, temperature, abortSignal,

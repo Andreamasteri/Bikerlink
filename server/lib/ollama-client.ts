@@ -140,6 +140,7 @@ export async function callOllamaChat<T = string>(
   let lastErr: unknown;
   for (let attempt = 0; attempt <= jsonRetries; attempt++) {
     try {
+      // check-ai-direct-generateobject: safe — Ollama supports json_schema natively
       const { object } = await generateObject({ model, schema, system, prompt, temperature, maxRetries, abortSignal });
       return object;
     } catch (err) {

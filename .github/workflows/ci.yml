@@ -51,3 +51,6 @@ jobs:
 
       - name: ESLint
         run: npm run lint
+
+      - name: AI schema drift check
+        run: bash scripts/check-ai-direct-generateobject.sh

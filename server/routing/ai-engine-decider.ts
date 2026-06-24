@@ -151,6 +151,7 @@ export async function decideEngineWithAI(
       const ollamaController = new AbortController();
       const ollamaTimer = setTimeout(() => ollamaController.abort(), effectiveOllamaMs);
       try {
+        // check-ai-direct-generateobject: safe — Ollama supports json_schema natively (not via runWithFallback)
         const result = await generateObject({
           model: om.model,
           schema: decisionSchema,

@@ -27,10 +27,14 @@ const GROQ_API_KEY = process.env.GROQ_API_KEY ?? "";
 const GROQ_MODEL = process.env.GROQ_MODEL ?? "llama-3.3-70b-versatile";
 
 /**
- * Modello Groq dedicato al parsing strutturato (generateObject / json_schema).
- * Deve essere un modello che supporta structured outputs — NON tutti lo fanno
- * (es. openai/gpt-oss-20b non lo supporta). Se GROQ_PARSE_MODEL non è impostato,
- * usa llama-3.3-70b-versatile che supporta json_schema nativamente.
+ * Modello Groq dedicato al parsing strutturato (generateObject via generateStructured).
+ * ATTENZIONE: llama-3.x NON supporta json_schema nativo — il Vercel AI SDK v6 ha
+ * rimosso il parametro `mode` e llama richiede output:"no-schema" con validazione
+ * Zod applicata lato client (vedere generateStructured in ai/moderation/provider.ts).
+ * Il campo objectMode:"json" nel ResolvedModel segnala questa limitazione a tutti
+ * i callsite: devono delegare a generateStructured, MAI chiamare generateObject con
+ * schema direttamente.
+ * Se GROQ_PARSE_MODEL non è impostato, usa llama-3.3-70b-versatile (objectMode:"json").
  */
 const GROQ_PARSE_MODEL = process.env.GROQ_PARSE_MODEL ?? "llama-3.3-70b-versatile";
 
@@ -52,10 +56,14 @@ export function getGroqModel(model: string = GROQ_MODEL): LanguageModel {
 }
 
 /**
- * Modello Groq per parsing strutturato (generateObject / json_schema).
- * Usa sempre GROQ_PARSE_MODEL (default llama-3.3-70b-versatile) che supporta
- * structured outputs, indipendentemente da GROQ_MODEL che può puntare a modelli
- * non compatibili (es. openai/gpt-oss-20b che non supporta json_schema).
+ * Modello Groq per parsing strutturato (generateObject via generateStructured).
+ * Usa sempre GROQ_PARSE_MODEL (default llama-3.3-70b-versatile).
+ * NOTA: llama-3.x NON supporta json_schema nativo. Il risultato di questa
+ * funzione deve essere passato a generateStructured (ai/moderation/provider.ts),
+ * che usa output:"no-schema" + validazione Zod per i modelli con objectMode:"json".
+ * Non chiamare generateObject con uno schema direttamente su questo modello.
+ * GROQ_MODEL può puntare a modelli non adatti al parsing strutturato (es.
+ * openai/gpt-oss-20b): usare getGroqParseModel(), non getGroqModel(), per il parsing.
  */
 export function getGroqParseModel(): LanguageModel {
   if (!GROQ_API_KEY) {
