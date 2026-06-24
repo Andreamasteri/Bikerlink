@@ -66,7 +66,26 @@ async function drainPendingOnboardingTags(): Promise<void> {
 }
 
 // Retry delays: 2s, 5s, 10s
-const RETRY_DELAYS = [2000, 5000, 10000];
+export const RETRY_DELAYS = [2000, 5000, 10000];
+
+/**
+ * Factory del predicato `retry` e del `retryDelay` usati da useQuery in
+ * AuthProvider. Estratto come funzione pura parametrizzata su hadSessionRef
+ * così da poterlo testare in isolamento:
+ *  - AbortError → no retry (cancellazione query / unmount)
+ *  - hadSessionRef=false → no retry (utente nuovo, niente sessione pregressa)
+ *  - hadSessionRef=true → fino a 3 tentativi poi authFailed=true
+ */
+export function createAuthRetryConfig(hadSessionRef: { current: boolean }) {
+  return {
+    retry: (failureCount: number, error: unknown): boolean => {
+      if (error instanceof Error && error.name === "AbortError") return false;
+      if (!hadSessionRef.current) return false;
+      return failureCount < 3;
+    },
+    retryDelay: (attempt: number): number => RETRY_DELAYS[attempt] ?? 10000,
+  };
+}
 
 // Timeout sul fetch di bootstrap /api/auth/me: se il server di produzione è
 // saturo/lento (pool DB saturo, ping multi-secondo) la richiesta verrebbe
@@ -417,18 +436,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // logica di timeout/abort, parametrizzata su hadSessionRef e setSessionExpired.
   const authQueryFn = createAuthQueryFn({ hadSessionRef, setSessionExpired });
 
+  const authRetryConfig = createAuthRetryConfig(hadSessionRef);
+
   const userQuery = useQuery<SafeUser | null>({
     queryKey: ["/api/auth/me"],
     queryFn: authQueryFn,
     staleTime: Infinity,
     enabled: storageChecked,
     // Only retry if the user had a previous session (don't make new users wait)
-    retry: (failureCount, error) => {
-      if (error instanceof Error && error.name === "AbortError") return false;
-      if (!hadSessionRef.current) return false;
-      return failureCount < 3;
-    },
-    retryDelay: (attempt) => RETRY_DELAYS[attempt] ?? 10000
+    retry: authRetryConfig.retry,
+    retryDelay: authRetryConfig.retryDelay,
   });
 
   // Clear sessionExpired whenever the user becomes authenticated
