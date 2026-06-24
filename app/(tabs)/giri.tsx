@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useRef } from "react";
+import React, { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import {
   View,
   Text,
@@ -33,7 +33,7 @@ export default function GiriScreen() {
   const topPad = insets.top;
   const botPad = insets.bottom;
 
-  const { data: routes = [], isLoading, refetch } = useQuery<PlannedRoute[]>({
+  const { data: routesData, isLoading, refetch } = useQuery<PlannedRoute[]>({
     queryKey: ["/api/planned-routes", filter],
     queryFn: async () => {
       const url = filter === "public"
@@ -42,6 +42,7 @@ export default function GiriScreen() {
       return apiRequest("GET", url).then((r) => r.json());
     },
   });
+  const routes = useMemo(() => routesData ?? [], [routesData]);
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => apiRequest("DELETE", `/api/planned-routes/${id}`),
@@ -65,9 +66,6 @@ export default function GiriScreen() {
   }, [refreshOfflineIndex]);
 
   // Re-check after routes load so new route IDs are evaluated
-  // check-unstable-query-defaults: safe — la guardia `if (!routes.length) return`
-  // previene qualsiasi setState quando routes è [] (loading): nessun loop infinito.
-  // Il side-effect (refreshOfflineIndex) è idempotente e non modifica routes.
   useEffect(() => {
     if (!routes.length) return;
     if (offlineCheckScheduled.current) return;
