@@ -1,5 +1,5 @@
 // Task #2533 — Collector DB Postgres. Connessioni, query lente, dimensione, IOPS approssimate.
-import { pool, isPoolHealthy } from "../../../db";
+import { pool, isPoolHealthy, snapshotBlockedQueries } from "../../../db";
 import type { Signal } from "../types";
 import { recordSuccess as cbRecordSuccess, recordFailure as cbRecordFailure, getCircuitStatus } from "../../../db-circuit-breaker";
 
@@ -27,6 +27,24 @@ export async function collectDb(): Promise<Signal[]> {
   // la saturazione; emettiamo solo un segnale informativo e usciamo. La
   // pressione reale è già coperta da pool-collector (db.pool.waiting).
   if (!isPoolHealthy()) {
+    // ── Monitoring snapshot (Fix #3) ─────────────────────────────────────────
+    // Pool saturo: il pool principale non ha connessioni libere, ma il pool di
+    // monitoraggio riservato (max=1, separato) è ancora disponibile.
+    // Logghiamo pg_stat_activity per vedere COSA sta occupando il DB.
+    snapshotBlockedQueries().then((rows) => {
+      if (rows.length === 0) return;
+      console.error(
+        "[watchdog/db] 🔴 POOL SATURO — query attive su DB:",
+        JSON.stringify(rows.map((r) => ({
+          pid: r.pid,
+          state: r.state,
+          duration_s: r.duration_s,
+          wait: r.wait_event_type ? `${r.wait_event_type}/${r.wait_event}` : null,
+          query: r.query,
+        }))),
+      );
+    }).catch(() => { /* monitoring pool non raggiungibile — silenzio */ });
+
     return [{
       source: "db", metric: "db.ping_saturated", severity: "warn",
       details: { reason: "pool_saturated_skip" },
@@ -52,6 +70,23 @@ export async function collectDb(): Promise<Signal[]> {
     cbRecordSuccess();
     consecutivePingFailures = 0;
     if (pingMs > 5000) {
+      // ── Monitoring snapshot (Fix #3) ─────────────────────────────────────────
+      // Ping spike: la connessione c'era ma la query è stata lenta (>5s).
+      // Logghiamo pg_stat_activity per vedere cosa stava girando in quel momento.
+      snapshotBlockedQueries().then((rows) => {
+        if (rows.length === 0) return;
+        console.error(
+          `[watchdog/db] 🟡 PING SPIKE ${pingMs}ms — query attive su DB:`,
+          JSON.stringify(rows.map((r) => ({
+            pid: r.pid,
+            state: r.state,
+            duration_s: r.duration_s,
+            wait: r.wait_event_type ? `${r.wait_event_type}/${r.wait_event}` : null,
+            query: r.query,
+          }))),
+        );
+      }).catch(() => {});
+
       const poolInfo = pool as { totalCount?: number; idleCount?: number; waitingCount?: number };
       // NB diagnostica (Task #4706): un ping lento (>8s) con `waiting=0` NON è una
       // saturazione del nostro pool né una connection leak — il pool ha conn libere

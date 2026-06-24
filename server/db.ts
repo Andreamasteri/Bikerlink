@@ -43,6 +43,71 @@ pool.on("error", (err) => {
 
 export const db = drizzle(pool, { schema });
 
+// ── Pool di monitoraggio riservato (Fix #3 pool-saturation diagnosis) ─────────
+//
+// Connessione SEPARATA dal pool principale: max=1, mai assegnata a job bg o
+// traffico utente. Serve esclusivamente per interrogare pg_stat_activity durante
+// una crisi di saturazione, quando il pool principale ha 0 connessioni libere e
+// qualsiasi pool.connect() resta in attesa indefinitamente.
+//
+// In condizioni normali questo client è inattivo (idle). Viene usato solo da
+// snapshotBlockedQueries(), chiamato automaticamente dal db-collector quando
+// rileva pool saturo.
+const monitoringPool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  max: 1,
+  idleTimeoutMillis: 60_000,
+  connectionTimeoutMillis: 4_000,
+  statement_timeout: 8_000,
+});
+monitoringPool.on("error", (err) => {
+  console.error("[DB/monitor] pool error:", err.message);
+});
+
+export interface BlockedQueryRow {
+  pid: number;
+  state: string;
+  duration_s: number;
+  query: string;
+  wait_event: string | null;
+  wait_event_type: string | null;
+  application_name: string;
+}
+
+/**
+ * Snapshot istantaneo delle query non-idle in esecuzione sul DB.
+ * Usa il pool di monitoraggio riservato: funziona anche quando il pool
+ * principale è completamente saturo. Restituisce [] in caso di errore.
+ */
+export async function snapshotBlockedQueries(): Promise<BlockedQueryRow[]> {
+  let client: import("pg").PoolClient | null = null;
+  try {
+    client = await monitoringPool.connect();
+    const r = await client.query<BlockedQueryRow>(`
+      SELECT
+        pid,
+        state,
+        EXTRACT(EPOCH FROM (now() - query_start))::int AS duration_s,
+        LEFT(query, 200)                               AS query,
+        wait_event,
+        wait_event_type,
+        COALESCE(application_name, '')                 AS application_name
+      FROM pg_stat_activity
+      WHERE datname        =  current_database()
+        AND pid            <> pg_backend_pid()
+        AND state          <> 'idle'
+        AND query_start    IS NOT NULL
+      ORDER BY duration_s DESC NULLS LAST
+      LIMIT 15
+    `);
+    return r.rows;
+  } catch {
+    return [];
+  } finally {
+    client?.release();
+  }
+}
+
 export class DbTimeoutError extends Error {
   readonly isDbTimeout = true;
   constructor(ms: number) {
