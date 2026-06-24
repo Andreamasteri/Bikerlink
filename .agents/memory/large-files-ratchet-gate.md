@@ -41,3 +41,7 @@ fix: pack several flat dotted keys onto a single physical line (`"a": "x", "b": 
 logical group — line count drops while every key/value is preserved. Keep en/it symmetric. Full-project
 `tsc --noEmit` often times out (>120s); since compaction changes no keys/values the typecheck state is
 unchanged, so an `esbuild --bundle` syntax check on the two files is sufficient to confirm validity.
+
+## Splittare gli script CLI sotto scripts/
+`scripts/` è in IGNORE_DIRS del fixer fix-inline-default-memo-deps (non auto-scansiona sé stesso) ma NON in EXCLUDED_DIRS del ratchet → i nuovi file sotto scripts/ sono comunque soggetti al limite 600. Quando uno script CLI sfora, estrai la logica pura in moduli `scripts/lib/*` e tieni un main sottile come entrypoint.
+**Why:** test/post-merge/check invocano lo script PER PATH; il path dell'entry NON deve cambiare durante lo split, altrimenti rompi gli invocatori.
