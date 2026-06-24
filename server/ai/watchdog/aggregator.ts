@@ -231,6 +231,11 @@ export function deriveProblems(signals: Signal[]): Problem[] {
     } else if (s.metric === "embedding.cap_reached") {
       title = `Cap embedding giornaliero raggiunto (${s.value} call)`;
       suggestion = "Embedding API call bloccate fino a mezzanotte. Aumenta il cap o verifica spike.";
+    } else if (s.metric === "embeddings.hnsw_index") {
+      const det = s.details as { exists?: boolean; valid?: boolean } | undefined;
+      const reason = det?.exists === false ? "mancante" : "invalido";
+      title = `Indice HNSW ${reason} — findSimilar usa sequential scan`;
+      suggestion = "HNSW index missing/invalid — findSimilar falling back to sequential scan. Riavvia il server: la boot-sequence ricostruisce l'indice al primo avvio.";
     } else if (s.metric === "db.pool.waiting") {
       const det = s.details as { total?: number; idle?: number; max?: number; consecutiveWaiting?: number } | undefined;
       if (s.severity === "critical") {

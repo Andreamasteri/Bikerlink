@@ -79,4 +79,5 @@
 - [Telemetry offline-first](telemetry-offline-first.md) — upload by distance (5km) non a timer; marker avanza solo su flush ok; DR anchor frozen, drEstPosRef separato.
 - [DB managed-Postgres slowness vs pool leak](db-managed-slowness.md) — ping>8s con waiting=0 = lentezza managed Replit (non leak); allarmi downstream soppressi quando ThinkCentre spento; backlog map-matching → stato terminale 'exhausted'.
 - [Boot crash-loop resilience](boot-crash-loop-resilience.md) — DB lento al boot causava loop: seed eager-promise→unhandledRejection (usa thunk), seed che propaga (withDbRetry+catch), exit immediato (backoff Atomics.wait su /tmp).
+- [Watchdog high-severity alerts](watchdog-high-severity-alerts.md) — alerts.ts generic loop pushes ONLY critical; "high" signals need a dedicated per-id block + shouldSend throttle to notify admins.
 - [Scheduler heartbeat & zombie recovery](scheduler-heartbeat-recovery.md) — ogni tick (anche skip) emette heartbeat; cycleInFlight reset >10min; bg-db-limiter coda con tetto+timeout (dropped* in stats). Evita falsi "high" + burn proposer.

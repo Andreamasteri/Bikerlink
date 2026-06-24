@@ -106,6 +106,35 @@ export async function dispatchAlerts(snap: HealthSnapshot): Promise<{ sent: numb
     }
   }
 
+  // Indice HNSW mancante/invalido (Task #4893) — segnale "high" emesso dal
+  // db-collector quando embeddings_vec_hnsw_cosine_idx non esiste o è invalido.
+  // findSimilar() degrada a sequential scan: nessun crash, ma latenza alta sotto
+  // carico (BioAffinity/MusicAffinity lo chiamano in loop). La severity è "high"
+  // (non critical) → NON viene catturata dal loop critical-only sotto, quindi
+  // serve un blocco dedicato perché la push parta davvero.
+  const hnswProblem = snap.problems.find(
+    (p) => p.id === "db.embeddings.hnsw_index" && p.severity === "high",
+  );
+  if (hnswProblem) {
+    await emitWatchdogAlert({ problem: hnswProblem, score: snap.score, status: snap.status });
+    if (shouldSend("db.embeddings.hnsw_index")) {
+      let detail: { exists?: boolean; valid?: boolean; indexName?: string } = {};
+      try { detail = JSON.parse(hnswProblem.detail ?? "{}"); } catch { /* use defaults */ }
+      const reason = detail.exists === false ? "mancante" : "invalido";
+      const n = await sendSystemAlertPushToAdmins(
+        `🧭 Indice HNSW ${reason} — ricerca affinità degradata`,
+        hnswProblem.suggestion ?? "HNSW index missing/invalid — findSimilar falling back to sequential scan. Riavvia il server per ricostruirlo.",
+        { type: "watchdog_hnsw_index", exists: detail.exists ?? null, valid: detail.valid ?? null, score: snap.score },
+      );
+      sentCount += n;
+      await writeWatchdogLog({
+        kind: "alert", scope: "db.embeddings.hnsw_index", status: "ok",
+        summary: `Alert HNSW index ${reason} inviato a ${n} admin`,
+        details: { sent: n, exists: detail.exists, valid: detail.valid, indexName: detail.indexName },
+      });
+    }
+  }
+
   // Problem-level (critical singoli — pool exhaustion e network_instability già gestite sopra)
   for (const p of snap.problems) {
     if (p.severity !== "critical") continue;

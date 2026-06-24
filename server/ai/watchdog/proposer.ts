@@ -30,6 +30,9 @@ PROBLEMI MAPPE (source="maps"):
 - Per "client.gps_lost_5min" alto: proporre verifica permission flow / suggerire push educational agli utenti.
 - Per "matching.last_run_h" > 24h: proporre run manuale map-matching job.
 
+SEGNALI DB (source="db"):
+- "embeddings.hnsw_index" severity=high: l'indice vettoriale HNSW (embeddings_vec_hnsw_cosine_idx) è mancante o invalido e findSimilar() degrada a sequential scan (latenza alta sotto carico). La boot-sequence ricostruisce l'indice al primo avvio: proporre un riavvio del server con azione "restart_worker" target="server" (oppure "rebuild_index" target="embeddings_vec_hnsw_cosine_idx"), riskLevel="medium".
+
 SEGNALI CLIENT CRITICI (source="app", metric="crash_signal.*"):
 - "crash_signal.appstate_transition" severity=high: PRIORITÀ MASSIMA — loop bug AppState colpisce molti dispositivi simultaneamente. Proporre hotfix OTA urgente (es. aggiungere guard de-bounce su AppState listener), segnalare come riskLevel="high" e azione "manual_only". Citare il numero di utenti colpiti e la finestra temporale (2h).
 - "crash_signal.js_thread_freeze" severity=high: proporre analisi flamegraph lato client e riduzione lavoro sul main thread.
