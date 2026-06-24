@@ -368,6 +368,24 @@ if [ "$INLINE_MEMO_DEPS_EXIT" -ne 0 ]; then
   exit "$INLINE_MEMO_DEPS_EXIT"
 fi
 
+# ── GATE REGRESSION TEST — check-inline-default-memo-deps ─────────────────
+# Verifica che il gate stesso (Modes A/B/C1/C2, soppressioni, guard tipo) non
+# sia regredito da modifiche alla logica Python (bracket-depth tracker,
+# lookbehind regex, ecc.).  I 20 snippet sintetici coprono ogni modalità di
+# rilevamento + tutti i falsi-positivo noti.
+echo "════════════════════════════════════════"
+echo "  Test regressione gate memo-deps"
+echo "════════════════════════════════════════"
+MEMO_DEPS_REGTEST_EXIT=0
+bash scripts/test-check-inline-default-memo-deps.sh || MEMO_DEPS_REGTEST_EXIT=$?
+echo "════════════════════════════════════════"
+echo ""
+if [ "$MEMO_DEPS_REGTEST_EXIT" -ne 0 ]; then
+  echo "❌ Regression test memo-deps FALLITI — la logica del gate è regredita."
+  echo "   Eseguire 'bash scripts/test-check-inline-default-memo-deps.sh' localmente per i dettagli."
+  exit "$MEMO_DEPS_REGTEST_EXIT"
+fi
+
 # ── GATE AI generateObject DIRETTO CON SCHEMA (bypass generateStructured) ──
 # llama-3.x (default Groq) NON supporta json_schema nativo.
 # generateObject({ schema: ... }) fuori dal gateway approvato crasha in prod
