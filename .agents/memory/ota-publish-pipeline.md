@@ -15,6 +15,14 @@ description: Comportamenti non ovvi del workflow OTA Publish (messaggio stale da
 
 **Come applicarlo:** il fix è già nello script — non rimuoverlo. Se l'export continua a morire mid-bundle senza errori nel log, controllare per prima cosa i processi orfani start-expo.sh (`pgrep -f start-expo.sh`).
 
+### Lanciare SEMPRE via workflow "OTA Publish", MAI via setsid dall'agente
+
+Lanciare `publish-ota-full.sh` con `setsid nohup ... &` dalla shell dell'agente fa **ancora** morire l'export: il `pkill watchdog.sh` dello script non basta perché altri workflow gestiti ("Watchdog"/"Clean Metro"/"Start App") restano attivi e ri-killano la 8081 mid-bundle. Tutte le OTA riuscite girano via il **workflow "OTA Publish"** (`restart_workflow({name:"OTA Publish"})`); lì il contesto evita la race. **Why:** il supervisore workflow + start-expo orfani vincono sulla shell detached. **Come applicarlo:** trigger OTA = `restart_workflow` sul workflow, poi polling su `logs/ota-timing.log` + `SELECT ... FROM ota_releases WHERE ota_version='...'` (l'insert DB avviene in coda; una query troppo presto dà 0 righe = falso negativo).
+
+### Recovery floor-guard se un kill pre-bumpa buildInfo
+
+Se l'export muore SENZA rollback, `constants/buildInfo.ts` resta pre-impostato a `NEXT` (es. 176). Al re-run `NEXT_OTA = max(DB_last+1, buildInfo+1)` → il floor lo spinge a 177, **saltando** la 176. Fix: prima di ri-lanciare, riporta `APPLIED_OTA_NUMBER` all'ultima OTA realmente pubblicata in DB (es. 175). Lo script committa buildInfo+hwm con un index separato (workaround git) e pusha: il remote avanza ma HEAD locale resta indietro con le stesse modifiche come working-tree changes — normale, l'auto-commit di fine task le allinea.
+
 ## Messaggio stale dal fallback DB
 
 Il workflow "OTA Publish" si **auto-riavvia** quando riavvii altri workflow dell'env
