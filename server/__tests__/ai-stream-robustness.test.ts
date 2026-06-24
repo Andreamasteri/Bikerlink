@@ -34,6 +34,7 @@ vi.mock("@ai-sdk/google", () => ({
 vi.mock("../lib/ollama-client", () => ({
   isOllamaConfigured: true,
   getOllamaModel: vi.fn(() => ({ __provider: "ollama" })),
+  isOllamaReachable: vi.fn().mockResolvedValue(true),
 }));
 
 // Groq disabilitato in questi test: la catena è Ollama → Gemini (vedi
@@ -67,6 +68,7 @@ const VALID_ROUTE = {
   startLocation: "Milano",
   endLocation: "Torino",
   waypoints: ["Como"],
+  poiStops: null,
   style: "curvy",
   isRoundTrip: false,
   isMultiDay: false,

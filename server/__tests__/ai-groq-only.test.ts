@@ -38,7 +38,20 @@ vi.mock("../lib/ollama-client", () => ({
 vi.mock("../lib/groq-client", () => ({
   isGroqConfigured: true,
   getGroqModel: vi.fn(() => ({ __provider: "groq" })),
+  getGroqParseModel: vi.fn(() => ({ __provider: "groq" })),
 }));
+
+vi.mock("../lib/openai-route-client", () => ({
+  isOpenAiRouteConfigured: false,
+  getOpenAiRouteModel: vi.fn(),
+}));
+
+// Catena deterministica: solo Groq (Ollama disabilitato, Gemini senza chiave).
+vi.mock("../ai/route-provider-config", () => ({
+  getEffectiveRouteChain: vi.fn().mockResolvedValue(["groq"]),
+}));
+
+vi.mock("../ai/route-provider-stats", () => ({ incrementProviderStat: vi.fn() }));
 
 import plannedRoutesRouter from "../routes/planned-routes";
 
@@ -64,6 +77,7 @@ const VALID_ROUTE = {
   startLocation: "Milano",
   endLocation: "Torino",
   waypoints: ["Como"],
+  poiStops: null,
   style: "curvy",
   isRoundTrip: false,
   isMultiDay: false,

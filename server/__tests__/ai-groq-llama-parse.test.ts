@@ -15,8 +15,14 @@ import { z } from "zod";
 // Each test module gets its own module registry in Vitest.
 // ---------------------------------------------------------------------------
 
-// Default: llama model (the real default when GROQ_PARSE_MODEL is unset).
-// We leave the env at its default so the module-level regex fires.
+// Explicitly force a llama model so _GROQ_PARSE_NEEDS_JSON_MODE = true.
+// The production default is now openai/gpt-oss-20b (strict-capable, no workaround
+// needed), but these tests specifically validate the no-schema path for llama models.
+const _envSetup = vi.hoisted(() => {
+  process.env.GROQ_PARSE_MODEL = "llama-3.3-70b-versatile";
+  return {};
+});
+
 // For the strict-model tests we use vi.resetModules + dynamic import.
 
 const aiMocks = vi.hoisted(() => ({ generateObject: vi.fn() }));

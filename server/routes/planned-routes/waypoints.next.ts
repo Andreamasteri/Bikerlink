@@ -35,7 +35,9 @@ import { incrementProviderStat } from "../../ai/route-provider-stats";
 
 // Groq llama-3.x models do not support json_schema structured outputs in AI SDK v6
 // (the `mode` parameter was removed). Detect at startup so the check is free at request time.
-const _GROQ_PARSE_MODEL_ID = process.env.GROQ_PARSE_MODEL ?? "llama-3.3-70b-versatile";
+// Default is openai/gpt-oss-20b (strict-capable) so _GROQ_PARSE_NEEDS_JSON_MODE is false
+// unless GROQ_PARSE_MODEL is explicitly overridden to a llama model.
+const _GROQ_PARSE_MODEL_ID = process.env.GROQ_PARSE_MODEL ?? "openai/gpt-oss-20b";
 const _GROQ_PARSE_NEEDS_JSON_MODE = /^(llama-3\.|meta-llama\/llama-3)/.test(_GROQ_PARSE_MODEL_ID);
 
 /**

@@ -34,12 +34,26 @@ vi.mock("@ai-sdk/google", () => ({
 vi.mock("../lib/ollama-client", () => ({
   isOllamaConfigured: true,
   getOllamaModel: vi.fn(() => ({ __provider: "ollama" })),
+  isOllamaReachable: vi.fn().mockResolvedValue(true),
 }));
 
 vi.mock("../lib/groq-client", () => ({
   isGroqConfigured: true,
   getGroqModel: vi.fn(() => ({ __provider: "groq" })),
+  getGroqParseModel: vi.fn(() => ({ __provider: "groq" })),
 }));
+
+vi.mock("../lib/openai-route-client", () => ({
+  isOpenAiRouteConfigured: false,
+  getOpenAiRouteModel: vi.fn(),
+}));
+
+// Catena deterministica: Ollama → Groq → Gemini (no openai, no env surprises).
+vi.mock("../ai/route-provider-config", () => ({
+  getEffectiveRouteChain: vi.fn().mockResolvedValue(["ollama", "groq", "gemini"]),
+}));
+
+vi.mock("../ai/route-provider-stats", () => ({ incrementProviderStat: vi.fn() }));
 
 // ---------------------------------------------------------------------------
 // Imports under test — after mocks
@@ -70,6 +84,7 @@ const VALID_ROUTE = {
   startLocation: "Milano",
   endLocation: "Torino",
   waypoints: ["Como"],
+  poiStops: null,
   style: "curvy",
   isRoundTrip: false,
   isMultiDay: false,
