@@ -92,6 +92,26 @@ export const styles = StyleSheet.create({
     color: Colors.textSecondary,
     textAlign: "right",
   },
+  hnswRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+  },
+  hnswLabel: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 12,
+    color: Colors.text,
+    flex: 1,
+  },
+  hnswStatusText: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 11,
+    letterSpacing: 0.5,
+  },
   fieldList: {
     gap: 6,
   },

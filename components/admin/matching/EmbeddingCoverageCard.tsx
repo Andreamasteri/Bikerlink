@@ -29,6 +29,28 @@ interface CoverageResponse {
   dailyCap: number;
 }
 
+interface HnswStatusResponse {
+  exists: boolean;
+  valid: boolean;
+}
+
+type HnswState = "ok" | "missing" | "invalid";
+
+function resolveHnswState(status?: HnswStatusResponse): HnswState {
+  if (!status?.exists) return "missing";
+  if (!status.valid) return "invalid";
+  return "ok";
+}
+
+const HNSW_PRESENTATION: Record<
+  HnswState,
+  { label: string; icon: keyof typeof Ionicons.glyphMap; color: "success" | "warning" | "error" }
+> = {
+  ok: { label: "OK", icon: "checkmark-circle", color: "success" },
+  missing: { label: "MANCANTE", icon: "close-circle", color: "error" },
+  invalid: { label: "INVALIDO", icon: "warning", color: "warning" },
+};
+
 function formatDate(iso: string | null): string {
   if (!iso) return "—";
   try {
@@ -49,6 +71,12 @@ export function EmbeddingCoverageCard() {
 
   const { data, isLoading, error, refetch, isFetching } = useQuery<CoverageResponse>({
     queryKey: ["/api/admin/embeddings/coverage"],
+    staleTime: 30000,
+    retry: false,
+  });
+
+  const { data: hnswStatus } = useQuery<HnswStatusResponse>({
+    queryKey: ["/api/admin/embeddings/hnsw-status"],
     staleTime: 30000,
     retry: false,
   });
@@ -175,6 +203,19 @@ export function EmbeddingCoverageCard() {
               Ultimo aggiornamento: {formatDate(bioBioRow.lastUpdated)}
             </Text>
           )}
+
+          {hnswStatus && (() => {
+            const state = resolveHnswState(hnswStatus);
+            const p = HNSW_PRESENTATION[state];
+            const color = Colors[p.color];
+            return (
+              <View style={[styles.hnswRow, { borderColor: color, backgroundColor: color + "14" }]}>
+                <Ionicons name={p.icon} size={16} color={color} />
+                <Text style={styles.hnswLabel}>Indice HNSW</Text>
+                <Text style={[styles.hnswStatusText, { color }]}>{p.label}</Text>
+              </View>
+            );
+          })()}
 
           {data.byField.length > 1 && (
             <View style={styles.fieldList}>

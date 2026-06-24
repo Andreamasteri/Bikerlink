@@ -111,6 +111,49 @@ export async function hnswIndexExists(): Promise<boolean> {
   }
 }
 
+export interface HnswIndexStatus {
+  exists: boolean;
+  valid: boolean;
+}
+
+/**
+ * Detailed status of the HNSW cosine index on the embeddings table.
+ * Unlike hnswIndexExists() (which collapses exists+valid into one boolean for
+ * batch-job gating), this returns both flags separately so the Admin panel can
+ * distinguish three states: OK (exists && valid), invalido (exists && !valid),
+ * mancante (!exists). Never throws — on a catalog read error it resolves to the
+ * optimistic { exists: true, valid: true } to match hnswIndexExists() semantics.
+ */
+export async function getHnswIndexStatus(): Promise<HnswIndexStatus> {
+  try {
+    const res = await db.execute<{ exists: boolean; valid: boolean }>(sql`
+      SELECT
+        EXISTS (
+          SELECT 1 FROM pg_indexes
+          WHERE schemaname = 'public'
+            AND tablename = 'embeddings'
+            AND indexname = ${HNSW_INDEX_NAME}
+        ) AS exists,
+        COALESCE(
+          (SELECT i.indisvalid
+           FROM pg_class c
+           JOIN pg_index i ON i.indrelid = c.oid
+           JOIN pg_class ic ON ic.oid = i.indexrelid
+           WHERE c.relname = 'embeddings'
+             AND ic.relname = ${HNSW_INDEX_NAME}
+             AND c.relnamespace = (SELECT oid FROM pg_namespace WHERE nspname = 'public')
+          ),
+          false
+        ) AS valid
+    `);
+    const row = (res.rows ?? res)[0] as { exists: boolean; valid: boolean } | undefined;
+    if (!row) return { exists: true, valid: true };
+    return { exists: row.exists ?? false, valid: row.valid ?? false };
+  } catch {
+    return { exists: true, valid: true };
+  }
+}
+
 /**
  * Read hnsw.ef_search from AppSetting `embedding_ef_search`.
  * Falls back to 64 if the setting is absent or invalid.

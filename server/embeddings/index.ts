@@ -10,6 +10,8 @@ export {
   findSimilar,
   deleteEmbedding,
   hnswIndexExists,
+  getHnswIndexStatus,
   type UpsertEmbeddingResult,
   type SimilarHit,
+  type HnswIndexStatus,
 } from "./store";

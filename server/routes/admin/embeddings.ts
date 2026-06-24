@@ -4,6 +4,7 @@ import { sendError, sendSuccess } from "../../lib/api-response";
 import {
   generateEmbedding,
   findSimilar,
+  getHnswIndexStatus,
   EMBEDDING_MODEL_TAG,
   EMBEDDING_DIMENSIONS,
 } from "../../embeddings";
@@ -305,6 +306,29 @@ router.get("/stats", async (_req: Request, res: Response) => {
     const msg = err instanceof Error ? err.message : String(err);
     console.error("[admin/embeddings/stats] error:", msg);
     return sendError(res, 500, `Errore stats embedding: ${msg}`);
+  }
+});
+
+/**
+ * GET /api/admin/embeddings/hnsw-status
+ *
+ * Reports the state of the HNSW cosine index on the embeddings table so admins
+ * can verify in-app whether findSimilar() is using the index or falling back to
+ * a slow sequential scan.
+ *
+ * Response: { exists: boolean, valid: boolean }
+ *   - exists && valid   → OK
+ *   - exists && !valid  → invalido (build interrotta)
+ *   - !exists           → mancante
+ */
+router.get("/hnsw-status", async (_req: Request, res: Response) => {
+  try {
+    const status = await getHnswIndexStatus();
+    return sendSuccess(res, { exists: status.exists, valid: status.valid });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error("[admin/embeddings/hnsw-status] error:", msg);
+    return sendError(res, 500, `Errore controllo indice HNSW: ${msg}`);
   }
 });
 
