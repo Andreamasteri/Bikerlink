@@ -39,6 +39,9 @@ export CERBERO_LOG_FILE CERBERO_LOG_MAX_BYTES METRO_LOCK_FILE BACKEND_PORT
 mkdir -p "$(dirname "$CERBERO_LOG_FILE")"
 # shellcheck source=scripts/cerbero-lib.sh
 source "$SCRIPT_DIR/cerbero-lib.sh"
+# Libreria diagnostica crash (sola osservazione — nessun side-effect su recovery).
+# shellcheck source=scripts/metro-crash-diag.sh
+source "$SCRIPT_DIR/metro-crash-diag.sh"
 
 # ── Single instance (flock fd 9) ──────────────────────────────────────────────
 exec 9>>"/tmp/cerbero.flock"
@@ -176,6 +179,11 @@ restart_metro() {
   fi
 
   cerbero_log "[TESTA 2] CRASH: porta $METRO_PORT non risponde. Pulizia cache e riavvio..."
+
+  # ── Snapshot diagnostico (sola osservazione, nessun side-effect) ────────────
+  # Cattura PID/stato, memoria e OOM del kernel PRIMA di qualsiasi kill, così da
+  # avere la fotografia del processo morente (o già scomparso).
+  metro_diag_snapshot 2>/dev/null || true
 
   # Rimozione lock SOLO se davvero stale (finestra TOCTOU): riacquisiamo con
   # flock -n su fd 200; se riesce il lock NON è detenuto → stale → lo rimuoviamo

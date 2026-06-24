@@ -15,6 +15,13 @@ METRO_PORT=8081
 LOCK_FILE="/tmp/start-metro.lock"
 CACHE_KEY_FILE="/tmp/.metro-cache-key"
 
+# Timestamp avvio per calcolare uptime Metro al momento della morte.
+METRO_START_TS=$(date +%s)
+
+# Carica libreria diagnostica crash (solo osservazione, nessun side-effect).
+# shellcheck source=scripts/metro-crash-diag.sh
+source "$SCRIPT_DIR/metro-crash-diag.sh"
+
 # ── Lock atomico con flock ────────────────────────────────────────────────────
 # fd 9 aperto in scrittura (crea il file se assente, non tronca se presente).
 # flock -n 9 fallisce immediatamente se il lock è già detenuto da un altro PID.
@@ -129,13 +136,58 @@ fi
 # ── Crea directory log Expo (evita ENOENT al primo avvio) ────────────────────
 mkdir -p "$PROJECT_ROOT/.expo/dev/logs"
 
+# ── Log sessione dedicato ─────────────────────────────────────────────────────
+# start-expo.sh può essere lanciato sia da start.sh (stdout → /tmp/metro.log)
+# sia da cerbero.sh (stdout → cerbero.log). In entrambi i casi questo file
+# cattura SEMPRE l'output di Expo, garantendo che le ultime righe siano
+# disponibili per la diagnostica crash indipendentemente dal chiamante.
+# Rotazione: max METRO_SESSION_LOG_MAX_LINES righe, mantenuta l'ultima metà.
+if [ -f "$METRO_SESSION_LOG" ]; then
+  session_lines=$(wc -l < "$METRO_SESSION_LOG" 2>/dev/null || echo 0)
+  if [ "$session_lines" -ge "$METRO_SESSION_LOG_MAX_LINES" ]; then
+    session_keep=$(( METRO_SESSION_LOG_MAX_LINES / 2 ))
+    tail -n "$session_keep" "$METRO_SESSION_LOG" > "${METRO_SESSION_LOG}.tmp" 2>/dev/null && \
+      mv "${METRO_SESSION_LOG}.tmp" "$METRO_SESSION_LOG" 2>/dev/null || true
+  fi
+fi
+
 # ── Avvio Expo come processo figlio (non exec) ────────────────────────────────
 # Importante: NON usare exec qui. exec sostituisce la shell corrente e impedisce
 # l'esecuzione del trap EXIT, lasciando il lock file orfano.
+#
+# `> >(tee -a ...)` redirige stdout al session log SENZA alterare l'exit code
+# (process substitution è asincrona, non un pipe): EXPO_EXIT cattura solo
+# l'exit code di npx expo start, non di tee.
+
+# ── Registra l'inizio di questa sessione Metro ────────────────────────────────
+# Genera un session_id univoco PRIMA di avviare Expo e lo scrive in
+# /tmp/metro-session-id. Sia il crash record (al termine, qui sotto) sia lo
+# snapshot di Cerbero (al prossimo ciclo di check) leggono lo stesso file →
+# correlazione affidabile anche se Cerbero rileva il crash 10s dopo l'uscita.
+metro_diag_new_session 2>/dev/null || true
+
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Avvio Expo dev server (reset_cache=$RESET_CACHE)..."
 cd "$PROJECT_ROOT"
+
+EXPO_EXIT=0
 if [ "$RESET_CACHE" -eq 1 ]; then
-  npx expo start --reset-cache
+  npx expo start --reset-cache > >(tee -a "$METRO_SESSION_LOG") 2>&1 || EXPO_EXIT=$?
 else
-  npx expo start
+  npx expo start > >(tee -a "$METRO_SESSION_LOG") 2>&1 || EXPO_EXIT=$?
 fi
+
+# ── Diagnostica crash: registra causa uscita ─────────────────────────────────
+# Registra tutti gli exit ≠ 0 e ≠ 2 (skip). Include exit 143 (SIGTERM da
+# piattaforma) per accumulare prove del riciclo periodico nel tempo.
+# Il session_id letto da metro_diag_record_crash è lo STESSO generato sopra da
+# metro_diag_new_session → correla con lo snapshot che Cerbero scriverà dopo.
+if [ "$EXPO_EXIT" -ne 0 ] && [ "$EXPO_EXIT" -ne 2 ]; then
+  METRO_UPTIME=$(( $(date +%s) - METRO_START_TS ))
+  # Leggi last_lines dal session log (sempre disponibile, indipendente dal
+  # chiamante — sia start.sh sia cerbero.sh).
+  METRO_LAST_LINES=$(tail -n 20 "$METRO_SESSION_LOG" 2>/dev/null || true)
+  metro_diag_record_crash "$EXPO_EXIT" "$METRO_UPTIME" "$METRO_LAST_LINES" 2>/dev/null || true
+fi
+
+# Propaga l'exit code originale di Expo.
+exit "$EXPO_EXIT"
