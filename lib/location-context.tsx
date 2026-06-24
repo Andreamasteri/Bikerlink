@@ -32,6 +32,13 @@ export interface SharedPosition {
   longitude: number;
 }
 
+// Esito ricco della richiesta del permesso background ("Sempre"):
+// - granted: concesso, la schermata può chiudersi.
+// - denied: negato ma il sistema può ancora mostrare un dialog → si può ritentare.
+// - needsSettings: il sistema impone le Impostazioni (canAskAgain=false /
+//   Android 11+) → mostrare il box rosso e mandare alle Impostazioni.
+export type BackgroundPermissionResult = "granted" | "denied" | "needsSettings";
+
 interface LocationContextType {
   hasLocationPermission: boolean;
   locationPermissionDenied: boolean;
@@ -42,7 +49,7 @@ interface LocationContextType {
   gpsRequired: boolean;
   isGpsGateActive: boolean;
   requestPermission: () => Promise<boolean>;
-  requestBackgroundPermission: () => Promise<boolean>;
+  requestBackgroundPermission: () => Promise<BackgroundPermissionResult>;
   positionReady: boolean;
   currentPosition: SharedPosition | null;
   positionLoading: boolean;
@@ -60,7 +67,7 @@ const LocationContext = createContext<LocationContextType>({
   gpsRequired: true,
   isGpsGateActive: false,
   requestPermission: async () => true,
-  requestBackgroundPermission: async () => false,
+  requestBackgroundPermission: async () => "denied",
   positionReady: true,
   currentPosition: null,
   positionLoading: true,
@@ -159,18 +166,41 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  const requestBackgroundPermission = useCallback(async (): Promise<boolean> => {
+  const requestBackgroundPermission = useCallback(async (): Promise<BackgroundPermissionResult> => {
     try {
-      const { status } = await loc().requestBackgroundPermissionsAsync();
+      // 1. Garantire prima il foreground: su Android 11+ il background ("Sempre")
+      // non può essere concesso se il foreground non è già concesso.
+      let fg = await loc().getForegroundPermissionsAsync();
+      if (fg.status !== "granted") {
+        if (!fg.canAskAgain) {
+          // Foreground negato definitivamente → solo Impostazioni.
+          return "needsSettings";
+        }
+        fg = await loc().requestForegroundPermissionsAsync();
+        setHasPermission(fg.status === "granted");
+        setPermissionDenied(fg.status === "denied");
+        setPermissionPrompt(fg.status === "undetermined");
+        if (fg.status !== "granted") {
+          // L'utente ha rifiutato il foreground ora: se può ancora chiedere lo
+          // lasciamo ritentare, altrimenti serve Impostazioni.
+          return fg.canAskAgain ? "denied" : "needsSettings";
+        }
+      }
+
+      // 2. Foreground ok → richiedere il background.
+      const { status, canAskAgain } = await loc().requestBackgroundPermissionsAsync();
       const granted = status === "granted";
       setHasBackgroundPermission(granted);
       if (granted) {
         hadBackgroundPermissionRef.current = true;
         setBackgroundPermissionRevoked(false);
+        return "granted";
       }
-      return granted;
+      // Negato: se il sistema impone le Impostazioni (canAskAgain false / Android
+      // 11+) → needsSettings; altrimenti il dialog è ancora possibile → denied.
+      return canAskAgain ? "denied" : "needsSettings";
     } catch {
-      return false;
+      return "denied";
     }
   }, []);
 

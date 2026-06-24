@@ -6,6 +6,7 @@ import {
   StyleSheet,
   Modal,
   Linking,
+  Platform,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -20,16 +21,28 @@ export default function AlwaysPermissionNotice({ onDismiss }: Props) {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { requestBackgroundPermission } = useLocationGate();
-  const [denied, setDenied] = useState(false);
+  const [needsSettings, setNeedsSettings] = useState(false);
+  const [requesting, setRequesting] = useState(false);
+
+  const isIos = Platform.OS === "ios";
 
   const handleOpenSettings = () => {
     Linking.openSettings();
   };
 
   const handleRequest = async () => {
-    const granted = await requestBackgroundPermission();
-    if (!granted) {
-      setDenied(true);
+    if (requesting) return;
+    setRequesting(true);
+    try {
+      const result = await requestBackgroundPermission();
+      if (result === "needsSettings") {
+        // Il sistema impone le Impostazioni (Android 11+ / canAskAgain false).
+        setNeedsSettings(true);
+      }
+      // "granted" → la schermata si chiude da sola (GpsAlwaysGate).
+      // "denied" → il dialog è ancora possibile: lasciamo il pulsante per ritentare.
+    } finally {
+      setRequesting(false);
     }
   };
 
@@ -61,34 +74,61 @@ export default function AlwaysPermissionNotice({ onDismiss }: Props) {
             {"Inviare la posizione SOS in emergenza\n"}
             <Text style={{ color: colors.text }}>{"• "}</Text>
             {"Mantenerti visibile nella community\n\n"}
-            Vai in{" "}
-            <Text style={[styles.bold, { color: colors.text }]}>
-              Impostazioni
-            </Text>{" "}
-            e imposta il permesso su{" "}
-            <Text style={[styles.bold, { color: colors.text }]}>
-              "Sempre"
-            </Text>
-            .
+            {needsSettings ? (
+              <>
+                {isIos
+                  ? "Apri le Impostazioni e imposta il permesso di posizione su "
+                  : "Apri le Impostazioni di sistema e imposta il permesso di posizione su "}
+                <Text style={[styles.bold, { color: colors.text }]}>
+                  {isIos ? '"Sempre"' : '"Consenti sempre"'}
+                </Text>
+                .
+              </>
+            ) : (
+              <>
+                Tocca{" "}
+                <Text style={[styles.bold, { color: colors.text }]}>
+                  Richiedi permesso
+                </Text>{" "}
+                e scegli{" "}
+                <Text style={[styles.bold, { color: colors.text }]}>
+                  "Consenti sempre"
+                </Text>
+                .
+              </>
+            )}
           </Text>
 
-          {denied && (
+          {needsSettings && (
             <View style={[styles.deniedBox, { backgroundColor: "#FF444418", borderColor: "#FF444433" }]}>
               <Ionicons name="warning-outline" size={16} color="#FF4444" />
               <Text style={[styles.deniedText, { color: "#FF4444" }]}>
-                Permesso negato. Vai in{" "}
-                <Text style={{ fontFamily: "Inter_600SemiBold" }}>
-                  Impostazioni → BikerLink → Posizione → Sempre
-                </Text>
-                .
+                {isIos ? (
+                  <>
+                    Permesso da concedere a mano. Vai in{" "}
+                    <Text style={{ fontFamily: "Inter_600SemiBold" }}>
+                      Impostazioni → BikerLink → Posizione → Sempre
+                    </Text>
+                    .
+                  </>
+                ) : (
+                  <>
+                    Android richiede di abilitare "Sempre" dalle Impostazioni. Vai in{" "}
+                    <Text style={{ fontFamily: "Inter_600SemiBold" }}>
+                      Impostazioni → Posizione → Consenti sempre
+                    </Text>
+                    .
+                  </>
+                )}
               </Text>
             </View>
           )}
 
-          {!denied && (
+          {!needsSettings && (
             <TouchableOpacity
-              style={[styles.primaryBtn, { backgroundColor: colors.accent }]}
+              style={[styles.primaryBtn, { backgroundColor: colors.accent, opacity: requesting ? 0.6 : 1 }]}
               onPress={handleRequest}
+              disabled={requesting}
               activeOpacity={0.85}
             >
               <Ionicons
@@ -98,14 +138,14 @@ export default function AlwaysPermissionNotice({ onDismiss }: Props) {
                 style={styles.btnIcon}
               />
               <Text style={[styles.primaryBtnText, { color: colors.background }]}>
-                Richiedi permesso
+                {requesting ? "Richiesta in corso…" : "Richiedi permesso"}
               </Text>
             </TouchableOpacity>
           )}
 
           <TouchableOpacity
             style={
-              denied
+              needsSettings
                 ? [styles.primaryBtn, { backgroundColor: colors.accent }]
                 : [styles.secondaryBtn, { backgroundColor: colors.surface, borderColor: colors.border }]
             }
@@ -115,12 +155,12 @@ export default function AlwaysPermissionNotice({ onDismiss }: Props) {
             <Ionicons
               name="settings-outline"
               size={18}
-              color={denied ? colors.background : colors.accent}
+              color={needsSettings ? colors.background : colors.accent}
               style={styles.btnIcon}
             />
             <Text
               style={
-                denied
+                needsSettings
                   ? [styles.primaryBtnText, { color: colors.background }]
                   : [styles.secondaryBtnText, { color: colors.accent }]
               }
