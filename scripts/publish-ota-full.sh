@@ -114,10 +114,28 @@ BUILD_INFO_CURRENT=$(node -e "
 " 2>/dev/null || echo "0")
 log_info "APPLIED_OTA_NUMBER corrente in buildInfo.ts: ${BUILD_INFO_CURRENT}"
 
+# ── Leggi high-water mark (terza sorgente: non resettabile automaticamente) ──
+HWM_FILE="logs/ota-hwm.txt"
+HWM_CURRENT=0
+if [[ -f "$HWM_FILE" ]]; then
+  HWM_VAL=$(cat "$HWM_FILE" 2>/dev/null | tr -d '[:space:]' || echo "0")
+  if [[ "$HWM_VAL" =~ ^[0-9]+$ ]]; then
+    HWM_CURRENT="$HWM_VAL"
+  fi
+fi
+log_info "OTA high-water mark da ${HWM_FILE}: ${HWM_CURRENT}"
+
 if [[ "$BUILD_INFO_CURRENT" =~ ^[0-9]+$ ]] && [[ "$LAST_OTA_NUMBER" -lt "$BUILD_INFO_CURRENT" ]]; then
   log_warn "⚠️  DB ha OTA ${LAST_OTA_NUMBER} < buildInfo.ts ${BUILD_INFO_CURRENT} — possibile DB non sincronizzato."
   log_warn "   Uso buildInfo.ts come base per evitare regressione del numero OTA."
   LAST_OTA_NUMBER="$BUILD_INFO_CURRENT"
+fi
+
+# Applica high-water mark come terzo floor (protegge se DB e buildInfo sono
+# entrambi azzerati contemporaneamente, es. durante un restore d'ambiente).
+if [[ "$HWM_CURRENT" -gt "$LAST_OTA_NUMBER" ]]; then
+  log_warn "⚠️  HWM ${HWM_CURRENT} > sorgenti correnti (${LAST_OTA_NUMBER}) — uso HWM come base."
+  LAST_OTA_NUMBER="$HWM_CURRENT"
 fi
 
 NEXT_OTA=$(( LAST_OTA_NUMBER + 1 ))
@@ -314,6 +332,11 @@ psql "$DATABASE_URL" -c "
   log_error "DB insert fallito — buildInfo NON modificato"
   exit 1
 }
+
+# ── Aggiorna high-water mark atomicamente dopo pubblicazione riuscita ────────
+mkdir -p logs
+echo "${NEXT_OTA}" > "${HWM_FILE}.tmp" && mv "${HWM_FILE}.tmp" "$HWM_FILE"
+log_ok "OTA HWM aggiornato a ${NEXT_OTA} in ${HWM_FILE}"
 
 # ── 6. Svuota .ota-message e chiave DB dopo pubblicazione riuscita ──────────
 echo "" > "$MSG_FILE"

@@ -98,6 +98,17 @@ BUILD_INFO_CURRENT=$(node -e "
 " 2>/dev/null || echo "0")
 log_info "APPLIED_OTA_NUMBER corrente in buildInfo.ts: ${BUILD_INFO_CURRENT}"
 
+# ── Leggi high-water mark (terza sorgente: non resettabile automaticamente) ──
+HWM_FILE="logs/ota-hwm.txt"
+HWM_CURRENT=0
+if [[ -f "$HWM_FILE" ]]; then
+  HWM_VAL=$(cat "$HWM_FILE" 2>/dev/null | tr -d '[:space:]' || echo "0")
+  if [[ "$HWM_VAL" =~ ^[0-9]+$ ]]; then
+    HWM_CURRENT="$HWM_VAL"
+  fi
+fi
+log_info "OTA high-water mark da ${HWM_FILE}: ${HWM_CURRENT}"
+
 EAS_UNREACHABLE=false
 
 if [[ -n "$PROJECT_ID" ]]; then
@@ -149,6 +160,13 @@ elif [[ "$BUILD_INFO_CURRENT" -gt "$CURRENT_MAX_OTA" ]]; then
   log_warn "⚠️  EAS ha restituito ${CURRENT_MAX_OTA} < buildInfo.ts ${BUILD_INFO_CURRENT} — possibile dato incompleto su questo branch."
   log_warn "   Uso buildInfo.ts come base per evitare regressione del numero OTA."
   CURRENT_MAX_OTA="$BUILD_INFO_CURRENT"
+fi
+
+# Applica high-water mark come terzo floor (protegge se DB e buildInfo sono
+# entrambi azzerati contemporaneamente, es. durante un restore d'ambiente).
+if [[ "$HWM_CURRENT" -gt "$CURRENT_MAX_OTA" ]]; then
+  log_warn "⚠️  HWM ${HWM_CURRENT} > sorgenti correnti (${CURRENT_MAX_OTA}) — uso HWM come base."
+  CURRENT_MAX_OTA="$HWM_CURRENT"
 fi
 
 NEXT_OTA=$((CURRENT_MAX_OTA + 1))
@@ -224,6 +242,10 @@ TIMING_LOG="logs/ota-timing.log"
 TIMING_LINE="[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] OTA v${VERSION} | export: ${T_EXPORT}s | upload: ${T_UPLOAD}s | publish: ${T_PUBLISH}s | db: ${T_DB}s | git: ${T_GIT}s | TOTALE: ${T_TOTAL}s"
 echo "$TIMING_LINE" >> "$TIMING_LOG"
 log_success "Timing appeso a ${TIMING_LOG}"
+
+# ── Aggiorna high-water mark atomicamente dopo pubblicazione riuscita ─────────
+echo "${NEXT_OTA}" > "${HWM_FILE}.tmp" && mv "${HWM_FILE}.tmp" "$HWM_FILE"
+log_success "OTA HWM aggiornato a ${NEXT_OTA} in ${HWM_FILE}"
 
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"

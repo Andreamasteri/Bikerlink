@@ -1,3 +1,4 @@
+- [OTA high-water mark floor](ota-hwm-floor.md) — logs/ota-hwm.txt è il terzo floor anti-regressione (dopo EAS+buildInfo); aggiornato atomicamente post-publish; tracked in git (!logs/ota-hwm.txt eccezione in .gitignore).
 - [ThinkCentre SSH access](thinkcentre-ssh-access.md) — credenziali in env: TC_SSH_HOST/USER/PASSWORD/PORT; usa paramiko + `echo $pwd | sudo -S`. Procedura pronta: skill `thinkcentre-access` (helper `tc.py status|exec`). TC_SSH_HOST ha prefisso `Https://` da strippare.
 - [part2/next continuation orphans](part-continuation-orphans.md) — most unimported .partN/.next files are intentional empty stubs OR stale duplicates; verify (incl. require()) before linking, often delete not link.
 - [zavarrina→zavorrina rename](zavorrina-rename.md) — rename globale completato in 57 file; SQL già corretto, solo nomi TS ORM/DTO allineati; typecheck EXIT:0.
