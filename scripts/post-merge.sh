@@ -296,6 +296,23 @@ if [ "$RNAV_EXIT" -ne 0 ]; then
   exit "$RNAV_EXIT"
 fi
 
+# ── GATE router IN useEffect DEPS (loop "Maximum update depth exceeded") ────
+# router di expo-router è un nuovo oggetto ad ogni render.
+# Se messo nei deps di useEffect che chiama router.replace/push, il ciclo:
+# replace → re-render → nuovo router → effect ri-scatta → loop infinito.
+# Fix: routerRef+didRedirectRef (vedi .agents/memory/router-in-useEffect-deps.md).
+echo "════════════════════════════════════════"
+echo "  Gate router in useEffect deps"
+echo "════════════════════════════════════════"
+ROUTER_EFFECT_EXIT=0
+bash scripts/check-router-in-effect-deps.sh || ROUTER_EFFECT_EXIT=$?
+echo "════════════════════════════════════════"
+echo ""
+if [ "$ROUTER_EFFECT_EXIT" -ne 0 ]; then
+  echo "❌ Gate router-in-effect-deps fallito — correggere prima di procedere."
+  exit "$ROUTER_EFFECT_EXIT"
+fi
+
 # ── GATE useQuery DEFAULT INSTABILI IN useEffect DEPS ─────────
 # Default inline = [] o = {} in useQuery creano un nuovo riferimento
 # array/oggetto ad ogni render quando data è undefined (loading).
