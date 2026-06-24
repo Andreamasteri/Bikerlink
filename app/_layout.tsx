@@ -129,7 +129,12 @@ function StartupGate({ ready, children }: { ready: boolean; children: React.Reac
       sendStartupBeacon("startup_gate_open");
     }
   }, [ready]);
-  if (!ready) return null;
+  // NEVER return null: restituire null smonta lo Stack → Expo Router va su
+  // +not-found e non riesce più a tornare → loop "Maximum update depth" →
+  // crash immediato, specialmente su fresh install dove il token non è in
+  // cache e `ready` resta false più a lungo. Lo SplashScreen nasconde la UI
+  // finché useAppBootstrap non chiama hideAsync(). Stessa fix già applicata
+  // a MapReadyGate.
   return <>{children}</>;
 }
 
@@ -235,6 +240,7 @@ function reportClientError(error: Error, componentStack: string) {
 
 export default function RootLayout() {
   const { ready, tokenReady } = useAppBootstrap();
+  const { renderKey } = useLanguage();
   useOtaAutoUpdate(tokenReady);
   usePostUpdateRefresh();
 
@@ -288,7 +294,7 @@ export default function RootLayout() {
           <OfflineBanner />
           <BackgroundNotificationHandler />
           <PushTokenRegistrar />
-          <View style={{ flex: 1 }} pointerEvents="box-none" key={useLanguage().renderKey}>
+          <View style={{ flex: 1 }} pointerEvents="box-none" key={renderKey}>
             <RootLayoutNav />
           </View>
           <MatchPopupAlert />
