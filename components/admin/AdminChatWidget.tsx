@@ -6,11 +6,13 @@
 //
 // Mostra il provider AI usato (Groq/Gemini/Ollama…) + costo stimato per risposta
 // e un pulsante "Nuova conversazione" per azzerare il contesto in-sessione.
-import React, { useCallback, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import Colors from "@/constants/colors";
 import { streamAssistantMessage } from "@/lib/ai-assistant/sse-client";
+import { useAuth } from "@/lib/auth-context";
 
 interface ChatMsg {
   id: string;
@@ -18,6 +20,14 @@ interface ChatMsg {
   content: string;
   provider?: string;
   costUsd?: number;
+}
+
+// Persistenza locale (AsyncStorage) della conversazione, keyed per admin.
+// La chat sopravvive a navigazione/refresh; nessuna persistenza server-side.
+const STORAGE_PREFIX = "admin_ai_chat_v1:";
+
+function storageKey(userId: string | undefined): string {
+  return STORAGE_PREFIX + (userId ?? "anon");
 }
 
 function genId(): string {
@@ -43,11 +53,60 @@ function costLabel(costUsd: number | undefined): string {
 }
 
 export default function AdminChatWidget() {
+  const { user } = useAuth();
+  const userId = user?.id;
   const [expanded, setExpanded] = useState(false);
   const [messages, setMessages] = useState<ChatMsg[]>([]);
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
+  // Evita di salvare prima che il caricamento iniziale abbia popolato lo stato,
+  // altrimenti l'array vuoto sovrascriverebbe la conversazione persistita.
+  const hydratedRef = useRef(false);
+
+  // Carica la conversazione persistita all'avvio (e quando cambia l'admin).
+  // Finché l'admin autenticato non è noto NON si idrata né si persiste:
+  // evita un bucket "anon" condiviso e residui di chat sbagliata.
+  useEffect(() => {
+    let cancelled = false;
+    hydratedRef.current = false;
+    // Reset visivo al cambio admin; verrà ripopolato dallo storage del nuovo admin.
+    setMessages([]);
+    if (!userId) {
+      return () => {
+        cancelled = true;
+      };
+    }
+    (async () => {
+      try {
+        const raw = await AsyncStorage.getItem(storageKey(userId));
+        if (cancelled || !raw) return;
+        const parsed = JSON.parse(raw) as ChatMsg[];
+        // Non sovrascrivere se l'utente ha già iniziato a scrivere durante l'idratazione.
+        if (Array.isArray(parsed)) setMessages((prev) => (prev.length > 0 ? prev : parsed));
+      } catch {
+        // storage corrotto: si parte da conversazione vuota
+      } finally {
+        if (!cancelled) hydratedRef.current = true;
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [userId]);
+
+  // Persiste la conversazione (dopo l'idratazione, solo con admin noto).
+  // Durante lo streaming si evitano le scritture per ogni delta: si salva
+  // quando lo streaming termina.
+  useEffect(() => {
+    if (!hydratedRef.current || streaming || !userId) return;
+    const key = storageKey(userId);
+    if (messages.length === 0) {
+      AsyncStorage.removeItem(key).catch(() => {});
+    } else {
+      AsyncStorage.setItem(key, JSON.stringify(messages)).catch(() => {});
+    }
+  }, [messages, userId, streaming]);
 
   const send = useCallback(async () => {
     const text = input.trim();
