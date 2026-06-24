@@ -26,14 +26,21 @@ FAIL=0
 ok()  { echo "  [PASS] $1"; PASS=$((PASS + 1)); }
 nok() { echo "  [FAIL] $1"; FAIL=$((FAIL + 1)); }
 
+# Prefer the locally-installed tsx binary (fast, offline) and fall back to npx.
+if [ -x "$PROJECT_ROOT/node_modules/.bin/tsx" ]; then
+  TSX="$PROJECT_ROOT/node_modules/.bin/tsx"
+else
+  TSX="npx --yes tsx"
+fi
+
 # Run the fixer (--apply) from within the temp dir.
 run_fixer() {
-  (cd "$TMP" && npx --yes tsx "$FIXER" --apply 2>&1) || true
+  (cd "$TMP" && $TSX "$FIXER" --apply 2>&1) || true
 }
 
 # Run the fixer in dry-run mode (no --apply) and capture its stdout.
 run_fixer_dryrun() {
-  (cd "$TMP" && npx --yes tsx "$FIXER" 2>&1) || true
+  (cd "$TMP" && $TSX "$FIXER" 2>&1) || true
 }
 
 # Check that a DEPS-INTERIOR line (leading whitespace + expr) matching the
@@ -500,6 +507,200 @@ if [ "$GATE_RESULT" = "OK" ]; then
 else
   nok "gate↔fixer DISACCORDO: gate trova ancora violazioni dopo il fix:"
   echo "$GATE_RESULT" | sed 's/^/    /'
+fi
+
+# ── Test 10: inference of a SOLE bare [] / {} dep from the callback body ───────
+echo ""
+echo "── Test 10: inferenza dep da corpo callback quando il literal nudo è l'unico elemento"
+cat > "$TMP/fixture_infer.tsx" << 'EOF'
+import { useMemo } from 'react';
+
+const Component = ({ data, items, count, props }: any) => {
+  // single-line: ?? capture
+  const m1 = useMemo(() => data ?? [], [[]]);
+  // single-line: single free identifier (no ??)
+  const m2 = useMemo(() => items.filter((x: any) => x.active), [[]]);
+  // single-line: member expression via ??
+  const m3 = useMemo(() => props.data ?? [], [[]]);
+  // single-line: bare {} with ??
+  const m4 = useMemo(() => count ?? {}, [{}]);
+  return null;
+};
+EOF
+
+run_fixer
+# m1 -> [data]
+if grep -q 'data ?? \[\], \[data\]' "$TMP/fixture_infer.tsx"; then
+  ok "infer m1: bare [] sostituito con [data] (?? capture)"
+else
+  nok "infer m1: atteso [data], non trovato"
+fi
+# m2 -> [items]  (single free identifier; `any` type keyword ignored)
+if grep -q 'x.active), \[items\]' "$TMP/fixture_infer.tsx"; then
+  ok "infer m2: bare [] sostituito con [items] (identificatore singolo)"
+else
+  nok "infer m2: atteso [items], non trovato"
+fi
+# m3 -> [props.data]
+if grep -q 'props.data ?? \[\], \[props.data\]' "$TMP/fixture_infer.tsx"; then
+  ok "infer m3: bare [] sostituito con [props.data] (member expr)"
+else
+  nok "infer m3: atteso [props.data], non trovato"
+fi
+# m4 -> [count]
+if grep -q 'count ?? {}, \[count\]' "$TMP/fixture_infer.tsx"; then
+  ok "infer m4: bare {} sostituito con [count]"
+else
+  nok "infer m4: atteso [count], non trovato"
+fi
+
+# ── Test 11: ambiguous / empty body -> manual fallback (no auto-fix) ───────────
+echo ""
+echo "── Test 11: ambiguità o corpo vuoto → fallback manuale (nessun auto-fix)"
+cat > "$TMP/fixture_manual.tsx" << 'EOF'
+import { useMemo } from 'react';
+
+const Component = ({ a, b }: any) => {
+  // two candidates -> ambiguous
+  const amb = useMemo(() => a + b, [[]]);
+  // empty body -> nothing to infer
+  const empty = useMemo(() => [], [[]]);
+  return null;
+};
+EOF
+
+OUT_MANUAL="$(run_fixer_dryrun)"
+# The bare [[]] must remain untouched (still present, no inference applied).
+if grep -q 'a + b, \[\[\]\]' "$TMP/fixture_manual.tsx"; then
+  ok "manual amb: bare [[]] preservato (nessun auto-fix su ambiguità)"
+else
+  nok "manual amb: bare [[]] modificato per errore"
+fi
+if grep -q '() => \[\], \[\[\]\]' "$TMP/fixture_manual.tsx"; then
+  ok "manual empty: bare [[]] preservato (corpo vuoto, nessuna inferenza)"
+else
+  nok "manual empty: bare [[]] modificato per errore"
+fi
+if echo "$OUT_MANUAL" | grep -q "FIX MANUALE RICHIESTO"; then
+  ok "manual: il fixer segnala 'FIX MANUALE RICHIESTO' per i casi ambigui/vuoti"
+else
+  nok "manual: nessun avviso 'FIX MANUALE RICHIESTO' emesso"
+fi
+
+# ── Test 12: multi-line sole-bare inference (Mode C) ──────────────────────────
+echo ""
+echo "── Test 12: inferenza dep su literal nudo unico in deps multi-linea (Mode C)"
+cat > "$TMP/fixture_infer_ml.tsx" << 'EOF'
+import { useMemo } from 'react';
+
+const Component = ({ data, items }: any) => {
+  const c1 = useMemo(() => data ?? [], [
+    [],
+  ]);
+  const c3 = useMemo(() => {
+    return items ?? [];
+  }, [
+    [],
+  ]);
+  return null;
+};
+EOF
+
+run_fixer
+assert_dep_present "$TMP/fixture_infer_ml.tsx" 'data'  "ML infer c1 -> data"
+assert_dep_present "$TMP/fixture_infer_ml.tsx" 'items' "ML infer c3 -> items"
+# The bare interior "[]," lines must be gone.
+if grep -qE '^\s+\[\],' "$TMP/fixture_infer_ml.tsx"; then
+  nok "ML infer: una riga interior '[]' nuda è ancora presente"
+else
+  ok "ML infer: nessuna riga interior '[]' nuda residua"
+fi
+
+# ── Test 13: false-positive guards — literals & object keys stay manual ───────
+echo ""
+echo "── Test 13: nessuna inferenza da stringhe/template/chiavi-oggetto (no falsi positivi)"
+cat > "$TMP/fixture_falsepos.tsx" << 'EOF'
+import { useMemo } from 'react';
+
+const Component = ({ data, key }: any) => {
+  // string literal body -> no real identifier
+  const s1 = useMemo(() => "abc", [[]]);
+  // template literal body
+  const s2 = useMemo(() => `hello world`, [[]]);
+  // string that even contains "?? []" text
+  const s3 = useMemo(() => "data ?? []", [[]]);
+  // object-literal return with property keys
+  const o1 = useMemo(() => ({ foo: 1, bar: 2 }), [[]]);
+  // shorthand prop references a REAL variable -> should infer
+  const sh = useMemo(() => ({ data }), [[]]);
+  // computed key references a REAL variable -> should infer
+  const ck = useMemo(() => ({ [key]: 1 }), [[]]);
+  return null;
+};
+EOF
+
+run_fixer
+# Literals / object keys must remain bare (manual) — never auto-fixed.
+for varname in s1 s2 s3 o1; do
+  if grep -qE "const ${varname} = useMemo\(.*\[\[\]\]\)" "$TMP/fixture_falsepos.tsx"; then
+    ok "falsepos ${varname}: bare [[]] preservato (nessuna inferenza da literal/object-key)"
+  else
+    nok "falsepos ${varname}: bare [[]] modificato per errore (falso positivo)"
+  fi
+done
+# Shorthand prop and computed key ARE real references -> must be inferred.
+if grep -q '({ data }), \[data\]' "$TMP/fixture_falsepos.tsx"; then
+  ok "falsepos sh: shorthand prop { data } correttamente inferito -> [data]"
+else
+  nok "falsepos sh: shorthand prop non inferito (atteso [data])"
+fi
+if grep -q '({ \[key\]: 1 }), \[key\]' "$TMP/fixture_falsepos.tsx"; then
+  ok "falsepos ck: computed key [key] correttamente inferito -> [key]"
+else
+  nok "falsepos ck: computed key non inferito (atteso [key])"
+fi
+
+# ── Test 14: local declarations are NOT valid deps (no false positives) ───────
+echo ""
+echo "── Test 14: variabili locali della callback non sono dipendenze (no falsi positivi)"
+cat > "$TMP/fixture_locals.tsx" << 'EOF'
+import { useMemo } from 'react';
+
+const Component = ({ data }: any) => {
+  // pure local -> manual
+  const l1 = useMemo(() => { const x = 1; return x; }, [[]]);
+  // local function declaration -> manual
+  const l4 = useMemo(() => { function helper() { return 1; } return helper(); }, [[]]);
+  // local x but initializer references outer `data` -> infer data
+  const l5 = useMemo(() => { const x = data; return x; }, [[]]);
+  // destructured locals, outer ref in initializer -> infer base identifier `data`
+  const l2 = useMemo(() => { const { a, b } = data; return a + b; }, [[]]);
+  return null;
+};
+EOF
+
+run_fixer
+# Pure-local cases must stay bare (manual).
+if grep -q 'const x = 1; return x; }, \[\[\]\]' "$TMP/fixture_locals.tsx"; then
+  ok "locals l1: variabile locale non inferita (manuale)"
+else
+  nok "locals l1: variabile locale inferita per errore"
+fi
+if grep -q 'return helper(); }, \[\[\]\]' "$TMP/fixture_locals.tsx"; then
+  ok "locals l4: funzione locale non inferita (manuale)"
+else
+  nok "locals l4: funzione locale inferita per errore"
+fi
+# Outer ref used in initializer must still be inferred.
+if grep -q 'const x = data; return x; }, \[data\]' "$TMP/fixture_locals.tsx"; then
+  ok "locals l5: ref esterna (data) nell'initializer correttamente inferita"
+else
+  nok "locals l5: ref esterna nell'initializer non inferita (atteso [data])"
+fi
+if grep -q '} = data; return a + b; }, \[data\]' "$TMP/fixture_locals.tsx"; then
+  ok "locals l2: ref esterna (data) inferita, locali destrutturati esclusi"
+else
+  nok "locals l2: inferenza errata con destructuring locale"
 fi
 
 # ── Summary ───────────────────────────────────────────────────────────────────
