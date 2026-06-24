@@ -42,3 +42,34 @@ export async function resolveBackgroundPermission(
   if (bg.status === "granted") return "granted";
   return bg.canAskAgain ? "denied" : "needsSettings";
 }
+
+/**
+ * Logica pura del ciclo di revoca del permesso background.
+ *
+ * Rispecchia esattamente la logica di `checkBackgroundPermission` nel provider:
+ *   - se il permesso era stato concesso (hadPermission=true) e ora NON lo è → revoked=true
+ *   - se il permesso è ancora concesso → revoked=false, nextHadPermission=true
+ *   - se il permesso non era mai stato concesso → revoked=false (invariato)
+ *
+ * Restituisce il nuovo stato (immutabile) senza dipendere da useState/useRef,
+ * così può essere testata senza montare nessun componente React.
+ */
+export interface BackgroundRevocationResult {
+  granted: boolean;
+  revoked: boolean;
+  nextHadPermission: boolean;
+}
+
+export function evaluateBackgroundRevocation(
+  status: string,
+  hadPermission: boolean,
+): BackgroundRevocationResult {
+  const granted = status === "granted";
+  if (hadPermission && !granted) {
+    return { granted, revoked: true, nextHadPermission: hadPermission };
+  }
+  if (granted) {
+    return { granted, revoked: false, nextHadPermission: true };
+  }
+  return { granted, revoked: false, nextHadPermission: hadPermission };
+}

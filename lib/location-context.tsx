@@ -4,7 +4,8 @@ import { useQuery } from "@tanstack/react-query";
 import { sendStartupBeacon } from "@/lib/startup-beacon";
 import { markAsyncError } from "@/lib/crash-logger";
 import { withTimeout } from "@/lib/resume-utils";
-import { resolveBackgroundPermission } from "@/lib/location-permission";
+import * as ExpoLocation from "expo-location";
+import { resolveBackgroundPermission, evaluateBackgroundRevocation } from "@/lib/location-permission";
 
 // GPS flood = ricezione anomala di fix mentre l'utente è fermo (sintomo di un
 // loop di watch impazzito che può saturare il JS thread). Finestra scorrevole di
@@ -20,13 +21,7 @@ const GPS_FLOOD_COOLDOWN_MS = 30000;
 // bridge rejects into the existing catch instead of hanging the resume sequence.
 const PERMISSION_CHECK_TIMEOUT_MS = 5000;
 
-let _expoLocation: typeof import("expo-location") | null = null;
-function loc(): typeof import("expo-location") {
-  if (_expoLocation === null) {
-    _expoLocation = require("expo-location") as typeof import("expo-location");
-  }
-  return _expoLocation!;
-}
+export const BG_PERMISSION_CHECK_INTERVAL = 30000;
 
 export interface SharedPosition {
   latitude: number;
@@ -81,7 +76,6 @@ export function useLocationGate() {
 }
 
 const GPS_CHECK_INTERVAL = 4000;
-const BG_PERMISSION_CHECK_INTERVAL = 30000;
 
 export function LocationProvider({ children }: { children: React.ReactNode }) {
   const [hasPermission, setHasPermission] = useState(true);
@@ -97,7 +91,7 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
 
   const appState = useRef(AppState.currentState);
   const hadBackgroundPermissionRef = useRef(false);
-  const sharedWatchRef = useRef<import("expo-location").LocationSubscription | null>(null);
+  const sharedWatchRef = useRef<ExpoLocation.LocationSubscription | null>(null);
   const suspendedRef = useRef(false);
   const gpsFixTimestampsRef = useRef<number[]>([]);
   // Cooldown anti-auto-flood: una volta rilevato un gps_flood, non rilogghiamo per
@@ -114,7 +108,7 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
   const checkPermission = useCallback(async () => {
     try {
       const { status } = await withTimeout(
-        loc().getForegroundPermissionsAsync(),
+        ExpoLocation.getForegroundPermissionsAsync(),
         PERMISSION_CHECK_TIMEOUT_MS,
         "getForegroundPermissions",
       );
@@ -131,17 +125,19 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
   const checkBackgroundPermission = useCallback(async () => {
     try {
       const { status } = await withTimeout(
-        loc().getBackgroundPermissionsAsync(),
+        ExpoLocation.getBackgroundPermissionsAsync(),
         PERMISSION_CHECK_TIMEOUT_MS,
         "getBackgroundPermissions",
       );
-      const granted = status === "granted";
+      const { granted, revoked, nextHadPermission } = evaluateBackgroundRevocation(
+        status,
+        hadBackgroundPermissionRef.current,
+      );
       setHasBackgroundPermission(granted);
-
-      if (hadBackgroundPermissionRef.current && !granted) {
+      hadBackgroundPermissionRef.current = nextHadPermission;
+      if (revoked) {
         setBackgroundPermissionRevoked(true);
       } else if (granted) {
-        hadBackgroundPermissionRef.current = true;
         setBackgroundPermissionRevoked(false);
       }
     } catch {
@@ -153,7 +149,7 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
 
   const requestPermission = useCallback(async (): Promise<boolean> => {
     try {
-      const { status } = await loc().requestForegroundPermissionsAsync();
+      const { status } = await ExpoLocation.requestForegroundPermissionsAsync();
       const granted = status === "granted";
       setHasPermission(granted);
       setPermissionDenied(status === "denied");
@@ -170,16 +166,16 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
   const requestBackgroundPermission = useCallback(async (): Promise<BackgroundPermissionResult> => {
     try {
       const result = await resolveBackgroundPermission(
-        () => loc().getForegroundPermissionsAsync(),
+        () => ExpoLocation.getForegroundPermissionsAsync(),
         async () => {
-          const fg = await loc().requestForegroundPermissionsAsync();
+          const fg = await ExpoLocation.requestForegroundPermissionsAsync();
           setHasPermission(fg.status === "granted");
           setPermissionDenied(fg.status === "denied");
           setPermissionPrompt(fg.status === "undetermined");
           return fg;
         },
         async () => {
-          const bg = await loc().requestBackgroundPermissionsAsync();
+          const bg = await ExpoLocation.requestBackgroundPermissionsAsync();
           const granted = bg.status === "granted";
           setHasBackgroundPermission(granted);
           if (granted) {
@@ -199,14 +195,14 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
     if (sharedWatchRef.current) return;
     if (suspendedRef.current) return;
     try {
-      const { status } = await loc().getForegroundPermissionsAsync();
+      const { status } = await ExpoLocation.getForegroundPermissionsAsync();
       if (status !== "granted") {
         setPositionLoading(false);
         return;
       }
-      sharedWatchRef.current = await loc().watchPositionAsync(
+      sharedWatchRef.current = await ExpoLocation.watchPositionAsync(
         {
-          accuracy: loc().Accuracy.Balanced,
+          accuracy: ExpoLocation.Accuracy.Balanced,
           timeInterval: 5000,
           distanceInterval: 10,
         },

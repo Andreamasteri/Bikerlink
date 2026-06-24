@@ -644,6 +644,27 @@ fi
 echo "════════════════════════════════════════"
 echo ""
 
+# ── GATE TEST REVOCA PERMESSO BACKGROUND ─────────────────────────────────────
+# Blocca regressioni su checkBackgroundPermission e evaluateBackgroundRevocation:
+# verifica la logica pura di revoca, l'infrastruttura di polling (setInterval),
+# il comportamento del provider sul contesto React e il listener AppState reale.
+echo "════════════════════════════════════════"
+echo "  Gate test revoca permesso background"
+echo "════════════════════════════════════════"
+BG_PERM_TEST_EXIT=0
+npx vitest run lib/__tests__/background-permission-revocation.test.ts 2>&1 || BG_PERM_TEST_EXIT=$?
+if [ "$BG_PERM_TEST_EXIT" -eq 0 ]; then
+  echo "✅ Background-permission tests: revoca + polling + AppState OK."
+else
+  echo "❌ Background-permission tests FALLITI (exit ${BG_PERM_TEST_EXIT}) — regressione in checkBackgroundPermission."
+  echo "   Eseguire 'npx vitest run lib/__tests__/background-permission-revocation.test.ts' localmente."
+  echo "════════════════════════════════════════"
+  echo ""
+  exit "$BG_PERM_TEST_EXIT"
+fi
+echo "════════════════════════════════════════"
+echo ""
+
 # ── GATE TEST HOOK AVVIO (useAppBootstrap / useOtaAutoUpdate) ────────────────
 # Blocca regressioni sui timeout di cold-start e OTA update: qualsiasi modifica
 # agli hook di avvio (useAppBootstrap, useOtaAutoUpdate) viene verificata prima
