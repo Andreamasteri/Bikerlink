@@ -208,7 +208,10 @@ while IFS= read -r _hfile; do
   scan_helper_export "$_hfile" '"BROKEN_FIXTURE"' '"BROKEN_FIXTURE" — export da helper'
   scan_helper_export "$_hfile" "'BROKEN_FIXTURE'" "'BROKEN_FIXTURE' — export da helper"
 
-done < <(find "$HELPERS_DIR" -maxdepth 1 -type f -name '*.ts' ! -name '*.tsx' 2>/dev/null)
+# Nessun -maxdepth: ricerca ricorsiva in helpers/ e tutte le sottocartelle
+# (es. helpers/streams/, helpers/factories/), così i file nidificati non
+# sfuggono al gate.  Il controllo si ferma comunque solo su .ts, non .tsx.
+done < <(find "$HELPERS_DIR" -type f -name '*.ts' ! -name '*.tsx' 2>/dev/null)
 
 if [ ${#HELPER_EXPORT_VIOLATIONS[@]} -gt 0 ]; then
   echo ""

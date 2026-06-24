@@ -42,8 +42,8 @@ blocca:
 1. **Stringhe broken inline** nei file di test (qualunque `.ts` sotto
    `server/__tests__/`, escluso `route-fixtures.ts`).
 2. **Export di broken strings da altri file helper** — qualunque file in
-   `server/__tests__/helpers/` diverso da `route-fixtures.ts` che esporti
-   pattern broken viene rifiutato.
+   `server/__tests__/helpers/` (incluse le sottocartelle, es. `helpers/streams/`)
+   diverso da `route-fixtures.ts` che esporti pattern broken viene rifiutato.
 
 Per sopprimere un'occorrenza intenzionale, aggiungere sulla riga precedente:
 
