@@ -27,6 +27,12 @@
 #     dep2 ?? [],
 #     dep3,
 #   ])
+#   useMemo(() => {                                ← callback a blocco multi-riga,
+#     return something;                               deps aperto sulla stessa riga
+#   }, [                                             di chiusura del blocco (Mode C3)
+#     dep1,
+#     dep2 ?? [],
+#   ])
 #
 # Soppressione per falsi positivi verificati:
 #   Aggiungere il commento nel file: // check-inline-default-memo-deps: safe
@@ -60,6 +66,12 @@ RE_HOOK_OPEN = re.compile(r'\b(useMemo|useCallback)\s*\(')
 # Mode C: line ends with ",  [" (with optional trailing whitespace/comment) →
 # the deps array opens here but does NOT close on the same line.
 RE_DEPS_OPEN_C1 = re.compile(r',\s*\[\s*(?://[^\n]*)?\s*$')
+
+# Mode C3: block-body callback closes on the same line as the deps opener.
+# Example: "  }, [" or "  },  [  // comment"
+# The closing "}" belongs to the callback body; useMemo/useCallback is on an
+# earlier line, so RE_HOOK_OPEN does NOT match this line (ruling out C1).
+RE_DEPS_OPEN_C3 = re.compile(r'\}\s*,?\s*\[\s*(?://[^\n]*)?\s*$')
 
 # Mode C: [] or {} that is NOT immediately preceded by a word character.
 # The (?<!\w) lookbehind excludes `string[]`, `number[]`, `MyType[]` (and
@@ -224,7 +236,24 @@ for root, dirs, files in os.walk('.'):
                                     is_c2 = True
                                     break
 
-            if not (is_c1 or is_c2):
+            # Mode C3: "}, [" pattern — block-body callback whose closing brace
+            # and deps bracket are on the same line, but the hook name is on an
+            # earlier line.  Example:
+            #   useMemo(() => {
+            #     return something;
+            #   }, [          ← matches RE_DEPS_OPEN_C3, no hook on this line
+            #     dep1,
+            #     dep2 ?? [], ← interior violation
+            #   ])
+            is_c3 = False
+            if not is_c1 and not is_c2:
+                if RE_DEPS_OPEN_C3.search(cl) and not RE_HOOK_OPEN.search(cl):
+                    for bj in range(ci - 1, max(-1, ci - 81), -1):
+                        if RE_HOOK_OPEN.search(lines[bj]):
+                            is_c3 = True
+                            break
+
+            if not (is_c1 or is_c2 or is_c3):
                 ci += 1
                 continue
 
