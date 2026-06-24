@@ -7,7 +7,7 @@ import NativeUpdateChecker from "@/components/NativeUpdateChecker";
 import MatchPopupAlert from "@/components/MatchPopupAlert";
 import UpdateNudgeModal from "@/components/UpdateNudgeModal";
 import { useUpdateCheck } from "@/hooks/useUpdateCheck";
-import AlwaysPermissionNotice from "@/components/AlwaysPermissionNotice";
+import { GpsAlwaysGate } from "@/components/GpsAlwaysGate";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Updates from "expo-updates";
 import { useAuth } from "@/lib/auth-context";
@@ -21,9 +21,6 @@ import FloatingWidget from "@/components/FloatingWidget";
 import { sendStartupBeacon } from "@/lib/startup-beacon";
 import { MapReadyGate } from "@/components/layout/MapReadyGate";
 import { useMapConfig } from "@/lib/map-context";
-import {
-  stopBackgroundLocationTask,
-} from "@/lib/background-location-task";
 // Side-effect import: registers the TASK_TELEMETRY background task with expo-task-manager
 // so it is available before any component mounts.
 import "@/lib/background-telemetry-task";
@@ -57,46 +54,9 @@ function DeviceMetricsReporter({ tokenReady }: { tokenReady: boolean }) {
   return null;
 }
 
-function GpsAlwaysGate({ isAuthenticated }: { isAuthenticated: boolean }) {
-  const { hasBackgroundPermission, backgroundPermissionChecked, backgroundPermissionRevoked } = useLocationGate();
-  const [dismissed, setDismissed] = useState(false);
-
-  if (!isAuthenticated || !backgroundPermissionChecked || hasBackgroundPermission) return null;
-  if (!dismissed) return <AlwaysPermissionNotice onDismiss={() => setDismissed(true)} />;
-  if (backgroundPermissionRevoked) return <BackgroundRevocationBanner />;
-  return null;
-}
-
 function GpsAlwaysGateWrapper() {
   const { user } = useAuth();
   return <GpsAlwaysGate key={user?.id ?? "logged-out"} isAuthenticated={!!user} />;
-}
-
-function BackgroundRevocationBanner() {
-  const { backgroundPermissionRevoked } = useLocationGate();
-  const { colors } = useTheme();
-  const insets = useSafeAreaInsets();
-
-  useEffect(() => {
-    if (backgroundPermissionRevoked) {
-      stopBackgroundLocationTask().catch(() => {});
-    }
-  }, [backgroundPermissionRevoked]);
-
-  if (!backgroundPermissionRevoked) return null;
-
-  return (
-    <View
-      style={[
-        revocationBannerStyles.banner,
-        { top: insets.top, backgroundColor: colors.accent },
-      ]}
-    >
-      <Text style={revocationBannerStyles.text}>
-        Posizione in background disattivata — vai in Impostazioni {">"} Permessi {">"} Sempre
-      </Text>
-    </View>
-  );
 }
 
 function PermissionGrantBeacon() {
