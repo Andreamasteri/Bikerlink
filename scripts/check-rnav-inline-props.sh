@@ -51,6 +51,8 @@ check_pattern_multiline() {
   fi
 }
 
+# ── Funzioni inline nelle prop di navigazione ─────────────────────────────────
+
 # tabBarIcon inline: tabBarIcon: ({ color, size, focused }) => ...
 check_pattern 'tabBarIcon:\s*\(\{' \
   "tabBarIcon con funzione arrow inline → usare useMemo sul componente parent (vedi rnav-memo-guard)"
@@ -62,6 +64,10 @@ check_pattern 'headerLeft:\s*\(\)\s*=>' \
 # headerRight inline (senza params): headerRight: () =>
 check_pattern 'headerRight:\s*\(\)\s*=>' \
   "headerRight con funzione arrow inline → usare useCallback (vedi rnav-memo-guard)"
+
+# header prop inline (custom header component): header: () =>
+check_pattern 'header:\s*\(\)\s*=>' \
+  "header con funzione arrow inline → usare useCallback (vedi rnav-memo-guard)"
 
 # headerLeft inline (ternary, stessa riga): headerLeft: expr ? () =>
 check_pattern 'headerLeft:\s*\S[^\n]*\?\s*\(\)\s*=>' \
@@ -79,19 +85,61 @@ check_pattern_multiline 'header(Left|Right):[^\n]*\n\s*\?\s*\(\)\s*=>' \
 check_pattern 'tabBar=\{\s*\(' \
   "tabBar con funzione arrow inline → usare useCallback (vedi rnav-memo-guard)"
 
-# screenOptions={{...}} con oggetto annidato *Style:{} — causa loop useLayoutEffect
-# Pattern: screenOptions={{ ... xStyle: { ... } — rilevato via rg multiline
+# ── Oggetti options/screenOptions con nested Style inline ─────────────────────
+# Causa: React Navigation chiama useLayoutEffect→setOptions ad ogni render se
+# il riferimento all'oggetto cambia. Anche con valori identici, un nuovo {}
+# ha referenza diversa → loop infinito ("Maximum update depth exceeded").
+
+# screenOptions={{...}} con oggetto annidato *Style:{}
 check_pattern_multiline 'screenOptions=\{\{[^}]{0,300}\w+Style:\s*\{' \
   "screenOptions={{}} con nested object (xStyle:{}) → wrappare con useMemo (vedi rnav-memo-guard)"
 
-# Stack.Screen options={{...}} con oggetto annidato *Style:{} — stesso loop in screen individuali
-# Pattern: options={{ ... headerStyle/contentStyle: { ... }
+# Stack.Screen options={{...}} con oggetto annidato *Style:{}
 check_pattern_multiline '<Stack\.Screen[^>]{0,200}options=\{\{[^}]{0,300}\w+Style:\s*\{' \
   "Stack.Screen options={{}} con nested object (xStyle:{}) → usare useMemo o costante module-level"
 
-# eslint-disable rules-of-hooks nei file app/ — marcatore di hook dopo early return
-# Viola le Regole dei Hook → "Maximum update depth exceeded" in loop infinito.
-# Fix: spostare useMemo/useCallback PRIMA di qualsiasi early return con optional chaining.
+# Tabs.Screen options={{...}} con oggetto annidato *Style:{}
+# (specchio del check Stack.Screen — colpisce anche il tab bar layout)
+check_pattern_multiline '<Tabs\.Screen[^>]{0,200}options=\{\{[^}]{0,300}\w+Style:\s*\{' \
+  "Tabs.Screen options={{}} con nested object (xStyle:{}) → usare useMemo o costante module-level"
+
+# ── router direttamente in useEffect (redirect loop) ─────────────────────────
+# Pattern pericoloso: router.replace/push chiamato direttamente dentro useEffect
+# con [router] nelle deps. Se il replace triggera un re-render, router cambia
+# referenza → useEffect gira di nuovo → loop.
+# Fix sicuro: routerRef+didRedirectRef (router NON va nelle deps).
+# Vedi: .agents/memory/router-in-useEffect-deps.md
+#
+# Nota: questo check cattura anche useCallback([router]) che è VALIDO.
+# Se il check segnala un falso positivo in useCallback, aggiungere:
+#   # rnav-memo-guard-ok — useCallback è safe
+# alla riga del match per escluderla.
+ROUTER_USEEFFECT=$(rg -n 'useEffect\s*\(' \
+  --glob 'app/**/*.tsx' --glob 'app/**/*.ts' \
+  --glob '!node_modules/**' --glob '!.local/**' --glob '!.agents/**' \
+  -l 2>/dev/null || true)
+if [ -n "$ROUTER_USEEFFECT" ]; then
+  for f in $ROUTER_USEEFFECT; do
+    # In ogni file che ha useEffect, cerca [router] come unica dep di un useEffect
+    # (pattern: }, [router]) che chiude un hook — potenzialmente pericoloso)
+    MATCHES=$(rg -n '\},\s*\[router\]\s*\)' "$f" 2>/dev/null || true)
+    if [ -n "$MATCHES" ]; then
+      # Verifica che non sia già protetto da routerRef
+      if ! grep -q 'routerRef' "$f" 2>/dev/null; then
+        echo ""
+        echo "⚠️  ATTENZIONE — router in hook deps senza routerRef guard ($f)"
+        echo "$MATCHES"
+        echo "   → Se è in useEffect che fa redirect, rischio loop. Usare routerRef+didRedirectRef."
+        echo "   → Se è in useCallback (handler), è corretto — aggiungere '# rnav-memo-guard-ok' come commento."
+        FAIL=1
+      fi
+    fi
+  done
+fi
+
+# ── eslint-disable rules-of-hooks in app/ ────────────────────────────────────
+# Marcatore di hook dopo early return — viola le Regole dei Hook.
+# Fix: spostare useMemo/useCallback PRIMA di qualsiasi early return.
 HOOKS_VIOLATION=$(rg 'eslint-disable.*rules-of-hooks' \
   --glob 'app/**/*.tsx' --glob 'app/**/*.ts' \
   --glob '!node_modules/**' --glob '!.local/**' --glob '!.agents/**' \
@@ -106,8 +154,10 @@ fi
 if [ $FAIL -eq 1 ]; then
   echo ""
   echo "💥 check-rnav-inline-props FALLITO"
-  echo "   Wrappare le funzioni con useCallback, gli oggetti options con useMemo."
-  echo "   Spostare useMemo/useCallback PRIMA degli early return (if isLoading / if !data)."
+  echo "   Funzioni arrow inline → wrappare con useCallback."
+  echo "   Oggetti options inline con nested *Style → usare useMemo o costante module-level."
+  echo "   router in useEffect deps → usare routerRef+didRedirectRef (non mettere router nelle deps)."
+  echo "   Hook dopo early return → spostare useMemo/useCallback prima del return."
   echo "   Documentazione: .agents/skills/rnav-memo-guard/SKILL.md"
   exit 1
 else
