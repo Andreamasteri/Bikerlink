@@ -69,6 +69,10 @@ args = "Diagnostic Report"
 task = "workflow.run"
 args = "secrets-scan"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "check-ai-direct-generateobject"
+
   [[workflows.workflow]]
   name = "Start App"
   mode = "parallel"
@@ -187,6 +191,17 @@ author = "agent"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "bash scripts/ci-secrets-scan.sh"
+
+[workflows.workflow.metadata]
+isValidation = true
+
+[[workflows.workflow]]
+name = "check-ai-direct-generateobject"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "bash scripts/check-ai-direct-generateobject.sh"
 
 [workflows.workflow.metadata]
 isValidation = true
