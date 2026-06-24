@@ -201,7 +201,7 @@ export function useRoutingAreas() {
   });
 
   const mode = data?.mode ?? "disabled";
-  const areas = data?.areas ?? [];
+  const areas = useMemo(() => data?.areas ?? [], [data?.areas]);
 
   const metricByCode = useMemo(() => {
     const map = new Map<string, AreaMetric>();

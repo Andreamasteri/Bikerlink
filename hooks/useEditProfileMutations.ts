@@ -4,37 +4,6 @@ import { useRouter } from "expo-router";
 import { apiRequest, queryClient } from "@/lib/query-client";
 import { useT } from "@/lib/language-context";
 
-interface ProfileData {
-  id: string;
-  nickname: string;
-  email: string;
-  userType: string;
-  sex?: string;
-  coupleSexConfig?: string;
-  birthYear?: number;
-  region?: string;
-  country?: string;
-  avatarUrl?: string;
-  profile?: {
-    bio?: string;
-  };
-  photos?: Array<{
-    id: string;
-    photoUrl: string;
-    sortOrder: number;
-    isApproved: boolean;
-  }>;
-  motorcycles?: Array<{
-    id: string;
-    brand: string;
-    model: string;
-    year?: number;
-    displacement?: number;
-    motorcycleType?: string;
-    ridingStyle?: string;
-  }>;
-}
-
 export function useEditProfileMutations() {
   const t = useT();
   const router = useRouter();

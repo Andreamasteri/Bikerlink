@@ -521,7 +521,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const authFailed = storageChecked && userQuery.isError && !userQuery.data;
   const retryAuth = useCallback(() => {
     userQuery.refetch();
-  }, [userQuery.refetch]);
+  }, [userQuery]);
 
   const loginMutation = useLoginMutation();
   const registerMutation = useRegisterMutation();

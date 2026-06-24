@@ -57,12 +57,6 @@ interface ProfileQueryData {
   fixedPositionEnabled?: boolean;
 }
 
-interface ProposalItem {
-  userId?: string | number;
-  status?: string;
-  searchRadius?: number;
-  [key: string]: unknown;
-}
 export function useHomeMapState() {
   const router = useRouter();
   const routerRef = useRef(router);
@@ -173,7 +167,7 @@ export function useHomeMapState() {
     if (mapReady) return;
     const timer = setTimeout(() => setMapReady(true), 2000);
     return () => clearTimeout(timer);
-  }, [mapReady]);
+  }, [mapReady, setMapReady]);
 
   useFocusEffect(
     useCallback(() => {
@@ -240,7 +234,7 @@ export function useHomeMapState() {
       }
       setCountriesLoaded(true);
     })();
-  }, []);
+  }, [setCountriesLoaded, setSelectedCountries]);
 
   const { invalidateCountryQueries } = mapData;
   const saveCountries = useCallback(async (countries: string[]) => {
@@ -249,12 +243,12 @@ export function useHomeMapState() {
       // no-op: ignore storage write failures
     }
     invalidateCountryQueries();
-  }, [invalidateCountryQueries]);
+  }, [invalidateCountryQueries, setSelectedCountries]);
 
   const toggleCountryInModal = useCallback((code: string) => {
     if (code === "__world__") { setSelectedCountries([]); return; }
     setSelectedCountries((prev) => prev.includes(code) ? prev.filter((c) => c !== code) : [...prev, code]);
-  }, []);
+  }, [setSelectedCountries]);
 
   const toggleContinentInModal = useCallback((continentKey: string) => {
     const continent = CONTINENT_MAP.find((c) => c.key === continentKey);
@@ -265,11 +259,11 @@ export function useHomeMapState() {
       if (allSelected) return prev.filter((c) => !codes.includes(c));
       return [...prev, ...codes.filter((c) => !prev.includes(c))];
     });
-  }, []);
+  }, [setSelectedCountries]);
 
   const areaLabel = useMemo(() => getAreaLabel(selectedCountries), [selectedCountries]);
 
-  const startOfflineTimer = useCallback(() => { setOfflineCountdown({ online: 30 }); }, []);
+  const startOfflineTimer = useCallback(() => { setOfflineCountdown({ online: 30 }); }, [setOfflineCountdown]);
   const hasActiveCountdown = offlineCountdown.online > 0;
 
   useEffect(() => {
@@ -282,7 +276,7 @@ export function useHomeMapState() {
       });
     }, 1000);
     return () => clearInterval(interval);
-  }, [hasActiveCountdown]);
+  }, [hasActiveCountdown, setOfflineCountdown, setShowOfflineOnline]);
 
   const profileQData = mapData.profileQuery.data as ProfileQueryData | undefined;
   const isAvailable = profileQData?.isAvailable || false;
@@ -323,7 +317,7 @@ export function useHomeMapState() {
       setAdIndex((prev) => mode === "random" ? Math.floor(Math.random() * myAds.length) : (prev + 1) % myAds.length);
     }, duration);
     return () => clearInterval(timer);
-  }, [myAds]);
+  }, [myAds, setAdIndex]);
 
   const {
     handleUserPress,

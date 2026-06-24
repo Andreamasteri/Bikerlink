@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useState } from "react";
 import * as Speech from "expo-speech";
 import { haversineM } from "@/lib/geo";

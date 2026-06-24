@@ -29,6 +29,7 @@ async function saveQueueRaw(queue: OfflineQueueEntry[]): Promise<void> {
   try {
     await AsyncStorage.setItem(QUEUE_KEY, JSON.stringify(queue));
   } catch {
+    /* no-op */
   }
 }
 

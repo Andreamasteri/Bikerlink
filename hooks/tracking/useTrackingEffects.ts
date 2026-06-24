@@ -21,6 +21,7 @@ const IDLE_THRESHOLD_KMH = 2;
 const PENDING_POINTS_REQUEST_TIMEOUT_MS = 8_000;
 const PENDING_POINTS_BUDGET_MS = 15_000;
 
+/* eslint-disable @typescript-eslint/no-explicit-any */
 interface EffectDeps {
   t: (key: string) => string;
   gps: any;
@@ -143,7 +144,7 @@ export function useOnNativeLocation(deps: Omit<EffectDeps, "onNativeLocation" | 
       // timeout. A subsequent clean fix re-arms lastUsableFixMs and restores
       // gps_sensors. Routed through logGpsError (same pipeline flushPoints uses)
       // with a recognizable tag so it stays visible in diagnostics.
-      try { gps.lastUsableFixMsRef.current = 0; } catch {}
+      try { gps.lastUsableFixMsRef.current = 0; } catch { /* no-op */ }
       logGpsError(e, "tracking_gps_fix");
     }
   };

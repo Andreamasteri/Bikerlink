@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import React from "react";
 import { Alert } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -52,12 +53,12 @@ export const usePlayerActions = (
     wasInterruptedRef.current = false;
     if (recoveryTimeoutRef.current) { clearTimeout(recoveryTimeoutRef.current); recoveryTimeoutRef.current = null; }
     try { playerRef.current?.play(); } catch (err) { console.warn("[Player] play error:", err); }
-  }, []);
+  }, [playerRef, recoveryTimeoutRef, userPausedRef, wasInterruptedRef]);
 
   const pause = React.useCallback(() => {
     userPausedRef.current = true;
     try { playerRef.current?.pause(); } catch (err) { console.warn("[Player] pause error:", err); }
-  }, []);
+  }, [playerRef, userPausedRef]);
 
   const togglePlay = React.useCallback(() => {
     if (isPlayingRef.current) pause(); else play();
@@ -83,19 +84,19 @@ export const usePlayerActions = (
     setIsPlaying(false);
     setPosition(0);
     setDuration(0);
-  }, [destroyPlayer]);
+  }, [destroyPlayer, loadGenRef, recoveryTimeoutRef, setCurrentTrack, setDuration, setIsPlaying, setPosition, setQueue, setSleepTimerEnd, setSleepTimerMinutes, sleepTimerRef, userPausedRef, wasInterruptedRef]);
 
   const playTrack = React.useCallback(async (track: PlayerTrack) => {
     setQueue([track]);
     await loadAndPlay(track, 0);
-  }, [loadAndPlay]);
+  }, [loadAndPlay, setQueue]);
 
   const playQueue = React.useCallback(async (tracks: PlayerTrack[], startIndex = 0) => {
     if (tracks.length === 0) return;
     shuffleHistoryRef.current = new Set();
     setQueue(tracks);
     await loadAndPlay(tracks[startIndex], startIndex);
-  }, [loadAndPlay]);
+  }, [loadAndPlay, setQueue, shuffleHistoryRef]);
 
   const playRadioStation = React.useCallback(async (station: RadioStation, genreId?: string) => {
     if (!station.streamUrl) {
@@ -113,7 +114,7 @@ export const usePlayerActions = (
     setQueue([track]);
     await loadAndPlay(track, 0);
     if (genreId) setSelectedGenre(genreId);
-  }, [loadAndPlay, toProxyUrl]);
+  }, [loadAndPlay, toProxyUrl, setQueue, setSelectedGenre]);
 
   const next = React.useCallback(async () => {
     const q = queueRef.current;
@@ -133,11 +134,11 @@ export const usePlayerActions = (
     if (q.length <= 1) return;
     const prevIdx = idx === 0 ? q.length - 1 : idx - 1;
     await loadAndPlay(q[prevIdx], prevIdx);
-  }, [loadAndPlay, position, queueRef, queueIndexRef]);
+  }, [loadAndPlay, position, queueRef, queueIndexRef, playerRef]);
 
   const seekTo = React.useCallback(async (pos: number) => {
     try { await playerRef.current?.seekTo(pos); } catch (err) { console.warn("[Player] seekTo error:", err); }
-  }, []);
+  }, [playerRef]);
 
   const setSleepTimer = React.useCallback((minutes: number | null) => {
     setSleepTimerMinutes(minutes);
@@ -147,7 +148,7 @@ export const usePlayerActions = (
       setSleepTimerEnd(Date.now() + minutes * 60 * 1000);
     }
     AsyncStorage.setItem(SLEEP_KEY, JSON.stringify(minutes)).catch((err) => { console.warn("[Player] sleep timer persist error:", err); });
-  }, []);
+  }, [setSleepTimerEnd, setSleepTimerMinutes]);
 
   const toggleFavorite = React.useCallback((stationId: string) => {
     setFavoriteStationIds((prev) => {
@@ -157,7 +158,7 @@ export const usePlayerActions = (
       AsyncStorage.setItem(FAVORITES_KEY, JSON.stringify(next)).catch((err) => { console.warn("[Player] favorites persist error:", err); });
       return next;
     });
-  }, []);
+  }, [setFavoriteStationIds]);
 
   const toggleShuffle = React.useCallback(() => {
     setIsShuffled((v) => {
@@ -168,7 +169,7 @@ export const usePlayerActions = (
       });
       return next;
     });
-  }, []);
+  }, [setIsShuffled, shuffleHistoryRef]);
 
   const toggleRepeat = React.useCallback(() => {
     setRepeatMode((prev) => {
@@ -179,7 +180,7 @@ export const usePlayerActions = (
       }
       return next;
     });
-  }, []);
+  }, [playerRef, setRepeatMode]);
 
   return {
     play,

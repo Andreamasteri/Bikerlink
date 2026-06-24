@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useCallback } from "react";
 import { useRouter } from "expo-router";
 import { InteractiveMapHandle } from "@/components/InteractiveMap";
@@ -20,7 +21,7 @@ export function useHomeMapInteractions(mapRef: React.RefObject<InteractiveMapHan
         handleFocusAnimation(u.nickname, setFocusToast, focusToastAnim);
       }
     }, 300);
-  }, [handleUserPress, focusToastAnim]);
+  }, [handleUserPress, focusToastAnim, focusMap, handleFocusAnimation, mapRef, setFocusToast, setLastSmallMapCenter]);
 
   return { handleSearchResultPress, handleLocateUser };
 }

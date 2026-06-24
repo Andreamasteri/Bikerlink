@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/query-client";
@@ -9,11 +10,11 @@ export function useHomeAds() {
   });
 
   const handleAdClick = useCallback(async (ad: any) => {
-    try { await apiRequest("POST", `/api/ads/${ad.id}/click`); } catch { }
+    try { await apiRequest("POST", `/api/ads/${ad.id}/click`); } catch { /* no-op */ }
     if (ad.linkUrl) {
       let url = ad.linkUrl.trim();
       if (!/^https?:\/\//i.test(url)) url = "https://" + url;
-      try { (require("react-native").Linking).openURL(url); } catch { }
+      try { (require("react-native").Linking).openURL(url); } catch { /* no-op */ }
     }
   }, []);
 
@@ -35,9 +36,9 @@ export function useHomeSearch(userId: string | undefined) {
       const res = await apiRequest("GET", `/api/users/search?q=${encodeURIComponent(text.trim())}`);
       const data = await res.json();
       setSearchResults((data as any[]).filter((u) => u.id !== userId));
-    } catch { }
+    } catch { /* no-op */ }
     setSearchLoading(false);
-  }, [userId]);
+  }, [userId, setSearchText, setSearchResults, setSearchLoading, setShowSearchResults]);
 
   return { searchText, setSearchText, searchResults, setSearchResults, searchLoading, showSearchResults, setShowSearchResults, handleSearch };
 }

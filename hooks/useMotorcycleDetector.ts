@@ -319,7 +319,7 @@ export function useMotorcycleDetector({ enabled, relaxedMode = false }: Options)
         setIsRiding(false);
       }
     };
-  }, [enabled, cleanup]);
+  }, [enabled, cleanup, startAccelFallback]);
 
   return { isRiding };
 }

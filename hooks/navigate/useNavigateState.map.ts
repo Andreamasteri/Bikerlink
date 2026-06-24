@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useMemo } from "react";
 import { getApiUrl } from "@/lib/query-client";
 
@@ -20,7 +21,7 @@ export function useNavMapUri(polylinePoints: any[], activeStepsRef: any, route: 
       uri += "&offlinePath=" + encodeURIComponent(offline.offlineTileBasePath);
     }
     return uri;
-  }, [polylinePoints, route?.navigationSteps, offline.status, offline.offlineTileBasePath, activeTileUrl, activeTileMaxZoom]);
+  }, [polylinePoints, route?.navigationSteps, offline.status, offline.offlineTileBasePath, activeTileUrl, activeTileMaxZoom, activeStepsRef]);
 
   return mapUri;
 }

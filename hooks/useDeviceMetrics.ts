@@ -52,7 +52,7 @@ async function checkRestartLoop(): Promise<void> {
   }
 }
 
-async function sendMetrics(userId: string): Promise<void> {
+async function sendMetrics(_userId: string): Promise<void> {
   try {
     const platform = Platform.OS === "ios" ? "ios" : Platform.OS === "android" ? "android" : "web";
 

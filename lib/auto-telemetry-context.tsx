@@ -45,7 +45,7 @@ function AutoTelemetryInner({ children }: { children: React.ReactNode }) {
       .then((c) => setIsCalibrated(!!c))
       .catch(() => {});
     loadRelaxedMountMode().then(setRelaxedMode).catch(() => {});
-  }, [user?.id]);
+  }, [user]);
 
   // ── Poll prefs every 4s so toggle changes in TelemetryPanel propagate ────
   useEffect(() => {

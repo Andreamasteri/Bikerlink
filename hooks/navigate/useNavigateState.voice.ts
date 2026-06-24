@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useCallback } from "react";
 
 export function useNavVoice(whisper: any, getApiUrl: any, apiRequest: any, triggerRerouteToDestination: any) {
@@ -33,7 +34,7 @@ export function useNavVoice(whisper: any, getApiUrl: any, apiRequest: any, trigg
       setVoiceCmdToast("Errore geocodifica");
       setTimeout(() => setVoiceCmdToast(null), 3000);
     }
-  }, [whisper, triggerRerouteToDestination]);
+  }, [whisper, triggerRerouteToDestination, apiRequest, getApiUrl]);
 
   return { voiceCmdToast, handleVoiceCommand };
 }

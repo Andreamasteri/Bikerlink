@@ -18,6 +18,7 @@ const BG_POINTS_KEY = "@bikerlink/bg_points_pending";
 const MAP_LAST_GPS_KEY = "map_last_gps";
 const GHOST_MODE_KEY = "@bikerlink/ghost_mode_active";
 
+/* eslint-disable @typescript-eslint/no-explicit-any */
 interface TrackingHandlerDeps {
   t: ReturnType<typeof useT>;
   gps: any;
@@ -96,8 +97,8 @@ export function buildResetTrackingState(deps: Pick<TrackingHandlerDeps, "gps" | 
 }
 
 export function useTrackingHandlers(deps: TrackingHandlerDeps) {
-  const { t, gps, sensors, sprint, battery, bg, session, stats, settings, mapState, refs, offlineQueue,
-    handsOffActive, setHandsOffActive, setVolumeUI, refetchRecords, flushPoints, beginActiveTracking,
+  const { t, gps, sensors, sprint, battery, bg: _bg, session, stats, settings, mapState, refs, offlineQueue,
+    handsOffActive: _handsOffActive, setHandsOffActive, setVolumeUI, refetchRecords, flushPoints, beginActiveTracking,
     resetTrackingState, cleanupTracking } = deps;
 
   const startDeviceMotion = useCallback(async () => {

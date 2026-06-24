@@ -24,8 +24,8 @@ import { useWhisperRecorder } from "@/hooks/useWhisperRecorder";
 import { useLocationGate } from "@/lib/location-context";
 import { announceStep, calculateRemainingDist, useVoiceCommandInternal, useNavigateStates, useWeatherHandlers } from "./useNavigateState.part2";
 
-const ANNOUNCE_DISTANCE_FAR = 200;
-const ANNOUNCE_DISTANCE_NEAR = 50;
+const _ANNOUNCE_DISTANCE_FAR = 200;
+const _ANNOUNCE_DISTANCE_NEAR = 50;
 const REROUTE_DISTANCE_M = 200;
 const REROUTE_DELAY_MS = 5000;
 const WEATHER_AHEAD_KM = 15;
@@ -127,7 +127,7 @@ export function useNavigateState() {
       activeTotalMinRef.current = route.durationMinutes;
     }
     activeStepsRef.current = route.navigationSteps ?? null;
-  }, [route]);
+  }, [route, setPolylinePoints, setRemainingKm, setRemainingMin]);
 
   useEffect(() => {
     let active = true;
@@ -331,7 +331,7 @@ export function useNavigateState() {
       isReroutingRef.current = false;
       setIsRerouting(false);
     }
-  }, [route, locale, t]);
+  }, [route, locale, t, setCurrentStep, setIsRerouting, setMapReady, setPolylinePoints]);
 
   const handlePositionUpdate = useCallback((lat: number, lng: number, heading: number) => {
     if (polylinePoints.length === 0) return;
@@ -395,7 +395,7 @@ export function useNavigateState() {
         Speech.speak(t("nav.announce.arrived"), { language: locale });
       }
     }
-  }, [polylinePoints, route, mapReady, isFinished, locale, t]);
+  }, [polylinePoints, route, mapReady, isFinished, locale, t, setCurrentStep, setDistanceToNext, setIsFinished, setProgressPct, setRemainingKm, setRemainingMin]);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- WebView message event
   const handleMapMessage = useCallback((event: any) => {
@@ -405,7 +405,7 @@ export function useNavigateState() {
     } catch {
       // no-op
     }
-  }, []);
+  }, [setMapReady]);
 
   const [voiceCmdToast, setVoiceCmdToast] = useState<string | null>(null);
 
