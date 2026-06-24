@@ -68,6 +68,7 @@ export interface BlockedQueryRow {
   pid: number;
   state: string;
   duration_s: number;
+  state_duration_s: number;
   query: string;
   wait_event: string | null;
   wait_event_type: string | null;
@@ -87,17 +88,17 @@ export async function snapshotBlockedQueries(): Promise<BlockedQueryRow[]> {
       SELECT
         pid,
         state,
-        EXTRACT(EPOCH FROM (now() - query_start))::int AS duration_s,
-        LEFT(query, 200)                               AS query,
+        EXTRACT(EPOCH FROM (now() - query_start))::int   AS duration_s,
+        EXTRACT(EPOCH FROM (now() - state_change))::int  AS state_duration_s,
+        LEFT(query, 200)                                 AS query,
         wait_event,
         wait_event_type,
-        COALESCE(application_name, '')                 AS application_name
+        COALESCE(application_name, '')                   AS application_name
       FROM pg_stat_activity
-      WHERE datname        =  current_database()
-        AND pid            <> pg_backend_pid()
-        AND state          <> 'idle'
-        AND query_start    IS NOT NULL
-      ORDER BY duration_s DESC NULLS LAST
+      WHERE datname  =  current_database()
+        AND pid      <> pg_backend_pid()
+        AND state    IS NOT NULL
+      ORDER BY state_duration_s DESC NULLS LAST
       LIMIT 15
     `);
     return r.rows;

@@ -34,12 +34,14 @@ export async function collectDb(): Promise<Signal[]> {
     snapshotBlockedQueries().then((rows) => {
       if (rows.length === 0) return;
       console.error(
-        "[watchdog/db] 🔴 POOL SATURO — query attive su DB:",
+        "[watchdog/db] 🔴 POOL SATURO — connessioni su DB:",
         JSON.stringify(rows.map((r) => ({
           pid: r.pid,
           state: r.state,
-          duration_s: r.duration_s,
+          state_s: r.state_duration_s,   // quanto è in questo stato (zombie detection)
+          query_s: r.duration_s,
           wait: r.wait_event_type ? `${r.wait_event_type}/${r.wait_event}` : null,
+          app: r.application_name,
           query: r.query,
         }))),
       );
@@ -76,12 +78,14 @@ export async function collectDb(): Promise<Signal[]> {
       snapshotBlockedQueries().then((rows) => {
         if (rows.length === 0) return;
         console.error(
-          `[watchdog/db] 🟡 PING SPIKE ${pingMs}ms — query attive su DB:`,
+          `[watchdog/db] 🟡 PING SPIKE ${pingMs}ms — connessioni su DB:`,
           JSON.stringify(rows.map((r) => ({
             pid: r.pid,
             state: r.state,
-            duration_s: r.duration_s,
+            state_s: r.state_duration_s,
+            query_s: r.duration_s,
             wait: r.wait_event_type ? `${r.wait_event_type}/${r.wait_event}` : null,
+            app: r.application_name,
             query: r.query,
           }))),
         );
