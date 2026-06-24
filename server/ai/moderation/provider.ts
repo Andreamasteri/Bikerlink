@@ -4,6 +4,8 @@
 import { createOpenAI } from "@ai-sdk/openai";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import type { LanguageModelV2 } from "@ai-sdk/provider";
+import { generateObject } from "ai";
+import { z } from "zod";
 import { limiters } from "../../lib/throttle";
 import { storage } from "../../storage";
 import { getOllamaModel, isOllamaConfigured } from "../../lib/ollama-client";
@@ -25,8 +27,10 @@ interface ResolvedModel {
   modelId: string;
   model: LanguageModelV2;
   scheduler: <T>(fn: () => Promise<T>) => Promise<T>;
-  // Presente solo per modelli che non supportano json_schema mode (es. Llama 3.x su Groq).
-  // Quando impostato, generateObject DEVE ricevere mode:"json" altrimenti fallisce.
+  // Presente solo per modelli che NON supportano structured outputs json_schema
+  // (es. Llama 3.x su Groq). In AI SDK v6 il parametro `mode` è stato rimosso:
+  // per questi modelli si usa generateStructured() che instrada su output:"no-schema"
+  // (JSON-object mode) + validazione Zod manuale. Vedi generateStructured().
   objectMode?: "json";
 }
 
@@ -262,7 +266,10 @@ function tryBuild(id: AiProviderId, role: ModelRole, forcedModelId?: string): Re
       // decoding). Confermato free tier nelle Groq rate-limits (30 RPM / 1K RPD).
       // Per abilitare strict mode (strict: true in Groq API), passare strictJsonSchema:true
       // via providerOptions nei singoli generateObject call site.
-      // llama-3.x-* non supportano json_schema su Groq → richiedono mode:"json" se forzati.
+      // llama-3.x-* NON supportano structured outputs json_schema su Groq: vengono
+      // marcati objectMode:"json" e instradati da generateStructured() su
+      // output:"no-schema" (JSON-object mode) + validazione Zod. In AI SDK v6 il
+      // parametro `mode` non esiste più, quindi non si passa più mode:"json".
       const modelId = forcedModelId ?? "openai/gpt-oss-20b";
       const client = createOpenAI({ apiKey: key, baseURL: "https://api.groq.com/openai/v1" });
       const needsJsonMode = /^(llama-3\.|meta-llama\/llama-3)/.test(modelId);
@@ -433,6 +440,67 @@ export async function runWithFallback<T>(
   }
   if (lastErr) throw lastErr;
   throw new Error("AI_PROVIDER_UNAVAILABLE: nessun provider AI configurato o disponibile");
+}
+
+// Task #4857 — Helper structured-generation v6-compatibile.
+// AI SDK v6 ha RIMOSSO il parametro `mode` di generateObject: ora ogni chiamata
+// invia una richiesta json_schema nativa, che Groq RIFIUTA per i modelli llama-3.x
+// ("json_schema non supportato da llama-3.3-70b-versatile per structured outputs").
+// Per questi modelli (flag objectMode:"json", impostato in tryBuild sul ramo groq)
+// si usa output:"no-schema" (JSON-object mode), si inietta la forma dello schema nel
+// prompt e si valida manualmente con schema.parse (throw → la fallback chain lo cattura).
+// I modelli schema-capable (Groq gpt-oss, Gemini, OpenAI, Ollama) restano invariati.
+export interface StructuredGenOpts<T> {
+  schema: z.ZodType<T>;
+  schemaName?: string;
+  schemaDescription?: string;
+  system?: string;
+  prompt: string;
+  temperature?: number;
+  abortSignal?: AbortSignal;
+}
+
+export interface StructuredGenResult<T> {
+  object: T;
+  usage?: { inputTokens?: number; outputTokens?: number };
+}
+
+export async function generateStructured<T>(
+  m: ResolvedModel,
+  opts: StructuredGenOpts<T>,
+): Promise<StructuredGenResult<T>> {
+  if (m.objectMode === "json") {
+    // Modello senza json_schema (Groq llama-3.x): no-schema + Zod parse manuale.
+    let shape = "";
+    try {
+      shape = JSON.stringify(z.toJSONSchema(opts.schema as unknown as z.ZodType));
+    } catch {/* schema non serializzabile: prompt JSON generico */}
+    const prompt = shape
+      ? `${opts.prompt}\n\nRispondi ESCLUSIVAMENTE con un oggetto JSON valido e conforme a questo JSON Schema (nessun testo, markdown o commento extra):\n${shape}`
+      : `${opts.prompt}\n\nRispondi ESCLUSIVAMENTE con un oggetto JSON valido (nessun testo, markdown o commento extra).`;
+    const res = await generateObject({
+      model: m.model,
+      output: "no-schema",
+      system: opts.system,
+      prompt,
+      temperature: opts.temperature,
+      abortSignal: opts.abortSignal,
+    });
+    const object = opts.schema.parse(res.object);
+    return { object, usage: res.usage };
+  }
+  // Modello schema-capable: structured outputs nativi (invariato).
+  const res = await generateObject({
+    model: m.model,
+    schema: opts.schema,
+    schemaName: opts.schemaName,
+    schemaDescription: opts.schemaDescription,
+    system: opts.system,
+    prompt: opts.prompt,
+    temperature: opts.temperature,
+    abortSignal: opts.abortSignal,
+  });
+  return { object: res.object, usage: res.usage };
 }
 
 // Task #2825 — Variabili d'ambiente che attivano almeno un provider AI.

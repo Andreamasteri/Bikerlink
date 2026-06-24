@@ -17,6 +17,25 @@ vi.mock("ai", () => ({ generateObject: aiMocks.generateObject }));
 vi.mock("../ai/moderation/provider", () => ({
   runWithFallback: vi.fn(),
   estimateCostUsd: vi.fn().mockReturnValue(0),
+  // resolveModel forza la fallthrough alla chain (runWithFallback) nel proposer.
+  resolveModel: vi.fn(() => { throw new Error("resolveModel mock: forza fallback chain"); }),
+  tryBuildOllama: vi.fn(() => null),
+  generateStructured: vi.fn(),
+}));
+
+vi.mock("../storage", () => ({
+  storage: {
+    getAppSetting: vi.fn().mockResolvedValue(null),
+    upsertAppSetting: vi.fn().mockResolvedValue(undefined),
+  },
+}));
+
+vi.mock("../ai/audit", () => ({
+  logAiUsage: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock("../lib/thinkcentre-ignore-tests", () => ({
+  isThinkCentreIgnoredForTests: vi.fn().mockResolvedValue(false),
 }));
 
 vi.mock("../ai/watchdog/kill-switch", () => ({
@@ -59,7 +78,7 @@ vi.mock("../ai/coordinator/integrations/console", () => ({
 // ---------------------------------------------------------------------------
 
 import { runProposer } from "../ai/watchdog/proposer";
-import { runWithFallback } from "../ai/moderation/provider";
+import { runWithFallback, generateStructured } from "../ai/moderation/provider";
 import { proposalSchema, weeklyReportSchema } from "../ai/watchdog/types";
 import type { HealthSnapshot } from "../ai/watchdog/types";
 import type { ResolvedModel } from "../ai/moderation/provider";
@@ -102,13 +121,17 @@ const emptyProposalsResponse = {
 };
 
 // ---------------------------------------------------------------------------
-// Test Suite 1 — Groq objectMode:json → generateObject riceve mode:"json"
+// Test Suite 1 — Proposer instrada attraverso generateStructured (AI SDK v6).
+// In v6 il parametro `mode` di generateObject è stato RIMOSSO: il proposer non
+// passa più mode:"json" e delega la scelta json-schema vs no-schema al helper
+// generateStructured (testato direttamente nella Suite 1b qui sotto).
 // ---------------------------------------------------------------------------
 
-describe("Groq objectMode:json — generateObject deve ricevere mode:'json'", () => {
+describe("Proposer — delega a generateStructured senza parametro mode (AI SDK v6)", () => {
   beforeEach(() => {
     aiMocks.generateObject.mockReset();
-    aiMocks.generateObject.mockResolvedValue(emptyProposalsResponse);
+    vi.mocked(generateStructured).mockReset();
+    vi.mocked(generateStructured).mockResolvedValue(emptyProposalsResponse);
 
     vi.mocked(runWithFallback).mockImplementation(async (_opts, fn) => {
       const value = await fn(mockGroqModel);
@@ -116,16 +139,17 @@ describe("Groq objectMode:json — generateObject deve ricevere mode:'json'", ()
     });
   });
 
-  it("runProposer passa mode:'json' a generateObject quando il modello ha objectMode:'json'", async () => {
+  it("instrada il modello Groq objectMode:'json' a generateStructured con lo schema", async () => {
     await runProposer(criticalSnapshot);
 
-    expect(aiMocks.generateObject).toHaveBeenCalledTimes(1);
-    expect(aiMocks.generateObject).toHaveBeenCalledWith(
-      expect.objectContaining({ mode: "json" })
-    );
+    expect(generateStructured).toHaveBeenCalledTimes(1);
+    const [model, opts] = vi.mocked(generateStructured).mock.calls[0];
+    expect(model).toBe(mockGroqModel);
+    expect(opts).toHaveProperty("schema");
+    expect(opts).not.toHaveProperty("mode");
   });
 
-  it("runProposer NON include mode quando il modello non ha objectMode", async () => {
+  it("non passa mai 'mode' (rimosso in v6) né chiama generateObject direttamente", async () => {
     const geminiModel: ResolvedModel = {
       ...mockGroqModel,
       id: "google",
@@ -139,11 +163,86 @@ describe("Groq objectMode:json — generateObject deve ricevere mode:'json'", ()
       return { value, model: geminiModel };
     });
 
-    await runProposer(criticalSnapshot);
+    // Snapshot con un problema diverso: il proposer ha una cache fingerprint
+    // a livello di modulo, quindi serve un set di problemi distinto da Suite-1
+    // test-1 per non incorrere nello skip "fingerprint invariato".
+    const distinctSnapshot: HealthSnapshot = {
+      ...criticalSnapshot,
+      problems: [
+        {
+          id: "queue.notify.waiting_high",
+          severity: "critical",
+          source: "bullmq",
+          title: "Notify queue bloccata",
+          detail: "waiting > 500",
+        },
+      ],
+    };
+    await runProposer(distinctSnapshot);
 
-    expect(aiMocks.generateObject).toHaveBeenCalledTimes(1);
-    const callArgs = aiMocks.generateObject.mock.calls[0][0];
-    expect(callArgs).not.toHaveProperty("mode");
+    expect(generateStructured).toHaveBeenCalledTimes(1);
+    const [, opts] = vi.mocked(generateStructured).mock.calls[0];
+    expect(opts).not.toHaveProperty("mode");
+    expect(aiMocks.generateObject).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Test Suite 1b — generateStructured (helper v6): no-schema per i modelli Groq
+// llama-3.x (objectMode:"json") vs structured outputs nativi per gli altri.
+// ---------------------------------------------------------------------------
+
+describe("generateStructured (AI SDK v6) — no-schema vs structured outputs", () => {
+  let realGenerateStructured: typeof import("../ai/moderation/provider").generateStructured;
+  const tinySchema = z.object({ proposals: z.array(z.object({ title: z.string() })) });
+
+  beforeEach(async () => {
+    aiMocks.generateObject.mockReset();
+    const actual = await vi.importActual<typeof import("../ai/moderation/provider")>(
+      "../ai/moderation/provider",
+    );
+    realGenerateStructured = actual.generateStructured;
+  });
+
+  it("objectMode:'json' → output:'no-schema', niente schema/mode, valida con Zod", async () => {
+    aiMocks.generateObject.mockResolvedValue({
+      object: { proposals: [{ title: "ok" }] },
+      usage: { inputTokens: 1, outputTokens: 2 },
+    });
+
+    const { object, usage } = await realGenerateStructured(mockGroqModel, {
+      schema: tinySchema, system: "s", prompt: "Analizza",
+    });
+
+    expect(object).toEqual({ proposals: [{ title: "ok" }] });
+    expect(usage).toEqual({ inputTokens: 1, outputTokens: 2 });
+    const args = aiMocks.generateObject.mock.calls[0][0];
+    expect(args.output).toBe("no-schema");
+    expect(args).not.toHaveProperty("schema");
+    expect(args).not.toHaveProperty("mode");
+    expect(String(args.prompt)).toContain("JSON");
+  });
+
+  it("objectMode:'json' + risposta non conforme → throw (catturato dalla fallback chain)", async () => {
+    aiMocks.generateObject.mockResolvedValue({ object: { nope: true }, usage: {} });
+
+    await expect(
+      realGenerateStructured(mockGroqModel, { schema: tinySchema, prompt: "x" }),
+    ).rejects.toThrow();
+  });
+
+  it("modello schema-capable → generateObject con schema nativo, niente output/mode", async () => {
+    aiMocks.generateObject.mockResolvedValue({ object: { proposals: [] }, usage: {} });
+    const schemaCapable: ResolvedModel = {
+      ...mockGroqModel, objectMode: undefined, modelId: "openai/gpt-oss-20b",
+    };
+
+    await realGenerateStructured(schemaCapable, { schema: tinySchema, prompt: "x", system: "s" });
+
+    const args = aiMocks.generateObject.mock.calls[0][0];
+    expect(args.schema).toBe(tinySchema);
+    expect(args.output).toBeUndefined();
+    expect(args).not.toHaveProperty("mode");
   });
 });
 
@@ -172,7 +271,7 @@ describe("proposalSchema — JSON Schema senza propertyNames né tipi unknown (c
     expect(serialized).not.toContain("propertyNames");
   });
 
-  it("proposalSchema è un oggetto Zod valido e il tipo inferito include params come Record", () => {
+  it("proposalSchema è un oggetto Zod valido e accetta params come stringa JSON", () => {
     const example = {
       title: "Riavvia worker",
       reasoning: "Il worker matching è bloccato da 30 minuti.",
@@ -180,9 +279,10 @@ describe("proposalSchema — JSON Schema senza propertyNames né tipi unknown (c
       action: {
         kind: "restart_worker" as const,
         target: "matching",
-        params: { timeout: 30, force: true, label: "hotfix" },
+        params: JSON.stringify({ timeout: 30, force: true, label: "hotfix" }),
       },
       affectedComponents: ["matching-worker"],
+      rollbackHint: null,
     };
     const result = proposalSchema.safeParse(example);
     expect(result.success).toBe(true);

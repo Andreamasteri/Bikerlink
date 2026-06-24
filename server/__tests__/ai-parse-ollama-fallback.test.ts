@@ -33,6 +33,8 @@ const ollamaMocks = vi.hoisted(() => ({
 vi.mock("../lib/ollama-client", () => ({
   isOllamaConfigured: true,
   getOllamaModel: ollamaMocks.getOllamaModel,
+  // Probe di raggiungibilità aggiunta a waypoints.next: in test Ollama è "online".
+  isOllamaReachable: vi.fn().mockResolvedValue(true),
 }));
 
 // Groq disabilitato qui: la catena è Ollama → Gemini (vedi ai-groq-fallback.test.ts
@@ -40,6 +42,14 @@ vi.mock("../lib/ollama-client", () => ({
 vi.mock("../lib/groq-client", () => ({
   isGroqConfigured: false,
   getGroqModel: vi.fn(() => { throw new Error("Groq non configurato (mock)"); }),
+}));
+
+// OpenAI disabilitato: "openai" fa parte della DEFAULT_ROUTE_CHAIN ma qui la
+// catena testata è Ollama → Gemini, quindi lo neutralizziamo (altrimenti, con
+// OPENAI_API_KEY presente nell'env, verrebbe tentato come tier finale).
+vi.mock("../lib/openai-route-client", () => ({
+  isOpenAiRouteConfigured: false,
+  getOpenAiRouteModel: vi.fn(() => { throw new Error("OpenAI non configurato (mock)"); }),
 }));
 
 // ---------------------------------------------------------------------------

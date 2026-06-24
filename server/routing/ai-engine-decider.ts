@@ -9,7 +9,7 @@
  */
 import { z } from "zod";
 import { generateObject } from "ai";
-import { runWithFallback } from "../ai/moderation/provider";
+import { runWithFallback, generateStructured } from "../ai/moderation/provider";
 import { getRoutingCounters, getRecentLatencies, getBboxEngineQuality, bboxKeyOf, type BboxEngineQuality } from "./routing-metrics";
 
 // Engine candidati per la selezione AI: solo i due self-hosted. Gli engine cloud
@@ -182,14 +182,12 @@ export async function decideEngineWithAI(
         try {
           const { value, model } = await runWithFallback({ role: "router", skipOllama: true }, (mm) =>
             mm.scheduler(() =>
-              generateObject({
-                model: mm.model,
+              generateStructured(mm, {
                 schema: decisionSchema,
                 system: SYSTEM_PROMPT,
                 prompt: JSON.stringify(ctx),
                 temperature: 0,
                 abortSignal: globalController.signal,
-                ...(mm.objectMode ? { mode: mm.objectMode } : {}),
               }),
             ),
           );

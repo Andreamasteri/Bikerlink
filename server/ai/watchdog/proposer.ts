@@ -1,8 +1,7 @@
 // Task #2533 — AI Proposer: dato uno snapshot con problems "high/critical" non
 // risolvibili da auto-fix sicuro, chiede all'AI di proporre 1-3 azioni rischiose
 // per approvazione admin. NIENTE esecuzione automatica.
-import { generateObject } from "ai";
-import { runWithFallback, resolveModel, estimateCostUsd, tryBuildOllama } from "../moderation/provider";
+import { runWithFallback, resolveModel, estimateCostUsd, tryBuildOllama, generateStructured } from "../moderation/provider";
 import { withBudget } from "../moderation/budget";
 import { logAiCall } from "../moderation/log";
 import { writeWatchdogLog } from "./log";
@@ -68,8 +67,12 @@ const FINGERPRINT_KEY = "watchdog_proposer_last_fingerprint";
 const MODEL_KEY = "watchdog_proposer_model";
 const DEFAULT_PROPOSER_MODEL = "llama-3.3-70b-versatile";
 
-// Modelli Groq che NON supportano structured outputs (json_schema).
-// Se il DB ha uno di questi salvati, usiamo il default.
+// Modelli Groq legacy/preview che resettiamo al default se salvati nel DB.
+// NOTA (Task #4857): anche il DEFAULT_PROPOSER_MODEL (llama-3.3-70b-versatile) NON
+// supporta json_schema su Groq — come tutti i llama-3.x. Non per questo va resettato:
+// generateStructured() lo instrada su output:"no-schema" (JSON-object mode) + validazione
+// Zod, quindi funziona. Questo set elenca solo modelli che NON vogliamo usare comunque
+// (8b/preview/whisper), per ricadere sul default llama-3.3 più capace.
 // Ref: https://console.groq.com/docs/structured-outputs#supported-models
 const GROQ_UNSUPPORTED_STRUCTURED_MODELS = new Set([
   "llama-3.1-8b-instant",
@@ -108,8 +111,8 @@ async function getProposerModel(): Promise<string> {
     if (!saved) return DEFAULT_PROPOSER_MODEL;
     if (GROQ_UNSUPPORTED_STRUCTURED_MODELS.has(saved)) {
       console.warn(
-        `[watchdog/proposer] modello salvato "${saved}" non supporta json_schema — ` +
-        `reset al default ${DEFAULT_PROPOSER_MODEL}`,
+        `[watchdog/proposer] modello salvato "${saved}" è legacy/preview — ` +
+        `reset al default ${DEFAULT_PROPOSER_MODEL} (llama-3.x via JSON-object mode)`,
       );
       return DEFAULT_PROPOSER_MODEL;
     }
@@ -191,14 +194,13 @@ export async function runProposer(snap: HealthSnapshot): Promise<ProposerResult 
     return await withBudget("triage", async () => {
       const started = Date.now();
 
-      // Helper: call generateObject on a resolved model, auto-detecting llama json mode.
-      const callModel = (mm: ReturnType<typeof resolveModel>) => {
-        const needsJsonMode = mm.objectMode === "json" || /^(llama-3\.|meta-llama\/llama)/i.test(mm.modelId);
-        return mm.scheduler(() => generateObject({
-          model: mm.model, schema: proposalsSchema, system: SYSTEM, prompt, temperature: 0.2,
-          ...(needsJsonMode ? { mode: "json" as const } : {}),
+      // Helper: structured generation tramite generateStructured (AI SDK v6).
+      // I modelli Groq llama-3.x (objectMode:"json") usano output:"no-schema" +
+      // validazione Zod; gli altri usano structured outputs nativi. Vedi provider.ts.
+      const callModel = (mm: ReturnType<typeof resolveModel>) =>
+        mm.scheduler(() => generateStructured(mm, {
+          schema: proposalsSchema, system: SYSTEM, prompt, temperature: 0.2,
         }));
-      };
 
       // Three-step model routing (Task #3872 — Ollama-first universale):
       // Step 0 — Ollama self-hosted (ThinkCentre, costo zero). Se configurato,

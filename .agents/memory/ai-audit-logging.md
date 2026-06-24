@@ -17,7 +17,7 @@ description: How logAiUsage() works, where it's called, and the proposer groq-on
 
 **Fix:** detect Groq-only model names with `/^(llama-3\.|llama-3\d|meta-llama\/|openai\/gpt-oss)/i`; if Groq-only, pass as `forcedModelId` to Groq only via `preferredProvider: "groq"`, not as global `forcedModelId`.
 
-**Llama + json mode:** llama-3.x on Groq REQUIRES `mode: "json"` in `generateObject`. In the proposer callback, check BOTH `mm.objectMode === "json"` AND `/^(llama-3\.|meta-llama\/llama)/i.test(mm.modelId)` as a safety net.
+**Llama + json mode (AI SDK v6):** `mode` was REMOVED from `generateObject` in AI SDK v6 — passing `mode:"json"` is silently ignored, so llama-3.x on Groq still gets a `json_schema` and Groq rejects it. The proposer `callModel` no longer passes `mode`; instead it delegates to `generateStructured` (in `server/ai/moderation/provider.ts`), which routes `objectMode:"json"` models through `generateObject({ output: "no-schema" })` + manual Zod validation. Still detect non-strict models via BOTH `mm.objectMode === "json"` AND `/^(llama-3\.|meta-llama\/llama)/i.test(mm.modelId)`. Do NOT reintroduce `mode`.
 
 ## Watchdog proposer skip logic
 

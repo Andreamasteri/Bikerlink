@@ -21,5 +21,12 @@ feature AI inutilizzabile in produzione, ed era difficile da notare senza legger
 
 **How to apply:** prima di aggiungere/modificare uno schema usato da `generateObject` nel
 watchdog o nell'assistant, verifica che non ci siano `.optional()` né object catchall/record.
-Il fallback `mode:"json"` (modelli non-strict, es. llama-3.x su Groq) è più permissivo, ma scrivi
-lo schema sempre strict-safe così funziona su tutta la catena di provider.
+Scrivi lo schema sempre strict-safe così funziona su tutta la catena di provider.
+
+**AI SDK v6 — `mode` rimosso da `generateObject`:** in v6 il parametro `mode` (es.
+`mode:"json"`) non esiste più; uno spread `...(x ? {mode:"json"} : {})` viene silenziosamente
+ignorato → i modelli non-strict (llama-3.x su Groq) ricevono comunque un `json_schema` e Groq
+rifiuta la chiamata. Soluzione adottata: i modelli con `objectMode:"json"` passano per
+`generateStructured` (helper in `server/ai/moderation/provider.ts`) che usa
+`generateObject({ output: "no-schema" })` + validazione Zod manuale; i modelli schema-capable
+restano invariati. Non reintrodurre `mode` in nessuna chiamata `generateObject`.
