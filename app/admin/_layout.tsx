@@ -87,6 +87,7 @@ export default function AdminLayout() {
         <Stack.Screen name="telemetry-users" options={{ title: "Sessioni Utenti" }} />
         <Stack.Screen name="telemetry-user/[userId]" options={{ title: "Dettaglio Sessioni" }} />
         <Stack.Screen name="boot-log" options={{ title: "Boot Log Avvio" }} />
+        <Stack.Screen name="metro-crashes" options={{ title: "Crash Metro" }} />
       </Stack>
     </View>
   );

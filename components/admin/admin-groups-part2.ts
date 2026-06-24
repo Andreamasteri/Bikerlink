@@ -249,6 +249,15 @@ export const adminGroupsPart2: AdminGroup[] = [
         accentColor: "#3B82F6",
         keywords: ["diagnostica", "remota", "report", "utenti", "online", "debug remoto", "trigger", "dispositivo remoto", "remote device", "crash remoto", "feedback", "segnalazione tecnica", "bug report", "invio diagnostica", "file json", "report file", "scarica report", "download diagnostica", "file diagnostica", "report su file", "json files", "esplora report", "filesystem diagnostica"],
       },
+      {
+        key: "metro-crashes",
+        label: "Crash Metro",
+        icon: "lightning-bolt",
+        iconSet: "MaterialCommunityIcons",
+        route: "/admin/metro-crashes",
+        accentColor: "#FF9500",
+        keywords: ["metro", "crash", "riavvio metro", "expo start", "sigkill", "oom", "out of memory", "platform recycle", "internal crash", "sigterm", "crash bundler", "metro bundler", "exit code", "uptime metro", "diagnosi metro", "jsonl crash", "cerbero metro", "metro log", "storico crash metro"],
+      },
     ],
   },
 ];

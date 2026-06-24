@@ -321,6 +321,7 @@ import diagnosticAdminRouter from './admin/diagnostic';
 import pipelineCheckRouter from './admin/pipeline-check';
 import diagnosticsStreamRouter from './admin/diagnostics-stream';
 import bootLogAdminRouter from './admin/boot-log';
+import metroCrashRouter from './admin/metro-crash';
 
 router.post('/maps/osm-updated', async (req: Request, res: Response) => {
   try {
@@ -463,5 +464,6 @@ router.use('/', _requireAdmin, diagnosticAdminRouter);
 router.use('/', _requireAdmin, pipelineCheckRouter);
 router.use('/', _requireAdmin, diagnosticsStreamRouter);
 router.use('/boot-log', _requireAdmin, bootLogAdminRouter);
+router.use('/', _requireAdmin, metroCrashRouter);
 
 export default router;
