@@ -28,6 +28,7 @@ FAIL=0
 VIOLATIONS=()
 
 TEST_DIR="server/__tests__"
+HELPERS_DIR="server/__tests__/helpers"
 FIXTURES_FILE="server/__tests__/helpers/route-fixtures.ts"
 
 # ── Self-check: la fixtures file deve esistere ───────────────────────────────
@@ -150,27 +151,109 @@ while IFS= read -r _file; do
 
 done < <(find "$TEST_DIR" -type f -name '*.ts' ! -name '*.tsx' 2>/dev/null)
 
-# ── Report ────────────────────────────────────────────────────────────────────
-if [ ${#VIOLATIONS[@]} -gt 0 ]; then
+# ── Check export broken-fixture da file helper non autorizzati ───────────────
+#
+# Solo route-fixtures.ts può ESPORTARE stringhe broken-fixture. Qualsiasi altro
+# file in server/__tests__/helpers/ che esportasse tali stringhe diventerebbe
+# una sorgente alternativa di fixture, vanificando la centralizzazione.
+#
+# Questo check scansiona i file helper (escluso route-fixtures.ts) cercando
+# pattern broken che compaiano su righe con `export` oppure nelle 5 righe
+# successive a un `export` (copertura best-effort per export multi-riga).
+#
+# Soppressione: aggiungere sopra la riga che triggera il check:
+#   // check-inline-broken-fixtures: safe — <motivazione>
+
+HELPER_EXPORT_VIOLATIONS=()
+
+scan_helper_export() {
+  local _file="$1"
+  local _pattern="$2"
+  local _label="$3"
+  local _linenum _prev _prev_content _start _context
+
+  while IFS= read -r _linenum; do
+    [ -z "$_linenum" ] && continue
+
+    # Soppressione: commento sulla riga immediatamente precedente
+    _prev=$(( _linenum - 1 ))
+    _prev_content=""
+    [ "$_prev" -ge 1 ] && _prev_content=$(sed -n "${_prev}p" "$_file" 2>/dev/null || true)
+    if printf '%s' "$_prev_content" | grep -q 'check-inline-broken-fixtures: safe'; then
+      continue
+    fi
+
+    # Verifica: il pattern cade su una riga con `export` oppure nelle 5 righe
+    # che seguono un `export` (gestisce dichiarazioni multi-riga).
+    _start=$(( _linenum - 5 ))
+    [ "$_start" -lt 1 ] && _start=1
+    _context=$(sed -n "${_start},${_linenum}p" "$_file" 2>/dev/null || true)
+    if ! printf '%s' "$_context" | grep -qE '\bexport\b'; then
+      continue  # Non è parte di un export — il check generico copre già gli usi interni
+    fi
+
+    HELPER_EXPORT_VIOLATIONS+=("$_file:$_linenum  [$_label]")
+    FAIL=1
+  done < <(grep -nF "$_pattern" "$_file" 2>/dev/null | cut -d: -f1 || true)
+}
+
+echo ""
+echo "🔍 Controllo export broken-fixture da helper non autorizzati in $HELPERS_DIR/..."
+
+while IFS= read -r _hfile; do
+  [ "$_hfile" = "$FIXTURES_FILE" ] && continue
+
+  scan_helper_export "$_hfile" '_BROKEN"'        '_BROKEN suffisso — export da helper'
+  scan_helper_export "$_hfile" "_BROKEN'"        "_BROKEN suffisso — export da helper"
+  scan_helper_export "$_hfile" '"BROKEN_FIXTURE"' '"BROKEN_FIXTURE" — export da helper'
+  scan_helper_export "$_hfile" "'BROKEN_FIXTURE'" "'BROKEN_FIXTURE' — export da helper"
+
+done < <(find "$HELPERS_DIR" -maxdepth 1 -type f -name '*.ts' ! -name '*.tsx' 2>/dev/null)
+
+if [ ${#HELPER_EXPORT_VIOLATIONS[@]} -gt 0 ]; then
   echo ""
-  echo "❌ TROVATE fixture broken inline nei file di test:"
-  for _v in "${VIOLATIONS[@]}"; do
+  echo "❌ FILE HELPER esportano broken-fixture strings (NON autorizzato):"
+  for _v in "${HELPER_EXPORT_VIOLATIONS[@]}"; do
     echo "   ⚠️  $_v"
   done
   echo ""
   echo "   Azione richiesta:"
-  echo "   Importare i fixture condivisi da server/__tests__/helpers/route-fixtures.ts"
-  echo "   invece di definire stringhe broken inline:"
+  echo "   Spostare la stringa broken in server/__tests__/helpers/route-fixtures.ts"
+  echo "   (sorgente autorevole unica). I test la importano da lì:"
   echo ""
   echo "     import { ROUTE_JSON_TRUNCATED_MID, BROKEN_STREAM_SENTINEL }"
   echo "       from './helpers/route-fixtures';"
   echo ""
-  echo "   Se la fixture inline è intenzionale e non sostituisce una condivisa,"
-  echo "   aggiungere sopra la riga:"
+  echo "   Se l'export è intenzionale e non duplica route-fixtures.ts, aggiungere"
+  echo "   sopra la riga che triggera il check:"
   echo "     // check-inline-broken-fixtures: safe — <motivazione>"
   echo ""
+fi
+
+# ── Report finale ─────────────────────────────────────────────────────────────
+if [ $FAIL -ne 0 ]; then
+  if [ ${#VIOLATIONS[@]} -gt 0 ]; then
+    echo ""
+    echo "❌ TROVATE fixture broken inline nei file di test:"
+    for _v in "${VIOLATIONS[@]}"; do
+      echo "   ⚠️  $_v"
+    done
+    echo ""
+    echo "   Azione richiesta:"
+    echo "   Importare i fixture condivisi da server/__tests__/helpers/route-fixtures.ts"
+    echo "   invece di definire stringhe broken inline:"
+    echo ""
+    echo "     import { ROUTE_JSON_TRUNCATED_MID, BROKEN_STREAM_SENTINEL }"
+    echo "       from './helpers/route-fixtures';"
+    echo ""
+    echo "   Se la fixture inline è intenzionale e non sostituisce una condivisa,"
+    echo "   aggiungere sopra la riga:"
+    echo "     // check-inline-broken-fixtures: safe — <motivazione>"
+    echo ""
+  fi
   echo "💥 check-inline-broken-fixtures FALLITO"
   exit 1
 else
   echo "✅ Nessuna broken fixture inline rilevata nei file di test."
+  echo "✅ Nessun export broken-fixture non autorizzato nei file helper."
 fi
