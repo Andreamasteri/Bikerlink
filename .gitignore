@@ -53,6 +53,7 @@ logs/*.txt
 logs/*.json
 !logs/apk-build-history.log
 !logs/ota-timing.log
+!logs/ota-hwm.txt
 
 # Static build (generated artifacts — non includere nel repo)
 static-build/
