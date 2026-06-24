@@ -136,17 +136,30 @@ if [[ -n "$PROJECT_ID" ]]; then
   fi
 fi
 
-# Se EAS non era raggiungibile o ha restituito 0, usa buildInfo.ts come base.
-# Scegliamo il massimo tra il valore EAS e quello baked in buildInfo.ts per
-# garantire che non si regredisca mai sotto il numero già pubblicato.
-if [[ "$EAS_UNREACHABLE" == "true" ]] || [[ "$CURRENT_MAX_OTA" -eq 0 ]]; then
-  if [[ "$BUILD_INFO_CURRENT" -gt "$CURRENT_MAX_OTA" ]]; then
-    log_warn "EAS GraphQL non disponibile o ha restituito 0 — uso buildInfo.ts come base (${BUILD_INFO_CURRENT})"
-    CURRENT_MAX_OTA="$BUILD_INFO_CURRENT"
-  fi
+# Applica SEMPRE max(EAS, buildInfo) — anche quando EAS risponde con un numero
+# valido ma inferiore a quello baked in buildInfo.ts (es. dati incompleti su un
+# branch). Questo garantisce che APPLIED_OTA_NUMBER non regredisca mai.
+if [[ "$EAS_UNREACHABLE" == "true" ]]; then
+  log_warn "EAS GraphQL non raggiungibile — uso buildInfo.ts come base (${BUILD_INFO_CURRENT})"
+  CURRENT_MAX_OTA="$BUILD_INFO_CURRENT"
+elif [[ "$CURRENT_MAX_OTA" -eq 0 ]]; then
+  log_warn "EAS GraphQL ha restituito 0 — uso buildInfo.ts come base (${BUILD_INFO_CURRENT})"
+  CURRENT_MAX_OTA="$BUILD_INFO_CURRENT"
+elif [[ "$BUILD_INFO_CURRENT" -gt "$CURRENT_MAX_OTA" ]]; then
+  log_warn "⚠️  EAS ha restituito ${CURRENT_MAX_OTA} < buildInfo.ts ${BUILD_INFO_CURRENT} — possibile dato incompleto su questo branch."
+  log_warn "   Uso buildInfo.ts come base per evitare regressione del numero OTA."
+  CURRENT_MAX_OTA="$BUILD_INFO_CURRENT"
 fi
 
 NEXT_OTA=$((CURRENT_MAX_OTA + 1))
+
+# Salvaguardia finale: NEXT_OTA non deve mai scendere sotto BUILD_INFO_CURRENT + 1.
+# Copre edge case in cui tutte le sorgenti restituiscono valori anomali.
+MIN_NEXT_OTA=$((BUILD_INFO_CURRENT + 1))
+if [[ "$NEXT_OTA" -lt "$MIN_NEXT_OTA" ]]; then
+  log_warn "⚠️  NEXT_OTA calcolato (${NEXT_OTA}) < floor minimo (${MIN_NEXT_OTA}) — forzato a ${MIN_NEXT_OTA}."
+  NEXT_OTA="$MIN_NEXT_OTA"
+fi
 VERSION="${BUILD_NUM}.${NEXT_OTA}.${RUNTIME_VER}"
 
 log_info "NEXT_OTA: ${NEXT_OTA}, Versione OTA: ${VERSION}"
