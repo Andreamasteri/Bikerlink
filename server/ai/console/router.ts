@@ -3,9 +3,8 @@
 // servono per rispondere al messaggio. Usa Gemini Flash come modello
 // veloce/economico. Cache Redis 60s su hash del messaggio.
 import crypto from "crypto";
-import { generateObject } from "ai";
 import { z } from "zod";
-import { runWithFallback, estimateCostUsd } from "../moderation/provider";
+import { runWithFallback, estimateCostUsd, generateStructured } from "../moderation/provider";
 import { getRedis } from "../../cache/redis";
 import { SCOPES } from "./tools";
 import { emitConsoleQuery } from "../coordinator/integrations/console";
@@ -79,8 +78,7 @@ export async function routeMessage(opts: RouteOpts): Promise<{
     const { value, model } = await runWithFallback(
       { role: "router" },
       async (m) => {
-        const r = await generateObject({
-          model: m.model,
+        const r = await generateStructured(m, {
           schema: RouterDecisionSchema,
           system: SYSTEM,
           prompt,

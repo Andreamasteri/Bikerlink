@@ -33,6 +33,48 @@ import { getOpenAiRouteModel, isOpenAiRouteConfigured } from "../../lib/openai-r
 import { getEffectiveRouteChain } from "../../ai/route-provider-config";
 import { incrementProviderStat } from "../../ai/route-provider-stats";
 
+// Groq llama-3.x models do not support json_schema structured outputs in AI SDK v6
+// (the `mode` parameter was removed). Detect at startup so the check is free at request time.
+const _GROQ_PARSE_MODEL_ID = process.env.GROQ_PARSE_MODEL ?? "llama-3.3-70b-versatile";
+const _GROQ_PARSE_NEEDS_JSON_MODE = /^(llama-3\.|meta-llama\/llama-3)/.test(_GROQ_PARSE_MODEL_ID);
+
+/**
+ * generateObject wrapper for the Groq parse model that is tolerant of llama-3.x
+ * models. If the configured GROQ_PARSE_MODEL is a llama model it uses
+ * output:"no-schema" + manual Zod parse (same strategy as generateStructured in
+ * provider.ts). For strict-capable models (e.g. openai/gpt-oss-20b) it falls
+ * through to a normal schema-passing generateObject call.
+ */
+async function groqGenerateObject<T>(params: {
+  schema: z.ZodType<T>;
+  prompt: string;
+  temperature: number;
+  maxRetries: number;
+  abortSignal?: AbortSignal;
+}): Promise<{ object: T }> {
+  const model = getGroqParseModel();
+  if (_GROQ_PARSE_NEEDS_JSON_MODE) {
+    let shape = "";
+    try {
+      shape = JSON.stringify(z.toJSONSchema(params.schema as unknown as z.ZodType));
+    } catch { /* schema non serializzabile: prompt JSON generico */ }
+    const noSchemaPrompt = shape
+      ? `${params.prompt}\n\nRispondi ESCLUSIVAMENTE con un oggetto JSON valido e conforme a questo JSON Schema (nessun testo, markdown o commento extra):\n${shape}`
+      : `${params.prompt}\n\nRispondi ESCLUSIVAMENTE con un oggetto JSON valido (nessun testo, markdown o commento extra).`;
+    const res = await generateObject({
+      model, output: "no-schema", prompt: noSchemaPrompt,
+      temperature: params.temperature, maxRetries: params.maxRetries, abortSignal: params.abortSignal,
+    });
+    const object = params.schema.parse(res.object);
+    return { object };
+  }
+  const { object } = await generateObject({
+    model, schema: params.schema, prompt: params.prompt,
+    temperature: params.temperature, maxRetries: params.maxRetries, abortSignal: params.abortSignal,
+  });
+  return { object };
+}
+
 interface RouteAiOptions<T> {
   prompt: string;
   /** Chiave Gemini per il fallback cloud. Opzionale: con Ollama configurato il flusso può girare senza. */
@@ -104,10 +146,7 @@ export async function generateRouteObject<T>(opts: RouteAiOptions<T>): Promise<{
     } else if (providerId === "groq") {
       if (!isGroqConfigured) continue;
       try {
-        const { object } = await generateObject({
-          model: getGroqParseModel(), schema, prompt: fullPrompt,
-          maxRetries: 0, temperature, abortSignal,
-        });
+        const { object } = await groqGenerateObject({ schema, prompt: fullPrompt, maxRetries: 0, temperature, abortSignal });
         incrementProviderStat("groq");
         return { result: object, provider_used: "groq" };
       } catch (err) {

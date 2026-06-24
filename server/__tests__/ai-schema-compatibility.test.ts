@@ -50,7 +50,69 @@ vi.mock("../ai/moderation/budget", () => ({
   withBudget: vi.fn().mockImplementation(
     (_scope: string, fn: () => Promise<unknown>) => fn()
   ),
+  addCost: vi.fn().mockResolvedValue(undefined),
 }));
+
+vi.mock("../db", () => {
+  // Returns an object that is both awaitable (Promise-like) and chainable.
+  // Supports: await chain() → [] AND await chain().orderBy().limit(N) → []
+  function makeChain(resolved: unknown[] = []) {
+    const p = Promise.resolve(resolved);
+    const chain: Record<string, unknown> = {
+      then: p.then.bind(p),
+      catch: p.catch.bind(p),
+      finally: p.finally.bind(p),
+    };
+    chain.from = vi.fn().mockReturnValue(chain);
+    chain.where = vi.fn().mockReturnValue(chain);
+    chain.orderBy = vi.fn().mockReturnValue(chain);
+    chain.limit = vi.fn().mockReturnValue(p);
+    return chain;
+  }
+  return {
+    db: {
+      select: vi.fn().mockImplementation(() => makeChain([])),
+      insert: vi.fn().mockReturnValue({
+        values: vi.fn().mockReturnValue({
+          onConflictDoNothing: vi.fn().mockReturnValue({
+            returning: vi.fn().mockResolvedValue([{ id: "weekly-report-id" }]),
+          }),
+        }),
+      }),
+      update: vi.fn().mockReturnValue({
+        set: vi.fn().mockReturnValue({
+          where: vi.fn().mockResolvedValue(undefined),
+        }),
+      }),
+    },
+  };
+});
+
+vi.mock("../ai/coordinator/integrations/moderation", () => ({
+  emitModerationSuggestion: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock("../ai/moderation/redact", () => ({
+  redactPII: vi.fn().mockImplementation((s: string) => s),
+}));
+
+vi.mock("@shared/db", () => {
+  const makeCol = (name: string) => ({ name });
+  return {
+    systemHealthSnapshot: { createdAt: makeCol("createdAt"), status: makeCol("status"), score: makeCol("score") },
+    aiWatchdogLog: { createdAt: makeCol("createdAt"), kind: makeCol("kind"), status: makeCol("status") },
+    weeklySystemReports: { id: makeCol("id"), weekStart: makeCol("weekStart") },
+    reports: {
+      id: makeCol("id"), reportedUserId: makeCol("reportedUserId"), reporterId: makeCol("reporterId"),
+      category: makeCol("category"), severity: makeCol("severity"), reason: makeCol("reason"),
+      description: makeCol("description"), context: makeCol("context"), affectedFeedbackLoop: makeCol("affectedFeedbackLoop"),
+      reporterTrustScore: makeCol("reporterTrustScore"), createdAt: makeCol("createdAt"),
+      disableAiAnalysis: makeCol("disableAiAnalysis"), aiAnalysis: makeCol("aiAnalysis"),
+      aiAnalyzedAt: makeCol("aiAnalyzedAt"), aiModel: makeCol("aiModel"),
+    },
+    users: { id: makeCol("id"), nickname: makeCol("nickname") },
+  };
+});
 
 vi.mock("../ai/moderation/log", () => ({
   logAiCall: vi.fn().mockResolvedValue(undefined),
@@ -82,9 +144,12 @@ import { runWithFallback, generateStructured } from "../ai/moderation/provider";
 import { proposalSchema, weeklyReportSchema } from "../ai/watchdog/types";
 import type { HealthSnapshot } from "../ai/watchdog/types";
 import type { ResolvedModel } from "../ai/moderation/provider";
-import { RouterDecisionSchema } from "../ai/console/router";
+import { RouterDecisionSchema, routeMessage } from "../ai/console/router";
 import { triageOutputSchema } from "../ai/moderation/types";
 import { aiExplainSchema } from "../ai/db-integrity/types";
+import { explainViolation } from "../ai/db-integrity/explain";
+import { runWeeklyReport } from "../ai/watchdog/weekly-report";
+import { runTriage } from "../ai/moderation/triage";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -343,5 +408,138 @@ describe("aiExplainSchema (db-integrity) — sql nullable per OpenAI strict mode
       reasoning: "test", risk: "low",
     });
     expect(result.success).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Test Suite 5 — Tutti i callsite non-proposer usano generateStructured
+// Regressione: quando runWithFallback inietta un modello llama (objectMode:"json"),
+// NESSUNO dei callsite deve chiamare generateObject direttamente con uno schema —
+// devono tutti delegare a generateStructured (che gestisce no-schema + Zod parse).
+// ---------------------------------------------------------------------------
+
+describe("Callsite non-proposer — generateStructured con modelli llama (AI SDK v6)", () => {
+  const llamaModel: ResolvedModel = {
+    id: "groq",
+    providerName: "groq",
+    modelId: "llama-3.3-70b-versatile",
+    model: {} as never,
+    objectMode: "json",
+    scheduler: <T>(fn: () => Promise<T>) => fn(),
+  };
+
+  beforeEach(() => {
+    aiMocks.generateObject.mockReset();
+    vi.mocked(generateStructured).mockReset();
+    vi.mocked(runWithFallback).mockImplementation(async (_opts, fn) => {
+      const value = await fn(llamaModel);
+      return { value, model: llamaModel };
+    });
+  });
+
+  it("routeMessage → generateStructured, mai generateObject diretto con schema", async () => {
+    vi.mocked(generateStructured).mockResolvedValue({
+      object: { scopes: ["watchdog"], reasoning: "test" },
+      usage: { inputTokens: 10, outputTokens: 5 },
+    });
+
+    await routeMessage({ message: "come va il sistema?" });
+
+    expect(generateStructured).toHaveBeenCalledTimes(1);
+    const [model, opts] = vi.mocked(generateStructured).mock.calls[0];
+    expect(model).toMatchObject({ objectMode: "json", modelId: "llama-3.3-70b-versatile" });
+    expect(opts).toHaveProperty("schema");
+    expect(opts).not.toHaveProperty("mode");
+    // generateObject NON deve essere stato chiamato con uno schema (solo generateStructured può)
+    const directSchemaCall = aiMocks.generateObject.mock.calls.some((c) => c[0]?.schema != null);
+    expect(directSchemaCall).toBe(false);
+  });
+
+  it("explainViolation → generateStructured, mai generateObject diretto con schema", async () => {
+    vi.mocked(generateStructured).mockResolvedValue({
+      object: {
+        rootCause: "orphan rows", blastRadius: "nessuno",
+        proposedFix: "manual", sql: null, reasoning: "test", risk: "low",
+      },
+      usage: { inputTokens: 20, outputTokens: 10 },
+    });
+
+    const check = {
+      id: "orphan-test", name: "Orphan test", category: "integrity",
+      severity: "low" as const, description: "test",
+    };
+    await explainViolation({ check, hash: "unique-hash-suite5", count: 1, sample: [] });
+
+    expect(generateStructured).toHaveBeenCalledTimes(1);
+    const [model, opts] = vi.mocked(generateStructured).mock.calls[0];
+    expect(model).toMatchObject({ objectMode: "json" });
+    expect(opts).toHaveProperty("schema");
+    expect(opts).not.toHaveProperty("mode");
+    const directSchemaCall = aiMocks.generateObject.mock.calls.some((c) => c[0]?.schema != null);
+    expect(directSchemaCall).toBe(false);
+  });
+
+  it("runWeeklyReport → generateStructured, mai generateObject diretto con schema", async () => {
+    vi.mocked(generateStructured).mockResolvedValue({
+      object: {
+        highlights: [], incidents: [], recommendations: [],
+        conclusion: "Settimana stabile.", overallStatus: "green",
+      },
+      usage: { inputTokens: 50, outputTokens: 30 },
+    });
+
+    await runWeeklyReport();
+
+    expect(generateStructured).toHaveBeenCalledTimes(1);
+    const [model, opts] = vi.mocked(generateStructured).mock.calls[0];
+    expect(model).toMatchObject({ objectMode: "json" });
+    expect(opts).toHaveProperty("schema");
+    expect(opts).not.toHaveProperty("mode");
+    const directSchemaCall = aiMocks.generateObject.mock.calls.some((c) => c[0]?.schema != null);
+    expect(directSchemaCall).toBe(false);
+  });
+
+  it("runTriage → generateStructured, mai generateObject diretto con schema", async () => {
+    const { db } = await import("../db");
+    const fakeReport = {
+      id: "r1", reportedUserId: "u2", reporterId: "u1",
+      category: "spam", severity: "low", reason: "test reason",
+      description: "test description", context: null, affectedFeedbackLoop: false,
+      reporterTrustScore: 0.8, createdAt: new Date(), disableAiAnalysis: false,
+      aiAnalysis: null, aiAnalyzedAt: null, aiModel: null,
+    };
+    // First select() returns the report; subsequent ones return []
+    let selectCallCount = 0;
+    vi.mocked(db.select).mockImplementation((() => {
+      selectCallCount++;
+      const resolved = selectCallCount === 1 ? [fakeReport] : [];
+      const p = Promise.resolve(resolved);
+      const chain: Record<string, unknown> = { then: p.then.bind(p), catch: p.catch.bind(p), finally: p.finally.bind(p) };
+      chain.from = vi.fn().mockReturnValue(chain);
+      chain.where = vi.fn().mockReturnValue(chain);
+      chain.orderBy = vi.fn().mockReturnValue(chain);
+      chain.limit = vi.fn().mockReturnValue(p);
+      return chain;
+    }) as never);
+
+    vi.mocked(generateStructured).mockResolvedValue({
+      object: {
+        severitySuggested: "low", categorySuggested: "spam",
+        isSpamProbability: 0.1, isRetaliatoryProbability: 0.1,
+        similarReports: [], summary: "Test", suggestedAction: "dismiss",
+        suggestedBanDays: 0, reasoning: "test", confidence: 0.7,
+      },
+      usage: { inputTokens: 30, outputTokens: 15 },
+    });
+
+    await runTriage({ reportId: "r1" });
+
+    expect(generateStructured).toHaveBeenCalledTimes(1);
+    const [model, opts] = vi.mocked(generateStructured).mock.calls[0];
+    expect(model).toMatchObject({ objectMode: "json" });
+    expect(opts).toHaveProperty("schema");
+    expect(opts).not.toHaveProperty("mode");
+    const directSchemaCall = aiMocks.generateObject.mock.calls.some((c) => c[0]?.schema != null);
+    expect(directSchemaCall).toBe(false);
   });
 });

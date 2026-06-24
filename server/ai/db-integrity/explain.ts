@@ -1,9 +1,8 @@
 // Task #2536 — AI explainer per violazioni DB integrity.
 // Riusa runWithFallback (#2532) + budget shared. Output Zod-validato.
 // Cache in-memory per (checkId, violationHash) per non ripagare per la stessa cosa.
-import { generateObject } from "ai";
 import { z } from "zod";
-import { runWithFallback, estimateCostUsd } from "../moderation/provider";
+import { runWithFallback, estimateCostUsd, generateStructured } from "../moderation/provider";
 import { withBudget, addCost } from "../moderation/budget";
 import { aiExplainSchema, type AiExplain, type IntegrityCheck, type ViolationSampleRow } from "./types";
 
@@ -31,9 +30,8 @@ export async function explainViolation(params: {
   try {
     const out = await withBudget("triage", async () => {
       const { value, model } = await runWithFallback({ role: "brain" }, async (m) => {
-        const result = await generateObject({
-          model: m.model,
-          schema: aiExplainSchema as unknown as z.ZodTypeAny,
+        const result = await generateStructured(m, {
+          schema: aiExplainSchema,
           prompt,
           temperature: 0.2,
         });

@@ -1,13 +1,12 @@
 // Task #2533 — Report settimanale (lunedì 07:00 Europe/Rome). Usa AI per
 // generare un report strutturato basato sui signals e log della settimana.
 import { Cron } from "croner";
-import { generateObject } from "ai";
+import { generateStructured, runWithFallback, estimateCostUsd } from "../moderation/provider";
 import { db } from "../../db";
 import {
   systemHealthSnapshot, aiWatchdogLog, weeklySystemReports,
 } from "@shared/db";
 import { and, gte, lt, desc, eq } from "drizzle-orm";
-import { runWithFallback, estimateCostUsd } from "../moderation/provider";
 import { withBudget } from "../moderation/budget";
 import { logAiCall } from "../moderation/log";
 import { writeWatchdogLog } from "./log";
@@ -96,8 +95,8 @@ export async function runWeeklyReport(_now = new Date()): Promise<string | null>
     return await withBudget("digest", async () => {
       const started = Date.now();
       const { value: result, model: m } = await runWithFallback({ role: "brain" }, (mm) =>
-        mm.scheduler(() => generateObject({
-          model: mm.model, schema: weeklyReportSchema, system: SYSTEM, prompt, temperature: 0.3,
+        mm.scheduler(() => generateStructured(mm, {
+          schema: weeklyReportSchema, system: SYSTEM, prompt, temperature: 0.3,
         })),
       );
       const tokensIn = result.usage?.inputTokens ?? Math.ceil(prompt.length / 4);

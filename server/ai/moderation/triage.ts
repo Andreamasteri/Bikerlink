@@ -1,11 +1,10 @@
 // Task #2532 — Triage engine. Riceve un report + contesto, ritorna un'analisi
 // strutturata via generateObject (Zod schema garantito). PII redacted prima.
-import { generateObject } from "ai";
+import { generateStructured, runWithFallback, estimateCostUsd } from "./provider";
 import { db } from "../../db";
 import { reports, users } from "@shared/db";
 import { eq, and, ne, desc, gte } from "drizzle-orm";
 import pRetry from "p-retry";
-import { runWithFallback, estimateCostUsd } from "./provider";
 import { redactPII } from "./redact";
 import { triageOutputSchema, type TriageOutput, type AiCallMeta } from "./types";
 import { withBudget } from "./budget";
@@ -149,8 +148,7 @@ export async function runTriage(input: TriageInput): Promise<TriageOutput | null
     try {
       const { value: result, model: m } = await runWithFallback({ role: "brain" }, (mm) =>
         pRetry(
-          () => mm.scheduler(() => generateObject({
-            model: mm.model,
+          () => mm.scheduler(() => generateStructured(mm, {
             schema: triageOutputSchema,
             system: SYSTEM_PROMPT,
             prompt,
