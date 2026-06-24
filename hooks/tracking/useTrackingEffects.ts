@@ -41,6 +41,7 @@ interface EffectDeps {
   lastLowAccuracyTelemetryRef: React.MutableRefObject<number>;
   handsOffDismissedForRideRef: React.MutableRefObject<boolean>;
   onNativeLocation: (loc: Location.LocationObject) => void;
+  requestBackgroundPermission: () => Promise<"granted" | "denied" | "needsSettings">;
 }
 
 export function useOnNativeLocation(deps: Omit<EffectDeps, "onNativeLocation" | "isTabFocused" | "isTabFocusedRef">) {
@@ -151,7 +152,7 @@ export function useOnNativeLocation(deps: Omit<EffectDeps, "onNativeLocation" | 
 }
 
 export function useTrackingEffects(deps: EffectDeps) {
-  const { t, bg, session, settings, isTabFocused, totalGpsPointsRef, onNativeLocation } = deps;
+  const { t, bg, session, settings, isTabFocused, totalGpsPointsRef, onNativeLocation, requestBackgroundPermission } = deps;
 
   // AppState: background → start bg location; active → replay bg points
   useEffect(() => {
@@ -173,8 +174,8 @@ export function useTrackingEffects(deps: EffectDeps) {
           title: t("tracking.bgTitle"), body: t("tracking.bgBody"),
           pointsLabel: t("tracking.bgPointsLabel"), accuracy, timeInterval: ti, distanceInterval: di,
         }));
-        const { status } = await Location.requestBackgroundPermissionsAsync();
-        if (status === "granted" && gen === bg.bgStartGenRef.current) {
+        const bgResult = await requestBackgroundPermission();
+        if (bgResult === "granted" && gen === bg.bgStartGenRef.current) {
           bg.bgTrackingActiveRef.current = true;
           await Location.startLocationUpdatesAsync(BACKGROUND_LOCATION_TASK, {
             accuracy, timeInterval: ti, distanceInterval: di,

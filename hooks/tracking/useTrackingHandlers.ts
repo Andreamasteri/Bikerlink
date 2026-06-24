@@ -40,6 +40,7 @@ interface TrackingHandlerDeps {
   beginActiveTracking: () => Promise<void>;
   resetTrackingState: () => void;
   cleanupTracking: () => void;
+  requestBackgroundPermission: () => Promise<"granted" | "denied" | "needsSettings">;
 }
 
 export function buildCleanupTracking(deps: Pick<TrackingHandlerDeps, "bg" | "gps" | "refs">) {
@@ -99,7 +100,7 @@ export function buildResetTrackingState(deps: Pick<TrackingHandlerDeps, "gps" | 
 export function useTrackingHandlers(deps: TrackingHandlerDeps) {
   const { t, gps, sensors, sprint, battery, bg: _bg, session, stats, settings, mapState, refs, offlineQueue,
     handsOffActive: _handsOffActive, setHandsOffActive, setVolumeUI, refetchRecords, flushPoints, beginActiveTracking,
-    resetTrackingState, cleanupTracking } = deps;
+    resetTrackingState, cleanupTracking, requestBackgroundPermission } = deps;
 
   const startDeviceMotion = useCallback(async () => {
     if (!settings.sensorsEnabledRef.current || sensors.sensorStartingRef.current) return;
@@ -210,7 +211,15 @@ export function useTrackingHandlers(deps: TrackingHandlerDeps) {
     try {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== "granted") { session.setLoading(false); Alert.alert(t("tracking.permReq"), t("tracking.permDenied")); return; }
-      Location.requestBackgroundPermissionsAsync().catch(() => {});
+      requestBackgroundPermission().then((bgResult) => {
+        if (bgResult === "needsSettings") {
+          Alert.alert(
+            t("tracking.bgPermTitle"),
+            t("tracking.bgPermNeedsSettings"),
+            [{ text: t("common.ok") }]
+          );
+        }
+      }).catch(() => {});
       const res = await (await apiRequest("POST", "/api/routes", { status: "active", isSprint: !!settings.is0100EnabledRef.current })).json() as { id: string };
       if (!res?.id) throw new Error("Server did not return a valid route id");
       resetTrackingState(); refs.routeIdRef.current = res.id;

@@ -8,6 +8,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useT } from "@/lib/language-context";
 import { useUnits } from "@/lib/units-context";
 import { useMapConfig } from "@/lib/map-context";
+import { useLocationGate } from "@/lib/location-context";
 import { useApiDebugLog } from "@/hooks/useApiDebugLog";
 import { apiRequest, getQueryFn } from "@/lib/query-client";
 import { setTrackingActive } from "@/lib/tracking-active";
@@ -112,6 +113,7 @@ export function useTrackingState() {
   const t = useT();
   const { speedUnit, distanceUnit } = useUnits();
   const { enabled: mapsEnabled, resolvedProvider } = useMapConfig();
+  const { requestBackgroundPermission } = useLocationGate();
 
   const gps = useGpsTracking();
   const sensors = useSensorTracking();
@@ -214,7 +216,7 @@ export function useTrackingState() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const resetTrackingState = useCallback(resetTrackingStateFn, [gps, sensors, sprint, stats, bg, refs]);
 
-  const onNativeLocationFn = useOnNativeLocation({ t, gps, sensors, sprint, bg, session, stats, settings, refs, handsOffActive, setHandsOffActive, setVolumeUI, totalGpsPointsRef, lastLowAccuracyTelemetryRef, handsOffDismissedForRideRef });
+  const onNativeLocationFn = useOnNativeLocation({ t, gps, sensors, sprint, bg, session, stats, settings, refs, handsOffActive, setHandsOffActive, setVolumeUI, totalGpsPointsRef, lastLowAccuracyTelemetryRef, handsOffDismissedForRideRef, requestBackgroundPermission });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const onNativeLocation = useCallback(onNativeLocationFn, [gps, sensors, sprint, bg, handsOffActive, settings, stats, session, refs, setVolumeUI]);
 
@@ -378,6 +380,7 @@ export function useTrackingState() {
       t, gps, sensors, sprint, battery, bg, session, stats, settings, mapState, refs, offlineQueue,
       handsOffActive, setHandsOffActive, setVolumeUI, refetchRecords,
       flushPoints, beginActiveTracking, resetTrackingState, cleanupTracking,
+      requestBackgroundPermission,
     });
 
   // Wire startDeviceMotionRef now that startDeviceMotion is declared
@@ -390,6 +393,7 @@ export function useTrackingState() {
     t, gps, sensors, sprint, bg, session, stats, settings, refs,
     handsOffActive, setHandsOffActive, setVolumeUI, isTabFocused, isTabFocusedRef,
     totalGpsPointsRef, lastLowAccuracyTelemetryRef, handsOffDismissedForRideRef, onNativeLocation,
+    requestBackgroundPermission,
   });
 
   return {

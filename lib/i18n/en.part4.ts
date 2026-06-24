@@ -188,6 +188,8 @@ const translations: Record<string, string> = {
   "tracking.gpsStartError": "GPS start error",
   "tracking.permReq": "Permission required",
   "tracking.permDenied": "Permission denied",
+  "tracking.bgPermTitle": "Background location",
+  "tracking.bgPermNeedsSettings": "To record routes in the background, BikerLink needs the \"Always\" permission. Open Settings and set location to \"Always Allow\".",
   "tracking.routeCreateError": "Route creation error",
   "tracking.routeUpdateError": "Route update error",
   "tracking.bgTitle": "BikerLink running",
