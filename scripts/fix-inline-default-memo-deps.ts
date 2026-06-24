@@ -189,6 +189,23 @@ function processFile(filePath: string): Fix[] {
   return fixes;
 }
 
+// ─── Baseline updater ──────────────────────────────────────────────────────
+
+const BASELINE_FILE = path.join(process.cwd(), ".large-files-baseline");
+
+function updateBaseline(filePath: string): void {
+  if (!fs.existsSync(BASELINE_FILE)) return;
+  const rel = path.relative(process.cwd(), filePath).replace(/\\/g, "/");
+  const lineCount = fs.readFileSync(filePath, "utf8").split("\n").length;
+  const baseline = fs.readFileSync(BASELINE_FILE, "utf8");
+  const pattern = new RegExp(`(LEGACY\\s+${rel.replace(/\./g, "\\.")}\\s+)\\d+`);
+  if (pattern.test(baseline)) {
+    const updated = baseline.replace(pattern, `$1${lineCount}`);
+    fs.writeFileSync(BASELINE_FILE, updated, "utf8");
+    console.log(`  📏 baseline aggiornata: ${rel} → ${lineCount}`);
+  }
+}
+
 // ─── File walker ───────────────────────────────────────────────────────────
 
 function walkFiles(dir: string): string[] {
@@ -250,8 +267,12 @@ function main() {
     if (fixes.length > 0) {
       const rel = path.relative(cwd, file);
       allResults.push({ filePath: rel, fixes });
-      totalAuto += fixes.filter((f) => f.kind === "auto").length;
+      const autoCount = fixes.filter((f) => f.kind === "auto").length;
+      totalAuto += autoCount;
       totalManual += fixes.filter((f) => f.kind === "manual").length;
+      if (APPLY && autoCount > 0) {
+        updateBaseline(file);
+      }
     } else if (VERBOSE) {
       console.log(`  ✅ ${path.relative(cwd, file)} — nessuna violazione`);
     }

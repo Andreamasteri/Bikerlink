@@ -333,6 +333,21 @@ if [ "$UNSTABLE_DEFAULTS_EXIT" -ne 0 ]; then
   exit "$UNSTABLE_DEFAULTS_EXIT"
 fi
 
+# ── FIX [] / {} INLINE NEI DEPS DI useMemo / useCallback (auto) ──────────
+# Corregge automaticamente pattern `expr ?? []` / `expr ?? {}` nei deps
+# prima del gate, così eventuali regressioni introdotte da un merge vengono
+# rimosse senza bloccare il build. Aggiorna anche .large-files-baseline per
+# i file modificati (stesso pattern del fixer i18n).
+echo "════════════════════════════════════════"
+echo "  Fix [] / {} inline memo deps (auto)"
+echo "════════════════════════════════════════"
+MEMO_FIX_EXIT=0
+npx tsx scripts/fix-inline-default-memo-deps.ts --apply 2>&1 || MEMO_FIX_EXIT=$?
+if [ "$MEMO_FIX_EXIT" -ne 0 ]; then
+  echo "⚠️  fix-inline-default-memo-deps ha restituito exit ${MEMO_FIX_EXIT} — verificare manualmente."
+fi
+echo ""
+
 # ── GATE [] / {} INLINE NEI DEPS DI useMemo / useCallback ─────
 # Un [] o {} letterale nei deps crea un nuovo riferimento ad ogni render.
 # Se useMemo/useCallback ricalcola ad ogni ciclo e il risultato alimenta
