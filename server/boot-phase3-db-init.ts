@@ -15,65 +15,17 @@ export async function runBootPhase3DbInit(): Promise<void> {
   }
 
   try {
-    const client = await pool.connect();
-    try {
-      // Check both existence AND validity of the HNSW index.
-      // pg_indexes alone does not distinguish valid from invalid (broken)
-      // indexes left by an interrupted CREATE INDEX CONCURRENTLY — indisvalid
-      // is the authoritative flag in pg_index.
-      const idxCheck = await client.query<{ exists: boolean; valid: boolean }>(
-        `SELECT
-           EXISTS (
-             SELECT 1 FROM pg_indexes
-             WHERE schemaname = 'public'
-               AND tablename = 'embeddings'
-               AND indexname = 'embeddings_vec_hnsw_cosine_idx'
-           ) AS exists,
-           COALESCE(
-             (SELECT i.indisvalid
-              FROM pg_class c
-              JOIN pg_index i ON i.indrelid = c.oid
-              JOIN pg_class ic ON ic.oid = i.indexrelid
-              WHERE c.relname = 'embeddings'
-                AND ic.relname = 'embeddings_vec_hnsw_cosine_idx'
-                AND c.relnamespace = (SELECT oid FROM pg_namespace WHERE nspname = 'public')
-             ),
-             false
-           ) AS valid`,
-      );
-      const idxExists = idxCheck.rows[0]?.exists ?? false;
-      const idxValid = idxCheck.rows[0]?.valid ?? false;
-
-      if (!idxExists) {
-        console.warn(
-          "[boot] HNSW index 'embeddings_vec_hnsw_cosine_idx' mancante — tento self-heal con CREATE INDEX CONCURRENTLY...",
-        );
-        await client.query(
-          `CREATE INDEX CONCURRENTLY IF NOT EXISTS "embeddings_vec_hnsw_cosine_idx"
-             ON "embeddings" USING hnsw ("embedding" vector_cosine_ops)`,
-        );
-        console.log("[boot] HNSW self-heal: index creato con successo");
-      } else if (!idxValid) {
-        // An invalid index exists (left by an interrupted CREATE INDEX
-        // CONCURRENTLY). DROP it first so IF NOT EXISTS does not skip
-        // the re-creation, then rebuild.
-        console.warn(
-          "[boot] HNSW index 'embeddings_vec_hnsw_cosine_idx' esiste ma è INVALIDO (build interrotta?) — " +
-          "DROP + CREATE CONCURRENTLY...",
-        );
-        await client.query(
-          `DROP INDEX CONCURRENTLY IF EXISTS "embeddings_vec_hnsw_cosine_idx"`,
-        );
-        await client.query(
-          `CREATE INDEX CONCURRENTLY IF NOT EXISTS "embeddings_vec_hnsw_cosine_idx"
-             ON "embeddings" USING hnsw ("embedding" vector_cosine_ops)`,
-        );
-        console.log("[boot] HNSW self-heal: index invalido rimosso e ricreato con successo");
-      } else {
-        console.log("[boot] HNSW index verificato OK (exists=true, valid=true)");
-      }
-    } finally {
-      client.release();
+    // Reuse the same self-heal logic exposed to the Admin panel
+    // (POST /api/admin/embeddings/hnsw-rebuild). CONCURRENTLY never takes an
+    // exclusive lock so findSimilar keeps working during the build.
+    const { rebuildHnswIndex } = await import("./embeddings");
+    const { action } = await rebuildHnswIndex();
+    if (action === "created") {
+      console.log("[boot] HNSW self-heal: index mancante creato con successo");
+    } else if (action === "rebuilt") {
+      console.log("[boot] HNSW self-heal: index invalido rimosso e ricreato con successo");
+    } else {
+      console.log("[boot] HNSW index verificato OK (exists=true, valid=true)");
     }
   } catch (e) {
     console.warn(

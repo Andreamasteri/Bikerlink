@@ -112,6 +112,20 @@ export const styles = StyleSheet.create({
     fontSize: 11,
     letterSpacing: 0.5,
   },
+  rebuildBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: Colors.accent,
+    borderRadius: 7,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  rebuildBtnText: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 11,
+    color: "#fff",
+  },
   fieldList: {
     gap: 6,
   },

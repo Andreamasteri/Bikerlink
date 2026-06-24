@@ -81,6 +81,17 @@ export function EmbeddingCoverageCard() {
     retry: false,
   });
 
+  const rebuildMutation = useMutation({
+    mutationFn: () => apiRequest("POST", "/api/admin/embeddings/hnsw-rebuild", {}),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["/api/admin/embeddings/hnsw-status"] });
+      Alert.alert("Indice ricostruito", "L'indice di ricerca HNSW è stato ricreato con successo.");
+    },
+    onError: () => {
+      Alert.alert("Errore", "Impossibile ricostruire l'indice HNSW. Riprova più tardi.");
+    },
+  });
+
   const [efSearchInput, setEfSearchInput] = useState<string>("");
   const [thresholdInput, setThresholdInput] = useState<string>("");
   const [dailyCapInput, setDailyCapInput] = useState<string>("");
@@ -213,6 +224,23 @@ export function EmbeddingCoverageCard() {
                 <Ionicons name={p.icon} size={16} color={color} />
                 <Text style={styles.hnswLabel}>Indice HNSW</Text>
                 <Text style={[styles.hnswStatusText, { color }]}>{p.label}</Text>
+                {state !== "ok" && (
+                  <TouchableOpacity
+                    style={[styles.rebuildBtn, rebuildMutation.isPending && styles.saveBtnDisabled]}
+                    onPress={() => rebuildMutation.mutate()}
+                    disabled={rebuildMutation.isPending}
+                    activeOpacity={0.7}
+                  >
+                    {rebuildMutation.isPending ? (
+                      <ActivityIndicator size="small" color="#fff" />
+                    ) : (
+                      <>
+                        <MaterialCommunityIcons name="wrench" size={13} color="#fff" />
+                        <Text style={styles.rebuildBtnText}>Ricostruisci indice</Text>
+                      </>
+                    )}
+                  </TouchableOpacity>
+                )}
               </View>
             );
           })()}

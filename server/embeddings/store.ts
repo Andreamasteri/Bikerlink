@@ -1,6 +1,6 @@
 import { createHash } from "crypto";
 import { sql } from "drizzle-orm";
-import { db } from "../db";
+import { db, pool } from "../db";
 import { withBgDbConnection } from "../lib/bg-db-limiter";
 import { embeddings, embeddingCallLog } from "@shared/db";
 import {
@@ -151,6 +151,91 @@ export async function getHnswIndexStatus(): Promise<HnswIndexStatus> {
     return { exists: row.exists ?? false, valid: row.valid ?? false };
   } catch {
     return { exists: true, valid: true };
+  }
+}
+
+export interface RebuildHnswIndexResult {
+  action: "created" | "rebuilt" | "noop";
+  status: HnswIndexStatus;
+}
+
+/**
+ * (Re)create the HNSW cosine index on the embeddings table, reusing the same
+ * self-heal logic the boot sequence runs (Phase 3 DB init).
+ *
+ * - missing  → CREATE INDEX CONCURRENTLY
+ * - invalid  → DROP INDEX CONCURRENTLY + CREATE INDEX CONCURRENTLY
+ * - valid    → no-op (unless `force` is true, which always DROP + CREATE)
+ *
+ * CONCURRENTLY is used so the rebuild does not take an exclusive lock and never
+ * blocks user-facing queries (findSimilar keeps working via sequential scan
+ * while the index is being built). CONCURRENTLY cannot run inside a
+ * transaction, so this uses a dedicated pool connection and does NOT wrap the
+ * statements in BEGIN/COMMIT.
+ *
+ * Returns the action taken and the resulting index status. Throws on failure
+ * (the caller is responsible for reporting the error to the admin).
+ */
+export async function rebuildHnswIndex(
+  force = false,
+): Promise<RebuildHnswIndexResult> {
+  const client = await pool.connect();
+  try {
+    const idxCheck = await client.query<{ exists: boolean; valid: boolean }>(
+      `SELECT
+         EXISTS (
+           SELECT 1 FROM pg_indexes
+           WHERE schemaname = 'public'
+             AND tablename = 'embeddings'
+             AND indexname = $1
+         ) AS exists,
+         COALESCE(
+           (SELECT i.indisvalid
+            FROM pg_class c
+            JOIN pg_index i ON i.indrelid = c.oid
+            JOIN pg_class ic ON ic.oid = i.indexrelid
+            WHERE c.relname = 'embeddings'
+              AND ic.relname = $1
+              AND c.relnamespace = (SELECT oid FROM pg_namespace WHERE nspname = 'public')
+           ),
+           false
+         ) AS valid`,
+      [HNSW_INDEX_NAME],
+    );
+    const idxExists = idxCheck.rows[0]?.exists ?? false;
+    const idxValid = idxCheck.rows[0]?.valid ?? false;
+
+    let action: RebuildHnswIndexResult["action"];
+    if (!idxExists) {
+      await client.query(
+        `CREATE INDEX CONCURRENTLY IF NOT EXISTS "${HNSW_INDEX_NAME}"
+           ON "embeddings" USING hnsw ("embedding" vector_cosine_ops)`,
+      );
+      action = "created";
+    } else if (!idxValid || force) {
+      // Invalid (interrupted build) or a forced rebuild: DROP first so the
+      // IF NOT EXISTS on CREATE does not skip the re-creation.
+      await client.query(
+        `DROP INDEX CONCURRENTLY IF EXISTS "${HNSW_INDEX_NAME}"`,
+      );
+      await client.query(
+        `CREATE INDEX CONCURRENTLY IF NOT EXISTS "${HNSW_INDEX_NAME}"
+           ON "embeddings" USING hnsw ("embedding" vector_cosine_ops)`,
+      );
+      action = "rebuilt";
+    } else {
+      action = "noop";
+    }
+
+    // Reset the once-per-process memo so warnIfHnswIndexMissing re-checks the
+    // (now healed) index on the next findSimilar() instead of trusting a stale
+    // "missing" verdict cached at boot.
+    _hnswIndexChecked = false;
+
+    const status = await getHnswIndexStatus();
+    return { action, status };
+  } finally {
+    client.release();
   }
 }
 

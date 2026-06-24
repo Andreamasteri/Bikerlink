@@ -5,6 +5,7 @@ import {
   generateEmbedding,
   findSimilar,
   getHnswIndexStatus,
+  rebuildHnswIndex,
   EMBEDDING_MODEL_TAG,
   EMBEDDING_DIMENSIONS,
 } from "../../embeddings";
@@ -329,6 +330,46 @@ router.get("/hnsw-status", async (_req: Request, res: Response) => {
     const msg = err instanceof Error ? err.message : String(err);
     console.error("[admin/embeddings/hnsw-status] error:", msg);
     return sendError(res, 500, `Errore controllo indice HNSW: ${msg}`);
+  }
+});
+
+const rebuildBodySchema = z.object({
+  force: z.boolean().optional(),
+});
+
+/**
+ * POST /api/admin/embeddings/hnsw-rebuild
+ *
+ * (Re)creates the HNSW cosine index on the embeddings table, reusing the same
+ * self-heal logic as the boot sequence (Phase 3 DB init):
+ *   - missing → CREATE INDEX CONCURRENTLY
+ *   - invalid → DROP INDEX CONCURRENTLY + CREATE INDEX CONCURRENTLY
+ *   - valid   → no-op (unless body { force: true })
+ *
+ * CONCURRENTLY never takes an exclusive lock, so findSimilar() keeps serving
+ * user queries (via sequential scan) while the index is being rebuilt.
+ *
+ * Response: { action: "created" | "rebuilt" | "noop", exists, valid }
+ */
+router.post("/hnsw-rebuild", async (req: Request, res: Response) => {
+  const parsed = rebuildBodySchema.safeParse(req.body ?? {});
+  if (!parsed.success) {
+    return sendError(res, 400, "Body non valido");
+  }
+  try {
+    const { action, status } = await rebuildHnswIndex(parsed.data.force ?? false);
+    console.info(
+      `[admin/embeddings/hnsw-rebuild] action=${action} exists=${status.exists} valid=${status.valid}`,
+    );
+    return sendSuccess(res, {
+      action,
+      exists: status.exists,
+      valid: status.valid,
+    });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error("[admin/embeddings/hnsw-rebuild] error:", msg);
+    return sendError(res, 500, `Errore ricostruzione indice HNSW: ${msg}`);
   }
 });
 
