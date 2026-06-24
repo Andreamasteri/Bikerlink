@@ -776,6 +776,28 @@ fi
 echo "════════════════════════════════════════"
 echo ""
 
+# ── GATE FIXER DEPS MULTI-LINEA ──────────────────────────────
+# Test end-to-end del fixer multi-line deps (Mode C) che corregge i blocchi
+# dependencies/peerDependencies/etc. spezzati su più righe. Senza questo gate,
+# una regressione nel fixer passerebbe inosservata e potrebbe corrompere i
+# manifest dei pacchetti.
+echo "════════════════════════════════════════"
+echo "  Gate fixer deps multi-linea (Mode C)"
+echo "════════════════════════════════════════"
+FIX_MULTILINE_DEPS_EXIT=0
+bash scripts/__tests__/fix-multiline-deps.test.sh 2>&1 || FIX_MULTILINE_DEPS_EXIT=$?
+if [ "$FIX_MULTILINE_DEPS_EXIT" -eq 0 ]; then
+  echo "✅ Fixer deps multi-linea: gate verde."
+else
+  echo "❌ Fixer deps multi-linea FALLITO (exit ${FIX_MULTILINE_DEPS_EXIT}) — il fixer multi-line deps è regredito."
+  echo "   Eseguire 'bash scripts/__tests__/fix-multiline-deps.test.sh' localmente per i dettagli."
+  echo "════════════════════════════════════════"
+  echo ""
+  exit "$FIX_MULTILINE_DEPS_EXIT"
+fi
+echo "════════════════════════════════════════"
+echo ""
+
 # ── GATE process.exit(1) NON PROTETTO DA applyCrashBackoff ───
 # Analisi statica grep: verifica che ogni process.exit(1) nei file server/
 # (escluse __tests__/, scripts/ e i seed standalone) sia preceduto da
