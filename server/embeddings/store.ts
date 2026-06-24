@@ -1,7 +1,7 @@
 import { createHash } from "crypto";
 import { sql } from "drizzle-orm";
-import { db, pool } from "../db";
-import { withBgDbSlot } from "../lib/bg-db-limiter";
+import { db } from "../db";
+import { withBgDbConnection } from "../lib/bg-db-limiter";
 import { embeddings, embeddingCallLog } from "@shared/db";
 import {
   generateEmbedding,
@@ -314,8 +314,7 @@ export async function findSimilar(
   // del pool e affama il traffico utente (sintomo prod: "pool saturo ma 0 query
   // attive", connessioni estratte e tenute mentre il thread elabora). NON
   // avvolgere i chiamanti in withBgDbSlot: l'annidamento può andare in deadlock.
-  return await withBgDbSlot(async () => {
-  const client = await pool.connect();
+  return await withBgDbConnection(async (client) => {
   try {
     await warnIfHnswIndexMissing(client);
     await client.query("BEGIN");
@@ -368,8 +367,6 @@ export async function findSimilar(
   } catch (err) {
     await client.query("ROLLBACK").catch(() => undefined);
     throw err;
-  } finally {
-    client.release();
   }
   });
 }

@@ -1,7 +1,7 @@
-import { db, pool } from "./db";
+import { db } from "./db";
 import { sql } from "drizzle-orm";
 import { storage } from "./storage";
-import { withBgDbSlot } from "./lib/bg-db-limiter";
+import { withBgDbConnection } from "./lib/bg-db-limiter";
 
 const VACUUM_LAST_RUN_KEY = "db_vacuum_smart_v1";
 const VACUUM_DETAIL_KEY = "db_vacuum_smart_v1_detail";
@@ -107,51 +107,45 @@ export async function runVacuumSmart(): Promise<"executed" | "skipped"> {
     console.log(
       `[VACUUM] Avvio VACUUM smart sulle tabelle principali (soglia bloat FULL: ${(threshold * 100).toFixed(0)}%)...`,
     );
-    await withBgDbSlot(async () => {
-      let client: import("pg").PoolClient | null = null;
-      try {
-        client = await pool.connect();
-        for (const table of VACUUM_TABLES) {
-          let sizeBefore = 0;
-          let sizeAfter = 0;
-          try {
-            const r = await client.query<{ size: string }>(
-              `SELECT pg_total_relation_size($1::regclass) AS size`,
-              [table],
-            );
-            sizeBefore = parseInt(r.rows[0]?.size ?? "0", 10);
-          } catch {
-            sizeBefore = 0;
-          }
-          const bloatRatio = await getTableBloatRatio(client, table);
-          const mode: "analyze" | "full" = bloatRatio > threshold ? "full" : "analyze";
-          const t0 = Date.now();
-          if (mode === "full") {
-            await client.query(`VACUUM FULL ANALYZE ${table}`);
-          } else {
-            await client.query(`VACUUM ANALYZE ${table}`);
-          }
-          const elapsed = Date.now() - t0;
-          try {
-            const r = await client.query<{ size: string }>(
-              `SELECT pg_total_relation_size($1::regclass) AS size`,
-              [table],
-            );
-            sizeAfter = parseInt(r.rows[0]?.size ?? "0", 10);
-          } catch {
-            sizeAfter = 0;
-          }
-          tableDetails.push({ table, mode, bloatRatio, bytesBefore: sizeBefore, bytesAfter: sizeAfter });
-          const savedMB = ((sizeBefore - sizeAfter) / 1024 / 1024).toFixed(2);
-          const beforeMB = (sizeBefore / 1024 / 1024).toFixed(2);
-          const afterMB = (sizeAfter / 1024 / 1024).toFixed(2);
-          const bloatPct = (bloatRatio * 100).toFixed(1);
-          console.log(
-            `[VACUUM] ${table}: mode=${mode.toUpperCase()} bloat=${bloatPct}% ${beforeMB}MB → ${afterMB}MB (risparmio ${savedMB}MB) in ${elapsed}ms`,
+    await withBgDbConnection(async (client) => {
+      for (const table of VACUUM_TABLES) {
+        let sizeBefore = 0;
+        let sizeAfter = 0;
+        try {
+          const r = await client.query<{ size: string }>(
+            `SELECT pg_total_relation_size($1::regclass) AS size`,
+            [table],
           );
+          sizeBefore = parseInt(r.rows[0]?.size ?? "0", 10);
+        } catch {
+          sizeBefore = 0;
         }
-      } finally {
-        if (client) client.release();
+        const bloatRatio = await getTableBloatRatio(client, table);
+        const mode: "analyze" | "full" = bloatRatio > threshold ? "full" : "analyze";
+        const t0 = Date.now();
+        if (mode === "full") {
+          await client.query(`VACUUM FULL ANALYZE ${table}`);
+        } else {
+          await client.query(`VACUUM ANALYZE ${table}`);
+        }
+        const elapsed = Date.now() - t0;
+        try {
+          const r = await client.query<{ size: string }>(
+            `SELECT pg_total_relation_size($1::regclass) AS size`,
+            [table],
+          );
+          sizeAfter = parseInt(r.rows[0]?.size ?? "0", 10);
+        } catch {
+          sizeAfter = 0;
+        }
+        tableDetails.push({ table, mode, bloatRatio, bytesBefore: sizeBefore, bytesAfter: sizeAfter });
+        const savedMB = ((sizeBefore - sizeAfter) / 1024 / 1024).toFixed(2);
+        const beforeMB = (sizeBefore / 1024 / 1024).toFixed(2);
+        const afterMB = (sizeAfter / 1024 / 1024).toFixed(2);
+        const bloatPct = (bloatRatio * 100).toFixed(1);
+        console.log(
+          `[VACUUM] ${table}: mode=${mode.toUpperCase()} bloat=${bloatPct}% ${beforeMB}MB → ${afterMB}MB (risparmio ${savedMB}MB) in ${elapsed}ms`,
+        );
       }
     });
     const totalElapsed = Date.now() - startTotal;

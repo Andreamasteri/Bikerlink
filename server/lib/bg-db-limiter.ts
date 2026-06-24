@@ -21,7 +21,36 @@
 // cicli interni con un minimo di parallelismo senza mai poter saturare il pool
 // da soli.
 
+import { pool } from "../db";
+
 const BG_DB_MAX_CONCURRENCY = 3;
+
+// ─── Fix 1: statement_timeout su connessioni bg ──────────────────────────────
+// Ogni connessione acquisita da withBgDbConnection riceve un timeout esplicito
+// di 12s. Postgres uccide la query e rilascia la connessione automaticamente:
+// nessuna query bg può più tenere bloccato uno slot oltre 12 secondi.
+// NOTA: VACUUM è escluso da statement_timeout in Postgres — il timeout non
+// interrompe operazioni di manutenzione legittime.
+const BG_DB_STATEMENT_TIMEOUT_MS = 12_000;
+// Timeout del pool (usato per ripristinare la connessione prima del release).
+const POOL_DEFAULT_STATEMENT_TIMEOUT_MS = 5_000;
+
+// ─── Fix 2: kill-switch adattivo ─────────────────────────────────────────────
+// Quando il db-collector rileva DB lento (≥N campioni consecutivi con p95>5s)
+// lo comunica via setDbSlowPingsConsecutive(). withBgDbSlot / withBgDbConnection
+// rifiutano i nuovi job non critici immediatamente (BgDbSlowKillSwitchError),
+// lasciando che il DB si scarichi. Appena i campioni lenti tornano a 0 i job
+// riprendono automaticamente. I job critici (es. health check, circuit breaker)
+// sono esclusi impostando { critical: true }.
+const BG_DB_SLOW_THRESHOLD = 2; // campioni consecutivi lenti per attivare il kill-switch
+
+let dbSlowPingsConsecutive = 0;
+let droppedSlowKillSwitchTotal = 0;
+
+/** Chiamato da db-collector ad ogni tick per aggiornare il contatore slow. */
+export function setDbSlowPingsConsecutive(n: number): void {
+  dbSlowPingsConsecutive = n;
+}
 
 // ─── Backlog containment (Task #4798) ───────────────────────────────────────
 //
@@ -57,6 +86,13 @@ export class BgDbQueueTimeoutError extends Error {
   }
 }
 
+export class BgDbSlowKillSwitchError extends Error {
+  constructor(consecutive: number, threshold: number) {
+    super(`bg-db-limiter kill-switch active (${consecutive} consecutive slow pings ≥${threshold}) — job dropped`);
+    this.name = "BgDbSlowKillSwitchError";
+  }
+}
+
 interface Waiter {
   resolve: () => void;
   reject: (err: Error) => void;
@@ -69,7 +105,14 @@ let droppedOverflowTotal = 0;
 let droppedTimeoutTotal = 0;
 const queue: Waiter[] = [];
 
-function acquire(): Promise<void> {
+function acquire(critical?: boolean): Promise<void> {
+  // Fix 2: kill-switch adattivo — rifiuta i job non critici quando il DB è lento.
+  // I job critici (es. health check) bypassano il kill-switch con { critical: true }.
+  if (!critical && dbSlowPingsConsecutive >= BG_DB_SLOW_THRESHOLD) {
+    droppedSlowKillSwitchTotal++;
+    return Promise.reject(new BgDbSlowKillSwitchError(dbSlowPingsConsecutive, BG_DB_SLOW_THRESHOLD));
+  }
+
   if (active < BG_DB_MAX_CONCURRENCY) {
     active++;
     return Promise.resolve();
@@ -127,12 +170,56 @@ function release(): void {
  * Va avvolto attorno alla porzione di lavoro che ACQUISISCE connessioni dal pool
  * (query/`pool.connect()`), non attorno a calcoli in-memory: tenere lo slot più
  * a lungo del necessario riduce inutilmente il parallelismo degli altri job.
+ *
+ * Per job che acquisiscono una PoolClient esplicitamente, preferire
+ * `withBgDbConnection` che gestisce anche il statement_timeout a 12s (Fix 1).
+ *
+ * @param opts.critical  Se true, bypassa il kill-switch adattivo (Fix 2).
+ *                       Usare solo per job essenziali alla salute del sistema.
  */
-export async function withBgDbSlot<T>(fn: () => Promise<T>): Promise<T> {
-  await acquire();
+export async function withBgDbSlot<T>(fn: () => Promise<T>, opts?: { critical?: boolean }): Promise<T> {
+  await acquire(opts?.critical);
   try {
     return await fn();
   } finally {
+    release();
+  }
+}
+
+/**
+ * Fix 1 — Combina slot bg + connessione pg + statement_timeout a 12s.
+ *
+ * Acquisce uno slot del budget bg, poi una PoolClient dal pool principale,
+ * imposta `statement_timeout = 12s` sulla sessione e passa la connessione a
+ * `fn`. In `finally` ripristina il timeout di default del pool, rilascia la
+ * connessione e libera lo slot — in quest'ordine, anche su eccezioni.
+ *
+ * Questo garantisce che nessuna query bg possa tenere bloccata una connessione
+ * oltre 12 secondi (Postgres uccide la query e rilascia il socket). VACUUM e
+ * altri comandi di manutenzione non sono interrotti da statement_timeout in
+ * Postgres, quindi questo wrapper è sicuro anche per operazioni di pulizia.
+ *
+ * NON fare `client.release()` dentro `fn`: il release è gestito da questo
+ * wrapper. NON annidare `withBgDbConnection` o `withBgDbSlot` dentro `fn`:
+ * l'annidamento può causare deadlock sul semaforo.
+ *
+ * @param opts.critical  Se true, bypassa il kill-switch adattivo (Fix 2).
+ */
+export async function withBgDbConnection<T>(
+  fn: (client: import("pg").PoolClient) => Promise<T>,
+  opts?: { critical?: boolean },
+): Promise<T> {
+  await acquire(opts?.critical);
+  let client: import("pg").PoolClient | null = null;
+  try {
+    client = await pool.connect();
+    try { await client.query(`SET statement_timeout = '${BG_DB_STATEMENT_TIMEOUT_MS}'`); } catch { /* best-effort */ }
+    return await fn(client);
+  } finally {
+    if (client) {
+      try { await client.query(`SET statement_timeout = '${POOL_DEFAULT_STATEMENT_TIMEOUT_MS}'`); } catch { /* best-effort */ }
+      client.release();
+    }
     release();
   }
 }
@@ -144,6 +231,8 @@ export function getBgDbLimiterStats(): {
   maxQueue: number;
   droppedOverflowTotal: number;
   droppedTimeoutTotal: number;
+  droppedSlowKillSwitchTotal: number;
+  dbSlowPingsConsecutive: number;
 } {
   return {
     active,
@@ -152,5 +241,7 @@ export function getBgDbLimiterStats(): {
     maxQueue: BG_DB_MAX_QUEUE,
     droppedOverflowTotal,
     droppedTimeoutTotal,
+    droppedSlowKillSwitchTotal,
+    dbSlowPingsConsecutive,
   };
 }

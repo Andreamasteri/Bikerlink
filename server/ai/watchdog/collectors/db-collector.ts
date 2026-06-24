@@ -2,6 +2,7 @@
 import { pool, isPoolHealthy, snapshotBlockedQueries } from "../../../db";
 import type { Signal } from "../types";
 import { recordSuccess as cbRecordSuccess, recordFailure as cbRecordFailure, getCircuitStatus } from "../../../db-circuit-breaker";
+import { setDbSlowPingsConsecutive } from "../../../lib/bg-db-limiter";
 
 // ── Anti-blip (Task #4546) ────────────────────────────────────────────────────
 // Un singolo campione lento o un singolo ping fallito è quasi sempre un blip
@@ -112,9 +113,11 @@ export async function collectDb(): Promise<Signal[]> {
     let pingSeverity: Signal["severity"];
     if (pingMs > SLOW_PING_THRESHOLD_MS) {
       consecutiveSlowPings++;
+      setDbSlowPingsConsecutive(consecutiveSlowPings);
       pingSeverity = consecutiveSlowPings >= CONSECUTIVE_SLOW_FOR_HIGH ? "high" : "warn";
     } else {
       consecutiveSlowPings = 0;
+      setDbSlowPingsConsecutive(0);
       pingSeverity = pingMs > WARN_PING_THRESHOLD_MS ? "warn" : "info";
     }
     signals.push({
@@ -172,6 +175,7 @@ export async function collectDb(): Promise<Signal[]> {
     } catch { /* ignore */ }
   } catch (err) {
     consecutiveSlowPings = 0;
+    setDbSlowPingsConsecutive(0);
     // Distingui "pool saturo" da "DB irraggiungibile" (incidente 20 giu).
     // Quando il pool è saturo (tutte le connessioni occupate + client in attesa)
     // il SELECT 1 fallisce perché non riesce ad ACQUISIRE una connessione entro

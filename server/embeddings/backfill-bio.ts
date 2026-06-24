@@ -1,6 +1,6 @@
 import type { PoolClient } from "pg";
-import { pool, withDbRetry } from "../db";
-import { withBgDbSlot } from "../lib/bg-db-limiter";
+
+import { withBgDbConnection } from "../lib/bg-db-limiter";
 import { upsertEmbedding } from "./store";
 import { storage } from "../storage";
 import { logAiUsage } from "../ai/audit";
@@ -98,15 +98,8 @@ export async function backfillBioEmbeddings(): Promise<{
   // sequenziale (1 connessione alla volta), intervallato da chiamate all'API di
   // embedding e da delayMs — tenere uno slot per tutta la sua durata ridurrebbe
   // inutilmente il parallelismo degli altri job.
-  const rows: Array<{ user_id: string; bio: string }> = await withBgDbSlot(() =>
-    withDbRetry(async () => {
-      const client = await pool.connect();
-      try {
-        return await findUsersNeedingEmbedding(client, batchSize);
-      } finally {
-        client.release();
-      }
-    }),
+  const rows: Array<{ user_id: string; bio: string }> = await withBgDbConnection((client) =>
+    findUsersNeedingEmbedding(client, batchSize),
   );
 
   if (rows.length === 0) {
