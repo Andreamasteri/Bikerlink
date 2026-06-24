@@ -46,6 +46,10 @@ export const businesses = pgTable("businesses", {
   eventUrl: text("event_url"),
   openingHours: jsonb("opening_hours"),
   logoUrl: text("logo_url"),
+  // Token di accesso self-service: il titolare del business lo usa per consultare
+  // i PROPRI numeri aggregati (reach) senza un account app. Generato/revocato
+  // dall'admin. Null = nessun accesso self-service attivo.
+  accessToken: varchar("access_token", { length: 64 }),
   isApproved: boolean("is_approved").notNull().default(false),
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at").notNull().defaultNow(),
@@ -53,6 +57,7 @@ export const businesses = pgTable("businesses", {
 }, (table) => [
   index("businesses_location_idx").on(table.latitude, table.longitude),
   index("businesses_type_idx").on(table.type),
+  uniqueIndex("businesses_access_token_idx").on(table.accessToken),
 ]);
 
 /**

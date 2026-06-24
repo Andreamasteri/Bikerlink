@@ -374,6 +374,22 @@ export class SocialStorage extends TextAliasesStorage {
       .where(and(eq(businesses.isApproved, true), eq(businesses.isActive, true)));
   }
 
+  /** Lookup per token di accesso self-service (vista business reach del titolare). */
+  async getBusinessByAccessToken(token: string): Promise<Business | undefined> {
+    if (!token) return undefined;
+    const [row] = await db.select().from(businesses)
+      .where(eq(businesses.accessToken, token)).limit(1);
+    return row;
+  }
+
+  /** Imposta (o revoca con null) il token di accesso self-service del business. */
+  async setBusinessAccessToken(id: string, token: string | null): Promise<Business | undefined> {
+    const [row] = await db.update(businesses)
+      .set({ accessToken: token, updatedAt: new Date() })
+      .where(eq(businesses.id, id)).returning();
+    return row;
+  }
+
   async createBusiness(data: InsertBusiness): Promise<Business> {
     const [row] = await db.insert(businesses).values(data).returning();
     return row;
@@ -526,5 +542,89 @@ export class SocialStorage extends TextAliasesStorage {
         clicksByAction,
       };
     });
+  }
+
+  /**
+   * Vista self-service del titolare (Task #4917): report reach aggregato di UN
+   * solo business per un mese, più l'elenco dei mesi disponibili. SOLO conteggi
+   * aggregati — nessuna traccia individuale di rider è mai esposta.
+   */
+  async getBusinessSelfReport(businessId: string, periodMonth: string): Promise<{
+    businessId: string;
+    name: string;
+    type: string;
+    periodMonth: string;
+    qualifiedPassages: number;
+    uniqueRiders: number;
+    radiusM: number;
+    computedAt: Date | null;
+    clicks: number;
+    clicksByAction: Record<string, number>;
+    availableMonths: string[];
+  } | null> {
+    const biz = await this.getBusiness(businessId);
+    if (!biz) return null;
+
+    const [yStr, mStr] = periodMonth.split("-");
+    const year = Number(yStr);
+    const month = Number(mStr);
+    const startMs = Date.UTC(year, month - 1, 1);
+    const endMs = Date.UTC(month === 12 ? year + 1 : year, month === 12 ? 0 : month, 1);
+    const monthStart = new Date(startMs);
+    const monthEnd = new Date(endMs);
+
+    const [stat] = await db.select().from(businessPassageStats)
+      .where(and(
+        eq(businessPassageStats.businessId, businessId),
+        eq(businessPassageStats.periodMonth, periodMonth),
+      )).limit(1);
+
+    const clickRows = await db.select({
+      actionType: businessClicks.actionType,
+      count: sql<number>`count(*)::int`,
+    })
+      .from(businessClicks)
+      .where(and(
+        eq(businessClicks.businessId, businessId),
+        sql`${businessClicks.createdAt} >= ${monthStart}`,
+        sql`${businessClicks.createdAt} < ${monthEnd}`,
+      ))
+      .groupBy(businessClicks.actionType);
+
+    const clicksByAction: Record<string, number> = {};
+    for (const r of clickRows) clicksByAction[r.actionType] = Number(r.count);
+    const clicks = Object.values(clicksByAction).reduce((a, c) => a + c, 0);
+
+    // Mesi disponibili: unione dei period_month con stat passaggi e dei mesi con
+    // almeno un click, per popolare il selettore mese della vista titolare.
+    const months = new Set<string>();
+    const statMonths = await db.select({ periodMonth: businessPassageStats.periodMonth })
+      .from(businessPassageStats)
+      .where(eq(businessPassageStats.businessId, businessId));
+    for (const r of statMonths) months.add(r.periodMonth);
+    const clickMonths = await db.execute(sql<{ m: string }>`
+      SELECT DISTINCT to_char(created_at, 'YYYY-MM') AS m
+      FROM business_clicks
+      WHERE business_id = ${businessId}
+    `);
+    for (const r of (clickMonths as unknown as { rows: Array<{ m: string }> }).rows ?? []) {
+      if (r.m) months.add(r.m);
+    }
+    months.add(periodMonth);
+    const availableMonths = Array.from(months).sort((a, b) => b.localeCompare(a));
+
+    return {
+      businessId: biz.id,
+      name: biz.name,
+      type: biz.type,
+      periodMonth,
+      qualifiedPassages: stat?.qualifiedPassages ?? 0,
+      uniqueRiders: stat?.uniqueRiders ?? 0,
+      radiusM: stat?.radiusM ?? 0,
+      computedAt: stat?.computedAt ?? null,
+      clicks,
+      clicksByAction,
+      availableMonths,
+    };
   }
 }

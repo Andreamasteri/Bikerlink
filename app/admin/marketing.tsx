@@ -4,9 +4,10 @@ import { KeyboardAvoidingView } from "react-native";
 import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollViewCompat";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { MaterialIcons } from "@expo/vector-icons";
+import * as Clipboard from "expo-clipboard";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
-import { apiRequest, queryClient } from "@/lib/query-client";
+import { apiRequest, queryClient, getApiUrl } from "@/lib/query-client";
 import { useT } from "@/lib/language-context";
 import AdminChatWidget from "@/components/admin/AdminChatWidget";
 
@@ -24,6 +25,7 @@ interface Business {
   description: string | null;
   promoText: string | null;
   eventUrl: string | null;
+  accessToken: string | null;
   isApproved: boolean;
   isActive: boolean;
 }
@@ -127,6 +129,26 @@ export default function AdminMarketing() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/admin/business"] }),
   });
 
+  const genTokenMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await apiRequest("POST", `/api/admin/business/${id}/access-token`);
+      return res.json() as Promise<{ id: string; accessToken: string }>;
+    },
+    onSuccess: async (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/business"] });
+      const link = `${getApiUrl()}/business-reach?token=${data.accessToken}`;
+      await Clipboard.setStringAsync(link).catch(() => {});
+      Alert.alert("Accesso creato", "Il link di accesso è stato copiato negli appunti. Inviatelo al titolare dell'attività.");
+    },
+  });
+
+  const revokeTokenMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await apiRequest("DELETE", `/api/admin/business/${id}/access-token`);
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/admin/business"] }),
+  });
+
   const configMutation = useMutation({
     mutationFn: async (data: { radiusM: number; maxSpeedKmh: number }) => {
       const res = await apiRequest("PUT", "/api/admin/business/config", data);
@@ -209,6 +231,37 @@ export default function AdminMarketing() {
     configMutation.mutate({ radiusM, maxSpeedKmh });
   }
 
+  function handleAccessToken(b: Business) {
+    if (b.accessToken) {
+      Alert.alert(
+        "Accesso titolare",
+        `"${b.name}" ha un accesso attivo. Il titolare può consultare i propri numeri aggregati.`,
+        [
+          {
+            text: "Copia link",
+            onPress: async () => {
+              const link = `${getApiUrl()}/business-reach?token=${b.accessToken}`;
+              await Clipboard.setStringAsync(link).catch(() => {});
+              Alert.alert("Copiato", "Link di accesso copiato negli appunti.");
+            },
+          },
+          { text: "Rigenera", onPress: () => genTokenMutation.mutate(b.id) },
+          { text: "Revoca", style: "destructive", onPress: () => revokeTokenMutation.mutate(b.id) },
+          { text: t("common.cancel") || "Annulla", style: "cancel" },
+        ],
+      );
+    } else {
+      Alert.alert(
+        "Crea accesso titolare",
+        `Generare un link di accesso per "${b.name}"? Il titolare potrà vedere solo i propri numeri aggregati, mai i dati dei singoli motociclisti.`,
+        [
+          { text: t("common.cancel") || "Annulla", style: "cancel" },
+          { text: "Genera", onPress: () => genTokenMutation.mutate(b.id) },
+        ],
+      );
+    }
+  }
+
   function renderItem({ item }: { item: Business }) {
     const accent = item.type === "concessionaria" ? ACCENT_DEALER : ACCENT_VENUE;
     return (
@@ -244,6 +297,13 @@ export default function AdminMarketing() {
                 <MaterialIcons name="check-circle" size={22} color={Colors.success} />
               </TouchableOpacity>
             ) : null}
+            <TouchableOpacity onPress={() => handleAccessToken(item)} hitSlop={8} testID={`access-token-${item.id}`}>
+              <MaterialIcons
+                name={item.accessToken ? "vpn-key" : "key-off"}
+                size={20}
+                color={item.accessToken ? ACCENT_VENUE : Colors.textSecondary}
+              />
+            </TouchableOpacity>
             <TouchableOpacity onPress={() => openEdit(item)} hitSlop={8}>
               <MaterialIcons name="edit" size={20} color={Colors.textSecondary} />
             </TouchableOpacity>

@@ -1,3 +1,4 @@
+import { randomBytes } from "node:crypto";
 import { Router, type Request, type Response } from "express";
 import { sendError } from "../../lib/api-response";
 import { storage } from "../../storage";
@@ -140,6 +141,30 @@ router.put("/business/:id/approve", async (req: Request, res: Response) => {
     return res.json(biz);
   } catch (_error) {
     return sendError(res, 500, "Errore approvazione business");
+  }
+});
+
+// Genera (o rigenera) il token di accesso self-service del business (Task #4917).
+// Con questo token il titolare consulta i PROPRI numeri aggregati senza account.
+router.post("/business/:id/access-token", async (req: Request, res: Response) => {
+  try {
+    const token = randomBytes(24).toString("base64url");
+    const biz = await storage.setBusinessAccessToken(String(req.params.id), token);
+    if (!biz) return sendError(res, 404, "Business non trovato");
+    return res.json({ id: biz.id, accessToken: biz.accessToken });
+  } catch (_error) {
+    return sendError(res, 500, "Errore generazione token accesso");
+  }
+});
+
+// Revoca il token di accesso self-service (disattiva la vista titolare).
+router.delete("/business/:id/access-token", async (req: Request, res: Response) => {
+  try {
+    const biz = await storage.setBusinessAccessToken(String(req.params.id), null);
+    if (!biz) return sendError(res, 404, "Business non trovato");
+    return res.json({ id: biz.id, accessToken: null });
+  } catch (_error) {
+    return sendError(res, 500, "Errore revoca token accesso");
   }
 });
 

@@ -143,6 +143,8 @@ export interface IStorage {
   getBusinesses(): Promise<Business[]>;
   getBusiness(id: string): Promise<Business | undefined>;
   getVisibleBusinesses(): Promise<Business[]>;
+  getBusinessByAccessToken(token: string): Promise<Business | undefined>;
+  setBusinessAccessToken(id: string, token: string | null): Promise<Business | undefined>;
   createBusiness(data: InsertBusiness): Promise<Business>;
   updateBusiness(id: string, data: Partial<InsertBusiness>): Promise<Business | undefined>;
   deleteBusiness(id: string): Promise<void>;
@@ -150,6 +152,7 @@ export interface IStorage {
   createBusinessClick(data: InsertBusinessClick): Promise<void>;
   computeQualifiedPassages(businessId: string, periodMonth: string, radiusM: number, maxSpeedKmh: number): Promise<{ qualifiedPassages: number; uniqueRiders: number }>;
   getBusinessReport(periodMonth: string): Promise<Array<{ businessId: string; name: string; type: string; qualifiedPassages: number; uniqueRiders: number; radiusM: number; computedAt: Date | null; clicks: number; clicksByAction: Record<string, number> }>>;
+  getBusinessSelfReport(businessId: string, periodMonth: string): Promise<{ businessId: string; name: string; type: string; periodMonth: string; qualifiedPassages: number; uniqueRiders: number; radiusM: number; computedAt: Date | null; clicks: number; clicksByAction: Record<string, number>; availableMonths: string[] } | null>;
   getEasterEggs(active?: boolean): Promise<EasterEgg[]>;
   getEasterEgg(id: string): Promise<EasterEgg | undefined>;
   createEasterEgg(egg: InsertEasterEgg): Promise<EasterEgg>;

@@ -23,6 +23,33 @@ function isOnCooldown(key: string, now: number): boolean {
   return false;
 }
 
+function currentMonth(): string {
+  const now = new Date();
+  return `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, "0")}`;
+}
+
+// Vista self-service del titolare (Task #4917): consulta i PROPRI numeri di reach
+// aggregati usando un token di accesso (nessun account app richiesto). Il token È
+// la credenziale → niente sessione. Strettamente aggregato: passaggi qualificati
+// + click per azione, mai tracce individuali di rider.
+router.get("/reach/:token", async (req: Request<{ token: string }>, res: Response) => {
+  try {
+    const token = String(req.params.token ?? "").trim();
+    if (!token) return sendError(res, 404, "Accesso non valido");
+    const business = await storage.getBusinessByAccessToken(token);
+    if (!business) return sendError(res, 404, "Accesso non valido");
+    const month = typeof req.query.month === "string" && /^\d{4}-\d{2}$/.test(req.query.month)
+      ? req.query.month
+      : currentMonth();
+    const report = await storage.getBusinessSelfReport(business.id, month);
+    if (!report) return sendError(res, 404, "Accesso non valido");
+    return res.json(report);
+  } catch (error) {
+    console.error("Business self-reach error:", error);
+    return sendError(res, 500, "Errore interno del server");
+  }
+});
+
 // Solo i business approvati E attivi sono visibili al rider (marker mappa).
 router.get("/", async (_req: Request, res: Response) => {
   try {

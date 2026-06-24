@@ -164,6 +164,7 @@ function RootLayoutNav() {
       <Stack.Screen name="chat/[id]" options={{ headerShown: false }} />
       <Stack.Screen name="motoclub/[id]" options={{ headerShown: false }} />
       <Stack.Screen name="business/[id]" options={{ headerShown: false }} />
+      <Stack.Screen name="business-reach" options={{ headerShown: false }} />
       <Stack.Screen name="route" options={{ headerShown: false }} />
       <Stack.Screen name="evento" options={{ headerShown: false }} />
       <Stack.Screen name="admin" options={{ headerShown: false }} />
