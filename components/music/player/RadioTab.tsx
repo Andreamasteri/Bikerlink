@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useState, useCallback, useEffect, useMemo } from "react";
 import {
   View,
   Text,
@@ -42,24 +42,22 @@ export function RadioTab({ onPlayStation }: RadioTabProps) {
     AsyncStorage.setItem(LASTFM_SUGGEST_KEY, String(val)).catch(() => {});
   }, []);
 
-  // check-unstable-query-defaults: safe — genres, suggestedGenreIds e stations
-  // con default = [] sono usati solo nel render JSX e in displayedGenres (derivato).
-  // Nessuna di queste variabili finisce nei deps di useEffect.
-  // Se in futuro si aggiunge un useEffect che le usa, rimuovere il default = []
-  // e usare `data ?? []` stabilizzato con useMemo.
-  const { data: genres = [] } = useQuery<Genre[]>({
+  const { data: rawGenres } = useQuery<Genre[]>({
     queryKey: ["/api/music/radio/genres"],
   });
+  const genres = useMemo(() => rawGenres ?? [], [rawGenres]);
 
-  const { data: suggestedGenreIds = [], isFetched: suggestedFetched } = useQuery<string[]>({
+  const { data: rawSuggestedGenreIds, isFetched: suggestedFetched } = useQuery<string[]>({
     queryKey: ["/api/music/radio/suggested-genres"],
     enabled: useLastFm,
   });
+  const suggestedGenreIds = useMemo(() => rawSuggestedGenreIds ?? [], [rawSuggestedGenreIds]);
 
-  const { data: stations = [], isLoading: loadingStations } = useQuery<RadioStation[]>({
+  const { data: rawStations, isLoading: loadingStations } = useQuery<RadioStation[]>({
     queryKey: [selectedGenre ? `/api/music/radio/stations?genre=${selectedGenre}` : "/api/music/radio/stations"],
     enabled: !!selectedGenre,
   });
+  const stations = useMemo(() => rawStations ?? [], [rawStations]);
 
   const displayedGenres = useLastFm && suggestedGenreIds.length > 0
     ? [...genres].sort((a, b) => {
