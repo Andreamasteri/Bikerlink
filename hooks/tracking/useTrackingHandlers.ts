@@ -1,5 +1,5 @@
-import { useCallback, useRef } from "react";
-import { Alert, Animated } from "react-native";
+import { useCallback } from "react";
+import { Alert } from "react-native";
 import * as Location from "expo-location";
 import { DeviceMotion } from "expo-sensors";
 import * as Battery from "expo-battery";

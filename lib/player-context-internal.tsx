@@ -1,4 +1,4 @@
-import React, { createContext, useContext } from "react";
+import { createContext, useContext } from "react";
 import { PlayerContextType } from "./player-context-types";
 
 export const PlayerContext = createContext<PlayerContextType | null>(null);

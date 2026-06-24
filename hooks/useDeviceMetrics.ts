@@ -8,7 +8,7 @@ import { useAuth } from "@/lib/auth-context";
 
 let _getUsedMemory: (() => Promise<number>) | null = null;
 try {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
+   
   const DeviceInfo = require("react-native-device-info");
   if (typeof DeviceInfo?.getUsedMemory === "function") {
     _getUsedMemory = DeviceInfo.getUsedMemory as () => Promise<number>;

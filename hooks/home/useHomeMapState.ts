@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import { Linking, Alert, Animated } from "react-native";
+import { Animated } from "react-native";
 import { useRouter, useLocalSearchParams, useFocusEffect } from "expo-router";
 import { useAuth } from "@/lib/auth-context";
 import { useLocationGate } from "@/lib/location-context";
@@ -8,15 +8,13 @@ import { useT } from "@/lib/language-context";
 import { useMapFilters } from "@/hooks/useMapFilters";
 import { useMapLocation } from "@/hooks/useMapLocation";
 import { useMapData } from "@/hooks/useMapData";
-import { CONTINENT_MAP, getCountryByCode } from "@/lib/countries-regions";
+import { CONTINENT_MAP } from "@/lib/countries-regions";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { apiRequest, queryClient } from "@/lib/query-client";
 import { InteractiveMapHandle } from "@/components/InteractiveMap";
 import type { User } from "@shared/db";
 import { sendStartupBeacon } from "@/lib/startup-beacon";
 import { handleFocusAnimation, focusMap, useHomeMapHandlers, getAreaLabel, handleAutoCollecting, useHomeMapStates, useHomeMapCalculated } from "./useHomeMapState.part2";
 
-import { useHomeAds, useHomeSearch } from "./useHomeMapState.hooks";
 
 type UserWithProfileCoords = Omit<User, "password"> & {
   profileLatitude?: number | null;

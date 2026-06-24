@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState } from "react";
 import * as Speech from "expo-speech";
 import { haversineM } from "@/lib/geo";
 import { apiRequest, getApiUrl } from "@/lib/query-client";

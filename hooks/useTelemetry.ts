@@ -23,7 +23,6 @@ import {
 import {
   useTelemetryUpload,
   FLUSH_MAX_SAMPLES,
-  UPLOAD_EVERY_KM,
   STOP_RETRY_DELAY_MS,
   CHECKPOINT_INTERVAL_MS,
 } from "@/hooks/useTelemetryUpload";
@@ -313,7 +312,7 @@ export function useTelemetry(isActive: boolean, externalGps = false) {
   // ── unmount cleanup ─────────────────────────────────────────────────────────
   useEffect(() => {
     return () => { machineRef.current?.stop().catch(() => {}); };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, []);
 
   // ── AppState → machine ──────────────────────────────────────────────────────

@@ -1,5 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
-import { getApiUrl, apiRequest } from "@/lib/query-client";
+import { useState, useCallback } from "react";
 
 export function useNavVoice(whisper: any, getApiUrl: any, apiRequest: any, triggerRerouteToDestination: any) {
   const [voiceCmdToast, setVoiceCmdToast] = useState<string | null>(null);

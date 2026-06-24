@@ -149,7 +149,7 @@ describe("recoverLastBeacon — best-effort, non blocca l'avvio", () => {
     // immediatamente, senza aspettare che lo storage si sblocchi.
     let callerReachedNextLine = false;
 
-    // eslint-disable-next-line @typescript-eslint/no-floating-promises
+     
     recoverLastBeacon(); // fire-and-forget intenzionale: simula l'uso nel bootstrap
 
     callerReachedNextLine = true; // deve essere raggiunta subito

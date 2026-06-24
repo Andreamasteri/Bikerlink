@@ -951,18 +951,19 @@ echo ""
 
 # ── ESLint gate: react-hooks/rules-of-hooks + all error-level rules ──────────
 echo "════════════════════════════════════════"
-echo "ESLint gate — verifica regole error-level su app/ ..."
+echo "ESLint gate — verifica regole error-level su app/ components/ hooks/ lib/ ..."
 echo ""
 # --cache         → riutilizza risultati file invariati (target < 30s)
 # Esce con codice non-zero solo sugli error; i warning (exhaustive-deps ecc.) non bloccano.
-if ! npx eslint app/ --ext .tsx --cache --cache-location .eslintcache; then
+# Copre app/ (Expo Router pages) + codice condiviso components/, hooks/, lib/
+if ! npx eslint app/ components/ hooks/ lib/ --ext .ts,.tsx --cache --cache-location .eslintcache; then
   echo ""
-  echo "❌ ESLint gate FALLITO — trovate violazioni error-level in app/"
+  echo "❌ ESLint gate FALLITO — trovate violazioni error-level in app/, components/, hooks/ o lib/"
   echo "   Correggere i file segnalati sopra prima del merge."
-  echo "   (Eseguire: npx eslint app/ --ext .tsx)"
+  echo "   (Eseguire: npx eslint app/ components/ hooks/ lib/ --ext .ts,.tsx)"
   exit 1
 else
-  echo "✅ ESLint gate superato — nessuna violazione error-level in app/"
+  echo "✅ ESLint gate superato — nessuna violazione error-level in app/, components/, hooks/, lib/"
 fi
 echo "════════════════════════════════════════"
 echo ""

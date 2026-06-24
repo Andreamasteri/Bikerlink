@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 import { Animated, AppState } from "react-native";
 import * as Location from "expo-location";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -230,7 +230,7 @@ export function useTrackingEffects(deps: EffectDeps) {
   const GPS_BUFFER_SEG_KEY = (n: number) => `@bikerlink/gps_buffer_seg_${n}`;
   useEffect(() => {
     AsyncStorage.removeMany([GPS_BUFFER_SEGCOUNT_KEY, ...Array.from({ length: 50 }, (_, i) => GPS_BUFFER_SEG_KEY(i))]).catch(() => {});
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);  
 
   // Bug 4 recovery: retry GPS point batches persisted at stop time due to network failure
   useEffect(() => {
@@ -252,5 +252,5 @@ export function useTrackingEffects(deps: EffectDeps) {
         }
       } catch { /* AsyncStorage unavailable */ }
     })();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);  
 }

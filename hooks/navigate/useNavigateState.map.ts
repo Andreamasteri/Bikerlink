@@ -1,4 +1,4 @@
-import { useMemo, useRef } from "react";
+import { useMemo } from "react";
 import { getApiUrl } from "@/lib/query-client";
 
 export function useNavMapUri(polylinePoints: any[], activeStepsRef: any, route: any, activeTileUrl: string, activeTileMaxZoom: number, offline: any) {

@@ -20,7 +20,6 @@ import {
   loadRouteFromCache,
   activeStepIndex,
 } from "@/components/navigate/navigate-helpers";
-import type { NavWeatherZone } from "@/components/navigate/NavigationWeather";
 import { useWhisperRecorder } from "@/hooks/useWhisperRecorder";
 import { useLocationGate } from "@/lib/location-context";
 import { announceStep, calculateRemainingDist, useVoiceCommandInternal, useNavigateStates, useWeatherHandlers } from "./useNavigateState.part2";

@@ -1,6 +1,6 @@
 import { AppState } from "react-native";
 import { router } from "expo-router";
-import { getApiUrl, authFetchHeaders, getSessionToken } from "@/lib/query-client";
+import { getApiUrl, getSessionToken } from "@/lib/query-client";
 import { runAllTests } from "@/lib/diagnostic/runner";
 
 let _ws: WebSocket | null = null;
