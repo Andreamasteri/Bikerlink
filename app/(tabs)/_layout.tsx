@@ -314,6 +314,45 @@ export default function TabLayout() {
   }), [colors.accent, colors.textSecondary, colors.surface, colors.border,
        colors.text, tabBarHeight, tabBarPaddingBottom]);
 
+  // ── Boot guard ──────────────────────────────────────────────────────────────
+  // Options memoizzate (riferimenti stabili) per le Tabs minimali.
+  // Se passassimo inline objects, React Navigation chiamerebbe setOptions ad
+  // ogni render perché la reference cambia → loop identico a quello che
+  // vogliamo evitare.
+  const minimalTabsScreenOptions = useMemo(
+    () => ({ headerShown: false, tabBarStyle: { display: "none" } as never }),
+    []
+  );
+  const hiddenTabOptions = useMemo(() => ({ href: null }), []);
+
+  // Finché user=null (isLoading O non autenticato), rendiamo Tabs minimali:
+  // • nessun tabBarIcon (arrow function) → nessun loop setOptions di RN
+  // • nessun renderCustomTabBar → nessun hook pesante da montare
+  // • il redirect useEffect (righe sopra) gestisce la navigazione verso
+  //   /(auth)/login quando hasWaited=true && !user.
+  // SplashScreen è ancora visibile in questo window → nessun flash utente.
+  if (isLoading || !user) {
+    return (
+      <Tabs screenOptions={minimalTabsScreenOptions}>
+        <Tabs.Screen name="index" />
+        <Tabs.Screen name="proposals" />
+        <Tabs.Screen name="ready" />
+        <Tabs.Screen name="motoclub" />
+        <Tabs.Screen name="eventi" />
+        <Tabs.Screen name="match" />
+        <Tabs.Screen name="music" />
+        <Tabs.Screen name="chat" />
+        <Tabs.Screen name="contest" />
+        <Tabs.Screen name="arcade" />
+        <Tabs.Screen name="ride" options={hiddenTabOptions} />
+        <Tabs.Screen name="giri" options={hiddenTabOptions} />
+        <Tabs.Screen name="tracking" options={hiddenTabOptions} />
+        <Tabs.Screen name="garage" />
+        <Tabs.Screen name="profile" />
+      </Tabs>
+    );
+  }
+
   return (
     <>
       {isGpsGateActive && (

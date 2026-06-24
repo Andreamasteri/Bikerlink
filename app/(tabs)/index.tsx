@@ -10,6 +10,7 @@ import {
   useWindowDimensions,
 } from "react-native";
 import { useRouter } from "expo-router";
+import { useAuth } from "@/lib/auth-context";
 import { queryClient } from "@/lib/query-client";
 import Colors from "@/constants/colors";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -35,7 +36,7 @@ interface CardLayout {
   height: number;
 }
 
-export default function MapScreen() {
+function MapScreenContent() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
@@ -452,3 +453,15 @@ const styles = StyleSheet.create({
     borderColor: "rgba(255,111,0,0.92)",
   },
 });
+
+// ── Boot guard ───────────────────────────────────────────────────────────────
+// MapScreenContent chiama useHomeMapState() che monta decine di hook pesanti.
+// Se montati prima che l'auth sia pronto (user=null), certi useEffect causano
+// "Maximum update depth exceeded". Il wrapper impedisce il mount finché
+// user è disponibile; il TabLayout (isLoading || !user guard) gestisce la
+// schermata vuota e il redirect verso login.
+export default function MapScreen() {
+  const { isLoading } = useAuth();
+  if (isLoading) return <View style={{ flex: 1 }} />;
+  return <MapScreenContent />;
+}
