@@ -12,9 +12,10 @@
 # restano silenziosamente in drift.
 #
 # Pattern rilevati (nei file .ts sotto server/__tests__/, esclusa la fixtures):
-#   1. _BROKEN"  o  _BROKEN'   — marcatore broken come suffisso di un valore stringa
+#   1. _BROKEN"  o  _BROKEN'  o  _BROKEN`  — marcatore broken come suffisso di un valore stringa
 #   2. "BROKEN_FIXTURE"        — sentinel usato come stringa letterale double-quote
 #   3. 'BROKEN_FIXTURE'        — sentinel usato come stringa letterale single-quote
+#   4. `BROKEN_FIXTURE`        — sentinel usato come template literal backtick
 #
 # Soppressione consapevole (aggiungere sopra la riga che triggera il check):
 #   // check-inline-broken-fixtures: safe — <motivazione>
@@ -62,6 +63,20 @@ if [ -z "$_SC3" ]; then
   FAIL=1
 fi
 
+# Self-check 4: _BROKEN` deve essere rilevato con backtick
+_SC4=$(printf '%s\n' 'const x = `FOO_BROKEN`;' | grep -F '_BROKEN`' || true)
+if [ -z "$_SC4" ]; then
+  echo "⚠️  Self-check 4 FALLITO — grep -F '_BROKEN\`' non rileva il caso positivo."
+  FAIL=1
+fi
+
+# Self-check 5: `BROKEN_FIXTURE` come template literal
+_SC5=$(printf '%s\n' 'expect(x).toBe(`BROKEN_FIXTURE`)' | grep -F '`BROKEN_FIXTURE`' || true)
+if [ -z "$_SC5" ]; then
+  echo "⚠️  Self-check 5 FALLITO — grep -F '\`BROKEN_FIXTURE\`' non rileva il caso positivo."
+  FAIL=1
+fi
+
 # Self-check negativo: un identifier puro non deve matchare
 _SC_NEG1=$(printf '%s\n' 'const x = BROKEN_STREAM_SENTINEL;' | grep -F '_BROKEN"' || true)
 if [ -n "$_SC_NEG1" ]; then
@@ -72,6 +87,13 @@ fi
 _SC_NEG2=$(printf '%s\n' 'const BROKEN_FIXTURE_VALUE = 42;' | grep -F '"BROKEN_FIXTURE"' || true)
 if [ -n "$_SC_NEG2" ]; then
   echo "⚠️  Self-check negativo 2 FALLITO — identifier triggera il pattern string literal."
+  FAIL=1
+fi
+
+# Self-check negativo 3: identifier senza quote non deve matchare il backtick pattern
+_SC_NEG3=$(printf '%s\n' 'const BROKEN_FIXTURE_VALUE = 42;' | grep -F '`BROKEN_FIXTURE`' || true)
+if [ -n "$_SC_NEG3" ]; then
+  echo "⚠️  Self-check negativo 3 FALLITO — identifier puro triggera il pattern backtick."
   FAIL=1
 fi
 
@@ -114,11 +136,17 @@ while IFS= read -r _file; do
   # Pattern 1b — _BROKEN' come chiusura di un valore stringa single-quote
   scan_file "$_file" "_BROKEN'" '_BROKEN come suffisso in stringa apici singoli'
 
+  # Pattern 1c — _BROKEN` come chiusura di un template literal
+  scan_file "$_file" '_BROKEN`' '_BROKEN come suffisso in template literal'
+
   # Pattern 2a — "BROKEN_FIXTURE" come stringa letterale double-quote
   scan_file "$_file" '"BROKEN_FIXTURE"' '"BROKEN_FIXTURE" come stringa letterale'
 
   # Pattern 2b — 'BROKEN_FIXTURE' come stringa letterale single-quote
   scan_file "$_file" "'BROKEN_FIXTURE'" "'BROKEN_FIXTURE' come stringa letterale"
+
+  # Pattern 3 — `BROKEN_FIXTURE` come template literal backtick
+  scan_file "$_file" '`BROKEN_FIXTURE`' '`BROKEN_FIXTURE` come template literal'
 
 done < <(find "$TEST_DIR" -type f -name '*.ts' ! -name '*.tsx' 2>/dev/null)
 
