@@ -148,6 +148,16 @@ export default function ProposalDetailScreen() {
       })
     : null;
 
+  const proposalScreenOptions = useMemo(
+    () => ({
+      headerShown: true,
+      title: proposal ? t(getTypeLabelKey(proposal.proposalType)) : "",
+      headerStyle: { backgroundColor: Colors.surface },
+      headerTintColor: Colors.text,
+    }),
+    [proposal, t],
+  );
+
   const webTopInset = 0;
 
   if (isLoading) {
@@ -173,16 +183,6 @@ export default function ProposalDetailScreen() {
   }
 
   const typeInfo = getTypeIcon(proposal.proposalType);
-  // eslint-disable-next-line react-hooks/rules-of-hooks
-  const proposalScreenOptions = useMemo(
-    () => ({
-      headerShown: true,
-      title: t(getTypeLabelKey(proposal.proposalType)),
-      headerStyle: { backgroundColor: Colors.surface },
-      headerTintColor: Colors.text,
-    }),
-    [proposal.proposalType],
-  );
 
   return (
     <>

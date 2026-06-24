@@ -326,6 +326,17 @@ export default function PublicProfileScreen() {
     }
   };
 
+  const profileScreenOptions = useMemo(
+    () => ({
+      headerShown: true,
+      title: profile?.nickname ?? "",
+      headerStyle: { backgroundColor: Colors.surface },
+      headerTintColor: Colors.text,
+      headerRight: profile && !isSelf ? headerRight : undefined,
+    }),
+    [profile, isSelf, headerRight],
+  );
+
   const webTopInset = 0;
 
   if (isLoading) {
@@ -358,17 +369,6 @@ export default function PublicProfileScreen() {
   }
 
   const color = getUserColor(profile.userType);
-
-  const profileScreenOptions = useMemo(
-    () => ({
-      headerShown: true,
-      title: profile.nickname,
-      headerStyle: { backgroundColor: Colors.surface },
-      headerTintColor: Colors.text,
-      headerRight: isSelf ? undefined : headerRight,
-    }),
-    [profile.nickname, isSelf, headerRight],
-  );
 
   return (
     <>

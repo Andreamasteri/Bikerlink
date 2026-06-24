@@ -89,10 +89,25 @@ check_pattern_multiline 'screenOptions=\{\{[^}]{0,300}\w+Style:\s*\{' \
 check_pattern_multiline '<Stack\.Screen[^>]{0,200}options=\{\{[^}]{0,300}\w+Style:\s*\{' \
   "Stack.Screen options={{}} con nested object (xStyle:{}) → usare useMemo o costante module-level"
 
+# eslint-disable rules-of-hooks nei file app/ — marcatore di hook dopo early return
+# Viola le Regole dei Hook → "Maximum update depth exceeded" in loop infinito.
+# Fix: spostare useMemo/useCallback PRIMA di qualsiasi early return con optional chaining.
+HOOKS_VIOLATION=$(rg 'eslint-disable.*rules-of-hooks' \
+  --glob 'app/**/*.tsx' --glob 'app/**/*.ts' \
+  --glob '!node_modules/**' --glob '!.local/**' --glob '!.agents/**' \
+  -n 2>/dev/null || true)
+if [ -n "$HOOKS_VIOLATION" ]; then
+  echo ""
+  echo "❌ TROVATO — eslint-disable rules-of-hooks in app/ (hook dopo early return)"
+  echo "$HOOKS_VIOLATION"
+  FAIL=1
+fi
+
 if [ $FAIL -eq 1 ]; then
   echo ""
   echo "💥 check-rnav-inline-props FALLITO"
   echo "   Wrappare le funzioni con useCallback, gli oggetti options con useMemo."
+  echo "   Spostare useMemo/useCallback PRIMA degli early return (if isLoading / if !data)."
   echo "   Documentazione: .agents/skills/rnav-memo-guard/SKILL.md"
   exit 1
 else
