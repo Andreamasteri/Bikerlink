@@ -104,6 +104,7 @@ function processFile(filePath: string): Fix[] {
   const lines = content.split("\n");
   const fixes: Fix[] = [];
 
+  // ── PASS 1: per-line checks (Mode A & B) ─────────────────────────────────
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
     const stripped = line;
@@ -180,6 +181,148 @@ function processFile(filePath: string): Fix[] {
 
       break; // one violation per line (same as gate)
     }
+  }
+
+  // ── PASS 2: Mode C — multi-line deps array interior lines ────────────────
+  // Catches ?? [] / ?? {} on interior lines of a multi-line deps array where
+  // the opening [ was on an earlier line (so Pass 1 never inspects that
+  // content):
+  //
+  //   Mode C1 — hook + ", [" on same line, closing ] on later line:
+  //     useMemo(() => x ?? [], [
+  //       dep ?? [],          ← interior line, not caught by Pass 1
+  //       otherDep,
+  //     ]);
+  //
+  //   Mode C2 — standalone "[" line (Mode B), but with unclosed bracket:
+  //     useMemo(
+  //       () => x ?? [],
+  //       [
+  //         dep ?? [],        ← interior line, not caught by Pass 1
+  //         count ?? {},
+  //       ]
+  //     );
+  const RE_DEPS_OPEN_C1 = /,\s*\[\s*(?:\/\/[^\n]*)?\s*$/;
+  // Bare [] or {} NOT preceded by a word character (excludes `Type[]` suffixes)
+  const RE_BARE_INTERIOR = /(?<!\w)(\[\]|\{\})/;
+
+  let ci = 0;
+  while (ci < lines.length) {
+    const cl = lines[ci];
+
+    // Mode C1: hook opener on same line AND line ends with ", ["
+    const isC1 = RE_HOOK_OPEN.test(cl) && RE_DEPS_OPEN_C1.test(cl);
+
+    // Mode C2: line starts with "[" only (Mode B pattern) AND the nearest
+    // preceding non-blank line ends with "," AND there is a useMemo/useCallback
+    // somewhere above (same look-back window as Pass 1 Mode B).
+    let isC2 = false;
+    if (!isC1) {
+      const lstripped = cl.trimStart();
+      if (lstripped.startsWith("[")) {
+        const indentPrefix = cl.slice(0, cl.length - lstripped.length);
+        if (indentPrefix.trim() === "") {
+          // Find nearest preceding non-blank line
+          let prevNonBlank = "";
+          for (let bj = ci - 1; bj >= Math.max(0, ci - 81); bj--) {
+            const ps = lines[bj].trimEnd();
+            if (ps.trim()) {
+              prevNonBlank = ps;
+              break;
+            }
+          }
+          // Strip trailing inline comment then check it ends with ","
+          const prevCode = prevNonBlank.replace(/\s*\/\/.*$/, "").trimEnd();
+          if (prevCode.endsWith(",")) {
+            for (let bj = ci - 1; bj >= Math.max(0, ci - 81); bj--) {
+              if (RE_HOOK_OPEN.test(lines[bj])) {
+                isC2 = true;
+                break;
+              }
+            }
+          }
+        }
+      }
+    }
+
+    if (!isC1 && !isC2) {
+      ci++;
+      continue;
+    }
+
+    // Count bracket depth left open after the opening line.
+    // If depth <= 0, the brackets are already balanced on this line and
+    // there are no interior lines to inspect (already handled by Pass 1).
+    let depth = 0;
+    for (const ch of cl) {
+      if (ch === "[") depth++;
+      else if (ch === "]") depth--;
+    }
+
+    if (depth <= 0) {
+      ci++;
+      continue;
+    }
+
+    // Scan interior lines until the deps array closes.
+    let j = ci + 1;
+    while (j < lines.length && depth > 0) {
+      const inner = lines[j];
+
+      // Suppression check (same as Pass 1)
+      let suppressed = inner.includes(SUPPRESSION);
+      if (!suppressed && j > 0) suppressed = lines[j - 1].includes(SUPPRESSION);
+
+      if (!suppressed) {
+        // Apply nullish-with-literal replacement to the interior line content.
+        RE_NULLISH_WITH_LITERAL.lastIndex = 0;
+        const fixedInner = inner.replace(
+          RE_NULLISH_WITH_LITERAL,
+          (_full, expr) => expr
+        );
+
+        if (fixedInner !== inner) {
+          fixes.push({
+            line: j + 1,
+            original: inner,
+            fixed: fixedInner,
+            kind: "auto",
+          });
+          lines[j] = fixedInner;
+
+          // After auto-fix, check if a bare [] or {} still remains
+          if (RE_BARE_INTERIOR.test(fixedInner)) {
+            fixes.push({
+              line: j + 1,
+              original: fixedInner,
+              fixed: fixedInner,
+              kind: "manual",
+              note: "[] o {} nudo nei deps senza ?? — richiede fix manuale: scegli il dep corretto.",
+            });
+          }
+        } else if (RE_BARE_INTERIOR.test(inner)) {
+          // Bare [] or {} with no ?? prefix — cannot be auto-fixed
+          fixes.push({
+            line: j + 1,
+            original: inner,
+            fixed: inner,
+            kind: "manual",
+            note: "[] o {} nudo nei deps senza ?? — richiede fix manuale: scegli il dep corretto.",
+          });
+        }
+      }
+
+      // Update bracket depth character by character
+      for (const ch of inner) {
+        if (ch === "[") depth++;
+        else if (ch === "]") depth--;
+        if (depth <= 0) break;
+      }
+
+      j++;
+    }
+
+    ci = j; // resume after the closing ] of this deps array
   }
 
   if (APPLY && fixes.some((f) => f.kind === "auto")) {
