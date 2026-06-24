@@ -9,11 +9,13 @@ import s from "@/components/admin/diagnostica-styles";
 import { TabRadiografia } from "./diagnostica-pipeline";
 import { TabMonitor } from "./diagnostica-monitor";
 import { TabDevice } from "./diagnostica-device";
+import { TabScan } from "./diagnostica-scan";
 import { adminFetch } from "./diagnostica-types";
 import type { PipelineRunResult } from "./diagnostica-types";
 import { ThinkCentreSystemMonitor } from "@/components/admin/ThinkCentreSystemMonitor";
+import { AiStatusCard } from "@/components/admin/AiStatusCard";
 
-type Tab = "radiografia" | "monitor" | "device" | "server";
+type Tab = "radiografia" | "monitor" | "device" | "server" | "scan";
 
 export default function DiagnosticaScreen() {
   const insets = useSafeAreaInsets();
@@ -39,9 +41,12 @@ export default function DiagnosticaScreen() {
 
   return (
     <View style={[s.root, { paddingTop: tabBarTop }]}>
+      {/* Stato AI — card fissa sopra le tab (Task #4825) */}
+      <AiStatusCard />
+
       {/* Tab bar */}
       <View style={s.tabBar}>
-        {(["radiografia", "monitor", "device", "server"] as Tab[]).map((tab) => (
+        {(["radiografia", "monitor", "device", "server", "scan"] as Tab[]).map((tab) => (
           <TouchableOpacity
             key={tab}
             style={[s.tabItem, activeTab === tab && s.tabItemActive]}
@@ -89,6 +94,13 @@ export default function DiagnosticaScreen() {
                   color={activeTab === tab ? Colors.accent : Colors.textSecondary}
                 />
               )}
+              {tab === "scan" && (
+                <MaterialCommunityIcons
+                  name="shield-search"
+                  size={20}
+                  color={activeTab === tab ? Colors.accent : Colors.textSecondary}
+                />
+              )}
             </View>
             <Text style={[s.tabLabel, activeTab === tab && s.tabLabelActive]}>
               {tab === "radiografia"
@@ -97,7 +109,9 @@ export default function DiagnosticaScreen() {
                   ? "Monitor"
                   : tab === "device"
                     ? "Device"
-                    : "Server"}
+                    : tab === "server"
+                      ? "Server"
+                      : "Scan"}
             </Text>
           </TouchableOpacity>
         ))}
@@ -123,6 +137,7 @@ export default function DiagnosticaScreen() {
         {activeTab === "monitor" && <TabMonitor onActiveCount={setActiveHoles} />}
         {activeTab === "device" && <TabDevice />}
         {activeTab === "server" && <ThinkCentreSystemMonitor />}
+        {activeTab === "scan" && <TabScan />}
       </View>
     </View>
   );

@@ -1,4 +1,4 @@
-import { StyleSheet } from "react-native";
+import { StyleSheet, Platform } from "react-native";
 import Colors from "@/constants/colors";
 
 const s = StyleSheet.create({
@@ -193,6 +193,107 @@ const s = StyleSheet.create({
   },
   exportButtonDisabled: { opacity: 0.6 },
   exportButtonText: { color: "#fff", fontWeight: "600", fontSize: 13 },
+
+  // ─── Stato AI card (Task #4825) ───
+  aiStatusCard: {
+    backgroundColor: Colors.surface,
+    borderBottomWidth: 1, borderBottomColor: Colors.border,
+    paddingHorizontal: 12, paddingVertical: 8, gap: 6,
+  },
+  aiStatusHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  aiStatusTitle: { fontSize: 11, fontWeight: "700", color: Colors.textSecondary, textTransform: "uppercase", letterSpacing: 0.5 },
+  aiStatusRow: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
+  aiStatusLoading: { fontSize: 12, color: Colors.textSecondary },
+  aiStatusChip: {
+    flexDirection: "row", alignItems: "center", gap: 6,
+    backgroundColor: Colors.card, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 5,
+    minWidth: "47%", flexGrow: 1,
+  },
+  aiStatusDot: { width: 9, height: 9, borderRadius: 4.5 },
+  aiStatusName: { fontSize: 12, fontWeight: "600", color: Colors.text },
+  aiStatusDetail: { fontSize: 10, color: Colors.textSecondary },
+
+  // ─── Scan tab (Task #4825) ───
+  scanLabel: { fontSize: 12, fontWeight: "700", color: Colors.text, marginTop: 6, marginBottom: 2 },
+  scanChipWrap: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
+  scanChip: {
+    borderRadius: 16, paddingHorizontal: 11, paddingVertical: 6,
+    backgroundColor: Colors.card, borderWidth: 1, borderColor: Colors.border,
+  },
+  scanChipOn: { borderColor: Colors.accent, backgroundColor: Colors.accent + "22" },
+  scanChipDisabled: { opacity: 0.4 },
+  scanChipText: { fontSize: 12, color: Colors.textSecondary },
+  scanChipTextOn: { color: Colors.accent, fontWeight: "600" },
+  scanChipTextDisabled: { color: Colors.textSecondary },
+
+  scanProviderChip: {
+    flexDirection: "row", alignItems: "center", gap: 5,
+    borderRadius: 16, paddingHorizontal: 11, paddingVertical: 6,
+    backgroundColor: Colors.card, borderWidth: 1, borderColor: Colors.border,
+  },
+  scanProviderDot: { width: 8, height: 8, borderRadius: 4 },
+
+  scanRunBtn: {
+    flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
+    backgroundColor: Colors.accent, paddingVertical: 12, borderRadius: 10, marginTop: 10,
+  },
+  scanRunBtnDisabled: { opacity: 0.55 },
+  scanRunBtnText: { color: "#fff", fontWeight: "800", fontSize: 15 },
+
+  scanProgressRow: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 8 },
+  scanProgressItem: { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: Colors.card, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 },
+  scanProgressText: { fontSize: 11, color: Colors.textSecondary },
+
+  scanSummaryRow: { flexDirection: "row", gap: 8, marginTop: 8 },
+  scanSummaryPill: { flex: 1, alignItems: "center", paddingVertical: 8, borderRadius: 8, backgroundColor: Colors.card },
+  scanSummaryNum: { fontSize: 20, fontWeight: "800" },
+  scanSummaryLbl: { fontSize: 10, color: Colors.textSecondary, marginTop: 1 },
+
+  scanGroupHeader: { fontSize: 13, fontWeight: "700", color: Colors.text, marginTop: 12, marginBottom: 4 },
+  scanResultCard: {
+    backgroundColor: Colors.card, borderRadius: 10, padding: 10, gap: 4,
+    borderLeftWidth: 4, marginBottom: 6,
+  },
+  scanResultHeaderRow: { flexDirection: "row", alignItems: "center", gap: 6, flexWrap: "wrap" },
+  scanResultCheckId: { fontSize: 11, fontWeight: "700", color: Colors.textSecondary },
+  scanBadge: { paddingHorizontal: 7, paddingVertical: 2, borderRadius: 6 },
+  scanBadgeText: { fontSize: 10, fontWeight: "700" },
+  scanResultFile: { fontSize: 11, color: Colors.accent },
+  scanResultDesc: { fontSize: 13, color: Colors.text },
+  scanResultEvidence: {
+    fontSize: 11, color: Colors.textSecondary, fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace",
+    backgroundColor: Colors.surface, borderRadius: 6, padding: 6,
+  },
+  scanDiffToggle: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 2 },
+  scanDiffToggleText: { fontSize: 12, color: Colors.accent, fontWeight: "600" },
+  scanDiffBox: {
+    backgroundColor: "#0b0b0b", borderRadius: 6, padding: 8, marginTop: 4,
+    borderWidth: 1, borderColor: Colors.border,
+  },
+  scanDiffText: { fontSize: 11, color: "#d1d5db", fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace" },
+
+  scanTaskBtn: {
+    flexDirection: "row", alignItems: "center", gap: 5, alignSelf: "flex-start",
+    borderWidth: 1, borderColor: Colors.accent, borderRadius: 7, paddingHorizontal: 9, paddingVertical: 4, marginTop: 4,
+  },
+  scanTaskBtnText: { fontSize: 11, color: Colors.accent, fontWeight: "600" },
+  scanReviewHint: { fontSize: 11, color: "#dc2626", marginTop: 4, fontStyle: "italic" },
+
+  scanActionBar: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 14 },
+  scanActionBtn: {
+    flexDirection: "row", alignItems: "center", gap: 5,
+    borderWidth: 1, borderColor: Colors.border, borderRadius: 8, paddingHorizontal: 11, paddingVertical: 8,
+    backgroundColor: Colors.card,
+  },
+  scanActionBtnText: { fontSize: 12, color: Colors.text, fontWeight: "600" },
+
+  scanAiBox: {
+    backgroundColor: Colors.surface, borderRadius: 10, padding: 10, marginTop: 12,
+    borderWidth: 1, borderColor: Colors.border, gap: 4,
+  },
+  scanAiTitle: { fontSize: 13, fontWeight: "700", color: Colors.text },
+  scanAiProvider: { fontSize: 11, color: Colors.textSecondary },
+  scanAiBody: { fontSize: 12, color: Colors.text, lineHeight: 18 },
 });
 
 export default s;
