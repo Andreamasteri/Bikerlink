@@ -115,6 +115,7 @@ export default function GiriScreen() {
     } finally {
       setIsImporting(false);
     }
+  // check-router-in-effect-deps: safe — router.push chiamato dopo import GPX, non da useEffect
   }, [qc, router]);
 
   const s = styles(colors);

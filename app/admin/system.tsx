@@ -180,6 +180,7 @@ export default function SystemScreen() {
     } finally {
       setIsPurging(false);
     }
+  // check-router-in-effect-deps: safe — router.replace chiamato da Alert press, non da useEffect
   }, [purgeConfirmText, logoutMutation, router, t]);
 
   const handlePurgeNonAdminUsers = useCallback(() => {

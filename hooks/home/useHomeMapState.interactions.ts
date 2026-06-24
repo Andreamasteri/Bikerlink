@@ -8,6 +8,7 @@ export function useHomeMapInteractions(mapRef: React.RefObject<InteractiveMapHan
 
   const handleSearchResultPress = useCallback((u: any) => {
     router.push(`/profile/${u.id}` as never);
+  // check-router-in-effect-deps: safe — router.push chiamato da press utente, non da useEffect
   }, [router]);
 
   const handleLocateUser = useCallback((u: any) => {

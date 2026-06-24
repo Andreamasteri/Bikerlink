@@ -1,14 +1,24 @@
 #!/usr/bin/env bash
 # check-router-in-effect-deps.sh
 #
-# Rileva il pattern pericoloso: `router` nel deps array di useEffect + chiamata
-# a router.replace/push nel corpo dell'effetto.
+# Rileva due pattern pericolosi:
+#
+# 1) `router` nel deps array di useEffect + chiamata a router.replace/push nel corpo.
+# 2) `router` nel deps array di useCallback + chiamata a router.replace/push nel corpo.
 #
 # Perché è pericoloso:
 #   useRouter() di expo-router restituisce un nuovo oggetto ad ogni render.
-#   Mettere `router` nei deps di useEffect che chiama router.replace/push crea
-#   un ciclo: replace → re-render → nuovo `router` → effect ri-scatta → loop
-#   infinito → "Maximum update depth exceeded" → crash globale.
+#
+#   Pattern 1 — useEffect:
+#     Mettere `router` nei deps di useEffect che chiama router.replace/push crea
+#     un ciclo: replace → re-render → nuovo `router` → effect ri-scatta → loop
+#     infinito → "Maximum update depth exceeded" → crash globale.
+#
+#   Pattern 2 — useCallback:
+#     Mettere `router` nei deps di useCallback che chiama router.replace/push fa
+#     sì che la funzione venga ricreata ad ogni render. Se il callback viene usato
+#     come dipendenza di un useEffect, quel useEffect ri-scatta ad ogni render →
+#     stesso loop infinito.
 #
 # Fix: usare routerRef + didRedirectRef
 #   const routerRef = useRef(router);
@@ -21,6 +31,11 @@
 #     }
 #   }, [condizione]); // ← router NON è nel deps
 #
+#   Per useCallback:
+#   const navigate = useCallback(() => {
+#     routerRef.current.replace("/destinazione");
+#   }, []); // ← router NON è nel deps, usa routerRef.current
+#
 # Soppressione (usa con criterio, solo se il pattern è genuinamente sicuro):
 #   Aggiungere il commento sulla riga del deps chiudente o sulla riga precedente:
 #   // check-router-in-effect-deps: safe
@@ -29,7 +44,7 @@
 
 set -euo pipefail
 
-echo "🔍 Controllo router in useEffect deps + router.replace/push..."
+echo "🔍 Controllo router in useEffect/useCallback deps + router.replace/push..."
 
 RESULT=$(python3 - << 'PYEOF'
 import os
@@ -45,6 +60,9 @@ RE_DEPS_ROUTER = re.compile(r'\},\s*\[.*\brouter\b.*\]')
 RE_HOOK_OPEN   = re.compile(r'\b(useEffect|useCallback|useMemo)\s*\(')
 # router.replace/push inside the block
 RE_ROUTER_CALL = re.compile(r'\brouter\.(replace|push)\s*\(')
+
+# Hooks to flag (useCallback is now included alongside useEffect)
+FLAGGED_HOOKS = {'useEffect', 'useCallback'}
 
 violations = []
 
@@ -88,8 +106,8 @@ for root, dirs, files in os.walk('.'):
                     hook_line = j
                     break
 
-            # Only flag if the nearest opener is useEffect (not useCallback/useMemo)
-            if nearest_hook != 'useEffect':
+            # Only flag useEffect and useCallback (not useMemo)
+            if nearest_hook not in FLAGGED_HOOKS:
                 continue
 
             # Verify that router.replace/push appears between hook_line and the closing line
@@ -97,12 +115,12 @@ for root, dirs, files in os.walk('.'):
             if not RE_ROUTER_CALL.search(block_text):
                 continue
 
-            violations.append(f"{fpath}:{lineno}: {line.rstrip()}")
+            violations.append((nearest_hook, f"{fpath}:{lineno}: {line.rstrip()}"))
 
 if violations:
     print("FAIL")
-    for v in violations:
-        print(v)
+    for hook, v in violations:
+        print(f"{hook}:{v}")
 else:
     print("OK")
 PYEOF
@@ -111,7 +129,7 @@ PYEOF
 FIRST_LINE=$(echo "$RESULT" | head -1)
 
 if [ "$FIRST_LINE" = "OK" ]; then
-  echo "✅ Nessun router-in-useEffect-deps pericoloso trovato."
+  echo "✅ Nessun router-in-useEffect/useCallback-deps pericoloso trovato."
   exit 0
 fi
 
@@ -120,16 +138,18 @@ echo ""
 VIOLATIONS=$(echo "$RESULT" | tail -n +2)
 while IFS= read -r vline; do
   [ -z "$vline" ] && continue
-  echo "❌ TROVATO — $vline"
+  HOOK_TYPE=$(echo "$vline" | cut -d: -f1)
+  REST=$(echo "$vline" | cut -d: -f2-)
+  echo "❌ TROVATO [${HOOK_TYPE}] —${REST}"
 done <<< "$VIOLATIONS"
 
 echo ""
 echo "💥 check-router-in-effect-deps FALLITO"
 echo ""
-echo "   router in useEffect deps + router.replace/push = loop infinito"
+echo "   router in useEffect/useCallback deps + router.replace/push = loop infinito"
 echo "   'Maximum update depth exceeded' → crash globale."
 echo ""
-echo "   Fix consigliato:"
+echo "   Fix consigliato per useEffect:"
 echo "     const routerRef = useRef(router);"
 echo "     routerRef.current = router;"
 echo "     const didRedirect = useRef(false);"
@@ -139,6 +159,13 @@ echo "         didRedirect.current = true;"
 echo "         routerRef.current.replace('/destinazione');"
 echo "       }"
 echo "     }, [condizione]); // router NON nei deps"
+echo ""
+echo "   Fix consigliato per useCallback:"
+echo "     const routerRef = useRef(router);"
+echo "     routerRef.current = router;"
+echo "     const navigate = useCallback(() => {"
+echo "       routerRef.current.replace('/destinazione');"
+echo "     }, []); // router NON nei deps, usa routerRef.current"
 echo ""
 echo "   Soppressione (solo se verificato sicuro):"
 echo "     // check-router-in-effect-deps: safe"

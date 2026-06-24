@@ -103,6 +103,7 @@ export default function MusicScreen() {
     } finally {
       setSendingToConv(null);
     }
+  // check-router-in-effect-deps: safe — router.push chiamato da press utente, non da useEffect
   }, [currentUser, router, apiPrefix, t]);
 
   useEffect(() => {

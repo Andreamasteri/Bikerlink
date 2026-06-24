@@ -60,6 +60,7 @@ export function useAiExplain(target: ExplainTarget) {
     const seed = target.seed ?? defaultSeed(target);
     setExplainPending({ ...target, seed, at: Date.now() });
     router.push("/admin/ai-console" as never);
+  // check-router-in-effect-deps: safe — router.push chiamato da trigger utente, non da useEffect
   }, [router, target]);
   return { trigger };
 }

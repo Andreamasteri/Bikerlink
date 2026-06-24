@@ -34,6 +34,7 @@ export function MatchCard({ match }: { match: MusicMatch }) {
     } finally {
       setChatLoading(false);
     }
+  // check-router-in-effect-deps: safe — router.push chiamato da press utente, non da useEffect
   }, [match.user.id, router, localQueryClient, t]);
 
   return (

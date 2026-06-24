@@ -93,6 +93,7 @@ export function useRouteEditor() {
     } catch (err: unknown) {
       Alert.alert("Errore", err instanceof Error ? err.message : "Impossibile leggere il file GPX.");
     } finally { setIsImporting(false); }
+  // check-router-in-effect-deps: safe — router.replace chiamato dopo import GPX, non da useEffect
   }, [router]);
 
   const saveMutation = useMutation({

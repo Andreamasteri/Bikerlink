@@ -193,6 +193,7 @@ export default function EditProfileScreen() {
         });
       },
     });
+  // check-router-in-effect-deps: safe — router.replace chiamato da onSuccess mutation, non da useEffect
   }, [requestDeletionMutation, logoutMutation, router, t]);
 
   const handleDeleteAccount = useCallback(() => {

@@ -157,6 +157,7 @@ export default function UptimeWidget() {
 
   const openHistory = useCallback(() => {
     router.push("/admin/restart-history" as never);
+  // check-router-in-effect-deps: safe — callback aggiornato via openHistoryRef, usato da PanResponder non da useEffect
   }, [router]);
 
   // Ref aggiornato a ogni render così il PanResponder frozen al mount chiama
