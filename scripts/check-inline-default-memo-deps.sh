@@ -177,4 +177,8 @@ echo "   Se il pattern è verificato sicuro (il ricalcolo non causa side-effect)
 echo "     // check-inline-default-memo-deps: safe — <motivo>"
 echo "     const derived = useMemo(() => ..., [dep ?? []]);"
 echo ""
+echo "   🔧 Auto-fix disponibile per i pattern 'expr ?? []' e 'expr ?? {}':"
+echo "     npx tsx scripts/fix-inline-default-memo-deps.ts          # dry-run"
+echo "     npx tsx scripts/fix-inline-default-memo-deps.ts --apply  # applica"
+echo ""
 exit 1
