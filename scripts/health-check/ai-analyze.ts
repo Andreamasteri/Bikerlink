@@ -62,20 +62,22 @@ export async function analyzeReport(
   return { markdown: value.text, provider: `${model.providerName}/${model.modelId}` };
 }
 
-// ─── Fix mode: diff per-anomalia (solo fix sicuri) ──────────────────────────────
+// ─── Fix mode: diff per-anomalia (una proposta per OGNI problema) ───────────────
 
-function buildFixPrompt(safe: CheckResult[]): string {
-  const items = safe.map((f, i) => {
+function buildFixPrompt(items: CheckResult[]): string {
+  const lines = items.map((f, i) => {
     const loc = f.file ? `${f.file}${f.line ? `:${f.line}` : ""}` : "(globale)";
-    return `#${i}: [${f.checkId}] @ ${loc} — ${f.description}${f.evidence ? `\n   evidenza:\n   ${f.evidence}` : ""}`;
+    const tag = f.safeFix ? "sicuro/meccanico" : "richiede revisione";
+    return `#${i} [${tag}]: [${f.checkId}] @ ${loc} — ${f.description}${f.evidence ? `\n   evidenza:\n   ${f.evidence}` : ""}`;
   });
   return [
     `Sei un revisore di codice senior per BikerLink (Expo + Express + Drizzle/Postgres).`,
-    `Per OGNI problema "sicuro" qui sotto proponi una correzione meccanica concreta come diff unificato (old→new).`,
-    `Questi problemi sono già stati classificati come sicuri/meccanici in modo deterministico: NON rivalutarne la sicurezza, NON aggiungerne altri.`,
+    `Per OGNI problema qui sotto proponi una correzione concreta come diff unificato (old→new).`,
+    `La gravità e la classificazione sicuro/revisione sono GIÀ decise in modo deterministico: NON rivalutarle e NON aggiungere problemi nuovi.`,
+    `Il tag [richiede revisione] indica solo che la patch va validata da un umano: proponi comunque il diff come suggerimento di partenza.`,
     ``,
     `Problemi:`,
-    items.join("\n"),
+    lines.join("\n"),
     ``,
     `Rispondi SOLO con un array JSON valido, senza testo extra, nella forma:`,
     `[{"index": <numero #>, "diff": "<diff unificato o frammento old→new>"}]`,
@@ -108,23 +110,26 @@ function parseFixJson(text: string): Array<{ index: number; diff: string }> {
 }
 
 /**
- * Genera diff AI per i fix SICURI e li attacca (aiDiff) ai CheckResult del report.
- * Una sola chiamata AI (batch) per contenere il costo. Ritorna provider+conteggio.
+ * Genera un diff AI per OGNI problema trovato (prioritizzato per gravità, con un
+ * cap per contenere il costo) e lo attacca (aiDiff) ai CheckResult del report.
+ * La classificazione sicuro/revisione resta deterministica: l'AI propone solo la
+ * patch, non rivaluta la sicurezza. Una sola chiamata AI (batch). Ritorna
+ * provider+conteggio dei diff applicati.
  */
 export async function proposeFixes(
   report: HealthCheckReport,
 ): Promise<{ provider: string; applied: number }> {
-  const safe = allFindings(report).filter((f) => f.safeFix === true).slice(0, 40);
-  if (safe.length === 0) return { provider: "n/d", applied: 0 };
+  const findings = topFindings(report, 40);
+  if (findings.length === 0) return { provider: "n/d", applied: 0 };
   const opts = mapProvider(report.aiProvider);
-  const prompt = buildFixPrompt(safe);
+  const prompt = buildFixPrompt(findings);
   const { value, model } = await runWithFallback(opts, (m) =>
     generateText({ model: m.model, prompt, temperature: 0.1 }),
   );
   const fixes = parseFixJson(value.text);
   let applied = 0;
   for (const fx of fixes) {
-    const target = safe[fx.index];
+    const target = findings[fx.index];
     if (target) {
       target.aiDiff = fx.diff;
       applied++;

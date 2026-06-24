@@ -66,8 +66,8 @@ function ResultCard({
         <Text style={s.scanResultEvidence} numberOfLines={6}>{item.evidence}</Text>
       ) : null}
 
-      {/* Diff AI per-anomalia (solo fix mode, solo fix sicuri con diff) */}
-      {fixMode && safe && item.aiDiff ? (
+      {/* Diff AI per-anomalia (fix mode, per OGNI problema con diff proposto) */}
+      {fixMode && item.aiDiff ? (
         <View style={s.scanDiffBox}>
           <TouchableOpacity style={s.scanDiffToggle} onPress={() => setShowDiff((v) => !v)} activeOpacity={0.75}>
             <Ionicons name={showDiff ? "chevron-up" : "chevron-down"} size={13} color={Colors.accent} />
