@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useRef, useState } from "react";
 import { StatusBar, View, StyleSheet } from "react-native";
 import { useRouter } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -20,12 +20,14 @@ async function markOnboardingComplete() {
 
 export default function OnboardingScreen() {
   const router = useRouter();
+  const routerRef = useRef(router);
+  routerRef.current = router;
   const [stage, setStage] = useState<Stage>("carousel");
 
   const finishOnboarding = useCallback(async () => {
     await markOnboardingComplete();
-    router.replace("/welcome");
-  }, [router]);
+    routerRef.current.replace("/welcome");
+  }, []);
 
   const handleCarouselComplete = useCallback(() => {
     setStage("tags");

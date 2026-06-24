@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useRef } from "react";
 import {
   View,
   Text,
@@ -141,6 +141,8 @@ function ProposalCard({ item, onPress, t, locale }: { item: ProposalItem; onPres
 
 export default function ProposalsScreen() {
   const router = useRouter();
+  const routerRef = useRef(router);
+  routerRef.current = router;
   const t = useT();
   const locale = useLocale();
   const [activeFilter, setActiveFilter] = useState("all");
@@ -194,12 +196,12 @@ export default function ProposalsScreen() {
   const totalPendingCount = pendingMatchCount + pendingPropProfileCount;
 
   const handleCreatePress = useCallback(() => {
-    router.push("/proposals/create");
-  }, [router]);
+    routerRef.current.push("/proposals/create");
+  }, []);
 
   const handleProposalPress = useCallback((id: string) => {
-    router.push(`/proposals/${id}`);
-  }, [router]);
+    routerRef.current.push(`/proposals/${id}`);
+  }, []);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- mixed list of proposal types
   const allData: any[] = [];

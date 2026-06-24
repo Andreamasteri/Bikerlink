@@ -1,4 +1,4 @@
-import React, { useCallback } from "react";
+import React, { useCallback, useRef } from "react";
 import {
   View,
   Text,
@@ -226,6 +226,8 @@ export default function NotificationsScreen() {
   const insets = useSafeAreaInsets();
   const qc = useQueryClient();
   const router = useRouter();
+  const routerRef = useRef(router);
+  routerRef.current = router;
 
   const { data: notifications = [], isLoading } = useQuery<AppNotification[]>({
     queryKey: ["/api/notifications"],
@@ -354,9 +356,9 @@ export default function NotificationsScreen() {
     }
     const route = getNotifRoute(item);
     if (route) {
-      router.push(route as Parameters<typeof router.push>[0]);
+      routerRef.current.push(route as never);
     }
-  }, [markReadMutation, router]);
+  }, [markReadMutation]);
 
   const handleDeleteOne = useCallback((id: string) => {
     deleteOneMutation.mutate(id);
