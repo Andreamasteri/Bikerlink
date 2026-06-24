@@ -1,1 +1,1 @@
-[OTA:75.10.169] Fix crash immediato su fresh install: StartupGate non ritorna più null (smontava lo Stack → loop Maximum update depth → crash). Hook useLanguage estratto prima del return in RootLayout.
+
