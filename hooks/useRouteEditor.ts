@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useMemo } from "react";
+import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { BackHandler, Alert } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { useMutation, useQuery } from "@tanstack/react-query";
@@ -28,6 +28,8 @@ export function useRouteEditor() {
   const t = useT();
   const WAYPOINT_TYPES = useMemo(() => getWaypointTypes(t), [t]);
   const router = useRouter();
+  const routerRef = useRef(router);
+  routerRef.current = router;
   const { editId } = useLocalSearchParams<{ editId?: string }>();
   const isEditMode = !!editId;
 
@@ -89,12 +91,11 @@ export function useRouteEditor() {
       const route = await res.json() as { id: string };
       queryClient.invalidateQueries({ queryKey: ["/api/custom-routes"] });
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      router.replace(`/routes/${route.id}` as any);
+      routerRef.current.replace(`/routes/${route.id}` as any);
     } catch (err: unknown) {
       Alert.alert("Errore", err instanceof Error ? err.message : "Impossibile leggere il file GPX.");
     } finally { setIsImporting(false); }
-  // check-router-in-effect-deps: safe — router.replace chiamato dopo import GPX, non da useEffect
-  }, [router]);
+  }, []);
 
   const saveMutation = useMutation({
     mutationFn: async () => {

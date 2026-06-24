@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useState, useCallback, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -63,6 +63,8 @@ export default function MusicScreen() {
 
   const { user: currentUser } = useAuth();
   const router = useRouter();
+  const routerRef = useRef(router);
+  routerRef.current = router;
 
   const apiPrefix = "/api/lastfm";
 
@@ -97,14 +99,13 @@ export default function MusicScreen() {
         return;
       }
       setSendModalVisible(false);
-      router.push(`/chat/${conv.id}` as never);
+      routerRef.current.push(`/chat/${conv.id}` as never);
     } catch {
       Alert.alert(t("music.error"), t("music.sendPlaylistError"));
     } finally {
       setSendingToConv(null);
     }
-  // check-router-in-effect-deps: safe — router.push chiamato da press utente, non da useEffect
-  }, [currentUser, router, apiPrefix, t]);
+  }, [currentUser, apiPrefix, t]);
 
   useEffect(() => {
     if (tabParam === "ricevute" || tabParam === "match" || tabParam === "brani" || tabParam === "telefono") {

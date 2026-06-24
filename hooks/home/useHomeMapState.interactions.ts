@@ -1,15 +1,16 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useCallback } from "react";
+import { useCallback, useRef } from "react";
 import { useRouter } from "expo-router";
 import { InteractiveMapHandle } from "@/components/InteractiveMap";
 
 export function useHomeMapInteractions(mapRef: React.RefObject<InteractiveMapHandle>, setLastSmallMapCenter: any, handleUserPress: any, handleFocusAnimation: any, setFocusToast: any, focusToastAnim: any, focusMap: any) {
   const router = useRouter();
+  const routerRef = useRef(router);
+  routerRef.current = router;
 
   const handleSearchResultPress = useCallback((u: any) => {
-    router.push(`/profile/${u.id}` as never);
-  // check-router-in-effect-deps: safe — router.push chiamato da press utente, non da useEffect
-  }, [router]);
+    routerRef.current.push(`/profile/${u.id}` as never);
+  }, []);
 
   const handleLocateUser = useCallback((u: any) => {
     const lat = Number(u.latitude);

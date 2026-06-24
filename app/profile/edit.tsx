@@ -69,6 +69,8 @@ export default function EditProfileScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const routerRef = useRef(router);
+  routerRef.current = router;
   const params = useLocalSearchParams();
   const { user, logoutMutation } = useAuth();
   const { language, setLanguage } = useLanguage();
@@ -188,13 +190,12 @@ export default function EditProfileScreen() {
         Alert.alert(t("profile.accountScheduledDeletion"));
         logoutMutation.mutate(undefined, {
           onSuccess: () => {
-            router.replace("/welcome");
+            routerRef.current.replace("/welcome");
           },
         });
       },
     });
-  // check-router-in-effect-deps: safe — router.replace chiamato da onSuccess mutation, non da useEffect
-  }, [requestDeletionMutation, logoutMutation, router, t]);
+  }, [requestDeletionMutation, logoutMutation, t]);
 
   const handleDeleteAccount = useCallback(() => {
     Alert.alert(

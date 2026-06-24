@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useRef } from "react";
 import {
   View,
   Text,
@@ -19,6 +19,8 @@ import { MusicMatch } from "./types";
 export function MatchCard({ match }: { match: MusicMatch }) {
   const t = useT();
   const router = useRouter();
+  const routerRef = useRef(router);
+  routerRef.current = router;
   const localQueryClient = useQueryClient();
   const [chatLoading, setChatLoading] = useState(false);
 
@@ -28,14 +30,13 @@ export function MatchCard({ match }: { match: MusicMatch }) {
       const res = await apiRequest("POST", "/api/chat/conversations", { conversationType: "private", participantIds: [match.user.id] });
       const data = await res.json();
       localQueryClient.invalidateQueries({ queryKey: ["/api/chat/conversations"] });
-      router.push(`/chat/${data.id}` as never);
+      routerRef.current.push(`/chat/${data.id}` as never);
     } catch {
       Alert.alert(t("music.error"), t("music.chatOpenError"));
     } finally {
       setChatLoading(false);
     }
-  // check-router-in-effect-deps: safe — router.push chiamato da press utente, non da useEffect
-  }, [match.user.id, router, localQueryClient, t]);
+  }, [match.user.id, localQueryClient, t]);
 
   return (
     <View style={styles.matchCard}>

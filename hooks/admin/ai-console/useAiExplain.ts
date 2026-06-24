@@ -1,7 +1,7 @@
 // Task #2645 — "Spiegami questo": apre la AI Console con un seed context per
 // l'entità passata. Espone trigger() + un flag globale (badge FAB) condiviso
 // via in-memory store con listener (no context provider, minimal footprint).
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, useRef } from "react";
 import { useRouter } from "expo-router";
 
 export interface ExplainTarget {
@@ -56,11 +56,12 @@ function defaultSeed(t: ExplainTarget): string {
 /** Hook usato da qualsiasi schermata admin per esporre un trigger "Spiegami questo". */
 export function useAiExplain(target: ExplainTarget) {
   const router = useRouter();
+  const routerRef = useRef(router);
+  routerRef.current = router;
   const trigger = useCallback(() => {
     const seed = target.seed ?? defaultSeed(target);
     setExplainPending({ ...target, seed, at: Date.now() });
-    router.push("/admin/ai-console" as never);
-  // check-router-in-effect-deps: safe — router.push chiamato da trigger utente, non da useEffect
-  }, [router, target]);
+    routerRef.current.push("/admin/ai-console" as never);
+  }, [target]);
   return { trigger };
 }

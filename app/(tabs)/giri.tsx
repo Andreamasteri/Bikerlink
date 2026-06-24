@@ -27,6 +27,8 @@ export default function GiriScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const routerRef = useRef(router);
+  routerRef.current = router;
   const qc = useQueryClient();
   const [filter, setFilter] = useState<FilterTab>("mine");
 
@@ -108,15 +110,14 @@ export default function GiriScreen() {
       });
       const route = await res.json() as { id: string };
       qc.invalidateQueries({ queryKey: ["/api/planned-routes"] });
-      router.push(`/giri/${route.id}` as never);
+      routerRef.current.push(`/giri/${route.id}` as never);
     } catch (err: unknown) {
       const msg = err instanceof Error ? (err as Error).message : "Impossibile leggere il file GPX.";
       Alert.alert("Errore", msg);
     } finally {
       setIsImporting(false);
     }
-  // check-router-in-effect-deps: safe — router.push chiamato dopo import GPX, non da useEffect
-  }, [qc, router]);
+  }, [qc]);
 
   const s = styles(colors);
 

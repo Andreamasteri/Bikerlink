@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import {
   View,
   TouchableOpacity,
@@ -142,6 +142,8 @@ export default function SystemScreen() {
   }, [nativeAndroidLatest, nativeAndroidMin, nativeAndroidUrl, nativeIosLatest, nativeIosMin, nativeIosUrl]);
 
   const router = useRouter();
+  const routerRef = useRef(router);
+  routerRef.current = router;
   const { sessionExpired, logoutMutation } = useAuth();
   const executePurge = useCallback(async () => {
     if (purgeConfirmText.trim().toUpperCase() !== "PURGA") {
@@ -170,7 +172,7 @@ export default function SystemScreen() {
               try { await logoutMutation.mutateAsync(); } catch {
                 // no-op: proceed to login even if logout fails
               }
-              router.replace("/(auth)/login");
+              routerRef.current.replace("/(auth)/login");
             }
           },
         ]
@@ -180,8 +182,7 @@ export default function SystemScreen() {
     } finally {
       setIsPurging(false);
     }
-  // check-router-in-effect-deps: safe — router.replace chiamato da Alert press, non da useEffect
-  }, [purgeConfirmText, logoutMutation, router, t]);
+  }, [purgeConfirmText, logoutMutation, t]);
 
   const handlePurgeNonAdminUsers = useCallback(() => {
     Alert.alert(
