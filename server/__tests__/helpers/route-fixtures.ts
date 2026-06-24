@@ -20,6 +20,16 @@
  * Object fixtures (ROUTE_MISSING_*, ROUTE_WRONG_*) model deserialized payloads
  * and are typed as `Record<string, unknown>` to keep them structurally invalid
  * while still being inspectable.
+ *
+ * --- CI guard ---
+ *
+ * `scripts/check-inline-broken-fixtures.sh` (called from `scripts/post-merge.sh`)
+ * blocks test files that re-introduce ad-hoc broken strings like
+ * '{"title":"FOO_BROKEN"' or "BROKEN_FIXTURE" inline instead of importing from
+ * here. If you need a new broken-stream fixture, add it to this file and export
+ * it — do NOT inline it in the test. To suppress a deliberate exception, add:
+ *   // check-inline-broken-fixtures: safe — <reason>
+ * on the line immediately preceding the match.
  */
 
 import { z } from "zod";

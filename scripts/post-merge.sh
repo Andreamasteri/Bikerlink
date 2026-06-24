@@ -527,6 +527,25 @@ fi
 echo "════════════════════════════════════════"
 echo ""
 
+# ── GATE INLINE BROKEN FIXTURES NEI TEST ─────────────────────
+# Verifica che nessun file di test sotto server/__tests__/ ridefinisca
+# inline stringhe "broken fixture" (es. '{"title":"FOO_BROKEN"') invece
+# di importarle dal file condiviso:
+#   server/__tests__/helpers/route-fixtures.ts
+# Un cambiamento a routeSchema aggiorna le fixture in un unico posto;
+# copie duplicate restano silenziosamente in drift e rendono vacui i test.
+echo "════════════════════════════════════════"
+echo "  Gate inline broken-fixture strings nei test"
+echo "════════════════════════════════════════"
+BROKEN_FIXTURES_EXIT=0
+bash scripts/check-inline-broken-fixtures.sh || BROKEN_FIXTURES_EXIT=$?
+echo "════════════════════════════════════════"
+echo ""
+if [ "$BROKEN_FIXTURES_EXIT" -ne 0 ]; then
+  echo "❌ Gate inline-broken-fixtures fallito — importare da server/__tests__/helpers/route-fixtures.ts."
+  exit "$BROKEN_FIXTURES_EXIT"
+fi
+
 # ── GATE TEST COMPONENTI ────────────────────────────────────
 # Esegue TUTTI i test automatici in components/__tests__/ (glob a livello di
 # cartella: ogni nuovo file *.test.ts viene incluso automaticamente, senza
