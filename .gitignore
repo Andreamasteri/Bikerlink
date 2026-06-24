@@ -94,3 +94,6 @@ docs/matching-system.pdf
 server/public/matching-system.pdf
 server/public/assets/competitor-analysis.pdf
 server/public/assets/competitor-analysis.png
+
+# ESLint cache — generated locally, not tracked
+.eslintcache
