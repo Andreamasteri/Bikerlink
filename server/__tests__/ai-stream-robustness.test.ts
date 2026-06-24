@@ -45,6 +45,7 @@ vi.mock("../lib/groq-client", () => ({
 }));
 
 import plannedRoutesRouter from "../routes/planned-routes";
+import { VALID_ROUTE } from "./helpers/route-fixtures";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -62,21 +63,6 @@ function buildApp(): express.Application {
   app.use("/api/planned-routes", plannedRoutesRouter);
   return app;
 }
-
-const VALID_ROUTE = {
-  title: "Giro sulle Alpi",
-  startLocation: "Milano",
-  endLocation: "Torino",
-  waypoints: ["Como"],
-  poiStops: null,
-  style: "curvy",
-  isRoundTrip: false,
-  isMultiDay: false,
-  daysEstimate: 1,
-  maxHoursPerDay: 6,
-  avoidHighways: false,
-  notes: "",
-};
 
 /** Costruisce un risultato streamText finto a partire da una lista di chunk. */
 function streamFrom(chunks: string[]) {

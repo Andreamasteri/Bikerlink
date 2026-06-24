@@ -58,7 +58,7 @@ IMPORTANTE: waypoints contiene SOLO luoghi geografici (città, strade, valichi).
 const AI_TIMEOUT_MS = parseInt(process.env.GEMINI_TIMEOUT_MS ?? "30000", 10) || 30000;
 const AI_MAX_RETRIES = 2;
 
-const routeSchema = z.object({
+export const routeSchema = z.object({
   title: z.string(),
   startLocation: z.string(),
   endLocation: z.string(),
