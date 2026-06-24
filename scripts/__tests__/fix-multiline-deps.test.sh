@@ -703,6 +703,83 @@ else
   nok "locals l2: inferenza errata con destructuring locale"
 fi
 
+# ── Test 15: mixed array (single-line) — bare [] alongside real deps ──────────
+echo ""
+echo "── Test 15: deps misti single-line — [] nudo accanto a dep reali, solo il [] viene inferito"
+cat > "$TMP/fixture_mixed.tsx" << 'EOF'
+import { useMemo } from 'react';
+
+const Component = ({ data, otherDep, items, more }: any) => {
+  // bare [] first, real dep second, ?? capture in body -> infer data
+  const m1 = useMemo(() => data ?? [], [[], otherDep]);
+  // real dep first, bare [] second, single free identifier in body -> infer items
+  const m2 = useMemo(() => items.filter((x: any) => x.active), [more, []]);
+  // two bare literals -> ambiguous, must stay manual (unchanged)
+  const m3 = useMemo(() => data ?? [], [[], {}]);
+  return null;
+};
+EOF
+
+run_fixer
+# m1: [[], otherDep] -> [data, otherDep]; sibling untouched, body preserved.
+if grep -q 'data ?? \[\], \[data, otherDep\]' "$TMP/fixture_mixed.tsx"; then
+  ok "mixed m1: [[], otherDep] -> [data, otherDep] (solo il [] inferito)"
+else
+  nok "mixed m1: atteso [data, otherDep], non trovato"
+fi
+# m2: [more, []] -> [more, items]; leading sibling untouched.
+if grep -q 'x.active), \[more, items\]' "$TMP/fixture_mixed.tsx"; then
+  ok "mixed m2: [more, []] -> [more, items] (fratello iniziale intatto)"
+else
+  nok "mixed m2: atteso [more, items], non trovato"
+fi
+# m3: two bare literals -> left untouched (manual).
+if grep -q 'data ?? \[\], \[\[\], {}\]' "$TMP/fixture_mixed.tsx"; then
+  ok "mixed m3: [[], {}] preservato (due literal nudi -> manuale)"
+else
+  nok "mixed m3: [[], {}] modificato per errore (atteso manuale)"
+fi
+
+# ── Test 16: mixed array (Mode C multi-line) — bare [] alongside real deps ─────
+echo ""
+echo "── Test 16: deps misti multi-linea (Mode C) — solo la riga interior nuda viene inferita"
+cat > "$TMP/fixture_mixed_ml.tsx" << 'EOF'
+import { useMemo } from 'react';
+
+const Component = ({ data, otherDep, extra }: any) => {
+  const c1 = useMemo(() => data ?? [], [
+    [],
+    otherDep,
+  ]);
+  const c3 = useMemo(() => {
+    return extra ?? [];
+  }, [
+    [],
+    data,
+  ]);
+  return null;
+};
+EOF
+
+run_fixer
+# c1: interior "[]," inferred to "data,"; otherDep untouched.
+assert_dep_present "$TMP/fixture_mixed_ml.tsx" 'data'     "ML mixed c1 -> data"
+assert_dep_present "$TMP/fixture_mixed_ml.tsx" 'otherDep' "ML mixed c1 otherDep intatto"
+# c3: interior "[]," inferred to "extra,"; data sibling untouched.
+assert_dep_present "$TMP/fixture_mixed_ml.tsx" 'extra'    "ML mixed c3 -> extra"
+# No residual bare interior "[]," line must remain.
+if grep -qE '^\s+\[\],' "$TMP/fixture_mixed_ml.tsx"; then
+  nok "ML mixed: una riga interior '[]' nuda è ancora presente"
+else
+  ok "ML mixed: nessuna riga interior '[]' nuda residua"
+fi
+# Bodies must be preserved (not over-fixed).
+if grep -q 'data ?? \[\], \[' "$TMP/fixture_mixed_ml.tsx" && grep -q 'return extra ?? \[\];' "$TMP/fixture_mixed_ml.tsx"; then
+  ok "ML mixed: corpi delle callback preservati"
+else
+  nok "ML mixed: corpo di una callback alterato (over-fix!)"
+fi
+
 # ── Summary ───────────────────────────────────────────────────────────────────
 echo ""
 echo "────────────────────────────────────────────────────────"

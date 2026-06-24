@@ -206,9 +206,13 @@ export function inferDep(body: string, literal: "[]" | "{}"): string | null {
   return null;
 }
 
-// If the deps array's SOLE element is a bare [] or {}, try to infer the dep
-// from the callback body. Returns { literal, inferred } or null.
-export function inferSoleBareDep(
+// If the deps array contains EXACTLY ONE bare [] or {} element — whether it is
+// the sole dependency or sits alongside other real deps — try to infer the
+// correct replacement for that element from the callback body. Returns
+// { literal, inferred } or null when there is not exactly one bare element or
+// the inference is ambiguous. Siblings are never inspected; the caller replaces
+// only the bare literal, leaving the others untouched.
+export function inferBareDep(
   depsArrayString: string,
   body: string
 ): { literal: "[]" | "{}"; inferred: string } | null {
@@ -219,9 +223,11 @@ export function inferSoleBareDep(
   const elements = splitTopLevel(inner)
     .map((e) => stripComments(e).trim())
     .filter((e) => e.length > 0);
-  if (elements.length !== 1) return null;
-  const literal = elements[0];
-  if (literal !== "[]" && literal !== "{}") return null;
+  const bareElements = elements.filter((e) => e === "[]" || e === "{}");
+  // Conservative: only auto-fix when there is a single, unambiguous bare
+  // literal. Two or more (e.g. [[], {}]) → we cannot map each to its dep.
+  if (bareElements.length !== 1) return null;
+  const literal = bareElements[0] as "[]" | "{}";
   const inferred = inferDep(body, literal);
   if (!inferred) return null;
   return { literal, inferred };

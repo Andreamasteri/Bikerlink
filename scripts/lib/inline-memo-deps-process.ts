@@ -15,7 +15,7 @@ import {
   RE_HOOK_SAME_LINE,
   RE_HOOK_OPEN,
   RE_NULLISH_WITH_LITERAL,
-  inferSoleBareDep,
+  inferBareDep,
   extractCallbackBody,
   extractBracketSpan,
 } from "./inline-memo-deps-infer";
@@ -111,11 +111,13 @@ export function processFile(filePath: string, apply: boolean): Fix[] {
       const depsOriginal = match[0];
       let { result: depsFixed, changed, hadBare } = fixDepsArray(depsOriginal);
 
-      // ── Try to infer a sole bare [] / {} dep from the callback body ────
+      // ── Try to infer the single bare [] / {} dep from the callback body ──
+      // Handles both the sole-element case ([[]]) and the mixed case
+      // ([[], otherDep]) — only the bare literal is replaced.
       let inferNote: string | undefined;
       if (hadBare) {
         const body = extractCallbackBody(lines, hookLineIdx, i, matchStart);
-        const inferred = inferSoleBareDep(depsFixed, body);
+        const inferred = inferBareDep(depsFixed, body);
         if (inferred) {
           // Replace the lone bare literal with the inferred dependency.
           depsFixed = depsFixed.replace(/\[\]|\{\}/, inferred.inferred);
@@ -275,14 +277,15 @@ export function processFile(filePath: string, apply: boolean): Fix[] {
       continue;
     }
 
-    // ── Sole bare-literal inference for the whole multi-line deps array ────
-    // If the deps array's only element is a bare [] / {}, try to infer the
-    // correct dep from the callback body (applied below on the interior line).
+    // ── Single bare-literal inference for the whole multi-line deps array ──
+    // If the deps array has exactly one bare [] / {} element (sole or mixed
+    // with real deps), infer the correct dep from the callback body (applied
+    // below on the interior line that holds the bare literal).
     let inferredSole: string | null = null;
     if (depsHookLine >= 0 && depsOpenCol >= 0) {
       const span = extractBracketSpan(lines, ci, depsOpenCol);
       const body = extractCallbackBody(lines, depsHookLine, ci, depsOpenCol);
-      const inferred = inferSoleBareDep(span.text, body);
+      const inferred = inferBareDep(span.text, body);
       if (inferred) inferredSole = inferred.inferred;
     }
 
