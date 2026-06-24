@@ -31,6 +31,11 @@ run_fixer() {
   (cd "$TMP" && npx --yes tsx "$FIXER" --apply 2>&1) || true
 }
 
+# Run the fixer in dry-run mode (no --apply) and capture its stdout.
+run_fixer_dryrun() {
+  (cd "$TMP" && npx --yes tsx "$FIXER" 2>&1) || true
+}
+
 # Check that a DEPS-INTERIOR line (leading whitespace + expr) matching the
 # pattern is NOT present in the file. Interior dep lines always have leading
 # whitespace and a trailing comma, so we match `^\s+<pattern>,`.
@@ -268,6 +273,97 @@ else
   nok "Mode B: deps [items] non trovata"
 fi
 
+# ── Test 9a: Mode C3 — block-body callback, "}, [" deps opener ───────────────
+echo ""
+echo "── Test 9a: Mode C3 (callback a blocco, deps aperto su '}, [')"
+cat > "$TMP/fixture_c3.tsx" << 'EOF'
+import { useMemo } from 'react';
+
+const Component = ({ data, otherDep }: any) => {
+  const derived = useMemo(() => {
+    return data ?? [];
+  }, [
+    data ?? [],
+    otherDep,
+  ]);
+  return null;
+};
+EOF
+
+run_fixer
+# Interior dep line "    data ?? []," should be gone; "    data," should exist.
+assert_dep_gone    "$TMP/fixture_c3.tsx"  'data \?\? \[\]'  "C3"
+assert_dep_present "$TMP/fixture_c3.tsx"  'data'            "C3 dep clean"
+assert_dep_present "$TMP/fixture_c3.tsx"  'otherDep'        "C3 otherDep untouched"
+# The block-body return expression must NOT have been altered
+if grep -q 'return data ?? \[\];' "$TMP/fixture_c3.tsx"; then
+  ok "C3: body 'return data ?? [];' in callback preserved (unchanged)"
+else
+  nok "C3: body 'return data ?? [];' was incorrectly removed (over-fix!)"
+fi
+
+# ── Test 9b: Mode C3 — useCallback block-body with multiple violations ────────
+echo ""
+echo "── Test 9b: Mode C3 useCallback con più violazioni interne"
+cat > "$TMP/fixture_c3_cb.tsx" << 'EOF'
+import { useCallback } from 'react';
+
+const Component = ({ a, b, c }: any) => {
+  const handler = useCallback(() => {
+    doSomething(a, b, c);
+  }, [
+    a ?? [],
+    b ?? {},
+    c,
+  ]);
+  return null;
+};
+EOF
+
+run_fixer
+assert_dep_gone    "$TMP/fixture_c3_cb.tsx"  'a \?\? \[\]'  "C3-cb a"
+assert_dep_gone    "$TMP/fixture_c3_cb.tsx"  'b \?\? \{\}'  "C3-cb b"
+assert_dep_present "$TMP/fixture_c3_cb.tsx"  'a'            "C3-cb a clean"
+assert_dep_present "$TMP/fixture_c3_cb.tsx"  'b'            "C3-cb b clean"
+assert_dep_present "$TMP/fixture_c3_cb.tsx"  'c'            "C3-cb c untouched"
+
+# ── Test 9c: Mode C3 — dry-run shows the rewrite WITHOUT mutating the file ────
+echo ""
+echo "── Test 9c: Mode C3 dry-run mostra il rewrite proposto senza modificare il file"
+cat > "$TMP/fixture_c3_dry.tsx" << 'EOF'
+import { useMemo } from 'react';
+
+const Component = ({ data, otherDep }: any) => {
+  const derived = useMemo(() => {
+    return data ?? [];
+  }, [
+    data ?? [],
+    otherDep,
+  ]);
+  return null;
+};
+EOF
+
+# Snapshot the file before running, then run dry-run (no --apply).
+BEFORE_HASH=$(md5sum "$TMP/fixture_c3_dry.tsx" | awk '{print $1}')
+DRY_OUTPUT=$(run_fixer_dryrun)
+AFTER_HASH=$(md5sum "$TMP/fixture_c3_dry.tsx" | awk '{print $1}')
+
+# The file must be unchanged in dry-run mode.
+if [ "$BEFORE_HASH" = "$AFTER_HASH" ]; then
+  ok "C3 dry-run: il file NON è stato modificato (nessuna scrittura)"
+else
+  nok "C3 dry-run: il file è stato modificato in dry-run (regressione!)"
+fi
+# The interior dep violation must still be present (not written away).
+assert_dep_present "$TMP/fixture_c3_dry.tsx"  'data \?\? \[\]'  "C3 dry-run dep intatto"
+# The dry-run report must show the proposed PRIMA→DOPO rewrite.
+if echo "$DRY_OUTPUT" | grep -q 'data ?? \[\]' && echo "$DRY_OUTPUT" | grep -qE 'DOPO:[[:space:]]+data,'; then
+  ok "C3 dry-run: il report mostra la riscrittura proposta (PRIMA data ?? [] → DOPO data)"
+else
+  nok "C3 dry-run: il report NON mostra la riscrittura proposta per C3"
+fi
+
 # ── Test 9: gate and fixer agree — gate finds no violations after fixer ───────
 echo ""
 echo "── Test 9: il gate non segnala violazioni dopo il fix del fixer (coerenza gate↔fixer)"
@@ -285,6 +381,12 @@ const Component = ({ data, items, count }: any) => {
       count ?? {},
     ]
   );
+  const d = useMemo(() => {
+    return data ?? [];
+  }, [
+    data ?? [],
+    count ?? {},
+  ]);
   return null;
 };
 EOF
@@ -302,6 +404,7 @@ RE_BRACKET_WITH_INLINE = re.compile(r'\[(?:[^\[\]]*?)(?:\[\]|\{\})(?:[^\[\]]*?)\
 RE_HOOK_SAME_LINE = re.compile(r'\b(useMemo|useCallback)\s*\(')
 RE_HOOK_OPEN = re.compile(r'\b(useMemo|useCallback)\s*\(')
 RE_DEPS_OPEN_C1 = re.compile(r',\s*\[\s*(?://[^\n]*)?\s*$')
+RE_DEPS_OPEN_C3 = re.compile(r'\}\s*,?\s*\[\s*(?://[^\n]*)?\s*$')
 RE_EMPTY_VAL = re.compile(r'(?<!\w)(\[\]|\{\})')
 
 with open(fpath, 'r') as f:
@@ -356,7 +459,14 @@ while ci < n:
                     if RE_HOOK_OPEN.search(lines[bj]):
                         is_c2 = True
                         break
-    if not (is_c1 or is_c2):
+    is_c3 = False
+    if not is_c1 and not is_c2:
+        if RE_DEPS_OPEN_C3.search(cl) and not RE_HOOK_OPEN.search(cl):
+            for bj in range(ci-1, max(-1, ci-81), -1):
+                if RE_HOOK_OPEN.search(lines[bj]):
+                    is_c3 = True
+                    break
+    if not (is_c1 or is_c2 or is_c3):
         ci += 1
         continue
     depth = sum(1 if c == '[' else -1 if c == ']' else 0 for c in cl)

@@ -202,7 +202,20 @@ function processFile(filePath: string): Fix[] {
   //         count ?? {},
   //       ]
   //     );
+  //
+  //   Mode C3 — block-body callback whose closing "}" and deps "[" share the
+  //   same line, while the hook name is on an earlier line:
+  //     useMemo(() => {
+  //       return something;
+  //     }, [                  ← matches RE_DEPS_OPEN_C3, no hook on this line
+  //       dep1,
+  //       dep2 ?? [],         ← interior line, not caught by Pass 1
+  //     ]);
   const RE_DEPS_OPEN_C1 = /,\s*\[\s*(?:\/\/[^\n]*)?\s*$/;
+  // Mode C3: block-body callback closes on the same line as the deps opener.
+  // Example: "  }, [" or "  },  [  // comment".  The closing "}" belongs to the
+  // callback body; the hook opener is on an earlier line (ruling out C1).
+  const RE_DEPS_OPEN_C3 = /\}\s*,?\s*\[\s*(?:\/\/[^\n]*)?\s*$/;
   // Bare [] or {} NOT preceded by a word character (excludes `Type[]` suffixes)
   const RE_BARE_INTERIOR = /(?<!\w)(\[\]|\{\})/;
 
@@ -245,7 +258,21 @@ function processFile(filePath: string): Fix[] {
       }
     }
 
+    // Mode C3: "}, [" pattern — block-body callback whose closing brace and
+    // deps bracket share this line, but the hook name is on an earlier line.
+    let isC3 = false;
     if (!isC1 && !isC2) {
+      if (RE_DEPS_OPEN_C3.test(cl) && !RE_HOOK_OPEN.test(cl)) {
+        for (let bj = ci - 1; bj >= Math.max(0, ci - 81); bj--) {
+          if (RE_HOOK_OPEN.test(lines[bj])) {
+            isC3 = true;
+            break;
+          }
+        }
+      }
+    }
+
+    if (!isC1 && !isC2 && !isC3) {
       ci++;
       continue;
     }
