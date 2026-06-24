@@ -51,6 +51,36 @@ app.get("/api/metrics", (_req: Request, res: Response) => {
   });
 });
 
+app.get("/api/beacon", (_req: Request, res: Response) => {
+  const { getServerStats } = require("./lib/alive-beacon") as typeof import("./lib/alive-beacon");
+  const s = getServerStats();
+  const active = s.pool.total - s.pool.idle;
+  res.json({
+    status: "ok",
+    ts: Date.now(),
+    uptime_s: s.uptime_s,
+    memory: {
+      rss_mb: s.memory_rss_mb,
+      heap_used_mb: s.memory_heap_used_mb,
+      heap_total_mb: s.memory_heap_total_mb,
+    },
+    db: {
+      active,
+      idle: s.pool.idle,
+      total: s.pool.total,
+      waiting: s.pool.waiting,
+      max: s.pool.max,
+      active_pct: s.pool.activePct,
+    },
+    bg: {
+      active: s.bg.active,
+      queued: s.bg.queued,
+      max: s.bg.max,
+      slow_pings: s.bg.dbSlowPingsConsecutive,
+    },
+  });
+});
+
 // Task #2789 / #4455 — Gate: 503 su /api/* mentre initState.initializing=true.
 // Logica + eccezioni (auth essenziali, /health) estratte in init-state.ts
 // (initGate) così il test di regressione può esercitare il gate reale.

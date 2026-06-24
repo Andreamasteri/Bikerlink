@@ -86,6 +86,7 @@ export default function AdminLayout() {
         <Stack.Screen name="whisper-config" options={{ title: "Voce & Trascrizione" }} />
         <Stack.Screen name="telemetry-users" options={{ title: "Sessioni Utenti" }} />
         <Stack.Screen name="telemetry-user/[userId]" options={{ title: "Dettaglio Sessioni" }} />
+        <Stack.Screen name="boot-log" options={{ title: "Boot Log Avvio" }} />
       </Stack>
     </View>
   );

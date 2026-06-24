@@ -15,6 +15,8 @@ import { db, pool } from "./db";
 import { sql } from "drizzle-orm";
 import { initUptimeTracking, startMetroMonitor } from "./uptime";
 import { runMigrations } from "./migrate";
+import { addBootLog, bootOk, bootErr } from "./lib/boot-log";
+import { startAliveBeacon } from "./lib/alive-beacon";
 import { initMissingClubConversations, ensureCompetitorAnalysisPdf } from "./init-helpers";
 import { enrichBikerMatchBreakdowns } from "./matching/enrich-breakdowns";
 import { runBootPhase3DbInit } from "./boot-phase3-db-init";
@@ -42,6 +44,8 @@ const BOOT_START = Date.now();
 function bootLog(n: number, total: number, step: string, msg: string) {
   const elapsed = ((Date.now() - BOOT_START) / 1000).toFixed(1);
   console.log(`[${new Date().toISOString()}] [${n}/${total}] ${step} — ${elapsed}s | ${msg}`);
+  const ok = msg === "done" ? true : msg === "start" ? null : null;
+  addBootLog(`[${n}/${total}] ${step}`, msg, ok);
 }
 
 // ── DB readiness pre-flight ───────────────────────────────────────────────────
@@ -257,6 +261,8 @@ export async function runBootSequence(server: Server, errorHandlersReady: Promis
   // un periodo sano attende solo il delay base, senza ereditare un backoff alto
   // di una raffica passata (vedi lib/crash-backoff.ts).
   resetCrashBackoff();
+  bootOk("READY", `All phases completed in ${((Date.now() - BOOT_START) / 1000).toFixed(1)}s — server is READY`);
+  startAliveBeacon();
   const totalElapsed = ((Date.now() - BOOT_START) / 1000).toFixed(1);
   console.log(`[INIT] All startup phases completed in ${totalElapsed}s — server is READY`);
 
