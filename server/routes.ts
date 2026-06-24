@@ -31,6 +31,7 @@ import chatRoutes from "./routes/chat";
 import notificationRoutes from "./routes/notifications";
 import reportRoutes from "./routes/reports";
 import workshopRoutes from "./routes/workshops";
+import businessRoutes from "./routes/businesses";
 import easterEggRoutes from "./routes/easter-eggs";
 import adminRoutes from "./routes/admin";
 import moderatorRoutes from "./routes/moderator";
@@ -317,6 +318,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/notifications", notificationRoutes);
   app.use("/api/reports", reportRoutes);
   app.use("/api/workshops", workshopRoutes);
+  app.use("/api/businesses", businessRoutes);
   app.use("/api/easter-eggs", easterEggRoutes);
   app.use("/api/ads", adsRoutes);
   app.use("/api/contest", contestRoutes);

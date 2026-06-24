@@ -118,6 +118,14 @@ export function useMapData({
   });
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const businessesQuery = useQuery<any[]>({
+    queryKey: ["/api/businesses"],
+    retry: false,
+    staleTime: 60000,
+    enabled: isAuthenticated && nearbyLoaded,
+  });
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const easterEggsQuery = useQuery<any[]>({
     queryKey: ["/api/easter-eggs/nearby", location?.latitude, location?.longitude],
     queryFn: async () => {
@@ -293,6 +301,7 @@ export function useMapData({
     bikerCountQuery,
     zavCountQuery,
     workshopsQuery,
+    businessesQuery,
     easterEggsQuery,
     adsGloballyEnabled,
     myAdsQuery,

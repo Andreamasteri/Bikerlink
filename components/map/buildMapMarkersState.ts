@@ -1,5 +1,5 @@
 import type {
-  MapUser, MapWorkshop, MapEasterEgg, MapSosRequest, ClubMapPin, EventMapPin,
+  MapUser, MapWorkshop, MapBusiness, MapEasterEgg, MapSosRequest, ClubMapPin, EventMapPin,
 } from "@/components/map/map-types";
 
 interface BuildMapMarkersStateParams {
@@ -11,6 +11,7 @@ interface BuildMapMarkersStateParams {
   searchRadiusKm?: number | null;
   filteredUsers: MapUser[];
   workshops: MapWorkshop[];
+  businesses: MapBusiness[];
   eventPins: EventMapPin[];
   showEventPins: boolean;
   filterEvents: boolean;
@@ -57,6 +58,13 @@ export function buildMapMarkersState(p: BuildMapMarkersStateParams): string {
         lat: ws.latitude,
         lng: ws.longitude,
         name: ws.name,
+      })),
+      businesses: p.businesses.map((b) => ({
+        id: b.id,
+        lat: b.latitude,
+        lng: b.longitude,
+        name: b.name,
+        type: b.type,
       })),
       events:
         p.showEventPins && p.filterEvents

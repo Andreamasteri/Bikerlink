@@ -37,11 +37,11 @@ interface HazardItem {
 }
 
 const InteractiveMap = forwardRef<InteractiveMapHandle, InteractiveMapProps>(function InteractiveMap({
-  users = [], workshops = [], easterEggs = [], activeSosRequests = [],
+  users = [], workshops = [], businesses = [], easterEggs = [], activeSosRequests = [],
   isAvailable, ghostMode = false, searchRadiusKm,
   filterBiker, filterZavorrina, filterBarTopOffset,
   onToggleFilterBiker, onToggleFilterZavorrina,
-  onUserPress, onEasterEggPress, onReady, currentUserId,
+  onUserPress, onEasterEggPress, onBusinessPress, onReady, currentUserId,
   realMeMarker, fakeMeMarker, onEventPress,
   showEventPins = true, clubPins = [],
   filterClubs = true, onToggleFilterClubs,
@@ -181,7 +181,7 @@ const InteractiveMap = forwardRef<InteractiveMapHandle, InteractiveMapProps>(fun
     activeTileUrl: effectiveTileUrl,
     activeTileMaxZoom: effectiveTileMaxZoom,
     userLocation, isAvailable,
-    searchRadiusKm, filteredUsers, workshops, eventPins, showEventPins, filterEvents,
+    searchRadiusKm, filteredUsers, workshops, businesses, eventPins, showEventPins, filterEvents,
     clubPins, filterClubs, easterEggs, activeSosRequests, realMeMarker, fakeMeMarker,
     currentUserId, fixedPositionEnabled,
   });
@@ -214,8 +214,8 @@ const InteractiveMap = forwardRef<InteractiveMapHandle, InteractiveMapProps>(fun
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const handleMessage = useCallback(
     createMapMessageHandler({
-      users, clubPins, easterEggs,
-      onUserPress, onClubPress, onEventPress, onEasterEggPress,
+      users, clubPins, easterEggs, businesses,
+      onUserPress, onClubPress, onEventPress, onEasterEggPress, onBusinessPress,
       onHazardPress: (id) => setSelectedHazardId(id),
       onVesselPress: (mmsi) => setSelectedVesselMmsi(mmsi),
       onReady, onRegionChangeComplete, setMapReady,
@@ -228,7 +228,7 @@ const InteractiveMap = forwardRef<InteractiveMapHandle, InteractiveMapProps>(fun
         });
       },
     }),
-    [users, clubPins, easterEggs, onUserPress, onClubPress, onEventPress, onEasterEggPress, onReady, onRegionChangeComplete],
+    [users, clubPins, easterEggs, businesses, onUserPress, onClubPress, onEventPress, onEasterEggPress, onBusinessPress, onReady, onRegionChangeComplete],
   );
 
   useImperativeHandle(ref, () => ({

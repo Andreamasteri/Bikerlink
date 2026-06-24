@@ -229,6 +229,15 @@ const BRIDGE_PART2 = `
         addMarker(ws.lat, ws.lng, iconBadge("#E65100", SVG.wrench, 30), [30, 30], [15, 15], null);
       });
 
+      (m.businesses || []).forEach(function(biz) {
+        var isDealer = biz.type === "concessionaria";
+        var color = isDealer ? "#1565C0" : "#AD1457";
+        var svg = isDealer ? SVG.car : SVG.store;
+        addMarker(biz.lat, biz.lng, iconBadge(color, svg, 32), [32, 32], [16, 16], function() {
+          postMsg({ type: "markerPress", markerType: "business", id: biz.id });
+        });
+      });
+
       (m.events || []).forEach(function(ev) {
         addMarker(ev.lat, ev.lng, iconBadge("#F57C00", SVG.calendar, 30), [30, 30], [15, 15], function() {
           postMsg({ type: "markerPress", markerType: "event", id: ev.id });

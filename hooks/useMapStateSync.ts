@@ -1,7 +1,7 @@
 import { useCallback, useEffect } from "react";
 import { buildMapMarkersState } from "@/components/map/buildMapMarkersState";
 import type {
-  MapUser, MapWorkshop, MapEasterEgg, MapSosRequest, ClubMapPin, EventMapPin,
+  MapUser, MapWorkshop, MapBusiness, MapEasterEgg, MapSosRequest, ClubMapPin, EventMapPin,
 } from "@/components/map/map-types";
 
 interface UseMapStateSyncParams {
@@ -16,6 +16,7 @@ interface UseMapStateSyncParams {
   searchRadiusKm?: number | null;
   filteredUsers: MapUser[];
   workshops: MapWorkshop[];
+  businesses: MapBusiness[];
   eventPins: EventMapPin[];
   showEventPins: boolean;
   filterEvents: boolean;
@@ -41,6 +42,7 @@ export function useMapStateSync({
   searchRadiusKm,
   filteredUsers,
   workshops,
+  businesses,
   eventPins,
   showEventPins,
   filterEvents,
@@ -57,14 +59,14 @@ export function useMapStateSync({
     if (!mapReady) return;
     const encoded = buildMapMarkersState({
       mapsEnabled, activeTileUrl, activeTileMaxZoom, userLocation, isAvailable, searchRadiusKm,
-      filteredUsers, workshops, eventPins, showEventPins, filterEvents,
+      filteredUsers, workshops, businesses, eventPins, showEventPins, filterEvents,
       clubPins, filterClubs, easterEggs, activeSosRequests,
       realMeMarker, fakeMeMarker, currentUserId, fixedPositionEnabled,
     });
     inject("window.leafletBridge && window.leafletBridge.updateState(" + encoded + ")");
   }, [
     mapReady, mapsEnabled, activeTileUrl, activeTileMaxZoom, userLocation, isAvailable, searchRadiusKm,
-    filteredUsers, workshops, eventPins, showEventPins, filterEvents,
+    filteredUsers, workshops, businesses, eventPins, showEventPins, filterEvents,
     clubPins, filterClubs, easterEggs, activeSosRequests,
     realMeMarker, fakeMeMarker, currentUserId, fixedPositionEnabled, inject,
   ]);

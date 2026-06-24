@@ -21,6 +21,7 @@ import {
   type PhotoWinner, type InsertPhotoWinner,
   type Workshop, type InsertWorkshop,
   type WorkshopContact, type InsertWorkshopContact,
+  type Business, type InsertBusiness, type InsertBusinessClick,
   type EasterEgg, type InsertEasterEgg,
   type CollectedEasterEgg, type InsertCollectedEasterEgg,
   type Report, type InsertReport,
@@ -139,6 +140,16 @@ export interface IStorage {
   createWorkshop(workshop: InsertWorkshop): Promise<Workshop>;
   updateWorkshop(id: string, data: Partial<InsertWorkshop>): Promise<Workshop | undefined>;
   createWorkshopContact(contact: InsertWorkshopContact): Promise<WorkshopContact>;
+  getBusinesses(): Promise<Business[]>;
+  getBusiness(id: string): Promise<Business | undefined>;
+  getVisibleBusinesses(): Promise<Business[]>;
+  createBusiness(data: InsertBusiness): Promise<Business>;
+  updateBusiness(id: string, data: Partial<InsertBusiness>): Promise<Business | undefined>;
+  deleteBusiness(id: string): Promise<void>;
+  setAllBusinessesActive(isActive: boolean): Promise<number>;
+  createBusinessClick(data: InsertBusinessClick): Promise<void>;
+  computeQualifiedPassages(businessId: string, periodMonth: string, radiusM: number, maxSpeedKmh: number): Promise<{ qualifiedPassages: number; uniqueRiders: number }>;
+  getBusinessReport(periodMonth: string): Promise<Array<{ businessId: string; name: string; type: string; qualifiedPassages: number; uniqueRiders: number; radiusM: number; computedAt: Date | null; clicks: number; clicksByAction: Record<string, number> }>>;
   getEasterEggs(active?: boolean): Promise<EasterEgg[]>;
   getEasterEgg(id: string): Promise<EasterEgg | undefined>;
   createEasterEgg(egg: InsertEasterEgg): Promise<EasterEgg>;

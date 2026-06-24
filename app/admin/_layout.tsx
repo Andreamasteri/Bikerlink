@@ -51,6 +51,7 @@ export default function AdminLayout() {
         <Stack.Screen name="crash-logs" options={{ title: "Log Riavvii App" }} />
         <Stack.Screen name="restart-history" options={{ title: "Storico Riavvii" }} />
         <Stack.Screen name="newsletter" options={{ title: "Iscritti Newsletter" }} />
+        <Stack.Screen name="marketing" options={{ title: "Business Reach" }} />
         <Stack.Screen name="visitatori" options={{ title: "Counter Visitatori Sito" }} />
         <Stack.Screen name="matching-hub" options={{ title: "Hub Matching" }} />
         <Stack.Screen name="matching-telemetry" options={{ title: "Telemetria Matching" }} />

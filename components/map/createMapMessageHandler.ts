@@ -1,15 +1,17 @@
 import { sendStartupBeacon } from "@/lib/startup-beacon";
 import type { WebViewMessageEvent } from "react-native-webview";
-import type { MapUser, MapEasterEgg, ClubMapPin } from "@/components/map/map-types";
+import type { MapUser, MapBusiness, MapEasterEgg, ClubMapPin } from "@/components/map/map-types";
 
 interface MapMessageHandlerOptions {
   users: MapUser[];
   clubPins: ClubMapPin[];
   easterEggs: MapEasterEgg[];
+  businesses: MapBusiness[];
   onUserPress?: (user: MapUser) => void;
   onClubPress?: (club: ClubMapPin) => void;
   onEventPress?: (id: string) => void;
   onEasterEggPress?: (egg: MapEasterEgg) => void;
+  onBusinessPress?: (business: MapBusiness) => void;
   onHazardPress?: (id: string) => void;
   onVesselPress?: (mmsi: string) => void;
   onReady?: () => void;
@@ -80,6 +82,9 @@ export function createMapMessageHandler(opts: MapMessageHandlerOptions) {
         } else if (msg.markerType === "egg") {
           const e = opts.easterEggs.find((x) => x.id === msg.id);
           if (e) opts.onEasterEggPress?.(e);
+        } else if (msg.markerType === "business") {
+          const b = opts.businesses.find((x) => x.id === msg.id);
+          if (b) opts.onBusinessPress?.(b);
         } else if (msg.markerType === "hazard") {
           if (msg.id) opts.onHazardPress?.(msg.id);
         } else if (msg.markerType === "vessel") {

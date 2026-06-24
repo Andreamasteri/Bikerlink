@@ -26,6 +26,14 @@ export interface MapEasterEgg {
   longitude: number;
 }
 
+export interface MapBusiness {
+  id: string;
+  name: string;
+  type: string;
+  latitude: number;
+  longitude: number;
+}
+
 export interface MapSosRequest {
   id: string;
   requesterNickname?: string;
@@ -60,6 +68,7 @@ export interface ClubMapPin {
 export interface InteractiveMapProps {
   users?: MapUser[];
   workshops?: MapWorkshop[];
+  businesses?: MapBusiness[];
   easterEggs?: MapEasterEgg[];
   activeSosRequests?: MapSosRequest[];
   isAvailable: boolean;
@@ -72,6 +81,7 @@ export interface InteractiveMapProps {
   onToggleFilterZavorrina: () => void;
   onUserPress?: (user: MapUser) => void;
   onEasterEggPress?: (egg: MapEasterEgg) => void;
+  onBusinessPress?: (business: MapBusiness) => void;
   onReady?: () => void;
   currentUserId?: string | null;
   realMeMarker?: { latitude: number; longitude: number } | null;

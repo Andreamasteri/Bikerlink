@@ -82,3 +82,4 @@
 - [Boot crash-loop resilience](boot-crash-loop-resilience.md) — DB lento al boot causava loop: seed eager-promise→unhandledRejection (usa thunk), seed che propaga (withDbRetry+catch), exit immediato (backoff Atomics.wait su /tmp).
 - [Watchdog high-severity alerts](watchdog-high-severity-alerts.md) — alerts.ts generic loop pushes ONLY critical; "high" signals need a dedicated per-id block + shouldSend throttle to notify admins.
 - [Scheduler heartbeat & zombie recovery](scheduler-heartbeat-recovery.md) — ogni tick (anche skip) emette heartbeat; cycleInFlight reset >10min; bg-db-limiter coda con tetto+timeout (dropped* in stats). Evita falsi "high" + burn proposer.
+- [Expo typed-routes stale in validation](expo-typedroutes-stale.md) — navigate new routes with `router.push(\`/x/${id}\` as never)`, NOT typed `pathname:"/x/[id]" as const`; validation tsc doesn't regen gitignored .expo types so new routes fail.

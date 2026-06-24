@@ -291,6 +291,15 @@ export const adminGroupsPart1: AdminGroup[] = [
     headerIconSet: "MaterialCommunityIcons",
     items: [
       {
+        key: "marketing",
+        label: "Business Reach",
+        icon: "storefront",
+        iconSet: "MaterialCommunityIcons",
+        route: "/admin/marketing",
+        accentColor: "#AD1457",
+        keywords: ["business", "locale", "locali", "concessionaria", "concessionarie", "reach", "marketing", "passaggi", "passaggi qualificati", "conversioni", "click", "report mensile", "attiva", "disattiva", "toggle", "raggio", "radius", "marker", "mappa business", "partner commerciale", "inserzionista"],
+      },
+      {
         key: "newsletter",
         label: "Newsletter",
         icon: "email-newsletter",

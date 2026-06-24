@@ -211,6 +211,11 @@ function MapScreenContent() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   ) as any;
 
+  const filteredBusinesses = ((mapData.businessesQuery.data ?? []) as { latitude?: number | null; longitude?: number | null }[]).filter(
+    (b) => b.latitude != null && b.longitude != null && !isNaN(b.latitude as number) && !isNaN(b.longitude as number)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  ) as any;
+
   const filteredSosRequests = ((mapData.activeSosQuery.data ?? []) as { latitude?: number | null; longitude?: number | null }[]).filter(
     (s) => s.latitude != null && s.longitude != null
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -339,6 +344,7 @@ function MapScreenContent() {
             ref={mapRef}
             users={filteredUsers}
             workshops={filteredWorkshops}
+            businesses={filteredBusinesses}
             easterEggs={filteredEasterEggs}
             activeSosRequests={filteredSosRequests}
             isAvailable={isAvailable}
@@ -358,6 +364,10 @@ function MapScreenContent() {
             onUserPress={(u) => { handleUserPress(u as any); }}
             // eslint-disable-next-line @typescript-eslint/no-explicit-any -- EasterEgg vs MapEasterEgg index signature mismatch
             onEasterEggPress={(e) => { handleEasterEggPress(e as any); }}
+            onBusinessPress={(b) => {
+              setMapFullscreen(false);
+              router.push(`/business/${b.id}` as never);
+            }}
             onEventPress={(id) => {
               setMapFullscreen(false);
               router.push({ pathname: "/evento/[id]" as const, params: { id } });
