@@ -7,14 +7,13 @@ declare global {
   }
 }
 import { createServer, type Server } from "node:http";
-import path from "node:path";
-import crypto from "node:crypto";
 import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
 import pg from "pg";
-import { pool } from "./db";
 import { storage } from "./storage";
 import { enforceOrigin } from "./middleware";
+import { registerPart2Routes } from "./routes.part2";
+import { geocodeRouter } from "./routes/planned-routes/waypoints.next";
 import internalRouter from "./routes/_internal";
 import authRoutes from "./routes/auth";
 import userRoutes from "./routes/users";
@@ -43,7 +42,6 @@ import telemetryRoutes from "./routes/telemetry";
 import telemetryMapsRoutes from "./routes/telemetry-maps";
 import motoclubsRoutes from "./routes/motoclubs";
 import friendsRoutes from "./routes/friends";
-import { handleMusicMatch, handleMusicMatchReject } from "./routes/music-match";
 import matchPreferencesRoutes from "./routes/match-preferences";
 import recapRoutes from "./routes/recap";
 import matchNegativePreferencesRoutes from "./routes/match-negative-preferences";
@@ -59,9 +57,6 @@ import wipStubsRouter from "./routes/wip-stubs";
 import routeCompletionRouter from "./routes/route-completion";
 import { publicMediaRouter, adminMediaRouter } from "./routes/media-library";
 import gdprRoutes from "./routes/gdpr";
-import { db } from "./db";
-import { userFavorites } from "@shared/db";
-import { eq, and } from "drizzle-orm";
 import { onlineTracker } from "./online-tracker";
 import { registerClientSettingsRoutes } from "./routes/client-settings";
 import { registerClientSettingsExtraRoutes } from "./routes/client-settings-extra";
@@ -374,7 +369,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const { default: plannedRouteInvitesRoutes } = await import("./routes/planned-route-invites");
   app.use("/api/planned-route-invites", plannedRouteInvitesRoutes);
 
-  const { geocodeRouter } = await import("./routes/planned-routes/waypoints.next");
   app.use("/api/geocode", geocodeRouter);
 
   // Task #2698 — AI Assistant utente (sessione richiesta, no admin role).
@@ -398,7 +392,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   registerMediaPromoRoutes(app);
 
-  const { registerPart2Routes } = await import("./routes.part2");
   registerPart2Routes(app);
 
   const { registerExportsRoutes } = await import("./routes/exports");
