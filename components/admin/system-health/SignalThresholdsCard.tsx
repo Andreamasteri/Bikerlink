@@ -55,6 +55,7 @@ interface EditState {
 export function SignalThresholdsCard() {
   const qc = useQueryClient();
   const [editing, setEditing] = useState<EditState | null>(null);
+  const [inlineError, setInlineError] = useState<string | null>(null);
 
   const q = useQuery<ThresholdsResp>({
     queryKey: ["/api/admin/watchdog/signal-thresholds"],
@@ -72,8 +73,9 @@ export function SignalThresholdsCard() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["/api/admin/watchdog/signal-thresholds"] });
       setEditing(null);
+      setInlineError(null);
     },
-    onError: (err: Error) => Alert.alert("Errore", err.message),
+    onError: (err: Error) => setInlineError(err.message),
   });
 
   const resetMutation = useMutation({
@@ -90,9 +92,10 @@ export function SignalThresholdsCard() {
     if (!editing) return;
     const n = parsePositiveInt(editing.value);
     if (n === null) {
-      Alert.alert("Valore non valido", "Inserisci un numero intero ≥ 1");
+      setInlineError("Inserisci un numero intero ≥ 1");
       return;
     }
+    setInlineError(null);
     saveMutation.mutate({ signal: editing.signal, field: editing.field, value: n });
   };
 
@@ -178,37 +181,42 @@ export function SignalThresholdsCard() {
                   <View key={field} style={styles.fieldCell}>
                     <Text style={styles.fieldLabel}>{FIELD_LABELS[field]}</Text>
                     {isEditing ? (
-                      <View style={styles.editRow}>
-                        <TextInput
-                          style={styles.input}
-                          value={editing.value}
-                          onChangeText={(v) => setEditing({ ...editing, value: v })}
-                          keyboardType="number-pad"
-                          autoFocus
-                          selectTextOnFocus
-                        />
-                        <TouchableOpacity
-                          style={styles.saveBtn}
-                          onPress={handleSave}
-                          disabled={saveMutation.isPending}
-                        >
-                          {saveMutation.isPending ? (
-                            <ActivityIndicator size="small" color="#fff" />
-                          ) : (
-                            <MaterialCommunityIcons name="check" size={14} color="#fff" />
-                          )}
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                          style={styles.cancelBtn}
-                          onPress={() => setEditing(null)}
-                        >
-                          <MaterialCommunityIcons name="close" size={14} color="#9ca3af" />
-                        </TouchableOpacity>
+                      <View>
+                        <View style={styles.editRow}>
+                          <TextInput
+                            style={styles.input}
+                            value={editing.value}
+                            onChangeText={(v) => { setEditing({ ...editing, value: v }); setInlineError(null); }}
+                            keyboardType="number-pad"
+                            autoFocus
+                            selectTextOnFocus
+                          />
+                          <TouchableOpacity
+                            style={styles.saveBtn}
+                            onPress={handleSave}
+                            disabled={saveMutation.isPending}
+                          >
+                            {saveMutation.isPending ? (
+                              <ActivityIndicator size="small" color="#fff" />
+                            ) : (
+                              <MaterialCommunityIcons name="check" size={14} color="#fff" />
+                            )}
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            style={styles.cancelBtn}
+                            onPress={() => { setEditing(null); setInlineError(null); }}
+                          >
+                            <MaterialCommunityIcons name="close" size={14} color="#9ca3af" />
+                          </TouchableOpacity>
+                        </View>
+                        {inlineError != null && (
+                          <Text style={styles.inlineErrorText}>{inlineError}</Text>
+                        )}
                       </View>
                     ) : (
                       <TouchableOpacity
                         style={[styles.valueBtn, isModified && styles.valueBtnModified]}
-                        onPress={() => setEditing({ signal, field, value: String(currentVal) })}
+                        onPress={() => { setInlineError(null); setEditing({ signal, field, value: String(currentVal) }); }}
                       >
                         <Text style={[styles.valueText, isModified && styles.valueTextModified]}>
                           {currentVal}
@@ -259,6 +267,7 @@ const styles = StyleSheet.create({
   defaultHint: { color: "#4b5563", fontSize: 10 },
 
   editRow: { flexDirection: "row", alignItems: "center", gap: 4 },
+  inlineErrorText: { color: "#f87171", fontSize: 10, marginTop: 4, lineHeight: 14 },
   input: {
     flex: 1, backgroundColor: "#374151", color: "#f3f4f6",
     fontSize: 15, fontWeight: "700" as const,

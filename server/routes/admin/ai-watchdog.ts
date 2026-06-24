@@ -344,6 +344,21 @@ router.put("/watchdog/signal-thresholds", async (req, res) => {
     if (typeof warnUsers === "number") next.warnUsers = warnUsers;
     if (typeof highCount === "number") next.highCount = highCount;
     if (typeof highUsers === "number") next.highUsers = highUsers;
+
+    // Cross-field validation: warn thresholds must not exceed high thresholds.
+    // Resolve effective values merging the new override with signal defaults.
+    const sigDefaults = DEFAULT_SIGNAL_CONFIG_BACKEND[signal];
+    const effWarnCount = typeof next.warnCount === "number" ? next.warnCount : sigDefaults.warnCount;
+    const effHighCount = typeof next.highCount === "number" ? next.highCount : sigDefaults.highCount;
+    const effWarnUsers = typeof next.warnUsers === "number" ? next.warnUsers : sigDefaults.warnUsers;
+    const effHighUsers = typeof next.highUsers === "number" ? next.highUsers : sigDefaults.highUsers;
+    if (effWarnCount > effHighCount) {
+      return sendError(res, 422, `warnCount (${effWarnCount}) deve essere ≤ highCount (${effHighCount})`);
+    }
+    if (effWarnUsers > effHighUsers) {
+      return sendError(res, 422, `warnUsers (${effWarnUsers}) deve essere ≤ highUsers (${effHighUsers})`);
+    }
+
     const updated = { ...current, [signal]: next };
     await storage.upsertAppSetting("watchdog_signal_thresholds", undefined, updated);
     return res.json({ ok: true, signal, thresholds: next });
