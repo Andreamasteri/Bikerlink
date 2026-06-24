@@ -233,7 +233,7 @@ export function useTrackingHandlers(deps: TrackingHandlerDeps) {
         refs.countdownGoTimeoutRef.current = setTimeout(() => { session.setCountdownValue(0); beginActiveTracking(); }, parseInt(settings.countdownSec || "10", 10) * 1000);
       } else { session.setLoading(false); beginActiveTracking(); }
     } catch (e) { logGpsError(e, "handleStart"); Alert.alert(t("common.error"), t("tracking.routeCreateError")); session.setLoading(false); }
-  }, [beginActiveTracking, settings, session, resetTrackingState, t, refs]);
+  }, [beginActiveTracking, settings, session, resetTrackingState, t, refs, requestBackgroundPermission]);
 
   const handleStop = useCallback(async () => {
     if (session.phaseRef.current === "idle") return;

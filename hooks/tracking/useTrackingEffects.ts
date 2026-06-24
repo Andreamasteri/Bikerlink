@@ -213,7 +213,7 @@ export function useTrackingEffects(deps: EffectDeps) {
       }
     });
     return () => sub.remove();
-  }, [t, bg, session, settings, onNativeLocation, totalGpsPointsRef, deps.isTabFocusedRef]);
+  }, [t, bg, session, settings, onNativeLocation, totalGpsPointsRef, deps.isTabFocusedRef, requestBackgroundPermission]);
 
   // Show pending bg toast when tab comes back to focus
   useEffect(() => {
