@@ -87,6 +87,19 @@ PROJECT_ID=$(node -e "const a=require('./app.json'); console.log(a.expo.extra?.e
 
 CURRENT_MAX_OTA=0
 
+# ── Leggi APPLIED_OTA_NUMBER corrente da buildInfo.ts come base di fallback ──
+BUILD_INFO_CURRENT=$(node -e "
+  try {
+    const fs = require('fs');
+    const src = fs.readFileSync('constants/buildInfo.ts', 'utf8');
+    const m = src.match(/APPLIED_OTA_NUMBER[^=]*=\s*(\d+)/);
+    console.log(m ? m[1] : '0');
+  } catch { console.log('0'); }
+" 2>/dev/null || echo "0")
+log_info "APPLIED_OTA_NUMBER corrente in buildInfo.ts: ${BUILD_INFO_CURRENT}"
+
+EAS_UNREACHABLE=false
+
 if [[ -n "$PROJECT_ID" ]]; then
   log_info "Interrogo EAS GraphQL per il numero OTA più alto (projectId: ${PROJECT_ID})..."
 
@@ -95,8 +108,9 @@ if [[ -n "$PROJECT_ID" ]]; then
     -H "Content-Type: application/json" \
     -d "{\"query\":\"{ app { byId(appId: \\\"${PROJECT_ID}\\\") { updateBranches(offset: 0, limit: 2) { updates(offset: 0, limit: 10) { updateGroup message } } } } }\"}" \
     "https://api.expo.dev/graphql" 2>/dev/null) || {
-    log_warn "EAS GraphQL non raggiungibile — uso NEXT_OTA=1 come fallback"
+    log_warn "EAS GraphQL non raggiungibile — fallback a buildInfo.ts (APPLIED_OTA_NUMBER=${BUILD_INFO_CURRENT})"
     GRAPHQL_RESPONSE=""
+    EAS_UNREACHABLE=true
   }
 
   if [[ -n "$GRAPHQL_RESPONSE" ]]; then
@@ -119,6 +133,16 @@ if [[ -n "$PROJECT_ID" ]]; then
         } catch { console.log(0); }
       });
     " 2>/dev/null || echo "0")
+  fi
+fi
+
+# Se EAS non era raggiungibile o ha restituito 0, usa buildInfo.ts come base.
+# Scegliamo il massimo tra il valore EAS e quello baked in buildInfo.ts per
+# garantire che non si regredisca mai sotto il numero già pubblicato.
+if [[ "$EAS_UNREACHABLE" == "true" ]] || [[ "$CURRENT_MAX_OTA" -eq 0 ]]; then
+  if [[ "$BUILD_INFO_CURRENT" -gt "$CURRENT_MAX_OTA" ]]; then
+    log_warn "EAS GraphQL non disponibile o ha restituito 0 — uso buildInfo.ts come base (${BUILD_INFO_CURRENT})"
+    CURRENT_MAX_OTA="$BUILD_INFO_CURRENT"
   fi
 fi
 
