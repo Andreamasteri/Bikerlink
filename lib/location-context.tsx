@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { sendStartupBeacon } from "@/lib/startup-beacon";
 import { markAsyncError } from "@/lib/crash-logger";
 import { withTimeout } from "@/lib/resume-utils";
+import { resolveBackgroundPermission } from "@/lib/location-permission";
 
 // GPS flood = ricezione anomala di fix mentre l'utente è fermo (sintomo di un
 // loop di watch impazzito che può saturare il JS thread). Finestra scorrevole di
@@ -168,37 +169,27 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
 
   const requestBackgroundPermission = useCallback(async (): Promise<BackgroundPermissionResult> => {
     try {
-      // 1. Garantire prima il foreground: su Android 11+ il background ("Sempre")
-      // non può essere concesso se il foreground non è già concesso.
-      let fg = await loc().getForegroundPermissionsAsync();
-      if (fg.status !== "granted") {
-        if (!fg.canAskAgain) {
-          // Foreground negato definitivamente → solo Impostazioni.
-          return "needsSettings";
-        }
-        fg = await loc().requestForegroundPermissionsAsync();
-        setHasPermission(fg.status === "granted");
-        setPermissionDenied(fg.status === "denied");
-        setPermissionPrompt(fg.status === "undetermined");
-        if (fg.status !== "granted") {
-          // L'utente ha rifiutato il foreground ora: se può ancora chiedere lo
-          // lasciamo ritentare, altrimenti serve Impostazioni.
-          return fg.canAskAgain ? "denied" : "needsSettings";
-        }
-      }
-
-      // 2. Foreground ok → richiedere il background.
-      const { status, canAskAgain } = await loc().requestBackgroundPermissionsAsync();
-      const granted = status === "granted";
-      setHasBackgroundPermission(granted);
-      if (granted) {
-        hadBackgroundPermissionRef.current = true;
-        setBackgroundPermissionRevoked(false);
-        return "granted";
-      }
-      // Negato: se il sistema impone le Impostazioni (canAskAgain false / Android
-      // 11+) → needsSettings; altrimenti il dialog è ancora possibile → denied.
-      return canAskAgain ? "denied" : "needsSettings";
+      const result = await resolveBackgroundPermission(
+        () => loc().getForegroundPermissionsAsync(),
+        async () => {
+          const fg = await loc().requestForegroundPermissionsAsync();
+          setHasPermission(fg.status === "granted");
+          setPermissionDenied(fg.status === "denied");
+          setPermissionPrompt(fg.status === "undetermined");
+          return fg;
+        },
+        async () => {
+          const bg = await loc().requestBackgroundPermissionsAsync();
+          const granted = bg.status === "granted";
+          setHasBackgroundPermission(granted);
+          if (granted) {
+            hadBackgroundPermissionRef.current = true;
+            setBackgroundPermissionRevoked(false);
+          }
+          return bg;
+        },
+      );
+      return result;
     } catch {
       return "denied";
     }
