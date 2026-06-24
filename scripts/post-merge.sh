@@ -949,4 +949,22 @@ fi
 echo "════════════════════════════════════════"
 echo ""
 
+# ── ESLint gate: react-hooks/rules-of-hooks + all error-level rules ──────────
+echo "════════════════════════════════════════"
+echo "ESLint gate — verifica regole error-level su app/ ..."
+echo ""
+# --cache         → riutilizza risultati file invariati (target < 30s)
+# Esce con codice non-zero solo sugli error; i warning (exhaustive-deps ecc.) non bloccano.
+if ! npx eslint app/ --ext .tsx --cache --cache-location .eslintcache; then
+  echo ""
+  echo "❌ ESLint gate FALLITO — trovate violazioni error-level in app/"
+  echo "   Correggere i file segnalati sopra prima del merge."
+  echo "   (Eseguire: npx eslint app/ --ext .tsx)"
+  exit 1
+else
+  echo "✅ ESLint gate superato — nessuna violazione error-level in app/"
+fi
+echo "════════════════════════════════════════"
+echo ""
+
 exit 0
