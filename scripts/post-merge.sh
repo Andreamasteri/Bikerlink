@@ -353,6 +353,25 @@ if [ "$INLINE_MEMO_DEPS_EXIT" -ne 0 ]; then
   exit "$INLINE_MEMO_DEPS_EXIT"
 fi
 
+# ── GATE AI generateObject DIRETTO CON SCHEMA (bypass generateStructured) ──
+# llama-3.x (default Groq) NON supporta json_schema nativo.
+# generateObject({ schema: ... }) fuori dal gateway approvato crasha in prod
+# quando il modello si risolve a llama. Il gateway corretto è generateStructured
+# in server/ai/moderation/provider.ts che usa output:"no-schema" + validazione Zod.
+# Soppressione: // check-ai-direct-generateobject: safe (riga precedente alla chiamata).
+# Vedi: .agents/memory/ai-strict-schema.md
+echo "════════════════════════════════════════"
+echo "  Gate AI generateObject con schema diretto"
+echo "════════════════════════════════════════"
+AI_SCHEMA_EXIT=0
+bash scripts/check-ai-direct-generateobject.sh || AI_SCHEMA_EXIT=$?
+echo "════════════════════════════════════════"
+echo ""
+if [ "$AI_SCHEMA_EXIT" -ne 0 ]; then
+  echo "❌ Gate ai-direct-generateobject fallito — correggere prima di procedere."
+  exit "$AI_SCHEMA_EXIT"
+fi
+
 # ── GUARD PORTE .replit (MAPPING [[ports]] + DEPLOY) ─────────
 # REGOLA BLOCCANTE (replit.md § Preferenze utente):
 # Nessun agente può modificare [[ports]] senza autorizzazione esplicita utente.
