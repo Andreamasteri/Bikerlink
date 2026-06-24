@@ -58,7 +58,7 @@ export function MusicRadioTab() {
     staleTime: 5 * 60 * 1000,
   });
 
-  const { data: suggestedGenreIds = [], isFetched: suggestedFetched } = useQuery<string[]>({
+  const { data: suggestedGenreIds, isFetched: suggestedFetched } = useQuery<string[]>({
     queryKey: ["/api/music/radio/suggested-genres"],
     enabled: useLastFm,
     staleTime: 5 * 60 * 1000,
@@ -75,10 +75,10 @@ export function MusicRadioTab() {
   });
 
   useEffect(() => {
-    if (useLastFm && suggestedGenreIds.length > 0 && !selectedGenre) {
+    if (useLastFm && suggestedFetched && suggestedGenreIds && suggestedGenreIds.length > 0 && !selectedGenre) {
       setSelectedGenre(suggestedGenreIds[0]);
     }
-  }, [useLastFm, suggestedGenreIds, selectedGenre, setSelectedGenre]);
+  }, [useLastFm, suggestedFetched, suggestedGenreIds, selectedGenre, setSelectedGenre]);
 
   const { data: stations = [], isLoading: loadingStations } = useQuery<RadioStation[]>({
     queryKey: selectedGenre
@@ -88,7 +88,7 @@ export function MusicRadioTab() {
   });
 
   const displayedGenres =
-    useLastFm && suggestedGenreIds.length > 0
+    useLastFm && suggestedGenreIds && suggestedGenreIds.length > 0
       ? [...genres].sort((a, b) => {
           const aIdx = suggestedGenreIds.indexOf(a.id);
           const bIdx = suggestedGenreIds.indexOf(b.id);
@@ -117,7 +117,7 @@ export function MusicRadioTab() {
           thumbColor={useLastFm ? Colors.accent : Colors.textSecondary}
         />
       </View>
-      {useLastFm && suggestedFetched && suggestedGenreIds.length === 0 && (
+      {useLastFm && suggestedFetched && (!suggestedGenreIds || suggestedGenreIds.length === 0) && (
         <View style={radioTabStyles.lastFmEmptyContainer}>
           <Text style={radioTabStyles.lastFmEmpty}>
             {lastfmStatus?.username
@@ -152,7 +152,7 @@ export function MusicRadioTab() {
       <Text style={radioTabStyles.sectionTitle}>Generi</Text>
       <View style={radioTabStyles.genreGrid}>
         {displayedGenres.map((g) => {
-          const isSuggested = suggestedGenreIds.includes(g.id);
+          const isSuggested = suggestedGenreIds?.includes(g.id) ?? false;
           return (
             <TouchableOpacity
               key={g.id}

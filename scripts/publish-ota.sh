@@ -70,9 +70,9 @@ if [[ -z "${EAS_TOKEN:-}" ]]; then
   exit 1
 fi
 
-# ── Verifica EAS CLI ──
-if [ ! -f "node_modules/.bin/eas" ]; then
-  log_error "eas CLI non trovato in node_modules/.bin/eas. Esegui: npm install"
+# ── Verifica EAS CLI (locale o npx fallback via eas.sh) ──
+if [ ! -f "node_modules/.bin/eas" ] && ! command -v npx &>/dev/null; then
+  log_error "eas CLI non trovato e npx non disponibile. Esegui: npm install"
   exit 1
 fi
 
