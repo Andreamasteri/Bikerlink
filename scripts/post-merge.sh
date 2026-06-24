@@ -332,6 +332,26 @@ if [ "$UNSTABLE_DEFAULTS_EXIT" -ne 0 ]; then
   exit "$UNSTABLE_DEFAULTS_EXIT"
 fi
 
+# ── GATE [] / {} INLINE NEI DEPS DI useMemo / useCallback ─────
+# Un [] o {} letterale nei deps crea un nuovo riferimento ad ogni render.
+# Se useMemo/useCallback ricalcola ad ogni ciclo e il risultato alimenta
+# altri hook o stati, si innesca "Maximum update depth exceeded" → crash.
+# Distinto dal caso useQuery (check-unstable-query-defaults): qui il default
+# inline è direttamente nel deps array del hook di memoizzazione.
+# Caso tipico: useMemo(() => x ?? [], [x ?? []])  ← [] nei deps
+# Vedi: scripts/check-inline-default-memo-deps.sh
+echo "════════════════════════════════════════"
+echo "  Gate [] / {} inline in useMemo / useCallback deps"
+echo "════════════════════════════════════════"
+INLINE_MEMO_DEPS_EXIT=0
+bash scripts/check-inline-default-memo-deps.sh || INLINE_MEMO_DEPS_EXIT=$?
+echo "════════════════════════════════════════"
+echo ""
+if [ "$INLINE_MEMO_DEPS_EXIT" -ne 0 ]; then
+  echo "❌ Gate inline-default-memo-deps fallito — correggere prima di procedere."
+  exit "$INLINE_MEMO_DEPS_EXIT"
+fi
+
 # ── GUARD PORTE .replit (MAPPING [[ports]] + DEPLOY) ─────────
 # REGOLA BLOCCANTE (replit.md § Preferenze utente):
 # Nessun agente può modificare [[ports]] senza autorizzazione esplicita utente.
