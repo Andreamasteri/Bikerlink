@@ -278,9 +278,18 @@ export function registerMoreRoutes(app: Express) {
         return sendError(res, 400, bodyParsed.error.issues[0]?.message ?? "Payload non valido");
       }
       const { message, stack, componentStack, platform, appVersion } = bodyParsed.data;
+
+      let resolvedStack = stack || "";
+      if (resolvedStack && appVersion) {
+        try {
+          const { symbolicateStack } = await import("../lib/symbolicate");
+          resolvedStack = await symbolicateStack(resolvedStack, appVersion);
+        } catch { /* fallback allo stack originale */ }
+      }
+
       console.error("[CLIENT-ERROR]", JSON.stringify({
         message: message || "unknown",
-        stack: (stack || "").substring(0, 2000),
+        stack: resolvedStack.substring(0, 2000),
         componentStack: (componentStack || "").substring(0, 1000),
         platform: platform || "unknown",
         appVersion: appVersion || "unknown",

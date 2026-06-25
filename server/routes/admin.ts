@@ -6,6 +6,7 @@ import { db } from "../db";
 import { motoClubs, motoClubMembers } from "@shared/db";
 import { clientErrorSchema, startupBeaconSchema } from "@shared/validators";
 import { eq } from "drizzle-orm";
+import { symbolicateStack } from "../lib/symbolicate";
 
 
 const router = Router();
@@ -213,14 +214,22 @@ function _requireAdmin(req: Request, res: Response, next: Function) {
 
 
 
-router.post("/client-error", clientErrorLimiter, clientErrorJson, (req: Request, res: Response) => {
+router.post("/client-error", clientErrorLimiter, clientErrorJson, async (req: Request, res: Response) => {
   try {
     const parsedCe = clientErrorSchema.safeParse(req.body || {});
     const { message, stack, componentStack, platform, appVersion, isFatal } = parsedCe.success ? parsedCe.data : {};
+
+    let resolvedStack = stack || "";
+    if (resolvedStack && appVersion) {
+      try {
+        resolvedStack = await symbolicateStack(resolvedStack, appVersion);
+      } catch { /* fallback allo stack originale */ }
+    }
+
     // GDPR/CCPA compliance: do NOT log req.ip — client IP must not appear in error logs
     console.error("[CLIENT-ERROR]", JSON.stringify({
       message: message || "unknown",
-      stack: (stack || "").substring(0, 2000),
+      stack: resolvedStack.substring(0, 2000),
       componentStack: (componentStack || "").substring(0, 3000),
       platform: platform || "unknown",
       appVersion: appVersion || "unknown",

@@ -220,6 +220,7 @@ _run_expo_export() {
   set +e
   EXPO_TOKEN="${EAS_TOKEN}" npx expo export \
     --platform android \
+    --source-maps \
     --output-dir "$DIST_DIR" \
     2>&1 | tee "$_EXPORT_LOG"
   _EXPO_RC=${PIPESTATUS[0]}
@@ -256,6 +257,50 @@ fi
 rm -f "$_EXPORT_LOG"
 T_EXPORT=$(( $(date +%s) - _T0 ))
 log_ok "⏱ Metro export completato in ${T_EXPORT}s"
+
+# ── 4b-bis. Source map: upload su Object Storage + rimozione dal bundle ───────
+# Con --source-maps, expo export produce file *.map (js.map o hbc.map) nella
+# directory di output. Li carichiamo su Object Storage (chiave
+# source-maps/ota-{N}.map) e li rimuoviamo da dist-ota PRIMA dell'upload EAS,
+# così non raggiungono i client. Il server li scarica on-demand per simbolicare
+# gli stack trace nei report di errore (POST /api/admin/client-error).
+_MAP_FILE=$(find "$DIST_DIR" -name "*.map" 2>/dev/null | sort | head -1)
+if [[ -n "$_MAP_FILE" ]]; then
+  _MAP_KEY="source-maps/ota-${NEXT_OTA}.map"
+  log_info "Source map: $(basename "$_MAP_FILE") → ${_MAP_KEY}"
+  _T0_MAP=$(date +%s)
+  set +e
+  node -e "
+    const { Client } = require('@replit/object-storage');
+    const { readFileSync } = require('fs');
+    try {
+      const client = new Client();
+      const buf = readFileSync('${_MAP_FILE}');
+      client.uploadFromBytes('${_MAP_KEY}', buf, { contentType: 'application/json' })
+        .then(r => {
+          if (!r.ok) {
+            process.stderr.write('[map-upload] err: ' + (r.error ? r.error.message : 'unknown') + '\n');
+            process.exit(1);
+          }
+          process.stdout.write('[map-upload] ok\n');
+        })
+        .catch(e => { process.stderr.write('[map-upload] ' + e.message + '\n'); process.exit(1); });
+    } catch(e) { process.stderr.write('[map-upload] ' + e.message + '\n'); process.exit(1); }
+  " 2>&1
+  _MAP_RC=$?
+  set -e
+  _T_MAP=$(( $(date +%s) - _T0_MAP ))
+  if [[ "$_MAP_RC" -eq 0 ]]; then
+    log_ok "⏱ Source map caricata: ${_MAP_KEY} (${_T_MAP}s)"
+  else
+    log_warn "Upload source map fallito in ${_T_MAP}s — il publish continua senza simbolicazione (non bloccante)"
+  fi
+  # Rimuovi le .map dal dist-ota: non devono essere distribuite ai client via EAS
+  find "$DIST_DIR" -name "*.map" -delete 2>/dev/null || true
+  log_info "Source map rimosse da ${DIST_DIR} (non distribuite ai client)"
+else
+  log_warn "Nessuna source map trovata in ${DIST_DIR} (expo export --source-maps non ha prodotto output?)"
+fi
 
 # ── 4b. EAS upload bundle su CDN — usa il bundle pre-compilato ───────────────
 # T_UPLOAD misura il trasferimento CDN (dominante); T_PUBLISH misura la creazione
