@@ -224,6 +224,9 @@ export default function RootLayout() {
       // valorizzato; altrimenti resta "" (crash fuori da qualsiasi boundary React).
       const g = globalThis as typeof globalThis & { __lastReactComponentStack?: string };
       const componentStack = g.__lastReactComponentStack || "";
+      // Reset dopo la lettura: evita che un crash successivo non-React riceva
+      // un componentStack stantio appartenente a un errore precedente.
+      g.__lastReactComponentStack = undefined;
       console.error("[GlobalError]", error?.message, "isFatal:", isFatal, "componentStack:", componentStack || "(none)", error?.stack);
       try {
         fetch(new URL("/api/admin/client-error", getApiUrl()).toString(), {
