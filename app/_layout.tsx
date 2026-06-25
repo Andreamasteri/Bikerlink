@@ -144,17 +144,29 @@ const ROOT_ONBOARDING_SCREEN_OPTIONS = { headerShown: false, gestureEnabled: fal
 
 function RootLayoutNav() {
   const { colors } = useTheme();
-  const stackScreenOptions = React.useMemo(
-    () => ({ headerShown: false, contentStyle: { backgroundColor: colors.background } }),
+  // ANTI-LOOP: nested objects (contentStyle, headerStyle) devono essere refs separati
+  // stabili. Se fossero inline nel useMemo esterno, ogni re-run (cambio tema) produce
+  // un nuovo nested ref → React Navigation shallow-compare fallisce → setOptions
+  // cascade su tutti gli Stack.Screen → "Maximum update depth exceeded" crash.
+  const rootContentStyle = React.useMemo(
+    () => ({ backgroundColor: colors.background }),
     [colors.background]
   );
+  const stackScreenOptions = React.useMemo(
+    () => ({ headerShown: false, contentStyle: rootContentStyle }),
+    [rootContentStyle]
+  );
+  const stackHeaderStyle = React.useMemo(
+    () => ({ backgroundColor: colors.surface }),
+    [colors.surface]
+  );
   const feedbackOptions = React.useMemo(
-    () => ({ headerShown: true, headerTitle: "Feedback", headerStyle: { backgroundColor: colors.surface }, headerTintColor: colors.text }),
-    [colors.surface, colors.text]
+    () => ({ headerShown: true, headerTitle: "Feedback", headerStyle: stackHeaderStyle, headerTintColor: colors.text }),
+    [stackHeaderStyle, colors.text]
   );
   const notificationsOptions = React.useMemo(
-    () => ({ headerShown: true, headerTitle: "Notifiche", headerStyle: { backgroundColor: colors.surface }, headerTintColor: colors.text }),
-    [colors.surface, colors.text]
+    () => ({ headerShown: true, headerTitle: "Notifiche", headerStyle: stackHeaderStyle, headerTintColor: colors.text }),
+    [stackHeaderStyle, colors.text]
   );
   return (
     <Stack screenOptions={stackScreenOptions}>

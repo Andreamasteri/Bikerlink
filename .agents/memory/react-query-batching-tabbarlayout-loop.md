@@ -51,6 +51,56 @@ aggiornato dal render di TabLayout). L'icona tab risultante è sempre fresca.
 (`tabBar`, `header`, `drawerContent`, ecc.) e la funzione cattura valori che cambiano
 con query data o context values. Usa sempre il pattern ref+`[]` deps.
 
+## Fix Layer 2 — Nested objects in screenOptions
+
+Anche dopo il fix del `tabBar` prop, il crash può persistere se `screenOptions` passa
+**nested objects non stabili** a `<Tabs>` o `<Stack>`. Quando `screenOptions` cambia:
+
+```
+tabsScreenOptions = { headerStyle: NEW_OBJ, headerTitleStyle: NEW_OBJ, ... }
+  → React Navigation aggiorna screenOptions per tutti gli N screen
+  → isEqual(old_merged, new_merged) fallisce sui nested objects (ref compare)
+  → setOptions cascade identico a quello su tabBar
+```
+
+**Regola:** qualsiasi nested object (`headerStyle`, `headerTitleStyle`, `contentStyle`, ecc.)
+dentro un `useMemo` di options DEVE essere estratto in un `useMemo` separato con le sue
+proprie deps, o a module-level se i valori sono costanti.
+
+```tsx
+// SBAGLIATO: headerTitleStyle creato ad ogni run del useMemo esterno
+const tabsScreenOptions = useMemo(() => ({
+  headerStyle: { backgroundColor: colors.surface },   // nuovo ref ogni volta
+  headerTitleStyle: { fontFamily: "Inter_600SemiBold" }, // nuovo ref ogni volta
+}), [colors.surface]);
+
+// CORRETTO: nested objects isolati
+const TABS_HEADER_TITLE_STYLE = { fontFamily: "Inter_600SemiBold" } as const; // module-level
+const tabHeaderStyle = useMemo(() => ({ backgroundColor: colors.surface }), [colors.surface]);
+const tabsScreenOptions = useMemo(() => ({
+  headerStyle: tabHeaderStyle,           // ref stabile tra render
+  headerTitleStyle: TABS_HEADER_TITLE_STYLE, // ref eternamente stabile
+}), [tabHeaderStyle]);
+```
+
+## Fix Layer 3 — De-batching Tour setVisible da React Query
+
+`InteractionManager.runAfterInteractions()` intorno a `setVisible(true)` nel Tour
+garantisce che il commit del Modal avvenga in un contesto async separato dai refetch
+React Query → React 18 non può batcharli insieme → nessuna combinazione pericolosa.
+
+```tsx
+InteractionManager.runAfterInteractions(() => {
+  if (!cancelled) {
+    setVisible(true);
+    void logAssistantClientEvent("onboarding_started");
+  }
+});
+```
+
+**Why:** anche se layer 1+2 sono corretti, un futuro cambio potrebbe reintrodurre
+instabilità. Il layer 3 è una difesa indipendente che garantisce la separazione dei commit.
+
 ## Segnali che indicano questo bug
 
 - Crash "Maximum update depth exceeded" SOLO quando una Modal appare in contemporanea
@@ -59,3 +109,4 @@ con query data o context values. Usa sempre il pattern ref+`[]` deps.
   → `commitHookEffectListMount` → `recursivelyTraverseLayoutEffects`
 - Il crash NON avviene se la Modal appare senza query active (es. offline)
 - Crash riproducibile su Android, meno frequente su iOS (scheduler timer diverso)
+- Se il crash persiste dopo layer 1: cercare nested objects in `screenOptions` useMemo

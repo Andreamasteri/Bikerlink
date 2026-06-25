@@ -1,7 +1,7 @@
 // Task #2698 — Onboarding tour minimale (slide tap-through). Salva flag in
 // AsyncStorage. Richiamabile via action "start-onboarding-tour".
 import React, { useEffect, useState } from "react";
-import { Modal, View, Text, Pressable, StyleSheet } from "react-native";
+import { Modal, View, Text, Pressable, StyleSheet, InteractionManager } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useColors } from "@/hooks/useColors";
@@ -34,10 +34,20 @@ export default function AssistantOnboardingTour() {
     let cancelled = false;
     void (async () => {
       const shown = await wasOnboardingShown();
-      if (!cancelled && !shown) {
-        setVisible(true);
-        await logAssistantClientEvent("onboarding_started");
-      }
+      if (cancelled || shown) return;
+      // Defer setVisible(true) fino a dopo che tutte le animazioni/interazioni
+      // correnti sono completate. Senza questo defer, React 18 automatic batching
+      // può raggruppare il commit di setVisible(true) con un refetch React Query
+      // nello stesso tick async → il commit include sia il Modal che monta sia
+      // TabLayout che ri-renderizza → se tabsScreenOptions produce nested objects
+      // nuovi (es. cambio tema al boot), React Navigation chiama setOptions cascade
+      // su tutti i Tabs.Screen → "Maximum update depth exceeded" crash su Android.
+      InteractionManager.runAfterInteractions(() => {
+        if (!cancelled) {
+          setVisible(true);
+          void logAssistantClientEvent("onboarding_started");
+        }
+      });
     })();
     return () => { cancelled = true; };
   }, [onboardingEnabled]);

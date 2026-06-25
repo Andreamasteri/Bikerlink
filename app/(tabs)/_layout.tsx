@@ -29,6 +29,12 @@ import {
 
 const FAKE_HOME_INTRO_KEY = "fake_home_intro_seen_v1";
 
+// ANTI-LOOP: headerTitleStyle è un valore costante — estratto a module-level così
+// l'oggetto non viene mai ricreato. Se fosse inline nel useMemo di tabsScreenOptions,
+// ogni re-run del useMemo (cambio tema) produrrebbe un nuovo ref → React Navigation
+// shallow-compare fallisce sul nested object → setOptions cascade.
+const TABS_HEADER_TITLE_STYLE = { fontFamily: "Inter_600SemiBold" } as const;
+
 interface LayoutGatingMeData {
   profile?: { fakeHomeLatitude?: number | null; fakeHomeLongitude?: number | null } | null;
 }
@@ -338,13 +344,22 @@ export default function TabLayout() {
   // anima la navigation bar → insets cambiano → renderCustomTabBar nuovo ref → tabBar
   // prop cambia su <Tabs> → React Navigation ri-renderizza il navigator → setOptions
   // cascata su 15 Tabs.Screen → 50+ livelli → "Maximum update depth exceeded" crash.
+  //
+  // ANTI-LOOP 2: i nested objects (headerStyle, headerTitleStyle) dentro tabsScreenOptions
+  // devono avere reference stabile. headerTitleStyle è costante → estratto a module-level.
+  // headerStyle dipende solo da colors.surface → useMemo separato per isolarne il ref.
+  // Quando tabsScreenOptions cambia (tema non-default al boot), React Navigation fa la
+  // shallow comparison sulle opzioni di ogni Tabs.Screen: se headerStyle/headerTitleStyle
+  // sono nuovi oggetti anche se uguali in valore → isEqual() fallisce → cascade identico.
+  const tabHeaderStyle = useMemo(
+    () => ({ backgroundColor: colors.surface }),
+    [colors.surface]
+  );
   const tabsScreenOptions = useMemo(() => ({
-    headerStyle: {
-      backgroundColor: colors.surface,
-    },
+    headerStyle: tabHeaderStyle,
     headerTintColor: colors.text,
-    headerTitleStyle: { fontFamily: "Inter_600SemiBold" },
-  }), [colors.surface, colors.text]);
+    headerTitleStyle: TABS_HEADER_TITLE_STYLE,
+  }), [tabHeaderStyle, colors.text]);
 
   // ── Boot guard ──────────────────────────────────────────────────────────────
   // Options memoizzate (riferimenti stabili) per le Tabs minimali.
