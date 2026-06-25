@@ -1,5 +1,5 @@
 import { Queue, type ConnectionOptions } from "bullmq";
-import { getRawRedis, isRedisAvailable } from "./redis";
+import { getBullConnectionOptions, isRedisAvailable } from "./redis";
 
 /**
  * BullMQ persistent queues (Task #2517).
@@ -17,10 +17,11 @@ const ALL_QUEUES: QueueName[] = ["embeddings", "recap", "route-fingerprint", "pa
 const queues = new Map<QueueName, Queue>();
 
 function getConnection(): ConnectionOptions | null {
-  const client = getRawRedis();
-  if (!client) return null;
-  // BullMQ accepts a shared ioredis instance via `connection`.
-  return client as unknown as ConnectionOptions;
+  const opts = getBullConnectionOptions();
+  if (!opts) return null;
+  // Passiamo le opzioni di connessione (non il client cache condiviso): BullMQ
+  // crea e gestisce le proprie connessioni con maxRetriesPerRequest:null.
+  return opts as unknown as ConnectionOptions;
 }
 
 export function getQueue(name: QueueName): Queue | null {

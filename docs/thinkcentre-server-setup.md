@@ -71,7 +71,9 @@
 
 ## 4. Redis — Installazione e Configurazione
 
-### Architettura
+> **⚠️ Migrazione a Upstash cloud (Task #4943).** Redis dell'app **non è più self-hosted**: `REDIS_URL` in produzione punta a **Upstash** (cloud, regione EU) così che cache/BullMQ/AI pub-sub sopravvivano allo spegnimento del ThinkCentre. Il container Redis descritto qui sotto **non è più una dipendenza dell'app** — può restare attivo per uso locale/sviluppo o essere spento. Tutta la sezione che segue (porta 6380, nginx stream TLS, rotazione password) si applica solo se vuoi mantenere un Redis self-hosted; per la produzione conta solo la secret `REDIS_URL` impostata su Upstash.
+
+### Architettura (legacy self-hosted — non più usato dall'app in produzione)
 
 ```
 Replit production

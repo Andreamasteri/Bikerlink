@@ -3,7 +3,7 @@
 // disponibile. Senza questo worker, gli expensive scan resterebbero in coda
 // senza essere mai consumati.
 import { Worker, type ConnectionOptions } from "bullmq";
-import { getRawRedis, isRedisAvailable } from "../../cache/redis";
+import { getBullConnectionOptions, isRedisAvailable } from "../../cache/redis";
 import { processExpensiveJob } from "./scheduler";
 
 let worker: Worker | null = null;
@@ -14,13 +14,13 @@ export function startDbIntegrityWorker(): void {
     console.log("[db-integrity/worker] Redis non disponibile — worker non avviato (fallback inline gestito dallo scheduler).");
     return;
   }
-  const client = getRawRedis();
-  if (!client) return;
+  const connOpts = getBullConnectionOptions();
+  if (!connOpts) return;
   try {
     worker = new Worker(
       "db-integrity-expensive",
       async () => processExpensiveJob(),
-      { connection: client as unknown as ConnectionOptions, concurrency: 1 },
+      { connection: connOpts as unknown as ConnectionOptions, concurrency: 1 },
     );
     worker.on("failed", (job, err) => {
       console.warn(`[db-integrity/worker] job ${job?.id} fallito:`, err?.message);

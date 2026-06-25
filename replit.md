@@ -455,10 +455,11 @@ Il matching engine usa un **lock distribuito Redis** (Redlock) per evitare cicli
 
 ### Configurazione
 - Secret `REDIS_URL` (Replit Secrets). Formato: `redis://user:pass@host:port` oppure `rediss://...` per TLS. Richiede Redis ≥ 7.0 (necessario per `SET NX EX` atomico e stream BullMQ).
+- **Provider: Upstash cloud (regione EU).** Redis è migrato dal ThinkCentre self-hosted (`bikerlink.duckdns.org:6380`) a **Upstash** così che cache/BullMQ/AI pub-sub sopravvivano allo spegnimento del ThinkCentre. Upstash espone solo `rediss://` (TLS obbligatorio); l'URL include username+password. Il Redis sul ThinkCentre può restare attivo per uso locale/futuro ma **non è più la dipendenza dell'app**.
 - Senza la secret: `getRedis()` ritorna `null`, `withMatchingLock` usa fallback in-memory, BullMQ è disattivato, Bull Board risponde 503.
 
 ### Moduli chiave
-- `server/cache/redis.ts` — client `ioredis` singleton con `retryStrategy` esponenziale, riconnessione automatica, `isAvailable()` flag. Tutti gli accessi a Redis passano da qui.
+- `server/cache/redis.ts` — client `ioredis` singleton con `retryStrategy` esponenziale capped (backoff `times*1000`, max 30s → riconnessione automatica), `tls:{}` auto-abilitato su URL `rediss://`, `isAvailable()` flag. Tutti gli accessi cache/Redlock/pub-sub passano da qui (`maxRetriesPerRequest:2`, fail-fast `enableOfflineQueue:false`). `getBullConnectionOptions()` ritorna invece opzioni dedicate a BullMQ con `maxRetriesPerRequest:null` (requisito delle connessioni bloccanti dei Worker): Queue/Worker ricevono le opzioni, non il client cache condiviso, così BullMQ gestisce le proprie connessioni.
 - `server/cache/matching-lock.ts` — `withMatchingLock(owner, fn)` basato su `redlock@5.0.0-beta.2` (TTL 5 min). Espone `getMatchingLockStatus()` con holder, scadenza, ultimi 10 acquire/release e stato Redis.
 - `server/cache/cache.ts` — wrapper JSON `cacheGet/cacheSet/cacheDel/cacheGetOrSet` con metriche hit/miss per namespace.
 - `server/cache/zone-cache.ts` — `cachedCandidatesForZone(lat, lon, radiusKm, loader)` con grid snap 0.05° + TTL 60s per le query di prossimità ricorrenti.
