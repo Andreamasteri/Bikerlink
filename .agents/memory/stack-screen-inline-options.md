@@ -20,9 +20,11 @@ Nuovo riferimento `options` → `useLayoutEffect` si attiva → `setOptions` →
 navigation state update → ri-render del navigator → ri-render della screen →
 nuovo oggetto `options` → loop → "Maximum update depth exceeded".
 
-**Why:** I file `_layout.tsx` si ri-renderano raramente (solo a cambio auth/tema),
-quindi `options={{ headerShown: false }}` è safe lì. Ma nelle screen normali
-(che si ri-renderano per React Query, context, state), il loop è inevitabile.
+**Why:** I file `_layout.tsx` si ri-renderano raramente MA possono farlo (cambio
+tema, cambio `renderKey` lingua, remount). Se il componente in `_layout.tsx`
+usa hooks come `useTheme()` o `useColors()`, i `options={{}}` inline causano lo
+stesso loop. I gate CI escludono `_layout.tsx` per evitare falsi positivi, ma
+i layout con hooks vanno fixati manualmente con costanti module-level.
 
 **How to apply:**
 - Options **statiche** (valori primitivi costanti): estrarre in costante module-level
@@ -47,3 +49,10 @@ quindi `options={{ headerShown: false }}` è safe lì. Ma nelle screen normali
 - `app/recap.tsx` → costante RECAP_SCREEN_OPTIONS
 - `app/admin/ai-assistant.tsx` → costante AI_ASSISTANT_SCREEN_OPTIONS
 - `app/admin/match-explain.tsx` → costante MATCH_EXPLAIN_SCREEN_OPTIONS
+
+## Fix applicati (OTA #181) — layout files con hooks
+- `app/_layout.tsx` → `RootLayoutNav` (usa `useTheme()`): aggiunte costanti
+  module-level `ROOT_HIDDEN_HEADER` e `ROOT_ONBOARDING_SCREEN_OPTIONS`.
+  Tutte le 15 Stack.Screen ora usano le costanti (non più inline).
+- `app/admin/_layout.tsx` → `AdminLayout` (usa `useColors()`): introdotto
+  lookup table module-level `ADMIN_OPTS` con tutti i 75+ titoli/opzioni.

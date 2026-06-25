@@ -139,6 +139,9 @@ function UpdateNudgeWrapper() {
   return <UpdateNudgeModal onDismiss={() => setDismissed(true)} />;
 }
 
+const ROOT_HIDDEN_HEADER = { headerShown: false } as const;
+const ROOT_ONBOARDING_SCREEN_OPTIONS = { headerShown: false, gestureEnabled: false, animation: "fade" as const } as const;
+
 function RootLayoutNav() {
   const { colors } = useTheme();
   const stackScreenOptions = React.useMemo(
@@ -156,25 +159,25 @@ function RootLayoutNav() {
   return (
     <Stack screenOptions={stackScreenOptions}>
       <Stack.Screen name="welcome" />
-      <Stack.Screen name="onboarding" options={{ headerShown: false, gestureEnabled: false, animation: "fade" }} />
+      <Stack.Screen name="onboarding" options={ROOT_ONBOARDING_SCREEN_OPTIONS} />
       <Stack.Screen name="(auth)" />
       <Stack.Screen name="(tabs)" />
-      <Stack.Screen name="proposals" options={{ headerShown: false }} />
-      <Stack.Screen name="profile" options={{ headerShown: false }} />
-      <Stack.Screen name="chat/[id]" options={{ headerShown: false }} />
-      <Stack.Screen name="motoclub/[id]" options={{ headerShown: false }} />
-      <Stack.Screen name="business/[id]" options={{ headerShown: false }} />
-      <Stack.Screen name="business-reach" options={{ headerShown: false }} />
-      <Stack.Screen name="route" options={{ headerShown: false }} />
-      <Stack.Screen name="evento" options={{ headerShown: false }} />
-      <Stack.Screen name="admin" options={{ headerShown: false }} />
-      <Stack.Screen name="moderator" options={{ headerShown: false }} />
-      <Stack.Screen name="contest" options={{ headerShown: false }} />
-      <Stack.Screen name="privacy-policy" options={{ headerShown: false }} />
+      <Stack.Screen name="proposals" options={ROOT_HIDDEN_HEADER} />
+      <Stack.Screen name="profile" options={ROOT_HIDDEN_HEADER} />
+      <Stack.Screen name="chat/[id]" options={ROOT_HIDDEN_HEADER} />
+      <Stack.Screen name="motoclub/[id]" options={ROOT_HIDDEN_HEADER} />
+      <Stack.Screen name="business/[id]" options={ROOT_HIDDEN_HEADER} />
+      <Stack.Screen name="business-reach" options={ROOT_HIDDEN_HEADER} />
+      <Stack.Screen name="route" options={ROOT_HIDDEN_HEADER} />
+      <Stack.Screen name="evento" options={ROOT_HIDDEN_HEADER} />
+      <Stack.Screen name="admin" options={ROOT_HIDDEN_HEADER} />
+      <Stack.Screen name="moderator" options={ROOT_HIDDEN_HEADER} />
+      <Stack.Screen name="contest" options={ROOT_HIDDEN_HEADER} />
+      <Stack.Screen name="privacy-policy" options={ROOT_HIDDEN_HEADER} />
       <Stack.Screen name="feedback/index" options={feedbackOptions} />
       <Stack.Screen name="notifications" options={notificationsOptions} />
-      <Stack.Screen name="sprint-history" options={{ headerShown: false }} />
-      <Stack.Screen name="diagnostica-risultati" options={{ headerShown: false }} />
+      <Stack.Screen name="sprint-history" options={ROOT_HIDDEN_HEADER} />
+      <Stack.Screen name="diagnostica-risultati" options={ROOT_HIDDEN_HEADER} />
     </Stack>
   );
 }
