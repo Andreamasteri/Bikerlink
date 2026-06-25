@@ -85,6 +85,28 @@ check_pattern_multiline 'header(Left|Right):[^\n]*\n\s*\?\s*\(\)\s*=>' \
 check_pattern 'tabBar=\{\s*\(' \
   "tabBar con funzione arrow inline → usare useCallback (vedi rnav-memo-guard)"
 
+# tabBarIcon inline con parametro singolo non-destructurato: tabBarIcon: (props) =>
+# Variante non catturata da tabBarIcon:\s*\(\{ (che cattura solo la forma destructurata).
+check_pattern 'tabBarIcon:\s*\([^{]' \
+  "tabBarIcon con param non-destructurato → usare useMemo sul componente parent (vedi rnav-memo-guard)"
+
+# headerTitle inline arrow (senza params): headerTitle: () =>
+# headerTitle come funzione (restituisce JSX) richiama setOptions ad ogni render.
+# Fix: useCallback o costante module-level.
+check_pattern 'headerTitle:\s*\(\)\s*=>' \
+  "headerTitle con funzione arrow inline (no-arg) → usare useCallback (vedi rnav-memo-guard)"
+
+# headerTitle inline arrow (con params): headerTitle: (props) => ...
+# Cattura sia la forma plain-arg che la forma destructurata ({ ... }) => ...
+check_pattern 'headerTitle:\s*\([^)]+\)\s*=>' \
+  "headerTitle con funzione arrow inline (con params) → usare useCallback (vedi rnav-memo-guard)"
+
+# headerLeft/headerRight inline con parametro singolo non-destructurato: prop: (p) =>
+# Il gate esistente cattura () => (no-arg) e ({ }) => (destructurato); questa regola
+# chiude il gap per la forma (singleParam) =>.
+check_pattern 'header(Left|Right):\s*\([^){]+\)\s*=>' \
+  "headerLeft/headerRight con param singolo non-destructurato → usare useCallback (vedi rnav-memo-guard)"
+
 # ── Oggetti options/screenOptions con nested Style inline ─────────────────────
 # Causa: React Navigation chiama useLayoutEffect→setOptions ad ogni render se
 # il riferimento all'oggetto cambia. Anche con valori identici, un nuovo {}
@@ -154,8 +176,9 @@ fi
 if [ $FAIL -eq 1 ]; then
   echo ""
   echo "💥 check-rnav-inline-props FALLITO"
-  echo "   Funzioni arrow inline → wrappare con useCallback."
-  echo "   Oggetti options inline con nested *Style → usare useMemo o costante module-level."
+  echo "   Funzioni arrow inline (tabBarIcon/headerLeft/headerRight/headerTitle/tabBar/header)"
+  echo "   → wrappare con useCallback; per tabBarIcon usare useMemo sul componente parent."
+  echo "   Oggetti options inline con nested *Style:{} → usare useMemo o costante module-level."
   echo "   router in useEffect deps → usare routerRef+didRedirectRef (non mettere router nelle deps)."
   echo "   Hook dopo early return → spostare useMemo/useCallback prima del return."
   echo "   Documentazione: .agents/skills/rnav-memo-guard/SKILL.md"
