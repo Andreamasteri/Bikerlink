@@ -221,7 +221,7 @@ router.post("/client-error", clientErrorLimiter, clientErrorJson, (req: Request,
     console.error("[CLIENT-ERROR]", JSON.stringify({
       message: message || "unknown",
       stack: (stack || "").substring(0, 2000),
-      componentStack: (componentStack || "").substring(0, 1000),
+      componentStack: (componentStack || "").substring(0, 3000),
       platform: platform || "unknown",
       appVersion: appVersion || "unknown",
       isFatal: !!isFatal,

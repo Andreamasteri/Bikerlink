@@ -180,6 +180,9 @@ function RootLayoutNav() {
 }
 
 function reportClientError(error: Error, componentStack: string) {
+  if (__DEV__) {
+    console.error("[reportClientError] componentStack:", componentStack || "(empty)");
+  }
   try {
     const url = getApiUrl() + "/api/admin/client-error";
     fetch(url, {
@@ -188,7 +191,7 @@ function reportClientError(error: Error, componentStack: string) {
       body: JSON.stringify({
         message: error?.message || "unknown",
         stack: (error?.stack || "").substring(0, 2000),
-        componentStack: (componentStack || "").substring(0, 1000),
+        componentStack: (componentStack || "").substring(0, 3000),
         platform: Platform.OS,
         appVersion: `rv${Updates.runtimeVersion || "?"}`,
       }),
@@ -216,7 +219,12 @@ export default function RootLayout() {
     if (!errorUtils) return;
     const prev = errorUtils.getGlobalHandler?.();
     errorUtils.setGlobalHandler?.((error: Error, isFatal?: boolean) => {
-      console.error("[GlobalError]", error?.message, "isFatal:", isFatal, error?.stack);
+      // Leggiamo il componentStack scritto da ErrorBoundary.componentDidCatch prima
+      // di chiamare onError. Se il crash è passato dall'ErrorBoundary il valore è
+      // valorizzato; altrimenti resta "" (crash fuori da qualsiasi boundary React).
+      const g = globalThis as typeof globalThis & { __lastReactComponentStack?: string };
+      const componentStack = g.__lastReactComponentStack || "";
+      console.error("[GlobalError]", error?.message, "isFatal:", isFatal, "componentStack:", componentStack || "(none)", error?.stack);
       try {
         fetch(new URL("/api/admin/client-error", getApiUrl()).toString(), {
           method: "POST",
@@ -224,7 +232,7 @@ export default function RootLayout() {
           body: JSON.stringify({
             message: error?.message || "unknown",
             stack: (error?.stack || "").substring(0, 2000),
-            componentStack: "",
+            componentStack: componentStack.substring(0, 3000),
             platform: Platform.OS,
             appVersion: `rv${Updates.runtimeVersion || "?"}`,
             isFatal: !!isFatal,

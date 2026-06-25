@@ -34,6 +34,10 @@ export class ErrorBoundary extends Component<
       this.autoRetryCount = 0;
       this.lastErrorKey = errorKey;
     }
+    // Ponte per GlobalErrorHandler: ErrorUtils.setGlobalHandler non ha accesso
+    // al componentStack React; lo esponiamo su globalThis così il GlobalErrorHandler
+    // lo può leggere quando costruisce il payload da inviare al server.
+    (globalThis as typeof globalThis & { __lastReactComponentStack?: string }).__lastReactComponentStack = info.componentStack;
     markJsError(error, info.componentStack).catch(() => {});
     import("@/lib/sentry").then(s => s.captureException(error, { componentStack: info.componentStack })).catch(() => {});
     if (typeof this.props.onError === "function") {
