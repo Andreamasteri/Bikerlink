@@ -292,26 +292,20 @@ export default function TabLayout() {
     [t, gpsTabHref, isBikerOrCoppia]
   );
 
+  // tabBarStyle / tabBarLabelStyle / tabBarActiveTintColor / tabBarInactiveTintColor
+  // NON vengono passati a screenOptions: con renderCustomTabBar sono ignorati da
+  // React Navigation e causerebbero una dipendenza da insets.bottom
+  // (tabBarHeight = 60 + insets.bottom) che produce il loop "Maximum update depth
+  // exceeded" — la Modal OnboardingTour anima la navigation bar su Android aggiornando
+  // insets frame-per-frame → tabsScreenOptions nuovo ref ogni frame → setOptions su 15
+  // Tabs.Screen → re-render → frame successivo → 50+ livelli → crash.
   const tabsScreenOptions = useMemo(() => ({
-    tabBarActiveTintColor: colors.accent as string,
-    tabBarInactiveTintColor: colors.textSecondary as string,
-    tabBarStyle: {
-      backgroundColor: colors.surface,
-      borderTopColor: colors.border,
-      height: tabBarHeight,
-      paddingBottom: tabBarPaddingBottom,
-    },
-    tabBarLabelStyle: {
-      fontSize: 11,
-      fontFamily: "Inter_500Medium",
-    },
     headerStyle: {
       backgroundColor: colors.surface,
     },
     headerTintColor: colors.text,
     headerTitleStyle: { fontFamily: "Inter_600SemiBold" },
-  }), [colors.accent, colors.textSecondary, colors.surface, colors.border,
-       colors.text, tabBarHeight, tabBarPaddingBottom]);
+  }), [colors.surface, colors.text]);
 
   // ── Boot guard ──────────────────────────────────────────────────────────────
   // Options memoizzate (riferimenti stabili) per le Tabs minimali.

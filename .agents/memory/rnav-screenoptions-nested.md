@@ -69,9 +69,20 @@ const screenOpts = useMemo(() => ({
 
 **Gate miss**: il gate `check-rnav-inline-props.sh` con `rg 'tabBarIcon:\s*\(\{'` trova correttamente il pattern in `_layout.part2.tsx` se eseguito direttamente. Il miss era dovuto a un bug di scope nell'esecuzione del gate come workflow CI — ora risolto fixando il codice.
 
+## Caso speciale: tabBar* in screenOptions con custom tabBar
+
+**Regola critica**: quando si usa `tabBar={renderCustomTabBar}`, le opzioni `tabBarStyle`, `tabBarLabelStyle`, `tabBarActiveTintColor`, `tabBarInactiveTintColor` in `screenOptions` sono **completamente ignorate** da React Navigation. Includerle è inutile E PERICOLOSO perché:
+- `tabBarStyle: { height: tabBarHeight }` dove `tabBarHeight = 60 + insets.bottom` introduce una dipendenza da `useSafeAreaInsets()`
+- Su Android, la Modal (es. OnboardingTour) anima la navigation bar frame-per-frame → `insets.bottom` cambia ad ogni frame → `tabsScreenOptions` nuovo ref ad ogni frame → `setOptions` per tutti i tab screen ad ogni frame → 50+ livelli → "Maximum update depth exceeded"
+
+**Fix**: rimuovere completamente `tabBarStyle`, `tabBarLabelStyle`, `tabBarActiveTintColor`, `tabBarInactiveTintColor` da `screenOptions` quando si usa un custom `tabBar`. Il custom tab bar gestisce visuale, altezza e colori autonomamente.
+
+**Questo era il crash dell'OnboardingTour.** Il crash sembrava causato dalla comparsa della Modal ma la causa era l'animazione dei safe area insets su Android durante il fade-in.
+
 ## File fixati (audit completo)
 Layout file:
-- `app/(tabs)/_layout.tsx`, `app/_layout.tsx`, `app/admin/_layout.tsx`, `app/giro/_layout.tsx`, `app/navigate/_layout.tsx`, `app/giri/_layout.tsx` → `useMemo` (usano `useColors()`)
+- `app/(tabs)/_layout.tsx` → `useMemo` per `tabsScreenOptions` (solo `headerStyle`/`headerTintColor`/`headerTitleStyle`; rimossi tutti i `tabBar*` che dipendono da `insets`)
+- `app/_layout.tsx`, `app/admin/_layout.tsx`, `app/giro/_layout.tsx`, `app/navigate/_layout.tsx`, `app/giri/_layout.tsx` → `useMemo` (usano `useColors()`)
 - `app/route/_layout.tsx`, `app/routes/_layout.tsx`, `app/profile/_layout.tsx`, `app/proposals/_layout.tsx`, `app/motoclub/_layout.tsx`, `app/evento/_layout.tsx`, `app/moderator/_layout.tsx`, `app/contest/_layout.tsx`, `app/(auth)/_layout.tsx` → costante module-level (usano `Colors` statico)
 - `app/admin/sensors/_layout.tsx` → `useMemo` (usa `useColors()`)
 
