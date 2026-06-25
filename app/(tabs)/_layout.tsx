@@ -68,7 +68,6 @@ export default function TabLayout() {
 
   useEffect(() => {
     sendStartupBeacon("tabs_layout_mount", { hasUser: !!user, authLoading: isLoading });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const { isGpsGateActive, requestPermission } = useLocationGate();
   const { taskbarStyle } = useTaskbarStyle();
