@@ -89,8 +89,17 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
     AsyncStorage.setItem(STORAGE_KEY, lang).catch(() => {});
   }, []);
 
+  // Context value memoizzato: senza useMemo ogni render del provider crea un
+  // nuovo oggetto → TUTTI i consumer (useT/useLanguage/useLocale) ri-renderano
+  // anche senza cambio lingua. Durante il boot/OTA cycle questo amplifica i
+  // re-render a cascata che alimentano il loop setOptions di React Navigation.
+  const contextValue = useMemo(
+    () => ({ language, setLanguage, renderKey }),
+    [language, setLanguage, renderKey]
+  );
+
   return (
-    <LanguageContext.Provider value={{ language, setLanguage, renderKey }}>
+    <LanguageContext.Provider value={contextValue}>
       {children}
     </LanguageContext.Provider>
   );

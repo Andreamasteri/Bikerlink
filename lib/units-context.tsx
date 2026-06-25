@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from "react";
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { getApiUrl, authFetchHeaders, queryClient } from "@/lib/query-client";
 
@@ -264,8 +264,13 @@ export function UnitsProvider({ children }: { children: React.ReactNode }) {
     }
   }, [storageLoaded, hasStoredPreference]);
 
+  const contextValue = useMemo(
+    () => ({ timeFormat, speedUnit, distanceUnit, setTimeFormat, setSpeedUnit, setDistanceUnit, setSystem, applyCountryDefault }),
+    [timeFormat, speedUnit, distanceUnit, setTimeFormat, setSpeedUnit, setDistanceUnit, setSystem, applyCountryDefault]
+  );
+
   return (
-    <UnitsContext.Provider value={{ timeFormat, speedUnit, distanceUnit, setTimeFormat, setSpeedUnit, setDistanceUnit, setSystem, applyCountryDefault }}>
+    <UnitsContext.Provider value={contextValue}>
       {children}
     </UnitsContext.Provider>
   );

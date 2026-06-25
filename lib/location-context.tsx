@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from "react";
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { AppState, AppStateStatus } from "react-native";
 import { useQuery } from "@tanstack/react-query";
 import { sendStartupBeacon } from "@/lib/startup-beacon";
@@ -321,8 +321,8 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
 
   const isGpsGateActive = gpsRequired && !hasPermission;
 
-  return (
-    <LocationContext.Provider value={{
+  const contextValue = useMemo(
+    () => ({
       hasLocationPermission: hasPermission,
       locationPermissionDenied: permissionDenied,
       locationPermissionPrompt: permissionPrompt,
@@ -338,7 +338,28 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
       positionLoading,
       suspendSharedWatch,
       resumeSharedWatch,
-    }}>
+    }),
+    [
+      hasPermission,
+      permissionDenied,
+      permissionPrompt,
+      hasBackgroundPermission,
+      backgroundPermissionChecked,
+      backgroundPermissionRevoked,
+      gpsRequired,
+      isGpsGateActive,
+      requestPermission,
+      requestBackgroundPermission,
+      positionReady,
+      currentPosition,
+      positionLoading,
+      suspendSharedWatch,
+      resumeSharedWatch,
+    ]
+  );
+
+  return (
+    <LocationContext.Provider value={contextValue}>
       {children}
     </LocationContext.Provider>
   );

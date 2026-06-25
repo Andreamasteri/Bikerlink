@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from "react";
+import React, { createContext, useContext, useState, useEffect, useMemo } from "react";
 import { useMotorcycleDetector } from "@/hooks/useMotorcycleDetector";
 import { useTelemetry } from "@/hooks/useTelemetry";
 import { loadTelemetryAlwaysActive, getTelemetryAlwaysActive } from "@/lib/telemetry-prefs";
@@ -78,8 +78,13 @@ function AutoTelemetryInner({ children }: { children: React.ReactNode }) {
 
   const isAutoRiding = isRiding && isEnabled;
 
+  const contextValue = useMemo(
+    () => ({ isAutoRiding, isEnabled, isCalibrated, alwaysActive, relaxedMode }),
+    [isAutoRiding, isEnabled, isCalibrated, alwaysActive, relaxedMode]
+  );
+
   return (
-    <AutoTelemetryContext.Provider value={{ isAutoRiding, isEnabled, isCalibrated, alwaysActive, relaxedMode }}>
+    <AutoTelemetryContext.Provider value={contextValue}>
       {children}
     </AutoTelemetryContext.Provider>
   );

@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { THEMES, THEME_META, ThemeName, ThemeColors } from "@/constants/colors";
 import { getApiUrl } from "@/lib/query-client";
@@ -63,17 +63,20 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     AsyncStorage.setItem(STORAGE_KEY, theme).catch(() => {});
   }, []);
 
+  const contextValue = useMemo(
+    () => ({
+      currentTheme,
+      setTheme,
+      colors: THEMES[currentTheme],
+      userSwitchingEnabled,
+      adminDefaultTheme,
+      isLoading,
+    }),
+    [currentTheme, setTheme, userSwitchingEnabled, adminDefaultTheme, isLoading]
+  );
+
   return (
-    <ThemeContext.Provider
-      value={{
-        currentTheme,
-        setTheme,
-        colors: THEMES[currentTheme],
-        userSwitchingEnabled,
-        adminDefaultTheme,
-        isLoading,
-      }}
-    >
+    <ThemeContext.Provider value={contextValue}>
       {children}
     </ThemeContext.Provider>
   );

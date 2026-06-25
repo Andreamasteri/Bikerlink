@@ -173,6 +173,16 @@ if [ -n "$HOOKS_VIOLATION" ]; then
   FAIL=1
 fi
 
+# ── Context.Provider con value oggetto inline non memoizzato ─────────────────
+# Pattern: <XxxContext.Provider value={{ ... }}>. Un nuovo oggetto literal a ogni
+# render del provider cambia referenza → TUTTI i consumer (useContext) ri-renderano
+# anche senza cambio di valore. Nell'albero di provider al boot/OTA questo amplifica
+# i re-render a cascata che alimentano il loop setOptions di React Navigation.
+# Fix: const value = useMemo(() => ({ ... }), [deps]) e passare value={value}.
+# Vedi: .agents/memory/rnav-screenoptions-nested.md
+check_pattern_multiline 'Context\.Provider\s+value=\{\s*\{' \
+  "Context.Provider con value oggetto inline ({{...}}) → wrappare con useMemo e passare value={memoValue} (vedi rnav-memo-guard)"
+
 if [ $FAIL -eq 1 ]; then
   echo ""
   echo "💥 check-rnav-inline-props FALLITO"

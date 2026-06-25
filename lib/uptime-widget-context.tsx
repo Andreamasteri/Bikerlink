@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from "react";
+import React, { createContext, useContext, useEffect, useState, useCallback, useMemo } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const STORAGE_KEY = "uptime_widget_enabled";
@@ -22,13 +22,18 @@ export function UptimeWidgetProvider({ children }: { children: React.ReactNode }
     });
   }, []);
 
-  const setEnabled = (val: boolean) => {
+  const setEnabled = useCallback((val: boolean) => {
     setEnabledState(val);
     AsyncStorage.setItem(STORAGE_KEY, val ? "true" : "false");
-  };
+  }, []);
+
+  const contextValue = useMemo(
+    () => ({ enabled, setEnabled }),
+    [enabled, setEnabled]
+  );
 
   return (
-    <UptimeWidgetContext.Provider value={{ enabled, setEnabled }}>
+    <UptimeWidgetContext.Provider value={contextValue}>
       {children}
     </UptimeWidgetContext.Provider>
   );

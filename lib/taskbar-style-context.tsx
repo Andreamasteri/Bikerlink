@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 export type TaskbarStyle = "scorri" | "raggruppa";
@@ -43,8 +43,13 @@ export function TaskbarStyleProvider({ children }: { children: React.ReactNode }
     AsyncStorage.setItem(STORAGE_KEY, style).catch(() => {});
   }, []);
 
+  const contextValue = useMemo(
+    () => ({ taskbarStyle, setTaskbarStyle, userHasCustomized }),
+    [taskbarStyle, setTaskbarStyle, userHasCustomized]
+  );
+
   return (
-    <TaskbarStyleContext.Provider value={{ taskbarStyle, setTaskbarStyle, userHasCustomized }}>
+    <TaskbarStyleContext.Provider value={contextValue}>
       {children}
     </TaskbarStyleContext.Provider>
   );

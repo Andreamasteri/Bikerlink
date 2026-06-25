@@ -86,3 +86,4 @@
 - [Expo typed-routes stale in validation](expo-typedroutes-stale.md) — navigate new routes with `router.push(\`/x/${id}\` as never)`, NOT typed `pathname:"/x/[id]" as const`; validation tsc doesn't regen gitignored .expo types so new routes fail.
 - [eslint single-file false unused](eslint-single-file-false-unused.md) — linting one TS file alone falsely flags used type-only imports (method return types) as unused; run the full-project lint instead, never delete them.
 - [AI Assistant admin actions](assistant-admin-actions.md) — admin & user chat share extractActions; split by whitelist at filter time; admin ops server-side (role gate+audit), IDs from admin-context snapshot.
+- [Context.Provider value memoization](context-provider-value-memo.md) — value oggetto inline = nuova ref ogni render → re-render a cascata che alimentano il loop setOptions rnav; useMemo+useCallback obbligatori; gate in check-rnav-inline-props.sh.

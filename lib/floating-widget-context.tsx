@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from "react";
+import React, { createContext, useContext, useEffect, useState, useCallback, useMemo, useRef } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/query-client";
@@ -67,13 +67,14 @@ export function FloatingWidgetProvider({ children }: { children: React.ReactNode
     },
   });
 
+  const { mutate: mutateEnabled } = updateMutation;
   const setEnabled = useCallback((val: boolean) => {
     const prev = enabledRef.current;
     setEnabledState(val);
     enabledRef.current = val;
     serverHydratedRef.current = true;
     AsyncStorage.setItem(STORAGE_KEY, val ? "true" : "false").catch(() => {});
-    updateMutation.mutate(val, {
+    mutateEnabled(val, {
       onError: () => {
         if (mountedRef.current) {
           setEnabledState(prev);
@@ -82,7 +83,7 @@ export function FloatingWidgetProvider({ children }: { children: React.ReactNode
         }
       },
     });
-  }, [updateMutation]);
+  }, [mutateEnabled]);
 
   // Soppressione temporanea del pallino. SCELTA INTENZIONALE: solo i giochi arcade
   // (app/(tabs)/arcade.tsx) lo usano, perché sono Modal fullscreen che catturano
@@ -94,14 +95,19 @@ export function FloatingWidgetProvider({ children }: { children: React.ReactNode
     setSuppressed(val);
   }, []);
 
-  return (
-    <FloatingWidgetContext.Provider value={{
+  const contextValue = useMemo(
+    () => ({
       enabled,
       setEnabled,
       suppressed,
       suppressWidget,
       isUpdating: updateMutation.isPending,
-    }}>
+    }),
+    [enabled, setEnabled, suppressed, suppressWidget, updateMutation.isPending]
+  );
+
+  return (
+    <FloatingWidgetContext.Provider value={contextValue}>
       {children}
     </FloatingWidgetContext.Provider>
   );
