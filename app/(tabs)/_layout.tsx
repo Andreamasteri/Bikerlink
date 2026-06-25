@@ -68,7 +68,8 @@ export default function TabLayout() {
 
   useEffect(() => {
     sendStartupBeacon("tabs_layout_mount", { hasUser: !!user, authLoading: isLoading });
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);  // mount-only: beacon di avvio, non si riemette al cambio auth
   const { isGpsGateActive, requestPermission } = useLocationGate();
   const { taskbarStyle } = useTaskbarStyle();
   const { unreadCount, hasActiveMatches } = useTabBadges();
@@ -287,7 +288,6 @@ export default function TabLayout() {
         style={_taskbarStyle}
       />
     );
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const gpsTabHref: Href | null | undefined = undefined;
 
