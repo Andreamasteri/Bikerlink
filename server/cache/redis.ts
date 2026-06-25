@@ -149,6 +149,40 @@ export function getRedisStatus() {
   };
 }
 
+/**
+ * Crea un client Redis dedicato al pub/sub (psubscribe/subscribe).
+ *
+ * NON usa `duplicate()` sul client cache perché quello ha
+ * `enableOfflineQueue:false` — con Upstash (TLS remoto) il duplicate
+ * tenta `psubscribe` prima che la connessione sia ready e fallisce
+ * immediatamente. Questo client usa `enableOfflineQueue:true` +
+ * `maxRetriesPerRequest:null` (richiesto per connessioni bloccanti)
+ * e si riconnette autonomamente.
+ *
+ * Ritorna null se REDIS_URL non è configurato.
+ */
+export function createPubSubClient(): Redis | null {
+  const url = process.env.REDIS_URL;
+  if (!url) return null;
+  try {
+    const opts: RedisOptions = {
+      lazyConnect: false,
+      maxRetriesPerRequest: null,
+      enableReadyCheck: true,
+      enableOfflineQueue: true,
+      connectTimeout: 8_000,
+      retryStrategy: (times: number) => Math.min(times * 1000, 30_000),
+    };
+    if (url.startsWith("rediss://")) {
+      opts.tls = {};
+    }
+    return new Redis(url, opts);
+  } catch (err) {
+    console.warn("[Redis] createPubSubClient failed:", err instanceof Error ? err.message : err);
+    return null;
+  }
+}
+
 export async function quitRedis(): Promise<void> {
   if (state.client) {
     try {

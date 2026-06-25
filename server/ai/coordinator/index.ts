@@ -2,7 +2,8 @@
 // Greenfield: nessun sottosistema esistente è collegato (scope task #2615).
 import { and, desc, eq, gte, sql, type SQL } from "drizzle-orm";
 import { db } from "../../db";
-import { getRedis, getRawRedis } from "../../cache/redis";
+import { getRedis, createPubSubClient } from "../../cache/redis";
+import type Redis from "ioredis";
 import {
   aiConflicts,
   aiDecisions,
@@ -48,7 +49,7 @@ const ADMIN_BROADCAST = "ai:admin:broadcast";
 export class AiCoordinator {
   private localListeners: Map<string, Set<EventCallback>> = new Map();
   private subscribers: Array<{
-    client: ReturnType<NonNullable<ReturnType<typeof getRawRedis>>["duplicate"]> | null;
+    client: Redis | null;
     pattern: string;
     cb: EventCallback;
   }> = [];
@@ -110,13 +111,13 @@ export class AiCoordinator {
     // locale (eviteremmo doppia consegna locale + Redis loopback). Solo se
     // Redis non è disponibile o psubscribe fallisce, ricadiamo sul fanout
     // in-process.
-    const raw = getRawRedis();
-    let client: ReturnType<NonNullable<typeof raw>["duplicate"]> | null = null;
+    let client: Redis | null = null;
     let usingRedis = false;
-    if (raw) {
+    if (process.env.REDIS_URL) {
       try {
-        client = raw.duplicate();
-        // Silenzio errori di connessione sul client duplicato (ETIMEDOUT ecc.)
+        client = createPubSubClient();
+        if (!client) throw new Error("createPubSubClient returned null");
+        // Silenzio errori di connessione sul client pub/sub (ETIMEDOUT ecc.)
         // per evitare flooding "Unhandled error event" nei log.
         client.on("error", () => {});
         const pattern = aiName === "*" ? CHANNEL_PREFIX + "*" : CHANNEL_PREFIX + aiName;
