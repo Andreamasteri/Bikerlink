@@ -150,6 +150,21 @@ if [ "$I18N_EXIT" -ne 0 ]; then
 fi
 echo ""
 
+# ── GATE: nessun placeholder __TODO__ residuo (anti-ombreggiamento cross-file) ─
+# Il fix sopra dedupa solo intra-file; questo gate vieta qualsiasi "__TODO__"
+# residuo in lib/i18n/ (es. it.ts che ombreggia it.part*.ts). Vedi task #4959.
+echo "════════════════════════════════════════"
+echo "  Gate i18n __TODO__ residui"
+echo "════════════════════════════════════════"
+I18N_TODO_EXIT=0
+bash scripts/check-i18n-todo-placeholders.sh || I18N_TODO_EXIT=$?
+echo "════════════════════════════════════════"
+echo ""
+if [ "$I18N_TODO_EXIT" -ne 0 ]; then
+  echo "❌ Gate __TODO__ i18n fallito post-merge — rimuovere/tradurre i placeholder segnalati sopra."
+  exit "$I18N_TODO_EXIT"
+fi
+
 # ── GATE "600 RIGHE PER FILE" POST-MERGE ─────────────────────
 # Subito dopo il merge (prima di chiudere): se un merge ha portato
 # dentro un file > 600 senza marker, falliamo qui e lasciamo
