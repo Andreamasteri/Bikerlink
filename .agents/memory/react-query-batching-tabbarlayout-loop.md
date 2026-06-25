@@ -101,6 +101,39 @@ InteractionManager.runAfterInteractions(() => {
 **Why:** anche se layer 1+2 sono corretti, un futuro cambio potrebbe reintrodurre
 instabilità. Il layer 3 è una difesa indipendente che garantisce la separazione dei commit.
 
+## Fix Strutturale Definitivo — Modal → View overlay
+
+**React Native `<Modal>` su Android cambia il system UI** (status bar + navigation bar
+animano in/out) → SafeAreaProvider aggiorna gli insets → TUTTI i consumatori di
+`useSafeAreaInsets()` re-renderizzano → cascade setOptions se uno di questi è nel
+tree di navigazione.
+
+**Regola:** qualsiasi overlay trasparente (Tour, confirm sheet, reminder) che appare
+AUTOMATICAMENTE (non su esplicita azione utente) DEVE usare `StyleSheet.absoluteFill`
++ `Animated.View`, NON `<Modal>`. La `<Modal>` di RN è riservata a fogli di sistema
+(`presentationStyle="formSheet"`) o contesti dove la separazione dal view tree è
+funzionalmente necessaria.
+
+```tsx
+// SBAGLIATO — Modal causa inset-cascade:
+<Modal visible transparent animationType="fade">
+  <View style={styles.overlay}>...</View>
+</Modal>
+
+// CORRETTO — View overlay, zero impatto system UI:
+<Animated.View style={[StyleSheet.absoluteFill, styles.overlay, { opacity: fadeAnim }]}>
+  <View style={[styles.card, { backgroundColor: colors.surface }]}>...</View>
+</Animated.View>
+
+const styles = StyleSheet.create({
+  overlay: { backgroundColor: "rgba(0,0,0,0.6)", padding: 24, justifyContent: "center", zIndex: 9999 },
+  // ...
+});
+```
+
+Componenti fixati (OTA #186): `AssistantOnboardingTour`, `FakeHomeIntroModal`,
+`GarageReminderModal`, `AssistantActionConfirmSheet`.
+
 ## Segnali che indicano questo bug
 
 - Crash "Maximum update depth exceeded" SOLO quando una Modal appare in contemporanea

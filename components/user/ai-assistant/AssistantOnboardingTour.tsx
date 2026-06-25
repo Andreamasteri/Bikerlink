@@ -1,7 +1,12 @@
 // Task #2698 — Onboarding tour minimale (slide tap-through). Salva flag in
 // AsyncStorage. Richiamabile via action "start-onboarding-tour".
-import React, { useEffect, useState } from "react";
-import { Modal, View, Text, Pressable, StyleSheet, InteractionManager } from "react-native";
+// NOTE: usa View+absoluteFillObject invece di Modal per evitare il crash
+// "Maximum update depth exceeded" su Android. Modal cambia i system insets
+// (status/nav bar animano) → SafeAreaProvider aggiorna → cascade setOptions
+// React Navigation su tutti i Tabs.Screen → loop. View overlay NON tocca il
+// system UI → nessun trigger insets → crash strutturalmente impossibile.
+import React, { useEffect, useRef, useState } from "react";
+import { View, Text, Pressable, StyleSheet, Animated, InteractionManager } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useColors } from "@/hooks/useColors";
@@ -28,6 +33,7 @@ export default function AssistantOnboardingTour() {
   const { onboardingEnabled } = useAssistantEnabled();
   const [visible, setVisible] = useState(false);
   const [step, setStep] = useState(0);
+  const fadeAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     if (!onboardingEnabled) return;
@@ -35,76 +41,73 @@ export default function AssistantOnboardingTour() {
     void (async () => {
       const shown = await wasOnboardingShown();
       if (cancelled || shown) return;
-      // Defer setVisible(true) fino a dopo che tutte le animazioni/interazioni
-      // correnti sono completate. Senza questo defer, React 18 automatic batching
-      // può raggruppare il commit di setVisible(true) con un refetch React Query
-      // nello stesso tick async → il commit include sia il Modal che monta sia
-      // TabLayout che ri-renderizza → se tabsScreenOptions produce nested objects
-      // nuovi (es. cambio tema al boot), React Navigation chiama setOptions cascade
-      // su tutti i Tabs.Screen → "Maximum update depth exceeded" crash su Android.
       InteractionManager.runAfterInteractions(() => {
         if (!cancelled) {
           setVisible(true);
+          Animated.timing(fadeAnim, { toValue: 1, duration: 200, useNativeDriver: true }).start();
           void logAssistantClientEvent("onboarding_started");
         }
       });
     })();
     return () => { cancelled = true; };
-  }, [onboardingEnabled]);
+  }, [onboardingEnabled, fadeAnim]);
 
   if (!visible) return null;
 
   const close = async () => {
-    setVisible(false);
+    Animated.timing(fadeAnim, { toValue: 0, duration: 150, useNativeDriver: true }).start(() => {
+      setVisible(false);
+    });
     await markOnboardingShown();
     await logAssistantClientEvent("onboarding_completed", { stepReached: step });
   };
 
   const cur = STEPS[step];
   const isLast = step === STEPS.length - 1;
+
   return (
-    <Modal visible transparent animationType="fade" onRequestClose={close}>
-      <View style={[styles.overlay, { paddingTop: insets.top + 24, paddingBottom: insets.bottom + 24 }]}>
-        <View style={[styles.card, { backgroundColor: colors.surface }]} testID="assistant-onboarding-card">
-          <View style={styles.headRow}>
-            <Ionicons name="sparkles" size={22} color={colors.primary} />
-            <Text style={[styles.stepBadge, { color: colors.textMuted ?? colors.textSecondary }]}>
-              {step + 1}/{STEPS.length}
-            </Text>
-            <Pressable testID="assistant-onboarding-skip" onPress={close} hitSlop={10}>
-              <Ionicons name="close" size={22} color={colors.text} />
-            </Pressable>
-          </View>
-          <Text style={[styles.title, { color: colors.text }]}>{t(cur.titleKey) || cur.titleFallback}</Text>
-          <Text style={[styles.body, { color: colors.text }]}>{t(cur.bodyKey) || cur.bodyFallback}</Text>
-          <View style={styles.row}>
-            {step > 0 && (
-              <Pressable
-                testID="assistant-onboarding-back"
-                onPress={() => setStep(step - 1)}
-                style={[styles.btnSecondary, { borderColor: colors.border }]}
-              >
-                <Text style={{ color: colors.text }}>{t("common.assistantBack") || "Indietro"}</Text>
-              </Pressable>
-            )}
+    <Animated.View
+      style={[StyleSheet.absoluteFill, styles.overlay, { opacity: fadeAnim, paddingTop: insets.top + 24, paddingBottom: insets.bottom + 24 }]}
+    >
+      <View style={[styles.card, { backgroundColor: colors.surface }]} testID="assistant-onboarding-card">
+        <View style={styles.headRow}>
+          <Ionicons name="sparkles" size={22} color={colors.primary} />
+          <Text style={[styles.stepBadge, { color: colors.textMuted ?? colors.textSecondary }]}>
+            {step + 1}/{STEPS.length}
+          </Text>
+          <Pressable testID="assistant-onboarding-skip" onPress={close} hitSlop={10}>
+            <Ionicons name="close" size={22} color={colors.text} />
+          </Pressable>
+        </View>
+        <Text style={[styles.title, { color: colors.text }]}>{t(cur.titleKey) || cur.titleFallback}</Text>
+        <Text style={[styles.body, { color: colors.text }]}>{t(cur.bodyKey) || cur.bodyFallback}</Text>
+        <View style={styles.row}>
+          {step > 0 && (
             <Pressable
-              testID="assistant-onboarding-next"
-              onPress={() => isLast ? close() : setStep(step + 1)}
-              style={[styles.btnPrimary, { backgroundColor: colors.primary }]}
+              testID="assistant-onboarding-back"
+              onPress={() => setStep(step - 1)}
+              style={[styles.btnSecondary, { borderColor: colors.border }]}
             >
-              <Text style={{ color: "#FFFFFF", fontWeight: "600" }}>
-                {isLast ? (t("common.assistantDone") || "Inizia") : (t("common.assistantNext") || "Avanti")}
-              </Text>
+              <Text style={{ color: colors.text }}>{t("common.assistantBack") || "Indietro"}</Text>
             </Pressable>
-          </View>
+          )}
+          <Pressable
+            testID="assistant-onboarding-next"
+            onPress={() => isLast ? close() : setStep(step + 1)}
+            style={[styles.btnPrimary, { backgroundColor: colors.primary }]}
+          >
+            <Text style={{ color: "#FFFFFF", fontWeight: "600" }}>
+              {isLast ? (t("common.assistantDone") || "Inizia") : (t("common.assistantNext") || "Avanti")}
+            </Text>
+          </Pressable>
         </View>
       </View>
-    </Modal>
+    </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
-  overlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.6)", padding: 24, justifyContent: "center" },
+  overlay: { backgroundColor: "rgba(0,0,0,0.6)", padding: 24, justifyContent: "center", zIndex: 9999 },
   card: { borderRadius: 16, padding: 20, gap: 12 },
   headRow: { flexDirection: "row", alignItems: "center", gap: 8 },
   stepBadge: { flex: 1, fontSize: 12 },

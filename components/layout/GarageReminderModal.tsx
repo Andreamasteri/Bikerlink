@@ -1,5 +1,5 @@
 import React from "react";
-import { View, Text, Pressable, Modal, StyleSheet } from "react-native";
+import { View, Text, Pressable, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useColors } from "@/hooks/useColors";
 import { useRouter, type Href } from "expo-router";
@@ -22,44 +22,39 @@ export function GarageReminderModal({
   const colors = useColors();
   const router = useRouter();
 
+  if (!visible) return null;
+
   return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="fade"
-      onRequestClose={onClose}
-    >
-      <View style={styles.overlay}>
-        <View style={[styles.card, { backgroundColor: colors.surface }]}>
-          <Ionicons
-            name={isBikerOrCoppia ? "build" : "heart"}
-            size={36}
-            color={colors.accent}
-            style={{ marginBottom: 12 }}
-          />
-          <Text style={[styles.text, { color: colors.text }]}>{text}</Text>
-          <Pressable
-            style={[styles.btn, { backgroundColor: colors.accent }]}
-            onPress={() => {
-              onClose();
-              router.push("/garage" as Href);
-            }}
-          >
-            <Text style={styles.btnText}>{buttonText}</Text>
-          </Pressable>
-        </View>
+    <View style={[StyleSheet.absoluteFill, styles.overlay]}>
+      <View style={[styles.card, { backgroundColor: colors.surface }]}>
+        <Ionicons
+          name={isBikerOrCoppia ? "build" : "heart"}
+          size={36}
+          color={colors.accent}
+          style={{ marginBottom: 12 }}
+        />
+        <Text style={[styles.text, { color: colors.text }]}>{text}</Text>
+        <Pressable
+          style={[styles.btn, { backgroundColor: colors.accent }]}
+          onPress={() => {
+            onClose();
+            router.push("/garage" as Href);
+          }}
+        >
+          <Text style={styles.btnText}>{buttonText}</Text>
+        </Pressable>
       </View>
-    </Modal>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   overlay: {
-    flex: 1,
     backgroundColor: "rgba(0,0,0,0.55)",
     justifyContent: "center",
     alignItems: "center",
     paddingHorizontal: 24,
+    zIndex: 9999,
   },
   card: {
     width: "100%",
