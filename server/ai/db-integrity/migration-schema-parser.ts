@@ -74,7 +74,7 @@ const DROP_TABLE_RE = /^\s*drop\s+table\s+(?:if\s+exists\s+)?("?[a-zA-Z0-9_."]+"
 const ADD_UNIQUE_CONSTRAINT_RE = /\badd\s+constraint\s+("?[a-zA-Z0-9_]+"?)\s+unique\b/gi;
 // CREATE UNIQUE INDEX name ON table (cols)
 const CREATE_UNIQUE_INDEX_RE =
-  /create\s+unique\s+index\s+(?:if\s+not\s+exists\s+)?("?[a-zA-Z0-9_]+"?)\s+on\s+("?[a-zA-Z0-9_.]+"?)/gi;
+  /create\s+unique\s+index\s+(?:concurrently\s+)?(?:if\s+not\s+exists\s+)?("?[a-zA-Z0-9_]+"?)\s+on\s+("?[a-zA-Z0-9_.]+"?)/gi;
 // CREATE INDEX (non-unique) name ON table (cols)
 // NB: "create unique index" è già catturato sopra; il lookahead negativo \b(?!unique\b)
 // garantisce che solo gli indici plain siano inclusi qui (case-insensitive tramite flag /gi).
