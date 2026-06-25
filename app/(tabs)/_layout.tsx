@@ -177,8 +177,55 @@ export default function TabLayout() {
   });
   const statusIsAvailable = profileData?.isAvailable || false;
 
+  // ANTI-LOOP: tutti i valori runtime vengono letti da un ref (sempre aggiornato
+  // ad ogni render) invece che dalla closure di useCallback. Così renderCustomTabBar
+  // ha deps [] → stesso riferimento funzione per sempre → tabBar prop su <Tabs>
+  // non cambia mai → nessun setOptions cascade su Tabs.Screen.
+  //
+  // Senza questo fix: quando React Query completa un refetch nello stesso tick
+  // async in cui setVisible(true) della OnboardingTour viene chiamato, React 18
+  // automatic batching raggruppa i due update in un unico commit. Il commit
+  // include sia AssistantOnboardingTour (Modal che monta) sia TabLayout (re-render
+  // da query data). Con le deps di useCallback che includono i valori React Query
+  // (hasActiveMatches, unreadCount, ecc.), renderCustomTabBar ottiene un nuovo ref
+  // → tabBar prop cambia → React Navigation setOptions cascade su 15 Tabs.Screen
+  // → 50+ update annidati → "Maximum update depth exceeded" crash su Android.
+  const tabBarStateRef = useRef({
+    showCalibrationBadge,
+    taskbarStyle,
+    globalTrackingActive,
+    globalSprintMeasuring,
+    hasActiveMatches,
+    statusIsAvailable,
+    newMatchCount,
+    unreadCount,
+    isBikerOrCoppia,
+  });
+  tabBarStateRef.current = {
+    showCalibrationBadge,
+    taskbarStyle,
+    globalTrackingActive,
+    globalSprintMeasuring,
+    hasActiveMatches,
+    statusIsAvailable,
+    newMatchCount,
+    unreadCount,
+    isBikerOrCoppia,
+  };
+
   const renderCustomTabBar = useCallback((props: BottomTabBarProps) => {
     const { state, descriptors, navigation } = props;
+    const {
+      showCalibrationBadge: _showCalibrationBadge,
+      taskbarStyle: _taskbarStyle,
+      globalTrackingActive: _globalTrackingActive,
+      globalSprintMeasuring: _globalSprintMeasuring,
+      hasActiveMatches: _hasActiveMatches,
+      statusIsAvailable: _statusIsAvailable,
+      newMatchCount: _newMatchCount,
+      unreadCount: _unreadCount,
+      isBikerOrCoppia: _isBikerOrCoppia,
+    } = tabBarStateRef.current;
 
     const tabs: TabItem[] = state.routes
       .filter((route) => {
@@ -201,7 +248,7 @@ export default function TabLayout() {
           });
           if (!isFocused && !event.defaultPrevented) {
             const extraParams =
-              route.name === "profile" && showCalibrationBadge
+              route.name === "profile" && _showCalibrationBadge
                 ? { focusTelemetry: "1" }
                 : undefined;
             navigation.navigate(
@@ -220,14 +267,14 @@ export default function TabLayout() {
               color={color}
               size={size}
               focused={isFocused}
-              globalTrackingActive={globalTrackingActive}
-              globalSprintMeasuring={globalSprintMeasuring}
-              hasActiveMatches={hasActiveMatches}
-              statusIsAvailable={statusIsAvailable}
-              newMatchCount={newMatchCount}
-              unreadCount={unreadCount}
-              showCalibrationBadge={showCalibrationBadge}
-              isBikerOrCoppia={isBikerOrCoppia}
+              globalTrackingActive={_globalTrackingActive}
+              globalSprintMeasuring={_globalSprintMeasuring}
+              hasActiveMatches={_hasActiveMatches}
+              statusIsAvailable={_statusIsAvailable}
+              newMatchCount={_newMatchCount}
+              unreadCount={_unreadCount}
+              showCalibrationBadge={_showCalibrationBadge}
+              isBikerOrCoppia={_isBikerOrCoppia}
             />
           ),
           isFocused,
@@ -238,14 +285,11 @@ export default function TabLayout() {
     return (
       <CustomTabBar
         tabs={tabs}
-        style={taskbarStyle}
+        style={_taskbarStyle}
       />
     );
-  }, [
-    showCalibrationBadge, taskbarStyle,
-    globalTrackingActive, globalSprintMeasuring, hasActiveMatches,
-    statusIsAvailable, newMatchCount, unreadCount, isBikerOrCoppia,
-  ]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const gpsTabHref: Href | null | undefined = undefined;
 
   const garageIsEmpty: boolean | undefined = isBikerOrCoppia
