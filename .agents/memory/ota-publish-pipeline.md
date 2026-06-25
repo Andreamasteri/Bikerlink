@@ -23,6 +23,13 @@ Lanciare `publish-ota-full.sh` con `setsid nohup ... &` dalla shell dell'agente 
 
 Se l'export muore SENZA rollback, `constants/buildInfo.ts` resta pre-impostato a `NEXT` (es. 176). Al re-run `NEXT_OTA = max(DB_last+1, buildInfo+1)` → il floor lo spinge a 177, **saltando** la 176. Fix: prima di ri-lanciare, riporta `APPLIED_OTA_NUMBER` all'ultima OTA realmente pubblicata in DB (es. 175). Lo script committa buildInfo+hwm con un index separato (workaround git) e pusha: il remote avanza ma HEAD locale resta indietro con le stesse modifiche come working-tree changes — normale, l'auto-commit di fine task le allinea.
 
+## ⚠️ Scrivere .ota-message PRIMA di triggerare il workflow — sempre
+
+Il messaggio va scritto in `.ota-message` **prima** di `restart_workflow("OTA Publish")`.
+Se il file è vuoto, lo script fa fallback su `app_settings.pending_ota_message` (messaggio stale del task precedente).
+**Sequenza corretta:** `printf 'OTA-N: ...' > .ota-message` → verifica con `cat` → poi `restart_workflow`.
+Non invertire l'ordine, non fidarsi della memoria: scrivere sempre il messaggio come primo passo.
+
 ## Messaggio stale dal fallback DB
 
 Il workflow "OTA Publish" si **auto-riavvia** quando riavvii altri workflow dell'env
