@@ -87,3 +87,4 @@
 - [eslint single-file false unused](eslint-single-file-false-unused.md) — linting one TS file alone falsely flags used type-only imports (method return types) as unused; run the full-project lint instead, never delete them.
 - [AI Assistant admin actions](assistant-admin-actions.md) — admin & user chat share extractActions; split by whitelist at filter time; admin ops server-side (role gate+audit), IDs from admin-context snapshot.
 - [Context.Provider value memoization](context-provider-value-memo.md) — value oggetto inline = nuova ref ogni render → re-render a cascata che alimentano il loop setOptions rnav; useMemo+useCallback obbligatori; gate in check-rnav-inline-props.sh.
+- [Stack.Screen inline options loop](stack-screen-inline-options.md) — options={{}} inline in screen files → nuovo oggetto ogni render → useLayoutEffect RNav setOptions → loop; fix: costante module-level (statico) o useMemo (dinamico); gate: check-rnav-inline-props.sh.

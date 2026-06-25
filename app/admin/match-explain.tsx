@@ -13,6 +13,8 @@ import Colors from "@/constants/colors";
 import { getApiUrl } from "@/lib/query-client";
 import { BioAffinityCard } from "@/components/admin/match-inspector/BioAffinityCard";
 
+const MATCH_EXPLAIN_SCREEN_OPTIONS = { title: "Spiega Match" } as const;
+
 interface ExplainResponse {
   userA: string;
   userB: string;
@@ -59,7 +61,7 @@ export default function MatchExplainScreen() {
 
   return (
     <>
-      <Stack.Screen options={{ title: "Spiega Match" }} />
+      <Stack.Screen options={MATCH_EXPLAIN_SCREEN_OPTIONS} />
       <ScrollView
         style={styles.container}
         contentContainerStyle={{ paddingBottom: insets.bottom + 24, paddingTop: 16 }}

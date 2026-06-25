@@ -1,4 +1,4 @@
-import React, { useCallback, useRef } from "react";
+import React, { useCallback, useMemo, useRef } from "react";
 import {
   View,
   Text,
@@ -403,13 +403,14 @@ export default function NotificationsScreen() {
     );
   };
 
+  const screenOptions = useMemo(
+    () => ({ headerRight: hasContent ? headerRight : undefined }),
+    [hasContent, headerRight]
+  );
+
   return (
     <View style={[styles.container, { backgroundColor: colors.background ?? colors.surface }]}>
-      <Stack.Screen
-        options={{
-          headerRight: hasContent ? headerRight : undefined,
-        }}
-      />
+      <Stack.Screen options={screenOptions} />
 
       {isLoadingAny ? (
         <ActivityIndicator color={colors.accent} style={{ marginTop: 40 }} />

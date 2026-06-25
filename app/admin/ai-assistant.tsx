@@ -9,6 +9,8 @@ import { Ionicons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
 import { apiRequest } from "@/lib/query-client";
 
+const AI_ASSISTANT_SCREEN_OPTIONS = { headerShown: false } as const;
+
 type Platform = "android" | "ios";
 
 interface PlatformConfig {
@@ -135,7 +137,7 @@ export default function AiAssistantAdminScreen() {
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
-      <Stack.Screen options={{ headerShown: false }} />
+      <Stack.Screen options={AI_ASSISTANT_SCREEN_OPTIONS} />
       <View style={styles.header}>
         <Text style={styles.title}>AI Assistant Utenti</Text>
         <Text style={styles.subtitle}>Config per piattaforma (Android / iOS).</Text>

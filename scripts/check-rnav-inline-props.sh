@@ -125,6 +125,26 @@ check_pattern_multiline '<Stack\.Screen[^>]{0,200}options=\{\{[^}]{0,300}\w+Styl
 check_pattern_multiline '<Tabs\.Screen[^>]{0,200}options=\{\{[^}]{0,300}\w+Style:\s*\{' \
   "Tabs.Screen options={{}} con nested object (xStyle:{}) → usare useMemo o costante module-level"
 
+# ── Stack.Screen / Tabs.Screen options={{}} inline in screen files ────────────
+# QUALSIASI options={{}} inline è pericoloso nelle screen components che si
+# ri-renderano: anche { headerShown: false } crea un nuovo oggetto a ogni render
+# → useLayoutEffect([options]) in React Navigation si attiva → setOptions →
+# navigation state update → ri-render → nuovo options → loop infinito.
+# Fix: costante module-level per options statiche, useMemo per quelle dinamiche.
+# I file _layout.tsx sono ESCLUSI perché si ri-renderano raramente.
+SCREEN_INLINE_OPTS=$(rg -n '<(Stack|Tabs)\.Screen[^/]*options=\{\{' \
+  --glob 'app/**/*.tsx' \
+  --glob '!app/**/_layout*.tsx' \
+  --glob '!node_modules/**' --glob '!.local/**' --glob '!.agents/**' \
+  2>/dev/null || true)
+if [ -n "$SCREEN_INLINE_OPTS" ]; then
+  echo ""
+  echo "❌ TROVATO — Stack/Tabs.Screen options={{}} inline in screen file"
+  echo "$SCREEN_INLINE_OPTS"
+  echo "   → Estrarre in costante module-level (se statico) o useMemo (se dipende da state/props)."
+  FAIL=1
+fi
+
 # ── router direttamente in useEffect (redirect loop) ─────────────────────────
 # Pattern pericoloso: router.replace/push chiamato direttamente dentro useEffect
 # con [router] nelle deps. Se il replace triggera un re-render, router cambia

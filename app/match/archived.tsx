@@ -1,4 +1,4 @@
-import React, { useCallback } from "react";
+import React, { useCallback, useMemo } from "react";
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Alert } from "react-native";
 import { Stack } from "expo-router";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -116,9 +116,11 @@ export default function ArchivedMatchesScreen() {
   const proposalRows = proposal.data ?? [];
   const empty = !loading && garageRows.length === 0 && bikerRows.length === 0 && proposalProfileRows.length === 0 && proposalRows.length === 0;
 
+  const screenOptions = useMemo(() => ({ title: t("match.archived") }), [t]);
+
   return (
     <>
-      <Stack.Screen options={{ title: t("match.archived") }} />
+      <Stack.Screen options={screenOptions} />
       <ScrollView
         style={styles.container}
         contentContainerStyle={{ paddingBottom: insets.bottom + 24, paddingTop: 12 }}

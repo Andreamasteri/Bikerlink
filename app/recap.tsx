@@ -17,6 +17,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 import { apiRequest, queryClient } from "@/lib/query-client";
 
+const RECAP_SCREEN_OPTIONS = { headerShown: false } as const;
+
 interface RecapTopMatch {
   matchId: string;
   otherUserId: string;
@@ -97,7 +99,7 @@ export default function RecapScreen() {
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
-      <Stack.Screen options={{ headerShown: false }} />
+      <Stack.Screen options={RECAP_SCREEN_OPTIONS} />
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn} testID="recap-back">
           <Ionicons name="chevron-back" size={26} color={Colors.text} />
