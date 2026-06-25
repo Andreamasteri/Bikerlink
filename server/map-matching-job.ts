@@ -46,7 +46,7 @@ import { rideTelemetry } from "@shared/db";
 import { eq, sql, and, lte, inArray } from "drizzle-orm";
 import { mapMatch, isSelfHosted, GHPoint } from "./graphhopper-client";
 import { isRoutingEnabled } from "./routing/routing-kill-switch";
-import { isThinkCentrePoweredOff } from "./lib/thinkcentre-powered-off";
+import { isThinkCentreOffline } from "./lib/thinkcentre-offline";
 import { storage } from "./storage";
 
 const LAST_RUN_KEY = "map_matching_last_run";
@@ -95,6 +95,13 @@ export async function runMapMatchingJob(): Promise<{
   if (!isSelfHosted && !process.env.GRAPHHOPPER_API_KEY) {
     console.warn("[MAP-MATCH] GraphHopper non configurato (né GRAPHHOPPER_URL né GRAPHHOPPER_API_KEY). Job saltato.");
     return { processed: 0, skipped: 0, retry: 0, unmatchable: 0, segments: 0, errors: ["GraphHopper not configured"] };
+  }
+  // ThinkCentre offline (spento O in manutenzione): il map-matching self-hosted
+  // non può andare a buon fine — salta subito senza interrogare il pool né
+  // attendere i timeout di rete del GraphHopper locale.
+  if (isSelfHosted && (await isThinkCentreOffline())) {
+    console.warn("[MAP-MATCH] ThinkCentre offline (spento o in manutenzione). Job saltato.");
+    return { processed: 0, skipped: 0, retry: 0, unmatchable: 0, segments: 0, errors: ["ThinkCentre offline"] };
   }
 
   isRunning = true;

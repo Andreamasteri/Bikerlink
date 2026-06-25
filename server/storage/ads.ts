@@ -1,4 +1,4 @@
-import { eq, and, or, sql, desc, asc } from "drizzle-orm";
+import { eq, and, or, sql, desc, asc, isNull, isNotNull } from "drizzle-orm";
 import { db } from "../db";
 import {
   adCampaigns, adClicks,
@@ -12,6 +12,7 @@ export class AdsStorage extends SocialStorage {
     return db.select().from(adCampaigns).where(
       and(
         eq(adCampaigns.isActive, true),
+        isNull(adCampaigns.ghostedAt),
         sql`${adCampaigns.name} NOT LIKE '\\_\\_selfcheck\\_\\_%' ESCAPE '\\'`
       )
     );
@@ -21,6 +22,7 @@ export class AdsStorage extends SocialStorage {
     return db.select().from(adCampaigns).where(
       and(
         eq(adCampaigns.isActive, true),
+        isNull(adCampaigns.ghostedAt),
         or(eq(adCampaigns.targetUserType, userType), eq(adCampaigns.targetUserType, "tutti")),
         sql`${adCampaigns.name} NOT LIKE '\\_\\_selfcheck\\_\\_%' ESCAPE '\\'`
       )
@@ -52,10 +54,55 @@ export class AdsStorage extends SocialStorage {
   }
 
   async getAllCampaigns(): Promise<AdCampaign[]> {
-    return db.select().from(adCampaigns).orderBy(desc(adCampaigns.createdAt));
+    // Le campagne nel cestino (ghosted_at IS NOT NULL) non esistono per il
+    // sistema: niente warmup, serving, conteggi né cleanup-reference.
+    return db.select().from(adCampaigns)
+      .where(isNull(adCampaigns.ghostedAt))
+      .orderBy(desc(adCampaigns.createdAt));
+  }
+
+  /**
+   * Marca una campagna come ghost (cestino) — usato dal warmup quando l'immagine
+   * è irrecuperabile da Object Storage. Non elimina la riga: l'admin può
+   * ripristinarla dal pannello "Segnalate dal sistema".
+   */
+  async ghostCampaign(id: string): Promise<void> {
+    await db.update(adCampaigns)
+      .set({ ghostedAt: sql`NOW()` })
+      .where(eq(adCampaigns.id, id));
+  }
+
+  /** Campagne nel cestino (solo pannello admin "Segnalate dal sistema"). */
+  async getGhostedCampaigns(): Promise<AdCampaign[]> {
+    return db.select().from(adCampaigns)
+      .where(isNotNull(adCampaigns.ghostedAt))
+      .orderBy(desc(adCampaigns.ghostedAt));
+  }
+
+  /** Ripristina una campagna ghostata (ghosted_at = NULL). */
+  async restoreCampaign(id: string): Promise<AdCampaign | undefined> {
+    const [campaign] = await db.update(adCampaigns)
+      .set({ ghostedAt: null })
+      .where(eq(adCampaigns.id, id))
+      .returning();
+    return campaign;
   }
 
   async deleteCampaign(id: string): Promise<void> {
     await db.delete(adCampaigns).where(eq(adCampaigns.id, id));
+  }
+
+  /**
+   * Hard-delete di TUTTE le campagne artefatto del prober (__selfcheck__*).
+   * Sono campagne di test, non campagne reali: vanno eliminate dal DB, mai
+   * ghostate. Idempotente — chiamabile nel finally del self-check per garantire
+   * che non restino mai artefatti anche se le DELETE HTTP per-id falliscono.
+   * Ritorna il numero di righe rimosse.
+   */
+  async deleteSelfcheckCampaigns(): Promise<number> {
+    const rows = await db.delete(adCampaigns)
+      .where(sql`${adCampaigns.name} LIKE '\\_\\_selfcheck\\_\\_%' ESCAPE '\\'`)
+      .returning({ id: adCampaigns.id });
+    return rows.length;
   }
 }

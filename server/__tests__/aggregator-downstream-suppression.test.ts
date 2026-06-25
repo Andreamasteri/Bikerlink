@@ -35,7 +35,7 @@ const collectErrorsMock = vi.hoisted(() => vi.fn<[], Promise<Signal[]>>());
 const collectMapsMock = vi.hoisted(() => vi.fn<[], Promise<Signal[]>>());
 const collectRestartsMock = vi.hoisted(() => vi.fn<[], Promise<Signal[]>>());
 const collectPoolMock = vi.hoisted(() => vi.fn<[], Signal[]>());
-const isThinkCentrePoweredOffMock = vi.hoisted(() => vi.fn<[], Promise<boolean>>());
+const isThinkCentreOfflineMock = vi.hoisted(() => vi.fn<[], Promise<boolean>>());
 const recordSignalsMock = vi.hoisted(() => vi.fn<[Signal[]], Promise<void>>());
 
 vi.mock("../ai/watchdog/collectors/bullmq-collector", () => ({ collectBullMq: collectBullMqMock }));
@@ -48,7 +48,7 @@ vi.mock("../ai/watchdog/collectors/maps-collector", () => ({ collectMaps: collec
 vi.mock("../ai/watchdog/collectors/restart-collector", () => ({ collectRestarts: collectRestartsMock }));
 vi.mock("../ai/watchdog/collectors/pool-collector", () => ({ collectPool: collectPoolMock }));
 vi.mock("../ai/watchdog/signals", () => ({ recordSignals: recordSignalsMock }));
-vi.mock("../lib/thinkcentre-powered-off", () => ({ isThinkCentrePoweredOff: isThinkCentrePoweredOffMock }));
+vi.mock("../lib/thinkcentre-offline", () => ({ isThinkCentreOffline: isThinkCentreOfflineMock }));
 vi.mock("../lib/bg-db-limiter", () => ({
   withBgDbSlot: vi.fn((fn: () => unknown) => (typeof fn === "function" ? fn() : Promise.resolve([]))),
 }));
@@ -152,7 +152,7 @@ describe("suppressDownstreamWhenPoweredOff — problemi a valle", () => {
 //
 // Esercita l'intero ciclo di aggregazione: i collector emettono segnali reali
 // (ping_ms HIGH, network_instability HIGH), il ciclo applica la soppressione
-// quando isThinkCentrePoweredOff()=true, e lo snapshot finale NON deve
+// quando isThinkCentreOffline()=true, e lo snapshot finale NON deve
 // contenere nessun problema con id db.db.ping_ms o maps.health.network_instability
 // con severity > "warn".
 
@@ -195,7 +195,7 @@ describe("runAggregatorCycle — E2E soppressione ThinkCentre spento", () => {
     ]);
 
     // ThinkCentre è spento: la soppressione deve attivarsi.
-    isThinkCentrePoweredOffMock.mockResolvedValue(true);
+    isThinkCentreOfflineMock.mockResolvedValue(true);
 
     const { runAggregatorCycle } = await import("../ai/watchdog/aggregator");
     const snap = await runAggregatorCycle();
@@ -230,7 +230,7 @@ describe("runAggregatorCycle — E2E soppressione ThinkCentre spento", () => {
       } satisfies Signal,
     ]);
     collectMapsMock.mockResolvedValue([]);
-    isThinkCentrePoweredOffMock.mockResolvedValue(true);
+    isThinkCentreOfflineMock.mockResolvedValue(true);
 
     const { runAggregatorCycle } = await import("../ai/watchdog/aggregator");
     const snap = await runAggregatorCycle();
@@ -264,7 +264,7 @@ describe("runAggregatorCycle — E2E soppressione ThinkCentre spento", () => {
     ]);
 
     // ThinkCentre acceso: nessuna soppressione.
-    isThinkCentrePoweredOffMock.mockResolvedValue(false);
+    isThinkCentreOfflineMock.mockResolvedValue(false);
 
     const { runAggregatorCycle } = await import("../ai/watchdog/aggregator");
     const snap = await runAggregatorCycle();
@@ -279,7 +279,7 @@ describe("runAggregatorCycle — E2E soppressione ThinkCentre spento", () => {
     expect(netProblem?.title).not.toContain("soppresso");
   });
 
-  it("isThinkCentrePoweredOff che solleva errore non interrompe il ciclo (fail-safe a false)", async () => {
+  it("isThinkCentreOffline che solleva errore non interrompe il ciclo (fail-safe a false)", async () => {
     collectDbMock.mockResolvedValue([
       {
         source: "db",
@@ -291,7 +291,7 @@ describe("runAggregatorCycle — E2E soppressione ThinkCentre spento", () => {
     collectMapsMock.mockResolvedValue([]);
 
     // Errore di rete nel leggere il flag: il ciclo deve continuare.
-    isThinkCentrePoweredOffMock.mockRejectedValue(new Error("DB timeout"));
+    isThinkCentreOfflineMock.mockRejectedValue(new Error("DB timeout"));
 
     const { runAggregatorCycle } = await import("../ai/watchdog/aggregator");
     const snap = await runAggregatorCycle();

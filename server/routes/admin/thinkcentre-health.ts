@@ -18,6 +18,7 @@ import {
 } from "./thinkcentre-health-utils";
 import { isThinkCentreInMaintenance } from "../../lib/thinkcentre-maintenance";
 import { isThinkCentrePoweredOff } from "../../lib/thinkcentre-powered-off";
+import { resetThinkCentreOfflineCache } from "../../lib/thinkcentre-offline";
 import { isThinkCentreIgnoredForTests } from "../../lib/thinkcentre-ignore-tests";
 import {
   probeValhallaDetailed,
@@ -96,6 +97,8 @@ router.post("/thinkcentre/maintenance", async (req: Request, res: ExpressRespons
           set: { value: enabled ? "true" : "false", updatedAt: new Date() },
         }),
     );
+    // Invalida la cache TTL 3min: lo switch deve avere effetto immediato.
+    resetThinkCentreOfflineCache();
     console.log(`[admin/thinkcentre-maintenance] manutenzione ${enabled ? "ATTIVATA" : "disattivata"}`);
     return res.json({ ok: true, enabled });
   } catch (_err) {
@@ -137,6 +140,8 @@ router.post("/thinkcentre/powered-off", async (req: Request, res: ExpressRespons
           set: { value: enabled ? "true" : "false", updatedAt: new Date() },
         }),
     );
+    // Invalida la cache TTL 3min: lo switch deve avere effetto immediato.
+    resetThinkCentreOfflineCache();
     console.log(`[admin/thinkcentre-powered-off] ThinkCentre ${enabled ? "SPENTO (override attivo)" : "acceso (override rimosso)"}`);
     return res.json({ ok: true, enabled });
   } catch (_err) {

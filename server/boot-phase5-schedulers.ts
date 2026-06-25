@@ -172,12 +172,21 @@ export async function runPhase5Schedulers(): Promise<void> {
     console.warn("[INIT] Critical reports notifier failed (non-fatal):", e);
   }
 
-  try {
-    const { hydrateProbeLog, hydrateErrorHistory } = await import("./routes/admin/thinkcentre-health-utils");
-    await Promise.all([hydrateProbeLog(), hydrateErrorHistory()]);
-  } catch (e) {
-    console.warn("[INIT] Ring-buffer hydration failed (non-fatal):", e);
-  }
+  // Ring-buffer hydration: differita di 2 minuti dal boot e avvolta in
+  // withBgDbSlot, fire-and-forget. Non più sincrona in Phase 5 (competeva con il
+  // DB Init per le connessioni del pool proprio mentre era già stressato).
+  setTimeout(() => {
+    void (async () => {
+      try {
+        const { hydrateProbeLog, hydrateErrorHistory } = await import("./routes/admin/thinkcentre-health-utils");
+        const { withBgDbSlot } = await import("./lib/bg-db-limiter");
+        await withBgDbSlot(() => hydrateProbeLog());
+        await withBgDbSlot(() => hydrateErrorHistory());
+      } catch (e) {
+        console.warn("[INIT] Ring-buffer hydration failed (non-fatal):", e);
+      }
+    })();
+  }, 2 * 60_000);
 
   try {
     const [{ startThinkCentreMonitor, checkMotorcycleProfile }, { startValhallaMonitor }] = await Promise.all([

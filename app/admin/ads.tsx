@@ -12,11 +12,12 @@ import { styles } from "@/components/admin/ads-styles";
 import { KeyboardAvoidingView } from "react-native";
 import { MaterialIcons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import Colors from "@/constants/colors";
 import { queryClient, apiRequest } from "@/lib/query-client";
 import { copyLogToClipboard } from "@/lib/copyAdminLog";
 
+interface GhostedCampaign { id: string; name: string; sponsor: string | null; ghostedAt: string | null; targetUserType: string }
 interface SelfCheckEntry { name: string; status: "ok" | "warn" | "error"; durationMs: number; message?: string }
 interface SelfCheckResult {
   overall: "ok" | "degraded" | "broken";
@@ -128,6 +129,25 @@ function AdminAdsInner() {
 
   const currentTab = TABS.find((t) => t.key === activeTab)!;
 
+  // Task #4942 — "Segnalate dal sistema": campagne ghostate (immagine irrecuperabile).
+  const [showGhosted, setShowGhosted] = useState(false);
+  const ghostedQuery = useQuery<GhostedCampaign[]>({
+    queryKey: ["/api/admin/advertisements/ghosted"],
+  });
+  const ghostedList: GhostedCampaign[] = Array.isArray(ghostedQuery.data) ? ghostedQuery.data : [];
+  const restoreMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await apiRequest("POST", `/api/admin/advertisements/${id}/restore`);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/advertisements/ghosted"] });
+      // La lista principale campagne è servita sotto ["/api/admin/n"] (useAdAdmin):
+      // invalidarla fa ricomparire la campagna ripristinata.
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/n"] });
+    },
+  });
+
   const [selfCheckResult, setSelfCheckResult] = useState<SelfCheckResult | null>(null);
   const [showSelfCheckModal, setShowSelfCheckModal] = useState(false);
   const [lastFetched, setLastFetched] = useState(false);
@@ -225,6 +245,53 @@ function AdminAdsInner() {
         onSelfCheck={() => { void openSelfCheckModal(); }}
         isSelfChecking={selfCheckMutation.isPending}
       />
+
+      {ghostedList.length > 0 && (
+        <View style={{ marginHorizontal: 12, marginTop: 8, borderWidth: 1, borderColor: Colors.warning, borderRadius: 10, overflow: "hidden" }}>
+          <TouchableOpacity
+            onPress={() => setShowGhosted((s) => !s)}
+            style={{ flexDirection: "row", alignItems: "center", gap: 8, padding: 12, backgroundColor: Colors.surface }}
+          >
+            <MaterialIcons name="report-problem" size={18} color={Colors.warning} />
+            <Text style={{ flex: 1, fontFamily: "Inter_600SemiBold", color: Colors.text }}>
+              Segnalate dal sistema ({ghostedList.length})
+            </Text>
+            <MaterialIcons name={showGhosted ? "expand-less" : "expand-more"} size={22} color={Colors.textSecondary} />
+          </TouchableOpacity>
+          {showGhosted && (
+            <View style={{ backgroundColor: Colors.background }}>
+              <Text style={{ fontSize: 12, color: Colors.textSecondary, paddingHorizontal: 12, paddingTop: 10 }}>
+                Campagne con immagine irrecuperabile da Object Storage, spostate nel cestino. Ripristinandole tornano normali ma senza immagine: ricaricala dalla modifica campagna.
+              </Text>
+              <ScrollView style={{ maxHeight: 260 }}>
+                {ghostedList.map((g) => (
+                  <View
+                    key={g.id}
+                    style={{ flexDirection: "row", alignItems: "center", gap: 8, padding: 12, borderTopWidth: 1, borderTopColor: Colors.border }}
+                  >
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontFamily: "Inter_600SemiBold", color: Colors.text }} numberOfLines={1}>{g.name}</Text>
+                      <Text style={{ fontSize: 11, color: Colors.textSecondary }} numberOfLines={1}>
+                        {g.sponsor ? `${g.sponsor} · ` : ""}
+                        {g.ghostedAt ? `Segnalata il ${new Date(g.ghostedAt).toLocaleString("it-IT")}` : ""}
+                      </Text>
+                      <Text style={{ fontSize: 11, color: Colors.warning }}>Immagine irrecuperabile</Text>
+                    </View>
+                    <TouchableOpacity
+                      onPress={() => restoreMutation.mutate(g.id)}
+                      disabled={restoreMutation.isPending}
+                      style={{ flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: Colors.accent, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8, opacity: restoreMutation.isPending ? 0.6 : 1 }}
+                    >
+                      <MaterialIcons name="restore" size={16} color={Colors.background} />
+                      <Text style={{ color: Colors.background, fontFamily: "Inter_600SemiBold", fontSize: 13 }}>Ripristina</Text>
+                    </TouchableOpacity>
+                  </View>
+                ))}
+              </ScrollView>
+            </View>
+          )}
+        </View>
+      )}
 
       <Modal
         visible={showSelfCheckModal}

@@ -22,7 +22,7 @@ import { collectErrors } from "./collectors/error-collector";
 import { collectRestarts } from "./collectors/restart-collector";
 import { collectCrashSignals } from "./collectors/crash-signals-collector";
 import { withBgDbSlot } from "../../lib/bg-db-limiter";
-import { isThinkCentrePoweredOff } from "../../lib/thinkcentre-powered-off";
+import { isThinkCentreOffline } from "../../lib/thinkcentre-offline";
 
 let latest: HealthSnapshot | null = null;
 const subscribers = new Set<(s: HealthSnapshot) => void>();
@@ -66,7 +66,7 @@ export async function runAggregatorCycle(): Promise<HealthSnapshot> {
   let problems = deriveProblems(signals);
 
   try {
-    if (await withBgDbSlot(() => isThinkCentrePoweredOff())) {
+    if (await withBgDbSlot(() => isThinkCentreOffline())) {
       problems = suppressDownstreamWhenPoweredOff(problems);
     }
   } catch { /* fail-safe */ }

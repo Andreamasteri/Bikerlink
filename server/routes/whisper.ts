@@ -2,6 +2,7 @@ import { Router, type Request, type Response } from "express";
 import multer from "multer";
 import { sendError } from "../lib/api-response";
 import { getEffectiveSttChain } from "../ai/whisper-provider-config";
+import { isThinkCentreOffline } from "../lib/thinkcentre-offline";
 
 const router = Router();
 
@@ -51,6 +52,13 @@ router.post("/transcribe", audioUpload.single("file"), async (req: Request, res:
         const whisperUrl = process.env.WHISPER_URL;
         const whisperToken = process.env.WHISPER_TOKEN;
         if (!whisperUrl) continue;
+
+        // ThinkCentre offline (spento O in manutenzione): salta subito Whisper
+        // di casa senza attendere il timeout di 15s — passa al provider cloud.
+        if (await isThinkCentreOffline()) {
+          console.warn("[whisper/home] ThinkCentre offline (spento o in manutenzione) — skip al cloud");
+          continue;
+        }
 
         const homeStart = Date.now();
         try {

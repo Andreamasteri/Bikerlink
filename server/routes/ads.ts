@@ -60,31 +60,27 @@ export async function warmupAdImageCache(): Promise<void> {
         continue;
       }
 
-      const WARMUP_BACKOFF_MS = [1_000, 2_000, 4_000];
-      let lastErr: unknown;
-      let ok = false;
-      for (let attempt = 0; attempt <= WARMUP_BACKOFF_MS.length; attempt++) {
-        try {
-          const buffer = await downloadBuffer(`public/ads/${filename}`);
-          fs.writeFileSync(localPath, buffer);
-          downloaded++;
-          console.log(`[ADS WARMUP] Ripristinata: ${filename} (campagna "${campaign.name}")${attempt > 0 ? ` al tentativo ${attempt + 1}` : ""}`);
-          ok = true;
-          break;
-        } catch (err) {
-          lastErr = err;
-          if (attempt < WARMUP_BACKOFF_MS.length) {
-            const delay = WARMUP_BACKOFF_MS[attempt];
-            console.warn(
-              `[ADS WARMUP] Retry ${attempt + 1}/${WARMUP_BACKOFF_MS.length} per "${filename}" tra ${delay}ms:`,
-              (err as Error)?.message,
-            );
-            await new Promise((r) => setTimeout(r, delay));
-          }
-        }
+      // Caricamento progressivo: gap di 500ms tra una campagna e la successiva
+      // (solo dopo il primo download effettivo) per non saturare il pool/IO al boot.
+      if (downloaded + failed > 0) {
+        await new Promise((r) => setTimeout(r, 500));
       }
-      if (!ok) {
-        // Auto-restore dal backup .private/ads-backup/ se disponibile
+
+      // 1 SOLO tentativo dal primario; in caso di fallimento un solo tentativo dal
+      // backup .private/ads-backup/. Se entrambi falliscono → la campagna è
+      // irrecuperabile e viene spostata nel cestino (ghost), non ri-processata a
+      // ogni boot.
+      let ok = false;
+      let primaryErr: unknown;
+      try {
+        const buffer = await downloadBuffer(`public/ads/${filename}`);
+        fs.writeFileSync(localPath, buffer);
+        downloaded++;
+        console.log(`[ADS WARMUP] Ripristinata: ${filename} (campagna "${campaign.name}")`);
+        ok = true;
+      } catch (err) {
+        primaryErr = err;
+        // Auto-restore dal backup .private/ads-backup/ se disponibile (1 tentativo).
         try {
           const backupBuffer = await downloadBuffer(`${ADS_BACKUP_PREFIX}${filename}`);
           await uploadBuffer(`public/ads/${filename}`, backupBuffer, "image/jpeg");
@@ -93,19 +89,26 @@ export async function warmupAdImageCache(): Promise<void> {
           console.log(`[ADS WARMUP] AUTO-RESTORE da backup: ${filename} — campagna "${campaign.name}" ripristinata automaticamente`);
           ok = true;
         } catch (_backupErr) {
-          failed++;
-          console.error(
-            `[ADS WARMUP] IMMAGINE NON TROVATA IN OBJECT STORAGE — campagna "${campaign.name}" (id=${campaign.id}): ` +
-            `"${filename}" assente da Object Storage e da backup .private/ads-backup/ dopo ${WARMUP_BACKOFF_MS.length + 1} tentativi. ` +
-            `Vai su /admin/ads → modifica la campagna → ricarica l'immagine.`,
-            lastErr,
-          );
+          // primaryErr intentionally surfaced as the cause below.
+          void primaryErr;
         }
+      }
+
+      if (!ok) {
+        failed++;
+        try {
+          await storage.ghostCampaign(campaign.id);
+        } catch (ghostErr) {
+          console.warn(`[ADS WARMUP] ghostCampaign(${campaign.id}) fallito (non-fatal):`, ghostErr);
+        }
+        console.log(
+          `[ADS WARMUP] GHOST campagna "${campaign.name}" (id=${campaign.id}) — immagine irrecuperabile, spostata nel cestino`,
+        );
       }
     }
 
     console.log(
-      `[ADS WARMUP] Completato — ripristinate: ${downloaded}, già in cache: ${skipped}, fallite: ${failed}`,
+      `[ADS WARMUP] Completato — ripristinate: ${downloaded}, già in cache: ${skipped}, ghostate: ${failed}`,
     );
   } catch (err) {
     console.warn("[ADS WARMUP] Warmup fallito (non bloccante):", err);

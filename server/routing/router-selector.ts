@@ -11,6 +11,7 @@ import { checkQuota as checkTomTomQuota } from "./tomtom/quota-guard";
 import { recordRoutingFallback, recordRoutingFailure, recordRoutingSuccess } from "./routing-metrics";
 import { isRoutingEnabled } from "./routing-kill-switch";
 import { isThinkCentrePoweredOff } from "../lib/thinkcentre-powered-off";
+import { isThinkCentreOffline } from "../lib/thinkcentre-offline";
 import { isAreaRoutingActive } from "./routing-area-mode";
 import { resolveRoutingArea } from "./routing-area-resolver";
 import { ROUTING_AREA_OUTCOMES, findRoutingAreasForPoint, type RoutingAreaCode } from "@shared/routing-areas";
@@ -368,12 +369,13 @@ async function getActiveRouterInner(
     throw new RoutingDisabledError();
   }
 
-  // ThinkCentre spento: tutti i servizi self-hosted (GH, Valhalla) sono offline.
-  // Il profilo auto_curvy richiede Valhalla locale e NON può essere degradato su
-  // cloud (GH Cloud produce solo percorso diretto, non panoramico): restituiamo
-  // subito un errore chiaro senza attendere il timeout del server locale.
-  // Gli altri profili vengono instradati sulla catena cloud Mapbox → TomTom.
-  if (await isThinkCentrePoweredOff()) {
+  // ThinkCentre offline (spento O in manutenzione): tutti i servizi self-hosted
+  // (GH, Valhalla) sono offline. Il profilo auto_curvy richiede Valhalla locale
+  // e NON può essere degradato su cloud (GH Cloud produce solo percorso diretto,
+  // non panoramico): restituiamo subito un errore chiaro senza attendere il
+  // timeout del server locale. Gli altri profili vanno sulla catena cloud
+  // Mapbox → TomTom.
+  if (await isThinkCentreOffline()) {
     if (req.profile === "auto_curvy") {
       throw new AutoCurvyOfflineError();
     }

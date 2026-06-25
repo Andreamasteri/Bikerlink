@@ -32,6 +32,11 @@ export const adCampaigns = pgTable("ad_campaigns", {
   placement: varchar("placement", { length: 30 }).notNull().default("all"),
   imageVersion: integer("image_version").notNull().default(0),
   groupId: text("group_id"),
+  // Task #4942 — "cestino" campagne: quando il warmup non trova l'immagine in
+  // Object Storage la campagna viene ghostata (ghosted_at = NOW()) invece di
+  // eliminata. Le campagne ghost sono escluse da serving/warmup/conteggi; solo
+  // il pannello admin "Segnalate dal sistema" le legge (ghosted_at IS NOT NULL).
+  ghostedAt: timestamp("ghosted_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

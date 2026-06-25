@@ -19,6 +19,7 @@ import { addBootLog, bootOk, bootErr } from "./lib/boot-log";
 import { startAliveBeacon } from "./lib/alive-beacon";
 import { initMissingClubConversations, ensureCompetitorAnalysisPdf } from "./init-helpers";
 import { enrichBikerMatchBreakdowns } from "./matching/enrich-breakdowns";
+import { bootJobQueue } from "./lib/boot-job-queue";
 import { runBootPhase3DbInit } from "./boot-phase3-db-init";
 import { resetCrashBackoff, applyCrashBackoff } from "./lib/crash-backoff";
 import type { Server } from "http";
@@ -243,6 +244,23 @@ export async function runBootSequence(server: Server, errorHandlersReady: Promis
   }
   bootLog(4, TOTAL, "Seed + Engine", "done");
 
+  // Job pesanti post-boot: registrati nel bootJobQueue (initial delay 4 min,
+  // gap 45s) PRIMA della Phase 5, perché è la Phase 5 (runPhase5Schedulers) a
+  // chiamare bootJobQueue.start() — registrarli dopo non avrebbe effetto.
+  // Così questi UPDATE/insert non competono col DB Init e appaiono nei log solo
+  // dopo 4+ minuti dal boot.
+  bootJobQueue.register("InitMissingClubConversations", async () => {
+    await initMissingClubConversations();
+  });
+  bootJobQueue.register("EnrichBikerMatchBreakdowns", async () => {
+    const r = await enrichBikerMatchBreakdowns();
+    console.log(
+      `[BootJobQueue] enrichBikerMatchBreakdowns — done` +
+      ` bb_updated=${r.bbUpdated} bb_cleared=${r.bbCleared}` +
+      ` bz_updated=${r.bzUpdated} bz_cleared=${r.bzCleared}`,
+    );
+  });
+
   // ── Phase 5: Schedulers + maintenance jobs ────────────────────────────────
   bootLog(5, TOTAL, "Schedulers", "start");
   try {
@@ -402,25 +420,9 @@ export async function runBootSequence(server: Server, errorHandlersReady: Promis
       }
     })();
 
-    console.log("[INIT][BG] Starting initMissingClubConversations...");
-    initMissingClubConversations()
-      .then(() => console.log("[INIT][BG] initMissingClubConversations — done"))
-      .catch((err) => {
-        console.warn("[INIT][BG] initMissingClubConversations error:", err);
-      });
-
-    console.log("[INIT][BG] Starting enrichBikerMatchBreakdowns (back-fill affinity chips)...");
-    enrichBikerMatchBreakdowns()
-      .then((r) =>
-        console.log(
-          `[INIT][BG] enrichBikerMatchBreakdowns — done` +
-          ` bb_music=${r.bbMusicUpdated} bb_telem=${r.bbTelemetryUpdated}` +
-          ` bz_music=${r.bzMusicUpdated} bz_telem=${r.bzTelemetryUpdated}`
-        )
-      )
-      .catch((err) => {
-        console.warn("[INIT][BG] enrichBikerMatchBreakdowns error:", err);
-      });
+    // initMissingClubConversations + enrichBikerMatchBreakdowns sono ora
+    // registrati nel bootJobQueue (vedi sopra, prima della Phase 5): partono dopo
+    // 4+ minuti dal boot, non più fire-and-forget immediato post-READY.
 
     if (needsFakeSeed) {
       console.log("[INIT][BG] Starting autoSeedFakeUsers...");

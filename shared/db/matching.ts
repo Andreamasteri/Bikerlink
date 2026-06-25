@@ -93,6 +93,13 @@ export const bikerZavorrinaMatches = pgTable("biker_zavorrina_matches", {
   index("matches_bz_notif_pending_idx").on(table.notificationPriority, table.notifiedAt),
   uniqueIndex("matches_unique_combo_idx").on(table.bikerId, table.zavorrinaId, table.bikerMotorcycleId, table.wishlistMotoId),
   index("bz_matches_archived_at_idx").on(table.archivedAt),
+  // Task #4942 — indice funzionale per i join LEAST/GREATEST di enrichBikerMatchBreakdowns.
+  // Espressione → la tabella è esclusa dal diff publish (tablesFilter in drizzle.config.ts);
+  // l'indice è creato dalla migration 0123 CONCURRENTLY.
+  index("matches_bz_symmetric_pair_idx").on(
+    sql`LEAST(${table.bikerId}, ${table.zavorrinaId})`,
+    sql`GREATEST(${table.bikerId}, ${table.zavorrinaId})`,
+  ),
   // Explicit FK names = exact 63-char PG-truncated versions of the auto-generated names.
   foreignKey({
     name: "biker_zavorrina_matches_biker_motorcycle_id_user_motorcycles_id",

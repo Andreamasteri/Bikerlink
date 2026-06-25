@@ -235,6 +235,10 @@ export interface IStorage {
   getModeratorLogs(): Promise<ModeratorLog[]>;
   clearModeratorLogs(): Promise<number>;
   getAllCampaigns(): Promise<AdCampaign[]>;
+  ghostCampaign(id: string): Promise<void>;
+  getGhostedCampaigns(): Promise<AdCampaign[]>;
+  restoreCampaign(id: string): Promise<AdCampaign | undefined>;
+  deleteSelfcheckCampaigns(): Promise<number>;
   deleteEasterEgg(id: string): Promise<void>;
   deleteWorkshop(id: string): Promise<void>;
   deleteCampaign(id: string): Promise<void>;

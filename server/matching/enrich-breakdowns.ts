@@ -19,6 +19,17 @@
  * user_b_id (same ordering used in biker_biker_matches biker1_id /
  * biker2_id). For biker_zavorrina_matches the biker/zavorrina columns
  * are role-ordered, not ID-ordered, so LEAST/GREATEST is used.
+ *
+ * Query strategy (Task #4942 — Parte C): instead of 8 separate
+ * statements (4 set + 4 clear, one per key per table), each table now
+ * runs exactly 2 statements:
+ *   1. one multi-key UPDATE that sets BOTH 'musica' and 'stile_guida'
+ *      from the active affinity rows in a single pass, and
+ *   2. one multi-key CLEAR that drops BOTH stale keys in a single pass.
+ * Both statements compute the target breakdown once (via a derived
+ * subquery) and only write rows where it actually differs
+ * (`IS DISTINCT FROM`), so no-op JSONB writes never touch the heap —
+ * this is the main pool-pressure win.
  */
 
 import { sql } from "drizzle-orm";
@@ -27,146 +38,160 @@ import { db } from "../db";
 const ACTIVE = sql`('new', 'accepted')`;
 
 export interface EnrichBreakdownsResult {
-  bbMusicUpdated: number;
-  bbTelemetryUpdated: number;
-  bzMusicUpdated: number;
-  bzTelemetryUpdated: number;
-  bbMusicCleared: number;
-  bbTelemetryCleared: number;
-  bzMusicCleared: number;
-  bzTelemetryCleared: number;
+  bbUpdated: number;
+  bzUpdated: number;
+  bbCleared: number;
+  bzCleared: number;
 }
 
 export async function enrichBikerMatchBreakdowns(): Promise<EnrichBreakdownsResult> {
   const zero: EnrichBreakdownsResult = {
-    bbMusicUpdated: 0,
-    bbTelemetryUpdated: 0,
-    bzMusicUpdated: 0,
-    bzTelemetryUpdated: 0,
-    bbMusicCleared: 0,
-    bbTelemetryCleared: 0,
-    bzMusicCleared: 0,
-    bzTelemetryCleared: 0,
+    bbUpdated: 0,
+    bzUpdated: 0,
+    bbCleared: 0,
+    bzCleared: 0,
   };
 
   try {
-    const [
-      bbMusic, bbTelemetry, bzMusic, bzTelemetry,
-      bbMusicClear, bbTelemetryClear, bzMusicClear, bzTelemetryClear,
-    ] = await Promise.all([
-      // ── WRITE: active affinity score → score_breakdown ─────────────────────
-
+    const [bbSet, bzSet, bbClear, bzClear] = await Promise.all([
+      // ── biker_biker_matches — multi-key SET ('musica' + 'stile_guida') ───────
+      // ma is ID-ordered (user_a_id < user_b_id) → matches biker1/biker2 directly.
+      // ta is unordered → LEAST/GREATEST. Only rows with at least one active
+      // affinity are candidates; IS DISTINCT FROM skips no-op writes.
       db.execute(sql`
         UPDATE biker_biker_matches bb
-        SET score_breakdown =
-          COALESCE(bb.score_breakdown, '{}'::jsonb)
-          || jsonb_build_object('musica', ma.combined_score)
-        FROM music_affinity_matches ma
-        WHERE bb.biker1_id = ma.user_a_id
-          AND bb.biker2_id = ma.user_b_id
-          AND bb.archived_at IS NULL
-          AND ma.archived_at IS NULL
-          AND ma.status IN ${ACTIVE}
-      `),
-
-      db.execute(sql`
-        UPDATE biker_biker_matches bb
-        SET score_breakdown =
-          COALESCE(bb.score_breakdown, '{}'::jsonb)
-          || jsonb_build_object('stile_guida', ta.combined_score)
-        FROM telemetry_affinity_matches ta
-        WHERE bb.biker1_id = LEAST(ta.user_a_id, ta.user_b_id)
-          AND bb.biker2_id = GREATEST(ta.user_a_id, ta.user_b_id)
-          AND bb.archived_at IS NULL
-          AND ta.archived_at IS NULL
-          AND ta.status IN ${ACTIVE}
-      `),
-
-      db.execute(sql`
-        UPDATE biker_zavorrina_matches bz
-        SET score_breakdown =
-          COALESCE(bz.score_breakdown, '{}'::jsonb)
-          || jsonb_build_object('musica', ma.combined_score)
-        FROM music_affinity_matches ma
-        WHERE LEAST(bz.biker_id, bz.zavorrina_id) = ma.user_a_id
-          AND GREATEST(bz.biker_id, bz.zavorrina_id) = ma.user_b_id
-          AND bz.archived_at IS NULL
-          AND ma.archived_at IS NULL
-          AND ma.status IN ${ACTIVE}
-      `),
-
-      db.execute(sql`
-        UPDATE biker_zavorrina_matches bz
-        SET score_breakdown =
-          COALESCE(bz.score_breakdown, '{}'::jsonb)
-          || jsonb_build_object('stile_guida', ta.combined_score)
-        FROM telemetry_affinity_matches ta
-        WHERE LEAST(bz.biker_id, bz.zavorrina_id) = LEAST(ta.user_a_id, ta.user_b_id)
-          AND GREATEST(bz.biker_id, bz.zavorrina_id) = GREATEST(ta.user_a_id, ta.user_b_id)
-          AND bz.archived_at IS NULL
-          AND ta.archived_at IS NULL
-          AND ta.status IN ${ACTIVE}
-      `),
-
-      // ── CLEAR: remove stale keys when no active affinity exists ─────────────
-      // Uses `score_breakdown - 'key'` (JSONB minus) to drop the key in-place.
-      // Only runs on rows that currently carry the key AND lack an active match,
-      // so the WHERE clause keeps the update set small.
-
-      db.execute(sql`
-        UPDATE biker_biker_matches bb
-        SET score_breakdown = score_breakdown - 'musica'
-        WHERE bb.archived_at IS NULL
-          AND bb.score_breakdown ? 'musica'
-          AND NOT EXISTS (
-            SELECT 1 FROM music_affinity_matches ma
-            WHERE bb.biker1_id = ma.user_a_id
-              AND bb.biker2_id = ma.user_b_id
+        SET score_breakdown = src.new_bd
+        FROM (
+          SELECT t.id,
+            COALESCE(t.score_breakdown, '{}'::jsonb)
+            || COALESCE(m.obj, '{}'::jsonb)
+            || COALESCE(s.obj, '{}'::jsonb) AS new_bd
+          FROM biker_biker_matches t
+          LEFT JOIN LATERAL (
+            SELECT jsonb_build_object('musica', ma.combined_score) AS obj
+            FROM music_affinity_matches ma
+            WHERE t.biker1_id = ma.user_a_id
+              AND t.biker2_id = ma.user_b_id
               AND ma.archived_at IS NULL
               AND ma.status IN ${ACTIVE}
-          )
-      `),
-
-      db.execute(sql`
-        UPDATE biker_biker_matches bb
-        SET score_breakdown = score_breakdown - 'stile_guida'
-        WHERE bb.archived_at IS NULL
-          AND bb.score_breakdown ? 'stile_guida'
-          AND NOT EXISTS (
-            SELECT 1 FROM telemetry_affinity_matches ta
-            WHERE bb.biker1_id = LEAST(ta.user_a_id, ta.user_b_id)
-              AND bb.biker2_id = GREATEST(ta.user_a_id, ta.user_b_id)
+            LIMIT 1
+          ) m ON true
+          LEFT JOIN LATERAL (
+            SELECT jsonb_build_object('stile_guida', ta.combined_score) AS obj
+            FROM telemetry_affinity_matches ta
+            WHERE t.biker1_id = LEAST(ta.user_a_id, ta.user_b_id)
+              AND t.biker2_id = GREATEST(ta.user_a_id, ta.user_b_id)
               AND ta.archived_at IS NULL
               AND ta.status IN ${ACTIVE}
-          )
+            LIMIT 1
+          ) s ON true
+          WHERE t.archived_at IS NULL
+            AND (m.obj IS NOT NULL OR s.obj IS NOT NULL)
+        ) src
+        WHERE bb.id = src.id
+          AND src.new_bd IS DISTINCT FROM bb.score_breakdown
       `),
 
+      // ── biker_zavorrina_matches — multi-key SET ('musica' + 'stile_guida') ───
+      // biker/zavorrina columns are role-ordered, so both joins use LEAST/GREATEST.
       db.execute(sql`
         UPDATE biker_zavorrina_matches bz
-        SET score_breakdown = score_breakdown - 'musica'
-        WHERE bz.archived_at IS NULL
-          AND bz.score_breakdown ? 'musica'
-          AND NOT EXISTS (
-            SELECT 1 FROM music_affinity_matches ma
-            WHERE LEAST(bz.biker_id, bz.zavorrina_id) = ma.user_a_id
-              AND GREATEST(bz.biker_id, bz.zavorrina_id) = ma.user_b_id
+        SET score_breakdown = src.new_bd
+        FROM (
+          SELECT t.id,
+            COALESCE(t.score_breakdown, '{}'::jsonb)
+            || COALESCE(m.obj, '{}'::jsonb)
+            || COALESCE(s.obj, '{}'::jsonb) AS new_bd
+          FROM biker_zavorrina_matches t
+          LEFT JOIN LATERAL (
+            SELECT jsonb_build_object('musica', ma.combined_score) AS obj
+            FROM music_affinity_matches ma
+            WHERE LEAST(t.biker_id, t.zavorrina_id) = ma.user_a_id
+              AND GREATEST(t.biker_id, t.zavorrina_id) = ma.user_b_id
               AND ma.archived_at IS NULL
               AND ma.status IN ${ACTIVE}
-          )
-      `),
-
-      db.execute(sql`
-        UPDATE biker_zavorrina_matches bz
-        SET score_breakdown = score_breakdown - 'stile_guida'
-        WHERE bz.archived_at IS NULL
-          AND bz.score_breakdown ? 'stile_guida'
-          AND NOT EXISTS (
-            SELECT 1 FROM telemetry_affinity_matches ta
-            WHERE LEAST(bz.biker_id, bz.zavorrina_id) = LEAST(ta.user_a_id, ta.user_b_id)
-              AND GREATEST(bz.biker_id, bz.zavorrina_id) = GREATEST(ta.user_a_id, ta.user_b_id)
+            LIMIT 1
+          ) m ON true
+          LEFT JOIN LATERAL (
+            SELECT jsonb_build_object('stile_guida', ta.combined_score) AS obj
+            FROM telemetry_affinity_matches ta
+            WHERE LEAST(t.biker_id, t.zavorrina_id) = LEAST(ta.user_a_id, ta.user_b_id)
+              AND GREATEST(t.biker_id, t.zavorrina_id) = GREATEST(ta.user_a_id, ta.user_b_id)
               AND ta.archived_at IS NULL
               AND ta.status IN ${ACTIVE}
-          )
+            LIMIT 1
+          ) s ON true
+          WHERE t.archived_at IS NULL
+            AND (m.obj IS NOT NULL OR s.obj IS NOT NULL)
+        ) src
+        WHERE bz.id = src.id
+          AND src.new_bd IS DISTINCT FROM bz.score_breakdown
+      `),
+
+      // ── biker_biker_matches — multi-key CLEAR (drop stale 'musica'/'stile_guida') ─
+      // array_remove(...,NULL) yields the set of keys with no active affinity;
+      // `jsonb - text[]` drops them in one pass. IS DISTINCT FROM skips no-ops.
+      db.execute(sql`
+        UPDATE biker_biker_matches bb
+        SET score_breakdown = src.new_bd
+        FROM (
+          SELECT t.id,
+            t.score_breakdown - array_remove(ARRAY[
+              CASE WHEN t.score_breakdown ? 'musica'
+                AND NOT EXISTS (
+                  SELECT 1 FROM music_affinity_matches ma
+                  WHERE t.biker1_id = ma.user_a_id
+                    AND t.biker2_id = ma.user_b_id
+                    AND ma.archived_at IS NULL
+                    AND ma.status IN ${ACTIVE}
+                ) THEN 'musica' END,
+              CASE WHEN t.score_breakdown ? 'stile_guida'
+                AND NOT EXISTS (
+                  SELECT 1 FROM telemetry_affinity_matches ta
+                  WHERE t.biker1_id = LEAST(ta.user_a_id, ta.user_b_id)
+                    AND t.biker2_id = GREATEST(ta.user_a_id, ta.user_b_id)
+                    AND ta.archived_at IS NULL
+                    AND ta.status IN ${ACTIVE}
+                ) THEN 'stile_guida' END
+            ], NULL)::text[] AS new_bd
+          FROM biker_biker_matches t
+          WHERE t.archived_at IS NULL
+            AND (t.score_breakdown ? 'musica' OR t.score_breakdown ? 'stile_guida')
+        ) src
+        WHERE bb.id = src.id
+          AND src.new_bd IS DISTINCT FROM bb.score_breakdown
+      `),
+
+      // ── biker_zavorrina_matches — multi-key CLEAR ────────────────────────────
+      db.execute(sql`
+        UPDATE biker_zavorrina_matches bz
+        SET score_breakdown = src.new_bd
+        FROM (
+          SELECT t.id,
+            t.score_breakdown - array_remove(ARRAY[
+              CASE WHEN t.score_breakdown ? 'musica'
+                AND NOT EXISTS (
+                  SELECT 1 FROM music_affinity_matches ma
+                  WHERE LEAST(t.biker_id, t.zavorrina_id) = ma.user_a_id
+                    AND GREATEST(t.biker_id, t.zavorrina_id) = ma.user_b_id
+                    AND ma.archived_at IS NULL
+                    AND ma.status IN ${ACTIVE}
+                ) THEN 'musica' END,
+              CASE WHEN t.score_breakdown ? 'stile_guida'
+                AND NOT EXISTS (
+                  SELECT 1 FROM telemetry_affinity_matches ta
+                  WHERE LEAST(t.biker_id, t.zavorrina_id) = LEAST(ta.user_a_id, ta.user_b_id)
+                    AND GREATEST(t.biker_id, t.zavorrina_id) = GREATEST(ta.user_a_id, ta.user_b_id)
+                    AND ta.archived_at IS NULL
+                    AND ta.status IN ${ACTIVE}
+                ) THEN 'stile_guida' END
+            ], NULL)::text[] AS new_bd
+          FROM biker_zavorrina_matches t
+          WHERE t.archived_at IS NULL
+            AND (t.score_breakdown ? 'musica' OR t.score_breakdown ? 'stile_guida')
+        ) src
+        WHERE bz.id = src.id
+          AND src.new_bd IS DISTINCT FROM bz.score_breakdown
       `),
     ]);
 
@@ -174,14 +199,10 @@ export async function enrichBikerMatchBreakdowns(): Promise<EnrichBreakdownsResu
       r.rowCount ?? (r.rows as unknown[])?.length ?? 0;
 
     return {
-      bbMusicUpdated: row(bbMusic),
-      bbTelemetryUpdated: row(bbTelemetry),
-      bzMusicUpdated: row(bzMusic),
-      bzTelemetryUpdated: row(bzTelemetry),
-      bbMusicCleared: row(bbMusicClear),
-      bbTelemetryCleared: row(bbTelemetryClear),
-      bzMusicCleared: row(bzMusicClear),
-      bzTelemetryCleared: row(bzTelemetryClear),
+      bbUpdated: row(bbSet),
+      bzUpdated: row(bzSet),
+      bbCleared: row(bbClear),
+      bzCleared: row(bzClear),
     };
   } catch (err) {
     console.error("[EnrichBreakdowns] error:", err);

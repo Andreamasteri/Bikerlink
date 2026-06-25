@@ -79,7 +79,7 @@ const CREATE_UNIQUE_INDEX_RE =
 // NB: "create unique index" è già catturato sopra; il lookahead negativo \b(?!unique\b)
 // garantisce che solo gli indici plain siano inclusi qui (case-insensitive tramite flag /gi).
 const CREATE_INDEX_RE =
-  /create\s+index\s+(?:if\s+not\s+exists\s+)?("?[a-zA-Z0-9_]+"?)\s+on\s+("?[a-zA-Z0-9_.]+"?)/gi;
+  /create\s+index\s+(?:concurrently\s+)?(?:if\s+not\s+exists\s+)?("?[a-zA-Z0-9_]+"?)\s+on\s+("?[a-zA-Z0-9_.]+"?)/gi;
 
 /**
  * Ricostruisce dalle migration la mappa tabella → set di colonne, applicando in

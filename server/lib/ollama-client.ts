@@ -27,6 +27,7 @@ import { createOllama } from "ollama-ai-provider-v2";
 import { generateObject, generateText, type LanguageModel } from "ai";
 import type { z } from "zod";
 import { repairJson } from "./json-repair";
+import { isThinkCentreOffline } from "./thinkcentre-offline";
 
 const OLLAMA_URL = process.env.OLLAMA_URL?.replace(/\/$/, "");
 const OLLAMA_TOKEN = process.env.OLLAMA_TOKEN ?? "";
@@ -53,6 +54,10 @@ let _probeTs = 0;
  */
 export async function isOllamaReachable(): Promise<boolean> {
   if (!OLLAMA_URL) return false;
+
+  // ThinkCentre offline (spento O in manutenzione): salta subito Ollama senza
+  // probe di rete — il chiamante ricade istantaneamente sul provider cloud.
+  if (await isThinkCentreOffline()) return false;
 
   const now = Date.now();
   if (_probeResult !== null && now - _probeTs < PROBE_CACHE_TTL_MS) {
@@ -130,6 +135,13 @@ export async function callOllamaChat<T = string>(
   options: OllamaChatOptions = {},
 ): Promise<T> {
   const { system, temperature = 0.2, abortSignal, maxRetries = 2, jsonRetries = 1, onRepair } = options;
+
+  // ThinkCentre offline (spento O in manutenzione): non tentare nemmeno la
+  // chiamata — lancia subito così il chiamante scala al provider cloud senza
+  // attendere il timeout di rete del server locale.
+  if (await isThinkCentreOffline()) {
+    throw new Error("Ollama non disponibile: ThinkCentre offline (spento o in manutenzione).");
+  }
   const model = getOllamaModel();
 
   if (!schema) {

@@ -303,14 +303,12 @@ export function triggerMatchingRun(): { started: boolean; reason?: string } {
 
         try {
           const enrichResult = await withCycleTimeout("enrich_breakdowns", cycleTimeoutMs, () => enrichBikerMatchBreakdowns());
-          const enrichTotal = enrichResult.bbMusicUpdated + enrichResult.bbTelemetryUpdated
-            + enrichResult.bzMusicUpdated + enrichResult.bzTelemetryUpdated;
-          const enrichCleared = enrichResult.bbMusicCleared + enrichResult.bbTelemetryCleared
-            + enrichResult.bzMusicCleared + enrichResult.bzTelemetryCleared;
+          const enrichTotal = enrichResult.bbUpdated + enrichResult.bzUpdated;
+          const enrichCleared = enrichResult.bbCleared + enrichResult.bzCleared;
           if (enrichTotal > 0 || enrichCleared > 0) {
             schedulerLogger.info(enrichResult, "score_breakdown enriched with affinity scores");
             addMatchLog("INFO", "enrich_breakdowns",
-              `Breakdown — scritto bb musica:${enrichResult.bbMusicUpdated} stile:${enrichResult.bbTelemetryUpdated} bz musica:${enrichResult.bzMusicUpdated} stile:${enrichResult.bzTelemetryUpdated} | rimosso bb musica:${enrichResult.bbMusicCleared} stile:${enrichResult.bbTelemetryCleared} bz musica:${enrichResult.bzMusicCleared} stile:${enrichResult.bzTelemetryCleared}`);
+              `Breakdown — scritto bb:${enrichResult.bbUpdated} bz:${enrichResult.bzUpdated} | rimosso bb:${enrichResult.bbCleared} bz:${enrichResult.bzCleared}`);
           }
         } catch (err) {
           if (err instanceof CycleTimeoutError) {

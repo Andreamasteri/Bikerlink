@@ -409,6 +409,20 @@ export async function runCampaignsSelfCheck(opts: RunSelfCheckOpts): Promise<Cam
     if (modCampaignId) {
       await deleteProbeWithRetry(modCampaignId, "mod-probe");
     }
+
+    // CLEANUP GARANTITO (Task #4942): hard-delete a livello DB di TUTTE le
+    // campagne __selfcheck__* — gira sempre, anche se le DELETE HTTP per-id
+    // sopra sono fallite o gli ID non sono stati catturati. Gli artefatti del
+    // prober non devono mai sopravvivere né finire nel cestino (ghost): vanno
+    // rimossi davvero dal DB.
+    try {
+      const removed = await storage.deleteSelfcheckCampaigns();
+      if (removed > 0) {
+        console.log(`[campaigns-self-check] cleanup garantito: ${removed} campagne __selfcheck__ hard-deleted dal DB`);
+      }
+    } catch (sweepErr) {
+      console.warn("[campaigns-self-check] WARN: hard-delete __selfcheck__ fallito (non-fatal):", (sweepErr as Error)?.message);
+    }
   }
 
   const overall = deriveOverall(checks);

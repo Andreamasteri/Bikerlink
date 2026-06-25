@@ -1,5 +1,6 @@
 import { storage } from "../storage";
 import { withDbRetry } from "../db";
+import { withBgDbSlot } from "../lib/bg-db-limiter";
 import { dedupWarn } from "../lib/dedup-logger";
 import { bootJobQueue } from "../lib/boot-job-queue";
 import { runMusicEmbeddingsBackfill } from "./jobs/backfill-music-embeddings";
@@ -198,7 +199,7 @@ export function startMatchingEngine(): void {
 
   setTimeout(() => {
     addMatchLog("INFO", "profile_recompute", "Ricalcolo profili utente avviato (startup)");
-    withDbRetry(() => recomputeAllUserMatchProfiles())
+    withBgDbSlot(() => withDbRetry(() => recomputeAllUserMatchProfiles()))
       .then(() => addMatchLog("INFO", "profile_recompute", "Ricalcolo profili utente completato (startup)"))
       .catch((err: unknown) => {
         dedupWarn("matching/profile-recompute-startup", "errore ricalcolo profili utente (non-fatal)", err);
@@ -207,7 +208,7 @@ export function startMatchingEngine(): void {
   }, 5 * 60 * 1000);
   _engineTimers.push(setInterval(() => {
     addMatchLog("INFO", "profile_recompute", "Ricalcolo profili utente avviato (giornaliero)");
-    withDbRetry(() => recomputeAllUserMatchProfiles())
+    withBgDbSlot(() => withDbRetry(() => recomputeAllUserMatchProfiles()))
       .then(() => addMatchLog("INFO", "profile_recompute", "Ricalcolo profili utente completato (giornaliero)"))
       .catch((err: unknown) => {
         dedupWarn("matching/profile-recompute-daily", "errore ricalcolo profili utente (non-fatal)", err);
@@ -251,11 +252,11 @@ export function startMatchingEngine(): void {
       }
       addMatchLog("INFO", "telemetry_affinity", `TelemetryAffinity completato: ${profiles} profili aggregati, ${count} nuovi match`);
       const enrichResult = await withCycleTimeout("enrich_breakdowns", timeoutMs, () => enrichBikerMatchBreakdowns());
-      const enrichTotal = enrichResult.bbTelemetryUpdated + enrichResult.bzTelemetryUpdated;
-      const enrichCleared = enrichResult.bbTelemetryCleared + enrichResult.bzTelemetryCleared;
+      const enrichTotal = enrichResult.bbUpdated + enrichResult.bzUpdated;
+      const enrichCleared = enrichResult.bbCleared + enrichResult.bzCleared;
       if (enrichTotal > 0 || enrichCleared > 0) {
         addMatchLog("INFO", "enrich_breakdowns",
-          `Breakdown stile_guida post-telemetry — scritto bb:${enrichResult.bbTelemetryUpdated} bz:${enrichResult.bzTelemetryUpdated} | rimosso bb:${enrichResult.bbTelemetryCleared} bz:${enrichResult.bzTelemetryCleared}`);
+          `Breakdown post-telemetry — scritto bb:${enrichResult.bbUpdated} bz:${enrichResult.bzUpdated} | rimosso bb:${enrichResult.bbCleared} bz:${enrichResult.bzCleared}`);
       }
     } catch (err) {
       if (err instanceof CycleTimeoutError) {

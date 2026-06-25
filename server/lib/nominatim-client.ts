@@ -284,8 +284,8 @@ export async function geocode(query: string): Promise<GeocodeResult[]> {
   // ThinkCentre offline: se il geocoder è self-hosted, salta il tentativo locale
   // e vai direttamente a Photon senza attendere il timeout da 10 secondi.
   if (isSelfHosted) {
-    const { isThinkCentrePoweredOff } = await import("./thinkcentre-powered-off");
-    if (await isThinkCentrePoweredOff()) {
+    const { isThinkCentreOffline } = await import("./thinkcentre-offline");
+    if (await isThinkCentreOffline()) {
       console.log(`[Nominatim] geocode: ThinkCentre offline — fallback diretto a Photon per "${query}"`);
       try {
         const results = await geocodePhoton(query);
@@ -380,8 +380,8 @@ export async function reverseGeocode(lat: number, lon: number, zoom = 14): Promi
   let effectiveUrl = BASE_URL;
   let useAuthToken = isSelfHosted;
   if (isSelfHosted) {
-    const { isThinkCentrePoweredOff } = await import("./thinkcentre-powered-off");
-    if (await isThinkCentrePoweredOff()) {
+    const { isThinkCentreOffline } = await import("./thinkcentre-offline");
+    if (await isThinkCentreOffline()) {
       console.log(`[Nominatim] reverseGeocode: ThinkCentre offline — fallback a ${PUBLIC_URL}`);
       effectiveUrl = PUBLIC_URL;
       useAuthToken = false;

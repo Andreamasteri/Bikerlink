@@ -9,6 +9,7 @@ import { z } from "zod";
 import { limiters } from "../../lib/throttle";
 import { storage } from "../../storage";
 import { getOllamaModel, isOllamaConfigured } from "../../lib/ollama-client";
+import { isThinkCentreOffline } from "../../lib/thinkcentre-offline";
 import type { AiProviderHealth, AiProviderId } from "./types";
 import {
   isGroqTpdExceededSync,
@@ -373,7 +374,7 @@ export async function runWithFallback<T>(
   // Ollama-first: se configurato e non esplicitamente saltato, prova Ollama
   // prima della chain cloud. Ollama è self-hosted e a costo zero; se è offline
   // o risponde lentamente la chain cloud prosegue senza impatto su health/cooldown.
-  if (!opts.skipOllama) {
+  if (!opts.skipOllama && !(await isThinkCentreOffline())) {
     const om = tryBuildOllama();
     if (om) {
       try {
@@ -425,7 +426,7 @@ export async function runWithFallback<T>(
   // ma viene mantenuto per compatibilità con i caller che lo impostano esplicitamente
   // e non è stato ancora aggiornato. Se skipOllama è true, questo blocco non si esegue
   // (rispetta l'intento del caller di non usare Ollama).
-  if (opts.ollamaBackstop && !opts.skipOllama) {
+  if (opts.ollamaBackstop && !opts.skipOllama && !(await isThinkCentreOffline())) {
     const om = tryBuildOllama();
     if (om) {
       try {

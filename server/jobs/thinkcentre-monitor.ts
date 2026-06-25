@@ -31,8 +31,7 @@ import { db, withDbRetry } from "../db";
 import { appSettings, thinkcentreHealthEvents } from "@shared/db";
 import { eq } from "drizzle-orm";
 import { dedupWarn } from "../lib/dedup-logger";
-import { isThinkCentreInMaintenance } from "../lib/thinkcentre-maintenance";
-import { isThinkCentrePoweredOff } from "../lib/thinkcentre-powered-off";
+import { isThinkCentreOffline } from "../lib/thinkcentre-offline";
 import { isThinkCentreIgnoredForTests } from "../lib/thinkcentre-ignore-tests";
 import { sendSystemAlertPushToAdmins } from "../push-notifications";
 import {
@@ -191,12 +190,10 @@ export async function runThinkCentreProbe(): Promise<void> {
     console.log("[thinkcentre-monitor] ignore_for_tests attivo — probe e notifiche soppresse");
     return;
   }
-  if (await isThinkCentrePoweredOff()) {
-    console.log("[thinkcentre-monitor] ThinkCentre spento (override manuale) — probe e notifiche saltate");
-    return;
-  }
-  if (await isThinkCentreInMaintenance()) {
-    console.log("[thinkcentre-monitor] manutenzione programmata — probe saltate");
+  // Una sola lettura cache-throttlata (TTL 3min) copre powered_off OR maintenance:
+  // niente più read AppSetting a ogni ciclo (~65s) — vedi step 2b/4 del task.
+  if (await isThinkCentreOffline()) {
+    console.log("[thinkcentre-monitor] ThinkCentre offline (spento o manutenzione) — probe e notifiche saltate");
     return;
   }
 

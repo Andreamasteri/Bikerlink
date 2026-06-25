@@ -35,10 +35,15 @@ function tpdKey(day: string): string {
 let state: { day: string; tokens: number } = { day: "", tokens: 0 };
 let softCap = DEFAULT_SOFT_CAP;
 
-// Timestamp dell'ultimo caricamento dal DB (per TTL refresh ogni 60s).
+// Timestamp dell'ultimo caricamento dal DB.
+// Cache in-memory TTL 5 minuti: con Redis down non si interroga più
+// app_settings ad ogni ciclo (~130s) ma al massimo una volta ogni 5 minuti.
+// Lo state in-memory è la fonte di verità tra un refresh e l'altro: viene
+// aggiornato direttamente da recordGroqTokens/atomicIncrementTokens, quindi la
+// cache resta coerente senza dover essere invalidata sulle scritture.
 let lastDbLoad = 0;
 let refreshInFlight = false;
-const DB_REFRESH_INTERVAL_MS = 60_000;
+const DB_REFRESH_INTERVAL_MS = 5 * 60_000;
 
 // ─── Atomic SQL increment ─────────────────────────────────────────────────────
 // Un singolo upsert che fa tokens = existing + delta in una sola operazione DB.
@@ -61,7 +66,12 @@ async function atomicIncrementTokens(key: string, delta: number): Promise<number
 
 // ─── Boot init (chiamare in initProviderHealth dopo le migration) ─────────────
 
-export async function loadGroqTpdFromDb(): Promise<void> {
+export async function loadGroqTpdFromDb(opts?: { force?: boolean }): Promise<void> {
+  // Cache hit: se il valore è stato caricato dal DB da meno di 5 minuti, riusa
+  // lo state in-memory senza una nuova query (a meno di force esplicito).
+  if (!opts?.force && lastDbLoad > 0 && Date.now() - lastDbLoad < DB_REFRESH_INTERVAL_MS) {
+    return;
+  }
   const day = todayUtc();
   try {
     const [row, capRow] = await Promise.all([

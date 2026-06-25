@@ -355,6 +355,39 @@ router.delete("/bulk-delete", async (req: Request, res: Response) => {
   }
 });
 
+// Task #4942 — Pannello "Segnalate dal sistema": campagne nel cestino (ghost).
+// Restituisce SOLO le campagne con ghosted_at IS NOT NULL.
+router.get("/ghosted", async (_req: Request, res: Response) => {
+  try {
+    const campaigns = await storage.getGhostedCampaigns();
+    return res.json(campaigns);
+  } catch (error) {
+    console.error("Admin get ghosted advertisements error:", error);
+    return sendError(res, 500, "Errore interno del server");
+  }
+});
+
+// Task #4942 — Ripristino di una campagna ghostata: azzera ghosted_at. La
+// campagna torna normale ma senza immagine — l'admin dovrà ricaricarla.
+router.post("/:id/restore", async (req: Request, res: Response) => {
+  try {
+    const id = req.params.id as string;
+    if (!id) return sendError(res, 400, "ID non valido");
+    const campaign = await storage.restoreCampaign(id);
+    if (!campaign) return sendError(res, 404, "Campagna non trovata");
+    await safeModLog({
+      moderatorId: req.session.userId!,
+      action: "restore_advertisement",
+      targetType: "campaign",
+      targetId: id,
+    });
+    return sendSuccess(res, campaign, "Campagna ripristinata — ricarica l'immagine");
+  } catch (error) {
+    console.error("Admin restore advertisement error:", error);
+    return sendError(res, 500, "Errore interno del server");
+  }
+});
+
 router.post("/warmup", async (_req: Request, res: Response) => {
   try {
     warmupAdImageCache().catch((e) => console.warn("[ADS WARMUP] manual trigger error:", e));

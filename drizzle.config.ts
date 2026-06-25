@@ -38,6 +38,9 @@ export default defineConfig({
     // Tabelle con expression-index (LEAST/GREATEST, ::text cast, GIN trgm) che il
     // diff non sa confrontare e per cui genererebbe DROP+CREATE spurî.
     "!biker_biker_matches",
+    // biker_zavorrina_matches ha un indice funzionale LEAST/GREATEST (migration 0123,
+    // Task #4942) che Drizzle non sa confrontare → escluso dal diff publish.
+    "!biker_zavorrina_matches",
     "!match_negative_preferences",
     "!pending_auto_suggestions",
     "!ai_messages",
