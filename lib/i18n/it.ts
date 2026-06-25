@@ -965,6 +965,18 @@ const translations = {
   "routes.cannotUpdateVisibilityLater": "__TODO__:routes.cannotUpdateVisibilityLater",
   "top": "__TODO__:top",
   "bottom": "__TODO__:bottom",
+  "push.match.title": "Ehi, hai un match! 🔥",
+  "push.match.body": "Tocca per vedere chi è",
+  "push.zoneProposal.title": "C'è una proposta nella tua zona! 🏍️",
+  "push.zoneProposal.body": "Apri BikerLink per scoprirla",
+  "push.plannedRouteInvite.title": "Sei stato proposto per un giro! 🏍️",
+  "push.plannedRouteInvite.body": "Un percorso compatibile con il tuo stile ti aspetta — apri BikerLink",
+  "push.proposalMatch.title": "Hai un nuovo match proposta! 🔥",
+  "push.proposalMatch.body": "Una proposta compatibile è stata trovata per il tuo viaggio.",
+  "push.proposalZone.title": "Nuova proposta in zona! 🏍️",
+  "push.proposalZone.body": "Un biker ha creato una proposta di viaggio vicino a te.",
+  "push.drivingStyleChanged.title": "Il tuo stile di guida è cambiato! 🏍️",
+  "push.drivingStyleChanged.body": "Scopri come sei evoluto",
 };
 
 export default translations;
