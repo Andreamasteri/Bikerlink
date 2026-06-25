@@ -3,7 +3,6 @@ import { Tabs, useRouter, type Href } from "expo-router";
 import { useColors } from "@/hooks/useColors";
 import { Animated } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useAuth } from "@/lib/auth-context";
 import { useLocationGate } from "@/lib/location-context";
@@ -63,7 +62,6 @@ function useLayoutGating(
 
 export default function TabLayout() {
   const t = useT();
-  const insets = useSafeAreaInsets();
   const colors = useColors();
   const router = useRouter();
   const { user, isLoading } = useAuth();
@@ -177,8 +175,6 @@ export default function TabLayout() {
     queryKey: ["/api/users/me"],
     enabled: !!user,
   });
-  const tabBarPaddingBottom = insets.bottom;
-  const tabBarHeight = 60 + insets.bottom;
   const statusIsAvailable = profileData?.isAvailable || false;
 
   const renderCustomTabBar = useCallback((props: BottomTabBarProps) => {
@@ -243,12 +239,10 @@ export default function TabLayout() {
       <CustomTabBar
         tabs={tabs}
         style={taskbarStyle}
-        tabBarHeight={tabBarHeight}
-        tabBarPaddingBottom={tabBarPaddingBottom}
       />
     );
   }, [
-    showCalibrationBadge, taskbarStyle, tabBarHeight, tabBarPaddingBottom,
+    showCalibrationBadge, taskbarStyle,
     globalTrackingActive, globalSprintMeasuring, hasActiveMatches,
     statusIsAvailable, newMatchCount, unreadCount, isBikerOrCoppia,
   ]);
@@ -293,12 +287,14 @@ export default function TabLayout() {
   );
 
   // tabBarStyle / tabBarLabelStyle / tabBarActiveTintColor / tabBarInactiveTintColor
-  // NON vengono passati a screenOptions: con renderCustomTabBar sono ignorati da
-  // React Navigation e causerebbero una dipendenza da insets.bottom
-  // (tabBarHeight = 60 + insets.bottom) che produce il loop "Maximum update depth
-  // exceeded" — la Modal OnboardingTour anima la navigation bar su Android aggiornando
-  // insets frame-per-frame → tabsScreenOptions nuovo ref ogni frame → setOptions su 15
-  // Tabs.Screen → re-render → frame successivo → 50+ livelli → crash.
+  // NON vengono passati a screenOptions (ignorati con renderCustomTabBar custom).
+  //
+  // ANTI-LOOP: tabBarHeight/tabBarPaddingBottom (insets.bottom) sono stati spostati
+  // DENTRO CustomTabBar — così renderCustomTabBar non dipende più da insets e il suo
+  // useCallback ref è stabile. Senza questo fix, la Modal OnboardingTour su Android
+  // anima la navigation bar → insets cambiano → renderCustomTabBar nuovo ref → tabBar
+  // prop cambia su <Tabs> → React Navigation ri-renderizza il navigator → setOptions
+  // cascata su 15 Tabs.Screen → 50+ livelli → "Maximum update depth exceeded" crash.
   const tabsScreenOptions = useMemo(() => ({
     headerStyle: {
       backgroundColor: colors.surface,

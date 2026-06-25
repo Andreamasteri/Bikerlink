@@ -9,6 +9,7 @@ import {
   Modal,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
 import { type TaskbarStyle } from "@/lib/taskbar-style-context";
 
@@ -23,8 +24,6 @@ export interface TabItem {
 interface CustomTabBarProps {
   tabs: TabItem[];
   style: TaskbarStyle;
-  tabBarHeight: number;
-  tabBarPaddingBottom: number;
 }
 
 const COMMUNITY_TABS = new Set(["match", "motoclub", "contest", "music", "eventi", "arcade"]);
@@ -70,9 +69,10 @@ function ScrollTabIcon({
 export default function CustomTabBar({
   tabs,
   style,
-  tabBarHeight,
-  tabBarPaddingBottom,
 }: CustomTabBarProps) {
+  const insets = useSafeAreaInsets();
+  const tabBarPaddingBottom = insets.bottom;
+  const tabBarHeight = 60 + insets.bottom;
   const colors = useColors();
   const [communityOpen, setCommunityOpen] = useState(false);
   const scrollRef = useRef<ScrollView>(null);

@@ -77,7 +77,34 @@ const screenOpts = useMemo(() => ({
 
 **Fix**: rimuovere completamente `tabBarStyle`, `tabBarLabelStyle`, `tabBarActiveTintColor`, `tabBarInactiveTintColor` da `screenOptions` quando si usa un custom `tabBar`. Il custom tab bar gestisce visuale, altezza e colori autonomamente.
 
-**Questo era il crash dell'OnboardingTour.** Il crash sembrava causato dalla comparsa della Modal ma la causa era l'animazione dei safe area insets su Android durante il fade-in.
+**Questo era il crash dell'OnboardingTour — FIX PARZIALE OTA #182.** Rimossi `tabBar*` da `screenOptions`, ma il crash persisteva (OTA #183 chiude definitivamente).
+
+## Caso speciale: renderCustomTabBar deps con insets → tabBar prop cascade (OTA #183)
+
+**Pattern pericoloso**: `renderCustomTabBar` con `tabBarHeight`/`tabBarPaddingBottom` nelle deps di `useCallback`, dove questi valori derivano da `insets.bottom`.
+
+```tsx
+// SBAGLIATO — crea loop:
+const tabBarHeight = 60 + insets.bottom;          // dipende da insets
+const renderCustomTabBar = useCallback((...) => {
+  return <CustomTabBar tabBarHeight={tabBarHeight} ... />;
+}, [..., tabBarHeight]);                           // deps instabili
+
+<Tabs tabBar={renderCustomTabBar} />               // tabBar prop cambia ogni frame
+```
+
+**Loop mechanism** (post-OTA#182, con `tabsScreenOptions` già stabile):
+1. Modal → Android anima navigation bar → `insets.bottom` cambia (anche un solo frame)
+2. `tabBarHeight` aggiornato → `renderCustomTabBar` nuovo ref (useCallback)
+3. `tabBar={renderCustomTabBar}` → prop cambia → React Navigation ri-renderizza il tab navigator
+4. Il ri-render del navigator triggera `useLayoutEffect` sui child screens → `setOptions`
+5. → cascade → 50+ livelli → crash
+
+**Fix definitivo**: spostare `useSafeAreaInsets()` DENTRO `CustomTabBar`. Il componente calcola `tabBarHeight`/`tabBarPaddingBottom` autonomamente. `renderCustomTabBar` non dipende più da insets → ref stabile → nessun cascade.
+
+**Regola generale**: qualsiasi valore derivato da `useSafeAreaInsets()` NON deve finire nelle deps di `useCallback` che restituisce il `tabBar` prop di `<Tabs>`. Il custom tab bar deve leggere insets internamente.
+
+**Why**: anche con `screenOptions` stabile, cambiare la `tabBar` prop causa un ri-render del tab navigator; se questo ri-render scatena `setOptions` (per qualsiasi ragione interna a React Navigation), il loop è garantito.
 
 ## File fixati (audit completo)
 Layout file:
