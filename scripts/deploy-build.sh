@@ -199,6 +199,17 @@ else
   exit 1
 fi
 
+log "=== [1f/3] Verifica versioni stabili dipendenze critiche (non-bloccante) ==="
+# Avvisa se esistono versioni major/minor più recenti per le dipendenze critiche.
+# Non blocca il deploy: exit sempre 0.
+# Interroga il registry npm — se la rete è irraggiungibile, lo step viene saltato
+# silenziosamente senza impatto sul deploy.
+STABLE_VER_EXIT=0
+bash scripts/check-stable-versions.sh 2>&1 || STABLE_VER_EXIT=$?
+if [ "$STABLE_VER_EXIT" -ne 0 ]; then
+  log "  ⚠️  check-stable-versions.sh ha restituito exit ${STABLE_VER_EXIT} (inatteso — lo script dovrebbe sempre uscire 0)."
+fi
+
 log "=== [2/3] Build server TypeScript ==="
 node scripts/server-build.js
 log "  server_dist/ prodotto → $(size server_dist) ($(size server_dist/index.js 2>/dev/null) il bundle)"
