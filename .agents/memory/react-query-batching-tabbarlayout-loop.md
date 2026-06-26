@@ -1,9 +1,33 @@
 ---
 name: React Query batching + TabBar layout loop
-description: Root cause e fix definitivo del crash "Maximum update depth exceeded" quando una Modal appare mentre React Query refetch è attivo.
+description: Root cause e fix del crash "Maximum update depth exceeded" — include boot-guard TabNavigator remount (OTA-188) e Modal/React Query batching (OTA-186).
 ---
 
-## Regola
+## Fix Layer 0 — Boot-guard TabNavigator remount (OTA #188)
+
+**Root cause** (simbolicata da source map OTA-187): `useSyncState.js:80` (listeners.forEach)
++ `TabRouter.js:127` (getRehydratedState con stale state).
+
+Il branch `if (isLoading || !user) return <Tabs minimal>` nel TabLayout smontava e
+rimontava il `<Tabs>` navigator ad ogni boot guard transition. Al remount, `useScheduleUpdate`
+(chiamato nel render body, non in un effect) accodava 15 callback (uno per Tab.Screen) →
+`flushUpdates` → `batchUpdates` → `store.setState` senza equality check → `useSyncExternalStore`
+ri-renderizzava → altri 15 callback → 50 iterazioni → crash.
+
+**Fix:** rimosso il branch minimal Tabs. `isReady: !isLoading && !!user` aggiunto al
+`tabBarStateRef.current`; `renderCustomTabBar` ritorna `null` quando `!isReady` (via ref,
+deps=[]) → tab bar nascosta durante il boot ma il `<Tabs>` ha un solo lifecycle.
+
+**Why:** `useScheduleUpdate` è un hook interno di Expo Router che schedula callback nel
+render body — non è safe da chiamare su un navigator che si rimonta. La soluzione è
+non smontare mai il `<Tabs>` principale; nascondere la tab bar via ref è l'alternativa sicura.
+
+**How to apply:** non usare `if (condition) return <Tabs minimal>` nei layout — usare invece
+un flag nel ref che nasconde la UI senza smontare il navigator.
+
+---
+
+## Regola generale (layer 1+)
 
 `renderCustomTabBar` (o qualsiasi funzione passata come `tabBar` a `<Tabs>`) DEVE avere
 deps `[]` e leggere i valori runtime da un `ref` aggiornato ogni render — mai da una

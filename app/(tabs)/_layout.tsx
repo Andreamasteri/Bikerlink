@@ -42,8 +42,6 @@ const FAKE_HOME_INTRO_KEY = "fake_home_intro_seen_v1";
 // il rendering degli header senza mai chiamare setOptions — non c'è cascata possibile.
 const TABS_HEADER_TITLE_STYLE = { fontFamily: "Inter_600SemiBold" } as const;
 const TABS_SCREEN_OPTIONS = { headerTitleStyle: TABS_HEADER_TITLE_STYLE } as const;
-const MINIMAL_TABS_SCREEN_OPTIONS = { headerShown: false, tabBarStyle: { display: "none" } as never } as const;
-const HIDDEN_TAB_OPTIONS = { href: null } as const;
 
 interface LayoutGatingMeData {
   profile?: { fakeHomeLatitude?: number | null; fakeHomeLongitude?: number | null } | null;
@@ -215,6 +213,7 @@ export default function TabLayout() {
     newMatchCount,
     unreadCount,
     isBikerOrCoppia,
+    isReady: !isLoading && !!user,
   });
   tabBarStateRef.current = {
     showCalibrationBadge,
@@ -226,9 +225,15 @@ export default function TabLayout() {
     newMatchCount,
     unreadCount,
     isBikerOrCoppia,
+    isReady: !isLoading && !!user,
   };
 
   const renderCustomTabBar = useCallback((props: BottomTabBarProps) => {
+    // Nasconde il tab bar durante il boot (loading / non autenticato) senza
+    // rimontare il TabNavigator. Il ref viene aggiornato ad ogni render di
+    // TabLayout senza cambiare la function reference di renderCustomTabBar,
+    // prevenendo il loop useScheduleUpdate→flushUpdates→setState×50.
+    if (!tabBarStateRef.current.isReady) return null;
     const { state, descriptors, navigation } = props;
     const {
       showCalibrationBadge: _showCalibrationBadge,
@@ -347,38 +352,13 @@ export default function TabLayout() {
   // tabBarStyle / tabBarLabelStyle / tabBarActiveTintColor / tabBarInactiveTintColor
   // NON vengono passati a screenOptions (ignorati con renderCustomTabBar custom).
   //
-  // ANTI-LOOP: vedi commento module-level TABS_SCREEN_OPTIONS sopra.
-  // Tutti gli oggetti options sono ora costanti statiche a livello modulo:
-  // TABS_SCREEN_OPTIONS, MINIMAL_TABS_SCREEN_OPTIONS, HIDDEN_TAB_OPTIONS.
-
-  // Finché user=null (isLoading O non autenticato), rendiamo Tabs minimali:
-  // • nessun tabBarIcon (arrow function) → nessun loop setOptions di RN
-  // • nessun renderCustomTabBar → nessun hook pesante da montare
-  // • il redirect useEffect (righe sopra) gestisce la navigazione verso
-  //   /(auth)/login quando hasWaited=true && !user.
-  // SplashScreen è ancora visibile in questo window → nessun flash utente.
-  if (isLoading || !user) {
-    return (
-      <Tabs screenOptions={MINIMAL_TABS_SCREEN_OPTIONS}>
-        <Tabs.Screen name="index" />
-        <Tabs.Screen name="proposals" />
-        <Tabs.Screen name="ready" />
-        <Tabs.Screen name="motoclub" />
-        <Tabs.Screen name="eventi" />
-        <Tabs.Screen name="match" />
-        <Tabs.Screen name="music" />
-        <Tabs.Screen name="chat" />
-        <Tabs.Screen name="contest" />
-        <Tabs.Screen name="arcade" />
-        <Tabs.Screen name="ride" options={HIDDEN_TAB_OPTIONS} />
-        <Tabs.Screen name="giri" options={HIDDEN_TAB_OPTIONS} />
-        <Tabs.Screen name="tracking" options={HIDDEN_TAB_OPTIONS} />
-        <Tabs.Screen name="garage" />
-        <Tabs.Screen name="profile" />
-      </Tabs>
-    );
-  }
-
+  // ANTI-LOOP definitivo: un solo <Tabs> per tutto il lifecycle → TabNavigator
+  // non si rimonta mai. Prima c'erano due branch (minimal / full) che causavano
+  // il remount al boot. Al remount, useScheduleUpdate accodava 15 callbacks×render
+  // → flushUpdates → store.setState (senza equality check) → useSyncExternalStore
+  // re-render → altri 15 callbacks → 50 iterazioni → "Maximum update depth exceeded".
+  // Ora renderCustomTabBar ritorna null mentre !isReady (via ref, deps=[]) e il
+  // TabNavigator rimane stabile per tutta la sessione.
   return (
     <>
       {isGpsGateActive && (

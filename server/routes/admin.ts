@@ -227,15 +227,19 @@ router.post("/client-error", clientErrorLimiter, clientErrorJson, async (req: Re
     }
 
     // GDPR/CCPA compliance: do NOT log req.ip — client IP must not appear in error logs
+    const csText = (componentStack || "").substring(0, 3000);
     console.error("[CLIENT-ERROR]", JSON.stringify({
       message: message || "unknown",
       stack: resolvedStack.substring(0, 2000),
-      componentStack: (componentStack || "").substring(0, 3000),
       platform: platform || "unknown",
       appVersion: appVersion || "unknown",
       isFatal: !!isFatal,
       timestamp: new Date().toISOString()
     }));
+    // Log componentStack su riga separata per evitare troncamento nel tool di deployment logs
+    if (csText) {
+      console.error("[CLIENT-ERROR-CS]", csText);
+    }
     return res.json({ received: true });
   } catch {
     return res.status(200).json({ received: true });
