@@ -5,7 +5,7 @@ import { readFileSync, existsSync } from "node:fs";
 import { resolve } from "node:path";
 import { db, withDbRetry } from "../../db";
 import { otaReleases, otaBootEvents } from "@shared/db";
-import { eq, desc, isNull, and, sql, ne, inArray, type SQL } from "drizzle-orm";
+import { eq, desc, isNull, and, sql, ne, inArray, lt, type SQL } from "drizzle-orm";
 import { sendError } from "../../lib/api-response";
 
 const execFileAsync = promisify(execFile);
@@ -343,11 +343,11 @@ router.post("/:id/approve", async (req: Request, res: Response) => {
 
     console.log(`[ota][AUDIT] release ${id} (${release.easUpdateId}) APPROVED by user ${userId}`);
 
-    // Auto-reject tutte le altre pending sullo stesso canale (sono obsolete)
+    // Auto-reject solo le OTA pending pubblicate PRIMA di quella approvata (non le future)
     const otherPending = await db
       .select({ id: otaReleases.id, easUpdateId: otaReleases.easUpdateId })
       .from(otaReleases)
-      .where(and(eq(otaReleases.status, "pending"), eq(otaReleases.channel, release.channel), ne(otaReleases.id, id)));
+      .where(and(eq(otaReleases.status, "pending"), eq(otaReleases.channel, release.channel), ne(otaReleases.id, id), lt(otaReleases.publishedAt, release.publishedAt)));
     if (otherPending.length > 0) {
       await db
         .update(otaReleases)
