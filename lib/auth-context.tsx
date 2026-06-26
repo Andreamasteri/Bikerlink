@@ -20,6 +20,46 @@ import { PENDING_ONBOARDING_TAGS_KEY } from "@/constants/onboarding";
 type SafeUser = Omit<User, "password">;
 
 const HAD_SESSION_KEY = "@bikerlink/had_session";
+const CACHED_USER_KEY = "@bikerlink/cached_user";
+
+/**
+ * Snapshot dell'ultimo utente autenticato, persistito in AsyncStorage.
+ *
+ * Serve a IDRATARE la query ["/api/auth/me"] PRIMA che il sottoalbero /(tabs)
+ * venga montato, così l'app boota con un `user` reale invece di `undefined`.
+ * È proprio la transizione `undefined → defined` (il mount ottimistico delle
+ * tabs mentre il bootstrap auth è ancora in volo) la CAUSA STRUTTURALE del loop
+ * "Maximum update depth exceeded" al boot Android: quando /api/auth/me risolve,
+ * il value di AuthContext cambia e l'intero albero authed appena montato si
+ * ri-renderizza nel suo momento più fragile → cascata setOptions di React
+ * Navigation. Seminando la cache, quella transizione non avviene più.
+ *
+ * Lo snapshot è un SafeUser (mai password né token).
+ */
+function persistCachedUser(user: SafeUser | null | undefined): void {
+  if (user) {
+    AsyncStorage.setItem(CACHED_USER_KEY, JSON.stringify(user)).catch(() => {});
+  } else {
+    AsyncStorage.removeItem(CACHED_USER_KEY).catch(() => {});
+  }
+}
+
+function parseCachedUser(raw: string | null): SafeUser | null {
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw);
+    if (
+      parsed &&
+      typeof parsed === "object" &&
+      (parsed as { id?: unknown }).id != null
+    ) {
+      return parsed as SafeUser;
+    }
+  } catch {
+    // snapshot corrotto → ignora, si ricade sul normale bootstrap
+  }
+  return null;
+}
 
 /**
  * After successful login/register, drain any tag selections the user picked
@@ -67,6 +107,25 @@ async function drainPendingOnboardingTags(): Promise<void> {
 
 // Retry delays: 2s, 5s, 10s
 export const RETRY_DELAYS = [2000, 5000, 10000];
+
+/**
+ * Predicato puro: decide se lanciare la revalidation UNA-TANTUM della sessione
+ * idratata da cache. Estratto come funzione pura (come createAuthQueryFn /
+ * createAuthRetryConfig) per testarlo senza montare AuthProvider.
+ *
+ * Deve essere true SOLO quando: lo storage è stato letto (query già abilitata),
+ * c'era una sessione pregressa, non abbiamo ancora revalidato, e c'è un utente
+ * in cache (seed). In tutti gli altri casi la query normale (enabled, no data)
+ * fa già il fetch da sola → niente doppio fetch, niente loop.
+ */
+export function shouldRevalidateHydratedSession(args: {
+  storageChecked: boolean;
+  hadSession: boolean;
+  didRevalidate: boolean;
+  hasUser: boolean;
+}): boolean {
+  return args.storageChecked && args.hadSession && !args.didRevalidate && args.hasUser;
+}
 
 /**
  * Factory del predicato `retry` e del `retryDelay` usati da useQuery in
@@ -354,6 +413,7 @@ function useLogoutMutation() {
       await Promise.allSettled([
         clearSessionToken(),
         AsyncStorage.removeItem(HAD_SESSION_KEY),
+        AsyncStorage.removeItem(CACHED_USER_KEY),
       ]);
 
       // 3. On Android, flush the connect.sid cookie from the native cookie jar.
@@ -389,6 +449,7 @@ function useLogoutMutation() {
       Promise.allSettled([
         clearSessionToken(),
         AsyncStorage.removeItem(HAD_SESSION_KEY),
+        AsyncStorage.removeItem(CACHED_USER_KEY),
       ]).catch(() => {});
       queryClient.setQueryData(["/api/auth/me"], null);
     }
@@ -410,13 +471,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // cookie from the native cookie jar — the server responds with Max-Age=0 which
   // causes the OS to evict it. Web is intentionally skipped (cookies work normally).
   const [storageChecked, setStorageChecked] = useState(false);
+  const didRevalidateRef = useRef(false);
   useEffect(() => {
     Promise.all([
       AsyncStorage.getItem(HAD_SESSION_KEY).catch(() => null),
       initSessionToken().catch(() => null),
+      AsyncStorage.getItem(CACHED_USER_KEY).catch(() => null),
     ])
-      .then(([hadSession, token]) => {
+      .then(([hadSession, token, cachedRaw]) => {
         hadSessionRef.current = hadSession === "true";
+        // HYDRATION: se c'era una sessione, semina la cache con l'ultimo utente
+        // noto PRIMA di abilitare la query. Così /(tabs) monta con un `user`
+        // reale e sparisce la transizione undefined→defined (causa strutturale
+        // del loop di boot). Con dato seminato e staleTime:Infinity la query NON
+        // rifà fetch da sola → forziamo una sola revalidation in background.
+        const cached = hadSessionRef.current ? parseCachedUser(cachedRaw) : null;
+        if (cached) {
+          queryClient.setQueryData(["/api/auth/me"], cached);
+        }
         if (Platform.OS === "android" && token) {
           const baseUrl = getApiUrl();
           fetch(new URL("/api/auth/clear-session-cookie", baseUrl).toString(), {
@@ -425,6 +497,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           }).catch(() => {});
         }
         setStorageChecked(true);
+        // NB: la revalidation NON va lanciata qui. La query è ancora enabled:false
+        // (storageChecked si applica solo al render successivo) e refetchQueries
+        // NON rifà fetch su una query disabilitata → la sessione scaduta non
+        // verrebbe mai validata. La validazione è in un effect dedicato
+        // post-useQuery (vedi sotto), che usa userQuery.refetch() a query ABILITATA.
       })
       .catch(() => {
         hadSessionRef.current = false;
@@ -447,6 +524,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     retry: authRetryConfig.retry,
     retryDelay: authRetryConfig.retryDelay,
   });
+
+  // Persisti/azzera lo snapshot utente ad ogni cambio del dato auth. Centralizza
+  // la persistenza per TUTTE le sorgenti — queryFn success, login/register (via
+  // setQueryData), logout/401 (data → null) — così il prossimo cold boot può
+  // idratare /(tabs) con un utente reale. Vedi persistCachedUser per il razionale.
+  useEffect(() => {
+    if (userQuery.data) {
+      persistCachedUser(userQuery.data);
+    } else if (userQuery.data === null && storageChecked) {
+      persistCachedUser(null);
+    }
+  }, [userQuery.data, storageChecked]);
+
+  // Revalidation UNA-TANTUM della sessione idratata. Quando la cache è stata
+  // seminata (utente cached + sessione pregressa) la query parte già "fresh"
+  // (staleTime:Infinity) e NON rifà fetch da sola: forziamo qui un solo
+  // userQuery.refetch() — che bypassa `enabled` ed è eseguito a query ABILITATA
+  // (storageChecked=true) — per validare la sessione contro il server. Se è
+  // scaduta → 401 → queryFn ritorna null → sessionExpired → redirect a /welcome.
+  // Con `data` già presente non c'è spinner né flicker (isLoading resta false).
+  useEffect(() => {
+    if (
+      shouldRevalidateHydratedSession({
+        storageChecked,
+        hadSession: hadSessionRef.current,
+        didRevalidate: didRevalidateRef.current,
+        hasUser: !!userQuery.data,
+      })
+    ) {
+      didRevalidateRef.current = true;
+      userQuery.refetch().catch(() => {});
+    }
+  }, [storageChecked, userQuery.data, userQuery.refetch]);
 
   // Clear sessionExpired whenever the user becomes authenticated
   // (covers login via setQueryData, not just queryFn success).

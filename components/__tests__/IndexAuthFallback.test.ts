@@ -111,6 +111,19 @@ describe("app/index — fallback auth (no spinner infinito)", () => {
     expect(retryButton()).toHaveLength(0);
   });
 
+  it("con sessione pregressa ma SENZA utente (loading) NON fa il redirect ottimistico a /(tabs)", async () => {
+    // Regressione strutturale: il vecchio redirect ottimistico montava /(tabs)
+    // con user=undefined durante il bootstrap auth → loop "Maximum update depth
+    // exceeded". Ora si attende che l'auth si risolva o che la cache idrati la
+    // query (isAuthenticated=true); finché è solo loading → spinner, MAI tabs.
+    authState.isLoading = true;
+    authState.hadPreviousSession = true;
+    authState.isAuthenticated = false;
+    await mount();
+    expect(Redirect).not.toHaveBeenCalled();
+    expect(find("ActivityIndicator").length).toBeGreaterThan(0);
+  });
+
   it("se authFailed e nessun utente: rende il fallback con 'auth-retry-button' invece dello spinner", async () => {
     authState.isLoading = false;
     authState.authFailed = true;

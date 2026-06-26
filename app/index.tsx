@@ -9,7 +9,7 @@ import { useAuth } from "@/lib/auth-context";
 export default function Index() {
   const [checked, setChecked] = useState(false);
   const [onboardingDone, setOnboardingDone] = useState(false);
-  const { isLoading: authIsLoading, isAuthenticated, authFailed, retryAuth, hadPreviousSession } = useAuth();
+  const { isLoading: authIsLoading, isAuthenticated, authFailed, retryAuth } = useAuth();
 
   useEffect(() => {
     AsyncStorage.getItem(ONBOARDING_STORAGE_KEY)
@@ -32,15 +32,12 @@ export default function Index() {
     );
   }
 
-  // Redirect ottimistico: se il device aveva già una sessione attiva, vai
-  // subito alle tabs senza aspettare la verifica server (che può richiedere
-  // 13-50s con DB lento). L'auth si risolve in background; se la sessione è
-  // scaduta, il server risponde 401 → sessionExpired → redirect a /welcome.
-  if (authIsLoading && hadPreviousSession) {
-    return <Redirect href={"/(tabs)" as Href} />;
-  }
-
-  // Spinner solo per utenti nuovi (nessuna sessione salvata) — dura pochi secondi
+  // Spinner durante il bootstrap auth. NB: con una sessione pregressa la query
+  // ["/api/auth/me"] viene SEMINATA da AsyncStorage all'avvio (vedi auth-context,
+  // HYDRATION) → `isAuthenticated` è già true qui e si redirige subito alle tabs,
+  // senza passare da questo spinner E senza montare /(tabs) con user=undefined
+  // (la causa strutturale del loop "Maximum update depth exceeded" al boot).
+  // Lo spinner resta solo per chi NON ha una sessione in cache (utente nuovo).
   if (authIsLoading) {
     return (
       <View style={styles.loader}>
