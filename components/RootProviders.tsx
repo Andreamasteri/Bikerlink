@@ -1,9 +1,6 @@
 import React from "react";
-import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
-import { createAsyncStoragePersister } from "@tanstack/query-async-storage-persister";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { QueryClientProvider } from "@tanstack/react-query";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
-import { KeyboardProvider } from "react-native-keyboard-controller";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { ThemeProvider } from "@/lib/theme-context";
 import { LanguageProvider } from "@/lib/language-context";
@@ -15,16 +12,15 @@ import { TaskbarStyleProvider } from "@/lib/taskbar-style-context";
 import { UnitsProvider } from "@/lib/units-context";
 import { PlayerProvider } from "@/lib/player-context";
 import { FloatingWidgetProvider } from "@/lib/floating-widget-context";
-import { AutoTelemetryProvider } from "@/lib/auto-telemetry-context";
-import { UptimeWidgetProvider } from "@/lib/uptime-widget-context";
 import { queryClient } from "@/lib/query-client";
 import { useAuth } from "@/lib/auth-context";
 
-const _persister = createAsyncStoragePersister({
-  storage: AsyncStorage,
-  key: "@bikerlink/rq-cache-v1",
-  throttleTime: 3000,
-});
+// ── Provider chain OTA-155-safe ──────────────────────────────────────────────
+// Questa lista è IDENTICA alla catena di provider che esisteva in OTA 155.
+// I provider aggiunti successivamente (AutoTelemetry, UptimeWidget, Keyboard,
+// PersistQueryClient) sono intenzionalmente ESCLUSI: verranno reintrodotti uno
+// per uno DOPO che il BootGate avrà identificato la root cause del loop boot.
+// ─────────────────────────────────────────────────────────────────────────────
 
 function ChatSseGate({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
@@ -35,36 +31,11 @@ function ChatSseGate({ children }: { children: React.ReactNode }) {
   );
 }
 
-/**
- * Wrapper del PersistQueryClientProvider, estratto in un componente named così da
- * poter comparire come singolo "layer" in PROVIDER_LAYERS. Il contenuto (client,
- * persistOptions, dehydrate) è identico alla versione inline storica.
- */
-function QueryPersistLayer({ children }: { children: React.ReactNode }) {
+function QueryLayer({ children }: { children: React.ReactNode }) {
   return (
-    <PersistQueryClientProvider
-      client={queryClient}
-      persistOptions={{
-        persister: _persister,
-        maxAge: 24 * 60 * 60 * 1000,
-        buster: "v2",
-        dehydrateOptions: {
-          shouldDehydrateQuery: (query) => {
-            const key = query.queryKey[0];
-            if (typeof key !== "string") return false;
-            return (
-              key.startsWith("/api/settings/") ||
-              key.startsWith("/api/ads/") ||
-              key === "/api/settings/ads-enabled" ||
-              key === "/api/settings/home-message" ||
-              key === "/api/workshops"
-            );
-          },
-        },
-      }}
-    >
+    <QueryClientProvider client={queryClient}>
       {children}
-    </PersistQueryClientProvider>
+    </QueryClientProvider>
   );
 }
 
@@ -91,7 +62,7 @@ interface ProviderLayer {
 export const PROVIDER_LAYERS: ProviderLayer[] = [
   { id: "theme", Component: ThemeProvider },
   { id: "language", Component: LanguageProvider },
-  { id: "query", Component: QueryPersistLayer },
+  { id: "query", Component: QueryLayer },
   { id: "auth", Component: AuthProvider },
   { id: "chat_sse", Component: ChatSseGate },
   { id: "map_settings", Component: MapSettingsProvider },
@@ -100,10 +71,7 @@ export const PROVIDER_LAYERS: ProviderLayer[] = [
   { id: "location", Component: LocationProvider },
   { id: "player", Component: PlayerProvider },
   { id: "floating_widget", Component: FloatingWidgetProvider },
-  { id: "uptime_widget", Component: UptimeWidgetProvider },
   { id: "gesture_handler", Component: GestureLayer },
-  { id: "keyboard", Component: KeyboardProvider },
-  { id: "auto_telemetry", Component: AutoTelemetryProvider },
 ];
 
 /**
