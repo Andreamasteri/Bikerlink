@@ -32,6 +32,7 @@ export function useAutoTelemetry(): AutoTelemetryContextValue {
 
 function AutoTelemetryInner({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
+  const userId = user?.id ?? null;
   const [alwaysActive, setAlwaysActive]   = useState(getTelemetryAlwaysActive());
   const [isCalibrated, setIsCalibrated]   = useState(false);
   const [relaxedMode, setRelaxedMode]     = useState(false);
@@ -45,7 +46,7 @@ function AutoTelemetryInner({ children }: { children: React.ReactNode }) {
       .then((c) => setIsCalibrated(!!c))
       .catch(() => {});
     loadRelaxedMountMode().then(setRelaxedMode).catch(() => {});
-  }, [user]);
+  }, [userId]);
 
   // ── Poll prefs every 4s so toggle changes in TelemetryPanel propagate ────
   useEffect(() => {
@@ -58,7 +59,7 @@ function AutoTelemetryInner({ children }: { children: React.ReactNode }) {
       loadRelaxedMountMode().then(setRelaxedMode).catch(() => {});
     }, 4000);
     return () => clearInterval(id);
-  }, [user]);
+  }, [userId]);
 
   // ── React immediately when manual tracking starts/stops ──────────────────
   useEffect(() => {

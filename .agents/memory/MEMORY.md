@@ -1,4 +1,5 @@
 - [React Query batching + TabBar layout loop](react-query-batching-tabbarlayout-loop.md) — renderCustomTabBar deps:[]+tabBarStateRef è il fix layer 1; nested objects (headerStyle,headerTitleStyle,contentStyle) in screenOptions useMemo = layer 2; InteractionManager.runAfterInteractions sul Tour setVisible = layer 3 (de-batching).
+- [auth-context React Query deps](auth-context-react-query-deps.md) — nel value memo di un Context dipendi dalle slice primitive (userQuery.data/.refetch, mutation.isPending), MAI dagli oggetti React Query interi (loop) né rimuoverli del tutto (isPending stantio).
 
 - [vitest lazy-require mock bypass](vitest-cjs-require-mock.md) — lazy `require()` dentro moduli ESM bypassa `vi.mock`; fix: import ESM statico al top del file.
 - [OTA high-water mark floor](ota-hwm-floor.md) — logs/ota-hwm.txt è il terzo floor anti-regressione (dopo EAS+buildInfo); aggiornato atomicamente post-publish; tracked in git (!logs/ota-hwm.txt eccezione in .gitignore).

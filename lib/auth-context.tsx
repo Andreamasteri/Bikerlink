@@ -662,7 +662,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const authFailed = storageChecked && userQuery.isError && !userQuery.data;
   const retryAuth = useCallback(() => {
     userQuery.refetch();
-  }, [userQuery]);
+  }, [userQuery.refetch]);
 
   const loginMutation = useLoginMutation();
   const registerMutation = useRegisterMutation();
@@ -682,7 +682,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       registerMutation,
       logoutMutation
     }),
-    [userQuery.data, userQuery.isLoading, storageChecked, sessionExpired, isReconnecting, authFailed, retryAuth, loginMutation, registerMutation, logoutMutation]
+    // Le mutation di React Query restituiscono un nuovo oggetto a ogni render: includerle
+    // intere qui invaliderebbe il memo a ogni render (causa del loop). Dipendiamo solo dalle
+    // slice primitive `isPending` così i consumer vedono lo stato aggiornato senza ricreare il value.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [userQuery.data, userQuery.isLoading, storageChecked, sessionExpired, isReconnecting, authFailed, retryAuth, loginMutation.isPending, registerMutation.isPending, logoutMutation.isPending]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
