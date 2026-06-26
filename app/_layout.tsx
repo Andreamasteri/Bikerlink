@@ -297,8 +297,9 @@ function NormalRootLayout() {
           </View>
           <MatchPopupAlert />
           <UpdateNudgeWrapper />
-          <AssistantOnboardingTour />
-          <FloatingWidget />
+          {/* Bowie disabilitato temporaneamente — OTA 201 */}
+          {/* <AssistantOnboardingTour /> */}
+          {/* <FloatingWidget /> */}
           <AdminUptimeOverlay />
         </MapReadyGate>
       </StartupGate>
