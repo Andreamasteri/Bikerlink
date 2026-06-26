@@ -1,7 +1,24 @@
-import React from "react";
-import { View } from "react-native";
+import { View, StyleSheet } from "react-native";
 import { Stack } from "expo-router";
-import { useColors } from "@/hooks/useColors";
+import Colors from "@/constants/colors";
+
+// ANTI-LOOP: costante statica — non dipende da useColors()/tema dinamico.
+// useMemo con deps colors.* creava un nuovo oggetto ad ogni tema-load dal server
+// → screenOptions prop cambiava → React Navigation setOptions cascade su tutti
+// gli Stack.Screen → "Maximum update depth exceeded". Stesso bug fixato per i
+// tab in OTA #187. I colori header vengono gestiti a livello navigation theme
+// da NavThemeProviderBridge senza mai chiamare setOptions.
+const ADMIN_SCREEN_OPTIONS = {
+  headerShown: true,
+  headerStyle: { backgroundColor: Colors.surface },
+  headerTintColor: Colors.accent,
+  headerTitleStyle: { color: Colors.text, fontFamily: "Inter_600SemiBold" },
+  contentStyle: { backgroundColor: Colors.background },
+} as const;
+
+const ADMIN_CONTAINER_STYLE = StyleSheet.create({
+  root: { flex: 1, backgroundColor: Colors.background },
+}).root;
 
 const ADMIN_OPTS: Record<string, { title: string } | { headerShown: false }> = {
   "index": { title: "Pannello Admin" },
@@ -85,17 +102,9 @@ const ADMIN_OPTS: Record<string, { title: string } | { headerShown: false }> = {
 } as const;
 
 export default function AdminLayout() {
-  const colors = useColors();
-  const adminScreenOptions = React.useMemo(() => ({
-    headerShown: true,
-    headerStyle: { backgroundColor: colors.surface },
-    headerTintColor: colors.accent,
-    headerTitleStyle: { color: colors.text, fontFamily: "Inter_600SemiBold" },
-    contentStyle: { backgroundColor: colors.background },
-  }), [colors.surface, colors.accent, colors.text, colors.background]);
   return (
-    <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <Stack screenOptions={adminScreenOptions}>
+    <View style={ADMIN_CONTAINER_STYLE}>
+      <Stack screenOptions={ADMIN_SCREEN_OPTIONS}>
         <Stack.Screen name="index" options={ADMIN_OPTS["index"]} />
         <Stack.Screen name="users" options={ADMIN_OPTS["users"]} />
         <Stack.Screen name="workshops" options={ADMIN_OPTS["workshops"]} />

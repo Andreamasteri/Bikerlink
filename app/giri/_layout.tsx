@@ -1,14 +1,12 @@
-import React, { useMemo } from "react";
 import { Stack } from "expo-router";
-import { useColors } from "@/hooks/useColors";
+import Colors from "@/constants/colors";
+
+// ANTI-LOOP: costante statica — stessa fix AdminLayout/tab (#187).
+const GIRI_SCREEN_OPTIONS = {
+  headerShown: false,
+  contentStyle: { backgroundColor: Colors.background },
+} as const;
 
 export default function GiriLayout() {
-  const colors = useColors();
-  const giriScreenOptions = useMemo(
-    () => ({ headerShown: false, contentStyle: { backgroundColor: colors.background } }),
-    [colors.background]
-  );
-  return (
-    <Stack screenOptions={giriScreenOptions} />
-  );
+  return <Stack screenOptions={GIRI_SCREEN_OPTIONS} />;
 }
