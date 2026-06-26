@@ -34,6 +34,7 @@ export default function AssistantOnboardingTour() {
   const [visible, setVisible] = useState(false);
   const [step, setStep] = useState(0);
   const fadeAnim = useRef(new Animated.Value(0)).current;
+  const showTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (!onboardingEnabled) return;
@@ -46,14 +47,28 @@ export default function AssistantOnboardingTour() {
       await markOnboardingShown();
       if (cancelled) return;
       InteractionManager.runAfterInteractions(() => {
-        if (!cancelled) {
+        if (cancelled) return;
+        // OTA 192: con la sessione idratata da cache (lib/auth-context) i tab
+        // montano istantaneamente al cold boot e runAfterInteractions può
+        // risolvere MENTRE React Navigation sta ancora facendo il settling
+        // della transizione iniziale — finestra in cui i touch vengono
+        // consumati dalla navigazione e i bottoni del tour risultano "sordi".
+        // Un breve delay copre quella fase senza essere percepibile.
+        showTimerRef.current = setTimeout(() => {
+          if (cancelled) return;
           setVisible(true);
           Animated.timing(fadeAnim, { toValue: 1, duration: 200, useNativeDriver: true }).start();
           void logAssistantClientEvent("onboarding_started");
-        }
+        }, 600);
       });
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+      if (showTimerRef.current) {
+        clearTimeout(showTimerRef.current);
+        showTimerRef.current = null;
+      }
+    };
   }, [onboardingEnabled, fadeAnim]);
 
   if (!visible) return null;
@@ -70,8 +85,18 @@ export default function AssistantOnboardingTour() {
 
   return (
     <Animated.View
-      style={[StyleSheet.absoluteFill, styles.overlay, { opacity: fadeAnim, paddingTop: insets.top + 24, paddingBottom: insets.bottom + 24 }]}
+      pointerEvents="box-none"
+      style={[StyleSheet.absoluteFill, styles.overlay, { opacity: fadeAnim }]}
     >
+      {/* Backdrop che CONSUMA i tap fuori dalla card: l'Animated.View esterno è
+          box-none per delegare i tocchi alla card su Android (così i bottoni
+          tornano tappabili), ma box-none lascerebbe passare i tap sullo sfondo
+          dim alle tab dietro. Questo strato ripristina il blocco modale. */}
+      <Pressable style={StyleSheet.absoluteFill} onPress={() => {}} />
+      <View
+        pointerEvents="box-none"
+        style={[styles.center, { paddingTop: insets.top + 24, paddingBottom: insets.bottom + 24 }]}
+      >
       <View style={[styles.card, { backgroundColor: colors.surface }]} testID="assistant-onboarding-card">
         <View style={styles.headRow}>
           <Ionicons name="sparkles" size={22} color={colors.primary} />
@@ -105,12 +130,18 @@ export default function AssistantOnboardingTour() {
           </Pressable>
         </View>
       </View>
+      </View>
     </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
-  overlay: { backgroundColor: "rgba(0,0,0,0.6)", padding: 24, justifyContent: "center", zIndex: 9999 },
+  // elevation > di tutti i fratelli a schermo (FloatingWidget=12, UptimeWidget=20):
+  // su Android l'elevation governa anche l'hit-testing tra viste sovrapposte, non
+  // solo l'ombra. Senza, i bottoni del tour perdono il tocco a favore dei widget
+  // flottanti elevati. zIndex da solo non basta su Android.
+  overlay: { backgroundColor: "rgba(0,0,0,0.6)", zIndex: 9999, elevation: 24 },
+  center: { flex: 1, padding: 24, justifyContent: "center" },
   card: { borderRadius: 16, padding: 20, gap: 12 },
   headRow: { flexDirection: "row", alignItems: "center", gap: 8 },
   stepBadge: { flex: 1, fontSize: 12 },
