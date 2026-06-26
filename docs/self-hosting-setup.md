@@ -29,7 +29,7 @@
 **Motivazione:**
 - LTS con supporto sicurezza garantito 5 anni (fino al 2029)
 - Supporto nativo ARM64 (compatibile Oracle Ampere)
-- Repository aggiornati: Java 17+, Docker, Nginx, Certbot tutti disponibili via apt
+- Repository aggiornati: Java 25 LTS, Docker, Nginx, Certbot tutti disponibili via apt
 - Ampia documentazione e community — il 90% degli errori si risolve con una ricerca
 
 ### Opzione A — Sviluppo/Test: Oracle Cloud Free Tier (costo zero)
@@ -99,11 +99,11 @@ rsync --archive --chown=bikerlink:bikerlink ~/.ssh /home/bikerlink
 
 ```bash
 # Installa tutti i pacchetti necessari in un colpo solo
-# Packages: Java 17 (GraphHopper), osmium-tool (merge OSM), screen/tmux (sessioni persistenti),
+# Packages: Java 25 LTS (GraphHopper/planetiler), osmium-tool (merge OSM), screen/tmux (sessioni persistenti),
 #           fail2ban (protezione SSH), ufw (firewall), nginx (proxy), certbot (HTTPS),
 #           postgresql-client (backup pg_dump), rclone (upload object storage)
 sudo apt install -y \
-  openjdk-17-jdk \
+  openjdk-25-jdk \
   python3 \
   python3-pip \
   osmium-tool \
@@ -127,10 +127,13 @@ sudo apt install -y \
 
 ```bash
 java -version
-# Output atteso: openjdk version "17.x.x" 2023-...
+# Output atteso: openjdk version "25.x.x" 2025-...
 
-# Se serve Java 21 (opzionale, per GraphHopper 10+)
-# sudo apt install openjdk-21-jdk
+# Java 25 è LTS (rilasciato set 2025) ed è il default di sistema.
+# Se openjdk-25-jdk non fosse nei repo della tua release Ubuntu, usa il
+# repository APT Adoptium/Temurin (temurin-25-jdk) o il tarball Temurin 25.
+# Imposta 25 come default:
+# sudo update-alternatives --config java   # seleziona java-25-openjdk-amd64
 ```
 
 ### 2.4 Configurazione Firewall (ufw)
