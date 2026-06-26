@@ -17,7 +17,7 @@ import { useLocationGate } from "@/lib/location-context";
 import { useLanguage } from "@/lib/language-context";
 import { useTheme } from "@/lib/theme-context";
 import UptimeWidget from "@/components/UptimeWidget";
-import FloatingWidget from "@/components/FloatingWidget";
+// import FloatingWidget from "@/components/FloatingWidget"; // disabilitato OTA 201
 import { sendStartupBeacon } from "@/lib/startup-beacon";
 import { MapReadyGate } from "@/components/layout/MapReadyGate";
 import { useMapConfig } from "@/lib/map-context";
@@ -36,8 +36,8 @@ import { BackgroundNotificationHandler } from "@/components/layout/BackgroundNot
 import { PushTokenRegistrar } from "@/components/layout/PushTokenRegistrar";
 import { DataRefreshIndicator } from "@/components/layout/DataRefreshIndicator";
 import { OfflineBanner } from "@/components/layout/OfflineBanner";
-// Task #2698 — AI Assistant utente.
-import AssistantOnboardingTour from "@/components/user/ai-assistant/AssistantOnboardingTour";
+// Task #2698 — AI Assistant utente. (import disabilitato OTA 201)
+// import AssistantOnboardingTour from "@/components/user/ai-assistant/AssistantOnboardingTour";
 import { useOtaStagingBanner } from "@/hooks/useOtaStagingBanner";
 import { useDeviceMetrics } from "@/hooks/useDeviceMetrics";
 import { useJsThreadWatchdog } from "@/hooks/useJsThreadWatchdog";
