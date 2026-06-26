@@ -8,6 +8,12 @@ can report `unused-imports/no-unused-imports` errors for type imports that ARE
 actually used as method return types in the file (e.g. BikerZavorrinaMatch,
 BikerBikerMatch, EmailVerificationToken in storage/index.ts — used 4–12x each).
 
+It ALSO misfires `react-hooks/exhaustive-deps` warnings on hooks that the
+full-project lint passes cleanly (seen splitting lib/auth-context.tsx — single
+file flagged 2 useEffect/useCallback deps that the project lint did not). Same
+root cause: the isolated invocation doesn't load the project flat config / type
+info correctly, so don't trust single-file lint output for any rule.
+
 **Why:** the rule needs full TypeScript project type info to see type-only usages
 in interface/method signatures; a single-file invocation lacks it and misfires.
 
