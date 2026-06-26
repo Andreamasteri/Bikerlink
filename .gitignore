@@ -51,6 +51,7 @@ website/.next/
 logs/*.log
 logs/*.txt
 logs/*.json
+logs/*.jsonl
 !logs/apk-build-history.log
 !logs/ota-timing.log
 !logs/ota-hwm.txt
