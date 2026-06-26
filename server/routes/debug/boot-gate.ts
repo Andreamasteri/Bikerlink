@@ -114,6 +114,24 @@ router.post("/ping", (req: Request, res: Response) => {
     lastDeviceId = deviceId;
     pruneOldestDeviceIfNeeded();
 
+    // Fire-and-forget: persistiamo l'ultimo ping su app_settings così l'agente
+    // può leggerlo in tempo reale senza polling dell'in-memory store.
+    const snapshot = JSON.stringify({
+      deviceId,
+      platform,
+      appVersion,
+      step,
+      status,
+      note,
+      ts,
+      totalSteps: state.entries.length,
+      entries: state.entries.slice(-30),
+    });
+    db.insert(appSettings)
+      .values({ key: "boot_gate_latest_ping", value: snapshot })
+      .onConflictDoUpdate({ target: appSettings.key, set: { value: snapshot } })
+      .catch(() => {/* volatile, ignoriamo errori DB */});
+
     return res.json({ ok: true });
   } catch (err) {
     console.error("[boot-gate/ping] error:", err);
