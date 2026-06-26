@@ -1,6 +1,5 @@
 import React, { useRef, useEffect, useState, useCallback, useMemo } from "react";
 import { Tabs, useRouter, type Href } from "expo-router";
-import { useColors } from "@/hooks/useColors";
 import { Animated } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
@@ -29,11 +28,22 @@ import {
 
 const FAKE_HOME_INTRO_KEY = "fake_home_intro_seen_v1";
 
-// ANTI-LOOP: headerTitleStyle è un valore costante — estratto a module-level così
-// l'oggetto non viene mai ricreato. Se fosse inline nel useMemo di tabsScreenOptions,
-// ogni re-run del useMemo (cambio tema) produrrebbe un nuovo ref → React Navigation
-// shallow-compare fallisce sul nested object → setOptions cascade.
+// ANTI-LOOP (root cause fix OTA #187):
+// tabsScreenOptions era un useMemo([colors.surface, colors.text]). Quando il tema
+// BikerLink caricava dal server al boot (300-700ms, rete), colors cambiava → nuovo
+// ref di tabsScreenOptions → React Navigation eseguiva forEach su tutti i 15 Tab.Screen
+// producendo nuovi merged-options object ad ogni iterazione → setOptions → navigation
+// state cambia → useLayoutEffect([navigation]) si ri-attiva → altro forEach → loop
+// infinito → "Maximum update depth exceeded".
+//
+// FIX: tabsScreenOptions diventa costante statica (zero dipendenze dal tema).
+// I colori degli header (surface, text) vengono ora gestiti dal NavThemeProviderBridge
+// in app/_layout.tsx tramite il ThemeProvider di @react-navigation/native, che aggiorna
+// il rendering degli header senza mai chiamare setOptions — non c'è cascata possibile.
 const TABS_HEADER_TITLE_STYLE = { fontFamily: "Inter_600SemiBold" } as const;
+const TABS_SCREEN_OPTIONS = { headerTitleStyle: TABS_HEADER_TITLE_STYLE } as const;
+const MINIMAL_TABS_SCREEN_OPTIONS = { headerShown: false, tabBarStyle: { display: "none" } as never } as const;
+const HIDDEN_TAB_OPTIONS = { href: null } as const;
 
 interface LayoutGatingMeData {
   profile?: { fakeHomeLatitude?: number | null; fakeHomeLongitude?: number | null } | null;
@@ -68,7 +78,6 @@ function useLayoutGating(
 
 export default function TabLayout() {
   const t = useT();
-  const colors = useColors();
   const router = useRouter();
   const { user, isLoading } = useAuth();
 
@@ -338,39 +347,9 @@ export default function TabLayout() {
   // tabBarStyle / tabBarLabelStyle / tabBarActiveTintColor / tabBarInactiveTintColor
   // NON vengono passati a screenOptions (ignorati con renderCustomTabBar custom).
   //
-  // ANTI-LOOP: tabBarHeight/tabBarPaddingBottom (insets.bottom) sono stati spostati
-  // DENTRO CustomTabBar — così renderCustomTabBar non dipende più da insets e il suo
-  // useCallback ref è stabile. Senza questo fix, la Modal OnboardingTour su Android
-  // anima la navigation bar → insets cambiano → renderCustomTabBar nuovo ref → tabBar
-  // prop cambia su <Tabs> → React Navigation ri-renderizza il navigator → setOptions
-  // cascata su 15 Tabs.Screen → 50+ livelli → "Maximum update depth exceeded" crash.
-  //
-  // ANTI-LOOP 2: i nested objects (headerStyle, headerTitleStyle) dentro tabsScreenOptions
-  // devono avere reference stabile. headerTitleStyle è costante → estratto a module-level.
-  // headerStyle dipende solo da colors.surface → useMemo separato per isolarne il ref.
-  // Quando tabsScreenOptions cambia (tema non-default al boot), React Navigation fa la
-  // shallow comparison sulle opzioni di ogni Tabs.Screen: se headerStyle/headerTitleStyle
-  // sono nuovi oggetti anche se uguali in valore → isEqual() fallisce → cascade identico.
-  const tabHeaderStyle = useMemo(
-    () => ({ backgroundColor: colors.surface }),
-    [colors.surface]
-  );
-  const tabsScreenOptions = useMemo(() => ({
-    headerStyle: tabHeaderStyle,
-    headerTintColor: colors.text,
-    headerTitleStyle: TABS_HEADER_TITLE_STYLE,
-  }), [tabHeaderStyle, colors.text]);
-
-  // ── Boot guard ──────────────────────────────────────────────────────────────
-  // Options memoizzate (riferimenti stabili) per le Tabs minimali.
-  // Se passassimo inline objects, React Navigation chiamerebbe setOptions ad
-  // ogni render perché la reference cambia → loop identico a quello che
-  // vogliamo evitare.
-  const minimalTabsScreenOptions = useMemo(
-    () => ({ headerShown: false, tabBarStyle: { display: "none" } as never }),
-    []
-  );
-  const hiddenTabOptions = useMemo(() => ({ href: null }), []);
+  // ANTI-LOOP: vedi commento module-level TABS_SCREEN_OPTIONS sopra.
+  // Tutti gli oggetti options sono ora costanti statiche a livello modulo:
+  // TABS_SCREEN_OPTIONS, MINIMAL_TABS_SCREEN_OPTIONS, HIDDEN_TAB_OPTIONS.
 
   // Finché user=null (isLoading O non autenticato), rendiamo Tabs minimali:
   // • nessun tabBarIcon (arrow function) → nessun loop setOptions di RN
@@ -380,7 +359,7 @@ export default function TabLayout() {
   // SplashScreen è ancora visibile in questo window → nessun flash utente.
   if (isLoading || !user) {
     return (
-      <Tabs screenOptions={minimalTabsScreenOptions}>
+      <Tabs screenOptions={MINIMAL_TABS_SCREEN_OPTIONS}>
         <Tabs.Screen name="index" />
         <Tabs.Screen name="proposals" />
         <Tabs.Screen name="ready" />
@@ -391,9 +370,9 @@ export default function TabLayout() {
         <Tabs.Screen name="chat" />
         <Tabs.Screen name="contest" />
         <Tabs.Screen name="arcade" />
-        <Tabs.Screen name="ride" options={hiddenTabOptions} />
-        <Tabs.Screen name="giri" options={hiddenTabOptions} />
-        <Tabs.Screen name="tracking" options={hiddenTabOptions} />
+        <Tabs.Screen name="ride" options={HIDDEN_TAB_OPTIONS} />
+        <Tabs.Screen name="giri" options={HIDDEN_TAB_OPTIONS} />
+        <Tabs.Screen name="tracking" options={HIDDEN_TAB_OPTIONS} />
         <Tabs.Screen name="garage" />
         <Tabs.Screen name="profile" />
       </Tabs>
@@ -407,7 +386,7 @@ export default function TabLayout() {
       )}
       <Tabs
         tabBar={renderCustomTabBar}
-        screenOptions={tabsScreenOptions}
+        screenOptions={TABS_SCREEN_OPTIONS}
       >
         {tabScreens}
       </Tabs>

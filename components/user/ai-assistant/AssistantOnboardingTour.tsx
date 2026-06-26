@@ -41,6 +41,10 @@ export default function AssistantOnboardingTour() {
     void (async () => {
       const shown = await wasOnboardingShown();
       if (cancelled || shown) return;
+      // Marca PRIMA di mostrare: se l'app crasha mentre il tour è visibile,
+      // al prossimo boot il flag è già settato e il tour non ricompare (no vicious cycle).
+      await markOnboardingShown();
+      if (cancelled) return;
       InteractionManager.runAfterInteractions(() => {
         if (!cancelled) {
           setVisible(true);
@@ -58,7 +62,6 @@ export default function AssistantOnboardingTour() {
     Animated.timing(fadeAnim, { toValue: 0, duration: 150, useNativeDriver: true }).start(() => {
       setVisible(false);
     });
-    await markOnboardingShown();
     await logAssistantClientEvent("onboarding_completed", { stepReached: step });
   };
 

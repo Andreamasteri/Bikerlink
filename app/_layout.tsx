@@ -142,34 +142,20 @@ function UpdateNudgeWrapper() {
 const ROOT_HIDDEN_HEADER = { headerShown: false } as const;
 const ROOT_ONBOARDING_SCREEN_OPTIONS = { headerShown: false, gestureEnabled: false, animation: "fade" as const } as const;
 
+// ANTI-LOOP (root cause fix OTA #187): stackScreenOptions e le opzioni degli header
+// erano useMemo dipendenti da colors.surface/colors.text. Quando il tema cambiava al
+// boot → nuovi ref → React Navigation forEach su tutti gli Stack.Screen → setOptions
+// con nuovi merged-objects → navigation state cambia → useLayoutEffect([navigation])
+// ri-attiva → altro forEach → loop "Maximum update depth exceeded".
+// FIX: costanti statiche. Colori header gestiti da NavThemeProviderBridge (ThemeProvider
+// di @react-navigation/native) → nessun setOptions, solo re-render visivo degli header.
+const STACK_SCREEN_OPTIONS = { headerShown: false } as const;
+const FEEDBACK_OPTIONS = { headerShown: true, headerTitle: "Feedback" } as const;
+const NOTIFICATIONS_OPTIONS = { headerShown: true, headerTitle: "Notifiche" } as const;
+
 function RootLayoutNav() {
-  const { colors } = useTheme();
-  // ANTI-LOOP: nested objects (contentStyle, headerStyle) devono essere refs separati
-  // stabili. Se fossero inline nel useMemo esterno, ogni re-run (cambio tema) produce
-  // un nuovo nested ref → React Navigation shallow-compare fallisce → setOptions
-  // cascade su tutti gli Stack.Screen → "Maximum update depth exceeded" crash.
-  const rootContentStyle = React.useMemo(
-    () => ({ backgroundColor: colors.background }),
-    [colors.background]
-  );
-  const stackScreenOptions = React.useMemo(
-    () => ({ headerShown: false, contentStyle: rootContentStyle }),
-    [rootContentStyle]
-  );
-  const stackHeaderStyle = React.useMemo(
-    () => ({ backgroundColor: colors.surface }),
-    [colors.surface]
-  );
-  const feedbackOptions = React.useMemo(
-    () => ({ headerShown: true, headerTitle: "Feedback", headerStyle: stackHeaderStyle, headerTintColor: colors.text }),
-    [stackHeaderStyle, colors.text]
-  );
-  const notificationsOptions = React.useMemo(
-    () => ({ headerShown: true, headerTitle: "Notifiche", headerStyle: stackHeaderStyle, headerTintColor: colors.text }),
-    [stackHeaderStyle, colors.text]
-  );
   return (
-    <Stack screenOptions={stackScreenOptions}>
+    <Stack screenOptions={STACK_SCREEN_OPTIONS}>
       <Stack.Screen name="welcome" />
       <Stack.Screen name="onboarding" options={ROOT_ONBOARDING_SCREEN_OPTIONS} />
       <Stack.Screen name="(auth)" />
@@ -186,8 +172,8 @@ function RootLayoutNav() {
       <Stack.Screen name="moderator" options={ROOT_HIDDEN_HEADER} />
       <Stack.Screen name="contest" options={ROOT_HIDDEN_HEADER} />
       <Stack.Screen name="privacy-policy" options={ROOT_HIDDEN_HEADER} />
-      <Stack.Screen name="feedback/index" options={feedbackOptions} />
-      <Stack.Screen name="notifications" options={notificationsOptions} />
+      <Stack.Screen name="feedback/index" options={FEEDBACK_OPTIONS} />
+      <Stack.Screen name="notifications" options={NOTIFICATIONS_OPTIONS} />
       <Stack.Screen name="sprint-history" options={ROOT_HIDDEN_HEADER} />
       <Stack.Screen name="diagnostica-risultati" options={ROOT_HIDDEN_HEADER} />
     </Stack>
