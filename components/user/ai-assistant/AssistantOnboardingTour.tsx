@@ -93,8 +93,12 @@ export default function AssistantOnboardingTour() {
           tornano tappabili), ma box-none lascerebbe passare i tap sullo sfondo
           dim alle tab dietro. Questo strato ripristina il blocco modale. */}
       <Pressable style={StyleSheet.absoluteFill} onPress={() => {}} />
+      {/* NON usare pointerEvents="box-none" qui: su Android "box-none" fa
+          passare i tocchi al Pressable backdrop sottostante, che li consuma
+          con onPress={()=>{}} → bottoni della card sordi. "auto" (default)
+          è corretto: i tocchi nell'area di center raggiungono i Pressable
+          figli (card, X, Avanti) regolarmente. */}
       <View
-        pointerEvents="box-none"
         style={[styles.center, { paddingTop: insets.top + 24, paddingBottom: insets.bottom + 24 }]}
       >
       <View style={[styles.card, { backgroundColor: colors.surface }]} testID="assistant-onboarding-card">
