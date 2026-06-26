@@ -15,6 +15,7 @@ import {
   ActivityIndicator,
   StyleSheet,
   Platform,
+  StatusBar,
   type ListRenderItemInfo,
 } from "react-native";
 import type { BootStep } from "@/lib/boot-gate-steps";
@@ -202,11 +203,18 @@ export function BootGateScreen({
   );
 }
 
+// Su Android la SafeAreaView di react-native gestisce SOLO la status bar, non la
+// navigation bar (gesture bar in basso). Aggiungiamo un padding fisso conservativo
+// così il panel coi bottoni non finisce sotto la nav bar.
+const ANDROID_NAV_BAR_EXTRA = Platform.OS === "android" ? 48 : 0;
+const ANDROID_STATUS_BAR_EXTRA =
+  Platform.OS === "android" ? (StatusBar.currentHeight ?? 24) : 0;
+
 const styles = StyleSheet.create({
   safe: {
     flex: 1,
     backgroundColor: C.bg,
-    paddingTop: Platform.OS === "android" ? 28 : 0,
+    paddingTop: ANDROID_STATUS_BAR_EXTRA,
   },
   header: {
     paddingHorizontal: 20,
@@ -238,6 +246,7 @@ const styles = StyleSheet.create({
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: C.border,
     padding: 20,
+    paddingBottom: 20 + ANDROID_NAV_BAR_EXTRA,
     gap: 6,
   },
   panelStop: { backgroundColor: "#241015" },

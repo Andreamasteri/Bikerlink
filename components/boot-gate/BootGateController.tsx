@@ -283,15 +283,6 @@ export function BootGateController({
 
   return (
     <View style={styles.root}>
-      {/* Catena provider incrementale: invisibile e non interattiva, dietro la UI. */}
-      <View style={StyleSheet.absoluteFill} pointerEvents="none">
-        <BootGateProviderChain
-          level={providerLevel}
-          resetKey={resetKey}
-          onError={handleProviderError}
-          onLevelMounted={handleLevelMounted}
-        />
-      </View>
       <BootGateScreen
         steps={steps}
         currentIndex={currentIndex}
@@ -303,10 +294,23 @@ export function BootGateController({
         onSkip={handleSkip}
         onRestart={handleRestart}
       />
+      {/* Catena provider: in un container 0×0 così non occupa spazio visivo e
+          non intercetta MAI i tocchi (su Android absoluteFill+pointerEvents="none"
+          può comunque mangiare i tap del fratello sottostante). I provider React
+          funzionano indipendentemente dalle dimensioni della loro View host. */}
+      <View style={styles.hidden}>
+        <BootGateProviderChain
+          level={providerLevel}
+          resetKey={resetKey}
+          onError={handleProviderError}
+          onLevelMounted={handleLevelMounted}
+        />
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: "#0b0f14" },
+  hidden: { width: 0, height: 0, overflow: "hidden" },
 });
