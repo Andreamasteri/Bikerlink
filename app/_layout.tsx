@@ -24,6 +24,8 @@ import { useMapConfig } from "@/lib/map-context";
 // Side-effect import: registers the TASK_TELEMETRY background task with expo-task-manager
 // so it is available before any component mounts.
 import "@/lib/background-telemetry-task";
+// Task #4979 — Livello B passivo: checkpoint PRE-React emessi a module-load.
+import { passiveCheckpoint } from "@/lib/boot-gate-passive";
 
 import { useAppBootstrap } from "@/hooks/useAppBootstrap";
 import { usePostUpdateRefresh } from "@/hooks/usePostUpdateRefresh";
@@ -40,13 +42,30 @@ import { useOtaStagingBanner } from "@/hooks/useOtaStagingBanner";
 import { useDeviceMetrics } from "@/hooks/useDeviceMetrics";
 import { useJsThreadWatchdog } from "@/hooks/useJsThreadWatchdog";
 import { initOnlineFocusManager } from "@/lib/online-focus-manager";
+// Task #4979 — BootGate diagnostico (strettamente opt-in). Import a livello modulo:
+// è tree-shaken solo a runtime dal branch flag-gated, l'import in sé non ha effetti.
+import { BootGateController } from "@/components/boot-gate/BootGateController";
+import { resolveBootGateActive } from "@/lib/boot-gate-passive";
+
+// Task #4979 — Livello B passivo: ogni side-effect di module-load registra il suo
+// checkpoint PRIMA che React renderizzi. Se l'app crasha qui (valutazione moduli /
+// init early), il server conosce comunque l'ultimo checkpoint raggiunto. I ping
+// partono SOLO se il BootGate è attivo; altrimenti i checkpoint sono scartati.
+//
+// background_telemetry_task gira al suo import (in cima al file): lo registriamo
+// per primo perché in ordine cronologico è il primo side-effect del modulo.
+passiveCheckpoint("background_telemetry_task");
+
 SplashScreen.preventAutoHideAsync();
+passiveCheckpoint("splash_prevent");
 
 import("@/lib/sentry").then(s => s.initSentry()).catch(() => {});
+passiveCheckpoint("sentry_init");
 
 // Wire React Query's onlineManager/focusManager to NetInfo + AppState once at
 // boot so queries pause offline and resume coordinated on reconnect/resume.
 initOnlineFocusManager();
+passiveCheckpoint("online_focus_manager");
 
 function DeviceMetricsReporter({ tokenReady }: { tokenReady: boolean }) {
   useDeviceMetrics(tokenReady);
@@ -204,7 +223,12 @@ function reportClientError(error: Error, componentStack: string) {
   }
 }
 
-export default function RootLayout() {
+// BOOT_GATE_ORIGINAL_POSITION: questo è l'albero applicativo ORIGINALE, invariato.
+// Nel percorso normale (flag OFF) viene renderizzato direttamente da RootLayout,
+// byte-per-byte identico a prima del Task #4979. Nel percorso BootGate (flag ON)
+// viene passato a BootGateController come `renderApp()` e montato SOLO a boot
+// completato — così l'app reale resta identica in entrambi i casi.
+function NormalRootLayout() {
   const { ready, tokenReady } = useAppBootstrap();
   const { renderKey } = useLanguage();
   useOtaAutoUpdate(tokenReady);
@@ -281,6 +305,58 @@ export default function RootLayout() {
     </RootProviders>
   );
 }
+
+// Task #4979 — gate flag-based del BootGate diagnostico.
+//
+// Contratto di NON-regressione: se NESSUN flag è attivo questa funzione renderizza
+// <NormalRootLayout/> esattamente come prima. Durante la decisione (`decision ===
+// null`) mostra una View piena di colore — MAI null (vedi StartupGate/MapReadyGate:
+// null smonta lo Stack → loop).
+//
+// L'attivazione è strettamente opt-in e considera DUE sorgenti per l'avvio CORRENTE:
+//  1. flag LOCALE su AsyncStorage (`__BOOT_GATE__`) — lettura immediata.
+//  2. flag REMOTO dal manifest (`bootGateEnabled`) — fetch con timeout breve.
+// Il BootGate parte se ANCHE solo una delle due è true. La risoluzione vive in
+// `resolveBootGateActive()` (lib/boot-gate-passive.ts): è memoizzata e CONDIVISA
+// con i checkpoint passivi pre-React, così c'è UN solo fetch del manifest per
+// avvio e la stessa decisione vale sia per il Livello A (UI) sia per il Livello B
+// (passivo). Con entrambe a false (caso normale) → comportamento byte-identico.
+export default function RootLayout() {
+  const [decision, setDecision] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const active = await resolveBootGateActive();
+      if (!cancelled) setDecision(active);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  if (decision === null) {
+    // Placeholder neutro mentre decidiamo (mai null). SplashScreen nativo resta
+    // comunque visibile sopra finché il bootstrap non chiama hideAsync().
+    return <View style={bootGatePlaceholderStyle.fill} />;
+  }
+
+  if (decision) {
+    return (
+      <BootGateController
+        reportClientError={reportClientError}
+        renderApp={() => <NormalRootLayout />}
+      />
+    );
+  }
+
+  // BOOT_GATE_ORIGINAL_POSITION: percorso normale invariato.
+  return <NormalRootLayout />;
+}
+
+const bootGatePlaceholderStyle = StyleSheet.create({
+  fill: { flex: 1, backgroundColor: "#0b0f14" },
+});
 
 
 const revocationBannerStyles = StyleSheet.create({

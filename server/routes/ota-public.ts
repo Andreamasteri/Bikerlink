@@ -47,10 +47,15 @@ async function getUserRole(userId: string | undefined): Promise<string | null> {
 // utenti normali e anonimi solo approved. Risposta usata dal client prima di parlare con EAS.
 router.get("/manifest", async (req: Request, res: Response) => {
   try {
+    // Task #4979 — flag BootGate diagnostico. Il client lo legge dal manifest per
+    // attivare la schermata di bisect del boot al prossimo avvio (strettamente opt-in).
+    const [bootGateRow] = await db.select({ value: appSettings.value }).from(appSettings).where(eq(appSettings.key, "boot_gate_enabled")).limit(1);
+    const bootGateEnabled = bootGateRow?.value === "true";
+
     // Kill switch globale: se ota_channel_locked=true, nessuna OTA viene distribuita a nessuno.
     const [lockRow] = await db.select({ value: appSettings.value }).from(appSettings).where(eq(appSettings.key, "ota_channel_locked")).limit(1);
     if (lockRow?.value === "true") {
-      return res.json({ allowed: false, reason: "channel_locked" });
+      return res.json({ allowed: false, reason: "channel_locked", bootGateEnabled });
     }
 
     const userId = req.session?.userId;
@@ -76,7 +81,7 @@ router.get("/manifest", async (req: Request, res: Response) => {
       .limit(1);
 
     if (!release) {
-      return res.json({ allowed: false, isAdmin });
+      return res.json({ allowed: false, isAdmin, bootGateEnabled });
     }
 
     // Raccogli tutti gli easUpdateId dello stesso gruppo (Android + iOS hanno lo stesso easGroupId
@@ -95,6 +100,7 @@ router.get("/manifest", async (req: Request, res: Response) => {
     return res.json({
       allowed: true,
       isAdmin,
+      bootGateEnabled,
       releaseId: release.id,
       allowedEasUpdateId: release.easUpdateId,
       allowedEasGroupId: release.easGroupId,

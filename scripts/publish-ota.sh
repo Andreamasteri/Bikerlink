@@ -194,6 +194,14 @@ else
   log_warn "${BUILD_INFO} non trovato — APPLIED_OTA_NUMBER non aggiornato"
 fi
 
+# ── Task #4979 — genera la mappa BootGate dell'avvio per questa OTA ──
+# Snapshot della sequenza di boot (da lib/boot-gate-steps.ts) salvata in
+# .local/boot-reports/ota-${NEXT_OTA}-boot-map.md. Non blocca la pubblicazione.
+log_info "Genero la mappa BootGate dell'avvio per OTA ${NEXT_OTA}..."
+NEXT_OTA="${NEXT_OTA}" npx tsx scripts/generate-boot-manifest.ts --ota "${NEXT_OTA}" 2>&1 || {
+  log_warn "Generazione mappa BootGate fallita — proseguo comunque con la pubblicazione."
+}
+
 # ── Metro export (bundle Android) — separato per misurare il tempo reale ──
 log_info "Fase 1/2 — Metro export (bundle Android, attendi 2-5 minuti)..."
 rm -rf "$DIST_DIR"

@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { View, Text, TouchableOpacity, Platform, Linking } from "react-native";
+import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
@@ -19,6 +20,7 @@ type Tab = "radiografia" | "monitor" | "device" | "server" | "scan";
 
 export default function DiagnosticaScreen() {
   const insets = useSafeAreaInsets();
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState<Tab>("radiografia");
   const [activeHoles, setActiveHoles] = useState(0);
 
@@ -129,6 +131,17 @@ export default function DiagnosticaScreen() {
         <Ionicons name="desktop-outline" size={13} color={Colors.accent} />
         <Text style={s.liveDashboardBtnText}>Live Dashboard (PC)</Text>
         <Ionicons name="open-outline" size={11} color={Colors.textSecondary} />
+      </TouchableOpacity>
+
+      {/* Task #4979 — BootGate: bisect interattivo dell'avvio */}
+      <TouchableOpacity
+        style={s.liveDashboardBtn}
+        onPress={() => router.push("/admin/boot-gate" as never)}
+        activeOpacity={0.75}
+      >
+        <MaterialCommunityIcons name="bug-check-outline" size={13} color={Colors.accent} />
+        <Text style={s.liveDashboardBtnText}>BootGate — Bisect Avvio</Text>
+        <Ionicons name="chevron-forward" size={11} color={Colors.textSecondary} />
       </TouchableOpacity>
 
       {/* Content */}

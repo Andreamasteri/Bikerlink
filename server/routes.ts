@@ -260,6 +260,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Task #2503 — endpoint pubblici OTA (gating manifest + telemetria boot)
   const { default: otaPublicRouter } = await import("./routes/ota-public");
   app.use("/api/ota", otaPublicRouter);
+  // Task #4979 — BootGate diagnostico: /ping pubblico (cattura pre-login), /status e
+  // /enable protetti da admin all'interno del router stesso.
+  const { default: bootGateDebugRouter } = await import("./routes/debug/boot-gate");
+  app.use("/api/debug/boot-gate", bootGateDebugRouter);
 
   app.get("/api/user/position", async (req: Request, res: Response) => {
     if (!req.session.userId) return res.status(401).json({ message: "Non autenticato" });

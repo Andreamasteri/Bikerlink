@@ -77,6 +77,7 @@ const ADMIN_OPTS: Record<string, { title: string } | { headerShown: false }> = {
   "telemetry-users": { title: "Sessioni Utenti" },
   "telemetry-user/[userId]": { title: "Dettaglio Sessioni" },
   "boot-log": { title: "Boot Log Avvio" },
+  "boot-gate": { title: "BootGate — Bisect Avvio" },
   "metro-crashes": { title: "Crash Metro" },
   "ai-assistant": { title: "Bowie" },
   "match-explain": { title: "Explain Matching" },
@@ -168,6 +169,7 @@ export default function AdminLayout() {
         <Stack.Screen name="telemetry-users" options={ADMIN_OPTS["telemetry-users"]} />
         <Stack.Screen name="telemetry-user/[userId]" options={ADMIN_OPTS["telemetry-user/[userId]"]} />
         <Stack.Screen name="boot-log" options={ADMIN_OPTS["boot-log"]} />
+        <Stack.Screen name="boot-gate" options={ADMIN_OPTS["boot-gate"]} />
         <Stack.Screen name="metro-crashes" options={ADMIN_OPTS["metro-crashes"]} />
         <Stack.Screen name="ai-assistant" options={ADMIN_OPTS["ai-assistant"]} />
         <Stack.Screen name="match-explain" options={ADMIN_OPTS["match-explain"]} />
