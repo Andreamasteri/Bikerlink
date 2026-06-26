@@ -31,9 +31,10 @@ DATA_DIR="${DATA_DIR:-${SCRIPT_DIR}/data}"
 GRAPHS_DIR="${GRAPHS_DIR:-${SCRIPT_DIR}/graphs}"
 CONFIG_FILE="${CONFIG_FILE:-${SCRIPT_DIR}/graphhopper/config.yml}"
 
-# Immagine GraphHopper PINNATA per digest (deve combaciare con docker-compose.yml).
-# latest = GH 12 (non esiste un tag 12.0). Aggiornare il pin: vedi README.md.
-GH_IMAGE="${GRAPHHOPPER_IMAGE:-israelhikingmap/graphhopper@sha256:3e79eb33862028cfc58f9d6c162630b68638d6aad790b5a698c854dbbaa7fe32}"
+# Immagine GraphHopper CUSTOM compilata da sorgente (master HEAD, GH 12.x) su
+# Java 25 — deve combaciare con docker-compose.yml (anchor x-gh-area). Vive solo
+# nell'image store locale del ThinkCentre. Rigenerare l'immagine: vedi README.md.
+GH_IMAGE="${GRAPHHOPPER_IMAGE:-bikerlink/graphhopper:latest}"
 
 # Heap/GC per il BUILD (RAM-hungry): import in RAM, poi una sola volta su disco.
 # RAM_STORE forzato via sysprop perché il config.yml condiviso ha MMAP (serving).

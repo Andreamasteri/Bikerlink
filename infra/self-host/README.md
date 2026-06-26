@@ -527,18 +527,37 @@ journalctl -u bikerlink-areas-core -n 30
 > prima di copiarlo: `Environment=COMPOSE_DIR=…` e `EnvironmentFile=-…/.env`
 > (systemd non espande variabili nei path `EnvironmentFile=`).
 
-### Aggiornare il pin dell'immagine GraphHopper
+### Rigenerare l'immagine GraphHopper (custom, da sorgente, Java 25)
 
-L'immagine è **pinnata per digest** (riproducibilità) in `docker-compose.yml` e
-`build-regions.sh`. `latest` corrisponde a GraphHopper 12 (non esiste un tag `12.0`).
-Per aggiornare al digest corrente:
+Non si usa più l'immagine di terze parti `israelhikingmap/graphhopper`. Ora gira
+un'immagine **custom** `bikerlink/graphhopper:latest` **compilata da sorgente** dal
+`master` HEAD di [`graphhopper/graphhopper`](https://github.com/graphhopper/graphhopper)
+(GraphHopper 12.x) su runtime **Java 25 LTS** (Temurin). L'immagine vive **solo
+nell'image store locale** del ThinkCentre (non è su Docker Hub) ed è referenziata per
+tag in `docker-compose.yml` (anchor `x-gh-area`) e `build-regions.sh` (`GH_IMAGE`).
+
+Il contratto d'avvio è identico all'immagine precedente: `WORKDIR /graphhopper`,
+porta `8989`, `curl` presente per l'healthcheck, e lo script `graphhopper.sh` che
+legge le env `FILE`/`GRAPH` e forza `graph.location` via sysprop (così ogni gruppo
+scrive sul proprio grafo). L'`entrypoint` del compose resta invariato.
+
+Il build context (`Dockerfile` multi-stage + `graphhopper.sh`) sta in
+`infra/self-host/graphhopper/image/`. Per ricostruire l'immagine sul ThinkCentre:
 
 ```bash
-docker pull israelhikingmap/graphhopper:latest
-docker inspect --format='{{index .RepoDigests 0}}' israelhikingmap/graphhopper:latest
-# Sostituisci il nuovo sha256:... in docker-compose.yml (anchor x-gh-area)
-# e in build-regions.sh (GH_IMAGE). Poi ri-builda i grafi.
+cd infra/self-host/graphhopper/image
+docker build --pull -t bikerlink/graphhopper:latest .
+
+# Verifica: runtime Java 25 + versione GraphHopper
+docker run --rm --entrypoint sh bikerlink/graphhopper:latest -c 'java -version'
+# -> openjdk version "25..."
+
+# Poi ri-builda i grafi con la nuova immagine.
 ```
+
+Lo stage di build clona il `master` HEAD: ricostruire l'immagine prende l'ultimo
+codice. Per fissare un commit specifico, sostituisci nel `Dockerfile` il
+`git clone --depth 1` con un checkout del commit voluto.
 
 Override al volo senza editare i file: `GRAPHHOPPER_IMAGE=<ref> ./build-regions.sh`.
 

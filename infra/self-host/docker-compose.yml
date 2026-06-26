@@ -42,14 +42,17 @@ name: bikerlink-selfhost
 # Blocco comune a tutte le istanze GraphHopper-area. Le differenze per gruppo
 # (porta, cartella grafo, env FILE, heap) sono override nei singoli servizi.
 x-gh-area: &gh-area
-  # Immagine PINNATA per digest = riproducibilità. latest = GH 12 (NON esiste un
-  # tag semver 12.0 su Docker Hub: si pinna il manifest multi-arch per digest).
-  # Lo STESSO pin va usato in build-regions.sh. Aggiornare il pin: vedi README.md.
-  image: israelhikingmap/graphhopper@sha256:3e79eb33862028cfc58f9d6c162630b68638d6aad790b5a698c854dbbaa7fe32
+  # Immagine CUSTOM compilata da sorgente (graphhopper/graphhopper @master HEAD,
+  # GraphHopper 12.x) su runtime Java 25 LTS. Costruita sul ThinkCentre, NON su
+  # Docker Hub: vive solo in locale (image store del daemon). Lo STESSO ref va
+  # usato in build-regions.sh. Rigenerare l'immagine: vedi README.md.
+  image: bikerlink/graphhopper:latest
   restart: unless-stopped
   # Override entrypoint: l'immagine usa per default "./graphhopper.sh -c config-example.yml"
   # (path relativo → legge il file bundled car/foot/bike ignorando il nostro mount).
   # Usiamo il path assoluto /graphhopper/config.yml per puntare al nostro config montato.
+  # graphhopper.sh, WORKDIR /graphhopper e porta 8989 sono identici all'immagine
+  # precedente (israelhikingmap), quindi l'entrypoint resta invariato.
   entrypoint: ["./graphhopper.sh", "-c", "/graphhopper/config.yml"]
   healthcheck:
     test: ["CMD-SHELL", "curl -fsS http://localhost:8989/health || exit 1"]

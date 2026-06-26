@@ -11,7 +11,7 @@
 # I sysprop -Ddw.graphhopper.* sovrascrivono le chiavi qui sotto, quindi i valori
 # `datareader.file` e `graph.location` di default servono solo come fallback.
 #
-# ⚠️ VINCOLO CRITICO GH (entrypoint israelhikingmap): l'entrypoint forza
+# ⚠️ VINCOLO CRITICO GH (script graphhopper.sh): l'entrypoint forza
 # graph.location via sysprop. Senza la env GRAPH tutti i gruppi scrivono su
 # /data/default-gh e collidono. Vedi infra/self-host/README.md.
 #
@@ -21,7 +21,7 @@
 #     (-Ddw.graphhopper.graph.dataaccess.default_type=RAM_STORE) perché l'import
 #     è molto più veloce in RAM.
 #
-# Versione GraphHopper: 12 (immagine pinnata per digest, vedi docker-compose.yml).
+# Versione GraphHopper: 12.x (immagine custom da sorgente su Java 25, vedi docker-compose.yml).
 # =============================================================================
 
 graphhopper:
