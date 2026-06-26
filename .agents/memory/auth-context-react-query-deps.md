@@ -33,3 +33,35 @@ si legge anche `.isPending`.
 
 Collegato: `auto-telemetry-context.tsx` usava `useEffect([user])` (oggetto user instabile
 dalla revalidation) → fix con `const userId = user?.id ?? null` e dep `[userId]`.
+
+## Stabilizzare la reference dell'oggetto user (non solo i deps)
+
+Rimuovere `userQuery.data` dai deps del value memo NON basta quando decine di
+consumer fanno `const { user } = useAuth()` e hanno effetti `useEffect([user])`.
+React Query restituisce un **nuovo oggetto** a ogni `refetch()` (es. la
+revalidation una-tantum della sessione idratata) anche con payload identico → tutti
+i `[user]` deps si ri-scatenano → con ~13 effetti + 15 tab screen (React Navigation
+`useSyncExternalStore`) si supera il limite di 25 update annidati → crash boot Android.
+
+**La regola:** stabilizza la reference di `user` nel provider con una shallow-equal:
+mantieni la stessa reference finché il contenuto è uguale, adottane una nuova solo
+su variazioni reali.
+
+```ts
+const stableUserRef = useRef(userQuery.data);
+if (!shallowEqualSafeUser(userQuery.data, stableUserRef.current)) {
+  stableUserRef.current = userQuery.data; // mutazione in render: idempotente, sicura
+}
+const user = stableUserRef.current;
+```
+
+**Why:** `SafeUser` è una riga DB piatta (`Omit<User,"password">`) → shallow su tutte
+le chiavi distingue cambi reali ma assorbe i refetch identici, preservando la
+freschezza. La mutazione del ref in render è il pattern di caching documentato da
+React (scrive solo quando il valore differisce → render idempotente). `shallowEqual`
+gestisce null vs undefined con `a==null → return a===b`. Così TUTTI i `[user]` deps
+diventano stabili **senza toccarli** e senza problemi eslint. Esporre anche `userId`
+primitivo aiuta i nuovi consumer.
+
+**How to apply:** `lib/auth-context.tsx`. Follow-up opzionale suggerito dall'architect:
+usare `structuralSharing`/`select` di React Query al posto della mutazione-in-render.

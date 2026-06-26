@@ -356,7 +356,11 @@ export function getQueryFnWithTimeout<T>(timeoutMs = 15000): QueryFunction<T> {
 export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      queryFn: getQueryFn({ on401: "returnNull" }),
+      // Timeout di default: una query che resta appesa (DB lento, rete) viene
+      // abortita dopo 30s e propaga isError → "Riprova" invece di lasciare
+      // "Aggiornamento dati..." bloccato per minuti. L'auth query usa la sua
+      // authQueryFn dedicata e non è toccata da questo default.
+      queryFn: getQueryFnWithTimeout(30000),
       refetchInterval: false,
       refetchOnWindowFocus: false,
       staleTime: Infinity,

@@ -60,17 +60,24 @@ function useLayoutGating(
   const [showFakeHomeGlobal, setShowFakeHomeGlobal] = useState(false);
   const [fakeHomeDontShowGlobal, setFakeHomeDontShowGlobal] = useState(false);
 
+  // Deps primitivi e stabili: meData (da useQuery) e user sono oggetti che
+  // cambiano reference a ogni refetch. Estraiamo i soli campi che contano così
+  // l'effetto (e il conseguente setShowFakeHomeGlobal) non si ri-scatena a ogni
+  // revalidation, contribuendo alla finestra di re-render del loop boot.
+  const userId = user?.id ?? null;
+  const hasProfile = meData?.profile != null;
+  const fakeHomeLat = meData?.profile?.fakeHomeLatitude ?? null;
+  const fakeHomeLng = meData?.profile?.fakeHomeLongitude ?? null;
+
   useEffect(() => {
-    if (!meData || !user) return;
-    const p = meData?.profile;
-    if (!p) return;
-    const unconfigured = p.fakeHomeLatitude == null || p.fakeHomeLongitude == null;
+    if (userId == null || !hasProfile) return;
+    const unconfigured = fakeHomeLat == null || fakeHomeLng == null;
     if (unconfigured) {
       AsyncStorage.getItem(FAKE_HOME_INTRO_KEY).then((val) => {
         if (val !== "dismissed") setShowFakeHomeGlobal(true);
       }).catch(() => {});
     }
-  }, [meData, user]);
+  }, [userId, hasProfile, fakeHomeLat, fakeHomeLng]);
 
   return {
     showFakeHomeGlobal,

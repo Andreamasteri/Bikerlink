@@ -19,6 +19,29 @@ import { PENDING_ONBOARDING_TAGS_KEY } from "@/constants/onboarding";
 
 type SafeUser = Omit<User, "password">;
 
+/**
+ * Confronto shallow di due SafeUser. React Query restituisce un nuovo oggetto a
+ * ogni refetch anche quando i dati sono identici: usiamo questo per mantenere
+ * stabile la reference dell'utente esposta nel context (vedi stableUserRef) ed
+ * evitare la cascata di re-render che innesca "Maximum update depth exceeded".
+ * SafeUser è una riga DB piatta (Omit<User,"password">) → shallow su tutte le
+ * chiavi è sufficiente e preserva la freschezza quando il contenuto cambia.
+ */
+function shallowEqualSafeUser(
+  a: SafeUser | null | undefined,
+  b: SafeUser | null | undefined
+): boolean {
+  if (a === b) return true;
+  if (a == null || b == null) return a === b;
+  const aKeys = Object.keys(a) as (keyof SafeUser)[];
+  const bKeys = Object.keys(b);
+  if (aKeys.length !== bKeys.length) return false;
+  for (const k of aKeys) {
+    if (a[k] !== b[k]) return false;
+  }
+  return true;
+}
+
 const HAD_SESSION_KEY = "@bikerlink/had_session";
 const CACHED_USER_KEY = "@bikerlink/cached_user";
 
@@ -235,6 +258,7 @@ export function createAuthQueryFn({ hadSessionRef, setSessionExpired }: AuthQuer
 
 interface AuthContextValue {
   user: SafeUser | null | undefined;
+  userId: SafeUser["id"] | null;
   isLoading: boolean;
   isAuthenticated: boolean;
   hadPreviousSession: boolean;
@@ -668,11 +692,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const registerMutation = useRegisterMutation();
   const logoutMutation = useLogoutMutation();
 
+  // Stabilizza la reference dell'utente. React Query crea un nuovo oggetto a ogni
+  // refetch (es. la revalidation una-tantum della sessione idratata) anche quando
+  // i dati sono identici. Senza questa guardia ogni refetch ricreerebbe il context
+  // value → cascata di re-render su TUTTI i consumer di useAuth() + i ~13 effetti
+  // con dep [user] → React Navigation supera il limite di 25 update annidati →
+  // "Maximum update depth exceeded". Manteniamo la stessa reference finché il
+  // contenuto è shallow-equal, così i [user] deps restano stabili ma i dati
+  // restano freschi quando cambiano davvero (login/logout/edit profilo).
+  const stableUserRef = useRef<SafeUser | null | undefined>(userQuery.data);
+  if (!shallowEqualSafeUser(userQuery.data, stableUserRef.current)) {
+    stableUserRef.current = userQuery.data;
+  }
+  const user = stableUserRef.current;
+  const userId = user?.id ?? null;
+
   const value = useMemo(
     () => ({
-      user: userQuery.data,
+      user,
+      userId,
       isLoading: userQuery.isLoading || !storageChecked,
-      isAuthenticated: !!userQuery.data,
+      isAuthenticated: !!user,
       hadPreviousSession: storageChecked && hadSessionRef.current,
       sessionExpired,
       isReconnecting,
@@ -685,8 +725,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Le mutation di React Query restituiscono un nuovo oggetto a ogni render: includerle
     // intere qui invaliderebbe il memo a ogni render (causa del loop). Dipendiamo solo dalle
     // slice primitive `isPending` così i consumer vedono lo stato aggiornato senza ricreare il value.
+    // `user` è già stabilizzato sopra (shallow-equal): cambia reference solo su variazioni reali.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [userQuery.data, userQuery.isLoading, storageChecked, sessionExpired, isReconnecting, authFailed, retryAuth, loginMutation.isPending, registerMutation.isPending, logoutMutation.isPending]
+    [user, userId, userQuery.isLoading, storageChecked, sessionExpired, isReconnecting, authFailed, retryAuth, loginMutation.isPending, registerMutation.isPending, logoutMutation.isPending]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
