@@ -3,27 +3,49 @@ name: React Query batching + TabBar layout loop
 description: Root cause e fix del crash "Maximum update depth exceeded" — include boot-guard TabNavigator remount (OTA-188) e Modal/React Query batching (OTA-186).
 ---
 
-## Fix Layer 0 — Boot-guard TabNavigator remount (OTA #188)
+## Fix Layer 0 — Boot-guard TabNavigator remount (OTA #188 → parziale, #189 → completo)
 
-**Root cause** (simbolicata da source map OTA-187): `useSyncState.js:80` (listeners.forEach)
-+ `TabRouter.js:127` (getRehydratedState con stale state).
+**OTA #188 — root cause parziale:** Il branch `if (isLoading || !user) return <Tabs minimal>`
+nel TabLayout smontava/rimontava il `<Tabs>` navigator al boot. Fix: rimosso il branch minimal,
+`renderCustomTabBar` ritorna `null` via ref (deps=[]) durante `!isReady`. Il crash però persisteva.
 
-Il branch `if (isLoading || !user) return <Tabs minimal>` nel TabLayout smontava e
-rimontava il `<Tabs>` navigator ad ogni boot guard transition. Al remount, `useScheduleUpdate`
-(chiamato nel render body, non in un effect) accodava 15 callback (uno per Tab.Screen) →
-`flushUpdates` → `batchUpdates` → `store.setState` senza equality check → `useSyncExternalStore`
-ri-renderizzava → altri 15 callback → 50 iterazioni → crash.
+**OTA #189 — root cause reale (simbolicata da source map OTA-188):**
+`useSyncState.js:80` (listeners.forEach) + `useChildListeners.js:54` + `useLatestCallback.js:52`.
 
-**Fix:** rimosso il branch minimal Tabs. `isReady: !isLoading && !!user` aggiunto al
-`tabBarStateRef.current`; `renderCustomTabBar` ritorna `null` quando `!isReady` (via ref,
-deps=[]) → tab bar nascosta durante il boot ma il `<Tabs>` ha un solo lifecycle.
+`tabScreens = useMemo(getTabScreens, [t, gpsTabHref, isBikerOrCoppia])` viene **invalidato**
+quando `isBikerOrCoppia` cambia al boot (`null→user carica`). Questo ricrea 15 nuovi options
+objects per i `<Tabs.Screen>` → `useLayoutEffect` in ogni screen fires → `setOptions × 15`
+→ `scheduleUpdate × 15` → `useSyncState.listeners.forEach × 50` → `enqueueConcurrentRenderForLane`
+× 50 sincrono → "Maximum update depth exceeded".
 
-**Why:** `useScheduleUpdate` è un hook interno di Expo Router che schedula callback nel
-render body — non è safe da chiamare su un navigator che si rimonta. La soluzione è
-non smontare mai il `<Tabs>` principale; nascondere la tab bar via ref è l'alternativa sicura.
+**La chiave:** il crash non richiede il remount del navigator — basta che i children `<Tabs.Screen>`
+ricevano nuovi options objects simultaneamente (15 in un batch) per innescare il loop.
 
-**How to apply:** non usare `if (condition) return <Tabs minimal>` nei layout — usare invece
-un flag nel ref che nasconde la UI senza smontare il navigator.
+**Fix (OTA #189):**
+```tsx
+// Module-level (stabili, mai ricreati):
+const BOOT_SCREENS: React.ReactElement[] = [
+  <Tabs.Screen key="index" name="index" options={{ headerShown: false }} />,
+  // ... 14 altri screen con options statiche
+];
+
+// In TabLayout — ref congelato:
+const frozenTabScreensRef = React.useRef<React.ReactElement[] | null>(null);
+if (frozenTabScreensRef.current === null && isTabBarReady) {
+  frozenTabScreensRef.current = getTabScreens(t, { gpsTabHref, isBikerOrCoppia });
+}
+const tabScreens = frozenTabScreensRef.current ?? BOOT_SCREENS;
+```
+
+**Why:** `tabScreens` viene creato UNA SOLA VOLTA (al primo render con user disponibile) e
+MAI aggiornato → nessun cambio di children dopo il mount → nessun cascade. Prima di isReady
+usa BOOT_SCREENS module-level (zero deps runtime → zero cascade).
+
+**How to apply:** i children di un navigator (`<Tabs>`, `<Stack>`) NON devono cambiare dopo il
+mount se le modifiche portano a 10+ screen simultanei che aggiornano options. Congela con ref.
+
+**Segnale diagnostico:** source map su `useSyncState.js:80` + `useChildListeners.js:54`
+(non solo useSyncState) indica cascade da options-change, non da remount.
 
 ---
 

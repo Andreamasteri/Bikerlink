@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState, useCallback, useMemo } from "react";
+import React, { useRef, useEffect, useState, useCallback } from "react";
 import { Tabs, useRouter, type Href } from "expo-router";
 import { Animated } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -42,6 +42,38 @@ const FAKE_HOME_INTRO_KEY = "fake_home_intro_seen_v1";
 // il rendering degli header senza mai chiamare setOptions — non c'è cascata possibile.
 const TABS_HEADER_TITLE_STYLE = { fontFamily: "Inter_600SemiBold" } as const;
 const TABS_SCREEN_OPTIONS = { headerTitleStyle: TABS_HEADER_TITLE_STYLE } as const;
+
+// ANTI-LOOP (root cause fix OTA #189):
+// useMemo(getTabScreens, [t, gpsTabHref, isBikerOrCoppia]) viene invalidato quando
+// isBikerOrCoppia cambia al boot (null→user carica). Questo ricrea 15 nuovi options
+// objects per i Tabs.Screen → useLayoutEffect di ogni screen → setOptions × 15
+// → scheduleUpdate × 15 → useSyncState.listeners.forEach × 50 → crash.
+//
+// FIX: BOOT_SCREENS module-level stabili (per il periodo pre-user) +
+// ref congelato che crea le opzioni reali UNA SOLA VOLTA (al primo isReady=true)
+// e non le cambia mai → nessun cascade possibile.
+//
+// BOOT_SCREENS devono avere href corretto (undefined per le tab visibili, null per
+// quelle nascoste) in modo che il custom tab bar le filtri correttamente.
+// Le Tabs.Screen con href:null vengono escluse dalla tab bar da renderCustomTabBar
+// tramite il check `options.tabBarButton === "function"`.
+const BOOT_SCREENS: React.ReactElement[] = [
+  <Tabs.Screen key="index" name="index" options={{ headerShown: false }} />,
+  <Tabs.Screen key="proposals" name="proposals" options={{}} />,
+  <Tabs.Screen key="ready" name="ready" options={{ headerShown: false }} />,
+  <Tabs.Screen key="motoclub" name="motoclub" options={{ headerShown: false }} />,
+  <Tabs.Screen key="eventi" name="eventi" options={{ headerShown: false }} />,
+  <Tabs.Screen key="match" name="match" options={{ headerShown: false }} />,
+  <Tabs.Screen key="music" name="music" options={{ headerShown: false }} />,
+  <Tabs.Screen key="chat" name="chat" options={{ headerShown: false }} />,
+  <Tabs.Screen key="contest" name="contest" options={{}} />,
+  <Tabs.Screen key="arcade" name="arcade" options={{}} />,
+  <Tabs.Screen key="ride" name="ride" options={{ href: null }} />,
+  <Tabs.Screen key="giri" name="giri" options={{ href: null, headerShown: false }} />,
+  <Tabs.Screen key="tracking" name="tracking" options={{ href: null }} />,
+  <Tabs.Screen key="garage" name="garage" options={{ href: null }} />,
+  <Tabs.Screen key="profile" name="profile" options={{}} />,
+];
 
 interface LayoutGatingMeData {
   profile?: { fakeHomeLatitude?: number | null; fakeHomeLongitude?: number | null } | null;
@@ -203,6 +235,7 @@ export default function TabLayout() {
   // (hasActiveMatches, unreadCount, ecc.), renderCustomTabBar ottiene un nuovo ref
   // → tabBar prop cambia → React Navigation setOptions cascade su 15 Tabs.Screen
   // → 50+ update annidati → "Maximum update depth exceeded" crash su Android.
+  const isTabBarReady = !isLoading && !!user;
   const tabBarStateRef = useRef({
     showCalibrationBadge,
     taskbarStyle,
@@ -213,7 +246,7 @@ export default function TabLayout() {
     newMatchCount,
     unreadCount,
     isBikerOrCoppia,
-    isReady: !isLoading && !!user,
+    isReady: isTabBarReady,
   });
   tabBarStateRef.current = {
     showCalibrationBadge,
@@ -225,7 +258,7 @@ export default function TabLayout() {
     newMatchCount,
     unreadCount,
     isBikerOrCoppia,
-    isReady: !isLoading && !!user,
+    isReady: isTabBarReady,
   };
 
   const renderCustomTabBar = useCallback((props: BottomTabBarProps) => {
@@ -344,10 +377,15 @@ export default function TabLayout() {
     setFakeHomeDontShowGlobal,
   } = useLayoutGating(user, meData as LayoutGatingMeData | null | undefined);
 
-  const tabScreens = useMemo(
-    () => getTabScreens(t, { gpsTabHref, isBikerOrCoppia }),
-    [t, gpsTabHref, isBikerOrCoppia]
-  );
+  // ANTI-LOOP: ref congelato — vedere commento BOOT_SCREENS a inizio file.
+  // tabScreens viene creato UNA SOLA VOLTA al primo render con user disponibile
+  // (isReady=true) e MAI aggiornato dopo. Prima di isReady usa BOOT_SCREENS
+  // module-level (stabili, nessuna dep runtime → nessun cascade possibile).
+  const frozenTabScreensRef = React.useRef<React.ReactElement[] | null>(null);
+  if (frozenTabScreensRef.current === null && isTabBarReady) {
+    frozenTabScreensRef.current = getTabScreens(t, { gpsTabHref, isBikerOrCoppia });
+  }
+  const tabScreens = frozenTabScreensRef.current ?? BOOT_SCREENS;
 
   // tabBarStyle / tabBarLabelStyle / tabBarActiveTintColor / tabBarInactiveTintColor
   // NON vengono passati a screenOptions (ignorati con renderCustomTabBar custom).
