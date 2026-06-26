@@ -321,6 +321,70 @@ journalctl -u valhalla -f
 
 ---
 
+## Come ricostruire Valhalla (immagine Docker custom da sorgente)
+
+L'immagine `gis-ops/docker-valhalla` è semi-abbandonata (ferma a 3.5.1, ott 2024).
+Per avere i fix critici di upstream (crash su oneway traces, loop edges, UB in
+adminbuilder, NaN in rapidjson, heap OOB, ecc.) costruiamo l'immagine **direttamente
+da `master` HEAD** di `valhalla/valhalla`, sotto il nostro controllo.
+
+Il Dockerfile custom è salvato in `infra/self-host/valhalla/Dockerfile`: è il
+`docker/Dockerfile` ufficiale di upstream **senza modifiche alla logica di build**,
+con in coda solo tre label di tracciamento (`bikerlink.version`, `bikerlink.built`,
+`bikerlink.commit`) passate come `--build-arg`.
+
+### Procedura di rebuild (sul ThinkCentre via SSH)
+
+```bash
+# 1. Clona il sorgente upstream e inizializza i submodule (third_party)
+rm -rf /tmp/valhalla-src
+git clone --depth=50 https://github.com/valhalla/valhalla.git /tmp/valhalla-src
+cd /tmp/valhalla-src
+git submodule update --init --recursive --depth=1
+SHA=$(git rev-parse HEAD)
+
+# 2. Builda con il Dockerfile custom (context = sorgente, -f = Dockerfile custom)
+DAY=$(date +%Y%m%d); BUILT=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+docker build \
+  -f /home/andrea/bikerlink/infra/self-host/valhalla/Dockerfile \
+  --build-arg BIKERLINK_VERSION=master-$DAY \
+  --build-arg BIKERLINK_BUILT=$BUILT \
+  --build-arg BIKERLINK_COMMIT=$SHA \
+  --build-arg VERSION_MODIFIER=${SHA:0:7} \
+  -t bikerlink/valhalla:master-$DAY \
+  -t bikerlink/valhalla:latest \
+  /tmp/valhalla-src
+```
+
+> La build dura ~20-40 min e richiede diversi GB di RAM (il ThinkCentre ha 30 GB +
+> 57 GB di swap — abbondante). Il Dockerfile usa un multi-stage build: stage `builder`
+> (ubuntu:24.04 + compilazione) e stage `runner` (solo runtime + binari).
+
+### Verifica dopo il build
+
+```bash
+docker images bikerlink/valhalla
+docker run --rm bikerlink/valhalla:latest valhalla_build_timezones --version
+docker inspect -f '{{json .Config.Labels}}' bikerlink/valhalla:latest
+```
+
+I label `bikerlink.version` / `bikerlink.built` / `bikerlink.commit` identificano la
+release. Il tag `latest` punta sempre all'ultima `master-YYYYMMDD` costruita.
+
+### Aggiornare a un master più recente
+
+Ripeti la procedura: il `--build-arg VERSION_MODIFIER` è sempre il commit hash, quindi
+ogni rebuild ricompila l'intero progetto dal nuovo HEAD. La sostituzione del container
+in produzione (swap dell'immagine nel `docker-compose.yml`) è gestita dal task
+dedicato — qui costruiamo soltanto l'immagine.
+
+> **Commit usato per la prima build:** `ae2c62e` (master HEAD del 2026-06-26),
+> include i fix #6048 (crash backwards traces oneway), #6050 (loop edges),
+> #6065 (auto_pedestrian costing), #6077 (UB adminbuilder), #6086 (flood fill loki),
+> #6115 (tileheader), #6143 (low_class_penalty), #6147 (NaN rapidjson).
+
+---
+
 ## Routing "ad aree regionali" (multi-istanza GraphHopper)
 
 Oltre al routing globale, BikerLink supporta un sistema di routing **per gruppi di
