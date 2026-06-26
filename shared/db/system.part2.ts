@@ -119,6 +119,9 @@ export const resourceSamples = pgTable("resource_samples", {
   onlineUsers: integer("online_users"),
   dbSizeMb: integer("db_size_mb"),
   backendRssMb: integer("backend_rss_mb"),
+  // NULL = campione runtime del resource-graph-sampler (default storico).
+  // 'stress_test' = riga inserita da scripts/db-stress-test.ts sotto carico.
+  source: varchar("source", { length: 40 }),
 }, (table) => [
   index("resource_samples_sampled_at_idx").on(table.sampledAt),
 ]);
