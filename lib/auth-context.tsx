@@ -473,10 +473,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [storageChecked, setStorageChecked] = useState(false);
   const didRevalidateRef = useRef(false);
   useEffect(() => {
-    Promise.all([
-      AsyncStorage.getItem(HAD_SESSION_KEY).catch(() => null),
-      initSessionToken().catch(() => null),
-      AsyncStorage.getItem(CACHED_USER_KEY).catch(() => null),
+    // Timeout di sicurezza: AsyncStorage su Android può appendere silenziosamente
+    // (SQLite lock / storage in bad state). Il .catch(() => null) non scatta mai
+    // perché la promise non rigetta — semplicemente non risolve. Senza questo guard
+    // storageChecked resta false → isLoading=true → spinner nero infinito.
+    // Con il timeout (5s) ricadiamo nel .catch → storageChecked=true con valori
+    // null → la query auth parte comunque e l'utente si sblocca.
+    const STORAGE_INIT_TIMEOUT_MS = 5000;
+    const storageTimeout = new Promise<[null, null, null]>((resolve) => {
+      setTimeout(() => resolve([null, null, null]), STORAGE_INIT_TIMEOUT_MS);
+    });
+
+    Promise.race([
+      Promise.all([
+        AsyncStorage.getItem(HAD_SESSION_KEY).catch(() => null),
+        initSessionToken().catch(() => null),
+        AsyncStorage.getItem(CACHED_USER_KEY).catch(() => null),
+      ]),
+      storageTimeout,
     ])
       .then(([hadSession, token, cachedRaw]) => {
         hadSessionRef.current = hadSession === "true";

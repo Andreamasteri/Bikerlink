@@ -12,15 +12,24 @@ export default function Index() {
   const { isLoading: authIsLoading, isAuthenticated, authFailed, retryAuth } = useAuth();
 
   useEffect(() => {
+    // Timeout di sicurezza: AsyncStorage su Android può appendere silenziosamente
+    // (SQLite lock / storage in bad state) → checked resta false → spinner nero infinito.
+    const timeoutId = setTimeout(() => {
+      setOnboardingDone(true);
+      setChecked(true);
+    }, 5000);
     AsyncStorage.getItem(ONBOARDING_STORAGE_KEY)
       .then((val) => {
+        clearTimeout(timeoutId);
         setOnboardingDone(val === "true");
         setChecked(true);
       })
       .catch(() => {
+        clearTimeout(timeoutId);
         setOnboardingDone(true);
         setChecked(true);
       });
+    return () => clearTimeout(timeoutId);
   }, []);
 
   // Se non abbiamo ancora letto AsyncStorage locale, spinner brevissimo (ms)
