@@ -17,7 +17,7 @@ export const adminGroupsPart2: AdminGroup[] = [
       },
       {
         key: "ai-assistant",
-        label: "AI Assistant Utenti",
+        label: "Bowie · Utenti",
         icon: "account-question-outline",
         iconSet: "MaterialCommunityIcons",
         route: "/admin/ai-assistant",

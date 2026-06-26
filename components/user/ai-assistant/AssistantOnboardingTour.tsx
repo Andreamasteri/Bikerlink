@@ -17,13 +17,13 @@ import { logAssistantClientEvent } from "@/lib/ai-assistant/telemetry-client";
 
 const STEPS = [
   { titleKey: "aiAssistant.tour.step1.title", bodyKey: "aiAssistant.tour.step1.body",
-    titleFallback: "Benvenuto su BikerLink", bodyFallback: "Sono il tuo AI Assistant: ti aiuto a navigare l'app e svolgere piccole azioni." },
+    titleFallback: "Benvenuto su BikerLink", bodyFallback: "Ciao, sono Bowie, il tuo assistente virtuale: ti aiuto a navigare l'app e svolgere piccole azioni." },
   { titleKey: "aiAssistant.tour.step2.title", bodyKey: "aiAssistant.tour.step2.body",
     titleFallback: "Mappa & Match", bodyFallback: "Sulla mappa vedi i biker compatibili. Tocca un marker per vedere il profilo." },
   { titleKey: "aiAssistant.tour.step3.title", bodyKey: "aiAssistant.tour.step3.body",
     titleFallback: "Privacy", bodyFallback: "Da Profilo › Privacy puoi gestire fake position, ghost mode e visibilità." },
   { titleKey: "aiAssistant.tour.step4.title", bodyKey: "aiAssistant.tour.step4.body",
-    titleFallback: "Chiedimi", bodyFallback: "Tocca il pulsante AI in basso a sinistra per chiedermi qualsiasi cosa." },
+    titleFallback: "Chiedimi", bodyFallback: "Tocca il pulsante di Bowie in basso a sinistra per chiedermi qualsiasi cosa." },
 ];
 
 export default function AssistantOnboardingTour() {

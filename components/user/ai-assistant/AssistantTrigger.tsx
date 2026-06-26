@@ -28,7 +28,7 @@ export default function AssistantTrigger({ screen }: Props) {
       >
         <Ionicons name="sparkles" size={16} color={colors.primary} />
         <Text style={[styles.label, { color: colors.primary }]}>
-          {t(`aiAssistant.trigger.${screen}`) || (t("aiAssistant.trigger.ask") || "Chiedi all'AI")}
+          {t(`aiAssistant.trigger.${screen}`) || (t("aiAssistant.trigger.ask") || "Chiedi a Bowie")}
         </Text>
       </Pressable>
       <AssistantChatSheet visible={open} onClose={() => setOpen(false)} />

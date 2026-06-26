@@ -78,9 +78,9 @@ const ADMIN_OPTS: Record<string, { title: string } | { headerShown: false }> = {
   "telemetry-user/[userId]": { title: "Dettaglio Sessioni" },
   "boot-log": { title: "Boot Log Avvio" },
   "metro-crashes": { title: "Crash Metro" },
-  "ai-assistant": { title: "AI Assistant" },
+  "ai-assistant": { title: "Bowie" },
   "match-explain": { title: "Explain Matching" },
-  "ai-assistant-config": { title: "AI Assistant Config" },
+  "ai-assistant-config": { title: "Bowie Config" },
 } as const;
 
 export default function AdminLayout() {

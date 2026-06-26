@@ -176,8 +176,8 @@ const translations: Record<string, string> = {
 
   "nav.rerouting": "Recalculating route…",
 
-  "aiAssistant.prefs.title": "AI assistant preferences",
-  "aiAssistant.prefs.description": "Customise AI assistant behaviour",
+  "aiAssistant.prefs.title": "Bowie",
+  "aiAssistant.prefs.description": "Customise Bowie, your virtual assistant",
   "aiAssistant.prefs.adminDisabled": "Disabled by administrator",
   "aiAssistant.prefs.disable": "Disable assistant",
   "aiAssistant.prefs.disableHint": "The assistant will not appear on any screen",
@@ -199,19 +199,19 @@ const translations: Record<string, string> = {
   "aiAssistant.confirm.title": "Confirm",
   "aiAssistant.confirm.fallback": "Do you want to proceed?",
   "aiAssistant.confirm.yes": "Yes",
-  "aiAssistant.title": "AI Assistant",
-  "aiAssistant.emptyHint": "Ask me anything about your riding experience",
+  "aiAssistant.title": "Bowie",
+  "aiAssistant.emptyHint": "Hi, I'm Bowie! Ask me anything about BikerLink.",
   "aiAssistant.inputPlaceholder": "Write a message…",
 
   "common.assistantBack": "Back",
   "common.assistantDone": "Done",
   "common.assistantNext": "Next",
 
-  "aiAssistant.tip.cta": "Try the assistant",
+  "aiAssistant.tip.cta": "Try Bowie",
   "aiAssistant.tip.dismiss": "Not now",
   "aiAssistant.tip.never": "Don't show again",
   "aiAssistant.trigger.${screen}": "Need help?",
-  "aiAssistant.trigger.ask": "Ask the assistant",
+  "aiAssistant.trigger.ask": "Ask Bowie",
 
   "tracking.loadPointsError": "Error loading points",
   "tracking.sharingNotAvailable": "Sharing not available",

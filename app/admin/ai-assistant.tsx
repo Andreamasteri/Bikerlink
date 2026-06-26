@@ -139,7 +139,7 @@ export default function AiAssistantAdminScreen() {
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <Stack.Screen options={AI_ASSISTANT_SCREEN_OPTIONS} />
       <View style={styles.header}>
-        <Text style={styles.title}>AI Assistant Utenti</Text>
+        <Text style={styles.title}>Bowie · Utenti</Text>
         <Text style={styles.subtitle}>Config per piattaforma (Android / iOS).</Text>
       </View>
 

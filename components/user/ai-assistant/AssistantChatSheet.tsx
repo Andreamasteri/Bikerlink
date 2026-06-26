@@ -137,7 +137,7 @@ export default function AssistantChatSheet({ visible, onClose }: Props) {
       >
         <View style={[styles.header, { borderBottomColor: colors.border }]}>
           <Ionicons name="sparkles" size={20} color={colors.primary} />
-          <Text style={[styles.title, { color: colors.text }]}>{t("aiAssistant.title") || "AI Assistant"}</Text>
+          <Text style={[styles.title, { color: colors.text }]}>{t("aiAssistant.title") || "Bowie"}</Text>
           <Pressable testID="assistant-chat-close" onPress={onClose} hitSlop={12}>
             <Ionicons name="close" size={24} color={colors.text} />
           </Pressable>

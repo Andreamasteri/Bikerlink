@@ -53,8 +53,8 @@ export function EditAssistantPrefs({
     <View style={[styles.section, { backgroundColor: colors.surface, borderColor: colors.border }]}>
       <Text style={[styles.title, { color: colors.text }]}>Assistente & Widget</Text>
       <Text style={[styles.desc, { color: colors.textSecondary }]}>
-        Il pallino flottante di navigazione include l'assistente AI: gestisci qui
-        sia il widget che le preferenze dell'assistente.
+        Il pallino flottante di navigazione include Bowie, il tuo assistente
+        virtuale: gestisci qui sia il widget che le preferenze di Bowie.
       </Text>
 
       <View style={styles.row}>

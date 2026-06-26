@@ -236,7 +236,7 @@ export default function AdminChatWidget() {
             <MaterialIcons name="auto-awesome" size={16} color="#fff" />
           </View>
           <View style={styles.headerTextBox}>
-            <Text style={styles.headerTitle}>Assistente AI</Text>
+            <Text style={styles.headerTitle}>Bowie</Text>
             <Text style={styles.headerSub}>Chiedi statistiche, business, OTA, stato servizi</Text>
           </View>
         </View>

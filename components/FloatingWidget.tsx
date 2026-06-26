@@ -223,7 +223,7 @@ export default function FloatingWidget() {
       {menuOpen && (
         <Pressable style={styles.overlay} onPress={() => setMenuOpen(false)}>
           <Pressable style={styles.menu} onPress={() => {}}>
-            <Text style={styles.menuTitle}>Navigazione & Assistente AI</Text>
+            <Text style={styles.menuTitle}>Navigazione & Bowie</Text>
 
             <Pressable
               style={styles.menuItem}
@@ -267,7 +267,7 @@ export default function FloatingWidget() {
                 }}
               >
                 <Ionicons name="sparkles-outline" size={22} color={Colors.accent} />
-                <Text style={styles.menuItemText}>Assistente AI</Text>
+                <Text style={styles.menuItemText}>Bowie</Text>
               </Pressable>
             )}
 
