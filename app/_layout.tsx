@@ -309,23 +309,22 @@ function NormalRootLayout() {
 
 // Task #4979 — gate flag-based del BootGate diagnostico.
 //
-// Contratto di NON-regressione: se NESSUN flag è attivo questa funzione renderizza
-// <NormalRootLayout/> esattamente come prima. Durante la decisione (`decision ===
-// null`) mostra una View piena di colore — MAI null (vedi StartupGate/MapReadyGate:
-// null smonta lo Stack → loop).
+// FORCE_BOOT_GATE = true: BootGate attivo in modo SINCRONO al primo render,
+// senza attendere API né AsyncStorage. Garantisce che l'utente veda la schermata
+// di bisect anche se l'app crashava prima che il flag asincrono venisse risolto.
+// Imposta a false (e pubblica un nuovo OTA) quando il bisect è completato.
 //
-// L'attivazione è strettamente opt-in e considera DUE sorgenti per l'avvio CORRENTE:
-//  1. flag LOCALE su AsyncStorage (`__BOOT_GATE__`) — lettura immediata.
-//  2. flag REMOTO dal manifest (`bootGateEnabled`) — fetch con timeout breve.
-// Il BootGate parte se ANCHE solo una delle due è true. La risoluzione vive in
-// `resolveBootGateActive()` (lib/boot-gate-passive.ts): è memoizzata e CONDIVISA
-// con i checkpoint passivi pre-React, così c'è UN solo fetch del manifest per
-// avvio e la stessa decisione vale sia per il Livello A (UI) sia per il Livello B
-// (passivo). Con entrambe a false (caso normale) → comportamento byte-identico.
+// Quando FORCE_BOOT_GATE è false, la risoluzione è flag-based (AsyncStorage locale
+// OPPURE manifest remoto `bootGateEnabled`). Con entrambi a false → percorso normale.
+const FORCE_BOOT_GATE = true;
+
 export default function RootLayout() {
-  const [decision, setDecision] = useState<boolean | null>(null);
+  const [decision, setDecision] = useState<boolean | null>(
+    FORCE_BOOT_GATE ? true : null,
+  );
 
   useEffect(() => {
+    if (FORCE_BOOT_GATE) return; // flag hardcoded: salta la risoluzione asincrona
     let cancelled = false;
     (async () => {
       const active = await resolveBootGateActive();
