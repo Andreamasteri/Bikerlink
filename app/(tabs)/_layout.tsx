@@ -43,37 +43,11 @@ const FAKE_HOME_INTRO_KEY = "fake_home_intro_seen_v1";
 const TABS_HEADER_TITLE_STYLE = { fontFamily: "Inter_600SemiBold" } as const;
 const TABS_SCREEN_OPTIONS = { headerTitleStyle: TABS_HEADER_TITLE_STYLE } as const;
 
-// ANTI-LOOP (root cause fix OTA #189):
-// useMemo(getTabScreens, [t, gpsTabHref, isBikerOrCoppia]) viene invalidato quando
-// isBikerOrCoppia cambia al boot (null→user carica). Questo ricrea 15 nuovi options
-// objects per i Tabs.Screen → useLayoutEffect di ogni screen → setOptions × 15
-// → scheduleUpdate × 15 → useSyncState.listeners.forEach × 50 → crash.
-//
-// FIX: BOOT_SCREENS module-level stabili (per il periodo pre-user) +
-// ref congelato che crea le opzioni reali UNA SOLA VOLTA (al primo isReady=true)
-// e non le cambia mai → nessun cascade possibile.
-//
-// BOOT_SCREENS devono avere href corretto (undefined per le tab visibili, null per
-// quelle nascoste) in modo che il custom tab bar le filtri correttamente.
-// Le Tabs.Screen con href:null vengono escluse dalla tab bar da renderCustomTabBar
-// tramite il check `options.tabBarButton === "function"`.
-const BOOT_SCREENS: React.ReactElement[] = [
-  <Tabs.Screen key="index" name="index" options={{ headerShown: false }} />,
-  <Tabs.Screen key="proposals" name="proposals" options={{}} />,
-  <Tabs.Screen key="ready" name="ready" options={{ headerShown: false }} />,
-  <Tabs.Screen key="motoclub" name="motoclub" options={{ headerShown: false }} />,
-  <Tabs.Screen key="eventi" name="eventi" options={{ headerShown: false }} />,
-  <Tabs.Screen key="match" name="match" options={{ headerShown: false }} />,
-  <Tabs.Screen key="music" name="music" options={{ headerShown: false }} />,
-  <Tabs.Screen key="chat" name="chat" options={{ headerShown: false }} />,
-  <Tabs.Screen key="contest" name="contest" options={{}} />,
-  <Tabs.Screen key="arcade" name="arcade" options={{}} />,
-  <Tabs.Screen key="ride" name="ride" options={{ href: null }} />,
-  <Tabs.Screen key="giri" name="giri" options={{ href: null, headerShown: false }} />,
-  <Tabs.Screen key="tracking" name="tracking" options={{ href: null }} />,
-  <Tabs.Screen key="garage" name="garage" options={{ href: null }} />,
-  <Tabs.Screen key="profile" name="profile" options={{}} />,
-];
+// ANTI-LOOP (root cause fix OTA #190):
+// i children di <Tabs> (Tabs.Screen elements) NON devono mai cambiare dopo il mount.
+// Qualsiasi ricreazione di options objects → useLayoutEffect × 15 → setOptions × 15
+// → scheduleUpdate × 15 → useSyncState.listeners × 50 → loop sincrono → crash.
+// Fix: frozenTabScreensRef creato al primo render, mai aggiornato (vedere uso sotto).
 
 interface LayoutGatingMeData {
   profile?: { fakeHomeLatitude?: number | null; fakeHomeLongitude?: number | null } | null;
@@ -377,15 +351,27 @@ export default function TabLayout() {
     setFakeHomeDontShowGlobal,
   } = useLayoutGating(user, meData as LayoutGatingMeData | null | undefined);
 
-  // ANTI-LOOP: ref congelato — vedere commento BOOT_SCREENS a inizio file.
-  // tabScreens viene creato UNA SOLA VOLTA al primo render con user disponibile
-  // (isReady=true) e MAI aggiornato dopo. Prima di isReady usa BOOT_SCREENS
-  // module-level (stabili, nessuna dep runtime → nessun cascade possibile).
+  // ANTI-LOOP (fix definitivo OTA #190):
+  // tabScreens viene creato UNA SOLA VOLTA al primissimo render del componente
+  // e MAI aggiornato dopo — indipendentemente da isTabBarReady / isBikerOrCoppia.
+  //
+  // Il fix precedente (OTA #189) era ancora sbagliato: usava BOOT_SCREENS prima
+  // di isTabBarReady e poi passava a frozenTabScreensRef.current — quella
+  // transizione creava di nuovo 15 nuovi options objects → cascade identico.
+  //
+  // Regola: i children di <Tabs> (gli elementi React.ReactElement dei Tabs.Screen)
+  // NON devono mai cambiare dopo il mount. Qualsiasi cambio ricrea le options objects
+  // → useLayoutEffect × 15 → setOptions × 15 → useSyncState.listeners × 50 → loop.
+  //
+  // Compromesso accettabile: al primo render user=null → isBikerOrCoppia=false →
+  // il tab "garage" avrà title=t("garage.tabWishlist"). La screen del garage
+  // stessa corregge il proprio header con navigation.setOptions quando l'utente
+  // la apre. Il tab "garage" ha href:null → non appare nella tab bar custom.
   const frozenTabScreensRef = React.useRef<React.ReactElement[] | null>(null);
-  if (frozenTabScreensRef.current === null && isTabBarReady) {
+  if (frozenTabScreensRef.current === null) {
     frozenTabScreensRef.current = getTabScreens(t, { gpsTabHref, isBikerOrCoppia });
   }
-  const tabScreens = frozenTabScreensRef.current ?? BOOT_SCREENS;
+  const tabScreens = frozenTabScreensRef.current;
 
   // tabBarStyle / tabBarLabelStyle / tabBarActiveTintColor / tabBarInactiveTintColor
   // NON vengono passati a screenOptions (ignorati con renderCustomTabBar custom).
