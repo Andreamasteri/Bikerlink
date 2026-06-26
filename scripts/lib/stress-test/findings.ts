@@ -13,21 +13,44 @@
 import type { Finding, Pool, TickSnapshot } from "./types";
 import type { IntegrityResult } from "./sandbox";
 
+/**
+ * Soglie ritarate dopo il primo run reale (Task #4975). Le motivazioni complete
+ * sono nella sezione "Calibrazione soglie" del SKILL.md. In sintesi: il DB
+ * managed Replit ha jitter sub-secondo costante anche a basso carico (run reale:
+ * p90≈344ms, p95≈777ms sugli endpoint DB-bound, con blip isolati a 5-11s) e la
+ * fase `saturation` (in `all`) satura il pool ~1/4 del tempo PER DESIGN: le
+ * soglie iniziali (p99 500/2000, pool 20/50) producevano falsi positivi a ogni
+ * tick/run. Sono state alzate per separare il rumore di piattaforma dai segnali
+ * reali, e la soglia seq-scan abbassata sotto le dimensioni del seed sandbox.
+ */
 export const THRESHOLDS = {
-  /** p99 (ms) oltre cui un tick è warning / critical. */
-  p99WarnMs: 500,
-  p99CriticalMs: 2_000,
-  /** error rate aggregato di un tick oltre cui warning / critical. */
+  /** p99 (ms) oltre cui un tick è warning / critical. Alzata da 500/2000:
+   *  il DB managed tocca regolarmente sub-secondo per jitter normale; 1s separa
+   *  la pressione reale dal rumore, 3s sta vicino al statement_timeout (8-10s). */
+  p99WarnMs: 1_000,
+  p99CriticalMs: 3_000,
+  /** error rate aggregato di un tick oltre cui warning / critical. Invariata:
+   *  il run reale non ha prodotto una distribuzione di errori DB pulita (i 502
+   *  erano app/AI), e i cluster per-codice gestiscono la sfumatura (POOL_TIMEOUT
+   *  atteso in saturation). 1%/5% restano una calibrazione standard difendibile. */
   errorRateWarn: 0.01,
   errorRateCritical: 0.05,
-  /** % di tick con pool pieno oltre cui warning / critical. */
-  poolFullPctWarn: 20,
-  poolFullPctCritical: 50,
-  /** Degradazione % del p99 (ultimo terzo vs primo terzo) oltre cui warning. */
-  latencyTrendWarnPct: 50,
-  latencyTrendCriticalPct: 150,
-  /** Righe stimate oltre cui un Seq Scan in EXPLAIN è sospetto. */
-  seqScanRowsThreshold: 5_000,
+  /** % di tick con pool pieno oltre cui warning / critical. Alzata da 20/50:
+   *  in `all` la fase saturation (~1/4 del run, pool max=workers/2) riempie il
+   *  pool per design; 30/60 tollerano quel quarto e segnalano solo l'eccesso. */
+  poolFullPctWarn: 30,
+  poolFullPctCritical: 60,
+  /** Degradazione % del p99 (ultimo terzo vs primo terzo) oltre cui warning.
+   *  Alzata da 50/150: cold-cache iniziale + blip di piattaforma fanno oscillare
+   *  la media di un terzo >50% senza degrado reale; 75/200 filtrano il jitter. */
+  latencyTrendWarnPct: 75,
+  latencyTrendCriticalPct: 200,
+  /** Righe stimate oltre cui un Seq Scan in EXPLAIN è sospetto. Abbassata da
+   *  5000: i seed sandbox sono embeddings=1000 / spatial=5000, quindi a 5000 la
+   *  regola non scattava mai. 2000 sta sopra la tabella embeddings (1000 righe,
+   *  dove il planner sceglie legittimamente seq scan → niente falso positivo) e
+   *  sotto la spatial (5000), così un GIST inutilizzato viene finalmente colto. */
+  seqScanRowsThreshold: 2_000,
 } as const;
 
 /** Query read campione su cui girare EXPLAIN per cercare seq scan. */

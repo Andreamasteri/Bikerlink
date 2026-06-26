@@ -124,12 +124,12 @@ raccomandazione:
 
 | Categoria | Trigger (soglia in `THRESHOLDS`) |
 |-----------|----------------------------------|
-| `latency` | p99 di tick ≥ 500ms (warn) / ≥ 2000ms (critical) |
-| `latency` (trend) | p99 dell'ultimo terzo +50% (warn) / +150% (critical) vs primo terzo → degrado nel tempo (bloat, cache fredda, lock crescenti) |
-| `pool` | % tick con pool pieno ≥ 20% (warn) / ≥ 50% (critical) |
+| `latency` | p99 di tick ≥ 1000ms (warn) / ≥ 3000ms (critical) |
+| `latency` (trend) | p99 dell'ultimo terzo +75% (warn) / +200% (critical) vs primo terzo → degrado nel tempo (bloat, cache fredda, lock crescenti) |
+| `pool` | % tick con pool pieno ≥ 30% (warn) / ≥ 60% (critical) |
 | `errors` | error rate ≥ 1% (warn) / ≥ 5% (critical) + cluster per codice noto |
 | `lock` | PID bloccati / waiter su Lock da `pg_locks` |
-| `index` | `Seq Scan` in `EXPLAIN` su tabella con ≥ 5000 righe stimate → indice mancante/non usato |
+| `index` | `Seq Scan` in `EXPLAIN` su tabella con ≥ 2000 righe stimate → indice mancante/non usato |
 | `integrity` | `_stress_writes`: write perse (conteggio ≠ atteso), id duplicati, payload NULL sotto concorrenza |
 
 Severità: **critical** = intervenire (collo di bottiglia o corruzione reale);
@@ -163,6 +163,46 @@ npx tsx scripts/db-stress-test.ts --duration=86400 --workers=6 --scenario=all
 > Se in futuro si libera uno slot workflow, si può registrare un workflow
 > `DB Stress Test` (output type `console`, **senza** autostart e **fuori** dalla
 > validazione run-all) con lo stesso comando qui sopra.
+
+## Calibrazione soglie (ritaratura post primo run reale)
+
+Le soglie iniziali erano stime ragionevoli ma non calibrate sul comportamento del
+DB managed Replit. Dopo il primo run reale sono state ritarate per eliminare i
+falsi positivi (Task #4975). Le motivazioni, da rileggere prima di toccarle:
+
+- **`p99WarnMs` 500 → 1000, `p99CriticalMs` 2000 → 3000.** Il DB managed Replit
+  ha jitter sub-secondo costante anche a basso carico: nel run reale gli endpoint
+  DB-bound stavano a p50≈19ms / p90≈344ms / p95≈777ms, con blip isolati a 5-11s
+  (cold cache, autovacuum, jitter di piattaforma). Un warn a 500ms scattava su
+  quasi ogni tick. 1s separa la pressione reale dal rumore; 3s sta vicino allo
+  `statement_timeout` (8s mon / 10s test), cioè la zona di pericolo vera.
+- **`poolFullPctWarn` 20 → 30, `poolFullPctCritical` 50 → 60.** In `all` la fase
+  `saturation` gira ~1/4 del run con `testPool.max = floor(workers/2)`: il pool è
+  pieno PER DESIGN in quella finestra, quindi ~25% dei tick risultano "pieni"
+  anche quando va tutto bene. Un warn a 20% scattava a ogni run. 30/60 tollerano
+  il quarto di saturazione intenzionale e segnalano solo l'eccesso patologico.
+- **`latencyTrendWarnPct` 50 → 75, `latencyTrendCriticalPct` 150 → 200.** Il
+  confronto primo-terzo vs ultimo-terzo è sensibile al cold-cache iniziale e ai
+  blip di piattaforma: pochi spike in un terzo spostano la media >50% senza un
+  degrado reale. 75/200 filtrano il jitter mantenendo il segnale di degrado vero
+  (bloat, dead tuple, lock crescenti) sui run lunghi.
+- **`seqScanRowsThreshold` 5000 → 2000.** I seed sandbox sono `embeddings=1000` e
+  `spatial=5000` (`scripts/db-stress-test.ts`). A 5000 la regola non scattava mai
+  (la spatial, dopo il filtro `ST_DWithin`, stima meno righe; la embeddings ha
+  solo 1000 righe). 2000 sta sopra la embeddings — dove su 1000 righe il planner
+  sceglie legittimamente il seq scan, quindi niente falso positivo — e sotto la
+  spatial, così un indice GIST non usato produce un seq scan ~5000 che ora viene
+  finalmente segnalato. Se aumenti i seed, rivedi anche questa soglia.
+- **`errorRateWarn`/`errorRateCritical` invariate (1%/5%).** Il run reale non ha
+  prodotto una distribuzione di errori *DB* pulita (i 502 osservati erano dello
+  strato app/AI, non query DB), quindi non c'era una base solida per ritararle.
+  1%/5% restano standard difendibili; la sfumatura "errore atteso sotto stress"
+  (es. `POOL_TIMEOUT` durante `saturation`) è già gestita dai cluster per-codice.
+
+> Quando ritari di nuovo: confronta sempre le soglie con la distribuzione reale
+> dei tick (`logs/stress-test-*.jsonl` del run più recente — istogramma latenze,
+> `poolFullPct` per fase, `errorCodes`) prima di cambiare i numeri, e aggiorna in
+> lockstep sia `THRESHOLDS` (con i commenti inline) sia la tabella più sopra.
 
 ## Come estendere (skill aggiornabile)
 
