@@ -13,7 +13,8 @@ planetiler). GraphHopper di produzione gira in Docker (×7 aree), non sull'host.
 - Host = Ubuntu 26.04 LTS ("resolute"). **OpenJDK 25 LTS è nei repo ufficiali Ubuntu**
   (`openjdk-25-jdk`, candidate 25.0.3) → NON serve Temurin/tarball.
 - Default di sistema = Java 25 (update-alternatives auto, priorità più alta = best).
-  `/usr/bin/java` → `java-25-openjdk-amd64`. OpenJDK 21 lasciato come fallback; 17 rimosso/purgato.
+  `/usr/bin/java` → `java-25-openjdk-amd64`. OpenJDK 21 purgato (2026-06-26); 17 rimosso in precedenza.
+- Solo alternativa registrata: `/usr/lib/jvm/java-25-openjdk-amd64/bin/java` (priorità 2511).
 
 ## Gotcha update-alternatives
 Le openjdk Ubuntu auto-registrano l'alternativa con priorità crescente per major
