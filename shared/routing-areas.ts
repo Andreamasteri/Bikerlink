@@ -28,7 +28,8 @@ export type RoutingAreaCode =
   | "iberia"
   | "arco-alpino"
   | "germania-centro"
-  | "francia-benelux";
+  | "francia-benelux"
+  | "ecuador";
 
 /**
  * Fascia operativa del gruppo:
@@ -200,6 +201,20 @@ export const ROUTING_AREAS: RoutingArea[] = [
     abilitatoDefault: false,
     pbfApproxGb: 6.7,
     serveHeapMb: 4096,
+  },
+  {
+    codice: "ecuador",
+    nome: "Ecuador",
+    nazioni: [
+      { iso: "EC", nome: "Ecuador", geofabrik: "ecuador" },
+    ],
+    bbox: { minLon: -92.0, minLat: -5.1, maxLon: -75.0, maxLat: 1.7 },
+    portaInterna: 8997,
+    path: "/areas/ecuador",
+    tier: "on-demand",
+    abilitatoDefault: false,
+    pbfApproxGb: 0.1,
+    serveHeapMb: 2048,
   },
 ];
 
