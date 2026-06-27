@@ -6,7 +6,7 @@
 #
 # Cosa fa:
 #   1. Verifica i prerequisiti (Docker + plugin compose, curl, osmium).
-#   2. Unisce i PBF delle aree core in valhalla-merged.osm.pbf (se necessario).
+#   2. Unisce i PBF delle aree core in europeecuador-merged.osm.pbf (se necessario).
 #   3. Ferma il container Valhalla (se in esecuzione) per liberare i volumi.
 #   4. Genera valhalla.json con valhalla_build_config.
 #   5. Costruisce gli admin database con valhalla_build_admins.
@@ -40,7 +40,7 @@ cd "$SCRIPT_DIR"
 DATA_DIR="${DATA_DIR:-${SCRIPT_DIR}/data}"
 ENV_FILE="${SCRIPT_DIR}/.env"
 
-MERGED_PBF="${DATA_DIR}/valhalla-merged.osm.pbf"
+MERGED_PBF="${DATA_DIR}/europeecuador-merged.osm.pbf"
 VALHALLA_JSON="${DATA_DIR}/valhalla.json"
 
 # Aree core da unire per Valhalla (modifica se vuoi coprire aree on-demand).
@@ -56,7 +56,7 @@ POLL_INTERVAL_SECS="${POLL_INTERVAL_SECS:-10}"
 # Percorsi interni al container (come da docker-compose.yml).
 CONTAINER_DATA_DIR="/custom_files"
 CONTAINER_TILES_DIR="/custom_files/valhalla_tiles"
-CONTAINER_PBF="/custom_files/valhalla-merged.osm.pbf"
+CONTAINER_PBF="/custom_files/europeecuador-merged.osm.pbf"
 CONTAINER_JSON="/custom_files/valhalla.json"
 CONTAINER_ADMINS="/custom_files/valhalla_tiles/admins.sqlite"
 CONTAINER_TIMEZONES="/custom_files/valhalla_tiles/timezones.sqlite"
@@ -114,7 +114,7 @@ if [[ ${#MISSING[@]} -gt 0 ]]; then
   die "PBF mancanti per le aree: ${MISSING[*]}"
 fi
 
-# ── Merge PBF aree → valhalla-merged.osm.pbf ─────────────────────────────────
+# ── Merge PBF aree → europeecuador-merged.osm.pbf ────────────────────────────
 needs_merge=false
 if [[ ! -f "$MERGED_PBF" ]]; then
   needs_merge=true
@@ -127,6 +127,23 @@ else
 fi
 
 if [[ "$needs_merge" == "true" ]]; then
+  # Warning se il file di destinazione esiste già ed è >10 GB (sovrascrittura lenta/distruttiva).
+  if [[ -f "$MERGED_PBF" ]]; then
+    _size_bytes=$(stat -c%s "$MERGED_PBF" 2>/dev/null || echo 0)
+    _ten_gb=$((10 * 1024 * 1024 * 1024))
+    if (( _size_bytes > _ten_gb )); then
+      _size_human=$(du -h "$MERGED_PBF" | cut -f1)
+      echo -e "\033[31m  ⚠  ATTENZIONE: ${MERGED_PBF} esiste già (${_size_human}) ed è >10 GB.\033[0m"
+      echo -e "\033[31m     Il merge sovrascriverà il file esistente (operazione lenta e distruttiva).\033[0m"
+      if [[ "${NONINTERACTIVE:-0}" == "1" ]]; then
+        log "[PBF] NONINTERACTIVE=1 — skip merge per sicurezza. Rimuovi manualmente il file per forzare."
+        exit 0
+      fi
+      read -r -p "  Continuare con la sovrascrittura? [s/N] " _merge_reply
+      [[ "${_merge_reply,,}" == "s" || "${_merge_reply,,}" == "y" ]] \
+        || { log "[PBF] Merge annullato dall'utente."; exit 0; }
+    fi
+  fi
   log "[PBF] Unione PBF aree in ${MERGED_PBF}..."
   osmium merge "${AREA_PBFS[@]}" -o "$MERGED_PBF" --overwrite
   log "[PBF] merge completato ✓ ($(du -h "$MERGED_PBF" | cut -f1))"

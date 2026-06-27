@@ -65,6 +65,11 @@ for (( i=0; i<${#args[@]}; i++ )); do
       echo "Dataset disponibili su Geofabrik:"
       echo "  Italia       https://download.geofabrik.de/europe/italy-latest.osm.pbf  (~1.7 GB)"
       echo "  Nord Italia  https://download.geofabrik.de/europe/italy/nord-ovest-latest.osm.pbf"
+      echo ""
+      echo "Dataset locale (ThinkCentre):"
+      echo "  Europa+Ecuador  file:///nominatim_data/europeecuador-merged.osm.pbf  (~33 GB / ~400 GB DB / ~24-48h)"
+      echo "  Seleziona opzione 5 dal menu interattivo, oppure passa:"
+      echo "    NOMINATIM_PBF_URL=file:///nominatim_data/europeecuador-merged.osm.pbf NOMINATIM_FREEZE=true $0 --pbf-url file:///nominatim_data/europeecuador-merged.osm.pbf --freeze --no-wait"
       exit 0 ;;
     *) die "Argomento sconosciuto: ${args[$i]} (usa --help)" ;;
   esac
@@ -78,23 +83,24 @@ declare -A DATASET_URLS=(
   [2]="https://download.geofabrik.de/europe/italy/nord-ovest-latest.osm.pbf"
   [3]="https://download.geofabrik.de/europe/italy/nord-est-latest.osm.pbf"
   [4]="custom"
-  # Opzione 5 (non mostrata nel menu interattivo): usa il file locale già in DATA_DIR.
-  # Il container Nominatim monta DATA_DIR_HOST in /nominatim_data (sola lettura).
-  # Impostare manualmente: NOMINATIM_PBF_URL=file:///nominatim_data/valhalla-merged.osm.pbf
-  # Il file valhalla-merged.osm.pbf (Europa + Ecuador, ~33 GB) è già in DATA_DIR
-  # (copiato da infra/self-host/data/ dalla cartella MAPPE dell'NVMe).
+  # Opzione 5: usa il file locale già in DATA_DIR (montato in /nominatim_data:ro nel container).
+  # Il file europeecuador-merged.osm.pbf (Europa intera + Ecuador, ~33 GB) è in DATA_DIR_HOST.
+  # FREEZE=true viene forzato automaticamente (nessun aggiornamento OSM automatico).
+  [5]="file:///nominatim_data/europeecuador-merged.osm.pbf"
 )
 declare -A DATASET_LABELS=(
   [1]="Italia intera        (~1.7 GB PBF / ~30 GB DB / ~1-2h)"
   [2]="Nord-Ovest Italia    (~350 MB PBF / ~5 GB DB  / ~15 min)"
   [3]="Nord-Est Italia      (~300 MB PBF / ~5 GB DB  / ~15 min)"
   [4]="URL personalizzato"
+  [5]="File locale Europa+Ecuador  (~33 GB / ~400 GB DB / ~24-48h)"
 )
 declare -A DATASET_REPLICATION=(
   [1]="https://download.geofabrik.de/europe/italy-updates/"
   [2]="https://download.geofabrik.de/europe/italy/nord-ovest-updates/"
   [3]="https://download.geofabrik.de/europe/italy/nord-est-updates/"
   [4]=""
+  [5]=""
 )
 
 # =============================================================================
@@ -136,7 +142,7 @@ else
     echo ""
     bold "Scegli il dataset OSM da importare:"
     echo ""
-    for key in 1 2 3 4; do
+    for key in 1 2 3 4 5; do
       echo "  ${key}) ${DATASET_LABELS[$key]}"
     done
     echo ""
@@ -145,11 +151,11 @@ else
       CHOICE=1
       info "Modalità non-interattiva: selezionato Italia intera (default)."
     else
-      read -r -p "  Scelta [1-4, default: 1]: " CHOICE
+      read -r -p "  Scelta [1-5, default: 1]: " CHOICE
       CHOICE="${CHOICE:-1}"
     fi
 
-    if [[ ! "$CHOICE" =~ ^[1-4]$ ]]; then
+    if [[ ! "$CHOICE" =~ ^[1-5]$ ]]; then
       warn "Scelta non valida — uso Italia intera (1)."
       CHOICE=1
     fi
@@ -161,6 +167,13 @@ else
       SELECTED_PBF_URL="${DATASET_URLS[$CHOICE]}"
       SELECTED_REPLICATION_URL="${DATASET_REPLICATION[$CHOICE]}"
     fi
+
+    # Opzione 5 — file locale Europa+Ecuador: FREEZE obbligatorio (non ci sono update OSM).
+    if [[ "$CHOICE" == "5" ]]; then
+      FREEZE="true"
+      info "Opzione 5 selezionata: FREEZE=true forzato (nessun aggiornamento OSM automatico)."
+    fi
+
     ok "Dataset selezionato: ${DATASET_LABELS[$CHOICE]:-$SELECTED_PBF_URL}"
   fi
 fi
