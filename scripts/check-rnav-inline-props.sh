@@ -145,6 +145,32 @@ if [ -n "$SCREEN_INLINE_OPTS" ]; then
   FAIL=1
 fi
 
+# ── Stack/Tabs.Screen options={{}} inline NEI _layout*.tsx ────────────────────
+# I sub-layout annidati (app/admin/sensors, app/route, app/routes, app/contest…)
+# montano i loro Stack.Screen quando il navigator si attiva durante la
+# navigazione. Anche un options={{ title: "…" }} statico è un nuovo oggetto
+# literal ad ogni render del layout → useLayoutEffect([options]) di React
+# Navigation → setOptions → re-render → "Maximum update depth exceeded".
+# Il check SCREEN_INLINE_OPTS sopra ESCLUDE i _layout.tsx; questo lo specchia
+# proprio per loro. `rg` salta di default le righe-solo-commento? No → si filtra
+# manualmente via grep -v sulle righe che iniziano con // o *.
+LAYOUT_INLINE_OPTS=$(rg -n '<(Stack|Tabs)\.Screen[^/]*options=\{\{' \
+  --glob 'app/**/_layout*.tsx' \
+  --glob '!node_modules/**' --glob '!.local/**' --glob '!.agents/**' \
+  2>/dev/null || true)
+if [ -n "$LAYOUT_INLINE_OPTS" ]; then
+  # Ignora righe di commento (// ... oppure * ... oppure {/* ... */}).
+  LAYOUT_INLINE_OPTS=$(printf '%s\n' "$LAYOUT_INLINE_OPTS" \
+    | grep -vE ':[0-9]+:[[:space:]]*(//|\*|\{/\*)' || true)
+fi
+if [ -n "$LAYOUT_INLINE_OPTS" ]; then
+  echo ""
+  echo "❌ TROVATO — Stack/Tabs.Screen options={{}} inline in _layout file"
+  echo "$LAYOUT_INLINE_OPTS"
+  echo "   → Estrarre in dizionario di costanti module-level (vedi ADMIN_OPTS/SENSORS_OPTS)."
+  FAIL=1
+fi
+
 # ── [router] come unica dep di un hook (loop setOptions / redirect loop) ──────
 # Pattern pericoloso: [router] come sola dep di useEffect/useCallback/useMemo.
 #  - In useEffect che fa router.replace/push → redirect loop (router cambia ref).

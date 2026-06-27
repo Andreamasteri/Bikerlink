@@ -31,7 +31,7 @@ export async function sendEmailDetailed(to: string, subject: string, html: strin
     const result: EmailSendResult = {
       ok: false,
       errorCode: "no-credentials",
-      error: "Credenziali Gmail non configurate (né in DB app_settings né in env GMAIL_USER/GMAIL_APP_PASSWORD).",
+      error: "Credenziali Gmail non configurate (env GMAIL_USER/GMAIL_APP_PASSWORD mancanti).",
       recipient: to,
       source: "none"
     };

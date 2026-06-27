@@ -35,26 +35,32 @@ export async function runBootPhase3DbInit(): Promise<void> {
   }
 
   try {
-    const { storage } = await import("./storage");
-    const [gmailUserSetting, gmailPassSetting] = await Promise.all([
-      storage.getAppSetting("gmail_user"),
-      storage.getAppSetting("gmail_app_password"),
-    ]);
+    // SMTP credentials are read ONLY from env (process.env.GMAIL_USER /
+    // GMAIL_APP_PASSWORD). Non si scrivono più in app_settings: i segreti nel DB
+    // operativo allargano la superficie di esposizione. Qui ci limitiamo a
+    // confermare la presenza delle env (senza stamparne il valore) e a
+    // verificare l'auth SMTP in background.
     const envUser = process.env.GMAIL_USER;
     const envPass = process.env.GMAIL_APP_PASSWORD;
-    if (envUser && !gmailUserSetting?.value) {
-      await storage.upsertAppSetting("gmail_user", envUser);
-      console.log("[EMAIL BOOTSTRAP] gmail_user scritto in app_settings da secret env");
+    if (envUser && envPass) {
+      console.log("[EMAIL BOOTSTRAP] credenziali Gmail presenti in env (GMAIL_USER/GMAIL_APP_PASSWORD)");
+    } else {
+      if (!envUser) console.warn("[EMAIL BOOTSTRAP] GMAIL_USER non trovato in env — email non funzionerà");
+      if (!envPass) console.warn("[EMAIL BOOTSTRAP] GMAIL_APP_PASSWORD non trovato in env — email non funzionerà");
     }
-    if (envPass && !gmailPassSetting?.value) {
-      await storage.upsertAppSetting("gmail_app_password", envPass);
-      console.log("[EMAIL BOOTSTRAP] gmail_app_password scritto in app_settings da secret env");
-    }
-    if (!envUser && !gmailUserSetting?.value) {
-      console.warn("[EMAIL BOOTSTRAP] GMAIL_USER non trovato né in env né in DB — email non funzionerà");
-    }
-    if (!envPass && !gmailPassSetting?.value) {
-      console.warn("[EMAIL BOOTSTRAP] GMAIL_APP_PASSWORD non trovato né in env né in DB — email non funzionerà");
+    // One-time cleanup: purge legacy SMTP secrets persisted by older builds.
+    // Le credenziali ora vivono SOLO nelle env; eventuali righe residue in
+    // app_settings sono segreti nel DB operativo e vanno rimosse (idempotente).
+    try {
+      const purged = await db.execute(
+        sql`DELETE FROM app_settings WHERE key IN ('gmail_user', 'gmail_app_password')`,
+      );
+      const removed = (purged as { rowCount?: number }).rowCount ?? 0;
+      if (removed > 0) {
+        console.log(`[EMAIL BOOTSTRAP] rimosse ${removed} credenziali SMTP legacy da app_settings (ora env-only)`);
+      }
+    } catch (e) {
+      console.warn("[EMAIL BOOTSTRAP] cleanup credenziali SMTP legacy fallito (non-fatale):", e);
     }
     setImmediate(async () => {
       try {

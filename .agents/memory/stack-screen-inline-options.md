@@ -21,10 +21,11 @@ navigation state update → ri-render del navigator → ri-render della screen �
 nuovo oggetto `options` → loop → "Maximum update depth exceeded".
 
 **Why:** I file `_layout.tsx` si ri-renderano raramente MA possono farlo (cambio
-tema, cambio `renderKey` lingua, remount). Se il componente in `_layout.tsx`
-usa hooks come `useTheme()` o `useColors()`, i `options={{}}` inline causano lo
-stesso loop. I gate CI escludono `_layout.tsx` per evitare falsi positivi, ma
-i layout con hooks vanno fixati manualmente con costanti module-level.
+tema, cambio `renderKey` lingua, remount) o vengono montati al passaggio di
+navigazione (sub-layout annidati: `app/route`, `app/routes`, `app/contest`,
+`app/admin/sensors`). Anche un `options={{ title: "…" }}` statico è un nuovo
+oggetto literal a ogni render → stesso loop. Per questo il gate CI ORA copre
+ANCHE i `_layout*.tsx` (vedi sotto), non solo le screen.
 
 **How to apply:**
 - Options **statiche** (valori primitivi costanti): estrarre in costante module-level
@@ -41,18 +42,12 @@ i layout con hooks vanno fixati manualmente con costanti module-level.
   );
   ```
 - Gate CI: `scripts/check-rnav-inline-props.sh` cattura il pattern
-  `<(Stack|Tabs)\.Screen.*options=\{\{` in file non-`_layout.tsx`.
+  `<(Stack|Tabs)\.Screen.*options=\{\{` SIA nelle screen (`SCREEN_INLINE_OPTS`)
+  SIA nei `_layout*.tsx` (`LAYOUT_INLINE_OPTS`, ignora le righe-solo-commento).
 
-## Fix applicati (OTA #180)
-- `app/notifications.tsx` → useMemo (deps: hasContent, headerRight)
-- `app/match/archived.tsx` → useMemo (deps: t)
-- `app/recap.tsx` → costante RECAP_SCREEN_OPTIONS
-- `app/admin/ai-assistant.tsx` → costante AI_ASSISTANT_SCREEN_OPTIONS
-- `app/admin/match-explain.tsx` → costante MATCH_EXPLAIN_SCREEN_OPTIONS
-
-## Fix applicati (OTA #181) — layout files con hooks
-- `app/_layout.tsx` → `RootLayoutNav` (usa `useTheme()`): aggiunte costanti
-  module-level `ROOT_HIDDEN_HEADER` e `ROOT_ONBOARDING_SCREEN_OPTIONS`.
-  Tutte le 15 Stack.Screen ora usano le costanti (non più inline).
-- `app/admin/_layout.tsx` → `AdminLayout` (usa `useColors()`): introdotto
-  lookup table module-level `ADMIN_OPTS` con tutti i 75+ titoli/opzioni.
+## Convenzione fix
+- Layout con molti screen (es. `app/admin/_layout.tsx`): usa una lookup table
+  module-level (pattern `ADMIN_OPTS`/`SENSORS_OPTS`/…) che mappa name→options
+  `as const`; il JSX referenzia `OPTS[name]`, mai oggetti inline.
+- Layout con hook (`useTheme()`/`useColors()`): le options statiche restano
+  costanti module-level; quelle che dipendono dai colori vanno in `useMemo`.

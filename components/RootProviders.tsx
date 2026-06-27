@@ -12,14 +12,17 @@ import { TaskbarStyleProvider } from "@/lib/taskbar-style-context";
 import { UnitsProvider } from "@/lib/units-context";
 import { PlayerProvider } from "@/lib/player-context";
 import { FloatingWidgetProvider } from "@/lib/floating-widget-context";
+import { UptimeWidgetProvider } from "@/lib/uptime-widget-context";
+import { AutoTelemetryProvider } from "@/lib/auto-telemetry-context";
 import { queryClient } from "@/lib/query-client";
 import { useAuth } from "@/lib/auth-context";
 
-// ── Provider chain OTA-155-safe ──────────────────────────────────────────────
-// Questa lista è IDENTICA alla catena di provider che esisteva in OTA 155.
-// I provider aggiunti successivamente (AutoTelemetry, UptimeWidget, Keyboard,
-// PersistQueryClient) sono intenzionalmente ESCLUSI: verranno reintrodotti uno
-// per uno DOPO che il BootGate avrà identificato la root cause del loop boot.
+// ── Catena provider (outer → inner) ──────────────────────────────────────────
+// Ordine corrente definito in PROVIDER_LAYERS sotto. REGOLA: qualsiasi nuovo
+// provider DEVE esporre un context value memoizzato con useMemo (e callback con
+// useCallback). Un value oggetto literal cambia referenza ad ogni render →
+// re-render a cascata sui consumer → alimenta il loop setOptions di React
+// Navigation ("Maximum update depth exceeded"). Gate: check-rnav-inline-props.sh.
 // ─────────────────────────────────────────────────────────────────────────────
 
 function ChatSseGate({ children }: { children: React.ReactNode }) {
@@ -71,6 +74,8 @@ export const PROVIDER_LAYERS: ProviderLayer[] = [
   { id: "location", Component: LocationProvider },
   { id: "player", Component: PlayerProvider },
   { id: "floating_widget", Component: FloatingWidgetProvider },
+  { id: "uptime_widget", Component: UptimeWidgetProvider },
+  { id: "auto_telemetry", Component: AutoTelemetryProvider },
   { id: "gesture_handler", Component: GestureLayer },
 ];
 

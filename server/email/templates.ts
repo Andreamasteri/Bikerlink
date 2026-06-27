@@ -39,20 +39,13 @@ export interface EmailDiagnostics {
 export interface EmailCredentials {
   user: string;
   pass: string;
-  source: "db" | "env";
+  source: "env";
 }
 
+// Credenziali SMTP lette ESCLUSIVAMENTE da env (process.env.GMAIL_USER /
+// GMAIL_APP_PASSWORD). Il vecchio fallback a app_settings è stato rimosso: i
+// segreti nel DB operativo allargano la superficie di esposizione.
 export async function getEmailCredentials(): Promise<EmailCredentials | null> {
-  try {
-    const userSetting = await storage.getAppSetting("gmail_user");
-    const passSetting = await storage.getAppSetting("gmail_app_password");
-    if (userSetting?.value && passSetting?.value) {
-      return { user: userSetting.value, pass: passSetting.value, source: "db" };
-    }
-  } catch {
-    // fallback to env vars
-  }
-
   const user = process.env.GMAIL_USER;
   const pass = process.env.GMAIL_APP_PASSWORD;
   if (user && pass) {
