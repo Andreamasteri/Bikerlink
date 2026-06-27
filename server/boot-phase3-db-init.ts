@@ -373,24 +373,24 @@ export async function runBootPhase3DbInit(): Promise<void> {
   }
 
   try {
-    const redisUrl = process.env.REDIS_URL ?? process.env.REDIS_URI;
-    if (!redisUrl) {
-      console.log("[boot] Redis: REDIS_URL non impostato — fallback in-memory attivo");
+    const tcRedisUrl = process.env.TC_REDIS_URL;
+    if (!tcRedisUrl) {
+      console.log("[boot] Redis: TC_REDIS_URL non impostato — fallback in-memory attivo");
     } else {
       try {
         const ioredis = await import("ioredis").catch(() => null);
         if (ioredis) {
           const Redis = (ioredis as { default?: unknown }).default ?? ioredis;
           const RedisCtor = Redis as unknown as { new (url: string, opts?: unknown): { ping: () => Promise<string>; quit: () => Promise<unknown> } };
-          const client = new RedisCtor(redisUrl, { lazyConnect: true, maxRetriesPerRequest: 1, connectTimeout: 2000 });
+          const client = new RedisCtor(tcRedisUrl, { lazyConnect: true, maxRetriesPerRequest: 1, connectTimeout: 2000 });
           const t0 = Date.now();
           await client.ping();
           const ms = Date.now() - t0;
           await client.quit().catch(() => {});
-          console.log(`[boot] Redis: raggiungibile — ping ${ms}ms (${redisUrl.replace(/:[^:@]*@/, ":***@")})`);
+          console.log(`[boot] Redis TC: raggiungibile — ping ${ms}ms (${tcRedisUrl.replace(/:[^:@]*@/, ":***@")})`);
         }
       } catch (redisErr) {
-        console.warn(`[boot] Redis: NON raggiungibile (${(redisErr as Error).message}) — fallback in-memory attivo`);
+        console.warn(`[boot] Redis TC: NON raggiungibile (${(redisErr as Error).message}) — fallback in-memory attivo`);
       }
     }
   } catch (e) {

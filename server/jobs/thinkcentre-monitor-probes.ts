@@ -196,9 +196,15 @@ function tcpConnectOk(host: string, port: number): Promise<boolean | null> {
 }
 
 async function probeRedisOk(): Promise<boolean | null> {
-  const host = process.env.REDIS_PROBE_HOST?.trim();
-  if (!host) return null;
-  return tcpConnectOk(host, parseInt(process.env.REDIS_PROBE_PORT ?? "6379", 10));
+  const tcRedisUrl = process.env.TC_REDIS_URL?.trim();
+  // Skip probe quando TC_REDIS_URL non è configurato: Redis non è atteso.
+  if (!tcRedisUrl) return null;
+  try {
+    const u = new URL(tcRedisUrl);
+    return tcpConnectOk(u.hostname, u.port ? parseInt(u.port, 10) : 6379);
+  } catch {
+    return false;
+  }
 }
 
 async function probePostgresOk(): Promise<boolean | null> {

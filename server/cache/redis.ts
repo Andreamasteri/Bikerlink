@@ -1,13 +1,14 @@
 import Redis, { type RedisOptions } from "ioredis";
 
 /**
- * Centralised ioredis client + helpers (Task #2517).
+ * Centralised ioredis client + helpers.
  *
- * Lazy singleton: instantiates only when REDIS_URL is set. All call sites must
- * tolerate `getRedis()` returning null and fall back to in-memory behaviour.
- * Connection errors never throw — they flip `available` to false and let the
- * caller proceed without Redis. A periodic reconnect attempt is built into
- * ioredis via `retryStrategy`.
+ * Reads TC_REDIS_URL (ThinkCentre self-hosted Redis). When not set, or when
+ * the TC is offline, the module operates in fallback (in-memory) mode.
+ *
+ * All call sites must tolerate `getRedis()` returning null and fall back to
+ * in-memory behaviour. A periodic reconnect is NOT built into ioredis here —
+ * re-init/suspend is driven externally by the ThinkCentre monitor.
  */
 
 type ClientState = {
@@ -15,6 +16,7 @@ type ClientState = {
   available: boolean;
   lastError: string | null;
   lastErrorAt: number | null;
+  tcProbeOk: boolean | null;
 };
 
 const state: ClientState = {
@@ -22,24 +24,13 @@ const state: ClientState = {
   available: false,
   lastError: null,
   lastErrorAt: null,
+  tcProbeOk: null,
 };
 
 let initAttempted = false;
 
-// ── Circuit breaker per quota Upstash esaurita ──────────────────────────────
-// Upstash impone un tetto di richieste (free tier: 500k/mese). Quando è
-// raggiunto, OGNI comando ritorna "ERR max requests limit exceeded". È un
-// errore a livello di COMANDO (ReplyError), non di connessione: la socket resta
-// "ready", quindi l'handler `error` non scatta e `state.available` resterebbe
-// `true`. Risultato: cache call-sites e worker BullMQ continuano a martellare
-// Redis, ogni comando fallisce, i log si riempiono e l'event loop si satura →
-// le API rallentano e l'app resta su "Aggiornamento dati…".
-//
-// Quando rileviamo questo errore apriamo un circuito: per la durata del
-// cooldown `getRedis()`/`isRedisAvailable()` ritornano null/false così tutto
-// ricade sul fallback in-memory/DB e smette di colpire Redis. Alla scadenza il
-// circuito si richiude da solo e Redis viene ritentato (la quota può essersi
-// resettata o essere stata aumentata).
+// ── Upstash quota circuit breaker (kept for compatibility / generic rate-limit protection) ──
+// If any Redis server returns a quota error, we open a cooldown circuit.
 const QUOTA_ERROR_RE = /max requests? limit exceeded|max daily request|max monthly request|ERR max requests/i;
 const QUOTA_COOLDOWN_MS = 15 * 60_000;
 let circuitOpenUntil = 0;
@@ -48,16 +39,15 @@ function circuitOpen(): boolean {
   return Date.now() < circuitOpenUntil;
 }
 
-/** True se l'errore è il tetto richieste Upstash (quota esaurita). */
+/** True se l'errore indica un tetto richieste esaurito. */
 export function isRedisQuotaError(err: unknown): boolean {
   const msg = err instanceof Error ? err.message : String(err ?? "");
   return QUOTA_ERROR_RE.test(msg);
 }
 
 /**
- * Apre il circuito quando la quota Upstash è esaurita: marca Redis come non
- * disponibile per `QUOTA_COOLDOWN_MS` così l'app degrada senza martellare il
- * server. Idempotente: logga una sola volta per finestra di apertura.
+ * Apre il circuito quando la quota è esaurita: marca Redis come non
+ * disponibile per `QUOTA_COOLDOWN_MS`. Idempotente: logga una sola volta.
  */
 export function noteRedisQuotaExhausted(source: string): void {
   const now = Date.now();
@@ -68,7 +58,7 @@ export function noteRedisQuotaExhausted(source: string): void {
   state.lastErrorAt = now;
   if (!wasOpen) {
     console.warn(
-      `[Redis] quota Upstash esaurita (${source}) — circuito aperto per ${Math.round(QUOTA_COOLDOWN_MS / 60_000)}min, fallback in-memory/DB`,
+      `[Redis] quota esaurita (${source}) — circuito aperto per ${Math.round(QUOTA_COOLDOWN_MS / 60_000)}min, fallback in-memory/DB`,
     );
   }
 }
@@ -85,29 +75,23 @@ export function noteRedisErrorMaybeQuota(source: string, err: unknown): boolean 
   return false;
 }
 
+function getRedisUrl(): string | undefined {
+  return process.env.TC_REDIS_URL;
+}
+
 function buildOptions(url: string): RedisOptions {
   const opts: RedisOptions = {
     lazyConnect: false,
     maxRetriesPerRequest: 2,
     enableReadyCheck: true,
-    // Fail-fast: i comandi emessi mentre la connessione è giù falliscono
-    // subito (niente coda offline) → il chiamante ricade sul fallback
-    // in-memory (cache miss / lock locale) senza bloccare.
+    // Fail-fast: comandi emessi mentre la connessione è giù falliscono subito
+    // → il chiamante ricade sul fallback in-memory senza bloccare.
     enableOfflineQueue: false,
-    // Timeout per singolo tentativo di connessione TLS.
-    connectTimeout: 8_000,
-    // Riconnessione automatica con backoff esponenziale capped (max 30s).
-    // Con Redis cloud (Upstash) la connessione è affidabile: dopo un blip di
-    // rete vogliamo riconnetterci da soli, non restare offline fino al
-    // restart del backend. Il backoff cap a 30s evita il flooding (al più un
-    // tentativo ogni 30s) e l'handler `error` qui sotto assorbe gli errori
-    // senza loggarli per-evento; il filtro console.error in server/index.ts
-    // copre eventuali "[ioredis] Unhandled error event" residui.
-    retryStrategy: (times: number) => Math.min(times * 1000, 30_000),
+    connectTimeout: 3_000,
+    // ThinkCentre Redis è locale: NO retry automatici — la riconnessione
+    // è gestita dal ThinkCentre monitor via reInitRedis().
+    retryStrategy: () => null,
   };
-  // Upstash richiede TLS. Con un URL `rediss://` ioredis abilita già il TLS,
-  // ma impostiamo esplicitamente `tls: {}` per coprire gli edge case (SNI /
-  // servername derivato dall'host). Mai su URL `redis://` plaintext.
   if (url.startsWith("rediss://")) {
     opts.tls = {};
   }
@@ -117,23 +101,21 @@ function buildOptions(url: string): RedisOptions {
 function init(): void {
   if (initAttempted) return;
   initAttempted = true;
-  const url = process.env.REDIS_URL;
+  const url = getRedisUrl();
   if (!url) {
-    console.log("[Redis] REDIS_URL not set — running in fallback (in-memory) mode");
+    console.log("[Redis] TC_REDIS_URL not set — running in fallback (in-memory) mode");
     return;
   }
   try {
     const client = new Redis(url, buildOptions(url));
     client.on("ready", () => {
       state.available = true;
-      console.log("[Redis] connected and ready");
+      console.log("[Redis] connected and ready (TC)");
     });
     client.on("error", (err: unknown) => {
       state.available = false;
       state.lastError = err instanceof Error ? err.message : String(err);
       state.lastErrorAt = Date.now();
-      // La quota Upstash può emergere anche come errore di connessione: apri il
-      // circuito così non si ritenta prima del cooldown.
       if (isRedisQuotaError(err)) noteRedisQuotaExhausted("client-error");
     });
     client.on("end", () => {
@@ -145,6 +127,55 @@ function init(): void {
     state.lastErrorAt = Date.now();
     console.warn("[Redis] init failed, fallback mode:", state.lastError);
   }
+}
+
+/**
+ * Tenta di (ri-)inizializzare la connessione Redis usando TC_REDIS_URL.
+ * Chiamato dal ThinkCentre monitor quando il TC torna online e la probe Redis è OK.
+ * Se Redis è già connesso e disponibile, è no-op.
+ */
+export async function reInitRedis(): Promise<void> {
+  const url = getRedisUrl();
+  if (!url) {
+    console.log("[Redis] reInitRedis: TC_REDIS_URL non configurato — skip");
+    return;
+  }
+  // Chiude il client esistente se presente (potrebbe essere in stato di errore).
+  if (state.client) {
+    if (state.available) {
+      console.log("[Redis] reInitRedis: già connesso e disponibile — skip");
+      return;
+    }
+    try { await state.client.quit(); } catch { /* ignore */ }
+    state.client = null;
+    state.available = false;
+  }
+  // Reset per permettere una nuova init.
+  initAttempted = false;
+  circuitOpenUntil = 0;
+  init();
+  console.log("[Redis] reInitRedis: tentativo di riconnessione al TC avviato");
+}
+
+/**
+ * Sospende Redis: chiude il client e marca come non disponibile.
+ * Chiamato dal ThinkCentre monitor quando il TC va offline.
+ * Nessuna reconnect automatica — sarà reInitRedis() a ripristinare.
+ */
+export async function suspendRedis(): Promise<void> {
+  if (!state.client && !state.available) {
+    return; // già sospeso
+  }
+  if (state.client) {
+    try { await state.client.quit(); } catch { /* ignore */ }
+    state.client = null;
+  }
+  state.available = false;
+  state.lastError = "TC offline — sospeso dal monitor";
+  state.lastErrorAt = Date.now();
+  // Consenti una futura reInit (non bloccare su initAttempted=true).
+  initAttempted = false;
+  console.log("[Redis] suspendRedis: connessione chiusa (TC offline)");
 }
 
 export function getRedis(): Redis | null {
@@ -162,18 +193,11 @@ export function getRawRedis(): Redis | null {
 /**
  * Opzioni di connessione dedicate a BullMQ.
  *
- * BullMQ richiede `maxRetriesPerRequest: null` sulle sue connessioni bloccanti
- * (i Worker usano `BRPOPLPUSH`); passargli il client cache condiviso
- * (`maxRetriesPerRequest: 2`) fa lanciare a runtime
- * "Your redis options maxRetriesPerRequest must be null" e impedisce l'avvio
- * dei worker. Passiamo quindi a Queue/Worker un *oggetto opzioni* derivato da
- * REDIS_URL: BullMQ crea e gestisce le proprie connessioni (duplicando
- * correttamente quella bloccante), separate dal client cache.
- *
- * Ritorna null se REDIS_URL non è configurato (modalità fallback in-memory).
+ * BullMQ richiede `maxRetriesPerRequest: null` sulle sue connessioni bloccanti.
+ * Ritorna null se TC_REDIS_URL non è configurato (modalità fallback in-memory).
  */
 export function getBullConnectionOptions(): RedisOptions | null {
-  const url = process.env.REDIS_URL;
+  const url = getRedisUrl();
   if (!url) return null;
   try {
     const u = new URL(url);
@@ -184,8 +208,8 @@ export function getBullConnectionOptions(): RedisOptions | null {
       password: u.password ? decodeURIComponent(u.password) : undefined,
       maxRetriesPerRequest: null,
       enableReadyCheck: true,
-      connectTimeout: 8_000,
-      retryStrategy: (times: number) => Math.min(times * 1000, 30_000),
+      connectTimeout: 3_000,
+      retryStrategy: () => null,
     };
     if (url.startsWith("rediss://")) {
       opts.tls = {};
@@ -203,11 +227,23 @@ export function isRedisAvailable(): boolean {
   return state.available;
 }
 
+/**
+ * Aggiorna il risultato dell'ultima probe TCP Redis del ThinkCentre monitor.
+ * Chiamato dal monitor dopo ogni ciclo di probe.
+ */
+export function setTcRedisProbeOk(ok: boolean | null): void {
+  state.tcProbeOk = ok;
+}
+
 export function getRedisStatus() {
   if (!initAttempted) init();
+  const url = getRedisUrl();
+  const source: "thinkcentre" | "none" = process.env.TC_REDIS_URL ? "thinkcentre" : "none";
   return {
-    configured: !!process.env.REDIS_URL,
+    configured: !!url,
     available: state.available && !circuitOpen(),
+    source,
+    tcProbeOk: state.tcProbeOk,
     quotaCircuitOpen: circuitOpen(),
     quotaCircuitResetsAt: circuitOpen() ? new Date(circuitOpenUntil).toISOString() : null,
     lastError: state.lastError,
@@ -217,18 +253,10 @@ export function getRedisStatus() {
 
 /**
  * Crea un client Redis dedicato al pub/sub (psubscribe/subscribe).
- *
- * NON usa `duplicate()` sul client cache perché quello ha
- * `enableOfflineQueue:false` — con Upstash (TLS remoto) il duplicate
- * tenta `psubscribe` prima che la connessione sia ready e fallisce
- * immediatamente. Questo client usa `enableOfflineQueue:true` +
- * `maxRetriesPerRequest:null` (richiesto per connessioni bloccanti)
- * e si riconnette autonomamente.
- *
- * Ritorna null se REDIS_URL non è configurato.
+ * Ritorna null se TC_REDIS_URL non è configurato.
  */
 export function createPubSubClient(): Redis | null {
-  const url = process.env.REDIS_URL;
+  const url = getRedisUrl();
   if (!url) return null;
   try {
     const opts: RedisOptions = {
@@ -236,8 +264,8 @@ export function createPubSubClient(): Redis | null {
       maxRetriesPerRequest: null,
       enableReadyCheck: true,
       enableOfflineQueue: true,
-      connectTimeout: 8_000,
-      retryStrategy: (times: number) => Math.min(times * 1000, 30_000),
+      connectTimeout: 3_000,
+      retryStrategy: () => null,
     };
     if (url.startsWith("rediss://")) {
       opts.tls = {};

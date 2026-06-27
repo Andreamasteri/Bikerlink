@@ -41,6 +41,7 @@ import {
   fetchSelfHostedProfiles,
   runAllProbes,
 } from "./thinkcentre-monitor-probes";
+import { reInitRedis, suspendRedis, setTcRedisProbeOk } from "../cache/redis";
 
 // ── Config ────────────────────────────────────────────────────────────────────
 const PROBE_INTERVAL_MS = 5 * 60 * 1000;
@@ -210,6 +211,10 @@ export async function runThinkCentreProbe(): Promise<void> {
   const isFirstRun = prev === null;
   lastStatus = current;
 
+  // Aggiorna il risultato della probe Redis in redis.ts (esposto via getRedisStatus().tcProbeOk).
+  const redisProbeResult = services.find((s) => s.key === "redis");
+  setTcRedisProbeOk(redisProbeResult?.ok ?? null);
+
   if (isFirstRun) {
     console.log(`[thinkcentre-monitor] stato iniziale: ${current}`);
     await handlePerServiceNotifications(services, true);
@@ -232,6 +237,8 @@ export async function runThinkCentreProbe(): Promise<void> {
       );
       console.log(`[thinkcentre-monitor] notifica offline inviata a ${n} admin`);
     }
+    // TC offline → sospendi Redis (evita flooding di errori di connessione).
+    void suspendRedis();
     return;
   }
 
@@ -249,6 +256,12 @@ export async function runThinkCentreProbe(): Promise<void> {
       console.log(`[thinkcentre-monitor] notifica online inviata a ${n} admin`);
     }
     void checkMotorcycleProfile();
+    // TC tornato online → riprova connessione Redis se la probe Redis è OK.
+    const redisProbe = services.find((s) => s.key === "redis");
+    if (redisProbe?.ok === true) {
+      void reInitRedis();
+      console.log("[thinkcentre-monitor] Redis TC: riconnessione avviata (probe OK)");
+    }
     return;
   }
 

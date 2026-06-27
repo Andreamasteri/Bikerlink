@@ -15,11 +15,11 @@ let hadSuccessfulConnection = false;
 
 export async function collectRedis(): Promise<Signal[]> {
   const signals: Signal[] = [];
-  const url = process.env.REDIS_URL ?? process.env.REDIS_URI;
+  const url = process.env.TC_REDIS_URL;
   if (!url) {
     signals.push({
       source: "redis", metric: "redis.absent", severity: "info",
-      details: { reason: "REDIS_URL non impostato" },
+      details: { reason: "TC_REDIS_URL non impostato" },
     });
     return signals;
   }
