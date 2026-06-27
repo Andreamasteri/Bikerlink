@@ -41,15 +41,22 @@ async function easGraphQL(query: string, variables?: Record<string, unknown>): P
 // Sincronizza il branch EAS `production` nel DB locale per tracking admin.
 // Task #2503: i nuovi update sincronizzati da EAS finiscono come `pending` —
 // l'admin li approva poi manualmente dal pannello.
+// Usa paginazione (limit 100 per pagina) per recuperare tutti gli update
+// anche quando il branch ne contiene più di 100.
 async function syncProductionUpdates(): Promise<{ inserted: number; backfilled: number }> {
-  const query = `
-    query GetBranchUpdates($appId: String!) {
+  const PAGE_LIMIT = 100;
+
+  type EasUpdate = { id: string; group?: string; message?: string; runtimeVersion?: string; createdAt?: string };
+  type EasData = { app?: { byId?: { updateBranches?: Array<{ id: string; name: string; updates?: EasUpdate[] }> } } };
+
+  const pageQuery = `
+    query GetBranchUpdates($appId: String!, $offset: Int!, $limit: Int!) {
       app {
         byId(appId: $appId) {
           updateBranches(offset: 0, limit: 10) {
             id
             name
-            updates(offset: 0, limit: 20) {
+            updates(offset: $offset, limit: $limit) {
               id
               group
               message
@@ -62,17 +69,28 @@ async function syncProductionUpdates(): Promise<{ inserted: number; backfilled: 
     }
   `;
 
-  let data: { app?: { byId?: { updateBranches?: Array<{ id: string; name: string; updates?: Array<{ id: string; group?: string; message?: string; runtimeVersion?: string; createdAt?: string }> }> } } };
-  try {
-    data = await easGraphQL(query, { appId: EAS_PROJECT_ID }) as typeof data;
-  } catch (err) {
-    console.warn("[ota-sync] EAS GraphQL error:", err);
-    throw err;
+  // Raccoglie tutti gli update del branch production con paginazione
+  const updates: EasUpdate[] = [];
+  let offset = 0;
+  while (true) {
+    let data: EasData;
+    try {
+      data = await easGraphQL(pageQuery, { appId: EAS_PROJECT_ID, offset, limit: PAGE_LIMIT }) as EasData;
+    } catch (err) {
+      console.warn("[ota-sync] EAS GraphQL error:", err);
+      throw err;
+    }
+
+    const branches = data?.app?.byId?.updateBranches ?? [];
+    const productionBranch = branches.find((b) => b.name === "production");
+    const page = productionBranch?.updates ?? [];
+    updates.push(...page);
+
+    if (page.length < PAGE_LIMIT) break;   // ultima pagina
+    offset += PAGE_LIMIT;
   }
 
-  const branches = data?.app?.byId?.updateBranches ?? [];
-  const productionBranch = branches.find((b) => b.name === "production");
-  const updates = productionBranch?.updates ?? [];
+  console.log(`[ota-sync] recuperati ${updates.length} update dal branch production`);
   if (updates.length === 0) return { inserted: 0, backfilled: 0 };
 
   let inserted = 0;
