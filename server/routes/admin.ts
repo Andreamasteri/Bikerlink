@@ -3,7 +3,7 @@ import rateLimit from "express-rate-limit";
 import { sendSuccess, sendError } from "../lib/api-response";
 import { storage } from "../storage";
 import { db } from "../db";
-import { motoClubs, motoClubMembers } from "@shared/db";
+import { motoClubs, motoClubMembers, appSettings } from "@shared/db";
 import { clientErrorSchema, startupBeaconSchema } from "@shared/validators";
 import { eq } from "drizzle-orm";
 import { symbolicateStack } from "../lib/symbolicate";
@@ -214,6 +214,30 @@ function _requireAdmin(req: Request, res: Response, next: Function) {
 
 
 
+// Cache breve del flag BootGuard: evita una query DB su OGNI client-error.
+// Quando il BootGuard è attivo persistiamo l'ultimo errore di boot in app_settings
+// (boot_gate_latest_error) così l'agente lo legge in tempo reale via dump-boot-log.
+let _bootGuardFlagCache: { value: boolean; expiresAt: number } | null = null;
+const _BOOTGUARD_CACHE_TTL_MS = 30_000;
+
+async function isBootGuardActive(): Promise<boolean> {
+  if (_bootGuardFlagCache && _bootGuardFlagCache.expiresAt > Date.now()) {
+    return _bootGuardFlagCache.value;
+  }
+  try {
+    const [row] = await db
+      .select({ value: appSettings.value })
+      .from(appSettings)
+      .where(eq(appSettings.key, "boot_gate_enabled"))
+      .limit(1);
+    const value = row?.value === "true";
+    _bootGuardFlagCache = { value, expiresAt: Date.now() + _BOOTGUARD_CACHE_TTL_MS };
+    return value;
+  } catch {
+    return false;
+  }
+}
+
 router.post("/client-error", clientErrorLimiter, clientErrorJson, async (req: Request, res: Response) => {
   try {
     const parsedCe = clientErrorSchema.safeParse(req.body || {});
@@ -240,6 +264,24 @@ router.post("/client-error", clientErrorLimiter, clientErrorJson, async (req: Re
     if (csText) {
       console.error("[CLIENT-ERROR-CS]", csText);
     }
+
+    // BootGuard attivo → persisti l'errore così dump-boot-log lo mostra in tempo reale.
+    if (await isBootGuardActive()) {
+      const errSnapshot = JSON.stringify({
+        message: (message || "unknown").substring(0, 500),
+        stack: resolvedStack.substring(0, 2000),
+        componentStack: csText,
+        platform: platform || "unknown",
+        appVersion: appVersion || "unknown",
+        isFatal: !!isFatal,
+        ts: Date.now(),
+      });
+      db.insert(appSettings)
+        .values({ key: "boot_gate_latest_error", value: errSnapshot })
+        .onConflictDoUpdate({ target: appSettings.key, set: { value: errSnapshot } })
+        .catch(() => {/* best-effort: non blocchiamo il report */});
+    }
+
     return res.json({ received: true });
   } catch {
     return res.status(200).json({ received: true });
