@@ -1,1 +1,1 @@
-Fix boot guard MapScreen: aggiunto !user al guard di avvio (isLoading || !user). Previene il mount di useHomeMapState quando user=null, eliminando il loop 'Maximum update depth exceeded' alla prima apertura dopo token scaduto o fresh install.
+
