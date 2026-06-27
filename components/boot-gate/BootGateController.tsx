@@ -12,7 +12,7 @@
 // identico a quello del percorso normale (passato come prop da _layout.tsx per
 // evitare import circolari).
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { View, StyleSheet } from "react-native";
+import { View, StyleSheet, InteractionManager } from "react-native";
 import * as Updates from "expo-updates";
 import * as SplashScreen from "expo-splash-screen";
 import { initSessionToken } from "@/lib/query-client";
@@ -57,6 +57,13 @@ export function BootGateController({
   // resetKey forza il re-mount dell'ErrorBoundary della catena ad ogni
   // "Ricomincia", così un crash provider precedente non resta in stato error.
   const [resetKey, setResetKey] = useState(0);
+  // Task #5065 — de-sincronizza il mount di NormalRootLayout dal commit in cui
+  // bootComplete diventa true. Senza questo, lo Stack fresco monta nello stesso
+  // tick del setState(bootComplete=true) → useLayoutEffect/setOptions di React
+  // Navigation si scatenano a cascata → "Maximum update depth exceeded".
+  // Con showApp ritardato di un frame (InteractionManager), il navigatore si
+  // stabilizza prima che l'albero reale venga aggiunto.
+  const [showApp, setShowApp] = useState(false);
   // Provider step in attesa di conferma di mount. L'esito (passed/stopped) è
   // deciso in modo asincrono: onLevelMounted (successo) o handleProviderError
   // (crash in render). Ref perché letto dentro callback senza dover ri-renderizzare.
@@ -76,6 +83,18 @@ export function BootGateController({
   useEffect(() => {
     SplashScreen.hideAsync().catch(() => {});
   }, []);
+
+  // Task #5065 — ritarda il mount di NormalRootLayout di un frame dopo che
+  // bootComplete diventa true. InteractionManager.runAfterInteractions garantisce
+  // che il navigatore si stabilizzi PRIMA che lo Stack fresco venga aggiunto,
+  // spezzando la cascata useLayoutEffect → setOptions che causava il loop.
+  useEffect(() => {
+    if (!bootComplete) return;
+    const handle = InteractionManager.runAfterInteractions(() => {
+      setShowApp(true);
+    });
+    return () => handle.cancel();
+  }, [bootComplete]);
 
   // Ping "reached" ad ogni nuovo step corrente.
   useEffect(() => {
@@ -278,6 +297,11 @@ export function BootGateController({
   }, []);
 
   if (bootComplete) {
+    // showApp è ritardato di un frame (vedi useEffect sopra) per evitare il loop
+    // useLayoutEffect/setOptions che si innesca quando NormalRootLayout monta nello
+    // stesso tick in cui bootComplete diventa true. Mostriamo uno sfondo neutro
+    // per il singolo frame di attesa; lo SplashScreen è già nascosto a questo punto.
+    if (!showApp) return <View style={styles.root} />;
     return <>{renderApp()}</>;
   }
 

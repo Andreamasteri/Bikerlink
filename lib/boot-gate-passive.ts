@@ -17,7 +17,14 @@
 // remoto). Con BootGate spento il buffer viene scartato → nessuna chiamata di rete
 // aggiuntiva oltre all'unica risoluzione del flag (condivisa con RootLayout) e
 // nessun effetto osservabile sul boot normale.
+//
+// GUARD ADMIN-ONLY (Task #5065): il flag REMOTO attiva il BootGate SOLO se
+// l'utente autenticato ha role="admin". Gli utenti normali non admin vengono
+// protetti dall'attivazione involontaria tramite DB condiviso dev/prod. Il flag
+// LOCALE manuale (__BOOT_GATE__) resta riservato agli admin che lo impostano
+// esplicitamente sul proprio device e non è soggetto a questo guard.
 
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { getApiUrl } from "@/lib/query-client";
 import {
   pingBootGate,
@@ -27,6 +34,10 @@ import {
 } from "@/lib/boot-gate-ping";
 
 const REMOTE_TIMEOUT_MS = 2500;
+
+// Chiave dello snapshot utente in cache (deve combaciare con CACHED_USER_KEY
+// in lib/auth-helpers.ts — parte del contratto stabile di storage).
+const CACHED_USER_KEY = "@bikerlink/cached_user";
 
 interface PendingCheckpoint {
   stepId: string;
@@ -45,6 +56,20 @@ let localPromise: Promise<boolean> | null = null;
 let remotePromise: Promise<boolean> | null = null;
 let combinedPromise: Promise<boolean> | null = null;
 let flushing = false;
+
+// Legge il ruolo dell'utente dalla cache locale (AsyncStorage). Restituisce
+// true SOLO se l'utente cachato ha role="admin". Usato per proteggere
+// l'attivazione remota del BootGate: utenti non-admin vengono ignorati.
+async function isCachedUserAdmin(): Promise<boolean> {
+  try {
+    const raw = await AsyncStorage.getItem(CACHED_USER_KEY);
+    if (!raw) return false;
+    const parsed = JSON.parse(raw) as { role?: string };
+    return parsed?.role === "admin";
+  } catch {
+    return false;
+  }
+}
 
 function resolveLocal(): Promise<boolean> {
   if (!localPromise) {
@@ -65,18 +90,23 @@ function resolveRemote(): Promise<boolean> {
             { headers: { "Content-Type": "application/json" }, signal: controller.signal },
           );
           const data = (await res.json()) as { bootGateEnabled?: boolean };
-          const remote = data?.bootGateEnabled === true;
-          // Specchio SIMMETRICO dell'ultimo valore remoto: serve SOLO da fallback
-          // offline al prossimo avvio. Riflette sia l'accensione sia lo spegnimento
-          // remoto — così lo "Disattiva" admin si propaga (niente latch sticky-ON).
-          // L'override MANUALE (`__BOOT_GATE__`) è una sorgente separata e resta
-          // intatto: lo gestisce solo resolveLocal(), mai il remoto.
+          const rawRemote = data?.bootGateEnabled === true;
+          // Specchio SIMMETRICO dell'ultimo valore remoto RAW: persiste il valore
+          // reale del server (non filtrato per ruolo) così un admin che apre l'app
+          // offline può beneficiarne al prossimo avvio anche senza rete.
           try {
-            await setBootGateRemoteMirror(remote);
+            await setBootGateRemoteMirror(rawRemote);
           } catch {
             // no-op: la persistenza è best-effort.
           }
-          return remote;
+          // GUARD ADMIN-ONLY: il flag remoto attiva il gate SOLO se l'utente
+          // cachato è admin. Utenti normali e sessioni anonime vengono ignorati,
+          // proteggendoli dall'accensione involontaria via DB condiviso dev/prod.
+          if (rawRemote) {
+            const isAdmin = await isCachedUserAdmin();
+            if (!isAdmin) return false;
+          }
+          return rawRemote;
         } finally {
           clearTimeout(timer);
         }
@@ -85,7 +115,10 @@ function resolveRemote(): Promise<boolean> {
         // remoto noto, così lo stato remoto persiste tra gli avvii anche senza
         // rete. Mai visto un valore remoto → false (default spento).
         const mirror = await getBootGateRemoteMirror().catch(() => null);
-        return mirror === true;
+        if (mirror !== true) return false;
+        // Anche per il fallback: applica il guard admin-only.
+        const isAdmin = await isCachedUserAdmin();
+        return isAdmin;
       }
     })();
   }
