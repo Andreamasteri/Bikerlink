@@ -7,6 +7,7 @@
 - [React Query mutation ref deps](react-query-mutation-ref-deps.md) — mutation intera nei deps di renderItem/handler FlatList = churn per-tick; `.mutate` è stabile ma exhaustive-deps lo rifiuta → tieni la mutation in un ref (esentato) e deps = solo slice primitive.
 - [Whole-mutation deps gate](mutation-object-deps-gate.md) — check-mutation-object-deps.sh blocca *Mutation intero nei deps di useCallback/useMemo (consente .mutate/.isPending/Ref); ratchet baseline .mutation-object-deps-baseline; in post-merge.sh.
 
+- [GH RAM_STORE OOM silenzioso su PBF grandi](gh-ramstore-oom.md) — aree > 5 GB PBF: import OK 28+ min, exit 0, ma properties mai scritto → OOM durante flush/CH; fix: rimuovi RAM_STORE (usa MMAP), heap 14g; usa ecuador come banco di prova prima di buildare tutto.
 - [vitest lazy-require mock bypass](vitest-cjs-require-mock.md) — lazy `require()` dentro moduli ESM bypassa `vi.mock`; fix: import ESM statico al top del file.
 - [OTA high-water mark floor](ota-hwm-floor.md) — logs/ota-hwm.txt è il terzo floor anti-regressione (dopo EAS+buildInfo); aggiornato atomicamente post-publish; tracked in git (!logs/ota-hwm.txt eccezione in .gitignore).
 - [ThinkCentre SSH access](thinkcentre-ssh-access.md) — credenziali in env: TC_SSH_HOST/USER/PASSWORD/PORT; usa paramiko + `echo $pwd | sudo -S`. Procedura pronta: skill `thinkcentre-access` (helper `tc.py status|exec`). TC_SSH_HOST ha prefisso `Https://` da strippare.
