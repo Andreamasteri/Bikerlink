@@ -32,6 +32,7 @@ export default function OtaPanel() {
   const [approvingId, setApprovingId] = useState<string | null>(null);
   const [rejectingId, setRejectingId] = useState<string | null>(null);
   const [rollingBackId, setRollingBackId] = useState<string | null>(null);
+  const [republishingId, setRepublishingId] = useState<string | null>(null);
   const [forcingUpdate, setForcingUpdate] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [expandedAutoId, setExpandedAutoId] = useState<string | null>(null);
@@ -39,7 +40,7 @@ export default function OtaPanel() {
   const historyInitialized = useRef(false);
 
   const { data: releases, isLoading, refetch, isFetching } = useQuery<OtaRelease[]>({
-    queryKey: ["/api/admin/ota/releases"],
+    queryKey: ["/api/admin/ota/releases?limit=500"],
   });
 
   useEffect(() => {
@@ -55,7 +56,7 @@ export default function OtaPanel() {
     mutationFn: (id: string) => apiRequest("POST", `/api/admin/ota/${id}/approve`),
     onSuccess: () => {
       setApprovingId(null);
-      qc.invalidateQueries({ queryKey: ["/api/admin/ota/releases"] });
+      qc.invalidateQueries({ queryKey: ["/api/admin/ota/releases?limit=500"] });
     },
     onError: (err: Error) => {
       setApprovingId(null);
@@ -67,7 +68,7 @@ export default function OtaPanel() {
     mutationFn: (id: string) => apiRequest("POST", `/api/admin/ota/${id}/reject`),
     onSuccess: () => {
       setRejectingId(null);
-      qc.invalidateQueries({ queryKey: ["/api/admin/ota/releases"] });
+      qc.invalidateQueries({ queryKey: ["/api/admin/ota/releases?limit=500"] });
     },
     onError: (err: Error) => {
       setRejectingId(null);
@@ -79,7 +80,7 @@ export default function OtaPanel() {
     mutationFn: (id: string) => apiRequest("POST", `/api/admin/ota/${id}/rollback`),
     onSuccess: () => {
       setRollingBackId(null);
-      qc.invalidateQueries({ queryKey: ["/api/admin/ota/releases"] });
+      qc.invalidateQueries({ queryKey: ["/api/admin/ota/releases?limit=500"] });
       Alert.alert("Rollback eseguito", "La release è stata ri-pubblicata su EAS production. Gli utenti la riceveranno al prossimo cold start.");
     },
     onError: (err: Error) => {
@@ -88,11 +89,24 @@ export default function OtaPanel() {
     },
   });
 
+  const republishMutation = useMutation({
+    mutationFn: (id: string) => apiRequest("POST", `/api/admin/ota/${id}/republish`),
+    onSuccess: () => {
+      setRepublishingId(null);
+      void qc.invalidateQueries({ queryKey: ["/api/admin/ota/releases?limit=500"] });
+      Alert.alert("Republish eseguito", "Bundle ri-pubblicato come pending. I dispositivi admin lo riceveranno al prossimo cold start. Usa '⚡ Forza Aggiornamento' per applicarlo subito.");
+    },
+    onError: (err: Error) => {
+      setRepublishingId(null);
+      Alert.alert("Errore republish", err.message || "Impossibile ri-pubblicare");
+    },
+  });
+
   const autoRollbackMutation = useMutation({
     mutationFn: (params: { id: string; patch: Record<string, unknown> }) =>
       apiRequest("POST", `/api/admin/ota/${params.id}/auto-rollback`, params.patch),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["/api/admin/ota/releases"] });
+      qc.invalidateQueries({ queryKey: ["/api/admin/ota/releases?limit=500"] });
     },
     onError: (err: Error) => {
       Alert.alert("Errore", err.message || "Impossibile aggiornare config auto-rollback");
@@ -102,7 +116,7 @@ export default function OtaPanel() {
   const setVersionMutation = useMutation({
     mutationFn: ({ id, otaVersion }: { id: string; otaVersion: string }) =>
       apiRequest("PATCH", `/api/admin/ota/${id}/ota-version`, { otaVersion }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["/api/admin/ota/releases"] }); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["/api/admin/ota/releases?limit=500"] }); },
     onError: (err: Error) => { Alert.alert("Errore versione", err.message || "Impossibile impostare versione"); },
   });
 
@@ -112,6 +126,8 @@ export default function OtaPanel() {
   rejectMutationRef.current = rejectMutation;
   const rollbackMutationRef = useRef(rollbackMutation);
   rollbackMutationRef.current = rollbackMutation;
+  const republishMutationRef = useRef(republishMutation);
+  republishMutationRef.current = republishMutation;
   const setVersionMutationRef = useRef(setVersionMutation);
   setVersionMutationRef.current = setVersionMutation;
 
@@ -128,7 +144,7 @@ export default function OtaPanel() {
             try {
               const res = await apiRequest("POST", "/api/admin/ota/sync");
               const result = await res.json() as { ok: boolean; inserted: number; backfilled: number; syncedAt: string };
-              await qc.invalidateQueries({ queryKey: ["/api/admin/ota/releases"] });
+              await qc.invalidateQueries({ queryKey: ["/api/admin/ota/releases?limit=500"] });
               const msg = result.inserted > 0
                 ? `${result.inserted} nuova/e release sincronizzata/e da EAS.`
                 : "Nessuna nuova release su EAS. Lista aggiornata.";
@@ -191,6 +207,23 @@ export default function OtaPanel() {
           onPress: () => {
             setRollingBackId(release.id);
             rollbackMutationRef.current.mutate(release.id);
+          },
+        },
+      ]
+    );
+  }, []);
+
+  const handleRepublish = useCallback((release: OtaRelease) => {
+    Alert.alert(
+      "📡 Republica per test",
+      `Ri-pubblicare il bundle di questa OTA su EAS production come pending?\n\nVersione: ${release.otaVersion ?? release.easUpdateId.slice(0, 8)}\nMessaggio: ${release.message ?? "—"}\n\nSolo i dispositivi admin la riceveranno al cold start. Gli utenti normali non la ricevono finché non viene approvata.`,
+      [
+        { text: "Annulla", style: "cancel" },
+        {
+          text: "Republica per test",
+          onPress: () => {
+            setRepublishingId(release.id);
+            republishMutationRef.current.mutate(release.id);
           },
         },
       ]
@@ -333,7 +366,9 @@ export default function OtaPanel() {
           <Text style={{ fontWeight: "700" }}>Flusso OTA</Text> — Quando pubblichi una OTA è{" "}
           <Text style={{ fontWeight: "700" }}>pending</Text>: solo gli account admin la ricevono al cold start per testarla.
           Dopo aver verificato che funziona, click <Text style={{ fontWeight: "700" }}>Approva</Text> e la OTA viene distribuita a tutti gli utenti al loro prossimo cold start.
-          Se rilevi un problema, click <Text style={{ fontWeight: "700" }}>Rifiuta</Text>. Il flusso è fisso: non esiste un toggle per saltare la fase di test.
+          Se rilevi un problema, click <Text style={{ fontWeight: "700" }}>Rifiuta</Text>. Il flusso è fisso: non esiste un toggle per saltare la fase di test.{" "}
+          Per testare un'OTA specifica (anche obsoleta), usa{" "}
+          <Text style={{ fontWeight: "700" }}>📡 Republica per test</Text> nella card: ri-pubblica il bundle come pending → solo gli admin lo ricevono al cold start.
         </Text>
       </View>
 
@@ -372,6 +407,8 @@ export default function OtaPanel() {
           expandedAutoId={expandedAutoId}
           setExpandedAutoId={setExpandedAutoId}
           autoRollbackMutation={autoRollbackMutation}
+          republishingId={republishingId}
+          handleRepublish={handleRepublish}
         />
       ))}
 
@@ -391,6 +428,8 @@ export default function OtaPanel() {
               expandedAutoId={expandedAutoId}
               setExpandedAutoId={setExpandedAutoId}
               autoRollbackMutation={autoRollbackMutation}
+              republishingId={republishingId}
+              handleRepublish={handleRepublish}
             />
           ))}
         </>

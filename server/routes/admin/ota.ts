@@ -365,6 +365,101 @@ router.post("/:id/rollback", async (req: Request, res: Response) => {
   }
 });
 
+// POST /api/admin/ota/:id/republish
+// Ri-pubblica su EAS il bundle di QUALSIASI release (pending, rejected, approved) come nuova
+// release pending → visibile solo agli admin. Usato per il debug step-by-step: permette di
+// far ricevere una specifica OTA storica al dispositivo di test senza distribuirla agli utenti.
+router.post("/:id/republish", async (req: Request, res: Response) => {
+  try {
+    const id = req.params.id as string;
+    const userId = req.session.userId!;
+
+    const [release] = await db.select().from(otaReleases).where(eq(otaReleases.id, id)).limit(1);
+    if (!release) return sendError(res, 404, "OTA release non trovata");
+    if (!release.easGroupId) {
+      return sendError(res, 400, "Questa release non ha un groupId EAS. Ri-sincronizza prima dal pannello admin (pulsante Sync).");
+    }
+    if (!process.env.EAS_TOKEN) {
+      return sendError(res, 500, "EAS_TOKEN non configurato sul server — impossibile eseguire republish");
+    }
+
+    const republishMessage = `Test republish OTA ${release.otaVersion ?? release.easUpdateId.slice(0, 8)} (by admin)`;
+
+    let stdoutText = "";
+    let stderrText = "";
+    try {
+      const { stdout, stderr } = await execFileAsync(
+        "npx",
+        [
+          "eas",
+          "update",
+          "--republish",
+          "--group",
+          release.easGroupId,
+          "--message",
+          republishMessage,
+          "--non-interactive",
+        ],
+        {
+          env: {
+            ...process.env,
+            EXPO_TOKEN: process.env.EAS_TOKEN,
+            EAS_NO_VCS: "1",
+            EAS_SKIP_AUTO_FINGERPRINT: "1",
+          },
+          timeout: 120_000,
+          maxBuffer: 10 * 1024 * 1024,
+        },
+      );
+      stdoutText = stdout || "";
+      stderrText = stderr || "";
+    } catch (err) {
+      const e = err as { stdout?: string; stderr?: string; message?: string };
+      console.error("[ota] republish eas update --republish FAILED:", e.message, e.stdout, e.stderr);
+      return sendError(res, 500, `EAS republish fallito: ${(e.stderr || e.message || "errore sconosciuto").slice(0, 400)}`);
+    }
+
+    const output = `${stdoutText}\n${stderrText}`;
+    const updateIdMatch = output.match(/Android update ID\s+([a-f0-9-]{36})/i)
+      ?? output.match(/iOS update ID\s+([a-f0-9-]{36})/i)
+      ?? output.match(/Update ID\s+([a-f0-9-]{36})/i);
+    const groupIdMatch = output.match(/Update group ID\s+([a-f0-9-]{36})/i);
+    if (!updateIdMatch || !groupIdMatch) {
+      console.error("[ota] republish parse FAILED — output:\n", output.slice(0, 4000));
+      return sendError(res, 500, "EAS republish completato ma impossibile parsare updateId/groupId dall'output. Verifica manualmente su EAS e ri-esegui Sync.");
+    }
+    const newUpdateId = updateIdMatch[1];
+    const newGroupId = groupIdMatch[1];
+
+    // Inserisce come pending: solo gli admin la ricevono per il debug.
+    // Non viene distribuita agli utenti normali finché non viene approvata.
+    const [inserted] = await db.insert(otaReleases).values({
+      easUpdateId: newUpdateId,
+      easGroupId: newGroupId,
+      channel: "production",
+      runtimeVersion: release.runtimeVersion,
+      message: republishMessage,
+      otaVersion: release.otaVersion ? `${release.otaVersion}-test` : null,
+      status: "pending",
+      publishedAt: new Date(),
+    }).onConflictDoUpdate({
+      target: otaReleases.easUpdateId,
+      set: {
+        status: "pending",
+        channel: "production",
+        easGroupId: newGroupId,
+        message: republishMessage,
+      },
+    }).returning();
+
+    console.log(`[ota][AUDIT] republish (test) release ${id} (${release.easUpdateId}) by user ${userId} → new updateId ${newUpdateId}`);
+    return res.json({ ok: true, republishedFrom: id, newRelease: inserted, output: output.slice(0, 2000) });
+  } catch (err) {
+    console.error("[ota] POST /:id/republish error:", err);
+    return sendError(res, 500, "Errore republish OTA");
+  }
+});
+
 // POST /api/admin/ota/:id/auto-rollback — toggle/aggiorna config auto-rollback per la release
 router.post("/:id/auto-rollback", async (req: Request, res: Response) => {
   try {

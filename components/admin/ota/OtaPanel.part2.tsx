@@ -20,12 +20,15 @@ interface PendingReleaseCardProps {
   expandedAutoId: string | null;
   setExpandedAutoId: (id: string | null) => void;
   autoRollbackMutation: any;
+  republishingId: string | null;
+  handleRepublish: (r: OtaRelease) => void;
 }
 
 export function PendingReleaseCard({
   release, otaNum, colors, tryingId, approvingId, rejectingId,
   handleTryOta, handleApprove, handleReject, handleSetVersion,
-  expandedAutoId, setExpandedAutoId, autoRollbackMutation
+  expandedAutoId, setExpandedAutoId, autoRollbackMutation,
+  republishingId, handleRepublish
 }: PendingReleaseCardProps) {
   const hasGroupId = !!release.easGroupId;
   return (
@@ -128,6 +131,20 @@ export function PendingReleaseCard({
             ? <ActivityIndicator size="small" color={colors.error} />
             : <Text style={[styles.actionBtnText, { color: colors.error }]}>✗ Rifiuta</Text>}
         </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.actionBtn, {
+            backgroundColor: "transparent",
+            borderColor: release.easGroupId ? colors.success : colors.textSecondary + "55",
+            opacity: release.easGroupId ? 1 : 0.5,
+          }]}
+          onPress={() => handleRepublish(release)}
+          disabled={republishingId === release.id || !release.easGroupId}
+        >
+          {republishingId === release.id
+            ? <ActivityIndicator size="small" color={colors.success} />
+            : <Text style={[styles.actionBtnText, { color: release.easGroupId ? colors.success : colors.textSecondary }]}>📡 Republica per test</Text>}
+        </TouchableOpacity>
       </View>
     </View>
   );
@@ -144,23 +161,66 @@ interface HistoryReleaseCardProps {
   expandedAutoId: string | null;
   setExpandedAutoId: (id: string | null) => void;
   autoRollbackMutation: any;
+  republishingId: string | null;
+  handleRepublish: (r: OtaRelease) => void;
 }
 
 export function HistoryReleaseCard({
   release, otaNum, colors, rollingBackId, handleRollback,
-  expandedHistoryId, setExpandedHistoryId, expandedAutoId, setExpandedAutoId, autoRollbackMutation
+  expandedHistoryId, setExpandedHistoryId, expandedAutoId, setExpandedAutoId, autoRollbackMutation,
+  republishingId, handleRepublish
 }: HistoryReleaseCardProps) {
   const isObsolete = release.status === "rejected" && release.rejectedBy === null;
   const sc = getStatusColor(release.status, colors);
 
   if (isObsolete) {
+    const isExpObs = expandedHistoryId === release.id;
     return (
-      <View key={release.id} style={[styles.obsoleteRow, { backgroundColor: colors.surfaceLight, borderColor: colors.border }]}>
-        <View style={[styles.numBadge, { backgroundColor: colors.textSecondary + "99" }]}>
-          <Text style={styles.numBadgeText}>OTA {otaNum}</Text>
-        </View>
-        <Text style={[styles.dateText, { color: colors.textSecondary, flex: 1 }]}>{formatDate(release.publishedAt)}</Text>
-        <Text style={[styles.badgeText, { color: colors.textSecondary }]}>OBSOLETA</Text>
+      <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+        <TouchableOpacity
+          style={styles.cardHeader}
+          onPress={() => setExpandedHistoryId(isExpObs ? null : release.id)}
+          activeOpacity={0.7}
+        >
+          <View style={styles.badgeRow}>
+            <View style={[styles.numBadge, { backgroundColor: colors.textSecondary + "99" }]}>
+              <Text style={styles.numBadgeText}>OTA {otaNum}</Text>
+            </View>
+            <View style={[styles.badge, { backgroundColor: colors.textSecondary + "22" }]}>
+              <Text style={[styles.badgeText, { color: colors.textSecondary }]}>OBSOLETA</Text>
+            </View>
+          </View>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+            <Text style={[styles.dateText, { color: colors.textSecondary }]}>{formatDate(release.publishedAt)}</Text>
+            <Text style={{ color: colors.textSecondary, fontSize: 12 }}>{isExpObs ? "▲" : "▼"}</Text>
+          </View>
+        </TouchableOpacity>
+        {isExpObs && (
+          <>
+            {release.otaVersion && (
+              <Text style={[styles.versionText, { color: colors.text }]}>{release.otaVersion}</Text>
+            )}
+            {release.message && (
+              <Text style={[styles.messageText, { color: colors.text }]}>{release.message}</Text>
+            )}
+            <Text selectable style={[styles.metaText, { color: colors.textSecondary }]}>
+              ID: {release.easUpdateId}
+            </Text>
+            {release.easGroupId ? (
+              <TouchableOpacity
+                style={[styles.rollbackBtn, { borderColor: colors.success }]}
+                onPress={() => handleRepublish(release)}
+                disabled={republishingId === release.id}
+              >
+                {republishingId === release.id
+                  ? <ActivityIndicator size="small" color={colors.success} />
+                  : <Text style={[styles.rollbackBtnText, { color: colors.success }]}>📡 Republica per test (→ pending)</Text>}
+              </TouchableOpacity>
+            ) : (
+              <Text style={[styles.metaText, { color: colors.error }]}>⚠ GroupID mancante — esegui ☁ Sync EAS</Text>
+            )}
+          </>
+        )}
       </View>
     );
   }
@@ -218,6 +278,17 @@ export function HistoryReleaseCard({
               {rollingBackId === release.id
                 ? <ActivityIndicator size="small" color={colors.accent} />
                 : <Text style={[styles.rollbackBtnText, { color: colors.accent }]}>↩ Rollback (eas update --republish)</Text>}
+            </TouchableOpacity>
+          )}
+          {release.easGroupId && (
+            <TouchableOpacity
+              style={[styles.rollbackBtn, { borderColor: colors.success }]}
+              onPress={() => handleRepublish(release)}
+              disabled={republishingId === release.id}
+            >
+              {republishingId === release.id
+                ? <ActivityIndicator size="small" color={colors.success} />
+                : <Text style={[styles.rollbackBtnText, { color: colors.success }]}>📡 Republica per test (→ pending)</Text>}
             </TouchableOpacity>
           )}
         </>
