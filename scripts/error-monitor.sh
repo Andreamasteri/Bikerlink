@@ -8,6 +8,21 @@ LOG_FILE="logs/error-monitor.log"
 CHECK_INTERVAL=30
 LOG_MAX_LINES=2000
 
+# ── Configurazione alert crash ────────────────────────────────────────────────
+# Numero di crash consecutivi (nella finestra) che attivano l'alert
+CRASH_ALERT_THRESHOLD=3
+# Finestra di osservazione in secondi (default: 300 = 5 minuti)
+CRASH_ALERT_WINDOW_SEC=300
+# Cooldown tra un alert e il successivo in secondi (default: 600 = 10 minuti)
+CRASH_ALERT_COOLDOWN_SEC=600
+# File dove vengono scritti gli alert (oltre al log principale)
+CRASH_ALERT_LOG="logs/crash-alerts.log"
+# Telegram: impostare TELEGRAM_BOT_TOKEN e TELEGRAM_CHAT_ID nell'ambiente per ricevere notifiche
+# TELEGRAM_BOT_TOKEN=""
+# TELEGRAM_CHAT_ID=""
+# Webhook generico: impostare CRASH_ALERT_WEBHOOK_URL per ricevere una POST JSON
+# CRASH_ALERT_WEBHOOK_URL=""
+
 mkdir -p logs
 
 # ── Unica istanza ────────────────────────────────────────────────────────────
@@ -32,6 +47,94 @@ rotate_log() {
       mv "${LOG_FILE}.tmp" "$LOG_FILE" 2>/dev/null
       log "LOG_ROTATE: troncato a $((LOG_MAX_LINES / 2)) righe"
     fi
+  fi
+}
+
+# ── Alert crash ───────────────────────────────────────────────────────────────
+# File temporanei per il contatore crash
+CRASH_TIMESTAMPS_FILE="/tmp/em_crash_timestamps"
+CRASH_LAST_ALERT_FILE="/tmp/em_last_crash_alert"
+# Cursore: ultima riga letta in backend-crashes.log (per lettura incrementale)
+CRASH_LOG_CURSOR_FILE="/tmp/em_crash_log_cursor"
+
+# Registra N eventi crash e verifica se superare la soglia.
+# $1 = numero di nuovi crash da registrare (default 1)
+track_crash_and_alert() {
+  local new_events="${1:-1}"
+  local now
+  now=$(date +%s)
+
+  # Aggiungi un timestamp per ogni nuovo evento crash
+  local i
+  for ((i = 0; i < new_events; i++)); do
+    echo "$now" >> "$CRASH_TIMESTAMPS_FILE"
+  done
+
+  # Elimina i timestamp più vecchi della finestra
+  local cutoff=$((now - CRASH_ALERT_WINDOW_SEC))
+  local tmp_file="/tmp/em_crash_timestamps_tmp"
+  awk -v cutoff="$cutoff" '$1 >= cutoff' "$CRASH_TIMESTAMPS_FILE" > "$tmp_file" 2>/dev/null
+  mv "$tmp_file" "$CRASH_TIMESTAMPS_FILE" 2>/dev/null
+
+  # Conta i crash nella finestra
+  local crash_count=0
+  if [ -f "$CRASH_TIMESTAMPS_FILE" ]; then
+    crash_count=$(wc -l < "$CRASH_TIMESTAMPS_FILE" 2>/dev/null | tr -d ' ')
+  fi
+
+  log "CRASH_COUNTER: $crash_count crash negli ultimi ${CRASH_ALERT_WINDOW_SEC}s (soglia: ${CRASH_ALERT_THRESHOLD}, +${new_events} nuovi)"
+
+  # Verifica soglia
+  if [ "$crash_count" -ge "$CRASH_ALERT_THRESHOLD" ]; then
+    # Verifica cooldown
+    local last_alert=0
+    if [ -f "$CRASH_LAST_ALERT_FILE" ]; then
+      last_alert=$(cat "$CRASH_LAST_ALERT_FILE" 2>/dev/null || echo 0)
+    fi
+    local elapsed_since_alert=$((now - last_alert))
+
+    if [ "$elapsed_since_alert" -ge "$CRASH_ALERT_COOLDOWN_SEC" ]; then
+      fire_crash_alert "$crash_count"
+      echo "$now" > "$CRASH_LAST_ALERT_FILE"
+    else
+      local remaining=$((CRASH_ALERT_COOLDOWN_SEC - elapsed_since_alert))
+      log "CRASH_ALERT_SUPPRESSED: soglia superata ($crash_count crash) ma cooldown attivo (ancora ${remaining}s)"
+    fi
+  fi
+}
+
+# Invia l'alert tramite tutti i canali configurati
+fire_crash_alert() {
+  local count="$1"
+  local ts
+  ts=$(date '+%Y-%m-%d %H:%M:%S')
+  local msg="[CRASH ALERT] $ts — $count crash del backend rilevati in ${CRASH_ALERT_WINDOW_SEC}s (soglia: ${CRASH_ALERT_THRESHOLD})"
+
+  # 1) Log dedicato
+  echo "$msg" >> "$CRASH_ALERT_LOG"
+  log "CRASH_ALERT_FIRED: $count crash nella finestra — alert registrato in $CRASH_ALERT_LOG"
+
+  # 2) Telegram (se configurato)
+  if [ -n "${TELEGRAM_BOT_TOKEN:-}" ] && [ -n "${TELEGRAM_CHAT_ID:-}" ]; then
+    local tg_text
+    tg_text="🚨 *BikerLink Backend Crash Alert*%0A${count} crash rilevati in $((CRASH_ALERT_WINDOW_SEC / 60)) min (soglia: ${CRASH_ALERT_THRESHOLD})%0A🕐 ${ts}"
+    curl -s --max-time 10 \
+      "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+      -d "chat_id=${TELEGRAM_CHAT_ID}&text=${tg_text}&parse_mode=Markdown" \
+      > /dev/null 2>&1 && log "CRASH_ALERT_TELEGRAM: notifica inviata" \
+                        || log "CRASH_ALERT_TELEGRAM_FAIL: invio fallito"
+  fi
+
+  # 3) Webhook generico (se configurato)
+  if [ -n "${CRASH_ALERT_WEBHOOK_URL:-}" ]; then
+    local payload
+    payload="{\"event\":\"backend_crash_alert\",\"crash_count\":${count},\"threshold\":${CRASH_ALERT_THRESHOLD},\"window_sec\":${CRASH_ALERT_WINDOW_SEC},\"timestamp\":\"${ts}\"}"
+    curl -s --max-time 10 -X POST \
+      -H "Content-Type: application/json" \
+      -d "$payload" \
+      "$CRASH_ALERT_WEBHOOK_URL" \
+      > /dev/null 2>&1 && log "CRASH_ALERT_WEBHOOK: notifica inviata" \
+                        || log "CRASH_ALERT_WEBHOOK_FAIL: invio fallito"
   fi
 }
 
@@ -67,20 +170,52 @@ check_backend() {
 }
 
 # ── Check 2: Crash backend recenti ───────────────────────────────────────────
+# Usa un cursore (numero di righe già lette) per leggere solo le nuove righe
+# dal file di crash, garantendo un conteggio preciso anche in caso di burst.
 check_recent_crashes() {
-  [ -f "logs/backend-crashes.log" ] || return 0
+  local crash_log="logs/backend-crashes.log"
+  [ -f "$crash_log" ] || return 0
 
-  local recent_crashes
-  recent_crashes=$(find logs/backend-crashes.log -newer /tmp/em_last_crash_check 2>/dev/null \
-    | xargs tail -3 2>/dev/null)
-
-  if [ -n "$recent_crashes" ]; then
-    while IFS= read -r line; do
-      [ -n "$line" ] && log "BACKEND_CRASH: $(echo "$line" | head -c 200)"
-    done <<< "$recent_crashes"
+  # Leggi il cursore (ultima riga già processata)
+  local raw_cursor last_line=0
+  if [ -f "$CRASH_LOG_CURSOR_FILE" ]; then
+    raw_cursor=$(cat "$CRASH_LOG_CURSOR_FILE" 2>/dev/null)
+    # Usa il valore solo se è un intero valido, altrimenti 0
+    [[ "$raw_cursor" =~ ^[0-9]+$ ]] && last_line="$raw_cursor"
+    # Sanity: se il file è stato ruotato/troncato, reset del cursore
+    local current_total
+    current_total=$(wc -l < "$crash_log" 2>/dev/null | tr -d ' ')
+    if [ "$last_line" -gt "${current_total:-0}" ]; then
+      last_line=0
+    fi
   fi
 
-  touch /tmp/em_last_crash_check 2>/dev/null
+  # Leggi TUTTE le nuove righe dall'ultima posizione
+  local new_lines
+  new_lines=$(tail -n +"$((last_line + 1))" "$crash_log" 2>/dev/null)
+
+  # Aggiorna il cursore al numero totale di righe correnti
+  local new_total
+  new_total=$(wc -l < "$crash_log" 2>/dev/null | tr -d ' ')
+  echo "$new_total" > "$CRASH_LOG_CURSOR_FILE"
+
+  if [ -z "$new_lines" ]; then
+    return 0
+  fi
+
+  # Conta e logga ogni nuova riga di crash (una per evento reale)
+  local event_count=0
+  while IFS= read -r line; do
+    if [ -n "$line" ]; then
+      log "BACKEND_CRASH: $(echo "$line" | head -c 200)"
+      event_count=$((event_count + 1))
+    fi
+  done <<< "$new_lines"
+
+  # Aggiorna il contatore passando il numero esatto di eventi rilevati
+  if [ "$event_count" -gt 0 ]; then
+    track_crash_and_alert "$event_count"
+  fi
 }
 
 
@@ -138,7 +273,16 @@ run_all_checks() {
   check_recent_crashes
 }
 
-touch /tmp/em_last_crash_check 2>/dev/null
+# Azzera il contatore crash all'avvio (nuova sessione = finestra scorrevole pulita)
+# La soglia è valutata su una finestra temporale mobile (es. 3 crash negli ultimi 5 min),
+# non su crash consecutivi senza interruzione.
+> "$CRASH_TIMESTAMPS_FILE" 2>/dev/null
+# Inizializza il cursore alla lunghezza corrente del log: le righe già
+# presenti a startup sono storia precedente, non crash nuovi da contare.
+_init_lines=0
+[ -f "logs/backend-crashes.log" ] && \
+  _init_lines=$(wc -l < "logs/backend-crashes.log" 2>/dev/null | tr -d ' ')
+echo "${_init_lines:-0}" > "$CRASH_LOG_CURSOR_FILE"
 
 log "============================================"
 log "ERROR MONITOR AVVIATO"
@@ -148,6 +292,8 @@ log "  Intervallo:   ${CHECK_INTERVAL}s"
 log "  Log:          $LOG_FILE"
 log "  Checks/ciclo: backend, backend-crashes"
 log "  Check Last.fm + endpoint critici: ogni 10 cicli (~5 min)"
+log "  Crash alert:  soglia=${CRASH_ALERT_THRESHOLD} in ${CRASH_ALERT_WINDOW_SEC}s, cooldown=${CRASH_ALERT_COOLDOWN_SEC}s"
+log "  Alert log:    $CRASH_ALERT_LOG"
 log "============================================"
 
 run_all_checks
