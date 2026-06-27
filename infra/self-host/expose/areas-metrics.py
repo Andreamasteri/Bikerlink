@@ -43,6 +43,7 @@ AREA_CODES = [
     "arco-alpino",
     "germania-centro",
     "francia-benelux",
+    "ecuador",
 ]
 CONTAINER_PREFIX = "bikerlink-gh-"
 

@@ -157,12 +157,12 @@ ufw allow from "${LAN}" to any port 8002 proto tcp
 echo "→ Nominatim 8080/tcp — solo LAN..."
 ufw allow from "${LAN}" to any port 8080 proto tcp
 
-# ── GraphHopper aree (8990-8996): solo LAN ───────────────────────────────────
+# ── GraphHopper aree (8990-8997): solo LAN ───────────────────────────────────
 # Porte da shared/routing-areas.ts campo portaInterna:
 #   grecia=8990  balcani=8991  est=8992  iberia=8993
-#   arco-alpino=8994  germania-centro=8995  francia-benelux=8996
-echo "→ GraphHopper 8990-8996/tcp — solo LAN..."
-ufw allow from "${LAN}" to any port 8990:8996 proto tcp
+#   arco-alpino=8994  germania-centro=8995  francia-benelux=8996  ecuador=8997
+echo "→ GraphHopper 8990-8997/tcp — solo LAN..."
+ufw allow from "${LAN}" to any port 8990:8997 proto tcp
 
 # ── Ollama: solo LAN ──────────────────────────────────────────────────────────
 echo "→ Ollama 11434/tcp — solo LAN..."

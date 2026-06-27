@@ -396,7 +396,7 @@ Testa 3-4 percorsi in zone curvy note (Dolomiti, Prealpi Venete). **Solo se i ri
 
 ### 5.2 Step 2 — Download dataset per regione
 
-> **Nota:** BikerLink usa 7 regioni GraphHopper separate (grecia, balcani, est-europa, iberia, arco-alpino, germania-centro, francia-benelux). Lo script `download-regions.sh` scarica i PBF corretti per ogni regione.
+> **Nota:** BikerLink usa 8 regioni GraphHopper separate (grecia, balcani, est-europa, iberia, arco-alpino, germania-centro, francia-benelux, ecuador). Lo script `download-regions.sh` scarica i PBF corretti per ogni regione.
 
 ```bash
 cd infra/self-host

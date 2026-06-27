@@ -19,7 +19,7 @@ ENV_FILE="${SCRIPT_DIR}/.env"
 
 # Gruppi core da controllare
 CORE_GROUPS="grecia balcani iberia arco-alpino"
-ALL_GROUPS="grecia balcani est iberia arco-alpino germania-centro francia-benelux"
+ALL_GROUPS="grecia balcani est iberia arco-alpino germania-centro francia-benelux ecuador"
 
 # Porte (sync con shared/routing-areas.ts e docker-compose.yml)
 declare -A AREA_PORT=(
@@ -30,6 +30,7 @@ declare -A AREA_PORT=(
   [arco-alpino]=8994
   [germania-centro]=8995
   [francia-benelux]=8996
+  [ecuador]=8997
 )
 
 bold()    { echo -e "\033[1m$*\033[0m"; }
@@ -185,7 +186,7 @@ done
 # Istanze non-core: solo stato
 echo ""
 info "Istanze non-core (on-demand, opzionali):"
-for grp in est germania-centro francia-benelux; do
+for grp in est germania-centro francia-benelux ecuador; do
   port="${AREA_PORT[$grp]:-0}"
   container="bikerlink-gh-${grp}"
   running="$($DOCKER ps -q -f name="${container}" 2>/dev/null || true)"

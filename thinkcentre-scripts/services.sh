@@ -24,6 +24,7 @@ DOCKER_HEAVY=(
   bikerlink-gh-est
   bikerlink-gh-francia-benelux
   bikerlink-gh-germania-centro
+  bikerlink-gh-ecuador
 )
 
 DOCKER_ALWAYS_ON=(

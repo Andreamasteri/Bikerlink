@@ -126,6 +126,7 @@ Le credenziali di Postgres e pgAdmin sono generate da `setup.sh` e salvate in `.
 | `arco-alpino` | `127.0.0.1:8994` | `GET /health` | ON |
 | `germania-centro` | `127.0.0.1:8995` | `GET /health` | OFF |
 | `francia-benelux` | `127.0.0.1:8996` | `GET /health` | OFF |
+| `ecuador` | `127.0.0.1:8997` | `GET /health` | OFF |
 
 > ⚠ Le porte sono bindate su `127.0.0.1`: **non accessibili da internet**.
 > L'accesso pubblico passa SOLO dal reverse proxy nginx
@@ -419,6 +420,7 @@ se cambi codici o porte lì, aggiorna anche `download-regions.sh`, `build-region
 | `arco-alpino` | Italia, Austria, Svizzera, Slovenia | 8994 | `/areas/arco-alpino` | ON |
 | `germania-centro` | Germania, Rep. Ceca | 8995 | `/areas/germania-centro` | OFF |
 | `francia-benelux` | Francia, Belgio, Paesi Bassi, Lussemburgo | 8996 | `/areas/francia-benelux` | OFF |
+| `ecuador` | Ecuador | 8997 | `/areas/ecuador` | OFF |
 
 > Le porte sono bindate su `127.0.0.1`: l'accesso pubblico passa SOLO dal reverse
 > proxy nginx (`/areas/<codice>/...`, stesso token `X-GH-Token` del vecchio monolite).
@@ -449,7 +451,7 @@ gruppo fallisce (riepilogo finale ✓/✗). I grafi finiscono in `${GRAPHS_DIR}/
 
 > **Prima pulizia grafi:** le cartelle sono create da Docker come root. Per ripulirle
 > serve `sudo` una volta:
-> `sudo rm -rf graphs/{grecia,balcani,est,iberia,arco-alpino,germania-centro,francia-benelux}`.
+> `sudo rm -rf graphs/{grecia,balcani,est,iberia,arco-alpino,germania-centro,francia-benelux,ecuador}`.
 > Lo script NON usa `sudo` internamente (gira unattended senza prompt).
 
 ### 3. Avvia le istanze abilitate

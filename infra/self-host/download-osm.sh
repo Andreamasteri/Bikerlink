@@ -192,8 +192,33 @@ build_area_francia_benelux() {
     "${DATA_DIR}/luxembourg-latest.osm.pbf"
 }
 
+build_area_ecuador() {
+  local GEOFABRIK_SA="https://download.geofabrik.de/south-america"
+  log "[ecuador] download paese..."
+  local dest="${DATA_DIR}/ecuador-latest.osm.pbf"
+  local url="${GEOFABRIK_SA}/ecuador-latest.osm.pbf"
+  local md5_url="${url}.md5"
+  if [[ -f "$dest" ]] && verify_md5 "$dest" "$md5_url" 2>/dev/null; then
+    log "  [ecuador] già presente e verificato ($(du -h "$dest" | cut -f1)) — skip"
+  else
+    log "  [ecuador] download da ${url}"
+    wget --continue --progress=bar:force:noscroll -O "$dest" "$url"
+    log "  [ecuador] verifica checksum MD5..."
+    verify_md5 "$dest" "$md5_url" 2>/dev/null \
+      && log "  [ecuador] checksum OK ✓" \
+      || log "  [ecuador] ⚠ checksum non verificabile — continuo"
+  fi
+  local merged="${DATA_DIR}/ecuador.osm.pbf"
+  if [[ ! -f "$merged" || "$dest" -nt "$merged" ]]; then
+    cp -f "$dest" "$merged"
+    log "  [merge:ecuador] ✓ → ${merged} ($(du -h "$merged" | cut -f1))"
+  else
+    log "  [merge:ecuador] già aggiornato — skip"
+  fi
+}
+
 # ── Main ──────────────────────────────────────────────────────────────────────
-ALL_AREAS=(grecia balcani est iberia arco-alpino germania-centro francia-benelux)
+ALL_AREAS=(grecia balcani est iberia arco-alpino germania-centro francia-benelux ecuador)
 TARGET_AREAS=(${AREAS:-${ALL_AREAS[@]}})
 
 echo "============================================================"
@@ -211,6 +236,7 @@ for area in "${TARGET_AREAS[@]}"; do
     arco-alpino)      build_area_arco_alpino ;;
     germania-centro)  build_area_germania_centro ;;
     francia-benelux)  build_area_francia_benelux ;;
+    ecuador)          build_area_ecuador ;;
     *) err "Area sconosciuta: '${area}'. Valori ammessi: ${ALL_AREAS[*]}"; exit 1 ;;
   esac
 done

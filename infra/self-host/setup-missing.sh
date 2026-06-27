@@ -45,7 +45,7 @@ GRAPHS_DIR="${GRAPHS_DIR:-${SCRIPT_DIR}/graphs}"
 
 # Gruppi "core" (abilitati di default): sync con shared/routing-areas.ts.
 CORE_GROUPS="${GROUPS_OVERRIDE:-grecia balcani iberia arco-alpino}"
-ALL_GROUPS="grecia balcani est iberia arco-alpino germania-centro francia-benelux"
+ALL_GROUPS="grecia balcani est iberia arco-alpino germania-centro francia-benelux ecuador"
 SKIP_GH=0
 
 GEN_SECRETS="${GEN_SECRETS:-${GEN_TOKENS:-0}}"
@@ -108,6 +108,7 @@ area_port() {
     arco-alpino)     echo 8994 ;;
     germania-centro) echo 8995 ;;
     francia-benelux) echo 8996 ;;
+    ecuador)         echo 8997 ;;
     *)               echo 0 ;;
   esac
 }
@@ -554,7 +555,7 @@ $(if [[ "$VALHALLA_TILES_READY" == "1" ]]; then
 
   Ollama                 già attivo — non toccato
 
-$(bold "GraphHopper — istanze multi-area (porte 8990-8996)")
+$(bold "GraphHopper — istanze multi-area (porte 8990-8997)")
 $(if [[ "$SKIP_GH" == "1" ]]; then
   echo "  (saltate con --skip-gh)"
 else

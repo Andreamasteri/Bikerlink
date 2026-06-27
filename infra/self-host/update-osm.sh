@@ -35,7 +35,7 @@ COUNTRIES_DIR="${COUNTRIES_DIR:-${DATA_DIR}/countries}"
 GRAPHS_DIR="${GRAPHS_DIR:-${SCRIPT_DIR}/graphs}"
 ENV_FILE="${SCRIPT_DIR}/.env"
 
-ALL_GROUPS="grecia balcani est iberia arco-alpino germania-centro francia-benelux"
+ALL_GROUPS="grecia balcani est iberia arco-alpino germania-centro francia-benelux ecuador"
 
 # Endpoint backend opzionale per registrare la data ultimo update.
 BACKEND_URL="${BACKEND_URL:-}"
@@ -129,6 +129,7 @@ area_port() {
     arco-alpino)     echo 8994 ;;
     germania-centro) echo 8995 ;;
     francia-benelux) echo 8996 ;;
+    ecuador)         echo 8997 ;;
     *) echo 0 ;;
   esac
 }

@@ -44,7 +44,7 @@ PLACEHOLDER_VALUE="<INSERIRE>"
 # Gruppi "core" (abilitati di default): sincronizzati con shared/routing-areas.ts.
 # Override via --groups "..." o GROUPS_OVERRIDE="...".
 CORE_GROUPS="${GROUPS_OVERRIDE:-grecia balcani iberia arco-alpino}"
-ALL_GROUPS="grecia balcani est iberia arco-alpino germania-centro francia-benelux"
+ALL_GROUPS="grecia balcani est iberia arco-alpino germania-centro francia-benelux ecuador"
 
 GEN_SECRETS="${GEN_SECRETS:-${GEN_TOKENS:-0}}"
 NONINTERACTIVE="${NONINTERACTIVE:-0}"
@@ -66,7 +66,7 @@ info()  { echo -e "  \033[36m→\033[0m $*"; }
 section() { echo; bold "━━━ $* ━━━"; }
 
 # ── Argomenti CLI ─────────────────────────────────────────────────────────────
-VALID_GROUPS="grecia balcani est iberia arco-alpino germania-centro francia-benelux"
+VALID_GROUPS="grecia balcani est iberia arco-alpino germania-centro francia-benelux ecuador"
 
 validate_groups() {
   local requested="$1" grp
@@ -393,6 +393,7 @@ area_port() {
     arco-alpino)     echo 8994 ;;
     germania-centro) echo 8995 ;;
     francia-benelux) echo 8996 ;;
+    ecuador)         echo 8997 ;;
     *)               echo 0 ;;
   esac
 }
@@ -449,6 +450,7 @@ $(bold "GraphHopper — istanze multi-area (profilo 'areas')")
   arco-alpino     http://127.0.0.1:8994   (health: /health)
   germania-centro http://127.0.0.1:8995   (avvia: docker compose up -d graphhopper-germania-centro)
   francia-benelux http://127.0.0.1:8996   (avvia: docker compose up -d graphhopper-francia-benelux)
+  ecuador         http://127.0.0.1:8997   (avvia: docker compose up -d graphhopper-ecuador)
 
   ⚠ Le porte sono bindate su 127.0.0.1: l'accesso pubblico passa SOLO dal
     reverse proxy nginx (expose/nginx-bikerlink.conf, location /areas/<codice>/).

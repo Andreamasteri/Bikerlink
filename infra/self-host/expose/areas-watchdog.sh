@@ -46,7 +46,7 @@ AREAS_EVENTS_FILE="${AREAS_EVENTS_FILE:-/var/lib/bikerlink/watchdog-events.jsonl
 EVENTS_MAX_LINES=200
 
 # Tutti i codici area validi (sync con shared/routing-areas.ts).
-ALL_CODES="grecia balcani est iberia arco-alpino germania-centro francia-benelux"
+ALL_CODES="grecia balcani est iberia arco-alpino germania-centro francia-benelux ecuador"
 
 ts()      { date '+%Y-%m-%d %H:%M:%S'; }
 ts_iso()  { date -u '+%Y-%m-%dT%H:%M:%SZ'; }
