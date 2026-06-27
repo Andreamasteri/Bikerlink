@@ -196,6 +196,13 @@ export function useOtaAutoUpdate(tokenReady = false): { checking: boolean } {
         const incomingGroupId = (check.manifest as { id?: string; group?: string } | undefined)?.group;
         const allowedGroup = manifest.allowedEasGroupId;
 
+        // Fail-closed: se il manifest in arrivo non ha né id né group non possiamo
+        // verificare l'identità del bundle → skip per sicurezza (non "fall-through").
+        if (!incomingId && !incomingGroupId) {
+          console.log("[useOtaAutoUpdate] manifest senza id/group — skip (fail-closed)");
+          return;
+        }
+
         // Priorità 1: confronto per groupId (platform-agnostic, Android e iOS stesso gruppo)
         if (allowedGroup && incomingGroupId) {
           if (incomingGroupId !== allowedGroup) {
