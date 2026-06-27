@@ -1,6 +1,5 @@
 import React, { createContext, useContext, useMemo, useState, useEffect, useRef, useCallback, ReactNode } from "react";
 import { Platform } from "react-native";
-import { router } from "expo-router";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { sendStartupBeacon } from "@/lib/startup-beacon";
@@ -402,62 +401,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [userQuery.data, storageChecked]);
 
-  // Remote diagnostic polling: every 60s check if admin has requested a diagnostic run.
-  // If pending, run silently in background and submit report with triggeredBy="remote".
-  const remoteDiagRunningRef = useRef(false);
-  useEffect(() => {
-    if (!userQuery.data) return;
-    const poll = async () => {
-      if (remoteDiagRunningRef.current) return;
-      try {
-        const res = await fetch(new URL("/api/diagnostic/pending", getApiUrl()).toString(), {
-          headers: authFetchHeaders(),
-          credentials: "include",
-        });
-        if (!res.ok) return;
-        const data = await res.json() as { pending?: boolean };
-        if (!data?.pending) return;
-        remoteDiagRunningRef.current = true;
-        try {
-          const role = userQuery.data?.role;
-          const isAdminOrMod = role === "admin" || role === "moderatore" || role === "moderator";
-          const { runAllTests } = await import("@/lib/diagnostic/runner");
-          const report = await runAllTests({ isAdmin: role === "admin" });
-          const { apiRequest: req } = await import("@/lib/query-client");
-          await req("POST", "/api/diagnostic/report", {
-            triggeredBy: "remote",
-            appVersion: report.appVersion,
-            platform: report.platform,
-            deviceModel: report.deviceModel,
-            sentryEventId: report.sentryEventId,
-            summary: report.summary,
-            results: report.results,
-          });
-          if (isAdminOrMod) {
-            try {
-              router.push({
-                pathname: "/diagnostica-risultati",
-                params: { reportJson: JSON.stringify(report) },
-              } as never);
-            } catch {
-              // best-effort: navigazione non critica
-            }
-          }
-        } catch {
-          // best-effort: silently skip on errors
-        } finally {
-          remoteDiagRunningRef.current = false;
-        }
-      } catch {
-        // network error — skip silently
-      }
-    };
-
-    poll();
-    const interval = setInterval(poll, 60_000);
-    return () => clearInterval(interval);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [!!userQuery.data]);
+  // NB: il polling diagnostico remoto (con la sua navigazione router.push verso
+  // /diagnostica-risultati) è stato estratto in components/layout/RemoteDiagnosticPoller.tsx
+  // (Task #5071): auth-context non contiene più side-effect di navigazione.
 
   // isReconnecting is true only during the INITIAL auth check when the user had a previous session.
   // Background refetches (triggered by scheduleAuthRecheck) don't set this flag.

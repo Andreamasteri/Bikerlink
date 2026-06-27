@@ -33,6 +33,7 @@ import { useOtaAutoUpdate } from "@/hooks/useOtaAutoUpdate";
 import { RootProviders } from "@/components/RootProviders";
 import { AppStateHandler } from "@/components/layout/AppStateHandler";
 import { BackgroundNotificationHandler } from "@/components/layout/BackgroundNotificationHandler";
+import { RemoteDiagnosticPoller } from "@/components/layout/RemoteDiagnosticPoller";
 import { PushTokenRegistrar } from "@/components/layout/PushTokenRegistrar";
 import { DataRefreshIndicator } from "@/components/layout/DataRefreshIndicator";
 import { OfflineBanner } from "@/components/layout/OfflineBanner";
@@ -291,6 +292,7 @@ function NormalRootLayout() {
           <DataRefreshIndicator />
           <OfflineBanner />
           <BackgroundNotificationHandler />
+          <RemoteDiagnosticPoller />
           <PushTokenRegistrar />
           <View style={{ flex: 1 }} pointerEvents="box-none" key={renderKey}>
             <RootLayoutNav />
