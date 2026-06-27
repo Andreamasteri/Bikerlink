@@ -247,19 +247,11 @@ services:
     # L'immagine custom (build da valhalla/valhalla master) NON ha l'entrypoint
     # orchestratore di gis-ops: CMD=/bin/bash. Lanciamo direttamente il server sui
     # tile/config già presenti in ./data (build da build-valhalla-tiles.sh).
-    # Le variabili use_tiles_ignore_pbf/serve_tiles/build_* qui sotto erano lette
-    # SOLO dall'entrypoint gis-ops: con l'immagine custom sono no-op, ma le teniamo
-    # per documentare l'intento del build dei tile (gestito separatamente).
+    # I tile vanno costruiti separatamente con build-valhalla-tiles.sh PRIMA di
+    # avviare questo servizio.
     command: ["valhalla_service", "/custom_files/valhalla.json", "1"]
     ports:
       - "8002:8002"
-    environment:
-      use_tiles_ignore_pbf: "False"
-      serve_tiles: "True"
-      build_admins: "True"
-      build_time_zones: "True"
-      build_elevation: "False"
-      force_rebuild: "${VALHALLA_FORCE_REBUILD:-False}"
     volumes:
       - ./data:/custom_files
       - valhalladata:/custom_files/valhalla_tiles

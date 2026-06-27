@@ -286,8 +286,8 @@ Lo script:
 > tale entrypoint (CMD=/bin/bash): i binari vengono invocati direttamente da questo
 > script tramite `docker compose run --rm -T valhalla <binario>` — il che garantisce
 > che i volumi usati durante il build siano identici (stessa mappatura project-scoped)
-> a quelli del container serve. Le variabili `force_rebuild` nel `docker-compose.yml`
-> sono no-op (lasciate solo a scopo documentativo).
+> a quelli del container serve. Tali variabili sono state rimosse dal `docker-compose.yml`
+> perché no-op con l'immagine custom.
 
 > Se i PBF per area mancano, lancia prima `./download-osm.sh`.
 
