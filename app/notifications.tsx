@@ -15,7 +15,6 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
 import { apiRequest } from "@/lib/query-client";
 import { useT } from "@/lib/language-context";
-import { NotificationItem } from "./_notifications.part2";
 import { styles } from "@/components/notifications/notifications-styles";
 
 export interface AppNotification {
@@ -43,7 +42,7 @@ interface IncomingMatchRequest {
   } | null;
 }
 
-function _getNotifIcon(type: string): { name: React.ComponentProps<typeof Ionicons>["name"]; color: string } {
+function getNotifIcon(type: string): { name: React.ComponentProps<typeof Ionicons>["name"]; color: string } {
   switch (type) {
     case "direct_match_request":
       return { name: "person-add", color: "#FF6600" };
@@ -106,6 +105,68 @@ function getNotifRoute(item: AppNotification): string | null {
     default:
       return null;
   }
+}
+
+function NotificationItem({
+  item,
+  onPress,
+  onDelete,
+  isDeleting,
+  colors,
+}: {
+  item: AppNotification;
+  onPress: () => void;
+  onDelete: () => void;
+  isDeleting: boolean;
+  colors: ReturnType<typeof useColors>;
+}) {
+  const icon = getNotifIcon(item.notificationType);
+  return (
+    <TouchableOpacity
+      style={[
+        styles.item,
+        {
+          backgroundColor: item.isRead ? colors.surface : (colors.background ?? colors.surface),
+          borderBottomColor: colors.border,
+        },
+        !item.isRead && { borderLeftWidth: 3, borderLeftColor: colors.accent },
+      ]}
+      onPress={onPress}
+      activeOpacity={0.7}
+    >
+      <View style={[styles.iconWrap, { backgroundColor: icon.color + "22" }]}>
+        <Ionicons name={icon.name} size={20} color={icon.color} />
+      </View>
+      <View style={styles.textWrap}>
+        <Text style={[styles.title, { color: colors.text }, !item.isRead && { fontWeight: "700" }]} numberOfLines={2}>
+          {item.title}
+        </Text>
+        {!!item.body && (
+          <Text style={[styles.body, { color: colors.textSecondary ?? colors.text }]} numberOfLines={2}>
+            {item.body}
+          </Text>
+        )}
+        <Text style={[styles.time, { color: colors.textSecondary ?? colors.text }]}>
+          {timeAgo(item.createdAt)}
+        </Text>
+      </View>
+      {!item.isRead && (
+        <View style={[styles.unreadDot, { backgroundColor: colors.accent }]} />
+      )}
+      <TouchableOpacity
+        onPress={onDelete}
+        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        disabled={isDeleting}
+        style={styles.deleteBtn}
+      >
+        <Ionicons
+          name="trash-outline"
+          size={18}
+          color={isDeleting ? (colors.textSecondary ?? "#999") : "#E63946"}
+        />
+      </TouchableOpacity>
+    </TouchableOpacity>
+  );
 }
 
 function MatchRequestCard({

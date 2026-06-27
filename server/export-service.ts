@@ -483,7 +483,22 @@ export async function startExportScheduler(): Promise<void> {
   scheduleNext(intervalMs);
 }
 
-export * from "./export-service.part2";
+export async function downloadExport(fileName: string): Promise<Buffer> {
+  const objectPath = `${EXPORT_OBJECT_PREFIX}/${fileName}`;
+  return downloadBuffer(objectPath);
+}
+
+export async function listExportFiles() {
+  return listObjects(EXPORT_OBJECT_PREFIX + "/");
+}
+
+export async function runScheduledExport(): Promise<void> {
+  try {
+    await runExport({});
+  } catch (err) {
+    console.error("[export-service] scheduled export failed:", err);
+  }
+}
 
 async function restartScheduler() {
   const schedule = await getExportSchedule();
