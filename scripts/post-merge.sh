@@ -196,7 +196,7 @@ fi
 # Expo Router registra OGNI file in app/(tabs)/ come rotta.
 # Regola STRETTA:
 #   - .tsx senza prefisso _ → screen legittimi (es. index.tsx, music.tsx)
-#   - _layout.tsx e _layout.part2.tsx → ammessi (layout Expo Router)
+#   - _layout.tsx → ammesso (layout Expo Router)
 #   - QUALSIASI altro file (.ts, .tsx con prefisso _, ecc.) → VIETATO
 #     → spostare in components/ o lib/
 # Vedi .agents/memory/expo-tabs-route-pollution.md
@@ -208,7 +208,7 @@ for _f in "app/(tabs)/"*; do
   [ -f "$_f" ] || continue
   _bn=$(basename "$_f")
   # ammetti solo screen .tsx senza prefisso _
-  if [[ "$_bn" == _layout.tsx || "$_bn" == _layout.part2.tsx ]]; then
+  if [[ "$_bn" == _layout.tsx ]]; then
     continue
   fi
   if [[ "$_bn" == *.tsx && "$_bn" != _* ]]; then
@@ -260,7 +260,7 @@ done < <(find app -type f -name '*.ts' ! -name '*.tsx' ! -path 'app/(tabs)/*')
 
 # Regola 2 — .tsx in sotto-sotto-cartelle di app/ (profondità ≥ 3)
 #   Se la cartella ha un _layout.tsx → è uno stack legittimo, tutti i .tsx ammessi.
-#   Altrimenti ammessi solo: index.tsx, _layout.tsx, _layout.part2.tsx, [param].tsx
+#   Altrimenti ammessi solo: index.tsx, _layout.tsx, [param].tsx
 while IFS= read -r _f; do
   _bn=$(basename "$_f")
   _dir=$(dirname "$_f")
@@ -269,7 +269,6 @@ while IFS= read -r _f; do
   # ammetti route di base
   [[ "$_bn" == "index.tsx" ]]         && continue
   [[ "$_bn" == "_layout.tsx" ]]       && continue
-  [[ "$_bn" == "_layout.part2.tsx" ]] && continue
   [[ "$_bn" =~ ^\[.+\]\.tsx$ ]]       && continue
   STACK_PHANTOM+=("$_f")
 done < <(find app -mindepth 3 -maxdepth 4 -type f -name '*.tsx' \

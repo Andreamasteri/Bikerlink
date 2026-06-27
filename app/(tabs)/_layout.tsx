@@ -1,3 +1,7 @@
+// @no-split — file di avvio critico: NON ri-splittare in _layout.partN.tsx (causa
+// del crash-loop OTA "Maximum update depth exceeded"). Marker DOCUMENTALE: non è un
+// bypass del ratchet 600 righe (il file è <600; se in futuro cresce, usare i marker
+// ufficiali LARGE-FILE-LOCKED/ALLOW). Tenere le options dei Tabs.Screen module-level.
 import React, { useRef, useEffect, useState, useCallback } from "react";
 import { Tabs, useRouter, type Href } from "expo-router";
 import { Animated } from "react-native";
@@ -12,7 +16,6 @@ import CustomTabBar, { type TabItem } from "@/components/CustomTabBar";
 type BottomTabBarProps = Parameters<NonNullable<React.ComponentProps<typeof Tabs>["tabBar"]>>[0];
 import { useTabBadges } from "@/hooks/useTabBadges";
 import { useNewMatchAlert } from "@/hooks/useNewMatchAlert";
-import { getTabScreens } from "./_layout.part2";
 import { TabIcon } from "@/components/TabIcons";
 import { GpsBanner } from "@/components/layout/GpsBanner";
 import { sendStartupBeacon } from "@/lib/startup-beacon";
@@ -48,6 +51,123 @@ const TABS_SCREEN_OPTIONS = { headerTitleStyle: TABS_HEADER_TITLE_STYLE } as con
 // Qualsiasi ricreazione di options objects → useLayoutEffect × 15 → setOptions × 15
 // → scheduleUpdate × 15 → useSyncState.listeners × 50 → loop sincrono → crash.
 // Fix: frozenTabScreensRef creato al primo render, mai aggiornato (vedere uso sotto).
+
+// ── OPZIONI TAB (costanti module-level) ──────────────────────────────────────
+// Le options di ogni Tabs.Screen sono dichiarate qui FUORI dal componente.
+// Le costanti totalmente statiche (nessun t(), href fisso) sono oggetti congelati.
+// Le costanti che dipendono da t() (i18n runtime), dal ternario isBikerOrCoppia o
+// da gpsTabHref sono FACTORY: una funzione module-level non può valutare t() al load
+// del modulo (il LanguageContext non è ancora pronto), quindi accetta i valori
+// runtime come argomenti. In entrambi i casi il riferimento dell'oggetto options è
+// stabile perché getTabScreens viene invocata UNA SOLA VOLTA (frozenTabScreensRef).
+type TabScreenOptions = React.ComponentProps<typeof Tabs.Screen>["options"];
+type GpsTabHref = Href | null | undefined;
+type TFn = (key: string) => string;
+
+// Statiche (href fisso, nessuna traduzione)
+const TAB_OPTIONS_RIDE: TabScreenOptions = {
+  title: "Privacy & GPS",
+  headerTitle: "Privacy & GPS",
+  href: null,
+};
+const TAB_OPTIONS_GIRI: TabScreenOptions = {
+  title: "Giri",
+  href: null,
+  headerShown: false,
+};
+
+// Factory (dipendono da t() e/o config runtime)
+const TAB_OPTIONS_INDEX = (t: TFn, gpsTabHref: GpsTabHref): TabScreenOptions => ({
+  title: t("map.title"),
+  headerShown: false,
+  href: gpsTabHref,
+});
+const TAB_OPTIONS_PROPOSALS = (t: TFn, gpsTabHref: GpsTabHref): TabScreenOptions => ({
+  title: t("proposals.hub.tabTitle"),
+  headerTitle: t("proposals.hub.headerTitle"),
+  href: gpsTabHref,
+});
+const TAB_OPTIONS_READY = (gpsTabHref: GpsTabHref): TabScreenOptions => ({
+  title: "Status",
+  headerShown: false,
+  href: gpsTabHref,
+});
+const TAB_OPTIONS_MOTOCLUB = (gpsTabHref: GpsTabHref): TabScreenOptions => ({
+  title: "Clubs",
+  headerShown: false,
+  href: gpsTabHref,
+});
+const TAB_OPTIONS_EVENTI = (t: TFn, gpsTabHref: GpsTabHref): TabScreenOptions => ({
+  title: t("events.tabTitle"),
+  headerShown: false,
+  href: gpsTabHref,
+});
+const TAB_OPTIONS_MATCH = (gpsTabHref: GpsTabHref): TabScreenOptions => ({
+  title: "Match",
+  headerShown: false,
+  href: gpsTabHref,
+});
+const TAB_OPTIONS_MUSIC = (t: TFn, gpsTabHref: GpsTabHref): TabScreenOptions => ({
+  title: t("music.tabTitle"),
+  headerShown: false,
+  href: gpsTabHref,
+});
+const TAB_OPTIONS_CHAT = (gpsTabHref: GpsTabHref): TabScreenOptions => ({
+  title: "Chat",
+  headerShown: false,
+  href: gpsTabHref,
+});
+const TAB_OPTIONS_CONTEST = (gpsTabHref: GpsTabHref): TabScreenOptions => ({
+  title: "Pic!",
+  headerTitle: "Pic!",
+  href: gpsTabHref,
+});
+const TAB_OPTIONS_ARCADE = (gpsTabHref: GpsTabHref): TabScreenOptions => ({
+  title: "Arcade",
+  headerTitle: "Arcade",
+  href: gpsTabHref,
+});
+const TAB_OPTIONS_TRACKING = (t: TFn): TabScreenOptions => ({
+  title: t("tracking.tabTitle"),
+  headerTitle: t("tracking.recordRide"),
+  href: null,
+});
+const TAB_OPTIONS_GARAGE = (t: TFn, isBikerOrCoppia: boolean): TabScreenOptions => ({
+  title: isBikerOrCoppia ? t("garage.tabTitle") : t("garage.tabWishlist"),
+  headerTitle: isBikerOrCoppia ? t("garage.myGarage") : t("garage.myWishlist"),
+  href: null,
+});
+const TAB_OPTIONS_PROFILE = (t: TFn): TabScreenOptions => ({
+  title: t("profile.title"),
+  headerTitle: t("profile.myProfile"),
+});
+
+// Costruisce i 15 Tabs.Screen. Invocata UNA SOLA VOLTA tramite frozenTabScreensRef
+// (vedi TabLayout): l'array di elementi è creato al primo render e mai più ricreato,
+// così le options objects non cambiano mai reference → nessuna cascata di setOptions.
+function getTabScreens(
+  t: TFn,
+  config: { gpsTabHref: GpsTabHref; isBikerOrCoppia: boolean }
+): React.ReactElement[] {
+  const { gpsTabHref, isBikerOrCoppia } = config;
+  return [
+    <Tabs.Screen key="index" name="index" options={TAB_OPTIONS_INDEX(t, gpsTabHref)} />,
+    <Tabs.Screen key="proposals" name="proposals" options={TAB_OPTIONS_PROPOSALS(t, gpsTabHref)} />,
+    <Tabs.Screen key="ready" name="ready" options={TAB_OPTIONS_READY(gpsTabHref)} />,
+    <Tabs.Screen key="motoclub" name="motoclub" options={TAB_OPTIONS_MOTOCLUB(gpsTabHref)} />,
+    <Tabs.Screen key="eventi" name="eventi" options={TAB_OPTIONS_EVENTI(t, gpsTabHref)} />,
+    <Tabs.Screen key="match" name="match" options={TAB_OPTIONS_MATCH(gpsTabHref)} />,
+    <Tabs.Screen key="music" name="music" options={TAB_OPTIONS_MUSIC(t, gpsTabHref)} />,
+    <Tabs.Screen key="chat" name="chat" options={TAB_OPTIONS_CHAT(gpsTabHref)} />,
+    <Tabs.Screen key="contest" name="contest" options={TAB_OPTIONS_CONTEST(gpsTabHref)} />,
+    <Tabs.Screen key="arcade" name="arcade" options={TAB_OPTIONS_ARCADE(gpsTabHref)} />,
+    <Tabs.Screen key="ride" name="ride" options={TAB_OPTIONS_RIDE} />,
+    <Tabs.Screen key="giri" name="giri" options={TAB_OPTIONS_GIRI} />,
+    <Tabs.Screen key="tracking" name="tracking" options={TAB_OPTIONS_TRACKING(t)} />,
+    <Tabs.Screen key="garage" name="garage" options={TAB_OPTIONS_GARAGE(t, isBikerOrCoppia)} />,
+    <Tabs.Screen key="profile" name="profile" options={TAB_OPTIONS_PROFILE(t)} />,
+  ];
+}
 
 interface LayoutGatingMeData {
   profile?: { fakeHomeLatitude?: number | null; fakeHomeLongitude?: number | null } | null;
@@ -442,4 +562,3 @@ export default function TabLayout() {
     </>
   );
 }
-
