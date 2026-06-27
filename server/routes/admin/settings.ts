@@ -41,12 +41,15 @@ router.get("/", async (_req: Request, res: Response) => {
 
 router.get("/email-config", async (_req: Request, res: Response) => {
   try {
-    const userSetting = await storage.getAppSetting("gmail_user");
-    const passSetting = await storage.getAppSetting("gmail_app_password");
+    // SMTP credentials live EXCLUSIVELY in environment secrets
+    // (GMAIL_USER / GMAIL_APP_PASSWORD). Non si leggono più da app_settings:
+    // i segreti nel DB operativo allargano la superficie di esposizione.
+    const envUser = process.env.GMAIL_USER || null;
+    const hasEnvPass = !!process.env.GMAIL_APP_PASSWORD;
     return res.json({
-      gmailUser: userSetting?.value || null,
-      gmailAppPassword: passSetting?.value ? "••••••••" : null,
-      configured: !!(userSetting?.value && passSetting?.value),
+      gmailUser: envUser,
+      gmailAppPassword: hasEnvPass ? "••••••••" : null,
+      configured: !!(envUser && hasEnvPass),
     });
   } catch (_error) {
     return sendError(res, 500, "Errore lettura config email");
@@ -57,7 +60,7 @@ router.put("/email-config", async (req: Request, res: Response) => {
   try {
     const parsedEc = emailConfigSchema.safeParse(req.body);
     if (!parsedEc.success) return sendError(res, 400, parsedEc.error.issues[0].message);
-    const { gmailUser, gmailAppPassword, adminPassword } = parsedEc.data;
+    const { adminPassword } = parsedEc.data;
 
     const userId = req.session?.userId;
     if (!userId) return sendError(res, 401, "Non autenticato");
@@ -67,10 +70,16 @@ router.put("/email-config", async (req: Request, res: Response) => {
     const valid = await bcrypt.compare(adminPassword, user.password);
     if (!valid) return sendError(res, 403, "Password admin non valida");
 
-    if (gmailUser !== undefined) await storage.upsertAppSetting("gmail_user", gmailUser ?? "");
-    if (gmailAppPassword !== undefined) await storage.upsertAppSetting("gmail_app_password", gmailAppPassword ?? "");
-
-    return res.json({ ok: true });
+    // SMTP credentials are managed EXCLUSIVELY via environment secrets
+    // (GMAIL_USER / GMAIL_APP_PASSWORD) and are no longer persisted to
+    // app_settings — storing secrets in operational data is a security risk
+    // (task #5086). Legacy rows are purged by the boot cleanup in
+    // server/boot-phase3-db-init.ts.
+    return sendError(
+      res,
+      400,
+      "Le credenziali SMTP sono gestite solo tramite i secret di ambiente (GMAIL_USER / GMAIL_APP_PASSWORD) e non vengono più salvate nel database.",
+    );
   } catch (_error) {
     return sendError(res, 500, "Errore salvataggio config email");
   }

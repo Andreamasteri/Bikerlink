@@ -112,3 +112,4 @@
 - [Boot post-READY block](boot-postready-block.md) — critical path vs runPostReady() async/non-fatale; MAI process.exit post-READY (crash-loop); .catch() sul void obbligatorio; fallimenti → markDegraded.
 - [OTA Emergency channel (EMCY)](ota-emergency-channel.md) — pipeline OTA parallela: redirect manifest via flag ota_emergency_active, approve DEVE preservare release.channel, publish builda da git worktree su commit base con npm ci+proxy sed e runtime guard.
 - [OLLAMA_MODEL è un secret](ollama-model-secret.md) — il modello Ollama attivo del backend è un Replit secret, non env shared; per cambiarlo serve requestEnvVar + restart, non setEnvVars. Attuale: qwen3-coder:30b (CPU-only).
+- [Production data removal is publish-gated](prod-data-removal-publish-gated.md) — agent can't delete live prod rows (prod DB read-only, publish diffs schema-only); only a boot cleanup on user publish mutates prod data; code-review blocks "complete" until rows actually gone.
