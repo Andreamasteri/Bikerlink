@@ -677,3 +677,9 @@ id = "C2-8rcTp3vxsi_4YbxRvT"
 uri = "file://reports/db-integrity-report-2026-06-04.pdf"
 type = "pdf"
 title = "AI DB Integrity — Report 4 giugno 2026"
+
+[[outputs]]
+id = "hJTvwa6KpY--juqgCb3BM"
+uri = "file://.local/tasks/lista-task-ota-154-216.md"
+type = "text"
+title = "Lista completa task & modifiche OTA 154→216"
