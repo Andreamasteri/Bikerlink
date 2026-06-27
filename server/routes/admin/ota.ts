@@ -4,7 +4,7 @@ import { promisify } from "node:util";
 import { readFileSync, existsSync } from "node:fs";
 import { resolve } from "node:path";
 import { db, withDbRetry } from "../../db";
-import { otaReleases } from "@shared/db";
+import { otaReleases, appSettings } from "@shared/db";
 import { eq, desc, and, sql, ne, inArray, lt } from "drizzle-orm";
 import { sendError } from "../../lib/api-response";
 import { EAS_PROJECT_ID, triggerSyncInBackground, forceSyncNow, syncProductionUpdates } from "./ota-sync";
@@ -156,6 +156,83 @@ router.post("/sync", async (_req: Request, res: Response) => {
   }
 });
 
+// ── Task #5087 — Canale Emergenza (EMCY) ────────────────────────────────────
+// Queste route DEVONO stare PRIMA di /:id/... per non essere catturate dal
+// parametro dinamico ("emergency" verrebbe trattato come :id).
+
+// GET /api/admin/ota/emergency/status — stato del redirect emergenza + release del canale.
+router.get("/emergency/status", async (_req: Request, res: Response) => {
+  try {
+    const [row] = await withDbRetry(() => db
+      .select({ value: appSettings.value })
+      .from(appSettings)
+      .where(eq(appSettings.key, "ota_emergency_active"))
+      .limit(1));
+    const active = row?.value === "true";
+
+    const releases = await withDbRetry(() => db
+      .select()
+      .from(otaReleases)
+      .where(and(eq(otaReleases.channel, "emergency"), ne(otaReleases.status, "archived")))
+      .orderBy(desc(otaReleases.publishedAt))
+      .limit(50));
+
+    return res.json({ active, releases });
+  } catch (err) {
+    console.error("[ota] GET /emergency/status error:", err);
+    return sendError(res, 500, "Errore recupero stato canale emergenza");
+  }
+});
+
+// POST /api/admin/ota/emergency/toggle — attiva/disattiva il redirect del manifest
+// verso il canale emergency. body: { active: boolean }.
+router.post("/emergency/toggle", async (req: Request, res: Response) => {
+  try {
+    const userId = req.session.userId!;
+    const body = req.body as { active?: unknown };
+    if (typeof body.active !== "boolean") {
+      return sendError(res, 400, "Campo 'active' (boolean) obbligatorio");
+    }
+    const value = body.active ? "true" : "false";
+
+    // Guard: non attivare il redirect se non esiste alcuna release emergency approvata,
+    // altrimenti i device riceverebbero allowed:false e resterebbero senza OTA.
+    if (body.active) {
+      const [approved] = await db
+        .select({ id: otaReleases.id })
+        .from(otaReleases)
+        .where(and(eq(otaReleases.channel, "emergency"), eq(otaReleases.status, "approved")))
+        .limit(1);
+      if (!approved) {
+        return sendError(res, 400, "Nessuna release EMCY approvata: approva prima una release sul canale emergency, poi attiva il redirect.");
+      }
+    }
+
+    const [existing] = await db
+      .select({ id: appSettings.id })
+      .from(appSettings)
+      .where(eq(appSettings.key, "ota_emergency_active"))
+      .limit(1);
+    if (existing) {
+      await db.update(appSettings)
+        .set({ value, updatedAt: new Date() })
+        .where(eq(appSettings.key, "ota_emergency_active"));
+    } else {
+      await db.insert(appSettings).values({
+        key: "ota_emergency_active",
+        value,
+        description: "Task #5087 — quando true, /api/ota/manifest serve il canale emergency invece di production.",
+      });
+    }
+
+    console.log(`[ota][AUDIT] EMERGENCY redirect ${value === "true" ? "ATTIVATO" : "disattivato"} by user ${userId}`);
+    return res.json({ ok: true, active: body.active });
+  } catch (err) {
+    console.error("[ota] POST /emergency/toggle error:", err);
+    return sendError(res, 500, "Errore aggiornamento canale emergenza");
+  }
+});
+
 // POST /api/admin/ota/:id/approve — promuove la release a `approved` (visibile a tutti gli utenti)
 router.post("/:id/approve", async (req: Request, res: Response) => {
   try {
@@ -170,14 +247,16 @@ router.post("/:id/approve", async (req: Request, res: Response) => {
       return sendError(res, 400, "Questa release non ha un groupId EAS. Ri-sincronizza prima dal pannello admin (pulsante Sync).");
     }
 
-    // UPDATE atomico con guard sullo status — previene race con worker auto-rollback o doppio click
+    // UPDATE atomico con guard sullo status — previene race con worker auto-rollback o doppio click.
+    // Task #5087: preserviamo il canale esistente (production O emergency) invece di forzare
+    // "production", altrimenti approvare una EMCY la sposterebbe per errore sul canale normale.
     const [updated] = await db
       .update(otaReleases)
       .set({
         status: "approved",
         approvedAt: new Date(),
         approvedBy: userId,
-        channel: "production",
+        channel: release.channel,
       })
       .where(and(eq(otaReleases.id, id), eq(otaReleases.status, "pending")))
       .returning();

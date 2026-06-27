@@ -58,6 +58,14 @@ router.get("/manifest", async (req: Request, res: Response) => {
       return res.json({ allowed: false, reason: "channel_locked", bootGateEnabled });
     }
 
+    // Task #5087 — redirect canale emergenza. Quando ota_emergency_active=true,
+    // il manifest serve l'ultima release del canale `emergency` (a TUTTI i device)
+    // invece di `production`. Quando false (default) il comportamento è invariato:
+    // si serve `production` e nessuna release emergency raggiunge i client.
+    const [emcyRow] = await db.select({ value: appSettings.value }).from(appSettings).where(eq(appSettings.key, "ota_emergency_active")).limit(1);
+    const emergencyActive = emcyRow?.value === "true";
+    const targetChannel = emergencyActive ? "emergency" : "production";
+
     const userId = req.session?.userId;
     const role = await getUserRole(userId);
     const isAdmin = role === "admin";
@@ -76,7 +84,7 @@ router.get("/manifest", async (req: Request, res: Response) => {
         channel: otaReleases.channel,
       })
       .from(otaReleases)
-      .where(inArray(otaReleases.status, statuses))
+      .where(and(inArray(otaReleases.status, statuses), eq(otaReleases.channel, targetChannel)))
       .orderBy(desc(otaReleases.publishedAt))
       .limit(1);
 
@@ -206,7 +214,7 @@ router.post("/event", async (req: Request, res: Response) => {
   }
 });
 
-// Silenziatore: l'import "or"/"and" potrebbe servire ad altri estensori futuri.
-void or; void and;
+// Silenziatore: l'import "or" potrebbe servire ad altri estensori futuri.
+void or;
 
 export default router;

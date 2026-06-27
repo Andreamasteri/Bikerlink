@@ -56,6 +56,20 @@
         "image": "latest"
       }
     },
+    "emergency-apk": {
+      "distribution": "internal",
+      "channel": "emergency",
+      "credentialsSource": "remote",
+      "env": {
+        "NODE_OPTIONS": "--max_old_space_size=8192",
+        "EXPO_PUBLIC_DOMAIN": "biker-link.replit.app"
+      },
+      "android": {
+        "buildType": "apk",
+        "gradleCommand": ":app:assembleRelease",
+        "image": "latest"
+      }
+    },
     "production": {
       "distribution": "store",
       "channel": "production",
