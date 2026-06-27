@@ -206,6 +206,7 @@ export default function AdminChatWidget() {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/business"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/business/report"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/business/config"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/ai/assistant/action-history"] });
     } catch (e) {
       setActionState(msgId, action.actionId, "error", (e as Error).message);
     }

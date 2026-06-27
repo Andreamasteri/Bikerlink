@@ -10,6 +10,7 @@ import Colors from "@/constants/colors";
 import { apiRequest, queryClient, getApiUrl } from "@/lib/query-client";
 import { useT } from "@/lib/language-context";
 import AdminChatWidget from "@/components/admin/AdminChatWidget";
+import AdminActionHistory from "@/components/admin/AdminActionHistory";
 
 interface Business {
   id: string;
@@ -319,6 +320,7 @@ export default function AdminMarketing() {
   const ListHeader = (
     <View>
       <AdminChatWidget />
+      <AdminActionHistory />
       <View style={styles.configCard}>
         <Text style={styles.configTitle}>Passaggi qualificati</Text>
         <Text style={styles.configHint}>

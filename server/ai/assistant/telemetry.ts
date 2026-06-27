@@ -1,7 +1,7 @@
 // Task #2698 — Telemetria AI Assistant (insert + cleanup retention 30d).
 import { db } from "../../db";
 import { aiAssistantTelemetry } from "@shared/db";
-import { lt, sql } from "drizzle-orm";
+import { lt, sql, desc } from "drizzle-orm";
 
 export type AssistantEventType =
   | "conversation_started"
@@ -46,6 +46,44 @@ export async function cleanupAssistantTelemetry(retentionDays = 30): Promise<num
     .where(lt(aiAssistantTelemetry.createdAt, cutoff))
     .returning({ id: aiAssistantTelemetry.id });
   return res.length;
+}
+
+export interface AdminActionHistoryRow {
+  id: string;
+  eventType: string;
+  userId: string | null;
+  actionId: string | null;
+  params: Record<string, unknown> | null;
+  ok: boolean | null;
+  summary: string | null;
+  createdAt: string;
+}
+
+export async function getAdminActionHistory(limit = 50): Promise<AdminActionHistoryRow[]> {
+  const ACTION_EVENTS: string[] = ["action_proposed", "action_executed", "action_rejected"];
+  const rows = await db
+    .select()
+    .from(aiAssistantTelemetry)
+    .where(
+      sql`platform = 'admin' AND event_type = ANY(${ACTION_EVENTS})`
+    )
+    .orderBy(desc(aiAssistantTelemetry.createdAt))
+    .limit(limit);
+  return rows.map((r) => {
+    const payload = (r.payload ?? {}) as Record<string, unknown>;
+    return {
+      id: r.id,
+      eventType: r.eventType,
+      userId: r.userId ?? null,
+      actionId: typeof payload.actionId === "string" ? payload.actionId : null,
+      params: typeof payload.params === "object" && payload.params !== null
+        ? (payload.params as Record<string, unknown>)
+        : null,
+      ok: typeof payload.ok === "boolean" ? payload.ok : null,
+      summary: typeof payload.summary === "string" ? payload.summary : null,
+      createdAt: r.createdAt.toISOString(),
+    };
+  });
 }
 
 export async function getTelemetrySummary(opts: {

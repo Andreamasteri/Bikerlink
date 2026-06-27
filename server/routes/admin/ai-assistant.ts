@@ -10,7 +10,7 @@ import {
   type AssistantPlatform,
 } from "../../ai/assistant/config";
 import { ASSISTANT_ACTIONS } from "../../ai/assistant/actions";
-import { getTelemetrySummary } from "../../ai/assistant/telemetry";
+import { getTelemetrySummary, getAdminActionHistory } from "../../ai/assistant/telemetry";
 import { getMemoryStats, runMemoryPruner } from "../../ai/assistant/memory-pruner";
 
 const router = Router();
@@ -90,6 +90,18 @@ router.get("/ai/assistant/telemetry", async (req: Request, res: Response) => {
   } catch (e) {
     console.error("[admin/ai-assistant/telemetry]", e);
     sendError(res, 500, "Errore lettura telemetria");
+  }
+});
+
+// Task #4927 — Storico azioni admin eseguite dall'assistente (ultimi 50 eventi action_*).
+router.get("/ai/assistant/action-history", async (req: Request, res: Response) => {
+  try {
+    const limit = Math.min(100, Math.max(1, parseInt(String(req.query.limit ?? "50"), 10) || 50));
+    const rows = await getAdminActionHistory(limit);
+    res.json({ rows });
+  } catch (e) {
+    console.error("[admin/ai-assistant/action-history]", e);
+    sendError(res, 500, "Errore lettura storico azioni");
   }
 });
 
