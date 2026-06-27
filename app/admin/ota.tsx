@@ -14,8 +14,10 @@ export default function AdminOta() {
       contentContainerStyle={{ padding: 16, paddingBottom: insets.bottom + 20 }}
     >
       <View style={styles.card}>
-        <OtaPanel />
         <OtaPanelExtra />
+      </View>
+      <View style={[styles.card, { marginTop: 12 }]}>
+        <OtaPanel />
       </View>
     </ScrollView>
   );
