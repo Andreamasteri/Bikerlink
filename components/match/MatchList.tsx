@@ -3,6 +3,14 @@ import { View, Text, StyleSheet, FlatList, RefreshControl, ActivityIndicator } f
 import { Ionicons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
 
+// keyExtractor stabile (module-level): non dipende da props, quindi non va
+// ricreato ad ogni render della lista.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- keyExtractor for polymorphic items
+function matchKeyExtractor(item: any): string {
+  const r = item;
+  return r.id?.toString() ?? r.user?.id ?? r.lastfmTrackId ?? String(r.songsInCommon) + (r.user?.id ?? "");
+}
+
 interface MatchListProps {
   currentList: Record<string, unknown>[];
   renderItem: ({ item }: { item: Record<string, unknown> }) => React.ReactElement;
@@ -48,8 +56,7 @@ export function MatchList({
   return (
     <FlatList
       data={currentList}
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- keyExtractor for polymorphic items
-      keyExtractor={(item) => { const r = item as any; return r.id?.toString() ?? r.user?.id ?? r.lastfmTrackId ?? String(r.songsInCommon) + (r.user?.id ?? ""); }}
+      keyExtractor={matchKeyExtractor}
       renderItem={renderItem}
       extraData={[currentList, activeTab]}
       contentContainerStyle={styles.list}

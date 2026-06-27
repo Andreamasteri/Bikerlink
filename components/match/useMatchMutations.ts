@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import { Alert } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter } from "expo-router";
@@ -328,6 +328,21 @@ export function useMatchMutations({ distanceMode, distanceKm, pendingKm, setDist
     },
   });
 
+  // Le mutation sono ref-stabili nei metodi (.mutate), ma l'oggetto cambia
+  // riferimento a ogni transizione di stato (idle→pending→success). Tenerle in
+  // un ref evita di rigenerare gli handler — e a cascata renderItem — ad ogni
+  // tick. exhaustive-deps esenta i ref, quindi i deps restano solo le slice reali.
+  const resetAndRematchMutationRef = useRef(resetAndRematchMutation);
+  resetAndRematchMutationRef.current = resetAndRematchMutation;
+  const removeGarageMatchMutationRef = useRef(removeGarageMatchMutation);
+  removeGarageMatchMutationRef.current = removeGarageMatchMutation;
+  const removeBikerMatchMutationRef = useRef(removeBikerMatchMutation);
+  removeBikerMatchMutationRef.current = removeBikerMatchMutation;
+  const removeProposalMatchMutationRef = useRef(removeProposalMatchMutation);
+  removeProposalMatchMutationRef.current = removeProposalMatchMutation;
+  const unblockMutationRef = useRef(unblockMutation);
+  unblockMutationRef.current = unblockMutation;
+
   const handleResetAndRematch = useCallback(() => {
     const kmVal = parseInt(pendingKm, 10);
     if (distanceMode === "km" && (isNaN(kmVal) || kmVal <= 0)) {
@@ -336,34 +351,34 @@ export function useMatchMutations({ distanceMode, distanceKm, pendingKm, setDist
     }
     setDistanceKm(pendingKm);
     AsyncStorage.setItem("match_distance_km", pendingKm).catch(() => {});
-    resetAndRematchMutation.mutate();
-  }, [distanceMode, pendingKm, resetAndRematchMutation, t, setDistanceKm]);
+    resetAndRematchMutationRef.current.mutate();
+  }, [distanceMode, pendingKm, t, setDistanceKm]);
 
   const confirmRemoveGarageMatch = useCallback((id: string) => {
     Alert.alert(t("common.confirm"), t("match.confirmRemoveMatch"), [
       { text: t("common.cancel"), style: "cancel" },
-      { text: t("common.remove"), style: "destructive", onPress: () => removeGarageMatchMutation.mutate(id) },
+      { text: t("common.remove"), style: "destructive", onPress: () => removeGarageMatchMutationRef.current.mutate(id) },
     ]);
-  }, [removeGarageMatchMutation, t]);
+  }, [t]);
 
   const confirmRemoveBikerMatch = useCallback((id: string) =>
     Alert.alert(t("common.confirm"), t("match.confirmRemoveMatch"), [
       { text: t("common.cancel"), style: "cancel" },
-      { text: t("common.remove"), style: "destructive", onPress: () => removeBikerMatchMutation.mutate(id) },
-    ]), [removeBikerMatchMutation, t]);
+      { text: t("common.remove"), style: "destructive", onPress: () => removeBikerMatchMutationRef.current.mutate(id) },
+    ]), [t]);
 
   const confirmRemoveProposalMatch = useCallback((id: string) =>
     Alert.alert(t("common.confirm"), t("match.confirmRemoveMatch"), [
       { text: t("common.cancel"), style: "cancel" },
-      { text: t("common.remove"), style: "destructive", onPress: () => removeProposalMatchMutation.mutate(id) },
-    ]), [removeProposalMatchMutation, t]);
+      { text: t("common.remove"), style: "destructive", onPress: () => removeProposalMatchMutationRef.current.mutate(id) },
+    ]), [t]);
 
   const handleUnblock = useCallback((blockedUserId: string) => {
     Alert.alert(t("common.confirm"), t("match.confirmUnblock"), [
       { text: t("common.cancel"), style: "cancel" },
-      { text: t("match.unblock"), onPress: () => unblockMutation.mutate(blockedUserId) },
+      { text: t("match.unblock"), onPress: () => unblockMutationRef.current.mutate(blockedUserId) },
     ]);
-  }, [unblockMutation, t]);
+  }, [t]);
 
   return {
     pendingMatchId,
