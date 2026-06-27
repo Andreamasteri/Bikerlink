@@ -44,6 +44,8 @@ interface UserSearchResult {
   distance?: number | null;
 }
 
+const keyExtractor = (item: ConversationItem) => item.id;
+
 export default function ChatScreen() {
   const router = useRouter();
   const routerRef = useRef(router);
@@ -240,9 +242,15 @@ export default function ChatScreen() {
     },
   });
 
+  // La mutation è ref-stabile nei metodi (.mutate) ma cambia riferimento a ogni
+  // transizione di stato: tenerla in un ref evita di rigenerare handler e
+  // renderItem quando l'utente elimina una conversazione. exhaustive-deps esenta i ref.
+  const deleteConversationMutationRef = useRef(deleteConversationMutation);
+  deleteConversationMutationRef.current = deleteConversationMutation;
+
   const handleDeleteConversation = useCallback((convId: string) => {
-    deleteConversationMutation.mutate(convId);
-  }, [deleteConversationMutation]);
+    deleteConversationMutationRef.current.mutate(convId);
+  }, []);
 
   const handleFriendPress = useCallback(
     (friend: FriendItem) => {
@@ -307,7 +315,7 @@ export default function ChatScreen() {
         <FlatList
           data={conversations}
           renderItem={renderItem}
-          keyExtractor={(item) => item.id}
+          keyExtractor={keyExtractor}
           contentContainerStyle={[styles.listContent, { paddingBottom: insets.bottom + 84 }]}
           showsVerticalScrollIndicator={false}
         />

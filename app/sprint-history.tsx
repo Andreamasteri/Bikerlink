@@ -53,6 +53,8 @@ interface LeaderboardEntry {
 
 type Tab = "mine" | "leaderboard";
 
+const keyExtractor = (item: SprintResult) => item.id;
+
 export default function SprintHistoryScreen() {
   const t = useT();
   const router = useRouter();
@@ -117,6 +119,12 @@ export default function SprintHistoryScreen() {
     onError: () => Alert.alert(t("common.error"), t("tracking.publishError")),
   });
 
+  // La mutation è ref-stabile nei metodi (.mutate) ma cambia riferimento a ogni
+  // transizione di stato: tenerla in un ref evita di rigenerare handlePublish — e
+  // a cascata il modal — quando si pubblica. exhaustive-deps esenta i ref.
+  const publishMutationRef = useRef(publishMutation);
+  publishMutationRef.current = publishMutation;
+
   const handlePublish = useCallback(() => {
     if (!publishSprint) return;
     const perfData = JSON.stringify({
@@ -128,8 +136,8 @@ export default function SprintHistoryScreen() {
       maxTiltDeg: publishSprint.maxTiltDeg ?? 0,
       date: publishSprint.createdAt,
     });
-    publishMutation.mutate({ performanceData: perfData, caption: publishCaption });
-  }, [publishSprint, publishCaption, publishMutation]);
+    publishMutationRef.current.mutate({ performanceData: perfData, caption: publishCaption });
+  }, [publishSprint, publishCaption]);
 
   const renderItem = useCallback(
     ({ item, index }: { item: SprintResult; index: number }) => (
@@ -191,7 +199,7 @@ export default function SprintHistoryScreen() {
             <FlatList
               ref={listRef}
               data={sprints}
-              keyExtractor={(item) => item.id}
+              keyExtractor={keyExtractor}
               renderItem={renderItem}
               contentContainerStyle={{ paddingBottom: bottomPad + 16, paddingTop: 8 }}
               showsVerticalScrollIndicator={false}

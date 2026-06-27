@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useRef } from "react";
 import {
   View,
   Text,
@@ -27,6 +27,8 @@ import { ContestUpload } from "@/components/contest/ContestUpload";
 
 const GAP = 8;
 const COLUMN_COUNT = 2;
+
+const keyExtractor = (item: ContestEntry) => item.id;
 
 interface ContestResponse {
   entries: ContestEntry[];
@@ -129,6 +131,16 @@ export default function ContestScreen() {
     },
   });
 
+  // Le mutation sono ref-stabili nei metodi (.mutate) ma cambiano riferimento a
+  // ogni transizione di stato: tenerle in ref evita di rigenerare gli handler — e
+  // a cascata renderEntry — quando l'utente vota/elimina. exhaustive-deps esenta i ref.
+  const deleteMutationRef = useRef(deleteMutation);
+  deleteMutationRef.current = deleteMutation;
+  const voteMutationRef = useRef(voteMutation);
+  voteMutationRef.current = voteMutation;
+  const uploadMutationRef = useRef(uploadMutation);
+  uploadMutationRef.current = uploadMutation;
+
   const handleDelete = useCallback(
     (entryId: string) => {
       Alert.alert(
@@ -139,19 +151,19 @@ export default function ContestScreen() {
           {
             text: t("common.delete"),
             style: "destructive",
-            onPress: () => deleteMutation.mutate(entryId),
+            onPress: () => deleteMutationRef.current.mutate(entryId),
           },
         ]
       );
     },
-    [deleteMutation, t]
+    [t]
   );
 
   const handleVote = useCallback(
     (entryId: string) => {
-      voteMutation.mutate(entryId);
+      voteMutationRef.current.mutate(entryId);
     },
-    [voteMutation]
+    []
   );
 
   const handlePickImage = useCallback(() => {
@@ -166,8 +178,8 @@ export default function ContestScreen() {
 
   const handleUpload = useCallback(() => {
     if (!selectedImage) return;
-    uploadMutation.mutate({ imageUri: selectedImage, caption });
-  }, [selectedImage, caption, uploadMutation]);
+    uploadMutationRef.current.mutate({ imageUri: selectedImage, caption });
+  }, [selectedImage, caption]);
 
   const votesUsed = data?.votesUsed ?? 0;
   const votesRemaining = 10 - votesUsed;
@@ -216,7 +228,7 @@ export default function ContestScreen() {
         <FlatList
           data={data?.entries ?? []}
           renderItem={renderEntry}
-          keyExtractor={(item) => item.id}
+          keyExtractor={keyExtractor}
           numColumns={COLUMN_COUNT}
           contentContainerStyle={styles.list}
           columnWrapperStyle={styles.columnWrapper}

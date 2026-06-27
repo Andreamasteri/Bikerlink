@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useState, useRef } from "react";
 import {
   View,
   Text,
@@ -47,6 +47,12 @@ export function SavedLapsArchive() {
     },
   });
 
+  // La mutation è ref-stabile nei metodi (.mutate) ma cambia riferimento a ogni
+  // transizione di stato: tenerla in un ref evita di rigenerare handleDelete — e
+  // a cascata le righe — quando si elimina un giro. exhaustive-deps esenta i ref.
+  const deleteMutationRef = useRef(deleteMutation);
+  deleteMutationRef.current = deleteMutation;
+
   const renameMutation = useMutation({
     mutationFn: ({ sessionId, name }: { sessionId: string; name: string }) =>
       apiRequest("PATCH", `/api/telemetry/ideal-laps/${encodeURIComponent(sessionId)}`, { lap_name: name }),
@@ -69,11 +75,11 @@ export function SavedLapsArchive() {
         {
           text: "Elimina",
           style: "destructive",
-          onPress: () => deleteMutation.mutate(lap.sessionId),
+          onPress: () => deleteMutationRef.current.mutate(lap.sessionId),
         },
       ]
     );
-  }, [deleteMutation]);
+  }, []);
 
   const openRename = useCallback((lap: IdealLap) => {
     setRenameText(lap.lapName ?? `Giro ${lap.lapNumber}`);
