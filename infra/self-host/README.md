@@ -268,14 +268,27 @@ chmod +x build-valhalla-tiles.sh
 ./build-valhalla-tiles.sh
 ```
 
-Lo script verifica i prerequisiti (Docker, curl, osmium), avvia il container in
-modalità build (`force_rebuild=True`), mostra i log in tempo reale e attende che
-`GET http://localhost:8002/status` risponda (timeout 3h). Al termine ripristina
-`force_rebuild=False` e riavvia in modalità serve, poi stampa version + data tile.
-Se `/status` non torna online dopo il riavvio, lo script esce con errore.
+Lo script:
+1. Verifica i prerequisiti (Docker, curl, osmium) e che l'immagine `bikerlink/valhalla:latest` esista localmente.
+2. Unisce i PBF delle aree core in `valhalla-merged.osm.pbf` (se i sorgenti sono più recenti del merged).
+3. Ferma il container Valhalla se in esecuzione (per liberare i volumi).
+4. **Genera `valhalla.json`** invocando direttamente `valhalla_build_config` (binario dell'immagine custom) — produce una config compatibile con master senza crash `ptree_bad_path`.
+5. **Costruisce gli admin database** (`valhalla_build_admins`) dal PBF merged.
+6. **Costruisce il timezone database** (`valhalla_build_timezones`).
+7. **Costruisce i tile** (`valhalla_build_tiles`) — step più lungo, fino a 3h, richiede RAM elevata (swap ≥32 GB su sistemi con 16 GB RAM).
+8. **Crea il tile extract** (`valhalla_build_extract`, file `.tar` usato da `valhalla_service`).
+9. Avvia il container in modalità serve (`valhalla_service`) e attende che `GET http://localhost:8002/status` risponda (timeout 10 min). Se non risponde, esce con errore.
 
-> Se nessun file `.osm.pbf` è presente in `./data/`, lo script chiede se vuoi
-> scaricarne uno con `./download-regions.sh` (uno o più gruppi-area).
+> **Differenza rispetto al vecchio flusso `gis-ops`:** la vecchia immagine leggeva
+> le variabili d'ambiente `force_rebuild`, `serve_tiles`, `build_admins`, ecc. dal
+> suo entrypoint orchestratore. L'immagine custom `bikerlink/valhalla:latest` non ha
+> tale entrypoint (CMD=/bin/bash): i binari vengono invocati direttamente da questo
+> script tramite `docker compose run --rm -T valhalla <binario>` — il che garantisce
+> che i volumi usati durante il build siano identici (stessa mappatura project-scoped)
+> a quelli del container serve. Le variabili `force_rebuild` nel `docker-compose.yml`
+> sono no-op (lasciate solo a scopo documentativo).
+
+> Se i PBF per area mancano, lancia prima `./download-osm.sh`.
 
 ### 2. Imposta il Secret `VALHALLA_URL`
 
