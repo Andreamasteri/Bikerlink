@@ -1,37 +1,46 @@
 ---
-name: nginx ThinkCentre listen IP specifico
-description: Perché i server block nginx sul ThinkCentre devono usare l'IP LAN esplicito e non 0.0.0.0
+name: nginx ThinkCentre listen — catch-all vs IP specifico
+description: Strategia listen nginx sul ThinkCentre: catch-all (0.0.0.0) per supportare sia eth (192.168.1.35) sia WiFi USB (192.168.1.36).
 ---
 
-# nginx ThinkCentre — listen deve usare 192.168.1.35:443
+# nginx ThinkCentre — listen 443 ssl (catch-all 0.0.0.0)
 
-## Regola
-Ogni `server` block su porta 443 nel config nginx del ThinkCentre DEVE usare:
+## Regola attuale (dal Giugno 2026)
+Tutti i `server` block su porta 443 in `/etc/nginx/sites-available/bikerlink` usano:
 ```nginx
-listen 192.168.1.35:443 ssl;
+listen 443 ssl;
+listen [::]:443 ssl;
 ```
-NON `listen 443 ssl;` (che diventa 0.0.0.0:443).
+Forma catch-all (0.0.0.0) — nginx risponde su **qualsiasi interfaccia attiva**: eth cablata (192.168.1.35) e adattatore WiFi USB (192.168.1.36).
 
-**Why:** Quando il router forwarda la porta pubblica 443 → 192.168.1.35:443, il kernel OS instrada la connessione al socket più specifico. Se esistono sia un socket `192.168.1.35:443` che uno `0.0.0.0:443`, tutte le connessioni esterne vanno al socket specifico (192.168.1.35:443). Un server block su `0.0.0.0:443` non riceve MAI quelle connessioni — nginx non controlla nemmeno il suo `server_name` per queste.
+**Why:** Il ThinkCentre ha due NIC:
+- `enp0s31f6` → 192.168.1.35 (ethernet cablata, principale)
+- `wlxccbabdb51e2e` → 192.168.1.36 (WiFi USB, backup/ridondanza)
 
-**How to apply:** Quando aggiungi un nuovo servizio al ThinkCentre (es. un nuovo agent, un nuovo tool), copia la riga `listen` dagli altri block esistenti (`listen 192.168.1.35:443 ssl;`). NON usare il form generico `listen 443 ssl;`. Rimuovi anche `listen [::]:443 ssl;` (IPv6) — non necessario per servizi esposti solo via DuckDNS/IPv4.
+Con IP-specifico `listen 192.168.1.35:443 ssl`, nginx non risponde mai su 192.168.1.36. Catch-all copre entrambe senza hardcodare IP, e sopravvive anche se il disco viene spostato su un altro PC.
 
-## Sintomo del problema
-- `nginx -T | grep -c "listen 443"` mostra solo 1 o 2 entry invece del numero atteso
-- Il nuovo subdomain risponde con il contenuto di un servizio diverso (es. GraphHopper) invece del servizio target
-- `tail /var/log/nginx/<nuovo-service>-access.log` è vuoto — il block non riceve traffico
-- Il cert SSL servito è CORRETTO (SNI matching funziona a livello TLS) ma il contenuto HTTP è sbagliato
+**How to apply:** Quando aggiungi un nuovo service block, usa sempre `listen 443 ssl;` + `listen [::]:443 ssl;`. Non usare `listen 192.168.1.35:443 ssl;`.
 
-## Diagnosi rapida
+## Storia
+- Prima del Giugno 2026: si usava `listen 192.168.1.35:443 ssl` (IP specifico). Motivo: conflict con Tailscale su [::]:443. Il conflict è stato risolto e IPv6 riabilitato.
+- Giugno 2026: migrazione a catch-all per supportare WiFi USB e portabilità del disco.
+
+## WiFi USB — setup profilo NM
+L'adattatore `wlxccbabdb51e2e` (MAC cc:ba:bd:b5:1e:2e) deve essere configurato via NetworkManager:
 ```bash
-sudo grep -n "^    listen" /etc/nginx/sites-enabled/bikerlink | head -20
-# Tutti devono mostrare: listen 192.168.1.35:443 ssl;
+sudo ./infra/self-host/expose/setup-wifi-usb.sh
+# oppure:
+WIFI_SSID="..." WIFI_PASSWORD="..." sudo -E ./setup-wifi-usb.sh
 ```
+Profilo: `BikerLink-WiFi`, IP statico 192.168.1.36, autoconnect=yes, route-metric=200 (subordinato a eth).
 
-## ATTENZIONE — due file distinti sul ThinkCentre
-`/etc/nginx/sites-available/bikerlink` e `/etc/nginx/sites-enabled/bikerlink` sono file **separati** (non symlink). Il blocco TC agent (`upstream tc_agent_backend` + `server_name tc.bikerlink.duckdns.org`) si trova **solo** in `sites-enabled/bikerlink` (≈ riga 530). Per editare la porta del TC agent occorre modificare `sites-enabled/bikerlink`, non `sites-available`.
+## ATTENZIONE — sites-available vs sites-enabled
+I due file sul ThinkCentre sono distinti (non symlink). Modificare sempre `sites-available/bikerlink` tramite `setup-expose.sh`, poi `sudo cp generated/nginx-bikerlink.conf /etc/nginx/sites-available/bikerlink`. Riapplicare anche a `sites-enabled/bikerlink` se è un file separato (verificare con `ls -la /etc/nginx/sites-enabled/`).
 
-Fix applicato (Giugno 2026): `tc_agent_backend` puntava a `127.0.0.1:9101` (Bacula Director) — corretto a `127.0.0.1:9199` con:
+## Template e rigenerazione
+Il template è in `infra/self-host/expose/nginx-bikerlink.conf`. Per rigenerare:
 ```bash
-sudo sed -i 's/server 127\.0\.0\.1:9101;/server 127.0.0.1:9199;/' /etc/nginx/sites-enabled/bikerlink && sudo nginx -t && sudo systemctl reload nginx
+NONINTERACTIVE=1 BASE_DOMAIN=bikerlink.duckdns.org APP_ORIGIN=https://bikerlink.app \
+ENV_LOCAL_FILE=/tmp/.env.local bash infra/self-host/expose/setup-expose.sh
 ```
+I token vengono scritti in `/tmp/.env.local` via SFTP (mai loggati), poi cancellati dopo la generazione.
