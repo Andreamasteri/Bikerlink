@@ -15,4 +15,4 @@ export const RUNTIME_VERSION: string = appJson.expo.runtimeVersion;
  * Valore null = nessun OTA applicato (installazione fresca o sistema OTA non attivo).
  * Aggiornare questo valore ad ogni OTA pubblicata (sempre +1 rispetto al precedente).
  */
-export const APPLIED_OTA_NUMBER: number | null = 206;
+export const APPLIED_OTA_NUMBER: number | null = 207;

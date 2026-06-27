@@ -1,3 +1,4 @@
+- [MapScreen boot guard — isLoading || !user](mapscreen-bootguard-user-null.md) — guard DEVE essere `isLoading || !user`; solo `isLoading` lascia una finestra 150ms in cui useHomeMapState monta con user=null → loop. Fix OTA 207.
 - [React Query batching + TabBar layout loop](react-query-batching-tabbarlayout-loop.md) — renderCustomTabBar deps:[]+tabBarStateRef è il fix layer 1; nested objects (headerStyle,headerTitleStyle,contentStyle) in screenOptions useMemo = layer 2; InteractionManager.runAfterInteractions sul Tour setVisible = layer 3 (de-batching).
 - [auth-context React Query deps](auth-context-react-query-deps.md) — nel value memo di un Context dipendi dalle slice primitive (userQuery.data/.refetch, mutation.isPending), MAI dagli oggetti React Query interi (loop) né rimuoverli del tutto (isPending stantio).
 

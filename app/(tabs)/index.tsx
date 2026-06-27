@@ -471,7 +471,11 @@ const styles = StyleSheet.create({
 // user è disponibile; il TabLayout (isLoading || !user guard) gestisce la
 // schermata vuota e il redirect verso login.
 export default function MapScreen() {
-  const { isLoading } = useAuth();
-  if (isLoading) return <View style={{ flex: 1 }} />;
+  const { isLoading, user } = useAuth();
+  // ANTI-LOOP: useHomeMapState causa "Maximum update depth exceeded" se montato
+  // con user=null (auth non ancora pronta O utente non autenticato). Il redirect
+  // login dal TabLayout ha un delay di 150ms (hasWaited); durante quella finestra
+  // MapScreenContent NON deve montare. Guard: isLoading || !user.
+  if (isLoading || !user) return <View style={{ flex: 1 }} />;
   return <MapScreenContent />;
 }
