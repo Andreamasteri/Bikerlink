@@ -192,10 +192,17 @@ if [[ -n "$_PIDS" ]]; then echo "$_PIDS" | xargs kill -9 2>/dev/null || true; sl
 
 log_info "Fase 1/3 — Metro export (bundle Android) dal worktree..."
 rm -rf "$DIST_DIR"
-if ! ( cd "$WORKTREE_DIR" && EXPO_TOKEN="${EAS_TOKEN:-}" npx expo export \
-        --platform android \
-        --output-dir "dist-ota-emcy" 2>&1 ); then
-  log_error "expo export fallito nel worktree."
+EXPORT_LOG="/tmp/emcy-export-android.log"
+( cd "$WORKTREE_DIR" && EXPO_TOKEN="${EAS_TOKEN:-}" \
+    EXPO_PUBLIC_DOMAIN="${EXPO_PUBLIC_DOMAIN:-}" \
+    EXPO_PUBLIC_SENTRY_DSN="${EXPO_PUBLIC_SENTRY_DSN:-}" \
+    npx expo export \
+    --platform android \
+    --output-dir "dist-ota-emcy" 2>&1 ) | tee "$EXPORT_LOG" || true
+EXPORT_EXIT=${PIPESTATUS[0]}
+if [[ "$EXPORT_EXIT" -ne 0 ]]; then
+  log_error "expo export fallito nel worktree (exit $EXPORT_EXIT). Ultime 40 righe:"
+  tail -40 "$EXPORT_LOG" >&2
   exit 1
 fi
 log_ok "Export completato."
