@@ -225,9 +225,16 @@ services:
   # Valhalla — engine alternativo (motorcycle nativo, fallback robusto)
   # ---------------------------------------------------------------------------
   valhalla:
-    image: ghcr.io/gis-ops/docker-valhalla/valhalla:latest
+    image: bikerlink/valhalla:latest
     container_name: bikerlink-valhalla
     restart: unless-stopped
+    # L'immagine custom (build da valhalla/valhalla master) NON ha l'entrypoint
+    # orchestratore di gis-ops: CMD=/bin/bash. Lanciamo direttamente il server sui
+    # tile/config già presenti in ./data (build da build-valhalla-tiles.sh).
+    # Le variabili use_tiles_ignore_pbf/serve_tiles/build_* qui sotto erano lette
+    # SOLO dall'entrypoint gis-ops: con l'immagine custom sono no-op, ma le teniamo
+    # per documentare l'intento del build dei tile (gestito separatamente).
+    command: ["valhalla_service", "/custom_files/valhalla.json", "1"]
     ports:
       - "8002:8002"
     environment:
