@@ -213,7 +213,8 @@ export const handleConfirmPreviewHelper = async (
       "/api/planned-routes/calculate", "POST",
       () => {
         const url = new URL("/api/planned-routes/calculate", getApiUrl());
-        return fetch(url.toString(), { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ waypoints: toCalc, style: aiPreview.style, drivingProfile, avoidHighways: aiPreview.avoidHighways, avoidTolls: false, isRoundTrip: aiPreview.isRoundTrip, roundTripDirection: aiPreview.roundTripDirection ?? null, language, geocodingOk: allItemsResolved, ...(vehicleProfile === "auto_curvy" ? { routingProfile: "auto_curvy" } : {}) }) });
+        const ghRoutingProfile = vehicleProfile === "auto_curvy" ? "auto_curvy" : vehicleProfile === "moto_fast" ? "motorcycle_fast" : vehicleProfile === "car" ? "car" : undefined;
+        return fetch(url.toString(), { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ waypoints: toCalc, style: aiPreview.style, drivingProfile, avoidHighways: aiPreview.avoidHighways, avoidTolls: false, isRoundTrip: aiPreview.isRoundTrip, roundTripDirection: aiPreview.roundTripDirection ?? null, language, geocodingOk: allItemsResolved, ...(ghRoutingProfile ? { routingProfile: ghRoutingProfile } : {}) }) });
       },
       async (resp: Response) => { if (!resp.ok) { const b = await resp.json().catch(() => ({})); throw new Error(b.message ?? "Calcolo fallito"); } return resp.json(); }
     );

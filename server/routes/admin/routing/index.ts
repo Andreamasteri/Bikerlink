@@ -87,6 +87,16 @@ router.get("/status", async (_req: Request, res: Response) => {
         ? profilesResult.profiles.includes("motorcycle")
         : null)
     : null;
+  const motorcycleFastProfileAvailable: boolean | null = snap.selfHosted
+    ? (profilesResult.reachable && profilesResult.profiles !== null
+        ? profilesResult.profiles.includes("motorcycle_fast")
+        : null)
+    : null;
+  const carProfileAvailable: boolean | null = snap.selfHosted
+    ? (profilesResult.reachable && profilesResult.profiles !== null
+        ? profilesResult.profiles.includes("car")
+        : null)
+    : null;
 
   const { successes = 0, fallbacks = 0, failures = 0 } = counters as {
     successes?: number; fallbacks?: number; failures?: number;
@@ -118,6 +128,11 @@ router.get("/status", async (_req: Request, res: Response) => {
       error: snap.error,
       version: ghInfo.version,
       motorcycleProfileAvailable,
+      motorcycleFastProfileAvailable,
+      carProfileAvailable,
+      availableProfiles: profilesResult.reachable && profilesResult.profiles !== null
+        ? profilesResult.profiles
+        : null,
     },
     cloudFallback: {
       available: snap.cloudFallbackAvailable,

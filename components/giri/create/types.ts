@@ -1,9 +1,12 @@
 export type Style = "direct" | "fast" | "balanced" | "curvy" | "extra_curvy";
 export type DrivingProfile = "geometric" | "real" | "my_style";
-// Profilo veicolo: "moto" usa il routing moto standard; "auto_curvy" instrada
-// a Valhalla con costing auto panoramico. Asse distinto da Style/DrivingProfile.
-export type VehicleProfile = "moto" | "auto_curvy";
-export type RoutingProfile = "auto_curvy";
+// Profilo veicolo: "moto" usa GH motorcycle; "moto_fast" usa GH motorcycle_fast;
+// "car" usa GH car; "auto_curvy" instrada a Valhalla con costing auto panoramico.
+// Asse distinto da Style/DrivingProfile.
+export type VehicleProfile = "moto" | "moto_fast" | "car" | "auto_curvy";
+// Profilo inviato al server: i profili GH ("motorcycle", "motorcycle_fast", "car")
+// vengono instradati a GraphHopper; "auto_curvy" viene instradato a Valhalla.
+export type RoutingProfile = "auto_curvy" | "motorcycle" | "motorcycle_fast" | "car";
 export type Mode = "ai" | "ai-preview" | "manual";
 export type CompassDir = "N" | "NE" | "E" | "SE" | "S" | "SO" | "O" | "NO";
 

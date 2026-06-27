@@ -221,7 +221,8 @@ export function useGiriCreateState(language?: string) {
     setRouteError(null);
     setWeatherPreview(null);
     try {
-      const result = await calcRoute(toCalc, style, drivingProfile, avoidHighways, avoidTolls, avoidFerries, avoidUnpaved, avoidWeather, roundTripHours, isRoundTrip, headingDeg, language, vehicleProfile === "auto_curvy" ? "auto_curvy" : undefined, true);
+      const ghRoutingProfile = vehicleProfile === "auto_curvy" ? "auto_curvy" : vehicleProfile === "moto_fast" ? "motorcycle_fast" : vehicleProfile === "car" ? "car" : undefined;
+      const result = await calcRoute(toCalc, style, drivingProfile, avoidHighways, avoidTolls, avoidFerries, avoidUnpaved, avoidWeather, roundTripHours, isRoundTrip, headingDeg, language, ghRoutingProfile, true);
       setRouteResult(result);
       setDismissedWarnings(new Set());
       if (result.durationMinutes > 480 && !isMultiDay) {

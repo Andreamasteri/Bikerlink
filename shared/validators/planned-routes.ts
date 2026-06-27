@@ -118,7 +118,7 @@ export const calculateRouteRequestSchema = z.object({
   })).min(2, "Almeno 2 waypoints richiesti"),
   style: z.enum(["direct", "fast", "balanced", "curvy", "extra_curvy"]).optional(),
   drivingProfile: z.enum(["geometric", "real", "my_style"]).optional(),
-  routingProfile: z.enum(["auto_curvy"]).optional(),
+  routingProfile: z.enum(["auto_curvy", "motorcycle", "motorcycle_fast", "car"]).optional(),
   avoidHighways: z.boolean().optional(),
   avoidTolls: z.boolean().optional(),
   avoidFerries: z.boolean().optional(),

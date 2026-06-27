@@ -62,7 +62,7 @@ void _isRoutingEnabled().then((enabled) => {
   if (!enabled) {
     console.warn("[GraphHopper] ROUTING DISABILITATO via kill-switch — tutte le chiamate verranno bloccate. Rendering mappa non impattato.");
   } else if (isSelfHosted) {
-    console.log(`[GraphHopper] Self-hosted mode — URL: ${GH_BASE_URL} — profile: motorcycle`);
+    console.log(`[GraphHopper] Self-hosted mode — URL: ${GH_BASE_URL} — profili disponibili: motorcycle, motorcycle_fast, car`);
   } else if (CLOUD_API_KEY) {
     console.warn("[GraphHopper] Cloud API mode — profile forced to 'car' (motorcycle not available on free plan)");
   } else {

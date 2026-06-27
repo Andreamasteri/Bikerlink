@@ -170,7 +170,8 @@ export default function GiriCreateScreen() {
       const toCalc = isRoundTrip ? [...resolved, resolved[0]] : resolved;
       setCalculating(true);
       try {
-        const result = await calcRoute(toCalc, style, drivingProfile, avoidHighways, avoidTolls, avoidFerries, avoidUnpaved, avoidWeather, roundTripHours, isRoundTrip, headingDeg, language, vehicleProfile === "auto_curvy" ? "auto_curvy" : undefined, true);
+        const ghRoutingProfile = vehicleProfile === "auto_curvy" ? "auto_curvy" : vehicleProfile === "moto_fast" ? "motorcycle_fast" : vehicleProfile === "car" ? "car" : undefined;
+        const result = await calcRoute(toCalc, style, drivingProfile, avoidHighways, avoidTolls, avoidFerries, avoidUnpaved, avoidWeather, roundTripHours, isRoundTrip, headingDeg, language, ghRoutingProfile, true);
         setRouteResult(result);
         setDismissedWarnings(new Set());
       } catch {
@@ -266,7 +267,7 @@ export default function GiriCreateScreen() {
             <RouteTitleSection title={title} setTitle={setTitle} />
             <RouteStyleSection style={style} setStyle={setStyle} STYLE_LEVELS={STYLE_LEVELS} />
             <VehicleProfileSection vehicleProfile={vehicleProfile} setVehicleProfile={setVehicleProfile} autoCurvyAvailable={autoCurvyAvailable} />
-            {vehicleProfile !== "auto_curvy" && (
+            {vehicleProfile !== "auto_curvy" && vehicleProfile !== "car" && (
               <DrivingProfileSection drivingProfile={drivingProfile} setDrivingProfile={setDrivingProfile} myStyleProfile={myStyleProfile} />
             )}
             <WaypointsSection

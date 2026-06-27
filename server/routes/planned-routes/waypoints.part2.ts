@@ -60,6 +60,12 @@ export async function handleCalculateRoute(req: Request, res: Response) {
   // distinto dallo stile/telemetria moto — quando attivo, il router-selector
   // instrada SEMPRE a Valhalla senza fallback a GraphHopper.
   const isAutoCurvy = routingProfile === "auto_curvy";
+  // Profilo GH self-hosted da usare: se l'utente ha scelto esplicitamente
+  // "motorcycle_fast" o "car", usiamo quel profilo; altrimenti il default
+  // ACTIVE_PROFILE ("motorcycle"). "auto_curvy" non passa a GH (va a Valhalla).
+  const ghProfile: string = (routingProfile && routingProfile !== "auto_curvy")
+    ? routingProfile
+    : ACTIVE_PROFILE;
 
   const DIRECTION_DEGREES: Record<string, number> = {
     N: 0, NE: 45, E: 90, SE: 135, S: 180, SO: 225, O: 270, NO: 315,
@@ -93,7 +99,7 @@ export async function handleCalculateRoute(req: Request, res: Response) {
   try {
     const body: Record<string, unknown> = {
       points: effectiveWaypoints.map((wp) => [wp.lng, wp.lat]),
-      profile: isAutoCurvy ? "auto_curvy" : ACTIVE_PROFILE,
+      profile: isAutoCurvy ? "auto_curvy" : ghProfile,
       instructions: true,
       calc_points: true,
       points_encoded: false,

@@ -16,8 +16,11 @@ const OPTIONS: {
   label: string;
   desc: string;
   icon: keyof typeof Ionicons.glyphMap;
+  requiresGhProfile?: "motorcycle_fast" | "car";
 }[] = [
   { key: "moto", label: "Moto", desc: "Percorso curvy per moto", icon: "bicycle-outline" },
+  { key: "moto_fast", label: "Moto veloce", desc: "Priorità a strade scorrevoli e a scorrimento veloce", icon: "speedometer-outline", requiresGhProfile: "motorcycle_fast" },
+  { key: "car", label: "Auto", desc: "Routing stradale per automobili", icon: "car-outline", requiresGhProfile: "car" },
   { key: "auto_curvy", label: "Auto panoramica", desc: "Statali e provinciali, niente autostrade", icon: "car-sport-outline" },
 ];
 
