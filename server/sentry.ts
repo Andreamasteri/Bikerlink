@@ -21,6 +21,11 @@ export async function initSentry(): Promise<void> {
       dsn,
       tracesSampleRate: 0.1,
       environment: process.env.NODE_ENV ?? "development",
+      ignoreErrors: [
+        "BgDbSlowKillSwitchError",
+        "BgDbQueueTimeoutError",
+        "BgDbQueueOverflowError",
+      ],
     });
     sentryReady = true;
     console.log("[sentry] inizializzato");

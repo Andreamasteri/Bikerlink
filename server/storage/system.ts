@@ -11,6 +11,9 @@ import {
 } from "@shared/db";
 import { AdsStorage } from "./ads";
 
+const _appSettingsCache = new Map<string, { value: AppSetting | undefined; expiresAt: number }>();
+const APP_SETTINGS_CACHE_TTL_MS = 60_000;
+
 export class SystemStorage extends AdsStorage {
   async getNotifications(userId: string): Promise<Notification[]> {
     return db.select().from(notifications).where(eq(notifications.userId, userId)).orderBy(desc(notifications.createdAt));
@@ -82,8 +85,16 @@ export class SystemStorage extends AdsStorage {
   }
 
   async getAppSetting(key: string): Promise<AppSetting | undefined> {
+    const cached = _appSettingsCache.get(key);
+    if (cached && cached.expiresAt > Date.now()) return cached.value;
     const [setting] = await db.select().from(appSettings).where(eq(appSettings.key, key)).limit(1);
+    _appSettingsCache.set(key, { value: setting, expiresAt: Date.now() + APP_SETTINGS_CACHE_TTL_MS });
     return setting;
+  }
+
+  invalidateAppSettingCache(key?: string): void {
+    if (key) _appSettingsCache.delete(key);
+    else _appSettingsCache.clear();
   }
 
   async upsertAppSetting(key: string, value?: string, valueJson?: unknown): Promise<AppSetting> {
@@ -91,6 +102,7 @@ export class SystemStorage extends AdsStorage {
       .values({ key, value, valueJson, updatedAt: new Date() })
       .onConflictDoUpdate({ target: [appSettings.key], set: { value, valueJson, updatedAt: new Date() } })
       .returning();
+    _appSettingsCache.delete(key);
     return setting;
   }
 
@@ -111,6 +123,7 @@ export class SystemStorage extends AdsStorage {
           .onConflictDoUpdate({ target: [appSettings.key], set: { value: e.value, valueJson: e.valueJson, updatedAt: new Date() } });
       }
     });
+    for (const e of entries) _appSettingsCache.delete(e.key);
   }
 
   async getPhoneSharedCount(conversationId: string, userId: string): Promise<number> {
