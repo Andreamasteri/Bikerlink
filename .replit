@@ -35,10 +35,6 @@ args = "Watchdog"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "Error Monitor"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
 args = "Clean Metro"
 
 [[workflows.workflow.tasks]]
@@ -93,17 +89,6 @@ args = "check-ai-direct-generateobject"
   [[workflows.workflow.tasks]]
   task = "shell.exec"
   args = "bash scripts/watchdog.sh"
-
-  [workflows.workflow.metadata]
-  outputType = "console"
-
-  [[workflows.workflow]]
-  name = "Error Monitor"
-  author = "agent"
-
-  [[workflows.workflow.tasks]]
-  task = "shell.exec"
-  args = "bash scripts/error-monitor.sh"
 
   [workflows.workflow.metadata]
   outputType = "console"
