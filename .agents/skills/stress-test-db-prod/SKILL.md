@@ -45,6 +45,42 @@ npx tsx scripts/db-stress-test.ts --scenario=saturation --workers=20 --duration=
 npx tsx scripts/db-stress-test.ts --duration=43200 --quiet
 ```
 
+Vedi la sezione **"Preset durata"** per i comandi pronti per 1h/4h/6h/12h/24h.
+
+## Preset durata
+
+Scegli il preset in base alla finestra di manutenzione disponibile e all'obiettivo del test. **Esegui sempre `--dry-run` prima di qualsiasi run lungo.**
+
+| Preset | Flag | Durata | Quando usarlo |
+|--------|------|--------|---------------|
+| Smoke | `--dry-run` | ~10s | Sempre prima di un run vero — valida la pipeline |
+| Rapido | `--duration=3600` | 1h | Verifica veloce dopo una modifica schema/indice; non abbastanza lungo per rilevare degrado progressivo |
+| Breve | `--duration=14400` | 4h | Finestra pomeridiana o mattutina con app spenta; copre 1 rotazione completa di tutti gli scenari in `all` |
+| Medio | `--duration=21600` | 6h | **Default consigliato** — se l'app deve tornare su in giornata; bilanciato tra copertura e durata |
+| Esteso | `--duration=43200` | 12h | Finestra notturna parziale; ideale per verificare trend di degrado (latenza, bloat) senza bloccare l'app 24h |
+| Completo | `--duration=86400` | 24h | Run notturno non presidiato in Power mode; massima copertura, richiede Always-On |
+
+### Comandi pronti
+
+```bash
+# 1h — verifica rapida post-modifica
+npx tsx scripts/db-stress-test.ts --duration=3600 --workers=6 --scenario=all
+
+# 4h — finestra breve (mattina/pomeriggio)
+npx tsx scripts/db-stress-test.ts --duration=14400 --workers=6 --scenario=all
+
+# 6h — default bilanciato (app torna su in giornata)
+npx tsx scripts/db-stress-test.ts --duration=21600 --workers=6 --scenario=all
+
+# 12h — notturno parziale, non presidiato
+npx tsx scripts/db-stress-test.ts --duration=43200 --workers=6 --scenario=all --quiet
+
+# 24h — run completo notturno non presidiato (Power mode obbligatorio)
+npx tsx scripts/db-stress-test.ts --duration=86400 --workers=6 --scenario=all --quiet
+```
+
+> **Regola pratica**: se non hai una finestra precisa, usa **6h** (`--duration=21600`). È sufficiente a rilevare saturazione pool, degrado di latenza e problemi di integrità, e lascia margine per la giornata. Usa 24h solo per run notturni non presidiati con il Repl in Power mode.
+
 ### Flag
 
 | Flag | Default | Significato |
