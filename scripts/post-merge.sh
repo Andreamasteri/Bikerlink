@@ -411,6 +411,29 @@ if [ "$MEMO_DEPS_REGTEST_EXIT" -ne 0 ]; then
   exit "$MEMO_DEPS_REGTEST_EXIT"
 fi
 
+# ── GATE OGGETTO-MUTATION INTERO NEI DEPS DI useCallback / useMemo ──────────
+# Mettere l'oggetto-mutation INTERO di React Query (variabile *Mutation) nei
+# deps di useCallback/useMemo fa cambiare riferimento all'handler ad ogni
+# transizione di stato (idle→pending→success). Se l'handler è chiuso in un
+# renderItem di FlatList, l'intera lista si ridisegna ad ogni azione utente /
+# tick di refetch — il bug ripulito a mano nei task #5038 e #5039.
+# Fix: tenere la mutation in un ref, deps = solo slice primitive (.mutate,
+# .isPending). Consentito nei deps: *Mutation.mutate, *Mutation.isPending,
+# *MutationRef. Le occorrenze legacy sono congelate in
+# .mutation-object-deps-baseline; il gate blocca solo le NUOVE.
+# Vedi: .agents/memory/react-query-mutation-ref-deps.md
+echo "════════════════════════════════════════"
+echo "  Gate oggetto-mutation intero nei deps"
+echo "════════════════════════════════════════"
+MUTATION_DEPS_EXIT=0
+bash scripts/check-mutation-object-deps.sh || MUTATION_DEPS_EXIT=$?
+echo "════════════════════════════════════════"
+echo ""
+if [ "$MUTATION_DEPS_EXIT" -ne 0 ]; then
+  echo "❌ Gate mutation-object-deps fallito — correggere prima di procedere."
+  exit "$MUTATION_DEPS_EXIT"
+fi
+
 # ── GATE AI generateObject DIRETTO CON SCHEMA (bypass generateStructured) ──
 # llama-3.x (default Groq) NON supporta json_schema nativo.
 # generateObject({ schema: ... }) fuori dal gateway approvato crasha in prod
