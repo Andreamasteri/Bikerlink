@@ -13,7 +13,7 @@
 #        a. Ferma il container.
 #        b. Ricostruisce il grafo (build-regions.sh <codice>).
 #        c. Riavvia il container e aspetta /health.
-#   4. Rebuild dei tile Valhalla (force_rebuild una tantum, se in esecuzione).
+#   4. Rebuild dei tile Valhalla via build-valhalla-tiles.sh (se in esecuzione).
 #   5. (Opzionale) notifica al backend la data di aggiornamento.
 #
 # Uso:
@@ -186,27 +186,20 @@ done
 # ── 4. Rebuild tile Valhalla (solo se in esecuzione) ─────────────────────────
 log "[4/5] Controllo Valhalla..."
 if [[ -n "$($DOCKER ps -q -f name=bikerlink-valhalla 2>/dev/null || true)" ]]; then
-  log "[Valhalla] container attivo — avvio rebuild tile (force_rebuild=True)..."
-  VALHALLA_FORCE_REBUILD=True $COMPOSE up -d --force-recreate valhalla
+  log "[Valhalla] container attivo — avvio rebuild tile via build-valhalla-tiles.sh..."
+  BUILD_VALHALLA_SCRIPT="${SCRIPT_DIR}/build-valhalla-tiles.sh"
+  [[ -f "$BUILD_VALHALLA_SCRIPT" ]] || die "build-valhalla-tiles.sh non trovato in ${SCRIPT_DIR}/"
+  chmod +x "$BUILD_VALHALLA_SCRIPT"
 
-  log "[Valhalla] attendo /status dopo il rebuild dei tile (timeout $((VALHALLA_TIMEOUT_SECS/3600))h)..."
-  VALHALLA_STATUS_URL="http://localhost:${VALHALLA_PORT:-8002}/status"
-  elapsed=0
-  valhalla_ok=false
-  while (( elapsed < VALHALLA_TIMEOUT_SECS )); do
-    if curl -fsS --max-time 10 "$VALHALLA_STATUS_URL" >/dev/null 2>&1; then
-      valhalla_ok=true
-      break
-    fi
-    sleep 30; elapsed=$((elapsed + 30))
-  done
-
-  if [[ "$valhalla_ok" == "true" ]]; then
-    log "[Valhalla] tile ricostruiti ✓ — ripristino force_rebuild=False..."
-    $COMPOSE up -d --force-recreate valhalla
-    log "[Valhalla] online ✓"
+  # SERVE_TIMEOUT_SECS: build-valhalla-tiles.sh lo usa per il polling /status post-avvio.
+  # Lo esponiamo mappandolo dal nostro VALHALLA_TIMEOUT_SECS (default 3h = 10800s).
+  if DATA_DIR="$DATA_DIR" \
+     VALHALLA_PORT="${VALHALLA_PORT:-8002}" \
+     SERVE_TIMEOUT_SECS="$VALHALLA_TIMEOUT_SECS" \
+     "$BUILD_VALHALLA_SCRIPT"; then
+    log "[Valhalla] rebuild tile completato ✓"
   else
-    log "[Valhalla] ATTENZIONE: /status non ha risposto entro $((VALHALLA_TIMEOUT_SECS/3600))h — controlla: $COMPOSE logs -f valhalla"
+    log "[Valhalla] ATTENZIONE: build-valhalla-tiles.sh ha restituito un errore — controlla i log sopra"
     VALHALLA_REBUILD_FAILED=1
   fi
 else
