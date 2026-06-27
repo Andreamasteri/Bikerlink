@@ -91,6 +91,20 @@ Aggiunto a `scripts/post-merge.sh` dopo il gate `rnav-inline-props`.
 Il gate usa il hook-opener più vicino (cercando a ritroso fino a 60 righe) per distinguere
 `useEffect`/`useCallback` (flaggati) da `useMemo` (ignorato).
 
+## Trappola gate: `}, [router])` vs `), [router])` (arrow body-espressione)
+
+Un `useCallback` con **body a espressione** che alimenta `headerLeft`/`headerRight`/
+`screenOptions` chiude con `), [router])`, NON con `}, [router])`. Un gate che cerca
+solo la forma con `}` (e che esonera l'intero file se contiene `routerRef` da
+qualunque parte) **non vede** questo caso → è esattamente ciò che ha fatto crashare
+`proposals/create.tsx` (headerLeft instabile → screenOptions instabile → setOptions
+loop → crash-loop al boot, aggravato dalla nav-state persistita di Expo Router).
+
+`scripts/check-rnav-inline-props.sh` ora flagga **qualsiasi** `[router]` come deps in
+`app/**` + `hooks/**`, senza esonero file-level; opt-out per riga con
+`// rnav-memo-guard-ok`. **Why:** un riferimento instabile su una prop di navigazione
+è loop indipendentemente dalla forma sintattica dell'arrow.
+
 ## Soppressione (solo se verificato sicuro)
 
 ```tsx

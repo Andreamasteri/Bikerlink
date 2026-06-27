@@ -1,4 +1,4 @@
-import React, { useCallback, useState, useEffect, useMemo } from "react";
+import React, { useCallback, useState, useEffect, useMemo, useRef } from "react";
 import * as Location from "expo-location";
 import { useFocusEffect } from "expo-router";
 import {
@@ -46,6 +46,8 @@ interface UserSearchResult {
 
 export default function ChatScreen() {
   const router = useRouter();
+  const routerRef = useRef(router);
+  routerRef.current = router;
   const insets = useSafeAreaInsets();
   const colors = useColors();
   const { user } = useAuth();
@@ -218,9 +220,9 @@ export default function ChatScreen() {
 
   const handleConversationPress = useCallback(
     (convId: string) => {
-      router.push(`/chat/${convId}`);
+      routerRef.current.push(`/chat/${convId}`);
     },
-    [router]
+    []
   );
 
   const deleteConversationMutation = useMutation({

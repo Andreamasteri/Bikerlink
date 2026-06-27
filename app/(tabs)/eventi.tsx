@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from "react";
+import React, { useState, useCallback, useMemo, useRef } from "react";
 import {
   View,
   Text,
@@ -45,6 +45,8 @@ export default function EventiScreen() {
   const insets = useSafeAreaInsets();
   const FILTERS = useMemo(() => FILTER_KEYS.map(f => ({ key: f.key, label: t(f.labelKey) })), [t]);
   const router = useRouter();
+  const routerRef = useRef(router);
+  routerRef.current = router;
   const [filter, setFilter] = useState<FilterType>("tutti");
   const [showForm, setShowForm] = useState(false);
 
@@ -82,9 +84,9 @@ export default function EventiScreen() {
 
   const handleEventPress = useCallback(
     (id: string) => {
-      router.push(`/evento/${id}` as const);
+      routerRef.current.push(`/evento/${id}` as const);
     },
-    [router]
+    []
   );
 
   const handleLoadMore = useCallback(() => {

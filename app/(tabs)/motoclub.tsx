@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useMemo } from "react";
+import React, { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import {
   View,
   Text,
@@ -32,6 +32,8 @@ export default function MotoclubScreen() {
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
   const router = useRouter();
+  const routerRef = useRef(router);
+  routerRef.current = router;
 
   const [tab, setTab] = useState<"all" | "mine" | "market">("all");
   const [search, setSearch] = useState("");
@@ -168,9 +170,9 @@ export default function MotoclubScreen() {
       const url = conversationId
         ? `/motoclub/${clubId}?conversationId=${conversationId}`
         : `/motoclub/${clubId}`;
-      router.push(url as never);
+      routerRef.current.push(url as never);
     },
-    [router]
+    []
   );
 
   const displayedClubs = tab === "mine"

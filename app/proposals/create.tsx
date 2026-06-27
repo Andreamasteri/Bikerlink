@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo } from "react";
+import React, { useCallback, useMemo, useRef } from "react";
 import { View, Text, TextInput, TouchableOpacity, ActivityIndicator } from "react-native";
 import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollViewCompat";
 import { Stack } from "expo-router";
@@ -54,11 +54,14 @@ export default function CreateProposalScreen() {
     formatDateInput, formatTimeInput, autoCompleteTime,
   } = useCreateProposalForm();
 
+  const routerRef = useRef(router);
+  routerRef.current = router;
+
   const headerLeft = useCallback(() => (
-    <TouchableOpacity onPress={() => router.back()}>
+    <TouchableOpacity onPress={() => routerRef.current.back()}>
       <Ionicons name="close" size={24} color={Colors.text} />
     </TouchableOpacity>
-  ), [router]);
+  ), []);
 
   const screenOptions = useMemo(() => ({
     headerShown: true as const,

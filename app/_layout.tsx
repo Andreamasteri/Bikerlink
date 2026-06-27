@@ -316,7 +316,7 @@ function NormalRootLayout() {
 //
 // Quando FORCE_BOOT_GATE è false, la risoluzione è flag-based (AsyncStorage locale
 // OPPURE manifest remoto `bootGateEnabled`). Con entrambi a false → percorso normale.
-const FORCE_BOOT_GATE = true;
+const FORCE_BOOT_GATE = false;
 
 export default function RootLayout() {
   const [decision, setDecision] = useState<boolean | null>(

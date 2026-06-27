@@ -145,22 +145,30 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     return unplayed[Math.floor(Math.random() * unplayed.length)];
   }, [isShuffledRef]);
 
+  const scheduleRecovery = useCallback(function scheduleRecovery() {
+    if (recoveryTimeoutRef.current) clearTimeout(recoveryTimeoutRef.current);
+    recoveryTimeoutRef.current = setTimeout(() => {
+      recoveryTimeoutRef.current = null;
+      if (!playerRef.current || !wasInterruptedRef.current || isPlayingRef.current || userPausedRef.current) return;
+      setAudioModeAsync(AUDIO_MODE_ACTIVE)
+        .then(() => {
+          if (playerRef.current && wasInterruptedRef.current && !isPlayingRef.current && !userPausedRef.current) {
+            playerRef.current.play();
+            scheduleRecovery();
+          }
+        })
+        .catch((err) => {
+          console.warn("[Player] foreground recovery error:", err);
+          if (wasInterruptedRef.current && !isPlayingRef.current && !userPausedRef.current) scheduleRecovery();
+        });
+    }, 5000);
+  }, []);
+
   const onPlaybackStatus = useCallback((status: AudioStatus) => {
     if (!status.isLoaded) return;
     if (prevPlayingRef.current && !status.playing && !status.didJustFinish && !userPausedRef.current) {
       wasInterruptedRef.current = true;
-      if (recoveryTimeoutRef.current) clearTimeout(recoveryTimeoutRef.current);
-      recoveryTimeoutRef.current = setTimeout(() => {
-        recoveryTimeoutRef.current = null;
-        if (playerRef.current && wasInterruptedRef.current && !isPlayingRef.current && !userPausedRef.current) {
-          setAudioModeAsync(AUDIO_MODE_ACTIVE).then(() => {
-            if (playerRef.current && wasInterruptedRef.current && !isPlayingRef.current && !userPausedRef.current) {
-              wasInterruptedRef.current = false;
-              playerRef.current.play();
-            }
-          }).catch((err) => console.warn("[Player] foreground recovery error:", err));
-        }
-      }, 5000);
+      scheduleRecovery();
     } else if (status.playing) {
       wasInterruptedRef.current = false;
       if (recoveryTimeoutRef.current) { clearTimeout(recoveryTimeoutRef.current); recoveryTimeoutRef.current = null; }
@@ -181,7 +189,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         loadAndPlayRef.current?.(q[nextIdx], nextIdx);
       } else { setIsPlaying(false); }
     }
-  }, [getNextIndex, repeatModeRef, queueRef, queueIndexRef, isShuffledRef, isPlayingRef]);
+  }, [getNextIndex, repeatModeRef, queueRef, queueIndexRef, isShuffledRef, isPlayingRef, scheduleRecovery]);
 
   const destroyPlayer = useCallback(() => {
     if (radioTimeoutRef.current) { clearTimeout(radioTimeoutRef.current); radioTimeoutRef.current = null; }

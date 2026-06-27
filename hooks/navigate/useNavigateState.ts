@@ -37,6 +37,8 @@ export function useNavigateState() {
   const { activeTileUrl, activeTileMaxZoom } = useMapConfig();
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const routerRef = useRef(router);
+  routerRef.current = router;
   const { id } = useLocalSearchParams<{ id: string }>();
   const locale = useLocale();
   const t = useT();
@@ -415,8 +417,8 @@ export function useNavigateState() {
     Speech.stop();
     locationSubRef.current?.remove();
     locationSubRef.current = null;
-    router.back();
-  }, [router]);
+    routerRef.current.back();
+  }, []);
 
   const mapUri = React.useMemo(() => {
     if (polylinePoints.length < 2) return null;

@@ -268,7 +268,8 @@ export default function NotificationsScreen() {
   });
 
   const markAllRead = useCallback(async () => {
-    const unread = notifications.filter((n) => !n.isRead);
+    const current = qc.getQueryData<AppNotification[]>(["/api/notifications"]) ?? [];
+    const unread = current.filter((n) => !n.isRead);
     for (const n of unread) {
       try {
         await apiRequest("PUT", `/api/notifications/${n.id}/read`);
@@ -277,7 +278,7 @@ export default function NotificationsScreen() {
       }
     }
     qc.invalidateQueries({ queryKey: ["/api/notifications"], refetchType: "all" });
-  }, [notifications, qc]);
+  }, [qc]);
 
   const deleteAllMutation = useMutation({
     mutationFn: async () => {
@@ -299,6 +300,13 @@ export default function NotificationsScreen() {
       qc.invalidateQueries({ queryKey: ["/api/notifications"], refetchType: "all" });
     },
   });
+
+  const markReadMutateRef = useRef(markReadMutation.mutate);
+  markReadMutateRef.current = markReadMutation.mutate;
+  const deleteOneMutateRef = useRef(deleteOneMutation.mutate);
+  deleteOneMutateRef.current = deleteOneMutation.mutate;
+  const deleteAllMutateRef = useRef(deleteAllMutation.mutate);
+  deleteAllMutateRef.current = deleteAllMutation.mutate;
 
   const acceptRequestMutation = useMutation({
     mutationFn: (requestId: string) => apiRequest("POST", `/api/friends/request/${requestId}/accept`, {}),
@@ -333,18 +341,18 @@ export default function NotificationsScreen() {
         {
           text: "Cancella tutto",
           style: "destructive",
-          onPress: () => deleteAllMutation.mutate(),
+          onPress: () => deleteAllMutateRef.current(),
         },
       ]
     );
-  }, [deleteAllMutation, t]);
+  }, [t]);
 
   const handleItemPress = useCallback((item: AppNotification) => {
     if (item.notificationType === "direct_match_request") {
       return;
     }
     if (!item.isRead) {
-      markReadMutation.mutate(item.id);
+      markReadMutateRef.current(item.id);
     }
     if (item.notificationType === "proposal_match") {
       Alert.alert(
@@ -358,11 +366,11 @@ export default function NotificationsScreen() {
     if (route) {
       routerRef.current.push(route as never);
     }
-  }, [markReadMutation]);
+  }, []);
 
   const handleDeleteOne = useCallback((id: string) => {
-    deleteOneMutation.mutate(id);
-  }, [deleteOneMutation]);
+    deleteOneMutateRef.current(id);
+  }, []);
 
   const unreadCount = notifications.filter((n) => !n.isRead).length;
   const isLoadingAny = isLoading || loadingRequests;
@@ -391,7 +399,7 @@ export default function NotificationsScreen() {
     </View>
   ), [unreadCount, markAllRead, notifications.length, handleDeleteAll, deleteAllMutation.isPending, colors]);
 
-  const renderItem = ({ item }: { item: AppNotification }) => {
+  const renderItem = useCallback(({ item }: { item: AppNotification }) => {
     return (
       <NotificationItem
         item={item}
@@ -401,7 +409,7 @@ export default function NotificationsScreen() {
         colors={colors}
       />
     );
-  };
+  }, [handleItemPress, handleDeleteOne, deleteOneMutation.isPending, deleteOneMutation.variables, colors]);
 
   const screenOptions = useMemo(
     () => ({ headerRight: hasContent ? headerRight : undefined }),

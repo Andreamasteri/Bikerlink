@@ -145,38 +145,38 @@ if [ -n "$SCREEN_INLINE_OPTS" ]; then
   FAIL=1
 fi
 
-# ── router direttamente in useEffect (redirect loop) ─────────────────────────
-# Pattern pericoloso: router.replace/push chiamato direttamente dentro useEffect
-# con [router] nelle deps. Se il replace triggera un re-render, router cambia
-# referenza → useEffect gira di nuovo → loop.
-# Fix sicuro: routerRef+didRedirectRef (router NON va nelle deps).
-# Vedi: .agents/memory/router-in-useEffect-deps.md
+# ── [router] come unica dep di un hook (loop setOptions / redirect loop) ──────
+# Pattern pericoloso: [router] come sola dep di useEffect/useCallback/useMemo.
+#  - In useEffect che fa router.replace/push → redirect loop (router cambia ref).
+#  - In useCallback che alimenta headerLeft/headerRight/screenOptions →
+#    riferimento instabile → Stack.Screen setOptions → "Maximum update depth exceeded".
 #
-# Nota: questo check cattura anche useCallback([router]) che è VALIDO.
-# Se il check segnala un falso positivo in useCallback, aggiungere:
-#   # rnav-memo-guard-ok — useCallback è safe
-# alla riga del match per escluderla.
-ROUTER_USEEFFECT=$(rg -n 'useEffect\s*\(' \
+# NB: il vecchio check guardava solo `}, [router])` (arrow con body a blocco) e
+# saltava l'INTERO file se conteneva `routerRef` ovunque. Questo lasciava passare
+# `useCallback(() => (...), [router])` (body a espressione, chiusura `), [router])`)
+# → è esattamente il bug che ha fatto slittare proposals/create.tsx al CI.
+# Ora cattura QUALSIASI `[router]` come deps array, in app/ e hooks/, senza
+# esonero file-level.
+#
+# Fix: routerRef (router NON nelle deps) con deps []; vedi router-in-useEffect-deps.md.
+# Opt-out esplicito per casi verificati safe: aggiungere il commento
+#   // rnav-memo-guard-ok
+# sulla STESSA riga del deps array.
+ROUTER_DEP=$(rg -n '\[router\]' \
   --glob 'app/**/*.tsx' --glob 'app/**/*.ts' \
+  --glob 'hooks/**/*.tsx' --glob 'hooks/**/*.ts' \
   --glob '!node_modules/**' --glob '!.local/**' --glob '!.agents/**' \
-  -l 2>/dev/null || true)
-if [ -n "$ROUTER_USEEFFECT" ]; then
-  for f in $ROUTER_USEEFFECT; do
-    # In ogni file che ha useEffect, cerca [router] come unica dep di un useEffect
-    # (pattern: }, [router]) che chiude un hook — potenzialmente pericoloso)
-    MATCHES=$(rg -n '\},\s*\[router\]\s*\)' "$f" 2>/dev/null || true)
-    if [ -n "$MATCHES" ]; then
-      # Verifica che non sia già protetto da routerRef
-      if ! grep -q 'routerRef' "$f" 2>/dev/null; then
-        echo ""
-        echo "⚠️  ATTENZIONE — router in hook deps senza routerRef guard ($f)"
-        echo "$MATCHES"
-        echo "   → Se è in useEffect che fa redirect, rischio loop. Usare routerRef+didRedirectRef."
-        echo "   → Se è in useCallback (handler), è corretto — aggiungere '# rnav-memo-guard-ok' come commento."
-        FAIL=1
-      fi
-    fi
-  done
+  2>/dev/null || true)
+if [ -n "$ROUTER_DEP" ]; then
+  ROUTER_DEP=$(printf '%s\n' "$ROUTER_DEP" | grep -v 'rnav-memo-guard-ok' || true)
+fi
+if [ -n "$ROUTER_DEP" ]; then
+  echo ""
+  echo "❌ TROVATO — [router] come unica dep di un hook (rischio loop setOptions/redirect)"
+  echo "$ROUTER_DEP"
+  echo "   → Usare routerRef (router NON nelle deps) con deps []."
+  echo "   → Se il caso è verificato safe, aggiungere '// rnav-memo-guard-ok' sulla riga delle deps."
+  FAIL=1
 fi
 
 # ── eslint-disable rules-of-hooks in app/ ────────────────────────────────────

@@ -1,4 +1,4 @@
-import React, { createContext, useContext, ReactNode } from "react";
+import React, { createContext, useContext, useMemo, ReactNode } from "react";
 import { Platform } from "react-native";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth-context";
@@ -117,14 +117,26 @@ export function MapSettingsProvider({ children }: { children: ReactNode }) {
     activeTileMaxZoom = activeTile.maxZoom;
   }
 
-  const value: MapConfig = {
-    enabled: mapsEnabled,
-    adminProvider,
-    resolvedProvider,
-    activeTileUrl,
-    activeTileMaxZoom,
-    isLoading: mapsLoading || profileLoading || tileLoading,
-  };
+  const value = useMemo<MapConfig>(
+    () => ({
+      enabled: mapsEnabled,
+      adminProvider,
+      resolvedProvider,
+      activeTileUrl,
+      activeTileMaxZoom,
+      isLoading: mapsLoading || profileLoading || tileLoading,
+    }),
+    [
+      mapsEnabled,
+      adminProvider,
+      resolvedProvider,
+      activeTileUrl,
+      activeTileMaxZoom,
+      mapsLoading,
+      profileLoading,
+      tileLoading,
+    ],
+  );
 
   return <MapContext.Provider value={value}>{children}</MapContext.Provider>;
 }
