@@ -691,6 +691,40 @@ fi
 echo "════════════════════════════════════════"
 echo ""
 
+# ── GATE TEST CHECKER HEALTH-CHECK (tutti) ───────────────────────────────────
+# Esegue TUTTI i test in scripts/health-check/__tests__/ con un singolo
+# comando glob. Qualsiasi nuovo file *.test.ts aggiunto alla directory
+# viene incluso automaticamente senza dover modificare questo script.
+# Copre: classify, dead-code, file-placement, imports, known-errors, logic,
+# typecheck — e ogni checker aggiunto in futuro.
+# Se uno qualsiasi dei test è rosso, il merge è bloccato.
+echo "════════════════════════════════════════"
+echo "  Gate test checker health-check (tutti)"
+echo "════════════════════════════════════════"
+HC_TEST_FILES=()
+for _hcf in scripts/health-check/__tests__/*.test.ts; do
+  [ -f "$_hcf" ] && HC_TEST_FILES+=("$_hcf")
+done
+HC_TEST_COUNT=${#HC_TEST_FILES[@]}
+echo "  File di test rilevati (${HC_TEST_COUNT}):"
+for _hcf in "${HC_TEST_FILES[@]}"; do
+  echo "    • $(basename "$_hcf")"
+done
+echo ""
+HC_TEST_EXIT=0
+npx vitest run scripts/health-check/__tests__ 2>&1 || HC_TEST_EXIT=$?
+if [ "$HC_TEST_EXIT" -eq 0 ]; then
+  echo "✅ Health-check checker tests: tutti i ${HC_TEST_COUNT} file passati."
+else
+  echo "❌ Health-check checker tests FALLITI (exit ${HC_TEST_EXIT}) — un checker è regredito."
+  echo "   Eseguire 'npx vitest run scripts/health-check/__tests__' localmente per i dettagli."
+  echo "════════════════════════════════════════"
+  echo ""
+  exit "$HC_TEST_EXIT"
+fi
+echo "════════════════════════════════════════"
+echo ""
+
 # ── GATE TEST REVOCA PERMESSO BACKGROUND ─────────────────────────────────────
 # Blocca regressioni su checkBackgroundPermission e evaluateBackgroundRevocation:
 # verifica la logica pura di revoca, l'infrastruttura di polling (setInterval),
