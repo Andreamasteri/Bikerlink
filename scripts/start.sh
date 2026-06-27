@@ -156,9 +156,11 @@ while [ $ATTEMPT -lt ${#DELAYS[@]} ]; do
     check_metro_alive
   fi
 
-  # Controlla sia lo status HTTP (deve essere 200) sia il body (status:ok, initializing:false)
+  # Controlla sia lo status HTTP (deve essere 200) sia il body. /api/health ora
+  # distingue booting(503)/ready(200)/degraded(200): "ready" e "degraded" = backend
+  # che SERVE richieste (vedi server/init-state.ts). "ok" accettato per retro-compat.
   HTTP_CODE=$(curl -s -o /tmp/health_body.txt -w "%{http_code}" --max-time 3 "$HEALTH_URL" 2>/dev/null || echo "000")
-  if [ "$HTTP_CODE" = "200" ] && grep -q '"status":"ok"' /tmp/health_body.txt 2>/dev/null; then
+  if [ "$HTTP_CODE" = "200" ] && grep -qE '"status":"(ready|degraded|ok)"' /tmp/health_body.txt 2>/dev/null; then
     HEALTHY=1
     break
   fi
@@ -186,7 +188,7 @@ if [ "$HEALTHY" -ne 1 ]; then
     log "  │ (log Metro non disponibile o vuoto)"
   fi
   log "━━━ Fine log Metro ━━━"
-  fail "3/4" "backend non è healthy (HTTP 200 + status:ok) dopo ${MAX_HEALTH_SECS}s"
+  fail "3/4" "backend non è healthy (HTTP 200 + status:ready|degraded) dopo ${MAX_HEALTH_SECS}s"
 fi
 
 log "[3/4] Backend healthy in $(elapsed_since $STEP_START)s"

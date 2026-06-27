@@ -50,11 +50,13 @@ cerbero_port_open() {
 }
 
 # ── TESTA 1: salute backend via /api/health ───────────────────────────────────
-# /api/health è initializing-aware: 503 {status:initializing} durante il boot DB,
-# 200 {status:ok} a regime. Distinguiamo 3 stati per NON riavviare un backend che
-# sta solo inizializzando (un restart in quella finestra → crash loop):
-#   return 0  → backend pronto      (HTTP 200, "status":"ok")
-#   return 2  → backend in avvio    (raggiungibile ma non ancora pronto, es. 503)
+# /api/health è initializing-aware: 503 {status:booting} durante il boot DB,
+# 200 {status:ready} a regime e 200 {status:degraded} quando un sottosistema
+# non-critico è ko ma il backend SERVE ancora. Distinguiamo 3 stati per NON
+# riavviare un backend che sta solo inizializzando (restart in quella finestra
+# → crash loop):
+#   return 0  → backend vivo/serve   (HTTP 200, "status":"ready"|"degraded"|"ok")
+#   return 2  → backend in avvio     (raggiungibile ma non ancora pronto, es. 503)
 #   return 1  → backend IRRAGGIUNGIBILE (porta chiusa/timeout) → da riavviare
 cerbero_health_backend() {
   local body code
@@ -63,7 +65,10 @@ cerbero_health_backend() {
   if [ -z "$code" ] || [ "$code" = "000" ]; then
     return 1
   fi
-  if printf '%s' "$body" | grep -q '"status":"ok"'; then
+  # status "ready" = pronto; "degraded" = pronto ma un sottosistema non-critico è
+  # in errore (vedi server/init-state.ts) — in entrambi i casi il backend SERVE
+  # richieste → stato 0 (vivo, nessun restart). "ok" accettato per retro-compat.
+  if printf '%s' "$body" | grep -qE '"status":"(ready|degraded|ok)"'; then
     return 0
   fi
   return 2

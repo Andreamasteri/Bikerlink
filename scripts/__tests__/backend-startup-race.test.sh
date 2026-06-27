@@ -161,9 +161,9 @@ BACKEND_PORT="$FREE_PORT"
 BACKEND_RESTART_LOCK="$TMP/cerbero-backend-restart.lock"
 
 # ══════════════════════════════════════════════════════════════════════════════
-section "Test 1 — cerbero_health_backend stato 0: HTTP 200 + status:ok"
+section "Test 1 — cerbero_health_backend stato 0: HTTP 200 + status:ready"
 # ══════════════════════════════════════════════════════════════════════════════
-PID_OK=$(start_mock_http 200 '{"status":"ok"}' "$MOCK_PORT_OK")
+PID_OK=$(start_mock_http 200 '{"status":"ready"}' "$MOCK_PORT_OK")
 MOCK_SERVER_PIDS+=("$PID_OK")
 BACKEND_PORT="$MOCK_PORT_OK"
 cerbero_health_backend
@@ -171,11 +171,30 @@ STATE_0=$?
 BACKEND_PORT="$FREE_PORT"
 
 if [ "$STATE_0" -eq 0 ]; then
-  ok "cerbero_health_backend ritorna 0 (pronto) su HTTP 200 + status:ok"
+  ok "cerbero_health_backend ritorna 0 (pronto) su HTTP 200 + status:ready"
 else
-  nok "cerbero_health_backend ritorna $STATE_0 invece di 0 su HTTP 200 + status:ok"
+  nok "cerbero_health_backend ritorna $STATE_0 invece di 0 su HTTP 200 + status:ready"
 fi
 kill "$PID_OK" 2>/dev/null || true
+
+# ══════════════════════════════════════════════════════════════════════════════
+section "Test 1b — cerbero_health_backend stato 0: HTTP 200 + status:degraded"
+# ══════════════════════════════════════════════════════════════════════════════
+# Degraded = READY ma un sottosistema non-critico è ko: il backend SERVE ancora,
+# quindi deve essere considerato vivo (stato 0), non riavviato.
+PID_DEG=$(start_mock_http 200 '{"status":"degraded","degradedReasons":["schedulers-init-failed"]}' "$MOCK_PORT_OK")
+MOCK_SERVER_PIDS+=("$PID_DEG")
+BACKEND_PORT="$MOCK_PORT_OK"
+cerbero_health_backend
+STATE_DEG=$?
+BACKEND_PORT="$FREE_PORT"
+
+if [ "$STATE_DEG" -eq 0 ]; then
+  ok "cerbero_health_backend ritorna 0 (vivo) su HTTP 200 + status:degraded"
+else
+  nok "cerbero_health_backend ritorna $STATE_DEG invece di 0 su HTTP 200 + status:degraded"
+fi
+kill "$PID_DEG" 2>/dev/null || true
 
 # ══════════════════════════════════════════════════════════════════════════════
 section "Test 2 — cerbero_health_backend stato 2: HTTP 503 (initializing)"

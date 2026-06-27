@@ -118,26 +118,27 @@ if [ "$BACKEND_UP" = true ]; then
     attempt=$((attempt + 1))
     HTTP_RESPONSE=$(curl -s --max-time "$PORT_TIMEOUT" http://localhost:5000/api/health 2>/dev/null || echo "")
 
-    # Verifica precisa: .status deve essere esattamente "ok"
-    # Prima tenta con jq (più affidabile), poi fallback a python3, poi a grep conservativo
+    # /api/health distingue booting(503)/ready(200)/degraded(200): "ready" e
+    # "degraded" = backend che SERVE richieste (vedi server/init-state.ts).
+    # "ok" accettato per retro-compat. Prima jq, poi python3, poi grep.
     STATUS_OK=false
     if command -v jq >/dev/null 2>&1; then
-      if echo "$HTTP_RESPONSE" | jq -e '.status == "ok"' >/dev/null 2>&1; then
+      if echo "$HTTP_RESPONSE" | jq -e '.status == "ready" or .status == "degraded" or .status == "ok"' >/dev/null 2>&1; then
         STATUS_OK=true
       fi
     elif command -v python3 >/dev/null 2>&1; then
-      if echo "$HTTP_RESPONSE" | python3 -c "import sys,json; d=json.load(sys.stdin); sys.exit(0 if d.get('status')=='ok' else 1)" 2>/dev/null; then
+      if echo "$HTTP_RESPONSE" | python3 -c "import sys,json; d=json.load(sys.stdin); sys.exit(0 if d.get('status') in ('ready','degraded','ok') else 1)" 2>/dev/null; then
         STATUS_OK=true
       fi
     else
-      # Fallback conservativo: cerca "status":"ok" o "status": "ok"
-      if echo "$HTTP_RESPONSE" | grep -qE '"status"\s*:\s*"ok"'; then
+      # Fallback conservativo: cerca "status":"ready|degraded|ok"
+      if echo "$HTTP_RESPONSE" | grep -qE '"status"\s*:\s*"(ready|degraded|ok)"'; then
         STATUS_OK=true
       fi
     fi
 
     if [ "$STATUS_OK" = true ]; then
-      ok "GET /api/health → { status: \"ok\" } verificato (tentativo ${attempt}/${MAX_RETRIES})"
+      ok "GET /api/health → { status: ready|degraded } verificato (tentativo ${attempt}/${MAX_RETRIES})"
       $QUIET || info "Risposta completa: $HTTP_RESPONSE"
       HEALTH_OK=true
       break
@@ -150,7 +151,7 @@ if [ "$BACKEND_UP" = true ]; then
   done
 
   if [ "$HEALTH_OK" = false ]; then
-    blocker "GET /api/health non restituisce { status: \"ok\" } dopo ${MAX_RETRIES} tentativi — risposta: ${HTTP_RESPONSE:-<vuota>}"
+    blocker "GET /api/health non restituisce { status: ready|degraded } dopo ${MAX_RETRIES} tentativi — risposta: ${HTTP_RESPONSE:-<vuota>}"
   fi
 else
   warning "GET /api/health saltato — backend non raggiungibile su porta 5000"

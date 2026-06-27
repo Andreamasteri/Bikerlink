@@ -1,14 +1,36 @@
 import type { Request, Response, NextFunction } from "express";
 
 export const initState = {
-  // True dal boot fino a quando TUTTE le fasi (migration, seed, scheduler) sono
-  // complete. Il gate /api/* in server/index.ts usa questo flag per il 503.
+  // True dal boot fino a quando le fasi CRITICHE (listen, migration, drift guard,
+  // DB init, seed + engine) sono complete. Il gate /api/* in server/index.ts usa
+  // questo flag per il 503. Schedulers/warmup post-READY NON lo tengono true.
   initializing: true,
   // True non appena le migration sono applicate: schema + tabella session pronti.
   // Permette al gate di lasciar passare le rotte auth essenziali (login, me,
   // logout) durante la finestra di init, prima che initializing diventi false.
   dbReady: false,
+  // True quando il server è READY ma uno o più sottosistemi NON critici sono in
+  // errore (es. schedulers init fallito, index-drift in block mode, ThinkCentre
+  // offline). NON è fatale: il server continua a servire. /api/health lo riporta
+  // come status "degraded" (200, mai 500), così il probe non lo considera morto.
+  degraded: false,
+  degradedReasons: [] as string[],
 };
+
+// Marca lo stato degraded (post-READY, non fatale). Idempotente per `reason`.
+export function markDegraded(reason: string): void {
+  if (!initState.degradedReasons.includes(reason)) {
+    initState.degradedReasons.push(reason);
+    console.warn(`[BOOT][DEGRADED] ${reason}`);
+  }
+  initState.degraded = true;
+}
+
+// Rimuove un motivo di degraded; azzera il flag se non resta alcun motivo.
+export function clearDegraded(reason: string): void {
+  initState.degradedReasons = initState.degradedReasons.filter((r) => r !== reason);
+  if (initState.degradedReasons.length === 0) initState.degraded = false;
+}
 
 // Task #2789 / #4455 — Rotte auth essenziali che il gate lascia passare appena
 // le migration sono applicate (dbReady=true), prima della fine del boot, così

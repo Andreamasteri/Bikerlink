@@ -1,5 +1,5 @@
 // overflow di server/index.ts — sequenza di boot estratta per ridurre le dimensioni
-import { initState } from "./init-state";
+import { initState, markDegraded } from "./init-state";
 import { startMatchingEngine } from "./matching-engine";
 import {
   autoSeedEssentialUsers,
@@ -39,6 +39,10 @@ function withPhaseTimeout<T>(label: string, promise: Promise<T>, timeoutMs = BOO
     );
   });
 }
+
+// Numero di fasi del boot loggate (1..5). Modulo-level perché lo usa anche
+// runPostReady() per la fase 5 (schedulers), ora eseguita post-READY.
+const TOTAL_PHASES = 5;
 
 const BOOT_START = Date.now();
 
@@ -82,7 +86,7 @@ async function waitForDatabaseReady(): Promise<void> {
 }
 
 export async function runBootSequence(server: Server, errorHandlersReady: Promise<void>): Promise<void> {
-  const TOTAL = 5;
+  const TOTAL = TOTAL_PHASES;
 
   let needsFakeSeed = false;
 
@@ -261,28 +265,21 @@ export async function runBootSequence(server: Server, errorHandlersReady: Promis
     );
   });
 
-  // ── Phase 5: Schedulers + maintenance jobs ────────────────────────────────
-  bootLog(5, TOTAL, "Schedulers", "start");
-  try {
-    const { runPhase5Schedulers } = await import("./boot-phase5-schedulers");
-    await runPhase5Schedulers();
-  } catch (err) {
-    console.error("[INIT] FATAL — Phase 5 failed:", err);
-    applyCrashBackoff("phase5-fatal");
-    process.exit(1);
-  }
-  bootLog(5, TOTAL, "Schedulers", "done");
-
-  // ── Boot complete ─────────────────────────────────────────────────────────
+  // ── READY ─────────────────────────────────────────────────────────────────
+  // Critical path completo (listen → migrations → drift guard → DB init → seed +
+  // matching engine + WS): il server può servire richieste ORA. Schedulers,
+  // warmup, analytics, index-drift e fake-seed NON bloccano più il READY: girano
+  // in runPostReady() in modo asincrono e NON fatale (nessun process.exit
+  // post-READY → niente crash-loop dopo aver già servito traffico).
   initState.initializing = false;
   // Boot riuscito: azzera il conteggio crash recenti così un crash isolato dopo
   // un periodo sano attende solo il delay base, senza ereditare un backoff alto
   // di una raffica passata (vedi lib/crash-backoff.ts).
   resetCrashBackoff();
-  bootOk("READY", `All phases completed in ${((Date.now() - BOOT_START) / 1000).toFixed(1)}s — server is READY`);
+  bootOk("READY", `Critical phases completed in ${((Date.now() - BOOT_START) / 1000).toFixed(1)}s — server is READY`);
   startAliveBeacon();
   const totalElapsed = ((Date.now() - BOOT_START) / 1000).toFixed(1);
-  console.log(`[INIT] All startup phases completed in ${totalElapsed}s — server is READY`);
+  console.log(`[INIT] Critical startup phases completed in ${totalElapsed}s — server is READY (schedulers + warmup run post-READY)`);
 
   console.log(
     `[INIT][SUMMARY] ── Boot task summary ──────────────────────────\n` +
@@ -292,7 +289,9 @@ export async function runBootSequence(server: Server, errorHandlersReady: Promis
     `[INIT][SUMMARY]     seedGooglePlayReviewerAccount : ran\n` +
     `[INIT][SUMMARY]     ensureBikerLinkOfficialOnBoot : ran\n` +
     `[INIT][SUMMARY]     seedMotoclubs / seedClubMembershipsOnBoot / startMatchingEngine : ran\n` +
-    `[INIT][SUMMARY]     schedulers (vacuum/mapMatch/curvyScore/OTA/zeroMatchSnapshot) : scheduled\n` +
+    `[INIT][SUMMARY]   POST-READY (async, non-blocking, non-fatal):\n` +
+    `[INIT][SUMMARY]     schedulers (vacuum/mapMatch/curvyScore/OTA/zeroMatchSnapshot) : post-READY\n` +
+    `[INIT][SUMMARY]     index-drift check / embedding-coverage check / competitor-PDF : post-READY\n` +
     `[INIT][SUMMARY]   BACKGROUND (fire-and-forget after READY):\n` +
     `[INIT][SUMMARY]     runPlaylistSnapshot / saveSchemaSnapshot / initMissingClubConversations : scheduled\n` +
     `[INIT][SUMMARY]     enrichBikerMatchBreakdowns (back-fill affinity chips) : scheduled\n` +
@@ -301,136 +300,173 @@ export async function runBootSequence(server: Server, errorHandlersReady: Promis
     `[INIT][SUMMARY] ────────────────────────────────────────────────`
   );
 
+  // Post-READY: asincrono, non bloccante, non fatale. Il .catch() finale è
+  // OBBLIGATORIO — una rejection non gestita qui diventerebbe unhandledRejection
+  // → crashExit() → restart, ricreando il crash-loop che vogliamo evitare.
+  void runPostReady(needsFakeSeed).catch((err) => {
+    console.warn("[BOOT][POST-READY] errore non gestito (non-fatale):", err);
+    markDegraded("post-ready-error");
+  });
+}
+
+// ── Post-READY ────────────────────────────────────────────────────────────────
+// Tutto ciò che NON è sul path critico del boot. Gira dopo che il server è già
+// in ascolto e ha dichiarato READY. È asincrono, non bloccante e NON fatale:
+// nessun ramo qui chiama process.exit, così un problema post-READY non riavvia
+// un processo che sta già servendo richieste. Un guard anti doppia esecuzione
+// evita che schedulers/seed partano due volte.
+let postReadyStarted = false;
+
+async function runPostReady(needsFakeSeed: boolean): Promise<void> {
+  if (postReadyStarted) {
+    console.warn("[BOOT][POST-READY] già avviato — skip per evitare doppia esecuzione.");
+    return;
+  }
+  postReadyStarted = true;
+
+  // ── Phase 5: Schedulers + maintenance jobs (post-READY, NON fatale) ────────
+  // Prima era FATAL (process.exit(1)) sul path critico: un errore degli scheduler
+  // riavviava il server. Ora si logga e si marca degraded; il server resta su.
+  bootLog(5, TOTAL_PHASES, "Schedulers", "start");
+  try {
+    const { runPhase5Schedulers } = await import("./boot-phase5-schedulers");
+    await runPhase5Schedulers();
+    bootLog(5, TOTAL_PHASES, "Schedulers", "done");
+  } catch (err) {
+    console.error("[INIT] Phase 5 (schedulers) failed (non-fatal, post-READY):", err);
+    markDegraded("schedulers-init-failed");
+  }
+
   ensureCompetitorAnalysisPdf();
 
-  setImmediate(() => {
-    (async () => {
-      try {
-        const { storage: s } = await import("./storage");
-        const modeSetting = await s.getAppSetting("index_drift_check_mode");
-        const VALID_MODES = ["warn", "block", "disabled"] as const;
-        type DriftMode = typeof VALID_MODES[number];
-        const rawMode = (modeSetting?.value ?? "warn").trim().toLowerCase();
-        const mode: DriftMode = (VALID_MODES as readonly string[]).includes(rawMode)
-          ? rawMode as DriftMode
-          : (() => {
-              console.warn(
-                `[BOOT][INDEX-DRIFT] Valore AppSetting non riconosciuto (index_drift_check_mode="${rawMode}") — fallback a "warn".`,
-              );
-              return "warn" as DriftMode;
-            })();
+  await runIndexDriftCheckPostReady();
+  await runEmbeddingCoveragePostReady();
 
-        if (mode === "disabled") {
-          console.log("[BOOT][INDEX-DRIFT] Check disabilitato via AppSetting (index_drift_check_mode=disabled).");
-          return;
-        }
+  // initMissingClubConversations + enrichBikerMatchBreakdowns sono registrati nel
+  // bootJobQueue (vedi runBootSequence, prima del READY): partono dopo 4+ minuti.
 
-        const { runIndexDriftCheck } = await import("../scripts/check-index-drift");
-        const result = await runIndexDriftCheck();
+  if (needsFakeSeed) {
+    console.log("[INIT][BG] Starting autoSeedFakeUsers...");
+    autoSeedFakeUsers()
+      .then(() => console.log("[INIT][BG] autoSeedFakeUsers — done"))
+      .catch((err) => {
+        console.warn("[INIT][BG] autoSeedFakeUsers error:", err);
+      });
+  }
+}
 
-        if (result.exitCode === 1) {
-          const summary = result.issues.slice(0, 3).join("; ") +
-            (result.issues.length > 3 ? ` (+${result.issues.length - 3} altri)` : "");
-
-          if (mode === "block") {
-            console.error(
-              `[BOOT][INDEX-DRIFT] FATAL (mode=block) — drift rilevato al boot (${result.issues.length} problema/i): ${summary}. ` +
-              `Correggere con migration o fix schema TS e riavviare.`,
-            );
-            applyCrashBackoff("index-drift-block");
-            process.exit(1);
-          } else {
-            // mode === "warn" (default)
-            console.error(
-              `[BOOT][INDEX-DRIFT] CRITICAL (mode=warn) — drift rilevato al boot (${result.issues.length} problema/i): ${summary}. ` +
-              `Correggere con migration o fix schema TS prima del prossimo deploy.`,
-            );
-            // Push alert solo in produzione per evitare rumore in ambienti di sviluppo
-            if (process.env.NODE_ENV === "production") {
-              try {
-                const { sendSystemAlertPushToAdmins } = await import("./push-notifications");
-                await sendSystemAlertPushToAdmins(
-                  "🔴 Index Drift rilevato al boot",
-                  `${result.issues.length} indice/i speciale/i non allineato/i col DB. Correzione richiesta. ${summary}`,
-                  { type: "index_drift_boot", issueCount: result.issues.length },
-                );
-              } catch (alertErr) {
-                console.warn("[BOOT][INDEX-DRIFT] Invio push alert fallito (non-fatal):", alertErr);
-              }
-            }
-          }
-        } else if (result.exitCode === 2) {
+// Index-drift check post-READY. NB: in passato il mode=block faceva
+// applyCrashBackoff()+process.exit(1) DOPO il READY → riavviava un server che
+// aveva già servito richieste (crash-loop). Ora né block né warn terminano il
+// processo: entrambi loggano; block marca anche lo stato degraded di /api/health,
+// così l'operatore vede il problema senza che il processo muoia.
+async function runIndexDriftCheckPostReady(): Promise<void> {
+  try {
+    const { storage: s } = await import("./storage");
+    const modeSetting = await s.getAppSetting("index_drift_check_mode");
+    const VALID_MODES = ["warn", "block", "disabled"] as const;
+    type DriftMode = typeof VALID_MODES[number];
+    const rawMode = (modeSetting?.value ?? "warn").trim().toLowerCase();
+    const mode: DriftMode = (VALID_MODES as readonly string[]).includes(rawMode)
+      ? rawMode as DriftMode
+      : (() => {
           console.warn(
-            "[BOOT][INDEX-DRIFT] DB non raggiungibile durante il check post-boot — verifica skippata.",
+            `[BOOT][INDEX-DRIFT] Valore AppSetting non riconosciuto (index_drift_check_mode="${rawMode}") — fallback a "warn".`,
           );
-        } else {
-          console.log("[BOOT][INDEX-DRIFT] OK — nessun drift di indici speciali rilevato.");
-        }
-      } catch (err) {
-        console.warn("[BOOT][INDEX-DRIFT] Check fallito (non-fatal):", err);
-      }
-    })();
-
-    (async () => {
-      try {
-        const { pool: pgPool } = await import("./db");
-        const { storage: s } = await import("./storage");
-        const thresholdSetting = await s.getAppSetting("embedding_coverage_threshold");
-        const threshold = (() => {
-          const raw = thresholdSetting?.value;
-          if (!raw) return 80;
-          const n = parseInt(raw, 10);
-          return Number.isFinite(n) ? Math.max(0, Math.min(100, n)) : 80;
+          return "warn" as DriftMode;
         })();
-        const client = await pgPool.connect();
-        try {
-          const [activeRes, covRes] = await Promise.all([
-            client.query<{ total: string }>(
-              `SELECT COUNT(*) AS total FROM users WHERE status = 'active'`,
-            ),
-            client.query<{ with_embedding: string }>(
-              `SELECT COUNT(DISTINCT e.entity_id) AS with_embedding
-               FROM embeddings e
-               JOIN users u ON u.id = e.entity_id AND u.status = 'active'
-               WHERE e.entity_type = 'user' AND e.field = 'bio'`,
-            ),
-          ]);
-          const activeUsers = parseInt(activeRes.rows[0]?.total ?? "0", 10);
-          const withEmbedding = parseInt(covRes.rows[0]?.with_embedding ?? "0", 10);
-          const pct = activeUsers > 0
-            ? Math.round((withEmbedding / activeUsers) * 100 * 10) / 10
-            : 100;
-          if (pct < threshold) {
-            console.warn(
-              `[INIT][EMBED] Coverage WARNING: only ${pct}% of active users have a 'bio' embedding` +
-              ` (${withEmbedding}/${activeUsers}, threshold=${threshold}%).` +
-              ` Match quality may be degraded for users without embeddings.`,
-            );
-          } else {
-            console.log(
-              `[INIT][EMBED] Coverage OK: ${pct}% of active users have a 'bio' embedding` +
-              ` (${withEmbedding}/${activeUsers}).`,
-            );
-          }
-        } finally {
-          client.release();
-        }
-      } catch (err) {
-        console.warn("[INIT][EMBED] Coverage check failed (non-fatal):", err);
-      }
-    })();
 
-    // initMissingClubConversations + enrichBikerMatchBreakdowns sono ora
-    // registrati nel bootJobQueue (vedi sopra, prima della Phase 5): partono dopo
-    // 4+ minuti dal boot, non più fire-and-forget immediato post-READY.
-
-    if (needsFakeSeed) {
-      console.log("[INIT][BG] Starting autoSeedFakeUsers...");
-      autoSeedFakeUsers()
-        .then(() => console.log("[INIT][BG] autoSeedFakeUsers — done"))
-        .catch((err) => {
-          console.warn("[INIT][BG] autoSeedFakeUsers error:", err);
-        });
+    if (mode === "disabled") {
+      console.log("[BOOT][INDEX-DRIFT] Check disabilitato via AppSetting (index_drift_check_mode=disabled).");
+      return;
     }
-  });
+
+    const { runIndexDriftCheck } = await import("../scripts/check-index-drift");
+    const result = await runIndexDriftCheck();
+
+    if (result.exitCode === 1) {
+      const summary = result.issues.slice(0, 3).join("; ") +
+        (result.issues.length > 3 ? ` (+${result.issues.length - 3} altri)` : "");
+
+      const severity = mode === "block" ? "DEGRADED (mode=block)" : "CRITICAL (mode=warn)";
+      console.error(
+        `[BOOT][INDEX-DRIFT] ${severity} — drift rilevato post-READY (${result.issues.length} problema/i): ${summary}. ` +
+        `Correggere con migration o fix schema TS prima del prossimo deploy.`,
+      );
+      if (mode === "block") {
+        markDegraded(`index-drift (${result.issues.length} issue/i)`);
+      }
+      // Push alert solo in produzione per evitare rumore in ambienti di sviluppo.
+      if (process.env.NODE_ENV === "production") {
+        try {
+          const { sendSystemAlertPushToAdmins } = await import("./push-notifications");
+          await sendSystemAlertPushToAdmins(
+            "🔴 Index Drift rilevato al boot",
+            `${result.issues.length} indice/i speciale/i non allineato/i col DB. Correzione richiesta. ${summary}`,
+            { type: "index_drift_boot", issueCount: result.issues.length },
+          );
+        } catch (alertErr) {
+          console.warn("[BOOT][INDEX-DRIFT] Invio push alert fallito (non-fatal):", alertErr);
+        }
+      }
+    } else if (result.exitCode === 2) {
+      console.warn(
+        "[BOOT][INDEX-DRIFT] DB non raggiungibile durante il check post-boot — verifica skippata.",
+      );
+    } else {
+      console.log("[BOOT][INDEX-DRIFT] OK — nessun drift di indici speciali rilevato.");
+    }
+  } catch (err) {
+    console.warn("[BOOT][INDEX-DRIFT] Check fallito (non-fatal):", err);
+  }
+}
+
+// Embedding coverage check post-READY (solo log/warn, mai fatale).
+async function runEmbeddingCoveragePostReady(): Promise<void> {
+  try {
+    const { pool: pgPool } = await import("./db");
+    const { storage: s } = await import("./storage");
+    const thresholdSetting = await s.getAppSetting("embedding_coverage_threshold");
+    const threshold = (() => {
+      const raw = thresholdSetting?.value;
+      if (!raw) return 80;
+      const n = parseInt(raw, 10);
+      return Number.isFinite(n) ? Math.max(0, Math.min(100, n)) : 80;
+    })();
+    const client = await pgPool.connect();
+    try {
+      const [activeRes, covRes] = await Promise.all([
+        client.query<{ total: string }>(
+          `SELECT COUNT(*) AS total FROM users WHERE status = 'active'`,
+        ),
+        client.query<{ with_embedding: string }>(
+          `SELECT COUNT(DISTINCT e.entity_id) AS with_embedding
+           FROM embeddings e
+           JOIN users u ON u.id = e.entity_id AND u.status = 'active'
+           WHERE e.entity_type = 'user' AND e.field = 'bio'`,
+        ),
+      ]);
+      const activeUsers = parseInt(activeRes.rows[0]?.total ?? "0", 10);
+      const withEmbedding = parseInt(covRes.rows[0]?.with_embedding ?? "0", 10);
+      const pct = activeUsers > 0
+        ? Math.round((withEmbedding / activeUsers) * 100 * 10) / 10
+        : 100;
+      if (pct < threshold) {
+        console.warn(
+          `[INIT][EMBED] Coverage WARNING: only ${pct}% of active users have a 'bio' embedding` +
+          ` (${withEmbedding}/${activeUsers}, threshold=${threshold}%).` +
+          ` Match quality may be degraded for users without embeddings.`,
+        );
+      } else {
+        console.log(
+          `[INIT][EMBED] Coverage OK: ${pct}% of active users have a 'bio' embedding` +
+          ` (${withEmbedding}/${activeUsers}).`,
+        );
+      }
+    } finally {
+      client.release();
+    }
+  } catch (err) {
+    console.warn("[INIT][EMBED] Coverage check failed (non-fatal):", err);
+  }
 }

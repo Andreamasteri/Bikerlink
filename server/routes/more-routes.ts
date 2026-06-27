@@ -64,10 +64,23 @@ export function registerMoreRoutes(app: Express) {
 
   app.get("/api/health", (_req, res) => {
     const dbCircuit = getCircuitStatus();
+    // Tre stati distinti, mai 500:
+    //   • booting  → 503 + Retry-After-friendly (fasi critiche non finite)
+    //   • degraded → 200 con i motivi (READY ma un sottosistema non-critico è ko)
+    //   • ready    → 200
     if (initState.initializing) {
-      return res.status(503).json({ status: "initializing", initializing: true, dbCircuit });
+      return res.status(503).json({ status: "booting", initializing: true, degraded: false, dbCircuit });
     }
-    res.json({ status: "ok", initializing: false, dbCircuit });
+    if (initState.degraded) {
+      return res.status(200).json({
+        status: "degraded",
+        initializing: false,
+        degraded: true,
+        degradedReasons: initState.degradedReasons,
+        dbCircuit,
+      });
+    }
+    res.json({ status: "ready", initializing: false, degraded: false, dbCircuit });
   });
 
   app.get("/api/admin/uptime", requireAdmin, async (_req, res) => {
