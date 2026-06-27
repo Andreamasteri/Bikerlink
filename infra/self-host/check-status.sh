@@ -103,7 +103,11 @@ else
 fi
 
 # ─────────────────────────────────────────────────────────────────────────────
-section "3/5 — Grafi GraphHopper (presenza edges/)"
+section "3/5 — Grafi GraphHopper (procedura GH 12: artefatto 'properties')"
+# ─────────────────────────────────────────────────────────────────────────────
+# GH 12: il marcatore di completamento è il file `properties` nella graph-cache
+# (NON la directory edges/ come in versioni precedenti — quella non esiste più).
+# Un grafo completo contiene: properties, nodes, edges, geometry, location_index.
 # ─────────────────────────────────────────────────────────────────────────────
 echo "  GRAPHS_DIR: ${GRAPHS_DIR}"
 echo ""
@@ -113,20 +117,32 @@ GRAPHS_MISSING=()
 
 for grp in $ALL_GROUPS; do
   graph_path="${GRAPHS_DIR}/${grp}"
-  if [[ -d "${graph_path}/edges" ]]; then
+  if [[ -f "${graph_path}/properties" ]]; then
     size="$(du -sh "$graph_path" 2>/dev/null | cut -f1 || echo '?')"
-    green "graphhopper-${grp}: grafo presente (${size})"
-    GRAPHS_OK+=("$grp")
+    # Controlla che i profili attesi siano nel file properties
+    props="$(cat "${graph_path}/properties" 2>/dev/null || true)"
+    missing_profiles=""
+    for prof in motorcycle motorcycle_fast car; do
+      echo "$props" | grep -q "$prof" || missing_profiles="${missing_profiles} ${prof}"
+    done
+    if [[ -n "$missing_profiles" ]]; then
+      yellow "graphhopper-${grp}: grafo presente (${size}) ma profili mancanti:${missing_profiles}"
+      GRAPHS_MISSING+=("$grp")
+      ISSUES+=("Grafo incompleto per '${grp}': profili${missing_profiles} assenti — esegui './build-graphs-sequential.sh ${grp}'")
+    else
+      green "graphhopper-${grp}: grafo OK — 3 profili (${size})"
+      GRAPHS_OK+=("$grp")
+    fi
   elif [[ -d "$graph_path" ]]; then
-    yellow "graphhopper-${grp}: cartella presente ma edges/ mancante (build incompleto?)"
+    yellow "graphhopper-${grp}: cartella presente ma 'properties' mancante (build incompleto o formato pre-GH12)"
     GRAPHS_MISSING+=("$grp")
-    ISSUES+=("Grafo incompleto per '${grp}': esegui './build-regions.sh ${grp}'")
+    ISSUES+=("Grafo incompleto per '${grp}': esegui './build-graphs-sequential.sh ${grp}'")
   else
     red "graphhopper-${grp}: grafo MANCANTE"
     GRAPHS_MISSING+=("$grp")
     # Solo i core sono critici
     if echo "$CORE_GROUPS" | grep -qw "$grp"; then
-      ISSUES+=("Grafo CORE mancante per '${grp}': esegui './download-regions.sh ${grp} && ./build-regions.sh ${grp}'")
+      ISSUES+=("Grafo CORE mancante per '${grp}': esegui './download-regions.sh ${grp} && ./build-graphs-sequential.sh ${grp}'")
     fi
   fi
 done
@@ -250,7 +266,7 @@ else
   for grp in $CORE_GROUPS; do
     pbf="${DATA_DIR}/${grp}.osm.pbf"
     has_graph=false
-    [[ -d "${GRAPHS_DIR}/${grp}/edges" ]] && has_graph=true
+    [[ -f "${GRAPHS_DIR}/${grp}/properties" ]] && has_graph=true
 
     container="bikerlink-gh-${grp}"
     running="$($DOCKER ps -q -f name="${container}" 2>/dev/null || true)"
@@ -260,11 +276,11 @@ else
 
     if [[ "$healthy" == "false" ]]; then
       if [[ ! -f "$pbf" ]]; then
-        echo "  # ${grp}: scarica dati + build + avvia"
-        echo "  ./download-regions.sh ${grp} && ./build-regions.sh ${grp} && docker compose up -d graphhopper-${grp}"
+        echo "  # ${grp}: scarica dati + build sequenziale + avvia"
+        echo "  ./download-regions.sh ${grp} && ./build-graphs-sequential.sh ${grp} && docker compose up -d graphhopper-${grp}"
       elif [[ "$has_graph" == "false" ]]; then
-        echo "  # ${grp}: build + avvia"
-        echo "  ./build-regions.sh ${grp} && docker compose up -d graphhopper-${grp}"
+        echo "  # ${grp}: build sequenziale + avvia"
+        echo "  ./build-graphs-sequential.sh ${grp} && docker compose up -d graphhopper-${grp}"
       elif [[ -z "$running" ]]; then
         echo "  # ${grp}: solo avvia (grafo già presente)"
         echo "  docker compose up -d graphhopper-${grp}"

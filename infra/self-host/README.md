@@ -437,22 +437,44 @@ Scarica i singoli `.pbf` nazionali da Geofabrik (cache condivisa in `data/countr
 così Albania viene scaricata una volta sola) e li unisce per gruppo con `osmium`.
 Idempotente, verifica MD5, riprende i download interrotti.
 
-### 2. Builda i grafi (uno alla volta)
+### 2. Builda i grafi — procedura GH 12 ⭐
+
+**Script consigliato: `build-graphs-sequential.sh`** (vedi sezione dedicata sotto).
 
 ```bash
-./build-regions.sh                     # tutti i gruppi
-./build-regions.sh grecia balcani      # solo alcuni gruppi
-GRAPHS_DIR=/mnt/nvme/graphs ./build-regions.sh   # grafi su NVMe dedicato
+# Tutte le 8 aree in sequenza (ordine ottimizzato: piccola → grande)
+./build-graphs-sequential.sh
+
+# Solo alcune aree
+./build-graphs-sequential.sh grecia balcani
+
+# Con path custom e swap dedicato
+GRAPHS_DIR=/mnt/nvme/graphs \
+SWAP_FILE=/mnt/nvme/build.swap \
+SWAP_SIZE_GB=64 \
+  ./build-graphs-sequential.sh
+
+# Monitoraggio in un secondo terminale
+./monitor-build-graphs.sh
 ```
 
-Per ogni gruppo lancia `docker run --import` con l'immagine **pinnata per digest**,
-forzando `RAM_STORE` via `JAVA_OPTS` per un import veloce. Continua anche se un
-gruppo fallisce (riepilogo finale ✓/✗). I grafi finiscono in `${GRAPHS_DIR}/<codice>`.
+**Procedura GH 12:** il build avviene in due fasi separate.
+1. `--import` crea la graph-cache (RAM-intensivo, termina quando finisce)
+2. Il server riusa la cache (avvio rapido)
 
-> **Prima pulizia grafi:** le cartelle sono create da Docker come root. Per ripulirle
-> serve `sudo` una volta:
-> `sudo rm -rf graphs/{grecia,balcani,est,iberia,arco-alpino,germania-centro,francia-benelux,ecuador}`.
-> Lo script NON usa `sudo` internamente (gira unattended senza prompt).
+A import riuscito, la `graph-cache/<area>/` contiene:
+`properties` *(marcatore di completamento — contiene i fingerprint dei profili)*,
+`nodes`, `edges`, `geometry`, `location_index`.
+
+> ⚠️ **GH 12 vs versioni precedenti:** in GH 12 il marcatore è il **file** `properties`,
+> NON la directory `edges/` (che non esiste più). `check-status.sh` usa già la logica corretta.
+
+> **Prima pulizia grafi:** le cartelle graph-cache sono create da Docker come root.
+> `build-graphs-sequential.sh` usa `sudo rm -rf` internamente per i retry. Per ripulirle
+> manualmente: `sudo rm -rf graphs/<area>`.
+
+**Script legacy:** `build-regions.sh` — build manuale senza verifica né test funzionale.
+Usare `build-graphs-sequential.sh` per la procedura completa.
 
 ### 3. Avvia le istanze abilitate
 
@@ -549,7 +571,7 @@ un'immagine **custom** `bikerlink/graphhopper:latest` **compilata da sorgente** 
 `master` HEAD di [`graphhopper/graphhopper`](https://github.com/graphhopper/graphhopper)
 (GraphHopper 12.x) su runtime **Java 25 LTS** (Temurin). L'immagine vive **solo
 nell'image store locale** del ThinkCentre (non è su Docker Hub) ed è referenziata per
-tag in `docker-compose.yml` (anchor `x-gh-area`) e `build-regions.sh` (`GH_IMAGE`).
+tag in `docker-compose.yml` (anchor `x-gh-area`) e `build-graphs-sequential.sh` (`GH_IMAGE`).
 
 Il contratto d'avvio è identico all'immagine precedente: `WORKDIR /graphhopper`,
 porta `8989`, `curl` presente per l'healthcheck, e lo script `graphhopper.sh` che
@@ -574,7 +596,79 @@ Lo stage di build clona il `master` HEAD: ricostruire l'immagine prende l'ultimo
 codice. Per fissare un commit specifico, sostituisci nel `Dockerfile` il
 `git clone --depth 1` con un checkout del commit voluto.
 
-Override al volo senza editare i file: `GRAPHHOPPER_IMAGE=<ref> ./build-regions.sh`.
+Override al volo senza editare i file: `GRAPHHOPPER_IMAGE=<ref> ./build-graphs-sequential.sh`.
+
+---
+
+## Build sequenziale grafi — dettaglio script
+
+### `build-graphs-sequential.sh`
+
+Orchestratore completo per costruire i grafi di tutte le 8 aree GraphHopper in serie.
+
+**Funzionamento passo-passo per ogni area:**
+
+1. **Stop preventivo** di tutte le istanze GH (`docker compose stop`) — evita crash-loop
+   (`restart: unless-stopped`) e libera tutta la RAM disponibile per il build
+2. **Guard risorse** — controlla RAM libera, swap (per le aree grandi), spazio disco
+3. **Attivazione swap NVMe** (solo per `germania-centro` e `francia-benelux`) — la
+   contraction CH a ~5-7 GB di `.pbf` può superare i 32 GB di RAM
+4. **Cleanup** graph-cache precedente (start pulito; usa `sudo rm -rf` per file root-owned)
+5. **`--import`** con heap JVM calibrato per area (`-Xmx` da 8 GB a 28 GB)
+6. **Verifica artefatti GH 12**: `properties` (marcatore principale + fingerprint profili),
+   `nodes`, `edges`, `geometry`, `location_index`
+7. **Avvio container** + attesa `/health` (max 5 min)
+8. **Test funzionale** `POST /route` con `profile=motorcycle` tra due punti reali dell'area
+9. **Stop container** — pronto per l'area successiva
+10. **Retry automatico** su qualsiasi errore (incluso OOM/exit 137), max `MAX_RETRIES` volte
+
+Al termine, se **tutte** le aree sono OK: backup automatico in `GRAFIGH/<area>/`.
+
+**Heap JVM per area** (32 GB RAM, OS + postgres/redis = ~4 GB):
+
+| Area | `.pbf` (~GB) | `-Xmx` | Swap NVMe |
+|------|-------------|--------|-----------|
+| ecuador | 0.1 | 8 GB | no |
+| grecia | 0.6 | 12 GB | no |
+| balcani | 1.5 | 16 GB | no |
+| est | 1.5 | 16 GB | no |
+| iberia | 1.8 | 18 GB | no |
+| arco-alpino | 3.6 | 22 GB | no |
+| germania-centro | 5.2 | **28 GB** | **sì** |
+| francia-benelux | 6.7 | **28 GB** | **sì** |
+
+**Variabili d'ambiente:**
+
+| Variabile | Default | Descrizione |
+|-----------|---------|-------------|
+| `DATA_DIR` | `./data` | Directory dei `.pbf` merged |
+| `GRAPHS_DIR` | `./graphs` | Directory dei grafi prodotti |
+| `BACKUP_DIR` | `/mnt/nvme/GRAFIGH` | Destinazione backup finale |
+| `SWAP_FILE` | `/mnt/nvme/build.swap` | File di swap per le aree grandi |
+| `SWAP_SIZE_GB` | `64` | Dimensione swap in GB |
+| `MAX_RETRIES` | `2` | Max tentativi per area |
+| `STATE_FILE` | `/tmp/bk-build-graphs-state.txt` | File di stato (letto dal monitor) |
+| `LOG_FILE` | `/tmp/bk-build-graphs.log` | Log completo |
+| `GRAPHHOPPER_IMAGE` | `bikerlink/graphhopper:latest` | Immagine Docker da usare |
+
+---
+
+### `monitor-build-graphs.sh`
+
+Interfaccia di monitoraggio in tempo reale per `build-graphs-sequential.sh`.
+Legge il file di stato scritto dall'orchestratore e mostra a colpo d'occhio:
+stato per ogni area (✓/✗/🔄/⏳), area e fase corrente, tempo trascorso, utilizzo RAM/swap,
+ultime righe del log.
+
+```bash
+# Apri in un secondo terminale mentre build-graphs-sequential.sh gira
+./monitor-build-graphs.sh
+
+# Aggiorna ogni 10s (default: 5s)
+REFRESH=10 ./monitor-build-graphs.sh
+```
+
+Il monitor esce automaticamente quando il build è terminato.
 
 ---
 

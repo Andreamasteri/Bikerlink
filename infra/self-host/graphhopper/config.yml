@@ -1,8 +1,8 @@
 # =============================================================================
 # BikerLink — GraphHopper config.yml CONDIVISO (GraphHopper 12)
 #
-# Questo è l'UNICO file di config: lo usano sia il BUILD (build-regions.sh) sia
-# il SERVING (docker-compose.yml), per OGNI gruppo-area. Ciò che cambia per
+# Questo è l'UNICO file di config: lo usano sia il BUILD (build-graphs-sequential.sh)
+# sia il SERVING (docker-compose.yml), per OGNI gruppo-area. Ciò che cambia per
 # gruppo NON è in questo file ma viene passato come env all'entrypoint:
 #
 #   FILE  → -Ddw.graphhopper.datareader.file   (il .pbf del gruppo, es. /data/grecia.osm.pbf)
@@ -17,9 +17,14 @@
 #
 # DATAACCESS:
 #   - SERVING (questo default): MMAP → poco heap, il grafo resta su disco/NVMe.
-#   - BUILD: build-regions.sh forza RAM_STORE via JAVA_OPTS
+#   - BUILD: build-graphs-sequential.sh forza RAM_STORE via JAVA_OPTS
 #     (-Ddw.graphhopper.graph.dataaccess.default_type=RAM_STORE) perché l'import
 #     è molto più veloce in RAM.
+#
+# 3 profili esposti:
+#   - motorcycle      → moto curvy (LM + curvature): flessibile, supporta custom model a runtime
+#   - motorcycle_fast → moto veloce (CH): routing rapido con Contraction Hierarchies
+#   - car             → auto (CH): routing auto rapido con Contraction Hierarchies
 #
 # Versione GraphHopper: 12.x (immagine custom da sorgente su Java 25, vedi docker-compose.yml).
 # =============================================================================
@@ -30,11 +35,10 @@ graphhopper:
   graph.location: /graphhopper/graph-cache
 
   # ── Profili ────────────────────────────────────────────────────────────────
-  # 4 profili, tutti su custom model:
+  # 3 profili, tutti su custom model:
   #   - motorcycle      → moto "curvy" (motorcycle + curvature), accelerato con LM
   #   - motorcycle_fast → moto veloce (motorcycle), accelerato con CH
   #   - car             → auto, CH
-  #   - car_fast        → auto veloce, CH
   # I file custom_model_*.json sono quelli BUILT-IN dell'immagine GraphHopper
   # (NON montare volumi custom_models: usiamo solo i preset ufficiali).
   profiles:
@@ -44,14 +48,11 @@ graphhopper:
       custom_model_files: [motorcycle.json]
     - name: car
       custom_model_files: [car.json]
-    - name: car_fast
-      custom_model_files: [car.json]
 
   # Contraction Hierarchies (routing veloce, no flessibilità) per i profili "fast".
   profiles_ch:
     - profile: motorcycle_fast
     - profile: car
-    - profile: car_fast
 
   # Landmarks (flessibile, supporta i custom model a runtime) per la moto curvy.
   profiles_lm:
@@ -61,7 +62,7 @@ graphhopper:
   graph.encoded_values: car_access, car_average_speed, road_access, track_type, road_class, curvature, surface, road_environment, ferry_speed, max_speed
 
   # Accesso ai dati del grafo: MMAP in serving (poco heap). In build viene
-  # forzato RAM_STORE via JAVA_OPTS da build-regions.sh.
+  # forzato RAM_STORE via JAVA_OPTS da build-graphs-sequential.sh.
   graph.dataaccess.default_type: MMAP
 
   # Strade da ignorare in import (non rilevanti per moto/auto): alleggerisce il grafo.
