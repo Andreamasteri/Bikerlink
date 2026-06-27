@@ -4,183 +4,14 @@ import { promisify } from "node:util";
 import { readFileSync, existsSync } from "node:fs";
 import { resolve } from "node:path";
 import { db, withDbRetry } from "../../db";
-import { otaReleases, otaBootEvents } from "@shared/db";
-import { eq, desc, isNull, and, sql, ne, inArray, lt, type SQL } from "drizzle-orm";
+import { otaReleases } from "@shared/db";
+import { eq, desc, and, sql, ne, inArray, lt } from "drizzle-orm";
 import { sendError } from "../../lib/api-response";
+import { EAS_PROJECT_ID, triggerSyncInBackground, forceSyncNow, syncProductionUpdates } from "./ota-sync";
 
 const execFileAsync = promisify(execFile);
 
 const router = Router();
-
-const EAS_PROJECT_ID = "a25192d7-72e5-46af-97d0-2d38ed9b78e3";
-const EAS_GRAPHQL_URL = "https://api.expo.dev/graphql";
-
-async function easGraphQL(query: string, variables?: Record<string, unknown>): Promise<unknown> {
-  const token = process.env.EAS_TOKEN;
-  if (!token) throw new Error("EAS_TOKEN non configurato");
-  const res = await fetch(EAS_GRAPHQL_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${token}`,
-    },
-    body: JSON.stringify({ query, variables }),
-  });
-  if (!res.ok) {
-    let body = "";
-    try { body = await res.text(); } catch { /* ignore */ }
-    throw new Error(`EAS GraphQL HTTP ${res.status}: ${body}`);
-  }
-  const json = await res.json() as { data?: unknown; errors?: unknown[] };
-  if (json.errors && (json.errors as unknown[]).length > 0) {
-    throw new Error(`EAS GraphQL error: ${JSON.stringify(json.errors)}`);
-  }
-  return json.data;
-}
-
-// Sincronizza il branch EAS `production` nel DB locale per tracking admin.
-// Task #2503: i nuovi update sincronizzati da EAS finiscono come `pending` —
-// l'admin li approva poi manualmente dal pannello.
-// Usa paginazione (limit 100 per pagina) per recuperare tutti gli update
-// anche quando il branch ne contiene più di 100.
-async function syncProductionUpdates(): Promise<{ inserted: number; backfilled: number }> {
-  const PAGE_LIMIT = 100;
-
-  type EasUpdate = { id: string; group?: string; message?: string; runtimeVersion?: string; createdAt?: string };
-  type EasData = { app?: { byId?: { updateBranches?: Array<{ id: string; name: string; updates?: EasUpdate[] }> } } };
-
-  const pageQuery = `
-    query GetBranchUpdates($appId: String!, $offset: Int!, $limit: Int!) {
-      app {
-        byId(appId: $appId) {
-          updateBranches(offset: 0, limit: 10) {
-            id
-            name
-            updates(offset: $offset, limit: $limit) {
-              id
-              group
-              message
-              runtimeVersion
-              createdAt
-            }
-          }
-        }
-      }
-    }
-  `;
-
-  // Raccoglie tutti gli update del branch production con paginazione
-  const updates: EasUpdate[] = [];
-  let offset = 0;
-  while (true) {
-    let data: EasData;
-    try {
-      data = await easGraphQL(pageQuery, { appId: EAS_PROJECT_ID, offset, limit: PAGE_LIMIT }) as EasData;
-    } catch (err) {
-      console.warn("[ota-sync] EAS GraphQL error:", err);
-      throw err;
-    }
-
-    const branches = data?.app?.byId?.updateBranches ?? [];
-    const productionBranch = branches.find((b) => b.name === "production");
-    const page = productionBranch?.updates ?? [];
-    updates.push(...page);
-
-    if (page.length < PAGE_LIMIT) break;   // ultima pagina
-    offset += PAGE_LIMIT;
-  }
-
-  console.log(`[ota-sync] recuperati ${updates.length} update dal branch production`);
-  if (updates.length === 0) return { inserted: 0, backfilled: 0 };
-
-  let inserted = 0;
-  for (const upd of updates) {
-    const existing = await withDbRetry(() => db.select({ id: otaReleases.id })
-      .from(otaReleases)
-      .where(eq(otaReleases.easUpdateId, upd.id))
-      .limit(1));
-
-    if (existing.length > 0) continue;
-
-    // Task #2503: i nuovi update vengono sempre inseriti come `pending`.
-    // L'admin li testa via cold-start su account admin e poi approva dal pannello.
-    await withDbRetry(() => db.insert(otaReleases).values({
-      easUpdateId: upd.id,
-      easGroupId: upd.group ?? null,
-      channel: "production",
-      runtimeVersion: upd.runtimeVersion ?? null,
-      message: upd.message ?? null,
-      status: "pending",
-      publishedAt: upd.createdAt ? new Date(upd.createdAt) : new Date(),
-    }).onConflictDoNothing());
-    inserted++;
-  }
-
-  // Backfill groupId per record vecchi che ne erano sprovvisti
-  for (const upd of updates) {
-    if (!upd.group) continue;
-    await withDbRetry(() => db.update(otaReleases)
-      .set({ easGroupId: upd.group })
-      .where(and(eq(otaReleases.easUpdateId, upd.id), isNull(otaReleases.easGroupId))));
-  }
-
-  // Backfill otaVersion: copia dal record Android (stesso gruppo) ai record iOS che non ce l'hanno
-  await withDbRetry(() => db.execute(sql`
-    UPDATE ota_releases r
-    SET ota_version = src.ota_version
-    FROM ota_releases src
-    WHERE r.ota_version IS NULL
-      AND r.eas_group_id IS NOT NULL
-      AND src.eas_group_id = r.eas_group_id
-      AND src.ota_version IS NOT NULL
-  `));
-
-  // Backfill otaVersion dal messaggio EAS — formato "[OTA:54.10.27] testo utente"
-  // Imposta automaticamente ota_version per tutti i record nello stesso gruppo
-  const noVersionRecords = await withDbRetry(() => db
-    .select({ id: otaReleases.id, message: otaReleases.message, easGroupId: otaReleases.easGroupId })
-    .from(otaReleases)
-    .where(isNull(otaReleases.otaVersion)));
-
-  let backfilled = 0;
-  for (const rec of noVersionRecords) {
-    const match = rec.message?.match(/^\[OTA:([\d.]+)\]/);
-    if (!match) continue;
-    const parsed = match[1];
-    const groupId = rec.easGroupId;
-    if (groupId) {
-      await withDbRetry(() => db.update(otaReleases)
-        .set({ otaVersion: parsed })
-        .where(eq(otaReleases.easGroupId, groupId)));
-    } else {
-      await withDbRetry(() => db.update(otaReleases)
-        .set({ otaVersion: parsed })
-        .where(eq(otaReleases.id, rec.id)));
-    }
-    backfilled++;
-  }
-
-  return { inserted, backfilled };
-}
-
-// Cache TTL in-memory di 60s sul sync EAS, con dedup delle richieste in volo.
-// La GET /releases (usata anche dalla Radiografia) prima faceva una GraphQL EAS
-// sincrona (lenta, anche >5s) ad ogni run → la probe OTA andava in timeout.
-const SYNC_TTL_MS = 60_000;
-let _lastSyncAt = 0;
-let _syncInFlight: Promise<{ inserted: number; backfilled: number }> | null = null;
-
-// Innesca il sync EAS in background senza bloccare il chiamante: se è già
-// avvenuto da meno di 60s (o è già in corso) non fa nulla. Non viene mai
-// awaitato dal request path, così GET /releases risponde subito dal DB.
-function triggerSyncInBackground(): void {
-  if (Date.now() - _lastSyncAt < SYNC_TTL_MS) return;
-  if (_syncInFlight) return;
-  _syncInFlight = syncProductionUpdates()
-    .then(() => { _lastSyncAt = Date.now(); return { inserted: 0, backfilled: 0 }; })
-    .catch((err) => { console.warn("[ota] background sync warning:", err); return { inserted: 0, backfilled: 0 }; })
-    .finally(() => { _syncInFlight = null; });
-}
 
 // GET /api/admin/ota/releases — restituisce lo storico release con telemetria (ultimi 50 di default)
 router.get("/releases", async (req: Request, res: Response) => {
@@ -243,7 +74,7 @@ router.post("/prune", async (_req: Request, res: Response) => {
     // Archivia rejected sul canale production con telemetria zero.
     // Con baseline: solo quelli più vecchi della release approvata.
     // Senza baseline: tutti i rejected con telemetria zero.
-    let rejectedQuery: SQL<unknown>;
+    let rejectedQuery;
     if (baselineTs) {
       rejectedQuery = sql`
         UPDATE ota_releases
@@ -270,7 +101,7 @@ router.post("/prune", async (_req: Request, res: Response) => {
     // Archivia pending obsolete con telemetria zero.
     // Con baseline: più vecchi della release approvata.
     // Senza baseline: tutti eccetto i 20 più recenti per canale production.
-    let pendingQuery: SQL<unknown>;
+    let pendingQuery;
     if (baselineTs) {
       pendingQuery = sql`
         UPDATE ota_releases
@@ -314,12 +145,8 @@ router.post("/sync", async (_req: Request, res: Response) => {
   if (!process.env.EAS_TOKEN) {
     return res.status(503).json({ ok: false, message: "EAS_TOKEN non configurato sul server. Impossibile contattare EAS." });
   }
-  // Azzera la cache TTL così il sync effettua davvero la chiamata GraphQL
-  _lastSyncAt = 0;
-  _syncInFlight = null;
   try {
-    const { inserted, backfilled } = await syncProductionUpdates();
-    _lastSyncAt = Date.now();
+    const { inserted, backfilled } = await forceSyncNow();
     console.log(`[ota][SYNC] sync manuale completato: ${inserted} nuove, ${backfilled} backfill`);
     return res.json({ ok: true, inserted, backfilled, syncedAt: new Date().toISOString() });
   } catch (err) {
@@ -495,8 +322,7 @@ router.post("/:id/rollback", async (req: Request, res: Response) => {
 
     const output = `${stdoutText}\n${stderrText}`;
     // Parsing STRICT: l'output di `eas update --republish` deve contenere chiaramente
-    // l'updateId e il groupId nuovi. Se non li troviamo non possiamo inventarli —
-    // un fake updateId rompe il gating client-side (`incomingId !== allowedEasUpdateId` sempre).
+    // l'updateId e il groupId nuovi. Se non li troviamo non possiamo inventarli.
     const updateIdMatch = output.match(/Android update ID\s+([a-f0-9-]{36})/i)
       ?? output.match(/iOS update ID\s+([a-f0-9-]{36})/i)
       ?? output.match(/Update ID\s+([a-f0-9-]{36})/i);
