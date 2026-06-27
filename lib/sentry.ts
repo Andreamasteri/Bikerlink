@@ -30,7 +30,12 @@ export async function initSentry(): Promise<void> {
       tracesSampleRate: 0,
       enableAutoSessionTracking: true,
       sessionTrackingIntervalMillis: 30000,
-      integrations: (defaults) => defaults,
+      // integrations: [] — disabilita TUTTE le integrazioni aggiuntive (default).
+      // @sentry/react-native 8.x include @sentry/react con SentryReact profiler
+      // che chiama setState dentro commitLayoutEffects → loop "Maximum update depth
+      // exceeded" su React Navigation. L'error capture base (sempre attivo nel core)
+      // continua a funzionare senza le integrazioni aggiuntive.
+      integrations: [],
     });
     _initialized = true;
   } catch {
