@@ -267,10 +267,11 @@ services:
   #
   # Sorgente PBF: europeecuador-merged.osm.pbf (Europa intera + Ecuador, ~33 GB)
   # Il file è in DATA_DIR_HOST (montata in /nominatim_data:ro nel container).
+  # È lo stesso file condiviso con il build tile Valhalla — nessun download aggiuntivo.
   #
   # Prima esecuzione: il container importa il PBF indicato da NOMINATIM_PBF_URL.
   # Con Europa+Ecuador l'import richiede 24-48h; spazio DB ~400 GB.
-  # FREEZE=true (default per il file locale): nessun aggiornamento OSM automatico.
+  # FREEZE=true (default): DB statico, nessun aggiornamento OSM automatico.
   # Monitorare con:  docker compose logs -f nominatim
   # Una volta terminato l'import, Nominatim risponde su http://127.0.0.1:7070
   #
@@ -282,9 +283,11 @@ services:
   #   NONINTERACTIVE=1 NOMINATIM_PBF_URL=file:///nominatim_data/europeecuador-merged.osm.pbf \
   #   NOMINATIM_FREEZE=true ./setup-nominatim.sh --pbf-url file:///nominatim_data/europeecuador-merged.osm.pbf --freeze --no-wait
   #
-  # Variabili opzionali in .env:
-  #   NOMINATIM_PBF_URL   URL del PBF da importare (default: italy-latest)
-  #   NOMINATIM_REPLICATION_URL  URL aggiornamenti OSM (disabilitato se FREEZE=true)
+  # Variabili override in .env (opzionali — i default sono già pronti):
+  #   NOMINATIM_PBF_URL   URL o path del PBF da importare
+  #                       (default: file locale europeecuador-merged.osm.pbf)
+  #   NOMINATIM_REPLICATION_URL  URL aggiornamenti OSM (ignorato con FREEZE=true)
+  #   NOMINATIM_FREEZE    "true" = DB statico, nessuna replica (default: true)
   # ---------------------------------------------------------------------------
   nominatim:
     image: mediagis/nominatim:5.3
@@ -293,12 +296,14 @@ services:
     profiles: ["nominatim"]
     shm_size: "4gb"
     environment:
-      # Per usare il file locale invece di un URL remoto:
-      #   NOMINATIM_PBF_URL=file:///nominatim_data/europeecuador-merged.osm.pbf
-      # Il file europeecuador-merged.osm.pbf deve essere in DATA_DIR_HOST (montata in /nominatim_data).
-      PBF_URL: ${NOMINATIM_PBF_URL:-https://download.geofabrik.de/europe/italy-latest.osm.pbf}
-      REPLICATION_URL: ${NOMINATIM_REPLICATION_URL:-https://download.geofabrik.de/europe/italy-updates/}
-      FREEZE: ${NOMINATIM_FREEZE:-false}
+      # Default: usa il PBF unificato già presente in DATA_DIR_HOST.
+      # Il file europeecuador-merged.osm.pbf è prodotto da download-osm.sh ed è
+      # condiviso con il build tile Valhalla (nessun download duplicato).
+      PBF_URL: ${NOMINATIM_PBF_URL:-file:///nominatim_data/europeecuador-merged.osm.pbf}
+      REPLICATION_URL: ${NOMINATIM_REPLICATION_URL:-https://download.geofabrik.de/europe-updates/}
+      # FREEZE=true: DB statico, aggiornamenti incrementali disabilitati.
+      # Cambia in "false" in .env solo se vuoi la replica OSM automatica.
+      FREEZE: ${NOMINATIM_FREEZE:-true}
       IMPORT_WIKIPEDIA: "false"
       IMPORT_STYLE: extratags
       NOMINATIM_PASSWORD: ${NOMINATIM_DB_PASSWORD:-nominatim}
@@ -306,8 +311,8 @@ services:
       - "127.0.0.1:7070:8080"
     volumes:
       - nominatimdata:/var/lib/postgresql/16/main
-      # DATA_DIR_HOST montata in sola lettura per accedere al PBF locale (europeecuador-merged.osm.pbf).
-      # Usare con: NOMINATIM_PBF_URL=file:///nominatim_data/europeecuador-merged.osm.pbf
+      # DATA_DIR_HOST montata in sola lettura: contiene europeecuador-merged.osm.pbf
+      # accessibile internamente come /nominatim_data/europeecuador-merged.osm.pbf.
       - ${DATA_DIR_HOST:-./data}:/nominatim_data:ro
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS 'http://localhost:8080/status.php' || exit 1"]

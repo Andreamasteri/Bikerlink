@@ -1,17 +1,18 @@
 #!/usr/bin/env bash
 # =============================================================================
 # BikerLink — build-valhalla-tiles.sh
-# Builda (o ricostruisce) i tile Valhalla a partire dai PBF per area in ./data,
-# invocando direttamente i binari della nuova immagine custom bikerlink/valhalla.
+# Builda (o ricostruisce) i tile Valhalla a partire da europeecuador-merged.osm.pbf
+# già presente in ./data (prodotto da download-osm.sh — NON va rifatto qui).
 #
 # Cosa fa:
-#   1. Verifica i prerequisiti (Docker + plugin compose, curl, osmium).
-#   2. Unisce i PBF delle aree core in europeecuador-merged.osm.pbf (se necessario).
-#   3. Ferma il container Valhalla (se in esecuzione) per liberare i volumi.
-#   4. Genera valhalla.json con valhalla_build_config.
+#   0. Verifica i prerequisiti (Docker + plugin compose, curl, python3).
+#   1. Verifica che ${DATA_DIR}/europeecuador-merged.osm.pbf esista (fail rapido se assente).
+#   2. Ferma il container Valhalla (se in esecuzione) per liberare i volumi.
+#   3. Genera valhalla.json con valhalla_build_config.
+#   4. Post-processa valhalla.json con python3 → mjolnir.concurrency = 8.
 #   5. Costruisce gli admin database con valhalla_build_admins.
 #   6. Costruisce il timezone database con valhalla_build_timezones.
-#   7. Costruisce i tile con valhalla_build_tiles (lunga, timeout 3h).
+#   7. Costruisce i tile con valhalla_build_tiles (lunga, timeout 6h).
 #   8. Crea il tile extract (.tar) con valhalla_build_extract.
 #   9. Verifica che i file chiave esistano nel volume.
 #  10. Avvia il container in modalità serve (valhalla_service) e verifica /status.
@@ -20,17 +21,20 @@
 #   ./build-valhalla-tiles.sh
 #   DATA_DIR=/mnt/osm ./build-valhalla-tiles.sh
 #
-# NOTA: il build dei tile può richiedere fino a 3h e molta RAM.
-#       Se i PBF per area mancano, lancia prima: ./download-osm.sh
+# NOTA: il build dei tile può richiedere fino a 6h e molta RAM.
+#       Se europeecuador-merged.osm.pbf manca, esegui prima: ./download-osm.sh
 #
 # IMMAGINE: bikerlink/valhalla:latest — build custom da valhalla/valhalla master.
-#   CMD=/bin/bash (nessun entrypoint orchestratore): i binari vanno invocati
-#   esplicitamente. Questa è la differenza fondamentale rispetto alla vecchia
-#   immagine gis-ops che leggeva le env force_rebuild/serve_tiles/build_admins.
+#   CMD=/bin/bash (nessun entrypoint orchestratore gis-ops): i binari vanno invocati
+#   esplicitamente tramite "docker compose run --rm -T valhalla".
 #
 # VOLUMI: tutti gli step di build usano "docker compose run --rm -T valhalla"
 #   (NON "docker run -v ...") così il mapping dei volumi è identico al container
 #   serve e non dipende dal nome del volume project-scoped generato da Compose.
+#
+# INTERFACCIA CON update-osm.sh:
+#   - Legge le variabili: DATA_DIR, VALHALLA_PORT, SERVE_TIMEOUT_SECS
+#   - Exit 0 = successo, exit 1 = errore (identico al comportamento precedente)
 # =============================================================================
 set -euo pipefail
 
@@ -43,15 +47,15 @@ ENV_FILE="${SCRIPT_DIR}/.env"
 MERGED_PBF="${DATA_DIR}/europeecuador-merged.osm.pbf"
 VALHALLA_JSON="${DATA_DIR}/valhalla.json"
 
-# Aree core da unire per Valhalla (modifica se vuoi coprire aree on-demand).
-VALHALLA_AREAS=(grecia balcani iberia arco-alpino)
-
 VALHALLA_PORT="${VALHALLA_PORT:-8002}"
 STATUS_URL="http://localhost:${VALHALLA_PORT}/status"
 
 # Timeout per il polling di /status dopo l'avvio del server.
 SERVE_TIMEOUT_SECS="${SERVE_TIMEOUT_SECS:-600}"
 POLL_INTERVAL_SECS="${POLL_INTERVAL_SECS:-10}"
+
+# Timeout per valhalla_build_tiles (Europa intera è più grande delle 4 aree precedenti).
+BUILD_TILES_TIMEOUT_SECS="${BUILD_TILES_TIMEOUT_SECS:-21600}"  # 6 ore
 
 # Percorsi interni al container (come da docker-compose.yml).
 CONTAINER_DATA_DIR="/custom_files"
@@ -61,6 +65,9 @@ CONTAINER_JSON="/custom_files/valhalla.json"
 CONTAINER_ADMINS="/custom_files/valhalla_tiles/admins.sqlite"
 CONTAINER_TIMEZONES="/custom_files/valhalla_tiles/timezones.sqlite"
 CONTAINER_EXTRACT="/custom_files/valhalla_tiles.tar"
+
+# Numero di thread per il build tile (i5-14400 16-thread, 96 GB RAM).
+MJOLNIR_CONCURRENCY="${MJOLNIR_CONCURRENCY:-8}"
 
 log()  { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"; }
 die()  { echo "[$(date '+%Y-%m-%d %H:%M:%S')] ERRORE: $*" >&2; exit 1; }
@@ -77,11 +84,11 @@ compose_run() {
   $COMPOSE run --rm -T valhalla "$@"
 }
 
-# ── Prerequisiti ──────────────────────────────────────────────────────────────
+# ── Prerequisiti ───────────────────────────────────────────────────────────────
 command -v curl    >/dev/null 2>&1 || die "curl non installato (sudo apt install -y curl)"
-command -v osmium  >/dev/null 2>&1 || die "osmium non installato (sudo apt install -y osmium-tool)"
 command -v python3 >/dev/null 2>&1 || die "python3 non installato (sudo apt install -y python3-minimal)"
-$DOCKER compose version >/dev/null 2>&1 || die "Docker Compose plugin non disponibile. Installa con: sudo apt install -y docker-compose-plugin"
+$DOCKER compose version >/dev/null 2>&1 || \
+  die "Docker Compose plugin non disponibile. Installa con: sudo apt install -y docker-compose-plugin"
 
 # Verifica che il servizio valhalla sia definito nel compose.
 if ! $COMPOSE config --services 2>/dev/null | grep -q '^valhalla$'; then
@@ -89,87 +96,42 @@ if ! $COMPOSE config --services 2>/dev/null | grep -q '^valhalla$'; then
 fi
 
 # Verifica che l'immagine esista localmente.
-VALHALLA_IMAGE="$($COMPOSE config --format json 2>/dev/null | python3 -c "import sys,json; print(json.load(sys.stdin)['services']['valhalla']['image'])" 2>/dev/null || echo "bikerlink/valhalla:latest")"
+VALHALLA_IMAGE="$($COMPOSE config --format json 2>/dev/null \
+  | python3 -c "import sys,json; print(json.load(sys.stdin)['services']['valhalla']['image'])" 2>/dev/null \
+  || echo "bikerlink/valhalla:latest")"
 if ! $DOCKER image inspect "$VALHALLA_IMAGE" >/dev/null 2>&1; then
   die "Immagine '$VALHALLA_IMAGE' non trovata localmente.
   Costruiscila prima con la procedura in infra/self-host/README.md § 'Come ricostruire Valhalla'."
 fi
 
-# ── Verifica PBF per area presenti ────────────────────────────────────────────
-AREA_PBFS=()
-MISSING=()
-for area in "${VALHALLA_AREAS[@]}"; do
-  pbf="${DATA_DIR}/${area}.osm.pbf"
-  if [[ -f "$pbf" ]]; then
-    AREA_PBFS+=("$pbf")
-  else
-    MISSING+=("$area")
-  fi
-done
-
-if [[ ${#MISSING[@]} -gt 0 ]]; then
-  log "[PBF] Aree mancanti: ${MISSING[*]}"
-  log "[PBF] Lancia prima: ./download-osm.sh"
-  log "[PBF] oppure: AREAS=\"${MISSING[*]}\" ./download-osm.sh"
-  die "PBF mancanti per le aree: ${MISSING[*]}"
-fi
-
-# ── Merge PBF aree → europeecuador-merged.osm.pbf ────────────────────────────
-needs_merge=false
+# ── Verifica PBF unificato ─────────────────────────────────────────────────────
 if [[ ! -f "$MERGED_PBF" ]]; then
-  needs_merge=true
-else
-  for pbf in "${AREA_PBFS[@]}"; do
-    if [[ "$pbf" -nt "$MERGED_PBF" ]]; then
-      needs_merge=true; break
-    fi
-  done
-fi
-
-if [[ "$needs_merge" == "true" ]]; then
-  # Warning se il file di destinazione esiste già ed è >10 GB (sovrascrittura lenta/distruttiva).
-  if [[ -f "$MERGED_PBF" ]]; then
-    _size_bytes=$(stat -c%s "$MERGED_PBF" 2>/dev/null || echo 0)
-    _ten_gb=$((10 * 1024 * 1024 * 1024))
-    if (( _size_bytes > _ten_gb )); then
-      _size_human=$(du -h "$MERGED_PBF" | cut -f1)
-      echo -e "\033[31m  ⚠  ATTENZIONE: ${MERGED_PBF} esiste già (${_size_human}) ed è >10 GB.\033[0m"
-      echo -e "\033[31m     Il merge sovrascriverà il file esistente (operazione lenta e distruttiva).\033[0m"
-      if [[ "${NONINTERACTIVE:-0}" == "1" ]]; then
-        log "[PBF] NONINTERACTIVE=1 — skip merge per sicurezza. Rimuovi manualmente il file per forzare."
-        exit 0
-      fi
-      read -r -p "  Continuare con la sovrascrittura? [s/N] " _merge_reply
-      [[ "${_merge_reply,,}" == "s" || "${_merge_reply,,}" == "y" ]] \
-        || { log "[PBF] Merge annullato dall'utente."; exit 0; }
-    fi
-  fi
-  log "[PBF] Unione PBF aree in ${MERGED_PBF}..."
-  osmium merge "${AREA_PBFS[@]}" -o "$MERGED_PBF" --overwrite
-  log "[PBF] merge completato ✓ ($(du -h "$MERGED_PBF" | cut -f1))"
-else
-  log "[PBF] ${MERGED_PBF} già aggiornato ($(du -h "$MERGED_PBF" | cut -f1)) — skip merge"
+  die "File non trovato: ${MERGED_PBF}
+  Il PBF unificato è prodotto da download-osm.sh.
+  Esegui prima:  ./download-osm.sh
+  (download-osm.sh scarica le aree e le unisce in europeecuador-merged.osm.pbf)"
 fi
 
 echo "============================================================"
 echo " BikerLink — Build tile Valhalla (immagine custom)"
-echo " Immagine      : ${VALHALLA_IMAGE}"
-echo " PBF sorgente  : ${MERGED_PBF} ($(du -h "$MERGED_PBF" | cut -f1))"
-echo " Aree incluse  : ${VALHALLA_AREAS[*]}"
-echo " Status URL    : ${STATUS_URL}"
-echo " Volumi        : stessi del servizio compose (project-scoped)"
+echo " Immagine         : ${VALHALLA_IMAGE}"
+echo " PBF sorgente     : ${MERGED_PBF} ($(du -h "$MERGED_PBF" | cut -f1))"
+echo " Concurrency      : ${MJOLNIR_CONCURRENCY} thread"
+echo " Timeout build    : $((BUILD_TILES_TIMEOUT_SECS / 3600))h"
+echo " Status URL       : ${STATUS_URL}"
+echo " Volumi           : stessi del servizio compose (project-scoped)"
 echo "============================================================"
 
-# ── 1. Ferma il container Valhalla (se gira) ─────────────────────────────────
+# ── 0. Ferma il container Valhalla (se gira) ──────────────────────────────────
 log "[Valhalla] fermo il container serve (se in esecuzione)..."
 $COMPOSE stop valhalla 2>/dev/null || true
 sleep 2
 
-# ── 2. Genera valhalla.json ────────────────────────────────────────────────────
+# ── 1. Genera valhalla.json ────────────────────────────────────────────────────
 # valhalla_build_config scrive su stdout: lo salviamo in DATA_DIR (montato come
 # /custom_files nel container serve). L'opzione -T di compose_run garantisce
 # stdout pulito, senza caratteri TTY che corromperebbero il JSON.
-log "[1/4] Genero valhalla.json con valhalla_build_config..."
+log "[1/5] Genero valhalla.json con valhalla_build_config..."
 compose_run \
   valhalla_build_config \
     --mjolnir-tile-dir     "${CONTAINER_TILES_DIR}" \
@@ -182,32 +144,64 @@ compose_run \
 if ! python3 -c "import sys,json; json.load(open('${VALHALLA_JSON}'))" 2>/dev/null; then
   die "valhalla.json generato non è un JSON valido. Controlla l'output di valhalla_build_config."
 fi
-log "[1/4] valhalla.json generato ✓ ($(wc -l < "${VALHALLA_JSON}") righe)"
+log "[1/5] valhalla.json generato ✓ ($(wc -l < "${VALHALLA_JSON}") righe)"
 
-# ── 3. Costruisci gli admin database ─────────────────────────────────────────
-log "[2/4] Costruisco admin database (valhalla_build_admins)..."
+# ── 2. Post-processa valhalla.json → mjolnir.concurrency = MJOLNIR_CONCURRENCY ─
+log "[2/5] Imposto mjolnir.concurrency = ${MJOLNIR_CONCURRENCY} in valhalla.json..."
+python3 - "${VALHALLA_JSON}" "${MJOLNIR_CONCURRENCY}" <<'PYEOF'
+import sys, json
+
+path = sys.argv[1]
+concurrency = int(sys.argv[2])
+
+with open(path, "r") as f:
+    cfg = json.load(f)
+
+# Naviga/crea la chiave mjolnir.concurrency
+cfg.setdefault("mjolnir", {})["concurrency"] = concurrency
+
+with open(path, "w") as f:
+    json.dump(cfg, f, indent=2, ensure_ascii=False)
+    f.write("\n")
+
+print(f"  mjolnir.concurrency = {concurrency} scritto in {path}")
+PYEOF
+log "[2/5] concurrency impostata ✓"
+
+# ── 3. Costruisci gli admin database ──────────────────────────────────────────
+log "[3/5] Costruisco admin database (valhalla_build_admins)..."
 log "      Qualche minuto..."
 compose_run \
   valhalla_build_admins \
   -c "${CONTAINER_JSON}" \
   "${CONTAINER_PBF}"
-log "[2/4] admin database ✓"
+log "[3/5] admin database ✓"
 
 # ── 4. Costruisci il timezone database ────────────────────────────────────────
-log "[3/4] Costruisco timezone database (valhalla_build_timezones)..."
+log "[4/5] Costruisco timezone database (valhalla_build_timezones)..."
 compose_run \
   valhalla_build_timezones \
   -c "${CONTAINER_JSON}"
-log "[3/4] timezone database ✓"
+log "[4/5] timezone database ✓"
 
 # ── 5. Costruisci i tile ───────────────────────────────────────────────────────
-log "[4/4] Costruisco i tile (valhalla_build_tiles) — può richiedere fino a 3h..."
-log "      RAM elevata richiesta: su 16 GB aggiungere swap ≥32 GB (vedi README)."
-compose_run \
-  valhalla_build_tiles \
-  -c "${CONTAINER_JSON}" \
-  "${CONTAINER_PBF}"
-log "[4/4] tile build ✓"
+log "[5/5] Costruisco i tile (valhalla_build_tiles) — timeout ${BUILD_TILES_TIMEOUT_SECS}s (~$((BUILD_TILES_TIMEOUT_SECS/3600))h)..."
+log "      Sistema target: i5-14400, 96 GB RAM, ${MJOLNIR_CONCURRENCY} thread mjolnir."
+timeout "${BUILD_TILES_TIMEOUT_SECS}" \
+  $COMPOSE run --rm -T valhalla \
+    valhalla_build_tiles \
+    -c "${CONTAINER_JSON}" \
+    "${CONTAINER_PBF}" \
+  || {
+    rc=$?
+    if [[ $rc -eq 124 ]]; then
+      die "valhalla_build_tiles ha superato il timeout di ${BUILD_TILES_TIMEOUT_SECS}s.
+  Puoi aumentarlo con: BUILD_TILES_TIMEOUT_SECS=43200 ./build-valhalla-tiles.sh"
+    else
+      die "valhalla_build_tiles ha restituito exit code ${rc}. Controlla i log sopra."
+    fi
+  }
+log "[5/5] tile build ✓"
 
 # ── 6. Crea il tile extract (.tar) ────────────────────────────────────────────
 log "[extra] Creo il tile extract (valhalla_build_extract)..."
@@ -263,7 +257,7 @@ if [[ "$serve_ok" != "true" ]]; then
   die "[Serve] /status non ha risposto entro ${SERVE_TIMEOUT_SECS}s. Controlla: $COMPOSE logs -f valhalla"
 fi
 
-# ── 10. Verifica e stampa lo stato finale ─────────────────────────────────────
+# ── 10. Verifica e stampa lo stato finale ──────────────────────────────────────
 log "[Serve] Valhalla online ✓ — verifico ${STATUS_URL}"
 STATUS_JSON="$(curl -fsS --max-time 10 "$STATUS_URL" || true)"
 echo "------------------------------------------------------------"
