@@ -40,6 +40,9 @@ export function useTrackingSession() {
     onError: () => Alert.alert(t("common.error"), t("tracking.publishError")),
   });
 
+  const publishMutationRef = useRef(publishMutation);
+  publishMutationRef.current = publishMutation;
+
   const handlePublish = useCallback(async () => {
     if (!publishRecord) return;
     const perfData = JSON.stringify({
@@ -52,8 +55,8 @@ export function useTrackingSession() {
       sprint0to100Ms: publishRecord.sprint0to100Ms,
       maxAccelerationG: publishRecord.maxAccelerationG,
     });
-    publishMutation.mutate({ performanceData: perfData, caption: publishCaption });
-  }, [publishMutation, publishRecord, publishCaption]);
+    publishMutationRef.current.mutate({ performanceData: perfData, caption: publishCaption });
+  }, [publishRecord, publishCaption]);
 
   return {
     phase,

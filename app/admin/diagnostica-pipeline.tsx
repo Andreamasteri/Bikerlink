@@ -133,10 +133,13 @@ export function TabRadiografia() {
     },
   });
 
+  const runMutationRef = useRef(runMutation);
+  runMutationRef.current = runMutation;
+
   const handleRun = useCallback(() => {
     setPolling(true);
-    runMutation.mutate();
-  }, [runMutation]);
+    runMutationRef.current.mutate();
+  }, []);
 
   const result = lastData?.result;
   const inProgress = lastData?.inProgress || runMutation.isPending;

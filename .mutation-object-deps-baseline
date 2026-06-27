@@ -5,26 +5,3 @@
 # Formato (un record per riga):  <path>\t<token>
 # Aggiornare SOLO via:
 #   BIKERLINK_HUMAN_BASELINE_UPDATE=1 bash scripts/check-mutation-object-deps.sh --update-baseline
-app/admin/diagnostica-pipeline.tsx	runMutation
-app/admin/match-preferences-edit.tsx	resetMutation
-app/admin/match-preferences-edit.tsx	saveMutation
-app/admin/system.tsx	logoutMutation
-app/profile/edit.tsx	deletePhotoMutation
-app/profile/edit.tsx	logoutMutation
-app/profile/edit.tsx	requestDeletionMutation
-app/profile/edit.tsx	uploadPhotoMutation
-app/(tabs)/arcade.tsx	scoreMutation
-app/(tabs)/chat.tsx	createConversationMutation
-app/(tabs)/music.tsx	disconnectMutation
-app/(tabs)/profile.tsx	deletePhotoMutation
-app/(tabs)/profile.tsx	uploadPhotoMutation
-components/admin/ota/OtaPanel.tsx	approveMutation
-components/admin/ota/OtaPanel.tsx	rejectMutation
-components/admin/ota/OtaPanel.tsx	rollbackMutation
-components/admin/ota/OtaPanel.tsx	setVersionMutation
-components/onboarding/OnboardingTagsStep.tsx	saveAuthedMutation
-hooks/tracking/useTrackingSession.ts	publishMutation
-hooks/useChatConversationActions.ts	deleteConversationMutation
-hooks/useChatConversationActions.ts	deleteMessageMutation
-hooks/useChatConversationActions.ts	sharePlaylistMutation
-hooks/useReadyState.ts	privacyMutation

@@ -1,4 +1,4 @@
-import React, { useCallback } from "react";
+import React, { useCallback, useRef } from "react";
 import {
   View,
   Text,
@@ -54,11 +54,14 @@ export default function AdminMatchPreferencesEditScreen() {
     onError: () => Alert.alert("Errore", "Impossibile salvare la preferenza"),
   });
 
+  const saveMutationRef = useRef(saveMutation);
+  saveMutationRef.current = saveMutation;
+
   const togglePref = useCallback(
     (key: keyof MatchPrefsPayload, value: boolean) => {
-      saveMutation.mutate({ [key]: value });
+      saveMutationRef.current.mutate({ [key]: value });
     },
-    [saveMutation],
+    [],
   );
 
   const resetMutation = useMutation({
@@ -79,6 +82,9 @@ export default function AdminMatchPreferencesEditScreen() {
     onError: () => Alert.alert("Errore", "Impossibile resettare le preferenze"),
   });
 
+  const resetMutationRef = useRef(resetMutation);
+  resetMutationRef.current = resetMutation;
+
   const resetAll = useCallback(() => {
     Alert.alert(
       "Ripristina tutto",
@@ -88,11 +94,11 @@ export default function AdminMatchPreferencesEditScreen() {
         {
           text: "Ripristina",
           style: "destructive",
-          onPress: () => resetMutation.mutate(),
+          onPress: () => resetMutationRef.current.mutate(),
         },
       ],
     );
-  }, [resetMutation]);
+  }, []);
 
   if (isLoading) {
     return (

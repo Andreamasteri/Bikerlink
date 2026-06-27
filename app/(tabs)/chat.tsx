@@ -194,14 +194,17 @@ export default function ChatScreen() {
     },
   });
 
+  const createConversationMutationRef = useRef(createConversationMutation);
+  createConversationMutationRef.current = createConversationMutation;
+
   const handleContactUser = useCallback(
     (targetUserId: string) => {
-      createConversationMutation.mutate({
+      createConversationMutationRef.current.mutate({
         conversationType: "private",
         participantIds: [targetUserId],
       });
     },
-    [createConversationMutation]
+    []
   );
 
   const filteredUsers = useMemo(() => {
@@ -254,12 +257,12 @@ export default function ChatScreen() {
 
   const handleFriendPress = useCallback(
     (friend: FriendItem) => {
-      createConversationMutation.mutate({
+      createConversationMutationRef.current.mutate({
         conversationType: "private",
         participantIds: [friend.id],
       });
     },
-    [createConversationMutation]
+    []
   );
 
   const renderItem = useCallback(

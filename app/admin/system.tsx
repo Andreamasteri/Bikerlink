@@ -145,6 +145,8 @@ export default function SystemScreen() {
   const routerRef = useRef(router);
   routerRef.current = router;
   const { sessionExpired, logoutMutation } = useAuth();
+  const logoutMutationRef = useRef(logoutMutation);
+  logoutMutationRef.current = logoutMutation;
   const executePurge = useCallback(async () => {
     if (purgeConfirmText.trim().toUpperCase() !== "PURGA") {
       Alert.alert("Conferma errata", "Devi scrivere esattamente PURGA per procedere.");
@@ -169,7 +171,7 @@ export default function SystemScreen() {
           {
             text: "OK",
             onPress: async () => {
-              try { await logoutMutation.mutateAsync(); } catch {
+              try { await logoutMutationRef.current.mutateAsync(); } catch {
                 // no-op: proceed to login even if logout fails
               }
               routerRef.current.replace("/(auth)/login");
@@ -182,7 +184,7 @@ export default function SystemScreen() {
     } finally {
       setIsPurging(false);
     }
-  }, [purgeConfirmText, logoutMutation, t]);
+  }, [purgeConfirmText, t]);
 
   const handlePurgeNonAdminUsers = useCallback(() => {
     Alert.alert(

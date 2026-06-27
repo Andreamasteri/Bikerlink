@@ -265,6 +265,9 @@ export function useReadyState() {
     },
   });
 
+  const privacyMutationRef = useRef(privacyMutation);
+  privacyMutationRef.current = privacyMutation;
+
   const handleToggle = () => {
     toggleMutation.mutate(!isAvailable);
   };
@@ -316,13 +319,13 @@ export function useReadyState() {
       const lng = loc.coords.longitude;
       setFixedPositionLat(lat);
       setFixedPositionLng(lng);
-      privacyMutation.mutate({ fixedPositionEnabled: true, fixedPositionLat: lat, fixedPositionLng: lng });
+      privacyMutationRef.current.mutate({ fixedPositionEnabled: true, fixedPositionLat: lat, fixedPositionLng: lng });
     } catch {
       Alert.alert("Errore GPS", "Impossibile ottenere la posizione.");
     } finally {
       setIsSettingFixedPosition(false);
     }
-  }, [privacyMutation]);
+  }, []);
 
   const pickFromGPS = async (target: MapTarget) => {
     try {

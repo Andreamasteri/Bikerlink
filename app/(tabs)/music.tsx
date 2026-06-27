@@ -271,16 +271,19 @@ export default function MusicScreen() {
     }
   });
 
+  const disconnectMutationRef = useRef(disconnectMutation);
+  disconnectMutationRef.current = disconnectMutation;
+
   const handleDisconnect = useCallback(() => {
     Alert.alert(
       t("music.disconnectTitle2"),
       t("music.disconnectMsg2"),
       [
         { text: t("common.cancel"), style: "cancel" },
-        { text: t("music.disconnectBtn"), style: "destructive", onPress: () => disconnectMutation.mutate() },
+        { text: t("music.disconnectBtn"), style: "destructive", onPress: () => disconnectMutationRef.current.mutate() },
       ]
     );
-  }, [disconnectMutation, t]);
+  }, [t]);
 
   const toggleCriteria = useCallback((c: string) => {
     setMatchCriteria((prev) => {

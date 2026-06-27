@@ -1,4 +1,4 @@
-import { useCallback } from "react";
+import { useCallback, useRef } from "react";
 import { Alert } from "react-native";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/query-client";
@@ -62,9 +62,12 @@ export function useChatConversationActions({
     },
   });
 
+  const deleteMessageMutationRef = useRef(deleteMessageMutation);
+  deleteMessageMutationRef.current = deleteMessageMutation;
+
   const handleDeleteMessage = useCallback((messageId: string) => {
-    deleteMessageMutation.mutate(messageId);
-  }, [deleteMessageMutation]);
+    deleteMessageMutationRef.current.mutate(messageId);
+  }, []);
 
   const sharePlaylistMutation = useMutation({
     mutationFn: async ({ toUserId }: { toUserId: string }) => {
@@ -83,6 +86,11 @@ export function useChatConversationActions({
     },
   });
 
+  const sharePlaylistMutationRef = useRef(sharePlaylistMutation);
+  sharePlaylistMutationRef.current = sharePlaylistMutation;
+  const deleteConversationMutationRef = useRef(deleteConversationMutation);
+  deleteConversationMutationRef.current = deleteConversationMutation;
+
   const handleSharePlaylist = useCallback(() => {
     if (!musicConnected) {
       Alert.alert(t("chat.musicNotConnected"), t("chat.connectLastfmMsg"));
@@ -96,10 +104,10 @@ export function useChatConversationActions({
         .replace("{name}", otherParticipant.nickname ?? ""),
       [
         { text: t("common.cancel"), style: "cancel" },
-        { text: t("chat.send"), onPress: () => sharePlaylistMutation.mutate({ toUserId: otherParticipant.id }) },
+        { text: t("chat.send"), onPress: () => sharePlaylistMutationRef.current.mutate({ toUserId: otherParticipant.id }) },
       ]
     );
-  }, [musicConnected, musicTrackCount, isPrivateChat, otherParticipant, sharePlaylistMutation, t]);
+  }, [musicConnected, musicTrackCount, isPrivateChat, otherParticipant, t]);
 
   const handleDeleteConversation = useCallback(() => {
     Alert.alert(
@@ -107,10 +115,10 @@ export function useChatConversationActions({
       t("chat.deleteConversationSimpleMsg"),
       [
         { text: t("common.cancel"), style: "cancel" },
-        { text: t("common.delete"), style: "destructive", onPress: () => deleteConversationMutation.mutate() },
+        { text: t("common.delete"), style: "destructive", onPress: () => deleteConversationMutationRef.current.mutate() },
       ]
     );
-  }, [deleteConversationMutation, t]);
+  }, [t]);
 
   return {
     otherParticipant,

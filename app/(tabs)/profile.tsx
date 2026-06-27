@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useState, useCallback, useEffect, useRef } from "react";
 import {
   View,
   StyleSheet,
@@ -171,6 +171,11 @@ export default function ProfileScreen() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/users/me"] })
   });
 
+  const uploadPhotoMutationRef = useRef(uploadPhotoMutation);
+  uploadPhotoMutationRef.current = uploadPhotoMutation;
+  const deletePhotoMutationRef = useRef(deletePhotoMutation);
+  deletePhotoMutationRef.current = deletePhotoMutation;
+
   const pickImageForSlot = useCallback((existingPhotoId?: string) => {
     showImagePickerMenu(
       async (uri) => {
@@ -180,18 +185,18 @@ export default function ProfileScreen() {
             // no-op: slot replacement proceeds even if delete fails
           }
         }
-        uploadPhotoMutation.mutate(uri, { onSettled: () => setReplacingSlot(null) });
+        uploadPhotoMutationRef.current.mutate(uri, { onSettled: () => setReplacingSlot(null) });
       },
       { aspect: [1, 1], quality: 0.8 }
     );
-  }, [uploadPhotoMutation]);
+  }, []);
 
   const handleDeletePhoto = useCallback((photoId: string) => {
     Alert.alert(t("profile.deletePhoto"), t("profile.deletePhotoConfirm"), [
       { text: t("common.cancel"), style: "cancel" },
-      { text: t("common.delete"), style: "destructive", onPress: () => deletePhotoMutation.mutate(photoId) },
+      { text: t("common.delete"), style: "destructive", onPress: () => deletePhotoMutationRef.current.mutate(photoId) },
     ]);
-  }, [deletePhotoMutation, t]);
+  }, [t]);
 
   const doLogout = () => logoutMutation.mutate(undefined);
 

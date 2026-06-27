@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useState, useCallback, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -94,26 +94,29 @@ export default function ArcadeScreen() {
     },
   });
 
+  const scoreMutationRef = useRef(scoreMutation);
+  scoreMutationRef.current = scoreMutation;
+
   const handleGameOver = useCallback((score: number) => {
     if (!activeGame) return;
     const personal = myScores?.[activeGame] ?? 0;
     setGameOver({ score, prevBest: personal });
     if (score > personal) {
-      scoreMutation.mutate({ game: activeGame, score });
+      scoreMutationRef.current.mutate({ game: activeGame, score });
     }
-  }, [activeGame, myScores, scoreMutation]);
+  }, [activeGame, myScores]);
 
   const handleReplay = useCallback(() => {
     setGameOver(null);
-    scoreMutation.reset();
+    scoreMutationRef.current.reset();
     setGameKey((k) => k + 1);
-  }, [scoreMutation]);
+  }, []);
 
   const handleExitGame = useCallback(() => {
     setGameOver(null);
-    scoreMutation.reset();
+    scoreMutationRef.current.reset();
     setActiveGame(null);
-  }, [scoreMutation]);
+  }, []);
 
   const renderGame = () => {
     if (!activeGame) return null;

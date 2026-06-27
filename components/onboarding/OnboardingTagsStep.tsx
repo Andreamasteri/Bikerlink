@@ -110,6 +110,9 @@ export default function OnboardingTagsStep({ onDone }: Props) {
     },
   });
 
+  const saveAuthedMutationRef = useRef(saveAuthedMutation);
+  saveAuthedMutationRef.current = saveAuthedMutation;
+
   const persistAndExit = useCallback(
     async (skipped: boolean) => {
       if (submitting) return;
@@ -141,7 +144,7 @@ export default function OnboardingTagsStep({ onDone }: Props) {
           if (isAuthenticated) {
             for (const [categorySlug, tagIds] of Object.entries(payload)) {
               try {
-                await saveAuthedMutation.mutateAsync({ categorySlug, tagIds });
+                await saveAuthedMutationRef.current.mutateAsync({ categorySlug, tagIds });
               } catch {
                 // best-effort: continue with next category
               }
@@ -169,7 +172,7 @@ export default function OnboardingTagsStep({ onDone }: Props) {
         onDone();
       }
     },
-    [selected, isAuthenticated, saveAuthedMutation, onDone, submitting]
+    [selected, isAuthenticated, onDone, submitting]
   );
 
   const handleContinue = useCallback(() => {

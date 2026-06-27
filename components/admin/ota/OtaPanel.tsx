@@ -106,6 +106,15 @@ export default function OtaPanel() {
     onError: (err: Error) => { Alert.alert("Errore versione", err.message || "Impossibile impostare versione"); },
   });
 
+  const approveMutationRef = useRef(approveMutation);
+  approveMutationRef.current = approveMutation;
+  const rejectMutationRef = useRef(rejectMutation);
+  rejectMutationRef.current = rejectMutation;
+  const rollbackMutationRef = useRef(rollbackMutation);
+  rollbackMutationRef.current = rollbackMutation;
+  const setVersionMutationRef = useRef(setVersionMutation);
+  setVersionMutationRef.current = setVersionMutation;
+
   const handleSync = useCallback(async () => {
     Alert.alert(
       "☁ Sync con server Expo (EAS)",
@@ -145,12 +154,12 @@ export default function OtaPanel() {
           text: "Approva e Distribuisci",
           onPress: () => {
             setApprovingId(release.id);
-            approveMutation.mutate(release.id);
+            approveMutationRef.current.mutate(release.id);
           },
         },
       ]
     );
-  }, [approveMutation]);
+  }, []);
 
   const handleReject = useCallback((release: OtaRelease) => {
     Alert.alert(
@@ -163,12 +172,12 @@ export default function OtaPanel() {
           style: "destructive",
           onPress: () => {
             setRejectingId(release.id);
-            rejectMutation.mutate(release.id);
+            rejectMutationRef.current.mutate(release.id);
           },
         },
       ]
     );
-  }, [rejectMutation]);
+  }, []);
 
   const handleRollback = useCallback((release: OtaRelease) => {
     Alert.alert(
@@ -181,12 +190,12 @@ export default function OtaPanel() {
           style: "destructive",
           onPress: () => {
             setRollingBackId(release.id);
-            rollbackMutation.mutate(release.id);
+            rollbackMutationRef.current.mutate(release.id);
           },
         },
       ]
     );
-  }, [rollbackMutation]);
+  }, []);
 
   const handleSetVersion = useCallback((release: OtaRelease) => {
     Alert.prompt(
@@ -197,14 +206,14 @@ export default function OtaPanel() {
         {
           text: "Salva",
           onPress: (v?: string) => {
-            if (v?.trim()) setVersionMutation.mutate({ id: release.id, otaVersion: v.trim() });
+            if (v?.trim()) setVersionMutationRef.current.mutate({ id: release.id, otaVersion: v.trim() });
           },
         },
       ],
       "plain-text",
       release.otaVersion ?? ""
     );
-  }, [setVersionMutation]);
+  }, []);
 
   const handleForceUpdate = useCallback(async () => {
     if (Platform.OS === "web") {

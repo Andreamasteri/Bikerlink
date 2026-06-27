@@ -184,18 +184,27 @@ export default function EditProfileScreen() {
     },
   });
 
+  const requestDeletionMutationRef = useRef(requestDeletionMutation);
+  requestDeletionMutationRef.current = requestDeletionMutation;
+  const logoutMutationRef = useRef(logoutMutation);
+  logoutMutationRef.current = logoutMutation;
+  const uploadPhotoMutationRef = useRef(uploadPhotoMutation);
+  uploadPhotoMutationRef.current = uploadPhotoMutation;
+  const deletePhotoMutationRef = useRef(deletePhotoMutation);
+  deletePhotoMutationRef.current = deletePhotoMutation;
+
   const handleRequestDeletion = useCallback(() => {
-    requestDeletionMutation.mutate(undefined, {
+    requestDeletionMutationRef.current.mutate(undefined, {
       onSuccess: () => {
         Alert.alert(t("profile.accountScheduledDeletion"));
-        logoutMutation.mutate(undefined, {
+        logoutMutationRef.current.mutate(undefined, {
           onSuccess: () => {
             routerRef.current.replace("/welcome");
           },
         });
       },
     });
-  }, [requestDeletionMutation, logoutMutation, t]);
+  }, [t]);
 
   const handleDeleteAccount = useCallback(() => {
     Alert.alert(
@@ -216,7 +225,7 @@ export default function EditProfileScreen() {
         if (existingPhotoId) {
           setReplacingSlot(existingPhotoId);
         }
-        uploadPhotoMutation.mutate(
+        uploadPhotoMutationRef.current.mutate(
           { uri, replacePhotoId: existingPhotoId },
           {
             onSettled: () => {
@@ -229,7 +238,7 @@ export default function EditProfileScreen() {
       },
       { aspect: [1, 1], quality: 0.5 }
     );
-  }, [uploadPhotoMutation]);
+  }, []);
 
   const handleDeletePhoto = useCallback((photoId: string) => {
     Alert.alert(t("profile.deletePhoto"), t("profile.deletePhotoConfirm"), [
@@ -237,10 +246,10 @@ export default function EditProfileScreen() {
       {
         text: t("common.delete"),
         style: "destructive",
-        onPress: () => deletePhotoMutation.mutate(photoId),
+        onPress: () => deletePhotoMutationRef.current.mutate(photoId),
       },
     ]);
-  }, [t, deletePhotoMutation]);
+  }, [t]);
 
   const handleSave = () => {
     const data: Record<string, unknown> = {};
