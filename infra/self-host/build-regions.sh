@@ -17,7 +17,7 @@
 #
 # ⚠️ PRIMA del primo run: le cartelle dei grafi sono root-owned (le crea Docker).
 # Per ripulirle serve sudo INTERATTIVO una volta:
-#     sudo rm -rf graphs/{grecia,balcani,est,iberia,arco-alpino,germania-centro,francia-benelux}
+#     sudo rm -rf graphs/{grecia,balcani,est,iberia,arco-alpino,germania-centro,francia-benelux,ecuador}
 # Questo script NON usa sudo internamente, così gira unattended senza prompt.
 #
 # Robustezza: ogni gruppo logga ✓/✗ e lo script CONTINUA anche se uno fallisce
@@ -40,7 +40,7 @@ GH_IMAGE="${GRAPHHOPPER_IMAGE:-bikerlink/graphhopper:latest}"
 # RAM_STORE forzato via sysprop perché il config.yml condiviso ha MMAP (serving).
 BUILD_JAVA_OPTS="${BUILD_JAVA_OPTS:--Xmx25g -Xms6g -XX:+UseParallelGC -XX:ParallelGCThreads=4 -XX:MaxMetaspaceSize=512m -server -Ddw.graphhopper.graph.dataaccess.default_type=RAM_STORE}"
 
-ALL_GROUPS="grecia balcani est iberia arco-alpino germania-centro francia-benelux"
+ALL_GROUPS="grecia balcani est iberia arco-alpino germania-centro francia-benelux ecuador"
 
 log()  { echo "[$(date '+%H:%M:%S')] $*"; }
 err()  { echo "[$(date '+%H:%M:%S')] ERRORE: $*" >&2; }

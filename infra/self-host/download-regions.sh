@@ -27,6 +27,7 @@ DATA_DIR="${DATA_DIR:-${SCRIPT_DIR}/data}"
 COUNTRIES_DIR="${COUNTRIES_DIR:-${DATA_DIR}/countries}"
 
 GEOFABRIK="https://download.geofabrik.de/europe"
+GEOFABRIK_SA="https://download.geofabrik.de/south-america"
 
 log()  { echo "[$(date '+%H:%M:%S')] $*"; }
 err()  { echo "[$(date '+%H:%M:%S')] ERRORE: $*" >&2; }
@@ -34,6 +35,8 @@ die()  { err "$*"; exit 1; }
 
 # ── Registro gruppi → slug Geofabrik (sync con shared/routing-areas.ts) ───────
 # Niente array associativi annidati: una funzione che mappa codice → slug.
+# Per gruppi fuori Europa (es. ecuador) il prefisso URL è diverso: viene
+# gestito in download_country() tramite group_base_url().
 group_slugs() {
   case "$1" in
     grecia)          echo "greece albania" ;;
@@ -43,11 +46,21 @@ group_slugs() {
     arco-alpino)     echo "italy austria switzerland slovenia" ;;
     germania-centro) echo "germany czech-republic" ;;
     francia-benelux) echo "france belgium netherlands luxembourg" ;;
+    ecuador)         echo "ecuador" ;;
     *)               return 1 ;;
   esac
 }
 
-ALL_GROUPS="grecia balcani est iberia arco-alpino germania-centro francia-benelux"
+# Restituisce l'URL base Geofabrik per il singolo slug.
+# Per gli slug del Sud America usa GEOFABRIK_SA, altrimenti GEOFABRIK (Europa).
+slug_base_url() {
+  case "$1" in
+    ecuador) echo "$GEOFABRIK_SA" ;;
+    *)       echo "$GEOFABRIK" ;;
+  esac
+}
+
+ALL_GROUPS="grecia balcani est iberia arco-alpino germania-centro francia-benelux ecuador"
 
 # Gruppi richiesti (argomenti) o tutti.
 GROUPS=("$@")
@@ -76,7 +89,8 @@ verify_md5() {
 download_country() {
   local slug="$1"
   local dest="${COUNTRIES_DIR}/${slug}-latest.osm.pbf"
-  local url="${GEOFABRIK}/${slug}-latest.osm.pbf"
+  local base_url; base_url="$(slug_base_url "$slug")"
+  local url="${base_url}/${slug}-latest.osm.pbf"
   local md5_url="${url}.md5"
 
   if [[ -f "$dest" ]] && verify_md5 "$dest" "$md5_url"; then

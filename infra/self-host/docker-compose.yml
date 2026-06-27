@@ -15,6 +15,7 @@
 #   - graphhopper-arco-alpino      → 127.0.0.1:8994
 #   - graphhopper-germania-centro  → 127.0.0.1:8995
 #   - graphhopper-francia-benelux  → 127.0.0.1:8996
+#   - graphhopper-ecuador          → 127.0.0.1:8997
 #
 # ⚠️ Codici/porte sincronizzati con shared/routing-areas.ts (FONTE DI VERITÀ).
 #
@@ -221,6 +222,21 @@ services:
       - ./graphhopper/config.yml:/graphhopper/config.yml:ro
       - ${GRAPHS_DIR:-./graphs}/francia-benelux:/graphhopper/graph-cache
 
+  graphhopper-ecuador:
+    <<: *gh-area
+    container_name: bikerlink-gh-ecuador
+    profiles: ["areas", "ecuador"]
+    ports:
+      - "127.0.0.1:8997:8989"
+    environment:
+      GRAPH: /graphhopper/graph-cache
+      FILE: /data/ecuador.osm.pbf
+      JAVA_OPTS: ${GH_HEAP_ECUADOR:--Xmx2g -Xms512m -XX:+UseG1GC}
+    volumes:
+      - ${DATA_DIR_HOST:-./data}:/data:ro
+      - ./graphhopper/config.yml:/graphhopper/config.yml:ro
+      - ${GRAPHS_DIR:-./graphs}/ecuador:/graphhopper/graph-cache
+
   # ---------------------------------------------------------------------------
   # Valhalla — engine alternativo (motorcycle nativo, fallback robusto)
   # ---------------------------------------------------------------------------
@@ -277,6 +293,9 @@ services:
     profiles: ["nominatim"]
     shm_size: "1gb"
     environment:
+      # Per usare il file locale invece di un URL remoto:
+      #   NOMINATIM_PBF_URL=file:///nominatim_data/valhalla-merged.osm.pbf
+      # Il file valhalla-merged.osm.pbf deve essere in DATA_DIR_HOST (montata in /nominatim_data).
       PBF_URL: ${NOMINATIM_PBF_URL:-https://download.geofabrik.de/europe/italy-latest.osm.pbf}
       REPLICATION_URL: ${NOMINATIM_REPLICATION_URL:-https://download.geofabrik.de/europe/italy-updates/}
       FREEZE: ${NOMINATIM_FREEZE:-false}
@@ -287,6 +306,9 @@ services:
       - "127.0.0.1:7070:8080"
     volumes:
       - nominatimdata:/var/lib/postgresql/16/main
+      # DATA_DIR_HOST montata in sola lettura per accedere al PBF locale (valhalla-merged.osm.pbf).
+      # Usare con: NOMINATIM_PBF_URL=file:///nominatim_data/valhalla-merged.osm.pbf
+      - ${DATA_DIR_HOST:-./data}:/nominatim_data:ro
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS 'http://localhost:8080/status.php' || exit 1"]
       interval: 30s

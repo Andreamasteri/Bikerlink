@@ -78,6 +78,11 @@ declare -A DATASET_URLS=(
   [2]="https://download.geofabrik.de/europe/italy/nord-ovest-latest.osm.pbf"
   [3]="https://download.geofabrik.de/europe/italy/nord-est-latest.osm.pbf"
   [4]="custom"
+  # Opzione 5 (non mostrata nel menu interattivo): usa il file locale già in DATA_DIR.
+  # Il container Nominatim monta DATA_DIR_HOST in /nominatim_data (sola lettura).
+  # Impostare manualmente: NOMINATIM_PBF_URL=file:///nominatim_data/valhalla-merged.osm.pbf
+  # Il file valhalla-merged.osm.pbf (Europa + Ecuador, ~33 GB) è già in DATA_DIR
+  # (copiato da infra/self-host/data/ dalla cartella MAPPE dell'NVMe).
 )
 declare -A DATASET_LABELS=(
   [1]="Italia intera        (~1.7 GB PBF / ~30 GB DB / ~1-2h)"
