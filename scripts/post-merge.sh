@@ -46,6 +46,16 @@ else
   echo "⚠️  package-lock.json mancante — sync node_modules saltato."
 fi
 
+# ── VERIFICA VERSIONI STABILI (non-bloccante) ─────────────────
+# Avvisa nei log post-merge se ci sono aggiornamenti major/minor
+# disponibili per le dipendenze critiche. Exit sempre 0.
+echo "════════════════════════════════════════"
+echo "  Verifica versioni stabili dipendenze"
+echo "════════════════════════════════════════"
+bash scripts/check-stable-versions.sh || true
+echo "════════════════════════════════════════"
+echo ""
+
 echo "Invalidating server_dist to force TypeScript recompile on next start..."
 rm -f server_dist/index.js
 
