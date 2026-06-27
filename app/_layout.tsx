@@ -2,7 +2,7 @@ import { Stack, useRouter } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import React, { useEffect, useRef, useState } from "react";
 import { getApiUrl } from "@/lib/query-client";
-import { Platform, View, Text, StyleSheet } from "react-native";
+import { Platform, View, Text, StyleSheet, InteractionManager } from "react-native";
 import NativeUpdateChecker from "@/components/NativeUpdateChecker";
 import MatchPopupAlert from "@/components/MatchPopupAlert";
 import UpdateNudgeModal from "@/components/UpdateNudgeModal";
@@ -322,22 +322,40 @@ export default function RootLayout() {
   const [decision, setDecision] = useState<boolean | null>(
     FORCE_BOOT_GATE ? true : null,
   );
+  // ANTI-LOOP (fix OTA #215): estende il pattern showApp di BootGateController al
+  // percorso normale. Senza questo delay, il mount immediato di NormalRootLayout
+  // dopo la risoluzione asincrona di resolveBootGateActive() scatena la cascata
+  // useLayoutEffect → setOptions di React Navigation → "Maximum update depth exceeded".
+  // Con InteractionManager.runAfterInteractions il navigatore si stabilizza PRIMA
+  // che lo Stack fresco venga aggiunto — identico alla fix in BootGateController.showApp.
+  const [showNormalLayout, setShowNormalLayout] = useState(false);
 
   useEffect(() => {
     if (FORCE_BOOT_GATE) return; // flag hardcoded: salta la risoluzione asincrona
     let cancelled = false;
+    let imHandle: ReturnType<typeof InteractionManager.runAfterInteractions> | null = null;
     (async () => {
       const active = await resolveBootGateActive();
-      if (!cancelled) setDecision(active);
+      if (cancelled) return;
+      setDecision(active);
+      if (!active) {
+        // Ritarda il mount di NormalRootLayout di un frame: InteractionManager
+        // garantisce che eventuali animazioni/transizioni pendenti siano terminate
+        // prima che lo Stack di navigazione venga aggiunto all'albero React.
+        imHandle = InteractionManager.runAfterInteractions(() => {
+          if (!cancelled) setShowNormalLayout(true);
+        });
+      }
     })();
     return () => {
       cancelled = true;
+      imHandle?.cancel();
     };
   }, []);
 
-  if (decision === null) {
-    // Placeholder neutro mentre decidiamo (mai null). SplashScreen nativo resta
-    // comunque visibile sopra finché il bootstrap non chiama hideAsync().
+  if (decision === null || (decision === false && !showNormalLayout)) {
+    // Placeholder neutro mentre decidiamo o aspettiamo InteractionManager.
+    // SplashScreen nativo resta visibile sopra finché useAppBootstrap non chiama hideAsync().
     return <View style={bootGatePlaceholderStyle.fill} />;
   }
 
