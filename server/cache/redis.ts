@@ -26,6 +26,65 @@ const state: ClientState = {
 
 let initAttempted = false;
 
+// ── Circuit breaker per quota Upstash esaurita ──────────────────────────────
+// Upstash impone un tetto di richieste (free tier: 500k/mese). Quando è
+// raggiunto, OGNI comando ritorna "ERR max requests limit exceeded". È un
+// errore a livello di COMANDO (ReplyError), non di connessione: la socket resta
+// "ready", quindi l'handler `error` non scatta e `state.available` resterebbe
+// `true`. Risultato: cache call-sites e worker BullMQ continuano a martellare
+// Redis, ogni comando fallisce, i log si riempiono e l'event loop si satura →
+// le API rallentano e l'app resta su "Aggiornamento dati…".
+//
+// Quando rileviamo questo errore apriamo un circuito: per la durata del
+// cooldown `getRedis()`/`isRedisAvailable()` ritornano null/false così tutto
+// ricade sul fallback in-memory/DB e smette di colpire Redis. Alla scadenza il
+// circuito si richiude da solo e Redis viene ritentato (la quota può essersi
+// resettata o essere stata aumentata).
+const QUOTA_ERROR_RE = /max requests? limit exceeded|max daily request|max monthly request|ERR max requests/i;
+const QUOTA_COOLDOWN_MS = 15 * 60_000;
+let circuitOpenUntil = 0;
+
+function circuitOpen(): boolean {
+  return Date.now() < circuitOpenUntil;
+}
+
+/** True se l'errore è il tetto richieste Upstash (quota esaurita). */
+export function isRedisQuotaError(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err ?? "");
+  return QUOTA_ERROR_RE.test(msg);
+}
+
+/**
+ * Apre il circuito quando la quota Upstash è esaurita: marca Redis come non
+ * disponibile per `QUOTA_COOLDOWN_MS` così l'app degrada senza martellare il
+ * server. Idempotente: logga una sola volta per finestra di apertura.
+ */
+export function noteRedisQuotaExhausted(source: string): void {
+  const now = Date.now();
+  const wasOpen = circuitOpen();
+  circuitOpenUntil = now + QUOTA_COOLDOWN_MS;
+  state.available = false;
+  state.lastError = "quota esaurita (max requests limit exceeded)";
+  state.lastErrorAt = now;
+  if (!wasOpen) {
+    console.warn(
+      `[Redis] quota Upstash esaurita (${source}) — circuito aperto per ${Math.round(QUOTA_COOLDOWN_MS / 60_000)}min, fallback in-memory/DB`,
+    );
+  }
+}
+
+/**
+ * Da chiamare nei catch dei call-site Redis: se l'errore è quota esaurita apre
+ * il circuito. Ritorna true se ha riconosciuto (e gestito) un errore di quota.
+ */
+export function noteRedisErrorMaybeQuota(source: string, err: unknown): boolean {
+  if (isRedisQuotaError(err)) {
+    noteRedisQuotaExhausted(source);
+    return true;
+  }
+  return false;
+}
+
 function buildOptions(url: string): RedisOptions {
   const opts: RedisOptions = {
     lazyConnect: false,
@@ -73,6 +132,9 @@ function init(): void {
       state.available = false;
       state.lastError = err instanceof Error ? err.message : String(err);
       state.lastErrorAt = Date.now();
+      // La quota Upstash può emergere anche come errore di connessione: apri il
+      // circuito così non si ritenta prima del cooldown.
+      if (isRedisQuotaError(err)) noteRedisQuotaExhausted("client-error");
     });
     client.on("end", () => {
       state.available = false;
@@ -87,6 +149,7 @@ function init(): void {
 
 export function getRedis(): Redis | null {
   if (!initAttempted) init();
+  if (circuitOpen()) return null;
   return state.available ? state.client : null;
 }
 
@@ -136,6 +199,7 @@ export function getBullConnectionOptions(): RedisOptions | null {
 
 export function isRedisAvailable(): boolean {
   if (!initAttempted) init();
+  if (circuitOpen()) return false;
   return state.available;
 }
 
@@ -143,7 +207,9 @@ export function getRedisStatus() {
   if (!initAttempted) init();
   return {
     configured: !!process.env.REDIS_URL,
-    available: state.available,
+    available: state.available && !circuitOpen(),
+    quotaCircuitOpen: circuitOpen(),
+    quotaCircuitResetsAt: circuitOpen() ? new Date(circuitOpenUntil).toISOString() : null,
     lastError: state.lastError,
     lastErrorAt: state.lastErrorAt ? new Date(state.lastErrorAt).toISOString() : null,
   };

@@ -1,4 +1,4 @@
-import { getRedis, isRedisAvailable } from "./redis";
+import { getRedis, isRedisAvailable, noteRedisErrorMaybeQuota } from "./redis";
 import { recordHit, recordMiss, recordError } from "./cache-metrics";
 
 /**
@@ -27,7 +27,9 @@ export async function cacheGet<T>(namespace: string, key: string): Promise<T | n
     return JSON.parse(raw) as T;
   } catch (err) {
     recordError(namespace);
-    console.warn(`[cache] get error ns=${namespace}:`, err instanceof Error ? err.message : err);
+    if (!noteRedisErrorMaybeQuota("cache.get", err)) {
+      console.warn(`[cache] get error ns=${namespace}:`, err instanceof Error ? err.message : err);
+    }
     return null;
   }
 }
@@ -44,7 +46,9 @@ export async function cacheSet<T>(
     await r.set(k(namespace, key), JSON.stringify(value), "EX", ttlSeconds);
   } catch (err) {
     recordError(namespace);
-    console.warn(`[cache] set error ns=${namespace}:`, err instanceof Error ? err.message : err);
+    if (!noteRedisErrorMaybeQuota("cache.set", err)) {
+      console.warn(`[cache] set error ns=${namespace}:`, err instanceof Error ? err.message : err);
+    }
   }
 }
 
