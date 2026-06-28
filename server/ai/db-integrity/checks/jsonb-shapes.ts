@@ -52,9 +52,9 @@ async function validateColumn(spec: JsonbColumnSpec): Promise<CheckResult> {
   const safeT = spec.table.replace(/[^a-z_]/g, "");
   const safeC = spec.column.replace(/[^a-z_]/g, "");
   const safePk = spec.pkColumn.replace(/[^a-z_]/g, "");
-  const rowsRes = await db.execute(sql.raw(
-    `SELECT "${safePk}" AS pk, "${safeC}" AS val FROM "${safeT}" WHERE "${safeC}" IS NOT NULL ORDER BY "${safePk}" DESC LIMIT ${limit}`,
-  ));
+  const rowsRes = await db.execute(
+    sql`SELECT ${sql.identifier(safePk)} AS pk, ${sql.identifier(safeC)} AS val FROM ${sql.identifier(safeT)} WHERE ${sql.identifier(safeC)} IS NOT NULL ORDER BY ${sql.identifier(safePk)} DESC LIMIT ${limit}`,
+  );
   const rows = (rowsRes.rows ?? []) as Array<{ pk: string; val: unknown }>;
   const invalid: Array<{ pk: string; data: Record<string, unknown> }> = [];
   for (const r of rows) {

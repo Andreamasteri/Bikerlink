@@ -19,10 +19,10 @@ async function createdGtUpdated(table: string): Promise<CheckResult> {
   }
   const safeT = table.replace(/[^a-z_]/g, "");
   try {
-    const cnt = await db.execute(sql.raw(`SELECT COUNT(*)::int AS c FROM "${safeT}" WHERE created_at > updated_at`));
+    const cnt = await db.execute(sql`SELECT COUNT(*)::int AS c FROM ${sql.identifier(safeT)} WHERE created_at > updated_at`);
     const count = Number((cnt.rows?.[0] as { c?: number } | undefined)?.c ?? 0);
     if (!count) return { ok: true, count: 0, sample: [] };
-    const smp = await db.execute(sql.raw(`SELECT id, created_at, updated_at FROM "${safeT}" WHERE created_at > updated_at LIMIT 10`));
+    const smp = await db.execute(sql`SELECT id, created_at, updated_at FROM ${sql.identifier(safeT)} WHERE created_at > updated_at LIMIT 10`);
     const rows = (smp.rows ?? []) as Array<Record<string, unknown>>;
     return { ok: false, count, sample: rows.map((r) => ({ pk: String(r.id), data: r })), details: { table } };
   } catch (err) {
@@ -34,11 +34,11 @@ async function backfillUpdatedAt(table: string, dryRun: boolean) {
   if (!(await tableExists(table)) || !(await columnExists(table, "updated_at"))) return { applied: false, affected: 0, summary: "skip" };
   const safeT = table.replace(/[^a-z_]/g, "");
   if (dryRun) {
-    const r = await db.execute(sql.raw(`SELECT COUNT(*)::int AS c FROM "${safeT}" WHERE updated_at IS NULL`));
+    const r = await db.execute(sql`SELECT COUNT(*)::int AS c FROM ${sql.identifier(safeT)} WHERE updated_at IS NULL`);
     const n = Number((r.rows?.[0] as { c?: number } | undefined)?.c ?? 0);
     return { applied: false, affected: n, summary: `[dry-run] ${n} updated_at NULL` };
   }
-  const r = await db.execute(sql.raw(`UPDATE "${safeT}" SET updated_at = created_at WHERE updated_at IS NULL AND created_at IS NOT NULL`));
+  const r = await db.execute(sql`UPDATE ${sql.identifier(safeT)} SET updated_at = created_at WHERE updated_at IS NULL AND created_at IS NOT NULL`);
   const affected = r.rowCount ?? 0;
   return { applied: affected > 0, affected, summary: `backfill updated_at su ${affected} righe di ${table}` };
 }

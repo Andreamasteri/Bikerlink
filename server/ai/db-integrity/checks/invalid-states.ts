@@ -1,5 +1,5 @@
 // Task #2536 — Check pack: stati impossibili.
-import { sql } from "drizzle-orm";
+import { sql, type SQL } from "drizzle-orm";
 import { db } from "../../../db";
 import type { IntegrityCheck, CheckResult } from "../types";
 
@@ -8,12 +8,12 @@ async function tableExists(name: string): Promise<boolean> {
   return Boolean((r.rows?.[0] as { ok?: boolean } | undefined)?.ok);
 }
 
-async function rawCheck(label: string, countSql: string, sampleSql: string, details?: Record<string, unknown>): Promise<CheckResult> {
+async function rawCheck(label: string, countSql: SQL, sampleSql: SQL, details?: Record<string, unknown>): Promise<CheckResult> {
   try {
-    const cnt = await db.execute(sql.raw(countSql));
+    const cnt = await db.execute(countSql);
     const count = Number((cnt.rows?.[0] as { c?: number } | undefined)?.c ?? 0);
     if (!count) return { ok: true, count: 0, sample: [], details };
-    const smp = await db.execute(sql.raw(sampleSql));
+    const smp = await db.execute(sampleSql);
     const rows = (smp.rows ?? []) as Array<Record<string, unknown>>;
     return {
       ok: false, count,
@@ -34,8 +34,8 @@ const checks: IntegrityCheck[] = [
     async query() {
       if (!(await tableExists("users"))) return { ok: true, count: 0, sample: [] };
       return rawCheck("invalid-role",
-        `SELECT COUNT(*)::int AS c FROM users WHERE role NOT IN ('user','admin','moderator','super_admin')`,
-        `SELECT id, nickname, role FROM users WHERE role NOT IN ('user','admin','moderator','super_admin') LIMIT 10`,
+        sql`SELECT COUNT(*)::int AS c FROM users WHERE role NOT IN ('user','admin','moderator','super_admin')`,
+        sql`SELECT id, nickname, role FROM users WHERE role NOT IN ('user','admin','moderator','super_admin') LIMIT 10`,
       );
     },
     // Enum-normalize safe: mappa varianti note (case, trim) ai valori canonici.
@@ -51,8 +51,8 @@ const checks: IntegrityCheck[] = [
           ["SUPER_ADMIN", "super_admin"], ["superadmin", "super_admin"], ["super-admin", "super_admin"],
         ];
         if (dryRun) {
-          const inList = mapping.map(([k]) => `'${k.replace(/'/g, "''")}'`).join(",");
-          const r = await db.execute(sql.raw(`SELECT COUNT(*)::int AS c FROM users WHERE role IN (${inList})`));
+          const inSql = sql.join(mapping.map(([k]) => sql`${k}`), sql`, `);
+          const r = await db.execute(sql`SELECT COUNT(*)::int AS c FROM users WHERE role IN (${inSql})`);
           const n = Number((r.rows?.[0] as { c?: number } | undefined)?.c ?? 0);
           return { applied: false, affected: n, summary: `[dry-run] ${n} role da normalizzare` };
         }
@@ -73,8 +73,8 @@ const checks: IntegrityCheck[] = [
     async query() {
       if (!(await tableExists("users"))) return { ok: true, count: 0, sample: [] };
       return rawCheck("invalid-status",
-        `SELECT COUNT(*)::int AS c FROM users WHERE status NOT IN ('active','suspended','deleted','pending','blocked')`,
-        `SELECT id, nickname, status FROM users WHERE status NOT IN ('active','suspended','deleted','pending','blocked') LIMIT 10`,
+        sql`SELECT COUNT(*)::int AS c FROM users WHERE status NOT IN ('active','suspended','deleted','pending','blocked')`,
+        sql`SELECT id, nickname, status FROM users WHERE status NOT IN ('active','suspended','deleted','pending','blocked') LIMIT 10`,
       );
     },
     autofix: {
@@ -89,8 +89,8 @@ const checks: IntegrityCheck[] = [
           ["PENDING", "pending"], ["Pending", "pending"],
         ];
         if (dryRun) {
-          const inList = mapping.map(([k]) => `'${k.replace(/'/g, "''")}'`).join(",");
-          const r = await db.execute(sql.raw(`SELECT COUNT(*)::int AS c FROM users WHERE status IN (${inList})`));
+          const inSql = sql.join(mapping.map(([k]) => sql`${k}`), sql`, `);
+          const r = await db.execute(sql`SELECT COUNT(*)::int AS c FROM users WHERE status IN (${inSql})`);
           const n = Number((r.rows?.[0] as { c?: number } | undefined)?.c ?? 0);
           return { applied: false, affected: n, summary: `[dry-run] ${n} status da normalizzare` };
         }
@@ -111,8 +111,8 @@ const checks: IntegrityCheck[] = [
     async query() {
       if (!(await tableExists("users"))) return { ok: true, count: 0, sample: [] };
       return rawCheck("shadowban-stale",
-        `SELECT COUNT(*)::int AS c FROM users WHERE shadow_banned_until IS NOT NULL AND shadow_banned_until < NOW() AND shadow_banned_at IS NOT NULL`,
-        `SELECT id, nickname, shadow_banned_until FROM users WHERE shadow_banned_until IS NOT NULL AND shadow_banned_until < NOW() AND shadow_banned_at IS NOT NULL LIMIT 10`,
+        sql`SELECT COUNT(*)::int AS c FROM users WHERE shadow_banned_until IS NOT NULL AND shadow_banned_until < NOW() AND shadow_banned_at IS NOT NULL`,
+        sql`SELECT id, nickname, shadow_banned_until FROM users WHERE shadow_banned_until IS NOT NULL AND shadow_banned_until < NOW() AND shadow_banned_at IS NOT NULL LIMIT 10`,
       );
     },
     autofix: {
@@ -142,8 +142,8 @@ const checks: IntegrityCheck[] = [
         if (!(await tableExists(t))) continue;
         // Lo score può vivere in colonna 'score' o dentro 'score_breakdown' JSONB.
         const r = await rawCheck(`score-${t}`,
-          `SELECT COUNT(*)::int AS c FROM "${t}" WHERE (score_breakdown->>'final')::float < 0 OR (score_breakdown->>'final')::float > 1`,
-          `SELECT id, score_breakdown FROM "${t}" WHERE (score_breakdown->>'final')::float < 0 OR (score_breakdown->>'final')::float > 1 LIMIT 10`,
+          sql`SELECT COUNT(*)::int AS c FROM ${sql.identifier(t)} WHERE (score_breakdown->>'final')::float < 0 OR (score_breakdown->>'final')::float > 1`,
+          sql`SELECT id, score_breakdown FROM ${sql.identifier(t)} WHERE (score_breakdown->>'final')::float < 0 OR (score_breakdown->>'final')::float > 1 LIMIT 10`,
           { table: t },
         );
         if (!r.ok) results.push(r);
@@ -161,8 +161,8 @@ const checks: IntegrityCheck[] = [
     async query() {
       if (!(await tableExists("reports"))) return { ok: true, count: 0, sample: [] };
       return rawCheck("reports-resolved",
-        `SELECT COUNT(*)::int AS c FROM reports WHERE status = 'resolved' AND (resolved_by IS NULL OR resolved_at IS NULL)`,
-        `SELECT id, status, resolved_by, resolved_at FROM reports WHERE status = 'resolved' AND (resolved_by IS NULL OR resolved_at IS NULL) LIMIT 10`,
+        sql`SELECT COUNT(*)::int AS c FROM reports WHERE status = 'resolved' AND (resolved_by IS NULL OR resolved_at IS NULL)`,
+        sql`SELECT id, status, resolved_by, resolved_at FROM reports WHERE status = 'resolved' AND (resolved_by IS NULL OR resolved_at IS NULL) LIMIT 10`,
       );
     },
   },
@@ -174,8 +174,8 @@ const checks: IntegrityCheck[] = [
     async query() {
       if (!(await tableExists("reports"))) return { ok: true, count: 0, sample: [] };
       return rawCheck("reports-category",
-        `SELECT COUNT(*)::int AS c FROM reports WHERE category NOT IN ('spam','harassment','fake_profile','inappropriate_content','scam','other','hate_speech','sexual_content','underage','violence')`,
-        `SELECT id, category FROM reports WHERE category NOT IN ('spam','harassment','fake_profile','inappropriate_content','scam','other','hate_speech','sexual_content','underage','violence') LIMIT 10`,
+        sql`SELECT COUNT(*)::int AS c FROM reports WHERE category NOT IN ('spam','harassment','fake_profile','inappropriate_content','scam','other','hate_speech','sexual_content','underage','violence')`,
+        sql`SELECT id, category FROM reports WHERE category NOT IN ('spam','harassment','fake_profile','inappropriate_content','scam','other','hate_speech','sexual_content','underage','violence') LIMIT 10`,
       );
     },
   },

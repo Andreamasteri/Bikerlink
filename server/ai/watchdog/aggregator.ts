@@ -1,7 +1,15 @@
 // Task #2533 — Aggregator: raccoglie tutti i signals, calcola HealthSnapshot
 // (status verde/giallo/arancio/rosso + score 0..100 + problems[]), persiste
 // snapshot + signals, espone "latest" in-memory per consumer realtime.
+//
+// === OBSERVABILITY PLANE ===
+// L'aggregator OSSERVA la salute dei sottosistemi e la riassume in uno snapshot.
+// NON altera lo stato operativo del server: alimenta solo la slice "watchdog"
+// (e, via collectDbIntegritySignals, la slice "db-integrity") dell'Health Arbiter
+// come input informativo. Il cambio di comportamento operativo resta esclusiva
+// del Control Plane (initState, db-circuit-breaker, bg-db-limiter).
 import { db } from "../../db";
+import { setHealthState } from "../../lib/health-arbiter";
 import { systemHealthSnapshot } from "@shared/db";
 import { desc } from "drizzle-orm";
 import { collectBullMq } from "./collectors/bullmq-collector";
@@ -27,7 +35,10 @@ import type { EmbeddingDailyReport } from "../../jobs/embedding-daily-report";
 export async function collectDbIntegritySignals(): Promise<Signal[]> {
   try {
     const snap = await collectDbIntegrity();
-    if (!snap.hasRun) return [];
+    if (!snap.hasRun) {
+      setHealthState("db-integrity", "READY", []);
+      return [];
+    }
     const out: Signal[] = [];
     if (snap.bySeverity.critical > 0) {
       out.push({ source: "db", metric: "db_integrity.critical_violations",
@@ -42,10 +53,32 @@ export async function collectDbIntegritySignals(): Promise<Signal[]> {
       out.push({ source: "db", metric: "db_integrity.medium_violations",
         severity: "warn", value: snap.bySeverity.medium });
     }
+    // Observability slice: critical ⇒ BROKEN, high ⇒ DEGRADED, altrimenti READY.
+    if (snap.bySeverity.critical > 0) {
+      const samples = snap.criticalSamples.map((s) => `${s.checkName} (${s.count})`);
+      setHealthState("db-integrity", "BROKEN", [
+        `${snap.bySeverity.critical} violazioni critical di integrità DB`,
+        ...samples,
+      ]);
+    } else if (snap.bySeverity.high > 0) {
+      setHealthState("db-integrity", "DEGRADED", [
+        `${snap.bySeverity.high} violazioni high di integrità DB`,
+      ]);
+    } else {
+      setHealthState("db-integrity", "READY", []);
+    }
     return out;
   } catch (err) {
+    // Il collector ha fallito: NON lasciare la slice arbiter sul valore precedente
+    // (BROKEN/DEGRADED resterebbe latchato all'infinito, oppure un vecchio READY
+    // mascherebbe il fatto che non sappiamo più nulla). La degradiamo con una
+    // reason esplicita finché un run riuscito non la riporta allo stato reale.
+    const msg = (err as Error).message?.slice(0, 200);
+    setHealthState("db-integrity", "DEGRADED", [
+      `collector db-integrity non disponibile${msg ? `: ${msg}` : ""}`,
+    ]);
     return [{ source: "db", metric: "collector.error", severity: "warn",
-      details: { collector: "db-integrity", error: (err as Error).message?.slice(0, 200) } }];
+      details: { collector: "db-integrity", error: msg } }];
   }
 }
 

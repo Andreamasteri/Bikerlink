@@ -39,6 +39,15 @@ export {
   createAuthQueryFn,
 };
 
+// Health Arbiter (Task #5124): stato di salute aggregato esposto da /api/health.
+type HealthState = "READY" | "DEGRADED" | "BROKEN";
+interface HealthResponse {
+  status?: string;
+  state?: HealthState;
+  degraded?: boolean;
+  degradedReasons?: string[];
+}
+
 interface AuthContextValue {
   user: SafeUser | null | undefined;
   userId: SafeUser["id"] | null;
@@ -49,6 +58,10 @@ interface AuthContextValue {
   isReconnecting: boolean;
   authFailed: boolean;
   retryAuth: () => void;
+  // Salute backend (Health Arbiter) — primitive stabili per il banner "degradato".
+  healthState: HealthState;
+  healthDegraded: boolean;
+  healthReason: string;
   loginMutation: ReturnType<typeof useLoginMutation>;
   registerMutation: ReturnType<typeof useRegisterMutation>;
   logoutMutation: ReturnType<typeof useLogoutMutation>;
@@ -437,6 +450,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const user = stableUserRef.current;
   const userId = user?.id ?? null;
 
+  // ── Health polling (Task #5124) ──────────────────────────────────────────────
+  // Poll leggero di /api/health ogni 60s per alimentare il banner "degradato".
+  // Esponiamo SOLO primitive nel context value (healthState string + healthReason
+  // come stringa joinata): un array di reasons cambierebbe reference a ogni poll
+  // e invaliderebbe il memo → cascata di re-render su tutti i consumer di useAuth
+  // (rischio loop React Navigation, vedi nota sul memo sotto). enabled:!!user
+  // perché il banner vive solo nelle (tabs) autenticate; retry:false così un 503
+  // di boot non innesca tentativi a raffica.
+  const healthQuery = useQuery<HealthResponse>({
+    queryKey: ["/api/health"],
+    enabled: !!user,
+    refetchInterval: 60_000,
+    staleTime: 55_000,
+    retry: false,
+  });
+  const healthStateRaw = healthQuery.data?.state;
+  const healthState: HealthState =
+    healthStateRaw === "DEGRADED" || healthStateRaw === "BROKEN" ? healthStateRaw : "READY";
+  const healthReason = (healthQuery.data?.degradedReasons ?? []).join(" · ");
+
   const value = useMemo(
     () => ({
       user,
@@ -448,6 +481,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isReconnecting,
       authFailed,
       retryAuth,
+      healthState,
+      healthDegraded: healthState !== "READY",
+      healthReason,
       loginMutation,
       registerMutation,
       logoutMutation
@@ -457,7 +493,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // slice primitive `isPending` così i consumer vedono lo stato aggiornato senza ricreare il value.
     // `user` è già stabilizzato sopra (shallow-equal): cambia reference solo su variazioni reali.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [user, userId, userQuery.isLoading, storageChecked, sessionExpired, isReconnecting, authFailed, retryAuth, loginMutation.isPending, registerMutation.isPending, logoutMutation.isPending]
+    [user, userId, userQuery.isLoading, storageChecked, sessionExpired, isReconnecting, authFailed, retryAuth, healthState, healthReason, loginMutation.isPending, registerMutation.isPending, logoutMutation.isPending]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

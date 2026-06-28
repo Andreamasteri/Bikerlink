@@ -1,14 +1,22 @@
 // Task #3395 — Rete preventiva al boot, subito dopo le migration.
 //
+// === OBSERVABILITY PLANE — drift schema (SECONDARIO) ===
 // Best-effort e NON bloccante: viene invocata fire-and-forget da server/index.ts.
 // Due fasi:
 //   1) genera + persiste il manifest/fingerprint dello schema corrente;
 //   2) esegue SOLO i check del pack schema-registry (trigger "boot"), così un
-//      drift dev↔prod viene rilevato a ogni avvio e — se critico — instradato
-//      negli alert critici dal runner (pushCriticalAlerts).
+//      drift dev↔prod viene LOGGATO a ogni avvio per visibilità precoce.
 //
-// I run "boot" sono esclusi da getLatestRunSummary/collector: non alterano il
-// semaforo di salute basato sugli scan completi (notturno/manuale).
+// De-dup (Task #5124): questo è un emitter SECONDARIO/diagnostico. NON è il
+// proprietario degli alert né del semaforo di salute:
+//   • i run "boot" sono esclusi da getLatestRunSummary/collector → non alterano
+//     il semaforo basato sugli scan completi (notturno/manuale);
+//   • il runner NON invia push critici per trigger "boot" (vedi runner.ts) →
+//     niente alert duplicati a ogni avvio.
+// L'emitter PRIMARIO per drift/integrità DB è lo scan schedulato in scheduler.ts
+// (checks/schema-registry.ts), che possiede alerting + health state.
+// Lo Phase 2b drift guard (boot-sequence.ts) resta un controllo STATICO distinto
+// (registry ↔ file di migration), fatale, e non sovrappone questo runtime check.
 import { loadAllChecks } from "./registry";
 import { runIntegrityScan } from "./runner";
 import { refreshSchemaManifest } from "./schema-manifest";

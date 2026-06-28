@@ -7,6 +7,7 @@ import { triggerMatchingRun, triggerMatchingForUser } from "../matching-engine";
 import { sendSuccess, sendError } from "../lib/api-response";
 import { initState } from "../init-state";
 import { getCircuitStatus } from "../db-circuit-breaker";
+import { getHealthState } from "../lib/health-arbiter";
 
 async function requireAdmin(req: Request, res: Response, next: NextFunction) {
   if (!req.session?.userId) {
@@ -64,23 +65,34 @@ export function registerMoreRoutes(app: Express) {
 
   app.get("/api/health", (_req, res) => {
     const dbCircuit = getCircuitStatus();
-    // Tre stati distinti, mai 500:
-    //   • booting  → 503 + Retry-After-friendly (fasi critiche non finite)
-    //   • degraded → 200 con i motivi (READY ma un sottosistema non-critico è ko)
-    //   • ready    → 200
+    const arbiter = getHealthState();
+    // Stati distinti, mai 500. Durante il boot il gate critico vince sempre
+    // (booting → 503). A regime lo `status` riflette il PEGGIORE tra le slice
+    // dell'Health Arbiter (server/lib/health-arbiter.ts):
+    //   • booting  → 503 (fasi critiche non finite)
+    //   • ready    → 200 (tutte le slice READY)
+    //   • degraded → 200 (almeno una slice DEGRADED, nessuna BROKEN)
+    //   • broken   → 200 (almeno una slice BROKEN; il backend SERVE ancora, non
+    //                va riavviato — vedi scripts/cerbero-lib.sh che lo tratta come vivo)
+    // `degradedReasons` aggrega i motivi di TUTTE le slice non-READY.
     if (initState.initializing) {
-      return res.status(503).json({ status: "booting", initializing: true, degraded: false, dbCircuit });
-    }
-    if (initState.degraded) {
-      return res.status(200).json({
-        status: "degraded",
-        initializing: false,
-        degraded: true,
-        degradedReasons: initState.degradedReasons,
-        dbCircuit,
+      return res.status(503).json({
+        status: "booting", initializing: true, degraded: false,
+        state: arbiter.state, dbCircuit,
       });
     }
-    res.json({ status: "ready", initializing: false, degraded: false, dbCircuit });
+    const status =
+      arbiter.state === "READY" ? "ready" :
+      arbiter.state === "DEGRADED" ? "degraded" : "broken";
+    return res.status(200).json({
+      status,
+      initializing: false,
+      degraded: arbiter.state !== "READY",
+      state: arbiter.state,
+      degradedReasons: arbiter.reasons,
+      slices: arbiter.slices,
+      dbCircuit,
+    });
   });
 
   app.get("/api/admin/uptime", requireAdmin, async (_req, res) => {

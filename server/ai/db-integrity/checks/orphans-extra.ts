@@ -19,14 +19,14 @@ async function orphanCheck(child: string, fk: string, parent: string, parentPk =
   const safeParent = parent.replace(/[^a-z0-9_]/g, "");
   const safePk = parentPk.replace(/[^a-z0-9_]/g, "");
   try {
-    const cnt = await db.execute(sql.raw(
-      `SELECT COUNT(*)::int AS c FROM "${safeChild}" c LEFT JOIN "${safeParent}" p ON c."${safeFk}" = p."${safePk}" WHERE c."${safeFk}" IS NOT NULL AND p."${safePk}" IS NULL`,
-    ));
+    const cnt = await db.execute(
+      sql`SELECT COUNT(*)::int AS c FROM ${sql.identifier(safeChild)} c LEFT JOIN ${sql.identifier(safeParent)} p ON c.${sql.identifier(safeFk)} = p.${sql.identifier(safePk)} WHERE c.${sql.identifier(safeFk)} IS NOT NULL AND p.${sql.identifier(safePk)} IS NULL`,
+    );
     const count = Number((cnt.rows?.[0] as { c?: number } | undefined)?.c ?? 0);
     if (!count) return { ok: true, count: 0, sample: [] };
-    const smp = await db.execute(sql.raw(
-      `SELECT c.* FROM "${safeChild}" c LEFT JOIN "${safeParent}" p ON c."${safeFk}" = p."${safePk}" WHERE c."${safeFk}" IS NOT NULL AND p."${safePk}" IS NULL LIMIT 10`,
-    ));
+    const smp = await db.execute(
+      sql`SELECT c.* FROM ${sql.identifier(safeChild)} c LEFT JOIN ${sql.identifier(safeParent)} p ON c.${sql.identifier(safeFk)} = p.${sql.identifier(safePk)} WHERE c.${sql.identifier(safeFk)} IS NOT NULL AND p.${sql.identifier(safePk)} IS NULL LIMIT 10`,
+    );
     const rows = (smp.rows ?? []) as Array<Record<string, unknown>>;
     return {
       ok: false, count,

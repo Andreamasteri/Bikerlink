@@ -16,12 +16,11 @@ async function jsonbMustHaveKey(table: string, column: string, key: string): Pro
   if (!(await tableExists(table)) || !(await colExists(table, column))) return { ok: true, count: 0, sample: [], details: { skipped: "missing" } };
   const safeT = table.replace(/[^a-z_]/g, "");
   const safeC = column.replace(/[^a-z_]/g, "");
-  const safeK = key.replace(/[^a-zA-Z0-9_]/g, "");
   try {
-    const cnt = await db.execute(sql.raw(`SELECT COUNT(*)::int AS c FROM "${safeT}" WHERE "${safeC}" IS NOT NULL AND NOT ("${safeC}" ? '${safeK}')`));
+    const cnt = await db.execute(sql`SELECT COUNT(*)::int AS c FROM ${sql.identifier(safeT)} WHERE ${sql.identifier(safeC)} IS NOT NULL AND NOT jsonb_exists(${sql.identifier(safeC)}, ${key})`);
     const count = Number((cnt.rows?.[0] as { c?: number } | undefined)?.c ?? 0);
     if (!count) return { ok: true, count: 0, sample: [] };
-    const smp = await db.execute(sql.raw(`SELECT id, "${safeC}" AS v FROM "${safeT}" WHERE "${safeC}" IS NOT NULL AND NOT ("${safeC}" ? '${safeK}') LIMIT 10`));
+    const smp = await db.execute(sql`SELECT id, ${sql.identifier(safeC)} AS v FROM ${sql.identifier(safeT)} WHERE ${sql.identifier(safeC)} IS NOT NULL AND NOT jsonb_exists(${sql.identifier(safeC)}, ${key}) LIMIT 10`);
     const rows = (smp.rows ?? []) as Array<Record<string, unknown>>;
     return { ok: false, count, sample: rows.map((r) => ({ pk: String(r.id), data: r })), details: { table, column, missingKey: key } };
   } catch (err) {
@@ -34,10 +33,10 @@ async function negativeCounter(table: string, column: string): Promise<CheckResu
   const safeT = table.replace(/[^a-z_]/g, "");
   const safeC = column.replace(/[^a-z_]/g, "");
   try {
-    const cnt = await db.execute(sql.raw(`SELECT COUNT(*)::int AS c FROM "${safeT}" WHERE "${safeC}" < 0`));
+    const cnt = await db.execute(sql`SELECT COUNT(*)::int AS c FROM ${sql.identifier(safeT)} WHERE ${sql.identifier(safeC)} < 0`);
     const count = Number((cnt.rows?.[0] as { c?: number } | undefined)?.c ?? 0);
     if (!count) return { ok: true, count: 0, sample: [] };
-    const smp = await db.execute(sql.raw(`SELECT id, "${safeC}" AS v FROM "${safeT}" WHERE "${safeC}" < 0 LIMIT 10`));
+    const smp = await db.execute(sql`SELECT id, ${sql.identifier(safeC)} AS v FROM ${sql.identifier(safeT)} WHERE ${sql.identifier(safeC)} < 0 LIMIT 10`);
     const rows = (smp.rows ?? []) as Array<Record<string, unknown>>;
     return { ok: false, count, sample: rows.map((r) => ({ pk: String(r.id), data: r })), details: { table, column } };
   } catch (err) {

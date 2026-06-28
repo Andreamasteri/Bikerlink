@@ -1,3 +1,9 @@
+// === OBSERVABILITY PLANE — db-integrity framework ===
+// Questo modulo APPARTIENE all'observability plane: esegue i check di integrità,
+// li misura e produce risultati; non modifica lo stato del sistema. L'alerting e
+// la slice di salute "db-integrity" sono gestiti a valle (runner.ts → aggregator),
+// con l'Health Arbiter (server/lib/health-arbiter.ts) come unica fonte di verità.
+//
 // Task #2536 — Framework: esegue un IntegrityCheck con timeout, cattura errori,
 // produce un risultato uniforme. Non scrive sul DB (lo fa il runner).
 import type { IntegrityCheck, CheckResult, IntegrityCheckContext } from "./types";

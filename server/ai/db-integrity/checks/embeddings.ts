@@ -83,11 +83,11 @@ const checks: IntegrityCheck[] = [
           'text-embedding-ada-002',
           'local:Xenova/multilingual-e5-small',
         ];
-        const inList = KNOWN_MODELS.map((m) => `'${m}'`).join(',');
-        const cnt = await db.execute(sql.raw(`SELECT COUNT(*)::int AS c FROM embeddings WHERE model IS NULL OR model NOT IN (${inList})`));
+        const inSql = sql.join(KNOWN_MODELS.map((m) => sql`${m}`), sql`, `);
+        const cnt = await db.execute(sql`SELECT COUNT(*)::int AS c FROM embeddings WHERE model IS NULL OR model NOT IN (${inSql})`);
         const count = Number((cnt.rows?.[0] as { c?: number } | undefined)?.c ?? 0);
         if (!count) return { ok: true, count: 0, sample: [] };
-        const smp = await db.execute(sql.raw(`SELECT id, entity_type, entity_id, model FROM embeddings WHERE model IS NULL OR model NOT IN (${inList}) LIMIT 10`));
+        const smp = await db.execute(sql`SELECT id, entity_type, entity_id, model FROM embeddings WHERE model IS NULL OR model NOT IN (${inSql}) LIMIT 10`);
         const rows = (smp.rows ?? []) as Array<Record<string, unknown>>;
         return { ok: false, count, sample: rows.map((r) => ({ pk: String(r.id), data: r })) };
       } catch (err) {

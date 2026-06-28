@@ -1,3 +1,10 @@
+// === CONTROL PLANE — budget connessioni DB ===
+// Questo modulo APPARTIENE al control plane: protegge attivamente una risorsa
+// (le connessioni del pool) regolando la concorrenza dei job di background. Non
+// è osservabilità (non misura/segnala lo stato): è un meccanismo che CAMBIA il
+// comportamento del sistema per preservarne la salute. La salute risultante è
+// poi esposta separatamente dall'Health Arbiter (server/lib/health-arbiter.ts).
+//
 // Limita la concorrenza dei job DB in background per riservare connessioni al
 // traffico utente.
 //

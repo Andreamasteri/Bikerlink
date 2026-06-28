@@ -197,6 +197,25 @@ fi
 kill "$PID_DEG" 2>/dev/null || true
 
 # ══════════════════════════════════════════════════════════════════════════════
+section "Test 1c — cerbero_health_backend stato 0: HTTP 200 + status:broken"
+# ══════════════════════════════════════════════════════════════════════════════
+# Broken = una slice critica dell'Health Arbiter è giù (es. circuit breaker DB)
+# ma il backend SERVE ancora: riavviarlo non risolve, quindi è vivo (stato 0).
+PID_BRK=$(start_mock_http 200 '{"status":"broken","state":"BROKEN","degradedReasons":["[db-breaker] circuit breaker DB aperto"]}' "$MOCK_PORT_OK")
+MOCK_SERVER_PIDS+=("$PID_BRK")
+BACKEND_PORT="$MOCK_PORT_OK"
+cerbero_health_backend
+STATE_BRK=$?
+BACKEND_PORT="$FREE_PORT"
+
+if [ "$STATE_BRK" -eq 0 ]; then
+  ok "cerbero_health_backend ritorna 0 (vivo) su HTTP 200 + status:broken"
+else
+  nok "cerbero_health_backend ritorna $STATE_BRK invece di 0 su HTTP 200 + status:broken"
+fi
+kill "$PID_BRK" 2>/dev/null || true
+
+# ══════════════════════════════════════════════════════════════════════════════
 section "Test 2 — cerbero_health_backend stato 2: HTTP 503 (initializing)"
 # ══════════════════════════════════════════════════════════════════════════════
 PID_INIT=$(start_mock_http 503 '{"status":"initializing"}' "$MOCK_PORT_INIT")

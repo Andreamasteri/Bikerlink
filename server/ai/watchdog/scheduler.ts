@@ -1,3 +1,11 @@
+// === OBSERVABILITY PLANE — watchdog scheduler ===
+// Questo modulo APPARTIENE all'observability plane: osserva il sistema (collettori
+// → aggregator), ne deriva problemi/salute e notifica (alerts). NON è il padrone
+// del semaforo di salute: pubblica la sua slice "watchdog" nell'Health Arbiter
+// (server/lib/health-arbiter.ts, via aggregator.part2.ts), che resta la singola
+// fonte di verità worst-of esposta da /api/health. L'auto-fix è l'unica azione di
+// control plane innescata da qui, in modo deliberato e tracciato.
+//
 // Task #2533 — Scheduler in-process del watchdog. Ogni 60s: aggregator → auto-fix
 // → (se serve) proposer → alerts. Cleanup signals 1x/h. Weekly report via cron sep.
 import { runAggregatorCycle } from "./aggregator";

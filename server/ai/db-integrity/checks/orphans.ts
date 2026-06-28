@@ -19,12 +19,10 @@ async function orphanCheck(child: string, fk: string, parent: string, parentPk =
   const safeFk = fk.replace(/[^a-z0-9_]/g, "");
   const safeParent = parent.replace(/[^a-z0-9_]/g, "");
   const safePk = parentPk.replace(/[^a-z0-9_]/g, "");
-  const countSql = `SELECT COUNT(*)::int AS c FROM "${safeChild}" c LEFT JOIN "${safeParent}" p ON c."${safeFk}" = p."${safePk}" WHERE c."${safeFk}" IS NOT NULL AND p."${safePk}" IS NULL`;
-  const sampleSql = `SELECT c.* FROM "${safeChild}" c LEFT JOIN "${safeParent}" p ON c."${safeFk}" = p."${safePk}" WHERE c."${safeFk}" IS NOT NULL AND p."${safePk}" IS NULL LIMIT 10`;
-  const cnt = await db.execute(sql.raw(countSql));
+  const cnt = await db.execute(sql`SELECT COUNT(*)::int AS c FROM ${sql.identifier(safeChild)} c LEFT JOIN ${sql.identifier(safeParent)} p ON c.${sql.identifier(safeFk)} = p.${sql.identifier(safePk)} WHERE c.${sql.identifier(safeFk)} IS NOT NULL AND p.${sql.identifier(safePk)} IS NULL`);
   const count = Number((cnt.rows?.[0] as { c?: number } | undefined)?.c ?? 0);
   if (count === 0) return { ok: true, count: 0, sample: [] };
-  const smp = await db.execute(sql.raw(sampleSql));
+  const smp = await db.execute(sql`SELECT c.* FROM ${sql.identifier(safeChild)} c LEFT JOIN ${sql.identifier(safeParent)} p ON c.${sql.identifier(safeFk)} = p.${sql.identifier(safePk)} WHERE c.${sql.identifier(safeFk)} IS NOT NULL AND p.${sql.identifier(safePk)} IS NULL LIMIT 10`);
   return {
     ok: false,
     count,
@@ -43,16 +41,15 @@ export async function deleteOrphans(child: string, fk: string, parent: string, p
   const safeParent = parent.replace(/[^a-z0-9_]/g, "");
   const safePk = parentPk.replace(/[^a-z0-9_]/g, "");
   if (dryRun) {
-    const cnt = await db.execute(sql.raw(
-      `SELECT COUNT(*)::int AS c FROM "${safeChild}" c LEFT JOIN "${safeParent}" p ON c."${safeFk}" = p."${safePk}" WHERE c."${safeFk}" IS NOT NULL AND p."${safePk}" IS NULL`,
-    ));
+    const cnt = await db.execute(
+      sql`SELECT COUNT(*)::int AS c FROM ${sql.identifier(safeChild)} c LEFT JOIN ${sql.identifier(safeParent)} p ON c.${sql.identifier(safeFk)} = p.${sql.identifier(safePk)} WHERE c.${sql.identifier(safeFk)} IS NOT NULL AND p.${sql.identifier(safePk)} IS NULL`,
+    );
     const n = Number((cnt.rows?.[0] as { c?: number } | undefined)?.c ?? 0);
     return { applied: false, affected: n, summary: `[dry-run] ${n} orfani in ${child}` };
   }
   // Quarantine-before-delete: snapshot di TUTTE le righe orfane prima del DELETE.
   // Limite difensivo: 5000 righe per esecuzione per evitare snapshot massivi.
-  const snapSql = `SELECT * FROM "${safeChild}" WHERE "${safeFk}" IS NOT NULL AND "${safeFk}" NOT IN (SELECT "${safePk}" FROM "${safeParent}") LIMIT 5000`;
-  const snap = await db.execute(sql.raw(snapSql));
+  const snap = await db.execute(sql`SELECT * FROM ${sql.identifier(safeChild)} WHERE ${sql.identifier(safeFk)} IS NOT NULL AND ${sql.identifier(safeFk)} NOT IN (SELECT ${sql.identifier(safePk)} FROM ${sql.identifier(safeParent)}) LIMIT 5000`);
   const rows = ((snap.rows ?? []) as Array<Record<string, unknown>>);
   if (rows.length) {
     const payload = rows.map((r) => ({
@@ -65,8 +62,8 @@ export async function deleteOrphans(child: string, fk: string, parent: string, p
   if (!rows.length) return { applied: false, affected: 0, summary: `nessun orfano in ${child}` };
   const ids = rows.map((r) => r.id).filter((v) => v !== undefined && v !== null);
   if (!ids.length) return { applied: false, affected: 0, summary: `orfani senza id in ${child} — skip` };
-  const idList = ids.map((id) => `'${String(id).replace(/'/g, "''")}'`).join(",");
-  const res = await db.execute(sql.raw(`DELETE FROM "${safeChild}" WHERE "id" IN (${idList})`));
+  const idSql = sql.join(ids.map((id) => sql`${String(id)}`), sql`, `);
+  const res = await db.execute(sql`DELETE FROM ${sql.identifier(safeChild)} WHERE ${sql.identifier("id")} IN (${idSql})`);
   const affected = res.rowCount ?? 0;
   return { applied: affected > 0, affected, summary: `eliminati ${affected} orfani da ${child} (quarantinati ${rows.length})` };
 }

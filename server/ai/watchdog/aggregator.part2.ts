@@ -23,6 +23,7 @@ import { collectRestarts } from "./collectors/restart-collector";
 import { collectCrashSignals } from "./collectors/crash-signals-collector";
 import { withBgDbSlot } from "../../lib/bg-db-limiter";
 import { isThinkCentreOffline } from "../../lib/thinkcentre-offline";
+import { setHealthState } from "../../lib/health-arbiter";
 
 let latest: HealthSnapshot | null = null;
 const subscribers = new Set<(s: HealthSnapshot) => void>();
@@ -100,6 +101,17 @@ export async function runAggregatorCycle(): Promise<HealthSnapshot> {
     status, score, problems, metrics, generatedAt: new Date().toISOString(),
   };
   latest = snap;
+
+  // Observability slice: traduce lo status del semaforo watchdog nello stato
+  // dell'Health Arbiter. green ⇒ READY, yellow/orange ⇒ DEGRADED, red ⇒ BROKEN.
+  // I motivi sono i titoli dei problemi critical/high (massimo 5).
+  const arbiterReasons = problems
+    .filter((p) => p.severity === "critical" || p.severity === "high")
+    .slice(0, 5)
+    .map((p) => p.title);
+  const arbiterState = status === "green" ? "READY" : status === "red" ? "BROKEN" : "DEGRADED";
+  setHealthState("watchdog", arbiterState, arbiterState === "READY" ? [] : arbiterReasons);
+
   try {
     const safeProblems = JSON.parse(JSON.stringify(problems)) as typeof problems;
     const safeMetrics = JSON.parse(JSON.stringify(metrics)) as typeof metrics;

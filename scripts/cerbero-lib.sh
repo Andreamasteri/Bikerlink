@@ -51,11 +51,13 @@ cerbero_port_open() {
 
 # ── TESTA 1: salute backend via /api/health ───────────────────────────────────
 # /api/health è initializing-aware: 503 {status:booting} durante il boot DB,
-# 200 {status:ready} a regime e 200 {status:degraded} quando un sottosistema
-# non-critico è ko ma il backend SERVE ancora. Distinguiamo 3 stati per NON
-# riavviare un backend che sta solo inizializzando (restart in quella finestra
-# → crash loop):
-#   return 0  → backend vivo/serve   (HTTP 200, "status":"ready"|"degraded"|"ok")
+# 200 {status:ready} a regime, 200 {status:degraded} quando un sottosistema
+# non-critico è ko e 200 {status:broken} quando una slice critica dell'Health
+# Arbiter è giù (es. circuit breaker DB aperto) ma il backend SERVE ancora.
+# Distinguiamo gli stati per NON riavviare un backend che sta solo inizializzando
+# o che è broken-ma-vivo (restart in quelle finestre → crash loop, e un restart
+# non risolve un breaker aperto o una violazione di integrità):
+#   return 0  → backend vivo/serve   (HTTP 200, "status":"ready"|"degraded"|"broken"|"ok")
 #   return 2  → backend in avvio     (raggiungibile ma non ancora pronto, es. 503)
 #   return 1  → backend IRRAGGIUNGIBILE (porta chiusa/timeout) → da riavviare
 cerbero_health_backend() {
@@ -66,9 +68,10 @@ cerbero_health_backend() {
     return 1
   fi
   # status "ready" = pronto; "degraded" = pronto ma un sottosistema non-critico è
-  # in errore (vedi server/init-state.ts) — in entrambi i casi il backend SERVE
-  # richieste → stato 0 (vivo, nessun restart). "ok" accettato per retro-compat.
-  if printf '%s' "$body" | grep -qE '"status":"(ready|degraded|ok)"'; then
+  # in errore; "broken" = una slice critica dell'Health Arbiter è giù ma il
+  # backend SERVE ancora (riavviarlo non aiuta) — in tutti questi casi il backend
+  # SERVE richieste → stato 0 (vivo, nessun restart). "ok" per retro-compat.
+  if printf '%s' "$body" | grep -qE '"status":"(ready|degraded|broken|ok)"'; then
     return 0
   fi
   return 2

@@ -18,12 +18,12 @@ async function invalidEnum(table: string, column: string, allowed: string[]): Pr
   if (!(await tableExists(table)) || !(await colExists(table, column))) return { ok: true, count: 0, sample: [], details: { skipped: "missing" } };
   const safeT = table.replace(/[^a-z_]/g, "");
   const safeC = column.replace(/[^a-z_]/g, "");
-  const inList = allowed.map((v) => `'${v.replace(/'/g, "''")}'`).join(",");
+  const inSql = sql.join(allowed.map((v) => sql`${v}`), sql`, `);
   try {
-    const cnt = await db.execute(sql.raw(`SELECT COUNT(*)::int AS c FROM "${safeT}" WHERE "${safeC}" IS NOT NULL AND "${safeC}" NOT IN (${inList})`));
+    const cnt = await db.execute(sql`SELECT COUNT(*)::int AS c FROM ${sql.identifier(safeT)} WHERE ${sql.identifier(safeC)} IS NOT NULL AND ${sql.identifier(safeC)} NOT IN (${inSql})`);
     const count = Number((cnt.rows?.[0] as { c?: number } | undefined)?.c ?? 0);
     if (!count) return { ok: true, count: 0, sample: [] };
-    const smp = await db.execute(sql.raw(`SELECT id, "${safeC}" AS v FROM "${safeT}" WHERE "${safeC}" IS NOT NULL AND "${safeC}" NOT IN (${inList}) LIMIT 10`));
+    const smp = await db.execute(sql`SELECT id, ${sql.identifier(safeC)} AS v FROM ${sql.identifier(safeT)} WHERE ${sql.identifier(safeC)} IS NOT NULL AND ${sql.identifier(safeC)} NOT IN (${inSql}) LIMIT 10`);
     const rows = (smp.rows ?? []) as Array<Record<string, unknown>>;
     return { ok: false, count, sample: rows.map((r) => ({ pk: String(r.id), data: r })), details: { table, column, allowed } };
   } catch (err) {

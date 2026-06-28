@@ -1,8 +1,8 @@
 // Task #2536 — Quarantena: prima di ogni delete automatico, copia la riga in
 // dbIntegrityQuarantine (TTL 30 giorni). Permette restore o purge anticipato.
-import { db, pool } from "../../db";
+import { db } from "../../db";
 import { dbIntegrityQuarantine } from "@shared/db";
-import { eq, lt, and, isNull } from "drizzle-orm";
+import { eq, lt, and, isNull, sql } from "drizzle-orm";
 
 const TTL_DAYS = 30;
 
@@ -48,18 +48,18 @@ export async function restoreFromQuarantine(id: string): Promise<{ ok: boolean; 
     const safeCols = cols.filter((c) => /^[a-zA-Z0-9_]+$/.test(c));
     if (safeCols.length !== cols.length) return { ok: false, message: "Colonne con caratteri non sicuri" };
     const safeTable = row.sourceTable.replace(/[^a-zA-Z0-9_]/g, "");
-    const colList = safeCols.map((c) => `"${c}"`).join(", ");
-    const placeholders = safeCols.map((_, i) => `$${i + 1}`).join(", ");
-    const vals = safeCols.map((c) => {
-      const v = payload[c];
-      // jsonb/object → stringify per node-postgres
-      if (v !== null && typeof v === "object" && !(v instanceof Date)) return JSON.stringify(v);
-      return v as unknown;
-    });
-    // Drizzle execute non accetta secondo array params: usiamo pool.query direttamente.
-    await pool.query(
-      `INSERT INTO "${safeTable}" (${colList}) VALUES (${placeholders}) ON CONFLICT DO NOTHING`,
-      vals,
+    const colSql = sql.join(safeCols.map((c) => sql.identifier(c)), sql`, `);
+    const valSql = sql.join(
+      safeCols.map((c) => {
+        const v = payload[c];
+        // jsonb/object → stringify per node-postgres (PG cast text→jsonb in INSERT)
+        if (v !== null && typeof v === "object" && !(v instanceof Date)) return sql`${JSON.stringify(v)}`;
+        return sql`${v as unknown}`;
+      }),
+      sql`, `,
+    );
+    await db.execute(
+      sql`INSERT INTO ${sql.identifier(safeTable)} (${colSql}) VALUES (${valSql}) ON CONFLICT DO NOTHING`,
     );
     await db.update(dbIntegrityQuarantine).set({ restoredAt: new Date() }).where(eq(dbIntegrityQuarantine.id, id));
     return { ok: true, message: "Riga ripristinata" };

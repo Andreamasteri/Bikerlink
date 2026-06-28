@@ -1,3 +1,8 @@
+// === OBSERVABILITY PLANE — pipeline monitor ===
+// Questo modulo APPARTIENE all'observability plane: sonda le pipeline end-to-end
+// (telemetria, matching, notifiche, ecc.) e ne registra l'esito storico per
+// diagnosi e dashboard. È pura osservazione: non agisce sul sistema e non possiede
+// il semaforo di salute, che resta nell'Health Arbiter (server/lib/health-arbiter.ts).
 import crypto from "crypto";
 import { EventEmitter } from "events";
 import { writeWatchdogLog } from "../watchdog/log";

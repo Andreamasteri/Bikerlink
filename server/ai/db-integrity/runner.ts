@@ -173,7 +173,12 @@ async function runScanInternal(opts: RunOptions): Promise<RunSummary> {
   }
 
   // Critical push immediato (best-effort, non blocca lo scan).
-  if (criticals.length) {
+  // De-dup (Task #5124): i run "boot" sono SOLO osservazione precoce dello schema
+  // (vedi boot-schema-check.ts) e NON sono l'emitter primario degli alert: senza
+  // questo gate, un drift critico persistente genererebbe un push duplicato a OGNI
+  // avvio, in aggiunta a quello dello scan schedulato (cron/weekly/manual), che
+  // resta l'unica sorgente di alerting/health per l'integrità DB.
+  if (criticals.length && trigger !== "boot") {
     pushCriticalAlerts(criticals).catch(() => { /* logged inside */ });
   }
 

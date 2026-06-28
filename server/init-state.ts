@@ -1,4 +1,12 @@
 import type { Request, Response, NextFunction } from "express";
+import { setHealthState, clearHealthState } from "./lib/health-arbiter";
+
+// === CONTROL PLANE ===
+// initState ALTERA lo stato operativo del server: il flag `initializing` guida il
+// gate 503 su /api/*, e `degraded` riflette un sottosistema non-critico in errore
+// (post-READY, mai fatale). Le transizioni qui sotto aggiornano la slice "init"
+// dell'Health Arbiter (server/lib/health-arbiter.ts), unica source of truth letta
+// da /api/health. Non è un osservatore: è uno dei sistemi che DEFINISCE la salute.
 
 export const initState = {
   // True dal boot fino a quando le fasi CRITICHE (listen, migration, drift guard,
@@ -24,12 +32,18 @@ export function markDegraded(reason: string): void {
     console.warn(`[BOOT][DEGRADED] ${reason}`);
   }
   initState.degraded = true;
+  setHealthState("init", "DEGRADED", initState.degradedReasons);
 }
 
 // Rimuove un motivo di degraded; azzera il flag se non resta alcun motivo.
 export function clearDegraded(reason: string): void {
   initState.degradedReasons = initState.degradedReasons.filter((r) => r !== reason);
-  if (initState.degradedReasons.length === 0) initState.degraded = false;
+  if (initState.degradedReasons.length === 0) {
+    initState.degraded = false;
+    clearHealthState("init");
+  } else {
+    setHealthState("init", "DEGRADED", initState.degradedReasons);
+  }
 }
 
 // Task #2789 / #4455 — Rotte auth essenziali che il gate lascia passare appena
