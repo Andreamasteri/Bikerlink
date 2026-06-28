@@ -42,6 +42,10 @@ logical group — line count drops while every key/value is preserved. Keep en/i
 `tsc --noEmit` often times out (>120s); since compaction changes no keys/values the typecheck state is
 unchanged, so an `esbuild --bundle` syntax check on the two files is sufficient to confirm validity.
 
+## Marker ALLOW: deve stare in PRIMA riga
+`parseMarker` (in `scripts/lib/large-files-core.ts`) legge SOLO `line[0]` per riconoscere `LARGE-FILE-ALLOW:` (la seconda riga è guardata solo per il companion del marker LOCKED). Quindi il marker che esenta un file deve essere la **prima riga fisica** del file (dopo lo strip del prefisso commento). Altri commenti come `// @no-split` NON sono letti da nessuno script: sono puramente documentali e possono stare in qualunque posizione. Se un file grande (es. i `lib/i18n/<lang>.ts` fusi) ha l'ALLOW in seconda riga il gate fallisce comunque.
+**Why:** durante il merge dei file i18n, mettere `// @no-split` in riga 1 e `// LARGE-FILE-ALLOW:` in riga 2 faceva fallire il ratchet pur avendo il marker; invertirle (ALLOW prima) risolve.
+
 ## Splittare gli script CLI sotto scripts/
 `scripts/` è in IGNORE_DIRS del fixer fix-inline-default-memo-deps (non auto-scansiona sé stesso) ma NON in EXCLUDED_DIRS del ratchet → i nuovi file sotto scripts/ sono comunque soggetti al limite 600. Quando uno script CLI sfora, estrai la logica pura in moduli `scripts/lib/*` e tieni un main sottile come entrypoint.
 **Why:** test/post-merge/check invocano lo script PER PATH; il path dell'entry NON deve cambiare durante lo split, altrimenti rompi gli invocatori.

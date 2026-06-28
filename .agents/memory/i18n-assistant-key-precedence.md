@@ -3,13 +3,13 @@ name: i18n assistant key precedence trap
 description: Italian aiAssistant.* strings are duplicated across two files; which wins depends on spread order in it.ts
 ---
 
-In `lib/i18n/it.ts` the merge spreads `...aiAssistantIt` (from `ai-assistant-it.ts`) BEFORE `...part4` (from `it.part4.ts`). Object spread = last wins, so for any key present in BOTH files, **`it.part4.ts` wins** and the copy in `ai-assistant-it.ts` is dead.
+Dopo il merge dei file i18n, NON esistono più i `*.part*.ts`: ogni lingua è un singolo file (`lib/i18n/<lang>.ts`). In `lib/i18n/it.ts` resta solo `import aiAssistantIt from "./ai-assistant-it"` spreddato PER PRIMO (`{...aiAssistantIt, ...<chiavi inline>}`); tutte le ex-chiavi dei part (incluse le ex-`it.part4.ts`) sono ora chiavi inline DENTRO `it.ts`, e vengono dopo lo spread → vincono su `ai-assistant-it.ts`.
 
-Shared (duplicated) keys → edit `it.part4.ts` (not just `ai-assistant-it.ts`): `aiAssistant.title`, `aiAssistant.emptyHint`, `aiAssistant.inputPlaceholder`, `aiAssistant.prefs.*`, `aiAssistant.confirm.*`, `aiAssistant.tip.*`, `aiAssistant.trigger.ask`.
+Per qualsiasi chiave `aiAssistant.*` italiana presente in ENTRAMBI: la copia inline in `it.ts` vince, quella in `ai-assistant-it.ts` è dead. Chiavi duplicate storiche (ora inline in `it.ts`): `aiAssistant.title`, `aiAssistant.emptyHint`, `aiAssistant.inputPlaceholder`, `aiAssistant.prefs.*`, `aiAssistant.confirm.*`, `aiAssistant.tip.*`, `aiAssistant.trigger.ask`.
 
-Keys ONLY in `ai-assistant-it.ts` (active there): `aiAssistant.tour.*`, `aiAssistant.admin.*`, `aiAssistant.subtitle`, `aiAssistant.trigger.home/map/profile`, `common.assistant*`.
+Chiavi SOLO in `ai-assistant-it.ts` (attive lì): `aiAssistant.tour.*`, `aiAssistant.admin.*`, `aiAssistant.subtitle`, `aiAssistant.trigger.home/map/profile`, `common.assistant*`.
 
-English has NO duplication: only `en.part4.ts` holds `aiAssistant.*` (no `ai-assistant-en.ts`), so edits there are always active.
+English: nessuna duplicazione; `aiAssistant.*` vive solo in `en.ts` (non esiste `ai-assistant-en.ts`).
 
-**Why:** renaming the assistant to "Bowie" by editing only `ai-assistant-it.ts` silently did nothing for title/prefs/emptyHint — the part4 duplicates overrode them; the architect caught it.
-**How to apply:** before changing any `aiAssistant.*` Italian string, grep BOTH files; if the key exists in `it.part4.ts`, edit it there.
+**Why:** rinominare l'assistente editando solo `ai-assistant-it.ts` non aveva effetto su title/prefs/emptyHint perché i duplicati (un tempo in `it.part4.ts`, oggi inline in `it.ts`) li sovrascrivono.
+**How to apply:** prima di cambiare una stringa italiana `aiAssistant.*`, grep in ENTRAMBI i file; se la chiave esiste in `it.ts` (blocco inline), editala lì, non in `ai-assistant-it.ts`.
