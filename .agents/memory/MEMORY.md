@@ -119,3 +119,5 @@
 - [Ollama diagnostics CLI](ollama-diag-cli.md) — `npx tsx scripts/ollama-diagnose.ts` invia log+sorgenti boot a Ollama sul PC dedicato (secret DIAG_OLLAMA_* distinti da OLLAMA_*, HTTP diretta no-Express, report logs/ai-diagnosis-*.md).
 
 - [Split-file merge via bash assembly](split-merge-bash-assembly.md) — fondi i part lazy-split assemblando con sed/cat (no ritrascrizione); subagent lasciano lavoro parziale, fonte di verità = filesystem; marker >600 = LARGE-FILE-ALLOW + voce allow.txt.
+
+- [Deep schema parity (dev↔prod)](deep-schema-parity.md) — confronto DEFINIZIONI (non nomi) su 7 categorie via hash; prod catturata offline (no conn string, read-only db skill) in server/data/deep-schema-parity.prod.json; spatial_ref_sys_pkey/postgis/user_sessions_chk allow-listati.
