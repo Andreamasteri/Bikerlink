@@ -37,6 +37,7 @@ import { RemoteDiagnosticPoller } from "@/components/layout/RemoteDiagnosticPoll
 import { PushTokenRegistrar } from "@/components/layout/PushTokenRegistrar";
 import { DataRefreshIndicator } from "@/components/layout/DataRefreshIndicator";
 import { OfflineBanner } from "@/components/layout/OfflineBanner";
+import { DegradedBanner } from "@/components/layout/DegradedBanner";
 // Task #2698 — AI Assistant utente. (import disabilitato OTA 201)
 // import AssistantOnboardingTour from "@/components/user/ai-assistant/AssistantOnboardingTour";
 import { useOtaStagingBanner } from "@/hooks/useOtaStagingBanner";
@@ -291,6 +292,7 @@ function NormalRootLayout() {
           <OtaPendingBanner />
           <DataRefreshIndicator />
           <OfflineBanner />
+          <DegradedBanner />
           <BackgroundNotificationHandler />
           <RemoteDiagnosticPoller />
           <PushTokenRegistrar />

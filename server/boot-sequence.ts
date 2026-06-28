@@ -54,6 +54,15 @@ function bootLog(n: number, total: number, step: string, msg: string) {
 }
 
 // ── DB readiness pre-flight ───────────────────────────────────────────────────
+// Task #5123 — Chiarimento sulla natura di questo pre-flight: NON è un gate
+// bloccante. È un "latency smoother" best-effort: prova ad aprire una connessione
+// e fare SELECT 1 con qualche retry, così nel caso comune (DB pronto in 1-2
+// tentativi) la Phase 2 (Migrations) parte su un pool già caldo, evitando un
+// primo errore rumoroso. Se dopo tutti i tentativi il DB resta irraggiungibile,
+// NON abortiamo né blocchiamo: si prosegue comunque e la Phase 2 — che è FATAL e
+// gestisce il proprio errore con process.exit + crash-backoff — diventa l'unico
+// vero gate sul DB. In sintesi: questo pre-flight può solo ridurre la latenza/i
+// falsi errori al boot, mai impedire l'avvio.
 const DB_READY_MAX_ATTEMPTS = 10;
 const DB_READY_INTERVAL_MS = 3_000;
 
@@ -162,10 +171,23 @@ export async function runBootSequence(server: Server, errorHandlersReady: Promis
       : "";
     console.log(`[BOOT] Registry ↔ Migration: OK — nessun nuovo drift${baselineNote}.`);
   } catch (e) {
+    // Task #5123 — Distinzione importante: questo catch NON significa "drift
+    // rilevato". Lo scenario di drift VERO (forward/inverse) è già gestito sopra
+    // come FATAL (process.exit). Qui finiamo solo se il drift-checker STESSO ha
+    // lanciato (errore interno del tooling: parser, lettura file, ecc.).
+    //
+    // Policy (non-fatale, ma VISIBILE): un errore interno del checker non è una
+    // prova di schema incoerente, quindi NON facciamo process.exit — renderlo
+    // fatale qui rischierebbe un crash-loop su un bug del tooling, non su un
+    // problema reale di schema. Lo marchiamo però come degraded così lo stato
+    // è visibile su /api/health (prima era un warning silenzioso ignorato) e
+    // db-integrity ricontrolla comunque il drift a runtime.
     console.warn(
-      "[BOOT] Registry ↔ Migration check fallito (non-fatal, db-integrity coprirà a runtime):",
+      "[BOOT] Registry ↔ Migration check NON eseguito — errore interno del checker " +
+      "(non-fatal, non è un drift; db-integrity ricontrolla a runtime):",
       (e as Error).message,
     );
+    markDegraded("drift-check-unavailable");
   }
 
   // ── Phase 3: DB Init (estratta in boot-phase3-db-init.ts) ─────────────────
@@ -250,7 +272,8 @@ export async function runBootSequence(server: Server, errorHandlersReady: Promis
 
   // Job pesanti post-boot: registrati nel bootJobQueue (initial delay 4 min,
   // gap 45s) PRIMA della Phase 5, perché è la Phase 5 (runPhase5Schedulers) a
-  // chiamare bootJobQueue.start() — registrarli dopo non avrebbe effetto.
+  // chiamare bootJobQueue.sealAndStart() — registrarli dopo la sigillatura
+  // lancerebbe un errore (coda sealed) invece di essere persi in silenzio.
   // Così questi UPDATE/insert non competono col DB Init e appaiono nei log solo
   // dopo 4+ minuti dal boot.
   bootJobQueue.register("InitMissingClubConversations", async () => {

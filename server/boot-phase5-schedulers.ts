@@ -2,20 +2,42 @@ import { db, withDbRetry } from "./db";
 import { sql } from "drizzle-orm";
 import { bootJobQueue } from "./lib/boot-job-queue";
 import { withBgDbSlot } from "./lib/bg-db-limiter";
+import { markDegraded } from "./init-state";
+
+/**
+ * Esegue un blocco di registrazione scheduler in ISOLAMENTO (Task #5123).
+ * Un fallimento di un singolo scheduler non deve impedire agli altri di armarsi
+ * (atomicità per-blocco): l'errore viene loggato e registrato come motivo di
+ * degraded (`scheduler:<name>`) così /api/health lo espone esplicitamente,
+ * invece di abortire silenziosamente l'intera Phase 5.
+ */
+async function arm(name: string, fn: () => Promise<void> | void): Promise<void> {
+  try {
+    await fn();
+  } catch (e) {
+    console.warn(`[INIT] scheduler "${name}" failed to arm (non-fatal):`, e);
+    markDegraded(`scheduler:${name}`);
+  }
+}
 
 /**
  * Phase 5 of the boot sequence: schedulers + maintenance jobs.
  * Extracted from boot-sequence.ts to keep that file under the 600-line limit.
  *
  * Called once during runBootSequence(); receives the HTTP Server for WS attachment.
+ *
+ * ATOMICITÀ (Task #5123): ogni blocco di registrazione è isolato (try/catch via
+ * `arm()` o blocco dedicato) così un singolo scheduler che fallisce non blocca
+ * gli altri. Il sigillo della boot-job queue (bootJobQueue.sealAndStart()) è in
+ * un `finally`: viene SEMPRE eseguito, anche se un blocco lancia, così la coda
+ * dei job pesanti parte comunque e nessun job resta perso.
  */
 export async function runPhase5Schedulers(): Promise<void> {
   try {
+  await arm("match-rules-cache", async () => {
     const { initMatchRulesCache } = await import("./matching/rules-cache");
     await initMatchRulesCache();
-  } catch (err) {
-    console.warn("[INIT] match-rules cache init failed (non-fatal):", err);
-  }
+  });
 
   const SIX_HOURS_MS = 6 * 60 * 60 * 1000;
   const runPlaylistSnapshot = async () => {
@@ -57,11 +79,17 @@ export async function runPhase5Schedulers(): Promise<void> {
   });
   setInterval(safeRunPlaylistSnapshot, SIX_HOURS_MS);
 
-  const { cleanupOrphanedAdImages } = await import("./routes/ads");
-  setTimeout(async () => {
-    await cleanupOrphanedAdImages();
-    setInterval(cleanupOrphanedAdImages, 24 * 60 * 60 * 1000);
-  }, 5 * 60 * 1000);
+  await arm("ad-image-cleanup", async () => {
+    const { cleanupOrphanedAdImages } = await import("./routes/ads");
+    setTimeout(async () => {
+      try {
+        await cleanupOrphanedAdImages();
+      } catch (e) {
+        console.warn("[INIT][BG] cleanupOrphanedAdImages error:", e);
+      }
+      setInterval(cleanupOrphanedAdImages, 24 * 60 * 60 * 1000);
+    }, 5 * 60 * 1000);
+  });
 
   // Pulizia file diagnostica su filesystem: rimuove file JSON più vecchi di 30 giorni
   setTimeout(async () => {
@@ -84,28 +112,42 @@ export async function runPhase5Schedulers(): Promise<void> {
     }
   }, 2 * 60_000);
 
-  const { scheduleNightlyVacuum } = await import("./vacuum-service");
-  scheduleNightlyVacuum();
+  await arm("nightly-vacuum", async () => {
+    const { scheduleNightlyVacuum } = await import("./vacuum-service");
+    scheduleNightlyVacuum();
+  });
 
-  const { scheduleLogRetention } = await import("./jobs/log-retention");
-  scheduleLogRetention();
+  await arm("log-retention", async () => {
+    const { scheduleLogRetention } = await import("./jobs/log-retention");
+    scheduleLogRetention();
+  });
 
-  const { scheduleNightlyMapMatching } = await import("./map-matching-job");
-  scheduleNightlyMapMatching();
+  await arm("nightly-map-matching", async () => {
+    const { scheduleNightlyMapMatching } = await import("./map-matching-job");
+    scheduleNightlyMapMatching();
+  });
 
-  const { scheduleWeeklyCurvyScoreUpdate } = await import("./curvy-score-job");
-  scheduleWeeklyCurvyScoreUpdate();
+  await arm("weekly-curvy-score", async () => {
+    const { scheduleWeeklyCurvyScoreUpdate } = await import("./curvy-score-job");
+    scheduleWeeklyCurvyScoreUpdate();
+  });
 
-  const { scheduleDailyUserTimeProfileJob } = await import("./matching/time-profile");
-  scheduleDailyUserTimeProfileJob();
+  await arm("daily-time-profile", async () => {
+    const { scheduleDailyUserTimeProfileJob } = await import("./matching/time-profile");
+    scheduleDailyUserTimeProfileJob();
+  });
 
-  const { scheduleMonthlyReset: scheduleMapboxQuotaReset } = await import("./routing/mapbox/quota-guard");
-  scheduleMapboxQuotaReset(); console.log("[INIT] Mapbox quota monthly reset scheduled");
+  await arm("mapbox-quota-reset", async () => {
+    const { scheduleMonthlyReset: scheduleMapboxQuotaReset } = await import("./routing/mapbox/quota-guard");
+    scheduleMapboxQuotaReset(); console.log("[INIT] Mapbox quota monthly reset scheduled");
+  });
 
-  const { scheduleDailyReset: scheduleTomTomQuotaReset } = await import("./routing/tomtom/quota-guard");
-  scheduleTomTomQuotaReset(); console.log("[INIT] TomTom quota daily reset scheduled");
+  await arm("tomtom-quota-reset", async () => {
+    const { scheduleDailyReset: scheduleTomTomQuotaReset } = await import("./routing/tomtom/quota-guard");
+    scheduleTomTomQuotaReset(); console.log("[INIT] TomTom quota daily reset scheduled");
+  });
 
-  setImmediate(() => void import("./routing/valhalla-startup").then(m => m.validateValhallaStartup()));
+  setImmediate(() => void import("./routing/valhalla-startup").then(m => m.validateValhallaStartup()).catch((e) => console.warn("[INIT][BG] validateValhallaStartup error:", e)));
 
   // Boot-time DB jobs scaglionati: evita saturazione pool (total=10) nei primi
   // secondi di avvio quando tutti gli scheduler sparerebbero contemporaneamente.
@@ -119,38 +161,42 @@ export async function runPhase5Schedulers(): Promise<void> {
     }
   }, 30_000); // +30s
 
-  const { saveSchemaSnapshot } = await import("./scripts/snapshot-schema");
-  setTimeout(() => {
-    saveSchemaSnapshot()
-      .then(() => console.log("[INIT][BG] saveSchemaSnapshot — done"))
-      .catch((e) => console.warn("[INIT][BG] saveSchemaSnapshot error:", e));
-  }, 60_000); // +60s
+  await arm("schema-snapshot", async () => {
+    const { saveSchemaSnapshot } = await import("./scripts/snapshot-schema");
+    setTimeout(() => {
+      saveSchemaSnapshot()
+        .then(() => console.log("[INIT][BG] saveSchemaSnapshot — done"))
+        .catch((e) => console.warn("[INIT][BG] saveSchemaSnapshot error:", e));
+    }, 60_000); // +60s
+  });
 
   setTimeout(() => void import("./ai/db-integrity/boot-schema-check").then((m) => m.runBootSchemaDriftCheck()).catch((e) => console.warn("[INIT][BG] boot schema drift check error:", e)), 90_000); // +90s
 
   const FIFTEEN_MIN_MS = 15 * 60 * 1000;
-  const { syncProductionUpdates } = await import("./routes/admin/ota");
-  setTimeout(() => {
-    console.log("[INIT][BG] OTA sync: first run...");
-    syncProductionUpdates()
-      .then(() => console.log("[INIT][BG] OTA sync: first run done"))
-      .catch((e) => console.warn("[INIT][BG] OTA sync error:", e));
-  }, 45_000); // +45s
-  setInterval(() => {
-    syncProductionUpdates().catch((e) => console.warn("[OTA-CRON] sync error:", e));
-  }, FIFTEEN_MIN_MS);
-  console.log("[INIT] OTA cron scheduled every 15 min");
+  await arm("ota-sync-cron", async () => {
+    const { syncProductionUpdates } = await import("./routes/admin/ota");
+    setTimeout(() => {
+      console.log("[INIT][BG] OTA sync: first run...");
+      syncProductionUpdates()
+        .then(() => console.log("[INIT][BG] OTA sync: first run done"))
+        .catch((e) => console.warn("[INIT][BG] OTA sync error:", e));
+    }, 45_000); // +45s
+    setInterval(() => {
+      syncProductionUpdates().catch((e) => console.warn("[OTA-CRON] sync error:", e));
+    }, FIFTEEN_MIN_MS);
+    console.log("[INIT] OTA cron scheduled every 15 min");
+  });
 
   // OTA auto-rollback: cron al minuto :00 di ogni slot di 5 min → :00, :05, :10, ...
   // Slot :00 — critical-reports è a :02, unban è a :01: tutti distanziati di 60s.
-  const { runOtaAutoRollback } = await import("./jobs/ota-auto-rollback");
-  {
+  await arm("ota-auto-rollback", async () => {
+    const { runOtaAutoRollback } = await import("./jobs/ota-auto-rollback");
     const { Cron } = await import("croner");
     new Cron("0-59/5 * * * *", { timezone: "Europe/Rome" }, () => {
       runOtaAutoRollback().catch((e) => console.warn("[OTA-AUTO-ROLLBACK] worker error:", e));
     });
-  }
-  console.log("[INIT] OTA auto-rollback worker scheduled every 5 min (cron slot :00)");
+    console.log("[INIT] OTA auto-rollback worker scheduled every 5 min (cron slot :00)");
+  });
 
   try {
     const { startAnomalyScheduler } = await import("./ai/moderation/anomalies");
@@ -162,6 +208,7 @@ export async function runPhase5Schedulers(): Promise<void> {
     console.log("[INIT] AI moderation schedulers (anomalies + digest + unban) started");
   } catch (e) {
     console.warn("[INIT] AI moderation schedulers failed (non-fatal):", e);
+    markDegraded("scheduler:ai-moderation");
   }
 
   try {
@@ -170,6 +217,7 @@ export async function runPhase5Schedulers(): Promise<void> {
     console.log("[INIT] Critical reports notifier started");
   } catch (e) {
     console.warn("[INIT] Critical reports notifier failed (non-fatal):", e);
+    markDegraded("scheduler:critical-reports-notifier");
   }
 
   // Ring-buffer hydration: differita di 2 minuti dal boot e avvolta in
@@ -198,6 +246,7 @@ export async function runPhase5Schedulers(): Promise<void> {
     setTimeout(() => { void checkMotorcycleProfile(); }, 30_000);
   } catch (e) {
     console.warn("[INIT] Service monitors failed (non-fatal):", e);
+    markDegraded("scheduler:service-monitors");
   }
 
   try {
@@ -206,6 +255,7 @@ export async function runPhase5Schedulers(): Promise<void> {
     console.log("[INIT] AI Watchdog scheduler started");
   } catch (e) {
     console.warn("[INIT] AI Watchdog scheduler failed (non-fatal):", e);
+    markDegraded("scheduler:ai-watchdog");
   }
 
   try {
@@ -214,6 +264,7 @@ export async function runPhase5Schedulers(): Promise<void> {
     console.log("[INIT] Campagne self-check scheduler started");
   } catch (e) {
     console.warn("[INIT] Campagne self-check scheduler failed (non-fatal):", e);
+    markDegraded("scheduler:campaigns-self-check");
   }
 
   try {
@@ -221,6 +272,7 @@ export async function runPhase5Schedulers(): Promise<void> {
     scheduleMemoryPruner();
   } catch (e) {
     console.warn("[INIT] Memory pruner scheduler failed (non-fatal):", e);
+    markDegraded("scheduler:memory-pruner");
   }
 
   try {
@@ -233,6 +285,7 @@ export async function runPhase5Schedulers(): Promise<void> {
     console.log("[INIT] Coordinator cleanup + session crash cleanup schedulers started");
   } catch (e) {
     console.warn("[INIT] Cleanup schedulers failed (non-fatal):", e);
+    markDegraded("scheduler:cleanup");
   }
 
   try {
@@ -251,6 +304,7 @@ export async function runPhase5Schedulers(): Promise<void> {
     console.log("[INIT] AI Coordinator integrations wired (6 sottosistemi)");
   } catch (e) {
     console.warn("[INIT] AI Coordinator integrations wire failed (non-fatal):", e);
+    markDegraded("scheduler:ai-coordinator-integrations");
   }
 
   try {
@@ -261,6 +315,7 @@ export async function runPhase5Schedulers(): Promise<void> {
     console.log("[INIT] AI DB Integrity scheduler + worker started");
   } catch (e) {
     console.warn("[INIT] AI DB Integrity scheduler failed (non-fatal):", e);
+    markDegraded("scheduler:ai-db-integrity");
   }
 
   try {
@@ -269,6 +324,7 @@ export async function runPhase5Schedulers(): Promise<void> {
     console.log("[INIT] AI App Integrity scheduler started");
   } catch (e) {
     console.warn("[INIT] AI App Integrity scheduler failed (non-fatal):", e);
+    markDegraded("scheduler:ai-app-integrity");
   }
 
   import("./jobs/zero-match-snapshot-job")
@@ -308,6 +364,7 @@ export async function runPhase5Schedulers(): Promise<void> {
     console.log("[INIT] Embedding daily report job scheduled (08:15 Europe/Rome)");
   } catch (e) {
     console.warn("[INIT] Embedding daily report scheduler failed (non-fatal):", e);
+    markDegraded("scheduler:embedding-daily-report");
   }
 
   try {
@@ -315,6 +372,7 @@ export async function runPhase5Schedulers(): Promise<void> {
     startEmbeddingCapAlertJob();
   } catch (e) {
     console.warn("[INIT] Embedding cap alert job failed (non-fatal):", e);
+    markDegraded("scheduler:embedding-cap-alert");
   }
 
   try {
@@ -323,6 +381,7 @@ export async function runPhase5Schedulers(): Promise<void> {
     console.log("[INIT] Resource graph sampler started (samples when resource_graph_enabled=true)");
   } catch (e) {
     console.warn("[INIT] Resource graph sampler failed to start (non-fatal):", e);
+    markDegraded("scheduler:resource-graph-sampler");
   }
 
   try {
@@ -331,6 +390,7 @@ export async function runPhase5Schedulers(): Promise<void> {
     console.log("[INIT] Export scheduler started");
   } catch (e) {
     console.warn("[INIT] Export scheduler failed to start (non-fatal):", e);
+    markDegraded("scheduler:export");
   }
 
   try {
@@ -339,6 +399,7 @@ export async function runPhase5Schedulers(): Promise<void> {
     console.log("[INIT] Pipeline hole detector scheduler started (5min interval)");
   } catch (e) {
     console.warn("[INIT] Pipeline hole detector scheduler failed (non-fatal):", e);
+    markDegraded("scheduler:pipeline-hole-detector");
   }
 
   try {
@@ -355,10 +416,17 @@ export async function runPhase5Schedulers(): Promise<void> {
     console.log("[INIT] Pipeline radiografia scheduler started (6h interval)");
   } catch (e) {
     console.warn("[INIT] Pipeline radiografia scheduler failed (non-fatal):", e);
+    markDegraded("scheduler:pipeline-radiografia");
   }
 
-  // Arm the boot-job queue here — phase 5 is the last boot phase, so all
-  // registrations from startMatchingEngine() and runPhase5Schedulers() are
-  // guaranteed to have happened before this point.
-  bootJobQueue.start();
+  } finally {
+    // Sigilla + arma la boot-job queue qui — phase 5 è l'ultima fase di boot,
+    // quindi tutte le register() da startMatchingEngine() e runPhase5Schedulers()
+    // sono garantite essere avvenute prima di questo punto. Il finally garantisce
+    // che la coda parta SEMPRE, anche se un blocco scheduler ha lanciato: i job
+    // pesanti registrati (back-fill embeddings, conversazioni club, ecc.) non
+    // restano persi. Dopo sealAndStart() ogni register() tardiva lancia (vedi
+    // boot-job-queue.ts), così un job aggiunto troppo tardi è un errore visibile.
+    bootJobQueue.sealAndStart();
+  }
 }

@@ -9,7 +9,13 @@
  * Usage:
  *   bootJobQueue.register("MyJob", async () => { ... });
  *   // At the end of the last boot phase:
- *   bootJobQueue.start();
+ *   bootJobQueue.sealAndStart();
+ *
+ * Barriera esplicita (Task #5123): dopo sealAndStart() la coda è "sigillata" e
+ * qualsiasi register() successiva LANCIA un errore invece di perdere il job in
+ * silenzio. Così un job registrato troppo tardi (es. dopo che la Phase 5 ha
+ * sigillato la coda) fallisce in modo rumoroso e visibile, anziché non girare
+ * mai senza che nessuno se ne accorga.
  */
 
 interface BootJob {
@@ -27,6 +33,7 @@ interface BootJobQueueOptions {
 class BootJobQueue {
   private readonly jobs: BootJob[] = [];
   private started = false;
+  private sealed = false;
   private readonly initialDelayMs: number;
   private readonly gapMs: number;
 
@@ -40,6 +47,15 @@ class BootJobQueue {
    * Duplicate names are allowed (each becomes a separate queue entry).
    */
   register(name: string, fn: () => Promise<void>): void {
+    // Barriera esplicita: dopo sealAndStart() registrare un job è un BUG (il job
+    // non girerebbe mai). Lanciamo invece di perderlo in silenzio — così l'errore
+    // è visibile nei log/Sentry e viene corretto, non ignorato.
+    if (this.sealed) {
+      throw new Error(
+        `[BootJobQueue] register("${name}") chiamato dopo sealAndStart() — la coda è sigillata. ` +
+        `Registra tutti i boot job PRIMA che la Phase 5 sigilli la coda.`,
+      );
+    }
     if (this.started) {
       console.warn(`[BootJobQueue] register("${name}") called after start() — job will NOT run`);
       return;
@@ -48,8 +64,22 @@ class BootJobQueue {
   }
 
   /**
+   * Sigilla la coda e la avvia (Task #5123). È il modo CANONICO di armare la
+   * coda al termine dell'ultima fase di boot: dopo questa chiamata register()
+   * lancia un errore esplicito. Idempotente — solo la prima chiamata ha effetto.
+   */
+  sealAndStart(): void {
+    this.sealed = true;
+    this.start();
+  }
+
+  /**
    * Arm the queue.  Safe to call multiple times — only the first call has effect.
    * Schedules the drain loop to begin after initialDelayMs.
+   *
+   * Preferire sealAndStart() ai chiamanti finali: arma E sigilla la coda. start()
+   * resta esposto per compatibilità ma NON sigilla (register continuerebbe a
+   * warnare invece di lanciare).
    */
   start(): void {
     if (this.started) return;
