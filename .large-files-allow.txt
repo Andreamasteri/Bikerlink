@@ -28,3 +28,9 @@ lib/i18n/tr.ts
 # la leggibilità della suite.
 server/__tests__/privacy-filter.test.ts
 server/__tests__/privacy-filter.part2.test.ts
+
+# ── Hook schermata mappa home ──────────────────────────────────────────────
+# Catena split (states/handlers/calculated/helpers) fusa in un unico file:
+# la logica è fortemente accoppiata (stesso set di stati, refs e handler
+# condivisi) e gli split precedenti erano file companion fragili/orfani.
+hooks/home/useHomeMapState.ts
