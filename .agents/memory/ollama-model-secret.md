@@ -16,4 +16,5 @@ dalla tab Secrets, poi riavviare i workflow (Start Backend ecc.) per ricaricarlo
 **How to apply:** quando si installa/cambia un modello Ollama sul ThinkCentre,
 dopo `ollama pull` aggiornare OLLAMA_MODEL via requestEnvVar (non hardcodare, non
 creare una env var shared duplicata che entrerebbe in conflitto col secret).
-Modello corrente: qwen3-coder:30b (MoE 30B-A3B, ~3B attivi, CPU-only fino a GPU).
+Modello corrente: bikerlink (custom su mistral-nemo:latest, 12B, GTX 1070 8GB VRAM).
+Fallback hardcoded in ollama-client.ts: mistral-nemo:latest.

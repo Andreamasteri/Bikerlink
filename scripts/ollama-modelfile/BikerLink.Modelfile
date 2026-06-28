@@ -9,9 +9,9 @@
 #   OLLAMA_MODEL=bikerlink
 #
 # Il modello base si può cambiare con la variabile CHAT_MODEL
-# del setup-ollama-server.sh; di default llama3.1:8b.
+# del setup-ollama-server.sh; di default mistral-nemo:latest.
 
-FROM llama3.1:8b
+FROM mistral-nemo:latest
 
 # System prompt BikerLink baked-in.
 # Anche senza system prompt esplicito nel payload, il modello mantiene la persona.

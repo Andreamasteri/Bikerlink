@@ -18,10 +18,11 @@ Sul server di casa devono essere già presenti e funzionanti:
   **Tailscale Funnel** (l'URL pubblico, es. `https://bikerlink.tail5056aa.ts.net`,
   già raggiungibile dall'esterno).
 - Connessione internet (per scaricare Ollama e i modelli).
-- ~14 GB liberi su disco (Ollama + llama3.1:8b ~5GB + mistral-nemo 12B ~7GB).
+- ~10 GB liberi su disco (Ollama + mistral-nemo:latest ~7GB + overhead).
 
-> **Hardware**: il 910q ha CPU Intel i5-7500T (solo CPU, niente GPU). Lo script
-> NON installa CUDA. Sono consigliati modelli ≤ 8B per restare interattivi su CPU.
+> **Hardware**: il ThinkCentre ha CPU Intel i5-7500T e GTX 1070 (8GB VRAM). Lo script
+> NON installa CUDA. Con GPU: `mistral-nemo:latest` (12B, ~7GB) gira a 13–16 token/s
+> con `OLLAMA_FLASH_ATTENTION=1`. Su CPU-only: consigliati modelli ≤ 8B.
 
 ---
 
@@ -55,7 +56,7 @@ OLLAMA_TOKEN="il-mio-token-esistente" bash setup-ollama-server.sh
 PUBLIC_HOST="bikerlink.tail5056aa.ts.net" bash setup-ollama-server.sh
 
 # Cambia i modelli scaricati
-CHAT_MODEL="llama3.1:8b" TRANSLATE_MODEL="qwen2.5:latest" bash setup-ollama-server.sh
+CHAT_MODEL="llama3.2:3b" bash setup-ollama-server.sh
 
 # Forza il file nginx da modificare
 NGINX_CONF="/etc/nginx/sites-enabled/default" bash setup-ollama-server.sh
@@ -86,18 +87,20 @@ direttamente, solo via nginx + token. Se il service non esiste, ne crea uno mini
 ```
 
 ### STEP 3 — Download modelli
-Scarica due modelli:
-- **`llama3.1:8b`** → chat/parsing comandi (sarà `OLLAMA_MODEL`). Qualità
-  superiore e tool calling più affidabile rispetto a llama3.2 (~5GB RAM).
-- **`mistral-nemo:latest`** → multilingue (12B) per le traduzioni, nettamente
-  superiore a mistral 7B. Richiede ~8GB RAM (vs ~4GB di mistral 7B).
+Scarica un unico modello:
+- **`mistral-nemo:latest`** → 12B parametri, luglio 2024, ottimo per chat/parsing
+  e multilingue. Con GTX 1070 (8GB VRAM) + `OLLAMA_FLASH_ATTENTION=1` raggiunge
+  13–16 token/s. Richiede ~7GB disco.
+
+Crea inoltre il modello custom **`bikerlink`** basato su `mistral-nemo:latest` con
+system prompt e parametri ottimizzati (vedere `BikerLink.Modelfile`).
 
 ```
-[ OK  ] Modello chat scaricato: llama3.1:8b
-[ OK  ] Modello traduzioni scaricato: mistral-nemo:latest
+[ OK  ] Modello scaricato: mistral-nemo:latest
+[ OK  ] Modello custom 'bikerlink' creato con successo.
 ```
 
-> **Sostituire un modello in futuro**: riesegui lo script con
+> **Sostituire il modello in futuro**: riesegui lo script con
 > `CHAT_MODEL=<nuovo>` (vedi i modelli su <https://ollama.com/library>), poi
 > aggiorna il secret `OLLAMA_MODEL` su Replit.
 
@@ -135,7 +138,7 @@ Lo script stampa i valori da copiare su Replit:
 ```
   OLLAMA_URL   = https://bikerlink.tail5056aa.ts.net/ollama
   OLLAMA_TOKEN = <token di 64 caratteri esadecimali>
-  OLLAMA_MODEL = llama3.1:8b
+  OLLAMA_MODEL = bikerlink
 ```
 
 ---
@@ -148,7 +151,7 @@ Nel progetto BikerLink su Replit:
 2. Aggiungi i tre secret con i valori stampati dallo script:
    - `OLLAMA_URL` → l'URL pubblico con suffisso `/ollama` (senza slash finale).
    - `OLLAMA_TOKEN` → il token (lo stesso verificato da nginx come `X-Ollama-Token`).
-   - `OLLAMA_MODEL` → il modello di default (es. `llama3.1:8b`).
+   - `OLLAMA_MODEL` → il modello custom (es. `bikerlink`).
 3. **Riavvia il backend** perché i secret vengano letti.
 
 > Il token è un segreto: non committarlo nel repo, non condividerlo.
@@ -187,7 +190,7 @@ curl -i https://bikerlink.tail5056aa.ts.net/ollama/api/tags
 # Generazione di prova
 curl https://bikerlink.tail5056aa.ts.net/ollama/api/generate \
   -H "X-Ollama-Token: <IL-TUO-TOKEN>" \
-  -d '{"model":"llama3.1:8b","prompt":"Ciao","stream":false}'
+  -d '{"model":"bikerlink","prompt":"Ciao","stream":false}'
 ```
 
 ### Dall'app BikerLink
@@ -218,15 +221,14 @@ journalctl -u ollama -n 100 --no-pager
 **Risposte molto lente**
 - Normale su CPU senza GPU per il primo token (caricamento modello in RAM).
   Mantieni il servizio sempre attivo per evitare ricaricamenti. Considera un
-  modello più piccolo (es. `llama3.2:3b`) per ridurre la latenza, o riduci il
-  modello traduzioni a `mistral:latest` (7B) se gli ~8GB di mistral-nemo (12B)
-  saturano la RAM disponibile.
+  modello più piccolo (es. `llama3.2:3b`) per ridurre la latenza se la RAM
+  disponibile è insufficiente per mistral-nemo (12B, ~7GB).
 
 **Cambiare/aggiungere un modello**
 ```bash
 # Scarica un nuovo modello
 ollama pull llama3.2:3b
-# Aggiorna il secret OLLAMA_MODEL su Replit e riavvia il backend
+# Aggiorna il secret OLLAMA_MODEL su Replit (bikerlink o il nuovo modello) e riavvia
 ```
 
 ---

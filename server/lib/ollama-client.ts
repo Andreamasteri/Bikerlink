@@ -10,8 +10,8 @@
  *                   chiamante ricade sul provider cloud (Gemini/OpenAI).
  *   OLLAMA_TOKEN  — Token per il server self-hosted (header Authorization: Bearer).
  *   OLLAMA_MODEL  — Modello locale da usare.
- *                   Default: "bikerlink" se disponibile (Modelfile custom Task #3017),
- *                   altrimenti "llama3.1:8b".
+ *                   Default: "mistral-nemo:latest" (il modello custom "bikerlink",
+ *                   basato su mistral-nemo:latest, è il valore consigliato via secret).
  *
  * L'integrazione usa il Vercel AI SDK (package `ollama-ai-provider-v2`,
  * compatibile con `ai` v6 + `zod` v4) così da poter usare lo stesso modello
@@ -33,7 +33,7 @@ const OLLAMA_URL = process.env.OLLAMA_URL?.replace(/\/$/, "");
 const OLLAMA_TOKEN = process.env.OLLAMA_TOKEN ?? "";
 // Task #3017: il modello default è "bikerlink" (Modelfile custom). Se OLLAMA_MODEL
 // non è impostato, il setup script lo setta a "bikerlink" dopo la creazione.
-const OLLAMA_MODEL = process.env.OLLAMA_MODEL ?? "llama3.1:8b";
+const OLLAMA_MODEL = process.env.OLLAMA_MODEL ?? "mistral-nemo:latest";
 
 /** true quando OLLAMA_URL è impostato (Ollama abilitato come provider primario). */
 export const isOllamaConfigured = Boolean(OLLAMA_URL);

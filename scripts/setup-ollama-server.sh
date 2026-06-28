@@ -24,8 +24,7 @@
 #                          se l'auto-detect via Tailscale non funziona.
 #   NGINX_CONF=<path>      Forza il file nginx da modificare
 #                          (default: auto-detect, fallback /etc/nginx/sites-enabled/default).
-#   CHAT_MODEL=<modello>   Modello chat/parsing (default: llama3.1:8b).
-#   TRANSLATE_MODEL=<mod>  Modello traduzioni (default: mistral-nemo:latest).
+#   CHAT_MODEL=<modello>   Modello base scaricato (default: mistral-nemo:latest).
 #   SKIP_MODELS=1          Salta il download dei modelli (solo install + nginx).
 # =============================================================================
 
@@ -33,21 +32,22 @@ set -euo pipefail
 
 # ── Configurazione (override via env) ────────────────────────────────────────
 # NOTA SUI MODELLI:
-#   - CHAT_MODEL viene usato da BikerLink per chat/parsing comandi (OLLAMA_MODEL).
-#     llama3.1:8b offre qualità superiore e tool calling più affidabile rispetto
-#     a llama3.2 mantenendo un buon compromesso qualità/velocità su CPU (~5GB RAM).
-#     Per sostituirlo in futuro basta esportare CHAT_MODEL=<nuovo> e rieseguire
-#     questo script, poi aggiornare il secret OLLAMA_MODEL su Replit.
-#   - TRANSLATE_MODEL è il modello multilingue per le traduzioni. mistral-nemo
-#     (12B) è nettamente superiore nel multilingue rispetto a mistral 7B, ma
-#     richiede ~8GB RAM (vs ~4GB). Alternative valide: qwen2.5, gemma2.
-#   Verifica i modelli correnti consigliati su: https://ollama.com/library
+#   - CHAT_MODEL è il modello base scaricato. Default: mistral-nemo:latest (12B).
+#     Entra nei 8GB VRAM della GTX 1070 con OLLAMA_FLASH_ATTENTION=1 → 13–16 token/s.
+#     Per cambiarlo in futuro: esporta CHAT_MODEL=<nuovo>, riesegui lo script,
+#     aggiorna il secret OLLAMA_MODEL su Replit.
+#   - Il modello custom "bikerlink" viene creato su base CHAT_MODEL con sistema
+#     prompt BikerLink baked-in (BikerLink.Modelfile). OLLAMA_MODEL deve puntare
+#     a "bikerlink" (fallback hardcoded: mistral-nemo:latest).
+#   Verifica i modelli su: https://ollama.com/library
 #
 # AGGIORNAMENTI (idempotente): rieseguendo questo script lo step di install
 # (curl ... install.sh | sh) aggiorna SEMPRE il runtime Ollama all'ultima
 # versione stabile, e i pull aggiornano i modelli se la tag :latest è cambiata.
-CHAT_MODEL="${CHAT_MODEL:-llama3.1:8b}"
-TRANSLATE_MODEL="${TRANSLATE_MODEL:-mistral-nemo:latest}"
+CHAT_MODEL="${CHAT_MODEL:-mistral-nemo:latest}"
+# Valore di default per l'output finale: sovrascritto a "bikerlink" se la
+# creazione del modello custom riesce, o a CHAT_MODEL se fallisce/SKIP_MODELS=1.
+BIKERLINK_CUSTOM_MODEL="bikerlink"
 OLLAMA_PORT="11434"
 OLLAMA_HOST_BIND="127.0.0.1:${OLLAMA_PORT}"
 NGINX_SNIPPET="/etc/nginx/snippets/bikerlink-ollama.conf"
@@ -126,6 +126,10 @@ Restart=always
 RestartSec=3
 # Bind solo localhost: l'esposizione pubblica passa esclusivamente da nginx+token
 Environment="OLLAMA_HOST=${OLLAMA_HOST_BIND}"
+# Performance: Flash Attention riduce la KV-cache RAM (+10–20% token/s su GPU).
+# NUM_PARALLEL=2 evita saturazione con richieste concorrenti (GTX 1070, 8GB VRAM).
+Environment="OLLAMA_FLASH_ATTENTION=1"
+Environment="OLLAMA_NUM_PARALLEL=2"
 
 [Install]
 WantedBy=multi-user.target
@@ -142,6 +146,8 @@ else
   $SUDO tee /etc/systemd/system/ollama.service.d/10-bikerlink-host.conf > /dev/null << EOF
 [Service]
 Environment="OLLAMA_HOST=${OLLAMA_HOST_BIND}"
+Environment="OLLAMA_FLASH_ATTENTION=1"
+Environment="OLLAMA_NUM_PARALLEL=2"
 EOF
   $SUDO systemctl daemon-reload
 fi
@@ -172,38 +178,37 @@ echo ""
 # =============================================================================
 if [[ "${SKIP_MODELS:-0}" == "1" ]]; then
   warn "STEP 3/6 — SKIP_MODELS=1: salto il download dei modelli."
+  BIKERLINK_CUSTOM_MODEL="${CHAT_MODEL}"
 else
-  log "STEP 3/6 — Download modelli (può richiedere alcuni minuti)..."
+  log "STEP 3/6 — Download modello (può richiedere alcuni minuti)..."
 
-  log "  → Chat/parsing: ${CHAT_MODEL}"
+  log "  → Modello base: ${CHAT_MODEL}"
   ollama pull "${CHAT_MODEL}" || die "Pull fallito per ${CHAT_MODEL}"
-  ok "  Modello chat scaricato: ${CHAT_MODEL}"
-
-  log "  → Traduzioni multilingue: ${TRANSLATE_MODEL}"
-  ollama pull "${TRANSLATE_MODEL}" || die "Pull fallito per ${TRANSLATE_MODEL}"
-  ok "  Modello traduzioni scaricato: ${TRANSLATE_MODEL}"
+  ok "  Modello scaricato: ${CHAT_MODEL}"
 
   echo ""
   log "Modelli installati:"
   ollama list || true
 
-  # ── Task #3017 — Crea il modello custom "bikerlink" dal Modelfile ────────
+  # ── Crea il modello custom "bikerlink" dal Modelfile ─────────────────────
+  # bikerlink = mistral-nemo:latest + system prompt BikerLink baked-in.
+  # Il base model è hardcoded nel Modelfile (FROM mistral-nemo:latest), non
+  # dipende da CHAT_MODEL. OLLAMA_MODEL su Replit deve valere "bikerlink";
+  # "mistral-nemo:latest" è il fallback hardcoded in ollama-client.ts.
   MODELFILE_DIR="$(cd "$(dirname "$0")/ollama-modelfile" 2>/dev/null && pwd || true)"
   MODELFILE_PATH="${MODELFILE_DIR}/BikerLink.Modelfile"
   if [[ -f "$MODELFILE_PATH" ]]; then
     log "  → Creazione modello custom bikerlink da BikerLink.Modelfile..."
-    # Il Modelfile usa FROM llama3.1:8b (già scaricato sopra)
     if ollama create bikerlink -f "$MODELFILE_PATH"; then
       ok "  Modello custom 'bikerlink' creato con successo."
-      # Imposta OLLAMA_MODEL=bikerlink su Replit solo se non già configurato
-      if [[ "${OLLAMA_MODEL:-}" == "" || "${OLLAMA_MODEL:-}" == "llama3.2:latest" || "${OLLAMA_MODEL:-}" == "llama3.1:8b" ]]; then
-        warn "  Ricordati di impostare OLLAMA_MODEL=bikerlink nelle variabili Replit."
-      fi
+      warn "  Imposta OLLAMA_MODEL=bikerlink nelle variabili Replit (vedi output finale)."
     else
       warn "  Creazione modello bikerlink fallita — usando '${CHAT_MODEL}' come fallback."
+      BIKERLINK_CUSTOM_MODEL="${CHAT_MODEL}"
     fi
   else
     warn "  BikerLink.Modelfile non trovato in ${MODELFILE_DIR} — salto creazione modello custom."
+    BIKERLINK_CUSTOM_MODEL="${CHAT_MODEL}"
   fi
 fi
 echo ""
@@ -438,14 +443,13 @@ echo "(Tools → Secrets), poi riavvia il backend:"
 echo ""
 echo -e "  \033[1mOLLAMA_URL\033[0m   = ${OLLAMA_URL_VALUE}"
 echo -e "  \033[1mOLLAMA_TOKEN\033[0m = ${TOKEN}"
-echo -e "  \033[1mOLLAMA_MODEL\033[0m = ${CHAT_MODEL}"
+echo -e "  \033[1mOLLAMA_MODEL\033[0m = ${BIKERLINK_CUSTOM_MODEL}"
 echo ""
 if [[ -z "$PUBLIC_HOSTNAME" ]]; then
   warn "Non sono riuscito a rilevare l'hostname Tailscale automaticamente."
   warn "Sostituisci <IL-TUO-HOST>.ts.net con il dominio del tuo nodo:"
   warn "  tailscale status   # colonna hostname, oppure il dominio del Funnel"
 fi
-echo "Modello traduzioni disponibile (non un secret): ${TRANSLATE_MODEL}"
 echo ""
 echo "Verifica dall'esterno (da un altro PC):"
 echo "  curl -H \"X-Ollama-Token: ${TOKEN}\" \\"
@@ -454,5 +458,5 @@ echo ""
 echo "Test di generazione:"
 echo "  curl ${OLLAMA_URL_VALUE}/api/generate \\"
 echo "    -H \"X-Ollama-Token: ${TOKEN}\" \\"
-echo "    -d '{\"model\":\"${CHAT_MODEL}\",\"prompt\":\"Ciao\",\"stream\":false}'"
+echo "    -d '{\"model\":\"${BIKERLINK_CUSTOM_MODEL}\",\"prompt\":\"Ciao\",\"stream\":false}'"
 echo "============================================================"
