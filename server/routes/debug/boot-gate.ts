@@ -69,6 +69,16 @@ async function isAdminRequest(req: Request): Promise<boolean> {
 }
 
 // ── POST /ping — pubblico (cattura anche ping pre-login) ──────────────────────
+// TRIAGE SICUREZZA (Semgrep, task #5109): questo endpoint è INTENZIONALMENTE
+// pubblico/non-autenticato. Serve a raccogliere la telemetria del boot-gate
+// PRIMA del login (crash-loop al boot, fresh install senza sessione): aggiungere
+// auth qui ne vanificherebbe lo scopo. È rate-bound dal client e l'input è
+// troncato/validato (deviceId/step/status/note con slice di lunghezza fissa)
+// senza query SQL costruite da stringhe. Esposizione accettata; hardening fuori
+// scope per #5109. Il finding Semgrep "needs-auth-review" (WARNING) resta
+// tracciato nel baseline come accettato anziché soppresso con `// nosemgrep`,
+// così resta visibile nelle revisioni future. Endpoint admin /status e /enable
+// sotto restano gated da isAdminRequest().
 router.post("/ping", (req: Request, res: Response) => {
   try {
     const body = (req.body ?? {}) as {

@@ -1223,6 +1223,26 @@ fi
 echo "════════════════════════════════════════"
 echo ""
 
+# ── GATE SEMGREP (sicurezza statica, baseline/ratchet) ───────────────────────
+# Scansione di sicurezza statica con Semgrep: regole locali versionate
+# (.semgrep/bikerlink.yml) + ruleset "open" del registry pubblico (NESSUN
+# account/login). I finding pre-esistenti sono congelati in .semgrep-baseline;
+# il gate FALLISCE solo su NUOVI finding di severità ERROR. I WARNING sono
+# tracciati ma non bloccano. Se il binario semgrep non è installato o il
+# registry non è raggiungibile, il gate degrada con un avviso e NON blocca.
+# Vedi: scripts/check-semgrep.sh
+echo "════════════════════════════════════════"
+echo "  Gate Semgrep (sicurezza statica)"
+echo "════════════════════════════════════════"
+SEMGREP_EXIT=0
+bash scripts/check-semgrep.sh || SEMGREP_EXIT=$?
+echo "════════════════════════════════════════"
+echo ""
+if [ "$SEMGREP_EXIT" -ne 0 ]; then
+  echo "❌ Gate Semgrep fallito — nuovi finding ERROR introdotti, correggere prima di procedere."
+  exit "$SEMGREP_EXIT"
+fi
+
 # ── ESLint gate: react-hooks/rules-of-hooks + all error-level rules ──────────
 echo "════════════════════════════════════════"
 echo "ESLint gate — verifica regole error-level su app/ components/ hooks/ lib/ ..."

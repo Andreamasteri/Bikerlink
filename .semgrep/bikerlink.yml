@@ -1,0 +1,120 @@
+# ═══════════════════════════════════════════════════════════════════════════
+#  BikerLink — regole Semgrep locali, mirate allo stack del progetto.
+#
+#  Queste regole sono VERSIONATE e NON dipendono da alcun account o servizio
+#  esterno (niente `semgrep login`, niente Semgrep AppSec Platform). Vengono
+#  eseguite da scripts/check-semgrep.sh insieme ai ruleset open del registry
+#  (p/...), che sono scaricati in modo anonimo e cache-ati localmente.
+#
+#  Stack coperto: TypeScript / Node.js / Express (server/) + React Native /
+#  Expo (app/, components/, hooks/, lib/).
+#
+#  Convenzioni severità:
+#    - ERROR   → potenziale vulnerabilità ad alta severità → BLOCCA (se NUOVA).
+#    - WARNING → superficie da rivedere (es. write su route senza auth inline)
+#                → NON blocca, ma viene tracciata in baseline e nel triage.
+#
+#  Soppressione puntuale (falsi positivi verificati): aggiungere il commento
+#  Semgrep nativo `// nosemgrep: <rule-id>` sulla riga incriminata.
+# ═══════════════════════════════════════════════════════════════════════════
+rules:
+  # ── Express: handler che scrive su DB — verifica auth ─────────────────────
+  # Heuristica anti-regressione per superfici pre-auth (es. l'endpoint pubblico
+  # POST /api/debug/boot-gate/ping che fa upsert su app_settings senza auth).
+  # Segnala un route handler Express che esegue una scrittura su DB (insert/
+  # update/delete/onConflictDoUpdate) SENZA un controllo di sessione/ruolo
+  # inline nello stesso handler. È WARNING (non blocca) perché molte route
+  # legittime delegano l'auth a un middleware montato a monte: serve come
+  # promemoria di triage, non come blocco automatico.
+  - id: bikerlink-express-route-db-write-needs-auth-review
+    languages: [typescript, javascript]
+    severity: WARNING
+    message: >-
+      Route handler Express che scrive su DB senza un controllo di
+      sessione/ruolo inline. Verificare che l'endpoint richieda
+      autenticazione/autorizzazione (middleware a monte o guard nell'handler).
+      Se è volutamente pubblico, sopprimere con `// nosemgrep:
+      bikerlink-express-route-db-write-needs-auth-review` e documentare il
+      motivo.
+    metadata:
+      category: security
+      cwe: "CWE-862: Missing Authorization"
+      owasp: "A01:2021 - Broken Access Control"
+      references:
+        - https://owasp.org/Top10/A01_2021-Broken_Access_Control/
+    # Nota implementativa: il parser TypeScript di Semgrep non accetta pattern
+    # con corpo di arrow function "con contenuto" (es. `($q,$s) => { ... foo() ... }`),
+    # quindi l'esclusione dell'auth è espressa legando l'intero handler alla
+    # metavariabile $HANDLER e applicandovi una `pattern-not-regex` testuale.
+    patterns:
+      - pattern-either:
+          - pattern: db.insert(...)
+          - pattern: db.update(...)
+          - pattern: db.delete(...)
+      - pattern-inside: "$R.$M($PATH, $HANDLER)"
+      - metavariable-regex:
+          metavariable: $R
+          regex: (?i)(router|app)$
+      - metavariable-regex:
+          metavariable: $M
+          regex: ^(post|put|patch|delete)$
+      - metavariable-pattern:
+          metavariable: $HANDLER
+          patterns:
+            - pattern-not-regex: "isAdminRequest|requireAuth|requireAdmin|requireRole|ensureAuth|\\.session"
+
+  # ── Node: esecuzione di comandi con input concatenato ─────────────────────
+  - id: bikerlink-child-process-concat-exec
+    languages: [typescript, javascript]
+    severity: ERROR
+    message: >-
+      Comando shell costruito con concatenazione di stringhe ed eseguito con
+      exec/execSync. Rischio di command injection. Usare execFile/spawn con un
+      array di argomenti, oppure validare/whitelistare rigorosamente l'input.
+    metadata:
+      category: security
+      cwe: "CWE-78: OS Command Injection"
+      owasp: "A03:2021 - Injection"
+    patterns:
+      - pattern-either:
+          - pattern: $CP.exec($CMD + $X, ...)
+          - pattern: $CP.execSync($CMD + $X, ...)
+          - pattern: $CP.exec(`...${$X}...`, ...)
+          - pattern: $CP.execSync(`...${$X}...`, ...)
+
+  # ── Node/JS: eval e Function-constructor su input dinamico ────────────────
+  - id: bikerlink-eval-dynamic-code
+    languages: [typescript, javascript]
+    severity: ERROR
+    message: >-
+      Uso di eval()/new Function() — esecuzione di codice dinamico. Evitare:
+      è una superficie di code injection. Sostituire con JSON.parse o logica
+      esplicita.
+    metadata:
+      category: security
+      cwe: "CWE-95: Eval Injection"
+      owasp: "A03:2021 - Injection"
+    patterns:
+      - pattern-either:
+          - pattern: eval(...)
+          - pattern: new Function(...)
+
+  # ── React Native WebView: HTML iniettato senza sanitizzazione ─────────────
+  - id: bikerlink-webview-dynamic-html
+    languages: [typescript, javascript]
+    severity: WARNING
+    message: >-
+      WebView con source.html costruito da una stringa dinamica/variabile.
+      Verificare che il contenuto sia fidato o sanitizzato (rischio XSS nel
+      contesto WebView). Se l'HTML è una costante template fidata, sopprimere
+      con `// nosemgrep: bikerlink-webview-dynamic-html`.
+    metadata:
+      category: security
+      cwe: "CWE-79: Cross-site Scripting"
+      owasp: "A03:2021 - Injection"
+    patterns:
+      - pattern: "<WebView source={{ html: $H }} ... />"
+      - metavariable-pattern:
+          metavariable: $H
+          patterns:
+            - pattern-not-regex: ^["'`]

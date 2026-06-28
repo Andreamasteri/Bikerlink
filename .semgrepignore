@@ -1,0 +1,46 @@
+# File ignorati da Semgrep (scripts/check-semgrep.sh).
+# Stessa filosofia di .gitignore: escludiamo build artifact, dipendenze,
+# asset e cartelle non-sorgente per tenere lo scan veloce e privo di rumore.
+
+# Dipendenze e build
+node_modules/
+server_dist/
+dist/
+dist-ota/
+static-build/
+android/
+.expo/
+.cache/
+
+# Tooling agente / configurazione locale
+.local/
+.agents/
+.git/
+
+# Asset, output e dati non-codice
+assets/
+attached_assets/
+uploads/
+exports/
+reports/
+screenshots/
+logs/
+docs/
+migrations/
+patches/
+graphhopper/
+video-pipeline/
+website/dist/
+
+# Test e mock (rumore di sicurezza non rilevante per il gate runtime)
+**/__tests__/
+**/*.test.ts
+**/*.test.tsx
+**/*.spec.ts
+**/*.spec.tsx
+e2e/
+mocks/
+
+# Build/minified
+*.min.js
+*.bundle.js

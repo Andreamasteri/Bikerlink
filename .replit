@@ -69,6 +69,10 @@ args = "secrets-scan"
 task = "workflow.run"
 args = "check-ai-direct-generateobject"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "semgrep"
+
   [[workflows.workflow]]
   name = "Start App"
   mode = "parallel"
@@ -187,6 +191,17 @@ author = "agent"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "bash scripts/check-ai-direct-generateobject.sh"
+
+[workflows.workflow.metadata]
+isValidation = true
+
+[[workflows.workflow]]
+name = "semgrep"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "bash scripts/check-semgrep.sh"
 
 [workflows.workflow.metadata]
 isValidation = true
