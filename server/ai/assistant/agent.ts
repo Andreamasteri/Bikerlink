@@ -19,7 +19,7 @@ import { aiConversationTurns } from "@shared/db";
 import { eq, desc } from "drizzle-orm";
 import { pruneUserMemory, MEMORY_TURNS_LIMIT } from "./memory-pruner";
 
-const OLLAMA_FALLBACK_MODEL_ID = process.env.OLLAMA_MODEL ?? "llama3.1:8b";
+const OLLAMA_FALLBACK_MODEL_ID = process.env.OLLAMA_MODEL ?? "mistral-nemo:latest";
 
 export interface AssistantAgentOpts {
   message: string;

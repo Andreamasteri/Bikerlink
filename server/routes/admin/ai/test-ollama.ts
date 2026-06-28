@@ -49,7 +49,7 @@ export function sanitizeError(msg: string): string {
 router.get("/test-ollama", async (_req: Request, res: Response) => {
   // Letto a request-time per riflettere eventuali cambi env nel processo long-lived.
   const rawUrl = process.env.OLLAMA_URL?.replace(/\/$/, "");
-  const model = process.env.OLLAMA_MODEL ?? "llama3.1:8b";
+  const model = process.env.OLLAMA_MODEL ?? "mistral-nemo:latest";
   const tokenConfigured = Boolean(process.env.OLLAMA_TOKEN);
 
   // Se OLLAMA_URL non è impostata: non è un errore, semplicemente non configurato.
