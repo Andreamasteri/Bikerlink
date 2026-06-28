@@ -85,7 +85,7 @@ attached_assets/
 exports/
 
 # Runtime upload assets (transient, not tracked)
-uploads/ads/
+
 logs/ota-timing.log
 
 # Oracle ARM Poller — config locale con OCID sensibili (mai committata)
@@ -100,3 +100,6 @@ server/public/assets/competitor-analysis.png
 
 # ESLint cache — generated locally, not tracked
 .eslintcache
+
+# Upload runtime utente (foto contest/profilo, codici invito, guide) — non vanno in git
+uploads/
