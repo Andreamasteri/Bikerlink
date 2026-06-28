@@ -181,12 +181,15 @@ function GiriElevation({ elevation, elevationLoading, elevationError, onLoadElev
 }
 
 function GiriWeather({ weather, weatherIcon }: any) {
+  const waypoints: WeatherWaypoint[] = Array.isArray(weather) ? weather.filter(Boolean) : [];
+  const point = waypoints[0];
+  if (!point) return null;
   return (
     <View style={{ padding: 16, backgroundColor: Colors.surface, borderRadius: 12, marginBottom: 16 }}>
        <Text style={{ fontSize: 16, fontWeight: "bold", marginBottom: 8 }}>Meteo lungo il percorso</Text>
        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-          <Ionicons name={weatherIcon(weather.weatherCode)} size={24} color={Colors.text} />
-          <Text>{weather.weatherDesc}</Text>
+          <Ionicons name={weatherIcon(point.weatherCode)} size={24} color={Colors.text} />
+          <Text>{point.weatherDesc}</Text>
        </View>
     </View>
   );
@@ -270,7 +273,7 @@ export default function GiriDetailScreen() {
   const [matchBannerDismissed, setMatchBannerDismissed] = useState(false);
   const [elevation, setElevation] = useState<any | null>(null);
   const [elevationLoading, setElevationLoading] = useState(false);
-  const [elevationError, setElevationError] = useState(false);
+  const [elevationError, setElevationError] = useState<string | null>(null);
   const [streetViewTip, setStreetViewTip] = useState(true);
 
   const { data: route, isLoading } = useQuery<PlannedRoute>({
@@ -472,7 +475,7 @@ export default function GiriDetailScreen() {
   const handleLoadElevation = async () => {
     if (!id) return;
     setElevationLoading(true);
-    setElevationError(false);
+    setElevationError(null);
     try {
       const url = new URL(`/api/planned-routes/${id}/elevation`, getApiUrl());
       const resp = await fetch(url.toString(), { credentials: "include" });
@@ -480,7 +483,7 @@ export default function GiriDetailScreen() {
       const data = await resp.json();
       setElevation(data);
     } catch {
-      setElevationError(true);
+      setElevationError("Impossibile caricare il profilo altimetrico. Riprova più tardi.");
     } finally {
       setElevationLoading(false);
     }
