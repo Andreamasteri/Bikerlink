@@ -116,3 +116,4 @@
 - [Production data removal is publish-gated](prod-data-removal-publish-gated.md) — agent can't delete live prod rows (prod DB read-only, publish diffs schema-only); only a boot cleanup on user publish mutates prod data; code-review blocks "complete" until rows actually gone.
 - [Semgrep CI gate quirks](semgrep-gate.md) — anonymous Semgrep redacts fingerprint/lines to "requires login" (compute own sha1); p/expressjs not p/express; verify via startValidationRun not the 120s bash cap.
 - [Merge part files — eslint-disable scope](merge-eslint-disable-scope.md) — la direttiva eslint-disable file-level di un part va riprodotta come blocco disable/enable nel file fuso, non disable-next-line, o il gate --max-warnings=0 fallisce.
+- [Ollama diagnostics CLI](ollama-diag-cli.md) — `npx tsx scripts/ollama-diagnose.ts` invia log+sorgenti boot a Ollama sul PC dedicato (secret DIAG_OLLAMA_* distinti da OLLAMA_*, HTTP diretta no-Express, report logs/ai-diagnosis-*.md).
