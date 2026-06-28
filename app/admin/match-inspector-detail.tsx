@@ -1,3 +1,4 @@
+// @no-split
 import React, { useState, useCallback } from "react";
 import {
   View,
@@ -21,7 +22,7 @@ import { ProfileGapsCard } from "@/components/admin/match-inspector/ProfileGapsC
 import { UserEditModal } from "@/components/admin/users/UserEditModal";
 import type { AdminUser } from "@/components/admin/users/UserCard";
 import { ZeroMatchDiagnosisCard } from "@/components/admin/match-inspector/ZeroMatchDiagnosisCard";
-import { MatchTypeSectionsList } from "./_match-inspector-detail.part2";
+import { MatchTypeCard } from "@/components/admin/match-inspector/MatchTypeCard";
 import { styles } from "@/components/admin/match-inspector-detail.styles";
 
 export interface MatchItem {
@@ -81,6 +82,43 @@ function getStatusColorForModal(status: string): string {
     case "blocked": return Colors.error;
     default: return Colors.textSecondary;
   }
+}
+
+function MatchTypeSectionsList({
+  matchesByType,
+  expandedTypes,
+  toggleType,
+  formatDate,
+  statusColor,
+  userId,
+  nickname
+}: {
+  matchesByType: MatchTypeSection[];
+  expandedTypes: Set<string>;
+  toggleType: (typeKey: string) => void;
+  formatDate: (iso: string) => string;
+  statusColor: (status: string) => string;
+  userId: string;
+  nickname: string;
+}) {
+  return (
+    <>
+      <Text style={styles.sectionTitle}>{matchesByType.length} Tipi di Match</Text>
+
+      {matchesByType.map((section) => (
+        <MatchTypeCard
+          key={section.typeKey}
+          section={section}
+          expanded={expandedTypes.has(section.typeKey)}
+          onToggle={() => toggleType(section.typeKey)}
+          formatDate={formatDate}
+          statusColor={statusColor}
+          currentUserId={userId}
+          currentNickname={nickname}
+        />
+      ))}
+    </>
+  );
 }
 
 export default function MatchInspectorDetailScreen() {

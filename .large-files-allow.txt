@@ -40,3 +40,4 @@ hooks/home/useHomeMapState.ts
 # sotto-componenti UI sono accoppiati alla schermata, nessuno split utile.
 app/giri/[id].tsx
 app/motoclub/create.tsx
+app/admin/stregatti.tsx

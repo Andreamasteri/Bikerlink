@@ -1,3 +1,4 @@
+// @no-split
 import React, { useState } from "react";
 import {
   View,
@@ -5,6 +6,7 @@ import {
   ScrollView,
   TouchableOpacity,
   ActivityIndicator,
+  StyleSheet,
 } from "react-native";
 import { useQuery } from "@tanstack/react-query";
 import { MaterialCommunityIcons, Ionicons, MaterialIcons } from "@expo/vector-icons";
@@ -372,4 +374,222 @@ export default function MatchHealthScreen() {
   );
 }
 
-import { styles } from "./_match-health.part2";
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: Colors.background,
+  },
+  content: {
+    padding: 16,
+    gap: 12,
+  },
+  overallCard: {
+    backgroundColor: Colors.surface,
+    borderRadius: 16,
+    padding: 18,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  overallLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    flex: 1,
+  },
+  overallLabel: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 14,
+    color: Colors.textSecondary,
+  },
+  overallStatus: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 22,
+    marginTop: 2,
+  },
+  overallStatusMuted: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 22,
+    color: Colors.textSecondary,
+    marginTop: 2,
+  },
+  runButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: Colors.accent,
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  runButtonDisabled: {
+    opacity: 0.6,
+  },
+  runButtonText: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 13,
+    color: "#fff",
+  },
+  checkedAt: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    color: Colors.textSecondary,
+    textAlign: "center",
+  },
+  errorBox: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    backgroundColor: Colors.error + "18",
+    borderRadius: 12,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: Colors.error,
+  },
+  errorText: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 13,
+    color: Colors.error,
+    flex: 1,
+  },
+  summaryRow: {
+    flexDirection: "row",
+    backgroundColor: Colors.surface,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    paddingVertical: 14,
+    alignItems: "center",
+  },
+  summaryItem: {
+    flex: 1,
+    alignItems: "center",
+  },
+  summaryValue: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 20,
+    color: Colors.text,
+  },
+  summaryKey: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 11,
+    color: Colors.textSecondary,
+    marginTop: 2,
+  },
+  summaryDivider: {
+    width: 1,
+    height: 32,
+    backgroundColor: Colors.border,
+  },
+  sectionCard: {
+    backgroundColor: Colors.surface,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    overflow: "hidden",
+  },
+  sectionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    padding: 14,
+  },
+  sectionHeaderRight: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  sectionTitle: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 14,
+    color: Colors.text,
+  },
+  sectionBody: {
+    borderTopWidth: 1,
+    borderTopColor: Colors.border,
+    padding: 14,
+    gap: 8,
+  },
+  badge: {
+    borderRadius: 6,
+    borderWidth: 1,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  badgeText: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 11,
+    letterSpacing: 0.5,
+  },
+  infoText: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 13,
+    color: Colors.text,
+  },
+  chipRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "center",
+    gap: 6,
+    marginTop: 4,
+  },
+  chipLabel: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 12,
+    color: Colors.textSecondary,
+  },
+  chip: {
+    borderRadius: 6,
+    borderWidth: 1,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  chipText: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 11,
+  },
+  distanceRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginTop: 4,
+  },
+  distancePill: {
+    backgroundColor: Colors.surfaceLight,
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+  },
+  distancePillText: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 13,
+    color: Colors.text,
+  },
+  gateRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginTop: 4,
+    backgroundColor: Colors.background,
+    borderRadius: 10,
+    padding: 10,
+  },
+  gateKey: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 13,
+    color: Colors.textSecondary,
+  },
+  gateValue: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 14,
+  },
+  copyBtn: {
+    padding: 4,
+  },
+  copiedHint: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 11,
+    color: Colors.success,
+    textAlign: "center",
+  },
+});

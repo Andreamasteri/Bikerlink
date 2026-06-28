@@ -1,3 +1,4 @@
+// @no-split
 import React, { useState } from "react";
 import {
   View,
@@ -6,6 +7,8 @@ import {
   TouchableOpacity,
   ScrollView,
   Alert,
+  Modal,
+  Platform,
 } from "react-native";
 import { useQuery } from "@tanstack/react-query";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -13,7 +16,6 @@ import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
 import { getApiUrl } from "@/lib/query-client";
 import { AdminUser, UserCard } from "@/components/admin/users/UserCard";
-import { BackupBanner, BackupUserDetailModal } from "./_backup-preview.part2";
 import { styles } from "@/components/admin/backup-preview.styles";
 
 export interface BackupSummaryItem {
@@ -67,6 +69,97 @@ function backupUserToAdminUser(u: BackupUser, index: number): AdminUser {
 
 function readOnlyAlert() {
   Alert.alert("Sola lettura", "Questi sono dati di backup — nessuna modifica è consentita.");
+}
+
+function BackupBanner() {
+  return (
+    <View style={styles.banner}>
+      <Ionicons name="warning-outline" size={18} color="#92400E" style={{ marginRight: 8 }} />
+      <Text style={styles.bannerText}>
+        Anteprima backup — dati non presenti nel database
+      </Text>
+    </View>
+  );
+}
+
+function BackupUserDetailModal({
+  visible,
+  user,
+  adminUser,
+  onClose,
+}: {
+  visible: boolean;
+  user: BackupUser | null;
+  adminUser: AdminUser | null;
+  onClose: () => void;
+}) {
+  if (!user || !adminUser) return null;
+
+  const extraFields = Object.entries(user).filter(
+    ([k]) => !["user", "email", "password", "country"].includes(k)
+  );
+
+  return (
+    <Modal
+      visible={visible}
+      animationType="slide"
+      presentationStyle={Platform.OS === "ios" ? "formSheet" : undefined}
+      onRequestClose={onClose}
+    >
+      <View style={styles.modalContainer}>
+        <View style={styles.modalHeader}>
+          <Text style={styles.modalTitle}>{adminUser.nickname}</Text>
+          <TouchableOpacity onPress={onClose} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+            <Ionicons name="close" size={24} color={Colors.text} />
+          </TouchableOpacity>
+        </View>
+
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 40 }}
+        >
+          <View style={{ marginTop: 12 }}>
+            <BackupBanner />
+          </View>
+
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Profilo Backup</Text>
+
+            <View style={styles.row}>
+              <Text style={styles.label}>Nickname / Username</Text>
+              <Text style={styles.value}>{user.user || "—"}</Text>
+            </View>
+            <View style={styles.row}>
+              <Text style={styles.label}>Email</Text>
+              <Text style={styles.value}>{user.email || "—"}</Text>
+            </View>
+            <View style={styles.row}>
+              <Text style={styles.label}>Password (testo chiaro)</Text>
+              <Text style={[styles.value, styles.passwordText]}>{user.password || "—"}</Text>
+            </View>
+            <View style={styles.row}>
+              <Text style={styles.label}>Paese selezionato</Text>
+              <Text style={styles.value}>{user.country || "—"}</Text>
+            </View>
+          </View>
+
+          {extraFields.length > 0 && (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Campi Aggiuntivi</Text>
+              {extraFields.map(([k, v]) => (
+                <View key={k} style={styles.row}>
+                  <Text style={styles.label}>{k}</Text>
+                  <Text style={styles.value} numberOfLines={3}>
+                    {typeof v === "object" ? JSON.stringify(v) : String(v ?? "—")}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          )}
+        </ScrollView>
+      </View>
+    </Modal>
+  );
 }
 
 export default function BackupPreviewScreen() {
