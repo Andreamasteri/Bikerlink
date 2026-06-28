@@ -55,6 +55,7 @@ logs/*.jsonl
 !logs/apk-build-history.log
 !logs/ota-timing.log
 !logs/ota-hwm.txt
+logs/ai-diagnosis-*.md
 
 # Static build (generated artifacts — non includere nel repo)
 static-build/
