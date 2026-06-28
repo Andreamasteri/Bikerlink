@@ -12,14 +12,27 @@
  *   - handleAdClick    → normalizzazione URL (prepend https) + apertura Linking
  *   - getAreaLabel     → mondo / continente / singolo paese / N paesi
  *
+ * Contesto (Task #5112): lo stesso file ospita anche `useHomeMapCalculated`,
+ * che produce i valori DERIVATI della mappa (chi mostrare e dove centrare). Un
+ * edit pesante potrebbe romperli in silenzio. Blindiamo:
+ *
+ *   - usersWithSelf         → inietta l'utente corrente se assente, senza duplicarlo
+ *   - smallMapInitialCenter → media coordinate visibili con filtri attivi,
+ *                             fallback alle coord profilo salvate, null se nessuna
+ *   - mySearchRadius        → 0 senza proposte attive, altrimenti il max searchRadius
+ *
  * Strategia: `useHomeMapHandlers` e `getAreaLabel` sono funzioni pure (nessun
  * hook React al loro interno), quindi si invocano direttamente. Mockiamo solo
  * le dipendenze di modulo che non caricano in ambiente node (react-native,
  * expo-router, context, hook mappa, query-client, AsyncStorage). NON mockiamo
  * `@/lib/countries-regions`: getAreaLabel viene testato contro i dati reali.
+ * `useHomeMapCalculated` usa `useMemo`, quindi va montato in un reconciler React
+ * reale (react-test-renderer) tramite una sonda che cattura il valore restituito.
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import React from "react";
+import TestRenderer, { act } from "react-test-renderer";
 
 // ── mock: dipendenze di modulo non caricabili in node ────────────────────────
 const apiRequest = vi.hoisted(() => vi.fn());
@@ -63,7 +76,7 @@ vi.mock("@/lib/query-client", () => ({
   queryClient: { invalidateQueries: vi.fn() },
 }));
 
-import { useHomeMapHandlers, getAreaLabel } from "../home/useHomeMapState";
+import { useHomeMapHandlers, getAreaLabel, useHomeMapCalculated } from "../home/useHomeMapState";
 import { CONTINENT_MAP } from "@/lib/countries-regions";
 
 // ── factory: handlers con un set fresco di spie ──────────────────────────────
@@ -241,5 +254,159 @@ describe("getAreaLabel", () => {
 
   it("più paesi (sottoinsieme di un continente) → conteggio N paesi", () => {
     expect(getAreaLabel(["IT", "FR"])).toBe("2 paesi");
+  });
+});
+
+// ══════════════════════════════════════════════════════════════════════════
+// useHomeMapCalculated (valori derivati: chi mostrare / dove centrare)
+// ══════════════════════════════════════════════════════════════════════════
+
+// mapData minimale: solo le query lette da useHomeMapCalculated
+function makeMapData(overrides: Record<string, unknown> = {}) {
+  return {
+    onlineCountQuery: { data: undefined },
+    bikerCountQuery: { data: undefined },
+    zavCountQuery: { data: undefined },
+    myProposalsQuery: { data: undefined },
+    ...overrides,
+  };
+}
+
+type CalcArgs = {
+  mapData?: ReturnType<typeof makeMapData>;
+  nearbyUsers?: any[];
+  user?: any;
+  location?: any;
+  filterBiker?: boolean;
+  filterZavorrina?: boolean;
+  profileQData?: any;
+};
+
+// monta il hook in un reconciler React reale e ne cattura il valore restituito
+function calc(args: CalcArgs) {
+  const {
+    mapData = makeMapData(),
+    nearbyUsers = [],
+    user = null,
+    location = null,
+    filterBiker = true,
+    filterZavorrina = true,
+    profileQData = undefined,
+  } = args;
+  let result: ReturnType<typeof useHomeMapCalculated> | null = null;
+  function Probe() {
+    result = useHomeMapCalculated(
+      mapData,
+      nearbyUsers,
+      user,
+      location,
+      filterBiker,
+      filterZavorrina,
+      profileQData,
+    );
+    return null;
+  }
+  let renderer: TestRenderer.ReactTestRenderer | null = null;
+  act(() => {
+    renderer = TestRenderer.create(React.createElement(Probe));
+  });
+  act(() => {
+    renderer!.unmount();
+  });
+  return result!;
+}
+
+describe("useHomeMapCalculated → usersWithSelf", () => {
+  it("inietta l'utente corrente in testa quando assente dalla lista", () => {
+    const res = calc({
+      nearbyUsers: [{ id: "u1" }],
+      user: { id: "me", nickname: "Io", userType: "biker" },
+      location: { latitude: 45, longitude: 9 },
+    });
+    expect(res.usersWithSelf).toHaveLength(2);
+    expect(res.usersWithSelf[0].id).toBe("me");
+    expect(res.usersWithSelf[0].latitude).toBe(45);
+    expect(res.usersWithSelf[0].longitude).toBe(9);
+    expect(res.usersWithSelf[1].id).toBe("u1");
+  });
+
+  it("NON duplica l'utente corrente quando è già presente nella lista", () => {
+    const rawList = [{ id: "me" }, { id: "u1" }];
+    const res = calc({
+      nearbyUsers: rawList,
+      user: { id: "me" },
+      location: { latitude: 45, longitude: 9 },
+    });
+    expect(res.usersWithSelf).toHaveLength(2);
+    expect(res.usersWithSelf.filter((u) => u.id === "me")).toHaveLength(1);
+  });
+
+  it("senza user o location restituisce la lista grezza inalterata", () => {
+    const rawList = [{ id: "u1" }];
+    expect(calc({ nearbyUsers: rawList, user: null, location: { latitude: 1, longitude: 2 } }).usersWithSelf).toBe(rawList);
+    expect(calc({ nearbyUsers: rawList, user: { id: "me" }, location: null }).usersWithSelf).toBe(rawList);
+  });
+});
+
+describe("useHomeMapCalculated → smallMapInitialCenter", () => {
+  it("filtri attivi: media le coordinate degli utenti visibili", () => {
+    const res = calc({
+      filterBiker: false, // filtersActive = !filterBiker || !filterZavorrina
+      filterZavorrina: true,
+      nearbyUsers: [
+        { id: "u1", userType: "coppia", latitude: 10, longitude: 20 },
+        { id: "u2", userType: "coppia", latitude: 30, longitude: 40 },
+      ],
+    });
+    expect(res.smallMapInitialCenter).toEqual({ latitude: 20, longitude: 30 });
+  });
+
+  it("filtri non attivi: fallback alle coordinate del profilo salvato", () => {
+    const res = calc({
+      filterBiker: true,
+      filterZavorrina: true,
+      nearbyUsers: [{ id: "u1", userType: "coppia", latitude: 10, longitude: 20 }],
+      profileQData: { latitude: 5, longitude: 6 },
+    });
+    expect(res.smallMapInitialCenter).toEqual({ latitude: 5, longitude: 6 });
+  });
+
+  it("nessuna sorgente disponibile → null", () => {
+    const res = calc({
+      filterBiker: true,
+      filterZavorrina: true,
+      nearbyUsers: [],
+      profileQData: undefined,
+    });
+    expect(res.smallMapInitialCenter).toBeNull();
+  });
+});
+
+describe("useHomeMapCalculated → mySearchRadius", () => {
+  it("nessuna proposta attiva → 0", () => {
+    expect(calc({ user: { id: "me" } }).mySearchRadius).toBe(0);
+    expect(
+      calc({
+        user: { id: "me" },
+        mapData: makeMapData({ myProposalsQuery: { data: [] } }),
+      }).mySearchRadius,
+    ).toBe(0);
+  });
+
+  it("restituisce il max searchRadius tra le proprie proposte attive", () => {
+    const res = calc({
+      user: { id: "me" },
+      mapData: makeMapData({
+        myProposalsQuery: {
+          data: [
+            { userId: "me", status: "active", searchRadius: 50 },
+            { userId: "me", status: "active", searchRadius: 120 },
+            { userId: "other", status: "active", searchRadius: 999 },
+            { userId: "me", status: "inactive", searchRadius: 500 },
+          ],
+        },
+      }),
+    });
+    expect(res.mySearchRadius).toBe(120);
   });
 });
