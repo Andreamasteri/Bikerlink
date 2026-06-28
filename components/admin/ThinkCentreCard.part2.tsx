@@ -33,11 +33,13 @@ export function serviceToStatus(s: any | undefined): DotStatus {
 
 export function ghToStatus(areas: any[], configured: boolean): DotStatus {
   if (!configured || areas.length === 0) return "unknown";
-  const anyOk = areas.some((a: any) => a.ok);
-  const allOk = areas.every((a: any) => a.ok);
+  const enabledAreas = areas.filter((a: any) => a.enabled);
+  if (enabledAreas.length === 0) return "unknown";
+  const anyOk = enabledAreas.some((a: any) => a.ok);
+  const allOk = enabledAreas.every((a: any) => a.ok);
   if (allOk) return "ok";
   if (anyOk) return "degraded";
-  const anyStarting = areas.some((a: any) => a.enabled && a.startingUp);
+  const anyStarting = enabledAreas.some((a: any) => a.startingUp);
   if (anyStarting) return "degraded";
   return "offline";
 }

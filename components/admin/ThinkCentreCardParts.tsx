@@ -314,7 +314,7 @@ export function GraphHopperBlock({
           </Text>
         </View>
         <Text style={styles.ghCount}>
-          {onlineCount}/{enabled.length}
+          {onlineCount}/{areas.length}
         </Text>
         <View style={[styles.ghDot, { backgroundColor: aggColor }]} />
         <Ionicons name={open ? "chevron-up" : "chevron-down"} size={16} color={Colors.textSecondary} />
