@@ -1,3 +1,4 @@
+// @no-split
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import {
   View,
@@ -5,6 +6,8 @@ import {
   TouchableOpacity,
   Alert,
   ActivityIndicator,
+  Modal,
+  Pressable,
 } from "react-native";
 import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollViewCompat";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -21,7 +24,6 @@ import { useT } from "@/lib/language-context";
 import { updateUserSchema } from "@shared/validators";
 import { useMutation } from "@tanstack/react-query";
 import { useColors } from "@/hooks/useColors";
-import { RevokeConsentModal } from "./_edit.part2";
 import { makeStyles } from "@/components/profile/edit.styles";
 
 import { EditBasicInfo } from "@/components/profile/edit/EditBasicInfo";
@@ -437,5 +439,56 @@ export default function EditProfileScreen() {
         t={t}
       />
     </View>
+  );
+}
+
+const revokeConsentStyles = makeStyles(Colors);
+
+function RevokeConsentModal({
+  visible,
+  onClose,
+  onConfirm,
+  t,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+  t: (k: string) => string;
+}) {
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="fade"
+      onRequestClose={onClose}
+    >
+      <Pressable
+        style={revokeConsentStyles.modalOverlay}
+        onPress={onClose}
+      >
+        <View style={revokeConsentStyles.modalContent}>
+          <Text style={revokeConsentStyles.modalTitle}>Revoca consensi privacy</Text>
+          <Text style={revokeConsentStyles.modalBody}>
+            Questa azione revocherà i consensi obbligatori per l&apos;uso dell&apos;app.
+            Verrai disconnesso e il tuo account verrà programmato per la
+            cancellazione automatica tra 30 giorni.
+          </Text>
+          <View style={revokeConsentStyles.modalButtons}>
+            <TouchableOpacity
+              style={revokeConsentStyles.modalBtnCancel}
+              onPress={onClose}
+            >
+              <Text style={revokeConsentStyles.modalBtnCancelText}>{t("common.cancel")}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={revokeConsentStyles.modalBtnConfirm}
+              onPress={onConfirm}
+            >
+              <Text style={revokeConsentStyles.modalBtnConfirmText}>Revoca e disconnetti</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Pressable>
+    </Modal>
   );
 }

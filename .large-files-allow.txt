@@ -34,3 +34,9 @@ server/__tests__/privacy-filter.part2.test.ts
 # la logica è fortemente accoppiata (stesso set di stati, refs e handler
 # condivisi) e gli split precedenti erano file companion fragili/orfani.
 hooks/home/useHomeMapState.ts
+
+# ── Schermate navigazione (merge split part2/3/4 → file unico) ──────────────
+# Catene split riunite in un solo file marcato `// @no-split`: stili, helper e
+# sotto-componenti UI sono accoppiati alla schermata, nessuno split utile.
+app/giri/[id].tsx
+app/motoclub/create.tsx

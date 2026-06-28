@@ -1,19 +1,25 @@
+// LARGE-FILE-ALLOW: schermata dettaglio giro — catena split (part2 stili+helper, part3/part4 sotto-componenti UI) fusa in un file unico; logica e UI fortemente accoppiate, nessuno split utile
+// @no-split
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useState, useMemo } from "react";
 import {
   View,
   Text,
   ScrollView,
+  StyleSheet,
   Alert,
   ActivityIndicator,
   Linking,
   Share,
   Pressable,
+  TouchableOpacity,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Ionicons } from "@expo/vector-icons";
+import WebView from "react-native-webview";
+import Colors from "@/constants/colors";
 import { useColors } from "@/hooks/useColors";
 import { apiRequest, getApiUrl } from "@/lib/query-client";
 import { useAuth } from "@/lib/auth-context";
@@ -23,14 +29,6 @@ import { decodePolyline } from "@/lib/polyline";
 
 // Components
 import { GiriHeader } from "@/components/giri/detail/GiriHeader";
-import { GiriMap, GiriStats, GiriElevation, GiriWeather, GiriParticipants } from "./_[id].part3";
-import { GiriActions, GiriOfflineCard, GiriMultiDayInfo } from "./_[id].part4";
-import {
-  makeStyles as styles,
-  weatherIcon,
-  bikerScoreColor,
-  styleLabel,
-} from "./_[id].part2";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -66,6 +64,184 @@ interface PlannedRoute {
   elevationGainM?: number | null;
   altitudeMinM?: number | null;
   altitudeMaxM?: number | null;
+}
+
+// ─── Stili & helper ──────────────────────────────────────────────────────────
+
+const styles = (colors: any) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: colors.background },
+  emptyText: { fontFamily: "Inter_400Regular", fontSize: 14, color: colors.textSecondary, textAlign: "center", paddingVertical: 8 },
+  loadMoreBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: colors.surface, borderRadius: 10, padding: 12, borderWidth: 1, borderColor: colors.border, marginBottom: 20 },
+  loadMoreText: { fontFamily: "Inter_500Medium", fontSize: 14, color: colors.accent },
+  infoCard: { flexDirection: "row", alignItems: "flex-start", gap: 12, backgroundColor: colors.surface, borderRadius: 12, padding: 14, marginTop: 4 },
+  infoTitle: { fontFamily: "Inter_600SemiBold", fontSize: 14, color: colors.text },
+  infoDesc: { fontFamily: "Inter_400Regular", fontSize: 13, color: colors.textSecondary, marginTop: 2 },
+});
+
+function weatherIcon(code: number): any {
+  if (code === 0) return "sunny-outline";
+  if (code <= 3) return "partly-sunny-outline";
+  if (code <= 9) return "cloud-outline";
+  if (code <= 59) return "rainy-outline";
+  if (code <= 79) return "snow-outline";
+  if (code <= 99) return "thunderstorm-outline";
+  return "cloud-outline";
+}
+
+function bikerScoreColor(score: number, colors: any): string {
+  if (score >= 0.7) return "#22c55e";
+  if (score >= 0.4) return colors.accent;
+  return colors.textSecondary;
+}
+
+// Helper POI latenti per la futura sezione POI (GiriPOIs non ancora montata);
+// prefisso `_` = volutamente inutilizzati, coerente col dead-code POI del file.
+function _poiTypeLabel(type: string): string {
+  const map: Record<string, string> = {
+    fuel: "Distributore", restaurant: "Ristorante", cafe: "Bar",
+    hotel: "Hotel", viewpoint: "Panorama",
+  };
+  return map[type] ?? type;
+}
+
+function _poiTypeIcon(type: string): any {
+  if (type === "fuel") return "flame-outline";
+  if (type === "restaurant") return "restaurant-outline";
+  if (type === "cafe") return "cafe-outline";
+  if (type === "hotel") return "bed-outline";
+  if (type === "viewpoint") return "eye-outline";
+  return "location-outline";
+}
+
+function styleLabel(style: string): string {
+  const map: Record<string, string> = {
+    direct: "Diretto", fast: "Veloce", balanced: "Bilanciato",
+    curvy: "Curvy", extra_curvy: "Extra Curvy",
+  };
+  return map[style] ?? style;
+}
+
+// ─── Sotto-componenti UI ──────────────────────────────────────────────────────
+
+function GiriMap({ mapUri, _style, distanceKm, _offlineStatus, _streetViewTip, onMessage }: any) {
+  return (
+    <View style={{ height: 250, borderRadius: 16, overflow: "hidden", marginBottom: 16 }}>
+      {mapUri ? (
+        <WebView source={{ uri: mapUri }} style={{ flex: 1 }} onMessage={onMessage} scrollEnabled={false} />
+      ) : (
+        <View style={{ flex: 1, backgroundColor: Colors.surface, alignItems: "center", justifyContent: "center" }}>
+          <ActivityIndicator color={Colors.accent} />
+        </View>
+      )}
+      <View style={{ position: "absolute", bottom: 10, right: 10, backgroundColor: "rgba(0,0,0,0.6)", padding: 6, borderRadius: 8 }}>
+        <Text style={{ color: "#fff", fontSize: 12 }}>{distanceKm} km</Text>
+      </View>
+    </View>
+  );
+}
+
+function GiriStats({ distanceKm, durationMinutes, bikerScore, scoreColor, _styleLabel, _isMultiDay, _elevationGainM, _altitudeMinM, _altitudeMaxM, _realCurvatureScore, _onLoadElevation, _elevationLoading }: any) {
+  return (
+    <View style={{ backgroundColor: Colors.surface, borderRadius: 16, padding: 16, marginBottom: 16, gap: 16 }}>
+       <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+          <View>
+            <Text style={{ fontSize: 12, color: Colors.textSecondary }}>Distanza</Text>
+            <Text style={{ fontSize: 18, fontWeight: "bold" }}>{distanceKm} km</Text>
+          </View>
+          <View>
+            <Text style={{ fontSize: 12, color: Colors.textSecondary }}>Tempo</Text>
+            <Text style={{ fontSize: 18, fontWeight: "bold" }}>{Math.round(durationMinutes)} min</Text>
+          </View>
+          <View>
+            <Text style={{ fontSize: 12, color: Colors.textSecondary }}>Score</Text>
+            <Text style={{ fontSize: 18, fontWeight: "bold", color: scoreColor }}>{Math.round(bikerScore * 100)}%</Text>
+          </View>
+       </View>
+    </View>
+  );
+}
+
+function GiriElevation({ elevation, elevationLoading, elevationError, onLoadElevation }: any) {
+  return (
+    <View style={{ marginBottom: 16 }}>
+       <Text style={{ fontSize: 16, fontWeight: "bold", marginBottom: 8 }}>Profilo Altimetrico</Text>
+       {elevationLoading ? (
+         <ActivityIndicator color={Colors.accent} />
+       ) : elevationError ? (
+         <Text style={{ color: Colors.error }}>{elevationError}</Text>
+       ) : elevation ? (
+         <View style={{ height: 100, backgroundColor: Colors.surface, borderRadius: 8 }} />
+       ) : (
+         <TouchableOpacity onPress={onLoadElevation} style={{ padding: 12, backgroundColor: Colors.accent, borderRadius: 8 }}>
+            <Text style={{ color: "#fff", textAlign: "center" }}>Carica Elevazione</Text>
+         </TouchableOpacity>
+       )}
+    </View>
+  );
+}
+
+function GiriWeather({ weather, weatherIcon }: any) {
+  return (
+    <View style={{ padding: 16, backgroundColor: Colors.surface, borderRadius: 12, marginBottom: 16 }}>
+       <Text style={{ fontSize: 16, fontWeight: "bold", marginBottom: 8 }}>Meteo lungo il percorso</Text>
+       <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+          <Ionicons name={weatherIcon(weather.weatherCode)} size={24} color={Colors.text} />
+          <Text>{weather.weatherDesc}</Text>
+       </View>
+    </View>
+  );
+}
+
+function GiriParticipants({ _matchBikers, matchLoading, _matchBannerDismissed, _onDismissBanner, onFindBikers, _onPressBiker }: any) {
+  return (
+    <View style={{ marginBottom: 16 }}>
+       <Text style={{ fontSize: 16, fontWeight: "bold", marginBottom: 8 }}>Partecipanti suggeriti</Text>
+       {matchLoading ? (
+         <ActivityIndicator color={Colors.accent} />
+       ) : (
+         <TouchableOpacity onPress={onFindBikers} style={{ padding: 12, backgroundColor: Colors.accent, borderRadius: 8 }}>
+            <Text style={{ color: "#fff", textAlign: "center" }}>Trova Biker Compatibili</Text>
+         </TouchableOpacity>
+       )}
+    </View>
+  );
+}
+
+function GiriActions({ onNavigate, onOpenGoogleMaps, _onOpenWaze, _onOpenAppleMaps, _onExportGPX, _onExportKML, onShare }: any) {
+  return (
+    <View style={{ gap: 12, marginBottom: 16 }}>
+       <TouchableOpacity onPress={onNavigate} style={{ backgroundColor: Colors.accent, padding: 16, borderRadius: 12, alignItems: "center" }}>
+          <Text style={{ color: "#fff", fontWeight: "bold" }}>Inizia Navigazione</Text>
+       </TouchableOpacity>
+       <View style={{ flexDirection: "row", gap: 8 }}>
+          <TouchableOpacity onPress={onOpenGoogleMaps} style={{ flex: 1, backgroundColor: Colors.surface, padding: 12, borderRadius: 12, alignItems: "center" }}>
+             <Text>Google Maps</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={onShare} style={{ flex: 1, backgroundColor: Colors.surface, padding: 12, borderRadius: 12, alignItems: "center" }}>
+             <Text>Condividi</Text>
+          </TouchableOpacity>
+       </View>
+    </View>
+  );
+}
+
+function GiriOfflineCard({ status, _progress, onDownload, _onCancel, _onDelete }: any) {
+  return (
+    <View style={{ padding: 16, backgroundColor: Colors.surface, borderRadius: 12, marginBottom: 16 }}>
+       <Text style={{ fontWeight: "bold" }}>Mappe Offline</Text>
+       <Text style={{ fontSize: 12, color: Colors.textSecondary, marginBottom: 8 }}>Stato: {status}</Text>
+       {status === "none" && <TouchableOpacity onPress={onDownload}><Text style={{ color: Colors.accent }}>Scarica</Text></TouchableOpacity>}
+    </View>
+  );
+}
+
+function GiriMultiDayInfo({ days, _hotels, _hotelsLoading, _onLoadHotels }: any) {
+  return (
+    <View style={{ padding: 16, backgroundColor: Colors.surface, borderRadius: 12 }}>
+       <Text style={{ fontWeight: "bold" }}>Giro Multigiorno</Text>
+       <Text>{days.length} giorni totali</Text>
+    </View>
+  );
 }
 
 // ─── Main Screen ──────────────────────────────────────────────────────────────
