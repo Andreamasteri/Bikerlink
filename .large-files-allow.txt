@@ -41,3 +41,11 @@ hooks/home/useHomeMapState.ts
 app/giri/[id].tsx
 app/motoclub/create.tsx
 app/admin/stregatti.tsx
+
+# ── Merge split lazy-load → file unici (refactor #5101) ─────────────────────
+# Catene split (part2/parts/map/voice) riunite nel file principale marcato
+# `// LARGE-FILE-ALLOW`: stili, helper e sotto-componenti sono accoppiati alla
+# schermata/hook, gli split erano companion fragili. Nessuno split utile.
+hooks/navigate/useNavigateState.ts
+components/tracking/TrackingDashboard.tsx
+components/admin/users/UserDetailModal.tsx

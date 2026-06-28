@@ -1,13 +1,388 @@
-import React from "react";
-import { View, Text, Modal, TouchableOpacity, ScrollView, Platform } from "react-native";
+// LARGE-FILE-ALLOW: components/admin/users/UserDetailModal — merge @no-split di file lazy-split
+import React, { useState } from "react";
+import { View, Text, Modal, TouchableOpacity, ScrollView, Platform, StyleSheet } from "react-native";
 import { Ionicons, MaterialIcons } from "@expo/vector-icons";
+import { useQuery } from "@tanstack/react-query";
 import Colors from "@/constants/colors";
+import { getApiUrl } from "@/lib/query-client";
 import { AdminUser } from "./UserCard";
 import { SessionStats } from "@/components/admin/analytics/UserStatsContent";
 import { UserSessionStatsBlock } from "./UserSessionStatsBlock";
-import { statsStyles, sessionStyles, fzStyles } from "./UserDetailModal.parts";
-import { PrivacySection } from "./UserDetailModal.part2";
 
+/* ===== StyleSheet (ex overflow UserDetailModal) ===== */
+export const sessionStyles = StyleSheet.create({
+  countBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+  },
+  countText: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 12,
+  },
+  sessionRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    backgroundColor: Colors.surface,
+    borderRadius: 8,
+    marginBottom: 6,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  sessionInfo: {
+    flex: 1,
+    gap: 2,
+  },
+  sessionSid: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 13,
+    color: Colors.text,
+  },
+  sessionExpiry: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 11,
+    color: Colors.textSecondary,
+    marginLeft: 20,
+  },
+  revokeBtn: {
+    backgroundColor: Colors.error + "22",
+    borderWidth: 1,
+    borderColor: Colors.error + "66",
+    borderRadius: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    marginLeft: 8,
+  },
+  revokeBtnText: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 12,
+    color: Colors.error,
+  },
+});
+
+export const fzStyles = StyleSheet.create({
+  row: {
+    flexDirection: "row",
+    gap: 8,
+    marginTop: 8,
+  },
+  chip: {
+    flex: 1,
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 6,
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: Colors.accent + "66",
+    backgroundColor: Colors.surface,
+  },
+  chipDisabled: {
+    borderColor: Colors.border,
+    backgroundColor: Colors.surface,
+    opacity: 0.5,
+  },
+  chipNum: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 16,
+    color: Colors.accent,
+  },
+  chipType: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 13,
+    color: Colors.textSecondary,
+  },
+  chipTextDisabled: {
+    color: Colors.textSecondary,
+  },
+  note: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    color: Colors.textSecondary,
+    marginTop: 8,
+    textAlign: "center" as const,
+  },
+});
+
+export const statsStyles = StyleSheet.create({
+  modalContainer: {
+    flex: 1,
+    backgroundColor: Colors.background,
+    marginTop: 40,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+  },
+  modalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+  },
+  modalTitle: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 20,
+    color: Colors.text,
+  },
+  section: {
+    marginTop: 20,
+  },
+  sectionTitle: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 15,
+    color: Colors.accent,
+    marginBottom: 10,
+    textTransform: "uppercase" as const,
+    letterSpacing: 1,
+  },
+  row: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border + "44",
+  },
+  label: { fontFamily: "Inter_400Regular", fontSize: 13, color: Colors.textSecondary },
+  value: { fontFamily: "Inter_600SemiBold", fontSize: 13, color: Colors.text },
+  statsGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  statBox: {
+    width: "31%",
+    backgroundColor: Colors.surface,
+    borderRadius: 12,
+    padding: 12,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  statNumber: { fontFamily: "Inter_700Bold", fontSize: 22, color: Colors.text },
+  statLabel: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 10,
+    color: Colors.textSecondary,
+    textAlign: "center",
+    marginTop: 4,
+  },
+  motoCard: {
+    backgroundColor: Colors.surface,
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  motoTitle: { fontFamily: "Inter_600SemiBold", fontSize: 14, color: Colors.text },
+  motoSub: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    color: Colors.textSecondary,
+    marginTop: 2,
+  },
+  logItem: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border + "44",
+  },
+  logText: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    color: Colors.text,
+    flex: 1,
+  },
+  logDate: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 11,
+    color: Colors.textSecondary,
+    marginLeft: 8,
+  },
+});
+
+export const privacyStyles = StyleSheet.create({
+  collapseHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 4,
+    marginBottom: 4,
+  },
+  settingRow: {
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border + "33",
+  },
+  settingTop: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 4,
+  },
+  settingName: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 13,
+    color: Colors.text,
+    flex: 1,
+    marginRight: 8,
+  },
+  badgeOn: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
+    backgroundColor: Colors.success + "22",
+    borderWidth: 1,
+    borderColor: Colors.success + "66",
+  },
+  badgeOff: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
+    backgroundColor: Colors.border,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  badgeText: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 11,
+  },
+  badgeParam: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 11,
+    color: Colors.textSecondary,
+    marginLeft: 6,
+  },
+  timelineItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingVertical: 2,
+    paddingLeft: 4,
+  },
+  timelineText: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 11,
+    color: Colors.textSecondary,
+    flex: 1,
+  },
+  noEvents: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 11,
+    color: Colors.textSecondary,
+    fontStyle: "italic" as const,
+    paddingLeft: 4,
+    marginTop: 2,
+  },
+});
+
+/* ===== PrivacySection (ex overflow UserDetailModal) ===== */
+export interface PrivacyLogEntry { newValue: boolean; changedAt: string }
+export interface PrivacyOverview {
+  currentSettings: Record<string, boolean | number | string>;
+  log: Record<string, PrivacyLogEntry[]>;
+}
+
+const PRIVACY_SETTINGS: Array<{ key: string; label: string; paramKey?: string; paramLabel?: string }> = [
+  { key: "ghost_mode", label: "Ghost Mode" },
+  { key: "hide_from_map", label: "Non visibile sulla mappa" },
+  { key: "position_fuzz", label: "Altera Posizione", paramKey: "position_fuzz_km", paramLabel: "km" },
+  { key: "fixed_position_enabled", label: "Posizione Fissa" },
+  { key: "fake_home_enabled", label: "Fake Home" },
+  { key: "fake_work_enabled", label: "Fake Work" },
+  { key: "fake_whatever_enabled", label: "Fake Whatever" },
+  { key: "offline_position_randomize", label: "Randomizza offline" },
+  { key: "continuous_gps", label: "GPS Continuo" },
+];
+
+function formatTimelineDate(iso: string): string {
+  const d = new Date(iso);
+  const day = d.getDate();
+  const months = ["gen","feb","mar","apr","mag","giu","lug","ago","set","ott","nov","dic"];
+  const month = months[d.getMonth()];
+  const h = String(d.getHours()).padStart(2, "0");
+  const m = String(d.getMinutes()).padStart(2, "0");
+  return `${day} ${month} alle ${h}:${m}`;
+}
+
+export function PrivacySection({ userId }: { userId: string }) {
+  const [expanded, setExpanded] = useState(false);
+
+  const { data, isLoading, isError } = useQuery<PrivacyOverview>({
+    queryKey: ["/api/admin/users", userId, "privacy-overview"],
+    queryFn: async () => {
+      const url = new URL(`/api/admin/users/${userId}/privacy-overview`, getApiUrl());
+      const res = await fetch(url.toString(), { credentials: "include" });
+      if (!res.ok) throw new Error("Errore caricamento dati privacy");
+      return res.json();
+    },
+    enabled: expanded,
+    staleTime: 30000,
+  });
+
+  return (
+    <View style={statsStyles.section}>
+      <TouchableOpacity style={privacyStyles.collapseHeader} onPress={() => setExpanded((v) => !v)}>
+        <Text style={statsStyles.sectionTitle}>Privacy &amp; Posizione</Text>
+        <Ionicons name={expanded ? "chevron-up" : "chevron-down"} size={18} color={Colors.accent} />
+      </TouchableOpacity>
+
+      {expanded && (
+        <>
+          {isLoading && <Text style={{ color: Colors.textSecondary, fontSize: 13, marginTop: 4 }}>Caricamento...</Text>}
+          {isError && <Text style={{ color: Colors.error, fontSize: 13, marginTop: 4 }}>Errore caricamento dati privacy</Text>}
+          {data && PRIVACY_SETTINGS.map(({ key, label, paramKey, paramLabel }) => {
+            const val = data.currentSettings[key] as boolean;
+            const param = paramKey ? data.currentSettings[paramKey] : undefined;
+            const entries = (data.log[key] ?? []).slice(0, 5);
+            return (
+              <View key={key} style={privacyStyles.settingRow}>
+                <View style={privacyStyles.settingTop}>
+                  <Text style={privacyStyles.settingName}>{label}</Text>
+                  <View style={{ flexDirection: "row", alignItems: "center" }}>
+                    {param !== undefined && <Text style={privacyStyles.badgeParam}>{param}{paramLabel}</Text>}
+                    <View style={val ? privacyStyles.badgeOn : privacyStyles.badgeOff}>
+                      <Text style={[privacyStyles.badgeText, { color: val ? Colors.success : Colors.textSecondary }]}>
+                        {val ? "ON" : "OFF"}
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+                {entries.length === 0 ? (
+                  <Text style={privacyStyles.noEvents}>Nessuna modifica recente</Text>
+                ) : (
+                  entries.map((e, i) => (
+                    <View key={i} style={privacyStyles.timelineItem}>
+                      <Ionicons
+                        name={e.newValue ? "radio-button-on" : "radio-button-off"}
+                        size={12}
+                        color={e.newValue ? Colors.success : Colors.textSecondary}
+                      />
+                      <Text style={privacyStyles.timelineText}>
+                        {e.newValue ? "Attivata" : "Disattivata"} il {formatTimelineDate(e.changedAt)}
+                      </Text>
+                    </View>
+                  ))
+                )}
+              </View>
+            );
+          })}
+        </>
+      )}
+    </View>
+  );
+}
+
+/* ===== UserDetailModal ===== */
 export interface GeoZone {
   type: "H" | "W" | "P";
   lat: number;
@@ -86,24 +461,6 @@ interface UserDetailModalProps {
   getRoleColor: (role: string) => string;
   getStatusColor: (status: string) => string;
 }
-
-type PrivacyLogEntry = { newValue: boolean; changedAt: string };
-type _PrivacyOverview = {
-  currentSettings: Record<string, boolean | number | string>;
-  log: Record<string, PrivacyLogEntry[]>;
-};
-
-const _PRIVACY_SETTINGS: Array<{ key: string; label: string; paramKey?: string; paramLabel?: string }> = [
-  { key: "ghost_mode", label: "Ghost Mode" },
-  { key: "hide_from_map", label: "Non visibile sulla mappa" },
-  { key: "position_fuzz", label: "Altera Posizione", paramKey: "position_fuzz_km", paramLabel: "km" },
-  { key: "fixed_position_enabled", label: "Posizione Fissa" },
-  { key: "fake_home_enabled", label: "Fake Home" },
-  { key: "fake_work_enabled", label: "Fake Work" },
-  { key: "fake_whatever_enabled", label: "Fake Whatever" },
-  { key: "offline_position_randomize", label: "Randomizza offline" },
-  { key: "continuous_gps", label: "GPS Continuo" },
-];
 
 function minutesAgo(dateStr: string | null): number | null {
   if (!dateStr) return null;
@@ -423,4 +780,3 @@ export const UserDetailModal: React.FC<UserDetailModalProps> = ({
     </Modal>
   );
 };
-

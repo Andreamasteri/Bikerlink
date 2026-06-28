@@ -117,3 +117,5 @@
 - [Semgrep CI gate quirks](semgrep-gate.md) — anonymous Semgrep redacts fingerprint/lines to "requires login" (compute own sha1); p/expressjs not p/express; verify via startValidationRun not the 120s bash cap.
 - [Merge part files — eslint-disable scope](merge-eslint-disable-scope.md) — la direttiva eslint-disable file-level di un part va riprodotta come blocco disable/enable nel file fuso, non disable-next-line, o il gate --max-warnings=0 fallisce.
 - [Ollama diagnostics CLI](ollama-diag-cli.md) — `npx tsx scripts/ollama-diagnose.ts` invia log+sorgenti boot a Ollama sul PC dedicato (secret DIAG_OLLAMA_* distinti da OLLAMA_*, HTTP diretta no-Express, report logs/ai-diagnosis-*.md).
+
+- [Split-file merge via bash assembly](split-merge-bash-assembly.md) — fondi i part lazy-split assemblando con sed/cat (no ritrascrizione); subagent lasciano lavoro parziale, fonte di verità = filesystem; marker >600 = LARGE-FILE-ALLOW + voce allow.txt.
