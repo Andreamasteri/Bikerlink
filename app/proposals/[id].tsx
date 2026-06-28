@@ -1,5 +1,4 @@
 // @no-split
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useMemo } from "react";
 import {
   View,
@@ -327,11 +326,11 @@ function ProposalActions({
   isCreator: boolean;
   isParticipant: boolean;
   canJoin: boolean;
-  joinMutation: any;
+  joinMutation: { isPending: boolean; mutate: () => void };
   id: string;
   title: string;
   participantUserIds: string[];
-  router: any;
+  router: ReturnType<typeof useRouter>;
   t: (k: string) => string;
 }) {
   return (
