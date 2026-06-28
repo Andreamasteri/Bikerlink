@@ -88,6 +88,9 @@ function makeHandlers(user: { id?: string } | null = { id: "me" }) {
   };
   const mapRef = { current: { focusOnCoordinate: spies.focusOnCoordinate } };
   const focusToastAnim = {};
+  // useHomeMapHandlers è una factory pura (non un hook React): la invochiamo
+  // direttamente nel test, quindi le rules-of-hooks non si applicano.
+  // eslint-disable-next-line react-hooks/rules-of-hooks
   const handlers = useHomeMapHandlers(
     spies.setSelectedUser,
     spies.setDetailLoading,
