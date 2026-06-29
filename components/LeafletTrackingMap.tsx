@@ -15,7 +15,7 @@ interface TrackingMapProps {
 }
 
 export default function LeafletTrackingMap({ points, currentLocation }: TrackingMapProps) {
-  const webViewRef = useRef<WebView>(null);
+  const webViewRef = useRef<WebView<{}>>(null);
   const [bridgeReady, setBridgeReady] = useState(false);
   const pendingRef = useRef<{ points: typeof points; currentLocation: typeof currentLocation } | null>(null);
   const { enabled: mapsEnabled, activeTileUrl, activeTileMaxZoom } = useMapConfig();
@@ -106,7 +106,8 @@ export default function LeafletTrackingMap({ points, currentLocation }: Tracking
         overScrollMode="never"
         cacheEnabled={false}
         startInLoadingState={false}
-        onError={(e) => console.warn("[LeafletTrackingMap] WebView error:", e.nativeEvent.description)}
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        onError={(e: any) => console.warn("[LeafletTrackingMap] WebView error:", e.nativeEvent.description)}
       />
       {bridgeReady && (
         <MapZoomSlider

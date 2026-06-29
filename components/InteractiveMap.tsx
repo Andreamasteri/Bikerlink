@@ -58,7 +58,7 @@ const InteractiveMap = forwardRef<InteractiveMapHandle, InteractiveMapProps>(fun
   showRouteDetailPanel = false,
 }: InteractiveMapProps, ref) {
   const { enabled: mapsEnabled } = useMapConfig();
-  const webViewRef = useRef<WebView>(null);
+  const webViewRef = useRef<WebView<{}>>(null);
   const [mapReady, setMapReady] = useState(false);
   const [mapReadyEpoch, setMapReadyEpoch] = useState(0);
   const [viewState, setViewState] = useState({
@@ -279,7 +279,8 @@ const InteractiveMap = forwardRef<InteractiveMapHandle, InteractiveMapProps>(fun
         overScrollMode="never"
         cacheEnabled={false}
         startInLoadingState={false}
-        onError={(e) => console.warn("[InteractiveMap] WebView error:", e.nativeEvent.description)}
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        onError={(e: any) => console.warn("[InteractiveMap] WebView error:", e.nativeEvent.description)}
       />
       {locationLoading && (
         <View style={styles.loadingOverlay}>

@@ -241,9 +241,9 @@ function buildApp(userId?: string) {
   return app;
 }
 
-const ADMIN_USER = { id: "admin-test-id", role: "admin", status: "active", password: "hashed", nickname: "Admin" };
-const NON_ADMIN_USER = { id: "user-test-id", role: "user", status: "active", password: "hashed", nickname: "Bob" };
-const SUSPENDED_ADMIN = { id: "susp-admin-id", role: "admin", status: "suspended", password: "hashed", nickname: "ExAdmin" };
+const ADMIN_USER = { id: "admin-test-id", role: "admin", status: "active", password: "hashed", nickname: "Admin" }; // pragma: allowlist secret
+const NON_ADMIN_USER = { id: "user-test-id", role: "user", status: "active", password: "hashed", nickname: "Bob" }; // pragma: allowlist secret
+const SUSPENDED_ADMIN = { id: "susp-admin-id", role: "admin", status: "suspended", password: "hashed", nickname: "ExAdmin" }; // pragma: allowlist secret
 
 const POST_PATH = "/api/admin/business/biz-1/access-token";
 const DELETE_PATH = "/api/admin/business/biz-1/access-token";

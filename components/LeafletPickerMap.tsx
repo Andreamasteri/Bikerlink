@@ -26,7 +26,7 @@ export default function LeafletPickerMap({
   existingWaypoints = [],
   onCoordPicked,
 }: LeafletPickerMapProps) {
-  const webViewRef = useRef<WebView>(null);
+  const webViewRef = useRef<WebView<{}>>(null);
   const { enabled: mapsEnabled, activeTileUrl, activeTileMaxZoom } = useMapConfig();
   const tileUrl = mapsEnabled ? activeTileUrl : "https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png";
   const tileMaxZoom = mapsEnabled ? activeTileMaxZoom : 19;
@@ -109,7 +109,8 @@ export default function LeafletPickerMap({
         overScrollMode="never"
         cacheEnabled={false}
         startInLoadingState={false}
-        onError={(e) => console.warn("[LeafletPickerMap] WebView error:", e.nativeEvent.description)}
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        onError={(e: any) => console.warn("[LeafletPickerMap] WebView error:", e.nativeEvent.description)}
       />
       <MapZoomSlider
         zoom={viewState.zoom}

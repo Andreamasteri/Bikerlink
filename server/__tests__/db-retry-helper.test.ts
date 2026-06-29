@@ -5,7 +5,7 @@ import { describe, it, expect, vi } from "vitest";
 // toccare un DB reale: settiamo DATABASE_URL e mockiamo `pg` con un Pool no-op.
 vi.hoisted(() => {
   process.env.DATABASE_URL =
-    process.env.DATABASE_URL || "postgres://test:test@localhost:5432/test";
+    process.env.DATABASE_URL || "postgres://test:test@localhost:5432/test"; // pragma: allowlist secret
 });
 
 vi.mock("pg", () => ({

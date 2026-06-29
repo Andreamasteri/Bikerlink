@@ -219,7 +219,7 @@ function buildAdminApp() {
   return app;
 }
 
-const ADMIN_USER = { id: "admin-test-id", role: "admin", status: "active", password: "hashed", nickname: "Admin" };
+const ADMIN_USER = { id: "admin-test-id", role: "admin", status: "active", password: "hashed", nickname: "Admin" }; // pragma: allowlist secret
 
 // ── Shared setup ──────────────────────────────────────────────────────────────
 

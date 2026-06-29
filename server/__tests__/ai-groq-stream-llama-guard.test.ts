@@ -143,7 +143,7 @@ describe("streamRouteText — Groq streaming usa getGroqModel (role:stream), non
   let app: express.Application;
 
   beforeEach(() => {
-    process.env.GEMINI_API_KEY = "test-key-groq-guard";
+    process.env.GEMINI_API_KEY = "test-key-groq-guard"; // pragma: allowlist secret
     app = buildApp();
     aiMocks.streamText.mockReset();
   });
@@ -185,7 +185,7 @@ describe("streamRouteText — llama come modello Groq non blocca lo streaming", 
   let app: express.Application;
 
   beforeEach(() => {
-    process.env.GEMINI_API_KEY = "test-key-groq-llama-stream";
+    process.env.GEMINI_API_KEY = "test-key-groq-llama-stream"; // pragma: allowlist secret
     app = buildApp();
     aiMocks.streamText.mockReset();
   });
@@ -225,7 +225,7 @@ describe("streamRouteText — Groq streaming JSON non valido → fallback Gemini
   let app: express.Application;
 
   beforeEach(() => {
-    process.env.GEMINI_API_KEY = "test-key-groq-invalid";
+    process.env.GEMINI_API_KEY = "test-key-groq-invalid"; // pragma: allowlist secret
     app = buildApp();
     aiMocks.streamText.mockReset();
   });
@@ -292,7 +292,7 @@ describe("streamRouteText — Groq 429 → skip immediato a Gemini", () => {
   let app: express.Application;
 
   beforeEach(() => {
-    process.env.GEMINI_API_KEY = "test-key-groq-429";
+    process.env.GEMINI_API_KEY = "test-key-groq-429"; // pragma: allowlist secret
     app = buildApp();
     aiMocks.streamText.mockReset();
   });

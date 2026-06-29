@@ -24,7 +24,7 @@ export default function LeafletRouteMap({ waypoints, height, typeColors, showMar
   const tileUrl = mapsEnabled ? activeTileUrl : "https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png";
   const tileMaxZoom = mapsEnabled ? activeTileMaxZoom : 19;
 
-  const webViewRef = useRef<WebView>(null);
+  const webViewRef = useRef<WebView<{}>>(null);
   const tlm = useMapTelemetry("LeafletRouteMap", "leaflet");
   const initStartRef = useRef<number>(Date.now());
   useEffect(() => {
@@ -112,7 +112,8 @@ export default function LeafletRouteMap({ waypoints, height, typeColors, showMar
           cacheEnabled={false}
           startInLoadingState={false}
           onLoadEnd={handleLoadEnd}
-          onError={(e) => console.warn("[LeafletRouteMap] WebView error:", e.nativeEvent.description)}
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          onError={(e: any) => console.warn("[LeafletRouteMap] WebView error:", e.nativeEvent.description)}
         />
       </Animated.View>
       {skeletonVisible && (
