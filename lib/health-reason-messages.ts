@@ -7,8 +7,20 @@
 // L'ordine definisce la priorità quando più match avvengono contemporaneamente.
 // I reason di sola manutenzione (vacuum, log-retention, snapshot, quota-reset,
 // ota-*, ecc.) NON sono in mappa: per quelli resta il testo generico.
+//
+// Task #5153: ogni entry può portare tabName + featureLabel opzionali per
+// mostrare shortcut "Vai alla sezione" nel modal HealthBanner.
 
-export const REASON_MESSAGES: ReadonlyArray<{ match: string; message: string }> = [
+export interface ReasonEntry {
+  match: string;
+  message: string;
+  /** Nome del tab (route Expo Router senza prefisso) es. "ride", "match" */
+  tabName?: string;
+  /** Label leggibile della sezione mostrata nel bottone shortcut */
+  featureLabel?: string;
+}
+
+export const REASON_MESSAGES: ReadonlyArray<ReasonEntry> = [
   // ── Health Arbiter / watchdog ──────────────────────────────────────────────
   { match: "db ping",         message: "Il database risponde lentamente — alcune operazioni potrebbero richiedere più tempo del solito" },
   { match: "db ping lento",   message: "Il database risponde lentamente — alcune operazioni potrebbero richiedere più tempo del solito" },
@@ -22,32 +34,72 @@ export const REASON_MESSAGES: ReadonlyArray<{ match: string; message: string }> 
   { match: "timeout",         message: "Alcune operazioni stanno impiegando troppo tempo — riprova tra qualche istante" },
   { match: "connection",      message: "Problema di connessione al database — alcune funzioni potrebbero non rispondere" },
   // ── Scheduler / sottosistemi funzionali ───────────────────────────────────
-  { match: "weekly-curvy-score",       message: "Il calcolo dei percorsi panoramici è temporaneamente non disponibile" },
-  { match: "nightly-map-matching",     message: "L'elaborazione dei tracciati GPS potrebbe essere in ritardo" },
-  { match: "daily-time-profile",       message: "Le stime sui tempi di percorrenza potrebbero essere meno precise" },
-  { match: "match-rules-cache",        message: "L'abbinamento tra biker potrebbe essere temporaneamente limitato" },
-  { match: "critical-reports-notifier",message: "Le notifiche delle segnalazioni potrebbero arrivare in ritardo" },
-  { match: "ai-moderation",           message: "La moderazione automatica dei contenuti è temporaneamente limitata" },
+  {
+    match: "weekly-curvy-score",
+    message: "Il calcolo dei percorsi panoramici è temporaneamente non disponibile",
+    tabName: "ride",
+    featureLabel: "Pianificazione percorsi",
+  },
+  {
+    match: "nightly-map-matching",
+    message: "L'elaborazione dei tracciati GPS potrebbe essere in ritardo",
+    tabName: "tracking",
+    featureLabel: "Tracking GPS",
+  },
+  {
+    match: "daily-time-profile",
+    message: "Le stime sui tempi di percorrenza potrebbero essere meno precise",
+    tabName: "ride",
+    featureLabel: "Pianificazione percorsi",
+  },
+  {
+    match: "match-rules-cache",
+    message: "L'abbinamento tra biker potrebbe essere temporaneamente limitato",
+    tabName: "match",
+    featureLabel: "Abbinamento biker",
+  },
+  {
+    match: "critical-reports-notifier",
+    message: "Le notifiche delle segnalazioni potrebbero arrivare in ritardo",
+  },
+  {
+    match: "ai-moderation",
+    message: "La moderazione automatica dei contenuti è temporaneamente limitata",
+  },
 ];
 
 export const GENERIC_MESSAGE_DEGRADED = "Alcune funzioni potrebbero essere temporaneamente limitate";
 export const GENERIC_MESSAGE_BROKEN   = "Alcune funzioni potrebbero non rispondere. Stiamo lavorando per ripristinarle.";
 export const GENERIC_MESSAGE_SLOW     = "Alcune funzioni potrebbero essere più lente del solito.";
 
-// Traduce i reason tecnici in messaggi comprensibili. Restituisce i messaggi
-// mappati (in ordine di priorità, deduplicati) oppure il fallback se nessun
-// reason è riconosciuto.
+export interface ReasonResult {
+  message: string;
+  tabName?: string;
+  featureLabel?: string;
+}
+
+// Traduce i reason tecnici in messaggi comprensibili con eventuale shortcut
+// di navigazione. Restituisce i risultati mappati (in ordine di priorità,
+// deduplicati per messaggio) oppure il fallback se nessun reason è riconosciuto.
 export function reasonsToMessages(
   reasons: string[] | string | undefined,
   fallback: string = GENERIC_MESSAGE_DEGRADED
-): string[] {
-  if (!reasons || (Array.isArray(reasons) && reasons.length === 0)) return [fallback];
+): ReasonResult[] {
+  if (!reasons || (Array.isArray(reasons) && reasons.length === 0)) {
+    return [{ message: fallback }];
+  }
   const haystack = (Array.isArray(reasons) ? reasons.join(" ") : reasons).toLowerCase();
-  const matched: string[] = [];
-  for (const { match, message } of REASON_MESSAGES) {
-    if (haystack.includes(match.toLowerCase()) && !matched.includes(message)) {
-      matched.push(message);
+  const matched: ReasonResult[] = [];
+  const seenMessages = new Set<string>();
+  for (const entry of REASON_MESSAGES) {
+    if (haystack.includes(entry.match.toLowerCase()) && !seenMessages.has(entry.message)) {
+      seenMessages.add(entry.message);
+      matched.push({
+        message: entry.message,
+        tabName: entry.tabName,
+        featureLabel: entry.featureLabel,
+      });
     }
   }
-  return matched.length > 0 ? matched : [fallback];
+  return matched.length > 0 ? matched : [{ message: fallback }];
 }

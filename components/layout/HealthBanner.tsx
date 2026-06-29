@@ -10,11 +10,13 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useRouter } from "expo-router";
 import { useAuth } from "@/lib/auth-context";
 import {
   reasonsToMessages,
   GENERIC_MESSAGE_BROKEN,
   GENERIC_MESSAGE_SLOW,
+  type ReasonResult,
 } from "@/lib/health-reason-messages";
 
 // Banner di salute backend (Task #5124 / #5147). Si alimenta dalle primitive
@@ -26,9 +28,13 @@ import {
 //
 // Task #5147: banner dismissibile (×) + tap per dettaglio user-friendly.
 // I reason watchdog raw vengono mappati a testo leggibile via health-reason-messages.ts.
+//
+// Task #5153: ogni ReasonResult può portare tabName + featureLabel → bottone
+// "Vai alla sezione" che porta l'utente direttamente alla tab interessata.
 export function HealthBanner() {
   const { healthState, healthReason, user } = useAuth();
   const insets = useSafeAreaInsets();
+  const router = useRouter();
   const [dismissed, setDismissed] = useState(false);
   const [detailVisible, setDetailVisible] = useState(false);
 
@@ -46,12 +52,20 @@ export function HealthBanner() {
   // Splitta il join " · " in array di reason individuali per la mappatura
   const rawReasons = healthReason ? healthReason.split(" · ").filter(Boolean) : [];
   const fallback = broken ? GENERIC_MESSAGE_BROKEN : GENERIC_MESSAGE_SLOW;
-  const friendlyMessages = reasonsToMessages(rawReasons, fallback);
-  const summaryText = friendlyMessages.join(" · ");
+  const results: ReasonResult[] = reasonsToMessages(rawReasons, fallback);
+  const summaryText = results.map((r) => r.message).join(" · ");
 
   const webTop = Platform.OS === "web" ? 67 : 0;
   const bgColor = broken ? "#C62828" : "#ED6C02";
   const iconName = broken ? "alert-circle" : "warning";
+
+  function navigateToTab(tabName: string) {
+    setDetailVisible(false);
+    // Piccolo delay per far chiudere il modal prima della navigazione
+    setTimeout(() => {
+      router.push(`/(tabs)/${tabName}` as never);
+    }, 300);
+  }
 
   return (
     <>
@@ -135,11 +149,26 @@ export function HealthBanner() {
             showsVerticalScrollIndicator={false}
             contentContainerStyle={styles.sheetContent}
           >
-            {/* Messaggi user-friendly */}
-            {friendlyMessages.map((msg, i) => (
-              <View key={i} style={styles.messageRow}>
-                <Ionicons name="ellipse" size={6} color="#888" style={styles.bullet} />
-                <Text style={styles.messageText}>{msg}</Text>
+            {/* Messaggi user-friendly con shortcut di navigazione opzionale */}
+            {results.map((result, i) => (
+              <View key={i} style={styles.messageBlock}>
+                <View style={styles.messageRow}>
+                  <Ionicons name="ellipse" size={6} color="#888" style={styles.bullet} />
+                  <Text style={styles.messageText}>{result.message}</Text>
+                </View>
+                {result.tabName && result.featureLabel && (
+                  <Pressable
+                    style={styles.featureLink}
+                    onPress={() => navigateToTab(result.tabName!)}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Vai alla sezione ${result.featureLabel}`}
+                  >
+                    <Ionicons name="arrow-forward-circle-outline" size={14} color="#555" />
+                    <Text style={styles.featureLinkText}>
+                      Vai a: {result.featureLabel}
+                    </Text>
+                  </Pressable>
+                )}
               </View>
             ))}
 
@@ -232,6 +261,9 @@ const styles = StyleSheet.create({
     padding: 20,
     gap: 10,
   },
+  messageBlock: {
+    gap: 4,
+  },
   messageRow: {
     flexDirection: "row",
     alignItems: "flex-start",
@@ -246,6 +278,22 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#333",
     lineHeight: 20,
+  },
+  featureLink: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    marginLeft: 14,
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+    backgroundColor: "#f0f0f0",
+    borderRadius: 8,
+    alignSelf: "flex-start",
+  },
+  featureLinkText: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 12,
+    color: "#444",
   },
   reassurance: {
     fontFamily: "Inter_400Regular",

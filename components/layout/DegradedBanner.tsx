@@ -65,7 +65,7 @@ export function DegradedBanner() {
   const message = reasonsToMessages(
     healthQ.data?.degradedReasons,
     GENERIC_MESSAGE_DEGRADED
-  ).join(" · ");
+  ).map((r) => r.message).join(" · ");
 
   return (
     <View style={[styles.wrap, { top: topInset }]} pointerEvents="box-none">
