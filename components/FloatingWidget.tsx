@@ -7,13 +7,10 @@ import {
   useWindowDimensions,
   Platform,
   PanResponder,
+  Animated,
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-} from "react-native-reanimated";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import Colors from "@/constants/colors";
@@ -71,10 +68,15 @@ export default function FloatingWidget() {
   const defaultX = width - WIDGET_SIZE - 20;
   const defaultY = height * 0.45;
 
-  // Posizione corrente del pallino come shared values Reanimated — il transform
-  // usa questi valori per posizionare il widget sullo schermo.
-  const posX = useSharedValue(defaultX);
-  const posY = useSharedValue(defaultY);
+  // Posizione corrente del pallino come Animated.Value RN — il transform usa questi
+  // valori. A differenza di Reanimated useSharedValue, Animated.Value con transform
+  // aggiorna la hitbox touch nativa su Android (fix: pallino non cliccabile).
+  const posXAnim = useRef(new Animated.Value(defaultX)).current;
+  const posYAnim = useRef(new Animated.Value(defaultY)).current;
+  // Ref paralleli per leggere il valore corrente in modo sincrono (Animated.Value
+  // non ha un getter sincrono affidabile cross-platform).
+  const posXRef = useRef(defaultX);
+  const posYRef = useRef(defaultY);
 
   // Origine del drag corrente (salvata a onPanResponderGrant sul JS thread).
   const dragStartX = useRef(defaultX);
@@ -104,13 +106,13 @@ export default function FloatingWidget() {
     const maxYPad = insets.bottom + 8;
     const maxX = width - WIDGET_SIZE;
     const maxY = height - WIDGET_SIZE - maxYPad;
-    const curX = posX.value;
-    const curY = posY.value;
+    const curX = posXRef.current;
+    const curY = posYRef.current;
     const clampedX = Math.max(0, Math.min(curX, maxX));
     const clampedY = Math.max(minY, Math.min(curY, maxY));
     if (clampedX !== curX || clampedY !== curY) {
-      posX.value = clampedX;
-      posY.value = clampedY;
+      posXAnim.setValue(clampedX); posXRef.current = clampedX;
+      posYAnim.setValue(clampedY); posYRef.current = clampedY;
     }
   }, [width, height, insets.top, insets.bottom]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -124,8 +126,8 @@ export default function FloatingWidget() {
           parsed.x, parsed.y, width, height,
           insets.top + 8, insets.bottom + 8,
         );
-        posX.value = clamped.x;
-        posY.value = clamped.y;
+        posXAnim.setValue(clamped.x); posXRef.current = clamped.x;
+        posYAnim.setValue(clamped.y); posYRef.current = clamped.y;
       } catch {
         // ignora
       }
@@ -154,8 +156,8 @@ export default function FloatingWidget() {
       onPanResponderTerminationRequest: () => false,
       onPanResponderGrant: () => {
         isDragging.current = true;
-        dragStartX.current = posX.value;
-        dragStartY.current = posY.value;
+        dragStartX.current = posXRef.current;
+        dragStartY.current = posYRef.current;
       },
       onPanResponderMove: (_, _gs) => {
         // Legge sempre i ref aggiornati a ogni render, mai la closure stantia
@@ -169,8 +171,8 @@ export default function FloatingWidget() {
           w, h,
           ins.top + 8, ins.bottom + 8,
         );
-        posX.value = clamped.x;
-        posY.value = clamped.y;
+        posXAnim.setValue(clamped.x); posXRef.current = clamped.x;
+        posYAnim.setValue(clamped.y); posYRef.current = clamped.y;
       },
       onPanResponderRelease: (_, _gs) => {
         isDragging.current = false;
@@ -180,11 +182,11 @@ export default function FloatingWidget() {
         const h = heightRef.current;
         const ins = insetsRef.current;
         const clamped = clampPos(
-          posX.value, posY.value, w, h,
+          posXRef.current, posYRef.current, w, h,
           ins.top + 8, ins.bottom + 8,
         );
-        posX.value = clamped.x;
-        posY.value = clamped.y;
+        posXAnim.setValue(clamped.x); posXRef.current = clamped.x;
+        posYAnim.setValue(clamped.y); posYRef.current = clamped.y;
         savePosition(clamped.x, clamped.y);
         if (!isDragGesture(_gs.dx, _gs.dy)) {
           toggleMenu();
@@ -192,18 +194,14 @@ export default function FloatingWidget() {
       },
       onPanResponderTerminate: () => {
         isDragging.current = false;
-        savePosition(posX.value, posY.value);
+        savePosition(posXRef.current, posYRef.current);
       },
     })
   ).current;
 
-  // Posizionamento via transform (translateX/translateY) invece di left/top: su
-  // Android animare left/top sposta il pixel ma lascia l'hitbox del touch alla
-  // posizione di layout originale. Con il transform l'area di tocco segue la
-  // posizione visiva.
-  const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: posX.value }, { translateY: posY.value }],
-  }));
+  // Posizionamento via transform (translateX/translateY) con Animated.Value di RN:
+  // su Android, Animated.Value con transform aggiorna la hitbox touch nativa in
+  // lockstep con la posizione visiva — Reanimated useSharedValue non lo fa.
 
   // Stato salute backend (Bowie assorbe il vecchio HealthBanner): quando il
   // backend non è READY, il pallino mostra un badge colorato e, all'apertura del
@@ -228,7 +226,11 @@ export default function FloatingWidget() {
     <>
       <Animated.View
         testID="floating-widget"
-        style={[styles.widget, animatedStyle, aiOpen && styles.widgetHidden]}
+        style={[
+          styles.widget,
+          { transform: [{ translateX: posXAnim }, { translateY: posYAnim }] },
+          aiOpen && styles.widgetHidden,
+        ]}
         pointerEvents={aiOpen ? "none" : "auto"}
       >
         <View {...panResponder.panHandlers} style={styles.widgetInner}>
@@ -334,7 +336,7 @@ const styles = StyleSheet.create({
   widget: {
     position: "absolute",
     // Ancorato all'origine: la posizione effettiva è data dal transform
-    // (translateX/translateY) dell'animatedStyle. Senza left/top espliciti, su
+    // (translateX/translateY) dell'Animated.Value. Senza left/top espliciti, su
     // Android l'hitbox del touch resterebbe a una posizione di layout indeterminata.
     left: 0,
     top: 0,
