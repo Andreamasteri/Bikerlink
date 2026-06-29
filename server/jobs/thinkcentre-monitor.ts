@@ -41,6 +41,12 @@ import {
   fetchSelfHostedProfiles,
   runAllProbes,
 } from "./thinkcentre-monitor-probes";
+
+export {
+  type OverallStatus,
+  computeOverallStatus,
+  probeGraphHopperAreas,
+} from "./thinkcentre-monitor-probes";
 import { reInitRedis, suspendRedis, setTcRedisProbeOk } from "../cache/redis";
 
 // ── Config ────────────────────────────────────────────────────────────────────

@@ -123,3 +123,4 @@
 - [Split-file merge via bash assembly](split-merge-bash-assembly.md) — fondi i part lazy-split assemblando con sed/cat (no ritrascrizione); subagent lasciano lavoro parziale, fonte di verità = filesystem; marker >600 = LARGE-FILE-ALLOW + voce allow.txt.
 
 - [Deep schema parity (dev↔prod)](deep-schema-parity.md) — confronto DEFINIZIONI (non nomi) su 7 categorie via hash; prod catturata offline (no conn string, read-only db skill) in server/data/deep-schema-parity.prod.json; spatial_ref_sys_pkey/postgis/user_sessions_chk allow-listati.
+- [ThinkCentre monitor test probes](thinkcentre-monitor-test-probes.md) — monitor deve re-exportare probeGraphHopperAreas/computeOverallStatus; debounce test va in hang se non si cancellano TUTTE le env probe (TCP Postgres/Redis = socket reali + fake timers); db mock serve withDbRetry + where() awaitable + drizzle inArray.

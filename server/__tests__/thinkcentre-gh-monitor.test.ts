@@ -25,15 +25,19 @@ vi.mock("../db", () => ({
   db: {
     select: vi.fn().mockReturnValue({
       from: vi.fn().mockReturnValue({
-        where: vi.fn().mockReturnValue({
-          limit: dbLimitMock,
-        }),
+        // `where()` può essere terminale (await diretto → array) oppure
+        // seguito da `.limit()`: l'oggetto restituito è sia un thenable che
+        // risolve a [] sia portatore di `.limit` (dbLimitMock controllabile).
+        where: vi.fn(() =>
+          Object.assign(Promise.resolve([]), { limit: dbLimitMock }),
+        ),
       }),
     }),
     insert: vi.fn().mockReturnValue({
       values: vi.fn().mockResolvedValue(undefined),
     }),
   },
+  withDbRetry: vi.fn(<T,>(fn: () => Promise<T>) => fn()),
 }));
 
 vi.mock("@shared/db", () => ({
@@ -41,7 +45,7 @@ vi.mock("@shared/db", () => ({
   thinkcentreHealthEvents: {},
 }));
 
-vi.mock("drizzle-orm", () => ({ eq: vi.fn() }));
+vi.mock("drizzle-orm", () => ({ eq: vi.fn(), inArray: vi.fn() }));
 
 vi.mock("../push-notifications", () => ({
   sendSystemAlertPushToAdmins: sendPushMock,
@@ -232,11 +236,12 @@ describe("probeGraphHopperAreas — selezione aree abilitate", () => {
     expect(keys).not.toContain("graphhopper:francia-benelux");
   });
 
-  it("include tutte le 7 aree in areas[] quando tutte sono abilitate", async () => {
-    const all = enabledMap({
-      grecia: true, balcani: true, est: true, iberia: true,
-      "arco-alpino": true, "germania-centro": true, "francia-benelux": true,
-    });
+  it("include tutte le aree in areas[] quando tutte sono abilitate", async () => {
+    const all = enabledMap(
+      Object.fromEntries(
+        ROUTING_AREAS.map((a) => [a.codice, true]),
+      ) as Partial<Record<RoutingAreaCode, boolean>>,
+    );
     getAreaEnabledMapMock.mockResolvedValue(all);
 
     const result = await probeGraphHopperAreas();
@@ -349,11 +354,21 @@ describe("computeOverallStatus — calcolo colore aggregato", () => {
 describe("Debounce notifiche per-area GraphHopper", () => {
   beforeEach(() => {
     process.env.GRAPHHOPPER_URL = "https://gh.example.org";
-    // Rimuoviamo le env degli altri servizi per isolare il test solo su GH
+    // Rimuoviamo le env di TUTTI gli altri servizi per isolare il test solo su
+    // GH. Le probe TCP (Postgres/Redis) aprono socket reali e, con i fake
+    // timers attivi, il loro setTimeout di abort non scatta mai → il test si
+    // blocca. Le probe HTTP passano da global.fetch (mockato) ma le isoliamo
+    // comunque per determinismo.
     delete process.env.OLLAMA_URL;
     delete process.env.WHISPER_URL;
     delete process.env.VALHALLA_URL;
     delete process.env.NOMINATIM_URL;
+    delete process.env.TC_REDIS_URL;
+    delete process.env.POSTGRES_PROBE_HOST;
+    delete process.env.UFW_STATUS_URL;
+    delete process.env.PGADMIN_URL;
+    delete process.env.NGINX_MONITOR_URL;
+    delete process.env.UPTIME_KUMA_URL;
     vi.useFakeTimers();
   });
 
