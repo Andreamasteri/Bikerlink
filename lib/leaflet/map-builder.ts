@@ -3,7 +3,7 @@ import { MAP_STYLES, CURVATURE_LEGEND_HTML, TAP_HINT_HTML } from './map-styles';
 import { COMMON_SCRIPTS } from './map-scripts';
 import { MARKER_SCRIPTS } from './map-markers';
 import { LEAFLET_JS, LEAFLET_CSS } from '../leaflet-bundle';
-import { decimateTrack } from '../maps/track-decimate';
+import { decimateTrack, decimateTrackCurvatureAware } from '../maps/track-decimate';
 
 export interface PlannerWaypoint {
   lat: number;
@@ -272,8 +272,9 @@ export function buildLeafletCurvatureGradientHtml(
   points: Array<{ lat: number; lng: number }>,
   offlineTileBasePath?: string | null
 ): string {
-  const _pointsJson = JSON.stringify(points);
-  const _offlinePathJs = offlineTileBasePath
+  const decimated = decimateTrackCurvatureAware(points);
+  const pointsJson = JSON.stringify(decimated);
+  const offlinePathJs = offlineTileBasePath
     ? JSON.stringify(offlineTileBasePath)
     : "null";
   return `<!DOCTYPE html>
@@ -292,8 +293,8 @@ export function buildLeafletCurvatureGradientHtml(
 (function() {
   \${COMMON_SCRIPTS}
   \${MARKER_SCRIPTS}
-  var points = \${pointsJson};
-  var offlineBasePath = \${offlinePathJs};
+  var points = ${pointsJson};
+  var offlineBasePath = ${offlinePathJs};
   var map = L.map("map", { zoomControl: false, attributionControl: true });
 
   if (offlineBasePath) {
@@ -382,7 +383,7 @@ export function buildLeafletRouteMapHtml(
       (typeColors && typeColors[w.waypointType]) || (require('./map-markers').getWaypointColor(w.waypointType));
   }
   const rawPolylinePoints = trackPoints ?? waypoints.map((w) => ({ lat: w.lat, lng: w.lng }));
-  const polylinePoints = decimateTrack(rawPolylinePoints);
+  const polylinePoints = decimateTrackCurvatureAware(rawPolylinePoints);
   const waypointsJson = JSON.stringify(waypoints);
   const colorsJson = JSON.stringify(resolvedTypeColors);
   const polylineJson = JSON.stringify(polylinePoints);
