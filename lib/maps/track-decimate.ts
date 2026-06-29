@@ -1,6 +1,6 @@
 const DEFAULT_MAX_POINTS = 1500;
 
-export function decimateTrack<T extends { lat: number; lng: number }>(
+export function decimateTrack<T extends { lat: number }>(
   points: T[],
   maxPoints: number = DEFAULT_MAX_POINTS
 ): T[] {

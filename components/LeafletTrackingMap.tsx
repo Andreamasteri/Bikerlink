@@ -7,6 +7,7 @@ import { getApiUrl } from "@/lib/query-client";
 import { buildLeafletTrackingMapHtml } from "@/lib/leaflet-tracking-map-html";
 import { MapZoomSlider } from "@/components/map/MapZoomSlider";
 import Colors from "@/constants/colors";
+import { decimateTrack } from "@/lib/maps/track-decimate";
 
 interface TrackingMapProps {
   points: Array<{ latitude: number; longitude: number }>;
@@ -38,7 +39,7 @@ export default function LeafletTrackingMap({ points, currentLocation }: Tracking
     (pts: typeof points, loc: typeof currentLocation) => {
       if (pts.length === 0 && !loc) return;
       const data: { points: Array<{ lat: number; lng: number }>; current?: { lat: number; lng: number } } = {
-        points: pts.map((p) => ({ lat: p.latitude, lng: p.longitude })),
+        points: decimateTrack(pts.map((p) => ({ lat: p.latitude, lng: p.longitude }))),
       };
       if (loc) {
         data.current = { lat: loc.latitude, lng: loc.longitude };

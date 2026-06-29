@@ -1,4 +1,5 @@
 import { LEAFLET_JS, LEAFLET_CSS } from './leaflet-bundle';
+import { decimateTrack } from './maps/track-decimate';
 
 export interface GpsSample {
   ts: number;
@@ -15,7 +16,7 @@ export function buildLeafletGpsTrackHtml(
   accentColor: string = "#FF6600",
   colorMode: "speed" | "lean" | "flat" = "speed"
 ): string {
-  const samplesJson = JSON.stringify(samples);
+  const samplesJson = JSON.stringify(decimateTrack(samples));
 
   return `<!DOCTYPE html>
 <html>
