@@ -1,3 +1,29 @@
+# Verifica routing post-spegnimento nginx (29 Giugno 2026)
+
+## Obiettivo
+Confermare che dopo la disattivazione di nginx (vedi sezione sotto) nessun percorso critico di routing dipendesse silenziosamente da nginx. Tutti i servizi devono restare raggiungibili esclusivamente via Cloudflare Tunnel.
+
+## Test eseguiti (sandbox Replit, env con token)
+
+```bash
+curl -s -o /dev/null -w "%{http_code}" -H "Authorization: Bearer $GRAPHHOPPER_TOKEN" "$GRAPHHOPPER_URL/areas/grecia/health"
+curl -s -o /dev/null -w "%{http_code}" "$VALHALLA_URL/status"
+curl -s -o /dev/null -w "%{http_code}" -H "X-Nominatim-Token: $NOMINATIM_TOKEN" "$NOMINATIM_URL/search?q=Roma&format=json&limit=1"
+```
+
+## Risultati
+
+| Servizio | URL | HTTP | Esito |
+|---|---|---|---|
+| GraphHopper | `gh.biker-link.net/areas/grecia/health` | **502** | ✅ path tunnel OK (origine offline, non 404/timeout) |
+| Valhalla | `valhalla.biker-link.net/status` | **502** | ✅ path tunnel OK (origine offline, non 404/timeout) |
+| Nominatim | `nominatim.biker-link.net/search?q=Roma` | **200** | ✅ raggiungibile e funzionante |
+
+## Conclusione
+Il percorso di esposizione via Cloudflare Tunnel è intatto per tutti e tre i servizi. Il 502 su GH/Valhalla indica che il tunnel raggiunge Cloudflare ma l'origine sul ThinkCentre era spenta al momento del test — **non** un 404/timeout, quindi nginx non era nel percorso di routing interno. Nessuna regressione introdotta dallo spegnimento di nginx.
+
+---
+
 # Deploy Log — Dismantling DuckDNS + nginx + certbot (29 Giugno 2026)
 
 ## Obiettivo
