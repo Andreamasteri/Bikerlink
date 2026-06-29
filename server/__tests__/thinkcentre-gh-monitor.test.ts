@@ -74,6 +74,7 @@ import {
   runThinkCentreProbe,
   type OverallStatus,
 } from "../jobs/thinkcentre-monitor";
+import { resetProbeEnvForTests, PROBE_ENV_VARS } from "../jobs/thinkcentre-monitor-probes";
 import { ROUTING_AREAS, type RoutingAreaCode } from "@shared/routing-areas";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -100,8 +101,10 @@ function fetchKo(): Response {
 beforeEach(() => {
   vi.clearAllMocks();
   stopThinkCentreMonitor();
-  delete process.env.GRAPHHOPPER_URL;
-  delete process.env.GRAPHHOPPER_TOKEN;
+  // Azzera in un colpo solo TUTTE le env var lette dalle probe (fonte di verità
+  // in thinkcentre-monitor-probes.ts). Aggiungere una nuova probe non richiede
+  // più di toccare questa lista: basta registrare la sua env var nel modulo.
+  resetProbeEnvForTests();
   dbLimitMock.mockResolvedValue([]);
 });
 
@@ -353,22 +356,11 @@ describe("computeOverallStatus — calcolo colore aggregato", () => {
 
 describe("Debounce notifiche per-area GraphHopper", () => {
   beforeEach(() => {
+    // Il beforeEach globale ha già azzerato TUTTE le env delle probe via
+    // resetProbeEnvForTests(): qui basta abilitare GraphHopper. Le probe TCP
+    // (Postgres/Redis) non aprono più socket reali sotto test (guard in
+    // thinkcentre-monitor-probes.ts), quindi i fake timers non causano hang.
     process.env.GRAPHHOPPER_URL = "https://gh.example.org";
-    // Rimuoviamo le env di TUTTI gli altri servizi per isolare il test solo su
-    // GH. Le probe TCP (Postgres/Redis) aprono socket reali e, con i fake
-    // timers attivi, il loro setTimeout di abort non scatta mai → il test si
-    // blocca. Le probe HTTP passano da global.fetch (mockato) ma le isoliamo
-    // comunque per determinismo.
-    delete process.env.OLLAMA_URL;
-    delete process.env.WHISPER_URL;
-    delete process.env.VALHALLA_URL;
-    delete process.env.NOMINATIM_URL;
-    delete process.env.TC_REDIS_URL;
-    delete process.env.POSTGRES_PROBE_HOST;
-    delete process.env.UFW_STATUS_URL;
-    delete process.env.PGADMIN_URL;
-    delete process.env.NGINX_MONITOR_URL;
-    delete process.env.UPTIME_KUMA_URL;
     vi.useFakeTimers();
   });
 
@@ -484,5 +476,41 @@ describe("Debounce notifiche per-area GraphHopper", () => {
       (c) => typeof c[0] === "string" && c[0].includes("GH · Balcani"),
     ).length;
     expect(countAfterSecond).toBe(2);
+  });
+});
+
+// =============================================================================
+// Suite 5 — PROBE_ENV_VARS parity (fail loud quando una probe nuova è dimenticata)
+// =============================================================================
+
+describe("PROBE_ENV_VARS — parità con le env lette dalle probe", () => {
+  // Env NON di probe lette nel modulo (test-mode guard): vanno escluse dal check.
+  const NON_PROBE_ENV = new Set(["VITEST", "NODE_ENV"]);
+
+  it("ogni process.env.X letto in thinkcentre-monitor-probes.ts è registrato in PROBE_ENV_VARS", async () => {
+    const fs = await import("node:fs");
+    const path = await import("node:path");
+    const raw = fs.readFileSync(
+      path.resolve(__dirname, "../jobs/thinkcentre-monitor-probes.ts"),
+      "utf8",
+    );
+    // Rimuovi i commenti (block /* */ e line //) per non catturare gli esempi
+    // come `delete process.env.X` nelle docstring.
+    const src = raw
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/\/\/[^\n]*/g, "");
+
+    const referenced = new Set<string>();
+    for (const m of src.matchAll(/process\.env\.([A-Z0-9_]+)/g)) {
+      const name = m[1];
+      if (!NON_PROBE_ENV.has(name)) referenced.add(name);
+    }
+
+    const registered = new Set<string>(PROBE_ENV_VARS);
+    const missing = [...referenced].filter((name) => !registered.has(name));
+
+    // Se questo fallisce: hai aggiunto una probe che legge una env var senza
+    // registrarla in PROBE_ENV_VARS → il test di isolamento non la azzererebbe.
+    expect(missing).toEqual([]);
   });
 });

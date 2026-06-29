@@ -17,15 +17,16 @@ to import them from the monitor module.
    but the monitor only re-exported some of them → `X is not a function` (surfaces as
    timeouts under parallel load). Keep the monitor's re-export list in sync.
 
-2. **runAllProbes opens REAL sockets for every configured service.** `runThinkCentreProbe`
-   → `runAllProbes` probes Ollama/Whisper/Valhalla/Nominatim/UFW/Redis/Postgres/pgAdmin/
-   nginx/UptimeKuma/GH. HTTP probes go through `global.fetch` (mocked), but **TCP probes
-   (`probePostgresOk`, `probeRedisOk`) use `net.createConnection` directly — not mocked.**
-   In this env `POSTGRES_PROBE_HOST` (etc.) are set, so with `vi.useFakeTimers()` active the
-   abort `setTimeout` never fires and the socket promise never settles → **15s timeout/hang.**
-   Any test that calls `runThinkCentreProbe` under fake timers MUST `delete` every probe env
-   var except the one under test. When a new probe/env var is added to `runAllProbes`, add it
-   to the test's `beforeEach` delete list too.
+2. **Rule: TCP probes must never open real sockets under test, and probe env isolation must
+   be a single source of truth — not a hand-kept delete list in the test.**
+   **Why:** raw `net.createConnection` probes (Postgres/Redis) never settle under
+   `vi.useFakeTimers()` (the abort `setTimeout` never fires), so any forgotten env var caused a
+   silent 15s hang. HTTP probes are safe (they go through the mocked `global.fetch`).
+   **How it's enforced now (so don't reintroduce the old pattern):** the low-level TCP helper
+   short-circuits when running under a test runner (VITEST / NODE_ENV==="test"); the env list
+   lives next to the probes and the test resets via that one helper + a parity test that fails
+   loudly if a probe reads an env var not registered in the list. Adding a probe = register its
+   env var next to the probe; never edit the test's isolation by hand.
 
 3. **db mock must match query shapes.** `isThinkCentreOffline` ends its query at `.where()`
    (awaited directly → expects an array, calls `rows.some`), while other helpers chain

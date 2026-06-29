@@ -17,6 +17,51 @@ export { isSelfHosted, fetchSelfHostedProfiles };
 
 const PROBE_TIMEOUT_MS = 5_000;
 
+/**
+ * Vero quando giriamo sotto un test runner (vitest imposta VITEST="true";
+ * NODE_ENV="test" copre gli altri casi). Usato per disinnescare le probe che
+ * aprono socket TCP reali: con i fake timers attivi il loro setTimeout di abort
+ * non scatta mai e il socket verso un host irraggiungibile non emette né
+ * `connect` né `error`, quindi la promise non si risolve e il test si blocca.
+ */
+const RUNNING_UNDER_TEST =
+  process.env.VITEST === "true" || process.env.NODE_ENV === "test";
+
+/**
+ * Elenco UNICO di tutte le env var lette dalle probe in questo modulo — la
+ * fonte di verità sta accanto alle probe che le consumano. Quando aggiungi una
+ * nuova probe in `runAllProbes`, aggiungi qui le sue env var: il test usa
+ * `resetProbeEnvForTests()` per isolarsi e non deve più mantenere a mano la
+ * propria lista di `delete process.env.X`.
+ */
+export const PROBE_ENV_VARS = [
+  "GRAPHHOPPER_URL",
+  "GRAPHHOPPER_TOKEN",
+  "OLLAMA_URL",
+  "OLLAMA_TOKEN",
+  "WHISPER_URL",
+  "WHISPER_TOKEN",
+  "NOMINATIM_URL",
+  "VALHALLA_URL",
+  "VALHALLA_API_KEY",
+  "UFW_STATUS_URL",
+  "TC_REDIS_URL",
+  "POSTGRES_PROBE_HOST",
+  "POSTGRES_PROBE_PORT",
+  "PGADMIN_URL",
+  "NGINX_MONITOR_URL",
+  "UPTIME_KUMA_URL",
+] as const;
+
+/**
+ * Helper SOLO per i test: azzera tutte le env var lette dalle probe così che
+ * ogni probe ricada nel ramo "non configurato" (null). Da chiamare in
+ * `beforeEach`. Mai usato in produzione.
+ */
+export function resetProbeEnvForTests(): void {
+  for (const name of PROBE_ENV_VARS) delete process.env[name];
+}
+
 export type OverallStatus = "green" | "yellow" | "red" | "idle";
 type ServiceKey = string;
 
@@ -188,6 +233,11 @@ async function probeUfwOk(): Promise<boolean | null> {
 }
 
 function tcpConnectOk(host: string, port: number): Promise<boolean | null> {
+  // Test-mode guard: sotto il test runner non apriamo socket reali. Con i fake
+  // timers il setTimeout di abort non scatta e il socket non si risolve mai →
+  // il test si bloccherebbe. Risolviamo subito a null (= non configurato) così
+  // le probe TCP restano isolate senza dover azzerare a mano le env var.
+  if (RUNNING_UNDER_TEST) return Promise.resolve(null);
   return new Promise((resolve) => {
     const socket = net.createConnection({ host, port });
     const timeout = setTimeout(() => { socket.destroy(); resolve(false); }, PROBE_TIMEOUT_MS);
