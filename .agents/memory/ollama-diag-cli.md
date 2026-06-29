@@ -42,3 +42,26 @@ schema + dati reali + drift dev↔prod) per diagnosi future più profonde.
   `${DIAG_OLLAMA_URL}/api/chat` (timeout 300s/chunk) + `cfAccessHeaders()`.
 - Flag: `--dry-run` (lista file), `--no-db`, `--branch`, `--max-files`, `--chunk-chars`.
 - È lungo (2000+ file): per prove rapide usa `--max-files N` / `--no-db` / `--dry-run`.
+- Dopo il report c'è uno step finale resumabile (Task #5189): genera un **manuale utente
+  Q&A** (`## D:`/`**R:**`) in `docs/bikerlink-qa-manual.md` (git-tracked); guardia di step
+  = `reportPath != null` (report fatto) poi `!done` (Q&A fatto), così vecchi state mid-run
+  generano comunque il Q&A senza `--reset`.
+
+## Push manuale Q&A → assistant ThinkCentre — `scripts/ollama-push-manual.ts`
+
+Inietta `docs/bikerlink-qa-manual.md` nel SYSTEM prompt di
+`scripts/ollama-modelfile/BikerLink.Modelfile` (tra i marker `INIZIO/FINE MANUALE UTENTE
+Q&A`, dentro il blocco `SYSTEM """…"""`) e ricrea il modello `bikerlink-assistant` via
+`POST ${OLLAMA_URL}/api/create` `{name,modelfile,stream:false}` — niente SSH/deploy.
+
+**Why:** cucire il manuale utente nell'assistente in-app del ThinkCentre senza training.
+
+**How to apply:**
+- Endpoint = `OLLAMA_URL` (ThinkCentre, **non** `DIAG_OLLAMA_URL`). Auth = `cfAccessHeaders()`
+  + `OLLAMA_TOKEN` su `Authorization: Bearer` **e** `X-Ollama-Token` (nginx accetta entrambi).
+- ORDINE CRITICO: contenuto costruito in memoria → push PRIMA → scrivi il Modelfile su disco
+  SOLO se ok; ThinkCentre giù / errore HTTP → exit 1, Modelfile invariato. `--dry-run` stampa
+  e basta (no call, no write). `"""` nel Q&A neutralizzato (chiuderebbe il SYSTEM block).
+- Flag: `--dry-run`, `--model-name` (default `bikerlink-assistant`), `--qa-file`. Poi punta
+  `OLLAMA_MODEL=bikerlink-assistant` (secret). Vincolo #5187: il run effettivo del 35b CPU
+  va da terminale (supera il cap 120s del foreground).

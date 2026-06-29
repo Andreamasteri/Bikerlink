@@ -32,6 +32,8 @@ export interface StudyState {
    */
   reduceQueue: string[] | null;
   reportPath: string | null;
+  /** Path del manuale utente Q&A generato (Task #5189); `null` = ancora da fare. */
+  qaPath: string | null;
   done: boolean;
 }
 

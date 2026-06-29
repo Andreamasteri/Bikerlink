@@ -118,6 +118,43 @@ Env aggiuntive rispetto alla diagnosi: `PROD_DATABASE_URL` (dump prod). Usa gli 
 NB: è un'operazione lunga (la codebase è grande). Usa `--dry-run` per vedere cosa
 verrebbe inviato, `--max-files`/`--no-db` per prove rapide.
 
+## Manuale Q&A utente → assistant ThinkCentre (`ollama-push-manual.ts`)
+
+Dopo la sintesi architetturale, `ollama-study-repo.ts` esegue un passo finale che
+chiede a Ollama DIAG un **manuale utente in formato Q&A** (50-100 coppie `## D: …` /
+`**R:** …`, punto di vista dell'utente finale) e lo salva in
+**`docs/bikerlink-qa-manual.md`** (file tracciato da git). È uno step resumabile come
+gli altri: con `--step` avanza una chiamata per volta dopo il report.
+
+Un secondo script inietta quel manuale nell'**assistente in-app** (l'Ollama del
+**ThinkCentre**, non il PC dedicato della diagnosi) creando/aggiornando il modello
+custom `bikerlink-assistant` via API, senza SSH:
+
+```bash
+npx tsx scripts/ollama-push-manual.ts                       # inietta + push al ThinkCentre
+npx tsx scripts/ollama-push-manual.ts --dry-run             # stampa il Modelfile, NON chiama, NON scrive
+npx tsx scripts/ollama-push-manual.ts --model-name bikerlink-assistant
+npx tsx scripts/ollama-push-manual.ts --qa-file docs/bikerlink-qa-manual.md
+```
+
+Cosa fa:
+1. Legge `docs/bikerlink-qa-manual.md` e `scripts/ollama-modelfile/BikerLink.Modelfile`.
+2. Inietta il Q&A come blocco `## MANUALE UTENTE Q&A` **dentro il SYSTEM prompt** del
+   Modelfile, tra i marker `INIZIO/FINE MANUALE UTENTE Q&A` (sostituisce il blocco
+   precedente se presente). Il contenuto è costruito **in memoria**.
+3. `POST ${OLLAMA_URL}/api/create` con `{ name, modelfile, stream:false }`, timeout 120s,
+   header **Cloudflare Access** (`cfAccessHeaders()`) + token custom `OLLAMA_TOKEN`
+   (Bearer / `X-Ollama-Token`).
+4. **Solo se il push riesce** scrive il Modelfile aggiornato su disco. Se il ThinkCentre
+   è irraggiungibile o l'endpoint risponde con errore → exit 1 e **nessuna modifica** al
+   Modelfile.
+
+Poi punta l'assistente in-app al modello aggiornato: `OLLAMA_MODEL=bikerlink-assistant`
+(secret Replit, via skill `environment-secrets`).
+
+Env aggiuntive: `OLLAMA_URL` (ThinkCentre, **distinto** da `DIAG_OLLAMA_URL`),
+`OLLAMA_TOKEN` (opz.). CF Access condiviso con gli altri servizi self-hosted.
+
 ## Out of scope
 
 - Nessun trigger automatico: solo esecuzione manuale o su richiesta.

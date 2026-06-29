@@ -50,6 +50,8 @@ import {
   ctxCharBudget,
   extractArchitecture,
   updateContext,
+  generateQaManual,
+  writeQaManual,
 } from "./ollama-study/ollama";
 import {
   resolveStateDir,
@@ -100,6 +102,7 @@ async function runStep(c: StepCtx): Promise<boolean> {
       dbSummary: null,
       reduceQueue: null,
       reportPath: null,
+      qaPath: null,
       done: false,
     };
     saveState(c.dir, state);
@@ -126,6 +129,7 @@ async function runStep(c: StepCtx): Promise<boolean> {
       dbSummary: null,
       reduceQueue: null,
       reportPath: null,
+      qaPath: null,
       done: false,
     };
     saveState(c.dir, state);
@@ -202,7 +206,7 @@ async function runStep(c: StepCtx): Promise<boolean> {
   }
 
   // 5. REDUCE finale: report + iniezione context.
-  if (!state.done) {
+  if (state.reportPath == null) {
     console.log("  📝 Sintesi report finale...");
     const summaries = state.reduceQueue as string[];
     const report = await composeReport(c.baseUrl, c.model, summaries, state.dbSummary, c.token, state.numCtx);
@@ -222,20 +226,41 @@ async function runStep(c: StepCtx): Promise<boolean> {
     let ctxMsg = "⚠️  sezione '## Architettura' non trovata nel report — context non aggiornato.";
     if (arch && updateContext(arch)) ctxMsg = `✅ bikerlink-context.md aggiornato (${arch.length} char).`;
 
-    state.done = true;
     state.reportPath = path.relative(ROOT, outPath);
     saveState(c.dir, state);
 
-    console.log("\n════════════════════════════════════════════════════════════");
     console.log(`  💾 Report: ${state.reportPath}`);
     console.log(`  📝 ${ctxMsg}`);
+    console.log(`  ➡️  Resta il manuale utente Q&A (rilancia con --step).`);
+    return true;
+  }
+
+  // 6. MAP finale: manuale utente Q&A (Task #5189). Si basa sul report già
+  //    salvato (fallback ai riassunti consolidati se il file non è leggibile).
+  if (!state.done) {
+    console.log("  📘 Generazione manuale utente Q&A...");
+    let context = "";
+    try {
+      context = fs.readFileSync(path.join(ROOT, state.reportPath), "utf8");
+    } catch {
+      context = (state.reduceQueue ?? []).join("\n\n");
+    }
+    const qa = await generateQaManual(c.baseUrl, c.model, context, c.token, state.numCtx);
+    state.qaPath = writeQaManual(qa);
+    state.done = true;
+    saveState(c.dir, state);
+
+    console.log("\n════════════════════════════════════════════════════════════");
+    console.log(`  💾 Report:       ${state.reportPath}`);
+    console.log(`  📘 Manuale Q&A:  ${state.qaPath}`);
+    console.log("  ➡️  Push all'assistant ThinkCentre: npx tsx scripts/ollama-push-manual.ts");
     console.log("════════════════════════════════════════════════════════════\n");
-    console.log(report.slice(0, 2000));
-    if (report.length > 2000) console.log("\n...[report troncato nella console, vedi il file]...");
+    console.log(qa.slice(0, 2000));
+    if (qa.length > 2000) console.log("\n...[manuale troncato nella console, vedi il file]...");
     return false;
   }
 
-  console.log(`  ✅ Studio già completato: ${state.reportPath}`);
+  console.log(`  ✅ Studio già completato: ${state.reportPath} (+ Q&A ${state.qaPath ?? "n/d"})`);
   return false;
 }
 

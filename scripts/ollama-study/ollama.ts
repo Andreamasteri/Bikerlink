@@ -255,3 +255,57 @@ export async function composeReport(
   ];
   return callOllama(baseUrl, model, messages, token, numCtx);
 }
+
+// ─── Manuale utente Q&A (Task #5189) ────────────────────────────────────────
+
+/** Percorso del manuale utente Q&A generato (tracciato da git). */
+export const QA_MANUAL_PATH = path.join(ROOT, "docs", "bikerlink-qa-manual.md");
+
+const QA_SYSTEM_PROMPT =
+  "Sei un esperto di prodotto che scrive documentazione per gli UTENTI FINALI dell'app " +
+  "italiana per motociclisti BikerLink. Conosci a fondo l'app dal report architetturale " +
+  "ricevuto. Scrivi in italiano semplice e amichevole, dal punto di vista di chi USA l'app: " +
+  "niente codice, niente nomi di file/funzioni/tabelle, niente dettagli implementativi, " +
+  "nessun dato di altri utenti.";
+
+/**
+ * REDUCE finale alternativo: a partire dal report architetturale, genera un
+ * manuale utente in formato Q&A (50-100 coppie) dal punto di vista dell'utente.
+ */
+export async function generateQaManual(
+  baseUrl: string,
+  model: string,
+  context: string,
+  token: string | undefined,
+  numCtx: number,
+): Promise<string> {
+  const budget = ctxCharBudget(numCtx);
+  const body = context.length > budget ? context.slice(0, budget) + "\n\n...[troncato per limite contesto]..." : context;
+  const messages = [
+    { role: "system", content: QA_SYSTEM_PROMPT },
+    {
+      role: "user",
+      content:
+        "Genera un MANUALE UTENTE BikerLink in formato Q&A: tra 50 e 100 coppie domanda/risposta " +
+        "che coprano TUTTE le funzionalità dell'app dal punto di vista dell'UTENTE FINALE. " +
+        "Risposte concise (2-4 frasi). Usa ESATTAMENTE questo formato per ogni voce, una dopo l'altra:\n" +
+        "## D: <domanda>\n**R:** <risposta>\n\n" +
+        "Nessun preambolo e nessuna conclusione: SOLO le coppie Q&A.\n\n" +
+        "--- REPORT ARCHITETTURALE DELLA CODEBASE ---\n" +
+        body,
+    },
+  ];
+  return callOllama(baseUrl, model, messages, token, numCtx);
+}
+
+/** Scrive il manuale Q&A in docs/bikerlink-qa-manual.md. Ritorna il path relativo. */
+export function writeQaManual(content: string): string {
+  fs.mkdirSync(path.dirname(QA_MANUAL_PATH), { recursive: true });
+  const head =
+    "# BikerLink — Manuale utente (Q&A)\n\n" +
+    "> Generato automaticamente da `scripts/ollama-study-repo.ts` (Ollama DIAG).\n" +
+    "> Da iniettare nell'assistant del ThinkCentre con `scripts/ollama-push-manual.ts`.\n" +
+    `> Ultimo aggiornamento: ${new Date().toISOString()}\n\n---\n\n`;
+  fs.writeFileSync(QA_MANUAL_PATH, head + content.trim() + "\n", "utf8");
+  return path.relative(ROOT, QA_MANUAL_PATH);
+}
