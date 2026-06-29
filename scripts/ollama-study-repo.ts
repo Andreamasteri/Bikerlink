@@ -2,67 +2,258 @@
  * BikerLink — Studio codebase + dump DB con Ollama (PC dedicato)  (Task #5187)
  *
  * Scarica l'intera codebase BikerLink da GitHub (token read-only), la manda a
- * Ollama a chunk per fargli studiare l'architettura, aggiunge al payload il dump
- * completo di schema + dati di ENTRAMBI i DB (dev e prod) e produce un report
- * architetturale in `logs/repo-study-<timestamp>.md`. La sezione `## Architettura`
- * del report viene iniettata in `.agents/skills/ollama-diagnostics/bikerlink-context.md`
- * così Ollama ha una conoscenza completa e persistente del progetto.
+ * Ollama a chunk per fargli studiare l'architettura, aggiunge il dump di schema
+ * + dati di ENTRAMBI i DB (dev e prod) e produce un report architetturale in
+ * `logs/repo-study-<timestamp>.md`. La sezione `## Architettura` del report viene
+ * iniettata in `.agents/skills/ollama-diagnostics/bikerlink-context.md` così
+ * Ollama ha una conoscenza completa e persistente del progetto.
  *
  * Distinto da `scripts/ollama-diagnose.ts` (diagnosi crash/boot): questo è uno
- * STUDIO completo, non un triage di crash. Non modifica i DB (sola lettura).
+ * STUDIO completo, non un triage. Non modifica i DB (sola lettura).
  *
- * La chiamata è HTTP DIRETTA all'endpoint Ollama (`${DIAG_OLLAMA_URL}/api/chat`),
- * con gli header del Service Token Cloudflare Access (se configurati) + Bearer
- * fallback. NON passa dal backend Express.
+ * STRATEGIA map-reduce (resumabile):
+ *   MAP    — ogni chunk viene riassunto in ISOLAMENTO (nessuna history
+ *            accumulata → niente overflow di contesto su repo grandi).
+ *   REDUCE — i riassunti (piccoli) vengono sintetizzati nel report finale.
+ *   STATO  — i file scaricati e i riassunti sono messi in cache su disco
+ *            (`.local/ollama-study-state/`), così con `--step` il run avanza
+ *            UNA chiamata Ollama per invocazione e sopravvive a interruzioni /
+ *            al cap dei 120s del foreground.
  *
- * Implementazione divisa in `scripts/ollama-study/`:
- *   config.ts   — costanti, ROOT e parsing CLI
- *   github.ts   — lista file + download dei contenuti dal repo
- *   db-dump.ts  — dump schema + dati di un DB (sola lettura)
- *   ollama.ts   — chunking, chiamata Ollama, iniezione context
+ * La chiamata è HTTP DIRETTA a `${DIAG_OLLAMA_URL}/api/chat` con gli header del
+ * Service Token Cloudflare Access (+ Bearer fallback). NON passa dal backend.
  *
  * Uso:
- *   npx tsx scripts/ollama-study-repo.ts
- *   npx tsx scripts/ollama-study-repo.ts --dry-run            # lista file, niente invio
- *   npx tsx scripts/ollama-study-repo.ts --no-db              # salta il dump dei DB
- *   npx tsx scripts/ollama-study-repo.ts --branch develop     # altro branch
- *   npx tsx scripts/ollama-study-repo.ts --max-files 800      # limita i file scaricati
- *   npx tsx scripts/ollama-study-repo.ts --chunk-chars 360000 # dimensione chunk
+ *   npx tsx scripts/ollama-study-repo.ts                  # run completo (terminale)
+ *   npx tsx scripts/ollama-study-repo.ts --step           # avanza di UN passo e esce
+ *   npx tsx scripts/ollama-study-repo.ts --reset          # azzera lo stato in cache
+ *   npx tsx scripts/ollama-study-repo.ts --dry-run        # lista file, niente invio
+ *   Flag: --no-db --branch <b> --max-files <n> --chunk-chars <n> --num-ctx <n>
+ *         --state-dir <path>
  *
- * Secret/env:
- *   DIAG_OLLAMA_URL    — URL base dell'Ollama sul PC dedicato (via Cloudflare Tunnel).
- *   DIAG_OLLAMA_MODEL  — modello da usare (default "qwen3.6:35b").
- *   DIAG_OLLAMA_TOKEN  — opzionale, Bearer token se l'endpoint è protetto.
- *   DIAG_GITHUB_TOKEN  — token GitHub READ-ONLY (fine-grained, Contents:read).
- *                        Fallback a GITHUB_TOKEN solo se DIAG_GITHUB_TOKEN assente.
- *   CF_ACCESS_CLIENT_ID / CF_ACCESS_CLIENT_SECRET — Service Token Cloudflare Access.
- *   DATABASE_URL       — DB dev (sola lettura).
- *   PROD_DATABASE_URL  — DB prod (sola lettura). Mancante → sezione "[non disponibile]".
+ * Secret/env: DIAG_OLLAMA_URL, DIAG_OLLAMA_MODEL, DIAG_OLLAMA_TOKEN (opz.),
+ *   DIAG_GITHUB_TOKEN (fallback GITHUB_TOKEN), CF_ACCESS_CLIENT_ID/SECRET,
+ *   DATABASE_URL, PROD_DATABASE_URL.
  */
 
 import fs from "fs";
 import path from "path";
-import {
-  ROOT,
-  GITHUB_REPO,
-  DEFAULT_MODEL,
-  DOWNLOAD_CONCURRENCY,
-  REQUEST_TIMEOUT_MS,
-  parseCli,
-} from "./ollama-study/config";
+import { ROOT, GITHUB_REPO, DEFAULT_MODEL, parseCli, type Cli } from "./ollama-study/config";
 import { githubToken, fetchFileList, downloadAll } from "./ollama-study/github";
 import { dumpDatabase } from "./ollama-study/db-dump";
-import { buildChunks, callOllama, STUDY_SYSTEM_PROMPT, extractArchitecture, updateContext } from "./ollama-study/ollama";
+import {
+  buildChunks,
+  summarizeChunk,
+  summarizeText,
+  foldSummaries,
+  composeReport,
+  ctxCharBudget,
+  extractArchitecture,
+  updateContext,
+} from "./ollama-study/ollama";
+import {
+  resolveStateDir,
+  loadFiles,
+  saveFiles,
+  loadState,
+  saveState,
+  clearState,
+  type StudyState,
+} from "./ollama-study/state";
+
+interface StepCtx {
+  cli: Cli;
+  baseUrl: string;
+  model: string;
+  token: string | undefined;
+  dir: string;
+  ghToken: string;
+}
+
+/** Esegue UN passo dello studio. Ritorna true se restano altri passi. */
+async function runStep(c: StepCtx): Promise<boolean> {
+  // 0. Init: scarica i file (una volta) e prepara lo stato.
+  let files = loadFiles(c.dir);
+  if (!files) {
+    console.log(`  📋 Lista file da GitHub (${GITHUB_REPO}@${c.cli.branch})...`);
+    let list = await fetchFileList(c.cli.branch, c.ghToken);
+    if (c.cli.maxFiles && list.length > c.cli.maxFiles) {
+      console.log(`  ✂️  Limito a ${c.cli.maxFiles} file (su ${list.length}).`);
+      list = list.slice(0, c.cli.maxFiles);
+    }
+    console.log(`  ⬇️  Scarico ${list.length} file...`);
+    const { downloaded, failed } = await downloadAll(list, c.cli.branch, c.ghToken);
+    if (failed.length) console.log(`  ⚠️  ${failed.length} file non scaricati.`);
+    saveFiles(c.dir, downloaded);
+    files = downloaded;
+    const chunks = buildChunks(downloaded, c.cli.chunkChars);
+    const state: StudyState = {
+      branch: c.cli.branch,
+      model: c.model,
+      chunkChars: c.cli.chunkChars,
+      numCtx: c.cli.numCtx,
+      noDb: c.cli.noDb,
+      maxFiles: c.cli.maxFiles,
+      totalChunks: chunks.length,
+      summaries: new Array<string | null>(chunks.length).fill(null),
+      dbRaw: null,
+      dbSummary: null,
+      reduceQueue: null,
+      reportPath: null,
+      done: false,
+    };
+    saveState(c.dir, state);
+    console.log(`  ✅ Init: ${downloaded.length} file, ${chunks.length} chunk (num_ctx ${state.numCtx}).`);
+    return true;
+  }
+
+  // Recovery: file in cache ma stato mancante (crash tra saveFiles e saveState).
+  // Ricostruisco lo stato iniziale dai file invece di obbligare a --reset.
+  let state = loadState(c.dir);
+  if (!state) {
+    console.log("  ♻️  Stato mancante ma file in cache: ricostruisco lo stato iniziale.");
+    const rebuilt = buildChunks(files, c.cli.chunkChars);
+    state = {
+      branch: c.cli.branch,
+      model: c.model,
+      chunkChars: c.cli.chunkChars,
+      numCtx: c.cli.numCtx,
+      noDb: c.cli.noDb,
+      maxFiles: c.cli.maxFiles,
+      totalChunks: rebuilt.length,
+      summaries: new Array<string | null>(rebuilt.length).fill(null),
+      dbRaw: null,
+      dbSummary: null,
+      reduceQueue: null,
+      reportPath: null,
+      done: false,
+    };
+    saveState(c.dir, state);
+  }
+  const chunks = buildChunks(files, state.chunkChars);
+  if (chunks.length !== state.summaries.length) {
+    throw new Error(
+      `Stato incoerente: ${chunks.length} chunk ma ${state.summaries.length} slot di riassunto. ` +
+        "I file in cache o chunk-chars sono cambiati: rilancia con --reset.",
+    );
+  }
+
+  // 1. MAP chunk: primo riassunto mancante.
+  const nextIdx = state.summaries.findIndex((s) => s === null);
+  if (nextIdx !== -1) {
+    console.log(`  🧩 Riassunto chunk ${nextIdx + 1}/${chunks.length}...`);
+    const summary = await summarizeChunk(c.baseUrl, c.model, chunks[nextIdx], nextIdx, chunks.length, c.token, state.numCtx);
+    state.summaries[nextIdx] = summary;
+    saveState(c.dir, state);
+    const left = state.summaries.filter((s) => s === null).length;
+    console.log(`  ✅ Chunk ${nextIdx + 1} fatto (${left} chunk rimanenti).`);
+    return true;
+  }
+
+  // 2. Dump DB (cache grezza), separato dalla chiamata Ollama.
+  if (!state.noDb && state.dbRaw === null) {
+    console.log("  🗄️  Dump database dev + prod (sola lettura)...");
+    const [dev, prod] = await Promise.all([
+      dumpDatabase("DEV", process.env.DATABASE_URL, false),
+      dumpDatabase("PROD", process.env.PROD_DATABASE_URL, false),
+    ]);
+    state.dbRaw = `${dev}\n\n${prod}`;
+    saveState(c.dir, state);
+    console.log(`  ✅ Dump DB in cache (${state.dbRaw.length} char).`);
+    return true;
+  }
+
+  // 3. MAP DB: riassunto del dump.
+  if (!state.noDb && state.dbSummary === null) {
+    console.log("  🧩 Riassunto del dump DB...");
+    state.dbSummary = await summarizeText(c.baseUrl, c.model, "i due database BikerLink (dev e prod)", state.dbRaw!, c.token, state.numCtx);
+    saveState(c.dir, state);
+    console.log("  ✅ Riassunto DB fatto.");
+    return true;
+  }
+
+  // 4. REDUCE gerarchico: inizializza la coda dai riassunti per-chunk e riducila
+  //    (fold) un batch per passo finché entra nel budget di contesto. Così la
+  //    sintesi finale non sfora `num_ctx` anche con tanti chunk.
+  if (state.reduceQueue === null) {
+    state.reduceQueue = state.summaries as string[];
+    saveState(c.dir, state);
+    return true;
+  }
+  const budget = ctxCharBudget(state.numCtx);
+  const dbLen = state.dbSummary?.length ?? 0;
+  const queueLen = (q: string[]): number => q.join("\n\n").length;
+  if (state.reduceQueue.length > 1 && queueLen(state.reduceQueue) + dbLen > budget) {
+    // Batch greedy dal fronte: almeno 2 elementi, senza sforare (budget - dbLen).
+    const target = Math.max(budget - dbLen, Math.floor(budget / 2));
+    const batch: string[] = [];
+    let acc = 0;
+    for (const s of state.reduceQueue) {
+      if (batch.length >= 2 && acc + s.length > target) break;
+      batch.push(s);
+      acc += s.length + 2;
+    }
+    console.log(`  🪢 Fold di ${batch.length}/${state.reduceQueue.length} riassunti (coda ${queueLen(state.reduceQueue)} char)...`);
+    const folded = await foldSummaries(c.baseUrl, c.model, batch, c.token, state.numCtx);
+    state.reduceQueue = [folded, ...state.reduceQueue.slice(batch.length)];
+    saveState(c.dir, state);
+    console.log(`  ✅ Fold fatto (coda ora ${state.reduceQueue.length} elementi).`);
+    return true;
+  }
+
+  // 5. REDUCE finale: report + iniezione context.
+  if (!state.done) {
+    console.log("  📝 Sintesi report finale...");
+    const summaries = state.reduceQueue as string[];
+    const report = await composeReport(c.baseUrl, c.model, summaries, state.dbSummary, c.token, state.numCtx);
+    const ts = new Date().toISOString().replace(/[:.]/g, "-");
+    const outPath = path.join(ROOT, "logs", `repo-study-${ts}.md`);
+    fs.mkdirSync(path.dirname(outPath), { recursive: true });
+    const head =
+      `# Studio codebase BikerLink — ${new Date().toISOString()}\n\n` +
+      `- Modello: \`${c.model}\` (num_ctx ${state.numCtx})\n` +
+      `- Endpoint: \`${c.baseUrl}\`\n` +
+      `- Branch: \`${state.branch}\`\n` +
+      `- File studiati: ${files.length} (${chunks.length} chunk, map-reduce)\n` +
+      `- DB: ${state.noDb ? "saltato" : "dev + prod inclusi"}\n\n---\n\n`;
+    fs.writeFileSync(outPath, head + report + "\n", "utf8");
+
+    const arch = extractArchitecture(report);
+    let ctxMsg = "⚠️  sezione '## Architettura' non trovata nel report — context non aggiornato.";
+    if (arch && updateContext(arch)) ctxMsg = `✅ bikerlink-context.md aggiornato (${arch.length} char).`;
+
+    state.done = true;
+    state.reportPath = path.relative(ROOT, outPath);
+    saveState(c.dir, state);
+
+    console.log("\n════════════════════════════════════════════════════════════");
+    console.log(`  💾 Report: ${state.reportPath}`);
+    console.log(`  📝 ${ctxMsg}`);
+    console.log("════════════════════════════════════════════════════════════\n");
+    console.log(report.slice(0, 2000));
+    if (report.length > 2000) console.log("\n...[report troncato nella console, vedi il file]...");
+    return false;
+  }
+
+  console.log(`  ✅ Studio già completato: ${state.reportPath}`);
+  return false;
+}
 
 async function main(): Promise<void> {
   const cli = parseCli();
   const baseUrl = process.env.DIAG_OLLAMA_URL?.trim();
   const model = process.env.DIAG_OLLAMA_MODEL?.trim() || DEFAULT_MODEL;
   const token = process.env.DIAG_OLLAMA_TOKEN?.trim() || undefined;
+  const dir = resolveStateDir(cli.stateDir);
 
   console.log("════════════════════════════════════════════════════════════");
-  console.log("  BikerLink — Studio codebase + dump DB con Ollama");
+  console.log("  BikerLink — Studio codebase + dump DB con Ollama (map-reduce)");
   console.log("════════════════════════════════════════════════════════════");
+
+  if (cli.reset) {
+    clearState(dir);
+    console.log(`  🧹 Stato azzerato: ${path.relative(ROOT, dir)}`);
+  }
 
   const ghToken = githubToken();
   if (!ghToken) {
@@ -76,125 +267,31 @@ async function main(): Promise<void> {
     return;
   }
 
-  // 1. Lista file
-  console.log(`\n  📋 Recupero lista file da GitHub (${GITHUB_REPO}@${cli.branch})...`);
-  let files: string[];
-  try {
-    files = await fetchFileList(cli.branch, ghToken);
-  } catch (err) {
-    console.error(`\n❌ Impossibile recuperare la lista file: ${(err as Error).message}`);
-    process.exitCode = 1;
-    return;
-  }
-  if (cli.maxFiles && files.length > cli.maxFiles) {
-    console.log(`  ✂️  Limito a ${cli.maxFiles} file (su ${files.length}).`);
-    files = files.slice(0, cli.maxFiles);
-  }
-  console.log(`  ✅ ${files.length} file rilevanti.`);
-
   if (cli.dryRun) {
-    console.log("\n  --dry-run: elenco file (nessun invio):\n");
+    let files = await fetchFileList(cli.branch, ghToken);
+    if (cli.maxFiles && files.length > cli.maxFiles) files = files.slice(0, cli.maxFiles);
+    console.log(`\n  --dry-run: ${files.length} file (nessun invio):\n`);
     files.forEach((f) => console.log(`    ${f}`));
-    console.log(`\n  Totale: ${files.length} file.`);
     return;
   }
 
-  // 2. Download
-  console.log(`\n  ⬇️  Scarico i contenuti (concorrenza ${DOWNLOAD_CONCURRENCY})...`);
-  const { downloaded, failed } = await downloadAll(files, cli.branch, ghToken);
-  if (failed.length) console.log(`  ⚠️  ${failed.length} file non scaricati.`);
-  console.log(`  ✅ ${downloaded.length} file scaricati.`);
-
-  // 3. Chunking
-  const chunks = buildChunks(downloaded, cli.chunkChars);
-  const totalChars = downloaded.reduce((a, f) => a + f.content.length, 0);
-  console.log(`  📦 ${chunks.length} chunk (~${cli.chunkChars} char/chunk, ${totalChars} char totali).`);
-
-  // 4. Dump DB
-  console.log(`\n  🗄️  Dump database${cli.noDb ? " (saltato: --no-db)" : " dev + prod"}...`);
-  const [devDump, prodDump] = await Promise.all([
-    dumpDatabase("DEV", process.env.DATABASE_URL, cli.noDb),
-    dumpDatabase("PROD", process.env.PROD_DATABASE_URL, cli.noDb),
-  ]);
-
-  // 5. Invio progressivo a Ollama
-  console.log(`\n  🤖 Invio a Ollama (${baseUrl}, modello ${model})...`);
-  const conversation: { role: string; content: string }[] = [{ role: "system", content: STUDY_SYSTEM_PROMPT }];
+  const ctx: StepCtx = { cli, baseUrl: baseUrl!, model, token, dir, ghToken };
   try {
-    for (let i = 0; i < chunks.length; i++) {
-      const header = `Chunk ${i + 1} di ${chunks.length} della codebase BikerLink.\n\n`;
-      conversation.push({ role: "user", content: header + chunks[i] + "\n\nConsolida brevemente." });
-      console.log(`  ⏳ Chunk ${i + 1}/${chunks.length} (timeout ${REQUEST_TIMEOUT_MS / 1000}s)...`);
-      const reply = await callOllama(baseUrl!, model, conversation, token);
-      conversation.push({ role: "assistant", content: reply });
+    if (cli.step) {
+      const more = await runStep(ctx);
+      console.log(more ? "\nSTATUS: MORE — restano altri passi (rilancia con --step)." : "\nSTATUS: DONE — studio completato.");
+    } else {
+      let more = true;
+      while (more) more = await runStep(ctx);
     }
-
-    if (!cli.noDb) {
-      console.log("  ⏳ Invio dump DB (schema + dati dev/prod)...");
-      conversation.push({
-        role: "user",
-        content:
-          "Di seguito il dump di schema e dati dei due database BikerLink. Studialo e " +
-          "annota il drift dev↔prod. Consolida brevemente.\n\n" +
-          devDump +
-          "\n\n" +
-          prodDump,
-      });
-      const dbReply = await callOllama(baseUrl!, model, conversation, token);
-      conversation.push({ role: "assistant", content: dbReply });
-    }
-
-    // 6. Sintesi finale
-    console.log("  ⏳ Richiesta report finale...");
-    conversation.push({
-      role: "user",
-      content:
-        "Produci ora un report completo dell'architettura BikerLink basato su tutto il " +
-        "materiale ricevuto. Usa ESATTAMENTE queste sezioni H2:\n" +
-        "## Architettura — panoramica architetturale e mappa dei moduli\n" +
-        "## Dipendenze critiche\n" +
-        "## Pattern ripetuti\n" +
-        "## Punti di rischio\n" +
-        "## Confronto schema dev↔prod\n" +
-        "La sezione '## Architettura' deve essere autosufficiente: verrà estratta e " +
-        "usata come system prompt persistente.",
-    });
-    const report = await callOllama(baseUrl!, model, conversation, token);
-
-    // Salvataggio report
-    const ts = new Date().toISOString().replace(/[:.]/g, "-");
-    const outDir = path.join(ROOT, "logs");
-    const outPath = path.join(outDir, `repo-study-${ts}.md`);
-    fs.mkdirSync(outDir, { recursive: true });
-    const head =
-      `# Studio codebase BikerLink — ${new Date().toISOString()}\n\n` +
-      `- Modello: \`${model}\`\n` +
-      `- Endpoint: \`${baseUrl}\`\n` +
-      `- Branch: \`${cli.branch}\`\n` +
-      `- File studiati: ${downloaded.length} (${chunks.length} chunk)\n` +
-      `- DB: ${cli.noDb ? "saltato" : "dev + prod inclusi"}\n\n---\n\n`;
-    fs.writeFileSync(outPath, head + report + "\n", "utf8");
-
-    // 7. Aggiornamento context
-    const arch = extractArchitecture(report);
-    let ctxMsg = "⚠️  sezione '## Architettura' non trovata nel report — context non aggiornato.";
-    if (arch && updateContext(arch)) {
-      ctxMsg = `✅ bikerlink-context.md aggiornato con la sezione Architettura (${arch.length} char).`;
-    }
-
-    console.log("\n════════════════════════════════════════════════════════════");
-    console.log(`  💾 Report: ${path.relative(ROOT, outPath)}`);
-    console.log(`  📝 ${ctxMsg}`);
-    console.log("════════════════════════════════════════════════════════════\n");
-    console.log(report.slice(0, 2000));
-    if (report.length > 2000) console.log("\n...[report troncato nella console, vedi il file]...");
   } catch (err) {
     const e = err as Error & { cause?: { code?: string } };
-    console.error("\n❌ Studio non riuscito: l'endpoint Ollama non ha risposto correttamente.");
-    if (e.name === "AbortError") console.error(`   Timeout dopo ${REQUEST_TIMEOUT_MS / 1000}s.`);
+    console.error("\n❌ Studio non riuscito.");
+    if (e.name === "AbortError") console.error("   Timeout: l'endpoint Ollama non ha risposto in tempo.");
     else if (["ECONNREFUSED", "ENOTFOUND", "EAI_AGAIN"].includes(e.cause?.code ?? ""))
       console.error("   Host irraggiungibile (PC spento o Cloudflare Tunnel giù).");
     console.error(`   Dettaglio: ${e.message}\n`);
+    console.error("   Lo stato parziale è salvato: correggi e rilancia (riprende da dove era).");
     process.exitCode = 1;
   }
 }

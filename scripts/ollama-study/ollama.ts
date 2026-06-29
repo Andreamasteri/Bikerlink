@@ -61,6 +61,7 @@ export async function callOllama(
   model: string,
   messages: { role: string; content: string }[],
   token: string | undefined,
+  numCtx?: number,
 ): Promise<string> {
   const url = `${baseUrl.replace(/\/$/, "")}/api/chat`;
   const controller = new AbortController();
@@ -68,12 +69,14 @@ export async function callOllama(
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   if (token) headers["Authorization"] = `Bearer ${token}`;
   Object.assign(headers, cfAccessHeaders());
+  const options: Record<string, unknown> = { temperature: 0.2 };
+  if (numCtx && numCtx > 0) options.num_ctx = numCtx;
   try {
     const res = await fetch(url, {
       method: "POST",
       headers,
       signal: controller.signal,
-      body: JSON.stringify({ model, stream: false, options: { temperature: 0.2 }, messages }),
+      body: JSON.stringify({ model, stream: false, options, messages }),
     });
     if (!res.ok) {
       const text = await res.text().catch(() => "");
@@ -118,4 +121,137 @@ export function updateContext(arch: string): boolean {
   }
   fs.writeFileSync(CONTEXT_PATH, next, "utf8");
   return true;
+}
+
+// ─── Map-reduce: riassunto per-chunk + sintesi finale ───────────────────────
+
+/** Budget di caratteri in input per stare in `numCtx` (≈3 char/token), lasciando
+ *  ~20% del contesto all'output del modello. */
+export function ctxCharBudget(numCtx: number): number {
+  return Math.max(8_000, Math.floor(numCtx * 3 * 0.8));
+}
+
+/**
+ * REDUCE intermedio (fold): consolida un BATCH di riassunti parziali in UN solo
+ * riassunto conciso, preservando i fatti chiave (moduli, responsabilità,
+ * dipendenze, rischi). Serve a far entrare nel contesto la sintesi finale quando
+ * i chunk sono tanti. Non produce le sezioni H2 finali: è un consolidamento.
+ */
+export async function foldSummaries(
+  baseUrl: string,
+  model: string,
+  parts: string[],
+  token: string | undefined,
+  numCtx: number,
+): Promise<string> {
+  const budget = ctxCharBudget(numCtx);
+  let joined = parts.map((p, i) => `### Parte ${i + 1}\n${p}`).join("\n\n");
+  if (joined.length > budget) joined = joined.slice(0, budget) + "\n\n...[troncato per limite contesto]...";
+  const messages = [
+    { role: "system", content: STUDY_SYSTEM_PROMPT },
+    {
+      role: "user",
+      content:
+        "Consolida i seguenti riassunti parziali della codebase BikerLink in UN UNICO riassunto conciso, " +
+        "preservando i fatti chiave (moduli e responsabilità, dipendenze, pattern, punti di rischio). " +
+        "NON usare intestazioni H2; niente preamboli.\n\n" +
+        joined,
+    },
+  ];
+  return callOllama(baseUrl, model, messages, token, numCtx);
+}
+
+/**
+ * MAP: riassume UN singolo chunk in ISOLAMENTO (nessuna history accumulata).
+ * Questo evita l'overflow di contesto su repo grandi e rende ogni chiamata
+ * indipendente (quindi resumabile).
+ */
+export async function summarizeChunk(
+  baseUrl: string,
+  model: string,
+  chunk: string,
+  idx: number,
+  total: number,
+  token: string | undefined,
+  numCtx: number,
+): Promise<string> {
+  const budget = ctxCharBudget(numCtx);
+  const body = chunk.length > budget ? chunk.slice(0, budget) + "\n\n...[troncato per limite contesto]..." : chunk;
+  const messages = [
+    { role: "system", content: STUDY_SYSTEM_PROMPT },
+    {
+      role: "user",
+      content:
+        `Questo è il chunk ${idx + 1}/${total} della codebase BikerLink, da analizzare in ISOLAMENTO. ` +
+        "Riassumi in modo strutturato e CONCISO (max ~350 parole): moduli/file presenti e loro responsabilità, " +
+        "dipendenze chiave, pattern ricorrenti, eventuali punti di rischio. Niente preamboli.\n\n" +
+        body,
+    },
+  ];
+  return callOllama(baseUrl, model, messages, token, numCtx);
+}
+
+/** MAP per testo generico (es. dump DB): riassunto strutturato entro il contesto. */
+export async function summarizeText(
+  baseUrl: string,
+  model: string,
+  label: string,
+  text: string,
+  token: string | undefined,
+  numCtx: number,
+): Promise<string> {
+  const budget = ctxCharBudget(numCtx);
+  const body = text.length > budget ? text.slice(0, budget) + "\n\n...[troncato per limite contesto]..." : text;
+  const messages = [
+    { role: "system", content: STUDY_SYSTEM_PROMPT },
+    {
+      role: "user",
+      content:
+        `Riassumi in modo strutturato e conciso ${label}. Evidenzia lo schema principale, le tabelle chiave, ` +
+        "le relazioni e ogni drift dev↔prod che noti.\n\n" +
+        body,
+    },
+  ];
+  return callOllama(baseUrl, model, messages, token, numCtx);
+}
+
+/**
+ * REDUCE: sintetizza i riassunti per-chunk (+ riassunto DB) nel report finale.
+ * L'input sono solo i riassunti (piccoli), quindi sta comodamente nel contesto.
+ */
+export async function composeReport(
+  baseUrl: string,
+  model: string,
+  summaries: string[],
+  dbSummary: string | null,
+  token: string | undefined,
+  numCtx: number,
+): Promise<string> {
+  const db = dbSummary ? `\n\n### Riassunto database (dev/prod)\n${dbSummary}` : "";
+  // Rete di sicurezza finale: anche se il fold gerarchico ha ridotto la coda,
+  // qui garantiamo che payload (riassunti + DB + scaffolding del prompt) stia nel
+  // budget di contesto. Copre anche il caso coda di 1 solo elemento sovradimensionato.
+  const budget = ctxCharBudget(numCtx);
+  const SCAFFOLD_OVERHEAD = 1_500;
+  const partsBudget = Math.max(2_000, budget - db.length - SCAFFOLD_OVERHEAD);
+  let parts = summaries.map((s, i) => `### Riassunto chunk ${i + 1}\n${s}`).join("\n\n");
+  if (parts.length > partsBudget) parts = parts.slice(0, partsBudget) + "\n\n...[troncato per limite contesto]...";
+  const messages = [
+    { role: "system", content: STUDY_SYSTEM_PROMPT },
+    {
+      role: "user",
+      content:
+        `Di seguito i riassunti per-chunk dell'INTERA codebase BikerLink${dbSummary ? " e dei due database" : ""}. ` +
+        "Sintetizzali in un UNICO report architetturale completo. Usa ESATTAMENTE queste sezioni H2:\n" +
+        "## Architettura — panoramica architetturale e mappa dei moduli\n" +
+        "## Dipendenze critiche\n" +
+        "## Pattern ripetuti\n" +
+        "## Punti di rischio\n" +
+        "## Confronto schema dev↔prod\n" +
+        "La sezione '## Architettura' deve essere autosufficiente: verrà estratta e usata come system prompt persistente.\n\n" +
+        parts +
+        db,
+    },
+  ];
+  return callOllama(baseUrl, model, messages, token, numCtx);
 }

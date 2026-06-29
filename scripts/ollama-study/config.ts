@@ -44,8 +44,14 @@ export const MAX_FILE_BYTES = 100_000;
 /** Concorrenza massima dei download da GitHub. */
 export const DOWNLOAD_CONCURRENCY = 10;
 
-/** Dimensione di default di un chunk di codice (caratteri ≈ 4 char/token). */
-export const DEFAULT_CHUNK_CHARS = 480_000;
+/** Dimensione di default di un chunk di codice (≈3-4 char/token). Tarata per
+ *  stare nel contesto `num_ctx` in modalità map-reduce (un chunk per chiamata). */
+export const DEFAULT_CHUNK_CHARS = 36_000;
+
+/** Finestra di contesto richiesta a Ollama (token). Senza `num_ctx` esplicito
+ *  Ollama tronca SILENZIOSAMENTE il prompt al default (~4k token), quindi i
+ *  chunk grandi verrebbero quasi ignorati dal modello. */
+export const DEFAULT_NUM_CTX = 16_384;
 
 /** Budget massimo di caratteri per il dump DATI dei DB (schema sempre intero). */
 export const MAX_DB_CHARS = 200_000;
@@ -70,6 +76,10 @@ export interface Cli {
   branch: string;
   maxFiles: number | null;
   chunkChars: number;
+  numCtx: number;
+  step: boolean;
+  reset: boolean;
+  stateDir: string | null;
 }
 
 export function parseCli(): Cli {
@@ -91,5 +101,9 @@ export function parseCli(): Cli {
     branch: value("--branch") || DEFAULT_BRANCH,
     maxFiles: intValue("--max-files", null),
     chunkChars: intValue("--chunk-chars", DEFAULT_CHUNK_CHARS) ?? DEFAULT_CHUNK_CHARS,
+    numCtx: intValue("--num-ctx", DEFAULT_NUM_CTX) ?? DEFAULT_NUM_CTX,
+    step: flag("--step"),
+    reset: flag("--reset"),
+    stateDir: value("--state-dir"),
   };
 }
