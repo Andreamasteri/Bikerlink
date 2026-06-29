@@ -20,7 +20,7 @@
  *
  * Task #3017 — JSON repair layer: prima di propagare un errore di parse,
  * `callOllamaChat` tenta un repair del JSON malformato (trailing comma, blocchi
- * ```json```, chiavi non quotate) e logga ogni repair come 'repaired' in ai_call_logs.
+ * ```json```, chiavi non quotate) e logga ogni repair come 'json_repaired' in ai_call_logs.
  */
 
 import { createOllama } from "ollama-ai-provider-v2";
@@ -28,6 +28,7 @@ import { generateObject, generateText, type LanguageModel } from "ai";
 import type { z } from "zod";
 import { repairJson } from "./json-repair";
 import { isThinkCentreOffline } from "./thinkcentre-offline";
+import { logAiCall } from "./ai-logger";
 
 const OLLAMA_URL = process.env.OLLAMA_URL?.replace(/\/$/, "");
 const OLLAMA_TOKEN = process.env.OLLAMA_TOKEN ?? "";
@@ -154,6 +155,7 @@ export async function callOllamaChat<T = string>(
   }
 
   let lastErr: unknown;
+  const callStart = Date.now();
   for (let attempt = 0; attempt <= jsonRetries; attempt++) {
     try {
       // check-ai-direct-generateobject: safe — Ollama supports json_schema natively
@@ -172,6 +174,16 @@ export async function callOllamaChat<T = string>(
           if (validated.success) {
             console.warn(`[Ollama] JSON repair riuscito (tentativo ${attempt + 1})`);
             onRepair?.(attempt + 1);
+            // Scrivi il repair in ai_call_logs — fire-and-forget, non blocca il ritorno.
+            logAiCall({
+              provider: "ollama",
+              modelId: OLLAMA_MODEL,
+              tokensIn: 0,
+              tokensOut: 0,
+              latencyMs: Date.now() - callStart,
+              costUsd: 0,
+              error: "json_repaired",
+            });
             return validated.data;
           }
         }

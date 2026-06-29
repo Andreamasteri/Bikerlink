@@ -44,7 +44,8 @@ router.get("/metrics", async (req: Request, res: Response) => {
           tokensOut: sql<number>`coalesce(sum(tokens_out),0)::int`,
           costUsd: sql<number>`coalesce(sum(cost_usd),0)::float`,
           degradedCount: sql<number>`sum(case when degraded then 1 else 0 end)::int`,
-          errorCount: sql<number>`sum(case when error is not null and error <> 'repaired' then 1 else 0 end)::int`,
+          errorCount: sql<number>`sum(case when error is not null and error not in ('json_repaired','repaired') then 1 else 0 end)::int`,
+          repairCount: sql<number>`sum(case when error in ('json_repaired','repaired') then 1 else 0 end)::int`,
         })
         .from(aiCallLogs)
         .where(gte(aiCallLogs.createdAt, since))
@@ -57,7 +58,8 @@ router.get("/metrics", async (req: Request, res: Response) => {
           tokensOut: sql<number>`coalesce(sum(tokens_out),0)::int`,
           costUsd: sql<number>`coalesce(sum(cost_usd),0)::float`,
           degradedCount: sql<number>`sum(case when degraded then 1 else 0 end)::int`,
-          errorCount: sql<number>`sum(case when error is not null and error <> 'repaired' then 1 else 0 end)::int`,
+          errorCount: sql<number>`sum(case when error is not null and error not in ('json_repaired','repaired') then 1 else 0 end)::int`,
+          repairCount: sql<number>`sum(case when error in ('json_repaired','repaired') then 1 else 0 end)::int`,
         })
         .from(aiCallLogs)
         .where(gte(aiCallLogs.createdAt, since)),
@@ -85,7 +87,7 @@ router.get("/metrics", async (req: Request, res: Response) => {
         .from(aiCallLogs)
         .where(and(
           gte(aiCallLogs.createdAt, since),
-          sql`(degraded = true or (error is not null and error <> 'repaired'))`,
+          sql`(degraded = true or (error is not null and error not in ('json_repaired','repaired')))`,
         ))
         .orderBy(desc(aiCallLogs.createdAt))
         .limit(20),
@@ -110,6 +112,10 @@ router.get("/metrics", async (req: Request, res: Response) => {
         errorRate: totals?.calls
           ? Number((((totals.errorCount ?? 0) / totals.calls) * 100).toFixed(1))
           : 0,
+        repairCount: totals?.repairCount ?? 0,
+        repairRate: totals?.calls
+          ? Number((((totals.repairCount ?? 0) / totals.calls) * 100).toFixed(2))
+          : 0,
         latencyP50Ms: percentile(sorted, 50),
         latencyP95Ms: percentile(sorted, 95),
       },
@@ -123,6 +129,10 @@ router.get("/metrics", async (req: Request, res: Response) => {
         errorCount: r.errorCount ?? 0,
         errorRate: r.calls
           ? Number((((r.errorCount ?? 0) / r.calls) * 100).toFixed(1))
+          : 0,
+        repairCount: r.repairCount ?? 0,
+        repairRate: r.calls
+          ? Number((((r.repairCount ?? 0) / r.calls) * 100).toFixed(2))
           : 0,
       })),
       recentIssues: recentIssues.map((r) => ({
