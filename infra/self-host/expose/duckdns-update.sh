@@ -1,4 +1,8 @@
 #!/usr/bin/env bash
+# ⚠️ OBSOLETO — DuckDNS disabilitato il 29 Giugno 2026.
+# Il ThinkCentre usa ora Cloudflare Tunnel su *.biker-link.net.
+# Questo script non va eseguito in produzione.
+#
 # =============================================================================
 # BikerLink — duckdns-update.sh
 # Aggiorna l'IP del sottodominio DuckDNS chiamando l'API ufficiale.

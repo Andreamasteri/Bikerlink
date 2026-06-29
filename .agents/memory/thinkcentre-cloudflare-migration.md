@@ -1,6 +1,6 @@
 ---
 name: ThinkCentre → Cloudflare migration notes
-description: Migrazione completata da DuckDNS+nginx+LE a Cloudflare Tunnel (cloudflared). Tunnel bikerlink-tc attivo sul TC, dominio biker-link.net su Cloudflare.
+description: Migrazione COMPLETATA da DuckDNS+nginx+LE a Cloudflare Tunnel. DuckDNS/nginx/certbot DISABILITATI il 29-giu-2026. Solo cloudflared attivo su biker-link.net.
 ---
 
 # ThinkCentre — Cloudflare Tunnel (MIGRAZIONE COMPLETATA)
@@ -53,10 +53,14 @@ Secret aggiornati:
 
 ---
 
-## Setup precedente (DuckDNS — DISMESSO)
-Tutti i vecchi URL `*.bikerlink.duckdns.org` non sono più usati da Replit.
-Il DuckDNS timer sul TC può essere disabilitato.
-Il certificato Let's Encrypt e nginx rimangono sul TC ma non sono più necessari per l'esposizione esterna.
+## Setup precedente (DuckDNS — DISMESSO e DISABILITATO)
+Tutti i vecchi URL `*.bikerlink.duckdns.org` non sono più raggiungibili.
+**29 Giugno 2026** — Disabilitati sul TC:
+- `duckdns.timer` + `duckdns.service` → `disabled`
+- `nginx` → `disabled`
+- `certbot.timer` → `disabled`
+Il cert Let's Encrypt rimane sul disco in `/etc/letsencrypt/live/bikerlink/` (non rinnovato).
+Può essere rimosso con: `sudo certbot delete --cert-name bikerlink`
 
 ---
 

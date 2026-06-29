@@ -1,3 +1,50 @@
+# Deploy Log — Dismantling DuckDNS + nginx + certbot (29 Giugno 2026)
+
+## Obiettivo
+Con il Cloudflare Tunnel (`cloudflared.service`) attivo e stabile, il vecchio stack DuckDNS + nginx + Let's Encrypt è diventato ridondante e aumentava la superficie d'attacco. Questo log documenta la disattivazione completa.
+
+## Azioni eseguite sul ThinkCentre
+
+```bash
+# 1. DuckDNS — timer e service disabilitati
+sudo systemctl disable --now duckdns.timer duckdns.service
+
+# 2. nginx — fermato e disabilitato
+sudo systemctl disable --now nginx
+
+# 3. certbot — timer di rinnovo disabilitato
+sudo systemctl disable --now certbot.timer certbot.service
+```
+
+## Stato finale verificato
+
+| Servizio | is-active | is-enabled |
+|---|---|---|
+| `duckdns.timer` | inactive | **disabled** |
+| `duckdns.service` | inactive | disabled |
+| `nginx` | inactive | **disabled** |
+| `certbot.timer` | inactive | **disabled** |
+| `cloudflared` | **active** | **enabled** ✅ |
+
+## Cosa rimane attivo
+
+- **Cloudflare Tunnel** (`cloudflared.service`) — unico punto di esposizione esterna
+- Tutti i servizi backend girano ancora su `localhost` (GraphHopper, Valhalla, Nominatim, Whisper, Ollama, TC Agent)
+- Il cert Let's Encrypt (`/etc/letsencrypt/live/bikerlink/`) rimane sul disco ma non viene più rinnovato né usato — può essere rimosso manualmente in futuro con `sudo certbot delete --cert-name bikerlink`
+
+## Verifica esposizione (post-disattivazione)
+
+I servizi sono raggiungibili solo via Cloudflare Tunnel sugli URL `*.biker-link.net`:
+- `gh.biker-link.net` → GH multi-area
+- `valhalla.biker-link.net` → Valhalla
+- `whisper.biker-link.net` → Whisper
+- `nominatim.biker-link.net` → Nominatim
+- `tc.biker-link.net` → TC Agent metrics
+
+Le vecchie URL `*.bikerlink.duckdns.org` non sono più funzionanti (DuckDNS fermato, porte router non più necessarie).
+
+---
+
 # Deploy Log — nginx catch-all listen (27 Giugno 2026)
 
 ## Obiettivo

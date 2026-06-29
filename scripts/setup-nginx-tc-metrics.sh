@@ -1,4 +1,8 @@
 #!/usr/bin/env bash
+# ⚠️ OBSOLETO — nginx e DuckDNS disabilitati il 29 Giugno 2026.
+# Il ThinkCentre usa ora Cloudflare Tunnel su *.biker-link.net.
+# Questo script non va più eseguito in produzione.
+#
 # =============================================================================
 # BikerLink — Aggiungi tc.bikerlink.duckdns.org al certificato TLS e nginx
 #
@@ -15,6 +19,10 @@
 # =============================================================================
 
 set -euo pipefail
+
+echo "ERRORE: Questo script è OBSOLETO. nginx e DuckDNS sono stati disabilitati il 29 Giugno 2026." >&2
+echo "Il ThinkCentre usa Cloudflare Tunnel su *.biker-link.net. Non eseguire questo script." >&2
+exit 1
 
 DOMAIN="tc.bikerlink.duckdns.org"
 BASE_DOMAIN="bikerlink.duckdns.org"

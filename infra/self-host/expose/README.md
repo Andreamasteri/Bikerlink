@@ -5,9 +5,12 @@ Lo stack self-host avvia GraphHopper, Valhalla, Ollama, Whisper e Nominatim
 cloud e non può raggiungere `localhost`: serve esporre tutti i servizi su un
 dominio pubblico in HTTPS con autenticazione a token.
 
-> **Obiettivo consigliato: Opzione C — DuckDNS.**
-> È la strada più semplice se hai IP dinamico e non vuoi dipendere da Tailscale
-> o da Cloudflare. Richiede solo di aprire le porte 80/443 sul router.
+> **⚠️ SETUP ATTUALE: Opzione A — Cloudflare Tunnel (ATTIVO).**
+> Il ThinkCentre è già esposto via Cloudflare Tunnel (`cloudflared.service`) su
+> `*.biker-link.net`. DuckDNS, nginx e certbot sono stati **disabilitati** il
+> 29 Giugno 2026. Non sono più necessari né attivi.
+> Per dettagli sull'infrastruttura attuale, vedi `.agents/memory/thinkcentre-cloudflare-migration.md`.
+> Per il log della disattivazione, vedi `DEPLOY-LOG.md` (prima voce).
 
 ---
 
