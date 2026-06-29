@@ -9,8 +9,16 @@
 // Logging: ogni chiamata viene loggata in ai_call_logs (fire-and-forget).
 import { streamText, stepCountIs } from "ai";
 import { runWithFallback, estimateCostUsd, type ResolvedModel } from "../moderation/provider";
-import { buildSystemPrompt, buildAdminSystemPrompt, type KnowledgeEntry } from "./knowledge";
+import {
+  buildSystemPrompt,
+  buildAdminSystemPrompt,
+  buildHorusSystemPrompt,
+  buildAresSystemPrompt,
+  type KnowledgeEntry,
+} from "./knowledge";
 import { getOllamaModel, isOllamaConfigured, isOllamaReachable } from "../../lib/ollama-client";
+import { AI_ROSTER, type AiPersonaId } from "./roster";
+import { isAresConfigured, getAresModelId, streamAresChat } from "../../lib/ares-client";
 import { retrieveContext, formatRagContext, indexKnowledge } from "./rag";
 import { OLLAMA_TOOLS } from "./tools";
 import { logAiCall } from "../../lib/ai-logger";
@@ -21,6 +29,8 @@ import { pruneUserMemory, MEMORY_TURNS_LIMIT } from "./memory-pruner";
 import { fetchUserLiveContext } from "./user-context";
 
 const OLLAMA_FALLBACK_MODEL_ID = process.env.OLLAMA_MODEL ?? "mistral-nemo:latest";
+// Task #5197 — Horus usa un modello Ollama dedicato (stessa infra di Bowie).
+const HORUS_MODEL_ID = process.env.OLLAMA_ROUTING_MODEL?.trim() || "bikerlink-routing";
 
 export interface AssistantAgentOpts {
   message: string;
@@ -36,6 +46,13 @@ export interface AssistantAgentOpts {
   adminContext?: string;
   // Soluzione 3 — Codice sorgente da GitHub (tools/actions) per admin mode.
   adminCodeContext?: string;
+  // Task #5197 — Persona attiva: "bowie" (default, entry point), "horus"
+  // (specialista percorsi) o "ares" (diagnostica tecnica, solo admin). La
+  // risoluzione dell'handoff avviene nel route; qui si applica solo.
+  persona?: AiPersonaId;
+  // Callback invocata quando la persona che risponde è nota (prima dei delta),
+  // così il client può mostrare CHI sta rispondendo.
+  onPersona?: (p: { id: AiPersonaId; name: string }) => void;
 }
 
 export interface AssistantAgentResult {
@@ -46,6 +63,9 @@ export interface AssistantAgentResult {
   tokensOut: number;
   costUsd: number;
   degraded: boolean;
+  // Task #5197 — Persona EFFETTIVA che ha risposto (può differire da quella
+  // richiesta: es. Ares offline → fallback a Bowie).
+  persona: { id: AiPersonaId; name: string };
 }
 
 // ── Memoria conversazionale ───────────────────────────────────────────────────
@@ -97,8 +117,41 @@ export async function runAssistantAgent(opts: AssistantAgentOpts): Promise<Assis
   const startTs = Date.now();
   const isAdmin = opts.platform === "admin";
 
+  // Task #5197 — Persona richiesta (handoff risolto a monte nel route).
+  // Difesa in profondità: Ares è SOLO per gli admin. Il route già lo garantisce,
+  // ma se runAssistantAgent venisse chiamato direttamente con persona="ares" fuori
+  // dalla modalità admin, ricadiamo su Bowie invece di esporre la diagnostica.
+  const requestedPersona: AiPersonaId =
+    opts.persona === "ares" && !isAdmin ? "bowie" : (opts.persona ?? "bowie");
+  // Persona EFFETTIVA: può cambiare se la richiesta fallisce (es. Ares offline).
+  let effectivePersona: AiPersonaId = requestedPersona;
+  // Tool calling server-side abilitato SOLO per Bowie (utente e admin); Horus è
+  // advisory e Ares passa per un endpoint dedicato.
+  const enableTools = requestedPersona === "bowie";
+  // Modello Ollama: Horus usa il modello dedicato; Bowie quello di default.
+  const ollamaModelName = requestedPersona === "horus" ? HORUS_MODEL_ID : undefined;
+
   let system: string;
-  if (isAdmin) {
+  if (requestedPersona === "ares") {
+    // Ares: diagnostica tecnica (solo admin), snapshot piattaforma nel prompt.
+    system = buildAresSystemPrompt(opts.adminContext ?? "");
+  } else if (requestedPersona === "horus") {
+    // Horus: specialista percorsi. RAG + contesto utente come Bowie, persona diversa.
+    indexKnowledge(opts.customFaqs ?? []);
+    const ragSnippets = retrieveContext(opts.message, {
+      k: 3,
+      threshold: 0.05,
+      extra: opts.customFaqs ?? [],
+    });
+    const ragContext = formatRagContext(ragSnippets);
+    const userContext = await fetchUserLiveContext(opts.userId);
+    system = buildHorusSystemPrompt({
+      platform: (isAdmin ? "web" : opts.platform) as "android" | "ios" | "web",
+      userId: opts.userId,
+      userContext: userContext || undefined,
+      ragContext,
+    });
+  } else if (isAdmin) {
     // Task #4842 — Modalità admin: system prompt dedicato con snapshot piattaforma.
     // Soluzione 3 — codeContext da GitHub (tools/actions) iniettato opzionalmente.
     system = buildAdminSystemPrompt(opts.adminContext ?? "", opts.adminCodeContext);
@@ -165,7 +218,8 @@ export async function runAssistantAgent(opts: AssistantAgentOpts): Promise<Assis
       abortSignal: opts.signal,
       temperature: 0.3,
       // Task #3017 — Tool calling: solo per Ollama, con max 3 step
-      ...(isOllama ? { tools: OLLAMA_TOOLS as never, stopWhen: stepCountIs(3) as never } : {}),
+      // Task #5197 — abilitato solo per la persona Bowie (Horus è advisory).
+      ...(isOllama && enableTools ? { tools: OLLAMA_TOOLS as never, stopWhen: stepCountIs(3) as never } : {}),
     });
     for await (const delta of result.textStream) {
       finalText += delta;
@@ -179,19 +233,66 @@ export async function runAssistantAgent(opts: AssistantAgentOpts): Promise<Assis
 
   let done = false;
 
+  // 0) Task #5197 — Ares: AI di diagnostica su PC fisso dedicato (DIAG_OLLAMA_*).
+  //    Endpoint separato (/api/chat HTTP diretta), NON la chain Ollama/cloud.
+  //    Se Ares è offline, degrada con GRAZIA: Bowie riprende con un messaggio
+  //    garbato (nessun crash, nessun secret stampato).
+  if (requestedPersona === "ares") {
+    opts.onPersona?.({ id: "ares", name: AI_ROSTER.ares.name });
+    try {
+      if (!isAresConfigured) throw new Error("Ares non configurato (DIAG_OLLAMA_URL mancante).");
+      await streamAresChat({
+        system,
+        messages: messages.map((m) => ({ role: m.role, content: m.content })),
+        signal: opts.signal,
+        timeoutMs: 60_000,
+        onDelta: (delta) => {
+          finalText += delta;
+          emittedAny = true;
+          opts.onTextDelta?.(delta);
+        },
+      });
+      provider = "ares";
+      modelId = getAresModelId();
+      done = true;
+      console.log("[assistant] risposta da Ares (diagnostica)");
+    } catch (aresErr) {
+      if (emittedAny) {
+        // Stream già parziale: non ripartire, segnala degraded.
+        console.warn("[assistant] Ares fallito a metà stream, mantengo il parziale:", (aresErr as Error).message);
+        degraded = true;
+        done = true;
+      } else {
+        // Fallback garbato: Bowie riprende la parola.
+        console.warn("[assistant] Ares offline, fallback a Bowie:", (aresErr as Error).message);
+        effectivePersona = "bowie";
+        opts.onPersona?.({ id: "bowie", name: AI_ROSTER.bowie.name });
+        finalText =
+          "Ho provato a passare la parola ad Ares (la nostra AI tecnica, gira su una macchina dedicata), ma al momento non risponde. Riprova più tardi.";
+        provider = "fallback";
+        modelId = "ares-offline";
+        opts.onTextDelta?.(finalText);
+        done = true;
+      }
+    }
+  } else {
+    // Bowie/Horus: notifica la persona prima di iniziare lo stream.
+    opts.onPersona?.({ id: effectivePersona, name: AI_ROSTER[effectivePersona].name });
+  }
+
   // 1) Ollama self-hosted — provider PRIMARIO (ThinkCentre, costo zero, illimitato).
   //    Coerente con il resto del backend (moderation, routing engine, watchdog):
   //    Ollama è il primo tentativo ovunque. Tool calling server-side abilitato (maxSteps: 3).
   //    Il probe isOllamaReachable() ha cache 60s: aggiunge latenza minima (<1ms se cached).
-  if (isOllamaConfigured) {
+  if (!done && isOllamaConfigured) {
     try {
       const reachable = await isOllamaReachable();
       if (reachable) {
-        await streamWith(getOllamaModel() as unknown as Parameters<typeof streamText>[0]["model"], true);
+        await streamWith(getOllamaModel(ollamaModelName) as unknown as Parameters<typeof streamText>[0]["model"], true);
         provider = "ollama";
-        modelId = OLLAMA_FALLBACK_MODEL_ID;
+        modelId = ollamaModelName ?? OLLAMA_FALLBACK_MODEL_ID;
         done = true;
-        console.log("[assistant] risposta da ollama (primario)");
+        console.log(`[assistant] risposta da ollama (primario, persona=${effectivePersona})`);
       } else {
         console.warn("[assistant] Ollama non raggiungibile, scalo a chain cloud");
       }
@@ -276,6 +377,7 @@ export async function runAssistantAgent(opts: AssistantAgentOpts): Promise<Assis
     tokensOut,
     costUsd,
     degraded,
+    persona: { id: effectivePersona, name: AI_ROSTER[effectivePersona].name },
   };
 }
 

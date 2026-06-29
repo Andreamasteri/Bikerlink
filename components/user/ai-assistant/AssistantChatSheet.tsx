@@ -24,7 +24,7 @@ import { isAiKeyMissingResponse, isAiKeyMissingError, AI_KEY_MISSING_MESSAGE } f
 import { currentAssistantPlatform } from "@/hooks/useAssistantConfig";
 import { executeClientAction } from "@/lib/ai-assistant/client-actions";
 import AssistantActionConfirmSheet from "./AssistantActionConfirmSheet";
-import type { AssistantChatMessage, AssistantProposedAction } from "@/lib/ai-assistant/types";
+import type { AssistantChatMessage, AssistantProposedAction, AssistantPersona } from "@/lib/ai-assistant/types";
 
 interface Props {
   visible: boolean;
@@ -74,14 +74,23 @@ export default function AssistantChatSheet({ visible, onClose }: Props) {
           if (ev.event === "delta") {
             const d = (ev.data as { text?: string }).text ?? "";
             setMessages((prev) => prev.map((m) => m.id === asstId ? { ...m, content: m.content + d } : m));
+          } else if (ev.event === "persona") {
+            // Task #5197 — il server annuncia CHI risponde (Bowie/Horus/Ares).
+            const p = ev.data as AssistantPersona;
+            setMessages((prev) => prev.map((m) => m.id === asstId ? { ...m, persona: p } : m));
           } else if (ev.event === "action") {
             const a = ev.data as AssistantProposedAction;
             collectedActions.push(a);
           } else if (ev.event === "done") {
-            const d = ev.data as { text?: string };
+            const d = ev.data as { text?: string; persona?: AssistantPersona };
             setMessages((prev) => prev.map((m) =>
               m.id === asstId
-                ? { ...m, content: d.text ?? m.content, actions: collectedActions.length ? collectedActions : undefined }
+                ? {
+                    ...m,
+                    content: d.text ?? m.content,
+                    actions: collectedActions.length ? collectedActions : undefined,
+                    persona: d.persona ?? m.persona,
+                  }
                 : m,
             ));
           } else if (ev.event === "error") {
@@ -129,6 +138,13 @@ export default function AssistantChatSheet({ visible, onClose }: Props) {
   const data = React.useMemo(() => [...messages].reverse(), [messages]);
   const hasMessages = messages.length > 0;
 
+  // Task #5197 — colore distintivo per ciascuna AI nelle etichette di chat.
+  const personaColor = useCallback((id: AssistantPersona["id"]): string => {
+    if (id === "horus") return colors.success;
+    if (id === "ares") return colors.warning;
+    return colors.accent; // bowie
+  }, [colors.success, colors.warning, colors.accent]);
+
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="formSheet" onRequestClose={onClose}>
       <KeyboardAvoidingView
@@ -158,6 +174,11 @@ export default function AssistantChatSheet({ visible, onClose }: Props) {
                   ? { backgroundColor: colors.primary, alignSelf: "flex-end" }
                   : { backgroundColor: colors.surface, alignSelf: "flex-start" },
               ]}>
+                {item.role === "assistant" && item.persona ? (
+                  <Text style={[styles.personaLabel, { color: personaColor(item.persona.id) }]}>
+                    {item.persona.name}
+                  </Text>
+                ) : null}
                 <Text style={{ color: item.role === "user" ? "#fff" : colors.text }}>
                   {item.content || (streaming && item.role === "assistant" ? "…" : "")}
                 </Text>
@@ -236,6 +257,7 @@ const styles = StyleSheet.create({
   },
   title: { flex: 1, fontSize: 17, fontWeight: "600" },
   bubble: { maxWidth: "85%", borderRadius: 14, padding: 10, marginBottom: 8, gap: 8 },
+  personaLabel: { fontSize: 11, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.5 },
   actionChip: {
     flexDirection: "row", alignItems: "center", gap: 6,
     paddingHorizontal: 10, paddingVertical: 6, borderRadius: 14, borderWidth: 1,

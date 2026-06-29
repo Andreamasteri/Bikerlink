@@ -21,6 +21,7 @@ import {
   type AssistantPlatform,
 } from "../ai/assistant/config";
 import { runAssistantAgent, extractActions } from "../ai/assistant/agent";
+import { classifyRoutingIntent, parseAresInvocation, type AiPersonaId } from "../ai/assistant/roster";
 import { hasAnyAiProvider, AI_NO_PROVIDER_MESSAGE } from "../ai/moderation/provider";
 import {
   ASSISTANT_ACTIONS,
@@ -148,9 +149,28 @@ router.post("/ai/assistant/message", requireUser, messageLimiter, async (req: Re
     customFaqs = await loadCustomFaqs(config.customFaqKeys);
   }
 
+  // Task #5197 — Risoluzione persona / handoff (Bowie è sempre l'entry point):
+  //   - Admin che invoca Ares ("chiama Ares") → Ares (diagnostica, solo admin).
+  //   - Utente che chiede un percorso/itinerario → Horus (specialista navigazione).
+  //   - Tutto il resto → Bowie.
+  // NOTA: risolta PRIMA del precheck provider, perché Ares ha un provider
+  // dedicato (DIAG_OLLAMA_*) non coperto da hasAnyAiProvider().
+  let persona: AiPersonaId = "bowie";
+  if (isAdminMode) {
+    if (user.role === "admin" && parseAresInvocation(parsed.data.message)) {
+      persona = "ares";
+    }
+  } else if (classifyRoutingIntent(parsed.data.message)) {
+    persona = "horus";
+  }
+
   // Task #2825 — Nessun provider AI configurato: rispondi 503 con il nome delle
   // variabili mancanti così il client può mostrare il banner "Funzione AI non attivata".
-  if (!hasAnyAiProvider()) {
+  // Task #5197 — Ares usa il provider dedicato (DIAG_OLLAMA_*): se è configurato,
+  // l'invocazione di Ares NON deve essere bloccata da hasAnyAiProvider() (che
+  // considera solo i provider di Bowie/Horus). Se Ares è offline, l'agent degrada
+  // con grazia (messaggio garbato), non con un 503.
+  if (persona !== "ares" && !hasAnyAiProvider()) {
     sendError(res, 503, AI_NO_PROVIDER_MESSAGE);
     return;
   }
@@ -205,6 +225,9 @@ router.post("/ai/assistant/message", requireUser, messageLimiter, async (req: Re
       userId: user.id,
       adminContext,
       adminCodeContext,
+      // Task #5197 — persona risolta a monte + notifica al client di CHI risponde.
+      persona,
+      onPersona: (p) => send("persona", p),
       signal: abort.signal,
       onTextDelta: (delta) => send("delta", { text: delta }),
     });
@@ -250,6 +273,7 @@ router.post("/ai/assistant/message", requireUser, messageLimiter, async (req: Re
       costUsd: result.costUsd,
       degraded: result.degraded,
       actionsCount: safeActions.length,
+      persona: result.persona,
     });
     res.end();
   } catch (err) {

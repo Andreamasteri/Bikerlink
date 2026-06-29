@@ -3,7 +3,8 @@ import { fetch as expoFetch } from "expo/fetch";
 import { getApiUrl, authFetchHeaders } from "@/lib/query-client";
 
 export interface AssistantStreamEvent {
-  event: "delta" | "action" | "done" | "error";
+  // Task #5197 — "persona" annuncia quale AI (Bowie/Horus/Ares) sta rispondendo.
+  event: "delta" | "action" | "done" | "error" | "persona";
   data: unknown;
 }
 

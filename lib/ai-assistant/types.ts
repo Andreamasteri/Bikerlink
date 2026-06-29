@@ -34,10 +34,19 @@ export interface AssistantProposedAction {
   confirmKey: string;
 }
 
+// Task #5197 — Le tre AI di BikerLink: Bowie (entry point), Horus (percorsi),
+// Ares (diagnostica, solo admin). Il server comunica CHI sta rispondendo.
+export interface AssistantPersona {
+  id: "bowie" | "horus" | "ares";
+  name: string;
+}
+
 export interface AssistantChatMessage {
   id: string;
   role: "user" | "assistant";
   content: string;
   actions?: AssistantProposedAction[];
   createdAt: number;
+  // Task #5197 — quale AI ha prodotto questo messaggio (solo per role assistant).
+  persona?: AssistantPersona;
 }
