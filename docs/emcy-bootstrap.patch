@@ -1,0 +1,1262 @@
+diff --git a/components/admin/ota/OtaPanelExtra.tsx b/components/admin/ota/OtaPanelExtra.tsx
+new file mode 100644
+index 00000000..c2298eef
+--- /dev/null
++++ b/components/admin/ota/OtaPanelExtra.tsx
+@@ -0,0 +1,348 @@
++import React, { useState, useCallback } from "react";
++import { View, Text, TouchableOpacity, Alert, ActivityIndicator, StyleSheet } from "react-native";
++import { useQuery, useQueryClient } from "@tanstack/react-query";
++import { useTheme } from "@/lib/theme-context";
++import { apiRequest } from "@/lib/query-client";
++
++interface EmcyRelease {
++  id: string;
++  easUpdateId: string;
++  otaVersion: string | null;
++  status: string;
++  message: string | null;
++  publishedAt: string;
++}
++
++interface EmcyStatus {
++  active: boolean;
++  releases: EmcyRelease[];
++}
++
++const EMCY_QUERY_KEY = ["/api/admin/ota/emergency/status"];
++
++export default function OtaPanelExtra() {
++  const { colors } = useTheme();
++  const qc = useQueryClient();
++  const [pruning, setPruning] = useState(false);
++  const [toggling, setToggling] = useState(false);
++  const [actingId, setActingId] = useState<string | null>(null);
++
++  const { data: emcy, isLoading: emcyLoading } = useQuery<EmcyStatus>({
++    queryKey: EMCY_QUERY_KEY,
++  });
++
++  const handlePrune = useCallback(() => {
++    Alert.alert(
++      "Archivia vecchie OTA",
++      "Archivia le release rifiutate e le release pending obsolete più vecchie della baseline approvata (o le meno recenti se non esiste ancora una release approvata).\n\nSolo release con telemetria zero vengono archiviate. Le release archiviate non appaiono nel pannello ma non vengono eliminate.",
++      [
++        { text: "Annulla", style: "cancel" },
++        {
++          text: "Archivia",
++          style: "destructive",
++          onPress: async () => {
++            setPruning(true);
++            try {
++              const res = await apiRequest("POST", "/api/admin/ota/prune");
++              const result = await res.json() as { ok: boolean; archivedRejected: number; archivedOldPending: number };
++              await qc.invalidateQueries({ queryKey: ["/api/admin/ota/releases"] });
++              Alert.alert(
++                "Archiviazione completata",
++                `Archiviate: ${result.archivedRejected} rifiutate + ${result.archivedOldPending} pending obsolete.`
++              );
++            } catch (err: unknown) {
++              Alert.alert("Errore", err instanceof Error ? err.message : "Impossibile eseguire l'archiviazione");
++            } finally {
++              setPruning(false);
++            }
++          },
++        },
++      ]
++    );
++  }, [qc]);
++
++  const doToggle = useCallback(async (next: boolean) => {
++    setToggling(true);
++    try {
++      await apiRequest("POST", "/api/admin/ota/emergency/toggle", { active: next });
++      await qc.invalidateQueries({ queryKey: EMCY_QUERY_KEY });
++      Alert.alert(
++        next ? "Redirect EMCY attivato" : "Redirect EMCY disattivato",
++        next
++          ? "Tutti i device riceveranno l'ultima release EMCY approvata al prossimo controllo OTA."
++          : "Il manifest è tornato al canale production normale."
++      );
++    } catch (err: unknown) {
++      Alert.alert("Errore", err instanceof Error ? err.message : "Impossibile aggiornare il redirect EMCY");
++    } finally {
++      setToggling(false);
++    }
++  }, [qc]);
++
++  const handleToggle = useCallback(() => {
++    const next = !(emcy?.active ?? false);
++    Alert.alert(
++      next ? "Attivare il redirect EMCY?" : "Disattivare il redirect EMCY?",
++      next
++        ? "⚠️ ATTENZIONE: tutti i device passeranno al canale di emergenza. Usa solo se la production è rotta."
++        : "I device torneranno a ricevere le OTA normali dal canale production.",
++      [
++        { text: "Annulla", style: "cancel" },
++        { text: next ? "Attiva EMCY" : "Disattiva", style: next ? "destructive" : "default", onPress: () => { void doToggle(next); } },
++      ]
++    );
++  }, [emcy?.active, doToggle]);
++
++  const handleReleaseAction = useCallback((rel: EmcyRelease, action: "approve" | "reject") => {
++    Alert.alert(
++      action === "approve" ? "Approvare la release EMCY?" : "Revocare la release EMCY?",
++      `${rel.otaVersion ?? rel.easUpdateId.slice(0, 8)} — ${rel.message ?? "(nessun messaggio)"}`,
++      [
++        { text: "Annulla", style: "cancel" },
++        {
++          text: action === "approve" ? "Approva" : "Revoca",
++          style: action === "approve" ? "default" : "destructive",
++          onPress: async () => {
++            setActingId(rel.id);
++            try {
++              await apiRequest("POST", `/api/admin/ota/${rel.id}/${action}`);
++              await qc.invalidateQueries({ queryKey: EMCY_QUERY_KEY });
++              await qc.invalidateQueries({ queryKey: ["/api/admin/ota/releases"] });
++            } catch (err: unknown) {
++              Alert.alert("Errore", err instanceof Error ? err.message : "Operazione non riuscita");
++            } finally {
++              setActingId(null);
++            }
++          },
++        },
++      ]
++    );
++  }, [qc]);
++
++  const active = emcy?.active ?? false;
++  const releases = emcy?.releases ?? [];
++
++  return (
++    <View style={styles.outer}>
++      {/* ── Canale Emergenza (EMCY) ─────────────────────────────────── */}
++      <View style={styles.container}>
++        <Text style={[styles.label, { color: colors.textSecondary }]}>
++          Canale Emergenza (EMCY)
++        </Text>
++
++        {active && (
++          <View style={[styles.banner, { backgroundColor: "#7f1d1d", borderColor: "#ef4444" }]}>
++            <Text style={styles.bannerText}>
++              🚨 REDIRECT EMCY ATTIVO — tutti i device ricevono il canale emergency
++            </Text>
++          </View>
++        )}
++
++        <TouchableOpacity
++          style={[
++            styles.toggleBtn,
++            { borderColor: active ? "#ef4444" : colors.border, backgroundColor: active ? "rgba(239,68,68,0.12)" : colors.surface },
++          ]}
++          onPress={handleToggle}
++          disabled={toggling}
++          testID="emcy-toggle"
++        >
++          {toggling
++            ? <ActivityIndicator size="small" color={active ? "#ef4444" : colors.textSecondary} />
++            : <Text style={[styles.toggleBtnText, { color: active ? "#ef4444" : colors.text }]}>
++                {active ? "🛑 Disattiva redirect EMCY" : "🚨 Attiva redirect EMCY"}
++              </Text>}
++        </TouchableOpacity>
++
++        <Text style={[styles.hint, { color: colors.textSecondary }]}>
++          Le release EMCY si pubblicano da shell con{"\n"}
++          bash scripts/publish-ota-emcy.sh (bundle da commit specifico).{"\n"}
++          Qui le approvi e attivi il redirect.
++        </Text>
++
++        {emcyLoading ? (
++          <ActivityIndicator size="small" color={colors.textSecondary} style={{ marginTop: 12 }} />
++        ) : releases.length === 0 ? (
++          <Text style={[styles.empty, { color: colors.textSecondary }]}>
++            Nessuna release sul canale emergency.
++          </Text>
++        ) : (
++          releases.map((rel) => (
++            <View key={rel.id} style={[styles.relCard, { borderColor: colors.border, backgroundColor: colors.surface }]}>
++              <View style={styles.relHeader}>
++                <Text style={[styles.relVersion, { color: colors.text }]} numberOfLines={1}>
++                  {rel.otaVersion ?? rel.easUpdateId.slice(0, 12)}
++                </Text>
++                <Text style={[styles.relStatus, { color: statusColor(rel.status) }]}>
++                  {rel.status.toUpperCase()}
++                </Text>
++              </View>
++              {rel.message ? (
++                <Text style={[styles.relMsg, { color: colors.textSecondary }]} numberOfLines={2}>
++                  {rel.message}
++                </Text>
++              ) : null}
++              {rel.status === "pending" && (
++                <View style={styles.relActions}>
++                  <TouchableOpacity
++                    style={[styles.relBtn, { borderColor: "#22c55e" }]}
++                    onPress={() => handleReleaseAction(rel, "approve")}
++                    disabled={actingId === rel.id}
++                  >
++                    {actingId === rel.id
++                      ? <ActivityIndicator size="small" color="#22c55e" />
++                      : <Text style={[styles.relBtnText, { color: "#22c55e" }]}>Approva</Text>}
++                  </TouchableOpacity>
++                  <TouchableOpacity
++                    style={[styles.relBtn, { borderColor: "#ef4444" }]}
++                    onPress={() => handleReleaseAction(rel, "reject")}
++                    disabled={actingId === rel.id}
++                  >
++                    <Text style={[styles.relBtnText, { color: "#ef4444" }]}>Revoca</Text>
++                  </TouchableOpacity>
++                </View>
++              )}
++            </View>
++          ))
++        )}
++      </View>
++
++      {/* ── Manutenzione DB OTA ─────────────────────────────────────── */}
++      <View style={styles.container}>
++        <Text style={[styles.label, { color: colors.textSecondary }]}>
++          Manutenzione DB OTA
++        </Text>
++        <TouchableOpacity
++          style={[styles.pruneBtn, { backgroundColor: colors.surface, borderColor: colors.border }]}
++          onPress={handlePrune}
++          disabled={pruning}
++        >
++          {pruning
++            ? <ActivityIndicator size="small" color={colors.textSecondary} />
++            : <Text style={[styles.pruneBtnText, { color: colors.textSecondary }]}>🗄 Archivia vecchie OTA</Text>}
++        </TouchableOpacity>
++      </View>
++    </View>
++  );
++}
++
++function statusColor(status: string): string {
++  switch (status) {
++    case "approved": return "#22c55e";
++    case "pending": return "#f59e0b";
++    case "rejected": return "#ef4444";
++    default: return "#9ca3af";
++  }
++}
++
++const styles = StyleSheet.create({
++  outer: {
++    alignSelf: "stretch",
++  },
++  container: {
++    marginTop: 24,
++    paddingTop: 16,
++    borderTopWidth: StyleSheet.hairlineWidth,
++    borderTopColor: "rgba(128,128,128,0.2)",
++    alignItems: "flex-start",
++    alignSelf: "stretch",
++  },
++  label: {
++    fontSize: 11,
++    fontWeight: "600",
++    letterSpacing: 0.5,
++    textTransform: "uppercase",
++    marginBottom: 8,
++  },
++  banner: {
++    alignSelf: "stretch",
++    borderWidth: 1,
++    borderRadius: 8,
++    paddingVertical: 8,
++    paddingHorizontal: 12,
++    marginBottom: 10,
++  },
++  bannerText: {
++    color: "#fecaca",
++    fontSize: 12,
++    fontWeight: "700",
++  },
++  toggleBtn: {
++    paddingHorizontal: 14,
++    paddingVertical: 10,
++    borderRadius: 8,
++    borderWidth: 1,
++    flexDirection: "row",
++    alignItems: "center",
++    alignSelf: "stretch",
++    justifyContent: "center",
++  },
++  toggleBtnText: {
++    fontSize: 14,
++    fontWeight: "600",
++  },
++  hint: {
++    fontSize: 11,
++    marginTop: 8,
++    lineHeight: 16,
++  },
++  empty: {
++    fontSize: 12,
++    marginTop: 12,
++    fontStyle: "italic",
++  },
++  relCard: {
++    alignSelf: "stretch",
++    borderWidth: 1,
++    borderRadius: 10,
++    padding: 12,
++    marginTop: 10,
++  },
++  relHeader: {
++    flexDirection: "row",
++    justifyContent: "space-between",
++    alignItems: "center",
++  },
++  relVersion: {
++    fontSize: 13,
++    fontWeight: "700",
++    flex: 1,
++    marginRight: 8,
++  },
++  relStatus: {
++    fontSize: 11,
++    fontWeight: "700",
++  },
++  relMsg: {
++    fontSize: 12,
++    marginTop: 6,
++  },
++  relActions: {
++    flexDirection: "row",
++    marginTop: 10,
++    gap: 8,
++  },
++  relBtn: {
++    flex: 1,
++    paddingVertical: 8,
++    borderRadius: 8,
++    borderWidth: 1,
++    alignItems: "center",
++  },
++  relBtnText: {
++    fontSize: 13,
++    fontWeight: "600",
++  },
++  pruneBtn: {
++    paddingHorizontal: 14,
++    paddingVertical: 8,
++    borderRadius: 8,
++    borderWidth: 1,
++    flexDirection: "row",
++    alignItems: "center",
++  },
++  pruneBtnText: {
++    fontSize: 13,
++    fontWeight: "500",
++  },
++});
+diff --git a/scripts/publish-ota-emcy.sh b/scripts/publish-ota-emcy.sh
+new file mode 100755
+index 00000000..18f30462
+--- /dev/null
++++ b/scripts/publish-ota-emcy.sh
+@@ -0,0 +1,302 @@
++#!/usr/bin/env bash
++# scripts/publish-ota-emcy.sh — BikerLink OTA Canale Emergenza (EMCY) — Task #5087
++#
++# Pipeline OTA PARALLELA che builda da un COMMIT SPECIFICO (base di recupero,
++# default OTA-131 = 408f82d1, runtimeVersion 10.0.0) invece che da HEAD, e
++# pubblica come `EMCY-N` sul canale EAS `emergency`. Serve quando la production
++# corrente è rotta e bisogna riportare TUTTI i device a una base sana senza
++# dover ricostruire un APK.
++#
++# Differenze chiave rispetto a publish-ota-full.sh (production da HEAD):
++#   • Builda da un git worktree DETACHED sul commit base (HEAD/branch NON toccati).
++#   • Canale EAS = emergency (non production).
++#   • Versione = EMCY-N (numerazione propria, separata dalla N.N.N production).
++#   • Inserisce la riga ota_releases con channel='emergency', status='pending'.
++#   • NON tocca constants/buildInfo.ts, NON aggiorna la HWM production, NON pusha git.
++#
++# 4 GUARD ANTI-FALLIMENTO (richiesti dalla spec):
++#   G1. runtimeVersion guard — ABORT se il runtime del commit base ≠ atteso (10.0.0).
++#   G2. npm ci dal lockfile del commit base + fix proxy Replit sul package-lock.
++#   G3. admin-first pending — la release entra `pending`, mai auto-distribuita.
++#   G4. smoke test pre-upload — il bundle Hermes/JS deve esistere ed essere > 0 byte.
++#
++# Uso:
++#   bash scripts/publish-ota-emcy.sh --message "testo" [opzioni]
++#
++# Opzioni:
++#   --message "<testo>"   Messaggio della release (o file .emcy-message / env EMCY_MESSAGE).
++#   --base <commit>       Commit base da cui buildare   (default: env EMCY_BASE o 408f82d1).
++#   --runtime <X.Y.Z>     runtimeVersion atteso          (default: env EMCY_RUNTIME o 10.0.0).
++#   --name EMCY-N         Forza il nome release          (default: auto = max(EMCY-N)+1).
++#   --channel <ch>        Canale EAS                     (default: emergency).
++#   --patch <file>        Patch opzionale da applicare sul worktree prima del bundle.
++#   --dry-run             Esegue tutto TRANNE eas update / DB insert / cleanup distruttivo.
++#
++# NOTA OPERATORE: eseguire dall'ambiente MAIN (non da un task-agent isolato).
++# Richiede EAS_TOKEN e DATABASE_URL nell'ambiente.
++
++set -euo pipefail
++
++RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; BLUE='\033[0;34m'; NC='\033[0m'
++log_info()  { echo -e "${BLUE}[EMCY]${NC} $*"; }
++log_ok()    { echo -e "${GREEN}[EMCY ✓]${NC} $*"; }
++log_warn()  { echo -e "${YELLOW}[EMCY !]${NC} $*"; }
++log_error() { echo -e "${RED}[EMCY ✗]${NC} $*" >&2; }
++
++cd /home/runner/workspace
++
++# ── 0. Parsing argomenti ─────────────────────────────────────────────────────
++MESSAGE=""
++BASE_COMMIT="${EMCY_BASE:-408f82d1}"
++EXPECTED_RUNTIME="${EMCY_RUNTIME:-10.0.0}"
++FORCE_NAME=""
++CHANNEL="emergency"
++PATCH_FILE=""
++DRY_RUN=0
++
++while [[ $# -gt 0 ]]; do
++  case "$1" in
++    --message)  MESSAGE="${2:-}"; shift 2 ;;
++    --base)     BASE_COMMIT="${2:-}"; shift 2 ;;
++    --runtime)  EXPECTED_RUNTIME="${2:-}"; shift 2 ;;
++    --name)     FORCE_NAME="${2:-}"; shift 2 ;;
++    --channel)  CHANNEL="${2:-}"; shift 2 ;;
++    --patch)    PATCH_FILE="${2:-}"; shift 2 ;;
++    --dry-run)  DRY_RUN=1; shift ;;
++    *) log_error "Argomento sconosciuto: $1"; exit 2 ;;
++  esac
++done
++
++# Messaggio: arg > file .emcy-message > env EMCY_MESSAGE
++if [[ -z "$MESSAGE" ]] && [[ -f ".emcy-message" ]]; then
++  MESSAGE=$(grep -v '^\s*#' ".emcy-message" | tr -d '\r' | sed '/^[[:space:]]*$/d' | head -1 || true)
++fi
++if [[ -z "$MESSAGE" ]]; then
++  MESSAGE="${EMCY_MESSAGE:-}"
++fi
++if [[ -z "$MESSAGE" ]]; then
++  log_error "Nessun messaggio. Usa --message \"...\" oppure scrivi una riga in .emcy-message."
++  exit 1
++fi
++
++log_info "Base commit     : ${BASE_COMMIT}"
++log_info "Runtime atteso  : ${EXPECTED_RUNTIME}"
++log_info "Canale EAS      : ${CHANNEL}"
++log_info "Messaggio       : ${MESSAGE}"
++[[ "$DRY_RUN" -eq 1 ]] && log_warn "MODALITÀ DRY-RUN: nessuna pubblicazione EAS, nessun DB insert."
++
++# ── 1. Verifica prerequisiti ambiente ────────────────────────────────────────
++if [[ "$DRY_RUN" -eq 0 ]]; then
++  if [[ -z "${EAS_TOKEN:-}" ]]; then log_error "EAS_TOKEN non impostato."; exit 1; fi
++  if [[ -z "${DATABASE_URL:-}" ]]; then log_error "DATABASE_URL non impostato."; exit 1; fi
++  log_info "EAS_TOKEN: ${#EAS_TOKEN} chars — OK"
++fi
++
++# ── 2. Calcolo numero EMCY-N (numerazione separata dalla production) ──────────
++if [[ -n "$FORCE_NAME" ]]; then
++  VERSION="$FORCE_NAME"
++  log_info "Nome release forzato via --name: ${VERSION}"
++elif [[ -n "${DATABASE_URL:-}" ]]; then
++  LAST_EMCY=$(psql "$DATABASE_URL" -tAc "
++    SELECT CAST(SPLIT_PART(ota_version, '-', 2) AS INTEGER)
++    FROM ota_releases
++    WHERE ota_version ~ '^EMCY-[0-9]+\$'
++    ORDER BY published_at DESC, id DESC
++    LIMIT 1
++  " 2>/dev/null | tr -d '[:space:]' || echo "")
++  if ! [[ "$LAST_EMCY" =~ ^[0-9]+$ ]]; then LAST_EMCY=0; fi
++  VERSION="EMCY-$(( LAST_EMCY + 1 ))"
++  log_info "Ultima EMCY in DB: ${LAST_EMCY} → nuova: ${VERSION}"
++else
++  VERSION="EMCY-1"
++  log_warn "DATABASE_URL assente (dry-run) — uso ${VERSION} provvisorio."
++fi
++
++# Guard duplicato (salta in dry-run senza DB)
++if [[ "$DRY_RUN" -eq 0 ]]; then
++  EXISTING=$(psql "$DATABASE_URL" -tAc "SELECT ota_version FROM ota_releases WHERE ota_version='${VERSION}' LIMIT 1" 2>/dev/null | tr -d '[:space:]' || true)
++  if [[ -n "$EXISTING" ]]; then
++    log_error "DUPLICATO: ota_version '${VERSION}' esiste già. Usa --name per forzare un altro numero."
++    exit 1
++  fi
++fi
++
++# ── 3. Crea worktree DETACHED sul commit base (non tocca HEAD/branch) ────────
++WORKTREE_DIR="/tmp/emcy-worktree-$$"
++DIST_DIR="${WORKTREE_DIR}/dist-ota-emcy"
++
++cleanup() {
++  if [[ -d "$WORKTREE_DIR" ]]; then
++    log_info "Cleanup worktree ${WORKTREE_DIR}..."
++    git worktree remove --force "$WORKTREE_DIR" 2>/dev/null \
++      || rm -rf "$WORKTREE_DIR" 2>/dev/null || true
++    git worktree prune 2>/dev/null || true
++  fi
++}
++trap cleanup EXIT
++
++log_info "Creo worktree detached su ${BASE_COMMIT}..."
++if ! git worktree add --detach "$WORKTREE_DIR" "$BASE_COMMIT" 2>&1; then
++  log_error "git worktree add fallito — commit base '${BASE_COMMIT}' non valido?"
++  exit 1
++fi
++log_ok "Worktree pronto: ${WORKTREE_DIR}"
++
++# Patch opzionale sopra la base
++if [[ -n "$PATCH_FILE" ]]; then
++  if [[ ! -f "$PATCH_FILE" ]]; then log_error "Patch non trovata: ${PATCH_FILE}"; exit 1; fi
++  log_info "Applico patch ${PATCH_FILE} sul worktree..."
++  if ! git -C "$WORKTREE_DIR" apply "$(realpath "$PATCH_FILE")" 2>&1; then
++    log_error "git apply fallito — la patch non si applica sul commit base."
++    exit 1
++  fi
++  log_ok "Patch applicata."
++fi
++
++# ── GUARD G1: runtimeVersion deve combaciare con l'atteso ────────────────────
++WT_RUNTIME=$(node -e "const a=require('${WORKTREE_DIR}/app.json'); console.log(a.expo.runtimeVersion||'')" 2>/dev/null || echo "")
++log_info "runtimeVersion del commit base: '${WT_RUNTIME}'"
++if [[ "$WT_RUNTIME" != "$EXPECTED_RUNTIME" ]]; then
++  log_error "GUARD G1 FALLITA: runtime base '${WT_RUNTIME}' ≠ atteso '${EXPECTED_RUNTIME}'."
++  log_error "I device sul runtime ${EXPECTED_RUNTIME} NON riceverebbero questa OTA. Abort."
++  exit 1
++fi
++log_ok "GUARD G1 OK: runtime ${WT_RUNTIME} combacia."
++
++RUNTIME_FULL="$WT_RUNTIME"
++
++# ── GUARD G2: fix proxy Replit sul lockfile + npm ci dal lockfile della base ─
++if [[ ! -f "${WORKTREE_DIR}/package-lock.json" ]]; then
++  log_error "GUARD G2 FALLITA: package-lock.json assente nel commit base — npm ci impossibile."
++  exit 1
++fi
++log_info "GUARD G2: fix URL proxy Replit nel package-lock.json del worktree..."
++sed -i 's|http://package-firewall\.replit\.local/npm/|https://registry.npmjs.org/|g' "${WORKTREE_DIR}/package-lock.json"
++log_info "GUARD G2: npm ci nel worktree (deps esatte del commit base)..."
++if ! ( cd "$WORKTREE_DIR" && npm ci --no-audit --no-fund 2>&1 ); then
++  log_error "GUARD G2 FALLITA: npm ci nel worktree fallito."
++  exit 1
++fi
++log_ok "GUARD G2 OK: dipendenze del commit base installate."
++
++# ── 4. Metro export nel worktree ─────────────────────────────────────────────
++# Libera la porta 8081 (watchdog/start-expo possono tenerla occupata).
++log_info "Pre-export: libero porta 8081..."
++pkill -TERM -f "watchdog.sh" 2>/dev/null || true
++pkill -TERM -f "start-expo.sh" 2>/dev/null || true
++sleep 1
++pkill -9 -f "watchdog.sh" 2>/dev/null || true
++pkill -9 -f "start-expo.sh" 2>/dev/null || true
++_PIDS=$(lsof -ti:8081 2>/dev/null || true)
++if [[ -n "$_PIDS" ]]; then echo "$_PIDS" | xargs kill -9 2>/dev/null || true; sleep 1; fi
++
++log_info "Fase 1/3 — Metro export (bundle Android) dal worktree..."
++rm -rf "$DIST_DIR"
++EXPORT_LOG="/tmp/emcy-export-android.log"
++( cd "$WORKTREE_DIR" && EXPO_TOKEN="${EAS_TOKEN:-}" \
++    EXPO_PUBLIC_DOMAIN="${EXPO_PUBLIC_DOMAIN:-}" \
++    EXPO_PUBLIC_SENTRY_DSN="${EXPO_PUBLIC_SENTRY_DSN:-}" \
++    npx expo export \
++    --platform android \
++    --output-dir "dist-ota-emcy" 2>&1 ) | tee "$EXPORT_LOG" || true
++EXPORT_EXIT=${PIPESTATUS[0]}
++if [[ "$EXPORT_EXIT" -ne 0 ]]; then
++  log_error "expo export fallito nel worktree (exit $EXPORT_EXIT). Ultime 40 righe:"
++  tail -40 "$EXPORT_LOG" >&2
++  exit 1
++fi
++log_ok "Export completato."
++
++# ── GUARD G4: smoke test — il bundle deve esistere ed essere > 0 byte ────────
++BUNDLE_FILE=$(find "$DIST_DIR" \( -name "*.hbc" -o -path "*android*.js" \) -type f 2>/dev/null | sort | head -1)
++if [[ -z "$BUNDLE_FILE" ]]; then
++  BUNDLE_FILE=$(find "$DIST_DIR" -name "*.js" -type f 2>/dev/null | sort | head -1)
++fi
++if [[ -z "$BUNDLE_FILE" ]] || [[ ! -s "$BUNDLE_FILE" ]]; then
++  log_error "GUARD G4 FALLITA: nessun bundle Android > 0 byte in ${DIST_DIR}."
++  exit 1
++fi
++BUNDLE_SIZE=$(stat -c%s "$BUNDLE_FILE" 2>/dev/null || echo 0)
++if [[ "$BUNDLE_SIZE" -lt 1000 ]]; then
++  log_error "GUARD G4 FALLITA: bundle sospettosamente piccolo (${BUNDLE_SIZE} byte): ${BUNDLE_FILE}."
++  exit 1
++fi
++log_ok "GUARD G4 OK: bundle $(basename "$BUNDLE_FILE") = ${BUNDLE_SIZE} byte."
++
++# Rimuovi eventuali source map dal dist (non distribuire ai client)
++find "$DIST_DIR" -name "*.map" -delete 2>/dev/null || true
++
++# Messaggio EAS con prefisso versione (coerente con la pipeline production)
++EAS_MESSAGE="[OTA:${VERSION}] ${MESSAGE}"
++
++# ── DRY-RUN: fermati qui ─────────────────────────────────────────────────────
++if [[ "$DRY_RUN" -eq 1 ]]; then
++  echo ""
++  log_ok "DRY-RUN completato — nessuna pubblicazione effettuata."
++  echo -e "  ${BLUE}Avrebbe pubblicato${NC} : ${VERSION} sul canale '${CHANNEL}'"
++  echo -e "  ${BLUE}Runtime${NC}            : ${RUNTIME_FULL}"
++  echo -e "  ${BLUE}Messaggio EAS${NC}      : ${EAS_MESSAGE}"
++  echo -e "  ${BLUE}Bundle${NC}             : ${BUNDLE_FILE} (${BUNDLE_SIZE} byte)"
++  exit 0
++fi
++
++# ── 5. EAS update sul canale emergency ───────────────────────────────────────
++log_info "Fase 2/3 — EAS update --channel ${CHANNEL} (attendi 1-2 minuti)..."
++EAS_OUTPUT=$( cd "$WORKTREE_DIR" && EAS_NO_VCS=1 EAS_SKIP_AUTO_FINGERPRINT=1 EXPO_TOKEN="${EAS_TOKEN}" \
++  bash scripts/eas.sh update \
++    --channel "${CHANNEL}" \
++    --message "${EAS_MESSAGE}" \
++    --input-dir "dist-ota-emcy" \
++    --skip-bundler \
++    --non-interactive 2>&1 ) || {
++  log_error "eas update fallito:"
++  echo "$EAS_OUTPUT"
++  exit 1
++}
++echo "$EAS_OUTPUT"
++
++UPDATE_ID=$(echo "$EAS_OUTPUT" | grep -oE 'Android update ID\s+[a-f0-9-]{36}' | grep -oE '[a-f0-9-]{36}' || true)
++GROUP_ID=$(echo  "$EAS_OUTPUT" | grep -oE 'Update group ID\s+[a-f0-9-]{36}' | grep -oE '[a-f0-9-]{36}' || true)
++if [[ -z "$UPDATE_ID" ]]; then
++  UPDATE_ID=$(echo "$EAS_OUTPUT" | grep -oE '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' | tail -2 | head -1 || true)
++fi
++if [[ -z "$GROUP_ID" ]]; then
++  GROUP_ID=$(echo  "$EAS_OUTPUT" | grep -oE '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' | tail -1 || true)
++fi
++if [[ -z "$UPDATE_ID" || -z "$GROUP_ID" ]]; then
++  log_error "Impossibile estrarre UPDATE_ID/GROUP_ID dall'output EAS — DB NON aggiornato."
++  exit 1
++fi
++log_ok "Update ID: ${UPDATE_ID} | Group ID: ${GROUP_ID}"
++
++# ── 6. Insert DB come PENDING sul canale emergency (GUARD G3: admin-first) ────
++log_info "Fase 3/3 — insert ota_releases (channel='${CHANNEL}', status='pending')..."
++psql "$DATABASE_URL" -c "
++  INSERT INTO ota_releases (
++    id, eas_update_id, eas_group_id, channel, runtime_version,
++    message, ota_version, status, published_at
++  ) VALUES (
++    gen_random_uuid(), '${UPDATE_ID}', '${GROUP_ID}', '${CHANNEL}', '${RUNTIME_FULL}',
++    \$\$${MESSAGE}\$\$, '${VERSION}', 'pending', NOW()
++  )
++  ON CONFLICT (eas_update_id) DO UPDATE SET
++    status       = 'pending',
++    channel      = '${CHANNEL}',
++    eas_group_id = EXCLUDED.eas_group_id,
++    ota_version  = EXCLUDED.ota_version;
++" -q 2>&1 || { log_error "DB insert fallito."; exit 1; }
++log_ok "DB: ${VERSION} inserita PENDING sul canale '${CHANNEL}'."
++
++# Svuota .emcy-message dopo pubblicazione riuscita
++[[ -f ".emcy-message" ]] && echo "" > ".emcy-message"
++
++echo ""
++echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
++log_ok "EMCY pubblicata come PENDING!"
++echo -e "  ${BLUE}Versione${NC}      : ${VERSION}"
++echo -e "  ${BLUE}Canale${NC}        : ${CHANNEL}"
++echo -e "  ${BLUE}Runtime${NC}       : ${RUNTIME_FULL}"
++echo -e "  ${BLUE}Update ID${NC}     : ${UPDATE_ID}"
++echo -e "  ${YELLOW}Prossimi step${NC} : 1) /admin/ota → sezione EMCY → Approva la release"
++echo -e "                  2) attiva il redirect EMCY per distribuirla a TUTTI i device"
++echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+diff --git a/server/routes/admin/ota.ts b/server/routes/admin/ota.ts
+index 5efcaf3f..07875d29 100644
+--- a/server/routes/admin/ota.ts
++++ b/server/routes/admin/ota.ts
+@@ -1,185 +1,216 @@
+ import { Router, type Request, type Response } from "express";
+-import { execFile } from "node:child_process";
+-import { promisify } from "node:util";
+-import { readFileSync, existsSync } from "node:fs";
+-import { resolve } from "node:path";
+ import { db, withDbRetry } from "../../db";
+-import { otaReleases, otaBootEvents } from "@shared/db";
+-import { eq, desc, isNull, and, sql, ne, inArray } from "drizzle-orm";
++import { otaReleases, appSettings } from "@shared/db";
++import { eq, desc, and, sql, ne, inArray, lt } from "drizzle-orm";
+ import { sendError } from "../../lib/api-response";
+-
+-const execFileAsync = promisify(execFile);
++import { EAS_PROJECT_ID, triggerSyncInBackground, forceSyncNow, syncProductionUpdates } from "./ota-sync";
++import otaPart2Router from "./ota.part2";
+ 
+ const router = Router();
+ 
+-const EAS_PROJECT_ID = "a25192d7-72e5-46af-97d0-2d38ed9b78e3";
+-const EAS_GRAPHQL_URL = "https://api.expo.dev/graphql";
+-
+-async function easGraphQL(query: string, variables?: Record<string, unknown>): Promise<unknown> {
+-  const token = process.env.EAS_TOKEN;
+-  if (!token) throw new Error("EAS_TOKEN non configurato");
+-  const res = await fetch(EAS_GRAPHQL_URL, {
+-    method: "POST",
+-    headers: {
+-      "Content-Type": "application/json",
+-      "Authorization": `Bearer ${token}`,
+-    },
+-    body: JSON.stringify({ query, variables }),
+-  });
+-  if (!res.ok) {
+-    let body = "";
+-    try { body = await res.text(); } catch { /* ignore */ }
+-    throw new Error(`EAS GraphQL HTTP ${res.status}: ${body}`);
+-  }
+-  const json = await res.json() as { data?: unknown; errors?: unknown[] };
+-  if (json.errors && (json.errors as unknown[]).length > 0) {
+-    throw new Error(`EAS GraphQL error: ${JSON.stringify(json.errors)}`);
+-  }
+-  return json.data;
+-}
+-
+-// Sincronizza il branch EAS `production` nel DB locale per tracking admin.
+-// Task #2503: i nuovi update sincronizzati da EAS finiscono come `pending` —
+-// l'admin li approva poi manualmente dal pannello.
+-async function syncProductionUpdates(): Promise<void> {
+-  const query = `
+-    query GetBranchUpdates($appId: String!) {
+-      app {
+-        byId(appId: $appId) {
+-          updateBranches(offset: 0, limit: 10) {
+-            id
+-            name
+-            updates(offset: 0, limit: 20) {
+-              id
+-              group
+-              message
+-              runtimeVersion
+-              createdAt
+-            }
+-          }
+-        }
+-      }
++// GET /api/admin/ota/releases — restituisce lo storico release con telemetria (ultimi 50 di default)
++router.get("/releases", async (req: Request, res: Response) => {
++  try {
++    const status = typeof req.query.status === "string" ? req.query.status : undefined;
++    const syncFirst = req.query.sync !== "false";
++    const limitParam = typeof req.query.limit === "string" ? parseInt(req.query.limit, 10) : 50;
++    const limit = Number.isFinite(limitParam) && limitParam > 0 ? Math.min(limitParam, 500) : 50;
++
++    // Non-blocking: serviamo subito il DB e lasciamo il sync EAS in background.
++    if (syncFirst) {
++      triggerSyncInBackground();
+     }
+-  `;
+ 
+-  let data: { app?: { byId?: { updateBranches?: Array<{ id: string; name: string; updates?: Array<{ id: string; group?: string; message?: string; runtimeVersion?: string; createdAt?: string }> }> } } };
+-  try {
+-    data = await easGraphQL(query, { appId: EAS_PROJECT_ID }) as typeof data;
++    // Filtra per status direttamente in SQL (prima del LIMIT) per garantire risultati completi.
++    // Le release archiviate (soft-delete) sono escluse di default; ?status=archived per vederle.
++    const showArchived = status === "archived";
++    const statusWhere = showArchived
++      ? eq(otaReleases.status, "archived")
++      : status
++        ? and(ne(otaReleases.status, "archived"), eq(otaReleases.status, status))
++        : ne(otaReleases.status, "archived");
++
++    const rows = await db.select().from(otaReleases)
++      .where(statusWhere)
++      .orderBy(desc(otaReleases.publishedAt))
++      .limit(limit);
++
++    return res.json(rows);
+   } catch (err) {
+-    console.warn("[ota-sync] EAS GraphQL error:", err);
+-    return;
++    console.error("[ota] GET /releases error:", err);
++    return sendError(res, 500, "Errore recupero OTA releases");
+   }
++});
+ 
+-  const branches = data?.app?.byId?.updateBranches ?? [];
+-  const productionBranch = branches.find((b) => b.name === "production");
+-  const updates = productionBranch?.updates ?? [];
+-  if (updates.length === 0) return;
++// POST /api/admin/ota/prune — archivia release rejected e pending obsolete (soft-delete via status='archived').
++// Usa soft-delete invece di DELETE per preservare l'integrità referenziale con ota_boot_events
++// (onDelete: cascade). Solo record con telemetria zero vengono archiviati.
++// Deve stare PRIMA di /:id/... per non essere catturata dal parametro dinamico.
++router.post("/prune", async (_req: Request, res: Response) => {
++  try {
++    const now = new Date();
+ 
+-  for (const upd of updates) {
+-    const existing = await withDbRetry(() => db.select({ id: otaReleases.id })
++    // Trova la release approved più recente sul canale production come baseline.
++    const [latestApproved] = await withDbRetry(() => db
++      .select({ publishedAt: otaReleases.publishedAt })
+       .from(otaReleases)
+-      .where(eq(otaReleases.easUpdateId, upd.id))
++      .where(and(eq(otaReleases.status, "approved"), eq(otaReleases.channel, "production")))
++      .orderBy(desc(otaReleases.publishedAt))
+       .limit(1));
+ 
+-    if (existing.length > 0) continue;
+-
+-    // Task #2503: i nuovi update vengono sempre inseriti come `pending`.
+-    // L'admin li testa via cold-start su account admin e poi approva dal pannello.
+-    await withDbRetry(() => db.insert(otaReleases).values({
+-      easUpdateId: upd.id,
+-      easGroupId: upd.group ?? null,
+-      channel: "production",
+-      runtimeVersion: upd.runtimeVersion ?? null,
+-      message: upd.message ?? null,
+-      status: "pending",
+-      publishedAt: upd.createdAt ? new Date(upd.createdAt) : new Date(),
+-    }).onConflictDoNothing());
+-  }
++    const baselineTs = latestApproved?.publishedAt ?? null;
++
++    let rejectedQuery;
++    if (baselineTs) {
++      rejectedQuery = sql`
++        UPDATE ota_releases
++        SET status = 'archived'
++        WHERE status = 'rejected'
++          AND channel = 'production'
++          AND boot_success_count = 0
++          AND boot_failure_count = 0
++          AND published_at < ${baselineTs}
++      `;
++    } else {
++      rejectedQuery = sql`
++        UPDATE ota_releases
++        SET status = 'archived'
++        WHERE status = 'rejected'
++          AND channel = 'production'
++          AND boot_success_count = 0
++          AND boot_failure_count = 0
++      `;
++    }
++    const rejectedResult = await withDbRetry(() => db.execute(rejectedQuery));
++    const archivedRejected = (rejectedResult as { rowCount?: number }).rowCount ?? 0;
++
++    let pendingQuery;
++    if (baselineTs) {
++      pendingQuery = sql`
++        UPDATE ota_releases
++        SET status = 'archived'
++        WHERE status = 'pending'
++          AND channel = 'production'
++          AND boot_success_count = 0
++          AND boot_failure_count = 0
++          AND published_at < ${baselineTs}
++      `;
++    } else {
++      pendingQuery = sql`
++        UPDATE ota_releases
++        SET status = 'archived'
++        WHERE status = 'pending'
++          AND channel = 'production'
++          AND boot_success_count = 0
++          AND boot_failure_count = 0
++          AND id NOT IN (
++            SELECT id FROM ota_releases
++            WHERE status = 'pending' AND channel = 'production'
++            ORDER BY published_at DESC
++            LIMIT 20
++          )
++      `;
++    }
++    const pendingResult = await withDbRetry(() => db.execute(pendingQuery));
++    const archivedOldPending = (pendingResult as { rowCount?: number }).rowCount ?? 0;
+ 
+-  // Backfill groupId per record vecchi che ne erano sprovvisti
+-  for (const upd of updates) {
+-    if (!upd.group) continue;
+-    await withDbRetry(() => db.update(otaReleases)
+-      .set({ easGroupId: upd.group })
+-      .where(and(eq(otaReleases.easUpdateId, upd.id), isNull(otaReleases.easGroupId))));
++    console.log(`[ota][PRUNE] archived ${archivedRejected} rejected + ${archivedOldPending} old pending (soft-delete, telemetry=0 only, baseline=${latestApproved?.publishedAt?.toISOString() ?? "none"})`);
++    return res.json({ ok: true, archivedRejected, archivedOldPending, archivedAt: now.toISOString() });
++  } catch (err) {
++    console.error("[ota] POST /prune error:", err);
++    return sendError(res, 500, "Errore pulizia OTA releases");
+   }
++});
+ 
+-  // Backfill otaVersion: copia dal record Android (stesso gruppo) ai record iOS che non ce l'hanno
+-  await withDbRetry(() => db.execute(sql`
+-    UPDATE ota_releases r
+-    SET ota_version = src.ota_version
+-    FROM ota_releases src
+-    WHERE r.ota_version IS NULL
+-      AND r.eas_group_id IS NOT NULL
+-      AND src.eas_group_id = r.eas_group_id
+-      AND src.ota_version IS NOT NULL
+-  `));
+-
+-  // Backfill otaVersion dal messaggio EAS — formato "[OTA:54.10.27] testo utente"
+-  // Imposta automaticamente ota_version per tutti i record nello stesso gruppo
+-  const noVersionRecords = await withDbRetry(() => db
+-    .select({ id: otaReleases.id, message: otaReleases.message, easGroupId: otaReleases.easGroupId })
+-    .from(otaReleases)
+-    .where(isNull(otaReleases.otaVersion)));
+-
+-  for (const rec of noVersionRecords) {
+-    const match = rec.message?.match(/^\[OTA:([\d.]+)\]/);
+-    if (!match) continue;
+-    const parsed = match[1];
+-    const groupId = rec.easGroupId;
+-    if (groupId) {
+-      await withDbRetry(() => db.update(otaReleases)
+-        .set({ otaVersion: parsed })
+-        .where(eq(otaReleases.easGroupId, groupId)));
+-    } else {
+-      await withDbRetry(() => db.update(otaReleases)
+-        .set({ otaVersion: parsed })
+-        .where(eq(otaReleases.id, rec.id)));
+-    }
++// POST /api/admin/ota/sync — forza una sincronizzazione sincrona con EAS.
++// Questa route DEVE stare PRIMA di /:id/... per non essere catturata dal parametro dinamico.
++router.post("/sync", async (_req: Request, res: Response) => {
++  if (!process.env.EAS_TOKEN) {
++    return res.status(503).json({ ok: false, message: "EAS_TOKEN non configurato sul server. Impossibile contattare EAS." });
+   }
+-}
+-
+-// Cache TTL in-memory di 60s sul sync EAS, con dedup delle richieste in volo.
+-// La GET /releases (usata anche dalla Radiografia) prima faceva una GraphQL EAS
+-// sincrona (lenta, anche >5s) ad ogni run → la probe OTA andava in timeout.
+-const SYNC_TTL_MS = 60_000;
+-let _lastSyncAt = 0;
+-let _syncInFlight: Promise<void> | null = null;
+-
+-// Innesca il sync EAS in background senza bloccare il chiamante: se è già
+-// avvenuto da meno di 60s (o è già in corso) non fa nulla. Non viene mai
+-// awaitato dal request path, così GET /releases risponde subito dal DB.
+-function triggerSyncInBackground(): void {
+-  if (Date.now() - _lastSyncAt < SYNC_TTL_MS) return;
+-  if (_syncInFlight) return;
+-  _syncInFlight = syncProductionUpdates()
+-    .then(() => { _lastSyncAt = Date.now(); })
+-    .catch((err) => { console.warn("[ota] background sync warning:", err); })
+-    .finally(() => { _syncInFlight = null; });
+-}
+-
+-// GET /api/admin/ota/releases — restituisce tutto lo storico release con telemetria
+-router.get("/releases", async (req: Request, res: Response) => {
+   try {
+-    const status = typeof req.query.status === "string" ? req.query.status : undefined;
+-    const syncFirst = req.query.sync !== "false";
++    const { inserted, backfilled } = await forceSyncNow();
++    console.log(`[ota][SYNC] sync manuale completato: ${inserted} nuove, ${backfilled} backfill`);
++    return res.json({ ok: true, inserted, backfilled, syncedAt: new Date().toISOString() });
++  } catch (err) {
++    const msg = err instanceof Error ? err.message : String(err);
++    console.error("[ota] POST /sync error:", err);
++    return res.status(502).json({ ok: false, message: `Errore sincronizzazione EAS: ${msg}` });
++  }
++});
+ 
+-    // Non-blocking: serviamo subito il DB e lasciamo il sync EAS in background.
+-    // I nuovi update appariranno alla chiamata successiva (entro la finestra TTL).
+-    if (syncFirst) {
+-      triggerSyncInBackground();
+-    }
++// ── Task #5087 — Canale Emergenza (EMCY) ────────────────────────────────────
++// Queste route DEVONO stare PRIMA di /:id/... per non essere catturate dal
++// parametro dinamico ("emergency" verrebbe trattato come :id).
+ 
+-    const rows = await db.select().from(otaReleases).orderBy(desc(otaReleases.publishedAt));
++// GET /api/admin/ota/emergency/status — stato del redirect emergenza + release del canale.
++router.get("/emergency/status", async (_req: Request, res: Response) => {
++  try {
++    const [row] = await withDbRetry(() => db
++      .select({ value: appSettings.value })
++      .from(appSettings)
++      .where(eq(appSettings.key, "ota_emergency_active"))
++      .limit(1));
++    const active = row?.value === "true";
+ 
+-    const filtered = status
+-      ? rows.filter((r) => r.status === status)
+-      : rows;
++    const releases = await withDbRetry(() => db
++      .select()
++      .from(otaReleases)
++      .where(and(eq(otaReleases.channel, "emergency"), ne(otaReleases.status, "archived")))
++      .orderBy(desc(otaReleases.publishedAt))
++      .limit(50));
+ 
+-    return res.json(filtered);
++    return res.json({ active, releases });
+   } catch (err) {
+-    console.error("[ota] GET /releases error:", err);
+-    return sendError(res, 500, "Errore recupero OTA releases");
++    console.error("[ota] GET /emergency/status error:", err);
++    return sendError(res, 500, "Errore recupero stato canale emergenza");
++  }
++});
++
++// POST /api/admin/ota/emergency/toggle — attiva/disattiva il redirect del manifest.
++router.post("/emergency/toggle", async (req: Request, res: Response) => {
++  try {
++    const userId = req.session.userId!;
++    const body = req.body as { active?: unknown };
++    if (typeof body.active !== "boolean") {
++      return sendError(res, 400, "Campo 'active' (boolean) obbligatorio");
++    }
++    const value = body.active ? "true" : "false";
++
++    // Guard: non attivare il redirect se non esiste alcuna release emergency approvata.
++    if (body.active) {
++      const [approved] = await db
++        .select({ id: otaReleases.id })
++        .from(otaReleases)
++        .where(and(eq(otaReleases.channel, "emergency"), eq(otaReleases.status, "approved")))
++        .limit(1);
++      if (!approved) {
++        return sendError(res, 400, "Nessuna release EMCY approvata: approva prima una release sul canale emergency, poi attiva il redirect.");
++      }
++    }
++
++    const [existing] = await db
++      .select({ id: appSettings.id })
++      .from(appSettings)
++      .where(eq(appSettings.key, "ota_emergency_active"))
++      .limit(1);
++    if (existing) {
++      await db.update(appSettings)
++        .set({ value, updatedAt: new Date() })
++        .where(eq(appSettings.key, "ota_emergency_active"));
++    } else {
++      await db.insert(appSettings).values({
++        key: "ota_emergency_active",
++        value,
++        description: "Task #5087 — quando true, /api/ota/manifest serve il canale emergency invece di production.",
++      });
++    }
++
++    console.log(`[ota][AUDIT] EMERGENCY redirect ${value === "true" ? "ATTIVATO" : "disattivato"} by user ${userId}`);
++    return res.json({ ok: true, active: body.active });
++  } catch (err) {
++    console.error("[ota] POST /emergency/toggle error:", err);
++    return sendError(res, 500, "Errore aggiornamento canale emergenza");
+   }
+ });
+ 
+@@ -197,14 +228,15 @@ router.post("/:id/approve", async (req: Request, res: Response) => {
+       return sendError(res, 400, "Questa release non ha un groupId EAS. Ri-sincronizza prima dal pannello admin (pulsante Sync).");
+     }
+ 
+-    // UPDATE atomico con guard sullo status — previene race con worker auto-rollback o doppio click
++    // UPDATE atomico con guard sullo status — previene race con worker auto-rollback o doppio click.
++    // Task #5087: preserviamo il canale esistente (production O emergency) invece di forzare "production".
+     const [updated] = await db
+       .update(otaReleases)
+       .set({
+         status: "approved",
+         approvedAt: new Date(),
+         approvedBy: userId,
+-        channel: "production",
++        channel: release.channel,
+       })
+       .where(and(eq(otaReleases.id, id), eq(otaReleases.status, "pending")))
+       .returning();
+@@ -215,11 +247,11 @@ router.post("/:id/approve", async (req: Request, res: Response) => {
+ 
+     console.log(`[ota][AUDIT] release ${id} (${release.easUpdateId}) APPROVED by user ${userId}`);
+ 
+-    // Auto-reject tutte le altre pending sullo stesso canale (sono obsolete)
++    // Auto-reject solo le OTA pending pubblicate PRIMA di quella approvata (non le future)
+     const otherPending = await db
+       .select({ id: otaReleases.id, easUpdateId: otaReleases.easUpdateId })
+       .from(otaReleases)
+-      .where(and(eq(otaReleases.status, "pending"), eq(otaReleases.channel, release.channel), ne(otaReleases.id, id)));
++      .where(and(eq(otaReleases.status, "pending"), eq(otaReleases.channel, release.channel), ne(otaReleases.id, id), lt(otaReleases.publishedAt, release.publishedAt)));
+     if (otherPending.length > 0) {
+       await db
+         .update(otaReleases)
+@@ -245,7 +277,6 @@ router.post("/:id/reject", async (req: Request, res: Response) => {
+     if (!release) return sendError(res, 404, "OTA release non trovata");
+     if (release.status !== "pending") return sendError(res, 400, `Stato non valido: ${release.status} (atteso: pending)`);
+ 
+-    // UPDATE atomico con guard sullo status — previene race con worker auto-rollback o doppio click
+     const [updated] = await db
+       .update(otaReleases)
+       .set({
+@@ -291,178 +322,9 @@ router.get("/:id/try", async (req: Request, res: Response) => {
+   }
+ });
+ 
+-// POST /api/admin/ota/:id/rollback
+-// Task #2503: rollback VERO — ri-pubblica su EAS production il bundle della release indicata
+-// via `eas update --republish --group=<groupId>` e inserisce una nuova riga `approved` nel DB.
+-router.post("/:id/rollback", async (req: Request, res: Response) => {
+-  try {
+-    const id = req.params.id as string;
+-    const userId = req.session.userId!;
+-
+-    const [release] = await db.select().from(otaReleases).where(eq(otaReleases.id, id)).limit(1);
+-    if (!release) return sendError(res, 404, "OTA release non trovata");
+-    if (release.status !== "approved") {
+-      return sendError(res, 400, `Rollback disponibile solo per release approvate (stato attuale: ${release.status})`);
+-    }
+-    if (!release.easGroupId) {
+-      return sendError(res, 400, "Questa release non ha un groupId EAS. Ri-sincronizza prima dal pannello admin (pulsante Sync).");
+-    }
+-    if (!process.env.EAS_TOKEN) {
+-      return sendError(res, 500, "EAS_TOKEN non configurato sul server — impossibile eseguire republish");
+-    }
+-
+-    const rollbackMessage = `Rollback to ${release.otaVersion ?? release.easUpdateId.slice(0, 8)} (by admin)`;
+-
+-    let stdoutText = "";
+-    let stderrText = "";
+-    try {
+-      const { stdout, stderr } = await execFileAsync(
+-        "npx",
+-        [
+-          "eas",
+-          "update",
+-          "--republish",
+-          "--group",
+-          release.easGroupId,
+-          "--message",
+-          rollbackMessage,
+-          "--non-interactive",
+-        ],
+-        {
+-          env: {
+-            ...process.env,
+-            EXPO_TOKEN: process.env.EAS_TOKEN,
+-            EAS_NO_VCS: "1",
+-            EAS_SKIP_AUTO_FINGERPRINT: "1",
+-          },
+-          timeout: 120_000,
+-          maxBuffer: 10 * 1024 * 1024,
+-        },
+-      );
+-      stdoutText = stdout || "";
+-      stderrText = stderr || "";
+-    } catch (err) {
+-      const e = err as { stdout?: string; stderr?: string; message?: string };
+-      console.error("[ota] rollback eas update --republish FAILED:", e.message, e.stdout, e.stderr);
+-      return sendError(res, 500, `EAS republish fallito: ${(e.stderr || e.message || "errore sconosciuto").slice(0, 400)}`);
+-    }
+-
+-    const output = `${stdoutText}\n${stderrText}`;
+-    // Parsing STRICT: l'output di `eas update --republish` deve contenere chiaramente
+-    // l'updateId e il groupId nuovi. Se non li troviamo non possiamo inventarli —
+-    // un fake updateId rompe il gating client-side (`incomingId !== allowedEasUpdateId` sempre).
+-    const updateIdMatch = output.match(/Android update ID\s+([a-f0-9-]{36})/i)
+-      ?? output.match(/iOS update ID\s+([a-f0-9-]{36})/i)
+-      ?? output.match(/Update ID\s+([a-f0-9-]{36})/i);
+-    const groupIdMatch = output.match(/Update group ID\s+([a-f0-9-]{36})/i);
+-    if (!updateIdMatch || !groupIdMatch) {
+-      console.error("[ota] rollback parse FAILED — output:\n", output.slice(0, 4000));
+-      return sendError(res, 500, "EAS republish completato ma impossibile parsare updateId/groupId dall'output. Verifica manualmente su EAS e ri-esegui Sync.");
+-    }
+-    const newUpdateId = updateIdMatch[1];
+-    const newGroupId = groupIdMatch[1];
+-
+-    // Inserisci la nuova riga (status approved → distribuita subito a tutti)
+-    const [inserted] = await db.insert(otaReleases).values({
+-      easUpdateId: newUpdateId,
+-      easGroupId: newGroupId,
+-      channel: "production",
+-      runtimeVersion: release.runtimeVersion,
+-      message: rollbackMessage,
+-      otaVersion: release.otaVersion ? `${release.otaVersion}-rb` : null,
+-      status: "approved",
+-      publishedAt: new Date(),
+-      approvedAt: new Date(),
+-      approvedBy: userId,
+-    }).onConflictDoUpdate({
+-      target: otaReleases.easUpdateId,
+-      set: {
+-        status: "approved",
+-        approvedAt: new Date(),
+-        approvedBy: userId,
+-        channel: "production",
+-        easGroupId: newGroupId,
+-      },
+-    }).returning();
+-
+-    console.log(`[ota][AUDIT] rollback to release ${id} (${release.easUpdateId}) by user ${userId} → new updateId ${newUpdateId}`);
+-    return res.json({ ok: true, rolledBackFrom: id, newRelease: inserted, output: output.slice(0, 2000) });
+-  } catch (err) {
+-    console.error("[ota] POST /:id/rollback error:", err);
+-    return sendError(res, 500, "Errore rollback OTA");
+-  }
+-});
+-
+-// POST /api/admin/ota/:id/auto-rollback — toggle/aggiorna config auto-rollback per la release
+-router.post("/:id/auto-rollback", async (req: Request, res: Response) => {
+-  try {
+-    const id = req.params.id as string;
+-    const body = req.body as {
+-      enabled?: unknown;
+-      threshold?: unknown;
+-      minDownloads?: unknown;
+-      windowMinutes?: unknown;
+-    };
+-
+-    const patch: Partial<typeof otaReleases.$inferInsert> = {};
+-    if (typeof body.enabled === "boolean") patch.autoRollbackEnabled = body.enabled;
+-    if (typeof body.threshold === "number" && body.threshold >= 1 && body.threshold <= 100) patch.autoRollbackThreshold = Math.round(body.threshold);
+-    if (typeof body.minDownloads === "number" && body.minDownloads >= 1) patch.autoRollbackMinDownloads = Math.round(body.minDownloads);
+-    if (typeof body.windowMinutes === "number" && body.windowMinutes >= 1) patch.autoRollbackWindowMinutes = Math.round(body.windowMinutes);
+-
+-    if (Object.keys(patch).length === 0) return sendError(res, 400, "Nessun campo valido da aggiornare");
+-
+-    const [updated] = await db.update(otaReleases).set(patch).where(eq(otaReleases.id, id)).returning();
+-    if (!updated) return sendError(res, 404, "OTA release non trovata");
+-
+-    return res.json(updated);
+-  } catch (err) {
+-    console.error("[ota] POST /:id/auto-rollback error:", err);
+-    return sendError(res, 500, "Errore aggiornamento config auto-rollback");
+-  }
+-});
+-
+-// ── GET /:id/failure-devices — modelli dispositivi con boot_failure per release ─
+-router.get("/:id/failure-devices", async (req: Request, res: Response) => {
+-  try {
+-    const releaseId = req.params.id;
+-    const rows = await db.execute<{ device_model: string | null; cnt: string }>(
+-      sql`SELECT device_model, COUNT(*) AS cnt
+-          FROM ota_boot_events
+-          WHERE release_id = ${releaseId}
+-            AND event_type = 'boot_failure'
+-          GROUP BY device_model
+-          ORDER BY cnt DESC`
+-    );
+-
+-    const devices = (rows.rows ?? rows).map((r: { device_model: string | null; cnt: string }) => ({
+-      deviceModel: r.device_model ?? null,
+-      count: Number(r.cnt),
+-    }));
+-
+-    return res.json({ devices });
+-  } catch (err) {
+-    console.error("[ota] GET /:id/failure-devices error:", err);
+-    return sendError(res, 500, "Errore recupero dispositivi con fallimento");
+-  }
+-});
+-
+-// ── GET /timing-log — ultime N righe di logs/ota-timing.log ──────────────────
+-router.get("/timing-log", async (req: Request, res: Response) => {
+-  try {
+-    const n = Math.min(Math.max(parseInt(String(req.query.n ?? "50"), 10) || 50, 1), 500);
+-    const logPath = resolve(process.cwd(), "logs/ota-timing.log");
+-    if (!existsSync(logPath)) {
+-      return res.json({ lines: [], message: "Nessun timing log disponibile ancora." });
+-    }
+-    const content = readFileSync(logPath, "utf-8");
+-    const lines = content.split("\n").filter(Boolean);
+-    return res.json({ lines: lines.slice(-n), total: lines.length });
+-  } catch (err) {
+-    console.error("[ota] GET /timing-log error:", err);
+-    return sendError(res, 500, "Errore lettura timing log");
+-  }
+-});
++// Route EAS-exec (rollback, republish, auto-rollback) + utility (failure-devices, timing-log)
++// montate dal subrouter ota.part2.ts per rispettare il limite di 600 righe per file.
++router.use("/", otaPart2Router);
+ 
+ export default router;
+ export { syncProductionUpdates };
