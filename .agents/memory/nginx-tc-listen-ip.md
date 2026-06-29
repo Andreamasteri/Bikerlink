@@ -1,46 +1,42 @@
 ---
-name: nginx ThinkCentre listen — catch-all vs IP specifico
-description: Strategia listen nginx sul ThinkCentre: catch-all (0.0.0.0) per supportare sia eth (192.168.1.35) sia WiFi USB (192.168.1.36).
+name: nginx ThinkCentre listen — IP specifico 192.168.1.35:443
+description: Tutti i server block nginx sul ThinkCentre usano listen 192.168.1.35:443 ssl (IP specifico, non catch-all 0.0.0.0) per evitare conflitto con Tailscale.
 ---
 
-# nginx ThinkCentre — listen 443 ssl (catch-all 0.0.0.0)
+# nginx ThinkCentre — listen 192.168.1.35:443 ssl (IP specifico)
 
-## Regola attuale (dal Giugno 2026)
-Tutti i `server` block su porta 443 in `/etc/nginx/sites-available/bikerlink` usano:
+## Regola attuale (Giugno 2026)
+Tutti i `server` block su porta 443 usano IP specifico:
 ```nginx
-listen 443 ssl;
-listen [::]:443 ssl;
+listen 192.168.1.35:443 ssl;
 ```
-Forma catch-all (0.0.0.0) — nginx risponde su **qualsiasi interfaccia attiva**: eth cablata (192.168.1.35) e adattatore WiFi USB (192.168.1.36).
+Nessun `listen 443 ssl;` catch-all (0.0.0.0) né `listen [::]:443 ssl;`.
 
-**Why:** Il ThinkCentre ha due NIC:
-- `enp0s31f6` → 192.168.1.35 (ethernet cablata, principale)
-- `wlxccbabdb51e2e` → 192.168.1.36 (WiFi USB, backup/ridondanza)
+**Why:** Tailscale si lega su `[::]:443` e `100.x.x.x:443`. Se nginx usa `listen 443 ssl;` o `listen [::]:443 ssl;`, il bind 0.0.0.0:443 entra in conflitto con Tailscale e `systemctl restart nginx` fallisce (i vecchi worker sopravvivono con `reload` ma non con `restart`). Il bind su IP specifico (`192.168.1.35`, NIC ethernet cablata) garantisce che nginx ascolti sull'interfaccia LAN senza interferire con Tailscale.
 
-Con IP-specifico `listen 192.168.1.35:443 ssl`, nginx non risponde mai su 192.168.1.36. Catch-all copre entrambe senza hardcodare IP, e sopravvive anche se il disco viene spostato su un altro PC.
+**How to apply:** Ogni nuovo `server` block usa `listen 192.168.1.35:443 ssl;`. Per cambiare le listen sockets (aggiunta/rimozione IP), serve `systemctl restart nginx` (non `reload` — reload non rebinda socket già aperti).
 
-**How to apply:** Quando aggiungi un nuovo service block, usa sempre `listen 443 ssl;` + `listen [::]:443 ssl;`. Non usare `listen 192.168.1.35:443 ssl;`.
+## File nginx attivi sul ThinkCentre
+- `/etc/nginx/sites-available/bikerlink` — file principale (26 KB); GH, Valhalla, Ollama, Whisper, Nominatim, TC agent
+- `/etc/nginx/sites-enabled/bikerlink` — symlink a sites-available/bikerlink
+- `/etc/nginx/sites-enabled/graphhopper` — file separato (NON symlink), legacy da Certbot; contiene block `bikerlink.duckdns.org` con cert LetsEncrypt (`/etc/letsencrypt/live/bikerlink.duckdns.org/`)
+- `/etc/nginx/sites-available/graphhopper` — vecchio file HTTP-only (porta 80), non usato per 443
+- `/etc/nginx/sites-available/tc-acme` — ACME challenge handler
 
-## Storia
-- Prima del Giugno 2026: si usava `listen 192.168.1.35:443 ssl` (IP specifico). Motivo: conflict con Tailscale su [::]:443. Il conflict è stato risolto e IPv6 riabilitato.
-- Giugno 2026: migrazione a catch-all per supportare WiFi USB e portabilità del disco.
-
-## WiFi USB — setup profilo NM
-L'adattatore `wlxccbabdb51e2e` (MAC cc:ba:bd:b5:1e:2e) deve essere configurato via NetworkManager:
-```bash
-sudo ./infra/self-host/expose/setup-wifi-usb.sh
-# oppure:
-WIFI_SSID="..." WIFI_PASSWORD="..." sudo -E ./setup-wifi-usb.sh
-```
-Profilo: `BikerLink-WiFi`, IP statico 192.168.1.36, autoconnect=yes, route-metric=200 (subordinato a eth).
-
-## ATTENZIONE — sites-available vs sites-enabled
-I due file sul ThinkCentre sono distinti (non symlink). Modificare sempre `sites-available/bikerlink` tramite `setup-expose.sh`, poi `sudo cp generated/nginx-bikerlink.conf /etc/nginx/sites-available/bikerlink`. Riapplicare anche a `sites-enabled/bikerlink` se è un file separato (verificare con `ls -la /etc/nginx/sites-enabled/`).
+## Attenzione — reload vs restart
+- `systemctl reload nginx` → respawna i worker ma NON cambia i socket di ascolto del master process; se il listen IP cambia, il socket vecchio rimane aperto finché il master non viene riavviato.
+- `systemctl restart nginx` → chiude tutti i socket e li riapre da zero secondo il config attuale. Serve dopo qualsiasi cambio di `listen` directive.
 
 ## Template e rigenerazione
-Il template è in `infra/self-host/expose/nginx-bikerlink.conf`. Per rigenerare:
+Il template principale è in `infra/self-host/expose/nginx-bikerlink.conf` (repo) — già con `listen 192.168.1.35:443 ssl;`. Non esiste un template separato per graphhopper. Per rigenerare:
 ```bash
 NONINTERACTIVE=1 BASE_DOMAIN=bikerlink.duckdns.org APP_ORIGIN=https://bikerlink.app \
 ENV_LOCAL_FILE=/tmp/.env.local bash infra/self-host/expose/setup-expose.sh
 ```
-I token vengono scritti in `/tmp/.env.local` via SFTP (mai loggati), poi cancellati dopo la generazione.
+
+## WiFi USB — nota
+Il ThinkCentre ha una seconda NIC WiFi USB (`wlxccbabdb51e2e`, IP 192.168.1.36). Con listen IP-specifico, nginx NON risponde su 192.168.1.36. Se serve ridondanza WiFi per nginx, aggiungere un secondo `listen 192.168.1.36:443 ssl;` in ciascun server block — ma per ora non è necessario perché il routing primario è via ethernet.
+
+## Storia
+- Pre-Giugno 2026: IP specifico (`192.168.1.35`), poi conflitto Tailscale su `[::]:443`.
+- Giugno 2026 (post-task): graphhopper site-enabled aveva ancora `listen 443 ssl;` (Certbot legacy) → 0.0.0.0:443 attivo; fixato con `sed` + `systemctl restart nginx`; ora `ss -tlnp | grep 443` mostra solo `192.168.1.35:443`.
