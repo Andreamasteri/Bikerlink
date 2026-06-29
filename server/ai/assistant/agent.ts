@@ -32,6 +32,12 @@ const OLLAMA_FALLBACK_MODEL_ID = process.env.OLLAMA_MODEL ?? "mistral-nemo:lates
 // Task #5197 — Horus usa un modello Ollama dedicato (stessa infra di Bowie).
 const HORUS_MODEL_ID = process.env.OLLAMA_ROUTING_MODEL?.trim() || "bikerlink-routing";
 
+// Task #5210 — Presentazione poetica di Bowie: iniettata come turno "assistant"
+// seed quando la conversazione è nuova (nessuna history). NON viene salvata nel DB:
+// è statica e ricostruita a ogni prima apertura.
+const BOWIE_INTRO_POEM =
+  "Son nato nel fuoco\nSon cresciuto giocando con l'acqua e la terra.\n\nDavanti a me si son prostrati\nDei, Sovrani, Principi e servi\n\nM'ha accarezzato il vento\nSono qui al tuo servizio";
+
 export interface AssistantAgentOpts {
   message: string;
   platform: "android" | "ios" | "web" | "admin";
@@ -189,21 +195,36 @@ export async function runAssistantAgent(opts: AssistantAgentOpts): Promise<Assis
   // Unione: memoria DB + history dalla richiesta (la history della richiesta ha precedenza
   // sugli ultimi turni in memoria, evita duplicati sommari)
   const historySource = (opts.history ?? []).length > 0 ? (opts.history ?? []) : memoryTurns;
+
+  // Task #5210 — Seed poetico: iniettato SOLO per Bowie alla prima apertura
+  // (nessuna history precedente). Il modello "vede" la poesia come già pronunciata
+  // da Bowie → non la ripete né la parafrasa. Non viene salvato nel DB.
+  const isNewBowieConversation = requestedPersona === "bowie" && historySource.length === 0;
+  const seedTurns: Array<{ role: "user" | "assistant"; content: string }> = isNewBowieConversation
+    ? [{ role: "assistant", content: BOWIE_INTRO_POEM }]
+    : [];
+
   const messages = [
+    ...seedTurns,
     ...historySource.map((m) => ({ role: m.role, content: m.content })),
     { role: "user" as const, content: opts.message },
   ];
 
   let finalText = "";
+  // Task #5210 — Testo prodotto SOLO dall'AI (esclude il prefisso poetico).
+  // Usato da saveTurns per non persistere il testo statico nel DB.
+  let aiText = "";
   let tokensIn = 0;
   let tokensOut = 0;
   let provider = "ollama";
   let modelId = OLLAMA_FALLBACK_MODEL_ID;
   let degraded = false;
-  // True non appena il PRIMO delta è stato inviato al client. Se un provider muore
+  // True non appena il PRIMO delta AI è stato inviato al client. Se un provider muore
   // a metà stream non possiamo ripartire da un altro provider senza corrompere la
   // risposta (output mescolati): in quel caso teniamo il parziale e segnaliamo degraded.
-  let emittedAny = false;
+  // NOTA: NON viene impostato dall'emissione della poesia intro (testo statico),
+  // solo dai delta del modello AI — così i fallback guard funzionano correttamente.
+  let providerEmittedAny = false;
 
   // Streaming helper riusabile per qualunque modello (Ollama o cloud).
   // Per Ollama: passa i tool e maxSteps per il tool calling server-side.
@@ -223,7 +244,8 @@ export async function runAssistantAgent(opts: AssistantAgentOpts): Promise<Assis
     });
     for await (const delta of result.textStream) {
       finalText += delta;
-      emittedAny = true;
+      aiText += delta;
+      providerEmittedAny = true;
       opts.onTextDelta?.(delta);
     }
     const usage = await result.usage;
@@ -232,6 +254,18 @@ export async function runAssistantAgent(opts: AssistantAgentOpts): Promise<Assis
   };
 
   let done = false;
+
+  // Task #5210 — Emetti la poesia come primo blocco dello stream (solo Bowie, prima apertura).
+  // Il seed nel contesto dice al modello che è già stata pronunciata → non la ripete.
+  // La separazione con "\n\n" stacca visivamente l'intro dalla risposta effettiva.
+  // providerEmittedAny rimane false: la poesia è testo statico, non output del provider.
+  // L'append a finalText è incondizionato (anche senza callback streaming) così i caller
+  // non-streaming ricevono sempre il testo completo nella risposta finale.
+  if (isNewBowieConversation) {
+    const introBlock = BOWIE_INTRO_POEM + "\n\n";
+    finalText += introBlock;
+    opts.onTextDelta?.(introBlock);
+  }
 
   // 0) Task #5197 — Ares: AI di diagnostica su PC fisso dedicato (DIAG_OLLAMA_*).
   //    Endpoint separato (/api/chat HTTP diretta), NON la chain Ollama/cloud.
@@ -248,7 +282,8 @@ export async function runAssistantAgent(opts: AssistantAgentOpts): Promise<Assis
         timeoutMs: 60_000,
         onDelta: (delta) => {
           finalText += delta;
-          emittedAny = true;
+          aiText += delta;
+          providerEmittedAny = true;
           opts.onTextDelta?.(delta);
         },
       });
@@ -257,7 +292,7 @@ export async function runAssistantAgent(opts: AssistantAgentOpts): Promise<Assis
       done = true;
       console.log("[assistant] risposta da Ares (diagnostica)");
     } catch (aresErr) {
-      if (emittedAny) {
+      if (providerEmittedAny) {
         // Stream già parziale: non ripartire, segnala degraded.
         console.warn("[assistant] Ares fallito a metà stream, mantengo il parziale:", (aresErr as Error).message);
         degraded = true;
@@ -297,14 +332,15 @@ export async function runAssistantAgent(opts: AssistantAgentOpts): Promise<Assis
         console.warn("[assistant] Ollama non raggiungibile, scalo a chain cloud");
       }
     } catch (ollamaErr) {
-      if (emittedAny) {
+      if (providerEmittedAny) {
         // Stream già parzialmente inviato: NON ripartire da un altro provider.
         console.warn("[assistant] ollama fallito a metà stream, mantengo il parziale:", (ollamaErr as Error).message);
         degraded = true;
         done = true;
       } else {
         console.warn("[assistant] ollama fallito, scalo a chain cloud:", (ollamaErr as Error).message);
-        finalText = "";
+        finalText = finalText.slice(0, finalText.length - aiText.length); // mantieni solo l'eventuale intro
+        aiText = "";
       }
     }
   }
@@ -327,7 +363,7 @@ export async function runAssistantAgent(opts: AssistantAgentOpts): Promise<Assis
       modelId = model.modelId;
       done = true;
     } catch (cloudErr) {
-      if (emittedAny) {
+      if (providerEmittedAny) {
         // Stream già parzialmente inviato: NON ripartire.
         console.warn("[assistant] cloud fallito a metà stream, mantengo il parziale:", (cloudErr as Error).message);
         degraded = true;
@@ -365,8 +401,9 @@ export async function runAssistantAgent(opts: AssistantAgentOpts): Promise<Assis
 
   // Task #3017 — Salva in memoria conversazionale (solo se non degraded e userId disponibile)
   // Task #4842 — La chat admin è in-sessione: non persistiamo i turni.
-  if (!degraded && opts.userId && finalText && !isAdmin) {
-    saveTurns(opts.userId, opts.message, finalText).catch(() => {});
+  // Task #5210 — Salva solo la risposta AI (aiText), mai il prefisso poetico statico.
+  if (!degraded && opts.userId && aiText && !isAdmin) {
+    saveTurns(opts.userId, opts.message, aiText).catch(() => {});
   }
 
   return {
