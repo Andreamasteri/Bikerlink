@@ -52,6 +52,10 @@ vi.mock("@/lib/query-client", () => ({ getApiUrl: () => "http://test.local" }));
 
 const MANUAL_KEY = "__BOOT_GATE__";
 const REMOTE_MIRROR_KEY = "__BOOT_GATE_REMOTE__";
+// Chiave usata da isCachedUserAdmin() in boot-gate-passive.ts (guard admin-only
+// aggiunto in Task #5065). I test che prevedono attivazione remota richiedono
+// un utente admin in cache.
+const CACHED_USER_KEY = "@bikerlink/cached_user";
 
 async function boot(): Promise<boolean> {
   vi.resetModules();
@@ -63,6 +67,10 @@ describe("resolveBootGateActive — precedenza e propagazione toggle remoto", ()
   beforeEach(() => {
     h.store.clear();
     h.setManifest(false);
+    // Guard admin-only (Task #5065): il flag remoto attiva il gate SOLO se
+    // l'utente cachato è admin. I test di questa suite verificano la propagazione
+    // del toggle remoto, quindi l'utente admin è sempre presente in cache.
+    h.store.set(CACHED_USER_KEY, JSON.stringify({ role: "admin" }));
     vi.stubGlobal("fetch", () => {
       const enabled = h.getManifest();
       if (enabled === null) {
