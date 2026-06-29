@@ -34,6 +34,7 @@ import {
 } from "@/lib/boot-gate-ping";
 
 const REMOTE_TIMEOUT_MS = 2500;
+const COMBINED_TIMEOUT_MS = 3000;
 
 // Chiave dello snapshot utente in cache (deve combaciare con CACHED_USER_KEY
 // in lib/auth-helpers.ts — parte del contratto stabile di storage).
@@ -134,14 +135,35 @@ function resolveRemote(): Promise<boolean> {
 // Decisione combinata per l'avvio CORRENTE: locale OPPURE remoto. Memoizzata e
 // CONDIVISA con RootLayout (app/_layout.tsx) così c'è UN solo fetch del manifest
 // per avvio e la stessa decisione vale per il Livello A (UI) e il Livello B.
+//
+// Belt-and-suspenders: un ceiling di 3s garantisce che questa promise risolva
+// sempre entro COMBINED_TIMEOUT_MS anche se AsyncStorage è degradato oltre il
+// suo timeout di 2s o la rete supera i 2.5s. In caso di timeout combinato il
+// gate si considera spento (false) e l'avvio procede normalmente.
+//
+// Il timer viene cancellato se il ramo asincrono vince prima (no leak).
+// Se vince il ceiling, activeSnapshot viene fissato a false immediatamente:
+// il ramo asincrono che completa in ritardo non può più sovrascriverlo.
 export function resolveBootGateActive(): Promise<boolean> {
   if (!combinedPromise) {
-    combinedPromise = (async () => {
+    let ceilingTimer: ReturnType<typeof setTimeout> | null = null;
+    const ceiling = new Promise<boolean>((resolve) => {
+      ceilingTimer = setTimeout(() => {
+        if (activeSnapshot === null) activeSnapshot = false;
+        resolve(false);
+      }, COMBINED_TIMEOUT_MS);
+    });
+    const inner = (async () => {
       const [local, remote] = await Promise.all([resolveLocal(), resolveRemote()]);
+      if (ceilingTimer !== null) {
+        clearTimeout(ceilingTimer);
+        ceilingTimer = null;
+      }
       const active = local || remote;
       if (activeSnapshot === null) activeSnapshot = active;
       return active;
     })();
+    combinedPromise = Promise.race([inner, ceiling]);
   }
   return combinedPromise;
 }
