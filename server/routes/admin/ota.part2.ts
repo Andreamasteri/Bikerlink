@@ -176,6 +176,15 @@ router.post("/:id/republish", async (req: Request, res: Response) => {
     const newUpdateId = updateIdMatch[1];
     const newGroupId = groupIdMatch[1];
 
+    const [existing] = await db.select({ id: otaReleases.id, status: otaReleases.status })
+      .from(otaReleases)
+      .where(eq(otaReleases.easUpdateId, newUpdateId))
+      .limit(1);
+    if (existing?.status === "approved") {
+      console.warn(`[ota][AUDIT] republish ABORTED — EAS returned same updateId ${newUpdateId} already approved (release ${existing.id}); would have downgraded to pending`);
+      return sendError(res, 409, `EAS ha restituito lo stesso updateId (${newUpdateId.slice(0, 8)}…) che è già approvato e distribuito. L'operazione è stata annullata per evitare di revocare la distribuzione agli utenti. Verifica manualmente su EAS.`);
+    }
+
     const [inserted] = await db.insert(otaReleases).values({
       easUpdateId: newUpdateId,
       easGroupId: newGroupId,

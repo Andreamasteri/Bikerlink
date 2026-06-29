@@ -3,7 +3,7 @@ import { MAP_STYLES, CURVATURE_LEGEND_HTML, TAP_HINT_HTML } from './map-styles';
 import { COMMON_SCRIPTS } from './map-scripts';
 import { MARKER_SCRIPTS } from './map-markers';
 import { LEAFLET_JS, LEAFLET_CSS } from '../leaflet-bundle';
-import { decimateTrackCurvatureAware } from '../maps/track-decimate';
+import { decimateTrack, decimateTrackCurvatureAware } from '../maps/track-decimate';
 
 export interface PlannerWaypoint {
   lat: number;

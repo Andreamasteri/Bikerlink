@@ -214,6 +214,24 @@ export default function OtaPanel() {
   }, []);
 
   const handleRepublish = useCallback((release: OtaRelease) => {
+    if (release.status === "approved") {
+      Alert.alert(
+        "⚠️ Attenzione — OTA già approvata",
+        `Stai per revocare un'OTA già approvata e distribuita.\n\nGli utenti non riceveranno più l'aggiornamento finché non riapprovi.\n\nVersione: ${release.otaVersion ?? release.easUpdateId.slice(0, 8)}\nMessaggio: ${release.message ?? "—"}\n\nContinuare?`,
+        [
+          { text: "Annulla", style: "cancel" },
+          {
+            text: "Sì, republica per test",
+            style: "destructive",
+            onPress: () => {
+              setRepublishingId(release.id);
+              republishMutationRef.current.mutate(release.id);
+            },
+          },
+        ]
+      );
+      return;
+    }
     Alert.alert(
       "📡 Republica per test",
       `Ri-pubblicare il bundle di questa OTA su EAS production come pending?\n\nVersione: ${release.otaVersion ?? release.easUpdateId.slice(0, 8)}\nMessaggio: ${release.message ?? "—"}\n\nSolo i dispositivi admin la riceveranno al cold start. Gli utenti normali non la ricevono finché non viene approvata.`,
