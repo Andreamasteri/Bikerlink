@@ -16,7 +16,8 @@
 #
 # 4 GUARD ANTI-FALLIMENTO (richiesti dalla spec):
 #   G1. runtimeVersion guard — ABORT se il runtime del commit base ≠ atteso (10.0.0).
-#   G2. npm ci dal lockfile del commit base + fix proxy Replit sul package-lock.
+#   G2. build-dir pronto — sorgenti del commit base copiate in workspace (stesso FS di node_modules),
+#       node_modules del workspace symlinkato; verifica che expo-router/entry.js sia presente.
 #   G3. admin-first pending — la release entra `pending`, mai auto-distribuita.
 #   G4. smoke test pre-upload — il bundle Hermes/JS deve esistere ed essere > 0 byte.
 #
@@ -123,7 +124,10 @@ fi
 
 # ── 3. Crea worktree DETACHED sul commit base (non tocca HEAD/branch) ────────
 WORKTREE_DIR="/tmp/emcy-worktree-$$"
-DIST_DIR="${WORKTREE_DIR}/dist-ota-emcy"
+# BUILD_DIR è dentro il workspace (stesso filesystem di node_modules) così i
+# symlink che Metro deve seguire restano sotto il project root.
+BUILD_DIR="/home/runner/workspace/.emcy-build-$$"
+DIST_DIR="${BUILD_DIR}/dist-ota-emcy"
 
 cleanup() {
   if [[ -d "$WORKTREE_DIR" ]]; then
@@ -131,6 +135,10 @@ cleanup() {
     git worktree remove --force "$WORKTREE_DIR" 2>/dev/null \
       || rm -rf "$WORKTREE_DIR" 2>/dev/null || true
     git worktree prune 2>/dev/null || true
+  fi
+  if [[ -d "$BUILD_DIR" ]]; then
+    log_info "Cleanup build dir ${BUILD_DIR}..."
+    rm -rf "$BUILD_DIR" 2>/dev/null || true
   fi
 }
 trap cleanup EXIT
@@ -165,21 +173,30 @@ log_ok "GUARD G1 OK: runtime ${WT_RUNTIME} combacia."
 
 RUNTIME_FULL="$WT_RUNTIME"
 
-# ── GUARD G2: fix proxy Replit sul lockfile + npm ci dal lockfile della base ─
-if [[ ! -f "${WORKTREE_DIR}/package-lock.json" ]]; then
-  log_error "GUARD G2 FALLITA: package-lock.json assente nel commit base — npm ci impossibile."
+# ── GUARD G2: crea BUILD_DIR nel workspace + symlink node_modules ─────────────
+# BUILD_DIR è sotto /home/runner/workspace (stesso filesystem di node_modules):
+# il symlink node_modules rimane dentro il project root che Metro osserva,
+# evitando l'errore "Invalid cross-device link" di /tmp e il fallimento di
+# risoluzione expo-router/entry.js per symlink fuori root.
+WORKSPACE_NM="/home/runner/workspace/node_modules"
+if [[ ! -d "$WORKSPACE_NM" ]]; then
+  log_error "GUARD G2 FALLITA: node_modules del workspace non trovata in ${WORKSPACE_NM}."
   exit 1
 fi
-log_info "GUARD G2: fix URL proxy Replit nel package-lock.json del worktree..."
-sed -i 's|http://package-firewall\.replit\.local/npm/|https://registry.npmjs.org/|g' "${WORKTREE_DIR}/package-lock.json"
-log_info "GUARD G2: npm ci nel worktree (deps esatte del commit base)..."
-if ! ( cd "$WORKTREE_DIR" && npm ci --no-audit --no-fund 2>&1 ); then
-  log_error "GUARD G2 FALLITA: npm ci nel worktree fallito."
+if [[ ! -f "${WORKSPACE_NM}/expo-router/entry.js" ]]; then
+  log_error "GUARD G2 FALLITA: expo-router/entry.js mancante nel workspace node_modules."
   exit 1
 fi
-log_ok "GUARD G2 OK: dipendenze del commit base installate."
+log_info "GUARD G2: copia sorgenti dal worktree a BUILD_DIR nel workspace (tar pipe)..."
+rm -rf "$BUILD_DIR"
+mkdir -p "$BUILD_DIR"
+( cd "$WORKTREE_DIR" && tar --exclude=./node_modules --exclude=./.git \
+    --exclude=./dist-ota-emcy -cf - . ) | ( cd "$BUILD_DIR" && tar xf - )
+# Symlink node_modules dal workspace (stesso filesystem → Metro lo segue correttamente)
+ln -sf "$WORKSPACE_NM" "${BUILD_DIR}/node_modules"
+log_ok "GUARD G2 OK: BUILD_DIR pronto (expo-router $(node -e "console.log(require('${WORKSPACE_NM}/expo-router/package.json').version)" 2>/dev/null || echo '?'))."
 
-# ── 4. Metro export nel worktree ─────────────────────────────────────────────
+# ── 4. Metro export da BUILD_DIR (dentro il workspace) ───────────────────────
 # Libera la porta 8081 (watchdog/start-expo possono tenerla occupata).
 log_info "Pre-export: libero porta 8081..."
 pkill -TERM -f "watchdog.sh" 2>/dev/null || true
@@ -190,10 +207,10 @@ pkill -9 -f "start-expo.sh" 2>/dev/null || true
 _PIDS=$(lsof -ti:8081 2>/dev/null || true)
 if [[ -n "$_PIDS" ]]; then echo "$_PIDS" | xargs kill -9 2>/dev/null || true; sleep 1; fi
 
-log_info "Fase 1/3 — Metro export (bundle Android) dal worktree..."
+log_info "Fase 1/3 — Metro export (bundle Android) da BUILD_DIR nel workspace..."
 rm -rf "$DIST_DIR"
 EXPORT_LOG="/tmp/emcy-export-android.log"
-( cd "$WORKTREE_DIR" && EXPO_TOKEN="${EAS_TOKEN:-}" \
+( cd "$BUILD_DIR" && EXPO_TOKEN="${EAS_TOKEN:-}" \
     EXPO_PUBLIC_DOMAIN="${EXPO_PUBLIC_DOMAIN:-}" \
     EXPO_PUBLIC_SENTRY_DSN="${EXPO_PUBLIC_SENTRY_DSN:-}" \
     npx expo export \
@@ -201,7 +218,7 @@ EXPORT_LOG="/tmp/emcy-export-android.log"
     --output-dir "dist-ota-emcy" 2>&1 ) | tee "$EXPORT_LOG" || true
 EXPORT_EXIT=${PIPESTATUS[0]}
 if [[ "$EXPORT_EXIT" -ne 0 ]]; then
-  log_error "expo export fallito nel worktree (exit $EXPORT_EXIT). Ultime 40 righe:"
+  log_error "expo export fallito (exit $EXPORT_EXIT). Ultime 40 righe:"
   tail -40 "$EXPORT_LOG" >&2
   exit 1
 fi
@@ -241,10 +258,13 @@ if [[ "$DRY_RUN" -eq 1 ]]; then
 fi
 
 # ── 5. EAS update sul canale emergency ───────────────────────────────────────
+# Usiamo BUILD_DIR (dentro il workspace) come CWD: ha eas.json, app.json ecc.
+# Il dist è dist-ota-emcy relativo a BUILD_DIR.
 log_info "Fase 2/3 — EAS update --channel ${CHANNEL} (attendi 1-2 minuti)..."
-EAS_OUTPUT=$( cd "$WORKTREE_DIR" && EAS_NO_VCS=1 EAS_SKIP_AUTO_FINGERPRINT=1 EXPO_TOKEN="${EAS_TOKEN}" \
-  bash scripts/eas.sh update \
+EAS_OUTPUT=$( cd "$BUILD_DIR" && EAS_NO_VCS=1 EAS_SKIP_AUTO_FINGERPRINT=1 EXPO_TOKEN="${EAS_TOKEN}" \
+  bash /home/runner/workspace/scripts/eas.sh update \
     --channel "${CHANNEL}" \
+    --environment production \
     --message "${EAS_MESSAGE}" \
     --input-dir "dist-ota-emcy" \
     --skip-bundler \

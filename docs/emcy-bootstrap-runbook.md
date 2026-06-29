@@ -1,107 +1,175 @@
 # Runbook — Bootstrap OTA Canale Emergenza (EMCY)
 
-> **NOTA**: questo file va eseguito DALL'AMBIENTE MAIN (non da un task-agent isolato).
-> Richiede `EAS_TOKEN` e `DATABASE_URL` nell'ambiente.
+> **NOTA**: questi passi vanno eseguiti DALL'AMBIENTE MAIN (non da un task-agent isolato).
+> Richiedono `EAS_TOKEN` e `DATABASE_URL` nell'ambiente.
 
 ---
 
-## Stato precondizioni (verificate da task-5091)
+## Stato precondizioni
 
 | Elemento | Stato |
 |---|---|
 | Script `scripts/publish-ota-emcy.sh` | ✅ presente e completo (guard G1–G4) |
 | Pannello admin `OtaPanelExtra.tsx` | ✅ presente con toggle + approva/revoca |
-| Commit base `408f82d1` | ✅ nel repo (runtimeVersion `10.0.0`) |
-| Patch infrastruttura EMCY | ✅ `docs/emcy-bootstrap.patch` (1262 righe) |
 | API backend `/api/admin/ota/emergency/*` | ✅ endpoint toggle + status |
+| Manifest redirect `ota_emergency_active` | ✅ implementato in `server/routes/ota-public.ts` |
+| Commit base `408f82d1` | ✅ nel repo (runtimeVersion `10.0.0`) |
 
 ---
 
-## Strategia canali
+## Obiettivo del bootstrap
 
-| Tipo | Canale EAS | Quando |
-|---|---|---|
-| Bootstrap (questo step) | `production` | Prima release dal commit base sul canale normale |
-| Release emergenza | `emergency` | Quando la production è rotta — redirect automatico |
-
-Il **bootstrap** va su `production` perché è il punto di partenza sicuro che i device
-già receivono normalmente. Le release EMCY successive usano `emergency` e vengono
-attivate tramite redirect (flag `ota_emergency_active`).
+Pubblicare EMCY-1 sul canale `emergency` come release di standby **approvata e pronta**.
+In condizioni normali rimane inattiva (il toggle è OFF). Quando la production si rompe,
+basta premere **🚨 Attiva redirect EMCY** per riportare tutti i device alla base sana.
 
 ---
 
-## Step 1 — Dry-run (verifica pre-pubblicazione)
+## Step 1 — Dry-run (verifica senza pubblicare)
 
 ```bash
 bash scripts/publish-ota-emcy.sh \
-  --message "Bootstrap EMCY — base di recupero runtime 10.0.0" \
+  --message "Bootstrap EMCY-1" \
   --base 408f82d1 \
-  --channel production \
+  --channel emergency \
   --dry-run
 ```
 
-Atteso output:
+Output atteso:
+
 ```
 [EMCY ✓] DRY-RUN completato — nessuna pubblicazione effettuata.
-  Avrebbe pubblicato : EMCY-1 sul canale 'production'
+  Avrebbe pubblicato : EMCY-1 sul canale 'emergency'
   Runtime            : 10.0.0
-  Bundle             : *.hbc (<size> byte)
+  Messaggio EAS      : [OTA:EMCY-1] Bootstrap EMCY-1
+  Bundle             : .../index.android.bundle (N byte)
 ```
 
-Se la GUARD G1 fallisce (`runtimeVersion` mismatch), verificare che
-`app.json` nel commit `408f82d1` abbia `runtimeVersion: "10.0.0"`.
+Se la Guard G1 fallisce (`runtimeVersion` mismatch), verificare:
+
+```bash
+git show 408f82d1:app.json | node -e \
+  "const d=JSON.parse(require('fs').readFileSync('/dev/stdin','utf8')); console.log(d.expo.runtimeVersion)"
+```
 
 ---
 
-## Step 2 — Pubblicazione bootstrap (solo dall'ambiente main)
+## Step 2 — Pubblicazione live (solo dall'ambiente main)
 
 ```bash
 bash scripts/publish-ota-emcy.sh \
-  --message "Bootstrap EMCY — base di recupero runtime 10.0.0" \
-  --base 408f82d1 \
-  --channel production
-```
-
-La release viene inserita in DB con `status='pending'` e `channel='production'`.
-EAS riceve la release nel canale `production`.
-**La release NON è ancora distribuita** (flag admin-first, stato `pending`).
-
----
-
-## Step 3 — Approvazione dal pannello admin
-
-1. Aprire l'app come admin
-2. Navigare in **Pannello Admin → OTA**
-3. La release comparirà nella lista OTA con stato `PENDING`
-4. Premere **Approva** → confermare
-5. Verificare che lo status passi a `APPROVED`
-
----
-
-## Step 4 — Pubblicazione EMCY (quando la production è rotta)
-
-Quando serve la rete di sicurezza, pubblicare una nuova release dal commit
-base sul canale `emergency`:
-
-```bash
-bash scripts/publish-ota-emcy.sh \
-  --message "Emergenza: <descrizione del problema>" \
+  --message "Bootstrap EMCY-1" \
   --base 408f82d1 \
   --channel emergency
 ```
 
-Poi dal pannello admin (sezione **Canale Emergenza**):
-1. Approvare la release EMCY-N
-2. Premere **🚨 Attiva redirect EMCY**
-3. Il manifest `/api/ota/manifest` inizia a servire EMCY-N a tutti i device
-4. Per disattivare: **🛑 Disattiva redirect EMCY**
+Lo script:
+1. Crea un git worktree detached su `408f82d1` (HEAD/branch non toccati).
+2. Copia i sorgenti del worktree in un `BUILD_DIR` dentro `/home/runner/workspace/` (stesso
+   filesystem di `node_modules`) via tar pipe; symlink `node_modules` dal workspace — Metro
+   risolve `expo-router/entry.js` correttamente.
+3. `npx expo export --platform android` dal `BUILD_DIR`.
+4. Smoke test: bundle > 1 KB.
+5. `eas update --channel emergency --environment production` (1-2 minuti).
+6. Insert in `ota_releases`: `channel='emergency'`, `status='pending'`.
+
+Output finale atteso:
+
+```
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+[EMCY ✓] EMCY pubblicata come PENDING!
+  Versione      : EMCY-1
+  Canale        : emergency
+  Runtime       : 10.0.0
+  Update ID     : <uuid>
+  Prossimi step : 1) /admin/ota → sezione EMCY → Approva la release
+                  2) attiva il redirect EMCY per distribuirla a TUTTI i device
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+```
 
 ---
 
-## Note tecniche
+## Step 3 — Approvazione in-app
 
-- Il toggle EMCY ON viene **rifiutato** se non esiste una release `emergency` con `status='approved'`
-- Le release EMCY usano numerazione `EMCY-N` separata dalla production (`N.N.N`)
-- La sync EAS production ignora le EMCY (regex `^[0-9]+\.[0-9]+\.[0-9]+$`)
-- `approve` preserva `release.channel` — le release restano sul loro canale originale
-- Base commit `408f82d1` = OTA-131, runtimeVersion `10.0.0`
+1. Aprire l'app come admin.
+2. Navigare in **Admin → OTA**.
+3. Nella sezione **Canale Emergenza (EMCY)** trovare `EMCY-1` con stato `PENDING`.
+4. Premere **Approva** → confermare nel dialog.
+5. Verificare che lo stato mostri **APPROVED**.
+
+Il pulsante **🚨 Attiva redirect EMCY** diventa operativo non appena esiste almeno
+una release EMCY approvata.
+
+---
+
+## Verifica rapida via API (opzionale)
+
+```bash
+curl -s "$EXPO_PUBLIC_DOMAIN/api/admin/ota/emergency/status" \
+  -H "Cookie: connect.sid=<admin-session>" \
+  | jq '{active:.active, releases:[.releases[]|{v:.otaVersion,s:.status}]}'
+```
+
+Risposta attesa dopo l'approvazione:
+
+```json
+{
+  "active": false,
+  "releases": [{ "v": "EMCY-1", "s": "approved" }]
+}
+```
+
+---
+
+## Come attivare il redirect in un'emergenza reale
+
+> **Usare solo se la production è rotta** e i device devono essere riportati alla base sana.
+
+1. In-app: **Admin → OTA → Canale Emergenza (EMCY)** → **🚨 Attiva redirect EMCY**.
+2. Confermare il dialog di avvertimento.
+3. Entro il prossimo ciclo OTA (~5 minuti), tutti i device ricevono EMCY-1.
+4. Per tornare alla production normale: **🛑 Disattiva redirect EMCY**.
+
+---
+
+## Pubblicare una EMCY-N successiva (con patch opzionale)
+
+```bash
+# Prepara patch dal diff tra commit base e HEAD
+git diff 408f82d1..HEAD -- path/to/fix.ts > /tmp/my-fix.patch
+
+# Pubblica EMCY-2 con la patch applicata sul commit base
+bash scripts/publish-ota-emcy.sh \
+  --message "Fix critico: <descrizione>" \
+  --base 408f82d1 \
+  --patch /tmp/my-fix.patch \
+  --channel emergency
+```
+
+Poi approvare EMCY-2 dal pannello admin. Il toggle EMCY servirà automaticamente
+la release approvata più recente sul canale `emergency`.
+
+---
+
+## Invarianti di sicurezza
+
+| Guard | Descrizione |
+|---|---|
+| G1 | Build solo dal commit con `runtimeVersion=10.0.0` — altri runtime non ricevono EMCY |
+| G2 | Sorgenti del commit base in `BUILD_DIR` (stesso filesystem workspace) + `node_modules` symlinkato — Metro risolve correttamente le dipendenze |
+| G3 | Release entra sempre `pending` — nessun device riceve EMCY senza approvazione admin |
+| G4 | Smoke test bundle > 1 KB prima dell'upload — previene distribuzione bundle corrotti |
+| Toggle guard | `active=true` bloccato se non esiste release `emergency` con `status='approved'` |
+| Channel preserve | `approve` mantiene `release.channel` — EMCY approvata rimane su `emergency`, mai su `production` |
+
+---
+
+## Componenti del sistema
+
+| Componente | File |
+|---|---|
+| Script publish | `scripts/publish-ota-emcy.sh` |
+| Manifest redirect | `server/routes/ota-public.ts` |
+| Admin API | `server/routes/admin/ota.ts` |
+| Admin UI (toggle + approva) | `components/admin/ota/OtaPanelExtra.tsx` |
+| Schermata admin | `app/admin/ota.tsx` |
