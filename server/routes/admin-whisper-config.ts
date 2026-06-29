@@ -19,6 +19,7 @@ import {
 } from "./admin-whisper-config.helpers";
 
 import { handleWhisperHealth, handleWhisperReset, handleWhisperDiagnose } from "./admin-whisper-config.part2";
+import { cfAccessHeaders } from "../lib/cf-access";
 
 const router = Router();
 
@@ -72,7 +73,7 @@ router.post("/whisper-config/test/:providerId", async (req: Request, res: Respon
         return;
       }
       const endpoint = whisperUrl.replace(/\/$/, "") + "/inference";
-      const headers: Record<string, string> = {};
+      const headers: Record<string, string> = { ...cfAccessHeaders() };
       if (whisperToken) headers["X-Whisper-Token"] = whisperToken;
       const wavResult = await probeHomeFormat(logId, endpoint, headers, wav, "audio/wav", "silence.wav", 15000);
       const m4aResult = await probeHomeFormat(logId, endpoint, headers, buildMinimalM4a(), "audio/x-m4a", "silence.m4a", 10000);

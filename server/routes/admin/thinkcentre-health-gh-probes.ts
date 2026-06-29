@@ -4,6 +4,7 @@
  */
 
 import { ACTIVE_PROFILE } from "../../graphhopper-client";
+import { cfAccessHeaders } from "../../lib/cf-access";
 import { getAreaEnabledMap } from "../../routing/routing-area-state";
 import {
   ROUTING_AREAS,
@@ -80,7 +81,7 @@ async function graphHopperRouteProbe(
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), PROBE_TIMEOUT_MS);
   const t0 = Date.now();
-  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  const headers: Record<string, string> = { "Content-Type": "application/json", ...cfAccessHeaders() };
   if (token) headers["X-GH-Token"] = token;
   try {
     const res = await fetch(`${base}/route`, {
@@ -149,7 +150,7 @@ async function probeGraphHopperArea(
     return { ...baseShape, enabled: false, ok: false, startingUp: false, latencyMs: null };
   }
   const areaBase = `${base}${area.path}`;
-  const headers: Record<string, string> = {};
+  const headers: Record<string, string> = { ...cfAccessHeaders() };
   if (token) headers["X-GH-Token"] = token;
   const health = await httpProbe(
     `${areaBase}/health`,
@@ -252,7 +253,7 @@ export async function probeWhisper(): Promise<ServiceHealth> {
   wav.writeUInt16LE(1, 22); wav.writeUInt32LE(sampleRate, 24);
   wav.writeUInt32LE(sampleRate * 2, 28); wav.writeUInt16LE(2, 32); wav.writeUInt16LE(16, 34);
   wav.write("data", 36); wav.writeUInt32LE(dataSize, 40);
-  const headers: Record<string, string> = {};
+  const headers: Record<string, string> = { ...cfAccessHeaders() };
   if (token) headers["Authorization"] = `Bearer ${token}`;
 
   const healthResult = await httpProbe(`${base}/health`, headers);

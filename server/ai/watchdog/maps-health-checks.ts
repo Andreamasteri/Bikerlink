@@ -11,6 +11,7 @@ import { getAreaEnabledMap } from "../../routing/routing-area-state";
 import { ROUTING_AREAS, routingAreaUrl } from "@shared/routing-areas";
 import { isThinkCentreInMaintenance } from "../../lib/thinkcentre-maintenance";
 import { isThinkCentrePoweredOff } from "../../lib/thinkcentre-powered-off";
+import { cfAccessHeaders } from "../../lib/cf-access";
 
 const log = logger.child({ scope: "maps-watchdog", check: "health" });
 
@@ -62,13 +63,15 @@ function engineTargets(): Target[] {
   const out: Target[] = [];
   const ghBase = process.env.GRAPHHOPPER_SELF_HOSTED_URL ?? process.env.GRAPHHOPPER_URL;
   if (ghBase) {
-    const ghHeaders: Record<string, string> = {};
+    const ghHeaders: Record<string, string> = { ...cfAccessHeaders() };
     if (process.env.GRAPHHOPPER_TOKEN) ghHeaders["X-GH-Token"] = process.env.GRAPHHOPPER_TOKEN;
     out.push({ kind: "engine", id: "graphhopper", url: `${ghBase.replace(/\/$/, "")}/health`, headers: ghHeaders });
   }
   const valhalla = process.env.VALHALLA_URL;
   if (valhalla) {
-    out.push({ kind: "engine", id: "valhalla", url: `${valhalla.replace(/\/$/, "")}/status` });
+    const vHeaders: Record<string, string> = { ...cfAccessHeaders() };
+    if (process.env.VALHALLA_API_KEY) vHeaders["X-Valhalla-Key"] = process.env.VALHALLA_API_KEY;
+    out.push({ kind: "engine", id: "valhalla", url: `${valhalla.replace(/\/$/, "")}/status`, headers: vHeaders });
   }
   if (process.env.MAPBOX_ACCESS_TOKEN) {
     out.push({ kind: "engine", id: "mapbox", url: "https://api.mapbox.com/", cloudEngine: true });
@@ -111,7 +114,7 @@ export async function areaEngineTargets(): Promise<Target[]> {
     return [];
   }
 
-  const headers: Record<string, string> = {};
+  const headers: Record<string, string> = { ...cfAccessHeaders() };
   if (process.env.GRAPHHOPPER_TOKEN) headers["X-GH-Token"] = process.env.GRAPHHOPPER_TOKEN;
 
   return ROUTING_AREAS.filter((a) => enabledMap[a.codice]).map((a) => ({

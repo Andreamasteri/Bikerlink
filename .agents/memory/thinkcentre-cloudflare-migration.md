@@ -96,5 +96,20 @@ Il nostro dominio è `biker-link.net` (registrato su Cloudflare).
 
 ---
 
+## Cloudflare Access (service token) — auth layer davanti ai servizi TC
+
+Layer di auth opzionale DAVANTI ai servizi self-hosted (gh/valhalla/nominatim/whisper), in aggiunta ai token custom esistenti (`X-GH-Token`, `X-Valhalla-Key`, `X-Nominatim-Token`, `X-Whisper-Token`) che restano come fallback.
+
+### Lato codice (già wired)
+- Helper `server/lib/cf-access.ts`: `cfAccessHeaders()` ritorna `{"CF-Access-Client-Id","CF-Access-Client-Secret"}` SOLO se entrambe le env `CF_ACCESS_CLIENT_ID` + `CF_ACCESS_CLIENT_SECRET` sono presenti, altrimenti `{}` (degrada senza rompere nulla). `isCfAccessConfigured()` per check.
+- `...cfAccessHeaders()` applicato SOLO ai target self-hosted, MAI a Nominatim/Photon pubblici, API cloud o tile. Header CF vanno all'edge CF, innocui per l'origin → safe da inviare anche prima che la policy Access sia attiva.
+- Gotcha: la valhalla engine target in `maps-health-checks.ts` non aveva `X-Valhalla-Key` → aggiunto in lockstep con i CF headers.
+- **Ollama escluso deliberatamente** (gh.* TC + PC fisso): non in scope; coprire come follow-up se si vuole Access anche lì.
+
+### Lato Cloudflare (da fare a mano — richiede CF API token / dashboard, non presenti in env)
+- Creare un'app **Access** per ogni hostname `gh|valhalla|whisper|nominatim.biker-link.net` (Zero Trust → Access → Applications, self-hosted).
+- Creare un **service token** (Access → Service Auth) e metterne Client ID/Secret nelle env Replit `CF_ACCESS_CLIENT_ID` / `CF_ACCESS_CLIENT_SECRET` (secret).
+- Policy: allow con "Service Token" = il token creato. Finché le env non sono settate, il codice continua a funzionare coi soli token custom.
+
 ## Why
-Cloudflare Tunnel elimina port forwarding sul router, DuckDNS, Let's Encrypt, e nginx per l'esposizione esterna. Zero ingress firewall rules. TLS gestito da Cloudflare Edge. Costo: solo il dominio biker-link.net (~$9-11/anno).
+Cloudflare Tunnel elimina port forwarding sul router, DuckDNS, Let's Encrypt, e nginx per l'esposizione esterna. Zero ingress firewall rules. TLS gestito da Cloudflare Edge. Costo: solo il dominio biker-link.net (~$9-11/anno). CF Access aggiunge un secondo fattore di auth all'edge senza esporre i servizi a chiunque conosca i token custom.

@@ -3,6 +3,7 @@ import multer from "multer";
 import { sendError } from "../lib/api-response";
 import { getEffectiveSttChain } from "../ai/whisper-provider-config";
 import { isThinkCentreOffline } from "../lib/thinkcentre-offline";
+import { cfAccessHeaders } from "../lib/cf-access";
 
 const router = Router();
 
@@ -69,7 +70,7 @@ router.post("/transcribe", audioUpload.single("file"), async (req: Request, res:
           formData.append("response_format", "json");
           formData.append("language", lang);
 
-          const headers: Record<string, string> = {};
+          const headers: Record<string, string> = { ...cfAccessHeaders() };
           if (whisperToken) {
             headers["X-Whisper-Token"] = whisperToken;
           }

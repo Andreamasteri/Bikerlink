@@ -7,6 +7,7 @@
  */
 
 import { getNominatimHealthSnapshot } from "../lib/nominatim-client";
+import { cfAccessHeaders } from "../lib/cf-access";
 import { ACTIVE_PROFILE, fetchSelfHostedProfiles, isSelfHosted } from "../graphhopper-client";
 import { getAreaEnabledMap } from "../routing/routing-area-state";
 import { ROUTING_AREAS, type RoutingArea, type RoutingAreaCode } from "@shared/routing-areas";
@@ -105,7 +106,7 @@ export async function probeGraphHopperAreas(): Promise<{ unitOk: boolean | null;
   const base = process.env.GRAPHHOPPER_URL?.replace(/\/$/, "");
   if (!base) return { unitOk: null, areas: [] };
 
-  const headers: Record<string, string> = {};
+  const headers: Record<string, string> = { ...cfAccessHeaders() };
   const token = process.env.GRAPHHOPPER_TOKEN;
   if (token) headers["X-GH-Token"] = token;
 
@@ -148,7 +149,7 @@ async function probeOllamaOk(): Promise<boolean | null> {
 async function probeWhisperOk(): Promise<boolean | null> {
   const base = process.env.WHISPER_URL?.replace(/\/$/, "");
   if (!base) return null;
-  const headers: Record<string, string> = {};
+  const headers: Record<string, string> = { ...cfAccessHeaders() };
   const token = process.env.WHISPER_TOKEN;
   if (token) headers["X-Whisper-Token"] = token;
   return httpProbe(`${base}/`, headers, (s) => s < 500);
@@ -163,7 +164,7 @@ async function probeNominatimOk(): Promise<boolean | null> {
 async function probeValhallaOk(): Promise<boolean | null> {
   const base = process.env.VALHALLA_URL?.replace(/\/$/, "");
   if (!base) return null;
-  const headers: Record<string, string> = {};
+  const headers: Record<string, string> = { ...cfAccessHeaders() };
   const apiKey = process.env.VALHALLA_API_KEY;
   if (apiKey) headers["X-Valhalla-Key"] = apiKey;
   return httpProbe(`${base}/status`, headers);

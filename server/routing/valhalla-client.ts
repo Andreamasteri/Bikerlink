@@ -24,6 +24,7 @@ import {
   type MatrixResult,
   type LatLon,
 } from "./valhalla/matrix-builder";
+import { cfAccessHeaders } from "../lib/cf-access";
 
 const VALHALLA_BASE_URL = process.env.VALHALLA_URL?.replace(/\/$/, "") ?? "";
 const VALHALLA_API_KEY = process.env.VALHALLA_API_KEY ?? "";
@@ -37,7 +38,8 @@ if (VALHALLA_BASE_URL) {
 }
 
 function buildHeaders(): Record<string, string> {
-  const h: Record<string, string> = { "Content-Type": "application/json" };
+  // Cloudflare Access Service Token (layer zero-trust davanti al tunnel TC).
+  const h: Record<string, string> = { "Content-Type": "application/json", ...cfAccessHeaders() };
   if (VALHALLA_API_KEY) h["X-Valhalla-Key"] = VALHALLA_API_KEY;
   return h;
 }

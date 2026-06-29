@@ -19,6 +19,7 @@
 import { tool } from "ai";
 import { z } from "zod";
 import { db } from "../../db";
+import { cfAccessHeaders } from "../../lib/cf-access";
 import { routes, events, plannedRoutes } from "@shared/db";
 import { eq, and, gte, desc, sql } from "drizzle-orm";
 
@@ -154,8 +155,8 @@ export const getThinkCentreStatusTool = tool<EmptyInput, Record<string, unknown>
 
     const probes: Promise<void>[] = [];
     if (ollamaUrl) probes.push(probe("ollama", `${ollamaUrl}/api/tags`, ollamaToken ? { "X-Ollama-Token": ollamaToken } : {}));
-    if (ghUrl) probes.push(probe("graphhopper", `${ghUrl}/health`, ghToken ? { "X-GH-Token": ghToken } : {}));
-    if (nominatimUrl) probes.push(probe("nominatim", `${nominatimUrl}/status`));
+    if (ghUrl) probes.push(probe("graphhopper", `${ghUrl}/health`, { ...cfAccessHeaders(), ...(ghToken ? { "X-GH-Token": ghToken } : {}) }));
+    if (nominatimUrl) probes.push(probe("nominatim", `${nominatimUrl}/status`, cfAccessHeaders()));
 
     await Promise.all(probes);
 

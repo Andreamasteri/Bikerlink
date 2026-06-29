@@ -14,6 +14,8 @@
  *                      Ignorato se NOMINATIM_URL non è impostata.
  */
 
+import { cfAccessHeaders } from "./cf-access";
+
 const SELF_HOSTED_URL = process.env.NOMINATIM_URL?.trim().replace(/\/$/, "") || undefined;
 const SELF_HOSTED_TOKEN = process.env.NOMINATIM_TOKEN ?? "";
 const PUBLIC_URL = "https://nominatim.openstreetmap.org";
@@ -111,8 +113,11 @@ export function getGeocodeCacheStats() {
 
 function buildHeaders(): Record<string, string> {
   const h: Record<string, string> = { "User-Agent": USER_AGENT };
-  if (isSelfHosted && SELF_HOSTED_TOKEN) {
-    h["X-Nominatim-Token"] = SELF_HOSTED_TOKEN;
+  if (isSelfHosted) {
+    // Cloudflare Access Service Token: solo verso il server self-hosted, MAI
+    // verso il Nominatim pubblico di terzi (vedi reverseGeocodeViaUrl).
+    Object.assign(h, cfAccessHeaders());
+    if (SELF_HOSTED_TOKEN) h["X-Nominatim-Token"] = SELF_HOSTED_TOKEN;
   }
   return h;
 }
@@ -341,8 +346,10 @@ async function reverseGeocodeViaUrl(
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), DEFAULT_TIMEOUT_MS);
   const headers: Record<string, string> = { "User-Agent": USER_AGENT };
-  if (includeAuthToken && SELF_HOSTED_TOKEN) {
-    headers["X-Nominatim-Token"] = SELF_HOSTED_TOKEN;
+  if (includeAuthToken) {
+    // CF Access + token custom solo verso il server self-hosted (mai a terzi).
+    Object.assign(headers, cfAccessHeaders());
+    if (SELF_HOSTED_TOKEN) headers["X-Nominatim-Token"] = SELF_HOSTED_TOKEN;
   }
   try {
     return await fetch(`${baseUrl}${path}`, {

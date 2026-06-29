@@ -49,6 +49,7 @@ export const canFallbackToCloud = isSelfHosted && Boolean(CLOUD_API_KEY);
 export { isRoutingEnabled } from "./routing/routing-kill-switch";
 import { isRoutingEnabled as _isRoutingEnabled } from "./routing/routing-kill-switch";
 import { ROUTING_AREAS } from "@shared/routing-areas";
+import { cfAccessHeaders } from "./lib/cf-access";
 
 /**
  * Profilo attivo: "motorcycle" quando si usa il server self-hosted,
@@ -75,8 +76,10 @@ const CLOUD_TIMEOUT_MS = 30_000;
 
 function buildHeaders(useCloud: boolean): Record<string, string> {
   const h: Record<string, string> = { "Content-Type": "application/json" };
-  if (!useCloud && isSelfHosted && SELF_HOSTED_TOKEN) {
-    h["X-GH-Token"] = SELF_HOSTED_TOKEN;
+  if (!useCloud && isSelfHosted) {
+    // Cloudflare Access Service Token (layer zero-trust davanti al tunnel).
+    Object.assign(h, cfAccessHeaders());
+    if (SELF_HOSTED_TOKEN) h["X-GH-Token"] = SELF_HOSTED_TOKEN;
   }
   return h;
 }
@@ -251,7 +254,7 @@ export interface GHProfilesResult {
 export async function fetchSelfHostedProfiles(): Promise<GHProfilesResult> {
   if (!isSelfHosted) return { reachable: false, profiles: null, error_reason: "not_self_hosted" };
 
-  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  const headers: Record<string, string> = { "Content-Type": "application/json", ...cfAccessHeaders() };
   if (SELF_HOSTED_TOKEN) headers["X-GH-Token"] = SELF_HOSTED_TOKEN;
 
   // Con il setup multi-area, ogni istanza GH risponde su /areas/<codice>/info —
