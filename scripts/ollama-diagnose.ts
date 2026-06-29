@@ -32,6 +32,7 @@
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
+import { cfAccessHeaders } from "../server/lib/cf-access";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, "..");
@@ -229,6 +230,11 @@ async function callOllama(
 
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   if (token) headers["Authorization"] = `Bearer ${token}`;
+  // Cloudflare Access Service Token: l'Ollama del PC dedicato è esposto via
+  // Cloudflare Tunnel su biker-link.net, dietro lo stesso layer Access degli
+  // altri servizi self-hosted. Innocuo se la policy non è attiva (l'origine
+  // ignora gli header). Mai inviato a endpoint pubblici di terzi.
+  Object.assign(headers, cfAccessHeaders());
 
   try {
     const res = await fetch(url, {

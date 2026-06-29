@@ -29,9 +29,28 @@ import type { z } from "zod";
 import { repairJson } from "./json-repair";
 import { isThinkCentreOffline } from "./thinkcentre-offline";
 import { logAiCall } from "./ai-logger";
+import { cfAccessHeaders } from "./cf-access";
 
 const OLLAMA_URL = process.env.OLLAMA_URL?.replace(/\/$/, "");
 const OLLAMA_TOKEN = process.env.OLLAMA_TOKEN ?? "";
+
+/**
+ * Header per le richieste verso il server Ollama self-hosted.
+ * Combina il token custom (Authorization: Bearer) con il Service Token
+ * Cloudflare Access (vedi cf-access.ts), così l'edge CF valida la richiesta
+ * prima dell'origine. OLLAMA_URL è SEMPRE self-hosted (nessun fallback cloud),
+ * quindi gli header CF Access sono sempre appropriati qui.
+ *
+ * Nota: NON impostiamo un header Host — il requisito di Ollama 0.24+
+ * (Host == localhost) è gestito da nginx sull'origine (proxy_set_header Host
+ * "localhost"), quindi resta intatto.
+ */
+function ollamaHeaders(): Record<string, string> {
+  const h: Record<string, string> = {};
+  if (OLLAMA_TOKEN) h["Authorization"] = `Bearer ${OLLAMA_TOKEN}`;
+  Object.assign(h, cfAccessHeaders());
+  return h;
+}
 // Task #3017: il modello default è "bikerlink" (Modelfile custom). Se OLLAMA_MODEL
 // non è impostato, il setup script lo setta a "bikerlink" dopo la creazione.
 const OLLAMA_MODEL = process.env.OLLAMA_MODEL ?? "mistral-nemo:latest";
@@ -68,9 +87,7 @@ export async function isOllamaReachable(): Promise<boolean> {
   try {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), PROBE_TIMEOUT_MS);
-    const headers: Record<string, string> = OLLAMA_TOKEN
-      ? { "Authorization": `Bearer ${OLLAMA_TOKEN}` }
-      : {};
+    const headers = ollamaHeaders();
     // /api/tags è l'endpoint standard Ollama che restituisce la lista dei modelli:
     // più stabile e affidabile di HEAD / (che su Ollama 0.24+ può tornare 403
     // se il Host header non è localhost — problema già fixato in nginx, ma il probe
@@ -102,9 +119,10 @@ export function getOllamaModel(model: string = OLLAMA_MODEL): LanguageModel {
   if (!OLLAMA_URL) {
     throw new Error("Ollama non configurato: variabile OLLAMA_URL mancante.");
   }
+  const headers = ollamaHeaders();
   const provider = createOllama({
     baseURL: `${OLLAMA_URL}/api`,
-    headers: OLLAMA_TOKEN ? { "Authorization": `Bearer ${OLLAMA_TOKEN}` } : undefined,
+    headers: Object.keys(headers).length > 0 ? headers : undefined,
   });
   return provider(model);
 }
