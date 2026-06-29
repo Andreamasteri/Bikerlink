@@ -1,12 +1,16 @@
-# BikerLink — Modelfile Ollama custom
-# Crea il modello "bikerlink" con persona e parametri ottimizzati.
+# BikerLink — Modelfile di BOWIE (assistente in-app, ThinkCentre, secret OLLAMA_*)
+# Crea il modello "bikerlink-assistant" con persona e parametri ottimizzati.
+# Bowie è l'istanza che risponde nella chat utente dentro l'app.
 #
-# Uso:
-#   ollama create bikerlink -f BikerLink.Modelfile
-#   ollama run bikerlink "Ciao, come funziona il matching?"
+# Uso (due nomi modello a seconda del percorso, stessa persona):
+#   - setup-ollama-server.sh crea il modello "bikerlink"
+#   - ollama-push-manual.ts crea/aggiorna "bikerlink-assistant" (con manuale Q&A iniettato)
+#   ollama create bikerlink-assistant -f BikerLink-Bowie.Modelfile
+#   ollama run bikerlink-assistant "Ciao, come funziona il matching?"
+#   # oppure via API senza SSH: npx tsx scripts/ollama-push-manual.ts
 #
-# Dopo la creazione, impostare su Replit:
-#   OLLAMA_MODEL=bikerlink
+# Dopo la creazione, impostare su Replit OLLAMA_MODEL al nome usato
+#   (es. OLLAMA_MODEL=bikerlink oppure OLLAMA_MODEL=bikerlink-assistant)
 #
 # Il modello base si può cambiare con la variabile CHAT_MODEL
 # del setup-ollama-server.sh; di default mistral-nemo:latest.

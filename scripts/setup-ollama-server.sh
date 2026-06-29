@@ -36,9 +36,9 @@ set -euo pipefail
 #     Entra nei 8GB VRAM della GTX 1070 con OLLAMA_FLASH_ATTENTION=1 → 13–16 token/s.
 #     Per cambiarlo in futuro: esporta CHAT_MODEL=<nuovo>, riesegui lo script,
 #     aggiorna il secret OLLAMA_MODEL su Replit.
-#   - Il modello custom "bikerlink" viene creato su base CHAT_MODEL con sistema
-#     prompt BikerLink baked-in (BikerLink.Modelfile). OLLAMA_MODEL deve puntare
-#     a "bikerlink" (fallback hardcoded: mistral-nemo:latest).
+#   - Il modello custom "bikerlink" (Bowie, assistente in-app) viene creato su base
+#     CHAT_MODEL con system prompt BikerLink baked-in (BikerLink-Bowie.Modelfile).
+#     OLLAMA_MODEL deve puntare a "bikerlink" (fallback hardcoded: mistral-nemo:latest).
 #   Verifica i modelli su: https://ollama.com/library
 #
 # AGGIORNAMENTI (idempotente): rieseguendo questo script lo step di install
@@ -196,18 +196,18 @@ else
   # dipende da CHAT_MODEL. OLLAMA_MODEL su Replit deve valere "bikerlink";
   # "mistral-nemo:latest" è il fallback hardcoded in ollama-client.ts.
   MODELFILE_DIR="$(cd "$(dirname "$0")/ollama-modelfile" 2>/dev/null && pwd || true)"
-  MODELFILE_PATH="${MODELFILE_DIR}/BikerLink.Modelfile"
+  MODELFILE_PATH="${MODELFILE_DIR}/BikerLink-Bowie.Modelfile"
   if [[ -f "$MODELFILE_PATH" ]]; then
-    log "  → Creazione modello custom bikerlink da BikerLink.Modelfile..."
+    log "  → Creazione modello custom bikerlink (Bowie) da BikerLink-Bowie.Modelfile..."
     if ollama create bikerlink -f "$MODELFILE_PATH"; then
-      ok "  Modello custom 'bikerlink' creato con successo."
+      ok "  Modello custom 'bikerlink' (Bowie) creato con successo."
       warn "  Imposta OLLAMA_MODEL=bikerlink nelle variabili Replit (vedi output finale)."
     else
       warn "  Creazione modello bikerlink fallita — usando '${CHAT_MODEL}' come fallback."
       BIKERLINK_CUSTOM_MODEL="${CHAT_MODEL}"
     fi
   else
-    warn "  BikerLink.Modelfile non trovato in ${MODELFILE_DIR} — salto creazione modello custom."
+    warn "  BikerLink-Bowie.Modelfile non trovato in ${MODELFILE_DIR} — salto creazione modello custom."
     BIKERLINK_CUSTOM_MODEL="${CHAT_MODEL}"
   fi
 fi

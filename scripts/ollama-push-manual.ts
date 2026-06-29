@@ -1,10 +1,15 @@
 /**
- * BikerLink — Push del Manuale Q&A nell'assistant Ollama del ThinkCentre  (Task #5189)
+ * BikerLink — Push del Manuale Q&A in BOWIE (assistente in-app, ThinkCentre)  (Task #5189)
  *
- * Legge `docs/bikerlink-qa-manual.md` (generato da `scripts/ollama-study-repo.ts`),
+ * Istanze Ollama (vedi .agents/memory/ollama-naming.md):
+ *   Ares  = DIAG_OLLAMA_* (PC fisso)   — genera il report e il manuale Q&A
+ *   Bowie = OLLAMA_*       (ThinkCentre) — assistente in-app (TARGET di questo script)
+ *   Horus = OLLAMA_*       (ThinkCentre) — AI routing
+ *
+ * Legge `docs/bikerlink-qa-manual.md` (generato da Ares via `scripts/ollama-study-repo.ts`),
  * lo inietta come blocco `## MANUALE UTENTE Q&A` nel SYSTEM prompt di
- * `scripts/ollama-modelfile/BikerLink.Modelfile`, e ricrea il modello custom
- * `bikerlink-assistant` sul ThinkCentre via `POST ${OLLAMA_URL}/api/create`
+ * `scripts/ollama-modelfile/BikerLink-Bowie.Modelfile`, e ricrea il modello custom
+ * `bikerlink-assistant` su Bowie via `POST ${OLLAMA_URL}/api/create`
  * — senza SSH, senza deploy. Così l'assistente in-app risponde con il manuale
  * già cucito nel system prompt (basta puntare `OLLAMA_MODEL=bikerlink-assistant`).
  *
@@ -35,7 +40,7 @@ const ROOT = path.resolve(__dirname, "..");
 
 const DEFAULT_MODEL_NAME = "bikerlink-assistant";
 const DEFAULT_QA_FILE = "docs/bikerlink-qa-manual.md";
-const MODELFILE_PATH = path.join(ROOT, "scripts", "ollama-modelfile", "BikerLink.Modelfile");
+const MODELFILE_PATH = path.join(ROOT, "scripts", "ollama-modelfile", "BikerLink-Bowie.Modelfile");
 const REQUEST_TIMEOUT_MS = 120_000;
 
 // Marker (testo letterale dentro il SYSTEM prompt) per iniettare/sostituire il blocco Q&A.
@@ -130,7 +135,7 @@ async function main(): Promise<void> {
   const qaPath = path.resolve(ROOT, cli.qaFile);
 
   console.log("════════════════════════════════════════════════════════════");
-  console.log("  BikerLink — Push Manuale Q&A → assistant Ollama (ThinkCentre)");
+  console.log("  [Bowie] BikerLink — Push Manuale Q&A → assistente in-app (ThinkCentre)");
   console.log("════════════════════════════════════════════════════════════");
 
   let qa: string;
@@ -181,13 +186,13 @@ async function main(): Promise<void> {
     return;
   }
 
-  console.log(`\n  🚀 Creo/aggiorno il modello "${cli.modelName}" su ${baseUrl} ...`);
+  console.log(`\n  🚀 [Bowie] Creo/aggiorno il modello "${cli.modelName}" su Bowie (ThinkCentre) ...`);
   try {
     const resp = await pushModel(baseUrl, cli.modelName, updated);
     // Push OK → SOLO ora persisto il Modelfile aggiornato su disco.
     fs.writeFileSync(MODELFILE_PATH, updated, "utf8");
     console.log("\n════════════════════════════════════════════════════════════");
-    console.log(`  ✅ Modello "${cli.modelName}" aggiornato sul ThinkCentre.`);
+    console.log(`  ✅ [Bowie] Modello "${cli.modelName}" aggiornato sul ThinkCentre.`);
     console.log(`  💾 Modelfile aggiornato: ${path.relative(ROOT, MODELFILE_PATH)}`);
     console.log(`  📘 Q&A iniettato da: ${path.relative(ROOT, qaPath)}`);
     console.log("  ➡️  Punta l'assistente in-app a questo modello: OLLAMA_MODEL=" + cli.modelName);

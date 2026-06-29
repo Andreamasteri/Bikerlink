@@ -1,8 +1,13 @@
 /**
- * BikerLink — Diagnosi AI con Ollama (PC dedicato)  (Task #5084)
+ * BikerLink — Diagnosi AI con ARES (Ollama PC fisso)  (Task #5084)
  *
- * Raccoglie log, crash e file chiave del boot, li invia al PC dedicato
- * (Windows + GPU) che esegue Ollama con un modello coder (default
+ * Istanze Ollama (vedi .agents/memory/ollama-naming.md):
+ *   Ares  = DIAG_OLLAMA_* (PC fisso)   — diagnosi/studio (QUESTO script)
+ *   Bowie = OLLAMA_*       (ThinkCentre) — assistente in-app
+ *   Horus = OLLAMA_*       (ThinkCentre) — AI routing
+ *
+ * Raccoglie log, crash e file chiave del boot, li invia ad Ares (PC fisso
+ * Windows + GPU) che esegue Ollama con un modello coder (default
  * `qwen3.6:35b`) e stampa/salva un report di diagnosi.
  *
  * I file SORGENTE vengono letti direttamente da GitHub API (branch main, sempre
@@ -17,11 +22,11 @@
  *   npx tsx scripts/ollama-diagnose.ts --tail 500      # più righe per log
  *
  * Secret/env:
- *   DIAG_OLLAMA_URL    — URL base dell'Ollama sul PC dedicato (via Cloudflare Tunnel).
+ *   DIAG_OLLAMA_URL    — URL base di Ares (Ollama PC fisso) via Cloudflare Tunnel.
  *                        Es: https://diag.example.com  (senza /api finale)
  *   DIAG_OLLAMA_MODEL  — modello da usare (default "qwen3.6:35b").
  *                        Può puntare a un modello custom (es. "bikerlink-diag")
- *                        creato via Modelfile sul PC dedicato.
+ *                        creato via Modelfile su Ares (PC fisso).
  *   DIAG_OLLAMA_TOKEN  — opzionale, Bearer token se l'endpoint è protetto.
  *   DIAG_GITHUB_TOKEN  — token GitHub READ-ONLY (fine-grained, solo Contents:read
  *                        su Andreamasteri/Bikerlink); usato per fetch sorgenti
@@ -230,7 +235,7 @@ async function callOllama(
 
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   if (token) headers["Authorization"] = `Bearer ${token}`;
-  // Cloudflare Access Service Token: l'Ollama del PC dedicato è esposto via
+  // Cloudflare Access Service Token: Ares (Ollama PC fisso) è esposto via
   // Cloudflare Tunnel su biker-link.net, dietro lo stesso layer Access degli
   // altri servizi self-hosted. Innocuo se la policy non è attiva (l'origine
   // ignora gli header). Mai inviato a endpoint pubblici di terzi.
@@ -276,13 +281,13 @@ async function main(): Promise<void> {
   const tail = parseTailArg();
 
   console.log("════════════════════════════════════════════════════════════");
-  console.log("  BikerLink — Diagnosi AI con Ollama (PC dedicato)");
+  console.log("  [Ares] BikerLink — Diagnosi AI con Ollama (PC fisso)");
   console.log("════════════════════════════════════════════════════════════");
 
   if (!baseUrl) {
     console.error(
       "\n❌ DIAG_OLLAMA_URL non impostato.\n" +
-        "   Imposta il secret DIAG_OLLAMA_URL con l'URL dell'Ollama sul PC dedicato\n" +
+        "   Imposta il secret DIAG_OLLAMA_URL con l'URL di Ares (Ollama PC fisso)\n" +
         "   (es. https://diag.example.com tramite Cloudflare Tunnel) e riprova.\n",
     );
     process.exitCode = 1;
@@ -292,7 +297,7 @@ async function main(): Promise<void> {
   const { prompt, collected, missing, githubUsed } = await collectContext(tail);
   const system = loadSystemPrompt();
 
-  console.log(`\n  Endpoint : ${baseUrl}`);
+  console.log(`\n  Istanza  : Ares (Ollama PC fisso, DIAG_OLLAMA_URL)`);
   console.log(`  Modello  : ${model}`);
   console.log(`  Tail     : ${tail} righe/log`);
   console.log(`  Sorgenti : ${githubUsed ? "✅ GitHub API (main)" : "⚠️  disco locale (GITHUB_TOKEN assente)"}`);
@@ -319,7 +324,7 @@ async function main(): Promise<void> {
       console.error("   Host irraggiungibile (PC spento o Cloudflare Tunnel giù).");
     }
     console.error(`   Dettaglio: ${e.message}`);
-    console.error("\n   Verifica che il PC dedicato sia acceso, che Ollama sia in esecuzione");
+    console.error("\n   Verifica che Ares (PC fisso) sia acceso, che Ollama sia in esecuzione");
     console.error("   e che il tunnel/hostname in DIAG_OLLAMA_URL sia raggiungibile.\n");
     process.exitCode = 1;
     return;
@@ -333,8 +338,8 @@ async function main(): Promise<void> {
     fs.mkdirSync(outDir, { recursive: true });
     const header =
       `# Diagnosi AI BikerLink — ${new Date().toISOString()}\n\n` +
+      `- Istanza: Ares (Ollama PC fisso)\n` +
       `- Modello: \`${model}\`\n` +
-      `- Endpoint: \`${baseUrl}\`\n` +
       `- Sorgenti: ${githubUsed ? "GitHub API (main)" : "disco locale"}\n` +
       `- File analizzati: ${collected.join(", ") || "(nessuno)"}\n\n` +
       `---\n\n`;

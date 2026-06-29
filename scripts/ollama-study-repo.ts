@@ -1,8 +1,13 @@
 /**
- * BikerLink — Studio codebase + dump DB con Ollama (PC dedicato)  (Task #5187)
+ * BikerLink — Studio codebase + dump DB con ARES (Ollama PC fisso)  (Task #5187)
  *
- * Scarica l'intera codebase BikerLink da GitHub (token read-only), la manda a
- * Ollama a chunk per fargli studiare l'architettura, aggiunge il dump di schema
+ * Istanze Ollama (vedi .agents/memory/ollama-naming.md):
+ *   Ares  = DIAG_OLLAMA_* (PC fisso)   — studio/diagnosi (QUESTO script)
+ *   Bowie = OLLAMA_*       (ThinkCentre) — assistente in-app (destinatario del manuale)
+ *   Horus = OLLAMA_*       (ThinkCentre) — AI routing
+ *
+ * Scarica l'intera codebase BikerLink da GitHub (token read-only), la manda ad
+ * Ares a chunk per fargli studiare l'architettura, aggiunge il dump di schema
  * + dati di ENTRAMBI i DB (dev e prod) e produce un report architetturale in
  * `logs/repo-study-<timestamp>.md`. La sezione `## Architettura` del report viene
  * iniettata in `.agents/skills/ollama-diagnostics/bikerlink-context.md` così
@@ -215,8 +220,8 @@ async function runStep(c: StepCtx): Promise<boolean> {
     fs.mkdirSync(path.dirname(outPath), { recursive: true });
     const head =
       `# Studio codebase BikerLink — ${new Date().toISOString()}\n\n` +
+      `- Istanza: Ares (Ollama PC fisso)\n` +
       `- Modello: \`${c.model}\` (num_ctx ${state.numCtx})\n` +
-      `- Endpoint: \`${c.baseUrl}\`\n` +
       `- Branch: \`${state.branch}\`\n` +
       `- File studiati: ${files.length} (${chunks.length} chunk, map-reduce)\n` +
       `- DB: ${state.noDb ? "saltato" : "dev + prod inclusi"}\n\n---\n\n`;
@@ -253,7 +258,7 @@ async function runStep(c: StepCtx): Promise<boolean> {
     console.log("\n════════════════════════════════════════════════════════════");
     console.log(`  💾 Report:       ${state.reportPath}`);
     console.log(`  📘 Manuale Q&A:  ${state.qaPath}`);
-    console.log("  ➡️  Push all'assistant ThinkCentre: npx tsx scripts/ollama-push-manual.ts");
+    console.log("  ➡️  Push a Bowie (assistente in-app, ThinkCentre): npx tsx scripts/ollama-push-manual.ts");
     console.log("════════════════════════════════════════════════════════════\n");
     console.log(qa.slice(0, 2000));
     if (qa.length > 2000) console.log("\n...[manuale troncato nella console, vedi il file]...");

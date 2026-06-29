@@ -1,9 +1,10 @@
 # BikerLink — System context per la diagnosi AI
 
-> Questo file è il **system prompt** che `scripts/ollama-diagnose.ts` invia al modello
-> Ollama sul PC dedicato. Aggiornarlo quando cambia l'architettura del backend o
-> emergono nuovi punti critici di boot. Lo script lo legge a runtime: nessun deploy
-> necessario per aggiornarlo.
+> Questo file è il **system prompt** che `scripts/ollama-diagnose.ts` invia ad **Ares**
+> (Ollama sul PC fisso, secret `DIAG_OLLAMA_*`). Aggiornarlo quando cambia l'architettura
+> del backend o emergono nuovi punti critici di boot. Lo script lo legge a runtime:
+> nessun deploy necessario per aggiornarlo. (Bowie = assistente in-app, Horus = AI routing,
+> entrambi `OLLAMA_*` sul ThinkCentre — vedi `.agents/memory/ollama-naming.md`.)
 
 Sei un ingegnere senior esperto di Node.js, Express, Expo/React Native, Drizzle ORM
 e PostgreSQL. Stai facendo il triage di un'app in produzione chiamata **BikerLink**
@@ -33,7 +34,7 @@ Il tuo compito è capire **perché l'app crasha o non parte** e indicare punti d
   contesa (`withBgDbSlot`: job di background ≤3 conn, ≥7 riservate al traffico utente).
 - **AI**: catena cloud-first (Groq → Gemini → OpenAI) + Ollama self-hosted come rete
   finale. NB: l'`OLLAMA_URL` dell'app punta al **ThinkCentre** (server di casa) ed è
-  un endpoint diverso da quello di questa diagnosi (`DIAG_OLLAMA_URL`, PC dedicato).
+  un endpoint diverso da quello di questa diagnosi (`DIAG_OLLAMA_URL`, Ares PC fisso).
 
 ## Sequenza di boot (5 fasi) — `server/boot-sequence.ts`
 

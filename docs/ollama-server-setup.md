@@ -92,8 +92,9 @@ Scarica un unico modello:
   e multilingue. Con GTX 1070 (8GB VRAM) + `OLLAMA_FLASH_ATTENTION=1` raggiunge
   13–16 token/s. Richiede ~7GB disco.
 
-Crea inoltre il modello custom **`bikerlink`** basato su `mistral-nemo:latest` con
-system prompt e parametri ottimizzati (vedere `BikerLink.Modelfile`).
+Crea inoltre il modello custom **`bikerlink`** (Bowie, assistente in-app) basato su
+`mistral-nemo:latest` con system prompt e parametri ottimizzati (vedere
+`BikerLink-Bowie.Modelfile`).
 
 ```
 [ OK  ] Modello scaricato: mistral-nemo:latest

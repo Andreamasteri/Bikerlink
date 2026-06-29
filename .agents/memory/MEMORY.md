@@ -118,7 +118,8 @@
 - [Ollama study-repo runner](ollama-study-runner.md) — full GitHub+DB study can't run to completion in the agent loop (bg reaped, workflows 12/10, 120s foreground < one chunk call); CF Access 403 on ALL paths (incl /api/version) when Service Token unauthorized — run from a real terminal.
 - [Semgrep CI gate quirks](semgrep-gate.md) — anonymous Semgrep redacts fingerprint/lines to "requires login" (compute own sha1); p/expressjs not p/express; verify via startValidationRun not the 120s bash cap.
 - [Merge part files — eslint-disable scope](merge-eslint-disable-scope.md) — la direttiva eslint-disable file-level di un part va riprodotta come blocco disable/enable nel file fuso, non disable-next-line, o il gate --max-warnings=0 fallisce.
-- [Ollama diagnostics CLI](ollama-diag-cli.md) — `npx tsx scripts/ollama-diagnose.ts` invia log+sorgenti boot a Ollama sul PC dedicato (secret DIAG_OLLAMA_* distinti da OLLAMA_*, HTTP diretta no-Express, report logs/ai-diagnosis-*.md).
+- [Ollama diagnostics CLI](ollama-diag-cli.md) — `npx tsx scripts/ollama-diagnose.ts` invia log+sorgenti boot ad Ares (secret DIAG_OLLAMA_* distinti da OLLAMA_*, HTTP diretta no-Express, report logs/ai-diagnosis-*.md).
+- [Ollama instance naming](ollama-naming.md) — Ares=DIAG_OLLAMA_* (PC fisso, diagnosi/studio), Bowie=OLLAMA_* (TC, assistente in-app), Horus=OLLAMA_* (TC, AI routing); i secret NON si rinominano, solo doc/log/Modelfile.
 
 - [Split-file merge via bash assembly](split-merge-bash-assembly.md) — fondi i part lazy-split assemblando con sed/cat (no ritrascrizione); subagent lasciano lavoro parziale, fonte di verità = filesystem; marker >600 = LARGE-FILE-ALLOW + voce allow.txt.
 

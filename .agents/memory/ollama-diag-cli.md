@@ -1,6 +1,6 @@
 ---
-name: Ollama diagnostics CLI (PC dedicato)
-description: Skill/script di triage AI che invia log+sorgenti boot a Ollama sul PC dedicato, separato dall'app.
+name: Ollama diagnostics CLI (Ares, PC fisso)
+description: Skill/script di triage AI che invia log+sorgenti boot ad Ares (Ollama PC fisso, DIAG_OLLAMA_*), separato dall'app.
 ---
 
 # Ollama diagnostics CLI — diagnosi crash/boot
@@ -10,8 +10,8 @@ logs/backend-crashes.log, logs/error-monitor.log, logs/cerbero.log) + sorgenti b
 (server/index.ts, boot-sequence.ts, init-state.ts) e li POSTa a `${DIAG_OLLAMA_URL}/api/chat`
 (HTTP diretta, NON via Express → funziona a server giù). Report in logs/ai-diagnosis-*.md (gitignored).
 
-**Why:** triage rapido di crash/boot senza leggere i log a mano; il PC dedicato è separato dal
-ThinkCentre per non interferire con l'app in produzione.
+**Why:** triage rapido di crash/boot senza leggere i log a mano; Ares (PC fisso) è separato dal
+ThinkCentre (Bowie/Horus) per non interferire con l'app in produzione.
 
 **How to apply:**
 - Secret distinti dall'app: `DIAG_OLLAMA_URL` (obbligatorio), `DIAG_OLLAMA_MODEL` (default
@@ -42,19 +42,22 @@ schema + dati reali + drift dev↔prod) per diagnosi future più profonde.
   `${DIAG_OLLAMA_URL}/api/chat` (timeout 300s/chunk) + `cfAccessHeaders()`.
 - Flag: `--dry-run` (lista file), `--no-db`, `--branch`, `--max-files`, `--chunk-chars`.
 - È lungo (2000+ file): per prove rapide usa `--max-files N` / `--no-db` / `--dry-run`.
-- Dopo il report c'è uno step finale resumabile (Task #5189): genera un **manuale utente
+- Dopo il report c'è uno step finale resumabile: genera un **manuale utente
   Q&A** (`## D:`/`**R:**`) in `docs/bikerlink-qa-manual.md` (git-tracked); guardia di step
   = `reportPath != null` (report fatto) poi `!done` (Q&A fatto), così vecchi state mid-run
   generano comunque il Q&A senza `--reset`.
 
-## Push manuale Q&A → assistant ThinkCentre — `scripts/ollama-push-manual.ts`
+## Push manuale Q&A → Bowie (assistente in-app) — `scripts/ollama-push-manual.ts`
 
 Inietta `docs/bikerlink-qa-manual.md` nel SYSTEM prompt di
-`scripts/ollama-modelfile/BikerLink.Modelfile` (tra i marker `INIZIO/FINE MANUALE UTENTE
-Q&A`, dentro il blocco `SYSTEM """…"""`) e ricrea il modello `bikerlink-assistant` via
-`POST ${OLLAMA_URL}/api/create` `{name,modelfile,stream:false}` — niente SSH/deploy.
+`scripts/ollama-modelfile/BikerLink-Bowie.Modelfile` (tra i marker `INIZIO/FINE MANUALE
+UTENTE Q&A`, dentro il blocco `SYSTEM """…"""`) e ricrea il modello `bikerlink-assistant`
+su **Bowie** via `POST ${OLLAMA_URL}/api/create` `{name,modelfile,stream:false}` —
+niente SSH/deploy.
 
-**Why:** cucire il manuale utente nell'assistente in-app del ThinkCentre senza training.
+**Why:** cucire il manuale utente in Bowie (assistente in-app, ThinkCentre) senza training.
+Nomi istanze: vedi `.agents/memory/ollama-naming.md` (Ares=diagnosi PC fisso,
+Bowie=assistente in-app, Horus=AI routing).
 
 **How to apply:**
 - Endpoint = `OLLAMA_URL` (ThinkCentre, **non** `DIAG_OLLAMA_URL`). Auth = `cfAccessHeaders()`

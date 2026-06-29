@@ -303,8 +303,8 @@ export function writeQaManual(content: string): string {
   fs.mkdirSync(path.dirname(QA_MANUAL_PATH), { recursive: true });
   const head =
     "# BikerLink — Manuale utente (Q&A)\n\n" +
-    "> Generato automaticamente da `scripts/ollama-study-repo.ts` (Ollama DIAG).\n" +
-    "> Da iniettare nell'assistant del ThinkCentre con `scripts/ollama-push-manual.ts`.\n" +
+    "> Generato automaticamente da `scripts/ollama-study-repo.ts` (Ares, Ollama PC fisso).\n" +
+    "> Da iniettare in Bowie (assistente in-app, ThinkCentre) con `scripts/ollama-push-manual.ts`.\n" +
     `> Ultimo aggiornamento: ${new Date().toISOString()}\n\n---\n\n`;
   fs.writeFileSync(QA_MANUAL_PATH, head + content.trim() + "\n", "utf8");
   return path.relative(ROOT, QA_MANUAL_PATH);
