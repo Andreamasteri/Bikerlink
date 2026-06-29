@@ -39,3 +39,11 @@ to import them from the monitor module.
 re-run `npx vitest run server/__tests__/thinkcentre-gh-monitor.test.ts` and confirm it
 finishes in <1s (not 75s). A multi-second/timeout run = a real socket probe leaked because
 an env var wasn't deleted.
+
+**Second TCP probe (admin panel).** There is a *separate* raw `net.createConnection` probe in
+`server/routes/admin/thinkcentre-health-infra-probes.ts` (richer return: `ok/latencyMs/error`
+feeding the admin probe log). It has the same fake-timer hang risk. The test-mode flag is the
+single source of truth: `RUNNING_UNDER_TEST` is **exported** from `thinkcentre-monitor-probes.ts`
+and imported by the admin file, whose `tcpConnect` early-returns under test. It was deliberately
+NOT replaced by `tcpConnectOk` (boolean|null) to preserve the latency/error fields. Any new raw
+TCP probe anywhere must reuse this exported flag, never redefine its own.

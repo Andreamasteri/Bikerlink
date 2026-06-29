@@ -17,6 +17,7 @@
  */
 
 import * as net from "net";
+import { RUNNING_UNDER_TEST } from "../../jobs/thinkcentre-monitor-probes";
 import {
   PROBE_TIMEOUT_MS,
   sanitizeError,
@@ -46,6 +47,14 @@ function tcpConnect(
   host: string,
   port: number,
 ): Promise<{ ok: boolean; latencyMs: number | null; error?: string }> {
+  // Test-mode guard (riusa il flag unico da thinkcentre-monitor-probes): sotto il
+  // test runner non apriamo socket reali. Con i fake timers il setTimeout di abort
+  // non scatta e il socket verso un host irraggiungibile non emette né `connect`
+  // né `error`, quindi la promise non si risolverebbe e il test si bloccherebbe
+  // ~15s. Risolviamo subito così le probe TCP admin restano isolate nei test.
+  if (RUNNING_UNDER_TEST) {
+    return Promise.resolve({ ok: false, latencyMs: null, error: "skipped (test mode)" });
+  }
   const t0 = Date.now();
   return new Promise((resolve) => {
     const socket = net.createConnection({ host, port });

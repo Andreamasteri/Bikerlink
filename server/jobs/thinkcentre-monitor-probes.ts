@@ -24,7 +24,7 @@ const PROBE_TIMEOUT_MS = 5_000;
  * non scatta mai e il socket verso un host irraggiungibile non emette né
  * `connect` né `error`, quindi la promise non si risolve e il test si blocca.
  */
-const RUNNING_UNDER_TEST =
+export const RUNNING_UNDER_TEST =
   process.env.VITEST === "true" || process.env.NODE_ENV === "test";
 
 /**
