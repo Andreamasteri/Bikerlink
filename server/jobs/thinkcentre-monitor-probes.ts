@@ -140,7 +140,7 @@ export async function probeGraphHopperAreas(): Promise<{ unitOk: boolean | null;
 async function probeOllamaOk(): Promise<boolean | null> {
   const base = process.env.OLLAMA_URL?.replace(/\/$/, "");
   if (!base) return null;
-  const headers: Record<string, string> = {};
+  const headers: Record<string, string> = { ...cfAccessHeaders() };
   const token = process.env.OLLAMA_TOKEN;
   if (token) headers["X-Ollama-Token"] = token;
   return httpProbe(`${base}/api/tags`, headers);

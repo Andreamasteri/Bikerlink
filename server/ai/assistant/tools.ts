@@ -154,7 +154,7 @@ export const getThinkCentreStatusTool = tool<EmptyInput, Record<string, unknown>
     const nominatimUrl = process.env.NOMINATIM_URL;
 
     const probes: Promise<void>[] = [];
-    if (ollamaUrl) probes.push(probe("ollama", `${ollamaUrl}/api/tags`, ollamaToken ? { "X-Ollama-Token": ollamaToken } : {}));
+    if (ollamaUrl) probes.push(probe("ollama", `${ollamaUrl}/api/tags`, { ...cfAccessHeaders(), ...(ollamaToken ? { "X-Ollama-Token": ollamaToken } : {}) }));
     if (ghUrl) probes.push(probe("graphhopper", `${ghUrl}/health`, { ...cfAccessHeaders(), ...(ghToken ? { "X-GH-Token": ghToken } : {}) }));
     if (nominatimUrl) probes.push(probe("nominatim", `${nominatimUrl}/status`, cfAccessHeaders()));
 

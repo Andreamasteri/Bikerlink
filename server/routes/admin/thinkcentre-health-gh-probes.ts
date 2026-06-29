@@ -216,7 +216,7 @@ export async function probeOllama(): Promise<ServiceHealth> {
     return { key: "ollama", label: "Ollama AI", configured: false, ok: false, startingUp: false, latencyMs: null, url: null, history: getHistory("ollama"), probeLog: getProbeLog("ollama") };
   }
   const tokenMissing = !token || token.trim() === "";
-  const headers: Record<string, string> = {};
+  const headers: Record<string, string> = { ...cfAccessHeaders() };
   if (token) headers["X-Ollama-Token"] = token;
   const r = await httpProbe(`${base}/api/tags`, headers);
   let error = r.error;
