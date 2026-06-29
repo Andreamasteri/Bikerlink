@@ -73,7 +73,13 @@ async function isCachedUserAdmin(): Promise<boolean> {
 
 function resolveLocal(): Promise<boolean> {
   if (!localPromise) {
-    localPromise = isBootGateEnabledLocally().catch(() => false);
+    const timeoutFallback = new Promise<boolean>((resolve) =>
+      setTimeout(() => resolve(false), 2000),
+    );
+    localPromise = Promise.race([
+      isBootGateEnabledLocally().catch(() => false),
+      timeoutFallback,
+    ]);
   }
   return localPromise;
 }

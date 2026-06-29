@@ -131,7 +131,7 @@ const server = createServer(app);
 // In produzione la piattaforma Replit (stack=EXPO) attende Metro su porta 8081.
 // Avviamo un probe server minimale per soddisfare il check senza avviare Metro.
 // In sviluppo la porta 8081 è già occupata da Metro, quindi non la tocchiamo.
-if (process.env.NODE_ENV === "production") {
+if (process.env.REPLIT_DEPLOYMENT === "1") {
   const probeApp = createProbeServer((_req, probeRes) => {
     probeRes.writeHead(200, { "Content-Type": "text/plain" });
     probeRes.end("ok");

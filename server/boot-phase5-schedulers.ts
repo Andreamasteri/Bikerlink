@@ -87,7 +87,7 @@ export async function runPhase5Schedulers(): Promise<void> {
       } catch (e) {
         console.warn("[INIT][BG] cleanupOrphanedAdImages error:", e);
       }
-      setInterval(cleanupOrphanedAdImages, 24 * 60 * 60 * 1000);
+      setInterval(() => cleanupOrphanedAdImages().catch((e) => console.warn("[INIT][BG] cleanupOrphanedAdImages (interval) error:", e)), 24 * 60 * 60 * 1000);
     }, 5 * 60 * 1000);
   });
 
