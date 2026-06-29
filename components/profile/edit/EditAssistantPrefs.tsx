@@ -1,6 +1,6 @@
-// Sezione unificata "Assistente & Widget" in Profilo › Modifica:
-// raggruppa il toggle del FloatingWidget (pallino di navigazione) e le
-// preferenze opt-out dell'assistente AI, dato che controllano lo stesso pallino.
+// Sezione "Bowie" in Profilo › Modifica: un solo toggle principale (il pallino
+// flottante di Bowie on/off) seguito dai toggle secondari piatti (suggerimenti
+// proattivi, guida introduttiva). Tutto controlla lo stesso assistente.
 import React from "react";
 import { View, Text, Switch, StyleSheet, ActivityIndicator } from "react-native";
 import { useColors } from "@/hooks/useColors";
@@ -51,12 +51,18 @@ export function EditAssistantPrefs({
 
   return (
     <View style={[styles.section, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-      <Text style={[styles.title, { color: colors.text }]}>Assistente & Widget</Text>
+      <Text style={[styles.title, { color: colors.text }]}>Bowie</Text>
       <Text style={[styles.desc, { color: colors.textSecondary }]}>
-        Il pallino flottante di navigazione include Bowie, il tuo assistente
-        virtuale: gestisci qui sia il widget che le preferenze di Bowie.
+        L'assistente AI interattivo di BikerLink
       </Text>
 
+      {adminDisabledForPlatform && (
+        <Text style={[styles.warning, { color: colors.warning }]}>
+          {t("aiAssistant.prefs.adminDisabled")}
+        </Text>
+      )}
+
+      {/* Toggle principale: Bowie on/off (il pallino flottante). */}
       <View style={styles.row}>
         <View style={{ flex: 1 }}>
           <Text
@@ -65,11 +71,11 @@ export function EditAssistantPrefs({
               { color: adminWidgetEnabled ? colors.text : colors.textSecondary },
             ]}
           >
-            Widget di navigazione
+            Bowie
           </Text>
           <Text style={[styles.hint, { color: colors.textSecondary }]}>
             {adminWidgetEnabled
-              ? "Pallino flottante con bussola e accesso rapido durante la navigazione"
+              ? "Mostra il pallino flottante di Bowie nell'app"
               : "Disabilitato dall'amministratore"}
           </Text>
         </View>
@@ -83,28 +89,11 @@ export function EditAssistantPrefs({
         />
       </View>
 
-      <Text style={[styles.subheading, { color: colors.text }]}>
-        {t("aiAssistant.prefs.title")}
-      </Text>
-      <Text style={[styles.desc, { color: colors.textSecondary }]}>
-        {t("aiAssistant.prefs.description")}
-      </Text>
-      {adminDisabledForPlatform && (
-        <Text style={[styles.warning, { color: colors.warning }]}>
-          {t("aiAssistant.prefs.adminDisabled")}
-        </Text>
-      )}
+      {/* Toggle secondari piatti, senza sotto-intestazioni ridondanti. */}
       {prefsQ.isLoading ? (
         <ActivityIndicator />
       ) : (
         <>
-          {row(
-            t("aiAssistant.prefs.disable"),
-            t("aiAssistant.prefs.disableHint"),
-            !!prefs.disabled,
-            (v) => update.mutate({ disabled: v }),
-            "assistant-pref-disable",
-          )}
           {row(
             t("aiAssistant.prefs.disableProactive"),
             t("aiAssistant.prefs.disableProactiveHint"),
@@ -128,7 +117,6 @@ export function EditAssistantPrefs({
 const styles = StyleSheet.create({
   section: { padding: 16, borderRadius: 12, borderWidth: StyleSheet.hairlineWidth, gap: 10, marginTop: 16 },
   title: { fontSize: 17, fontWeight: "700" },
-  subheading: { fontSize: 15, fontWeight: "700", marginTop: 8 },
   desc: { fontSize: 13, marginBottom: 4 },
   warning: { fontSize: 13, fontWeight: "600" },
   row: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 8 },

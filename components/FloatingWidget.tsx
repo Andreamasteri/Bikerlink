@@ -59,7 +59,7 @@ export function isDragGesture(
 
 export default function FloatingWidget() {
   const { enabled, suppressed } = useFloatingWidget();
-  const { user } = useAuth();
+  const { user, healthState, healthReason } = useAuth();
   const { fabEnabled } = useAssistantEnabled();
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -205,6 +205,22 @@ export default function FloatingWidget() {
     transform: [{ translateX: posX.value }, { translateY: posY.value }],
   }));
 
+  // Stato salute backend (Bowie assorbe il vecchio HealthBanner): quando il
+  // backend non è READY, il pallino mostra un badge colorato e, all'apertura del
+  // pannello, un messaggio informativo in cima.
+  const healthProblem = healthState !== "READY";
+  const healthBroken = healthState === "BROKEN";
+  const healthColor = healthBroken ? "#C62828" : "#ED6C02";
+  const healthTitle = healthBroken
+    ? "Servizio parzialmente non disponibile"
+    : "Servizio rallentato";
+  const healthMessage =
+    healthReason && healthReason.trim().length > 0
+      ? healthReason
+      : healthBroken
+        ? "Alcune sezioni dell'app potrebbero non rispondere temporaneamente."
+        : "Alcune operazioni potrebbero richiedere più tempo del solito.";
+
   // Il widget non serve sulla web preview e non c'è un caso d'uso reale.
   if (!user || !enabled || suppressed || Platform.OS === "web") return null;
 
@@ -216,13 +232,40 @@ export default function FloatingWidget() {
         pointerEvents={aiOpen ? "none" : "auto"}
       >
         <View {...panResponder.panHandlers} style={styles.widgetInner}>
-          <MaterialCommunityIcons name="compass-outline" size={19} color="#fff" />
+          <MaterialCommunityIcons name="cat" size={20} color="#fff" />
+          {healthProblem && (
+            <View
+              testID="floating-widget-health-badge"
+              style={[styles.healthBadge, { backgroundColor: healthColor }]}
+            />
+          )}
         </View>
       </Animated.View>
 
       {menuOpen && (
         <Pressable style={styles.overlay} onPress={() => setMenuOpen(false)}>
           <Pressable style={styles.menu} onPress={() => {}}>
+            {healthProblem && (
+              <View
+                testID="floating-widget-health-message"
+                style={[styles.healthMessage, { borderLeftColor: healthColor }]}
+              >
+                <View style={styles.healthMessageHeader}>
+                  <Ionicons
+                    name={healthBroken ? "alert-circle" : "warning"}
+                    size={16}
+                    color={healthColor}
+                  />
+                  <Text style={[styles.healthMessageTitle, { color: healthColor }]}>
+                    {healthTitle}
+                  </Text>
+                </View>
+                <Text style={styles.healthMessageText} numberOfLines={3}>
+                  {healthMessage}
+                </Text>
+              </View>
+            )}
+
             <Text style={styles.menuTitle}>Navigazione & Bowie</Text>
 
             <Pressable
@@ -305,6 +348,42 @@ const styles = StyleSheet.create({
   },
   widgetHidden: {
     opacity: 0,
+  },
+  healthBadge: {
+    position: "absolute",
+    top: 2,
+    right: 2,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    borderWidth: 2,
+    borderColor: "#fff",
+  },
+  healthMessage: {
+    marginHorizontal: 8,
+    marginTop: 10,
+    marginBottom: 4,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    borderLeftWidth: 3,
+    backgroundColor: Colors.background,
+    gap: 4,
+  },
+  healthMessageHeader: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: 6,
+  },
+  healthMessageTitle: {
+    fontSize: 13,
+    fontWeight: "600" as const,
+    flex: 1,
+  },
+  healthMessageText: {
+    fontSize: 12,
+    color: Colors.textSecondary,
+    lineHeight: 16,
   },
   widgetInner: {
     width: WIDGET_SIZE,

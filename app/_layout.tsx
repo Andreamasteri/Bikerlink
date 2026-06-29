@@ -17,7 +17,7 @@ import { useLocationGate } from "@/lib/location-context";
 import { useLanguage } from "@/lib/language-context";
 import { useTheme } from "@/lib/theme-context";
 import UptimeWidget from "@/components/UptimeWidget";
-// import FloatingWidget from "@/components/FloatingWidget"; // disabilitato OTA 201
+import FloatingWidget from "@/components/FloatingWidget";
 import { sendStartupBeacon } from "@/lib/startup-beacon";
 import { MapReadyGate } from "@/components/layout/MapReadyGate";
 import { useMapConfig } from "@/lib/map-context";
@@ -38,8 +38,8 @@ import { PushTokenRegistrar } from "@/components/layout/PushTokenRegistrar";
 import { DataRefreshIndicator } from "@/components/layout/DataRefreshIndicator";
 import { OfflineBanner } from "@/components/layout/OfflineBanner";
 import { DegradedBanner } from "@/components/layout/DegradedBanner";
-// Task #2698 — AI Assistant utente. (import disabilitato OTA 201)
-// import AssistantOnboardingTour from "@/components/user/ai-assistant/AssistantOnboardingTour";
+// Task #2698 — AI Assistant utente (Bowie).
+import AssistantOnboardingTour from "@/components/user/ai-assistant/AssistantOnboardingTour";
 import { useOtaStagingBanner } from "@/hooks/useOtaStagingBanner";
 import { useDeviceMetrics } from "@/hooks/useDeviceMetrics";
 import { useJsThreadWatchdog } from "@/hooks/useJsThreadWatchdog";
@@ -236,6 +236,18 @@ function NormalRootLayout() {
   useOtaAutoUpdate(tokenReady);
   usePostUpdateRefresh();
 
+  // Bowie (FloatingWidget + onboarding tour) montato in modo differito: mai nel
+  // percorso critico del boot. InteractionManager garantisce che React Navigation
+  // si sia stabilizzato prima che questi overlay vengano aggiunti all'albero —
+  // separato e successivo al showNormalLayout di RootLayout (anti-loop).
+  const [showBowie, setShowBowie] = useState(false);
+  useEffect(() => {
+    const handle = InteractionManager.runAfterInteractions(() => {
+      setShowBowie(true);
+    });
+    return () => handle.cancel();
+  }, []);
+
   useEffect(() => {
     type ErrorHandler = (error: Error, isFatal?: boolean) => void;
     interface ErrorUtilsType {
@@ -301,9 +313,9 @@ function NormalRootLayout() {
           </View>
           <MatchPopupAlert />
           <UpdateNudgeWrapper />
-          {/* Bowie disabilitato temporaneamente — OTA 201 */}
-          {/* <AssistantOnboardingTour /> */}
-          {/* <FloatingWidget /> */}
+          {/* Bowie — montato in modo differito (mai nel percorso critico del boot). */}
+          {showBowie && <AssistantOnboardingTour />}
+          {showBowie && <FloatingWidget />}
           <AdminUptimeOverlay />
         </MapReadyGate>
       </StartupGate>

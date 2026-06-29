@@ -141,7 +141,7 @@ vi.mock("@/hooks/useAssistantEnabled", () => ({
   useAssistantEnabled: () => ({ fabEnabled: true }),
 }));
 vi.mock("@/lib/auth-context", () => ({
-  useAuth: () => ({ user: mockEnv.user }),
+  useAuth: () => ({ user: mockEnv.user, healthState: "READY", healthReason: "" }),
 }));
 vi.mock("@/components/user/ai-assistant/AssistantChatSheet", () => ({
   default: () => null,

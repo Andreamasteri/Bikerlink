@@ -162,7 +162,7 @@ vi.mock("@/hooks/useAssistantEnabled", () => ({
 }));
 
 vi.mock("@/lib/auth-context", () => ({
-  useAuth: () => ({ user: mocks.user }),
+  useAuth: () => ({ user: mocks.user, healthState: "READY", healthReason: "" }),
 }));
 
 vi.mock("@/components/user/ai-assistant/AssistantChatSheet", () => ({

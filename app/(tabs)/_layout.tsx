@@ -18,7 +18,6 @@ import { useTabBadges } from "@/hooks/useTabBadges";
 import { useNewMatchAlert } from "@/hooks/useNewMatchAlert";
 import { TabIcon } from "@/components/TabIcons";
 import { GpsBanner } from "@/components/layout/GpsBanner";
-import { HealthBanner } from "@/components/layout/HealthBanner";
 import { sendStartupBeacon } from "@/lib/startup-beacon";
 import { useAutoTelemetry } from "@/lib/auto-telemetry-context";
 import { SafetyOverlay } from "@/components/layout/SafetyOverlay";
@@ -516,7 +515,6 @@ export default function TabLayout() {
       {isGpsGateActive && (
         <GpsBanner requestPermission={requestPermission} />
       )}
-      <HealthBanner />
       <Tabs
         tabBar={renderCustomTabBar}
         screenOptions={TABS_SCREEN_OPTIONS}
