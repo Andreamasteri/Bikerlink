@@ -191,6 +191,18 @@ async function downloadFile(rel: string, branch: string, token: string): Promise
   }
 }
 
+/**
+ * Hard-timeout a livello JS: garantisce che la promise risolva entro `ms`
+ * anche se il fetch sottostante resta appeso nella lettura del body (caso in
+ * cui AbortSignal.timeout non interrompe lo stream). Restituisce `fallback`.
+ */
+function withHardTimeout<T>(p: Promise<T>, ms: number, fallback: T): Promise<T> {
+  return Promise.race([
+    p,
+    new Promise<T>((resolve) => setTimeout(() => resolve(fallback), ms)),
+  ]);
+}
+
 /** Scarica tutti i file in batch paralleli ≤ DOWNLOAD_CONCURRENCY. */
 async function downloadAll(
   files: string[],
@@ -201,7 +213,9 @@ async function downloadAll(
   const failed: string[] = [];
   for (let i = 0; i < files.length; i += DOWNLOAD_CONCURRENCY) {
     const batch = files.slice(i, i + DOWNLOAD_CONCURRENCY);
-    const results = await Promise.all(batch.map((f) => downloadFile(f, branch, token)));
+    const results = await Promise.all(
+      batch.map((f) => withHardTimeout(downloadFile(f, branch, token), 25_000, null)),
+    );
     results.forEach((r, idx) => {
       if (r) downloaded.push(r);
       else failed.push(batch[idx]);
