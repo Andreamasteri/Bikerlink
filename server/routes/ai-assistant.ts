@@ -155,12 +155,15 @@ router.post("/ai/assistant/message", requireUser, messageLimiter, async (req: Re
     return;
   }
 
-  // Task #4842 — Snapshot admin sintetico iniettato nel system prompt.
+  // Task #4842 — Snapshot admin sintetico + codice sorgente (GitHub) iniettati nel system prompt.
   let adminContext: string | undefined;
+  let adminCodeContext: string | undefined;
   if (isAdminMode) {
     try {
       const { buildAdminContextSnapshot } = await import("../ai/assistant/admin-context");
-      adminContext = await buildAdminContextSnapshot();
+      const result = await buildAdminContextSnapshot();
+      adminContext = result.snapshot;
+      adminCodeContext = result.codeContext || undefined;
     } catch (e) {
       console.warn("[ai-assistant/admin-context]", (e as Error).message);
       adminContext = "(snapshot piattaforma non disponibile al momento)";
@@ -197,8 +200,11 @@ router.post("/ai/assistant/message", requireUser, messageLimiter, async (req: Re
       // Task #4842 — userId solo in modalità admin (per il logging ai_call_logs).
       // Per gli utenti normali resta omesso, preservando il comportamento esistente
       // (nessuna persistenza di memoria conversazionale via questa route).
-      userId: isAdminMode ? user.id : undefined,
+      // Soluzione 2: userId passato sempre — fetchUserLiveContext lo usa per
+      // iniettare profilo/giri/proposte nel system prompt (non-admin mode).
+      userId: user.id,
       adminContext,
+      adminCodeContext,
       signal: abort.signal,
       onTextDelta: (delta) => send("delta", { text: delta }),
     });

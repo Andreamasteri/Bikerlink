@@ -3,7 +3,11 @@
  *
  * Raccoglie log, crash e file chiave del boot, li invia al PC dedicato
  * (Windows + GPU) che esegue Ollama con un modello coder (default
- * `qwen2.5-coder:32b`) e stampa/salva un report di diagnosi.
+ * `qwen3.6:35b`) e stampa/salva un report di diagnosi.
+ *
+ * I file SORGENTE vengono letti direttamente da GitHub API (branch main, sempre
+ * aggiornato). Fallback al disco locale se GITHUB_TOKEN è assente o la fetch
+ * fallisce.
  *
  * La chiamata è HTTP DIRETTA all'endpoint Ollama (`${DIAG_OLLAMA_URL}/api/chat`),
  * NON passa dal backend Express: funziona anche quando il server è giù.
@@ -15,10 +19,14 @@
  * Secret/env:
  *   DIAG_OLLAMA_URL    — URL base dell'Ollama sul PC dedicato (via Cloudflare Tunnel).
  *                        Es: https://diag.example.com  (senza /api finale)
- *   DIAG_OLLAMA_MODEL  — modello da usare (default "qwen2.5-coder:32b").
+ *   DIAG_OLLAMA_MODEL  — modello da usare (default "qwen3.6:35b").
  *                        Può puntare a un modello custom (es. "bikerlink-diag")
  *                        creato via Modelfile sul PC dedicato.
  *   DIAG_OLLAMA_TOKEN  — opzionale, Bearer token se l'endpoint è protetto.
+ *   DIAG_GITHUB_TOKEN  — token GitHub READ-ONLY (fine-grained, solo Contents:read
+ *                        su Andreamasteri/Bikerlink); usato per fetch sorgenti
+ *                        aggiornati. Se assente legge dal disco locale (fallback).
+ *                        NON usare il GITHUB_TOKEN principale (ha write).
  */
 
 import fs from "fs";
@@ -56,7 +64,7 @@ const MAX_SOURCE_CHARS = 12_000;
 /** Timeout della chiamata Ollama. Il 32b su CPU/RAM può impiegare 2-5 minuti. */
 const REQUEST_TIMEOUT_MS = 180_000;
 
-const DEFAULT_MODEL = "qwen2.5-coder:32b";
+const DEFAULT_MODEL = "qwen3.6:35b";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -84,8 +92,8 @@ function readTail(relOrAbs: string, tail: number): string | null {
   }
 }
 
-/** Legge un file sorgente intero, troncato a MAX_SOURCE_CHARS. */
-function readSource(rel: string): string | null {
+/** Legge un file sorgente intero dal disco, troncato a MAX_SOURCE_CHARS. */
+function readSourceLocal(rel: string): string | null {
   const abs = path.join(ROOT, rel);
   try {
     if (!fs.existsSync(abs)) return null;
@@ -94,6 +102,39 @@ function readSource(rel: string): string | null {
       content = content.slice(0, MAX_SOURCE_CHARS) + "\n\n...[troncato]...";
     }
     return content;
+  } catch {
+    return null;
+  }
+}
+
+const GITHUB_REPO = "Andreamasteri/Bikerlink";
+const GITHUB_BRANCH = "main";
+
+/**
+ * Fetcha un file sorgente direttamente da GitHub API (sempre aggiornato).
+ * Ritorna null se DIAG_GITHUB_TOKEN manca, il file non esiste, o la rete fallisce.
+ */
+async function fetchGitHubFile(rel: string): Promise<{ content: string; source: "github" } | null> {
+  const token = process.env.DIAG_GITHUB_TOKEN?.trim();
+  if (!token) return null;
+  try {
+    const url = `https://api.github.com/repos/${GITHUB_REPO}/contents/${rel}?ref=${GITHUB_BRANCH}`;
+    const res = await fetch(url, {
+      headers: {
+        Authorization: `token ${token}`,
+        Accept: "application/vnd.github+json",
+        "User-Agent": "BikerLink-Diag/1.0",
+      },
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (!res.ok) return null;
+    const data = (await res.json()) as { content?: string; encoding?: string };
+    if (data.encoding !== "base64" || !data.content) return null;
+    let content = Buffer.from(data.content.replace(/\n/g, ""), "base64").toString("utf8");
+    if (content.length > MAX_SOURCE_CHARS) {
+      content = content.slice(0, MAX_SOURCE_CHARS) + "\n\n...[troncato]...";
+    }
+    return { content, source: "github" };
   } catch {
     return null;
   }
@@ -117,10 +158,13 @@ function fmtSection(title: string, body: string): string {
 
 // ─── Raccolta contesto ──────────────────────────────────────────────────────────
 
-function collectContext(tail: number): { prompt: string; collected: string[]; missing: string[] } {
+async function collectContext(tail: number): Promise<{ prompt: string; collected: string[]; missing: string[]; githubUsed: boolean }> {
   const collected: string[] = [];
   const missing: string[] = [];
   const parts: string[] = [];
+  let githubUsed = false;
+
+  const hasGithubToken = Boolean(process.env.DIAG_GITHUB_TOKEN?.trim());
 
   parts.push("# CONTESTO DI DIAGNOSI BIKERLINK\n");
   parts.push(`Generato: ${new Date().toISOString()}\n`);
@@ -138,13 +182,21 @@ function collectContext(tail: number): { prompt: string; collected: string[]; mi
 
   parts.push("\n## FILE SORGENTE CHIAVE DEL BOOT\n");
   for (const f of SOURCE_FILES) {
-    const body = readSource(f);
-    if (body == null) {
-      missing.push(f);
-      continue;
+    // Prova prima GitHub API (sempre aggiornato), fallback a disco locale
+    const gh = hasGithubToken ? await fetchGitHubFile(f) : null;
+    if (gh) {
+      githubUsed = true;
+      collected.push(`${f} [github]`);
+      parts.push(fmtSection(`FILE: ${f} (da GitHub main)`, gh.content));
+    } else {
+      const body = readSourceLocal(f);
+      if (body == null) {
+        missing.push(f);
+        continue;
+      }
+      collected.push(`${f} [locale]`);
+      parts.push(fmtSection(`FILE: ${f} (da disco locale)`, body));
     }
-    collected.push(f);
-    parts.push(fmtSection(`FILE: ${f}`, body));
   }
 
   parts.push(
@@ -154,7 +206,7 @@ function collectContext(tail: number): { prompt: string; collected: string[]; mi
       "## Problemi trovati, ## Causa probabile, ## Azione suggerita.\n",
   );
 
-  return { prompt: parts.join("\n"), collected, missing };
+  return { prompt: parts.join("\n"), collected, missing, githubUsed };
 }
 
 // ─── Chiamata Ollama diretta ─────────────────────────────────────────────────
@@ -231,12 +283,13 @@ async function main(): Promise<void> {
     return;
   }
 
-  const { prompt, collected, missing } = collectContext(tail);
+  const { prompt, collected, missing, githubUsed } = await collectContext(tail);
   const system = loadSystemPrompt();
 
   console.log(`\n  Endpoint : ${baseUrl}`);
   console.log(`  Modello  : ${model}`);
   console.log(`  Tail     : ${tail} righe/log`);
+  console.log(`  Sorgenti : ${githubUsed ? "✅ GitHub API (main)" : "⚠️  disco locale (GITHUB_TOKEN assente)"}`);
   console.log(`  Raccolti : ${collected.length ? collected.join(", ") : "(nessuno)"}`);
   if (missing.length) console.log(`  Mancanti : ${missing.join(", ")}`);
 
@@ -276,6 +329,7 @@ async function main(): Promise<void> {
       `# Diagnosi AI BikerLink — ${new Date().toISOString()}\n\n` +
       `- Modello: \`${model}\`\n` +
       `- Endpoint: \`${baseUrl}\`\n` +
+      `- Sorgenti: ${githubUsed ? "GitHub API (main)" : "disco locale"}\n` +
       `- File analizzati: ${collected.join(", ") || "(nessuno)"}\n\n` +
       `---\n\n`;
     fs.writeFileSync(outPath, header + report + "\n", "utf8");

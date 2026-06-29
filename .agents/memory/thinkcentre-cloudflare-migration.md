@@ -1,92 +1,100 @@
 ---
 name: ThinkCentre → Cloudflare migration notes
-description: Tutto quello che è stato fatto sul ThinkCentre con DuckDNS/nginx/TLS da rifare/adattare quando si passa a Cloudflare Tunnel o Cloudflare DNS.
+description: Migrazione completata da DuckDNS+nginx+LE a Cloudflare Tunnel (cloudflared). Tunnel bikerlink-tc attivo sul TC, dominio biker-link.net su Cloudflare.
 ---
 
-# ThinkCentre — Note per migrazione a Cloudflare
+# ThinkCentre — Cloudflare Tunnel (MIGRAZIONE COMPLETATA)
 
-## Setup attuale (DuckDNS + Let's Encrypt + nginx)
+## Setup attuale (Cloudflare Tunnel)
 
-### Domini configurati
-Tutti sotto `bikerlink.duckdns.org`:
-- `gh.bikerlink.duckdns.org` → GraphHopper (127.0.0.1:8989) — token `X-GH-Token`
-- `valhalla.bikerlink.duckdns.org` → Valhalla (127.0.0.1:8002) — token `X-Valhalla-Key`
-- `ollama.bikerlink.duckdns.org` → Ollama (127.0.0.1:11434) — token + header Host fix
-- `whisper.bikerlink.duckdns.org` → Whisper (127.0.0.1:9000) — token `X-Whisper-Token`
-- `nominatim.bikerlink.duckdns.org` → Nominatim (127.0.0.1:7070) — token
-- `tc.bikerlink.duckdns.org` → ThinkCentre Agent (127.0.0.1:9101) — token `X-Agent-Token`
-- `bkredis.bikerlink.duckdns.org:6380` → Redis TLS (nginx stream, 127.0.0.1:6379) — **porta 6380 NON ancora forwarded sul router**
+### Tunnel
+- Nome: `bikerlink-tc`
+- ID: `86122511-2752-4002-aec9-1fdd7c25b9f5`
+- Account CF (Zero Trust): `d116d3d97b133c543d02934be4bc98d2`
+- Dominio: `biker-link.net` (acquistato su Cloudflare, zone ID `e2ced3f458b06555c6c8e8a403f4b489`)
+- cloudflared: installato su TC via `cloudflared service install <token>`, systemd `cloudflared.service` ENABLED+ACTIVE
 
-### Cert TLS
-- Emesso da Let's Encrypt via certbot `--standalone` (nginx fermato 10s durante rinnovo)
-- Cert path: `/etc/letsencrypt/live/bikerlink/fullchain.pem`
-- Copre tutti e 6 i sottodomini sopra (SAN multi-domain)
-- Rinnovo: `certbot renew` (cron automatico)
-- Vecchio cert separato: `/etc/letsencrypt/live/bikerlink.duckdns.org/` — ancora attivo per il config graphhopper legacy
+### Tunnel 1: bikerlink-tc (ThinkCentre)
+ID: `86122511-2752-4002-aec9-1fdd7c25b9f5`
+Route ingress:
+- `gh.biker-link.net`        → `http://127.0.0.1:8989`
+- `valhalla.biker-link.net`  → `http://127.0.0.1:8003`
+- `whisper.biker-link.net`   → `http://127.0.0.1:8080`
+- `nominatim.biker-link.net` → `http://127.0.0.1:7070`
+- `tc.biker-link.net`        → `http://127.0.0.1:9199`
 
-### nginx
-- Config attivo: `/etc/nginx/sites-enabled/bikerlink` (569 righe, repo: `infra/self-host/expose/nginx-bikerlink.conf`)
-- Config legacy ancora attivo: `/etc/nginx/sites-enabled/graphhopper` — serve `bikerlink.duckdns.org` con routing path-based (da rimuovere, vedi task #3662)
-- **CRITICO**: tutti i `server` block usano `listen 192.168.1.35:443 ssl;` — NON `listen 443 ssl;`
-- Rate limiting zone: `gh_limit`, `valhalla_limit`, `ollama_limit`, `whisper_limit`, `nominatim_limit`, `tc_limit`
-- Log separati per servizio: `/var/log/nginx/<service>-access.log` e `<service>-auth-fail.log`
+### Tunnel 2: bikerlink-pc (PC fisso Windows — Ollama)
+ID: `4626e124-4601-43c2-bbda-78ef4295da2d`
+Route ingress:
+- `ollama.biker-link.net`    → `http://127.0.0.1:11434` + `httpHostHeader: localhost`
+Installato come Windows service: `C:\cloudflared.exe service install <token>`
+Ollama installato via winget: `winget install Ollama.Ollama`
 
-### ThinkCentre Agent
-- Processo: `pm2` → `bikerlink-agent` → `thinkcentre-agent/server.js` (PORT=9101)
-- Espone: `GET /sys-metrics` → CPU loadAvg, RAM, uptime
-- Token: `THINKCENTRE_AGENT_TOKEN` (in Replit Secrets)
+### DNS Cloudflare (CNAME proxied)
+- `gh/valhalla/whisper/nominatim/tc` → CNAME `86122511-....cfargotunnel.com` (TC tunnel)
+- `ollama` → CNAME `4626e124-....cfargotunnel.com` (PC fisso tunnel)
+Tutti creati via API automaticamente.
 
-### Env Replit (secret)
-- `THINKCENTRE_METRICS_URL` = `https://tc.bikerlink.duckdns.org`
-- `THINKCENTRE_AGENT_TOKEN` = token agente
-- `GRAPHHOPPER_TOKEN` = token GH
-- `VALHALLA_API_KEY` = token Valhalla
-- `WHISPER_TOKEN` = token Whisper
-- `NOMINATIM_TOKEN` = token Nominatim
-- `OLLAMA_TOKEN` = token Ollama
-- `OLLAMA_URL` = `https://ollama.bikerlink.duckdns.org`
-- `REDIS_URL` = `rediss://...@bkredis.bikerlink.duckdns.org:6380` (**non funziona ancora** — porta 6380 non forwarded)
+### Env Replit aggiornate
+Shared env vars (non sensibili):
+- `GRAPHHOPPER_URL` = `https://gh.biker-link.net`
+- `VALHALLA_URL`    = `https://valhalla.biker-link.net`
+- `NOMINATIM_URL`   = `https://nominatim.biker-link.net`
+- `WHISPER_URL`     = `https://whisper.biker-link.net`
+- `REDIS_PROBE_URL` = `https://tc.biker-link.net/probe/redis`
+- `DIAG_OLLAMA_URL` = `https://ollama.biker-link.net` (PC fisso — codice/diagnostica)
 
----
+Secret aggiornati:
+- `OLLAMA_URL` = `https://ollama-tc.biker-link.net` (TC — floating widget AI assistant)
 
-## Con Cloudflare — cosa cambia
-
-### Opzione A: Cloudflare Tunnel (cloudflared)
-Nessun port forwarding sul router, nessun IP pubblico esposto.
-1. Installa `cloudflared` sul ThinkCentre
-2. Crea un tunnel: `cloudflared tunnel create bikerlink`
-3. Mappa ogni sottodominio → `http://127.0.0.1:<porta>` nel config tunnel
-4. **Non serve più nginx** per l'esposizione — cloudflared fa da reverse proxy diretto
-5. **Non serve più Let's Encrypt** — Cloudflare gestisce i cert (Edge Certificate)
-6. **Non serve più DuckDNS** — Cloudflare gestisce i DNS
-
-Attenzione:
-- Cloudflare Tunnel NON supporta TCP grezzo (Redis) → per Redis usare Cloudflare Spectrum (a pagamento) o mantieni tunnel separato con `cloudflared access tcp`
-- I token di autenticazione (`X-GH-Token` ecc.) possono essere sostituiti con Cloudflare Access (zero-trust) o mantenuti come header custom
-- Ollama ha un fix speciale `proxy_set_header Host "localhost"` — con cloudflared il problema non esiste (connessione diretta localhost)
-
-### Opzione B: Cloudflare DNS + IP pubblico (come ora, solo DNS)
-Sostituisce solo DuckDNS, mantieni nginx + Let's Encrypt.
-1. Aggiungi dominio `bikerlink.it` (o simile) su Cloudflare
-2. Record A: `gh.bikerlink.it` → IP pubblico ThinkCentre (con proxy orange = CDN, oppure DNS-only = grey)
-3. **Se proxy orange**: Cloudflare termina TLS → backend vede HTTP, non HTTPS → nginx deve accettare HTTP interno O usare `ssl_certificate` di Cloudflare Origin
-4. **Se DNS-only**: nginx mantiene Let's Encrypt, tutto invariato
-5. Aggiorna tutti i secret Replit con i nuovi URL (`gh.bikerlink.it` ecc.)
-
-### Cosa NON cambia (in entrambe le opzioni)
-- I servizi interni (GH, Valhalla, Ollama ecc.) rimangono sulle stesse porte locali
-- I token di autenticazione possono restare invariati
-- Il ThinkCentre Agent (`thinkcentre-agent/server.js`, PORT=9101) resta identico
-- `server/routes/admin/thinkcentre-metrics.ts` e tutti i route file lato Replit restano identici
-- `THINKCENTRE_AGENT_TOKEN` resta necessario (autenticazione dell'agent)
-
-### File da aggiornare a migrazione completata
-- `infra/self-host/expose/nginx-bikerlink.conf` (se si mantiene nginx)
-- Tutti i secret Replit con i nuovi URL
-- `server/routes/admin/thinkcentre-metrics.ts` — solo se cambia il nome dell'env var
-- `MEMORY.md` — aggiornare/eliminare questa nota
+### Due Ollama distinti
+- **ollama-tc.biker-link.net** → TC Ollama (systemd) → floating widget AI assistant (`OLLAMA_URL`)
+- **ollama.biker-link.net** → PC fisso Ollama (Windows service) → codice/diagnostica (`DIAG_OLLAMA_URL`)
 
 ---
 
-## Why (perché è stato scelto DuckDNS invece di Cloudflare)
-Soluzione veloce e gratuita per esporre i servizi del ThinkCentre senza modificare il dominio principale (`bikerlink.it`/`bikerlink.duckdns.org`). La migrazione a Cloudflare è pianificata per quando il progetto è più maturo.
+## Setup precedente (DuckDNS — DISMESSO)
+Tutti i vecchi URL `*.bikerlink.duckdns.org` non sono più usati da Replit.
+Il DuckDNS timer sul TC può essere disabilitato.
+Il certificato Let's Encrypt e nginx rimangono sul TC ma non sono più necessari per l'esposizione esterna.
+
+---
+
+## Note operative
+
+### Gestire il tunnel
+```bash
+# Status
+sudo systemctl status cloudflared
+
+# Restart
+sudo systemctl restart cloudflared
+
+# Logs
+journalctl -u cloudflared -f
+
+# Aggiornare config ingress (via API CF, non file locale)
+# PUT /accounts/{account_id}/cfd_tunnel/{tunnel_id}/configurations
+```
+
+### Aggiornare token tunnel (se necessario)
+```bash
+sudo cloudflared service uninstall
+sudo cloudflared service install <nuovo_token>
+sudo systemctl enable cloudflared && sudo systemctl start cloudflared
+```
+
+### Redis
+TCP puro non supportato da CF Tunnel free. Redis rimane su connessione diretta o da valutare CF Spectrum (a pagamento).
+
+### Ollama fix Host header
+Il tunnel usa `originRequest.httpHostHeader = "localhost"` — Ollama 0.24+ rifiuta richieste con Host ≠ localhost (403). Già configurato nell'ingress.
+
+### bikerlink.it (dominio di terzi)
+`bikerlink.it` NON è nostro — appartiene a un'altra organizzazione. Non usare quel dominio.
+Il nostro dominio è `biker-link.net` (registrato su Cloudflare).
+
+---
+
+## Why
+Cloudflare Tunnel elimina port forwarding sul router, DuckDNS, Let's Encrypt, e nginx per l'esposizione esterna. Zero ingress firewall rules. TLS gestito da Cloudflare Edge. Costo: solo il dominio biker-link.net (~$9-11/anno).

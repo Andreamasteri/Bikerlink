@@ -224,9 +224,14 @@ timeoutMs = 420000
   BIKERLINK_BACKEND_URL = "https://biker-link.replit.app"
   EXPO_PUBLIC_DOMAIN = "biker-link.replit.app"
   TILES_URL = "https://tiles.bikerlink.app"
-  OLLAMA_URL = "https://ollama.bikerlink.duckdns.org"
-  REDIS_PROBE_URL = "https://tc.bikerlink.duckdns.org/probe/redis"
+REDIS_PROBE_URL = "https://tc.biker-link.net/probe/redis"
 TC_SSH_PORT = "22"
+GRAPHHOPPER_URL = "https://gh.biker-link.net"
+VALHALLA_URL = "https://valhalla.biker-link.net"
+NOMINATIM_URL = "https://nominatim.biker-link.net"
+WHISPER_URL = "https://whisper.biker-link.net"
+DIAG_OLLAMA_URL = "https://ollama.biker-link.net"
+DIAG_OLLAMA_MODEL = "qwen3.6:35b"
 
   [userenv.development]
   EXPO_WEB_URL = "http://localhost:8081"

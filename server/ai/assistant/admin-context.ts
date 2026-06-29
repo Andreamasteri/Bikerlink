@@ -11,6 +11,7 @@
 import { withBgDbConnection } from "../../lib/bg-db-limiter";
 import { storage } from "../../storage";
 import type { ProbeLogEntry } from "../../routes/admin/thinkcentre-health-utils";
+import { fetchAdminCodeContext } from "./github-context";
 
 const PROBE_LOG_SNAPSHOT_KEY = "probe_log_snapshot";
 
@@ -170,13 +171,19 @@ function formatSnapshot(snap: AdminSnapshot): string {
  * Compone lo snapshot admin formattato da iniettare nel system prompt.
  * Best-effort: ogni sorgente fallita degrada a "dato non disponibile" senza
  * far fallire l'intera composizione.
+ * Ritorna { snapshot, codeContext } separati così agent.ts può passarli
+ * a buildAdminSystemPrompt(adminContext, codeContext).
  */
-export async function buildAdminContextSnapshot(): Promise<string> {
-  const [dbStats, thinkCentre] = await Promise.all([
+export async function buildAdminContextSnapshot(): Promise<{ snapshot: string; codeContext: string }> {
+  const [dbStats, thinkCentre, codeContext] = await Promise.all([
     loadDbStats(),
     loadThinkCentreStatus(),
+    fetchAdminCodeContext(),
   ]);
   const snap: AdminSnapshot = { ...dbStats, thinkCentre };
   const generatedAt = new Date().toLocaleString("it-IT");
-  return `Snapshot generato il ${generatedAt}.\n${formatSnapshot(snap)}`;
+  return {
+    snapshot: `Snapshot generato il ${generatedAt}.\n${formatSnapshot(snap)}`,
+    codeContext,
+  };
 }

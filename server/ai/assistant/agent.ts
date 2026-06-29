@@ -18,6 +18,7 @@ import { db } from "../../db";
 import { aiConversationTurns } from "@shared/db";
 import { eq, desc } from "drizzle-orm";
 import { pruneUserMemory, MEMORY_TURNS_LIMIT } from "./memory-pruner";
+import { fetchUserLiveContext } from "./user-context";
 
 const OLLAMA_FALLBACK_MODEL_ID = process.env.OLLAMA_MODEL ?? "mistral-nemo:latest";
 
@@ -33,6 +34,8 @@ export interface AssistantAgentOpts {
   // Task #4842 — Contesto admin sintetico (snapshot piattaforma) iniettato nel
   // system prompt quando platform === "admin".
   adminContext?: string;
+  // Soluzione 3 — Codice sorgente da GitHub (tools/actions) per admin mode.
+  adminCodeContext?: string;
 }
 
 export interface AssistantAgentResult {
@@ -97,8 +100,8 @@ export async function runAssistantAgent(opts: AssistantAgentOpts): Promise<Assis
   let system: string;
   if (isAdmin) {
     // Task #4842 — Modalità admin: system prompt dedicato con snapshot piattaforma.
-    // Nessun RAG/FAQ utente, nessuna azione strutturata.
-    system = buildAdminSystemPrompt(opts.adminContext ?? "");
+    // Soluzione 3 — codeContext da GitHub (tools/actions) iniettato opzionalmente.
+    system = buildAdminSystemPrompt(opts.adminContext ?? "", opts.adminCodeContext);
   } else {
     // Task #3017 — RAG: assicuriamoci che l'indice sia aggiornato e recuperiamo contesto
     indexKnowledge(opts.customFaqs ?? []);
@@ -109,6 +112,9 @@ export async function runAssistantAgent(opts: AssistantAgentOpts): Promise<Assis
     });
     const ragContext = formatRagContext(ragSnippets);
 
+    // Soluzione 2 — Contesto live utente (profilo, ultimi giri, proposte attive).
+    const userContext = await fetchUserLiveContext(opts.userId);
+
     system = buildSystemPrompt({
       platform: opts.platform as "android" | "ios" | "web",
       customFaqs: opts.customFaqs,
@@ -116,6 +122,7 @@ export async function runAssistantAgent(opts: AssistantAgentOpts): Promise<Assis
       ragContext,
       // Task #3090 — passa userId così Ollama lo usa nei tool call (getUserPlannedRoutes, getBikerStats)
       userId: opts.userId,
+      userContext: userContext || undefined,
     });
   }
 

@@ -67,6 +67,9 @@ export function buildSystemPrompt(opts: {
   /** Task #3090 — ID utente corrente: necessario affinché Ollama possa passarlo ai tool
    *  (getUserPlannedRoutes, getBikerStats) che richiedono userId come parametro. */
   userId?: string | null;
+  /** Soluzione 2 — Dati live dell'utente (profilo, ultimi giri, proposte attive).
+   *  Fetchati dal DB ad ogni chiamata e iniettati nel system prompt. */
+  userContext?: string;
 }): string {
   const faqs = [...ASSISTANT_KNOWLEDGE, ...(opts.customFaqs ?? [])]
     .map((k) => `Q: ${k.question}\nA: ${k.answer}`)
@@ -78,6 +81,10 @@ export function buildSystemPrompt(opts: {
 
   const ragSection = opts.ragContext
     ? `\n\n${opts.ragContext}`
+    : "";
+
+  const userContextSection = opts.userContext
+    ? `\n\nCONTESTO UTENTE (dati live dal DB, usa per personalizzare le risposte):\n${opts.userContext}`
     : "";
 
   // Task #3090 — Includi userId nel prompt così Ollama può passarlo ai tool call
@@ -106,7 +113,7 @@ AZIONI ABILITATE DALL'ADMIN PER QUESTA PIATTAFORMA:
 ${allowedActionsList}
 
 KNOWLEDGE BASE FAQ (usa queste informazioni per rispondere):
-${faqs}${ragSection}`;
+${faqs}${ragSection}${userContextSection}`;
 }
 
 // Task #4842 — System prompt dedicato per la chat assistant del pannello admin.
@@ -114,7 +121,11 @@ ${faqs}${ragSection}`;
 // servizi, business, OTA.
 // Task #4922 — Ora può anche PROPORRE azioni admin da una whitelist; l'admin
 // conferma sempre prima dell'esecuzione (eseguita server-side).
-export function buildAdminSystemPrompt(adminContext: string): string {
+export function buildAdminSystemPrompt(adminContext: string, codeContext?: string): string {
+  const codeSection = codeContext
+    ? `\n\n${codeContext}`
+    : "";
+
   return `Sei Bowie, l'assistente virtuale amministrativo di BikerLink, un'app per motociclisti. Stai parlando con un AMMINISTRATORE fidato dentro la sezione Marketing/Business Reach del pannello admin.
 
 REGOLE:
@@ -131,5 +142,5 @@ AZIONI ADMIN DISPONIBILI (whitelist server-side, sempre con conferma):
 ${listAdminActionsForPrompt()}
 
 SNAPSHOT PIATTAFORMA (contesto corrente, sola lettura):
-${adminContext || "(nessun dato disponibile)"}`;
+${adminContext || "(nessun dato disponibile)"}${codeSection}`;
 }
