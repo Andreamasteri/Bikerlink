@@ -1,4 +1,5 @@
 import { htmlHead, mapScriptWrap } from "./map-builder";
+import { decimateTrack } from "../maps/track-decimate";
 
 /**
  * Snippet JS condiviso dalle mappe secondarie per emettere lo stato della
@@ -47,7 +48,7 @@ export function buildMapLibreRouteHtml(
   accentColor: string = "#FF6600"
 ): string {
   const wpsJson = JSON.stringify(waypoints);
-  const trackJson = JSON.stringify(trackPoints ?? []);
+  const trackJson = JSON.stringify(decimateTrack(trackPoints ?? []));
   const accentJs = JSON.stringify(accentColor);
 
   return `${htmlHead()}

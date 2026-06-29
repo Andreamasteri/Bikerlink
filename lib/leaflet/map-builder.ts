@@ -3,6 +3,7 @@ import { MAP_STYLES, CURVATURE_LEGEND_HTML, TAP_HINT_HTML } from './map-styles';
 import { COMMON_SCRIPTS } from './map-scripts';
 import { MARKER_SCRIPTS } from './map-markers';
 import { LEAFLET_JS, LEAFLET_CSS } from '../leaflet-bundle';
+import { decimateTrack } from '../maps/track-decimate';
 
 export interface PlannerWaypoint {
   lat: number;
@@ -380,7 +381,8 @@ export function buildLeafletRouteMapHtml(
     resolvedTypeColors[w.waypointType] =
       (typeColors && typeColors[w.waypointType]) || (require('./map-markers').getWaypointColor(w.waypointType));
   }
-  const polylinePoints = trackPoints ?? waypoints.map((w) => ({ lat: w.lat, lng: w.lng }));
+  const rawPolylinePoints = trackPoints ?? waypoints.map((w) => ({ lat: w.lat, lng: w.lng }));
+  const polylinePoints = decimateTrack(rawPolylinePoints);
   const waypointsJson = JSON.stringify(waypoints);
   const colorsJson = JSON.stringify(resolvedTypeColors);
   const polylineJson = JSON.stringify(polylinePoints);
