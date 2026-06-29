@@ -84,9 +84,45 @@ Quando cambia l'architettura del boot o emergono nuovi punti critici, aggiorna
 runtime: nessun deploy necessario. Per aggiungere/togliere file dal contesto, modifica
 gli array di configurazione in cima a `scripts/ollama-diagnose.ts`.
 
+## Studio completo della codebase + DB (`ollama-study-repo.ts`)
+
+Script separato e più ampio della diagnosi crash: fa STUDIARE a Ollama l'intera
+codebase e il dump dei due database, producendo un report architetturale persistente.
+
+```bash
+npx tsx scripts/ollama-study-repo.ts
+npx tsx scripts/ollama-study-repo.ts --dry-run          # lista file, niente invio
+npx tsx scripts/ollama-study-repo.ts --no-db            # salta il dump dei DB
+npx tsx scripts/ollama-study-repo.ts --branch develop   # altro branch
+npx tsx scripts/ollama-study-repo.ts --max-files 800    # limita i file scaricati
+npx tsx scripts/ollama-study-repo.ts --chunk-chars 360000
+```
+
+Cosa fa:
+1. Scarica da GitHub (`DIAG_GITHUB_TOKEN`, fallback `GITHUB_TOKEN`) tutti i file
+   `.ts/.tsx/.sql` + i `.json` rilevanti (esclude `node_modules`, `.expo`, `dist`,
+   `assets`, `logs`, file > 100 KB), in batch paralleli (≤10).
+2. Raggruppa i file in chunk (~480 000 char di default) rispettando i confini di file.
+3. Fa il dump di **schema completo** (sempre intero) + **dati riga per riga** (troncati
+   a `MAX_DB_CHARS` = 200 000 char, tabelle piccole prioritarie) di **dev** (`DATABASE_URL`)
+   e **prod** (`PROD_DATABASE_URL`) — sola lettura. DB irraggiungibile → `[non disponibile: …]`.
+4. Invia i chunk + il blocco DB in sequenza a `${DIAG_OLLAMA_URL}/api/chat` (timeout 300s/chunk),
+   poi chiede un report finale strutturato.
+5. Salva il report in `logs/repo-study-<timestamp>.md` e **inietta la sezione
+   `## Architettura`** in `bikerlink-context.md` (tra i marker `AUTO-ARCHITETTURA`),
+   così la diagnosi crash eredita la conoscenza dell'architettura.
+
+Env aggiuntive rispetto alla diagnosi: `PROD_DATABASE_URL` (dump prod). Usa gli stessi
+`DIAG_OLLAMA_URL/MODEL/TOKEN` e gli header Cloudflare Access (`cfAccessHeaders()`).
+
+NB: è un'operazione lunga (la codebase è grande). Usa `--dry-run` per vedere cosa
+verrebbe inviato, `--max-files`/`--no-db` per prove rapide.
+
 ## Out of scope
 
 - Nessun trigger automatico: solo esecuzione manuale o su richiesta.
 - Nessuna modifica all'app Expo o al backend Express.
+- Nessun accesso in scrittura ai DB (lo studio è sola lettura).
+- Nessun embedding o vector store: il contesto vive in `bikerlink-context.md`.
 - Il setup del PC Windows/Ollama/Cloudflare Tunnel è manuale (lato utente); la skill
   assume l'endpoint già raggiungibile.

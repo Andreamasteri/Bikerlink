@@ -21,3 +21,24 @@ ThinkCentre per non interferire con l'app in produzione.
   (aggiornalo lì quando cambia il boot, niente deploy). File da raccogliere configurabili in cima
   allo script (LOG_FILES/SOURCE_FILES). Timeout 180s (il 32b su CPU impiega 2-5 min).
 - Skill: `.agents/skills/ollama-diagnostics/SKILL.md` (trigger "diagnosi ollama").
+
+## Studio completo — `scripts/ollama-study-repo.ts`
+
+Script separato (NON è la diagnosi crash): fa STUDIARE a Ollama l'intera codebase +
+dump dei due DB e produce `logs/repo-study-<ts>.md`, poi inietta la sezione
+`## Architettura` in `bikerlink-context.md` tra i marker `AUTO-ARCHITETTURA` (idempotente).
+
+**Why:** dare a Ollama una conoscenza completa e persistente del progetto (codice +
+schema + dati reali + drift dev↔prod) per diagnosi future più profonde.
+
+**How to apply:**
+- Scarica i sorgenti da GitHub via `git/trees?recursive=1` + `contents` (base64),
+  token `DIAG_GITHUB_TOKEN` con fallback `GITHUB_TOKEN`; filtra `.ts/.tsx/.sql` + JSON
+  rilevanti, esclude node_modules/.expo/dist/assets/logs e file > 100 KB.
+- Dump DB con lib `pg` diretta (sola lettura): `DATABASE_URL` (dev) + `PROD_DATABASE_URL`
+  (prod, env AGGIUNTIVA rispetto alla diagnosi). Schema SEMPRE intero, dati troncati a
+  `MAX_DB_CHARS` (200k char) con tabelle piccole prioritarie; DB giù → `[non disponibile]`.
+- Chunk codice ~480k char rispettando i confini di file; invio sequenziale a
+  `${DIAG_OLLAMA_URL}/api/chat` (timeout 300s/chunk) + `cfAccessHeaders()`.
+- Flag: `--dry-run` (lista file), `--no-db`, `--branch`, `--max-files`, `--chunk-chars`.
+- È lungo (2000+ file): per prove rapide usa `--max-files N` / `--no-db` / `--dry-run`.
