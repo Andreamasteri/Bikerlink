@@ -228,7 +228,7 @@ export default function FloatingWidget() {
         testID="floating-widget"
         style={[
           styles.widget,
-          { transform: [{ translateX: posXAnim }, { translateY: posYAnim }] },
+          { left: posXAnim, top: posYAnim },
           aiOpen && styles.widgetHidden,
         ]}
         pointerEvents={aiOpen ? "none" : "auto"}
@@ -335,17 +335,9 @@ export default function FloatingWidget() {
 const styles = StyleSheet.create({
   widget: {
     position: "absolute",
-    // Ancorato all'origine: la posizione effettiva è data dal transform
-    // (translateX/translateY) dell'Animated.Value. Senza left/top espliciti, su
-    // Android l'hitbox del touch resterebbe a una posizione di layout indeterminata.
-    left: 0,
-    top: 0,
     width: WIDGET_SIZE,
     height: WIDGET_SIZE,
     zIndex: 9000,
-    // elevation sul container esterno: su Android l'elevation governa anche
-    // l'hit-testing tra fratelli sovrapposti, non solo l'ombra. Garantisce che
-    // il pallino abbia priorità di tocco sopra le viste fratello a schermo.
     elevation: 12,
   },
   widgetHidden: {
