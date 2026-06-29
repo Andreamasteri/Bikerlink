@@ -70,7 +70,11 @@ export async function isOllamaReachable(): Promise<boolean> {
     const headers: Record<string, string> = OLLAMA_TOKEN
       ? { "Authorization": `Bearer ${OLLAMA_TOKEN}` }
       : {};
-    const res = await fetch(`${OLLAMA_URL}/`, { method: "HEAD", headers, signal: controller.signal });
+    // /api/tags è l'endpoint standard Ollama che restituisce la lista dei modelli:
+    // più stabile e affidabile di HEAD / (che su Ollama 0.24+ può tornare 403
+    // se il Host header non è localhost — problema già fixato in nginx, ma il probe
+    // dal backend usa l'URL OLLAMA_URL diretto, quindi /api/tags è più robusto).
+    const res = await fetch(`${OLLAMA_URL}/api/tags`, { method: "GET", headers, signal: controller.signal });
     clearTimeout(timer);
     _probeResult = res.ok || res.status < 500;
     _probeTs = Date.now();

@@ -10,7 +10,7 @@
 import { streamText, stepCountIs } from "ai";
 import { runWithFallback, estimateCostUsd, type ResolvedModel } from "../moderation/provider";
 import { buildSystemPrompt, buildAdminSystemPrompt, type KnowledgeEntry } from "./knowledge";
-import { getOllamaModel, isOllamaConfigured } from "../../lib/ollama-client";
+import { getOllamaModel, isOllamaConfigured, isOllamaReachable } from "../../lib/ollama-client";
 import { retrieveContext, formatRagContext, indexKnowledge } from "./rag";
 import { OLLAMA_TOOLS } from "./tools";
 import { logAiCall } from "../../lib/ai-logger";
@@ -172,54 +172,70 @@ export async function runAssistantAgent(opts: AssistantAgentOpts): Promise<Assis
 
   let done = false;
 
-  // 1) Cloud primario (chain "router": Groq Llama 3.3 70B → Gemini Flash → OpenAI →
-  //    Anthropic). Qualità nettamente superiore al modello locale; free tier protetto
-  //    da RPM (m.scheduler/Bottleneck) + RPD (DAILY_CAPS): quando i cap si esauriscono
-  //    la chain prosegue e poi cade su Ollama. CRITICO: lo stream DEVE passare dallo
-  //    scheduler del provider, altrimenti i limiti per-minuto verrebbero bypassati.
-  try {
-    const { model } = await runWithFallback(
-      { role: "router" },
-      async (m: ResolvedModel) => {
-        await m.scheduler(() => streamWith(m.model, false));
-      },
-    );
-    provider = model.providerName;
-    modelId = model.modelId;
-    done = true;
-  } catch (cloudErr) {
-    if (emittedAny) {
-      // Stream già parzialmente inviato: NON ripartire da un altro provider.
-      console.warn("[assistant] cloud fallito a metà stream, mantengo il parziale:", (cloudErr as Error).message);
-      degraded = true;
-      done = true;
-    } else {
-      console.warn("[assistant] cloud non disponibile, fallback Ollama:", (cloudErr as Error).message);
-      finalText = "";
-    }
-  }
-
-  // 2) Ollama self-hosted come rete finale illimitata (ThinkCentre acceso).
-  //    Task #3017: con tool calling e maxSteps: 3.
-  if (!done && isOllamaConfigured) {
+  // 1) Ollama self-hosted — provider PRIMARIO (ThinkCentre, costo zero, illimitato).
+  //    Coerente con il resto del backend (moderation, routing engine, watchdog):
+  //    Ollama è il primo tentativo ovunque. Tool calling server-side abilitato (maxSteps: 3).
+  //    Il probe isOllamaReachable() ha cache 60s: aggiunge latenza minima (<1ms se cached).
+  if (isOllamaConfigured) {
     try {
-      await streamWith(getOllamaModel() as unknown as Parameters<typeof streamText>[0]["model"], true);
-      provider = "ollama";
-      modelId = OLLAMA_FALLBACK_MODEL_ID;
-      done = true;
+      const reachable = await isOllamaReachable();
+      if (reachable) {
+        await streamWith(getOllamaModel() as unknown as Parameters<typeof streamText>[0]["model"], true);
+        provider = "ollama";
+        modelId = OLLAMA_FALLBACK_MODEL_ID;
+        done = true;
+        console.log("[assistant] risposta da ollama (primario)");
+      } else {
+        console.warn("[assistant] Ollama non raggiungibile, scalo a chain cloud");
+      }
     } catch (ollamaErr) {
-      degraded = true;
-      finalText = finalText
-        || `⚠️ Assistente non disponibile al momento (${(ollamaErr as Error).message.slice(0, 100)}). Riprova tra qualche istante.`;
-      opts.onTextDelta?.(finalText);
+      if (emittedAny) {
+        // Stream già parzialmente inviato: NON ripartire da un altro provider.
+        console.warn("[assistant] ollama fallito a metà stream, mantengo il parziale:", (ollamaErr as Error).message);
+        degraded = true;
+        done = true;
+      } else {
+        console.warn("[assistant] ollama fallito, scalo a chain cloud:", (ollamaErr as Error).message);
+        finalText = "";
+      }
     }
   }
 
-  // 3) Nessun provider disponibile (né cloud né Ollama).
-  if (!done && !isOllamaConfigured) {
+  // 2) Cloud fallback (chain "router": Groq → Gemini Flash → OpenAI).
+  //    Attivato solo se Ollama è irraggiungibile o ha lanciato un errore.
+  //    Free tier protetto da RPM (m.scheduler/Bottleneck) + RPD (DAILY_CAPS).
+  //    CRITICO: lo stream DEVE passare dallo scheduler del provider, altrimenti
+  //    i limiti per-minuto verrebbero bypassati.
+  //    skipOllama: true — Ollama è già stato tentato nel passo 1.
+  if (!done) {
+    try {
+      const { model } = await runWithFallback(
+        { role: "router", skipOllama: true },
+        async (m: ResolvedModel) => {
+          await m.scheduler(() => streamWith(m.model, false));
+        },
+      );
+      provider = model.providerName;
+      modelId = model.modelId;
+      done = true;
+    } catch (cloudErr) {
+      if (emittedAny) {
+        // Stream già parzialmente inviato: NON ripartire.
+        console.warn("[assistant] cloud fallito a metà stream, mantengo il parziale:", (cloudErr as Error).message);
+        degraded = true;
+        done = true;
+      } else {
+        degraded = true;
+        finalText = `⚠️ Assistente non disponibile al momento (${(cloudErr as Error).message.slice(0, 100)}). Riprova tra qualche istante.`;
+        opts.onTextDelta?.(finalText);
+      }
+    }
+  }
+
+  // 3) Nessun provider disponibile (né Ollama né cloud).
+  if (!done && !degraded) {
     degraded = true;
-    finalText = finalText
-      || "⚠️ Assistente non disponibile al momento (nessun provider AI configurato). Riprova tra qualche istante.";
+    finalText = "⚠️ Assistente non disponibile al momento (nessun provider AI configurato). Riprova tra qualche istante.";
     opts.onTextDelta?.(finalText);
   }
 
