@@ -48,11 +48,12 @@ import renderer from "react-test-renderer";
 
 // ── vi.hoisted: stato condiviso accessibile nelle factory vi.mock ─────────────
 
-const svStore = vi.hoisted(() => ({
-  slots: [] as Array<{ value: number }>,
-  idx: 0,
-  reset() { this.idx = 0; },
-  clear() { this.slots = []; this.idx = 0; },
+// avStore traccia le istanze Animated.Value create durante il mount.
+// Le prime due (indice 0 e 1) sono posXAnim e posYAnim — quelle memorizzate
+// in useRef e su cui viene chiamato setValue() durante drag/tap.
+const avStore = vi.hoisted(() => ({
+  instances: [] as Array<{ _v: number }>,
+  reset() { this.instances = []; },
 }));
 
 const panCapture = vi.hoisted(() => ({
@@ -69,37 +70,40 @@ const mockEnv = vi.hoisted(() => ({
 }));
 
 // ── Mock: react-native ────────────────────────────────────────────────────────
-vi.mock("react-native", () => ({
-  StyleSheet: { create: (s: unknown) => s },
-  View: "View",
-  Text: "Text",
-  Pressable: "Pressable",
-  Modal: "Modal",
-  PanResponder: {
-    create: (cfg: Record<string, (...a: unknown[]) => unknown>) => {
-      panCapture.config = cfg;
-      return { panHandlers: {} };
+// Animated.Value traccia le istanze in avStore; le prime due (slot 0 e 1) sono
+// posXAnim e posYAnim — i ref che React conserva tra i render.
+vi.mock("react-native", () => {
+  class AnimatedValue {
+    _v: number;
+    constructor(v: number) {
+      this._v = v;
+      avStore.instances.push(this as unknown as { _v: number });
+    }
+    get value() { return this._v; }
+    setValue(v: number) { this._v = v; }
+    addListener() { return 0; }
+    removeListener(_id: number) {}
+  }
+  return {
+    StyleSheet: { create: (s: unknown) => s },
+    View: "View",
+    Text: "Text",
+    Pressable: "Pressable",
+    Modal: "Modal",
+    PanResponder: {
+      create: (cfg: Record<string, (...a: unknown[]) => unknown>) => {
+        panCapture.config = cfg;
+        return { panHandlers: {} };
+      },
     },
-  },
-  useWindowDimensions: () => ({ ...mockEnv.screen }),
-  Platform: { get OS() { return mockEnv.platformOS; } },
-}));
-
-// ── Mock: react-native-reanimated ─────────────────────────────────────────────
-// useSharedValue restituisce sempre lo stesso slot per lo stesso indice di
-// chiamata (simula Reanimated tra render diversi).
-// useAnimatedStyle chiama la factory subito → lo style riflette i valori
-// correnti dei shared value → le asserzioni su transform sono sempre accurate.
-vi.mock("react-native-reanimated", () => ({
-  default: { View: "AnimatedView" },
-  useSharedValue: (initialValue: number) => {
-    const i = svStore.idx++;
-    if (!svStore.slots[i]) svStore.slots[i] = { value: initialValue };
-    return svStore.slots[i];
-  },
-  useAnimatedStyle: (fn: () => object) => fn(),
-  runOnJS: (f: unknown) => f,
-}));
+    useWindowDimensions: () => ({ ...mockEnv.screen }),
+    Platform: { get OS() { return mockEnv.platformOS; } },
+    Animated: {
+      View: "AnimatedView",
+      Value: AnimatedValue,
+    },
+  };
+});
 
 // ── Mock: react-native-gesture-handler ────────────────────────────────────────
 vi.mock("react-native-gesture-handler", () => ({
@@ -157,13 +161,15 @@ const TOP_INSET = 47;
 const BOT_INSET = 34;
 const WIDGET_SIZE = 40;
 
-// Helper: accede ai shared value 0 (posX) e 1 (posY).
-function posX() { return svStore.slots[0]; }
-function posY() { return svStore.slots[1]; }
+// Helper: accede alle istanze Animated.Value 0 (posX) e 1 (posY).
+// useRef(new Animated.Value(x)) chiama il costruttore ad ogni render ma React
+// conserva solo la prima istanza — quella salvata in avStore.instances[0/1].
+function posX(): { value: number } { return avStore.instances[0] as unknown as { value: number }; }
+function posY(): { value: number } { return avStore.instances[1] as unknown as { value: number }; }
 
 // Helper: monta FloatingWidget con stato pulito.
 function mountFloating() {
-  svStore.clear(); panCapture.config = null;
+  avStore.reset(); panCapture.config = null;
   mockEnv.screen = { width: SCREEN_W, height: SCREEN_H };
   mockEnv.insets = { top: TOP_INSET, bottom: BOT_INSET, left: 0, right: 0 };
   mockEnv.platformOS = "android";
@@ -171,7 +177,6 @@ function mountFloating() {
   mockEnv.enabled = true;
   mockEnv.suppressed = false;
   let comp!: ReturnType<typeof renderer.create>;
-  svStore.reset();
   renderer.act(() => { comp = renderer.create(React.createElement(FloatingWidget)); });
   return comp;
 }

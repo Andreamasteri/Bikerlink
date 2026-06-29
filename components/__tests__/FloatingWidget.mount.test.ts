@@ -78,28 +78,32 @@ vi.mock("react", async (importOriginal) => {
 });
 
 // ── Mock: react-native ────────────────────────────────────────────────────────
-vi.mock("react-native", () => ({
-  StyleSheet: { create: (s: unknown) => s },
-  View: "View",
-  Text: "Text",
-  Pressable: "Pressable",
-  useWindowDimensions: () => ({ width: mocks.screenW, height: mocks.screenH }),
-  Modal: "Modal",
-  Platform: { get OS() { return mocks.platformOS; } },
-  PanResponder: {
-    create: () => ({ panHandlers: {} }),
-  },
-}));
-
-// ── Mock: react-native-reanimated ─────────────────────────────────────────────
-// Animated.View è il container esterno del pallino; useAnimatedStyle restituisce
-// uno style con il transform translateX/translateY così i test (f1) lo vedono.
-vi.mock("react-native-reanimated", () => ({
-  default: { View: "AnimatedView" },
-  useSharedValue: (v: unknown) => ({ value: v }),
-  useAnimatedStyle: () => ({ transform: [{ translateX: 0 }, { translateY: 0 }] }),
-  runOnJS: (fn: unknown) => fn,
-}));
+// Animated.View = "AnimatedView" così i test (f1/e1/e2) trovano il container
+// come AnimatedView nel tree. Animated.Value è la classe minima necessaria a
+// far girare `new Animated.Value(x)` senza il native driver.
+vi.mock("react-native", () => {
+  class AnimatedValue {
+    _v: number;
+    constructor(v: number) { this._v = v; }
+    setValue(v: number) { this._v = v; }
+    addListener() { return 0; }
+    removeListener(_id: number) {}
+  }
+  return {
+    StyleSheet: { create: (s: unknown) => s },
+    View: "View",
+    Text: "Text",
+    Pressable: "Pressable",
+    useWindowDimensions: () => ({ width: mocks.screenW, height: mocks.screenH }),
+    Modal: "Modal",
+    Platform: { get OS() { return mocks.platformOS; } },
+    PanResponder: { create: () => ({ panHandlers: {} }) },
+    Animated: {
+      View: "AnimatedView",
+      Value: AnimatedValue,
+    },
+  };
+});
 
 // ── Mock: react-native-gesture-handler ────────────────────────────────────────
 // GestureDetector è un passthrough che rende i suoi figli; Gesture.Pan() è una
