@@ -3,6 +3,7 @@
  * Importati da thinkcentre-health.ts per mantenere il file sotto 600 righe.
  */
 
+import { cfAccessHeaders } from "../../lib/cf-access";
 import { PROBE_TIMEOUT_MS, readBodySafe, sanitizeError, maskUrl, recordError, getHistory, recordProbeLog, getProbeLog, type ProbeLogEntry } from "./thinkcentre-health-utils";
 
 export type { ProbeLogEntry };
@@ -153,7 +154,7 @@ export async function probeValhallaProfiles(
   base: string,
   apiKey: string | undefined,
 ): Promise<string[]> {
-  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  const headers: Record<string, string> = { "Content-Type": "application/json", ...cfAccessHeaders() };
   if (apiKey) headers["X-Valhalla-Key"] = apiKey;
 
   const results = await Promise.all(
@@ -200,7 +201,7 @@ export async function probeValhallaDetailed(): Promise<ValhallaDetailedHealth> {
     return { configured: false, ok: false, latencyMs: null, url: null, activeProfiles: [], history: getHistory("valhalla"), probeLog: getProbeLog("valhalla") };
   }
   const tokenMissing = !apiKey || apiKey.trim() === "";
-  const headers: Record<string, string> = {};
+  const headers: Record<string, string> = { ...cfAccessHeaders() };
   if (apiKey) headers["X-Valhalla-Key"] = apiKey;
 
   const controller = new AbortController();
@@ -282,6 +283,8 @@ export async function probeNominatimDetailed(): Promise<NominatimDetailedHealth>
   const probeUrl = `${probeBase}/status?format=json`;
 
   const headers: Record<string, string> = { "User-Agent": "BikerLink/4.0 (info@bikerlink.it)" };
+  // CF Access headers solo verso il Nominatim self-hosted (mai al fallback pubblico openstreetmap.org).
+  if (base) Object.assign(headers, cfAccessHeaders());
   if (base && token) headers["X-Nominatim-Token"] = token;
 
   const controller = new AbortController();

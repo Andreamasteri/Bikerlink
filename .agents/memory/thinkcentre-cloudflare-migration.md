@@ -100,20 +100,22 @@ Il nostro dominio è `biker-link.net` (registrato su Cloudflare).
 
 ---
 
-## Cloudflare Access (service token) — auth layer davanti ai servizi TC
+## Cloudflare Access (service token) — auth layer davanti ai servizi TC — ATTIVO
 
-Layer di auth opzionale DAVANTI ai servizi self-hosted (gh/valhalla/nominatim/whisper), in aggiunta ai token custom esistenti (`X-GH-Token`, `X-Valhalla-Key`, `X-Nominatim-Token`, `X-Whisper-Token`) che restano come fallback.
+Layer di auth ATTIVO DAVANTI ai servizi self-hosted (gh/valhalla/nominatim/whisper), in aggiunta ai token custom esistenti (`X-GH-Token`, `X-Valhalla-Key`, `X-Nominatim-Token`, `X-Whisper-Token`) che restano come fallback. Senza i CF headers ogni hostname risponde **403** (pagina "Cloudflare Access"); col service token la richiesta passa l'edge e raggiunge l'origin.
 
-### Lato codice (già wired)
-- Helper `server/lib/cf-access.ts`: `cfAccessHeaders()` ritorna `{"CF-Access-Client-Id","CF-Access-Client-Secret"}` SOLO se entrambe le env `CF_ACCESS_CLIENT_ID` + `CF_ACCESS_CLIENT_SECRET` sono presenti, altrimenti `{}` (degrada senza rompere nulla). `isCfAccessConfigured()` per check.
-- `...cfAccessHeaders()` applicato SOLO ai target self-hosted, MAI a Nominatim/Photon pubblici, API cloud o tile. Header CF vanno all'edge CF, innocui per l'origin → safe da inviare anche prima che la policy Access sia attiva.
-- Gotcha: la valhalla engine target in `maps-health-checks.ts` non aveva `X-Valhalla-Key` → aggiunto in lockstep con i CF headers.
-- **Ollama escluso deliberatamente** (gh.* TC + PC fisso): non in scope; coprire come follow-up se si vuole Access anche lì.
+### Stato Cloudflare (creato — ATTIVO)
+- Account Zero Trust `d116d3d97b133c543d02934be4bc98d2`.
+- 4 app **Access self-hosted**: `gh|valhalla|whisper|nominatim.biker-link.net`.
+- **Service token** `bikerlink-tc-access` (id `d976f94d-ab33-46c1-9a48-f8340483dbb1`) + policy reusable non_identity (id `260f8223-b86a-41cf-9490-bc186842497d`) che allow-a il token.
+- Client ID/Secret in Replit secrets `CF_ACCESS_CLIENT_ID` / `CF_ACCESS_CLIENT_SECRET`.
+- **Gotcha CF_API_TOKEN**: per creare/gestire app+policy+service token serve un token con permessi Account → "Access: Apps and Policies" Edit + "Access: Service Tokens" Edit; senza Zero Trust scope l'API torna errore di permessi.
 
-### Lato Cloudflare (da fare a mano — richiede CF API token / dashboard, non presenti in env)
-- Creare un'app **Access** per ogni hostname `gh|valhalla|whisper|nominatim.biker-link.net` (Zero Trust → Access → Applications, self-hosted).
-- Creare un **service token** (Access → Service Auth) e metterne Client ID/Secret nelle env Replit `CF_ACCESS_CLIENT_ID` / `CF_ACCESS_CLIENT_SECRET` (secret).
-- Policy: allow con "Service Token" = il token creato. Finché le env non sono settate, il codice continua a funzionare coi soli token custom.
+### Lato codice (wired)
+- Helper `server/lib/cf-access.ts`: `cfAccessHeaders()` ritorna `{"CF-Access-Client-Id","CF-Access-Client-Secret"}` SOLO se entrambe le env sono presenti, altrimenti `{}` (degrada). `isCfAccessConfigured()` per check.
+- `...cfAccessHeaders()` SOLO ai target self-hosted, MAI a Nominatim/Photon pubblici, API cloud o tile. Header CF vanno all'edge CF, innocui per l'origin.
+- **Gotcha probe admin**: l'attivazione di Access ha rotto i probe health di `server/routes/admin/thinkcentre-health-vn-probes.ts` (valhalla+nominatim) con 403 — erano stati DIMENTICATI nel wiring iniziale. Risolto aggiungendo `cfAccessHeaders()` (nominatim solo quando self-hosted, mai sul fallback openstreetmap.org). `gh-probes.ts` era già corretto; `infra-probes.ts` non serve (host `tc.biker-link.net`/TCP non sotto Access).
+- **Ollama escluso deliberatamente** (TC + PC fisso): non in scope; coprire come follow-up se si vuole Access anche lì.
 
 ## Why
 Cloudflare Tunnel elimina port forwarding sul router, DuckDNS, Let's Encrypt, e nginx per l'esposizione esterna. Zero ingress firewall rules. TLS gestito da Cloudflare Edge. Costo: solo il dominio biker-link.net (~$9-11/anno). CF Access aggiunge un secondo fattore di auth all'edge senza esporre i servizi a chiunque conosca i token custom.
