@@ -216,7 +216,7 @@ export function buildLeafletPostRideHtml(
   accentColor: string,
   points: Array<{ lat: number; lng: number }>
 ): string {
-  const _pointsJson = JSON.stringify(points);
+  const pointsJson = JSON.stringify(decimateTrack(points));
 
   return `<!DOCTYPE html>
 <html>
@@ -224,19 +224,19 @@ export function buildLeafletPostRideHtml(
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
 <style>${LEAFLET_CSS}</style>
-<style>\${MAP_STYLES}</style>
+<style>${MAP_STYLES}</style>
 </head>
 <body>
 <div id="map"></div>
 <script>${LEAFLET_JS}</script>
 <script>
 (function() {
-  \${MARKER_SCRIPTS}
-  var accentColor = \${JSON.stringify(accentColor)};
-  var points = \${pointsJson};
+  ${MARKER_SCRIPTS}
+  var accentColor = ${JSON.stringify(accentColor)};
+  var points = ${pointsJson};
 
   var map = L.map("map", { zoomControl: false, attributionControl: true });
-  L.tileLayer(\${JSON.stringify(tileUrl)}, { maxZoom: \${tileMaxZoom}, attribution: "" }).addTo(map);
+  L.tileLayer(${JSON.stringify(tileUrl)}, { maxZoom: ${tileMaxZoom}, attribution: "" }).addTo(map);
 
   if (points.length > 1) {
     var latlngs = points.map(function(p) { return [p.lat, p.lng]; });
@@ -283,16 +283,16 @@ export function buildLeafletCurvatureGradientHtml(
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
 <style>${LEAFLET_CSS}</style>
-<style>\${MAP_STYLES}</style>
+<style>${MAP_STYLES}</style>
 </head>
 <body>
 <div id="map"></div>
-\${CURVATURE_LEGEND_HTML}
+${CURVATURE_LEGEND_HTML}
 <script>${LEAFLET_JS}</script>
 <script>
 (function() {
-  \${COMMON_SCRIPTS}
-  \${MARKER_SCRIPTS}
+  ${COMMON_SCRIPTS}
+  ${MARKER_SCRIPTS}
   var points = ${pointsJson};
   var offlineBasePath = ${offlinePathJs};
   var map = L.map("map", { zoomControl: false, attributionControl: true });
@@ -306,7 +306,7 @@ export function buildLeafletCurvatureGradientHtml(
         var img = document.createElement("img");
         img.setAttribute("role", "presentation");
         var offlineUrl = this.getTileUrl(coords);
-        var onlineUrl = \${JSON.stringify(tileUrl)}
+        var onlineUrl = ${JSON.stringify(tileUrl)}
           .replace("{z}", coords.z)
           .replace("{x}", coords.x)
           .replace("{y}", coords.y);
@@ -319,9 +319,9 @@ export function buildLeafletCurvatureGradientHtml(
         return img;
       }
     });
-    new OfflineTileLayer("", { maxZoom: \${tileMaxZoom}, attribution: "" }).addTo(map);
+    new OfflineTileLayer("", { maxZoom: ${tileMaxZoom}, attribution: "" }).addTo(map);
   } else {
-    L.tileLayer(\${JSON.stringify(tileUrl)}, { maxZoom: \${tileMaxZoom}, attribution: "" }).addTo(map);
+    L.tileLayer(${JSON.stringify(tileUrl)}, { maxZoom: ${tileMaxZoom}, attribution: "" }).addTo(map);
   }
 
   var legendEl = document.getElementById("curvature-legend");

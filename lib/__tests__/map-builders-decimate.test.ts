@@ -11,7 +11,11 @@ vi.mock("@/lib/maps/tile-cache", () => ({
   tileCacheSet: vi.fn(),
 }));
 
-import { buildLeafletRouteMapHtml } from "../leaflet/map-builder";
+import {
+  buildLeafletRouteMapHtml,
+  buildLeafletCurvatureGradientHtml,
+  buildLeafletPostRideHtml,
+} from "../leaflet/map-builder";
 import { buildMapLibreRouteHtml } from "../maplibre/secondary-builders";
 
 const N = 50_000;
@@ -223,5 +227,103 @@ describe("buildMapLibreRouteHtml — decimation integration", () => {
     const html = buildMapLibreRouteHtml("{}", waypoints, undefined);
     const pts = extractJsonArray(html, "track");
     expect(pts.length).toBe(0);
+  });
+});
+
+describe("buildLeafletCurvatureGradientHtml — decimation integration", () => {
+  const TILE = "https://tile.openstreetmap.org/{z}/{x}/{y}.png";
+  let track: ReturnType<typeof makeLargeTrack>;
+
+  beforeAll(() => {
+    track = makeLargeTrack(N);
+  });
+
+  it("embeds at most 1500 coordinate pairs for a 50 000-point track", () => {
+    const html = buildLeafletCurvatureGradientHtml(TILE, 19, track);
+    const pts = extractJsonArray(html, "points");
+    expect(pts.length).toBeLessThanOrEqual(1500);
+  });
+
+  it("embeds at least 2 points (non-trivial output) for a 50 000-point track", () => {
+    const html = buildLeafletCurvatureGradientHtml(TILE, 19, track);
+    const pts = extractJsonArray(html, "points");
+    expect(pts.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("preserves the first track point", () => {
+    const html = buildLeafletCurvatureGradientHtml(TILE, 19, track);
+    const pts = extractJsonArray(html, "points") as Array<{
+      lat: number;
+      lng: number;
+    }>;
+    expect(pts[0].lat).toBeCloseTo(track[0].lat, 8);
+    expect(pts[0].lng).toBeCloseTo(track[0].lng, 8);
+  });
+
+  it("preserves the last track point", () => {
+    const html = buildLeafletCurvatureGradientHtml(TILE, 19, track);
+    const pts = extractJsonArray(html, "points") as Array<{
+      lat: number;
+      lng: number;
+    }>;
+    const last = pts[pts.length - 1];
+    expect(last.lat).toBeCloseTo(track[track.length - 1].lat, 8);
+    expect(last.lng).toBeCloseTo(track[track.length - 1].lng, 8);
+  });
+
+  it("passes through a short track unchanged (no decimation)", () => {
+    const shortTrack = makeLargeTrack(100);
+    const html = buildLeafletCurvatureGradientHtml(TILE, 19, shortTrack);
+    const pts = extractJsonArray(html, "points");
+    expect(pts.length).toBe(100);
+  });
+});
+
+describe("buildLeafletPostRideHtml — decimation integration", () => {
+  const TILE = "https://tile.openstreetmap.org/{z}/{x}/{y}.png";
+  let track: ReturnType<typeof makeLargeTrack>;
+
+  beforeAll(() => {
+    track = makeLargeTrack(N);
+  });
+
+  it("embeds at most 1500 coordinate pairs for a 50 000-point track", () => {
+    const html = buildLeafletPostRideHtml(TILE, 19, "#FF6600", track);
+    const pts = extractJsonArray(html, "points");
+    expect(pts.length).toBeLessThanOrEqual(1500);
+  });
+
+  it("embeds at least 2 points (non-trivial output) for a 50 000-point track", () => {
+    const html = buildLeafletPostRideHtml(TILE, 19, "#FF6600", track);
+    const pts = extractJsonArray(html, "points");
+    expect(pts.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("preserves the first track point", () => {
+    const html = buildLeafletPostRideHtml(TILE, 19, "#FF6600", track);
+    const pts = extractJsonArray(html, "points") as Array<{
+      lat: number;
+      lng: number;
+    }>;
+    expect(pts[0].lat).toBeCloseTo(track[0].lat, 8);
+    expect(pts[0].lng).toBeCloseTo(track[0].lng, 8);
+  });
+
+  it("preserves the last track point", () => {
+    const html = buildLeafletPostRideHtml(TILE, 19, "#FF6600", track);
+    const pts = extractJsonArray(html, "points") as Array<{
+      lat: number;
+      lng: number;
+    }>;
+    const last = pts[pts.length - 1];
+    expect(last.lat).toBeCloseTo(track[track.length - 1].lat, 8);
+    expect(last.lng).toBeCloseTo(track[track.length - 1].lng, 8);
+  });
+
+  it("passes through a short track unchanged (no decimation)", () => {
+    const shortTrack = makeLargeTrack(100);
+    const html = buildLeafletPostRideHtml(TILE, 19, "#FF6600", shortTrack);
+    const pts = extractJsonArray(html, "points");
+    expect(pts.length).toBe(100);
   });
 });
