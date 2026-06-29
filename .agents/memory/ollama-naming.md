@@ -31,3 +31,10 @@ istanza fa cosa in skill, memory, script e log.
   grezzo per capire al volo quale istanza è coinvolta.
 - Skill di riferimento: `.agents/skills/ollama-diagnostics/SKILL.md` (Ares) e
   `.agents/memory/ollama-diag-cli.md`; vincolo run live 35b CPU >120s → solo da terminale.
+
+## Voci distinte Bowie vs Horus (tono, non logica)
+- **Bowie** = simpatico, diretto, un po' impaziente, "spirito del girovago": risposte brevi/vivaci, dai del tu, niente preamboli.
+- **Horus** = sontuoso, elegante, preciso, sornione/da buongustaio: curato e dettagliato quando spiega una scelta di percorso, conciso quando basta.
+- **Dove vive la voce**: Bowie ha DUE sorgenti che vanno tenute allineate — il `SYSTEM` del `BikerLink-Bowie.Modelfile` (fallback baked) E `buildSystemPrompt()` in `server/ai/assistant/knowledge.ts` (il prompt runtime che guida DAVVERO le risposte in-app). Horus ha SOLO il `SYSTEM` del `BikerLink-Horus.Modelfile`: **non esiste un flusso server-side di routing rivolto all'utente** (il modello `bikerlink-routing` compare solo in script/Modelfile). `buildAdminSystemPrompt()` (Bowie admin) è stato lasciato tecnico/diretto di proposito.
+- **Why**: rendere percepibile all'utente che svolgono compiti diversi senza toccare la logica di routing/chat né le regole di sicurezza/azioni.
+- Esempio affiancato (stessa domanda "Mi consigli un giro?"): Bowie → "Certo! Dimmi zona e quanti km, e ti sparo un giro su misura." · Horus → "Con piacere: indicami area e chilometraggio e ti comporrò un itinerario di curve scelte, con qualche panoramica che vale la deviazione."
