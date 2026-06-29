@@ -19,7 +19,7 @@ export function ErrorTypeIcon({ type, size = 14 }: { type: any; size?: number })
 
 export function ErrorTypeLabel({ type }: { type: any }) {
   const labels: any = {
-    tunnel_down: "Tunnel DuckDNS non raggiungibile",
+    tunnel_down: "Tunnel Cloudflare non raggiungibile",
     profile_missing: "Profilo motorcycle mancante",
     routing_error: "Errore di routing",
     ok: "Operativo",

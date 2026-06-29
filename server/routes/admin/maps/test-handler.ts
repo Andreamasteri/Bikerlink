@@ -77,8 +77,8 @@ router.get("/routing-health", async (_req: Request, res: Response) => {
   } else if (ghDown) {
     if (errorType === "tunnel_down") {
       message = snap.cloudFallbackAvailable
-        ? "Tunnel DuckDNS non raggiungibile — routing servito dalla Cloud API (profilo car)."
-        : "Tunnel DuckDNS non raggiungibile — nessun fallback Cloud configurato (GRAPHHOPPER_API_KEY).";
+        ? "Tunnel Cloudflare non raggiungibile — routing servito dalla Cloud API (profilo car)."
+        : "Tunnel Cloudflare non raggiungibile — nessun fallback Cloud configurato (GRAPHHOPPER_API_KEY).";
     } else if (errorType === "profile_missing") {
       message = "Profilo motorcycle non disponibile sul server GH.";
     } else {

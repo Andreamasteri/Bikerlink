@@ -117,5 +117,12 @@ Layer di auth ATTIVO DAVANTI ai servizi self-hosted (gh/valhalla/nominatim/whisp
 - **Gotcha probe admin**: l'attivazione di Access ha rotto i probe health di `server/routes/admin/thinkcentre-health-vn-probes.ts` (valhalla+nominatim) con 403 — erano stati DIMENTICATI nel wiring iniziale. Risolto aggiungendo `cfAccessHeaders()` (nominatim solo quando self-hosted, mai sul fallback openstreetmap.org). `gh-probes.ts` era già corretto; `infra-probes.ts` non serve (host `tc.biker-link.net`/TCP non sotto Access).
 - **Ollama escluso deliberatamente** (TC + PC fisso): non in scope; coprire come follow-up se si vuole Access anche lì.
 
+## Monitor "Ares" (PC fisso Ollama) — admin ThinkCentre card
+- Ares è una macchina SEPARATA dal TC (PC Windows, `DIAG_OLLAMA_URL`=`ollama.biker-link.net`). Ha il suo blocco dedicato nella ThinkCentreCard (`components/admin/ThinkCentreAresBlock.tsx`), probe backend `server/routes/admin/thinkcentre-health-ares-probe.ts`, esposto come `aresDetail` nella risposta `/api/admin/thinkcentre-health`.
+- **Decisione**: Ares NON contribuisce a onlineCount/configuredCount/overall né a onStatuses del TC (host esterno → niente coupling con la SLA del ThinkCentre). **Why**: evitare scope creep/falsi degradati quando una macchina diversa è giù.
+- Metriche RAM/CPU/GPU sono OPZIONALI via `ARES_METRICS_URL` (endpoint JSON sul PC che restituisce `{cpu,ram,gpu,gpuName?}` in %). Se assente → UI mostra solo online/offline e segnala l'endpoint come PREREQUISITO. **Regola**: questo monitor NON installa servizi sul PC fisso; l'endpoint metriche va predisposto manualmente.
+- Storico chart = ring buffer **in-memory** (60 campioni, volatile, si azzera al restart) — niente persistenza DB per le metriche ad alta frequenza.
+- **Gotcha CF headers**: gli header CF Access si allegano SOLO verso host `*.biker-link.net` (helper `trustedCfHeaders(url)` nel probe), per non disclosare il service token se `ARES_METRICS_URL`/`DIAG_OLLAMA_URL` puntasse per errore a un origin esterno. `DIAG_OLLAMA_TOKEN` aggiunto a `sanitizeError`.
+
 ## Why
 Cloudflare Tunnel elimina port forwarding sul router, DuckDNS, Let's Encrypt, e nginx per l'esposizione esterna. Zero ingress firewall rules. TLS gestito da Cloudflare Edge. Costo: solo il dominio biker-link.net (~$9-11/anno). CF Access aggiunge un secondo fattore di auth all'edge senza esporre i servizi a chiunque conosca i token custom.

@@ -51,10 +51,10 @@ function ProfilesSection({
 }) {
   if (!profilesReachable) {
     const label = profilesErrorReason === "timeout"
-      ? "Timeout — il tunnel DuckDNS non risponde"
+      ? "Timeout — il tunnel Cloudflare non risponde"
       : profilesErrorReason === "not_self_hosted"
       ? null
-      : "Tunnel DuckDNS non raggiungibile — impossibile leggere i profili";
+      : "Tunnel Cloudflare non raggiungibile — impossibile leggere i profili";
 
     if (!label) return null;
 

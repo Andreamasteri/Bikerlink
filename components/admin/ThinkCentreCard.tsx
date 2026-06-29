@@ -19,6 +19,8 @@ import {
   NginxBlock,
   UptimeKumaBlock,
 } from "./ThinkCentreInfraBlocks";
+import { AresBlock } from "./ThinkCentreAresBlock";
+import type { AresDetailedHealth } from "./ThinkCentreAresBlock";
 import type { SystemStatuses } from "./SystemHealthContainer";
 import { useThinkCentreToggles } from "./ThinkCentreCardToggles";
 import {
@@ -68,6 +70,7 @@ interface ThinkCentreHealth {
   valhallaDetail?: ValhallaDetailedHealth;
   nominatimDetail?: NominatimDetailedHealth;
   ufwDetail?: UfwDetailedHealth;
+  aresDetail?: AresDetailedHealth | null;
   tokenFingerprints?: {
     graphhopper: string | null;
     valhalla: string | null;
@@ -392,6 +395,13 @@ export function ThinkCentreCard({
             <WhisperBlock
               service={error ? undefined : data?.services.find((s) => s.key === "whisper")}
               fingerprint={error ? null : (fp?.whisper ?? null)}
+              isLoading={isLoading}
+              hasError={!!error}
+            />
+          )}
+          {!poweredOffActive && (
+            <AresBlock
+              detail={error ? null : (data?.aresDetail ?? null)}
               isLoading={isLoading}
               hasError={!!error}
             />

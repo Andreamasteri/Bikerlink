@@ -146,6 +146,7 @@ export function sanitizeError(msg: string): string {
     process.env.GRAPHHOPPER_TOKEN,
     process.env.NOMINATIM_TOKEN,
     process.env.VALHALLA_API_KEY,
+    process.env.DIAG_OLLAMA_TOKEN,
   ]) {
     if (tok) out = out.split(tok).join("***");
   }

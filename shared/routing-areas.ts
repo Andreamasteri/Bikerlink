@@ -255,8 +255,8 @@ export function findRoutingAreasForPoint(
 
 /**
  * Costruisce l'URL pubblico dell'istanza GraphHopper di un gruppo a partire
- * dalla base (es. `https://gh.bikerlink.duckdns.org`).
- * Esempio risultato: `https://gh.bikerlink.duckdns.org/areas/grecia`.
+ * dalla base (es. `https://gh.biker-link.net`).
+ * Esempio risultato: `https://gh.biker-link.net/areas/grecia`.
  */
 export function routingAreaUrl(area: RoutingArea, baseUrl: string): string {
   return `${baseUrl.replace(/\/+$/, "")}${area.path}`;

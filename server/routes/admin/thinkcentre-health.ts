@@ -44,6 +44,7 @@ import {
   type GraphHopperHealth,
   type ErrorEvent,
 } from "./thinkcentre-health-gh-probes";
+import { probeAres, type AresHealth } from "./thinkcentre-health-ares-probe";
 import { updateSystemStatus, type DotStatus as CachedDotStatus } from "../../lib/system-status-cache";
 import { sendError } from "../../lib/api-response";
 
@@ -58,6 +59,7 @@ export type {
   ValhallaDetailedHealth,
   NominatimDetailedHealth,
   UfwDetailedHealth,
+  AresHealth,
 };
 
 export { probeThinkCentreStatusSnapshot };
@@ -222,6 +224,7 @@ router.get("/thinkcentre-health", async (_req: Request, res: ExpressResponse) =>
         nominatimDetail: null,
         ufwDetail: null,
         tokenFingerprints: { graphhopper: null, valhalla: null, ollama: null, whisper: null, nominatim: null },
+        aresDetail: null,
         maintenanceMode: false,
         poweredOff: true,
         checkedAt: Date.now(),
@@ -241,6 +244,7 @@ router.get("/thinkcentre-health", async (_req: Request, res: ExpressResponse) =>
       pgadminInfra,
       nginxInfra,
       uptimeKumaInfra,
+      aresDetail,
     ] = await Promise.all([
       isThinkCentreInMaintenance(),
       probeGraphHopperAreas(),
@@ -254,6 +258,7 @@ router.get("/thinkcentre-health", async (_req: Request, res: ExpressResponse) =>
       probePgAdmin(),
       probeNginxInfra(),
       probeUptimeKuma(),
+      probeAres(),
     ]);
 
     const valhallaService: ServiceHealth = {
@@ -395,6 +400,7 @@ router.get("/thinkcentre-health", async (_req: Request, res: ExpressResponse) =>
       nominatimDetail,
       ufwDetail,
       tokenFingerprints,
+      aresDetail,
       maintenanceMode: maintenance,
       checkedAt: Date.now(),
     });
