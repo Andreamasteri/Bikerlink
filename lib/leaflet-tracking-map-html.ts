@@ -38,6 +38,19 @@ html, body, #map { width: 100%; height: 100%; background: #1a1a1a; }
 
   L.tileLayer(${JSON.stringify(tileUrl)}, { maxZoom: ${tileMaxZoom}, attribution: "" }).addTo(map);
 
+  var MAX_TRACK_POINTS = 1500;
+
+  function decimatePoints(pts, maxPts) {
+    if (pts.length <= maxPts) return pts;
+    var result = [];
+    var stride = (pts.length - 1) / (maxPts - 1);
+    for (var i = 0; i < maxPts; i++) {
+      var idx = i === maxPts - 1 ? pts.length - 1 : Math.round(i * stride);
+      result.push(pts[idx]);
+    }
+    return result;
+  }
+
   var trackPoints = [];
   var trackPolyline = null;
   var currentMarker = null;
@@ -62,9 +75,9 @@ html, body, #map { width: 100%; height: 100%; background: #1a1a1a; }
         console.warn("[BikerLink] applyUpdate: skipping " + badPoints.length + " out-of-range point(s).", badPoints.slice(0, 3).map(function(p) { return p ? { lat: p.lat, lng: p.lng } : p; }));
         postMsg({ type: "trackingCoordError", source: "points", skipped: badPoints.length, samples: badPoints.slice(0, 3) });
       }
-      trackPoints = data.points.filter(function(p) {
+      trackPoints = decimatePoints(data.points.filter(function(p) {
         return p && isValidCoord(p.lat, p.lng);
-      });
+      }), MAX_TRACK_POINTS);
       if (trackPolyline) { map.removeLayer(trackPolyline); }
       if (trackPoints.length > 1) {
         trackPolyline = L.polyline(trackPoints.map(function(p) { return [p.lat, p.lng]; }), {

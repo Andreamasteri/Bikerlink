@@ -11,6 +11,7 @@ export default defineConfig({
       "components/__tests__/**/*.test.ts",
       "shared/__tests__/**/*.test.ts",
       "lib/__tests__/**/*.test.ts",
+      "lib/maps/__tests__/**/*.test.ts",
       "scripts/**/__tests__/**/*.test.ts",
     ],
     testTimeout: 15000,
