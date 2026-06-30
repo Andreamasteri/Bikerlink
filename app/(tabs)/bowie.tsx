@@ -1,20 +1,26 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useCallback } from "react";
 import { View } from "react-native";
-import { useRouter } from "expo-router";
+import { useRouter, useFocusEffect } from "expo-router";
 import AssistantChatSheet from "@/components/user/ai-assistant/AssistantChatSheet";
 
 export default function BowieScreen() {
   const router = useRouter();
   const [visible, setVisible] = useState(false);
 
-  useEffect(() => {
-    setVisible(true);
-  }, []);
+  // Task #5216 — useFocusEffect (non useEffect([])) così la chat torna visibile
+  // a OGNI focus del tab. Il tab navigator può tenere lo screen montato: se
+  // l'utente apre Bowie, chiude (visible=false) e ri-apre senza unmount, un
+  // semplice effect-on-mount non si rilancerebbe e la chat resterebbe nascosta.
+  useFocusEffect(
+    useCallback(() => {
+      setVisible(true);
+    }, []),
+  );
 
-  const handleClose = () => {
+  const handleClose = useCallback(() => {
     setVisible(false);
     router.back();
-  };
+  }, [router]);
 
   return (
     <View style={{ flex: 1 }}>
