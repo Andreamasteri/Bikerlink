@@ -181,6 +181,17 @@ export async function rebuildHnswIndex(
 ): Promise<RebuildHnswIndexResult> {
   const client = await pool.connect();
   try {
+    // CREATE/DROP INDEX CONCURRENTLY su embeddings può durare minuti. La
+    // connessione eredita lo statement_timeout di default del pool (5s, Task
+    // #5229): senza disattivarlo Postgres ucciderebbe il CONCURRENTLY a metà,
+    // lasciando un indice INVALID. Lo disabilitiamo (0 = nessun limite) solo su
+    // questa connessione admin-triggered e ripristiniamo il default nel finally
+    // prima del release, così la connessione torna pulita nel pool.
+    try {
+      await client.query("SET statement_timeout = 0");
+    } catch {
+      /* best-effort */
+    }
     const idxCheck = await client.query<{ exists: boolean; valid: boolean }>(
       `SELECT
          EXISTS (
@@ -235,6 +246,14 @@ export async function rebuildHnswIndex(
     const status = await getHnswIndexStatus();
     return { action, status };
   } finally {
+    // Ripristina lo statement_timeout di default del pool (5s) prima di
+    // restituire la connessione, così non torna nel pool con il timeout
+    // disabilitato (lascerebbe una query utente girare senza limite).
+    try {
+      await client.query("SET statement_timeout = 5000");
+    } catch {
+      /* best-effort */
+    }
     client.release();
   }
 }

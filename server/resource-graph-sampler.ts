@@ -41,6 +41,16 @@ async function takeSample(): Promise<void> {
 
         const client = await pool.connect();
         try {
+          // statement_timeout esplicito (Task #5229, step 4): questo job gira
+          // ogni 10s. Anche se eredita già il default del pool (5s), lo fissiamo
+          // a 4s in modo esplicito così una query lenta (es. pg_database_size su
+          // DB grande, o lentezza managed) non tiene la connessione appesa: la
+          // query è uccisa e il finally rilascia subito. Ripristino nel finally.
+          try {
+            await client.query("SET statement_timeout = '4000'");
+          } catch {
+            /* best-effort */
+          }
           const sizeRes = await client.query(
             "SELECT pg_database_size(current_database()) AS size_bytes"
           );
@@ -66,6 +76,12 @@ async function takeSample(): Promise<void> {
           avgIosRamPct = avgRow?.avg_ios_ram_pct ?? null;
           avgAndroidRamPct = avgRow?.avg_android_ram_pct ?? null;
         } finally {
+          // Ripristina il default del pool prima del release.
+          try {
+            await client.query("SET statement_timeout = '5000'");
+          } catch {
+            /* best-effort */
+          }
           client.release();
         }
 

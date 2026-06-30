@@ -10,9 +10,29 @@ if (!process.env.DATABASE_URL) {
   );
 }
 
+/**
+ * application_name marcato su OGNI connessione del pool principale. Senza questo,
+ * in pg_stat_activity le nostre connessioni hanno application_name vuoto e sono
+ * INDISTINGUIBILI da quelle del Postgres managed di Replit (pooler/manutenzione
+ * piattaforma). Questo rende il sintomo "pool saturo ma 0 query attive"
+ * non-attribuibile: non si può sapere se le connessioni idle anomale sono nostre.
+ * Marcandole, il detector in pool-collector filtra ESATTAMENTE le nostre.
+ */
+export const APP_NAME = "bikerlink-app";
+const MONITOR_APP_NAME = "bikerlink-monitor";
+
 export const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
+  application_name: APP_NAME,
   keepAlive: true,
+  // Rete di sicurezza lato SERVER contro il leak "idle in transaction": qualsiasi
+  // sessione che apre una transazione (BEGIN) e resta idle oltre 60s viene uccisa
+  // da Postgres, liberando il socket. Le query autocommit di drizzle non aprono
+  // transazioni → non sono toccate. findSimilar usa BEGIN/COMMIT: se un percorso
+  // d'errore lasciasse la txn appesa, Postgres la chiude invece di tenere la
+  // connessione bloccata per minuti (causa diretta di "pool saturo ma 0 query
+  // attive"). 60s > qualsiasi statement_timeout (5s pool / 12s bg) con margine.
+  idle_in_transaction_session_timeout: 60000,
   // 10s < timeout lato Replit managed DB (~20s) → connessioni rilasciate prima
   // che il server le droppi, evitando "Connection terminated unexpectedly".
   idleTimeoutMillis: 10000,
@@ -41,6 +61,83 @@ pool.on("error", (err) => {
   console.error("[DB] Pool connection error (ignorato per evitare crash):", err.message);
 });
 
+// ── Step 1 (Task #5229): tracer di checkout delle connessioni del pool ────────
+//
+// Strumentazione permanente e leggera per attribuire con CERTEZZA — non per
+// indovinare — quale chiamante trattiene una connessione senza rilasciarla.
+//
+// Ogni `await pool.connect()` (forma promise) registra un id incrementale +
+// timestamp + uno stack trace ridotto catturato AL MOMENTO dell'acquisizione;
+// `release()` lo cancella (con guardia contro il doppio-release). Il detector in
+// pool-collector legge getCheckedOutConnections(minAgeMs) per stampare lo stack
+// di origine delle connessioni tenute oltre soglia.
+//
+// COSTO: la cattura dello stack avviene SOLO sulla forma promise di connect(),
+// cioè i checkout ESPLICITI (raw `pool.connect()` + transazioni drizzle) — quelli
+// rischiosi. Le query autocommit di drizzle passano da `pool.query()` che
+// internamente usa la forma CALLBACK di connect(): quella la lasciamo passare
+// non tracciata (vita brevissima, release automatico) → overhead trascurabile.
+interface ConnCheckout {
+  id: number;
+  acquiredAt: number;
+  stack: string;
+}
+let _connSeq = 0;
+const _checkedOut = new Map<number, ConnCheckout>();
+
+const _origConnect = pool.connect.bind(pool);
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+(pool as any).connect = function patchedConnect(maybeCb?: unknown) {
+  // Forma callback (usata internamente da pool.query → query autocommit drizzle):
+  // pass-through non tracciato, è già auto-release e di vita brevissima.
+  if (typeof maybeCb === "function") {
+    return (_origConnect as (cb: unknown) => unknown)(maybeCb);
+  }
+  // Forma promise: checkout esplicito → traccia.
+  return (_origConnect() as Promise<import("pg").PoolClient>).then((client) => {
+    const id = ++_connSeq;
+    const stack = (new Error().stack ?? "")
+      .split("\n")
+      .slice(2, 8)
+      .map((l) => l.trim())
+      .join(" | ");
+    _checkedOut.set(id, { id, acquiredAt: Date.now(), stack });
+    const origRelease = client.release.bind(client);
+    let released = false;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (client as any).release = (err?: Error | boolean) => {
+      if (!released) {
+        released = true;
+        _checkedOut.delete(id);
+      }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return (origRelease as (e?: any) => unknown)(err);
+    };
+    return client;
+  });
+};
+
+export interface CheckedOutConnection {
+  id: number;
+  ageMs: number;
+  stack: string;
+}
+
+/**
+ * Connessioni del pool principale attualmente acquisite con `pool.connect()`
+ * (forma promise) e tenute da almeno `minAgeMs`. Ordinate dalla più vecchia.
+ * Una connessione qui da minuti = il chiamante nel suo `stack` non ha rilasciato.
+ */
+export function getCheckedOutConnections(minAgeMs = 0): CheckedOutConnection[] {
+  const now = Date.now();
+  const out: CheckedOutConnection[] = [];
+  for (const c of _checkedOut.values()) {
+    const ageMs = now - c.acquiredAt;
+    if (ageMs >= minAgeMs) out.push({ id: c.id, ageMs, stack: c.stack });
+  }
+  return out.sort((a, b) => b.ageMs - a.ageMs);
+}
+
 export const db = drizzle(pool, { schema });
 
 // ── Pool di monitoraggio riservato (Fix #3 pool-saturation diagnosis) ─────────
@@ -55,6 +152,7 @@ export const db = drizzle(pool, { schema });
 // rileva pool saturo.
 const monitoringPool = new Pool({
   connectionString: process.env.DATABASE_URL,
+  application_name: MONITOR_APP_NAME,
   max: 1,
   idleTimeoutMillis: 60_000,
   connectionTimeoutMillis: 4_000,
