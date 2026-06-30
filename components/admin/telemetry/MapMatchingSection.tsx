@@ -4,6 +4,13 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
 import { StatCard } from "./StatCard";
 
+interface JobAttempt {
+  ts: string;
+  ok: boolean;
+  retries: number;
+  error: string | null;
+}
+
 interface MapMatchingStats {
   pending: number;
   retry: number;
@@ -12,6 +19,7 @@ interface MapMatchingStats {
   exhausted?: number;
   segments: number;
   lastRun: string | null;
+  lastAttempt?: JobAttempt | null;
   isRunning: boolean;
   ghConfigured: boolean;
 }
@@ -98,9 +106,24 @@ export function MapMatchingSection({
             color={Colors.textSecondary}
           />
           <Text style={styles.mmMetaText}>
-            Ultima esecuzione: {formatLastRun(stats?.lastRun)}
+            Ultima esecuzione (successo): {formatLastRun(stats?.lastRun)}
           </Text>
         </View>
+        {stats?.lastAttempt && (
+          <View style={styles.mmMetaRow}>
+            <MaterialCommunityIcons
+              name={stats.lastAttempt.ok ? "check-circle-outline" : "alert-circle-outline"}
+              size={14}
+              color={stats.lastAttempt.ok ? "#22c55e" : "#ef4444"}
+            />
+            <Text style={[styles.mmMetaText, { color: stats.lastAttempt.ok ? Colors.textSecondary : "#ef4444" }]}>
+              Ultimo tentativo: {formatLastRun(stats.lastAttempt.ts)} —{" "}
+              {stats.lastAttempt.ok ? "ok" : "FALLITO"}
+              {stats.lastAttempt.retries > 0 ? ` (${stats.lastAttempt.retries} retry)` : ""}
+              {!stats.lastAttempt.ok && stats.lastAttempt.error ? `: ${stats.lastAttempt.error}` : ""}
+            </Text>
+          </View>
+        )}
         <View style={styles.mmMetaRow}>
           <MaterialCommunityIcons
             name={stats?.ghConfigured ? "check-circle-outline" : "alert-circle-outline"}

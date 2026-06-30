@@ -3,10 +3,11 @@ import { withBgDbSlot } from "./lib/bg-db-limiter";
 import { rideTelemetry } from "@shared/db";
 import { sql } from "drizzle-orm";
 import { storage } from "./storage";
+import { readJobAttempt, type JobAttempt } from "./lib/scheduler-retry";
 
 const LAST_RUN_KEY = "map_matching_last_run";
 
-import { getMaxAttempts, isRunningState } from "./map-matching-job";
+import { getMaxAttempts, isRunningState, MAP_MATCHING_LAST_ATTEMPT_KEY } from "./map-matching-job";
 
 export async function requeueUnmatchable(): Promise<{ requeuedSamples: number; requeuedSessions: number; skipped?: boolean; reason?: string }> {
   const { isThinkCentrePoweredOff } = await import("./lib/thinkcentre-powered-off");
@@ -68,11 +69,12 @@ export async function getMapMatchingStats(): Promise<{
   exhausted: number;
   segments: number;
   lastRun: string | null;
+  lastAttempt: JobAttempt | null;
   isRunning: boolean;
   ghConfigured: boolean;
 }> {
   const { isSelfHosted } = await import("./graphhopper-client");
-  const [countsResult, segResult, lastRunSetting] = await Promise.all([
+  const [countsResult, segResult, lastRunSetting, lastAttempt] = await Promise.all([
     db.execute<{ match_status: string; total: string }>(
       sql`
         SELECT
@@ -84,6 +86,7 @@ export async function getMapMatchingStats(): Promise<{
     ),
     db.execute<{ count: string }>(sql`SELECT COUNT(*)::text AS count FROM segment_telemetry`),
     storage.getAppSetting(LAST_RUN_KEY),
+    readJobAttempt(MAP_MATCHING_LAST_ATTEMPT_KEY),
   ]);
 
   let pending = 0;
@@ -107,7 +110,7 @@ export async function getMapMatchingStats(): Promise<{
   const lastRun = lastRunSetting?.value ?? null;
   const ghConfigured = isSelfHosted || Boolean(process.env.GRAPHHOPPER_API_KEY);
 
-  return { pending, retry, matched, unmatchable, exhausted, segments, lastRun, isRunning: isRunningState(), ghConfigured };
+  return { pending, retry, matched, unmatchable, exhausted, segments, lastRun, lastAttempt, isRunning: isRunningState(), ghConfigured };
 }
 
 export async function getMatchingBacklogEstimate(): Promise<{

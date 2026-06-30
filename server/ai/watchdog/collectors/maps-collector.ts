@@ -9,7 +9,8 @@ import { aggregateMapsTelemetry } from "../maps-telemetry-store";
 import { isMapsFlagEnabled } from "../maps-kill-switch";
 import { checkQuota as checkMapboxQuota } from "../../../routing/mapbox/quota-guard";
 import { checkQuota as checkTomTomQuota } from "../../../routing/tomtom/quota-guard";
-import { getMatchingBacklogEstimate } from "../../../map-matching-job";
+import { getMatchingBacklogEstimate, MAP_MATCHING_LAST_ATTEMPT_KEY } from "../../../map-matching-job";
+import { readJobAttempt } from "../../../lib/scheduler-retry";
 import { getRoutingCounters } from "../../../routing/routing-metrics";
 import { runMapsHealthChecks } from "../maps-health-checks";
 import { logger } from "../../../lib/logger";
@@ -240,6 +241,27 @@ export async function collectMaps(): Promise<Signal[]> {
     signals.push({
       source: "maps", metric: "collector.error", severity: "warn",
       details: { stage: "matching", error: (err as Error).message?.slice(0, 200) },
+    });
+  }
+
+  // ─── 4b. Esito dell'ULTIMO TENTATIVO del giro notturno di map-matching ───
+  // Distinto da last_run_h (che misura l'ultimo SUCCESSO): se l'ultimo giro è
+  // fallito (es. la discovery ha esaurito i retry) qui lo segnaliamo "high" così
+  // l'admin lo vede SUBITO, invece di accorgersene solo quando last_run invecchia.
+  try {
+    const attempt = await withBgDbSlot(() => readJobAttempt(MAP_MATCHING_LAST_ATTEMPT_KEY));
+    if (attempt) {
+      const ageH = Math.round((Date.now() - new Date(attempt.ts).getTime()) / 3_600_000);
+      signals.push({
+        source: "maps", metric: "matching.last_attempt", value: attempt.ok ? 1 : 0,
+        severity: attempt.ok ? "info" : "high",
+        details: { ts: attempt.ts, ok: attempt.ok, retries: attempt.retries, error: attempt.error, ageH },
+      });
+    }
+  } catch (err) {
+    signals.push({
+      source: "maps", metric: "collector.error", severity: "warn",
+      details: { stage: "matching_last_attempt", error: (err as Error).message?.slice(0, 200) },
     });
   }
 

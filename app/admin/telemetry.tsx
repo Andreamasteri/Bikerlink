@@ -35,6 +35,13 @@ interface TelemetryAdminStats {
   latestSample?: string | null;
 }
 
+interface JobAttempt {
+  ts: string;
+  ok: boolean;
+  retries: number;
+  error: string | null;
+}
+
 interface MapMatchingStats {
   pending: number;
   retry: number;
@@ -42,6 +49,7 @@ interface MapMatchingStats {
   unmatchable: number;
   segments: number;
   lastRun: string | null;
+  lastAttempt?: JobAttempt | null;
   isRunning: boolean;
   ghConfigured: boolean;
 }

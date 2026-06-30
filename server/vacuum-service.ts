@@ -2,9 +2,12 @@ import { db } from "./db";
 import { sql } from "drizzle-orm";
 import { storage } from "./storage";
 import { withBgDbConnection } from "./lib/bg-db-limiter";
+import { withSchedulerRetry, recordJobAttempt } from "./lib/scheduler-retry";
 
 const VACUUM_LAST_RUN_KEY = "db_vacuum_smart_v1";
 const VACUUM_DETAIL_KEY = "db_vacuum_smart_v1_detail";
+/** AppSetting che registra l'ULTIMO TENTATIVO di vacuum (anche fallito), distinto dall'ultimo successo. */
+const VACUUM_LAST_ATTEMPT_KEY = "db_vacuum_smart_v1_last_attempt";
 
 // Soglia di bloat (dead tuple ratio) oltre la quale si esegue VACUUM FULL ANALYZE
 // invece del semplice VACUUM ANALYZE. Configurabile via AppSetting.
@@ -13,6 +16,7 @@ const DEFAULT_BLOAT_THRESHOLD = 0.2;
 
 export const VACUUM_LAST_RUN_SETTING_KEY = VACUUM_LAST_RUN_KEY;
 export const VACUUM_DETAIL_SETTING_KEY = VACUUM_DETAIL_KEY;
+export const VACUUM_LAST_ATTEMPT_SETTING_KEY = VACUUM_LAST_ATTEMPT_KEY;
 
 export const VACUUM_TABLES = [
   "conversation_participants",
@@ -101,13 +105,32 @@ export async function runVacuumSmart(): Promise<"executed" | "skipped"> {
     bytesBefore: number;
     bytesAfter: number;
   };
-  const tableDetails: TableDetail[] = [];
+  let tableDetails: TableDetail[] = [];
+  let vacuumRetries = 0;
   try {
     const threshold = await getBloatThreshold();
     console.log(
       `[VACUUM] Avvio VACUUM smart sulle tabelle principali (soglia bloat FULL: ${(threshold * 100).toFixed(0)}%)...`,
     );
-    await withBgDbConnection(async (client) => {
+    // FASE 1 — acquisizione connessione (RITENTABILE). Il bg-db-limiter può
+    // RIGETTARE l'acquisizione (kill-switch DB lento / coda piena) PRIMA ancora
+    // di eseguire la callback: è qui che il giro notturno saltava in silenzio.
+    // Ritentiamo SOLO questa fase con backoff+jitter: una SELECT 1 conferma che
+    // slot + connessione sono ottenibili. NON avvolgiamo il loop per-tabella nel
+    // retry, altrimenti un errore a metà giro ri-vacuumerebbe le tabelle già
+    // processate.
+    await withSchedulerRetry(
+      () => withBgDbConnection(async (client) => {
+        await client.query("SELECT 1");
+      }),
+      { label: "vacuum connection", onRetry: () => { vacuumRetries++; } },
+    );
+
+    // FASE 2 — loop per-tabella (NON ritentato): gira UNA sola volta. Un errore
+    // qui finisce nel catch esterno (registrato come tentativo fallito), senza
+    // ri-eseguire i VACUUM già completati su questo giro.
+    tableDetails = await withBgDbConnection(async (client) => {
+      const details: TableDetail[] = [];
       for (const table of VACUUM_TABLES) {
         let sizeBefore = 0;
         let sizeAfter = 0;
@@ -138,7 +161,7 @@ export async function runVacuumSmart(): Promise<"executed" | "skipped"> {
         } catch {
           sizeAfter = 0;
         }
-        tableDetails.push({ table, mode, bloatRatio, bytesBefore: sizeBefore, bytesAfter: sizeAfter });
+        details.push({ table, mode, bloatRatio, bytesBefore: sizeBefore, bytesAfter: sizeAfter });
         const savedMB = ((sizeBefore - sizeAfter) / 1024 / 1024).toFixed(2);
         const beforeMB = (sizeBefore / 1024 / 1024).toFixed(2);
         const afterMB = (sizeAfter / 1024 / 1024).toFixed(2);
@@ -147,6 +170,7 @@ export async function runVacuumSmart(): Promise<"executed" | "skipped"> {
           `[VACUUM] ${table}: mode=${mode.toUpperCase()} bloat=${bloatPct}% ${beforeMB}MB → ${afterMB}MB (risparmio ${savedMB}MB) in ${elapsed}ms`,
         );
       }
+      return details;
     });
     const totalElapsed = Date.now() - startTotal;
     const fullCount = tableDetails.filter((d) => d.mode === "full").length;
@@ -163,9 +187,13 @@ export async function runVacuumSmart(): Promise<"executed" | "skipped"> {
     } catch (err) {
       console.warn("[VACUUM] Impossibile salvare il dettaglio per-tabella:", err);
     }
+    await recordJobAttempt(VACUUM_LAST_ATTEMPT_KEY, { ok: true, retries: vacuumRetries });
     return "executed";
   } catch (err) {
     console.error("[VACUUM] Errore durante VACUUM smart:", err);
+    // Registra SEMPRE l'ultimo tentativo (anche fallito) così il guasto è
+    // visibile in admin e non resta silenzioso come per il map-matching.
+    await recordJobAttempt(VACUUM_LAST_ATTEMPT_KEY, { ok: false, retries: vacuumRetries, error: err });
     throw err;
   } finally {
     isRunning = false;

@@ -48,8 +48,12 @@ import { mapMatch, isSelfHosted, GHPoint } from "./graphhopper-client";
 import { isRoutingEnabled } from "./routing/routing-kill-switch";
 import { isThinkCentreOffline } from "./lib/thinkcentre-offline";
 import { storage } from "./storage";
+import { withSchedulerRetry, recordJobAttempt } from "./lib/scheduler-retry";
+import { requeueUnmatchable } from "./map-matching-job.part2";
 
 const LAST_RUN_KEY = "map_matching_last_run";
+/** AppSetting che registra l'ULTIMO TENTATIVO (anche fallito), distinto dall'ultimo successo. */
+export const MAP_MATCHING_LAST_ATTEMPT_KEY = "map_matching_last_attempt";
 const _JOB_RUNNING_KEY = "map_matching_job_running";
 
 /** Tentativi massimi per una sessione in retry prima di smettere di selezionarla. */
@@ -122,6 +126,7 @@ export async function runMapMatchingJob(): Promise<{
   const startedAt = Date.now();
   let retryRides = 0;
   let unmatchableRides = 0;
+  let discoveryRetries = 0;
 
   try {
     // Recupera le sessioni da processare: stato pending o retry, sotto il cap
@@ -132,21 +137,29 @@ export async function runMapMatchingJob(): Promise<{
     // background: il loop per-sessione successivo alterna chiamate di rete a
     // GraphHopper, quindi non va avvolto (terrebbe uno slot per tutta la durata
     // della richiesta HTTP, riducendo il parallelismo degli altri job).
-    const pendingRides = await withBgDbSlot(() => withDbRetry(() => db.execute<{ session_id: string; sample_count: string; attempts: number }>(
-      sql`
-        SELECT session_id, COUNT(*) AS sample_count, MAX(match_attempts)::int AS attempts
-        FROM ride_telemetry
-        WHERE match_status IN ('pending', 'retry')
-          AND match_attempts < ${maxAttempts}
-          AND (
-            last_match_attempt_at IS NULL
-            OR last_match_attempt_at < NOW() - (INTERVAL '1 minute' * ${retryBaseMin} * POWER(2, GREATEST(match_attempts - 1, 0)))
-          )
-        GROUP BY session_id
-        ORDER BY MIN(ts) ASC
-        LIMIT ${batchSize}
-      `,
-    )));
+    // La query di discovery è di SOLA LETTURA e idempotente: la avvolgiamo in
+    // withSchedulerRetry (backoff + jitter) così un rigetto transitorio del
+    // bg-db-limiter (kill-switch DB lento / coda piena) o un timeout pg non fa
+    // abortire l'intero giro notturno in silenzio. withDbRetry resta interno per
+    // gli errori pg transitori veloci; withBgDbSlot rispetta il budget connessioni.
+    const pendingRides = await withSchedulerRetry(
+      () => withBgDbSlot(() => withDbRetry(() => db.execute<{ session_id: string; sample_count: string; attempts: number }>(
+        sql`
+          SELECT session_id, COUNT(*) AS sample_count, MAX(match_attempts)::int AS attempts
+          FROM ride_telemetry
+          WHERE match_status IN ('pending', 'retry')
+            AND match_attempts < ${maxAttempts}
+            AND (
+              last_match_attempt_at IS NULL
+              OR last_match_attempt_at < NOW() - (INTERVAL '1 minute' * ${retryBaseMin} * POWER(2, GREATEST(match_attempts - 1, 0)))
+            )
+          GROUP BY session_id
+          ORDER BY MIN(ts) ASC
+          LIMIT ${batchSize}
+        `,
+      ))),
+      { label: "map-matching discovery", onRetry: () => { discoveryRetries++; } },
+    );
 
     console.log(`[MAP-MATCH] ${pendingRides.rows.length} ride da processare`);
 
@@ -343,12 +356,17 @@ export async function runMapMatchingJob(): Promise<{
       `[MAP-MATCH] Job completato in ${elapsedSec}s — matchate: ${processedRides}, retry: ${retryRides}, unmatchable: ${unmatchableRides}, segmenti: ${totalSegmentsUpserted}`,
     );
 
-    // Salva timestamp ultima esecuzione
+    // Salva timestamp ultima esecuzione (= ultimo SUCCESSO) e l'ultimo TENTATIVO ok.
     await storage.upsertAppSetting(LAST_RUN_KEY, new Date().toISOString());
+    await recordJobAttempt(MAP_MATCHING_LAST_ATTEMPT_KEY, { ok: true, retries: discoveryRetries });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error("[MAP-MATCH] Errore fatale nel job:", msg);
     errors.push(`Fatal: ${msg.slice(0, 200)}`);
+    // Anche su fallimento fatale (es. la discovery esaurisce i retry) registriamo
+    // SEMPRE l'ultimo tentativo, così il guasto è visibile in admin/watchdog e non
+    // resta silenzioso come accaduto col map-matching fermo da 9 giorni.
+    await recordJobAttempt(MAP_MATCHING_LAST_ATTEMPT_KEY, { ok: false, retries: discoveryRetries, error: err });
   } finally {
     isRunning = false;
   }
@@ -370,6 +388,50 @@ export async function runMapMatchingJob(): Promise<{
 // ─── Stats helpers ─────────────────────────────────────────────────────────────
 
 export { getMapMatchingStats, getMatchingBacklogEstimate, requeueUnmatchable, drainStuckRetryBacklog } from "./map-matching-job.part2";
+
+// ─── Nightly self-heal + run ────────────────────────────────────────────────────
+
+/**
+ * Giro notturno completo: PRIMA ri-accoda i campioni rimasti `exhausted`
+ * (terminali per cap tentativi — tipicamente perché l'engine era offline)
+ * riportandoli a `pending`, POI esegue il map-matching così li riprocessa nello
+ * stesso giro. È il self-heal del backlog: senza questo, le sessioni esaurite
+ * durante un'indisponibilità prolungata di GraphHopper restavano bloccate per
+ * sempre. Il requeue è best-effort (non fa abortire il run) e logga i conteggi
+ * prima/dopo. Usa la funzione esistente requeueUnmatchable().
+ */
+export async function runNightlyMapMatching(): Promise<void> {
+  try {
+    const before = await withBgDbSlot(() =>
+      withSchedulerRetry(
+        () => db.execute<{ exhausted: string; unmatchable: string }>(sql`
+          SELECT
+            COUNT(*) FILTER (WHERE match_status = 'exhausted')::text AS exhausted,
+            COUNT(*) FILTER (WHERE match_status = 'unmatchable')::text AS unmatchable
+          FROM ride_telemetry
+        `),
+        { label: "map-matching recovery count" },
+      ),
+    );
+    const beforeExhausted = parseInt(before.rows[0]?.exhausted ?? "0", 10);
+    const beforeUnmatchable = parseInt(before.rows[0]?.unmatchable ?? "0", 10);
+
+    const result = await requeueUnmatchable();
+    if (result.skipped) {
+      console.log(`[MAP-MATCH] Self-heal exhausted saltato: ${result.reason}`);
+    } else {
+      console.log(
+        `[MAP-MATCH] Self-heal exhausted→pending — prima: ${beforeExhausted} exhausted, ${beforeUnmatchable} unmatchable; ` +
+          `ri-accodati ${result.requeuedSamples} campioni / ${result.requeuedSessions} sessioni a 'pending'`,
+      );
+    }
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.warn(`[MAP-MATCH] Self-heal exhausted fallito (non fatale): ${msg.slice(0, 150)}`);
+  }
+
+  await runMapMatchingJob();
+}
 
 // ─── Nightly scheduler ─────────────────────────────────────────────────────────
 
@@ -414,7 +476,7 @@ export function scheduleNightlyMapMatching(): void {
 
   const fireAndReschedule = async () => {
     try {
-      await runMapMatchingJob();
+      await runNightlyMapMatching();
     } catch (err) {
       console.error("[MAP-MATCH] Errore nel giro notturno:", err);
     }

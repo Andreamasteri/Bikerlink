@@ -30,11 +30,19 @@ interface VacuumTableDetail {
   bloatRatio?: number;
 }
 
+interface JobAttempt {
+  ts: string;
+  ok: boolean;
+  retries: number;
+  error: string | null;
+}
+
 interface TableSizesData {
   tables: TableSizeRow[];
   isRunning: boolean;
   lastVacuum: string | null;
   lastVacuumDetail: VacuumTableDetail[] | null;
+  lastVacuumAttempt?: JobAttempt | null;
 }
 
 function formatBytes(bytes: number): string {
@@ -285,12 +293,33 @@ export default function DbTablesScreen() {
             color={colors.textSecondary}
           />
           <Text style={styles.lastVacuumText}>
-            Ultimo VACUUM:{" "}
+            Ultimo VACUUM (successo):{" "}
             <Text style={styles.lastVacuumValue}>
               {formatDateIT(data?.lastVacuum ?? null)}
             </Text>
           </Text>
         </View>
+
+        {data?.lastVacuumAttempt && (
+          <View style={styles.lastVacuumRow}>
+            <MaterialCommunityIcons
+              name={data.lastVacuumAttempt.ok ? "check-circle-outline" : "alert-circle-outline"}
+              size={14}
+              color={data.lastVacuumAttempt.ok ? (colors.success ?? "#22c55e") : "#ef4444"}
+            />
+            <Text style={[styles.lastVacuumText, !data.lastVacuumAttempt.ok && { color: "#ef4444" }]}>
+              Ultimo tentativo:{" "}
+              <Text style={styles.lastVacuumValue}>
+                {formatDateIT(data.lastVacuumAttempt.ts)} —{" "}
+                {data.lastVacuumAttempt.ok ? "ok" : "FALLITO"}
+                {data.lastVacuumAttempt.retries > 0 ? ` (${data.lastVacuumAttempt.retries} retry)` : ""}
+                {!data.lastVacuumAttempt.ok && data.lastVacuumAttempt.error
+                  ? `: ${data.lastVacuumAttempt.error}`
+                  : ""}
+              </Text>
+            </Text>
+          </View>
+        )}
 
         {hasDetail && totalSavedBytes > 0 && (
           <View style={styles.savedBanner}>

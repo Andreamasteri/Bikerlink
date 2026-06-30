@@ -7,8 +7,10 @@ import {
   runVacuumSmart,
   VACUUM_LAST_RUN_SETTING_KEY,
   VACUUM_DETAIL_SETTING_KEY,
+  VACUUM_LAST_ATTEMPT_SETTING_KEY,
   VACUUM_TABLES,
 } from "../../vacuum-service";
+import { readJobAttempt } from "../../lib/scheduler-retry";
 
 const router = Router();
 
@@ -172,7 +174,10 @@ router.get("/db/table-sizes", async (_req: Request, res: Response) => {
       lastVacuumDetail = null;
     }
 
-    return res.json({ tables, isRunning, lastVacuum, lastVacuumDetail });
+    // Ultimo TENTATIVO di vacuum (anche fallito), distinto da lastVacuum (ultimo successo).
+    const lastVacuumAttempt = await readJobAttempt(VACUUM_LAST_ATTEMPT_SETTING_KEY);
+
+    return res.json({ tables, isRunning, lastVacuum, lastVacuumDetail, lastVacuumAttempt });
   } catch (err) {
     console.error("[admin/db/table-sizes] error:", err);
     return sendError(res, 500, "Errore lettura dimensioni tabelle");

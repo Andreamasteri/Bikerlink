@@ -2,7 +2,9 @@
 import { pool, isPoolHealthy, snapshotBlockedQueries } from "../../../db";
 import type { Signal } from "../types";
 import { recordSuccess as cbRecordSuccess, recordFailure as cbRecordFailure, getCircuitStatus } from "../../../db-circuit-breaker";
-import { setDbSlowPingsConsecutive } from "../../../lib/bg-db-limiter";
+import { setDbSlowPingsConsecutive, withBgDbSlot } from "../../../lib/bg-db-limiter";
+import { readJobAttempt } from "../../../lib/scheduler-retry";
+import { VACUUM_LAST_ATTEMPT_SETTING_KEY } from "../../../vacuum-service";
 
 // ── HNSW index health probe (throttled) ───────────────────────────────────────
 // Checked at most once every 5 minutes per process (not every collector tick)
@@ -292,6 +294,28 @@ export async function collectDb(): Promise<Signal[]> {
       try { await client.query("SET statement_timeout = '5000'"); } catch { /* best-effort */ }
       client.release();
     }
+  }
+
+  // ─── Esito dell'ULTIMO TENTATIVO del giro notturno di VACUUM ──────────────
+  // Distinto da db_vacuum_smart_v1 (l'ultimo SUCCESSO): se l'ultimo giro è
+  // fallito (es. l'acquisizione connessione bg ha esaurito i retry) lo
+  // segnaliamo "high" subito, invece di accorgersene solo quando il last-run
+  // invecchia. Simmetrico al segnale matching.last_attempt (maps-collector 4b).
+  try {
+    const attempt = await withBgDbSlot(() => readJobAttempt(VACUUM_LAST_ATTEMPT_SETTING_KEY));
+    if (attempt) {
+      const ageH = Math.round((Date.now() - new Date(attempt.ts).getTime()) / 3_600_000);
+      signals.push({
+        source: "db", metric: "vacuum.last_attempt", value: attempt.ok ? 1 : 0,
+        severity: attempt.ok ? "info" : "high",
+        details: { ts: attempt.ts, ok: attempt.ok, retries: attempt.retries, error: attempt.error, ageH },
+      });
+    }
+  } catch (err) {
+    signals.push({
+      source: "db", metric: "collector.error", severity: "warn",
+      details: { stage: "vacuum_last_attempt", error: (err as Error).message?.slice(0, 200) },
+    });
   }
 
   // Circuit breaker state — always emitted so it appears in watchdog metrics
