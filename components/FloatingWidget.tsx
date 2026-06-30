@@ -224,7 +224,7 @@ export default function FloatingWidget() {
         testID="floating-widget"
         style={[
           styles.widget,
-          { left: posXAnim, top: posYAnim },
+          { transform: [{ translateX: posXAnim }, { translateY: posYAnim }] },
         ]}
       >
         <View {...panResponder.panHandlers} style={styles.widgetInner}>

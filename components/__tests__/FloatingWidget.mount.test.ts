@@ -322,17 +322,20 @@ describe("FloatingWidget — posizionamento Android-safe (transform, no left/top
   });
 });
 
-// ── (e) aiOpen=true → pallino nascosto e non interattivo ─────────────────────
-describe("FloatingWidget — pallino nascosto quando la chat AI è aperta", () => {
+// ── (e) pallino sempre visibile e interattivo ────────────────────────────────
+// aiOpen è stato rimosso dal componente (task #5213: Bowie spostato nel tab
+// Community). Il FloatingWidget non ha più uno stato "nascosto per chat aperta":
+// il pallino è sempre visibile e interattivo quando il widget è abilitato.
+describe("FloatingWidget — pallino sempre visibile e interattivo", () => {
   beforeEach(() => {
     mocks.platformOS = "ios";
     mocks.user = { id: "1" };
     mocks.enabled = true;
     mocks.suppressed = false;
+    ctrl.forceAiOpen = false;
   });
 
-  it("(e1) il pallino (AnimatedView) ha opacity 0 con aiOpen=true", () => {
-    ctrl.forceAiOpen = true;
+  it("(e1) il pallino (AnimatedView) non ha opacity 0 a stato iniziale", () => {
     const comp = mount();
 
     const json = comp.toJSON() as unknown;
@@ -342,32 +345,23 @@ describe("FloatingWidget — pallino nascosto quando la chat AI è aperta", () =
     };
 
     expect(ball.type).toBe("AnimatedView");
-    expect(flattenStyle(ball.props.style).opacity).toBe(0);
-  });
-
-  it("(e2) il pallino ha pointerEvents='none' con aiOpen=true", () => {
-    ctrl.forceAiOpen = true;
-    const comp = mount();
-
-    const json = comp.toJSON() as unknown;
-    const ball = (Array.isArray(json) ? json[0] : json) as {
-      props: Record<string, unknown>;
-    };
-
-    expect(ball.props.pointerEvents).toBe("none");
-  });
-
-  it("(e-baseline) con aiOpen=false il pallino è visibile e interattivo", () => {
-    ctrl.forceAiOpen = false;
-    const comp = mount();
-
-    const json = comp.toJSON() as unknown;
-    const ball = (Array.isArray(json) ? json[0] : json) as {
-      props: Record<string, unknown>;
-    };
-
     expect(flattenStyle(ball.props.style).opacity).not.toBe(0);
+  });
+
+  it("(e2) il pallino non ha pointerEvents='none' a stato iniziale", () => {
+    const comp = mount();
+
+    const json = comp.toJSON() as unknown;
+    const ball = (Array.isArray(json) ? json[0] : json) as {
+      props: Record<string, unknown>;
+    };
+
     expect(ball.props.pointerEvents).not.toBe("none");
+  });
+
+  it("(e-baseline) il pallino è montato e non null con valori validi", () => {
+    const comp = mount();
+    expect(comp.toJSON()).not.toBeNull();
   });
 });
 
