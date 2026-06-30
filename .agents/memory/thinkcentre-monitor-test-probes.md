@@ -40,10 +40,11 @@ re-run `npx vitest run server/__tests__/thinkcentre-gh-monitor.test.ts` and conf
 finishes in <1s (not 75s). A multi-second/timeout run = a real socket probe leaked because
 an env var wasn't deleted.
 
-**Second TCP probe (admin panel).** There is a *separate* raw `net.createConnection` probe in
-`server/routes/admin/thinkcentre-health-infra-probes.ts` (richer return: `ok/latencyMs/error`
-feeding the admin probe log). It has the same fake-timer hang risk. The test-mode flag is the
-single source of truth: `RUNNING_UNDER_TEST` is **exported** from `thinkcentre-monitor-probes.ts`
-and imported by the admin file, whose `tcpConnect` early-returns under test. It was deliberately
-NOT replaced by `tcpConnectOk` (boolean|null) to preserve the latency/error fields. Any new raw
-TCP probe anywhere must reuse this exported flag, never redefine its own.
+**Second TCP probe (admin panel) — unified (Task #5208).** The admin panel needs a richer
+return (`ok/latencyMs/error`) than `tcpConnectOk` (boolean|null), so it used to keep its own
+duplicated raw-socket implementation. Now `thinkcentre-monitor-probes.ts` exports
+`tcpConnectDetailed` (the raw socket + test-mode short-circuit, returning the full
+`{ok,latencyMs,error}` shape); `tcpConnectOk` is a thin wrapper around it, and
+`server/routes/admin/thinkcentre-health-infra-probes.ts` imports `tcpConnectDetailed` directly
+instead of redefining a socket. Any new raw TCP probe anywhere must call `tcpConnectDetailed`
+(or `tcpConnectOk` if only a boolean is needed) — never redefine `net.createConnection` logic.

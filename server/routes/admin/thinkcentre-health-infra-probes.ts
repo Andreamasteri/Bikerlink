@@ -16,10 +16,8 @@
  *   UPTIME_KUMA_URL       URL Uptime Kuma — punta al probe TC agent: https://tc.biker-link.net/probe/uptime-kuma
  */
 
-import * as net from "net";
-import { RUNNING_UNDER_TEST } from "../../jobs/thinkcentre-monitor-probes";
+import { tcpConnectDetailed } from "../../jobs/thinkcentre-monitor-probes";
 import {
-  PROBE_TIMEOUT_MS,
   sanitizeError,
   maskUrl,
   httpProbe,
@@ -43,50 +41,19 @@ export interface InfraServiceHealth {
 }
 
 // ── TCP probe helper ──────────────────────────────────────────────────────────
-function tcpConnect(
+// Socket raw + guard test-mode condivisi con `server/jobs/thinkcentre-monitor-probes.ts`
+// (`tcpConnectDetailed`); qui applichiamo solo la classificazione/maschera errore
+// specifica della UI admin.
+async function tcpConnect(
   host: string,
   port: number,
 ): Promise<{ ok: boolean; latencyMs: number | null; error?: string }> {
-  // Test-mode guard (riusa il flag unico da thinkcentre-monitor-probes): sotto il
-  // test runner non apriamo socket reali. Con i fake timers il setTimeout di abort
-  // non scatta e il socket verso un host irraggiungibile non emette né `connect`
-  // né `error`, quindi la promise non si risolverebbe e il test si bloccherebbe
-  // ~15s. Risolviamo subito così le probe TCP admin restano isolate nei test.
-  if (RUNNING_UNDER_TEST) {
-    return Promise.resolve({ ok: false, latencyMs: null, error: "skipped (test mode)" });
-  }
-  const t0 = Date.now();
-  return new Promise((resolve) => {
-    const socket = net.createConnection({ host, port });
-
-    const timeout = setTimeout(() => {
-      socket.destroy();
-      resolve({
-        ok: false,
-        latencyMs: null,
-        error: `timeout (>${Math.round(PROBE_TIMEOUT_MS / 1000)} s) — TCP timeout`,
-      });
-    }, PROBE_TIMEOUT_MS);
-
-    socket.on("connect", () => {
-      clearTimeout(timeout);
-      const latencyMs = Date.now() - t0;
-      socket.destroy();
-      resolve({ ok: true, latencyMs });
-    });
-
-    socket.on("error", (err) => {
-      clearTimeout(timeout);
-      const raw = err.message;
-      let classified: string;
-      if (/ECONNREFUSED|ENOTFOUND/i.test(raw)) {
-        classified = `network error — ${raw}`;
-      } else {
-        classified = raw;
-      }
-      resolve({ ok: false, latencyMs: Date.now() - t0, error: sanitizeError(classified) });
-    });
-  });
+  const r = await tcpConnectDetailed(host, port);
+  if (r.ok || !r.error) return r;
+  const classified = /ECONNREFUSED|ENOTFOUND/i.test(r.error)
+    ? `network error — ${r.error}`
+    : r.error;
+  return { ok: false, latencyMs: r.latencyMs, error: sanitizeError(classified) };
 }
 
 // ── Redis ─────────────────────────────────────────────────────────────────────

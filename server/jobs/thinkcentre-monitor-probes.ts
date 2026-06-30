@@ -232,18 +232,57 @@ async function probeUfwOk(): Promise<boolean | null> {
   }
 }
 
-function tcpConnectOk(host: string, port: number): Promise<boolean | null> {
+export interface TcpConnectResult {
+  ok: boolean;
+  latencyMs: number | null;
+  error?: string;
+}
+
+/**
+ * Probe TCP grezza condivisa (apre un socket raw verso host:port). Usata sia
+ * da `tcpConnectOk` (sopra) sia dalle probe admin in
+ * `server/routes/admin/thinkcentre-health-infra-probes.ts`, che necessitano
+ * di latenza/messaggio d'errore dettagliati per la UI — invece di duplicare
+ * la logica del socket.
+ */
+export function tcpConnectDetailed(host: string, port: number): Promise<TcpConnectResult> {
   // Test-mode guard: sotto il test runner non apriamo socket reali. Con i fake
   // timers il setTimeout di abort non scatta e il socket non si risolve mai →
-  // il test si bloccherebbe. Risolviamo subito a null (= non configurato) così
-  // le probe TCP restano isolate senza dover azzerare a mano le env var.
-  if (RUNNING_UNDER_TEST) return Promise.resolve(null);
+  // il test si bloccherebbe. Risolviamo subito a "skipped" così le probe TCP
+  // restano isolate senza dover azzerare a mano le env var.
+  if (RUNNING_UNDER_TEST) {
+    return Promise.resolve({ ok: false, latencyMs: null, error: "skipped (test mode)" });
+  }
+  const t0 = Date.now();
   return new Promise((resolve) => {
     const socket = net.createConnection({ host, port });
-    const timeout = setTimeout(() => { socket.destroy(); resolve(false); }, PROBE_TIMEOUT_MS);
-    socket.on("connect", () => { clearTimeout(timeout); socket.destroy(); resolve(true); });
-    socket.on("error", () => { clearTimeout(timeout); resolve(false); });
+    const timeout = setTimeout(() => {
+      socket.destroy();
+      resolve({
+        ok: false,
+        latencyMs: null,
+        error: `timeout (>${Math.round(PROBE_TIMEOUT_MS / 1000)} s) — TCP timeout`,
+      });
+    }, PROBE_TIMEOUT_MS);
+    socket.on("connect", () => {
+      clearTimeout(timeout);
+      const latencyMs = Date.now() - t0;
+      socket.destroy();
+      resolve({ ok: true, latencyMs });
+    });
+    socket.on("error", (err) => {
+      clearTimeout(timeout);
+      resolve({ ok: false, latencyMs: Date.now() - t0, error: err.message });
+    });
   });
+}
+
+export function tcpConnectOk(host: string, port: number): Promise<boolean | null> {
+  // Test-mode guard: sotto il test runner non apriamo socket reali. Risolviamo
+  // subito a null (= non configurato) così le probe TCP restano isolate senza
+  // dover azzerare a mano le env var.
+  if (RUNNING_UNDER_TEST) return Promise.resolve(null);
+  return tcpConnectDetailed(host, port).then((r) => r.ok);
 }
 
 async function probeRedisOk(): Promise<boolean | null> {
