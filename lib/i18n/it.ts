@@ -1398,6 +1398,9 @@ const translations: Record<string, string> = {
   "push.proposalZone.title": "Nuova proposta in zona! 🏍️",
   "push.proposalZone.body": "Un biker ha creato una proposta di viaggio vicino a te.",
 
+
+  "match.styleLabel.${label}": "__TODO__:match.styleLabel.${label}",
+  "tracking.fusion.${fusionMode}": "__TODO__:tracking.fusion.${fusionMode}",
 };
 
 export default translations;
