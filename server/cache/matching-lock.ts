@@ -7,7 +7,8 @@ import { getRawRedis, isRedisAvailable } from "./redis";
  * Replaces the in-process `isMatchingRunning` boolean with a Redlock-backed
  * distributed lock so multiple backend instances can't run overlapping cycles.
  * Falls back transparently to an in-memory lock when Redis is unavailable —
- * single-instance deployments keep working unchanged.
+ * single-instance deployments keep working unchanged. Backed by DragonflyDB
+ * (drop-in Redis-protocol compatible, Task #5244): Redlock works unchanged.
  */
 
 const LOCK_KEY = "bl:lock:matching";

@@ -84,7 +84,7 @@ $COMPOSE ps --all 2>/dev/null | sed 's/^/  /' || echo "  (errore nel leggere lo 
 echo ""
 
 # Controlla servizi base
-for svc in postgres redis valhalla; do
+for svc in postgres dragonfly valhalla; do
   status="$($DOCKER inspect --format '{{.State.Health.Status}}' "bikerlink-${svc}" 2>/dev/null || echo 'missing')"
   case "$status" in
     healthy)  green "bikerlink-${svc}: healthy" ;;

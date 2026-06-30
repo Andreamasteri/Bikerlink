@@ -198,7 +198,7 @@ export function RedisBlock({
   return (
     <InfraBlock
       serviceKey="redis"
-      label="Redis"
+      label="DragonflyDB"
       icon="database-outline"
       service={service}
       configNote="Aggiungere REDIS_PROBE_HOST (e REDIS_PROBE_PORT se diversa da 6379) nei secret Replit."

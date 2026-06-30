@@ -6,8 +6,8 @@ import { isRedisAvailable } from "./redis";
  * Bull Board admin dashboard (Task #2517).
  *
  * Mounted at /api/admin/queues by routes.ts behind the admin middleware.
- * If Redis is unavailable, returns a stub router that responds with 503 so
- * the route stays reachable for diagnostics.
+ * If Redis/DragonflyDB (Task #5244) is unavailable, returns a stub router that
+ * responds with 503 so the route stays reachable for diagnostics.
  */
 
 export async function buildBullBoardRouter(): Promise<Router> {

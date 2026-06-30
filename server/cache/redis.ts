@@ -3,12 +3,17 @@ import Redis, { type RedisOptions } from "ioredis";
 /**
  * Centralised ioredis client + helpers.
  *
- * Reads TC_REDIS_URL (ThinkCentre self-hosted Redis). When not set, or when
- * the TC is offline, the module operates in fallback (in-memory) mode.
+ * Reads TC_REDIS_URL (ThinkCentre self-hosted DragonflyDB, drop-in compatible
+ * with the ioredis client). When not set, or when the TC is offline, the
+ * module operates in fallback (in-memory) mode.
  *
  * All call sites must tolerate `getRedis()` returning null and fall back to
  * in-memory behaviour. A periodic reconnect is NOT built into ioredis here —
  * re-init/suspend is driven externally by the ThinkCentre monitor.
+ *
+ * Nota: il circuit breaker quota (ex Upstash) è stato rimosso — DragonflyDB
+ * self-hosted non ha tetti di richieste. Il fallback in-memory standard
+ * (quando il client non è `available`) resta invariato.
  */
 
 type ClientState = {
@@ -28,52 +33,6 @@ const state: ClientState = {
 };
 
 let initAttempted = false;
-
-// ── Upstash quota circuit breaker (kept for compatibility / generic rate-limit protection) ──
-// If any Redis server returns a quota error, we open a cooldown circuit.
-const QUOTA_ERROR_RE = /max requests? limit exceeded|max daily request|max monthly request|ERR max requests/i;
-const QUOTA_COOLDOWN_MS = 15 * 60_000;
-let circuitOpenUntil = 0;
-
-function circuitOpen(): boolean {
-  return Date.now() < circuitOpenUntil;
-}
-
-/** True se l'errore indica un tetto richieste esaurito. */
-export function isRedisQuotaError(err: unknown): boolean {
-  const msg = err instanceof Error ? err.message : String(err ?? "");
-  return QUOTA_ERROR_RE.test(msg);
-}
-
-/**
- * Apre il circuito quando la quota è esaurita: marca Redis come non
- * disponibile per `QUOTA_COOLDOWN_MS`. Idempotente: logga una sola volta.
- */
-export function noteRedisQuotaExhausted(source: string): void {
-  const now = Date.now();
-  const wasOpen = circuitOpen();
-  circuitOpenUntil = now + QUOTA_COOLDOWN_MS;
-  state.available = false;
-  state.lastError = "quota esaurita (max requests limit exceeded)";
-  state.lastErrorAt = now;
-  if (!wasOpen) {
-    console.warn(
-      `[Redis] quota esaurita (${source}) — circuito aperto per ${Math.round(QUOTA_COOLDOWN_MS / 60_000)}min, fallback in-memory/DB`,
-    );
-  }
-}
-
-/**
- * Da chiamare nei catch dei call-site Redis: se l'errore è quota esaurita apre
- * il circuito. Ritorna true se ha riconosciuto (e gestito) un errore di quota.
- */
-export function noteRedisErrorMaybeQuota(source: string, err: unknown): boolean {
-  if (isRedisQuotaError(err)) {
-    noteRedisQuotaExhausted(source);
-    return true;
-  }
-  return false;
-}
 
 function getRedisUrl(): string | undefined {
   return process.env.TC_REDIS_URL;
@@ -116,7 +75,6 @@ function init(): void {
       state.available = false;
       state.lastError = err instanceof Error ? err.message : String(err);
       state.lastErrorAt = Date.now();
-      if (isRedisQuotaError(err)) noteRedisQuotaExhausted("client-error");
     });
     client.on("end", () => {
       state.available = false;
@@ -152,7 +110,6 @@ export async function reInitRedis(): Promise<void> {
   }
   // Reset per permettere una nuova init.
   initAttempted = false;
-  circuitOpenUntil = 0;
   init();
   console.log("[Redis] reInitRedis: tentativo di riconnessione al TC avviato");
 }
@@ -180,7 +137,6 @@ export async function suspendRedis(): Promise<void> {
 
 export function getRedis(): Redis | null {
   if (!initAttempted) init();
-  if (circuitOpen()) return null;
   return state.available ? state.client : null;
 }
 
@@ -223,7 +179,6 @@ export function getBullConnectionOptions(): RedisOptions | null {
 
 export function isRedisAvailable(): boolean {
   if (!initAttempted) init();
-  if (circuitOpen()) return false;
   return state.available;
 }
 
@@ -241,11 +196,9 @@ export function getRedisStatus() {
   const source: "thinkcentre" | "none" = process.env.TC_REDIS_URL ? "thinkcentre" : "none";
   return {
     configured: !!url,
-    available: state.available && !circuitOpen(),
+    available: state.available,
     source,
     tcProbeOk: state.tcProbeOk,
-    quotaCircuitOpen: circuitOpen(),
-    quotaCircuitResetsAt: circuitOpen() ? new Date(circuitOpenUntil).toISOString() : null,
     lastError: state.lastError,
     lastErrorAt: state.lastErrorAt ? new Date(state.lastErrorAt).toISOString() : null,
   };

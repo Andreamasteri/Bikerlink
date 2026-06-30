@@ -2,7 +2,7 @@
 # services.sh — Accendi o spegni i servizi BikerLink sul ThinkCentre
 #
 # Uso:
-#   ./services.sh stop    — ferma tutto tranne Valhalla, Postgres, Redis
+#   ./services.sh stop    — ferma tutto tranne Valhalla, Postgres, DragonflyDB
 #   ./services.sh start   — riavvia tutto
 #   ./services.sh status  — mostra stato di tutti i container/servizi
 
@@ -30,7 +30,7 @@ DOCKER_HEAVY=(
 DOCKER_ALWAYS_ON=(
   bikerlink-valhalla
   bikerlink-postgres
-  bikerlink-redis
+  bikerlink-dragonfly
   bikerlink-uptime-kuma
   bikerlink-pgadmin
 )
@@ -63,7 +63,7 @@ case "$ACTION" in
       docker_action stop "$c"
     done
     echo ""
-    info "Valhalla, Postgres, Redis: rimasti accesi."
+    info "Valhalla, Postgres, DragonflyDB: rimasti accesi."
     ;;
 
   start)

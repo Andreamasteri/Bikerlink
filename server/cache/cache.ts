@@ -1,8 +1,8 @@
-import { getRedis, isRedisAvailable, noteRedisErrorMaybeQuota } from "./redis";
+import { getRedis, isRedisAvailable } from "./redis";
 import { recordHit, recordMiss, recordError } from "./cache-metrics";
 
 /**
- * Thin JSON cache wrapper around Redis (Task #2517).
+ * Thin JSON cache wrapper around DragonflyDB via the ioredis client (Task #2517).
  *
  * All methods are no-ops or fall through when Redis is unavailable, so callers
  * can use them without conditionals. Namespaces double as cache-metric keys.
@@ -27,9 +27,7 @@ export async function cacheGet<T>(namespace: string, key: string): Promise<T | n
     return JSON.parse(raw) as T;
   } catch (err) {
     recordError(namespace);
-    if (!noteRedisErrorMaybeQuota("cache.get", err)) {
-      console.warn(`[cache] get error ns=${namespace}:`, err instanceof Error ? err.message : err);
-    }
+    console.warn(`[cache] get error ns=${namespace}:`, err instanceof Error ? err.message : err);
     return null;
   }
 }
@@ -46,9 +44,7 @@ export async function cacheSet<T>(
     await r.set(k(namespace, key), JSON.stringify(value), "EX", ttlSeconds);
   } catch (err) {
     recordError(namespace);
-    if (!noteRedisErrorMaybeQuota("cache.set", err)) {
-      console.warn(`[cache] set error ns=${namespace}:`, err instanceof Error ? err.message : err);
-    }
+    console.warn(`[cache] set error ns=${namespace}:`, err instanceof Error ? err.message : err);
   }
 }
 

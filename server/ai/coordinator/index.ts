@@ -38,13 +38,14 @@ const ADMIN_BROADCAST = "ai:admin:broadcast";
 
 /**
  * Singleton — un solo bus per processo. `emit`/`recordDecision` scrivono su DB
- * e (se disponibile) pubblicano su Redis. `subscribe` apre una connessione
- * Redis dedicata (subscribe lock) e instrada gli eventi al callback.
+ * e (se disponibile) pubblicano su Redis/DragonflyDB (Task #5244, drop-in
+ * compatibile via ioredis). `subscribe` apre una connessione Pub/Sub dedicata
+ * (subscribe lock) e instrada gli eventi al callback.
  *
- * Fallback senza Redis: emit funziona comunque (solo DB). subscribe registra
- * un callback in-process: gli emit dello stesso processo notificano i listener
- * locali, gli emit di altri processi NON vengono propagati (Redis è l'unica
- * via cross-process).
+ * Fallback senza Redis/DragonflyDB: emit funziona comunque (solo DB). subscribe
+ * registra un callback in-process: gli emit dello stesso processo notificano i
+ * listener locali, gli emit di altri processi NON vengono propagati (Pub/Sub è
+ * l'unica via cross-process).
  */
 export class AiCoordinator {
   private localListeners: Map<string, Set<EventCallback>> = new Map();

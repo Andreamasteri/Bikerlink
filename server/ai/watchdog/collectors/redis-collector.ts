@@ -1,5 +1,7 @@
-// Task #2533 — Collector Redis. Se non configurato, restituisce signal "absent" senza severità.
+// Task #2533 — Collector Redis/DragonflyDB. Se non configurato, restituisce signal "absent" senza severità.
 // Task #3799 — Hysteresis: warn di default, high solo dopo 3 fallimenti consecutivi senza recovery.
+// Naming interno (source "redis", metric "redis.*") invariato anche dopo la migrazione a DragonflyDB
+// (Task #5244) — è cablato in SignalSource/aggregator/auto-fix, vedi server/ai/watchdog/types.ts.
 import type { Signal } from "../types";
 
 let warned = false;
@@ -43,16 +45,21 @@ export async function collectRedis(): Promise<Signal[]> {
       severity: pingMs > 200 ? "warn" : "info",
     });
     try {
+      // DragonflyDB's INFO memory section may omit or rename some Redis fields
+      // (e.g. used_memory_rss, rdb_changes_since_last_save) — only `used_memory`
+      // is relied upon here, with optional-chaining-style guards so a missing
+      // or unparsable field degrades to "no signal" instead of throwing.
       const info = await client.info("memory");
-      const m = /used_memory:(\d+)/.exec(info);
-      if (m) {
-        const mb = Math.round(Number(m[1]) / 1024 / 1024);
+      const m = /used_memory:(\d+)/.exec(info ?? "");
+      const usedMemoryBytes = m?.[1] ? Number(m[1]) : null;
+      if (usedMemoryBytes != null && Number.isFinite(usedMemoryBytes)) {
+        const mb = Math.round(usedMemoryBytes / 1024 / 1024);
         signals.push({
           source: "redis", metric: "redis.used_memory_mb", value: mb, unit: "MB",
           severity: mb > 800 ? "warn" : "info",
         });
       }
-    } catch { /* ignore */ }
+    } catch { /* ignore — campo assente o non parsabile, nessun segnale emesso */ }
     await client.quit().catch(() => {});
   } catch (err) {
     consecutiveFailures += 1;

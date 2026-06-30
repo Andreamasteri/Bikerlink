@@ -4,7 +4,8 @@ import { getBullConnectionOptions, isRedisAvailable } from "./redis";
 /**
  * BullMQ persistent queues (Task #2517).
  *
- * Lazily instantiated — only when REDIS_URL is configured. Consumers that need
+ * Backed by DragonflyDB (drop-in Redis-protocol compatible, Task #5244) via
+ * TC_REDIS_URL. Lazily instantiated — only when configured. Consumers that need
  * to enqueue jobs should `getQueue(name)` and fall back to direct execution if
  * it returns null. This module deliberately does NOT register workers — those
  * are added by the individual job owners (#2515/#2516/#2520/#2523/#2526).

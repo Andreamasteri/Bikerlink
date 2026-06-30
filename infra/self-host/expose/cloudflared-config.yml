@@ -10,7 +10,7 @@
 # token che l'app invia (X-GH-Token / X-Valhalla-Key), quindi anche con il
 # tunnel pubblico solo chi ha il token può chiamare le API.
 #
-# POSTGRES e REDIS NON vanno messi nel tunnel come hostname HTTP pubblici.
+# POSTGRES e DRAGONFLY (DragonflyDB) NON vanno messi nel tunnel come hostname HTTP pubblici.
 # Per accesso remoto al DB usa `cloudflared access` (TCP) o una VPN.
 #
 # ── Setup (una tantum, sul PC di casa) ───────────────────────────────────────
