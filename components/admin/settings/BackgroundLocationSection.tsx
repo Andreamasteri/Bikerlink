@@ -98,10 +98,7 @@ const bgLocationStyles = StyleSheet.create({
   },
 });
 
-interface BackgroundLocationSectionProps {
-  expanded: boolean;
-  onToggle: () => void;
-  standalone?: boolean;
+type BackgroundLocationSectionBaseProps = {
   settings: {
     enabled: boolean;
     trigger: string;
@@ -116,7 +113,11 @@ interface BackgroundLocationSectionProps {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- mutation body shape varies
   onMutation: (body: any) => void;
   isPending: boolean;
-}
+};
+
+type BackgroundLocationSectionProps =
+  | (BackgroundLocationSectionBaseProps & { standalone: true; expanded?: never; onToggle?: never })
+  | (BackgroundLocationSectionBaseProps & { standalone?: false; expanded: boolean; onToggle: () => void });
 
 export function BackgroundLocationSection({
   expanded,

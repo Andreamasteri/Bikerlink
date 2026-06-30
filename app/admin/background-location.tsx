@@ -25,8 +25,6 @@ export default function BackgroundLocationPage() {
     >
       <BackgroundLocationSection
         standalone={true}
-        expanded={true}
-        onToggle={() => {}}
         settings={bgLocation.bgLocationSettings}
         bgIntervalInput={bgLocation.bgIntervalInput}
         setBgIntervalInput={bgLocation.setBgIntervalInput}
