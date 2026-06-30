@@ -164,6 +164,7 @@ function gracefulShutdown(signal: string) {
 
   stopMatchingEngine();
   stopMetroMonitor();
+  import("./cache/redis-tunnel").then(({ stopRedisTunnel }) => stopRedisTunnel()).catch(() => {});
   import("./jobs/thinkcentre-monitor").then(({ stopThinkCentreMonitor }) => stopThinkCentreMonitor()).catch(() => {});
   import("./jobs/valhalla-monitor").then(({ stopValhallaMonitor }) => stopValhallaMonitor()).catch(() => {});
 

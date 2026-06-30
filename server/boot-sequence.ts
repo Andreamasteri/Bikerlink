@@ -15,7 +15,7 @@ import { db, pool } from "./db";
 import { sql } from "drizzle-orm";
 import { initUptimeTracking, startMetroMonitor } from "./uptime";
 import { runMigrations } from "./migrate";
-import { addBootLog, bootOk, bootErr } from "./lib/boot-log";
+import { addBootLog, bootOk } from "./lib/boot-log";
 import { startAliveBeacon } from "./lib/alive-beacon";
 import { initMissingClubConversations, ensureCompetitorAnalysisPdf } from "./init-helpers";
 import { enrichBikerMatchBreakdowns } from "./matching/enrich-breakdowns";
@@ -115,6 +115,18 @@ export async function runBootSequence(server: Server, errorHandlersReady: Promis
 
   initUptimeTracking();
   startMetroMonitor();
+
+  // ── Redis TCP bridge (cloudflared access tcp) — Task #5261 ────────────────
+  // Apre il path privato TCP verso il DragonflyDB del ThinkCentre se configurato
+  // (REDIS_TUNNEL_HOSTNAME). No-op se non configurato (usa TC_REDIS_URL diretto).
+  // Non bloccante e MAI fatale: il monitor TC farà reInitRedis quando la probe
+  // Redis passa, anche se il listener non è ancora pronto qui.
+  try {
+    const { startRedisTunnel } = await import("./cache/redis-tunnel");
+    await startRedisTunnel();
+  } catch (e) {
+    console.warn("[BOOT] avvio redis-tunnel fallito (non-fatal):", e);
+  }
 
   // ── DB readiness pre-flight (prima di Phase 2) ────────────────────────────
   await waitForDatabaseReady();

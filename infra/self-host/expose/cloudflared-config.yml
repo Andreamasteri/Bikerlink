@@ -13,6 +13,13 @@
 # POSTGRES e DRAGONFLY (DragonflyDB) NON vanno messi nel tunnel come hostname HTTP pubblici.
 # Per accesso remoto al DB usa `cloudflared access` (TCP) o una VPN.
 #
+# REDIS/DRAGONFLY via TCP privato (Task #5261): si usa una regola ingress
+# `service: tcp://127.0.0.1:6379` su un hostname dedicato (es. redis-tc.__BASE_DOMAIN__)
+# PROTETTO da Cloudflare Access con service-token (NON è un web pubblico: solo chi
+# ha il token può aprire il bridge). Lato Replit, server/cache/redis-tunnel.ts
+# esegue `cloudflared access tcp --hostname redis-tc.__BASE_DOMAIN__ --url 127.0.0.1:16379`.
+# Setup automatico di ingress+DNS+Access app: scripts/setup-cloudflared-redis-tunnel.sh.
+#
 # ── Setup (una tantum, sul PC di casa) ───────────────────────────────────────
 #   1. Installa cloudflared:
 #        curl -L https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb -o cloudflared.deb
@@ -55,6 +62,13 @@ ingress:
     originRequest:
       connectTimeout: 5s
       noHappyEyeballs: true
+
+  # Redis/DragonflyDB -> tcp://127.0.0.1:6379 (Task #5261)
+  # Bridge TCP privato per Replit Cloud, protetto da Cloudflare Access
+  # (service-token). NON è un endpoint HTTP: si raggiunge solo via
+  # `cloudflared access tcp` con token valido. Vedi scripts/setup-cloudflared-redis-tunnel.sh.
+  - hostname: redis-tc.__BASE_DOMAIN__
+    service: tcp://127.0.0.1:6379
 
   # Catch-all obbligatorio
   - service: http_status:404

@@ -214,6 +214,28 @@ log "=== [2/3] Build server TypeScript ==="
 node scripts/server-build.js
 log "  server_dist/ prodotto → $(size server_dist) ($(size server_dist/index.js 2>/dev/null) il bundle)"
 
+# Task #5261 — Bake del binario cloudflared nel Repl layer.
+# Il bridge TCP verso il DragonflyDB del ThinkCentre (server/cache/redis-tunnel.ts)
+# esegue `cloudflared access tcp`. Scarichiamo il binario qui così è presente a
+# runtime nel container autoscale (la rete in FASE 4 potrebbe non essere garantita).
+# NON-FATALE: se il download fallisce, il bridge degrada a no-op e l'app usa il
+# fallback in-memory di server/cache/redis.ts (nessun crash, deploy non bloccato).
+log "=== [2c/3] Bake binario cloudflared (bridge Redis TCP) ==="
+CF_BIN="bin/cloudflared"
+if [ -x "$CF_BIN" ]; then
+  log "  $CF_BIN già presente ($(size $CF_BIN)) — skip download."
+else
+  mkdir -p bin
+  CF_URL="https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64"
+  if curl -fsSL "$CF_URL" -o "$CF_BIN" 2>/dev/null; then
+    chmod +x "$CF_BIN"
+    log "  cloudflared scaricato → $(size $CF_BIN)"
+  else
+    log "  ⚠️  download cloudflared fallito — il bridge Redis TCP degraderà a no-op (fallback in-memory)."
+    rm -f "$CF_BIN"
+  fi
+fi
+
 # Task #3501 — Garantisce che server/public/matching-system.pdf sia presente nel
 # Repl layer. Il file viene creato dal post-merge hook (scripts/generate-matching-pdf.mjs)
 # e copiato in server/public/. Se per qualsiasi motivo manca (primo deploy senza
