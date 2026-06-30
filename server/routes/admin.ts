@@ -379,6 +379,7 @@ import healthCheckRouter from './admin/health-check';
 import diagnosticsStreamRouter from './admin/diagnostics-stream';
 import bootLogAdminRouter from './admin/boot-log';
 import metroCrashRouter from './admin/metro-crash';
+import coordinateHistoryAdminRouter from './admin/coordinate-history';
 
 router.post('/maps/osm-updated', async (req: Request, res: Response) => {
   try {
@@ -524,5 +525,6 @@ router.use('/', _requireAdmin, healthCheckRouter);
 router.use('/', _requireAdmin, diagnosticsStreamRouter);
 router.use('/boot-log', _requireAdmin, bootLogAdminRouter);
 router.use('/', _requireAdmin, metroCrashRouter);
+router.use('/coordinate-history', _requireAdmin, coordinateHistoryAdminRouter);
 
 export default router;
