@@ -24,6 +24,7 @@ export default function BackgroundLocationPage() {
       bottomOffset={20}
     >
       <BackgroundLocationSection
+        standalone={true}
         expanded={true}
         onToggle={() => {}}
         settings={bgLocation.bgLocationSettings}
