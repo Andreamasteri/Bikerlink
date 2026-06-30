@@ -321,9 +321,10 @@ export async function runAssistantAgent(opts: AssistantAgentOpts): Promise<Assis
   //    Il probe isOllamaReachable() ha cache 60s: aggiunge latenza minima (<1ms se cached).
   if (!done && isOllamaConfigured) {
     try {
-      const reachable = await isOllamaReachable();
+      const ollamaPersona = requestedPersona === "horus" ? "horus" : "bowie";
+      const reachable = await isOllamaReachable(ollamaPersona);
       if (reachable) {
-        await streamWith(getOllamaModel(ollamaModelName) as unknown as Parameters<typeof streamText>[0]["model"], true);
+        await streamWith(getOllamaModel(ollamaModelName, ollamaPersona) as unknown as Parameters<typeof streamText>[0]["model"], true);
         provider = "ollama";
         modelId = ollamaModelName ?? OLLAMA_FALLBACK_MODEL_ID;
         done = true;

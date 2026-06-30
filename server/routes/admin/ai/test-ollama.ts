@@ -12,9 +12,13 @@
  */
 
 import { Router, type Request, type Response } from "express";
-import { callOllamaChat, isOllamaConfigured } from "../../../lib/ollama-client";
+import { callOllamaChat, getOllamaDiagnostics, isOllamaReachable, type OllamaPersona } from "../../../lib/ollama-client";
 
 const router = Router();
+
+function parsePersona(req: Request): OllamaPersona {
+  return req.query.persona === "horus" ? "horus" : "bowie";
+}
 
 /** Maschera un URL mostrando solo protocollo + hostname (mai path/query/credenziali). */
 function maskUrl(url: string): string {
@@ -34,11 +38,12 @@ function maskUrl(url: string): string {
  */
 export function sanitizeError(msg: string): string {
   let out = msg;
-  const token = process.env.BOWIE_OLLAMA_TOKEN;
   // Sostituisci eventuali URL http(s) con la sola versione mascherata host.
   out = out.replace(/https?:\/\/[^\s"'`)]+/gi, (m) => maskUrl(m));
-  // Rimuovi il token se presente nel testo.
-  if (token) out = out.split(token).join("***");
+  // Rimuovi il token (Bowie e/o Horus, se diverso) se presente nel testo.
+  for (const token of [process.env.BOWIE_OLLAMA_TOKEN, process.env.HORUS_OLLAMA_TOKEN]) {
+    if (token) out = out.split(token).join("***");
+  }
   // Maschera schemi "Bearer <token>".
   out = out.replace(/(bearer)\s+\S+/gi, "$1 ***");
   // Rimuovi header/coppie chiave-valore di tipo token/authorization/api-key.
@@ -46,15 +51,20 @@ export function sanitizeError(msg: string): string {
   return out.slice(0, 300);
 }
 
-router.get("/test-ollama", async (_req: Request, res: Response) => {
+router.get("/test-ollama", async (req: Request, res: Response) => {
   // Letto a request-time per riflettere eventuali cambi env nel processo long-lived.
-  const rawUrl = process.env.BOWIE_OLLAMA_URL?.trim().replace(/\/$/, "");
-  const model = process.env.BOWIE_OLLAMA_MODEL ?? "mistral-nemo:latest";
-  const tokenConfigured = Boolean(process.env.BOWIE_OLLAMA_TOKEN);
+  // ?persona=horus testa la config dedicata di Horus (fallback su Bowie se assente).
+  const persona = parsePersona(req);
+  const { url: rawUrl, tokenConfigured } = getOllamaDiagnostics(persona);
+  const model =
+    persona === "horus"
+      ? (process.env.HORUS_OLLAMA_MODEL?.trim() || "bikerlink-routing")
+      : (process.env.BOWIE_OLLAMA_MODEL ?? "mistral-nemo:latest");
 
-  // Se BOWIE_OLLAMA_URL non è impostata: non è un errore, semplicemente non configurato.
-  if (!isOllamaConfigured || !rawUrl) {
+  // Se l'URL non è impostato: non è un errore, semplicemente non configurato.
+  if (!rawUrl) {
     return res.json({
+      persona,
       configured: false,
       model,
       url: null,
@@ -66,6 +76,7 @@ router.get("/test-ollama", async (_req: Request, res: Response) => {
 
   const start = Date.now();
   const diagnostics = {
+    persona,
     configured: true as const,
     model,
     url: maskUrl(rawUrl),
@@ -73,10 +84,19 @@ router.get("/test-ollama", async (_req: Request, res: Response) => {
   };
 
   try {
+    const reachable = await isOllamaReachable(persona);
+    if (!reachable) {
+      return res.status(502).json({
+        ...diagnostics,
+        latency_ms: Date.now() - start,
+        ok: false,
+        error: "Server non raggiungibile.",
+      });
+    }
     const reply = await callOllamaChat(
       "Rispondi solo con la parola: PONG",
       undefined,
-      { temperature: 0, maxRetries: 0 },
+      { temperature: 0, maxRetries: 0, persona },
     );
     const latency_ms = Date.now() - start;
     return res.json({
@@ -88,7 +108,7 @@ router.get("/test-ollama", async (_req: Request, res: Response) => {
   } catch (err: unknown) {
     const latency_ms = Date.now() - start;
     const msg = err instanceof Error ? err.message : String(err);
-    console.error("[admin/ai/test-ollama] errore:", msg);
+    console.error(`[admin/ai/test-ollama] errore (persona=${persona}):`, msg);
     return res.status(502).json({
       ...diagnostics,
       latency_ms,
