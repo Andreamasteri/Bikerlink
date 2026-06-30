@@ -13,7 +13,7 @@ Modelfile **e i secret/env var**. Le env var Ollama sono rinominate per-persona
 |-------|-------------------------------------------|-------------|-------|
 | **Ares**  | `ARES_OLLAMA_URL/TOKEN/MODEL`         | PC fisso (Windows + GPU) | Diagnosi crash/boot, studio codebase, generazione manuale Q&A. Chiamata HTTP diretta (no Express), CF Access via `DIAG_OLLAMA_CF_CLIENT_ID/SECRET`. |
 | **Bowie** | `BOWIE_OLLAMA_URL/TOKEN/MODEL`        | ThinkCentre | Assistente in-app / chat utente. Client condiviso `server/lib/ollama-client.ts`. |
-| **Horus** | `HORUS_OLLAMA_MODEL` (host/token Bowie) | ThinkCentre (stesso di Bowie) | AI routing / analisi percorsi moto. Solo model id: NON fa HTTP diretta, usa il client Bowie. |
+| **Horus** | `HORUS_OLLAMA_URL/TOKEN/MODEL` | ThinkCentre (stesso host di Bowie) | AI routing / analisi percorsi moto. Ha endpoint/token dedicati (duplicati di Bowie, per diagnostica indipendente); `server/lib/ollama-client.ts` fa fallback automatico su `BOWIE_OLLAMA_*` se le var Horus sono assenti. |
 
 **Why:** prima i secret condivisi (`OLLAMA_*` per Bowie+Horus, `DIAG_OLLAMA_*` per Ares)
 erano ambigui e la vecchia convenzione diceva "i secret NON si rinominano". Task #5256 ha
