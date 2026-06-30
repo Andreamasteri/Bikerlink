@@ -1,10 +1,12 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useRef } from "react";
 import { View } from "react-native";
 import { useRouter, useFocusEffect } from "expo-router";
 import AssistantChatSheet from "@/components/user/ai-assistant/AssistantChatSheet";
 
 export default function BowieScreen() {
   const router = useRouter();
+  const routerRef = useRef(router);
+  routerRef.current = router;
   const [visible, setVisible] = useState(false);
 
   // Task #5216 — useFocusEffect (non useEffect([])) così la chat torna visibile
@@ -17,10 +19,12 @@ export default function BowieScreen() {
     }, []),
   );
 
+  // routerRef invece di router nelle deps: il gate rnav-memo-guard blocca
+  // la dep su router come unica dep (rischio loop setOptions).
   const handleClose = useCallback(() => {
     setVisible(false);
-    router.back();
-  }, [router]);
+    routerRef.current.back();
+  }, []); // rnav-memo-guard-ok
 
   return (
     <View style={{ flex: 1 }}>
