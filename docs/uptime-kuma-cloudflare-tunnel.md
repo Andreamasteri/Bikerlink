@@ -28,7 +28,7 @@
 | Dominio su Cloudflare (es. `bikerlink.com`) | DNS del dominio punta ai nameserver Cloudflare |
 | ThinkCentre acceso e connesso a internet | — |
 
-> **Nota DuckDNS:** gli altri servizi (GraphHopper, Ollama, Whisper, Nominatim) continuano a girare su DuckDNS senza modifiche. Cloudflare Tunnel opera in modo completamente indipendente.
+> **Nota esposizione:** dal 29 Giugno 2026 **tutti** i servizi (GraphHopper, Valhalla, Ollama, Whisper, Nominatim) sono esposti tramite **Cloudflare Tunnel** su `*.biker-link.net`. DuckDNS + nginx + certbot sono stati dismessi. Uptime Kuma li monitora ai rispettivi URL `*.biker-link.net`.
 
 Se Docker non è ancora installato, segui la sezione 3 di `docs/self-hosting-setup.md`.
 
@@ -343,7 +343,7 @@ Checklist da completare prima di considerare l'installazione terminata:
 - [ ] `https://status.bikerlink.com` si apre nel browser da una rete esterna (es. hotspot telefono)
 - [ ] Il certificato HTTPS è valido (🔒 nella barra del browser) — gestito automaticamente da Cloudflare
 - [ ] Il login al pannello Uptime Kuma funziona correttamente
-- [ ] Gli altri servizi DuckDNS (GraphHopper, Ollama, ecc.) continuano a funzionare normalmente
+- [ ] Gli altri servizi (GraphHopper, Valhalla, Ollama, Whisper, Nominatim) restano raggiungibili via Cloudflare Tunnel su `*.biker-link.net`
 
 ### 7.4 Aggiunge un monitor di test
 

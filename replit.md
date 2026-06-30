@@ -455,7 +455,7 @@ Il matching engine usa un **lock distribuito Redis** (Redlock) per evitare cicli
 
 ### Configurazione
 - Secret `REDIS_URL` (Replit Secrets). Formato: `redis://user:pass@host:port` oppure `rediss://...` per TLS. Richiede Redis ≥ 7.0 (necessario per `SET NX EX` atomico e stream BullMQ).
-- **Provider: Upstash cloud (regione EU).** Redis è migrato dal ThinkCentre self-hosted (`bikerlink.duckdns.org:6380`) a **Upstash** così che cache/BullMQ/AI pub-sub sopravvivano allo spegnimento del ThinkCentre. Upstash espone solo `rediss://` (TLS obbligatorio); l'URL include username+password. Il Redis sul ThinkCentre può restare attivo per uso locale/futuro ma **non è più la dipendenza dell'app**.
+- **Provider: Upstash cloud (regione EU).** Redis è migrato dal ThinkCentre self-hosted (storico: `bikerlink.duckdns.org:6380`, endpoint ormai dismesso con DuckDNS+nginx il 29/06/2026) a **Upstash** così che cache/BullMQ/AI pub-sub sopravvivano allo spegnimento del ThinkCentre. Upstash espone solo `rediss://` (TLS obbligatorio); l'URL include username+password. Il Redis sul ThinkCentre può restare attivo per uso locale/futuro ma **non è più la dipendenza dell'app**.
 - Senza la secret: `getRedis()` ritorna `null`, `withMatchingLock` usa fallback in-memory, BullMQ è disattivato, Bull Board risponde 503.
 
 ### Moduli chiave

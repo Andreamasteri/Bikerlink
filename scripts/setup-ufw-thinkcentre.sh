@@ -180,13 +180,10 @@ ufw allow from "${LOCALHOST}" to any port 9099 proto tcp
 echo "→ PostgreSQL 5432/tcp — solo localhost..."
 ufw allow from "${LOCALHOST}" to any port 5432 proto tcp
 
-# ── Redis TLS pubblico (porta 6380 via nginx stream) ─────────────────────────
-# nginx fa da proxy TLS → Redis locale 6379 rimane solo localhost.
-# Replit (cloud) si connette a rediss://bikerlink.duckdns.org:6380
-echo "→ Redis TLS 6380/tcp — internet (nginx stream proxy)..."
-ufw allow 6380/tcp comment "Redis TLS pubblico via nginx stream (BikerLink)"
-
-# Redis raw 6379: solo localhost (mai LAN/internet)
+# ── Redis: solo localhost (mai LAN/internet) ─────────────────────────────────
+# La porta pubblica 6380 (nginx stream proxy raggiungibile via DuckDNS) è stata
+# RIMOSSA il 29 Giugno 2026: nginx è disattivato e l'esposizione passa solo da
+# Cloudflare Tunnel. Redis locale, se presente, resta accessibile da localhost.
 ufw allow from "${LOCALHOST}" to any port 6379 proto tcp comment "Redis raw — solo localhost"
 
 # ── Regole future (commentate) ────────────────────────────────────────────────

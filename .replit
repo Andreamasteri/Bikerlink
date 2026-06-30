@@ -220,7 +220,6 @@ timeoutMs = 420000
   EXPO_WEB_URL = "https://biker-link--8081.replit.app"
 
   [userenv.shared]
-  BIKERLINK_ADMIN_EMAIL = "admin@bikerlink.it"
   BIKERLINK_BACKEND_URL = "https://biker-link.replit.app"
   EXPO_PUBLIC_DOMAIN = "biker-link.replit.app"
   TILES_URL = "https://tiles.bikerlink.app"

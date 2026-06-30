@@ -16,13 +16,13 @@ dominio pubblico in HTTPS con autenticazione a token.
 
 ## Scelta rapida
 
-| | Opzione A — Cloudflare Tunnel | Opzione B — IP statico | **Opzione C — DuckDNS** |
+| | **Opzione A — Cloudflare Tunnel (ATTIVA)** | Opzione B — IP statico | Opzione C — DuckDNS (RITIRATA) |
 |---|---|---|---|
 | IP pubblico statico richiesto | ❌ no | ✅ sì | ❌ no |
 | Aprire porte router | ❌ no | ✅ sì | ✅ 80/443 |
 | Dipendenza da servizio terzo | Cloudflare | — | DuckDNS (aggiornamento DNS) |
 | TLS | gestito da Cloudflare | certbot | certbot |
-| **Ideale per** | CG-NAT / IP dinamico | VPS | **casa con IP dinamico** |
+| **Stato** | ✅ in uso | mai usata | ❌ dismessa 29/06/2026 |
 
 ---
 
@@ -49,7 +49,15 @@ cd infra/self-host/expose
 
 ---
 
-## Opzione C — DuckDNS + Nginx + Let's Encrypt (consigliata)
+## Opzione C — DuckDNS + Nginx + Let's Encrypt (RITIRATA — solo storica)
+
+> ❌ **Questa opzione è stata dismessa il 29 Giugno 2026** e sostituita
+> dall'Opzione A (Cloudflare Tunnel). I file di setup citati qui sotto
+> (`duckdns-update.sh`, `duckdns.service`, `duckdns.timer`, `nginx-bikerlink.conf`,
+> `setup-expose.sh`, `setup-wifi-usb.sh`, `test-connectivity.sh`,
+> `certbot-renew.*`, `MIGRA-DA-TAILSCALE.md`) sono stati spostati in
+> `legacy-duckdns-nginx/`. La sezione resta solo come contesto storico: **non
+> seguire questi passi**.
 
 Questa sezione ti guida passo passo. Esegui ogni passo nell'ordine indicato.
 

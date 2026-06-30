@@ -1,8 +1,15 @@
 # ThinkCentre Home Server — Guida Operativa
 
+> ⚠️ **DOCUMENTO STORICO (superato il 29 Giugno 2026).** Le sezioni su DuckDNS,
+> nginx (reverse proxy + stream TLS) e i certificati Let's Encrypt descrivono il
+> **vecchio** stack di esposizione, ormai **dismesso**. L'esposizione attiva è
+> ora **solo Cloudflare Tunnel** su `*.biker-link.net` (vedi sezione 11 e
+> `infra/self-host/expose/DEPLOY-LOG.md`). Le parti hardware/OS/servizi/Redis
+> locale restano valide; ignora i passi DuckDNS+nginx+certbot se non per contesto storico.
+
 > Guida operativa per il mini-PC ThinkCentre (`192.168.1.35`) che ospita i servizi self-hosted di BikerLink: GraphHopper, Ollama, Whisper, Nominatim, Valhalla e Redis.
 >
-> Il server è raggiungibile esternamente tramite DuckDNS (`bikerlink.duckdns.org`) con nginx come reverse proxy HTTPS.
+> Esposizione esterna **attuale**: Cloudflare Tunnel su `*.biker-link.net`. (Storico: DuckDNS `bikerlink.duckdns.org` + nginx reverse proxy HTTPS, dismesso il 29 Giugno 2026.)
 
 ---
 
@@ -30,7 +37,7 @@
 | Modello | Lenovo ThinkCentre (mini-PC) |
 | IP locale | `192.168.1.35` |
 | OS | Ubuntu 22.04 / 24.04 LTS |
-| DuckDNS | `bikerlink.duckdns.org` |
+| Esposizione | Cloudflare Tunnel → `*.biker-link.net` (storico: DuckDNS `bikerlink.duckdns.org`, dismesso) |
 | Ruolo | Server self-hosted BikerLink |
 
 ---

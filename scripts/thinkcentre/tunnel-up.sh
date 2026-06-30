@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Riavvia tunnel cloudflared e aggiorna DuckDNS
+# Riavvia il tunnel cloudflared — unica via di esposizione del ThinkCentre.
+# DuckDNS è stato rimosso il 29 Giugno 2026 (migrazione a Cloudflare Tunnel su *.biker-link.net).
 sudo systemctl restart cloudflared
 sleep 3
 systemctl is-active cloudflared && echo "tunnel OK" || echo "tunnel FAIL"
-curl -s "https://www.duckdns.org/update?domains=bikerlink&token=${DUCKDNS_TOKEN}&ip=" && echo ""
