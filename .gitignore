@@ -103,3 +103,6 @@ server/public/assets/competitor-analysis.png
 
 # Upload runtime utente (foto contest/profilo, codici invito, guide) — non vanno in git
 uploads/
+
+# Task #5261 — binario cloudflared bakato dal deploy-build (non versionare)
+bin/cloudflared
