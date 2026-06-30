@@ -93,11 +93,22 @@ services:
   # snapshot. Compatibile drop-in con ioredis/BullMQ/Redlock/Pub-Sub: nessuna
   # modifica al codice applicativo, stessa porta 6379, stessa TC_REDIS_URL.
   #
-  # --cluster_mode emulated: OBBLIGATORIO per BullMQ (usa Lua script con chiavi
-  #   non dichiarate; senza questo flag fallisce silenziosamente).
+  # --cluster_mode emulated: OBBLIGATORIO per BullMQ (usa script Lua il cui
+  #   prefisso di coda è passato via ARGV, non KEYS).
+  # --default_lua_flags=allow-undeclared-keys: OBBLIGATORIO insieme a
+  #   cluster_mode=emulated. Senza questo flag gli script BullMQ (es. addJob)
+  #   falliscono SEMPRE con "ERR ...script tried accessing undeclared key" —
+  #   a differenza del vero Redis Cluster, Dragonfly in modalità emulated
+  #   applica comunque il controllo "tutte le chiavi toccate devono essere
+  #   dichiarate in KEYS" a meno di questo override esplicito. Verificato con
+  #   smoke test end-to-end (queue.add + Worker) prima del cutover.
   # --requirepass: stessa REDIS_PASSWORD usata in precedenza con Redis.
-  # --save 3600 1 + --aof_rewrite_min_size 64mb: persistenza equivalente ad
-  #   `--appendonly yes` (snapshot orario + riscrittura AOF).
+  # --snapshot_cron "0 * * * *": snapshot orario (equivalente a --save 3600 1
+  #   di Redis). NOTA: DragonflyDB NON ha i flag Redis --maxmemory-policy,
+  #   --save o --aof_rewrite_min_size (CLI diversa, non un superset di Redis;
+  #   il binario va in crash-loop con "Unknown command line flag" se passati).
+  #   Non esiste un flag di eviction policy: con cluster_mode=emulated e
+  #   maxmemory impostato, Dragonfly applica eviction automatica quando serve.
   # ulimits.memlock=-1: senza questo il container non parte.
   # healthcheck: DragonflyDB include redis-cli; con --requirepass attivo va
   #   autenticato (-a) o il ping fallisce sempre con NOAUTH → unhealthy falso.
@@ -110,9 +121,8 @@ services:
       - "--cluster_mode=emulated"
       - "--requirepass=${REDIS_PASSWORD}"
       - "--maxmemory=1gb"
-      - "--maxmemory-policy=noeviction"
-      - "--save=3600 1"
-      - "--aof_rewrite_min_size=64mb"
+      - "--snapshot_cron=0 * * * *"
+      - "--default_lua_flags=allow-undeclared-keys"
     environment:
       # Necessaria solo per l'healthcheck sotto (redis-cli gira DENTRO il
       # container e legge questa env var, non quella interpolata in `command`).

@@ -95,7 +95,14 @@ start_dragonfly() {
 
   # --cluster_mode emulated è OBBLIGATORIO: BullMQ usa Lua script con chiavi
   # non dichiarate, senza questo flag fallisce silenziosamente.
+  # --default_lua_flags=allow-undeclared-keys è OBBLIGATORIO insieme a
+  # cluster_mode=emulated, altrimenti gli script BullMQ (es. addJob) falliscono
+  # SEMPRE con "ERR ...script tried accessing undeclared key" (verificato con
+  # smoke test end-to-end prima del cutover — vedi docker-compose.yml).
   # --ulimit memlock=-1: senza questo il container non parte.
+  # NOTA: DragonflyDB NON supporta i flag Redis --maxmemory-policy, --save,
+  # --aof_rewrite_min_size (CLI diversa da Redis, non un superset). Usa invece
+  # --snapshot_cron per gli snapshot periodici (equivalente a --save 3600 1).
   docker run -d \
     --name "${CONTAINER_NAME}" \
     --restart unless-stopped \
@@ -106,9 +113,8 @@ start_dragonfly() {
     --cluster_mode=emulated \
     --requirepass="${REDIS_PASSWORD}" \
     --maxmemory=1gb \
-    --maxmemory-policy=noeviction \
-    --save="3600 1" \
-    --aof_rewrite_min_size=64mb
+    --snapshot_cron="0 * * * *" \
+    --default_lua_flags=allow-undeclared-keys
 
   success "${CONTAINER_NAME} avviato"
 }

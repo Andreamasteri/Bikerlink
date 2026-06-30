@@ -132,3 +132,4 @@
 - [AI tri-persona handoff (Bowie/Horus/Ares)](ai-tri-persona-handoff.md) — handoff deciso nel ROUTE (non agent, test verdi); Ares ha provider dedicato DIAG_OLLAMA_* NON coperto da hasAnyAiProvider() → risolvi persona prima del precheck 503 e salta per ares.
 - [ThinkCentre exposure reality](thinkcentre-exposure-reality.md) — nginx è disabled/legacy; esposizione reale via Cloudflare tunnel (biker-link.net, dashboard-managed); Ollama bind solo 127.0.0.1 → container con --network host.
 - [Valhalla port — real vs tunnel ingress](thinkcentre-exposure-reality.md) — Valhalla ascolta SOLO 8002 (verificato); l'ingress dashboard del tunnel per valhalla.biker-link.net dialga 8003 (refused) → endpoint pubblico rotto, fix richiede dashboard CF (fuori dal repo).
+- [DragonflyDB + BullMQ undeclared keys](dragonfly-bullmq-undeclared-keys.md) — cluster_mode=emulated da solo NON basta per BullMQ; serve anche --default_lua_flags=allow-undeclared-keys o ogni Queue.add() fallisce.
