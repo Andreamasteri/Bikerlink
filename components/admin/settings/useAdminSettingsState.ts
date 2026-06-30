@@ -7,7 +7,6 @@ import { ThemeName } from "@/constants/colors";
 
 // Sub-hooks
 import { useCoordHistoryState } from "./useCoordHistoryState";
-import { useBgLocationState } from "./useBgLocationState";
 import { useMatchingState } from "./useMatchingState";
 import { useMusicAdminState } from "./useMusicAdminState";
 import { useToggleSettings } from "./useToggleSettings";
@@ -53,12 +52,10 @@ export function useAdminSettingsState({ isAdmin, t, setTheme }: UseAdminSettings
   const [musicSystemExpanded, setMusicSystemExpanded] = useState(false);
   const [mapsExpanded, setMapsExpanded] = useState(false);
   const [docsExpanded, setDocsExpanded] = useState(false);
-  const [bgLocationExpanded, setBgLocationExpanded] = useState(false);
   const [distanceCounterExpanded, setDistanceCounterExpanded] = useState(false);
 
   // Initialize sub-hooks
   const coordHistory = useCoordHistoryState(isAdmin, t, coordHistoryExpanded);
-  const bgLocation = useBgLocationState(isAdmin, t);
   const matching = useMatchingState(t);
   const music = useMusicAdminState();
   const toggles = useToggleSettings(t, setProtectedToggle, setProtectedPassword);
@@ -129,8 +126,6 @@ export function useAdminSettingsState({ isAdmin, t, setTheme }: UseAdminSettings
     setMapsExpanded,
     docsExpanded,
     setDocsExpanded,
-    bgLocationExpanded,
-    setBgLocationExpanded,
     distanceCounterExpanded,
     setDistanceCounterExpanded,
     adsEnabled: featureFlags.adsEnabled,
@@ -154,12 +149,6 @@ export function useAdminSettingsState({ isAdmin, t, setTheme }: UseAdminSettings
     chUserSearch: coordHistory.chUserSearch,
     setChUserSearch: coordHistory.setChUserSearch,
     chSearchResults: coordHistory.chSearchResults,
-    bgLocationSettings: bgLocation.bgLocationSettings,
-    bgIntervalInput: bgLocation.bgIntervalInput,
-    setBgIntervalInput: bgLocation.setBgIntervalInput,
-    bgNotificationTextInput: bgLocation.bgNotificationTextInput,
-    setBgNotificationTextInput: bgLocation.setBgNotificationTextInput,
-    bgLocationMutation: bgLocation.bgLocationMutation,
     primalEnabled: featureFlags.primalEnabled,
     motoclubCreationEnabled: featureFlags.motoclubCreationEnabled,
     motoclubCreationMutation: featureFlags.motoclubCreationMutation,

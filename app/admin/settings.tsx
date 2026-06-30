@@ -12,7 +12,6 @@ import { EmailStatusCard } from "@/components/admin/settings/EmailStatusCard";
 import { CoordinateHistorySection } from "@/components/admin/settings/CoordinateHistorySection";
 import { SosBikerSection } from "@/components/admin/settings/SosBikerSection";
 import { MusicSystemSection } from "@/components/admin/settings/MusicSystemSection";
-import { BackgroundLocationSection } from "@/components/admin/settings/BackgroundLocationSection";
 import { AppSettingsSection } from "@/components/admin/settings/AppSettingsSection";
 import { ApkSection } from "@/components/admin/settings/ApkSection";
 import { ThemeSection } from "@/components/admin/settings/ThemeSection";
@@ -129,17 +128,6 @@ export default function AdminSettings() {
 
         {/* ── 4. GPS & MAPPE ── */}
         <SectionHeader icon="navigate-circle-outline" label="GPS & Mappe" />
-        <BackgroundLocationSection
-          expanded={state.bgLocationExpanded}
-          onToggle={() => state.setBgLocationExpanded((v) => !v)}
-          settings={state.bgLocationSettings}
-          bgIntervalInput={state.bgIntervalInput}
-          setBgIntervalInput={state.setBgIntervalInput}
-          bgNotificationTextInput={state.bgNotificationTextInput}
-          setBgNotificationTextInput={state.setBgNotificationTextInput}
-          onMutation={(body) => state.bgLocationMutation.mutate(body)}
-          isPending={state.bgLocationMutation.isPending}
-        />
         <CoordinateHistorySection
           expanded={state.coordHistoryExpanded}
           onToggle={() => state.setCoordHistoryExpanded((v) => !v)}

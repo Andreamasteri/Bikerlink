@@ -135,7 +135,7 @@ export function BackgroundLocationSection({
       <TouchableOpacity style={styles.accordionPanelHeader} onPress={onToggle}>
         <View style={styles.synecoInfo}>
           <Ionicons name="location" size={20} color={Colors.accent} />
-          <Text style={styles.accordionPanelTitle}>Background Location (BETA)</Text>
+          <Text style={styles.accordionPanelTitle}>Background Location</Text>
         </View>
         <Ionicons name={expanded ? "chevron-up" : "chevron-down"} size={18} color={Colors.textSecondary} />
       </TouchableOpacity>

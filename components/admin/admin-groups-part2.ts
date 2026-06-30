@@ -51,6 +51,14 @@ export const adminGroupsPart2: AdminGroup[] = [
         keywords: ["impostazioni", "settings", "configurazione", "config", "preferenze", "preferences", "opzioni", "widget", "galleggiante", "floating", "bubble", "notifica", "notifiche", "push", "push notification", "avviso", "alert", "popup", "toggle", "parametri globali", "app config"],
       },
       {
+        key: "background-location",
+        label: "Posizione Background",
+        icon: "map-marker-path",
+        iconSet: "MaterialCommunityIcons",
+        route: "/admin/background-location",
+        keywords: ["background", "location", "posizione", "gps", "background location", "tracking", "sos", "intervallo", "notifica persistente", "ghost mode", "always on", "posizione background", "bg location", "bg tracking"],
+      },
+      {
         key: "legal-docs",
         label: "Manualistica",
         icon: "document-text-outline",
