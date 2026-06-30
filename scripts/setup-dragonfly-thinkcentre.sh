@@ -103,6 +103,7 @@ start_dragonfly() {
   # NOTA: DragonflyDB NON supporta i flag Redis --maxmemory-policy, --save,
   # --aof_rewrite_min_size (CLI diversa da Redis, non un superset). Usa invece
   # --snapshot_cron per gli snapshot periodici (equivalente a --save 3600 1).
+  # L'eviction sotto maxmemory è automatica, non richiede una policy esplicita.
   docker run -d \
     --name "${CONTAINER_NAME}" \
     --restart unless-stopped \
