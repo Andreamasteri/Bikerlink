@@ -229,8 +229,6 @@ GRAPHHOPPER_URL = "https://gh.biker-link.net"
 VALHALLA_URL = "https://valhalla.biker-link.net"
 NOMINATIM_URL = "https://nominatim.biker-link.net"
 WHISPER_URL = "https://whisper.biker-link.net"
-DIAG_OLLAMA_URL = "https://ollama.biker-link.net"
-DIAG_OLLAMA_MODEL = "qwen3.6:35b"
 ARES_OLLAMA_URL = "https://ollama.biker-link.net"
 ARES_OLLAMA_MODEL = "qwen3.6:35b"
 
