@@ -1,6 +1,6 @@
 /**
- * Ares — monitor del PC fisso (Windows) che ospita Ollama dedicato alla
- * diagnostica AI.
+ * Ares — monitor del PC fisso (Linux server headless, in migrazione da Windows —
+ * Task #5259) che ospita Ollama dedicato alla diagnostica AI.
  *
  * Ares è una macchina SEPARATA dal ThinkCentre: espone Ollama su
  * `ARES_OLLAMA_URL` (es. https://ollama.biker-link.net) tramite Cloudflare

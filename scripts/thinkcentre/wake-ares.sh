@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
-# Sveglia Ares (PC Windows fisso, Ollama diagnostica) via Wake-on-WLAN.
+# Sveglia Ares (PC fisso, Ollama diagnostica/studio) via Wake-on-WLAN.
+# Ares è in migrazione Windows→Linux (Task #5259); il MAC resta invariato,
+# quindi questo script funziona identico sia su Windows sia su Linux headless.
 # Eseguito SUL ThinkCentre (stessa LAN di Ares). Non richiede wakeonlan/etherwake:
 # costruisce e invia il magic packet con python3 puro (già presente sul box).
 #

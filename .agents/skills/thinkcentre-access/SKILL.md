@@ -55,19 +55,44 @@ curl -s -o /dev/null -w "%{http_code}\n" -H "Authorization: Bearer ${GRAPHHOPPER
 curl -s -o /dev/null -w "%{http_code}\n" "${VALHALLA_URL}/status"
 ```
 
-## Wake-on-LAN remoto per Ares
+## Ares (PC fisso, Ollama diagnostica/studio `DIAG_OLLAMA_*`)
 
-Ares (PC fisso Windows 11, Ollama diagnostica) resta tipicamente in **Sleep** per risparmiare energia. Per risvegliarlo da remoto, comanda il ThinkCentre (stessa LAN, sempre online) via SSH:
+Ares è una macchina SEPARATA dal ThinkCentre, sulla **stessa LAN**. È in
+**migrazione da Windows a Linux server headless** (Task #5259): runbook e script
+idempotenti in `scripts/thinkcentre/ares/` (`MIGRATION.md`). Su Linux l'OS occupa
+~1 GB, liberando i ~31 GB di RAM per tenere un 32B Q4 in RAM senza swap.
+
+### Accesso SSH (ProxyJump via ThinkCentre)
+Ares è **LAN-only**: dalla sandbox Replit ci si arriva SOLO saltando dal TC.
+Helper dedicato (analogo a `tc.py`):
+
+```bash
+python3 scripts/thinkcentre/ares/ares.py status
+python3 scripts/thinkcentre/ares/ares.py exec "free -h && ollama ps"
+python3 scripts/thinkcentre/ares/ares.py ip       # risolve l'IP LAN di Ares
+```
+
+- Chiave **privata** dell'agente nel secret `ARES_SSH_KEY`; pubblica incorporata
+  in `ares-bootstrap.sh`. Utente SSH: `ares-agent`.
+- IP di Ares è **dinamico**: `ares.py` lo risolve dalla neighbor table del TC via
+  MAC, oppure passa `ARES_LAN_IP=<ip>`.
+
+### Wake-on-LAN remoto
+Comanda il ThinkCentre (stessa LAN, sempre online) via SSH:
 
 ```bash
 python3 .agents/skills/thinkcentre-access/tc.py exec "bash ~/scripts/wake-ares.sh"
 ```
 
-- **MAC address WiFi di Ares**: `A8:E2:91:2C:90:6A` (IP dinamico, niente reservation DHCP per scelta — la sveglia è via broadcast WoL su `192.168.1.255`, non IP diretto)
-- Lo script (`~/scripts/wake-ares.sh` sul TC, sorgente in `scripts/thinkcentre/wake-ares.sh` nel repo) costruisce e invia il magic packet con **python3 puro** — non richiede `wakeonlan`/`etherwake` installati
-- Alias disponibile sul TC: `wake-ares` (in `~/.bashrc`)
-- **IMPORTANTE — Sleep, non Shutdown/Hibernate**: WoL su scheda WiFi funziona solo se Ares è in stato di sospensione (Sleep/Standby). Da Shutdown completo o Hibernate la scheda WiFi perde alimentazione e il magic packet non arriva. Verificato funzionante: il PC compare nella tabella ARP del TC (`C510W.station`) entro pochi secondi dall'invio del pacchetto.
-- Nessun endpoint API/pulsante app per questo (fuori scope, solo comando SSH manuale)
+- **MAC di Ares**: `A8:E2:91:2C:90:6A` — **invariato** dopo la migrazione, quindi
+  `wake-ares.sh` continua a funzionare. IP dinamico, sveglia via broadcast WoL su
+  `192.168.1.255`, non IP diretto.
+- Lo script (`~/scripts/wake-ares.sh` sul TC, sorgente `scripts/thinkcentre/wake-ares.sh`)
+  costruisce e invia il magic packet con **python3 puro** — niente `wakeonlan`/`etherwake`.
+- Alias sul TC: `wake-ares` (in `~/.bashrc`).
+- Su Linux il WoL è reso persistente da `ares-wol.sh` (`ethtool ... wol g` + systemd unit).
+- **WoL su WiFi richiede Sleep/Standby**, non Shutdown/Hibernate (la NIC WiFi perde
+  alimentazione). Verificato: Ares compare nella ARP del TC pochi secondi dopo il pacchetto.
 
 ## Secret usati (già presenti, non chiederli)
 `TC_SSH_HOST`, `TC_SSH_USER`, `TC_SSH_PASSWORD`, `TC_SSH_PORT`, `TC_SSH_KEY` (SSH) · `GRAPHHOPPER_URL`/`GRAPHHOPPER_TOKEN`, `VALHALLA_URL`/`VALHALLA_API_KEY`, `OLLAMA_URL`/`OLLAMA_TOKEN`, `THINKCENTRE_METRICS_URL`/`THINKCENTRE_AGENT_TOKEN` (HTTP). Non stamparne mai i valori.
