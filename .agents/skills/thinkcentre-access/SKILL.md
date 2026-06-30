@@ -55,5 +55,19 @@ curl -s -o /dev/null -w "%{http_code}\n" -H "Authorization: Bearer ${GRAPHHOPPER
 curl -s -o /dev/null -w "%{http_code}\n" "${VALHALLA_URL}/status"
 ```
 
+## Wake-on-LAN remoto per Ares
+
+Ares (PC fisso Windows 11, Ollama diagnostica) resta tipicamente in **Sleep** per risparmiare energia. Per risvegliarlo da remoto, comanda il ThinkCentre (stessa LAN, sempre online) via SSH:
+
+```bash
+python3 .agents/skills/thinkcentre-access/tc.py exec "bash ~/scripts/wake-ares.sh"
+```
+
+- **MAC address WiFi di Ares**: `A8:E2:91:2C:90:6A` (IP dinamico, niente reservation DHCP per scelta — la sveglia è via broadcast WoL su `192.168.1.255`, non IP diretto)
+- Lo script (`~/scripts/wake-ares.sh` sul TC, sorgente in `scripts/thinkcentre/wake-ares.sh` nel repo) costruisce e invia il magic packet con **python3 puro** — non richiede `wakeonlan`/`etherwake` installati
+- Alias disponibile sul TC: `wake-ares` (in `~/.bashrc`)
+- **IMPORTANTE — Sleep, non Shutdown/Hibernate**: WoL su scheda WiFi funziona solo se Ares è in stato di sospensione (Sleep/Standby). Da Shutdown completo o Hibernate la scheda WiFi perde alimentazione e il magic packet non arriva. Verificato funzionante: il PC compare nella tabella ARP del TC (`C510W.station`) entro pochi secondi dall'invio del pacchetto.
+- Nessun endpoint API/pulsante app per questo (fuori scope, solo comando SSH manuale)
+
 ## Secret usati (già presenti, non chiederli)
 `TC_SSH_HOST`, `TC_SSH_USER`, `TC_SSH_PASSWORD`, `TC_SSH_PORT`, `TC_SSH_KEY` (SSH) · `GRAPHHOPPER_URL`/`GRAPHHOPPER_TOKEN`, `VALHALLA_URL`/`VALHALLA_API_KEY`, `OLLAMA_URL`/`OLLAMA_TOKEN`, `THINKCENTRE_METRICS_URL`/`THINKCENTRE_AGENT_TOKEN` (HTTP). Non stamparne mai i valori.
