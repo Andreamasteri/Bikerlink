@@ -103,7 +103,7 @@ Crea inoltre il modello custom **`bikerlink`** (Bowie, assistente in-app) basato
 
 > **Sostituire il modello in futuro**: riesegui lo script con
 > `CHAT_MODEL=<nuovo>` (vedi i modelli su <https://ollama.com/library>), poi
-> aggiorna il secret `OLLAMA_MODEL` su Replit.
+> aggiorna il secret `BOWIE_OLLAMA_MODEL` su Replit.
 
 ### STEP 4 — Configurazione nginx
 Crea lo snippet `/etc/nginx/snippets/bikerlink-ollama.conf` con la
@@ -137,9 +137,9 @@ automatico** se `nginx -t` fallisce).
 Lo script stampa i valori da copiare su Replit:
 
 ```
-  OLLAMA_URL   = https://bikerlink.tail5056aa.ts.net/ollama
-  OLLAMA_TOKEN = <token di 64 caratteri esadecimali>
-  OLLAMA_MODEL = bikerlink
+  BOWIE_OLLAMA_URL   = https://bikerlink.tail5056aa.ts.net/ollama
+  BOWIE_OLLAMA_TOKEN = <token di 64 caratteri esadecimali>
+  BOWIE_OLLAMA_MODEL = bikerlink
 ```
 
 ---
@@ -150,9 +150,9 @@ Nel progetto BikerLink su Replit:
 
 1. Apri **Tools → Secrets** (o il pannello "Secrets" / "Environment variables").
 2. Aggiungi i tre secret con i valori stampati dallo script:
-   - `OLLAMA_URL` → l'URL pubblico con suffisso `/ollama` (senza slash finale).
-   - `OLLAMA_TOKEN` → il token (lo stesso verificato da nginx come `X-Ollama-Token`).
-   - `OLLAMA_MODEL` → il modello custom (es. `bikerlink`).
+   - `BOWIE_OLLAMA_URL` → l'URL pubblico con suffisso `/ollama` (senza slash finale).
+   - `BOWIE_OLLAMA_TOKEN` → il token (lo stesso verificato da nginx come `X-Ollama-Token`).
+   - `BOWIE_OLLAMA_MODEL` → il modello custom (es. `bikerlink`).
 3. **Riavvia il backend** perché i secret vengano letti.
 
 > Il token è un segreto: non committarlo nel repo, non condividerlo.
@@ -161,7 +161,7 @@ Nel progetto BikerLink su Replit:
 > già un token, viene **riusato** (i secret su Replit restano validi). Lo script
 > genera un token nuovo solo alla prima esecuzione o se passi `OLLAMA_TOKEN=<nuovo>`.
 > Per forzare la rotazione: rimuovi `/etc/nginx/snippets/bikerlink-ollama.conf` e
-> riesegui, poi aggiorna `OLLAMA_TOKEN` su Replit con il nuovo valore stampato.
+> riesegui, poi aggiorna `BOWIE_OLLAMA_TOKEN` su Replit con il nuovo valore stampato.
 
 ---
 
@@ -196,8 +196,8 @@ curl https://bikerlink.tail5056aa.ts.net/ollama/api/generate \
 
 ### Dall'app BikerLink
 Dopo aver impostato i 3 secret e riavviato il backend, l'integrazione lato app
-(task gemello "Integrazione Ollama — lato app BikerLink") userà `OLLAMA_URL` +
-`OLLAMA_TOKEN` per le chiamate. Verifica nei log del backend l'eventuale riga di
+(task gemello "Integrazione Ollama — lato app BikerLink") userà `BOWIE_OLLAMA_URL` +
+`BOWIE_OLLAMA_TOKEN` per le chiamate. Verifica nei log del backend l'eventuale riga di
 inizializzazione del client Ollama e l'assenza di errori 403/timeout.
 
 ---
@@ -229,7 +229,7 @@ journalctl -u ollama -n 100 --no-pager
 ```bash
 # Scarica un nuovo modello
 ollama pull llama3.2:3b
-# Aggiorna il secret OLLAMA_MODEL su Replit (bikerlink o il nuovo modello) e riavvia
+# Aggiorna il secret BOWIE_OLLAMA_MODEL su Replit (bikerlink o il nuovo modello) e riavvia
 ```
 
 ---

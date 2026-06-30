@@ -9,7 +9,7 @@
 #   4. Aggiunge a nginx una `location /ollama/` con auth token X-Ollama-Token
 #      (stesso pattern di X-GH-Token usato da GraphHopper) + reverse proxy a 11434.
 #   5. Esegue test locale e attraverso nginx.
-#   6. Stampa i 3 secret da impostare su Replit (OLLAMA_URL/TOKEN/MODEL).
+#   6. Stampa i 3 secret da impostare su Replit (BOWIE_OLLAMA_URL/TOKEN/MODEL).
 #
 # Prerequisiti sul server:
 #   - Ubuntu 26.04 LTS, nginx già installato e configurato con Tailscale Funnel.
@@ -35,10 +35,10 @@ set -euo pipefail
 #   - CHAT_MODEL è il modello base scaricato. Default: mistral-nemo:latest (12B).
 #     Entra nei 8GB VRAM della GTX 1070 con OLLAMA_FLASH_ATTENTION=1 → 13–16 token/s.
 #     Per cambiarlo in futuro: esporta CHAT_MODEL=<nuovo>, riesegui lo script,
-#     aggiorna il secret OLLAMA_MODEL su Replit.
+#     aggiorna il secret BOWIE_OLLAMA_MODEL su Replit.
 #   - Il modello custom "bikerlink" (Bowie, assistente in-app) viene creato su base
 #     CHAT_MODEL con system prompt BikerLink baked-in (BikerLink-Bowie.Modelfile).
-#     OLLAMA_MODEL deve puntare a "bikerlink" (fallback hardcoded: mistral-nemo:latest).
+#     BOWIE_OLLAMA_MODEL deve puntare a "bikerlink" (fallback hardcoded: mistral-nemo:latest).
 #   Verifica i modelli su: https://ollama.com/library
 #
 # AGGIORNAMENTI (idempotente): rieseguendo questo script lo step di install
@@ -193,7 +193,7 @@ else
   # ── Crea il modello custom "bikerlink" dal Modelfile ─────────────────────
   # bikerlink = mistral-nemo:latest + system prompt BikerLink baked-in.
   # Il base model è hardcoded nel Modelfile (FROM mistral-nemo:latest), non
-  # dipende da CHAT_MODEL. OLLAMA_MODEL su Replit deve valere "bikerlink";
+  # dipende da CHAT_MODEL. BOWIE_OLLAMA_MODEL su Replit deve valere "bikerlink";
   # "mistral-nemo:latest" è il fallback hardcoded in ollama-client.ts.
   MODELFILE_DIR="$(cd "$(dirname "$0")/ollama-modelfile" 2>/dev/null && pwd || true)"
   MODELFILE_PATH="${MODELFILE_DIR}/BikerLink-Bowie.Modelfile"
@@ -201,7 +201,7 @@ else
     log "  → Creazione modello custom bikerlink (Bowie) da BikerLink-Bowie.Modelfile..."
     if ollama create bikerlink -f "$MODELFILE_PATH"; then
       ok "  Modello custom 'bikerlink' (Bowie) creato con successo."
-      warn "  Imposta OLLAMA_MODEL=bikerlink nelle variabili Replit (vedi output finale)."
+      warn "  Imposta BOWIE_OLLAMA_MODEL=bikerlink nelle variabili Replit (vedi output finale)."
     else
       warn "  Creazione modello bikerlink fallita — usando '${CHAT_MODEL}' come fallback."
       BIKERLINK_CUSTOM_MODEL="${CHAT_MODEL}"
@@ -242,7 +242,7 @@ elif [[ -n "$EXISTING_TOKEN" ]]; then
 else
   TOKEN="$(openssl rand -hex 32)"
   ok "Generato un NUOVO token (openssl rand -hex 32)."
-  warn "Token ruotato: aggiorna il secret OLLAMA_TOKEN su Replit con il valore stampato a fine script."
+  warn "Token ruotato: aggiorna il secret BOWIE_OLLAMA_TOKEN su Replit con il valore stampato a fine script."
 fi
 
 # ── Snippet nginx con la location /ollama/ ───────────────────────────────────
@@ -441,9 +441,9 @@ echo ""
 echo "Imposta questi 3 secret nel progetto BikerLink su Replit"
 echo "(Tools → Secrets), poi riavvia il backend:"
 echo ""
-echo -e "  \033[1mOLLAMA_URL\033[0m   = ${OLLAMA_URL_VALUE}"
-echo -e "  \033[1mOLLAMA_TOKEN\033[0m = ${TOKEN}"
-echo -e "  \033[1mOLLAMA_MODEL\033[0m = ${BIKERLINK_CUSTOM_MODEL}"
+echo -e "  \033[1mBOWIE_OLLAMA_URL\033[0m   = ${OLLAMA_URL_VALUE}"
+echo -e "  \033[1mBOWIE_OLLAMA_TOKEN\033[0m = ${TOKEN}"
+echo -e "  \033[1mBOWIE_OLLAMA_MODEL\033[0m = ${BIKERLINK_CUSTOM_MODEL}"
 echo ""
 if [[ -z "$PUBLIC_HOSTNAME" ]]; then
   warn "Non sono riuscito a rilevare l'hostname Tailscale automaticamente."

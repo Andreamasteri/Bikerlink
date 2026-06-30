@@ -141,12 +141,12 @@ export function maskUrl(url: string): string {
 export function sanitizeError(msg: string): string {
   let out = msg.replace(/https?:\/\/[^\s"'`)]+/gi, (m) => maskUrl(m));
   for (const tok of [
-    process.env.OLLAMA_TOKEN,
+    process.env.BOWIE_OLLAMA_TOKEN,
     process.env.WHISPER_TOKEN,
     process.env.GRAPHHOPPER_TOKEN,
     process.env.NOMINATIM_TOKEN,
     process.env.VALHALLA_API_KEY,
-    process.env.DIAG_OLLAMA_TOKEN,
+    process.env.ARES_OLLAMA_TOKEN,
   ]) {
     if (tok) out = out.split(tok).join("***");
   }

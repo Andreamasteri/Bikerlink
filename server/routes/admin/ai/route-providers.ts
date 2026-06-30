@@ -85,7 +85,7 @@ router.post("/route-providers/test", async (req: Request, res: Response) => {
   try {
     if (provider === "ollama") {
       if (!isOllamaConfigured) {
-        res.json({ success: false, ok: false, latency_ms: 0, error: "OLLAMA_URL non configurata." });
+        res.json({ success: false, ok: false, latency_ms: 0, error: "BOWIE_OLLAMA_URL non configurata." });
         return;
       }
       const reply = await callOllamaChat(

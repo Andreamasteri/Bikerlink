@@ -210,8 +210,8 @@ export async function probeGraphHopperAreas(): Promise<GraphHopperHealth> {
 // ── Ollama ────────────────────────────────────────────────────────────────────
 
 export async function probeOllama(): Promise<ServiceHealth> {
-  const base = process.env.OLLAMA_URL?.replace(/\/$/, "");
-  const token = process.env.OLLAMA_TOKEN;
+  const base = process.env.BOWIE_OLLAMA_URL?.trim().replace(/\/$/, "");
+  const token = process.env.BOWIE_OLLAMA_TOKEN;
   if (!base) {
     return { key: "ollama", label: "Ollama AI", configured: false, ok: false, startingUp: false, latencyMs: null, url: null, history: getHistory("ollama"), probeLog: getProbeLog("ollama") };
   }

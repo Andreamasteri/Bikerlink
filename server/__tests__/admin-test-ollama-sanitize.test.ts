@@ -5,8 +5,8 @@ const URL_WITH_PATH = "https://bikerlink.tail5056aa.ts.net/ollama/api/chat";
 const TOKEN = "super-secret-token-abc123";
 
 beforeAll(() => {
-  process.env.OLLAMA_URL = URL_WITH_PATH;
-  process.env.OLLAMA_TOKEN = TOKEN;
+  process.env.BOWIE_OLLAMA_URL = URL_WITH_PATH;
+  process.env.BOWIE_OLLAMA_TOKEN = TOKEN;
 });
 
 describe("sanitizeError (admin/ai/test-ollama)", () => {

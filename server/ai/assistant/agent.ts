@@ -28,9 +28,9 @@ import { eq, desc } from "drizzle-orm";
 import { pruneUserMemory, MEMORY_TURNS_LIMIT } from "./memory-pruner";
 import { fetchUserLiveContext } from "./user-context";
 
-const OLLAMA_FALLBACK_MODEL_ID = process.env.OLLAMA_MODEL ?? "mistral-nemo:latest";
+const OLLAMA_FALLBACK_MODEL_ID = process.env.BOWIE_OLLAMA_MODEL ?? "mistral-nemo:latest";
 // Task #5197 — Horus usa un modello Ollama dedicato (stessa infra di Bowie).
-const HORUS_MODEL_ID = process.env.OLLAMA_ROUTING_MODEL?.trim() || "bikerlink-routing";
+const HORUS_MODEL_ID = process.env.HORUS_OLLAMA_MODEL?.trim() || "bikerlink-routing";
 
 // Task #5210 — Presentazione poetica di Bowie: iniettata come turno "assistant"
 // seed quando la conversazione è nuova (nessuna history). NON viene salvata nel DB:
@@ -274,7 +274,7 @@ export async function runAssistantAgent(opts: AssistantAgentOpts): Promise<Assis
   if (requestedPersona === "ares") {
     opts.onPersona?.({ id: "ares", name: AI_ROSTER.ares.name });
     try {
-      if (!isAresConfigured) throw new Error("Ares non configurato (DIAG_OLLAMA_URL mancante).");
+      if (!isAresConfigured) throw new Error("Ares non configurato (ARES_OLLAMA_URL mancante).");
       await streamAresChat({
         system,
         messages: messages.map((m) => ({ role: m.role, content: m.content })),

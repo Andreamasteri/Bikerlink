@@ -6,25 +6,25 @@
  * Ollama via le variabili d'ambiente DIAG_OLLAMA_*.
  *
  * Variabili d'ambiente (secret Replit — i VALORI non vanno mai stampati):
- *   DIAG_OLLAMA_URL    — URL base Ollama del PC fisso (via Cloudflare Tunnel).
+ *   ARES_OLLAMA_URL    — URL base Ollama del PC fisso (via Cloudflare Tunnel).
  *                        Se assente, isAresConfigured è false e il chiamante
  *                        degrada con grazia (messaggio garbato, niente crash).
- *   DIAG_OLLAMA_MODEL  — modello da usare per la chat diagnostica.
- *   DIAG_OLLAMA_TOKEN  — (opzionale) token custom Ollama, header X-Ollama-Token.
+ *   ARES_OLLAMA_MODEL  — modello da usare per la chat diagnostica.
+ *   ARES_OLLAMA_TOKEN  — (opzionale) token custom Ollama, header X-Ollama-Token.
  *
  * A differenza di Bowie/Horus (ollama-client.ts), Ares NON usa il Vercel AI SDK:
- * fa una chiamata HTTP diretta a `${DIAG_OLLAMA_URL}/api/chat` (NDJSON stream),
+ * fa una chiamata HTTP diretta a `${ARES_OLLAMA_URL}/api/chat` (NDJSON stream),
  * coerente con gli altri tocchi ad Ares (scripts/ollama-diagnose.ts, monitor
  * thinkcentre-health-ares-probe.ts).
  */
 
 import { cfAccessHeaders } from "./cf-access";
 
-const ARES_URL = process.env.DIAG_OLLAMA_URL?.replace(/\/$/, "");
-const ARES_TOKEN = process.env.DIAG_OLLAMA_TOKEN ?? "";
-const ARES_MODEL = process.env.DIAG_OLLAMA_MODEL?.trim() || "qwen3-coder:30b";
+const ARES_URL = process.env.ARES_OLLAMA_URL?.trim().replace(/\/$/, "");
+const ARES_TOKEN = process.env.ARES_OLLAMA_TOKEN ?? "";
+const ARES_MODEL = process.env.ARES_OLLAMA_MODEL?.trim() || "qwen3-coder:30b";
 
-/** true quando DIAG_OLLAMA_URL è impostato (Ares disponibile come destinazione). */
+/** true quando ARES_OLLAMA_URL è impostato (Ares disponibile come destinazione). */
 export const isAresConfigured = Boolean(ARES_URL);
 
 /** Id del modello Ares (per logging ai_call_logs). */
@@ -35,7 +35,7 @@ export function getAresModelId(): string {
 /**
  * Header per le richieste verso Ares. Il Service Token Cloudflare Access viene
  * allegato SOLO verso origin di nostra proprietà (biker-link.net): se per errore
- * DIAG_OLLAMA_URL puntasse a un host esterno, non disclosiamo il token CF.
+ * ARES_OLLAMA_URL puntasse a un host esterno, non disclosiamo il token CF.
  */
 function aresHeaders(): Record<string, string> {
   const h: Record<string, string> = { "Content-Type": "application/json" };
@@ -69,7 +69,7 @@ export interface AresChatOptions {
  */
 export async function streamAresChat(opts: AresChatOptions): Promise<{ text: string }> {
   if (!ARES_URL) {
-    throw new Error("Ares non configurato: variabile DIAG_OLLAMA_URL mancante.");
+    throw new Error("Ares non configurato: variabile ARES_OLLAMA_URL mancante.");
   }
 
   const controller = new AbortController();

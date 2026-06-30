@@ -529,12 +529,14 @@ Ollama è il provider AI **primario** per due flussi, con il cloud come **fallba
 - **Traduzioni i18n** (`scripts/translate-i18n.ts`): Ollama → fallback OpenAI.
 - **Fuori scope** (restano sempre cloud): moderazione, console admin, assistente utente.
 
-Client condiviso: `server/lib/ollama-client.ts` — `isOllamaConfigured`, `getOllamaModel(model?)` (lancia un errore catchabile se `OLLAMA_URL` manca), `callOllamaChat(prompt, schema?, options)` (usa `generateObject` se passato uno schema Zod, altrimenti `generateText`). `baseURL = ${OLLAMA_URL}/api`, header auth `X-Ollama-Token`. Pacchetto: `ollama-ai-provider-v2` (export `createOllama`). Helper route parsing: `server/routes/planned-routes/waypoints.next.ts`.
+Client condiviso: `server/lib/ollama-client.ts` — `isOllamaConfigured`, `getOllamaModel(model?)` (lancia un errore catchabile se `BOWIE_OLLAMA_URL` manca), `callOllamaChat(prompt, schema?, options)` (usa `generateObject` se passato uno schema Zod, altrimenti `generateText`). `baseURL = ${BOWIE_OLLAMA_URL}/api`, header auth `X-Ollama-Token`. Pacchetto: `ollama-ai-provider-v2` (export `createOllama`). Helper route parsing: `server/routes/planned-routes/waypoints.next.ts`.
 
-Variabili d'ambiente (tutte **opzionali** — segue il pattern URL/token-from-env di GraphHopper):
-- `OLLAMA_URL` — URL base del server Ollama self-hosted. **Se non impostata, Ollama è disabilitato e i flussi usano direttamente il cloud (zero breaking changes).**
-- `OLLAMA_TOKEN` — token opzionale inviato come header `X-Ollama-Token`.
-- `OLLAMA_MODEL` — modello da usare (default `llama3.1:8b`).
+Variabili d'ambiente per-persona (tutte **opzionali** — segue il pattern URL/token-from-env di GraphHopper). Naming dedicato per istanza (Task #5256): **Bowie** = assistente in-app (TC), **Horus** = AI routing (TC, usa il client Bowie, solo model id), **Ares** = diagnosi/studio (PC fisso, chiamata HTTP diretta).
+- `BOWIE_OLLAMA_URL` — URL base del server Ollama self-hosted (Bowie). **Se non impostata, Ollama è disabilitato e i flussi usano direttamente il cloud (zero breaking changes).**
+- `BOWIE_OLLAMA_TOKEN` — token opzionale inviato come header `X-Ollama-Token`.
+- `BOWIE_OLLAMA_MODEL` — modello da usare (default `llama3.1:8b`).
+- `HORUS_OLLAMA_MODEL` — model id per l'AI routing (usa lo stesso host/token di Bowie via client condiviso).
+- `ARES_OLLAMA_URL` / `ARES_OLLAMA_TOKEN` / `ARES_OLLAMA_MODEL` — istanza Ares (PC fisso) per diagnosi/studio; CF Access via `DIAG_OLLAMA_CF_CLIENT_ID`/`DIAG_OLLAMA_CF_CLIENT_SECRET` (invariati).
 
 ### Nominatim self-hosted (geocoding)
 

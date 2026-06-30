@@ -9,16 +9,16 @@
  * Legge `docs/bikerlink-qa-manual.md` (generato da Ares via `scripts/ollama-study-repo.ts`),
  * lo inietta come blocco `## MANUALE UTENTE Q&A` nel SYSTEM prompt di
  * `scripts/ollama-modelfile/BikerLink-Bowie.Modelfile`, e ricrea il modello custom
- * `bikerlink-assistant` su Bowie via `POST ${OLLAMA_URL}/api/create`
+ * `bikerlink-assistant` su Bowie via `POST ${BOWIE_OLLAMA_URL}/api/create`
  * — senza SSH, senza deploy. Così l'assistente in-app risponde con il manuale
- * già cucito nel system prompt (basta puntare `OLLAMA_MODEL=bikerlink-assistant`).
+ * già cucito nel system prompt (basta puntare `BOWIE_OLLAMA_MODEL=bikerlink-assistant`).
  *
  * SICUREZZA ORDINE: il Modelfile su disco viene sovrascritto SOLO dopo che il push
  * è andato a buon fine. ThinkCentre irraggiungibile o errore HTTP → exit 1 e
  * NESSUNA modifica al Modelfile.
  *
  * Auth: header del Service Token Cloudflare Access (`cfAccessHeaders()`) + il token
- * custom `OLLAMA_TOKEN` come Bearer / `X-Ollama-Token` (consumato da nginx all'origine).
+ * custom `BOWIE_OLLAMA_TOKEN` come Bearer / `X-Ollama-Token` (consumato da nginx all'origine).
  *
  * Uso:
  *   npx tsx scripts/ollama-push-manual.ts
@@ -26,7 +26,7 @@
  *   npx tsx scripts/ollama-push-manual.ts --model-name bikerlink-assistant
  *   npx tsx scripts/ollama-push-manual.ts --qa-file docs/bikerlink-qa-manual.md
  *
- * Env/secret: OLLAMA_URL (obbligatorio), OLLAMA_TOKEN (opz.),
+ * Env/secret: BOWIE_OLLAMA_URL (obbligatorio), BOWIE_OLLAMA_TOKEN (opz.),
  *   CF_ACCESS_CLIENT_ID / CF_ACCESS_CLIENT_SECRET (Service Token Cloudflare Access).
  */
 
@@ -100,7 +100,7 @@ function injectQa(modelfile: string, qa: string): string {
 function authHeaders(): Record<string, string> {
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   Object.assign(headers, cfAccessHeaders());
-  const token = process.env.OLLAMA_TOKEN?.trim();
+  const token = process.env.BOWIE_OLLAMA_TOKEN?.trim();
   if (token) {
     headers["Authorization"] = `Bearer ${token}`;
     headers["X-Ollama-Token"] = token;
@@ -179,9 +179,9 @@ async function main(): Promise<void> {
     return;
   }
 
-  const baseUrl = process.env.OLLAMA_URL?.trim();
+  const baseUrl = process.env.BOWIE_OLLAMA_URL?.trim();
   if (!baseUrl) {
-    console.error("\n❌ OLLAMA_URL non impostato. Imposta il secret e riprova (oppure usa --dry-run).");
+    console.error("\n❌ BOWIE_OLLAMA_URL non impostato. Imposta il secret e riprova (oppure usa --dry-run).");
     process.exitCode = 1;
     return;
   }
@@ -195,7 +195,7 @@ async function main(): Promise<void> {
     console.log(`  ✅ [Bowie] Modello "${cli.modelName}" aggiornato sul ThinkCentre.`);
     console.log(`  💾 Modelfile aggiornato: ${path.relative(ROOT, MODELFILE_PATH)}`);
     console.log(`  📘 Q&A iniettato da: ${path.relative(ROOT, qaPath)}`);
-    console.log("  ➡️  Punta l'assistente in-app a questo modello: OLLAMA_MODEL=" + cli.modelName);
+    console.log("  ➡️  Punta l'assistente in-app a questo modello: BOWIE_OLLAMA_MODEL=" + cli.modelName);
     console.log("════════════════════════════════════════════════════════════");
     if (resp.trim()) console.log(`  Risposta endpoint: ${resp.trim().slice(0, 300)}`);
   } catch (err) {

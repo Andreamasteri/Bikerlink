@@ -328,7 +328,7 @@ async function generate(): Promise<void> {
   infoBox(doc,
     "✅  Livello di resilienza: il sistema funziona con un solo provider configurato. " +
     "Con solo GROQ_API_KEY tutte le feature AI sono attive (eccetto embeddings OpenAI). " +
-    "Con zero chiavi cloud ma OLLAMA_URL configurato, l'AI assistant è operativo in modalità degradata. " +
+    "Con zero chiavi cloud ma BOWIE_OLLAMA_URL configurato, l'AI assistant è operativo in modalità degradata. " +
     "Con zero provider, il server parte comunque e il triage usa il fallback rule-based deterministico.",
     C.greenLight, C.green,
   );

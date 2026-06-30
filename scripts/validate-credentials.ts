@@ -127,17 +127,17 @@ async function checkGemini() {
 }
 
 async function checkOllama() {
-  const url = process.env.OLLAMA_URL;
-  const token = process.env.OLLAMA_TOKEN;
-  const model = process.env.OLLAMA_MODEL;
+  const url = process.env.BOWIE_OLLAMA_URL;
+  const token = process.env.BOWIE_OLLAMA_TOKEN;
+  const model = process.env.BOWIE_OLLAMA_MODEL;
 
-  record("Ollama", "OLLAMA_URL", "optional", !!url, null,
+  record("Ollama", "BOWIE_OLLAMA_URL", "optional", !!url, null,
     url ? `Configurata: ${url}` : "Non configurata (opzionale — usa cloud AI come fallback)");
 
-  record("Ollama", "OLLAMA_TOKEN", "optional", !!token, null,
+  record("Ollama", "BOWIE_OLLAMA_TOKEN", "optional", !!token, null,
     token ? `Presente (${token.length} char)` : "Non configurata");
 
-  record("Ollama", "OLLAMA_MODEL", "optional", !!model, null,
+  record("Ollama", "BOWIE_OLLAMA_MODEL", "optional", !!model, null,
     model ? `Configurato: ${model}` : "Non configurato (default: llama3.1:8b)");
 
   if (!url) return;
@@ -145,7 +145,7 @@ async function checkOllama() {
   const r = await fetchCheck(`${url}/api/tags`, {
     headers: token ? { "X-Ollama-Token": token } : {},
   });
-  record("Ollama health", "OLLAMA_URL + OLLAMA_TOKEN", "optional", true, r.ok,
+  record("Ollama health", "BOWIE_OLLAMA_URL + BOWIE_OLLAMA_TOKEN", "optional", true, r.ok,
     r.ok ? "HTTP 200 — server raggiungibile" : `HTTP ${r.status} — ${r.body.slice(0, 80)}`);
 }
 

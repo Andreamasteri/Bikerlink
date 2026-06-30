@@ -147,8 +147,8 @@ export const getThinkCentreStatusTool = tool<EmptyInput, Record<string, unknown>
       }
     };
 
-    const ollamaUrl = process.env.OLLAMA_URL;
-    const ollamaToken = process.env.OLLAMA_TOKEN;
+    const ollamaUrl = process.env.BOWIE_OLLAMA_URL?.trim();
+    const ollamaToken = process.env.BOWIE_OLLAMA_TOKEN;
     const ghUrl = process.env.GRAPHHOPPER_URL;
     const ghToken = process.env.GRAPHHOPPER_TOKEN;
     const nominatimUrl = process.env.NOMINATIM_URL;

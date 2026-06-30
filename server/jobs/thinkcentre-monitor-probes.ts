@@ -37,8 +37,8 @@ export const RUNNING_UNDER_TEST =
 export const PROBE_ENV_VARS = [
   "GRAPHHOPPER_URL",
   "GRAPHHOPPER_TOKEN",
-  "OLLAMA_URL",
-  "OLLAMA_TOKEN",
+  "BOWIE_OLLAMA_URL",
+  "BOWIE_OLLAMA_TOKEN",
   "WHISPER_URL",
   "WHISPER_TOKEN",
   "NOMINATIM_URL",
@@ -183,10 +183,10 @@ export async function probeGraphHopperAreas(): Promise<{ unitOk: boolean | null;
 }
 
 async function probeOllamaOk(): Promise<boolean | null> {
-  const base = process.env.OLLAMA_URL?.replace(/\/$/, "");
+  const base = process.env.BOWIE_OLLAMA_URL?.trim().replace(/\/$/, "");
   if (!base) return null;
   const headers: Record<string, string> = { ...cfAccessHeaders() };
-  const token = process.env.OLLAMA_TOKEN;
+  const token = process.env.BOWIE_OLLAMA_TOKEN;
   if (token) headers["X-Ollama-Token"] = token;
   return httpProbe(`${base}/api/tags`, headers);
 }

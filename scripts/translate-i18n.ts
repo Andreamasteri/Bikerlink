@@ -24,13 +24,13 @@ async function main() {
   const flags = parseArgs(process.argv.slice(2));
 
   const apiKey = process.env.OPENAI_API_KEY;
-  const ollamaConfigured = Boolean(process.env.OLLAMA_URL);
+  const ollamaConfigured = Boolean(process.env.BOWIE_OLLAMA_URL);
   if (!apiKey && !ollamaConfigured && !flags.dryRun) {
-    console.error("[i18n] FATAL: né OPENAI_API_KEY né OLLAMA_URL sono impostati. Aborting.");
+    console.error("[i18n] FATAL: né OPENAI_API_KEY né BOWIE_OLLAMA_URL sono impostati. Aborting.");
     process.exit(1);
   }
   if (ollamaConfigured) {
-    console.log(`[i18n] Provider primario: Ollama (${process.env.OLLAMA_MODEL ?? "llama3.1:8b"})${apiKey ? " — fallback OpenAI" : " — nessun fallback OpenAI (OPENAI_API_KEY mancante)"}`);
+    console.log(`[i18n] Provider primario: Ollama (${process.env.BOWIE_OLLAMA_MODEL ?? "llama3.1:8b"})${apiKey ? " — fallback OpenAI" : " — nessun fallback OpenAI (OPENAI_API_KEY mancante)"}`);
   }
 
   const itPath = path.join(I18N_DIR, `${SOURCE_LANG}.ts`);

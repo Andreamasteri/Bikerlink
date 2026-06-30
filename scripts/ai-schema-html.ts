@@ -231,7 +231,7 @@ ${envRowsHtml}
   </tbody>
 </table>
 <div class="infobox infobox-green">
-  <strong>✅ Livello di resilienza:</strong> Il sistema funziona con un solo provider configurato. Con solo <span class="mono">GROQ_API_KEY</span> tutte le feature AI sono attive (eccetto embeddings OpenAI). Con zero chiavi cloud ma <span class="mono">OLLAMA_URL</span> configurato, l'AI assistant è operativo in modalità degradata. Con zero provider, il server parte comunque e il triage usa il fallback rule-based deterministico.
+  <strong>✅ Livello di resilienza:</strong> Il sistema funziona con un solo provider configurato. Con solo <span class="mono">GROQ_API_KEY</span> tutte le feature AI sono attive (eccetto embeddings OpenAI). Con zero chiavi cloud ma <span class="mono">BOWIE_OLLAMA_URL</span> configurato, l'AI assistant è operativo in modalità degradata. Con zero provider, il server parte comunque e il triage usa il fallback rule-based deterministico.
 </div>
 <footer>
   <span>BikerLink AI Stack Schema — Documento riservato</span>

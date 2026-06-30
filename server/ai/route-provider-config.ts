@@ -106,7 +106,7 @@ export async function getRouteProviderStatusList(): Promise<{
       configured: isOllamaConfigured,
       inChain: chain.includes("ollama"),
       position: chain.includes("ollama") ? chain.indexOf("ollama") + 1 : null,
-      envKey: "OLLAMA_URL",
+      envKey: "BOWIE_OLLAMA_URL",
     },
     {
       id: "groq",

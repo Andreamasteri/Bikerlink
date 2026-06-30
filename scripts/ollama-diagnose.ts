@@ -14,7 +14,7 @@
  * aggiornato). Fallback al disco locale se GITHUB_TOKEN è assente o la fetch
  * fallisce.
  *
- * La chiamata è HTTP DIRETTA all'endpoint Ollama (`${DIAG_OLLAMA_URL}/api/chat`),
+ * La chiamata è HTTP DIRETTA all'endpoint Ollama (`${ARES_OLLAMA_URL}/api/chat`),
  * NON passa dal backend Express: funziona anche quando il server è giù.
  *
  * Uso:
@@ -22,12 +22,12 @@
  *   npx tsx scripts/ollama-diagnose.ts --tail 500      # più righe per log
  *
  * Secret/env:
- *   DIAG_OLLAMA_URL    — URL base di Ares (Ollama PC fisso) via Cloudflare Tunnel.
+ *   ARES_OLLAMA_URL    — URL base di Ares (Ollama PC fisso) via Cloudflare Tunnel.
  *                        Es: https://diag.example.com  (senza /api finale)
- *   DIAG_OLLAMA_MODEL  — modello da usare (default "qwen3.6:35b").
+ *   ARES_OLLAMA_MODEL  — modello da usare (default "qwen3.6:35b").
  *                        Può puntare a un modello custom (es. "bikerlink-diag")
  *                        creato via Modelfile su Ares (PC fisso).
- *   DIAG_OLLAMA_TOKEN  — opzionale, Bearer token se l'endpoint è protetto.
+ *   ARES_OLLAMA_TOKEN  — opzionale, Bearer token se l'endpoint è protetto.
  *   DIAG_GITHUB_TOKEN  — token GitHub READ-ONLY (fine-grained, solo Contents:read
  *                        su Andreamasteri/Bikerlink); usato per fetch sorgenti
  *                        aggiornati. Se assente legge dal disco locale (fallback).
@@ -275,9 +275,9 @@ async function callOllama(
 // ─── Main ────────────────────────────────────────────────────────────────────
 
 async function main(): Promise<void> {
-  const baseUrl = process.env.DIAG_OLLAMA_URL?.trim();
-  const model = process.env.DIAG_OLLAMA_MODEL?.trim() || DEFAULT_MODEL;
-  const token = process.env.DIAG_OLLAMA_TOKEN?.trim() || undefined;
+  const baseUrl = process.env.ARES_OLLAMA_URL?.trim();
+  const model = process.env.ARES_OLLAMA_MODEL?.trim() || DEFAULT_MODEL;
+  const token = process.env.ARES_OLLAMA_TOKEN?.trim() || undefined;
   const tail = parseTailArg();
 
   console.log("════════════════════════════════════════════════════════════");
@@ -286,8 +286,8 @@ async function main(): Promise<void> {
 
   if (!baseUrl) {
     console.error(
-      "\n❌ DIAG_OLLAMA_URL non impostato.\n" +
-        "   Imposta il secret DIAG_OLLAMA_URL con l'URL di Ares (Ollama PC fisso)\n" +
+      "\n❌ ARES_OLLAMA_URL non impostato.\n" +
+        "   Imposta il secret ARES_OLLAMA_URL con l'URL di Ares (Ollama PC fisso)\n" +
         "   (es. https://diag.example.com tramite Cloudflare Tunnel) e riprova.\n",
     );
     process.exitCode = 1;
@@ -297,7 +297,7 @@ async function main(): Promise<void> {
   const { prompt, collected, missing, githubUsed } = await collectContext(tail);
   const system = loadSystemPrompt();
 
-  console.log(`\n  Istanza  : Ares (Ollama PC fisso, DIAG_OLLAMA_URL)`);
+  console.log(`\n  Istanza  : Ares (Ollama PC fisso, ARES_OLLAMA_URL)`);
   console.log(`  Modello  : ${model}`);
   console.log(`  Tail     : ${tail} righe/log`);
   console.log(`  Sorgenti : ${githubUsed ? "✅ GitHub API (main)" : "⚠️  disco locale (GITHUB_TOKEN assente)"}`);
@@ -325,7 +325,7 @@ async function main(): Promise<void> {
     }
     console.error(`   Dettaglio: ${e.message}`);
     console.error("\n   Verifica che Ares (PC fisso) sia acceso, che Ollama sia in esecuzione");
-    console.error("   e che il tunnel/hostname in DIAG_OLLAMA_URL sia raggiungibile.\n");
+    console.error("   e che il tunnel/hostname in ARES_OLLAMA_URL sia raggiungibile.\n");
     process.exitCode = 1;
     return;
   }

@@ -380,7 +380,7 @@ router.get("/thinkcentre-health", async (_req: Request, res: ExpressResponse) =>
     const tokenFingerprints = {
       graphhopper: tokenFingerprint(process.env.GRAPHHOPPER_TOKEN),
       valhalla:    tokenFingerprint(process.env.VALHALLA_API_KEY),
-      ollama:      tokenFingerprint(process.env.OLLAMA_TOKEN),
+      ollama:      tokenFingerprint(process.env.BOWIE_OLLAMA_TOKEN),
       whisper:     tokenFingerprint(process.env.WHISPER_TOKEN),
       nominatim:   tokenFingerprint(process.env.NOMINATIM_TOKEN),
     };

@@ -73,9 +73,9 @@ router.get("/health-check/ai-status", async (_req: Request, res: Response) => {
         {
           id: "ollama",
           label: "Ollama",
-          configured: Boolean(process.env.OLLAMA_URL),
+          configured: Boolean(process.env.BOWIE_OLLAMA_URL?.trim()),
           available: ollamaUp,
-          detail: process.env.OLLAMA_URL ? (ollamaUp ? "self-hosted" : "offline") : "non configurato",
+          detail: process.env.BOWIE_OLLAMA_URL?.trim() ? (ollamaUp ? "self-hosted" : "offline") : "non configurato",
         },
         cloud("groq", "Groq"),
         cloud("google", "Gemini"),

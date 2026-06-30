@@ -9,8 +9,8 @@
 #   ollama run bikerlink-assistant "Ciao, come funziona il matching?"
 #   # oppure via API senza SSH: npx tsx scripts/ollama-push-manual.ts
 #
-# Dopo la creazione, impostare su Replit OLLAMA_MODEL al nome usato
-#   (es. OLLAMA_MODEL=bikerlink oppure OLLAMA_MODEL=bikerlink-assistant)
+# Dopo la creazione, impostare su Replit BOWIE_OLLAMA_MODEL al nome usato
+#   (es. BOWIE_OLLAMA_MODEL=bikerlink oppure BOWIE_OLLAMA_MODEL=bikerlink-assistant)
 #
 # Il modello base si può cambiare con la variabile CHAT_MODEL
 # del setup-ollama-server.sh; di default mistral-nemo:latest.

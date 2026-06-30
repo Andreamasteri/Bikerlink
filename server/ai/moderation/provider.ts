@@ -289,11 +289,11 @@ function tryBuild(id: AiProviderId, role: ModelRole, forcedModelId?: string): Re
 
 // Task #2966 — Rete finale self-hosted: Ollama (ThinkCentre). Illimitato e locale,
 // quindi fuori dai cooldown/cap dei provider cloud. Lo scheduler è pass-through
-// (nessun limiter Bottleneck). Ritorna null se OLLAMA_URL non è configurato.
+// (nessun limiter Bottleneck). Ritorna null se BOWIE_OLLAMA_URL non è configurato.
 export function tryBuildOllama(): ResolvedModel | null {
   if (!isOllamaConfigured) return null;
   try {
-    const modelId = process.env.OLLAMA_MODEL ?? "mistral-nemo:latest";
+    const modelId = process.env.BOWIE_OLLAMA_MODEL ?? "mistral-nemo:latest";
     const model = getOllamaModel(modelId) as unknown as LanguageModelV2;
     return {
       id: "ollama",
@@ -505,12 +505,12 @@ export async function generateStructured<T>(
 }
 
 // Task #2825 — Variabili d'ambiente che attivano almeno un provider AI.
-export const AI_PROVIDER_ENV_VARS = ["GROQ_API_KEY", "OPENAI_API_KEY", "GEMINI_API_KEY", "OLLAMA_URL"] as const;
+export const AI_PROVIDER_ENV_VARS = ["GROQ_API_KEY", "OPENAI_API_KEY", "GEMINI_API_KEY", "BOWIE_OLLAMA_URL"] as const;
 
 // Messaggio standard 503 quando nessun provider AI è configurato. Contiene i nomi
 // delle variabili mancanti così il client può riconoscere il caso "chiave mancante".
 export const AI_NO_PROVIDER_MESSAGE =
-  "Servizio AI non disponibile: nessuna chiave AI configurata (OPENAI_API_KEY / GEMINI_API_KEY / OLLAMA_URL mancante)";
+  "Servizio AI non disponibile: nessuna chiave AI configurata (OPENAI_API_KEY / GEMINI_API_KEY / BOWIE_OLLAMA_URL mancante)";
 
 // Ritorna gli ID dei provider che hanno una chiave configurata (ignora il cooldown).
 export function getConfiguredProviders(): AiProviderId[] {
@@ -523,7 +523,7 @@ export function getConfiguredProviders(): AiProviderId[] {
 
 // True se almeno un provider AI è configurato (cloud o Ollama self-hosted).
 export function hasAnyAiProvider(): boolean {
-  return getConfiguredProviders().length > 0 || Boolean(process.env.OLLAMA_URL);
+  return getConfiguredProviders().length > 0 || Boolean(process.env.BOWIE_OLLAMA_URL?.trim());
 }
 
 export { readPreferredProvider, getGroqTpdStatus };

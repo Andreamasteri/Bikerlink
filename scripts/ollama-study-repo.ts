@@ -25,7 +25,7 @@
  *            UNA chiamata Ollama per invocazione e sopravvive a interruzioni /
  *            al cap dei 120s del foreground.
  *
- * La chiamata è HTTP DIRETTA a `${DIAG_OLLAMA_URL}/api/chat` con gli header del
+ * La chiamata è HTTP DIRETTA a `${ARES_OLLAMA_URL}/api/chat` con gli header del
  * Service Token Cloudflare Access (+ Bearer fallback). NON passa dal backend.
  *
  * Uso:
@@ -36,7 +36,7 @@
  *   Flag: --no-db --branch <b> --max-files <n> --chunk-chars <n> --num-ctx <n>
  *         --state-dir <path>
  *
- * Secret/env: DIAG_OLLAMA_URL, DIAG_OLLAMA_MODEL, DIAG_OLLAMA_TOKEN (opz.),
+ * Secret/env: ARES_OLLAMA_URL, ARES_OLLAMA_MODEL, ARES_OLLAMA_TOKEN (opz.),
  *   DIAG_GITHUB_TOKEN (fallback GITHUB_TOKEN), CF_ACCESS_CLIENT_ID/SECRET,
  *   DATABASE_URL, PROD_DATABASE_URL.
  */
@@ -271,9 +271,9 @@ async function runStep(c: StepCtx): Promise<boolean> {
 
 async function main(): Promise<void> {
   const cli = parseCli();
-  const baseUrl = process.env.DIAG_OLLAMA_URL?.trim();
-  const model = process.env.DIAG_OLLAMA_MODEL?.trim() || DEFAULT_MODEL;
-  const token = process.env.DIAG_OLLAMA_TOKEN?.trim() || undefined;
+  const baseUrl = process.env.ARES_OLLAMA_URL?.trim();
+  const model = process.env.ARES_OLLAMA_MODEL?.trim() || DEFAULT_MODEL;
+  const token = process.env.ARES_OLLAMA_TOKEN?.trim() || undefined;
   const dir = resolveStateDir(cli.stateDir);
 
   console.log("════════════════════════════════════════════════════════════");
@@ -292,7 +292,7 @@ async function main(): Promise<void> {
     return;
   }
   if (!cli.dryRun && !baseUrl) {
-    console.error("\n❌ DIAG_OLLAMA_URL non impostato. Imposta il secret e riprova (oppure usa --dry-run).");
+    console.error("\n❌ ARES_OLLAMA_URL non impostato. Imposta il secret e riprova (oppure usa --dry-run).");
     process.exitCode = 1;
     return;
   }

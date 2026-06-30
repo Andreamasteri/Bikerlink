@@ -3,13 +3,13 @@
  * diagnostica AI.
  *
  * Ares è una macchina SEPARATA dal ThinkCentre: espone Ollama su
- * `DIAG_OLLAMA_URL` (es. https://ollama.biker-link.net) tramite Cloudflare
+ * `ARES_OLLAMA_URL` (es. https://ollama.biker-link.net) tramite Cloudflare
  * Tunnel, NON protetto da Cloudflare Access (gli header CF Access vengono
  * comunque allegati: sono innocui verso un origin che non li valida).
  *
  * Env vars:
- *   DIAG_OLLAMA_URL    URL Ollama del PC fisso (online/offline + latenza).
- *   DIAG_OLLAMA_TOKEN  (opzionale) token custom Ollama, header X-Ollama-Token.
+ *   ARES_OLLAMA_URL    URL Ollama del PC fisso (online/offline + latenza).
+ *   ARES_OLLAMA_TOKEN  (opzionale) token custom Ollama, header X-Ollama-Token.
  *   ARES_METRICS_URL   (opzionale) endpoint HTTP che restituisce le metriche
  *                      host in JSON. Se assente, il monitor mostra solo
  *                      online/offline e segnala l'endpoint come prerequisito
@@ -36,7 +36,7 @@ import {
 export type { ProbeLogEntry };
 
 // Gli header CF Access vanno allegati SOLO verso origin di nostra proprietà
-// (biker-link.net). Se ARES_METRICS_URL/DIAG_OLLAMA_URL puntasse per errore a un
+// (biker-link.net). Se ARES_METRICS_URL/ARES_OLLAMA_URL puntasse per errore a un
 // host esterno, evitiamo di disclosare il service token Cloudflare.
 function trustedCfHeaders(url: string): Record<string, string> {
   try {
@@ -58,7 +58,7 @@ export interface AresSample {
 }
 
 export interface AresHealth {
-  /** DIAG_OLLAMA_URL impostato. */
+  /** ARES_OLLAMA_URL impostato. */
   configured: boolean;
   /** Ollama sul PC fisso raggiungibile. */
   online: boolean;
@@ -153,7 +153,7 @@ async function fetchAresMetrics(url: string): Promise<AresMetrics | null> {
 }
 
 export async function probeAres(): Promise<AresHealth> {
-  const base = process.env.DIAG_OLLAMA_URL?.replace(/\/$/, "");
+  const base = process.env.ARES_OLLAMA_URL?.trim().replace(/\/$/, "");
   const metricsUrl = process.env.ARES_METRICS_URL?.trim();
   const metricsConfigured = !!metricsUrl;
 
@@ -176,7 +176,7 @@ export async function probeAres(): Promise<AresHealth> {
   // Online check via Ollama /api/version (lightweight). Il PC fisso non è dietro
   // CF Access: gli header restano innocui (e comunque solo verso biker-link.net).
   const headers: Record<string, string> = { ...trustedCfHeaders(base) };
-  const token = process.env.DIAG_OLLAMA_TOKEN;
+  const token = process.env.ARES_OLLAMA_TOKEN;
   if (token) headers["X-Ollama-Token"] = token;
 
   const r = await httpProbe(`${base}/api/version`, headers);

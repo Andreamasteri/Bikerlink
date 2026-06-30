@@ -5,11 +5,11 @@
  * (stesso pattern di GraphHopper: URL + token in header custom).
  *
  * Variabili d'ambiente:
- *   OLLAMA_URL    — URL base del server Ollama (es: https://bikerlink.tail5056aa.ts.net/ollama)
+ *   BOWIE_OLLAMA_URL    — URL base del server Ollama (es: https://bikerlink.tail5056aa.ts.net/ollama)
  *                   Se non impostata, le funzioni lanciano un errore catchable e il
  *                   chiamante ricade sul provider cloud (Gemini/OpenAI).
- *   OLLAMA_TOKEN  — Token per il server self-hosted (header Authorization: Bearer).
- *   OLLAMA_MODEL  — Modello locale da usare.
+ *   BOWIE_OLLAMA_TOKEN  — Token per il server self-hosted (header Authorization: Bearer).
+ *   BOWIE_OLLAMA_MODEL  — Modello locale da usare.
  *                   Default: "mistral-nemo:latest" (il modello custom "bikerlink",
  *                   basato su mistral-nemo:latest, è il valore consigliato via secret).
  *
@@ -31,14 +31,14 @@ import { isThinkCentreOffline } from "./thinkcentre-offline";
 import { logAiCall } from "./ai-logger";
 import { cfAccessHeaders } from "./cf-access";
 
-const OLLAMA_URL = process.env.OLLAMA_URL?.replace(/\/$/, "");
-const OLLAMA_TOKEN = process.env.OLLAMA_TOKEN ?? "";
+const BOWIE_OLLAMA_URL = process.env.BOWIE_OLLAMA_URL?.trim().replace(/\/$/, "");
+const BOWIE_OLLAMA_TOKEN = process.env.BOWIE_OLLAMA_TOKEN ?? "";
 
 /**
  * Header per le richieste verso il server Ollama self-hosted.
  * Combina il token custom (Authorization: Bearer) con il Service Token
  * Cloudflare Access (vedi cf-access.ts), così l'edge CF valida la richiesta
- * prima dell'origine. OLLAMA_URL è SEMPRE self-hosted (nessun fallback cloud),
+ * prima dell'origine. BOWIE_OLLAMA_URL è SEMPRE self-hosted (nessun fallback cloud),
  * quindi gli header CF Access sono sempre appropriati qui.
  *
  * Nota: NON impostiamo un header Host — il requisito di Ollama 0.24+
@@ -47,16 +47,16 @@ const OLLAMA_TOKEN = process.env.OLLAMA_TOKEN ?? "";
  */
 function ollamaHeaders(): Record<string, string> {
   const h: Record<string, string> = {};
-  if (OLLAMA_TOKEN) h["Authorization"] = `Bearer ${OLLAMA_TOKEN}`;
+  if (BOWIE_OLLAMA_TOKEN) h["Authorization"] = `Bearer ${BOWIE_OLLAMA_TOKEN}`;
   Object.assign(h, cfAccessHeaders());
   return h;
 }
-// Task #3017: il modello default è "bikerlink" (Modelfile custom). Se OLLAMA_MODEL
+// Task #3017: il modello default è "bikerlink" (Modelfile custom). Se BOWIE_OLLAMA_MODEL
 // non è impostato, il setup script lo setta a "bikerlink" dopo la creazione.
-const OLLAMA_MODEL = process.env.OLLAMA_MODEL ?? "mistral-nemo:latest";
+const BOWIE_OLLAMA_MODEL = process.env.BOWIE_OLLAMA_MODEL ?? "mistral-nemo:latest";
 
-/** true quando OLLAMA_URL è impostato (Ollama abilitato come provider primario). */
-export const isOllamaConfigured = Boolean(OLLAMA_URL);
+/** true quando BOWIE_OLLAMA_URL è impostato (Ollama abilitato come provider primario). */
+export const isOllamaConfigured = Boolean(BOWIE_OLLAMA_URL);
 
 // ─── Circuit breaker — probe con cache 60s ────────────────────────────────────
 
@@ -73,7 +73,7 @@ let _probeTs = 0;
  * immediatamente così il chiamante salta Ollama senza aspettare AI_TIMEOUT_MS.
  */
 export async function isOllamaReachable(): Promise<boolean> {
-  if (!OLLAMA_URL) return false;
+  if (!BOWIE_OLLAMA_URL) return false;
 
   // ThinkCentre offline (spento O in manutenzione): salta subito Ollama senza
   // probe di rete — il chiamante ricade istantaneamente sul provider cloud.
@@ -91,8 +91,8 @@ export async function isOllamaReachable(): Promise<boolean> {
     // /api/tags è l'endpoint standard Ollama che restituisce la lista dei modelli:
     // più stabile e affidabile di HEAD / (che su Ollama 0.24+ può tornare 403
     // se il Host header non è localhost — problema già fixato in nginx, ma il probe
-    // dal backend usa l'URL OLLAMA_URL diretto, quindi /api/tags è più robusto).
-    const res = await fetch(`${OLLAMA_URL}/api/tags`, { method: "GET", headers, signal: controller.signal });
+    // dal backend usa l'URL BOWIE_OLLAMA_URL diretto, quindi /api/tags è più robusto).
+    const res = await fetch(`${BOWIE_OLLAMA_URL}/api/tags`, { method: "GET", headers, signal: controller.signal });
     clearTimeout(timer);
     _probeResult = res.ok || res.status < 500;
     _probeTs = Date.now();
@@ -112,16 +112,16 @@ export function resetOllamaProbeCache(): void {
 
 /**
  * Restituisce un LanguageModel del Vercel AI SDK puntato sul server Ollama.
- * Lancia subito un errore catchable se OLLAMA_URL non è impostato — così il
+ * Lancia subito un errore catchable se BOWIE_OLLAMA_URL non è impostato — così il
  * chiamante può ricadere sul provider cloud senza errori visibili all'utente.
  */
-export function getOllamaModel(model: string = OLLAMA_MODEL): LanguageModel {
-  if (!OLLAMA_URL) {
-    throw new Error("Ollama non configurato: variabile OLLAMA_URL mancante.");
+export function getOllamaModel(model: string = BOWIE_OLLAMA_MODEL): LanguageModel {
+  if (!BOWIE_OLLAMA_URL) {
+    throw new Error("Ollama non configurato: variabile BOWIE_OLLAMA_URL mancante.");
   }
   const headers = ollamaHeaders();
   const provider = createOllama({
-    baseURL: `${OLLAMA_URL}/api`,
+    baseURL: `${BOWIE_OLLAMA_URL}/api`,
     headers: Object.keys(headers).length > 0 ? headers : undefined,
   });
   return provider(model);
@@ -195,7 +195,7 @@ export async function callOllamaChat<T = string>(
             // Scrivi il repair in ai_call_logs — fire-and-forget, non blocca il ritorno.
             logAiCall({
               provider: "ollama",
-              modelId: OLLAMA_MODEL,
+              modelId: BOWIE_OLLAMA_MODEL,
               tokensIn: 0,
               tokensOut: 0,
               latencyMs: Date.now() - callStart,

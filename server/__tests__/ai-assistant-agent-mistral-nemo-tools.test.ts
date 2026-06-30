@@ -356,7 +356,7 @@ describe("runAssistantAgent — Mistral Nemo tool calling (Ollama provider)", ()
     expect(typeof result.tokensIn).toBe("number");
     expect(typeof result.tokensOut).toBe("number");
     expect(result.provider).toBe("ollama");
-    // Il model è determinato da OLLAMA_MODEL env var (runtime) — verifichiamo solo che sia una stringa non vuota
+    // Il model è determinato da BOWIE_OLLAMA_MODEL env var (runtime) — verifichiamo solo che sia una stringa non vuota
     expect(typeof result.model).toBe("string");
     expect(result.model.length).toBeGreaterThan(0);
   });

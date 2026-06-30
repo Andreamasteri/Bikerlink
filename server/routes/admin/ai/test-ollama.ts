@@ -34,7 +34,7 @@ function maskUrl(url: string): string {
  */
 export function sanitizeError(msg: string): string {
   let out = msg;
-  const token = process.env.OLLAMA_TOKEN;
+  const token = process.env.BOWIE_OLLAMA_TOKEN;
   // Sostituisci eventuali URL http(s) con la sola versione mascherata host.
   out = out.replace(/https?:\/\/[^\s"'`)]+/gi, (m) => maskUrl(m));
   // Rimuovi il token se presente nel testo.
@@ -48,11 +48,11 @@ export function sanitizeError(msg: string): string {
 
 router.get("/test-ollama", async (_req: Request, res: Response) => {
   // Letto a request-time per riflettere eventuali cambi env nel processo long-lived.
-  const rawUrl = process.env.OLLAMA_URL?.replace(/\/$/, "");
-  const model = process.env.OLLAMA_MODEL ?? "mistral-nemo:latest";
-  const tokenConfigured = Boolean(process.env.OLLAMA_TOKEN);
+  const rawUrl = process.env.BOWIE_OLLAMA_URL?.trim().replace(/\/$/, "");
+  const model = process.env.BOWIE_OLLAMA_MODEL ?? "mistral-nemo:latest";
+  const tokenConfigured = Boolean(process.env.BOWIE_OLLAMA_TOKEN);
 
-  // Se OLLAMA_URL non è impostata: non è un errore, semplicemente non configurato.
+  // Se BOWIE_OLLAMA_URL non è impostata: non è un errore, semplicemente non configurato.
   if (!isOllamaConfigured || !rawUrl) {
     return res.json({
       configured: false,
