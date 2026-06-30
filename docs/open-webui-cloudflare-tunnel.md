@@ -11,8 +11,10 @@
 
 | Componente | Stato |
 |---|---|
-| Container `open-webui` | ✅ Up (healthy), `--network host`, porta `3010` |
+| Container `open-webui` | ✅ Up (healthy), bind `127.0.0.1:3010->8080/tcp` |
 | `curl http://127.0.0.1:3010` sul TC | ✅ HTTP 200 |
+| `curl http://192.168.1.35:3010` (LAN diretta) | ✅ Connection refused — bypass bloccato |
+| Ollama raggiungibile dal container | ✅ `host.docker.internal:11434` HTTP 200 |
 | `cloudflared` (systemd) | ✅ active, token-managed |
 | Config locale `/etc/cloudflared/config.yml` | ❌ Non esiste — tunnel è dashboard-managed |
 
@@ -147,43 +149,47 @@ Procedura: apri `https://ai.biker-link.net`, inserisci email autorizzata, ricevi
 > Se la porta 3010 è raggiungibile direttamente (es. da LAN o con port-forward),
 > l'autenticazione può essere bypassata.
 
-### Problema attuale
+### ~~Problema attuale~~ — RISOLTO (30 giugno 2026)
 
-Il container usa `--network host`: la porta 3010 è esposta su **tutte le interfacce** del ThinkCentre
-(incluse LAN e Wi-Fi). Chiunque nella rete locale può accedere direttamente a `http://192.168.1.35:3010`
-senza passare per Cloudflare.
+~~Il container usa `--network host`: la porta 3010 è esposta su **tutte le interfacce** del ThinkCentre~~
+~~(incluse LAN e Wi-Fi). Chiunque nella rete locale può accedere direttamente a `http://192.168.1.35:3010`~~
+~~senza passare per Cloudflare.~~
 
-### Fix: bind solo su loopback
+Il container è stato ricreato con bind loopback. Accesso diretto dalla LAN: **Connection refused**.
 
-Ricrea il container con binding esplicito su loopback invece di `--network host`:
+### Configurazione attuale del container
 
 ```bash
-# Sul ThinkCentre:
-
-# 1. Ferma e rimuovi il container attuale
-docker stop open-webui
-docker rm open-webui
-
-# 2. Riavvia con binding loopback
 docker run -d \
   --name open-webui \
   --restart unless-stopped \
   -p 127.0.0.1:3010:8080 \
-  -e PORT=8080 \
-  -e OLLAMA_BASE_URL=http://127.0.0.1:11434 \
+  --add-host=host.docker.internal:host-gateway \
+  -e OLLAMA_BASE_URL=http://host.docker.internal:11434 \
+  -e WEBUI_NAME="BikerLink AI (Bowie)" \
+  -e SCARF_NO_ANALYTICS=true \
+  -e DO_NOT_TRACK=true \
+  -e ANONYMIZED_TELEMETRY=false \
   -v open-webui:/app/backend/data \
   ghcr.io/open-webui/open-webui:main
 ```
 
-> **Nota:** con `-p 127.0.0.1:3010:8080` (non `--network host`), Ollama deve essere
-> raggiungibile. Poiché Ollama è su `127.0.0.1:11434` dell'host e il container non
-> è più in host network, usa invece `http://host.docker.internal:11434` se il Docker
-> supporta quel nome, oppure ottieni l'IP del gateway Docker:
-> ```bash
-> docker network inspect bridge | grep '"Gateway"'
-> # di solito 172.17.0.1
-> ```
-> E usa `OLLAMA_BASE_URL=http://172.17.0.1:11434`
+> **Nota Ollama:** senza `--network host`, il container non può raggiungere `127.0.0.1:11434`
+> dell'host direttamente. Sono necessarie due modifiche:
+>
+> 1. **Ollama bind su `0.0.0.0`** — override systemd in
+>    `/etc/systemd/system/ollama.service.d/override.conf`:
+>    ```ini
+>    [Service]
+>    Environment="OLLAMA_HOST=0.0.0.0:11434"
+>    ```
+>    (protetto da ufw — porta 11434 accessibile solo da LAN + Docker bridge)
+>
+> 2. **Regola ufw per Docker bridge** — aggiunta manualmente:
+>    ```bash
+>    sudo ufw allow from 172.17.0.0/16 to any port 11434 proto tcp comment 'Docker bridge → Ollama'
+>    ```
+>    Questo permette al container (rete `172.17.0.0/16`) di raggiungere Ollama sull'host.
 
 Dopo il fix, verifica che il tunnel funzioni ancora:
 ```bash
@@ -199,9 +205,9 @@ curl -s --connect-timeout 3 http://192.168.1.35:3010
 # Atteso: Connection refused o timeout
 ```
 
-- [ ] Container ricreato con bind `127.0.0.1:3010:8080`
-- [ ] Accesso diretto a `http://192.168.1.35:3010` → Connection refused ✅
-- [ ] Tunnel `https://ai.biker-link.net` → ancora funzionante ✅
+- [x] Container ricreato con bind `127.0.0.1:3010:8080`
+- [x] Accesso diretto a `http://192.168.1.35:3010` → Connection refused ✅
+- [ ] Tunnel `https://ai.biker-link.net` → ancora funzionante ✅ (da verificare dopo setup Cloudflare dashboard)
 
 ---
 
@@ -228,16 +234,28 @@ curl -s -o /dev/null -w "%{http_code}" https://ai.biker-link.net
 
 ### Open WebUI e Ollama
 
-Open WebUI è già configurato per parlare con Ollama su `127.0.0.1:11434` (rete host).
-Se il container viene ricreato senza `--network host`, aggiornare `OLLAMA_BASE_URL`
-di conseguenza (vedi sezione Hardening di rete).
+Open WebUI parla con Ollama tramite `OLLAMA_BASE_URL=http://host.docker.internal:11434`.
+Ollama è configurato per ascoltare su `0.0.0.0:11434` (override systemd), protetto da ufw.
+Il container usa `--add-host=host.docker.internal:host-gateway` per risolvere l'host.
 
 ### Aggiornamento Open WebUI
 
 ```bash
 docker pull ghcr.io/open-webui/open-webui:main
 docker stop open-webui && docker rm open-webui
-# ri-lancia con gli stessi parametri (vedi sezione Hardening per parametri aggiornati)
+# ri-lancia con i parametri della sezione "Configurazione attuale del container"
+docker run -d \
+  --name open-webui \
+  --restart unless-stopped \
+  -p 127.0.0.1:3010:8080 \
+  --add-host=host.docker.internal:host-gateway \
+  -e OLLAMA_BASE_URL=http://host.docker.internal:11434 \
+  -e WEBUI_NAME="BikerLink AI (Bowie)" \
+  -e SCARF_NO_ANALYTICS=true \
+  -e DO_NOT_TRACK=true \
+  -e ANONYMIZED_TELEMETRY=false \
+  -v open-webui:/app/backend/data \
+  ghcr.io/open-webui/open-webui:main
 ```
 
 ---
@@ -251,5 +269,6 @@ docker stop open-webui && docker rm open-webui
 | 3 | 👤 Tu | Cloudflare dashboard | Crea Access Application + policy email | ⬜ |
 | 4 | 👤 Tu | Browser (incognito) | Verifica blocco utente non autorizzato | ⬜ |
 | 5 | 👤 Tu | Browser (autenticato) | Verifica accesso membro team | ⬜ |
-| 6 | 👤 Tu | ThinkCentre | Ricrea container con bind loopback (hardening) | ⬜ |
-| 7 | 👤 Tu | Terminale | Verifica accesso diretto `192.168.1.35:3010` bloccato | ⬜ |
+| 6 | ✅ Agente | ThinkCentre | Ricrea container con bind loopback `127.0.0.1:3010:8080` | ✅ |
+| 7 | ✅ Agente | ThinkCentre | Accesso diretto `192.168.1.35:3010` → Connection refused | ✅ |
+| 8 | ✅ Agente | ThinkCentre | Ollama bind `0.0.0.0` + ufw regola Docker bridge → 11434 | ✅ |

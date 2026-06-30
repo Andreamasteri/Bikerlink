@@ -45,6 +45,7 @@
 | Whisper ASR | `9000` | HTTPS `/whisper/*` | Trascrizione audio |
 | Nominatim | `8080` | HTTPS `/nominatim/*` | Geocoding OSM |
 | **Redis** | **`6379`** | **Stream TLS `:6380`** | **Cache, BullMQ, pub/sub** |
+| **Open WebUI (Bowie)** | **`3010`** | **Cloudflare Tunnel `ai.biker-link.net`** | **GUI Ollama — solo loopback** |
 
 ---
 
@@ -64,6 +65,7 @@
 | 9099 | TCP | ufw-status daemon | Solo localhost |
 | 6379 | TCP | Redis plaintext | **Solo localhost** |
 | 5432 | TCP | PostgreSQL | **Solo localhost** |
+| 3010 | TCP | Open WebUI (Bowie) | **Solo localhost** (bind `127.0.0.1`) |
 
 > **Nota router:** Il port forwarding per la porta 6380 deve essere configurato sul router di casa: `Esterno:6380 → 192.168.1.35:6380`.
 
@@ -221,6 +223,8 @@ Lo script è **idempotente**: può essere rieseguito senza danni in qualsiasi mo
 | PostgreSQL | 5432 | Solo localhost |
 | Redis TLS (nginx stream) | 6380 | Internet |
 | Redis raw | 6379 | Solo localhost |
+| Open WebUI (Bowie) | 3010 | Solo localhost (bind `127.0.0.1`) |
+| Ollama (da Docker bridge) | 11434 | Solo LAN + `172.17.0.0/16` (Docker bridge) |
 | Uptime Kuma *(futuro)* | 3001 | Commentato |
 
 ### Verifica stato
