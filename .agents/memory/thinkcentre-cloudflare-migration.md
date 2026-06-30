@@ -18,7 +18,7 @@ description: Migrazione COMPLETATA da DuckDNS+nginx+LE a Cloudflare Tunnel. Duck
 ID: `86122511-2752-4002-aec9-1fdd7c25b9f5`
 Route ingress:
 - `gh.biker-link.net`        → `http://127.0.0.1:8989`
-- `valhalla.biker-link.net`  → `http://127.0.0.1:8003`
+- `valhalla.biker-link.net`  → `http://127.0.0.1:8003` ⚠️ DOVREBBE essere `8002` (porta reale, verificato 30-giu-2026 via `ss -tlnp`+`docker ps`); ingress dashboard è scollegato/errato → endpoint pubblico rotto (502/connection refused). Fix richiede accesso alla dashboard Cloudflare, fuori dal repo.
 - `whisper.biker-link.net`   → `http://127.0.0.1:8080`
 - `nominatim.biker-link.net` → `http://127.0.0.1:7070`
 - `tc.biker-link.net`        → `http://127.0.0.1:9199`

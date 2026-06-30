@@ -10,7 +10,8 @@ La documentazione/skill descrivono nginx (duckdns) come reverse proxy attivo. **
 ## Fatti scoperti
 - **nginx è `disabled` + `inactive`** sul TC. I server block duckdns in `/etc/nginx/sites-available/bikerlink` sono **legacy**.
 - L'esposizione reale è il **Cloudflare Tunnel** (`cloudflared`, systemd, token-managed — NON c'è `/etc/cloudflared/config.yml`, le ingress rule stanno nella dashboard Cloudflare, fuori dalla portata dell'agente).
-- Il dominio pubblico attivo è **`biker-link.net`** (non più `*.bikerlink.duckdns.org`). Es. `gh.biker-link.net`→`127.0.0.1:8989`, `valhalla.biker-link.net`→`127.0.0.1:8003`. Il tunnel punta DIRETTO alle porte localhost dei backend, non a nginx:443.
+- Il dominio pubblico attivo è **`biker-link.net`** (non più `*.bikerlink.duckdns.org`). Es. `gh.biker-link.net`→`127.0.0.1:8989`, `valhalla.biker-link.net`→ dovrebbe puntare a `127.0.0.1:8002` (porta REALE in ascolto, verificato `ss -tlnp`/`docker ps`, container `bikerlink-valhalla` healthy). Il tunnel punta DIRETTO alle porte localhost dei backend, non a nginx:443.
+- **Bug noto (30 giu 2026, non fixabile da repo):** l'ingress dashboard del tunnel per `valhalla.biker-link.net` dialga `127.0.0.1:8003` (verificato via `journalctl -u cloudflared`: `connection refused`), ma Valhalla ascolta SOLO su `8002` → endpoint pubblico rotto. Serve correggere l'ingress rule nella dashboard Cloudflare (fuori dal repo). I file repo (docker-compose, build-valhalla-tiles.sh, cloudflared-config.yml, nginx-bikerlink.conf) sono tutti allineati a 8002 dal task #5250.
 - I cert Let's Encrypt (`/etc/letsencrypt/live/bikerlink`) sono **SAN** (gh/nominatim/ollama/tc/valhalla/whisper.bikerlink.duckdns.org), **non wildcard**; renewal `authenticator=standalone`.
 - DNS dei `*.bikerlink.duckdns.org` risolve all'**IP pubblico** (no DNS locale/pihole sul TC), quindi sulla LAN quei hostname NON puntano a 192.168.1.35.
 
