@@ -15,9 +15,7 @@ import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import Colors from "@/constants/colors";
 import { useFloatingWidget } from "@/lib/floating-widget-context";
-import { useAssistantEnabled } from "@/hooks/useAssistantEnabled";
 import { useAuth } from "@/lib/auth-context";
-import AssistantChatSheet from "@/components/user/ai-assistant/AssistantChatSheet";
 
 export const WIDGET_SIZE = 40;
 export const TAP_THRESHOLD = 8; // pixel di movimento oltre cui il gesto è un drag
@@ -57,13 +55,11 @@ export function isDragGesture(
 export default function FloatingWidget() {
   const { enabled, suppressed } = useFloatingWidget();
   const { user, healthState, healthReason } = useAuth();
-  const { fabEnabled } = useAssistantEnabled();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { width, height } = useWindowDimensions();
 
   const [menuOpen, setMenuOpen] = useState(false);
-  const [aiOpen, setAiOpen] = useState(false);
 
   const defaultX = width - WIDGET_SIZE - 20;
   const defaultY = height * 0.45;
@@ -229,9 +225,7 @@ export default function FloatingWidget() {
         style={[
           styles.widget,
           { left: posXAnim, top: posYAnim },
-          aiOpen && styles.widgetHidden,
         ]}
-        pointerEvents={aiOpen ? "none" : "auto"}
       >
         <View {...panResponder.panHandlers} style={styles.widgetInner}>
           <MaterialCommunityIcons name="cat" size={20} color="#fff" />
@@ -268,7 +262,7 @@ export default function FloatingWidget() {
               </View>
             )}
 
-            <Text style={styles.menuTitle}>Navigazione & Bowie</Text>
+            <Text style={styles.menuTitle}>Navigazione</Text>
 
             <Pressable
               style={styles.menuItem}
@@ -303,19 +297,6 @@ export default function FloatingWidget() {
               <Text style={styles.menuItemText}>Torna alla mappa</Text>
             </Pressable>
 
-            {fabEnabled && (
-              <Pressable
-                style={styles.menuItem}
-                onPress={() => {
-                  setMenuOpen(false);
-                  setAiOpen(true);
-                }}
-              >
-                <Ionicons name="sparkles-outline" size={22} color={Colors.accent} />
-                <Text style={styles.menuItemText}>Bowie</Text>
-              </Pressable>
-            )}
-
             <Pressable
               style={[styles.menuItem, styles.menuItemClose]}
               onPress={() => setMenuOpen(false)}
@@ -327,7 +308,6 @@ export default function FloatingWidget() {
         </Pressable>
       )}
 
-      {aiOpen && <AssistantChatSheet visible={aiOpen} onClose={() => setAiOpen(false)} />}
     </>
   );
 }
@@ -339,9 +319,6 @@ const styles = StyleSheet.create({
     height: WIDGET_SIZE,
     zIndex: 9000,
     elevation: 12,
-  },
-  widgetHidden: {
-    opacity: 0,
   },
   healthBadge: {
     position: "absolute",

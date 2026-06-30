@@ -127,6 +127,11 @@ const TAB_OPTIONS_ARCADE = (gpsTabHref: GpsTabHref): TabScreenOptions => ({
   headerTitle: "Arcade",
   href: gpsTabHref,
 });
+const TAB_OPTIONS_BOWIE: TabScreenOptions = {
+  title: "Bowie",
+  headerShown: false,
+  href: null,
+};
 const TAB_OPTIONS_TRACKING = (t: TFn): TabScreenOptions => ({
   title: t("tracking.tabTitle"),
   headerTitle: t("tracking.recordRide"),
@@ -161,6 +166,7 @@ function getTabScreens(
     <Tabs.Screen key="chat" name="chat" options={TAB_OPTIONS_CHAT(gpsTabHref)} />,
     <Tabs.Screen key="contest" name="contest" options={TAB_OPTIONS_CONTEST(gpsTabHref)} />,
     <Tabs.Screen key="arcade" name="arcade" options={TAB_OPTIONS_ARCADE(gpsTabHref)} />,
+    <Tabs.Screen key="bowie" name="bowie" options={TAB_OPTIONS_BOWIE} />,
     <Tabs.Screen key="ride" name="ride" options={TAB_OPTIONS_RIDE} />,
     <Tabs.Screen key="giri" name="giri" options={TAB_OPTIONS_GIRI} />,
     <Tabs.Screen key="tracking" name="tracking" options={TAB_OPTIONS_TRACKING(t)} />,
@@ -384,8 +390,9 @@ export default function TabLayout() {
     const tabs: TabItem[] = state.routes
       .filter((route) => {
         const options = descriptors[route.key].options as Record<string, unknown>;
-        // Exclude href:null screens (Expo Router sets tabBarButton to a null fn)
-        if (typeof options.tabBarButton === "function") return false;
+        // Exclude href:null screens (Expo Router sets tabBarButton to a null fn),
+        // EXCEPT "bowie" which is href:null but must appear in the Community modal.
+        if (typeof options.tabBarButton === "function" && route.name !== "bowie") return false;
         return true;
       })
       .map((route) => {

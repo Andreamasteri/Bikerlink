@@ -26,7 +26,7 @@ interface CustomTabBarProps {
   style: TaskbarStyle;
 }
 
-const COMMUNITY_TABS = new Set(["match", "motoclub", "contest", "music", "eventi", "arcade"]);
+const COMMUNITY_TABS = new Set(["match", "motoclub", "contest", "music", "eventi", "arcade", "bowie"]);
 const MAX_SCORRI_VISIBLE = 6;
 
 function TabIcon({ tab, isActive }: { tab: TabItem; isActive: boolean }) {
@@ -86,6 +86,9 @@ export default function CustomTabBar({
   };
 
   if (style === "scorri") {
+    // "bowie" is a Community-modal-only tab: accessible only via the raggruppa
+    // Community modal, not as a direct entry in the scorri scroll bar.
+    const scorriTabs = tabs.filter((t) => t.name !== "bowie");
     const screenWidth = Dimensions.get("window").width;
     const arrowWidth = 32;
     const availableWidth = screenWidth - arrowWidth * 2;
@@ -106,7 +109,7 @@ export default function CustomTabBar({
           contentContainerStyle={staticStyles.scorriContent}
           style={{ flex: 1 }}
         >
-          {tabs.map((tab) => (
+          {scorriTabs.map((tab) => (
             <ScrollTabIcon
               key={tab.name}
               tab={tab}

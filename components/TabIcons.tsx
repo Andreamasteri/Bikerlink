@@ -175,6 +175,9 @@ export function TabIcon({
     case "arcade":
       return <Ionicons name="game-controller" size={size} color={color} />;
 
+    case "bowie":
+      return <MaterialCommunityIcons name="cat" size={size} color={color} />;
+
     case "ride":
       return null;
 
