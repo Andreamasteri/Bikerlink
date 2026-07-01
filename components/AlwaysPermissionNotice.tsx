@@ -73,54 +73,130 @@ export default function AlwaysPermissionNotice({ onDismiss }: Props) {
             <Text style={{ color: colors.text }}>{"• "}</Text>
             {"Inviare la posizione SOS in emergenza\n"}
             <Text style={{ color: colors.text }}>{"• "}</Text>
-            {"Mantenerti visibile nella community\n\n"}
-            {needsSettings ? (
-              <>
-                {isIos
-                  ? "Apri le Impostazioni e imposta il permesso di posizione su "
-                  : "Apri le Impostazioni di sistema e imposta il permesso di posizione su "}
-                <Text style={[styles.bold, { color: colors.text }]}>
-                  {isIos ? '"Sempre"' : '"Consenti sempre"'}
-                </Text>
-                .
-              </>
-            ) : (
-              <>
-                Tocca{" "}
-                <Text style={[styles.bold, { color: colors.text }]}>
-                  Richiedi permesso
-                </Text>{" "}
-                e scegli{" "}
-                <Text style={[styles.bold, { color: colors.text }]}>
-                  "Consenti sempre"
-                </Text>
-                .
-              </>
-            )}
+            {"Mantenerti visibile nella community"}
           </Text>
 
-          {needsSettings && (
-            <View style={[styles.deniedBox, { backgroundColor: "#FF444418", borderColor: "#FF444433" }]}>
-              <Ionicons name="warning-outline" size={16} color="#FF4444" />
-              <Text style={[styles.deniedText, { color: "#FF4444" }]}>
-                {isIos ? (
-                  <>
-                    Permesso da concedere a mano. Vai in{" "}
-                    <Text style={{ fontFamily: "Inter_600SemiBold" }}>
-                      Impostazioni → BikerLink → Posizione → Sempre
-                    </Text>
-                    .
-                  </>
-                ) : (
-                  <>
-                    Android richiede di abilitare "Sempre" dalle Impostazioni. Vai in{" "}
-                    <Text style={{ fontFamily: "Inter_600SemiBold" }}>
-                      Impostazioni → Posizione → Consenti sempre
-                    </Text>
-                    .
-                  </>
-                )}
+          {!needsSettings && (
+            <View style={[styles.stepsBox, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+              <Text style={[styles.stepsTitle, { color: colors.text }]}>
+                Come rispondere al popup
               </Text>
+
+              <View style={styles.stepRow}>
+                <View style={[styles.stepBadge, { backgroundColor: colors.border }]}>
+                  <Text style={[styles.stepBadgeText, { color: colors.text }]}>1</Text>
+                </View>
+                <Text style={[styles.stepText, { color: colors.textSecondary }]}>
+                  Tocca{" "}
+                  <Text style={[styles.bold, { color: colors.text }]}>Richiedi permesso</Text>
+                  {" "}qui sotto.
+                </Text>
+              </View>
+
+              <View style={styles.stepRow}>
+                <View style={[styles.stepBadge, { backgroundColor: colors.border }]}>
+                  <Text style={[styles.stepBadgeText, { color: colors.text }]}>2</Text>
+                </View>
+                <Text style={[styles.stepText, { color: colors.textSecondary }]}>
+                  Nel popup del telefono, scegli{" "}
+                  <Text style={[styles.highlight, { backgroundColor: colors.accent, color: colors.background }]}>
+                    {isIos ? '"Sempre"' : '"Consenti sempre"'}
+                  </Text>
+                  .
+                </Text>
+              </View>
+
+              <View style={[styles.infoRow, { borderTopColor: colors.border }]}>
+                <Ionicons name="information-circle-outline" size={16} color={colors.textSecondary} />
+                <Text style={[styles.infoText, { color: colors.textSecondary }]}>
+                  {isIos
+                    ? 'A volte iOS mostra prima solo "Consenti mentre usi l\'app": è normale, non è un errore. Continua a usare l\'app e dopo qualche minuto iOS ripropone il popup con l\'opzione "Sempre" — scegli quella al secondo popup.'
+                    : 'Su alcuni Android il popup propone solo "Consenti mentre usi l\'app" e non mostra "Consenti sempre": è normale. In quel caso tocca "Apri Impostazioni" qui sotto e abilita "Consenti sempre" manualmente.'}
+                </Text>
+              </View>
+            </View>
+          )}
+
+          {needsSettings && (
+            <View style={[styles.stepsBox, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+              <Text style={[styles.stepsTitle, { color: colors.text }]}>
+                Attiva "Sempre" dalle Impostazioni
+              </Text>
+              {isIos ? (
+                <>
+                  <View style={styles.stepRow}>
+                    <View style={[styles.stepBadge, { backgroundColor: colors.border }]}>
+                      <Text style={[styles.stepBadgeText, { color: colors.text }]}>1</Text>
+                    </View>
+                    <Text style={[styles.stepText, { color: colors.textSecondary }]}>
+                      Tocca{" "}
+                      <Text style={[styles.bold, { color: colors.text }]}>Apri Impostazioni</Text>
+                      {" "}qui sotto.
+                    </Text>
+                  </View>
+                  <View style={styles.stepRow}>
+                    <View style={[styles.stepBadge, { backgroundColor: colors.border }]}>
+                      <Text style={[styles.stepBadgeText, { color: colors.text }]}>2</Text>
+                    </View>
+                    <Text style={[styles.stepText, { color: colors.textSecondary }]}>
+                      Vai su{" "}
+                      <Text style={[styles.bold, { color: colors.text }]}>Posizione</Text>
+                    </Text>
+                  </View>
+                  <View style={styles.stepRow}>
+                    <View style={[styles.stepBadge, { backgroundColor: colors.border }]}>
+                      <Text style={[styles.stepBadgeText, { color: colors.text }]}>3</Text>
+                    </View>
+                    <Text style={[styles.stepText, { color: colors.textSecondary }]}>
+                      Seleziona{" "}
+                      <Text style={[styles.highlight, { backgroundColor: colors.accent, color: colors.background }]}>
+                        "Sempre"
+                      </Text>
+                    </Text>
+                  </View>
+                </>
+              ) : (
+                <>
+                  <View style={styles.stepRow}>
+                    <View style={[styles.stepBadge, { backgroundColor: colors.border }]}>
+                      <Text style={[styles.stepBadgeText, { color: colors.text }]}>1</Text>
+                    </View>
+                    <Text style={[styles.stepText, { color: colors.textSecondary }]}>
+                      Tocca{" "}
+                      <Text style={[styles.bold, { color: colors.text }]}>Apri Impostazioni</Text>
+                      {" "}qui sotto.
+                    </Text>
+                  </View>
+                  <View style={styles.stepRow}>
+                    <View style={[styles.stepBadge, { backgroundColor: colors.border }]}>
+                      <Text style={[styles.stepBadgeText, { color: colors.text }]}>2</Text>
+                    </View>
+                    <Text style={[styles.stepText, { color: colors.textSecondary }]}>
+                      Vai su{" "}
+                      <Text style={[styles.bold, { color: colors.text }]}>Autorizzazioni → Posizione</Text>
+                    </Text>
+                  </View>
+                  <View style={styles.stepRow}>
+                    <View style={[styles.stepBadge, { backgroundColor: colors.border }]}>
+                      <Text style={[styles.stepBadgeText, { color: colors.text }]}>3</Text>
+                    </View>
+                    <Text style={[styles.stepText, { color: colors.textSecondary }]}>
+                      Seleziona{" "}
+                      <Text style={[styles.highlight, { backgroundColor: colors.accent, color: colors.background }]}>
+                        "Consenti sempre"
+                      </Text>
+                    </Text>
+                  </View>
+                </>
+              )}
+              <View style={[styles.infoRow, { borderTopColor: colors.border }]}>
+                <Ionicons name="warning-outline" size={16} color="#FF4444" />
+                <Text style={[styles.infoTextWarn, { color: "#FF4444" }]}>
+                  {isIos
+                    ? "Il sistema non mostrerà più il popup automatico per questa app: il permesso va concesso a mano da qui."
+                    : "Android richiede di abilitare \"Consenti sempre\" a mano dalle Impostazioni: il popup automatico non basta più."}
+                </Text>
+              </View>
             </View>
           )}
 
@@ -261,20 +337,67 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_400Regular",
     fontSize: 14,
   },
-  deniedBox: {
+  stepsBox: {
+    borderRadius: 14,
+    borderWidth: 1,
+    padding: 16,
+    width: "100%",
+    marginBottom: 20,
+  },
+  stepsTitle: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 14,
+    marginBottom: 14,
+  },
+  stepRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 10,
+    marginBottom: 12,
+  },
+  stepBadge: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 1,
+  },
+  stepBadgeText: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 12,
+  },
+  stepText: {
+    flex: 1,
+    fontFamily: "Inter_400Regular",
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  highlight: {
+    fontFamily: "Inter_700Bold",
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    overflow: "hidden",
+  },
+  infoRow: {
     flexDirection: "row",
     alignItems: "flex-start",
     gap: 8,
-    borderRadius: 10,
-    borderWidth: 1,
-    padding: 12,
-    width: "100%",
-    marginBottom: 16,
+    borderTopWidth: 1,
+    paddingTop: 12,
+    marginTop: 2,
   },
-  deniedText: {
+  infoText: {
     flex: 1,
     fontFamily: "Inter_400Regular",
-    fontSize: 13,
-    lineHeight: 19,
+    fontSize: 12,
+    lineHeight: 18,
+  },
+  infoTextWarn: {
+    flex: 1,
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    lineHeight: 18,
   },
 });
