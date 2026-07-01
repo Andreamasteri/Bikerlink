@@ -65,12 +65,13 @@ export function startMatchingEngine(): void {
       const { bz, bb, pp, pm, afterDays } = await withDbRetry(async () => {
         const afterSetting = await storage.getAppSetting("match_archive_after_days");
         const days = afterSetting?.value ? Math.max(1, parseInt(afterSetting.value, 10)) : 30;
-        const [bz, bb, pp, pm] = await Promise.all([
-          storage.archiveStaleBikerZavorrinaMatches(days),
-          storage.archiveStaleBikerBikerMatches(days),
-          storage.archiveStaleProposalProfileMatches(days),
-          storage.archiveStaleProposalMatches(days),
-        ]);
+        // Pool budget (Task #5323): archiviazioni in sequenza, non con
+        // Promise.all — 4 UPDATE simultanee aprivano 4 connessioni del pool
+        // insieme (burst non budgettato che contribuisce ai picchi di "waiting").
+        const bz = await storage.archiveStaleBikerZavorrinaMatches(days);
+        const bb = await storage.archiveStaleBikerBikerMatches(days);
+        const pp = await storage.archiveStaleProposalProfileMatches(days);
+        const pm = await storage.archiveStaleProposalMatches(days);
         return { bz, bb, pp, pm, afterDays: days };
       });
       const total = bz + bb + pp + pm;

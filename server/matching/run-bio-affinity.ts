@@ -124,13 +124,14 @@ export async function runBioAffinityMatching(): Promise<number> {
 
   try {
     // ── Parametri configurabili ───────────────────────────────────────────
-    const [budgetMs, topK, simThreshold, batchSize, requireHnsw] = await Promise.all([
-      readNumberSetting("bio_affinity_budget_ms", DEFAULT_BUDGET_MS),
-      readNumberSetting("bio_affinity_top_k", DEFAULT_TOP_K),
-      readNumberSetting("bio_affinity_threshold", DEFAULT_SIM_THRESHOLD),
-      readNumberSetting("bio_affinity_batch_size", DEFAULT_BATCH_SIZE),
-      readBoolSetting("bio_affinity_require_hnsw", false),
-    ]);
+    // Pool budget (Task #5323): letture di setup in sequenza, non con
+    // Promise.all — quest'ultimo apriva 5 connessioni del pool insieme (burst
+    // non budgettato che contribuisce ai picchi di "waiting" con pool max=10).
+    const budgetMs = await readNumberSetting("bio_affinity_budget_ms", DEFAULT_BUDGET_MS);
+    const topK = await readNumberSetting("bio_affinity_top_k", DEFAULT_TOP_K);
+    const simThreshold = await readNumberSetting("bio_affinity_threshold", DEFAULT_SIM_THRESHOLD);
+    const batchSize = await readNumberSetting("bio_affinity_batch_size", DEFAULT_BATCH_SIZE);
+    const requireHnsw = await readBoolSetting("bio_affinity_require_hnsw", false);
     const BUDGET_MS = Math.max(1_000, budgetMs);
     const TOP_K = Math.max(1, Math.floor(topK));
     const SIM_THRESHOLD = Math.max(0, Math.min(1, simThreshold));
@@ -181,7 +182,7 @@ export async function runBioAffinityMatching(): Promise<number> {
 
     // ── Cursore persistente ───────────────────────────────────────────────
     const cursor = (await readSettingRaw(CURSOR_KEY)) ?? "";
-    let drivers = cursor ? rows.filter((r) => r.user_id > cursor) : rows;
+    const drivers = cursor ? rows.filter((r) => r.user_id > cursor) : rows;
     if (drivers.length === 0) {
       // Cursore oltre la fine della lista (o lista accorciata): azzera e
       // riparti dall'inizio al prossimo ciclo.

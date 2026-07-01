@@ -221,17 +221,20 @@ async function loadMusicMatchingCap(): Promise<number> {
 
 export async function runMusicAffinityMatching(): Promise<number> {
   try {
-    const [allUserIds, prefsMap, blocked, wTag, wEmb, minCombined, matchingDisabledSet, maxTotal, k] = await Promise.all([
-      loadMusicEmbeddingUserIds(),
-      loadMatchPreferencesMap(),
-      storage.getAllBlockedPairs(),
-      loadWeight("match_music_combined_weight_tag", DEFAULT_W_TAG),
-      loadWeight("match_music_combined_weight_embedding", DEFAULT_W_EMB),
-      loadCombinedThreshold(),
-      loadMatchingDisabledSet(),
-      loadMusicMatchingCap(),
-      loadMatchingK(),
-    ]);
+    // Pool budget (Task #5323): queste letture di setup venivano eseguite con
+    // Promise.all, aprendo fino a 9 connessioni del pool simultaneamente (burst
+    // non budgettato). Con pool max=10 un singolo run saturava quasi il pool e
+    // affamava il traffico utente (picco di "waiting"). Eseguite in sequenza
+    // usano 1 connessione alla volta; la latenza extra è irrilevante per un job bg.
+    const allUserIds = await loadMusicEmbeddingUserIds();
+    const prefsMap = await loadMatchPreferencesMap();
+    const blocked = await storage.getAllBlockedPairs();
+    const wTag = await loadWeight("match_music_combined_weight_tag", DEFAULT_W_TAG);
+    const wEmb = await loadWeight("match_music_combined_weight_embedding", DEFAULT_W_EMB);
+    const minCombined = await loadCombinedThreshold();
+    const matchingDisabledSet = await loadMatchingDisabledSet();
+    const maxTotal = await loadMusicMatchingCap();
+    const k = await loadMatchingK();
 
     if (allUserIds.length < 2) {
       console.log("[MusicAffinity] meno di 2 embedding `music_taste`, skip.");

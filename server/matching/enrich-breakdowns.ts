@@ -53,12 +53,15 @@ export async function enrichBikerMatchBreakdowns(): Promise<EnrichBreakdownsResu
   };
 
   try {
-    const [bbSet, bzSet, bbClear, bzClear] = await Promise.all([
-      // ── biker_biker_matches — multi-key SET ('musica' + 'stile_guida') ───────
-      // ma is ID-ordered (user_a_id < user_b_id) → matches biker1/biker2 directly.
-      // ta is unordered → LEAST/GREATEST. Only rows with at least one active
-      // affinity are candidates; IS DISTINCT FROM skips no-op writes.
-      db.execute(sql`
+    // Pool budget (Task #5323): queste 4 UPDATE pesanti venivano eseguite con
+    // Promise.all, aprendo 4 connessioni del pool simultaneamente (burst non
+    // budgettato che con pool max=10 contribuisce ai picchi di "waiting").
+    // Eseguite in sequenza usano 1 connessione alla volta; è un job bg.
+    // ── biker_biker_matches — multi-key SET ('musica' + 'stile_guida') ───────
+    // ma is ID-ordered (user_a_id < user_b_id) → matches biker1/biker2 directly.
+    // ta is unordered → LEAST/GREATEST. Only rows with at least one active
+    // affinity are candidates; IS DISTINCT FROM skips no-op writes.
+    const bbSet = await db.execute(sql`
         UPDATE biker_biker_matches bb
         SET score_breakdown = src.new_bd
         FROM (
@@ -90,11 +93,11 @@ export async function enrichBikerMatchBreakdowns(): Promise<EnrichBreakdownsResu
         ) src
         WHERE bb.id = src.id
           AND src.new_bd IS DISTINCT FROM bb.score_breakdown
-      `),
+      `);
 
-      // ── biker_zavorrina_matches — multi-key SET ('musica' + 'stile_guida') ───
-      // biker/zavorrina columns are role-ordered, so both joins use LEAST/GREATEST.
-      db.execute(sql`
+    // ── biker_zavorrina_matches — multi-key SET ('musica' + 'stile_guida') ───
+    // biker/zavorrina columns are role-ordered, so both joins use LEAST/GREATEST.
+    const bzSet = await db.execute(sql`
         UPDATE biker_zavorrina_matches bz
         SET score_breakdown = src.new_bd
         FROM (
@@ -126,12 +129,12 @@ export async function enrichBikerMatchBreakdowns(): Promise<EnrichBreakdownsResu
         ) src
         WHERE bz.id = src.id
           AND src.new_bd IS DISTINCT FROM bz.score_breakdown
-      `),
+      `);
 
-      // ── biker_biker_matches — multi-key CLEAR (drop stale 'musica'/'stile_guida') ─
-      // array_remove(...,NULL) yields the set of keys with no active affinity;
-      // `jsonb - text[]` drops them in one pass. IS DISTINCT FROM skips no-ops.
-      db.execute(sql`
+    // ── biker_biker_matches — multi-key CLEAR (drop stale 'musica'/'stile_guida') ─
+    // array_remove(...,NULL) yields the set of keys with no active affinity;
+    // `jsonb - text[]` drops them in one pass. IS DISTINCT FROM skips no-ops.
+    const bbClear = await db.execute(sql`
         UPDATE biker_biker_matches bb
         SET score_breakdown = src.new_bd
         FROM (
@@ -160,10 +163,10 @@ export async function enrichBikerMatchBreakdowns(): Promise<EnrichBreakdownsResu
         ) src
         WHERE bb.id = src.id
           AND src.new_bd IS DISTINCT FROM bb.score_breakdown
-      `),
+      `);
 
-      // ── biker_zavorrina_matches — multi-key CLEAR ────────────────────────────
-      db.execute(sql`
+    // ── biker_zavorrina_matches — multi-key CLEAR ────────────────────────────
+    const bzClear = await db.execute(sql`
         UPDATE biker_zavorrina_matches bz
         SET score_breakdown = src.new_bd
         FROM (
@@ -192,8 +195,7 @@ export async function enrichBikerMatchBreakdowns(): Promise<EnrichBreakdownsResu
         ) src
         WHERE bz.id = src.id
           AND src.new_bd IS DISTINCT FROM bz.score_breakdown
-      `),
-    ]);
+      `);
 
     const row = (r: { rowCount?: number | null; rows?: unknown[] }) =>
       r.rowCount ?? (r.rows as unknown[])?.length ?? 0;
