@@ -30,6 +30,7 @@ import {
   pipelineFlowEvents,
 } from "@shared/db";
 import { withDbRetry } from "../lib/db-retry";
+import { purgeOldAssistantImages } from "./assistant-images-retention";
 
 interface RetentionTarget {
   name: string;
@@ -173,6 +174,11 @@ export async function runLogRetention(): Promise<void> {
     }
   }
   totalDeleted += await purgeNotificationHistory();
+  try {
+    await purgeOldAssistantImages();
+  } catch (err) {
+    console.warn("[LOG-RETENTION] Errore purge assistant images:", err);
+  }
   console.log(`[LOG-RETENTION] Completato — totale righe rimosse: ${totalDeleted}`);
 }
 
