@@ -10,6 +10,8 @@ import {
   recordNotificationHistory,
   getAppPushTokens,
   clearStalePushTokenRow,
+  getBowieDeviceToken,
+  clearStaleBowieDeviceToken,
 } from "./push-notifications-internal";
 
 const EXPO_PUSH_URL = "https://exp.host/--/api/v2/push/send";
@@ -338,13 +340,24 @@ export async function sendDrivingStyleChangePushNotification(
 // esplicitamente dall'utente nel terminale, non una notifica promozionale.
 export async function sendBowieReplyPush(
   userId: string,
-  opts: { body: string; persona?: { id: string; name: string } },
+  opts: { body: string; persona?: { id: string; name: string }; deviceId?: string },
 ): Promise<number> {
   try {
-    // Task #5273: la risposta Bowie va SOLO ai token registrati dalla Bowie
-    // Terminal (app_id="bowie"), non a users.expoPushToken (che appartiene
-    // all'app principale). Così le due app non si rubano più le notifiche.
-    const tokens = await getAppPushTokens([userId], "bowie");
+    // Task #5277: se conosciamo il device che ha originato la richiesta (quick-
+    // reply Bowie Terminal), consegniamo SOLO a quello — non a tutti i device
+    // Bowie dell'utente — e mai a un device revocato dall'admin (la lookup
+    // esclude revoked_at). Senza deviceId (client vecchi, o richieste dall'app
+    // principale) si torna al broadcast per app_id="bowie" di prima.
+    let tokens: Array<{ userId: string; token: string }>;
+    if (opts.deviceId) {
+      const deviceToken = await getBowieDeviceToken(userId, opts.deviceId);
+      tokens = deviceToken ? [{ userId, token: deviceToken }] : [];
+    } else {
+      // Task #5273: la risposta Bowie va SOLO ai token registrati dalla Bowie
+      // Terminal (app_id="bowie"), non a users.expoPushToken (che appartiene
+      // all'app principale). Così le due app non si rubano più le notifiche.
+      tokens = await getAppPushTokens([userId], "bowie");
+    }
     if (!tokens.length) return 0;
 
     const personaName = opts.persona?.name ?? "Bowie";
@@ -358,7 +371,8 @@ export async function sendBowieReplyPush(
       channelId: "bowie",
     }));
     await sendExpoMessages(messages, userIdByToken, {
-      onDeviceNotRegistered: (token) => clearStalePushTokenRow(token),
+      onDeviceNotRegistered: (token) =>
+        opts.deviceId ? clearStaleBowieDeviceToken(token) : clearStalePushTokenRow(token),
     });
     return messages.length;
   } catch (err) {

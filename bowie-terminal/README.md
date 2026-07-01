@@ -20,7 +20,7 @@ bowie-terminal/
   lib/
     bowie-client.ts # login + SSE sendMessage + notification-reply + push-token
     session.ts      # SecureStore: token, ruolo, tema
-    notifications.ts# notifica persistente + quick-reply (POC) + background task
+    notifications.ts# notifica persistente + quick-reply per-device + push listener
   constants/
     theme.ts        # 4 temi BikerLink (attuale/asfalto/velocita/rotta)
   app.json eas.json tsconfig.json babel.config.js
@@ -60,21 +60,27 @@ backend e colora automaticamente il prefisso della risposta.
   `ai_call_logs.security_blocked`) sono **lato backend**: il terminale riceve già
   la risposta filtrata. Nessun segreto è hardcoded nel client.
 
-## Notifica persistente Android — ⚠️ POC
+## Notifica persistente Android — quick-reply per-device
 
-Lo step "quick-reply ad app terminata" (Task #5222, step 6) è un **POC non
-collaudato**:
+La quick-reply dalla notifica persistente (Task #5222/#5272, wiring finale
+Task #5277) passa **sempre** da `POST /api/ai/assistant/notification-reply`
+con il `deviceId` di questo device — mai dallo streaming inline usato per
+l'input digitato a mano nel terminale:
 
-- **Funziona** (app viva, foreground/background): la quick-reply arriva al
-  listener, viene inoltrata a `POST /api/ai/assistant/notification-reply`, e la
-  risposta torna come push.
-- **Non garantito** (app completamente chiusa): l'headless text-reply dipende
-  dall'OS/SDK. Se non si risveglia il task, il **fallback accettabile** è che la
-  notifica apra l'app.
-- Il push token viene registrato su `PUT /api/users/me/push-token`. ⚠️ Questo
-  **condivide** il campo `users.expoPushToken` con l'app BikerLink principale:
-  l'ultimo install che registra il token riceve le push. Convivenza dei due APK
-  sullo stesso account = limite noto del POC.
+- **App viva** (foreground/background): `addReplyListener` riceve il testo →
+  `submitNotificationReply` lo inoltra con `deviceId`; il server
+  (`sendBowieReplyPush`) risponde con una push mirata **solo a questo
+  dispositivo** (lookup su `bowie_terminal_tokens`, esclude device revocati
+  dall'admin). `addBowieReplyPushListener` intercetta la push (`data.type ===
+  "bowie_reply"`) e ripristina il testo nella riga AI in attesa, con timeout
+  di cortesia (20s) se la push non arriva.
+- **App completamente chiusa → riaperta** (`opensAppToForeground: true`):
+  `consumePendingReply()` recupera il testo al cold-start e lo invia con lo
+  stesso percorso `notification-reply` + push mirata.
+- Il device è identificato da `getOrCreateDeviceId()` (id stabile per-install,
+  non il push token): registrato via `registerBowieTerminalToken` nella
+  tabella dedicata `bowie_terminal_tokens`, separata da `users.expoPushToken`
+  dell'app BikerLink principale — i due APK non si rubano più le push.
 
 Push reali richiedono credenziali FCM configurate via `eas credentials` (non
 funzionano in Expo Go).

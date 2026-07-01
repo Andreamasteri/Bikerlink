@@ -193,14 +193,17 @@ export async function registerBowieTerminalToken(
 
 // Invio non-streaming usato dalla quick-reply: il server elabora e rispedisce
 // la risposta come push notification.
-export async function notificationReply(message: string, token: string): Promise<void> {
+// Task #5277 — passa il deviceId così il server consegna la risposta SOLO a
+// questo dispositivo (bowie_terminal_tokens) invece di fare broadcast su
+// tutti i device Bowie Terminal registrati per l'account.
+export async function notificationReply(message: string, token: string, deviceId?: string): Promise<void> {
   const res = await expoFetch(new URL("/api/ai/assistant/notification-reply", getApiUrl()).toString(), {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${token}`,
     },
-    body: JSON.stringify({ message, platform: "android", source: "bowie_terminal" }),
+    body: JSON.stringify({ message, platform: "android", source: "bowie_terminal", deviceId }),
   });
   if (res.status === 401 || res.status === 403) throw new SessionExpiredError();
 }

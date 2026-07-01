@@ -139,11 +139,9 @@
 - [DragonflyDB + BullMQ undeclared keys](dragonfly-bullmq-undeclared-keys.md) — cluster_mode=emulated da solo NON basta per BullMQ; serve anche --default_lua_flags=allow-undeclared-keys o ogni Queue.add() fallisce.
 - [Old Redis retirement confirmed safe](redis-retirement-confirmed.md) — old redis container+volume gone, only fallback = tiny backup tarballs; queues empty, no lock lost; cache is ephemeral so no rollback plan needed.
 - [Bowie Terminal push-token sharing](bowie-terminal-push-token.md) — standalone bowie-terminal APK writes the SAME users.expoPushToken as the main app; last install wins push; needs per-device token table to fix.
-- [Bowie notification quick-reply delivery](bowie-notification-reply-delivery.md) — app-killed headless reply is unreliable; use opensAppToForeground:true + getLastNotificationResponse cold-start recovery + clearLastNotificationResponse dedupe, submit inline.
+- [Bowie notification quick-reply delivery](bowie-notification-reply-delivery.md) — app-killed headless reply is unreliable; use opensAppToForeground:true + getLastNotificationResponse cold-start recovery + clearLastNotificationResponse dedupe; submit via notification-reply, not inline SSE.
 - [Env vs Secret classification](env-secret-classification.md) — EXPO_PUBLIC_* stay env (client-inlined); server-only service URLs are secrets; Redis=DragonflyDB via TC_REDIS_URL (not Upstash/REDIS_URL); viewEnvVars unfiltered secrets map is stale, use keys-filtered.
 - [Updated secret needs cold boot](updated-secret-cold-boot.md) — riaggiornare il VALORE di un secret esistente non propaga col restart workflow; serve cold boot/deploy/merge; un secret NUOVO invece entra subito.
-<<<<<<< HEAD
 - [GCE VM SSH access](gce-vm-ssh-access.md) — VM Google "dragonfly" raggiungibile diretta (no jump host); paste multi-riga di chiavi private nel dialog secret puo' collassare i newline in spazi, normalizzare sempre.
-=======
 - [Dual-read env gate audit](dual-read-env-gate-audit.md) — quando aggiungi un fallback NEW ?? OLD per un secret rinominato, controlla OGNI `if (process.env.OLD)` diretto, non solo il wrapper URL; un gate raro (pub/sub coordinator) può restare sul vecchio nome e fallire in silenzio.
->>>>>>> e6c34d9f (Task #5285: Deep rename Redis → DragonflyDB (Phases A/B/C complete))
+- [Bowie per-device push delivery](bowie-per-device-push.md) — sendBowieReplyPush(deviceId) delivers to one device (bowie_terminal_tokens) vs broadcast fallback; revoke must also purge pushTokens; client now wired end-to-end (fix #5291).

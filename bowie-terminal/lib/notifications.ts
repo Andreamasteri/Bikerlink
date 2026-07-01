@@ -13,8 +13,10 @@ import Constants from "expo-constants";
 //   - App viva (foreground/background): `addReplyListener` riceve la response.
 //   - App killata → riavviata: `consumePendingReply()` legge la response che ha
 //     lanciato l'app (getLastNotificationResponse) e la consuma una sola volta.
-// In entrambi i casi il testo viene reimmesso nel terminale e inviato inline,
-// così l'utente vede la risposta nella chat invece che come push separata.
+// In entrambi i casi (Task #5277) il testo passa da POST /notification-reply
+// con il deviceId di questo device: il server risponde con una push mirata
+// SOLO a lui, intercettata da `addBowieReplyPushListener` qui sotto e mostrata
+// nella riga AI in attesa nel terminale.
 
 const CHANNEL_ID = "bowie";
 const CATEGORY_ID = "bowie_reply";
@@ -91,7 +93,8 @@ export async function showPersistentNotification(): Promise<void> {
 
 // Listener attivo quando il processo è vivo (foreground/background): la response
 // della quick-reply arriva qui. Passa il testo al chiamante (il terminale lo
-// invia inline) e ripristina la notifica persistente.
+// inoltra a /notification-reply, la risposta di Bowie torna come push) e
+// ripristina la notifica persistente.
 export function addReplyListener(onReply: (text: string) => void): {
   remove: () => void;
 } {
@@ -100,6 +103,34 @@ export function addReplyListener(onReply: (text: string) => void): {
     if (!text) return;
     onReply(text);
     void showPersistentNotification();
+  });
+}
+
+// Task #5277 (gap fix) — riceve la push di risposta di Bowie generata da
+// sendBowieReplyPush() per la quick-reply inviata via notification-reply.
+// data.type === "bowie_reply" distingue questa push da qualunque altra.
+export interface BowieReplyPush {
+  persona: string;
+  text: string;
+}
+
+function extractBowieReplyPush(
+  notification: Notifications.Notification | null,
+): BowieReplyPush | null {
+  if (!notification) return null;
+  const data = notification.request.content.data as { type?: string; persona?: string } | undefined;
+  if (data?.type !== "bowie_reply") return null;
+  const text = notification.request.content.body?.trim();
+  if (!text) return null;
+  return { persona: data.persona ?? "bowie", text };
+}
+
+export function addBowieReplyPushListener(onPush: (reply: BowieReplyPush) => void): {
+  remove: () => void;
+} {
+  return Notifications.addNotificationReceivedListener((notification) => {
+    const reply = extractBowieReplyPush(notification);
+    if (reply) onPush(reply);
   });
 }
 

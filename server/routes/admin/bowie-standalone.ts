@@ -18,7 +18,7 @@
 
 import { Router, type Request, type Response } from "express";
 import { db } from "../../db";
-import { aiCallLogs, bowieTerminalTokens, users } from "@shared/db";
+import { aiCallLogs, bowieTerminalTokens, pushTokens, users } from "@shared/db";
 import { and, eq, gte, sql, desc, isNull, isNotNull } from "drizzle-orm";
 import { sendSuccess, sendError } from "../../lib/api-response";
 import { AI_ROSTER, type AiPersonaId } from "../../ai/assistant/roster";
@@ -199,8 +199,17 @@ router.delete("/token/:id", async (req: Request, res: Response) => {
       .update(bowieTerminalTokens)
       .set({ revokedAt: sql`now()` })
       .where(and(eq(bowieTerminalTokens.id, id), isNull(bowieTerminalTokens.revokedAt)))
-      .returning({ id: bowieTerminalTokens.id });
+      .returning({ id: bowieTerminalTokens.id, pushToken: bowieTerminalTokens.pushToken });
     if (!updated) return sendError(res, 404, "Dispositivo non trovato o già revocato");
+    // Task #5277 — la registrazione scrive lo STESSO Expo push token sia in
+    // bowie_terminal_tokens che in push_tokens (app_id="bowie"): rimuoviamo
+    // anche quella riga così un device revocato non riceve più nemmeno il
+    // broadcast di fallback (client vecchi senza deviceId nella richiesta).
+    if (updated.pushToken) {
+      await db
+        .delete(pushTokens)
+        .where(and(eq(pushTokens.token, updated.pushToken), eq(pushTokens.appId, "bowie")));
+    }
     return sendSuccess(res, { success: true, id: updated.id });
   } catch (err) {
     console.error("[admin/bowie-standalone] revoke error:", err);

@@ -1,8 +1,8 @@
 // Tipi e helper interni condivisi tra push-notifications.ts e push-notifications-admin.ts.
 // Non importare direttamente dall'esterno — usare push-notifications.ts come entry point.
 import { db } from "./db";
-import { users, userProfiles, pushTokens } from "@shared/db";
-import { inArray, eq, and, sql } from "drizzle-orm";
+import { users, userProfiles, pushTokens, bowieTerminalTokens } from "@shared/db";
+import { inArray, eq, and, isNull, sql } from "drizzle-orm";
 
 export type NotificationPrefKey = "matches" | "zoneProposals" | "chat" | "motoclub" | "eventi" | "system_alerts";
 
@@ -68,6 +68,47 @@ export async function getAppPushTokens(
   } catch (err) {
     console.warn("[Push] getAppPushTokens failed (non-fatal):", err);
     return [];
+  }
+}
+
+// Task #5277: token del device specifico che ha originato una notification-reply
+// (registro per-dispositivo bowie_terminal_tokens), per non fare broadcast a
+// TUTTI i device Bowie dell'utente quando sappiamo esattamente quale ha
+// chiesto la risposta. Un device revocato (revoked_at valorizzato) non viene
+// mai restituito, quindi non riceve mai la consegna.
+export async function getBowieDeviceToken(
+  userId: string,
+  deviceId: string,
+): Promise<string | null> {
+  try {
+    const [row] = await db
+      .select({ pushToken: bowieTerminalTokens.pushToken })
+      .from(bowieTerminalTokens)
+      .where(
+        and(
+          eq(bowieTerminalTokens.userId, userId),
+          eq(bowieTerminalTokens.deviceId, deviceId),
+          isNull(bowieTerminalTokens.revokedAt),
+        ),
+      )
+      .limit(1);
+    if (!row || !isValidExpoPushToken(row.pushToken)) return null;
+    return row.pushToken;
+  } catch (err) {
+    console.warn("[Push] getBowieDeviceToken failed (non-fatal):", err);
+    return null;
+  }
+}
+
+// Task #5277: rimuove la riga bowie_terminal_tokens stantia (DeviceNotRegistered)
+// individuata per push_token, così un device disinstallato non resta nel
+// registro come "attivo" pronto a ricevere altre consegne.
+export async function clearStaleBowieDeviceToken(token: string): Promise<void> {
+  try {
+    await db.delete(bowieTerminalTokens).where(eq(bowieTerminalTokens.pushToken, token));
+    console.warn(`[Push] Cleared stale bowie_terminal_tokens row (DeviceNotRegistered)`);
+  } catch (err) {
+    console.warn("[Push] Failed to clear stale bowie_terminal_tokens row (non-fatal):", err);
   }
 }
 

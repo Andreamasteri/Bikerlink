@@ -35,6 +35,7 @@ re-introduce stealing — consider rejecting instead); no uniqueness on
 (user_id, app_id, device_id), so stale per-device rows can accumulate until a
 send fails with DeviceNotRegistered.
 
-The notification quick-reply headless path (app fully killed) remains an
-unvalidated POC in `bowie-terminal/lib/notifications.ts`; accepted fallback =
-notification opens the app.
+Quick-reply is wired end-to-end (see `bowie-notification-reply-delivery.md` and
+`bowie-per-device-push.md`); the app-fully-killed case relies on
+`opensAppToForeground: true` (accepted fallback = notification opens the app),
+not a headless task.

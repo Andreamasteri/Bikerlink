@@ -199,6 +199,10 @@ const NotificationReplyBody = z.object({
   platform: z.enum(["android", "ios"]).optional(),
   // Task #5228 — client di origine per l'attribuzione nel monitor Bowie Standalone.
   source: z.enum(["main_app", "bowie_terminal"]).optional(),
+  // Task #5277 — device che ha originato la richiesta (bowie_terminal_tokens.device_id),
+  // così la risposta torna SOLO a questo device invece che a tutti quelli
+  // registrati per l'account (es. altri telefoni con Bowie Terminal installato).
+  deviceId: z.string().min(1).max(128).optional(),
 });
 
 router.post("/ai/assistant/notification-reply", requireUser, async (req: Request, res: Response) => {
@@ -274,6 +278,7 @@ router.post("/ai/assistant/notification-reply", requireUser, async (req: Request
     const delivered = await sendBowieReplyPush(user.id, {
       body: filtered.text,
       persona: result.persona,
+      deviceId: parsed.data.deviceId,
     });
     logAiCall({
       userId: user.id,
@@ -291,6 +296,7 @@ router.post("/ai/assistant/notification-reply", requireUser, async (req: Request
     try {
       await sendBowieReplyPush(user.id, {
         body: "Qualcosa è andato storto, riprova dall'app.",
+        deviceId: parsed.data.deviceId,
       });
     } catch { /* push best-effort */ }
   } finally {

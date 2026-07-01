@@ -65,6 +65,12 @@ export function isThemeName(v: string): v is ThemeName {
   return (THEME_NAMES as string[]).includes(v);
 }
 
+export const PERSONA_IDS: PersonaId[] = ["bowie", "horus", "ares"];
+
+export function isPersonaId(v: string): v is PersonaId {
+  return (PERSONA_IDS as string[]).includes(v);
+}
+
 export function personaColor(theme: TerminalTheme, persona: PersonaId): string {
   if (persona === "horus") return theme.horus;
   if (persona === "ares") return theme.ares;

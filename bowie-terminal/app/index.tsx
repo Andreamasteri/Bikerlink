@@ -16,6 +16,7 @@ import {
   SessionExpiredError,
   registerPushToken,
   registerBowieTerminalToken,
+  notificationReply,
 } from "../lib/bowie-client";
 import {
   clearSession,
@@ -26,12 +27,14 @@ import {
   saveTheme,
 } from "../lib/session";
 import {
+  addBowieReplyPushListener,
   addReplyListener,
   consumePendingReply,
   setupNotifications,
   showPersistentNotification,
 } from "../lib/notifications";
 import {
+  isPersonaId,
   isThemeName,
   personaColor,
   personaLabel,
@@ -79,9 +82,15 @@ export default function TerminalScreen() {
   const intervalsRef = useRef<ReturnType<typeof setInterval>[]>([]);
   const abortRef = useRef<AbortController | null>(null);
   const welcomeStartedRef = useRef(false);
-  // Task #5272 — ref sempre aggiornato a submitText: la quick-reply della notifica
-  // (listener + cold-start) invia inline SENZA rieseguire il bootstrap.
+  // Task #5272 — ref sempre aggiornato a submitText: usato per l'input digitato
+  // a mano nel terminale (invio inline via SSE streaming).
   const submitTextRef = useRef<(raw: string) => void>(() => {});
+  // Task #5277 (gap fix) — id stabile del device, e id della riga AI in attesa
+  // della push di risposta (una quick-reply per volta: l'app è sempre in
+  // foreground quando può inviarne una nuova).
+  const deviceIdRef = useRef<string | null>(null);
+  const pendingReplyLineIdRef = useRef<string | null>(null);
+  const pendingReplyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const cursorOpacity = useRef(new Animated.Value(1)).current;
 
@@ -133,6 +142,13 @@ export default function TerminalScreen() {
     intervalsRef.current.push(timer);
   }, [pushLine, setLineText]);
 
+  // ---- session expiry ----
+  const handleSessionExpired = useCallback(async () => {
+    pushLine({ kind: "system", text: "SESSION EXPIRED — reconnecting..." });
+    await clearSession();
+    setTimeout(() => router.replace("/login"), 1200);
+  }, [pushLine]);
+
   // ---- notifications (best-effort, Android) ----
   const initNotifications = useCallback(async (token: string) => {
     if (Platform.OS !== "android") return;
@@ -142,6 +158,7 @@ export default function TerminalScreen() {
         await registerPushToken(pushToken, token);
         // Task #5228 — registra il device nel registro per-dispositivo (monitor admin).
         const deviceId = await getOrCreateDeviceId();
+        deviceIdRef.current = deviceId;
         await registerBowieTerminalToken(deviceId, pushToken, token);
       }
       await showPersistentNotification();
@@ -150,9 +167,54 @@ export default function TerminalScreen() {
     }
   }, []);
 
+  // Task #5277 (gap fix) — la quick-reply dalla notifica (app viva o riaperta
+  // da killata) NON usa più lo streaming inline: passa da
+  // POST /notification-reply con il deviceId di QUESTO dispositivo, così
+  // sendBowieReplyPush() risponde con una push mirata SOLO a lui (mai a un
+  // altro telefono con Bowie Terminal, mai a un device revocato dall'admin).
+  // La riga AI resta "in attesa" finché addBowieReplyPushListener non riceve
+  // la push con il testo — con un timeout di cortesia se non arriva mai.
+  const clearPendingReplyTimeout = useCallback(() => {
+    if (pendingReplyTimeoutRef.current) {
+      clearTimeout(pendingReplyTimeoutRef.current);
+      pendingReplyTimeoutRef.current = null;
+    }
+  }, []);
+
+  const submitNotificationReply = useCallback(
+    async (text: string) => {
+      const clean = text.trim();
+      if (!clean) return;
+      pushLine({ kind: "user", text: clean });
+      const aiId = pushLine({ kind: "ai", persona: "bowie", text: "···" });
+      pendingReplyLineIdRef.current = aiId;
+      clearPendingReplyTimeout();
+      pendingReplyTimeoutRef.current = setTimeout(() => {
+        if (pendingReplyLineIdRef.current === aiId) {
+          setLineText(aiId, "! nessuna risposta ricevuta (push non consegnata) — riprova dal terminale");
+          pendingReplyLineIdRef.current = null;
+        }
+      }, 20000);
+
+      try {
+        await notificationReply(clean, tokenRef.current ?? "", deviceIdRef.current ?? undefined);
+      } catch (e) {
+        clearPendingReplyTimeout();
+        pendingReplyLineIdRef.current = null;
+        if (e instanceof SessionExpiredError) {
+          await handleSessionExpired();
+          return;
+        }
+        setLineText(aiId, `! ${(e as Error).message}`);
+      }
+    },
+    [clearPendingReplyTimeout, handleSessionExpired, pushLine, setLineText],
+  );
+
   // ---- bootstrap ----
   useEffect(() => {
     let replyListener: { remove: () => void } | null = null;
+    let pushListener: { remove: () => void } | null = null;
     (async () => {
       const tok = await getToken();
       if (!tok) {
@@ -165,28 +227,45 @@ export default function TerminalScreen() {
       if (saved && isThemeName(saved)) setThemeName(saved);
       setPhase("ready");
       startWelcome();
-      // Task #5272 — quick-reply notifica: app viva → listener; app killata →
-      // riaperta dall'OS (opensAppToForeground) → recupero cold-start. In entrambi
-      // i casi il testo viene inviato inline via submitTextRef (nessun input perso).
-      replyListener = addReplyListener((text) => submitTextRef.current(text));
+      // Task #5272/#5277 — quick-reply notifica: app viva → listener; app killata
+      // → riaperta dall'OS (opensAppToForeground) → recupero cold-start. In
+      // entrambi i casi il testo passa da notification-reply (push mirata al
+      // device), NON dallo streaming inline usato per l'input digitato a mano.
+      replyListener = addReplyListener((text) => void submitNotificationReply(text));
+      pushListener = addBowieReplyPushListener((reply) => {
+        const pendingId = pendingReplyLineIdRef.current;
+        clearPendingReplyTimeout();
+        const persona: PersonaId = isPersonaId(reply.persona) ? reply.persona : "bowie";
+        if (pendingId) {
+          setLinePersona(pendingId, persona);
+          setLineText(pendingId, reply.text);
+          pendingReplyLineIdRef.current = null;
+        } else {
+          pushLine({ kind: "ai", persona, text: reply.text });
+        }
+        historyRef.current.push({ role: "assistant", content: reply.text });
+      });
       void initNotifications(tok);
       const pending = await consumePendingReply();
-      if (pending) submitTextRef.current(pending);
+      if (pending) void submitNotificationReply(pending);
     })();
 
     return () => {
       intervalsRef.current.forEach(clearInterval);
       abortRef.current?.abort();
       replyListener?.remove();
+      pushListener?.remove();
+      clearPendingReplyTimeout();
     };
-  }, [initNotifications, startWelcome]);
-
-  // ---- session expiry ----
-  const handleSessionExpired = useCallback(async () => {
-    pushLine({ kind: "system", text: "SESSION EXPIRED — reconnecting..." });
-    await clearSession();
-    setTimeout(() => router.replace("/login"), 1200);
-  }, [pushLine]);
+  }, [
+    clearPendingReplyTimeout,
+    initNotifications,
+    pushLine,
+    setLinePersona,
+    setLineText,
+    startWelcome,
+    submitNotificationReply,
+  ]);
 
   // ---- local commands ----
   const handleCommand = useCallback(
