@@ -30,3 +30,28 @@ lines) and run `npx tsx server/scripts/check-migration-prefix-duplicates.ts`.
 Fixing a duplicate = rename the newer/unapplied file to the next free `NNNN`
 (verify via `schema_migrations` in both dev and prod that neither duplicate
 filename was already tracked before renaming, or you'll orphan the tracking row).
+
+## Overlapping-boot race (two processes applying the same pending file)
+
+Because the migration runner re-checks and applies pending files on every
+boot, two overlapping boot processes (redeploy overlap, or a
+healthcheck-triggered restart racing a still-finishing instance) can both see
+the same file as pending and both try to apply it. The loser's final tracking
+insert used to be treated as FATAL on conflict — crashing the process and
+triggering the anti-crash-loop backoff (a burst of healthcheck 500s).
+
+The durable fix pattern: serialize the whole apply phase behind a dedicated
+Postgres advisory lock (its own key, separate from other subsystems' locks) so
+the loser blocks instead of racing, then re-checks what's still pending after
+acquiring the lock. Layer a race-safe upsert (ON CONFLICT DO NOTHING, treat
+zero-rows-affected as "already applied concurrently") as an independent
+second safety net, in case the lock is ever bypassed by a future refactor.
+
+**Why:** a lock alone is fragile if someone later adds a code path that
+doesn't take it; the idempotent insert is a structural backstop that keeps the
+"duplicate application is a warning, not a crash" property true regardless.
+
+**How to apply:** treat any "boot crashed with duplicate key on the migration
+tracking table" report as this race, not a data bug — look for two boot
+sequences overlapping in time rather than assuming the migration SQL itself
+is broken.

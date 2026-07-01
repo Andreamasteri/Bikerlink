@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import * as fs from "fs";
 
 vi.mock("../db", () => ({
   pool: {
@@ -6,7 +7,24 @@ vi.mock("../db", () => ({
   },
 }));
 
-import { isPostgisOwnerError, isNoTransactionMigration, applyMigration, applyMigrationNoTransaction } from "../migrate";
+vi.mock("fs", async () => {
+  const actual = await vi.importActual<typeof import("fs")>("fs");
+  return {
+    ...actual,
+    default: {
+      ...(actual as unknown as { default?: typeof actual }).default,
+      ...actual,
+    },
+    existsSync: vi.fn(actual.existsSync),
+    readdirSync: vi.fn(actual.readdirSync),
+    readFileSync: vi.fn(actual.readFileSync),
+    writeFileSync: vi.fn(actual.writeFileSync),
+    mkdirSync: vi.fn(actual.mkdirSync),
+  };
+});
+
+import { isPostgisOwnerError, isNoTransactionMigration, applyMigration, applyMigrationNoTransaction, runMigrations } from "../migrate";
+import { pool } from "../db";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -22,7 +40,14 @@ function makeMockClient() {
   const queries: string[] = [];
   const client = {
     query: vi.fn(async (sql: string) => {
-      queries.push(typeof sql === "string" ? sql.trim() : sql);
+      const trimmed = typeof sql === "string" ? sql.trim() : sql;
+      queries.push(trimmed);
+      // Default: a plain INSERT into schema_migrations succeeds and inserts
+      // exactly one row (rowCount:1). Tests that need to simulate a
+      // concurrent process winning the race override this per-test.
+      if (typeof trimmed === "string" && trimmed.startsWith("INSERT INTO schema_migrations")) {
+        return { rows: [], rowCount: 1 };
+      }
       return { rows: [] };
     }),
     release: vi.fn(),
@@ -221,6 +246,28 @@ describe("applyMigrationNoTransaction", () => {
     );
     expect(recorded).toBe(false);
   });
+
+  it("does not throw when the insert is a no-op (ON CONFLICT DO NOTHING, rowCount 0) — already applied concurrently", async () => {
+    client.query.mockImplementation(async (sql: string) => {
+      const trimmed = typeof sql === "string" ? sql.trim() : sql;
+      client._queries.push(trimmed);
+      if (trimmed.startsWith("INSERT INTO schema_migrations")) {
+        return { rows: [], rowCount: 0 };
+      }
+      return { rows: [] };
+    });
+
+    const statements = ["CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_x ON t(c)"];
+
+    await expect(
+      applyMigrationNoTransaction(client as never, "0088_test.sql", statements)
+    ).resolves.toBeUndefined();
+
+    const usedOnConflict = client._queries.some((q) =>
+      q.includes("ON CONFLICT (filename) DO NOTHING")
+    );
+    expect(usedOnConflict).toBe(true);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -306,5 +353,140 @@ describe("applyMigration — PostGIS 42501 guard", () => {
 
     const committed = client._queries.some((q) => q === "COMMIT");
     expect(committed).toBe(true);
+  });
+
+  it("does not throw when the insert is a no-op (ON CONFLICT DO NOTHING, rowCount 0) — already applied concurrently", async () => {
+    client.query.mockImplementation(async (sql: string) => {
+      const trimmed = typeof sql === "string" ? sql.trim() : sql;
+      client._queries.push(trimmed);
+      if (trimmed.startsWith("INSERT INTO schema_migrations")) {
+        return { rows: [], rowCount: 0 };
+      }
+      return { rows: [] };
+    });
+
+    const statements = ["CREATE TABLE IF NOT EXISTS test_table (id SERIAL PRIMARY KEY)"];
+
+    await expect(
+      applyMigration(client as never, "0004_test.sql", statements)
+    ).resolves.toBeUndefined();
+
+    const usedOnConflict = client._queries.some((q) =>
+      q.includes("ON CONFLICT (filename) DO NOTHING")
+    );
+    expect(usedOnConflict).toBe(true);
+
+    const committed = client._queries.some((q) => q === "COMMIT");
+    expect(committed).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Concurrency test — runMigrations() advisory lock (Task #5314)
+//
+// Simulates two overlapping boot processes calling runMigrations() against
+// the same pending migration file. Before the fix, both instances would try
+// to apply and INSERT the same filename, and the loser's INSERT would throw
+// a duplicate-key error treated as FATAL. With the advisory lock in place,
+// the second process blocks until the first releases the lock, re-checks
+// schema_migrations, sees the file already applied, and returns cleanly —
+// neither instance throws and the migration SQL runs exactly once.
+// ---------------------------------------------------------------------------
+
+describe("runMigrations — concurrent boot processes racing the same migration", () => {
+  const TEST_FILENAME = "9999_test_concurrent_migration.sql";
+
+  function createSharedDbState() {
+    return {
+      appliedMigrations: new Set<string>(),
+      lockHeld: false,
+      lockWaiters: [] as Array<() => void>,
+      ddlRunCount: 0,
+      insertRunCount: 0,
+    };
+  }
+
+  function createFakeClient(state: ReturnType<typeof createSharedDbState>) {
+    return {
+      query: vi.fn(async (sqlText: string, params?: unknown[]) => {
+        const trimmed = typeof sqlText === "string" ? sqlText.trim() : sqlText;
+
+        if (trimmed.startsWith("SET statement_timeout") || trimmed.startsWith("RESET statement_timeout")) {
+          return { rows: [] };
+        }
+        if (trimmed.startsWith("CREATE TABLE IF NOT EXISTS schema_migrations")) {
+          return { rows: [] };
+        }
+        if (trimmed.startsWith("SELECT filename FROM schema_migrations")) {
+          return { rows: Array.from(state.appliedMigrations).map((filename) => ({ filename })) };
+        }
+        if (trimmed.startsWith("SELECT pg_advisory_lock")) {
+          if (!state.lockHeld) {
+            state.lockHeld = true;
+            return { rows: [] };
+          }
+          await new Promise<void>((resolve) => state.lockWaiters.push(resolve));
+          state.lockHeld = true;
+          return { rows: [] };
+        }
+        if (trimmed.startsWith("SELECT pg_advisory_unlock")) {
+          state.lockHeld = false;
+          const next = state.lockWaiters.shift();
+          if (next) next();
+          return { rows: [] };
+        }
+        if (trimmed === "BEGIN" || trimmed === "COMMIT" || trimmed === "ROLLBACK") {
+          return { rows: [] };
+        }
+        if (
+          trimmed.startsWith("SAVEPOINT") ||
+          trimmed.startsWith("RELEASE SAVEPOINT") ||
+          trimmed.startsWith("ROLLBACK TO SAVEPOINT")
+        ) {
+          return { rows: [] };
+        }
+        if (trimmed.startsWith("INSERT INTO schema_migrations")) {
+          const filename = params?.[0] as string;
+          if (state.appliedMigrations.has(filename)) {
+            return { rows: [], rowCount: 0 };
+          }
+          state.appliedMigrations.add(filename);
+          state.insertRunCount++;
+          return { rows: [], rowCount: 1 };
+        }
+        // Any other statement is treated as the migration's own DDL.
+        state.ddlRunCount++;
+        return { rows: [] };
+      }),
+      release: vi.fn(),
+    };
+  }
+
+  it("serializes two concurrent runMigrations() calls: only one applies the SQL, neither crashes", async () => {
+    const state = createSharedDbState();
+
+    vi.mocked(fs.existsSync).mockImplementation((p: unknown) => {
+      if (typeof p === "string" && p.includes(".migrations-hash")) return false;
+      return true;
+    });
+    vi.mocked(fs.readdirSync).mockReturnValue([TEST_FILENAME] as never);
+    vi.mocked(fs.readFileSync).mockImplementation((p: unknown) => {
+      if (typeof p === "string" && p.includes(TEST_FILENAME)) {
+        return "CREATE TABLE IF NOT EXISTS test_concurrent_migration_table (id int);";
+      }
+      return "";
+    });
+    vi.mocked(fs.writeFileSync).mockImplementation(() => undefined as never);
+    vi.mocked(fs.mkdirSync).mockImplementation(() => undefined as never);
+
+    (pool.connect as ReturnType<typeof vi.fn>).mockImplementation(async () => createFakeClient(state));
+
+    await expect(Promise.all([runMigrations(), runMigrations()])).resolves.toBeDefined();
+
+    expect(state.appliedMigrations.has(TEST_FILENAME)).toBe(true);
+    expect(state.insertRunCount).toBe(1);
+    expect(state.ddlRunCount).toBe(1);
+
+    vi.restoreAllMocks();
   });
 });

@@ -8,6 +8,24 @@ const MIGRATIONS_DIR = path.resolve(process.cwd(), "migrations");
 const MIGRATIONS_HASH_CACHE = path.resolve(process.cwd(), "server_dist", ".migrations-hash");
 
 /**
+ * Task #5314 — Advisory lock key dedicated to the migration-apply phase.
+ * Distinct from the db-integrity scan lock (0x4242_4242) and the AI-audit
+ * per-day hashtext lock so the three never collide.
+ *
+ * Boot-race root cause: two overlapping boot processes (redeploy overlap, or
+ * a health-check-triggered restart racing a still-finishing previous
+ * instance) both read "migration X is pending" and both try to apply it. The
+ * loser's final INSERT INTO schema_migrations hits a duplicate-key violation,
+ * which runMigrations() treated as FATAL — crashing the process and
+ * triggering the anti-crash-loop backoff (visible as a burst of healthcheck
+ * 500s / restarts). This session-level pg_advisory_lock serializes the
+ * apply phase across processes: the loser BLOCKS until the winner finishes
+ * and releases the lock, then re-checks schema_migrations for anything still
+ * pending, instead of racing to apply the same file.
+ */
+const MIGRATION_ADVISORY_LOCK_KEY = 0x4d69_6772; // "Migr" — arbitrary, must stay <2^31.
+
+/**
  * PostgreSQL error codes that are safe to skip when bootstrapping on an existing
  * database whose schema_migrations table is empty (legacy DB pre-tracking).
  *
@@ -208,13 +226,24 @@ export async function applyMigrationNoTransaction(
     }
   }
 
-  await client.query(
-    "INSERT INTO schema_migrations (filename) VALUES ($1)",
+  // Task #5314 — Defense in depth alongside the advisory lock in
+  // runMigrations(): ON CONFLICT DO NOTHING makes this insert race-safe even
+  // if two processes somehow reach here concurrently (e.g. lock unavailable).
+  // A rowCount of 0 means another process already recorded this exact
+  // filename — treat that as "already applied concurrently", not a crash.
+  const insertResult = await client.query(
+    "INSERT INTO schema_migrations (filename) VALUES ($1) ON CONFLICT (filename) DO NOTHING",
     [filename]
   );
 
   const note = skipped > 0 ? ` (${skipped}/${statements.length} stmt already existed, skipped)` : "";
-  console.log(`[migrate] ✓ ${filename} applied (no-transaction)${note}`);
+  if ((insertResult.rowCount ?? 0) === 0) {
+    console.warn(
+      `[migrate] ⚠ ${filename} was already recorded by a concurrent process (no-transaction) — treating as applied${note}.`
+    );
+  } else {
+    console.log(`[migrate] ✓ ${filename} applied (no-transaction)${note}`);
+  }
 }
 
 /**
@@ -271,14 +300,28 @@ export async function applyMigration(
       }
     }
 
-    await client.query(
-      "INSERT INTO schema_migrations (filename) VALUES ($1)",
+    // Task #5314 — Defense in depth alongside the advisory lock in
+    // runMigrations(): ON CONFLICT DO NOTHING makes this insert race-safe
+    // even if two processes somehow reach here concurrently (e.g. lock
+    // unavailable). A rowCount of 0 means another process already recorded
+    // this exact filename — treat that as "already applied concurrently",
+    // not a crash. The DDL we just ran inside this transaction is still
+    // committed (each statement was already guarded by its own SAVEPOINT
+    // against "already exists" errors), so committing here is safe either way.
+    const insertResult = await client.query(
+      "INSERT INTO schema_migrations (filename) VALUES ($1) ON CONFLICT (filename) DO NOTHING",
       [filename]
     );
     await client.query("COMMIT");
 
     const note = skipped > 0 ? ` (${skipped}/${statements.length} stmt already existed, skipped)` : "";
-    console.log(`[migrate] ✓ ${filename} applied${note}`);
+    if ((insertResult.rowCount ?? 0) === 0) {
+      console.warn(
+        `[migrate] ⚠ ${filename} was already recorded by a concurrent process — treating as applied${note}.`
+      );
+    } else {
+      console.log(`[migrate] ✓ ${filename} applied${note}`);
+    }
   } catch (err) {
     await client.query("ROLLBACK");
     const message = err instanceof Error ? err.message : String(err);
@@ -317,42 +360,76 @@ export async function runMigrations(): Promise<void> {
 
     await ensureMigrationsTable(client);
 
-    const applied = await appliedMigrations(client);
-    const pending = pendingFiles(all, applied);
+    const preLockApplied = await appliedMigrations(client);
+    const preLockPending = pendingFiles(all, preLockApplied);
 
-    if (pending.length === 0) {
+    if (preLockPending.length === 0) {
       console.log("[migrate] All migrations already applied — nothing to do.");
       writeCachedHash(currentHash);
       return;
     }
 
-    console.log(
-      `[migrate] Applying ${pending.length} pending migration(s): ${pending.join(", ")}`
-    );
+    // Task #5314 — Serialize the apply phase across concurrent boot processes.
+    // This BLOCKS (does not busy-crash) if another instance already holds the
+    // lock, e.g. because it is mid-way through applying the same pending
+    // file(s). Once acquired, re-check schema_migrations: the previous holder
+    // may have just finished applying everything we saw as pending.
+    console.log(`[migrate] Acquiring migration advisory lock (key ${MIGRATION_ADVISORY_LOCK_KEY})...`);
+    await client.query("SELECT pg_advisory_lock($1)", [MIGRATION_ADVISORY_LOCK_KEY]);
+    let lockHeld = true;
+    try {
+      const applied = await appliedMigrations(client);
+      const pending = pendingFiles(all, applied);
 
-    for (const filename of pending) {
-      const filePath = path.join(MIGRATIONS_DIR, filename);
-      const sql = fs.readFileSync(filePath, "utf-8");
-      const statements = splitStatements(sql);
-      const noTxn = isNoTransactionMigration(sql);
+      if (pending.length === 0) {
+        console.log(
+          "[migrate] All migrations already applied by a concurrent process while waiting for the lock — nothing to do."
+        );
+        writeCachedHash(currentHash);
+        return;
+      }
 
-      console.log(`[migrate] → ${filename} (${statements.length} statement(s))${noTxn ? " [no-transaction]" : ""}`);
+      console.log(
+        `[migrate] Applying ${pending.length} pending migration(s): ${pending.join(", ")}`
+      );
 
-      try {
-        if (noTxn) {
-          await applyMigrationNoTransaction(client, filename, statements);
-        } else {
-          await applyMigration(client, filename, statements);
+      for (const filename of pending) {
+        const filePath = path.join(MIGRATIONS_DIR, filename);
+        const sql = fs.readFileSync(filePath, "utf-8");
+        const statements = splitStatements(sql);
+        const noTxn = isNoTransactionMigration(sql);
+
+        console.log(`[migrate] → ${filename} (${statements.length} statement(s))${noTxn ? " [no-transaction]" : ""}`);
+
+        try {
+          if (noTxn) {
+            await applyMigrationNoTransaction(client, filename, statements);
+          } else {
+            await applyMigration(client, filename, statements);
+          }
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err);
+          console.error(`[migrate] ✗ ${filename} FAILED: ${message}`);
+          throw err;
         }
-      } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
-        console.error(`[migrate] ✗ ${filename} FAILED: ${message}`);
-        throw err;
+      }
+
+      console.log(`[migrate] Done — ${pending.length} migration(s) applied successfully.`);
+      writeCachedHash(currentHash);
+    } finally {
+      if (lockHeld) {
+        try {
+          await client.query("SELECT pg_advisory_unlock($1)", [MIGRATION_ADVISORY_LOCK_KEY]);
+        } catch (err) {
+          console.warn(
+            `[migrate] failed to release advisory lock (non-fatal, session will release it on disconnect): ${
+              err instanceof Error ? err.message : String(err)
+            }`
+          );
+        }
+        lockHeld = false;
       }
     }
-
-    console.log(`[migrate] Done — ${pending.length} migration(s) applied successfully.`);
-    writeCachedHash(currentHash);
   } finally {
     // Reset statement_timeout to the server default before returning the
     // connection to the pool, so subsequent app queries are not affected.
