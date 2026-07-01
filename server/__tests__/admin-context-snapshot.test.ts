@@ -88,7 +88,7 @@ describe("buildAdminContextSnapshot — DB stats source failure degrades gracefu
     mockWithBgDbConnection.mockRejectedValue(new Error("bg-db overflow"));
     mockGetAppSetting.mockResolvedValue(null);
 
-    const snapshot = await buildAdminContextSnapshot();
+    const { snapshot } = await buildAdminContextSnapshot();
 
     expect(snapshot).toContain("Utenti attivi (24h): dato non disponibile");
     expect(snapshot).toContain("Business: dato non disponibile");
@@ -112,7 +112,7 @@ describe("buildAdminContextSnapshot — DB stats source failure degrades gracefu
     mockWithBgDbConnection.mockImplementation(runWithClient(client));
     mockGetAppSetting.mockResolvedValue(null);
 
-    const snapshot = await buildAdminContextSnapshot();
+    const { snapshot } = await buildAdminContextSnapshot();
 
     // users degraded
     expect(snapshot).toContain("Utenti attivi (24h): dato non disponibile");
@@ -130,7 +130,8 @@ describe("buildAdminContextSnapshot — DB stats source failure degrades gracefu
     mockWithBgDbConnection.mockImplementation(runWithClient(client));
     mockGetAppSetting.mockResolvedValue(null);
 
-    await expect(buildAdminContextSnapshot()).resolves.toBeTypeOf("string");
+    const { snapshot } = await buildAdminContextSnapshot();
+    expect(snapshot).toBeTypeOf("string");
   });
 });
 
@@ -147,7 +148,7 @@ describe("buildAdminContextSnapshot — ThinkCentre probe setting missing/malfor
   it("missing setting (null) composes with no-probe line", async () => {
     mockGetAppSetting.mockResolvedValue(null);
 
-    const snapshot = await buildAdminContextSnapshot();
+    const { snapshot } = await buildAdminContextSnapshot();
 
     expect(snapshot).toContain(
       "Servizi self-hosted (ThinkCentre): nessun probe recente disponibile",
@@ -157,7 +158,7 @@ describe("buildAdminContextSnapshot — ThinkCentre probe setting missing/malfor
   it("setting with non-object valueJson composes with no-probe line", async () => {
     mockGetAppSetting.mockResolvedValue({ key: "probe_log_snapshot", valueJson: "garbage" });
 
-    const snapshot = await buildAdminContextSnapshot();
+    const { snapshot } = await buildAdminContextSnapshot();
 
     expect(snapshot).toContain(
       "Servizi self-hosted (ThinkCentre): nessun probe recente disponibile",
@@ -167,7 +168,7 @@ describe("buildAdminContextSnapshot — ThinkCentre probe setting missing/malfor
   it("getAppSetting rejecting does not break the snapshot", async () => {
     mockGetAppSetting.mockRejectedValue(new Error("storage down"));
 
-    const snapshot = await buildAdminContextSnapshot();
+    const { snapshot } = await buildAdminContextSnapshot();
 
     expect(snapshot).toContain(
       "Servizi self-hosted (ThinkCentre): nessun probe recente disponibile",
@@ -180,7 +181,7 @@ describe("buildAdminContextSnapshot — ThinkCentre probe setting missing/malfor
       valueJson: { ollama: [], graphhopper: [] },
     });
 
-    const snapshot = await buildAdminContextSnapshot();
+    const { snapshot } = await buildAdminContextSnapshot();
 
     expect(snapshot).toContain(
       "Servizi self-hosted (ThinkCentre): nessun probe recente disponibile",
@@ -210,7 +211,7 @@ describe("buildAdminContextSnapshot — fully successful path formats everything
       },
     });
 
-    const snapshot = await buildAdminContextSnapshot();
+    const { snapshot } = await buildAdminContextSnapshot();
 
     expect(snapshot).toContain(
       "Utenti attivi (login ultime 24h, esclusi fake/staff): 137",
@@ -232,7 +233,7 @@ describe("buildAdminContextSnapshot — fully successful path formats everything
     mockWithBgDbConnection.mockImplementation(runWithClient(client));
     mockGetAppSetting.mockResolvedValue(null);
 
-    const snapshot = await buildAdminContextSnapshot();
+    const { snapshot } = await buildAdminContextSnapshot();
 
     expect(snapshot).toContain(
       "Utenti attivi (login ultime 24h, esclusi fake/staff): 0",
@@ -250,7 +251,7 @@ describe("buildAdminContextSnapshot — fully successful path formats everything
     }
     mockGetAppSetting.mockResolvedValue({ key: "probe_log_snapshot", valueJson: services });
 
-    const snapshot = await buildAdminContextSnapshot();
+    const { snapshot } = await buildAdminContextSnapshot();
 
     const servicesLine = snapshot
       .split("\n")
