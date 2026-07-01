@@ -14,6 +14,16 @@ Distinzione operativa:
 - `waiting > 0` → contesa REALE sul nostro pool → indaga job/leak, riduci la contesa
   (mai alzare pool max oltre 10: il DB è managed).
 - `waiting = 0` + ping alto → lentezza managed lato server → NON agire sul pool.
+- `waiting = 1` persistente per molti tick (10-30+) IN CONCOMITANZA con "DB ping
+  lento"/kill-switch bg-limiter → quasi sempre l'ECO di UNA query reale bloccata
+  dalla lentezza managed, non un leak: il pool-collector idle-leak detector (che
+  guarda SOLO le connessioni della nostra application_name idle >30s) non trova
+  nulla di anomalo in questi episodi, mentre la probe generica "0 query attive"
+  logga comunque un warn (falso allarme di leak). Prima di aprire un task di fix,
+  controlla SEMPRE l'idle-leak detector: se è pulito, il colpevole è la latenza
+  managed, non il codice applicativo. Il fix "sequenzializza Promise.all di setup"
+  (vedi pool-promise-all-setup-burst.md) risolve SOLO il burst a 10-12, non
+  elimina l'eco a waiting=1 durante gli episodi di ping lento prolungato.
 
 **Why:** durante outage del ThinkCentre (GraphHopper/Valhalla/Redis self-hosted
 spenti) il watchdog generava una tempesta di allarmi critici + push (pool.waiting,
