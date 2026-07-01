@@ -67,7 +67,7 @@ export interface SystemStatuses {
   ollama: DotStatus;
   whisper: DotStatus;
   ufw: DotStatus;
-  redis: DotStatus;
+  dragonfly: DotStatus;
   postgres: DotStatus;
   pgadmin: DotStatus;
   nginx: DotStatus;
@@ -90,7 +90,7 @@ const DOT_DEFS: { key: keyof SystemStatuses; label: string }[] = [
   { key: "ollama",       label: "Ollama AI"       },
   { key: "whisper",      label: "Whisper ASR"     },
   { key: "ufw",          label: "Firewall"        },
-  { key: "redis",        label: "Redis"           },
+  { key: "dragonfly",    label: "DragonflyDB"     },
   { key: "postgres",     label: "PostgreSQL"      },
   { key: "pgadmin",      label: "pgAdmin"         },
   { key: "nginx",        label: "nginx"           },

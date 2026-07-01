@@ -18,8 +18,8 @@ const NICE_LABELS: Record<string, string> = {
   "error.client.crashes_1h": "Crash 1h",
   "scheduler.scheduler.last_run_min_ago": "Match scheduler (min fa)",
   "scheduler.scheduler.lock_age_min": "Lock scheduler (min)",
-  "redis.redis.ping_ms": "DragonflyDB ping (ms)",
-  "redis.redis.used_memory_mb": "DragonflyDB RAM (MB)",
+  "dragonfly.dragonfly.ping_ms": "DragonflyDB ping (ms)",
+  "dragonfly.dragonfly.used_memory_mb": "DragonflyDB RAM (MB)",
   "db.db.bg_limiter.dropped_overflow": "Job bg scartati (coda piena)",
   "db.db.bg_limiter.dropped_timeout": "Job bg scartati (scaduti)",
 };

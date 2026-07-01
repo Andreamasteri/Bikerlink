@@ -37,7 +37,7 @@ const MATCH_DEBOUNCE_MS = 10_000;
 // fase appesa, una promise che non rigetta), resterebbe true per sempre e ogni
 // tick successivo verrebbe saltato come "already_running" finché il processo non
 // riparte — esattamente lo stallo da centinaia di minuti osservato di notte.
-// Il lock distribuito (redis/memory) ha già un TTL di 5min, ma questo booleano
+// Il lock distribuito (dragonfly/memory) ha già un TTL di 5min, ma questo booleano
 // no. Se cycleInFlight è true da oltre CYCLE_STALE_MS lo consideriamo zombie e
 // lo resettiamo (a quel punto il lock sottostante è certamente scaduto), così il
 // tick può ripartire da solo.

@@ -1,7 +1,7 @@
 // Task #2637 — Router multi-scope per la AI Console.
 // Decide quali scope (moderation/watchdog/ota/db-integrity/app-integrity)
 // servono per rispondere al messaggio. Usa Gemini Flash come modello
-// veloce/economico. Cache Redis 60s su hash del messaggio.
+// veloce/economico. Cache DragonflyDB 60s su hash del messaggio.
 import crypto from "crypto";
 import { z } from "zod";
 import { runWithFallback, estimateCostUsd, generateStructured } from "../moderation/provider";
@@ -20,7 +20,7 @@ export type RouterDecision = z.infer<typeof RouterDecisionSchema>;
 const SYSTEM = `Sei il router multi-scope della AI Console admin di BikerLink.
 SCOPE DISPONIBILI:
 - moderation: report utenti, ban, decisioni moderatori, anomalie comportamentali
-- watchdog: salute sistema (DB/Redis/queue/latenza), crash client, signals, proposte AI di auto-fix
+- watchdog: salute sistema (DB/DragonflyDB/queue/latenza), crash client, signals, proposte AI di auto-fix
 - ota: release OTA, boot events, OTA assistant, rollback candidates
 - db-integrity: orphan rows, FK invalide, stati DB anomali
 - app-integrity: drift codice/config/dipendenze, asset mancanti

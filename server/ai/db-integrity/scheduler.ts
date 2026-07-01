@@ -7,9 +7,9 @@ import { cleanupExpiredQuarantine } from "./quarantine";
 import { getQueue } from "../../cache/queues";
 
 // Task #2536 — enqueue background per scan expensive (settimanale).
-// Quando Redis è disponibile, la weekly cron NON esegue il scan in-process
+// Quando DragonflyDB è disponibile, la weekly cron NON esegue il scan in-process
 // ma lo accoda su BullMQ "db-integrity-expensive" (worker registrato a parte
-// nello stesso processo per ora). Quando Redis non è disponibile, fallback
+// nello stesso processo per ora). Quando DragonflyDB non è disponibile, fallback
 // a esecuzione diretta.
 async function enqueueOrRunExpensive(): Promise<void> {
   const q = getQueue("db-integrity-expensive");

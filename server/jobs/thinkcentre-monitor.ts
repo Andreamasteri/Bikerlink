@@ -217,9 +217,9 @@ export async function runThinkCentreProbe(): Promise<void> {
   const isFirstRun = prev === null;
   lastStatus = current;
 
-  // Aggiorna il risultato della probe Redis in redis.ts (esposto via getRedisStatus().tcProbeOk).
-  const redisProbeResult = services.find((s) => s.key === "redis");
-  setTcRedisProbeOk(redisProbeResult?.ok ?? null);
+  // Aggiorna il risultato della probe DragonflyDB in redis.ts (esposto via getRedisStatus().tcProbeOk).
+  const dragonflyProbeResult = services.find((s) => s.key === "dragonfly");
+  setTcRedisProbeOk(dragonflyProbeResult?.ok ?? null);
 
   if (isFirstRun) {
     console.log(`[thinkcentre-monitor] stato iniziale: ${current}`);
@@ -243,7 +243,7 @@ export async function runThinkCentreProbe(): Promise<void> {
       );
       console.log(`[thinkcentre-monitor] notifica offline inviata a ${n} admin`);
     }
-    // TC offline → sospendi Redis (evita flooding di errori di connessione).
+    // TC offline → sospendi DragonflyDB (evita flooding di errori di connessione).
     void suspendRedis();
     return;
   }
@@ -262,11 +262,11 @@ export async function runThinkCentreProbe(): Promise<void> {
       console.log(`[thinkcentre-monitor] notifica online inviata a ${n} admin`);
     }
     void checkMotorcycleProfile();
-    // TC tornato online → riprova connessione Redis se la probe Redis è OK.
-    const redisProbe = services.find((s) => s.key === "redis");
-    if (redisProbe?.ok === true) {
+    // TC tornato online → riprova connessione DragonflyDB se la probe è OK.
+    const dragonflyProbe = services.find((s) => s.key === "dragonfly");
+    if (dragonflyProbe?.ok === true) {
       void reInitRedis();
-      console.log("[thinkcentre-monitor] Redis TC: riconnessione avviata (probe OK)");
+      console.log("[thinkcentre-monitor] DragonflyDB TC: riconnessione avviata (probe OK)");
     }
     return;
   }

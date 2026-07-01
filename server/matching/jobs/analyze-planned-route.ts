@@ -19,7 +19,7 @@
  *
  * Se BullMQ è disponibile e il toggle admin `matching_integration` è on,
  * il job viene enqueued sulla coda `route-fingerprint`; altrimenti esegue
- * inline. Lo skill anche se Redis non c'è.
+ * inline. Lo skill anche se DragonflyDB non c'è.
  */
 
 import { db } from "../../db";
@@ -157,7 +157,7 @@ export function invalidateMatchingIntegrationCache(): void {
 
 /**
  * Hook fire-and-forget richiamabile da crud.ts/waypoints.ts.
- * Enqueues su BullMQ se Redis disponibile, altrimenti setImmediate.
+ * Enqueues su BullMQ se DragonflyDB disponibile, altrimenti setImmediate.
  */
 export function triggerAnalyzePlannedRoute(routeId: string): void {
   setImmediate(() => {

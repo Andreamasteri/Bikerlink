@@ -97,7 +97,7 @@ export class AiCoordinator {
           await redis.publish(ADMIN_BROADCAST, payload);
         }
       } catch (err) {
-        console.warn("[ai-coordinator/emit] redis publish failed:", (err as Error).message);
+        console.warn("[ai-coordinator/emit] dragonfly publish failed:", (err as Error).message);
       }
     }
 
@@ -108,13 +108,13 @@ export class AiCoordinator {
   async subscribe(aiName: string | "*", cb: EventCallback): Promise<CoordinatorSubscription> {
     const key = aiName;
 
-    // Tentativo Redis prima: se va a buon fine, NON registriamo il listener
-    // locale (eviteremmo doppia consegna locale + Redis loopback). Solo se
-    // Redis non è disponibile o psubscribe fallisce, ricadiamo sul fanout
+    // Tentativo DragonflyDB prima: se va a buon fine, NON registriamo il listener
+    // locale (eviteremmo doppia consegna locale + DragonflyDB loopback). Solo se
+    // DragonflyDB non è disponibile o psubscribe fallisce, ricadiamo sul fanout
     // in-process.
     let client: Redis | null = null;
     let usingRedis = false;
-    if (process.env.TC_REDIS_URL) {
+    if (process.env.TC_DRAGONFLY_URL ?? process.env.TC_REDIS_URL) {
       try {
         client = createPubSubClient();
         if (!client) throw new Error("createPubSubClient returned null");
@@ -134,9 +134,9 @@ export class AiCoordinator {
         this.subscribers.push({ client, pattern, cb });
         usingRedis = true;
       } catch (err) {
-        // Redis pub/sub non disponibile da cloud (es. porta non forwardata dal router).
+        // DragonflyDB pub/sub non disponibile da cloud (es. porta non forwardata dal router).
         // Fallback automatico al fanout in-process — nessun impatto funzionale.
-        console.log("[ai-coordinator/subscribe] redis pub/sub non raggiungibile (fallback in-process):", (err as Error).message);
+        console.log("[ai-coordinator/subscribe] dragonfly pub/sub non raggiungibile (fallback in-process):", (err as Error).message);
         // Chiude il client duplicato per evitare leak di socket.
         if (client) {
           try { client.disconnect(); } catch { /* ignore */ }
@@ -450,7 +450,7 @@ export function onConflictCreated(cb: ConflictCallback): () => void {
   return () => conflictListeners.delete(cb);
 }
 
-// Task #2657 — Pause / kill switch helpers. Stato in Redis con TTL; se Redis
+// Task #2657 — Pause / kill switch helpers. Stato in DragonflyDB con TTL; se DragonflyDB
 // non disponibile fallback in-memory (process-local). Tutte le funzioni
 // graceful: errori non propagano.
 export * from "./index.part2";

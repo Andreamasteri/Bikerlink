@@ -31,7 +31,7 @@ interface AutoFixState {
   latencyP99Ms: number | null;
   errorHttp5xxPerMin: number | null;
   lruRegistrySize: number | null;
-  redisUnreachable: boolean;
+  dragonflyUnreachable: boolean;
 }
 
 function snapshotState(snap: HealthSnapshot): AutoFixState {
@@ -44,7 +44,7 @@ function snapshotState(snap: HealthSnapshot): AutoFixState {
     latencyP99Ms: Number.isFinite(m["latency.latency.p99_ms"]) ? m["latency.latency.p99_ms"] : null,
     errorHttp5xxPerMin: Number.isFinite(m["error.http.5xx_per_min"]) ? m["error.http.5xx_per_min"] : null,
     lruRegistrySize: reg ? reg.size : null,
-    redisUnreachable: (snap.problems ?? []).some((p) => p.id === "redis.redis.unreachable"),
+    dragonflyUnreachable: (snap.problems ?? []).some((p) => p.id === "dragonfly.dragonfly.unreachable"),
   };
 }
 
@@ -58,7 +58,7 @@ export async function runAutoFix(snapshot: HealthSnapshot): Promise<AutoFixOutco
       const durationMs = Date.now() - startedAt;
       if (res.applied) {
         // afterState: rivaluta solo i campi che NON dipendono dal prossimo
-        // aggregator cycle (LRU size, redis flag dal prev snapshot). Per i
+        // aggregator cycle (LRU size, dragonfly flag dal prev snapshot). Per i
         // contatori coda/latency/lock il delta sarà visibile al prossimo
         // tick — registriamo comunque beforeState come riferimento.
         const afterReg = (globalThis as unknown as { __bikerlinkLruCaches?: Map<string, unknown> }).__bikerlinkLruCaches;

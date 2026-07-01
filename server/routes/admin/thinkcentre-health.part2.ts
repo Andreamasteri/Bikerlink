@@ -12,7 +12,7 @@ import {
   probeUfwDetailed,
 } from "./thinkcentre-health-vn-probes";
 import {
-  probeRedisInfra,
+  probeDragonflyInfra,
   probePostgresInfra,
   probePgAdmin,
   probeNginxInfra,
@@ -65,7 +65,7 @@ export async function updateThinkCentreSystemStatus(
       ollama: "unknown",
       whisper: "unknown",
       ufw: "unknown",
-      redis: "unknown",
+      dragonfly: "unknown",
       postgres: "unknown",
       pgadmin: "unknown",
       nginx: "unknown",
@@ -80,7 +80,7 @@ export async function updateThinkCentreSystemStatus(
       ollama: svcDot(svcMap.get("ollama")),
       whisper: svcDot(svcMap.get("whisper")),
       ufw: ufwDot(),
-      redis: svcDot(svcMap.get("redis")),
+      dragonfly: svcDot(svcMap.get("dragonfly")),
       postgres: svcDot(svcMap.get("postgres")),
       pgadmin: svcDot(svcMap.get("pgadmin")),
       nginx: svcDot(svcMap.get("nginx")),
@@ -101,7 +101,7 @@ export async function probeThinkCentreStatusSnapshot(): Promise<
     import("../../lib/system-status-cache").SystemStatusSnapshot,
     | "thinkcentre" | "graphhopper" | "valhalla" | "nominatim"
     | "ollama" | "whisper" | "ufw"
-    | "redis" | "postgres" | "pgadmin" | "nginx" | "uptimeKuma"
+    | "dragonfly" | "postgres" | "pgadmin" | "nginx" | "uptimeKuma"
   >
 > {
   // ThinkCentre spento: snapshot sintetico immediato, zero probe di rete.
@@ -114,7 +114,7 @@ export async function probeThinkCentreStatusSnapshot(): Promise<
       ollama: "unknown" as CachedDotStatus,
       whisper: "unknown" as CachedDotStatus,
       ufw: "unknown" as CachedDotStatus,
-      redis: "unknown" as CachedDotStatus,
+      dragonfly: "unknown" as CachedDotStatus,
       postgres: "unknown" as CachedDotStatus,
       pgadmin: "unknown" as CachedDotStatus,
       nginx: "unknown" as CachedDotStatus,
@@ -133,7 +133,7 @@ export async function probeThinkCentreStatusSnapshot(): Promise<
       ollama: "unknown" as CachedDotStatus,
       whisper: "unknown" as CachedDotStatus,
       ufw: "unknown" as CachedDotStatus,
-      redis: "unknown" as CachedDotStatus,
+      dragonfly: "unknown" as CachedDotStatus,
       postgres: "unknown" as CachedDotStatus,
       pgadmin: "unknown" as CachedDotStatus,
       nginx: "unknown" as CachedDotStatus,
@@ -150,7 +150,7 @@ export async function probeThinkCentreStatusSnapshot(): Promise<
     ollama,
     whisper,
     ufwDetail,
-    redisInfra,
+    dragonflyInfra,
     postgresInfra,
     pgadminInfra,
     nginxInfra,
@@ -162,7 +162,7 @@ export async function probeThinkCentreStatusSnapshot(): Promise<
     probeOllama(),
     probeWhisper(),
     probeUfwDetailed(),
-    probeRedisInfra(),
+    probeDragonflyInfra(),
     probePostgresInfra(),
     probePgAdmin(),
     probeNginxInfra(),
@@ -185,7 +185,7 @@ export async function probeThinkCentreStatusSnapshot(): Promise<
     return "offline";
   };
 
-  const configuredServices = [valhallaDetail, nominatimDetail, ollama, whisper, redisInfra, postgresInfra, pgadminInfra, nginxInfra, uptimeKumaInfra].filter((s) => s.configured);
+  const configuredServices = [valhallaDetail, nominatimDetail, ollama, whisper, dragonflyInfra, postgresInfra, pgadminInfra, nginxInfra, uptimeKumaInfra].filter((s) => s.configured);
   const ghContributes = graphhopper.configured && graphhopper.areas.some((a: any) => a.enabled);
   const configuredCount = configuredServices.length + (ghContributes ? 1 : 0);
   const onlineCount = configuredServices.filter((s) => s.ok).length + (ghContributes && graphhopper.ok ? 1 : 0);
@@ -202,7 +202,7 @@ export async function probeThinkCentreStatusSnapshot(): Promise<
     ollama: svc(ollama),
     whisper: svc(whisper),
     ufw: ufwDetail.configured ? (ufwDetail.ok ? "ok" : "offline") as CachedDotStatus : "unknown",
-    redis: svc(redisInfra),
+    dragonfly: svc(dragonflyInfra),
     postgres: svc(postgresInfra),
     pgadmin: svc(pgadminInfra),
     nginx: svc(nginxInfra),

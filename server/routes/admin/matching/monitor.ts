@@ -202,7 +202,7 @@ router.get("/matching/monitor", async (_req: Request, res: Response) => {
       },
       integrity: {
         usesGistIndex,
-        redis: redisStatus,
+        dragonfly: redisStatus,
         rateLimiterOk,
       },
       recentErrorCount: recentErrors,

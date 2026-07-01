@@ -43,7 +43,7 @@ const SERVICE_LABELS: Record<string, string> = {
   whisper: "Whisper ASR",
   nominatim: "Nominatim",
   ufw: "UFW",
-  redis: "Redis",
+  dragonfly: "DragonflyDB",
   postgres: "PostgreSQL",
   pgadmin: "pgAdmin",
   nginx: "nginx",

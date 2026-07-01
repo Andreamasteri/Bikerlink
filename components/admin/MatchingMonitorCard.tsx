@@ -354,8 +354,8 @@ export function MatchingMonitorCard({ onStatus }: { onStatus?: (s: "ok" | "degra
                   ok={monitor.integrity.usesGistIndex}
                 />
                 <IntegrityRow
-                  label={`Redis: ${monitor.integrity.redis.configured ? (monitor.integrity.redis.available ? "online" : "offline") : "non configurato"}`}
-                  ok={monitor.integrity.redis.configured ? monitor.integrity.redis.available : null}
+                  label={`DragonflyDB: ${monitor.integrity.dragonfly.configured ? (monitor.integrity.dragonfly.available ? "online" : "offline") : "non configurato"}`}
+                  ok={monitor.integrity.dragonfly.configured ? monitor.integrity.dragonfly.available : null}
                 />
                 <IntegrityRow
                   label={`Rate limiter: ${monitor.integrity.rateLimiterOk ? "OK" : "Code elevate!"}`}

@@ -4,7 +4,7 @@ import { recordHit, recordMiss, recordError } from "./cache-metrics";
 /**
  * Thin JSON cache wrapper around DragonflyDB via the ioredis client (Task #2517).
  *
- * All methods are no-ops or fall through when Redis is unavailable, so callers
+ * All methods are no-ops or fall through when DragonflyDB is unavailable, so callers
  * can use them without conditionals. Namespaces double as cache-metric keys.
  */
 

@@ -15,7 +15,7 @@ import { desc } from "drizzle-orm";
 import { collectBullMq } from "./collectors/bullmq-collector";
 import { collectScheduler } from "./collectors/scheduler-collector";
 import { collectDb } from "./collectors/db-collector";
-import { collectRedis } from "./collectors/redis-collector";
+import { collectDragonfly } from "./collectors/dragonfly-collector";
 import { collectLatency } from "./collectors/latency-collector";
 import { collectErrors } from "./collectors/error-collector";
 import { collectMaps } from "./collectors/maps-collector";
@@ -200,10 +200,10 @@ export function deriveProblems(signals: Signal[]): Problem[] {
       suggestion = "Riduci pool client o investiga query lente.";
     } else if (s.metric === "db.slow_queries") {
       title = `${s.value} query lente (>500ms medi)`;
-    } else if (s.metric === "redis.unreachable") {
+    } else if (s.metric === "dragonfly.unreachable") {
       const cf = (s.details as { consecutiveFailures?: number } | undefined)?.consecutiveFailures ?? 1;
-      title = `Redis non raggiungibile — fallback in-memory attivo (${cf} fallimenti consecutivi)`;
-      suggestion = "Fallback in-memory attivo: il matching continua a funzionare. Verifica REDIS_URL e stato del servizio per ripristinare il distributed lock.";
+      title = `DragonflyDB non raggiungibile — fallback in-memory attivo (${cf} fallimenti consecutivi)`;
+      suggestion = "Fallback in-memory attivo: il matching continua a funzionare. Verifica TC_DRAGONFLY_URL e stato del servizio per ripristinare il distributed lock.";
     } else if (s.metric === "latency.p95_ms" || s.metric === "latency.p99_ms") {
       title = `Latenza API ${s.metric}: ${s.value}ms`;
     } else if (s.metric === "http.5xx_per_min") {
@@ -363,7 +363,7 @@ export function deriveProblems(signals: Signal[]): Problem[] {
 // Problemi che sono CONSEGUENZA diretta del ThinkCentre offline — lista
 // ESPLICITA e ristretta, mai per prefisso (un prefisso largo sopprimerebbe anche
 // guasti indipendenti):
-//  - Redis non raggiungibile (self-hosted sul ThinkCentre);
+//  - DragonflyDB non raggiungibile (self-hosted sul ThinkCentre);
 //  - backlog map-matching che cresce perché GraphHopper non risponde;
 //  - routing engine SELF-HOSTED down (graphhopper/valhalla). I cloud engine
 //    (mapbox/tomtom) sono ESCLUSI: un loro down è indipendente dal ThinkCentre
@@ -378,7 +378,7 @@ export function deriveProblems(signals: Signal[]): Problem[] {
 //  - maps.routing.engine_down.mapbox/tomtom (cloud, indipendenti dall'outage);
 //  - db.db.circuit_breaker (DB realmente giù — sempre azionabile).
 const OUTAGE_DOWNSTREAM_IDS = new Set<string>([
-  "redis.redis.unreachable",
+  "dragonfly.dragonfly.unreachable",
   "maps.matching.pending",
   "maps.routing.engine_down.graphhopper",
   "maps.routing.engine_down.valhalla",

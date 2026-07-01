@@ -13,7 +13,7 @@ import type { ValhallaDetailedHealth, NominatimDetailedHealth, UfwDetailedHealth
 import {
   OllamaBlock,
   WhisperBlock,
-  RedisBlock,
+  DragonflyBlock,
   PostgresBlock,
   PgAdminBlock,
   NginxBlock,
@@ -37,7 +37,7 @@ type ServiceKey =
   | "ollama"
   | "whisper"
   | "nominatim"
-  | "redis"
+  | "dragonfly"
   | "postgres"
   | "pgadmin"
   | "nginx"
@@ -101,7 +101,7 @@ type ThinkCentreStatusKeys =
   | "ollama"
   | "whisper"
   | "ufw"
-  | "redis"
+  | "dragonfly"
   | "postgres"
   | "pgadmin"
   | "nginx"
@@ -115,7 +115,7 @@ const ALL_UNKNOWN: Pick<SystemStatuses, ThinkCentreStatusKeys> = {
   ollama: "unknown",
   whisper: "unknown",
   ufw: "unknown",
-  redis: "unknown",
+  dragonfly: "unknown",
   postgres: "unknown",
   pgadmin: "unknown",
   nginx: "unknown",
@@ -192,7 +192,7 @@ export function ThinkCentreCard({
       ollama: serviceToStatus(findSvc("ollama")),
       whisper: serviceToStatus(findSvc("whisper")),
       ufw: ufwToStatus(data.ufwDetail),
-      redis: serviceToStatus(findSvc("redis")),
+      dragonfly: serviceToStatus(findSvc("dragonfly")),
       postgres: serviceToStatus(findSvc("postgres")),
       pgadmin: serviceToStatus(findSvc("pgadmin")),
       nginx: serviceToStatus(findSvc("nginx")),
@@ -407,8 +407,8 @@ export function ThinkCentreCard({
             />
           )}
           {!poweredOffActive && (
-            <RedisBlock
-              service={error ? undefined : data?.services.find((s) => s.key === "redis")}
+            <DragonflyBlock
+              service={error ? undefined : data?.services.find((s) => s.key === "dragonfly")}
               isLoading={isLoading}
               hasError={!!error}
             />

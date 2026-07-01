@@ -89,7 +89,7 @@ export function getTrustedClientIp(req: Request): string | undefined {
 //      backend instance, and on a restart any partial counter resets — at
 //      worst an attacker gets one extra burst per restart.
 //
-// If we ever scale horizontally, swap the Map for a shared store (Redis)
+// If we ever scale horizontally, swap the Map for a shared store (DragonflyDB)
 // behind the same `isOverLimit` helper signature.
 
 interface Bucket {

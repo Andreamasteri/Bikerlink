@@ -358,7 +358,7 @@ describe("Debounce notifiche per-area GraphHopper", () => {
   beforeEach(() => {
     // Il beforeEach globale ha già azzerato TUTTE le env delle probe via
     // resetProbeEnvForTests(): qui basta abilitare GraphHopper. Le probe TCP
-    // (Postgres/Redis) non aprono più socket reali sotto test (guard in
+    // (Postgres/DragonflyDB) non aprono più socket reali sotto test (guard in
     // thinkcentre-monitor-probes.ts), quindi i fake timers non causano hang.
     process.env.GRAPHHOPPER_URL = "https://gh.example.org";
     vi.useFakeTimers();

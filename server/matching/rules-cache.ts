@@ -44,7 +44,7 @@ function symmetricKeys(a: string, b: string): [string, string] {
 type SerialisedRule = { a: string; b: string; compatible: boolean; weight: number };
 
 async function loadFromDb(): Promise<void> {
-  // First try Redis-mirrored cache so multi-instance deployments share warm state.
+  // First try DragonflyDB-mirrored cache so multi-instance deployments share warm state.
   const cached = await cacheGet<SerialisedRule[]>(RULES_CACHE_NS, RULES_CACHE_KEY);
   if (cached && Array.isArray(cached)) {
     const m = new Map<string, CacheEntry>();
@@ -52,7 +52,7 @@ async function loadFromDb(): Promise<void> {
       m.set(key(r.a, r.b), { compatible: r.compatible, weight: r.weight });
     }
     cache = m;
-    matchingLogger.info({ rules: m.size, source: "redis" }, "match-rules cache loaded");
+    matchingLogger.info({ rules: m.size, source: "dragonfly" }, "match-rules cache loaded");
     return;
   }
   const rows = await db.select().from(matchRules);
@@ -78,7 +78,7 @@ export async function initMatchRulesCache(): Promise<void> {
 
 export function invalidateMatchRulesCache(): void {
   cache = null;
-  // Also clear any Redis-backed mirror so other instances refetch.
+  // Also clear any DragonflyDB-backed mirror so other instances refetch.
   void cacheDel(RULES_CACHE_NS, RULES_CACHE_KEY);
 }
 

@@ -4,7 +4,7 @@
  * GET /api/admin/thinkcentre-health
  * Probe parallelo dei servizi self-hosted sul ThinkCentre:
  * GraphHopper (routing), Ollama (AI), Whisper (ASR), Nominatim (geocoding),
- * Valhalla (routing), Redis (cache), PostgreSQL (DB), pgAdmin, nginx, Uptime Kuma.
+ * Valhalla (routing), DragonflyDB (cache), PostgreSQL (DB), pgAdmin, nginx, Uptime Kuma.
  */
 
 import { Router, type Request, type Response as ExpressResponse } from "express";
@@ -29,7 +29,7 @@ import {
   type UfwDetailedHealth,
 } from "./thinkcentre-health-vn-probes";
 import {
-  probeRedisInfra,
+  probeDragonflyInfra,
   probePostgresInfra,
   probePgAdmin,
   probeNginxInfra,
@@ -239,7 +239,7 @@ router.get("/thinkcentre-health", async (_req: Request, res: ExpressResponse) =>
       ollama,
       whisper,
       ufwDetail,
-      redisInfra,
+      dragonflyInfra,
       postgresInfra,
       pgadminInfra,
       nginxInfra,
@@ -253,7 +253,7 @@ router.get("/thinkcentre-health", async (_req: Request, res: ExpressResponse) =>
       probeOllama(),
       probeWhisper(),
       probeUfwDetailed(),
-      probeRedisInfra(),
+      probeDragonflyInfra(),
       probePostgresInfra(),
       probePgAdmin(),
       probeNginxInfra(),
@@ -288,17 +288,17 @@ router.get("/thinkcentre-health", async (_req: Request, res: ExpressResponse) =>
       history: nominatimDetail.history,
       probeLog: nominatimDetail.probeLog,
     };
-    const redisService: ServiceHealth = {
-      key: "redis",
-      label: "Redis",
-      configured: redisInfra.configured,
-      ok: redisInfra.ok,
-      startingUp: redisInfra.ok ? false : isStartingUp("redis"),
-      latencyMs: redisInfra.latencyMs,
-      url: redisInfra.url,
-      error: redisInfra.error,
-      history: redisInfra.history,
-      probeLog: redisInfra.probeLog,
+    const dragonflyService: ServiceHealth = {
+      key: "dragonfly",
+      label: "DragonflyDB",
+      configured: dragonflyInfra.configured,
+      ok: dragonflyInfra.ok,
+      startingUp: dragonflyInfra.ok ? false : isStartingUp("dragonfly"),
+      latencyMs: dragonflyInfra.latencyMs,
+      url: dragonflyInfra.url,
+      error: dragonflyInfra.error,
+      history: dragonflyInfra.history,
+      probeLog: dragonflyInfra.probeLog,
     };
     const postgresService: ServiceHealth = {
       key: "postgres",
@@ -354,7 +354,7 @@ router.get("/thinkcentre-health", async (_req: Request, res: ExpressResponse) =>
       ollama,
       whisper,
       nominatimService,
-      redisService,
+      dragonflyService,
       postgresService,
       pgadminService,
       nginxService,

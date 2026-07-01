@@ -18,7 +18,7 @@ export async function buildBullBoardRouter(): Promise<Router> {
     router.use((_req, res) => {
       res
         .status(503)
-        .json({ error: "queues_unavailable", message: "Redis non disponibile — code BullMQ disattivate." });
+        .json({ error: "queues_unavailable", message: "DragonflyDB non disponibile — code BullMQ disattivate." });
     });
     return router;
   }

@@ -57,7 +57,7 @@ export function getHeartbeatPayload(): unknown {
     matching: s.matching,
     ota: s.uptimeKuma,
     ai: s.ollama,
-    websocket: s.redis !== "offline" ? "ok" : "degraded",
+    websocket: s.dragonfly !== "offline" ? "ok" : "degraded",
     updatedAt: s.updatedAt ? new Date(s.updatedAt).toISOString() : null,
     ts: new Date().toISOString(),
   };

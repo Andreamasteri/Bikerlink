@@ -1,6 +1,6 @@
 - [Sentry RN integrations loop](sentry-rn-integrations-loop.md) — @sentry/react-native 8.x default integrations causano loop React Navigation (setState in commitLayoutEffects); usa sempre integrations:[].
 - [DragonflyDB flag compatibility](dragonfly-flag-compat.md) — Redis-only flags (--maxmemory-policy, --save, --aof_rewrite_min_size) crashano Dragonfly; usa --snapshot_cron e --maxmemory ≥1gb (4 IO thread × 256MB).
-- [ThinkCentre Redis network path](tc-redis-network-path.md) — Redis NON va in tunnel Cloudflare come hostname HTTP; nessun path TCP Cloudflare ancora costruito; nginx+DuckDNS:6380 funziona ma è deprecato, non usarlo per TC_REDIS_URL.
+- [ThinkCentre DragonflyDB network path](tc-dragonfly-network-path.md) — DragonflyDB NON va in tunnel Cloudflare come hostname HTTP; nessun path TCP Cloudflare ancora costruito; nginx+DuckDNS:6380 funziona ma è deprecato, non usarlo per TC_DRAGONFLY_URL.
 - [FloatingWidget Android hitbox — Reanimated vs RN Animated](floating-widget-android-hitbox.md) — useSharedValue+useAnimatedStyle (Reanimated) NON aggiorna la hitbox touch su Android; usare RN Animated.Value con transform.
 - [RootLayout InteractionManager boot guard](rootlayout-interactionmanager-guard.md) — qualsiasi mount di NormalRootLayout DEVE passare per InteractionManager.runAfterInteractions; mount immediato → loop useLayoutEffect/setOptions di React Navigation. Fix in app/_layout.tsx con showNormalLayout state.
 - [Auth gate distribution — don't centralize into _layout](auth-gate-distribution.md) — isLoading/!user/ready decision is intentionally split across index.tsx/+not-found/(tabs)/_layout.tsx; centralizing reintroduces boot loop; auth-context navigation side-effect moved to components/layout/RemoteDiagnosticPoller.tsx.
@@ -142,4 +142,8 @@
 - [Bowie notification quick-reply delivery](bowie-notification-reply-delivery.md) — app-killed headless reply is unreliable; use opensAppToForeground:true + getLastNotificationResponse cold-start recovery + clearLastNotificationResponse dedupe, submit inline.
 - [Env vs Secret classification](env-secret-classification.md) — EXPO_PUBLIC_* stay env (client-inlined); server-only service URLs are secrets; Redis=DragonflyDB via TC_REDIS_URL (not Upstash/REDIS_URL); viewEnvVars unfiltered secrets map is stale, use keys-filtered.
 - [Updated secret needs cold boot](updated-secret-cold-boot.md) — riaggiornare il VALORE di un secret esistente non propaga col restart workflow; serve cold boot/deploy/merge; un secret NUOVO invece entra subito.
+<<<<<<< HEAD
 - [GCE VM SSH access](gce-vm-ssh-access.md) — VM Google "dragonfly" raggiungibile diretta (no jump host); paste multi-riga di chiavi private nel dialog secret puo' collassare i newline in spazi, normalizzare sempre.
+=======
+- [Dual-read env gate audit](dual-read-env-gate-audit.md) — quando aggiungi un fallback NEW ?? OLD per un secret rinominato, controlla OGNI `if (process.env.OLD)` diretto, non solo il wrapper URL; un gate raro (pub/sub coordinator) può restare sul vecchio nome e fallire in silenzio.
+>>>>>>> e6c34d9f (Task #5285: Deep rename Redis → DragonflyDB (Phases A/B/C complete))

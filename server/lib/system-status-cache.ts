@@ -15,7 +15,7 @@ export interface SystemStatusSnapshot {
   ollama: DotStatus;
   whisper: DotStatus;
   ufw: DotStatus;
-  redis: DotStatus;
+  dragonfly: DotStatus;
   postgres: DotStatus;
   pgadmin: DotStatus;
   nginx: DotStatus;
@@ -33,7 +33,7 @@ const _defaults: SystemStatusSnapshot = {
   ollama: "unknown",
   whisper: "unknown",
   ufw: "unknown",
-  redis: "unknown",
+  dragonfly: "unknown",
   postgres: "unknown",
   pgadmin: "unknown",
   nginx: "unknown",

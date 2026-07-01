@@ -20,7 +20,7 @@ export function buildTools() {
     getRecentSignals: tool({
       description: "Ultimi signals raccolti, filtrabili per source.",
       inputSchema: z.object({
-        source: z.enum(["bullmq", "scheduler", "db", "redis", "latency", "error", "app"]).optional(),
+        source: z.enum(["bullmq", "scheduler", "db", "dragonfly", "latency", "error", "app"]).optional(),
         minutes: z.number().int().min(1).max(720).default(60),
         limit: z.number().int().min(1).max(200).default(50),
       }),

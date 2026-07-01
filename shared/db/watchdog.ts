@@ -6,11 +6,11 @@ import {
   timestamp, jsonb, index,
 } from "drizzle-orm/pg-core";
 
-// Signal grezzi raccolti dai collectors (BullMQ, scheduler, DB, Redis, latency, errori).
+// Signal grezzi raccolti dai collectors (BullMQ, scheduler, DB, DragonflyDB, latency, errori).
 // Retention: 7 giorni (cleanup tramite cron sul watchdog stesso).
 export const systemSignals = pgTable("system_signals", {
   id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
-  source: varchar("source", { length: 40 }).notNull(),    // bullmq|scheduler|db|redis|latency|error|app
+  source: varchar("source", { length: 40 }).notNull(),    // bullmq|scheduler|db|dragonfly|latency|error|app
   metric: varchar("metric", { length: 80 }).notNull(),    // e.g. queue.waiting, scheduler.last_run_ms_ago
   value: doublePrecision("value"),                         // numeric value when applicable
   unit: varchar("unit", { length: 20 }),

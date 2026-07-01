@@ -6,7 +6,7 @@ import { getRawRedis, isRedisAvailable } from "./redis";
  *
  * Replaces the in-process `isMatchingRunning` boolean with a Redlock-backed
  * distributed lock so multiple backend instances can't run overlapping cycles.
- * Falls back transparently to an in-memory lock when Redis is unavailable —
+ * Falls back transparently to an in-memory lock when DragonflyDB is unavailable —
  * single-instance deployments keep working unchanged. Backed by DragonflyDB
  * (drop-in Redis-protocol compatible, Task #5244): Redlock works unchanged.
  */
@@ -19,7 +19,7 @@ type Holder = {
   owner: string;
   acquiredAt: number;
   expiresAt: number;
-  source: "redis" | "memory";
+  source: "dragonfly" | "memory";
 };
 
 const HISTORY_MAX = 10;
@@ -59,7 +59,7 @@ function getRedlock(): Redlock | null {
 }
 
 export type LockResult<T> =
-  | { acquired: true; result: T; source: "redis" | "memory" }
+  | { acquired: true; result: T; source: "dragonfly" | "memory" }
   | { acquired: false; reason: string };
 
 export async function withMatchingLock<T>(
@@ -74,18 +74,18 @@ export async function withMatchingLock<T>(
     try {
       lock = await rl.acquire([LOCK_KEY], LOCK_TTL_MS);
     } catch (_err) {
-      pushHistory({ event: "rejected", owner, source: "redis", reason: "already_held" });
+      pushHistory({ event: "rejected", owner, source: "dragonfly", reason: "already_held" });
       return { acquired: false, reason: "already_running" };
     }
     const holder: Holder = {
       owner,
       acquiredAt: Date.now(),
       expiresAt: Date.now() + LOCK_TTL_MS,
-      source: "redis",
+      source: "dragonfly",
     };
     memoryLockHolder = holder;
     lastHolder = holder;
-    // Persist holder metadata in Redis so other instances can read it via
+    // Persist holder metadata in DragonflyDB so other instances can read it via
     // getMatchingLockStatus(). Mirrors lock TTL so it auto-expires.
     const rawClient = getRawRedis();
     if (rawClient) {
@@ -98,17 +98,17 @@ export async function withMatchingLock<T>(
         );
       } catch { /* best-effort */ }
     }
-    pushHistory({ event: "acquired", owner, source: "redis", ttlMs: LOCK_TTL_MS });
+    pushHistory({ event: "acquired", owner, source: "dragonfly", ttlMs: LOCK_TTL_MS });
     try {
       const result = await fn();
-      return { acquired: true, result, source: "redis" };
+      return { acquired: true, result, source: "dragonfly" };
     } finally {
       const ttlResidualMs = Math.max(0, holder.expiresAt - Date.now());
       try {
         await lock.release();
-        pushHistory({ event: "released", owner, source: "redis", ttlMs: ttlResidualMs });
+        pushHistory({ event: "released", owner, source: "dragonfly", ttlMs: ttlResidualMs });
       } catch (err: unknown) {
-        pushHistory({ event: "expired", owner, source: "redis", ttlMs: ttlResidualMs, reason: err instanceof Error ? err.message : String(err) });
+        pushHistory({ event: "expired", owner, source: "dragonfly", ttlMs: ttlResidualMs, reason: err instanceof Error ? err.message : String(err) });
       }
       memoryLockHolder = null;
       if (rawClient) {
@@ -146,7 +146,7 @@ export async function withMatchingLock<T>(
   lastHolder = holder;
   pushHistory({ event: "acquired", owner, source: "memory", ttlMs: LOCK_TTL_MS });
   if (!useRedis) {
-    console.warn("[matching-lock] Redis not available — using in-memory lock fallback");
+    console.warn("[matching-lock] DragonflyDB not available — using in-memory lock fallback");
   }
   try {
     const result = await fn();
@@ -166,7 +166,7 @@ export function forceUnlockMatchingLock(): { wasHeld: boolean; holder: Holder | 
   memoryLockHeld = false;
   memoryLockHolder = null;
   pushHistory({ event: "released", owner: holder?.owner ?? "force", source: holder?.source ?? "memory", reason: "force_unlock", ttlMs: ttlResidualMs });
-  // Best-effort Redis release.
+  // Best-effort DragonflyDB release.
   const r = getRawRedis();
   if (r) {
     r.del(LOCK_KEY).catch(() => { /* ignore */ });

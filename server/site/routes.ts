@@ -348,13 +348,13 @@ code{background:#f0f0f0;padding:1px 5px;border-radius:2px;font-size:11px;font-fa
 <thead><tr><th>Layer</th><th>Tecnologia</th><th>Note</th></tr></thead>
 <tbody>
 <tr><td>Database</td><td><code>PostgreSQL 16 + PostGIS + pgvector</code></td><td>Dati utente, percorsi, embeddings 1536-dim</td></tr>
-<tr><td>Cache & Code</td><td><code>Redis 7 + BullMQ</code></td><td>Cache score, code ricalcolo, lock distribuiti</td></tr>
+<tr><td>Cache & Code</td><td><code>DragonflyDB + BullMQ</code></td><td>Cache score, code ricalcolo, lock distribuiti</td></tr>
 <tr><td>Scoring Engine</td><td><code>Express + TypeScript</code></td><td>17 segnali, pesi configurabili, feedback loop</td></tr>
 <tr><td>Embeddings</td><td><code>OpenAI text-embedding-3-large + multilingual-e5-small</code></td><td>Bio e musica, fallback self-hosted</td></tr>
 <tr><td>AI Orchestration</td><td><code>Anthropic Claude → OpenAI GPT → Google Gemini</code></td><td>Cascata failover, 99.95% uptime atteso</td></tr>
 <tr><td>Geo</td><td><code>PostGIS + H3 geohash</code></td><td>Distanze reali, zone di guida, route affinity</td></tr>
 <tr><td>Client</td><td><code>React Native (Expo) + React Query</code></td><td>iOS/Android, aggiornamenti OTA via EAS</td></tr>
-<tr><td>A/B Testing</td><td><code>Framework interno + Redis flag</code></td><td>Split test algoritmi su % utenti configurabile</td></tr>
+<tr><td>A/B Testing</td><td><code>Framework interno + DragonflyDB flag</code></td><td>Split test algoritmi su % utenti configurabile</td></tr>
 </tbody>
 </table>
 </div>

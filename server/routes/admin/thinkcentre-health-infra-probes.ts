@@ -1,7 +1,7 @@
 /**
  * ThinkCentre — Infra probes
  *
- * Probe TCP per Redis e PostgreSQL, probe HTTP per pgAdmin, nginx e Uptime Kuma.
+ * Probe TCP per DragonflyDB e PostgreSQL, probe HTTP per pgAdmin, nginx e Uptime Kuma.
  * Importati da thinkcentre-health.ts.
  *
  * Env vars:
@@ -58,40 +58,40 @@ async function tcpConnect(
   return { ok: false, latencyMs: r.latencyMs, error: sanitizeError(classified) };
 }
 
-// ── Redis ─────────────────────────────────────────────────────────────────────
-export async function probeRedisInfra(): Promise<InfraServiceHealth> {
-  // Modalità HTTP via TC agent (REDIS_PROBE_URL ha precedenza)
-  const probeUrl = process.env.REDIS_PROBE_URL?.trim();
+// ── DragonflyDB ───────────────────────────────────────────────────────────────
+export async function probeDragonflyInfra(): Promise<InfraServiceHealth> {
+  // Modalità HTTP via TC agent (DRAGONFLY_PROBE_URL ha precedenza; legacy REDIS_PROBE_URL)
+  const probeUrl = (process.env.DRAGONFLY_PROBE_URL ?? process.env.REDIS_PROBE_URL)?.trim();
   if (probeUrl) {
     const agentToken = process.env.THINKCENTRE_AGENT_TOKEN ?? "";
     const r = await httpProbe(probeUrl, agentToken ? { "X-Agent-Token": agentToken } : {}, (s) => s < 500);
     if (!r.ok) {
       const error = r.error ?? "HTTP error";
-      recordError("redis", error);
-      recordProbeLog("redis", { timestamp: Date.now(), ok: false, latencyMs: r.latencyMs, detail: error });
-      return { configured: true, ok: false, latencyMs: r.latencyMs, url: probeUrl, error, history: getHistory("redis"), probeLog: getProbeLog("redis") };
+      recordError("dragonfly", error);
+      recordProbeLog("dragonfly", { timestamp: Date.now(), ok: false, latencyMs: r.latencyMs, detail: error });
+      return { configured: true, ok: false, latencyMs: r.latencyMs, url: probeUrl, error, history: getHistory("dragonfly"), probeLog: getProbeLog("dragonfly") };
     }
-    recordProbeLog("redis", { timestamp: Date.now(), ok: true, latencyMs: r.latencyMs, detail: "HTTP probe OK" });
-    return { configured: true, ok: true, latencyMs: r.latencyMs, url: probeUrl, history: getHistory("redis"), probeLog: getProbeLog("redis") };
+    recordProbeLog("dragonfly", { timestamp: Date.now(), ok: true, latencyMs: r.latencyMs, detail: "HTTP probe OK" });
+    return { configured: true, ok: true, latencyMs: r.latencyMs, url: probeUrl, history: getHistory("dragonfly"), probeLog: getProbeLog("dragonfly") };
   }
 
   // Modalità TCP diretta (fallback)
-  const host = process.env.REDIS_PROBE_HOST?.trim();
-  const port = parseInt(process.env.REDIS_PROBE_PORT ?? "6379", 10);
+  const host = (process.env.DRAGONFLY_PROBE_HOST ?? process.env.REDIS_PROBE_HOST)?.trim();
+  const port = parseInt(process.env.DRAGONFLY_PROBE_PORT ?? process.env.REDIS_PROBE_PORT ?? "6379", 10);
   if (!host) {
-    return { configured: false, ok: false, latencyMs: null, url: null, history: getHistory("redis"), probeLog: getProbeLog("redis") };
+    return { configured: false, ok: false, latencyMs: null, url: null, history: getHistory("dragonfly"), probeLog: getProbeLog("dragonfly") };
   }
   const displayUrl = `${host}:${port}`;
   const r = await tcpConnect(host, port);
   if (!r.ok) {
     const error = r.error ?? "connection refused";
-    console.error("[thinkcentre-probe] redis KO", { error });
-    recordError("redis", error);
-    recordProbeLog("redis", { timestamp: Date.now(), ok: false, latencyMs: r.latencyMs, detail: error });
-    return { configured: true, ok: false, latencyMs: r.latencyMs, url: displayUrl, error, history: getHistory("redis"), probeLog: getProbeLog("redis") };
+    console.error("[thinkcentre-probe] dragonfly KO", { error });
+    recordError("dragonfly", error);
+    recordProbeLog("dragonfly", { timestamp: Date.now(), ok: false, latencyMs: r.latencyMs, detail: error });
+    return { configured: true, ok: false, latencyMs: r.latencyMs, url: displayUrl, error, history: getHistory("dragonfly"), probeLog: getProbeLog("dragonfly") };
   }
-  recordProbeLog("redis", { timestamp: Date.now(), ok: true, latencyMs: r.latencyMs, detail: "TCP connect OK" });
-  return { configured: true, ok: true, latencyMs: r.latencyMs, url: displayUrl, history: getHistory("redis"), probeLog: getProbeLog("redis") };
+  recordProbeLog("dragonfly", { timestamp: Date.now(), ok: true, latencyMs: r.latencyMs, detail: "TCP connect OK" });
+  return { configured: true, ok: true, latencyMs: r.latencyMs, url: displayUrl, history: getHistory("dragonfly"), probeLog: getProbeLog("dragonfly") };
 }
 
 // ── PostgreSQL ────────────────────────────────────────────────────────────────

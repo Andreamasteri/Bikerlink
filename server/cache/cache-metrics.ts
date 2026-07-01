@@ -1,5 +1,5 @@
 /**
- * In-process hit/miss counters for Redis caches (Task #2517).
+ * In-process hit/miss counters for DragonflyDB caches (Task #2517).
  * Exposed via /api/admin/matching/perf.
  */
 

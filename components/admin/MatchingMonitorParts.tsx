@@ -69,7 +69,7 @@ export interface MonitorData {
   memory: { rssMb: number };
   integrity: {
     usesGistIndex: boolean | null;
-    redis: { configured: boolean; available: boolean };
+    dragonfly: { configured: boolean; available: boolean };
     rateLimiterOk: boolean;
   };
   recentErrorCount: number;

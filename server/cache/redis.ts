@@ -3,9 +3,10 @@ import Redis, { type RedisOptions } from "ioredis";
 /**
  * Centralised ioredis client + helpers.
  *
- * Reads TC_REDIS_URL (ThinkCentre self-hosted DragonflyDB, drop-in compatible
- * with the ioredis client). When not set, or when the TC is offline, the
- * module operates in fallback (in-memory) mode.
+ * Reads TC_DRAGONFLY_URL (ThinkCentre self-hosted DragonflyDB, drop-in
+ * compatible with the ioredis client; legacy TC_REDIS_URL still honoured as
+ * fallback). When not set, or when the TC is offline, the module operates in
+ * fallback (in-memory) mode.
  *
  * All call sites must tolerate `getRedis()` returning null and fall back to
  * in-memory behaviour. A periodic reconnect is NOT built into ioredis here —
@@ -14,6 +15,9 @@ import Redis, { type RedisOptions } from "ioredis";
  * Nota: il circuit breaker quota (ex Upstash) è stato rimosso — DragonflyDB
  * self-hosted non ha tetti di richieste. Il fallback in-memory standard
  * (quando il client non è `available`) resta invariato.
+ *
+ * NB (Task #5285): i simboli esportati mantengono il nome `*Redis` perché sono
+ * cablati a ioredis/Redlock/BullMQ; solo i log/label/commenti citano DragonflyDB.
  */
 
 type ClientState = {
@@ -35,7 +39,7 @@ const state: ClientState = {
 let initAttempted = false;
 
 function getRedisUrl(): string | undefined {
-  return process.env.TC_REDIS_URL;
+  return process.env.TC_DRAGONFLY_URL ?? process.env.TC_REDIS_URL;
 }
 
 function buildOptions(url: string): RedisOptions {
@@ -47,7 +51,7 @@ function buildOptions(url: string): RedisOptions {
     // → il chiamante ricade sul fallback in-memory senza bloccare.
     enableOfflineQueue: false,
     connectTimeout: 3_000,
-    // ThinkCentre Redis è locale: NO retry automatici — la riconnessione
+    // ThinkCentre DragonflyDB è locale: NO retry automatici — la riconnessione
     // è gestita dal ThinkCentre monitor via reInitRedis().
     retryStrategy: () => null,
   };
@@ -62,14 +66,14 @@ function init(): void {
   initAttempted = true;
   const url = getRedisUrl();
   if (!url) {
-    console.log("[Redis] TC_REDIS_URL not set — running in fallback (in-memory) mode");
+    console.log("[DragonflyDB] TC_DRAGONFLY_URL not set — running in fallback (in-memory) mode");
     return;
   }
   try {
     const client = new Redis(url, buildOptions(url));
     client.on("ready", () => {
       state.available = true;
-      console.log("[Redis] connected and ready (TC)");
+      console.log("[DragonflyDB] connected and ready (TC)");
     });
     client.on("error", (err: unknown) => {
       state.available = false;
@@ -83,25 +87,25 @@ function init(): void {
   } catch (err) {
     state.lastError = err instanceof Error ? err.message : String(err);
     state.lastErrorAt = Date.now();
-    console.warn("[Redis] init failed, fallback mode:", state.lastError);
+    console.warn("[DragonflyDB] init failed, fallback mode:", state.lastError);
   }
 }
 
 /**
- * Tenta di (ri-)inizializzare la connessione Redis usando TC_REDIS_URL.
- * Chiamato dal ThinkCentre monitor quando il TC torna online e la probe Redis è OK.
- * Se Redis è già connesso e disponibile, è no-op.
+ * Tenta di (ri-)inizializzare la connessione DragonflyDB usando TC_DRAGONFLY_URL.
+ * Chiamato dal ThinkCentre monitor quando il TC torna online e la probe è OK.
+ * Se già connesso e disponibile, è no-op.
  */
 export async function reInitRedis(): Promise<void> {
   const url = getRedisUrl();
   if (!url) {
-    console.log("[Redis] reInitRedis: TC_REDIS_URL non configurato — skip");
+    console.log("[DragonflyDB] reInitRedis: TC_DRAGONFLY_URL non configurato — skip");
     return;
   }
   // Chiude il client esistente se presente (potrebbe essere in stato di errore).
   if (state.client) {
     if (state.available) {
-      console.log("[Redis] reInitRedis: già connesso e disponibile — skip");
+      console.log("[DragonflyDB] reInitRedis: già connesso e disponibile — skip");
       return;
     }
     try { await state.client.quit(); } catch { /* ignore */ }
@@ -111,11 +115,11 @@ export async function reInitRedis(): Promise<void> {
   // Reset per permettere una nuova init.
   initAttempted = false;
   init();
-  console.log("[Redis] reInitRedis: tentativo di riconnessione al TC avviato");
+  console.log("[DragonflyDB] reInitRedis: tentativo di riconnessione al TC avviato");
 }
 
 /**
- * Sospende Redis: chiude il client e marca come non disponibile.
+ * Sospende DragonflyDB: chiude il client e marca come non disponibile.
  * Chiamato dal ThinkCentre monitor quando il TC va offline.
  * Nessuna reconnect automatica — sarà reInitRedis() a ripristinare.
  */
@@ -132,7 +136,7 @@ export async function suspendRedis(): Promise<void> {
   state.lastErrorAt = Date.now();
   // Consenti una futura reInit (non bloccare su initAttempted=true).
   initAttempted = false;
-  console.log("[Redis] suspendRedis: connessione chiusa (TC offline)");
+  console.log("[DragonflyDB] suspendRedis: connessione chiusa (TC offline)");
 }
 
 export function getRedis(): Redis | null {
@@ -150,7 +154,7 @@ export function getRawRedis(): Redis | null {
  * Opzioni di connessione dedicate a BullMQ.
  *
  * BullMQ richiede `maxRetriesPerRequest: null` sulle sue connessioni bloccanti.
- * Ritorna null se TC_REDIS_URL non è configurato (modalità fallback in-memory).
+ * Ritorna null se TC_DRAGONFLY_URL non è configurato (modalità fallback in-memory).
  */
 export function getBullConnectionOptions(): RedisOptions | null {
   const url = getRedisUrl();
@@ -172,7 +176,7 @@ export function getBullConnectionOptions(): RedisOptions | null {
     }
     return opts;
   } catch (err) {
-    console.warn("[Redis] getBullConnectionOptions parse failed:", err instanceof Error ? err.message : err);
+    console.warn("[DragonflyDB] getBullConnectionOptions parse failed:", err instanceof Error ? err.message : err);
     return null;
   }
 }
@@ -183,7 +187,7 @@ export function isRedisAvailable(): boolean {
 }
 
 /**
- * Aggiorna il risultato dell'ultima probe TCP Redis del ThinkCentre monitor.
+ * Aggiorna il risultato dell'ultima probe TCP DragonflyDB del ThinkCentre monitor.
  * Chiamato dal monitor dopo ogni ciclo di probe.
  */
 export function setTcRedisProbeOk(ok: boolean | null): void {
@@ -193,7 +197,8 @@ export function setTcRedisProbeOk(ok: boolean | null): void {
 export function getRedisStatus() {
   if (!initAttempted) init();
   const url = getRedisUrl();
-  const source: "thinkcentre" | "none" = process.env.TC_REDIS_URL ? "thinkcentre" : "none";
+  const source: "thinkcentre" | "none" =
+    process.env.TC_DRAGONFLY_URL ?? process.env.TC_REDIS_URL ? "thinkcentre" : "none";
   return {
     configured: !!url,
     available: state.available,
@@ -205,8 +210,8 @@ export function getRedisStatus() {
 }
 
 /**
- * Crea un client Redis dedicato al pub/sub (psubscribe/subscribe).
- * Ritorna null se TC_REDIS_URL non è configurato.
+ * Crea un client DragonflyDB dedicato al pub/sub (psubscribe/subscribe).
+ * Ritorna null se TC_DRAGONFLY_URL non è configurato.
  */
 export function createPubSubClient(): Redis | null {
   const url = getRedisUrl();
@@ -225,7 +230,7 @@ export function createPubSubClient(): Redis | null {
     }
     return new Redis(url, opts);
   } catch (err) {
-    console.warn("[Redis] createPubSubClient failed:", err instanceof Error ? err.message : err);
+    console.warn("[DragonflyDB] createPubSubClient failed:", err instanceof Error ? err.message : err);
     return null;
   }
 }

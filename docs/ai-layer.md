@@ -29,7 +29,7 @@ flowchart LR
     CON[Console]
   end
   AIs -->|emit/recordDecision| C[(AiCoordinator)]
-  C -->|publish ai:events:*| R[(Redis pub/sub)]
+  C -->|publish ai:events:*| R[(DragonflyDB pub/sub)]
   C -->|append| DBR[(Postgres ai_events, ai_decisions, ai_conflicts)]
   C -->|evaluate| PE[Policy Engine YAML]
   R --> WSB[ws-bridge]
@@ -38,7 +38,7 @@ flowchart LR
   WS --> UI[Tab AI Layer]
   UI -->|REST| API[/api/admin/ai/*/]
   API --> C
-  API -->|pause/resume| KSW[(ai:paused:* Redis)]
+  API -->|pause/resume| KSW[(ai:paused:* DragonflyDB)]
   C -->|isAiPaused?| KSW
 ```
 
@@ -119,11 +119,11 @@ Il client React Query invalida `["/api/admin/ai/overview"]`, `["/api/admin/ai/he
 
 ## Kill switch — semantica
 
-- `ai:paused:<aiName>` in Redis con TTL configurabile (default 3600s, max 86400s).
+- `ai:paused:<aiName>` in DragonflyDB con TTL configurabile (default 3600s, max 86400s).
 - `ai:paused:*` blocca l'intero layer.
 - `Coordinator.emit()` legge `isAiPaused(aiName)` **prima** di persistere/pubblicare:
   se in pausa l'evento è scartato e ritorna `id=""` (caller non vede errore).
-- Fallback in-memory se Redis non disponibile (process-local).
+- Fallback in-memory se DragonflyDB non disponibile (process-local).
 - Override admin **bypassa** la pausa: il path `aiName='admin'` non viene mai bloccato.
 
 ## Override workflow

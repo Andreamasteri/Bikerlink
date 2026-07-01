@@ -449,18 +449,18 @@ Dopo la scheda, l'agente chiede: **"Hai preferenze su come risolvere, o procedo 
 
 **"Pubblica l'OTA"** significa SOLO pubblicare una OTA (Over-the-Air update). NON avviare mai una build EAS (APK/AAB) in risposta a questo comando. La build EAS è un'operazione separata e richiede autorizzazione esplicita come da sezione "APK Build — Regola Obbligatoria".
 
-## Redis — Lock Distribuito + Cache + Code BullMQ (Task #2517)
+## DragonflyDB (Redis-compatible) — Lock Distribuito + Cache + Code BullMQ (Task #2517)
 
-Il matching engine usa un **lock distribuito** (Redlock) per evitare cicli sovrapposti tra istanze multiple, una **cache breve** (TTL 60–120s) per tag e candidati per zona, e **code BullMQ** persistenti per i job pesanti. Tutto è **opzionale**: se `TC_REDIS_URL` non è configurato, il backend ricade automaticamente su lock in-memory + cache assente (modalità single-instance) con un warning nei log.
+Il matching engine usa un **lock distribuito** (Redlock) per evitare cicli sovrapposti tra istanze multiple, una **cache breve** (TTL 60–120s) per tag e candidati per zona, e **code BullMQ** persistenti per i job pesanti. Tutto è **opzionale**: se non è configurata la connessione DragonflyDB (`TC_DRAGONFLY_URL`, con fallback legacy `TC_REDIS_URL`), il backend ricade automaticamente su lock in-memory + cache assente (modalità single-instance) con un warning nei log.
 
 ### Configurazione
-- Secret `TC_REDIS_URL` (Replit Secrets). Formato: `redis://user:pass@host:port` oppure `rediss://...` per TLS.
+- Secret `TC_DRAGONFLY_URL` (Replit Secrets). Formato: `redis://user:pass@host:port` oppure `rediss://...` per TLS (DragonflyDB parla il protocollo Redis, quindi lo schema URL resta `redis://`/`rediss://`). Il vecchio nome `TC_REDIS_URL` è ancora letto come fallback (dual-read `TC_DRAGONFLY_URL ?? TC_REDIS_URL`), così la migrazione della secret non richiede downtime.
 - **Provider: DragonflyDB self-hosted sul ThinkCentre (Task #5244).** Il vecchio Redis (`redis:7-alpine`) è stato **sostituito da DragonflyDB**, drop-in compatibile col protocollo Redis; il backend lo raggiunge via **Cloudflare Tunnel** (non più DuckDNS né Upstash). Il precedente circuit breaker quota Upstash è stato rimosso. Se il ThinkCentre è spento, il backend degrada in fallback in-memory single-instance.
 - Senza la secret: `getRedis()` ritorna `null`, `withMatchingLock` usa fallback in-memory, BullMQ è disattivato, Bull Board risponde 503.
 
 ### Moduli chiave
 - `server/cache/redis.ts` — client `ioredis` singleton con `retryStrategy` esponenziale capped (backoff `times*1000`, max 30s → riconnessione automatica), `tls:{}` auto-abilitato su URL `rediss://`, `isAvailable()` flag. Tutti gli accessi cache/Redlock/pub-sub passano da qui (`maxRetriesPerRequest:2`, fail-fast `enableOfflineQueue:false`). `getBullConnectionOptions()` ritorna invece opzioni dedicate a BullMQ con `maxRetriesPerRequest:null` (requisito delle connessioni bloccanti dei Worker): Queue/Worker ricevono le opzioni, non il client cache condiviso, così BullMQ gestisce le proprie connessioni.
-- `server/cache/matching-lock.ts` — `withMatchingLock(owner, fn)` basato su `redlock@5.0.0-beta.2` (TTL 5 min). Espone `getMatchingLockStatus()` con holder, scadenza, ultimi 10 acquire/release e stato Redis.
+- `server/cache/matching-lock.ts` — `withMatchingLock(owner, fn)` basato su `redlock@5.0.0-beta.2` (TTL 5 min). Espone `getMatchingLockStatus()` con holder, scadenza, ultimi 10 acquire/release e stato DragonflyDB.
 - `server/cache/cache.ts` — wrapper JSON `cacheGet/cacheSet/cacheDel/cacheGetOrSet` con metriche hit/miss per namespace.
 - `server/cache/zone-cache.ts` — `cachedCandidatesForZone(lat, lon, radiusKm, loader)` con grid snap 0.05° + TTL 60s per le query di prossimità ricorrenti.
 - `server/cache/queues.ts` — code BullMQ: `embeddings`, `recap`, `route-fingerprint`, `pattern-detect`. Lazy-init.

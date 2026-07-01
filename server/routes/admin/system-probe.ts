@@ -11,7 +11,7 @@
  *    background probe is fired to refresh it for the next caller.
  *
  * ThinkCentre services (graphhopper, valhalla, nominatim, ollama, whisper,
- * ufw, redis, postgres, pgadmin, nginx, uptimeKuma, thinkcentre overall) →
+ * ufw, dragonfly, postgres, pgadmin, nginx, uptimeKuma, thinkcentre overall) →
  *   parallel HTTP probes via probeThinkCentreStatusSnapshot().
  *
  * routing  → derived from in-memory routing counters (no network call).

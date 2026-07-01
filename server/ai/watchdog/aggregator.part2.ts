@@ -13,7 +13,7 @@ import {
 } from "./aggregator";
 import { collectBullMq } from "./collectors/bullmq-collector";
 import { collectDb } from "./collectors/db-collector";
-import { collectRedis } from "./collectors/redis-collector";
+import { collectDragonfly } from "./collectors/dragonfly-collector";
 import { collectLatency } from "./collectors/latency-collector";
 import { collectPool } from "./collectors/pool-collector";
 import { collectMaps } from "./collectors/maps-collector";
@@ -47,7 +47,7 @@ function computeStatus(problems: Problem[]): { status: HealthSnapshot["status"];
 
 export async function runAggregatorCycle(): Promise<HealthSnapshot> {
   const collectors = await Promise.allSettled([
-    collectBullMq(), collectDb(), collectRedis(), collectLatency(),
+    collectBullMq(), collectDb(), collectDragonfly(), collectLatency(),
     Promise.resolve(collectPool()), collectMaps(),
     withBgDbSlot(() => collectScheduler()),
     withBgDbSlot(() => collectErrors()),

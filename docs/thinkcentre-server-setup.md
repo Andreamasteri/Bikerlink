@@ -4,10 +4,10 @@
 > nginx (reverse proxy + stream TLS) e i certificati Let's Encrypt descrivono il
 > **vecchio** stack di esposizione, ormai **dismesso**. L'esposizione attiva è
 > ora **solo Cloudflare Tunnel** su `*.biker-link.net` (vedi sezione 11 e
-> `infra/self-host/expose/DEPLOY-LOG.md`). Le parti hardware/OS/servizi/Redis
+> `infra/self-host/expose/DEPLOY-LOG.md`). Le parti hardware/OS/servizi/DragonflyDB
 > locale restano valide; ignora i passi DuckDNS+nginx+certbot se non per contesto storico.
 
-> Guida operativa per il mini-PC ThinkCentre (`192.168.1.35`) che ospita i servizi self-hosted di BikerLink: GraphHopper, Ollama, Whisper, Nominatim, Valhalla e Redis.
+> Guida operativa per il mini-PC ThinkCentre (`192.168.1.35`) che ospita i servizi self-hosted di BikerLink: GraphHopper, Ollama, Whisper, Nominatim, Valhalla e DragonflyDB (Redis-compatible).
 >
 > Esposizione esterna **attuale**: Cloudflare Tunnel su `*.biker-link.net`. (Storico: DuckDNS `bikerlink.duckdns.org` + nginx reverse proxy HTTPS, dismesso il 29 Giugno 2026.)
 

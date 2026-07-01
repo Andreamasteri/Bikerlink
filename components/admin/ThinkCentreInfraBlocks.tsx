@@ -190,18 +190,18 @@ export function WhisperBlock({
   );
 }
 
-export function RedisBlock({
+export function DragonflyBlock({
   service,
   isLoading,
   hasError,
 }: { service?: SimpleServiceHealth; isLoading?: boolean; hasError?: boolean }) {
   return (
     <InfraBlock
-      serviceKey="redis"
+      serviceKey="dragonfly"
       label="DragonflyDB"
       icon="database-outline"
       service={service}
-      configNote="Aggiungere REDIS_PROBE_HOST (e REDIS_PROBE_PORT se diversa da 6379) nei secret Replit."
+      configNote="Aggiungere DRAGONFLY_PROBE_HOST (e DRAGONFLY_PROBE_PORT se diversa da 6379) nei secret Replit."
       isLoading={isLoading}
       hasError={hasError}
     />

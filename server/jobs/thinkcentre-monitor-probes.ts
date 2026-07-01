@@ -45,6 +45,7 @@ export const PROBE_ENV_VARS = [
   "VALHALLA_URL",
   "VALHALLA_API_KEY",
   "UFW_STATUS_URL",
+  "TC_DRAGONFLY_URL",
   "TC_REDIS_URL",
   "POSTGRES_PROBE_HOST",
   "POSTGRES_PROBE_PORT",
@@ -285,12 +286,12 @@ export function tcpConnectOk(host: string, port: number): Promise<boolean | null
   return tcpConnectDetailed(host, port).then((r) => r.ok);
 }
 
-async function probeRedisOk(): Promise<boolean | null> {
-  const tcRedisUrl = process.env.TC_REDIS_URL?.trim();
-  // Skip probe quando TC_REDIS_URL non è configurato: Redis non è atteso.
-  if (!tcRedisUrl) return null;
+async function probeDragonflyOk(): Promise<boolean | null> {
+  const tcDragonflyUrl = (process.env.TC_DRAGONFLY_URL ?? process.env.TC_REDIS_URL)?.trim();
+  // Skip probe quando TC_DRAGONFLY_URL non è configurato: DragonflyDB non è atteso.
+  if (!tcDragonflyUrl) return null;
   try {
-    const u = new URL(tcRedisUrl);
+    const u = new URL(tcDragonflyUrl);
     return tcpConnectOk(u.hostname, u.port ? parseInt(u.port, 10) : 6379);
   } catch {
     return false;
@@ -328,7 +329,7 @@ export async function runAllProbes(): Promise<AggregateProbeResult> {
     { key: "nominatim",   label: "Nominatim",      fn: probeNominatimOk },
     { key: "valhalla",    label: "Valhalla",       fn: probeValhallaOk },
     { key: "ufw",         label: "Firewall (ufw)", fn: probeUfwOk },
-    { key: "redis",       label: "Redis",          fn: probeRedisOk },
+    { key: "dragonfly",   label: "DragonflyDB",    fn: probeDragonflyOk },
     { key: "postgres",    label: "PostgreSQL",     fn: probePostgresOk },
     { key: "pgadmin",     label: "pgAdmin",        fn: probePgAdminOk },
     { key: "nginx",       label: "nginx",          fn: probeNginxOk },

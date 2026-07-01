@@ -36,7 +36,7 @@ let state: { day: string; tokens: number } = { day: "", tokens: 0 };
 let softCap = DEFAULT_SOFT_CAP;
 
 // Timestamp dell'ultimo caricamento dal DB.
-// Cache in-memory TTL 5 minuti: con Redis down non si interroga più
+// Cache in-memory TTL 5 minuti: con DragonflyDB down non si interroga più
 // app_settings ad ogni ciclo (~130s) ma al massimo una volta ogni 5 minuti.
 // Lo state in-memory è la fonte di verità tra un refresh e l'altro: viene
 // aggiornato direttamente da recordGroqTokens/atomicIncrementTokens, quindi la

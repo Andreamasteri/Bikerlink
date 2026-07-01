@@ -268,7 +268,7 @@ router.get("/matching/lock-state", async (_req: Request, res: Response) => {
   }
 });
 
-// Task #2517 — distributed lock status (Redis-aware).
+// Task #2517 — distributed lock status (DragonflyDB-aware).
 router.get("/matching/lock-status", async (_req: Request, res: Response) => {
   try {
     const status = await getMatchingLockStatus();

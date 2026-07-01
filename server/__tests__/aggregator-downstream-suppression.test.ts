@@ -2,7 +2,7 @@
  * Aggregator — confini della soppressione allarmi a valle (ThinkCentre spento).
  *
  * suppressDownstreamWhenPoweredOff() retrocede a "warn" SOLO i problemi che sono
- * conseguenza diretta del ThinkCentre offline (Redis self-hosted, backlog
+ * conseguenza diretta del ThinkCentre offline (DragonflyDB self-hosted, backlog
  * map-matching, routing engine self-hosted, pressione del pool, instabilità di
  * rete gonfiata dai self-hosted giù, DB ping lento per job map-matching a vuoto),
  * lasciandoli comunque visibili in dashboard. Gli allarmi indipendenti (engine
@@ -29,7 +29,7 @@ import type { Problem, Severity, SignalSource, Signal } from "../ai/watchdog/typ
 const collectDbMock = vi.hoisted(() => vi.fn<[], Promise<Signal[]>>());
 const collectBullMqMock = vi.hoisted(() => vi.fn<[], Promise<Signal[]>>());
 const collectSchedulerMock = vi.hoisted(() => vi.fn<[], Promise<Signal[]>>());
-const collectRedisMock = vi.hoisted(() => vi.fn<[], Promise<Signal[]>>());
+const collectDragonflyMock = vi.hoisted(() => vi.fn<[], Promise<Signal[]>>());
 const collectLatencyMock = vi.hoisted(() => vi.fn<[], Promise<Signal[]>>());
 const collectErrorsMock = vi.hoisted(() => vi.fn<[], Promise<Signal[]>>());
 const collectMapsMock = vi.hoisted(() => vi.fn<[], Promise<Signal[]>>());
@@ -41,7 +41,7 @@ const recordSignalsMock = vi.hoisted(() => vi.fn<[Signal[]], Promise<void>>());
 vi.mock("../ai/watchdog/collectors/bullmq-collector", () => ({ collectBullMq: collectBullMqMock }));
 vi.mock("../ai/watchdog/collectors/scheduler-collector", () => ({ collectScheduler: collectSchedulerMock }));
 vi.mock("../ai/watchdog/collectors/db-collector", () => ({ collectDb: collectDbMock }));
-vi.mock("../ai/watchdog/collectors/redis-collector", () => ({ collectRedis: collectRedisMock }));
+vi.mock("../ai/watchdog/collectors/dragonfly-collector", () => ({ collectDragonfly: collectDragonflyMock }));
 vi.mock("../ai/watchdog/collectors/latency-collector", () => ({ collectLatency: collectLatencyMock }));
 vi.mock("../ai/watchdog/collectors/error-collector", () => ({ collectErrors: collectErrorsMock }));
 vi.mock("../ai/watchdog/collectors/maps-collector", () => ({ collectMaps: collectMapsMock }));
@@ -81,7 +81,7 @@ function prob(
 describe("suppressDownstreamWhenPoweredOff — problemi a valle", () => {
   it("retrocede a warn i problemi downstream critical/high del ThinkCentre", () => {
     const input: Problem[] = [
-      prob("redis.redis.unreachable", "critical", "redis"),
+      prob("dragonfly.dragonfly.unreachable", "critical", "dragonfly"),
       prob("maps.matching.pending", "high", "maps"),
       prob("maps.routing.engine_down.graphhopper", "critical", "maps"),
       prob("maps.routing.engine_down.valhalla", "high", "maps"),
@@ -164,7 +164,7 @@ describe("runAggregatorCycle — E2E soppressione ThinkCentre spento", () => {
     // Default: tutti i collector restituiscono array vuoti.
     collectBullMqMock.mockResolvedValue([]);
     collectSchedulerMock.mockResolvedValue([]);
-    collectRedisMock.mockResolvedValue([]);
+    collectDragonflyMock.mockResolvedValue([]);
     collectLatencyMock.mockResolvedValue([]);
     collectErrorsMock.mockResolvedValue([]);
     collectRestartsMock.mockResolvedValue([]);

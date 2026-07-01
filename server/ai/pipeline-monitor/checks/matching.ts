@@ -68,7 +68,7 @@ export async function checkMatching(): Promise<PipelineCheckResult> {
     overall,
     steps,
     suggestedFix: overall !== "ok"
-      ? "Verifica matching/scheduler.ts, controlla il lock Redis e riavvia il backend se il lock è zombie."
+      ? "Verifica matching/scheduler.ts, controlla il lock DragonflyDB e riavvia il backend se il lock è zombie."
       : null,
     durationMs: Date.now() - t0,
   };

@@ -5,7 +5,7 @@ export function buildMatchingInvestors(baseUrl: string): { meta: PageMeta; body:
   const meta: PageMeta = {
     path: "/matching/per-investitori",
     title: "Matching BikerLink per Investitori — Architettura tecnica e vantaggio competitivo",
-    description: "Architettura tecnica del sistema matching BikerLink: PostgreSQL+PostGIS+pgvector, Redis+BullMQ, scoring engine, embeddings, feedback loop. KPI, stack completo e roadmap.",
+    description: "Architettura tecnica del sistema matching BikerLink: PostgreSQL+PostGIS+pgvector, DragonflyDB+BullMQ, scoring engine, embeddings, feedback loop. KPI, stack completo e roadmap.",
     ogImage: `${baseUrl}/assets/images/playstore-feature-graphic.png`,
     headExtras: MATCHING_CSS,
     jsonld: [
@@ -31,13 +31,13 @@ export function buildMatchingInvestors(baseUrl: string): { meta: PageMeta; body:
 
   const techStack = [
     { layer: "Database", tech: "PostgreSQL 16 + PostGIS + pgvector", note: "Dati utente, percorsi, score. pgvector per embeddings (1536 dim)." },
-    { layer: "Cache & Code", tech: "Redis 7 + BullMQ", note: "Cache score, code di ricalcolo asincrono, lock distribuiti." },
+    { layer: "Cache & Code", tech: "DragonflyDB + BullMQ", note: "Cache score, code di ricalcolo asincrono, lock distribuiti." },
     { layer: "Scoring Engine", tech: "Express + TypeScript", note: "17 segnali, pesi configurabili, feedback loop, decay." },
     { layer: "Embeddings", tech: "OpenAI text-embedding-3-large + multilingual-e5-small", note: "Bio e musica. Fallback self-hosted per resilienza." },
     { layer: "AI Orchestration", tech: "Anthropic Claude + OpenAI GPT + Google Gemini", note: "Cascata di fallback automatica. 99.95% uptime atteso." },
     { layer: "Geo", tech: "PostGIS + H3 geohash", note: "Distanze reali, zone di guida, route affinity su percorsi storici." },
     { layer: "Client", tech: "React Native (Expo) + React Query", note: "App mobile iOS/Android. Aggiornamenti OTA via EAS." },
-    { layer: "A/B Testing", tech: "Framework interno + Redis flag", note: "Split test algoritmi su % utenti configurabile dall'admin." },
+    { layer: "A/B Testing", tech: "Framework interno + DragonflyDB flag", note: "Split test algoritmi su % utenti configurabile dall'admin." },
   ];
 
   const roadmap = [
@@ -87,7 +87,7 @@ ${matchSubnav("/matching/per-investitori")}
     <div style="background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:28px 24px;margin:28px 0;overflow-x:auto">
       <svg viewBox="0 0 760 220" role="img" aria-labelledby="arch-svg-title arch-svg-desc" style="width:100%;max-width:760px;height:auto;display:block;margin:0 auto" xmlns="http://www.w3.org/2000/svg">
         <title id="arch-svg-title">Stack architettura matching BikerLink</title>
-        <desc id="arch-svg-desc">Pipeline a 5 layer: Database (PostgreSQL+PostGIS+pgvector) → Cache (Redis+BullMQ) → Engine scoring (TypeScript) → API REST → Client (Expo React Native iOS/Android)</desc>
+        <desc id="arch-svg-desc">Pipeline a 5 layer: Database (PostgreSQL+PostGIS+pgvector) → Cache (DragonflyDB+BullMQ) → Engine scoring (TypeScript) → API REST → Client (Expo React Native iOS/Android)</desc>
         <defs>
           <marker id="arch-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
             <path d="M0,0 L10,5 L0,10 z" fill="#FF3B30"/>
@@ -95,7 +95,7 @@ ${matchSubnav("/matching/per-investitori")}
         </defs>
         ${[
           {l:"DB",      s:"PostgreSQL 16<br/>PostGIS · pgvector", c:"#888"},
-          {l:"CACHE",   s:"Redis 7<br/>BullMQ", c:"#888"},
+          {l:"CACHE",   s:"DragonflyDB<br/>BullMQ", c:"#888"},
           {l:"ENGINE",  s:"17 segnali<br/>scoring + decay", c:"#FF3B30"},
           {l:"API",     s:"Express<br/>REST + auth", c:"#888"},
           {l:"CLIENT",  s:"Expo RN<br/>iOS · Android", c:"#888"},
@@ -115,7 +115,7 @@ ${matchSubnav("/matching/per-investitori")}
 flowchart TB
   subgraph DB["🗄️ Database Layer"]
     PG["PostgreSQL 16<br/>+ PostGIS + pgvector"]
-    REDIS["Redis 7<br/>+ BullMQ queues"]
+    REDIS["DragonflyDB<br/>+ BullMQ queues"]
   end
   subgraph ENG["⚙️ Scoring Engine"]
     SC["17-signal scorer<br/>(TypeScript)"]

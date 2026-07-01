@@ -113,7 +113,7 @@ export class TagsStorage extends TrackingStorage {
       categorySlug: r.category.slug,
       categoryLabel: r.category.label,
     }));
-    // Populate Redis cache (no-op when REDIS_URL unset).
+    // Populate DragonflyDB cache (no-op when TC_DRAGONFLY_URL unset).
     void cacheSet(TAGS_CACHE_NS, cacheKey, result, TAGS_CACHE_TTL_S);
     return result;
   }
@@ -156,7 +156,7 @@ export class TagsStorage extends TrackingStorage {
       }
     }
 
-    // Invalidate Redis cache after mutation completes.
+    // Invalidate DragonflyDB cache after mutation completes.
     void cacheDel(TAGS_CACHE_NS, tagsCacheKey(entityType, entityId));
 
     return await db.transaction(async (tx) => {
