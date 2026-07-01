@@ -689,3 +689,9 @@ id = "hJTvwa6KpY--juqgCb3BM"
 uri = "file://.local/tasks/lista-task-ota-154-216.md"
 type = "text"
 title = "Lista completa task & modifiche OTA 154→216"
+
+[[outputs]]
+id = "l6ALGw8wN8mI4X0IPgMRd"
+uri = "file://.local/tasks/quebracho-recap-table.md"
+type = "text"
+title = "Quebracho - Cosa coordina e cosa no"
