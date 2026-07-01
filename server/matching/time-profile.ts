@@ -403,16 +403,18 @@ export async function getTimeProfileLabelDistribution(): Promise<{
   lastStats: TimeProfileJobResult | null;
   isRunning: boolean;
 }> {
-  const [counts, lastRunSetting, lastStatsSetting] = await Promise.all([
-    db.execute<{ label: string | null; cnt: string }>(sql`
-      SELECT label, COUNT(*)::text AS cnt
-      FROM user_time_profile
-      GROUP BY label
-      ORDER BY cnt DESC
-    `),
-    storage.getAppSetting(SETTING_LAST_RUN),
-    storage.getAppSetting(SETTING_LAST_STATS),
-  ]);
+  // Pool budget (Task #5324): 3 letture di setup in sequenza, non con
+  // Promise.all — è un endpoint admin a bassa frequenza ma il gate
+  // check-bg-promise-all-burst.sh tratta l'intero modulo come path bg;
+  // sequenziale evita di reintrodurre il pattern altrove nel file per copia.
+  const counts = await db.execute<{ label: string | null; cnt: string }>(sql`
+    SELECT label, COUNT(*)::text AS cnt
+    FROM user_time_profile
+    GROUP BY label
+    ORDER BY cnt DESC
+  `);
+  const lastRunSetting = await storage.getAppSetting(SETTING_LAST_RUN);
+  const lastStatsSetting = await storage.getAppSetting(SETTING_LAST_STATS);
 
   const rows = counts.rows.map((r) => ({
     label: r.label ?? "unknown",

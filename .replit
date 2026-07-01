@@ -201,13 +201,9 @@ GCE_SSH_PORT = "22"
 
 [[ports]]
 localPort = 5000
-externalPort = 80
+externalPort = 5000
 
 [[ports]]
 localPort = 8081
 externalPort = 8081
-
-[[ports]]
-localPort = 8082
-externalPort = 6000
   

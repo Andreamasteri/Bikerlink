@@ -452,6 +452,27 @@ if [ "$AI_SCHEMA_EXIT" -ne 0 ]; then
   exit "$AI_SCHEMA_EXIT"
 fi
 
+# ── GATE Promise.all NON BUDGETTATI IN JOB BG (pool DB saturation) ──
+# server/matching/* e server/jobs/*: un Promise.all([...]) di setup con
+# >2 elementi (o un fan-out .map() non pLimit-bounded) apre più connessioni
+# del pool DB simultaneamente. Con pool max=10 un burst così affama il
+# traffico utente (picco intermittente di "waiting"). Già risolto per
+# music/bio affinity, archive stale, enrich-breakdowns e le stat time-profile;
+# questo gate blocca la regressione futura. Soppressione:
+# // check-bg-promise-all-burst: safe (riga precedente alla chiamata).
+# Vedi: .agents/memory/pool-promise-all-setup-burst.md
+echo "════════════════════════════════════════"
+echo "  Gate Promise.all non budgettati nei job bg"
+echo "════════════════════════════════════════"
+BG_PROMISE_ALL_EXIT=0
+bash scripts/check-bg-promise-all-burst.sh || BG_PROMISE_ALL_EXIT=$?
+echo "════════════════════════════════════════"
+echo ""
+if [ "$BG_PROMISE_ALL_EXIT" -ne 0 ]; then
+  echo "❌ Gate bg-promise-all-burst fallito — correggere prima di procedere."
+  exit "$BG_PROMISE_ALL_EXIT"
+fi
+
 # ── GUARD PORTE .replit (MAPPING [[ports]] + DEPLOY) ─────────
 # REGOLA BLOCCANTE (replit.md § Preferenze utente):
 # Nessun agente può modificare [[ports]] senza autorizzazione esplicita utente.

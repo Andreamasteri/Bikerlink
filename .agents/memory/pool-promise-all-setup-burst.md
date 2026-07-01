@@ -38,3 +38,10 @@ errore generico. Eccezioni OK: fan-out già `pLimit`-bounded (es. backfill
 embeddings); burst 2-wide su path user-facing (run-biker, time-profile) NON sono la
 causa dei picchi 10-12 e wrapparli/sequenzializzarli aggiungerebbe latenza al path
 utente — lasciarli.
+
+**Gate CI:** `scripts/check-bg-promise-all-burst.sh` (in post-merge.sh) scansiona
+SOLO `server/matching/**` e `server/jobs/**` e blocca `Promise.all([...])` con >2
+elementi letterali o `.map()` fan-out senza `pLimit` visibile nelle righe precedenti.
+Burst 2-wide sono tollerati (vedi sopra); soppressione puntuale con commento
+`// check-bg-promise-all-burst: safe — <motivo>`. Nessuna baseline: qualsiasi nuova
+violazione va sequenzializzata/pLimit-bounded, non congelata.
