@@ -16,8 +16,9 @@ import {
   buildAresSystemPrompt,
   type KnowledgeEntry,
 } from "./knowledge";
-import { getOllamaModel, isOllamaConfigured, isOllamaReachable } from "../../lib/ollama-client";
-import { AI_ROSTER, type AiPersonaId } from "./roster";
+import { getOllamaModel, isOllamaConfigured, isOllamaReachable, callOllamaChat } from "../../lib/ollama-client";
+import { AI_ROSTER, type AiPersonaId, createHandoffMarkerFilter, stripHandoffMarker } from "./roster";
+import { recordKnowledgeGap } from "./knowledge-gaps";
 import { isAresConfigured, getAresModelId, streamAresChat } from "../../lib/ares-client";
 import { retrieveContext, formatRagContext, indexKnowledge } from "./rag";
 import { OLLAMA_TOOLS } from "./tools";
@@ -38,6 +39,49 @@ const HORUS_MODEL_ID = process.env.HORUS_OLLAMA_MODEL?.trim() || "bikerlink-rout
 // NON viene salvata nel DB: è statica e ricostruita a ogni prima apertura. Il
 // testo è centralizzato in @shared/bowie-greeting così che terminale standalone/
 // backend e chat in-app condividano la stessa fonte (import in cima al file).
+
+// Task #5322 — Fase di COMPOSIZIONE domanda per Ares (solo handoff admin→Ares).
+// Prima di inoltrare ad Ares, Bowie sintetizza il contesto della conversazione in
+// UNA domanda tecnica unica, completa e strutturata (via Ollama locale). Ares
+// riceve solo quella domanda, così NON risponde "a metà" con Bowie che parla al
+// posto suo. Se Ollama locale è offline/fallisce, si degrada al messaggio grezzo
+// dell'admin (nessun blocco, nessun fallback cloud).
+const ARES_QUESTION_MAX_CHARS = 1200;
+
+async function composeAresQuestion(
+  history: Array<{ role: "user" | "assistant"; content: string }>,
+  latestMessage: string,
+): Promise<string> {
+  const fallback = latestMessage.trim();
+  try {
+    if (!isOllamaConfigured || !(await isOllamaReachable("bowie"))) return fallback;
+    const transcript = [...history, { role: "user" as const, content: latestMessage }]
+      .slice(-12)
+      .map((m) => `${m.role === "user" ? "ADMIN" : "ASSISTENTE"}: ${m.content}`)
+      .join("\n");
+    const prompt = `Sei Bowie e stai per passare la parola ad Ares, l'AI di diagnostica tecnica.
+Leggi la conversazione qui sotto e formula UNA singola domanda tecnica per Ares:
+completa, autosufficiente e ben strutturata (includi il contesto rilevante e cosa
+serve sapere). NON rispondere tu, NON aggiungere convenevoli: restituisci SOLO la
+domanda da inoltrare ad Ares, in italiano, concisa.
+
+CONVERSAZIONE:
+${transcript}
+
+DOMANDA PER ARES:`;
+    const composed = await callOllamaChat(prompt, undefined, {
+      persona: "bowie",
+      temperature: 0.3,
+      numPredict: 400,
+    });
+    const clean = (composed ?? "").trim();
+    if (!clean) return fallback;
+    return clean.length > ARES_QUESTION_MAX_CHARS ? clean.slice(0, ARES_QUESTION_MAX_CHARS) : clean;
+  } catch (err) {
+    console.warn("[assistant] composizione domanda Ares fallita, uso il messaggio grezzo:", (err as Error).message);
+    return fallback;
+  }
+}
 
 export interface AssistantAgentOpts {
   message: string;
@@ -76,6 +120,10 @@ export interface AssistantAgentResult {
   // Task #5197 — Persona EFFETTIVA che ha risposto (può differire da quella
   // richiesta: es. Ares offline → fallback a Bowie).
   persona: { id: AiPersonaId; name: string };
+  // Task #5322 — true se la persona ha emesso il marcatore di congedo
+  // (HANDOFF_BACK_TO_BOWIE): il chiamante resetta lo stato "persona attiva" così
+  // il turno successivo torna a Bowie. Il marcatore è già rimosso da `text`.
+  farewell: boolean;
 }
 
 // ── Memoria conversazionale ───────────────────────────────────────────────────
@@ -142,6 +190,9 @@ export async function runAssistantAgent(opts: AssistantAgentOpts): Promise<Assis
   const ollamaModelName = requestedPersona === "horus" ? HORUS_MODEL_ID : undefined;
 
   let system: string;
+  // Task #5322 — Miglior punteggio RAG del turno (null = nessun match). Usato a
+  // fine turno per registrare le lacune di conoscenza (ai_knowledge_gaps).
+  let ragTopScore: number | null = null;
   if (requestedPersona === "ares") {
     // Ares: diagnostica tecnica (solo admin), snapshot piattaforma nel prompt.
     system = buildAresSystemPrompt(opts.adminContext ?? "");
@@ -153,6 +204,7 @@ export async function runAssistantAgent(opts: AssistantAgentOpts): Promise<Assis
       threshold: 0.05,
       extra: opts.customFaqs ?? [],
     });
+    ragTopScore = ragSnippets[0]?.score ?? null;
     const ragContext = formatRagContext(ragSnippets);
     const userContext = await fetchUserLiveContext(opts.userId);
     system = buildHorusSystemPrompt({
@@ -173,6 +225,7 @@ export async function runAssistantAgent(opts: AssistantAgentOpts): Promise<Assis
       threshold: 0.05,
       extra: opts.customFaqs ?? [],
     });
+    ragTopScore = ragSnippets[0]?.score ?? null;
     const ragContext = formatRagContext(ragSnippets);
 
     // Soluzione 2 — Contesto live utente (profilo, ultimi giri, proposte attive).
@@ -230,6 +283,15 @@ export async function runAssistantAgent(opts: AssistantAgentOpts): Promise<Assis
   // solo dai delta del modello AI — così i fallback guard funzionano correttamente.
   let providerEmittedAny = false;
 
+  // Task #5322 — Filtro di streaming che rimuove il marcatore di congedo
+  // (HANDOFF_BACK_TO_BOWIE) dai delta prima che raggiungano il client. Tutti i
+  // delta del MODELLO passano di qui; l'intro poetica e i messaggi di errore/
+  // fallback (testo statico senza marcatore) sono emessi direttamente.
+  const handoffFilter = createHandoffMarkerFilter();
+  const emitAiDelta = (delta: string) => {
+    if (opts.onTextDelta) handoffFilter.push(delta, opts.onTextDelta);
+  };
+
   // Streaming helper riusabile per qualunque modello (Ollama o cloud).
   // Per Ollama: passa i tool e maxSteps per il tool calling server-side.
   const streamWith = async (
@@ -250,7 +312,7 @@ export async function runAssistantAgent(opts: AssistantAgentOpts): Promise<Assis
       finalText += delta;
       aiText += delta;
       providerEmittedAny = true;
-      opts.onTextDelta?.(delta);
+      emitAiDelta(delta);
     }
     const usage = await result.usage;
     tokensIn = usage?.inputTokens ?? 0;
@@ -279,16 +341,21 @@ export async function runAssistantAgent(opts: AssistantAgentOpts): Promise<Assis
     opts.onPersona?.({ id: "ares", name: AI_ROSTER.ares.name });
     try {
       if (!isAresConfigured) throw new Error("Ares non configurato (ARES_OLLAMA_URL mancante).");
+      // Task #5322 — Composizione: Bowie sintetizza il contesto in UNA domanda per
+      // Ares (via Ollama locale). Ares riceve SOLO quella domanda + un vincolo di
+      // sintesi nel system prompt, così risponde con la sua voce e in modo contenuto.
+      const aresQuestion = await composeAresQuestion(opts.history ?? [], opts.message);
+      const aresSystem = `${system}\n\nVINCOLO DI RISPOSTA: rispondi in modo CONTENUTO e STRUTTURATO (punti chiave, niente preamboli né divagazioni). Vai dritto alla diagnosi/azione.`;
       await streamAresChat({
-        system,
-        messages: messages.map((m) => ({ role: m.role, content: m.content })),
+        system: aresSystem,
+        messages: [{ role: "user", content: aresQuestion }],
         signal: opts.signal,
         timeoutMs: 60_000,
         onDelta: (delta) => {
           finalText += delta;
           aiText += delta;
           providerEmittedAny = true;
-          opts.onTextDelta?.(delta);
+          emitAiDelta(delta);
         },
       });
       provider = "ares";
@@ -388,6 +455,14 @@ export async function runAssistantAgent(opts: AssistantAgentOpts): Promise<Assis
     opts.onTextDelta?.(finalText);
   }
 
+  // Task #5322 — Rilascia la coda residua del filtro di congedo (l'eventuale
+  // tail trattenuto) e determina lo stato di congedo dal testo AI grezzo.
+  if (opts.onTextDelta) handoffFilter.flush(opts.onTextDelta);
+  const { text: cleanAiText, farewell } = stripHandoffMarker(aiText);
+  // Il testo restituito ai chiamanti NON-streaming deve essere pulito dal
+  // marcatore (l'intro poetica non lo contiene, quindi è sicuro strippare tutto).
+  const cleanFinalText = stripHandoffMarker(finalText).text;
+
   const costUsd = estimateCostUsd(modelId, tokensIn, tokensOut);
   const latencyMs = Date.now() - startTs;
 
@@ -409,12 +484,24 @@ export async function runAssistantAgent(opts: AssistantAgentOpts): Promise<Assis
   // Task #3017 — Salva in memoria conversazionale (solo se non degraded e userId disponibile)
   // Task #4842 — La chat admin è in-sessione: non persistiamo i turni.
   // Task #5210 — Salva solo la risposta AI (aiText), mai il prefisso poetico statico.
-  if (!degraded && opts.userId && aiText && !isAdmin) {
-    saveTurns(opts.userId, opts.message, aiText).catch(() => {});
+  if (!degraded && opts.userId && cleanAiText && !isAdmin) {
+    saveTurns(opts.userId, opts.message, cleanAiText).catch(() => {});
+  }
+
+  // Task #5322 — Lacune di conoscenza: se il RAG non ha trovato nulla di
+  // pertinente (score basso o nullo) registriamo la domanda. Solo Bowie/Horus
+  // (persone RAG-driven), mai admin/Ares. Best-effort, non blocca il turno.
+  if (!isAdmin && effectivePersona !== "ares") {
+    void recordKnowledgeGap({
+      question: opts.message,
+      topScore: ragTopScore,
+      persona: effectivePersona,
+      sourceApp: opts.sourceApp ?? "main_app",
+    });
   }
 
   return {
-    text: finalText,
+    text: cleanFinalText,
     provider,
     model: modelId,
     tokensIn,
@@ -422,6 +509,7 @@ export async function runAssistantAgent(opts: AssistantAgentOpts): Promise<Assis
     costUsd,
     degraded,
     persona: { id: effectivePersona, name: AI_ROSTER[effectivePersona].name },
+    farewell,
   };
 }
 

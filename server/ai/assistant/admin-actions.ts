@@ -8,7 +8,20 @@
 // server valida i params (zod) ed esegue, con permission-check (role === admin) e
 // audit log. Nessun eval/dynamic exec: l'id è validato contro un Set literal.
 import { z } from "zod";
+import { eq } from "drizzle-orm";
 import { storage } from "../../storage";
+import { db } from "../../db";
+import { aiKnowledgeGaps } from "@shared/db";
+import {
+  execVpsCommand,
+  startVpsJob,
+  getVpsJob,
+  isDestructiveCommand,
+} from "./vps-ops";
+
+// Task #5322 — Livello di rischio dell'azione admin. Guida il client (badge/UX di
+// conferma) e viene loggato nell'audit trail. "high" = distruttivo/irreversibile.
+export type AdminActionRiskLevel = "low" | "medium" | "high";
 
 export interface AdminAssistantActionDef {
   id: string;
@@ -16,6 +29,10 @@ export interface AdminAssistantActionDef {
   description: string;
   // Testo statico (NON generato dall'LLM) mostrato all'admin nel prompt di conferma.
   confirmLabel: string;
+  // Task #5322 — Metadati di sicurezza esposti al client + audit.
+  riskLevel: AdminActionRiskLevel;
+  // Se true il client DEVE mostrare una conferma esplicita prima di eseguire.
+  requiresConfirm: boolean;
   paramsSchema: z.ZodTypeAny;
 }
 
@@ -33,6 +50,8 @@ export const ADMIN_ASSISTANT_ACTIONS = {
     description:
       "Approva un business (locale o concessionaria) in attesa di approvazione. Param: businessId (stringa, l'ID del business). Usa SOLO gli ID dei business elencati nello snapshot piattaforma.",
     confirmLabel: "Confermi l'approvazione di questo business?",
+    riskLevel: "medium",
+    requiresConfirm: true,
     paramsSchema: z.object({ businessId: z.string().min(1, "businessId obbligatorio") }),
   },
   "set-business-active": {
@@ -40,6 +59,8 @@ export const ADMIN_ASSISTANT_ACTIONS = {
     description:
       "Attiva o disattiva la visibilità marketing di un business. Params: businessId (stringa), isActive (boolean — true per renderlo visibile, false per nasconderlo). Usa SOLO gli ID dei business dello snapshot.",
     confirmLabel: "Confermi il cambio di visibilità di questo business?",
+    riskLevel: "medium",
+    requiresConfirm: true,
     paramsSchema: z.object({
       businessId: z.string().min(1, "businessId obbligatorio"),
       isActive: z.boolean(),
@@ -50,8 +71,66 @@ export const ADMIN_ASSISTANT_ACTIONS = {
     description:
       "Ricalcola i passaggi qualificati (report reach) di tutti i business per un mese. Param opzionale: month (formato 'YYYY-MM', default mese corrente).",
     confirmLabel: "Confermi il ricalcolo dei passaggi qualificati?",
+    // Non distruttiva (ricalcolo idempotente) ma pesante: chiediamo comunque conferma.
+    riskLevel: "low",
+    requiresConfirm: true,
     paramsSchema: z.object({
       month: z.string().regex(/^\d{4}-\d{2}$/, "month deve essere nel formato YYYY-MM").optional(),
+    }),
+  },
+  // Task #5322 — Chiude una lacuna di conoscenza (ai_knowledge_gaps) marcandola
+  // "dismissed": non verrà più proposta all'auto-apprendimento locale.
+  "dismiss-knowledge-gap": {
+    id: "dismiss-knowledge-gap",
+    description:
+      "Marca come 'scartata' una lacuna di conoscenza dell'AI (una domanda utente senza risposta pertinente), così non verrà più proposta all'auto-apprendimento. Param: gapId (stringa, l'ID della lacuna dallo snapshot). Param opzionale: note (stringa, motivazione).",
+    confirmLabel: "Confermi di scartare questa lacuna di conoscenza?",
+    riskLevel: "low",
+    requiresConfirm: true,
+    paramsSchema: z.object({
+      gapId: z.string().min(1, "gapId obbligatorio"),
+      note: z.string().max(500).optional(),
+    }),
+  },
+  // Task #5322 — Operazioni sul VPS Google "dragonfly" (SOLO admin). Esecuzione
+  // server-side via helper (vps-ops.ts → scripts/gce/gce.py). Ogni op mutante
+  // richiede conferma; i comandi distruttivi richiedono ANCHE confirmDestructive
+  // (doppia conferma). La chiave SSH non transita mai da qui.
+  "vps-exec": {
+    id: "vps-exec",
+    description:
+      "Esegue un comando/script BREVE (sincrono) sul VPS Google 'dragonfly' e restituisce l'output. Param: command (stringa, il comando bash). Params opzionali: sudo (boolean), confirmDestructive (boolean, OBBLIGATORIO true per comandi distruttivi come rm -rf, apt remove, reboot). Usa per install/verifica/lettura veloce.",
+    confirmLabel: "Confermi l'esecuzione di questo comando sul VPS?",
+    riskLevel: "high",
+    requiresConfirm: true,
+    paramsSchema: z.object({
+      command: z.string().min(1, "command obbligatorio").max(2000, "comando troppo lungo"),
+      sudo: z.boolean().optional(),
+      confirmDestructive: z.boolean().optional(),
+    }),
+  },
+  "vps-start-job": {
+    id: "vps-start-job",
+    description:
+      "Avvia un JOB LUNGO asincrono sul VPS Google (es. '24h di ping verso un sito'): parte distaccato e l'esito arriva dopo, in chat e via notifica. Param: command (stringa). Params opzionali: label (stringa breve descrittiva), confirmDestructive (boolean per comandi distruttivi).",
+    confirmLabel: "Confermi l'avvio di questo job lungo sul VPS?",
+    riskLevel: "high",
+    requiresConfirm: true,
+    paramsSchema: z.object({
+      command: z.string().min(1, "command obbligatorio").max(2000, "comando troppo lungo"),
+      label: z.string().max(120).optional(),
+      confirmDestructive: z.boolean().optional(),
+    }),
+  },
+  "vps-job-status": {
+    id: "vps-job-status",
+    description:
+      "Legge stato ed esito (se pronto) di un job VPS avviato in precedenza. Param: jobId (stringa, l'ID del job). Sola lettura.",
+    confirmLabel: "Mostro lo stato del job VPS?",
+    riskLevel: "low",
+    requiresConfirm: false,
+    paramsSchema: z.object({
+      jobId: z.string().min(1, "jobId obbligatorio"),
     }),
   },
 } as const satisfies Record<string, AdminAssistantActionDef>;
@@ -78,8 +157,18 @@ export function validateAdminActionParams(id: AdminAssistantActionId, raw: unkno
 
 export function listAdminActionsForPrompt(): string {
   return Object.values(ADMIN_ASSISTANT_ACTIONS)
-    .map((a) => `- ${a.id}: ${a.description}`)
+    .map((a) => `- ${a.id} [rischio: ${a.riskLevel}]: ${a.description}`)
     .join("\n");
+}
+
+/** Task #5322 — Metadati di sicurezza di un'azione admin (per client + audit). */
+export function getAdminActionMeta(id: AdminAssistantActionId): {
+  riskLevel: AdminActionRiskLevel;
+  requiresConfirm: boolean;
+  confirmLabel: string;
+} {
+  const def = ADMIN_ASSISTANT_ACTIONS[id];
+  return { riskLevel: def.riskLevel, requiresConfirm: def.requiresConfirm, confirmLabel: def.confirmLabel };
 }
 
 export type AdminActionResult =
@@ -102,6 +191,7 @@ async function getReachConfig(): Promise<{ radiusM: number; maxSpeedKmh: number 
 export async function executeAdminAction(
   id: AdminAssistantActionId,
   params: unknown,
+  adminUserId: string,
 ): Promise<AdminActionResult> {
   if (id === "approve-business") {
     const p = params as { businessId: string };
@@ -147,6 +237,79 @@ export async function executeAdminAction(
       summary: `Passaggi qualificati ricalcolati per ${computed} business (mese ${month}).`,
       data: { month, computed },
     };
+  }
+
+  if (id === "dismiss-knowledge-gap") {
+    const p = params as { gapId: string; note?: string };
+    const gapId = p.gapId.trim();
+    if (!gapId) return { ok: false, httpStatus: 400, error: "gapId non valido" };
+    const rows = await db
+      .update(aiKnowledgeGaps)
+      .set({ status: "dismissed", resolutionNote: p.note ?? null })
+      .where(eq(aiKnowledgeGaps.id, gapId))
+      .returning({ id: aiKnowledgeGaps.id, question: aiKnowledgeGaps.question });
+    if (rows.length === 0) return { ok: false, httpStatus: 404, error: "Lacuna non trovata" };
+    console.info(`[admin-ai-action] dismiss-knowledge-gap id=${gapId}`);
+    return {
+      ok: true,
+      summary: `Lacuna di conoscenza scartata.`,
+      data: { gapId, status: "dismissed" },
+    };
+  }
+
+  if (id === "vps-exec") {
+    const p = params as { command: string; sudo?: boolean; confirmDestructive?: boolean };
+    if (isDestructiveCommand(p.command) && p.confirmDestructive !== true) {
+      return {
+        ok: false,
+        httpStatus: 400,
+        error: "Comando distruttivo: richiede doppia conferma (confirmDestructive=true).",
+      };
+    }
+    const res = await execVpsCommand(p.command, { sudo: p.sudo === true });
+    console.info(`[admin-ai-action] vps-exec ok=${res.ok} sudo=${p.sudo === true}`);
+    return {
+      ok: true,
+      summary: res.ok
+        ? `Comando eseguito sul VPS.\n\n${res.output || "(nessun output)"}`
+        : `Il comando VPS è terminato con errore.\n\n${res.output}`,
+      data: { executed: res.ok },
+    };
+  }
+
+  if (id === "vps-start-job") {
+    const p = params as { command: string; label?: string; confirmDestructive?: boolean };
+    if (isDestructiveCommand(p.command) && p.confirmDestructive !== true) {
+      return {
+        ok: false,
+        httpStatus: 400,
+        error: "Comando distruttivo: richiede doppia conferma (confirmDestructive=true).",
+      };
+    }
+    const res = await startVpsJob({ adminUserId, command: p.command, label: p.label });
+    if (!res.ok) return { ok: false, httpStatus: 502, error: `Avvio job VPS fallito: ${res.error}` };
+    console.info(`[admin-ai-action] vps-start-job id=${res.job.id}`);
+    return {
+      ok: true,
+      summary: `Job VPS avviato (id ${res.job.id}). Ti avviserò quando è pronto; puoi anche chiedermi lo stato.`,
+      data: { jobId: res.job.id, status: res.job.status },
+    };
+  }
+
+  if (id === "vps-job-status") {
+    const p = params as { jobId: string };
+    const job = await getVpsJob(p.jobId.trim());
+    if (!job) return { ok: false, httpStatus: 404, error: "Job VPS non trovato" };
+    if (job.adminUserId !== adminUserId) {
+      return { ok: false, httpStatus: 403, error: "Questo job appartiene a un altro admin." };
+    }
+    const parts = [`Job ${job.id.slice(0, 8)} — stato: ${job.status}`];
+    if (job.label) parts.push(`label: ${job.label}`);
+    if (job.exitCode != null) parts.push(`exit: ${job.exitCode}`);
+    if (job.errorMessage) parts.push(`errore: ${job.errorMessage}`);
+    if (job.resultSummary) parts.push(`\n${job.resultSummary}`);
+    else if (job.status === "running") parts.push("\nAncora in esecuzione.");
+    return { ok: true, summary: parts.join("\n"), data: { jobId: job.id, status: job.status } };
   }
 
   return { ok: false, httpStatus: 400, error: "Azione admin non implementata" };

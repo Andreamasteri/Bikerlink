@@ -56,5 +56,16 @@ export async function loadCustomFaqs(_keys: string[]): Promise<KnowledgeEntry[]>
   // Le chiavi i18n editabili runtime sono tradotte client-side; per il prompt
   // server-side qui non risolvo (per evitare dipendenze su un i18n server).
   // Le FAQ statiche di seed in ASSISTANT_KNOWLEDGE coprono il caso base.
-  return [];
+  //
+  // Task #5322 — Iniettiamo qui la conoscenza AUTO-APPRESA in locale da Bowie
+  // (ai_learned_knowledge): finisce in opts.customFaqs → parametro `extra` del
+  // RAG, quindi entra nel retrieval SENZA toccare la KB statica. Best-effort e
+  // con cache breve: se il DB non risponde, il chiamante prosegue senza extra.
+  try {
+    const { loadLearnedKnowledge } = await import("../ai/assistant/auto-learn");
+    return await loadLearnedKnowledge();
+  } catch (e) {
+    console.warn("[ai-assistant/loadCustomFaqs] learned knowledge load failed:", (e as Error).message);
+    return [];
+  }
 }

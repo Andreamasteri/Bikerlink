@@ -6,7 +6,8 @@ import { storage } from "../storage";
 import { sendError } from "../lib/api-response";
 import { loadAssistantConfig } from "../ai/assistant/config";
 import { runAssistantAgent, extractActions } from "../ai/assistant/agent";
-import { classifyRoutingIntent, type AiPersonaId } from "../ai/assistant/roster";
+import { type AiPersonaId } from "../ai/assistant/roster";
+import { resolvePersonaForTurn, commitPersonaAfterTurn } from "../ai/assistant/persona-state";
 import { hasAnyAiProvider, AI_NO_PROVIDER_MESSAGE } from "../ai/moderation/provider";
 import { filterSensitiveOutput } from "../ai/assistant/security-filter";
 import { logAiCall } from "../lib/ai-logger";
@@ -22,6 +23,7 @@ import {
   isWhitelistedAdminAction,
   validateAdminActionParams,
   executeAdminAction,
+  getAdminActionMeta,
   type AdminAssistantActionId,
 } from "../ai/assistant/admin-actions";
 import { requireUser, actionLimiter, parsePlatform } from "./ai-assistant-helpers";
@@ -83,6 +85,33 @@ async function executeServerAction(
         updatedWaypointsCount: newWaypoints.length,
       },
     };
+  }
+
+  if (id === "rename-planned-route") {
+    const p = params as { routeId: string; newTitle: string };
+    const route = await storage.getPlannedRoute(p.routeId);
+    if (!route) return { ok: false, httpStatus: 404, error: "Percorso non trovato" };
+    if (route.userId !== userId) return { ok: false, httpStatus: 403, error: "Non autorizzato" };
+
+    const newTitle = p.newTitle.trim();
+    if (!newTitle) return { ok: false, httpStatus: 400, error: "Titolo non valido" };
+
+    const updated = await storage.updatePlannedRoute(p.routeId, { title: newTitle });
+    if (!updated) return { ok: false, httpStatus: 500, error: "Errore rinomina percorso" };
+
+    console.info(`[ai-action] rename-planned-route: route=${p.routeId} title="${newTitle}" user=${userId}`);
+    return { ok: true, data: { routeId: p.routeId, title: newTitle } };
+  }
+
+  if (id === "delete-planned-route") {
+    const p = params as { routeId: string };
+    const route = await storage.getPlannedRoute(p.routeId);
+    if (!route) return { ok: false, httpStatus: 404, error: "Percorso non trovato" };
+    if (route.userId !== userId) return { ok: false, httpStatus: 403, error: "Non autorizzato" };
+
+    await storage.deletePlannedRoute(p.routeId);
+    console.info(`[ai-action] delete-planned-route: route=${p.routeId} user=${userId}`);
+    return { ok: true, data: { routeId: p.routeId, deleted: true } };
   }
 
   return { ok: false, httpStatus: 400, error: "Azione server non implementata" };
@@ -159,7 +188,7 @@ router.post("/ai/assistant/admin-action/:id", requireUser, actionLimiter, async 
 
   let result;
   try {
-    result = await executeAdminAction(id as AdminAssistantActionId, v.params);
+    result = await executeAdminAction(id as AdminAssistantActionId, v.params, user.id);
   } catch (err) {
     console.error("[ai-assistant/admin-action]", err);
     await logAssistantEvent({
@@ -173,12 +202,13 @@ router.post("/ai/assistant/admin-action/:id", requireUser, actionLimiter, async 
     return;
   }
 
+  const meta = getAdminActionMeta(id as AdminAssistantActionId);
   await logAssistantEvent({
     eventType: result.ok ? "action_executed" : "action_rejected",
     platform: "admin",
     userRole: user.role ?? null,
     userId: user.id,
-    payload: { actionId: id, params: v.params, ok: result.ok },
+    payload: { actionId: id, params: v.params, ok: result.ok, riskLevel: meta.riskLevel },
   });
 
   if (!result.ok) { sendError(res, result.httpStatus, result.error); return; }
@@ -223,9 +253,17 @@ router.post("/ai/assistant/notification-reply", requireUser, async (req: Request
 
   const rawPlatform = parsed.data.platform ?? "android";
 
-  // Persona: Bowie è l'entry point; un intento di percorso passa a Horus.
-  // (Ares è solo lato admin/pannello, non da quick-reply notifica.)
-  const persona: AiPersonaId = classifyRoutingIntent(parsed.data.message) ? "horus" : "bowie";
+  // Task #5322 — Persona deterministica + sticky handoff persistito (TTL).
+  // Ares resta escluso qui (isAdmin=false): la diagnostica è solo lato pannello,
+  // non da quick-reply notifica. sourceApp separa il contesto per client.
+  const personaSourceApp = parsed.data.source ?? "main_app";
+  const personaResolution = await resolvePersonaForTurn({
+    userId: user.id,
+    sourceApp: personaSourceApp,
+    message: parsed.data.message,
+    isAdmin: false,
+  });
+  const persona: AiPersonaId = personaResolution.persona;
 
   if (!hasAnyAiProvider()) {
     sendError(res, 503, AI_NO_PROVIDER_MESSAGE);
@@ -251,6 +289,15 @@ router.post("/ai/assistant/notification-reply", requireUser, async (req: Request
       persona,
       // Task #5228 — attribuzione client di origine.
       sourceApp: parsed.data.source ?? "main_app",
+    });
+
+    // Task #5322 — Persisti lo stato "persona attiva" (sticky handoff con TTL).
+    await commitPersonaAfterTurn({
+      userId: user.id,
+      sourceApp: personaSourceApp,
+      persona: result.persona.id,
+      reason: personaResolution.reason,
+      farewell: result.farewell,
     });
 
     // Buffer completo → filtro one-shot (non c'è streaming, nessun leak parziale).

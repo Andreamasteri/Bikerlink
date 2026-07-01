@@ -275,6 +275,23 @@ export async function runPhase5Schedulers(): Promise<void> {
     markDegraded("scheduler:memory-pruner");
   }
 
+  await arm("assistant-auto-learn", async () => {
+    const { startAutoLearnScheduler } = await import("./ai/assistant/auto-learn");
+    startAutoLearnScheduler();
+    console.log("[INIT] Bowie auto-learn scheduler started (local-only)");
+  });
+
+  // Task #5322 — Poller dei job VPS (VM Google): raccoglie l'esito dei job async
+  // avviati dagli admin in chat e li recapita. Cadenza 2 min, non-fatale.
+  await arm("assistant-vps-poller", async () => {
+    const { pollVpsJobs, reapStaleVpsJobsOnBoot } = await import("./ai/assistant/vps-ops");
+    await reapStaleVpsJobsOnBoot().catch((e) => console.warn("[INIT][BG] reapStaleVpsJobsOnBoot error:", e));
+    setInterval(() => {
+      pollVpsJobs().catch((e) => console.warn("[vps-poller] tick error:", e));
+    }, 2 * 60 * 1000);
+    console.log("[INIT] Bowie VPS job poller started");
+  });
+
   try {
     const [{ startCoordinatorCleanupScheduler }, { scheduleSessionCrashCleanup }] = await Promise.all([
       import("./ai/coordinator/cleanup"),

@@ -76,6 +76,11 @@ const BOWIE_OLLAMA_MODEL = process.env.BOWIE_OLLAMA_MODEL ?? "mistral-nemo:lates
 /** true quando BOWIE_OLLAMA_URL è impostato (Ollama abilitato come provider primario). */
 export const isOllamaConfigured = Boolean(BOWIE_OLLAMA_URL);
 
+/** Nome del modello locale usato per una persona (audit/log; nessun secret). */
+export function getOllamaModelId(_persona: OllamaPersona = "bowie"): string {
+  return BOWIE_OLLAMA_MODEL;
+}
+
 /** Config diagnostica (URL + token configurato sì/no) per una persona — admin panel. */
 export function getOllamaDiagnostics(persona: OllamaPersona): { url?: string; tokenConfigured: boolean } {
   const { url, token } = endpointFor(persona);
@@ -167,6 +172,12 @@ export interface OllamaChatOptions {
   onRepair?: (attempt: number) => void;
   /** Persona la cui config (URL/token) usare — default "bowie". */
   persona?: OllamaPersona;
+  /**
+   * Task #5322 — Cap di lunghezza della risposta (Ollama `num_predict`). Usato per
+   * ottenere risposte contenute (es. composizione domanda per Ares) SENZA toccare
+   * il Modelfile/personalità. Se assente, il modello usa il suo default.
+   */
+  numPredict?: number;
 }
 
 /**
@@ -187,7 +198,12 @@ export async function callOllamaChat<T = string>(
   schema?: z.ZodType<T>,
   options: OllamaChatOptions = {},
 ): Promise<T> {
-  const { system, temperature = 0.2, abortSignal, maxRetries = 2, jsonRetries = 1, onRepair, persona = "bowie" } = options;
+  const { system, temperature = 0.2, abortSignal, maxRetries = 2, jsonRetries = 1, onRepair, persona = "bowie", numPredict } = options;
+
+  // Task #5322 — provider options Ollama (num_predict) per il controllo verbosità.
+  const providerOptions = numPredict
+    ? { ollama: { options: { num_predict: numPredict } } }
+    : undefined;
 
   // ThinkCentre offline (spento O in manutenzione): non tentare nemmeno la
   // chiamata — lancia subito così il chiamante scala al provider cloud senza
@@ -198,7 +214,7 @@ export async function callOllamaChat<T = string>(
   const model = getOllamaModel(undefined, persona);
 
   if (!schema) {
-    const { text } = await generateText({ model, system, prompt, temperature, maxRetries, abortSignal });
+    const { text } = await generateText({ model, system, prompt, temperature, maxRetries, abortSignal, providerOptions });
     return text as unknown as T;
   }
 
@@ -207,7 +223,7 @@ export async function callOllamaChat<T = string>(
   for (let attempt = 0; attempt <= jsonRetries; attempt++) {
     try {
       // check-ai-direct-generateobject: safe — Ollama supports json_schema natively
-      const { object } = await generateObject({ model, schema, system, prompt, temperature, maxRetries, abortSignal });
+      const { object } = await generateObject({ model, schema, system, prompt, temperature, maxRetries, abortSignal, providerOptions });
       return object;
     } catch (err) {
       lastErr = err;

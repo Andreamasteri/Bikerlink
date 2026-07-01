@@ -7,13 +7,14 @@ import { Router, type Request, type Response } from "express";
 import { z } from "zod";
 import { loadAssistantConfig } from "../ai/assistant/config";
 import { runAssistantAgent, extractActions } from "../ai/assistant/agent";
-import { classifyRoutingIntent, parseAresInvocation, type AiPersonaId } from "../ai/assistant/roster";
+import { type AiPersonaId } from "../ai/assistant/roster";
 import {
   isCoordinatorControlRequest,
   isCoordinatorStatusRequest,
   askHorusForCoordinatorDirective,
   getCoordinatorStatusNote,
 } from "../ai/assistant/coordinator-bridge";
+import { resolvePersonaForTurn, commitPersonaAfterTurn } from "../ai/assistant/persona-state";
 import { hasAnyAiProvider, AI_NO_PROVIDER_MESSAGE } from "../ai/moderation/provider";
 import {
   createStreamingSecurityFilter,
@@ -106,14 +107,18 @@ router.post("/ai/assistant/message", requireUser, messageLimiter, async (req: Re
   //   - Tutto il resto → Bowie.
   // NOTA: risolta PRIMA del precheck provider, perché Ares ha un provider
   // dedicato (DIAG_OLLAMA_*) non coperto da hasAnyAiProvider().
-  let persona: AiPersonaId = "bowie";
-  if (isAdminMode) {
-    if (user.role === "admin" && parseAresInvocation(parsed.data.message)) {
-      persona = "ares";
-    }
-  } else if (classifyRoutingIntent(parsed.data.message)) {
-    persona = "horus";
-  }
+  // Task #5322 — La persona è ora deterministica E persistente: lo stato attivo
+  // (ai_conversation_state, con TTL) rende sticky l'handoff tra i turni finché
+  // l'utente non torna esplicitamente indietro o la persona emette il congedo.
+  // sourceApp separa il contesto admin dal main_app dell'utente.
+  const personaSourceApp = isAdminMode ? "admin" : (parsed.data.source ?? "main_app");
+  const personaResolution = await resolvePersonaForTurn({
+    userId: user.id,
+    sourceApp: personaSourceApp,
+    message: parsed.data.message,
+    isAdmin: isAdminMode,
+  });
+  const persona: AiPersonaId = personaResolution.persona;
 
   let effectiveMessage = parsed.data.message;
 
@@ -224,6 +229,16 @@ router.post("/ai/assistant/message", requireUser, messageLimiter, async (req: Re
       onPersona: (p) => send("persona", p),
       signal: abort.signal,
       onTextDelta: (delta) => securityFilter.push(delta, (safe) => send("delta", { text: safe })),
+    });
+
+    // Task #5322 — Persisti lo stato "persona attiva" (sticky handoff con TTL).
+    // farewell o persona=bowie → torna a Bowie; altrimenti rinnova lo stato.
+    await commitPersonaAfterTurn({
+      userId: user.id,
+      sourceApp: personaSourceApp,
+      persona: result.persona.id,
+      reason: personaResolution.reason,
+      farewell: result.farewell,
     });
 
     // Rilascia la coda residua del filtro e determina lo stato di blocco

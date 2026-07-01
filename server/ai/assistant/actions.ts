@@ -96,6 +96,29 @@ export const ASSISTANT_ACTIONS = {
       lng: z.number().finite().optional(),
     }),
   },
+  // Task #5322 — Rinomina di un percorso pianificato dell'utente (ownership-checked
+  // server-side). Params: routeId + newTitle. Usa getUserPlannedRoutes per il routeId.
+  "rename-planned-route": {
+    id: "rename-planned-route",
+    kind: "server" as const,
+    confirmKey: "aiAssistant.action.renamePlannedRoute.confirm",
+    description: "Rinomina un percorso moto pianificato dell'utente. Params: routeId (stringa, ID del percorso), newTitle (stringa, nuovo titolo). Usa lo strumento getUserPlannedRoutes per trovare il routeId corretto.",
+    paramsSchema: z.object({
+      routeId: z.string().min(1, "routeId obbligatorio"),
+      newTitle: z.string().min(1, "newTitle obbligatorio").max(120),
+    }),
+  },
+  // Task #5322 — Eliminazione di un percorso pianificato dell'utente (ownership-checked).
+  // Distruttiva: il client DEVE chiedere conferma esplicita prima di chiamare l'endpoint.
+  "delete-planned-route": {
+    id: "delete-planned-route",
+    kind: "server" as const,
+    confirmKey: "aiAssistant.action.deletePlannedRoute.confirm",
+    description: "Elimina definitivamente un percorso moto pianificato dell'utente. Param: routeId (stringa, ID del percorso). Azione irreversibile: proponila solo se l'utente lo chiede esplicitamente. Usa getUserPlannedRoutes per trovare il routeId.",
+    paramsSchema: z.object({
+      routeId: z.string().min(1, "routeId obbligatorio"),
+    }),
+  },
 } as const satisfies Record<string, AssistantActionDef>;
 
 export type AssistantActionId = keyof typeof ASSISTANT_ACTIONS;

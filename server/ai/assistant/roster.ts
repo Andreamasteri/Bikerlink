@@ -127,3 +127,140 @@ export function parseAresInvocation(message: string): boolean {
     /\bares\b[\s\w']*\b(diagnos\w+|tecnic\w+)/.test(m)
   );
 }
+
+// ── Task #5322 — Invocazione esplicita di Horus per nome ──────────────────────
+//
+// Analogo a `parseAresInvocation` ma per Horus: riconosce quando l'utente chiede
+// ESPLICITAMENTE di parlare con Horus ("chiama Horus", "passami Horus", "voglio
+// parlare con Horus"), a prescindere dall'intento di percorso. È volutamente
+// stretto: richiede il nome "horus" + un verbo di invocazione o un contesto
+// percorso, per non dirottare frasi che citano Horus di sfuggita.
+
+export function parseHorusInvocation(message: string): boolean {
+  const m = (message ?? "").toLowerCase();
+  if (!m.includes("horus")) return false;
+  return (
+    /\b(chiam\w*|passa\w*|attiv\w*|interpell\w*|coinvolg\w*|sent[io]|invoc\w*|vogli\w*|fammi)\b[\s\w']*\bhorus\b/.test(m) ||
+    /\bparl\w+\s+con\s+horus\b/.test(m) ||
+    /\bhorus\b[\s\w']*\b(percors\w+|itinerari\w+|navigaz\w+|strad\w+|giro|giri)/.test(m)
+  );
+}
+
+// ── Task #5322 — Marcatore di congedo strutturato interno ─────────────────────
+//
+// Una persona non-Bowie (Horus/Ares) emette questo marcatore a FINE compito per
+// segnalare al backend che il turno successivo deve tornare a Bowie. Il backend
+// lo riconosce, resetta lo stato "persona attiva" e lo RIMUOVE dal testo prima
+// di mostrarlo all'utente (sia nel percorso normale che in streaming SSE).
+export const HANDOFF_BACK_TO_BOWIE = "[[HANDOFF_BACK_TO_BOWIE]]";
+
+/**
+ * Rimuove il marcatore di congedo dal testo completo e segnala se era presente.
+ * Usato dal percorso NON-streaming (buffer completo) e per il valore di ritorno.
+ */
+export function stripHandoffMarker(text: string): { text: string; farewell: boolean } {
+  if (!text) return { text: text ?? "", farewell: false };
+  const farewell = text.includes(HANDOFF_BACK_TO_BOWIE);
+  if (!farewell) return { text, farewell: false };
+  const cleaned = text
+    .split(HANDOFF_BACK_TO_BOWIE)
+    .join("")
+    .replace(/[ \t]+\n/g, "\n")
+    .trim();
+  return { text: cleaned, farewell: true };
+}
+
+/**
+ * Filtro di streaming che rimuove il marcatore di congedo dai delta man mano che
+ * arrivano, trattenendo una coda di (markerLen-1) caratteri per gestire i
+ * marcatori spezzati tra due chunk. Analogo al security-filter: `push` emette il
+ * testo sicuro, `flush` rilascia la coda residua a fine stream.
+ */
+export function createHandoffMarkerFilter() {
+  const marker = HANDOFF_BACK_TO_BOWIE;
+  let pending = "";
+  let detected = false;
+
+  const drainCompleteMarkers = () => {
+    let idx: number;
+    while ((idx = pending.indexOf(marker)) >= 0) {
+      detected = true;
+      pending = pending.slice(0, idx) + pending.slice(idx + marker.length);
+    }
+  };
+
+  return {
+    get detected(): boolean {
+      return detected;
+    },
+    push(delta: string, emit: (safe: string) => void): void {
+      pending += delta;
+      drainCompleteMarkers();
+      // Trattieni gli ultimi (markerLen-1) char: potrebbero essere l'inizio di un
+      // marcatore ancora incompleto che si completerà nel chunk successivo.
+      const safeLen = Math.max(0, pending.length - (marker.length - 1));
+      if (safeLen > 0) {
+        emit(pending.slice(0, safeLen));
+        pending = pending.slice(safeLen);
+      }
+    },
+    flush(emit: (safe: string) => void): void {
+      drainCompleteMarkers();
+      if (pending) {
+        emit(pending);
+        pending = "";
+      }
+    },
+  };
+}
+
+// ── Task #5322 — Risoluzione deterministica della persona del turno ───────────
+//
+// Combina l'invocazione esplicita nel messaggio con lo stato "persona attiva"
+// persistito (stickiness). Priorità (dalla più alta):
+//   1. Invocazione esplicita di Ares (solo admin).
+//   2. Invocazione esplicita di Horus per nome.
+//   3. Intento di percorso/itinerario → Horus.
+//   4. Stickiness: resta sulla persona attiva non-Bowie del turno precedente.
+//   5. Default → Bowie.
+export type PersonaResolutionReason =
+  | "explicit-ares"
+  | "explicit-horus"
+  | "route-intent"
+  | "sticky"
+  | "default";
+
+export interface PersonaResolution {
+  persona: AiPersonaId;
+  reason: PersonaResolutionReason;
+}
+
+export function resolveTurnPersona(input: {
+  message: string;
+  isAdmin: boolean;
+  activePersona?: AiPersonaId | null;
+}): PersonaResolution {
+  const { message, isAdmin } = input;
+  const active = input.activePersona ?? null;
+
+  // 1. Ares — solo admin, massima priorità (comando operativo esplicito).
+  if (isAdmin && parseAresInvocation(message)) {
+    return { persona: "ares", reason: "explicit-ares" };
+  }
+  // 2. Horus per nome.
+  if (parseHorusInvocation(message)) {
+    return { persona: "horus", reason: "explicit-horus" };
+  }
+  // 3. Intento di percorso → Horus.
+  if (classifyRoutingIntent(message)) {
+    return { persona: "horus", reason: "route-intent" };
+  }
+  // 4. Stickiness sulla persona attiva non-Bowie.
+  if (active && active !== "bowie") {
+    // Difesa in profondità: Ares resta appiccicato SOLO per gli admin.
+    if (active === "ares" && !isAdmin) return { persona: "bowie", reason: "default" };
+    return { persona: active, reason: "sticky" };
+  }
+  // 5. Default.
+  return { persona: "bowie", reason: "default" };
+}

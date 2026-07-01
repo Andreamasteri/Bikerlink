@@ -60,7 +60,16 @@ export interface AresChatOptions {
   onDelta?: (delta: string) => void;
   /** Timeout duro della chiamata (default 60s). */
   timeoutMs?: number;
+  /**
+   * Task #5322 — Cap di lunghezza risposta (Ollama `num_predict`). Serve a tenere
+   * Ares CONTENUTO e strutturato a runtime, SENZA toccare il suo Modelfile. Se
+   * assente si usa ARES_DEFAULT_NUM_PREDICT.
+   */
+  numPredict?: number;
 }
+
+// Task #5322 — Cap di default sulla verbosità di Ares (risposte contenute).
+const ARES_DEFAULT_NUM_PREDICT = 768;
 
 /**
  * Esegue una chat in streaming verso Ares e restituisce il testo completo.
@@ -88,7 +97,7 @@ export async function streamAresChat(opts: AresChatOptions): Promise<{ text: str
         model: ARES_MODEL,
         stream: true,
         messages: [{ role: "system", content: opts.system }, ...opts.messages],
-        options: { temperature: 0.3 },
+        options: { temperature: 0.3, num_predict: opts.numPredict ?? ARES_DEFAULT_NUM_PREDICT },
       }),
       signal: controller.signal,
     });
