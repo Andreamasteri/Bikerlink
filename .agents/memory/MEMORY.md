@@ -141,3 +141,4 @@
 - [Bowie Terminal push-token sharing](bowie-terminal-push-token.md) — standalone bowie-terminal APK writes the SAME users.expoPushToken as the main app; last install wins push; needs per-device token table to fix.
 - [Bowie notification quick-reply delivery](bowie-notification-reply-delivery.md) — app-killed headless reply is unreliable; use opensAppToForeground:true + getLastNotificationResponse cold-start recovery + clearLastNotificationResponse dedupe, submit inline.
 - [Env vs Secret classification](env-secret-classification.md) — EXPO_PUBLIC_* stay env (client-inlined); server-only service URLs are secrets; Redis=DragonflyDB via TC_REDIS_URL (not Upstash/REDIS_URL); viewEnvVars unfiltered secrets map is stale, use keys-filtered.
+- [Updated secret needs cold boot](updated-secret-cold-boot.md) — riaggiornare il VALORE di un secret esistente non propaga col restart workflow; serve cold boot/deploy/merge; un secret NUOVO invece entra subito.

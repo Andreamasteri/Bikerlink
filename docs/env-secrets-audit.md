@@ -57,6 +57,28 @@ inlinata nel client:
 > `ARES_METRICS_URL` risultano **non impostate** e rientrano nel dominio del task di
 > refactoring persona (Bowie/Horus/Ares): **non toccate qui**.
 
+## Pannelli admin ThinkCentre — URL infra/metriche (secret su `tc.biker-link.net`)
+
+Questi valori alimentano i pannelli admin **Metriche** e **Infra** del ThinkCentre.
+Vanno tenuti come **secret** e puntati all'host Cloudflare Tunnel `tc.biker-link.net`
+(il vecchio host DuckDNS `*.bikerlink.duckdns.org` è **dismesso**). Il codice appende
+da solo i path (`/sys-metrics`, `/whisper-health`, `/probe/*`), quindi impostare solo la base:
+
+| Secret | Valore corretto | Letto da |
+|---|---|---|
+| `THINKCENTRE_METRICS_URL` | `https://tc.biker-link.net` | `server/routes/admin/thinkcentre-metrics.ts`, `server/routes/admin-whisper-config.part2.ts` |
+| `NGINX_MONITOR_URL` | `https://tc.biker-link.net/probe/nginx` | `server/routes/admin/thinkcentre-health-infra-probes.ts` |
+| `PGADMIN_URL` | `https://tc.biker-link.net/probe/pgadmin` | idem |
+| `UPTIME_KUMA_URL` | `https://tc.biker-link.net/probe/uptime-kuma` | idem |
+| `REDIS_PROBE_URL` | `https://tc.biker-link.net/probe/redis` | idem (ha precedenza sul TCP `REDIS_PROBE_HOST`) |
+
+> **Propagazione secret aggiornati:** un secret **nuovo** entra nel container in
+> tempo reale, ma un secret **esistente** riaggiornato mantiene il vecchio valore
+> nell'env del container già avviato — si aggiorna solo a **cold boot** (deploy /
+> merge / riavvio del Repl), NON con un semplice restart dei workflow. Se il probe
+> non è raggiungibile il pannello mostra correttamente lo stato `offline`/`non
+> configurato` senza crash.
+
 ## Procedura di migrazione env → secret
 
 1. `requestEnvVar({ requestType: "secret", keys: [...9...] })` — l'utente reinserisce
