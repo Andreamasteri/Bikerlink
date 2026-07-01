@@ -2,8 +2,10 @@ import React, { useEffect, useState } from "react";
 import { View, Text, Pressable, StyleSheet, Platform } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useQuery } from "@tanstack/react-query";
+import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useColors } from "@/hooks/useColors";
+import { useAuth } from "@/lib/auth-context";
 import { reasonsToMessages, GENERIC_MESSAGE_DEGRADED } from "@/lib/health-reason-messages";
 
 // ──────────────────────────────────────────────────────────────────────
@@ -25,6 +27,11 @@ import { reasonsToMessages, GENERIC_MESSAGE_DEGRADED } from "@/lib/health-reason
 //
 // Task #5147: la mappa reason → messaggi è ora centralizzata in
 // lib/health-reason-messages.ts (condivisa con HealthBanner).
+//
+// Task #5331: il tap sul corpo del banner porta alla "Lista problemi" del
+// watchdog (app/admin/system-health.tsx, componente ProblemsList — Task #2533).
+// Solo gli admin hanno accesso a quella schermata: per gli utenti standard il
+// tap resta senza effetto (nessuna schermata "problemi" lato utente oggi).
 // ──────────────────────────────────────────────────────────────────────
 
 interface HealthResp {
@@ -37,6 +44,9 @@ interface HealthResp {
 export function DegradedBanner() {
   const insets = useSafeAreaInsets();
   const colors = useColors();
+  const router = useRouter();
+  const { user } = useAuth();
+  const isAdmin = user?.role === "admin";
   const [dismissed, setDismissed] = useState(false);
 
   const healthQ = useQuery<HealthResp>({
@@ -71,9 +81,20 @@ export function DegradedBanner() {
     <View style={[styles.wrap, { top: topInset }]} pointerEvents="box-none">
       <View style={[styles.banner, { backgroundColor: colors.surface, borderColor: colors.warning as string }]}>
         <Ionicons name="warning-outline" size={18} color={colors.warning as string} />
-        <Text style={[styles.label, { color: colors.text as string }]} numberOfLines={3}>
-          {message}
-        </Text>
+        <Pressable
+          testID="degraded-body"
+          style={styles.bodyWrap}
+          accessibilityRole="button"
+          accessibilityLabel={isAdmin ? "Vai alla lista problemi" : undefined}
+          disabled={!isAdmin}
+          onPress={() => {
+            if (isAdmin) router.push("/admin/system-health" as never);
+          }}
+        >
+          <Text style={[styles.label, { color: colors.text as string }]} numberOfLines={3}>
+            {message}
+          </Text>
+        </Pressable>
 
         <Pressable
           testID="degraded-dismiss"
@@ -115,6 +136,9 @@ const styles = StyleSheet.create({
     elevation: 4,
     maxWidth: 520,
     width: "100%",
+  },
+  bodyWrap: {
+    flex: 1,
   },
   label: {
     flex: 1,
