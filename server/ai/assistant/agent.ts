@@ -7,7 +7,7 @@
 // Memoria: gli ultimi N turni dell'utente vengono caricati dal DB e inclusi nel contesto.
 // RAG: i top-3 snippet più rilevanti dalla knowledge base vengono iniettati nel system prompt.
 // Logging: ogni chiamata viene loggata in ai_call_logs (fire-and-forget).
-import { streamText, stepCountIs } from "ai";
+import { streamText, stepCountIs, type ModelMessage } from "ai";
 import { runWithFallback, estimateCostUsd, type ResolvedModel } from "../moderation/provider";
 import {
   buildSystemPrompt,
@@ -16,9 +16,11 @@ import {
   buildAresSystemPrompt,
   type KnowledgeEntry,
 } from "./knowledge";
-import { getOllamaModel, isOllamaConfigured, isOllamaReachable, callOllamaChat } from "../../lib/ollama-client";
+import { getOllamaModel, isOllamaConfigured, warmOllama } from "../../lib/ollama-client";
+import { isThinkCentreOffline } from "../../lib/thinkcentre-offline";
 import { AI_ROSTER, type AiPersonaId, createHandoffMarkerFilter, stripHandoffMarker } from "./roster";
 import { recordKnowledgeGap } from "./knowledge-gaps";
+import { composeAresQuestion } from "./ares-question";
 import { isAresConfigured, getAresModelId, streamAresChat } from "../../lib/ares-client";
 import { retrieveContext, formatRagContext, indexKnowledge } from "./rag";
 import { OLLAMA_TOOLS } from "./tools";
@@ -40,49 +42,6 @@ const HORUS_MODEL_ID = process.env.HORUS_OLLAMA_MODEL?.trim() || "bikerlink-rout
 // testo è centralizzato in @shared/bowie-greeting così che terminale standalone/
 // backend e chat in-app condividano la stessa fonte (import in cima al file).
 
-// Task #5322 — Fase di COMPOSIZIONE domanda per Ares (solo handoff admin→Ares).
-// Prima di inoltrare ad Ares, Bowie sintetizza il contesto della conversazione in
-// UNA domanda tecnica unica, completa e strutturata (via Ollama locale). Ares
-// riceve solo quella domanda, così NON risponde "a metà" con Bowie che parla al
-// posto suo. Se Ollama locale è offline/fallisce, si degrada al messaggio grezzo
-// dell'admin (nessun blocco, nessun fallback cloud).
-const ARES_QUESTION_MAX_CHARS = 1200;
-
-async function composeAresQuestion(
-  history: Array<{ role: "user" | "assistant"; content: string }>,
-  latestMessage: string,
-): Promise<string> {
-  const fallback = latestMessage.trim();
-  try {
-    if (!isOllamaConfigured || !(await isOllamaReachable("bowie"))) return fallback;
-    const transcript = [...history, { role: "user" as const, content: latestMessage }]
-      .slice(-12)
-      .map((m) => `${m.role === "user" ? "ADMIN" : "ASSISTENTE"}: ${m.content}`)
-      .join("\n");
-    const prompt = `Sei Bowie e stai per passare la parola ad Ares, l'AI di diagnostica tecnica.
-Leggi la conversazione qui sotto e formula UNA singola domanda tecnica per Ares:
-completa, autosufficiente e ben strutturata (includi il contesto rilevante e cosa
-serve sapere). NON rispondere tu, NON aggiungere convenevoli: restituisci SOLO la
-domanda da inoltrare ad Ares, in italiano, concisa.
-
-CONVERSAZIONE:
-${transcript}
-
-DOMANDA PER ARES:`;
-    const composed = await callOllamaChat(prompt, undefined, {
-      persona: "bowie",
-      temperature: 0.3,
-      numPredict: 400,
-    });
-    const clean = (composed ?? "").trim();
-    if (!clean) return fallback;
-    return clean.length > ARES_QUESTION_MAX_CHARS ? clean.slice(0, ARES_QUESTION_MAX_CHARS) : clean;
-  } catch (err) {
-    console.warn("[assistant] composizione domanda Ares fallita, uso il messaggio grezzo:", (err as Error).message);
-    return fallback;
-  }
-}
-
 export interface AssistantAgentOpts {
   message: string;
   platform: "android" | "ios" | "web" | "admin";
@@ -90,6 +49,11 @@ export interface AssistantAgentOpts {
   customFaqs?: KnowledgeEntry[];
   history?: Array<{ role: "user" | "assistant"; content: string }>;
   userId?: string | null;
+  // Task #5327 — Immagini allegate dall'utente, già risolte a base64 + mediaType
+  // dal route (da object storage). Attiva il path multimodale (vision) sui
+  // provider cloud (Gemini/OpenAI); Ollama locale non è multimodale → fallback
+  // text-only che ignora le immagini ma risponde comunque al testo.
+  images?: Array<{ base64: string; mediaType: string }>;
   signal?: AbortSignal;
   onTextDelta?: (delta: string) => void;
   // Task #4842 — Contesto admin sintetico (snapshot piattaforma) iniettato nel
@@ -189,6 +153,23 @@ export async function runAssistantAgent(opts: AssistantAgentOpts): Promise<Assis
   // Modello Ollama: Horus usa il modello dedicato; Bowie quello di default.
   const ollamaModelName = requestedPersona === "horus" ? HORUS_MODEL_ID : undefined;
 
+  // Task #5327 — immagini allegate → path multimodale (vision) sui provider cloud.
+  const hasImages = (opts.images?.length ?? 0) > 0;
+
+  // Latenza (Task #5327): scalda il modello Ollama in modo fire-and-forget, in
+  // parallelo alla costruzione del contesto (RAG + profilo utente + memoria), così
+  // è già residente quando parte lo stream. Skip per Ares (endpoint dedicato) e
+  // quando ci sono immagini (si va sul path vision cloud, non su Ollama).
+  if (isOllamaConfigured && requestedPersona !== "ares" && !hasImages) {
+    warmOllama(requestedPersona === "horus" ? "horus" : "bowie", ollamaModelName);
+  }
+
+  // Latenza (Task #5327): la memoria conversazionale (query DB) parte SUBITO, in
+  // parallelo con fetchUserLiveContext (anch'essa DB) usata nel build del system,
+  // invece di attenderla sequenzialmente dopo.
+  const memoryPromise: Promise<Array<{ role: "user" | "assistant"; content: string }>> =
+    (opts.userId && !isAdmin) ? loadMemoryTurns(opts.userId) : Promise.resolve([]);
+
   let system: string;
   // Task #5322 — Miglior punteggio RAG del turno (null = nessun match). Usato a
   // fine turno per registrare le lacune di conoscenza (ai_knowledge_gaps).
@@ -245,9 +226,7 @@ export async function runAssistantAgent(opts: AssistantAgentOpts): Promise<Assis
   // Task #3017 — Memoria: carica turni precedenti dal DB se userId è disponibile.
   // Task #4842 — La chat admin è in-sessione (nessuna persistenza cross-sessione):
   // non carichiamo né salviamo la memoria conversazionale per la modalità admin.
-  const memoryTurns = (opts.userId && !isAdmin)
-    ? await loadMemoryTurns(opts.userId)
-    : [];
+  const memoryTurns = await memoryPromise;
 
   // Unione: memoria DB + history dalla richiesta (la history della richiesta ha precedenza
   // sugli ultimi turni in memoria, evita duplicati sommari)
@@ -261,10 +240,30 @@ export async function runAssistantAgent(opts: AssistantAgentOpts): Promise<Assis
     ? [{ role: "assistant", content: BOWIE_INTRO_POEM }]
     : [];
 
-  const messages = [
-    ...seedTurns,
+  // Task #5327 — Ultimo turno utente: multimodale se ci sono immagini (parti
+  // testo + immagine), altrimenti stringa semplice. Le immagini arrivano già in
+  // base64 dal route (risolte da object storage): le passiamo come Buffer così i
+  // provider cloud (Gemini/OpenAI) le vedono senza dover fare fetch di URL autenticati.
+  const baseHistory: ModelMessage[] = [
+    ...seedTurns.map((m) => ({ role: m.role, content: m.content })),
     ...historySource.map((m) => ({ role: m.role, content: m.content })),
-    { role: "user" as const, content: opts.message },
+  ];
+  const imageParts = (opts.images ?? []).map((img) => ({
+    type: "image" as const,
+    image: Buffer.from(img.base64, "base64"),
+    mediaType: img.mediaType,
+  }));
+  const messages: ModelMessage[] = [
+    ...baseHistory,
+    hasImages
+      ? { role: "user", content: [{ type: "text" as const, text: opts.message }, ...imageParts] }
+      : { role: "user", content: opts.message },
+  ];
+  // Variante text-only: usata da Ares (endpoint non multimodale) e come fallback
+  // Ollama quando nessun provider vision cloud è disponibile.
+  const messagesTextOnly: ModelMessage[] = [
+    ...baseHistory,
+    { role: "user", content: opts.message },
   ];
 
   let finalText = "";
@@ -297,11 +296,12 @@ export async function runAssistantAgent(opts: AssistantAgentOpts): Promise<Assis
   const streamWith = async (
     model: Parameters<typeof streamText>[0]["model"],
     isOllama: boolean,
+    msgs: ModelMessage[] = messages,
   ) => {
     const result = streamText({
       model,
       system,
-      messages,
+      messages: msgs,
       abortSignal: opts.signal,
       temperature: 0.3,
       // Task #3017 — Tool calling: solo per Ollama, con max 3 step
@@ -389,19 +389,23 @@ export async function runAssistantAgent(opts: AssistantAgentOpts): Promise<Assis
   // 1) Ollama self-hosted — provider PRIMARIO (ThinkCentre, costo zero, illimitato).
   //    Coerente con il resto del backend (moderation, routing engine, watchdog):
   //    Ollama è il primo tentativo ovunque. Tool calling server-side abilitato (maxSteps: 3).
-  //    Il probe isOllamaReachable() ha cache 60s: aggiunge latenza minima (<1ms se cached).
-  if (!done && isOllamaConfigured) {
+  //    Task #5327 — con immagini si salta Ollama (non multimodale) e si va sul
+  //    path vision cloud; il fallback text-only Ollama arriva DOPO il cloud.
+  if (!done && isOllamaConfigured && !hasImages) {
     try {
       const ollamaPersona = requestedPersona === "horus" ? "horus" : "bowie";
-      const reachable = await isOllamaReachable(ollamaPersona);
-      if (reachable) {
+      // Latenza (Task #5327): niente più probe /api/tags (fino a 2.5s). Saltiamo
+      // Ollama solo se il ThinkCentre è NOTO offline (check locale con cache, <1ms).
+      // Altrimenti tentiamo lo stream direttamente: un ECONNREFUSED fallisce comunque
+      // in fretta e viene gestito dal catch (scalo alla chain cloud).
+      if (await isThinkCentreOffline()) {
+        console.warn("[assistant] ThinkCentre offline, scalo a chain cloud");
+      } else {
         await streamWith(getOllamaModel(ollamaModelName, ollamaPersona) as unknown as Parameters<typeof streamText>[0]["model"], true);
         provider = "ollama";
         modelId = ollamaModelName ?? OLLAMA_FALLBACK_MODEL_ID;
         done = true;
         console.log(`[assistant] risposta da ollama (primario, persona=${effectivePersona})`);
-      } else {
-        console.warn("[assistant] Ollama non raggiungibile, scalo a chain cloud");
       }
     } catch (ollamaErr) {
       if (providerEmittedAny) {
@@ -440,6 +444,30 @@ export async function runAssistantAgent(opts: AssistantAgentOpts): Promise<Assis
         console.warn("[assistant] cloud fallito a metà stream, mantengo il parziale:", (cloudErr as Error).message);
         degraded = true;
         done = true;
+      } else if (hasImages && isOllamaConfigured && !(await isThinkCentreOffline())) {
+        // Task #5327 — Fallback text-only: c'erano immagini ma nessun provider
+        // vision cloud ha risposto. Rispondiamo comunque via Ollama ignorando le
+        // immagini (il modello locale non è multimodale) → l'utente riceve almeno
+        // il testo, con un avviso che le immagini non sono state analizzate.
+        try {
+          const ollamaPersona = requestedPersona === "horus" ? "horus" : "bowie";
+          const notice = "⚠️ Non riesco ad analizzare le immagini in questo momento, ma provo a rispondere al testo.\n\n";
+          finalText += notice;
+          opts.onTextDelta?.(notice);
+          await streamWith(
+            getOllamaModel(ollamaModelName, ollamaPersona) as unknown as Parameters<typeof streamText>[0]["model"],
+            true,
+            messagesTextOnly,
+          );
+          provider = "ollama";
+          modelId = ollamaModelName ?? OLLAMA_FALLBACK_MODEL_ID;
+          done = true;
+          console.log("[assistant] fallback text-only via ollama (vision non disponibile)");
+        } catch (fallbackErr) {
+          degraded = true;
+          finalText = `⚠️ Assistente non disponibile al momento (${(fallbackErr as Error).message.slice(0, 100)}). Riprova tra qualche istante.`;
+          opts.onTextDelta?.(finalText);
+        }
       } else {
         degraded = true;
         finalText = `⚠️ Assistente non disponibile al momento (${(cloudErr as Error).message.slice(0, 100)}). Riprova tra qualche istante.`;

@@ -73,6 +73,12 @@ function ollamaHeaders(token: string): Record<string, string> {
 // non è impostato, il setup script lo setta a "bikerlink" dopo la creazione.
 const BOWIE_OLLAMA_MODEL = process.env.BOWIE_OLLAMA_MODEL ?? "mistral-nemo:latest";
 
+// Latenza (Task #5327): keep_alive esplicito tiene il modello caricato in VRAM/RAM
+// tra una richiesta e l'altra, evitando il cold-load (diversi secondi) al primo
+// token quando il modello era stato scaricato. Configurabile via OLLAMA_KEEP_ALIVE
+// (formato Ollama: "30m", "1h", "-1" per non scaricare mai). Default 30 minuti.
+const OLLAMA_KEEP_ALIVE = process.env.OLLAMA_KEEP_ALIVE?.trim() || "30m";
+
 /** true quando BOWIE_OLLAMA_URL è impostato (Ollama abilitato come provider primario). */
 export const isOllamaConfigured = Boolean(BOWIE_OLLAMA_URL);
 
@@ -132,6 +138,41 @@ export async function isOllamaReachable(persona: OllamaPersona = "bowie"): Promi
     _probeTs[persona] = Date.now();
     return false;
   }
+}
+
+/**
+ * Latenza (Task #5327): "scalda" il modello Ollama in modo fire-and-forget.
+ *
+ * Invia una richiesta leggera a /api/generate con `keep_alive` esplicito e prompt
+ * vuoto: Ollama carica (o mantiene caricato) il modello in memoria senza generare
+ * output. Chiamata all'inizio di una richiesta AI, in parallelo alla costruzione
+ * del contesto (RAG + profilo utente), così il modello è già residente quando
+ * parte lo stream → time-to-first-token più basso. `keep_alive` lo tiene caldo
+ * per le richieste successive.
+ *
+ * NOTA: il provider `ollama-ai-provider-v2` non espone `keep_alive` per le chat
+ * (solo per gli embedding), quindi lo impostiamo qui con una chiamata diretta.
+ * Best-effort: qualunque errore è silenzioso (il path normale gestisce i fallback).
+ */
+export function warmOllama(persona: OllamaPersona = "bowie", model?: string): void {
+  const { url, token } = endpointFor(persona);
+  if (!url) return;
+  const modelName = model ?? BOWIE_OLLAMA_MODEL;
+  void (async () => {
+    try {
+      if (await isThinkCentreOffline()) return;
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), PROBE_TIMEOUT_MS);
+      const headers = { ...ollamaHeaders(token), "Content-Type": "application/json" };
+      await fetch(`${url}/api/generate`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ model: modelName, prompt: "", stream: false, keep_alive: OLLAMA_KEEP_ALIVE }),
+        signal: controller.signal,
+      });
+      clearTimeout(timer);
+    } catch { /* warm-up best-effort */ }
+  })();
 }
 
 /** Invalida la cache del probe (es. dopo un cambio di configurazione). */

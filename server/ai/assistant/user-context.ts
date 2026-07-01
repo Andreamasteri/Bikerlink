@@ -24,43 +24,46 @@ async function fetchUserData(userId: string): Promise<UserLiveData> {
 
   try {
     await withBgDbConnection(async (client) => {
-      try {
-        const r = await client.query(
-          `SELECT nickname, user_type, region FROM users WHERE id = $1 LIMIT 1`,
-          [userId],
-        );
-        if (r.rows[0]) {
-          data.nickname = r.rows[0].nickname ?? null;
-          data.userType = r.rows[0].user_type ?? null;
-          data.region = r.rows[0].region ?? null;
+      // Latenza (Task #5327): le tre sorgenti (profilo, ultimi giri, proposte
+      // attive) sono raccolte in UN SOLO round-trip via sub-select correlate.
+      // Un singolo client pg serializza comunque le query concorrenti sulla
+      // stessa connessione, quindi Promise.all non ridurrebbe la latenza —
+      // una query combinata sì (un round-trip invece di tre) e non consuma
+      // slot bg aggiuntivi. Best-effort: se la query fallisce, resta tutto null.
+      const r = await client.query(
+        `SELECT
+           (SELECT row_to_json(u) FROM (
+              SELECT nickname, user_type, region FROM users WHERE id = $1 LIMIT 1
+           ) u) AS profile,
+           (SELECT COALESCE(json_agg(rt), '[]'::json) FROM (
+              SELECT title, total_distance_km, started_at
+              FROM routes
+              WHERE user_id = $1 AND status = 'active'
+              ORDER BY started_at DESC LIMIT 3
+           ) rt) AS routes,
+           (SELECT COUNT(*)::int FROM proposals
+              WHERE user_id = $1 AND status = 'active') AS proposals`,
+        [userId],
+      );
+
+      const row = r.rows[0];
+      if (row) {
+        const profile = row.profile as { nickname?: string | null; user_type?: string | null; region?: string | null } | null;
+        if (profile) {
+          data.nickname = profile.nickname ?? null;
+          data.userType = profile.user_type ?? null;
+          data.region = profile.region ?? null;
         }
-      } catch { /* sorgente opzionale */ }
-
-      try {
-        const r = await client.query(
-          `SELECT title, total_distance_km, started_at
-           FROM routes
-           WHERE user_id = $1 AND status = 'active'
-           ORDER BY started_at DESC LIMIT 3`,
-          [userId],
-        );
-        data.recentRoutes = r.rows.map((row) => ({
-          title: row.title ?? null,
-          distanceKm: row.total_distance_km != null ? Math.round(row.total_distance_km) : null,
-          date: row.started_at ? new Date(row.started_at).toLocaleDateString("it-IT") : "?",
+        const routes = (row.routes ?? []) as Array<{ title?: string | null; total_distance_km?: number | null; started_at?: string | null }>;
+        data.recentRoutes = routes.map((rt) => ({
+          title: rt.title ?? null,
+          distanceKm: rt.total_distance_km != null ? Math.round(rt.total_distance_km) : null,
+          date: rt.started_at ? new Date(rt.started_at).toLocaleDateString("it-IT") : "?",
         }));
-      } catch { /* sorgente opzionale */ }
-
-      try {
-        const r = await client.query(
-          `SELECT COUNT(*)::int AS c FROM proposals
-           WHERE user_id = $1 AND status = 'active'`,
-          [userId],
-        );
-        data.activeProposalsCount = r.rows[0]?.c ?? 0;
-      } catch { /* sorgente opzionale */ }
+        data.activeProposalsCount = row.proposals ?? 0;
+      }
     }, { critical: false });
-  } catch { /* bg-db overflow: lascia tutto null */ }
+  } catch { /* bg-db overflow o query fallita: lascia tutto null */ }
 
   return data;
 }

@@ -38,6 +38,7 @@ import { sendError } from "../lib/api-response";
 import { requireUser, messageLimiter, parsePlatform, loadCustomFaqs } from "./ai-assistant-helpers";
 import aiAssistantActionsRouter from "./ai-assistant-actions";
 import aiAssistantPrefsRouter from "./ai-assistant-prefs";
+import aiAssistantImagesRouter, { resolveAssistantImageBuffer } from "./ai-assistant-images";
 
 const router = Router();
 
@@ -64,6 +65,9 @@ const MessageBody = z.object({
   })).max(10).optional(),
   // Task #5228 — client di origine per l'attribuzione nel monitor Bowie Standalone.
   source: z.enum(["main_app", "bowie_terminal"]).optional(),
+  // Task #5327 — URL immagini allegate (relativi, restituiti da POST /images).
+  // Risolti server-side in base64 e passati all'agent per il path vision.
+  imageUrls: z.array(z.string().min(1).max(300)).max(4).optional(),
 });
 
 router.post("/ai/assistant/message", requireUser, messageLimiter, async (req: Request, res: Response) => {
@@ -207,6 +211,17 @@ router.post("/ai/assistant/message", requireUser, messageLimiter, async (req: Re
   // prompt vieta già il leak, questo filtro è il backstop lato server.
   const securityFilter = createStreamingSecurityFilter();
 
+  // Task #5327 — Risolvi le immagini allegate (object storage → base64) per il
+  // path multimodale. Best-effort: le immagini non risolvibili vengono ignorate.
+  let images: Array<{ base64: string; mediaType: string }> | undefined;
+  if (parsed.data.imageUrls && parsed.data.imageUrls.length > 0) {
+    const resolved = await Promise.all(
+      parsed.data.imageUrls.map((u) => resolveAssistantImageBuffer(u)),
+    );
+    const usable = resolved.filter((r): r is { base64: string; mediaType: string } => r !== null);
+    if (usable.length > 0) images = usable;
+  }
+
   try {
     const result = await runAssistantAgent({
       message: effectiveMessage,
@@ -214,6 +229,7 @@ router.post("/ai/assistant/message", requireUser, messageLimiter, async (req: Re
       allowedActions,
       customFaqs,
       history: parsed.data.history ?? [],
+      images,
       // Task #4842 — userId solo in modalità admin (per il logging ai_call_logs).
       // Per gli utenti normali resta omesso, preservando il comportamento esistente
       // (nessuna persistenza di memoria conversazionale via questa route).
@@ -328,5 +344,6 @@ router.post("/ai/assistant/message", requireUser, messageLimiter, async (req: Re
 // ── Sotto-router splittati per il limite 600 righe ────────────────────────
 router.use(aiAssistantActionsRouter);
 router.use(aiAssistantPrefsRouter);
+router.use(aiAssistantImagesRouter);
 
 export default router;

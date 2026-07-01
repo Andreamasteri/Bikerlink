@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  Animated,
+  Alert,
   AppState,
   BackHandler,
   FlatList,
@@ -8,13 +8,15 @@ import {
   Platform,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from "react-native";
+import * as ImagePicker from "expo-image-picker";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import {
   sendMessage,
+  uploadImage,
   SessionExpiredError,
   registerPushToken,
   registerBowieTerminalToken,
@@ -41,31 +43,13 @@ import {
 import {
   isPersonaId,
   isThemeName,
-  personaColor,
-  personaLabel,
   THEMES,
   type PersonaId,
   type ThemeName,
 } from "../constants/theme";
-
-const MONO = Platform.select({ ios: "Menlo", default: "monospace" });
-
-// Messaggio di benvenuto fisso (hardcoded, non generato dall'AI).
-const WELCOME = `Son nato nel fuoco
-Son cresciuto giocando con l'acqua
-
-Davanti a me si son prostrati
-Dei, Sovrani, Principi e servi
-
-M'ha accarezzato il vento.
-Parlami, sono qui per te.`;
-
-interface Line {
-  id: string;
-  kind: "user" | "ai" | "system";
-  persona?: PersonaId;
-  text: string;
-}
+import { Composer } from "../components/Composer";
+import { MessageBubble } from "../components/MessageBubble";
+import { WELCOME, type Line } from "../lib/terminal-format";
 
 export default function TerminalScreen() {
   const insets = useSafeAreaInsets();
@@ -77,6 +61,8 @@ export default function TerminalScreen() {
   const [lines, setLines] = useState<Line[]>([]);
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState(false);
+  // Task #5327 — immagine in composizione (uri locale), inviata al submit.
+  const [attachedImage, setAttachedImage] = useState<string | null>(null);
   // Task #5298 — schermata di blocco iOS: le app iOS non possono auto-terminarsi,
   // quindi al posto della chiusura mostriamo un overlay a tutto schermo.
   const [locked, setLocked] = useState(false);
@@ -102,8 +88,6 @@ export default function TerminalScreen() {
   // Task #5298 — stato baseline/ack per rilevare l'apertura dell'app principale.
   const mainAppWatchRef = useRef(createWatchState());
 
-  const cursorOpacity = useRef(new Animated.Value(1)).current;
-
   // ---- line helpers ----
   const pushLine = useCallback((p: Omit<Line, "id">): string => {
     const id = `l${++idCounter.current}`;
@@ -123,25 +107,10 @@ export default function TerminalScreen() {
     setLines((prev) => prev.map((l) => (l.id === id ? { ...l, persona } : l)));
   }, []);
 
-  // ---- cursor blink ----
-  useEffect(() => {
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(cursorOpacity, { toValue: 0, duration: 530, useNativeDriver: true }),
-        Animated.timing(cursorOpacity, { toValue: 1, duration: 530, useNativeDriver: true }),
-      ]),
-    );
-    loop.start();
-    return () => loop.stop();
-  }, [cursorOpacity]);
-
   // ---- welcome stream (char by char) ----
   const startWelcome = useCallback(() => {
     if (welcomeStartedRef.current) return;
     welcomeStartedRef.current = true;
-    pushLine({ kind: "system", text: "BOWIE TERMINAL v1.0" });
-    pushLine({ kind: "system", text: "connecting · biker-link.replit.app · ok" });
-    pushLine({ kind: "system", text: "────────────────────────────────────────" });
     const aiId = pushLine({ kind: "ai", persona: "bowie", text: "" });
     let i = 0;
     const timer = setInterval(() => {
@@ -154,7 +123,7 @@ export default function TerminalScreen() {
 
   // ---- session expiry ----
   const handleSessionExpired = useCallback(async () => {
-    pushLine({ kind: "system", text: "SESSION EXPIRED — reconnecting..." });
+    pushLine({ kind: "system", text: "Sessione scaduta — riconnessione..." });
     await clearSession();
     setTimeout(() => router.replace("/login"), 1200);
   }, [pushLine]);
@@ -257,7 +226,7 @@ export default function TerminalScreen() {
       clearPendingReplyTimeout();
       pendingReplyTimeoutRef.current = setTimeout(() => {
         if (pendingReplyLineIdRef.current === aiId) {
-          setLineText(aiId, "! nessuna risposta ricevuta (push non consegnata) — riprova dal terminale");
+          setLineText(aiId, "Nessuna risposta ricevuta (push non consegnata) — riprova dal terminale");
           pendingReplyLineIdRef.current = null;
         }
       }, 20000);
@@ -343,7 +312,7 @@ export default function TerminalScreen() {
   // ---- local commands ----
   const handleCommand = useCallback(
     (raw: string): boolean => {
-      const cmd = raw.replace(/^›?\s*/, "").trim().toLowerCase();
+      const cmd = raw.trim().toLowerCase();
       if (cmd === "logout") {
         void (async () => {
           await clearSession();
@@ -378,23 +347,80 @@ export default function TerminalScreen() {
     [pushLine],
   );
 
+  // ---- image picker ----
+  const pickImage = useCallback(async () => {
+    if (streaming) return;
+    const fromLibrary = async () => {
+      try {
+        const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (!perm.granted) return;
+        const r = await ImagePicker.launchImageLibraryAsync({
+          mediaTypes: ["images"],
+          quality: 0.7,
+        });
+        if (!r.canceled && r.assets[0]) setAttachedImage(r.assets[0].uri);
+      } catch {
+        /* best-effort */
+      }
+    };
+    const fromCamera = async () => {
+      try {
+        const perm = await ImagePicker.requestCameraPermissionsAsync();
+        if (!perm.granted) return;
+        const r = await ImagePicker.launchCameraAsync({ quality: 0.7 });
+        if (!r.canceled && r.assets[0]) setAttachedImage(r.assets[0].uri);
+      } catch {
+        /* best-effort */
+      }
+    };
+    if (Platform.OS === "web") {
+      void fromLibrary();
+      return;
+    }
+    Alert.alert("Aggiungi immagine", undefined, [
+      { text: "Fotocamera", onPress: () => void fromCamera() },
+      { text: "Libreria", onPress: () => void fromLibrary() },
+      { text: "Annulla", style: "cancel" },
+    ]);
+  }, [streaming]);
+
   // ---- send ----
   const submitText = useCallback(async (raw: string) => {
     const text = raw.trim();
-    if (!text || streaming) return;
+    const image = attachedImage;
+    if ((!text && !image) || streaming) return;
     setInput("");
-    if (handleCommand(text)) return;
+    // I comandi valgono solo per messaggi di solo testo (senza immagine).
+    if (text && !image && handleCommand(text)) return;
 
-    pushLine({ kind: "user", text });
+    pushLine({ kind: "user", text, imageUri: image ?? undefined });
+    setAttachedImage(null);
     const aiId = pushLine({ kind: "ai", persona: "bowie", text: "" });
     setStreaming(true);
     const controller = new AbortController();
     abortRef.current = controller;
     const history = historyRef.current.slice(-8);
+    // Il server richiede un messaggio non vuoto: se c'è solo l'immagine, invia
+    // un prompt neutro (l'utente vede comunque solo la sua immagine nella bolla).
+    const outMessage = text || "Guarda questa immagine.";
 
     try {
+      let imageUrls: string[] | undefined;
+      if (image) {
+        try {
+          const url = await uploadImage(image, tokenRef.current ?? "");
+          imageUrls = [url];
+        } catch (e) {
+          if (e instanceof SessionExpiredError) {
+            await handleSessionExpired();
+            return;
+          }
+          appendLineText(aiId, `\n! upload immagine fallito: ${(e as Error).message}`);
+        }
+      }
+
       await sendMessage(
-        text,
+        outMessage,
         tokenRef.current ?? "",
         {
           onPersona: (p) => setLinePersona(aiId, p),
@@ -403,13 +429,13 @@ export default function TerminalScreen() {
             if (done.persona) setLinePersona(aiId, done.persona);
             setLineText(aiId, done.text);
             historyRef.current.push(
-              { role: "user", content: text },
+              { role: "user", content: outMessage },
               { role: "assistant", content: done.text },
             );
           },
           onError: (e) => appendLineText(aiId, `\n! ${e.message}`),
         },
-        { history, signal: controller.signal },
+        { history, signal: controller.signal, imageUrls },
       );
     } catch (e) {
       if (e instanceof SessionExpiredError) {
@@ -423,6 +449,7 @@ export default function TerminalScreen() {
     }
   }, [
     appendLineText,
+    attachedImage,
     handleCommand,
     handleSessionExpired,
     pushLine,
@@ -444,29 +471,8 @@ export default function TerminalScreen() {
   const reversed = useMemo(() => [...lines].reverse(), [lines]);
 
   const renderItem = useCallback(
-    ({ item }: { item: Line }) => {
-      if (item.kind === "system") {
-        return <Text style={[styles.line, { color: theme.textSecondary }]}>{item.text}</Text>;
-      }
-      if (item.kind === "user") {
-        return (
-          <Text style={[styles.line, { color: theme.text }]}>
-            <Text style={{ color: theme.bowie, fontWeight: "bold" }}>› </Text>
-            {item.text}
-          </Text>
-        );
-      }
-      const persona = item.persona ?? "bowie";
-      return (
-        <Text style={[styles.line, { color: theme.text }]}>
-          <Text style={{ color: personaColor(theme, persona), fontWeight: "bold" }}>
-            {personaLabel(persona)} ›{" "}
-          </Text>
-          {item.text}
-        </Text>
-      );
-    },
-    [theme],
+    ({ item }: { item: Line }) => <MessageBubble item={item} theme={theme} streaming={streaming} />,
+    [theme, streaming],
   );
 
   if (phase === "boot") {
@@ -500,8 +506,20 @@ export default function TerminalScreen() {
       style={[styles.root, { backgroundColor: theme.background }]}
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
+      <View
+        style={[
+          styles.header,
+          { paddingTop: topInset + 8, borderBottomColor: theme.border },
+        ]}
+      >
+        <View style={[styles.avatar, { backgroundColor: theme.bowie }]}>
+          <Ionicons name="sparkles" size={18} color={theme.accentText} />
+        </View>
+        <Text style={[styles.headerTitle, { color: theme.text }]}>Bowie</Text>
+      </View>
+
       <FlatList
-        style={[styles.list, { paddingTop: topInset + 8 }]}
+        style={styles.list}
         contentContainerStyle={styles.listContent}
         data={reversed}
         keyExtractor={(l) => l.id}
@@ -512,31 +530,17 @@ export default function TerminalScreen() {
         keyboardDismissMode="interactive"
       />
 
-      <View
-        style={[
-          styles.inputBar,
-          { borderTopColor: theme.border, paddingBottom: bottomInset + 8 },
-        ]}
-      >
-        <Text style={[styles.prompt, { color: theme.bowie }]}>› </Text>
-        <TextInput
-          value={input}
-          onChangeText={setInput}
-          onSubmitEditing={onSubmit}
-          editable={!streaming}
-          blurOnSubmit={false}
-          autoCapitalize="none"
-          autoCorrect={false}
-          style={[styles.input, { color: theme.text }]}
-          placeholder={streaming ? "..." : ""}
-          placeholderTextColor={theme.textSecondary}
-          returnKeyType="send"
-          testID="terminal-input"
-        />
-        <Animated.Text style={[styles.cursor, { color: theme.bowie, opacity: cursorOpacity }]}>
-          █
-        </Animated.Text>
-      </View>
+      <Composer
+        input={input}
+        onChangeText={setInput}
+        onSubmit={onSubmit}
+        streaming={streaming}
+        attachedImage={attachedImage}
+        onRemoveImage={() => setAttachedImage(null)}
+        onPickImage={pickImage}
+        theme={theme}
+        bottomInset={bottomInset}
+      />
     </KeyboardAvoidingView>
   );
 }
@@ -544,19 +548,24 @@ export default function TerminalScreen() {
 const styles = StyleSheet.create({
   root: { flex: 1 },
   lockRoot: { flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 32 },
-  lockTitle: { fontFamily: MONO, fontSize: 20, fontWeight: "bold", marginBottom: 16, textAlign: "center" },
-  lockBody: { fontFamily: MONO, fontSize: 14, lineHeight: 21, textAlign: "center", marginBottom: 10 },
-  list: { flex: 1, paddingHorizontal: 14 },
-  listContent: { paddingVertical: 8 },
-  line: { fontFamily: MONO, fontSize: 13, lineHeight: 19, marginVertical: 1 },
-  inputBar: {
+  lockTitle: { fontSize: 20, fontWeight: "700", marginBottom: 16, textAlign: "center" },
+  lockBody: { fontSize: 15, lineHeight: 22, textAlign: "center", marginBottom: 10 },
+  header: {
     flexDirection: "row",
     alignItems: "center",
-    borderTopWidth: StyleSheet.hairlineWidth,
-    paddingHorizontal: 14,
-    paddingTop: 10,
+    gap: 10,
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  prompt: { fontFamily: MONO, fontSize: 14, fontWeight: "bold" },
-  input: { flex: 1, fontFamily: MONO, fontSize: 14, paddingVertical: 2 },
-  cursor: { fontFamily: MONO, fontSize: 14 },
+  avatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  headerTitle: { fontSize: 18, fontWeight: "700" },
+  list: { flex: 1 },
+  listContent: { padding: 12 },
 });

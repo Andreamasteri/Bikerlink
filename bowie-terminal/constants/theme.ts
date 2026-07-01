@@ -7,6 +7,8 @@ export type PersonaId = "bowie" | "horus" | "ares";
 
 export interface TerminalTheme {
   background: string;
+  // Superficie delle bolle AI (leggermente staccata dallo sfondo).
+  surface: string;
   text: string;
   textSecondary: string;
   border: string;
@@ -14,11 +16,14 @@ export interface TerminalTheme {
   horus: string;
   ares: string;
   error: string;
+  // Testo sopra una bolla utente colorata con l'accent (bowie).
+  accentText: string;
 }
 
 export const THEMES: Record<ThemeName, TerminalTheme> = {
   attuale: {
     background: "#0D0D0D",
+    surface: "#1C1C1C",
     text: "#FFFFFF",
     textSecondary: "#AAAAAA",
     border: "#333333",
@@ -26,9 +31,11 @@ export const THEMES: Record<ThemeName, TerminalTheme> = {
     horus: "#4A90D9",
     ares: "#E63946",
     error: "#F44336",
+    accentText: "#FFFFFF",
   },
   asfalto: {
     background: "#F5F0E8",
+    surface: "#EBE2D3",
     text: "#1C1410",
     textSecondary: "#7A6A5A",
     border: "#C8B89A",
@@ -36,9 +43,11 @@ export const THEMES: Record<ThemeName, TerminalTheme> = {
     horus: "#5B8FBA",
     ares: "#C0392B",
     error: "#C0392B",
+    accentText: "#FFFFFF",
   },
   velocita: {
     background: "#0D0E1A",
+    surface: "#1B1D33",
     text: "#F0F4FF",
     textSecondary: "#8A90B0",
     border: "#2A2E4A",
@@ -46,9 +55,11 @@ export const THEMES: Record<ThemeName, TerminalTheme> = {
     horus: "#4A90D9",
     ares: "#FF2244",
     error: "#FF2244",
+    accentText: "#FFFFFF",
   },
   rotta: {
     background: "#1A1A1A",
+    surface: "#2A2A2A",
     text: "#F2EDE4",
     textSecondary: "#9A9590",
     border: "#3D3D3D",
@@ -56,6 +67,7 @@ export const THEMES: Record<ThemeName, TerminalTheme> = {
     horus: "#5A8FA0",
     ares: "#C41230",
     error: "#C41230",
+    accentText: "#FFFFFF",
   },
 };
 

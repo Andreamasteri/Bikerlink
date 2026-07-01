@@ -67,6 +67,35 @@ export interface StreamCallbacks {
 export interface SendOptions {
   history?: { role: "user" | "assistant"; content: string }[];
   signal?: AbortSignal;
+  // Task #5327 — URL (relativi) delle immagini allegate, ottenuti da uploadImage().
+  imageUrls?: string[];
+}
+
+// Task #5327 — Carica un'immagine locale (uri del picker) sul backend e
+// restituisce l'URL relativo servibile ("/api/ai/assistant/images/<file>").
+// Usa la fetch nativa di RN (gestisce il multipart con { uri, name, type });
+// expo/fetch è riservata allo streaming SSE.
+export async function uploadImage(uri: string, token: string): Promise<string> {
+  const name = uri.split("/").pop() || `image_${Date.now()}.jpg`;
+  const ext = (/\.(\w+)$/.exec(name)?.[1] || "jpg").toLowerCase();
+  const mime =
+    ext === "png" ? "image/png"
+    : ext === "webp" ? "image/webp"
+    : ext === "gif" ? "image/gif"
+    : ext === "heic" ? "image/heic"
+    : "image/jpeg";
+  const form = new FormData();
+  form.append("image", { uri, name, type: mime } as unknown as Blob);
+  const res = await fetch(new URL("/api/ai/assistant/images", getApiUrl()).toString(), {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: form,
+  });
+  if (res.status === 401 || res.status === 403) throw new SessionExpiredError();
+  if (!res.ok) throw new Error(`Upload immagine fallito (${res.status})`);
+  const json = (await res.json().catch(() => ({}))) as { url?: string };
+  if (!json.url) throw new Error("URL immagine non ricevuto dal server");
+  return json.url;
 }
 
 // Stream SSE della risposta dell'agente. Legge il body chunk per chunk, separa
@@ -90,6 +119,8 @@ export async function sendMessage(
       history: opts?.history ?? [],
       // Task #5228 — attribuzione al client standalone nel monitor admin.
       source: "bowie_terminal",
+      // Task #5327 — immagini allegate (URL relativi risolti server-side).
+      ...(opts?.imageUrls && opts.imageUrls.length > 0 ? { imageUrls: opts.imageUrls } : {}),
     }),
     signal: opts?.signal,
   });

@@ -8,10 +8,13 @@
     "android": "expo run:android"
   },
   "dependencies": {
+    "@expo/vector-icons": "^15.1.1",
     "expo": "~56.0.13",
     "expo-build-properties": "~56.0.20",
     "expo-constants": "~56.0.19",
     "expo-font": "~56.0.7",
+    "expo-image": "^56.0.11",
+    "expo-image-picker": "^56.0.18",
     "expo-linking": "^56.0.14",
     "expo-notifications": "~56.0.19",
     "expo-router": "~56.2.12",
