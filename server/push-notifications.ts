@@ -8,6 +8,8 @@ import {
   sendExpoMessages,
   filterUserIdsByPreference,
   recordNotificationHistory,
+  getAppPushTokens,
+  clearStalePushTokenRow,
 } from "./push-notifications-internal";
 
 const EXPO_PUSH_URL = "https://exp.host/--/api/v2/push/send";
@@ -339,27 +341,26 @@ export async function sendBowieReplyPush(
   opts: { body: string; persona?: { id: string; name: string } },
 ): Promise<number> {
   try {
-    const [row] = await db
-      .select({ id: users.id, expoPushToken: users.expoPushToken })
-      .from(users)
-      .where(eq(users.id, userId));
-
-    if (!row?.expoPushToken || !isValidExpoPushToken(row.expoPushToken)) return 0;
+    // Task #5273: la risposta Bowie va SOLO ai token registrati dalla Bowie
+    // Terminal (app_id="bowie"), non a users.expoPushToken (che appartiene
+    // all'app principale). Così le due app non si rubano più le notifiche.
+    const tokens = await getAppPushTokens([userId], "bowie");
+    if (!tokens.length) return 0;
 
     const personaName = opts.persona?.name ?? "Bowie";
-    const userIdByToken = new Map([[row.expoPushToken, row.id]]);
-    await sendExpoMessages(
-      [{
-        to: row.expoPushToken,
-        title: personaName,
-        body: opts.body.slice(0, 500),
-        sound: "default" as const,
-        data: { type: "bowie_reply", persona: opts.persona?.id ?? "bowie" },
-        channelId: "bowie",
-      }],
-      userIdByToken,
-    );
-    return 1;
+    const userIdByToken = new Map(tokens.map((t) => [t.token, t.userId]));
+    const messages = tokens.map((t) => ({
+      to: t.token,
+      title: personaName,
+      body: opts.body.slice(0, 500),
+      sound: "default" as const,
+      data: { type: "bowie_reply", persona: opts.persona?.id ?? "bowie" },
+      channelId: "bowie",
+    }));
+    await sendExpoMessages(messages, userIdByToken, {
+      onDeviceNotRegistered: (token) => clearStalePushTokenRow(token),
+    });
+    return messages.length;
   } catch (err) {
     console.warn("[Push] sendBowieReplyPush error (non-fatal):", err);
     return 0;

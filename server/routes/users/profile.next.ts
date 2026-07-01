@@ -1,9 +1,24 @@
 import { Router, type Request, type Response } from "express";
+import { and, eq } from "drizzle-orm";
 import { storage } from "../../storage";
+import { db } from "../../db";
+import { pushTokens } from "@shared/db";
 import { requireAuth } from "../../lib/auth-middleware";
 import { sendSuccess, sendError } from "../../lib/api-response";
 
 const router = Router();
+
+// App che registrano un push token. "main" = app BikerLink principale (mantiene
+// invariato il comportamento storico su users.expoPushToken); qualsiasi altro
+// valore (es. "bowie" per la Bowie Terminal) NON tocca users.expoPushToken così
+// le due app smettono di rubarsi le notifiche a vicenda (Task #5273).
+const MAIN_APP_ID = "main";
+const VALID_APP_IDS = new Set([MAIN_APP_ID, "bowie"]);
+const VALID_PUSH_PLATFORMS = new Set(["android", "ios", "web"]);
+
+function normalizeAppId(raw: unknown): string {
+  return typeof raw === "string" && VALID_APP_IDS.has(raw) ? raw : MAIN_APP_ID;
+}
 
 const VALID_PUSH_TOKEN_CAUSES = new Set([
   "PERMESSI_NEGATI",
@@ -46,10 +61,36 @@ router.put("/me/push-token-error", requireAuth, async (req: Request, res: Respon
 router.put("/me/push-token", requireAuth, async (req: Request, res: Response) => {
   try {
     const userId = req.session.userId!;
-    const { token } = req.body as { token?: string };
+    const { token, appId: rawAppId, deviceId: rawDeviceId, platform: rawPlatform } =
+      req.body as {
+        token?: string;
+        appId?: string;
+        deviceId?: string;
+        platform?: string;
+      };
 
+    const appId = normalizeAppId(rawAppId);
+    const isMainApp = appId === MAIN_APP_ID;
+    const deviceId =
+      typeof rawDeviceId === "string" && rawDeviceId.length > 0
+        ? rawDeviceId.slice(0, 128)
+        : null;
+    const platform =
+      typeof rawPlatform === "string" && VALID_PUSH_PLATFORMS.has(rawPlatform)
+        ? rawPlatform
+        : null;
+
+    // ── Clear ─────────────────────────────────────────────────────────────
     if (token === "" || token == null) {
-      await storage.updateUser(userId, { expoPushToken: null });
+      // Rimuove SOLO i token di questa app; le altre app restano intatte.
+      await db.delete(pushTokens).where(
+        and(eq(pushTokens.userId, userId), eq(pushTokens.appId, appId)),
+      );
+      // Il comportamento storico dell'app principale è invariato: continua a
+      // svuotare anche lo slot legacy users.expoPushToken.
+      if (isMainApp) {
+        await storage.updateUser(userId, { expoPushToken: null });
+      }
       return res.json({ success: true, cleared: true });
     }
 
@@ -57,13 +98,27 @@ router.put("/me/push-token", requireAuth, async (req: Request, res: Response) =>
       return sendError(res, 400, "Token Expo non valido");
     }
 
-    await storage.updateUser(userId, {
-      expoPushToken: token,
-      pushTokenError: null,
-      pushTokenErrorDetail: null,
-      pushTokenErrorPlatform: null,
-      pushTokenErrorAt: null,
-    });
+    // ── Upsert nella tabella per-app (chiave naturale: il token Expo) ──────
+    await db
+      .insert(pushTokens)
+      .values({ userId, appId, deviceId, token, platform })
+      .onConflictDoUpdate({
+        target: pushTokens.token,
+        set: { userId, appId, deviceId, platform, updatedAt: new Date() },
+      });
+
+    // Solo l'app principale scrive lo slot legacy users.expoPushToken, così i
+    // ~15 sender esistenti (match, chat, moderazione, job) restano invariati.
+    // Le altre app (es. bowie) NON lo toccano più → niente più furto di push.
+    if (isMainApp) {
+      await storage.updateUser(userId, {
+        expoPushToken: token,
+        pushTokenError: null,
+        pushTokenErrorDetail: null,
+        pushTokenErrorPlatform: null,
+        pushTokenErrorAt: null,
+      });
+    }
 
     return sendSuccess(res, { success: true });
   } catch (error) {

@@ -153,7 +153,10 @@ export async function registerPushToken(expoPushToken: string, token: string): P
         "Content-Type": "application/json",
         Authorization: `Bearer ${token}`,
       },
-      body: JSON.stringify({ token: expoPushToken }),
+      // Task #5273: appId="bowie" così il server salva questo token nella
+      // tabella per-app push_tokens senza toccare users.expoPushToken (che
+      // appartiene all'app principale). Fine del furto di notifiche.
+      body: JSON.stringify({ token: expoPushToken, appId: "bowie", platform: "android" }),
     });
   } catch {
     /* best-effort */

@@ -1,8 +1,8 @@
 // Tipi e helper interni condivisi tra push-notifications.ts e push-notifications-admin.ts.
 // Non importare direttamente dall'esterno — usare push-notifications.ts come entry point.
 import { db } from "./db";
-import { users, userProfiles } from "@shared/db";
-import { inArray, eq, sql } from "drizzle-orm";
+import { users, userProfiles, pushTokens } from "@shared/db";
+import { inArray, eq, and, sql } from "drizzle-orm";
 
 export type NotificationPrefKey = "matches" | "zoneProposals" | "chat" | "motoclub" | "eventi" | "system_alerts";
 
@@ -38,6 +38,39 @@ async function clearStaleToken(userId: string): Promise<void> {
   }
 }
 
+// Task #5273: rimuove UNA riga stantia dalla tabella per-app push_tokens usando
+// il token come chiave (DeviceNotRegistered). Usato dai sender che leggono dalla
+// tabella per-app (es. bowie) invece che da users.expoPushToken, così pulire un
+// token di un'app NON azzera lo slot legacy dell'app principale.
+export async function clearStalePushTokenRow(token: string): Promise<void> {
+  try {
+    await db.delete(pushTokens).where(eq(pushTokens.token, token));
+    console.warn(`[Push] Cleared stale push_tokens row (DeviceNotRegistered)`);
+  } catch (err) {
+    console.warn("[Push] Failed to clear stale push_tokens row (non-fatal):", err);
+  }
+}
+
+// Task #5273: token validi di una specifica app (es. "bowie") per un insieme di
+// utenti, letti dalla tabella per-app push_tokens. Ritorna la mappa token→userId
+// pronta per sendExpoMessages.
+export async function getAppPushTokens(
+  userIds: string[],
+  appId: string,
+): Promise<Array<{ userId: string; token: string }>> {
+  if (!userIds.length) return [];
+  try {
+    const rows = await db
+      .select({ userId: pushTokens.userId, token: pushTokens.token })
+      .from(pushTokens)
+      .where(and(inArray(pushTokens.userId, userIds), eq(pushTokens.appId, appId)));
+    return rows.filter((r) => isValidExpoPushToken(r.token));
+  } catch (err) {
+    console.warn("[Push] getAppPushTokens failed (non-fatal):", err);
+    return [];
+  }
+}
+
 // Task #4436: ogni invio push (riuscito o fallito) viene registrato in
 // notification_history così la probe diagnostica "Notifiche Push" ha dati reali
 // invece di restare a 0 (che faceva apparire la pipeline come ghost/rotta).
@@ -65,6 +98,13 @@ function notificationTypeOf(msg: ExpoPushMessage): string {
 export async function sendExpoMessages(
   messages: ExpoPushMessage[],
   userIdByToken: Map<string, string>,
+  opts?: {
+    // Task #5273: gestore custom per DeviceNotRegistered. Di default azzera
+    // users.expoPushToken (comportamento storico dell'app principale). I sender
+    // che leggono dalla tabella per-app (es. bowie) passano un handler che
+    // cancella la riga push_tokens per token, senza toccare lo slot legacy.
+    onDeviceNotRegistered?: (token: string, userId: string | undefined) => void;
+  },
 ): Promise<void> {
   try {
     const resp = await fetch(EXPO_PUSH_URL, {
@@ -109,7 +149,11 @@ export async function sendExpoMessages(
       } else if (ticket.status === "error") {
         if (ticket.details?.error === "DeviceNotRegistered") {
           const userId = userIdByToken.get(msg.to);
-          if (userId) clearStaleToken(userId);
+          if (opts?.onDeviceNotRegistered) {
+            opts.onDeviceNotRegistered(msg.to, userId);
+          } else if (userId) {
+            clearStaleToken(userId);
+          }
         } else {
           console.warn("[Push] Expo push ticket error:", ticket.message, ticket.details?.error);
         }

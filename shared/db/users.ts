@@ -256,6 +256,35 @@ export const userDevices = pgTable("user_devices", {
 export type UserDevice = typeof userDevices.$inferSelect;
 export type InsertUserDevice = typeof userDevices.$inferInsert;
 
+// Task #5273 — token push per-app / per-dispositivo.
+// Prima esisteva un solo slot `users.expoPushToken`: la Bowie Terminal (APK
+// separato, bundle com.bikerlink.bowieterminal) loggava sullo STESSO account e
+// sovrascriveva quel campo → l'ultima app installata rubava le notifiche
+// all'altra. Questa tabella scinde i token per `appId` (es. "main" | "bowie")
+// così ogni app riceve le proprie push. Il token Expo è unico per
+// installazione, quindi lo usiamo come chiave naturale per l'upsert.
+export const pushTokens = pgTable("push_tokens", {
+  id: varchar("id", { length: 36 })
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  userId: varchar("user_id", { length: 36 })
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  appId: varchar("app_id", { length: 32 }).notNull().default("main"),
+  deviceId: varchar("device_id", { length: 128 }),
+  token: text("token").notNull(),
+  platform: varchar("platform", { length: 16 }),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex("push_tokens_token_uq").on(table.token),
+  index("push_tokens_user_id_idx").on(table.userId),
+  index("push_tokens_user_app_idx").on(table.userId, table.appId),
+]);
+
+export type PushToken = typeof pushTokens.$inferSelect;
+export type InsertPushToken = typeof pushTokens.$inferInsert;
+
 export const motorcyclePhotos = pgTable("motorcycle_photos", {
   id: varchar("id", { length: 36 })
     .primaryKey()
