@@ -34,7 +34,7 @@ function readMigrationFiles(): string[] {
 }
 
 /** Prossimo prefisso libero = (max prefisso numerico esistente + 1), zero-padded. */
-function nextPrefix(files: readonly string[]): string {
+export function nextPrefix(files: readonly string[]): string {
   let max = -1;
   let width = 4;
   for (const f of files) {
@@ -47,7 +47,7 @@ function nextPrefix(files: readonly string[]): string {
   return String(max + 1).padStart(width, "0");
 }
 
-function sanitizeDescription(raw: string): string {
+export function sanitizeDescription(raw: string): string {
   return raw
     .trim()
     .toLowerCase()
@@ -55,8 +55,13 @@ function sanitizeDescription(raw: string): string {
     .replace(/^_+|_+$/g, "");
 }
 
-/** Fallisce se la cartella contiene un duplicato NON riconducibile alla baseline. */
-function assertNoUnknownDuplicates(files: readonly string[]): void {
+/**
+ * Ritorna i gruppi duplicati NON riconducibili alla baseline nota (array
+ * vuoto = cartella sana). Funzione pura, testabile senza process.exit.
+ */
+export function findUnknownDuplicates(
+  files: readonly string[],
+): Array<[string, string[]]> {
   const dups = findDuplicateMigrationPrefixes(files);
   const offending: Array<[string, string[]]> = [];
   for (const [prefix, group] of dups) {
@@ -67,6 +72,12 @@ function assertNoUnknownDuplicates(files: readonly string[]): void {
       group.every((f) => known.has(f));
     if (!isExactKnown) offending.push([prefix, group]);
   }
+  return offending;
+}
+
+/** Fallisce se la cartella contiene un duplicato NON riconducibile alla baseline. */
+function assertNoUnknownDuplicates(files: readonly string[]): void {
+  const offending = findUnknownDuplicates(files);
   if (offending.length === 0) return;
   console.error(
     "[new-migration] ATTENZIONE: la cartella migrations/ contiene già un prefisso duplicato:",
@@ -137,4 +148,11 @@ function main(): void {
   console.log(`[new-migration] creata migrations/${filename}`);
 }
 
-main();
+// Esegue main() solo quando lo script è invocato direttamente (CLI), non
+// quando i suoi helper puri vengono importati da un test.
+const isDirectRun =
+  typeof process.argv[1] === "string" &&
+  import.meta.url === `file://${process.argv[1]}`;
+if (isDirectRun) {
+  main();
+}
