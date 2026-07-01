@@ -35,6 +35,7 @@ vi.mock("../lib/ollama-client", () => ({
   isOllamaConfigured: true,
   getOllamaModel: vi.fn(() => ({ __provider: "ollama", modelId: "mistral-nemo:latest" })),
   isOllamaReachable: vi.fn().mockResolvedValue(true),
+  warmOllama: vi.fn(),
 }));
 
 // Mock OLLAMA_TOOLS: sostituiamo le execute con spy per verificare le invocazioni.
