@@ -35,10 +35,6 @@ args = "Watchdog"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "Clean Metro"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
 args = "typecheck"
 
 [[workflows.workflow.tasks]]
@@ -59,19 +55,15 @@ args = "db-migration-checks"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "Diagnostic Report"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
 args = "secrets-scan"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "check-ai-direct-generateobject"
+args = "semgrep"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "semgrep"
+args = "check-ai-direct-generateobject"
 
   [[workflows.workflow]]
   name = "Start App"
@@ -93,18 +85,6 @@ args = "semgrep"
   [[workflows.workflow.tasks]]
   task = "shell.exec"
   args = "bash scripts/watchdog.sh"
-
-  [workflows.workflow.metadata]
-  outputType = "console"
-
-  [[workflows.workflow]]
-  name = "Clean Metro"
-  author = "agent"
-
-  [[workflows.workflow.tasks]]
-  task = "shell.exec"
-  args = "bash scripts/clean-metro-restart.sh"
-  waitForPort = 8081
 
   [workflows.workflow.metadata]
   outputType = "console"
@@ -166,14 +146,6 @@ args = "semgrep"
   outputType = "console"
 
 [[workflows.workflow]]
-name = "Diagnostic Report"
-author = "agent"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "npx tsx scripts/dump-diagnostic-report.ts"
-
-[[workflows.workflow]]
 name = "secrets-scan"
 author = "agent"
 
@@ -185,23 +157,23 @@ args = "bash scripts/ci-secrets-scan.sh"
 isValidation = true
 
 [[workflows.workflow]]
-name = "check-ai-direct-generateobject"
-author = "agent"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "bash scripts/check-ai-direct-generateobject.sh"
-
-[workflows.workflow.metadata]
-isValidation = true
-
-[[workflows.workflow]]
 name = "semgrep"
 author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "bash scripts/check-semgrep.sh"
+
+[workflows.workflow.metadata]
+isValidation = true
+
+[[workflows.workflow]]
+name = "check-ai-direct-generateobject"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "bash scripts/check-ai-direct-generateobject.sh"
 
 [workflows.workflow.metadata]
 isValidation = true

@@ -17,6 +17,20 @@
         "gradleCommand": ":app:assembleRelease",
         "image": "latest"
       }
+    },
+    "production": {
+      "distribution": "store",
+      "channel": "production",
+      "credentialsSource": "remote",
+      "env": {
+        "NODE_OPTIONS": "--max_old_space_size=8192",
+        "EXPO_PUBLIC_DOMAIN": "biker-link.replit.app"
+      },
+      "android": {
+        "buildType": "app-bundle",
+        "gradleCommand": ":app:bundleRelease -PreactNativeArchitectures=armeabi-v7a,arm64-v8a,x86,x86_64",
+        "image": "latest"
+      }
     }
   },
   "submit": {
