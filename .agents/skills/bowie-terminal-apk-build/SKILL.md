@@ -84,9 +84,13 @@ Atteso: `reactNativeArchitectures=arm64-v8a`, `enableMinifyInReleaseBuilds=true`
 Eseguire SEMPRE da dentro `bowie-terminal/` (mai dalla root):
 
 ```bash
-cd bowie-terminal && EAS_TOKEN="$EAS_TOKEN" EAS_NO_VCS=1 EAS_SKIP_AUTO_FINGERPRINT=1 \
+cd bowie-terminal && EAS_TOKEN="$EAS_TOKEN" EAS_NO_VCS=1 EAS_PROJECT_ROOT="$(pwd)" EAS_SKIP_AUTO_FINGERPRINT=1 \
 npx --yes eas-cli@^20.1.0 build --platform android --profile release-apk --non-interactive --no-wait
 ```
+
+⚠️ **`EAS_PROJECT_ROOT` (path assoluto) è OBBLIGATORIO insieme a `EAS_NO_VCS=1`, non opzionale** — vedi Pitfall 1 aggiornato sotto: senza di esso, `EAS_NO_VCS=1` da solo NON evita la scansione dell'intero monorepo.
+
+Lanciare sempre in **foreground** con timeout ≥110s (mai `&`/`nohup` in background: nell'ambiente Replit il processo figlio viene terminato insieme alla sessione bash che lo ha avviato, anche con `disown`, lasciando un file di log vuoto e nessuna build reale su EAS).
 
 Per il profilo Play Store, sostituire `--profile release-apk` con `--profile production`.
 
@@ -103,11 +107,14 @@ Per il profilo Play Store, sostituire `--profile release-apk` con `--profile pro
 
 **Sintomo:** l'upload riporta una dimensione enorme (es. ~70 MB) per un progetto che su disco pesa ~1 MB (`du -sh bowie-terminal` conferma la dimensione reale). Confermato empiricamente: `git ls-files | grep -v '^bowie-terminal/'` pesa ~74 MB — combacia quasi esattamente con la dimensione dell'archivio caricato.
 
-**Fix — obbligatorio per ogni build Bowie:**
+**`EAS_NO_VCS=1` da solo NON risolve il problema — è un fix parziale/insufficiente.** Root cause (verificato leggendo `eas-cli/build/vcs/clients/noVcs.js`): anche in modalità "no VCS", `NoVcsClient.getRootPathAsync()` prova PRIMA `git rev-parse --show-toplevel`, e solo se quel comando fallisce ricade su `process.cwd()`. Dentro `bowie-terminal/` quel comando NON fallisce (c'è la `.git` della root che lo contiene), quindi la root risolta resta la root dell'intero monorepo (~6+ GB tra `node_modules/` e `.git/`), e la compressione resta bloccata per minuti/non finisce mai entro un timeout ragionevole (i tentativi precedenti sono arrivati a build MERGED sul task tracker senza che nessuna build risultasse davvero in coda su `eas build:list`).
+
+**Fix reale — entrambe le env var sono obbligatorie insieme:**
 ```bash
 EAS_NO_VCS=1
+EAS_PROJECT_ROOT="/percorso/assoluto/a/bowie-terminal"   # es. "$(pwd)" se già dentro bowie-terminal/
 ```
-Forza EAS CLI a copiare i file dalla working directory corrente (`bowie-terminal/`) invece di usare `git archive` dalla root del repo. Accompagnare con un `bowie-terminal/.easignore` scoped (già presente) per escludere esplicitamente cache/log locali:
+`EAS_PROJECT_ROOT`, se assoluto, ha precedenza su tutto e salta del tutto la chiamata `git rev-parse`, quindi la root risolta è finalmente `bowie-terminal/` (upload atteso: centinaia di KB, non decine di MB). Accompagnare con un `bowie-terminal/.easignore` scoped (già presente) per escludere esplicitamente cache/log locali:
 ```
 node_modules
 .expo
@@ -118,7 +125,9 @@ web-build
 expo-env.d.ts
 ```
 
-**Non modificare `.gitignore`/`.easignore` alla ROOT del progetto per risolvere questo** — è una risorsa condivisa e potrebbe alterare il comportamento della build dell'app principale (fuori scope, vietato dal task). Lo scoping va fatto SEMPRE lato Bowie con `EAS_NO_VCS=1` + `.easignore` locale.
+**Non modificare `.gitignore`/`.easignore` alla ROOT del progetto per risolvere questo** — è una risorsa condivisa e potrebbe alterare il comportamento della build dell'app principale (fuori scope, vietato dal task). Lo scoping va fatto SEMPRE lato Bowie con `EAS_NO_VCS=1` + `EAS_PROJECT_ROOT` assoluto + `.easignore` locale.
+
+**Verifica in caso di dubbio:** se il CLI resta su "Compressing project files" per più di ~20-30s per un progetto che pesa ~1MB su disco, è quasi certo che stia scansionando la root sbagliata — interrompere e ricontrollare che `EAS_PROJECT_ROOT` sia impostato e assoluto, non lasciare girare "per vedere se finisce".
 
 ### Pitfall 2 — Computing project fingerprint può bloccarsi a lungo
 
