@@ -452,6 +452,26 @@ if [ "$AI_SCHEMA_EXIT" -ne 0 ]; then
   exit "$AI_SCHEMA_EXIT"
 fi
 
+# ── GATE AUTO-LEARN NO-CLOUD (Bowie self-learning deve restare locale) ──
+# server/ai/assistant/auto-learn.ts è il job di auto-apprendimento LOCALE di
+# Bowie: DEVE usare esclusivamente Ollama locale (callOllamaChat), MAI un
+# provider cloud (Groq/Gemini/OpenAI) né il gateway runWithFallback
+# (server/ai/moderation/provider.ts). Il test runtime (Task #5330) scatta solo
+# se il modulo cloud viene davvero importato/invocato; questo gate statico
+# blocca l'import stesso, a lint/CI time, prima che il codice giri.
+# Vedi: server/ai/assistant/auto-learn.ts (commento header)
+echo "════════════════════════════════════════"
+echo "  Gate auto-learn no-cloud (Bowie self-learning)"
+echo "════════════════════════════════════════"
+AUTO_LEARN_CLOUD_EXIT=0
+bash scripts/check-auto-learn-no-cloud-ai.sh || AUTO_LEARN_CLOUD_EXIT=$?
+echo "════════════════════════════════════════"
+echo ""
+if [ "$AUTO_LEARN_CLOUD_EXIT" -ne 0 ]; then
+  echo "❌ Gate auto-learn-no-cloud-ai fallito — correggere prima di procedere."
+  exit "$AUTO_LEARN_CLOUD_EXIT"
+fi
+
 # ── GATE Promise.all NON BUDGETTATI IN JOB BG (pool DB saturation) ──
 # server/matching/* e server/jobs/*: un Promise.all([...]) di setup con
 # >2 elementi (o un fan-out .map() non pLimit-bounded) apre più connessioni
