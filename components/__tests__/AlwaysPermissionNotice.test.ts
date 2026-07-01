@@ -1,7 +1,7 @@
 /**
  * Test di mount per AlwaysPermissionNotice.
  *
- * Verifica che il box rosso ("Permesso da concedere a mano" + warning icon) e il
+ * Verifica che il box rosso ("il permesso va concesso a mano da qui" + warning icon) e il
  * pulsante primario "Apri Impostazioni" compaiano SOLO quando
  * requestBackgroundPermission() ritorna "needsSettings", e che nella UI di default
  * (prima di qualsiasi richiesta) il box non sia visibile e il pulsante
@@ -131,7 +131,7 @@ describe("AlwaysPermissionNotice — stato iniziale", () => {
   it("NON mostra il box rosso prima di qualsiasi richiesta", async () => {
     await mount();
     // Il testo del box rosso compare solo in stato needsSettings.
-    expect(findTextWith("Permesso da concedere")).toBe(false);
+    expect(findTextWith("concesso a mano")).toBe(false);
     expect(findTextWith("Android richiede")).toBe(false);
   });
 
@@ -157,7 +157,7 @@ describe("AlwaysPermissionNotice — esito 'needsSettings'", () => {
     });
 
     // Testo iOS per needsSettings
-    expect(findTextWith("Permesso da concedere a mano")).toBe(true);
+    expect(findTextWith("il permesso va concesso a mano da qui")).toBe(true);
   });
 
   it("nasconde il pulsante 'Richiedi permesso' e promuove 'Apri Impostazioni' a primario", async () => {
