@@ -53,13 +53,34 @@ l'app principale BikerLink installata sullo stesso account.
    - Atteso: il terminale si chiude da solo (processo terminato/tornato alla
      home) entro ~50 secondi dal momento in cui BikerLink va in foreground.
 
-3. **Lock screen su iOS quando si apre BikerLink** (se disponibile un device
-   iOS con build TestFlight/dev — attualmente il progetto builda solo
-   Android via EAS, vedi `app.json`; da eseguire quando/se esiste un build iOS)
-   - Stessa sequenza del punto 2.
-   - Atteso: il terminale non si chiude da solo (iOS non permette
-     l'auto-terminazione) ma mostra la schermata "BikerLink è aperto" a
-     schermo intero, con invito a chiudere manualmente.
+3. **Lock screen su iOS quando si apre BikerLink** (richiede un build iOS
+   reale — TestFlight o dev client — installato su device fisico; non
+   simulabile in questo ambiente)
+   - **3a — terminale in background (non killato):** apri Bowie, mandalo in
+     background (Home/App Switcher senza chiuderlo), poi apri BikerLink sullo
+     stesso account. Atteso: la push silenziosa (`sendBowieCloseSignalPush`,
+     `_contentAvailable: true` + `priority: "normal"`, richiede
+     `UIBackgroundModes: ["remote-notification"]` in `app.json` — già presente)
+     dovrebbe risvegliare il terminale e mostrare la lock screen entro pochi
+     secondi. **Nota:** su iOS le push "silenziose" sono consegnate a
+     discrezione del sistema operativo (throttling per battery/data, nessuna
+     garanzia di tempo) — un ritardo occasionale non è un bug applicativo.
+     Il poll di fallback (50s, invariato) copre comunque il caso.
+   - **3b — terminale davvero killato (rimosso dall'App Switcher):** su iOS,
+     quando l'utente forza la chiusura di un'app, il sistema operativo **non
+     rilancia né risveglia il processo per NESSUNA push, nemmeno silenziosa
+     con `content-available`** — è un vincolo di piattaforma documentato da
+     Apple, non aggirabile lato app. Quindi in questo scenario non ci si deve
+     aspettare alcuna lock screen "in background": il segnale arriva solo
+     quando l'utente riapre manualmente il terminale. Al riavvio, per design
+     (baseline-reset in `evaluateSignal`), la prima lettura registra sempre la
+     baseline senza mostrare la lock screen (evita falsi positivi al riavvio,
+     vedi punto 4) — il terminale si apre normalmente. Questo è il
+     comportamento atteso e corretto, non un difetto da correggere.
+   - Se 3a manca completamente (nessuna lock screen mai, entro il timeout del
+     poll di 50s) su un device con permessi di rete normali, verificare prima
+     che il push token sia stato registrato (`registerBowieTerminalToken`) e
+     che l'app non sia in Low Power Mode/Focus che blocca le push in background.
 
 4. **Nessun falso positivo al riavvio del terminale**
    - Dopo aver eventualmente già triggerato il caso 2 in passato (quindi
@@ -74,4 +95,18 @@ l'app principale BikerLink installata sullo stesso account.
 Static/code review + unit/contract test: **PASS, nessun problema rilevato**.
 Verifica su device fisico: **da eseguire dall'utente** seguendo la checklist
 sopra — non eseguibile da questo agente (nessun accesso a device Android/iOS
-reale in questo ambiente).
+reale in questo ambiente, né a un build EAS installato).
+
+### Nota specifica — push silenziosa iOS (Task #5312)
+
+Review statica di `server/push-notifications.ts` (`sendBowieCloseSignalPush`),
+`bowie-terminal/lib/notifications.ts` (`setupNotifications`,
+`addMainAppForegroundClosePushListener`) e `bowie-terminal/app.json`
+(`ios.infoPlist.UIBackgroundModes`) conferma che tutti i campi richiesti da
+APNs per una push data-only sono presenti e corretti (`_contentAvailable:
+true`, `priority: "normal"`, `UIBackgroundModes: ["remote-notification"]`,
+token registrato via `getExpoPushTokenAsync` senza richiedere permesso
+"alert"). Non è possibile confermare la consegna reale APNs senza un build
+iOS su device fisico — vedi checklist 3a/3b sopra per cosa aspettarsi e i
+limiti noti della piattaforma (force-quit = nessun risveglio possibile, per
+design Apple, indipendentemente dall'implementazione).
