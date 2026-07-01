@@ -10,7 +10,10 @@
     "backgroundColor": "#0D0D0D",
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.bikerlink.bowieterminal"
+      "bundleIdentifier": "com.bikerlink.bowieterminal",
+      "infoPlist": {
+        "UIBackgroundModes": ["remote-notification"]
+      }
     },
     "android": {
       "package": "com.bikerlink.bowieterminal",

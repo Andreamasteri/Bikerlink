@@ -16,6 +16,12 @@ export interface ExpoPushMessage {
   sound?: "default" | null;
   badge?: number;
   channelId?: string;
+  // Task #5309 — richiesti da APNs per consegnare una push "silenziosa" (nessun
+  // banner) a un device iOS anche in background/killed: senza _contentAvailable
+  // il sistema APNs scarta il payload data-only invece di risvegliare l'app.
+  // priority "normal" evita l'alert implicito che high-priority forzerebbe.
+  priority?: "default" | "normal" | "high";
+  _contentAvailable?: boolean;
 }
 
 interface ExpoPushTicket {

@@ -397,6 +397,11 @@ export async function sendBowieCloseSignalPush(userId: string): Promise<number> 
       data: { type: "main_app_foreground_close" },
       sound: null,
       channelId: "bowie",
+      // Task #5309 — su iOS un payload data-only senza questi due campi viene
+      // scartato da APNs invece di risvegliare l'app in background/killed;
+      // su Android sono no-op (FCM già consegna i data message così com'è).
+      priority: "normal" as const,
+      _contentAvailable: true,
     }));
     await sendExpoMessages(messages, userIdByToken, {
       onDeviceNotRegistered: (token) => clearStalePushTokenRow(token),

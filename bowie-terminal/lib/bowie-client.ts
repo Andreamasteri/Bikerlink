@@ -1,4 +1,5 @@
 import { fetch as expoFetch } from "expo/fetch";
+import { Platform } from "react-native";
 import type { PersonaId } from "../constants/theme";
 
 // Dominio del backend BikerLink. Iniettato a build-time via EAS (EXPO_PUBLIC_DOMAIN).
@@ -162,7 +163,9 @@ export async function registerPushToken(expoPushToken: string, token: string): P
       // Task #5273: appId="bowie" così il server salva questo token nella
       // tabella per-app push_tokens senza toccare users.expoPushToken (che
       // appartiene all'app principale). Fine del furto di notifiche.
-      body: JSON.stringify({ token: expoPushToken, appId: "bowie", platform: "android" }),
+      // Task #5309: platform dinamica (era hardcoded "android") ora che anche
+      // iOS registra un push token per il segnale di auto-chiusura.
+      body: JSON.stringify({ token: expoPushToken, appId: "bowie", platform: Platform.OS }),
     });
   } catch {
     /* best-effort */

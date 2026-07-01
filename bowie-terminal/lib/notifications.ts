@@ -37,29 +37,37 @@ function extractReplyText(
 }
 
 // Crea il canale Android, la categoria con input di testo e richiede i permessi.
-// Ritorna l'Expo push token (o null se non disponibile / non Android).
+// Ritorna l'Expo push token (o null se non disponibile).
+// Task #5309 — su iOS non serve il permesso "alert" per ricevere la push
+// data-only di auto-chiusura: bastano registerForRemoteNotifications (che
+// getExpoPushTokenAsync fa internamente, anche a permesso negato/non chiesto)
+// e UIBackgroundModes=remote-notification in app.json. Per questo iOS salta
+// canale/categoria/richiesta permessi (tutta roba per la quick-reply, non
+// ancora supportata sul terminale iOS) e va dritto a getExpoPushTokenAsync.
 export async function setupNotifications(): Promise<string | null> {
-  if (Platform.OS !== "android") return null;
+  if (Platform.OS !== "android" && Platform.OS !== "ios") return null;
 
-  await Notifications.setNotificationChannelAsync(CHANNEL_ID, {
-    name: "Bowie Terminal",
-    importance: Notifications.AndroidImportance.LOW,
-    showBadge: false,
-  });
+  if (Platform.OS === "android") {
+    await Notifications.setNotificationChannelAsync(CHANNEL_ID, {
+      name: "Bowie Terminal",
+      importance: Notifications.AndroidImportance.LOW,
+      showBadge: false,
+    });
 
-  await Notifications.setNotificationCategoryAsync(CATEGORY_ID, [
-    {
-      identifier: REPLY_ACTION_ID,
-      buttonTitle: "Scrivi a Bowie",
-      textInput: { submitButtonTitle: "Invia", placeholder: "Chiedi a Bowie..." },
-      // Task #5272 — true: l'app si apre sempre all'invio della reply, così il
-      // testo raggiunge la JS in modo garantito (nessun input perso ad app killata).
-      options: { opensAppToForeground: true },
-    },
-  ]);
+    await Notifications.setNotificationCategoryAsync(CATEGORY_ID, [
+      {
+        identifier: REPLY_ACTION_ID,
+        buttonTitle: "Scrivi a Bowie",
+        textInput: { submitButtonTitle: "Invia", placeholder: "Chiedi a Bowie..." },
+        // Task #5272 — true: l'app si apre sempre all'invio della reply, così il
+        // testo raggiunge la JS in modo garantito (nessun input perso ad app killata).
+        options: { opensAppToForeground: true },
+      },
+    ]);
 
-  const perm = await Notifications.requestPermissionsAsync();
-  if (!perm.granted) return null;
+    const perm = await Notifications.requestPermissionsAsync();
+    if (!perm.granted) return null;
+  }
 
   try {
     const projectId =
