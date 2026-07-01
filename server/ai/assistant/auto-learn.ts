@@ -142,7 +142,17 @@ async function persistLearned(gap: OpenGap, answer: string, modelId: string): Pr
   });
 }
 
-async function runCycle(): Promise<void> {
+/**
+ * Esegue un singolo ciclo di auto-apprendimento LOCALE.
+ *
+ * Esportata (Task #5330) per essere testabile in isolamento: l'invariante
+ * critica — il job NON deve MAI usare un provider cloud a pagamento
+ * (Groq/Gemini/OpenAI), nemmeno come fallback — è ora coperta da un test
+ * automatico dedicato. La sola via di generazione è `callOllamaChat` (modello
+ * locale); se Ollama non è configurato o non è raggiungibile il ciclo si salta
+ * SENZA alcun fallback.
+ */
+export async function runCycle(): Promise<void> {
   if (running) return; // single-flight
   const now = Date.now();
   if (lastRunAt > 0 && now - lastRunAt < COOLDOWN_MS) return; // cooldown ≥60min
@@ -216,6 +226,19 @@ export function startAutoLearnScheduler(): void {
 
 export function stopAutoLearnScheduler(): void {
   if (cycleTimer) { clearTimeout(cycleTimer); cycleTimer = null; }
+}
+
+/**
+ * Solo per i test (Task #5330): azzera lo stato interno del ciclo (single-flight,
+ * cooldown, contatori) così ogni caso può partire da una tabula rasa. NON usare
+ * in produzione.
+ */
+export function __resetAutoLearnStateForTest(): void {
+  running = false;
+  lastRunAt = 0;
+  totalCycles = 0;
+  totalLearned = 0;
+  lastError = null;
 }
 
 export function getAutoLearnStats() {
