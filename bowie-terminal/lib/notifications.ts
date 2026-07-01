@@ -1,31 +1,37 @@
 import { Platform } from "react-native";
 import * as Notifications from "expo-notifications";
-import * as TaskManager from "expo-task-manager";
 import Constants from "expo-constants";
-import { getToken } from "./session";
-import { notificationReply } from "./bowie-client";
 
-// ⚠️ POC (Task #5222, step 6). Il flusso headless text-reply ad app terminata
-// NON è collaudato in questo progetto. Se l'OS non risveglia il task con il
-// testo della quick-reply, il fallback accettabile è: la notifica apre l'app.
+// Task #5272 — Consegna affidabile della quick-reply dalla notifica persistente.
+//
+// Il flusso headless "app terminata" (Task #5222 POC) NON era collaudabile: se
+// l'OS non risveglia il task con il testo, la reply spariva silenziosamente.
+// Non potendo validarlo su device fisico, lo rendiamo affidabile per costruzione:
+// l'azione di reply ha `opensAppToForeground: true`, quindi Android APRE SEMPRE
+// l'app quando si invia una risposta (anche da app killata). Il testo digitato
+// viene recuperato in due modi complementari, senza mai perderlo:
+//   - App viva (foreground/background): `addReplyListener` riceve la response.
+//   - App killata → riavviata: `consumePendingReply()` legge la response che ha
+//     lanciato l'app (getLastNotificationResponse) e la consuma una sola volta.
+// In entrambi i casi il testo viene reimmesso nel terminale e inviato inline,
+// così l'utente vede la risposta nella chat invece che come push separata.
 
 const CHANNEL_ID = "bowie";
 const CATEGORY_ID = "bowie_reply";
 const ONGOING_ID = "bowie-ongoing";
-const BACKGROUND_TASK = "BOWIE_NOTIFICATION_TASK";
+const REPLY_ACTION_ID = "REPLY";
 
-// Inoltra il testo della quick-reply all'endpoint non-streaming. La risposta
-// dell'AI arriva come nuova push notification (gestita dal server).
-async function forwardReply(userText: string | undefined): Promise<void> {
-  const text = userText?.trim();
-  if (!text) return;
-  const token = await getToken();
-  if (!token) return;
-  try {
-    await notificationReply(text, token);
-  } catch {
-    /* push reply best-effort */
-  }
+// Estrae il testo della quick-reply da una response SOLO se proviene dalla nostra
+// azione REPLY della categoria Bowie (ignora tap generici / altre notifiche).
+function extractReplyText(
+  response: Notifications.NotificationResponse | null,
+): string | null {
+  if (!response) return null;
+  if (response.actionIdentifier !== REPLY_ACTION_ID) return null;
+  const category = response.notification.request.content.categoryIdentifier;
+  if (category !== CATEGORY_ID) return null;
+  const text = response.userText?.trim();
+  return text ? text : null;
 }
 
 // Crea il canale Android, la categoria con input di testo e richiede i permessi.
@@ -41,10 +47,12 @@ export async function setupNotifications(): Promise<string | null> {
 
   await Notifications.setNotificationCategoryAsync(CATEGORY_ID, [
     {
-      identifier: "REPLY",
+      identifier: REPLY_ACTION_ID,
       buttonTitle: "Scrivi a Bowie",
       textInput: { submitButtonTitle: "Invia", placeholder: "Chiedi a Bowie..." },
-      options: { opensAppToForeground: false },
+      // Task #5272 — true: l'app si apre sempre all'invio della reply, così il
+      // testo raggiunge la JS in modo garantito (nessun input perso ad app killata).
+      options: { opensAppToForeground: true },
     },
   ]);
 
@@ -71,7 +79,7 @@ export async function showPersistentNotification(): Promise<void> {
     identifier: ONGOING_ID,
     content: {
       title: "Bowie Terminal",
-      body: "In ascolto — scrivi senza aprire l'app",
+      body: "In ascolto — scrivi e apri per parlare con Bowie",
       categoryIdentifier: CATEGORY_ID,
       color: "#FF6600",
       sticky: true,
@@ -81,39 +89,34 @@ export async function showPersistentNotification(): Promise<void> {
   });
 }
 
-// Listener foreground/background: quando il processo è vivo, la quick-reply
-// arriva qui e viene inoltrata. (Percorso affidabile, non-POC.)
-export function addReplyListener(): { remove: () => void } {
+// Listener attivo quando il processo è vivo (foreground/background): la response
+// della quick-reply arriva qui. Passa il testo al chiamante (il terminale lo
+// invia inline) e ripristina la notifica persistente.
+export function addReplyListener(onReply: (text: string) => void): {
+  remove: () => void;
+} {
   return Notifications.addNotificationResponseReceivedListener((response) => {
-    void (async () => {
-      await forwardReply(response.userText);
-      await showPersistentNotification();
-    })();
+    const text = extractReplyText(response);
+    if (!text) return;
+    onReply(text);
+    void showPersistentNotification();
   });
 }
 
-// Task headless: l'OS PUO' risvegliarlo per le risposte quando l'app non è in
-// foreground. POC — se il payload non contiene il testo, non fa nulla (fallback
-// = la notifica apre l'app).
-TaskManager.defineTask(BACKGROUND_TASK, async ({ data, error }) => {
-  if (error) return;
+// Recupero cold-start: legge la response che ha lanciato l'app (da killata) e la
+// consuma UNA sola volta (clear), evitando di re-inviarla a ogni apertura futura.
+// Ritorna il testo della quick-reply, o null se l'app non è stata aperta da una
+// reply. Sincrono lato native ma esposto async per comodità del chiamante.
+export async function consumePendingReply(): Promise<string | null> {
+  if (Platform.OS !== "android") return null;
   try {
-    const payload = data as {
-      notification?: { userText?: string };
-      response?: { userText?: string };
-    } | undefined;
-    const userText = payload?.response?.userText ?? payload?.notification?.userText;
-    await forwardReply(userText);
+    const response = Notifications.getLastNotificationResponse();
+    const text = extractReplyText(response);
+    if (!text) return null;
+    // Consuma la response così non viene riprocessata alle aperture successive.
+    Notifications.clearLastNotificationResponse();
+    return text;
   } catch {
-    /* headless best-effort */
-  }
-});
-
-export async function registerBackgroundTask(): Promise<void> {
-  if (Platform.OS !== "android") return;
-  try {
-    await Notifications.registerTaskAsync(BACKGROUND_TASK);
-  } catch {
-    /* non tutte le combinazioni SDK/OS supportano la reply headless — fallback documentato */
+    return null;
   }
 }

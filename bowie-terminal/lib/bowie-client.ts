@@ -160,16 +160,3 @@ export async function registerPushToken(expoPushToken: string, token: string): P
   }
 }
 
-// Invio non-streaming usato dalla quick-reply: il server elabora e rispedisce
-// la risposta come push notification.
-export async function notificationReply(message: string, token: string): Promise<void> {
-  const res = await expoFetch(new URL("/api/ai/assistant/notification-reply", getApiUrl()).toString(), {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
-    body: JSON.stringify({ message, platform: "android" }),
-  });
-  if (res.status === 401 || res.status === 403) throw new SessionExpiredError();
-}

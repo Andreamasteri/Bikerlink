@@ -139,3 +139,4 @@
 - [DragonflyDB + BullMQ undeclared keys](dragonfly-bullmq-undeclared-keys.md) — cluster_mode=emulated da solo NON basta per BullMQ; serve anche --default_lua_flags=allow-undeclared-keys o ogni Queue.add() fallisce.
 - [Old Redis retirement confirmed safe](redis-retirement-confirmed.md) — old redis container+volume gone, only fallback = tiny backup tarballs; queues empty, no lock lost; cache is ephemeral so no rollback plan needed.
 - [Bowie Terminal push-token sharing](bowie-terminal-push-token.md) — standalone bowie-terminal APK writes the SAME users.expoPushToken as the main app; last install wins push; needs per-device token table to fix.
+- [Bowie notification quick-reply delivery](bowie-notification-reply-delivery.md) — app-killed headless reply is unreliable; use opensAppToForeground:true + getLastNotificationResponse cold-start recovery + clearLastNotificationResponse dedupe, submit inline.

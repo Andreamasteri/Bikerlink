@@ -25,7 +25,7 @@ import {
 } from "../lib/session";
 import {
   addReplyListener,
-  registerBackgroundTask,
+  consumePendingReply,
   setupNotifications,
   showPersistentNotification,
 } from "../lib/notifications";
@@ -77,6 +77,9 @@ export default function TerminalScreen() {
   const intervalsRef = useRef<ReturnType<typeof setInterval>[]>([]);
   const abortRef = useRef<AbortController | null>(null);
   const welcomeStartedRef = useRef(false);
+  // Task #5272 — ref sempre aggiornato a submitText: la quick-reply della notifica
+  // (listener + cold-start) invia inline SENZA rieseguire il bootstrap.
+  const submitTextRef = useRef<(raw: string) => void>(() => {});
 
   const cursorOpacity = useRef(new Animated.Value(1)).current;
 
@@ -135,7 +138,6 @@ export default function TerminalScreen() {
       const pushToken = await setupNotifications();
       if (pushToken) await registerPushToken(pushToken, token);
       await showPersistentNotification();
-      await registerBackgroundTask();
     } catch {
       /* notifiche best-effort */
     }
@@ -156,8 +158,13 @@ export default function TerminalScreen() {
       if (saved && isThemeName(saved)) setThemeName(saved);
       setPhase("ready");
       startWelcome();
-      replyListener = addReplyListener();
+      // Task #5272 — quick-reply notifica: app viva → listener; app killata →
+      // riaperta dall'OS (opensAppToForeground) → recupero cold-start. In entrambi
+      // i casi il testo viene inviato inline via submitTextRef (nessun input perso).
+      replyListener = addReplyListener((text) => submitTextRef.current(text));
       void initNotifications(tok);
+      const pending = await consumePendingReply();
+      if (pending) submitTextRef.current(pending);
     })();
 
     return () => {
@@ -213,8 +220,8 @@ export default function TerminalScreen() {
   );
 
   // ---- send ----
-  const onSubmit = useCallback(async () => {
-    const text = input.trim();
+  const submitText = useCallback(async (raw: string) => {
+    const text = raw.trim();
     if (!text || streaming) return;
     setInput("");
     if (handleCommand(text)) return;
@@ -259,12 +266,20 @@ export default function TerminalScreen() {
     appendLineText,
     handleCommand,
     handleSessionExpired,
-    input,
     pushLine,
     setLinePersona,
     setLineText,
     streaming,
   ]);
+
+  const onSubmit = useCallback(() => {
+    void submitText(input);
+  }, [submitText, input]);
+
+  // Mantiene il ref allineato all'ultima submitText per la quick-reply notifica.
+  useEffect(() => {
+    submitTextRef.current = (raw: string) => void submitText(raw);
+  }, [submitText]);
 
   // ---- render ----
   const reversed = useMemo(() => [...lines].reverse(), [lines]);
