@@ -80,6 +80,36 @@ router.post("/app-close", requireAuth, async (req: Request, res: Response) => {
   }
 });
 
+// Task #5298 — segnale "app principale in foreground".
+// L'app principale BikerLink chiama questo endpoint a ogni apertura/foreground
+// dell'utente autenticato. Scrive SOLO users.lastMainAppForegroundAt: è la
+// sorgente di verità che il Bowie Terminal standalone legge per auto-chiudersi.
+router.post("/me/main-app-foreground", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const userId = req.session.userId!;
+    await storage.updateUser(userId, { lastMainAppForegroundAt: new Date() });
+    return sendSuccess(res);
+  } catch (error) {
+    console.error("Main-app-foreground signal error:", error);
+    return sendError(res, 500, "Errore interno del server");
+  }
+});
+
+// Lettura del segnale, usata dal Bowie Terminal (poll periodico in foreground).
+// Restituisce il timestamp ISO dell'ultima apertura dell'app principale, o null.
+router.get("/me/main-app-foreground", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const userId = req.session.userId!;
+    const user = await storage.getUser(userId);
+    if (!user) return sendError(res, 404, "Utente non trovato");
+    const at = user.lastMainAppForegroundAt;
+    return res.json({ lastMainAppForegroundAt: at ? new Date(at).toISOString() : null });
+  } catch (error) {
+    console.error("Main-app-foreground read error:", error);
+    return sendError(res, 500, "Errore interno del server");
+  }
+});
+
 router.get("/:id/public", requireAuth, async (req: Request, res: Response) => {
   try {
     const requesterId = req.session.userId!;

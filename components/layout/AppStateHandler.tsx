@@ -36,6 +36,18 @@ let _currentSessionId: string | null = null;
 export function getCurrentSessionId(): string | null { return _currentSessionId; }
 export function clearCurrentSessionId(): void { _currentSessionId = null; }
 
+// Task #5298 — segnala al server che l'app PRINCIPALE è in foreground. Il Bowie
+// Terminal standalone legge questo segnale per auto-chiudersi. Best-effort: un
+// fallimento (rete lenta/assente) degrada in silenzio e viene ritentato al
+// prossimo foreground.
+async function signalMainAppForeground() {
+  try {
+    await apiRequest("POST", "/api/users/me/main-app-foreground", undefined, { timeoutMs: RESUME_NET_TIMEOUT_MS });
+  } catch {
+    // no-op: ritentato al prossimo resume in foreground
+  }
+}
+
 async function sendHeartbeat() {
   try {
     const appVersion = getReliableAppVersion();
@@ -126,6 +138,10 @@ export function AppStateHandler() {
     sendHeartbeat();
     heartbeatTimerRef.current = setInterval(sendHeartbeat, HEARTBEAT_INTERVAL_MS);
 
+    // Task #5298 — apertura dell'app principale: notifica il server così il
+    // Bowie Terminal standalone (stesso account) può auto-chiudersi.
+    signalMainAppForeground();
+
     sendStartupBeacon("app_state_handler_mount");
 
     startSession().then((id) => {
@@ -191,6 +207,10 @@ export function AppStateHandler() {
           // on the next interval/resume, rather than propagating as a fatal
           // unhandled rejection that closes the app.
           sendHeartbeat().catch(() => {});
+
+          // Task #5298 — resume in foreground dell'app principale: ri-notifica
+          // il server per l'auto-chiusura del Bowie Terminal standalone.
+          signalMainAppForeground().catch(() => {});
 
           const invalidate = (queryKey: string[]) =>
             queryClient.invalidateQueries({ queryKey }).catch(() => {});

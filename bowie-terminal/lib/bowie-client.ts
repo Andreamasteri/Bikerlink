@@ -191,6 +191,21 @@ export async function registerBowieTerminalToken(
   }
 }
 
+// Task #5298 — legge il segnale "app principale in foreground" per l'account.
+// Restituisce il timestamp ISO dell'ultima apertura dell'app principale, o null
+// se non è mai stata aperta. Usato dal poll periodico del terminale per
+// l'auto-chiusura (vedi lib/main-app-watch.ts).
+export async function getMainAppForeground(token: string): Promise<string | null> {
+  const res = await expoFetch(new URL("/api/users/me/main-app-foreground", getApiUrl()).toString(), {
+    method: "GET",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (res.status === 401 || res.status === 403) throw new SessionExpiredError();
+  if (!res.ok) throw new Error(`Errore server (${res.status})`);
+  const json = (await res.json().catch(() => ({}))) as { lastMainAppForegroundAt?: string | null };
+  return json.lastMainAppForegroundAt ?? null;
+}
+
 // Invio non-streaming usato dalla quick-reply: il server elabora e rispedisce
 // la risposta come push notification.
 // Task #5277 — passa il deviceId così il server consegna la risposta SOLO a

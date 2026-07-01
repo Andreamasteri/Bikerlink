@@ -69,6 +69,12 @@ export const users = pgTable("users", {
   lastLoginAt: timestamp("last_login_at"),
   lastLogoutAt: timestamp("last_logout_at"),
   lastAppCloseAt: timestamp("last_app_close_at"),
+  // Task #5298 — timestamp dell'ultima apertura/foreground dell'app PRINCIPALE
+  // BikerLink. Campo DEDICATO (mai riusare lastLoginAt): scritto SOLO dall'app
+  // principale, letto dal Bowie Terminal standalone per auto-chiudersi quando
+  // l'utente apre BikerLink. Il terminale usa un algoritmo baseline/ack sul
+  // valore di questo campo — vedi bowie-terminal/lib/main-app-watch.ts.
+  lastMainAppForegroundAt: timestamp("last_main_app_foreground_at"),
   lastAppVersion: varchar("last_app_version", { length: 32 }),
   lastPlatform: varchar("last_platform", { length: 16 }),
   lastDeviceModel: varchar("last_device_model", { length: 100 }),

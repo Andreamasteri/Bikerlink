@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Animated,
+  AppState,
+  BackHandler,
   FlatList,
   KeyboardAvoidingView,
   Platform,
@@ -17,7 +19,9 @@ import {
   registerPushToken,
   registerBowieTerminalToken,
   notificationReply,
+  getMainAppForeground,
 } from "../lib/bowie-client";
+import { createWatchState, evaluateSignal } from "../lib/main-app-watch";
 import {
   clearSession,
   getOrCreateDeviceId,
@@ -72,6 +76,9 @@ export default function TerminalScreen() {
   const [lines, setLines] = useState<Line[]>([]);
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState(false);
+  // Task #5298 — schermata di blocco iOS: le app iOS non possono auto-terminarsi,
+  // quindi al posto della chiusura mostriamo un overlay a tutto schermo.
+  const [locked, setLocked] = useState(false);
 
   const theme = THEMES[themeName];
 
@@ -91,6 +98,8 @@ export default function TerminalScreen() {
   const deviceIdRef = useRef<string | null>(null);
   const pendingReplyLineIdRef = useRef<string | null>(null);
   const pendingReplyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Task #5298 — stato baseline/ack per rilevare l'apertura dell'app principale.
+  const mainAppWatchRef = useRef(createWatchState());
 
   const cursorOpacity = useRef(new Animated.Value(1)).current;
 
@@ -148,6 +157,47 @@ export default function TerminalScreen() {
     await clearSession();
     setTimeout(() => router.replace("/login"), 1200);
   }, [pushLine]);
+
+  // ---- auto-chiusura all'apertura dell'app principale (Task #5298) ----
+  // Poll periodico + al resume in foreground: se l'app principale BikerLink
+  // viene aperta DOPO l'avvio del terminale, su Android chiudiamo l'app, su iOS
+  // (che non può auto-terminarsi) mostriamo la schermata di blocco.
+  const checkMainAppForeground = useCallback(async () => {
+    if (AppState.currentState !== "active") return;
+    const tok = tokenRef.current;
+    if (!tok) return;
+    try {
+      const value = await getMainAppForeground(tok);
+      const result = evaluateSignal(mainAppWatchRef.current, value);
+      mainAppWatchRef.current = result.state;
+      if (result.shouldTrigger) {
+        if (Platform.OS === "android") {
+          BackHandler.exitApp();
+        } else {
+          setLocked(true);
+        }
+      }
+    } catch (e) {
+      if (e instanceof SessionExpiredError) {
+        await handleSessionExpired();
+      }
+      // altri errori: best-effort, ritentato al prossimo tick
+    }
+  }, [handleSessionExpired]);
+
+  useEffect(() => {
+    if (phase !== "ready") return;
+    // Prima lettura → registra baseline (nessuna azione).
+    void checkMainAppForeground();
+    const interval = setInterval(() => void checkMainAppForeground(), 50000);
+    const sub = AppState.addEventListener("change", (next) => {
+      if (next === "active") void checkMainAppForeground();
+    });
+    return () => {
+      clearInterval(interval);
+      sub.remove();
+    };
+  }, [phase, checkMainAppForeground]);
 
   // ---- notifications (best-effort, Android) ----
   const initNotifications = useCallback(async (token: string) => {
@@ -400,6 +450,28 @@ export default function TerminalScreen() {
     return <View style={[styles.root, { backgroundColor: theme.background }]} />;
   }
 
+  // Task #5298 — schermata di blocco iOS: l'app principale è stata aperta.
+  // Non potendo auto-terminarsi, il terminale sostituisce la UI con questo
+  // messaggio a tutto schermo e invita l'utente a chiudere manualmente.
+  if (locked) {
+    return (
+      <View
+        style={[
+          styles.lockRoot,
+          { backgroundColor: theme.background, paddingTop: topInset + 24, paddingBottom: bottomInset + 24 },
+        ]}
+      >
+        <Text style={[styles.lockTitle, { color: theme.bowie }]}>BikerLink è aperto</Text>
+        <Text style={[styles.lockBody, { color: theme.text }]}>
+          Bowie è già disponibile dentro l'app principale BikerLink.
+        </Text>
+        <Text style={[styles.lockBody, { color: theme.textSecondary }]}>
+          Chiudi questa app per continuare da BikerLink.
+        </Text>
+      </View>
+    );
+  }
+
   return (
     <KeyboardAvoidingView
       style={[styles.root, { backgroundColor: theme.background }]}
@@ -448,6 +520,9 @@ export default function TerminalScreen() {
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
+  lockRoot: { flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 32 },
+  lockTitle: { fontFamily: MONO, fontSize: 20, fontWeight: "bold", marginBottom: 16, textAlign: "center" },
+  lockBody: { fontFamily: MONO, fontSize: 14, lineHeight: 21, textAlign: "center", marginBottom: 10 },
   list: { flex: 1, paddingHorizontal: 14 },
   listContent: { paddingVertical: 8 },
   line: { fontFamily: MONO, fontSize: 13, lineHeight: 19, marginVertical: 1 },
