@@ -30,7 +30,7 @@ import { aiConversationTurns } from "@shared/db";
 import { eq, desc } from "drizzle-orm";
 import { pruneUserMemory, MEMORY_TURNS_LIMIT } from "./memory-pruner";
 import { fetchUserLiveContext } from "./user-context";
-import { BOWIE_INTRO_POEM } from "@shared/bowie-greeting";
+import { BOWIE_INTRO_POEM, HORUS_INTRO_POEM, ARES_INTRO_POEM } from "@shared/bowie-greeting";
 
 const OLLAMA_FALLBACK_MODEL_ID = process.env.BOWIE_OLLAMA_MODEL ?? "mistral-nemo:latest";
 // Task #5197 — Horus usa un modello Ollama dedicato (stessa infra di Bowie).
@@ -65,6 +65,12 @@ export interface AssistantAgentOpts {
   // (specialista percorsi) o "ares" (diagnostica tecnica, solo admin). La
   // risoluzione dell'handoff avviene nel route; qui si applica solo.
   persona?: AiPersonaId;
+  // Task #5331 — true quando questo è la VERA prima apparizione di Horus/Ares
+  // in questa conversazione, calcolato a monte nel route via
+  // resolvePersonaForTurn (persistito in ai_conversation_state.introShownPersonas,
+  // sopravvive ai cicli Bowie ⇄ Horus/Ares ⇄ Bowie).
+  // Ignorato per Bowie (usa historySource.length===0, coerente con Task #5210).
+  personaFirstTurn?: boolean;
   // Task #5228 — Client di origine ("main_app" | "bowie_terminal"). Loggato in
   // ai_call_logs.source_app per il monitor Bowie Standalone.
   sourceApp?: string;
@@ -236,8 +242,22 @@ export async function runAssistantAgent(opts: AssistantAgentOpts): Promise<Assis
   // (nessuna history precedente). Il modello "vede" la poesia come già pronunciata
   // da Bowie → non la ripete né la parafrasa. Non viene salvato nel DB.
   const isNewBowieConversation = requestedPersona === "bowie" && historySource.length === 0;
-  const seedTurns: Array<{ role: "user" | "assistant"; content: string }> = isNewBowieConversation
-    ? [{ role: "assistant", content: BOWIE_INTRO_POEM }]
+  // Task #5331 — Stesso pattern per Horus/Ares, ma il "primo turno" è deciso a
+  // monte (route) confrontando la persona richiesta con quella attiva prima di
+  // questo turno (personaFirstTurn), non dalla lunghezza della history: la
+  // conversazione può già avere turni di Bowie quando Horus/Ares entrano per
+  // la prima volta via handoff.
+  const isNewHorusTurn = requestedPersona === "horus" && !!opts.personaFirstTurn;
+  const isNewAresTurn = requestedPersona === "ares" && !!opts.personaFirstTurn;
+  const introPoem = isNewBowieConversation
+    ? BOWIE_INTRO_POEM
+    : isNewHorusTurn
+      ? HORUS_INTRO_POEM
+      : isNewAresTurn
+        ? ARES_INTRO_POEM
+        : null;
+  const seedTurns: Array<{ role: "user" | "assistant"; content: string }> = introPoem
+    ? [{ role: "assistant", content: introPoem }]
     : [];
 
   // Task #5327 — Ultimo turno utente: multimodale se ci sono immagini (parti
@@ -282,6 +302,24 @@ export async function runAssistantAgent(opts: AssistantAgentOpts): Promise<Assis
   // solo dai delta del modello AI — così i fallback guard funzionano correttamente.
   let providerEmittedAny = false;
 
+  // Task #5210/#5331 — Poesia di benvenuto (Bowie alla prima apertura, Horus/Ares
+  // al primo turno della persona) emessa SOLO al primo delta REALE del provider,
+  // mai in anticipo. Prima (bug da code review) veniva emessa subito via
+  // onTextDelta: se il provider falliva a zero delta il chiamante non-streaming
+  // vedeva finalText riassegnato SENZA intro, ma il client SSE l'aveva già
+  // ricevuta → comportamento divergente tra i due percorsi. Ritardando
+  // l'emissione fino al primo delta, i due percorsi restano identici: nessuna
+  // intro se il provider non produce nulla, intro+risposta se produce almeno un
+  // delta (anche poi fallito a metà, nel qual caso resta come parziale degraded).
+  let introEmitted = false;
+  const ensureIntroEmitted = () => {
+    if (!introPoem || introEmitted) return;
+    introEmitted = true;
+    const introBlock = introPoem + "\n\n";
+    finalText += introBlock;
+    opts.onTextDelta?.(introBlock);
+  };
+
   // Task #5322 — Filtro di streaming che rimuove il marcatore di congedo
   // (HANDOFF_BACK_TO_BOWIE) dai delta prima che raggiungano il client. Tutti i
   // delta del MODELLO passano di qui; l'intro poetica e i messaggi di errore/
@@ -309,6 +347,7 @@ export async function runAssistantAgent(opts: AssistantAgentOpts): Promise<Assis
       ...(isOllama && enableTools ? { tools: OLLAMA_TOOLS as never, stopWhen: stepCountIs(3) as never } : {}),
     });
     for await (const delta of result.textStream) {
+      ensureIntroEmitted();
       finalText += delta;
       aiText += delta;
       providerEmittedAny = true;
@@ -320,18 +359,6 @@ export async function runAssistantAgent(opts: AssistantAgentOpts): Promise<Assis
   };
 
   let done = false;
-
-  // Task #5210 — Emetti la poesia come primo blocco dello stream (solo Bowie, prima apertura).
-  // Il seed nel contesto dice al modello che è già stata pronunciata → non la ripete.
-  // La separazione con "\n\n" stacca visivamente l'intro dalla risposta effettiva.
-  // providerEmittedAny rimane false: la poesia è testo statico, non output del provider.
-  // L'append a finalText è incondizionato (anche senza callback streaming) così i caller
-  // non-streaming ricevono sempre il testo completo nella risposta finale.
-  if (isNewBowieConversation) {
-    const introBlock = BOWIE_INTRO_POEM + "\n\n";
-    finalText += introBlock;
-    opts.onTextDelta?.(introBlock);
-  }
 
   // 0) Task #5197 — Ares: AI di diagnostica su PC fisso dedicato (DIAG_OLLAMA_*).
   //    Endpoint separato (/api/chat HTTP diretta), NON la chain Ollama/cloud.
@@ -352,6 +379,7 @@ export async function runAssistantAgent(opts: AssistantAgentOpts): Promise<Assis
         signal: opts.signal,
         timeoutMs: 60_000,
         onDelta: (delta) => {
+          ensureIntroEmitted();
           finalText += delta;
           aiText += delta;
           providerEmittedAny = true;

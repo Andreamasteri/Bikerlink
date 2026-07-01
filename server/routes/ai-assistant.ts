@@ -123,6 +123,10 @@ router.post("/ai/assistant/message", requireUser, messageLimiter, async (req: Re
     isAdmin: isAdminMode,
   });
   const persona: AiPersonaId = personaResolution.persona;
+  // Task #5331 — vera prima apparizione di Horus/Ares in questa conversazione
+  // (mai mostrata prima, calcolato su introShownPersonas: sopravvive ai cicli
+  // Bowie ⇄ Horus/Ares ⇄ Bowie). Bowie usa un criterio separato (agent.ts).
+  const personaFirstTurn = personaResolution.personaFirstTurn;
 
   let effectiveMessage = parsed.data.message;
 
@@ -240,6 +244,8 @@ router.post("/ai/assistant/message", requireUser, messageLimiter, async (req: Re
       adminCodeContext,
       // Task #5197 — persona risolta a monte + notifica al client di CHI risponde.
       persona,
+      // Task #5331 — primo turno di Horus/Ares → intro poetica dedicata.
+      personaFirstTurn,
       // Task #5228 — attribuzione client di origine.
       sourceApp: parsed.data.source ?? "main_app",
       onPersona: (p) => send("persona", p),

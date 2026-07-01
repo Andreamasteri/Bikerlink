@@ -121,6 +121,11 @@ export const aiConversationState = pgTable("ai_conversation_state", {
   sourceApp: varchar("source_app", { length: 32 }).notNull().default("main_app"),
   activePersona: varchar("active_persona", { length: 16 }).notNull(),
   handoffReason: varchar("handoff_reason", { length: 32 }),
+  // Task #5331 — Persone (Horus/Ares) la cui intro poetica è GIA' stata mostrata
+  // in questa conversazione. A differenza di activePersona (che torna a "bowie"
+  // quando l'utente esce dall'handoff) questo elenco NON viene mai svuotato al
+  // ritorno a Bowie — solo dalla scadenza del TTL della riga (nuova conversazione).
+  introShownPersonas: jsonb("intro_shown_personas").$type<string[]>().notNull().default([]),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
   expiresAt: timestamp("expires_at").notNull(),
 }, (t) => [

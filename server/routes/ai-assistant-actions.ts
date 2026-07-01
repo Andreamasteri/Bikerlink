@@ -264,6 +264,9 @@ router.post("/ai/assistant/notification-reply", requireUser, async (req: Request
     isAdmin: false,
   });
   const persona: AiPersonaId = personaResolution.persona;
+  // Task #5331 — vera prima apparizione di Horus in questa conversazione (Ares
+  // è escluso qui, isAdmin=false sopra); stesso criterio del route SSE principale.
+  const personaFirstTurn = personaResolution.personaFirstTurn;
 
   if (!hasAnyAiProvider()) {
     sendError(res, 503, AI_NO_PROVIDER_MESSAGE);
@@ -287,6 +290,8 @@ router.post("/ai/assistant/notification-reply", requireUser, async (req: Request
       history: [],
       userId: user.id,
       persona,
+      // Task #5331 — primo turno di Horus → intro poetica dedicata.
+      personaFirstTurn,
       // Task #5228 — attribuzione client di origine.
       sourceApp: parsed.data.source ?? "main_app",
     });
