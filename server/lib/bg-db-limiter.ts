@@ -100,6 +100,20 @@ export class BgDbSlowKillSwitchError extends Error {
   }
 }
 
+// ─── Task #5316 — distinguere i drop "attesi" del limiter dagli errori reali ──
+// Un job scartato da questo modulo (kill-switch adattivo, coda piena, coda
+// scaduta) NON è un bug applicativo: è la valvola di sfogo che protegge il
+// pool. I chiamanti (es. scheduler.cycle.ts) usano questo helper per loggare
+// questi drop come WARN "posticipato" invece di ERROR generico, ed escluderli
+// dal conteggio errori che alimenta gli alert high/critical del watchdog.
+export function isBgDbLimiterDropError(err: unknown): boolean {
+  return (
+    err instanceof BgDbSlowKillSwitchError ||
+    err instanceof BgDbQueueOverflowError ||
+    err instanceof BgDbQueueTimeoutError
+  );
+}
+
 interface Waiter {
   resolve: () => void;
   reject: (err: Error) => void;

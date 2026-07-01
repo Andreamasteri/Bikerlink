@@ -1,6 +1,6 @@
 import { storage } from "../storage";
 import { withDbRetry, isPoolHealthy } from "../db";
-import { withBgDbSlot } from "../lib/bg-db-limiter";
+import { withBgDbSlot, isBgDbLimiterDropError } from "../lib/bg-db-limiter";
 import { dedupWarn } from "../lib/dedup-logger";
 import { runMatching, runWishlistMatching, getLastProposalMatchingStats, getLastWishlistMatchingStats } from "./run-matching";
 import { runBikerBikerMatching, runBikerBikerTypeStyleMatching } from "./run-biker";
@@ -22,6 +22,7 @@ import {
   recordMatchingCycle,
   recordMatchesCreated,
   recordCycleError,
+  recordCycleDrop,
   setMatchingLockState,
 } from "./metrics";
 import { captureMatchingError } from "../sentry";
@@ -45,7 +46,10 @@ const CYCLE_STALE_MS = 10 * 60 * 1000;
 
 let cycleInFlight = false;
 let lastMatchingStart: number | null = null;
-let lastCycleOutcome: "ok" | "error" | null = null;
+// Task #5316 — "skipped" distingue un ciclo posticipato dal bg-db-limiter
+// (DB managed sotto pressione, valvola di sfogo attesa) da un vero errore
+// applicativo del ciclo, così il watchdog non genera falsi allarmi high/critical.
+let lastCycleOutcome: "ok" | "error" | "skipped" | null = null;
 let lastCycleMeta: {
   completedAt: string;
   durationMs: number;
@@ -57,8 +61,42 @@ export function getLastMatchingCycleMeta() {
   return lastCycleMeta;
 }
 
-export function getLastCycleOutcome(): "ok" | "error" | null {
+export function getLastCycleOutcome(): "ok" | "error" | "skipped" | null {
   return lastCycleOutcome;
+}
+
+// ─── Task #5316 — retry rapido per cleanup_delete_expired ───────────────────
+// Se questa fase viene droppata dal bg-db-limiter (kill-switch/coda), NON
+// aspettiamo il prossimo giro naturale del ciclo (poteva essere un'ora dopo):
+// ritentiamo a breve termine, così le proposte scadute non restano sporche a
+// lungo durante episodi di instabilità DB prolungata. Un solo timer alla
+// volta (no accumulo se il drop si ripete più volte nello stesso giro).
+const CLEANUP_EXPIRED_RETRY_DELAY_MS = 90_000;
+let cleanupExpiredRetryTimer: ReturnType<typeof setTimeout> | null = null;
+
+function scheduleCleanupExpiredRetry(): void {
+  if (cleanupExpiredRetryTimer) return;
+  cleanupExpiredRetryTimer = setTimeout(() => {
+    cleanupExpiredRetryTimer = null;
+    withBgDbSlot(() => withDbRetry(() => storage.deleteExpiredProposals()))
+      .then((deleted) => {
+        if (deleted > 0) {
+          schedulerLogger.info({ deleted }, "Eliminate proposte scadute (retry post kill-switch)");
+          addMatchLog("INFO", "cleanup_delete_expired", `Retry riuscito — eliminate ${deleted} proposte scadute rimaste in sospeso`);
+        }
+      })
+      .catch((err) => {
+        if (isBgDbLimiterDropError(err)) {
+          addMatchLog("WARN", "cleanup_delete_expired", "Retry posticipato di nuovo — DB managed ancora sotto pressione, riprovo al prossimo ciclo naturale");
+          void recordCycleDrop("cleanup_delete_expired_retry");
+        } else {
+          schedulerLogger.error({ err }, "Retry cleanup_delete_expired fallito");
+          addMatchLog("ERROR", "cleanup_delete_expired", `Retry fallito: ${err instanceof Error ? err.message : String(err)}`);
+          void recordCycleError("cleanup_delete_expired_retry");
+        }
+      });
+  }, CLEANUP_EXPIRED_RETRY_DELAY_MS);
+  cleanupExpiredRetryTimer.unref?.();
 }
 
 export function getMatchingLockState() {
@@ -146,7 +184,7 @@ export function triggerMatchingRun(): { started: boolean; reason?: string } {
 
   (async () => {
     const cycleStartedAt = Date.now();
-    let cycleStatus: "ok" | "error" = "ok";
+    let cycleStatus: "ok" | "error" | "skipped" = "ok";
     try {
     const lockOutcome = await withMatchingLock(owner, async () => {
     void setMatchingLockState(true);
@@ -166,8 +204,15 @@ export function triggerMatchingRun(): { started: boolean; reason?: string } {
         const deleted = await recorder.time("cleanup_delete_expired", () => withBgDbSlot(() => withDbRetry(() => storage.deleteExpiredProposals())));
         if (deleted > 0) schedulerLogger.info({ deleted }, "Eliminate proposte scadute");
       } catch (err) {
-        schedulerLogger.error({ err }, "Errore eliminazione proposte scadute");
-        addMatchLog("ERROR", "cleanup_delete_expired", `Errore eliminazione proposte scadute: ${err instanceof Error ? err.message : String(err)}`);
+        if (isBgDbLimiterDropError(err)) {
+          schedulerLogger.warn({ err }, "cleanup_delete_expired posticipato — bg-db-limiter kill-switch attivo");
+          addMatchLog("WARN", "cleanup_delete_expired", `Pulizia proposte scadute posticipata — DB managed sotto pressione (instabilità connessioni Postgres di Replit, NON il ThinkCentre), riparte a breve: ${err instanceof Error ? err.message : String(err)}`);
+          void recordCycleDrop("cleanup_delete_expired");
+          scheduleCleanupExpiredRetry();
+        } else {
+          schedulerLogger.error({ err }, "Errore eliminazione proposte scadute");
+          addMatchLog("ERROR", "cleanup_delete_expired", `Errore eliminazione proposte scadute: ${err instanceof Error ? err.message : String(err)}`);
+        }
       }
 
       const autoMatchSetting = await withBgDbSlot(() => withDbRetry(() => storage.getAppSetting("auto_matching_enabled")));
@@ -262,6 +307,12 @@ export function triggerMatchingRun(): { started: boolean; reason?: string } {
               void recordCycleError(`${name}_timeout`);
               continue;
             }
+            if (isBgDbLimiterDropError(err)) {
+              schedulerLogger.warn({ err, phase: name }, "fase posticipata — bg-db-limiter kill-switch attivo");
+              addMatchLog("WARN", name, `Fase "${name}" posticipata — DB managed sotto pressione (instabilità connessioni Postgres di Replit, NON il ThinkCentre), riparte al prossimo tick: ${err instanceof Error ? err.message : String(err)}`);
+              void recordCycleDrop(name);
+              continue;
+            }
             schedulerLogger.error({ err, phase: name }, "phase failed (non-blocking)");
             void captureMatchingError(err, { phase: name, trigger: "on-demand" }).then((eid) => {
               addMatchLog("ERROR", name, `Fase fallita: ${err instanceof Error ? err.message : String(err)}`, undefined, eid);
@@ -295,6 +346,10 @@ export function triggerMatchingRun(): { started: boolean; reason?: string } {
             );
             addMatchLog("WARN", err.cycleName, `Fase "${err.cycleName}" interrotta per timeout dopo ${err.elapsedMs}ms (limite ${cycleTimeoutMs}ms) — proseguo`);
             void recordCycleError(`${err.cycleName}_timeout`);
+          } else if (isBgDbLimiterDropError(err)) {
+            schedulerLogger.warn({ err }, "route_affinity posticipato — bg-db-limiter kill-switch attivo");
+            addMatchLog("WARN", "route_affinity", `Route affinity posticipato — DB managed sotto pressione (instabilità connessioni Postgres di Replit, NON il ThinkCentre), riparte al prossimo tick: ${err instanceof Error ? err.message : String(err)}`);
+            void recordCycleDrop("route_affinity");
           } else {
             console.error("[Matching] RouteAffinity matching error (non-blocking):", err);
             addMatchLog("ERROR", "route_affinity", `Route affinity errore: ${err instanceof Error ? err.message : String(err)}`);
@@ -318,6 +373,10 @@ export function triggerMatchingRun(): { started: boolean; reason?: string } {
             );
             addMatchLog("WARN", err.cycleName, `Fase "${err.cycleName}" interrotta per timeout dopo ${err.elapsedMs}ms (limite ${cycleTimeoutMs}ms) — proseguo`);
             void recordCycleError(`${err.cycleName}_timeout`);
+          } else if (isBgDbLimiterDropError(err)) {
+            schedulerLogger.warn({ err }, "enrich_breakdowns posticipato — bg-db-limiter kill-switch attivo");
+            addMatchLog("WARN", "enrich_breakdowns", `Arricchimento breakdown posticipato — DB managed sotto pressione (instabilità connessioni Postgres di Replit, NON il ThinkCentre), riparte al prossimo tick: ${err instanceof Error ? err.message : String(err)}`);
+            void recordCycleDrop("enrich_breakdowns");
           } else {
             console.error("[Matching] EnrichBreakdowns error (non-blocking):", err);
             addMatchLog("ERROR", "enrich_breakdowns", `Errore arricchimento breakdown: ${err instanceof Error ? err.message : String(err)}`);
@@ -354,14 +413,22 @@ export function triggerMatchingRun(): { started: boolean; reason?: string } {
         "Ciclo on-demand completato"
       );
     } catch (err) {
-      schedulerLogger.error({ err }, "Errore nel ciclo on-demand");
       recorder.finish(totalMatches);
-      cycleStatus = "error";
-      lastCycleOutcome = "error";
-      void recordCycleError("cycle_root");
-      void captureMatchingError(err, { trigger: "on-demand", phase: "cycle_root" }).then((eid) => {
-        addMatchLog("ERROR", "cycle_root", `Errore ciclo: ${err instanceof Error ? err.message : String(err)}`, undefined, eid);
-      });
+      if (isBgDbLimiterDropError(err)) {
+        schedulerLogger.warn({ err }, "Ciclo posticipato — bg-db-limiter kill-switch attivo");
+        cycleStatus = "skipped";
+        lastCycleOutcome = "skipped";
+        void recordCycleDrop("cycle_root");
+        addMatchLog("WARN", "cycle_root", `Ciclo posticipato — DB managed sotto pressione (instabilità connessioni Postgres di Replit, NON il ThinkCentre), riparte al prossimo tick: ${err instanceof Error ? err.message : String(err)}`);
+      } else {
+        schedulerLogger.error({ err }, "Errore nel ciclo on-demand");
+        cycleStatus = "error";
+        lastCycleOutcome = "error";
+        void recordCycleError("cycle_root");
+        void captureMatchingError(err, { trigger: "on-demand", phase: "cycle_root" }).then((eid) => {
+          addMatchLog("ERROR", "cycle_root", `Errore ciclo: ${err instanceof Error ? err.message : String(err)}`, undefined, eid);
+        });
+      }
     }
     });
     if (!lockOutcome.acquired) {
@@ -369,13 +436,21 @@ export function triggerMatchingRun(): { started: boolean; reason?: string } {
       addMatchLog("WARN", "lock", `Ciclo skippato — lock già attivo: ${lockOutcome.reason ?? ""}`);
     }
     } catch (err) {
-      schedulerLogger.error({ err }, "Errore non gestito attorno a withMatchingLock");
-      cycleStatus = "error";
-      lastCycleOutcome = "error";
-      void recordCycleError("lock_wrapper");
-      void captureMatchingError(err, { trigger: "on-demand", phase: "lock_wrapper" }).then((eid) => {
-        addMatchLog("ERROR", "lock_wrapper", `Errore withMatchingLock: ${err instanceof Error ? err.message : String(err)}`, undefined, eid);
-      });
+      if (isBgDbLimiterDropError(err)) {
+        schedulerLogger.warn({ err }, "withMatchingLock posticipato — bg-db-limiter kill-switch attivo");
+        cycleStatus = "skipped";
+        lastCycleOutcome = "skipped";
+        void recordCycleDrop("lock_wrapper");
+        addMatchLog("WARN", "lock_wrapper", `Ciclo posticipato — DB managed sotto pressione (instabilità connessioni Postgres di Replit, NON il ThinkCentre), riparte al prossimo tick: ${err instanceof Error ? err.message : String(err)}`);
+      } else {
+        schedulerLogger.error({ err }, "Errore non gestito attorno a withMatchingLock");
+        cycleStatus = "error";
+        lastCycleOutcome = "error";
+        void recordCycleError("lock_wrapper");
+        void captureMatchingError(err, { trigger: "on-demand", phase: "lock_wrapper" }).then((eid) => {
+          addMatchLog("ERROR", "lock_wrapper", `Errore withMatchingLock: ${err instanceof Error ? err.message : String(err)}`, undefined, eid);
+        });
+      }
     } finally {
       void recordMatchingCycle(cycleStatus, Date.now() - cycleStartedAt);
       void setMatchingLockState(false);

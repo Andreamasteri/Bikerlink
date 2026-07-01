@@ -23,6 +23,7 @@ export async function checkMatching(): Promise<PipelineCheckResult> {
     const outcome = getLastCycleOutcome();
     if (!meta) return "nessun ciclo eseguito ancora (server appena avviato)";
     if (outcome === "error") throw new Error("ultimo ciclo terminato in errore");
+    if (outcome === "skipped") return "ultimo tentativo posticipato — DB managed sotto pressione (bg-db-limiter kill-switch), NON il ThinkCentre; riprova al prossimo tick";
     const ageMin = Math.round((Date.now() - new Date(meta.completedAt).getTime()) / 60_000);
     return `completato ${ageMin}min fa — ${meta.zavorrinaMatchesNew} zav + ${meta.bikerBikerMatchesNew} bb (${meta.durationMs}ms)`;
   }));
