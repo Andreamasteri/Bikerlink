@@ -57,6 +57,9 @@ export interface AssistantAgentOpts {
   // (specialista percorsi) o "ares" (diagnostica tecnica, solo admin). La
   // risoluzione dell'handoff avviene nel route; qui si applica solo.
   persona?: AiPersonaId;
+  // Task #5228 — Client di origine ("main_app" | "bowie_terminal"). Loggato in
+  // ai_call_logs.source_app per il monitor Bowie Standalone.
+  sourceApp?: string;
   // Callback invocata quando la persona che risponde è nota (prima dei delta),
   // così il client può mostrare CHI sta rispondendo.
   onPersona?: (p: { id: AiPersonaId; name: string }) => void;
@@ -398,6 +401,8 @@ export async function runAssistantAgent(opts: AssistantAgentOpts): Promise<Assis
     latencyMs,
     costUsd,
     degraded,
+    persona: effectivePersona,
+    sourceApp: opts.sourceApp ?? "main_app",
     error: degraded && !finalText.startsWith("⚠️") ? "degraded" : null,
   });
 

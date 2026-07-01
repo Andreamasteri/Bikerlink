@@ -55,6 +55,8 @@ const MessageBody = z.object({
     role: z.enum(["user", "assistant"]),
     content: z.string().min(1).max(4000),
   })).max(10).optional(),
+  // Task #5228 — client di origine per l'attribuzione nel monitor Bowie Standalone.
+  source: z.enum(["main_app", "bowie_terminal"]).optional(),
 });
 
 router.post("/ai/assistant/message", requireUser, messageLimiter, async (req: Request, res: Response) => {
@@ -176,6 +178,8 @@ router.post("/ai/assistant/message", requireUser, messageLimiter, async (req: Re
       adminCodeContext,
       // Task #5197 — persona risolta a monte + notifica al client di CHI risponde.
       persona,
+      // Task #5228 — attribuzione client di origine.
+      sourceApp: parsed.data.source ?? "main_app",
       onPersona: (p) => send("persona", p),
       signal: abort.signal,
       onTextDelta: (delta) => securityFilter.push(delta, (safe) => send("delta", { text: safe })),
@@ -196,6 +200,8 @@ router.post("/ai/assistant/message", requireUser, messageLimiter, async (req: Re
         tokensOut: 0,
         costUsd: 0,
         securityBlocked: true,
+        persona: result.persona.id,
+        sourceApp: parsed.data.source ?? "main_app",
         error: "security_blocked: output filter intercepted sensitive content",
       });
       send("done", {

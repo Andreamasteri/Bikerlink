@@ -15,9 +15,11 @@ import {
   sendMessage,
   SessionExpiredError,
   registerPushToken,
+  registerBowieTerminalToken,
 } from "../lib/bowie-client";
 import {
   clearSession,
+  getOrCreateDeviceId,
   getRole,
   getSavedTheme,
   getToken,
@@ -136,7 +138,12 @@ export default function TerminalScreen() {
     if (Platform.OS !== "android") return;
     try {
       const pushToken = await setupNotifications();
-      if (pushToken) await registerPushToken(pushToken, token);
+      if (pushToken) {
+        await registerPushToken(pushToken, token);
+        // Task #5228 — registra il device nel registro per-dispositivo (monitor admin).
+        const deviceId = await getOrCreateDeviceId();
+        await registerBowieTerminalToken(deviceId, pushToken, token);
+      }
       await showPersistentNotification();
     } catch {
       /* notifiche best-effort */

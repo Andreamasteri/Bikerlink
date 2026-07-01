@@ -364,6 +364,7 @@ import aiTestOllamaRouter from './admin/ai/test-ollama';
 import aiRouteProvidersRouter from './admin/ai/route-providers';
 // Task #3017 — Metriche chiamate AI (provider usage, latenza, token, costo, degraded, repair).
 import aiMetricsRouter from './admin/ai/metrics';
+import bowieStandaloneRouter from './admin/bowie-standalone';
 // Salute unificata servizi self-hosted ThinkCentre (GraphHopper/Ollama/Whisper/Nominatim).
 import thinkcentreHealthRouter from './admin/thinkcentre-health';
 // Metriche hardware ThinkCentre (CPU/RAM/uptime via agente Node.js sul mini-PC).
@@ -481,6 +482,7 @@ router.use('/maps', _requireAdmin, mapsAdminRouter);
 router.use('/ai', _requireAdmin, aiTestOllamaRouter);
 router.use('/ai', _requireAdmin, aiRouteProvidersRouter);
 router.use('/ai', _requireAdmin, aiMetricsRouter);
+router.use('/bowie-standalone', _requireAdmin, bowieStandaloneRouter);
 router.use('/', _requireAdmin, thinkcentreHealthRouter);
 router.use('/', _requireAdmin, thinkcentreMetricsRouter);
 router.use('/', _requireAdmin, systemProbeRouter);

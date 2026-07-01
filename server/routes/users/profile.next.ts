@@ -1,8 +1,8 @@
 import { Router, type Request, type Response } from "express";
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { storage } from "../../storage";
 import { db } from "../../db";
-import { pushTokens } from "@shared/db";
+import { pushTokens, bowieTerminalTokens } from "@shared/db";
 import { requireAuth } from "../../lib/auth-middleware";
 import { sendSuccess, sendError } from "../../lib/api-response";
 
@@ -123,6 +123,43 @@ router.put("/me/push-token", requireAuth, async (req: Request, res: Response) =>
     return sendSuccess(res, { success: true });
   } catch (error) {
     console.error("PUT /me/push-token error:", error);
+    return sendError(res, 500, "Errore interno del server");
+  }
+});
+
+// Task #5228 — Registrazione token push per-dispositivo del client "Bowie
+// Terminal" (APK standalone). Upsert per device_id: rinnova token + last_active_at
+// e "resuscita" un device precedentemente revocato. Separato da /me/push-token
+// (users.expoPushToken) così il monitor admin può elencare/revocare i singoli
+// device senza toccare il token di consegna principale dell'utente.
+router.put("/me/bowie-terminal-token", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const userId = req.session.userId!;
+    const { deviceId, token } = req.body as { deviceId?: string; token?: string };
+
+    if (!deviceId || typeof deviceId !== "string" || deviceId.length > 128) {
+      return sendError(res, 400, "deviceId mancante o non valido");
+    }
+    if (!token || !EXPO_TOKEN_REGEX.test(token)) {
+      return sendError(res, 400, "Token Expo non valido");
+    }
+
+    await db
+      .insert(bowieTerminalTokens)
+      .values({ deviceId, userId, pushToken: token })
+      .onConflictDoUpdate({
+        target: bowieTerminalTokens.deviceId,
+        set: {
+          userId,
+          pushToken: token,
+          lastActiveAt: sql`now()`,
+          revokedAt: null,
+        },
+      });
+
+    return sendSuccess(res, { success: true });
+  } catch (error) {
+    console.error("PUT /me/bowie-terminal-token error:", error);
     return sendError(res, 500, "Errore interno del server");
   }
 });

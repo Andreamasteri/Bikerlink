@@ -83,7 +83,13 @@ export async function sendMessage(
       Authorization: `Bearer ${token}`,
       Accept: "text/event-stream",
     },
-    body: JSON.stringify({ message, platform: "android", history: opts?.history ?? [] }),
+    body: JSON.stringify({
+      message,
+      platform: "android",
+      history: opts?.history ?? [],
+      // Task #5228 — attribuzione al client standalone nel monitor admin.
+      source: "bowie_terminal",
+    }),
     signal: opts?.signal,
   });
 
@@ -163,3 +169,38 @@ export async function registerPushToken(expoPushToken: string, token: string): P
   }
 }
 
+// Task #5228 — Registra il token push nel registro per-dispositivo del terminale
+// standalone (bowie_terminal_tokens), separato da users.expoPushToken. Permette
+// al monitor admin di elencare/revocare i singoli device. Best-effort.
+export async function registerBowieTerminalToken(
+  deviceId: string,
+  expoPushToken: string,
+  token: string,
+): Promise<void> {
+  try {
+    await expoFetch(new URL("/api/users/me/bowie-terminal-token", getApiUrl()).toString(), {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ deviceId, token: expoPushToken }),
+    });
+  } catch {
+    /* best-effort */
+  }
+}
+
+// Invio non-streaming usato dalla quick-reply: il server elabora e rispedisce
+// la risposta come push notification.
+export async function notificationReply(message: string, token: string): Promise<void> {
+  const res = await expoFetch(new URL("/api/ai/assistant/notification-reply", getApiUrl()).toString(), {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ message, platform: "android", source: "bowie_terminal" }),
+  });
+  if (res.status === 401 || res.status === 403) throw new SessionExpiredError();
+}

@@ -197,6 +197,8 @@ const NOTIFICATION_REPLY_COOLDOWN_MS = 10_000;
 const NotificationReplyBody = z.object({
   message: z.string().min(1).max(2000),
   platform: z.enum(["android", "ios"]).optional(),
+  // Task #5228 — client di origine per l'attribuzione nel monitor Bowie Standalone.
+  source: z.enum(["main_app", "bowie_terminal"]).optional(),
 });
 
 router.post("/ai/assistant/notification-reply", requireUser, async (req: Request, res: Response) => {
@@ -243,6 +245,8 @@ router.post("/ai/assistant/notification-reply", requireUser, async (req: Request
       history: [],
       userId: user.id,
       persona,
+      // Task #5228 — attribuzione client di origine.
+      sourceApp: parsed.data.source ?? "main_app",
     });
 
     // Buffer completo → filtro one-shot (non c'è streaming, nessun leak parziale).
@@ -258,13 +262,29 @@ router.post("/ai/assistant/notification-reply", requireUser, async (req: Request
         tokensOut: 0,
         costUsd: 0,
         securityBlocked: true,
+        persona: result.persona.id,
+        sourceApp: parsed.data.source ?? "main_app",
         error: "security_blocked: notification-reply output filter",
       });
     }
 
-    await sendBowieReplyPush(user.id, {
+    // Task #5228 — traccia l'esito della consegna push come riga dedicata
+    // (notification_status delivered/failed). Righe SOLO di consegna: token 0 e
+    // notificationStatus valorizzato, così il monitor non le conta come turni.
+    const delivered = await sendBowieReplyPush(user.id, {
       body: filtered.text,
       persona: result.persona,
+    });
+    logAiCall({
+      userId: user.id,
+      provider: result.provider,
+      modelId: result.model,
+      tokensIn: 0,
+      tokensOut: 0,
+      costUsd: 0,
+      persona: result.persona.id,
+      sourceApp: parsed.data.source ?? "main_app",
+      notificationStatus: delivered > 0 ? "delivered" : "failed",
     });
   } catch (err) {
     console.error("[ai-assistant/notification-reply]", err);

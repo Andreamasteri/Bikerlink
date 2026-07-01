@@ -25,6 +25,15 @@ export const adminGroupsPart2: AdminGroup[] = [
         keywords: ["ai", "assistant", "assistente", "chatbot", "utente", "supporto", "help", "bot", "widget", "galleggiante", "bubble", "floating", "popup ai", "bollicina", "chat ai", "conversazione ai"],
       },
       {
+        key: "bowie-standalone",
+        label: "Bowie · Standalone",
+        icon: "console",
+        iconSet: "MaterialCommunityIcons",
+        route: "/admin/bowie-standalone",
+        accentColor: "#FF6600",
+        keywords: ["bowie", "standalone", "terminal", "terminale", "apk", "monitor", "diagnostica bowie", "push token", "device", "dispositivo", "notifica", "notification reply", "persona", "horus", "ares", "sicurezza", "security block", "blocco sicurezza", "revoca token", "connessione", "attività ai"],
+      },
+      {
         key: "system-health",
         label: "AI System Watchdog",
         icon: "shield-check",

@@ -160,6 +160,15 @@ export default function AdminDashboard() {
     setSystemStatuses((prev) => ({ ...prev, ...probeData }));
   }, [probeData]);
 
+  // Task #5228 — badge rosso su "Bowie · Standalone" se ci sono blocchi di sicurezza nelle ultime 24h.
+  const { data: bowieBadge } = useQuery<{ securityBlocks24h: number }>({
+    queryKey: ["/api/admin/bowie-standalone/badge"],
+    refetchInterval: NORMAL_POLL_INTERVAL_MS,
+    staleTime: 60_000,
+    retry: 1,
+  });
+  const bowieSecurityBlocks = bowieBadge?.securityBlocks24h ?? 0;
+
   const handleThinkCentreStatuses = useCallback(
     (s: Pick<SystemStatuses, "thinkcentre" | "graphhopper" | "valhalla" | "nominatim" | "ollama" | "whisper" | "ufw" | "redis" | "postgres" | "pgadmin" | "nginx" | "uptimeKuma">) => {
       setSystemStatuses((prev) => ({ ...prev, ...s }));
@@ -459,6 +468,7 @@ export default function AdminDashboard() {
                   {group.items.map((section) => {
                     const iconColor = section.accentColor || Colors.accent;
                     const itemMatches = isSearching && !group.titleMatched && normalize(section.label).includes(normalizedSearch);
+                    const showBowieBadge = section.key === "bowie-standalone" && bowieSecurityBlocks > 0;
                     return (
                       <TouchableOpacity
                         key={section.key}
@@ -466,6 +476,13 @@ export default function AdminDashboard() {
                         onPress={() => handleItemPress(section)}
                         activeOpacity={0.7}
                       >
+                        {showBowieBadge && (
+                          <View style={styles.cardBadge}>
+                            <Text style={styles.cardBadgeText}>
+                              {bowieSecurityBlocks > 99 ? "99+" : bowieSecurityBlocks}
+                            </Text>
+                          </View>
+                        )}
                         <View style={styles.cardIcon}>
                           {renderIcon(section, 28, iconColor)}
                         </View>

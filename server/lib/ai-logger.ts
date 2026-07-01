@@ -18,6 +18,12 @@ export interface LogAiCallOpts {
   costUsd: number;
   degraded?: boolean;
   securityBlocked?: boolean;
+  /** Task #5228 — persona AI ("bowie" | "horus" | "ares"). */
+  persona?: string | null;
+  /** Task #5228 — client di origine ("main_app" | "bowie_terminal"). */
+  sourceApp?: string | null;
+  /** Task #5228 — esito consegna push per le righe notification-reply ("delivered" | "failed"). */
+  notificationStatus?: string | null;
   error?: string | null;
 }
 
@@ -36,6 +42,9 @@ export function logAiCall(opts: LogAiCallOpts): void {
     costUsd: opts.costUsd,
     degraded: opts.degraded ?? false,
     securityBlocked: opts.securityBlocked ?? false,
+    persona: opts.persona ?? null,
+    sourceApp: opts.sourceApp ?? null,
+    notificationStatus: opts.notificationStatus ?? null,
     error: opts.error ?? null,
   }).catch((err) => {
     console.warn("[ai-logger] inserimento fallito (ignorato):", (err as Error).message);

@@ -97,6 +97,7 @@ const ADMIN_OPTS: Record<string, { title: string } | { headerShown: false }> = {
   "boot-gate": { title: "BootGate — Bisect Avvio" },
   "metro-crashes": { title: "Crash Metro" },
   "ai-assistant": { title: "Bowie" },
+  "bowie-standalone": { title: "Bowie · Standalone" },
   "match-explain": { title: "Explain Matching" },
   "ai-assistant-config": { title: "Bowie Config" },
   "background-location": { title: "Posizione Background" },
@@ -182,6 +183,7 @@ export default function AdminLayout() {
         <Stack.Screen name="boot-gate" options={ADMIN_OPTS["boot-gate"]} />
         <Stack.Screen name="metro-crashes" options={ADMIN_OPTS["metro-crashes"]} />
         <Stack.Screen name="ai-assistant" options={ADMIN_OPTS["ai-assistant"]} />
+        <Stack.Screen name="bowie-standalone" options={ADMIN_OPTS["bowie-standalone"]} />
         <Stack.Screen name="match-explain" options={ADMIN_OPTS["match-explain"]} />
         <Stack.Screen name="ai-assistant-config" options={ADMIN_OPTS["ai-assistant-config"]} />
         <Stack.Screen name="background-location" options={ADMIN_OPTS["background-location"]} />
