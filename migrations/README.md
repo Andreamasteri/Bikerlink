@@ -26,13 +26,41 @@ NNNN_descrizione_breve.sql
 
 ---
 
-## Come scegliere il numero
+## Come creare una migration (consigliato)
+
+Usa lo **scaffolder**: calcola da solo il prossimo numero libero e crea il file,
+quindi una collisione di prefisso è **impossibile per costruzione**.
+
+```bash
+npx tsx scripts/new-migration.ts <descrizione_snake_case>
+# es. npx tsx scripts/new-migration.ts add_sos_events  →  0078_add_sos_events.sql
+```
+
+Lo script:
+
+- calcola il prossimo numero (max esistente + 1, zero-padded);
+- rifiuta di procedere se la cartella contiene **già** un prefisso duplicato;
+- crea il file con un header template idempotente.
+
+Senza argomenti stampa solo il prossimo numero libero (dry-run, non crea nulla):
+
+```bash
+npx tsx scripts/new-migration.ts
+```
+
+## Come scegliere il numero (manuale)
+
+Se crei il file a mano invece di usare lo scaffolder:
 
 1. Trova l'ultimo numero in uso:
    ```bash
    ls migrations/*.sql | sort | tail -5
    ```
 2. Usa il successivo disponibile. Se l'ultimo è `0077`, il prossimo è `0078`.
+3. Verifica subito di non aver introdotto un duplicato:
+   ```bash
+   npx tsx server/scripts/check-migration-prefix-duplicates.ts
+   ```
 
 ---
 
