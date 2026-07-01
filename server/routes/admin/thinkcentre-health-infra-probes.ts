@@ -9,8 +9,10 @@
  *                         Se impostato ha precedenza su REDIS_PROBE_HOST (modalità TCP diretta).
  *   REDIS_PROBE_HOST      hostname/IP Redis (TCP diretto, fallback se REDIS_PROBE_URL non impostato)
  *   REDIS_PROBE_PORT      porta Redis (default: 6379, usato solo in modalità TCP)
- *   POSTGRES_PROBE_HOST   hostname/IP PostgreSQL sul ThinkCentre (TCP diretto)
- *   POSTGRES_PROBE_PORT   porta PostgreSQL (default: 5432)
+ *   POSTGRES_PROBE_URL    URL HTTP del probe PostgreSQL via TC agent (es. https://tc.biker-link.net/probe/postgres)
+ *                         Se impostato ha precedenza su POSTGRES_PROBE_HOST (modalità TCP diretta).
+ *   POSTGRES_PROBE_HOST   hostname/IP PostgreSQL sul ThinkCentre (TCP diretto, fallback se POSTGRES_PROBE_URL non impostato)
+ *   POSTGRES_PROBE_PORT   porta PostgreSQL (default: 5432, usato solo in modalità TCP)
  *   PGADMIN_URL           URL pgAdmin — punta al probe TC agent: https://tc.biker-link.net/probe/pgadmin
  *   NGINX_MONITOR_URL     URL nginx  — punta al probe TC agent: https://tc.biker-link.net/probe/nginx
  *   UPTIME_KUMA_URL       URL Uptime Kuma — punta al probe TC agent: https://tc.biker-link.net/probe/uptime-kuma
@@ -94,6 +96,22 @@ export async function probeRedisInfra(): Promise<InfraServiceHealth> {
 
 // ── PostgreSQL ────────────────────────────────────────────────────────────────
 export async function probePostgresInfra(): Promise<InfraServiceHealth> {
+  // Modalità HTTP via TC agent (POSTGRES_PROBE_URL ha precedenza)
+  const probeUrl = process.env.POSTGRES_PROBE_URL?.trim();
+  if (probeUrl) {
+    const agentToken = process.env.THINKCENTRE_AGENT_TOKEN ?? "";
+    const r = await httpProbe(probeUrl, agentToken ? { "X-Agent-Token": agentToken } : {}, (s) => s < 500);
+    if (!r.ok) {
+      const error = r.error ?? "HTTP error";
+      recordError("postgres", error);
+      recordProbeLog("postgres", { timestamp: Date.now(), ok: false, latencyMs: r.latencyMs, detail: error });
+      return { configured: true, ok: false, latencyMs: r.latencyMs, url: probeUrl, error, history: getHistory("postgres"), probeLog: getProbeLog("postgres") };
+    }
+    recordProbeLog("postgres", { timestamp: Date.now(), ok: true, latencyMs: r.latencyMs, detail: "HTTP probe OK" });
+    return { configured: true, ok: true, latencyMs: r.latencyMs, url: probeUrl, history: getHistory("postgres"), probeLog: getProbeLog("postgres") };
+  }
+
+  // Modalità TCP diretta (fallback)
   const host = process.env.POSTGRES_PROBE_HOST?.trim();
   const port = parseInt(process.env.POSTGRES_PROBE_PORT ?? "5432", 10);
   if (!host) {

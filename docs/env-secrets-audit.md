@@ -47,6 +47,7 @@ inlinata nel client:
 | `WHISPER_URL` | `server/routes/whisper.ts`, `server/ai/whisper-provider-config.ts` | URL servizio self-hosted, solo server |
 | `TILES_URL` | `lib/map-tiles.ts` (importata solo da route admin server) | URL tile self-hosted; sul client resta `undefined` (non `EXPO_PUBLIC_`) |
 | `REDIS_PROBE_URL` | `server/routes/admin/thinkcentre-health-infra-probes.ts` | Endpoint di probe per il **DragonflyDB** (Redis-compatible) self-hosted sul ThinkCentre — Redis è stato sostituito da DragonflyDB; l'endpoint resta `/probe/redis` solo per compatibilità. Solo server |
+| `POSTGRES_PROBE_URL` | `server/routes/admin/thinkcentre-health-infra-probes.ts` | Endpoint di probe HTTP per **PostgreSQL** self-hosted sul ThinkCentre via TC agent (`/probe/postgres`). Il TCP diretto non passa dal Cloudflare Tunnel (Postgres è escluso dagli hostname HTTP pubblici), quindi si usa il probe HTTP. Solo server |
 | `TC_SSH_PORT` | `server/routes/ssh-exec.ts` | Parametro connessione SSH ThinkCentre, solo server |
 | `DIAG_OLLAMA_URL` | provider **Ares** — `server/lib/ares-client.ts`, `server/routes/admin/thinkcentre-health-ares-probe.ts`, `scripts/ollama-diagnose.ts` | URL dell'istanza Ollama dedicata ad **Ares** (l'AI di diagnostica tecnica su PC fisso separato); solo server |
 | `DIAG_OLLAMA_MODEL` | provider **Ares** — `server/lib/ares-client.ts` | Modello usato da **Ares**; coerente con la famiglia `DIAG_OLLAMA_*` (secret) |
@@ -71,6 +72,7 @@ da solo i path (`/sys-metrics`, `/whisper-health`, `/probe/*`), quindi impostare
 | `PGADMIN_URL` | `https://tc.biker-link.net/probe/pgadmin` | idem |
 | `UPTIME_KUMA_URL` | `https://tc.biker-link.net/probe/uptime-kuma` | idem |
 | `REDIS_PROBE_URL` | `https://tc.biker-link.net/probe/redis` | idem (ha precedenza sul TCP `REDIS_PROBE_HOST`) |
+| `POSTGRES_PROBE_URL` | `https://tc.biker-link.net/probe/postgres` | idem (ha precedenza sul TCP `POSTGRES_PROBE_HOST`; il TCP diretto non passa dal tunnel) |
 
 > **Propagazione secret aggiornati:** un secret **nuovo** entra nel container in
 > tempo reale, ma un secret **esistente** riaggiornato mantiene il vecchio valore
