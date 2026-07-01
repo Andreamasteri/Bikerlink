@@ -24,6 +24,14 @@ import { runAssistantAgent, extractActions } from "../ai/assistant/agent";
 import { classifyRoutingIntent, parseAresInvocation, type AiPersonaId } from "../ai/assistant/roster";
 import { hasAnyAiProvider, AI_NO_PROVIDER_MESSAGE } from "../ai/moderation/provider";
 import {
+  createStreamingSecurityFilter,
+  matchesSensitive,
+  filterSensitiveOutput,
+  SECURITY_REFUSAL_MESSAGE,
+} from "../ai/assistant/security-filter";
+import { logAiCall } from "../lib/ai-logger";
+import { sendBowieReplyPush } from "../push-notifications";
+import {
   ASSISTANT_ACTIONS,
   isWhitelistedAction,
   validateActionParams,
@@ -210,6 +218,12 @@ router.post("/ai/assistant/message", requireUser, messageLimiter, async (req: Re
     payload: { messageLen: parsed.data.message.length },
   });
 
+  // Task #5222 — Filtro di sicurezza in streaming: trattiene una coda di
+  // caratteri e blocca l'emissione se rileva un pattern sensibile (token,
+  // credenziali, connection string, env var). Difesa in profondità: il system
+  // prompt vieta già il leak, questo filtro è il backstop lato server.
+  const securityFilter = createStreamingSecurityFilter();
+
   try {
     const result = await runAssistantAgent({
       message: parsed.data.message,
@@ -229,8 +243,39 @@ router.post("/ai/assistant/message", requireUser, messageLimiter, async (req: Re
       persona,
       onPersona: (p) => send("persona", p),
       signal: abort.signal,
-      onTextDelta: (delta) => send("delta", { text: delta }),
+      onTextDelta: (delta) => securityFilter.push(delta, (safe) => send("delta", { text: safe })),
     });
+
+    // Rilascia la coda residua del filtro e determina lo stato di blocco
+    // (controllo finale anche sul testo completo come ulteriore rete).
+    securityFilter.flush((safe) => send("delta", { text: safe }));
+    const blocked = securityFilter.isBlocked || matchesSensitive(result.text);
+
+    if (blocked) {
+      console.warn(`[ai-assistant/security] output bloccato (persona=${result.persona}, user=${user.id})`);
+      logAiCall({
+        userId: user.id,
+        provider: result.provider,
+        modelId: result.model,
+        tokensIn: 0,
+        tokensOut: 0,
+        costUsd: 0,
+        securityBlocked: true,
+        error: "security_blocked: output filter intercepted sensitive content",
+      });
+      send("done", {
+        text: SECURITY_REFUSAL_MESSAGE,
+        provider: result.provider,
+        model: result.model,
+        costUsd: result.costUsd,
+        degraded: result.degraded,
+        actionsCount: 0,
+        persona: result.persona,
+        securityBlocked: true,
+      });
+      res.end();
+      return;
+    }
 
     const { cleanText, actions } = extractActions(result.text);
     // Filtra azioni in base alla modalità:
@@ -438,6 +483,99 @@ router.post("/ai/assistant/admin-action/:id", requireUser, actionLimiter, async 
 
   if (!result.ok) { sendError(res, result.httpStatus, result.error); return; }
   res.json({ ok: true, actionId: id, summary: result.summary, data: result.data });
+});
+
+// ── Task #5222 — POST /notification-reply (Bowie Terminal) ───────────────────
+// Risposta NON in streaming pensata per la quick-reply dalla notifica Android
+// persistente. Bearer → cookie bridge fa già da auth (requireUser). La risposta
+// viene generata, filtrata (security) e rispedita come push notification.
+// Anti-abuso leggero: 1 richiesta concorrente per utente + cooldown 10s.
+const notificationReplyInFlight = new Set<string>();
+const notificationReplyCooldown = new Map<string, number>();
+const NOTIFICATION_REPLY_COOLDOWN_MS = 10_000;
+
+const NotificationReplyBody = z.object({
+  message: z.string().min(1).max(2000),
+  platform: z.enum(["android", "ios"]).optional(),
+});
+
+router.post("/ai/assistant/notification-reply", requireUser, async (req: Request, res: Response) => {
+  const parsed = NotificationReplyBody.safeParse(req.body ?? {});
+  if (!parsed.success) { sendError(res, 400, parsed.error.issues[0].message); return; }
+  const user = (req as Request & { sessionUser?: { id: string; role?: string | null } }).sessionUser!;
+
+  const now = Date.now();
+  const until = notificationReplyCooldown.get(user.id) ?? 0;
+  if (now < until) {
+    sendError(res, 429, "Aspetta qualche secondo prima di un'altra richiesta.");
+    return;
+  }
+  if (notificationReplyInFlight.has(user.id)) {
+    sendError(res, 429, "Una richiesta è già in corso.");
+    return;
+  }
+
+  const rawPlatform = parsed.data.platform ?? "android";
+
+  // Persona: Bowie è l'entry point; un intento di percorso passa a Horus.
+  // (Ares è solo lato admin/pannello, non da quick-reply notifica.)
+  const persona: AiPersonaId = classifyRoutingIntent(parsed.data.message) ? "horus" : "bowie";
+
+  if (!hasAnyAiProvider()) {
+    sendError(res, 503, AI_NO_PROVIDER_MESSAGE);
+    return;
+  }
+
+  notificationReplyInFlight.add(user.id);
+  notificationReplyCooldown.set(user.id, now + NOTIFICATION_REPLY_COOLDOWN_MS);
+
+  // Risponde subito al client (la generazione + push avvengono in background):
+  // la quick-reply dalla notifica non attende l'inferenza, riceve la risposta
+  // come nuova push notification.
+  res.json({ ok: true, accepted: true, persona });
+
+  try {
+    const result = await runAssistantAgent({
+      message: parsed.data.message,
+      platform: rawPlatform as "android" | "ios",
+      allowedActions: [],
+      customFaqs: [],
+      history: [],
+      userId: user.id,
+      persona,
+    });
+
+    // Buffer completo → filtro one-shot (non c'è streaming, nessun leak parziale).
+    const { cleanText } = extractActions(result.text);
+    const filtered = filterSensitiveOutput(cleanText);
+    if (filtered.blocked) {
+      console.warn(`[ai-assistant/notification-reply] output bloccato (persona=${result.persona}, user=${user.id})`);
+      logAiCall({
+        userId: user.id,
+        provider: result.provider,
+        modelId: result.model,
+        tokensIn: 0,
+        tokensOut: 0,
+        costUsd: 0,
+        securityBlocked: true,
+        error: "security_blocked: notification-reply output filter",
+      });
+    }
+
+    await sendBowieReplyPush(user.id, {
+      body: filtered.text,
+      persona: result.persona,
+    });
+  } catch (err) {
+    console.error("[ai-assistant/notification-reply]", err);
+    try {
+      await sendBowieReplyPush(user.id, {
+        body: "Qualcosa è andato storto, riprova dall'app.",
+      });
+    } catch { /* push best-effort */ }
+  } finally {
+    notificationReplyInFlight.delete(user.id);
+  }
 });
 
 // ── User prefs ────────────────────────────────────────────────────────────

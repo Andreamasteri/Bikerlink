@@ -16,6 +16,10 @@ export const aiCallLogs = pgTable("ai_call_logs", {
   latencyMs: integer("latency_ms"),
   costUsd: doublePrecision("cost_usd").notNull().default(0),
   degraded: boolean("degraded").notNull().default(false),
+  // Task #5222 — true quando il filtro di sicurezza ha bloccato l'output AI
+  // (tentato leak di credenziali/token/env). La risposta viene sostituita con
+  // un messaggio di rifiuto e l'attempt resta tracciato qui per audit.
+  securityBlocked: boolean("security_blocked").notNull().default(false),
   error: text("error"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (t) => [
@@ -23,6 +27,7 @@ export const aiCallLogs = pgTable("ai_call_logs", {
   index("ai_call_logs_provider_idx").on(t.provider, t.createdAt.desc()),
   index("ai_call_logs_user_id_idx").on(t.userId),
   index("ai_call_logs_degraded_idx").on(t.degraded).where(sql`degraded = true`),
+  index("ai_call_logs_security_blocked_idx").on(t.securityBlocked).where(sql`security_blocked = true`),
 ]);
 
 export type AiCallLog = typeof aiCallLogs.$inferSelect;

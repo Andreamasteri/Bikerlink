@@ -138,3 +138,4 @@
 - [Valhalla port — real vs tunnel ingress](thinkcentre-exposure-reality.md) — Valhalla ascolta SOLO 8002 (verificato); l'ingress dashboard del tunnel per valhalla.biker-link.net dialga 8003 (refused) → endpoint pubblico rotto, fix richiede dashboard CF (fuori dal repo).
 - [DragonflyDB + BullMQ undeclared keys](dragonfly-bullmq-undeclared-keys.md) — cluster_mode=emulated da solo NON basta per BullMQ; serve anche --default_lua_flags=allow-undeclared-keys o ogni Queue.add() fallisce.
 - [Old Redis retirement confirmed safe](redis-retirement-confirmed.md) — old redis container+volume gone, only fallback = tiny backup tarballs; queues empty, no lock lost; cache is ephemeral so no rollback plan needed.
+- [Bowie Terminal push-token sharing](bowie-terminal-push-token.md) — standalone bowie-terminal APK writes the SAME users.expoPushToken as the main app; last install wins push; needs per-device token table to fix.

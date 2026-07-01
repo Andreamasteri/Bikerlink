@@ -330,6 +330,42 @@ export async function sendDrivingStyleChangePushNotification(
   }
 }
 
+// Task #5222 — Bowie Terminal: rispedisce la risposta dell'AI come push
+// notification (usato dalla quick-reply della notifica Android persistente).
+// NON passa per filterUserIdsByPreference: è una risposta diretta richiesta
+// esplicitamente dall'utente nel terminale, non una notifica promozionale.
+export async function sendBowieReplyPush(
+  userId: string,
+  opts: { body: string; persona?: { id: string; name: string } },
+): Promise<number> {
+  try {
+    const [row] = await db
+      .select({ id: users.id, expoPushToken: users.expoPushToken })
+      .from(users)
+      .where(eq(users.id, userId));
+
+    if (!row?.expoPushToken || !isValidExpoPushToken(row.expoPushToken)) return 0;
+
+    const personaName = opts.persona?.name ?? "Bowie";
+    const userIdByToken = new Map([[row.expoPushToken, row.id]]);
+    await sendExpoMessages(
+      [{
+        to: row.expoPushToken,
+        title: personaName,
+        body: opts.body.slice(0, 500),
+        sound: "default" as const,
+        data: { type: "bowie_reply", persona: opts.persona?.id ?? "bowie" },
+        channelId: "bowie",
+      }],
+      userIdByToken,
+    );
+    return 1;
+  } catch (err) {
+    console.warn("[Push] sendBowieReplyPush error (non-fatal):", err);
+    return 0;
+  }
+}
+
 export async function sendPlannedRouteInvitePushNotifications(
   userIds: string[],
   opts: { routeId: string },

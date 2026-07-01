@@ -17,6 +17,7 @@ export interface LogAiCallOpts {
   latencyMs?: number | null;
   costUsd: number;
   degraded?: boolean;
+  securityBlocked?: boolean;
   error?: string | null;
 }
 
@@ -34,6 +35,7 @@ export function logAiCall(opts: LogAiCallOpts): void {
     latencyMs: opts.latencyMs ?? null,
     costUsd: opts.costUsd,
     degraded: opts.degraded ?? false,
+    securityBlocked: opts.securityBlocked ?? false,
     error: opts.error ?? null,
   }).catch((err) => {
     console.warn("[ai-logger] inserimento fallito (ignorato):", (err as Error).message);

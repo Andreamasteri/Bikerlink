@@ -19,6 +19,7 @@ module.exports = defineConfig([
       "server_dist/**",
       "node_modules/**",
       "static-build/**",
+      "bowie-terminal/**",
       ".expo/**",
       ".local/**",
       ".agents/**",

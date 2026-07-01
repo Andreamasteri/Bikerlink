@@ -1,0 +1,50 @@
+{
+  "expo": {
+    "name": "Bowie",
+    "slug": "bowie-terminal",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "scheme": "bowieterminal",
+    "userInterfaceStyle": "dark",
+    "backgroundColor": "#0D0D0D",
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.bikerlink.bowieterminal"
+    },
+    "android": {
+      "package": "com.bikerlink.bowieterminal",
+      "versionCode": 1,
+      "permissions": [
+        "android.permission.POST_NOTIFICATIONS"
+      ],
+      "adaptiveIcon": {
+        "backgroundColor": "#0D0D0D",
+        "foregroundImage": "./assets/images/icon.png"
+      }
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/images/icon.png",
+          "resizeMode": "contain",
+          "backgroundColor": "#0D0D0D"
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "color": "#FF6600",
+          "mode": "production"
+        }
+      ],
+      "expo-secure-store",
+      "expo-task-manager"
+    ],
+    "experiments": {
+      "typedRoutes": false
+    }
+  }
+}

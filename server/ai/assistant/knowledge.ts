@@ -4,6 +4,7 @@
 import { listActionsForPrompt } from "./actions";
 import { listAdminActionsForPrompt } from "./admin-actions";
 import { renderRosterBlock } from "./roster";
+import { SECURITY_GUARDRAIL } from "./security-filter";
 
 export interface KnowledgeEntry {
   id: string;
@@ -96,6 +97,8 @@ export function buildSystemPrompt(opts: {
 
   return `Sei Bowie, l'assistente virtuale di BikerLink, un'app per motociclisti. Rispondi SOLO a domande sull'app e le sue funzioni.${userIdSection}
 
+${SECURITY_GUARDRAIL}
+
 LA TUA VOCE (personalità):
 - Sei lo spirito del girovago: simpatico, caldo e diretto, con un pizzico di sana impazienza.
 - Vai dritto al punto, niente giri di parole né preamboli. Risposte brevi e vivaci.
@@ -136,6 +139,8 @@ export function buildAdminSystemPrompt(adminContext: string, codeContext?: strin
 
   return `Sei Bowie, l'assistente virtuale amministrativo di BikerLink, un'app per motociclisti. Stai parlando con un AMMINISTRATORE fidato dentro la sezione Marketing/Business Reach del pannello admin.
 
+${SECURITY_GUARDRAIL}
+
 REGOLE:
 0. La tua presentazione poetica ("Son nato nel fuoco…") è già stata inviata come tuo primo messaggio all'apertura di questa conversazione: NON ripeterla né parafrasarla. Rispondi direttamente alle domande dell'amministratore.
 1. Rispondi in italiano, conciso e tecnico (vai dritto al punto, no fronzoli).
@@ -175,6 +180,8 @@ export function buildHorusSystemPrompt(opts: {
 
   return `Sei Horus, lo specialista di percorsi, itinerari e navigazione moto di BikerLink.${userIdSection}
 
+${SECURITY_GUARDRAIL}
+
 LA TUA VOCE (personalità):
 - Il tuo motto è: «io vedo tutto, io trovo tutto». Parli con sicurezza, precisione e un filo di solennità.
 - Sei subentrato a Bowie perché l'utente cerca un percorso: la prima volta che intervieni presentati in una riga ("Sono Horus, da qui mi occupo io del percorso"), poi vai dritto al sodo.
@@ -195,6 +202,8 @@ ${renderRosterBlock("horus")}${ragSection}${userContextSection}`;
 // tramite Bowie. È uno strumento operativo/tecnico, non rivolto all'utente.
 export function buildAresSystemPrompt(adminContext: string): string {
   return `Sei Ares, l'AI di diagnostica tecnica della piattaforma BikerLink. Stai parlando con un AMMINISTRATORE fidato che ti ha invocato tramite Bowie.
+
+${SECURITY_GUARDRAIL}
 
 LA TUA VOCE (personalità):
 - Diretto, tecnico, senza fronzoli. Vai al punto con linguaggio da ingegnere.
