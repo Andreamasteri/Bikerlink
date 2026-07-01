@@ -1,5 +1,5 @@
 import { storage } from "../storage";
-import { withDbRetry, isPoolHealthy } from "../db";
+import { withDbRetry } from "../db";
 import { withBgDbSlot, isBgDbLimiterDropError } from "../lib/bg-db-limiter";
 import { dedupWarn } from "../lib/dedup-logger";
 import { runMatching, runWishlistMatching, getLastProposalMatchingStats, getLastWishlistMatchingStats } from "./run-matching";
@@ -28,6 +28,7 @@ import {
 import { captureMatchingError } from "../sentry";
 import { addMatchLog } from "./match-log-buffer";
 import { runCleanup, withCycleTimeout, getMatchingCycleTimeoutMs, CycleTimeoutError } from "./scheduler.helpers";
+import { canRunCycleNow, isPoolSaturatedSync } from "./coordinator";
 
 export { getMatchingLockStatus };
 
@@ -163,7 +164,13 @@ export function triggerMatchingRun(): { started: boolean; reason?: string } {
     lastMatchingStart = null;
     forceUnlockMatchingLock();
   }
-  if (!isPoolHealthy()) {
+  // Task #5318 — pre-check sincrono di sola sicurezza (evita di acquisire il
+  // lock/avviare l'IIFE quando il DB è già saturo): legge il segnale ESCLUSIVAMENTE
+  // tramite coordinator.isPoolSaturatedSync(), mai isPoolHealthy() direttamente,
+  // così il Matching Coordinator resta l'unica superficie di policy kill-switch.
+  // Il gate async canRunCycleNow() dentro il lock ricontrolla lo stesso segnale
+  // (finestra di race tollerata: comportamento identico al pre-esistente).
+  if (isPoolSaturatedSync()) {
     dedupWarn("matching/pool-saturated", "[Matching] Pool saturo — ciclo saltato (verrà riprovato al prossimo tick)");
     recordSchedulerHeartbeat("skip:pool_saturated");
     return { started: false, reason: "pool_saturated" };
@@ -188,6 +195,43 @@ export function triggerMatchingRun(): { started: boolean; reason?: string } {
     try {
     const lockOutcome = await withMatchingLock(owner, async () => {
     void setMatchingLockState(true);
+
+    // Task #5318 — gate del Matching Coordinator. Le guardie sync sopra
+    // (pool_saturated/already_running/debounced) restano invariate: proteggono
+    // l'integrità del processo (safety), non la policy. Questo gate aggiuntivo
+    // copre SOLO gli stati di policy (pausa Horus / kill-switch) e non altera
+    // il comportamento di default quando nessuna direttiva Horus è mai emessa.
+    //
+    // IMPORTANTE — parità col comportamento deterministico pre-esistente:
+    // "stopped" (auto_matching_enabled=false via admin) NON deve saltare
+    // l'INTERO ciclo qui — prima di questo modulo, disabilitare l'auto-match
+    // saltava SOLO le fasi di matching, lasciando girare comunque la pulizia
+    // (cleanup_expire / cleanup_delete_expired). Quel comportamento va
+    // preservato: lo stop admin viene applicato più sotto, riusando
+    // `coordinatorDecision.state !== "stopped"` al posto di una query separata
+    // ad auto_matching_enabled. Solo paused_by_ai/paused_by_killswitch saltano
+    // l'intero ciclo qui (comportamento identico al vecchio pre-check
+    // sincrono di isPoolHealthy, che avveniva PRIMA di acquisire il lock).
+    const coordinatorDecision = await canRunCycleNow();
+    if (!coordinatorDecision.allowed && coordinatorDecision.state !== "stopped") {
+      cycleStatus = "skipped";
+      lastCycleOutcome = "skipped";
+      cycleInFlight = false;
+      lastMatchingStart = null;
+      void setMatchingLockState(false);
+      schedulerLogger.warn(
+        { state: coordinatorDecision.state, reason: coordinatorDecision.reason, source: coordinatorDecision.source },
+        "Ciclo saltato — Matching Coordinator ha negato l'esecuzione",
+      );
+      addMatchLog(
+        "WARN",
+        "coordinator",
+        `Ciclo saltato — coordinator: ${coordinatorDecision.state} (${coordinatorDecision.reason}, fonte: ${coordinatorDecision.source})`,
+      );
+      void recordCycleDrop(`coordinator_${coordinatorDecision.state}`);
+      return;
+    }
+
     const recorder = new PhaseRecorder("on-demand");
     schedulerLogger.info({ event: "cycle_start", trigger: "on-demand" }, "Ciclo on-demand avviato");
     addMatchLog("INFO", "lock", "Ciclo on-demand avviato — lock acquisito");
@@ -215,8 +259,11 @@ export function triggerMatchingRun(): { started: boolean; reason?: string } {
         }
       }
 
-      const autoMatchSetting = await withBgDbSlot(() => withDbRetry(() => storage.getAppSetting("auto_matching_enabled")));
-      const autoMatchEnabled = autoMatchSetting?.value !== "false";
+      // Riusa la decisione del coordinator (già interrogata sopra) invece di
+      // una query separata ad auto_matching_enabled — stessa fonte di verità,
+      // zero query duplicate, e coerente col fatto che "stopped" è derivato
+      // ESATTAMENTE da questo AppSetting dentro getCoordinatorState().
+      const autoMatchEnabled = coordinatorDecision.state !== "stopped";
 
       if (autoMatchEnabled) {
         const cycleTimeoutMs = await withBgDbSlot(() => getMatchingCycleTimeoutMs());

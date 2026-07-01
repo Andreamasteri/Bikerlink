@@ -6,7 +6,10 @@ import { eq } from "drizzle-orm";
 import { dedupWarn } from "../../lib/dedup-logger";
 
 export interface WatchdogLogEntry {
-  kind: "auto_fix" | "proposal" | "alert" | "chat" | "report" | "signal";
+  // Task #5318 — "coordinator" audita le direttive Horus/admin sul matching
+  // coordinator (pause/resume/force_cycle, fallback transitions) — unificato
+  // in questa stessa tabella invece di una nuova, riusando retention+admin UI.
+  kind: "auto_fix" | "proposal" | "alert" | "chat" | "report" | "signal" | "coordinator";
   scope?: string | null;
   status?: "ok" | "warn" | "error" | "pending" | "accepted" | "rejected";
   summary?: string | null;

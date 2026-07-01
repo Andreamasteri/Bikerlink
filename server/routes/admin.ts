@@ -349,6 +349,7 @@ import appIntegrityRouter from './admin/app-integrity';
 import aiConsoleRouter from './admin/ai-console';
 import aiConsoleNextRouter from './admin/ai-console.next';
 import aiCoordinatorRouter from './admin/ai-coordinator';
+import matchingCoordinatorRouter from './admin/matching-coordinator';
 import aiCoordinatorGovernanceRouter from './admin/ai-coordinator-governance';
 import metricsRouter from './admin/metrics';
 // Task #2698 — AI Assistant per utenti normali (admin config/telemetria).
@@ -505,6 +506,8 @@ router.use('/', _requireAdmin, aiWatchdogRouter);
 // Task #2536 — AI Database Integrity.
 router.use('/', _requireAdmin, dbIntegrityRouter);
 router.use('/', _requireAdmin, appIntegrityRouter);
+// Task #5318 — Matching Coordinator (control plane unificato, autorità Horus).
+router.use('/', _requireAdmin, matchingCoordinatorRouter);
 router.use('/', aiConsoleRouter);
 router.use('/', aiConsoleNextRouter);
 // Task #2649 — Layer AI Coordinato (auth interno: requireConsoleRole).

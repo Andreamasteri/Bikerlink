@@ -8,6 +8,12 @@ import { z } from "zod";
 import { loadAssistantConfig } from "../ai/assistant/config";
 import { runAssistantAgent, extractActions } from "../ai/assistant/agent";
 import { classifyRoutingIntent, parseAresInvocation, type AiPersonaId } from "../ai/assistant/roster";
+import {
+  isCoordinatorControlRequest,
+  isCoordinatorStatusRequest,
+  askHorusForCoordinatorDirective,
+  getCoordinatorStatusNote,
+} from "../ai/assistant/coordinator-bridge";
 import { hasAnyAiProvider, AI_NO_PROVIDER_MESSAGE } from "../ai/moderation/provider";
 import {
   createStreamingSecurityFilter,
@@ -109,6 +115,8 @@ router.post("/ai/assistant/message", requireUser, messageLimiter, async (req: Re
     persona = "horus";
   }
 
+  let effectiveMessage = parsed.data.message;
+
   // Task #2825 — Nessun provider AI configurato: rispondi 503 con il nome delle
   // variabili mancanti così il client può mostrare il banner "Funzione AI non attivata".
   // Task #5197 — Ares usa il provider dedicato (DIAG_OLLAMA_*): se è configurato,
@@ -118,6 +126,39 @@ router.post("/ai/assistant/message", requireUser, messageLimiter, async (req: Re
   if (persona !== "ares" && !hasAnyAiProvider()) {
     sendError(res, 503, AI_NO_PROVIDER_MESSAGE);
     return;
+  }
+
+  // Task #5318 — Matching Coordinator via Bowie/chat. DEVE stare DOPO il
+  // precheck 503 sopra: il ramo di CONTROLLO ha effetti collaterali (applica
+  // una direttiva via Horus), quindi non deve mai eseguirsi se la richiesta
+  // finirebbe comunque in 503 ("azione applicata ma richiesta fallita").
+  //  - Richieste di CONTROLLO (write-intent: "metti in pausa", "forza un
+  //    ciclo ora"...) relayano a Horus, che decide E applica l'eventuale
+  //    direttiva. Horus ha autorità di scrittura reale sul coordinator, quindi
+  //    questo path è riservato ESCLUSIVAMENTE alla chat admin (isAdminMode,
+  //    già verificato user.role==='admin' sopra) — MAI alla chat utente
+  //    ordinaria, o qualsiasi utente autenticato potrebbe mettere in pausa il
+  //    matching dell'intera piattaforma scrivendo un messaggio.
+  //  - Richieste puramente INFORMATIVE ("il matching è fermo?", "come va il
+  //    matching?") sono una lettura, aperta a QUALSIASI utente: leggono lo
+  //    snapshot direttamente (getCoordinatorStatusNote), senza mai passare da
+  //    Horus/Ollama — funzionano anche se Horus/il ThinkCentre sono offline.
+  // Timeout stretto e fail-safe: in caso di errore, Bowie risponde
+  // normalmente senza la nota (nessun blocco della chat).
+  if (persona === "bowie" && isAdminMode && isCoordinatorControlRequest(parsed.data.message)) {
+    try {
+      const relay = await askHorusForCoordinatorDirective(parsed.data.message);
+      effectiveMessage = `${parsed.data.message}\n\n[Nota di sistema — Horus ha valutato la richiesta sul matching: direttiva="${relay.directive}", applicata=${relay.applied ? "sì" : "no"}, motivo="${relay.reason}". Rispondi all'utente in modo naturale su questa base, senza esporre dettagli tecnici interni.]`;
+    } catch (e) {
+      console.warn("[ai-assistant/coordinator-relay]", (e as Error).message);
+    }
+  } else if (persona === "bowie" && isCoordinatorStatusRequest(parsed.data.message)) {
+    try {
+      const statusNote = await getCoordinatorStatusNote();
+      effectiveMessage = `${parsed.data.message}\n\n${statusNote}`;
+    } catch (e) {
+      console.warn("[ai-assistant/coordinator-status]", (e as Error).message);
+    }
   }
 
   // Task #4842 — Snapshot admin sintetico + codice sorgente (GitHub) iniettati nel system prompt.
@@ -163,7 +204,7 @@ router.post("/ai/assistant/message", requireUser, messageLimiter, async (req: Re
 
   try {
     const result = await runAssistantAgent({
-      message: parsed.data.message,
+      message: effectiveMessage,
       platform: rawPlatform as "android" | "ios" | "web" | "admin",
       allowedActions,
       customFaqs,
