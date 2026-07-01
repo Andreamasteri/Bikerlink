@@ -23,8 +23,23 @@ import { streamAssistantMessage } from "@/lib/ai-assistant/sse-client";
 import { isAiKeyMissingResponse, isAiKeyMissingError, AI_KEY_MISSING_MESSAGE } from "@/lib/ai-errors";
 import { currentAssistantPlatform } from "@/hooks/useAssistantConfig";
 import { executeClientAction } from "@/lib/ai-assistant/client-actions";
+import { BOWIE_INTRO_POEM } from "@shared/bowie-greeting";
 import AssistantActionConfirmSheet from "./AssistantActionConfirmSheet";
 import type { AssistantChatMessage, AssistantProposedAction, AssistantPersona } from "@/lib/ai-assistant/types";
+
+// Task #5233 — Bolla di apertura poetica di Bowie. Sintetica (NON nello stato
+// `messages`): mostrata solo a chat vuota come messaggio di apertura, così la
+// chat in-app apre con lo stesso testo del terminale standalone. In send() viene
+// però inclusa in cima alla history inviata al backend, così il backend non
+// considera la conversazione "nuova" e non re-emette il proprio seed poetico
+// (niente doppione tra bolla client e stream).
+const BOWIE_GREETING_MESSAGE: AssistantChatMessage = {
+  id: "bowie-intro-poem",
+  role: "assistant",
+  content: BOWIE_INTRO_POEM,
+  createdAt: 0,
+  persona: { id: "bowie", name: "Bowie" },
+};
 
 interface Props {
   visible: boolean;
@@ -57,7 +72,11 @@ export default function AssistantChatSheet({ visible, onClose }: Props) {
     setInput("");
     setStreaming(true);
     const platform = (Platform.OS === "web" ? "web" : currentAssistantPlatform()) as "android" | "ios" | "web";
-    const history = messages
+    // Task #5233 — Includi la poesia di Bowie come primo turno "assistant" nella
+    // history inviata: così il backend NON la considera una conversazione nuova e
+    // NON re-emette il proprio seed poetico → niente doppione tra bolla client e
+    // stream backend. La poesia statica non è salvata nel DB lato server.
+    const history = [BOWIE_GREETING_MESSAGE, ...messages]
       .filter((m) => m.content)
       .slice(-8)
       .map((m) => ({ role: m.role, content: m.content }));
@@ -135,8 +154,15 @@ export default function AssistantChatSheet({ visible, onClose }: Props) {
     }
   }, [pendingAction, router, setLanguage]);
 
-  const data = React.useMemo(() => [...messages].reverse(), [messages]);
-  const hasMessages = messages.length > 0;
+  // Task #5233 — La bolla poetica di Bowie appare SOLO a chat vuota (nessuna
+  // cronologia nella sessione): è l'unico messaggio mostrato all'apertura. Appena
+  // l'utente scrive, la conversazione reale prende il posto e la poesia non viene
+  // più reinserita. La non-duplicazione col seed del backend è garantita in send()
+  // includendo la poesia nella history inviata (vedi sotto).
+  const data = React.useMemo(
+    () => (messages.length ? [...messages].reverse() : [BOWIE_GREETING_MESSAGE]),
+    [messages],
+  );
 
   // Task #5197 — colore distintivo per ciascuna AI nelle etichette di chat.
   const personaColor = useCallback((id: AssistantPersona["id"]): string => {
@@ -159,8 +185,7 @@ export default function AssistantChatSheet({ visible, onClose }: Props) {
           </Pressable>
         </View>
 
-        {hasMessages ? (
-          <FlatList
+        <FlatList
             data={data}
             inverted
             keyExtractor={(m) => m.id}
@@ -198,14 +223,6 @@ export default function AssistantChatSheet({ visible, onClose }: Props) {
               </View>
             )}
           />
-        ) : (
-          <View style={styles.empty}>
-            <Ionicons name="chatbubbles-outline" size={48} color={colors.textMuted ?? colors.textSecondary} />
-            <Text style={[styles.emptyText, { color: colors.textMuted ?? colors.textSecondary }]}>
-              {t("aiAssistant.emptyHint") || "Chiedi qualcosa su BikerLink: funzioni, impostazioni, percorsi…"}
-            </Text>
-          </View>
-        )}
 
         <View
           style={[
@@ -263,8 +280,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10, paddingVertical: 6, borderRadius: 14, borderWidth: 1,
     alignSelf: "flex-start", backgroundColor: "rgba(255,255,255,0.6)",
   },
-  empty: { flex: 1, alignItems: "center", justifyContent: "center", gap: 12, padding: 24 },
-  emptyText: { textAlign: "center", fontSize: 14, lineHeight: 20 },
   inputRow: {
     flexDirection: "row", gap: 8, padding: 8,
     borderTopWidth: StyleSheet.hairlineWidth, alignItems: "flex-end",

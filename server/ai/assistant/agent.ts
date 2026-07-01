@@ -27,16 +27,17 @@ import { aiConversationTurns } from "@shared/db";
 import { eq, desc } from "drizzle-orm";
 import { pruneUserMemory, MEMORY_TURNS_LIMIT } from "./memory-pruner";
 import { fetchUserLiveContext } from "./user-context";
+import { BOWIE_INTRO_POEM } from "@shared/bowie-greeting";
 
 const OLLAMA_FALLBACK_MODEL_ID = process.env.BOWIE_OLLAMA_MODEL ?? "mistral-nemo:latest";
 // Task #5197 — Horus usa un modello Ollama dedicato (stessa infra di Bowie).
 const HORUS_MODEL_ID = process.env.HORUS_OLLAMA_MODEL?.trim() || "bikerlink-routing";
 
-// Task #5210 — Presentazione poetica di Bowie: iniettata come turno "assistant"
-// seed quando la conversazione è nuova (nessuna history). NON viene salvata nel DB:
-// è statica e ricostruita a ogni prima apertura.
-const BOWIE_INTRO_POEM =
-  "Son nato nel fuoco\nSon cresciuto giocando con l'acqua e la terra.\n\nDavanti a me si son prostrati\nDei, Sovrani, Principi e servi\n\nM'ha accarezzato il vento\nSono qui al tuo servizio";
+// Task #5210/#5233 — Presentazione poetica di Bowie (BOWIE_INTRO_POEM): iniettata
+// come turno "assistant" seed quando la conversazione è nuova (nessuna history).
+// NON viene salvata nel DB: è statica e ricostruita a ogni prima apertura. Il
+// testo è centralizzato in @shared/bowie-greeting così che terminale standalone/
+// backend e chat in-app condividano la stessa fonte (import in cima al file).
 
 export interface AssistantAgentOpts {
   message: string;
