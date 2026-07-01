@@ -19,7 +19,7 @@
 
 | Variabile | Situazione precedente | Azione |
 |---|---|---|
-| `BIKERLINK_ADMIN_EMAIL` | esisteva sia come **env shared** sia come **secret** (in shell vinceva l'env); **non letta da nessun punto del codice** | Rimossa la copia **env shared**; resta il **secret** come canale unico. Il secret è a sua volta inutilizzato: l'utente può rimuoverlo dalla UI Secrets se non serve. |
+| `BIKERLINK_ADMIN_EMAIL` | esisteva sia come **env shared** sia come **secret** (in shell vinceva l'env); **non letta da nessun punto del codice** | Rimossa la copia **env shared**. Confermato con ricerca globale che il **secret** omonimo è a sua volta inutilizzato: da rimuovere manualmente dal pannello Secrets (l'agente non può cancellare secret via tool). |
 | `BIKERLINK_BACKEND_URL` | solo **env shared**, **non letta da nessun punto del codice** | Rimossa (variabile morta). |
 
 ## Classificazione delle variabili shared rimanenti
