@@ -221,6 +221,8 @@ timeoutMs = 420000
 
   [userenv.shared]
   EXPO_PUBLIC_DOMAIN = "biker-link.replit.app"
+GCE_SSH_USER = "bikerlink"
+GCE_SSH_PORT = "22"
 
   [userenv.development]
   EXPO_WEB_URL = "http://localhost:8081"

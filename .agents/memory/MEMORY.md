@@ -142,3 +142,4 @@
 - [Bowie notification quick-reply delivery](bowie-notification-reply-delivery.md) — app-killed headless reply is unreliable; use opensAppToForeground:true + getLastNotificationResponse cold-start recovery + clearLastNotificationResponse dedupe, submit inline.
 - [Env vs Secret classification](env-secret-classification.md) — EXPO_PUBLIC_* stay env (client-inlined); server-only service URLs are secrets; Redis=DragonflyDB via TC_REDIS_URL (not Upstash/REDIS_URL); viewEnvVars unfiltered secrets map is stale, use keys-filtered.
 - [Updated secret needs cold boot](updated-secret-cold-boot.md) — riaggiornare il VALORE di un secret esistente non propaga col restart workflow; serve cold boot/deploy/merge; un secret NUOVO invece entra subito.
+- [GCE VM SSH access](gce-vm-ssh-access.md) — VM Google "dragonfly" raggiungibile diretta (no jump host); paste multi-riga di chiavi private nel dialog secret puo' collassare i newline in spazi, normalizzare sempre.
