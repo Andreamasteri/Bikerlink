@@ -12,4 +12,6 @@
 
 ALTER TABLE "ai_call_logs" ADD COLUMN IF NOT EXISTS "security_blocked" boolean NOT NULL DEFAULT false;
 --> statement-breakpoint
+DROP INDEX IF EXISTS "ai_call_logs_security_blocked_idx";
+--> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "ai_call_logs_security_blocked_idx" ON "ai_call_logs" ("security_blocked") WHERE security_blocked = true;
