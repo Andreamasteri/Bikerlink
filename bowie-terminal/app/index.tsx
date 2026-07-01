@@ -49,6 +49,7 @@ import {
 } from "../constants/theme";
 import { Composer } from "../components/Composer";
 import { MessageBubble } from "../components/MessageBubble";
+import { ImageViewerModal } from "../components/ImageViewerModal";
 import { WELCOME, type Line } from "../lib/terminal-format";
 
 export default function TerminalScreen() {
@@ -63,6 +64,8 @@ export default function TerminalScreen() {
   const [streaming, setStreaming] = useState(false);
   // Task #5327 — immagine in composizione (uri locale), inviata al submit.
   const [attachedImage, setAttachedImage] = useState<string | null>(null);
+  // Task #5335 — immagine selezionata per la vista a tutto schermo.
+  const [viewerImage, setViewerImage] = useState<string | null>(null);
   // Task #5298 — schermata di blocco iOS: le app iOS non possono auto-terminarsi,
   // quindi al posto della chiusura mostriamo un overlay a tutto schermo.
   const [locked, setLocked] = useState(false);
@@ -471,7 +474,9 @@ export default function TerminalScreen() {
   const reversed = useMemo(() => [...lines].reverse(), [lines]);
 
   const renderItem = useCallback(
-    ({ item }: { item: Line }) => <MessageBubble item={item} theme={theme} streaming={streaming} />,
+    ({ item }: { item: Line }) => (
+      <MessageBubble item={item} theme={theme} streaming={streaming} onImagePress={setViewerImage} />
+    ),
     [theme, streaming],
   );
 
@@ -541,6 +546,8 @@ export default function TerminalScreen() {
         theme={theme}
         bottomInset={bottomInset}
       />
+
+      <ImageViewerModal uri={viewerImage} onClose={() => setViewerImage(null)} />
     </KeyboardAvoidingView>
   );
 }
