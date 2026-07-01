@@ -381,6 +381,33 @@ export async function sendBowieReplyPush(
   }
 }
 
+// Task #5304 — segnale push data-only (nessun banner) inviato a TUTTI i device
+// Bowie Terminal registrati per l'utente quando l'app principale BikerLink va
+// in foreground. Rende l'auto-chiusura del terminale quasi istantanea invece
+// di attendere il prossimo poll (fino a 50s). Best-effort: se non ci sono
+// token registrati o l'invio fallisce, il poll periodico resta il fallback.
+export async function sendBowieCloseSignalPush(userId: string): Promise<number> {
+  try {
+    const tokens = await getAppPushTokens([userId], "bowie");
+    if (!tokens.length) return 0;
+
+    const userIdByToken = new Map(tokens.map((t) => [t.token, t.userId]));
+    const messages = tokens.map((t) => ({
+      to: t.token,
+      data: { type: "main_app_foreground_close" },
+      sound: null,
+      channelId: "bowie",
+    }));
+    await sendExpoMessages(messages, userIdByToken, {
+      onDeviceNotRegistered: (token) => clearStalePushTokenRow(token),
+    });
+    return messages.length;
+  } catch (err) {
+    console.warn("[Push] sendBowieCloseSignalPush error (non-fatal):", err);
+    return 0;
+  }
+}
+
 export async function sendPlannedRouteInvitePushNotifications(
   userIds: string[],
   opts: { routeId: string },

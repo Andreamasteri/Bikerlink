@@ -32,6 +32,7 @@ import {
 } from "../lib/session";
 import {
   addBowieReplyPushListener,
+  addMainAppForegroundClosePushListener,
   addReplyListener,
   consumePendingReply,
   setupNotifications,
@@ -162,6 +163,18 @@ export default function TerminalScreen() {
   // Poll periodico + al resume in foreground: se l'app principale BikerLink
   // viene aperta DOPO l'avvio del terminale, su Android chiudiamo l'app, su iOS
   // (che non può auto-terminarsi) mostriamo la schermata di blocco.
+  // Task #5304 — azione di auto-chiusura condivisa: sia il poll (fallback)
+  // sia la push data-only (percorso rapido) convergono qui. Idempotente: marca
+  // lo stato come "triggered" così il poll successivo non ripete l'azione.
+  const triggerAutoClose = useCallback(() => {
+    mainAppWatchRef.current = { ...mainAppWatchRef.current, triggered: true };
+    if (Platform.OS === "android") {
+      BackHandler.exitApp();
+    } else {
+      setLocked(true);
+    }
+  }, []);
+
   const checkMainAppForeground = useCallback(async () => {
     if (AppState.currentState !== "active") return;
     const tok = tokenRef.current;
@@ -171,11 +184,7 @@ export default function TerminalScreen() {
       const result = evaluateSignal(mainAppWatchRef.current, value);
       mainAppWatchRef.current = result.state;
       if (result.shouldTrigger) {
-        if (Platform.OS === "android") {
-          BackHandler.exitApp();
-        } else {
-          setLocked(true);
-        }
+        triggerAutoClose();
       }
     } catch (e) {
       if (e instanceof SessionExpiredError) {
@@ -183,8 +192,10 @@ export default function TerminalScreen() {
       }
       // altri errori: best-effort, ritentato al prossimo tick
     }
-  }, [handleSessionExpired]);
+  }, [handleSessionExpired, triggerAutoClose]);
 
+  // Task #5304 — fallback: il poll ogni 50s resta attivo per i casi in cui la
+  // push data-only non arriva (rete assente, token non ancora registrato, ecc).
   useEffect(() => {
     if (phase !== "ready") return;
     // Prima lettura → registra baseline (nessuna azione).
@@ -265,6 +276,7 @@ export default function TerminalScreen() {
   useEffect(() => {
     let replyListener: { remove: () => void } | null = null;
     let pushListener: { remove: () => void } | null = null;
+    let closeSignalListener: { remove: () => void } | null = null;
     (async () => {
       const tok = await getToken();
       if (!tok) {
@@ -295,6 +307,10 @@ export default function TerminalScreen() {
         }
         historyRef.current.push({ role: "assistant", content: reply.text });
       });
+      // Task #5304 — percorso rapido di auto-chiusura: push data-only in
+      // arrivo dal server appena l'app principale va in foreground. Il poll
+      // (sopra) resta come fallback se la push non arriva.
+      closeSignalListener = addMainAppForegroundClosePushListener(() => triggerAutoClose());
       void initNotifications(tok);
       const pending = await consumePendingReply();
       if (pending) void submitNotificationReply(pending);
@@ -305,6 +321,7 @@ export default function TerminalScreen() {
       abortRef.current?.abort();
       replyListener?.remove();
       pushListener?.remove();
+      closeSignalListener?.remove();
       clearPendingReplyTimeout();
     };
   }, [
@@ -315,6 +332,7 @@ export default function TerminalScreen() {
     setLineText,
     startWelcome,
     submitNotificationReply,
+    triggerAutoClose,
   ]);
 
   // ---- local commands ----

@@ -3,6 +3,7 @@ import { storage } from "../../storage";
 import { updateLocationSchema } from "@shared/validators";
 import { applyFakeZones, applyPositionFuzz, fuzzedCoordsForViewer, isPositionFuzzed } from "../users";
 import { triggerProposalProfileMatchingForZavorrina } from "../../matching-engine";
+import { sendBowieCloseSignalPush } from "../../push-notifications";
 
 import { requireAuth } from "../../lib/auth-middleware";
 import { sendSuccess, sendError } from "../../lib/api-response";
@@ -88,6 +89,11 @@ router.post("/me/main-app-foreground", requireAuth, async (req: Request, res: Re
   try {
     const userId = req.session.userId!;
     await storage.updateUser(userId, { lastMainAppForegroundAt: new Date() });
+    // Task #5304 — oltre al segnale letto dal poll, spinge subito una push
+    // data-only ai device Bowie Terminal registrati: chiusura quasi istantanea
+    // invece di attendere fino a 50s. Fire-and-forget, non deve rallentare/
+    // bloccare la risposta né far fallire il segnale se la push fallisce.
+    void sendBowieCloseSignalPush(userId).catch(() => {});
     return sendSuccess(res);
   } catch (error) {
     console.error("Main-app-foreground signal error:", error);

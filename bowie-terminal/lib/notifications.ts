@@ -134,6 +134,25 @@ export function addBowieReplyPushListener(onPush: (reply: BowieReplyPush) => voi
   });
 }
 
+// Task #5304 — segnale push data-only inviato dal server quando l'app
+// principale BikerLink va in foreground. Rende l'auto-chiusura del terminale
+// quasi istantanea invece di attendere il prossimo poll (fino a 50s).
+function isMainAppForegroundClosePush(
+  notification: Notifications.Notification | null,
+): boolean {
+  if (!notification) return false;
+  const data = notification.request.content.data as { type?: string } | undefined;
+  return data?.type === "main_app_foreground_close";
+}
+
+export function addMainAppForegroundClosePushListener(onSignal: () => void): {
+  remove: () => void;
+} {
+  return Notifications.addNotificationReceivedListener((notification) => {
+    if (isMainAppForegroundClosePush(notification)) onSignal();
+  });
+}
+
 // Recupero cold-start: legge la response che ha lanciato l'app (da killata) e la
 // consuma UNA sola volta (clear), evitando di re-inviarla a ogni apertura futura.
 // Ritorna il testo della quick-reply, o null se l'app non è stata aperta da una

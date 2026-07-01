@@ -8,8 +8,10 @@ export type NotificationPrefKey = "matches" | "zoneProposals" | "chat" | "motocl
 
 export interface ExpoPushMessage {
   to: string;
-  title: string;
-  body: string;
+  // Task #5304 — opzionali per i segnali data-only (es. auto-chiusura Bowie
+  // Terminal): senza title/body Android non mostra alcun banner visibile.
+  title?: string;
+  body?: string;
   data?: Record<string, unknown>;
   sound?: "default" | null;
   badge?: number;
