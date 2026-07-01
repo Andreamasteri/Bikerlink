@@ -153,6 +153,24 @@ sed -i 's|http://package-firewall\.replit\.local/npm/|https://registry.npmjs.org
 
 Non toccare mai il lockfile della root con lo stesso comando nello stesso passaggio — sono due progetti npm indipendenti.
 
+### Pitfall 4b — `npm ci` crasha con "Exit handler never called!" (proxy Replit nel lockfile, non ERESOLVE)
+
+Se dopo il fix del Pitfall 4 (sed sulle URL) `npm ci --include=dev` fallisce comunque nella fase "Install dependencies" con `npm error Exit handler never called!` (errore generico npm, non un conflitto di peer dependency visibile), la causa è la stessa del Pitfall 4 ma **riapparsa dopo una rigenerazione del lockfile**: ogni volta che il lockfile di Bowie viene rigenerato con `npm install --package-lock-only` dentro l'ambiente Replit, npm risolve di nuovo gli URL tramite il proxy interno `package-firewall.replit.local`, che EAS non può raggiungere. Il sintomo è diverso da quello del Pitfall 4 (lì l'upload/scan si blocca, qui `npm ci` crasha subito con un errore criptico "Exit handler never called!") ma la causa e il fix sono identici — riapplicare SEMPRE il sed dopo QUALSIASI rigenerazione del lockfile, non solo la prima volta:
+```bash
+sed -i 's|http://package-firewall\.replit\.local/npm/|https://registry.npmjs.org/|g' bowie-terminal/package-lock.json
+```
+Conflitto `ERESOLVE` reale (peer dependency, es. `react`/`react-dom` tra `expo-router` e le sue dipendenze transitive `@radix-ui/*`/`vaul`/`@expo/ui`) si risolve invece con `bowie-terminal/.npmrc` contenente `legacy-peer-deps=true` (la root ce l'ha già, ma non si eredita nell'archivio EAS isolato di Bowie — va creato scoped lì).
+
+### Pitfall 4c — `babel-preset-expo` non hoistato → "Cannot find module 'babel-preset-expo'" nella fase Bundle JavaScript
+
+Se l'installazione (`npm ci`) passa ma la build fallisce dopo, nella fase "Bundle JavaScript", con `Failed to construct transformer: Error: Cannot find module 'babel-preset-expo'`, la causa è che npm ha risolto `babel-preset-expo` come dipendenza SOLO annidata sotto `node_modules/expo/node_modules/babel-preset-expo` invece di hoistarla alla radice di `node_modules/`. `babel.config.js` fa `presets: ["babel-preset-expo"]` con risoluzione Node a partire dalla root del progetto, che non trova pacchetti annidati sotto un'altra dipendenza.
+
+**Fix:** dichiarare `babel-preset-expo` come devDependency esplicita di primo livello in `bowie-terminal/package.json` (stessa versione richiesta da `expo`, verificabile in `package-lock.json`, es. `~56.0.16`), poi rigenerare il lockfile — questo forza npm a hoistarla a `node_modules/babel-preset-expo` (root). Verificabile prima di lanciare la build:
+```bash
+grep -n '"node_modules/babel-preset-expo"' bowie-terminal/package-lock.json
+```
+Deve comparire la entry a livello radice (non solo `node_modules/expo/node_modules/babel-preset-expo`).
+
 ### Pitfall 5 — `EAS_TOKEN` invece di login interattivo
 
 Bowie usa lo stesso secret `EAS_TOKEN` già presente nell'ambiente (autenticato come `andreamasteri`). Non serve un secondo account: `eas whoami` da dentro `bowie-terminal/` deve risultare autenticato senza prompt.
