@@ -46,7 +46,6 @@ export const PROBE_ENV_VARS = [
   "VALHALLA_API_KEY",
   "UFW_STATUS_URL",
   "TC_DRAGONFLY_URL",
-  "TC_REDIS_URL",
   "POSTGRES_PROBE_HOST",
   "POSTGRES_PROBE_PORT",
   "PGADMIN_URL",
@@ -287,7 +286,7 @@ export function tcpConnectOk(host: string, port: number): Promise<boolean | null
 }
 
 async function probeDragonflyOk(): Promise<boolean | null> {
-  const tcDragonflyUrl = (process.env.TC_DRAGONFLY_URL ?? process.env.TC_REDIS_URL)?.trim();
+  const tcDragonflyUrl = process.env.TC_DRAGONFLY_URL?.trim();
   // Skip probe quando TC_DRAGONFLY_URL non è configurato: DragonflyDB non è atteso.
   if (!tcDragonflyUrl) return null;
   try {

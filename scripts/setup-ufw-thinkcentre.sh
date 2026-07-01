@@ -181,7 +181,7 @@ ufw allow from "${LOCALHOST}" to any port 5432 proto tcp
 
 # ── Redis raw 6379: solo localhost (mai LAN/internet) ────────────────────────
 # Redis (DragonflyDB) sul ThinkCentre è esposto a Replit via Cloudflare Tunnel
-# (secret TC_REDIS_URL), NON più via nginx stream TLS su porta 6380/DuckDNS.
+# (secret TC_DRAGONFLY_URL), NON più via nginx stream TLS su porta 6380/DuckDNS.
 # La vecchia regola pubblica 6380 (nginx stream + bikerlink.duckdns.org) è stata
 # rimossa il 29 giugno 2026 con la dismissione di DuckDNS.
 ufw allow from "${LOCALHOST}" to any port 6379 proto tcp comment "Redis raw — solo localhost"

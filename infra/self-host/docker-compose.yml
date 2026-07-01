@@ -91,7 +91,7 @@ services:
   # Fino all'80% meno RAM rispetto a Redis (critico con Ollama + GraphHopper
   # attivi), multi-thread su tutti i core, nessuno spike di memoria durante gli
   # snapshot. Compatibile drop-in con ioredis/BullMQ/Redlock/Pub-Sub: nessuna
-  # modifica al codice applicativo, stessa porta 6379, stessa TC_REDIS_URL.
+  # modifica al codice applicativo, stessa porta 6379, stessa TC_DRAGONFLY_URL.
   #
   # --cluster_mode emulated: OBBLIGATORIO per BullMQ (usa script Lua il cui
   #   prefisso di coda è passato via ARGV, non KEYS).

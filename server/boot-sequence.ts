@@ -118,7 +118,7 @@ export async function runBootSequence(server: Server, errorHandlersReady: Promis
 
   // ── DragonflyDB TCP bridge (cloudflared access tcp) — Task #5261 ────────────────
   // Apre il path privato TCP verso il DragonflyDB del ThinkCentre se configurato
-  // (REDIS_TUNNEL_HOSTNAME). No-op se non configurato (usa TC_REDIS_URL diretto).
+  // (REDIS_TUNNEL_HOSTNAME). No-op se non configurato (usa TC_DRAGONFLY_URL diretto).
   // Non bloccante e MAI fatale: il monitor TC farà reInitRedis quando la probe
   // DragonflyDB passa, anche se il listener non è ancora pronto qui.
   try {

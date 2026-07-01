@@ -114,7 +114,7 @@ export class AiCoordinator {
     // in-process.
     let client: Redis | null = null;
     let usingRedis = false;
-    if (process.env.TC_DRAGONFLY_URL ?? process.env.TC_REDIS_URL) {
+    if (process.env.TC_DRAGONFLY_URL) {
       try {
         client = createPubSubClient();
         if (!client) throw new Error("createPubSubClient returned null");

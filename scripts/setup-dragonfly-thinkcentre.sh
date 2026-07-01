@@ -8,7 +8,7 @@
 # Ollama + GraphHopper attivi sullo stesso mini-PC), è multi-thread su tutti
 # i core, e non ha spike di memoria durante gli snapshot. È compatibile
 # drop-in con ioredis/BullMQ/Redlock/Pub-Sub: nessuna modifica al codice
-# applicativo, stessa porta 6379, stessa variabile TC_REDIS_URL.
+# applicativo, stessa porta 6379, stessa variabile TC_DRAGONFLY_URL.
 #
 # Utilizzo:
 #   sudo bash scripts/setup-dragonfly-thinkcentre.sh
@@ -157,7 +157,7 @@ print_summary() {
   echo "  Porta:           ${DRAGONFLY_PORT} (invariata rispetto a Redis)"
   echo "  Volume:          ${VOLUME_NAME}"
   echo ""
-  echo "  TC_REDIS_URL resta invariata (stesso protocollo, nessuna modifica"
+  echo "  TC_DRAGONFLY_URL resta invariata (stesso protocollo, nessuna modifica"
   echo "  al secret Replit né al codice applicativo):"
   echo "    redis://:<REDIS_PASSWORD>@<tc-host>:${DRAGONFLY_PORT}"
   echo ""

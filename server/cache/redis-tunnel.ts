@@ -18,14 +18,14 @@
 // CONFIGURAZIONE (env)
 //   REDIS_TUNNEL_HOSTNAME    hostname Access del bridge TCP (es. redis-tc.biker-link.net).
 //                            Se NON impostato → il bridge è DISATTIVO (no-op) e
-//                            l'app usa direttamente TC_REDIS_URL (comportamento legacy).
+//                            l'app usa direttamente TC_DRAGONFLY_URL.
 //   REDIS_TUNNEL_LOCAL_PORT  porta locale del listener (default 16379).
 //   CF_ACCESS_CLIENT_ID      service token id   (riusa il token già usato per gli altri servizi TC).
 //   CF_ACCESS_CLIENT_SECRET  service token secret.
 //   CLOUDFLARED_BIN          path del binario cloudflared (default: ./bin/cloudflared, poi "cloudflared" nel PATH).
 //
-// Con il bridge attivo, TC_REDIS_URL DEVE puntare al listener locale in chiaro:
-//   TC_REDIS_URL=redis://:<password>@127.0.0.1:16379
+// Con il bridge attivo, TC_DRAGONFLY_URL DEVE puntare al listener locale in chiaro:
+//   TC_DRAGONFLY_URL=redis://:<password>@127.0.0.1:16379
 // (niente `rediss://`: il TLS è gestito da cloudflared verso l'edge; il salto
 //  localhost→cloudflared è in chiaro ma resta dentro il container).
 //
@@ -183,7 +183,7 @@ export async function startRedisTunnel(waitMs = 8_000): Promise<boolean> {
 
   const hostname = process.env.REDIS_TUNNEL_HOSTNAME?.trim();
   if (!hostname) {
-    console.log("[redis-tunnel] REDIS_TUNNEL_HOSTNAME non impostato — bridge disattivo (uso TC_REDIS_URL diretto)");
+    console.log("[redis-tunnel] REDIS_TUNNEL_HOSTNAME non impostato — bridge disattivo (uso TC_DRAGONFLY_URL diretto)");
     return false;
   }
   if (!process.env.CF_ACCESS_CLIENT_ID || !process.env.CF_ACCESS_CLIENT_SECRET) {

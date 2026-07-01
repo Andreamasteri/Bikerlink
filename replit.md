@@ -451,10 +451,10 @@ Dopo la scheda, l'agente chiede: **"Hai preferenze su come risolvere, o procedo 
 
 ## DragonflyDB (Redis-compatible) — Lock Distribuito + Cache + Code BullMQ (Task #2517)
 
-Il matching engine usa un **lock distribuito** (Redlock) per evitare cicli sovrapposti tra istanze multiple, una **cache breve** (TTL 60–120s) per tag e candidati per zona, e **code BullMQ** persistenti per i job pesanti. Tutto è **opzionale**: se non è configurata la connessione DragonflyDB (`TC_DRAGONFLY_URL`, con fallback legacy `TC_REDIS_URL`), il backend ricade automaticamente su lock in-memory + cache assente (modalità single-instance) con un warning nei log.
+Il matching engine usa un **lock distribuito** (Redlock) per evitare cicli sovrapposti tra istanze multiple, una **cache breve** (TTL 60–120s) per tag e candidati per zona, e **code BullMQ** persistenti per i job pesanti. Tutto è **opzionale**: se non è configurata la connessione DragonflyDB (`TC_DRAGONFLY_URL`), il backend ricade automaticamente su lock in-memory + cache assente (modalità single-instance) con un warning nei log.
 
 ### Configurazione
-- Secret `TC_DRAGONFLY_URL` (Replit Secrets). Formato: `redis://user:pass@host:port` oppure `rediss://...` per TLS (DragonflyDB parla il protocollo Redis, quindi lo schema URL resta `redis://`/`rediss://`). Il vecchio nome `TC_REDIS_URL` è ancora letto come fallback (dual-read `TC_DRAGONFLY_URL ?? TC_REDIS_URL`), così la migrazione della secret non richiede downtime.
+- Secret `TC_DRAGONFLY_URL` (Replit Secrets). Formato: `redis://user:pass@host:port` oppure `rediss://...` per TLS (DragonflyDB parla il protocollo Redis, quindi lo schema URL resta `redis://`/`rediss://`). Il vecchio nome `TC_REDIS_URL` è stato **ritirato** (Task #5300): il dual-read di fallback è stato rimosso, si legge solo `TC_DRAGONFLY_URL`.
 - **Provider: DragonflyDB self-hosted sul ThinkCentre (Task #5244).** Il vecchio Redis (`redis:7-alpine`) è stato **sostituito da DragonflyDB**, drop-in compatibile col protocollo Redis; il backend lo raggiunge via **Cloudflare Tunnel** (non più DuckDNS né Upstash). Il precedente circuit breaker quota Upstash è stato rimosso. Se il ThinkCentre è spento, il backend degrada in fallback in-memory single-instance.
 - Senza la secret: `getRedis()` ritorna `null`, `withMatchingLock` usa fallback in-memory, BullMQ è disattivato, Bull Board risponde 503.
 

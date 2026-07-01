@@ -82,7 +82,7 @@
 
 > **⚠️ Stato attuale: DragonflyDB self-hosted (Task #5244).** Redis è stato
 > **sostituito da DragonflyDB** (drop-in Redis-compatible) che gira sul ThinkCentre
-> ed è raggiunto dal backend tramite la secret **`TC_REDIS_URL`** (esposizione via
+> ed è raggiunto dal backend tramite la secret **`TC_DRAGONFLY_URL`** (esposizione via
 > **Cloudflare Tunnel**, non più DuckDNS). L'app **non usa più Upstash** né il
 > vecchio container `redis:7-alpine`. Tutta la sezione che segue (container
 > `redis:7-alpine`, porta 6380, nginx stream TLS su DuckDNS, rotazione password)

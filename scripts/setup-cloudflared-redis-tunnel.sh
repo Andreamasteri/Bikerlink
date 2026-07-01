@@ -17,7 +17,7 @@
 # Dal lato Replit, il bridge è server/cache/redis-tunnel.ts: esegue
 #   cloudflared access tcp --hostname <REDIS_HOSTNAME> --url 127.0.0.1:16379
 # e si autentica all'edge con CF_ACCESS_CLIENT_ID/SECRET. Dopodiché:
-#   TC_REDIS_URL=redis://:<password>@127.0.0.1:16379   (in chiaro su localhost)
+#   TC_DRAGONFLY_URL=redis://:<password>@127.0.0.1:16379   (in chiaro su localhost)
 #   REDIS_PROBE_HOST=127.0.0.1   REDIS_PROBE_PORT=16379
 #
 # Requisiti:
@@ -169,9 +169,9 @@ echo ""
 success "=== Path Cloudflare Redis TCP configurato ==="
 echo ""
 echo "  Imposta i secret Replit (Tools › Secrets) — il <password> è la stessa già"
-echo "  in uso nel TC_REDIS_URL attuale (DragonflyDB --requirepass):"
+echo "  in uso nel TC_DRAGONFLY_URL attuale (DragonflyDB --requirepass):"
 echo ""
-echo "    TC_REDIS_URL      = redis://:<password>@127.0.0.1:16379"
+echo "    TC_DRAGONFLY_URL      = redis://:<password>@127.0.0.1:16379"
 echo "    REDIS_TUNNEL_HOSTNAME = ${REDIS_HOSTNAME}"
 echo "    REDIS_PROBE_HOST  = 127.0.0.1"
 echo "    REDIS_PROBE_PORT  = 16379"

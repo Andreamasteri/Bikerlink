@@ -22,10 +22,23 @@ Full audit lives in `docs/env-secrets-audit.md`. Durable rules:
 ## Redis is DragonflyDB now (naming trap in docs)
 
 The app's Redis-compatible store is **DragonflyDB self-hosted on the ThinkCentre**,
-reached via secret **`TC_REDIS_URL`** over Cloudflare Tunnel. It is **NOT** Upstash
+reached via secret **`TC_DRAGONFLY_URL`** over Cloudflare Tunnel. It is **NOT** Upstash
 and **NOT** `REDIS_URL`. Old docs (`replit.md`, `docs/thinkcentre-server-setup.md`)
 still claimed "Upstash / REDIS_URL / bikerlink.duckdns.org:6380" — all three stale;
 corrected. `REDIS_PROBE_URL` path stays `/probe/redis` only for compatibility.
+The legacy name `TC_REDIS_URL` is **retired**: the `?? process.env.TC_REDIS_URL`
+dual-read fallback was removed from every call site — the app reads **only**
+`TC_DRAGONFLY_URL`.
+
+## deleteEnvVars cannot delete a global SECRET
+
+`deleteEnvVars({keys:[...]})` operates on **env-scoped** vars (default
+`environment:"shared"`). Against a global **secret** it returns a success payload
+(`{environment:"shared", keys:[...]}`) but the secret **still exists** on the next
+keys-filtered `viewEnvVars` read — the call was a no-op on a non-existent shared
+env twin. The agent **cannot** delete a global secret; ask the user to remove it
+from the Secrets tab. **Why:** secrets are global, not environment-scoped, so an
+environment-targeted delete never touches them.
 
 ## viewEnvVars tooling gotcha
 

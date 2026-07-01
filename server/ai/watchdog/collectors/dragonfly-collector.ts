@@ -17,7 +17,7 @@ let hadSuccessfulConnection = false;
 
 export async function collectDragonfly(): Promise<Signal[]> {
   const signals: Signal[] = [];
-  const url = process.env.TC_DRAGONFLY_URL ?? process.env.TC_REDIS_URL;
+  const url = process.env.TC_DRAGONFLY_URL;
   if (!url) {
     signals.push({
       source: "dragonfly", metric: "dragonfly.absent", severity: "info",

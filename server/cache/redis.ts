@@ -4,9 +4,8 @@ import Redis, { type RedisOptions } from "ioredis";
  * Centralised ioredis client + helpers.
  *
  * Reads TC_DRAGONFLY_URL (ThinkCentre self-hosted DragonflyDB, drop-in
- * compatible with the ioredis client; legacy TC_REDIS_URL still honoured as
- * fallback). When not set, or when the TC is offline, the module operates in
- * fallback (in-memory) mode.
+ * compatible with the ioredis client). When not set, or when the TC is offline,
+ * the module operates in fallback (in-memory) mode.
  *
  * All call sites must tolerate `getRedis()` returning null and fall back to
  * in-memory behaviour. A periodic reconnect is NOT built into ioredis here —
@@ -39,7 +38,7 @@ const state: ClientState = {
 let initAttempted = false;
 
 function getRedisUrl(): string | undefined {
-  return process.env.TC_DRAGONFLY_URL ?? process.env.TC_REDIS_URL;
+  return process.env.TC_DRAGONFLY_URL;
 }
 
 function buildOptions(url: string): RedisOptions {
@@ -198,7 +197,7 @@ export function getRedisStatus() {
   if (!initAttempted) init();
   const url = getRedisUrl();
   const source: "thinkcentre" | "none" =
-    process.env.TC_DRAGONFLY_URL ?? process.env.TC_REDIS_URL ? "thinkcentre" : "none";
+    process.env.TC_DRAGONFLY_URL ? "thinkcentre" : "none";
   return {
     configured: !!url,
     available: state.available,

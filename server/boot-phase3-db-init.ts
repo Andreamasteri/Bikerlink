@@ -379,7 +379,7 @@ export async function runBootPhase3DbInit(): Promise<void> {
   }
 
   try {
-    const tcDragonflyUrl = process.env.TC_DRAGONFLY_URL ?? process.env.TC_REDIS_URL;
+    const tcDragonflyUrl = process.env.TC_DRAGONFLY_URL;
     if (!tcDragonflyUrl) {
       console.log("[boot] DragonflyDB: TC_DRAGONFLY_URL non impostato — fallback in-memory attivo");
     } else {
