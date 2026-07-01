@@ -36,14 +36,15 @@ function extractReplyText(
   return text ? text : null;
 }
 
-// Crea il canale Android, la categoria con input di testo e richiede i permessi.
-// Ritorna l'Expo push token (o null se non disponibile).
-// Task #5309 — su iOS non serve il permesso "alert" per ricevere la push
-// data-only di auto-chiusura: bastano registerForRemoteNotifications (che
-// getExpoPushTokenAsync fa internamente, anche a permesso negato/non chiesto)
-// e UIBackgroundModes=remote-notification in app.json. Per questo iOS salta
-// canale/categoria/richiesta permessi (tutta roba per la quick-reply, non
-// ancora supportata sul terminale iOS) e va dritto a getExpoPushTokenAsync.
+// Crea il canale Android (no-op su iOS), la categoria con input di testo
+// (Android + iOS — su iOS diventa una UNTextInputNotificationAction, che è
+// l'equivalente nativo e appare anche dalla notifica sulla lock screen) e
+// richiede i permessi. Ritorna l'Expo push token (o null se non disponibile).
+// Task #5311 — prima solo Android aveva categoria/permessi: su iOS bastava
+// registerForRemoteNotifications (via getExpoPushTokenAsync) per la push
+// data-only di auto-chiusura (Task #5309). Ora anche iOS chiede il permesso
+// "alert" e registra la stessa categoria REPLY, perché senza permesso
+// notifiche visibili l'azione di quick-reply non comparirebbe mai in UI.
 export async function setupNotifications(): Promise<string | null> {
   if (Platform.OS !== "android" && Platform.OS !== "ios") return null;
 
@@ -53,21 +54,22 @@ export async function setupNotifications(): Promise<string | null> {
       importance: Notifications.AndroidImportance.LOW,
       showBadge: false,
     });
-
-    await Notifications.setNotificationCategoryAsync(CATEGORY_ID, [
-      {
-        identifier: REPLY_ACTION_ID,
-        buttonTitle: "Scrivi a Bowie",
-        textInput: { submitButtonTitle: "Invia", placeholder: "Chiedi a Bowie..." },
-        // Task #5272 — true: l'app si apre sempre all'invio della reply, così il
-        // testo raggiunge la JS in modo garantito (nessun input perso ad app killata).
-        options: { opensAppToForeground: true },
-      },
-    ]);
-
-    const perm = await Notifications.requestPermissionsAsync();
-    if (!perm.granted) return null;
   }
+
+  await Notifications.setNotificationCategoryAsync(CATEGORY_ID, [
+    {
+      identifier: REPLY_ACTION_ID,
+      buttonTitle: "Scrivi a Bowie",
+      textInput: { submitButtonTitle: "Invia", placeholder: "Chiedi a Bowie..." },
+      // Task #5272 — true: l'app si apre sempre all'invio della reply, così il
+      // testo raggiunge la JS in modo garantito (nessun input perso ad app killata).
+      // Su iOS opensAppToForeground è l'equivalente di foreground:true.
+      options: { opensAppToForeground: true },
+    },
+  ]);
+
+  const perm = await Notifications.requestPermissionsAsync();
+  if (!perm.granted) return null;
 
   try {
     const projectId =
@@ -83,8 +85,12 @@ export async function setupNotifications(): Promise<string | null> {
 }
 
 // Notifica ongoing "in ascolto" con la quick-reply inline.
+// Task #5311 — abilitata anche su iOS: `sticky`/`autoDismiss` sono ignorati
+// dall'OS (iOS non ha l'equivalente della notifica persistente da foreground
+// service Android), ma la notifica compare comunque su lock screen/Notification
+// Center con l'azione REPLY della categoria, che è ciò che serve alla quick-reply.
 export async function showPersistentNotification(): Promise<void> {
-  if (Platform.OS !== "android") return;
+  if (Platform.OS !== "android" && Platform.OS !== "ios") return;
   await Notifications.scheduleNotificationAsync({
     identifier: ONGOING_ID,
     content: {
@@ -165,8 +171,12 @@ export function addMainAppForegroundClosePushListener(onSignal: () => void): {
 // consuma UNA sola volta (clear), evitando di re-inviarla a ogni apertura futura.
 // Ritorna il testo della quick-reply, o null se l'app non è stata aperta da una
 // reply. Sincrono lato native ma esposto async per comodità del chiamante.
+// Task #5311 — abilitato anche su iOS: getLastNotificationResponse/
+// clearLastNotificationResponse sono API cross-platform, ma il cold-start su
+// iOS si comporta diversamente da Android (l'OS può richiedere più tempo a
+// consegnare la response che ha lanciato l'app) — va verificato su device reale.
 export async function consumePendingReply(): Promise<string | null> {
-  if (Platform.OS !== "android") return null;
+  if (Platform.OS !== "android" && Platform.OS !== "ios") return null;
   try {
     const response = Notifications.getLastNotificationResponse();
     const text = extractReplyText(response);

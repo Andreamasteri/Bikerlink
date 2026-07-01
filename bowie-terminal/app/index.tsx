@@ -211,9 +211,11 @@ export default function TerminalScreen() {
   }, [phase, checkMainAppForeground]);
 
   // ---- notifications (best-effort) ----
-  // Task #5309 — anche iOS registra un push token: gli serve solo per ricevere
-  // il segnale silenzioso di auto-chiusura (nessuna UI di notifica su iOS,
-  // showPersistentNotification/quick-reply restano Android-only internamente).
+  // Task #5309 — iOS registra un push token anche per ricevere il segnale
+  // silenzioso di auto-chiusura.
+  // Task #5311 — ora iOS mostra anche la notifica persistente con la
+  // quick-reply (stessa categoria REPLY di Android): non è più solo per
+  // l'auto-chiusura, l'utente può rispondere a Bowie dalla lock notification.
   const initNotifications = useCallback(async (token: string) => {
     if (Platform.OS !== "android" && Platform.OS !== "ios") return;
     try {
