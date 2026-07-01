@@ -1,5 +1,6 @@
 - [Sentry RN integrations loop](sentry-rn-integrations-loop.md) — @sentry/react-native 8.x default integrations causano loop React Navigation (setState in commitLayoutEffects); usa sempre integrations:[].
 - [DragonflyDB flag compatibility](dragonfly-flag-compat.md) — Redis-only flags (--maxmemory-policy, --save, --aof_rewrite_min_size) crashano Dragonfly; usa --snapshot_cron e --maxmemory ≥1gb (4 IO thread × 256MB).
+- [Redis → Dragonfly rename verification](redis-dragonfly-rename.md) — migrazione 0129 rinomina segnali/health/settings da "redis" a "dragonfly"; bloccata da prefisso duplicato 0128 (Task #5297); fixato rinominando push_tokens in 0130.
 - [ThinkCentre DragonflyDB network path](tc-dragonfly-network-path.md) — DragonflyDB NON va in tunnel Cloudflare come hostname HTTP; nessun path TCP Cloudflare ancora costruito; nginx+DuckDNS:6380 funziona ma è deprecato, non usarlo per TC_DRAGONFLY_URL.
 - [FloatingWidget Android hitbox — Reanimated vs RN Animated](floating-widget-android-hitbox.md) — useSharedValue+useAnimatedStyle (Reanimated) NON aggiorna la hitbox touch su Android; usare RN Animated.Value con transform.
 - [RootLayout InteractionManager boot guard](rootlayout-interactionmanager-guard.md) — qualsiasi mount di NormalRootLayout DEVE passare per InteractionManager.runAfterInteractions; mount immediato → loop useLayoutEffect/setOptions di React Navigation. Fix in app/_layout.tsx con showNormalLayout state.
@@ -142,7 +143,13 @@
 - [Bowie notification quick-reply delivery](bowie-notification-reply-delivery.md) — app-killed headless reply is unreliable; use opensAppToForeground:true + getLastNotificationResponse cold-start recovery + clearLastNotificationResponse dedupe; submit via notification-reply, not inline SSE.
 - [Env vs Secret classification](env-secret-classification.md) — EXPO_PUBLIC_* stay env (client-inlined); server-only service URLs are secrets; Redis=DragonflyDB via TC_REDIS_URL (not Upstash/REDIS_URL); viewEnvVars unfiltered secrets map is stale, use keys-filtered.
 - [Updated secret needs cold boot](updated-secret-cold-boot.md) — riaggiornare il VALORE di un secret esistente non propaga col restart workflow; serve cold boot/deploy/merge; un secret NUOVO invece entra subito.
+<<<<<<< HEAD
 - [GCE VM SSH access](gce-vm-ssh-access.md) — VM Google "dragonfly" raggiungibile diretta (no jump host); paste multi-riga di chiavi private nel dialog secret puo' collassare i newline in spazi, normalizzare sempre.
 - [Dual-read env gate audit](dual-read-env-gate-audit.md) — quando aggiungi un fallback NEW ?? OLD per un secret rinominato, controlla OGNI `if (process.env.OLD)` diretto, non solo il wrapper URL; un gate raro (pub/sub coordinator) può restare sul vecchio nome e fallire in silenzio.
 - [Bowie per-device push delivery](bowie-per-device-push.md) — sendBowieReplyPush(deviceId) delivers to one device (bowie_terminal_tokens) vs broadcast fallback; revoke must also purge pushTokens; client now wired end-to-end (fix #5291).
 - [Secret verification blocked by unrelated boot crash](secret-verify-boot-crash.md) — dopo aver aggiunto un secret nuovo, se il boot crasha PRIMA della fase che lo consuma (es. migration-prefix-guard fatal) va risolto il blocco (anche se ignoto) per poter confermare il secret funzionante.
+=======
+- [Custom migration runner is boot-gated, not publish-diffed](custom-migration-runner-boot-gate.md) — migrations/*.sql run via server/migrate.ts on server boot (not Replit's schema-diff-on-publish); one bad duplicate-prefix file blocks the ENTIRE pending batch (dev AND prod) until fixed.
+- [GCE VM SSH access](gce-vm-ssh-access.md) — VM Google "dragonfly" raggiungibile diretta (no jump host); paste multi-riga di chiavi private nel dialog secret puo' collassare i newline in spazi, normalizzare sempre.
+- [Dual-read env gate audit](dual-read-env-gate-audit.md) — quando aggiungi un fallback NEW ?? OLD per un secret rinominato, controlla OGNI `if (process.env.OLD)` diretto, non solo il wrapper URL; un gate raro (pub/sub coordinator) può restare sul vecchio nome e fallire in silenzio.
+>>>>>>> ca4a9360 (Task #5297: Confirm live monitoring data renames cleanly to DragonflyDB)
