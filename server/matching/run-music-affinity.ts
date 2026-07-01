@@ -9,6 +9,7 @@ import {
   appSettings,
 } from "@shared/db";
 import { findSimilar } from "../embeddings";
+import { withBgDbSlot } from "../lib/bg-db-limiter";
 import { loadMatchPreferencesMap, bothPrefsEnabled, loadMatchingDisabledSet, neitherMatchingDisabled } from "./filters";
 import { tagOverlap, loadMatchThresholds } from "./scoring";
 import { protectedNicknamesSqlArray } from "./protection-filter";
@@ -220,10 +221,18 @@ async function loadMusicMatchingCap(): Promise<number> {
 }
 
 export async function runMusicAffinityMatching(): Promise<number> {
+  // Pool budget: l'intero job gira dentro UNO slot del budget bg per la sua
+  // intera durata (non solo il setup), così al massimo BG_DB_MAX_CONCURRENCY job
+  // bg competono per il pool. withBgDbSlot è rientrante (AsyncLocalStorage):
+  // findSimilar (withBgDbConnection) nel loop non riacquisisce lo slot.
+  return withBgDbSlot(() => runMusicAffinityMatchingInner());
+}
+
+async function runMusicAffinityMatchingInner(): Promise<number> {
   try {
-    // Pool budget (Task #5323): queste letture di setup venivano eseguite con
-    // Promise.all, aprendo fino a 9 connessioni del pool simultaneamente (burst
-    // non budgettato). Con pool max=10 un singolo run saturava quasi il pool e
+    // Pool budget: queste letture di setup venivano eseguite con Promise.all,
+    // aprendo fino a 9 connessioni del pool simultaneamente (burst non
+    // budgettato). Con pool max=10 un singolo run saturava quasi il pool e
     // affamava il traffico utente (picco di "waiting"). Eseguite in sequenza
     // usano 1 connessione alla volta; la latenza extra è irrilevante per un job bg.
     const allUserIds = await loadMusicEmbeddingUserIds();

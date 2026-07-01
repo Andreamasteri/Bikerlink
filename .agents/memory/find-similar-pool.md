@@ -23,8 +23,15 @@ return await withBgDbSlot(async () => {
 - Con lo slot rilasciato dopo il connect, N chiamate concorrenti tengono N connessioni reali senza budget → saturano le 10 conn del pool → API in connection timeout → freeze
 - Sintomo prod: **"pool saturo ma 0 query attive"** — connessioni estratte e tenute mentre il thread elabora i risultati / tra BEGIN e query
 
-## Anti-deadlock
-NON avvolgere i chiamanti di `findSimilar` in `withBgDbSlot`. Annidare withBgDbSlot (caller + interno) può andare in deadlock: se 3 slot esterni sono presi, l'acquire interno resta in coda all'infinito (limiter max=3). I matcher attuali chiamano findSimilar DIRETTAMENTE (verificato in scheduler.cycle.ts safePhases + run-*-affinity.ts) → sicuro tenere il wrap dentro findSimilar.
+## Annidamento — ora sicuro (re-entrant, Task #5323)
+withBgDbSlot/withBgDbConnection sono RIENTRANTI via AsyncLocalStorage in
+bg-db-limiter.ts: un chiamante avvolto in withBgDbSlot che poi chiama findSimilar
+(withBgDbConnection) NON riacquisisce lo slot (riusa quello esterno) → niente
+deadlock, un solo slot per job. I matcher di affinità (run-*-affinity.ts) sono ora
+avvolti interamente in withBgDbSlot per budgettare l'intera durata del job, e
+findSimilar nel loop resta corretto grazie alla re-entrancy. **Obsoleta la vecchia
+regola "non avvolgere i chiamanti di findSimilar".** L'annidato prende comunque la
+sua PoolClient, ma non un secondo slot del budget.
 
 ## Come rilevare la prossima volta
 - `pool-collector.ts` lancia `probePgStatActivity()` via `pg.Client` diretta al tick 5+ con `waiting > 0` → log `[pool-collector/activity]`. Esclude `state='idle'` → 0 righe = connessioni estratte ma idle (tenute senza query attiva), non un DB lento

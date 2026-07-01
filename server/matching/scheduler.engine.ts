@@ -1,6 +1,6 @@
 import { storage } from "../storage";
 import { withDbRetry } from "../db";
-import { withBgDbSlot } from "../lib/bg-db-limiter";
+import { withBgDbSlot, isBgDbLimiterDropError } from "../lib/bg-db-limiter";
 import { dedupWarn } from "../lib/dedup-logger";
 import { bootJobQueue } from "../lib/boot-job-queue";
 import { runMusicEmbeddingsBackfill } from "./jobs/backfill-music-embeddings";
@@ -14,7 +14,7 @@ import { aggregateTelemetryProfiles } from "../jobs/aggregate-telemetry-profiles
 import { runCleanup, pruneStaleProposalProfileMatches, pruneOldZoneNotifications, stopFakeZavorrineRotation, lastUserMatchingAt, withCycleTimeout, getMatchingCycleTimeoutMs, CycleTimeoutError } from "./scheduler.helpers";
 import { recomputeAllUserMatchProfiles } from "./recompute-profiles";
 import { addMatchLog } from "./match-log-buffer";
-import { recordCycleError } from "./metrics";
+import { recordCycleError, recordCycleDrop } from "./metrics";
 import { triggerMatchingRun } from "./scheduler.cycle";
 
 const _engineTimers: ReturnType<typeof setInterval>[] = [];
@@ -230,6 +230,10 @@ export function startMatchingEngine(): void {
         console.warn(`[Matching] BioAffinity ciclo interrotto per timeout dopo ${err.elapsedMs}ms (limite ${timeoutMs}ms)`);
         addMatchLog("WARN", "bio_affinity", `BioAffinity interrotto per timeout dopo ${err.elapsedMs}ms (limite ${timeoutMs}ms)`);
         void recordCycleError("bio_affinity_timeout");
+      } else if (isBgDbLimiterDropError(err)) {
+        console.warn("[Matching] BioAffinity posticipato — bg-db-limiter attivo (pool sotto pressione), riparte al prossimo tick");
+        addMatchLog("WARN", "bio_affinity", `BioAffinity posticipato — DB managed sotto pressione, riparte al prossimo tick: ${err instanceof Error ? err.message : String(err)}`);
+        void recordCycleDrop("bio_affinity");
       } else {
         console.error("[Matching] BioAffinity ciclo errore:", err);
       }
@@ -264,6 +268,10 @@ export function startMatchingEngine(): void {
         console.warn(`[Matching] TelemetryAffinity "${err.cycleName}" interrotto per timeout dopo ${err.elapsedMs}ms (limite ${timeoutMs}ms)`);
         addMatchLog("WARN", err.cycleName, `Fase "${err.cycleName}" interrotta per timeout dopo ${err.elapsedMs}ms (limite ${timeoutMs}ms)`);
         void recordCycleError(`${err.cycleName}_timeout`);
+      } else if (isBgDbLimiterDropError(err)) {
+        console.warn("[Matching] TelemetryAffinity posticipato — bg-db-limiter attivo (pool sotto pressione), riparte al prossimo tick");
+        addMatchLog("WARN", "telemetry_affinity", `TelemetryAffinity posticipato — DB managed sotto pressione, riparte al prossimo tick: ${err instanceof Error ? err.message : String(err)}`);
+        void recordCycleDrop("telemetry_affinity");
       } else {
         console.error("[Matching] TelemetryAffinity ciclo errore:", err);
         addMatchLog("ERROR", "telemetry_affinity", `Errore TelemetryAffinity: ${err instanceof Error ? err.message : String(err)}`);

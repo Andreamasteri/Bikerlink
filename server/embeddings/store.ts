@@ -495,8 +495,10 @@ export async function findSimilar(
   // SUBITO dopo il connect, lasciando la query a trattenere una connessione
   // FUORI dal budget → un burst di chiamate concorrenti satura le 10 connessioni
   // del pool e affama il traffico utente (sintomo prod: "pool saturo ma 0 query
-  // attive", connessioni estratte e tenute mentre il thread elabora). NON
-  // avvolgere i chiamanti in withBgDbSlot: l'annidamento può andare in deadlock.
+  // attive", connessioni estratte e tenute mentre il thread elabora). È SICURO
+  // avvolgere i chiamanti in withBgDbSlot: i wrapper sono rientranti
+  // (AsyncLocalStorage), quindi l'annidamento riusa lo slot esterno invece di
+  // riacquisirlo (nessun deadlock) — così l'intero job matcher gira in UNO slot.
   return await withBgDbConnection(async (client) => {
   try {
     await warnIfHnswIndexMissing(client);

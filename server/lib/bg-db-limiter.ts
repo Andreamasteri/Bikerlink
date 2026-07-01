@@ -28,6 +28,7 @@
 // cicli interni con un minimo di parallelismo senza mai poter saturare il pool
 // da soli.
 
+import { AsyncLocalStorage } from "node:async_hooks";
 import { pool } from "../db";
 
 const BG_DB_MAX_CONCURRENCY = 3;
@@ -126,6 +127,21 @@ let droppedOverflowTotal = 0;
 let droppedTimeoutTotal = 0;
 const queue: Waiter[] = [];
 
+// ─── Rientranza (AsyncLocalStorage) ──────────────────────────────────────────
+// Un job bg può voler avvolgere la sua INTERA durata in withBgDbSlot e, al suo
+// interno, chiamare findSimilar (withBgDbConnection) o altri helper budgettati.
+// Senza rientranza questo annidamento andrebbe in deadlock: il secondo acquire()
+// attenderebbe uno slot mentre il primo lo tiene occupato per tutta la durata di
+// fn. Con questo contesto async i wrapper annidati NELLO STESSO contesto NON
+// riacquisiscono lo slot: quello esterno copre l'intero job. Le chiamate
+// annidate a withBgDbConnection continuano ad acquisire la loro PoolClient dal
+// pool, ma senza consumare un secondo slot del budget.
+const bgSlotContext = new AsyncLocalStorage<true>();
+
+function isHoldingBgSlot(): boolean {
+  return bgSlotContext.getStore() === true;
+}
+
 function acquire(critical?: boolean): Promise<void> {
   // Fix 2: kill-switch adattivo — rifiuta i job non critici quando il DB è lento.
   // I job critici (es. health check) bypassano il kill-switch con { critical: true }.
@@ -199,9 +215,14 @@ function release(): void {
  *                       Usare solo per job essenziali alla salute del sistema.
  */
 export async function withBgDbSlot<T>(fn: () => Promise<T>, opts?: { critical?: boolean }): Promise<T> {
+  // Rientrante: se il contesto async corrente tiene già uno slot, non
+  // riacquisire (eviterebbe un deadlock) — riusa lo slot esterno.
+  if (isHoldingBgSlot()) {
+    return await fn();
+  }
   await acquire(opts?.critical);
   try {
-    return await fn();
+    return await bgSlotContext.run(true, fn);
   } finally {
     release();
   }
@@ -221,8 +242,10 @@ export async function withBgDbSlot<T>(fn: () => Promise<T>, opts?: { critical?: 
  * Postgres, quindi questo wrapper è sicuro anche per operazioni di pulizia.
  *
  * NON fare `client.release()` dentro `fn`: il release è gestito da questo
- * wrapper. NON annidare `withBgDbConnection` o `withBgDbSlot` dentro `fn`:
- * l'annidamento può causare deadlock sul semaforo.
+ * wrapper. È SICURO annidare `withBgDbConnection` o `withBgDbSlot` dentro `fn`:
+ * i wrapper sono rientranti (AsyncLocalStorage) e i livelli annidati riusano lo
+ * slot esterno invece di riacquisirlo (nessun deadlock). L'annidamento acquisisce
+ * comunque una PoolClient propria, ma non un secondo slot del budget.
  *
  * @param opts.critical  Se true, bypassa il kill-switch adattivo (Fix 2).
  */
@@ -230,18 +253,26 @@ export async function withBgDbConnection<T>(
   fn: (client: import("pg").PoolClient) => Promise<T>,
   opts?: { critical?: boolean },
 ): Promise<T> {
-  await acquire(opts?.critical);
+  // Rientrante: se il contesto tiene già uno slot (es. job avvolto in
+  // withBgDbSlot che poi chiama findSimilar), acquisiamo solo la PoolClient
+  // senza consumare un secondo slot del budget.
+  const reentrant = isHoldingBgSlot();
+  if (!reentrant) await acquire(opts?.critical);
   let client: import("pg").PoolClient | null = null;
   try {
     client = await pool.connect();
     try { await client.query(`SET statement_timeout = '${BG_DB_STATEMENT_TIMEOUT_MS}'`); } catch { /* best-effort */ }
-    return await fn(client);
+    if (reentrant) {
+      return await fn(client);
+    }
+    const c = client;
+    return await bgSlotContext.run(true, () => fn(c));
   } finally {
     if (client) {
       try { await client.query(`SET statement_timeout = '${POOL_DEFAULT_STATEMENT_TIMEOUT_MS}'`); } catch { /* best-effort */ }
       client.release();
     }
-    release();
+    if (!reentrant) release();
   }
 }
 

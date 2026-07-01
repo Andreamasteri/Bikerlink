@@ -14,16 +14,27 @@ scritture di setup a inizio di un job bg**: apre N connessioni del pool
 *simultaneamente*. Con pool max=10 un singolo job che apre ~9 conn insieme affama
 il traffico utente → picco di "waiting" che poi si azzera quando le read tornano.
 
-**Regola:** un job bg che fa più letture/scritture di setup deve usare `await`
-sequenziali (1 conn alla volta), MAI un `Promise.all` non budgettato.
+**Fix a due livelli (servono ENTRAMBI):**
+1. **Sequenzializza il setup:** un job bg che fa più letture/scritture di setup usa
+   `await` sequenziali (1 conn alla volta), MAI un `Promise.all` non budgettato.
+2. **Budgetta l'INTERA durata del job:** avvolgi tutto il corpo del job in
+   `withBgDbSlot(() => ...Inner())` (pattern: rinomina il corpo in `*Inner` + thin
+   wrapper). Così al massimo `BG_DB_MAX_CONCURRENCY` (=3) job bg competono per il
+   pool per tutta la loro vita, non solo durante il setup.
 
-**Why sequenziale e non `withBgDbSlot`:** withBgDbSlot NON va annidato (deadlock,
-vedi memoria dedicata) e findSimilar già acquisisce uno slot nel loop; wrappare il
-setup rischierebbe nesting. Sono letture one-shot per-run → la latenza extra è
-irrilevante.
+**Perché serve la re-entrancy (AsyncLocalStorage):** withBgDbSlot/withBgDbConnection
+sono ora **rientranti** (contesto async in bg-db-limiter.ts). Un job avvolto in
+`withBgDbSlot` chiama `findSimilar` (che usa `withBgDbConnection`) nel loop: il
+livello annidato NON riacquisisce lo slot (riusa quello esterno) → niente deadlock,
+un solo slot per job. L'annidato prende comunque la sua PoolClient, ma non un
+secondo slot del budget. **Questo rende obsoleta la vecchia regola "non annidare
+withBgDbSlot".** La sequenzializzazione del setup resta comunque necessaria:
+withBgDbSlot limita il # di job concorrenti, NON il # di conn per singolo job.
 
 **How to apply:** vale per music/bio/telemetry affinity, archive stale, enrich
-breakdowns e ogni nuovo job schedulato. Eccezioni OK: fan-out già `pLimit`-bounded
-(es. backfill embeddings); burst 2-wide su path user-facing (run-biker,
-time-profile) NON sono la causa dei picchi 10-12 e sequenzializzarli aggiungerebbe
-latenza al path utente — lasciarli.
+breakdowns e ogni nuovo job schedulato. Nei call site il drop del limiter va gestito
+con `isBgDbLimiterDropError` (WARN + recordCycleDrop, riparte al tick dopo), non come
+errore generico. Eccezioni OK: fan-out già `pLimit`-bounded (es. backfill
+embeddings); burst 2-wide su path user-facing (run-biker, time-profile) NON sono la
+causa dei picchi 10-12 e wrapparli/sequenzializzarli aggiungerebbe latenza al path
+utente — lasciarli.

@@ -31,6 +31,7 @@ import { db } from "../db";
 import { storage } from "../storage";
 import { bioAffinityMatches } from "@shared/db";
 import { findSimilar, hnswIndexExists, EMBEDDING_MODEL_TAG } from "../embeddings";
+import { withBgDbSlot } from "../lib/bg-db-limiter";
 import { loadMatchPreferencesMap, bothPrefsEnabled, loadMatchingDisabledSet, neitherMatchingDisabled } from "./filters";
 import { haversineKm } from "../geo";
 import { protectedNicknamesSqlArray } from "./protection-filter";
@@ -106,6 +107,13 @@ async function readBoolSetting(key: string, fallback: boolean): Promise<boolean>
 }
 
 export async function runBioAffinityMatching(): Promise<number> {
+  // Pool budget: l'intero job gira dentro UNO slot del budget bg per la sua
+  // intera durata (non solo il setup). withBgDbSlot è rientrante: findSimilar
+  // (withBgDbConnection) nel loop non riacquisisce lo slot.
+  return withBgDbSlot(() => runBioAffinityMatchingInner());
+}
+
+async function runBioAffinityMatchingInner(): Promise<number> {
   const startedAt = Date.now();
   let matchesCreated = 0;
   let usersProcessed = 0;

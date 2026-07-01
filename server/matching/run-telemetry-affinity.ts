@@ -28,6 +28,7 @@ import { db } from "../db";
 import { storage } from "../storage";
 import { telemetryAffinityMatches, type Proposal } from "@shared/db";
 import { findSimilar } from "../embeddings";
+import { withBgDbSlot } from "../lib/bg-db-limiter";
 import { loadMatchPreferencesMap, bothPrefsEnabled, clubScopeAllows, getActiveClubMembershipKeys, loadMatchingDisabledSet, neitherMatchingDisabled } from "./filters";
 import { protectedNicknamesSqlArray } from "./protection-filter";
 import { styleLabelsFromProfile } from "../ai/telemetry-style-embedder";
@@ -72,6 +73,13 @@ function jaccard(a: Set<string>, b: Set<string>): number {
 }
 
 export async function runTelemetryAffinityMatching(): Promise<number> {
+  // Pool budget: l'intero job gira dentro UNO slot del budget bg per la sua
+  // intera durata (non solo il setup). withBgDbSlot è rientrante: findSimilar
+  // (withBgDbConnection) nel loop non riacquisisce lo slot.
+  return withBgDbSlot(() => runTelemetryAffinityMatchingInner());
+}
+
+async function runTelemetryAffinityMatchingInner(): Promise<number> {
   const startedAt = Date.now();
   let matchesCreated = 0;
   let matchesUpdated = 0;

@@ -26,7 +26,10 @@ Esistono DUE entry point nel limiter:
    slot bg + `pool.connect()` + `SET statement_timeout = 12s` + release nel
    `finally`. Usare quando `fn` fa query dirette via PoolClient.
    - NON fare `client.release()` dentro `fn` — gestito dal wrapper.
-   - NON annidare withBgDbConnection/withBgDbSlot dentro `fn` — deadlock.
+   - Annidare withBgDbConnection/withBgDbSlot dentro `fn` è SICURO: i wrapper sono
+     rientranti (AsyncLocalStorage) — i livelli annidati riusano lo slot esterno
+     invece di riacquisirlo (nessun deadlock). L'annidato prende comunque la sua
+     PoolClient, ma non un secondo slot del budget. (era: "NON annidare — deadlock").
    - VACUUM non è interrotto da statement_timeout in Postgres → safe.
 
 3. **`setDbSlowPingsConsecutive(n)`** — Fix 2: chiamato da db-collector dopo ogni
