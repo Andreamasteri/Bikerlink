@@ -1,5 +1,9 @@
 # Verifica routing post-spegnimento nginx (29 Giugno 2026)
 
+> **Contesto storico.** I riferimenti a `*.duckdns.org` in questo log appartengono
+> al vecchio setup (nginx + DuckDNS), ormai dismesso a favore di Cloudflare Tunnel
+> (`*.biker-link.net`). Il log documenta proprio la verifica di quella transizione.
+
 ## Obiettivo
 Confermare che dopo la disattivazione di nginx (vedi sezione sotto) nessun percorso critico di routing dipendesse silenziosamente da nginx. Tutti i servizi devono restare raggiungibili esclusivamente via Cloudflare Tunnel.
 

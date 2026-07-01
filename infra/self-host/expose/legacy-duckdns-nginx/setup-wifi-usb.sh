@@ -2,8 +2,9 @@
 # =============================================================================
 # BikerLink — expose/setup-wifi-usb.sh
 # Configura l'adattatore WiFi USB sul ThinkCentre con IP statico 192.168.1.36
-# tramite NetworkManager (nmcli), in modo che i servizi (nginx + DuckDNS) siano
-# raggiungibili anche quando il disco viene spostato su un PC senza NIC cablata.
+# tramite NetworkManager (nmcli), in modo che i servizi (esposti via Cloudflare
+# Tunnel) siano raggiungibili anche quando il disco viene spostato su un PC senza
+# NIC cablata.
 #
 # Prerequisiti:
 #   - NetworkManager installato e attivo (systemctl is-active NetworkManager)
@@ -226,8 +227,8 @@ cat <<'EOF'
 ━━━ Operazioni manuali post-setup ━━━
 
   # 1. Verifica che nginx risponda sull'IP WiFi (eseguire sul TC):
-  curl -sk --resolve "gh.bikerlink.duckdns.org:443:192.168.1.36" \
-    https://gh.bikerlink.duckdns.org/areas/grecia/health || true
+  curl -sk --resolve "gh.biker-link.net:443:192.168.1.36" \
+    https://gh.biker-link.net/areas/grecia/health || true
 
   # 2. Test post-reboot — verifica autoconnect dopo riavvio:
   sudo reboot
@@ -239,10 +240,10 @@ cat <<'EOF'
   sudo ss -tlnp | grep :443
   # output atteso: *:443 (o le righe 192.168.1.35:443 e 192.168.1.36:443)
 
-  # 4. DuckDNS (nessuna modifica necessaria):
-  #    L'aggiornamento usa l'IP pubblico del router — indipendente dalla NIC.
-  #    Verifica con: sudo systemctl status duckdns  (oppure: crontab -l | grep duck)
-  #    Esecuzione manuale: sudo /home/<user>/duckdns/duck.sh  (o: sudo /etc/cron.d/duckdns)
+  # 4. Esposizione pubblica (nessuna modifica necessaria):
+  #    Cloudflare Tunnel (cloudflared) usa una connessione outbound verso Cloudflare,
+  #    indipendente dalla NIC e dall'IP pubblico del router.
+  #    Verifica con: sudo systemctl status cloudflared
 
   # 5. Aggiorna il config nginx sul TC per allineare al template del repo:
   #    (setup-expose.sh genera il config con entrambi i listen)

@@ -140,13 +140,13 @@ ENV_TC_AGENT_TOKEN="$(read_env_value TC_AGENT_TOKEN  "$ENV_LOCAL_FILE" 2>/dev/nu
 # ─────────────────────────────────────────────────────────────────────────────
 section "2/5 — Parametri di esposizione"
 # ─────────────────────────────────────────────────────────────────────────────
-BASE_DOMAIN="${BASE_DOMAIN:-$(ask "Dominio base (es: bikerlink.duckdns.org)")}"
+BASE_DOMAIN="${BASE_DOMAIN:-$(ask "Dominio base (es: biker-link.net)")}"
 [[ -n "$BASE_DOMAIN" ]] || die "Dominio base obbligatorio."
 [[ "$BASE_DOMAIN" =~ ^[A-Za-z0-9.-]+\.[A-Za-z]{2,}$ ]] \
   || warn "Il dominio '$BASE_DOMAIN' non sembra valido: procedo comunque."
 
 APP_ORIGIN="${APP_ORIGIN:-$(ask "Origin web autorizzato per CORS" "https://${BASE_DOMAIN}")}"
-TUNNEL_UUID="${TUNNEL_UUID:-$(ask "Tunnel UUID Cloudflare (vuoto se usi solo Nginx/DuckDNS)")}"
+TUNNEL_UUID="${TUNNEL_UUID:-$(ask "Tunnel UUID Cloudflare (vuoto se usi solo Nginx locale)")}"
 
 ok "Dominio:     $BASE_DOMAIN"
 ok "App origin:  $APP_ORIGIN"
@@ -301,7 +301,7 @@ cat <<EOF
 
 $(bold "Config pronti in: ${OUT_DIR}")
 
-$(bold "Nginx + Let's Encrypt (o DuckDNS)")
+$(bold "Nginx + Let's Encrypt (setup legacy — l'esposizione attiva è Cloudflare Tunnel)")
   # 1. Ferma nginx prima di chiedere il certificato (challenge HTTP-01 porta 80)
   sudo systemctl stop nginx
 

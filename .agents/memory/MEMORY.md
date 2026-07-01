@@ -140,3 +140,4 @@
 - [Old Redis retirement confirmed safe](redis-retirement-confirmed.md) — old redis container+volume gone, only fallback = tiny backup tarballs; queues empty, no lock lost; cache is ephemeral so no rollback plan needed.
 - [Bowie Terminal push-token sharing](bowie-terminal-push-token.md) — standalone bowie-terminal APK writes the SAME users.expoPushToken as the main app; last install wins push; needs per-device token table to fix.
 - [Bowie notification quick-reply delivery](bowie-notification-reply-delivery.md) — app-killed headless reply is unreliable; use opensAppToForeground:true + getLastNotificationResponse cold-start recovery + clearLastNotificationResponse dedupe, submit inline.
+- [Env vs Secret classification](env-secret-classification.md) — EXPO_PUBLIC_* stay env (client-inlined); server-only service URLs are secrets; Redis=DragonflyDB via TC_REDIS_URL (not Upstash/REDIS_URL); viewEnvVars unfiltered secrets map is stale, use keys-filtered.

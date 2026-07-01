@@ -1,5 +1,13 @@
 # Esporre i servizi self-host all'app BikerLink
 
+> ⚠️ **NOTA STORICA (29 giugno 2026).** Questo documento descrive il vecchio
+> approccio di esposizione basato su **DuckDNS + nginx + Let's Encrypt**, ora
+> **dismesso**. L'esposizione attiva usa **Cloudflare Tunnel** (`cloudflared`,
+> vedi `cloudflared-config.yml`) sui sottodomini `*.biker-link.net`. I riferimenti
+> a `*.duckdns.org` e alla configurazione nginx/certbot qui sotto restano solo
+> come contesto storico: `setup-expose.sh` è ancora utile per **generare i token**
+> (`--gen-tokens`), ma il percorso nginx/DuckDNS non va più eseguito in produzione.
+
 Lo stack self-host avvia GraphHopper, Valhalla, Ollama, Whisper e Nominatim
 **solo su `localhost`** del ThinkCentre. L'app BikerLink su Replit gira nel
 cloud e non può raggiungere `localhost`: serve esporre tutti i servizi su un

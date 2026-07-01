@@ -451,11 +451,11 @@ Dopo la scheda, l'agente chiede: **"Hai preferenze su come risolvere, o procedo 
 
 ## Redis — Lock Distribuito + Cache + Code BullMQ (Task #2517)
 
-Il matching engine usa un **lock distribuito Redis** (Redlock) per evitare cicli sovrapposti tra istanze multiple, una **cache Redis breve** (TTL 60–120s) per tag e candidati per zona, e **code BullMQ** persistenti per i job pesanti. Tutto è **opzionale**: se `REDIS_URL` non è configurato, il backend ricade automaticamente su lock in-memory + cache assente (modalità single-instance) con un warning nei log.
+Il matching engine usa un **lock distribuito** (Redlock) per evitare cicli sovrapposti tra istanze multiple, una **cache breve** (TTL 60–120s) per tag e candidati per zona, e **code BullMQ** persistenti per i job pesanti. Tutto è **opzionale**: se `TC_REDIS_URL` non è configurato, il backend ricade automaticamente su lock in-memory + cache assente (modalità single-instance) con un warning nei log.
 
 ### Configurazione
-- Secret `REDIS_URL` (Replit Secrets). Formato: `redis://user:pass@host:port` oppure `rediss://...` per TLS. Richiede Redis ≥ 7.0 (necessario per `SET NX EX` atomico e stream BullMQ).
-- **Provider: Upstash cloud (regione EU).** Redis è migrato dal ThinkCentre self-hosted (storico: `bikerlink.duckdns.org:6380`, endpoint ormai dismesso con DuckDNS+nginx il 29/06/2026) a **Upstash** così che cache/BullMQ/AI pub-sub sopravvivano allo spegnimento del ThinkCentre. Upstash espone solo `rediss://` (TLS obbligatorio); l'URL include username+password. Il Redis sul ThinkCentre può restare attivo per uso locale/futuro ma **non è più la dipendenza dell'app**.
+- Secret `TC_REDIS_URL` (Replit Secrets). Formato: `redis://user:pass@host:port` oppure `rediss://...` per TLS.
+- **Provider: DragonflyDB self-hosted sul ThinkCentre (Task #5244).** Il vecchio Redis (`redis:7-alpine`) è stato **sostituito da DragonflyDB**, drop-in compatibile col protocollo Redis; il backend lo raggiunge via **Cloudflare Tunnel** (non più DuckDNS né Upstash). Il precedente circuit breaker quota Upstash è stato rimosso. Se il ThinkCentre è spento, il backend degrada in fallback in-memory single-instance.
 - Senza la secret: `getRedis()` ritorna `null`, `withMatchingLock` usa fallback in-memory, BullMQ è disattivato, Bull Board risponde 503.
 
 ### Moduli chiave

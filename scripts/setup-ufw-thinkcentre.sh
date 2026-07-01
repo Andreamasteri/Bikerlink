@@ -31,8 +31,7 @@
 #   ufw-status      9099      → solo localhost (health endpoint admin)
 #   PostgreSQL      5432      → solo localhost (mai LAN/internet)
 #   # Uptime Kuma   3001      → commentato — abilitare quando installato
-#   Redis TLS       6380      → internet (nginx stream proxy, setup-redis-nginx-stream.sh)
-#   Redis raw       6379      → solo localhost
+#   Redis raw       6379      → solo localhost (esposto a Replit via Cloudflare Tunnel)
 # =============================================================================
 
 set -euo pipefail
@@ -180,10 +179,11 @@ ufw allow from "${LOCALHOST}" to any port 9099 proto tcp
 echo "→ PostgreSQL 5432/tcp — solo localhost..."
 ufw allow from "${LOCALHOST}" to any port 5432 proto tcp
 
-# ── Redis: solo localhost (mai LAN/internet) ─────────────────────────────────
-# La porta pubblica 6380 (nginx stream proxy raggiungibile via DuckDNS) è stata
-# RIMOSSA il 29 Giugno 2026: nginx è disattivato e l'esposizione passa solo da
-# Cloudflare Tunnel. Redis locale, se presente, resta accessibile da localhost.
+# ── Redis raw 6379: solo localhost (mai LAN/internet) ────────────────────────
+# Redis (DragonflyDB) sul ThinkCentre è esposto a Replit via Cloudflare Tunnel
+# (secret TC_REDIS_URL), NON più via nginx stream TLS su porta 6380/DuckDNS.
+# La vecchia regola pubblica 6380 (nginx stream + bikerlink.duckdns.org) è stata
+# rimossa il 29 giugno 2026 con la dismissione di DuckDNS.
 ufw allow from "${LOCALHOST}" to any port 6379 proto tcp comment "Redis raw — solo localhost"
 
 # ── Regole future (commentate) ────────────────────────────────────────────────

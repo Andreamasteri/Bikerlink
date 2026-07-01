@@ -1,5 +1,11 @@
 # Migrazione Tailscale → DuckDNS sul ThinkCentre
 
+> ⚠️ **DOCUMENTO STORICO (29 giugno 2026).** Descrive una migrazione passata
+> (Tailscale → DuckDNS). **DuckDNS è stato a sua volta dismesso**: l'esposizione
+> attuale è **Cloudflare Tunnel** su `*.biker-link.net`
+> (vedi `cloudflared-config.yml` e `docs/uptime-kuma-cloudflare-tunnel.md`).
+> Conservato solo come contesto storico — non seguire questa procedura.
+
 > **Scenario:** i servizi self-hosted (GraphHopper, Valhalla, Ollama, Whisper,
 > Nominatim) sono oggi raggiungibili dall'app Replit tramite hostname Tailscale
 > (es. `http://100.x.y.z:8989`). Questa guida sposta tutto su URL DuckDNS

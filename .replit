@@ -220,15 +220,7 @@ timeoutMs = 420000
   EXPO_WEB_URL = "https://biker-link--8081.replit.app"
 
   [userenv.shared]
-  BIKERLINK_BACKEND_URL = "https://biker-link.replit.app"
   EXPO_PUBLIC_DOMAIN = "biker-link.replit.app"
-  TILES_URL = "https://tiles.bikerlink.app"
-REDIS_PROBE_URL = "https://tc.biker-link.net/probe/redis"
-TC_SSH_PORT = "22"
-GRAPHHOPPER_URL = "https://gh.biker-link.net"
-VALHALLA_URL = "https://valhalla.biker-link.net"
-NOMINATIM_URL = "https://nominatim.biker-link.net"
-WHISPER_URL = "https://whisper.biker-link.net"
 
   [userenv.development]
   EXPO_WEB_URL = "http://localhost:8081"
