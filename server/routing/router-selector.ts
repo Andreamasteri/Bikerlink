@@ -6,20 +6,15 @@ export type { RouteRequest, RouteResult } from "./graphhopper-adapter";
 import { calculateRoute as valhallaCalculateRoute } from "./valhalla-client";
 import { calculateRoute as mapboxCalculateRoute } from "./mapbox-directions-client";
 import { calculateRoute as tomtomCalculateRoute } from "./tomtom-routing-client";
-import { checkQuota } from "./mapbox/quota-guard";
 import { checkQuota as checkTomTomQuota } from "./tomtom/quota-guard";
 import { recordRoutingFallback, recordRoutingFailure, recordRoutingSuccess } from "./routing-metrics";
 import { isRoutingEnabled } from "./routing-kill-switch";
-import { isThinkCentrePoweredOff } from "../lib/thinkcentre-powered-off";
 import { isThinkCentreOffline } from "../lib/thinkcentre-offline";
 import { isAreaRoutingActive } from "./routing-area-mode";
 import { resolveRoutingArea } from "./routing-area-resolver";
 import { ROUTING_AREA_OUTCOMES, findRoutingAreasForPoint, type RoutingAreaCode } from "@shared/routing-areas";
-import { decideEngineWithAI, type AiRoutingContext } from "./ai-engine-decider";
-import { scoreRoute } from "./route-quality-score";
-import { recordAiDecision } from "./ai-decision-log";
+import { type AiRoutingContext } from "./ai-engine-decider";
 import { recordPipelineEvent, type PipelineOutcome } from "./routing-pipeline-log";
-import { haversineKm } from "../geo";
 
 /** Errore lanciato quando il routing è disabilitato dal kill-switch (admin/env). */
 export class RoutingDisabledError extends Error {
@@ -163,23 +158,6 @@ export function isTransientValhallaError(err: unknown): boolean {
 }
 
 /**
- * Determina se l'errore Mapbox giustifica il fallback a GraphHopper.
- * Fallback su: qualsiasi errore HTTP (4xx + 5xx), timeout (AbortError),
- * errori di rete (TypeError), token non configurato.
- * Il task richiede fallback su 4xx/5xx/timeout — tutti i casi HTTP sono inclusi.
- */
-function isTransientMapboxError(err: unknown): boolean {
-  const name = err instanceof Error ? err.name : "";
-  const msg = err instanceof Error ? err.message : String(err);
-  if (name === "AbortError") return true;
-  if (err instanceof TypeError) return true;
-  if (msg.includes("MAPBOX_ACCESS_TOKEN non configurato")) return true;
-  if (/Mapbox Directions error \d{3}/.test(msg)) return true;
-  if (msg.startsWith("Mapbox: ")) return true;
-  return false;
-}
-
-/**
  * Tenta il routing via Valhalla con fallback automatico a GraphHopper.
  */
 export async function routeViaValhallaWithFallback(
@@ -199,45 +177,6 @@ export async function routeViaValhallaWithFallback(
       res.setHeader("X-Routing-Fallback", "graphhopper");
     }
     recordRoutingFallback("valhalla", "graphhopper");
-    return graphHopperRoute(req, isMapTester);
-  }
-}
-
-/**
- * Tenta il routing via Mapbox con fallback automatico a GraphHopper.
- * Verifica la quota PRIMA di chiamare Mapbox: se esaurita, fallback preventivo.
- * Qualsiasi errore HTTP (4xx/5xx), timeout o errore di rete causa fallback.
- */
-async function routeViaMapboxWithFallback(
-  req: RouteRequest,
-  isMapTester: boolean,
-  res?: Response
-): Promise<RouteResult> {
-  const quota = await checkQuota();
-  if (!quota.ok) {
-    const msg = `Mapbox quota esaurita (${quota.used}/${quota.limit}) — fallback preventivo a GraphHopper`;
-    console.warn(`[RouterSelector] ${msg}`);
-    if (res && !res.headersSent) {
-      res.setHeader("X-Routing-Fallback", "graphhopper");
-    }
-    // Fallback runtime a tutti gli effetti (engine non utilizzabile per quota):
-    // registrato in metrics come i rami errore, per coerenza con l'header.
-    recordRoutingFallback("mapbox", "graphhopper");
-    return graphHopperRoute(req, isMapTester);
-  }
-
-  try {
-    return await mapboxCalculateRoute(req);
-  } catch (err: unknown) {
-    if (!isTransientMapboxError(err)) {
-      throw err;
-    }
-    const msg = err instanceof Error ? err.message : String(err);
-    console.warn(`[RouterSelector] Mapbox fallito (${msg}) — fallback a GraphHopper`);
-    if (res && !res.headersSent) {
-      res.setHeader("X-Routing-Fallback", "graphhopper");
-    }
-    recordRoutingFallback("mapbox", "graphhopper");
     return graphHopperRoute(req, isMapTester);
   }
 }
@@ -472,7 +411,7 @@ async function getActiveRouterInner(
   return wrapMetrics("graphhopper", () => graphHopperRoute(req, opts.isMapTester), res);
 }
 
-import { aerialKmOf, aiOverride } from "./router-selector.part2";
+import { aiOverride } from "./router-selector.part2";
 export { aiOverride };
 
 export async function resolveActiveEngine(opts: RouterSelectorOptions): Promise<RoutingEngineId> {

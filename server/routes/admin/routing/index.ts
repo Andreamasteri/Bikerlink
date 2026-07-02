@@ -35,8 +35,6 @@ import {
 import { ROUTING_FUNCTIONS } from "@shared/routing-functions";
 import type { RouteRequest } from "../../../routing/graphhopper-adapter";
 import { SELF_HOSTED_TILES_URL, isTilesSelfHosted } from "../../../../lib/map-tiles";
-import { SELF_HOSTED_BASE_URL, isSelfHosted } from "../../../graphhopper-client";
-import { ROUTING_AREAS, routingAreaUrl } from "@shared/routing-areas";
 import { updateSystemStatus } from "../../../lib/system-status-cache";
 import { sendError } from "../../../lib/api-response";
 
