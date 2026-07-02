@@ -136,7 +136,7 @@ function isNewEngineEnabled(opts: RouterSelectorOptions): boolean {
 /**
  * Determina se l'errore Valhalla giustifica il fallback a GraphHopper.
  */
-function isTransientValhallaError(err: unknown): boolean {
+export function isTransientValhallaError(err: unknown): boolean {
   const name = err instanceof Error ? err.name : "";
   const msg = err instanceof Error ? err.message : String(err);
   if (name === "AbortError") return true;
@@ -438,6 +438,7 @@ async function getActiveRouterInner(
 }
 
 import { aerialKmOf, aiOverride } from "./router-selector.part2";
+export { aiOverride };
 
 export async function resolveActiveEngine(opts: RouterSelectorOptions): Promise<RoutingEngineId> {
   if (opts.aiMode) return "ai";

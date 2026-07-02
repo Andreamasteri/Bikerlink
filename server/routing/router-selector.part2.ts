@@ -3,7 +3,7 @@ import { haversineKm } from "../geo";
 import { recordAiDecision } from "./ai-decision-log";
 import { recordRoutingFallback, recordRoutingFailure, recordRoutingSuccess } from "./routing-metrics";
 import { scoreRoute } from "./route-quality-score";
-import { graphHopperRoute, type RouterSelectorOptions, type RouteRequest, type RouteResult } from "./router-selector";
+import { graphHopperRoute, isTransientValhallaError, type RouterSelectorOptions, type RouteRequest, type RouteResult } from "./router-selector";
 import { calculateRoute as valhallaCalculateRoute } from "./valhalla-client";
 import { decideEngineWithAI } from "./ai-engine-decider";
 
@@ -54,15 +54,32 @@ export async function aiOverride(
       confidence: decision.confidence, reason: decision.reason, provider: decision.provider,
       decisionLatencyMs: Date.now() - started, dualScores: null,
     });
-    // Manual inline of routeViaValhallaWithFallback logic but without re-import cycles if possible
-    // For simplicity, we assume the main file handles complex fallbacks or we just call them
-    if (decision.engine === "valhalla") {
-      // We can't easily call routeViaValhallaWithFallback if it's in the main file and depends on us
-      // But in this case, the main file exports it.
-      const { routeViaValhallaWithFallback } = await import("./router-selector");
-      return routeViaValhallaWithFallback(req, opts.isMapTester, res);
+    // Esegue l'engine scelto e attribuisce le routing-metrics all'engine che ha
+    // REALMENTE prodotto la route (non a quello scelto dall'AI), per restare
+    // coerente con ai-decision-log quando Valhalla fallisce e si ricade su GH.
+    const directStarted = Date.now();
+    try {
+      let directResult: RouteResult;
+      let executedEngine: "graphhopper" | "valhalla" = decision.engine;
+      if (decision.engine === "valhalla") {
+        try {
+          directResult = await valhallaCalculateRoute(req);
+        } catch (err: unknown) {
+          if (!isTransientValhallaError(err)) throw err;
+          if (res && !res.headersSent) res.setHeader("X-Routing-Fallback", "graphhopper");
+          recordRoutingFallback("valhalla", "graphhopper");
+          executedEngine = "graphhopper";
+          directResult = await graphHopperRoute(req, opts.isMapTester);
+        }
+      } else {
+        directResult = await graphHopperRoute(req, opts.isMapTester);
+      }
+      recordRoutingSuccess(executedEngine, Date.now() - directStarted);
+      return directResult;
+    } catch (err) {
+      recordRoutingFailure(decision.engine);
+      throw err;
     }
-    return graphHopperRoute(req, opts.isMapTester);
   }
 
   // Confidence bassa: confronto a doppia route + score qualità.
