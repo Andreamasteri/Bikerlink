@@ -9,34 +9,27 @@
 // Logging: ogni chiamata viene loggata in ai_call_logs (fire-and-forget).
 import { streamText, stepCountIs, type ModelMessage } from "ai";
 import { runWithFallback, estimateCostUsd, type ResolvedModel } from "../moderation/provider";
-import {
-  buildSystemPrompt,
-  buildAdminSystemPrompt,
-  buildHorusSystemPrompt,
-  buildAresSystemPrompt,
-  type KnowledgeEntry,
-} from "./knowledge";
 import { getOllamaModel, isOllamaConfigured, warmOllama } from "../../lib/ollama-client";
 import { isThinkCentreOffline } from "../../lib/thinkcentre-offline";
 import { AI_ROSTER, type AiPersonaId, createHandoffMarkerFilter, stripHandoffMarker } from "./roster";
 import { recordKnowledgeGap } from "./knowledge-gaps";
 import { composeAresQuestion } from "./ares-question";
 import { isAresConfigured, getAresModelId, streamAresChat } from "../../lib/ares-client";
-import { retrieveContext, formatRagContext, indexKnowledge } from "./rag";
 import { OLLAMA_TOOLS, HORUS_TOOLS } from "./tools";
-import { buildAresLearningContext } from "./ares-learning";
-import { loadShareableAnalysisKnowledge } from "./horus-analyzer";
 import { logAiCall } from "../../lib/ai-logger";
-import { db } from "../../db";
-import { aiConversationTurns } from "@shared/db";
-import { eq, desc } from "drizzle-orm";
-import { pruneUserMemory, MEMORY_TURNS_LIMIT } from "./memory-pruner";
-import { fetchUserLiveContext } from "./user-context";
 import { BOWIE_INTRO_POEM, HORUS_INTRO_POEM, ARES_INTRO_POEM } from "@shared/bowie-greeting";
+import {
+  OLLAMA_FALLBACK_MODEL_ID,
+  HORUS_MODEL_ID,
+  loadMemoryTurns,
+  saveTurns,
+  buildAgentSystem,
+  type AssistantAgentOpts,
+  type AssistantAgentResult,
+} from "./agent-support";
 
-const OLLAMA_FALLBACK_MODEL_ID = process.env.BOWIE_OLLAMA_MODEL ?? "mistral-nemo:latest";
-// Task #5197 — Horus usa un modello Ollama dedicato (stessa infra di Bowie).
-const HORUS_MODEL_ID = process.env.HORUS_OLLAMA_MODEL?.trim() || "bikerlink-routing";
+// Re-export per i consumer esistenti (routes, test): il modulo pubblico resta agent.ts.
+export { extractActions, type AssistantAgentOpts, type AssistantAgentResult } from "./agent-support";
 
 // Task #5210/#5233 — Presentazione poetica di Bowie (BOWIE_INTRO_POEM): iniettata
 // come turno "assistant" seed quando la conversazione è nuova (nessuna history).
