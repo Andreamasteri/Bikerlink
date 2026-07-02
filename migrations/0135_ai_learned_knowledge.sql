@@ -20,4 +20,6 @@ CREATE TABLE IF NOT EXISTS "ai_learned_knowledge" (
 --> statement-breakpoint
 CREATE UNIQUE INDEX IF NOT EXISTS "ai_learned_knowledge_fingerprint_key" ON "ai_learned_knowledge" ("fingerprint");
 --> statement-breakpoint
+DROP INDEX IF EXISTS "ai_learned_knowledge_updated_at_idx";
+--> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "ai_learned_knowledge_updated_at_idx" ON "ai_learned_knowledge" ("updated_at" DESC);

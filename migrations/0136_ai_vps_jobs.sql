@@ -20,6 +20,10 @@ CREATE TABLE IF NOT EXISTS "ai_vps_jobs" (
   "notified_at" timestamp
 );
 --> statement-breakpoint
+DROP INDEX IF EXISTS "ai_vps_jobs_status_idx";
+--> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "ai_vps_jobs_status_idx" ON "ai_vps_jobs" ("status", "started_at" DESC);
+--> statement-breakpoint
+DROP INDEX IF EXISTS "ai_vps_jobs_admin_idx";
 --> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "ai_vps_jobs_admin_idx" ON "ai_vps_jobs" ("admin_user_id", "started_at" DESC);

@@ -21,4 +21,6 @@ CREATE TABLE IF NOT EXISTS "ai_knowledge_gaps" (
 --> statement-breakpoint
 CREATE UNIQUE INDEX IF NOT EXISTS "ai_knowledge_gaps_fingerprint_key" ON "ai_knowledge_gaps" ("fingerprint");
 --> statement-breakpoint
+DROP INDEX IF EXISTS "ai_knowledge_gaps_status_idx";
+--> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "ai_knowledge_gaps_status_idx" ON "ai_knowledge_gaps" ("status", "last_seen_at" DESC);

@@ -17,7 +17,11 @@ CREATE TABLE IF NOT EXISTS "ai_analysis_runs" (
   "created_at" timestamp NOT NULL DEFAULT now()
 );
 --> statement-breakpoint
+DROP INDEX IF EXISTS "ai_analysis_runs_created_at_idx";
+--> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "ai_analysis_runs_created_at_idx" ON "ai_analysis_runs" ("created_at" DESC);
+--> statement-breakpoint
+DROP INDEX IF EXISTS "ai_analysis_runs_persona_idx";
 --> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "ai_analysis_runs_persona_idx" ON "ai_analysis_runs" ("persona", "created_at" DESC);
 --> statement-breakpoint
@@ -37,6 +41,10 @@ CREATE TABLE IF NOT EXISTS "ai_analysis_artifacts" (
 --> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "ai_analysis_artifacts_run_id_idx" ON "ai_analysis_artifacts" ("run_id");
 --> statement-breakpoint
+DROP INDEX IF EXISTS "ai_analysis_artifacts_kind_idx";
+--> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "ai_analysis_artifacts_kind_idx" ON "ai_analysis_artifacts" ("kind", "created_at" DESC);
+--> statement-breakpoint
+DROP INDEX IF EXISTS "ai_analysis_artifacts_expires_at_idx";
 --> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "ai_analysis_artifacts_expires_at_idx" ON "ai_analysis_artifacts" ("expires_at") WHERE "expires_at" IS NOT NULL;
