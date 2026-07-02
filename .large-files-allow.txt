@@ -49,3 +49,8 @@ app/admin/stregatti.tsx
 hooks/navigate/useNavigateState.ts
 components/tracking/TrackingDashboard.tsx
 components/admin/users/UserDetailModal.tsx
+
+# ── Agente AI Assistant core ───────────────────────────────────────────────
+# Split vietato per decisione esplicita dell'utente (lug 2026): flusso
+# streaming unico e coeso (persona, fallback chain, memoria conversazionale).
+server/ai/assistant/agent.ts
