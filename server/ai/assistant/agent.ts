@@ -23,7 +23,9 @@ import { recordKnowledgeGap } from "./knowledge-gaps";
 import { composeAresQuestion } from "./ares-question";
 import { isAresConfigured, getAresModelId, streamAresChat } from "../../lib/ares-client";
 import { retrieveContext, formatRagContext, indexKnowledge } from "./rag";
-import { OLLAMA_TOOLS } from "./tools";
+import { OLLAMA_TOOLS, HORUS_TOOLS } from "./tools";
+import { buildAresLearningContext } from "./ares-learning";
+import { loadShareableAnalysisKnowledge } from "./horus-analyzer";
 import { logAiCall } from "../../lib/ai-logger";
 import { db } from "../../db";
 import { aiConversationTurns } from "@shared/db";
@@ -153,9 +155,11 @@ export async function runAssistantAgent(opts: AssistantAgentOpts): Promise<Assis
     opts.persona === "ares" && !isAdmin ? "bowie" : (opts.persona ?? "bowie");
   // Persona EFFETTIVA: può cambiare se la richiesta fallisce (es. Ares offline).
   let effectivePersona: AiPersonaId = requestedPersona;
-  // Tool calling server-side abilitato SOLO per Bowie (utente e admin); Horus è
-  // advisory e Ares passa per un endpoint dedicato.
-  const enableTools = requestedPersona === "bowie";
+  // Tool calling server-side abilitato per Bowie e Horus (Task #5326 — Horus
+  // usa HORUS_TOOLS: meteo, stato ThinkCentre, eventi vicini, ricerca web).
+  // Ares passa per un endpoint dedicato (nessun tool calling server-side).
+  const enableTools = requestedPersona === "bowie" || requestedPersona === "horus";
+  const toolsForPersona = requestedPersona === "horus" ? HORUS_TOOLS : OLLAMA_TOOLS;
   // Modello Ollama: Horus usa il modello dedicato; Bowie quello di default.
   const ollamaModelName = requestedPersona === "horus" ? HORUS_MODEL_ID : undefined;
 
@@ -182,14 +186,20 @@ export async function runAssistantAgent(opts: AssistantAgentOpts): Promise<Assis
   let ragTopScore: number | null = null;
   if (requestedPersona === "ares") {
     // Ares: diagnostica tecnica (solo admin), snapshot piattaforma nel prompt.
-    system = buildAresSystemPrompt(opts.adminContext ?? "");
+    // Task #5326 — knowledge transfer read-only Horus → Ares (RAG + prompt injection).
+    const horusLearningContext = await buildAresLearningContext();
+    system = buildAresSystemPrompt(opts.adminContext ?? "", horusLearningContext || undefined);
   } else if (requestedPersona === "horus") {
     // Horus: specialista percorsi. RAG + contesto utente come Bowie, persona diversa.
+    // Task #5326 — in modalità admin riceve anche la memoria delle proprie
+    // analisi autonome (extra RAG) + il codice sorgente GitHub per la modalità
+    // "code reviewer" (adminCodeContext già fetchato dalla route per isAdminMode).
+    const horusExtra = isAdmin ? await loadShareableAnalysisKnowledge() : [];
     indexKnowledge(opts.customFaqs ?? []);
     const ragSnippets = retrieveContext(opts.message, {
       k: 3,
       threshold: 0.05,
-      extra: opts.customFaqs ?? [],
+      extra: [...(opts.customFaqs ?? []), ...horusExtra],
     });
     ragTopScore = ragSnippets[0]?.score ?? null;
     const ragContext = formatRagContext(ragSnippets);
@@ -199,6 +209,8 @@ export async function runAssistantAgent(opts: AssistantAgentOpts): Promise<Assis
       userId: opts.userId,
       userContext: userContext || undefined,
       ragContext,
+      isAdmin,
+      codeContext: isAdmin ? opts.adminCodeContext : undefined,
     });
   } else if (isAdmin) {
     // Task #4842 — Modalità admin: system prompt dedicato con snapshot piattaforma.
@@ -343,8 +355,8 @@ export async function runAssistantAgent(opts: AssistantAgentOpts): Promise<Assis
       abortSignal: opts.signal,
       temperature: 0.3,
       // Task #3017 — Tool calling: solo per Ollama, con max 3 step
-      // Task #5197 — abilitato solo per la persona Bowie (Horus è advisory).
-      ...(isOllama && enableTools ? { tools: OLLAMA_TOOLS as never, stopWhen: stepCountIs(3) as never } : {}),
+      // Task #5326 — abilitato per Bowie e Horus (Ares passa da un endpoint dedicato).
+      ...(isOllama && enableTools ? { tools: toolsForPersona as never, stopWhen: stepCountIs(3) as never } : {}),
     });
     for await (const delta of result.textStream) {
       ensureIntroEmitted();

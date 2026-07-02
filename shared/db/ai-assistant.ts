@@ -239,3 +239,73 @@ export const aiVpsJobs = pgTable("ai_vps_jobs", {
 
 export type AiVpsJob = typeof aiVpsJobs.$inferSelect;
 export type InsertAiVpsJob = typeof aiVpsJobs.$inferInsert;
+
+// ── Task #5326 — Analisi continua autonoma di Horus (dual-write DB + file) ────
+//
+// Horus, nelle finestre di basso carico (load-aware via online-tracker), esegue
+// cicli di analisi in SOLA LETTURA che riusano l'engine db-integrity (problemi DB)
+// + il watchdog (salute sistema) come fonti primarie, più esplorazione mirata del
+// codice via GitHub read-only. Ogni ciclo produce UN run (metadati) e N artifact
+// (i contenuti veri: report, insight, domande aperte). Dual-write: la riga in
+// ai_analysis_artifacts È la fonte di verità; il file logs/horus-analysis-<ts>.md
+// (stesso contenuto) è uno specchio leggibile/grep-abile per debug umano, mai
+// l'inverso — se il file manca il dato in DB resta valido.
+//
+//   trigger     → "schedule" (ciclo autonomo) | "manual" (admin on-demand) | "repo-study".
+//   fingerprint → hash dei dati sorgente (violazioni db-integrity + snapshot watchdog):
+//                 se identico all'ultimo run, il ciclo si ferma dopo il fingerprint
+//                 check (nessun lavoro/chiamata Ollama duplicata).
+export const aiAnalysisRuns = pgTable("ai_analysis_runs", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  persona: varchar("persona", { length: 16 }).notNull().default("horus"),
+  trigger: varchar("trigger", { length: 16 }).notNull().default("schedule"),
+  fingerprint: varchar("fingerprint", { length: 64 }),
+  status: varchar("status", { length: 16 }).notNull().default("completed"),
+  durationMs: integer("duration_ms"),
+  artifactCount: integer("artifact_count").notNull().default(0),
+  // Modello Ollama locale che ha generato l'analisi (audit; mai un secret).
+  modelId: varchar("model_id", { length: 100 }),
+  // Riassunto brevissimo per liste/notifiche (mai dati sensibili).
+  summary: text("summary"),
+  errorMessage: text("error_message"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (t) => [
+  index("ai_analysis_runs_created_at_idx").on(t.createdAt.desc()),
+  index("ai_analysis_runs_persona_idx").on(t.persona, t.createdAt.desc()),
+]);
+
+export type AiAnalysisRun = typeof aiAnalysisRuns.$inferSelect;
+export type InsertAiAnalysisRun = typeof aiAnalysisRuns.$inferInsert;
+
+// Contenuto vero degli artifact prodotti da un run. Un run può produrre più
+// artifact (es. uno per categoria: db-integrity, watchdog, repo-study, code-review).
+//   kind        → "db-integrity" | "watchdog" | "repo-study" | "code-review" | "web-research".
+//   sensitivity → "internal" (default, mai esposto a utenti finali) | "shareable"
+//                 (può essere iniettato nel contesto di Ares/Bowie via RAG).
+//   sharedWith  → array persona ("bowie","ares") a cui l'artifact è stato iniettato
+//                 (bidirezionale: traccia il flusso di conoscenza per audit).
+//   mirrorPath  → path del file logs/horus-analysis-*.md gemello (dual-write).
+//   expiresAt   → TTL di retention: gli artifact scaduti vengono ripuliti (evita
+//                 crescita illimitata + conoscenza stantia iniettata nel RAG).
+export const aiAnalysisArtifacts = pgTable("ai_analysis_artifacts", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  runId: uuid("run_id")
+    .notNull()
+    .references(() => aiAnalysisRuns.id, { onDelete: "cascade" }),
+  kind: varchar("kind", { length: 24 }).notNull(),
+  title: varchar("title", { length: 200 }).notNull(),
+  content: text("content").notNull(),
+  sensitivity: varchar("sensitivity", { length: 16 }).notNull().default("internal"),
+  sharedWith: jsonb("shared_with").$type<string[]>().default([]),
+  mirrorPath: text("mirror_path"),
+  contentHash: varchar("content_hash", { length: 64 }),
+  expiresAt: timestamp("expires_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (t) => [
+  index("ai_analysis_artifacts_run_id_idx").on(t.runId),
+  index("ai_analysis_artifacts_kind_idx").on(t.kind, t.createdAt.desc()),
+  index("ai_analysis_artifacts_expires_at_idx").on(t.expiresAt).where(sql`expires_at IS NOT NULL`),
+]);
+
+export type AiAnalysisArtifact = typeof aiAnalysisArtifacts.$inferSelect;
+export type InsertAiAnalysisArtifact = typeof aiAnalysisArtifacts.$inferInsert;

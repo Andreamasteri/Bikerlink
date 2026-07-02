@@ -281,6 +281,17 @@ export async function runPhase5Schedulers(): Promise<void> {
     console.log("[INIT] Bowie auto-learn scheduler started (local-only)");
   });
 
+  // Task #5326 — Horus: analisi autonoma continua in background (load-aware,
+  // finestre a basso carico via online-tracker), riusa db-integrity/watchdog
+  // come sorgenti dati, dual-write DB + logs/horus-analysis-*.md. Nessuna
+  // sovrapposizione con altri scheduler AI: gira su un proprio intervallo con
+  // gate di fingerprint (skip se nulla è cambiato dall'ultimo giro).
+  await arm("horus-analysis", async () => {
+    const { startHorusAnalysisScheduler } = await import("./ai/assistant/horus-analyzer");
+    startHorusAnalysisScheduler();
+    console.log("[INIT] Horus background analysis scheduler started (load-aware)");
+  });
+
   // Task #5322 — Poller dei job VPS (VM Google): raccoglie l'esito dei job async
   // avviati dagli admin in chat e li recapita. Cadenza 2 min, non-fatale.
   await arm("assistant-vps-poller", async () => {

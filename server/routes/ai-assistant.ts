@@ -180,7 +180,8 @@ router.post("/ai/assistant/message", requireUser, messageLimiter, async (req: Re
   if (isAdminMode) {
     try {
       const { buildAdminContextSnapshot } = await import("../ai/assistant/admin-context");
-      const result = await buildAdminContextSnapshot();
+      const codePersona = persona === "horus" || persona === "ares" ? persona : "bowie";
+      const result = await buildAdminContextSnapshot(codePersona);
       adminContext = result.snapshot;
       adminCodeContext = result.codeContext || undefined;
     } catch (e) {

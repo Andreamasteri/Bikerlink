@@ -22,6 +22,7 @@ import { db } from "../../db";
 import { cfAccessHeaders } from "../../lib/cf-access";
 import { routes, events, plannedRoutes } from "@shared/db";
 import { eq, and, gte, desc, sql } from "drizzle-orm";
+import { webSearch } from "./web-search";
 
 const PROBE_TIMEOUT_MS = 5_000;
 
@@ -286,6 +287,24 @@ export const getUserPlannedRoutesTool = tool<PlannedRoutesInput, Record<string, 
   },
 });
 
+// ── Tool: webSearch (Task #5326) ─────────────────────────────────────────────
+
+const webSearchSchema = z.object({
+  query: z.string().min(3).max(300).describe("Query di ricerca web (in italiano o inglese, concisa)"),
+});
+type WebSearchInput = z.infer<typeof webSearchSchema>;
+
+export const webSearchTool = tool<WebSearchInput, Record<string, unknown>>({
+  description: "Cerca informazioni aggiornate sul web (metamotore SearXNG self-hosted) quando la domanda richiede dati non presenti nella knowledge base dell'app (es. novità, normative, prezzi esterni, notizie). Sola lettura, nessuna azione sull'app.",
+  inputSchema: webSearchSchema,
+  execute: async (input: WebSearchInput) => {
+    const res = await webSearch(input.query);
+    if (!res.available) return { error: res.error, results: [] };
+    if (res.error) return { error: res.error, results: [] };
+    return { answer: res.answer, results: res.results, query: res.query };
+  },
+});
+
 // ── Exported tool set ─────────────────────────────────────────────────────────
 
 export const OLLAMA_TOOLS = {
@@ -294,4 +313,15 @@ export const OLLAMA_TOOLS = {
   getThinkCentreStatus: getThinkCentreStatusTool,
   getNearbyEvents: getNearbyEventsTool,
   getUserPlannedRoutes: getUserPlannedRoutesTool,
+  webSearch: webSearchTool,
+} as const;
+
+// Task #5326 — Sottoinsieme di tool per Horus (specialista percorsi): niente
+// stats/percorsi utente specifici di Bowie, ma sì meteo + ricerca web (utile
+// per condizioni strada/eventi che influenzano un itinerario).
+export const HORUS_TOOLS = {
+  getWeather: getWeatherTool,
+  getThinkCentreStatus: getThinkCentreStatusTool,
+  getNearbyEvents: getNearbyEventsTool,
+  webSearch: webSearchTool,
 } as const;

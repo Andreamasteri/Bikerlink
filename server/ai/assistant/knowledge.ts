@@ -171,12 +171,23 @@ export function buildHorusSystemPrompt(opts: {
   userId?: string | null;
   userContext?: string;
   ragContext?: string;
+  // Task #5326 — Modalità admin: snapshot analisi autonoma pregresse (Horus
+  // "ricorda" i propri cicli) + contesto codice GitHub read-only per la
+  // modalità "code reviewer" (attiva solo quando isAdmin passa adminCodeContext).
+  isAdmin?: boolean;
+  analysisContext?: string;
+  codeContext?: string;
 }): string {
   const userIdSection = opts.userId
     ? `\n\n(ID utente corrente: ${opts.userId} — usalo se serve per contestualizzare, mai mostrarlo all'utente.)`
     : "";
   const ragSection = opts.ragContext ? `\n\n${opts.ragContext}` : "";
   const userContextSection = opts.userContext ? `\n\n${opts.userContext}` : "";
+  const analysisSection = opts.analysisContext ? `\n\n${opts.analysisContext}` : "";
+  const codeReviewSection =
+    opts.isAdmin && opts.codeContext
+      ? `\n\nMODALITÀ CODE REVIEWER (solo admin): l'amministratore può chiederti di rivedere il codice sorgente qui sotto (read-only, da GitHub main). Analizza pattern rischiosi, bug potenziali o violazioni delle convenzioni del progetto, e proponi correzioni testuali (MAI eseguirle: sei sola lettura, nessuna scrittura su GitHub). Sii specifico su file/riga quando possibile.\n\n${opts.codeContext}`
+      : "";
 
   return `Sei Horus, lo specialista di percorsi, itinerari e navigazione moto di BikerLink.${userIdSection}
 
@@ -199,13 +210,14 @@ CONGEDO (ritorno a Bowie):
 - Per farlo, aggiungi ESATTAMENTE il marcatore ${HANDOFF_BACK_TO_BOWIE} alla FINE della tua risposta (ultima riga, da solo). Il marcatore è tecnico: l'utente non lo vedrà, verrà rimosso automaticamente.
 - NON usare il marcatore se la conversazione sul percorso è ancora in corso (stai chiedendo partenza/destinazione/preferenze o l'utente sta ancora rifinendo l'itinerario).
 
-${renderRosterBlock("horus")}${ragSection}${userContextSection}`;
+${renderRosterBlock("horus")}${ragSection}${userContextSection}${analysisSection}${codeReviewSection}`;
 }
 
 // ── Task #5197 — System prompt di Ares (diagnostica tecnica, solo admin) ──────
 // Ares gira su un PC fisso dedicato (DIAG_OLLAMA_*) ed è invocato dall'admin
 // tramite Bowie. È uno strumento operativo/tecnico, non rivolto all'utente.
-export function buildAresSystemPrompt(adminContext: string): string {
+export function buildAresSystemPrompt(adminContext: string, horusLearningContext?: string): string {
+  const horusLearningSection = horusLearningContext ? `\n\n${horusLearningContext}` : "";
   return `Sei Ares, l'AI di diagnostica tecnica della piattaforma BikerLink. Stai parlando con un AMMINISTRATORE fidato che ti ha invocato tramite Bowie.
 
 ${SECURITY_GUARDRAIL}
@@ -229,5 +241,5 @@ CONGEDO (ritorno a Bowie):
 ${renderRosterBlock("ares")}
 
 SNAPSHOT PIATTAFORMA (contesto corrente, sola lettura):
-${adminContext || "(nessun dato disponibile)"}`;
+${adminContext || "(nessun dato disponibile)"}${horusLearningSection}`;
 }

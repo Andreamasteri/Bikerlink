@@ -18,6 +18,8 @@ import {
   getVpsJob,
   isDestructiveCommand,
 } from "./vps-ops";
+import { runHorusAnalysisNow } from "./horus-analyzer";
+import { fetchCodeContextForFiles, isGithubContextConfigured } from "./github-context";
 
 // Task #5322 — Livello di rischio dell'azione admin. Guida il client (badge/UX di
 // conferma) e viene loggato nell'audit trail. "high" = distruttivo/irreversibile.
@@ -131,6 +133,33 @@ export const ADMIN_ASSISTANT_ACTIONS = {
     requiresConfirm: false,
     paramsSchema: z.object({
       jobId: z.string().min(1, "jobId obbligatorio"),
+    }),
+  },
+  // Task #5326 — Trigger manuale del ciclo di analisi autonoma di Horus (ignora
+  // il gate load-aware/cooldown dello scheduler in background). Sola lettura:
+  // legge db-integrity/watchdog e scrive SOLO il proprio artifact di analisi.
+  "horus-analyze-now": {
+    id: "horus-analyze-now",
+    description:
+      "Esegue subito un ciclo di analisi autonoma di Horus (db-integrity + watchdog), ignorando il gate di carico/cooldown dello scheduler in background. Sola lettura sui dati piattaforma, scrive solo il proprio report di analisi.",
+    confirmLabel: "Confermi l'avvio di un'analisi Horus immediata?",
+    riskLevel: "low",
+    requiresConfirm: true,
+    paramsSchema: z.object({}),
+  },
+  // Task #5326 — Modalità "code reviewer" di Horus: fetch read-only di file
+  // specifici da GitHub (HORUS_GITHUB_TOKEN, fine-grained e mai scrittura,
+  // dedicato solo a Horus — mai il DIAG_GITHUB_TOKEN uso umano) da iniettare
+  // nel prossimo turno come contesto di revisione codice.
+  "horus-code-review": {
+    id: "horus-code-review",
+    description:
+      "Recupera da GitHub (sola lettura, branch main) il codice sorgente dei file indicati per farli rivedere a Horus nella modalità code reviewer. Param: files (array di percorsi relativi al repo, max 8). Non esegue né modifica nulla su GitHub.",
+    confirmLabel: "Confermi il recupero di questi file da GitHub per la revisione?",
+    riskLevel: "low",
+    requiresConfirm: true,
+    paramsSchema: z.object({
+      files: z.array(z.string().min(1)).min(1).max(8),
     }),
   },
 } as const satisfies Record<string, AdminAssistantActionDef>;
@@ -293,6 +322,33 @@ export async function executeAdminAction(
       ok: true,
       summary: `Job VPS avviato (id ${res.job.id}). Ti avviserò quando è pronto; puoi anche chiedermi lo stato.`,
       data: { jobId: res.job.id, status: res.job.status },
+    };
+  }
+
+  if (id === "horus-analyze-now") {
+    const result = await runHorusAnalysisNow();
+    console.info(`[admin-ai-action] horus-analyze-now ran=${result.ran} reason=${result.reason ?? "-"}`);
+    return {
+      ok: true,
+      summary: result.ran
+        ? "Ciclo di analisi Horus completato: report salvato (DB + logs/horus-analysis-*.md)."
+        : `Ciclo di analisi Horus non eseguito: ${result.reason ?? "motivo sconosciuto"}.`,
+      data: result,
+    };
+  }
+
+  if (id === "horus-code-review") {
+    const p = params as { files: string[] };
+    if (!isGithubContextConfigured("horus")) {
+      return { ok: false, httpStatus: 400, error: "Contesto GitHub non configurato (HORUS_GITHUB_TOKEN mancante)." };
+    }
+    const code = await fetchCodeContextForFiles(p.files, "horus", "[CODICE SORGENTE — revisione Horus, GitHub main]");
+    if (!code) return { ok: false, httpStatus: 404, error: "Nessuno dei file richiesti è stato recuperato da GitHub." };
+    console.info(`[admin-ai-action] horus-code-review files=${p.files.join(",")}`);
+    return {
+      ok: true,
+      summary: `Codice recuperato per ${p.files.length} file. Chiedi a Horus di rivederlo: incollerò il contenuto nel prossimo turno.\n\n${code.slice(0, 3000)}`,
+      data: { files: p.files },
     };
   }
 

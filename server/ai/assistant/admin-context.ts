@@ -11,7 +11,7 @@
 import { withBgDbConnection } from "../../lib/bg-db-limiter";
 import { storage } from "../../storage";
 import type { ProbeLogEntry } from "../../routes/admin/thinkcentre-health-utils";
-import { fetchAdminCodeContext } from "./github-context";
+import { fetchAdminCodeContext, type AiGithubPersona } from "./github-context";
 
 const PROBE_LOG_SNAPSHOT_KEY = "probe_log_snapshot";
 
@@ -174,11 +174,13 @@ function formatSnapshot(snap: AdminSnapshot): string {
  * Ritorna { snapshot, codeContext } separati così agent.ts può passarli
  * a buildAdminSystemPrompt(adminContext, codeContext).
  */
-export async function buildAdminContextSnapshot(): Promise<{ snapshot: string; codeContext: string }> {
+export async function buildAdminContextSnapshot(
+  persona: AiGithubPersona = "bowie",
+): Promise<{ snapshot: string; codeContext: string }> {
   const [dbStats, thinkCentre, codeContext] = await Promise.all([
     loadDbStats(),
     loadThinkCentreStatus(),
-    fetchAdminCodeContext(),
+    fetchAdminCodeContext(persona),
   ]);
   const snap: AdminSnapshot = { ...dbStats, thinkCentre };
   const generatedAt = new Date().toLocaleString("it-IT");
