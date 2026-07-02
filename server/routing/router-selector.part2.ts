@@ -58,9 +58,9 @@ export async function aiOverride(
     // REALMENTE prodotto la route (non a quello scelto dall'AI), per restare
     // coerente con ai-decision-log quando Valhalla fallisce e si ricade su GH.
     const directStarted = Date.now();
+    let executedEngine: "graphhopper" | "valhalla" = decision.engine;
     try {
       let directResult: RouteResult;
-      let executedEngine: "graphhopper" | "valhalla" = decision.engine;
       if (decision.engine === "valhalla") {
         try {
           directResult = await valhallaCalculateRoute(req);
@@ -77,7 +77,10 @@ export async function aiOverride(
       recordRoutingSuccess(executedEngine, Date.now() - directStarted);
       return directResult;
     } catch (err) {
-      recordRoutingFailure(decision.engine);
+      // Failure attribuito all'engine ESEGUITO (dopo eventuale fallback), non
+      // a quello deciso dall'AI: se valhalla→GH e GH fallisce, il failure è di
+      // GH (valhalla ha già il suo campione fallback).
+      recordRoutingFailure(executedEngine);
       throw err;
     }
   }

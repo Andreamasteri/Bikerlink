@@ -10,7 +10,7 @@ import { Router, type Request, type Response } from "express";
 import { storage } from "../../../storage";
 import { getActiveRouter } from "../../../routing/router-selector";
 import type { RouteRequest } from "../../../routing/graphhopper-adapter";
-import type { MapsRollout, RoutingEngineId } from "@shared/maps-config";
+import { ARCHIVED_ROUTING_ENGINES, type MapsRollout, type RoutingEngineId } from "@shared/maps-config";
 import {
   GH_BASE_URL, isSelfHosted, getServerInfo,
   getRoutingHealthSnapshot,
@@ -191,9 +191,11 @@ async function handleTestRouting(_req: Request, res: Response): Promise<Response
 
     const latency_ms = Date.now() - start;
     const path = result.paths[0];
+    // Engine archiviati: il selettore li serve sempre via GraphHopper senza
+    // header di fallback (guard di config, non fallback runtime — Task #5347).
     const usedEngine = res.getHeader("X-Routing-Fallback") === "graphhopper"
       ? "graphhopper"
-      : engine;
+      : (ARCHIVED_ROUTING_ENGINES.has(engine) ? "graphhopper" : engine);
 
     return res.json({
       ok: true,

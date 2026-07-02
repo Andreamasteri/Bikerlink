@@ -122,7 +122,21 @@ async function wrapMetrics(
     }
     return out;
   } catch (err) {
-    recordRoutingFailure(engine, meta);
+    // Errori di config/area (nessun dispatch HTTP verso l'engine): zero campioni.
+    // Contarli come failure marcherebbe GraphHopper "down" per input utente
+    // non validi (rotta cross-group / area non abilitata).
+    if (err instanceof CrossGroupRoutingError || err instanceof AreaNotEnabledError) {
+      throw err;
+    }
+    // Coerente col ramo success: se è attivo un fallback runtime (header),
+    // il failure è attribuito all'engine di destinazione che ha DAVVERO
+    // fallito, non all'engine di partenza (che ha già il suo campione fallback).
+    const fallbackTo = res?.getHeader("X-Routing-Fallback");
+    if (typeof fallbackTo === "string" && fallbackTo.length > 0) {
+      recordRoutingFailure(fallbackTo as MetricsEngine, meta);
+    } else {
+      recordRoutingFailure(engine, meta);
+    }
     throw err;
   }
 }
@@ -206,6 +220,9 @@ async function routeViaMapboxWithFallback(
     if (res && !res.headersSent) {
       res.setHeader("X-Routing-Fallback", "graphhopper");
     }
+    // Fallback runtime a tutti gli effetti (engine non utilizzabile per quota):
+    // registrato in metrics come i rami errore, per coerenza con l'header.
+    recordRoutingFallback("mapbox", "graphhopper");
     return graphHopperRoute(req, isMapTester);
   }
 
@@ -257,6 +274,9 @@ async function routeViaTomTomWithFallback(
     if (res && !res.headersSent) {
       res.setHeader("X-Routing-Fallback", "graphhopper");
     }
+    // Fallback runtime a tutti gli effetti (engine non utilizzabile per quota):
+    // registrato in metrics come i rami errore, per coerenza con l'header.
+    recordRoutingFallback("tomtom", "graphhopper");
     return graphHopperRoute(req, isMapTester);
   }
 
@@ -328,7 +348,11 @@ function recordPipelineOutcome(
 
   // Engine "previsto" prima dell'eventuale fallback: vince la scelta AI, poi
   // l'engine selezionato (in modalità AI senza header esplicito si assume GH).
-  const intendedEngine = aiCompare ?? aiDirect ?? (engineSelected === "ai" ? "graphhopper" : engineSelected);
+  // Gli engine archiviati sono normalizzati a graphhopper: il guard di config
+  // in getActiveRouterInner li serve SEMPRE via GH senza header di fallback.
+  const selectedIsArchived = engineSelected === "ai"
+    || ARCHIVED_ROUTING_ENGINES.has(engineSelected as RoutingEngineId);
+  const intendedEngine = aiCompare ?? aiDirect ?? (selectedIsArchived ? "graphhopper" : engineSelected);
 
   let outcome: PipelineOutcome;
   let engineUsed: string;
@@ -381,10 +405,12 @@ async function getActiveRouterInner(
     }
     console.log("[RouterSelector] ThinkCentre spento — routing su cloud");
     // Catena cloud resiliente: Mapbox → TomTom, con fallback su errore runtime.
+    let mapboxAttempted = false;
     if (process.env.MAPBOX_ACCESS_TOKEN) {
       try {
         if (res && !res.headersSent) res.setHeader("X-Routing-Fallback", "mapbox");
         recordRoutingFallback("graphhopper", "mapbox");
+        mapboxAttempted = true;
         return await wrapMetrics("mapbox", () => mapboxCalculateRoute(req), res);
       } catch (mapboxErr) {
         const msg = mapboxErr instanceof Error ? mapboxErr.message : String(mapboxErr);
@@ -393,7 +419,10 @@ async function getActiveRouterInner(
     }
     if (process.env.TOMTOM_API_KEY) {
       if (res && !res.headersSent) res.setHeader("X-Routing-Fallback", "tomtom");
-      recordRoutingFallback("graphhopper", "tomtom");
+      // Il secondo salto della catena parte dall'engine che ha DAVVERO fallito:
+      // mapbox se è stato tentato (il suo failure è già registrato da wrapMetrics),
+      // altrimenti graphhopper (mapbox non configurato, salto diretto).
+      recordRoutingFallback(mapboxAttempted ? "mapbox" : "graphhopper", "tomtom");
       return wrapMetrics("tomtom", () => tomtomCalculateRoute(req), res);
     }
     throw new Error("ThinkCentre spento — nessun engine cloud configurato come fallback");
@@ -420,7 +449,13 @@ async function getActiveRouterInner(
   if (ARCHIVED_ROUTING_ENGINES.has(opts.engine) || aiEngineArchived) {
     const archivedName = aiEngineArchived ? "ai" : opts.engine;
     console.warn(`[RouterSelector] Engine archiviato "${archivedName}" ignorato — fallback a GraphHopper`);
-    if (res && !res.headersSent) res.setHeader("X-Routing-Fallback", "graphhopper");
+    // Scelta Task #5347: questo è un guard di CONFIG (deterministico su ogni
+    // richiesta), NON un fallback runtime — nessun header X-Routing-Fallback e
+    // nessun recordRoutingFallback, altrimenti pipeline/metrics registrerebbero
+    // un "fallback" fasullo a ogni richiesta (e falsi engine-down). L'engine
+    // effettivo è GraphHopper: l'attribuzione corretta è garantita dalla
+    // normalizzazione archived→graphhopper in recordPipelineOutcome e nei
+    // consumer admin.
     return wrapMetrics("graphhopper", () => graphHopperRoute(req, opts.isMapTester), res);
   }
 

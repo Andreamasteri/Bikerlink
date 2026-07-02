@@ -10,7 +10,7 @@
  * i contatori runtime (routing-metrics) e il selettore engine (router-selector).
  */
 import { Router, type Request, type Response } from "express";
-import type { MapsRollout, RoutingEngineId } from "@shared/maps-config";
+import { ARCHIVED_ROUTING_ENGINES, type MapsRollout, type RoutingEngineId } from "@shared/maps-config";
 import { storage } from "../../../storage";
 import {
   GH_BASE_URL,
@@ -207,8 +207,12 @@ router.post("/test", async (req: Request, res: Response) => {
     );
     const latencyMs = Date.now() - start;
     const path = result.paths[0];
+    // Engine archiviati: il selettore li serve sempre via GraphHopper senza
+    // header di fallback (guard di config, non fallback runtime — Task #5347).
     const usedEngine =
-      res.getHeader("X-Routing-Fallback") === "graphhopper" ? "graphhopper" : engine;
+      res.getHeader("X-Routing-Fallback") === "graphhopper"
+        ? "graphhopper"
+        : (ARCHIVED_ROUTING_ENGINES.has(engine) ? "graphhopper" : engine);
 
     return res.json({
       ok: true,
