@@ -1,5 +1,9 @@
 # BikerLink
 
+## User preferences
+
+- **Non splittare mai un file senza permesso esplicito.** Anche se il ratchet 600 righe segnala un file oltre soglia, NON eseguire lo split autonomamente: chiedere prima il permesso all'utente. Se l'utente vuole tenere il file intero, marcarlo con `LARGE-FILE-ALLOW` in `.large-files-allow.txt` invece di splittarlo.
+
 ## ⛔ Regole OTA — Leggere Prima di Qualsiasi Lavoro
 
 **I task NON devono mai includere la pubblicazione di una OTA.**
