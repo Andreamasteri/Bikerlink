@@ -12,9 +12,25 @@ const connectMock = vi.hoisted(() =>
 // isPoolHealthy pilotabile: distingue "pool saturo" da "DB irraggiungibile".
 const isPoolHealthyMock = vi.hoisted(() => vi.fn(() => true));
 
+// snapshotBlockedQueries: logging best-effort di pg_stat_activity quando il
+// pool è saturo/lento. Risolve a [] di default così il collector non tenta
+// mai una query DB reale per questo path diagnostico.
+const snapshotBlockedQueriesMock = vi.hoisted(() => vi.fn(async () => []));
+
 vi.mock("../db", () => ({
   pool: { totalCount: 0, idleCount: 0, waitingCount: 0, connect: connectMock },
   isPoolHealthy: isPoolHealthyMock,
+  snapshotBlockedQueries: snapshotBlockedQueriesMock,
+}));
+
+// readJobAttempt: il ramo "vacuum.last_attempt" del collector chiama
+// readJobAttempt() (che a sua volta tocca storage.getAppSetting → DB reale
+// non coperto da questo mock). Mockiamo direttamente il modulo
+// scheduler-retry così quel ramo resta un no-op deterministico e non sfasa i
+// Date.now() mockati su cui i test di severity si basano.
+const readJobAttemptMock = vi.hoisted(() => vi.fn(async () => null));
+vi.mock("../lib/scheduler-retry", () => ({
+  readJobAttempt: readJobAttemptMock,
 }));
 
 // Circuit breaker: spy hoisted così possiamo asserire che la saturazione NON lo arma.
@@ -26,12 +42,30 @@ vi.mock("../db-circuit-breaker", () => ({
   getCircuitStatus: vi.fn(() => ({ state: "CLOSED", consecutiveFailures: 0, openedAt: null })),
 }));
 
-// Date.now mock: ogni collectDb success fa 2 chiamate (started, dopo-ping) →
-// l'indice pari restituisce 0 e quello dispari `pingMs`, così pingMs è
-// deterministico e configurabile per test.
+// Date.now mock: invece di contare le chiamate (fragile — moduli terzi come
+// Bottleneck in bg-db-limiter chiamano Date.now() al bootstrap del modulo via
+// vi.resetModules(), sfasando qualunque conteggio a indice pari/dispari),
+// usiamo un orologio controllabile con avanzamento esplicito. `currentTime`
+// parte da 0 ad ogni test; l'avanzamento di `pingMs` avviene SOLO quando il
+// mock di `client.query` intercetta la query "SELECT 1" (il ping reale nel
+// collector), quindi è ancorato al punto esatto di esecuzione e non al
+// numero di chiamate a Date.now() fatte da codice estraneo (import di
+// moduli, logger, HNSW throttle, ecc.).
 let pingMs = 0;
-let nowIdx = 0;
+let currentTime = 0;
 let dateSpy: ReturnType<typeof vi.spyOn>;
+
+function mockQueryWithPing(
+  impl?: (sql: string) => Promise<{ rows: unknown[] }> | { rows: unknown[] },
+) {
+  queryMock.mockImplementation(async (sql: string) => {
+    if (typeof sql === "string" && sql.includes("SELECT 1")) {
+      currentTime += pingMs;
+    }
+    if (impl) return impl(sql);
+    return { rows: [] };
+  });
+}
 
 const ping = (s: Signal[]) => s.find((x) => x.metric === "db.ping_ms");
 const collectorErr = (s: Signal[]) => s.find((x) => x.metric === "collector.error");
@@ -44,18 +78,14 @@ async function loadCollector() {
 describe("db-collector anti-blip gating", () => {
   beforeEach(() => {
     vi.resetModules(); // azzera lo stato modulo (consecutiveSlow/Fail)
-    nowIdx = 0;
+    currentTime = 0;
     pingMs = 0;
     queryMock.mockReset();
     isPoolHealthyMock.mockReset();
     isPoolHealthyMock.mockReturnValue(true); // default: pool sano (un fallimento = DB down)
     recordSuccessMock.mockReset();
     recordFailureMock.mockReset();
-    dateSpy = vi.spyOn(Date, "now").mockImplementation(() => {
-      const isStart = nowIdx % 2 === 0;
-      nowIdx++;
-      return isStart ? 0 : pingMs;
-    });
+    dateSpy = vi.spyOn(Date, "now").mockImplementation(() => currentTime);
   });
 
   afterEach(() => {
@@ -64,7 +94,7 @@ describe("db-collector anti-blip gating", () => {
 
   it("un singolo ping lento resta 'warn', escala a 'high' solo dopo 3 consecutivi", async () => {
     pingMs = 600; // > SLOW_PING_THRESHOLD_MS (500)
-    queryMock.mockResolvedValue({ rows: [] });
+    mockQueryWithPing();
     const collectDb = await loadCollector();
 
     expect(ping(await collectDb())?.severity).toBe("warn"); // 1
@@ -73,7 +103,7 @@ describe("db-collector anti-blip gating", () => {
   });
 
   it("un ping veloce resetta il contatore dei lenti consecutivi", async () => {
-    queryMock.mockResolvedValue({ rows: [] });
+    mockQueryWithPing();
     const collectDb = await loadCollector();
 
     pingMs = 600;
@@ -89,7 +119,7 @@ describe("db-collector anti-blip gating", () => {
 
   it("latenza intermedia (>150ms, <=500ms) è 'warn' senza escalation", async () => {
     pingMs = 200;
-    queryMock.mockResolvedValue({ rows: [] });
+    mockQueryWithPing();
     const collectDb = await loadCollector();
 
     for (let i = 0; i < 5; i++) {
@@ -119,7 +149,7 @@ describe("db-collector anti-blip gating", () => {
     await collectDb(); // fail #2
 
     queryMock.mockReset();
-    queryMock.mockResolvedValue({ rows: [] });
+    mockQueryWithPing();
     pingMs = 100;
     await collectDb(); // success → reset
 
