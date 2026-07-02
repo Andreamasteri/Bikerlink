@@ -3,9 +3,18 @@ import { haversineKm } from "../geo";
 import { recordAiDecision } from "./ai-decision-log";
 import { recordRoutingFallback, recordRoutingFailure, recordRoutingSuccess } from "./routing-metrics";
 import { scoreRoute } from "./route-quality-score";
-import { graphHopperRoute, isTransientValhallaError, type RouterSelectorOptions, type RouteRequest, type RouteResult } from "./router-selector";
+import { graphHopperRoute, isTransientValhallaError, CrossGroupRoutingError, AreaNotEnabledError, type RouterSelectorOptions, type RouteRequest, type RouteResult } from "./router-selector";
 import { calculateRoute as valhallaCalculateRoute } from "./valhalla-client";
 import { decideEngineWithAI } from "./ai-engine-decider";
+
+/**
+ * Errori di config/area senza dispatch HTTP verso l'engine (stessa regola di
+ * wrapMetrics in router-selector.ts): non vanno contati come failure metrics,
+ * o marcherebbero l'engine "down" per input utente non validi.
+ */
+function isNoDispatchError(err: unknown): boolean {
+  return err instanceof CrossGroupRoutingError || err instanceof AreaNotEnabledError;
+}
 
 /** Somma delle distanze aeree (haversine) tra waypoint consecutivi. */
 export function aerialKmOf(points: [number, number][]): number {
@@ -79,8 +88,11 @@ export async function aiOverride(
     } catch (err) {
       // Failure attribuito all'engine ESEGUITO (dopo eventuale fallback), non
       // a quello deciso dall'AI: se valhalla→GH e GH fallisce, il failure è di
-      // GH (valhalla ha già il suo campione fallback).
-      recordRoutingFailure(executedEngine);
+      // GH (valhalla ha già il suo campione fallback). Errori di config/area
+      // senza dispatch (cross-group / area non abilitata) = zero campioni.
+      if (!isNoDispatchError(err)) {
+        recordRoutingFailure(executedEngine);
+      }
       throw err;
     }
   }
@@ -103,14 +115,14 @@ export async function aiOverride(
     const score = scoreRoute(gh.value.result, aerialKm, ctx.style).score;
     candidates.push({ engine: "graphhopper", result: gh.value.result, score });
     recordRoutingSuccess("graphhopper", gh.value.latencyMs, { bboxKey: ctx.bboxKey, score });
-  } else {
+  } else if (!isNoDispatchError(gh.reason)) {
     recordRoutingFailure("graphhopper", { bboxKey: ctx.bboxKey });
   }
   if (val.status === "fulfilled") {
     const score = scoreRoute(val.value.result, aerialKm, ctx.style).score;
     candidates.push({ engine: "valhalla", result: val.value.result, score });
     recordRoutingSuccess("valhalla", val.value.latencyMs, { bboxKey: ctx.bboxKey, score });
-  } else {
+  } else if (!isNoDispatchError(val.reason)) {
     recordRoutingFailure("valhalla", { bboxKey: ctx.bboxKey });
   }
 

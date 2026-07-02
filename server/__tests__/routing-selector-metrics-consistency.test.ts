@@ -467,4 +467,34 @@ describe("aiOverride ai-direct — failure dopo fallback attribuito all'engine e
     expect(c.byEngine["graphhopper"]?.failure ?? 0).toBe(0);
     expect(mocks.routeViaGraphHopper).not.toHaveBeenCalled();
   });
+
+  it("GH diretto con errore area (cross-group) → ZERO failure (no dispatch)", async () => {
+    mocks.decideEngineWithAI.mockResolvedValue({
+      engine: "graphhopper", confidence: 0.9, reason: "test", provider: "groq",
+    });
+    mocks.isAreaRoutingActive.mockResolvedValue(true);
+    mocks.resolveRoutingArea.mockResolvedValue({ kind: ROUTING_AREA_OUTCOMES.CROSS_GROUP, codes: [] });
+    const res = makeRes();
+
+    await expect(aiOverride(FAKE_REQ, AI_OPTS, res)).rejects.toThrow(CrossGroupRoutingError);
+
+    const c = counters();
+    expect(c.successes + c.failures + c.fallbacks).toBe(0);
+  });
+
+  it("valhalla→GH e GH fallisce per errore area → fallback(valhalla) MA zero failure", async () => {
+    mocks.decideEngineWithAI.mockResolvedValue({
+      engine: "valhalla", confidence: 0.9, reason: "test", provider: "groq",
+    });
+    mocks.valhallaCalculateRoute.mockRejectedValue(new Error("Valhalla: timeout"));
+    mocks.isAreaRoutingActive.mockResolvedValue(true);
+    mocks.resolveRoutingArea.mockResolvedValue({ kind: ROUTING_AREA_OUTCOMES.CROSS_GROUP, codes: [] });
+    const res = makeRes();
+
+    await expect(aiOverride(FAKE_REQ, AI_OPTS, res)).rejects.toThrow(CrossGroupRoutingError);
+
+    const c = counters();
+    expect(c.byEngine["valhalla"]?.fallback).toBe(1);
+    expect(c.failures).toBe(0);
+  });
 });
