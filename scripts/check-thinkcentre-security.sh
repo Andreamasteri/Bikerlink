@@ -52,12 +52,7 @@ if command -v ufw &>/dev/null; then
     ok "Porta 443 non esposta a internet generico"
   fi
 
-  # Verifica loopback e Tailscale
-  if ufw status verbose 2>/dev/null | grep -q "tailscale0"; then
-    ok "Tailscale (tailscale0) aperto"
-  else
-    warn "Regola Tailscale non trovata in ufw"
-  fi
+  # (Tailscale rimosso — nessuna verifica necessaria)
 else
   fail "ufw non installato"
 fi

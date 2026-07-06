@@ -22,7 +22,6 @@
 # Porta mappa:
 #   nginx           80, 443   → dipende da --mode (vedi sopra)
 #   SSH             22|2222   → solo LAN 192.168.1.0/24 + rate limit
-#   Tailscale       —         → allow in on tailscale0 (interfaccia intera)
 #   GraphHopper     8990-8996 → solo LAN 192.168.1.0/24
 #   Valhalla        8002      → solo LAN 192.168.1.0/24
 #   Nominatim       8080      → solo LAN 192.168.1.0/24
@@ -91,9 +90,6 @@ echo "→ Policy default: nega tutto in ingresso, consenti tutto in uscita..."
 ufw default deny incoming
 ufw default allow outgoing
 
-# ── Tailscale (interfaccia intera) ────────────────────────────────────────────
-echo "→ Tailscale: allow in on tailscale0..."
-ufw allow in on tailscale0
 
 # ── Loopback ──────────────────────────────────────────────────────────────────
 echo "→ Loopback: allow in on lo..."
@@ -322,8 +318,6 @@ if command -v nginx &>/dev/null; then
 # Copiare manualmente il blocco location nel server block esistente.
 #
 #   location /ufw-status {
-#       # Accessibile solo via Tailscale — sicurezza aggiuntiva a livello nginx
-#       allow 100.64.0.0/10;   # range Tailscale
 #       allow 192.168.1.0/24;  # LAN locale
 #       deny all;
 #       proxy_pass http://127.0.0.1:9099/;
