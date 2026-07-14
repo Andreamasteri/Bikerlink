@@ -64,7 +64,6 @@
 - [Registry↔migration drift guard](registry-migration-drift-guard.md) — validazione "schema-drift" usa parser table-qualified (no token-search globale) per trovare tabelle/colonne del registry non create da migration; baseline KNOWN_UNMIGRATED tiene verde il drift noto ma blocca il nuovo.
 - [600-line ratchet gate](large-files-ratchet-gate.md) — gate blocca a 600; quando si splitta, i file risultanti vanno a ≤450; boot-sequence split in boot-phase3-db-init.ts (Phase 3 DB Init) → 348+235 righe.
 - [AI routing engine selector](ai-routing-engine-selector.md) — dual-compare basso usa engine grezzi; part2.ts split richiede re-export esplicito; ogni decision-log entry deve avere metrics attribuite all'engine REALE eseguito.
-- [Nominatim setup — revisione post-GH](nominatim-post-gh-review.md) — setup-nominatim.sh va rivisto/verificato dopo che le 7 zone GraphHopper+Valhalla sono operative sul ThinkCentre.
 - [Ollama nginx Host header fix](ollama-nginx-host-header.md) — Ollama 0.24+ ritorna 403 se `Host≠localhost`; fix: `proxy_set_header Host "localhost"` + nginx su `192.168.1.35:443` (no conflitto Tailscale).
 - [react-native-keyboard-controller version lock](keyboard-controller-lock.md) — bloccato a 1.21.6; NON aggiornare senza autorizzazione esplicita utente; in expo.install.exclude di package.json.
 - [package-lock Replit proxy → EAS crash](package-lock-replit-proxy.md) — dopo ogni `npm install` in Replit, le URL resolved diventano `package-firewall.replit.local` → EAS crashe "Exit handler never called!". Fix: `sed -i 's|http://package-firewall\.replit\.local/npm/|https://registry.npmjs.org/|g' package-lock.json`.
@@ -130,6 +129,7 @@
 
 - [Split-file merge via bash assembly](split-merge-bash-assembly.md) — fondi i part lazy-split assemblando con sed/cat (no ritrascrizione); subagent lasciano lavoro parziale, fonte di verità = filesystem; marker >600 = LARGE-FILE-ALLOW + voce allow.txt.
 
+- [CF tunnel/origin down vs bad secret](cf-tunnel-origin-down-vs-secret.md) — uniform 502+SSH-timeout across every TC service = box/tunnel offline, not a secret issue; new secrets need a workflow restart to reach ShellExec env.
 - [CF Access service-token 403 troubleshooting](cf-access-secret-troubleshooting.md) — se client_id+policy sono ok ma 403, è il secret: dev'essere 64-hex senza .access (usa Copy button, no select manuale); secret sbagliato 403a TUTTI i servizi TC insieme; agent non può salvare secret → solo requestEnvVar.
 - [Deep schema parity (dev↔prod)](deep-schema-parity.md) — confronto DEFINIZIONI (non nomi) su 7 categorie via hash; prod catturata offline (no conn string, read-only db skill) in server/data/deep-schema-parity.prod.json; spatial_ref_sys_pkey/postgis/user_sessions_chk allow-listati.
 - [ThinkCentre monitor test probes](thinkcentre-monitor-test-probes.md) — monitor re-esporta probeGraphHopperAreas/computeOverallStatus; tcpConnectOk ora corto-circuita sotto test (no hang); isola via PROBE_ENV_VARS+resetProbeEnvForTests, mai delete-list a mano; db mock serve withDbRetry + where() awaitable + drizzle inArray.
