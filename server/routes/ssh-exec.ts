@@ -1,6 +1,25 @@
 import { Router, type Request, type Response } from "express";
 import { Client as SshClient } from "ssh2";
 import { storage } from "../storage";
+import { ensureTcSshBridge } from "../lib/tc-ssh-bridge";
+
+/**
+ * Ricostruisce una chiave privata OpenSSH il cui contenuto ha i newline
+ * "collassati" (il paste nell'UI secret spesso li trasforma in spazi). I marker
+ * BEGIN/END contengono spazi legittimi, quindi si isolano via regex e si
+ * riavvolge il corpo base64 a 64 colonne. Ritorna la chiave normalizzata, o la
+ * stringa originale se non combacia il formato (paramiko/ssh2 proverà comunque).
+ */
+export function normalizeOpenSshPrivateKey(raw: string): string {
+  const s = raw.trim();
+  if (s.includes("\n")) return s; // già multi-linea, non toccare
+  const m = /-----BEGIN ([A-Z0-9 ]+?)-----(.*?)-----END \1-----/s.exec(s);
+  if (!m) return s;
+  const label = m[1].trim();
+  const body = m[2].replace(/\s+/g, "");
+  const wrapped = body.replace(/(.{64})/g, "$1\n").replace(/\n$/, "");
+  return `-----BEGIN ${label}-----\n${wrapped}\n-----END ${label}-----\n`;
+}
 
 export interface SshLogEntry {
   id: number;
@@ -56,19 +75,29 @@ function extractCommand(body: unknown): string | undefined {
   return undefined;
 }
 
-function execSsh(command: string, timeoutMs = 30_000): Promise<{ stdout: string; stderr: string; exitCode: number | null }> {
+async function execSsh(command: string, timeoutMs = 30_000): Promise<{ stdout: string; stderr: string; exitCode: number | null }> {
+  const username = process.env.TC_SSH_USER;
+  const rawKey = process.env.TC_SSH_KEY;
+
+  if (!username) {
+    throw new Error("TC_SSH_USER non configurato");
+  }
+  if (!rawKey || !rawKey.trim()) {
+    throw new Error("TC_SSH_KEY deve essere configurato (chiave privata OpenSSH)");
+  }
+
+  // Il TC è dietro Cloudflare Tunnel + Access: nessuna connessione diretta sulla
+  // porta 22. Apriamo (lazy) il bridge cloudflared e ci colleghiamo al listener
+  // locale con la chiave privata. Se il bridge non è disponibile (binario o
+  // token mancanti) degradiamo con un errore descrittivo, senza crashare.
+  const bridge = await ensureTcSshBridge();
+  if (!bridge.ok) {
+    throw new Error(`Bridge Cloudflare Access non disponibile: ${bridge.error ?? "sconosciuto"}`);
+  }
+
+  const privateKey = normalizeOpenSshPrivateKey(rawKey);
+
   return new Promise((resolve, reject) => {
-    const host = (process.env.TC_SSH_HOST ?? "").replace(/^https?:\/\//i, "").trim();
-    const username = process.env.TC_SSH_USER;
-    const password = process.env.TC_SSH_PASSWORD;
-
-    if (!host || !username) {
-      return reject(new Error("TC_SSH_HOST e TC_SSH_USER non configurati"));
-    }
-    if (!password) {
-      return reject(new Error("TC_SSH_PASSWORD deve essere configurato"));
-    }
-
     const conn = new SshClient();
     let settled = false;
     let stdout = "";
@@ -117,10 +146,10 @@ function execSsh(command: string, timeoutMs = 30_000): Promise<{ stdout: string;
     });
 
     const connectOpts: Parameters<SshClient["connect"]>[0] = {
-      host,
-      port: parseInt(process.env.TC_SSH_PORT ?? "22", 10),
+      host: "127.0.0.1",
+      port: bridge.localPort,
       username,
-      password,
+      privateKey,
       readyTimeout: timeoutMs,
     };
 

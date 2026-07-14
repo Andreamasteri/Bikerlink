@@ -214,13 +214,15 @@ log "=== [2/3] Build server TypeScript ==="
 node scripts/server-build.js
 log "  server_dist/ prodotto → $(size server_dist) ($(size server_dist/index.js 2>/dev/null) il bundle)"
 
-# Task #5261 — Bake del binario cloudflared nel Repl layer.
-# Il bridge TCP verso il DragonflyDB del ThinkCentre (server/cache/redis-tunnel.ts)
-# esegue `cloudflared access tcp`. Scarichiamo il binario qui così è presente a
-# runtime nel container autoscale (la rete in FASE 4 potrebbe non essere garantita).
-# NON-FATALE: se il download fallisce, il bridge degrada a no-op e l'app usa il
-# fallback in-memory di server/cache/redis.ts (nessun crash, deploy non bloccato).
-log "=== [2c/3] Bake binario cloudflared (bridge Redis TCP) ==="
+# Task #5261 / #19 — Bake del binario cloudflared nel Repl layer (CONDIVISO).
+# Due bridge lo usano: il TCP verso il DragonflyDB (server/cache/redis-tunnel.ts,
+# `cloudflared access tcp`) e l'SSH verso il ThinkCentre (server/lib/tc-ssh-bridge.ts,
+# stesso `cloudflared access tcp` per la route server/routes/ssh-exec.ts). Scarichiamo
+# il binario qui così è presente a runtime nel container autoscale (la rete in FASE 4
+# potrebbe non essere garantita). NON-FATALE: se il download fallisce, i bridge
+# degradano con grazia (Redis → fallback in-memory; SSH → errore descrittivo, niente
+# crash) e il deploy non è bloccato.
+log "=== [2c/3] Bake binario cloudflared (bridge Redis TCP + SSH) ==="
 CF_BIN="bin/cloudflared"
 if [ -x "$CF_BIN" ]; then
   log "  $CF_BIN già presente ($(size $CF_BIN)) — skip download."

@@ -72,13 +72,13 @@ tunnel e l'origine sono su**.
   Gira su TC via pm2, porta 4600.
 
 ### SSH — cloudflared ProxyCommand (mai porta 22 diretta)
-Metodo corretto (dalla memoria BikerBlog, verificato):
+Metodo corretto (verificato live; **ricablato nel codice in Task #19**):
 ```bash
 ssh -i ~/.ssh/tc_key \
     -o ProxyCommand="cloudflared access ssh --hostname %h" \
     "$TC_SSH_USER@$TC_SSH_HOST" 'comando'
 ```
-- `TC_SSH_HOST` = `tc.biker-link.net` (hostname SSH del tunnel).
+- `TC_SSH_HOST` = **`ssh.biker-link.net`** (hostname SSH del tunnel; `tc.biker-link.net` NON è instradato come SSH → `bad handshake`).
 - `TC_SSH_USER` = utente con sudo passwordless (probabile `andrea`, da
   confermare — un mismatch dà lo stesso `Permission denied (publickey)` di una
   chiave errata).
@@ -90,15 +90,19 @@ ssh -i ~/.ssh/tc_key \
 - `cloudflared` richiede `CF_ACCESS_CLIENT_ID/SECRET` in env per autenticarsi in
   modo non interattivo.
 
-> ⚠️ **Blocco sandbox:** `cloudflared` **non è installato** nella sandbox Replit
-> (`command -v cloudflared` → MISSING). Il repo lo prevede baked in
-> `./bin/cloudflared` dal deploy-build (`server/cache/redis-tunnel.ts`
-> `resolveBin()`), ma per una verifica SSH live *dalla sandbox* va installato
-> prima. Il codice attuale di SSH (`server/routes/ssh-exec.ts`,
-> `.agents/skills/thinkcentre-access/tc.py`) usa ancora SSH **password diretta**
-> (`TC_SSH_PASSWORD`) stile Tailscale: **non funziona più** col tunnel CF. Il
-> ricablaggio al metodo ProxyCommand è **codice → task #3/#4** (qui solo
-> documentato, non applicato).
+> ✅ **Ricablaggio completato (Task #19).** Entrambi i percorsi SSH usano ora
+> Cloudflare Access, non più la password diretta (`TC_SSH_PASSWORD`, dismesso):
+> - **Agente** — `.agents/skills/thinkcentre-access/tc.py` usa `ssh` di sistema con
+>   `ProxyCommand="cloudflared access ssh --hostname %h"`, scaricando `cloudflared`
+>   on-demand se assente e usando `TC_SSH_KEY` (chiave privata, newline ricostruiti)
+>   in un file temporaneo `0600` rimosso a fine sessione.
+> - **Server** — `server/routes/ssh-exec.ts` apre (lazy) il bridge
+>   `server/lib/tc-ssh-bridge.ts` (`cloudflared access tcp` → listener locale, stesso
+>   pattern di `server/cache/redis-tunnel.ts`) e si collega con `ssh2` + chiave privata.
+> Il binario `cloudflared` è baked in `./bin/cloudflared` dal deploy-build (condiviso
+> col bridge Redis); nella sandbox viene scaricato on-demand. Verificato live
+> 2026-07-14: entrambi i percorsi eseguono comandi reali sul TC (uptime/hostname
+> `bikerlink`).
 
 ---
 

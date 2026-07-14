@@ -22,10 +22,23 @@ python3 .agents/skills/thinkcentre-access/tc.py exec "docker ps -a"
 python3 .agents/skills/thinkcentre-access/tc.py exec "systemctl restart whisper" --sudo
 ```
 
-Se `paramiko` manca: `installLanguagePackages('python3', 'paramiko')`.
+`tc.py` non usa più `paramiko`: si appoggia al binario `ssh` di sistema con `cloudflared` come ProxyCommand. `cloudflared` viene risolto da `bin/cloudflared` del repo, poi dal PATH, e in ultima istanza scaricato on-demand in una dir temporanea (rimossa a fine sessione).
 
-### Perché il mio SSH a volte fallisce
-`TC_SSH_HOST` contiene il prefisso `Https://` (l'host reale è il DuckDNS pubblico via Cloudflare tunnel). `tc.py` lo strippa già. Se ti connetti a mano: `os.environ["TC_SSH_HOST"].replace("Https://","").strip().rstrip("/")`. NON usare l'IP LAN `192.168.1.35` né nomi Tailscale: non sono risolvibili dalla sandbox Replit (`gaierror`).
+### Come funziona l'accesso SSH (Cloudflare Access — NON porta 22 diretta)
+Il ThinkCentre è dietro **Cloudflare Tunnel + Cloudflare Access**: non accetta connessioni SSH dirette sulla porta 22 né via password. `tc.py` si connette così:
+
+```bash
+ssh -i <chiave-privata> \
+    -o ProxyCommand="cloudflared access ssh --hostname %h" \
+    "$TC_SSH_USER@$TC_SSH_HOST" '<comando>'
+```
+
+- `TC_SSH_HOST` = **`ssh.biker-link.net`** (hostname SSH del tunnel). ⚠️ NON usare `tc.biker-link.net`: quell'hostname non è instradato come SSH e `cloudflared access ssh` fallisce con `websocket: bad handshake`. `tc.py` strippa comunque un eventuale prefisso `Https://`.
+- `TC_SSH_USER` = utente con sudo passwordless (`andrea`). `--sudo` usa `sudo -n` (non interattivo).
+- `TC_SSH_KEY` = chiave **privata** OpenSSH. Il paste nell'UI secret spesso collassa i newline in spazi: `tc.py` la **ricostruisce** automaticamente (riavvolge il corpo base64 a 64 colonne) e la scrive in un file temporaneo `0600` cancellato a fine sessione.
+- `CF_ACCESS_CLIENT_ID`/`CF_ACCESS_CLIENT_SECRET` = service token Cloudflare Access, passati a `cloudflared` via `TUNNEL_SERVICE_TOKEN_ID/SECRET`.
+
+NON usare l'IP LAN `192.168.1.35` né nomi Tailscale: non sono risolvibili dalla sandbox Replit.
 
 ## Inventario servizi
 
@@ -95,4 +108,4 @@ python3 .agents/skills/thinkcentre-access/tc.py exec "bash ~/scripts/wake-ares.s
   alimentazione). Verificato: Ares compare nella ARP del TC pochi secondi dopo il pacchetto.
 
 ## Secret usati (già presenti, non chiederli)
-`TC_SSH_HOST`, `TC_SSH_USER`, `TC_SSH_PASSWORD`, `TC_SSH_PORT`, `TC_SSH_KEY` (SSH) · `GRAPHHOPPER_URL`/`GRAPHHOPPER_TOKEN`, `VALHALLA_URL`/`VALHALLA_API_KEY`, `OLLAMA_URL`/`OLLAMA_TOKEN`, `THINKCENTRE_METRICS_URL`/`THINKCENTRE_AGENT_TOKEN` (HTTP). Non stamparne mai i valori.
+`TC_SSH_HOST` (=`ssh.biker-link.net`), `TC_SSH_USER`, `TC_SSH_KEY`, `CF_ACCESS_CLIENT_ID`, `CF_ACCESS_CLIENT_SECRET` (SSH via Cloudflare Access — `TC_SSH_PASSWORD` NON è più usato) · `GRAPHHOPPER_URL`/`GRAPHHOPPER_TOKEN`, `VALHALLA_URL`/`VALHALLA_API_KEY`, `OLLAMA_URL`/`OLLAMA_TOKEN`, `THINKCENTRE_METRICS_URL`/`THINKCENTRE_AGENT_TOKEN` (HTTP). Non stamparne mai i valori.
