@@ -169,7 +169,7 @@ router.post("/ai-parse", async (req: Request, res: Response) => {
     if (rawPoiStops.length > 0) {
       try {
         const { searchPoi } = await import("../../lib/overpass-client");
-        const { geocode } = await import("../../lib/nominatim-client");
+        const { geocode } = await import("../../lib/photon-client");
         resolvedPoiStops = await Promise.all(
           rawPoiStops.map(async (stop) => {
             try {
@@ -268,7 +268,7 @@ router.get("/geocode", async (req: Request, res: Response) => {
   const { q } = req.query as { q?: string };
   if (!q) return sendError(res, 400, "Query richiesta");
   try {
-    const { geocode } = await import("../../lib/nominatim-client");
+    const { geocode } = await import("../../lib/photon-client");
     const results = await geocode(q);
     return res.json(results);
   } catch (err) {

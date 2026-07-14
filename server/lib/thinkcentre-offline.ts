@@ -4,7 +4,7 @@
  * Ritorna true quando `thinkcentre_powered_off=true` OPPURE
  * `thinkcentre_maintenance_mode=true`. In entrambi i casi il sistema deve
  * smettere immediatamente di interagire con i servizi self-hosted del
- * ThinkCentre (Ollama, Whisper, routing, map-matching, Nominatim): niente
+ * ThinkCentre (Ollama, Whisper, routing, map-matching, Photon): niente
  * timeout di rete da attendere, niente retry, fallback cloud istantaneo.
  *
  * Le due AppSetting vengono lette con cache in-memory TTL 3 minuti: così le

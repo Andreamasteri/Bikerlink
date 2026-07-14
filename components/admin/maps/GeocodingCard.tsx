@@ -3,7 +3,7 @@ import { View, Text, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
 
-export interface NominatimHealth {
+export interface PhotonHealth {
   configured: boolean;
   url: string;
   latencyMs: number | null;
@@ -11,16 +11,16 @@ export interface NominatimHealth {
 }
 
 interface GeocodingCardProps {
-  nominatim: NominatimHealth;
+  photon: PhotonHealth;
 }
 
-export function GeocodingCard({ nominatim }: GeocodingCardProps) {
-  const { configured, url, latencyMs, ok } = nominatim;
+export function GeocodingCard({ photon }: GeocodingCardProps) {
+  const { configured, url, latencyMs, ok } = photon;
 
   const color = ok ? Colors.success : Colors.error;
   const icon: "checkmark-circle" | "alert-circle" = ok ? "checkmark-circle" : "alert-circle";
   const statusText = ok ? "raggiungibile" : "non raggiungibile";
-  const sourceLabel = configured ? "self-hosted" : "pubblico (fallback)";
+  const sourceLabel = configured ? "Photon self-hosted" : "non configurato";
 
   return (
     <View style={styles.card}>

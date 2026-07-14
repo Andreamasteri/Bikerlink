@@ -61,8 +61,8 @@ export async function testApiRouting(): Promise<DiagnosticTestResult[]> {
       if (data?.available === false) return { status: "WARN", message: "Valhalla non disponibile" };
       return { status: "PASS" };
     }, 5000),
-    runTest(section, "Nominatim geocoding", async () => {
-      const url = new URL("/api/routing/nominatim/search?q=Roma&limit=1", getApiUrl()).toString();
+    runTest(section, "Photon geocoding", async () => {
+      const url = new URL("/api/routing/photon/search?q=Roma&limit=1", getApiUrl()).toString();
       const res = await fetch(url, { headers: authFetchHeaders(), credentials: "include" });
       if (!res.ok) return { status: "WARN", message: `HTTP ${res.status}` };
       return { status: "PASS" };

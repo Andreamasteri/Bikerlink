@@ -153,7 +153,7 @@ export const adminGroupsPart2: AdminGroup[] = [
         iconSet: "Ionicons",
         route: "/admin/maps",
         accentColor: "#0EA5E9",
-        keywords: ["mappa", "map", "mappe", "leaflet", "tile", "osm", "openstreetmap", "cartografia", "geocoding", "nominatim", "geocoder", "reverse geocoding", "coordinate", "zoom", "marker", "poi", "layer", "tileset"],
+        keywords: ["mappa", "map", "mappe", "leaflet", "tile", "osm", "openstreetmap", "cartografia", "geocoding", "photon", "geocoder", "reverse geocoding", "coordinate", "zoom", "marker", "poi", "layer", "tileset"],
       },
     ],
   },

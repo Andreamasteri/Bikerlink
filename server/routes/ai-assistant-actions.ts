@@ -53,7 +53,7 @@ async function executeServerAction(
 
     if (lat == null || lng == null || !isFinite(lat) || !isFinite(lng)) {
       try {
-        const { geocode } = await import("../lib/nominatim-client");
+        const { geocode } = await import("../lib/photon-client");
         const results = await geocode(p.waypointName);
         if (!results.length) {
           return { ok: false, httpStatus: 404, error: `Luogo non trovato: ${p.waypointName}` };

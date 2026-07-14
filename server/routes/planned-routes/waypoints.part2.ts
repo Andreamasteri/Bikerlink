@@ -123,7 +123,7 @@ export async function handleCalculateRoute(req: Request, res: Response) {
     const routerOpts = await resolveRouterOpts(userId, body.points as [number, number][], normStyle);
 
     // geocodingOk: il client informa il server se il geocoding è andato a buon
-    // fine per tutti i waypoint (es. Nominatim disponibile). Se assente, si
+    // fine per tutti i waypoint (es. Photon disponibile). Se assente, si
     // assume true (coordinate già risolte o fornite direttamente via GPS/mappa).
     const geocodingOk = clientGeocodingOk ?? true;
 

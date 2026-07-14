@@ -13,7 +13,7 @@ import { RendererCard } from "@/components/admin/maps/RendererCard";
 import { RoutingCard } from "@/components/admin/maps/RoutingCard";
 import { TileProvidersCard } from "@/components/admin/maps/TileProvidersCard";
 import { GeocodingCard } from "@/components/admin/maps/GeocodingCard";
-import type { NominatimHealth } from "@/components/admin/maps/GeocodingCard";
+import type { PhotonHealth } from "@/components/admin/maps/GeocodingCard";
 
 interface AdminMapsConfig {
   rollout: MapsRollout;
@@ -34,7 +34,7 @@ interface AdminMapsConfig {
     resets_at: string;
     warning_threshold: number;
   };
-  nominatim?: NominatimHealth;
+  photon?: PhotonHealth;
 }
 
 const ROLLOUT_LABELS: Record<MapsRollout, string> = {
@@ -180,7 +180,7 @@ export default function AdminMapsPage() {
         onRoutingChange={(engine, profile) => routingMutation.mutate({ engine, profile })}
       />
 
-      {data.nominatim && <GeocodingCard nominatim={data.nominatim} />}
+      {data.photon && <GeocodingCard photon={data.photon} />}
 
       <TileProvidersCard />
 

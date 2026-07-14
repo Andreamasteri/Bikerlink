@@ -339,7 +339,7 @@ export function RoutingCoordinationCard({
                     </View>
                     {!ev.geocodingOk && (
                       <Text style={[styles.eventSub, { color: "#f59e0b" }]}>
-                        Nominatim o AI lookup falliti — coordinate non risolte correttamente
+                        Photon o AI lookup falliti — coordinate non risolte correttamente
                       </Text>
                     )}
                     {ev.fallbackReason && (

@@ -2,7 +2,7 @@
  * Overpass API Client — BikerLink
  *
  * Ricerca POI (ristoranti, hotel, rifugi, ecc.) via Overpass QL.
- * Usato dal flusso AI per risolvere poiStops non geocodificabili con Nominatim.
+ * Usato dal flusso AI per risolvere poiStops non geocodificabili con Photon.
  *
  * TTL cache: 10 min | Timeout: 8 s | Max risultati: 10
  *

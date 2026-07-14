@@ -63,7 +63,7 @@ export interface SystemStatuses {
   thinkcentre: DotStatus;
   graphhopper: DotStatus;
   valhalla: DotStatus;
-  nominatim: DotStatus;
+  photon: DotStatus;
   ollama: DotStatus;
   whisper: DotStatus;
   ufw: DotStatus;
@@ -86,7 +86,7 @@ const DOT_DEFS: { key: keyof SystemStatuses; label: string }[] = [
   { key: "thinkcentre",  label: "ThinkCentre"    },
   { key: "graphhopper",  label: "GraphHopper"    },
   { key: "valhalla",     label: "Valhalla"        },
-  { key: "nominatim",    label: "Nominatim"       },
+  { key: "photon",       label: "Photon"          },
   { key: "ollama",       label: "Ollama AI"       },
   { key: "whisper",      label: "Whisper ASR"     },
   { key: "ufw",          label: "Firewall"        },

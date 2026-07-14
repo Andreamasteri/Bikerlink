@@ -8,7 +8,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 //  - `@shared/db`                   → tabelle drizzle usate come riferimento
 //  - `drizzle-orm`                  → `eq` passato a `.where()` (già mockato)
 //  - `../push-notifications`        → verifica notifiche senza push reale
-//  - `../lib/nominatim-client`      → non configurato di default
+//  - `../lib/photon-client`         → non configurato di default
 //  - `../graphhopper-client`        → ACTIVE_PROFILE + gate isSelfHosted
 //  - `../routing/routing-area-state`→ getAreaEnabledMap controllabile per-test
 //
@@ -51,8 +51,8 @@ vi.mock("../push-notifications", () => ({
   sendSystemAlertPushToAdmins: sendPushMock,
 }));
 
-vi.mock("../lib/nominatim-client", () => ({
-  getNominatimHealthSnapshot: vi.fn().mockResolvedValue({ configured: false, ok: false }),
+vi.mock("../lib/photon-client", () => ({
+  getPhotonHealthSnapshot: vi.fn().mockResolvedValue({ configured: false, ok: false }),
 }));
 
 vi.mock("../graphhopper-client", () => ({
@@ -332,8 +332,8 @@ describe("computeOverallStatus — calcolo colore aggregato", () => {
   });
 
   it("GH conta come singola unità logica: true+false+false+null+true → yellow non red", () => {
-    // 4 servizi singoli (Ollama, Whisper, Nominatim, Valhalla) + GH unitOk
-    // Scenario: Ollama=true, Whisper=false, Nominatim=false, Valhalla=null, GH=true
+    // 4 servizi singoli (Ollama, Whisper, Photon, Valhalla) + GH unitOk
+    // Scenario: Ollama=true, Whisper=false, Photon=false, Valhalla=null, GH=true
     // Configurati: [true, false, false, true] → 2/4 online → yellow
     expect(computeOverallStatus([true, false, false, null, true])).toBe<OverallStatus>("yellow");
   });

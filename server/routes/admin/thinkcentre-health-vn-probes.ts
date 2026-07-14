@@ -1,5 +1,5 @@
 /**
- * Probe Valhalla, Nominatim e ufw — estratti da thinkcentre-health.ts
+ * Probe Valhalla, Photon e ufw — estratti da thinkcentre-health.ts
  * Importati da thinkcentre-health.ts per mantenere il file sotto 600 righe.
  */
 
@@ -21,16 +21,12 @@ export interface ValhallaDetailedHealth {
   probeLog: ProbeLogEntry[];
 }
 
-export interface NominatimDetailedHealth {
+export interface PhotonDetailedHealth {
   configured: boolean;
   ok: boolean;
   latencyMs: number | null;
   url: string | null;
   error?: string;
-  dataUpdated?: string;
-  softwareVersion?: string;
-  dbState?: "ok" | "error" | "unknown";
-  geocodeLatencyMs?: number | null;
   tokenMissing?: boolean;
   history: Array<{ timestamp: number; error: string }>;
   probeLog: ProbeLogEntry[];
@@ -255,37 +251,25 @@ export async function probeValhallaDetailed(): Promise<ValhallaDetailedHealth> {
   }
 }
 
-async function probeNominatimGeocodeLatency(
-  base: string,
-  headers: Record<string, string>,
-): Promise<number | null> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 4_000);
-  const t0 = Date.now();
-  try {
-    const res = await fetch(`${base}/search?q=Roma&format=json&limit=1&accept-language=it`, { headers, signal: controller.signal });
-    if (res.status >= 200 && res.status < 300) return Date.now() - t0;
-    return null;
-  } catch {
-    return null;
-  } finally {
-    clearTimeout(timer);
-  }
-}
-
-export async function probeNominatimDetailed(): Promise<NominatimDetailedHealth> {
-  const base = process.env.NOMINATIM_URL?.trim().replace(/\/$/, "") || null;
+export async function probePhotonDetailed(): Promise<PhotonDetailedHealth> {
+  const base = process.env.PHOTON_URL?.trim().replace(/\/$/, "") || null;
   const configured = Boolean(base);
-  const token = process.env.NOMINATIM_TOKEN;
+  const token = process.env.PHOTON_TOKEN;
   const tokenMissing = configured && (!token || token.trim() === "");
-  const maskedUrl = base ? maskUrl(base) : "nominatim.openstreetmap.org";
-  const probeBase = base ?? "https://nominatim.openstreetmap.org";
-  const probeUrl = `${probeBase}/status?format=json`;
 
-  const headers: Record<string, string> = { "User-Agent": "BikerLink/4.0 (info@bikerlink.it)" };
-  // CF Access headers solo verso il Nominatim self-hosted (mai al fallback pubblico openstreetmap.org).
-  if (base) Object.assign(headers, cfAccessHeaders());
-  if (base && token) headers["X-Nominatim-Token"] = token;
+  // Nessun fallback pubblico: se PHOTON_URL non è impostata, il geocoder è
+  // "non configurato" (nessun probe di rete).
+  if (!base) {
+    return { configured: false, ok: false, latencyMs: null, url: null, tokenMissing: false, history: getHistory("photon"), probeLog: getProbeLog("photon") };
+  }
+
+  const maskedUrl = maskUrl(base);
+  // Photon non espone /status: una query di geocoding minima ("Roma") misura
+  // disponibilità e latenza reali del motore.
+  const probeUrl = `${base}/api/?q=Roma&limit=1&lang=default`;
+
+  const headers: Record<string, string> = { "User-Agent": "BikerLink/4.0 (info@bikerlink.it)", ...cfAccessHeaders() };
+  if (token) headers["X-Photon-Token"] = token;
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), PROBE_TIMEOUT_MS);
@@ -299,43 +283,13 @@ export async function probeNominatimDetailed(): Promise<NominatimDetailedHealth>
       const error = bodySnippet
         ? sanitizeError(`HTTP ${res.status} — ${bodySnippet}`)
         : `HTTP ${res.status}`;
-      if (configured) {
-        console.error("[thinkcentre-probe] nominatim KO", { status: res.status, error });
-        recordError("nominatim", error);
-      }
-      recordProbeLog("nominatim", { timestamp: Date.now(), ok: false, latencyMs, detail: error });
-      return { configured, ok: false, latencyMs, url: configured ? maskedUrl : null, error, tokenMissing, dbState: "unknown", history: getHistory("nominatim"), probeLog: getProbeLog("nominatim") };
+      console.error("[thinkcentre-probe] photon KO", { status: res.status, error });
+      recordError("photon", error);
+      recordProbeLog("photon", { timestamp: Date.now(), ok: false, latencyMs, detail: error });
+      return { configured, ok: false, latencyMs, url: maskedUrl, error, tokenMissing, history: getHistory("photon"), probeLog: getProbeLog("photon") };
     }
-    const data = (await res.json().catch(() => ({}))) as {
-      status?: number;
-      message?: string;
-      data_updated?: string;
-      software_version?: string;
-      database_version?: string;
-    };
-    const dbState: "ok" | "error" | "unknown" =
-      data.status === 0 ? "ok" : data.status != null ? "error" : "unknown";
-    const isOk = dbState !== "error";
-    if (!isOk && configured) {
-      recordError("nominatim", sanitizeError(`DB status ${data.status} — ${data.message ?? ""}`));
-    }
-    const geocodeLatencyMs = isOk ? await probeNominatimGeocodeLatency(probeBase, headers) : null;
-    const detailParts: string[] = [`DB ${dbState}`];
-    if (geocodeLatencyMs != null) detailParts.push(`geocode ${geocodeLatencyMs} ms`);
-    recordProbeLog("nominatim", { timestamp: Date.now(), ok: isOk, latencyMs, detail: detailParts.join(", ") });
-    return {
-      configured,
-      ok: isOk,
-      latencyMs,
-      url: configured ? maskedUrl : null,
-      dataUpdated: data.data_updated,
-      softwareVersion: data.software_version ?? data.database_version,
-      dbState,
-      geocodeLatencyMs,
-      tokenMissing,
-      history: getHistory("nominatim"),
-      probeLog: getProbeLog("nominatim"),
-    };
+    recordProbeLog("photon", { timestamp: Date.now(), ok: true, latencyMs, detail: `geocode ${latencyMs} ms` });
+    return { configured, ok: true, latencyMs, url: maskedUrl, tokenMissing, history: getHistory("photon"), probeLog: getProbeLog("photon") };
   } catch (err: unknown) {
     const raw = err instanceof Error ? err.message : String(err);
     let classified: string;
@@ -347,12 +301,10 @@ export async function probeNominatimDetailed(): Promise<NominatimDetailedHealth>
       classified = raw;
     }
     const error = sanitizeError(classified);
-    if (configured) {
-      console.error("[thinkcentre-probe] nominatim KO (rete/timeout)", { error });
-      recordError("nominatim", error);
-    }
-    recordProbeLog("nominatim", { timestamp: Date.now(), ok: false, latencyMs: null, detail: error });
-    return { configured, ok: false, latencyMs: null, url: configured ? maskedUrl : null, error, tokenMissing, dbState: "unknown", history: getHistory("nominatim"), probeLog: getProbeLog("nominatim") };
+    console.error("[thinkcentre-probe] photon KO (rete/timeout)", { error });
+    recordError("photon", error);
+    recordProbeLog("photon", { timestamp: Date.now(), ok: false, latencyMs: null, detail: error });
+    return { configured, ok: false, latencyMs: null, url: maskedUrl, error, tokenMissing, history: getHistory("photon"), probeLog: getProbeLog("photon") };
   } finally {
     clearTimeout(timer);
   }

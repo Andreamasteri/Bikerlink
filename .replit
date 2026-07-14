@@ -199,6 +199,7 @@ BIKERBLOG_BRIEFING_URL = "https://3abefdc3-a018-4771-90ae-b2c3a0fd6b0e-00-2g5dq1
 ARES_OLLAMA_MODEL = "devstral:latest"
 BOWIE_OLLAMA_MODEL = "bikerlink"
 HORUS_OLLAMA_MODEL = "qwen3:4b"
+PHOTON_URL = "https://photon.biker-link.net"
 
   [userenv.development]
   EXPO_WEB_URL = "http://localhost:8081"

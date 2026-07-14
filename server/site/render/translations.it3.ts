@@ -202,7 +202,7 @@ export const SITE_TRANSLATIONS_IT3: Record<string, string> = {
   'match.inv.rdm.item7': 'Routing moto curvy (Valhalla + GraphHopper)',
   'match.inv.rdm.item8': 'SOS real-time + geolocalizzazione',
   'match.inv.rdm.item9': 'MotoClub + eventi',
-  'match.inv.rdm.item10': 'Nominatim self-hosted',
+  'match.inv.rdm.item10': 'Photon self-hosted',
   'match.inv.rdm.item11': 'AI Integrity Monitor v2',
   'match.inv.kpi1': 'AI specializzate',
   'match.inv.kpi2': 'Modelli orchestrati',

@@ -8,7 +8,7 @@ import {
 } from "./thinkcentre-health-gh-probes";
 import {
   probeValhallaDetailed,
-  probeNominatimDetailed,
+  probePhotonDetailed,
   probeUfwDetailed,
 } from "./thinkcentre-health-vn-probes";
 import {
@@ -61,7 +61,7 @@ export async function updateThinkCentreSystemStatus(
       thinkcentre: "unknown",
       graphhopper: "unknown",
       valhalla: "unknown",
-      nominatim: "unknown",
+      photon: "unknown",
       ollama: "unknown",
       whisper: "unknown",
       ufw: "unknown",
@@ -76,7 +76,7 @@ export async function updateThinkCentreSystemStatus(
       thinkcentre: tcDot,
       graphhopper: ghDot(),
       valhalla: svcDot(svcMap.get("valhalla")),
-      nominatim: svcDot(svcMap.get("nominatim")),
+      photon: svcDot(svcMap.get("photon")),
       ollama: svcDot(svcMap.get("ollama")),
       whisper: svcDot(svcMap.get("whisper")),
       ufw: ufwDot(),
@@ -99,7 +99,7 @@ export async function updateThinkCentreSystemStatus(
 export async function probeThinkCentreStatusSnapshot(): Promise<
   Pick<
     import("../../lib/system-status-cache").SystemStatusSnapshot,
-    | "thinkcentre" | "graphhopper" | "valhalla" | "nominatim"
+    | "thinkcentre" | "graphhopper" | "valhalla" | "photon"
     | "ollama" | "whisper" | "ufw"
     | "dragonfly" | "postgres" | "pgadmin" | "nginx" | "uptimeKuma"
   >
@@ -110,7 +110,7 @@ export async function probeThinkCentreStatusSnapshot(): Promise<
       thinkcentre: "unknown" as CachedDotStatus,
       graphhopper: "unknown" as CachedDotStatus,
       valhalla: "unknown" as CachedDotStatus,
-      nominatim: "unknown" as CachedDotStatus,
+      photon: "unknown" as CachedDotStatus,
       ollama: "unknown" as CachedDotStatus,
       whisper: "unknown" as CachedDotStatus,
       ufw: "unknown" as CachedDotStatus,
@@ -129,7 +129,7 @@ export async function probeThinkCentreStatusSnapshot(): Promise<
       thinkcentre: "unknown" as CachedDotStatus,
       graphhopper: "unknown" as CachedDotStatus,
       valhalla: "unknown" as CachedDotStatus,
-      nominatim: "unknown" as CachedDotStatus,
+      photon: "unknown" as CachedDotStatus,
       ollama: "unknown" as CachedDotStatus,
       whisper: "unknown" as CachedDotStatus,
       ufw: "unknown" as CachedDotStatus,
@@ -146,7 +146,7 @@ export async function probeThinkCentreStatusSnapshot(): Promise<
   const [
     graphhopper,
     valhallaDetail,
-    nominatimDetail,
+    photonDetail,
     ollama,
     whisper,
     ufwDetail,
@@ -158,7 +158,7 @@ export async function probeThinkCentreStatusSnapshot(): Promise<
   ] = await Promise.all([
     probeGraphHopperAreas(),
     probeValhallaDetailed(),
-    probeNominatimDetailed(),
+    probePhotonDetailed(),
     probeOllama(),
     probeWhisper(),
     probeUfwDetailed(),
@@ -185,7 +185,7 @@ export async function probeThinkCentreStatusSnapshot(): Promise<
     return "offline";
   };
 
-  const configuredServices = [valhallaDetail, nominatimDetail, ollama, whisper, dragonflyInfra, postgresInfra, pgadminInfra, nginxInfra, uptimeKumaInfra].filter((s) => s.configured);
+  const configuredServices = [valhallaDetail, photonDetail, ollama, whisper, dragonflyInfra, postgresInfra, pgadminInfra, nginxInfra, uptimeKumaInfra].filter((s) => s.configured);
   const ghContributes = graphhopper.configured && graphhopper.areas.some((a: any) => a.enabled);
   const configuredCount = configuredServices.length + (ghContributes ? 1 : 0);
   const onlineCount = configuredServices.filter((s) => s.ok).length + (ghContributes && graphhopper.ok ? 1 : 0);
@@ -198,7 +198,7 @@ export async function probeThinkCentreStatusSnapshot(): Promise<
     thinkcentre: overall,
     graphhopper: ghDot(),
     valhalla: svc(valhallaDetail),
-    nominatim: svc(nominatimDetail),
+    photon: svc(photonDetail),
     ollama: svc(ollama),
     whisper: svc(whisper),
     ufw: ufwDetail.configured ? (ufwDetail.ok ? "ok" : "offline") as CachedDotStatus : "unknown",

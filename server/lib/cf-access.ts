@@ -1,7 +1,7 @@
 /**
  * Cloudflare Access — Service Token helper (BikerLink)
  *
- * I servizi self-hosted sul ThinkCentre (GraphHopper, Valhalla, Nominatim,
+ * I servizi self-hosted sul ThinkCentre (GraphHopper, Valhalla, Photon,
  * Whisper) sono esposti su biker-link.net tramite Cloudflare Tunnel. Con
  * Cloudflare Access si aggiunge un layer zero-trust DAVANTI a ogni sottodominio:
  * l'edge Cloudflare valida le richieste prima che raggiungano l'origine.
@@ -18,13 +18,13 @@
  * Comportamento:
  *   - Se ENTRAMBE sono impostate, cfAccessHeaders() restituisce i due header.
  *   - Altrimenti restituisce {} (degrada con grazia): i token custom esistenti
- *     (X-GH-Token / X-Valhalla-Key / X-Nominatim-Token / X-Whisper-Token)
+ *     (X-GH-Token / X-Valhalla-Key / X-Photon-Token / X-Whisper-Token)
  *     restano l'autenticazione attiva come fallback.
  *
  * Gli header sono validati e consumati dall'edge Cloudflare; l'origine li
  * ignora, quindi inviarli è innocuo anche quando la policy Access non è ancora
  * attiva sul sottodominio. Non vanno MAI inviati a endpoint pubblici di terzi
- * (nominatim.openstreetmap.org, Photon, tile CDN, API cloud).
+ * (tile CDN, API cloud pubbliche).
  */
 
 const CF_ACCESS_CLIENT_ID = process.env.CF_ACCESS_CLIENT_ID?.trim() ?? "";
@@ -37,7 +37,7 @@ export function isCfAccessConfigured(): boolean {
 
 /**
  * Header del Service Token Cloudflare Access da allegare alle richieste verso i
- * servizi self-hosted protetti (gh/valhalla/nominatim/whisper su biker-link.net).
+ * servizi self-hosted protetti (gh/valhalla/photon/whisper su biker-link.net).
  * Restituisce {} se le credenziali non sono configurate (fallback ai token custom).
  */
 export function cfAccessHeaders(): Record<string, string> {

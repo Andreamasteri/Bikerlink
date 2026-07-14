@@ -3,7 +3,7 @@
  *
  * GET /api/admin/thinkcentre-health
  * Probe parallelo dei servizi self-hosted sul ThinkCentre:
- * GraphHopper (routing), Ollama (AI), Whisper (ASR), Nominatim (geocoding),
+ * GraphHopper (routing), Ollama (AI), Whisper (ASR), Photon (geocoding),
  * Valhalla (routing), DragonflyDB (cache), PostgreSQL (DB), pgAdmin, nginx, Uptime Kuma.
  */
 
@@ -22,10 +22,10 @@ import { resetThinkCentreOfflineCache } from "../../lib/thinkcentre-offline";
 import { isThinkCentreIgnoredForTests } from "../../lib/thinkcentre-ignore-tests";
 import {
   probeValhallaDetailed,
-  probeNominatimDetailed,
+  probePhotonDetailed,
   probeUfwDetailed,
   type ValhallaDetailedHealth,
-  type NominatimDetailedHealth,
+  type PhotonDetailedHealth,
   type UfwDetailedHealth,
 } from "./thinkcentre-health-vn-probes";
 import {
@@ -57,7 +57,7 @@ export type {
   ErrorEvent,
   ProbeLogEntry,
   ValhallaDetailedHealth,
-  NominatimDetailedHealth,
+  PhotonDetailedHealth,
   UfwDetailedHealth,
   AresHealth,
 };
@@ -221,9 +221,9 @@ router.get("/thinkcentre-health", async (_req: Request, res: ExpressResponse) =>
         graphhopperTokenMissing: false,
         graphhopperAreas: [],
         valhallaDetail: null,
-        nominatimDetail: null,
+        photonDetail: null,
         ufwDetail: null,
-        tokenFingerprints: { graphhopper: null, valhalla: null, ollama: null, whisper: null, nominatim: null },
+        tokenFingerprints: { graphhopper: null, valhalla: null, ollama: null, whisper: null, photon: null },
         aresDetail: null,
         maintenanceMode: false,
         poweredOff: true,
@@ -235,7 +235,7 @@ router.get("/thinkcentre-health", async (_req: Request, res: ExpressResponse) =>
       maintenance,
       graphhopper,
       valhallaDetail,
-      nominatimDetail,
+      photonDetail,
       ollama,
       whisper,
       ufwDetail,
@@ -249,7 +249,7 @@ router.get("/thinkcentre-health", async (_req: Request, res: ExpressResponse) =>
       isThinkCentreInMaintenance(),
       probeGraphHopperAreas(),
       probeValhallaDetailed(),
-      probeNominatimDetailed(),
+      probePhotonDetailed(),
       probeOllama(),
       probeWhisper(),
       probeUfwDetailed(),
@@ -275,18 +275,18 @@ router.get("/thinkcentre-health", async (_req: Request, res: ExpressResponse) =>
       history: valhallaDetail.history,
       probeLog: valhallaDetail.probeLog,
     };
-    const nominatimService: ServiceHealth = {
-      key: "nominatim",
-      label: "Nominatim",
-      configured: nominatimDetail.configured,
-      ok: nominatimDetail.ok,
-      startingUp: nominatimDetail.ok ? false : isStartingUp("nominatim"),
-      latencyMs: nominatimDetail.latencyMs,
-      url: nominatimDetail.url,
-      error: nominatimDetail.error,
-      tokenMissing: nominatimDetail.tokenMissing,
-      history: nominatimDetail.history,
-      probeLog: nominatimDetail.probeLog,
+    const photonService: ServiceHealth = {
+      key: "photon",
+      label: "Photon",
+      configured: photonDetail.configured,
+      ok: photonDetail.ok,
+      startingUp: photonDetail.ok ? false : isStartingUp("photon"),
+      latencyMs: photonDetail.latencyMs,
+      url: photonDetail.url,
+      error: photonDetail.error,
+      tokenMissing: photonDetail.tokenMissing,
+      history: photonDetail.history,
+      probeLog: photonDetail.probeLog,
     };
     const dragonflyService: ServiceHealth = {
       key: "dragonfly",
@@ -353,7 +353,7 @@ router.get("/thinkcentre-health", async (_req: Request, res: ExpressResponse) =>
       valhallaService,
       ollama,
       whisper,
-      nominatimService,
+      photonService,
       dragonflyService,
       postgresService,
       pgadminService,
@@ -382,7 +382,7 @@ router.get("/thinkcentre-health", async (_req: Request, res: ExpressResponse) =>
       valhalla:    tokenFingerprint(process.env.VALHALLA_API_KEY),
       ollama:      tokenFingerprint(process.env.BOWIE_OLLAMA_TOKEN),
       whisper:     tokenFingerprint(process.env.WHISPER_TOKEN),
-      nominatim:   tokenFingerprint(process.env.NOMINATIM_TOKEN),
+      photon:      tokenFingerprint(process.env.PHOTON_TOKEN),
     };
 
     await updateThinkCentreSystemStatus(maintenance, services, graphhopper, ufwDetail, overall);
@@ -397,7 +397,7 @@ router.get("/thinkcentre-health", async (_req: Request, res: ExpressResponse) =>
       graphhopperTokenMissing: graphhopper.tokenMissing,
       graphhopperAreas: graphhopper.areas,
       valhallaDetail,
-      nominatimDetail,
+      photonDetail,
       ufwDetail,
       tokenFingerprints,
       aresDetail,

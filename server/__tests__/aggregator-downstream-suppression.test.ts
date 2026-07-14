@@ -190,7 +190,7 @@ describe("runAggregatorCycle — E2E soppressione ThinkCentre spento", () => {
         metric: "health.network_instability",
         severity: "high",
         value: 3,
-        details: { engines: ["graphhopper", "valhalla", "nominatim"] },
+        details: { engines: ["graphhopper", "valhalla", "photon"] },
       } satisfies Signal,
     ]);
 

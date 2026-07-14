@@ -50,7 +50,7 @@ export function ServiceBadgeStrip({ data }: { data: ThinkCentreHealthMini }) {
       items: [
         { name: "GH", color: ghBadgeColor(data) },
         { name: "Valhalla", color: svcColor(find("valhalla")) },
-        { name: "Nominatim", color: svcColor(find("nominatim")) },
+        { name: "Photon", color: svcColor(find("photon")) },
       ],
     },
     {

@@ -11,7 +11,7 @@ export interface SystemStatusSnapshot {
   thinkcentre: DotStatus;
   graphhopper: DotStatus;
   valhalla: DotStatus;
-  nominatim: DotStatus;
+  photon: DotStatus;
   ollama: DotStatus;
   whisper: DotStatus;
   ufw: DotStatus;
@@ -29,7 +29,7 @@ const _defaults: SystemStatusSnapshot = {
   thinkcentre: "unknown",
   graphhopper: "unknown",
   valhalla: "unknown",
-  nominatim: "unknown",
+  photon: "unknown",
   ollama: "unknown",
   whisper: "unknown",
   ufw: "unknown",

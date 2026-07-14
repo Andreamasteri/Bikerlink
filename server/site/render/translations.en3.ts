@@ -277,7 +277,7 @@ export const SITE_TRANSLATIONS_EN3: Record<string, string> = {
   'match.inv.rdm.item7': 'Curvy motorcycle routing (Valhalla + GraphHopper)',
   'match.inv.rdm.item8': 'SOS real-time + geolocation',
   'match.inv.rdm.item9': 'MotoClub + events',
-  'match.inv.rdm.item10': 'Self-hosted Nominatim',
+  'match.inv.rdm.item10': 'Self-hosted Photon',
   'match.inv.rdm.item11': 'AI Integrity Monitor v2',
   'match.inv.kpi1': 'Specialised AIs',
   'match.inv.kpi2': 'Orchestrated models',

@@ -15,7 +15,7 @@ geocodeRouter.get("/reverse", async (req: Request, res: Response) => {
   const zoomNum = zoom !== undefined ? parseInt(zoom, 10) : 14;
   const safeZoom = isNaN(zoomNum) ? 14 : Math.max(0, Math.min(18, zoomNum));
   try {
-    const { reverseGeocode } = await import("../../lib/nominatim-client");
+    const { reverseGeocode } = await import("../../lib/photon-client");
     const result = await reverseGeocode(latNum, lonNum, safeZoom);
     return res.json(result);
   } catch (err) {
@@ -31,7 +31,7 @@ poiExtraRouter.get("/poi-search", async (req: Request, res: Response) => {
   if (!q || !near) return sendError(res, 400, "Parametri 'q' e 'near' obbligatori");
 
   try {
-    const { geocode } = await import("../../lib/nominatim-client");
+    const { geocode } = await import("../../lib/photon-client");
     const { searchPoi } = await import("../../lib/overpass-client");
 
     const geoResults = await geocode(near);

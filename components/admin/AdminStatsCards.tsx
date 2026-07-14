@@ -4,7 +4,7 @@ import { MaterialCommunityIcons, Ionicons } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
 import Colors from "@/constants/colors";
 import { getApiUrl, authFetchHeaders } from "@/lib/query-client";
-import type { ValhallaDetailedHealth, NominatimDetailedHealth } from "./ThinkCentreValhallaNominatimBlocks";
+import type { ValhallaDetailedHealth, PhotonDetailedHealth } from "./ThinkCentreValhallaPhotonBlocks";
 import { ErrorHistory, ProbeLog } from "./ThinkCentreCardParts";
 
 export { TelemetryCard } from "./AdminTelemetryCard";
@@ -18,13 +18,13 @@ interface GHStatus {
 
 interface ThinkCentreHealthMinimal {
   valhallaDetail?: ValhallaDetailedHealth;
-  nominatimDetail?: NominatimDetailedHealth;
+  photonDetail?: PhotonDetailedHealth;
   tokenFingerprints?: {
     graphhopper: string | null;
     valhalla: string | null;
     ollama: string | null;
     whisper: string | null;
-    nominatim: string | null;
+    photon: string | null;
   };
 }
 
@@ -288,7 +288,7 @@ export function ValhallaCard() {
   );
 }
 
-export function NominatimCard() {
+export function PhotonCard() {
   const [collapsed, setCollapsed] = useState(true);
 
   const { data, isLoading, error } = useQuery<ThinkCentreHealthMinimal>({
@@ -300,7 +300,7 @@ export function NominatimCard() {
     refetchOnWindowFocus: true,
   });
 
-  const detail = error ? null : (data?.nominatimDetail ?? null);
+  const detail = error ? null : (data?.photonDetail ?? null);
 
   const statusColor = detail == null
     ? (error ? "#ef4444" : "#6b7280")
@@ -312,22 +312,16 @@ export function NominatimCard() {
 
   const dotColor = isLoading && !detail ? "#6b7280" : statusColor;
 
-  const dbStateColor = (s: string | undefined) => {
-    if (s === "ok") return "#22c55e";
-    if (s === "error") return "#ef4444";
-    return "#6b7280";
-  };
-
   return (
     <View style={styles.card}>
       <TouchableOpacity
         style={styles.cardHeader}
         onPress={() => setCollapsed((c) => !c)}
         activeOpacity={0.7}
-        testID="nominatim-card-header"
+        testID="photon-card-header"
       >
         <MaterialCommunityIcons name="map-search-outline" size={18} color={dotColor} />
-        <Text style={styles.cardTitle}>Nominatim</Text>
+        <Text style={styles.cardTitle}>Photon</Text>
         <View style={styles.headerRight}>
           {isLoading && !detail && <ActivityIndicator size="small" color={dotColor} />}
           {error && !isLoading && (
@@ -343,7 +337,7 @@ export function NominatimCard() {
       {!collapsed && (
         <View style={styles.body}>
           {error && !isLoading && (
-            <Text style={styles.errorText}>Impossibile leggere lo stato di Nominatim.</Text>
+            <Text style={styles.errorText}>Impossibile leggere lo stato di Photon.</Text>
           )}
           {detail == null && !error && !isLoading && (
             <Text style={styles.metaText}>Nessun dato disponibile.</Text>
@@ -354,7 +348,7 @@ export function NominatimCard() {
                 <View style={styles.stat}>
                   <Text style={[styles.statValue, { color: dotColor }]}>
                     {!detail.configured
-                      ? "Pubblico"
+                      ? "Non configurato"
                       : detail.ok
                         ? "Online"
                         : "Offline"}
@@ -363,40 +357,18 @@ export function NominatimCard() {
                 </View>
                 <View style={styles.divider} />
                 <View style={styles.stat}>
-                  <Text style={[styles.statValue, { color: dbStateColor(detail.dbState) }]}>
-                    {detail.dbState ? detail.dbState.toUpperCase() : "—"}
-                  </Text>
-                  <Text style={styles.statLabel}>DB</Text>
-                </View>
-                <View style={styles.divider} />
-                <View style={styles.stat}>
                   <Text style={styles.statValue}>
-                    {detail.geocodeLatencyMs != null ? `${detail.geocodeLatencyMs} ms` : "—"}
+                    {detail.latencyMs != null ? `${detail.latencyMs} ms` : "—"}
                   </Text>
                   <Text style={styles.statLabel}>Geocode</Text>
                 </View>
               </View>
 
-              {detail.softwareVersion != null && (
-                <View style={styles.chipsRow}>
-                  <View style={styles.metaChip}>
-                    <Ionicons name="code-outline" size={11} color="#60a5fa" />
-                    <Text style={styles.metaChipText}>v{detail.softwareVersion}</Text>
-                  </View>
-                  {detail.latencyMs != null && (
-                    <View style={styles.metaChip}>
-                      <Ionicons name="timer-outline" size={11} color="#60a5fa" />
-                      <Text style={styles.metaChipText}>{detail.latencyMs} ms ping</Text>
-                    </View>
-                  )}
-                </View>
-              )}
-
               {!detail.configured && (
                 <View style={styles.warningBanner}>
                   <MaterialCommunityIcons name="information-outline" size={13} color="#f59e0b" />
                   <Text style={styles.warningText}>
-                    Nessun NOMINATIM_URL — usa il server pubblico (rate-limited).
+                    Nessun PHOTON_URL — geocoding disabilitato (nessun fallback pubblico).
                   </Text>
                 </View>
               )}

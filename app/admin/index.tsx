@@ -8,7 +8,7 @@ import { useQuery } from "@tanstack/react-query";
 import Colors from "@/constants/colors";
 import { getApiUrl, authFetchHeaders } from "@/lib/query-client";
 import { styles } from "@/components/admin/AdminDashboardStyles";
-import { TelemetryCard, GraphHopperCard, ValhallaCard, NominatimCard } from "@/components/admin/AdminStatsCards";
+import { TelemetryCard, GraphHopperCard, ValhallaCard, PhotonCard } from "@/components/admin/AdminStatsCards";
 import { ServerEfficiencyCard } from "@/components/admin/ServerEfficiencyCard";
 import { ThinkCentreCard } from "@/components/admin/ThinkCentreCard";
 import { ThinkCentreEfficiencyCard } from "@/components/admin/ThinkCentreEfficiencyCard";
@@ -97,7 +97,7 @@ const UNKNOWN_STATUSES: SystemStatuses = {
   thinkcentre: "unknown",
   graphhopper: "unknown",
   valhalla: "unknown",
-  nominatim: "unknown",
+  photon: "unknown",
   ollama: "unknown",
   whisper: "unknown",
   ufw: "unknown",
@@ -133,7 +133,7 @@ export default function AdminDashboard() {
   const thinkcentreRef = useRef<View>(null);
   const graphhopperRef = useRef<View>(null);
   const valhallaRef = useRef<View>(null);
-  const nominatimRef = useRef<View>(null);
+  const photonRef = useRef<View>(null);
   const whisperRef = useRef<View>(null);
   const routingRef = useRef<View>(null);
   const matchingRef = useRef<View>(null);
@@ -170,7 +170,7 @@ export default function AdminDashboard() {
   const bowieSecurityBlocks = bowieBadge?.securityBlocks24h ?? 0;
 
   const handleThinkCentreStatuses = useCallback(
-    (s: Pick<SystemStatuses, "thinkcentre" | "graphhopper" | "valhalla" | "nominatim" | "ollama" | "whisper" | "ufw" | "dragonfly" | "postgres" | "pgadmin" | "nginx" | "uptimeKuma">) => {
+    (s: Pick<SystemStatuses, "thinkcentre" | "graphhopper" | "valhalla" | "photon" | "ollama" | "whisper" | "ufw" | "dragonfly" | "postgres" | "pgadmin" | "nginx" | "uptimeKuma">) => {
       setSystemStatuses((prev) => ({ ...prev, ...s }));
     },
     []
@@ -203,7 +203,7 @@ export default function AdminDashboard() {
       uptimeKuma:  thinkcentreRef,
       graphhopper: graphhopperRef,
       valhalla:    valhallaRef,
-      nominatim:   nominatimRef,
+      photon:   photonRef,
       whisper:     whisperRef,
       routing:     routingRef,
       matching:    matchingRef,
@@ -238,10 +238,10 @@ export default function AdminDashboard() {
         icon: "road-variant",
       },
       {
-        key: "nominatim",
-        label: "Nominatim",
-        keywords: ["nominatim", "geocoding", "geocodifica", "indirizzo", "address", "osm address", "reverse geo"],
-        ref: nominatimRef,
+        key: "photon",
+        label: "Photon",
+        keywords: ["photon", "geocoding", "geocodifica", "indirizzo", "address", "osm address", "reverse geo"],
+        ref: photonRef,
         icon: "map-search",
       },
       {
@@ -278,7 +278,7 @@ export default function AdminDashboard() {
   }, [normalizedSearch, systemCardDefs]);
 
   function handleSystemCardPress(def: SystemCardDef) {
-    if (["graphhopper", "valhalla", "nominatim"].includes(def.key)) {
+    if (["graphhopper", "valhalla", "photon"].includes(def.key)) {
       setRoutingCardCollapsed(false);
     }
     setSearch("");
@@ -384,8 +384,8 @@ export default function AdminDashboard() {
                 <View ref={valhallaRef}>
                   <ValhallaCard />
                 </View>
-                <View ref={nominatimRef}>
-                  <NominatimCard />
+                <View ref={photonRef}>
+                  <PhotonCard />
                 </View>
                 <TelemetryCard />
               </View>

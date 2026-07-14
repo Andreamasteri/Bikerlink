@@ -144,7 +144,7 @@ export function sanitizeError(msg: string): string {
     process.env.BOWIE_OLLAMA_TOKEN,
     process.env.WHISPER_TOKEN,
     process.env.GRAPHHOPPER_TOKEN,
-    process.env.NOMINATIM_TOKEN,
+    process.env.PHOTON_TOKEN,
     process.env.VALHALLA_API_KEY,
     process.env.ARES_OLLAMA_TOKEN,
   ]) {

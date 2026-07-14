@@ -29,16 +29,12 @@ export interface ValhallaDetailedHealth {
   probeLog?: ProbeLogEntry[];
 }
 
-export interface NominatimDetailedHealth {
+export interface PhotonDetailedHealth {
   configured: boolean;
   ok: boolean;
   latencyMs: number | null;
   url: string | null;
   error?: string;
-  dataUpdated?: string;
-  softwareVersion?: string;
-  dbState?: "ok" | "error" | "unknown";
-  geocodeLatencyMs?: number | null;
   tokenMissing?: boolean;
   history: Array<{ timestamp: number; error: string }>;
   probeLog?: ProbeLogEntry[];
@@ -57,18 +53,6 @@ const PROFILE_LABELS: Record<string, string> = {
   bicycle: "Bici",
   pedestrian: "Pedonale",
 };
-
-function formatDataUpdated(iso: string | undefined): string {
-  if (!iso) return "—";
-  try {
-    const d = new Date(iso);
-    if (isNaN(d.getTime())) return iso.slice(0, 10);
-    const pad = (n: number) => String(n).padStart(2, "0");
-    return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`;
-  } catch {
-    return iso.slice(0, 10);
-  }
-}
 
 export function ValhallaBlock({
   detail,
@@ -197,13 +181,13 @@ export function ValhallaBlock({
   );
 }
 
-export function NominatimBlock({
+export function PhotonBlock({
   detail,
   fingerprint,
   isLoading,
   hasError,
 }: {
-  detail: NominatimDetailedHealth | null;
+  detail: PhotonDetailedHealth | null;
   fingerprint: string | null;
   isLoading?: boolean;
   hasError?: boolean;
@@ -221,13 +205,13 @@ export function NominatimBlock({
   const subtitleText = detail == null
     ? (isLoading ? "…" : hasError ? "Errore connessione" : "…")
     : detail.configured
-      ? `Self-hosted${detail.ok && detail.latencyMs != null ? ` · ${detail.latencyMs} ms` : ""}${detail.ok && detail.dbState ? ` · DB ${detail.dbState}` : ""}`
-      : "Fallback pubblico";
+      ? `Self-hosted${detail.ok && detail.latencyMs != null ? ` · ${detail.latencyMs} ms` : ""}`
+      : "Non configurato";
 
   const statusLabel = detail == null
     ? (isLoading ? "…" : hasError ? "Errore connessione" : "…")
     : !detail.configured
-      ? "Pubblico (OSM)"
+      ? "Non configurato"
       : detail.ok
         ? detail.latencyMs != null
           ? `Online · ${detail.latencyMs} ms`
@@ -245,11 +229,11 @@ export function NominatimBlock({
         style={styles.header}
         onPress={() => setOpen((o) => !o)}
         activeOpacity={0.7}
-        testID="thinkcentre-nominatim-block-header"
+        testID="thinkcentre-photon-block-header"
       >
         <MaterialCommunityIcons name="map-search-outline" size={18} color={statusColor} style={styles.headerIcon} />
         <View style={styles.headerText}>
-          <Text style={styles.title}>Nominatim</Text>
+          <Text style={styles.title}>Photon</Text>
           <Text style={[styles.subtitle, hasError && detail == null && styles.subtitleError]}>
             {subtitleText}
             {detail?.url ? ` · ${detail.url}` : ""}
@@ -268,54 +252,11 @@ export function NominatimBlock({
             </Text>
           </View>
 
-          {detail != null && (detail.dbState || detail.geocodeLatencyMs != null || detail.softwareVersion || detail.dataUpdated) && (
-            <View style={styles.metaRow}>
-              {detail.dbState && (
-                <View style={[
-                  styles.metaChip,
-                  detail.dbState === "error" && styles.metaChipError,
-                ]}>
-                  <Ionicons
-                    name={detail.dbState === "ok" ? "server-outline" : "alert-circle-outline"}
-                    size={10}
-                    color={detail.dbState === "ok" ? "#22c55e" : detail.dbState === "error" ? "#ef4444" : "#6b7280"}
-                  />
-                  <Text style={[
-                    styles.metaText,
-                    detail.dbState === "ok" && { color: "#22c55e" },
-                    detail.dbState === "error" && { color: "#ef4444" },
-                    detail.dbState === "unknown" && { color: "#6b7280" },
-                  ]}>
-                    DB {detail.dbState === "ok" ? "OK" : detail.dbState === "error" ? "Error" : "?"}
-                  </Text>
-                </View>
-              )}
-              {detail.geocodeLatencyMs != null && (
-                <View style={styles.metaChip}>
-                  <Ionicons name="location-outline" size={10} color="#60a5fa" />
-                  <Text style={styles.metaText}>geocode {detail.geocodeLatencyMs} ms</Text>
-                </View>
-              )}
-              {detail.softwareVersion && (
-                <View style={styles.metaChip}>
-                  <Ionicons name="code-outline" size={10} color="#60a5fa" />
-                  <Text style={styles.metaText}>v{detail.softwareVersion}</Text>
-                </View>
-              )}
-              {detail.dataUpdated && (
-                <View style={styles.metaChip}>
-                  <Ionicons name="time-outline" size={10} color="#60a5fa" />
-                  <Text style={styles.metaText}>OSM {formatDataUpdated(detail.dataUpdated)}</Text>
-                </View>
-              )}
-            </View>
-          )}
-
           {detail != null && !detail.configured && (
             <View style={styles.publicNote}>
               <Ionicons name="information-circle-outline" size={11} color="#f59e0b" />
               <Text style={styles.publicNoteText}>
-                Nessun NOMINATIM_URL — usa il server pubblico (rate-limited)
+                Nessun PHOTON_URL — geocoding disabilitato (nessun fallback pubblico)
               </Text>
             </View>
           )}
@@ -463,4 +404,4 @@ export function UfwBlock({
   );
 }
 
-import { styles } from "./ThinkCentreValhallaNominatimBlocks.styles";
+import { styles } from "./ThinkCentreValhallaPhotonBlocks.styles";

@@ -10,7 +10,7 @@
  *  - Warm cache: cached snapshot is returned immediately (fast-path) and a
  *    background probe is fired to refresh it for the next caller.
  *
- * ThinkCentre services (graphhopper, valhalla, nominatim, ollama, whisper,
+ * ThinkCentre services (graphhopper, valhalla, photon, ollama, whisper,
  * ufw, dragonfly, postgres, pgadmin, nginx, uptimeKuma, thinkcentre overall) →
  *   parallel HTTP probes via probeThinkCentreStatusSnapshot().
  *

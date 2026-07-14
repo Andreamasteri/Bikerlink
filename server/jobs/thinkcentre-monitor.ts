@@ -2,7 +2,7 @@
  * ThinkCentre Monitor — Push notifications admin.
  *
  * Ogni 5 minuti proba i servizi self-hosted sul ThinkCentre
- * (GraphHopper, Ollama, Whisper, Nominatim, Valhalla) e invia una push agli
+ * (GraphHopper, Ollama, Whisper, Photon, Valhalla) e invia una push agli
  * admin quando il server passa da online → offline o da offline → online.
  *
  * Stati globali:

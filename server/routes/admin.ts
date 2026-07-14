@@ -366,7 +366,7 @@ import aiRouteProvidersRouter from './admin/ai/route-providers';
 // Task #3017 — Metriche chiamate AI (provider usage, latenza, token, costo, degraded, repair).
 import aiMetricsRouter from './admin/ai/metrics';
 import bowieStandaloneRouter from './admin/bowie-standalone';
-// Salute unificata servizi self-hosted ThinkCentre (GraphHopper/Ollama/Whisper/Nominatim).
+// Salute unificata servizi self-hosted ThinkCentre (GraphHopper/Ollama/Whisper/Photon).
 import thinkcentreHealthRouter from './admin/thinkcentre-health';
 // Metriche hardware ThinkCentre (CPU/RAM/uptime via agente Node.js sul mini-PC).
 import thinkcentreMetricsRouter from './admin/thinkcentre-metrics';

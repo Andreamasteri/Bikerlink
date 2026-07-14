@@ -8,8 +8,8 @@ import { styles } from "./ThinkCentreCardStyles";
 import { GraphHopperBlock } from "./ThinkCentreCardParts";
 import type { HealthEvent, AreaServiceHealth, ProbeLogEntry } from "./ThinkCentreCardParts";
 import { ServiceBadgeStrip } from "./ThinkCentreServiceBadge";
-import { ValhallaBlock, NominatimBlock, UfwBlock } from "./ThinkCentreValhallaNominatimBlocks";
-import type { ValhallaDetailedHealth, NominatimDetailedHealth, UfwDetailedHealth } from "./ThinkCentreValhallaNominatimBlocks";
+import { ValhallaBlock, PhotonBlock, UfwBlock } from "./ThinkCentreValhallaPhotonBlocks";
+import type { ValhallaDetailedHealth, PhotonDetailedHealth, UfwDetailedHealth } from "./ThinkCentreValhallaPhotonBlocks";
 import {
   OllamaBlock,
   WhisperBlock,
@@ -36,7 +36,7 @@ type ServiceKey =
   | "valhalla"
   | "ollama"
   | "whisper"
-  | "nominatim"
+  | "photon"
   | "dragonfly"
   | "postgres"
   | "pgadmin"
@@ -68,7 +68,7 @@ interface ThinkCentreHealth {
   graphhopperTokenMissing?: boolean;
   graphhopperAreas: AreaServiceHealth[];
   valhallaDetail?: ValhallaDetailedHealth;
-  nominatimDetail?: NominatimDetailedHealth;
+  photonDetail?: PhotonDetailedHealth;
   ufwDetail?: UfwDetailedHealth;
   aresDetail?: AresDetailedHealth | null;
   tokenFingerprints?: {
@@ -76,7 +76,7 @@ interface ThinkCentreHealth {
     valhalla: string | null;
     ollama: string | null;
     whisper: string | null;
-    nominatim: string | null;
+    photon: string | null;
   };
   maintenanceMode?: boolean;
   checkedAt: number;
@@ -97,7 +97,7 @@ type ThinkCentreStatusKeys =
   | "thinkcentre"
   | "graphhopper"
   | "valhalla"
-  | "nominatim"
+  | "photon"
   | "ollama"
   | "whisper"
   | "ufw"
@@ -111,7 +111,7 @@ const ALL_UNKNOWN: Pick<SystemStatuses, ThinkCentreStatusKeys> = {
   thinkcentre: "unknown",
   graphhopper: "unknown",
   valhalla: "unknown",
-  nominatim: "unknown",
+  photon: "unknown",
   ollama: "unknown",
   whisper: "unknown",
   ufw: "unknown",
@@ -188,7 +188,7 @@ export function ThinkCentreCard({
       thinkcentre: overallToStatus(data.overall),
       graphhopper: ghToStatus(data.graphhopperAreas, data.graphhopperConfigured),
       valhalla: serviceToStatus(findSvc("valhalla")),
-      nominatim: serviceToStatus(findSvc("nominatim")),
+      photon: serviceToStatus(findSvc("photon")),
       ollama: serviceToStatus(findSvc("ollama")),
       whisper: serviceToStatus(findSvc("whisper")),
       ufw: ufwToStatus(data.ufwDetail),
@@ -369,9 +369,9 @@ export function ThinkCentreCard({
             />
           )}
           {!poweredOffActive && (
-            <NominatimBlock
-              detail={error ? null : (data?.nominatimDetail ?? null)}
-              fingerprint={error ? null : (fp?.nominatim ?? null)}
+            <PhotonBlock
+              detail={error ? null : (data?.photonDetail ?? null)}
+              fingerprint={error ? null : (fp?.photon ?? null)}
               isLoading={isLoading}
               hasError={!!error}
             />

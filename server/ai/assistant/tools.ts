@@ -8,7 +8,7 @@
  * Tool disponibili (5):
  *   - getWeather           — meteo corrente da OpenMeteo (free, no key)
  *   - getBikerStats        — statistiche aggregate del biker dal DB
- *   - getThinkCentreStatus — stato dei servizi self-hosted (Ollama, GH, Nominatim)
+ *   - getThinkCentreStatus — stato dei servizi self-hosted (Ollama, GH, Photon)
  *   - getNearbyEvents      — eventi/raduni attivi nel DB entro un raggio
  *   - getUserPlannedRoutes — percorsi moto pianificati dell'utente (Task #3090)
  *
@@ -130,7 +130,7 @@ export const getBikerStatsTool = tool({
 // ── Tool: getThinkCentreStatus ────────────────────────────────────────────────
 
 export const getThinkCentreStatusTool = tool({
-  description: "Verifica lo stato dei servizi self-hosted sul ThinkCentre di casa (Ollama, GraphHopper routing, Nominatim geocoding).",
+  description: "Verifica lo stato dei servizi self-hosted sul ThinkCentre di casa (Ollama, GraphHopper routing, Photon geocoding).",
   inputSchema: emptySchema,
   execute: async (_input: EmptyInput) => {
     const results: Record<string, { ok: boolean; latencyMs: number | null; error?: string }> = {};
@@ -152,12 +152,14 @@ export const getThinkCentreStatusTool = tool({
     const ollamaToken = process.env.BOWIE_OLLAMA_TOKEN;
     const ghUrl = process.env.GRAPHHOPPER_URL;
     const ghToken = process.env.GRAPHHOPPER_TOKEN;
-    const nominatimUrl = process.env.NOMINATIM_URL;
+    const photonUrl = process.env.PHOTON_URL;
+    const photonToken = process.env.PHOTON_TOKEN;
 
     const probes: Promise<void>[] = [];
     if (ollamaUrl) probes.push(probe("ollama", `${ollamaUrl}/api/tags`, { ...cfAccessHeaders(), ...(ollamaToken ? { "X-Ollama-Token": ollamaToken } : {}) }));
     if (ghUrl) probes.push(probe("graphhopper", `${ghUrl}/health`, { ...cfAccessHeaders(), ...(ghToken ? { "X-GH-Token": ghToken } : {}) }));
-    if (nominatimUrl) probes.push(probe("nominatim", `${nominatimUrl}/status`, cfAccessHeaders()));
+    // Photon non ha /status: una query di geocoding minima ("Roma") verifica il servizio.
+    if (photonUrl) probes.push(probe("photon", `${photonUrl.replace(/\/$/, "")}/api/?q=Roma&limit=1&lang=default`, { ...cfAccessHeaders(), ...(photonToken ? { "X-Photon-Token": photonToken } : {}) }));
 
     await Promise.all(probes);
 
@@ -167,7 +169,7 @@ export const getThinkCentreStatusTool = tool({
       configured: {
         ollama: Boolean(ollamaUrl),
         graphhopper: Boolean(ghUrl),
-        nominatim: Boolean(nominatimUrl),
+        photon: Boolean(photonUrl),
       },
     };
   },

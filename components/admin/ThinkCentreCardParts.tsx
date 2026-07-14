@@ -41,7 +41,7 @@ const SERVICE_LABELS: Record<string, string> = {
   valhalla: "Valhalla",
   ollama: "Ollama AI",
   whisper: "Whisper ASR",
-  nominatim: "Nominatim",
+  photon: "Photon",
   ufw: "UFW",
   dragonfly: "DragonflyDB",
   postgres: "PostgreSQL",

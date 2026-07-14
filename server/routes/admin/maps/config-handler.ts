@@ -1,7 +1,7 @@
 import { Router, type Request, type Response } from "express";
 import { storage } from "../../../storage";
 import { sendError } from "../../../lib/api-response";
-import { getGeocodeCacheStats } from "../../../lib/nominatim-client";
+import { getGeocodeCacheStats } from "../../../lib/photon-client";
 import {
   AVAILABLE_RENDERERS, AVAILABLE_TILES, AVAILABLE_ENGINES, AVAILABLE_PROFILES,
   DEFAULT_RENDERER, DEFAULT_TILE, DEFAULT_ENGINE, DEFAULT_PROFILE,
@@ -9,7 +9,7 @@ import {
 import type { MapsRendererId, MapsTileId, RoutingEngineId, RoutingProfileId, MapsRollout } from "@shared/maps-config";
 import { checkQuota } from "../../../routing/mapbox/quota-guard";
 import { getDemSource } from "../../../../lib/maplibre/style-3d";
-import { getNominatimHealthSnapshot } from "../../../lib/nominatim-client";
+import { getPhotonHealthSnapshot } from "../../../lib/photon-client";
 
 const router = Router();
 
@@ -23,7 +23,7 @@ function isMapboxAvailable(): boolean {
 
 router.get("/config", async (_req: Request, res: Response) => {
   try {
-    const [rolloutSetting, rendererSetting, tileSetting, engineSetting, profileSetting, osmSetting, matchingIntegrationSetting, testerCustomizeSetting, nominatimHealth] =
+    const [rolloutSetting, rendererSetting, tileSetting, engineSetting, profileSetting, osmSetting, matchingIntegrationSetting, testerCustomizeSetting, photonHealth] =
       await Promise.all([
         storage.getAppSetting("maps_rollout"),
         storage.getAppSetting("maps_renderer"),
@@ -33,7 +33,7 @@ router.get("/config", async (_req: Request, res: Response) => {
         storage.getAppSetting("osm_last_updated_at"),
         storage.getAppSetting("matching_integration"),
         storage.getAppSetting("maps_tester_can_customize"),
-        getNominatimHealthSnapshot(),
+        getPhotonHealthSnapshot(),
       ]);
 
     const routing = (engineSetting?.value ?? DEFAULT_ENGINE) as RoutingEngineId;
@@ -86,7 +86,7 @@ router.get("/config", async (_req: Request, res: Response) => {
       matching_integration: matchingIntegrationSetting?.value !== "false",
       // Consenti ai tester di personalizzare renderer/tile dal proprio profilo (default OFF)
       tester_can_customize: testerCustomizeSetting?.value === "true",
-      nominatim: nominatimHealth,
+      photon: photonHealth,
     };
 
     if (mapbox_quota !== undefined) {
@@ -195,8 +195,8 @@ router.put("/tester-customize", async (req: Request, res: Response) => {
 });
 
 /**
- * GET /admin/maps/geocode-cache — statistiche cache Nominatim (hits, misses, size).
- * Utile per monitorare l'efficacia del caching e il carico sul server Nominatim.
+ * GET /admin/maps/geocode-cache — statistiche cache Photon (hits, misses, size).
+ * Utile per monitorare l'efficacia del caching e il carico sul server Photon.
  */
 router.get("/geocode-cache", (_req: Request, res: Response) => {
   return res.json(getGeocodeCacheStats());

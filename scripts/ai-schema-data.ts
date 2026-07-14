@@ -110,7 +110,7 @@ export const FEATURES: Feature[] = [
     name: "Coordinate/geocode AI prompt",
     file: "server/routes/planned-routes/waypoints.ts",
     provider: "Non AI",
-    model: "Nominatim (OSM self-hosted)",
+    model: "Photon (OSM self-hosted)",
     fallback: "Overpass per POI search",
     note: "Downstream dall'AI Parse; no provider AI diretto",
   },

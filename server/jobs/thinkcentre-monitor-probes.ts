@@ -6,7 +6,7 @@
  *          computeOverallStatus, probeGraphHopperAreas, runAllProbes.
  */
 
-import { getNominatimHealthSnapshot } from "../lib/nominatim-client";
+import { getPhotonHealthSnapshot } from "../lib/photon-client";
 import { cfAccessHeaders } from "../lib/cf-access";
 import { ACTIVE_PROFILE, fetchSelfHostedProfiles, isSelfHosted } from "../graphhopper-client";
 import { getAreaEnabledMap } from "../routing/routing-area-state";
@@ -41,7 +41,7 @@ export const PROBE_ENV_VARS = [
   "BOWIE_OLLAMA_TOKEN",
   "WHISPER_URL",
   "WHISPER_TOKEN",
-  "NOMINATIM_URL",
+  "PHOTON_URL",
   "VALHALLA_URL",
   "VALHALLA_API_KEY",
   "UFW_STATUS_URL",
@@ -200,8 +200,8 @@ async function probeWhisperOk(): Promise<boolean | null> {
   return httpProbe(`${base}/`, headers, (s) => s < 500);
 }
 
-async function probeNominatimOk(): Promise<boolean | null> {
-  const snap = await getNominatimHealthSnapshot();
+async function probePhotonOk(): Promise<boolean | null> {
+  const snap = await getPhotonHealthSnapshot();
   if (!snap.configured) return null;
   return snap.ok;
 }
@@ -325,7 +325,7 @@ export async function runAllProbes(): Promise<AggregateProbeResult> {
   const probes: Array<{ key: ServiceKey; label: string; fn: () => Promise<boolean | null> }> = [
     { key: "ollama",      label: "Ollama AI",      fn: probeOllamaOk },
     { key: "whisper",     label: "Whisper ASR",    fn: probeWhisperOk },
-    { key: "nominatim",   label: "Nominatim",      fn: probeNominatimOk },
+    { key: "photon",      label: "Photon",         fn: probePhotonOk },
     { key: "valhalla",    label: "Valhalla",       fn: probeValhallaOk },
     { key: "ufw",         label: "Firewall (ufw)", fn: probeUfwOk },
     { key: "dragonfly",   label: "DragonflyDB",    fn: probeDragonflyOk },
