@@ -42,6 +42,20 @@ export interface InfraServiceHealth {
   probeLog: ProbeLogEntry[];
 }
 
+// ── Classificazione errore auth agente TC ──────────────────────────────────────
+// Distingue "auth mancante/errata" (401/403 dal TC agent) da un errore generico,
+// così la UI non mostra un rosso ambiguo né — con la vecchia soglia `< 500` — un
+// falso verde quando il token è sbagliato o assente.
+function classifyAgentAuthError(rawError: string | undefined, agentToken: string): string {
+  const error = rawError ?? "HTTP error";
+  if (error.startsWith("HTTP 401") || error.startsWith("HTTP 403")) {
+    return agentToken
+      ? `Auth ThinkCentre rifiutata (THINKCENTRE_AGENT_TOKEN errato) — ${error}`
+      : `Token ThinkCentre mancante (THINKCENTRE_AGENT_TOKEN) — ${error}`;
+  }
+  return error;
+}
+
 // ── TCP probe helper ──────────────────────────────────────────────────────────
 // Socket raw + guard test-mode condivisi con `server/jobs/thinkcentre-monitor-probes.ts`
 // (`tcpConnectDetailed`); qui applichiamo solo la classificazione/maschera errore
@@ -64,9 +78,11 @@ export async function probeDragonflyInfra(): Promise<InfraServiceHealth> {
   const probeUrl = (process.env.DRAGONFLY_PROBE_URL ?? process.env.REDIS_PROBE_URL)?.trim();
   if (probeUrl) {
     const agentToken = process.env.THINKCENTRE_AGENT_TOKEN ?? "";
-    const r = await httpProbe(probeUrl, agentToken ? { "X-Agent-Token": agentToken } : {}, (s) => s < 500);
+    // Solo 2xx = up. 401/403 = auth (token TC mancante/errato), non "up":
+    // con la vecchia soglia `< 500` un rifiuto di autenticazione mostrava verde.
+    const r = await httpProbe(probeUrl, agentToken ? { "X-Agent-Token": agentToken } : {}, (s) => s >= 200 && s < 300);
     if (!r.ok) {
-      const error = r.error ?? "HTTP error";
+      const error = classifyAgentAuthError(r.error, agentToken);
       recordError("dragonfly", error);
       recordProbeLog("dragonfly", { timestamp: Date.now(), ok: false, latencyMs: r.latencyMs, detail: error });
       return { configured: true, ok: false, latencyMs: r.latencyMs, url: probeUrl, error, history: getHistory("dragonfly"), probeLog: getProbeLog("dragonfly") };
@@ -100,9 +116,10 @@ export async function probePostgresInfra(): Promise<InfraServiceHealth> {
   const probeUrl = process.env.POSTGRES_PROBE_URL?.trim();
   if (probeUrl) {
     const agentToken = process.env.THINKCENTRE_AGENT_TOKEN ?? "";
-    const r = await httpProbe(probeUrl, agentToken ? { "X-Agent-Token": agentToken } : {}, (s) => s < 500);
+    // Solo 2xx = up; 401/403 = auth (token TC mancante/errato), vedi Dragonfly sopra.
+    const r = await httpProbe(probeUrl, agentToken ? { "X-Agent-Token": agentToken } : {}, (s) => s >= 200 && s < 300);
     if (!r.ok) {
-      const error = r.error ?? "HTTP error";
+      const error = classifyAgentAuthError(r.error, agentToken);
       recordError("postgres", error);
       recordProbeLog("postgres", { timestamp: Date.now(), ok: false, latencyMs: r.latencyMs, detail: error });
       return { configured: true, ok: false, latencyMs: r.latencyMs, url: probeUrl, error, history: getHistory("postgres"), probeLog: getProbeLog("postgres") };

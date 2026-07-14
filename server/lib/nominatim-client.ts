@@ -7,7 +7,7 @@
  *
  * Variabili d'ambiente:
  *   NOMINATIM_URL    — URL base del server Nominatim self-hosted
- *                      (es: https://nominatim.bikerlink.app)
+ *                      (es: https://nominatim.biker-link.net)
  *                      Se non impostata, fallback a nominatim.openstreetmap.org
  *                      (pubblico, rate-limited, nessun token).
  *   NOMINATIM_TOKEN  — Token per il server self-hosted (header X-Nominatim-Token).

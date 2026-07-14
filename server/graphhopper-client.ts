@@ -4,7 +4,7 @@
  * Wrappa le chiamate HTTP al server GraphHopper, sia self-hosted che Cloud API.
  *
  * Variabili d'ambiente:
- *   GRAPHHOPPER_URL    — URL base del server GH self-hosted (es: https://gh.bikerlink.app)
+ *   GRAPHHOPPER_URL    — URL base del server GH self-hosted (es: https://gh.biker-link.net)
  *                        Se non impostata, usa la Cloud API come fallback.
  *   GRAPHHOPPER_TOKEN  — Token per il server self-hosted (header X-GH-Token).
  *   GRAPHHOPPER_API_KEY — API key per la Cloud API (query param ?key=).

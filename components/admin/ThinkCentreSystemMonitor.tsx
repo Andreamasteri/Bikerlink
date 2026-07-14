@@ -19,6 +19,11 @@ interface DiskMount {
 interface MetricsSample {
   cpuTempC:     number | null;
   gpuTempC:     number | null;
+  // GPU (nvidia-smi) — assenti se il TC non ha GPU NVIDIA / nvidia-smi mancante.
+  gpuUtilPct?:  number | null;
+  vramUsedMb?:  number | null;
+  vramTotalMb?: number | null;
+  gpuName?:     string | null;
   loadAvg1:     number;
   loadAvg5:     number;
   ramUsedMb:    number;
@@ -171,6 +176,26 @@ function DiskBar({ mount }: { mount: DiskMount }) {
   );
 }
 
+// ── Barra VRAM ────────────────────────────────────────────────────────────
+
+function VramBar({ usedMb, totalMb }: { usedMb: number; totalMb: number }) {
+  const pct = totalMb > 0 ? Math.min(100, Math.round((usedMb / totalMb) * 100)) : 0;
+  const color = pct > 90 ? "#ef4444" : pct > 75 ? "#f59e0b" : "#22c55e";
+  const fmtGb = (mb: number) => (mb / 1024).toFixed(1);
+  return (
+    <View style={ch.diskItem}>
+      <View style={ch.diskLabelRow}>
+        <Text style={ch.diskPath}>GPU</Text>
+        <Text style={[ch.diskPct, { color }]}>{pct}%</Text>
+        <Text style={ch.diskDetail}>{fmtGb(usedMb)} / {fmtGb(totalMb)} GB</Text>
+      </View>
+      <View style={ch.diskTrack}>
+        <View style={[ch.diskFill, { width: `${pct}%` as `${number}%`, backgroundColor: color }]} />
+      </View>
+    </View>
+  );
+}
+
 // ── Ring buffer ───────────────────────────────────────────────────────────
 
 function makeRing<T>(size: number, fill: T): T[] {
@@ -191,9 +216,12 @@ export function ThinkCentreSystemMonitor() {
   const [online,  setOnline]  = useState<boolean | null>(null);
   const [reason,  setReason]  = useState<string>("");
   const [lastMounts, setLastMounts] = useState<DiskMount[]>([]);
+  // GPU: presente solo se il TC espone metriche nvidia-smi (degrada silenziosa).
+  const [gpu, setGpu] = useState<{ vramUsedMb: number | null; vramTotalMb: number | null; name: string | null } | null>(null);
 
   const cpuTemp   = useRef<(number | null)[]>([...NULL_RING]);
   const gpuTemp   = useRef<(number | null)[]>([...NULL_RING]);
+  const gpuUtil   = useRef<(number | null)[]>([...NULL_RING]);
   const loadAvg   = useRef<(number | null)[]>([...NULL_RING]);
   const ramPct    = useRef<(number | null)[]>([...NULL_RING]);
   const netRx     = useRef<(number | null)[]>([...NULL_RING]);
@@ -226,6 +254,9 @@ export function ThinkCentreSystemMonitor() {
       setOnline(true);
       setReason("");
       setLastMounts(data.diskMounts ?? []);
+      // GPU disponibile solo se l'agente TC riporta almeno una metrica nvidia-smi.
+      const hasGpu = data.gpuUtilPct != null || data.vramUsedMb != null || data.vramTotalMb != null;
+      setGpu(hasGpu ? { vramUsedMb: data.vramUsedMb ?? null, vramTotalMb: data.vramTotalMb ?? null, name: data.gpuName ?? null } : null);
 
       const ramPctVal = data.ramTotalMb > 0
         ? Math.round((data.ramUsedMb / data.ramTotalMb) * 100)
@@ -233,6 +264,7 @@ export function ThinkCentreSystemMonitor() {
 
       cpuTemp.current   = pushRing(cpuTemp.current,   data.cpuTempC ?? null);
       gpuTemp.current   = pushRing(gpuTemp.current,   data.gpuTempC ?? null);
+      gpuUtil.current   = pushRing(gpuUtil.current,   data.gpuUtilPct ?? null);
       loadAvg.current   = pushRing(loadAvg.current,   data.loadAvg1);
       ramPct.current    = pushRing(ramPct.current,    ramPctVal);
       netRx.current     = pushRing(netRx.current,     data.netRxKBs);
@@ -252,6 +284,7 @@ export function ThinkCentreSystemMonitor() {
       // reset buffer quando si disattiva
       cpuTemp.current   = [...NULL_RING];
       gpuTemp.current   = [...NULL_RING];
+      gpuUtil.current   = [...NULL_RING];
       loadAvg.current   = [...NULL_RING];
       ramPct.current    = [...NULL_RING];
       netRx.current     = [...NULL_RING];
@@ -325,6 +358,25 @@ export function ThinkCentreSystemMonitor() {
             unit="°C"
             lines={[{ color: "#3b82f6", label: "GPU", data: gpuTemp.current }]}
           />
+
+          {/* GPU utilizzo + VRAM — solo se il TC espone metriche nvidia-smi */}
+          {gpu && (
+            <>
+              <LineChart
+                title={`GPU Utilizzo${gpu.name ? ` — ${gpu.name}` : ""}`}
+                unit="%"
+                lines={[{ color: "#ec4899", label: "GPU", data: gpuUtil.current }]}
+                min={0}
+                max={100}
+              />
+              {gpu.vramTotalMb != null && gpu.vramTotalMb > 0 && (
+                <View style={ch.diskBox}>
+                  <Text style={ch.sectionTitle}>VRAM</Text>
+                  <VramBar usedMb={gpu.vramUsedMb ?? 0} totalMb={gpu.vramTotalMb} />
+                </View>
+              )}
+            </>
+          )}
 
           <LineChart
             title="CPU Load Avg 1m"

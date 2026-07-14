@@ -13,15 +13,15 @@ import { Router, type Request, type Response } from "express";
 
 const router = Router();
 
-const METRICS_URL = process.env.THINKCENTRE_METRICS_URL
-  ? `${process.env.THINKCENTRE_METRICS_URL.replace(/\/$/, "")}/sys-metrics`
-  : null;
-
-const AGENT_TOKEN = process.env.THINKCENTRE_AGENT_TOKEN ?? "";
-
 const TIMEOUT_MS = 4_000;
 
+// Env letta per-richiesta (non a module-load): un secret appena provisioning-ato
+// prende effetto al semplice restart, senza redeploy del codice.
 router.get("/thinkcentre-metrics", async (_req: Request, res: Response) => {
+  const metricsBase = process.env.THINKCENTRE_METRICS_URL?.trim().replace(/\/$/, "");
+  const METRICS_URL = metricsBase ? `${metricsBase}/sys-metrics` : null;
+  const AGENT_TOKEN = process.env.THINKCENTRE_AGENT_TOKEN ?? "";
+
   if (!METRICS_URL) {
     return res.json({ online: false, reason: "THINKCENTRE_METRICS_URL non configurato" });
   }

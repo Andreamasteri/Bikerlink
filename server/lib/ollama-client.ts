@@ -5,7 +5,7 @@
  * (stesso pattern di GraphHopper: URL + token in header custom).
  *
  * Variabili d'ambiente:
- *   BOWIE_OLLAMA_URL    — URL base del server Ollama (es: https://bikerlink.tail5056aa.ts.net/ollama)
+ *   BOWIE_OLLAMA_URL    — URL base del server Ollama (es: https://ollama.biker-link.net)
  *                   Se non impostata, le funzioni lanciano un errore catchable e il
  *                   chiamante ricade sul provider cloud (Gemini/OpenAI).
  *   BOWIE_OLLAMA_TOKEN  — Token per il server self-hosted (header Authorization: Bearer).

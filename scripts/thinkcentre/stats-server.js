@@ -65,6 +65,35 @@ function parseSensors() {
   return { cpuTempC, gpuTempC };
 }
 
+// ── GPU: utilizzo, VRAM, temperatura (nvidia-smi) ───────────────────────────
+// Degrada in modo pulito se nvidia-smi non è installato / nessuna GPU NVIDIA:
+// tutti i campi restano null e il frontend semplicemente non li mostra.
+function parseGpu() {
+  let output = "";
+  try {
+    output = execSync(
+      "nvidia-smi --query-gpu=utilization.gpu,memory.used,memory.total,temperature.gpu,name --format=csv,noheader,nounits 2>/dev/null",
+      { timeout: 3000 },
+    ).toString().trim();
+  } catch {
+    return { gpuUtilPct: null, vramUsedMb: null, vramTotalMb: null, gpuTempC: null, gpuName: null };
+  }
+  const line = output.split("\n")[0] ?? "";
+  const cols = line.split(",").map((s) => s.trim());
+  if (cols.length < 4) {
+    return { gpuUtilPct: null, vramUsedMb: null, vramTotalMb: null, gpuTempC: null, gpuName: null };
+  }
+  const num = (v) => (v !== undefined && v !== "" && !Number.isNaN(Number(v)) ? Math.round(Number(v)) : null);
+  return {
+    gpuUtilPct:  num(cols[0]),
+    vramUsedMb:  num(cols[1]),
+    vramTotalMb: num(cols[2]),
+    gpuTempC:    num(cols[3]),
+    // il nome può teoricamente contenere virgole → riunisci il resto
+    gpuName:     cols.slice(4).join(",").trim() || null,
+  };
+}
+
 // ── RAM/Swap ──────────────────────────────────────────────────────────────
 
 function parseMeminfo() {
@@ -198,8 +227,9 @@ const server = http.createServer(async (req, res) => {
   }
 
   try {
-    const [temps, mem, load, delta] = await Promise.all([
+    const [temps, gpu, mem, load, delta] = await Promise.all([
       Promise.resolve(parseSensors()),
+      Promise.resolve(parseGpu()),
       Promise.resolve(parseMeminfo()),
       Promise.resolve(parseLoadavg()),
       sampleWithDelta(),
@@ -207,7 +237,12 @@ const server = http.createServer(async (req, res) => {
 
     const payload = {
       cpuTempC:     temps.cpuTempC,
-      gpuTempC:     temps.gpuTempC,
+      // nvidia-smi è più affidabile di `sensors` per la GPU: usalo come primaria.
+      gpuTempC:     gpu.gpuTempC ?? temps.gpuTempC,
+      gpuUtilPct:   gpu.gpuUtilPct,
+      vramUsedMb:   gpu.vramUsedMb,
+      vramTotalMb:  gpu.vramTotalMb,
+      gpuName:      gpu.gpuName,
       loadAvg1:     load.loadAvg1,
       loadAvg5:     load.loadAvg5,
       ramUsedMb:    mem.ramUsedMb,
