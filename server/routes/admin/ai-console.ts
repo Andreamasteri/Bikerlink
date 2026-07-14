@@ -71,7 +71,13 @@ router.post("/ai/console/message", async (req: Request, res: Response) => {
     res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
   };
   const abort = new AbortController();
-  req.on("close", () => abort.abort());
+  // Task #21 (porting da BikerBlog, contratto parità E1) — abort su `res.on("close")`,
+  // NON `req.on("close")`: su Node 20 + express.json() la IncomingMessage emette
+  // "close" appena il body POST è consumato (prima di questo punto), e "close" è
+  // one-shot, quindi un listener su `req` agganciato dopo gli await non scatta mai
+  // → abort morto (generazione AI che prosegue su socket chiuso). `res` emette
+  // "close" solo alla reale chiusura della risposta. Vedi ai-assistant.ts.
+  res.on("close", () => abort.abort());
 
   try {
     if (!conversationId) {

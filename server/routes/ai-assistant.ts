@@ -246,7 +246,18 @@ router.post("/ai/assistant/message", requireUser, messageLimiter, async (req: Re
     res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
   };
   const abort = new AbortController();
-  req.on("close", () => abort.abort());
+  // Task #21 (porting da BikerBlog, contratto parità E1) — l'abort DEVE ascoltare
+  // `res.on("close")`, MAI `req.on("close")`. Su Node 20 + express.json() la
+  // IncomingMessage (`req`) emette "close" NON appena il body della POST è stato
+  // consumato dal middleware — cioè PRIMA che questo handler arrivi qui (dopo i
+  // vari await di config/persona/contesto). "close" è one-shot: un listener
+  // agganciato dopo che l'evento è già scattato non verrà MAI chiamato → l'abort
+  // su disconnessione del client sarebbe morto (il server continuerebbe a
+  // generare e a scrivere su un socket già chiuso, sprecando compute Ollama/cloud
+  // e quota). La ServerResponse (`res`) emette "close" solo quando la connessione
+  // di risposta si chiude davvero (disconnessione del client o fine dello stream),
+  // quindi è il segnale corretto e non scatta mai in anticipo.
+  res.on("close", () => abort.abort());
   // Task #11 — Battito SSE per tenere viva la connessione (tunnel Cloudflare)
   // durante i silenzi del turno (tool calling, prompt processing su CPU prima
   // del primo token). Fermato SEMPRE nel finally, qualunque sia l'esito.
