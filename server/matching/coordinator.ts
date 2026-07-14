@@ -382,12 +382,14 @@ export async function getCoordinatorSnapshot(): Promise<{
 }> {
   await loadDirectiveIfNeeded();
   const { state, reason } = await getCoordinatorState();
-  const [effective, horusUnreachable, quebrachoUnreachable, tcOffline] = await Promise.all([
-    resolveEffectivePauses(),
-    isHorusUnreachable(),
-    isQuebrachoUnreachable(),
-    isThinkCentreOffline(),
-  ]);
+  // Sequenziale (non Promise.all): snapshot di stato non è nel path critico e
+  // le 4 chiamate condividono letture DB cache-friendly (isThinkCentreOffline);
+  // un burst a 4 apre più connessioni pool simultanee senza reale beneficio di
+  // latenza qui. Vedi .agents/memory/pool-promise-all-setup-burst.md.
+  const effective = await resolveEffectivePauses();
+  const horusUnreachable = await isHorusUnreachable();
+  const quebrachoUnreachable = await isQuebrachoUnreachable();
+  const tcOffline = await isThinkCentreOffline();
   return {
     state,
     reason,
