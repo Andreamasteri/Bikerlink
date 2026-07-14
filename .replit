@@ -197,7 +197,6 @@ GCE_SSH_USER = "bikerlink"
 GCE_SSH_PORT = "22"
 BIKERBLOG_BRIEFING_URL = "https://3abefdc3-a018-4771-90ae-b2c3a0fd6b0e-00-2g5dq1gy90toi.riker.replit.dev/api/_internal/agent-briefing"
 ARES_OLLAMA_MODEL = "devstral:latest"
-ARES_OLLAMA_URL = "https://ollama-tc.biker-link.net"
 BOWIE_OLLAMA_MODEL = "bikerlink"
 HORUS_OLLAMA_MODEL = "qwen3:4b"
 
@@ -211,4 +210,3 @@ externalPort = 5000
 [[ports]]
 localPort = 8081
 externalPort = 8081
-  
