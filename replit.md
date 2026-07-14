@@ -4,6 +4,34 @@
 
 - **Non splittare mai un file senza permesso esplicito.** Anche se il ratchet 600 righe segnala un file oltre soglia, NON eseguire lo split autonomamente: chiedere prima il permesso all'utente. Se l'utente vuole tenere il file intero, marcarlo con `LARGE-FILE-ALLOW` in `.large-files-allow.txt` invece di splittarlo.
 
+## BikerBlog — repo gemello di riferimento
+
+**BikerBlog** (`https://github.com/Andreamasteri/bikerblog`) è il progetto "costola" di
+BikerLink: mentre BikerLink era down, lo sviluppo dell'ecosistema (agenti AI
+Horus/Bowie/Quebracho/Nadir/Ares, AI-Hub, pipeline) è avvenuto lì. BikerLink deve poter
+consultare **sempre** lo stato corrente di quel repo come riferimento per il lavoro di
+allineamento/porting.
+
+**Come rinfrescare la copia locale (read-only):**
+
+```bash
+bash scripts/refresh-bikerblog.sh          # clona (prima volta) o aggiorna alla HEAD
+bash scripts/refresh-bikerblog.sh --status # stampa solo il commit corrente
+```
+
+- La copia vive in `.bikerblog-ref/` — **ignorata da git** (`.gitignore`), non finisce nel
+  repo né gonfia il Repl layer del deploy.
+- Lo script è idempotente: clone alla prima esecuzione, `fetch + reset --hard` le
+  successive. Stampa sempre l'hash del commit aggiornato.
+- **Auth**: usa il secret `BIKERBLOG_GITHUB_TOKEN` se presente (fallback robusto per repo
+  privato / rate limit GitHub); altrimenti clone pubblico HTTPS (il repo è pubblico oggi).
+  Il token non viene mai stampato in chat né nei log.
+- Canale complementare di sincronizzazione continua: l'endpoint `/_internal/agent-briefing`
+  di BikerBlog (`BIKERBLOG_BRIEFING_URL` + `BIKERBLOG_INTERNAL_TOKEN`) — vedi
+  `docs/tc-access-secret-discovery.md`.
+
+---
+
 ## ⛔ Regole OTA — Leggere Prima di Qualsiasi Lavoro
 
 **I task NON devono mai includere la pubblicazione di una OTA.**

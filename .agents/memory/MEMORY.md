@@ -10,7 +10,6 @@
 - [auth-context React Query deps](auth-context-react-query-deps.md) — nel value memo di un Context dipendi dalle slice primitive (userQuery.data/.refetch, mutation.isPending), MAI dagli oggetti React Query interi (loop) né rimuoverli del tutto (isPending stantio).
 - [React Query mutation ref deps](react-query-mutation-ref-deps.md) — mutation intera nei deps di renderItem/handler FlatList = churn per-tick; `.mutate` è stabile ma exhaustive-deps lo rifiuta → tieni la mutation in un ref (esentato) e deps = solo slice primitive.
 - [Whole-mutation deps gate](mutation-object-deps-gate.md) — check-mutation-object-deps.sh blocca *Mutation intero nei deps di useCallback/useMemo (consente .mutate/.isPending/Ref); ratchet baseline .mutation-object-deps-baseline; in post-merge.sh.
-
 - [GH RAM_STORE OOM silenzioso su PBF grandi](gh-ramstore-oom.md) — aree > 5 GB PBF: import OK 28+ min, exit 0, ma properties mai scritto → OOM durante flush/CH; fix: rimuovi RAM_STORE (usa MMAP), heap 14g; usa ecuador come banco di prova prima di buildare tutto.
 - [vitest lazy-require mock bypass](vitest-cjs-require-mock.md) — lazy `require()` dentro moduli ESM bypassa `vi.mock`; fix: import ESM statico al top del file.
 - [OTA high-water mark floor](ota-hwm-floor.md) — logs/ota-hwm.txt è il terzo floor anti-regressione (dopo EAS+buildInfo); aggiornato atomicamente post-publish; tracked in git (!logs/ota-hwm.txt eccezione in .gitignore).
@@ -126,9 +125,7 @@
 - [Merge part files — eslint-disable scope](merge-eslint-disable-scope.md) — la direttiva eslint-disable file-level di un part va riprodotta come blocco disable/enable nel file fuso, non disable-next-line, o il gate --max-warnings=0 fallisce.
 - [Ollama diagnostics CLI](ollama-diag-cli.md) — `npx tsx scripts/ollama-diagnose.ts` invia log+sorgenti boot ad Ares (secret DIAG_OLLAMA_* distinti da OLLAMA_*, HTTP diretta no-Express, report logs/ai-diagnosis-*.md).
 - [Ollama instance naming](ollama-naming.md) — Ares=DIAG_OLLAMA_* (PC fisso, diagnosi/studio), Bowie=OLLAMA_* (TC, assistente in-app), Horus=OLLAMA_* (TC, AI routing); i secret NON si rinominano, solo doc/log/Modelfile.
-
 - [Split-file merge via bash assembly](split-merge-bash-assembly.md) — fondi i part lazy-split assemblando con sed/cat (no ritrascrizione); subagent lasciano lavoro parziale, fonte di verità = filesystem; marker >600 = LARGE-FILE-ALLOW + voce allow.txt.
-
 - [CF tunnel/origin down vs bad secret](cf-tunnel-origin-down-vs-secret.md) — uniform 502+SSH-timeout across every TC service = box/tunnel offline, not a secret issue; new secrets need a workflow restart to reach ShellExec env.
 - [CF Access service-token 403 troubleshooting](cf-access-secret-troubleshooting.md) — se client_id+policy sono ok ma 403, è il secret: dev'essere 64-hex senza .access (usa Copy button, no select manuale); secret sbagliato 403a TUTTI i servizi TC insieme; agent non può salvare secret → solo requestEnvVar.
 - [Deep schema parity (dev↔prod)](deep-schema-parity.md) — confronto DEFINIZIONI (non nomi) su 7 categorie via hash; prod catturata offline (no conn string, read-only db skill) in server/data/deep-schema-parity.prod.json; spatial_ref_sys_pkey/postgis/user_sessions_chk allow-listati.
@@ -157,3 +154,4 @@
 - [Date.now mock fragility with vi.resetModules](datenow-mock-fragility.md) — call-count/parity Date.now() mocks break when vi.resetModules() re-triggers module-scope side effects (e.g. Bottleneck) that also call Date.now(); use a controllable clock keyed to an identifiable call site instead.
 - [Full vitest run in Replit sandbox](vitest-full-run-sandbox.md) — background/detached `vitest run` processes die when the spawning bash tool call returns (no true cross-call daemonization); split the suite into ≤120s foreground chunks by file list instead.
 - [DB coherence report (dev vs prod)](db-coherence-report.md) — dev DB quasi vuoto → check dati a bassa confidenza; prod non raggiungibile da connection string (solo snapshot offline); drift dev-ahead = Importante non Bloccante; generatore in scripts/db-check/*.
+- [BikerBlog reference access](bikerblog-reference-access.md) — repo gemello github.com/Andreamasteri/bikerblog; `bash scripts/refresh-bikerblog.sh` clona/aggiorna read-only in .bikerblog-ref/ (git-ignored); auth via BIKERBLOG_GITHUB_TOKEN o clone pubblico.
