@@ -15,4 +15,6 @@ CREATE TABLE IF NOT EXISTS "ai_tool_events" (
 --> statement-breakpoint
 CREATE UNIQUE INDEX IF NOT EXISTS "ai_tool_events_key" ON "ai_tool_events" ("tool_name", "roster", "event_type");
 --> statement-breakpoint
+DROP INDEX IF EXISTS "ai_tool_events_last_occurred_idx";
+--> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "ai_tool_events_last_occurred_idx" ON "ai_tool_events" ("last_occurred_at" DESC);
