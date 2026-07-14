@@ -4,6 +4,7 @@ import { sql } from "drizzle-orm";
 import { storage } from "./storage";
 import { onlineTracker } from "./online-tracker";
 import { withBgDbSlot } from "./lib/bg-db-limiter";
+import { withJobGate } from "./ai/coordinator/gated-job";
 
 let _samplerTimer: ReturnType<typeof setInterval> | null = null;
 let _purgeTimer: ReturnType<typeof setInterval> | null = null;
@@ -118,10 +119,11 @@ async function purgeOldData(): Promise<void> {
 export function startResourceGraphSampler(): void {
   if (_samplerTimer) return;
   _samplerEnabled = true;
-  _samplerTimer = setInterval(async () => {
+  const _gatedSample = withJobGate("resource-graph-sampler", async () => {
     if (!_samplerEnabled) return;
     await takeSample();
-  }, SAMPLE_INTERVAL_MS);
+  });
+  _samplerTimer = setInterval(_gatedSample, SAMPLE_INTERVAL_MS);
   _samplerTimer.unref();
 
   if (!_purgeTimer) {

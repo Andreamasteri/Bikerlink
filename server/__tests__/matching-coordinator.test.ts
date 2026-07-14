@@ -24,6 +24,9 @@ vi.mock("../ai/watchdog/log", () => ({ writeWatchdogLog: writeWatchdogLogMock })
 
 vi.mock("../lib/dedup-logger", () => ({ dedupWarn: vi.fn() }));
 
+const isQuebrachoUnreachableMock = vi.hoisted(() => vi.fn(async () => false));
+vi.mock("../ai/coordinator/job-gate", () => ({ isQuebrachoUnreachable: isQuebrachoUnreachableMock }));
+
 import {
   getCoordinatorState,
   canRunCycleNow,
@@ -41,6 +44,7 @@ beforeEach(() => {
   isThinkCentreOfflineMock.mockReset().mockResolvedValue(false);
   isOllamaReachableMock.mockReset().mockResolvedValue(true);
   writeWatchdogLogMock.mockReset().mockResolvedValue(undefined);
+  isQuebrachoUnreachableMock.mockReset().mockResolvedValue(false);
 });
 
 describe("isValidCoordinatorDirectiveKind", () => {
@@ -202,5 +206,64 @@ describe("getCoordinatorSnapshot", () => {
     expect(snapshot.activeDirective).toMatchObject({ kind: "pause", issuedBy: "horus" });
     expect(snapshot.horusReachable).toBe(true);
     expect(snapshot.thinkCentreOffline).toBe(false);
+  });
+
+  it("espone anche la raggiungibilità e la direttiva di Quebracho", async () => {
+    await applyCoordinatorDirective("pause", { reason: "manutenzione quebracho" }, "quebracho");
+    const snapshot = await getCoordinatorSnapshot();
+    expect(snapshot.quebrachoReachable).toBe(true);
+    expect(snapshot.directives.quebracho).toMatchObject({ kind: "pause", issuedBy: "quebracho" });
+    expect(snapshot.directives.horus).toBeNull();
+    expect(snapshot.directives.admin_manual).toBeNull();
+  });
+});
+
+describe("direttive multi-issuer (Task #9) — Horus e Quebracho pari grado, admin sempre prioritario", () => {
+  it("due pause simultanee (horus + quebracho) non si cancellano a vicenda: entrambe restano attive nella mappa per-issuer", async () => {
+    await applyCoordinatorDirective("pause", { reason: "pausa horus" }, "horus");
+    await applyCoordinatorDirective("pause", { reason: "pausa quebracho" }, "quebracho");
+
+    const snapshot = await getCoordinatorSnapshot();
+    expect(snapshot.directives.horus).toMatchObject({ kind: "pause", issuedBy: "horus" });
+    expect(snapshot.directives.quebracho).toMatchObject({ kind: "pause", issuedBy: "quebracho" });
+    expect((await canRunCycleNow()).allowed).toBe(false);
+  });
+
+  it("resume di un issuer non tocca la pausa dell'altro (resume indipendente per-issuer)", async () => {
+    await applyCoordinatorDirective("pause", { reason: "pausa horus" }, "horus");
+    await applyCoordinatorDirective("pause", { reason: "pausa quebracho" }, "quebracho");
+
+    await applyCoordinatorDirective("resume", { reason: "riprendi horus" }, "horus");
+    let snapshot = await getCoordinatorSnapshot();
+    expect(snapshot.directives.horus).toBeNull();
+    expect(snapshot.directives.quebracho).toMatchObject({ kind: "pause" });
+    // Quebracho pausa ancora attiva → il ciclo resta bloccato.
+    expect((await canRunCycleNow()).allowed).toBe(false);
+
+    await applyCoordinatorDirective("resume", { reason: "riprendi quebracho" }, "quebracho");
+    snapshot = await getCoordinatorSnapshot();
+    expect(snapshot.directives.quebracho).toBeNull();
+    expect((await canRunCycleNow()).allowed).toBe(true);
+  });
+
+  it("una pausa di Quebracho viene ignorata (fallback deterministico) se Quebracho è irraggiungibile", async () => {
+    await applyCoordinatorDirective("pause", { reason: "pausa quebracho" }, "quebracho");
+    isQuebrachoUnreachableMock.mockResolvedValue(true);
+
+    const { state } = await getCoordinatorState();
+    expect(state).toBe("running");
+    expect((await canRunCycleNow()).allowed).toBe(true);
+  });
+
+  it("admin_manual resta efficace anche con pause horus+quebracho attive e con entrambi irraggiungibili", async () => {
+    await applyCoordinatorDirective("pause", { reason: "pausa horus" }, "horus");
+    await applyCoordinatorDirective("pause", { reason: "pausa quebracho" }, "quebracho");
+    await applyCoordinatorDirective("pause", { reason: "stop admin" }, "admin_manual");
+    isOllamaReachableMock.mockResolvedValue(false);
+    isQuebrachoUnreachableMock.mockResolvedValue(true);
+
+    const { state } = await getCoordinatorState();
+    expect(state).toBe("paused_by_ai");
+    expect((await canRunCycleNow()).allowed).toBe(false);
   });
 });

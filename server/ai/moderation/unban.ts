@@ -10,6 +10,7 @@ import { and, eq, lte, isNotNull } from "drizzle-orm";
 import { withDbRetry } from "../../lib/db-retry";
 import { withBgDbSlot } from "../../lib/bg-db-limiter";
 import { Cron } from "croner";
+import { withJobGate } from "../coordinator/gated-job";
 
 let cron: Cron | null = null;
 
@@ -33,10 +34,12 @@ export async function runUnbanScan(): Promise<{ unbanned: number }> {
 
 export function startUnbanScheduler(): void {
   if (cron) return;
+  // Task #9 — subsystem moderation, gate unico Quebracho.
+  const gatedUnban = withJobGate("moderation-unban", runUnbanScan);
   // Cron al minuto :01 di ogni slot di 5 min → :01, :06, :11, :16, :21, :26, :31, :36, :41, :46, :51, :56
   // Garantisce dephasing stabile in steady-state (non solo al boot).
   cron = new Cron("1-59/5 * * * *", { timezone: "Europe/Rome" }, () => {
-    runUnbanScan().catch((err) => console.warn("[ai-unban] scan error:", err));
+    gatedUnban().catch((err) => console.warn("[ai-unban] scan error:", err));
   });
   cron.trigger(); // primo run immediato al boot
   console.log("[ai-unban] scheduler started (cron slot :01, ogni 5 min)");

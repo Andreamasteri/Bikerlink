@@ -351,6 +351,9 @@ import aiConsoleNextRouter from './admin/ai-console.next';
 import aiCoordinatorRouter from './admin/ai-coordinator';
 import matchingCoordinatorRouter from './admin/matching-coordinator';
 import aiCoordinatorGovernanceRouter from './admin/ai-coordinator-governance';
+// Task #10 (Quebracho c) — registry job coordinatore + monitor unificato 4 AI.
+import coordinatorJobsRouter from './admin/coordinator-jobs';
+import aiMonitorRouter from './admin/ai-monitor';
 import metricsRouter from './admin/metrics';
 // Task #2698 — AI Assistant per utenti normali (admin config/telemetria).
 import aiAssistantAdminRouter from './admin/ai-assistant';
@@ -508,6 +511,9 @@ router.use('/', _requireAdmin, dbIntegrityRouter);
 router.use('/', _requireAdmin, appIntegrityRouter);
 // Task #5318 — Matching Coordinator (control plane unificato, autorità Horus).
 router.use('/', _requireAdmin, matchingCoordinatorRouter);
+// Task #10 — registry job coordinatore Quebracho + monitor unificato 4 AI.
+router.use('/', _requireAdmin, coordinatorJobsRouter);
+router.use('/', _requireAdmin, aiMonitorRouter);
 router.use('/', aiConsoleRouter);
 router.use('/', aiConsoleNextRouter);
 // Task #2649 — Layer AI Coordinato (auth interno: requireConsoleRole).

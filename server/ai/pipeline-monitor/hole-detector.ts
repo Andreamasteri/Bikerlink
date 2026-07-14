@@ -3,6 +3,7 @@ import { pipelineFlowEvents } from "@shared/db";
 import { and, eq, isNull, lt, or, sql } from "drizzle-orm";
 import { writeWatchdogLog } from "../watchdog/log";
 import { withBgDbSlot } from "../../lib/bg-db-limiter";
+import { withJobGate } from "../coordinator/gated-job";
 
 export interface PipelineHole {
   id: string;
@@ -124,10 +125,11 @@ export async function detectPipelineHoles(): Promise<HolesResult> {
 
 export function startHoleDetectorScheduler(): void {
   const FIVE_MIN = 5 * 60_000;
+  const _gatedDetect = withJobGate("pipeline-hole-detector", () => {
+    detectPipelineHoles().catch((e) => console.warn("[hole-detector] interval run error:", e));
+  });
   setTimeout(() => {
     detectPipelineHoles().catch((e) => console.warn("[hole-detector] initial run error:", e));
-    setInterval(() => {
-      detectPipelineHoles().catch((e) => console.warn("[hole-detector] interval run error:", e));
-    }, FIVE_MIN);
+    setInterval(_gatedDetect, FIVE_MIN);
   }, 60_000);
 }

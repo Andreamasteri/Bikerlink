@@ -3,6 +3,7 @@ import { sql } from "drizzle-orm";
 import { bootJobQueue } from "./lib/boot-job-queue";
 import { withBgDbSlot } from "./lib/bg-db-limiter";
 import { markDegraded } from "./init-state";
+import { withJobGate } from "./ai/coordinator/gated-job";
 
 /**
  * Esegue un blocco di registrazione scheduler in ISOLAMENTO (Task #5123).
@@ -69,25 +70,23 @@ export async function runPhase5Schedulers(): Promise<void> {
       console.log(`[SNAPSHOT] Playlist snapshot saved for ${saved} users`);
     } catch (e) { console.warn("[SNAPSHOT] runPlaylistSnapshot error:", e); }
   };
-  const safeRunPlaylistSnapshot = () =>
-    runPlaylistSnapshot().catch((e) => console.warn("[SNAPSHOT] runPlaylistSnapshot (interval) error:", e));
+  const safeRunPlaylistSnapshot = withJobGate("playlist-snapshot", () =>
+    runPlaylistSnapshot().catch((e) => console.warn("[SNAPSHOT] runPlaylistSnapshot (interval) error:", e)));
   // Registered in bootJobQueue to avoid overlapping with other heavy boot jobs.
   bootJobQueue.register("PlaylistSnapshot", async () => {
     console.log("[INIT][BG] Starting runPlaylistSnapshot...");
-    await runPlaylistSnapshot();
+    await safeRunPlaylistSnapshot();
     console.log("[INIT][BG] runPlaylistSnapshot — done");
   });
   setInterval(safeRunPlaylistSnapshot, SIX_HOURS_MS);
 
   await arm("ad-image-cleanup", async () => {
     const { cleanupOrphanedAdImages } = await import("./routes/ads");
+    const gatedAdImageCleanup = withJobGate("ad-image-cleanup", () =>
+      cleanupOrphanedAdImages().catch((e) => console.warn("[INIT][BG] cleanupOrphanedAdImages error:", e)));
     setTimeout(async () => {
-      try {
-        await cleanupOrphanedAdImages();
-      } catch (e) {
-        console.warn("[INIT][BG] cleanupOrphanedAdImages error:", e);
-      }
-      setInterval(() => cleanupOrphanedAdImages().catch((e) => console.warn("[INIT][BG] cleanupOrphanedAdImages (interval) error:", e)), 24 * 60 * 60 * 1000);
+      await gatedAdImageCleanup();
+      setInterval(gatedAdImageCleanup, 24 * 60 * 60 * 1000);
     }, 5 * 60 * 1000);
   });
 
@@ -95,8 +94,9 @@ export async function runPhase5Schedulers(): Promise<void> {
   setTimeout(async () => {
     try {
       const { cleanupOldDiagFiles } = await import("./routes/admin/diagnostic");
-      cleanupOldDiagFiles();
-      setInterval(cleanupOldDiagFiles, 24 * 60 * 60 * 1000);
+      const gatedDiagCleanup = withJobGate("diag-files-cleanup", cleanupOldDiagFiles);
+      gatedDiagCleanup();
+      setInterval(gatedDiagCleanup, 24 * 60 * 60 * 1000);
     } catch (e) {
       console.warn("[INIT] cleanupOldDiagFiles error:", e);
     }
@@ -175,14 +175,19 @@ export async function runPhase5Schedulers(): Promise<void> {
   const FIFTEEN_MIN_MS = 15 * 60 * 1000;
   await arm("ota-sync-cron", async () => {
     const { syncProductionUpdates } = await import("./routes/admin/ota");
+    const { withJobGate } = await import("./ai/coordinator/gated-job");
+    // Task #9 — anche il subsystem OTA (già integrato con l'AI Coordinator
+    // event-based) risponde ora al gate unico di Quebracho: kill-switch/pause
+    // rispettati allo stesso modo di ogni altro job schedulato.
+    const gatedSync = withJobGate("ota-sync-cron", syncProductionUpdates);
     setTimeout(() => {
       console.log("[INIT][BG] OTA sync: first run...");
-      syncProductionUpdates()
+      gatedSync()
         .then(() => console.log("[INIT][BG] OTA sync: first run done"))
         .catch((e) => console.warn("[INIT][BG] OTA sync error:", e));
     }, 45_000); // +45s
     setInterval(() => {
-      syncProductionUpdates().catch((e) => console.warn("[OTA-CRON] sync error:", e));
+      gatedSync().catch((e) => console.warn("[OTA-CRON] sync error:", e));
     }, FIFTEEN_MIN_MS);
     console.log("[INIT] OTA cron scheduled every 15 min");
   });
@@ -191,9 +196,11 @@ export async function runPhase5Schedulers(): Promise<void> {
   // Slot :00 — critical-reports è a :02, unban è a :01: tutti distanziati di 60s.
   await arm("ota-auto-rollback", async () => {
     const { runOtaAutoRollback } = await import("./jobs/ota-auto-rollback");
+    const { withJobGate } = await import("./ai/coordinator/gated-job");
     const { Cron } = await import("croner");
+    const gatedRollback = withJobGate("ota-auto-rollback", runOtaAutoRollback);
     new Cron("0-59/5 * * * *", { timezone: "Europe/Rome" }, () => {
-      runOtaAutoRollback().catch((e) => console.warn("[OTA-AUTO-ROLLBACK] worker error:", e));
+      gatedRollback().catch((e) => console.warn("[OTA-AUTO-ROLLBACK] worker error:", e));
     });
     console.log("[INIT] OTA auto-rollback worker scheduled every 5 min (cron slot :00)");
   });
@@ -235,6 +242,22 @@ export async function runPhase5Schedulers(): Promise<void> {
       }
     })();
   }, 2 * 60_000);
+
+  try {
+    const { startQuebrachoGuards } = await import("./ai/coordinator/guards");
+    startQuebrachoGuards();
+  } catch (e) {
+    console.warn("[INIT] Quebracho guard jobs failed (non-fatal):", e);
+    markDegraded("scheduler:quebracho-guards");
+  }
+
+  try {
+    const { startQuebrachoAutoLearnScheduler } = await import("./ai/coordinator/quebracho-auto-learn");
+    startQuebrachoAutoLearnScheduler();
+  } catch (e) {
+    console.warn("[INIT] Quebracho auto-learn scheduler failed (non-fatal):", e);
+    markDegraded("scheduler:quebracho-auto-learn");
+  }
 
   try {
     const [{ startThinkCentreMonitor, checkMotorcycleProfile }, { startValhallaMonitor }] = await Promise.all([
@@ -297,9 +320,9 @@ export async function runPhase5Schedulers(): Promise<void> {
   await arm("assistant-vps-poller", async () => {
     const { pollVpsJobs, reapStaleVpsJobsOnBoot } = await import("./ai/assistant/vps-ops");
     await reapStaleVpsJobsOnBoot().catch((e) => console.warn("[INIT][BG] reapStaleVpsJobsOnBoot error:", e));
-    setInterval(() => {
+    setInterval(withJobGate("assistant-vps-poller", () => {
       pollVpsJobs().catch((e) => console.warn("[vps-poller] tick error:", e));
-    }, 2 * 60 * 1000);
+    }), 2 * 60 * 1000);
     console.log("[INIT] Bowie VPS job poller started");
   });
 
@@ -382,7 +405,7 @@ export async function runPhase5Schedulers(): Promise<void> {
   // single source of truth for bio embedding back-fill scheduling.
   // Registered in bootJobQueue to avoid overlapping with other heavy boot jobs.
   const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
-  const runBioBackfill = () =>
+  const runBioBackfill = withJobGate("bio-embeddings-backfill", () =>
     import("./embeddings/backfill-bio")
       .then(({ backfillBioEmbeddings }) => backfillBioEmbeddings())
       .then((r) =>
@@ -391,7 +414,8 @@ export async function runPhase5Schedulers(): Promise<void> {
           ` backfilled=${r.backfilled} skipped=${r.skipped} errors=${r.errors}`,
         ),
       )
-      .catch((e) => console.warn("[EMBED BACKFILL] error:", e));
+      .catch((e) => console.warn("[EMBED BACKFILL] error:", e)),
+  );
   bootJobQueue.register("BioEmbeddingsBackfill", async () => {
     console.log("[INIT][BG] Starting backfillBioEmbeddings (boot-time pass)...");
     await runBioBackfill();
@@ -446,14 +470,15 @@ export async function runPhase5Schedulers(): Promise<void> {
   try {
     const { runPipelineChecks } = await import("./ai/pipeline-monitor/runner");
     const SIX_HOURS_MS = 6 * 60 * 60_000;
+    const _gatedPipelineChecks = withJobGate("pipeline-radiografia", () => {
+      runPipelineChecks({ triggeredBy: "scheduler" }).catch((e) =>
+        console.warn("[pipeline-check] scheduled run failed:", e));
+    });
     setTimeout(() => {
       runPipelineChecks({ triggeredBy: "scheduler" }).catch((e) =>
         console.warn("[pipeline-check] startup run failed:", e));
     }, 5 * 60_000);
-    setInterval(() => {
-      runPipelineChecks({ triggeredBy: "scheduler" }).catch((e) =>
-        console.warn("[pipeline-check] scheduled run failed:", e));
-    }, SIX_HOURS_MS);
+    setInterval(_gatedPipelineChecks, SIX_HOURS_MS);
     console.log("[INIT] Pipeline radiografia scheduler started (6h interval)");
   } catch (e) {
     console.warn("[INIT] Pipeline radiografia scheduler failed (non-fatal):", e);

@@ -8,6 +8,7 @@ import { uploadBuffer, downloadBuffer, listObjects } from "./objectStorage";
 import { db } from "./db";
 import { appSettings } from "@shared/db";
 import { eq } from "drizzle-orm";
+import { withJobGate } from "./ai/coordinator/gated-job";
 
 export const EXPORT_OBJECT_PREFIX = ".private/exports";
 
@@ -461,15 +462,19 @@ export async function startExportScheduler(): Promise<void> {
 
   nextAt = addMs(intervalMs);
 
+  const _gatedExport = withJobGate("export-scheduler", async () => {
+    try {
+      await runExport({});
+    } catch (err) {
+      console.error("[export-service] scheduled export failed:", err);
+    }
+  });
+
   function scheduleNext(delayMs: number): void {
     schedulerTimer = setTimeout(async () => {
       schedulerTimer = null;
       nextAt = null;
-      try {
-        await runExport({});
-      } catch (err) {
-        console.error("[export-service] scheduled export failed:", err);
-      }
+      await _gatedExport();
       const sched = await getExportSchedule();
       const ms = getScheduleIntervalMs(sched);
       if (ms) {

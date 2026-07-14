@@ -6,6 +6,7 @@
 // Sfasamento thundering-herd: cron parte al minuto :02/:07/:12/... (non :00)
 // per non collidere con OTA auto-rollback (:00) e unban (:01).
 import { Cron } from "croner";
+import { withJobGate } from "../ai/coordinator/gated-job";
 import { db } from "../db";
 import { reports, users } from "@shared/db";
 import { and, eq, inArray, isNull, lt, or } from "drizzle-orm";
@@ -92,7 +93,7 @@ export function startCriticalReportsNotifier(): void {
   try {
     // Cron al minuto :02 di ogni slot di 5 min → :02, :07, :12, :17, :22, :27, :32, :37, :42, :47, :52, :57
     // Sfasato rispetto a OTA auto-rollback (:00) e unban (:01) per distribuire il carico sul pool DB.
-    cron = new Cron("2-59/5 * * * *", { timezone: "Europe/Rome" }, async () => {
+    cron = new Cron("2-59/5 * * * *", { timezone: "Europe/Rome" }, withJobGate("critical-reports-notifier", async () => {
       try {
         const out = await scanAndNotifyCriticalReports();
         if (out.notified > 0) {
@@ -101,7 +102,7 @@ export function startCriticalReportsNotifier(): void {
       } catch (err) {
         console.warn("[critical-notifier] cron error:", err);
       }
-    });
+    }));
     console.log(`[critical-notifier] scheduler attivo (ogni 5 min al :02, Europe/Rome) throttle=${THROTTLE_MIN}min`);
   } catch (err) {
     console.warn("[critical-notifier] init error:", err);

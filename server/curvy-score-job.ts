@@ -28,6 +28,7 @@ import { db, withDbRetry } from "./db";
 import { sql } from "drizzle-orm";
 import { storage } from "./storage";
 import { withBgDbSlot } from "./lib/bg-db-limiter";
+import { withJobGate } from "./ai/coordinator/gated-job";
 
 const LAST_RUN_KEY = "curvy_score_last_run";
 const LAST_RUN_STATS_KEY = "curvy_score_last_stats";
@@ -389,9 +390,13 @@ export function scheduleWeeklyCurvyScoreUpdate(): void {
   const TARGET_DAY = 0; // Domenica
   const TARGET_HOUR = 3; // 03:00 Europe/Rome
 
+  // Task #9 — gate SOLO sul lavoro (gatedRun), il ri-arm resta fuori: se lo
+  // fosse anche lui, uno skip (pausa/kill-switch) fermerebbe il loop per
+  // sempre — vedi stesso pattern in map-matching-job.ts.
+  const gatedRun = withJobGate("weekly-curvy-score", runCurvyScoreJob);
   const fireAndReschedule = async () => {
     try {
-      await runCurvyScoreJob();
+      await gatedRun();
     } catch (err) {
       console.error("[CURVY-SCORE] Errore nel job settimanale:", err);
     }

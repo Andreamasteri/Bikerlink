@@ -15,6 +15,7 @@ import { logAiCall } from "./log";
 import { redactPII } from "./redact";
 import type { AiCallMeta } from "./types";
 import { logAiUsage } from "../audit";
+import { withJobGate } from "../coordinator/gated-job";
 
 interface CaseSummary {
   id: string;
@@ -226,11 +227,13 @@ let cron: Cron | null = null;
 
 export function startDigestScheduler(): void {
   if (cron) return;
+  // Task #9 — subsystem moderation, gate unico Quebracho.
+  const gatedRunDigest = withJobGate("moderation-digest", runDigestForAll);
   try {
     cron = new Cron("0 8 * * *", { timezone: "Europe/Rome" }, async () => {
       try {
-        const out = await runDigestForAll();
-        console.log(`[ai-digest] generato per ${out.moderators} moderatori`);
+        const out = await gatedRunDigest();
+        if (out) console.log(`[ai-digest] generato per ${out.moderators} moderatori`);
       } catch (err) {
         console.warn("[ai-digest] run error:", err);
       }

@@ -1,4 +1,5 @@
 import { db, withDbRetry } from "../db";
+import { withJobGate } from "../ai/coordinator/gated-job";
 import { userSessions } from "@shared/db";
 import { sql, eq } from "drizzle-orm";
 import { dedupWarn } from "../lib/dedup-logger";
@@ -46,14 +47,15 @@ export function scheduleSessionCrashCleanup(): void {
   // Primo run dopo 70s: evita di contendere il pool DB con gli altri worker
   // che partono al boot (thundering herd). Usa un chain auto-rischedulante
   // con jitter ±10% per evitare la risincronizzazione dopo ogni restart.
+  const gatedCleanup = withJobGate("session-crash-cleanup", () => { void runSessionCrashCleanup(); });
   const scheduleNext = () => {
     setTimeout(() => {
-      void runSessionCrashCleanup();
+      void gatedCleanup();
       scheduleNext();
     }, jitteredInterval());
   };
   setTimeout(() => {
-    void runSessionCrashCleanup();
+    void gatedCleanup();
     scheduleNext();
   }, 70_000);
 }

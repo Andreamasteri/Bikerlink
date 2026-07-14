@@ -15,6 +15,7 @@
  * Throttle: min 10 min tra notifiche dello stesso tipo.
  */
 
+import { withJobGate } from "../ai/coordinator/gated-job";
 import { getInfo as getValhallaInfo } from "../routing/valhalla-client";
 import { storage } from "../storage";
 import { sendSystemAlertPushToAdmins } from "../push-notifications";
@@ -128,12 +129,14 @@ export function startValhallaMonitor(): void {
   // Guard: already started (either waiting for first probe or running on interval)
   if (firstProbeTimer !== null || intervalHandle !== null) return;
 
+  const gatedProbe = withJobGate("valhalla-monitor", async () => {
+    await runValhallaProbe();
+  }, { critical: true });
+
   firstProbeTimer = setTimeout(async () => {
     firstProbeTimer = null;
-    await runValhallaProbe();
-    intervalHandle = setInterval(async () => {
-      await runValhallaProbe();
-    }, PROBE_INTERVAL_MS);
+    await gatedProbe();
+    intervalHandle = setInterval(gatedProbe, PROBE_INTERVAL_MS);
   }, FIRST_PROBE_DELAY_MS);
 
   console.log(`[valhalla-monitor] avviato (primo probe tra ${FIRST_PROBE_DELAY_MS / 1000}s, poi ogni ${PROBE_INTERVAL_MS / 60000} min — soglia: ${FAIL_THRESHOLD} fail consecutivi)`);

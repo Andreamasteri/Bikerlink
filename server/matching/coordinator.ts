@@ -24,6 +24,7 @@ import { isPoolHealthy } from "../db";
 import { storage } from "../storage";
 import { isThinkCentreOffline } from "../lib/thinkcentre-offline";
 import { isOllamaReachable } from "../lib/ollama-client";
+import { isQuebrachoUnreachable as isQuebrachoCoordinatorUnreachable } from "../ai/coordinator/job-gate";
 import { writeWatchdogLog } from "../ai/watchdog/log";
 import { dedupWarn } from "../lib/dedup-logger";
 import { z } from "zod";
@@ -44,42 +45,74 @@ export function isPoolSaturatedSync(): boolean {
 
 export type CoordinatorDirectiveKind = "pause" | "resume" | "force_cycle";
 
+/**
+ * Task #9 — Quebracho diventa un'autorità di direttiva PARI a Horus (non la
+ * sostituisce): admin_manual, horus e quebracho hanno ciascuno il proprio slot
+ * di direttiva persistito su una chiave AppSetting separata. Questo evita che
+ * l'uno sovrascriva silenziosamente la direttiva dell'altro (requisito
+ * esplicito: nessuna direttiva persa se entrambi possono agire in parallelo).
+ */
+export type DirectiveIssuer = "horus" | "admin_manual" | "quebracho";
+const DIRECTIVE_ISSUERS: readonly DirectiveIssuer[] = ["admin_manual", "horus", "quebracho"];
+
 export interface CoordinatorDirective {
   kind: CoordinatorDirectiveKind;
   reason: string;
-  issuedBy: "horus" | "admin_manual";
+  issuedBy: DirectiveIssuer;
   issuedAt: string;
 }
 
-const APP_SETTING_KEY = "matching_coordinator_directive";
+// Chiave legacy pre-#9 (un solo slot condiviso Horus/admin_manual) — letta una
+// tantum in migrazione così una pausa emessa prima di questo cambiamento non
+// va persa quando si passa agli slot per-issuer.
+const LEGACY_APP_SETTING_KEY = "matching_coordinator_directive";
+function settingKeyFor(issuer: DirectiveIssuer): string {
+  return `matching_coordinator_directive:${issuer}`;
+}
 
-// ─── Direttiva Horus in-memory (rispecchiata su AppSetting per sopravvivere ai
-// restart) ─────────────────────────────────────────────────────────────────
-let currentDirective: CoordinatorDirective | null = null;
-let directiveLoaded = false;
+// ─── Direttive in-memory per issuer (rispecchiate su AppSetting per
+// sopravvivere ai restart) ───────────────────────────────────────────────────
+const directives: Record<DirectiveIssuer, CoordinatorDirective | null> = {
+  admin_manual: null,
+  horus: null,
+  quebracho: null,
+};
+let directivesLoaded = false;
 
 // One-shot: consumato dal primo triggerMatchingRun successivo alla direttiva.
+// Condiviso tra issuer per costruzione (era già così pre-#9): chi lo emette è
+// tracciato solo a scopo di log/audit, il bypass one-shot resta unico.
 let pendingForceCycle = false;
+let pendingForceCycleIssuedBy: DirectiveIssuer | null = null;
 
 async function loadDirectiveIfNeeded(): Promise<void> {
-  if (directiveLoaded) return;
-  directiveLoaded = true;
+  if (directivesLoaded) return;
+  directivesLoaded = true;
   try {
-    const row = await storage.getAppSetting(APP_SETTING_KEY);
-    const val = row?.valueJson as CoordinatorDirective | undefined;
-    if (val && (val.kind === "pause" || val.kind === "resume" || val.kind === "force_cycle")) {
+    for (const issuer of DIRECTIVE_ISSUERS) {
+      const row = await storage.getAppSetting(settingKeyFor(issuer));
+      const val = row?.valueJson as CoordinatorDirective | undefined;
       // Solo "pause" sopravvive al riavvio come stato persistente; resume/force_cycle
       // sono transitori e non vanno ri-applicati automaticamente al boot.
-      if (val.kind === "pause") currentDirective = val;
+      if (val?.kind === "pause") directives[issuer] = val;
+    }
+
+    // Migrazione one-shot dalla vecchia chiave condivisa, solo se lo slot
+    // per-issuer corrispondente è ancora vuoto (non sovrascrive nulla).
+    const legacyRow = await storage.getAppSetting(LEGACY_APP_SETTING_KEY);
+    const legacyVal = legacyRow?.valueJson as CoordinatorDirective | undefined;
+    if (legacyVal?.kind === "pause" && legacyVal.issuedBy && !directives[legacyVal.issuedBy]) {
+      directives[legacyVal.issuedBy] = legacyVal;
+      await persistDirective(legacyVal.issuedBy, legacyVal);
     }
   } catch (err) {
-    dedupWarn("matching-coordinator/load", "errore lettura direttiva persistita (non-fatal, riparto senza direttiva)", err);
+    dedupWarn("matching-coordinator/load", "errore lettura direttive persistite (non-fatal, riparto senza direttive)", err);
   }
 }
 
-async function persistDirective(directive: CoordinatorDirective | null): Promise<void> {
+async function persistDirective(issuer: DirectiveIssuer, directive: CoordinatorDirective | null): Promise<void> {
   try {
-    await storage.upsertAppSetting(APP_SETTING_KEY, undefined, directive as unknown);
+    await storage.upsertAppSetting(settingKeyFor(issuer), undefined, directive as unknown);
   } catch (err) {
     dedupWarn("matching-coordinator/persist", "errore persistenza direttiva (non-fatal, resta in-memory)", err);
   }
@@ -94,6 +127,13 @@ const FALLBACK_LOG_THROTTLE_MS = 5 * 60_000;
 async function isHorusUnreachable(): Promise<boolean> {
   if (await isThinkCentreOffline()) return true;
   return !(await isOllamaReachable("horus"));
+}
+
+/** Riusa lo stesso check di raggiungibilità del job-gate di Quebracho, così
+ * le due superfici (job-gate per i loop, coordinator per il matching) non
+ * possono divergere su cosa significhi "Quebracho irraggiungibile". */
+async function isQuebrachoUnreachable(): Promise<boolean> {
+  return isQuebrachoCoordinatorUnreachable();
 }
 
 function logFallbackTransition(reason: string): void {
@@ -118,6 +158,53 @@ function logFallbackTransition(reason: string): void {
  * inserisce SOLO come gate aggiuntivo, e SOLO se Horus/TC sono raggiungibili
  * (altrimenti fallback trasparente, loggato).
  */
+/**
+ * Risolve quali direttive di pausa sono attualmente EFFICACI (non solo
+ * presenti): admin_manual è sempre efficace; horus/quebracho lo sono solo se
+ * la rispettiva autorità è raggiungibile (altrimenti fallback trasparente,
+ * loggato una tantum per finestra). Nessuna delle due sovrascrive l'altra —
+ * possono essere entrambe attive in parallelo.
+ */
+async function resolveEffectivePauses(): Promise<{
+  admin: CoordinatorDirective | null;
+  horus: CoordinatorDirective | null;
+  quebracho: CoordinatorDirective | null;
+}> {
+  const admin = directives.admin_manual?.kind === "pause" ? directives.admin_manual : null;
+
+  let horus: CoordinatorDirective | null = null;
+  if (directives.horus?.kind === "pause") {
+    if (await isHorusUnreachable()) {
+      logFallbackTransition("direttiva pause di Horus attiva ma Horus/ThinkCentre irraggiungibile — ignorata");
+    } else {
+      horus = directives.horus;
+    }
+  }
+
+  let quebracho: CoordinatorDirective | null = null;
+  if (directives.quebracho?.kind === "pause") {
+    if (await isQuebrachoUnreachable()) {
+      logFallbackTransition("direttiva pause di Quebracho attiva ma Quebracho irraggiungibile — ignorata");
+    } else {
+      quebracho = directives.quebracho;
+    }
+  }
+
+  return { admin, horus, quebracho };
+}
+
+/** Priorità di visualizzazione quando più direttive sono attive insieme:
+ * admin_manual (sicurezza umana) > horus > quebracho. Usata SOLO per il campo
+ * di compatibilità "activeDirective"/"source" — lo stato paused_by_ai risulta
+ * comunque se ALMENO una è efficace, indipendentemente dalla priorità. */
+function pickActiveDirective(effective: {
+  admin: CoordinatorDirective | null;
+  horus: CoordinatorDirective | null;
+  quebracho: CoordinatorDirective | null;
+}): CoordinatorDirective | null {
+  return effective.admin ?? effective.horus ?? effective.quebracho ?? null;
+}
+
 export async function getCoordinatorState(): Promise<{ state: CoordinatorState; reason: string }> {
   await loadDirectiveIfNeeded();
 
@@ -126,23 +213,16 @@ export async function getCoordinatorState(): Promise<{ state: CoordinatorState; 
     return { state: "stopped", reason: "auto_matching_enabled=false (admin)" };
   }
 
-  if (currentDirective?.kind === "pause") {
-    // Il fallback trasparente (ignora la pausa se irraggiungibile) si applica
-    // SOLO alle direttive emesse da Horus: se Horus/il ThinkCentre sono giù,
-    // non ha senso "richiedere conferma" a un'autorità assente. Una pausa
-    // manuale di un admin umano (issuedBy="admin_manual") non dipende in alcun
-    // modo da Horus/ThinkCentre e NON deve mai essere ignorata per quel motivo
-    // — altrimenti uno stop di emergenza dell'admin verrebbe silenziosamente
-    // bypassato proprio mentre il ThinkCentre è offline.
-    if (currentDirective.issuedBy === "admin_manual") {
-      return { state: "paused_by_ai", reason: currentDirective.reason };
-    }
-    if (await isHorusUnreachable()) {
-      logFallbackTransition(`direttiva pause di Horus attiva ma Horus/ThinkCentre irraggiungibile — ignorata`);
-      // fallthrough al gate deterministico sottostante
-    } else {
-      return { state: "paused_by_ai", reason: currentDirective.reason };
-    }
+  const effective = await resolveEffectivePauses();
+  const activePauses = [effective.admin, effective.horus, effective.quebracho].filter(
+    (d): d is CoordinatorDirective => d !== null,
+  );
+  if (activePauses.length > 0) {
+    const reason =
+      activePauses.length === 1
+        ? activePauses[0].reason
+        : activePauses.map((d) => `${d.issuedBy}: ${d.reason}`).join(" | ");
+    return { state: "paused_by_ai", reason };
   }
 
   if (!isPoolHealthy()) {
@@ -161,8 +241,8 @@ export interface CanRunCycleDecision {
    * attiva (mai un valore fisso), così log/scheduler distinguono sempre una
    * pausa applicata da Horus da una pausa manuale di un admin.
    */
-  source: "deterministic" | "horus" | "admin_manual";
-  /** true se questo run consuma un force_cycle one-shot di Horus. */
+  source: "deterministic" | DirectiveIssuer;
+  /** true se questo run consuma un force_cycle one-shot (di Horus o Quebracho). */
   forcedByHorus: boolean;
 }
 
@@ -184,27 +264,34 @@ export async function canRunCycleNow(): Promise<CanRunCycleDecision> {
   // "running" resterebbe pending indefinitamente e potrebbe poi far bypassare
   // a sorpresa una pausa AI applicata molto più tardi.
   const forceRequested = pendingForceCycle;
+  const forceIssuedBy = pendingForceCycleIssuedBy;
   pendingForceCycle = false;
+  pendingForceCycleIssuedBy = null;
 
   if (state === "running") {
     return { allowed: true, state, reason, source: "deterministic", forcedByHorus: false };
   }
 
   if (state === "paused_by_ai" && forceRequested) {
+    const source = forceIssuedBy ?? "horus";
     void writeWatchdogLog({
       kind: "coordinator",
       scope: "matching_coordinator",
       status: "ok",
-      summary: "force_cycle di Horus consumato — ciclo forzato nonostante pausa AI attiva",
+      summary: `force_cycle di ${source} consumato — ciclo forzato nonostante pausa AI attiva`,
     });
-    return { allowed: true, state, reason: "force_cycle Horus", source: "horus", forcedByHorus: true };
+    return { allowed: true, state, reason: `force_cycle ${source}`, source, forcedByHorus: true };
   }
 
   // source riflette l'issuedBy REALE della direttiva attiva (mai un valore
   // fisso "horus"): una pausa manuale admin deve tracciarsi come admin_manual,
-  // non venire attribuita a Horus nei log/decision metadata.
-  const pauseSource: "deterministic" | "horus" | "admin_manual" =
-    state === "paused_by_ai" ? (currentDirective?.issuedBy ?? "horus") : "deterministic";
+  // e una pausa Quebracho come "quebracho", non venire attribuita a Horus nei
+  // log/decision metadata.
+  let pauseSource: "deterministic" | DirectiveIssuer = "deterministic";
+  if (state === "paused_by_ai") {
+    const effective = await resolveEffectivePauses();
+    pauseSource = pickActiveDirective(effective)?.issuedBy ?? "horus";
+  }
   return { allowed: false, state, reason, source: pauseSource, forcedByHorus: false };
 }
 
@@ -235,7 +322,7 @@ export type ApplyDirectiveResult =
 export async function applyCoordinatorDirective(
   kind: string,
   rawParams: unknown,
-  issuedBy: "horus" | "admin_manual",
+  issuedBy: DirectiveIssuer,
 ): Promise<ApplyDirectiveResult> {
   if (!isValidCoordinatorDirectiveKind(kind)) {
     return { ok: false, error: `Direttiva sconosciuta: "${kind}"` };
@@ -250,13 +337,17 @@ export async function applyCoordinatorDirective(
   const directive: CoordinatorDirective = { kind, reason, issuedBy, issuedAt: new Date().toISOString() };
 
   if (kind === "pause") {
-    currentDirective = directive;
-    await persistDirective(directive);
+    // Scrive SOLO il proprio slot — non tocca la direttiva di un altro issuer,
+    // così una pause di Horus e una di Quebracho possono coesistere ed
+    // entrambe restano attive finché il rispettivo issuer non fa resume.
+    directives[issuedBy] = directive;
+    await persistDirective(issuedBy, directive);
   } else if (kind === "resume") {
-    currentDirective = null;
-    await persistDirective(null);
+    directives[issuedBy] = null;
+    await persistDirective(issuedBy, null);
   } else if (kind === "force_cycle") {
     pendingForceCycle = true;
+    pendingForceCycleIssuedBy = issuedBy;
     // force_cycle è transitorio: non sovrascrive una eventuale pausa persistita,
     // consuma solo il prossimo tick.
   }
@@ -278,28 +369,44 @@ export async function applyCoordinatorDirective(
 export async function getCoordinatorSnapshot(): Promise<{
   state: CoordinatorState;
   reason: string;
+  /** Compat: la direttiva "in evidenza" quando ne è attiva più di una insieme
+   * (priorità admin_manual > horus > quebracho) — vedi anche `directives`. */
   activeDirective: CoordinatorDirective | null;
+  /** Direttive per-issuer complete (nuovo in #9): admin_manual/horus/quebracho
+   * possono essere attive contemporaneamente. */
+  directives: Record<DirectiveIssuer, CoordinatorDirective | null>;
   pendingForceCycle: boolean;
   horusReachable: boolean;
+  quebrachoReachable: boolean;
   thinkCentreOffline: boolean;
 }> {
   await loadDirectiveIfNeeded();
   const { state, reason } = await getCoordinatorState();
-  const [horusUnreachable, tcOffline] = await Promise.all([isHorusUnreachable(), isThinkCentreOffline()]);
+  const [effective, horusUnreachable, quebrachoUnreachable, tcOffline] = await Promise.all([
+    resolveEffectivePauses(),
+    isHorusUnreachable(),
+    isQuebrachoUnreachable(),
+    isThinkCentreOffline(),
+  ]);
   return {
     state,
     reason,
-    activeDirective: currentDirective,
+    activeDirective: pickActiveDirective(effective),
+    directives: { ...directives },
     pendingForceCycle,
     horusReachable: !horusUnreachable,
+    quebrachoReachable: !quebrachoUnreachable,
     thinkCentreOffline: tcOffline,
   };
 }
 
 /** Solo per test — reset dello stato in-memory del modulo. */
 export function __resetCoordinatorForTests(): void {
-  currentDirective = null;
-  directiveLoaded = false;
+  directives.admin_manual = null;
+  directives.horus = null;
+  directives.quebracho = null;
+  directivesLoaded = false;
   pendingForceCycle = false;
+  pendingForceCycleIssuedBy = null;
   lastFallbackLoggedAt = 0;
 }

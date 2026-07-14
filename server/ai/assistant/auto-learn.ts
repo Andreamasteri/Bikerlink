@@ -21,6 +21,7 @@
 // fingerprint/no-change skip, cap di lavoro per ciclo, skip immediato se Ollama
 // locale non è raggiungibile.
 import { createHash } from "crypto";
+import { withJobGate } from "../coordinator/gated-job";
 import { and, desc, eq, sql } from "drizzle-orm";
 import { db } from "../../db";
 import { aiKnowledgeGaps, aiLearnedKnowledge } from "@shared/db";
@@ -209,15 +210,16 @@ export function startAutoLearnScheduler(): void {
   if (cycleTimer) return;
   // Jitter ±15% sul primo run per evitare la risincronizzazione tra worker.
   const jitter = (base: number) => base * (0.85 + Math.random() * 0.3);
+  const gatedCycle = withJobGate("assistant-auto-learn", () => { runCycle().catch(() => {}); });
   const scheduleNext = () => {
     cycleTimer = setTimeout(() => {
-      runCycle().catch(() => {});
+      void gatedCycle();
       scheduleNext();
     }, jitter(CYCLE_MS));
     cycleTimer.unref?.();
   };
   cycleTimer = setTimeout(() => {
-    runCycle().catch(() => {});
+    void gatedCycle();
     scheduleNext();
   }, jitter(FIRST_RUN_DELAY_MS));
   cycleTimer.unref?.();

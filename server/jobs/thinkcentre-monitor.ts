@@ -48,6 +48,7 @@ export {
   probeGraphHopperAreas,
 } from "./thinkcentre-monitor-probes";
 import { reInitRedis, suspendRedis, setTcRedisProbeOk } from "../cache/redis";
+import { withJobGate } from "../ai/coordinator/gated-job";
 
 // ── Config ────────────────────────────────────────────────────────────────────
 const PROBE_INTERVAL_MS = 5 * 60 * 1000;
@@ -287,11 +288,13 @@ export async function runThinkCentreProbe(): Promise<void> {
 export function startThinkCentreMonitor(): void {
   if (intervalHandle) return;
 
-  const firstTimer = setTimeout(async () => {
+  const gatedProbe = withJobGate("thinkcentre-monitor", async () => {
     await runThinkCentreProbe();
-    intervalHandle = setInterval(async () => {
-      await runThinkCentreProbe();
-    }, PROBE_INTERVAL_MS);
+  }, { critical: true });
+
+  const firstTimer = setTimeout(async () => {
+    await gatedProbe();
+    intervalHandle = setInterval(gatedProbe, PROBE_INTERVAL_MS);
   }, FIRST_PROBE_DELAY_MS);
 
   (firstTimer as unknown as { _thinkcentreFirst: boolean })._thinkcentreFirst = true;

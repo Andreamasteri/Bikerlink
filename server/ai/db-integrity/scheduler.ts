@@ -5,6 +5,7 @@ import { Cron } from "croner";
 import { runIntegrityScan } from "./runner";
 import { cleanupExpiredQuarantine } from "./quarantine";
 import { getQueue } from "../../cache/queues";
+import { withJobGate } from "../coordinator/gated-job";
 
 // Task #2536 — enqueue background per scan expensive (settimanale).
 // Quando DragonflyDB è disponibile, la weekly cron NON esegue il scan in-process
@@ -48,11 +49,21 @@ let lastRunAt: string | null = null;
 
 export function startDbIntegrityScheduler(): void {
   if (nightly) return;
+  // Task #9 — subsystem db-integrity, gate unico Quebracho (già integrato via
+  // coordinator/integrations/db-integrity.ts a livello di eventi/decisioni).
+  const gatedNightly = withJobGate("db-integrity-nightly", async () => {
+    const s = await runIntegrityScan({ trigger: "cron", includeExpensive: false });
+    lastRunAt = s.runAt;
+    console.log(`[db-integrity/scheduler] notturno: ${s.checksRun} check, ${s.violationsFound} violazioni, ${s.autoFixed} fix`);
+  });
+  const gatedWeekly = withJobGate("db-integrity-weekly", enqueueOrRunExpensive);
+  const gatedCleanup = withJobGate("db-integrity-cleanup", async () => {
+    const n = await cleanupExpiredQuarantine();
+    if (n > 0) console.log(`[db-integrity/scheduler] quarantena: ${n} righe scadute purgate`);
+  });
   nightly = new Cron("0 3 * * *", { timezone: TZ, protect: true }, async () => {
     try {
-      const s = await runIntegrityScan({ trigger: "cron", includeExpensive: false });
-      lastRunAt = s.runAt;
-      console.log(`[db-integrity/scheduler] notturno: ${s.checksRun} check, ${s.violationsFound} violazioni, ${s.autoFixed} fix`);
+      await gatedNightly();
     } catch (err) {
       lastError = { at: new Date().toISOString(), message: (err as Error).message?.slice(0, 300) ?? "unknown" };
       console.warn("[db-integrity/scheduler] notturno error:", err);
@@ -60,7 +71,7 @@ export function startDbIntegrityScheduler(): void {
   });
   weekly = new Cron("0 4 * * 0", { timezone: TZ, protect: true }, async () => {
     try {
-      await enqueueOrRunExpensive();
+      await gatedWeekly();
     } catch (err) {
       lastError = { at: new Date().toISOString(), message: (err as Error).message?.slice(0, 300) ?? "unknown" };
       console.warn("[db-integrity/scheduler] settimanale error:", err);
@@ -68,8 +79,7 @@ export function startDbIntegrityScheduler(): void {
   });
   cleanup = new Cron("0 */6 * * *", { timezone: TZ, protect: true }, async () => {
     try {
-      const n = await cleanupExpiredQuarantine();
-      if (n > 0) console.log(`[db-integrity/scheduler] quarantena: ${n} righe scadute purgate`);
+      await gatedCleanup();
     } catch (err) {
       console.warn("[db-integrity/scheduler] cleanup error:", err);
     }

@@ -10,6 +10,7 @@ import { sendAiAnomalyAlertPush } from "./push";
 import { storage } from "../../storage";
 import { withDbRetry } from "../../lib/db-retry";
 import { withBgDbSlot } from "../../lib/bg-db-limiter";
+import { withJobGate } from "../coordinator/gated-job";
 
 const WINDOW_MIN = 60;
 const HISTORY_HOURS = 24;
@@ -123,23 +124,26 @@ export async function runAnomalyScan(): Promise<{ created: number; scannedCatego
   return { created, scannedCategories: current.size };
 }
 
-function scheduleNextTick(): void {
+function scheduleNextTick(gatedScan: () => Promise<unknown>): void {
   const jitter = TICK_MS * 0.1 * (Math.random() * 2 - 1);
   const delay = TICK_MS + jitter;
   timer = setTimeout(async () => {
-    await runAnomalyScan().catch((err) => console.warn("[ai-anomaly] scan error:", err));
-    if (timer !== null) scheduleNextTick();
+    await gatedScan().catch((err) => console.warn("[ai-anomaly] scan error:", err));
+    if (timer !== null) scheduleNextTick(gatedScan);
   }, delay);
   timer.unref?.();
 }
 
 export function startAnomalyScheduler(): void {
   if (timer) return;
+  // Task #9 — Quebracho può pausare/riprendere anche questo loop (subsystem
+  // moderation, già integrato via coordinator/integrations/moderation.ts).
+  const gatedScan = withJobGate("moderation-anomalies", runAnomalyScan);
   // Primo run dopo 1 min, poi ogni 10 min ±10% jitter (anti-thundering-herd).
   timer = setTimeout(() => {
-    runAnomalyScan()
+    gatedScan()
       .catch((err) => console.warn("[ai-anomaly] first scan error:", err))
-      .finally(() => { if (timer !== null) scheduleNextTick(); });
+      .finally(() => { if (timer !== null) scheduleNextTick(gatedScan); });
   }, 60_000);
   timer.unref?.();
   console.log("[ai-anomaly] scheduler started, initial-delay=1min, tick=10min±10%");

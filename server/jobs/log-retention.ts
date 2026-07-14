@@ -12,6 +12,7 @@ import { lt, sql } from "drizzle-orm";
 import type { PgColumn } from "drizzle-orm/pg-core";
 import { db } from "../db";
 import { storage } from "../storage";
+import { withJobGate } from "../ai/coordinator/gated-job";
 import {
   gpsErrors,
   appCrashLogs,
@@ -189,11 +190,11 @@ export function scheduleLogRetention(): void {
   scheduled = true;
   // Prima esecuzione poco dopo il boot (per non contendere con il carico di avvio),
   // poi ogni 5 giorni.
+  const gatedRun = withJobGate("log-retention", () =>
+    runLogRetention().catch((e) => console.warn("[LOG-RETENTION] run error:", e)));
   setTimeout(() => {
-    runLogRetention().catch((e) => console.warn("[LOG-RETENTION] run iniziale error:", e));
-    setInterval(() => {
-      runLogRetention().catch((e) => console.warn("[LOG-RETENTION] run schedulato error:", e));
-    }, FIVE_DAYS_MS);
+    gatedRun();
+    setInterval(gatedRun, FIVE_DAYS_MS);
   }, INITIAL_DELAY_MS);
   console.log("[INIT] Log retention scheduled (run iniziale + ogni 5 giorni)");
 }

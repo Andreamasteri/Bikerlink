@@ -5,6 +5,7 @@
 // turns. Called lazily (fire-and-forget) after each conversation via agent.ts
 // and proactively via the nightly cron.
 import { Cron } from "croner";
+import { withJobGate } from "../coordinator/gated-job";
 import { db } from "../../db";
 import { aiConversationTurns } from "@shared/db";
 import { eq, asc, sql, inArray } from "drizzle-orm";
@@ -145,7 +146,7 @@ export async function getMemoryStats(): Promise<MemoryStats> {
  */
 export function scheduleMemoryPruner(): void {
   if (_cron) return;
-  _cron = new Cron("30 3 * * *", { timezone: TIMEZONE, protect: true }, async () => {
+  _cron = new Cron("30 3 * * *", { timezone: TIMEZONE, protect: true }, withJobGate("memory-pruner", async () => {
     try {
       console.log("[memory-pruner] Nightly batch start...");
       const result = await runMemoryPruner();
@@ -155,6 +156,6 @@ export function scheduleMemoryPruner(): void {
     } catch (err) {
       console.warn("[memory-pruner] Nightly batch error:", (err as Error).message);
     }
-  });
+  }));
   console.log("[memory-pruner] Nightly cron scheduled at 03:30 Europe/Rome");
 }

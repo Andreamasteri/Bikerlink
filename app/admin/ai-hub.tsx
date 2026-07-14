@@ -152,6 +152,22 @@ export default function AiHubScreen() {
       route: "/admin/app-integrity",
       color: "#FF3B30",
     },
+    {
+      key: "coordinator-jobs",
+      label: "Quebracho — Job",
+      subtitle: "Registry job, kill-switch, direttive",
+      icon: "sitemap-outline",
+      route: "/admin/coordinator-jobs",
+      color: "#7C3AED",
+    },
+    {
+      key: "ai-monitor",
+      label: "Monitor 4 AI",
+      subtitle: "Bowie · Horus · Ares · Quebracho",
+      icon: "heart-pulse",
+      route: "/admin/ai-monitor",
+      color: "#0EA5E9",
+    },
   ];
 
   return (

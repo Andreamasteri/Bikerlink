@@ -50,6 +50,7 @@ import { isThinkCentreOffline } from "./lib/thinkcentre-offline";
 import { storage } from "./storage";
 import { withSchedulerRetry, recordJobAttempt } from "./lib/scheduler-retry";
 import { requeueUnmatchable } from "./map-matching-job.part2";
+import { withJobGate } from "./ai/coordinator/gated-job";
 
 const LAST_RUN_KEY = "map_matching_last_run";
 /** AppSetting che registra l'ULTIMO TENTATIVO (anche fallito), distinto dall'ultimo successo. */
@@ -474,9 +475,16 @@ export function scheduleNightlyMapMatching(): void {
 
   const TARGET_HOUR = 2; // 02:00 Europe/Rome
 
+  // Task #9 — SOLO il lavoro vero e proprio è gated, non il ri-arm del timer:
+  // se withJobGate nega l'esecuzione (pausa/kill-switch) restituisce
+  // `undefined` senza chiamare la funzione interna. Se il ri-arm vivesse
+  // dentro la funzione gated, un singolo skip fermerebbe per sempre il loop
+  // (nessun altro setTimeout in giro). fireAndReschedule quindi NON è gated:
+  // pianifica sempre il prossimo giro; solo `gatedRun` è soggetto al gate.
+  const gatedRun = withJobGate("nightly-map-matching", runNightlyMapMatching);
   const fireAndReschedule = async () => {
     try {
-      await runNightlyMapMatching();
+      await gatedRun();
     } catch (err) {
       console.error("[MAP-MATCH] Errore nel giro notturno:", err);
     }

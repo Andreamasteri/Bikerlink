@@ -22,6 +22,7 @@
 // avvolte in withBgDbSlot/withBgDbConnection, sanitize (redact PII + drop
 // se contiene secret) prima di persistere.
 import { createHash } from "crypto";
+import { withJobGate } from "../coordinator/gated-job";
 import { promises as fs } from "fs";
 import path from "path";
 import { desc, sql } from "drizzle-orm";
@@ -279,15 +280,16 @@ export async function runHorusAnalysisNow(): Promise<{ ran: boolean; reason?: st
 export function startHorusAnalysisScheduler(): void {
   if (cycleTimer) return;
   const jitter = (base: number) => base * (0.85 + Math.random() * 0.3);
+  const gatedCycle = withJobGate("horus-analysis", () => { runCycle("schedule").catch(() => {}); });
   const scheduleNext = () => {
     cycleTimer = setTimeout(() => {
-      runCycle("schedule").catch(() => {});
+      void gatedCycle();
       scheduleNext();
     }, jitter(CYCLE_MS));
     cycleTimer.unref?.();
   };
   cycleTimer = setTimeout(() => {
-    runCycle("schedule").catch(() => {});
+    void gatedCycle();
     scheduleNext();
   }, jitter(FIRST_RUN_DELAY_MS));
   cycleTimer.unref?.();

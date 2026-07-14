@@ -12,6 +12,7 @@ import { and, eq, inArray } from "drizzle-orm";
 import { getTodayEmbeddingApiCallCount } from "../embeddings/store";
 import { storage } from "../storage";
 import { dedupWarn } from "../lib/dedup-logger";
+import { withJobGate } from "../ai/coordinator/gated-job";
 
 const EXPO_PUSH_URL = "https://exp.host/--/api/v2/push/send";
 const THRESHOLD_WARN = 0.85;
@@ -118,11 +119,14 @@ export function startEmbeddingCapAlertJob(): void {
   if (_timerId) return;
   // Primo run dopo 120s: evita di contendere il pool DB con gli altri worker
   // al boot (thundering herd). Chain auto-rischedulante con jitter ±10%.
+  const _gatedCheck = withJobGate("embedding-cap-alert", () => {
+    checkEmbeddingCapAlert().catch((e) =>
+      console.warn("[embed-cap-alert] check error:", e),
+    );
+  });
   const scheduleNext = () => {
     _timerId = setTimeout(() => {
-      checkEmbeddingCapAlert().catch((e) =>
-        console.warn("[embed-cap-alert] check error:", e),
-      );
+      _gatedCheck();
       scheduleNext();
     }, jitteredInterval());
   };

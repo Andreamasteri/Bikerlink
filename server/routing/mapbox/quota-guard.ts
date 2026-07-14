@@ -9,6 +9,7 @@
  */
 
 import { storage } from "../../storage";
+import { withJobGate } from "../../ai/coordinator/gated-job";
 
 export const MAPBOX_QUOTA_LIMIT = 100_000;
 export const MAPBOX_DEFAULT_WARNING = 80_000;
@@ -123,15 +124,24 @@ export function scheduleMonthlyReset(): void {
     return Math.max(0, new Date(nextResetDate()).getTime() - Date.now());
   }
 
+  // Task #9 — gate SOLO sul reset vero e proprio; scheduleNext() resta fuori
+  // dal gate (stesso pattern di map-matching-job.ts): se il ri-arm vivesse
+  // dentro la funzione gated, un singolo skip fermerebbe il loop per sempre.
+  const gatedReset = withJobGate("mapbox-quota-reset", async () => {
+    await resetQuota().catch((e) => console.error("[Mapbox] Errore reset quota:", e));
+  });
+
+  async function fireAndReschedule() {
+    await gatedReset();
+    scheduleNext();
+  }
+
   function scheduleNext() {
     const delay = msUntilNextReset();
     const days = Math.round(delay / 86_400_000);
     console.log(`[Mapbox] Quota reset schedulato tra ~${days} giorni (${nextResetDate()})`);
 
-    safeSetTimeout(async () => {
-      await resetQuota().catch((e) => console.error("[Mapbox] Errore reset quota:", e));
-      scheduleNext();
-    }, delay);
+    safeSetTimeout(() => { void fireAndReschedule(); }, delay);
   }
 
   scheduleNext();

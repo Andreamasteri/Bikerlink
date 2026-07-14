@@ -1,6 +1,7 @@
 // Task #2654 — Adapter AI Console → AI Coordinator (b).
 // Read-only audit: ogni interazione admin produce un evento per correlazione.
 import { getCoordinator } from "../index";
+import { registerGatedJob } from "../gated-job";
 
 const AI_NAME = "console";
 
@@ -71,5 +72,12 @@ export async function emitConsolePin(args: {
 }
 
 export function wireConsoleToCoordinator(): void {
+  // Task #9 — "console" non ha un loop schedulato (le emit sopra sono
+  // sincrone alla richiesta admin, non ripetibili a piacere): gatarle con
+  // canRunJob aggiungerebbe latenza/IO a una richiesta interattiva senza un
+  // vero beneficio di coordinamento. Ci limitiamo a registrare il subsystem
+  // nel registry di Quebracho per visibilità/audit nell'admin panel, senza
+  // alcun controllo bloccante sulle emit.
+  registerGatedJob("console-adapter", { critical: false });
   console.log("[INIT] AI Coordinator wire console");
 }

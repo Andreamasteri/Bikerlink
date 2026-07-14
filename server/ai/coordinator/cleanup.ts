@@ -2,6 +2,7 @@
 // Retention configurabile via env `AI_AUDIT_RETENTION_DAYS` (default 30).
 // Tutti e tre i tipi seguono la stessa finestra (nessun floor separato).
 import { Cron } from "croner";
+import { withJobGate } from "./gated-job";
 import { lt, sql } from "drizzle-orm";
 import { db } from "../../db";
 import { aiConflicts, aiDecisions, aiEvents } from "@shared/db";
@@ -39,7 +40,7 @@ export async function runCoordinatorCleanup(): Promise<{ events: number; decisio
 
 export function startCoordinatorCleanupScheduler(): void {
   if (cron) return;
-  cron = new Cron("30 4 * * *", { timezone: TZ, protect: true }, async () => {
+  cron = new Cron("30 4 * * *", { timezone: TZ, protect: true }, withJobGate("coordinator-cleanup", async () => {
     try {
       const s = await runCoordinatorCleanup();
       console.log(`[ai-coordinator/cleanup] retention OK: events=${s.events} decisions=${s.decisions} conflicts=${s.conflicts}`);
@@ -47,7 +48,7 @@ export function startCoordinatorCleanupScheduler(): void {
       lastError = { at: new Date().toISOString(), message: (err as Error).message?.slice(0, 300) ?? "unknown" };
       console.warn("[ai-coordinator/cleanup] retention error:", err);
     }
-  });
+  }));
   console.log("[ai-coordinator/cleanup] scheduler avviato (04:30 Europe/Rome)");
 }
 

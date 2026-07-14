@@ -3,6 +3,7 @@ import { sql } from "drizzle-orm";
 import { storage } from "./storage";
 import { withBgDbConnection } from "./lib/bg-db-limiter";
 import { withSchedulerRetry, recordJobAttempt } from "./lib/scheduler-retry";
+import { withJobGate } from "./ai/coordinator/gated-job";
 
 const VACUUM_LAST_RUN_KEY = "db_vacuum_smart_v1";
 const VACUUM_DETAIL_KEY = "db_vacuum_smart_v1_detail";
@@ -287,16 +288,22 @@ export function scheduleNightlyVacuum(): void {
     return;
   }
 
-  const fireAndReschedule = async () => {
+  // Task #9 — gate SOLO sul vacuum vero e proprio; il ri-arm del timer resta
+  // fuori dal gate (stesso pattern di map-matching-job.ts): altrimenti un
+  // singolo skip (pausa/kill-switch) fermerebbe il loop notturno per sempre.
+  const gatedVacuum = withJobGate("nightly-vacuum", async () => {
     if (isRunning) {
       console.warn("[VACUUM] Esecuzione notturna saltata: giro precedente ancora in corso.");
-    } else {
-      try {
-        await runVacuumSmart();
-      } catch (err) {
-        console.error("[VACUUM] Errore nel giro notturno:", err);
-      }
+      return;
     }
+    try {
+      await runVacuumSmart();
+    } catch (err) {
+      console.error("[VACUUM] Errore nel giro notturno:", err);
+    }
+  });
+  const fireAndReschedule = async () => {
+    await gatedVacuum();
     // Pulizia contatori AI indipendente dal vacuum principale
     try {
       await purgeOldAiAuditRows();

@@ -4,6 +4,7 @@
 // (.private/selfcheck/ e public/ads/). Risultato persistito su
 // ai_watchdog_log (kind="report", scope="campaigns") + ultimo run in memoria.
 import http from "http";
+import { withJobGate } from "../coordinator/gated-job";
 import crypto from "crypto";
 import { generateText } from "ai";
 import { runWithFallback, estimateCostUsd } from "../moderation/provider";
@@ -474,10 +475,10 @@ export function startCampaignsSelfCheckScheduler(): void {
     runCampaignsSelfCheck({ triggeredBy: "startup" }).catch((e) =>
       console.warn("[campaigns-self-check] startup run failed:", e));
   }, 30_000);
-  timer = setInterval(() => {
+  timer = setInterval(withJobGate("campaigns-self-check", () => {
     runCampaignsSelfCheck({ triggeredBy: "scheduler" }).catch((e) =>
       console.warn("[campaigns-self-check] scheduled run failed:", e));
-  }, SIX_HOURS);
+  }), SIX_HOURS);
   timer.unref?.();
   console.log("[campaigns-self-check] scheduler avviato (ogni 6h)");
 }

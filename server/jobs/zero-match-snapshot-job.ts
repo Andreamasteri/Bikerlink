@@ -4,6 +4,7 @@ import { matchZeroSnapshots } from "@shared/db";
 import { Cron } from "croner";
 import { dedupWarn } from "../lib/dedup-logger";
 import { withBgDbSlot } from "../lib/bg-db-limiter";
+import { withJobGate } from "../ai/coordinator/gated-job";
 
 let schedulerHandle: { stop?: () => void } | null = null;
 let started = false;
@@ -61,13 +62,13 @@ export function startZeroMatchSnapshotScheduler(): void {
   if (started) return;
   started = true;
 
-  const run = async () => {
+  const run = withJobGate("zero-match-snapshot", async () => {
     try {
       await runZeroMatchSnapshot();
     } catch (e) {
       dedupWarn("zero-match-snapshot", "nightly job failed (non-fatal)", e);
     }
-  };
+  });
 
   try {
     const cron = new Cron("0 3 * * *", { timezone: "Europe/Rome" }, run);

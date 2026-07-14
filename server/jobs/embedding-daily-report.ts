@@ -17,6 +17,7 @@ import { sql } from "drizzle-orm";
 import { db, withDbRetry } from "../db";
 import { storage } from "../storage";
 import { dedupWarn } from "../lib/dedup-logger";
+import { withJobGate } from "../ai/coordinator/gated-job";
 
 export interface EmbeddingDailyReport {
   generatedAt: string;
@@ -194,21 +195,20 @@ let _scheduled = false;
 export function scheduleEmbeddingDailyReport(): void {
   if (_scheduled) return;
   _scheduled = true;
+  const _gatedRun = withJobGate("embedding-daily-report", () => {
+    runEmbeddingDailyReport().catch((e) =>
+      dedupWarn("embed-daily-report", "scheduled run error (non-fatal)", e),
+    );
+  });
   try {
-    new Cron("15 8 * * *", { timezone: TIMEZONE, protect: true }, () => {
-      runEmbeddingDailyReport().catch((e) =>
-        dedupWarn("embed-daily-report", "scheduled run error (non-fatal)", e),
-      );
-    });
+    new Cron("15 8 * * *", { timezone: TIMEZONE, protect: true }, _gatedRun);
   } catch (cronErr) {
     console.warn("[EmbedReport] croner unavailable, fallback 24h interval:", cronErr);
     const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
     const DELAY_TO_MORNING_MS = 8 * 60 * 60 * 1000; // rough initial delay
     setTimeout(() => {
       runEmbeddingDailyReport().catch((e) => console.error("[EmbedReport] First run error:", e));
-      setInterval(() => {
-        runEmbeddingDailyReport().catch((e) => console.error("[EmbedReport] Interval run error:", e));
-      }, TWENTY_FOUR_HOURS_MS);
+      setInterval(_gatedRun, TWENTY_FOUR_HOURS_MS);
     }, DELAY_TO_MORNING_MS);
   }
 }

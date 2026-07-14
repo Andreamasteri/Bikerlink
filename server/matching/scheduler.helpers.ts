@@ -17,6 +17,7 @@
 
 import { db } from "../db";
 import { storage } from "../storage";
+import { withJobGate } from "../ai/coordinator/gated-job";
 import {
   proposals,
   proposalZoneNotifications,
@@ -165,9 +166,10 @@ export function isFakeRotationRunning(): boolean {
 export function startFakeZavorrineRotation(): void {
   if (_fakeRotationTimer) return; // idempotent — already running
   void runFakeZavorrineRotation(); // run immediately on enable
-  _fakeRotationTimer = setInterval(() => {
+  const _gatedRotation = withJobGate("fake-activity-rotation", () => {
     void runFakeZavorrineRotation();
-  }, FAKE_ROTATION_INTERVAL_MS);
+  });
+  _fakeRotationTimer = setInterval(_gatedRotation, FAKE_ROTATION_INTERVAL_MS);
   console.log("[Matching] Fake zavorrine availability rotation started (5min interval)");
 }
 

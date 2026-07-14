@@ -24,6 +24,7 @@ import { AI_ROSTER, type AiPersonaId, createHandoffMarkerFilter, stripHandoffMar
 import { recordKnowledgeGap } from "./knowledge-gaps";
 import { composeAresQuestion } from "./ares-question";
 import { isAresConfigured, getAresModelId, streamAresChat } from "../../lib/ares-client";
+import { withAresVramPriority } from "../../lib/vram-arbiter";
 import { composeQuebrachoQuestion } from "./quebracho-question";
 import { isQuebrachoConfigured, getQuebrachoModelId, streamQuebrachoChat } from "../../lib/quebracho-client";
 import { retrieveContext, formatRagContext, indexKnowledge } from "./rag";
@@ -406,19 +407,24 @@ export async function runAssistantAgent(opts: AssistantAgentOpts): Promise<Assis
       // sintesi nel system prompt, così risponde con la sua voce e in modo contenuto.
       const aresQuestion = await composeAresQuestion(opts.history ?? [], opts.message);
       const aresSystem = `${system}\n\nVINCOLO DI RISPOSTA: rispondi in modo CONTENUTO e STRUTTURATO (punti chiave, niente preamboli né divagazioni). Vai dritto alla diagnosi/azione.`;
-      await streamAresChat({
-        system: aresSystem,
-        messages: [{ role: "user", content: aresQuestion }],
-        signal: opts.signal,
-        timeoutMs: 60_000,
-        onDelta: (delta) => {
-          ensureIntroEmitted();
-          finalText += delta;
-          aiText += delta;
-          providerEmittedAny = true;
-          emitAiDelta(delta);
-        },
-      });
+      // Task #10 — VRAM arbiter: libera memoria sull'istanza Ollama di Ares da
+      // eventuali altri modelli residenti prima di caricare il suo modello
+      // pesante on-demand, poi li ricarica best-effort (mai altera l'esito).
+      await withAresVramPriority(getAresModelId(), () =>
+        streamAresChat({
+          system: aresSystem,
+          messages: [{ role: "user", content: aresQuestion }],
+          signal: opts.signal,
+          timeoutMs: 60_000,
+          onDelta: (delta) => {
+            ensureIntroEmitted();
+            finalText += delta;
+            aiText += delta;
+            providerEmittedAny = true;
+            emitAiDelta(delta);
+          },
+        }),
+      );
       provider = "ares";
       modelId = getAresModelId();
       done = true;

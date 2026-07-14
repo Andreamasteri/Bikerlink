@@ -19,6 +19,7 @@ import { startMetroCrashDiagScheduler } from "../../jobs/metro-crash-diag-job";
 import { cleanupMapsTelemetry } from "./maps-telemetry-store";
 import { runMapsHealthChecks } from "./maps-health-checks";
 import { sendSystemAlertPushToAdmins } from "../../push-notifications-admin";
+import { withJobGate } from "../coordinator/gated-job";
 
 const TICK_MS = 60_000;
 const CLEANUP_MS = 60 * 60_000;
@@ -130,29 +131,35 @@ export function startWatchdogScheduler(): void {
   // (51–69s) per evitare la risincronizzazione tra worker dopo ogni restart.
   // clearTimeout e clearInterval condividono lo stesso namespace in Node.js,
   // quindi stopWatchdogScheduler() può usare clearTimeout(tickTimer) sul timer.
+  // Task #9 — subsystem watchdog, gate unico Quebracho (già integrato via
+  // coordinator/integrations/watchdog.ts a livello di eventi/decisioni).
+  const gatedTick = withJobGate("watchdog-scheduler-tick", tick);
+  const gatedCleanup = withJobGate("watchdog-scheduler-cleanup", async () => {
+    await cleanupOldSignals().then((n) => {
+      if (n > 0) console.log(`[watchdog/scheduler] cleanup signals: ${n} righe rimosse`);
+    }).catch(() => {});
+    // Task #2686 — cleanup telemetria mappe (retention 7gg)
+    await cleanupMapsTelemetry().then((n) => {
+      if (n > 0) console.log(`[watchdog/scheduler] cleanup maps telemetry: ${n} righe rimosse`);
+    }).catch(() => {});
+    // Task #2686 — refresh health-checks tile/engine periodicamente
+    await runMapsHealthChecks(true).catch(() => {});
+  });
   const jitter = () => TICK_MS * (0.85 + Math.random() * 0.30);
   const scheduleNext = () => {
     tickTimer = setTimeout(() => {
-      tick().catch(() => {});
+      gatedTick().catch(() => {});
       scheduleNext();
     }, jitter());
     tickTimer.unref?.();
   };
   tickTimer = setTimeout(() => {
-    tick().catch(() => {});
+    gatedTick().catch(() => {});
     scheduleNext();
   }, 90_000);
   tickTimer.unref?.();
   cleanupTimer = setInterval(() => {
-    cleanupOldSignals().then((n) => {
-      if (n > 0) console.log(`[watchdog/scheduler] cleanup signals: ${n} righe rimosse`);
-    }).catch(() => {});
-    // Task #2686 — cleanup telemetria mappe (retention 7gg)
-    cleanupMapsTelemetry().then((n) => {
-      if (n > 0) console.log(`[watchdog/scheduler] cleanup maps telemetry: ${n} righe rimosse`);
-    }).catch(() => {});
-    // Task #2686 — refresh health-checks tile/engine periodicamente
-    runMapsHealthChecks(true).catch(() => {});
+    gatedCleanup().catch(() => {});
   }, CLEANUP_MS);
   cleanupTimer.unref?.();
   startWeeklyReportScheduler();

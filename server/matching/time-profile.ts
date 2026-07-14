@@ -16,6 +16,7 @@ import { sql } from "drizzle-orm";
 import { userTimeProfile } from "@shared/db";
 import { storage } from "../storage";
 import { toZonedTime } from "date-fns-tz";
+import { withJobGate } from "../ai/coordinator/gated-job";
 
 const TZ = "Europe/Rome";
 const WINDOW_DAYS = 90;
@@ -371,9 +372,12 @@ export function scheduleDailyUserTimeProfileJob(): void {
 
   const TARGET_HOUR = 4; // 04:00 Europe/Rome
 
+  // Task #9 — gate SOLO sul lavoro, il ri-arm resta fuori (stesso pattern di
+  // map-matching-job.ts): altrimenti un singolo skip fermerebbe il loop per sempre.
+  const gatedRun = withJobGate("daily-time-profile", runUserTimeProfileJob);
   const fire = async () => {
     try {
-      await runUserTimeProfileJob();
+      await gatedRun();
     } catch (err) {
       console.error("[USER-TIME-PROFILE] Errore esecuzione giornaliera:", err);
     }

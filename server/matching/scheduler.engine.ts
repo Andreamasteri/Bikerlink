@@ -16,6 +16,15 @@ import { recomputeAllUserMatchProfiles } from "./recompute-profiles";
 import { addMatchLog } from "./match-log-buffer";
 import { recordCycleError, recordCycleDrop } from "./metrics";
 import { triggerMatchingRun } from "./scheduler.cycle";
+import { withJobGate } from "../ai/coordinator/gated-job";
+
+// Task #9 (Quebracho b, "Group D") — questi loop del motore di matching sono
+// GIÀ soggetti al Matching Coordinator (canRunCycleNow, per-issuer
+// admin/horus/quebracho — vedi ./coordinator.ts) per la decisione FINE
+// "può girare un ciclo di matching adesso?". withJobGate qui aggiunge SOLO il
+// gate GROSSOLANO di Quebracho a livello di job-registry (visibilità/pausa
+// on-off dal pannello admin, coerente con gli altri ~26+ loop), senza
+// duplicare né sostituire la logica del coordinator.
 
 const _engineTimers: ReturnType<typeof setInterval>[] = [];
 const _engineCrons: Cron[] = [];
@@ -46,16 +55,15 @@ export function startMatchingEngine(): void {
   // initialised at boot by initFakeActivityOnBoot(). This avoids a ghost 5-min
   // timer running whenever the matching engine is up.
 
-  _engineTimers.push(setInterval(() => {
-    try {
-      console.log("[Matching] Ciclo automatico orario avviato");
-      const result = triggerMatchingRun();
-      if (!result.started) {
-        console.log(`[Matching] Ciclo automatico saltato: ${result.reason}`);
-      }
-    } catch (err) {
-      console.error("[Matching] Errore imprevisto nel ciclo automatico orario:", err);
+  const gatedHourlyTick = withJobGate("matching-hourly-tick", async () => {
+    console.log("[Matching] Ciclo automatico orario avviato");
+    const result = triggerMatchingRun();
+    if (!result.started) {
+      console.log(`[Matching] Ciclo automatico saltato: ${result.reason}`);
     }
+  });
+  _engineTimers.push(setInterval(() => {
+    gatedHourlyTick().catch((err) => console.error("[Matching] Errore imprevisto nel ciclo automatico orario:", err));
   }, 60 * 60 * 1000));
   console.log("[Matching] Ciclo di matching automatico orario avviato");
 
@@ -86,27 +94,29 @@ export function startMatchingEngine(): void {
       addMatchLog("ERROR", "archive_stale", `Errore archiviazione match stale: ${err instanceof Error ? err.message : String(err)}`);
     }
   };
+  const gatedArchiveStale = withJobGate("matching-archive-stale", runArchiveStaleMatches);
   addMatchLog("INFO", "archive_stale", "Prima archiviazione programmata tra 3 minuti");
-  setTimeout(runArchiveStaleMatches, 3 * 60 * 1000);
-  _engineTimers.push(setInterval(runArchiveStaleMatches, 24 * 60 * 60 * 1000));
+  setTimeout(gatedArchiveStale, 3 * 60 * 1000);
+  _engineTimers.push(setInterval(gatedArchiveStale, 24 * 60 * 60 * 1000));
   console.log("[Matching] Archiviazione giornaliera match 'new' stale avviata");
 
   if (process.env.DISABLE_WEEKLY_RECAP_JOB !== "1") {
     try {
+      const gatedWeeklyRecap = withJobGate("matching-weekly-recap", async () => {
+        addMatchLog("INFO", "weekly_recap", "Weekly recap avviato (lun 09:00 Europe/Rome)");
+        try {
+          console.log("[WeeklyRecap] Trigger schedulato (lun 09:00 Europe/Rome)");
+          const r = await runWeeklyRecapJob();
+          addMatchLog("INFO", "weekly_recap", `Weekly recap completato — utenti: ${r.usersProcessed}, recap: ${r.recapsCreated}, push: ${r.pushSent}`);
+        } catch (err) {
+          console.error("[WeeklyRecap] Errore esecuzione schedulata:", err);
+          addMatchLog("ERROR", "weekly_recap", `Errore weekly recap: ${err instanceof Error ? err.message : String(err)}`);
+        }
+      });
       const cron = new Cron(
         "0 9 * * 1",
         { timezone: "Europe/Rome", protect: true, name: "weekly-recap" },
-        async () => {
-          addMatchLog("INFO", "weekly_recap", "Weekly recap avviato (lun 09:00 Europe/Rome)");
-          try {
-            console.log("[WeeklyRecap] Trigger schedulato (lun 09:00 Europe/Rome)");
-            const r = await runWeeklyRecapJob();
-            addMatchLog("INFO", "weekly_recap", `Weekly recap completato — utenti: ${r.usersProcessed}, recap: ${r.recapsCreated}, push: ${r.pushSent}`);
-          } catch (err) {
-            console.error("[WeeklyRecap] Errore esecuzione schedulata:", err);
-            addMatchLog("ERROR", "weekly_recap", `Errore weekly recap: ${err instanceof Error ? err.message : String(err)}`);
-          }
-        },
+        gatedWeeklyRecap,
       );
       _engineCrons.push(cron);
       const nextRun = cron.nextRun();
@@ -118,7 +128,7 @@ export function startMatchingEngine(): void {
     console.log("[Matching] Weekly recap disabilitato (DISABLE_WEEKLY_RECAP_JOB=1)");
   }
 
-  _engineTimers.push(setInterval(async () => {
+  const gatedHourlyCleanup = withJobGate("matching-hourly-cleanup", async () => {
     try {
       const { expired, deleted, prunedZoneNotifs, prunedStaleMatches } = await withDbRetry(async () => {
         const expired = await runCleanup();
@@ -145,77 +155,84 @@ export function startMatchingEngine(): void {
     console.log(
       `[MemDiag] rss=${memMb}MB | lastUserMatchingAt=${lastUserMatchingAt.size} (purgati=${purgati}) | ora=${new Date().toISOString()}`
     );
-  }, 60 * 60 * 1000));
+  });
+  _engineTimers.push(setInterval(() => { void gatedHourlyCleanup(); }, 60 * 60 * 1000));
   console.log("[Matching] Cleanup orario proposte scadute avviato");
 
-  setTimeout(() => {
+  const gatedNegPatternStartup = withJobGate("matching-daily-negative-pattern", async () => {
     addMatchLog("INFO", "neg_pattern", "Rilevamento pattern negativi avviato (startup)");
-    runDetectNegativePatternsJob()
-      .then((r) => {
-        if (r.suggestionsInserted > 0) {
-          console.log(`[NegPattern] ${r.suggestionsInserted} suggerimenti inseriti su ${r.usersProcessed} utenti`);
-        }
-        addMatchLog("INFO", "neg_pattern", `Pattern negativi (startup): ${r.suggestionsInserted} suggerimenti / ${r.usersProcessed} utenti analizzati`);
-      })
-      .catch((err) => {
-        console.error("[NegPattern] startup run failed:", err);
-        addMatchLog("ERROR", "neg_pattern", `Errore rilevamento pattern negativi (startup): ${err instanceof Error ? err.message : String(err)}`);
-      });
-  }, 10 * 60 * 1000);
-  _engineTimers.push(setInterval(() => {
+    try {
+      const r = await runDetectNegativePatternsJob();
+      if (r.suggestionsInserted > 0) {
+        console.log(`[NegPattern] ${r.suggestionsInserted} suggerimenti inseriti su ${r.usersProcessed} utenti`);
+      }
+      addMatchLog("INFO", "neg_pattern", `Pattern negativi (startup): ${r.suggestionsInserted} suggerimenti / ${r.usersProcessed} utenti analizzati`);
+    } catch (err) {
+      console.error("[NegPattern] startup run failed:", err);
+      addMatchLog("ERROR", "neg_pattern", `Errore rilevamento pattern negativi (startup): ${err instanceof Error ? err.message : String(err)}`);
+    }
+  });
+  setTimeout(() => { void gatedNegPatternStartup(); }, 10 * 60 * 1000);
+  const gatedNegPatternDaily = withJobGate("matching-daily-negative-pattern", async () => {
     addMatchLog("INFO", "neg_pattern", "Rilevamento pattern negativi avviato (giornaliero)");
-    runDetectNegativePatternsJob()
-      .then((r) => {
-        if (r.suggestionsInserted > 0) {
-          console.log(`[NegPattern] daily: ${r.suggestionsInserted} suggerimenti inseriti su ${r.usersProcessed} utenti`);
-        }
-        addMatchLog("INFO", "neg_pattern", `Pattern negativi (giornaliero): ${r.suggestionsInserted} suggerimenti / ${r.usersProcessed} utenti analizzati`);
-      })
-      .catch((err) => {
-        console.error("[NegPattern] daily run failed:", err);
-        addMatchLog("ERROR", "neg_pattern", `Errore rilevamento pattern negativi (giornaliero): ${err instanceof Error ? err.message : String(err)}`);
-      });
-  }, 24 * 60 * 60 * 1000));
+    try {
+      const r = await runDetectNegativePatternsJob();
+      if (r.suggestionsInserted > 0) {
+        console.log(`[NegPattern] daily: ${r.suggestionsInserted} suggerimenti inseriti su ${r.usersProcessed} utenti`);
+      }
+      addMatchLog("INFO", "neg_pattern", `Pattern negativi (giornaliero): ${r.suggestionsInserted} suggerimenti / ${r.usersProcessed} utenti analizzati`);
+    } catch (err) {
+      console.error("[NegPattern] daily run failed:", err);
+      addMatchLog("ERROR", "neg_pattern", `Errore rilevamento pattern negativi (giornaliero): ${err instanceof Error ? err.message : String(err)}`);
+    }
+  });
+  _engineTimers.push(setInterval(() => { void gatedNegPatternDaily(); }, 24 * 60 * 60 * 1000));
   console.log("[Matching] Daily negative-pattern detection scheduled");
 
-  setTimeout(() => {
-    import("../services/reportingService").then(({ recomputeAllTrustScores }) =>
-      withDbRetry(() => recomputeAllTrustScores())
-        .then((r) => {
-          if (r.updated > 0) console.log(`[Reports] trust score startup: ${r.updated} report aggiornati`);
-        })
-        .catch((err) => dedupWarn("reports/trust-startup", "trust recompute startup failed (non-fatal)", err)),
-    ).catch((err) => dedupWarn("reports/trust-import", "trust import failed (non-fatal)", err));
-  }, 7 * 60 * 1000);
-  _engineTimers.push(setInterval(() => {
-    import("../services/reportingService").then(({ recomputeAllTrustScores }) =>
-      withDbRetry(() => recomputeAllTrustScores())
-        .then((r) => {
-          if (r.updated > 0) console.log(`[Reports] daily trust score: ${r.updated} report aggiornati`);
-        })
-        .catch((err) => dedupWarn("reports/trust-daily", "daily trust recompute failed (non-fatal)", err)),
-    ).catch(() => {});
-  }, 24 * 60 * 60 * 1000));
+  const gatedTrustStartup = withJobGate("matching-daily-trust-recompute", async () => {
+    try {
+      const { recomputeAllTrustScores } = await import("../services/reportingService");
+      const r = await withDbRetry(() => recomputeAllTrustScores());
+      if (r.updated > 0) console.log(`[Reports] trust score startup: ${r.updated} report aggiornati`);
+    } catch (err) {
+      dedupWarn("reports/trust-startup", "trust recompute startup failed (non-fatal)", err);
+    }
+  });
+  setTimeout(() => { void gatedTrustStartup(); }, 7 * 60 * 1000);
+  const gatedTrustDaily = withJobGate("matching-daily-trust-recompute", async () => {
+    try {
+      const { recomputeAllTrustScores } = await import("../services/reportingService");
+      const r = await withDbRetry(() => recomputeAllTrustScores());
+      if (r.updated > 0) console.log(`[Reports] daily trust score: ${r.updated} report aggiornati`);
+    } catch (err) {
+      dedupWarn("reports/trust-daily", "daily trust recompute failed (non-fatal)", err);
+    }
+  });
+  _engineTimers.push(setInterval(() => { void gatedTrustDaily(); }, 24 * 60 * 60 * 1000));
   console.log("[Matching] Daily reporter trust-score recompute scheduled");
 
-  setTimeout(() => {
+  const gatedProfileRecomputeStartup = withJobGate("matching-daily-profile-recompute", async () => {
     addMatchLog("INFO", "profile_recompute", "Ricalcolo profili utente avviato (startup)");
-    withBgDbSlot(() => withDbRetry(() => recomputeAllUserMatchProfiles()))
-      .then(() => addMatchLog("INFO", "profile_recompute", "Ricalcolo profili utente completato (startup)"))
-      .catch((err: unknown) => {
-        dedupWarn("matching/profile-recompute-startup", "errore ricalcolo profili utente (non-fatal)", err);
-        addMatchLog("ERROR", "profile_recompute", `Errore ricalcolo profili utente (startup): ${err instanceof Error ? err.message : String(err)}`);
-      });
-  }, 5 * 60 * 1000);
-  _engineTimers.push(setInterval(() => {
+    try {
+      await withBgDbSlot(() => withDbRetry(() => recomputeAllUserMatchProfiles()));
+      addMatchLog("INFO", "profile_recompute", "Ricalcolo profili utente completato (startup)");
+    } catch (err) {
+      dedupWarn("matching/profile-recompute-startup", "errore ricalcolo profili utente (non-fatal)", err);
+      addMatchLog("ERROR", "profile_recompute", `Errore ricalcolo profili utente (startup): ${err instanceof Error ? err.message : String(err)}`);
+    }
+  });
+  setTimeout(() => { void gatedProfileRecomputeStartup(); }, 5 * 60 * 1000);
+  const gatedProfileRecomputeDaily = withJobGate("matching-daily-profile-recompute", async () => {
     addMatchLog("INFO", "profile_recompute", "Ricalcolo profili utente avviato (giornaliero)");
-    withBgDbSlot(() => withDbRetry(() => recomputeAllUserMatchProfiles()))
-      .then(() => addMatchLog("INFO", "profile_recompute", "Ricalcolo profili utente completato (giornaliero)"))
-      .catch((err: unknown) => {
-        dedupWarn("matching/profile-recompute-daily", "errore ricalcolo profili utente (non-fatal)", err);
-        addMatchLog("ERROR", "profile_recompute", `Errore ricalcolo profili utente (giornaliero): ${err instanceof Error ? err.message : String(err)}`);
-      });
-  }, 24 * 60 * 60 * 1000));
+    try {
+      await withBgDbSlot(() => withDbRetry(() => recomputeAllUserMatchProfiles()));
+      addMatchLog("INFO", "profile_recompute", "Ricalcolo profili utente completato (giornaliero)");
+    } catch (err) {
+      dedupWarn("matching/profile-recompute-daily", "errore ricalcolo profili utente (non-fatal)", err);
+      addMatchLog("ERROR", "profile_recompute", `Errore ricalcolo profili utente (giornaliero): ${err instanceof Error ? err.message : String(err)}`);
+    }
+  });
+  _engineTimers.push(setInterval(() => { void gatedProfileRecomputeDaily(); }, 24 * 60 * 60 * 1000));
   console.log("[Matching] Daily user-match-profile recompute scheduled");
 
   const runBioAffinitySafe = async () => {
@@ -239,8 +256,9 @@ export function startMatchingEngine(): void {
       }
     }
   };
-  bootJobQueue.register("BioAffinityMatching", runBioAffinitySafe);
-  _engineTimers.push(setInterval(runBioAffinitySafe, 30 * 60 * 1000));
+  const gatedBioAffinity = withJobGate("matching-bio-affinity", runBioAffinitySafe);
+  bootJobQueue.register("BioAffinityMatching", gatedBioAffinity);
+  _engineTimers.push(setInterval(() => { void gatedBioAffinity(); }, 30 * 60 * 1000));
   console.log("[Matching] BioAffinity matcher schedulato (30 min)");
 
   const runTelemetryAffinitySafe = async () => {
@@ -278,8 +296,9 @@ export function startMatchingEngine(): void {
       }
     }
   };
-  bootJobQueue.register("TelemetryAffinityMatching", runTelemetryAffinitySafe);
-  _engineTimers.push(setInterval(runTelemetryAffinitySafe, 24 * 60 * 60 * 1000));
+  const gatedTelemetryAffinity = withJobGate("matching-telemetry-affinity", runTelemetryAffinitySafe);
+  bootJobQueue.register("TelemetryAffinityMatching", gatedTelemetryAffinity);
+  _engineTimers.push(setInterval(() => { void gatedTelemetryAffinity(); }, 24 * 60 * 60 * 1000));
   console.log("[Matching] TelemetryAffinity matcher schedulato (24h)");
 }
 
