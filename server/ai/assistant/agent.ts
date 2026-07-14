@@ -29,6 +29,13 @@ import { composeQuebrachoQuestion } from "./quebracho-question";
 import { isQuebrachoConfigured, getQuebrachoModelId, streamQuebrachoChat } from "../../lib/quebracho-client";
 import { retrieveContext, formatRagContext, indexKnowledge } from "./rag";
 import { OLLAMA_TOOLS, HORUS_TOOLS } from "./tools";
+import {
+  selectToolNamesForMessage,
+  buildMissingToolInstruction,
+  createOllamaOutputGate,
+  tryParseTextualToolCall,
+} from "./tool-calling";
+import { isWebSearchConfigured } from "./web-search";
 import { buildAresLearningContext } from "./ares-learning";
 import { loadShareableAnalysisKnowledge } from "./horus-analyzer";
 import { logAiCall } from "../../lib/ai-logger";
@@ -170,6 +177,26 @@ export async function runAssistantAgent(opts: AssistantAgentOpts): Promise<Assis
   // Ares passa per un endpoint dedicato (nessun tool calling server-side).
   const enableTools = requestedPersona === "bowie" || requestedPersona === "horus";
   const toolsForPersona = requestedPersona === "horus" ? HORUS_TOOLS : OLLAMA_TOOLS;
+
+  // Task #7 (#3) — Selezione contestuale + gating per capacità: invece di
+  // allegare l'INTERO set di tool a ogni turno, alleghiamo solo il sottoinsieme
+  // pertinente al messaggio e ai servizi effettivamente attivi (webSearch solo
+  // con SearXNG configurato; stats/percorsi solo con un userId reale). Un
+  // messaggio conversazionale non riceve alcun tool.
+  const availableToolNames = Object.keys(toolsForPersona);
+  const selectedToolNames = enableTools
+    ? selectToolNamesForMessage(availableToolNames, opts.message, {
+        webSearchAvailable: isWebSearchConfigured(),
+        hasUserId: Boolean(opts.userId),
+      })
+    : [];
+  const selectedTools: Record<string, unknown> = Object.fromEntries(
+    Object.entries(toolsForPersona).filter(([name]) => selectedToolNames.includes(name)),
+  );
+  // True quando la selezione contestuale ha ridotto il set: in tal caso diamo al
+  // modello la via d'uscita del sentinel (#2) per un tool non allegato.
+  const toolsReduced = enableTools && selectedToolNames.length < availableToolNames.length;
+
   // Modello Ollama: Horus usa il modello dedicato; Bowie quello di default.
   const ollamaModelName = requestedPersona === "horus" ? HORUS_MODEL_ID : undefined;
 
@@ -264,6 +291,14 @@ export async function runAssistantAgent(opts: AssistantAgentOpts): Promise<Assis
       userId: opts.userId,
       userContext: userContext || undefined,
     });
+  }
+
+  // Task #7 (#2) — Se la selezione contestuale ha ridotto i tool disponibili,
+  // istruiamo il modello a segnalare col sentinel [TOOL_MANCANTE: nome] un tool
+  // che gli serve ma non è allegato, invece di allucinare i dati o scrivere una
+  // tool call testuale. Il turno verrà rieseguito con l'intero set (vedi sotto).
+  if (toolsReduced) {
+    system += `\n\n${buildMissingToolInstruction(availableToolNames)}`;
   }
 
   // Task #3017 — Memoria: carica turni precedenti dal DB se userId è disponibile.
@@ -371,11 +406,26 @@ export async function runAssistantAgent(opts: AssistantAgentOpts): Promise<Assis
 
   // Streaming helper riusabile per qualunque modello (Ollama o cloud).
   // Per Ollama: passa i tool e maxSteps per il tool calling server-side.
+  // Sink di default per i delta AI: emette l'intro alla PRIMA emissione reale,
+  // accumula finalText/aiText e inoltra al client (via handoff filter).
+  const defaultSink = (delta: string) => {
+    ensureIntroEmitted();
+    finalText += delta;
+    aiText += delta;
+    providerEmittedAny = true;
+    emitAiDelta(delta);
+  };
+
   const streamWith = async (
     model: Parameters<typeof streamText>[0]["model"],
     isOllama: boolean,
     msgs: ModelMessage[] = messages,
+    sink: (delta: string) => void = defaultSink,
+    toolsForTurn: Record<string, unknown> = selectedTools,
   ) => {
+    // Task #7 (#3) — allega SOLO i tool selezionati per il turno (o nessuno per
+    // un messaggio conversazionale); il cloud gira comunque senza tool.
+    const turnTools = isOllama && enableTools ? toolsForTurn : {};
     const result = streamText({
       model,
       system,
@@ -384,7 +434,9 @@ export async function runAssistantAgent(opts: AssistantAgentOpts): Promise<Assis
       temperature: 0.3,
       // Task #3017 — Tool calling: solo per Ollama, con max 3 step
       // Task #5326 — abilitato per Bowie e Horus (Ares passa da un endpoint dedicato).
-      ...(isOllama && enableTools ? { tools: toolsForPersona as never, stopWhen: isStepCount(3) as never } : {}),
+      ...(Object.keys(turnTools).length > 0
+        ? { tools: turnTools as never, stopWhen: isStepCount(3) as never }
+        : {}),
       // Task #4 — Horus gira su qwen3:4b, che "pensa" di default: disattiviamo il
       // ragionamento esplicito così l'output di navigazione resta pulito (niente
       // blocchi <think>). Innocuo per gli altri modelli (accettano think:false).
@@ -393,11 +445,7 @@ export async function runAssistantAgent(opts: AssistantAgentOpts): Promise<Assis
         : {}),
     });
     for await (const delta of result.textStream) {
-      ensureIntroEmitted();
-      finalText += delta;
-      aiText += delta;
-      providerEmittedAny = true;
-      emitAiDelta(delta);
+      sink(delta);
     }
     const usage = await result.usage;
     tokensIn = usage?.inputTokens ?? 0;
@@ -524,7 +572,42 @@ export async function runAssistantAgent(opts: AssistantAgentOpts): Promise<Assis
       if (await isThinkCentreOffline()) {
         console.warn("[assistant] ThinkCentre offline, scalo a chain cloud");
       } else {
-        await streamWith(getOllamaModel(ollamaModelName, ollamaPersona) as unknown as Parameters<typeof streamText>[0]["model"], true);
+        const ollamaModel = getOllamaModel(ollamaModelName, ollamaPersona) as unknown as Parameters<typeof streamText>[0]["model"];
+        // Task #7 (#1/#2) — Gate: trattiene l'output finché non è chiaro se è
+        // prosa (streaming normale), un sentinel di tool mancante o una tool call
+        // scritta come TESTO. In quei due casi il testo grezzo non raggiunge mai
+        // l'utente e facciamo il recovery qui sotto.
+        const gate = createOllamaOutputGate(availableToolNames);
+        await streamWith(ollamaModel, true, messages, (delta) => gate.push(delta, defaultSink));
+        const gateResult = gate.flush(defaultSink);
+
+        if (gateResult.mode === "sentinel") {
+          // #2 — Il modello ha chiesto un tool non allegato: riesegui UNA volta
+          // con l'intero set di tool della persona (silenzioso: il sentinel non è
+          // mai stato emesso al client).
+          console.log(`[assistant] tool mancante segnalato (${gateResult.sentinelTool}), retry con set completo`);
+          await streamWith(ollamaModel, true, messages, defaultSink, toolsForPersona as Record<string, unknown>);
+        } else if (gateResult.mode === "toolcall" && gateResult.toolCall) {
+          // #1 — Il modello ha scritto la tool call come TESTO: eseguiamo il tool
+          // e rigeneriamo la risposta con il risultato, così l'utente non vede il
+          // JSON grezzo. Nessun tool nel follow-up (evita loop).
+          const { name, arguments: rawArgs } = gateResult.toolCall;
+          console.log(`[assistant] tool call testuale intercettata (${name}), eseguo e rigenero`);
+          const tool = (toolsForPersona as unknown as Record<string, { execute?: (...args: unknown[]) => Promise<unknown> }>)[name];
+          let toolOutput: unknown;
+          try {
+            toolOutput = await tool?.execute?.({ userId: opts.userId, ...rawArgs });
+          } catch (toolErr) {
+            toolOutput = { error: (toolErr as Error).message };
+          }
+          const followUp: ModelMessage[] = [
+            ...messages,
+            { role: "assistant", content: `Ho eseguito lo strumento ${name} e ho ottenuto: ${JSON.stringify(toolOutput)}` },
+            { role: "user", content: "Rispondi ora all'utente in linguaggio naturale usando questi dati, senza mostrare JSON." },
+          ];
+          await streamWith(ollamaModel, true, followUp, defaultSink, {});
+        }
+
         provider = "ollama";
         modelId = ollamaModelName ?? OLLAMA_FALLBACK_MODEL_ID;
         done = true;
@@ -542,6 +625,24 @@ export async function runAssistantAgent(opts: AssistantAgentOpts): Promise<Assis
         aiText = "";
       }
     }
+  }
+
+  // Task #7 (#12) — Guardia fallback cloud legata ai tool: se il turno RICHIEDE
+  // tool (selezione contestuale non vuota) ma Ollama/ThinkCentre è irraggiungibile,
+  // NON ripieghiamo sul cloud — la chain cloud gira SENZA tool e produrrebbe una
+  // risposta plausibile ma priva dei dati reali (statistiche, percorsi, stato
+  // servizi). Meglio degradare con un messaggio esplicito. Il fallback cloud
+  // resta per i turni puramente conversazionali (nessun tool) e per il path
+  // vision (immagini). Salta se un parziale è già stato inviato (gestito sopra).
+  if (!done && !providerEmittedAny && !hasImages && selectedToolNames.length > 0) {
+    console.warn(
+      `[assistant] Ollama non disponibile e turno con tool (${selectedToolNames.join(", ")}): blocco il fallback cloud senza tool`,
+    );
+    degraded = true;
+    finalText +=
+      "⚠️ Per rispondere mi servono i dati in tempo reale dai miei strumenti, ma al momento non sono raggiungibili. Riprova tra poco.";
+    opts.onTextDelta?.(finalText);
+    done = true;
   }
 
   // 2) Cloud fallback (chain "router": Groq → Gemini Flash → OpenAI).

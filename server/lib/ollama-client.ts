@@ -84,7 +84,7 @@ const BOWIE_OLLAMA_MODEL = process.env.BOWIE_OLLAMA_MODEL ?? "llama3.2:3b";
 // essere il NUMERO -1: la stringa "-1" viene interpretata come 0 secondi (scarica
 // subito), l'opposto di ciò che si vuole. Quindi se il valore è un intero puro lo
 // inviamo come number, altrimenti come stringa di durata.
-function normalizeKeepAlive(raw: string): string | number {
+export function normalizeKeepAlive(raw: string): string | number {
   const n = Number(raw);
   return raw !== "" && Number.isInteger(n) ? n : raw;
 }
