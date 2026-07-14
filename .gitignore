@@ -106,3 +106,8 @@ uploads/
 
 # Task #5261 — binario cloudflared bakato dal deploy-build (non versionare)
 bin/cloudflared
+
+# Copia read-only di riferimento di BikerBlog (repo gemello).
+# Generata/aggiornata da scripts/refresh-bikerblog.sh — mai versionata,
+# non deve gonfiare il Repl layer del deploy.
+.bikerblog-ref/
