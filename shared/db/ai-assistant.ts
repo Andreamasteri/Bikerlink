@@ -309,3 +309,38 @@ export const aiAnalysisArtifacts = pgTable("ai_analysis_artifacts", {
 
 export type AiAnalysisArtifact = typeof aiAnalysisArtifacts.$inferSelect;
 export type InsertAiAnalysisArtifact = typeof aiAnalysisArtifacts.$inferInsert;
+
+// ── Task #41 — Visibilità admin su timeout/troncamenti dei tool AI ───────────
+//
+// guardTool (server/ai/assistant/tools.ts) mette già un tetto uniforme di
+// tempo (TOOL_EXECUTION_TIMEOUT_MS) e di dimensione (MAX_TOOL_RESULT_CHARS) su
+// ogni tool-call, ma finora l'evento era visibile SOLO dentro il singolo
+// turno (il modello riceve un {error}/{truncated:true} e va avanti). Questa
+// tabella è un contatore-per-combinazione (non un log riga-per-evento, per
+// restare piccola): una riga per (tool, roster, tipo evento), incrementata a
+// ogni occorrenza — stesso pattern dedup di ai_knowledge_gaps. Permette
+// all'admin di capire, a posteriori, SE e QUANTO spesso un tool/persona
+// specifico sta timeout-ando o troncando (query mirata, non serve grep log).
+//
+//   roster    → "bowie" | "horus" (quale set di tool/persona ha invocato il tool;
+//               lo stesso tool sottostante è condiviso ma OLLAMA_TOOLS/HORUS_TOOLS
+//               lo avvolgono separatamente con un'etichetta statica diversa).
+//   eventType → "timeout" | "truncated".
+export const aiToolEvents = pgTable("ai_tool_events", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  toolName: varchar("tool_name", { length: 64 }).notNull(),
+  roster: varchar("roster", { length: 16 }).notNull(),
+  eventType: varchar("event_type", { length: 16 }).notNull(),
+  occurrences: integer("occurrences").notNull().default(1),
+  // Ultimo messaggio (errore di timeout o dimensione troncata), troncato per
+  // audit — mai un secret (i tool non ne maneggiano).
+  lastMessage: text("last_message"),
+  lastOccurredAt: timestamp("last_occurred_at").notNull().defaultNow(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (t) => [
+  uniqueIndex("ai_tool_events_key").on(t.toolName, t.roster, t.eventType),
+  index("ai_tool_events_last_occurred_idx").on(t.lastOccurredAt.desc()),
+]);
+
+export type AiToolEvent = typeof aiToolEvents.$inferSelect;
+export type InsertAiToolEvent = typeof aiToolEvents.$inferInsert;

@@ -20,7 +20,7 @@ import { tool } from "ai";
 import { z } from "zod";
 import { db } from "../../db";
 import { cfAccessHeaders } from "../../lib/cf-access";
-import { routes, events, plannedRoutes } from "@shared/db";
+import { routes, events, plannedRoutes, aiToolEvents } from "@shared/db";
 import { eq, and, gte, desc, sql } from "drizzle-orm";
 import { webSearch } from "./web-search";
 
@@ -52,7 +52,35 @@ export const MAX_TOOL_RESULT_CHARS = 4_000;
 
 class ToolTimeoutError extends Error {}
 
-async function withToolTimeout<T>(name: string, run: () => Promise<T>): Promise<T | { error: string }> {
+/** Roster/persona che ha invocato il tool — vedi aiToolEvents in shared/db/ai-assistant.ts. */
+type ToolRoster = "bowie" | "horus";
+
+// Task #41 — Il modello vedeva già l'errore/troncamento nel singolo turno, ma
+// l'evento era invisibile all'admin al di fuori di quella conversazione. Qui
+// lo persistiamo come contatore-per-combinazione (tool, roster, tipo evento),
+// fire-and-forget e best-effort: un fallimento di questo insert non deve MAI
+// far fallire il tool-call che lo ha generato.
+function recordToolEvent(name: string, roster: ToolRoster, eventType: "timeout" | "truncated", message: string): void {
+  db.insert(aiToolEvents)
+    .values({ toolName: name, roster, eventType, lastMessage: message.slice(0, 300) })
+    .onConflictDoUpdate({
+      target: [aiToolEvents.toolName, aiToolEvents.roster, aiToolEvents.eventType],
+      set: {
+        occurrences: sql`${aiToolEvents.occurrences} + 1`,
+        lastMessage: message.slice(0, 300),
+        lastOccurredAt: new Date(),
+      },
+    })
+    .catch((err) => {
+      console.warn(`[tools] recordToolEvent(${name}/${roster}/${eventType}) fallito (ignorato):`, (err as Error).message);
+    });
+}
+
+async function withToolTimeout<T>(
+  name: string,
+  roster: ToolRoster,
+  run: () => Promise<T>,
+): Promise<T | { error: string }> {
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {
     return await new Promise<T>((resolve, reject) => {
@@ -63,15 +91,18 @@ async function withToolTimeout<T>(name: string, run: () => Promise<T>): Promise<
       run().then(resolve, reject);
     });
   } catch (err) {
-    return { error: err instanceof Error ? err.message : String(err) };
+    const message = err instanceof Error ? err.message : String(err);
+    if (err instanceof ToolTimeoutError) recordToolEvent(name, roster, "timeout", message);
+    return { error: message };
   } finally {
     if (timer) clearTimeout(timer);
   }
 }
 
 /** Tronca il risultato di un tool se il suo JSON supera MAX_TOOL_RESULT_CHARS,
- * avvisando esplicitamente il modello del taglio (non silenzioso). */
-function capToolResult(name: string, result: unknown): unknown {
+ * avvisando esplicitamente il modello del taglio (non silenzioso) e
+ * registrando l'evento per l'admin (Task #41). */
+function capToolResult(name: string, roster: ToolRoster, result: unknown): unknown {
   let json: string;
   try {
     json = JSON.stringify(result) ?? "";
@@ -79,6 +110,7 @@ function capToolResult(name: string, result: unknown): unknown {
     return result;
   }
   if (json.length <= MAX_TOOL_RESULT_CHARS) return result;
+  recordToolEvent(name, roster, "truncated", `risultato di ${json.length} caratteri troncato a ${MAX_TOOL_RESULT_CHARS}`);
   return {
     truncated: true,
     tool: name,
@@ -100,13 +132,18 @@ type AnyExecute = (...args: any[]) => any;
  * qui: la firma esatta di `execute` (input/output/context generici) varia per
  * ogni tool e viene già ri-castata dai chiamanti (streamText con `as never`,
  * agent.ts con `execute?: (...args) => Promise<unknown>`), quindi non serve
- * — anzi comprometterebbe — che `guardTool` la preservi esattamente. */
-function guardTool<T extends { execute?: AnyExecute }>(name: string, toolDef: T): T {
+ * — anzi comprometterebbe — che `guardTool` la preservi esattamente.
+ *
+ * Task #41 — `roster` è un'etichetta STATICA (non deriva dal turno): Bowie e
+ * Horus avvolgono separatamente la stessa definizione di tool (vedi
+ * OLLAMA_TOOLS/HORUS_TOOLS sotto), quindi basta per attribuire gli eventi
+ * timeout/troncamento alla persona che li ha effettivamente generati. */
+function guardTool<T extends { execute?: AnyExecute }>(name: string, roster: ToolRoster, toolDef: T): T {
   const original = toolDef.execute as AnyExecute | undefined;
   if (!original) return toolDef;
   const guarded: AnyExecute = async (...args: unknown[]) => {
-    const raw = await withToolTimeout(name, () => Promise.resolve(original(...args)));
-    return capToolResult(name, raw);
+    const raw = await withToolTimeout(name, roster, () => Promise.resolve(original(...args)));
+    return capToolResult(name, roster, raw);
   };
   return { ...toolDef, execute: guarded } as T;
 }
@@ -395,20 +432,22 @@ export const webSearchTool = tool({
 // ── Exported tool set ─────────────────────────────────────────────────────────
 
 export const OLLAMA_TOOLS = {
-  getWeather: guardTool("getWeather", getWeatherTool),
-  getBikerStats: guardTool("getBikerStats", getBikerStatsTool),
-  getThinkCentreStatus: guardTool("getThinkCentreStatus", getThinkCentreStatusTool),
-  getNearbyEvents: guardTool("getNearbyEvents", getNearbyEventsTool),
-  getUserPlannedRoutes: guardTool("getUserPlannedRoutes", getUserPlannedRoutesTool),
-  webSearch: guardTool("webSearch", webSearchTool),
+  getWeather: guardTool("getWeather", "bowie", getWeatherTool),
+  getBikerStats: guardTool("getBikerStats", "bowie", getBikerStatsTool),
+  getThinkCentreStatus: guardTool("getThinkCentreStatus", "bowie", getThinkCentreStatusTool),
+  getNearbyEvents: guardTool("getNearbyEvents", "bowie", getNearbyEventsTool),
+  getUserPlannedRoutes: guardTool("getUserPlannedRoutes", "bowie", getUserPlannedRoutesTool),
+  webSearch: guardTool("webSearch", "bowie", webSearchTool),
 } as const;
 
 // Task #5326 — Sottoinsieme di tool per Horus (specialista percorsi): niente
 // stats/percorsi utente specifici di Bowie, ma sì meteo + ricerca web (utile
-// per condizioni strada/eventi che influenzano un itinerario).
+// per condizioni strada/eventi che influenzano un itinerario). Task #41 — le
+// istanze guardate sono SEPARATE da quelle di OLLAMA_TOOLS (stessa definizione
+// di tool, wrapper diverso) proprio per etichettare gli eventi con roster="horus".
 export const HORUS_TOOLS = {
-  getWeather: guardTool("getWeather", getWeatherTool),
-  getThinkCentreStatus: guardTool("getThinkCentreStatus", getThinkCentreStatusTool),
-  getNearbyEvents: guardTool("getNearbyEvents", getNearbyEventsTool),
-  webSearch: guardTool("webSearch", webSearchTool),
+  getWeather: guardTool("getWeather", "horus", getWeatherTool),
+  getThinkCentreStatus: guardTool("getThinkCentreStatus", "horus", getThinkCentreStatusTool),
+  getNearbyEvents: guardTool("getNearbyEvents", "horus", getNearbyEventsTool),
+  webSearch: guardTool("webSearch", "horus", webSearchTool),
 } as const;

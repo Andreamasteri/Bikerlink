@@ -10,7 +10,7 @@
 
 import { Router, type Request, type Response } from "express";
 import { db } from "../../../db";
-import { aiCallLogs } from "@shared/db";
+import { aiCallLogs, aiToolEvents } from "@shared/db";
 import { gte, desc, sql, and } from "drizzle-orm";
 import { sendError } from "../../../lib/api-response";
 
@@ -36,7 +36,7 @@ router.get("/metrics", async (req: Request, res: Response) => {
     const range = ["24h", "7d", "30d"].includes(rawRange) ? rawRange : "7d";
     const since = new Date(Date.now() - rangeMs(range));
 
-    const [perProvider, totalsRow, latencies, recentIssues] = await Promise.all([
+    const [perProvider, totalsRow, latencies, recentIssues, toolEvents] = await Promise.all([
       db.select({
           provider: aiCallLogs.provider,
           calls: sql<number>`count(*)::int`,
@@ -91,6 +91,21 @@ router.get("/metrics", async (req: Request, res: Response) => {
         ))
         .orderBy(desc(aiCallLogs.createdAt))
         .limit(20),
+
+      // Task #41 — Contatori timeout/troncamenti tool (server/ai/assistant/tools.ts
+      // guardTool). Tabella piccola (una riga per tool+roster+tipo evento):
+      // nessun filtro sul range, si vuole sempre lo storico completo.
+      db.select({
+          toolName: aiToolEvents.toolName,
+          roster: aiToolEvents.roster,
+          eventType: aiToolEvents.eventType,
+          occurrences: aiToolEvents.occurrences,
+          lastMessage: aiToolEvents.lastMessage,
+          lastOccurredAt: aiToolEvents.lastOccurredAt,
+        })
+        .from(aiToolEvents)
+        .orderBy(desc(aiToolEvents.lastOccurredAt))
+        .limit(50),
     ]);
 
     const totals = totalsRow[0];
@@ -144,6 +159,15 @@ router.get("/metrics", async (req: Request, res: Response) => {
         degraded: r.degraded,
         error: r.error,
         createdAt: r.createdAt?.toISOString(),
+      })),
+      // Task #41 — visibilità admin sui timeout/troncamenti dei tool AI.
+      toolEvents: toolEvents.map((r) => ({
+        toolName: r.toolName,
+        roster: r.roster,
+        eventType: r.eventType,
+        occurrences: r.occurrences,
+        lastMessage: r.lastMessage,
+        lastOccurredAt: r.lastOccurredAt?.toISOString(),
       })),
     });
   } catch (err) {

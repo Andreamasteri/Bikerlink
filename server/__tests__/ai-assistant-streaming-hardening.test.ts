@@ -127,7 +127,18 @@ describe("Task #11 (#2) — sse-heartbeat", () => {
 // toccano l'agent (vedi drizzle-sql-mock-agent-import in memoria — `sql` va
 // sempre ri-esportato dal mock di drizzle-orm).
 
-vi.mock("../db", () => ({ db: { select: vi.fn() } }));
+// Task #41 — recordToolEvent() fa db.insert(aiToolEvents).values(...).onConflictDoUpdate(...);
+// il mock deve restituire una catena chainable che risolve (fire-and-forget, best-effort).
+vi.mock("../db", () => ({
+  db: {
+    select: vi.fn(),
+    insert: vi.fn(() => ({
+      values: vi.fn(() => ({
+        onConflictDoUpdate: vi.fn(() => Promise.resolve()),
+      })),
+    })),
+  },
+}));
 vi.mock("drizzle-orm", () => ({
   eq: vi.fn(),
   and: vi.fn(),
@@ -136,7 +147,7 @@ vi.mock("drizzle-orm", () => ({
   sql: Object.assign(vi.fn(), { raw: vi.fn() }),
 }));
 vi.mock("../lib/cf-access", () => ({ cfAccessHeaders: () => ({}) }));
-vi.mock("@shared/db", () => ({ routes: {}, events: {}, plannedRoutes: {} }));
+vi.mock("@shared/db", () => ({ routes: {}, events: {}, plannedRoutes: {}, aiToolEvents: {} }));
 vi.mock("./web-search", () => ({ webSearch: vi.fn() }));
 
 describe("Task #11 (#3) — guardTool: timeout uniforme + cap risultato", () => {

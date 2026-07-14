@@ -35,11 +35,22 @@ interface RecentIssue {
   createdAt: string;
 }
 
+// Task #41 — Contatore timeout/troncamenti per tool AI (guardTool).
+interface ToolEvent {
+  toolName: string;
+  roster: string;
+  eventType: "timeout" | "truncated";
+  occurrences: number;
+  lastMessage: string | null;
+  lastOccurredAt: string;
+}
+
 interface MetricsResponse {
   range: string;
   summary: Summary;
   perProvider: ProviderData[];
   recentIssues: RecentIssue[];
+  toolEvents: ToolEvent[];
 }
 
 function useAiMetrics(range: Range) {
@@ -155,7 +166,18 @@ export default function AiMetricsCard() {
             </>
           )}
 
-          {data.perProvider.length === 0 && data.recentIssues.length === 0 && (
+          {/* Task #41 — Tool AI: timeout/troncamenti (storico completo, non filtrato per range) */}
+          {data.toolEvents.length > 0 && (
+            <>
+              <View style={[styles.divider, { backgroundColor: colors.border }]} />
+              <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>Tool timeout/troncati</Text>
+              {data.toolEvents.map((ev) => (
+                <ToolEventRow key={`${ev.toolName}:${ev.roster}:${ev.eventType}`} ev={ev} colors={colors} />
+              ))}
+            </>
+          )}
+
+          {data.perProvider.length === 0 && data.recentIssues.length === 0 && data.toolEvents.length === 0 && (
             <Text style={[styles.empty, { color: colors.textSecondary }]}>Nessun dato nel periodo selezionato</Text>
           )}
         </>
@@ -219,6 +241,32 @@ function IssueRow({
       <Text style={[styles.issueProvider, { color: colors.text }]}>{issue.provider}</Text>
       <Text style={[styles.issueErr, { color: colors.textSecondary }]} numberOfLines={1}>
         {issue.error ?? "—"}
+      </Text>
+      <Text style={[styles.issueTs, { color: colors.textSecondary }]}>{ts}</Text>
+    </View>
+  );
+}
+
+function ToolEventRow({
+  ev, colors,
+}: {
+  ev: ToolEvent;
+  colors: ReturnType<typeof useColors>;
+}) {
+  const ts = ev.lastOccurredAt
+    ? new Date(ev.lastOccurredAt).toLocaleString("it-IT", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })
+    : "";
+  const tagColor = ev.eventType === "timeout" ? colors.error : colors.warning;
+  return (
+    <View style={styles.issueRow}>
+      <View style={[styles.tag, { backgroundColor: tagColor + "22", borderColor: tagColor }]}>
+        <Text style={[styles.tagTxt, { color: tagColor }]}>{ev.eventType}</Text>
+      </View>
+      <Text style={[styles.issueProvider, { color: colors.text }]} numberOfLines={1}>
+        {ev.toolName} ({ev.roster})
+      </Text>
+      <Text style={[styles.issueErr, { color: colors.textSecondary }]} numberOfLines={1}>
+        ×{ev.occurrences} — {ev.lastMessage ?? "—"}
       </Text>
       <Text style={[styles.issueTs, { color: colors.textSecondary }]}>{ts}</Text>
     </View>
