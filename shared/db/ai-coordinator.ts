@@ -60,9 +60,36 @@ export const aiConflicts = pgTable("ai_conflicts", {
   index("ai_conflicts_created_idx").on(t.createdAt),
 ]);
 
+// Task #5 (Quebracho a) — Registry persistente dei job di background gestiti dal
+// coordinatore Quebracho. Fonte di verità live = mappa in-memory (job-registry.ts);
+// questa tabella persiste stato/direttive fra i restart. Una riga per job.
+export const aiCoordinatorJobs = pgTable("ai_coordinator_jobs", {
+  name: varchar("name", { length: 120 }).primaryKey(),
+  // idle|running|paused|throttled|disabled
+  state: varchar("state", { length: 24 }).notNull().default("idle"),
+  lastRunAt: timestamp("last_run_at"),
+  lastSuccessAt: timestamp("last_success_at"),
+  lastErrorAt: timestamp("last_error_at"),
+  lastError: text("last_error"),
+  nextRunAt: timestamp("next_run_at"),
+  // quebracho|admin_manual|killswitch|deterministic
+  pauseSource: varchar("pause_source", { length: 24 }),
+  pauseReason: text("pause_reason"),
+  // { kind: "pause"|"throttle", reason, issuedBy, issuedAt, throttleMs? }
+  directive: jsonb("directive"),
+  runCount: integer("run_count").notNull().default(0),
+  successCount: integer("success_count").notNull().default(0),
+  failureCount: integer("failure_count").notNull().default(0),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (t) => [
+  index("ai_coordinator_jobs_state_idx").on(t.state),
+]);
+
 export type AiEvent = typeof aiEvents.$inferSelect;
 export type InsertAiEvent = typeof aiEvents.$inferInsert;
 export type AiDecision = typeof aiDecisions.$inferSelect;
 export type InsertAiDecision = typeof aiDecisions.$inferInsert;
 export type AiConflict = typeof aiConflicts.$inferSelect;
 export type InsertAiConflict = typeof aiConflicts.$inferInsert;
+export type AiCoordinatorJob = typeof aiCoordinatorJobs.$inferSelect;
+export type InsertAiCoordinatorJob = typeof aiCoordinatorJobs.$inferInsert;

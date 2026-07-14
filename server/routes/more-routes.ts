@@ -8,6 +8,8 @@ import { sendSuccess, sendError } from "../lib/api-response";
 import { initState } from "../init-state";
 import { getCircuitStatus } from "../db-circuit-breaker";
 import { getHealthState } from "../lib/health-arbiter";
+import { getCoordinatorHealthSummary } from "../ai/coordinator/job-gate";
+import { isQuebrachoLoopRunning } from "../ai/coordinator/quebracho-loop";
 
 async function requireAdmin(req: Request, res: Response, next: NextFunction) {
   if (!req.session?.userId) {
@@ -84,6 +86,15 @@ export function registerMoreRoutes(app: Express) {
     const status =
       arbiter.state === "READY" ? "ready" :
       arbiter.state === "DEGRADED" ? "degraded" : "broken";
+    // Task #5 (Quebracho a) — stato del coordinatore, puramente INFORMATIVO: NON
+    // influenza `status`/`degraded` (il fallback è deterministico, un coordinatore
+    // offline non degrada il backend). Vista sincrona, non lancia mai.
+    let coordinator: unknown;
+    try {
+      coordinator = { ...getCoordinatorHealthSummary(), loopRunning: isQuebrachoLoopRunning() };
+    } catch {
+      coordinator = { unavailable: true };
+    }
     return res.status(200).json({
       status,
       initializing: false,
@@ -92,6 +103,7 @@ export function registerMoreRoutes(app: Express) {
       degradedReasons: arbiter.reasons,
       slices: arbiter.slices,
       dbCircuit,
+      coordinator,
     });
   });
 

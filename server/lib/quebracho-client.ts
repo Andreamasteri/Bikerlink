@@ -23,6 +23,7 @@
  */
 
 import { cfAccessHeaders } from "./cf-access";
+import { isThinkCentreOffline } from "./thinkcentre-offline";
 
 const QUEBRACHO_URL = (
   process.env.QUEBRACHO_OLLAMA_URL?.trim() ||
@@ -64,6 +65,55 @@ function quebrachoHeaders(): Record<string, string> {
     /* URL malformato → nessun header CF */
   }
   return h;
+}
+
+// ─── Reachability probe (per il fallback del coordinatore) ────────────────────
+//
+// Come isOllamaReachable() in ollama-client.ts: probe leggero su /api/tags con
+// cache 60s. Serve al gate `canRunJob` per decidere se ignorare le pause emesse
+// da Quebracho quando Quebracho stesso è irraggiungibile (fallback deterministico).
+
+const QUEBRACHO_PROBE_TIMEOUT_MS = 2500;
+const QUEBRACHO_PROBE_CACHE_TTL_MS = 60_000;
+let _probeResult: boolean | null = null;
+let _probeTs = 0;
+
+/**
+ * true se l'infra Ollama di Quebracho risponde. Cache 60s. Ritorna false subito
+ * se non configurato o se il ThinkCentre è spento/in manutenzione (nessun probe
+ * di rete inutile). Non lancia mai.
+ */
+export async function isQuebrachoReachable(): Promise<boolean> {
+  if (!QUEBRACHO_URL) return false;
+  if (await isThinkCentreOffline()) return false;
+
+  const now = Date.now();
+  if (_probeResult !== null && now - _probeTs < QUEBRACHO_PROBE_CACHE_TTL_MS) {
+    return _probeResult;
+  }
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), QUEBRACHO_PROBE_TIMEOUT_MS);
+    const res = await fetch(`${QUEBRACHO_URL}/api/tags`, {
+      method: "GET",
+      headers: quebrachoHeaders(),
+      signal: controller.signal,
+    });
+    clearTimeout(timer);
+    _probeResult = res.ok || res.status < 500;
+    _probeTs = Date.now();
+    return _probeResult;
+  } catch {
+    _probeResult = false;
+    _probeTs = Date.now();
+    return false;
+  }
+}
+
+/** Invalida la cache del probe (es. dopo un cambio di configurazione / nei test). */
+export function resetQuebrachoProbeCache(): void {
+  _probeResult = null;
+  _probeTs = 0;
 }
 
 export interface QuebrachoChatOptions {

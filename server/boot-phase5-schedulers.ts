@@ -335,6 +335,19 @@ export async function runPhase5Schedulers(): Promise<void> {
     markDegraded("scheduler:ai-coordinator-integrations");
   }
 
+  // Task #5 (Quebracho a) — Control-plane del coordinatore: idrata la registry
+  // dei job dal DB (ripristina pause/throttle sopravvissuti al restart) e avvia
+  // il loop seriale continuo di Quebracho. In questa fase la registry può essere
+  // vuota di callback `run` (il cablaggio dei ~26 loop è Task #9): il loop resta
+  // un no-op leggero ma osservabile via /api/health.
+  await arm("quebracho-coordinator-loop", async () => {
+    const { hydrateRegistryFromDb } = await import("./ai/coordinator/job-registry");
+    const { startQuebrachoLoop } = await import("./ai/coordinator/quebracho-loop");
+    await hydrateRegistryFromDb();
+    startQuebrachoLoop();
+    console.log("[INIT] Quebracho coordinator loop started (serial control-plane)");
+  });
+
   try {
     const { startDbIntegrityScheduler } = await import("./ai/db-integrity/scheduler");
     startDbIntegrityScheduler();
