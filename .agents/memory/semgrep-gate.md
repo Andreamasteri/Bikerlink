@@ -29,6 +29,23 @@ Semgrep's TS parser FAILS on arrow-body-with-content patterns; function-form par
 fine. Workaround for Express handlers: `pattern-inside: "$R.$M($PATH, $HANDLER)"` +
 metavariable-regex on $R/$M + metavariable-pattern (pattern-not-regex) on $HANDLER.
 
+## Core engine can be ABSENT → placeholder output, not a real finding
+In the Replit nix sandbox the semgrep package can ship WITHOUT the OCaml core engine
+(`semgrep-core`/`osemgrep`): `.../site-packages/semgrep/bin/` has only `__init__.py`.
+Then `semgrep --version` works (pure python) but ANY scan exits 0 while pysemgrep
+writes the literal placeholder `<ERROR: missing output>` (from `rpc_call.py`, RPC to
+the missing core returns nothing) — NOT valid JSON, NOT a finding. `.pythonlibs`
+PYTHONPATH pollution is a separate failure (ModuleNotFoundError pydantic_core) already
+handled by `env -u PYTHONPATH`.
+**Why:** feeding that placeholder to the downstream `json.load()` crashes under
+`set -euo pipefail`, aborting the whole `post-merge.sh` with a misleading "new ERROR
+findings" message — even though nothing was scanned.
+**How to apply:** after the semgrep run, VALIDATE the output is parseable JSON with a
+`results` key BEFORE the ratchet parser. If not, soft-degrade (warn + `exit 0`) like the
+missing-binary / unreachable-registry paths, unless `SEMGREP_STRICT=1` (fail hard for a
+real CI with a working core). Do the check in an `if ! python3 ...; then` condition so
+`set -e` doesn't abort on the expected parse failure.
+
 ## Run time vs the 2-min bash cap
 Full scan ~80s–3.5min on 2 cores. The `bash` tool caps at 120s, so a foreground scan
 there may report exit -1 while the detached process still finishes and writes the

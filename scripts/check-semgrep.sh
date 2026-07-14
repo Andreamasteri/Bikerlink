@@ -120,6 +120,42 @@ if [ "$SEMGREP_EXIT" -gt 1 ]; then
   exit "$SEMGREP_EXIT"
 fi
 
+# ── Validazione output: motore core assente / crash RPC ──────────────────────
+# Semgrep può terminare con exit 0/1 (apparente successo) ma NON produrre un
+# report JSON valido quando il motore core (semgrep-core/osemgrep) non è
+# disponibile o il suo canale RPC fallisce nel sandbox: in quel caso pysemgrep
+# scrive il placeholder "<ERROR: missing output>" (da rpc_call.py) invece del
+# report, oppure lascia l'output vuoto. NON è un finding reale né un errore del
+# nostro codice, e passarlo al parser sottostante farebbe crashare il gate (e con
+# esso il post-merge) con un messaggio fuorviante.
+#
+# Lo trattiamo come il caso "binario assente": degrado morbido (exit 0) con
+# avviso esplicito, oppure blocco se SEMGREP_STRICT=1 (CI dedicata con core
+# funzionante), così il controllo non viene mai silenziosamente saltato lì dove
+# deve essere effettivo.
+if ! python3 - "$TMP_JSON" >/dev/null 2>&1 << 'PYEOF'
+import json
+import sys
+
+with open(sys.argv[1], "r", encoding="utf-8", errors="ignore") as f:
+    data = json.load(f)
+assert isinstance(data, dict) and "results" in data
+PYEOF
+then
+  if [ "${SEMGREP_STRICT:-0}" = "1" ]; then
+    echo "❌ Semgrep non ha prodotto un report JSON valido (motore core assente o crash RPC) e SEMGREP_STRICT=1 — gate FALLITO."
+    echo "    Output grezzo (primi 200 byte):"
+    head -c 200 "$TMP_JSON" | sed 's/^/      /'
+    echo ""
+    echo "    Installa un semgrep-core funzionante (il pacchetto attuale espone solo pysemgrep)."
+    exit 1
+  fi
+  echo "⚠️  Semgrep non ha prodotto un report JSON valido — motore core (semgrep-core/osemgrep) assente o crash RPC nel sandbox."
+  echo "    Nessun finding analizzabile → gate di sicurezza SALTATO (non bloccante)."
+  echo "    Installa un semgrep-core funzionante o usa SEMGREP_STRICT=1 in CI per renderlo bloccante."
+  exit 0
+fi
+
 # ── Estrazione dei finding (TSV: key \t :: \t display) ───────────────────────
 # key = severità\tcheck_id\tpath\t<fingerprint-di-contenuto>
 #
