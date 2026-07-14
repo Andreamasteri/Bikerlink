@@ -19,7 +19,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const aiMocks = vi.hoisted(() => ({
   streamText: vi.fn(),
-  stepCountIs: vi.fn(() => "step-count-is-3-sentinel"),
+  isStepCount: vi.fn(() => "step-count-is-3-sentinel"),
 }));
 
 const providerMocks = vi.hoisted(() => ({
@@ -43,7 +43,7 @@ const offlineMocks = vi.hoisted(() => ({
 
 vi.mock("ai", () => ({
   streamText: aiMocks.streamText,
-  stepCountIs: aiMocks.stepCountIs,
+  isStepCount: aiMocks.isStepCount,
 }));
 
 vi.mock("../ai/moderation/provider", () => ({
@@ -155,7 +155,7 @@ const IMAGE_OPTS = {
 describe("runAssistantAgent — multimodal (vision) path", () => {
   beforeEach(() => {
     aiMocks.streamText.mockReset();
-    aiMocks.stepCountIs.mockClear();
+    aiMocks.isStepCount.mockClear();
     providerMocks.runWithFallback.mockReset();
     ollamaMocks.getOllamaModel.mockClear();
     ollamaMocks.warmOllama.mockClear();

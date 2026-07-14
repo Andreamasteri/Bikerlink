@@ -482,7 +482,7 @@ export async function generateStructured<T>(
     const res = await generateObject({
       model: m.model,
       output: "no-schema",
-      system: opts.system,
+      instructions: opts.system,
       prompt,
       temperature: opts.temperature,
       abortSignal: opts.abortSignal,
@@ -496,7 +496,7 @@ export async function generateStructured<T>(
     schema: opts.schema,
     schemaName: opts.schemaName,
     schemaDescription: opts.schemaDescription,
-    system: opts.system,
+    instructions: opts.system,
     prompt: opts.prompt,
     temperature: opts.temperature,
     abortSignal: opts.abortSignal,

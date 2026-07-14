@@ -27,7 +27,7 @@ export async function explainViolation(input: ExplainInput): Promise<ExplainOk |
       { role: "brain", ollamaBackstop: true },
       (m) => m.scheduler(() => generateText({
         model: m.model,
-        system: "Sei un Senior Software Engineer. Rispondi SOLO con JSON valido conforme allo schema richiesto. Nessun testo extra. Tutto in italiano.",
+        instructions: "Sei un Senior Software Engineer. Rispondi SOLO con JSON valido conforme allo schema richiesto. Nessun testo extra. Tutto in italiano.",
         prompt,
         maxRetries: 1,
       })),

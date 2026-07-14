@@ -6,7 +6,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const aiMocks = vi.hoisted(() => ({
   streamText: vi.fn(),
-  stepCountIs: vi.fn(() => "step-count-is-3-sentinel"),
+  isStepCount: vi.fn(() => "step-count-is-3-sentinel"),
 }));
 
 const providerMocks = vi.hoisted(() => ({
@@ -23,7 +23,7 @@ const getUserPlannedRoutesExecute = vi.hoisted(() => vi.fn());
 
 vi.mock("ai", () => ({
   streamText: aiMocks.streamText,
-  stepCountIs: aiMocks.stepCountIs,
+  isStepCount: aiMocks.isStepCount,
 }));
 
 vi.mock("../ai/moderation/provider", () => ({
@@ -149,7 +149,7 @@ describe("runAssistantAgent — Mistral Nemo tool calling (Ollama provider)", ()
       new Error("tutti i provider cloud offline (mock)"),
     );
     aiMocks.streamText.mockReset();
-    aiMocks.stepCountIs.mockClear();
+    aiMocks.isStepCount.mockClear();
     getBikerStatsExecute.mockReset();
     getUserPlannedRoutesExecute.mockReset();
   });
@@ -177,7 +177,7 @@ describe("runAssistantAgent — Mistral Nemo tool calling (Ollama provider)", ()
 
     // stopWhen deve essere settato — è il parametro che limita a 3 step di tool calling
     expect(callArgs.stopWhen).toBeDefined();
-    expect(aiMocks.stepCountIs).toHaveBeenCalledWith(3);
+    expect(aiMocks.isStepCount).toHaveBeenCalledWith(3);
   });
 
   // -------------------------------------------------------------------------

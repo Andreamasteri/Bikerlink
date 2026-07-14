@@ -27,7 +27,7 @@ import { db } from "../../db";
 import { otaAssistantRuns, otaWatchdogReports } from "@shared/db";
 import { eq, desc, and, gte, sql, or, like } from "drizzle-orm";
 import { sendError } from "../../lib/api-response";
-import { generateText, tool } from "ai";
+import { generateText, tool, type ToolSet } from "ai";
 import { runWithFallback, hasAnyAiProvider, AI_NO_PROVIDER_MESSAGE } from "../../ai/moderation/provider";
 import type { AiProviderId } from "../../ai/moderation/types";
 import { z } from "zod";
@@ -151,9 +151,9 @@ router.post("/", async (req: Request, res: Response) => {
       (m) => m.scheduler(() => generateText({
         model: m.model,
         temperature: TEMPERATURE,
-        system: systemPrompt,
+        instructions: systemPrompt,
         prompt: parsed.data.prompt,
-        tools: tools as never,
+        tools: tools as ToolSet,
         stopWhen: ({ steps }) => steps.length >= 5,
       })),
     );

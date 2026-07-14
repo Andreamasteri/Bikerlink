@@ -155,7 +155,7 @@ export async function decideEngineWithAI(
         const result = await generateObject({
           model: om.model,
           schema: decisionSchema,
-          system: SYSTEM_PROMPT,
+          instructions: SYSTEM_PROMPT,
           prompt: JSON.stringify(ctx),
           temperature: 0,
           abortSignal: ollamaController.signal,

@@ -1,7 +1,7 @@
 // Task #2637 — Agente principale della AI Console (streaming).
 // Wrappa streamText con fallback chain Anthropic Sonnet → OpenAI GPT-5.1 →
 // Gemini Pro. Filtra i tool secondo gli scope selezionati dal router.
-import { streamText, stepCountIs } from "ai";
+import { streamText, isStepCount, type ToolSet } from "ai";
 import { runWithFallback, estimateCostUsd, type ResolvedModel } from "../moderation/provider";
 import { buildToolsForScopes, type Scope } from "./tools";
 import { correlateTool } from "./correlate";
@@ -42,9 +42,9 @@ export interface AgentRunResult {
 
 export async function runAgent(opts: AgentRunOpts): Promise<AgentRunResult> {
   const tools = {
-    ...(buildToolsForScopes(opts.scopes) as Record<string, never>),
-    correlate: correlateTool as never,
-  };
+    ...buildToolsForScopes(opts.scopes),
+    correlate: correlateTool,
+  } as ToolSet;
   const system = [SYSTEM_BASE, opts.systemContext ? `\nCONTESTO CONVERSAZIONE:\n${opts.systemContext}` : ""].join("");
 
   const messages = [
@@ -66,12 +66,12 @@ export async function runAgent(opts: AgentRunOpts): Promise<AgentRunResult> {
       async (m: ResolvedModel) => {
         const result = streamText({
           model: m.model,
-          system,
+          instructions: system,
           messages,
-          tools: tools as never,
-          stopWhen: stepCountIs(opts.maxSteps ?? 6) as never,
+          tools,
+          stopWhen: isStepCount(opts.maxSteps ?? 6),
           abortSignal: opts.signal,
-          onStepFinish: (step) => {
+          onStepEnd: (step) => {
             if (step.toolCalls?.length) {
               for (const tc of step.toolCalls) {
                 toolCalls.push({ name: tc.toolName, args: tc.input });

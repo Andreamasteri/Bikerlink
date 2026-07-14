@@ -1,6 +1,6 @@
 // Task #2533 — Chat copilot watchdog. Streaming via streamText, tool read-only.
 // Riusa provider/budget/log del modulo moderation (#2532).
-import { streamText, stepCountIs } from "ai";
+import { streamText, isStepCount } from "ai";
 import { runWithFallback, estimateCostUsd } from "../moderation/provider";
 import { withBudget } from "../moderation/budget";
 import { logAiCall } from "../moderation/log";
@@ -32,12 +32,12 @@ export async function streamWatchdogChat(opts: WatchdogChatOpts) {
     const { value: result, model: m } = await runWithFallback({ role: "brain" }, async (mm) => {
       return streamText({
         model: mm.model,
-        system: SYSTEM_PROMPT,
+        instructions: SYSTEM_PROMPT,
         messages: opts.messages,
         tools,
-        stopWhen: stepCountIs(6),
+        stopWhen: isStepCount(6),
         temperature: 0.2,
-        onFinish: async (ev) => {
+        onEnd: async (ev) => {
           const tokensIn = ev.usage?.inputTokens ?? 0;
           const tokensOut = ev.usage?.outputTokens ?? 0;
           const meta: AiCallMeta = {

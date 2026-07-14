@@ -1,6 +1,6 @@
 // Task #2532 — Chat copilot endpoint. Streaming via streamText + tool calling.
 // Tutti i tool sono read-only o "draft" (mai esecuzioni). PII redacted.
-import { streamText, stepCountIs, tool } from "ai";
+import { streamText, isStepCount, tool } from "ai";
 import { z } from "zod";
 import { db } from "../../db";
 import { reports, users, moderatorLogs } from "@shared/db";
@@ -238,12 +238,12 @@ export async function streamChat(opts: ChatStreamOpts) {
     const { value: result, model: m } = await runWithFallback({ role: "brain", skipOllama: true }, async (mm) => {
       return streamText({
         model: mm.model,
-        system: `${SYSTEM_PROMPT}\n\nCONTESTO: ${ctxLine}`,
+        instructions: `${SYSTEM_PROMPT}\n\nCONTESTO: ${ctxLine}`,
         messages: safeMessages,
         tools,
-        stopWhen: stepCountIs(6),
+        stopWhen: isStepCount(6),
         temperature: 0.3,
-        onFinish: async (ev) => {
+        onEnd: async (ev) => {
           const tokensIn = ev.usage?.inputTokens ?? 0;
           const tokensOut = ev.usage?.outputTokens ?? 0;
           const meta: AiCallMeta = {

@@ -122,7 +122,7 @@ export async function askHorusForCoordinatorDirective(
         const { object } = await generateObject({
           model,
           schema: directiveDecisionSchema,
-          system: SYSTEM_PROMPT,
+          instructions: SYSTEM_PROMPT,
           prompt,
           temperature: 0,
           abortSignal: controller.signal,

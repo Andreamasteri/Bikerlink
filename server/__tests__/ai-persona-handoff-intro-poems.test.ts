@@ -16,7 +16,7 @@ import { BOWIE_INTRO_POEM, HORUS_INTRO_POEM, ARES_INTRO_POEM } from "@shared/bow
 
 const aiMocks = vi.hoisted(() => ({
   streamText: vi.fn(),
-  stepCountIs: vi.fn(() => "step-count-is-3-sentinel"),
+  isStepCount: vi.fn(() => "step-count-is-3-sentinel"),
 }));
 
 const providerMocks = vi.hoisted(() => ({
@@ -49,7 +49,7 @@ const dbInsertValues = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
 
 vi.mock("ai", () => ({
   streamText: aiMocks.streamText,
-  stepCountIs: aiMocks.stepCountIs,
+  isStepCount: aiMocks.isStepCount,
 }));
 
 vi.mock("../ai/moderation/provider", () => ({

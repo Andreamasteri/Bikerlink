@@ -52,7 +52,7 @@ type NearbyEventsInput = z.infer<typeof nearbyEventsSchema>;
 
 // ── Tool: getWeather ──────────────────────────────────────────────────────────
 
-export const getWeatherTool = tool<WeatherInput, Record<string, unknown>>({
+export const getWeatherTool = tool({
   description: "Restituisce le condizioni meteo correnti per una posizione geografica. Usa OpenMeteo (no API key).",
   inputSchema: weatherSchema,
   execute: async (input: WeatherInput) => {
@@ -99,7 +99,7 @@ function describeWeatherCode(code: number): string {
 
 // ── Tool: getBikerStats ───────────────────────────────────────────────────────
 
-export const getBikerStatsTool = tool<BikerStatsInput, Record<string, unknown>>({
+export const getBikerStatsTool = tool({
   description: "Restituisce statistiche aggregate di un biker (giri completati, km totali, media km/giro). Usa user_id dell'utente.",
   inputSchema: bikerStatsSchema,
   execute: async (input: BikerStatsInput) => {
@@ -129,7 +129,7 @@ export const getBikerStatsTool = tool<BikerStatsInput, Record<string, unknown>>(
 
 // ── Tool: getThinkCentreStatus ────────────────────────────────────────────────
 
-export const getThinkCentreStatusTool = tool<EmptyInput, Record<string, unknown>>({
+export const getThinkCentreStatusTool = tool({
   description: "Verifica lo stato dei servizi self-hosted sul ThinkCentre di casa (Ollama, GraphHopper routing, Nominatim geocoding).",
   inputSchema: emptySchema,
   execute: async (_input: EmptyInput) => {
@@ -175,7 +175,7 @@ export const getThinkCentreStatusTool = tool<EmptyInput, Record<string, unknown>
 
 // ── Tool: getNearbyEvents ─────────────────────────────────────────────────────
 
-export const getNearbyEventsTool = tool<NearbyEventsInput, Record<string, unknown>>({
+export const getNearbyEventsTool = tool({
   description: "Cerca eventi e raduni moto attivi nel DB entro un raggio dalla posizione. Ritorna titolo, data, distanza.",
   inputSchema: nearbyEventsSchema,
   execute: async (input: NearbyEventsInput) => {
@@ -241,7 +241,7 @@ const plannedRoutesSchema = z.object({
 });
 type PlannedRoutesInput = z.infer<typeof plannedRoutesSchema>;
 
-export const getUserPlannedRoutesTool = tool<PlannedRoutesInput, Record<string, unknown>>({
+export const getUserPlannedRoutesTool = tool({
   description: "Restituisce i percorsi moto pianificati recenti dell'utente. Utile per rispondere a domande su giri pianificati, soste, destinazioni o per aggiungere una tappa a un percorso esistente.",
   inputSchema: plannedRoutesSchema,
   execute: async (input: PlannedRoutesInput) => {
@@ -294,7 +294,7 @@ const webSearchSchema = z.object({
 });
 type WebSearchInput = z.infer<typeof webSearchSchema>;
 
-export const webSearchTool = tool<WebSearchInput, Record<string, unknown>>({
+export const webSearchTool = tool({
   description: "Cerca informazioni aggiornate sul web (metamotore SearXNG self-hosted) quando la domanda richiede dati non presenti nella knowledge base dell'app (es. novità, normative, prezzi esterni, notizie). Sola lettura, nessuna azione sull'app.",
   inputSchema: webSearchSchema,
   execute: async (input: WebSearchInput) => {

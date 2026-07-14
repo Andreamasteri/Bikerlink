@@ -8,7 +8,7 @@
 // Memoria: gli ultimi N turni dell'utente vengono caricati dal DB e inclusi nel contesto.
 // RAG: i top-3 snippet più rilevanti dalla knowledge base vengono iniettati nel system prompt.
 // Logging: ogni chiamata viene loggata in ai_call_logs (fire-and-forget).
-import { streamText, stepCountIs, type ModelMessage } from "ai";
+import { streamText, isStepCount, type ModelMessage } from "ai";
 import { runWithFallback, estimateCostUsd, type ResolvedModel } from "../moderation/provider";
 import {
   buildSystemPrompt,
@@ -357,7 +357,7 @@ export async function runAssistantAgent(opts: AssistantAgentOpts): Promise<Assis
       temperature: 0.3,
       // Task #3017 — Tool calling: solo per Ollama, con max 3 step
       // Task #5326 — abilitato per Bowie e Horus (Ares passa da un endpoint dedicato).
-      ...(isOllama && enableTools ? { tools: toolsForPersona as never, stopWhen: stepCountIs(3) as never } : {}),
+      ...(isOllama && enableTools ? { tools: toolsForPersona as never, stopWhen: isStepCount(3) as never } : {}),
     });
     for await (const delta of result.textStream) {
       ensureIntroEmitted();

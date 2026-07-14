@@ -255,7 +255,7 @@ export async function callOllamaChat<T = string>(
   const model = getOllamaModel(undefined, persona);
 
   if (!schema) {
-    const { text } = await generateText({ model, system, prompt, temperature, maxRetries, abortSignal, providerOptions });
+    const { text } = await generateText({ model, instructions: system, prompt, temperature, maxRetries, abortSignal, providerOptions });
     return text as unknown as T;
   }
 
@@ -264,7 +264,7 @@ export async function callOllamaChat<T = string>(
   for (let attempt = 0; attempt <= jsonRetries; attempt++) {
     try {
       // check-ai-direct-generateobject: safe — Ollama supports json_schema natively
-      const { object } = await generateObject({ model, schema, system, prompt, temperature, maxRetries, abortSignal, providerOptions });
+      const { object } = await generateObject({ model, schema, instructions: system, prompt, temperature, maxRetries, abortSignal, providerOptions });
       return object;
     } catch (err) {
       lastErr = err;
