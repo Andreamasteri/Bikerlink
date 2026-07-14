@@ -1366,6 +1366,7 @@ const translations: Record<string, string> = {
   "aiAssistant.title": "Bowie",
   "aiAssistant.emptyHint": "Hi, I'm Bowie! Ask me anything about BikerLink.",
   "aiAssistant.inputPlaceholder": "Write a message…",
+  "aiAssistant.status.typing": "is typing…",
   "common.assistantBack": "Back",
   "common.assistantDone": "Done",
   "common.assistantNext": "Next",

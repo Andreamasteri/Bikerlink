@@ -20,8 +20,10 @@ import { useColors } from "@/hooks/useColors";
 import { useT, useLanguage } from "@/lib/language-context";
 import { apiRequest } from "@/lib/query-client";
 import { streamAssistantMessage } from "@/lib/ai-assistant/sse-client";
-import { isAiKeyMissingResponse, isAiKeyMissingError, AI_KEY_MISSING_MESSAGE } from "@/lib/ai-errors";
+import { friendlyChatErrorMessage, friendlyChatErrorFromEvent } from "@/lib/ai-assistant/friendly-error";
 import { currentAssistantPlatform } from "@/hooks/useAssistantConfig";
+import { useAssistantRoster } from "@/hooks/useAssistantRoster";
+import { rosterPersonaName } from "@/lib/ai-assistant/roster";
 import { executeClientAction } from "@/lib/ai-assistant/client-actions";
 import { BOWIE_INTRO_POEM } from "@shared/bowie-greeting";
 import AssistantActionConfirmSheet from "./AssistantActionConfirmSheet";
@@ -61,6 +63,9 @@ export default function AssistantChatSheet({ visible, onClose }: Props) {
   const [streaming, setStreaming] = useState(false);
   const [pendingAction, setPendingAction] = useState<AssistantProposedAction | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  // Task #8 — L'elenco degli agenti mostrati in UI riflette il roster server
+  // (agenti configurati/raggiungibili), con degradazione all'elenco noto.
+  const { personas: roster } = useAssistantRoster(visible);
 
   const send = useCallback(async () => {
     const text = input.trim();
@@ -114,9 +119,7 @@ export default function AssistantChatSheet({ visible, onClose }: Props) {
             ));
           } else if (ev.event === "error") {
             const d = ev.data as { code?: number; message?: string };
-            const text = isAiKeyMissingResponse(d.code ?? 0, d.message)
-              ? AI_KEY_MISSING_MESSAGE
-              : (d.message ?? "errore");
+            const text = friendlyChatErrorFromEvent(d.code, d.message);
             setMessages((prev) => prev.map((m) =>
               m.id === asstId ? { ...m, content: `⚠️ ${text}` } : m,
             ));
@@ -124,10 +127,18 @@ export default function AssistantChatSheet({ visible, onClose }: Props) {
         },
       });
     } catch (e) {
-      const text = isAiKeyMissingError(e) ? AI_KEY_MISSING_MESSAGE : (e as Error).message;
-      setMessages((prev) => prev.map((m) =>
-        m.id === asstId ? { ...m, content: `⚠️ ${text}` } : m,
-      ));
+      // Task #8 — Ogni interruzione dello stream (fetch iniziale o reader.read()
+      // a metà lettura, tunnel Cloudflare che cade) diventa un messaggio
+      // amichevole in italiano, mai il testo grezzo del browser. "" = abort
+      // volontario dell'utente → non mostrare alcun errore.
+      const text = friendlyChatErrorMessage(e);
+      if (text) {
+        setMessages((prev) => prev.map((m) =>
+          m.id === asstId
+            ? { ...m, content: m.content ? `${m.content}\n\n⚠️ ${text}` : `⚠️ ${text}` }
+            : m,
+        ));
+      }
     } finally {
       setStreaming(false);
       abortRef.current = null;
@@ -172,6 +183,14 @@ export default function AssistantChatSheet({ visible, onClose }: Props) {
     return colors.accent; // bowie
   }, [colors.success, colors.warning, colors.primary, colors.accent]);
 
+  // Task #8 — nome mostrato risolto dal roster server (fallback: nome inviato
+  // dallo stream, poi elenco noto). Così l'identità dell'agente in UI dipende
+  // dal roster, non da un elenco hardcoded nel componente.
+  const personaName = useCallback(
+    (p: AssistantPersona): string => rosterPersonaName(roster, p.id, p.name),
+    [roster],
+  );
+
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="formSheet" onRequestClose={onClose}>
       <KeyboardAvoidingView
@@ -202,12 +221,23 @@ export default function AssistantChatSheet({ visible, onClose }: Props) {
               ]}>
                 {item.role === "assistant" && item.persona ? (
                   <Text style={[styles.personaLabel, { color: personaColor(item.persona.id) }]}>
-                    {item.persona.name}
+                    {personaName(item.persona)}
                   </Text>
                 ) : null}
-                <Text style={{ color: item.role === "user" ? "#fff" : colors.text }}>
-                  {item.content || (streaming && item.role === "assistant" ? "…" : "")}
-                </Text>
+                {item.content ? (
+                  <Text style={{ color: item.role === "user" ? "#fff" : colors.text }}>
+                    {item.content}
+                  </Text>
+                ) : streaming && item.role === "assistant" ? (
+                  // Task #8 — indicatore di stato leggibile invece di un'attesa
+                  // muta durante i turni più lenti (modello locale / tool in corso).
+                  <View style={styles.typingRow}>
+                    <ActivityIndicator size="small" color={colors.textMuted ?? colors.textSecondary} />
+                    <Text style={[styles.typingText, { color: colors.textMuted ?? colors.textSecondary }]}>
+                      {`${item.persona ? personaName(item.persona) : (t("aiAssistant.title") || "Bowie")} ${t("aiAssistant.status.typing") || "sta scrivendo…"}`}
+                    </Text>
+                  </View>
+                ) : null}
                 {item.actions?.map((a, i) => (
                   <Pressable
                     key={i}
@@ -276,6 +306,8 @@ const styles = StyleSheet.create({
   title: { flex: 1, fontSize: 17, fontWeight: "600" },
   bubble: { maxWidth: "85%", borderRadius: 14, padding: 10, marginBottom: 8, gap: 8 },
   personaLabel: { fontSize: 11, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.5 },
+  typingRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+  typingText: { fontSize: 13, fontStyle: "italic" },
   actionChip: {
     flexDirection: "row", alignItems: "center", gap: 6,
     paddingHorizontal: 10, paddingVertical: 6, borderRadius: 14, borderWidth: 1,

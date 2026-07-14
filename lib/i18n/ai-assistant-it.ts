@@ -3,6 +3,7 @@ const aiAssistantIt: Record<string, string> = {
   "aiAssistant.subtitle": "Il tuo assistente virtuale",
   "aiAssistant.emptyHint": "Ciao, sono Bowie! Chiedimi qualsiasi cosa: funzioni, impostazioni, percorsi, profilo…",
   "aiAssistant.inputPlaceholder": "Scrivi un messaggio…",
+  "aiAssistant.status.typing": "sta scrivendo…",
   "aiAssistant.confirm.title": "Confermi questa azione?",
   "aiAssistant.confirm.yes": "Sì, esegui",
   "aiAssistant.confirm.fallback": "L'azione verrà eseguita immediatamente.",
