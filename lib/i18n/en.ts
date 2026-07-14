@@ -1367,6 +1367,8 @@ const translations: Record<string, string> = {
   "aiAssistant.emptyHint": "Hi, I'm Bowie! Ask me anything about BikerLink.",
   "aiAssistant.inputPlaceholder": "Write a message…",
   "aiAssistant.status.typing": "is typing…",
+  // Task #44 — "Riprova"/retry button on a recoverable transient error.
+  "aiAssistant.retry": "Retry",
   "common.assistantBack": "Back",
   "common.assistantDone": "Done",
   "common.assistantNext": "Next",

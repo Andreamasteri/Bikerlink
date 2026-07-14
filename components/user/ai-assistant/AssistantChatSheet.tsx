@@ -63,28 +63,22 @@ export default function AssistantChatSheet({ visible, onClose }: Props) {
   const [streaming, setStreaming] = useState(false);
   const [pendingAction, setPendingAction] = useState<AssistantProposedAction | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  // Task #44 — cronologia + testo dell'ultima richiesta inviata, per poter
+  // rimandare l'IDENTICA richiesta con "Riprova" senza duplicare la bolla
+  // utente. La reply-cache server-side (Task #11) rende un retry identico
+  // idempotente: se il server aveva già finito, la risposta torna all'istante.
+  const lastRequestRef = useRef<{ text: string; history: Array<{ role: "user" | "assistant"; content: string }> } | null>(null);
   // Task #8 — L'elenco degli agenti mostrati in UI riflette il roster server
   // (agenti configurati/raggiungibili), con degradazione all'elenco noto.
   const { personas: roster } = useAssistantRoster(visible);
 
-  const send = useCallback(async () => {
-    const text = input.trim();
-    if (!text || streaming) return;
-    const userMsg: AssistantChatMessage = { id: genId(), role: "user", content: text, createdAt: Date.now() };
-    const asstId = genId();
-    const asstMsg: AssistantChatMessage = { id: asstId, role: "assistant", content: "", createdAt: Date.now() };
-    setMessages((prev) => [...prev, userMsg, asstMsg]);
-    setInput("");
+  const runSend = useCallback(async (
+    asstId: string,
+    text: string,
+    history: Array<{ role: "user" | "assistant"; content: string }>,
+  ) => {
     setStreaming(true);
     const platform = (Platform.OS === "web" ? "web" : currentAssistantPlatform()) as "android" | "ios" | "web";
-    // Task #5233 — Includi la poesia di Bowie come primo turno "assistant" nella
-    // history inviata: così il backend NON la considera una conversazione nuova e
-    // NON re-emette il proprio seed poetico → niente doppione tra bolla client e
-    // stream backend. La poesia statica non è salvata nel DB lato server.
-    const history = [BOWIE_GREETING_MESSAGE, ...messages]
-      .filter((m) => m.content)
-      .slice(-8)
-      .map((m) => ({ role: m.role, content: m.content }));
     const abort = new AbortController();
     abortRef.current = abort;
     const collectedActions: AssistantProposedAction[] = [];
@@ -114,14 +108,17 @@ export default function AssistantChatSheet({ visible, onClose }: Props) {
                     content: d.text ?? m.content,
                     actions: collectedActions.length ? collectedActions : undefined,
                     persona: d.persona ?? m.persona,
+                    errorRecoverable: false,
                   }
                 : m,
             ));
           } else if (ev.event === "error") {
-            const d = ev.data as { code?: number; message?: string };
+            // Task #44 (parità BikerBlog D4) — il server marca `recoverable` gli
+            // errori transitori (rete/provider): solo quelli offrono "Riprova".
+            const d = ev.data as { code?: number; message?: string; recoverable?: boolean };
             const text = friendlyChatErrorFromEvent(d.code, d.message);
             setMessages((prev) => prev.map((m) =>
-              m.id === asstId ? { ...m, content: `⚠️ ${text}` } : m,
+              m.id === asstId ? { ...m, content: `⚠️ ${text}`, errorRecoverable: d.recoverable === true } : m,
             ));
           }
         },
@@ -133,9 +130,13 @@ export default function AssistantChatSheet({ visible, onClose }: Props) {
       // volontario dell'utente → non mostrare alcun errore.
       const text = friendlyChatErrorMessage(e);
       if (text) {
+        // Task #44 — un drop di connessione lato client è per definizione
+        // transitorio (il server potrebbe aver comunque completato e cachato
+        // la risposta): offriamo "Riprova" anche qui, non solo sugli errori
+        // segnalati dal server nello stream.
         setMessages((prev) => prev.map((m) =>
           m.id === asstId
-            ? { ...m, content: m.content ? `${m.content}\n\n⚠️ ${text}` : `⚠️ ${text}` }
+            ? { ...m, content: m.content ? `${m.content}\n\n⚠️ ${text}` : `⚠️ ${text}`, errorRecoverable: true }
             : m,
         ));
       }
@@ -143,7 +144,38 @@ export default function AssistantChatSheet({ visible, onClose }: Props) {
       setStreaming(false);
       abortRef.current = null;
     }
-  }, [input, messages, streaming]);
+  }, []);
+
+  const send = useCallback(async () => {
+    const text = input.trim();
+    if (!text || streaming) return;
+    const userMsg: AssistantChatMessage = { id: genId(), role: "user", content: text, createdAt: Date.now() };
+    const asstId = genId();
+    const asstMsg: AssistantChatMessage = { id: asstId, role: "assistant", content: "", createdAt: Date.now() };
+    setMessages((prev) => [...prev, userMsg, asstMsg]);
+    setInput("");
+    // Task #5233 — Includi la poesia di Bowie come primo turno "assistant" nella
+    // history inviata: così il backend NON la considera una conversazione nuova e
+    // NON re-emette il proprio seed poetico → niente doppione tra bolla client e
+    // stream backend. La poesia statica non è salvata nel DB lato server.
+    const history = [BOWIE_GREETING_MESSAGE, ...messages]
+      .filter((m) => m.content)
+      .slice(-8)
+      .map((m) => ({ role: m.role, content: m.content }));
+    lastRequestRef.current = { text, history };
+    await runSend(asstId, text, history);
+  }, [input, messages, streaming, runSend]);
+
+  // Task #44 — rimanda l'ULTIMA richiesta identica (stesso messaggio + stessa
+  // cronologia) senza aggiungere una nuova bolla utente: solo l'ultimo turno
+  // assistente può trovarsi in stato d'errore recuperabile, quindi il testo/
+  // history salvati in lastRequestRef sono sempre quelli giusti da rimandare.
+  const retry = useCallback(async (asstId: string) => {
+    const last = lastRequestRef.current;
+    if (!last || streaming) return;
+    setMessages((prev) => prev.map((m) => m.id === asstId ? { ...m, content: "", errorRecoverable: false } : m));
+    await runSend(asstId, last.text, last.history);
+  }, [streaming, runSend]);
 
   const confirmAction = useCallback(async () => {
     if (!pendingAction) return;
@@ -251,6 +283,22 @@ export default function AssistantChatSheet({ visible, onClose }: Props) {
                     </Text>
                   </Pressable>
                 ))}
+                {item.errorRecoverable && !streaming ? (
+                  // Task #44 — errore transitorio (rete/provider): la stessa
+                  // richiesta può recuperare la risposta dalla reply-cache o
+                  // rigenerarla in fretta, quindi offriamo "Riprova" invece di
+                  // lasciare un vicolo cieco.
+                  <Pressable
+                    testID="assistant-chat-retry"
+                    onPress={() => retry(item.id)}
+                    style={[styles.actionChip, { borderColor: colors.primary }]}
+                  >
+                    <Ionicons name="refresh" size={14} color={colors.primary} />
+                    <Text style={{ color: colors.primary, fontWeight: "600" }}>
+                      {t("aiAssistant.retry") || "Riprova"}
+                    </Text>
+                  </Pressable>
+                ) : null}
               </View>
             )}
           />

@@ -50,4 +50,9 @@ export interface AssistantChatMessage {
   createdAt: number;
   // Task #5197 — quale AI ha prodotto questo messaggio (solo per role assistant).
   persona?: AssistantPersona;
+  // Task #44 — true quando questo messaggio è terminato in un errore
+  // TRANSITORIO (server/rete): la UI offre "Riprova" per rimandare la stessa
+  // richiesta (recuperabile dalla reply-cache se il server aveva già finito).
+  // Assente/false = nessun errore, oppure errore permanente (nessun "Riprova").
+  errorRecoverable?: boolean;
 }

@@ -46,6 +46,7 @@ import {
   setCachedReply,
   type CachedSseEvent,
 } from "../ai/assistant/reply-cache";
+import { isRecoverableAiError } from "../ai/assistant/error-classification";
 
 const router = Router();
 
@@ -419,7 +420,10 @@ router.post("/ai/assistant/message", requireUser, messageLimiter, async (req: Re
     res.end();
   } catch (err) {
     console.error("[ai-assistant/message]", err);
-    try { send("error", { code: 500, message: (err as Error).message }); } catch { /* */ }
+    // Task #44 (parità BikerBlog D4) — vedi error-classification.ts per la logica.
+    const message = (err as Error).message ?? "Errore imprevisto";
+    const recoverable = isRecoverableAiError(message);
+    try { send("error", { code: 500, message, recoverable }); } catch { /* */ }
     res.end();
   } finally {
     stopHeartbeat();

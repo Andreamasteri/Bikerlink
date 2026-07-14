@@ -37,7 +37,12 @@ export async function streamAssistantMessage(opts: AssistantStreamOpts): Promise
   if (!res.ok || !res.body) {
     let msg = `HTTP ${res.status}`;
     try { const j = await res.json() as { message?: string }; if (j?.message) msg = j.message; } catch { /* */ }
-    opts.onEvent({ event: "error", data: { code: res.status, message: msg } });
+    // Task #44 — questi fallimenti (400/403/429/503) sono decisi PRIMA di aprire
+    // lo stream (config disabilitata, nessun provider, rate-limit): un retry
+    // immediato della stessa richiesta darebbe lo stesso esito, quindi non sono
+    // "recoverable" via il pulsante Riprova (a differenza degli errori emessi
+    // DENTRO lo stream già aperto, che portano il flag dal server).
+    opts.onEvent({ event: "error", data: { code: res.status, message: msg, recoverable: false } });
     return;
   }
   const reader = res.body.getReader();
