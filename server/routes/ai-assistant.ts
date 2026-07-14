@@ -39,6 +39,13 @@ import { requireUser, messageLimiter, parsePlatform, loadCustomFaqs } from "./ai
 import aiAssistantActionsRouter from "./ai-assistant-actions";
 import aiAssistantPrefsRouter from "./ai-assistant-prefs";
 import aiAssistantImagesRouter, { resolveAssistantImageBuffer } from "./ai-assistant-images";
+import { startSseHeartbeat } from "../ai/assistant/sse-heartbeat";
+import {
+  computeReplyCacheKey,
+  getCachedReply,
+  setCachedReply,
+  type CachedSseEvent,
+} from "../ai/assistant/reply-cache";
 
 const router = Router();
 
@@ -141,6 +148,38 @@ router.post("/ai/assistant/message", requireUser, messageLimiter, async (req: Re
     return;
   }
 
+  // Task #11 — Recovero di un turno completato ma il cui evento "done" non è
+  // mai arrivato al client (tunnel Cloudflare/rete mobile che interrompe la
+  // connessione DOPO che il server ha già generato la risposta: vedi la stessa
+  // rogna nel repo gemello BikerBlog, Task #185 lì). Un retry IDENTICO
+  // (stesso utente, piattaforma/modalità, persona risolta, messaggio,
+  // cronologia) entro REPLY_CACHE_TTL_MS trova qui la risposta già prodotta e
+  // la rispedisce all'istante — nessuna rigenerazione (niente doppia chiamata
+  // AI/tool), nessuna perdita silenziosa. Controllato DOPO il precheck 503
+  // (identico comportamento su provider assente) ma PRIMA di qualsiasi ramo
+  // con effetti collaterali (relay coordinator, azioni admin), altrimenti un
+  // retry rieseguirebbe quegli effetti una seconda volta.
+  const replyCacheKey = computeReplyCacheKey({
+    userId: user.id,
+    mode: `${rawPlatform}:${persona}`,
+    message: parsed.data.message,
+    history: parsed.data.history ?? [],
+  });
+  const cachedEvents = getCachedReply(replyCacheKey);
+  if (cachedEvents) {
+    console.log(`[ai-assistant/message] risposta servita dalla cache (retry, user=${user.id})`);
+    res.setHeader("Content-Type", "text/event-stream; charset=utf-8");
+    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Connection", "keep-alive");
+    res.setHeader("X-Accel-Buffering", "no");
+    res.flushHeaders?.();
+    for (const { event, data } of cachedEvents) {
+      res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+    }
+    res.end();
+    return;
+  }
+
   // Task #5318 — Matching Coordinator via Bowie/chat. DEVE stare DOPO il
   // precheck 503 sopra: il ramo di CONTROLLO ha effetti collaterali (applica
   // una direttiva via Horus), quindi non deve mai eseguirsi se la richiesta
@@ -196,11 +235,22 @@ router.post("/ai/assistant/message", requireUser, messageLimiter, async (req: Re
   res.setHeader("Connection", "keep-alive");
   res.setHeader("X-Accel-Buffering", "no");
   res.flushHeaders?.();
+  // Task #11 — Registriamo ogni evento inviato (tranne "delta": alta frequenza,
+  // e il testo completo è comunque nel campo `text` dell'evento "done") così
+  // possiamo rispedirlo IDENTICO a un retry che trova la cache (vedi sopra).
+  // Non è la sorgente di verità per il client corrente (che riceve comunque lo
+  // stream live via res.write), solo il materiale per il recovero futuro.
+  const recordedEvents: CachedSseEvent[] = [];
   const send = (event: string, data: unknown) => {
+    if (event !== "delta") recordedEvents.push({ event, data });
     res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
   };
   const abort = new AbortController();
   req.on("close", () => abort.abort());
+  // Task #11 — Battito SSE per tenere viva la connessione (tunnel Cloudflare)
+  // durante i silenzi del turno (tool calling, prompt processing su CPU prima
+  // del primo token). Fermato SEMPRE nel finally, qualunque sia l'esito.
+  const stopHeartbeat = startSseHeartbeat(res);
 
   await logAssistantEvent({
     eventType: "message_sent",
@@ -293,6 +343,10 @@ router.post("/ai/assistant/message", requireUser, messageLimiter, async (req: Re
         persona: result.persona,
         securityBlocked: true,
       });
+      // Task #11 — memorizza ANCHE il ramo bloccato: un retry identico deve
+      // ritrovare lo stesso esito (bloccato), non rieseguire il turno e
+      // magari incappare in un blocco diverso per un modello non deterministico.
+      setCachedReply(replyCacheKey, recordedEvents);
       res.end();
       return;
     }
@@ -340,11 +394,24 @@ router.post("/ai/assistant/message", requireUser, messageLimiter, async (req: Re
       actionsCount: safeActions.length,
       persona: result.persona,
     });
+    // Task #11 — memorizza il turno completo PRIMA di controllare se il client
+    // è ancora connesso: è esattamente quando la connessione è già sparita
+    // (drop di rete a metà silenzio, tab mobile sospesa) che la cache serve
+    // di più — il prossimo retry identico trova la risposta già pronta invece
+    // di rigenerarla e rischiare di perderla una seconda volta. Non cachiamo
+    // un turno degraded SENZA testo utile (finalText vuoto/solo warning) — non
+    // avrebbe senso ripeterlo pari pari a un retry che nel frattempo potrebbe
+    // trovare i provider di nuovo su.
+    if (cleanText && !result.degraded) {
+      setCachedReply(replyCacheKey, recordedEvents);
+    }
     res.end();
   } catch (err) {
     console.error("[ai-assistant/message]", err);
     try { send("error", { code: 500, message: (err as Error).message }); } catch { /* */ }
     res.end();
+  } finally {
+    stopHeartbeat();
   }
 });
 

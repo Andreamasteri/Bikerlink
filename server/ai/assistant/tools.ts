@@ -26,6 +26,91 @@ import { webSearch } from "./web-search";
 
 const PROBE_TIMEOUT_MS = 5_000;
 
+// Task #11 — Hardening backend AI Assistant (b) streaming.
+//
+// Le tool sopra (getWeather, getThinkCentreStatus) hanno già un timeout
+// esplicito sulla singola fetch (PROBE_TIMEOUT_MS via AbortController), ma
+// getBikerStats/getNearbyEvents/getUserPlannedRoutes interrogano il DB SENZA
+// alcun timeout: una query lenta (DB managed sotto carico, vedi
+// db-managed-slowness) blocca l'intero turno finché il pool non risponde o il
+// tunnel Cloudflare non scade da solo. `withToolTimeout` mette un tetto
+// UNIFORME sull'attesa per QUALSIASI tool (anche quelli già temporizzati
+// internamente, come rete di sicurezza in più): se scatta, la query DB
+// sottostante continua a girare in background (drizzle non supporta la
+// cancellazione lato server), ma l'agente non resta bloccato ad aspettarla e
+// il modello riceve un errore esplicito invece di un turno appeso.
+export const TOOL_EXECUTION_TIMEOUT_MS = 8_000;
+
+// Un singolo risultato-tool grande (es. molti percorsi pianificati con
+// waypoint estesi) fa crescere il prefill reinserito nel prompt
+// dell'iterazione successiva, con lo stesso rischio di superare il tetto di
+// tempo del tunnel documentato nel repo gemello BikerBlog (vedi
+// `capToolResult`/MAX_TOOL_RESULT_CHARS là). Cappiamo quindi anche qui la
+// dimensione JSON di OGNI risultato-tool prima che rientri nel contesto del
+// modello, avvisando esplicitamente il modello del taglio.
+export const MAX_TOOL_RESULT_CHARS = 4_000;
+
+class ToolTimeoutError extends Error {}
+
+async function withToolTimeout<T>(name: string, run: () => Promise<T>): Promise<T | { error: string }> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await new Promise<T>((resolve, reject) => {
+      timer = setTimeout(
+        () => reject(new ToolTimeoutError(`Tool "${name}" ha superato il timeout di ${TOOL_EXECUTION_TIMEOUT_MS}ms`)),
+        TOOL_EXECUTION_TIMEOUT_MS,
+      );
+      run().then(resolve, reject);
+    });
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : String(err) };
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
+/** Tronca il risultato di un tool se il suo JSON supera MAX_TOOL_RESULT_CHARS,
+ * avvisando esplicitamente il modello del taglio (non silenzioso). */
+function capToolResult(name: string, result: unknown): unknown {
+  let json: string;
+  try {
+    json = JSON.stringify(result) ?? "";
+  } catch {
+    return result;
+  }
+  if (json.length <= MAX_TOOL_RESULT_CHARS) return result;
+  return {
+    truncated: true,
+    tool: name,
+    note:
+      `Risultato di "${name}" troncato a ${MAX_TOOL_RESULT_CHARS} caratteri per restare sotto il ` +
+      "limite di tempo del turno: richiama il tool con parametri più mirati se ti serve il resto.",
+    preview: json.slice(0, MAX_TOOL_RESULT_CHARS),
+  };
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type AnyExecute = (...args: any[]) => any;
+
+/** Avvolge `execute` di un tool AI SDK con timeout uniforme + cap del
+ * risultato, senza toccarne description/inputSchema. Applicato a ogni tool
+ * esportato più sotto, sia per il tool-calling nativo (streamText) sia per il
+ * percorso manuale di recovery in agent.ts (tryParseTextualToolCall). Il
+ * tipo del tool AI SDK è volutamente ristretto a `unknown` in ingresso/uscita
+ * qui: la firma esatta di `execute` (input/output/context generici) varia per
+ * ogni tool e viene già ri-castata dai chiamanti (streamText con `as never`,
+ * agent.ts con `execute?: (...args) => Promise<unknown>`), quindi non serve
+ * — anzi comprometterebbe — che `guardTool` la preservi esattamente. */
+function guardTool<T extends { execute?: AnyExecute }>(name: string, toolDef: T): T {
+  const original = toolDef.execute as AnyExecute | undefined;
+  if (!original) return toolDef;
+  const guarded: AnyExecute = async (...args: unknown[]) => {
+    const raw = await withToolTimeout(name, () => Promise.resolve(original(...args)));
+    return capToolResult(name, raw);
+  };
+  return { ...toolDef, execute: guarded } as T;
+}
+
 // ── Schemas ───────────────────────────────────────────────────────────────────
 
 const weatherSchema = z.object({
@@ -310,20 +395,20 @@ export const webSearchTool = tool({
 // ── Exported tool set ─────────────────────────────────────────────────────────
 
 export const OLLAMA_TOOLS = {
-  getWeather: getWeatherTool,
-  getBikerStats: getBikerStatsTool,
-  getThinkCentreStatus: getThinkCentreStatusTool,
-  getNearbyEvents: getNearbyEventsTool,
-  getUserPlannedRoutes: getUserPlannedRoutesTool,
-  webSearch: webSearchTool,
+  getWeather: guardTool("getWeather", getWeatherTool),
+  getBikerStats: guardTool("getBikerStats", getBikerStatsTool),
+  getThinkCentreStatus: guardTool("getThinkCentreStatus", getThinkCentreStatusTool),
+  getNearbyEvents: guardTool("getNearbyEvents", getNearbyEventsTool),
+  getUserPlannedRoutes: guardTool("getUserPlannedRoutes", getUserPlannedRoutesTool),
+  webSearch: guardTool("webSearch", webSearchTool),
 } as const;
 
 // Task #5326 — Sottoinsieme di tool per Horus (specialista percorsi): niente
 // stats/percorsi utente specifici di Bowie, ma sì meteo + ricerca web (utile
 // per condizioni strada/eventi che influenzano un itinerario).
 export const HORUS_TOOLS = {
-  getWeather: getWeatherTool,
-  getThinkCentreStatus: getThinkCentreStatusTool,
-  getNearbyEvents: getNearbyEventsTool,
-  webSearch: webSearchTool,
+  getWeather: guardTool("getWeather", getWeatherTool),
+  getThinkCentreStatus: guardTool("getThinkCentreStatus", getThinkCentreStatusTool),
+  getNearbyEvents: guardTool("getNearbyEvents", getNearbyEventsTool),
+  webSearch: guardTool("webSearch", webSearchTool),
 } as const;
