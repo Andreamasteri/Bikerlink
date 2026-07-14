@@ -24,3 +24,11 @@ La documentazione/skill descrivono nginx (duckdns) come reverse proxy attivo. **
 
 **Why:** ho perso tempo assumendo che nginx fosse il proxy attivo e che `--add-host=host.docker.internal` bastasse; entrambe le assunzioni erano false.
 **How to apply:** prima di "aggiungere un blocco nginx" o usare host.docker.internal sul TC, verifica `systemctl is-active nginx`, `cloudflared` ingress (journal), e il bind di Ollama (`ss -tlnp | grep 11434`).
+
+## Aggiornamento 2026-07-14 (post migrazione Tailscale→Cloudflare, verificato via SSH live)
+- **Bug `gh.biker-link.net` confermato ancora presente:** ingress punta a `127.0.0.1:8989`, connection refused — i container GH (8 aree) sono sani internamente (`docker exec <container> wget localhost:8989/health` → OK) ma quella porta non è pubblicata sull'host. Stesso bug-shape di valhalla, root cause = ingress dashboard, non il repo.
+- **SSH ha DUE hostname distinti sul tunnel, non uno solo:** `ssh.biker-link.net` (funziona con `cloudflared access ssh`, login OK) e `tc.biker-link.net` (fallisce con `websocket: bad handshake` — non instradato come servizio SSH). Il secret `TC_SSH_HOST` va puntato a `ssh.biker-link.net`.
+- **Whisper NON è più il container Docker `faster_whisper/large-v2`** citato altrove: ora è **whisper.cpp nativo** (`/opt/whisper.cpp/build/bin/whisper-server`, modello `ggml-medium.bin`, `--language it --threads 4`, bind `127.0.0.1:8080`). Auth resta CF Access; env `WHISPER_URL` (non `THINKCENTRE_WHISPER_URL`, usato solo da un path admin secondario).
+- **Nominatim risulta `inactive`** (nessun processo, nessun container residuo) — il 502 pubblico non è un bug di routing ma il servizio realmente fermo, verosimilmente sospeso/decommissionato a favore del nuovo **Photon** (`photon.biker-link.net`, systemd `photon.service`, bind `127.0.0.1:2322`, stesso Access token degli altri servizi geo).
+- **GPU confermata attiva:** NVIDIA GTX 1070, 8192MiB VRAM totali (coerente con la stima "8.19GB" della memoria BikerBlog).
+- **Drift modelli Ollama vs "decisione finale" del briefing BikerBlog:** `ollama ps` live mostra residenti `qwen3:4b` + **`llama3.2:3b`** + `granite4:tiny-h` — NON `qwen3:1.7b`/`all-minilm` come indicato dal briefing. Prima di fissare `BOWIE_OLLAMA_MODEL`/`NADIR_*` in un task di ricablaggio, riverificare `ollama ps` al momento, non fidarsi ciecamente del briefing.
