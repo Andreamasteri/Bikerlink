@@ -109,7 +109,7 @@ Decisione: installo X.Y.Z / scendo a X.Y.W perché [motivo con fonte]
 
 Questi pacchetti hanno una versione fissa per motivi già verificati e documentati. **NON aggiornare senza autorizzazione esplicita dell'utente.**
 
-### `react-native-keyboard-controller` — pinned `^1.21.11` (min 1.21.9)
+### `react-native-keyboard-controller` — pinned `^1.22.1` (min 1.21.9)
 - **Perché:** Kotlin 2.1.20 (Expo SDK 56 / compileSdk 36) richiede che `onConfigurationChanged` abbia un parametro `Configuration` non-nullable. Versioni < 1.21.9 dichiaravano `Configuration?` → errore `'onConfigurationChanged' overrides nothing` → build Android EAS fallisce.
 - **In `expo.install.exclude`:** expo doctor EAS segnalava mismatch tra la versione attesa e quella installata → build annullata. L'exclude risolve.
 - **API JS invariata:** `KeyboardProvider`, `KeyboardAwareScrollView`, `KeyboardAvoidingView` — nessuna migrazione richiesta.
