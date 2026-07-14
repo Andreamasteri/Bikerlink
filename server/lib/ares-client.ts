@@ -22,7 +22,9 @@ import { cfAccessHeaders } from "./cf-access";
 
 const ARES_URL = process.env.ARES_OLLAMA_URL?.trim().replace(/\/$/, "");
 const ARES_TOKEN = process.env.ARES_OLLAMA_TOKEN ?? "";
-const ARES_MODEL = process.env.ARES_OLLAMA_MODEL?.trim() || "qwen3-coder:30b";
+// Task #4 — default = "devstral:latest" (modello coding residente sul PC fisso/TC).
+// ARES_OLLAMA_MODEL come secret ha la precedenza se impostato.
+const ARES_MODEL = process.env.ARES_OLLAMA_MODEL?.trim() || "devstral:latest";
 
 /** true quando ARES_OLLAMA_URL è impostato (Ares disponibile come destinazione). */
 export const isAresConfigured = Boolean(ARES_URL);
@@ -44,7 +46,7 @@ function aresHeaders(): Record<string, string> {
     if (ARES_URL) {
       const host = new URL(ARES_URL).hostname.toLowerCase();
       if (host === "biker-link.net" || host.endsWith(".biker-link.net")) {
-        Object.assign(h, cfAccessHeaders());
+        Object.assign(h, cfAccessHeaders("ares"));
       }
     }
   } catch {

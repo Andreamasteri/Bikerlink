@@ -15,6 +15,7 @@ import {
   buildAdminSystemPrompt,
   buildHorusSystemPrompt,
   buildAresSystemPrompt,
+  buildQuebrachoSystemPrompt,
   type KnowledgeEntry,
 } from "./knowledge";
 import { getOllamaModel, isOllamaConfigured, warmOllama } from "../../lib/ollama-client";
@@ -23,6 +24,8 @@ import { AI_ROSTER, type AiPersonaId, createHandoffMarkerFilter, stripHandoffMar
 import { recordKnowledgeGap } from "./knowledge-gaps";
 import { composeAresQuestion } from "./ares-question";
 import { isAresConfigured, getAresModelId, streamAresChat } from "../../lib/ares-client";
+import { composeQuebrachoQuestion } from "./quebracho-question";
+import { isQuebrachoConfigured, getQuebrachoModelId, streamQuebrachoChat } from "../../lib/quebracho-client";
 import { retrieveContext, formatRagContext, indexKnowledge } from "./rag";
 import { OLLAMA_TOOLS, HORUS_TOOLS } from "./tools";
 import { buildAresLearningContext } from "./ares-learning";
@@ -33,11 +36,13 @@ import { aiConversationTurns } from "@shared/db";
 import { eq, desc } from "drizzle-orm";
 import { pruneUserMemory, MEMORY_TURNS_LIMIT } from "./memory-pruner";
 import { fetchUserLiveContext } from "./user-context";
-import { BOWIE_INTRO_POEM, HORUS_INTRO_POEM, ARES_INTRO_POEM } from "@shared/bowie-greeting";
+import { BOWIE_INTRO_POEM, HORUS_INTRO_POEM, ARES_INTRO_POEM, QUEBRACHO_INTRO_POEM } from "@shared/bowie-greeting";
 
-const OLLAMA_FALLBACK_MODEL_ID = process.env.BOWIE_OLLAMA_MODEL ?? "mistral-nemo:latest";
+// Task #4 — default Bowie = "llama3.2:3b" (residente sul ThinkCentre).
+const OLLAMA_FALLBACK_MODEL_ID = process.env.BOWIE_OLLAMA_MODEL ?? "llama3.2:3b";
 // Task #5197 — Horus usa un modello Ollama dedicato (stessa infra di Bowie).
-const HORUS_MODEL_ID = process.env.HORUS_OLLAMA_MODEL?.trim() || "bikerlink-routing";
+// Task #4 — default aggiornato a "qwen3:4b" (modello residente sul ThinkCentre).
+const HORUS_MODEL_ID = process.env.HORUS_OLLAMA_MODEL?.trim() || "qwen3:4b";
 
 // Task #5210/#5233 — Presentazione poetica di Bowie (BOWIE_INTRO_POEM): iniettata
 // come turno "assistant" seed quando la conversazione è nuova (nessuna history).
@@ -149,11 +154,14 @@ export async function runAssistantAgent(opts: AssistantAgentOpts): Promise<Assis
   const isAdmin = opts.platform === "admin";
 
   // Task #5197 — Persona richiesta (handoff risolto a monte nel route).
-  // Difesa in profondità: Ares è SOLO per gli admin. Il route già lo garantisce,
-  // ma se runAssistantAgent venisse chiamato direttamente con persona="ares" fuori
-  // dalla modalità admin, ricadiamo su Bowie invece di esporre la diagnostica.
+  // Difesa in profondità: Ares e Quebracho sono SOLO per gli admin. Il route già
+  // lo garantisce, ma se runAssistantAgent venisse chiamato direttamente con
+  // persona="ares"/"quebracho" fuori dalla modalità admin, ricadiamo su Bowie
+  // invece di esporre agenti riservati.
   const requestedPersona: AiPersonaId =
-    opts.persona === "ares" && !isAdmin ? "bowie" : (opts.persona ?? "bowie");
+    (opts.persona === "ares" || opts.persona === "quebracho") && !isAdmin
+      ? "bowie"
+      : (opts.persona ?? "bowie");
   // Persona EFFETTIVA: può cambiare se la richiesta fallisce (es. Ares offline).
   let effectivePersona: AiPersonaId = requestedPersona;
   // Tool calling server-side abilitato per Bowie e Horus (Task #5326 — Horus
@@ -169,9 +177,9 @@ export async function runAssistantAgent(opts: AssistantAgentOpts): Promise<Assis
 
   // Latenza (Task #5327): scalda il modello Ollama in modo fire-and-forget, in
   // parallelo alla costruzione del contesto (RAG + profilo utente + memoria), così
-  // è già residente quando parte lo stream. Skip per Ares (endpoint dedicato) e
-  // quando ci sono immagini (si va sul path vision cloud, non su Ollama).
-  if (isOllamaConfigured && requestedPersona !== "ares" && !hasImages) {
+  // è già residente quando parte lo stream. Skip per Ares/Quebracho (endpoint
+  // dedicati) e quando ci sono immagini (si va sul path vision cloud, non Ollama).
+  if (isOllamaConfigured && requestedPersona !== "ares" && requestedPersona !== "quebracho" && !hasImages) {
     warmOllama(requestedPersona === "horus" ? "horus" : "bowie", ollamaModelName);
   }
 
@@ -190,6 +198,9 @@ export async function runAssistantAgent(opts: AssistantAgentOpts): Promise<Assis
     // Task #5326 — knowledge transfer read-only Horus → Ares (RAG + prompt injection).
     const horusLearningContext = await buildAresLearningContext();
     system = buildAresSystemPrompt(opts.adminContext ?? "", horusLearningContext || undefined);
+  } else if (requestedPersona === "quebracho") {
+    // Task #4 — Quebracho: coordinatore/regista (solo admin), snapshot piattaforma.
+    system = buildQuebrachoSystemPrompt(opts.adminContext ?? "");
   } else if (requestedPersona === "horus") {
     // Horus: specialista percorsi. RAG + contesto utente come Bowie, persona diversa.
     // Task #5326 — in modalità admin riceve anche la memoria delle proprie
@@ -262,13 +273,16 @@ export async function runAssistantAgent(opts: AssistantAgentOpts): Promise<Assis
   // la prima volta via handoff.
   const isNewHorusTurn = requestedPersona === "horus" && !!opts.personaFirstTurn;
   const isNewAresTurn = requestedPersona === "ares" && !!opts.personaFirstTurn;
+  const isNewQuebrachoTurn = requestedPersona === "quebracho" && !!opts.personaFirstTurn;
   const introPoem = isNewBowieConversation
     ? BOWIE_INTRO_POEM
     : isNewHorusTurn
       ? HORUS_INTRO_POEM
       : isNewAresTurn
         ? ARES_INTRO_POEM
-        : null;
+        : isNewQuebrachoTurn
+          ? QUEBRACHO_INTRO_POEM
+          : null;
   const seedTurns: Array<{ role: "user" | "assistant"; content: string }> = introPoem
     ? [{ role: "assistant", content: introPoem }]
     : [];
@@ -358,6 +372,12 @@ export async function runAssistantAgent(opts: AssistantAgentOpts): Promise<Assis
       // Task #3017 — Tool calling: solo per Ollama, con max 3 step
       // Task #5326 — abilitato per Bowie e Horus (Ares passa da un endpoint dedicato).
       ...(isOllama && enableTools ? { tools: toolsForPersona as never, stopWhen: isStepCount(3) as never } : {}),
+      // Task #4 — Horus gira su qwen3:4b, che "pensa" di default: disattiviamo il
+      // ragionamento esplicito così l'output di navigazione resta pulito (niente
+      // blocchi <think>). Innocuo per gli altri modelli (accettano think:false).
+      ...(isOllama && requestedPersona === "horus"
+        ? { providerOptions: { ollama: { think: false } } as never }
+        : {}),
     });
     for await (const delta of result.textStream) {
       ensureIntroEmitted();
@@ -418,6 +438,50 @@ export async function runAssistantAgent(opts: AssistantAgentOpts): Promise<Assis
           "Ho provato a passare la parola ad Ares (la nostra AI tecnica, gira su una macchina dedicata), ma al momento non risponde. Riprova più tardi.";
         provider = "fallback";
         modelId = "ares-offline";
+        opts.onTextDelta?.(finalText);
+        done = true;
+      }
+    }
+  } else if (requestedPersona === "quebracho") {
+    // 0.5) Task #4 — Quebracho: coordinatore/regista su Ollama (client dedicato,
+    //      /api/chat HTTP diretta), NON la chain Ollama/cloud. Se offline degrada
+    //      con GRAZIA: Bowie riprende con un messaggio garbato (mai fallback cloud).
+    opts.onPersona?.({ id: "quebracho", name: AI_ROSTER.quebracho.name });
+    try {
+      if (!isQuebrachoConfigured) throw new Error("Quebracho non configurato (nessun URL Ollama disponibile).");
+      // Composizione: Bowie sintetizza il contesto in UNA richiesta per Quebracho.
+      const quebrachoQuestion = await composeQuebrachoQuestion(opts.history ?? [], opts.message);
+      const quebrachoSystem = `${system}\n\nVINCOLO DI RISPOSTA: rispondi in modo CONTENUTO e STRUTTURATO (punti chiave, niente preamboli né divagazioni). Vai dritto al coordinamento/azione.`;
+      await streamQuebrachoChat({
+        system: quebrachoSystem,
+        messages: [{ role: "user", content: quebrachoQuestion }],
+        signal: opts.signal,
+        timeoutMs: 60_000,
+        onDelta: (delta) => {
+          ensureIntroEmitted();
+          finalText += delta;
+          aiText += delta;
+          providerEmittedAny = true;
+          emitAiDelta(delta);
+        },
+      });
+      provider = "quebracho";
+      modelId = getQuebrachoModelId();
+      done = true;
+      console.log("[assistant] risposta da Quebracho (coordinamento)");
+    } catch (quebrachoErr) {
+      if (providerEmittedAny) {
+        console.warn("[assistant] Quebracho fallito a metà stream, mantengo il parziale:", (quebrachoErr as Error).message);
+        degraded = true;
+        done = true;
+      } else {
+        console.warn("[assistant] Quebracho offline, fallback a Bowie:", (quebrachoErr as Error).message);
+        effectivePersona = "bowie";
+        opts.onPersona?.({ id: "bowie", name: AI_ROSTER.bowie.name });
+        finalText =
+          "Ho provato a passare la parola a Quebracho (il nostro coordinatore, gira su una macchina dedicata), ma al momento non risponde. Riprova più tardi.";
+        provider = "fallback";
+        modelId = "quebracho-offline";
         opts.onTextDelta?.(finalText);
         done = true;
       }
@@ -560,7 +624,7 @@ export async function runAssistantAgent(opts: AssistantAgentOpts): Promise<Assis
   // Task #5322 — Lacune di conoscenza: se il RAG non ha trovato nulla di
   // pertinente (score basso o nullo) registriamo la domanda. Solo Bowie/Horus
   // (persone RAG-driven), mai admin/Ares. Best-effort, non blocca il turno.
-  if (!isAdmin && effectivePersona !== "ares") {
+  if (!isAdmin && effectivePersona !== "ares" && effectivePersona !== "quebracho") {
     void recordKnowledgeGap({
       question: opts.message,
       topScore: ragTopScore,

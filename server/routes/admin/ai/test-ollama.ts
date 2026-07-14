@@ -40,8 +40,13 @@ export function sanitizeError(msg: string): string {
   let out = msg;
   // Sostituisci eventuali URL http(s) con la sola versione mascherata host.
   out = out.replace(/https?:\/\/[^\s"'`)]+/gi, (m) => maskUrl(m));
-  // Rimuovi il token (Bowie e/o Horus, se diverso) se presente nel testo.
-  for (const token of [process.env.BOWIE_OLLAMA_TOKEN, process.env.HORUS_OLLAMA_TOKEN]) {
+  // Rimuovi il token di ogni agente (Bowie/Horus/Ares/Quebracho) se presente nel testo.
+  for (const token of [
+    process.env.BOWIE_OLLAMA_TOKEN,
+    process.env.HORUS_OLLAMA_TOKEN,
+    process.env.ARES_OLLAMA_TOKEN,
+    process.env.QUEBRACHO_OLLAMA_TOKEN,
+  ]) {
     if (token) out = out.split(token).join("***");
   }
   // Maschera schemi "Bearer <token>".
@@ -58,8 +63,8 @@ router.get("/test-ollama", async (req: Request, res: Response) => {
   const { url: rawUrl, tokenConfigured } = getOllamaDiagnostics(persona);
   const model =
     persona === "horus"
-      ? (process.env.HORUS_OLLAMA_MODEL?.trim() || "bikerlink-routing")
-      : (process.env.BOWIE_OLLAMA_MODEL ?? "mistral-nemo:latest");
+      ? (process.env.HORUS_OLLAMA_MODEL?.trim() || "qwen3:4b")
+      : (process.env.BOWIE_OLLAMA_MODEL ?? "llama3.2:3b");
 
   // Se l'URL non è impostato: non è un errore, semplicemente non configurato.
   if (!rawUrl) {

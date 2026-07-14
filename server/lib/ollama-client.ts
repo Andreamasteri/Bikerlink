@@ -63,21 +63,32 @@ function endpointFor(persona: OllamaPersona): { url?: string; token: string } {
  * (Host == localhost) è gestito da nginx sull'origine (proxy_set_header Host
  * "localhost"), quindi resta intatto.
  */
-function ollamaHeaders(token: string): Record<string, string> {
+function ollamaHeaders(token: string, persona: OllamaPersona = "bowie"): Record<string, string> {
   const h: Record<string, string> = {};
   if (token) h["Authorization"] = `Bearer ${token}`;
-  Object.assign(h, cfAccessHeaders());
+  // Task #4 — override CF Access per-agente (fallback alla coppia generica).
+  Object.assign(h, cfAccessHeaders(persona));
   return h;
 }
-// Task #3017: il modello default è "bikerlink" (Modelfile custom). Se BOWIE_OLLAMA_MODEL
-// non è impostato, il setup script lo setta a "bikerlink" dopo la creazione.
-const BOWIE_OLLAMA_MODEL = process.env.BOWIE_OLLAMA_MODEL ?? "mistral-nemo:latest";
+// Task #4: modello default di Bowie = "llama3.2:3b" (residente sul ThinkCentre).
+// Se BOWIE_OLLAMA_MODEL è impostato come secret, ha la precedenza.
+const BOWIE_OLLAMA_MODEL = process.env.BOWIE_OLLAMA_MODEL ?? "llama3.2:3b";
 
 // Latenza (Task #5327): keep_alive esplicito tiene il modello caricato in VRAM/RAM
 // tra una richiesta e l'altra, evitando il cold-load (diversi secondi) al primo
 // token quando il modello era stato scaricato. Configurabile via OLLAMA_KEEP_ALIVE
 // (formato Ollama: "30m", "1h", "-1" per non scaricare mai). Default 30 minuti.
-const OLLAMA_KEEP_ALIVE = process.env.OLLAMA_KEEP_ALIVE?.trim() || "30m";
+//
+// Task #4 — Normalizzazione: Ollama accetta keep_alive sia come durata stringa
+// ("30m") sia come numero di secondi. Il valore speciale "non scaricare mai" DEVE
+// essere il NUMERO -1: la stringa "-1" viene interpretata come 0 secondi (scarica
+// subito), l'opposto di ciò che si vuole. Quindi se il valore è un intero puro lo
+// inviamo come number, altrimenti come stringa di durata.
+function normalizeKeepAlive(raw: string): string | number {
+  const n = Number(raw);
+  return raw !== "" && Number.isInteger(n) ? n : raw;
+}
+const OLLAMA_KEEP_ALIVE = normalizeKeepAlive(process.env.OLLAMA_KEEP_ALIVE?.trim() || "30m");
 
 /** true quando BOWIE_OLLAMA_URL è impostato (Ollama abilitato come provider primario). */
 export const isOllamaConfigured = Boolean(BOWIE_OLLAMA_URL);
@@ -123,7 +134,7 @@ export async function isOllamaReachable(persona: OllamaPersona = "bowie"): Promi
   try {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), PROBE_TIMEOUT_MS);
-    const headers = ollamaHeaders(token);
+    const headers = ollamaHeaders(token, persona);
     // /api/tags è l'endpoint standard Ollama che restituisce la lista dei modelli:
     // più stabile e affidabile di HEAD / (che su Ollama 0.24+ può tornare 403
     // se il Host header non è localhost — problema già fixato in nginx, ma il probe
@@ -163,7 +174,7 @@ export function warmOllama(persona: OllamaPersona = "bowie", model?: string): vo
       if (await isThinkCentreOffline()) return;
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), PROBE_TIMEOUT_MS);
-      const headers = { ...ollamaHeaders(token), "Content-Type": "application/json" };
+      const headers = { ...ollamaHeaders(token, persona), "Content-Type": "application/json" };
       await fetch(`${url}/api/generate`, {
         method: "POST",
         headers,
@@ -193,7 +204,7 @@ export function getOllamaModel(model: string = BOWIE_OLLAMA_MODEL, persona: Olla
   if (!url) {
     throw new Error(`Ollama non configurato: variabile ${persona === "horus" ? "HORUS" : "BOWIE"}_OLLAMA_URL mancante.`);
   }
-  const headers = ollamaHeaders(token);
+  const headers = ollamaHeaders(token, persona);
   const provider = createOllama({
     baseURL: `${url}/api`,
     headers: Object.keys(headers).length > 0 ? headers : undefined,
