@@ -177,6 +177,9 @@ export function buildHorusSystemPrompt(opts: {
   isAdmin?: boolean;
   analysisContext?: string;
   codeContext?: string;
+  // Task #25 — stato LIVE dei motori di routing (solo admin): iniettato così
+  // Horus risponde con dati reali su "come sta andando il routing?".
+  routingStatus?: string;
 }): string {
   const userIdSection = opts.userId
     ? `\n\n(ID utente corrente: ${opts.userId} — usalo se serve per contestualizzare, mai mostrarlo all'utente.)`
@@ -184,6 +187,10 @@ export function buildHorusSystemPrompt(opts: {
   const ragSection = opts.ragContext ? `\n\n${opts.ragContext}` : "";
   const userContextSection = opts.userContext ? `\n\n${opts.userContext}` : "";
   const analysisSection = opts.analysisContext ? `\n\n${opts.analysisContext}` : "";
+  const routingStatusSection =
+    opts.isAdmin && opts.routingStatus
+      ? `\n\nUsa i dati qui sotto per rispondere all'admin sullo stato del routing (sola lettura, dati correnti: se un valore manca, dillo, non inventarlo):\n\n${opts.routingStatus}`
+      : "";
   const codeReviewSection =
     opts.isAdmin && opts.codeContext
       ? `\n\nMODALITÀ CODE REVIEWER (solo admin): l'amministratore può chiederti di rivedere il codice sorgente qui sotto (read-only, da GitHub main). Analizza pattern rischiosi, bug potenziali o violazioni delle convenzioni del progetto, e proponi correzioni testuali (MAI eseguirle: sei sola lettura, nessuna scrittura su GitHub). Sii specifico su file/riga quando possibile.\n\n${opts.codeContext}`
@@ -210,7 +217,7 @@ CONGEDO (ritorno a Bowie):
 - Per farlo, aggiungi ESATTAMENTE il marcatore ${HANDOFF_BACK_TO_BOWIE} alla FINE della tua risposta (ultima riga, da solo). Il marcatore è tecnico: l'utente non lo vedrà, verrà rimosso automaticamente.
 - NON usare il marcatore se la conversazione sul percorso è ancora in corso (stai chiedendo partenza/destinazione/preferenze o l'utente sta ancora rifinendo l'itinerario).
 
-${renderRosterBlock("horus")}${ragSection}${userContextSection}${analysisSection}${codeReviewSection}`;
+${renderRosterBlock("horus")}${routingStatusSection}${ragSection}${userContextSection}${analysisSection}${codeReviewSection}`;
 }
 
 // ── Task #5197 — System prompt di Ares (diagnostica tecnica, solo admin) ──────

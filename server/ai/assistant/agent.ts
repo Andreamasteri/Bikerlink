@@ -217,6 +217,17 @@ export async function runAssistantAgent(opts: AssistantAgentOpts): Promise<Assis
     ragTopScore = ragSnippets[0]?.score ?? null;
     const ragContext = formatRagContext(ragSnippets);
     const userContext = await fetchUserLiveContext(opts.userId);
+    // Task #25 — in modalità admin, inietta lo stato LIVE dei motori di routing
+    // così Horus risponde a "come sta andando il routing?" con dati reali.
+    let routingStatus: string | undefined;
+    if (isAdmin) {
+      try {
+        const { buildRoutingStatusSummary } = await import("../watchdog/routing-status-summary");
+        routingStatus = await buildRoutingStatusSummary();
+      } catch (e) {
+        console.warn("[assistant/horus] routing-status non disponibile:", (e as Error).message);
+      }
+    }
     system = buildHorusSystemPrompt({
       platform: (isAdmin ? "web" : opts.platform) as "android" | "ios" | "web",
       userId: opts.userId,
@@ -224,6 +235,7 @@ export async function runAssistantAgent(opts: AssistantAgentOpts): Promise<Assis
       ragContext,
       isAdmin,
       codeContext: isAdmin ? opts.adminCodeContext : undefined,
+      routingStatus,
     });
   } else if (isAdmin) {
     // Task #4842 — Modalità admin: system prompt dedicato con snapshot piattaforma.

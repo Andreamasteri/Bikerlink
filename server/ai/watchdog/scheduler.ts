@@ -11,6 +11,7 @@
 import { runAggregatorCycle } from "./aggregator";
 import { runAutoFix } from "./auto-fix";
 import { runProposer } from "./proposer";
+import { runHorusRoutingProposer, filterHorusProblems } from "./horus-proposer";
 import { dispatchAlerts } from "./alerts";
 import { cleanupOldSignals } from "./signals";
 import { isWatchdogEnabled } from "./kill-switch";
@@ -30,6 +31,9 @@ const PROPOSER_COOLDOWN_MS = 60 * 60_000;
 let tickTimer: NodeJS.Timeout | null = null;
 let cleanupTimer: NodeJS.Timeout | null = null;
 let lastProposerRunAt = 0;
+// Task #25 — cooldown separato per il proposer di routing di Horus, così un
+// problema routing persistente non richiama il modello di Horus ogni minuto.
+let lastHorusProposerRunAt = 0;
 // Cooldown push appstate_transition: condivide la stessa durata del proposer
 // per evitare spam notifiche durante un loop-bug prolungato.
 let lastAppstateAlertSentAt = 0;
@@ -69,6 +73,27 @@ async function tick(): Promise<void> {
         console.log(
           `[watchdog/proposer] skip cooldown — problemi rilevati ma AI non richiamata (riprova tra ${cooldownRemainingSec}s)`,
         );
+      }
+
+      // Task #25 — Proposer di routing di Horus: gestisce il namespace "horus"
+      // (correttezza routing/geocoding) che il proposer generico esclude. Cooldown
+      // indipendente per non richiamare il modello di Horus a ogni tick.
+      if (filterHorusProblems(snap.problems).length > 0) {
+        const horusRemainingSec = Math.ceil((PROPOSER_COOLDOWN_MS - (now - lastHorusProposerRunAt)) / 1000);
+        if (now - lastHorusProposerRunAt >= PROPOSER_COOLDOWN_MS) {
+          const hProp = await runHorusRoutingProposer(snap);
+          if (hProp) {
+            totalProposalsCreated += hProp.proposals.length;
+            lastHorusProposerRunAt = now;
+            console.log(
+              `[watchdog/horus-proposer] run: ${hProp.proposals.length} proposta/e routing | provider=${hProp.meta.provider} model=${hProp.meta.model} | prossimo run tra ~${PROPOSER_COOLDOWN_MS / 60_000}min`,
+            );
+          }
+        } else {
+          console.log(
+            `[watchdog/horus-proposer] skip cooldown — problemi routing rilevati ma Horus non richiamato (riprova tra ${horusRemainingSec}s)`,
+          );
+        }
       }
     }
 

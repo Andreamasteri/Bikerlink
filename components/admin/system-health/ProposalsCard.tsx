@@ -33,15 +33,20 @@ export function ProposalsCard({ proposals, onAccept, onReject, busyId }: Props) 
         const det = (p.details ?? {}) as {
           title?: string; reasoning?: string; riskLevel?: string;
           action?: { kind?: string; target?: string };
-          rollbackHint?: string;
+          rollbackHint?: string; persona?: string;
         };
         const risk = det.riskLevel ?? "medium";
         const color = RISK_COLOR[risk] ?? "#9ca3af";
+        // Task #25 — proposta a firma Horus (proposer di routing dedicato).
+        const isHorus = det.persona === "horus";
         return (
           <View key={p.id} style={[styles.row, { borderLeftColor: color }]}>
             <View style={styles.headerRow}>
               <Text style={[styles.risk, { color }]}>RISCHIO {risk.toUpperCase()}</Text>
-              <Text style={styles.action}>{det.action?.kind ?? "?"}</Text>
+              <View style={styles.headerRight}>
+                {isHorus ? <Text style={styles.horusBadge}>🦅 Horus</Text> : null}
+                <Text style={styles.action}>{det.action?.kind ?? "?"}</Text>
+              </View>
             </View>
             <Text style={styles.title}>{det.title ?? p.summary ?? "Proposta"}</Text>
             {det.reasoning ? <Text style={styles.reasoning}>{det.reasoning}</Text> : null}
@@ -73,7 +78,9 @@ const styles = StyleSheet.create({
     marginBottom: 8, borderLeftWidth: 3,
   },
   headerRow: { flexDirection: "row", justifyContent: "space-between", marginBottom: 4 },
+  headerRight: { flexDirection: "row", alignItems: "center", gap: 8 },
   risk: { fontWeight: "700" as const, fontSize: 11 },
+  horusBadge: { color: "#c4b5fd", fontSize: 11, fontWeight: "700" as const },
   action: { color: "#9ca3af", fontSize: 11 },
   title: { color: "#f3f4f6", fontWeight: "600" as const, marginBottom: 4 },
   reasoning: { color: "#9ca3af", fontSize: 12, marginBottom: 4 },

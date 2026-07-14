@@ -459,6 +459,9 @@ export interface StructuredGenOpts<T> {
   prompt: string;
   temperature?: number;
   abortSignal?: AbortSignal;
+  // Task #25 — opzioni provider-specifiche (es. { ollama: { think: false } } per
+  // disattivare il ragionamento esplicito di qwen3 quando si genera JSON strutturato).
+  providerOptions?: Record<string, Record<string, unknown>>;
 }
 
 export interface StructuredGenResult<T> {
@@ -486,6 +489,7 @@ export async function generateStructured<T>(
       prompt,
       temperature: opts.temperature,
       abortSignal: opts.abortSignal,
+      ...(opts.providerOptions ? { providerOptions: opts.providerOptions as never } : {}),
     });
     const object = opts.schema.parse(res.object);
     return { object, usage: res.usage };
@@ -500,6 +504,7 @@ export async function generateStructured<T>(
     prompt: opts.prompt,
     temperature: opts.temperature,
     abortSignal: opts.abortSignal,
+    ...(opts.providerOptions ? { providerOptions: opts.providerOptions as never } : {}),
   });
   return { object: res.object, usage: res.usage };
 }

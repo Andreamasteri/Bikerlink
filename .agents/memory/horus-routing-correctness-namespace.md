@@ -22,6 +22,27 @@ dedicated Horus proposer, filter by that source. Self-hosted `horus.*` ids (grap
 valhalla/photon/pipeline `.correct`) are in `OUTAGE_DOWNSTREAM_IDS` so they're demoted to
 warn when the ThinkCentre is powered off — mirror that for any new self-hosted correctness id.
 
+## Dedicated Horus routing proposer (separate from generic watchdog proposer)
+The generic `runProposer` excludes `source==="horus"`; those routing/geocoding
+correctness problems are handled by a **dedicated** Horus proposer that generates
+the fix through Horus's own persona + model (self-hosted Ollama first, cloud
+fallback) with a routing-log-interpretation prompt, and writes via the SAME
+`writeWatchdogLog` (kind:"proposal") so it appears in the existing admin panel.
+
+**Why:** the fix suggestion for a routing engine must be authored by the routing
+specialist (Horus), interpreting the real engine logs, not the generic watchdog
+voice; reusing `writeWatchdogLog` + `proposalSchema` means zero new panel infra.
+
+**How to apply:** sign as Horus by adding `persona:"horus"` into the proposal
+`details` object (schema has no persona field) — the admin ProposalsCard badges it.
+qwen3:4b "thinks" by default and corrupts structured JSON, so structured calls to
+Horus's Ollama MUST pass `providerOptions:{ ollama:{ think:false } }` (added to
+`generateStructured`). Keep a SEPARATE fingerprint AppSetting key and an
+independent scheduler cooldown so the Horus proposer never piggybacks on / bursts
+the generic one. Admin chat with Horus injects a live routing-status summary
+(GraphHopper/Valhalla/Photon + pipeline + active horus problems) into the system
+prompt (admin path only), built from the same ~4min-cached correctness probes.
+
 ## AI priority gate — routing AI wins over Horus background cycle
 Real route-generation AI (`decideEngineWithAI`) and Horus's background diagnostic
 cycle both hit the **same self-hosted Ollama**, whose scheduler in

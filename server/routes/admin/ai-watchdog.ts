@@ -12,6 +12,7 @@ import { isWatchdogEnabled, setWatchdogEnabled } from "../../ai/watchdog/kill-sw
 import { getWatchdogStats } from "../../ai/watchdog/scheduler";
 import { runAutoFix } from "../../ai/watchdog/auto-fix";
 import { runProposer } from "../../ai/watchdog/proposer";
+import { runHorusRoutingProposer } from "../../ai/watchdog/horus-proposer";
 import { markProposalAccepted, markProposalRejected } from "../../ai/watchdog/log";
 import { runWeeklyReport } from "../../ai/watchdog/weekly-report";
 import {
@@ -80,8 +81,13 @@ router.post("/watchdog/propose-now", async (_req, res) => {
   if (!(await isWatchdogEnabled())) return sendError(res, 409, "Watchdog disabilitato");
   const snap = getLatestSnapshot();
   if (!snap) return sendError(res, 503, "Nessun snapshot ancora generato");
+  // Task #25 — genera sia le proposte generiche sia quelle di routing (namespace
+  // "horus", gestito dal proposer dedicato di Horus). Le eseguiamo in serie:
+  // condividono budget/quota AI e restano poche chiamate.
   const out = await runProposer(snap);
-  return res.json({ proposals: out?.proposals ?? [], meta: out?.meta ?? null });
+  const horusOut = await runHorusRoutingProposer(snap);
+  const proposals = [...(out?.proposals ?? []), ...(horusOut?.proposals ?? [])];
+  return res.json({ proposals, meta: out?.meta ?? horusOut?.meta ?? null });
 });
 
 router.post("/watchdog/proposals/:id/accept", async (req, res) => {
