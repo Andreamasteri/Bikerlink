@@ -1,3 +1,4 @@
+- [TC GPU boot + persona preload](tc-gpu-boot-persona-preload.md) — nvidia.conf Requires→Wants (no boot-block se GPU assente); GPU non enumerata=hardware/alimentazione, non driver; keep_alive:-1 + OLLAMA_MAX_LOADED_MODELS espliciti per Bowie/Horus/Nadir/Quebracho, Ares escluso.
 - [Sentry RN integrations loop](sentry-rn-integrations-loop.md) — @sentry/react-native 8.x default integrations causano loop React Navigation (setState in commitLayoutEffects); usa sempre integrations:[].
 - [DragonflyDB flag compatibility](dragonfly-flag-compat.md) — Redis-only flags (--maxmemory-policy, --save, --aof_rewrite_min_size) crashano Dragonfly; usa --snapshot_cron e --maxmemory ≥1gb (4 IO thread × 256MB).
 - [Redis → Dragonfly rename verification](redis-dragonfly-rename.md) — migrazione 0129 rinomina segnali/health/settings da "redis" a "dragonfly"; bloccata da prefisso duplicato 0128 (Task #5297); fixato rinominando push_tokens in 0130.
