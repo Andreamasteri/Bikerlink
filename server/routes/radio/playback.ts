@@ -167,7 +167,13 @@ router.get("/stream", requireAuth, async (req: Request, res: Response) => {
       activeController.abort();
     }, STREAM_MAX_DURATION_MS);
 
-    req.on("close", () => {
+    // Task #43 — `res.on("close")`, mai `req.on("close")`: su Node 20 +
+    // express.json() la IncomingMessage emette "close" (one-shot) non appena
+    // il body/stream della richiesta è stato consumato dal middleware
+    // globale, ben prima che questo handler arrivi qui (dopo i vari await di
+    // fetch/redirect). Un listener agganciato dopo non scatterebbe mai sulla
+    // vera disconnessione del client. Vedi .agents/memory/sse-abort-res-not-req.md.
+    res.on("close", () => {
       activeController.abort();
     });
 

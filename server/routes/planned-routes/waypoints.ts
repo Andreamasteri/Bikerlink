@@ -146,8 +146,13 @@ router.post("/ai-parse", async (req: Request, res: Response) => {
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), AI_TIMEOUT_MS);
+  // Task #43 — `res.on("close")`, mai `req.on("close")`: su Node 20 +
+  // express.json() la IncomingMessage emette "close" (one-shot) non appena il
+  // body della POST è stato consumato dal middleware, ben prima che questo
+  // handler arrivi qui — un listener agganciato dopo non scatterebbe mai sulla
+  // vera disconnessione del client. Vedi .agents/memory/sse-abort-res-not-req.md.
   const onClose = () => { controller.abort(); clearTimeout(timeout); };
-  req.on("close", onClose);
+  res.on("close", onClose);
 
   try {
     const { result: object, provider_used } = await generateRouteObject({
@@ -160,7 +165,7 @@ router.post("/ai-parse", async (req: Request, res: Response) => {
       abortSignal: controller.signal,
     });
     clearTimeout(timeout);
-    req.off("close", onClose);
+    res.off("close", onClose);
     console.info(`[AI parse] provider usato: ${provider_used} | poiStops raw: ${JSON.stringify(object.poiStops)}`);
 
     // ── Risoluzione automatica poiStops ──────────────────────────────────────
@@ -196,7 +201,7 @@ router.post("/ai-parse", async (req: Request, res: Response) => {
     });
   } catch (err: unknown) {
     clearTimeout(timeout);
-    req.off("close", onClose);
+    res.off("close", onClose);
     console.error("[AI parse] error:", (err as Error)?.message ?? err);
     const { httpStatus, message } = geminiErrorMessage(err);
     return res.status(httpStatus).json({ message });
@@ -222,8 +227,10 @@ router.post("/ai-stream", async (req: Request, res: Response) => {
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), AI_TIMEOUT_MS);
+  // Task #43 — `res.on("close")`, mai `req.on("close")` (vedi commento sopra
+  // in /ai-parse e .agents/memory/sse-abort-res-not-req.md).
   const onClose = () => { controller.abort(); clearTimeout(timeout); };
-  req.on("close", onClose);
+  res.on("close", onClose);
 
   try {
     let fullText = "";
@@ -248,7 +255,7 @@ router.post("/ai-stream", async (req: Request, res: Response) => {
     }
 
     clearTimeout(timeout);
-    req.off("close", onClose);
+    res.off("close", onClose);
 
     console.info(`[AI stream] provider usato: ${aiProvider ?? "unknown"}`);
     const parsed = tryParseRoute(fullText);
@@ -256,7 +263,7 @@ router.post("/ai-stream", async (req: Request, res: Response) => {
     res.end();
   } catch (err: unknown) {
     clearTimeout(timeout);
-    req.off("close", onClose);
+    res.off("close", onClose);
     console.error("[AI stream] error:", (err as Error)?.message ?? err);
     const { message } = geminiErrorMessage(err);
     res.write(`event: error\ndata: ${JSON.stringify({ message })}\n\n`);

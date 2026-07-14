@@ -23,14 +23,24 @@ buggy `req.on("close", abort)`:
 closes (real client disconnect, or stream end), so it never fires prematurely and
 is not missed. This is BikerBlog parity-contract point **E1**.
 
-**How to apply:** fixed in `server/routes/ai-assistant.ts` and
-`server/routes/admin/ai-console.ts`. Regression + Node-semantics proof in
-`server/__tests__/ai-assistant-abort-on-disconnect.test.ts`. The same
-`req.on("close")` pattern still lives in several NON-AI routes (chat/stream,
-auth/login, radio/playback, planned-routes/waypoints, admin/diagnostics-stream,
-admin/translations) — audit those before trusting their disconnect handling.
+**How to apply:** fixed in `server/routes/ai-assistant.ts`,
+`server/routes/admin/ai-console.ts`, and (Task #43 audit) `chat/stream.ts`,
+`auth/login.ts` (`/session-events`), `radio/playback.ts`, `planned-routes/waypoints.ts`
+(`/ai-parse` + `/ai-stream`), `admin/diagnostics-stream.ts`, `admin/translations.ts`
+(`/ai-complete`) — all now use `res.on("close")`. Regression + Node-semantics proof in
+`server/__tests__/ai-assistant-abort-on-disconnect.test.ts` and
+`server/__tests__/streaming-routes-abort-on-disconnect.test.ts`.
+
+**Important correction:** the bug is NOT limited to POST/JSON-body requests. The
+global `express.json()` middleware in `server/middleware.ts` runs on every
+request (GET included, minus a small POST-body-limit bypass list), and even a
+bodyless GET's `req` (IncomingMessage) still emits the one-shot "close" early
+during request processing — proven empirically with a GET SSE route in the
+regression test. Treat every `req.on("close"/"aborted")` used for
+abort/cleanup as suspect regardless of HTTP method; grep for the pattern
+project-wide, not just on POST streaming routes.
 
 **Verification tip:** don't reason from "the app works" — a dead abort listener is
 silent. Reproduce with a tiny express+http server: attach both `req`/`res` close
 listeners after `setImmediate` and assert which fires on a mid-stream client
-`destroy()`.
+`destroy()` — test both a POST and a bodyless GET route.

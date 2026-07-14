@@ -243,7 +243,9 @@ router.get("/session-events", (req: Request, res: Response) => {
     try { res.write(":heartbeat\n\n"); } catch { clearInterval(heartbeat); }
   }, 15000);
 
-  req.on("close", () => {
+  // Task #43 — `res.on("close")`, mai `req.on("close")`: vedi
+  // .agents/memory/sse-abort-res-not-req.md per il perché.
+  res.on("close", () => {
     clearInterval(heartbeat);
     removeSessionSseClient(userId, connId);
   });

@@ -96,7 +96,15 @@ router.get("/", (req: Request, res: Response) => {
     }, 60_000);
   }
 
-  req.on("close", () => {
+  // Task #43 — l'aggancio DEVE essere su `res.on("close")`, mai su
+  // `req.on("close")`: su Node 20 + express.json() la IncomingMessage emette
+  // "close" non appena il body (qui assente, ma il middleware globale gira
+  // comunque su ogni richiesta) viene consumato, PRIMA che questo handler
+  // arrivi qui — "close" è one-shot, quindi un listener agganciato dopo
+  // scatterebbe solo per un evento già perso in precedenza (mai per la vera
+  // disconnessione del client). `res` emette "close" solo alla chiusura reale
+  // della risposta. Vedi .agents/memory/sse-abort-res-not-req.md.
+  res.on("close", () => {
     clearInterval(heartbeat);
     if (sessionCheck !== undefined) clearInterval(sessionCheck);
     removeSseClient(userId, connId);

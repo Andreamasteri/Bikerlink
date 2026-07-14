@@ -219,8 +219,13 @@ router.post("/ai-complete", async (req: Request, res: Response) => {
 
     let aborted = false;
     const onAbort = () => { aborted = true; };
-    req.on("close", onAbort);
-    req.on("aborted", onAbort);
+    // Task #43 — `res.on("close")`, mai `req.on("close")`: su Node 20 +
+    // express.json() la IncomingMessage emette "close" (one-shot) non appena
+    // il body della POST è stato consumato dal middleware, ben prima che
+    // questo handler arrivi qui — un listener agganciato dopo non
+    // scatterebbe mai sulla vera disconnessione del client. Vedi
+    // .agents/memory/sse-abort-res-not-req.md.
+    res.on("close", onAbort);
 
     const sseWrite = (event: string, data: unknown) => {
       try { res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`); } catch { /* connessione chiusa */ }
