@@ -15,6 +15,9 @@ export const EXCLUDED_DIRS = new Set([
   "build",
   "coverage",
   ".turbo",
+  // Read-only reference clone of the sibling BikerBlog repo (scripts/refresh-bikerblog.sh).
+  // Gitignored, not part of this codebase, not subject to our line-count rules.
+  ".bikerblog-ref",
 ]);
 export const EXCLUDED_FILES = new Set([
   "scripts/check-large-files.ts",
