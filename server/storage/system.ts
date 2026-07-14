@@ -1,5 +1,5 @@
 import { eq, and, desc, gte, lte, sql } from "drizzle-orm";
-import { db } from "../db";
+import { db, withDbRetry } from "../db";
 import {
   notifications, invitationCodes, feedbackTickets, appSettings, phoneSharingTracker, workshopContacts,
   users,
@@ -87,7 +87,10 @@ export class SystemStorage extends AdsStorage {
   async getAppSetting(key: string): Promise<AppSetting | undefined> {
     const cached = _appSettingsCache.get(key);
     if (cached && cached.expiresAt > Date.now()) return cached.value;
-    const [setting] = await db.select().from(appSettings).where(eq(appSettings.key, key)).limit(1);
+    // withDbRetry assorbe un singolo blip transitorio del DB managed. Se il
+    // guasto è prolungato l'errore viene propagato e la cache NON viene scritta
+    // (nessun fallimento cachato come valore valido).
+    const [setting] = await withDbRetry(() => db.select().from(appSettings).where(eq(appSettings.key, key)).limit(1));
     _appSettingsCache.set(key, { value: setting, expiresAt: Date.now() + APP_SETTINGS_CACHE_TTL_MS });
     return setting;
   }
@@ -98,16 +101,16 @@ export class SystemStorage extends AdsStorage {
   }
 
   async upsertAppSetting(key: string, value?: string, valueJson?: unknown): Promise<AppSetting> {
-    const [setting] = await db.insert(appSettings)
+    const [setting] = await withDbRetry(() => db.insert(appSettings)
       .values({ key, value, valueJson, updatedAt: new Date() })
       .onConflictDoUpdate({ target: [appSettings.key], set: { value, valueJson, updatedAt: new Date() } })
-      .returning();
+      .returning());
     _appSettingsCache.delete(key);
     return setting;
   }
 
   async getAllAppSettings(): Promise<AppSetting[]> {
-    return db.select().from(appSettings);
+    return withDbRetry(() => db.select().from(appSettings));
   }
 
   /**
@@ -116,13 +119,15 @@ export class SystemStorage extends AdsStorage {
    * (nessuno stato parziale persistito).
    */
   async upsertAppSettingsAtomic(entries: { key: string; value?: string; valueJson?: unknown }[]): Promise<void> {
-    await db.transaction(async (tx) => {
+    // La transazione è atomica (all-or-nothing): ritentarla su un blip
+    // transitorio è sicuro, un fallimento persistente viene propagato.
+    await withDbRetry(() => db.transaction(async (tx) => {
       for (const e of entries) {
         await tx.insert(appSettings)
           .values({ key: e.key, value: e.value, valueJson: e.valueJson, updatedAt: new Date() })
           .onConflictDoUpdate({ target: [appSettings.key], set: { value: e.value, valueJson: e.valueJson, updatedAt: new Date() } });
       }
-    });
+    }));
     for (const e of entries) _appSettingsCache.delete(e.key);
   }
 
