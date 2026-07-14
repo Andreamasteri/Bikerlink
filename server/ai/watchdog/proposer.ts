@@ -137,7 +137,10 @@ export async function runProposer(snap: HealthSnapshot): Promise<ProposerResult 
   const mapsLlmEnabled = await isMapsFlagEnabled("llm");
   let hiSev = snap.problems
     .filter((p) => p.severity === "high" || p.severity === "critical")
-    .filter((p) => mapsLlmEnabled || p.source !== "maps");
+    .filter((p) => mapsLlmEnabled || p.source !== "maps")
+    // Task #23 — il namespace "horus" (correttezza routing) ha un proposer dedicato
+    // (Task #25). Escludilo qui per non generare proposte premature dal proposer generico.
+    .filter((p) => p.source !== "horus");
   if (hiSev.length === 0) return null;
 
   // Se il flag "ThinkCentre offline per test" è attivo, rimuovi i problemi ThinkCentre

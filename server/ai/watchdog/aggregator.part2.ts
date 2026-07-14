@@ -21,6 +21,7 @@ import { collectScheduler } from "./collectors/scheduler-collector";
 import { collectErrors } from "./collectors/error-collector";
 import { collectRestarts } from "./collectors/restart-collector";
 import { collectCrashSignals } from "./collectors/crash-signals-collector";
+import { collectRoutingCorrectness } from "./collectors/routing-correctness-collector";
 import { withBgDbSlot } from "../../lib/bg-db-limiter";
 import { isThinkCentreOffline } from "../../lib/thinkcentre-offline";
 import { setHealthState } from "../../lib/health-arbiter";
@@ -49,6 +50,9 @@ export async function runAggregatorCycle(): Promise<HealthSnapshot> {
   const collectors = await Promise.allSettled([
     collectBullMq(), collectDb(), collectDragonfly(), collectLatency(),
     Promise.resolve(collectPool()), collectMaps(),
+    // Routing-correctness (namespace "horus"): sonde di rete lente come collectMaps,
+    // quindi FUORI da withBgDbSlot (le sue eventuali query DB sono già cachate/interne).
+    collectRoutingCorrectness(),
     withBgDbSlot(() => collectScheduler()),
     withBgDbSlot(() => collectErrors()),
     withBgDbSlot(() => collectDbIntegritySignals()),

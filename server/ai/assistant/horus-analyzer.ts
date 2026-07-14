@@ -34,6 +34,7 @@ import { redactPII } from "../moderation/redact";
 import { matchesSensitive } from "./security-filter";
 import { getLatestRunSummary, listOpenViolations } from "../db-integrity/runner";
 import { getLatestSnapshot } from "../watchdog/aggregator.part2";
+import { isRoutingAiBusy } from "../ai-priority-gate";
 import type { KnowledgeEntry } from "./knowledge";
 
 // ── Parametri di robustezza ──────────────────────────────────────────────────
@@ -54,6 +55,7 @@ let cycleTimer: NodeJS.Timeout | null = null;
 let totalCycles = 0;
 let totalRuns = 0;
 let totalSkippedLoad = 0;
+let totalSkippedRoutingBusy = 0;
 let totalSkippedFingerprint = 0;
 let lastError: { at: string; message: string } | null = null;
 let lastFingerprint: string | null = null;
@@ -219,6 +221,14 @@ async function runCycle(trigger: "schedule" | "manual" = "schedule"): Promise<{ 
       totalSkippedLoad++;
       return { ran: false, reason: `carico troppo alto (${online} utenti online)` };
     }
+    // Task #23 — priorità al routing: se una chiamata AI reale per la generazione
+    // di percorsi è in volo, il ciclo diagnostico di background CEDE il turno
+    // (stesso Ollama self-hosted, scheduler pass-through). Non cambia la cadenza:
+    // riproveremo al tick successivo. Il trigger manuale ("analizza ora") non cede.
+    if (isRoutingAiBusy()) {
+      totalSkippedRoutingBusy++;
+      return { ran: false, reason: "AI di routing prioritaria in corso — ciclo ceduto" };
+    }
   }
 
   if (!isOllamaConfigured) return { ran: false, reason: "Ollama non configurato" };
@@ -294,6 +304,7 @@ export function getHorusAnalysisStats() {
     totalCycles,
     totalRuns,
     totalSkippedLoad,
+    totalSkippedRoutingBusy,
     totalSkippedFingerprint,
     lastRunAt: lastRunAt > 0 ? new Date(lastRunAt).toISOString() : null,
     lastError,

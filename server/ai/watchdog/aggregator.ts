@@ -351,6 +351,19 @@ export function deriveProblems(signals: Signal[]): Problem[] {
       suggestion = s.severity === "high"
         ? `Alto volume di "${label}" rilevato. Verifica i crash log e filtra per questo tipo nel pannello diagnostici.`
         : `Frequenza anomala di "${label}" rilevata. Monitora la tendenza nei crash log.`;
+    } else if (s.metric === "routing.graphhopper.correct" || s.metric === "routing.valhalla.correct") {
+      const engine = s.metric.split(".")[1];
+      const reason = (s.details as { reason?: string } | undefined)?.reason ?? "risultato non plausibile";
+      title = `Routing ${engine}: correttezza KO — ${reason}`;
+      suggestion = `${engine} risponde ma restituisce un percorso non plausibile o errore silenzioso. Verifica il grafo/i tile di ${engine} e la sua salute sul ThinkCentre.`;
+    } else if (s.metric === "geocoding.photon.correct") {
+      const reason = (s.details as { reason?: string } | undefined)?.reason ?? "risultato non plausibile";
+      title = `Geocoding Photon: correttezza KO — ${reason}`;
+      suggestion = "Photon risponde ma il geocoding è vuoto/errato. Verifica l'indice Photon e la connettività sul ThinkCentre.";
+    } else if (s.metric === "pipeline.correct") {
+      const reason = (s.details as { reason?: string } | undefined)?.reason ?? "pipeline non corretta";
+      title = `Pipeline routing: ${reason}`;
+      suggestion = "Verifica il fallback Valhalla→GraphHopper e lo stato dei motori self-hosted.";
     }
     problems.push({
       id, severity: s.severity, source: s.source, title, suggestion,
@@ -388,6 +401,12 @@ const OUTAGE_DOWNSTREAM_IDS = new Set<string>([
   "db.db.bg_limiter.dropped",
   "maps.health.network_instability",
   "db.db.ping_ms",
+  // Task #23 — sonde di correttezza routing self-hosted (namespace Horus): con il
+  // ThinkCentre spento i motori risultano scorretti/irraggiungibili → downstream.
+  "horus.routing.graphhopper.correct",
+  "horus.routing.valhalla.correct",
+  "horus.geocoding.photon.correct",
+  "horus.pipeline.correct",
 ]);
 
 function isOutageDownstreamProblem(id: string): boolean {

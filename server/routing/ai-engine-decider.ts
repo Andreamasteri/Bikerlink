@@ -11,6 +11,7 @@ import { z } from "zod";
 import { generateObject } from "ai";
 import { runWithFallback, generateStructured } from "../ai/moderation/provider";
 import { getRoutingCounters, getRecentLatencies, getBboxEngineQuality, bboxKeyOf, type BboxEngineQuality } from "./routing-metrics";
+import { withRoutingAiPriority } from "../ai/ai-priority-gate";
 
 // Engine candidati per la selezione AI: solo i due self-hosted. Gli engine cloud
 // (mapbox/tomtom) restano fuori dalla scelta automatica.
@@ -130,6 +131,9 @@ export async function decideEngineWithAI(
   timeoutMs = 800,
   ollamaTimeoutMs = 400,
 ): Promise<AiEngineDecision | null> {
+  // Task #23 — marca l'intera chiamata come AI di routing PRIORITARIA: mentre è in
+  // volo (più la finestra di grazia), il ciclo diagnostico di Horus cede il turno.
+  return withRoutingAiPriority(async () => {
   const startTs = Date.now();
   // Abort globale: si attiva allo scadere del budget totale. Usato dalla cloud chain.
   const globalController = new AbortController();
@@ -208,4 +212,5 @@ export async function decideEngineWithAI(
     console.warn("[ai-engine-decider] decisione AI fallita:", (err as Error)?.message ?? err);
     return null;
   }
+  });
 }
