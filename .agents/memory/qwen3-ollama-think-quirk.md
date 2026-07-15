@@ -39,3 +39,18 @@ Horus's consult; 1600 worked reliably).
    "reason into a side channel we can ignore." Verified live 2026-07-15:
    think:true → content=127 clean chars, thinking=4232 chars separate.
    Scoped to Horus in agent.ts; Bowie's streaming stays on think:false.
+
+**Worse case confirmed live (2026-07-15, Horus full-scan verification):** for
+longer, more "thoughtful" prompts (Horus's manual-section synthesis), qwen3:4b
+reasons in English with **no `<think>`/`</think>` tags at all** — not even the
+orphan closing tag. A tag-based stripper can't help here; the raw reasoning
+preamble ("Okay, l'utente chiede...") lands directly in the delivered content.
+**Fix that works:** don't fight brevity (the user explicitly wants full-depth
+reasoning, no rush) — instead give the model an explicit **contract** via
+`options.system`: "wrap ALL reasoning in `<think>...</think>`, write ONLY the
+final answer after the closing tag" + a generous `numPredict` so the reasoning
+has room to finish. Verified: the model still omits the *opening* tag but
+reliably emits the *closing* one, which the existing orphan-aware stripThink
+handles — output was clean, coherent, non-hallucinated. Applied in
+`server/ai/assistant/horus-scanner.ts` / `horus-scanner-finalize.ts` via the
+shared `HORUS_THINK_TAG_CONTRACT` constant in `codebase-inventory.ts`.

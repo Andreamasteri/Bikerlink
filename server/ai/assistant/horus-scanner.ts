@@ -25,6 +25,7 @@ import {
   computePending,
   readAndHashFile,
   saveFileScanStore,
+  HORUS_THINK_TAG_CONTRACT,
 } from "./codebase-inventory";
 import { finalizeAnalysisScan, finalizeManualScan } from "./horus-scanner-finalize";
 
@@ -33,7 +34,18 @@ const TICK_DELAY_MS = 1500;
 const ROUTING_BUSY_RETRY_MS = 8000;
 const MAX_FILE_CHARS = 6000;
 const NOTE_MAX = 800;
-const NOTE_NUM_PREDICT = 320;
+// Verificato live: con un tetto stretto il ragionamento di qwen3:4b (senza tag,
+// vedi HORUS_THINK_TAG_CONTRACT) consuma tutto lo spazio e la nota vera non viene
+// mai scritta. Budget generoso: nessuna fretta, la nota per-file può richiedere
+// più tempo — la scansione è un job in background, non un flusso interattivo.
+const NOTE_NUM_PREDICT = 2400;
+
+// `persona: "horus"` in callOllamaChat sceglie SOLO l'endpoint (URL/token), NON il
+// modello: senza `model` esplicito la chiamata ricade su BOWIE_OLLAMA_MODEL (il
+// modello di Bowie, più piccolo). Le scansioni devono girare sul modello di Horus
+// (qwen3:4b) come tutti gli altri consult persona-specifici (inter-agent, group,
+// proposer). Vedi memory: inter-agent-consult-model-mismatch.
+const HORUS_MODEL_ID = process.env.HORUS_OLLAMA_MODEL?.trim() || "qwen3:4b";
 
 export type ScanStatus = "idle" | "running" | "completed" | "interrupted" | "error";
 
@@ -225,6 +237,8 @@ async function processFile(mode: ScanMode, rel: string): Promise<"ok" | "interru
   try {
     const raw = await callOllamaChat(prompt, undefined, {
       persona: "horus",
+      model: HORUS_MODEL_ID,
+      system: HORUS_THINK_TAG_CONTRACT,
       temperature: mode === "analysis" ? 0.2 : 0.3,
       numPredict: NOTE_NUM_PREDICT,
     });

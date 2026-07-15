@@ -19,13 +19,13 @@ import { createHash } from "node:crypto";
 import { db } from "../../db";
 import { aiAnalysisRuns, aiAnalysisArtifacts } from "@shared/db";
 import { withBgDbSlot } from "../../lib/bg-db-limiter";
-import { callOllamaChat, getOllamaModelId } from "../../lib/ollama-client";
+import { callOllamaChat } from "../../lib/ollama-client";
 import { redactPII } from "../moderation/redact";
 import { matchesSensitive } from "./security-filter";
 import { getLatestRunSummary, listOpenViolations } from "../db-integrity/runner";
 import { saveNadirManualWithBackup } from "../nadir/manual";
 import { reindexNadir } from "../nadir/reindex";
-import type { FileScanStore } from "./codebase-inventory";
+import { type FileScanStore, HORUS_THINK_TAG_CONTRACT } from "./codebase-inventory";
 
 const MIRROR_DIR = path.join(process.cwd(), "logs");
 const MIN_ARTIFACT_LEN = 30;
@@ -34,8 +34,18 @@ const ARTIFACT_TTL_DAYS = 30;
 const MAX_VIOLATIONS = 20;
 const SYNTHESIS_GROUP_CHARS = 8000;
 const SECTION_MAX_NOTES_CHARS = 8000;
-const SYNTHESIS_NUM_PREDICT = 800;
-const SECTION_NUM_PREDICT = 700;
+// Verificato live: con un tetto stretto il ragionamento di qwen3:4b (senza tag,
+// vedi HORUS_THINK_TAG_CONTRACT) consuma tutto lo spazio e la sintesi/sezione vera
+// non viene mai scritta per intero. Budget generoso: la finalizzazione gira poche
+// volte per scansione (non per-file), nessuna fretta.
+const SYNTHESIS_NUM_PREDICT = 4000;
+const SECTION_NUM_PREDICT = 4000;
+
+// `persona: "horus"` sceglie SOLO l'endpoint, NON il modello: senza `model`
+// esplicito la sintesi ricadrebbe su BOWIE_OLLAMA_MODEL. Le proposte e il manuale
+// devono essere prodotti dal modello di Horus (qwen3:4b), come gli altri consult
+// persona-specifici. Vedi memory: inter-agent-consult-model-mismatch.
+const HORUS_MODEL_ID = process.env.HORUS_OLLAMA_MODEL?.trim() || "qwen3:4b";
 
 // ── Helper condivisi ─────────────────────────────────────────────────────────
 
@@ -121,6 +131,8 @@ ${renderFindings(group)}
 PROPOSTE:`;
   const raw = await callOllamaChat(prompt, undefined, {
     persona: "horus",
+    model: HORUS_MODEL_ID,
+    system: HORUS_THINK_TAG_CONTRACT,
     temperature: 0.2,
     numPredict: SYNTHESIS_NUM_PREDICT,
   });
@@ -144,6 +156,8 @@ ${partials.join("\n\n---\n\n")}
 PROPOSTE FINALI:`;
   const raw = await callOllamaChat(prompt, undefined, {
     persona: "horus",
+    model: HORUS_MODEL_ID,
+    system: HORUS_THINK_TAG_CONTRACT,
     temperature: 0.2,
     numPredict: SYNTHESIS_NUM_PREDICT,
   });
@@ -172,7 +186,9 @@ async function persistAnalysisRun(
   findingsCount: number,
 ): Promise<void> {
   const expiresAt = new Date(Date.now() + ARTIFACT_TTL_DAYS * 24 * 60 * 60_000);
-  const modelId = getOllamaModelId("horus");
+  // getOllamaModelId ignora la persona e ritorna sempre BOWIE_OLLAMA_MODEL: qui
+  // registriamo il modello REALE che ha prodotto le proposte (Horus/qwen3:4b).
+  const modelId = HORUS_MODEL_ID;
   await withBgDbSlot(async () => {
     const [run] = await db
       .insert(aiAnalysisRuns)
@@ -306,6 +322,8 @@ ${notesText}
 SEZIONE:`;
   const raw = await callOllamaChat(prompt, undefined, {
     persona: "horus",
+    model: HORUS_MODEL_ID,
+    system: HORUS_THINK_TAG_CONTRACT,
     temperature: 0.3,
     numPredict: SECTION_NUM_PREDICT,
   });

@@ -21,6 +21,28 @@ import { storage } from "../../storage";
 /** Le due modalità di scansione condividono l'inventario ma NON lo store. */
 export type ScanMode = "analysis" | "manual";
 
+/**
+ * Contratto di system prompt condiviso da tutte le chiamate Ollama delle scansioni
+ * di Horus (nota per-file, sintesi proposte, sezioni di manuale).
+ *
+ * Verificato live (2026-07-15) su qwen3:4b/Ollama: `think:false` E `/no_think` NON
+ * sopprimono il ragionamento — il modello "pensa ad alta voce" in inglese, spesso
+ * SENZA alcun tag `<think>`, e con un budget di token insufficiente il ragionamento
+ * consuma tutto lo spazio disponibile senza mai arrivare alla risposta vera
+ * (troncamento a metà pensiero, non un output incompleto per scelta).
+ *
+ * Horus non è una chat: il suo output finisce in un file/proposta che un altro
+ * agente interpreta, quindi vale la precisione sopra la rapidità — nessuna fretta,
+ * nessun limite al ragionamento. La leva giusta non è "rispondi breve" ma dare un
+ * contratto esplicito (racchiudi il pensiero, quanto ti serve, tra <think></think>)
+ * + un budget di token generoso perché il ragionamento possa esaurirsi E la
+ * risposta finale possa essere scritta per intero dopo il tag di chiusura.
+ */
+export const HORUS_THINK_TAG_CONTRACT = `Sei Horus. Puoi ragionare quanto ti serve, con tutta la profondità e il tempo necessari: nessuna fretta, nessun limite al pensiero — la precisione conta più della rapidità.
+Però racchiudi SEMPRE ed ESCLUSIVAMENTE il tuo ragionamento tra i tag <think> e </think>.
+Dopo il tag </think> di chiusura scrivi SOLO il risultato finale richiesto, senza ripetere né riassumere il ragionamento e senza premesse tipo "Okay", "Let me", "The user wants".
+Se non hai bisogno di ragionare, va bene anche <think></think> vuoto seguito subito dal risultato finale.`;
+
 const ROOT = process.cwd();
 
 // Radici di codice sorgente da leggere: backend (server), codice condiviso
