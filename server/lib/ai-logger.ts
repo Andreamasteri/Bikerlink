@@ -24,6 +24,10 @@ export interface LogAiCallOpts {
   sourceApp?: string | null;
   /** Task #5228 — esito consegna push per le righe notification-reply ("delivered" | "failed"). */
   notificationStatus?: string | null;
+  /** Task #51 — superficie della chiamata ("direct" chat 1:1 | "group" tavola rotonda). */
+  surface?: string | null;
+  /** Task #51 — id della conversazione di gruppo quando surface="group". */
+  groupConversationId?: string | null;
   error?: string | null;
 }
 
@@ -45,6 +49,8 @@ export function logAiCall(opts: LogAiCallOpts): void {
     persona: opts.persona ?? null,
     sourceApp: opts.sourceApp ?? null,
     notificationStatus: opts.notificationStatus ?? null,
+    surface: opts.surface ?? null,
+    groupConversationId: opts.groupConversationId ?? null,
     error: opts.error ?? null,
   }).catch((err) => {
     console.warn("[ai-logger] inserimento fallito (ignorato):", (err as Error).message);

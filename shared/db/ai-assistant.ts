@@ -29,6 +29,15 @@ export const aiCallLogs = pgTable("ai_call_logs", {
   persona: varchar("persona", { length: 16 }),
   sourceApp: varchar("source_app", { length: 32 }),
   notificationStatus: varchar("notification_status", { length: 16 }),
+  // Task #51 — "Superficie" della chiamata AI: distingue la chat diretta con una
+  // singola persona ("direct", default per le righe legacy/omesse) dai turni di
+  // una conversazione di gruppo osservabile ("group"). Permette al monitoraggio
+  // admin (ai/metrics) di separare i due flussi.
+  //   surface             → "direct" | "group" (NULL = legacy, trattato come direct).
+  //   groupConversationId → riferimento alla conversazione di gruppo quando
+  //                         surface="group"; NULL per la chat diretta.
+  surface: varchar("surface", { length: 16 }),
+  groupConversationId: uuid("group_conversation_id"),
   error: text("error"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (t) => [
@@ -38,6 +47,7 @@ export const aiCallLogs = pgTable("ai_call_logs", {
   index("ai_call_logs_degraded_idx").on(t.degraded).where(sql`degraded = true`),
   index("ai_call_logs_security_blocked_idx").on(t.securityBlocked).where(sql`security_blocked = true`),
   index("ai_call_logs_source_app_idx").on(t.sourceApp),
+  index("ai_call_logs_surface_idx").on(t.surface),
 ]);
 
 export type AiCallLog = typeof aiCallLogs.$inferSelect;
@@ -344,3 +354,64 @@ export const aiToolEvents = pgTable("ai_tool_events", {
 
 export type AiToolEvent = typeof aiToolEvents.$inferSelect;
 export type InsertAiToolEvent = typeof aiToolEvents.$inferInsert;
+
+// ── Task #51 — Conversazione osservabile a più agenti (Horus/Bowie/Quebracho) ─
+//
+// A differenza della chat diretta (UNA persona attiva per turno, con handoff che
+// SOSTITUISCE), qui l'admin propone un ARGOMENTO e 2-3 agenti (bowie/horus/
+// quebracho — Ares è escluso: resta l'analisi asincrona) discutono a TURNI, in
+// diretta, mentre l'admin osserva. Il transcript è persistito così che, se la
+// connessione cade a metà, riaprendo la stessa conversazione si vedono i turni
+// già avvenuti e la si può far ripartire dall'ultimo turno completato.
+//
+//   participants → sottoinsieme del roster in ordine di turno (a rotazione:
+//                  persona del turno = participants[turnIndex % participants.length]).
+//   maxTurns     → default 6, cap 20; la conversazione si conclude da sola al
+//                  raggiungimento, o quando l'admin la interrompe.
+//   status       → "running" (in corso o interrotta a metà = riprendibile) |
+//                  "completed" (raggiunti maxTurns) | "aborted" (stop admin).
+//   turnCount    → numero di turni COMPLETATI e persistiti (source of truth per
+//                  la ripresa: si riparte da turnIndex = turnCount).
+export const aiGroupConversations = pgTable("ai_group_conversations", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  topic: text("topic").notNull(),
+  participants: jsonb("participants").$type<string[]>().notNull().default([]),
+  maxTurns: integer("max_turns").notNull().default(6),
+  turnCount: integer("turn_count").notNull().default(0),
+  status: varchar("status", { length: 16 }).notNull().default("running"),
+  // Admin che ha avviato la conversazione (audit). set null se l'utente è rimosso.
+  createdBy: varchar("created_by", { length: 36 })
+    .references(() => users.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  endedAt: timestamp("ended_at"),
+}, (t) => [
+  index("ai_group_conversations_created_at_idx").on(t.createdAt.desc()),
+  index("ai_group_conversations_status_idx").on(t.status, t.createdAt.desc()),
+]);
+
+export type AiGroupConversation = typeof aiGroupConversations.$inferSelect;
+export type InsertAiGroupConversation = typeof aiGroupConversations.$inferInsert;
+
+// Un turno completato della conversazione di gruppo. Persistito NON appena il
+// turno finisce (streaming a parte): la coppia (conversationId, turnIndex) è
+// UNIQUE — la ripresa non può duplicare un turno già scritto.
+export const aiGroupConversationTurns = pgTable("ai_group_conversation_turns", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  conversationId: uuid("conversation_id")
+    .notNull()
+    .references(() => aiGroupConversations.id, { onDelete: "cascade" }),
+  turnIndex: integer("turn_index").notNull(),
+  persona: varchar("persona", { length: 16 }).notNull(),
+  content: text("content").notNull(),
+  // Provider/modello che ha generato il turno (audit; mai un secret).
+  provider: varchar("provider", { length: 40 }),
+  modelId: varchar("model_id", { length: 100 }),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (t) => [
+  uniqueIndex("ai_group_conversation_turns_conv_turn_key").on(t.conversationId, t.turnIndex),
+  index("ai_group_conversation_turns_conv_idx").on(t.conversationId, t.turnIndex),
+]);
+
+export type AiGroupConversationTurn = typeof aiGroupConversationTurns.$inferSelect;
+export type InsertAiGroupConversationTurn = typeof aiGroupConversationTurns.$inferInsert;

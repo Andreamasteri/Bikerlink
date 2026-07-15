@@ -45,11 +45,19 @@ interface ToolEvent {
   lastOccurredAt: string;
 }
 
+// Task #51 — Ripartizione chiamate per superficie (chat diretta vs gruppo).
+interface SurfaceData {
+  surface: string;
+  calls: number;
+  costUsd: number;
+}
+
 interface MetricsResponse {
   range: string;
   summary: Summary;
   perProvider: ProviderData[];
   recentIssues: RecentIssue[];
+  bySurface: SurfaceData[];
   toolEvents: ToolEvent[];
 }
 
@@ -151,6 +159,23 @@ export default function AiMetricsCard() {
               <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>Per provider</Text>
               {data.perProvider.map((p) => (
                 <ProviderRow key={p.provider} row={p} colors={colors} />
+              ))}
+            </>
+          )}
+
+          {/* Task #51 — Per superficie (chat diretta 1:1 vs conversazione di gruppo) */}
+          {data.bySurface.length > 0 && (
+            <>
+              <View style={[styles.divider, { backgroundColor: colors.border }]} />
+              <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>Per superficie</Text>
+              {data.bySurface.map((s) => (
+                <View key={s.surface} style={styles.provRow}>
+                  <Text style={[styles.provName, { color: colors.text }]}>
+                    {s.surface === "group" ? "Gruppo (tavola rotonda)" : "Chat diretta"}
+                  </Text>
+                  <Text style={[styles.provStat, { color: colors.textSecondary }]}>{s.calls} calls</Text>
+                  <Text style={[styles.provStat, { color: colors.textSecondary }]}>${s.costUsd.toFixed(4)}</Text>
+                </View>
               ))}
             </>
           )}

@@ -36,7 +36,7 @@ router.get("/metrics", async (req: Request, res: Response) => {
     const range = ["24h", "7d", "30d"].includes(rawRange) ? rawRange : "7d";
     const since = new Date(Date.now() - rangeMs(range));
 
-    const [perProvider, totalsRow, latencies, recentIssues, toolEvents] = await Promise.all([
+    const [perProvider, totalsRow, latencies, recentIssues, bySurface, toolEvents] = await Promise.all([
       db.select({
           provider: aiCallLogs.provider,
           calls: sql<number>`count(*)::int`,
@@ -82,6 +82,7 @@ router.get("/metrics", async (req: Request, res: Response) => {
           costUsd: aiCallLogs.costUsd,
           degraded: aiCallLogs.degraded,
           error: aiCallLogs.error,
+          surface: aiCallLogs.surface,
           createdAt: aiCallLogs.createdAt,
         })
         .from(aiCallLogs)
@@ -91,6 +92,18 @@ router.get("/metrics", async (req: Request, res: Response) => {
         ))
         .orderBy(desc(aiCallLogs.createdAt))
         .limit(20),
+
+      // Task #51 — Ripartizione per "superficie": chat diretta 1:1 vs turni di
+      // una conversazione di gruppo osservabile. surface NULL = legacy → "direct".
+      db.select({
+          surface: sql<string>`coalesce(surface, 'direct')`,
+          calls: sql<number>`count(*)::int`,
+          costUsd: sql<number>`coalesce(sum(cost_usd),0)::float`,
+        })
+        .from(aiCallLogs)
+        .where(gte(aiCallLogs.createdAt, since))
+        .groupBy(sql`coalesce(surface, 'direct')`)
+        .orderBy(sql`count(*) desc`),
 
       // Task #41 — Contatori timeout/troncamenti tool (server/ai/assistant/tools.ts
       // guardTool). Tabella piccola (una riga per tool+roster+tipo evento):
@@ -158,7 +171,14 @@ router.get("/metrics", async (req: Request, res: Response) => {
         costUsd: Number((r.costUsd ?? 0).toFixed(6)),
         degraded: r.degraded,
         error: r.error,
+        surface: r.surface ?? "direct",
         createdAt: r.createdAt?.toISOString(),
+      })),
+      // Task #51 — chiamate per superficie (direct vs group) nel range.
+      bySurface: bySurface.map((r) => ({
+        surface: r.surface,
+        calls: r.calls,
+        costUsd: Number((r.costUsd ?? 0).toFixed(6)),
       })),
       // Task #41 — visibilità admin sui timeout/troncamenti dei tool AI.
       toolEvents: toolEvents.map((r) => ({

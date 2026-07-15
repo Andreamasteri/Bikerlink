@@ -369,6 +369,8 @@ import aiRouteProvidersRouter from './admin/ai/route-providers';
 // Task #3017 — Metriche chiamate AI (provider usage, latenza, token, costo, degraded, repair).
 import aiMetricsRouter from './admin/ai/metrics';
 import bowieStandaloneRouter from './admin/bowie-standalone';
+// Task #51 — Conversazione osservabile a più agenti (Horus/Bowie/Quebracho).
+import aiGroupChatRouter from './admin/ai-group-chat';
 // Salute unificata servizi self-hosted ThinkCentre (GraphHopper/Ollama/Whisper/Photon).
 import thinkcentreHealthRouter from './admin/thinkcentre-health';
 // Metriche hardware ThinkCentre (CPU/RAM/uptime via agente Node.js sul mini-PC).
@@ -487,6 +489,7 @@ router.use('/ai', _requireAdmin, aiTestOllamaRouter);
 router.use('/ai', _requireAdmin, aiRouteProvidersRouter);
 router.use('/ai', _requireAdmin, aiMetricsRouter);
 router.use('/bowie-standalone', _requireAdmin, bowieStandaloneRouter);
+router.use('/ai', _requireAdmin, aiGroupChatRouter);
 router.use('/', _requireAdmin, thinkcentreHealthRouter);
 router.use('/', _requireAdmin, thinkcentreMetricsRouter);
 router.use('/', _requireAdmin, systemProbeRouter);

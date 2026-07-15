@@ -98,6 +98,7 @@ const ADMIN_OPTS: Record<string, { title: string } | { headerShown: false }> = {
   "metro-crashes": { title: "Crash Metro" },
   "ai-assistant": { title: "Bowie" },
   "bowie-standalone": { title: "Bowie · Standalone" },
+  "ai-group-chat": { title: "Tavola Rotonda AI" },
   "match-explain": { title: "Explain Matching" },
   "ai-assistant-config": { title: "Bowie Config" },
   "background-location": { title: "Posizione Background" },
@@ -184,6 +185,7 @@ export default function AdminLayout() {
         <Stack.Screen name="metro-crashes" options={ADMIN_OPTS["metro-crashes"]} />
         <Stack.Screen name="ai-assistant" options={ADMIN_OPTS["ai-assistant"]} />
         <Stack.Screen name="bowie-standalone" options={ADMIN_OPTS["bowie-standalone"]} />
+        <Stack.Screen name="ai-group-chat" options={ADMIN_OPTS["ai-group-chat"]} />
         <Stack.Screen name="match-explain" options={ADMIN_OPTS["match-explain"]} />
         <Stack.Screen name="ai-assistant-config" options={ADMIN_OPTS["ai-assistant-config"]} />
         <Stack.Screen name="background-location" options={ADMIN_OPTS["background-location"]} />

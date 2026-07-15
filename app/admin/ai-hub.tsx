@@ -168,6 +168,14 @@ export default function AiHubScreen() {
       route: "/admin/ai-monitor",
       color: "#0EA5E9",
     },
+    {
+      key: "ai-group-chat",
+      label: "Tavola Rotonda AI",
+      subtitle: "Bowie · Horus · Quebracho a confronto",
+      icon: "forum-outline",
+      route: "/admin/ai-group-chat",
+      color: "#14B8A6",
+    },
   ];
 
   return (
