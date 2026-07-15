@@ -37,6 +37,13 @@ vi.mock("../routing/routing-area-state", () => ({
   getAreaEnabledMap: stateMocks.getAreaEnabledMap,
 }));
 
+// cfAccessHeaders() reads real CF_ACCESS_CLIENT_ID/SECRET secrets from the
+// environment; mocked to a deterministic empty object so these tests don't
+// depend on (or ever print) real secret values.
+vi.mock("../lib/cf-access", () => ({
+  cfAccessHeaders: () => ({}),
+}));
+
 import { areaEngineTargets } from "../ai/watchdog/maps-health-checks";
 import {
   ROUTING_AREAS,

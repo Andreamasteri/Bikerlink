@@ -6,9 +6,15 @@
  *
  * Modalità (persistite in `app_settings`, chiave `routing_area_mode`):
  *   - "disabled" → comportamento STORICO: una sola istanza GraphHopper globale,
- *                  nessuna selezione per area. È il DEFAULT (impatto zero).
+ *                  nessuna selezione per area. Il ThinkCentre è però migrato in
+ *                  pianta stabile al multi-area (root `/info`/`/route` risponde
+ *                  404 in modo permanente): questa modalità NON funziona più.
  *   - "tester"   → attivo solo per gli utenti map-tester (rollout graduale).
- *   - "enabled"  → attivo per tutti.
+ *   - "enabled"  → attivo per tutti. È il DEFAULT: se la chiave non è ancora
+ *                  stata scritta in `app_settings` (es. su un DB appena
+ *                  ripristinato/prod non ancora migrato), o se la lettura DB
+ *                  fallisce, ricadere su "disabled" instraderebbe silenziosamente
+ *                  verso l'istanza legacy morta → outage di routing (Task #52).
  *
  * Il valore DB è cache-ato in memoria per evitare una query ad ogni richiesta di
  * routing; `setRoutingAreaMode` aggiorna sia il DB sia la cache.
@@ -33,10 +39,13 @@ function isValidMode(v: unknown): v is RoutingAreaMode {
 async function readDbMode(): Promise<RoutingAreaMode> {
   try {
     const s = await storage.getAppSetting(DB_KEY);
-    return isValidMode(s?.value) ? s!.value as RoutingAreaMode : "disabled";
+    // Task #52: chiave assente (default) → "enabled", non "disabled" — la
+    // modalità legacy è morta in modo permanente sul ThinkCentre.
+    return isValidMode(s?.value) ? s!.value as RoutingAreaMode : "enabled";
   } catch (err) {
     console.error("[routing-area-mode] lettura DB fallita:", err);
-    return "disabled";
+    // Fail-safe verso il percorso VIVO (multi-area), non verso quello morto.
+    return "enabled";
   }
 }
 

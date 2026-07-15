@@ -23,7 +23,7 @@
  *   - Senza base self-hosted non possiamo indirizzare l'istanza → "area_not_enabled".
  */
 
-import { sql } from "drizzle-orm";
+import { sql, type SQL } from "drizzle-orm";
 import {
   ROUTING_AREAS,
   routingAreaUrl,
@@ -44,6 +44,23 @@ export type RoutingAreaResolution =
  * bbox (envelope) contiene il punto, in ordine di registro (ROUTING_AREAS = dal
  * più stretto). Una sola query per tutti i waypoint.
  */
+/**
+ * Costruisce un letterale Postgres `ARRAY[$1, $2, ...]::<sqlType>` a partire da
+ * un array JS. NECESSARIO invece di interpolare l'array direttamente nel
+ * template `sql`: drizzle-orm spande un array interpolato in una lista di
+ * placeholder tra parentesi tonde (es. `($1, $2)`), che Postgres legge come un
+ * ROW CONSTRUCTOR — il cast `(record)::float8[]` fallisce con
+ * "cannot cast type record to double precision[]" (42846) non appena l'array
+ * ha più di un elemento. `ARRAY[$1, $2, ...]` è l'unica forma che Postgres
+ * accetta come vero array letterale con placeholder parametrizzati.
+ */
+function sqlFloatArray(values: number[]): SQL {
+  return sql`ARRAY[${sql.join(values.map((v) => sql`${v}`), sql`, `)}]::float8[]`;
+}
+function sqlTextArray(values: string[]): SQL {
+  return sql`ARRAY[${sql.join(values.map((v) => sql`${v}`), sql`, `)}]::text[]`;
+}
+
 async function candidateCodesPerPoint(
   points: [number, number][],
 ): Promise<RoutingAreaCode[][]> {
@@ -57,13 +74,13 @@ async function candidateCodesPerPoint(
 
   const result = await db.execute<{ point_index: number; code: string }>(sql`
     SELECT p.idx::int AS point_index, a.code AS code
-    FROM unnest(${lons}::float8[], ${lats}::float8[]) WITH ORDINALITY AS p(lon, lat, idx)
+    FROM unnest(${sqlFloatArray(lons)}, ${sqlFloatArray(lats)}) WITH ORDINALITY AS p(lon, lat, idx)
     CROSS JOIN unnest(
-      ${codes}::text[],
-      ${minLons}::float8[],
-      ${minLats}::float8[],
-      ${maxLons}::float8[],
-      ${maxLats}::float8[]
+      ${sqlTextArray(codes)},
+      ${sqlFloatArray(minLons)},
+      ${sqlFloatArray(minLats)},
+      ${sqlFloatArray(maxLons)},
+      ${sqlFloatArray(maxLats)}
     ) WITH ORDINALITY AS a(code, min_lon, min_lat, max_lon, max_lat, ord)
     WHERE ST_Contains(
       ST_MakeEnvelope(a.min_lon, a.min_lat, a.max_lon, a.max_lat, 4326),
