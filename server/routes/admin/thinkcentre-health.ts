@@ -43,6 +43,7 @@ import {
   type ErrorEvent,
 } from "./thinkcentre-health-gh-probes";
 import { probeAres, type AresHealth } from "./thinkcentre-health-ares-probe";
+import { probeRepoDrift, type RepoDriftHealth } from "./thinkcentre-health-repodrift-probe";
 import { sendError } from "../../lib/api-response";
 
 import { updateThinkCentreSystemStatus, probeThinkCentreStatusSnapshot } from "./thinkcentre-health.part2";
@@ -57,6 +58,7 @@ export type {
   PhotonDetailedHealth,
   UfwDetailedHealth,
   AresHealth,
+  RepoDriftHealth,
 };
 
 export { probeThinkCentreStatusSnapshot };
@@ -240,6 +242,7 @@ router.get("/thinkcentre-health", async (_req: Request, res: ExpressResponse) =>
       nginxInfra,
       uptimeKumaInfra,
       aresDetail,
+      repoDrift,
     ] = await Promise.all([
       isThinkCentreInMaintenance(),
       probeGraphHopperAreas(),
@@ -252,6 +255,7 @@ router.get("/thinkcentre-health", async (_req: Request, res: ExpressResponse) =>
       probeNginxInfra(),
       probeUptimeKuma(),
       probeAres(),
+      probeRepoDrift(),
     ]);
 
     const valhallaService: ServiceHealth = {
@@ -368,6 +372,7 @@ router.get("/thinkcentre-health", async (_req: Request, res: ExpressResponse) =>
       ufwDetail,
       tokenFingerprints,
       aresDetail,
+      repoDrift,
       maintenanceMode: maintenance,
       checkedAt: Date.now(),
     });

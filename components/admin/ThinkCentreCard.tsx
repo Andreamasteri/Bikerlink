@@ -54,6 +54,15 @@ interface ServiceHealth {
   probeLog?: ProbeLogEntry[];
 }
 
+interface RepoDriftHealth {
+  checked: boolean;
+  driftDetected: boolean;
+  behind: number | null;
+  driftedFiles: string[];
+  checkedAt: string | null;
+  error?: string;
+}
+
 interface ThinkCentreHealth {
   overall: "green" | "yellow" | "red" | "idle";
   onlineCount: number;
@@ -67,6 +76,7 @@ interface ThinkCentreHealth {
   photonDetail?: PhotonDetailedHealth;
   ufwDetail?: UfwDetailedHealth;
   aresDetail?: AresDetailedHealth | null;
+  repoDrift?: RepoDriftHealth;
   tokenFingerprints?: {
     graphhopper: string | null;
     valhalla: string | null;
@@ -100,6 +110,51 @@ type ThinkCentreStatusKeys =
   | "dragonfly"
   | "nginx"
   | "uptimeKuma";
+
+// ── Deriva del checkout app sul ThinkCentre ───────────────────────────────
+// Mostrata come banner di avviso quando i file di build dei modelli Ollama
+// differiscono da origin/main — evita build da Modelfile stale.
+
+function RepoDriftBanner({ drift }: { drift: RepoDriftHealth }) {
+  const fileList = drift.driftedFiles
+    .map((f) => f.replace("scripts/ollama-modelfile/", "").replace("scripts/", ""))
+    .join(", ");
+  const behindStr = drift.behind != null && drift.behind > 0 ? ` · ${drift.behind} commit indietro` : "";
+
+  return (
+    <View style={repoDriftStyles.banner}>
+      <Ionicons name="git-branch-outline" size={15} color="#f59e0b" style={{ marginTop: 1 }} />
+      <View style={repoDriftStyles.body}>
+        <Text style={repoDriftStyles.title}>⚠ App checkout in deriva rispetto a origin/main</Text>
+        <Text style={repoDriftStyles.sub}>
+          {"File build Ollama diversi: "}
+          <Text style={repoDriftStyles.mono}>{fileList || "—"}</Text>
+          {behindStr}
+          {"\nNON buildare modelli finché non si riallineano i Modelfile."}
+        </Text>
+      </View>
+    </View>
+  );
+}
+
+const repoDriftStyles = {
+  banner: {
+    flexDirection: "row" as const,
+    gap: 8,
+    backgroundColor: "#f59e0b18",
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#f59e0b55",
+    padding: 10,
+    marginHorizontal: 10,
+    marginBottom: 6,
+    alignItems: "flex-start" as const,
+  },
+  body: { flex: 1, gap: 3 },
+  title: { fontSize: 12, fontWeight: "700" as const, color: "#f59e0b" },
+  sub:   { fontSize: 11, color: "#b45309", lineHeight: 16 },
+  mono:  { fontFamily: "monospace" as const, fontWeight: "600" as const },
+};
 
 const ALL_UNKNOWN: Pick<SystemStatuses, ThinkCentreStatusKeys> = {
   thinkcentre: "unknown",
@@ -252,6 +307,10 @@ export function ThinkCentreCard({
       </TouchableOpacity>
 
       {data && !poweredOffActive && <ServiceBadgeStrip data={data} />}
+
+      {data?.repoDrift?.driftDetected && !poweredOffActive && (
+        <RepoDriftBanner drift={data.repoDrift} />
+      )}
 
       {!collapsed && (
         <View style={styles.list}>

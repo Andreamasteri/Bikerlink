@@ -207,6 +207,72 @@ function sampleWithDelta() {
   });
 }
 
+// ── Repo drift check (~/bikerlink vs origin/main) ─────────────────────────
+// Verifica se il checkout locale dell'app è allineato con origin/main sui
+// file critici per i build dei modelli custom Ollama.
+// Restituisce { ok, driftDetected, behind, driftedFiles, checkedAt, error? }.
+
+const REPO_PATH = (process.env.HOME ?? "/root") + "/bikerlink";
+const DRIFT_BRANCH = "main";
+const DRIFT_TRACKED = [
+  "scripts/setup-ollama-server.sh",
+  "scripts/ollama-modelfile/BikerLink-Bowie.Modelfile",
+  "scripts/ollama-modelfile/BikerLink-Horus.Modelfile",
+];
+
+function checkRepoDrift() {
+  // Verifica che sia un repo git valido.
+  try {
+    execSync(`git -C "${REPO_PATH}" rev-parse --show-toplevel`, { timeout: 3_000, stdio: "pipe" });
+  } catch {
+    return { ok: false, driftDetected: false, behind: null, driftedFiles: [], checkedAt: new Date().toISOString(), error: "not-a-repo" };
+  }
+
+  // Fetch remoto con timeout generoso; se fallisce, si usa lo stato in cache.
+  let fetchError = null;
+  try {
+    execSync(`git -C "${REPO_PATH}" fetch origin ${DRIFT_BRANCH} --quiet 2>/dev/null`, { timeout: 15_000, stdio: "pipe" });
+  } catch (e) {
+    fetchError = "fetch-failed";
+    void e;
+  }
+
+  // Commit di distanza.
+  let behind = null;
+  try {
+    const raw = execSync(
+      `git -C "${REPO_PATH}" rev-list --count HEAD..origin/${DRIFT_BRANCH}`,
+      { timeout: 3_000, stdio: "pipe" },
+    ).toString().trim();
+    behind = parseInt(raw, 10);
+    if (Number.isNaN(behind)) behind = null;
+  } catch { /* ignora */ }
+
+  // Confronto file di build: exit != 0 significa "differisce da origin".
+  const driftedFiles = [];
+  for (const f of DRIFT_TRACKED) {
+    try {
+      execSync(
+        `git -C "${REPO_PATH}" diff --quiet "origin/${DRIFT_BRANCH}" -- "${f}"`,
+        { timeout: 3_000, stdio: "pipe" },
+      );
+      // exit 0 → allineato
+    } catch {
+      driftedFiles.push(f);
+    }
+  }
+
+  const driftDetected = driftedFiles.length > 0;
+  return {
+    ok: !driftDetected,
+    driftDetected,
+    behind,
+    driftedFiles,
+    checkedAt: new Date().toISOString(),
+    ...(fetchError ? { fetchError } : {}),
+  };
+}
+
 // ── HTTP server ───────────────────────────────────────────────────────────
 
 const server = http.createServer(async (req, res) => {
@@ -218,6 +284,19 @@ const server = http.createServer(async (req, res) => {
       res.end(JSON.stringify({ error: "unauthorized" }));
       return;
     }
+  }
+
+  // ── GET /repo-drift ──────────────────────────────────────────────────────
+  if (req.method === "GET" && req.url === "/repo-drift") {
+    try {
+      const result = checkRepoDrift();
+      res.writeHead(200, { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" });
+      res.end(JSON.stringify(result));
+    } catch (err) {
+      res.writeHead(500, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: String(err) }));
+    }
+    return;
   }
 
   if (req.method !== "GET" || req.url !== "/sys-metrics") {
