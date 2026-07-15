@@ -86,11 +86,11 @@ function ghAuthMismatchError(status: number, tokenMissing: boolean, bodySnippet?
   return sanitizeError(bodySnippet ? `${base} — ${bodySnippet}` : base);
 }
 
-async function graphHopperRouteProbe(
+export async function graphHopperRouteProbe(
   base: string,
   token: string | undefined,
   points: [number, number][] = [[9.19, 45.46], [9.08, 45.81]],
-): Promise<{ ok: boolean; latencyMs: number | null; error?: string }> {
+): Promise<{ ok: boolean; latencyMs: number | null; status?: number; error?: string }> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), PROBE_TIMEOUT_MS);
   const t0 = Date.now();
@@ -110,7 +110,7 @@ async function graphHopperRouteProbe(
       }),
     });
     const latencyMs = Date.now() - t0;
-    if (res.status >= 200 && res.status < 300) return { ok: true, latencyMs };
+    if (res.status >= 200 && res.status < 300) return { ok: true, latencyMs, status: res.status };
     const body = await readBodySafe(res);
     const bodySnippet = body.trim().slice(0, 400);
     let error: string;
@@ -121,7 +121,7 @@ async function graphHopperRouteProbe(
         ? sanitizeError(`HTTP ${res.status} — ${bodySnippet}`)
         : `HTTP ${res.status}`;
     }
-    return { ok: false, latencyMs, error };
+    return { ok: false, latencyMs, status: res.status, error };
   } catch (err: unknown) {
     const raw = err instanceof Error ? err.message : String(err);
     let classified: string;
@@ -138,7 +138,7 @@ async function graphHopperRouteProbe(
   }
 }
 
-function areaProbePoints(area: RoutingArea): [number, number][] {
+export function areaProbePoints(area: RoutingArea): [number, number][] {
   const { minLon, minLat, maxLon, maxLat } = area.bbox;
   const cLon = (minLon + maxLon) / 2;
   const cLat = (minLat + maxLat) / 2;
