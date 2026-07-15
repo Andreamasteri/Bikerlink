@@ -110,6 +110,13 @@ export interface AssistantAgentOpts {
   // Callback invocata quando la persona che risponde è nota (prima dei delta),
   // così il client può mostrare CHI sta rispondendo.
   onPersona?: (p: { id: AiPersonaId; name: string }) => void;
+  // Task #141 — Invocata (una sola volta per turno) alla PRIMA parte di
+  // ragionamento del modello (fullStream `reasoning-delta`), prima di qualunque
+  // `text-delta`. qwen3 (Horus 4b, Bowie 1.7b) con think:true ragiona 45–60s
+  // prima di emettere testo visibile: senza questo segnale il client resterebbe
+  // con lo schermo vuoto per tutta la fase. Consente al client di mostrare
+  // subito un indicatore "sta pensando…" senza toccare l'accumulo del testo.
+  onThinking?: () => void;
 }
 
 export interface AssistantAgentResult {
@@ -594,6 +601,16 @@ export async function runAssistantAgent(opts: AssistantAgentOpts): Promise<Assis
     if (opts.onTextDelta) handoffFilter.push(delta, opts.onTextDelta);
   };
 
+  // Task #141 — Segnale "sta pensando", emesso UNA sola volta per turno alla
+  // prima parte di ragionamento (fullStream `reasoning-delta`), anche se
+  // streamWith viene richiamato più volte (retry gate / rigenerazione tool call).
+  let thinkingNotified = false;
+  const notifyThinking = () => {
+    if (thinkingNotified) return;
+    thinkingNotified = true;
+    opts.onThinking?.();
+  };
+
   // Streaming helper riusabile per qualunque modello (Ollama o cloud).
   // Per Ollama: passa i tool e maxSteps per il tool calling server-side.
   // Sink di default per i delta AI: emette l'intro alla PRIMA emissione reale,
@@ -637,8 +654,37 @@ export async function runAssistantAgent(opts: AssistantAgentOpts): Promise<Assis
         ? { providerOptions: { ollama: { think: ollamaThinkSeparated } } as never }
         : {}),
     });
-    for await (const delta of result.textStream) {
-      sink(delta);
+    // Task #141 — Consumiamo il `fullStream` (non solo il `textStream`) così da
+    // intercettare le parti `reasoning-delta`: con think:true qwen3 (Horus 4b,
+    // Bowie 1.7b) ragiona 45–60s PRIMA di emettere il primo `text-delta`. Alla
+    // prima parte di ragionamento segnaliamo "sta pensando" (notifyThinking) così
+    // il client mostra subito un indicatore (<2s) senza toccare l'accumulo del
+    // testo: le parti `text-delta` continuano a passare identiche a `sink`.
+    // A differenza del textStream, il fullStream NON rilancia gli errori (li
+    // emette come parti `error`/`abort`): li rilanciamo qui per preservare la
+    // catena di fallback (Ollama → cloud) che dipende dal throw. Fallback al
+    // textStream per i provider/mock che non espongono un fullStream.
+    const full = (result as {
+      fullStream?: AsyncIterable<{ type: string; text?: string; error?: unknown }>;
+    }).fullStream;
+    if (full) {
+      for await (const part of full) {
+        if (part.type === "text-delta") {
+          if (part.text) sink(part.text);
+        } else if (part.type === "reasoning-delta") {
+          notifyThinking();
+        } else if (part.type === "error") {
+          throw part.error instanceof Error
+            ? part.error
+            : new Error(String(part.error ?? "stream error"));
+        } else if (part.type === "abort") {
+          throw new Error("stream aborted");
+        }
+      }
+    } else {
+      for await (const delta of result.textStream) {
+        sink(delta);
+      }
     }
     const usage = await result.usage;
     tokensIn = usage?.inputTokens ?? 0;

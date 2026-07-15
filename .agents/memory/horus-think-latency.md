@@ -24,8 +24,14 @@ guarantee content after reasoning.
 
 **How to apply:**
 - Production backend (no num_predict cap) does generate content correctly after reasoning —
-  qwen3:4b eventually finishes thinking and emits text. Follow-up #141 tracks the UX fix
-  (surface a "thinking" indicator to the user during the reasoning phase).
+  qwen3:4b eventually finishes thinking and emits text.
+- UX fix (resolved): agent.ts `streamWith` now consumes `result.fullStream` (not just
+  `textStream`) and fires `onThinking()` once on the first `reasoning-delta`; the assistant
+  SSE route forwards it as a lightweight "thinking" event and the 1:1 chat shows a
+  "sta pensando…" indicator within <2s. IMPORTANT: fullStream does NOT throw on error/abort
+  (unlike textStream) — it emits `error`/`abort` parts, so the loop must re-throw them or the
+  Ollama→cloud fallback chain silently breaks. Keep a `textStream` fallback branch for
+  provider/test mocks that don't expose a fullStream.
 - Verification script: `scripts/verify-bowie-horus-think.py` (runs on ThinkCentre via
   background nohup + poll pattern; tc.py SSH timeout is 90s).
 - Never use num_predict < 4000 for Horus interactive chat tests.

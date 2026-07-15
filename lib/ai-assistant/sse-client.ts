@@ -4,7 +4,9 @@ import { getApiUrl, authFetchHeaders } from "@/lib/query-client";
 
 export interface AssistantStreamEvent {
   // Task #5197 — "persona" annuncia quale AI (Bowie/Horus/Ares) sta rispondendo.
-  event: "delta" | "action" | "done" | "error" | "persona";
+  // Task #141 — "thinking" segnala che il modello sta ragionando (prima di
+  // qualunque delta di testo): la UI mostra "sta pensando…".
+  event: "delta" | "action" | "done" | "error" | "persona" | "thinking";
   data: unknown;
 }
 

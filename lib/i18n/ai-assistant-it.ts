@@ -4,6 +4,7 @@ const aiAssistantIt: Record<string, string> = {
   "aiAssistant.emptyHint": "Ciao, sono Bowie! Chiedimi qualsiasi cosa: funzioni, impostazioni, percorsi, profilo…",
   "aiAssistant.inputPlaceholder": "Scrivi un messaggio…",
   "aiAssistant.status.typing": "sta scrivendo…",
+  "aiAssistant.status.thinking": "sta pensando…",
   // Task #44 — pulsante "Riprova" su un errore transitorio recuperabile.
   "aiAssistant.retry": "Riprova",
   "aiAssistant.confirm.title": "Confermi questa azione?",

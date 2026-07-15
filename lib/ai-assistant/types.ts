@@ -55,4 +55,9 @@ export interface AssistantChatMessage {
   // richiesta (recuperabile dalla reply-cache se il server aveva già finito).
   // Assente/false = nessun errore, oppure errore permanente (nessun "Riprova").
   errorRecoverable?: boolean;
+  // Task #141 — true quando il modello sta ragionando (evento SSE "thinking")
+  // ma non ha ancora emesso testo: la UI mostra "sta pensando…" invece del
+  // generico "sta scrivendo…". qwen3 (Horus/Bowie) ragiona ~45–60s prima del
+  // primo token, quindi questo indicatore dà feedback immediato all'utente.
+  thinking?: boolean;
 }

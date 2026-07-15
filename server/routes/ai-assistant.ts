@@ -248,7 +248,11 @@ router.post("/ai/assistant/message", requireUser, messageLimiter, async (req: Re
   // stream live via res.write), solo il materiale per il recovero futuro.
   const recordedEvents: CachedSseEvent[] = [];
   const send = (event: string, data: unknown) => {
-    if (event !== "delta") recordedEvents.push({ event, data });
+    // Task #141 — "thinking" è un segnale effimero (indicatore "sta pensando…"
+    // durante la fase di ragionamento del modello): come "delta" non lo
+    // registriamo per il replay dalla reply-cache (un retry riparte già dalla
+    // risposta completa, non serve rigiocare l'indicatore).
+    if (event !== "delta" && event !== "thinking") recordedEvents.push({ event, data });
     res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
   };
   const abort = new AbortController();
@@ -319,6 +323,9 @@ router.post("/ai/assistant/message", requireUser, messageLimiter, async (req: Re
       // Task #107 — lingua app del richiedente per il grounding Nadir multilingua.
       language: parsed.data.language ?? SOURCE_APP_LANGUAGE,
       onPersona: (p) => send("persona", p),
+      // Task #141 — segnale immediato "sta pensando…" al primo ragionamento del
+      // modello, prima di qualunque delta di testo (qwen3 ragiona ~45–60s).
+      onThinking: () => send("thinking", { thinking: true }),
       signal: abort.signal,
       onTextDelta: (delta) => securityFilter.push(delta, (safe) => send("delta", { text: safe })),
     });

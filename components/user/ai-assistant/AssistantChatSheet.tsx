@@ -94,7 +94,13 @@ export default function AssistantChatSheet({ visible, onClose }: Props) {
         onEvent: (ev) => {
           if (ev.event === "delta") {
             const d = (ev.data as { text?: string }).text ?? "";
-            setMessages((prev) => prev.map((m) => m.id === asstId ? { ...m, content: m.content + d } : m));
+            // Task #141 — arrivato il testo: la fase di ragionamento è finita.
+            setMessages((prev) => prev.map((m) => m.id === asstId ? { ...m, content: m.content + d, thinking: false } : m));
+          } else if (ev.event === "thinking") {
+            // Task #141 — il modello sta ragionando (nessun testo ancora): la UI
+            // mostra "sta pensando…" per dare feedback immediato (qwen3 ragiona
+            // ~45–60s prima del primo token).
+            setMessages((prev) => prev.map((m) => m.id === asstId ? { ...m, thinking: true } : m));
           } else if (ev.event === "persona") {
             // Task #5197 — il server annuncia CHI risponde (Bowie/Horus/Ares).
             const p = ev.data as AssistantPersona;
@@ -112,6 +118,7 @@ export default function AssistantChatSheet({ visible, onClose }: Props) {
                     actions: collectedActions.length ? collectedActions : undefined,
                     persona: d.persona ?? m.persona,
                     errorRecoverable: false,
+                    thinking: false,
                   }
                 : m,
             ));
@@ -176,7 +183,7 @@ export default function AssistantChatSheet({ visible, onClose }: Props) {
   const retry = useCallback(async (asstId: string) => {
     const last = lastRequestRef.current;
     if (!last || streaming) return;
-    setMessages((prev) => prev.map((m) => m.id === asstId ? { ...m, content: "", errorRecoverable: false } : m));
+    setMessages((prev) => prev.map((m) => m.id === asstId ? { ...m, content: "", errorRecoverable: false, thinking: false } : m));
     await runSend(asstId, last.text, last.history);
   }, [streaming, runSend]);
 
@@ -269,7 +276,11 @@ export default function AssistantChatSheet({ visible, onClose }: Props) {
                   <View style={styles.typingRow}>
                     <ActivityIndicator size="small" color={colors.textMuted ?? colors.textSecondary} />
                     <Text style={[styles.typingText, { color: colors.textMuted ?? colors.textSecondary }]}>
-                      {`${item.persona ? personaName(item.persona) : (t("aiAssistant.title") || "Bowie")} ${t("aiAssistant.status.typing") || "sta scrivendo…"}`}
+                      {`${item.persona ? personaName(item.persona) : (t("aiAssistant.title") || "Bowie")} ${
+                        item.thinking
+                          ? (t("aiAssistant.status.thinking") || "sta pensando…")
+                          : (t("aiAssistant.status.typing") || "sta scrivendo…")
+                      }`}
                     </Text>
                   </View>
                 ) : null}
