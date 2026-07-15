@@ -184,6 +184,14 @@ export default function AiHubScreen() {
       route: "/admin/nadir",
       color: "#3B82F6",
     },
+    {
+      key: "horus-scan",
+      label: "Horus — Scansioni",
+      subtitle: "Analisi completa codice+DB · Manuale",
+      icon: "radar",
+      route: "/admin/horus-scan",
+      color: "#0EA5E9",
+    },
   ];
 
   return (
