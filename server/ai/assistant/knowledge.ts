@@ -157,6 +157,7 @@ ${listAdminActionsForPrompt()}
 
 ${renderRosterBlock("bowie")}
 COMANDO SPECIALE (solo admin): se l'amministratore scrive "chiama Ares", "passami Ares" o simili, l'app passa la parola ad Ares, la nostra AI di diagnostica tecnica. Non rispondere tu al posto suo: l'handoff è automatico.
+COMANDO SPECIALE (solo admin) — SCANSIONI COMPLETE DI HORUS: se l'amministratore chiede di far analizzare/revisionare a Horus l'INTERO codice e/o il DB dell'app ("chiama Horus, fagli fare l'analisi completa del codice e del db dell'app"), oppure di fargli produrre/aggiornare il MANUALE testuale dell'app ("Horus, leggi l'app intera e produci un manuale aggiornato"), l'app avvia AUTOMATICAMENTE il job giusto in Horus (analisi codice+DB, oppure generazione manuale). NON rispondere tu al posto suo e NON trattarla come una semplice consultazione: l'avvio è automatico. Sono capacità ON-DEMAND (mai automatiche); una volta avviate Horus procede da solo a lotti fino alla fine, in sola lettura.
 
 JOB AUTONOMI DI ARES (solo admin, avvio on-demand): Ares ha due capacità long-running che leggono l'INTERA app. (1) "sveglia Ares, fagli fare l'analisi completa del codice e del db dell'app" → avvia il job di ANALISI (proposte/migliorie). (2) "Ares, leggi l'app intera e produci un manuale testuale aggiornato" → avvia il job di MANUALE (salvato nello storage di Nadir). L'app riconosce da sola queste richieste e AVVIA il job giusto in Ares come lavoro in background: NON rispondere tu al posto suo e non trattarlo come una domanda tecnica normale. Sono lavori lunghi (anche ore): l'admin può chiedere lo stato in un secondo momento.
 
@@ -197,6 +198,15 @@ export function buildHorusSystemPrompt(opts: {
     opts.isAdmin && opts.codeContext
       ? `\n\nMODALITÀ CODE REVIEWER (solo admin): l'amministratore può chiederti di rivedere il codice sorgente qui sotto (read-only, da GitHub main). Analizza pattern rischiosi, bug potenziali o violazioni delle convenzioni del progetto, e proponi correzioni testuali (MAI eseguirle: sei sola lettura, nessuna scrittura su GitHub). Sii specifico su file/riga quando possibile.\n\n${opts.codeContext}`
       : "";
+  // Task #86 — Consapevolezza delle due scansioni complete on-demand (solo admin):
+  // così se un admin gliene chiede conto in chat, Horus le conferma correttamente
+  // invece di negarle o inventare.
+  const scanCapabilitiesSection = opts.isAdmin
+    ? `\n\nLE TUE DUE SCANSIONI COMPLETE ON-DEMAND (solo admin, SOLA LETTURA): oltre alla revisione di un singolo piano di task, sai fare due cose sull'INTERA app, ma SOLO quando un admin te lo chiede esplicitamente (mai in automatico, mai su schedule):
+1) ANALISI COMPLETA CODICE+DB: leggi da solo, a lotti, tutto il codice sorgente (server/client/shared) e lo stato di integrità del DB già esistente, e al termine produci PROPOSTE azionabili (proponi, non applichi e non modifichi nulla).
+2) MANUALE DELL'APP: leggi tutta l'app e componi un manuale testuale organizzato per funzionalità (per istruire gli agenti AI), salvato nello storage del manuale di Nadir e reindicizzato per la ricerca semantica.
+Entrambe, una volta avviate, proseguono da sole fino alla fine e i file invariati dall'ultima passata vengono saltati. Se ti viene chiesto, confermale come reali; l'avvio avviene tramite un comando dedicato (chat admin o pannello), non le esegui in mezzo a una conversazione.`
+    : "";
 
   return `Sei Horus, lo specialista di percorsi, itinerari e navigazione moto di BikerLink.${userIdSection}
 
@@ -219,7 +229,7 @@ CONGEDO (ritorno a Bowie):
 - Per farlo, aggiungi ESATTAMENTE il marcatore ${HANDOFF_BACK_TO_BOWIE} alla FINE della tua risposta (ultima riga, da solo). Il marcatore è tecnico: l'utente non lo vedrà, verrà rimosso automaticamente.
 - NON usare il marcatore se la conversazione sul percorso è ancora in corso (stai chiedendo partenza/destinazione/preferenze o l'utente sta ancora rifinendo l'itinerario).
 
-${renderRosterBlock("horus")}${routingStatusSection}${ragSection}${userContextSection}${analysisSection}${codeReviewSection}`;
+${renderRosterBlock("horus")}${routingStatusSection}${ragSection}${userContextSection}${analysisSection}${codeReviewSection}${scanCapabilitiesSection}`;
 }
 
 // ── Task #5197 — System prompt di Ares (diagnostica tecnica, solo admin) ──────

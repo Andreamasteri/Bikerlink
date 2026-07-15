@@ -29,6 +29,7 @@ import { withAresVramPriority } from "../../lib/vram-arbiter";
 import { composeQuebrachoQuestion } from "./quebracho-question";
 import { isQuebrachoConfigured, getQuebrachoModelId, streamQuebrachoChat } from "../../lib/quebracho-client";
 import { detectPlanReviewRequest, reviewTaskPlan } from "./task-review";
+import { detectHorusScanRequest, startHorusScan } from "./horus-scanner";
 import { retrieveContext, formatRagContext, indexKnowledge } from "./rag";
 import {
   OLLAMA_TOOLS,
@@ -608,6 +609,40 @@ export async function runAssistantAgent(opts: AssistantAgentOpts): Promise<Assis
   };
 
   let done = false;
+
+  // Task #86 — Trigger da chat: se un admin chiede a Bowie (o direttamente a
+  // Horus) di far partire una delle due scansioni COMPLETE di Horus (analisi
+  // codice+DB, o generazione manuale), NON rispondiamo con l'LLM né trattiamo la
+  // richiesta come una consultazione mid-chat: avviamo direttamente il job giusto
+  // in Horus e confermiamo. Stessa logica di intercettazione pre-composizione di
+  // Ares/Quebracho. Gated ad admin (le scansioni sono capacità admin).
+  if (!done && isAdmin) {
+    const scanReq = detectHorusScanRequest(opts.message);
+    if (scanReq) {
+      opts.onPersona?.({ id: "horus", name: AI_ROSTER.horus.name });
+      try {
+        const res = await startHorusScan(scanReq.mode);
+        const label = scanReq.mode === "analysis" ? "analisi completa del codice e del DB" : "generazione del manuale dell'app";
+        const text = res.started
+          ? scanReq.mode === "analysis"
+            ? `Ho avviato l'${label}. Procedo da solo a lotti sull'intero codice (${res.status.filesPending} file da leggere, ${res.status.filesSkipped} invariati saltati) e sullo stato di integrità del DB; al termine produco proposte azionabili — resto in sola lettura, non applico nulla. Chiedimi "stato scansioni Horus" per l'avanzamento.`
+            : `Ho avviato la ${label}. Leggo tutta l'app (${res.status.filesPending} file da leggere, ${res.status.filesSkipped} invariati saltati) e comporrò un manuale per funzionalità, che salvo nello storage di Nadir (versione precedente conservata) e reindicizzo. Chiedimi "stato scansioni Horus" per l'avanzamento.`
+          : `Non sono riuscito ad avviare l'${label}: ${res.reason}.`;
+        ensureIntroEmitted();
+        finalText += text;
+        aiText += text;
+        providerEmittedAny = true;
+        emitAiDelta(text);
+        effectivePersona = "horus";
+        provider = "horus-scan";
+        modelId = "horus-scan";
+        done = true;
+        console.log(`[assistant] scansione Horus "${scanReq.mode}" avviata da chat (started=${res.started})`);
+      } catch (scanErr) {
+        console.warn("[assistant] avvio scansione Horus da chat fallito:", (scanErr as Error).message);
+      }
+    }
+  }
 
   // 0) Task #5197 — Ares: AI di diagnostica su PC fisso dedicato (DIAG_OLLAMA_*).
   //    Endpoint separato (/api/chat HTTP diretta), NON la chain Ollama/cloud.

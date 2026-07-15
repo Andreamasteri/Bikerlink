@@ -21,6 +21,7 @@ import {
 import { runHorusAnalysisNow } from "./horus-analyzer";
 import { fetchCodeContextForFiles, isGithubContextConfigured } from "./github-context";
 import { startAresJob, getAresJobStatus, type AresJobMode } from "../ares-jobs";
+import { startHorusScan, getAllHorusScanStatus, formatScanStatusText } from "./horus-scanner";
 
 // Task #5322 — Livello di rischio dell'azione admin. Guida il client (badge/UX di
 // conferma) e viene loggato nell'audit trail. "high" = distruttivo/irreversibile.
@@ -192,6 +193,41 @@ export const ADMIN_ASSISTANT_ACTIONS = {
     riskLevel: "low",
     requiresConfirm: false,
     paramsSchema: z.object({ mode: z.enum(["analysis", "manual"]).optional() }),
+  },
+  // Task #86 — Scansione COMPLETA e autonoma dell'intero codice sorgente +
+  // struttura DB da parte di Horus. Solo su richiesta esplicita, mai automatica.
+  // Una volta avviata prosegue da sola a lotti (i file invariati vengono saltati)
+  // e al termine produce PROPOSTE azionabili (mai modifiche). Sola lettura.
+  "horus-scan-code-db": {
+    id: "horus-scan-code-db",
+    description:
+      "Avvia una scansione COMPLETA e autonoma dell'intero codice sorgente (server/client/shared) + stato integrità del DB da parte di Horus. Una volta avviata prosegue da sola a lotti fino a coprire tutti i file pendenti (quelli invariati dall'ultima passata vengono saltati). Al termine produce proposte azionabili, mai modifiche. SOLA LETTURA. Solo su richiesta esplicita, mai automatica.",
+    confirmLabel: "Confermi l'avvio della scansione completa codice+DB di Horus?",
+    riskLevel: "low",
+    requiresConfirm: true,
+    paramsSchema: z.object({}),
+  },
+  // Task #86 — Generazione autonoma del manuale testuale dell'app da parte di
+  // Horus: legge tutta l'app e produce un manuale per funzionalità, salvato nello
+  // storage del manuale di Nadir (versione precedente conservata) e reindicizzato.
+  "horus-generate-manual": {
+    id: "horus-generate-manual",
+    description:
+      "Avvia la generazione autonoma del MANUALE testuale dell'app da parte di Horus: legge tutta l'app e produce un manuale organizzato per funzionalità (non un dump di codice), pensato per istruire gli agenti AI. Al termine lo salva nello storage del manuale di Nadir (conservando la versione precedente) e lo reindicizza per la ricerca semantica. SOLA LETTURA. Solo su richiesta esplicita, mai automatica.",
+    confirmLabel: "Confermi l'avvio della generazione del manuale da parte di Horus?",
+    riskLevel: "low",
+    requiresConfirm: true,
+    paramsSchema: z.object({}),
+  },
+  // Task #86 — Stato di avanzamento delle scansioni Horus (sola lettura).
+  "horus-scan-status": {
+    id: "horus-scan-status",
+    description:
+      "Mostra lo stato di avanzamento delle due scansioni Horus (analisi codice+DB e generazione manuale): quanti file letti/saltati/pendenti e l'esito dell'ultima passata. Sola lettura, non avvia nulla.",
+    confirmLabel: "Mostro lo stato delle scansioni Horus?",
+    riskLevel: "low",
+    requiresConfirm: false,
+    paramsSchema: z.object({}),
   },
 } as const satisfies Record<string, AdminAssistantActionDef>;
 
@@ -365,6 +401,39 @@ export async function executeAdminAction(
         ? "Ciclo di analisi Horus completato: report salvato (DB + logs/horus-analysis-*.md)."
         : `Ciclo di analisi Horus non eseguito: ${result.reason ?? "motivo sconosciuto"}.`,
       data: result,
+    };
+  }
+
+  if (id === "horus-scan-code-db") {
+    const res = await startHorusScan("analysis");
+    console.info(`[admin-ai-action] horus-scan-code-db started=${res.started} reason=${res.reason ?? "-"}`);
+    return {
+      ok: true,
+      summary: res.started
+        ? "Scansione completa codice+DB avviata: Horus procede da solo a lotti (i file invariati vengono saltati) e al termine produrrà proposte azionabili. Chiedimi \"stato scansioni Horus\" per l'avanzamento."
+        : `Scansione non avviata: ${res.reason}.`,
+      data: res,
+    };
+  }
+
+  if (id === "horus-generate-manual") {
+    const res = await startHorusScan("manual");
+    console.info(`[admin-ai-action] horus-generate-manual started=${res.started} reason=${res.reason ?? "-"}`);
+    return {
+      ok: true,
+      summary: res.started
+        ? "Generazione manuale avviata: Horus legge l'app e comporrà il manuale (salvato nello storage di Nadir e reindicizzato, versione precedente conservata). Chiedimi \"stato scansioni Horus\" per l'avanzamento."
+        : `Generazione non avviata: ${res.reason}.`,
+      data: res,
+    };
+  }
+
+  if (id === "horus-scan-status") {
+    const all = getAllHorusScanStatus();
+    return {
+      ok: true,
+      summary: formatScanStatusText(),
+      data: all,
     };
   }
 

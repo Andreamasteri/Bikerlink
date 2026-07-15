@@ -75,9 +75,11 @@ export function originToEntityType(origin: NadirOrigin): string {
 // Il manuale e lo stato di Nadir vivono in AppSettings (persistiti, NON file
 // git), così un admin può modificarli senza redeploy.
 export const NADIR_MANUAL_KEY = "nadir_manual_text"; // value: testo libero
-// Task #87 — Backup della versione PRECEDENTE del manuale, salvato appena prima
-// di una sovrascrittura (es. manuale rigenerato da Ares). Permette di
-// recuperare/confrontare il manuale di prima. valueJson: { text, savedAt }.
+// Task #87/#86 — Backup della versione PRECEDENTE del manuale, salvato appena
+// prima di una sovrascrittura (es. manuale rigenerato da Ares o Horus). Permette
+// di recuperare/confrontare il manuale di prima. Chiave UNICA condivisa dai due
+// generatori così il backup resta coerente a prescindere da chi ha sovrascritto.
+// valueJson: { text, savedAt }.
 export const NADIR_MANUAL_PREVIOUS_KEY = "nadir_manual_previous"; // valueJson
 export const NADIR_FRAGMENTS_KEY = "nadir_fragments"; // valueJson: manifest testo
 export const NADIR_INDEX_STATUS_KEY = "nadir_index_status"; // valueJson
