@@ -24,6 +24,7 @@ import { EmbeddingUsageCard } from "@/components/admin/EmbeddingUsageCard";
 import { AiTokenAuditCard } from "@/components/admin/AiTokenAuditCard";
 import { CrashBreakdownCard } from "@/components/admin/system-health/CrashBreakdownCard";
 import { SignalThresholdsCard } from "@/components/admin/system-health/SignalThresholdsCard";
+import { AiHubHealthCard } from "@/components/admin/system-health/AiHubHealthCard";
 
 interface DbCircuit {
   state: "CLOSED" | "OPEN" | "HALF_OPEN";
@@ -269,6 +270,9 @@ export default function SystemHealthScreen() {
               <Text style={styles.muted}>Dati watchdog Whisper non disponibili.</Text>
             </View>
           )}
+
+          <SectionTitle icon="brain">TC AI Hub</SectionTitle>
+          <AiHubHealthCard />
 
           <SectionTitle icon="robot-outline">Proposte AI in attesa</SectionTitle>
           <ProposalsCard

@@ -3,8 +3,9 @@ import { Router, type Request, type Response } from "express";
 import { sendError } from "../../lib/api-response";
 import { db } from "../../db";
 import { storage } from "../../storage";
-import { aiWatchdogLog, weeklySystemReports } from "@shared/db";
-import { desc, eq, sql } from "drizzle-orm";
+import { aiWatchdogLog, weeklySystemReports, systemSignals } from "@shared/db";
+import { desc, eq, sql, and, gte, or } from "drizzle-orm";
+import { isHubConfigured, isHubAvailable } from "../../lib/ai-hub-client";
 import { z } from "zod";
 import { getLatestSnapshot, runAggregatorCycle, getRecentSnapshots } from "../../ai/watchdog/aggregator";
 import { streamWatchdogChat } from "../../ai/watchdog/chat";
@@ -389,6 +390,72 @@ router.delete("/watchdog/signal-thresholds/:signal", async (req, res) => {
 });
 
 // === Crash Breakdown ===
+
+// === AI Hub health (Task #162) ===
+// Legge le ultime probe ai_hub dalla tabella system_signals + stato in-process.
+router.get("/watchdog/ai-hub-health", async (_req, res) => {
+  try {
+    const configured = isHubConfigured();
+    const reachable  = isHubAvailable();
+
+    if (!configured) {
+      return res.json({
+        configured: false,
+        reachable: false,
+        lastProbeAt: null,
+        latencyMs: null,
+        consecutiveFailures: 0,
+        error: null,
+      });
+    }
+
+    // Leggi le ultime probe ai_hub dalle ultime 6 ore.
+    const since = new Date(Date.now() - 6 * 60 * 60 * 1000);
+    const rows = await db
+      .select()
+      .from(systemSignals)
+      .where(
+        and(
+          eq(systemSignals.source, "ai_hub"),
+          or(
+            eq(systemSignals.metric, "ai_hub.unreachable"),
+            eq(systemSignals.metric, "ai_hub.ping_ms"),
+          ),
+          gte(systemSignals.createdAt, since),
+        ),
+      )
+      .orderBy(desc(systemSignals.createdAt))
+      .limit(20);
+
+    const latest = rows[0] ?? null;
+    const lastProbeAt = latest?.createdAt instanceof Date
+      ? latest.createdAt.toISOString()
+      : (latest?.createdAt ? String(latest.createdAt) : null);
+
+    // Ultima ping latency (se OK)
+    const latencyRow = rows.find((r) => r.metric === "ai_hub.ping_ms");
+    const latencyMs = latencyRow?.value != null ? Math.round(latencyRow.value) : null;
+
+    // Fallimenti consecutivi dall'ultimo segnale di unreachable
+    const unreachableRow = rows.find((r) => r.metric === "ai_hub.unreachable");
+    const consecutiveFailures =
+      (unreachableRow?.details as { consecutiveFailures?: number } | null)
+        ?.consecutiveFailures ?? 0;
+    const error =
+      (unreachableRow?.details as { error?: string } | null)?.error ?? null;
+
+    return res.json({
+      configured,
+      reachable,
+      lastProbeAt,
+      latencyMs: reachable ? latencyMs : null,
+      consecutiveFailures,
+      error: reachable ? null : error,
+    });
+  } catch (err) {
+    return sendError(res, 500, (err as Error).message);
+  }
+});
 
 router.get("/watchdog/crash-breakdown", async (req, res) => {
   const days = Math.min(30, Math.max(1, Number(req.query.days ?? 7)));
