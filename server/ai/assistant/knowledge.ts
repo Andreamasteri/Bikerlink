@@ -251,8 +251,14 @@ ${renderRosterBlock("horus")}${routingStatusSection}${ragSection}${userContextSe
 // ── Task #5197 — System prompt di Ares (diagnostica tecnica, solo admin) ──────
 // Ares gira su un PC fisso dedicato (DIAG_OLLAMA_*) ed è invocato dall'admin
 // tramite Bowie. È uno strumento operativo/tecnico, non rivolto all'utente.
-export function buildAresSystemPrompt(adminContext: string, horusLearningContext?: string, language?: AppLanguageCode): string {
+export function buildAresSystemPrompt(
+  adminContext: string,
+  horusLearningContext?: string,
+  language?: AppLanguageCode,
+  hubFileCapabilities?: string,
+): string {
   const horusLearningSection = horusLearningContext ? `\n\n${horusLearningContext}` : "";
+  const hubFileSection = hubFileCapabilities ? `\n\n${hubFileCapabilities}` : "";
   return `Sei Ares, l'AI di diagnostica tecnica della piattaforma BikerLink. Stai parlando con un AMMINISTRATORE fidato che ti ha invocato tramite Bowie.
 
 ${SECURITY_GUARDRAIL}
@@ -278,7 +284,7 @@ CONGEDO (ritorno a Bowie):
 - Per farlo, aggiungi ESATTAMENTE il marcatore ${HANDOFF_BACK_TO_BOWIE} alla FINE della tua risposta (ultima riga, da solo). È tecnico: l'admin non lo vedrà, verrà rimosso automaticamente.
 - NON usare il marcatore se stai ancora indagando o attendi ulteriori dettagli dall'admin per completare la diagnosi.
 
-${renderRosterBlock("ares")}
+${renderRosterBlock("ares")}${hubFileSection}
 
 SNAPSHOT PIATTAFORMA (contesto corrente, sola lettura):
 ${adminContext || "(nessun dato disponibile)"}${horusLearningSection}`;
@@ -288,7 +294,12 @@ ${adminContext || "(nessun dato disponibile)"}${horusLearningSection}`;
 // Quebracho ("Qq") gira su Ollama (ThinkCentre) con un modello leggero. È il
 // regista degli agenti: fa il punto, coordina e propone come muoversi. È uno
 // strumento operativo riservato agli amministratori, invocato tramite Bowie.
-export function buildQuebrachoSystemPrompt(adminContext: string, language?: AppLanguageCode): string {
+export function buildQuebrachoSystemPrompt(
+  adminContext: string,
+  language?: AppLanguageCode,
+  hubFileCapabilities?: string,
+): string {
+  const hubFileSection = hubFileCapabilities ? `\n\n${hubFileCapabilities}` : "";
   return `Sei Quebracho (per gli amici "Qq"), il coordinatore e regista degli agenti AI di BikerLink. Stai parlando con un AMMINISTRATORE fidato che ti ha invocato tramite Bowie.
 
 ${SECURITY_GUARDRAIL}
@@ -309,7 +320,7 @@ CONGEDO (ritorno a Bowie):
 - Per farlo, aggiungi ESATTAMENTE il marcatore ${HANDOFF_BACK_TO_BOWIE} alla FINE della tua risposta (ultima riga, da solo). È tecnico: l'admin non lo vedrà, verrà rimosso automaticamente.
 - NON usare il marcatore se stai ancora coordinando o attendi ulteriori dettagli dall'admin.
 
-${renderRosterBlock("quebracho")}
+${renderRosterBlock("quebracho")}${hubFileSection}
 
 SNAPSHOT PIATTAFORMA (contesto corrente, sola lettura):
 ${adminContext || "(nessun dato disponibile)"}`;

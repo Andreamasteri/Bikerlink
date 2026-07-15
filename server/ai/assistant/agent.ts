@@ -40,6 +40,12 @@ import {
   buildSearchManualTool,
 } from "./tools";
 import { buildHubFileTools, buildCheckVramTool } from "./tc-hub-tools";
+import {
+  buildHubFileCapabilitiesBlock,
+  buildHubFileContextForPrompt,
+  createSaveDirectiveStreamFilter,
+  executeHubFileSaves,
+} from "./hub-file-injection";
 import { loadHorusMemory } from "./horus-memory";
 import { searchNadir, SEARCH_MANUAL_RE } from "../nadir";
 import { SOURCE_APP_LANGUAGE, type AppLanguageCode } from "@shared/languages";
@@ -406,11 +412,21 @@ export async function runAssistantAgent(opts: AssistantAgentOpts): Promise<Assis
   if (requestedPersona === "ares") {
     // Ares: diagnostica tecnica (solo admin), snapshot piattaforma nel prompt.
     // Task #5326 — knowledge transfer read-only Horus → Ares (RAG + prompt injection).
+    // Task #163 — Ares accede ai file della cartella condivisa TC (~/agent-shared/)
+    // tramite pre-composition + response parser (nessun tool nativo: endpoint dedicato).
     const horusLearningContext = await buildAresLearningContext();
-    system = buildAresSystemPrompt(opts.adminContext ?? "", horusLearningContext || undefined, opts.language ?? SOURCE_APP_LANGUAGE);
+    const aresHubFileCaps = buildHubFileCapabilitiesBlock({ includeWrite: true });
+    system = buildAresSystemPrompt(opts.adminContext ?? "", horusLearningContext || undefined, opts.language ?? SOURCE_APP_LANGUAGE, aresHubFileCaps);
+    // Pre-composizione file: se il messaggio contiene un intento di lettura/elenco
+    // file, fetchhiamo il risultato dall'hub e lo iniettiamo nel system prompt PRIMA
+    // della composizione della domanda per Ares. Best-effort: nessun file intent → "".
+    system += await buildHubFileContextForPrompt(opts.message, { includeWrite: true });
   } else if (requestedPersona === "quebracho") {
     // Task #4 — Quebracho: coordinatore/regista (solo admin), snapshot piattaforma.
-    system = buildQuebrachoSystemPrompt(opts.adminContext ?? "", opts.language ?? SOURCE_APP_LANGUAGE);
+    // Task #163 — Quebracho accede ai file della cartella condivisa TC in lettura e
+    // scrittura (pre-composition + response parser, nessun tool nativo).
+    const quebrachoHubFileCaps = buildHubFileCapabilitiesBlock({ includeWrite: true });
+    system = buildQuebrachoSystemPrompt(opts.adminContext ?? "", opts.language ?? SOURCE_APP_LANGUAGE, quebrachoHubFileCaps);
     // Task #75 — Nadir agent-neutral anche per Quebracho. Quebracho NON usa il
     // tool-calling nativo (endpoint dedicato), quindi invece del tool `search_manual`
     // usiamo l'INTERCETTAZIONE PRE-COMPOSIZIONE: se il messaggio contiene un cue di
@@ -421,6 +437,8 @@ export async function runAssistantAgent(opts: AssistantAgentOpts): Promise<Assis
       includeAllUsers: isAdmin,
       language: opts.language ?? SOURCE_APP_LANGUAGE,
     });
+    // Task #163 — Pre-composizione file: stesso pattern di Nadir ma per l'hub TC.
+    system += await buildHubFileContextForPrompt(opts.message, { includeWrite: true });
   } else if (requestedPersona === "horus") {
     // Horus: specialista percorsi. RAG + contesto utente come Bowie, persona diversa.
     // Task #5326 — in modalità admin riceve anche la memoria delle proprie
@@ -788,6 +806,10 @@ export async function runAssistantAgent(opts: AssistantAgentOpts): Promise<Assis
       // Task #87 — La consultazione INTERATTIVA di Ares ha la precedenza sui job
       // long-running: la marca "busy" così un eventuale job di background cede il
       // passo tra un chunk e l'altro. La chat non attende mai il job.
+      // Task #163 — Streaming filter: sopprime i blocchi [[AGENT_SAVE_FILE:…]] IN
+      // TEMPO REALE così nessun byte della direttiva raggiunge mai il client SSE.
+      // Le direttive catturate sono eseguite sull'hub dopo il completamento dello stream.
+      const aresSaveFilter = createSaveDirectiveStreamFilter();
       await withAresInteractivePriority(() =>
         withAresVramPriority(getAresModelId(), () =>
           streamAresChat({
@@ -796,15 +818,37 @@ export async function runAssistantAgent(opts: AssistantAgentOpts): Promise<Assis
             signal: opts.signal,
             timeoutMs: 60_000,
             onDelta: (delta) => {
-              ensureIntroEmitted();
-              finalText += delta;
-              aiText += delta;
-              providerEmittedAny = true;
-              emitAiDelta(delta);
+              aresSaveFilter.push(delta, (safe) => {
+                ensureIntroEmitted();
+                finalText += safe;
+                aiText += safe;
+                providerEmittedAny = true;
+                emitAiDelta(safe);
+              });
             },
           }),
         ),
       );
+      // Flush residui + esegui scritture catturate dal filtro (best-effort)
+      const aresCaptured = aresSaveFilter.flush((safe) => {
+        if (safe) {
+          ensureIntroEmitted();
+          finalText += safe;
+          aiText += safe;
+          emitAiDelta(safe);
+        }
+      });
+      if (aresCaptured.length > 0) {
+        const outcomes = await executeHubFileSaves(aresCaptured);
+        const saveLog = outcomes
+          .map((s) => (s.ok ? `✅ File salvato: ${s.path}` : `⚠️ Salvataggio "${s.path}" fallito: ${s.error}`))
+          .join("\n");
+        const summaryDelta = `\n\n${saveLog}`;
+        finalText += summaryDelta;
+        aiText += summaryDelta;
+        opts.onTextDelta?.(summaryDelta);
+        console.log(`[assistant] Ares save directives: ${outcomes.map((s) => `${s.path}=${s.ok}`).join(", ")}`);
+      }
       provider = "ares";
       modelId = getAresModelId();
       done = true;
@@ -868,19 +912,44 @@ export async function runAssistantAgent(opts: AssistantAgentOpts): Promise<Assis
       // Composizione: Bowie sintetizza il contesto in UNA richiesta per Quebracho.
       const quebrachoQuestion = await composeQuebrachoQuestion(opts.history ?? [], opts.message);
       const quebrachoSystem = `${system}\n\nVINCOLO DI RISPOSTA: rispondi in modo CONTENUTO e STRUTTURATO (punti chiave, niente preamboli né divagazioni). Vai dritto al coordinamento/azione.`;
+      // Task #163 — stesso streaming filter di Ares: sopprime [[AGENT_SAVE_FILE:…]]
+      // in tempo reale durante lo stream di Quebracho.
+      const quebrachoSaveFilter = createSaveDirectiveStreamFilter();
       await streamQuebrachoChat({
         system: quebrachoSystem,
         messages: [{ role: "user", content: quebrachoQuestion }],
         signal: opts.signal,
         timeoutMs: 60_000,
         onDelta: (delta) => {
-          ensureIntroEmitted();
-          finalText += delta;
-          aiText += delta;
-          providerEmittedAny = true;
-          emitAiDelta(delta);
+          quebrachoSaveFilter.push(delta, (safe) => {
+            ensureIntroEmitted();
+            finalText += safe;
+            aiText += safe;
+            providerEmittedAny = true;
+            emitAiDelta(safe);
+          });
         },
       });
+      // Flush residui + esegui scritture catturate (best-effort)
+      const quebraChoCaptured = quebrachoSaveFilter.flush((safe) => {
+        if (safe) {
+          ensureIntroEmitted();
+          finalText += safe;
+          aiText += safe;
+          emitAiDelta(safe);
+        }
+      });
+      if (quebraChoCaptured.length > 0) {
+        const outcomes = await executeHubFileSaves(quebraChoCaptured);
+        const saveLog = outcomes
+          .map((s) => (s.ok ? `✅ File salvato: ${s.path}` : `⚠️ Salvataggio "${s.path}" fallito: ${s.error}`))
+          .join("\n");
+        const summaryDelta = `\n\n${saveLog}`;
+        finalText += summaryDelta;
+        aiText += summaryDelta;
+        opts.onTextDelta?.(summaryDelta);
+        console.log(`[assistant] Quebracho save directives: ${outcomes.map((s) => `${s.path}=${s.ok}`).join(", ")}`);
+      }
       provider = "quebracho";
       modelId = getQuebrachoModelId();
       done = true;
