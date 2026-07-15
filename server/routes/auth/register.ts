@@ -9,6 +9,7 @@ import { storage } from "../../storage";
 import { sendVerificationEmail, sendInvitationGiftEmail, sendNewUserNotificationEmail } from "../../email";
 import { createRegionalClubInvite } from "../motoclubs";
 import { parseVisitorCookie, recordVisit } from "../../lib/visitor-tracking";
+import { isUniqueViolation } from "../../lib/db-errors";
 // @ts-ignore
 import signature from "cookie-signature";
 
@@ -304,6 +305,17 @@ router.post("/register", registerLimiter, async (req: Request, res: Response) =>
     if (error instanceof DbTimeoutError || isPgStatementTimeout) {
       console.error("[register] DB timeout:", (error as Error).message);
       return sendError(res, 503, "Servizio temporaneamente non disponibile. Riprova.");
+    }
+    // Task #13 — rete di sicurezza contro la race condition tra il check
+    // pre-insert (getUserByNickname/getUserByEmail) e l'INSERT: se due
+    // richieste concorrenti la superano entrambe, il vincolo UNIQUE a
+    // livello DB rifiuta la seconda insert e qui la traduciamo in un errore
+    // applicativo invece del generico 500.
+    if (isUniqueViolation(error, "users_nickname_lower_uq")) {
+      return sendError(res, 409, "Nickname già in uso");
+    }
+    if (isUniqueViolation(error, "users_email_unique") || isUniqueViolation(error, "users_email_key")) {
+      return sendError(res, 409, "Email già registrata");
     }
     console.error("Register error:", error);
     return sendError(res, 500, "Errore interno del server");

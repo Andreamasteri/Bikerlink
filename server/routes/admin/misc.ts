@@ -9,6 +9,7 @@ import { eq } from "drizzle-orm";
 import { massSeedFakeUsers, getMassSeedStatus } from "../../mass-seed";
 import { getMotionStatus } from "../../motion-simulator";
 import { getServerInfo, isSelfHosted, ACTIVE_PROFILE, GH_BASE_URL, isRoutingEnabled } from "../../graphhopper-client";
+import { isUniqueViolation } from "../../lib/db-errors";
 
 const router = Router();
 
@@ -28,7 +29,11 @@ router.post("/workshops", async (req: Request, res: Response) => {
     if (!parsed.success) return sendError(res, 400, parsed.error.issues[0].message);
     const workshop = await storage.createWorkshop(parsed.data as import("@shared/db").InsertWorkshop);
     return res.status(201).json(workshop);
-  } catch (_error) {
+  } catch (error) {
+    // Task #13 — vincolo UNIQUE su LOWER(email) (migrations/0142_*.sql).
+    if (isUniqueViolation(error, "workshops_email_lower_uq")) {
+      return sendError(res, 409, "Email già in uso da un'altra officina");
+    }
     return sendError(res, 500, "Errore creazione officina");
   }
 });

@@ -5,6 +5,7 @@ import {
   type Business, type InsertBusiness, type InsertBusinessClick,
 } from "@shared/db";
 import { TextAliasesStorage } from "./text-aliases";
+import { normalizeOptionalEmail } from "../lib/normalize-email";
 
 /**
  * Business Reach storage (Task #4818, #4917).
@@ -45,13 +46,16 @@ export class BusinessStorage extends TextAliasesStorage {
   }
 
   async createBusiness(data: InsertBusiness): Promise<Business> {
-    const [row] = await db.insert(businesses).values(data).returning();
+    const [row] = await db.insert(businesses)
+      .values({ ...data, email: normalizeOptionalEmail(data.email) })
+      .returning();
     return row;
   }
 
   async updateBusiness(id: string, data: Partial<InsertBusiness>): Promise<Business | undefined> {
+    const patch = "email" in data ? { ...data, email: normalizeOptionalEmail(data.email) } : data;
     const [row] = await db.update(businesses)
-      .set({ ...data, updatedAt: new Date() })
+      .set({ ...patch, updatedAt: new Date() })
       .where(eq(businesses.id, id)).returning();
     return row;
   }

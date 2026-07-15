@@ -3,6 +3,7 @@ import { Router, type Request, type Response } from "express";
 import { sendError } from "../../lib/api-response";
 import { storage } from "../../storage";
 import { businessSchema, businessUpdateSchema, type InsertBusiness } from "@shared/db";
+import { isUniqueViolation } from "../../lib/db-errors";
 
 const router = Router();
 
@@ -117,7 +118,11 @@ router.post("/business", async (req: Request, res: Response) => {
     if (!parsed.success) return sendError(res, 400, parsed.error.issues[0].message);
     const biz = await storage.createBusiness(parsed.data as InsertBusiness);
     return res.status(201).json(biz);
-  } catch (_error) {
+  } catch (error) {
+    // Task #13 — vincolo UNIQUE su LOWER(email) (migrations/0142_*.sql).
+    if (isUniqueViolation(error, "businesses_email_lower_uq")) {
+      return sendError(res, 409, "Email già in uso da un altro business");
+    }
     return sendError(res, 500, "Errore creazione business");
   }
 });
@@ -129,7 +134,10 @@ router.put("/business/:id", async (req: Request, res: Response) => {
     const biz = await storage.updateBusiness(String(req.params.id), parsed.data as Partial<InsertBusiness>);
     if (!biz) return sendError(res, 404, "Business non trovato");
     return res.json(biz);
-  } catch (_error) {
+  } catch (error) {
+    if (isUniqueViolation(error, "businesses_email_lower_uq")) {
+      return sendError(res, 409, "Email già in uso da un altro business");
+    }
     return sendError(res, 500, "Errore aggiornamento business");
   }
 });

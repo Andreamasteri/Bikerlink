@@ -10,6 +10,7 @@ import {
   type ModeratorLog, type InsertModeratorLog,
 } from "@shared/db";
 import { BusinessStorage } from "./business";
+import { normalizeOptionalEmail } from "../lib/normalize-email";
 
 export class SocialStorage extends BusinessStorage {
   async getWorkshops(approved?: boolean): Promise<Workshop[]> {
@@ -25,12 +26,15 @@ export class SocialStorage extends BusinessStorage {
   }
 
   async createWorkshop(data: InsertWorkshop): Promise<Workshop> {
-    const [workshop] = await db.insert(workshops).values(data).returning();
+    const [workshop] = await db.insert(workshops)
+      .values({ ...data, email: normalizeOptionalEmail(data.email) })
+      .returning();
     return workshop;
   }
 
   async updateWorkshop(id: string, data: Partial<InsertWorkshop>): Promise<Workshop | undefined> {
-    const [workshop] = await db.update(workshops).set({ ...data, updatedAt: new Date() }).where(eq(workshops.id, id)).returning();
+    const patch = "email" in data ? { ...data, email: normalizeOptionalEmail(data.email) } : data;
+    const [workshop] = await db.update(workshops).set({ ...patch, updatedAt: new Date() }).where(eq(workshops.id, id)).returning();
     return workshop;
   }
 

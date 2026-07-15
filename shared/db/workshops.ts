@@ -8,6 +8,7 @@ import {
   doublePrecision,
   jsonb,
   index,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
 import { z } from "zod";
 import { users } from "./users";
@@ -34,6 +35,12 @@ export const workshops = pgTable("workshops", {
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (table) => [
   index("workshops_location_idx").on(table.latitude, table.longitude),
+  // Task #13 — email officina unica case-insensitive, opzionale (NULL/''
+  // esclusi dal vincolo). Vedi migrations/0142_*.sql e storage/social.ts
+  // (normalizzazione trim+lower in createWorkshop/updateWorkshop).
+  uniqueIndex("workshops_email_lower_uq")
+    .on(sql`LOWER(${table.email})`)
+    .where(sql`${table.email} IS NOT NULL AND ${table.email} <> ''`),
 ]);
 
 export const workshopContacts = pgTable("workshop_contacts", {

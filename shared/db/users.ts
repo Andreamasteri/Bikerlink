@@ -121,6 +121,9 @@ export const users = pgTable("users", {
   index("users_user_type_idx").on(table.userType),
   index("users_active_pool_idx").on(table.status, table.isFake, table.ghostMode),
   index("users_role_idx").on(table.role),
+  // Task #13 — nickname deve essere unico case-insensitive (l'app confronta
+  // già via LOWER() in getUserByNickname). Vedi migrations/0142_*.sql.
+  uniqueIndex("users_nickname_lower_uq").on(sql`LOWER(${table.nickname})`),
 ]);
 
 export const userPhotos = pgTable("user_photos", {

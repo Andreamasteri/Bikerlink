@@ -58,6 +58,12 @@ export const businesses = pgTable("businesses", {
   index("businesses_location_idx").on(table.latitude, table.longitude),
   index("businesses_type_idx").on(table.type),
   uniqueIndex("businesses_access_token_idx").on(table.accessToken),
+  // Task #13 — email business unica case-insensitive, ma opzionale: le righe
+  // senza email (NULL o stringa vuota) sono escluse dal vincolo. Vedi
+  // migrations/0142_*.sql e storage/business.ts (normalizzazione trim+lower).
+  uniqueIndex("businesses_email_lower_uq")
+    .on(sql`LOWER(${table.email})`)
+    .where(sql`${table.email} IS NOT NULL AND ${table.email} <> ''`),
 ]);
 
 /**
