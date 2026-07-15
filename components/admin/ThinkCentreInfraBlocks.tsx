@@ -208,42 +208,6 @@ export function DragonflyBlock({
   );
 }
 
-export function PostgresBlock({
-  service,
-  isLoading,
-  hasError,
-}: { service?: SimpleServiceHealth; isLoading?: boolean; hasError?: boolean }) {
-  return (
-    <InfraBlock
-      serviceKey="postgres"
-      label="PostgreSQL"
-      icon="database"
-      service={service}
-      configNote="Aggiungere POSTGRES_PROBE_HOST (e POSTGRES_PROBE_PORT se diversa da 5432) nei secret Replit."
-      isLoading={isLoading}
-      hasError={hasError}
-    />
-  );
-}
-
-export function PgAdminBlock({
-  service,
-  isLoading,
-  hasError,
-}: { service?: SimpleServiceHealth; isLoading?: boolean; hasError?: boolean }) {
-  return (
-    <InfraBlock
-      serviceKey="pgadmin"
-      label="pgAdmin"
-      icon="monitor-eye"
-      service={service}
-      configNote="Aggiungere PGADMIN_URL (es. http://192.168.1.35:5050) nei secret Replit."
-      isLoading={isLoading}
-      hasError={hasError}
-    />
-  );
-}
-
 export function NginxBlock({
   service,
   isLoading,

@@ -357,7 +357,6 @@ $(bold "Secrets Replit da aggiornare")
   THINKCENTRE_AGENT_TOKEN=<valore da .env.local (TC_AGENT_TOKEN)>
   # Probe infra via TC agent (nessun token aggiuntivo: usano THINKCENTRE_AGENT_TOKEN)
   NGINX_MONITOR_URL=https://tc.${BASE_DOMAIN}/probe/nginx
-  PGADMIN_URL=https://tc.${BASE_DOMAIN}/probe/pgadmin
   UPTIME_KUMA_URL=https://tc.${BASE_DOMAIN}/probe/uptime-kuma
   REDIS_PROBE_URL=https://tc.${BASE_DOMAIN}/probe/redis
 

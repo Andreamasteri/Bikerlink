@@ -4,7 +4,7 @@
  * GET /api/admin/thinkcentre-health
  * Probe parallelo dei servizi self-hosted sul ThinkCentre:
  * GraphHopper (routing), Ollama (AI), Whisper (ASR), Photon (geocoding),
- * Valhalla (routing), DragonflyDB (cache), PostgreSQL (DB), pgAdmin, nginx, Uptime Kuma.
+ * Valhalla (routing), DragonflyDB (cache), nginx, Uptime Kuma.
  */
 
 import { Router, type Request, type Response as ExpressResponse } from "express";
@@ -30,8 +30,6 @@ import {
 } from "./thinkcentre-health-vn-probes";
 import {
   probeDragonflyInfra,
-  probePostgresInfra,
-  probePgAdmin,
   probeNginxInfra,
   probeUptimeKuma,
 } from "./thinkcentre-health-infra-probes";
@@ -239,8 +237,6 @@ router.get("/thinkcentre-health", async (_req: Request, res: ExpressResponse) =>
       whisper,
       ufwDetail,
       dragonflyInfra,
-      postgresInfra,
-      pgadminInfra,
       nginxInfra,
       uptimeKumaInfra,
       aresDetail,
@@ -253,8 +249,6 @@ router.get("/thinkcentre-health", async (_req: Request, res: ExpressResponse) =>
       probeWhisper(),
       probeUfwDetailed(),
       probeDragonflyInfra(),
-      probePostgresInfra(),
-      probePgAdmin(),
       probeNginxInfra(),
       probeUptimeKuma(),
       probeAres(),
@@ -299,30 +293,6 @@ router.get("/thinkcentre-health", async (_req: Request, res: ExpressResponse) =>
       history: dragonflyInfra.history,
       probeLog: dragonflyInfra.probeLog,
     };
-    const postgresService: ServiceHealth = {
-      key: "postgres",
-      label: "PostgreSQL",
-      configured: postgresInfra.configured,
-      ok: postgresInfra.ok,
-      startingUp: postgresInfra.ok ? false : isStartingUp("postgres"),
-      latencyMs: postgresInfra.latencyMs,
-      url: postgresInfra.url,
-      error: postgresInfra.error,
-      history: postgresInfra.history,
-      probeLog: postgresInfra.probeLog,
-    };
-    const pgadminService: ServiceHealth = {
-      key: "pgadmin",
-      label: "pgAdmin",
-      configured: pgadminInfra.configured,
-      ok: pgadminInfra.ok,
-      startingUp: pgadminInfra.ok ? false : isStartingUp("pgadmin"),
-      latencyMs: pgadminInfra.latencyMs,
-      url: pgadminInfra.url,
-      error: pgadminInfra.error,
-      history: pgadminInfra.history,
-      probeLog: pgadminInfra.probeLog,
-    };
     const nginxService: ServiceHealth = {
       key: "nginx",
       label: "nginx",
@@ -354,8 +324,6 @@ router.get("/thinkcentre-health", async (_req: Request, res: ExpressResponse) =>
       whisper,
       photonService,
       dragonflyService,
-      postgresService,
-      pgadminService,
       nginxService,
       uptimeKumaService,
     ];

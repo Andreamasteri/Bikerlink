@@ -46,9 +46,6 @@ export const PROBE_ENV_VARS = [
   "VALHALLA_API_KEY",
   "UFW_STATUS_URL",
   "TC_DRAGONFLY_URL",
-  "POSTGRES_PROBE_HOST",
-  "POSTGRES_PROBE_PORT",
-  "PGADMIN_URL",
   "NGINX_MONITOR_URL",
   "UPTIME_KUMA_URL",
 ] as const;
@@ -297,18 +294,6 @@ async function probeDragonflyOk(): Promise<boolean | null> {
   }
 }
 
-async function probePostgresOk(): Promise<boolean | null> {
-  const host = process.env.POSTGRES_PROBE_HOST?.trim();
-  if (!host) return null;
-  return tcpConnectOk(host, parseInt(process.env.POSTGRES_PROBE_PORT ?? "5432", 10));
-}
-
-async function probePgAdminOk(): Promise<boolean | null> {
-  const base = process.env.PGADMIN_URL?.replace(/\/$/, "");
-  if (!base) return null;
-  return httpProbe(`${base}/`, {}, (s) => s < 500);
-}
-
 async function probeNginxOk(): Promise<boolean | null> {
   const base = process.env.NGINX_MONITOR_URL?.replace(/\/$/, "");
   if (!base) return null;
@@ -329,8 +314,6 @@ export async function runAllProbes(): Promise<AggregateProbeResult> {
     { key: "valhalla",    label: "Valhalla",       fn: probeValhallaOk },
     { key: "ufw",         label: "Firewall (ufw)", fn: probeUfwOk },
     { key: "dragonfly",   label: "DragonflyDB",    fn: probeDragonflyOk },
-    { key: "postgres",    label: "PostgreSQL",     fn: probePostgresOk },
-    { key: "pgadmin",     label: "pgAdmin",        fn: probePgAdminOk },
     { key: "nginx",       label: "nginx",          fn: probeNginxOk },
     { key: "uptimekuma",  label: "Uptime Kuma",    fn: probeUptimeKumaOk },
   ];

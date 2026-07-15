@@ -16,8 +16,6 @@ export interface SystemStatusSnapshot {
   whisper: DotStatus;
   ufw: DotStatus;
   dragonfly: DotStatus;
-  postgres: DotStatus;
-  pgadmin: DotStatus;
   nginx: DotStatus;
   uptimeKuma: DotStatus;
   routing: DotStatus;
@@ -34,8 +32,6 @@ const _defaults: SystemStatusSnapshot = {
   whisper: "unknown",
   ufw: "unknown",
   dragonfly: "unknown",
-  postgres: "unknown",
-  pgadmin: "unknown",
   nginx: "unknown",
   uptimeKuma: "unknown",
   routing: "unknown",

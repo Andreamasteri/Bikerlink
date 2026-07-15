@@ -68,8 +68,6 @@ export interface SystemStatuses {
   whisper: DotStatus;
   ufw: DotStatus;
   dragonfly: DotStatus;
-  postgres: DotStatus;
-  pgadmin: DotStatus;
   nginx: DotStatus;
   uptimeKuma: DotStatus;
   routing: DotStatus;
@@ -91,8 +89,6 @@ const DOT_DEFS: { key: keyof SystemStatuses; label: string }[] = [
   { key: "whisper",      label: "Whisper ASR"     },
   { key: "ufw",          label: "Firewall"        },
   { key: "dragonfly",    label: "DragonflyDB"     },
-  { key: "postgres",     label: "PostgreSQL"      },
-  { key: "pgadmin",      label: "pgAdmin"         },
   { key: "nginx",        label: "nginx"           },
   { key: "uptimeKuma",   label: "Uptime Kuma"     },
   { key: "routing",      label: "Routing"         },

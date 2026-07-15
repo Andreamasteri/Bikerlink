@@ -14,8 +14,6 @@ import {
   OllamaBlock,
   WhisperBlock,
   DragonflyBlock,
-  PostgresBlock,
-  PgAdminBlock,
   NginxBlock,
   UptimeKumaBlock,
 } from "./ThinkCentreInfraBlocks";
@@ -38,8 +36,6 @@ type ServiceKey =
   | "whisper"
   | "photon"
   | "dragonfly"
-  | "postgres"
-  | "pgadmin"
   | "nginx"
   | "uptimekuma";
 
@@ -102,8 +98,6 @@ type ThinkCentreStatusKeys =
   | "whisper"
   | "ufw"
   | "dragonfly"
-  | "postgres"
-  | "pgadmin"
   | "nginx"
   | "uptimeKuma";
 
@@ -116,8 +110,6 @@ const ALL_UNKNOWN: Pick<SystemStatuses, ThinkCentreStatusKeys> = {
   whisper: "unknown",
   ufw: "unknown",
   dragonfly: "unknown",
-  postgres: "unknown",
-  pgadmin: "unknown",
   nginx: "unknown",
   uptimeKuma: "unknown",
 };
@@ -193,8 +185,6 @@ export function ThinkCentreCard({
       whisper: serviceToStatus(findSvc("whisper")),
       ufw: ufwToStatus(data.ufwDetail),
       dragonfly: serviceToStatus(findSvc("dragonfly")),
-      postgres: serviceToStatus(findSvc("postgres")),
-      pgadmin: serviceToStatus(findSvc("pgadmin")),
       nginx: serviceToStatus(findSvc("nginx")),
       uptimeKuma: serviceToStatus(findSvc("uptimekuma")),
     });
@@ -409,20 +399,6 @@ export function ThinkCentreCard({
           {!poweredOffActive && (
             <DragonflyBlock
               service={error ? undefined : data?.services.find((s) => s.key === "dragonfly")}
-              isLoading={isLoading}
-              hasError={!!error}
-            />
-          )}
-          {!poweredOffActive && (
-            <PostgresBlock
-              service={error ? undefined : data?.services.find((s) => s.key === "postgres")}
-              isLoading={isLoading}
-              hasError={!!error}
-            />
-          )}
-          {!poweredOffActive && (
-            <PgAdminBlock
-              service={error ? undefined : data?.services.find((s) => s.key === "pgadmin")}
               isLoading={isLoading}
               hasError={!!error}
             />

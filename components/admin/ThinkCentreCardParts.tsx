@@ -44,8 +44,6 @@ const SERVICE_LABELS: Record<string, string> = {
   photon: "Photon",
   ufw: "UFW",
   dragonfly: "DragonflyDB",
-  postgres: "PostgreSQL",
-  pgadmin: "pgAdmin",
   nginx: "nginx",
   uptimekuma: "Uptime Kuma",
 };

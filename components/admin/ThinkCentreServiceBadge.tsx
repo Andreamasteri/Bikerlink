@@ -64,8 +64,6 @@ export function ServiceBadgeStrip({ data }: { data: ThinkCentreHealthMini }) {
       label: "Infra",
       items: [
         { name: "DragonflyDB", color: svcColor(find("dragonfly")) },
-        { name: "Postgres", color: svcColor(find("postgres")) },
-        { name: "pgAdmin", color: svcColor(find("pgadmin")) },
         { name: "nginx", color: svcColor(find("nginx")) },
         { name: "Kuma", color: svcColor(find("uptimekuma")) },
       ],

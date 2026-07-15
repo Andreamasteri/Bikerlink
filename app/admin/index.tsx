@@ -102,8 +102,6 @@ const UNKNOWN_STATUSES: SystemStatuses = {
   whisper: "unknown",
   ufw: "unknown",
   dragonfly: "unknown",
-  postgres: "unknown",
-  pgadmin: "unknown",
   nginx: "unknown",
   uptimeKuma: "unknown",
   routing: "unknown",
@@ -170,7 +168,7 @@ export default function AdminDashboard() {
   const bowieSecurityBlocks = bowieBadge?.securityBlocks24h ?? 0;
 
   const handleThinkCentreStatuses = useCallback(
-    (s: Pick<SystemStatuses, "thinkcentre" | "graphhopper" | "valhalla" | "photon" | "ollama" | "whisper" | "ufw" | "dragonfly" | "postgres" | "pgadmin" | "nginx" | "uptimeKuma">) => {
+    (s: Pick<SystemStatuses, "thinkcentre" | "graphhopper" | "valhalla" | "photon" | "ollama" | "whisper" | "ufw" | "dragonfly" | "nginx" | "uptimeKuma">) => {
       setSystemStatuses((prev) => ({ ...prev, ...s }));
     },
     []
@@ -197,8 +195,6 @@ export default function AdminDashboard() {
       ollama:      thinkcentreRef,
       ufw:         thinkcentreRef,
       dragonfly:   thinkcentreRef,
-      postgres:    thinkcentreRef,
-      pgadmin:     thinkcentreRef,
       nginx:       thinkcentreRef,
       uptimeKuma:  thinkcentreRef,
       graphhopper: graphhopperRef,
@@ -219,7 +215,7 @@ export default function AdminDashboard() {
       {
         key: "thinkcentre",
         label: "ThinkCentre",
-        keywords: ["thinkcentre", "think centre", "server di casa", "home server", "dragonfly", "dragonflydb", "postgres", "postgresql", "nginx", "ufw", "pgadmin", "pg admin", "uptime kuma", "kuma", "tailscale", "minipc", "mini pc", "ollama", "ai locale", "llm locale"],
+        keywords: ["thinkcentre", "think centre", "server di casa", "home server", "dragonfly", "dragonflydb", "nginx", "ufw", "uptime kuma", "kuma", "tailscale", "minipc", "mini pc", "ollama", "ai locale", "llm locale"],
         ref: thinkcentreRef,
         icon: "server-network",
       },

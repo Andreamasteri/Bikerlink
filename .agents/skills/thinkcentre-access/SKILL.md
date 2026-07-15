@@ -1,6 +1,6 @@
 ---
 name: thinkcentre-access
-description: Accedere in modo autonomo al ThinkCentre (server di casa BikerLink) per controllare e gestire i servizi self-hosted (GraphHopper, Valhalla, Ollama, Nominatim, Whisper, Postgres, Redis). Le credenziali SSH sono GIA' nei secret dell'environment. Usa questa skill ogni volta che devi controllare lo stato, riavviare o accendere/spegnere un servizio sul ThinkCentre, diagnosticare routing/Valhalla/GraphHopper giù, o leggere CPU/RAM/uptime del mini-PC. NON chiedere mai le credenziali all'utente.
+description: Accedere in modo autonomo al ThinkCentre (server di casa BikerLink) per controllare e gestire i servizi self-hosted (GraphHopper, Valhalla, Ollama, Nominatim, Whisper, Redis/DragonflyDB). Le credenziali SSH sono GIA' nei secret dell'environment. Usa questa skill ogni volta che devi controllare lo stato, riavviare o accendere/spegnere un servizio sul ThinkCentre, diagnosticare routing/Valhalla/GraphHopper giù, o leggere CPU/RAM/uptime del mini-PC. NON chiedere mai le credenziali all'utente.
 ---
 
 # ThinkCentre Access
@@ -48,7 +48,7 @@ NON usare l'IP LAN `192.168.1.35` né nomi Tailscale: non sono risolvibili dalla
 | **GraphHopper** ×7 aree | Docker | `docker start/stop bikerlink-gh-<area>` |
 | **Nominatim** | Docker | `docker start/stop bikerlink-nominatim` |
 | **Whisper** | Docker + watchdog systemd | `sudo systemctl restart whisper` |
-| **Postgres / Redis / pgAdmin** | Docker | `docker start/stop bikerlink-<nome>` |
+| **DragonflyDB (Redis)** | Docker | `docker start/stop bikerlink-dragonfly` |
 | **Ollama** | systemd (NON docker) | `sudo systemctl start/stop/status ollama` |
 | **Cloudflared (tunnel)** | systemd | `sudo systemctl restart cloudflared` |
 

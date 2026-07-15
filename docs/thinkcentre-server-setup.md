@@ -468,7 +468,6 @@ redis-cli -h bikerlink.duckdns.org -p 6380 \
 | Nominatim | 8080 | `docker compose up -d` in `infra/self-host/` |
 | Ollama | 11434 | `systemctl start ollama` |
 | Whisper | 9000 | `systemctl start whisper` |
-| PostgreSQL | 5432 | `docker compose up -d postgres` in `infra/self-host/` |
 | ufw-status daemon | 9099 | `systemctl start bikerlink-ufw-status` |
 
 ### Comandi utili
