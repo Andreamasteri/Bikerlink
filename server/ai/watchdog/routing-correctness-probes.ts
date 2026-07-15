@@ -17,6 +17,7 @@ import type { RouteRequest } from "../../routing/router-selector";
 import { cfAccessHeaders } from "../../lib/cf-access";
 import { isThinkCentrePoweredOff } from "../../lib/thinkcentre-powered-off";
 import { isThinkCentreInMaintenance } from "../../lib/thinkcentre-maintenance";
+import { isRoutingExplicitlyDisabled } from "../../routing/routing-kill-switch";
 import {
   measureRouteResult,
   validateRoutePlausibility,
@@ -86,11 +87,14 @@ function notConfigured(engine: CorrectnessEngine): CorrectnessProbeResult {
   };
 }
 
-function skipped(engine: CorrectnessEngine): CorrectnessProbeResult {
+function skipped(
+  engine: CorrectnessEngine,
+  reason = "ThinkCentre spento/in manutenzione — sonda saltata",
+): CorrectnessProbeResult {
   return {
     engine, configured: true, reachable: false, plausible: false, ok: false,
     skipped: true, latencyMs: null, distanceKm: null, durationMin: null,
-    reason: "ThinkCentre spento/in manutenzione — sonda saltata", severity: "info",
+    reason, severity: "info",
   };
 }
 
@@ -213,10 +217,12 @@ export function derivePipelineCorrectness(
     };
   }
   if (gh.skipped || valhalla.skipped) {
+    // Rispecchia la causa reale del salto (ThinkCentre spento vs kill-switch routing).
+    const skipReason = (gh.skipped ? gh.reason : valhalla.reason) ?? "motori self-hosted non valutati";
     return {
       engine: "pipeline", configured: true, reachable: false, plausible: false, ok: false,
       skipped: true, latencyMs: null, distanceKm: null, durationMin: null,
-      reason: "ThinkCentre spento/in manutenzione — pipeline non valutata", severity: "info", detail,
+      reason: `${skipReason} — pipeline non valutata`, severity: "info", detail,
     };
   }
 
@@ -271,11 +277,22 @@ export async function runRoutingCorrectnessProbes(force = false): Promise<Correc
     return cachedResults;
   }
 
-  const [poweredOff, inMaintenance] = await Promise.all([
+  const [poweredOff, inMaintenance, routingOff] = await Promise.all([
     isThinkCentrePoweredOff().catch(() => false),
     isThinkCentreInMaintenance().catch(() => false),
+    // Solo un OFF CONFERMATO dall'admin fa saltare le sonde. In caso di stato
+    // incerto (lettura DB fallita) → false → eseguiamo comunque il probe, per
+    // non mascherare un guasto reale (vedi isRoutingExplicitlyDisabled).
+    isRoutingExplicitlyDisabled().catch(() => false),
   ]);
   const skipSelfHosted = poweredOff || inMaintenance;
+  // Routing spento via kill-switch = stato voluto dall'admin, NON un guasto:
+  // le sonde di routing (GH/Valhalla) verrebbero rifiutate dal client con
+  // "Routing disabilitato via kill-switch" e classificate come KO critico,
+  // trascinando la salute complessiva in BROKEN. Le saltiamo (neutro), come
+  // per il ThinkCentre spento. Il geocoding (Photon) è indipendente dal
+  // kill-switch e continua a essere sondato.
+  const ROUTING_OFF_REASON = "Routing disabilitato via kill-switch — sonda saltata";
 
   let gh: CorrectnessProbeResult;
   let valhalla: CorrectnessProbeResult;
@@ -287,9 +304,20 @@ export async function runRoutingCorrectnessProbes(force = false): Promise<Correc
     photon = process.env.PHOTON_URL ? skipped("photon") : notConfigured("photon");
   } else {
     // ≤3 sonde di rete in parallelo (nessuna query DB globale in Promise.all).
+    // GH/Valhalla saltate solo se il routing è disabilitato in modo confermato.
+    const ghProbe = routingOff
+      ? Promise.resolve(
+          process.env.GRAPHHOPPER_URL ? skipped("graphhopper", ROUTING_OFF_REASON) : notConfigured("graphhopper"),
+        )
+      : probeGraphHopperCorrectness();
+    const valhallaProbe = routingOff
+      ? Promise.resolve(
+          process.env.VALHALLA_URL ? skipped("valhalla", ROUTING_OFF_REASON) : notConfigured("valhalla"),
+        )
+      : probeValhallaCorrectness();
     [gh, valhalla, photon] = await Promise.all([
-      probeGraphHopperCorrectness(),
-      probeValhallaCorrectness(),
+      ghProbe,
+      valhallaProbe,
       probePhotonCorrectness(),
     ]);
   }

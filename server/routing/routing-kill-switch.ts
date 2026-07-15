@@ -61,6 +61,24 @@ export async function refreshRoutingKillSwitch(): Promise<boolean> {
   return softCache;
 }
 
+/**
+ * true SOLO se il routing è disabilitato in modo CONFERMATO dall'admin, cioè
+ * l'AppSetting è stato letto con successo e vale ≠ "true" (o è assente).
+ *
+ * A differenza di `!isRoutingEnabled()`, questa funzione NON confonde un errore
+ * di lettura DB con un "disabilitato": in caso di eccezione restituisce `false`
+ * (= "non confermato disabilitato"). È pensata per i chiamanti che devono
+ * evitare falsi-skip nascondendo un guasto reale — es. le sonde di correttezza
+ * del watchdog: se lo stato del kill-switch è incerto (DB lento/errore) devono
+ * eseguire comunque il probe invece di saltarlo silenziosamente. Legge sempre
+ * fresco dal DB (non usa la cache in-memory), così un errore transitorio non
+ * resta "appiccicato".
+ */
+export async function isRoutingExplicitlyDisabled(): Promise<boolean> {
+  const s = await storage.getAppSetting(DB_KEY);
+  return s?.value !== "true";
+}
+
 export interface RoutingKillSwitchState {
   /** Stato effettivo del routing (soft toggle DB). */
   enabled: boolean;
