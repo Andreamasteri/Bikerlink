@@ -13,8 +13,12 @@ export {
   saveNadirManualWithBackup,
   getNadirManualPrevious,
   chunkManual,
+  getNadirManualTranslationStatus,
   type NadirManualBackup,
+  type NadirManualTranslationState,
+  type NadirManualTranslationStatusEntry,
 } from "./manual";
+export { retranslateManualNow, isRetranslationInFlight } from "./translate";
 export {
   searchNadir,
   loadFragmentManifest,

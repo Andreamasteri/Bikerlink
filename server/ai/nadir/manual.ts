@@ -12,7 +12,7 @@ import {
   NADIR_MANUAL_PREVIOUS_KEY,
   NADIR_MANUAL_TRANSLATIONS_KEY,
 } from "./constants";
-import { SOURCE_APP_LANGUAGE, type AppLanguageCode } from "@shared/languages";
+import { SOURCE_APP_LANGUAGE, TRANSLATABLE_APP_LANGUAGES, type AppLanguageCode } from "@shared/languages";
 
 /** Legge il manuale ITALIANO corrente (stringa vuota se mai scritto). Sorgente di verità. */
 export async function getNadirManual(): Promise<string> {
@@ -113,6 +113,41 @@ export async function getAllNadirManualVersions(): Promise<Partial<Record<AppLan
     if (entry?.text?.trim() && entry.sourceHash === currentHash) out[lang] = entry.text;
   }
   return out;
+}
+
+/**
+ * Task #112 — Stato per-lingua delle traduzioni rispetto all'italiano ATTUALE,
+ * per il pannello admin: `current` = sourceHash combacia con l'italiano di ora,
+ * `stale` = esiste ma è legata a una versione precedente (il manuale è stato
+ * cambiato — es. da uno hand-edit admin — da quando è stata generata),
+ * `missing` = mai tradotta in quella lingua.
+ */
+export type NadirManualTranslationState = "current" | "stale" | "missing";
+
+export interface NadirManualTranslationStatusEntry {
+  lang: AppLanguageCode;
+  state: NadirManualTranslationState;
+  translatedAt: string | null;
+}
+
+/** Stato di tutte le lingue traducibili rispetto al manuale italiano corrente. */
+export async function getNadirManualTranslationStatus(): Promise<NadirManualTranslationStatusEntry[]> {
+  const [italian, translations] = await Promise.all([
+    getNadirManual(),
+    getNadirManualTranslations(),
+  ]);
+  const currentHash = hashManualText(italian);
+  return TRANSLATABLE_APP_LANGUAGES.map((lang) => {
+    const entry = translations[lang];
+    if (!entry?.text?.trim()) {
+      return { lang, state: "missing" as const, translatedAt: null };
+    }
+    return {
+      lang,
+      state: (entry.sourceHash === currentHash ? "current" : "stale") as NadirManualTranslationState,
+      translatedAt: entry.translatedAt,
+    };
+  });
 }
 
 /** Versione precedente del manuale, catturata prima dell'ultima sovrascrittura. */

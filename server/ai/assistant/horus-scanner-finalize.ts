@@ -23,15 +23,10 @@ import { callOllamaChat } from "../../lib/ollama-client";
 import { redactPII } from "../moderation/redact";
 import { matchesSensitive } from "./security-filter";
 import { getLatestRunSummary, listOpenViolations } from "../db-integrity/runner";
-import {
-  saveNadirManualWithBackup,
-  saveNadirManualTranslations,
-  hashManualText,
-  type NadirManualTranslations,
-} from "../nadir/manual";
-import { reindexNadir } from "../nadir/reindex";
+import { saveNadirManualWithBackup } from "../nadir/manual";
+import { retranslateManualNow } from "../nadir/translate";
 import { type FileScanStore, HORUS_THINK_TAG_CONTRACT } from "./codebase-inventory";
-import { TRANSLATABLE_APP_LANGUAGES, APP_LANGUAGE_NAMES, type AppLanguageCode } from "@shared/languages";
+import { TRANSLATABLE_APP_LANGUAGES } from "@shared/languages";
 
 const MIRROR_DIR = path.join(process.cwd(), "logs");
 const MIN_ARTIFACT_LEN = 30;
@@ -336,63 +331,14 @@ SEZIONE:`;
   return sanitize(stripThink(raw ?? ""));
 }
 
-// ── Task #107 — Traduzione del manuale in tutte le lingue app ────────────────
-// Verificato: con un budget generoso (come le altre finalizzazioni, la
-// traduzione gira poche volte per scansione, non per-file) ma il manuale intero
-// può superare comodamente la finestra di generazione di un solo turno. Si
-// traduce un BLOCCO alla volta (spezzato sui titoli "## ", stesso confine usato
-// per assemblare il manuale), non l'intero testo in un colpo solo.
-const TRANSLATE_NUM_PREDICT = 4000;
-
-async function translateManualBlock(block: string, langName: string): Promise<string | null> {
-  const prompt = `Sei un traduttore tecnico. Traduci FEDELMENTE in ${langName} il testo qui sotto, che è un frammento del manuale tecnico dell'app BikerLink scritto per istruire agenti AI. Mantieni ESATTAMENTE la struttura Markdown (titoli "##", paragrafi, elenchi), non aggiungere né omettere contenuto, non aggiungere commenti tuoi, non tradurre nomi propri di prodotto (es. "BikerLink", "Horus", "Bowie", "Nadir"). Restituisci SOLO il testo tradotto, nient'altro.
-
-TESTO ORIGINALE (italiano):
-${block}
-
-TRADUZIONE (${langName}):`;
-  const raw = await callOllamaChat(prompt, undefined, {
-    persona: "horus",
-    model: HORUS_MODEL_ID,
-    system: HORUS_THINK_TAG_CONTRACT,
-    temperature: 0.2,
-    numPredict: TRANSLATE_NUM_PREDICT,
-  });
-  const clean = stripThink(raw ?? "").trim();
-  return clean.length > 0 ? clean : null;
-}
-
-/**
- * Traduce l'intero manuale (italiano) in `lang`, blocco per blocco. Ritorna
- * null se NESSUN blocco è stato tradotto con successo (mai una traduzione
- * vuota/parziale silenziosa: il chiamante ricade sull'italiano per quella lingua).
- */
-/**
- * Task #113 — Esportata così il pannello admin può ritradurre UNA SOLA lingua
- * su richiesta (spot-check qualità / recupero da traduzione mancante) senza
- * dover rilanciare l'intera scansione completa di Horus.
- */
-export async function translateManualToLanguage(manual: string, lang: AppLanguageCode): Promise<string | null> {
-  const langName = APP_LANGUAGE_NAMES[lang];
-  // Spezza sui titoli di sezione di primo livello ("## "), stesso separatore
-  // usato per assemblare il manuale in finalizeManualScan; il preambolo (titolo
-  // + riga "Aggiornato il...") prima della prima sezione è il suo blocco.
-  const blocks = manual.split(/\n(?=## )/).filter((b) => b.trim().length > 0);
-  const translatedBlocks: string[] = [];
-  for (const block of blocks) {
-    const translated = await translateManualBlock(block, langName);
-    if (translated) translatedBlocks.push(translated);
-  }
-  if (translatedBlocks.length === 0) return null;
-  return translatedBlocks.join("\n\n");
-}
-
 /**
  * Finalizza la modalità MANUALE: raggruppa le descrizioni per-file per area,
  * fa scrivere a Horus una sezione per area, assembla il manuale, lo salva nello
  * storage di Nadir CONSERVANDO la versione precedente, lo traduce in TUTTE le
  * lingue supportate dall'app (Task #107 — così Bowie ragiona con la stessa
  * profondità in ogni lingua, non solo in italiano) e reindicizza tutte le versioni.
+ * La traduzione vera e propria vive in ../nadir/translate.ts (Task #112 — stessa
+ * logica riusata quando un admin modifica il manuale a mano).
  */
 export async function finalizeManualScan(store: FileScanStore): Promise<string> {
   // Raggruppa le note (non vuote) per area.
@@ -429,35 +375,18 @@ export async function finalizeManualScan(store: FileScanStore): Promise<string> 
   const { backedUp } = await saveNadirManualWithBackup(manual);
 
   // Task #107 — Traduce il manuale appena generato in ogni lingua app supportata
-  // (tranne l'italiano, la sorgente). Best-effort per lingua: una traduzione
-  // fallita non blocca le altre né il salvataggio/reindicizzazione dell'italiano
-  // già avvenuti sopra; quella lingua ricade sull'italiano finché non riesce.
-  const sourceHash = hashManualText(manual);
-  const translations: NadirManualTranslations = {};
-  for (const lang of TRANSLATABLE_APP_LANGUAGES) {
-    try {
-      const translated = await translateManualToLanguage(manual, lang);
-      if (translated) translations[lang] = { text: translated, translatedAt: now, sourceHash };
-    } catch (e) {
-      console.warn(`[horus-scan:manual] traduzione ${lang} fallita (non-fatale, fallback italiano):`, (e as Error).message);
-    }
-  }
-  const translatedLangs = Object.keys(translations) as AppLanguageCode[];
-  if (translatedLangs.length > 0) {
-    await saveNadirManualTranslations(translations);
-  }
-
-  const index = await reindexNadir("manual").catch((e) => {
-    console.warn("[horus-scan:manual] reindicizzazione fallita (manuale salvato comunque):", (e as Error).message);
-    return null;
-  });
-
+  // (tranne l'italiano, la sorgente) e reindicizza tutte le versioni. Best-effort
+  // per lingua: una traduzione fallita non blocca le altre né il salvataggio
+  // dell'italiano già avvenuto sopra; quella lingua ricade sull'italiano finché
+  // non riesce (retranslateManualNow include già la reindicizzazione).
+  const { translatedLangs } = await retranslateManualNow("horus-scan");
   const missingLangs = TRANSLATABLE_APP_LANGUAGES.filter((l) => !translatedLangs.includes(l));
+
   return (
     `Manuale generato (${sections.length} aree, ${manual.length} caratteri) e salvato nello storage di Nadir` +
     `${backedUp ? " (versione precedente conservata per confronto)" : ""}. ` +
     `Tradotto in ${translatedLangs.length}/${TRANSLATABLE_APP_LANGUAGES.length} lingue` +
     `${missingLangs.length > 0 ? ` (mancanti: ${missingLangs.join(", ")}, ricadono sull'italiano)` : ""}. ` +
-    `${index ? (index.ok ? "Reindicizzazione OK." : "Reindicizzazione con avvisi.") : "Reindicizzazione da riprovare."}`
+    `Reindicizzazione inclusa nella rigenerazione traduzioni.`
   );
 }

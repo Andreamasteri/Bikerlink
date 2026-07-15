@@ -236,6 +236,12 @@ export default function NadirScreen() {
         {reindexMutation.isError ? (
           <Text style={styles.errText}>Errore reindicizzazione.</Text>
         ) : null}
+        {saveMutation.isSuccess ? (
+          <Text style={styles.hint}>
+            Rigenerazione traduzioni avviata in background (può richiedere qualche minuto).
+            Ricarica questa scheda per aggiornare gli stati sotto.
+          </Text>
+        ) : null}
       </View>
 
       {/* ── Stato reindicizzazione ── */}

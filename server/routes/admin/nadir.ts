@@ -18,6 +18,8 @@ import {
   reindexNadir,
   runNadirSearchHealthProbe,
   searchNadir,
+  getNadirManualTranslationStatus,
+  retranslateManualNow,
   NADIR_LOG_PREFIX,
 } from "../../ai/nadir";
 import {
@@ -25,7 +27,7 @@ import {
   saveNadirManualTranslation,
   hashManualText,
 } from "../../ai/nadir/manual";
-import { translateManualToLanguage } from "../../ai/assistant/horus-scanner-finalize";
+import { translateManualToLanguage } from "../../ai/nadir/translate";
 import {
   TRANSLATABLE_APP_LANGUAGES,
   APP_LANGUAGE_NAMES,
@@ -47,8 +49,11 @@ const searchSchema = z.object({
 
 router.get("/manual", async (_req: Request, res: Response) => {
   try {
-    const text = await getNadirManual();
-    return sendSuccess(res, { text });
+    const [text, translations] = await Promise.all([
+      getNadirManual(),
+      getNadirManualTranslationStatus(),
+    ]);
+    return sendSuccess(res, { text, translations });
   } catch (err) {
     return sendError(res, 500, (err as Error)?.message ?? "Errore lettura manuale Nadir");
   }
@@ -59,7 +64,20 @@ router.put("/manual", async (req: Request, res: Response) => {
   if (!parsed.success) return sendError(res, 400, "Body non valido");
   try {
     const saved = await saveNadirManual(parsed.data.text);
-    return sendSuccess(res, { text: saved, length: saved.length });
+    // Task #112 — Un hand-edit admin cambia la sorgente italiana: le traduzioni
+    // esistenti restano legate al vecchio sourceHash e getNadirManualForLanguage
+    // già ricade automaticamente sull'italiano per quelle stantie (vedi manual.ts).
+    // Qui si avvia ANCHE una rigenerazione delle traduzioni per non lasciare le
+    // altre lingue sull'italiano più del necessario. Non bloccante: la risposta
+    // torna subito, la rigenerazione (minuti, chiama Ollama per lingua) gira in
+    // background e si autoesclude se un'altra è già in corso (es. scansione Horus).
+    retranslateManualNow("admin-edit").catch((err) => {
+      console.warn(
+        `${NADIR_LOG_PREFIX} rigenerazione traduzioni dopo hand-edit admin fallita (manuale salvato comunque):`,
+        (err as Error).message,
+      );
+    });
+    return sendSuccess(res, { text: saved, length: saved.length, translationsRegenerating: true });
   } catch (err) {
     return sendError(res, 500, (err as Error)?.message ?? "Errore salvataggio manuale Nadir");
   }
