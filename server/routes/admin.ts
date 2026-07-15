@@ -332,6 +332,7 @@ import matchingRouter from './admin/matching';
 import abRouter from './admin/ab';
 import embeddingsRouter from './admin/embeddings';
 import nadirRouter from './admin/nadir';
+import aresJobsRouter from './admin/ares-jobs';
 import otaRouter from './admin/ota';
 import otaAssistantRouter from './admin/ota-assistant';
 import mapsAdminRouter from './admin/maps/index';
@@ -510,6 +511,7 @@ router.use('/', _requireAdmin, matchingRouter);
 router.use('/', _requireAdmin, abRouter);
 router.use('/embeddings', _requireAdmin, embeddingsRouter);
 router.use('/nadir', _requireAdmin, nadirRouter);
+router.use('/ares', _requireAdmin, aresJobsRouter);
 // Task #2532 — Co-Pilot AI Moderazione.
 router.use('/', _requireAdmin, aiModerationRouter);
 router.use('/', _requireAdmin, aiModerationNextRouter);

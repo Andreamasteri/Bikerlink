@@ -137,6 +137,51 @@ export function parseAresInvocation(message: string): boolean {
   );
 }
 
+// ── Task #87 — Comando admin: avvio job long-running di Ares ───────────────────
+//
+// Ares ha due capacità autonome (analisi codice+DB, generazione manuale) che si
+// avviano SOLO su richiesta esplicita. Anche da Bowie in chat: "sveglia Ares,
+// fagli fare l'analisi completa del codice e del db" → job analisi; "Ares, leggi
+// l'app intera e produci un manuale testuale aggiornato" → job manuale.
+//
+// Questo classificatore riconosce l'INTENTO di AVVIARE uno dei due job (distinto
+// dall'invocazione di Ares per una consultazione mid-chat: quella è
+// parseAresInvocation). Deterministico, conservativo. Ritorna la modalità o null.
+//
+// NB: "sveglia" NON è nei verbi di parseAresInvocation, quindi "sveglia Ares e
+// fagli fare l'analisi" viene classificato QUI (job) e non come handoff generico.
+
+export type AresJobMode = "analysis" | "manual";
+
+const ARES_JOB_ANALYSIS_RE =
+  /\b(analisi|analizz\w+|revision\w+|passa\w*\s+in\s+rassegn\w+|scansion\w+|esamin\w+)\b/;
+const ARES_JOB_MANUAL_RE =
+  /\b(manuale|documentazion\w+|documenta\w*)\b/;
+// Segnali che si vuole coprire "tutta l'app / codice e db".
+const ARES_JOB_SCOPE_RE =
+  /\b(app\s+inter\w+|inter\w+\s+app|tutto\s+il\s+codice|codice\s+e\s+(il\s+)?db|codice\s+e\s+database|dell['’]?app|tutta\s+l['’]?app|dell['’]?intera\s+app)\b/;
+// Verbi che indicano "avvia / fai partire / fagli fare".
+const ARES_JOB_START_RE =
+  /\b(svegli\w+|avvi\w+|lancia\w*|fai\s+partire|fagli\s+fare|fall[oa]\s+fare|far\s+fare|produc\w+|gener\w+|scriv\w+|legg\w+|fai\s+un|fammi)\b/;
+
+export function detectAresJobRequest(message: string): AresJobMode | null {
+  const m = (message ?? "").toLowerCase();
+  if (!m.trim()) return null;
+  // Deve riguardare Ares esplicitamente.
+  if (!m.includes("ares")) return null;
+
+  const wantsManual = ARES_JOB_MANUAL_RE.test(m);
+  const wantsAnalysis = ARES_JOB_ANALYSIS_RE.test(m) || ARES_JOB_SCOPE_RE.test(m);
+  const hasStart = ARES_JOB_START_RE.test(m);
+
+  // Il manuale ha priorità: la parola "manuale"/"documentazione" è un segnale
+  // molto specifico e non ambiguo.
+  if (wantsManual && (hasStart || ARES_JOB_SCOPE_RE.test(m))) return "manual";
+  // Analisi: serve sia un verbo di avvio sia un intento di analisi/scope.
+  if (wantsAnalysis && hasStart) return "analysis";
+  return null;
+}
+
 // ── Task #4 — Comando admin: handoff Bowie → Quebracho ("chiama Quebracho") ────
 //
 // Analogo a parseAresInvocation. Riconosce il nome "quebracho" o il nomignolo

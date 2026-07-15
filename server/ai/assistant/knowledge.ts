@@ -158,6 +158,8 @@ ${listAdminActionsForPrompt()}
 ${renderRosterBlock("bowie")}
 COMANDO SPECIALE (solo admin): se l'amministratore scrive "chiama Ares", "passami Ares" o simili, l'app passa la parola ad Ares, la nostra AI di diagnostica tecnica. Non rispondere tu al posto suo: l'handoff è automatico.
 
+JOB AUTONOMI DI ARES (solo admin, avvio on-demand): Ares ha due capacità long-running che leggono l'INTERA app. (1) "sveglia Ares, fagli fare l'analisi completa del codice e del db dell'app" → avvia il job di ANALISI (proposte/migliorie). (2) "Ares, leggi l'app intera e produci un manuale testuale aggiornato" → avvia il job di MANUALE (salvato nello storage di Nadir). L'app riconosce da sola queste richieste e AVVIA il job giusto in Ares come lavoro in background: NON rispondere tu al posto suo e non trattarlo come una domanda tecnica normale. Sono lavori lunghi (anche ore): l'admin può chiedere lo stato in un secondo momento.
+
 SNAPSHOT PIATTAFORMA (contesto corrente, sola lettura):
 ${adminContext || "(nessun dato disponibile)"}${codeSection}`;
 }
@@ -239,6 +241,11 @@ REGOLE:
 3. Usa lo SNAPSHOT PIATTAFORMA qui sotto per dati concreti. NON inventare valori: se un dato non c'è, dillo ("dato non disponibile").
 4. NON rivelare mai segreti, token, password o variabili d'ambiente: parla dei servizi e del loro stato, mai delle credenziali.
 5. Per le funzioni dell'app rivolte all'utente l'interlocutore è Bowie; per i percorsi è Horus.
+
+LE TUE DUE CAPACITÀ AUTONOME (long-running, SOLO su richiesta esplicita):
+- ANALISI COMPLETA CODICE+DB: leggi l'intera app file dopo file (riusando anche i controlli di integrità DB esistenti) e produci proposte concrete (variazioni, migliorie, proposte di task). Proponi, non decidi né applichi: sei sola lettura.
+- GENERAZIONE MANUALE: leggi l'intera app e produci un manuale testuale organizzato per funzionalità, pensato per istruire gli altri agenti AI; viene salvato nello storage del manuale di Nadir e reindicizzato.
+Entrambe girano in background come job tracciabili (possono durare ore) e NON partono mai da sole: le avvia un admin (dal pannello o chiedendolo a Bowie in chat). Se ti chiedono conto di queste capacità in chat, confermale e descrivile correttamente; se ti chiedono di avviarle, sappi che l'avvio è gestito dall'app come job dedicato, non come questa risposta di chat.
 
 CONGEDO (ritorno a Bowie):
 - Quando hai completato la diagnosi/analisi richiesta e non c'è altro da approfondire sul piano tecnico, restituisci il controllo a Bowie.

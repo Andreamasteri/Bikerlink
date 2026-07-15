@@ -7,7 +7,14 @@
  * ./constants.ts).
  */
 export * from "./constants";
-export { getNadirManual, saveNadirManual, chunkManual } from "./manual";
+export {
+  getNadirManual,
+  saveNadirManual,
+  saveNadirManualWithBackup,
+  getNadirManualPrevious,
+  chunkManual,
+  type NadirManualBackup,
+} from "./manual";
 export {
   searchNadir,
   loadFragmentManifest,

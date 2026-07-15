@@ -20,6 +20,7 @@ import {
 } from "./vps-ops";
 import { runHorusAnalysisNow } from "./horus-analyzer";
 import { fetchCodeContextForFiles, isGithubContextConfigured } from "./github-context";
+import { startAresJob, getAresJobStatus, type AresJobMode } from "../ares-jobs";
 
 // Task #5322 — Livello di rischio dell'azione admin. Guida il client (badge/UX di
 // conferma) e viene loggato nell'audit trail. "high" = distruttivo/irreversibile.
@@ -161,6 +162,36 @@ export const ADMIN_ASSISTANT_ACTIONS = {
     paramsSchema: z.object({
       files: z.array(z.string().min(1)).min(1).max(8),
     }),
+  },
+  // Task #87 — Avvio on-demand dei job long-running di Ares. Sola lettura: Ares
+  // legge l'intera app e (per il manuale) scrive SOLO nello storage del manuale
+  // di Nadir. Mai esecuzione automatica: parte solo da qui o da Bowie in chat.
+  "ares-analyze-app": {
+    id: "ares-analyze-app",
+    description:
+      "Avvia il job in background di ANALISI completa di codice + DB di Ares (legge l'intera app + i controlli di integrità DB esistenti). Al termine produce proposte concrete. Sola lettura: propone, non applica. Lavoro lungo (anche ore), lo stato è consultabile con ares-job-status.",
+    confirmLabel: "Confermi l'avvio dell'analisi completa codice+DB di Ares (job in background)?",
+    riskLevel: "low",
+    requiresConfirm: true,
+    paramsSchema: z.object({}),
+  },
+  "ares-generate-manual": {
+    id: "ares-generate-manual",
+    description:
+      "Avvia il job in background di GENERAZIONE MANUALE di Ares: legge l'intera app e produce un manuale testuale per funzionalità, salvato nello storage del manuale di Nadir (con backup della versione precedente) e reindicizzato. Lavoro lungo (anche ore), lo stato è consultabile con ares-job-status.",
+    confirmLabel: "Confermi l'avvio della generazione del manuale da parte di Ares (job in background)?",
+    riskLevel: "low",
+    requiresConfirm: true,
+    paramsSchema: z.object({}),
+  },
+  "ares-job-status": {
+    id: "ares-job-status",
+    description:
+      "Legge lo stato dei job di Ares (analisi e manuale): in corso/completato/fallito, avanzamento e — se completato — un estratto del risultato. Param opzionale: mode ('analysis' | 'manual'); se assente riporta entrambi. Sola lettura.",
+    confirmLabel: "Mostro lo stato dei job di Ares?",
+    riskLevel: "low",
+    requiresConfirm: false,
+    paramsSchema: z.object({ mode: z.enum(["analysis", "manual"]).optional() }),
   },
 } as const satisfies Record<string, AdminAssistantActionDef>;
 
@@ -350,6 +381,47 @@ export async function executeAdminAction(
       summary: `Codice recuperato per ${p.files.length} file. Chiedi a Horus di rivederlo: incollerò il contenuto nel prossimo turno.\n\n${code.slice(0, 3000)}`,
       data: { files: p.files },
     };
+  }
+
+  if (id === "ares-analyze-app" || id === "ares-generate-manual") {
+    const mode: AresJobMode = id === "ares-analyze-app" ? "analysis" : "manual";
+    const label = mode === "analysis" ? "analisi completa codice+DB" : "generazione manuale";
+    const res = await startAresJob(mode, { trigger: "admin-action", startedBy: adminUserId });
+    console.info(`[admin-ai-action] ${id} started=${res.started} reason=${res.reason ?? "-"}`);
+    if (!res.started) {
+      return { ok: false, httpStatus: 409, error: res.reason ?? `Job ${label} non avviato.` };
+    }
+    return {
+      ok: true,
+      summary: `Ares ha avviato la ${label} in background. È un lavoro lungo, procede da solo: chiedimi "stato job Ares" quando vuoi.`,
+      data: { mode, started: true },
+    };
+  }
+
+  if (id === "ares-job-status") {
+    const p = params as { mode?: AresJobMode };
+    const modes: AresJobMode[] = p.mode ? [p.mode] : ["analysis", "manual"];
+    const lines: string[] = [];
+    const data: Record<string, unknown> = {};
+    for (const mode of modes) {
+      const st = await getAresJobStatus(mode);
+      data[mode] = st;
+      const label = mode === "analysis" ? "Analisi codice+DB" : "Manuale";
+      let line = `${label}: ${st.status}`;
+      if (st.status === "running") {
+        line += ` (${st.cursor}/${st.totalChunks} lotti, ${st.processedFiles}/${st.totalFiles} file)`;
+      }
+      if (st.status === "failed" && st.error) line += ` — ${st.error}`;
+      if (st.status === "completed") {
+        if (mode === "analysis" && st.report) {
+          line += ` — proposte pronte:\n${st.report.slice(0, 1500)}`;
+        } else if (mode === "manual") {
+          line += ` — manuale aggiornato (${st.manualLength ?? 0} caratteri), reindicizzato=${st.reindexed ? "sì" : "no"}. Consultabilità: pannello Nadir.`;
+        }
+      }
+      lines.push(line);
+    }
+    return { ok: true, summary: lines.join("\n\n"), data };
   }
 
   if (id === "vps-job-status") {

@@ -20,7 +20,8 @@ import {
 } from "./knowledge";
 import { getOllamaModel, isOllamaConfigured, warmOllama } from "../../lib/ollama-client";
 import { isThinkCentreOffline } from "../../lib/thinkcentre-offline";
-import { AI_ROSTER, type AiPersonaId, createHandoffMarkerFilter, stripHandoffMarker } from "./roster";
+import { AI_ROSTER, type AiPersonaId, createHandoffMarkerFilter, stripHandoffMarker, detectAresJobRequest } from "./roster";
+import { startAresJob, withAresInteractivePriority, type AresJobMode } from "../ares-jobs";
 import { recordKnowledgeGap } from "./knowledge-gaps";
 import { composeAresQuestion } from "./ares-question";
 import { isAresConfigured, getAresModelId, streamAresChat } from "../../lib/ares-client";
@@ -202,11 +203,56 @@ async function buildNadirContextForPrompt(
   }
 }
 
+// ── Task #87 — Avvio job Ares da chat ──────────────────────────────────────────
+// Bowie avvia il job long-running di Ares e conferma all'admin. Non attende il
+// completamento (che può durare ore): il job prosegue in background, lo stato è
+// consultabile a parte. Se un job è già in corso o Ares è irraggiungibile,
+// restituisce un messaggio chiaro.
+async function startAresJobFromChat(mode: AresJobMode, userId: string | null): Promise<string> {
+  const label = mode === "analysis" ? "analisi completa di codice e database" : "generazione del manuale dell'app";
+  try {
+    const res = await startAresJob(mode, { trigger: "bowie-chat", startedBy: userId });
+    if (res.started) {
+      return `Ho svegliato Ares: ha avviato la ${label} in background. È un lavoro lungo, procede da solo. Puoi chiedermi lo stato quando vuoi — non serve tenere aperta la chat.`;
+    }
+    return `Non ho avviato la ${label}: ${res.reason ?? "operazione non riuscita"}.`;
+  } catch (err) {
+    return `Non sono riuscito ad avviare la ${label}: ${(err as Error)?.message ?? "errore sconosciuto"}.`;
+  }
+}
+
 // ── Core agent ────────────────────────────────────────────────────────────────
 
 export async function runAssistantAgent(opts: AssistantAgentOpts): Promise<AssistantAgentResult> {
   const startTs = Date.now();
   const isAdmin = opts.platform === "admin";
+
+  // Task #87 — Trigger dei job long-running di Ares da chat (SOLO admin). Bowie
+  // riconosce l'intento ("sveglia Ares, fagli fare l'analisi completa del codice
+  // e del db" → analisi; "Ares, leggi l'app intera e produci un manuale" →
+  // manuale) e AVVIA il job giusto in Ares, senza rispondere al posto suo né
+  // trattarlo come una consultazione mid-chat generica. Il job prosegue da solo:
+  // qui rispondiamo solo con la conferma d'avvio. Intercettato PRIMA del dispatch
+  // della persona, indipendentemente dalla persona risolta.
+  if (isAdmin) {
+    const aresJobMode = detectAresJobRequest(opts.message);
+    if (aresJobMode) {
+      const text = await startAresJobFromChat(aresJobMode, opts.userId ?? null);
+      opts.onPersona?.({ id: "bowie", name: AI_ROSTER.bowie.name });
+      opts.onTextDelta?.(text);
+      return {
+        text,
+        provider: "ares-jobs",
+        model: "ares-jobs",
+        tokensIn: 0,
+        tokensOut: 0,
+        costUsd: 0,
+        degraded: false,
+        persona: { id: "bowie", name: AI_ROSTER.bowie.name },
+        farewell: false,
+      };
+    }
+  }
 
   // Task #5197 — Persona richiesta (handoff risolto a monte nel route).
   // Difesa in profondità: Ares e Quebracho sono SOLO per gli admin. Il route già
@@ -613,20 +659,25 @@ export async function runAssistantAgent(opts: AssistantAgentOpts): Promise<Assis
       // Task #10 — VRAM arbiter: libera memoria sull'istanza Ollama di Ares da
       // eventuali altri modelli residenti prima di caricare il suo modello
       // pesante on-demand, poi li ricarica best-effort (mai altera l'esito).
-      await withAresVramPriority(getAresModelId(), () =>
-        streamAresChat({
-          system: aresSystem,
-          messages: [{ role: "user", content: aresQuestion }],
-          signal: opts.signal,
-          timeoutMs: 60_000,
-          onDelta: (delta) => {
-            ensureIntroEmitted();
-            finalText += delta;
-            aiText += delta;
-            providerEmittedAny = true;
-            emitAiDelta(delta);
-          },
-        }),
+      // Task #87 — La consultazione INTERATTIVA di Ares ha la precedenza sui job
+      // long-running: la marca "busy" così un eventuale job di background cede il
+      // passo tra un chunk e l'altro. La chat non attende mai il job.
+      await withAresInteractivePriority(() =>
+        withAresVramPriority(getAresModelId(), () =>
+          streamAresChat({
+            system: aresSystem,
+            messages: [{ role: "user", content: aresQuestion }],
+            signal: opts.signal,
+            timeoutMs: 60_000,
+            onDelta: (delta) => {
+              ensureIntroEmitted();
+              finalText += delta;
+              aiText += delta;
+              providerEmittedAny = true;
+              emitAiDelta(delta);
+            },
+          }),
+        ),
       );
       provider = "ares";
       modelId = getAresModelId();
