@@ -1,3 +1,4 @@
+- [routing_area_mode legacy instance gone](routing-area-mode-legacy-gone.md) — root GraphHopper /info+/route now 404 (multi-area-only TC); routing_area_mode unset in dev AND prod silently falls back to the dead legacy path.
 - [large-files-ratchet scans filesystem, not git](large-files-ratchet-external-refs.md) — untracked reference clones on disk (e.g. .bikerblog-ref) still get scanned by the 600-line gate; add to EXCLUDED_DIRS proactively.
 - [TC GPU boot + persona preload](tc-gpu-boot-persona-preload.md) — nvidia.conf Requires→Wants (no boot-block se GPU assente); GPU non enumerata=hardware/alimentazione, non driver; keep_alive:-1 + OLLAMA_MAX_LOADED_MODELS espliciti per Bowie/Horus/Nadir/Quebracho, Ares escluso.
 - [Sentry RN integrations loop](sentry-rn-integrations-loop.md) — @sentry/react-native 8.x default integrations causano loop React Navigation (setState in commitLayoutEffects); usa sempre integrations:[].
