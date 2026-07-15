@@ -361,6 +361,42 @@ Variabili opzionali: `GRAPHHOPPER_TOKEN`, `VALHALLA_API_KEY`, `OLLAMA_TOKEN`,
 
 ---
 
+## ⚠️ Avviso nginx sul ThinkCentre — sites-enabled può contenere file reali
+
+Su questo box, `/etc/nginx/sites-enabled/graphhopper` era originariamente un
+**file reale** (non un symlink), a differenza di `bikerlink` e
+`bikerlink-searxng` che sono correttamente symlink verso `sites-available/`.
+Il risultato: qualsiasi modifica fatta in `sites-available/graphhopper`
+passava `nginx -t` e ricaricava senza errori, ma **non aveva alcun effetto**
+a runtime perché nginx caricava il file separato in `sites-enabled/`.
+
+**Prima di editare qualsiasi config nginx su questo box, verificare sempre:**
+
+```bash
+ls -la /etc/nginx/sites-enabled/
+```
+
+Se una voce è un file reale invece di un symlink (`->`) il fix è:
+
+```bash
+# Backup del file live (contiene la config attiva)
+sudo cp /etc/nginx/sites-enabled/<nome> /tmp/<nome>.bak
+
+# Sovrascrivi sites-available con il contenuto corretto
+sudo cp /tmp/<nome>.bak /etc/nginx/sites-available/<nome>
+
+# Sostituisci il file reale con un symlink
+sudo rm /etc/nginx/sites-enabled/<nome>
+sudo ln -sf /etc/nginx/sites-available/<nome> /etc/nginx/sites-enabled/
+
+# Verifica e ricarica
+sudo nginx -t && sudo nginx -s reload
+```
+
+Da luglio 2026, `sites-enabled/graphhopper` è un symlink come gli altri.
+
+---
+
 ## Troubleshooting
 
 - **401 anche con token** → il token del proxy non coincide con quello nei

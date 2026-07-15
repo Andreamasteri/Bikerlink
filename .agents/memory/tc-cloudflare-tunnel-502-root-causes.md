@@ -27,12 +27,15 @@ anymore. `gh.biker-link.net/areas/<code>/health` (the contract in
 + `location ~ ^/areas/(?<area>[a-z-]+)/(?<rest>.*)$` that strips the `/areas/<code>`
 prefix and proxies to the matching per-area host port (containers serve `/health`,
 `/info`, `/route` at their own root, not under `/areas/...`).
-**Gotcha — config drift:** `/etc/nginx/sites-enabled/graphhopper` on this box is a
-**real standalone file**, NOT a symlink to `sites-available/graphhopper` (unlike
-`bikerlink`/`bikerlink-searxng` which ARE symlinks). Editing `sites-available/*`
-here does nothing at runtime — always check `ls -la sites-enabled/` for symlink vs.
-real file before assuming an edit took effect; `nginx -t` succeeding proves syntax
-only, not that you edited the loaded file.
+**Gotcha — config drift (FIXED Jul 2026):** `/etc/nginx/sites-enabled/graphhopper`
+was a real standalone file, NOT a symlink. It is now a symlink to
+`sites-available/graphhopper` (matching bikerlink/bikerlink-searxng). However,
+`sites-enabled/openwebui` is still a real file — same trap (task #137). ALWAYS
+check `ls -la /etc/nginx/sites-enabled/` before editing; `nginx -t` passing
+proves syntax only, not that you edited the loaded file.
+**Side-fix:** the `bikerlink` nginx file had `listen 192.168.1.35:443 ssl` (stale
+IP, real IP is 192.168.0.100) in all 5 server blocks — fixed via sed at the same
+time. The old graphhopper DuckDNS `listen 443` block was masking this bind failure.
 **Gotcha — token drift:** the `X-GH-Token` hardcoded in that nginx file did NOT
 match the current `GRAPHHOPPER_TOKEN` Replit secret (different length, clearly
 rotated at some point without updating nginx). Verify with a SHA-256 prefix
