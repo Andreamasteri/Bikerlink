@@ -52,6 +52,11 @@ vi.mock("../ai/assistant/tools", () => ({
       execute: getUserPlannedRoutesExecute,
     },
   },
+  HORUS_TOOLS: {},
+  buildBowieInterAgentTools: vi.fn(() => ({})),
+  buildRememberNoteTool: vi.fn(() => ({})),
+  buildReviewTaskPlanTool: vi.fn(() => ({})),
+  buildSearchManualTool: vi.fn(() => ({})),
 }));
 
 vi.mock("../ai/assistant/knowledge", () => ({
@@ -98,6 +103,10 @@ vi.mock("drizzle-orm", () => {
 vi.mock("../ai/assistant/memory-pruner", () => ({
   pruneUserMemory: vi.fn().mockResolvedValue(undefined),
   MEMORY_TURNS_LIMIT: 10,
+}));
+
+vi.mock("../lib/thinkcentre-offline", () => ({
+  isThinkCentreOffline: vi.fn().mockResolvedValue(false),
 }));
 
 // ---------------------------------------------------------------------------

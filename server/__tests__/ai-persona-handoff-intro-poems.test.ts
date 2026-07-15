@@ -70,6 +70,11 @@ vi.mock("../lib/thinkcentre-offline", () => ({
 
 vi.mock("../ai/assistant/tools", () => ({
   OLLAMA_TOOLS: {},
+  HORUS_TOOLS: {},
+  buildBowieInterAgentTools: vi.fn(() => ({})),
+  buildRememberNoteTool: vi.fn(() => ({})),
+  buildReviewTaskPlanTool: vi.fn(() => ({})),
+  buildSearchManualTool: vi.fn(() => ({})),
 }));
 
 vi.mock("../ai/assistant/knowledge", () => ({
@@ -124,10 +129,15 @@ vi.mock("@shared/db", () => ({
   aiConversationTurns: { _: "mocked-table" },
 }));
 
-vi.mock("drizzle-orm", () => ({
-  eq: vi.fn((a: unknown, b: unknown) => `eq(${String(a)},${String(b)})`),
-  desc: vi.fn((a: unknown) => `desc(${String(a)})`),
-}));
+vi.mock("drizzle-orm", () => {
+  const sql = vi.fn((strings: TemplateStringsArray, ...values: unknown[]) => ({ __sql: strings, values }));
+  (sql as unknown as { raw: unknown }).raw = vi.fn((s: string) => ({ __rawSql: s }));
+  return {
+    eq: vi.fn((a: unknown, b: unknown) => `eq(${String(a)},${String(b)})`),
+    desc: vi.fn((a: unknown) => `desc(${String(a)})`),
+    sql,
+  };
+});
 
 vi.mock("../ai/assistant/memory-pruner", () => ({
   pruneUserMemory: vi.fn().mockResolvedValue(undefined),

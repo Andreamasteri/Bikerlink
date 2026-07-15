@@ -55,6 +55,14 @@ vi.mock("../lib/groq-client", () => ({
   getGroqModel: vi.fn(() => { throw new Error("Groq non configurato (mock)"); }),
 }));
 
+// Fallback switch abilitato: permette alla chain di includere Gemini.
+// Senza questo, isAiFallbackEnabled() → false → chain=["ollama"] → Ollama skippato
+// (non configurato) → NO_PROVIDER_MSG → 503 su tutti i test che si aspettano 200/429.
+vi.mock("../ai/fallback-switch", () => ({
+  isAiFallbackEnabled: vi.fn().mockResolvedValue(true),
+  isAiFallbackEnabledSync: vi.fn().mockReturnValue(true),
+}));
+
 // ---------------------------------------------------------------------------
 // Import router and the exported utility after mocks are in place
 // ---------------------------------------------------------------------------
