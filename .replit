@@ -192,7 +192,7 @@ timeoutMs = 420000
   EXPO_WEB_URL = "https://biker-link--8081.replit.app"
 
   [userenv.shared]
-  EXPO_PUBLIC_DOMAIN = "biker-link.replit.app"
+EXPO_PUBLIC_DOMAIN = "bikerlink.replit.app"
 GCE_SSH_USER = "bikerlink"
 GCE_SSH_PORT = "22"
 BIKERBLOG_BRIEFING_URL = "https://3abefdc3-a018-4771-90ae-b2c3a0fd6b0e-00-2g5dq1gy90toi.riker.replit.dev/api/_internal/agent-briefing"

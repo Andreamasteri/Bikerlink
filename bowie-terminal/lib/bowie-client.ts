@@ -3,7 +3,7 @@ import { Platform } from "react-native";
 import type { PersonaId } from "../constants/theme";
 
 // Dominio del backend BikerLink. Iniettato a build-time via EAS (EXPO_PUBLIC_DOMAIN).
-const DOMAIN = process.env.EXPO_PUBLIC_DOMAIN || "biker-link.replit.app";
+const DOMAIN = process.env.EXPO_PUBLIC_DOMAIN || "bikerlink.replit.app";
 
 export function getApiUrl(): string {
   return `https://${DOMAIN}`;

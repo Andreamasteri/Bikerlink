@@ -19,7 +19,7 @@ export function getBaseUrl(req: Request): string {
   const forwardedProto = req.header("x-forwarded-proto");
   const protocol = forwardedProto || req.protocol || "https";
   const forwardedHost = req.header("x-forwarded-host");
-  const host = forwardedHost || req.get("host") || "biker-link.replit.app";
+  const host = forwardedHost || req.get("host") || "bikerlink.replit.app";
   return `${protocol}://${host}`;
 }
 

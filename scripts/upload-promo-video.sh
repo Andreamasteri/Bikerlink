@@ -33,7 +33,7 @@ async function upload() {
   });
 
   if (result.ok) {
-    const domain = process.env.REPLIT_DEV_DOMAIN || 'biker-link.replit.app';
+    const domain = process.env.REPLIT_DEV_DOMAIN || 'bikerlink.replit.app';
     console.log('Upload completato!');
     console.log('');
     console.log('URL pubblica (backend):');

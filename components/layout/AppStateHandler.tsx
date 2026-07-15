@@ -316,7 +316,7 @@ export function AppStateHandler() {
         let intervalSeconds = 30;
         let notificationText = "BikerLink: {motivo} — posizione attiva in background";
         try {
-          const domain = process.env.EXPO_PUBLIC_DOMAIN || "biker-link.replit.app";
+          const domain = process.env.EXPO_PUBLIC_DOMAIN || "bikerlink.replit.app";
           const res = await fetch(`https://${domain}/api/settings/bg-location`, {
             credentials: "include",
           });
@@ -333,7 +333,7 @@ export function AppStateHandler() {
         let gpsPrecision = await AsyncStorage.getItem(GPS_PRECISION_STORAGE_KEY).catch(() => null);
         if (!gpsPrecision) {
           try {
-            const domain = process.env.EXPO_PUBLIC_DOMAIN || "biker-link.replit.app";
+            const domain = process.env.EXPO_PUBLIC_DOMAIN || "bikerlink.replit.app";
             const meRes = await fetch(`https://${domain}/api/users/me`, { credentials: "include" });
             if (meRes.ok) {
               const meData = await meRes.json();

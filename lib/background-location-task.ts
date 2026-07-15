@@ -68,7 +68,7 @@ export async function restartBackgroundLocationTaskWithPrecision(
 ): Promise<boolean> {
   try {
     await stopBackgroundLocationTask();
-    const domain = process.env.EXPO_PUBLIC_DOMAIN || "biker-link.replit.app";
+    const domain = process.env.EXPO_PUBLIC_DOMAIN || "bikerlink.replit.app";
     const cached = await getCachedSettings();
     const config = cached || (await fetchAndCacheSettings(domain));
     if (!config.enabled) return false;
@@ -161,7 +161,7 @@ TaskManager.defineTask(
     if (!locations || locations.length === 0) return;
 
     const location = locations[locations.length - 1];
-    const domain = process.env.EXPO_PUBLIC_DOMAIN || "biker-link.replit.app";
+    const domain = process.env.EXPO_PUBLIC_DOMAIN || "bikerlink.replit.app";
 
     const cached = await getCachedSettings();
     const settings = cached || (await fetchAndCacheSettings(domain));
