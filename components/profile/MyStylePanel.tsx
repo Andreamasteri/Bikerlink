@@ -8,6 +8,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useColors } from "@/hooks/useColors";
 import { useAuth } from "@/lib/auth-context";
 import { useT } from "@/lib/language-context";
+import { SectionErrorState } from "@/components/profile/SectionErrorState";
 
 type StyleProfile = {
   speedBucket: string;
@@ -77,11 +78,17 @@ export default function MyStylePanel() {
   const { user } = useAuth();
   const t = useT();
 
-  const { data, isLoading } = useQuery<MyStyleResponse>({
+  const { data, isLoading, isError, refetch } = useQuery<MyStyleResponse>({
     queryKey: ["/api/proposals/my-telemetry-style"],
     enabled: !!user,
     staleTime: 60_000,
   });
+
+  // Task #82 — se il fetch fallisce (endpoint in errore/timeout), non far sparire
+  // silenziosamente la sezione: mostra una card di retry come per la Telemetria.
+  if (isError && !data) {
+    return <SectionErrorState title="Stile di guida non disponibile" onRetry={() => refetch()} />;
+  }
 
   if (isLoading || !data) return null;
 
