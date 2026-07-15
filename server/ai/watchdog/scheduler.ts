@@ -197,6 +197,15 @@ export function stopWatchdogScheduler(): void {
   if (cleanupTimer) { clearInterval(cleanupTimer); cleanupTimer = null; }
 }
 
+// Task #37 — esposti SOLO per i test: eseguire un tick isolato (senza timer/jitter)
+// e resettare i cooldown in-process tra i casi di test.
+export const _tickForTests = tick;
+export function _resetSchedulerCooldownsForTests(): void {
+  lastProposerRunAt = 0;
+  lastHorusProposerRunAt = 0;
+  lastAppstateAlertSentAt = 0;
+}
+
 export function getWatchdogStats() {
   const cooldownRemainingSec =
     lastProposerRunAt > 0
