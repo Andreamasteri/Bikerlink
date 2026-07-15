@@ -14,6 +14,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useQuery } from "@tanstack/react-query";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useColors } from "@/hooks/useColors";
+import { useLanguage } from "@/lib/language-context";
 import { apiRequest } from "@/lib/query-client";
 import {
   startGroupChat, resumeGroupChat,
@@ -64,6 +65,7 @@ const DEFAULT_TURNS = 6;
 export default function AiGroupChatScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
+  const { language } = useLanguage();
 
   const [topic, setTopic] = useState("");
   const [participants, setParticipants] = useState<string[]>(
@@ -147,6 +149,8 @@ export default function AiGroupChatScreen() {
         topic: t,
         participants,
         maxTurns,
+        // Task #130 — la tavola rotonda risponde nella lingua dell'admin presente.
+        language,
         signal: ac.signal,
         ...commonHandlers(),
       });
@@ -155,7 +159,7 @@ export default function AiGroupChatScreen() {
       abortRef.current = null;
       if (!ac.signal.aborted) setStatusMsg(`Errore: ${(err as Error).message}`);
     }
-  }, [topic, running, participants, maxTurns, commonHandlers]);
+  }, [topic, running, participants, maxTurns, language, commonHandlers]);
 
   const handleResume = useCallback(async (convo: ConversationMeta) => {
     if (running) return;

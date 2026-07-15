@@ -379,6 +379,10 @@ export const aiGroupConversations = pgTable("ai_group_conversations", {
   maxTurns: integer("max_turns").notNull().default(6),
   turnCount: integer("turn_count").notNull().default(0),
   status: varchar("status", { length: 16 }).notNull().default("running"),
+  // Task #130 — Lingua dell'utente presente alla tavola rotonda: persistita così
+  // la ripresa (resume) genera i turni nella stessa lingua dell'avvio. Default
+  // italiano (sorgente app), coerente col comportamento storico.
+  language: varchar("language", { length: 8 }).notNull().default("it"),
   // Admin che ha avviato la conversazione (audit). set null se l'utente è rimosso.
   createdBy: varchar("created_by", { length: 36 })
     .references(() => users.id, { onDelete: "set null" }),

@@ -58,12 +58,18 @@ interface StartOpts extends GroupChatStreamHandlers {
   topic: string;
   participants?: string[];
   maxTurns?: number;
+  /** Task #130 — lingua dell'utente presente: tutti i turni visibili la usano. */
+  language?: string;
 }
 
 /** Avvia una nuova conversazione di gruppo e ne streamma i turni. */
 export async function startGroupChat(opts: StartOpts): Promise<void> {
   const url = new URL("/api/admin/ai/group-chat/conversations", getApiUrl()).toString();
-  await consumeStream(url, { topic: opts.topic, participants: opts.participants, maxTurns: opts.maxTurns }, opts);
+  await consumeStream(
+    url,
+    { topic: opts.topic, participants: opts.participants, maxTurns: opts.maxTurns, language: opts.language },
+    opts,
+  );
 }
 
 /** Riprende una conversazione interrotta dall'ultimo turno completato. */

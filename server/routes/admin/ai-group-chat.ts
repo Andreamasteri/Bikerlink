@@ -41,6 +41,7 @@ import {
   normalizeParticipants,
   personaForTurn,
 } from "../../ai/assistant/group-conversation";
+import { APP_LANGUAGES, SOURCE_APP_LANGUAGE, type AppLanguageCode } from "@shared/languages";
 
 const router = Router();
 
@@ -48,6 +49,9 @@ const startSchema = z.object({
   topic: z.string().trim().min(3).max(500),
   participants: z.array(z.string()).optional(),
   maxTurns: z.number().optional(),
+  // Task #130 — Lingua dell'utente presente (stesso enum della chat 1:1). Se
+  // assente ricade sull'italiano (client vecchi / comportamento storico).
+  language: z.enum(APP_LANGUAGES).optional(),
 });
 
 function currentAdminId(req: Request): string | null {
@@ -110,6 +114,7 @@ router.post("/group-chat/conversations", async (req: Request, res: Response) => 
       maxTurns,
       turnCount: 0,
       status: "running",
+      language: parsed.data.language ?? SOURCE_APP_LANGUAGE,
       createdBy: currentAdminId(req),
     })
     .returning();
@@ -243,6 +248,9 @@ async function runConversationStream(
           persona,
           participants,
           priorTurns,
+          // Task #130 — lingua persistita sulla conversazione: la ripresa usa la
+          // stessa lingua dell'avvio (fallback italiano per righe legacy).
+          language: ((convo.language as AppLanguageCode | null) ?? SOURCE_APP_LANGUAGE),
           signal: abort.signal,
           onDelta: (delta) =>
             securityFilter.push(delta, (safe) => send("delta", { turnIndex, text: safe })),

@@ -392,10 +392,10 @@ export async function runAssistantAgent(opts: AssistantAgentOpts): Promise<Assis
     // Ares: diagnostica tecnica (solo admin), snapshot piattaforma nel prompt.
     // Task #5326 — knowledge transfer read-only Horus → Ares (RAG + prompt injection).
     const horusLearningContext = await buildAresLearningContext();
-    system = buildAresSystemPrompt(opts.adminContext ?? "", horusLearningContext || undefined);
+    system = buildAresSystemPrompt(opts.adminContext ?? "", horusLearningContext || undefined, opts.language ?? SOURCE_APP_LANGUAGE);
   } else if (requestedPersona === "quebracho") {
     // Task #4 — Quebracho: coordinatore/regista (solo admin), snapshot piattaforma.
-    system = buildQuebrachoSystemPrompt(opts.adminContext ?? "");
+    system = buildQuebrachoSystemPrompt(opts.adminContext ?? "", opts.language ?? SOURCE_APP_LANGUAGE);
     // Task #75 — Nadir agent-neutral anche per Quebracho. Quebracho NON usa il
     // tool-calling nativo (endpoint dedicato), quindi invece del tool `search_manual`
     // usiamo l'INTERCETTAZIONE PRE-COMPOSIZIONE: se il messaggio contiene un cue di
@@ -440,6 +440,7 @@ export async function runAssistantAgent(opts: AssistantAgentOpts): Promise<Assis
       isAdmin,
       codeContext: isAdmin ? opts.adminCodeContext : undefined,
       routingStatus,
+      language: opts.language ?? SOURCE_APP_LANGUAGE,
     });
     // Task #50 — Memoria persistente di Horus: le note salvate via remember_note
     // in conversazioni precedenti vengono iniettate PRIMA del resto del prompt,
@@ -455,7 +456,7 @@ export async function runAssistantAgent(opts: AssistantAgentOpts): Promise<Assis
   } else if (isAdmin) {
     // Task #4842 — Modalità admin: system prompt dedicato con snapshot piattaforma.
     // Soluzione 3 — codeContext da GitHub (tools/actions) iniettato opzionalmente.
-    system = buildAdminSystemPrompt(opts.adminContext ?? "", opts.adminCodeContext);
+    system = buildAdminSystemPrompt(opts.adminContext ?? "", opts.adminCodeContext, opts.language ?? SOURCE_APP_LANGUAGE);
   } else {
     // Task #3017 — RAG: assicuriamoci che l'indice sia aggiornato e recuperiamo contesto
     indexKnowledge(opts.customFaqs ?? []);
@@ -478,6 +479,7 @@ export async function runAssistantAgent(opts: AssistantAgentOpts): Promise<Assis
       // Task #3090 — passa userId così Ollama lo usa nei tool call (getUserPlannedRoutes, getBikerStats)
       userId: opts.userId,
       userContext: userContext || undefined,
+      language: opts.language ?? SOURCE_APP_LANGUAGE,
     });
   }
 

@@ -7,6 +7,7 @@ import { sendError } from "../lib/api-response";
 import { loadAssistantConfig } from "../ai/assistant/config";
 import { runAssistantAgent, extractActions } from "../ai/assistant/agent";
 import { type AiPersonaId } from "../ai/assistant/roster";
+import { APP_LANGUAGES, SOURCE_APP_LANGUAGE } from "@shared/languages";
 import { resolvePersonaForTurn, commitPersonaAfterTurn } from "../ai/assistant/persona-state";
 import { hasAnyAiProvider, AI_NO_PROVIDER_MESSAGE } from "../ai/moderation/provider";
 import { filterSensitiveOutput } from "../ai/assistant/security-filter";
@@ -233,6 +234,9 @@ const NotificationReplyBody = z.object({
   // così la risposta torna SOLO a questo device invece che a tutti quelli
   // registrati per l'account (es. altri telefoni con Bowie Terminal installato).
   deviceId: z.string().min(1).max(128).optional(),
+  // Task #130 — lingua dell'utente: la risposta visibile deve essere nella sua
+  // lingua (stesso enum della chat 1:1). Assente → italiano (fallback storico).
+  language: z.enum(APP_LANGUAGES).optional(),
 });
 
 router.post("/ai/assistant/notification-reply", requireUser, async (req: Request, res: Response) => {
@@ -294,6 +298,8 @@ router.post("/ai/assistant/notification-reply", requireUser, async (req: Request
       personaFirstTurn,
       // Task #5228 — attribuzione client di origine.
       sourceApp: parsed.data.source ?? "main_app",
+      // Task #130 — turno visibile: rispondi nella lingua dell'utente (fallback IT).
+      language: parsed.data.language ?? SOURCE_APP_LANGUAGE,
     });
 
     // Task #5322 — Persisti lo stato "persona attiva" (sticky handoff con TTL).
