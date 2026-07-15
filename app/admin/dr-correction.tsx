@@ -17,6 +17,7 @@ import * as FileSystem from "expo-file-system/legacy";
 import * as Sharing from "expo-sharing";
 import Colors from "@/constants/colors";
 import { getApiUrl, authFetchHeaders } from "@/lib/query-client";
+import { BLEND_SMOOTHING_K } from "@shared/dr-correction";
 
 interface DrUser {
   userId: string;
@@ -31,6 +32,12 @@ interface DrUser {
   meanSpeedErrorKmh: number;
   updatedAt: string | null;
   lastSampleAt: string | null;
+  effective?: {
+    distanceScale: number;
+    speedScale: number;
+    speedBiasKmh: number;
+    headingBiasDeg: number;
+  };
 }
 
 interface DrUsersResponse {
@@ -165,12 +172,32 @@ function UserCard({ item, onExport, exporting }: { item: DrUser; onExport: () =>
           </View>
         )}
       </View>
+      <Text style={styles.sectionLabel}>Appreso (grezzo)</Text>
       <View style={styles.metricRow}>
         <Metric label="scala dist." value={item.distanceScale.toFixed(3)} />
         <Metric label="scala vel." value={item.speedScale.toFixed(3)} />
         <Metric label="bias vel." value={`${item.speedBiasKmh.toFixed(1)}`} />
         <Metric label="bias head." value={`${item.headingBiasDeg.toFixed(1)}°`} />
       </View>
+      {item.effective && (
+        <>
+          <Text style={styles.sectionLabel}>Effettivo (applicato)</Text>
+          <View style={styles.metricRow}>
+            <Metric label="scala dist." value={item.effective.distanceScale.toFixed(3)} />
+            <Metric label="scala vel." value={item.effective.speedScale.toFixed(3)} />
+            <Metric label="bias vel." value={`${item.effective.speedBiasKmh.toFixed(1)}`} />
+            <Metric label="bias head." value={`${item.effective.headingBiasDeg.toFixed(1)}°`} />
+          </View>
+          <View style={styles.blendNote}>
+            <MaterialCommunityIcons name="information-outline" size={13} color={Colors.textSecondary} />
+            <Text style={styles.blendNoteText}>
+              L&apos;<Text style={styles.blendNoteEmph}>effettivo</Text> è ciò che il client applica: il
+              modello grezzo fuso col globale, smorzato dai campioni (peso = n/(n+{BLEND_SMOOTHING_K})).
+              Con pochi dati resta vicino al globale; con più dati converge al grezzo.
+            </Text>
+          </View>
+        </>
+      )}
       <View style={styles.metricRow}>
         <Metric label="err. pos. medio" value={`${item.meanPosErrorM.toFixed(0)} m`} />
         <Metric label="err. vel. medio" value={`${item.meanSpeedErrorKmh.toFixed(1)} km/h`} />
@@ -282,6 +309,19 @@ const styles = StyleSheet.create({
   cardLast: { fontFamily: "Inter_400Regular", fontSize: 11, color: Colors.textSecondary, marginTop: 2 },
   testBadge: { backgroundColor: "#f59e0b22", borderRadius: 6, paddingHorizontal: 7, paddingVertical: 3 },
   testBadgeText: { fontFamily: "Inter_600SemiBold", fontSize: 10, color: "#f59e0b" },
+  sectionLabel: {
+    fontFamily: "Inter_600SemiBold", fontSize: 11, color: Colors.textSecondary,
+    marginTop: 10, marginBottom: 2, textTransform: "uppercase", letterSpacing: 0.4,
+  },
+  blendNote: {
+    flexDirection: "row", gap: 6, marginTop: 8,
+    backgroundColor: Colors.background, borderRadius: 8, padding: 8,
+  },
+  blendNoteText: {
+    flex: 1, fontFamily: "Inter_400Regular", fontSize: 11,
+    color: Colors.textSecondary, lineHeight: 15,
+  },
+  blendNoteEmph: { fontFamily: "Inter_600SemiBold", color: Colors.text },
   metricRow: { flexDirection: "row", gap: 8, marginTop: 4 },
   metric: {
     flex: 1, backgroundColor: Colors.background, borderRadius: 8,

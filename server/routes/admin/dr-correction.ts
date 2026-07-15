@@ -3,7 +3,8 @@ import { db } from "../../db";
 import { sql } from "drizzle-orm";
 import { sendError } from "../../lib/api-response";
 import { logTelemetryEvent } from "../../lib/telemetry-error-log";
-import { getEffectiveModel } from "../../dr-correction/engine";
+import { getEffectiveModel, getGlobalModel } from "../../dr-correction/engine";
+import { blendWithGlobal, type DrCorrectionModel } from "@shared/dr-correction";
 
 const router = Router();
 
@@ -18,7 +19,7 @@ router.get("/dr-correction/users", async (req: Request, res: Response) => {
     const page = Math.max(0, parseInt(String(req.query.page ?? "0"), 10) || 0);
     const offset = page * limit;
 
-    const [usersResult, countResult] = await Promise.all([
+    const [usersResult, countResult, global] = await Promise.all([
       db.execute<{
         user_id: string;
         username: string;
@@ -52,22 +53,43 @@ router.get("/dr-correction/users", async (req: Request, res: Response) => {
         LIMIT ${limit} OFFSET ${offset}
       `),
       db.execute<{ total: string }>(sql`SELECT COUNT(*)::text AS total FROM dr_correction_model`),
+      getGlobalModel(),
     ]);
 
-    const users = usersResult.rows.map((r) => ({
-      userId: r.user_id,
-      username: r.username,
-      isTest: Boolean(r.is_test),
-      distanceScale: parseFloat(r.distance_scale),
-      speedScale: parseFloat(r.speed_scale),
-      speedBiasKmh: parseFloat(r.speed_bias_kmh),
-      headingBiasDeg: parseFloat(r.heading_bias_deg),
-      sampleCount: parseInt(r.sample_count, 10),
-      meanPosErrorM: parseFloat(r.mean_pos_error_m),
-      meanSpeedErrorKmh: parseFloat(r.mean_speed_error_kmh),
-      updatedAt: r.updated_at ?? null,
-      lastSampleAt: r.last_sample_at ?? null,
-    }));
+    const users = usersResult.rows.map((r) => {
+      const raw: DrCorrectionModel = {
+        distanceScale: parseFloat(r.distance_scale),
+        speedScale: parseFloat(r.speed_scale),
+        speedBiasKmh: parseFloat(r.speed_bias_kmh),
+        headingBiasDeg: parseFloat(r.heading_bias_deg),
+        meanPosErrorM: parseFloat(r.mean_pos_error_m),
+        meanSpeedErrorKmh: parseFloat(r.mean_speed_error_kmh),
+        sampleCount: parseInt(r.sample_count, 10),
+      };
+      // "Effective" = what the client actually applies: the raw per-user model
+      // blended with the global model, damped by sample count (userWeight = n/(n+K)).
+      const effective = blendWithGlobal(raw, global);
+      return {
+        userId: r.user_id,
+        username: r.username,
+        isTest: Boolean(r.is_test),
+        distanceScale: raw.distanceScale,
+        speedScale: raw.speedScale,
+        speedBiasKmh: raw.speedBiasKmh,
+        headingBiasDeg: raw.headingBiasDeg,
+        sampleCount: raw.sampleCount,
+        meanPosErrorM: raw.meanPosErrorM,
+        meanSpeedErrorKmh: raw.meanSpeedErrorKmh,
+        updatedAt: r.updated_at ?? null,
+        lastSampleAt: r.last_sample_at ?? null,
+        effective: {
+          distanceScale: effective.distanceScale,
+          speedScale: effective.speedScale,
+          speedBiasKmh: effective.speedBiasKmh,
+          headingBiasDeg: effective.headingBiasDeg,
+        },
+      };
+    });
 
     return res.json({
       users,
