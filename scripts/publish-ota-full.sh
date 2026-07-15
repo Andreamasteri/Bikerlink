@@ -57,6 +57,10 @@ fi
 log_info "Messaggio: ${MESSAGE}"
 
 # ── 2. Verifica token ────────────────────────────────────────────────────────
+# Supporta sia EAS_TOKEN che EXPO_TOKEN (alias storico nell'environment)
+if [[ -z "${EAS_TOKEN:-}" && -n "${EXPO_TOKEN:-}" ]]; then
+  EAS_TOKEN="${EXPO_TOKEN}"
+fi
 if [[ -z "${EAS_TOKEN:-}" ]]; then
   log_error "EAS_TOKEN non impostato nell'ambiente."
   exit 1
