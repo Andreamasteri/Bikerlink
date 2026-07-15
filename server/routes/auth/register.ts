@@ -4,7 +4,7 @@ import crypto from "crypto";
 import { db, withDbTimeout, DbTimeoutError } from "../../db";
 import { matchPreferences } from "@shared/db";
 import rateLimit, { MemoryStore } from "express-rate-limit";
-import { registerSchema } from "@shared/validators";
+import { registerSchema, isReservedNickname, isReservedEmailLocalPart } from "@shared/validators";
 import { storage } from "../../storage";
 import { sendVerificationEmail, sendInvitationGiftEmail, sendNewUserNotificationEmail } from "../../email";
 import { createRegionalClubInvite } from "../motoclubs";
@@ -131,9 +131,14 @@ router.post("/register", registerLimiter, async (req: Request, res: Response) =>
       return sendError(res, 409, "Email già registrata");
     }
 
-    const reservedNicknames = ["admin", "administrator", "administrators", "amministratore", "amministratori", "mod", "moderator", "moderatore"];
-    if (reservedNicknames.includes(data.nickname.toLowerCase())) {
+    if (isReservedNickname(data.nickname)) {
       return sendError(res, 400, "Nickname non disponibile");
+    }
+
+    // Task #119 — blocca anche la parte locale dell'email se imita un agente
+    // AI (es. "nadir@..."), non solo il nickname pubblico.
+    if (isReservedEmailLocalPart(data.email)) {
+      return sendError(res, 400, "Indirizzo email non consentito");
     }
 
     const existingNickname = await withDbTimeout(storage.getUserByNickname(data.nickname));

@@ -1,5 +1,39 @@
 import { z } from "zod";
 
+// Nickname riservati per match ESATTO (invariato dal comportamento storico).
+export const RESERVED_EXACT_NICKNAMES = [
+  "admin",
+  "administrator",
+  "administrators",
+  "amministratore",
+  "amministratori",
+  "mod",
+  "moderator",
+  "moderatore",
+];
+
+// Task #119 — nomi degli agenti AI interni (Ares, Nadir, Bowie, Quebracho,
+// Horus). A differenza della lista sopra, questi vanno bloccati anche come
+// SOTTOSTRINGA case-insensitive (es. "AresAdmin", "il_bowie99", "nadir@...")
+// per impedire tentativi di impersonificazione/ingegneria sociale in chat,
+// log e pannelli admin dove questi nomi sono riconoscibili.
+export const RESERVED_AI_AGENT_NAMES = ["ares", "nadir", "bowie", "quebracho", "horus"];
+
+/** True se il nickname è riservato (match esatto admin/mod, o contiene un nome di agente AI). */
+export function isReservedNickname(nickname: string): boolean {
+  const lower = nickname.trim().toLowerCase();
+  if (!lower) return false;
+  if (RESERVED_EXACT_NICKNAMES.includes(lower)) return true;
+  return RESERVED_AI_AGENT_NAMES.some((name) => lower.includes(name));
+}
+
+/** True se la parte locale (prima della @) dell'email contiene un nome di agente AI. */
+export function isReservedEmailLocalPart(email: string): boolean {
+  const localPart = email.split("@")[0]?.trim().toLowerCase() ?? "";
+  if (!localPart) return false;
+  return RESERVED_AI_AGENT_NAMES.some((name) => localPart.includes(name));
+}
+
 export const registerSchema = z.object({
   nickname: z.string().min(3).max(50),
   email: z.string().email(),

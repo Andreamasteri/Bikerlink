@@ -22,6 +22,7 @@ import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { sendError } from "../../lib/api-response";
 import { onlineTracker } from "../../online-tracker";
+import { isReservedNickname, isReservedEmailLocalPart } from "@shared/validators";
 
 const router = Router();
 
@@ -44,6 +45,16 @@ router.post("/", async (req: Request, res: Response) => {
       return sendError(res, 400, parsed.error.issues[0].message);
     }
     const { nickname, email, password, userType, sex, birthYear, region } = parsed.data;
+
+    // Task #119 — la creazione utente da admin bypassava il signup pubblico,
+    // lasciando una via per creare account che imitano un agente AI (Ares,
+    // Nadir, Bowie, Quebracho, Horus) sia nel nickname sia nell'email.
+    if (isReservedNickname(nickname)) {
+      return sendError(res, 400, "Nickname non disponibile");
+    }
+    if (isReservedEmailLocalPart(email)) {
+      return sendError(res, 400, "Indirizzo email non consentito");
+    }
 
     const existingNickname = await storage.getUserByNickname(nickname);
     if (existingNickname) {
