@@ -280,6 +280,10 @@ services:
     image: bikerlink/valhalla:latest
     container_name: bikerlink-valhalla
     restart: unless-stopped
+    # Grace period esteso: Valhalla ha tile memory-mapped enormi (Europa+Ecuador),
+    # ha bisogno di >10s per flush pulito. Senza questo Docker force-killa dopo
+    # i 10s di default → tile corrotte + cgroup_drain_dying nel kernel.
+    stop_grace_period: 40s
     # L'immagine custom (build da valhalla/valhalla master) NON ha l'entrypoint
     # orchestratore di gis-ops: CMD=/bin/bash. Lanciamo direttamente il server sui
     # tile/config già presenti in ./data (build da build-valhalla-tiles.sh).
