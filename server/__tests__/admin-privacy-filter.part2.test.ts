@@ -10,44 +10,12 @@ const { mockGetAllUsers, mockGetUser, mockGetAppSetting } = vi.hoisted(() => ({
   mockGetAppSetting: vi.fn(),
 }));
 
-vi.mock("../db", () => {
-  const mockSelect = vi.fn();
-  const mockSelectDistinct = vi.fn();
-  const mockExecute = vi.fn();
-  const mockInsert = vi.fn();
-  const mockDelete = vi.fn();
-  const mockUpdate = vi.fn();
-
-  const chainable = () => ({ from: vi.fn().mockResolvedValue([]), where: vi.fn().mockReturnThis(), orderBy: vi.fn().mockReturnThis(), limit: vi.fn().mockResolvedValue([]) });
-
-  mockSelect.mockReturnValue(chainable());
-  mockSelectDistinct.mockReturnValue(chainable());
-  mockExecute.mockResolvedValue({ rows: [] });
-  mockInsert.mockReturnValue({ values: vi.fn().mockReturnValue({ onConflictDoUpdate: vi.fn().mockReturnValue({ returning: vi.fn().mockResolvedValue([]) }), returning: vi.fn().mockResolvedValue([]) }) });
-  mockDelete.mockReturnValue({ where: vi.fn().mockResolvedValue([]), returning: vi.fn().mockResolvedValue([]) });
-  mockUpdate.mockReturnValue({ set: vi.fn().mockReturnValue({ where: vi.fn().mockResolvedValue([]) }) });
-
-  // selectDistinctOn(...).from(...).innerJoin(...).where(...).orderBy(...) — usato da GET /admin/users
-  const distinctOnChain: Record<string, unknown> = {};
-  distinctOnChain.from = vi.fn(() => distinctOnChain);
-  distinctOnChain.innerJoin = vi.fn(() => distinctOnChain);
-  distinctOnChain.where = vi.fn(() => distinctOnChain);
-  distinctOnChain.orderBy = vi.fn().mockResolvedValue([]);
-
-  return {
-    db: {
-      select: mockSelect,
-      selectDistinct: mockSelectDistinct,
-      selectDistinctOn: vi.fn(() => distinctOnChain),
-      execute: mockExecute,
-      insert: mockInsert,
-      delete: mockDelete,
-      update: mockUpdate,
-    },
-    pool: { query: vi.fn(), end: vi.fn() },
-    // Passthrough: il wrapper di retry deve solo eseguire la funzione avvolta.
-    withDbRetry: <T>(fn: () => Promise<T> | T): Promise<T> | T => fn(),
-  };
+// Uses the shared db-mock helper (chainable+thenable builders, execute default,
+// withDbRetry passthrough) so future DB-shape changes need one edit in the helper,
+// not here. Async factory + dynamic import is the hoisting-safe usage.
+vi.mock("../db", async () => {
+  const { createDbMock } = await import("./helpers/db-mock");
+  return createDbMock();
 });
 
 vi.mock("../storage", () => ({

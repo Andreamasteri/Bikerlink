@@ -28,10 +28,12 @@ vi.mock("../online-tracker", () => ({
   },
 }));
 
-vi.mock("../db", () => ({
-  db: { select: vi.fn(), insert: vi.fn(), update: vi.fn(), delete: vi.fn() },
-  pool: { query: vi.fn(), connect: vi.fn() },
-}));
+// Uses the shared db-mock helper so future DB-shape changes need one edit in the
+// helper, not here. Async factory + dynamic import is the hoisting-safe usage.
+vi.mock("../db", async () => {
+  const { createDbMock } = await import("./helpers/db-mock");
+  return createDbMock();
+});
 
 vi.mock("../objectStorage", () => ({
   uploadBuffer: vi.fn(),

@@ -34,22 +34,13 @@ const { mockGetUser, mockGetAppSetting, mockSetBusinessAccessToken } = vi.hoiste
   mockSetBusinessAccessToken: vi.fn(),
 }));
 
-// database — avoids DATABASE_URL check at module load time
-vi.mock("../db", () => {
-  const chainable = () => ({ from: vi.fn().mockResolvedValue([]), where: vi.fn().mockReturnThis(), orderBy: vi.fn().mockReturnThis(), limit: vi.fn().mockResolvedValue([]) });
-  const mockSelect = vi.fn().mockReturnValue(chainable());
-  const mockSelectDistinct = vi.fn().mockReturnValue(chainable());
-  return {
-    db: {
-      select: mockSelect,
-      selectDistinct: mockSelectDistinct,
-      execute: vi.fn().mockResolvedValue({ rows: [] }),
-      insert: vi.fn().mockReturnValue({ values: vi.fn().mockReturnValue({ onConflictDoUpdate: vi.fn().mockReturnValue({ returning: vi.fn().mockResolvedValue([]) }), returning: vi.fn().mockResolvedValue([]) }) }),
-      delete: vi.fn().mockReturnValue({ where: vi.fn().mockResolvedValue([]), returning: vi.fn().mockResolvedValue([]) }),
-      update: vi.fn().mockReturnValue({ set: vi.fn().mockReturnValue({ where: vi.fn().mockResolvedValue([]) }) }),
-    },
-    pool: { query: vi.fn(), end: vi.fn() },
-  };
+// database — avoids DATABASE_URL check at module load time.
+// Uses the shared db-mock helper (chainable+thenable builders, execute default,
+// withDbRetry passthrough) so future DB-shape changes need one edit in the helper,
+// not here. Async factory + dynamic import is the hoisting-safe usage.
+vi.mock("../db", async () => {
+  const { createDbMock } = await import("./helpers/db-mock");
+  return createDbMock();
 });
 
 // storage — _requireAdmin uses getUser; the business router uses setBusinessAccessToken

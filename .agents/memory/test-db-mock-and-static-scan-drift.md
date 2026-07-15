@@ -5,13 +5,30 @@ description: Why server/__tests__ suites silently rot when db.ts / route DB-acce
 
 # Test DB-mock & static-scan drift
 
-The `server/__tests__` suites use **per-file hand-rolled** `vi.mock("../db", …)`
-factories — there is **no shared db-mock helper** (extracting one was considered
-and rejected: too much structural variance between suites + `vi.mock` hoisting
-friction makes a shared factory the higher-risk choice). Consequence: whenever a
-route changes how it touches the DB, the matching mock must be updated by hand,
-one file at a time. Failing suites then show 500s / TypeErrors that look like
-product bugs but are pure mock drift → real regressions can hide behind them.
+The `server/__tests__` suites historically used **per-file hand-rolled**
+`vi.mock("../db", …)` factories. Consequence: whenever a route changes how it
+touches the DB, the matching mock must be updated by hand, one file at a time.
+Failing suites then show 500s / TypeErrors that look like product bugs but are
+pure mock drift → real regressions can hide behind them.
+
+**A shared, opt-in helper now exists:** `server/__tests__/helpers/db-mock.ts`
+(`createDbMock(overrides?)`). It provides the common surface — chainable+thenable
+query builders (`select`/`selectDistinct`/`selectDistinctOn`/`insert`/`update`/
+`delete`), `execute` → `{ rows: [] }`, `transaction(fn)`, `withDbRetry`
+passthrough, `pool` + `isPoolHealthy` stubs — so a future DB-shape change is ONE
+edit in the helper, not N.
+- **Hoisting-safe usage is mandatory:** `vi.mock("../db", async () => { const { createDbMock } = await import("./helpers/db-mock"); return createDbMock(); })`.
+  A sync factory with a top-level import fails because `vi.mock` is hoisted above
+  imports; the async dynamic import resolves lazily after hoisting.
+- The chainable builder is a `Proxy` where **every** method returns itself and it
+  is thenable — so it survives a route adding a new chain link (that was the
+  original fragility of the bare `{ select: vi.fn() }` mocks).
+- Override a single db method or top-level export via `createDbMock({ db: { execute: myMock }, isPoolHealthy: () => false })`.
+- **Do NOT adopt it** in suites that must test the REAL `withDbRetry` /
+  `isTransientDbError` (retry-resilience) — those keep `importOriginal`; the
+  helper deliberately provides a passthrough `withDbRetry`.
+- Adopted so far by the highest-churn admin-route + discovery/system-account/
+  fake-zones suites; extending adoption is safe suite-by-suite (run each after).
 
 **Why:** a full `vitest run` after a big migration surfaced ~40 failing tests
 across ~18 files, all mock/test drift (routes evolved, mocks didn't).
