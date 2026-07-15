@@ -30,9 +30,17 @@ coordinate_history, no first_login_lat/lng, region not in
   `0146_fix_visible_profiles_null_coords.sql`: backfill from
   `users.first_login_lat/lng` when present, else flip to hidden.
 
-**Known edge (accepted, task-endorsed):** a rider who explicitly hides *before*
-ever getting a coordinate gets auto-revealed on first coordinate. Rare; would
-need a "user explicitly touched visibility" marker to fully avoid.
+**Explicit-hide preservation (Task #103):** `user_profiles.hide_from_map_explicit`
+marks that the rider deliberately chose their map visibility (set only in the
+privacy-settings PUT: `true` on hide, `false` on show). `revealOnFirstCoordinate`
+skips the reveal when it's `true`, and the login-time coordinate-recovery block in
+`login.ts` omits its hardcoded `hideFromMap:false` when the marker is set — so a
+rider who hides before their first GPS fix is never silently un-hidden. Backfilled
+by `0147_user_profiles_hide_from_map_explicit.sql` from the latest
+`user_privacy_log` entry for `hide_from_map` (only when still `true`), so
+signup-default / login-flip hides stay unmarked and remain revealable.
+**Why:** without the marker the reveal can't tell a signup-default hide from a
+deliberate one — auto-revealing the latter is a privacy-intent regression.
 
 **Helper placement gotcha:** `revealOnFirstCoordinate` lives in
 `server/lib/map-visibility.ts`, NOT `routes/users.ts` — importing it from the

@@ -137,6 +137,11 @@ router.post("/login", loginLimiter, async (req: Request, res: Response) => {
     if (userProfile && userProfile.latitude == null && userProfile.longitude == null) {
       (async () => {
         try {
+          // Task #103 — a rider who explicitly hid themselves before ever getting
+          // a coordinate must stay hidden even when we backfill a position for
+          // them here. Only reveal (hide_from_map=false) when they did NOT make an
+          // explicit "hide me" choice.
+          const keepHidden = userProfile.hideFromMapExplicit === true;
           // On a successful backfill the profile now has a position, so a
           // never-positioned profile is revealed (Task #66 invariant); this is a
           // no-op for profiles that are already visible.
@@ -146,7 +151,7 @@ router.post("/login", loginLimiter, async (req: Request, res: Response) => {
               latitude: historyCoord.latitude,
               longitude: historyCoord.longitude,
               coordinatesUpdatedAt: new Date(),
-              hideFromMap: false,
+              ...(keepHidden ? {} : { hideFromMap: false }),
             } as Partial<InsertUserProfile>);
             console.log(`[login] coordinate recovered from history for user ${user.id}`);
             return;
@@ -159,7 +164,7 @@ router.post("/login", loginLimiter, async (req: Request, res: Response) => {
               latitude: lat,
               longitude: lng,
               coordinatesUpdatedAt: new Date(),
-              hideFromMap: false,
+              ...(keepHidden ? {} : { hideFromMap: false }),
             } as Partial<InsertUserProfile>);
             console.log(`[login] coordinate recovered from firstLogin for user ${user.id}`);
             return;
@@ -171,7 +176,7 @@ router.post("/login", loginLimiter, async (req: Request, res: Response) => {
               latitude: centroid[0],
               longitude: centroid[1],
               coordinatesUpdatedAt: new Date(),
-              hideFromMap: false,
+              ...(keepHidden ? {} : { hideFromMap: false }),
             } as Partial<InsertUserProfile>);
             console.log(`[login] coordinate recovered from region centroid for user ${user.id}`);
             return;

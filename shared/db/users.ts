@@ -192,6 +192,13 @@ export const userProfiles = pgTable("user_profiles", {
     .default(sql`'{"matches":true,"zoneProposals":true,"chat":true,"motoclub":true,"eventi":true}'::jsonb`),
   pushNotificationsEnabled: boolean("push_notifications_enabled").notNull().default(true),
   hideFromMap: boolean("hide_from_map").notNull().default(false),
+  // Task #103 — marker: the rider explicitly chose their map visibility via the
+  // privacy-settings PUT. When true, revealOnFirstCoordinate must NOT auto-reveal
+  // (hide_from_map=false) on the first stored coordinate — doing so would silently
+  // override a "hide me from map" choice made before the rider ever got a GPS fix.
+  // Signup-default and Task #66 login-flip hides leave this false so those profiles
+  // stay eligible for reveal-on-first-coordinate.
+  hideFromMapExplicit: boolean("hide_from_map_explicit").notNull().default(false),
   hideOnlineStatus: boolean("hide_online_status").notNull().default(false),
   hideLastSeen: boolean("hide_last_seen").notNull().default(false),
   hideDistance: boolean("hide_distance").notNull().default(false),

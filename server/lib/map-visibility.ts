@@ -12,18 +12,29 @@
  * has never been positioned (coordinatesUpdatedAt == null), so it never overrides
  * a visibility choice a positioned rider makes later.
  *
+ * Task #103 — it must ALSO respect an explicit choice a rider made *before* their
+ * first coordinate. `hideFromMapExplicit` is set only when the rider touches the
+ * map-visibility toggle in privacy settings; when it is present the reveal is
+ * skipped, so a rider who registers, turns themselves off the map, then gets
+ * their first GPS fix is never silently un-hidden. Without this marker the reveal
+ * could not tell a signup-default hide apart from a deliberate one.
+ *
  * Lives in its own module (not routes/users.ts) so the auth login handler can use
  * it without importing the entire users router tree.
  */
 export function revealOnFirstCoordinate<T extends Record<string, unknown>>(
   updateData: T,
-  existingProfile: { coordinatesUpdatedAt?: Date | null } | null | undefined,
+  existingProfile:
+    | { coordinatesUpdatedAt?: Date | null; hideFromMapExplicit?: boolean | null }
+    | null
+    | undefined,
   newLat: number | null | undefined,
   newLng: number | null | undefined,
 ): T {
   const hasNewCoords = typeof newLat === "number" && typeof newLng === "number";
   const neverPositioned = !existingProfile || existingProfile.coordinatesUpdatedAt == null;
-  if (hasNewCoords && neverPositioned) {
+  const explicitlyHidden = !!existingProfile && existingProfile.hideFromMapExplicit === true;
+  if (hasNewCoords && neverPositioned && !explicitlyHidden) {
     return { ...updateData, hideFromMap: false };
   }
   return updateData;

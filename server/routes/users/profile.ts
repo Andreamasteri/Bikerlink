@@ -337,7 +337,14 @@ router.put("/me/privacy", requireAuth, async (req: Request, res: Response) => {
 
     const existing = await storage.getUserProfile(userId);
     const updateData: Partial<InsertUserProfile> = {};
-    if (hideFromMap !== undefined) updateData.hideFromMap = hideFromMap;
+    if (hideFromMap !== undefined) {
+      updateData.hideFromMap = hideFromMap;
+      // Task #103 — record that the rider made an explicit map-visibility choice.
+      // A deliberate "hide me" (true) sets the marker so revealOnFirstCoordinate
+      // won't silently un-hide them on their first GPS fix; choosing to be visible
+      // (false) clears it, restoring the reveal-on-first-coordinate default.
+      updateData.hideFromMapExplicit = hideFromMap === true;
+    }
     if (hideOnlineStatus !== undefined) updateData.hideOnlineStatus = (hideOnlineStatus as boolean | null) ?? undefined;
     if (hideLastSeen !== undefined) updateData.hideLastSeen = (hideLastSeen as boolean | null) ?? undefined;
     if (hideDistance !== undefined) updateData.hideDistance = (hideDistance as boolean | null) ?? undefined;
