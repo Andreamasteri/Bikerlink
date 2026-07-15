@@ -106,6 +106,7 @@ async function loadRuntimeMaxVessels(): Promise<void> {
       }
     }
   } catch {
+    // best-effort: keep the current runtimeMaxVessels on read failure
   }
 }
 
@@ -233,6 +234,7 @@ async function connectAisStream() {
         });
         evictOldestVessels();
       } catch {
+        // best-effort: malformed AIS position report, skip this update
       }
     });
 

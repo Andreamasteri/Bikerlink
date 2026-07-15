@@ -3,36 +3,14 @@
 import { sendError } from "../../lib/api-response";
 import { Router, Request, Response } from "express";
 import { requireAuth } from "./utils";
-import { aiPromptSchema, calculateRouteRequestSchema } from "@shared/validators";
+import { aiPromptSchema } from "@shared/validators";
 import { z } from "zod";
 import { generateRouteObject, streamRouteText } from "./waypoints.next";
-import { geminiErrorMessage, extractElevationProfile } from "./waypoints-helpers";
+import { geminiErrorMessage } from "./waypoints-helpers";
 import { isOllamaConfigured } from "../../lib/ollama-client";
 import { isGroqConfigured } from "../../lib/groq-client";
 import { isOpenAiRouteConfigured } from "../../lib/openai-route-client";
 export const poiPhotoSchema = z.object({ poiId: z.string().min(1, "poiId obbligatorio") });
-import { ACTIVE_PROFILE } from "../../graphhopper-client";
-import {
-  getActiveRouter,
-  CrossGroupRoutingError,
-  AreaNotEnabledError,
-} from "../../routing/router-selector";
-import type { RouteRequest } from "../../routing/graphhopper-adapter";
-import { ROUTING_AREA_OUTCOME_MESSAGES } from "@shared/routing-areas";
-import {
-  buildGeometricWeights,
-  buildTelemetryWeightsForRoute,
-  extractRouteWayIds,
-  normalizeStyle,
-  normalizeDrivingProfile,
-} from "../../routing/route-weights";
-import type { TelemetryCoverage } from "../../routing/route-weights";
-import {
-  fetchWeatherForWaypoints,
-  samplePointsAlongPath,
-  buildWeatherAvoidAreas,
-  type WeatherSample,
-} from "./weather-helper";
 
 const router = Router();
 

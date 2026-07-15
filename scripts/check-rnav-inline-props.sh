@@ -205,16 +205,16 @@ if [ -n "$ROUTER_DEP" ]; then
   FAIL=1
 fi
 
-# ── eslint-disable rules-of-hooks in app/ ────────────────────────────────────
+# ── disable-comment rules-of-hooks in app/ ───────────────────────────────────
 # Marcatore di hook dopo early return — viola le Regole dei Hook.
 # Fix: spostare useMemo/useCallback PRIMA di qualsiasi early return.
-HOOKS_VIOLATION=$(rg 'eslint-disable.*rules-of-hooks' \
+HOOKS_VIOLATION=$(rg '(oxlint|eslint)-disable.*rules-of-hooks' \
   --glob 'app/**/*.tsx' --glob 'app/**/*.ts' \
   --glob '!node_modules/**' --glob '!.local/**' --glob '!.agents/**' \
   -n 2>/dev/null || true)
 if [ -n "$HOOKS_VIOLATION" ]; then
   echo ""
-  echo "❌ TROVATO — eslint-disable rules-of-hooks in app/ (hook dopo early return)"
+  echo "❌ TROVATO — disable-comment rules-of-hooks in app/ (hook dopo early return)"
   echo "$HOOKS_VIOLATION"
   FAIL=1
 fi

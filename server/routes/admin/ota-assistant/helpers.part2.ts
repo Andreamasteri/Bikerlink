@@ -3,8 +3,8 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { promisify } from "node:util";
 import { db } from "../../../db";
-import { otaReleases, otaBootEvents, otaAssistantRuns, users } from "@shared/db";
-import { eq, and } from "drizzle-orm";
+import { otaReleases, otaBootEvents, users } from "@shared/db";
+import { eq } from "drizzle-orm";
 import { recordOtaDecision } from "../../../ai/coordinator/integrations/ota";
 import { LOG_DIR, finalizePublishRun } from "./helpers";
 

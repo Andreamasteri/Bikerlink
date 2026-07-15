@@ -3,15 +3,14 @@
 // non richiedere sessione) + /api/ads/placement/all unauth + object storage
 // (.private/selfcheck/ e public/ads/). Risultato persistito su
 // ai_watchdog_log (kind="report", scope="campaigns") + ultimo run in memoria.
-import http from "http";
 import { withJobGate } from "../coordinator/gated-job";
 import crypto from "crypto";
 import { generateText } from "ai";
-import { runWithFallback, estimateCostUsd } from "../moderation/provider";
+import { runWithFallback } from "../moderation/provider";
 import { writeWatchdogLog } from "./log";
 import { logAiUsage } from "../audit";
 import { uploadBuffer, deleteObject, objectExists } from "../../objectStorage";
-import { getInternalProbeToken, getInternalProbeHeaderName, getInternalProbeModeratorHeaderName } from "./internal-token";
+import { getInternalProbeModeratorHeaderName } from "./internal-token";
 import { storage } from "../../storage";
 import { cleanupOrphanAdImages } from "../../ads/cleanup-orphan-images";
 
@@ -48,12 +47,6 @@ const TINY_PNG = Buffer.from(
   "base64",
 );
 
-interface HttpProbeResp {
-  status: number;
-  body: string;
-  json: unknown | null;
-}
-
 import { httpProbe } from "./campaigns-self-check.part2";
 
 export interface RunSelfCheckOpts {
@@ -84,13 +77,12 @@ async function ensureSelfCheckModerator(): Promise<string> {
   const SELFCHECK_EMAIL = "selfcheck-mod@bikerlink.internal";
   const existing = await storage.getUserByEmail(SELFCHECK_EMAIL);
   if (existing) return existing.id;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const created = await storage.createUser({
     email: SELFCHECK_EMAIL,
-    username: "selfcheck-mod",
+    nickname: "selfcheck-mod",
     password: crypto.randomBytes(32).toString("hex"),
     role: "moderator",
-  } as any);
+  });
   return created.id;
 }
 

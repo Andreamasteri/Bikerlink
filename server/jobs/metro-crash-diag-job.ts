@@ -107,7 +107,7 @@ export function classifyMetroCrashLog(jsonlContent: string): MetroCrashSummary {
       .map((s) => s.session_id),
   );
 
-  let oomCount = oomSessionIds.size;
+  const oomCount = oomSessionIds.size;
 
   for (const sid of oomSessionIds) {
     const sessionCrashes = crashes.filter((c) => c.session_id === sid);

@@ -10,22 +10,9 @@
  * Task #2853 — buffering + validazione stream Ollama prima di emettere al client.
  */
 
-import { Router, Request, Response } from "express";
-import { sendError } from "../../lib/api-response";
-import { requireAuth } from "./utils";
-import { poiSearchSchema, poiRequestSchema } from "@shared/validators";
-import { poiPhotoSchema } from "./waypoints";
 import { z } from "zod";
-import { fetchWeatherForWaypoints } from "./weather-helper";
 import { generateObject, streamText } from "ai";
 
-// Task #2633 — weather helpers estratti per riuso da /weather/:id (GET).
-const weatherWaypointsSchema = z.object({
-  routeId: z.string().optional(),
-  waypoints: z.array(z.object({ lat: z.number().finite(), lng: z.number().finite(), name: z.string().optional() })).min(1).max(8),
-  departureIso: z.string().optional(),
-  avgSpeedKmh: z.number().optional(),
-});
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { getOllamaModel, isOllamaConfigured, isOllamaReachable } from "../../lib/ollama-client";
 import { getGroqModel, getGroqParseModel, isGroqConfigured } from "../../lib/groq-client";
@@ -117,7 +104,7 @@ function geminiModel(apiKey: string) {
  * Restituisce anche il provider vincitore come `provider_used`.
  */
 export async function generateRouteObject<T>(opts: RouteAiOptions<T>): Promise<{ result: T; provider_used: string }> {
-  const { prompt, apiKey, system, schema, abortSignal, maxRetries = 2, temperature = 0.1 } = opts;
+  const { prompt, apiKey, system, schema, abortSignal, temperature = 0.1 } = opts;
   const fullPrompt = `${system}\n\nRichiesta: ${prompt}`;
 
   const chain = await getEffectiveRouteChain();
@@ -271,11 +258,10 @@ async function bufferAndValidateStream(
 }
 
 export async function* streamRouteText(opts: StreamRouteOptions): AsyncGenerator<string> {
-  const { prompt, apiKey, system, abortSignal, maxRetries = 2, temperature = 0.1, validate, onProviderSelected } = opts;
+  const { prompt, apiKey, system, abortSignal, temperature = 0.1, validate, onProviderSelected } = opts;
   const fullPrompt = `${system}\n\nRichiesta: ${prompt}`;
 
   const chain = await getEffectiveRouteChain();
-  let lastErr: unknown = null;
 
   // maxRetries: 0 su ogni chiamata — il chain loop esterno gestisce il fallback.
   // Questo garantisce skip immediato su 429 senza sprecare retry sullo stesso provider esaurito.
@@ -304,7 +290,6 @@ export async function* streamRouteText(opts: StreamRouteOptions): AsyncGenerator
         }
         console.warn("[AI stream] Ollama output non valido, fallback provider successivo.");
       } catch (err) {
-        lastErr = err;
         if (isLast) throw err;
         const rateLimited = isRateLimitError(err);
         console.warn(`[AI stream] Ollama ${rateLimited ? "429 rate-limit, skip immediato" : "non disponibile/risposta non valida, fallback"}:`, (err as Error)?.message ?? err);
@@ -324,7 +309,6 @@ export async function* streamRouteText(opts: StreamRouteOptions): AsyncGenerator
         }
         console.warn("[AI stream] Groq output non valido, fallback provider successivo.");
       } catch (err) {
-        lastErr = err;
         if (isLast) throw err;
         const rateLimited = isRateLimitError(err);
         console.warn(`[AI stream] Groq ${rateLimited ? "429 rate-limit, skip immediato" : "non disponibile/risposta non valida, fallback"}:`, (err as Error)?.message ?? err);
@@ -345,7 +329,6 @@ export async function* streamRouteText(opts: StreamRouteOptions): AsyncGenerator
         for (const chunk of geminiBuffer) yield chunk;
         return;
       } catch (err) {
-        lastErr = err;
         if (isLast) throw err;
         const rateLimited = isRateLimitError(err);
         console.warn(`[AI stream] Gemini ${rateLimited ? "429 rate-limit, skip immediato" : "non disponibile/risposta non valida"}:`, (err as Error)?.message ?? err);
@@ -366,7 +349,6 @@ export async function* streamRouteText(opts: StreamRouteOptions): AsyncGenerator
         for (const chunk of openaiBuffer) yield chunk;
         return;
       } catch (err) {
-        lastErr = err;
         if (isLast) throw err;
         const rateLimited = isRateLimitError(err);
         console.warn(`[AI stream] OpenAI ${rateLimited ? "429 rate-limit, skip immediato" : "non disponibile/risposta non valida"}:`, (err as Error)?.message ?? err);

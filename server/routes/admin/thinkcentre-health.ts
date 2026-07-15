@@ -10,7 +10,7 @@
 import { Router, type Request, type Response as ExpressResponse } from "express";
 import { db, withDbRetry } from "../../db";
 import { appSettings, thinkcentreHealthEvents } from "@shared/db";
-import { desc, eq } from "drizzle-orm";
+import { desc } from "drizzle-orm";
 import {
   isStartingUp,
   tokenFingerprint,
@@ -45,7 +45,6 @@ import {
   type ErrorEvent,
 } from "./thinkcentre-health-gh-probes";
 import { probeAres, type AresHealth } from "./thinkcentre-health-ares-probe";
-import { updateSystemStatus, type DotStatus as CachedDotStatus } from "../../lib/system-status-cache";
 import { sendError } from "../../lib/api-response";
 
 import { updateThinkCentreSystemStatus, probeThinkCentreStatusSnapshot } from "./thinkcentre-health.part2";

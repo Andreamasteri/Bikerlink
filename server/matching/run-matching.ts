@@ -12,28 +12,17 @@ import {
 } from "./filters";
 import {
   areCompatible,
-  baseModelName,
-  tagOverlap,
-  loadMatchThresholds,
-  getThresholdSync,
-  getSupermatchMinCategories,
-  isSupermatchByBreakdown,
-  type ScoreBreakdown,
 } from "./scoring";
 import { db } from "../db";
 import { sql } from "drizzle-orm";
-import { entityTags, tags as tagsTable, tagCategories, zavorrinaWishlistMotos } from "@shared/db";
-import { and, count, eq, inArray } from "drizzle-orm";
 import { haversineDistance } from "../geo";
 import { createUserLoader } from "../lib/user-loader";
 import { matchingLogger } from "../lib/logger";
 import { addMatchLog } from "./match-log-buffer";
-import type { MatchTable } from "./notifications/dispatcher-types";
 import {
   resetNotificationCycleStats,
   recordNotifSent,
   recordNotifFailed,
-  recordNotifRetried,
   getNotificationCycleStats,
 } from "./notification-stats";
 import { retryPendingNotifications } from "./retry-pending-notifications";
@@ -60,7 +49,7 @@ export type CapStatus = {
 /** Fallback identico al vecchio hardcoded — wishlist era 500. */
 const DEFAULT_WISHLIST_CAP = 500;
 
-let lastWishlistCapStatus: CapStatus = {
+const lastWishlistCapStatus: CapStatus = {
   cap: DEFAULT_WISHLIST_CAP,
   capReached: false,
   usersProcessed: 0,
@@ -75,7 +64,7 @@ let lastProposalStats: MatchingRunStats = {
 };
 export function getLastProposalMatchingStats(): MatchingRunStats { return lastProposalStats; }
 
-let lastWishlistStats: MatchingRunStats = {
+const lastWishlistStats: MatchingRunStats = {
   candidatesPre: 0, candidatesPost: 0, pairsConsidered: 0, pairsAfterBbox: 0, matchesCreated: 0,
 };
 export function getLastWishlistMatchingStats(): MatchingRunStats { return lastWishlistStats; }

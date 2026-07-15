@@ -1,6 +1,5 @@
 import { db, withDbRetry } from "../../db";
 import { pipelineFlowEvents } from "@shared/db";
-import { and, eq, isNull, lt, or, sql } from "drizzle-orm";
 import { writeWatchdogLog } from "../watchdog/log";
 import { withBgDbSlot } from "../../lib/bg-db-limiter";
 import { withJobGate } from "../coordinator/gated-job";

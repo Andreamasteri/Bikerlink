@@ -83,7 +83,7 @@ export function mapTomTomResponse(raw: TomTomRoutingResponse): RouteResult {
   const totalDistance = route.summary?.lengthInMeters ?? 0;
   const totalTime = (route.summary?.travelTimeInSeconds ?? 0) * 1000;
 
-  const instructions: any[] = (route.guidance?.instructions ?? []).map((instr) => ({
+  const instructions: Array<{ text: string; distance: number; time: number; sign: number; interval: [number, number] }> = (route.guidance?.instructions ?? []).map((instr) => ({
     text: instr.message ?? instr.roadName ?? "",
     distance: instr.routeOffsetInMeters ?? 0,
     time: (instr.travelTimeInSeconds ?? 0) * 1000,

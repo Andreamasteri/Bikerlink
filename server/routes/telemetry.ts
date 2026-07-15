@@ -347,7 +347,7 @@ router.get("/stats", async (req: Request, res: Response) => {
     });
   } catch (err) {
     const elapsedMs = Date.now() - startMs;
-    const pgMsg = (err as any)?.cause?.message ?? "";
+    const pgMsg = (err instanceof Error ? (err as Error & { cause?: { message?: string } }).cause?.message : undefined) ?? "";
     const errMsg = err instanceof Error ? err.message : String(err);
     console.error("[telemetry/stats] error:", err, pgMsg ? `| PG: ${pgMsg}` : "");
     logTelemetryEvent({
@@ -355,7 +355,7 @@ router.get("/stats", async (req: Request, res: Response) => {
       type: "ERROR",
       context: "telemetry/stats",
       message: `Fallita dopo ${elapsedMs}ms: ${errMsg}`,
-      userId: (req as any).user?.id,
+      userId: (req as Request & { user?: { id?: number } }).user?.id,
       detail: pgMsg || (err instanceof Error ? err.stack : undefined),
     });
     return sendError(res, 500, "Errore interno del server");

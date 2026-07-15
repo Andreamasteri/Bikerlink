@@ -1,7 +1,6 @@
 // Task #2536 — AI explainer per violazioni DB integrity.
 // Riusa runWithFallback (#2532) + budget shared. Output Zod-validato.
 // Cache in-memory per (checkId, violationHash) per non ripagare per la stessa cosa.
-import { z } from "zod";
 import { runWithFallback, estimateCostUsd, generateStructured } from "../moderation/provider";
 import { withBudget, addCost } from "../moderation/budget";
 import { aiExplainSchema, type AiExplain, type IntegrityCheck, type ViolationSampleRow } from "./types";

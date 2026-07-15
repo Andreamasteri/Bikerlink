@@ -8,26 +8,10 @@
 // (e, via collectDbIntegritySignals, la slice "db-integrity") dell'Health Arbiter
 // come input informativo. Il cambio di comportamento operativo resta esclusiva
 // del Control Plane (initState, db-circuit-breaker, bg-db-limiter).
-import { db } from "../../db";
 import { setHealthState } from "../../lib/health-arbiter";
-import { systemHealthSnapshot } from "@shared/db";
-import { desc } from "drizzle-orm";
-import { collectBullMq } from "./collectors/bullmq-collector";
-import { collectScheduler } from "./collectors/scheduler-collector";
-import { collectDb } from "./collectors/db-collector";
-import { collectDragonfly } from "./collectors/dragonfly-collector";
-import { collectLatency } from "./collectors/latency-collector";
-import { collectErrors } from "./collectors/error-collector";
-import { collectMaps } from "./collectors/maps-collector";
-import { collectRestarts } from "./collectors/restart-collector";
-import { collectCrashSignals } from "./collectors/crash-signals-collector";
-import { collectPool } from "./collectors/pool-collector";
-import { recordSignals } from "./signals";
-import type { HealthSnapshot, Problem, Severity, Signal } from "./types";
+import type { Problem, Severity, Signal } from "./types";
 import { collectDbIntegrity } from "../db-integrity/collector";
 import { storage } from "../../storage";
-import { withBgDbSlot } from "../../lib/bg-db-limiter";
-import { isThinkCentrePoweredOff } from "../../lib/thinkcentre-powered-off";
 import type { EmbeddingDailyReport } from "../../jobs/embedding-daily-report";
 
 // Task #2536 — wrapper che traduce lo snapshot db-integrity in Signal[] per
@@ -433,17 +417,6 @@ export function suppressDownstreamWhenPoweredOff(problems: Problem[]): Problem[]
     }
     return p;
   });
-}
-
-function computeStatus(problems: Problem[]): { status: HealthSnapshot["status"]; score: number } {
-  let penalty = 0;
-  for (const p of problems) penalty += SEVERITY_WEIGHT[p.severity] ?? 0;
-  const score = Math.max(0, 100 - penalty);
-  const status: HealthSnapshot["status"] =
-    score >= 90 ? "green" :
-    score >= 70 ? "yellow" :
-    score >= 40 ? "orange" : "red";
-  return { status, score };
 }
 
 export { runAggregatorCycle, getRecentSnapshots, getLatestSnapshot, subscribeSnapshot } from "./aggregator.part2";

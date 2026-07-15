@@ -1,8 +1,5 @@
 import type { Express, Request, Response } from "express";
 import { storage } from "../storage";
-import { db, withDbRetry } from "../db";
-import { users } from "@shared/db";
-import { sql } from "drizzle-orm";
 import { sendSuccess, sendError } from "../lib/api-response";
 
 export function registerPart2Routes(app: Express) {
@@ -51,6 +48,7 @@ export function registerPart2Routes(app: Express) {
         }
         storage.saveCoordinateHistory(userId, latitude, longitude).catch(() => {});
       } catch {
+        // best-effort: profile/coordinate update failures are non-fatal here
       }
 
       if (activeRouteId && typeof activeRouteId === "string") {
@@ -68,6 +66,7 @@ export function registerPart2Routes(app: Express) {
             await storage.createRoutePoints([point]);
           }
         } catch {
+          // best-effort: route-point tracking failures are non-fatal here
         }
       }
 

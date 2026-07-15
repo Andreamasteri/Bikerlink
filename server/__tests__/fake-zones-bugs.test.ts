@@ -96,6 +96,7 @@ vi.mock("../embeddings", () => ({
 
 import { storage } from "../storage";
 import usersRouter from "../routes/users";
+import type { User, UserProfile, AppSetting } from "@shared/db";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -178,9 +179,9 @@ describe("BUG 1 — PUT /me applica applyFakeZones prima di persistere lat/lng",
     vi.clearAllMocks();
     app = buildApp();
 
-    vi.mocked(storage.getUser).mockResolvedValue(makeUser() as any);
-    vi.mocked(storage.getUserProfile).mockResolvedValue(makeFakeHomeProfile() as any);
-    vi.mocked(storage.updateUserProfile).mockResolvedValue({} as any);
+    vi.mocked(storage.getUser).mockResolvedValue(makeUser() as unknown as User);
+    vi.mocked(storage.getUserProfile).mockResolvedValue(makeFakeHomeProfile() as unknown as UserProfile);
+    vi.mocked(storage.updateUserProfile).mockResolvedValue({} as unknown as UserProfile);
     vi.mocked(storage.getUserPhotos).mockResolvedValue([]);
     vi.mocked(storage.getUserMotorcycles).mockResolvedValue([]);
   });
@@ -208,7 +209,7 @@ describe("BUG 1 — PUT /me applica applyFakeZones prima di persistere lat/lng",
 
   it("persiste le coordinate reali quando l'utente NON è nel raggio fakeHome", async () => {
     vi.mocked(storage.getUserProfile).mockResolvedValue(
-      makeFakeHomeProfile({ homeLatitude: 50.0, homeLongitude: 15.0 }) as any,
+      makeFakeHomeProfile({ homeLatitude: 50.0, homeLongitude: 15.0 }) as unknown as UserProfile,
     );
 
     const res = await request(app)
@@ -237,12 +238,12 @@ describe("BUG 2 — captureFirstAvailabilityLocation riceve coordinate già alte
     vi.clearAllMocks();
     app = buildApp();
 
-    vi.mocked(storage.getUserProfile).mockResolvedValue(makeFakeHomeProfile() as any);
-    vi.mocked(storage.updateUserProfile).mockResolvedValue({} as any);
+    vi.mocked(storage.getUserProfile).mockResolvedValue(makeFakeHomeProfile() as unknown as UserProfile);
+    vi.mocked(storage.updateUserProfile).mockResolvedValue({} as unknown as UserProfile);
     vi.mocked(storage.getUser).mockResolvedValue(
-      makeUser({ firstLoginLat: null, firstLoginLng: null }) as any,
+      makeUser({ firstLoginLat: null, firstLoginLng: null }) as unknown as User,
     );
-    vi.mocked(storage.updateUser).mockResolvedValue(undefined as any);
+    vi.mocked(storage.updateUser).mockResolvedValue(undefined as unknown as User);
   });
 
   afterEach(() => {
@@ -283,8 +284,8 @@ describe("BUG 3 — POST /app-close rispetta il setting globale offline_position
     vi.clearAllMocks();
     app = buildApp();
 
-    vi.mocked(storage.updateUser).mockResolvedValue(undefined as any);
-    vi.mocked(storage.updateUserProfile).mockResolvedValue({} as any);
+    vi.mocked(storage.updateUser).mockResolvedValue(undefined as unknown as User);
+    vi.mocked(storage.updateUserProfile).mockResolvedValue({} as unknown as UserProfile);
   });
 
   afterEach(() => {
@@ -293,11 +294,11 @@ describe("BUG 3 — POST /app-close rispetta il setting globale offline_position
 
   it("NON scrive lastOfflineLat/Lng quando offline_position_randomize_default=false", async () => {
     vi.mocked(storage.getUserProfile).mockResolvedValue(
-      makeFakeHomeProfile({ offlinePositionRandomize: true }) as any,
+      makeFakeHomeProfile({ offlinePositionRandomize: true }) as unknown as UserProfile,
     );
     vi.mocked(storage.getAppSetting).mockImplementation(async (key: string) => {
       if (key === "offline_position_randomize_default") {
-        return { key, value: "false" } as any;
+        return { key, value: "false" } as unknown as AppSetting;
       }
       return null;
     });
@@ -317,7 +318,7 @@ describe("BUG 3 — POST /app-close rispetta il setting globale offline_position
 
   it("scrive lastOfflineLat/Lng quando offline_position_randomize_default non è 'false'", async () => {
     vi.mocked(storage.getUserProfile).mockResolvedValue(
-      makeFakeHomeProfile({ latitude: REAL_LAT, longitude: REAL_LNG, offlinePositionRandomize: true }) as any,
+      makeFakeHomeProfile({ latitude: REAL_LAT, longitude: REAL_LNG, offlinePositionRandomize: true }) as unknown as UserProfile,
     );
     vi.mocked(storage.getAppSetting).mockResolvedValue(undefined);
 
@@ -336,7 +337,7 @@ describe("BUG 3 — POST /app-close rispetta il setting globale offline_position
 
   it("NON scrive lastOfflineLat/Lng quando l'utente ha offlinePositionRandomize=false", async () => {
     vi.mocked(storage.getUserProfile).mockResolvedValue(
-      makeFakeHomeProfile({ offlinePositionRandomize: false }) as any,
+      makeFakeHomeProfile({ offlinePositionRandomize: false }) as unknown as UserProfile,
     );
     vi.mocked(storage.getAppSetting).mockResolvedValue(undefined);
 

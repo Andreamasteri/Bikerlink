@@ -32,7 +32,7 @@ const FAIL_THRESHOLD = 2;
 // ── State ─────────────────────────────────────────────────────────────────────
 let consecutiveFailures = 0;
 let isAlertActive = false;
-let lastNotifiedAt = new Map<string, number>();
+const lastNotifiedAt = new Map<string, number>();
 let intervalHandle: ReturnType<typeof setInterval> | null = null;
 let firstProbeTimer: ReturnType<typeof setTimeout> | null = null;
 

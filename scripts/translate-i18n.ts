@@ -1,10 +1,7 @@
 #!/usr/bin/env tsx
 import * as fs from "node:fs";
 import * as path from "node:path";
-import * as crypto from "node:crypto";
 import { 
-  parseValue, 
-  emitValue, 
   hash, 
   parseFile, 
   buildKeyMap, 
@@ -12,12 +9,10 @@ import {
   loadState, 
   saveState, 
   loadGlossary, 
-  buildGlossaryPrompt, 
   translateBatchSmart, 
   parseArgs, 
   I18N_DIR, 
-  SOURCE_LANG, 
-  STATE_FILE 
+  SOURCE_LANG 
 } from "./translate-i18n.part2";
 
 async function main() {

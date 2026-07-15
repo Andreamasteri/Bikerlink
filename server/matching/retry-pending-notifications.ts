@@ -5,7 +5,6 @@ import { storage } from "../storage";
 import { dispatchMatchNotification } from "./notifications/dispatcher";
 import type { MatchTable } from "./notifications/dispatcher-types";
 import {
-  recordNotifSent,
   recordNotifFailed,
   recordNotifRetried,
   canRetryMatch,

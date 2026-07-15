@@ -6,7 +6,7 @@ import { sendError, sendSuccess } from "../../lib/api-response";
 import { safeModLog } from "../../lib/safe-mod-log";
 import { storage } from "../../storage";
 import { objectExists } from "../../objectStorage";
-import { uploadBuffer, deleteObject, downloadBuffer } from "../../objectStorage";
+import { uploadBuffer, deleteObject } from "../../objectStorage";
 import crypto from "crypto";
 
 const router = Router();

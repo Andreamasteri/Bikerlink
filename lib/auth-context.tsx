@@ -390,6 +390,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       didRevalidateRef.current = true;
       userQuery.refetch().catch(() => {});
     }
+    // oxlint-disable-next-line react-hooks/exhaustive-deps -- intentional: only re-run on storageChecked/userQuery.data changes, not on every userQuery identity change
   }, [storageChecked, userQuery.data, userQuery.refetch]);
 
   // Clear sessionExpired whenever the user becomes authenticated
@@ -429,6 +430,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const authFailed = storageChecked && userQuery.isError && !userQuery.data;
   const retryAuth = useCallback(() => {
     userQuery.refetch();
+    // oxlint-disable-next-line react-hooks/exhaustive-deps -- intentional: userQuery.refetch is stable, depending on the whole userQuery object would churn every render
   }, [userQuery.refetch]);
 
   const loginMutation = useLoginMutation();

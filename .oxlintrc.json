@@ -1,0 +1,70 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": [
+    "typescript",
+    "react",
+    "unicorn",
+    "oxc"
+  ],
+  "categories": {
+    "correctness": "off"
+  },
+  "ignorePatterns": [
+    "dist/**",
+    "dist-ota-env/**",
+    "server_dist/**",
+    "node_modules/**",
+    "static-build/**",
+    "bowie-terminal/**",
+    ".expo/**",
+    ".local/**",
+    ".agents/**",
+    "migrations/**",
+    "mocks/**",
+    "exports/**",
+    "graphhopper/**",
+    "website/**",
+    "android/**",
+    "tmp_*/**",
+    "uploads/**",
+    "logs/**",
+    "**/*.js",
+    "**/*.jsx",
+    "**/*.mjs",
+    "**/*.cjs"
+  ],
+  "rules": {
+    "no-unused-vars": [
+      "warn",
+      {
+        "vars": "all",
+        "varsIgnorePattern": "^_",
+        "args": "after-used",
+        "argsIgnorePattern": "^_",
+        "caughtErrors": "all",
+        "caughtErrorsIgnorePattern": "^_"
+      }
+    ],
+    "typescript/no-explicit-any": "warn",
+    "react/rules-of-hooks": "error",
+    "react/exhaustive-deps": "warn",
+    "typescript/no-redeclare": "warn",
+    "no-redeclare": "off",
+    "no-constant-condition": "warn",
+    "no-debugger": "warn",
+    "no-duplicate-case": "error",
+    "no-empty": "warn",
+    "no-unreachable": "warn",
+    "prefer-const": "warn",
+    "eqeqeq": ["warn", "smart"]
+  },
+  "overrides": [
+    {
+      "files": ["server/**/*.ts"],
+      "rules": {
+        "react/rules-of-hooks": "off",
+        "react/exhaustive-deps": "off"
+      }
+    }
+  ]
+}

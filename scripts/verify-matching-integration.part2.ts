@@ -1,5 +1,6 @@
 import { promises as fs } from "node:fs";
 import * as path from "node:path";
+import type { Gap } from "./verify-matching-integration";
 
 const ROOT = process.cwd();
 
@@ -150,7 +151,7 @@ export async function checkAdminEndpoints() {
     }
   }
 
-  const gaps: any[] = [];
+  const gaps: Gap[] = [];
   let checkedCount = 0;
   for (const f of files) {
     const c = await readFileSafe(f);
@@ -197,7 +198,7 @@ export async function checkReplitMd() {
     "Sistema OTA",
     "A/B Testing",
   ];
-  const gaps: any[] = [];
+  const gaps: Gap[] = [];
   for (const s of expectedSections) {
     if (!new RegExp(s, "i").test(md)) {
       gaps.push({

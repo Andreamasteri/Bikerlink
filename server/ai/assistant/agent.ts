@@ -40,7 +40,6 @@ import {
   selectToolNamesForMessage,
   buildMissingToolInstruction,
   createOllamaOutputGate,
-  tryParseTextualToolCall,
 } from "./tool-calling";
 import { isWebSearchConfigured } from "./web-search";
 import { buildAresLearningContext } from "./ares-learning";

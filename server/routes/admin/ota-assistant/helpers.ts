@@ -2,18 +2,13 @@
 // Helpers READ-ONLY e MUTANTI per l'assistente OTA. Caratteri identici al file
 // originale; solo `export` aggiunto a function/const per renderli importabili.
 
-import { spawn } from "node:child_process";
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { execFile } from "node:child_process";
-import { promisify } from "node:util";
 import { db } from "../../../db";
 import { otaReleases, otaBootEvents, otaAssistantRuns, otaWatchdogReports, users } from "@shared/db";
 import { eq, desc, and, inArray, or, like } from "drizzle-orm";
 import { syncProductionUpdates } from "../ota";
 import { shouldDelayForCoordinator, recordOtaDecision } from "../../../ai/coordinator/integrations/ota";
-
-const execFileAsync = promisify(execFile);
 
 // Soglie AI per proposta di rollback (distinte dal deterministico ota-auto-rollback.ts).
 export const AI_ROLLBACK_PROPOSAL_THRESHOLD = Number(process.env.OTA_ASSISTANT_ROLLBACK_THRESHOLD ?? "85");
@@ -303,8 +298,6 @@ export async function finalizePublishRun(runId: string, status: "completed" | "e
 
 import {
   spawnPublishJob,
-  execRollbackToGroup,
-  execForceUpdateDevice,
   execMutatingTool as execMutatingToolPart2,
 } from "./helpers.part2";
 

@@ -45,7 +45,7 @@ async function main() {
   const fromIdx = args.indexOf("--from");
   const toIdx = args.indexOf("--to");
 
-  let packages =
+  const packages =
     manualIdx !== -1
       ? parseManualPackages(args[manualIdx + 1])
       : detectChangedPackages(

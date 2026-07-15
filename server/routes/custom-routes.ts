@@ -1,7 +1,6 @@
 import { Router } from "express";
 import { storage } from "../storage";
 import { allLimited } from "../lib/concurrency";
-import { haversineKm } from "../geo";
 import { createCustomRouteSchema, updateCustomRouteSchema, createWaypointSchema, updateWaypointSchema, gpxImportSchema } from "@shared/validators";
 import { sendError } from "../lib/api-response";
 

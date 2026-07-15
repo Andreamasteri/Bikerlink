@@ -89,8 +89,6 @@ import { storage } from "../storage";
 type StorageSetting = Awaited<ReturnType<typeof storage.getAppSetting>>;
 type StorageOnlineRow = Awaited<ReturnType<typeof storage.getOnlineUsersList>>[0];
 type StorageAvailableRow = Awaited<ReturnType<typeof storage.getAvailableBikersList>>[0];
-type StorageNearbyRow = Awaited<ReturnType<typeof storage.getNearbyUsers>>[0];
-type StorageSearchRow = Awaited<ReturnType<typeof storage.searchUsers>>[0];
 
 import { onlineTracker } from "../online-tracker";
 import usersRouter from "../routes/users";
@@ -196,23 +194,6 @@ function makeAvailableRow(userType: "biker" | "zavorrina" = "biker", profileOver
     user: makeTargetUser({ userType }),
     profile: makeFuzzedProfile({ isAvailable: true, ...profileOverrides }),
     distance: 5,
-  };
-}
-
-/** Row format used by nearby endpoint. */
-function makeNearbyRow(profileOverrides: Record<string, unknown> = {}) {
-  return {
-    user: makeTargetUser(),
-    profile: makeFuzzedProfile({ offlinePositionRandomize: false, ...profileOverrides }),
-    distance: 8,
-  };
-}
-
-/** Row format used by search endpoint. */
-function makeSearchRow(profileOverrides: Record<string, unknown> = {}) {
-  return {
-    user: makeTargetUser(),
-    profile: makeFuzzedProfile(profileOverrides),
   };
 }
 

@@ -7,7 +7,7 @@
 //   B. strict-capable model → generateObject with schema property, no output:"no-schema"
 //   C. llama model + Zod parse failure → error propagates (fallback chain catches it)
 
-import { describe, it, expect, vi, beforeAll, afterAll } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { z } from "zod";
 
 // ---------------------------------------------------------------------------

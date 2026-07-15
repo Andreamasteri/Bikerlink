@@ -175,7 +175,7 @@ router.get("/telemetry-stats", async (_req: Request, res: Response) => {
     return res.json(payload);
   } catch (err) {
     const elapsedMs = Date.now() - startMs;
-    const pgMsg = (err as any)?.cause?.message ?? "";
+    const pgMsg = err instanceof Error ? ((err.cause as Error | null)?.message ?? "") : "";
     const errMsg = err instanceof Error ? err.message : String(err);
     const cause = pgMsg || errMsg;
     console.error("[admin/telemetry-stats] error:", err, pgMsg ? `| PG: ${pgMsg}` : "");
@@ -195,7 +195,7 @@ router.get("/map-matching-stats", async (_req: Request, res: Response) => {
     const stats = await getMapMatchingStats();
     return res.json(stats);
   } catch (err) {
-    const cause = (err as any)?.cause?.message ?? "";
+    const cause = err instanceof Error ? ((err.cause as Error | null)?.message ?? "") : "";
     const errMsg = err instanceof Error ? err.message : String(err);
     console.error("[admin/map-matching-stats] error:", err, cause ? `| PG: ${cause}` : "");
     logTelemetryEvent({
@@ -222,7 +222,7 @@ router.get("/curvy-score-stats", async (_req: Request, res: Response) => {
       isRunning: raw.isRunning,
     });
   } catch (err) {
-    const cause = (err as any)?.cause?.message ?? "";
+    const cause = err instanceof Error ? ((err.cause as Error | null)?.message ?? "") : "";
     const errMsg = err instanceof Error ? err.message : String(err);
     console.error("[admin/curvy-score-stats] error:", err, cause ? `| PG: ${cause}` : "");
     logTelemetryEvent({
@@ -247,7 +247,7 @@ router.put("/sensors-global", async (req: Request, res: Response) => {
     await storage.upsertAppSetting(SENSORS_GLOBAL_SETTING, String(enabled));
     return res.json({ enabled });
   } catch (err) {
-    const cause = (err as any)?.cause?.message ?? "";
+    const cause = err instanceof Error ? ((err.cause as Error | null)?.message ?? "") : "";
     const errMsg = err instanceof Error ? err.message : String(err);
     console.error("[admin/sensors-global] error:", err, cause ? `| PG: ${cause}` : "");
     logTelemetryEvent({
@@ -267,7 +267,7 @@ router.get("/sensors-global", async (_req: Request, res: Response) => {
     const enabled = setting?.value !== "false";
     return res.json({ enabled });
   } catch (err) {
-    const cause = (err as any)?.cause?.message ?? "";
+    const cause = err instanceof Error ? ((err.cause as Error | null)?.message ?? "") : "";
     const errMsg = err instanceof Error ? err.message : String(err);
     console.error("[admin/sensors-global GET] error:", err, cause ? `| PG: ${cause}` : "");
     logTelemetryEvent({
@@ -291,7 +291,7 @@ router.put("/telemetry-target-km", async (req: Request, res: Response) => {
     await storage.upsertAppSetting(TARGET_KM_SETTING, String(val));
     return res.json({ target_km: val });
   } catch (err) {
-    const cause = (err as any)?.cause?.message ?? "";
+    const cause = err instanceof Error ? ((err.cause as Error | null)?.message ?? "") : "";
     const errMsg = err instanceof Error ? err.message : String(err);
     console.error("[admin/telemetry-target-km] error:", err, cause ? `| PG: ${cause}` : "");
     logTelemetryEvent({
@@ -325,7 +325,7 @@ router.post("/map-matching/rematch", async (_req: Request, res: Response) => {
     const result = await requeueUnmatchable();
     return res.json({ success: true, ...result });
   } catch (err) {
-    const cause = (err as any)?.cause?.message ?? "";
+    const cause = err instanceof Error ? ((err.cause as Error | null)?.message ?? "") : "";
     const errMsg = err instanceof Error ? err.message : String(err);
     console.error("[admin/map-matching/rematch] error:", err, cause ? `| PG: ${cause}` : "");
     logTelemetryEvent({
@@ -348,7 +348,7 @@ router.post("/map-matching/drain-backlog", async (_req: Request, res: Response) 
     const result = await drainStuckRetryBacklog();
     return res.json({ success: true, ...result });
   } catch (err) {
-    const cause = (err as any)?.cause?.message ?? "";
+    const cause = err instanceof Error ? ((err.cause as Error | null)?.message ?? "") : "";
     const errMsg = err instanceof Error ? err.message : String(err);
     console.error("[admin/map-matching/drain-backlog] error:", err, cause ? `| PG: ${cause}` : "");
     logTelemetryEvent({
@@ -465,7 +465,7 @@ router.get("/telemetry-top-riders", async (req: Request, res: Response) => {
     return res.json(payload);
   } catch (err) {
     const elapsedMs = Date.now() - startMs;
-    const pgMsg = (err as any)?.cause?.message ?? "";
+    const pgMsg = err instanceof Error ? ((err.cause as Error | null)?.message ?? "") : "";
     const errMsg = err instanceof Error ? err.message : String(err);
     const cause = pgMsg || errMsg;
     console.error("[admin/telemetry-top-riders] error:", err, pgMsg ? `| PG: ${pgMsg}` : "");

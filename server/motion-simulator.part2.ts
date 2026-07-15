@@ -1,11 +1,9 @@
 import { db } from "./db";
 import { users, userProfiles } from "@shared/db";
 import { eq, and, sql } from "drizzle-orm";
-import { storage } from "./storage";
 import { systemAccountConditions } from "./lib/system-account-filter";
 import { 
   UserMotionState, 
-  MOTION_CRON_INTERVAL_MS, 
   SPEED_PROFILES, 
   stepSpeed, 
   applyDelta,

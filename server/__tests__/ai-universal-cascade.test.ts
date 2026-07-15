@@ -152,7 +152,7 @@ describe("runWithFallback — AI Universal Cascade (Task #3872, Ollama-first)", 
   it("preferredProvider mette il provider cloud scelto in testa (dopo Ollama)", async () => {
     const runWithFallback = await freshRunWithFallback();
     const calls: string[] = [];
-    const { value, model } = await runWithFallback(
+    const { model } = await runWithFallback(
       { role: "brain", preferredProvider: "openai", skipOllama: true },
       (m) => {
         calls.push(m.providerName);

@@ -4,7 +4,6 @@ import { haversineDistance } from "../geo";
 import {
   users,
   userProfiles,
-  proposals,
   type Proposal,
 } from "@shared/db";
 import { and, eq, inArray, isNotNull } from "drizzle-orm";

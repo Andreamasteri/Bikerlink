@@ -66,7 +66,6 @@ type StorageUser = Awaited<ReturnType<typeof storage.getAllUsers>>[0];
 type StorageSetting = Awaited<ReturnType<typeof storage.getAppSetting>>;
 type StorageSearchRow = Awaited<ReturnType<typeof storage.searchUsers>>[0];
 type StorageNearbyRow = Awaited<ReturnType<typeof storage.getNearbyUsers>>[0];
-type StorageAvailableRow = Awaited<ReturnType<typeof storage.getAvailableUsersList>>[0];
 
 import { onlineTracker } from "../online-tracker";
 import usersRouter from "../routes/users";
@@ -141,29 +140,6 @@ function makeNearbyRow(
   return {
     ...makeSearchRow(id, userOverrides, profileOverrides),
     distance: 5,
-  };
-}
-
-/** Row as returned by storage.getAvailableBikersList / getAvailableZavorrinaList. */
-function makeAvailableRow(
-  id: string,
-  userType: "biker" | "zavorrina" = "biker",
-  profileOverrides: Record<string, unknown> = {}
-) {
-  return {
-    user: makeUser(id, { userType }),
-    profile: {
-      latitude: 45.0,
-      longitude: 9.0,
-      hideFromMap: false,
-      isAvailable: true,
-      bio: null,
-      lastOfflineLat: null,
-      lastOfflineLng: null,
-      offlinePositionRandomize: true,
-      ...profileOverrides,
-    },
-    distance: 3,
   };
 }
 

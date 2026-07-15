@@ -55,7 +55,6 @@ export async function checkTelemetryRide(): Promise<PipelineCheckResult> {
   const t0 = Date.now();
   const steps: PipelineCheckStep[] = [];
   const sessionId = `probe-${crypto.randomBytes(6).toString("hex")}`;
-  const userId = "pipeline-probe-user";
 
   // Step 1: POST /api/telemetry/batch via admin probe (uses internal token bypass)
   let isProbeMode = false;

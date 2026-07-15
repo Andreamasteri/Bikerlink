@@ -1,10 +1,9 @@
 /**
  * Smoke Test Part 2
  */
-import { cleanupOrphanSmokeUsers } from "./cleanup-orphans-runtime.js";
 
 // Helper for cleaning up
-export async function runWithCleanup(mainFn: () => Promise<number>, email: string, createdUserId: string | null, registeredThisRun: boolean): Promise<void> {
+export async function runWithCleanup(mainFn: () => Promise<number>, email: string, _createdUserId: string | null, _registeredThisRun: boolean): Promise<void> {
   let exitCode = 0;
   let fatal: unknown = null;
   try {

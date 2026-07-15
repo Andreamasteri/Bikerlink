@@ -62,9 +62,7 @@ vi.mock("../routes/motoclubs", () => ({
 
 import { storage } from "../storage";
 // Mock return type aliases — avoids explicit `any` casts
-type StorageUser = Awaited<ReturnType<typeof storage.getAllUsers>>[0];
 type StorageSetting = Awaited<ReturnType<typeof storage.getAppSetting>>;
-type StorageSearchRow = Awaited<ReturnType<typeof storage.searchUsers>>[0];
 type StorageNearbyRow = Awaited<ReturnType<typeof storage.getNearbyUsers>>[0];
 type StorageAvailableRow = Awaited<ReturnType<typeof storage.getAvailableUsersList>>[0];
 

@@ -8,11 +8,7 @@
  * GPS motion simulator for fake users (Stregatti).
  */
 
-import { db } from "./db";
-import { users, userProfiles } from "@shared/db";
-import { eq, and, sql, inArray } from "drizzle-orm";
 import { storage } from "./storage";
-import { systemAccountConditions } from "./lib/system-account-filter";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 

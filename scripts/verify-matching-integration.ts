@@ -331,8 +331,8 @@ const ALL_CHECKS: CheckSpec[] = [
   { id: "registry-vs-manual", name: "Registry → Manuale", fn: checkRegistryVsManual },
   { id: "packages", name: "Npm packages dichiarati vs installati", fn: checkPackages },
   { id: "i18n", name: "i18n coverage IT vs EN", fn: checkI18n },
-  { id: "admin-endpoints", name: "Endpoint admin con middleware", fn: checkAdminEndpoints as any },
-  { id: "replit-md", name: "Sezioni replit.md attese", fn: checkReplitMd as any },
+  { id: "admin-endpoints", name: "Endpoint admin con middleware", fn: checkAdminEndpoints },
+  { id: "replit-md", name: "Sezioni replit.md attese", fn: checkReplitMd },
 ];
 
 async function main() {

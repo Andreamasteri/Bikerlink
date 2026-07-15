@@ -1,6 +1,6 @@
 import { Router, type Request, type Response } from "express";
 import { db, pool } from "../../db";
-import { users, userProfiles, userPrivacyLog } from "@shared/db";
+import { users, userPrivacyLog } from "@shared/db";
 import { eq, sql, and, gte, desc } from "drizzle-orm";
 import { sendError } from "../../lib/api-response";
 import { storage } from "../../storage";

@@ -272,14 +272,19 @@ function makeMapData(overrides: Record<string, unknown> = {}) {
   };
 }
 
+type NearbyUser = { id: string; userType?: string; latitude?: number | null; longitude?: number | null; [key: string]: unknown };
+type CalcUser = { id: string; nickname?: string; userType?: string; sex?: string | null; country?: string | null; region?: string | null; [key: string]: unknown };
+type CalcLocation = { latitude: number; longitude: number };
+type CalcProfileQData = { latitude?: number; longitude?: number; [key: string]: unknown } | undefined;
+
 type CalcArgs = {
   mapData?: ReturnType<typeof makeMapData>;
-  nearbyUsers?: any[];
-  user?: any;
-  location?: any;
+  nearbyUsers?: NearbyUser[];
+  user?: CalcUser | null;
+  location?: CalcLocation | null;
   filterBiker?: boolean;
   filterZavorrina?: boolean;
-  profileQData?: any;
+  profileQData?: CalcProfileQData;
 };
 
 // monta il hook in un reconciler React reale e ne cattura il valore restituito

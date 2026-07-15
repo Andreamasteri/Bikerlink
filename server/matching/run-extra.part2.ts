@@ -1,11 +1,10 @@
 import { db } from "../db";
 import { storage } from "../storage";
 import {
-  users,
   zavorrinaWishlists,
   zavorrinaWishlistMotos,
 } from "@shared/db";
-import { eq, and } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { loadMatchPreferencesMap, prefEnabled, loadMatchingDisabledSet } from "./filters";
 import { classifyMatch } from "./notifications/classify";
 import { dispatchMatchNotification } from "./notifications/dispatcher";

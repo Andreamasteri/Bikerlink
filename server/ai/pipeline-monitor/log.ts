@@ -1,6 +1,6 @@
 import { db } from "../../db";
 import { pipelineFlowEvents } from "@shared/db";
-import { eq, and, lt, sql } from "drizzle-orm";
+import { eq, and, lt } from "drizzle-orm";
 import crypto from "crypto";
 
 export async function recordCheckpoint(opts: {

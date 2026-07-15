@@ -46,6 +46,7 @@ function AutoTelemetryInner({ children }: { children: React.ReactNode }) {
       .then((c) => setIsCalibrated(!!c))
       .catch(() => {});
     loadRelaxedMountMode().then(setRelaxedMode).catch(() => {});
+    // oxlint-disable-next-line react-hooks/exhaustive-deps -- intentional: depend on the primitive userId, not the whole user object (avoids re-running on unrelated user field changes)
   }, [userId]);
 
   // ── Poll prefs every 4s so toggle changes in TelemetryPanel propagate ────
@@ -59,6 +60,7 @@ function AutoTelemetryInner({ children }: { children: React.ReactNode }) {
       loadRelaxedMountMode().then(setRelaxedMode).catch(() => {});
     }, 4000);
     return () => clearInterval(id);
+    // oxlint-disable-next-line react-hooks/exhaustive-deps -- intentional: depend on the primitive userId, not the whole user object
   }, [userId]);
 
   // ── React immediately when manual tracking starts/stops ──────────────────

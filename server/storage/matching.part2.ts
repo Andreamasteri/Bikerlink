@@ -1,9 +1,9 @@
-import { eq, and, sql, desc, isNull, isNotNull, lt } from "drizzle-orm";
+import { eq, and, isNull, isNotNull, lt } from "drizzle-orm";
 import { db } from "../db";
 import {
   proposalProfileMatches,
 } from "@shared/db";
-import { dynamicScoreSql, FRESHNESS_DEFAULTS } from "../matching/scoring";
+import { FRESHNESS_DEFAULTS } from "../matching/scoring";
 
 export async function archiveStaleProposalProfileMatches(afterDays: number = FRESHNESS_DEFAULTS.archiveAfterDays): Promise<number> {
   const cutoff = new Date(Date.now() - afterDays * 24 * 60 * 60 * 1000);

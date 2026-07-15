@@ -6,7 +6,7 @@ import { storage } from "../storage";
 import { db, withDbRetry } from "../db";
 import { users } from "@shared/db";
 import { sql } from "drizzle-orm";
-import { sendSuccess, sendError } from "../lib/api-response";
+import { sendError } from "../lib/api-response";
 
 export function registerClientSettingsRoutes(app: Express) {
   app.get("/api/settings/privacy-policy", async (_req, res) => {

@@ -4,15 +4,13 @@ import {
   users,
   routes,
   proposals,
-  zavorrinaWishlists,
-  zavorrinaWishlistMotos,
   eventParticipants,
   entityTags,
   tags,
   tagCategories,
 } from "@shared/db";
 import { and, eq, isNotNull, gt, inArray } from "drizzle-orm";
-import { loadMatchPreferencesMap, bothPrefsEnabled, prefEnabled, loadMatchingDisabledSet, neitherMatchingDisabled } from "./filters";
+import { loadMatchPreferencesMap, bothPrefsEnabled } from "./filters";
 import { getVariantConfig, trackAbEvent } from "./ab";
 import { classifyMatch } from "./notifications/classify";
 import { dispatchMatchNotification } from "./notifications/dispatcher";

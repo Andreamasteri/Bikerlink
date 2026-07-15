@@ -2,15 +2,8 @@
 // Tutti i check sono filesystem-based (no AST heavy tools richiesti). Quando
 // disponibili (ts-morph, knip, madge, jscpd), una versione expensive può
 // arricchirli — qui restano cheap/medium per stabilità.
-import path from "path";
-import fs from "fs/promises";
-import os from "os";
-import { execFile } from "child_process";
-import { promisify } from "util";
 import type { AppIntegrityCheck } from "../types";
-import { walkFiles, readSafe, countLines, relWithin } from "../fs-helpers";
-
-const execFileAsync = promisify(execFile);
+import { walkFiles, readSafe, countLines } from "../fs-helpers";
 
 const TS_EXTS = [".ts", ".tsx"];
 const SERVER_DIRS = ["server"];
@@ -167,21 +160,6 @@ const largeFunctionsCheck: AppIntegrityCheck = {
 };
 
 // ---------- Expensive checks (eseguiti solo con includeExpensive: true) ----------
-
-const EXPENSIVE_DIRS = ["server", "app", "lib", "hooks", "components", "shared"];
-const EXPENSIVE_TIMEOUT_MS = 180_000;
-
-async function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
-  let to: NodeJS.Timeout | undefined;
-  const timeout = new Promise<never>((_, rej) => {
-    to = setTimeout(() => rej(new Error(`${label} timeout dopo ${ms}ms`)), ms);
-  });
-  try {
-    return await Promise.race([p, timeout]);
-  } finally {
-    if (to) clearTimeout(to);
-  }
-}
 
 import { codeDuplicationCheck, circularImportsCheck, unusedExportsCheck } from "./code.part2";
 

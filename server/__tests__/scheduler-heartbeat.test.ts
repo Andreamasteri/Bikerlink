@@ -116,7 +116,7 @@ describe("scheduler heartbeat — recordSchedulerHeartbeat()", () => {
 
     recordSchedulerHeartbeat("skip:pool_saturated");
     await flush();
-    let write = lastTickWrite();
+    const write = lastTickWrite();
     expect(write?.lastTickResult).toBe("skip:pool_saturated");
     expect(write?.lastTickAt).toBe(new Date(nowMs).toISOString());
     // I campi pre-esistenti (lastRunAt) non vengono persi.

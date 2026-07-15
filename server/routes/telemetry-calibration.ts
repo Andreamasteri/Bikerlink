@@ -3,7 +3,7 @@ import { db, withDbRetry } from "../db";
 import { sql } from "drizzle-orm";
 import { storage } from "../storage";
 import { requireUserId } from "../lib/auth-middleware";
-import { sendSuccess, sendError } from "../lib/api-response";
+import { sendError } from "../lib/api-response";
 
 const router = Router();
 

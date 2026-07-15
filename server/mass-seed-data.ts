@@ -382,69 +382,6 @@ export const MOTORCYCLES = [
   { brand: "Royal Enfield", model: "Interceptor 650", displacement: 648, type: "Naked", style: "Tranquilla" },
 ];
 
-const BIKER_M_BIOS = [
-  "Biker della domenica, ma in sella mi sento un campione! Cerco compagni per bei giri",
-  "Amo le curve e le strade di montagna. Weekend = moto, sempre!",
-  "La moto è libertà. Punto. Cerco gente con la stessa passione",
-  "Chilometri su chilometri, non mi fermo mai. Chi viene con me?",
-  "Motociclista da sempre, le due ruote sono la mia vita",
-  "Giro per tutta Italia appena posso. Le strade belle non finiscono mai",
-  "Appassionato di moto e buon cibo. Meglio se insieme!",
-  "Cerco compagni per giri nei weekend. No perditempo, solo passione vera",
-  "La mia moto è la mia migliore amica. Cercasi altri amici su due ruote",
-  "Ogni curva è un'emozione. Ogni viaggio un'avventura. Vieni?",
-  "Nato in sella, morirò in sella. Nel frattempo cerco buona compagnia",
-  "Weekend in moto, birra al tramonto. Cosa c'è di meglio?",
-  "Strade panoramiche e tornanti: il mio habitat naturale",
-  "Motociclista esperto, cerco gruppo per viaggi lunghi e avventure",
-  "Due ruote, una passione infinita. Scrivetemi se condividete!",
-];
-
-const BIKER_F_BIOS = [
-  "Motociclista e fiera di esserlo! Le ragazze in moto sono le migliori",
-  "Chi dice che la moto è roba da uomini non ha mai visto me in sella!",
-  "Amo la libertà della strada e il vento tra i capelli (sotto il casco!)",
-  "Biker girl con la passione per i viaggi lunghi. Chi mi segue?",
-  "La moto mi ha cambiato la vita. Cerco altre biker per condividere la passione",
-  "Guido da sola ma preferisco la compagnia. Ragazze biker, dove siete?",
-  "Strade, curve, tramonti e la mia moto. Cos'altro serve?",
-  "Non lasciatevi ingannare dal look: in moto sono una furia!",
-  "Weekend in sella, giorni feriali sogno la prossima uscita",
-  "La moto è il mio antistress. Cerco anime affini per bei giri",
-];
-
-const ZAV_F_BIOS = [
-  "Cerco un biker che mi porti a scoprire posti nuovi! Sono simpatica e avventurosa",
-  "Sogno un giro in moto da sempre. Chi mi porta?",
-  "Mi piace stare in moto dietro e godermi il panorama. Cercasi pilota!",
-  "Avventurosa e senza paura: cercasi biker per belle esperienze",
-  "La moto mi affascina ma non guido. Cerco qualcuno che mi porti a fare un giro",
-  "Amo la velocità e il vento in faccia. Chi mi offre un passaggio?",
-  "Cercasi biker affidabile per giri nel weekend. Sono buona compagnia!",
-  "Un giro in moto è sempre una bella avventura. Mi offro come passeggera ideale!",
-  "Sognatrice con la passione per le due ruote. Cercasi cavaliere motorizzato",
-  "Mi piacerebbe provare l'emozione della moto. Chi mi accompagna?",
-];
-
-const ZAV_M_BIOS = [
-  "Sì, sono un ragazzo zavorrina! La guida la lascio a chi è più bravo",
-  "Mi piace stare dietro e godermi il viaggio. Cerco bikers esperti!",
-  "Non ho la patente A ma amo la moto. Cercasi pilota per bei giri",
-  "Passeggero per passione! La moto mi piace ma preferisco non guidare",
-  "Cerco biker per condividere l'esperienza su due ruote, io dietro ovviamente!",
-];
-
-const COUPLE_BIOS = [
-  "Coppia unita dalla passione per la moto. Viaggiamo insieme ovunque!",
-  "In moto insieme da anni, cerchiamo altri amici motociclisti",
-  "Due cuori e una moto. Cerchiamo compagni per giri di gruppo",
-  "La moto ci ha fatto incontrare e non ci ha più separato!",
-  "Coppia on the road: cerchiamo altri per condividere avventure su due ruote",
-  "Sempre insieme in sella. Le strade europee sono il nostro parco giochi",
-  "La nostra storia d'amore è iniziata su una moto. Il resto è storia!",
-  "Due persone, una moto, mille avventure. Chi si unisce?",
-];
-
 const WELCOME_MESSAGES: Record<string, string[]> = {
   biker_m: [
     "Benvenuto su BikerLink! 🏍️ Qui troverai altri motociclisti della tua zona. Completa il profilo e inizia a cercare compagni di viaggio!",

@@ -89,7 +89,7 @@ export async function probeHomeFormat(
     let data: { text?: string };
     try {
       data = JSON.parse(rawText) as { text?: string };
-    } catch (parseErr) {
+    } catch  {
       console.log(`[whisper-test/${logId}] home→PARSE_FAIL body="${bodyPreview}"`);
       return { ok: false, latency_ms, error: `Risposta non-JSON: ${rawText.slice(0, 200)}`, body_raw: bodyPreview };
     }

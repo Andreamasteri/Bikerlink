@@ -73,23 +73,21 @@ Sostituire `generateObject({ model, schema, prompt })` con `generateStructured(r
 
 ---
 
-## Policy ESLint CI — Gate Obbligatorio (Ratchet)
+## Policy Lint CI — oxlint, Gate Obbligatorio a Zero Warning
 
-La regola `react-hooks/exhaustive-deps` è impostata su **`"warn"`** in `eslint.config.js`. Il gate CI usa un meccanismo **ratchet**: fallisce se il conteggio delle violazioni **aumenta** rispetto alla baseline, impedendo regressioni pur non bloccando il lavoro sul debito tecnico esistente.
+Il progetto lint con **oxlint** (Rust-based), non più ESLint/`@typescript-eslint` (rimossi: oxlint non dipende dal pacchetto `typescript`, il che sblocca l'upgrade a TypeScript 7). La regola `react-hooks/exhaustive-deps` è impostata su **`"warn"`**, ma il gate CI gira a **`--max-warnings=0`**: qualunque nuovo warning (incluso `exhaustive-deps`) blocca il task, niente ratchet a soglia crescente.
 
 ### File chiave
-- `eslint.config.js` — configurazione ESLint (flat config ESLint v9)
-- `scripts/eslint-hooks-check.sh` — script ratchet CI
-- `.eslint-hooks-baseline` — numero corrente di violazioni accettate (baseline)
+- `.oxlintrc.json` — configurazione oxlint (porta le regole dell'ex `eslint.config.js`: typescript/react/unicorn/oxc plugin, `react-hooks/rules-of-hooks` error, `react-hooks/exhaustive-deps` warn, unused-vars, ecc.)
+- `scripts/check-part-nav.mjs` — sostituisce la vecchia regola ESLint custom `no-part-nav.js` (oxlint non ha plugin custom JS maturi); chiude il gap dei template-literal multi-riga che il grep gate in `scripts/post-merge.sh` non vede.
 
 ### Gate CI registrato
-Validation command `eslint` (comando: `bash scripts/eslint-hooks-check.sh`) è registrato nella piattaforma Replit. Viene eseguito automaticamente alla chiusura del task.
+Validation command `lint` (comando: `npm run lint -- --max-warnings=0`, che esegue `npx oxlint -c .oxlintrc.json .`) è registrato nella piattaforma Replit.
 
 ### Regole operative
-1. **Non aumentare le violazioni**: il gate blocca il task se il conteggio supera la baseline.
-2. **Quando si riducono le violazioni**: eseguire `bash scripts/eslint-hooks-check.sh --update-baseline` per aggiornare `.eslint-hooks-baseline` al nuovo valore più basso (direzione: riduzione progressiva del debito).
-3. **Per silenziare un caso legittimo**: usare `// eslint-disable-next-line react-hooks/exhaustive-deps` con commento che spiega il motivo tecnico.
-4. **Violazioni `exhaustive-deps`** causano bug di stale closure in produzione — non aggiungerne di nuove.
+1. **Zero warning al gate**: qualsiasi nuovo finding (anche `exhaustive-deps`) blocca il task — niente soglia di tolleranza.
+2. **Per silenziare un caso legittimo e intenzionale**: usare `// oxlint-disable-next-line react-hooks/exhaustive-deps` con commento che spiega il motivo tecnico. Va posizionato sulla riga **immediatamente sopra l'array delle dipendenze** (`}, [deps]);`), non sopra la dichiarazione dell'hook né sopra la riga d'uso interna — oxlint attribuisce il warning lì.
+3. **Violazioni `exhaustive-deps`** causano bug di stale closure e loop "Maximum update depth exceeded" in produzione — non aggiungerne di nuove senza verificare caso per caso se il dep mancante sia sicuro da aggiungere (vedi memoria `auth-context-react-query-deps.md`: dipendere da slice primitive, mai da oggetti React Query interi).
 
 ---
 

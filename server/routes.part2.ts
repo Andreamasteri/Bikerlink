@@ -1,4 +1,4 @@
-import type { Express, Request, Response, NextFunction } from "express";
+import type { Express, Request, Response } from "express";
 import { db } from "./db";
 import { userFavorites } from "@shared/db";
 import { eq, and } from "drizzle-orm";

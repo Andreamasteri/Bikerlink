@@ -18,7 +18,6 @@
 
 import * as fs from "fs";
 import * as path from "path";
-import * as readline from "readline";
 
 const I18N_DIR = path.join(process.cwd(), "lib/i18n");
 const BASELINE_FILE = path.join(process.cwd(), ".large-files-baseline");

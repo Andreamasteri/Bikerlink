@@ -98,7 +98,7 @@ router.get("/telemetry/users", async (req: Request, res: Response) => {
       limit,
     });
   } catch (err) {
-    const cause = (err as any)?.cause?.message ?? "";
+    const cause = err instanceof Error ? ((err.cause as Error | null)?.message ?? "") : "";
     const errMsg = err instanceof Error ? err.message : String(err);
     console.error("[admin/telemetry/users] error:", err, cause ? `| PG: ${cause}` : "");
     logTelemetryEvent({
@@ -176,7 +176,7 @@ router.get("/telemetry/users/:userId/sessions", async (req: Request, res: Respon
 
     return res.json({ sessions, userId });
   } catch (err) {
-    const cause = (err as any)?.cause?.message ?? "";
+    const cause = err instanceof Error ? ((err.cause as Error | null)?.message ?? "") : "";
     const errMsg = err instanceof Error ? err.message : String(err);
     console.error("[admin/telemetry/users/:userId/sessions] error:", err, cause ? `| PG: ${cause}` : "");
     logTelemetryEvent({
@@ -236,7 +236,7 @@ router.get("/telemetry/sessions/:sessionId/samples", async (req: Request, res: R
 
     return res.json({ samples, total, sessionId });
   } catch (err) {
-    const cause = (err as any)?.cause?.message ?? "";
+    const cause = err instanceof Error ? ((err.cause as Error | null)?.message ?? "") : "";
     const errMsg = err instanceof Error ? err.message : String(err);
     console.error("[admin/telemetry/sessions/:sessionId/samples] error:", err, cause ? `| PG: ${cause}` : "");
     logTelemetryEvent({

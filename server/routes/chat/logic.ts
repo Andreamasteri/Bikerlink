@@ -1,9 +1,8 @@
 import { storage } from "../../storage";
 import { db } from "../../db";
-import { motoClubs, motoClubMembers, users, messages as messagesTable } from "@shared/db";
-import { eq, and, ne, count } from "drizzle-orm";
-import { invalidateConvCache, escapeHtml } from "./utils";
-import { notifyChatEvent } from "../../chat-sse";
+import { motoClubs } from "@shared/db";
+import { eq } from "drizzle-orm";
+import { escapeHtml } from "./utils";
 import { sendChatPushNotifications, sendMotoclubPushNotifications } from "../../push-notifications";
 import { sendEmail } from "../../email";
 import { onlineTracker } from "../../online-tracker";

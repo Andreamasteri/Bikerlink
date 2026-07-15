@@ -350,6 +350,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
           if (wasInterruptedRef.current && !isPlayingRef.current && !userPausedRef.current) scheduleRecovery();
         });
     }, 5000);
+    // oxlint-disable-next-line react-hooks/exhaustive-deps -- intentional: isPlayingRef is a ref (stable identity), not a reactive dependency
   }, []);
 
   const onPlaybackStatus = useCallback((status: AudioStatus) => {
@@ -377,6 +378,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         loadAndPlayRef.current?.(q[nextIdx], nextIdx);
       } else { setIsPlaying(false); }
     }
+    // oxlint-disable-next-line react-hooks/exhaustive-deps -- intentional: isPlayingRef is a ref (stable identity), not a reactive dependency
   }, [getNextIndex, repeatModeRef, queueRef, queueIndexRef, isShuffledRef, isPlayingRef, scheduleRecovery]);
 
   const destroyPlayer = useCallback(() => {

@@ -91,7 +91,7 @@ export function mapMapboxResponse(raw: MapboxDirectionsResponse): RouteResult {
   const route = routes[0];
   const coords = buildCoords(route.geometry);
 
-  const instructions: any[] = [];
+  const instructions: Array<{ text: string; distance: number; time: number; sign: number; interval: [number, number] }> = [];
   let stepOffset = 0;
 
   for (const leg of route.legs ?? []) {

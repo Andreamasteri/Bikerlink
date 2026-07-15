@@ -1,10 +1,3 @@
-import { and, eq, gte, sql } from "drizzle-orm";
-import { db } from "../../db";
-import {
-  aiConflicts,
-  aiDecisions,
-  aiEvents,
-} from "@shared/db";
 import { getRedis } from "../../cache/redis";
 
 const PAUSE_KEY = (ai: string) => `ai:paused:${ai}`;

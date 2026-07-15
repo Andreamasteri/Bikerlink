@@ -5,7 +5,7 @@ import { readFileSync, existsSync } from "node:fs";
 import { resolve } from "node:path";
 import { db } from "../../db";
 import { otaReleases } from "@shared/db";
-import { eq, and, sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { sendError } from "../../lib/api-response";
 import { EAS_PROJECT_ID } from "./ota-sync";
 

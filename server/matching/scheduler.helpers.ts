@@ -19,12 +19,10 @@ import { db } from "../db";
 import { storage } from "../storage";
 import { withJobGate } from "../ai/coordinator/gated-job";
 import {
-  proposals,
   proposalZoneNotifications,
-  proposalProfileMatches,
   type Proposal,
 } from "@shared/db";
-import { eq, sql, lt } from "drizzle-orm";
+import { sql, lt } from "drizzle-orm";
 import { runProposalToProfileMatching } from "./run-profile";
 import { runProposalMatchingForUser, runProposalZoneNotifications } from "./run-proposals";
 import { runMatchingForUser } from "./run-user";

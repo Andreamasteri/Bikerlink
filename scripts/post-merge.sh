@@ -1168,49 +1168,39 @@ echo ""
 #                                            e.g. const { push } = useRouter(); push("/x.part2")
 #
 # ⚠️  SCOPE LIMITATION — dynamic / template-literal paths:
-#   This grep guard detects STATIC string literals only.
-#   Paths built at runtime — e.g. push(`/giri/${id}.part2`) or
-#   const seg = ".part2"; push("/giri/" + seg) — are INVISIBLE to grep.
+#   This grep guard is line-based, so it already catches single-line
+#   template literals — e.g. push(`/giri/${id}.part2`) — because the literal
+#   text ".part2" still appears on the same source line as the call, even
+#   though the path is built dynamically.
 #
-#   The gap for dynamic paths is closed at the lint layer:
-#     scripts/eslint-rules/no-part-nav.js  (ESLint custom rule)
-#   That rule catches Literal strings, TemplateLiteral arguments, and
-#   binary-concatenation (+) chains in push/replace/navigate calls
-#   whose value contains ".partN", and fires a warning during
-#   `npx eslint` (also runs in the lint workflow).
-#   This grep gate is retained as belt-and-suspenders for edge cases
-#   (generated code, unusual AST shapes) that the ESLint rule cannot see.
-#   A string-concatenation pattern is still out of scope for static
-#   analysis — keep helper-screen paths as non-exported constants and
+#   The one gap grep genuinely cannot see is a template literal whose
+#   ".partN" segment is split across multiple lines. That gap is closed by a
+#   small standalone whole-file scan (no ESLint / no AST parser dependency,
+#   since oxlint has no mature custom-JS-plugin support):
+#     scripts/check-part-nav.mjs
+#   A string-concatenation-via-intermediate-variable pattern
+#   (const seg = ".part2"; push("/giri/" + seg)) is still out of scope for
+#   static analysis — keep helper-screen paths as non-exported constants and
 #   avoid constructing them dynamically.
 echo "════════════════════════════════════════"
 echo "  Guard: navigation strings ↔ .part paths"
 echo "════════════════════════════════════════"
 
-# Self-check D: ESLint rule file must exist.
-if [ ! -f "scripts/eslint-rules/no-part-nav.js" ]; then
-  echo "⚠️  Guard self-check D FALLITO — scripts/eslint-rules/no-part-nav.js mancante."
-  echo "   La regola ESLint che copre i template-literal non è presente."
+# Self-check D: standalone multi-line template-literal checker must exist.
+if [ ! -f "scripts/check-part-nav.mjs" ]; then
+  echo "⚠️  Guard self-check D FALLITO — scripts/check-part-nav.mjs mancante."
+  echo "   Il check che copre i template-literal multi-riga non è presente."
   echo "   Ripristinare il file dal repo."
   exit 1
 else
-  echo "✅ ESLint rule no-part-nav presente (copertura template-literal)."
+  echo "✅ check-part-nav.mjs presente (copertura template-literal multi-riga)."
 fi
 
-# Self-check E: run the no-part-nav unit test suite to verify the rule itself.
-if [ ! -f "scripts/eslint-rules/no-part-nav.test.js" ]; then
-  echo "⚠️  Guard self-check E FALLITO — scripts/eslint-rules/no-part-nav.test.js mancante."
-  echo "   Il test della regola ESLint no-part-nav non è presente."
-  echo "   Ripristinare il file dal repo."
+# Self-check E: run the standalone checker against the real tree.
+if ! node scripts/check-part-nav.mjs; then
+  echo "❌ Guard self-check E FALLITO — check-part-nav.mjs ha riportato errori."
+  echo "   Correggere i path di navigazione (vedi output sopra) prima del merge."
   exit 1
-fi
-if ! node scripts/eslint-rules/no-part-nav.test.js; then
-  echo "❌ Guard self-check E FALLITO — no-part-nav.test.js ha riportato errori."
-  echo "   La regola ESLint no-part-nav potrebbe essere rotta."
-  echo "   Correggere scripts/eslint-rules/no-part-nav.js prima del merge."
-  exit 1
-else
-  echo "✅ ESLint rule no-part-nav: tutti i test passati."
 fi
 
 # Self-check A: the guard regex must detect router.push form.
@@ -1284,21 +1274,22 @@ if [ "$SEMGREP_EXIT" -ne 0 ]; then
   exit "$SEMGREP_EXIT"
 fi
 
-# ── ESLint gate: react-hooks/rules-of-hooks + all error-level rules ──────────
+# ── oxlint gate: react-hooks/rules-of-hooks + all error-level rules ──────────
 echo "════════════════════════════════════════"
-echo "ESLint gate — verifica regole error-level su app/ components/ hooks/ lib/ ..."
+echo "oxlint gate — verifica regole error-level su app/ components/ hooks/ lib/ ..."
 echo ""
-# --cache         → riutilizza risultati file invariati (target < 30s)
-# Esce con codice non-zero solo sugli error; i warning (exhaustive-deps ecc.) non bloccano.
+# oxlint exits non-zero only on error-level rules by default; warnings
+# (exhaustive-deps ecc.) non bloccano qui (il gate lint separato, a
+# --max-warnings=0 sul repo intero, li copre già in modo più stretto).
 # Copre app/ (Expo Router pages) + codice condiviso components/, hooks/, lib/
-if ! npx eslint app/ components/ hooks/ lib/ --ext .ts,.tsx --cache --cache-location .eslintcache; then
+if ! npx oxlint -c .oxlintrc.json app/ components/ hooks/ lib/; then
   echo ""
-  echo "❌ ESLint gate FALLITO — trovate violazioni error-level in app/, components/, hooks/ o lib/"
+  echo "❌ oxlint gate FALLITO — trovate violazioni error-level in app/, components/, hooks/ o lib/"
   echo "   Correggere i file segnalati sopra prima del merge."
-  echo "   (Eseguire: npx eslint app/ components/ hooks/ lib/ --ext .ts,.tsx)"
+  echo "   (Eseguire: npx oxlint -c .oxlintrc.json app/ components/ hooks/ lib/)"
   exit 1
 else
-  echo "✅ ESLint gate superato — nessuna violazione error-level in app/, components/, hooks/, lib/"
+  echo "✅ oxlint gate superato — nessuna violazione error-level in app/, components/, hooks/, lib/"
 fi
 echo "════════════════════════════════════════"
 echo ""

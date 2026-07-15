@@ -60,9 +60,9 @@ const SERVICE_NOTIFY_COOLDOWN_MS = 15 * 60 * 1000;
 type ServiceKey = string;
 
 let lastStatus: OverallStatus | null = null;
-let lastNotifiedAt = new Map<string, number>();
-let lastServiceStatuses = new Map<ServiceKey, boolean>();
-let lastServiceNotifiedAt = new Map<ServiceKey, number>();
+const lastNotifiedAt = new Map<string, number>();
+const lastServiceStatuses = new Map<ServiceKey, boolean>();
+const lastServiceNotifiedAt = new Map<ServiceKey, number>();
 let intervalHandle: ReturnType<typeof setInterval> | null = null;
 
 // ── AppSetting toggle ─────────────────────────────────────────────────────────

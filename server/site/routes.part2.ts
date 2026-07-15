@@ -1,4 +1,4 @@
-import type { Express, Request, Response } from "express";
+import type { Express, Request, Response, NextFunction } from "express";
 import { getBaseUrl } from "./render";
 
 export function registerLegacyRedirects(app: Express, PERMANENT_REDIRECTS: Record<string, string>) {
@@ -9,7 +9,7 @@ export function registerLegacyRedirects(app: Express, PERMANENT_REDIRECTS: Recor
 
 export function registerStaticLegalPages(app: Express, STATIC_HTML_PAGES: Record<string, string>, staticTemplates: Record<string, string>) {
   for (const [route, _file] of Object.entries(STATIC_HTML_PAGES)) {
-    app.get(route, (req: Request, res: Response, next: any) => {
+    app.get(route, (req: Request, res: Response, next: NextFunction) => {
       try {
         const baseUrl = getBaseUrl(req);
         const html = staticTemplates[route].replace(/\{\{BASE_URL\}\}/g, baseUrl);
@@ -24,7 +24,7 @@ export function registerStaticLegalPages(app: Express, STATIC_HTML_PAGES: Record
   }
 }
 
-export function registerRobotsAndSitemap(app: Express, PAGES: any[], STATIC_HTML_PAGES: Record<string, string>) {
+export function registerRobotsAndSitemap(app: Express, PAGES: { route: string; sitemap: { priority: number; changefreq: string } }[], _STATIC_HTML_PAGES: Record<string, string>) {
   // robots.txt — dynamic, references the current host.
   app.get("/robots.txt", (req: Request, res: Response) => {
     const baseUrl = getBaseUrl(req);

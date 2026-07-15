@@ -12,7 +12,6 @@ import {
   type SttProviderId,
 } from "../ai/whisper-provider-config";
 import {
-  safeUrl,
   buildSilentWav,
   buildMinimalM4a,
   probeHomeFormat,
@@ -100,7 +99,6 @@ router.post("/whisper-config/test/:providerId", async (req: Request, res: Respon
       formData.append("response_format", "json");
       const groqRes = await fetch(groqUrl, { method: "POST", headers: { Authorization: `Bearer ${groqKey}`, "Accept-Encoding": "identity" }, body: formData });
       const latency_ms = Date.now() - start;
-      const rawText = await groqRes.text().catch(() => "");
       if (!groqRes.ok) {
         res.json({ success: false, ok: false, latency_ms, error: `HTTP ${groqRes.status}`, session_ok: sessionOk });
         return;

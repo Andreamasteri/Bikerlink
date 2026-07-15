@@ -1,10 +1,11 @@
-import { isStartingUp } from "./thinkcentre-health-utils";
 import { updateSystemStatus, type DotStatus as CachedDotStatus } from "../../lib/system-status-cache";
 import {
   probeGraphHopperAreas,
   probeOllama,
   probeWhisper,
   type ServiceHealth,
+  type GraphHopperHealth,
+  type AreaServiceHealth,
 } from "./thinkcentre-health-gh-probes";
 import {
   probeValhallaDetailed,
@@ -27,8 +28,8 @@ import { isThinkCentrePoweredOff } from "../../lib/thinkcentre-powered-off";
 export async function updateThinkCentreSystemStatus(
   maintenance: boolean,
   services: ServiceHealth[],
-  graphhopper: any,
-  ufwDetail: any,
+  graphhopper: GraphHopperHealth,
+  ufwDetail: { configured: boolean; ok: boolean },
   overall: "green" | "yellow" | "red" | "idle"
 ) {
   function svcDot(s: ServiceHealth | undefined): CachedDotStatus {
@@ -39,11 +40,11 @@ export async function updateThinkCentreSystemStatus(
   }
   function ghDot(): CachedDotStatus {
     if (!graphhopper.configured || graphhopper.areas.length === 0) return "unknown";
-    const anyOk = graphhopper.areas.some((a: any) => a.ok);
-    const allOk = graphhopper.areas.every((a: any) => a.ok);
+    const anyOk = graphhopper.areas.some((a: AreaServiceHealth) => a.ok);
+    const allOk = graphhopper.areas.every((a: AreaServiceHealth) => a.ok);
     if (allOk) return "ok";
     if (anyOk) return "degraded";
-    const anyStarting = graphhopper.areas.some((a: any) => a.enabled && a.startingUp);
+    const anyStarting = graphhopper.areas.some((a: AreaServiceHealth) => a.enabled && a.startingUp);
     if (anyStarting) return "degraded";
     return "offline";
   }
@@ -178,15 +179,15 @@ export async function probeThinkCentreStatusSnapshot(): Promise<
 
   const ghDot = (): CachedDotStatus => {
     if (!graphhopper.configured || graphhopper.areas.length === 0) return "unknown";
-    const allOk = graphhopper.areas.every((a: any) => a.ok);
+    const allOk = graphhopper.areas.every((a: AreaServiceHealth) => a.ok);
     if (allOk) return "ok";
-    if (graphhopper.areas.some((a: any) => a.ok)) return "degraded";
-    if (graphhopper.areas.some((a: any) => a.enabled && a.startingUp)) return "degraded";
+    if (graphhopper.areas.some((a: AreaServiceHealth) => a.ok)) return "degraded";
+    if (graphhopper.areas.some((a: AreaServiceHealth) => a.enabled && a.startingUp)) return "degraded";
     return "offline";
   };
 
   const configuredServices = [valhallaDetail, photonDetail, ollama, whisper, dragonflyInfra, postgresInfra, pgadminInfra, nginxInfra, uptimeKumaInfra].filter((s) => s.configured);
-  const ghContributes = graphhopper.configured && graphhopper.areas.some((a: any) => a.enabled);
+  const ghContributes = graphhopper.configured && graphhopper.areas.some((a: AreaServiceHealth) => a.enabled);
   const configuredCount = configuredServices.length + (ghContributes ? 1 : 0);
   const onlineCount = configuredServices.filter((s) => s.ok).length + (ghContributes && graphhopper.ok ? 1 : 0);
   const overall: CachedDotStatus =

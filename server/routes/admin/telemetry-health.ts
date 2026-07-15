@@ -13,7 +13,7 @@ router.get("/telemetry/error-log", (_req: Request, res: Response) => {
     const entries = getTelemetryErrorLog();
     return res.json({ entries, count: entries.length });
   } catch (err) {
-    const cause = (err as any)?.cause?.message ?? "";
+    const cause = err instanceof Error ? ((err.cause as Error | null)?.message ?? "") : "";
     console.error("[admin/telemetry/error-log] error:", err, cause ? `| PG: ${cause}` : "");
     return sendError(res, 500, "Errore lettura log errori");
   }

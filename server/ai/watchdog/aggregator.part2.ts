@@ -1,7 +1,7 @@
 import { db } from "../../db";
 import { systemHealthSnapshot } from "@shared/db";
 import { desc } from "drizzle-orm";
-import type { HealthSnapshot, Problem, Severity, Signal } from "./types";
+import type { HealthSnapshot, Problem, Signal } from "./types";
 import { recordSignals } from "./signals";
 import {
   SEVERITY_WEIGHT,

@@ -1,6 +1,5 @@
 import { db, withDbRetry } from "./db";
 import { withBgDbSlot } from "./lib/bg-db-limiter";
-import { rideTelemetry } from "@shared/db";
 import { sql } from "drizzle-orm";
 import { storage } from "./storage";
 import { readJobAttempt, type JobAttempt } from "./lib/scheduler-retry";
