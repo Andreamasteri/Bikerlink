@@ -103,5 +103,10 @@ export const MIN_FRAGMENT_CHARS = 12; // ignora frammenti troppo corti/rumore
 // `search_manual` NON è mai un default silenzioso: si attiva SOLO quando il
 // messaggio contiene un cue esplicito di richiamo semantico. Le frasi sono
 // quelle definite nel piano del Task #75.
+// Task #175 — aggiunge i cue per domande UI sull'interfaccia: "dove trovo il
+// tasto", "cosa fa il pulsante Azzera", ecc. — il manuale ora include un
+// "Dizionario dell'Interfaccia" con etichette esatte dei bottoni, e Bowie deve
+// cercarlo invece di inventare. Aggiunta per estensione: ogni pattern nuovo
+// preserva il comportamento esistente (regex è or-chain, test autonomo).
 export const SEARCH_MANUAL_RE =
-  /per\s+significato|\bmanuale\b|cosa\s+ti\s+avevo\s+detto|ne\s+avevamo\s+gi[àa]\s+parlato|come\s+avevamo\s+detto|knowledge\s*base|base\s+di\s+conoscenza/i;
+  /per\s+significato|\bmanuale\b|cosa\s+ti\s+avevo\s+detto|ne\s+avevamo\s+gi[àa]\s+parlato|come\s+avevamo\s+detto|knowledge\s*base|base\s+di\s+conoscenza|\btasto\b|\bpulsante\b|\bbotton[ei]\b|dove\s+tr[ou]v/i;
