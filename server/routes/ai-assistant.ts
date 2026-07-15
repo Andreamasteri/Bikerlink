@@ -35,6 +35,7 @@ import {
   type AdminAssistantActionId,
 } from "../ai/assistant/admin-actions";
 import { sendError } from "../lib/api-response";
+import { APP_LANGUAGES, SOURCE_APP_LANGUAGE } from "@shared/languages";
 import { requireUser, messageLimiter, parsePlatform, loadCustomFaqs } from "./ai-assistant-helpers";
 import aiAssistantActionsRouter from "./ai-assistant-actions";
 import aiAssistantPrefsRouter from "./ai-assistant-prefs";
@@ -76,6 +77,10 @@ const MessageBody = z.object({
   // Task #5327 — URL immagini allegate (relativi, restituiti da POST /images).
   // Risolti server-side in base64 e passati all'agent per il path vision.
   imageUrls: z.array(z.string().min(1).max(300)).max(4).optional(),
+  // Task #107 — Lingua app del richiedente: filtra il manuale recuperato da
+  // Nadir alla sua traduzione (fallback italiano). Assente → italiano (client
+  // vecchi, admin panel).
+  language: z.enum(APP_LANGUAGES).optional(),
 });
 
 router.post("/ai/assistant/message", requireUser, messageLimiter, async (req: Request, res: Response) => {
@@ -311,6 +316,8 @@ router.post("/ai/assistant/message", requireUser, messageLimiter, async (req: Re
       personaFirstTurn,
       // Task #5228 — attribuzione client di origine.
       sourceApp: parsed.data.source ?? "main_app",
+      // Task #107 — lingua app del richiedente per il grounding Nadir multilingua.
+      language: parsed.data.language ?? SOURCE_APP_LANGUAGE,
       onPersona: (p) => send("persona", p),
       signal: abort.signal,
       onTextDelta: (delta) => securityFilter.push(delta, (safe) => send("delta", { text: safe })),

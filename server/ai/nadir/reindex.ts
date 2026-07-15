@@ -20,7 +20,8 @@ import { getLastUsedModelTag } from "../../embeddings/client";
 import { redactPII } from "../moderation/redact";
 import { writeWatchdogLog } from "../watchdog/log";
 import { sendSystemAlertPushToAdmins } from "../../push-notifications";
-import { getNadirManual, chunkManual } from "./manual";
+import { getAllNadirManualVersions, chunkManual } from "./manual";
+import { type AppLanguageCode } from "@shared/languages";
 import { searchNadir, loadFragmentManifest, type NadirFragmentManifest } from "./search";
 import {
   CONVERSATION_WINDOW,
@@ -78,11 +79,26 @@ interface SourceResult {
   entries: NadirFragmentManifest;
   ok: boolean;
   error?: string;
+  /**
+   * Task #107 fix — indica se le tabelle `embeddings` per questo entityType
+   * sono state EFFETTIVAMENTE scritte/pruned in questa corsa. Deve restare
+   * DISACCOPPIATO da `ok`: il manuale multilingua può scrivere con successo
+   * ALCUNE lingue/chunk e fallirne altri (ok=false) pur avendo mutato il DB
+   * per quelle riuscite — `entries`/`mutated` riflettono lo stato REALE del
+   * DB, `ok` è solo un flag di stato per gli allarmi admin. Se `mutated` è
+   * assente si assume `= ok` (comportamento storico pre-Task#107: conversazioni
+   * e commenti sono tutto-o-niente, quindi DB mutato SOLO quando ok=true).
+   */
+  mutated?: boolean;
 }
 
-/** entityId dei chunk manuale: indice deterministico. */
-function manualChunkId(i: number): string {
-  return `chunk-${i}`;
+/**
+ * entityId dei chunk manuale: indice deterministico, prefissato con la lingua
+ * (Task #107) così ogni versione tradotta occupa righe distinte nello stesso
+ * entityType invece di collidere con l'italiano.
+ */
+function manualChunkId(lang: AppLanguageCode, i: number): string {
+  return `${lang}-chunk-${i}`;
 }
 
 /** Elimina le righe di `entityType` il cui entityId NON è tra `keepIds`. */
@@ -112,28 +128,79 @@ async function pruneStale(entityType: string, keepIds: string[]): Promise<void> 
   );
 }
 
+/**
+ * Task #107 — Indicizza il manuale in TUTTE le lingue disponibili (italiano +
+ * traduzioni), non solo l'italiano. Ogni lingua è chunked/embeddata separatamente
+ * (stessi confini di paragrafo, testi diversi) e taggata con `lang` nel manifest,
+ * così `searchNadir` può filtrare per la lingua del richiedente. Una lingua che
+ * fallisce l'embedding non blocca le altre.
+ */
 async function reindexManual(): Promise<SourceResult> {
   const entries: NadirFragmentManifest = {};
+  const errors: string[] = [];
   try {
-    const manual = await getNadirManual();
-    const chunks = chunkManual(manual, MANUAL_CHUNK_SIZE, MANUAL_MAX_CHUNKS);
-    const keepIds: string[] = [];
-    for (let i = 0; i < chunks.length; i++) {
-      const text = chunks[i];
-      if (text.length < MIN_FRAGMENT_CHARS) continue;
-      const id = manualChunkId(i);
-      await upsertEmbedding(NADIR_MANUAL_ENTITY_TYPE, id, NADIR_FIELD, text);
-      entries[`${NADIR_MANUAL_ENTITY_TYPE}:${id}`] = { origin: "manual", text };
-      keepIds.push(id);
+    const versions = await getAllNadirManualVersions();
+    const totalExpectedChunks: Array<{ lang: AppLanguageCode; i: number; text: string }> = [];
+    for (const [lang, manual] of Object.entries(versions) as [AppLanguageCode, string][]) {
+      const chunks = chunkManual(manual, MANUAL_CHUNK_SIZE, MANUAL_MAX_CHUNKS);
+      chunks.forEach((text, i) => {
+        if (text.length >= MIN_FRAGMENT_CHARS) totalExpectedChunks.push({ lang, i, text });
+      });
     }
+
+    const keepIds: string[] = [];
+    for (const { lang, i, text } of totalExpectedChunks) {
+      const id = manualChunkId(lang, i);
+      try {
+        await upsertEmbedding(NADIR_MANUAL_ENTITY_TYPE, id, NADIR_FIELD, text);
+        entries[`${NADIR_MANUAL_ENTITY_TYPE}:${id}`] = { origin: "manual", text, lang };
+        keepIds.push(id);
+      } catch (err) {
+        errors.push(`${lang}:${i} — ${(err as Error)?.message ?? err}`);
+      }
+    }
+
+    // Task #107 fix — pruneStale cancella dal DB qualunque id manuale NON in
+    // keepIds: se TUTTI i chunk attesi sono falliti (keepIds vuoto ma c'era
+    // contenuto da indicizzare), pruneStale cancellerebbe l'INTERO indice
+    // manuale (tutte le lingue, comprese quelle indicizzate con successo in
+    // corse precedenti) pur non avendo scritto nulla di nuovo. In quel caso
+    // NON tocchiamo il DB affatto (mutated=false) e si continua a servire il
+    // vecchio indice, esattamente come il comportamento pre-Task#107 quando
+    // l'unica scrittura Ollama falliva prima di raggiungere pruneStale.
+    const totalFailure = totalExpectedChunks.length > 0 && keepIds.length === 0;
+    if (totalFailure) {
+      return {
+        entityType: NADIR_MANUAL_ENTITY_TYPE,
+        origin: "manual",
+        entries: {},
+        ok: false,
+        mutated: false,
+        error: errors.slice(0, 5).join("; "),
+      };
+    }
+
     await pruneStale(NADIR_MANUAL_ENTITY_TYPE, keepIds);
-    return { entityType: NADIR_MANUAL_ENTITY_TYPE, origin: "manual", entries, ok: true };
+    // Tollerante per-chunk/lingua: se ALMENO un chunk è stato indicizzato, il DB
+    // è stato mutato e `entries` riflette ESATTAMENTE lo stato post-prune (quindi
+    // va sempre pubblicato a manifest in reindexNadir, indipendentemente da `ok`).
+    // `ok` resta un segnale di salute separato: false se qualche chunk/lingua è
+    // fallito, per gli allarmi admin — ma non deve nascondere le lingue riuscite.
+    return {
+      entityType: NADIR_MANUAL_ENTITY_TYPE,
+      origin: "manual",
+      entries,
+      ok: errors.length === 0,
+      mutated: true,
+      error: errors.length > 0 ? errors.slice(0, 5).join("; ") : undefined,
+    };
   } catch (err) {
     return {
       entityType: NADIR_MANUAL_ENTITY_TYPE,
       origin: "manual",
       entries: {},
       ok: false,
+      mutated: false,
       error: (err as Error)?.message ?? String(err),
     };
   }
@@ -239,7 +306,15 @@ export async function reindexNadir(trigger: "nightly" | "manual"): Promise<Nadir
 
   for (const r of results) {
     const prefix = `${r.entityType}:`;
-    if (r.ok) {
+    // Task #107 fix — `mutated` (default = `ok` per le sorgenti tutto-o-niente
+    // conversazioni/commenti) dice se il DB `embeddings` è stato EFFETTIVAMENTE
+    // riscritto/pruned in questa corsa. Il manifest DEVE sempre rispecchiare lo
+    // stato reale del DB: pubblicarlo quando mutated=true (anche se `ok` è false
+    // per un fallimento parziale, es. una lingua su sette del manuale), tenerlo
+    // invariato quando mutated=false (nessuna scrittura è avvenuta, l'indice
+    // vecchio è ancora quello servito dal DB).
+    const mutated = r.mutated ?? r.ok;
+    if (mutated) {
       // Rimuovi le vecchie voci di questa sorgente, aggiungi le nuove.
       for (const key of Object.keys(newManifest)) {
         if (key.startsWith(prefix)) delete newManifest[key];
@@ -247,10 +322,12 @@ export async function reindexNadir(trigger: "nightly" | "manual"): Promise<Nadir
       Object.assign(newManifest, r.entries);
       counts[r.origin] = Object.keys(r.entries).length;
     } else {
-      // Fallita: conserva le vecchie voci (indice vecchio in servizio).
+      // Nessuna scrittura: conserva le vecchie voci (indice vecchio in servizio).
       counts[r.origin] = Object.keys(oldManifest).filter((k) => k.startsWith(prefix)).length;
+    }
+    if (!r.ok) {
       errors.push(`${r.origin}: ${r.error}`);
-      console.warn(`${NADIR_LOG_PREFIX} sorgente "${r.origin}" fallita (tollerato):`, r.error);
+      console.warn(`${NADIR_LOG_PREFIX} sorgente "${r.origin}" ${mutated ? "con avvisi" : "fallita"} (tollerato):`, r.error);
     }
   }
 

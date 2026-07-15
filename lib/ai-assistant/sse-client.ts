@@ -15,6 +15,10 @@ export interface AssistantStreamOpts {
   history?: Array<{ role: "user" | "assistant"; content: string }>;
   signal?: AbortSignal;
   onEvent: (ev: AssistantStreamEvent) => void;
+  // Task #107 — lingua app corrente: il server la usa per recuperare dal
+  // manuale (Nadir) la traduzione corrispondente invece del solo italiano.
+  // Assente → il server ricade sull'italiano.
+  language?: string;
 }
 
 export async function streamAssistantMessage(opts: AssistantStreamOpts): Promise<void> {
@@ -30,6 +34,7 @@ export async function streamAssistantMessage(opts: AssistantStreamOpts): Promise
       message: opts.message,
       platform: opts.platform,
       history: opts.history ?? [],
+      ...(opts.language ? { language: opts.language } : {}),
     }),
     credentials: "include",
     signal: opts.signal,

@@ -81,6 +81,11 @@ export const NADIR_MANUAL_KEY = "nadir_manual_text"; // value: testo libero
 // generatori così il backup resta coerente a prescindere da chi ha sovrascritto.
 // valueJson: { text, savedAt }.
 export const NADIR_MANUAL_PREVIOUS_KEY = "nadir_manual_previous"; // valueJson
+// Task #107 — Traduzioni del manuale (tutte le lingue app TRANNE l'italiano,
+// che resta la sorgente in NADIR_MANUAL_KEY). valueJson: Record<lang, { text,
+// translatedAt, sourceHash }>. sourceHash lega ogni traduzione alla versione
+// italiana da cui è stata generata, per rilevare traduzioni stantie.
+export const NADIR_MANUAL_TRANSLATIONS_KEY = "nadir_manual_translations"; // valueJson
 export const NADIR_FRAGMENTS_KEY = "nadir_fragments"; // valueJson: manifest testo
 export const NADIR_INDEX_STATUS_KEY = "nadir_index_status"; // valueJson
 export const NADIR_SEARCH_HEALTH_KEY = "nadir_search_health"; // valueJson

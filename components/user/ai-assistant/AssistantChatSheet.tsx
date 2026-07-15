@@ -57,7 +57,7 @@ export default function AssistantChatSheet({ visible, onClose }: Props) {
   const insets = useSafeAreaInsets();
   const t = useT();
   const router = useRouter();
-  const { setLanguage } = useLanguage();
+  const { language, setLanguage } = useLanguage();
   const [messages, setMessages] = useState<AssistantChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState(false);
@@ -88,6 +88,9 @@ export default function AssistantChatSheet({ visible, onClose }: Props) {
         platform,
         history,
         signal: abort.signal,
+        // Task #107 — lingua app corrente: il server recupera la traduzione
+        // corrispondente del manuale (Nadir) invece del solo italiano.
+        language,
         onEvent: (ev) => {
           if (ev.event === "delta") {
             const d = (ev.data as { text?: string }).text ?? "";
@@ -144,7 +147,7 @@ export default function AssistantChatSheet({ visible, onClose }: Props) {
       setStreaming(false);
       abortRef.current = null;
     }
-  }, []);
+  }, [language]);
 
   const send = useCallback(async () => {
     const text = input.trim();

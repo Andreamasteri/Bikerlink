@@ -14,15 +14,19 @@ import {
   NADIR_FIELD,
   NADIR_FRAGMENTS_KEY,
   NADIR_LOG_PREFIX,
+  NADIR_MANUAL_ENTITY_TYPE,
   entityTypeToOrigin,
   type NadirOrigin,
 } from "./constants";
+import { APP_LANGUAGES, SOURCE_APP_LANGUAGE, type AppLanguageCode } from "@shared/languages";
 
 export interface NadirFragment {
   origin: NadirOrigin;
   text: string;
   similarity: number;
   entityId: string;
+  /** Task #107 — lingua del frammento, presente SOLO per origin="manual" (le altre sorgenti sono testo utente non tradotto). */
+  lang?: AppLanguageCode;
 }
 
 export interface NadirSearchResult {
@@ -39,7 +43,7 @@ export interface NadirSearchResult {
  */
 export type NadirFragmentManifest = Record<
   string,
-  { origin: NadirOrigin; text: string; userId?: string | null }
+  { origin: NadirOrigin; text: string; userId?: string | null; lang?: AppLanguageCode }
 >;
 
 /**
@@ -52,6 +56,14 @@ export interface NadirSearchOpts {
   requesterId?: string | null;
   /** Contesto admin/di sistema: sblocca le conversazioni di tutti gli utenti. */
   includeAllUsers?: boolean;
+  /**
+   * Task #107 — Lingua del richiedente: filtra i frammenti del MANUALE alla
+   * versione tradotta corrispondente (conversazioni/commenti restano testo
+   * utente originale, non tradotto). Default italiano. Se la lingua richiesta
+   * non ha frammenti indicizzati, si ricade su qualunque lingua disponibile
+   * (in pratica l'italiano, sempre presente) invece di restituire zero risultati.
+   */
+  language?: AppLanguageCode;
 }
 
 export async function loadFragmentManifest(): Promise<NadirFragmentManifest> {
@@ -75,7 +87,7 @@ export async function searchNadir(
   limit = 5,
   opts: NadirSearchOpts = {},
 ): Promise<NadirSearchResult> {
-  const { requesterId = null, includeAllUsers = false } = opts;
+  const { requesterId = null, includeAllUsers = false, language = SOURCE_APP_LANGUAGE } = opts;
   const cleaned = (query ?? "").trim();
   if (!cleaned) return { model: getLastUsedModelTag(), fragments: [] };
 
@@ -83,17 +95,27 @@ export async function searchNadir(
   const modelTag = getLastUsedModelTag();
   const manifest = await loadFragmentManifest();
 
-  // Una query per entityType (findSimilar filtra per un solo entityType/field).
+  // Task #107 — Il manuale è ora indicizzato in TUTTE le lingue app (stesso
+  // contenuto, testi diversi): a parità di `limit` i risultati grezzi rischiano
+  // di essere dominati da una sola lingua (o mescolare lingue diverse) prima del
+  // filtro sotto. Sovra-peschiamo SOLO l'entityType manuale di un fattore pari al
+  // numero di lingue, così dopo aver filtrato sulla lingua richiesta restano
+  // comunque abbastanza candidati; le altre sorgenti (testo utente, non tradotto)
+  // restano al fetch minimo di sempre.
   const perType = await Promise.all(
-    NADIR_ENTITY_TYPES.map((entityType) =>
-      findSimilar(entityType, NADIR_FIELD, vec, Math.max(limit, 5), 0, modelTag).catch((err) => {
+    NADIR_ENTITY_TYPES.map((entityType) => {
+      const fetchLimit =
+        entityType === NADIR_MANUAL_ENTITY_TYPE
+          ? Math.max(limit, 5) * APP_LANGUAGES.length
+          : Math.max(limit, 5);
+      return findSimilar(entityType, NADIR_FIELD, vec, fetchLimit, 0, modelTag).catch((err) => {
         console.warn(
           `${NADIR_LOG_PREFIX} findSimilar(${entityType}) fallita:`,
           (err as Error)?.message ?? err,
         );
         return [] as Awaited<ReturnType<typeof findSimilar>>;
-      }),
-    ),
+      });
+    }),
   );
 
   const fragments: NadirFragment[] = [];
@@ -117,10 +139,25 @@ export async function searchNadir(
         text: entry.text,
         similarity: hit.similarity,
         entityId: hit.entityId,
+        lang: entry.lang,
       });
     }
   }
 
-  fragments.sort((a, b) => b.similarity - a.similarity);
-  return { model: modelTag, fragments: fragments.slice(0, limit) };
+  // Task #107 — Scoping per lingua SOLO sui frammenti del manuale: se esistono
+  // frammenti nella lingua richiesta, teniamo solo quelli (stessa profondità di
+  // risposta dell'italiano); altrimenti ricadiamo su tutte le lingue disponibili
+  // per il manuale (in pratica l'italiano, sempre presente) invece di azzerare i
+  // risultati. Conversazioni/commenti non sono per-lingua e restano invariati.
+  const manualFragments = fragments.filter((f) => f.origin === "manual");
+  const manualInLanguage = manualFragments.filter((f) => f.lang === language);
+  const droppedManual = new Set(
+    manualInLanguage.length > 0
+      ? manualFragments.filter((f) => f.lang !== language)
+      : [],
+  );
+  const scoped = fragments.filter((f) => !droppedManual.has(f));
+
+  scoped.sort((a, b) => b.similarity - a.similarity);
+  return { model: modelTag, fragments: scoped.slice(0, limit) };
 }

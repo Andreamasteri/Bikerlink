@@ -4,13 +4,101 @@
  * Il manuale è persistito in AppSettings (chiave `nadir_manual_text`), NON in un
  * file git: un admin può leggerlo/scriverlo dal pannello senza redeploy.
  */
+import { createHash } from "node:crypto";
 import { storage } from "../../storage";
-import { NADIR_LOG_PREFIX, NADIR_MANUAL_KEY, NADIR_MANUAL_PREVIOUS_KEY } from "./constants";
+import {
+  NADIR_LOG_PREFIX,
+  NADIR_MANUAL_KEY,
+  NADIR_MANUAL_PREVIOUS_KEY,
+  NADIR_MANUAL_TRANSLATIONS_KEY,
+} from "./constants";
+import { SOURCE_APP_LANGUAGE, type AppLanguageCode } from "@shared/languages";
 
-/** Legge il manuale corrente (stringa vuota se mai scritto). */
+/** Legge il manuale ITALIANO corrente (stringa vuota se mai scritto). Sorgente di verità. */
 export async function getNadirManual(): Promise<string> {
   const row = await storage.getAppSetting(NADIR_MANUAL_KEY);
   return row?.value ?? "";
+}
+
+/**
+ * Task #107 — Una traduzione del manuale, con l'hash della versione italiana
+ * da cui è stata generata (rileva traduzioni stantie rispetto alla sorgente).
+ */
+export interface NadirManualTranslation {
+  text: string;
+  translatedAt: string;
+  sourceHash: string;
+}
+
+export type NadirManualTranslations = Partial<Record<AppLanguageCode, NadirManualTranslation>>;
+
+/** Hash stabile del testo del manuale italiano, usato per legare le traduzioni alla sorgente. */
+export function hashManualText(text: string): string {
+  return createHash("sha256").update(text ?? "").digest("hex").slice(0, 32);
+}
+
+/** Legge la mappa completa delle traduzioni (vuota se mai generate). */
+export async function getNadirManualTranslations(): Promise<NadirManualTranslations> {
+  const row = await storage.getAppSetting(NADIR_MANUAL_TRANSLATIONS_KEY);
+  const raw = row?.valueJson;
+  if (raw && typeof raw === "object") return raw as NadirManualTranslations;
+  return {};
+}
+
+/** Sovrascrive l'intera mappa delle traduzioni (chiamata dopo aver rigenerato il manuale). */
+export async function saveNadirManualTranslations(
+  translations: NadirManualTranslations,
+): Promise<void> {
+  await storage.upsertAppSetting(NADIR_MANUAL_TRANSLATIONS_KEY, undefined, translations);
+  console.log(
+    `${NADIR_LOG_PREFIX} traduzioni manuale aggiornate (${Object.keys(translations).length} lingue)`,
+  );
+}
+
+/**
+ * Legge il manuale nella lingua richiesta: italiano dalla sorgente, le altre
+ * lingue dalla mappa traduzioni. Fallback all'italiano se la lingua richiesta
+ * non ha (ancora) una traduzione — mai una stringa vuota se l'italiano esiste.
+ */
+export async function getNadirManualForLanguage(lang: AppLanguageCode): Promise<string> {
+  const italian = await getNadirManual();
+  if (lang === SOURCE_APP_LANGUAGE) return italian;
+  const translations = await getNadirManualTranslations();
+  const entry = translations[lang];
+  // Task #107 fix — una traduzione è valida SOLO se il suo sourceHash combacia
+  // con l'italiano ATTUALE. Se l'italiano è cambiato da quando la traduzione è
+  // stata generata (nuova scansione di Horus con traduzioni parzialmente fallite,
+  // o un admin che ha modificato a mano il manuale italiano — vedi
+  // server/routes/admin/nadir.ts) la traduzione è considerata stantia e si ricade
+  // sull'italiano, invece di servire testo tradotto disallineato dalla sorgente.
+  if (entry?.text?.trim() && entry.sourceHash === hashManualText(italian)) return entry.text;
+  return italian;
+}
+
+/**
+ * Tutte le versioni del manuale ATTUALMENTE disponibili, chiave = lingua.
+ * Usato dalla reindicizzazione Nadir per indicizzare ogni lingua separatamente.
+ * Include sempre l'italiano (se non vuoto) e le traduzioni presenti, anche se
+ * parziali/incomplete rispetto a APP_LANGUAGES.
+ */
+export async function getAllNadirManualVersions(): Promise<Partial<Record<AppLanguageCode, string>>> {
+  const [italian, translations] = await Promise.all([
+    getNadirManual(),
+    getNadirManualTranslations(),
+  ]);
+  const out: Partial<Record<AppLanguageCode, string>> = {};
+  if (italian.trim()) out[SOURCE_APP_LANGUAGE] = italian;
+  // Task #107 fix — indicizza SOLO le traduzioni ancora allineate all'italiano
+  // corrente (stesso controllo sourceHash di getNadirManualForLanguage). Una
+  // traduzione stantia (italiano cambiato da quando è stata generata) non va
+  // indicizzata: verrebbe servita come se fosse corretta, mentre la ricerca deve
+  // ricadere sull'italiano (sempre presente sopra) per quella lingua finché non
+  // viene rigenerata.
+  const currentHash = hashManualText(italian);
+  for (const [lang, entry] of Object.entries(translations) as [AppLanguageCode, NadirManualTranslation][]) {
+    if (entry?.text?.trim() && entry.sourceHash === currentHash) out[lang] = entry.text;
+  }
+  return out;
 }
 
 /** Versione precedente del manuale, catturata prima dell'ultima sovrascrittura. */

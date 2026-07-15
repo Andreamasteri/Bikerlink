@@ -41,6 +41,7 @@ import {
 } from "./tools";
 import { loadHorusMemory } from "./horus-memory";
 import { searchNadir, SEARCH_MANUAL_RE } from "../nadir";
+import { SOURCE_APP_LANGUAGE, type AppLanguageCode } from "@shared/languages";
 import {
   selectToolNamesForMessage,
   buildMissingToolInstruction,
@@ -98,6 +99,11 @@ export interface AssistantAgentOpts {
   // sopravvive ai cicli Bowie ⇄ Horus/Ares ⇄ Bowie).
   // Ignorato per Bowie (usa historySource.length===0, coerente con Task #5210).
   personaFirstTurn?: boolean;
+  // Task #107 — Lingua dell'app del richiedente: filtra i frammenti del manuale
+  // recuperati da Nadir alla traduzione corrispondente (fallback italiano se
+  // mancante/non ancora tradotta). Default italiano quando assente (client
+  // vecchi, admin panel, Ares/Quebracho).
+  language?: AppLanguageCode;
   // Task #5228 — Client di origine ("main_app" | "bowie_terminal"). Loggato in
   // ai_call_logs.source_app per il monitor Bowie Standalone.
   sourceApp?: string;
@@ -175,16 +181,19 @@ async function maybeSummarize(userId: string): Promise<void> {
  */
 async function buildNadirContextForPrompt(
   message: string,
-  access: { requesterId?: string | null; includeAllUsers?: boolean } = {},
+  access: { requesterId?: string | null; includeAllUsers?: boolean; language?: AppLanguageCode } = {},
 ): Promise<string> {
   if (!SEARCH_MANUAL_RE.test(message ?? "")) return "";
   try {
     // SICUREZZA (Task #75): stesso scoping del tool `search_manual`. Quebracho è
     // solo-admin (contesto di sistema) → includeAllUsers; passiamo comunque il
     // requesterId per coerenza con Bowie/Horus.
+    // Task #107 — la lingua filtra i frammenti del MANUALE alla traduzione del
+    // richiedente (fallback italiano se assente); nessun effetto su conversazioni/commenti.
     const result = await searchNadir(message, 5, {
       requesterId: access.requesterId ?? null,
       includeAllUsers: access.includeAllUsers ?? false,
+      language: access.language ?? SOURCE_APP_LANGUAGE,
     });
     if (result.fragments.length === 0) return "";
     const lines = result.fragments
@@ -298,6 +307,7 @@ export async function runAssistantAgent(opts: AssistantAgentOpts): Promise<Assis
         signal: opts.signal,
         requesterId: opts.userId ?? null,
         includeAllUsers: isAdmin,
+        language: opts.language ?? SOURCE_APP_LANGUAGE,
       }),
     );
   } else if (requestedPersona === "horus") {
@@ -309,6 +319,7 @@ export async function runAssistantAgent(opts: AssistantAgentOpts): Promise<Assis
         signal: opts.signal,
         requesterId: opts.userId ?? null,
         includeAllUsers: isAdmin,
+        language: opts.language ?? SOURCE_APP_LANGUAGE,
       }),
     );
   }
@@ -388,6 +399,7 @@ export async function runAssistantAgent(opts: AssistantAgentOpts): Promise<Assis
     system += await buildNadirContextForPrompt(opts.message, {
       requesterId: opts.userId ?? null,
       includeAllUsers: isAdmin,
+      language: opts.language ?? SOURCE_APP_LANGUAGE,
     });
   } else if (requestedPersona === "horus") {
     // Horus: specialista percorsi. RAG + contesto utente come Bowie, persona diversa.

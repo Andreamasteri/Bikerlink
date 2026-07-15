@@ -18,6 +18,7 @@ import { askHorus, askQuebracho, askAres } from "./inter-agent";
 import { appendHorusNote } from "./horus-memory";
 import { reviewTaskPlan, type ReviewAgent } from "./task-review";
 import { searchNadir } from "../nadir";
+import { type AppLanguageCode } from "@shared/languages";
 
 export interface InterAgentToolContext {
   /** Sessione admin: sblocca call_ares (solo admin). */
@@ -182,7 +183,13 @@ export function buildReviewTaskPlanTool(
  * (manual/conversation/comment) e punteggio di similarità.
  */
 export function buildSearchManualTool(
-  opts: { signal?: AbortSignal; requesterId?: string | null; includeAllUsers?: boolean } = {},
+  opts: {
+    signal?: AbortSignal;
+    requesterId?: string | null;
+    includeAllUsers?: boolean;
+    /** Task #107 — lingua del richiedente: filtra i frammenti del manuale alla sua traduzione. Default italiano. */
+    language?: AppLanguageCode;
+  } = {},
 ): Record<string, unknown> {
   void opts.signal; // searchNadir gestisce internamente latenza/errori
   // SICUREZZA (Task #75): l'accesso ai frammenti di conversazione (privati) è
@@ -190,6 +197,7 @@ export function buildSearchManualTool(
   // userId (vede solo le SUE chat); in contesto admin `includeAllUsers` sblocca tutti.
   const requesterId = opts.requesterId ?? null;
   const includeAllUsers = opts.includeAllUsers ?? false;
+  const language = opts.language;
   return {
     search_manual: tool({
       description:
@@ -213,6 +221,7 @@ export function buildSearchManualTool(
           const result = await searchNadir(input.query, input.limit ?? 5, {
             requesterId,
             includeAllUsers,
+            language,
           });
           return {
             ok: true,
