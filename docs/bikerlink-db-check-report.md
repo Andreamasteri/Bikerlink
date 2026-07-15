@@ -4,7 +4,7 @@
 > **Modalità:** sola lettura — nessuna modifica applicata al database.
 > **Script sorgente:** `scripts/generate-db-check-report.ts` (rieseguibile).
 
-Questo report fotografa lo stato del **DB di sviluppo** (interrogato live via `DATABASE_URL`) e lo confronta strutturalmente con il **DB di produzione** tramite lo snapshot offline `server/data/deep-schema-parity.prod.json` (la prod non è raggiungibile con una connection string diretta dalla sandbox Replit). I check di integrità/logici/range girano sul DB dev live.
+Questo report fotografa lo stato del **DB di sviluppo** (interrogato live via `DATABASE_URL`) e lo confronta strutturalmente con il **DB di produzione** tramite lo snapshot offline `server/data/deep-schema-parity.prod.json` (la prod non è raggiungibile con una connection string diretta dalla sandbox Replit). I check di integrità/logici/range delle sezioni 2–4 girano sul DB dev live, quasi vuoto: la §7 rilancia la STESSA checklist sui **dati reali di produzione** via la replica read-only (`executeSql` con `environment: "production"`), colmando il gap.
 
 ## 0. Contesto
 
@@ -3287,6 +3287,7 @@ _Nessun problema bloccante rilevato._
 ### 🟠 Importante
 
 - Deploy pendente: 10 aree di schema esistono in dev ma non nello snapshot prod (2026-06-28T12:58:52.982Z). Applicare le migration a prod al prossimo publish e ricatturare lo snapshot `server/data/deep-schema-parity.prod.json`.
+- **Confermato sui dati reali (§7.2.d):** 6 righe in `user_profiles` (prod) hanno `hide_from_map=false` ma `latitude`/`longitude` NULL — profili che dovrebbero essere visibili in mappa ma non lo sono. Vedi esempi in §7.2.d.
 
 ### 🟡 Cosmetic
 
@@ -3297,6 +3298,115 @@ _Nessun problema bloccante rilevato._
 - Colonna candidate-unique `users.nickname` priva di UNIQUE constraint a livello DB — valutare se aggiungerlo (o se i duplicati sono leciti).
 - Colonna candidate-unique `workshops.email` priva di UNIQUE constraint a livello DB — valutare se aggiungerlo (o se i duplicati sono leciti).
 
+## 7. Verifica sui dati REALI di produzione (read-only, DB replica)
+
+> **Generato:** 2026-07-15T01:09:52.000Z
+> **Metodo:** query `SELECT`-only eseguite dalla skill database con `environment: "production"` (replica in sola lettura del DB di produzione; nessuna scrittura possibile). Prod **non** è raggiungibile via connection string dalla sandbox — questa sezione colma il gap lasciato aperto dalle sezioni 2–4 (che girano solo su dev, quasi vuoto) rieseguendo la STESSA logica di check sui dati reali.
+
+Le sezioni 2–4 sopra restano a bassa confidenza (dev quasi vuoto); questa sezione è la verifica ad alta confidenza sui dati reali, e ne conferma o smentisce gli esiti.
+
+### 7.0 Popolamento tabelle (prod)
+
+49 tabelle su 168 hanno almeno 1 riga in produzione (conteggio esatto, non stima da `pg_stat_user_tables` — quella era stale/azzerata su questo DB).
+
+| Tabella | Righe |
+|---|---:|
+| `ai_events` | 49616 |
+| `system_signals` | 44664 |
+| `site_visits` | 18935 |
+| `ai_watchdog_log` | 9878 |
+| `spatial_ref_sys` | 8500 |
+| `pipeline_probe_history` | 8216 |
+| `system_health_snapshot` | 6823 |
+| `server_restarts` | 2875 |
+| `db_integrity_runs` | 1658 |
+| `db_integrity_violations` | 1046 |
+| `moderator_logs` | 920 |
+| `ai_suggestions_log` | 678 |
+| `integrity_violations` | 609 |
+| `thinkcentre_health_events` | 292 |
+| `ota_releases` | 220 |
+| `schema_migrations` | 175 |
+| `app_settings` | 148 |
+| `tags` | 72 |
+| `ai_coordinator_jobs` | 53 |
+| `text_aliases` | 45 |
+| `conversations` | 40 |
+| `moto_clubs` | 40 |
+| `moderator_digests` | 28 |
+| `match_zero_snapshots` | 27 |
+| `integrity_runs` | 21 |
+| `translation_keys` | 20 |
+| `moto_club_members` | 20 |
+| `easter_eggs` | 20 |
+| `conversation_participants` | 20 |
+| `bio_affinity_matches` | 15 |
+| `ai_analysis_artifacts` | 14 |
+| `users` | 8 |
+| `user_profiles` | 8 |
+| `match_preferences` | 8 |
+| `embeddings` | 8 |
+| `ai_analysis_runs` | 7 |
+| `match_rules` | 5 |
+| `moderation_thresholds` | 4 |
+| `match_thresholds` | 4 |
+| `match_feedback` | 4 |
+| `user_match_profile` | 3 |
+| `tag_categories` | 3 |
+| `ai_usage_budget` | 3 |
+| `user_motorcycles` | 2 |
+| `invitation_codes` | 2 |
+| `diagnostic_reports` | 2 |
+| `biker_biker_matches` | 2 |
+| `weekly_system_reports` | 1 |
+| `session` | 1 |
+
+### 7.1 Integrità referenziale (FK) — dati reali
+
+27 FK con tabella figlia popolata sono state verificate (le altre 130 FK hanno 0 righe lato figlio in prod, quindi nessuna violazione è possibile per costruzione).
+
+✅ **Nessuna riga orfana rilevata** su nessuna delle 27 FK controllate (dati reali: utenti, moto club, match, conversazioni, ecc.).
+
+### 7.2 Checklist deterministica (a–f) — dati reali
+
+**(a) Coordinate fuori range:** 13 colonne latitudine + 13 longitudine ispezionate su dati reali (utenti, moto club, easter egg, posizioni fake/fuzz per privacy). ✅ 0 violazioni.
+
+**(b) Timestamp impossibili:** 34 check (`created_at` nel futuro / `updated_at` < `created_at`) su tutte le tabelle popolate con quelle colonne. ✅ 0 violazioni.
+
+**(c) Contatori negativi:** 20 colonne-contatore ispezionate (km, punteggi, contatori boot/OTA, feedback, member_count, ecc.). ✅ 0 violazioni.
+
+**(d) Entità attive con campi obbligatori mancanti:**
+
+| Check | Violazioni |
+|---|---:|
+| utenti `active` senza email | 0 |
+| utenti `active` senza nickname | 0 |
+| profili visibili in mappa (`hide_from_map=false`) senza coordinate | **6** ⚠️ |
+| moto club senza nome | 0 |
+
+⚠️ **Violazione reale confermata:** 6 righe in `user_profiles` hanno `hide_from_map=false` (quindi il profilo dovrebbe essere visibile in mappa) ma `latitude`/`longitude` NULL — utenti che non compaiono in mappa nonostante l'intento di condividere la posizione. Stessa cifra già segnalata (a bassa confidenza) dalla sezione 3(d) sul DB dev — qui è confermata sui dati reali. Impatto: UX (utente si aspetta di essere visibile, non lo è), non integrità/sicurezza. Severità: **Importante**, non bloccante.
+
+**(e) Telemetria/tracce senza GPS:** nessuna delle tabelle di telemetria (`ride_telemetry`, `route_points`, `routes`, `planned_routes`, `segment_telemetry`, `maps_telemetry_events`) ha righe in produzione al momento del check (0 corse/percorsi registrati finora). Check non applicabile — nessun dato da validare, non un "0 violazioni" su dati popolati.
+
+**(f) Valori-stato fuori dal set ammesso:** distribuzione valori-stato calcolata su 11 colonne stato/state/visibility popolate (`users.status`, `moto_club_members.status`, `biker_biker_matches.status`, `bio_affinity_matches.status`, `ai_*`, `ota_releases.status`, ecc.). ✅ `users.status` = solo `active` (8/8); `moto_club_members.status` = solo `active` (20/20) — entrambi dentro il set ammesso. Nessun valore-stato fuori dal set curato.
+
+### 7.3 Duplicati su colonne candidate-unique — dati reali
+
+Colonne candidate (`email`, `slug`, `username`, `nickname`, `external_id`, `normalized_email`) presenti su tabelle popolate: `tag_categories.slug`, `tags.slug`, `users.nickname`, `users.email`.
+
+| Colonna | Copertura UNIQUE (DB) | Duplicati reali |
+|---|---|---|
+| `users.email` | ✅ single-col (`users_email_unique`) | nessuno (garantito dal DB) |
+| `users.nickname` | ⚠️ nessuno | nessun duplicato tra gli 8 utenti reali |
+| `tag_categories.slug` | ✅ single-col (`tag_categories_slug_unique`) | nessuno (garantito dal DB) |
+| `tags.slug` | ➖ composita (`category_id, slug`) | `tourer`×2 — **atteso**, categorie diverse (verificato: 2 `category_id` distinti) |
+
+✅ Nessun duplicato illecito sui dati reali.
+
+### 7.4 Conclusione
+
+Sui dati reali di produzione (49 tabelle popolate, incluse tutte le entità di dominio con dati: utenti, profili, moto club, match, tag): **0 violazioni bloccanti**, **1 violazione Importante** (6 profili "visibili in mappa" senza coordinate — §7.2.d), **0 violazioni cosmetic aggiuntive** rispetto a quelle già note dalla sezione 5. Le tabelle di telemetria/percorsi (routes, ride_telemetry, planned_routes) sono a 0 righe in prod: nessuna corsa/percorso è ancora stato registrato, quindi i check su quei dati non sono applicabili (non "puliti per assenza di anomalie", ma "non ancora testabili per assenza di dati").
+
 ---
 
-> Report generato in sola lettura. Le decisioni di migrazione sono demandate a un task successivo (dopo review). Rieseguibile con `npx tsx scripts/generate-db-check-report.ts`.
+> Report generato in sola lettura. Le decisioni di migrazione sono demandate a un task successivo (dopo review). Rieseguibile con `npx tsx scripts/generate-db-check-report.ts`. La sezione 7 (dati reali di produzione) è rieseguibile via `executeSql({ environment: "production" })` dalla skill database — non richiede `DATABASE_URL` di prod.
