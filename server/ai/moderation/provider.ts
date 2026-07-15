@@ -293,7 +293,7 @@ function tryBuild(id: AiProviderId, role: ModelRole, forcedModelId?: string): Re
 export function tryBuildOllama(): ResolvedModel | null {
   if (!isOllamaConfigured) return null;
   try {
-    const modelId = process.env.BOWIE_OLLAMA_MODEL ?? "mistral-nemo:latest";
+    const modelId = process.env.BOWIE_OLLAMA_MODEL ?? "qwen3:1.7b";
     const model = getOllamaModel(modelId) as unknown as LanguageModelV2;
     return {
       id: "ollama",
@@ -473,6 +473,16 @@ export async function generateStructured<T>(
   m: ResolvedModel,
   opts: StructuredGenOpts<T>,
 ): Promise<StructuredGenResult<T>> {
+  // Ollama (Bowie=qwen3:1.7b) "pensa" di default: disattiviamo il ragionamento
+  // esplicito quando genera JSON strutturato, altrimenti i blocchi <think>
+  // rompono il parsing. Rispetta eventuali override espliciti del chiamante.
+  const providerOptions =
+    m.id === "ollama"
+      ? {
+          ...(opts.providerOptions ?? {}),
+          ollama: { think: false, ...(opts.providerOptions?.ollama ?? {}) },
+        }
+      : opts.providerOptions;
   if (m.objectMode === "json") {
     // Modello senza json_schema (Groq llama-3.x): no-schema + Zod parse manuale.
     let shape = "";
@@ -489,7 +499,7 @@ export async function generateStructured<T>(
       prompt,
       temperature: opts.temperature,
       abortSignal: opts.abortSignal,
-      ...(opts.providerOptions ? { providerOptions: opts.providerOptions as never } : {}),
+      ...(providerOptions ? { providerOptions: providerOptions as never } : {}),
     });
     const object = opts.schema.parse(res.object);
     return { object, usage: res.usage };
@@ -504,7 +514,7 @@ export async function generateStructured<T>(
     prompt: opts.prompt,
     temperature: opts.temperature,
     abortSignal: opts.abortSignal,
-    ...(opts.providerOptions ? { providerOptions: opts.providerOptions as never } : {}),
+    ...(providerOptions ? { providerOptions: providerOptions as never } : {}),
   });
   return { object: res.object, usage: res.usage };
 }

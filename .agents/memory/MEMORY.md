@@ -1,3 +1,4 @@
+- [qwen3 think:false for personas](qwen3-think-false-personas.md) — Bowie=qwen3:1.7b, Horus=qwen3:4b; qwen3 reasons by default so EVERY Ollama call must pass ollama.think=false or <think> pollutes chat/breaks JSON.
 - [routing_area_mode legacy instance gone](routing-area-mode-legacy-gone.md) — root GraphHopper /info+/route now 404 (multi-area-only TC); routing_area_mode unset in dev AND prod silently falls back to the dead legacy path.
 - [large-files-ratchet scans filesystem, not git](large-files-ratchet-external-refs.md) — untracked reference clones on disk (e.g. .bikerblog-ref) still get scanned by the 600-line gate; add to EXCLUDED_DIRS proactively.
 - [Ares/Quebracho lack native tool-calling](ares-quebracho-no-native-tools.md) — no streamText/tools; new in-chat capabilities need pre-composition message interception in agent.ts, not a tool() def.

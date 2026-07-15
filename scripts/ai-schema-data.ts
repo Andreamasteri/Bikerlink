@@ -237,7 +237,7 @@ export const ENV_ROWS: EnvRow[] = [
   { varname: "OPENAI_API_KEY", provider: "OpenAI + Embeddings",
     note: "Pay-per-use. Nessun cap RPD di default (Infinity). Attiva anche text-embedding-3-large" },
   { varname: "BOWIE_OLLAMA_URL", provider: "Ollama (self-hosted)",
-    note: "ThinkCentre LAN/Cloudflare. Se assente, Ollama disabilitato. Modello: BOWIE_OLLAMA_MODEL (default llama3.1:8b)" },
+    note: "ThinkCentre LAN/Cloudflare. Se assente, Ollama disabilitato. Modello: BOWIE_OLLAMA_MODEL (default qwen3:1.7b)" },
   { varname: "COORDINATOR_DISABLED", provider: "AiCoordinator",
     note: "Se =1, tutto il layer coordinator è disabilitato (emit/subscribe no-op)" },
   { varname: "GEMINI_TIMEOUT_MS", provider: "Route AI Parse/Stream",

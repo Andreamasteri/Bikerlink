@@ -24,7 +24,7 @@
 #                          se l'auto-detect via Tailscale non funziona.
 #   NGINX_CONF=<path>      Forza il file nginx da modificare
 #                          (default: auto-detect, fallback /etc/nginx/sites-enabled/default).
-#   CHAT_MODEL=<modello>   Modello base scaricato (default: mistral-nemo:latest).
+#   CHAT_MODEL=<modello>   Modello base scaricato (default: qwen3:1.7b).
 #   SKIP_MODELS=1          Salta il download dei modelli (solo install + nginx).
 # =============================================================================
 
@@ -32,19 +32,20 @@ set -euo pipefail
 
 # ── Configurazione (override via env) ────────────────────────────────────────
 # NOTA SUI MODELLI:
-#   - CHAT_MODEL è il modello base scaricato. Default: mistral-nemo:latest (12B).
-#     Entra nei 8GB VRAM della GTX 1070 con OLLAMA_FLASH_ATTENTION=1 → 13–16 token/s.
+#   - CHAT_MODEL è il modello base scaricato. Default: qwen3:1.7b (~1.4GB).
+#     Modello piccolo e veloce, entra comodamente negli 8GB VRAM della GTX 1070.
+#     Lineup assistenti BikerLink: Horus = qwen3:4b, Bowie = qwen3:1.7b.
 #     Per cambiarlo in futuro: esporta CHAT_MODEL=<nuovo>, riesegui lo script,
 #     aggiorna il secret BOWIE_OLLAMA_MODEL su Replit.
 #   - Il modello custom "bikerlink" (Bowie, assistente in-app) viene creato su base
-#     CHAT_MODEL con system prompt BikerLink baked-in (BikerLink-Bowie.Modelfile).
-#     BOWIE_OLLAMA_MODEL deve puntare a "bikerlink" (fallback hardcoded: mistral-nemo:latest).
+#     qwen3:1.7b con system prompt BikerLink baked-in (BikerLink-Bowie.Modelfile).
+#     BOWIE_OLLAMA_MODEL deve puntare a "bikerlink" (fallback hardcoded: qwen3:1.7b).
 #   Verifica i modelli su: https://ollama.com/library
 #
 # AGGIORNAMENTI (idempotente): rieseguendo questo script lo step di install
 # (curl ... install.sh | sh) aggiorna SEMPRE il runtime Ollama all'ultima
 # versione stabile, e i pull aggiornano i modelli se la tag :latest è cambiata.
-CHAT_MODEL="${CHAT_MODEL:-mistral-nemo:latest}"
+CHAT_MODEL="${CHAT_MODEL:-qwen3:1.7b}"
 # Valore di default per l'output finale: sovrascritto a "bikerlink" se la
 # creazione del modello custom riesce, o a CHAT_MODEL se fallisce/SKIP_MODELS=1.
 BIKERLINK_CUSTOM_MODEL="bikerlink"
@@ -191,10 +192,10 @@ else
   ollama list || true
 
   # ── Crea il modello custom "bikerlink" dal Modelfile ─────────────────────
-  # bikerlink = mistral-nemo:latest + system prompt BikerLink baked-in.
-  # Il base model è hardcoded nel Modelfile (FROM mistral-nemo:latest), non
+  # bikerlink = qwen3:1.7b + system prompt BikerLink baked-in.
+  # Il base model è hardcoded nel Modelfile (FROM qwen3:1.7b), non
   # dipende da CHAT_MODEL. BOWIE_OLLAMA_MODEL su Replit deve valere "bikerlink";
-  # "mistral-nemo:latest" è il fallback hardcoded in ollama-client.ts.
+  # "qwen3:1.7b" è il fallback hardcoded in ollama-client.ts.
   MODELFILE_DIR="$(cd "$(dirname "$0")/ollama-modelfile" 2>/dev/null && pwd || true)"
   MODELFILE_PATH="${MODELFILE_DIR}/BikerLink-Bowie.Modelfile"
   if [[ -f "$MODELFILE_PATH" ]]; then
@@ -444,6 +445,11 @@ echo ""
 echo -e "  \033[1mBOWIE_OLLAMA_URL\033[0m   = ${OLLAMA_URL_VALUE}"
 echo -e "  \033[1mBOWIE_OLLAMA_TOKEN\033[0m = ${TOKEN}"
 echo -e "  \033[1mBOWIE_OLLAMA_MODEL\033[0m = ${BIKERLINK_CUSTOM_MODEL}"
+echo ""
+warn "PROMEMORIA: il secret BOWIE_OLLAMA_MODEL va AGGIORNATO A MANO su Replit dopo"
+warn "questo deploy sul ThinkCentre (Tools → Secrets). L'agente Replit NON può"
+warn "modificare un secret già esistente in autonomia. Base model ora: qwen3:1.7b;"
+warn "fallback hardcoded nel codice: qwen3:1.7b (se il secret resta vuoto)."
 echo ""
 if [[ -z "$PUBLIC_HOSTNAME" ]]; then
   warn "Non sono riuscito a rilevare l'hostname Tailscale automaticamente."

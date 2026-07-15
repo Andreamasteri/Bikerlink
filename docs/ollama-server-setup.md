@@ -18,11 +18,12 @@ Sul server di casa devono essere già presenti e funzionanti:
   **Tailscale Funnel** (l'URL pubblico, es. `https://bikerlink.tail5056aa.ts.net`,
   già raggiungibile dall'esterno).
 - Connessione internet (per scaricare Ollama e i modelli).
-- ~10 GB liberi su disco (Ollama + mistral-nemo:latest ~7GB + overhead).
+- ~5 GB liberi su disco (Ollama + qwen3:1.7b ~1.4GB + overhead).
 
 > **Hardware**: il ThinkCentre ha CPU Intel i5-7500T e GTX 1070 (8GB VRAM). Lo script
-> NON installa CUDA. Con GPU: `mistral-nemo:latest` (12B, ~7GB) gira a 13–16 token/s
-> con `OLLAMA_FLASH_ATTENTION=1`. Su CPU-only: consigliati modelli ≤ 8B.
+> NON installa CUDA. Il default `qwen3:1.7b` (~1.4GB) è piccolo e veloce e sta
+> comodamente in VRAM con `OLLAMA_FLASH_ATTENTION=1`. Lineup: Horus=`qwen3:4b`,
+> Bowie=`qwen3:1.7b`.
 
 ---
 
@@ -56,7 +57,7 @@ OLLAMA_TOKEN="il-mio-token-esistente" bash setup-ollama-server.sh
 PUBLIC_HOST="bikerlink.tail5056aa.ts.net" bash setup-ollama-server.sh
 
 # Cambia i modelli scaricati
-CHAT_MODEL="llama3.2:3b" bash setup-ollama-server.sh
+CHAT_MODEL="qwen3:4b" bash setup-ollama-server.sh
 
 # Forza il file nginx da modificare
 NGINX_CONF="/etc/nginx/sites-enabled/default" bash setup-ollama-server.sh
@@ -88,16 +89,17 @@ direttamente, solo via nginx + token. Se il service non esiste, ne crea uno mini
 
 ### STEP 3 — Download modelli
 Scarica un unico modello:
-- **`mistral-nemo:latest`** → 12B parametri, luglio 2024, ottimo per chat/parsing
-  e multilingue. Con GTX 1070 (8GB VRAM) + `OLLAMA_FLASH_ATTENTION=1` raggiunge
-  13–16 token/s. Richiede ~7GB disco.
+- **`qwen3:1.7b`** → ~1.7B parametri, piccolo e veloce, ottimo per chat/parsing
+  concisi. Sta comodamente in VRAM (GTX 1070) con `OLLAMA_FLASH_ATTENTION=1`.
+  Richiede ~1.4GB disco. NOTA: qwen3 "pensa" di default; il ragionamento esplicito
+  è disattivato lato codice (`ollama.think=false`).
 
 Crea inoltre il modello custom **`bikerlink`** (Bowie, assistente in-app) basato su
-`mistral-nemo:latest` con system prompt e parametri ottimizzati (vedere
+`qwen3:1.7b` con system prompt e parametri ottimizzati (vedere
 `BikerLink-Bowie.Modelfile`).
 
 ```
-[ OK  ] Modello scaricato: mistral-nemo:latest
+[ OK  ] Modello scaricato: qwen3:1.7b
 [ OK  ] Modello custom 'bikerlink' creato con successo.
 ```
 
@@ -222,13 +224,13 @@ journalctl -u ollama -n 100 --no-pager
 **Risposte molto lente**
 - Normale su CPU senza GPU per il primo token (caricamento modello in RAM).
   Mantieni il servizio sempre attivo per evitare ricaricamenti. Considera un
-  modello più piccolo (es. `llama3.2:3b`) per ridurre la latenza se la RAM
-  disponibile è insufficiente per mistral-nemo (12B, ~7GB).
+  modello più grande (es. `qwen3:4b`) per risposte migliori se la RAM
+  lo consente; qwen3:1.7b è già il default leggero.
 
 **Cambiare/aggiungere un modello**
 ```bash
 # Scarica un nuovo modello
-ollama pull llama3.2:3b
+ollama pull qwen3:4b
 # Aggiorna il secret BOWIE_OLLAMA_MODEL su Replit (bikerlink o il nuovo modello) e riavvia
 ```
 

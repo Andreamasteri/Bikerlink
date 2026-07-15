@@ -64,7 +64,7 @@ router.get("/test-ollama", async (req: Request, res: Response) => {
   const model =
     persona === "horus"
       ? (process.env.HORUS_OLLAMA_MODEL?.trim() || "qwen3:4b")
-      : (process.env.BOWIE_OLLAMA_MODEL ?? "llama3.2:3b");
+      : (process.env.BOWIE_OLLAMA_MODEL ?? "qwen3:1.7b");
 
   // Se l'URL non è impostato: non è un errore, semplicemente non configurato.
   if (!rawUrl) {

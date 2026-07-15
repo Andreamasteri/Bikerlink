@@ -53,8 +53,8 @@ import { pruneUserMemory, MEMORY_TURNS_LIMIT } from "./memory-pruner";
 import { fetchUserLiveContext } from "./user-context";
 import { BOWIE_INTRO_POEM, HORUS_INTRO_POEM, ARES_INTRO_POEM, QUEBRACHO_INTRO_POEM } from "@shared/bowie-greeting";
 
-// Task #4 — default Bowie = "llama3.2:3b" (residente sul ThinkCentre).
-const OLLAMA_FALLBACK_MODEL_ID = process.env.BOWIE_OLLAMA_MODEL ?? "llama3.2:3b";
+// Default Bowie = "qwen3:1.7b" (lineup: Horus=qwen3:4b, Bowie=qwen3:1.7b).
+const OLLAMA_FALLBACK_MODEL_ID = process.env.BOWIE_OLLAMA_MODEL ?? "qwen3:1.7b";
 // Task #5197 — Horus usa un modello Ollama dedicato (stessa infra di Bowie).
 // Task #4 — default aggiornato a "qwen3:4b" (modello residente sul ThinkCentre).
 const HORUS_MODEL_ID = process.env.HORUS_OLLAMA_MODEL?.trim() || "qwen3:4b";
@@ -481,10 +481,11 @@ export async function runAssistantAgent(opts: AssistantAgentOpts): Promise<Assis
       ...(Object.keys(turnTools).length > 0
         ? { tools: turnTools as never, stopWhen: isStepCount(3) as never }
         : {}),
-      // Task #4 — Horus gira su qwen3:4b, che "pensa" di default: disattiviamo il
-      // ragionamento esplicito così l'output di navigazione resta pulito (niente
-      // blocchi <think>). Innocuo per gli altri modelli (accettano think:false).
-      ...(isOllama && requestedPersona === "horus"
+      // Bowie (qwen3:1.7b) e Horus (qwen3:4b) "pensano" di default: disattiviamo il
+      // ragionamento esplicito così l'output di chat/navigazione resta pulito (niente
+      // blocchi <think>). Vale per tutte le chiamate Ollama (Bowie/Horus); innocuo
+      // per gli altri modelli (accettano think:false).
+      ...(isOllama
         ? { providerOptions: { ollama: { think: false } } as never }
         : {}),
     });

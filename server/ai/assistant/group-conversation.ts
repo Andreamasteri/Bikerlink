@@ -37,7 +37,7 @@ export const GROUP_MIN_PARTICIPANTS = 2;
 // Modelli Ollama per Bowie/Horus (coerenti con agent.ts). I VALORI dei secret
 // non vengono mai stampati; questi sono solo nomi di modello, non credenziali.
 const HORUS_MODEL_ID = process.env.HORUS_OLLAMA_MODEL?.trim() || "qwen3:4b";
-const BOWIE_MODEL_ID = process.env.BOWIE_OLLAMA_MODEL?.trim() || "llama3.2:3b";
+const BOWIE_MODEL_ID = process.env.BOWIE_OLLAMA_MODEL?.trim() || "qwen3:1.7b";
 
 /**
  * Normalizza e valida la lista di partecipanti proposta. Filtra i duplicati,
@@ -172,11 +172,10 @@ export async function generateGroupTurn(params: GenerateGroupTurnParams): Promis
     messages,
     abortSignal: signal,
     temperature: 0.4,
-    // Horus gira su qwen3:*, che "pensa" di default: disattiviamo il ragionamento
-    // esplicito così l'output resta pulito. Innocuo per gli altri modelli.
-    ...(persona === "horus"
-      ? { providerOptions: { ollama: { think: false } } as never }
-      : {}),
+    // Bowie (qwen3:1.7b) e Horus (qwen3:4b) "pensano" di default: disattiviamo il
+    // ragionamento esplicito così l'output della tavola rotonda resta pulito.
+    // Innocuo per gli altri modelli (accettano think:false).
+    providerOptions: { ollama: { think: false } } as never,
   });
   let text = "";
   for await (const delta of result.textStream) {

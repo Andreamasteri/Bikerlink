@@ -10,8 +10,8 @@
  *                   chiamante ricade sul provider cloud (Gemini/OpenAI).
  *   BOWIE_OLLAMA_TOKEN  — Token per il server self-hosted (header Authorization: Bearer).
  *   BOWIE_OLLAMA_MODEL  — Modello locale da usare.
- *                   Default: "mistral-nemo:latest" (il modello custom "bikerlink",
- *                   basato su mistral-nemo:latest, è il valore consigliato via secret).
+ *                   Default: "qwen3:1.7b" (il modello custom "bikerlink",
+ *                   basato su qwen3:1.7b, è il valore consigliato via secret).
  *
  *   HORUS_OLLAMA_URL / HORUS_OLLAMA_TOKEN — opzionali. Horus gira sulla STESSA
  *                   infra di Bowie (stesso container Ollama sul ThinkCentre): se
@@ -70,9 +70,11 @@ function ollamaHeaders(token: string, persona: OllamaPersona = "bowie"): Record<
   Object.assign(h, cfAccessHeaders(persona));
   return h;
 }
-// Task #4: modello default di Bowie = "llama3.2:3b" (residente sul ThinkCentre).
-// Se BOWIE_OLLAMA_MODEL è impostato come secret, ha la precedenza.
-const BOWIE_OLLAMA_MODEL = process.env.BOWIE_OLLAMA_MODEL ?? "llama3.2:3b";
+// Modello default di Bowie = "qwen3:1.7b" (lineup: Horus=qwen3:4b, Bowie=qwen3:1.7b).
+// Se BOWIE_OLLAMA_MODEL è impostato come secret, ha la precedenza. Ricorda: dopo
+// il deploy sul ThinkCentre il secret va aggiornato A MANO (l'agente non può
+// modificare secret esistenti).
+const BOWIE_OLLAMA_MODEL = process.env.BOWIE_OLLAMA_MODEL ?? "qwen3:1.7b";
 
 // Latenza (Task #5327): keep_alive esplicito tiene il modello caricato in VRAM/RAM
 // tra una richiesta e l'altra, evitando il cold-load (diversi secondi) al primo
@@ -252,10 +254,17 @@ export async function callOllamaChat<T = string>(
 ): Promise<T> {
   const { system, temperature = 0.2, abortSignal, maxRetries = 2, jsonRetries = 1, onRepair, persona = "bowie", numPredict } = options;
 
-  // Task #5322 — provider options Ollama (num_predict) per il controllo verbosità.
-  const providerOptions = numPredict
-    ? { ollama: { options: { num_predict: numPredict } } }
-    : undefined;
+  // Provider options Ollama:
+  //  - think:false disattiva il ragionamento esplicito di qwen3 (Bowie=qwen3:1.7b,
+  //    Horus=qwen3:4b): senza, i blocchi <think> inquinerebbero le risposte in chat
+  //    e romperebbero il JSON strutturato. Innocuo per modelli che non "pensano".
+  //  - num_predict (Task #5322) cappa la lunghezza per risposte concise.
+  const providerOptions = {
+    ollama: {
+      think: false,
+      ...(numPredict ? { options: { num_predict: numPredict } } : {}),
+    },
+  };
 
   // ThinkCentre offline (spento O in manutenzione): non tentare nemmeno la
   // chiamata — lancia subito così il chiamante scala al provider cloud senza

@@ -25,7 +25,7 @@ async function main() {
     process.exit(1);
   }
   if (ollamaConfigured) {
-    console.log(`[i18n] Provider primario: Ollama (${process.env.BOWIE_OLLAMA_MODEL ?? "llama3.1:8b"})${apiKey ? " — fallback OpenAI" : " — nessun fallback OpenAI (OPENAI_API_KEY mancante)"}`);
+    console.log(`[i18n] Provider primario: Ollama (${process.env.BOWIE_OLLAMA_MODEL ?? "qwen3:1.7b"})${apiKey ? " — fallback OpenAI" : " — nessun fallback OpenAI (OPENAI_API_KEY mancante)"}`);
   }
 
   const itPath = path.join(I18N_DIR, `${SOURCE_LANG}.ts`);

@@ -564,7 +564,7 @@ Client condiviso: `server/lib/ollama-client.ts` — `isOllamaConfigured`, `getOl
 Variabili d'ambiente per-persona (tutte **opzionali** — segue il pattern URL/token-from-env di GraphHopper). Naming dedicato per istanza (Task #5256): **Bowie** = assistente in-app (TC), **Horus** = AI routing (TC, usa il client Bowie, solo model id), **Ares** = diagnosi/studio (PC fisso, chiamata HTTP diretta).
 - `BOWIE_OLLAMA_URL` — URL base del server Ollama self-hosted (Bowie). **Se non impostata, Ollama è disabilitato e i flussi usano direttamente il cloud (zero breaking changes).**
 - `BOWIE_OLLAMA_TOKEN` — token opzionale inviato come header `X-Ollama-Token`.
-- `BOWIE_OLLAMA_MODEL` — modello da usare (default `llama3.1:8b`).
+- `BOWIE_OLLAMA_MODEL` — modello da usare (default `qwen3:1.7b`; lineup: Horus=`qwen3:4b`, Bowie=`qwen3:1.7b`). Va aggiornato **a mano** su Replit dopo il deploy sul ThinkCentre (l'agente non può modificare secret esistenti).
 - `HORUS_OLLAMA_MODEL` — model id per l'AI routing (usa lo stesso host/token di Bowie via client condiviso).
 - `ARES_OLLAMA_URL` / `ARES_OLLAMA_TOKEN` / `ARES_OLLAMA_MODEL` — istanza Ares (PC fisso) per diagnosi/studio; CF Access via `DIAG_OLLAMA_CF_CLIENT_ID`/`DIAG_OLLAMA_CF_CLIENT_SECRET` (invariati).
 

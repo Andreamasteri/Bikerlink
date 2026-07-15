@@ -13,9 +13,9 @@
 #   (es. BOWIE_OLLAMA_MODEL=bikerlink oppure BOWIE_OLLAMA_MODEL=bikerlink-assistant)
 #
 # Il modello base si può cambiare con la variabile CHAT_MODEL
-# del setup-ollama-server.sh; di default mistral-nemo:latest.
+# del setup-ollama-server.sh; di default qwen3:1.7b.
 
-FROM mistral-nemo:latest
+FROM qwen3:1.7b
 
 # System prompt BikerLink baked-in.
 # Anche senza system prompt esplicito nel payload, il modello mantiene la persona.
@@ -35,7 +35,11 @@ REGOLE INDEROGABILI:
 5. Se non conosci la risposta, dì: "Non ho informazioni su questo — ti consiglio di contattare il supporto BikerLink."
 """
 
-# Parametri ottimizzati per l'assistente BikerLink
+# Parametri ottimizzati per l'assistente BikerLink (sensati anche per qwen3:1.7b,
+# modello più piccolo: 4096 token di contesto bastano per la chat in-app).
+# NOTA qwen3: "pensa" (blocchi <think>) di default. Il ragionamento esplicito
+# viene disattivato lato codice (providerOptions ollama.think=false) nelle
+# chiamate di Bowie, così l'output di chat/JSON resta pulito.
 PARAMETER temperature 0.2
 PARAMETER num_ctx 4096
 PARAMETER repeat_penalty 1.1
