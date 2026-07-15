@@ -78,6 +78,126 @@ echo "============================================================"
 echo ""
 
 # =============================================================================
+# STEP 0 — Anti-deriva: i file di build DEVONO combaciare con origin/main
+# =============================================================================
+# PERCHÉ: il checkout ~/bikerlink sul ThinkCentre può restare centinaia di
+# commit indietro rispetto a origin/main, con la copia locale dei Modelfile
+# STALE (es. Bowie con `FROM mistral-nemo:latest` quando origin/main è già a
+# `FROM qwen3:1.7b`). In quel caso `ollama create` builda il modello custom sul
+# BASE SBAGLIATO senza alcun errore: `ollama list` sembra normale, la deriva è
+# invisibile. Questo step verifica i file tracciati da cui dipende la build
+# contro origin/main PRIMA di qualunque `ollama create`, e o li riallinea
+# automaticamente (checkout mirato, non un pull completo) o si ferma rumorosamente.
+#
+# Override (env):
+#   SKIP_GIT_SYNC=1   Salta del tutto la verifica (SCONSIGLIATO: rischi build stale).
+#   VERIFY_ONLY=1     Non modifica nulla: fallisce se rileva deriva (utile in CI/gate).
+#   SETUP_OLLAMA_BRANCH=<branch>   Ramo di confronto (default: main).
+BRANCH="${SETUP_OLLAMA_BRANCH:-main}"
+# File tracciati da cui dipende la build dei modelli custom (relativi alla root repo).
+TRACKED_BUILD_FILES=(
+  "scripts/setup-ollama-server.sh"
+  "scripts/ollama-modelfile/BikerLink-Bowie.Modelfile"
+  "scripts/ollama-modelfile/BikerLink-Horus.Modelfile"
+)
+
+git_sync_preflight() {
+  if [[ "${SKIP_GIT_SYNC:-0}" == "1" ]]; then
+    warn "STEP 0/6 — SKIP_GIT_SYNC=1: salto la verifica anti-deriva dei Modelfile."
+    warn "  RISCHIO: potresti buildare su un Modelfile STALE (base model sbagliato)."
+    return 0
+  fi
+
+  log "STEP 0/6 — Verifica anti-deriva dei file di build vs origin/${BRANCH}..."
+
+  local repo_root
+  repo_root="$(git rev-parse --show-toplevel 2>/dev/null || echo "")"
+  if [[ -z "$repo_root" ]]; then
+    die "Non sono in un repository git: impossibile verificare i Modelfile vs origin/${BRANCH}.
+       Esegui lo script dal checkout ~/bikerlink, oppure SKIP_GIT_SYNC=1 per forzare (SCONSIGLIATO)."
+  fi
+
+  export GIT_TERMINAL_PROMPT=0
+
+  # fetch best-effort con retry (rete/credenziali possono essere lente).
+  local fetched=0 attempt
+  for attempt in 1 2 3; do
+    if git -C "$repo_root" fetch origin "$BRANCH" >/dev/null 2>&1; then
+      fetched=1; break
+    fi
+    warn "  git fetch origin ${BRANCH} fallito (tentativo ${attempt}/3)..."
+    sleep $((attempt * 3))
+  done
+  if [[ "$fetched" -ne 1 ]]; then
+    die "Impossibile fare 'git fetch origin ${BRANCH}': non posso verificare che i Modelfile
+       siano aggiornati. Controlla rete/credenziali git (vedi anche scripts/pulla.sh),
+       oppure SKIP_GIT_SYNC=1 per forzare la build STALE (SCONSIGLIATO)."
+  fi
+
+  git -C "$repo_root" rev-parse --verify "origin/${BRANCH}" >/dev/null 2>&1 \
+    || die "origin/${BRANCH} non risolvibile dopo il fetch."
+
+  # Distanza in commit (solo informativo).
+  local behind
+  behind="$(git -C "$repo_root" rev-list --count "HEAD..origin/${BRANCH}" 2>/dev/null || echo "?")"
+  if [[ "$behind" =~ ^[0-9]+$ && "$behind" -gt 0 ]]; then
+    warn "  Il checkout locale è ${behind} commit indietro rispetto a origin/${BRANCH}."
+  else
+    ok "  Checkout allineato a origin/${BRANCH} (0 commit indietro)."
+  fi
+
+  # Confronta ogni file di build (working tree) con la versione di origin/BRANCH.
+  local drifted=() f
+  for f in "${TRACKED_BUILD_FILES[@]}"; do
+    [[ -e "$repo_root/$f" ]] || continue  # file assente in questo checkout → salta
+    if ! git -C "$repo_root" diff --quiet "origin/${BRANCH}" -- "$f" 2>/dev/null; then
+      drifted+=("$f")
+    fi
+  done
+
+  if [[ "${#drifted[@]}" -eq 0 ]]; then
+    ok "  Tutti i file di build combaciano con origin/${BRANCH} (nessuna deriva)."
+    return 0
+  fi
+
+  warn "  DERIVA RILEVATA — questi file differiscono da origin/${BRANCH}:"
+  for f in "${drifted[@]}"; do warn "    • $f"; done
+
+  if [[ "${VERIFY_ONLY:-0}" == "1" ]]; then
+    die "VERIFY_ONLY=1: build interrotta perché i file di build sono in deriva (vedi sopra).
+       Riallinea con:
+         git -C \"$repo_root\" checkout origin/${BRANCH} -- ${drifted[*]}"
+  fi
+
+  # Auto-riallineamento MIRATO (solo i file di build, niente pull completo:
+  # meno conflitti con eventuali edit infra locali non correlati).
+  warn "  Riallineo automaticamente i file di build da origin/${BRANCH} (checkout mirato)..."
+  local self_refreshed=0
+  for f in "${drifted[@]}"; do
+    if git -C "$repo_root" checkout "origin/${BRANCH}" -- "$f" 2>/dev/null; then
+      ok "    ✓ aggiornato: $f"
+      [[ "$f" == "scripts/setup-ollama-server.sh" ]] && self_refreshed=1
+    else
+      die "    ✗ impossibile aggiornare $f da origin/${BRANCH} (edit locali non committati?).
+         Risolvi a mano: git -C \"$repo_root\" checkout origin/${BRANCH} -- $f"
+    fi
+  done
+
+  # Se ho aggiornato QUESTO stesso script, la copia in esecuzione è ancora quella
+  # vecchia (bash l'ha già caricata): ri-eseguo una sola volta la versione fresca.
+  if [[ "$self_refreshed" -eq 1 && "${SETUP_OLLAMA_REEXECED:-0}" != "1" ]]; then
+    warn "  setup-ollama-server.sh era STALE ed è stato aggiornato: ri-eseguo la versione fresca."
+    export SETUP_OLLAMA_REEXECED=1
+    exec bash "$repo_root/scripts/setup-ollama-server.sh" "$@"
+  fi
+
+  ok "  File di build riallineati a origin/${BRANCH}."
+}
+
+git_sync_preflight "$@"
+echo ""
+
+# =============================================================================
 # STEP 1 — Installazione Ollama (ultima versione stabile, metodo ufficiale)
 # =============================================================================
 log "STEP 1/6 — Installazione Ollama..."
@@ -199,9 +319,16 @@ else
   MODELFILE_DIR="$(cd "$(dirname "$0")/ollama-modelfile" 2>/dev/null && pwd || true)"
   MODELFILE_PATH="${MODELFILE_DIR}/BikerLink-Bowie.Modelfile"
   if [[ -f "$MODELFILE_PATH" ]]; then
+    # Base model dichiarato nel Modelfile (dopo lo STEP 0 è garantito allineato a
+    # origin/main). Lo stampiamo per rendere la deriva IMPOSSIBILE da ignorare.
+    FROM_LINE="$(grep -m1 -E '^[[:space:]]*FROM[[:space:]]' "$MODELFILE_PATH" | awk '{print $2}' || true)"
     log "  → Creazione modello custom bikerlink (Bowie) da BikerLink-Bowie.Modelfile..."
+    log "     Base model dichiarato nel Modelfile (FROM): ${FROM_LINE:-<non trovato>}"
     if ollama create bikerlink -f "$MODELFILE_PATH"; then
       ok "  Modello custom 'bikerlink' (Bowie) creato con successo."
+      # Conferma il base effettivo: 'ollama show' riporta architettura/parametri.
+      log "  Verifica base effettivo del modello 'bikerlink':"
+      ollama show bikerlink 2>/dev/null | grep -iE 'architecture|parameters' | sed 's/^/       /' || true
       warn "  Imposta BOWIE_OLLAMA_MODEL=bikerlink nelle variabili Replit (vedi output finale)."
     else
       warn "  Creazione modello bikerlink fallita — usando '${CHAT_MODEL}' come fallback."
