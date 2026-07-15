@@ -59,6 +59,9 @@ vi.mock("../db", () => {
 
 vi.mock("../embeddings", () => ({
   upsertEmbedding: mockUpsertEmbedding,
+  // reindexNadir legge lo stato del circuit breaker OpenAI a fine run per
+  // riportarlo nello status; in test è sempre chiuso (nessuna quota esaurita).
+  getOpenAiCircuitBreakerStatus: () => ({ open: false, reason: null, reopenAt: null }),
 }));
 
 vi.mock("../embeddings/client", () => ({
