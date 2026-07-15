@@ -459,5 +459,6 @@ export {
   buildBowieInterAgentTools,
   buildRememberNoteTool,
   buildReviewTaskPlanTool,
+  buildSearchManualTool,
   type InterAgentToolContext,
 } from "./inter-agent-tools";

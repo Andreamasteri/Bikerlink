@@ -17,6 +17,7 @@ import { z } from "zod";
 import { askHorus, askQuebracho, askAres } from "./inter-agent";
 import { appendHorusNote } from "./horus-memory";
 import { reviewTaskPlan, type ReviewAgent } from "./task-review";
+import { searchNadir } from "../nadir";
 
 export interface InterAgentToolContext {
   /** Sessione admin: sblocca call_ares (solo admin). */
@@ -166,6 +167,65 @@ export function buildReviewTaskPlanTool(
         });
         if (!r.ok) return { ok: false, error: r.error };
         return { ok: true, review: r.review, missingFiles: r.missingFiles ?? [] };
+      },
+    }),
+  };
+}
+
+/**
+ * Tool `search_manual` — consulta Nadir, il MOTORE DI RICERCA SEMANTICA (Task #75).
+ *
+ * Agent-neutral: identico per Bowie, Horus (e, via injection pre-composizione, per
+ * Quebracho — vedi agent.ts). NON è un default silenzioso: la selezione contestuale
+ * lo allega SOLO quando il messaggio contiene un cue esplicito di richiamo semantico
+ * (SEARCH_MANUAL_RE in tool-calling.ts). Ritorna frammenti ordinati con origine
+ * (manual/conversation/comment) e punteggio di similarità.
+ */
+export function buildSearchManualTool(
+  opts: { signal?: AbortSignal; requesterId?: string | null; includeAllUsers?: boolean } = {},
+): Record<string, unknown> {
+  void opts.signal; // searchNadir gestisce internamente latenza/errori
+  // SICUREZZA (Task #75): l'accesso ai frammenti di conversazione (privati) è
+  // scoping-ato al richiedente. Bowie/Horus per un utente normale passano il suo
+  // userId (vede solo le SUE chat); in contesto admin `includeAllUsers` sblocca tutti.
+  const requesterId = opts.requesterId ?? null;
+  const includeAllUsers = opts.includeAllUsers ?? false;
+  return {
+    search_manual: tool({
+      description:
+        "Cerca per SIGNIFICATO (non per parole esatte) nella base di conoscenza Nadir: il manuale " +
+        "scritto dagli admin, le conversazioni AI recenti e i commenti recenti degli utenti. Ritorna i " +
+        "frammenti più pertinenti con la loro origine e un punteggio di similarità, perché tu li " +
+        "incorpori nella risposta. Usalo quando ti si chiede cosa dice il manuale, cosa ci si era detti, " +
+        "se ne avevate già parlato, o di cercare nella knowledge base.",
+      inputSchema: z.object({
+        query: z.string().min(1).describe("La domanda o il concetto da cercare per significato."),
+        limit: z
+          .number()
+          .int()
+          .min(1)
+          .max(10)
+          .nullable()
+          .describe("Numero massimo di frammenti da restituire (default 5)."),
+      }),
+      execute: async (input: { query: string; limit: number | null }) => {
+        try {
+          const result = await searchNadir(input.query, input.limit ?? 5, {
+            requesterId,
+            includeAllUsers,
+          });
+          return {
+            ok: true,
+            model: result.model,
+            fragments: result.fragments.map((f) => ({
+              origin: f.origin,
+              similarity: Number(f.similarity.toFixed(4)),
+              text: f.text,
+            })),
+          };
+        } catch (err) {
+          return { ok: false, error: (err as Error)?.message ?? String(err) };
+        }
       },
     }),
   };

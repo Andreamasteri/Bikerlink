@@ -18,6 +18,10 @@
 //        sottoinsieme minimo di tool pertinente al messaggio (o nessuno per un
 //        messaggio conversazionale), e solo per i servizi effettivamente attivi.
 
+// Task #75 — search_manual (Nadir): cue di richiamo semantico. Definito nel
+// sottosistema Nadir (unica fonte di verità) e riusato qui per il gating del tool.
+import { SEARCH_MANUAL_RE } from "../nadir/constants";
+
 // ── #2 — Sentinel "tool mancante" ─────────────────────────────────────────────
 
 /** Prefisso del sentinel emesso dal modello quando gli serve un tool non allegato. */
@@ -192,6 +196,8 @@ export function selectToolNamesForMessage(
   if (CALL_ARES_RE.test(m)) want("call_ares");
   if (REMEMBER_NOTE_RE.test(m)) want("remember_note");
   if (REVIEW_TASK_PLAN_RE.test(m)) want("review_task_plan");
+  // Task #75 — search_manual (Nadir): mai un default silenzioso, solo su cue esplicito.
+  if (SEARCH_MANUAL_RE.test(m)) want("search_manual");
 
   // Ordine stabile e deterministico = ordine di dichiarazione della persona.
   return availableToolNames.filter((n) => wanted.has(n));

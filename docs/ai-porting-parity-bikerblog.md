@@ -99,7 +99,7 @@ segnalate come follow-up.
 | VRAM arbiter (evict/restore per Ares) | ✅ Presente | `lib/vram-arbiter.ts` `withAresVramPriority` |
 | Quebracho coordinatore (client dedicato, gate) | ✅ Presente | `quebracho-*.ts` |
 | Fallback cloud per Ares/Quebracho | ➖ Assente **per scelta** | Da memoria (`quebracho-coordinator-gate`, `ai-tri-persona-handoff`): Ares degrada con grazia, Quebracho no cloud. **Non un gap** |
-| **Nadir** — ricerca semantica manuale (`search_manual`), reindex, alert staleness-streak | ➖ Assente | Sottosistema intero → **decisione di prodotto, report only** |
+| **Nadir** — ricerca semantica manuale (`search_manual`), reindex, alert staleness-streak | ✅ Presente (Task #75) | `server/ai/nadir/*`, tool `search_manual` (Bowie/Horus nativo, Quebracho via injection pre-composizione), job notturno `jobs/nadir-nightly.ts`, pannello `app/admin/nadir.tsx`. **Divergenza deliberata:** riusa la pipeline embedding+HNSW locale invece di un servizio TC standalone `all-minilm` (vedi `nadir/constants.ts`) |
 | `check_vram_usage` tool + iniezione warning congestione nel prompt + isteresi | ➖ Assente (parziale: c'è l'arbiter, non il tool/prompt) | **Feature, report only** |
 | `coder-alert` | ➖ Assente | **Feature, report only** |
 | Tool agente: `remember_note`, `save_file`/`read_file`/`list_files`, `call_[agent]` delega, `typecheck`/`lint`/`sonar`/`search_code`/`git_log`/`architect` | ➖ Assente | BikerLink usa bridge + admin-actions. **Decisioni di architettura/prodotto, report only** |

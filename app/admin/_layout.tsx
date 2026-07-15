@@ -91,6 +91,7 @@ const ADMIN_OPTS: Record<string, { title: string } | { headerShown: false }> = {
   "ai-pinned": { title: "AI — Insight Pinnati" },
   "ai-layer": { title: "AI Layer" },
   "ai-hub": { title: "Hub AI" },
+  "nadir": { title: "Nadir — Ricerca semantica" },
   "whisper-config": { title: "Voce & Trascrizione" },
   "telemetry-users": { title: "Sessioni Utenti" },
   "telemetry-user/[userId]": { title: "Dettaglio Sessioni" },
@@ -178,6 +179,7 @@ export default function AdminLayout() {
         <Stack.Screen name="ai-pinned" options={ADMIN_OPTS["ai-pinned"]} />
         <Stack.Screen name="ai-layer" options={ADMIN_OPTS["ai-layer"]} />
         <Stack.Screen name="ai-hub" options={ADMIN_OPTS["ai-hub"]} />
+        <Stack.Screen name="nadir" options={ADMIN_OPTS["nadir"]} />
         <Stack.Screen name="whisper-config" options={ADMIN_OPTS["whisper-config"]} />
         <Stack.Screen name="telemetry-users" options={ADMIN_OPTS["telemetry-users"]} />
         <Stack.Screen name="telemetry-user/[userId]" options={ADMIN_OPTS["telemetry-user/[userId]"]} />

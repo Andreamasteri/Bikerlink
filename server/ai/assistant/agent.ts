@@ -35,8 +35,10 @@ import {
   buildBowieInterAgentTools,
   buildRememberNoteTool,
   buildReviewTaskPlanTool,
+  buildSearchManualTool,
 } from "./tools";
 import { loadHorusMemory } from "./horus-memory";
+import { searchNadir, SEARCH_MANUAL_RE } from "../nadir";
 import {
   selectToolNamesForMessage,
   buildMissingToolInstruction,
@@ -162,6 +164,44 @@ async function maybeSummarize(userId: string): Promise<void> {
   }
 }
 
+/**
+ * Task #75 — Contesto Nadir per personas SENZA tool-calling nativo (Quebracho).
+ * Se il messaggio contiene un cue di richiamo semantico (stesso gate del tool
+ * `search_manual`), interroga Nadir e ritorna un blocco da appendere al system
+ * prompt. Nessun cue → stringa vuota (nessuna ricerca, nessun costo). Best-effort:
+ * un errore di Nadir non deve far fallire il turno.
+ */
+async function buildNadirContextForPrompt(
+  message: string,
+  access: { requesterId?: string | null; includeAllUsers?: boolean } = {},
+): Promise<string> {
+  if (!SEARCH_MANUAL_RE.test(message ?? "")) return "";
+  try {
+    // SICUREZZA (Task #75): stesso scoping del tool `search_manual`. Quebracho è
+    // solo-admin (contesto di sistema) → includeAllUsers; passiamo comunque il
+    // requesterId per coerenza con Bowie/Horus.
+    const result = await searchNadir(message, 5, {
+      requesterId: access.requesterId ?? null,
+      includeAllUsers: access.includeAllUsers ?? false,
+    });
+    if (result.fragments.length === 0) return "";
+    const lines = result.fragments
+      .map(
+        (f, i) =>
+          `${i + 1}. [${f.origin}, similarità ${f.similarity.toFixed(3)}] ${f.text}`,
+      )
+      .join("\n");
+    return (
+      `\n\n---\nNADIR — RICERCA SEMANTICA (motore ${result.model}). Frammenti pertinenti ` +
+      `recuperati per significato dalla knowledge base; usali se utili, cita l'origine ` +
+      `solo se serve:\n${lines}\n---`
+    );
+  } catch (e) {
+    console.warn("[Nadir] injection Quebracho fallita (non-fatal):", (e as Error)?.message ?? e);
+    return "";
+  }
+}
+
 // ── Core agent ────────────────────────────────────────────────────────────────
 
 export async function runAssistantAgent(opts: AssistantAgentOpts): Promise<AssistantAgentResult> {
@@ -202,12 +242,27 @@ export async function runAssistantAgent(opts: AssistantAgentOpts): Promise<Assis
         signal: opts.signal,
       }),
       buildReviewTaskPlanTool("bowie", { signal: opts.signal, allowFileRead: isAdmin }),
+      // Task #75 — Nadir: motore di ricerca semantica, agent-neutral (identico per
+      // Bowie e Horus). La selezione contestuale lo allega SOLO su un cue di
+      // richiamo semantico (SEARCH_MANUAL_RE), mai come default. SICUREZZA: le
+      // conversazioni private sono scoping-ate al richiedente (solo le SUE chat);
+      // in sessione admin `includeAllUsers` le sblocca tutte.
+      buildSearchManualTool({
+        signal: opts.signal,
+        requesterId: opts.userId ?? null,
+        includeAllUsers: isAdmin,
+      }),
     );
   } else if (requestedPersona === "horus") {
     Object.assign(
       toolsForPersona,
       buildRememberNoteTool(isAdmin),
       buildReviewTaskPlanTool("horus", { signal: opts.signal, allowFileRead: isAdmin }),
+      buildSearchManualTool({
+        signal: opts.signal,
+        requesterId: opts.userId ?? null,
+        includeAllUsers: isAdmin,
+      }),
     );
   }
 
@@ -262,6 +317,15 @@ export async function runAssistantAgent(opts: AssistantAgentOpts): Promise<Assis
   } else if (requestedPersona === "quebracho") {
     // Task #4 — Quebracho: coordinatore/regista (solo admin), snapshot piattaforma.
     system = buildQuebrachoSystemPrompt(opts.adminContext ?? "");
+    // Task #75 — Nadir agent-neutral anche per Quebracho. Quebracho NON usa il
+    // tool-calling nativo (endpoint dedicato), quindi invece del tool `search_manual`
+    // usiamo l'INTERCETTAZIONE PRE-COMPOSIZIONE: se il messaggio contiene un cue di
+    // richiamo semantico, interroghiamo Nadir e iniettiamo i frammenti nel prompt.
+    // Stesso gating (SEARCH_MANUAL_RE) di Bowie/Horus: mai su un messaggio generico.
+    system += await buildNadirContextForPrompt(opts.message, {
+      requesterId: opts.userId ?? null,
+      includeAllUsers: isAdmin,
+    });
   } else if (requestedPersona === "horus") {
     // Horus: specialista percorsi. RAG + contesto utente come Bowie, persona diversa.
     // Task #5326 — in modalità admin riceve anche la memoria delle proprie

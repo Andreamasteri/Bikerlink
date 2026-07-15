@@ -176,6 +176,14 @@ export default function AiHubScreen() {
       route: "/admin/ai-group-chat",
       color: "#14B8A6",
     },
+    {
+      key: "nadir",
+      label: "Nadir",
+      subtitle: "Ricerca semantica: manuale + KB",
+      icon: "magnify-scan",
+      route: "/admin/nadir",
+      color: "#3B82F6",
+    },
   ];
 
   return (

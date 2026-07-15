@@ -452,6 +452,16 @@ export async function runPhase5Schedulers(): Promise<void> {
     markDegraded("scheduler:embedding-cap-alert");
   }
 
+  // Task #75 — Nadir: reindicizzazione notturna + sonda salute ricerca (03:30 Europe/Rome).
+  try {
+    const { scheduleNadirNightly } = await import("./jobs/nadir-nightly");
+    scheduleNadirNightly();
+    console.log("[INIT] Nadir nightly reindex+health job scheduled (03:30 Europe/Rome)");
+  } catch (e) {
+    console.warn("[INIT] Nadir nightly scheduler failed (non-fatal):", e);
+    markDegraded("scheduler:nadir-nightly");
+  }
+
   try {
     const { startResourceGraphSampler } = await import("./resource-graph-sampler");
     startResourceGraphSampler();
