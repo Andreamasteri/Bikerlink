@@ -167,12 +167,38 @@ export function resolveWorkspacePath(filePath: string): { ok: true; abs: string 
 // comunque un percorso in-chat, il messaggio dell'admin viene ispezionato PRIMA
 // di comporre la domanda per l'agente: se sembra una richiesta di revisione
 // piano, la conversazione salta il normale giro di chat e chiama direttamente
-// `reviewTaskPlan`. Euristica volutamente conservativa (falsi negativi >
-// falsi positivi): se non è chiaro, si ricade sulla chat normale.
-const REVIEW_TRIGGER_RE = /\b(revisiona|rivedi|rivedere|rivisiona|controlla|review)\b/i;
+// `reviewTaskPlan`.
+//
+// Task #71 — L'euristica originale (lista chiusa di 5 verbi + parola piano + un
+// percorso file O un blocco ≥200 char) mancava quasi tutte le formulazioni
+// naturali di un admin in chat, anche quando il percorso ERA presente: la
+// richiesta cadeva in silenzio sulla chat normale. Verbi ora ampliati e due
+// aggiunte: (a) le formule idiomatiche "soft" ("dai un'occhiata", "che ne
+// pensi", "un parere"…), che però attivano la review SOLO con un bersaglio
+// esplicito (percorso o numero di task), mai col fallback ≥200 char, per non
+// scattare su chiacchiere lunghe; (b) il riferimento "task N" risolto a
+// `.local/tasks/task-N.md` (convenzione seguita da centinaia di file di piano),
+// così un admin può dire "revisiona il piano del task 57" senza incollare il
+// percorso. L'invariante resta: serve SEMPRE la parola piano/plan; senza un
+// bersaglio da revisionare (percorso, numero task o testo incollato) si ricade
+// sulla chat normale.
+
+// Verbi/nomi che esprimono INEQUIVOCABILMENTE l'intento di revisione. Abilitano
+// tutti i casi, incluso il piano incollato inline (≥200 char).
+const REVIEW_TRIGGER_RE =
+  /\b(revisiona|revisione|revisionare|rivedi|rivedere|rivisiona|rivisita|rivisitare|controlla|controllare|verifica|verificare|esamina|esaminare|valuta|valutare|analizza|analizzare|critica|criticare|commenta|commentare|review)\b/i;
+// Formule idiomatiche "soft": esprimono comunque una richiesta di parere ma sono
+// ampie, quindi attivano la review SOLO se c'è un bersaglio esplicito (percorso o
+// numero di task), MAI il fallback inline ≥200 char (evita falsi positivi su
+// messaggi lunghi che nominano "un piano" senza chiedere una revisione).
+const SOFT_INTENT_RE =
+  /(\bocchiata\b|che ne pensi|cosa ne pensi|\bun parere\b|il tuo parere|un'opinione|la tua opinione|\bun feedback\b|\bfeedback\b|\bguarda\b|\bguardare\b)/i;
 const PLAN_WORD_RE = /\b(piano|task ?plan|plan)\b/i;
 // Percorso "nudo" (non tra backtick) plausibile: almeno una directory + estensione md/txt.
 const BARE_PATH_RE = /(?:[.\w-]+\/)+[\w.-]+\.(?:md|txt)\b/;
+// Riferimento a un task per numero: "task 57", "task plan 57", "task #57",
+// "del task 57". Risolto a `.local/tasks/task-N.md`.
+const TASK_NUMBER_RE = /\btask(?:[ -]?plan)?\s*#?\s*(\d{1,6})\b/i;
 const MIN_INLINE_CONTENT_CHARS = 200;
 
 export interface DetectedPlanReviewRequest {
@@ -188,7 +214,10 @@ export interface DetectedPlanReviewRequest {
 export function detectPlanReviewRequest(message: string): DetectedPlanReviewRequest | null {
   const text = (message ?? "").trim();
   if (!text) return null;
-  if (!REVIEW_TRIGGER_RE.test(text) || !PLAN_WORD_RE.test(text)) return null;
+  if (!PLAN_WORD_RE.test(text)) return null;
+  const hasStrongIntent = REVIEW_TRIGGER_RE.test(text);
+  const hasSoftIntent = SOFT_INTENT_RE.test(text);
+  if (!hasStrongIntent && !hasSoftIntent) return null;
 
   // 1) Percorso citato tra backtick (stesso formato accettato dal tool AI SDK).
   const backticked = extractReferencedFiles(text);
@@ -198,10 +227,16 @@ export function detectPlanReviewRequest(message: string): DetectedPlanReviewRequ
   const bare = BARE_PATH_RE.exec(text);
   if (bare) return { filePath: bare[0] };
 
-  // 3) Nessun percorso: se il messaggio è sostanzioso, trattalo come il piano
-  // incollato per intero (il piano stesso di solito supera di molto la sola
-  // richiesta "revisiona questo piano: ...").
-  if (text.length >= MIN_INLINE_CONTENT_CHARS) return { content: text };
+  // 3) Riferimento "task N": risolvi al file di piano canonico. Se il file non
+  // esiste, reviewTaskPlan risponde con un errore chiaro ("File non trovato"),
+  // non un crash — meglio di un silenzioso fallback a chat.
+  const taskNum = TASK_NUMBER_RE.exec(text);
+  if (taskNum) return { filePath: `.local/tasks/task-${taskNum[1]}.md` };
+
+  // 4) Nessun bersaglio esplicito: solo con intento FORTE e un messaggio
+  // sostanzioso lo trattiamo come piano incollato per intero (le formule soft
+  // non arrivano qui, per non scattare su chiacchiere lunghe).
+  if (hasStrongIntent && text.length >= MIN_INLINE_CONTENT_CHARS) return { content: text };
 
   return null;
 }
