@@ -179,7 +179,7 @@ args = "bash scripts/check-ai-direct-generateobject.sh"
 isValidation = true
 
   [objectStorage]
-  defaultBucketID = "replit-objstore-ca2daf22-cabb-4140-a095-7b5a6f1afcde"
+defaultBucketID = "replit-objstore-eab04d75-96eb-47fa-8ab7-710ec976a6e8"
 
   [postMerge]
   path = "scripts/post-merge.sh"

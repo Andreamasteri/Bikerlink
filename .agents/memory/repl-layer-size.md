@@ -21,6 +21,8 @@ Prima di ogni deploy, il build script (scripts/deploy-build.sh) deve pulire le d
 - `.local/backups/` — dump/JSONL backup DB (~53 MB)
 - `dist/`, `dist-ota-env/` — export web/OTA Expo; il server gira da `server_dist/`, NON da `dist/`
 - `tmp_review_frames/`, `tmp_check/`, `logs/` — artefatti temporanei
+- `exports/` — bundle Git e PDF generati dall'agente (~500 MB), non serviti da Express
+- `.git/` — storia git (~3.4 GB di cui ~1.9 GB LFS objects); server non usa git a runtime; già su GitHub
 
 ## NON rimuovere (serviti a runtime via express.static)
 - `uploads/` (foto moto/ads/wishlist), `assets/`, `server/public/` (music), `server_dist/`
@@ -33,6 +35,12 @@ Prima di ogni deploy, il build script (scripts/deploy-build.sh) deve pulire le d
 - .local/state/replit/ = 504 MB (376 MB agent/ + 124 MB log-query.db)
 - Repl layer totale = ~1.7 GB → oltre il limite
 - Dopo pulizia: ~1.2 GB → OK
+
+## Dimensioni osservate (15 luglio 2026) — causa del build fallito
+- .git/ = 3.4 GB (di cui .git/lfs = 1.9 GB, .git/objects = 1.5 GB)
+- exports/ = 505 MB (checkpoint-iniziale-remix.bundle 470 MB + feature-images 35 MB)
+- Repl layer totale PRIMA: ~4.2 GB → build falliva silenziosamente a "Creating Autoscale service"
+- Repl layer stimato DOPO (nuova pulizia exports/ + .git/): ~335 MB → ampiamente OK
 
 ## NON pulire .cache/ nel deploy-build.sh
 - **Regola:** il build script NON deve rimuovere `.cache/`. La piattaforma Replit la gestisce come layer dedicato ("Pushing Repl (cache) layer" → "Created Repl (cache) layer"), separato dal Repl layer su cui vale il limite ~2 GB.
