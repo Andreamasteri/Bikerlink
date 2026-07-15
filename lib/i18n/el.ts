@@ -1143,6 +1143,7 @@ const translations: Record<string, string> = {
   "nav.no_gps": "Απαιτείται τοποθεσία",
   "nav.no_gps_msg": "Ενεργοποιήστε τη θέση GPS για να χρησιμοποιήσετε την πλοήγηση.",
   "nav.map_unavailable": "Ο χάρτης δεν είναι διαθέσιμος",
+  "nav.minimal.toggle": "Προβολή κόκκινης λωρίδας",
   "nav.arrived": "Έχετε φτάσει!",
   "nav.save_ride": "Αποθήκευση διαδρομής",
   "nav.close": "Κλείσιμο",

@@ -16,6 +16,8 @@ interface NavigationMapProps {
   remainingMin: number | null;
   topPad: number;
   formatDuration: (mins: number) => string;
+  minimalMode: boolean;
+  onToggleMinimal: () => void;
 }
 
 export function NavigationMap({
@@ -28,6 +30,8 @@ export function NavigationMap({
   remainingMin,
   topPad,
   formatDuration,
+  minimalMode,
+  onToggleMinimal,
 }: NavigationMapProps) {
   const colors = useColors();
   const t = useT();
@@ -57,6 +61,21 @@ export function NavigationMap({
       {/* Close button */}
       <Pressable style={[s.closeBtn, { top: topPad + 8 }]} onPress={handleClose} hitSlop={12}>
         <Ionicons name="close" size={20} color="#fff" />
+      </Pressable>
+
+      {/* Minimal red-stripe view toggle */}
+      <Pressable
+        style={[s.minimalBtn, { top: topPad + 8 }, minimalMode && s.minimalBtnActive]}
+        onPress={onToggleMinimal}
+        hitSlop={12}
+        accessibilityRole="button"
+        accessibilityLabel={t("nav.minimal.toggle")}
+      >
+        <MaterialCommunityIcons
+          name={minimalMode ? "map-outline" : "vector-polyline"}
+          size={20}
+          color="#fff"
+        />
       </Pressable>
 
       {/* Rerouting banner */}
@@ -99,6 +118,20 @@ const styles = () =>
       justifyContent: "center",
       alignItems: "center",
       zIndex: 10,
+    },
+    minimalBtn: {
+      position: "absolute",
+      left: 56,
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      backgroundColor: "rgba(0,0,0,0.65)",
+      justifyContent: "center",
+      alignItems: "center",
+      zIndex: 10,
+    },
+    minimalBtnActive: {
+      backgroundColor: "rgba(220,0,0,0.85)",
     },
     remainingBadge: {
       position: "absolute",

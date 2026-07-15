@@ -18,6 +18,7 @@ export default function NavigateScreen() {
     currentStep, distanceToNext, progressPct, remainingKm, remainingMin,
     isRerouting, isOffline, weatherLoading, currentWeather, aheadWeather,
     voiceCmdToast, mapUri, offline, whisper, activeStepsRef,
+    minimalMode, handleToggleMinimal,
     handleMapMessage, handleVoiceCommand, handleClose, triggerWeatherReroute,
   } = useNavigateState();
 
@@ -61,6 +62,8 @@ export default function NavigateScreen() {
         remainingMin={remainingMin}
         topPad={topPad}
         formatDuration={formatDuration}
+        minimalMode={minimalMode}
+        onToggleMinimal={handleToggleMinimal}
       />
 
       {/* Progress bar */}

@@ -1144,6 +1144,7 @@ const translations: Record<string, string> = {
   "nav.no_gps": "Konum gerekli",
   "nav.no_gps_msg": "Navigasyonu kullanmak için GPS konumunu etkinleştirin.",
   "nav.map_unavailable": "Harita mevcut değil",
+  "nav.minimal.toggle": "Kırmızı şerit görünümü",
   "nav.arrived": "Ulaştınız!",
   "nav.save_ride": "Sürüşü kaydet",
   "nav.close": "Kapat",

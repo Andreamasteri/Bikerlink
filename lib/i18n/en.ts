@@ -1209,6 +1209,7 @@ const translations: Record<string, string> = {
   "nav.no_gps": "Location required",
   "nav.no_gps_msg": "Enable GPS location to use navigation.",
   "nav.map_unavailable": "Map not available",
+  "nav.minimal.toggle": "Red-stripe view",
   "nav.arrived": "You have arrived!",
   "nav.save_ride": "Save the ride",
   "nav.close": "Close",

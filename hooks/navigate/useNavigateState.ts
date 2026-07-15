@@ -560,11 +560,23 @@ export function useNavigateState() {
     }
   }, [polylinePoints, route, mapReady, isFinished, locale, t, setCurrentStep, setDistanceToNext, setIsFinished, setProgressPct, setRemainingKm, setRemainingMin]);
 
+  const [minimalMode, setMinimalMode] = useState(false);
+  const minimalManualRef = useRef(false);
+
+  const handleToggleMinimal = useCallback(() => {
+    const next = !minimalManualRef.current;
+    minimalManualRef.current = next;
+    webViewRef.current?.injectJavaScript(
+      `window.navBridge && window.navBridge.setManualMinimal(${next}); true;`
+    );
+  }, []);
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- WebView message event
   const handleMapMessage = useCallback((event: any) => {
     try {
       const data = JSON.parse(event.nativeEvent.data);
       if (data.type === "mapReady") setMapReady(true);
+      else if (data.type === "viewMode") setMinimalMode(!!data.minimal);
     } catch {
       // no-op
     }
@@ -604,6 +616,7 @@ export function useNavigateState() {
     hasPermission, isRerouting, isOffline,
     weatherLoading, currentWeather, aheadWeather, voiceCmdToast,
     mapUri, offline, whisper, activeStepsRef,
+    minimalMode, handleToggleMinimal,
     handleMapMessage, handleVoiceCommand, handleClose, triggerWeatherReroute,
   };
 }

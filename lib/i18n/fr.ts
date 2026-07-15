@@ -1153,6 +1153,7 @@ const translations: Record<string, string> = {
   "nav.no_gps": "Position requise",
   "nav.no_gps_msg": "Activez la localisation GPS pour utiliser la navigation.",
   "nav.map_unavailable": "Carte non disponible",
+  "nav.minimal.toggle": "Vue à bande rouge",
   "nav.arrived": "Vous êtes arrivé !",
   "nav.save_ride": "Sauvegarder le trajet",
   "nav.close": "Fermer",
