@@ -54,6 +54,7 @@ interface JobEntry {
 interface JobsResponse {
   killSwitch: boolean;
   quebrachoReachable: boolean;
+  horusReachable: boolean;
   jobs: JobEntry[];
 }
 
@@ -113,6 +114,17 @@ export default function CoordinatorJobsScreen() {
         />
         <Text style={styles.statusText}>
           Quebracho {data?.quebrachoReachable ? "raggiungibile" : "non raggiungibile — pause automatiche ignorate (fallback)"}
+        </Text>
+      </View>
+
+      <View style={[styles.statusBanner, { borderColor: data?.horusReachable ? "#22C55E" : Colors.error }]} testID="coordinator-horus-status-banner">
+        <MaterialCommunityIcons
+          name={data?.horusReachable ? "check-circle-outline" : "alert-circle-outline"}
+          size={20}
+          color={data?.horusReachable ? "#22C55E" : Colors.error}
+        />
+        <Text style={styles.statusText}>
+          Horus {data?.horusReachable ? "raggiungibile" : "non raggiungibile — pause automatiche ignorate (fallback)"}
         </Text>
       </View>
 

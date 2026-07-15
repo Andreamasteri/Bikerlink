@@ -12,6 +12,7 @@ import {
   isCoordinatorKillSwitchActive,
   setCoordinatorKillSwitch,
   isQuebrachoUnreachable,
+  isHorusUnreachable,
   applyJobDirective,
 } from "../../ai/coordinator/job-gate";
 
@@ -19,13 +20,15 @@ const router = Router();
 
 router.get("/coordinator/jobs", async (_req: Request, res: Response) => {
   try {
-    const [killSwitch, quebrachoDown] = await Promise.all([
+    const [killSwitch, quebrachoDown, horusDown] = await Promise.all([
       isCoordinatorKillSwitchActive(),
       isQuebrachoUnreachable(),
+      isHorusUnreachable(),
     ]);
     res.json({
       killSwitch,
       quebrachoReachable: !quebrachoDown,
+      horusReachable: !horusDown,
       summary: getCoordinatorHealthSummary(),
       jobs: getCoordinatorJobsSnapshot(),
     });
