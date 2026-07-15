@@ -135,6 +135,63 @@ export async function dispatchAlerts(snap: HealthSnapshot): Promise<{ sent: numb
     }
   }
 
+  // Sovraccarico DB sostenuto (Task #72) — segnale "high" emesso dall'overload-collector
+  // quando il DB resta sovraccarico (pool saturo / ping alto / errori) per una
+  // finestra sostenuta. Severity "high" (non critical) → NON catturato dal loop
+  // critical-only sotto: serve un blocco dedicato perché la push parta. Rispetta
+  // il throttle shouldSend (una push ogni 10 min) per non spammare.
+  const dbOverloadProblem = snap.problems.find(
+    (p) => p.id === "db.db.overload_sustained" && p.severity === "high",
+  );
+  if (dbOverloadProblem) {
+    await emitWatchdogAlert({ problem: dbOverloadProblem, score: snap.score, status: snap.status });
+    if (shouldSend("db.overload_sustained")) {
+      let detail: { consecutiveTicks?: number; reasons?: string[] } = {};
+      try { detail = JSON.parse(dbOverloadProblem.detail ?? "{}"); } catch { /* use defaults */ }
+      const ticks = detail.consecutiveTicks ?? "?";
+      const reasons = detail.reasons?.length ? detail.reasons.join(", ") : "pool/ping/errori DB";
+      const n = await sendSystemAlertPushToAdmins(
+        `🗄️ Database sovraccarico da ${ticks} cicli`,
+        dbOverloadProblem.suggestion ?? `Il database è sovraccarico in modo sostenuto (${reasons}). Verifica query lente/lock e la concorrenza dei job interni.`,
+        { type: "watchdog_db_overload", consecutiveTicks: detail.consecutiveTicks ?? null, score: snap.score },
+      );
+      sentCount += n;
+      await writeWatchdogLog({
+        kind: "alert", scope: "db.overload_sustained", status: "ok",
+        summary: `Alert DB sovraccarico sostenuto inviato a ${n} admin`,
+        details: { sent: n, consecutiveTicks: detail.consecutiveTicks, reasons: detail.reasons },
+      });
+    }
+  }
+
+  // Sovraccarico backend Node sostenuto (Task #72) — segnale "high" emesso
+  // dall'overload-collector quando il server Node resta sovraccarico (event-loop
+  // lag / CPU) per una finestra sostenuta, INDIPENDENTEMENTE dal DB. Blocco
+  // dedicato per la stessa ragione: severity "high" non passa dal loop critical.
+  const backendOverloadProblem = snap.problems.find(
+    (p) => p.id === "app.backend.overload_sustained" && p.severity === "high",
+  );
+  if (backendOverloadProblem) {
+    await emitWatchdogAlert({ problem: backendOverloadProblem, score: snap.score, status: snap.status });
+    if (shouldSend("backend.overload_sustained")) {
+      let detail: { consecutiveTicks?: number; reasons?: string[] } = {};
+      try { detail = JSON.parse(backendOverloadProblem.detail ?? "{}"); } catch { /* use defaults */ }
+      const ticks = detail.consecutiveTicks ?? "?";
+      const reasons = detail.reasons?.length ? detail.reasons.join(", ") : "event-loop lag / CPU";
+      const n = await sendSystemAlertPushToAdmins(
+        `⚙️ Backend sovraccarico da ${ticks} cicli`,
+        backendOverloadProblem.suggestion ?? `Il server Node è sovraccarico in modo sostenuto (${reasons}), indipendentemente dal DB. Verifica loop bloccanti o lavoro sincrono pesante.`,
+        { type: "watchdog_backend_overload", consecutiveTicks: detail.consecutiveTicks ?? null, score: snap.score },
+      );
+      sentCount += n;
+      await writeWatchdogLog({
+        kind: "alert", scope: "backend.overload_sustained", status: "ok",
+        summary: `Alert backend sovraccarico sostenuto inviato a ${n} admin`,
+        details: { sent: n, consecutiveTicks: detail.consecutiveTicks, reasons: detail.reasons },
+      });
+    }
+  }
+
   // Problem-level (critical singoli — pool exhaustion e network_instability già gestite sopra)
   for (const p of snap.problems) {
     if (p.severity !== "critical") continue;

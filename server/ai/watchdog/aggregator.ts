@@ -312,6 +312,16 @@ export function deriveProblems(signals: Signal[]): Problem[] {
     } else if (s.metric === "db.pool.collector.error") {
       title = `Errore probe pool DB`;
       suggestion = "Verifica che pool sia correttamente inizializzato e accessibile dal collector.";
+    } else if (s.metric === "db.overload_sustained") {
+      const det = s.details as { reasons?: string[]; poolActivePct?: number; pingMs?: number | null } | undefined;
+      const reasons = det?.reasons?.length ? det.reasons.join(", ") : "pool/ping/errori DB";
+      title = `Database sovraccarico da ${s.value} cicli consecutivi (${reasons})`;
+      suggestion = "Il database è sovraccarico in modo sostenuto (pool saturo, ping alto o errori). Verifica query lente/lock (pg_stat_activity), la concorrenza dei job interni e valuta di ridurre il carico o aumentare pool.max.";
+    } else if (s.metric === "backend.overload_sustained") {
+      const det = s.details as { reasons?: string[]; cpuPct?: number; eventLoopLagMs?: number } | undefined;
+      const reasons = det?.reasons?.length ? det.reasons.join(", ") : "event-loop lag / CPU";
+      title = `Backend Node sovraccarico da ${s.value} cicli consecutivi (${reasons})`;
+      suggestion = "Il server Node è sovraccarico in modo sostenuto (event-loop lag alto o CPU satura) INDIPENDENTEMENTE dal DB: le richieste rallentano anche col database sano. Verifica loop bloccanti, lavoro sincrono pesante o chiamate esterne lente sul thread principale.";
     } else if (s.metric === "ads_orphan_images_high_count") {
       const det = s.details as { orphans?: number; threshold?: number; runAt?: string } | undefined;
       title = `Immagini pubblicitarie orfane: ${s.value} file trovati (soglia: ${det?.threshold ?? 10})`;
@@ -385,6 +395,11 @@ const OUTAGE_DOWNSTREAM_IDS = new Set<string>([
   "db.db.bg_limiter.dropped",
   "maps.health.network_instability",
   "db.db.ping_ms",
+  // Task #72 — sovraccarico sostenuto: con il ThinkCentre spento pool/ping/errori
+  // DB e l'event-loop ingolfato dalle chiamate lente verso i self-hosted sono
+  // conseguenze attese dell'outage → downstream, push soppressa.
+  "db.db.overload_sustained",
+  "app.backend.overload_sustained",
   // Task #23 — sonde di correttezza routing self-hosted (namespace Horus): con il
   // ThinkCentre spento i motori risultano scorretti/irraggiungibili → downstream.
   "horus.routing.graphhopper.correct",
