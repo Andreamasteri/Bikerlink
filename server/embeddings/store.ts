@@ -9,7 +9,14 @@ import {
   getLastUsedModelTag,
   EMBEDDING_DIMENSIONS,
 } from "./client";
-import { storage } from "../storage";
+// NOTE: `storage` (the aggregate singleton from ../storage/index) is imported
+// lazily inside the two async helpers below. Importing it eagerly here creates a
+// source-level circular dependency: the storage inheritance chain
+// (users.ts / tags.ts) → ../embeddings/music-text → ./store → ../storage/index →
+// the full DatabaseStorage chain → contest.ts `extends MapStorage`, which
+// evaluates before map.ts finishes defining MapStorage ("Class extends
+// undefined"). A dynamic import defers that edge until first call, breaking the
+// cycle so any storage class (e.g. MapStorage) can be imported in isolation.
 
 const EF_SEARCH_DEFAULT = 64;
 const EF_SEARCH_MIN = 1;
@@ -264,6 +271,7 @@ export async function rebuildHnswIndex(
  */
 async function getEfSearch(): Promise<number> {
   try {
+    const { storage } = await import("../storage");
     const setting = await storage.getAppSetting("embedding_ef_search");
     if (!setting?.value) return EF_SEARCH_DEFAULT;
     const n = parseInt(setting.value, 10);
@@ -300,6 +308,7 @@ function _resetCounterIfNewDay(): void {
 async function getDailyCap(): Promise<number> {
   if (_cachedCap !== null && Date.now() < _capCacheExpiry) return _cachedCap;
   try {
+    const { storage } = await import("../storage");
     const setting = await storage.getAppSetting("embedding_daily_cap");
     const n = setting?.value ? parseInt(setting.value, 10) : NaN;
     _cachedCap = Number.isFinite(n) && n > 0 ? n : DEFAULT_DAILY_CAP;
