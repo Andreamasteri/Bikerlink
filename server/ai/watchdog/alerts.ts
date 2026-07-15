@@ -12,6 +12,16 @@ const mapsLog = logger.child({ scope: "maps-watchdog", layer: "alerts" });
 const ALERT_TTL_MS = 10 * 60 * 1000;
 const sent = new Map<string, number>();
 
+// Task #96 — Latch: uno START alert di sovraccarico è stato REALMENTE emesso agli
+// admin (segnale severity "high", NON declassato a "warn" dalla soppressione
+// downstream quando il ThinkCentre è spento). La push di RIENTRO ("all-clear")
+// legge i metrics grezzi dello snapshot e bypasserebbe quella soppressione: senza
+// questo gate un admin potrebbe ricevere un "✅ rientrato" per un overload di cui
+// non è mai stato avvisato (start soppresso durante un outage del ThinkCentre).
+// Il latch viene consumato (riportato a false) quando la push di rientro parte.
+let dbOverloadAlertSent = false;
+let backendOverloadAlertSent = false;
+
 interface AdminWsBroadcast { (msg: { type: string; payload: unknown }): void }
 let wsBroadcast: AdminWsBroadcast | null = null;
 export function registerAdminWsBroadcast(fn: AdminWsBroadcast): void { wsBroadcast = fn; }
@@ -144,6 +154,10 @@ export async function dispatchAlerts(snap: HealthSnapshot): Promise<{ sent: numb
     (p) => p.id === "db.db.overload_sustained" && p.severity === "high",
   );
   if (dbOverloadProblem) {
+    // Task #96 — arma il latch: uno start alert reale (high, non soppresso) è
+    // presente. Impostato qui (non dentro shouldSend) così resta armato anche
+    // quando la push è throttled ma l'overload è comunque in corso.
+    dbOverloadAlertSent = true;
     await emitWatchdogAlert({ problem: dbOverloadProblem, score: snap.score, status: snap.status });
     if (shouldSend("db.overload_sustained")) {
       let detail: { consecutiveTicks?: number; reasons?: string[] } = {};
@@ -172,6 +186,8 @@ export async function dispatchAlerts(snap: HealthSnapshot): Promise<{ sent: numb
     (p) => p.id === "app.backend.overload_sustained" && p.severity === "high",
   );
   if (backendOverloadProblem) {
+    // Task #96 — arma il latch backend (stessa logica del blocco DB).
+    backendOverloadAlertSent = true;
     await emitWatchdogAlert({ problem: backendOverloadProblem, score: snap.score, status: snap.status });
     if (shouldSend("backend.overload_sustained")) {
       let detail: { consecutiveTicks?: number; reasons?: string[] } = {};
@@ -199,7 +215,16 @@ export async function dispatchAlerts(snap: HealthSnapshot): Promise<{ sent: numb
   // dello snapshot per chiudere il cerchio con UNA push "rientrato". Throttle
   // dedicato (chiave distinta dalla start) per non lampeggiare su overload che
   // vanno e vengono.
-  if (snap.metrics["db.db.overload_recovered"] != null && shouldSend("db.overload_recovered")) {
+  // Task #96 — gate: la push di rientro parte SOLO se lo start alert era stato
+  // realmente emesso (dbOverloadAlertSent). Se lo start era soppresso dal
+  // ThinkCentre spento (declassato a "warn"), il latch non è mai stato armato e
+  // l'admin non riceve un "all-clear" per un allarme mai partito.
+  if (
+    snap.metrics["db.db.overload_recovered"] != null &&
+    dbOverloadAlertSent &&
+    shouldSend("db.overload_recovered")
+  ) {
+    dbOverloadAlertSent = false; // consuma il latch: un prossimo rientro richiede un nuovo start reale
     const n = await sendSystemAlertPushToAdmins(
       `✅ Database rientrato — sovraccarico risolto`,
       "Il database è tornato in condizioni normali dopo un periodo di sovraccarico sostenuto (pool/ping/errori). Nessun intervento ulteriore necessario.",
@@ -216,7 +241,13 @@ export async function dispatchAlerts(snap: HealthSnapshot): Promise<{ sent: numb
   // Rientro dal sovraccarico backend Node sostenuto (Task #84) — stessa logica del
   // blocco DB ma per il segnale info app.backend.overload_recovered, così l'"all
   // clear" distingue backend da DB (chiave throttle e payload separati).
-  if (snap.metrics["app.backend.overload_recovered"] != null && shouldSend("backend.overload_recovered")) {
+  // Task #96 — stesso gate del blocco DB, per il latch backend.
+  if (
+    snap.metrics["app.backend.overload_recovered"] != null &&
+    backendOverloadAlertSent &&
+    shouldSend("backend.overload_recovered")
+  ) {
+    backendOverloadAlertSent = false; // consuma il latch backend
     const n = await sendSystemAlertPushToAdmins(
       `✅ Backend rientrato — sovraccarico risolto`,
       "Il server Node è tornato in condizioni normali dopo un periodo di sovraccarico sostenuto (event-loop lag / CPU). Nessun intervento ulteriore necessario.",
@@ -264,4 +295,8 @@ export async function dispatchAlerts(snap: HealthSnapshot): Promise<{ sent: numb
   return { sent: sentCount };
 }
 
-export function _resetThrottleForTests(): void { sent.clear(); }
+export function _resetThrottleForTests(): void {
+  sent.clear();
+  dbOverloadAlertSent = false;
+  backendOverloadAlertSent = false;
+}

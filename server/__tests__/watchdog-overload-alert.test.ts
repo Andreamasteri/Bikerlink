@@ -128,7 +128,11 @@ describe("watchdog overload alerts (Task #72)", () => {
     return { status: "green", score: 96, problems: [], metrics, generatedAt: new Date().toISOString() };
   }
 
-  it("invia una push di rientro DB quando db.db.overload_recovered è nei metrics", async () => {
+  it("invia una push di rientro DB quando db.db.overload_recovered è nei metrics (dopo uno start reale)", async () => {
+    // Task #96 — lo start alert reale arma il latch; solo allora il rientro parte.
+    await dispatchAlerts(makeSnapshot([dbOverloadProblem]));
+    sendPushMock.mockClear();
+
     await dispatchAlerts(snapWithMetrics({ "db.db.overload_recovered": 3 }));
 
     const dbCalls = sendPushMock.mock.calls.filter(
@@ -138,7 +142,10 @@ describe("watchdog overload alerts (Task #72)", () => {
     expect(dbCalls[0][0]).toContain("Database rientrato");
   });
 
-  it("invia una push di rientro backend quando app.backend.overload_recovered è nei metrics", async () => {
+  it("invia una push di rientro backend quando app.backend.overload_recovered è nei metrics (dopo uno start reale)", async () => {
+    await dispatchAlerts(makeSnapshot([backendOverloadProblem]));
+    sendPushMock.mockClear();
+
     await dispatchAlerts(snapWithMetrics({ "app.backend.overload_recovered": 3 }));
 
     const beCalls = sendPushMock.mock.calls.filter(
@@ -149,6 +156,9 @@ describe("watchdog overload alerts (Task #72)", () => {
   });
 
   it("distingue rientro DB e backend: due push separate quando entrambi rientrano", async () => {
+    await dispatchAlerts(makeSnapshot([dbOverloadProblem, backendOverloadProblem]));
+    sendPushMock.mockClear();
+
     await dispatchAlerts(snapWithMetrics({
       "db.db.overload_recovered": 3,
       "app.backend.overload_recovered": 4,
@@ -160,17 +170,70 @@ describe("watchdog overload alerts (Task #72)", () => {
   });
 
   it("throttle: non reinvia la stessa push di rientro DB entro la finestra TTL", async () => {
+    // Primo incidente completo: start (arma latch) → rientro (push inviata, latch consumato).
+    await dispatchAlerts(makeSnapshot([dbOverloadProblem]));
     await dispatchAlerts(snapWithMetrics({ "db.db.overload_recovered": 3 }));
+    sendPushMock.mockClear();
+
+    // Secondo incidente entro la finestra: nuovo start ri-arma il latch, ma il
+    // throttle (10 min) blocca la seconda push di rientro.
+    await dispatchAlerts(makeSnapshot([dbOverloadProblem]));
+    await dispatchAlerts(snapWithMetrics({ "db.db.overload_recovered": 5 }));
+
+    const dbCalls = sendPushMock.mock.calls.filter(
+      ([, , p]) => (p as { type?: string })?.type === "watchdog_db_recovered",
+    );
+    expect(dbCalls).toHaveLength(0);
+  });
+
+  it("nessuna push di rientro quando i metrics non contengono le chiavi", async () => {
+    await dispatchAlerts(makeSnapshot([dbOverloadProblem, backendOverloadProblem]));
+    sendPushMock.mockClear();
+
+    await dispatchAlerts(snapWithMetrics({}));
+
+    const recoveryCalls = sendPushMock.mock.calls.filter(([, , p]) => {
+      const t = (p as { type?: string })?.type;
+      return t === "watchdog_db_recovered" || t === "watchdog_backend_recovered";
+    });
+    expect(recoveryCalls).toHaveLength(0);
+  });
+
+  // -------------------------------------------------------------------------
+  // Task #96 — il gate anti "all-clear fantasma": se lo start alert non è mai
+  // stato emesso agli admin (nessuno start, oppure start soppresso perché il
+  // ThinkCentre è spento → severity declassata a "warn"), NON deve partire alcuna
+  // push di rientro leggendo i metrics grezzi.
+  // -------------------------------------------------------------------------
+  it("NON invia push di rientro DB se non c'era uno start alert precedente", async () => {
     await dispatchAlerts(snapWithMetrics({ "db.db.overload_recovered": 3 }));
 
     const dbCalls = sendPushMock.mock.calls.filter(
       ([, , p]) => (p as { type?: string })?.type === "watchdog_db_recovered",
     );
-    expect(dbCalls).toHaveLength(1);
+    expect(dbCalls).toHaveLength(0);
   });
 
-  it("nessuna push di rientro quando i metrics non contengono le chiavi", async () => {
-    await dispatchAlerts(snapWithMetrics({}));
+  it("NON invia push di rientro backend se non c'era uno start alert precedente", async () => {
+    await dispatchAlerts(snapWithMetrics({ "app.backend.overload_recovered": 3 }));
+
+    const beCalls = sendPushMock.mock.calls.filter(
+      ([, , p]) => (p as { type?: string })?.type === "watchdog_backend_recovered",
+    );
+    expect(beCalls).toHaveLength(0);
+  });
+
+  it("NON invia push di rientro se lo start era soppresso (ThinkCentre spento → warn)", async () => {
+    // Start declassato a "warn" dalla soppressione downstream: latch mai armato.
+    const warnedDb: Problem = { ...dbOverloadProblem, severity: "warn" };
+    const warnedBackend: Problem = { ...backendOverloadProblem, severity: "warn" };
+    await dispatchAlerts(makeSnapshot([warnedDb, warnedBackend]));
+    sendPushMock.mockClear();
+
+    await dispatchAlerts(snapWithMetrics({
+      "db.db.overload_recovered": 3,
+      "app.backend.overload_recovered": 4,
+    }));
 
     const recoveryCalls = sendPushMock.mock.calls.filter(([, , p]) => {
       const t = (p as { type?: string })?.type;
