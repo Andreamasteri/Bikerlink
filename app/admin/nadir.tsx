@@ -38,6 +38,8 @@ interface NadirStatus {
     model: string;
     counts: { manual: number; conversation: number; comment: number };
     errors: string[];
+    openAiFallbackActive?: boolean;
+    openAiFallbackReason?: string | null;
   } | null;
   searchHealth: {
     lastCheckAt: string;
@@ -203,6 +205,13 @@ export default function NadirScreen() {
           valueColor={idx ? (idx.ok ? healthColorOk() : Colors.error) : undefined}
         />
         <Row label="Durata" value={idx ? `${idx.durationMs} ms` : "—"} />
+        {idx?.openAiFallbackActive ? (
+          <Text style={styles.errText}>
+            ⚠️ Quota OpenAI esaurita durante il run — reindicizzazione (parziale o totale) in
+            fallback locale finché la quota non si libera.
+            {idx.openAiFallbackReason ? ` (${idx.openAiFallbackReason})` : ""}
+          </Text>
+        ) : null}
         {idx?.errors && idx.errors.length > 0 ? (
           <Text style={styles.errText}>{idx.errors.join("\n")}</Text>
         ) : null}

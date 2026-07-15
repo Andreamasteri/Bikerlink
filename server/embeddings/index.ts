@@ -4,6 +4,8 @@ export {
   EMBEDDING_MODEL_ID,
   EMBEDDING_MODEL_TAG,
   EMBEDDING_DIMENSIONS,
+  isOpenAiCircuitOpen,
+  getOpenAiCircuitBreakerStatus,
 } from "./client";
 export {
   upsertEmbedding,

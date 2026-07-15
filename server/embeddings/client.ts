@@ -29,6 +29,77 @@ function hasOpenAI(): boolean {
   return Boolean(process.env.OPENAI_API_KEY);
 }
 
+// ─── Circuit breaker per quota OpenAI esaurita (Task #108) ─────────────────
+// Bug osservato: durante un reindex Nadir con quota OpenAI esaurita, OGNI
+// chunk ritentava 3x (backoff) contro OpenAI prima di ricadere sul modello
+// locale — un reindex da ~1 minuto diventava di molti minuti (40+ retry
+// "OpenAI fallita, fallback locale" consecutivi osservati in produzione).
+// Un errore di quota esaurita è PERMANENTE per la finestra corrente (non ha
+// senso ritentare né per il chunk corrente né per i successivi): la prima
+// volta che lo rileviamo, apriamo il breaker e per i prossimi
+// OPENAI_CIRCUIT_BREAKER_MS saltiamo OpenAI del tutto, andando dritti al
+// fallback locale — sia per il resto del run corrente sia per le chiamate
+// successive nello stesso processo, finché il breaker non si richiude.
+const OPENAI_CIRCUIT_BREAKER_MS = 10 * 60_000; // 10 minuti
+let _openAiCircuitOpenUntil = 0;
+let _openAiCircuitReason: string | null = null;
+
+/**
+ * Rileva un fallimento OpenAI PERMANENTE per la finestra corrente (quota
+ * esaurita/billing), da distinguere da un 429 di rate-limit transitorio (per
+ * cui vale ancora la pena ritentare con backoff) o da un 5xx momentaneo.
+ */
+function isQuotaExhaustedError(err: unknown): boolean {
+  const e = err as { statusCode?: number; status?: number; message?: string; responseBody?: string; data?: unknown };
+  const status = e?.statusCode ?? e?.status;
+  let dataText = "";
+  try {
+    dataText = JSON.stringify(e?.data ?? {});
+  } catch {
+    dataText = "";
+  }
+  const haystack = `${e?.message ?? ""} ${e?.responseBody ?? ""} ${dataText}`;
+  if (/insufficient_quota|exceeded[^a-z]*(your)?[^a-z]*current quota|billing hard limit/i.test(haystack)) {
+    return true;
+  }
+  // Un 429 il cui corpo menziona esplicitamente "quota" è quasi certamente
+  // quota esaurita (non semplice rate-limit) — trattalo come permanente.
+  if (status === 429 && /quota/i.test(haystack)) return true;
+  return false;
+}
+
+function openOpenAiCircuitBreaker(reason: string): void {
+  const alreadyOpen = isOpenAiCircuitOpen();
+  _openAiCircuitOpenUntil = Date.now() + OPENAI_CIRCUIT_BREAKER_MS;
+  _openAiCircuitReason = reason;
+  if (!alreadyOpen) {
+    console.warn(
+      `[Embeddings] OpenAI quota esaurita — apro il circuit breaker per ${OPENAI_CIRCUIT_BREAKER_MS / 60_000} min: ` +
+        `salto OpenAI e uso il fallback locale per tutte le chiamate successive (fino a riapertura). Motivo: ${reason}`,
+    );
+  }
+}
+
+/** true quando il circuit breaker è aperto: le chiamate devono saltare OpenAI. */
+export function isOpenAiCircuitOpen(): boolean {
+  return Date.now() < _openAiCircuitOpenUntil;
+}
+
+/** Stato del circuit breaker, per il pannello admin / NadirIndexStatus. */
+export function getOpenAiCircuitBreakerStatus(): { open: boolean; reason: string | null; reopenAt: string | null } {
+  return {
+    open: isOpenAiCircuitOpen(),
+    reason: _openAiCircuitReason,
+    reopenAt: _openAiCircuitOpenUntil > 0 ? new Date(_openAiCircuitOpenUntil).toISOString() : null,
+  };
+}
+
+/** Solo per i test: azzera lo stato del circuit breaker. */
+export function __resetOpenAiCircuitBreakerForTest(): void {
+  _openAiCircuitOpenUntil = 0;
+  _openAiCircuitReason = null;
+}
+
 function getModel() {
   return openai.textEmbedding(EMBEDDING_MODEL_ID);
 }
@@ -176,7 +247,7 @@ export async function generateEmbedding(text: string): Promise<number[]> {
   if (!cleaned) {
     throw new Error("generateEmbedding: testo vuoto");
   }
-  if (hasOpenAI()) {
+  if (hasOpenAI() && !isOpenAiCircuitOpen()) {
     try {
       const model = getModel();
       const result = await pRetry(
@@ -189,6 +260,10 @@ export async function generateEmbedding(text: string): Promise<number[]> {
             );
             return embedding;
           } catch (err) {
+            if (isQuotaExhaustedError(err)) {
+              openOpenAiCircuitBreaker((err as Error)?.message ?? "quota esaurita");
+              throw new AbortError(err as Error);
+            }
             if (!isRetryable(err)) throw new AbortError(err as Error);
             throw err;
           }
@@ -203,11 +278,13 @@ export async function generateEmbedding(text: string): Promise<number[]> {
         (err as Error)?.message ?? err,
       );
     }
-  } else {
+  } else if (!hasOpenAI()) {
     console.warn(
       "[Embeddings] OPENAI_API_KEY assente: uso fallback locale HF transformers.",
     );
   }
+  // (circuit breaker aperto: nessun log qui per non ripetere il warning ad ogni
+  // chunk — è già stato loggato una volta all'apertura del breaker)
   const local = await generateLocal(cleaned);
   _lastUsedModelTag = LOCAL_EMBEDDING_MODEL_TAG;
   return local;
@@ -224,7 +301,7 @@ export async function generateEmbeddings(
   if (cleaned.some((t) => !t)) {
     throw new Error("generateEmbeddings: almeno un testo è vuoto");
   }
-  if (hasOpenAI()) {
+  if (hasOpenAI() && !isOpenAiCircuitOpen()) {
     try {
       const model = getModel();
       const result = await pRetry(
@@ -237,6 +314,10 @@ export async function generateEmbeddings(
             );
             return embeddings;
           } catch (err) {
+            if (isQuotaExhaustedError(err)) {
+              openOpenAiCircuitBreaker((err as Error)?.message ?? "quota esaurita");
+              throw new AbortError(err as Error);
+            }
             if (!isRetryable(err)) throw new AbortError(err as Error);
             throw err;
           }
@@ -251,7 +332,7 @@ export async function generateEmbeddings(
         (err as Error)?.message ?? err,
       );
     }
-  } else {
+  } else if (!hasOpenAI()) {
     console.warn(
       "[Embeddings] OPENAI_API_KEY assente: uso fallback locale HF transformers (batch).",
     );

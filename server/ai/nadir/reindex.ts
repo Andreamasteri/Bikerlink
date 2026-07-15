@@ -15,7 +15,7 @@ import { desc, and, eq, notInArray } from "drizzle-orm";
 import { db, withDbRetry } from "../../db";
 import { storage } from "../../storage";
 import { aiConversationTurns, roadHazardComments, embeddings } from "@shared/db";
-import { upsertEmbedding } from "../../embeddings";
+import { upsertEmbedding, getOpenAiCircuitBreakerStatus } from "../../embeddings";
 import { getLastUsedModelTag } from "../../embeddings/client";
 import { redactPII } from "../moderation/redact";
 import { writeWatchdogLog } from "../watchdog/log";
@@ -47,6 +47,16 @@ export interface NadirIndexStatus {
   model: string;
   counts: { manual: number; conversation: number; comment: number };
   errors: string[];
+  /**
+   * Task #108 — true quando questo run ha girato (in tutto o in parte) in
+   * modalità "solo fallback locale" perché il circuit breaker OpenAI era
+   * aperto (quota esaurita rilevata durante il run). Il modello locale resta
+   * comunque valido per la ricerca — questo è solo un segnale di visibilità
+   * admin (la qualità degli embedding OpenAI non è disponibile finché la
+   * quota non si libera).
+   */
+  openAiFallbackActive: boolean;
+  openAiFallbackReason: string | null;
 }
 
 export interface NadirSearchHealth {
@@ -246,6 +256,13 @@ export async function reindexNadir(trigger: "nightly" | "manual"): Promise<Nadir
 
   await storage.upsertAppSetting(NADIR_FRAGMENTS_KEY, undefined, newManifest);
 
+  // Task #108 — visibilità admin: se il circuit breaker OpenAI si è aperto
+  // durante QUESTO run (quota esaurita rilevata su uno dei chunk), il resto
+  // del run è girato in fallback locale invece di ritentare OpenAI 3x per
+  // ogni chunk successivo. Segnaliamolo esplicitamente nello stato persistito
+  // e in log/push admin, invece di lasciarlo visibile solo come 40+ righe di
+  // warning "OpenAI fallita, fallback locale" nei log grezzi.
+  const breaker = getOpenAiCircuitBreakerStatus();
   const status: NadirIndexStatus = {
     lastRunAt: new Date().toISOString(),
     trigger,
@@ -254,13 +271,27 @@ export async function reindexNadir(trigger: "nightly" | "manual"): Promise<Nadir
     model: getLastUsedModelTag(),
     counts,
     errors,
+    openAiFallbackActive: breaker.open,
+    openAiFallbackReason: breaker.open ? breaker.reason : null,
   };
   await storage.upsertAppSetting(NADIR_INDEX_STATUS_KEY, undefined, status);
   console.log(
     `${NADIR_LOG_PREFIX} reindicizzazione completata — manual=${counts.manual} ` +
       `conversation=${counts.conversation} comment=${counts.comment} ` +
-      `ok=${status.ok} durata=${status.durationMs}ms modello=${status.model}`,
+      `ok=${status.ok} durata=${status.durationMs}ms modello=${status.model}` +
+      (status.openAiFallbackActive ? ` [OPENAI FALLBACK LOCALE ATTIVO: ${status.openAiFallbackReason}]` : ""),
   );
+
+  if (status.openAiFallbackActive) {
+    await writeWatchdogLog({
+      kind: "alert",
+      scope: "nadir.reindex",
+      status: "warn",
+      summary: `${NADIR_LOG_PREFIX} reindex (trigger=${trigger}) girato in fallback locale — quota OpenAI esaurita: ${status.openAiFallbackReason}`,
+      details: { trigger, reason: status.openAiFallbackReason, reopenAt: breaker.reopenAt, counts },
+    }).catch(() => {});
+  }
+
   return status;
 }
 

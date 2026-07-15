@@ -29,7 +29,7 @@ import { desc, sql } from "drizzle-orm";
 import { db } from "../../db";
 import { aiAnalysisRuns, aiAnalysisArtifacts } from "@shared/db";
 import { withBgDbSlot } from "../../lib/bg-db-limiter";
-import { callOllamaChat, isOllamaConfigured, isOllamaReachable, getOllamaModelId } from "../../lib/ollama-client";
+import { callOllamaChat, isOllamaConfigured, isOllamaReachable } from "../../lib/ollama-client";
 import { onlineTracker } from "../../online-tracker";
 import { redactPII } from "../moderation/redact";
 import { matchesSensitive } from "./security-filter";
@@ -37,6 +37,13 @@ import { getLatestRunSummary, listOpenViolations } from "../db-integrity/runner"
 import { getLatestSnapshot } from "../watchdog/aggregator.part2";
 import { isRoutingAiBusy } from "../ai-priority-gate";
 import type { KnowledgeEntry } from "./knowledge";
+
+// Task #108 — stesso fix già applicato a horus-scanner.ts/horus-scanner-finalize.ts
+// (Task #92): `persona: "horus"` in callOllamaChat sceglie SOLO l'endpoint
+// (URL/token), NON il modello — senza `model` esplicito la chiamata ricade
+// silenziosamente su BOWIE_OLLAMA_MODEL (qwen3:1.7b) invece di qwen3:4b, e il
+// modelId persistito mentirebbe su quale modello ha davvero generato il report.
+const HORUS_MODEL_ID = process.env.HORUS_OLLAMA_MODEL?.trim() || "qwen3:4b";
 
 // ── Parametri di robustezza ──────────────────────────────────────────────────
 const FIRST_RUN_DELAY_MS = 6 * 60_000; // parte 6 min dopo READY (dopo auto-learn)
@@ -134,6 +141,7 @@ ${source.watchdogSummaryText}
 REPORT:`;
   return callOllamaChat(prompt, undefined, {
     persona: "horus",
+    model: HORUS_MODEL_ID,
     temperature: 0.2,
     numPredict: ANSWER_NUM_PREDICT,
   });
@@ -249,7 +257,10 @@ export async function runCycle(trigger: "schedule" | "manual" = "schedule"): Pro
       return { ran: false, reason: "fingerprint invariato" };
     }
 
-    const modelId = getOllamaModelId("horus");
+    // getOllamaModelId ignora la persona e ritorna sempre BOWIE_OLLAMA_MODEL: qui
+    // registriamo il modello REALE che ha prodotto il report (Horus/qwen3:4b),
+    // stesso pattern di horus-scanner-finalize.ts.
+    const modelId = HORUS_MODEL_ID;
     const raw = await generateReport(source);
     const report = sanitizeArtifact(raw ?? "");
     if (!report) {
