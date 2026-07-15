@@ -78,6 +78,8 @@ export function buildResetTrackingState(deps: Pick<TrackingHandlerDeps, "gps" | 
     gps.gpsFixAcquiredRef.current = false; gps.fusionModeRef.current = "acquiring"; gps.lastAccuracyRef.current = null;
     gps.lastGpsEventMsRef.current = 0; gps.lastUsableFixMsRef.current = 0;
     gps.drSpeedKmhRef.current = 0; gps.drGapKmRef.current = 0; gps.divergenceCountRef.current = 0;
+    gps.drRecoveryPendingRef.current = null;
+    refs.drCorrectionRef.current = { distanceScale: 1, speedScale: 1, speedBiasKmh: 0, headingBiasDeg: 0 };
     stats.setTotalMs(0); stats.setDisplayIdleMs(0); stats.setPointsBuffered(0); stats.setPointsSent(0); stats.setAvgSpeedDisplayKmh(0);
     sensors.setCurrentG(0); sensors.setCurrentLateralG(0); sensors.setCurrentTiltDeg(0); sensors.setMaxAccelG(0); sensors.setMaxDecelG(0); sensors.setMaxLateralG(0); sensors.setMaxTiltDeg(0); sensors.setShowSensorOverlay(false);
     sprint.setSprintPhase("waiting"); sprint.setSprint0to100Ms(null); sprint.setIsNewRecord(false); sprint.recordAnim.setValue(0);
@@ -224,6 +226,22 @@ export function useTrackingHandlers(deps: TrackingHandlerDeps) {
       if (!res?.id) throw new Error("Server did not return a valid route id");
       resetTrackingState(); refs.routeIdRef.current = res.id;
       console.log("[handleStart] routeId set:", res.id);
+      // Task #47 — load this user's effective DR correction model for the session
+      // and apply it to live dead-reckoning. Fire-and-forget: identity stays if it fails.
+      apiRequest("GET", "/api/telemetry/dr-correction")
+        .then((r) => r.json())
+        .then((d: { model?: { distanceScale?: number; speedScale?: number; speedBiasKmh?: number; headingBiasDeg?: number } }) => {
+          const m = d?.model;
+          if (m) {
+            refs.drCorrectionRef.current = {
+              distanceScale: typeof m.distanceScale === "number" ? m.distanceScale : 1,
+              speedScale: typeof m.speedScale === "number" ? m.speedScale : 1,
+              speedBiasKmh: typeof m.speedBiasKmh === "number" ? m.speedBiasKmh : 0,
+              headingBiasDeg: typeof m.headingBiasDeg === "number" ? m.headingBiasDeg : 0,
+            };
+          }
+        })
+        .catch(() => {});
       if (settings.countdownEnabled) {
         session.setPhase("countdown"); session.setCountdownValue(parseInt(settings.countdownSec || "10", 10)); session.setLoading(false);
         refs.countdownTickRef.current = setInterval(() => session.setCountdownValue((v: number) => {

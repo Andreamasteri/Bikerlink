@@ -26,6 +26,16 @@ export function useTrackingRefs() {
   // unchanged. Reset to null whenever GPS is fresh again.
   const drEstPosRef = useRef<{ lat: number; lon: number } | null>(null);
 
+  // Task #47 — DR correction engine: the effective correction model fetched from
+  // the server at session start and applied to the live dead-reckoning distance
+  // step. Defaults to identity (no change) until a learned model arrives.
+  const drCorrectionRef = useRef<{
+    distanceScale: number;
+    speedScale: number;
+    speedBiasKmh: number;
+    headingBiasDeg: number;
+  }>({ distanceScale: 1, speedScale: 1, speedBiasKmh: 0, headingBiasDeg: 0 });
+
   const pointsBufferRef = useRef<GpsPoint[]>([]);
   const telemetryAccumRef = useRef<Array<{
     timestamp: string;
@@ -52,6 +62,7 @@ export function useTrackingRefs() {
     lastFusionTickRef,
     headingRef,
     drEstPosRef,
+    drCorrectionRef,
     pointsBufferRef,
     telemetryAccumRef,
   };

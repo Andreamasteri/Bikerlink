@@ -18,6 +18,7 @@ export * from "./motoclubs";
 export * from "./music";
 export * from "./events";
 export * from "./gps";
+export * from "./dr-correction";
 export * from "./road-hazards";
 export * from "./ota";
 export * from "./tags";

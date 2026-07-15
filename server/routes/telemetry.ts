@@ -10,6 +10,7 @@ import { getInternalProbeToken, getInternalProbeHeaderName, isLoopback } from ".
 import idealLapsRouter from "./telemetry-ideal-laps";
 import calibrationRouter from "./telemetry-calibration";
 import { updateTelemetrySessionStats } from "../lib/telemetry-session-stats";
+import drCorrectionRouter from "./telemetry-dr-correction";
 
 const router = Router();
 
@@ -304,5 +305,6 @@ router.get("/stats", async (req: Request, res: Response) => {
 
 router.use(idealLapsRouter);
 router.use(calibrationRouter);
+router.use(drCorrectionRouter);
 
 export default router;

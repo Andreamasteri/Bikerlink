@@ -11,6 +11,7 @@ import { runBioAffinityMatching } from "./run-bio-affinity";
 import { runTelemetryAffinityMatching } from "./run-telemetry-affinity";
 import { enrichBikerMatchBreakdowns } from "./enrich-breakdowns";
 import { aggregateTelemetryProfiles } from "../jobs/aggregate-telemetry-profiles";
+import { recomputeDrCorrectionGlobal } from "../jobs/dr-correction-global";
 import { runCleanup, pruneStaleProposalProfileMatches, pruneOldZoneNotifications, stopFakeZavorrineRotation, lastUserMatchingAt, withCycleTimeout, getMatchingCycleTimeoutMs, CycleTimeoutError } from "./scheduler.helpers";
 import { recomputeAllUserMatchProfiles } from "./recompute-profiles";
 import { addMatchLog } from "./match-log-buffer";
@@ -300,6 +301,23 @@ export function startMatchingEngine(): void {
   bootJobQueue.register("TelemetryAffinityMatching", gatedTelemetryAffinity);
   _engineTimers.push(setInterval(() => { void gatedTelemetryAffinity(); }, 24 * 60 * 60 * 1000));
   console.log("[Matching] TelemetryAffinity matcher schedulato (24h)");
+
+  // DR Correction Engine — global cross-user aggregate (Task #47). Per-user models
+  // update in real time on ingestion; only the global aggregate is a periodic job.
+  const gatedDrCorrectionGlobal = withJobGate("dr-correction-global", async () => {
+    try {
+      await recomputeDrCorrectionGlobal();
+    } catch (err) {
+      if (isBgDbLimiterDropError(err)) {
+        console.warn("[DrCorrectionGlobal] posticipato — bg-db-limiter attivo, riparte al prossimo tick");
+      } else {
+        console.error("[DrCorrectionGlobal] ciclo errore:", err);
+      }
+    }
+  });
+  bootJobQueue.register("DrCorrectionGlobal", gatedDrCorrectionGlobal);
+  _engineTimers.push(setInterval(() => { void gatedDrCorrectionGlobal(); }, 6 * 60 * 60 * 1000));
+  console.log("[Matching] DR correction global aggregate schedulato (6h)");
 }
 
 export function stopMatchingEngine(): void {

@@ -7,6 +7,15 @@ import { apiRequest } from "@/lib/query-client";
 import { markAsyncError } from "@/lib/crash-logger";
 import { emitMapsTelemetry } from "@/hooks/useMapTelemetry";
 import { evaluateSegment, TRACKING_FUSION } from "@shared/tracking-fusion";
+import {
+  haversineMeters,
+  bearingDeg,
+  angleDiffDeg,
+  RECOVERY_FIXES_REQUIRED,
+  RECOVERY_COHERENCE_MAX_KMH,
+  type DrDeviationSample,
+} from "@shared/dr-correction";
+import { reportDrDeviation } from "@/lib/dr-deviation-uploader";
 import { setHandsOffBroadcast, setSprintMeasuringBroadcast } from "@/lib/tracking-active";
 import { logGpsError } from "@/lib/gps-logger";
 import type { GpsPoint } from "@/components/tracking/useGpsTracking";
@@ -89,19 +98,92 @@ export function useOnNativeLocation(deps: Omit<EffectDeps, "onNativeLocation" | 
     // A raw callback (any quality) keeps the blackout heartbeat alive. Only a
     // quality fix marks GPS as "fresh" for fusion and is allowed to anchor distance.
     gps.lastGpsEventMsRef.current = now;
+    // Are we mid-recovery from a blackout (frozen anchor + accumulated DR gap) and
+    // NOT yet confirmed? While pending we deliberately keep GPS "stale" for fusion.
+    const inUnconfirmedRecovery = !!gps.lastPosRef.current && gps.drGapKmRef.current > 0;
     if (fixUsable) {
-      gps.lastUsableFixMsRef.current = now;
       if (!gps.gpsFixAcquiredRef.current) { gps.gpsFixAcquiredRef.current = true; gps.setGpsFixAcquired(true); }
+      // Defer the fusion-freshness marker until recovery is CONFIRMED (Task #47). If
+      // we marked GPS fresh on the FIRST recovery fix, the fusion loop would leave
+      // sensors_only and stop dead-reckoning accumulation, while the GPS segment path
+      // is still bypassed (drGapKm>0) until confirmation — a multi-fix window of
+      // movement counted by NEITHER path (systematic undercount). Keeping it stale
+      // keeps DR accumulating continuously; we set it at confirmation below.
+      if (!inUnconfirmedRecovery) gps.lastUsableFixMsRef.current = now;
     }
     if (gps.lastPosRef.current) {
       if (gps.drGapKmRef.current > 0) {
-        // Dead reckoning covered the GPS blackout. Only a QUALITY fix is trusted to
-        // reseed the anchor + clear the gap (without adding the bridging segment, so
-        // the gap isn't double-counted). A poor recovery fix keeps us in DR.
+        // Dead reckoning covered the GPS blackout. The first recovery fix is often
+        // noisy (tunnel exit / multipath), so we do NOT trust it immediately:
+        // instead we wait for RECOVERY_FIXES_REQUIRED coherent consecutive usable
+        // fixes (Task #47). Crucially, distance accumulation stays CONTINUOUS during
+        // this wait: GPS freshness is deferred (see above) so fusion remains in
+        // sensors_only and DR keeps adding to totalKm + drGapKm every tick. We only
+        // withhold the GPS *segment* (anchor→recovery bridging) so nothing is
+        // double-counted. The frozen anchor + the accumulating gap are read FRESH at
+        // confirmation below, not snapshotted at the first fix (which would understate
+        // the gap by the DR distance travelled during the recovery wait).
         if (fixUsable) {
-          gps.drGapKmRef.current = 0;
-          gps.lastPosRef.current = { lat: latitude, lng: longitude, time: now };
-          if (settings.showMyRoute) { gps.mapCoordsRef.current = [...gps.mapCoordsRef.current, { latitude, longitude }]; gps.setMapCoords(gps.mapCoordsRef.current); }
+          const pending = gps.drRecoveryPendingRef.current;
+          if (!pending) {
+            gps.drRecoveryPendingRef.current = {
+              lastFixLat: latitude, lastFixLng: longitude, lastFixTime: now, fixCount: 1,
+            };
+          } else {
+            // Coherence between consecutive recovery fixes: an implausible jump
+            // resets the streak so we keep waiting for a stable lock.
+            const stepKm = haversineMeters(pending.lastFixLat, pending.lastFixLng, latitude, longitude) / 1000;
+            const stepH = Math.max((now - pending.lastFixTime) / 3_600_000, 1e-6);
+            const impliedKmh = stepKm / stepH;
+            pending.fixCount = impliedKmh <= RECOVERY_COHERENCE_MAX_KMH ? pending.fixCount + 1 : 1;
+            pending.lastFixLat = latitude; pending.lastFixLng = longitude; pending.lastFixTime = now;
+          }
+
+          const p = gps.drRecoveryPendingRef.current;
+          if (p && p.fixCount >= RECOVERY_FIXES_REQUIRED) {
+            // Confirmed ground truth: record the DR-vs-GPS deviation, then reconcile
+            // by clearing the gap and reseeding the anchor to the recovery position.
+            // No bridging segment is added between anchor and recovery, so the
+            // sensor-only blackout distance is never re-counted as GPS distance.
+            const anchor = gps.lastPosRef.current;
+            const drEst = refs.drEstPosRef?.current ?? null;
+            const drGapKm = gps.drGapKmRef.current;
+            const sessionId = refs.routeIdRef?.current ?? null;
+            if (sessionId && anchor) {
+              const gpsDistanceKm = haversineMeters(anchor.lat, anchor.lng, latitude, longitude) / 1000;
+              const posErrorM = drEst
+                ? haversineMeters(drEst.lat, drEst.lon, latitude, longitude)
+                : Math.abs(gpsDistanceKm - drGapKm) * 1000;
+              const headingErrorDeg = drEst
+                ? angleDiffDeg(
+                    bearingDeg(anchor.lat, anchor.lng, drEst.lat, drEst.lon),
+                    bearingDeg(anchor.lat, anchor.lng, latitude, longitude),
+                  )
+                : null;
+              const sample: DrDeviationSample = {
+                sessionId: String(sessionId),
+                blackoutMs: Math.max(0, now - anchor.time),
+                drDistanceKm: drGapKm,
+                gpsDistanceKm,
+                posErrorM,
+                estSpeedKmh: gps.drSpeedKmhRef.current ?? 0,
+                obsSpeedKmh: smoothedSpeed,
+                headingErrorDeg,
+                recoveryAccuracyM: accuracy ?? 0,
+                recoveryFixCount: p.fixCount,
+              };
+              reportDrDeviation(sample);
+            }
+            gps.drGapKmRef.current = 0;
+            gps.lastPosRef.current = { lat: latitude, lng: longitude, time: now };
+            // Recovery confirmed — GPS is authoritative again for fusion.
+            gps.lastUsableFixMsRef.current = now;
+            gps.drRecoveryPendingRef.current = null;
+            if (settings.showMyRoute) { gps.mapCoordsRef.current = [...gps.mapCoordsRef.current, { latitude, longitude }]; gps.setMapCoords(gps.mapCoordsRef.current); }
+          }
+        } else {
+          // A poor recovery fix breaks the coherent streak — restart when a good one returns.
+          gps.drRecoveryPendingRef.current = null;
         }
       } else {
         const decision = evaluateSegment({

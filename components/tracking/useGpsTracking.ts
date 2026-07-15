@@ -59,6 +59,15 @@ export function useGpsTracking() {
   const drGapKmRef = useRef(0);
   // Consecutive samples where the sensor estimate diverges markedly from GPS.
   const divergenceCountRef = useRef(0);
+  // Task #47 — DR correction engine: coherence tracker for GPS-recovery. Non-null
+  // while we wait for RECOVERY_FIXES_REQUIRED coherent consecutive usable fixes
+  // before trusting the recovery as ground truth and recording the DR-vs-GPS
+  // deviation. Holds ONLY the streak state — the anchor stays frozen (gps.lastPosRef)
+  // and DR keeps accumulating into gps.drGapKmRef, both read fresh at confirmation.
+  const drRecoveryPendingRef = useRef<{
+    lastFixLat: number; lastFixLng: number; lastFixTime: number;
+    fixCount: number;
+  } | null>(null);
 
   // Task #2686 — telemetria GPS: emette gps_acquire/gps_lost SOLO sulle transizioni
   // di stato e throttla gps_low_accuracy a 60s per evitare spam di rete.
@@ -123,5 +132,6 @@ export function useGpsTracking() {
     drSpeedKmhRef,
     drGapKmRef,
     divergenceCountRef,
+    drRecoveryPendingRef,
   };
 }

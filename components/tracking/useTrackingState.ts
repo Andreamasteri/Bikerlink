@@ -312,10 +312,18 @@ export function useTrackingState() {
         if (gps.fusionModeRef.current !== mode) { gps.fusionModeRef.current = mode; gps.setFusionMode(mode); }
 
         if (mode === "sensors_only") {
-          const distKm = (dr / 3600) * dt;
-          if (distKm > 0) {
+          // Raw dead-reckoning step, before the learned correction (Task #47).
+          const rawDistKm = (dr / 3600) * dt;
+          // Apply the per-user DR correction model (identity=1 until learned) to the
+          // distance that feeds the LIVE total. The gap stays RAW: it both blocks the
+          // bridging segment on recovery and is the ground truth the correction model
+          // learns from, so scaling it would corrupt the learning loop. The server's
+          // stop handler saves the client totalDistanceKm, so live == saved (no drift).
+          const distanceScale = refs.drCorrectionRef?.current?.distanceScale ?? 1;
+          const distKm = rawDistKm * distanceScale;
+          if (rawDistKm > 0) {
             gps.totalKmRef.current += distKm; gps.setTotalKm(gps.totalKmRef.current);
-            gps.drGapKmRef.current += distKm; // reconciled by onNativeLocation on GPS recovery
+            gps.drGapKmRef.current += rawDistKm; // RAW — reconciled by onNativeLocation on GPS recovery
           }
           // Dead-reckon an ESTIMATED position from the frozen GPS anchor using the
           // compass heading + travelled distance (Task #4705). The GPS anchor

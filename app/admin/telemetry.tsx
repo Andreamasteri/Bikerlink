@@ -370,6 +370,16 @@ export default function AdminTelemetryScreen() {
 
         <TouchableOpacity
           style={[styles.navBtn, { marginTop: 6 }]}
+          onPress={() => router.push("/admin/dr-correction" as never)}
+          activeOpacity={0.8}
+        >
+          <MaterialCommunityIcons name="compass-outline" size={18} color={Colors.accent} />
+          <Text style={styles.navBtnText}>Correzione Dead Reckoning</Text>
+          <Ionicons name="chevron-forward" size={16} color={Colors.accent} />
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.navBtn, { marginTop: 6 }]}
           onPress={() => { setShowErrorLog((v) => !v); if (!showErrorLog) refetchErrorLog(); }}
           activeOpacity={0.8}
         >
