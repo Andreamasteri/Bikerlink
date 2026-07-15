@@ -166,16 +166,27 @@ export async function generateGroupTurn(params: GenerateGroupTurnParams): Promis
   const modelName = persona === "horus" ? HORUS_MODEL_ID : BOWIE_MODEL_ID;
   const ollamaPersona = persona === "horus" ? "horus" : "bowie";
   const model = getOllamaModel(modelName, ollamaPersona) as unknown as Parameters<typeof streamText>[0]["model"];
+
+  // Task #100 — Ragionamento di Horus (qwen3:4b) fuori dallo stream di gruppo.
+  // Stessa insidia risolta nel path persona 1:1 (agent.ts, Task #77): con
+  // `think:false` qwen3:4b NON smette di ragionare — riversa ~4000 char di
+  // chain-of-thought nel `content`, che qui consumiamo via `result.textStream`
+  // e streammiamo LIVE nella tavola rotonda PRIMA della risposta vera (nessuno
+  // strip post-hoc può agire in tempo). Con `think:true` Ollama separa il
+  // ragionamento nel canale `thinking`: il provider (ollama-ai-provider-v2) lo
+  // mappa a parti `reasoning-delta` del fullStream, MAI a `text-delta` del
+  // textStream. Siccome consumiamo solo `textStream`, il ragionamento non
+  // raggiunge mai la chat, ma la risposta continua a fare streaming token-per-
+  // token (latenza percepita invariata). Scoping a Horus: Bowie (qwen3:1.7b)
+  // resta su think:false, coerente con agent.ts.
+  const thinkSeparated = persona === "horus";
   const result = streamText({
     model,
     system,
     messages,
     abortSignal: signal,
     temperature: 0.4,
-    // Bowie (qwen3:1.7b) e Horus (qwen3:4b) "pensano" di default: disattiviamo il
-    // ragionamento esplicito così l'output della tavola rotonda resta pulito.
-    // Innocuo per gli altri modelli (accettano think:false).
-    providerOptions: { ollama: { think: false } } as never,
+    providerOptions: { ollama: { think: thinkSeparated } } as never,
   });
   let text = "";
   for await (const delta of result.textStream) {
