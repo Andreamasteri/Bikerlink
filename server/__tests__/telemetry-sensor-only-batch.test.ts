@@ -13,13 +13,21 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import express, { type Request, type Response, type NextFunction } from "express";
 import request from "supertest";
 
-vi.mock("../db", () => ({
-  db: {
-    execute: vi.fn(),
-    insert: vi.fn(() => ({ values: vi.fn().mockResolvedValue(undefined) })),
-  },
-  pool: { query: vi.fn(), connect: vi.fn() },
-}));
+vi.mock("../db", () => {
+  const execute = vi.fn();
+  const insert = vi.fn(() => ({ values: vi.fn().mockResolvedValue(undefined) }));
+  // POST /batch ora esegue insert + aggiornamento riepilogo in una transazione:
+  // la fake tx riusa gli stessi spy così i test sui campioni inseriti continuano
+  // a valere e updateTelemetrySessionStats (che chiama tx.execute) non rompe.
+  const transaction = vi.fn(async (cb: (t: { execute: typeof execute; insert: typeof insert }) => Promise<unknown>) =>
+    cb({ execute, insert }),
+  );
+  return {
+    db: { execute, insert, transaction },
+    pool: { query: vi.fn(), connect: vi.fn() },
+    withDbRetry: (fn: () => unknown) => fn(),
+  };
+});
 
 vi.mock("../lib/telemetry-error-log", () => ({
   logTelemetryEvent: vi.fn(),

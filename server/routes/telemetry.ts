@@ -9,7 +9,7 @@ import { classifyTelemetrySample, coerceFiniteNumber } from "@shared/tracking-fu
 import { getInternalProbeToken, getInternalProbeHeaderName, isLoopback } from "../ai/watchdog/internal-token";
 import idealLapsRouter from "./telemetry-ideal-laps";
 import calibrationRouter from "./telemetry-calibration";
-import { getCachedTelemetryStats, setCachedTelemetryStats, invalidateTelemetryStatsCache } from "../lib/telemetry-stats-cache";
+import { updateTelemetrySessionStats } from "../lib/telemetry-session-stats";
 
 const router = Router();
 
@@ -157,9 +157,16 @@ router.post("/batch", async (req: Request, res: Response) => {
 
     const CHUNK = 500;
     try {
-      for (let i = 0; i < rows.length; i += CHUNK) {
-        await db.insert(rideTelemetry).values(rows.slice(i, i + CHUNK));
-      }
+      // Task #81 — insert campioni + aggiornamento del riepilogo per-sessione
+      // (telemetry_session_stats) ATOMICI in un'unica transazione: o entrambi
+      // committati o entrambi annullati. Così GET /stats (che legge SOLO il
+      // riepilogo) non può mai divergere dai campioni realmente salvati.
+      await db.transaction(async (tx) => {
+        for (let i = 0; i < rows.length; i += CHUNK) {
+          await tx.insert(rideTelemetry).values(rows.slice(i, i + CHUNK));
+        }
+        await updateTelemetrySessionStats(userId, session_id, resolvedType, rows, tx);
+      });
     } catch (dbErr) {
       const msg = dbErr instanceof Error ? dbErr.message : String(dbErr);
       const stack = dbErr instanceof Error ? dbErr.stack : undefined;
@@ -168,15 +175,13 @@ router.post("/batch", async (req: Request, res: Response) => {
         ts: new Date().toISOString(),
         type: "ERROR",
         context: "telemetry/batch",
-        message: `DB insert fallito: ${msg}`,
+        message: `DB insert/riepilogo fallito: ${msg}`,
         userId,
         sessionId: session_id,
         detail: stack,
       });
       return sendError(res, 500, "Errore salvataggio campioni");
     }
-
-    invalidateTelemetryStatsCache(userId);
 
     console.log(`[telemetry/batch] userId=${userId} sessionId=${session_id} received=${received} valid=${rows.length} discarded=${discarded}`);
     logTelemetryEvent({
@@ -221,22 +226,38 @@ router.get("/stats", async (req: Request, res: Response) => {
 
   const startMs = Date.now();
   try {
-    const cached = getCachedTelemetryStats(userId);
-    if (cached) {
-      return res.json(cached);
-    }
-
+    // Task #81 — i km per sessione sono pre-calcolati incrementalmente in
+    // `telemetry_session_stats` (una riga per sessione, aggiornata ad ogni
+    // POST /batch). I totali utente sono una semplice SUM/COUNT su poche righe:
+    // niente più scansione Haversine con window function su tutti i campioni.
+    //
+    //   km_collected  = SUM(dist_speed_filtered) su TUTTE le sessioni (incl. ideal_lap)
+    //   track_km      = SUM(dist_all)            solo sessioni 'ideal_lap'
+    //   ideal_lap_km  = SUM(dist_speed_filtered) solo sessioni 'ideal_lap'
+    //   sample_count / session_count / sensor_only_count escludono 'ideal_lap'
     const statsResult = await withDbRetry(() => db.execute(sql`
       SELECT
-        COUNT(*) AS sample_count,
-        COUNT(DISTINCT session_id) AS session_count,
-        COUNT(*) FILTER (WHERE lat IS NULL AND lon IS NULL) AS sensor_only_count
-      FROM ride_telemetry
+        COALESCE(SUM(dist_speed_filtered), 0) AS km_collected,
+        COALESCE(SUM(dist_all) FILTER (WHERE session_type = 'ideal_lap'), 0) AS track_km,
+        COALESCE(SUM(dist_speed_filtered) FILTER (WHERE session_type = 'ideal_lap'), 0) AS ideal_lap_km,
+        COALESCE(SUM(sample_count) FILTER (WHERE session_type <> 'ideal_lap'), 0) AS sample_count,
+        COUNT(*) FILTER (WHERE session_type <> 'ideal_lap') AS session_count,
+        COALESCE(SUM(sensor_only_count) FILTER (WHERE session_type <> 'ideal_lap'), 0) AS sensor_only_count
+      FROM telemetry_session_stats
       WHERE user_id = ${userId}
-        AND session_type NOT IN ('ideal_lap')
     `));
 
-    const row = statsResult.rows[0] as { sample_count: string; session_count: string; sensor_only_count: string } | undefined;
+    const row = statsResult.rows[0] as
+      | {
+          km_collected: string;
+          track_km: string;
+          ideal_lap_km: string;
+          sample_count: string;
+          session_count: string;
+          sensor_only_count: string;
+        }
+      | undefined;
+
     const sampleCount = parseInt(row?.sample_count ?? "0", 10);
     const sessionCount = parseInt(row?.session_count ?? "0", 10);
     const sensorOnlyCount = parseInt(row?.sensor_only_count ?? "0", 10);
@@ -248,50 +269,10 @@ router.get("/stats", async (req: Request, res: Response) => {
       userId,
     });
 
-    // Task #53 — le tre query Haversine separate (km totali, km in pista,
-    // km giro ideale) condividono la stessa CTE `ordered` (LAG per session_id);
-    // filtrare session_type PRIMA del LAG non cambia il risultato perché un
-    // session_id appartiene sempre a un solo session_type, quindi possiamo
-    // calcolarle in un solo passaggio con SUM...FILTER invece di 3 scan separate.
-    const distancesResult = await withDbRetry(() => db.execute(sql`
-      WITH ordered AS (
-        SELECT
-          session_id, session_type, lat, lon, ts, speed_kmh,
-          LAG(lat) OVER (PARTITION BY session_id ORDER BY ts) AS prev_lat,
-          LAG(lon) OVER (PARTITION BY session_id ORDER BY ts) AS prev_lon
-        FROM ride_telemetry
-        WHERE user_id = ${userId}
-      ),
-      distances AS (
-        SELECT
-          session_type,
-          speed_kmh,
-          2 * 6371 * ASIN(
-            SQRT(
-              POWER(SIN(RADIANS(lat - prev_lat) / 2), 2)
-              + COS(RADIANS(prev_lat)) * COS(RADIANS(lat))
-              * POWER(SIN(RADIANS(lon - prev_lon) / 2), 2)
-            )
-          ) AS dist_km
-        FROM ordered
-        WHERE prev_lat IS NOT NULL AND prev_lon IS NOT NULL
-          AND ABS(lat - prev_lat) < 0.5
-          AND ABS(lon - prev_lon) < 0.5
-      )
-      SELECT
-        COALESCE(SUM(dist_km) FILTER (WHERE speed_kmh IS NULL OR speed_kmh >= 20), 0) AS km_collected,
-        COALESCE(SUM(dist_km) FILTER (WHERE session_type = 'ideal_lap'), 0) AS track_km,
-        COALESCE(SUM(dist_km) FILTER (WHERE session_type = 'ideal_lap' AND (speed_kmh IS NULL OR speed_kmh >= 20)), 0) AS ideal_lap_km
-      FROM distances
-    `));
-
-    const distancesRow = distancesResult.rows[0] as
-      | { km_collected: string; track_km: string; ideal_lap_km: string }
-      | undefined;
-    const kmCollected = Math.round(parseFloat(distancesRow?.km_collected ?? "0") * 10) / 10;
+    const kmCollected = Math.round(parseFloat(row?.km_collected ?? "0") * 10) / 10;
     const progressPct = Math.min(100, Math.round((kmCollected / TARGET_KM) * 100));
-    const trackKm = Math.round(parseFloat(distancesRow?.track_km ?? "0") * 10) / 10;
-    const idealLapKm = Math.round(parseFloat(distancesRow?.ideal_lap_km ?? "0") * 10) / 10;
+    const trackKm = Math.round(parseFloat(row?.track_km ?? "0") * 10) / 10;
+    const idealLapKm = Math.round(parseFloat(row?.ideal_lap_km ?? "0") * 10) / 10;
 
     const payload = {
       km_collected: kmCollected,
@@ -303,7 +284,6 @@ router.get("/stats", async (req: Request, res: Response) => {
       track_km: trackKm,
       ideal_lap_km: idealLapKm,
     };
-    setCachedTelemetryStats(userId, payload);
     return res.json(payload);
   } catch (err) {
     const elapsedMs = Date.now() - startMs;

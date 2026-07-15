@@ -168,6 +168,49 @@ export const userTelemetryProfile = pgTable("user_telemetry_profile", {
 export type UserTelemetryProfile = typeof userTelemetryProfile.$inferSelect;
 export type InsertUserTelemetryProfile = typeof userTelemetryProfile.$inferInsert;
 
+/**
+ * Task #81 — Riepilogo incrementale per-sessione delle distanze di telemetria.
+ *
+ * Una riga per (user_id, session_id). Mantenuta incrementalmente ad ogni
+ * `POST /api/telemetry/batch`: invece di ri-scansionare tutti i campioni con la
+ * window function Haversine ad ogni `GET /api/telemetry/stats`, i km per sessione
+ * sono pre-calcolati qui e i totali utente si ottengono con una semplice
+ * SUM/COUNT su poche righe (una per sessione).
+ *
+ *  - `distAll`            = SUM delle distanze Haversine consecutive nella sessione
+ *                          (nessun filtro velocità) → alimenta `track_km` per le
+ *                          sessioni `ideal_lap`.
+ *  - `distSpeedFiltered`  = come sopra ma solo per i segmenti con velocità NULL o
+ *                          >= 20 km/h → alimenta `km_collected` (tutte le sessioni)
+ *                          e `ideal_lap_km` (sessioni `ideal_lap`).
+ *  - `lastLat/lastLon/lastTs` = ultimo campione (per ts) della sessione: àncora
+ *                          per collegare il primo segmento del batch successivo,
+ *                          replicando la semantica di LAG(...) OVER (ORDER BY ts).
+ *  - `sampleCount/sensorOnlyCount` = conteggi cumulativi (i totali utente li
+ *                          filtrano escludendo `session_type = 'ideal_lap'`).
+ */
+export const telemetrySessionStats = pgTable("telemetry_session_stats", {
+  userId: varchar("user_id", { length: 36 })
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  sessionId: varchar("session_id", { length: 36 }).notNull(),
+  sessionType: varchar("session_type", { length: 10 }).notNull().default("ride"),
+  distAll: doublePrecision("dist_all").notNull().default(0),
+  distSpeedFiltered: doublePrecision("dist_speed_filtered").notNull().default(0),
+  sampleCount: integer("sample_count").notNull().default(0),
+  sensorOnlyCount: integer("sensor_only_count").notNull().default(0),
+  lastLat: doublePrecision("last_lat"),
+  lastLon: doublePrecision("last_lon"),
+  lastTs: bigint("last_ts", { mode: "number" }),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => [
+  primaryKey({ columns: [table.userId, table.sessionId], name: "telemetry_session_stats_pk" }),
+  index("telemetry_session_stats_user_idx").on(table.userId),
+]);
+
+export type TelemetrySessionStats = typeof telemetrySessionStats.$inferSelect;
+export type InsertTelemetrySessionStats = typeof telemetrySessionStats.$inferInsert;
+
 export type CoordinateHistory = typeof coordinateHistory.$inferSelect;
 export type InsertCoordinateHistory = typeof coordinateHistory.$inferInsert;
 export type ArcadeScore = typeof arcadeScores.$inferSelect;

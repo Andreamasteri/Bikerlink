@@ -4,7 +4,6 @@ import { sql } from "drizzle-orm";
 import { storage } from "../storage";
 import { requireUserId } from "../lib/auth-middleware";
 import { sendError } from "../lib/api-response";
-import { invalidateTelemetryStatsCache } from "../lib/telemetry-stats-cache";
 
 const router = Router();
 
@@ -91,8 +90,15 @@ router.delete("/reset", async (req: Request, res: Response) => {
         AND session_type NOT IN ('ideal_lap')
     `);
 
+    // Task #81 — allinea il riepilogo incrementale: /reset cancella solo le
+    // sessioni non-ideal_lap, quindi rimuovi le stesse righe di riepilogo.
+    await db.execute(sql`
+      DELETE FROM telemetry_session_stats
+      WHERE user_id = ${userId}
+        AND session_type NOT IN ('ideal_lap')
+    `);
+
     const deleted = result.rowCount ?? 0;
-    invalidateTelemetryStatsCache(userId);
     return res.json({ deleted });
   } catch (err) {
     console.error("[telemetry/reset] error:", err);

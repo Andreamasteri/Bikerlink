@@ -9,6 +9,7 @@ import { db, withDbRetry } from "../db";
 import { storage } from "../storage";
 import { requireAuth } from "../lib/auth-middleware";
 import { sendError } from "../lib/api-response";
+import { updateTelemetrySessionStats } from "../lib/telemetry-session-stats";
 import {
   routes,
   routePoints,
@@ -128,9 +129,16 @@ router.patch("/routes/:id", requireAuth, async (req: Request, res: Response) => 
             }
             if (rows.length > 0) {
               const CHUNK = 500;
-              for (let i = 0; i < rows.length; i += CHUNK) {
-                await db.insert(rideTelemetry).values(rows.slice(i, i + CHUNK));
-              }
+              // Task #81 — insert + riepilogo per-sessione (telemetry_session_stats)
+              // atomici: GET /api/telemetry/stats legge SOLO il riepilogo, quindi
+              // anche questo percorso di scrittura (salvataggio route con telemetria
+              // allegata) DEVE aggiornarlo o i totali/progresso divergono.
+              await db.transaction(async (tx) => {
+                for (let i = 0; i < rows.length; i += CHUNK) {
+                  await tx.insert(rideTelemetry).values(rows.slice(i, i + CHUNK));
+                }
+                await updateTelemetrySessionStats(userId, id, "ride", rows, tx);
+              });
               console.log(`[routes/:id PATCH] telemetria: ${rows.length} campioni inseriti per sessione ${id}`);
             }
           } else {
