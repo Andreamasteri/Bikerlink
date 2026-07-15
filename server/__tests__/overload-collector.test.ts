@@ -24,7 +24,22 @@ const getPoolStatsMock = vi.hoisted(() =>
 vi.mock("../lib/backend-load-probe", () => ({
   getBackendLoad: getBackendLoadMock,
   startBackendLoadProbe: vi.fn(),
-  BACKEND_LOAD_THRESHOLDS: { eventLoopLagMs: 100, eventLoopP99Ms: 500, cpuPct: 85 },
+}));
+
+// Task #83 — le soglie sono ora regolabili (AppSetting). Nei test usiamo i default
+// hardcoded (pool 90% / ping 500ms / lag 100ms / p99 500ms / CPU 85% / 3 tick) e
+// un refresh no-op, così il comportamento resta identico a Task #72.
+const DEFAULTS = vi.hoisted(() => ({
+  poolActivePct: 90,
+  pingMs: 500,
+  eventLoopLagMs: 100,
+  eventLoopP99Ms: 500,
+  cpuPct: 85,
+  consecutiveTicks: 3,
+}));
+vi.mock("../lib/overload-thresholds", () => ({
+  getOverloadThresholds: vi.fn(() => DEFAULTS),
+  refreshOverloadThresholds: vi.fn().mockResolvedValue(DEFAULTS),
 }));
 
 vi.mock("../db", () => ({

@@ -13,14 +13,13 @@ import { db, withDbRetry, getPoolStats } from "./db";
 import { dbMonitorHistory } from "@shared/db";
 import { lt } from "drizzle-orm";
 import { withBgDbSlot } from "./lib/bg-db-limiter";
-import { getBackendLoad, startBackendLoadProbe, BACKEND_LOAD_THRESHOLDS } from "./lib/backend-load-probe";
+import { getBackendLoad, startBackendLoadProbe } from "./lib/backend-load-probe";
+import { getOverloadThresholds, refreshOverloadThresholds } from "./lib/overload-thresholds";
 import { dedupWarn } from "./lib/dedup-logger";
 
-// Soglia latenza ping oltre la quale il DB è considerato sovraccarico (allineata
-// a SLOW_PING_THRESHOLD_MS del db-collector).
-const PING_OVERLOAD_MS = 500;
-// Saturazione pool oltre la quale il DB è considerato sovraccarico.
-const POOL_OVERLOAD_PCT = 90;
+// Task #83 — le soglie di ping/pool/tick-sostenuti non sono più costanti: si
+// leggono da getOverloadThresholds() (regolabili dall'admin), con i vecchi valori
+// (pool 90% / ping 500ms / 3 tick) come default se il setting manca o è invalido.
 
 const RETENTION_DAYS = 35;
 const CLEANUP_INTERVAL_MS = 6 * 60 * 60 * 1000; // ogni 6h
@@ -30,18 +29,19 @@ const CLEANUP_INTERVAL_MS = 6 * 60 * 60 * 1000; // ogni 6h
 // Il banner del Database Monitor mostra il sovraccarico solo quando un admin
 // guarda lo schermo. Qui contiamo i tick consecutivi in cui il DB (o il backend
 // Node) risulta sovraccarico: quando lo stesso lato resta sovraccarico per
-// CONSECUTIVE_TICKS_FOR_SUSTAINED cicli aggregator (~60s l'uno) lo classifichiamo
+// `consecutiveTicks` cicli aggregator (~60s l'uno) lo classifichiamo
 // "sostenuto" e lo esponiamo via getSustainedOverloadState(). L'overload-collector
 // lo legge al tick successivo ed emette un segnale "high" che il watchdog alza a
 // push (distinguendo DB vs backend), riusando il canale alert esistente col suo
-// throttle. Un singolo tick di picco resta un blip e NON allerta.
-const CONSECUTIVE_TICKS_FOR_SUSTAINED = 3;
+// throttle. Un singolo tick di picco resta un blip e NON allerta. La finestra
+// (numero di tick) è regolabile dall'admin via getOverloadThresholds().consecutiveTicks.
 
 // Task #84 — Notifica di rientro. Un overload precedentemente SOSTENUTO è
 // considerato "risolto" solo dopo altrettanti tick consecutivi di salute
 // (simmetrico all'ingresso): così la push di rientro non lampeggia su un singolo
 // tick buono, esattamente come la push di allerta non parte su un singolo picco.
-const CONSECUTIVE_TICKS_FOR_RECOVERY = CONSECUTIVE_TICKS_FOR_SUSTAINED;
+// La finestra di rientro = la stessa finestra "sostenuto", ora regolabile
+// dall'admin (Task #83, getOverloadThresholds().consecutiveTicks).
 
 /** Stato di sovraccarico sostenuto per DB e backend, letto dall'overload-collector. */
 export interface SustainedOverloadState {
@@ -128,6 +128,10 @@ function readMetric(metrics: Record<string, number>, ...keys: string[]): number 
  */
 export async function recordDbMonitorSample(snap: SnapshotLike): Promise<void> {
   try {
+    // Ricarica le soglie regolabili dall'admin (default-safe se il setting manca).
+    // Un cambio dall'admin panel si propaga entro un tick (~60s).
+    await refreshOverloadThresholds();
+    const thresholds = getOverloadThresholds();
     const { activePct: poolActivePct, waiting: poolWaiting } = getPoolStats();
 
     // Ping: il db-collector emette "db.ping_ms" (source "db") → chiave "db.db.ping_ms".
@@ -146,8 +150,8 @@ export async function recordDbMonitorSample(snap: SnapshotLike): Promise<void> {
 
     const dbOverload =
       dbErrorCount > 0 ||
-      poolActivePct >= POOL_OVERLOAD_PCT ||
-      (pingMs != null && pingMs >= PING_OVERLOAD_MS);
+      poolActivePct >= thresholds.poolActivePct ||
+      (pingMs != null && pingMs >= thresholds.pingMs);
 
     const backend = getBackendLoad();
 
@@ -191,6 +195,7 @@ function updateSustainedOverload(input: {
   backend: ReturnType<typeof getBackendLoad>;
 }): void {
   const { dbOverload, poolActivePct, poolWaiting, pingMs, dbErrorCount, backend } = input;
+  const t = getOverloadThresholds();
 
   dbOverloadConsecutive = dbOverload ? dbOverloadConsecutive + 1 : 0;
   backendOverloadConsecutive = backend.overloaded ? backendOverloadConsecutive + 1 : 0;
@@ -199,8 +204,8 @@ function updateSustainedOverload(input: {
   dbHealthyConsecutive = dbOverload ? 0 : dbHealthyConsecutive + 1;
   backendHealthyConsecutive = backend.overloaded ? 0 : backendHealthyConsecutive + 1;
 
-  const dbSustained = dbOverloadConsecutive >= CONSECUTIVE_TICKS_FOR_SUSTAINED;
-  const backendSustained = backendOverloadConsecutive >= CONSECUTIVE_TICKS_FOR_SUSTAINED;
+  const dbSustained = dbOverloadConsecutive >= t.consecutiveTicks;
+  const backendSustained = backendOverloadConsecutive >= t.consecutiveTicks;
 
   // Task #84 — latch: appena un lato diventa sostenuto, ricordiamo che va poi
   // segnalato come RISOLTO quando rientra. Senza latch non sapremmo distinguere
@@ -213,21 +218,21 @@ function updateSustainedOverload(input: {
   // rete anti-flap. recovered NON è "sostenuto rientrato" a ripetizione: dopo la
   // singola emissione il latch è spento e recovered torna false ai tick seguenti.
   const dbRecovered =
-    dbWasSustained && !dbOverload && dbHealthyConsecutive >= CONSECUTIVE_TICKS_FOR_RECOVERY;
+    dbWasSustained && !dbOverload && dbHealthyConsecutive >= t.consecutiveTicks;
   if (dbRecovered) dbWasSustained = false;
   const backendRecovered =
-    backendWasSustained && !backend.overloaded && backendHealthyConsecutive >= CONSECUTIVE_TICKS_FOR_RECOVERY;
+    backendWasSustained && !backend.overloaded && backendHealthyConsecutive >= t.consecutiveTicks;
   if (backendRecovered) backendWasSustained = false;
 
   const dbReasons: string[] = [];
   if (dbErrorCount > 0) dbReasons.push(`${dbErrorCount} errori DB`);
-  if (poolActivePct >= POOL_OVERLOAD_PCT) dbReasons.push(`pool al ${Math.round(poolActivePct)}%`);
-  if (pingMs != null && pingMs >= PING_OVERLOAD_MS) dbReasons.push(`ping ${Math.round(pingMs)}ms`);
+  if (poolActivePct >= t.poolActivePct) dbReasons.push(`pool al ${Math.round(poolActivePct)}%`);
+  if (pingMs != null && pingMs >= t.pingMs) dbReasons.push(`ping ${Math.round(pingMs)}ms`);
 
   const backendReasons: string[] = [];
-  if (backend.eventLoopLagMs >= BACKEND_LOAD_THRESHOLDS.eventLoopLagMs) backendReasons.push(`event-loop lag ${backend.eventLoopLagMs}ms`);
-  if (backend.eventLoopP99Ms >= BACKEND_LOAD_THRESHOLDS.eventLoopP99Ms) backendReasons.push(`event-loop p99 ${backend.eventLoopP99Ms}ms`);
-  if (backend.cpuPct >= BACKEND_LOAD_THRESHOLDS.cpuPct) backendReasons.push(`CPU ${backend.cpuPct}%`);
+  if (backend.eventLoopLagMs >= t.eventLoopLagMs) backendReasons.push(`event-loop lag ${backend.eventLoopLagMs}ms`);
+  if (backend.eventLoopP99Ms >= t.eventLoopP99Ms) backendReasons.push(`event-loop p99 ${backend.eventLoopP99Ms}ms`);
+  if (backend.cpuPct >= t.cpuPct) backendReasons.push(`CPU ${backend.cpuPct}%`);
 
   sustainedState = {
     db: {

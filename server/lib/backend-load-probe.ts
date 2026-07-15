@@ -17,15 +17,13 @@
 
 import { monitorEventLoopDelay, type IntervalHistogram } from "node:perf_hooks";
 import os from "node:os";
+import { getOverloadThresholds } from "./overload-thresholds";
 
 // ── Soglie di sovraccarico ────────────────────────────────────────────────────
 // Sovraccarico backend = event loop che non smaltisce (lag medio alto o coda di
-// picco lunga) OPPURE CPU quasi satura in modo sostenuto. Valori scelti larghi
-// per evitare falsi positivi da blip GC: un lag medio ≥100ms su una finestra di
-// 5s significa che l'event loop è davvero indietro.
-const EVENT_LOOP_LAG_OVERLOAD_MS = 100;
-const EVENT_LOOP_P99_OVERLOAD_MS = 500;
-const CPU_OVERLOAD_PCT = 85;
+// picco lunga) OPPURE CPU quasi satura in modo sostenuto. Le soglie non sono più
+// costanti: vengono lette da getOverloadThresholds() (Task #83), regolabili
+// dall'admin, con i vecchi valori (lag 100ms / p99 500ms / CPU 85%) come default.
 
 const PROBE_INTERVAL_MS = 5_000;
 
@@ -91,10 +89,11 @@ function sample(): void {
 
   const rssMb = Math.round(process.memoryUsage().rss / 1024 / 1024);
 
+  const t = getOverloadThresholds();
   const overloaded =
-    lagMs >= EVENT_LOOP_LAG_OVERLOAD_MS ||
-    p99Ms >= EVENT_LOOP_P99_OVERLOAD_MS ||
-    cpuPct >= CPU_OVERLOAD_PCT;
+    lagMs >= t.eventLoopLagMs ||
+    p99Ms >= t.eventLoopP99Ms ||
+    cpuPct >= t.cpuPct;
 
   latest = { eventLoopLagMs: lagMs, eventLoopP99Ms: p99Ms, cpuPct, rssMb, overloaded, at: now };
 }
@@ -131,9 +130,3 @@ export function stopBackendLoadProbe(): void {
 export function getBackendLoad(): BackendLoad {
   return latest;
 }
-
-export const BACKEND_LOAD_THRESHOLDS = {
-  eventLoopLagMs: EVENT_LOOP_LAG_OVERLOAD_MS,
-  eventLoopP99Ms: EVENT_LOOP_P99_OVERLOAD_MS,
-  cpuPct: CPU_OVERLOAD_PCT,
-} as const;

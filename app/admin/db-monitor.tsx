@@ -4,12 +4,13 @@
 // (24h/48h/7d/30d), con banner separati per sovraccarico DB e sovraccarico
 // backend (un admin capisce a colpo d'occhio quale dei due — o entrambi — è il
 // problema), trend bucketati, contatori errori/restart e download CSV del range.
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
+  TextInput,
   TouchableOpacity,
   ActivityIndicator,
   RefreshControl,
@@ -17,14 +18,20 @@ import {
   Alert,
   useWindowDimensions,
 } from "react-native";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { MaterialCommunityIcons, Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as FileSystem from "expo-file-system/legacy";
 import * as Sharing from "expo-sharing";
 import Colors from "@/constants/colors";
-import { apiRequest, getApiUrl, authFetchHeaders } from "@/lib/query-client";
+import { apiRequest, getApiUrl, authFetchHeaders, queryClient } from "@/lib/query-client";
 import { DbMonitorChart, type ChartSeries } from "@/components/admin/db-monitor/DbMonitorChart";
+import {
+  DEFAULT_OVERLOAD_THRESHOLDS,
+  OVERLOAD_THRESHOLD_BOUNDS,
+  normalizeOverloadThresholds,
+  type OverloadThresholds,
+} from "@shared/overload-thresholds";
 
 type RangeKey = "24h" | "48h" | "7d" | "30d";
 const RANGES: { key: RangeKey; label: string }[] = [
@@ -94,6 +101,21 @@ function overloadMinutes(samples: number, intervalSec: number): string {
   return m > 0 ? `${h}h ${m}m` : `${h}h`;
 }
 
+type ThresholdDraft = Record<keyof OverloadThresholds, string>;
+const THRESHOLD_KEYS = Object.keys(OVERLOAD_THRESHOLD_BOUNDS) as (keyof OverloadThresholds)[];
+
+function toDraft(t: OverloadThresholds): ThresholdDraft {
+  const out = {} as ThresholdDraft;
+  for (const k of THRESHOLD_KEYS) out[k] = String(t[k]);
+  return out;
+}
+
+interface ThresholdsResponse {
+  thresholds: OverloadThresholds;
+  defaults: OverloadThresholds;
+  bounds: typeof OVERLOAD_THRESHOLD_BOUNDS;
+}
+
 export default function DbMonitorScreen() {
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
@@ -144,6 +166,29 @@ export default function DbMonitorScreen() {
       setDownloading(false);
     }
   }, [range]);
+
+  // Task #83 — soglie di sovraccarico regolabili dall'admin.
+  const { data: cfg } = useQuery<ThresholdsResponse>({
+    queryKey: ["/api/admin/db-monitor/thresholds"],
+    queryFn: async () => (await apiRequest("GET", "/api/admin/db-monitor/thresholds")).json(),
+    staleTime: 60_000,
+  });
+  const [draft, setDraft] = useState<ThresholdDraft>(() => toDraft(DEFAULT_OVERLOAD_THRESHOLDS));
+  useEffect(() => {
+    if (cfg?.thresholds) setDraft(toDraft(cfg.thresholds));
+  }, [cfg?.thresholds]);
+
+  const saveMutation = useMutation({
+    mutationFn: async (payload: OverloadThresholds) =>
+      (await apiRequest("PUT", "/api/admin/db-monitor/thresholds", payload)).json() as Promise<ThresholdsResponse>,
+    onSuccess: (res) => {
+      if (res?.thresholds) setDraft(toDraft(res.thresholds));
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/db-monitor/thresholds"] });
+      Alert.alert("Salvato", "Soglie di sovraccarico aggiornate. Le allerte usano i nuovi valori entro ~1 minuto.");
+    },
+    onError: (err) => Alert.alert("Errore", err instanceof Error ? err.message : "Salvataggio fallito"),
+  });
+  const isSaving = saveMutation.isPending;
 
   const chartWidth = Math.max(240, width - 48);
   const series = useMemo(() => data?.series ?? [], [data?.series]);
@@ -296,6 +341,59 @@ export default function DbMonitorScreen() {
         <Text style={styles.samplesNote}>{sum?.totalSamples ?? 0} campioni nel range</Text>
       </View>
 
+      {/* Soglie allerte sovraccarico (Task #83) */}
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>Soglie allerte sovraccarico</Text>
+        <Text style={styles.cardSub}>
+          Regola quando scattano le allerte proattive di sovraccarico DB/backend. Valori fuori range vengono
+          riportati al default. Le modifiche entrano in vigore entro ~1 minuto.
+        </Text>
+        {THRESHOLD_KEYS.map((key) => {
+          const b = OVERLOAD_THRESHOLD_BOUNDS[key];
+          return (
+            <View key={key} style={styles.threshRow}>
+              <View style={styles.threshInfo}>
+                <Text style={styles.threshLabel}>{b.label}</Text>
+                <Text style={styles.threshHint}>
+                  {b.min}–{b.max} {b.unit} · default {DEFAULT_OVERLOAD_THRESHOLDS[key]}
+                </Text>
+              </View>
+              <TextInput
+                style={styles.threshInput}
+                value={draft[key]}
+                onChangeText={(v) => setDraft((d) => ({ ...d, [key]: v.replace(/[^0-9]/g, "") }))}
+                keyboardType="number-pad"
+                maxLength={6}
+                editable={!isSaving}
+                placeholder={String(DEFAULT_OVERLOAD_THRESHOLDS[key])}
+                placeholderTextColor={Colors.textSecondary}
+              />
+              <Text style={styles.threshUnit}>{b.unit}</Text>
+            </View>
+          );
+        })}
+        <View style={styles.threshBtnRow}>
+          <TouchableOpacity
+            style={[styles.threshBtn, styles.threshBtnGhost]}
+            onPress={() => setDraft(toDraft(DEFAULT_OVERLOAD_THRESHOLDS))}
+            disabled={isSaving}
+          >
+            <Text style={styles.threshBtnGhostText}>Ripristina default</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.threshBtn, styles.threshBtnPrimary]}
+            onPress={() => saveMutation.mutate(normalizeOverloadThresholds(draft))}
+            disabled={isSaving}
+          >
+            {isSaving ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <Text style={styles.threshBtnPrimaryText}>Salva soglie</Text>
+            )}
+          </TouchableOpacity>
+        </View>
+      </View>
+
       {/* Download */}
       <TouchableOpacity style={styles.downloadBtn} onPress={handleDownload} disabled={downloading}>
         {downloading ? (
@@ -342,6 +440,30 @@ const styles = StyleSheet.create({
   statValueDanger: { color: "#f87171" },
   statLabel: { color: Colors.textSecondary, fontFamily: "Inter_400Regular", fontSize: 9, marginTop: 2, textAlign: "center" },
   samplesNote: { color: Colors.textSecondary, fontFamily: "Inter_400Regular", fontSize: 10, marginTop: 8 },
+  threshRow: { flexDirection: "row", alignItems: "center", gap: 10, marginTop: 10 },
+  threshInfo: { flex: 1 },
+  threshLabel: { color: Colors.text, fontFamily: "Inter_600SemiBold", fontSize: 13 },
+  threshHint: { color: Colors.textSecondary, fontFamily: "Inter_400Regular", fontSize: 10, marginTop: 1 },
+  threshInput: {
+    width: 72,
+    backgroundColor: Colors.background,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    color: Colors.text,
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 14,
+    textAlign: "right",
+  },
+  threshUnit: { width: 34, color: Colors.textSecondary, fontFamily: "Inter_500Medium", fontSize: 11 },
+  threshBtnRow: { flexDirection: "row", gap: 10, marginTop: 16 },
+  threshBtn: { flex: 1, borderRadius: 10, paddingVertical: 11, alignItems: "center", justifyContent: "center" },
+  threshBtnGhost: { borderWidth: 1, borderColor: Colors.border },
+  threshBtnGhostText: { color: Colors.textSecondary, fontFamily: "Inter_600SemiBold", fontSize: 13 },
+  threshBtnPrimary: { backgroundColor: Colors.accent },
+  threshBtnPrimaryText: { color: "#fff", fontFamily: "Inter_600SemiBold", fontSize: 13 },
   downloadBtn: {
     flexDirection: "row",
     alignItems: "center",

@@ -15,13 +15,19 @@ import { Router } from "express";
 import { sql } from "drizzle-orm";
 import { db, getPoolStats } from "../../db";
 import { withBgDbSlot } from "../../lib/bg-db-limiter";
-import { getBackendLoad, BACKEND_LOAD_THRESHOLDS } from "../../lib/backend-load-probe";
+import { getBackendLoad } from "../../lib/backend-load-probe";
+import {
+  getOverloadThresholds,
+  refreshOverloadThresholds,
+  saveOverloadThresholds,
+} from "../../lib/overload-thresholds";
+import {
+  DEFAULT_OVERLOAD_THRESHOLDS,
+  OVERLOAD_THRESHOLD_BOUNDS,
+} from "@shared/overload-thresholds";
 import { getLatestSnapshot } from "../../ai/watchdog/aggregator.part2";
 
 const router = Router();
-
-const PING_OVERLOAD_MS = 500;
-const POOL_OVERLOAD_PCT = 90;
 
 // range → { secondi totali, secondi per bucket }. I bucket sono scelti per
 // mantenere ~150-300 punti indipendentemente dalla finestra.
@@ -139,8 +145,9 @@ function currentState() {
   const dbErrors = (snap?.problems ?? []).filter(
     (p) => p.source === "db" && (p.severity === "high" || p.severity === "critical"),
   ).length;
+  const t = getOverloadThresholds();
   const dbOverload =
-    dbErrors > 0 || activePct >= POOL_OVERLOAD_PCT || (pingMs != null && pingMs >= PING_OVERLOAD_MS);
+    dbErrors > 0 || activePct >= t.poolActivePct || (pingMs != null && pingMs >= t.pingMs);
   const backend = getBackendLoad();
   return {
     poolActivePct: Math.round(activePct),
@@ -163,15 +170,20 @@ router.get("/db-monitor/history", async (req, res) => {
       queryBuckets(rangeSec, bucketSec),
       querySummary(rangeSec),
     ]);
+    const t = getOverloadThresholds();
     return res.json({
       range,
       bucketSec,
       sampleIntervalSec: 60,
       current: currentState(),
       thresholds: {
-        poolActivePct: POOL_OVERLOAD_PCT,
-        pingMs: PING_OVERLOAD_MS,
-        backend: BACKEND_LOAD_THRESHOLDS,
+        poolActivePct: t.poolActivePct,
+        pingMs: t.pingMs,
+        backend: {
+          eventLoopLagMs: t.eventLoopLagMs,
+          eventLoopP99Ms: t.eventLoopP99Ms,
+          cpuPct: t.cpuPct,
+        },
       },
       summary,
       series,
@@ -219,6 +231,38 @@ router.get("/db-monitor/history/csv", async (req, res) => {
     res.setHeader("Content-Type", "text/csv");
     res.setHeader("Content-Disposition", `attachment; filename="db_monitor_${range}_${Date.now()}.csv"`);
     return res.send(header + body + (body ? "\n" : ""));
+  } catch (err) {
+    return res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+// ── GET /db-monitor/thresholds ───────────────────────────────────────────────
+// Config corrente delle soglie di sovraccarico + default + limiti (per la UI).
+router.get("/db-monitor/thresholds", async (_req, res) => {
+  try {
+    const thresholds = await refreshOverloadThresholds();
+    return res.json({
+      thresholds,
+      defaults: DEFAULT_OVERLOAD_THRESHOLDS,
+      bounds: OVERLOAD_THRESHOLD_BOUNDS,
+    });
+  } catch (err) {
+    return res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+// ── PUT /db-monitor/thresholds ───────────────────────────────────────────────
+// Salva le soglie regolate dall'admin. Il body viene normalizzato lato server
+// (ogni campo invalido/fuori range ricade sul default) prima di persistere, così
+// una config corrotta non può mai disabilitare le allerte.
+router.put("/db-monitor/thresholds", async (req, res) => {
+  try {
+    const saved = await saveOverloadThresholds(req.body);
+    return res.json({
+      thresholds: saved,
+      defaults: DEFAULT_OVERLOAD_THRESHOLDS,
+      bounds: OVERLOAD_THRESHOLD_BOUNDS,
+    });
   } catch (err) {
     return res.status(500).json({ error: (err as Error).message });
   }
