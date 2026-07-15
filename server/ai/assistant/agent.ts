@@ -28,7 +28,14 @@ import { withAresVramPriority } from "../../lib/vram-arbiter";
 import { composeQuebrachoQuestion } from "./quebracho-question";
 import { isQuebrachoConfigured, getQuebrachoModelId, streamQuebrachoChat } from "../../lib/quebracho-client";
 import { retrieveContext, formatRagContext, indexKnowledge } from "./rag";
-import { OLLAMA_TOOLS, HORUS_TOOLS } from "./tools";
+import {
+  OLLAMA_TOOLS,
+  HORUS_TOOLS,
+  buildBowieInterAgentTools,
+  buildRememberNoteTool,
+  buildReviewTaskPlanTool,
+} from "./tools";
+import { loadHorusMemory } from "./horus-memory";
 import {
   selectToolNamesForMessage,
   buildMissingToolInstruction,
@@ -176,7 +183,33 @@ export async function runAssistantAgent(opts: AssistantAgentOpts): Promise<Assis
   // usa HORUS_TOOLS: meteo, stato ThinkCentre, eventi vicini, ricerca web).
   // Ares passa per un endpoint dedicato (nessun tool calling server-side).
   const enableTools = requestedPersona === "bowie" || requestedPersona === "horus";
-  const toolsForPersona = requestedPersona === "horus" ? HORUS_TOOLS : OLLAMA_TOOLS;
+  // Task #50 — Set di tool costruito PER TURNO: al set base della persona
+  // (OLLAMA_TOOLS/HORUS_TOOLS) si aggiungono i tool inter-agente (solo Bowie;
+  // call_ares solo in sessioni admin), il tool di memoria (solo Horus) e il tool
+  // di revisione piani (Bowie e Horus). La selezione contestuale (sotto) filtra
+  // ulteriormente; il retry sentinella riesegue con l'intero `toolsForPersona`,
+  // così anche i nuovi tool sono coperti dall'auto-correzione.
+  const toolsForPersona: Record<string, unknown> = {
+    ...(requestedPersona === "horus" ? HORUS_TOOLS : OLLAMA_TOOLS),
+  };
+  if (requestedPersona === "bowie") {
+    Object.assign(
+      toolsForPersona,
+      buildBowieInterAgentTools({
+        isAdmin,
+        history: opts.history ?? [],
+        latestMessage: opts.message,
+        signal: opts.signal,
+      }),
+      buildReviewTaskPlanTool("bowie", { signal: opts.signal, allowFileRead: isAdmin }),
+    );
+  } else if (requestedPersona === "horus") {
+    Object.assign(
+      toolsForPersona,
+      buildRememberNoteTool(isAdmin),
+      buildReviewTaskPlanTool("horus", { signal: opts.signal, allowFileRead: isAdmin }),
+    );
+  }
 
   // Task #7 (#3) — Selezione contestuale + gating per capacità: invece di
   // allegare l'INTERO set di tool a ogni turno, alleghiamo solo il sottoinsieme
@@ -264,6 +297,17 @@ export async function runAssistantAgent(opts: AssistantAgentOpts): Promise<Assis
       codeContext: isAdmin ? opts.adminCodeContext : undefined,
       routingStatus,
     });
+    // Task #50 — Memoria persistente di Horus: le note salvate via remember_note
+    // in conversazioni precedenti vengono iniettate PRIMA del resto del prompt,
+    // così Horus "ricorda" tra sessioni diverse. Solo Horus le vede (Bowie/Ares/
+    // Quebracho non passano di qui). Best-effort: assente → nessuna sezione.
+    const horusMemory = await loadHorusMemory();
+    if (horusMemory) {
+      system =
+        "MEMORIA PERSISTENTE DI HORUS — note che hai salvato in conversazioni precedenti " +
+        "(usale se pertinenti al turno corrente, non citarle testualmente se non serve):\n\n" +
+        `${horusMemory}\n\n---\n\n${system}`;
+    }
   } else if (isAdmin) {
     // Task #4842 — Modalità admin: system prompt dedicato con snapshot piattaforma.
     // Soluzione 3 — codeContext da GitHub (tools/actions) iniettato opzionalmente.

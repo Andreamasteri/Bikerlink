@@ -127,6 +127,30 @@ const THINKCENTRE_RE =
 const WEB_SEARCH_RE =
   /cerca\s+(online|sul\s+web|in\s+rete|su\s+internet|in\s+internet)|ultime\s+notizie|\bnovità\b|\bnotizie\b|\bprezz\w+|normativ|regolament|aggiornament\w*[\s\S]*(web|internet|online)|sul\s+web\b|in\s+rete\b/i;
 
+// Task #50 — Tool inter-agente + memoria + revisione piani.
+//
+// call_horus: delega/consultazione esplicita di Horus, o intento di
+// routing/itinerario (Horus è lo specialista), oltre alla menzione diretta.
+const CALL_HORUS_RE =
+  /\bhorus\b|(chied\w*|chiam\w*|us\w*|deleg\w*|pass\w*|senti\w*|coinvolg\w*|fall?o?\s+fare)\s+(a\s+)?horus|(itinerari|percors\w+\s+moto|pianific\w*\s+(un\s+)?(percors|itinerari|gir[oi]))/i;
+
+// call_quebracho: parere/coinvolgimento di Quebracho (alias "qq"), o menzione diretta.
+const CALL_QUEBRACHO_RE =
+  /\bquebracho\b|\bqq\b|(chied\w*|chiam\w*|senti\w*|coinvolg\w*|pens\w*|parere)\s+[\s\S]*\b(quebracho|qq)\b|cosa\s+ne\s+pensa\s+quebracho/i;
+
+// call_ares: attivazione esplicita di Ares (solo admin — il gating avviene a
+// monte tramite la disponibilità del tool), o menzione diretta.
+const CALL_ARES_RE =
+  /\bares\b|(chiam\w*|attiv\w*|lanc\w*|avvi\w*|mand\w*|us\w*)\s+(ares|are)|ares\s+(analizz\w*|esamin\w*|guard\w*|controll\w*)/i;
+
+// remember_note: richiesta di memorizzare qualcosa (solo Horus vede il tool).
+const REMEMBER_NOTE_RE =
+  /\bricord\w+|memorizz\w+|non\s+dimenticare|tieni\s+a\s+mente|segna\w*|prendi\s+nota|appunt\w+|annot\w+/i;
+
+// review_task_plan: revisione di un task plan / piano di lavoro.
+const REVIEW_TASK_PLAN_RE =
+  /task\s*plan|(revision\w*|rivedi|rivedere|rived\w*|controll\w*|analizz\w*|esamin\w*|valut\w*)\s+(il\s+|questo\s+|un\s+|il\s+mio\s+)?(piano|task|task\s*plan)|review\s+(del\s+)?(task|piano)|(piano|task)\s+di\s+lavoro/i;
+
 /**
  * Restituisce i NOMI dei tool da allegare al turno, partendo dai tool
  * effettivamente disponibili per la persona (`availableToolNames`). Applica la
@@ -159,6 +183,15 @@ export function selectToolNamesForMessage(
     }
   }
   if (caps.webSearchAvailable && WEB_SEARCH_RE.test(m)) want("webSearch");
+
+  // Task #50 — Tool inter-agente / memoria / revisione. `want()` allega solo i
+  // tool DAVVERO disponibili per la persona (call_* solo Bowie, call_ares solo
+  // admin, remember_note solo Horus): la selezione contestuale non li "crea".
+  if (CALL_HORUS_RE.test(m)) want("call_horus");
+  if (CALL_QUEBRACHO_RE.test(m)) want("call_quebracho");
+  if (CALL_ARES_RE.test(m)) want("call_ares");
+  if (REMEMBER_NOTE_RE.test(m)) want("remember_note");
+  if (REVIEW_TASK_PLAN_RE.test(m)) want("review_task_plan");
 
   // Ordine stabile e deterministico = ordine di dichiarazione della persona.
   return availableToolNames.filter((n) => wanted.has(n));
