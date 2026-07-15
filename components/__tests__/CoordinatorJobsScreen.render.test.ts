@@ -186,18 +186,14 @@ describe("CoordinatorJobsScreen — render end-to-end con dati live", () => {
     const client = buildClient();
     await mount(client);
 
-    const jobCard = findByTestId("coordinator-job-routing-health-probe")[0];
-    const pausaBtn = jobCard.findAll(
-      (n) => (n.type as unknown) === "Text" && n.props.children === "Pausa",
-    )[0];
-    let cur = pausaBtn.parent;
-    while (cur && (cur.type as unknown) !== "TouchableOpacity") cur = cur.parent;
+    const pausaBtn = findByTestId("coordinator-job-routing-health-probe-pause")[0];
+    expect(pausaBtn).toBeTruthy();
 
     apiRequestMock.mockClear();
     mockApiRequestRouter();
 
     await act(async () => {
-      cur!.props.onPress();
+      pausaBtn.props.onPress();
     });
     await flushPromises();
 

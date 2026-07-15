@@ -197,6 +197,7 @@ export default function CoordinatorJobsScreen() {
                 disabled={busyJob === job.name}
                 style={styles.actionButton}
                 onPress={() => applyDirective(job.name, "pause")}
+                testID={`coordinator-job-${job.name}-pause`}
               >
                 <Text style={styles.actionButtonText}>Pausa</Text>
               </TouchableOpacity>
@@ -204,6 +205,7 @@ export default function CoordinatorJobsScreen() {
                 disabled={busyJob === job.name}
                 style={styles.actionButton}
                 onPress={() => applyDirective(job.name, "resume")}
+                testID={`coordinator-job-${job.name}-resume`}
               >
                 <Text style={styles.actionButtonText}>Riprendi</Text>
               </TouchableOpacity>
@@ -211,6 +213,7 @@ export default function CoordinatorJobsScreen() {
                 disabled={busyJob === job.name}
                 style={styles.actionButton}
                 onPress={() => applyDirective(job.name, "force")}
+                testID={`coordinator-job-${job.name}-force`}
               >
                 <Text style={styles.actionButtonText}>Forza ora</Text>
               </TouchableOpacity>
