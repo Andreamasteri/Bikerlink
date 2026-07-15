@@ -17,7 +17,10 @@ description: "Server non disponibile. Riprova tra un momento." across all app sc
 1. `EXPO_PUBLIC_DOMAIN` shared env var (persisted in `.replit [userenv.shared]`) — this is the one that wins.
 2. `eas.json` — `EXPO_PUBLIC_DOMAIN` per build profile (native builds read this).
 3. Hardcoded fallbacks `process.env.EXPO_PUBLIC_DOMAIN || "..."` in: `lib/query-client.ts`, `components/layout/AppStateHandler.tsx`, `lib/foreground-location-service.ts`, `lib/background-location-task.ts`, and the nested app `bowie-terminal/`.
-4. Server/scripts self-references (`server/site/render.ts`, `scripts/error-monitor.sh`, etc.) — lower priority.
+4. **Native code is NOT env-var driven** — `android/app/src/main/java/com/bikerlink/app/MainApplication.kt` hardcodes the startup-beacon URL as a literal; grep for it in `.kt`/`.java`/`.swift` explicitly.
+5. Server/scripts self-references (`server/site/render.ts`, `scripts/error-monitor.sh`) and user-facing PDF footers (`scripts/generate-*-pdf.mjs`, were `www.` prefixed → drop the non-resolving `www.`) — lower priority but still point users at a dead host.
+
+**Grep caveat:** a repo-wide `grep -rn <domain> .` TIMES OUT on `android/*/build` + `node_modules`. Search targeted dirs only: `app components lib server scripts android/app/src ios eas.json app.json` and exclude `/build/` + `server_dist` (compiled output, regenerates).
 
 **Verification that actually confirms the fix:** `curl -s -o /dev/null -w "%{http_code} %{content_type}" https://<host>/api/health` — the correct host returns `200 application/json`, the dead one `404 text/html`. After changing the env var, a FRESH shell/process must echo the new value before an OTA export will bake it in.
 

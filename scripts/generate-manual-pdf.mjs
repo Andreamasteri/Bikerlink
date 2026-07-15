@@ -152,7 +152,7 @@ function renderCover(doc) {
   doc.fill(WHITE).font('Helvetica').fontSize(11)
      .text('Italiano  ·  Guida Completa', 0, doc.page.height - 82, { align: 'center' });
   doc.fill(WHITE).font('Helvetica').fontSize(10)
-     .text('www.biker-link.replit.app', 0, doc.page.height - 58, { align: 'center' });
+     .text('bikerlink.replit.app', 0, doc.page.height - 58, { align: 'center' });
 }
 
 function renderFooter(doc, pageNum) {
@@ -244,7 +244,7 @@ function renderFinalPage(doc) {
   doc.fill(WHITE).font('Helvetica').fontSize(11)
      .text('Per assistenza: usa la sezione Feedback nel tuo profilo', 0, 355, { align: 'center' });
   doc.fill(WHITE).font('Helvetica').fontSize(10)
-     .text('www.biker-link.replit.app', 0, 380, { align: 'center' });
+     .text('bikerlink.replit.app', 0, 380, { align: 'center' });
   doc.fill(WHITE).font('Helvetica').fontSize(9)
      .text('Versione manuale: Aprile 2026  ·  App v1.1.0', 0, 405, { align: 'center' });
 }

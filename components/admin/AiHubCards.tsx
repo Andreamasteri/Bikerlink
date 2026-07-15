@@ -120,17 +120,52 @@ export function OllamaStatusCard() {
 
   const runTest = async () => {
     setLoading(true);
+    // Safety-net timeout: se il backend non risponde affatto (rete assente,
+    // host irraggiungibile) la fetch resterebbe appesa e il bottone girerebbe
+    // all'infinito. 75s è generoso di proposito — il test Ollama può impiegare
+    // 45-60s quando il modello qwen3 ragiona — così non abortiamo un test lento
+    // ma valido; scatta solo su un vero black-hole di rete.
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 75_000);
+    // Base per l'errorBox: la card mostra il riquadro d'errore solo quando
+    // `configured === true`, quindi ogni fallimento client-side deve settarlo.
+    const errBase = {
+      configured: true,
+      model: "—",
+      url: null,
+      token_configured: false,
+      latency_ms: null,
+      ok: false,
+    } as const;
     try {
       const url = new URL("/api/admin/ai/test-ollama", getApiUrl()).toString();
       const res = await fetch(url, {
         headers: authFetchHeaders(),
         credentials: "include",
+        signal: controller.signal,
       });
+      const ct = res.headers.get("content-type") || "";
+      if (!ct.includes("application/json")) {
+        // Risposta non-JSON (es. pagina HTML di errore da un proxy o da un host
+        // sbagliato): non fingere che sia andata bene, mostra un errore esplicito.
+        setResult({
+          ...errBase,
+          error: `Risposta non valida dal server (HTTP ${res.status}). Backend non raggiungibile.`,
+        });
+        return;
+      }
       const data: OllamaTestResult = await res.json();
       setResult(data);
-    } catch {
-      setResult(null);
+    } catch (err) {
+      const isAbort = err instanceof Error && err.name === "AbortError";
+      setResult({
+        ...errBase,
+        error: isAbort
+          ? "Ollama non raggiungibile: timeout (nessuna risposta dal server entro 75s)."
+          : `Errore di rete: ${err instanceof Error ? err.message : "Ollama non raggiungibile"}`,
+      });
     } finally {
+      clearTimeout(timer);
       setLoading(false);
     }
   };
