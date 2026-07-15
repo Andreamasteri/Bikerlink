@@ -374,6 +374,16 @@ async function runPostReady(needsFakeSeed: boolean): Promise<void> {
 
   ensureCompetitorAnalysisPdf();
 
+  // Push model→agent map to the ai-hub (fire-and-forget, never markDegraded).
+  void (async () => {
+    try {
+      const { pushAgentModelMapToHub } = await import("./lib/ai-hub-map-push");
+      await pushAgentModelMapToHub();
+    } catch (err) {
+      console.warn("[BOOT][POST-READY] ai-hub map push unexpected error (non-fatal):", err);
+    }
+  })();
+
   await runIndexDriftCheckPostReady();
   await runEmbeddingCoveragePostReady();
 
