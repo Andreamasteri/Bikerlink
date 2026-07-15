@@ -29,7 +29,8 @@ import {
   HORUS_THINK_TAG_CONTRACT,
   MANUAL_LANGUAGE_STYLE_BLOCK,
 } from "./codebase-inventory";
-import { finalizeAnalysisScan, finalizeManualScan } from "./horus-scanner-finalize";
+import { finalizeAnalysisScan } from "./horus-scanner-finalize";
+import { finalizeManualScan } from "./horus-scanner-finalize-manual";
 
 const BATCH_SIZE = 4;
 const TICK_DELAY_MS = 1500;

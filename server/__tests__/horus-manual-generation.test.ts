@@ -89,7 +89,7 @@ import {
   buildManualLexiconPrompt,
 } from "../ai/assistant/horus-scanner";
 import { MANUAL_LANGUAGE_STYLE_BLOCK } from "../ai/assistant/codebase-inventory";
-import { finalizeManualScan } from "../ai/assistant/horus-scanner-finalize";
+import { finalizeManualScan } from "../ai/assistant/horus-scanner-finalize-manual";
 import type { FileScanStore } from "../ai/assistant/codebase-inventory";
 
 const SIX_TARGETS = ["English", "Deutsch", "Español", "Français", "Ελληνικά", "Turco"];
