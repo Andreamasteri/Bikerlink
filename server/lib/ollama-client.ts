@@ -227,6 +227,14 @@ export interface OllamaChatOptions {
   /** Persona la cui config (URL/token) usare — default "bowie". */
   persona?: OllamaPersona;
   /**
+   * Override esplicito del modello da usare (es. HORUS_OLLAMA_MODEL quando si
+   * consulta Horus). Se assente, ricade su BOWIE_OLLAMA_MODEL — attenzione:
+   * `persona` sceglie solo l'endpoint (URL/token), NON il modello, quindi le
+   * chiamate per una persona diversa da Bowie DEVONO passare `model` esplicito
+   * o finiranno per usare il modello di Bowie.
+   */
+  model?: string;
+  /**
    * Task #5322 — Cap di lunghezza della risposta (Ollama `num_predict`). Usato per
    * ottenere risposte contenute (es. composizione domanda per Ares) SENZA toccare
    * il Modelfile/personalità. Se assente, il modello usa il suo default.
@@ -252,12 +260,15 @@ export async function callOllamaChat<T = string>(
   schema?: z.ZodType<T>,
   options: OllamaChatOptions = {},
 ): Promise<T> {
-  const { system, temperature = 0.2, abortSignal, maxRetries = 2, jsonRetries = 1, onRepair, persona = "bowie", numPredict } = options;
+  const { system, temperature = 0.2, abortSignal, maxRetries = 2, jsonRetries = 1, onRepair, persona = "bowie", numPredict, model: modelOverride } = options;
 
   // Provider options Ollama:
   //  - think:false disattiva il ragionamento esplicito di qwen3 (Bowie=qwen3:1.7b,
   //    Horus=qwen3:4b): senza, i blocchi <think> inquinerebbero le risposte in chat
   //    e romperebbero il JSON strutturato. Innocuo per modelli che non "pensano".
+  //    Nota Task #56: su Ollama 0.30.11 questo sopprime solo il tag <think> di
+  //    apertura — può restare un </think> orfano a fine blocco di ragionamento;
+  //    vedi stripThink() in inter-agent.ts per il caso Horus.
   //  - num_predict (Task #5322) cappa la lunghezza per risposte concise.
   const providerOptions = {
     ollama: {
@@ -272,7 +283,7 @@ export async function callOllamaChat<T = string>(
   if (await isThinkCentreOffline()) {
     throw new Error("Ollama non disponibile: ThinkCentre offline (spento o in manutenzione).");
   }
-  const model = getOllamaModel(undefined, persona);
+  const model = getOllamaModel(modelOverride, persona);
 
   if (!schema) {
     const { text } = await generateText({ model, instructions: system, prompt, temperature, maxRetries, abortSignal, providerOptions });

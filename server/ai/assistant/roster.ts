@@ -165,6 +165,15 @@ export function parseQuebrachoInvocation(message: string): boolean {
 export function parseHorusInvocation(message: string): boolean {
   const m = (message ?? "").toLowerCase();
   if (!m.includes("horus")) return false;
+  // Verificato live (Task #56): "chiedi a Horus perché ha scelto questa
+  // strada" è un CONSULTO mid-conversazione (Bowie inoltra la domanda e resta
+  // Bowie — il tool call_horus di tool-calling.ts), non una richiesta di
+  // prendere il controllo della conversazione. Prima di questa esclusione,
+  // qualunque "chiedi ... horus" vicino a una parola di contesto percorso
+  // (es. "strada") faceva scattare SEMPRE l'handoff completo, rendendo il
+  // tool call_horus di fatto irraggiungibile per questa frase. "chiama Horus"
+  // / "voglio parlare con Horus" restano handoff pieno.
+  if (/\bchied\w*\s+(a\s+)?horus\b/.test(m)) return false;
   return (
     /\b(chiam\w*|passa\w*|attiv\w*|interpell\w*|coinvolg\w*|sent[io]|invoc\w*|vogli\w*|fammi)\b[\s\w']*\bhorus\b/.test(m) ||
     /\bparl\w+\s+con\s+horus\b/.test(m) ||

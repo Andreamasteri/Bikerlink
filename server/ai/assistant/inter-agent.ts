@@ -37,14 +37,36 @@ const ARES_CONSULT_SYSTEM =
   "percorsi di risoluzione. REGOLA ASSOLUTA: proponi, non applichi mai modifiche — la decisione " +
   "resta all'admin. Rispondi in italiano, conciso e strutturato.";
 
+// Horus gira sull'infra Ollama del ThinkCentre ma con un MODELLO diverso da
+// Bowie (callOllamaChat sceglie l'endpoint in base a `persona`, ma NON il
+// modello — va passato esplicitamente o si finisce per usare il modello di
+// Bowie contro l'endpoint di Horus, causando "model not found").
+const HORUS_MODEL_ID = process.env.HORUS_OLLAMA_MODEL?.trim() || "qwen3:4b";
+
 const HORUS_TIMEOUT_MS = 60_000;
 const QUEBRACHO_TIMEOUT_MS = 60_000;
-const ARES_TIMEOUT_MS = 90_000;
+// Verificato live (2026-07-15): il cold-load di devstral:latest (14GB, CPU) su
+// Ares richiede tipicamente 55-90s (load_duration + prompt_eval su CPU) prima
+// di produrre anche solo il primo token: 90s era troppo risicato e faceva
+// scattare l'abort quasi sempre. Margine ampio perché l'attivazione di Ares è
+// rara (on-demand, solo admin) e la latenza percepita è comunque annunciata.
+const ARES_TIMEOUT_MS = 170_000;
 
 /** Rimuove i blocchi di ragionamento `<think>…</think>` che alcuni modelli (qwen3)
  *  emettono quando il think non è disattivato. Solo la risposta finale interessa. */
 function stripThink(text: string): string {
-  return (text ?? "").replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
+  let out = (text ?? "").replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
+  // Verificato live (2026-07-15): qwen3:4b su Ollama, anche con think:false,
+  // a volte omette il tag di apertura `<think>` ma lascia quello di chiusura
+  // `</think>` a fine ragionamento — il testo comincia DIRETTAMENTE col
+  // ragionamento grezzo. Se resta un `</think>` orfano, tutto ciò che lo
+  // precede è comunque da scartare.
+  const closeTag = "</think>";
+  const closeIdx = out.toLowerCase().indexOf(closeTag);
+  if (closeIdx !== -1) {
+    out = out.slice(closeIdx + closeTag.length).trim();
+  }
+  return out;
 }
 
 /**
@@ -95,9 +117,16 @@ export async function askHorus(
   try {
     const raw = await callOllamaChat(clean, undefined, {
       persona: "horus",
+      model: HORUS_MODEL_ID,
       system: HORUS_CONSULT_SYSTEM,
       temperature: 0.3,
-      numPredict: 700,
+      // Verificato live (2026-07-15): qwen3:4b continua a "pensare" ad alta
+      // verbosità anche con think:false (quirk del template/versione Ollama:
+      // il tag di apertura <think> sparisce ma il ragionamento resta nel
+      // content). Un numPredict basso tronca la risposta PRIMA che il modello
+      // arrivi al </think> e alla risposta vera — serve headroom sufficiente
+      // per lasciar chiudere il ragionamento e produrre comunque la risposta.
+      numPredict: 1600,
       abortSignal: t.signal,
     });
     const out = stripThink(raw ?? "");
