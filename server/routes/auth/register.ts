@@ -182,7 +182,11 @@ router.post("/register", registerLimiter, async (req: Request, res: Response) =>
       isPrimal,
     }));
 
-    await withDbTimeout(storage.createUserProfile({ userId: user.id }));
+    // Task #66 — create the profile hidden: with no coordinates yet, advertising
+    // it as visible would be a lie (map queries need non-null lat/lng, so the
+    // rider would never actually appear). It is revealed automatically the first
+    // time a real coordinate is stored (see revealOnFirstCoordinate).
+    await withDbTimeout(storage.createUserProfile({ userId: user.id, hideFromMap: true }));
 
     // Crea subito la riga match_preferences con i valori di default: il motore
     // di matching vede il nuovo utente senza aspettare che salvi manualmente le

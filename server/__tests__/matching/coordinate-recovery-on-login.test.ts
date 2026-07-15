@@ -23,6 +23,11 @@ import request from "supertest";
 vi.mock("../../db", () => ({
   db: {},
   pool: {},
+  // login.ts guards its DB access with these helpers; the mock must expose them
+  // or every handler call throws (TypeError) and returns 500.
+  withDbTimeout: <T,>(p: Promise<T>): Promise<T> => p,
+  DbTimeoutError: class DbTimeoutError extends Error {},
+  isPoolHealthy: () => true,
 }));
 
 vi.mock("../../storage", () => ({
@@ -320,6 +325,51 @@ describe("coordinate recovery on login — pre-existing user with null coords", 
         (data as Record<string, unknown>).longitude != null
     );
     expect(coordCalls).toHaveLength(0);
+  });
+
+  it("flips hide_from_map=true when no coordinate source is available (Task #66 invariant)", async () => {
+    vi.mocked(storage.getLatestCoordinateHistory).mockResolvedValue(null);
+    vi.mocked(storage.getUserByEmail).mockResolvedValue(makeBaseUser({ region: "UnknownRegion" }) as never);
+    vi.mocked(storage.getUser).mockResolvedValue(makeBaseUser({ region: "UnknownRegion" }) as never);
+    // Profile is advertised as visible (hide_from_map=false) but has no coords —
+    // exactly the stuck state from prod. With no recovery source, it must be
+    // flipped to hidden so the visibility state is truthful.
+    vi.mocked(storage.getUserProfile).mockResolvedValue(makeProfile() as never);
+
+    const res = await request(app).post("/api/auth/login").send(LOGIN_BODY);
+
+    expect(res.status).toBe(200);
+
+    await vi.waitFor(() => {
+      const calls = vi.mocked(storage.upsertUserProfile).mock.calls;
+      const hideCall = calls.find(
+        ([uid, data]) =>
+          uid === USER_ID && (data as Record<string, unknown>).hideFromMap === true
+      );
+      expect(hideCall).toBeDefined();
+    });
+  });
+
+  it("reveals a never-positioned profile (hide_from_map=false) on its first coordinate", async () => {
+    const CLIENT_LAT = 41.89;
+    const CLIENT_LNG = 12.48;
+
+    const res = await request(app)
+      .post("/api/auth/login")
+      .send({ ...LOGIN_BODY, latitude: CLIENT_LAT, longitude: CLIENT_LNG });
+
+    expect(res.status).toBe(200);
+
+    await vi.waitFor(() => {
+      const calls = vi.mocked(storage.upsertUserProfile).mock.calls;
+      const revealCall = calls.find(
+        ([uid, data]) =>
+          uid === USER_ID &&
+          (data as Record<string, unknown>).latitude === CLIENT_LAT &&
+          (data as Record<string, unknown>).hideFromMap === false
+      );
+      expect(revealCall).toBeDefined();
+    });
   });
 
   // -------------------------------------------------------------------------

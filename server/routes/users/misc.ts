@@ -2,6 +2,7 @@ import { Router, type Request, type Response } from "express";
 import { storage } from "../../storage";
 import { updateLocationSchema } from "@shared/validators";
 import { applyFakeZones, applyPositionFuzz, fuzzedCoordsForViewer, isPositionFuzzed } from "../users";
+import { revealOnFirstCoordinate } from "../../lib/map-visibility";
 import { triggerProposalProfileMatchingForZavorrina } from "../../matching-engine";
 import { sendBowieCloseSignalPush } from "../../push-notifications";
 
@@ -39,11 +40,13 @@ router.put("/location", requireAuth, async (req: Request, res: Response) => {
       fLat = fuzzed.lat;
       fLng = fuzzed.lng;
     }
-    const updateData = { latitude: fLat, longitude: fLng, coordinatesUpdatedAt: new Date() };
+    const baseUpdate = { latitude: fLat, longitude: fLng, coordinatesUpdatedAt: new Date() };
     if (existingProfile) {
+      // Task #66 — reveal a never-positioned profile now that it has real coords.
+      const updateData = revealOnFirstCoordinate(baseUpdate, existingProfile, fLat, fLng);
       await storage.updateUserProfile(userId, updateData);
     } else {
-      await storage.createUserProfile({ userId, ...updateData } as import("@shared/db").InsertUserProfile);
+      await storage.createUserProfile({ userId, ...baseUpdate } as import("@shared/db").InsertUserProfile);
     }
 
     const user = await storage.getUser(userId);

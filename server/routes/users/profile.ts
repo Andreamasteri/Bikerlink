@@ -3,6 +3,7 @@ import { storage } from "../../storage";
 import { updateUserMeSchema, updateProfileDynamicSchema, ghostModeSchema, privacySettingsSchema, availabilitySchema } from "@shared/validators";
 import { onlineTracker } from "../../online-tracker";
 import { applyFakeZones, applyPositionFuzz, captureFirstAvailabilityLocation } from "../users";
+import { revealOnFirstCoordinate } from "../../lib/map-visibility";
 import { createRegionalClubInvite } from "../motoclubs/utils";
 import { triggerProposalProfileMatchingForZavorrina } from "../../matching-engine";
 import { enqueueBioEmbedding } from "../../embeddings/bio-queue";
@@ -279,7 +280,9 @@ router.put("/profile/dynamic", requireAuth, async (req: Request, res: Response) 
     }
 
     if (existingProfile) {
-      const profile = await storage.updateUserProfile(userId, updateData);
+      // Task #66 — reveal a never-positioned profile now that it has real coords.
+      const finalUpdate = revealOnFirstCoordinate(updateData, existingProfile, fLat, fLng);
+      const profile = await storage.updateUserProfile(userId, finalUpdate);
       if (typeof isAvailable === "boolean") onlineTracker.setAvailability(userId, isAvailable);
 
       const user = await storage.getUser(userId);
@@ -428,7 +431,9 @@ router.put("/me/availability", requireAuth, async (req: Request, res: Response) 
     }
 
     if (existing) {
-      await storage.updateUserProfile(userId, updateData);
+      // Task #66 — reveal a never-positioned profile now that it has real coords.
+      const finalUpdate = revealOnFirstCoordinate(updateData, existing, fLat, fLng);
+      await storage.updateUserProfile(userId, finalUpdate);
     } else {
       await storage.createUserProfile({ userId, ...updateData } as InsertUserProfile);
     }

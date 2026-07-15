@@ -12,6 +12,7 @@ import { sendSuccess, sendError } from "../../lib/api-response";
 import { withDbTimeout, DbTimeoutError, isPoolHealthy } from "../../db";
 import { parseVisitorCookie, recordVisit } from "../../lib/visitor-tracking";
 import { createRegionalClubInvite } from "../motoclubs";
+import { revealOnFirstCoordinate } from "../../lib/map-visibility";
 import { addSessionSseClient, removeSessionSseClient } from "../../session-sse";
 import { closeSseClient } from "../../chat-sse";
 import { ITALIAN_REGION_CENTROIDS } from "../../lib/region-centroids";
@@ -96,8 +97,16 @@ router.post("/login", loginLimiter, async (req: Request, res: Response) => {
         console.warn("[login] upsertUserProfile failed:", e?.message);
       });
     }
+    const profileBeforeCoords = await storage.getUserProfile(user.id).catch(() => null);
     if (typeof loginLat === "number" && typeof loginLng === "number") {
-      storage.upsertUserProfile(user.id, { latitude: loginLat, longitude: loginLng, coordinatesUpdatedAt: new Date() } as Partial<InsertUserProfile>).catch(() => {});
+      // Task #66 — reveal a never-positioned profile now that it has real coords.
+      const coordUpdate = revealOnFirstCoordinate(
+        { latitude: loginLat, longitude: loginLng, coordinatesUpdatedAt: new Date() },
+        profileBeforeCoords,
+        loginLat,
+        loginLng,
+      );
+      storage.upsertUserProfile(user.id, coordUpdate as Partial<InsertUserProfile>).catch(() => {});
     }
 
     const sessionType: "mobile" | "web" =
@@ -128,12 +137,16 @@ router.post("/login", loginLimiter, async (req: Request, res: Response) => {
     if (userProfile && userProfile.latitude == null && userProfile.longitude == null) {
       (async () => {
         try {
+          // On a successful backfill the profile now has a position, so a
+          // never-positioned profile is revealed (Task #66 invariant); this is a
+          // no-op for profiles that are already visible.
           const historyCoord = await storage.getLatestCoordinateHistory(user.id);
           if (historyCoord) {
             await storage.upsertUserProfile(user.id, {
               latitude: historyCoord.latitude,
               longitude: historyCoord.longitude,
               coordinatesUpdatedAt: new Date(),
+              hideFromMap: false,
             } as Partial<InsertUserProfile>);
             console.log(`[login] coordinate recovered from history for user ${user.id}`);
             return;
@@ -146,6 +159,7 @@ router.post("/login", loginLimiter, async (req: Request, res: Response) => {
               latitude: lat,
               longitude: lng,
               coordinatesUpdatedAt: new Date(),
+              hideFromMap: false,
             } as Partial<InsertUserProfile>);
             console.log(`[login] coordinate recovered from firstLogin for user ${user.id}`);
             return;
@@ -157,8 +171,18 @@ router.post("/login", loginLimiter, async (req: Request, res: Response) => {
               latitude: centroid[0],
               longitude: centroid[1],
               coordinatesUpdatedAt: new Date(),
+              hideFromMap: false,
             } as Partial<InsertUserProfile>);
             console.log(`[login] coordinate recovered from region centroid for user ${user.id}`);
+            return;
+          }
+          // Task #66 — no coordinate source available. Rather than leave the
+          // profile advertised as visible with no position (a silent trust gap:
+          // the rider believes they're on the map but never appears), flip it to
+          // hidden until they actually provide a location.
+          if (userProfile.hideFromMap === false) {
+            await storage.upsertUserProfile(user.id, { hideFromMap: true } as Partial<InsertUserProfile>);
+            console.log(`[login] no coordinate source — profile hidden until positioned for user ${user.id}`);
           }
         } catch (e) {
           console.warn("[login] coordinate recovery failed (non-blocking):", (e as Error)?.message);
