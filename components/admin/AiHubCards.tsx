@@ -1,9 +1,105 @@
 import React from "react";
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Switch, Alert } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import Colors from "@/constants/colors";
-import { getApiUrl, authFetchHeaders } from "@/lib/query-client";
+import { getApiUrl, authFetchHeaders, apiRequest, queryClient } from "@/lib/query-client";
+
+// ── FallbackSwitchCard (Task #110) ────────────────────────────────────────────
+// Master switch globale: ON = fallback cloud (Groq/Gemini/OpenAI) consentito,
+// OFF (default) = SOLO i modelli self-hosted ThinkCentre. Mostra la modalità
+// effettiva accanto allo stato provider e permette di cambiarla.
+
+export function FallbackSwitchCard() {
+  const { data, isLoading } = useQuery<{ enabled: boolean }>({
+    queryKey: ["/api/admin/ai/fallback-switch"],
+    queryFn: async () => (await apiRequest("GET", "/api/admin/ai/fallback-switch")).json(),
+    staleTime: 15_000,
+  });
+
+  const enabled = data?.enabled ?? false;
+
+  const toggle = useMutation({
+    mutationFn: async (next: boolean) =>
+      (await apiRequest("POST", "/api/admin/ai/fallback-switch", { enabled: next })).json(),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/ai/fallback-switch"] });
+    },
+    onError: (err) =>
+      Alert.alert("Errore", err instanceof Error ? err.message : "Impossibile aggiornare il fallback AI"),
+  });
+
+  const modeColor = enabled ? Colors.warning : Colors.success;
+  const modeLabel = enabled ? "Fallback: ON — cloud consentito" : "Fallback: OFF — solo ThinkCentre";
+  const modeIcon: keyof typeof MaterialCommunityIcons.glyphMap = enabled ? "cloud-outline" : "server-security";
+
+  return (
+    <View style={fallbackStyles.card}>
+      <View style={fallbackStyles.header}>
+        <View style={fallbackStyles.headerLeft}>
+          <MaterialCommunityIcons name={modeIcon} size={20} color={modeColor} />
+          <Text style={fallbackStyles.title}>Fallback AI</Text>
+        </View>
+        <View style={fallbackStyles.headerRight}>
+          {isLoading || toggle.isPending ? (
+            <ActivityIndicator size="small" color={Colors.textSecondary} />
+          ) : (
+            <Switch
+              value={enabled}
+              onValueChange={(next) => toggle.mutate(next)}
+              trackColor={{ false: Colors.border, true: Colors.warning + "88" }}
+              thumbColor={enabled ? Colors.warning : Colors.success}
+            />
+          )}
+        </View>
+      </View>
+      <View style={fallbackStyles.body}>
+        <View style={[fallbackStyles.modeBadge, { borderColor: modeColor, backgroundColor: modeColor + "1A" }]}>
+          <MaterialCommunityIcons name={modeIcon} size={13} color={modeColor} />
+          <Text style={[fallbackStyles.modeText, { color: modeColor }]}>{modeLabel}</Text>
+        </View>
+        <Text style={fallbackStyles.hint}>
+          {enabled
+            ? "ON: le AI usano prima ThinkCentre (Ollama), poi ricadono su Groq/Gemini/OpenAI se il self-hosted non risponde. Comportamento multi-provider completo."
+            : "OFF (default): tutta l'app usa SOLO i modelli self-hosted ThinkCentre. Nessuna chiamata cloud viene mai tentata; se il self-hosted non è disponibile la funzione degrada con un avviso."}
+        </Text>
+      </View>
+    </View>
+  );
+}
+
+const fallbackStyles = StyleSheet.create({
+  card: {
+    backgroundColor: Colors.surface,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    marginBottom: 16,
+    overflow: "hidden",
+  },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    padding: 14,
+  },
+  headerLeft: { flexDirection: "row", alignItems: "center", gap: 8, flex: 1 },
+  headerRight: { flexDirection: "row", alignItems: "center", gap: 8 },
+  title: { fontFamily: "Inter_600SemiBold", fontSize: 14, color: Colors.text },
+  body: { borderTopWidth: 1, borderTopColor: Colors.border, padding: 14, gap: 10 },
+  modeBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    alignSelf: "flex-start",
+    gap: 5,
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+  },
+  modeText: { fontFamily: "Inter_700Bold", fontSize: 12, letterSpacing: 0.2 },
+  hint: { fontFamily: "Inter_400Regular", fontSize: 12, color: Colors.textSecondary, lineHeight: 18 },
+});
 
 // ── OllamaStatusCard ─────────────────────────────────────────────────────────
 

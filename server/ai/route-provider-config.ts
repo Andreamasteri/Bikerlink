@@ -14,6 +14,7 @@
  */
 
 import { storage } from "../storage";
+import { isAiFallbackEnabled, isAiFallbackEnabledSync } from "./fallback-switch";
 import { isOllamaConfigured } from "../lib/ollama-client";
 import { isGroqConfigured } from "../lib/groq-client";
 import { isOpenAiRouteConfigured } from "../lib/openai-route-client";
@@ -38,6 +39,11 @@ function parseChain(raw: string): RouteProviderId[] {
  * 3. Default ["ollama","groq","gemini"]
  */
 export async function getEffectiveRouteChain(): Promise<RouteProviderId[]> {
+  // Task #110 — Master switch "Fallback AI" OFF (default): chain self-hosted-only
+  // (solo Ollama/ThinkCentre), a prescindere da env override, config DB salvata o
+  // chiavi cloud presenti. Con OFF nessun provider cloud viene mai tentato.
+  if (!(await isAiFallbackEnabled())) return ["ollama"];
+
   const envOverride = process.env.ROUTE_AI_PROVIDERS;
   if (envOverride && envOverride !== "auto") {
     const parsed = parseChain(envOverride);
@@ -65,6 +71,9 @@ export async function getEffectiveRouteChain(): Promise<RouteProviderId[]> {
  * Per la chain DB usare getEffectiveRouteChain().
  */
 export function getEffectiveRouteChainSync(): RouteProviderId[] {
+  // Task #110 — master switch OFF (default): self-hosted-only.
+  if (!isAiFallbackEnabledSync()) return ["ollama"];
+
   const envOverride = process.env.ROUTE_AI_PROVIDERS;
   if (envOverride && envOverride !== "auto") {
     const parsed = parseChain(envOverride);

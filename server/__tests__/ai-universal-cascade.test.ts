@@ -32,6 +32,16 @@ vi.mock("../storage", () => ({
   },
 }));
 
+// Task #110 — questo file verifica il comportamento con "Fallback AI" ON (cascade
+// cloud completa). Il default reale è OFF (solo ThinkCentre), coperto da
+// task-110-fallback-switch.test.ts.
+vi.mock("../ai/fallback-switch", () => ({
+  isAiFallbackEnabled: vi.fn().mockResolvedValue(true),
+  isAiFallbackEnabledSync: vi.fn().mockReturnValue(true),
+  setAiFallbackEnabled: vi.fn().mockResolvedValue(undefined),
+  invalidateAiFallbackCache: vi.fn(),
+}));
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------

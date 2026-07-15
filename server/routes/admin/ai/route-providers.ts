@@ -23,6 +23,7 @@ import {
   type RouteProviderId,
 } from "../../../ai/route-provider-config";
 import { storage } from "../../../storage";
+import { isAiFallbackEnabled, setAiFallbackEnabled } from "../../../ai/fallback-switch";
 import { callOllamaChat, isOllamaConfigured } from "../../../lib/ollama-client";
 import { getGroqModel, isGroqConfigured } from "../../../lib/groq-client";
 import { getOpenAiRouteModel, isOpenAiRouteConfigured } from "../../../lib/openai-route-client";
@@ -81,6 +82,19 @@ router.post("/route-providers/test", async (req: Request, res: Response) => {
 
   const { provider } = parsed.data;
   const start = Date.now();
+
+  // Task #110 — Master switch "Fallback AI" OFF (default): i provider cloud non
+  // devono essere raggiunti nemmeno da un test manuale. Ollama (self-hosted) è
+  // sempre testabile; per groq/gemini/openai ritorna un esito chiaro senza chiamare.
+  if (provider !== "ollama" && !(await isAiFallbackEnabled())) {
+    res.json({
+      success: false,
+      ok: false,
+      latency_ms: 0,
+      error: "Fallback AI disattivato (solo ThinkCentre): i provider cloud non sono testabili finché il master switch è OFF.",
+    });
+    return;
+  }
 
   try {
     if (provider === "ollama") {
@@ -170,6 +184,37 @@ router.post("/route-providers/config", async (req: Request, res: Response) => {
     res.json({ success: true, ok: true, ...data });
   } catch (err) {
     console.error("[admin/ai/route-providers/config] POST error:", err);
+    sendError(res, 500, (err as Error).message);
+  }
+});
+
+// ── Task #110 — Master switch globale "Fallback AI" ──────────────────────────
+// GET  /ai/fallback-switch  → { enabled } — stato effettivo del toggle globale.
+// POST /ai/fallback-switch  → { enabled } — ON = fallback cloud consentito,
+//                                            OFF (default) = solo ThinkCentre.
+router.get("/fallback-switch", async (_req: Request, res: Response) => {
+  try {
+    const enabled = await isAiFallbackEnabled();
+    res.json({ enabled });
+  } catch (err) {
+    console.error("[admin/ai/fallback-switch] GET error:", err);
+    sendError(res, 500, (err as Error).message);
+  }
+});
+
+const FallbackBody = z.object({ enabled: z.boolean() });
+
+router.post("/fallback-switch", async (req: Request, res: Response) => {
+  const parsed = FallbackBody.safeParse(req.body);
+  if (!parsed.success) {
+    sendError(res, 400, parsed.error.issues[0].message);
+    return;
+  }
+  try {
+    await setAiFallbackEnabled(parsed.data.enabled);
+    res.json({ success: true, ok: true, enabled: parsed.data.enabled });
+  } catch (err) {
+    console.error("[admin/ai/fallback-switch] POST error:", err);
     sendError(res, 500, (err as Error).message);
   }
 });

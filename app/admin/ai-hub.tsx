@@ -19,7 +19,7 @@ import { apiRequest } from "@/lib/query-client";
 import { useAiActionQueue } from "@/hooks/admin/ai-console/useAiActionQueue";
 import { useAiAlertsState } from "@/hooks/admin/ai-console/useAiAlerts";
 import { useAiPinned } from "@/hooks/admin/ai-console/useAiPinned";
-import { OllamaStatusCard, AiMetricsCard } from "@/components/admin/AiHubCards";
+import { OllamaStatusCard, AiMetricsCard, FallbackSwitchCard } from "@/components/admin/AiHubCards";
 
 interface AiHubCardData {
   state: "ok" | "warn" | "frozen";
@@ -230,6 +230,7 @@ export default function AiHubScreen() {
           />
         </TouchableOpacity>
       ) : null}
+      <FallbackSwitchCard />
       <OllamaStatusCard />
       <AiMetricsCard />
       <View style={styles.grid}>

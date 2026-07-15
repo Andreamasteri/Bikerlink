@@ -10,6 +10,7 @@ import { limiters } from "../../lib/throttle";
 import { storage } from "../../storage";
 import { getOllamaModel, isOllamaConfigured } from "../../lib/ollama-client";
 import { isThinkCentreOffline } from "../../lib/thinkcentre-offline";
+import { isAiFallbackEnabled, isAiFallbackEnabledSync } from "../fallback-switch";
 import type { AiProviderHealth, AiProviderId } from "./types";
 import {
   isGroqTpdExceededSync,
@@ -348,6 +349,14 @@ async function readPreferredProvider(): Promise<AiProviderId | "auto"> {
 
 export function resolveModel(opts: ResolveOpts = {}): ResolvedModel {
   const role: ModelRole = opts.role ?? "brain";
+  // Task #110 — Master switch "Fallback AI" OFF (default): resolveModel costruisce
+  // SOLO modelli cloud (Ollama passa da tryBuildOllama), quindi con il fallback
+  // disattivato lancia un errore chiaro invece di raggiungere un provider cloud.
+  if (!isAiFallbackEnabledSync()) {
+    throw new Error(
+      "AI_SELFHOSTED_ONLY: fallback cloud disattivato (solo ThinkCentre) — nessun provider cloud disponibile",
+    );
+  }
   const chain = buildChain(role, opts.preferredProvider);
   for (const id of chain) {
     const m = tryBuild(id, role, opts.forcedModelId);
@@ -371,10 +380,18 @@ export async function runWithFallback<T>(
   const chain = buildChain(role, preferred);
   let lastErr: unknown = null;
 
+  // Task #110 — Master switch "Fallback AI". Quando OFF (default) l'intera app usa
+  // SOLO il modello self-hosted ThinkCentre (Ollama): la chain cloud (Groq/Gemini/
+  // OpenAI) NON viene mai tentata. In OFF ignoriamo skipOllama così un tentativo
+  // self-hosted avviene comunque; se fallisce, si propaga un errore chiaro.
+  const fallbackEnabled = await isAiFallbackEnabled();
+
   // Ollama-first: se configurato e non esplicitamente saltato, prova Ollama
   // prima della chain cloud. Ollama è self-hosted e a costo zero; se è offline
   // o risponde lentamente la chain cloud prosegue senza impatto su health/cooldown.
-  if (!opts.skipOllama && !(await isThinkCentreOffline())) {
+  // Con il master switch OFF il tentativo self-hosted è forzato (self-hosted-only).
+  const attemptOllamaFirst = fallbackEnabled ? !opts.skipOllama : true;
+  if (attemptOllamaFirst && !(await isThinkCentreOffline())) {
     const om = tryBuildOllama();
     if (om) {
       try {
@@ -383,9 +400,22 @@ export async function runWithFallback<T>(
         return { value, model: om };
       } catch (err) {
         lastErr = err;
-        console.warn(`[ai-provider] ollama-first fallito, scalo a chain cloud:`, (err as Error).message);
+        console.warn(
+          `[ai-provider] ollama-first fallito${fallbackEnabled ? ", scalo a chain cloud" : " (fallback cloud disattivato)"}:`,
+          (err as Error).message,
+        );
       }
     }
+  }
+
+  // Task #110 — Master switch OFF: non toccare MAI la chain cloud. Degrada con un
+  // errore chiaro così i caller possono gestire il fallimento invece di raggiungere
+  // silenziosamente un provider cloud.
+  if (!fallbackEnabled) {
+    if (lastErr) throw lastErr;
+    throw new Error(
+      "AI_SELFHOSTED_UNAVAILABLE: fallback cloud disattivato (solo ThinkCentre) e il modello self-hosted non è disponibile",
+    );
   }
 
   for (const id of chain) {

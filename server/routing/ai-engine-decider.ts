@@ -10,6 +10,7 @@
 import { z } from "zod";
 import { generateObject } from "ai";
 import { runWithFallback, generateStructured } from "../ai/moderation/provider";
+import { isAiFallbackEnabled } from "../ai/fallback-switch";
 import { getRoutingCounters, getRecentLatencies, getBboxEngineQuality, bboxKeyOf, type BboxEngineQuality } from "./routing-metrics";
 import { withRoutingAiPriority } from "../ai/ai-priority-gate";
 
@@ -176,6 +177,13 @@ export async function decideEngineWithAI(
     }
 
     // ── Fase 2: chain cloud con budget residuo (abortSignal globale) ─────────
+    // Task #110 — Master switch "Fallback AI" OFF (default): nessuna chiamata cloud.
+    // Ollama è già stato tentato nella Fase 1; ritorna null → il selettore
+    // deterministico normale subentra, senza raggiungere alcun provider cloud.
+    if (!(await isAiFallbackEnabled())) {
+      clearTimeout(globalTimer);
+      return null;
+    }
     const remainingMs = timeoutMs - (Date.now() - startTs);
     if (remainingMs <= 0) {
       clearTimeout(globalTimer);
