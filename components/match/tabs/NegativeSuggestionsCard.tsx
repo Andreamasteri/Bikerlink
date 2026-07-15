@@ -13,6 +13,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import Colors from "@/constants/colors";
 import { apiRequest } from "@/lib/query-client";
+import { SectionErrorState } from "@/components/profile/SectionErrorState";
 
 interface Suggestion {
   id: string;
@@ -46,7 +47,7 @@ export function NegativeSuggestionsCard() {
   const queryClient = useQueryClient();
   const queryKey = ["/api/match-negative-preferences/suggestions"];
 
-  const { data, isLoading } = useQuery<{ suggestions: Suggestion[] }>({
+  const { data, isLoading, isError, refetch } = useQuery<{ suggestions: Suggestion[] }>({
     queryKey,
     refetchOnWindowFocus: false,
   });
@@ -72,7 +73,19 @@ export function NegativeSuggestionsCard() {
     },
   });
 
-  if (isLoading || !data) return null;
+  if (isLoading) return null;
+
+  if (isError) {
+    return (
+      <SectionErrorState
+        title="Suggerimenti di esclusione non disponibili"
+        hint="Tocca per riprovare"
+        onRetry={() => refetch()}
+      />
+    );
+  }
+
+  if (!data) return null;
   const suggestions = data.suggestions ?? [];
   if (suggestions.length === 0) return null;
 
