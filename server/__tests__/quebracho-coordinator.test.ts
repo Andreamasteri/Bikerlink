@@ -34,6 +34,12 @@ vi.mock("../lib/quebracho-client", () => ({
   resetQuebrachoProbeCache: vi.fn(),
 }));
 
+const isOllamaReachableMock = vi.hoisted(() => vi.fn(async () => true));
+vi.mock("../lib/ollama-client", () => ({
+  isOllamaReachable: isOllamaReachableMock,
+  resetOllamaProbeCache: vi.fn(),
+}));
+
 vi.mock("../lib/dedup-logger", () => ({ dedupWarn: vi.fn() }));
 
 const isAiPausedMock = vi.hoisted(() => vi.fn(async () => false));
@@ -67,6 +73,7 @@ beforeEach(() => {
   isPoolHealthyMock.mockReset().mockReturnValue(true);
   isThinkCentreOfflineMock.mockReset().mockResolvedValue(false);
   isQuebrachoReachableMock.mockReset().mockResolvedValue(true);
+  isOllamaReachableMock.mockReset().mockResolvedValue(true);
   isAiPausedMock.mockReset().mockResolvedValue(false);
   evaluateEventMock.mockReset().mockReturnValue({ action: "ALLOW", message: "" });
 });
@@ -157,6 +164,42 @@ describe("direttive per-job + fallback Quebracho", () => {
     isThinkCentreOfflineMock.mockResolvedValue(true);
     const d = await canRunJob("job-d");
     expect(d.allowed).toBe(true);
+  });
+
+  it("una pausa di Horus è rispettata SOLO se Horus è raggiungibile", async () => {
+    registerJob("job-h1");
+    await applyJobDirective("job-h1", "pause", { reason: "guard escalation" }, "horus");
+    isOllamaReachableMock.mockResolvedValue(true); // Horus online
+    const d = await canRunJob("job-h1");
+    expect(d.allowed).toBe(false);
+    expect(d.source).toBe("horus");
+  });
+
+  it("fallback: una pausa di Horus viene IGNORATA se Horus è irraggiungibile", async () => {
+    registerJob("job-h2");
+    await applyJobDirective("job-h2", "pause", { reason: "guard escalation" }, "horus");
+    isOllamaReachableMock.mockResolvedValue(false); // Horus (Ollama self-hosted) offline
+    const d = await canRunJob("job-h2");
+    // La pausa auto-emessa da Horus non sopravvive all'outage dell'emittente:
+    // una volta risolto il problema il job può ripartire (fail-open).
+    expect(d.allowed).toBe(true);
+  });
+
+  it("fallback: TC offline conta come Horus irraggiungibile", async () => {
+    registerJob("job-h3");
+    await applyJobDirective("job-h3", "pause", {}, "horus");
+    isThinkCentreOfflineMock.mockResolvedValue(true);
+    const d = await canRunJob("job-h3");
+    expect(d.allowed).toBe(true);
+  });
+
+  it("fallback Horus indipendente da Quebracho: Quebracho online non tiene viva la pausa Horus", async () => {
+    registerJob("job-h4");
+    await applyJobDirective("job-h4", "pause", { reason: "guard escalation" }, "horus");
+    isQuebrachoReachableMock.mockResolvedValue(true); // Quebracho raggiungibile
+    isOllamaReachableMock.mockResolvedValue(false); // ma Horus no
+    const d = await canRunJob("job-h4");
+    expect(d.allowed).toBe(true); // conta la reachability di Horus, non di Quebracho
   });
 
   it("resume rimuove la pausa", async () => {
