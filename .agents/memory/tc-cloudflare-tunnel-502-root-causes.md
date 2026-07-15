@@ -37,6 +37,11 @@ only, not that you edited the loaded file.
 match the current `GRAPHHOPPER_TOKEN` Replit secret (different length, clearly
 rotated at some point without updating nginx). Verify with a SHA-256 prefix
 comparison (never print either raw value) before assuming "403 = my rule is wrong."
+**Now auto-detected:** the health-panel GH probe (`thinkcentre-health-gh-probes.ts`)
+no longer treats a 401/403 on `/health` as green ("reachable"); it surfaces an
+explicit "token non combaciante / token drift" message distinct from unreachable.
+One-off/cron check: `npx tsx scripts/check-graphhopper-token.ts` classifies each
+area as ok / token-mismatch / unreachable (exit 2 = drift, 3 = all unreachable).
 
 ## 3. tc.biker-link.net/probe/redis — the TC agent process wasn't running at all
 `tc.biker-link.net` ingress → `127.0.0.1:9199` (nginx `tc_agent_backend` upstream)

@@ -159,20 +159,20 @@ export async function httpProbe(
   url: string,
   headers: Record<string, string>,
   isHealthy: (status: number) => boolean = (status) => status >= 200 && status < 300,
-): Promise<{ ok: boolean; latencyMs: number | null; error?: string }> {
+): Promise<{ ok: boolean; latencyMs: number | null; error?: string; status?: number }> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), PROBE_TIMEOUT_MS);
   const t0 = Date.now();
   try {
     const res = await fetch(url, { method: "GET", headers, signal: controller.signal });
     const latencyMs = Date.now() - t0;
-    if (isHealthy(res.status)) return { ok: true, latencyMs };
+    if (isHealthy(res.status)) return { ok: true, latencyMs, status: res.status };
     const body = await readBodySafe(res);
     const bodySnippet = body.trim().slice(0, 400);
     const error = bodySnippet
       ? sanitizeError(`HTTP ${res.status} — ${bodySnippet}`)
       : `HTTP ${res.status}`;
-    return { ok: false, latencyMs, error };
+    return { ok: false, latencyMs, error, status: res.status };
   } catch (err: unknown) {
     const raw = err instanceof Error ? err.message : String(err);
     let classified: string;

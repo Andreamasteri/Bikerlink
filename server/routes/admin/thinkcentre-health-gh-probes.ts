@@ -73,6 +73,19 @@ export interface GraphHopperHealth {
 
 // ── GraphHopper ───────────────────────────────────────────────────────────────
 
+/**
+ * Costruisce un messaggio d'errore esplicito per un 401/403 sul GraphHopper del
+ * ThinkCentre, distinguendo "token mancante nella app" da "token che non combacia
+ * con l'X-GH-Token hardcoded nella nginx del ThinkCentre" (drift). Serve a non
+ * scambiare un 403 di autenticazione per un generico "servizio down".
+ */
+function ghAuthMismatchError(status: number, tokenMissing: boolean, bodySnippet?: string): string {
+  const base = tokenMissing
+    ? `Token mancante (HTTP ${status}) — GRAPHHOPPER_TOKEN non è configurato nella app`
+    : `Token non combaciante (HTTP ${status}) — GRAPHHOPPER_TOKEN diverso dall'X-GH-Token nella nginx del ThinkCentre (token drift)`;
+  return sanitizeError(bodySnippet ? `${base} — ${bodySnippet}` : base);
+}
+
 async function graphHopperRouteProbe(
   base: string,
   token: string | undefined,
@@ -100,9 +113,14 @@ async function graphHopperRouteProbe(
     if (res.status >= 200 && res.status < 300) return { ok: true, latencyMs };
     const body = await readBodySafe(res);
     const bodySnippet = body.trim().slice(0, 400);
-    const error = bodySnippet
-      ? sanitizeError(`HTTP ${res.status} — ${bodySnippet}`)
-      : `HTTP ${res.status}`;
+    let error: string;
+    if (res.status === 401 || res.status === 403) {
+      error = ghAuthMismatchError(res.status, !token || token.trim() === "", bodySnippet);
+    } else {
+      error = bodySnippet
+        ? sanitizeError(`HTTP ${res.status} — ${bodySnippet}`)
+        : `HTTP ${res.status}`;
+    }
     return { ok: false, latencyMs, error };
   } catch (err: unknown) {
     const raw = err instanceof Error ? err.message : String(err);
@@ -152,14 +170,29 @@ async function probeGraphHopperArea(
   const areaBase = `${base}${area.path}`;
   const headers: Record<string, string> = { ...cfAccessHeaders() };
   if (token) headers["X-GH-Token"] = token;
-  const health = await httpProbe(
-    `${areaBase}/health`,
-    headers,
-    (status) => (status >= 200 && status < 300) || status === 401 || status === 403,
-  );
+  // Solo 2xx = OK: un 401/403 NON è "raggiungibile quindi ok", è un token rifiutato
+  // (drift) che va reso esplicito, non mascherato da stato verde.
+  const health = await httpProbe(`${areaBase}/health`, headers);
   if (health.ok) {
     recordProbeLog(historyKey, { timestamp: Date.now(), ok: true, latencyMs: health.latencyMs, detail: "health OK" });
     return { ...baseShape, enabled: true, ok: true, startingUp: false, latencyMs: health.latencyMs, history: getHistory(historyKey), probeLog: getProbeLog(historyKey) };
+  }
+  // Token drift: la /health raggiunge il servizio ma il token è rifiutato.
+  if (health.status === 401 || health.status === 403) {
+    const finalError = ghAuthMismatchError(health.status, !token || token.trim() === "");
+    console.error(`[thinkcentre-probe] graphhopper ${area.codice} token mismatch`, { status: health.status });
+    recordError(historyKey, finalError);
+    recordProbeLog(historyKey, { timestamp: Date.now(), ok: false, latencyMs: health.latencyMs, detail: finalError });
+    return {
+      ...baseShape,
+      enabled: true,
+      ok: false,
+      startingUp: false, // un errore di autenticazione non è un cold-start
+      latencyMs: health.latencyMs,
+      error: finalError,
+      history: getHistory(historyKey),
+      probeLog: getProbeLog(historyKey),
+    };
   }
   const route = await graphHopperRouteProbe(areaBase, token, areaProbePoints(area));
   if (!route.ok) {
