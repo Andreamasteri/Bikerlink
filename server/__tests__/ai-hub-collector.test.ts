@@ -114,4 +114,45 @@ describe("ai-hub collector — autenticazione e comportamento probe", () => {
     expect(mockSetHubReachable).not.toHaveBeenCalled();
     expect(signals.some((s) => s.metric === "ai_hub.absent")).toBe(true);
   });
+
+  it("ping_ms severity info se latenza ≤ 3000ms, warn se > 3000ms (SLA Task #161)", async () => {
+    // Verifica che la soglia <3s sia rispettata nel collector: latenza entro SLA →
+    // severity "info"; latenza oltre SLA → severity "warn". La soglia è codificata
+    // in ai-hub-collector.ts (latencyMs > 3000 ? "warn" : "info") e questa suite
+    // la ancora al test così una modifica accidentale viene intercettata.
+    vi.useFakeTimers();
+
+    // ── Caso 1: risposta veloce (< 3000ms) → severity "info" ──
+    mockHubGet.mockImplementation(() =>
+      Promise.resolve({ ok: true, status: 200, data: { ok: true } }),
+    );
+    // La probe usa Date.now() che sotto fake timers è fermo a t=0:
+    // started = 0, after hubGet ≈ 0 → latencyMs ≈ 0 → "info".
+    const fastSignals = await collectAiHub();
+    vi.useRealTimers();
+
+    const fastPing = fastSignals.find((s) => s.metric === "ai_hub.ping_ms");
+    expect(fastPing).toBeDefined();
+    expect(fastPing?.severity).toBe("info");
+
+    // ── Caso 2: risposta lenta (> 3000ms) → severity "warn" ──
+    vi.useFakeTimers();
+    let resolveSlowHub!: () => void;
+    mockHubGet.mockImplementation(
+      () =>
+        new Promise<{ ok: boolean; status: number; data: { ok: boolean } }>((resolve) => {
+          resolveSlowHub = () => resolve({ ok: true, status: 200, data: { ok: true } });
+        }),
+    );
+    const slowPromise = collectAiHub();
+    // Avanza 3500ms PRIMA che hubGet risolva → latencyMs = 3500 → "warn".
+    await vi.advanceTimersByTimeAsync(3500);
+    resolveSlowHub();
+    const slowSignals = await slowPromise;
+    vi.useRealTimers();
+
+    const slowPing = slowSignals.find((s) => s.metric === "ai_hub.ping_ms");
+    expect(slowPing).toBeDefined();
+    expect(slowPing?.severity).toBe("warn");
+  });
 });

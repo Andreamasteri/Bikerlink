@@ -112,4 +112,37 @@ describe("ai-hub-client", () => {
     expect(res.ok).toBe(false);
     expect(fetchMock).not.toHaveBeenCalled();
   });
+
+  it("fetch che non risponde → abortisce dopo HUB_TIMEOUT_MS e ritorna { ok:false, error:'timeout …' }", async () => {
+    // Task #161 — verifica che l'AbortController scatti correttamente dopo 8s
+    // (HUB_TIMEOUT_MS). Con vi.useFakeTimers() setTimeout è sostituito.
+    // Il mock fetch DEVE reagire al segnale di abort (altrimenti la Promise
+    // non risolve mai e il test timeouterebbe da solo).
+    vi.useFakeTimers();
+    fetchMock.mockImplementation((_url: string, init: RequestInit) =>
+      new Promise<Response>((_, reject) => {
+        // Reject con AbortError non appena il segnale viene abortito.
+        const signal = init?.signal as AbortSignal | undefined;
+        if (signal?.aborted) {
+          reject(new DOMException("The user aborted a request.", "AbortError"));
+          return;
+        }
+        signal?.addEventListener("abort", () =>
+          reject(new DOMException("The user aborted a request.", "AbortError")),
+        );
+      }),
+    );
+    const { hubGet } = await loadClient();
+
+    const resultPromise = hubGet("/nadir/search");
+    // Avanza di 8001ms → il setTimeout nel client chiama ctrl.abort() →
+    // il signal "abort" event fire → fetchMock reject con AbortError →
+    // hubFetch cattura l'errore e ritorna { ok:false, error:"timeout 8000ms" }.
+    await vi.advanceTimersByTimeAsync(8001);
+    const res = await resultPromise;
+
+    vi.useRealTimers();
+    expect(res.ok).toBe(false);
+    expect(res.error).toMatch(/timeout/i);
+  });
 });
