@@ -123,6 +123,18 @@ function isExcludedFile(relPath: string): boolean {
   return relPath.endsWith(".d.ts");
 }
 
+/**
+ * Task #176 — Verifica se un file è eleggibile per la nota lessicale UI.
+ * Spostato da horus-scanner.ts in questo modulo così che computePending possa
+ * usarlo per il backfill delle note lessicali mancanti (vedi sotto).
+ *
+ * Solo `.tsx` in `app/` e `components/` ha un'interfaccia utente documentabile.
+ */
+export function isLexiconEligible(rel: string): boolean {
+  const p = rel.replace(/\\/g, "/");
+  return p.endsWith(".tsx") && (p.startsWith("app/") || p.startsWith("components/"));
+}
+
 /** Enumera (ricorsivamente) tutti i file di codice sorgente rilevanti, ordinati. */
 export async function enumerateSourceFiles(): Promise<string[]> {
   const out: string[] = [];
@@ -279,7 +291,15 @@ export async function computePending(mode: ScanMode): Promise<PendingComputation
     if (!read) continue;
     hashes[rel] = read.hash;
     if (store[rel] && store[rel].hash === read.hash) {
-      unchanged++;
+      // Task #176 — Backfill: anche se l'hash non è cambiato, se siamo in
+      // modalità MANUALE e il file è eleggibile per la nota lessicale ma ne è
+      // privo (scansioni pre-Task #152 o completamenti parziali), va inserito
+      // nel batch così che processFile produca la lexiconNote mancante.
+      if (mode === "manual" && isLexiconEligible(rel) && !store[rel].lexiconNote) {
+        pending.push(rel);
+      } else {
+        unchanged++;
+      }
     } else {
       pending.push(rel);
     }

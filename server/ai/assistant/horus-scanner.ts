@@ -26,6 +26,7 @@ import {
   readAndHashFile,
   saveFileScanStore,
   loadI18nDictionary,
+  isLexiconEligible,
   HORUS_THINK_TAG_CONTRACT,
   MANUAL_LANGUAGE_STYLE_BLOCK,
 } from "./codebase-inventory";
@@ -194,12 +195,6 @@ ${content.slice(0, MAX_FILE_CHARS)}
 \`\`\`
 
 DIZIONARIO DELL'INTERFACCIA:`;
-}
-
-/** Task #152 — Solo `.tsx` in `app/` e `components/` ha una nota lessicale UI. */
-function isLexiconEligible(rel: string): boolean {
-  const p = rel.replace(/\\/g, "/");
-  return p.endsWith(".tsx") && (p.startsWith("app/") || p.startsWith("components/"));
 }
 
 // ── Avvio (SOLO esplicito) ────────────────────────────────────────────────────
