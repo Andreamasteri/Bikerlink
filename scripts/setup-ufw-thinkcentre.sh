@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# BikerLink — Configurazione ufw sul ThinkCentre (192.168.1.35, Ubuntu)
+# BikerLink — Configurazione ufw sul ThinkCentre (192.168.0.100, Ubuntu)
 #
 # Esegui come root:
 #   sudo bash scripts/setup-ufw-thinkcentre.sh [--mode tunnel|dns-proxy] [--ssh-port PORT]
@@ -21,13 +21,13 @@
 #
 # Porta mappa:
 #   nginx           80, 443   → dipende da --mode (vedi sopra)
-#   SSH             22|2222   → solo LAN 192.168.1.0/24 + rate limit
+#   SSH             22|2222   → solo LAN 192.168.0.0/24 + rate limit
 #   Tailscale       —         → allow in on tailscale0 (interfaccia intera)
-#   GraphHopper     8990-8996 → solo LAN 192.168.1.0/24
-#   Valhalla        8002      → solo LAN 192.168.1.0/24
-#   Nominatim       8080      → solo LAN 192.168.1.0/24
-#   Ollama          11434     → solo LAN 192.168.1.0/24
-#   Whisper         9000      → solo LAN 192.168.1.0/24
+#   GraphHopper     8990-8996 → solo LAN 192.168.0.0/24
+#   Valhalla        8002      → solo LAN 192.168.0.0/24
+#   Nominatim       8080      → solo LAN 192.168.0.0/24
+#   Ollama          11434     → solo LAN 192.168.0.0/24
+#   Whisper         9000      → solo LAN 192.168.0.0/24
 #   ufw-status      9099      → solo localhost (health endpoint admin)
 #   PostgreSQL      5432      → solo localhost (mai LAN/internet)
 #   # Uptime Kuma   3001      → commentato — abilitare quando installato
@@ -36,7 +36,7 @@
 
 set -euo pipefail
 
-LAN="192.168.1.0/24"
+LAN="192.168.0.0/24"
 LOCALHOST="127.0.0.1"
 CLOUDFLARE_MODE=""   # tunnel | dns-proxy | "" (aperto — solo pre-Cloudflare)
 SSH_PORT=2222        # porta post-hardening (setup-ssh-hardening-thinkcentre.sh)
@@ -186,6 +186,19 @@ ufw allow from "${LOCALHOST}" to any port 5432 proto tcp
 # rimossa il 29 giugno 2026 con la dismissione di DuckDNS.
 ufw allow from "${LOCALHOST}" to any port 6379 proto tcp comment "Redis raw — solo localhost"
 
+# ── Docker bridge rules (container → host) ───────────────────────────────────
+# Queste regole permettono ai container Docker di raggiungere servizi sul host.
+# ufw --force reset le cancella; vanno ri-aggiunte esplicitamente.
+#   172.17.0.0/16  = bridge Docker default (docker0)
+#   172.19.0.0/24  = bridge rete personalizzata (es. Uptime Kuma stack)
+#   172.16.0.0/12  = intero spazio bridge Docker (copertura generica)
+echo "→ Docker bridge → Ollama 11434/tcp..."
+ufw allow from 172.17.0.0/16 to any port 11434 proto tcp comment "Docker bridge → Ollama"
+echo "→ Docker bridge → Open WebUI 3010/tcp (Uptime Kuma stack)..."
+ufw allow from 172.19.0.0/24 to any port 3010 proto tcp comment "Uptime Kuma → Open WebUI"
+echo "→ Docker bridge → GPU stats 9999/tcp..."
+ufw allow from 172.16.0.0/12 to any port 9999 proto tcp comment "Docker→host GPU stats"
+
 # ── Regole future (commentate) ────────────────────────────────────────────────
 # Uptime Kuma — abilitare quando installato:
 #   ufw allow from "${LAN}" to any port 3001 proto tcp
@@ -324,7 +337,7 @@ if command -v nginx &>/dev/null; then
 #   location /ufw-status {
 #       # Accessibile solo via Tailscale — sicurezza aggiuntiva a livello nginx
 #       allow 100.64.0.0/10;   # range Tailscale
-#       allow 192.168.1.0/24;  # LAN locale
+#       allow 192.168.0.0/24;  # LAN locale
 #       deny all;
 #       proxy_pass http://127.0.0.1:9099/;
 #       proxy_set_header Host "localhost";
@@ -346,7 +359,7 @@ echo "  systemctl status bikerlink-ufw-status"
 echo ""
 echo "Per aggiungere porte future (es. Uptime Kuma 3001):"
 echo "  Decommentare le righe corrispondenti in questo script e rieseguirlo."
-echo "  Oppure: sudo ufw allow from 192.168.1.0/24 to any port 3001 proto tcp"
+echo "  Oppure: sudo ufw allow from 192.168.0.0/24 to any port 3001 proto tcp"
 echo ""
 echo "Per configurare il pannello admin BikerLink:"
 echo "  Aggiungere in Replit Secrets:  UFW_STATUS_URL=https://<host-thinkcentre>/ufw-status"
