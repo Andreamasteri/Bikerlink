@@ -192,6 +192,14 @@ export default function AiHubScreen() {
       route: "/admin/horus-scan",
       color: "#0EA5E9",
     },
+    {
+      key: "ares-jobs",
+      label: "Ares — Job",
+      subtitle: "Analisi completa codice+DB · Manuale",
+      icon: "robot-industrial",
+      route: "/admin/ares-jobs",
+      color: "#E63946",
+    },
   ];
 
   return (
