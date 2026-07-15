@@ -7,7 +7,7 @@ import { Router, type Request, type Response } from "express";
 import { storage } from "../../storage";
 import { db } from "../../db";
 import { users, userLastfmSessions, userMusicTracks, otaBootEvents, otaReleases } from "@shared/db";
-import { userStatusSchema, userRoleSchema, userEmailAdminSchema, adminSetPasswordSchema, primalSchema } from "@shared/validators";
+import { userStatusSchema, userRoleSchema, userEmailAdminSchema, adminSetPasswordSchema, primalSchema, isReservedEmailLocalPart } from "@shared/validators";
 import { eq, and, ne, sql, inArray, desc } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import { isProtectedUser } from "../../constants";
@@ -216,6 +216,9 @@ router.put("/:id/email", async (req: Request, res: Response) => {
     const parsedUe = userEmailAdminSchema.safeParse(req.body);
     if (!parsedUe.success) return sendError(res, 400, parsedUe.error.issues[0].message);
     const { email } = parsedUe.data;
+    if (isReservedEmailLocalPart(email)) {
+      return sendError(res, 400, "Email non consentita: imita un agente AI interno");
+    }
     const targetUser = await storage.getUser(id);
     if (!targetUser) return sendError(res, 404, "Utente non trovato");
     if (isProtectedUser(targetUser.nickname)) {

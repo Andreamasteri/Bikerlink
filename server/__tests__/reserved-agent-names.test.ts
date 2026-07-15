@@ -300,6 +300,66 @@ describe("POST /api/admin/users — stessa regola sul percorso di creazione admi
   });
 });
 
+describe("PUT /api/admin/users/:id/email — un admin non può assegnare un'email che imita un agente AI", () => {
+  let app: import("express").Express;
+
+  const EXISTING_USER = {
+    id: "u77",
+    nickname: "MotoRider99",
+    email: "old@example.com",
+    password: "hashed",
+  };
+
+  beforeEach(async () => {
+    vi.clearAllMocks();
+
+    const storageModule = await import("../storage");
+    const s = storageModule.storage as unknown as Record<string, unknown>;
+    s.getUser = vi.fn().mockResolvedValue(EXISTING_USER);
+    s.updateUser = vi.fn().mockResolvedValue({ ...EXISTING_USER, email: "new@example.com" });
+    s.createModeratorLog = mockCreateModeratorLog;
+
+    const express = (await import("express")).default;
+    const usersRouter = (await import("../routes/admin/users")).default;
+    app = express();
+    app.use(express.json());
+    app.use((req, _res, next) => {
+      (req as unknown as { session: Record<string, unknown> }).session = { userId: "admin1" };
+      next();
+    });
+    app.use("/api/admin/users", usersRouter);
+  });
+
+  it("rifiuta un'email la cui parte locale contiene un nome agente (posizione iniziale)", async () => {
+    const request = (await import("supertest")).default;
+    const res = await request(app)
+      .put("/api/admin/users/u77/email")
+      .send({ email: "horus@example.com" });
+    expect(res.status).toBe(400);
+  });
+
+  it("rifiuta un'email la cui parte locale contiene un nome agente (posizione centrale/finale, casing misto)", async () => {
+    const request = (await import("supertest")).default;
+    const res1 = await request(app)
+      .put("/api/admin/users/u77/email")
+      .send({ email: "ares.something@example.com" });
+    expect(res1.status).toBe(400);
+
+    const res2 = await request(app)
+      .put("/api/admin/users/u77/email")
+      .send({ email: "team_NaDiR@example.com" });
+    expect(res2.status).toBe(400);
+  });
+
+  it("accetta un'email legittima non correlata", async () => {
+    const request = (await import("supertest")).default;
+    const res = await request(app)
+      .put("/api/admin/users/u77/email")
+      .send({ email: "mario.rossi99@example.com" });
+    expect(res.status).toBe(200);
+  });
+});
+
 // ── Module mocks aggiuntivi per il router reale di users/profile.ts ──────────
 
 vi.mock("../lib/auth-middleware", () => ({
