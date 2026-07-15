@@ -25,8 +25,10 @@ CREATE TABLE IF NOT EXISTS "ai_group_conversations" (
   "ended_at" timestamp
 );
 --> statement-breakpoint
+DROP INDEX IF EXISTS "ai_group_conversations_created_at_idx";
 CREATE INDEX IF NOT EXISTS "ai_group_conversations_created_at_idx" ON "ai_group_conversations" ("created_at" DESC);
 --> statement-breakpoint
+DROP INDEX IF EXISTS "ai_group_conversations_status_idx";
 CREATE INDEX IF NOT EXISTS "ai_group_conversations_status_idx" ON "ai_group_conversations" ("status", "created_at" DESC);
 --> statement-breakpoint
 -- 3) Turni completati (persistiti a fine turno). (conversation_id, turn_index)

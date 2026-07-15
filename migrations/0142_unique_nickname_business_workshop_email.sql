@@ -18,6 +18,8 @@
 -- anche le stringhe vuote per evitare collisioni artificiali su "nessuna email".
 CREATE UNIQUE INDEX IF NOT EXISTS "users_nickname_lower_uq" ON "users" (LOWER("nickname"));
 --> statement-breakpoint
+DROP INDEX IF EXISTS "businesses_email_lower_uq";
 CREATE UNIQUE INDEX IF NOT EXISTS "businesses_email_lower_uq" ON "businesses" (LOWER("email")) WHERE "email" IS NOT NULL AND "email" <> '';
 --> statement-breakpoint
+DROP INDEX IF EXISTS "workshops_email_lower_uq";
 CREATE UNIQUE INDEX IF NOT EXISTS "workshops_email_lower_uq" ON "workshops" (LOWER("email")) WHERE "email" IS NOT NULL AND "email" <> '';
