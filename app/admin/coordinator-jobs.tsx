@@ -19,10 +19,22 @@ type JobState = "idle" | "running" | "paused" | "throttled" | "disabled";
 interface JobDirective {
   kind: "pause" | "throttle";
   reason: string;
-  issuedBy: "quebracho" | "admin_manual";
+  issuedBy: "quebracho" | "admin_manual" | "horus";
   issuedAt: string;
   throttleMs?: number;
 }
+
+const ISSUER_LABEL: Record<JobDirective["issuedBy"], string> = {
+  admin_manual: "Admin",
+  quebracho: "Quebracho",
+  horus: "Horus (autonomo)",
+};
+
+const ISSUER_COLOR: Record<JobDirective["issuedBy"], string> = {
+  admin_manual: "#F59E0B",
+  quebracho: "#0EA5E9",
+  horus: "#8B5CF6",
+};
 
 interface JobEntry {
   name: string;
@@ -142,9 +154,22 @@ export default function CoordinatorJobsScreen() {
               </View>
             </View>
             {job.directive ? (
-              <Text style={styles.directiveText}>
-                Direttiva: {job.directive.kind} ({job.directive.issuedBy}) — {job.directive.reason}
-              </Text>
+              <View
+                style={[
+                  styles.directiveRow,
+                  { borderColor: ISSUER_COLOR[job.directive.issuedBy], backgroundColor: ISSUER_COLOR[job.directive.issuedBy] + "18" },
+                ]}
+                testID={`coordinator-job-${job.name}-directive`}
+              >
+                <MaterialCommunityIcons
+                  name={job.directive.issuedBy === "horus" ? "robot-outline" : job.directive.issuedBy === "admin_manual" ? "account-lock-outline" : "cog-outline"}
+                  size={14}
+                  color={ISSUER_COLOR[job.directive.issuedBy]}
+                />
+                <Text style={[styles.directiveText, { color: ISSUER_COLOR[job.directive.issuedBy] }]}>
+                  {job.directive.kind} — {ISSUER_LABEL[job.directive.issuedBy]} — {job.directive.reason}
+                </Text>
+              </View>
             ) : null}
             <View style={styles.metaRow}>
               <Text style={styles.metaText}>Ultima run: {fmt(job.lastRunAt)}</Text>
@@ -226,7 +251,17 @@ const styles = StyleSheet.create({
   jobName: { fontFamily: "Inter_600SemiBold", fontSize: 14, color: Colors.text },
   stateBadge: { paddingHorizontal: 10, paddingVertical: 3, borderRadius: 10 },
   stateBadgeText: { fontFamily: "Inter_700Bold", fontSize: 11, textTransform: "uppercase" },
-  directiveText: { fontFamily: "Inter_400Regular", fontSize: 12, color: Colors.warning, marginBottom: 6 },
+  directiveRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    marginBottom: 6,
+  },
+  directiveText: { flex: 1, fontFamily: "Inter_400Regular", fontSize: 12 },
   metaRow: { flexDirection: "row", gap: 14, marginBottom: 2 },
   metaText: { fontFamily: "Inter_400Regular", fontSize: 12, color: Colors.textSecondary },
   actionsRow: { flexDirection: "row", gap: 8, marginTop: 8 },

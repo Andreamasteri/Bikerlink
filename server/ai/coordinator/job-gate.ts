@@ -16,6 +16,7 @@ import { storage } from "../../storage";
 import { isPoolHealthy } from "../../db";
 import { isThinkCentreOffline } from "../../lib/thinkcentre-offline";
 import { isQuebrachoReachable } from "../../lib/quebracho-client";
+import { isOllamaReachable } from "../../lib/ollama-client";
 import { dedupWarn } from "../../lib/dedup-logger";
 import { isAiPaused } from "./index.part2";
 import { evaluateEvent } from "./policy-engine";
@@ -39,6 +40,7 @@ let _quebrachoReachableCached: boolean | null = null;
 export type JobGateSource =
   | "deterministic"
   | "quebracho"
+  | "horus"
   | "admin_manual"
   | "killswitch"
   | "policy"
@@ -102,6 +104,29 @@ export async function isQuebrachoUnreachable(): Promise<boolean> {
   }
 }
 
+/** Cache sync dello stato di raggiungibilità di Horus (per la view admin). */
+let _horusReachableCached: boolean | null = null;
+
+/**
+ * true quando NON possiamo contare su Horus (TC offline o il suo Ollama
+ * self-hosted irraggiungibile). In questo caso le pause emesse da Horus
+ * vengono ignorate dal gate — stesso contratto di fallback di Quebracho.
+ */
+export async function isHorusUnreachable(): Promise<boolean> {
+  try {
+    if (await isThinkCentreOffline()) {
+      _horusReachableCached = false;
+      return true;
+    }
+    const reachable = await isOllamaReachable("horus");
+    _horusReachableCached = reachable;
+    return !reachable;
+  } catch {
+    _horusReachableCached = false;
+    return true; // in dubbio, degrada in modo deterministico
+  }
+}
+
 // ── Direttive per-job ────────────────────────────────────────────────────────
 
 export type JobDirectiveKind = "pause" | "resume" | "force" | "throttle";
@@ -124,7 +149,7 @@ export async function applyJobDirective(
 ): Promise<ApplyDirectiveResult> {
   ensureJob(jobName);
   const reason = params.reason ?? `${kind} da ${issuedBy}`;
-  const source = issuedBy === "admin_manual" ? "admin_manual" : "quebracho";
+  const source = issuedBy;
 
   switch (kind) {
     case "pause": {
@@ -200,18 +225,21 @@ export async function canRunJob(name: string): Promise<JobGateDecision> {
       if (byAdmin) {
         return deny(name, e.directive.reason || "In pausa (admin)", "admin_manual");
       }
-      // Pausa emessa da Quebracho: rispettata solo se Quebracho è raggiungibile.
-      if (!quebrachoDown) {
-        return deny(name, e.directive.reason || "In pausa (Quebracho)", "quebracho");
+      // Pausa emessa da Quebracho o Horus: rispettata solo se il rispettivo
+      // backing service è raggiungibile (fallback deterministico altrimenti).
+      const issuerDown = e.directive.issuedBy === "horus" ? await isHorusUnreachable() : quebrachoDown;
+      if (!issuerDown) {
+        return deny(name, e.directive.reason || `In pausa (${e.directive.issuedBy})`, e.directive.issuedBy);
       }
-      logFallback(name, "pausa Quebracho ignorata (irraggiungibile)");
+      logFallback(name, `pausa ${e.directive.issuedBy} ignorata (irraggiungibile)`);
       // fall-through: consenti
     }
 
     // 4. Throttle per-job (direttiva) o nextRun schedulato.
     if (e.directive?.kind === "throttle" && e.lastRunAt !== null) {
       const minGap = e.directive.throttleMs ?? 60_000;
-      const respect = e.directive.issuedBy === "admin_manual" || !quebrachoDown;
+      const throttleIssuerDown = e.directive.issuedBy === "horus" ? await isHorusUnreachable() : quebrachoDown;
+      const respect = e.directive.issuedBy === "admin_manual" || !throttleIssuerDown;
       if (respect && now - e.lastRunAt < minGap) {
         return deny(name, `Throttle attivo (${minGap}ms)`, "throttle");
       }

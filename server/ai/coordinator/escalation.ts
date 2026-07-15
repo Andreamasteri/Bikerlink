@@ -14,15 +14,87 @@
 import { callOllamaChat } from "../../lib/ollama-client";
 import { writeWatchdogLog } from "../watchdog/log";
 import { dedupWarn } from "../../lib/dedup-logger";
+import { applyJobDirective } from "./job-gate";
 
 export interface EscalationFinding {
   scope: string;
   summary: string;
   details?: unknown;
+  /**
+   * Nome del job (job-registry.ts) a cui questo finding è collegato. Se
+   * presente e il finding è severo e ripetuto, `escalateFinding` può tradurlo
+   * in una pausa autonoma (issuedBy="horus") — vedi `maybeAutoPause` sotto.
+   * Se assente, l'escalation resta puramente informativa (comportamento
+   * invariato rispetto a prima).
+   */
+  affectedJob?: string;
 }
 
 const ESCALATION_TIMEOUT_MS = 20_000;
 const ESCALATION_NUM_PREDICT = 320;
+
+// ── Auto-pausa Horus per finding severi e ripetuti ──────────────────────────
+//
+// Horus non deve aspettare un admin per fermare un job che sta chiaramente
+// deragliando: se lo stesso scope viene segnalato come "error" almeno
+// AUTO_PAUSE_REPEAT_THRESHOLD volte entro AUTO_PAUSE_WINDOW_MS, la direttiva
+// di pausa viene emessa in autonomia (issuedBy="horus"). Il gate (job-gate.ts)
+// la rispetta SOLO se il backing service di Horus è raggiungibile in quel
+// momento: se Horus è offline, la pausa "congelata" non può bloccare il job
+// per sempre — fallback deterministico, stesso contratto di Quebracho.
+const AUTO_PAUSE_REPEAT_THRESHOLD = 3;
+const AUTO_PAUSE_WINDOW_MS = 24 * 60 * 60 * 1000;
+
+interface RepeatState {
+  count: number;
+  lastAt: number;
+}
+const _repeatCounters = new Map<string, RepeatState>();
+
+/**
+ * Incrementa il contatore di ripetizioni SOLO per i finding severi (status
+ * "error") dello stesso scope. I finding "warn" non contribuiscono mai alla
+ * soglia di auto-pausa — altrimenti una serie di warning innocui seguita da
+ * un singolo errore isolato potrebbe far scattare una pausa non giustificata.
+ */
+function bumpSevereRepeatCount(scope: string): number {
+  const now = Date.now();
+  const prev = _repeatCounters.get(scope);
+  const count = prev && now - prev.lastAt < AUTO_PAUSE_WINDOW_MS ? prev.count + 1 : 1;
+  _repeatCounters.set(scope, { count, lastAt: now });
+  return count;
+}
+
+async function maybeAutoPause(
+  finding: EscalationFinding,
+  repeatCount: number,
+  assessment: string | null,
+): Promise<void> {
+  if (!finding.affectedJob) return;
+  try {
+    const reasonParts = [
+      `Horus: pausa automatica dopo ${repeatCount} rilevazioni ripetute di "${finding.scope}"`,
+      finding.summary,
+    ];
+    if (assessment) reasonParts.push(`Valutazione Horus: ${assessment}`);
+    const reason = reasonParts.join(" — ").slice(0, 500);
+    await applyJobDirective(finding.affectedJob, "pause", { reason }, "horus");
+    await writeWatchdogLog({
+      kind: "alert",
+      scope: `${finding.scope}_autopause`,
+      status: "warn",
+      summary: `[Horus] Job "${finding.affectedJob}" messo in pausa automaticamente dopo ${repeatCount} rilevazioni ripetute (senza attendere un admin).`,
+      details: { affectedJob: finding.affectedJob, repeatCount, originalScope: finding.scope },
+    });
+  } catch (err) {
+    dedupWarn("escalation/horus-autopause", `Horus: auto-pausa fallita per job "${finding.affectedJob}" (non-fatal)`, err);
+  }
+}
+
+/** Solo per i test: azzera i contatori di ripetizione. */
+export function __resetEscalationRepeatCountersForTests(): void {
+  _repeatCounters.clear();
+}
 
 /**
  * Chiede a Horus una valutazione breve (max ~3 frasi) di un finding. Ritorna
@@ -68,24 +140,38 @@ export async function escalateFinding(
   finding: EscalationFinding,
   extra: { status?: "warn" | "error" } = {},
 ): Promise<string | null> {
+  const status = extra.status ?? "warn";
   const originalId = await writeWatchdogLog({
     kind: "alert",
     scope: finding.scope,
-    status: extra.status ?? "warn",
+    status,
     summary: finding.summary,
     details: finding.details,
   });
 
-  const assessment = await askHorusForAssessment(finding);
-  if (!assessment) return originalId;
+  // Il conteggio delle ripetizioni è deterministico (non dipende dalla
+  // disponibilità di Horus): un finding severo e ripetuto deve poter mettere
+  // in pausa il job anche se la valutazione testuale di Horus fallisce sotto.
+  // Solo i finding "error" incrementano il contatore — un warning non conta
+  // mai come "ripetizione severa", nemmeno se segue altri warning sullo
+  // stesso scope.
+  const severe = status === "error";
+  const repeatCount = severe ? bumpSevereRepeatCount(finding.scope) : 0;
 
-  await writeWatchdogLog({
-    kind: "alert",
-    scope: `${finding.scope}_escalation`,
-    status: "warn",
-    summary: `[Horus] ${assessment}`,
-    details: { originalWatchdogLogId: originalId, originalScope: finding.scope, originalSummary: finding.summary },
-  });
+  const assessment = await askHorusForAssessment(finding);
+  if (assessment) {
+    await writeWatchdogLog({
+      kind: "alert",
+      scope: `${finding.scope}_escalation`,
+      status: "warn",
+      summary: `[Horus] ${assessment}`,
+      details: { originalWatchdogLogId: originalId, originalScope: finding.scope, originalSummary: finding.summary },
+    });
+  }
+
+  if (severe && repeatCount >= AUTO_PAUSE_REPEAT_THRESHOLD) {
+    await maybeAutoPause(finding, repeatCount, assessment);
+  }
 
   return originalId;
 }

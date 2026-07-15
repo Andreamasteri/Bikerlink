@@ -14,8 +14,12 @@ import { aiCoordinatorJobs } from "@shared/db";
 import { dedupWarn } from "../../lib/dedup-logger";
 
 export type JobRunState = "idle" | "running" | "paused" | "throttled" | "disabled";
-export type PauseSource = "quebracho" | "admin_manual" | "killswitch" | "deterministic";
-export type DirectiveIssuer = "quebracho" | "admin_manual";
+export type PauseSource = "quebracho" | "admin_manual" | "horus" | "killswitch" | "deterministic";
+// "horus" — Horus può emettere le proprie direttive (pause) in autonomia, con lo
+// STESSO comportamento di fallback di "quebracho": il gate le ignora se il
+// backing service di Horus (Ollama self-hosted) è irraggiungibile, così una
+// pausa bloccata non può mai sopravvivere a un outage dell'emittente.
+export type DirectiveIssuer = "quebracho" | "admin_manual" | "horus";
 
 export interface JobDirective {
   kind: "pause" | "throttle";

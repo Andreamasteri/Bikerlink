@@ -12,11 +12,21 @@ vi.mock("../lib/ollama-client", () => ({ callOllamaChat: callOllamaChatMock }));
 
 vi.mock("../lib/dedup-logger", () => ({ dedupWarn: vi.fn() }));
 
-import { escalateFinding, askHorusForAssessment } from "../ai/coordinator/escalation";
+const applyJobDirectiveMock = vi.hoisted(() => vi.fn(async () => ({ applied: true, jobName: "job", kind: "pause" as const })));
+vi.mock("../ai/coordinator/job-gate", () => ({ applyJobDirective: applyJobDirectiveMock }));
+
+import {
+  escalateFinding,
+  askHorusForAssessment,
+  __resetEscalationRepeatCountersForTests,
+} from "../ai/coordinator/escalation";
 
 beforeEach(() => {
   writeWatchdogLogMock.mockReset().mockResolvedValue("log-id-1");
   callOllamaChatMock.mockReset().mockResolvedValue("Valutazione sintetica di Horus.");
+  applyJobDirectiveMock.mockReset().mockResolvedValue({ applied: true, jobName: "job", kind: "pause" });
+  __resetEscalationRepeatCountersForTests();
+  vi.useRealTimers();
 });
 
 describe("escalateFinding", () => {
@@ -52,5 +62,72 @@ describe("escalateFinding", () => {
     callOllamaChatMock.mockResolvedValue("   ");
     const result = await askHorusForAssessment({ scope: "x", summary: "y" });
     expect(result).toBeNull();
+  });
+});
+
+describe("escalateFinding — auto-pausa Horus su finding severi ripetuti", () => {
+  it("i finding 'warn' non contano MAI verso la soglia severa, anche ripetuti", async () => {
+    for (let i = 0; i < 5; i++) {
+      await escalateFinding(
+        { scope: "auto_pause_guard", summary: "solo un warning", affectedJob: "job-x" },
+        { status: "warn" },
+      );
+    }
+    expect(applyJobDirectiveMock).not.toHaveBeenCalled();
+  });
+
+  it("un singolo finding 'error' non basta da solo a mettere in pausa (sotto soglia)", async () => {
+    await escalateFinding(
+      { scope: "auto_pause_guard", summary: "errore isolato", affectedJob: "job-x" },
+      { status: "error" },
+    );
+    expect(applyJobDirectiveMock).not.toHaveBeenCalled();
+  });
+
+  it("warning seguiti da un solo errore NON raggiungono la soglia (i warning non contano)", async () => {
+    await escalateFinding({ scope: "auto_pause_guard", summary: "w1", affectedJob: "job-x" }, { status: "warn" });
+    await escalateFinding({ scope: "auto_pause_guard", summary: "w2", affectedJob: "job-x" }, { status: "warn" });
+    await escalateFinding({ scope: "auto_pause_guard", summary: "e1", affectedJob: "job-x" }, { status: "error" });
+    expect(applyJobDirectiveMock).not.toHaveBeenCalled();
+  });
+
+  it("3 finding 'error' ripetuti sullo stesso scope mettono in pausa il job come 'horus'", async () => {
+    await escalateFinding({ scope: "auto_pause_guard", summary: "e1", affectedJob: "job-x" }, { status: "error" });
+    await escalateFinding({ scope: "auto_pause_guard", summary: "e2", affectedJob: "job-x" }, { status: "error" });
+    expect(applyJobDirectiveMock).not.toHaveBeenCalled(); // ancora sotto soglia
+    await escalateFinding({ scope: "auto_pause_guard", summary: "e3", affectedJob: "job-x" }, { status: "error" });
+    expect(applyJobDirectiveMock).toHaveBeenCalledTimes(1);
+    expect(applyJobDirectiveMock).toHaveBeenCalledWith(
+      "job-x",
+      "pause",
+      expect.objectContaining({ reason: expect.any(String) }),
+      "horus",
+    );
+  });
+
+  it("nessuna auto-pausa se il finding severo non ha affectedJob", async () => {
+    await escalateFinding({ scope: "auto_pause_guard_2", summary: "e1" }, { status: "error" });
+    await escalateFinding({ scope: "auto_pause_guard_2", summary: "e2" }, { status: "error" });
+    await escalateFinding({ scope: "auto_pause_guard_2", summary: "e3" }, { status: "error" });
+    expect(applyJobDirectiveMock).not.toHaveBeenCalled();
+  });
+
+  it("un finding severo fuori dalla finestra temporale resetta il progresso", async () => {
+    vi.useFakeTimers();
+    const base = new Date("2026-01-01T00:00:00Z");
+    vi.setSystemTime(base);
+    await escalateFinding({ scope: "auto_pause_guard_3", summary: "e1", affectedJob: "job-y" }, { status: "error" });
+    await escalateFinding({ scope: "auto_pause_guard_3", summary: "e2", affectedJob: "job-y" }, { status: "error" });
+
+    // Oltre la finestra di 24h: il contatore riparte da 1, non da 3.
+    vi.setSystemTime(new Date(base.getTime() + 25 * 60 * 60 * 1000));
+    await escalateFinding({ scope: "auto_pause_guard_3", summary: "e3", affectedJob: "job-y" }, { status: "error" });
+    expect(applyJobDirectiveMock).not.toHaveBeenCalled();
+
+    await escalateFinding({ scope: "auto_pause_guard_3", summary: "e4", affectedJob: "job-y" }, { status: "error" });
+    expect(applyJobDirectiveMock).not.toHaveBeenCalled();
+    await escalateFinding({ scope: "auto_pause_guard_3", summary: "e5", affectedJob: "job-y" }, { status: "error" });
+    expect(applyJobDirectiveMock).toHaveBeenCalledTimes(1);
+    vi.useRealTimers();
   });
 });
