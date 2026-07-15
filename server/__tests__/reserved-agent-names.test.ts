@@ -341,6 +341,17 @@ vi.mock("../routes/motoclubs/utils", () => ({
   createRegionalClubInvite: vi.fn().mockResolvedValue(undefined),
 }));
 
+// ── Audit: percorso admin rename nickname esistente? ─────────────────────────
+// Task #129: audit eseguito su server/routes/admin/users.ts,
+// users.next.ts, users-extra.ts, users.next-detail.ts.
+// Risultato: NESSUN endpoint PUT/PATCH /:id/nickname esiste.
+// I soli percorsi di scrittura del nickname sono:
+//   • POST /api/auth/register      → register.ts (già coperto sopra)
+//   • POST /api/admin/users        → users.next.ts (già coperto sopra)
+//   • PUT  /api/users/me           → routes/users/profile.ts (coperto qui sotto)
+// Se un endpoint admin di rename viene aggiunto in futuro, aggiungere qui
+// un describe corrispondente che verifica il blocco isReservedNickname.
+
 describe("PUT /api/users/me — rinomina self-service bloccata dai nomi agente AI", () => {
   let app: import("express").Express;
 

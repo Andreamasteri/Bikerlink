@@ -136,6 +136,17 @@ router.get("/stats/summary", async (_req: Request, res: Response) => {
   }
 });
 
+// NOTE (Task #129 — audit): there is intentionally NO PUT /:id/nickname endpoint.
+// Renaming an existing user's nickname from the admin panel is not supported.
+// The only nickname-write paths that exist are:
+//   • POST /api/auth/register (public signup)
+//   • POST /api/admin/users  (admin-create, users.next.ts)
+//   • PUT  /api/users/me     (self-service rename, routes/users/profile.ts)
+// All three call isReservedNickname() from shared/validators/auth.ts.
+// If a nickname-rename admin endpoint is ever added here, it MUST call
+// isReservedNickname() to prevent agent-lookalike names (Ares, Nadir, Bowie,
+// Quebracho, Horus) from being assigned by an admin to an existing account.
+
 router.put("/:id/status", async (req: Request, res: Response) => {
   try {
     const id = req.params.id as string;
