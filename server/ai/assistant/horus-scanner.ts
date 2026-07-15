@@ -25,7 +25,9 @@ import {
   computePending,
   readAndHashFile,
   saveFileScanStore,
+  loadI18nDictionary,
   HORUS_THINK_TAG_CONTRACT,
+  MANUAL_LANGUAGE_STYLE_BLOCK,
 } from "./codebase-inventory";
 import { finalizeAnalysisScan, finalizeManualScan } from "./horus-scanner-finalize";
 
@@ -33,12 +35,15 @@ const BATCH_SIZE = 4;
 const TICK_DELAY_MS = 1500;
 const ROUTING_BUSY_RETRY_MS = 8000;
 const MAX_FILE_CHARS = 6000;
-const NOTE_MAX = 800;
+// Task #152 — La nota per-file del manuale è ora più ricca (descrizione
+// funzionale in 4-7 frasi + nota lessicale con testi UI esatti), quindi il tetto
+// di caratteri per nota è più alto di quello dell'analisi.
+const NOTE_MAX = 2000;
 // Verificato live: con un tetto stretto il ragionamento di qwen3:4b (senza tag,
 // vedi HORUS_THINK_TAG_CONTRACT) consuma tutto lo spazio e la nota vera non viene
 // mai scritta. Budget generoso: nessuna fretta, la nota per-file può richiedere
 // più tempo — la scansione è un job in background, non un flusso interattivo.
-const NOTE_NUM_PREDICT = 2400;
+const NOTE_NUM_PREDICT = 4000;
 
 // `persona: "horus"` in callOllamaChat sceglie SOLO l'endpoint (URL/token), NON il
 // modello: senza `model` esplicito la chiamata ricade su BOWIE_OLLAMA_MODEL (il
@@ -83,6 +88,10 @@ const states: Record<ScanMode, ScanState> = {
   analysis: initialState("analysis"),
   manual: initialState("manual"),
 };
+// Task #152 — Dizionario i18n caricato UNA sola volta all'avvio della scansione
+// MANUALE e riusato dai prompt lessicali di ogni schermata (evita di rileggerlo
+// per-file). Vuoto per la modalità analisi (che non lo usa).
+let manualI18nDict = "";
 const running: Record<ScanMode, boolean> = { analysis: false, manual: false };
 const queues: Record<ScanMode, string[]> = { analysis: [], manual: [] };
 const stores: Record<ScanMode, FileScanStore> = { analysis: {}, manual: {} };
@@ -117,8 +126,30 @@ ${content.slice(0, MAX_FILE_CHARS)}
 OSSERVAZIONI:`;
 }
 
-function buildManualFilePrompt(rel: string, content: string): string {
-  return `Sei Horus, in modalità MANUALE (SOLA LETTURA) dell'app BikerLink. In 2-4 frasi in italiano, descrivi COSA fa questo file e a quale FUNZIONALITÀ/AREA dell'app contribuisce, pensando a istruire un altro agente AI. Niente codice, niente elenco di funzioni: solo il ruolo funzionale. Se il file è puramente tecnico/di supporto senza una funzionalità utente, dillo in una frase.
+/**
+ * Task #152 — Prompt per-file FUNZIONALE (sostituisce il vecchio
+ * buildManualFilePrompt). Oltre al blocco lingua, dà a Horus il contesto completo
+ * di com'è fatta BikerLink e chiede una descrizione funzionale ricca.
+ */
+export function buildManualFunctionalPrompt(rel: string, content: string): string {
+  return `${MANUAL_LANGUAGE_STYLE_BLOCK}
+
+Sei Horus, in modalità MANUALE (SOLA LETTURA) dell'app BikerLink.
+
+CONTESTO BIKERLINK (com'è fatta l'app):
+- App mobile per motociclisti sviluppata in React Native (Expo).
+- Pianificazione percorsi (routing) self-hosted sul ThinkCentre con GraphHopper e Valhalla.
+- Stack AI multi-persona: Bowie (assistente utenti), Horus (routing e analisi codice),
+  Nadir (ricerca semantica/RAG), Ares (diagnostica), Quebracho (coordinamento job).
+- Backend Express + Drizzle ORM + PostgreSQL.
+- Aggiornamenti dell'app distribuiti via OTA con EAS.
+
+COMPITO:
+In 4-7 frasi in italiano, descrivi il ruolo FUNZIONALE di questo file per
+istruire un altro agente AI: COSA fa, CHI lo usa, il FLUSSO principale, il
+COMPORTAMENTO in caso di errore e le INTERAZIONI critiche con altri moduli.
+Niente codice, niente elenco di funzioni. Se il file è puramente tecnico/di
+supporto senza una funzionalità utente, dillo in UNA sola frase.
 
 FILE: ${rel}
 \`\`\`
@@ -126,6 +157,48 @@ ${content.slice(0, MAX_FILE_CHARS)}
 \`\`\`
 
 DESCRIZIONE:`;
+}
+
+/**
+ * Task #152 — Prompt per-file LESSICALE (solo schermate/componenti UI). Con il
+ * dizionario i18n, Horus risolve ogni `t("chiave")` nel label italiano esatto e
+ * documenta l'interfaccia della schermata (titolo, tab, bottoni, campi, messaggi,
+ * modal, voci di menu) con i testi precisi.
+ */
+export function buildManualLexiconPrompt(rel: string, content: string, i18nDict: string): string {
+  return `${MANUAL_LANGUAGE_STYLE_BLOCK}
+
+Sei Horus, in modalità MANUALE LESSICALE (SOLA LETTURA) dell'app BikerLink.
+Documenti l'interfaccia utente ESATTA di questa schermata/componente, così che un
+altro agente AI possa dire all'utente il testo preciso di ogni elemento.
+
+DIZIONARIO I18N (chiave=valore — risolvi OGNI t("chiave") con il valore italiano):
+${i18nDict}
+
+Per questa schermata produci in italiano SOLO le voci effettivamente presenti nel file:
+- **TITOLO SCHERMATA** — il testo dell'header risolto dal dizionario i18n
+- **TAB / SEZIONI INTERNE** — il nome esatto di ciascuna
+- **BOTTONI E AZIONI** — "Testo esatto" → cosa succede (1 frase)
+- **CAMPI DI INPUT** — label e placeholder esatti
+- **MESSAGGI** — errori, toast, alert con testo esatto
+- **MODAL E BOTTOM SHEET** — titolo e ogni opzione/bottone
+- **VOCI DI MENU** — ogni voce con testo esatto
+
+Se una chiave i18n non è nel dizionario, riportala come [chiave.non.trovata].
+NON inventare testi: usa solo ciò che risolvi dal dizionario o trovi nel file.
+
+FILE: ${rel}
+\`\`\`
+${content.slice(0, MAX_FILE_CHARS)}
+\`\`\`
+
+DIZIONARIO DELL'INTERFACCIA:`;
+}
+
+/** Task #152 — Solo `.tsx` in `app/` e `components/` ha una nota lessicale UI. */
+function isLexiconEligible(rel: string): boolean {
+  const p = rel.replace(/\\/g, "/");
+  return p.endsWith(".tsx") && (p.startsWith("app/") || p.startsWith("components/"));
 }
 
 // ── Avvio (SOLO esplicito) ────────────────────────────────────────────────────
@@ -165,6 +238,15 @@ export async function startHorusScan(mode: ScanMode): Promise<StartResult> {
       reason: `impossibile costruire l'inventario: ${(err as Error).message}`,
       status: { ...states[mode] },
     };
+  }
+
+  // Task #152 — Carica il dizionario i18n UNA sola volta per scansione manuale,
+  // così i prompt lessicali per-schermata risolvono i label italiani esatti.
+  if (mode === "manual") {
+    manualI18nDict = await loadI18nDictionary().catch((err) => {
+      console.warn(`[horus-scan:manual] dizionario i18n non caricato (proseguo senza): ${(err as Error).message}`);
+      return "";
+    });
   }
 
   stores[mode] = comp.store;
@@ -230,21 +312,51 @@ function interrupt(mode: ScanMode, message: string): void {
 async function processFile(mode: ScanMode, rel: string): Promise<"ok" | "interrupt"> {
   const read = await readAndHashFile(rel);
   if (!read) return "ok"; // file sparito nel frattempo: salta
-  const prompt =
-    mode === "analysis"
-      ? buildAnalysisFilePrompt(rel, read.content)
-      : buildManualFilePrompt(rel, read.content);
   try {
-    const raw = await callOllamaChat(prompt, undefined, {
+    if (mode === "analysis") {
+      const raw = await callOllamaChat(buildAnalysisFilePrompt(rel, read.content), undefined, {
+        persona: "horus",
+        model: HORUS_MODEL_ID,
+        system: HORUS_THINK_TAG_CONTRACT,
+        temperature: 0.2,
+        numPredict: NOTE_NUM_PREDICT,
+      });
+      stores[mode][rel] = {
+        hash: read.hash,
+        note: sanitizeNote(stripThink(raw ?? "")),
+        at: new Date().toISOString(),
+      };
+      return "ok";
+    }
+
+    // Modalità MANUALE: nota FUNZIONALE per ogni file (Task #152, step 3) e, solo
+    // per le schermate/componenti UI, una nota LESSICALE separata (step 4).
+    const rawFn = await callOllamaChat(buildManualFunctionalPrompt(rel, read.content), undefined, {
       persona: "horus",
       model: HORUS_MODEL_ID,
       system: HORUS_THINK_TAG_CONTRACT,
-      temperature: mode === "analysis" ? 0.2 : 0.3,
+      temperature: 0.3,
       numPredict: NOTE_NUM_PREDICT,
     });
+    let lexiconNote: string | undefined;
+    if (isLexiconEligible(rel)) {
+      const rawLx = await callOllamaChat(
+        buildManualLexiconPrompt(rel, read.content, manualI18nDict),
+        undefined,
+        {
+          persona: "horus",
+          model: HORUS_MODEL_ID,
+          system: HORUS_THINK_TAG_CONTRACT,
+          temperature: 0.3,
+          numPredict: NOTE_NUM_PREDICT,
+        },
+      );
+      lexiconNote = sanitizeNote(stripThink(rawLx ?? "")) || undefined;
+    }
     stores[mode][rel] = {
       hash: read.hash,
-      note: sanitizeNote(stripThink(raw ?? "")),
+      note: sanitizeNote(stripThink(rawFn ?? "")),
+      lexiconNote,
       at: new Date().toISOString(),
     };
     return "ok";

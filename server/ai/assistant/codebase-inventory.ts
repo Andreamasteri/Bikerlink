@@ -43,7 +43,42 @@ Però racchiudi SEMPRE ed ESCLUSIVAMENTE il tuo ragionamento tra i tag <think> e
 Dopo il tag </think> di chiusura scrivi SOLO il risultato finale richiesto, senza ripetere né riassumere il ragionamento e senza premesse tipo "Okay", "Let me", "The user wants".
 Se non hai bisogno di ragionare, va bene anche <think></think> vuoto seguito subito dal risultato finale.`;
 
+/**
+ * Task #152 — Blocco lingua/stile OBBLIGATORIO in testa a OGNI prompt della
+ * generazione del manuale (per-file funzionale, per-file lessicale, per-sezione,
+ * dizionario, panoramica, glossario).
+ *
+ * Il manuale è scritto SOLO in italiano (lingua sorgente e canonica: il
+ * dizionario UI e la documentazione interna sono in italiano) e poi tradotto
+ * automaticamente nelle altre 6 lingue app. Lo stile deve quindi essere chiaro e
+ * traducibile: frasi complete, niente idiomi, terminologia tecnica internazionale,
+ * nomi propri invariati, label UI tra virgolette in italiano.
+ */
+export const MANUAL_LANGUAGE_STYLE_BLOCK = `LINGUA E STILE DI SCRITTURA (obbligatorio):
+Scrivi SEMPRE e SOLO in italiano. L'italiano è la lingua sorgente e canonica
+di BikerLink: il dizionario UI, la documentazione interna e queste istruzioni
+sono in italiano perché è la lingua più completa e precisa per l'app.
+
+Il manuale verrà tradotto automaticamente in:
+  • Inglese (English) • Tedesco (Deutsch) • Spagnolo (Español)
+  • Francese (Français) • Greco (Ελληνικά) • Turco (Türkçe)
+
+Per traduzioni accurate:
+✓ Frasi complete (soggetto + verbo + complemento)
+✓ No abbreviazioni italiane non universali (cfr., vd., s.v.)
+✓ No modi di dire o metafore idiomatiche italiane
+✓ Terminologia tecnica internazionale (routing, GPS, non instradamento/navigatore)
+✓ Nomi propri (Bowie, Horus, Nadir, ThinkCentre…) invariati in tutte le lingue
+✓ Label UI tra virgolette in italiano ("Partecipa", "Salva percorso")`;
+
 const ROOT = process.cwd();
+
+// Task #152 — Dizionario i18n italiano passato ai prompt LESSICALI del manuale,
+// così Horus risolve `t("proposals.join")` → "Partecipa" invece di trattare la
+// chiave come testo opaco. Letto una sola volta per scansione. Cap prudente per
+// non far esplodere i prompt (il dizionario è ampio ma non illimitato).
+const I18N_DICT_FILES = ["lib/i18n/it.ts", "lib/i18n/ai-assistant-it.ts"] as const;
+const I18N_DICT_MAX_CHARS = 60_000;
 
 // Radici di codice sorgente da leggere: backend (server), codice condiviso
 // (shared) e l'INTERO frontend dell'app Expo. In questo repo il frontend NON è
@@ -133,13 +168,61 @@ export async function readAndHashFile(
   }
 }
 
+/**
+ * Task #152 — Carica il dizionario i18n italiano come stringa compatta
+ * `chiave=valore` (una per riga), da passare ai prompt LESSICALI del manuale.
+ * Legge i file sorgente del dizionario e ne estrae le coppie `"chiave": "valore"`
+ * con una regex (nessun import di moduli RN lato server). Troncato a
+ * I18N_DICT_MAX_CHARS per non gonfiare i prompt. Chiamato una sola volta per
+ * scansione (il risultato è passato ai prompt dei file frontend).
+ */
+export async function loadI18nDictionary(): Promise<string> {
+  const lines: string[] = [];
+  let size = 0;
+  const pairRe = /"([A-Za-z0-9_.]+)"\s*:\s*"((?:[^"\\]|\\.)*)"/g;
+  for (const rel of I18N_DICT_FILES) {
+    let text: string;
+    try {
+      text = await fs.readFile(path.join(ROOT, rel), "utf8");
+    } catch {
+      continue; // file assente: salta senza far fallire la scansione
+    }
+    let m: RegExpExecArray | null;
+    pairRe.lastIndex = 0;
+    while ((m = pairRe.exec(text)) !== null) {
+      const key = m[1];
+      const value = m[2]
+        .replace(/\\"/g, '"')
+        .replace(/\\n/g, " ")
+        .replace(/\\t/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+      if (!value) continue;
+      const line = `${key}=${value}`;
+      if (size + line.length + 1 > I18N_DICT_MAX_CHARS) return lines.join("\n");
+      lines.push(line);
+      size += line.length + 1;
+    }
+  }
+  return lines.join("\n");
+}
+
 // ── Store persistente per-file (hash + nota + timestamp) ─────────────────────
 
 export interface FileScanRecord {
   /** Hash del contenuto letto l'ultima volta. */
   hash: string;
-  /** Esito della lettura: osservazioni (analisi) o descrizione (manuale). */
+  /** Esito della lettura: osservazioni (analisi) o descrizione funzionale (manuale). */
   note: string;
+  /**
+   * Task #152 — Solo modalità MANUALE, solo per le schermate/componenti UI
+   * (`.tsx` in `app/` e `components/`): documentazione lessicale dell'interfaccia
+   * (titolo, tab, bottoni, campi, messaggi, modal, voci di menu con testo esatto
+   * risolto dal dizionario i18n). Separato da `note` (funzionale) così le due
+   * fasi del manuale — sezioni funzionali e dizionario dell'interfaccia — usano
+   * ognuna la propria fonte.
+   */
+  lexiconNote?: string;
   /** ISO timestamp dell'ultima lettura. */
   at: string;
 }
