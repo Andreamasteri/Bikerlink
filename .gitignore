@@ -57,6 +57,9 @@ logs/*.jsonl
 !logs/ota-hwm.txt
 logs/ai-diagnosis-*.md
 
+# Task #50 — Memoria persistente di Horus (note runtime, non versionare)
+inbox/
+
 # Static build (generated artifacts — non includere nel repo)
 static-build/
 
