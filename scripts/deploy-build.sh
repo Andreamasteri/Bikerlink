@@ -94,6 +94,16 @@ rm -rf tmp_check/
 rm -rf logs/
 log "  backups, dist, dist-ota-env e artefatti temporanei rimossi."
 
+# Pulizia directory non necessarie a runtime che fanno superare il limite ~2 GB del Repl layer.
+# - exports/ → bundle Git e PDF generati dall'agente (~500 MB), non serviti da Express
+# - .git/    → storia git (~3.4 GB di cui ~1.9 GB LFS objects), non necessaria a runtime
+#              Il server non esegue comandi git; il repository completo è su GitHub.
+log "=== [1d/3] Pulizia exports/ e .git/ per rispettare il limite Repl layer ===  "
+log "  exports=$(size exports) .git=$(size .git)"
+rm -rf exports/
+rm -rf .git/
+log "  exports/ e .git/ rimossi — Repl layer ora sotto il limite ~2 GB."
+
 log "=== [1c/3] Gate Index Drift (DESC/WHERE — regressioni migration, solo statico) ==="
 # Verifica che nessuna migration SQL abbia introdotto una regressione sugli
 # indici speciali (DESC / WHERE) dichiarati nello schema Drizzle TS.
