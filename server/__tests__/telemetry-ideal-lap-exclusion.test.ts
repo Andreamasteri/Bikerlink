@@ -8,10 +8,16 @@ vi.mock("../db", () => ({
     insert: vi.fn(() => ({ values: vi.fn() })),
   },
   pool: { query: vi.fn(), connect: vi.fn() },
+  // withDbRetry non era nel mock originale: le chiamate reali del route
+  // ("../routes/telemetry" usa withDbRetry(() => db.execute(...))) restituivano
+  // undefined() → 500 in ogni test, mascherando qualunque regressione reale
+  // (task #65 — mock DB stantii che nascondono bug veri).
+  withDbRetry: (fn: () => unknown) => fn(),
 }));
 
 import { db } from "../db";
 import telemetryRouter from "../routes/telemetry";
+import { invalidateTelemetryStatsCache } from "../lib/telemetry-stats-cache";
 
 const USER_ID = "test-user-ideal-lap";
 
@@ -31,6 +37,10 @@ describe("GET /api/telemetry/stats — km_collected includes ideal_lap, speed fi
 
   beforeEach(() => {
     vi.clearAllMocks();
+    // Task #53 — la cache in-process persiste tra i test perché usano tutti
+    // lo stesso USER_ID; senza reset i test successivi riceverebbero il
+    // payload cache-ato del primo invece di colpire i mock del DB.
+    invalidateTelemetryStatsCache(USER_ID);
     app = buildApp();
   });
 
@@ -38,9 +48,7 @@ describe("GET /api/telemetry/stats — km_collected includes ideal_lap, speed fi
     const dbExecute = vi.mocked(db.execute);
     dbExecute
       .mockResolvedValueOnce({ rows: [{ sample_count: "0", session_count: "0" }] } as unknown as Awaited<ReturnType<typeof db.execute>>)
-      .mockResolvedValueOnce({ rows: [{ km_collected: "0" }] } as unknown as Awaited<ReturnType<typeof db.execute>>)
-      .mockResolvedValueOnce({ rows: [{ track_km: "0" }] } as unknown as Awaited<ReturnType<typeof db.execute>>)
-      .mockResolvedValueOnce({ rows: [{ ideal_lap_km: "0" }] } as unknown as Awaited<ReturnType<typeof db.execute>>);
+      .mockResolvedValueOnce({ rows: [{ km_collected: "0", track_km: "0", ideal_lap_km: "0" }] } as unknown as Awaited<ReturnType<typeof db.execute>>);
 
     const res = await request(app).get("/api/telemetry/stats");
 
@@ -56,9 +64,7 @@ describe("GET /api/telemetry/stats — km_collected includes ideal_lap, speed fi
     const dbExecute = vi.mocked(db.execute);
     dbExecute
       .mockResolvedValueOnce({ rows: [{ sample_count: "200", session_count: "3" }] } as unknown as Awaited<ReturnType<typeof db.execute>>)
-      .mockResolvedValueOnce({ rows: [{ km_collected: "150.5" }] } as unknown as Awaited<ReturnType<typeof db.execute>>)
-      .mockResolvedValueOnce({ rows: [{ track_km: "0" }] } as unknown as Awaited<ReturnType<typeof db.execute>>)
-      .mockResolvedValueOnce({ rows: [{ ideal_lap_km: "0" }] } as unknown as Awaited<ReturnType<typeof db.execute>>);
+      .mockResolvedValueOnce({ rows: [{ km_collected: "150.5", track_km: "0", ideal_lap_km: "0" }] } as unknown as Awaited<ReturnType<typeof db.execute>>);
 
     const res = await request(app).get("/api/telemetry/stats");
 
@@ -74,9 +80,7 @@ describe("GET /api/telemetry/stats — km_collected includes ideal_lap, speed fi
     const dbExecute = vi.mocked(db.execute);
     dbExecute
       .mockResolvedValueOnce({ rows: [{ sample_count: "300", session_count: "3" }] } as unknown as Awaited<ReturnType<typeof db.execute>>)
-      .mockResolvedValueOnce({ rows: [{ km_collected: "18.5" }] } as unknown as Awaited<ReturnType<typeof db.execute>>)
-      .mockResolvedValueOnce({ rows: [{ track_km: "8.5" }] } as unknown as Awaited<ReturnType<typeof db.execute>>)
-      .mockResolvedValueOnce({ rows: [{ ideal_lap_km: "6.2" }] } as unknown as Awaited<ReturnType<typeof db.execute>>);
+      .mockResolvedValueOnce({ rows: [{ km_collected: "18.5", track_km: "8.5", ideal_lap_km: "6.2" }] } as unknown as Awaited<ReturnType<typeof db.execute>>);
 
     const res = await request(app).get("/api/telemetry/stats");
 
@@ -91,9 +95,7 @@ describe("GET /api/telemetry/stats — km_collected includes ideal_lap, speed fi
     const dbExecute = vi.mocked(db.execute);
     dbExecute
       .mockResolvedValueOnce({ rows: [{ sample_count: "500", session_count: "5" }] } as unknown as Awaited<ReturnType<typeof db.execute>>)
-      .mockResolvedValueOnce({ rows: [{ km_collected: "300" }] } as unknown as Awaited<ReturnType<typeof db.execute>>)
-      .mockResolvedValueOnce({ rows: [{ track_km: "0" }] } as unknown as Awaited<ReturnType<typeof db.execute>>)
-      .mockResolvedValueOnce({ rows: [{ ideal_lap_km: "0" }] } as unknown as Awaited<ReturnType<typeof db.execute>>);
+      .mockResolvedValueOnce({ rows: [{ km_collected: "300", track_km: "0", ideal_lap_km: "0" }] } as unknown as Awaited<ReturnType<typeof db.execute>>);
 
     const res = await request(app).get("/api/telemetry/stats");
 
@@ -107,9 +109,7 @@ describe("GET /api/telemetry/stats — km_collected includes ideal_lap, speed fi
     const dbExecute = vi.mocked(db.execute);
     dbExecute
       .mockResolvedValueOnce({ rows: [{ sample_count: "300", session_count: "4" }] } as unknown as Awaited<ReturnType<typeof db.execute>>)
-      .mockResolvedValueOnce({ rows: [{ km_collected: "200" }] } as unknown as Awaited<ReturnType<typeof db.execute>>)
-      .mockResolvedValueOnce({ rows: [{ track_km: "12.5" }] } as unknown as Awaited<ReturnType<typeof db.execute>>)
-      .mockResolvedValueOnce({ rows: [{ ideal_lap_km: "10.3" }] } as unknown as Awaited<ReturnType<typeof db.execute>>);
+      .mockResolvedValueOnce({ rows: [{ km_collected: "200", track_km: "12.5", ideal_lap_km: "10.3" }] } as unknown as Awaited<ReturnType<typeof db.execute>>);
 
     const res = await request(app).get("/api/telemetry/stats");
 
@@ -118,5 +118,22 @@ describe("GET /api/telemetry/stats — km_collected includes ideal_lap, speed fi
     expect(res.body.track_km).toBe(12.5);
     expect(res.body.ideal_lap_km).toBe(10.3);
     expect(res.body.progress_pct).toBe(20);
+  });
+
+  it("second request within TTL is served from cache without hitting the DB again", async () => {
+    const dbExecute = vi.mocked(db.execute);
+    dbExecute
+      .mockResolvedValueOnce({ rows: [{ sample_count: "10", session_count: "1" }] } as unknown as Awaited<ReturnType<typeof db.execute>>)
+      .mockResolvedValueOnce({ rows: [{ km_collected: "5", track_km: "0", ideal_lap_km: "0" }] } as unknown as Awaited<ReturnType<typeof db.execute>>);
+
+    const first = await request(app).get("/api/telemetry/stats");
+    expect(first.status).toBe(200);
+    expect(dbExecute).toHaveBeenCalledTimes(2);
+
+    const second = await request(app).get("/api/telemetry/stats");
+    expect(second.status).toBe(200);
+    expect(second.body).toEqual(first.body);
+    // Nessuna chiamata DB aggiuntiva: servito dalla cache in-process.
+    expect(dbExecute).toHaveBeenCalledTimes(2);
   });
 });

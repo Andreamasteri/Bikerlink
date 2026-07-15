@@ -22,6 +22,7 @@ import { useAutoTelemetry } from "@/lib/auto-telemetry-context";
 
 import type { ProfileData } from "@/components/profile/types";
 import TelemetryPanel from "@/components/profile/TelemetryPanel.next";
+import { TelemetryErrorState } from "@/components/profile/TelemetryErrorState";
 import MyStylePanel from "@/components/profile/MyStylePanel";
 import PhotoGrid from "@/components/profile/PhotoGrid";
 import NotificationsPanel from "@/components/profile/NotificationsPanel";
@@ -92,7 +93,11 @@ export default function ProfileScreen() {
   });
   const searchPrefLocked = searchPrefLockedData?.locked === true;
 
-  const { data: telemetryStats } = useQuery<{
+  const {
+    data: telemetryStats,
+    isError: telemetryStatsError,
+    refetch: refetchTelemetryStats,
+  } = useQuery<{
     km_collected: number;
     sample_count: number;
     session_count: number;
@@ -262,7 +267,11 @@ export default function ProfileScreen() {
           t={t}
         />
 
-        {telemetryStats != null && <TelemetryPanel telemetryStats={telemetryStats} />}
+        {telemetryStats != null ? (
+          <TelemetryPanel telemetryStats={telemetryStats} />
+        ) : telemetryStatsError ? (
+          <TelemetryErrorState onRetry={() => refetchTelemetryStats()} />
+        ) : null}
 
         {isBikerOrCoppia && <MyStylePanel />}
 

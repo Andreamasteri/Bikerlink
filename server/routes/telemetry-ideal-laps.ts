@@ -3,6 +3,7 @@ import { db, withDbRetry } from "../db";
 import { sql } from "drizzle-orm";
 import { requireUserId } from "../lib/auth-middleware";
 import { sendSuccess, sendError } from "../lib/api-response";
+import { invalidateTelemetryStatsCache } from "../lib/telemetry-stats-cache";
 
 const router = Router();
 
@@ -195,6 +196,7 @@ router.delete("/ideal-laps/:sessionId", async (req: Request, res: Response) => {
         AND session_id = ${sessionId}
         AND session_type = 'ideal_lap'
     `);
+    invalidateTelemetryStatsCache(userId);
     return sendSuccess(res);
   } catch (err) {
     console.error("[telemetry/ideal-laps DELETE] error:", err);

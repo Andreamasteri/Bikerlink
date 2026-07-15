@@ -9,6 +9,7 @@ import { classifyTelemetrySample, coerceFiniteNumber } from "@shared/tracking-fu
 import { getInternalProbeToken, getInternalProbeHeaderName, isLoopback } from "../ai/watchdog/internal-token";
 import idealLapsRouter from "./telemetry-ideal-laps";
 import calibrationRouter from "./telemetry-calibration";
+import { getCachedTelemetryStats, setCachedTelemetryStats, invalidateTelemetryStatsCache } from "../lib/telemetry-stats-cache";
 
 const router = Router();
 
@@ -175,6 +176,8 @@ router.post("/batch", async (req: Request, res: Response) => {
       return sendError(res, 500, "Errore salvataggio campioni");
     }
 
+    invalidateTelemetryStatsCache(userId);
+
     console.log(`[telemetry/batch] userId=${userId} sessionId=${session_id} received=${received} valid=${rows.length} discarded=${discarded}`);
     logTelemetryEvent({
       ts: new Date().toISOString(),
@@ -218,6 +221,11 @@ router.get("/stats", async (req: Request, res: Response) => {
 
   const startMs = Date.now();
   try {
+    const cached = getCachedTelemetryStats(userId);
+    if (cached) {
+      return res.json(cached);
+    }
+
     const statsResult = await withDbRetry(() => db.execute(sql`
       SELECT
         COUNT(*) AS sample_count,
@@ -240,10 +248,15 @@ router.get("/stats", async (req: Request, res: Response) => {
       userId,
     });
 
-    const kmResult = await withDbRetry(() => db.execute(sql`
+    // Task #53 — le tre query Haversine separate (km totali, km in pista,
+    // km giro ideale) condividono la stessa CTE `ordered` (LAG per session_id);
+    // filtrare session_type PRIMA del LAG non cambia il risultato perché un
+    // session_id appartiene sempre a un solo session_type, quindi possiamo
+    // calcolarle in un solo passaggio con SUM...FILTER invece di 3 scan separate.
+    const distancesResult = await withDbRetry(() => db.execute(sql`
       WITH ordered AS (
         SELECT
-          session_id, lat, lon, ts, speed_kmh,
+          session_id, session_type, lat, lon, ts, speed_kmh,
           LAG(lat) OVER (PARTITION BY session_id ORDER BY ts) AS prev_lat,
           LAG(lon) OVER (PARTITION BY session_id ORDER BY ts) AS prev_lon
         FROM ride_telemetry
@@ -251,6 +264,8 @@ router.get("/stats", async (req: Request, res: Response) => {
       ),
       distances AS (
         SELECT
+          session_type,
+          speed_kmh,
           2 * 6371 * ASIN(
             SQRT(
               POWER(SIN(RADIANS(lat - prev_lat) / 2), 2)
@@ -262,80 +277,23 @@ router.get("/stats", async (req: Request, res: Response) => {
         WHERE prev_lat IS NOT NULL AND prev_lon IS NOT NULL
           AND ABS(lat - prev_lat) < 0.5
           AND ABS(lon - prev_lon) < 0.5
-          AND (speed_kmh IS NULL OR speed_kmh >= 20)
       )
-      SELECT COALESCE(SUM(dist_km), 0) AS km_collected
+      SELECT
+        COALESCE(SUM(dist_km) FILTER (WHERE speed_kmh IS NULL OR speed_kmh >= 20), 0) AS km_collected,
+        COALESCE(SUM(dist_km) FILTER (WHERE session_type = 'ideal_lap'), 0) AS track_km,
+        COALESCE(SUM(dist_km) FILTER (WHERE session_type = 'ideal_lap' AND (speed_kmh IS NULL OR speed_kmh >= 20)), 0) AS ideal_lap_km
       FROM distances
     `));
 
-    const kmRow = kmResult.rows[0] as { km_collected: string } | undefined;
-    const kmCollected = Math.round(parseFloat(kmRow?.km_collected ?? "0") * 10) / 10;
+    const distancesRow = distancesResult.rows[0] as
+      | { km_collected: string; track_km: string; ideal_lap_km: string }
+      | undefined;
+    const kmCollected = Math.round(parseFloat(distancesRow?.km_collected ?? "0") * 10) / 10;
     const progressPct = Math.min(100, Math.round((kmCollected / TARGET_KM) * 100));
+    const trackKm = Math.round(parseFloat(distancesRow?.track_km ?? "0") * 10) / 10;
+    const idealLapKm = Math.round(parseFloat(distancesRow?.ideal_lap_km ?? "0") * 10) / 10;
 
-    const trackKmResult = await withDbRetry(() => db.execute(sql`
-      WITH ordered AS (
-        SELECT
-          session_id, lat, lon, ts,
-          LAG(lat) OVER (PARTITION BY session_id ORDER BY ts) AS prev_lat,
-          LAG(lon) OVER (PARTITION BY session_id ORDER BY ts) AS prev_lon
-        FROM ride_telemetry
-        WHERE user_id = ${userId}
-          AND session_type = 'ideal_lap'
-      ),
-      distances AS (
-        SELECT
-          2 * 6371 * ASIN(
-            SQRT(
-              POWER(SIN(RADIANS(lat - prev_lat) / 2), 2)
-              + COS(RADIANS(prev_lat)) * COS(RADIANS(lat))
-              * POWER(SIN(RADIANS(lon - prev_lon) / 2), 2)
-            )
-          ) AS dist_km
-        FROM ordered
-        WHERE prev_lat IS NOT NULL AND prev_lon IS NOT NULL
-          AND ABS(lat - prev_lat) < 0.5
-          AND ABS(lon - prev_lon) < 0.5
-      )
-      SELECT COALESCE(SUM(dist_km), 0) AS track_km
-      FROM distances
-    `));
-
-    const trackKmRow = trackKmResult.rows[0] as { track_km: string } | undefined;
-    const trackKm = Math.round(parseFloat(trackKmRow?.track_km ?? "0") * 10) / 10;
-
-    const idealLapKmResult = await withDbRetry(() => db.execute(sql`
-      WITH ordered AS (
-        SELECT
-          session_id, lat, lon, ts, speed_kmh,
-          LAG(lat) OVER (PARTITION BY session_id ORDER BY ts) AS prev_lat,
-          LAG(lon) OVER (PARTITION BY session_id ORDER BY ts) AS prev_lon
-        FROM ride_telemetry
-        WHERE user_id = ${userId}
-          AND session_type = 'ideal_lap'
-      ),
-      distances AS (
-        SELECT
-          2 * 6371 * ASIN(
-            SQRT(
-              POWER(SIN(RADIANS(lat - prev_lat) / 2), 2)
-              + COS(RADIANS(prev_lat)) * COS(RADIANS(lat))
-              * POWER(SIN(RADIANS(lon - prev_lon) / 2), 2)
-            )
-          ) AS dist_km
-        FROM ordered
-        WHERE prev_lat IS NOT NULL AND prev_lon IS NOT NULL
-          AND ABS(lat - prev_lat) < 0.5
-          AND ABS(lon - prev_lon) < 0.5
-          AND (speed_kmh IS NULL OR speed_kmh >= 20)
-      )
-      SELECT COALESCE(SUM(dist_km), 0) AS ideal_lap_km
-      FROM distances
-    `));
-
-    const idealLapKmRow = idealLapKmResult.rows[0] as { ideal_lap_km: string } | undefined;
-    const idealLapKm = Math.round(parseFloat(idealLapKmRow?.ideal_lap_km ?? "0") * 10) / 10;
-
-    return res.json({
+    const payload = {
       km_collected: kmCollected,
       sample_count: sampleCount,
       session_count: sessionCount,
@@ -344,7 +302,9 @@ router.get("/stats", async (req: Request, res: Response) => {
       target_km: TARGET_KM,
       track_km: trackKm,
       ideal_lap_km: idealLapKm,
-    });
+    };
+    setCachedTelemetryStats(userId, payload);
+    return res.json(payload);
   } catch (err) {
     const elapsedMs = Date.now() - startMs;
     const pgMsg = (err instanceof Error ? (err as Error & { cause?: { message?: string } }).cause?.message : undefined) ?? "";

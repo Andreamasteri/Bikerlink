@@ -4,6 +4,7 @@ import { sql } from "drizzle-orm";
 import { storage } from "../storage";
 import { requireUserId } from "../lib/auth-middleware";
 import { sendError } from "../lib/api-response";
+import { invalidateTelemetryStatsCache } from "../lib/telemetry-stats-cache";
 
 const router = Router();
 
@@ -91,6 +92,7 @@ router.delete("/reset", async (req: Request, res: Response) => {
     `);
 
     const deleted = result.rowCount ?? 0;
+    invalidateTelemetryStatsCache(userId);
     return res.json({ deleted });
   } catch (err) {
     console.error("[telemetry/reset] error:", err);
