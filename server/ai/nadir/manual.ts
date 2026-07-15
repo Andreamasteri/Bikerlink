@@ -56,6 +56,20 @@ export async function saveNadirManualTranslations(
 }
 
 /**
+ * Task #113 — Aggiorna la traduzione di UNA SOLA lingua senza toccare le altre
+ * (usato dal ritraduci-singola-lingua manuale dal pannello admin: legge la
+ * mappa corrente, sostituisce solo `lang`, riscrive tutta la mappa).
+ */
+export async function saveNadirManualTranslation(
+  lang: AppLanguageCode,
+  entry: NadirManualTranslation,
+): Promise<void> {
+  const current = await getNadirManualTranslations();
+  current[lang] = entry;
+  await saveNadirManualTranslations(current);
+}
+
+/**
  * Legge il manuale nella lingua richiesta: italiano dalla sorgente, le altre
  * lingue dalla mappa traduzioni. Fallback all'italiano se la lingua richiesta
  * non ha (ancora) una traduzione — mai una stringa vuota se l'italiano esiste.

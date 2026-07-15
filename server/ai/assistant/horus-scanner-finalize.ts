@@ -367,7 +367,12 @@ TRADUZIONE (${langName}):`;
  * null se NESSUN blocco è stato tradotto con successo (mai una traduzione
  * vuota/parziale silenziosa: il chiamante ricade sull'italiano per quella lingua).
  */
-async function translateManualToLanguage(manual: string, lang: AppLanguageCode): Promise<string | null> {
+/**
+ * Task #113 — Esportata così il pannello admin può ritradurre UNA SOLA lingua
+ * su richiesta (spot-check qualità / recupero da traduzione mancante) senza
+ * dover rilanciare l'intera scansione completa di Horus.
+ */
+export async function translateManualToLanguage(manual: string, lang: AppLanguageCode): Promise<string | null> {
   const langName = APP_LANGUAGE_NAMES[lang];
   // Spezza sui titoli di sezione di primo livello ("## "), stesso separatore
   // usato per assemblare il manuale in finalizeManualScan; il preambolo (titolo

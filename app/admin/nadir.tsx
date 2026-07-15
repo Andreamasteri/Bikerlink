@@ -27,6 +27,27 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import Colors from "@/constants/colors";
 import { apiRequest } from "@/lib/query-client";
 
+interface NadirTranslationStatus {
+  lang: string;
+  name: string;
+  exists: boolean;
+  translatedAt: string | null;
+  length: number;
+  stale: boolean;
+}
+
+interface NadirTranslationsList {
+  sourceLang: string;
+  languages: NadirTranslationStatus[];
+}
+
+interface NadirTranslationText {
+  lang: string;
+  text: string;
+  translatedAt: string;
+  stale: boolean;
+}
+
 interface NadirStatus {
   defaultModel: string;
   lastRunModel: string | null;
@@ -66,6 +87,7 @@ export default function NadirScreen() {
   const qc = useQueryClient();
   const [manualText, setManualText] = useState("");
   const [dirty, setDirty] = useState(false);
+  const [expandedLang, setExpandedLang] = useState<string | null>(null);
 
   const manualQuery = useQuery<{ text: string }>({
     queryKey: ["/api/admin/nadir/manual"],
@@ -100,6 +122,28 @@ export default function NadirScreen() {
     mutationFn: async () => (await apiRequest("POST", "/api/admin/nadir/reindex")).json(),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["/api/admin/nadir/status"] });
+    },
+  });
+
+  const translationsQuery = useQuery<NadirTranslationsList>({
+    queryKey: ["/api/admin/nadir/manual/translations"],
+    queryFn: async () => (await apiRequest("GET", "/api/admin/nadir/manual/translations")).json(),
+    staleTime: 15_000,
+  });
+
+  const translationTextQuery = useQuery<NadirTranslationText>({
+    queryKey: ["/api/admin/nadir/manual/translations", expandedLang],
+    queryFn: async () =>
+      (await apiRequest("GET", `/api/admin/nadir/manual/translations/${expandedLang}`)).json(),
+    enabled: !!expandedLang,
+  });
+
+  const retranslateMutation = useMutation({
+    mutationFn: async (lang: string) =>
+      (await apiRequest("POST", `/api/admin/nadir/manual/translations/${lang}/retranslate`)).json(),
+    onSuccess: (_data, lang) => {
+      qc.invalidateQueries({ queryKey: ["/api/admin/nadir/manual/translations"] });
+      qc.invalidateQueries({ queryKey: ["/api/admin/nadir/manual/translations", lang] });
     },
   });
 
@@ -242,6 +286,80 @@ export default function NadirScreen() {
         {health?.error ? <Text style={styles.errText}>{health.error}</Text> : null}
       </View>
 
+      {/* ── Traduzioni del manuale (Task #113) ── */}
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>Traduzioni del manuale</Text>
+        <Text style={styles.hint}>
+          Generate automaticamente da Horus in ogni scansione completa. "Stantia" = l'italiano è
+          cambiato dopo l'ultima traduzione: Nadir e la chat ricadono sull'italiano finché non viene
+          rigenerata.
+        </Text>
+        {translationsQuery.isLoading ? (
+          <ActivityIndicator color={Colors.primary} style={{ marginVertical: 12 }} />
+        ) : (
+          (translationsQuery.data?.languages ?? []).map((t) => {
+            const isExpanded = expandedLang === t.lang;
+            const isRetranslating = retranslateMutation.isPending && retranslateMutation.variables === t.lang;
+            const statusColor = !t.exists ? Colors.textSecondary : t.stale ? Colors.error : Colors.success;
+            const statusLabel = !t.exists ? "mancante" : t.stale ? "stantia" : "aggiornata";
+            return (
+              <View key={t.lang} style={styles.translationBlock} testID={`nadir-translation-${t.lang}`}>
+                <View style={styles.translationHeaderRow}>
+                  <MaterialCommunityIcons
+                    name={!t.exists ? "help-circle-outline" : t.stale ? "alert-circle" : "check-circle"}
+                    size={18}
+                    color={statusColor}
+                  />
+                  <Text style={styles.translationLang}>{t.name} ({t.lang})</Text>
+                  <Text style={[styles.translationStatus, { color: statusColor }]}>{statusLabel}</Text>
+                </View>
+                <Row label="Generata il" value={fmtDate(t.translatedAt)} />
+                <Row label="Lunghezza" value={t.exists ? `${t.length} caratteri` : "—"} />
+                <View style={styles.btnRow}>
+                  <TouchableOpacity
+                    style={[styles.btn, styles.btnSecondary, !t.exists && styles.btnDisabled]}
+                    onPress={() => setExpandedLang(isExpanded ? null : t.lang)}
+                    disabled={!t.exists}
+                    testID={`nadir-view-translation-${t.lang}`}
+                  >
+                    <Text style={[styles.btnText, { color: Colors.primary }]}>
+                      {isExpanded ? "Nascondi" : "Visualizza"}
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.btn, styles.btnPrimary, isRetranslating && styles.btnDisabled]}
+                    onPress={() => retranslateMutation.mutate(t.lang)}
+                    disabled={isRetranslating}
+                    testID={`nadir-retranslate-${t.lang}`}
+                  >
+                    {isRetranslating ? (
+                      <ActivityIndicator color="#fff" size="small" />
+                    ) : (
+                      <Text style={styles.btnText}>Ritraduci ora</Text>
+                    )}
+                  </TouchableOpacity>
+                </View>
+                {retranslateMutation.isError && retranslateMutation.variables === t.lang ? (
+                  <Text style={styles.errText}>Errore ritraduzione.</Text>
+                ) : null}
+                {isExpanded ? (
+                  translationTextQuery.isLoading ? (
+                    <ActivityIndicator color={Colors.primary} style={{ marginVertical: 12 }} />
+                  ) : (
+                    <ScrollView style={styles.translationPreview} nestedScrollEnabled>
+                      <Text style={styles.translationPreviewText} selectable>
+                        {translationTextQuery.data?.text ?? ""}
+                      </Text>
+                    </ScrollView>
+                  )
+                ) : null}
+              </View>
+            );
+          })
+        )}
+        {translationsQuery.isError ? <Text style={styles.errText}>Errore caricamento traduzioni.</Text> : null}
+      </View>
+
       {/* ── Conteggio frammenti indicizzati ── */}
       <View style={styles.card}>
         <Text style={styles.cardTitle}>Frammenti indicizzati</Text>
@@ -369,5 +487,43 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: Colors.error,
     marginTop: 8,
+  },
+  translationBlock: {
+    borderTopWidth: 1,
+    borderTopColor: Colors.border,
+    paddingTop: 12,
+    marginTop: 12,
+  },
+  translationHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 4,
+  },
+  translationLang: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 14,
+    color: Colors.text,
+    flex: 1,
+  },
+  translationStatus: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 12,
+    textTransform: "uppercase",
+  },
+  translationPreview: {
+    maxHeight: 220,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: 12,
+    padding: 12,
+    marginTop: 10,
+    backgroundColor: Colors.background,
+  },
+  translationPreviewText: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 13,
+    color: Colors.text,
+    lineHeight: 19,
   },
 });
