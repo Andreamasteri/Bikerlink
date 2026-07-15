@@ -36,7 +36,14 @@ const PORT        = parseInt(process.env.PORT || "9199", 10);
 const AGENT_TOKEN = process.env.AGENT_TOKEN || "";
 const DISK_PATH   = process.env.DISK_PATH   || "/";
 
+// Reverse-proxy verso il Kalman filter service (localhost-only, vedi
+// infra/self-host/kalman/). Nessuna ingress Cloudflare dedicata: le richieste
+// entrano da tc.biker-link.net → questo agente → /kalman/* → servizio locale,
+// riusando l'autenticazione già applicata qui (X-Agent-Token + CF Access edge).
+const KALMAN_URL = (process.env.KALMAN_URL || "http://127.0.0.1:9210").replace(/\/$/, "");
+
 const PROBE_TIMEOUT_MS = 3000;
+const PROXY_TIMEOUT_MS = 5000;
 
 // ── Helpers metriche ─────────────────────────────────────────────────────────
 
@@ -214,6 +221,42 @@ const server = http.createServer(async (req, res) => {
         res.end(JSON.stringify({ ok, output: output.trim(), elapsedMs: Date.now() - startedAt }));
       }
     );
+    return;
+  }
+
+  // Reverse-proxy Kalman filter service (localhost:9210 di default).
+  // Inoltra qualunque metodo su /kalman/* → KALMAN_URL, strippando il prefisso.
+  // L'auth è già stata verificata sopra (X-Agent-Token + CF Access all'edge),
+  // quindi il servizio a valle bind solo su 127.0.0.1 senza auth propria.
+  if (path === "/kalman" || path.startsWith("/kalman/")) {
+    const targetPath = url.pathname.replace(/^\/kalman/, "") || "/";
+    const target = new URL(KALMAN_URL + targetPath + url.search);
+    const proxyReq = http.request(
+      {
+        hostname: target.hostname,
+        port: target.port || 80,
+        path: target.pathname + target.search,
+        method,
+        headers: { ...req.headers, host: target.host },
+        timeout: PROXY_TIMEOUT_MS,
+      },
+      (proxyRes) => {
+        res.writeHead(proxyRes.statusCode || 502, proxyRes.headers);
+        proxyRes.pipe(res);
+      }
+    );
+    proxyReq.on("timeout", () => {
+      proxyReq.destroy(new Error("upstream timeout"));
+    });
+    proxyReq.on("error", (err) => {
+      if (!res.headersSent) {
+        res.writeHead(503, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ ok: false, error: `kalman service unreachable: ${err.message}` }));
+      } else {
+        res.destroy();
+      }
+    });
+    req.pipe(proxyReq);
     return;
   }
 

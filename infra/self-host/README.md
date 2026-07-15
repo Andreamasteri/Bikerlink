@@ -206,6 +206,43 @@ Il token si genera (se non esiste già) con:
 cd infra/self-host/expose && ./setup-expose.sh --gen-tokens
 ```
 
+## Kalman filter service (stima bias DR/GPS)
+
+Servizio Node dedicato che stima nel tempo il **bias di velocità e heading** di
+ogni utente dagli scostamenti dead-reckoning vs GPS, usando la libreria
+[`kalman-filter`](https://github.com/piercus/kalman-filter). È il motore
+statistico su cui il Task #47 (correzione DR/GPS) costruirà tabella di
+scostamento e modulo di correzione.
+
+| Servizio | URL locale | Health | Esposizione |
+|----------|-----------|--------|-------------|
+| Kalman filter | `http://127.0.0.1:9210` | `GET /health` | via `thinkcentre-agent` → `/kalman/*` |
+
+Vive in `infra/self-host/kalman/`, gira sotto **pm2** (come il `thinkcentre-agent`)
+e bind **solo su `127.0.0.1`**: NON ha una regola ingress Cloudflare dedicata.
+L'accesso pubblico passa esclusivamente dal `thinkcentre-agent` (già su
+`tc.biker-link.net`), che inoltra `/kalman/*` verso il servizio locale riusando
+la sua autenticazione (`X-Agent-Token` + Cloudflare Access).
+
+```bash
+cd infra/self-host/kalman
+npm ci --omit=dev
+node test-model.js            # smoke test del modello (opzionale)
+pm2 start ecosystem.config.js && pm2 save   # avvio persistente + boot
+curl -s http://127.0.0.1:9210/health
+```
+
+> **Contratto dati completo (request/response di `/update` e `/state/:userId`),
+> parametri del modello e comportamento di fallback:** vedi
+> [`kalman/README.md`](kalman/README.md).
+
+Lato app (backend cloud) il client è `server/services/kalman-client.ts`
+(**fail-soft**: ritorna `null` se il TC è spento/irraggiungibile, senza lanciare).
+Secret da impostare: `KALMAN_SERVICE_URL=https://tc.biker-link.net/kalman`
+(auth via `THINKCENTRE_AGENT_TOKEN` + `CF_ACCESS_CLIENT_ID/SECRET`, già presenti).
+
+---
+
 ## Variabili d'ambiente per l'app
 
 `setup.sh` genera `.env.local` dal template `.env.local.template`, con già pronti:

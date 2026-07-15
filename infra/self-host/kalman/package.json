@@ -1,0 +1,17 @@
+{
+  "name": "bikerlink-kalman-service",
+  "version": "1.0.0",
+  "private": true,
+  "description": "BikerLink — servizio Kalman filter self-hosted per la stima del bias velocità/heading (DR vs GPS)",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node test-model.js"
+  },
+  "dependencies": {
+    "kalman-filter": "2.3.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
