@@ -6,7 +6,7 @@
 // esistente + una registrazione nel job-registry (per visibilità/pausa da
 // Quebracho/admin). Nessuna riscrittura della logica interna del job.
 import { canRunJob } from "./job-gate";
-import { registerJob } from "./job-registry";
+import { registerJob, markRunStart, markRunSuccess, markRunFailure } from "./job-registry";
 import { dedupWarn } from "../../lib/dedup-logger";
 
 export interface GatedJobOptions {
@@ -49,6 +49,19 @@ export function withJobGate<Args extends unknown[], R>(
       );
       return undefined;
     }
-    return await fn(...args);
+    // Tracking del ciclo di vita — allineato ai job supervised del loop seriale
+    // (vedi quebracho-loop.ts): senza questo, i job gated-only comparirebbero per
+    // sempre con lastRunAt=null/runCount=0/state=idle nell'admin screen, rendendo
+    // impossibile sapere se stanno davvero girando. ensureJob è garantito (lo
+    // chiama registerGatedJob sopra), quindi il registry esiste già.
+    markRunStart(name);
+    try {
+      const result = await fn(...args);
+      markRunSuccess(name);
+      return result;
+    } catch (err) {
+      markRunFailure(name, err);
+      throw err;
+    }
   };
 }

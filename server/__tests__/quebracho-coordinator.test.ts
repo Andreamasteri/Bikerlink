@@ -64,6 +64,7 @@ import {
   getCoordinatorHealthSummary,
   __resetGateCachesForTests,
 } from "../ai/coordinator/job-gate";
+import { withJobGate } from "../ai/coordinator/gated-job";
 
 beforeEach(() => {
   __resetRegistryForTests();
@@ -282,6 +283,46 @@ describe("registry — transizioni di stato e contatori", () => {
     markRunFailure("job-fail", new Error("boom"));
     expect(getJob("job-fail")?.failureCount).toBe(1);
     expect(getJob("job-fail")?.lastError).toContain("boom");
+  });
+});
+
+describe("withJobGate — tracking del ciclo di vita", () => {
+  it("un job gated che ha successo aggiorna runCount/successCount e torna idle", async () => {
+    const gated = withJobGate("gated-ok", async () => "done");
+    const result = await gated();
+    expect(result).toBe("done");
+    const e = getJob("gated-ok");
+    expect(e?.runCount).toBe(1);
+    expect(e?.successCount).toBe(1);
+    expect(e?.failureCount).toBe(0);
+    expect(e?.lastRunAt).not.toBeNull();
+    expect(e?.lastSuccessAt).not.toBeNull();
+    expect(e?.state).toBe("idle");
+  });
+
+  it("un job gated che fallisce incrementa failureCount e registra lastErrorAt, ri-lanciando l'errore", async () => {
+    const gated = withJobGate("gated-fail", async () => {
+      throw new Error("kaboom");
+    });
+    await expect(gated()).rejects.toThrow("kaboom");
+    const e = getJob("gated-fail");
+    expect(e?.runCount).toBe(1);
+    expect(e?.successCount).toBe(0);
+    expect(e?.failureCount).toBe(1);
+    expect(e?.lastErrorAt).not.toBeNull();
+    expect(e?.lastError).toContain("kaboom");
+  });
+
+  it("un job gated saltato dal gate NON tocca i contatori", async () => {
+    registerJob("gated-skip");
+    await applyJobDirective("gated-skip", "pause", {}, "admin_manual");
+    const gated = withJobGate("gated-skip", async () => "should-not-run");
+    const result = await gated();
+    expect(result).toBeUndefined();
+    const e = getJob("gated-skip");
+    expect(e?.runCount).toBe(0);
+    expect(e?.successCount).toBe(0);
+    expect(e?.failureCount).toBe(0);
   });
 });
 
