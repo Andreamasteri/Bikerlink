@@ -42,11 +42,19 @@ async function checkSpatialRefSysGuard(): Promise<void> {
     return;
   }
   if (row.tableowner !== "postgres" || !row.has_pk) {
-    await escalateFinding({
-      scope: "spatial_ref_sys_guard",
-      summary: `Deriva rilevata su spatial_ref_sys: owner="${row.tableowner}" (atteso "postgres"), PK presente=${row.has_pk}. Il fallback in isPostgisOwnerError (server/migrate.ts) potrebbe non essere più valido — verificare prima del prossimo publish.`,
-      details: { tableowner: row.tableowner, hasPrimaryKey: row.has_pk },
-    });
+    // Qualsiasi deriva qui è già di per sé grave (il presupposto silenzioso in
+    // isPostgisOwnerError smette di valere): status "error" fin dalla prima
+    // rilevazione, così un guard che continua a rilevarla può auto-pausarsi
+    // (vedi escalation.ts) invece di continuare ad alertare a vuoto ogni giorno.
+    await escalateFinding(
+      {
+        scope: "spatial_ref_sys_guard",
+        summary: `Deriva rilevata su spatial_ref_sys: owner="${row.tableowner}" (atteso "postgres"), PK presente=${row.has_pk}. Il fallback in isPostgisOwnerError (server/migrate.ts) potrebbe non essere più valido — verificare prima del prossimo publish.`,
+        details: { tableowner: row.tableowner, hasPrimaryKey: row.has_pk },
+        affectedJob: "guard-spatial-ref-sys",
+      },
+      { status: "error" },
+    );
   }
 }
 
@@ -59,6 +67,7 @@ async function checkSpatialRefSysGuard(): Promise<void> {
 // o di un restart recente da monitorare, non un bug da correggere qui.
 const ONLINE_DRIFT_MIN_ABS = 10; // sotto questa soglia il rumore statistico domina, non alertare
 const ONLINE_DRIFT_RATIO = 0.35; // 35% di scarto relativo al maggiore dei due
+const ONLINE_DRIFT_SEVERE_RATIO = 0.6; // oltre questa soglia non è più "rumore da restart", è un heartbeat rotto
 
 async function checkOnlineCounterCongruence(): Promise<void> {
   const since = new Date(Date.now() - 30 * 60 * 1000);
@@ -70,11 +79,19 @@ async function checkOnlineCounterCongruence(): Promise<void> {
   if (larger < ONLINE_DRIFT_MIN_ABS) return;
   const drift = Math.abs(dbCount - memoryCount) / larger;
   if (drift > ONLINE_DRIFT_RATIO) {
-    await escalateFinding({
-      scope: "online_counter_congruence_guard",
-      summary: `Contatori online disallineati oltre soglia: DB(lastLoginAt 30min)=${dbCount}, in-memory(OnlineTracker)=${memoryCount} (drift=${(drift * 100).toFixed(0)}%). Possibile restart recente o heartbeat rotti — verificare prima di fidarsi del counter home.`,
-      details: { dbCount, memoryCount, driftRatio: drift },
-    });
+    // Oltre ONLINE_DRIFT_SEVERE_RATIO non è più il rumore atteso da un restart
+    // recente: è un heartbeat rotto persistente — status "error", così una
+    // ripetizione può portare all'auto-pausa di questo stesso guard.
+    const severe = drift > ONLINE_DRIFT_SEVERE_RATIO;
+    await escalateFinding(
+      {
+        scope: "online_counter_congruence_guard",
+        summary: `Contatori online disallineati oltre soglia: DB(lastLoginAt 30min)=${dbCount}, in-memory(OnlineTracker)=${memoryCount} (drift=${(drift * 100).toFixed(0)}%). Possibile restart recente o heartbeat rotti — verificare prima di fidarsi del counter home.`,
+        details: { dbCount, memoryCount, driftRatio: drift },
+        ...(severe ? { affectedJob: "guard-online-counter-congruence" } : {}),
+      },
+      { status: severe ? "error" : "warn" },
+    );
   }
 }
 
@@ -85,6 +102,8 @@ async function checkOnlineCounterCongruence(): Promise<void> {
 // per una sola lingua (es. via editor admin) lascia silenziosamente le altre
 // lingue vuote o (dopo un rename di key) orfane — l'utente in quella lingua
 // vede testo mancante/stale, senza alcun errore visibile lato server.
+const ONBOARDING_SEVERE_INCOMPLETE_COUNT = 5; // oltre questa quantità non è più un dimenticato isolato, è un pattern
+
 async function checkOnboardingMessageConsistency(): Promise<void> {
   const rows = await withDbRetry(() =>
     db.select().from(translationKeys).where(eq(translationKeys.position, "onboarding")),
@@ -95,11 +114,20 @@ async function checkOnboardingMessageConsistency(): Promise<void> {
     if (missing.length > 0) incomplete.push({ key: row.key, missing });
   }
   if (incomplete.length > 0) {
-    await escalateFinding({
-      scope: "onboarding_message_consistency_guard",
-      summary: `${incomplete.length} chiave/i di onboarding con traduzioni mancanti in una o più lingue: ${incomplete.map((i) => `${i.key} [${i.missing.join(",")}]`).join("; ")}`,
-      details: { incomplete },
-    });
+    // Poche chiavi incomplete sono normale rumore editoriale (traduzione in
+    // corso); oltre ONBOARDING_SEVERE_INCOMPLETE_COUNT è un pattern (es. rename
+    // di key che ha orfanato tutta la tabella) — status "error", ripetibile
+    // fino all'auto-pausa del guard stesso.
+    const severe = incomplete.length > ONBOARDING_SEVERE_INCOMPLETE_COUNT;
+    await escalateFinding(
+      {
+        scope: "onboarding_message_consistency_guard",
+        summary: `${incomplete.length} chiave/i di onboarding con traduzioni mancanti in una o più lingue: ${incomplete.map((i) => `${i.key} [${i.missing.join(",")}]`).join("; ")}`,
+        details: { incomplete },
+        ...(severe ? { affectedJob: "guard-onboarding-message-consistency" } : {}),
+      },
+      { status: severe ? "error" : "warn" },
+    );
   }
 }
 
