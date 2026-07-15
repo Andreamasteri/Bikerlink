@@ -125,8 +125,8 @@ router.post("/prune", async (_req: Request, res: Response) => {
 // POST /api/admin/ota/sync — forza una sincronizzazione sincrona con EAS.
 // Questa route DEVE stare PRIMA di /:id/... per non essere catturata dal parametro dinamico.
 router.post("/sync", async (_req: Request, res: Response) => {
-  if (!process.env.EAS_TOKEN) {
-    return res.status(503).json({ ok: false, message: "EAS_TOKEN non configurato sul server. Impossibile contattare EAS." });
+  if (!(process.env.EAS_TOKEN ?? process.env.EXPO_TOKEN)) {
+    return res.status(503).json({ ok: false, message: "EAS_TOKEN / EXPO_TOKEN non configurato sul server. Impossibile contattare EAS." });
   }
   try {
     const { inserted, backfilled } = await forceSyncNow();

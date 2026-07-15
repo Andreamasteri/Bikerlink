@@ -29,8 +29,9 @@ router.post("/:id/rollback", async (req: Request, res: Response) => {
     if (!release.easGroupId) {
       return sendError(res, 400, "Questa release non ha un groupId EAS. Ri-sincronizza prima dal pannello admin (pulsante Sync).");
     }
-    if (!process.env.EAS_TOKEN) {
-      return sendError(res, 500, "EAS_TOKEN non configurato sul server — impossibile eseguire republish");
+    const _easToken = process.env.EAS_TOKEN ?? process.env.EXPO_TOKEN;
+    if (!_easToken) {
+      return sendError(res, 500, "EAS_TOKEN / EXPO_TOKEN non configurato sul server — impossibile eseguire republish");
     }
 
     const rollbackMessage = `Rollback to ${release.otaVersion ?? release.easUpdateId.slice(0, 8)} (by admin)`;
@@ -53,7 +54,7 @@ router.post("/:id/rollback", async (req: Request, res: Response) => {
         {
           env: {
             ...process.env,
-            EXPO_TOKEN: process.env.EAS_TOKEN,
+            EXPO_TOKEN: _easToken,
             EAS_NO_VCS: "1",
             EAS_SKIP_AUTO_FINGERPRINT: "1",
           },
@@ -124,8 +125,9 @@ router.post("/:id/republish", async (req: Request, res: Response) => {
     if (!release.easGroupId) {
       return sendError(res, 400, "Questa release non ha un groupId EAS. Ri-sincronizza prima dal pannello admin (pulsante Sync).");
     }
-    if (!process.env.EAS_TOKEN) {
-      return sendError(res, 500, "EAS_TOKEN non configurato sul server — impossibile eseguire republish");
+    const _easToken2 = process.env.EAS_TOKEN ?? process.env.EXPO_TOKEN;
+    if (!_easToken2) {
+      return sendError(res, 500, "EAS_TOKEN / EXPO_TOKEN non configurato sul server — impossibile eseguire republish");
     }
 
     const republishMessage = `Test republish OTA ${release.otaVersion ?? release.easUpdateId.slice(0, 8)} (by admin)`;
@@ -148,7 +150,7 @@ router.post("/:id/republish", async (req: Request, res: Response) => {
         {
           env: {
             ...process.env,
-            EXPO_TOKEN: process.env.EAS_TOKEN,
+            EXPO_TOKEN: _easToken2,
             EAS_NO_VCS: "1",
             EAS_SKIP_AUTO_FINGERPRINT: "1",
           },

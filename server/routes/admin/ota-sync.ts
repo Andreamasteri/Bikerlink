@@ -9,8 +9,8 @@ export const EAS_PROJECT_ID = "a25192d7-72e5-46af-97d0-2d38ed9b78e3";
 const EAS_GRAPHQL_URL = "https://api.expo.dev/graphql";
 
 export async function easGraphQL(query: string, variables?: Record<string, unknown>): Promise<unknown> {
-  const token = process.env.EAS_TOKEN;
-  if (!token) throw new Error("EAS_TOKEN non configurato");
+  const token = process.env.EAS_TOKEN ?? process.env.EXPO_TOKEN;
+  if (!token) throw new Error("EAS_TOKEN / EXPO_TOKEN non configurato");
   const res = await fetch(EAS_GRAPHQL_URL, {
     method: "POST",
     headers: {

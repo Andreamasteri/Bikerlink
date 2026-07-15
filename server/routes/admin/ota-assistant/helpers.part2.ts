@@ -71,7 +71,8 @@ export async function execRollbackToGroup(releaseId: string, adminId: string) {
   if (!release) return { ok: false, error: "Release non trovata" };
   if (release.status !== "approved") return { ok: false, error: `Rollback solo su release approved (stato: ${release.status})` };
   if (!release.easGroupId) return { ok: false, error: "Manca easGroupId — esegui sync prima" };
-  if (!process.env.EAS_TOKEN) return { ok: false, error: "EAS_TOKEN non configurato" };
+  const _easToken = process.env.EAS_TOKEN ?? process.env.EXPO_TOKEN;
+  if (!_easToken) return { ok: false, error: "EAS_TOKEN / EXPO_TOKEN non configurato" };
 
   const rollbackMessage = `Rollback to ${release.otaVersion ?? release.easUpdateId.slice(0, 8)} (by AI orchestrator)`;
   try {
@@ -81,7 +82,7 @@ export async function execRollbackToGroup(releaseId: string, adminId: string) {
       "--message", rollbackMessage,
       "--non-interactive",
     ], {
-      env: { ...process.env, EXPO_TOKEN: process.env.EAS_TOKEN, EAS_NO_VCS: "1", EAS_SKIP_AUTO_FINGERPRINT: "1" },
+      env: { ...process.env, EXPO_TOKEN: _easToken, EAS_NO_VCS: "1", EAS_SKIP_AUTO_FINGERPRINT: "1" },
       timeout: 120_000,
       maxBuffer: 10 * 1024 * 1024,
     });
