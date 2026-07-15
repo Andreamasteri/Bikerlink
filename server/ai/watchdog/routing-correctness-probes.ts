@@ -148,7 +148,10 @@ async function probePhotonCorrectness(): Promise<CorrectnessProbeResult> {
   const base = process.env.PHOTON_URL?.replace(/\/$/, "");
   if (!base) return notConfigured("photon");
   // Photon supporta solo lang=default/de/en/fr (it→400): usiamo default (nomi nativi).
-  const url = `${base}/api?q=${encodeURIComponent(PHOTON_QUERY)}&limit=1&lang=default`;
+  // limit=5 (non 1): un geocoder sano può riordinare i risultati (bias di viewbox,
+  // aggiornamento indice) senza essere rotto — validateGeocodePlausibility accetta
+  // QUALSIASI dei primi risultati vicino al punto atteso, non solo il primo.
+  const url = `${base}/api?q=${encodeURIComponent(PHOTON_QUERY)}&limit=5&lang=default`;
   const headers: Record<string, string> = { ...cfAccessHeaders() };
   if (process.env.PHOTON_TOKEN) headers["X-Photon-Token"] = process.env.PHOTON_TOKEN;
   const ctrl = new AbortController();

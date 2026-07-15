@@ -103,12 +103,21 @@ export function validateRoutePlausibility(aerialKm: number, m: RouteMeasurements
   return { ...base, impliedKmh, plausible: true, reason: null };
 }
 
+/** Un singolo risultato di geocoding (coordinate + nome, se presente). */
+export interface GeocodeCandidate {
+  lat: number;
+  lon: number;
+  name: string | null;
+}
+
 /** Misure estratte da una risposta Photon (GeoJSON FeatureCollection). */
 export interface GeocodeMeasurements {
   featureCount: number;
   firstLat: number | null;
   firstLon: number | null;
   firstName: string | null;
+  /** Fino a topN risultati con coordinate valide, in ordine di ranking Photon. */
+  candidates: GeocodeCandidate[];
 }
 
 export interface GeocodePlausibilityResult {
@@ -119,30 +128,53 @@ export interface GeocodePlausibilityResult {
   firstLon: number | null;
 }
 
-/** Estrae il conteggio dei risultati e la prima coordinata da una risposta Photon. */
-export function measurePhotonResponse(body: unknown): GeocodeMeasurements {
+function extractCandidate(feature: unknown): GeocodeCandidate | null {
+  const f = feature as { geometry?: { coordinates?: unknown }; properties?: { name?: unknown } };
+  const coords = f.geometry?.coordinates;
+  if (Array.isArray(coords) && coords.length >= 2 && typeof coords[0] === "number" && typeof coords[1] === "number") {
+    const name = typeof f.properties?.name === "string" ? f.properties.name : null;
+    return { lon: coords[0], lat: coords[1], name };
+  }
+  return null;
+}
+
+/**
+ * Estrae il conteggio dei risultati e fino a `topN` coordinate candidate da una
+ * risposta Photon, in ordine di ranking. Il ranking di un geocoder può variare
+ * innocuamente tra due chiamate (indice riordinato, bias di viewbox, ecc.): non
+ * fidarsi del SOLO primo risultato evita falsi positivi di correttezza.
+ */
+export function measurePhotonResponse(body: unknown, topN = 5): GeocodeMeasurements {
   const features = (body as { features?: unknown } | null | undefined)?.features;
   if (!Array.isArray(features) || features.length === 0) {
-    return { featureCount: 0, firstLat: null, firstLon: null, firstName: null };
+    return { featureCount: 0, firstLat: null, firstLon: null, firstName: null, candidates: [] };
   }
-  const f0 = features[0] as { geometry?: { coordinates?: unknown }; properties?: { name?: unknown } };
-  const coords = f0.geometry?.coordinates;
-  let lon: number | null = null;
-  let lat: number | null = null;
-  if (Array.isArray(coords) && coords.length >= 2 && typeof coords[0] === "number" && typeof coords[1] === "number") {
-    lon = coords[0];
-    lat = coords[1];
+  const candidates: GeocodeCandidate[] = [];
+  for (const f of features.slice(0, Math.max(topN, 1))) {
+    const c = extractCandidate(f);
+    if (c) candidates.push(c);
   }
-  const name = typeof f0.properties?.name === "string" ? f0.properties.name : null;
-  return { featureCount: features.length, firstLat: lat, firstLon: lon, firstName: name };
+  const first = candidates[0] ?? null;
+  return {
+    featureCount: features.length,
+    firstLat: first?.lat ?? null,
+    firstLon: first?.lon ?? null,
+    firstName: first?.name ?? null,
+    candidates,
+  };
 }
 
 /**
  * Valida un risultato di geocoding.
  * - almeno un risultato (200 con features=[] è un errore silenzioso del geocoder)
- * - coordinate finite e nel range valido
- * - se `expected` è fornito, il primo risultato deve cadere entro `tolKm` dal punto
- *   atteso (intercetta geocoding "sbagliato ma OK", es. Roma restituita altrove).
+ * - coordinate finite e nel range valido (sul primo risultato)
+ * - se `expected` è fornito, ALMENO UNO dei risultati candidati (fino a topN,
+ *   vedi `measurePhotonResponse`) deve cadere entro `tolKm` dal punto atteso.
+ *   Non pretendiamo che sia esattamente il PRIMO: il ranking di un geocoder
+ *   sano può normalmente riordinarsi (bias di viewbox, aggiornamento indice,
+ *   ecc.) senza che il servizio sia rotto. Intercetta comunque il caso di
+ *   geocoding "sbagliato ma OK" (es. Roma restituita altrove, nessun
+ *   candidato vicino al punto atteso).
  *
  * Il calcolo della distanza è iniettato per non creare dipendenze (funzione pura).
  */
@@ -166,12 +198,21 @@ export function validateGeocodePlausibility(
   const expected = opts?.expected;
   const distanceKm = opts?.distanceKm;
   if (expected && distanceKm) {
-    const d = distanceKm(m.firstLat, m.firstLon, expected.lat, expected.lon);
-    if (d > expected.tolKm) {
+    const candidates = m.candidates.length > 0 ? m.candidates : [{ lat: m.firstLat, lon: m.firstLon, name: null }];
+    let closestKm = Infinity;
+    for (const c of candidates) {
+      const d = distanceKm(c.lat, c.lon, expected.lat, expected.lon);
+      if (d < closestKm) closestKm = d;
+      if (d <= expected.tolKm) {
+        closestKm = d;
+        break;
+      }
+    }
+    if (closestKm > expected.tolKm) {
       return {
         ...base,
         plausible: false,
-        reason: `risultato a ${d.toFixed(0)}km dal punto atteso (>${expected.tolKm}km) — geocoding errato?`,
+        reason: `nessuno dei primi ${candidates.length} risultati è entro ${expected.tolKm}km dal punto atteso (il più vicino è a ${closestKm.toFixed(0)}km) — geocoding errato?`,
       };
     }
   }

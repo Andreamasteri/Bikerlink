@@ -115,6 +115,48 @@ describe("geocoding plausibility", () => {
     expect(r.plausible).toBe(false);
     expect(r.reason).toMatch(/dal punto atteso/);
   });
+
+  // ── Calibrazione Task #34: ranking riordinato non deve essere un falso positivo ──
+  it("accetta il risultato corretto anche se NON è il primo (ranking riordinato)", () => {
+    // Simula un Photon che, per un aggiornamento indice/bias viewbox, restituisce
+    // prima un omonimo minore e SOLO al secondo posto la Roma attesa: servizio
+    // comunque sano, non deve produrre una KO.
+    const reordered = {
+      features: [
+        { geometry: { coordinates: [-84.2, 33.58] }, properties: { name: "Rome" } }, // Rome, Georgia (USA)
+        { geometry: { coordinates: [12.4964, 41.9028] }, properties: { name: "Roma" } },
+      ],
+    };
+    const r = validateGeocodePlausibility(measurePhotonResponse(reordered), { expected, distanceKm: haversineKm });
+    expect(r.plausible).toBe(true);
+    expect(r.reason).toBeNull();
+  });
+
+  it("rifiuta comunque se NESSUNO dei primi risultati è vicino al punto atteso", () => {
+    const allWrong = {
+      features: [
+        { geometry: { coordinates: [-84.2, 33.58] }, properties: { name: "Rome" } },
+        { geometry: { coordinates: [13.405, 52.52] }, properties: { name: "Berlin" } },
+      ],
+    };
+    const r = validateGeocodePlausibility(measurePhotonResponse(allWrong), { expected, distanceKm: haversineKm });
+    expect(r.plausible).toBe(false);
+    expect(r.reason).toMatch(/nessuno dei primi/);
+  });
+
+  it("measurePhotonResponse espone i candidati fino a topN in ordine di ranking", () => {
+    const reordered = {
+      features: [
+        { geometry: { coordinates: [-84.2, 33.58] }, properties: { name: "Rome" } },
+        { geometry: { coordinates: [12.4964, 41.9028] }, properties: { name: "Roma" } },
+      ],
+    };
+    const m = measurePhotonResponse(reordered, 5);
+    expect(m.candidates).toHaveLength(2);
+    expect(m.candidates[1].name).toBe("Roma");
+    // firstLat/firstLon restano quelli del PRIMO risultato (retro-compatibilità).
+    expect(m.firstName).toBe("Rome");
+  });
 });
 
 // ── pipeline combinata ───────────────────────────────────────────────────────
