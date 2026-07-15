@@ -23,3 +23,11 @@ app's `session` table rows when hand-building a test session, never
 `passport.user`. Also remember: chat-message endpoints validate
 `platform` against a fixed enum (`android`/`ios`/`web`/`admin`) — `mobile` is
 not a valid value.
+
+**Confirmed working (Task #67 DR/GPS E2E):** this is the reliable way to drive
+the REAL HTTP pipeline as any chosen user (incl. an `is_fake` rider AND a
+throwaway `role='admin'` user for admin GETs) from a tsx script — no login/
+password needed. Insert the `session` row, mint `"s:" + cookieSignature.sign(sid,
+SESSION_SECRET)` as the Bearer. Cleanup must `DELETE FROM session WHERE
+sess->>'userId' IN (...)` (session has NO FK to users, so it isn't cascade-
+deleted). Pattern lives in `server/scripts/verify-dr-correction-e2e.ts`.

@@ -44,3 +44,19 @@ accumulate. Don't "fix" the damping.
 (per-user, userId PK), `dr_correction_global` (singleton id='global'). Migration is
 boot-gated via `server/migrate.ts` (not publish-diffed); drizzle indexes must match
 the migration exactly or the boot index-drift check fails.
+
+## Raw (per-user model) vs effective (blended) — don't confuse them
+`dr_correction_model` and the admin users-list `distanceScale` store the RAW
+model computed straight from that user's samples (`computeModelFromSamples`). BUT
+`GET /api/telemetry/dr-correction` and the export's `effectiveModel` return
+`blendWithGlobal(user, global)` — a smaller/damped value (w = n/(n+K),
+K=MIN_SAMPLES_FOR_USER_MODEL=5). Same user shows e.g. 1.10 in the admin list and
+~1.06 in the export. Intended; a numeric assertion must target the RIGHT one.
+
+## Verified end-to-end (Task #67)
+`server/scripts/verify-dr-correction-e2e.ts` proves the deterministic path:
+synthetic route+telemetry (GPS + sensor-only blackout + reacquire) with a KNOWN
+injected deviation → real `POST /api/telemetry/batch` + `/dr-deviation` → real
+per-user recompute → admin read + export. N identical deviation samples make the
+robust median EXACT, so the engine reproduces the injected ratio to ~1e-12.
+`is_test` is stamped server-side from `is_fake` and the global job excludes it.
