@@ -160,6 +160,52 @@ export function resolveWorkspacePath(filePath: string): { ok: true; abs: string 
   return { ok: true, abs };
 }
 
+// ── Task #57 — Rilevamento in-chat per Ares/Quebracho ──────────────────────────
+// Ares e Quebracho non passano da streamText (nessun tool-calling nativo: usano
+// un client HTTP diretto + una singola domanda composta), quindi non possono
+// esporre `review_task_plan` come tool AI SDK come fanno Bowie/Horus. Per dare
+// comunque un percorso in-chat, il messaggio dell'admin viene ispezionato PRIMA
+// di comporre la domanda per l'agente: se sembra una richiesta di revisione
+// piano, la conversazione salta il normale giro di chat e chiama direttamente
+// `reviewTaskPlan`. Euristica volutamente conservativa (falsi negativi >
+// falsi positivi): se non è chiaro, si ricade sulla chat normale.
+const REVIEW_TRIGGER_RE = /\b(revisiona|rivedi|rivedere|rivisiona|controlla|review)\b/i;
+const PLAN_WORD_RE = /\b(piano|task ?plan|plan)\b/i;
+// Percorso "nudo" (non tra backtick) plausibile: almeno una directory + estensione md/txt.
+const BARE_PATH_RE = /(?:[.\w-]+\/)+[\w.-]+\.(?:md|txt)\b/;
+const MIN_INLINE_CONTENT_CHARS = 200;
+
+export interface DetectedPlanReviewRequest {
+  filePath?: string;
+  content?: string;
+}
+
+/**
+ * Ispeziona un messaggio in chat e decide se è una richiesta di revisione di un
+ * task plan. Ritorna `null` se non riconosciuto (il chiamante prosegue con la
+ * chat normale). Pura: nessun accesso al filesystem o al modello.
+ */
+export function detectPlanReviewRequest(message: string): DetectedPlanReviewRequest | null {
+  const text = (message ?? "").trim();
+  if (!text) return null;
+  if (!REVIEW_TRIGGER_RE.test(text) || !PLAN_WORD_RE.test(text)) return null;
+
+  // 1) Percorso citato tra backtick (stesso formato accettato dal tool AI SDK).
+  const backticked = extractReferencedFiles(text);
+  if (backticked.length > 0) return { filePath: backticked[0] };
+
+  // 2) Percorso "nudo" nel testo (es. "revisiona .local/tasks/task-57.md").
+  const bare = BARE_PATH_RE.exec(text);
+  if (bare) return { filePath: bare[0] };
+
+  // 3) Nessun percorso: se il messaggio è sostanzioso, trattalo come il piano
+  // incollato per intero (il piano stesso di solito supera di molto la sola
+  // richiesta "revisiona questo piano: ...").
+  if (text.length >= MIN_INLINE_CONTENT_CHARS) return { content: text };
+
+  return null;
+}
+
 function agentConfigured(agent: ReviewAgent): boolean {
   switch (agent) {
     case "ares":

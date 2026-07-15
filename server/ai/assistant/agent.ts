@@ -27,6 +27,7 @@ import { isAresConfigured, getAresModelId, streamAresChat } from "../../lib/ares
 import { withAresVramPriority } from "../../lib/vram-arbiter";
 import { composeQuebrachoQuestion } from "./quebracho-question";
 import { isQuebrachoConfigured, getQuebrachoModelId, streamQuebrachoChat } from "../../lib/quebracho-client";
+import { detectPlanReviewRequest, reviewTaskPlan } from "./task-review";
 import { retrieveContext, formatRagContext, indexKnowledge } from "./rag";
 import {
   OLLAMA_TOOLS,
@@ -503,7 +504,41 @@ export async function runAssistantAgent(opts: AssistantAgentOpts): Promise<Assis
   //    garbato (nessun crash, nessun secret stampato).
   if (requestedPersona === "ares") {
     opts.onPersona?.({ id: "ares", name: AI_ROSTER.ares.name });
-    try {
+    // Task #57 — Ares non passa da streamText (nessun tool-calling nativo: HTTP
+    // diretta + una domanda composta), quindi non può esporre review_task_plan
+    // come tool AI SDK come Bowie/Horus. Rileviamo qui una richiesta di revisione
+    // piano nel messaggio grezzo dell'admin e, se riconosciuta, saltiamo la
+    // composizione della domanda per chiamare direttamente reviewTaskPlan (stesso
+    // lock a ciclo singolo e stesso "propone, non applica" della CLI).
+    const aresReviewReq = detectPlanReviewRequest(opts.message);
+    if (aresReviewReq) {
+      try {
+        const r = await reviewTaskPlan({
+          ...aresReviewReq,
+          agent: "ares",
+          signal: opts.signal,
+          allowFileRead: isAdmin,
+        });
+        const text = r.ok
+          ? (r.review ?? "(nessuna review prodotta)") +
+            (r.missingFiles && r.missingFiles.length > 0
+              ? `\n\n⚠️ File citati nel piano ma non trovati nel repository: ${r.missingFiles.join(", ")}`
+              : "")
+          : `⚠️ Revisione non eseguita: ${r.error ?? "errore sconosciuto"}`;
+        ensureIntroEmitted();
+        finalText += text;
+        aiText += text;
+        providerEmittedAny = true;
+        emitAiDelta(text);
+        provider = "ares";
+        modelId = getAresModelId();
+        done = true;
+        console.log(`[assistant] revisione task plan in-chat da Ares (ok=${r.ok})`);
+      } catch (reviewErr) {
+        console.warn("[assistant] revisione task plan Ares fallita:", (reviewErr as Error).message);
+      }
+    }
+    if (!done) try {
       if (!isAresConfigured) throw new Error("Ares non configurato (ARES_OLLAMA_URL mancante).");
       // Task #5322 — Composizione: Bowie sintetizza il contesto in UNA domanda per
       // Ares (via Ollama locale). Ares riceve SOLO quella domanda + un vincolo di
@@ -556,7 +591,37 @@ export async function runAssistantAgent(opts: AssistantAgentOpts): Promise<Assis
     //      /api/chat HTTP diretta), NON la chain Ollama/cloud. Se offline degrada
     //      con GRAZIA: Bowie riprende con un messaggio garbato (mai fallback cloud).
     opts.onPersona?.({ id: "quebracho", name: AI_ROSTER.quebracho.name });
-    try {
+    // Task #57 — stesso intercettamento pre-composizione applicato ad Ares sopra:
+    // Quebracho gira anch'esso su HTTP diretta senza tool-calling nativo.
+    const quebrachoReviewReq = detectPlanReviewRequest(opts.message);
+    if (quebrachoReviewReq) {
+      try {
+        const r = await reviewTaskPlan({
+          ...quebrachoReviewReq,
+          agent: "quebracho",
+          signal: opts.signal,
+          allowFileRead: isAdmin,
+        });
+        const text = r.ok
+          ? (r.review ?? "(nessuna review prodotta)") +
+            (r.missingFiles && r.missingFiles.length > 0
+              ? `\n\n⚠️ File citati nel piano ma non trovati nel repository: ${r.missingFiles.join(", ")}`
+              : "")
+          : `⚠️ Revisione non eseguita: ${r.error ?? "errore sconosciuto"}`;
+        ensureIntroEmitted();
+        finalText += text;
+        aiText += text;
+        providerEmittedAny = true;
+        emitAiDelta(text);
+        provider = "quebracho";
+        modelId = getQuebrachoModelId();
+        done = true;
+        console.log(`[assistant] revisione task plan in-chat da Quebracho (ok=${r.ok})`);
+      } catch (reviewErr) {
+        console.warn("[assistant] revisione task plan Quebracho fallita:", (reviewErr as Error).message);
+      }
+    }
+    if (!done) try {
       if (!isQuebrachoConfigured) throw new Error("Quebracho non configurato (nessun URL Ollama disponibile).");
       // Composizione: Bowie sintetizza il contesto in UNA richiesta per Quebracho.
       const quebrachoQuestion = await composeQuebrachoQuestion(opts.history ?? [], opts.message);
