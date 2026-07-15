@@ -50,11 +50,26 @@ const PERSONA_ICONS: Record<string, keyof typeof MaterialCommunityIcons.glyphMap
   quebracho: "account-tie-outline",
 };
 
+const PARTICIPANT_OPTIONS: { id: GroupTurnPersona["id"]; name: string }[] = [
+  { id: "bowie", name: "Bowie" },
+  { id: "horus", name: "Horus" },
+  { id: "quebracho", name: "Quebracho" },
+];
+
+const MIN_PARTICIPANTS = 2;
+const MIN_TURNS = 2;
+const MAX_TURNS = 20;
+const DEFAULT_TURNS = 6;
+
 export default function AiGroupChatScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
 
   const [topic, setTopic] = useState("");
+  const [participants, setParticipants] = useState<string[]>(
+    PARTICIPANT_OPTIONS.map((p) => p.id),
+  );
+  const [maxTurns, setMaxTurns] = useState(DEFAULT_TURNS);
   const [turns, setTurns] = useState<DisplayTurn[]>([]);
   const [running, setRunning] = useState(false);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -128,13 +143,19 @@ export default function AiGroupChatScreen() {
     const ac = new AbortController();
     abortRef.current = ac;
     try {
-      await startGroupChat({ topic: t, signal: ac.signal, ...commonHandlers() });
+      await startGroupChat({
+        topic: t,
+        participants,
+        maxTurns,
+        signal: ac.signal,
+        ...commonHandlers(),
+      });
     } catch (err) {
       setRunning(false);
       abortRef.current = null;
       if (!ac.signal.aborted) setStatusMsg(`Errore: ${(err as Error).message}`);
     }
-  }, [topic, running, commonHandlers]);
+  }, [topic, running, participants, maxTurns, commonHandlers]);
 
   const handleResume = useCallback(async (convo: ConversationMeta) => {
     if (running) return;
@@ -181,7 +202,21 @@ export default function AiGroupChatScreen() {
     list.refetch();
   }, [activeId, list]);
 
-  const canStart = topic.trim().length >= 3 && !running;
+  const toggleParticipant = useCallback((id: string) => {
+    setParticipants((prev) => {
+      if (prev.includes(id)) {
+        if (prev.length <= MIN_PARTICIPANTS) return prev;
+        return prev.filter((p) => p !== id);
+      }
+      return [...prev, id];
+    });
+  }, []);
+
+  const adjustTurns = useCallback((delta: number) => {
+    setMaxTurns((prev) => Math.min(MAX_TURNS, Math.max(MIN_TURNS, prev + delta)));
+  }, []);
+
+  const canStart = topic.trim().length >= 3 && !running && participants.length >= MIN_PARTICIPANTS;
 
   return (
     <KeyboardAvoidingView
@@ -195,7 +230,7 @@ export default function AiGroupChatScreen() {
         keyboardShouldPersistTaps="handled"
       >
         <Text style={[styles.intro, { color: colors.textSecondary }]}>
-          Proponi un argomento: Bowie, Horus e Quebracho ne discutono a turni, in diretta.
+          Proponi un argomento e scegli chi partecipa: gli agenti selezionati ne discutono a turni, in diretta.
         </Text>
 
         <TextInput
@@ -207,6 +242,51 @@ export default function AiGroupChatScreen() {
           multiline
           style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.surface }]}
         />
+
+        <Text style={[styles.sectionLabel, { color: colors.textSecondary, marginTop: 16 }]}>Partecipanti (min. 2)</Text>
+        <View style={styles.participantsRow}>
+          {PARTICIPANT_OPTIONS.map((p) => {
+            const selected = participants.includes(p.id);
+            const color = PERSONA_COLORS[p.id] ?? colors.accent;
+            const icon = PERSONA_ICONS[p.id] ?? "robot-outline";
+            return (
+              <TouchableOpacity
+                key={p.id}
+                onPress={() => toggleParticipant(p.id)}
+                disabled={running}
+                style={[
+                  styles.participantChip,
+                  { borderColor: selected ? color : colors.border, backgroundColor: selected ? `${color}22` : colors.surface },
+                ]}
+                testID={`group-chat-participant-${p.id}`}
+              >
+                <MaterialCommunityIcons name={icon} size={16} color={selected ? color : colors.textSecondary} />
+                <Text style={[styles.participantTxt, { color: selected ? color : colors.textSecondary }]}>{p.name}</Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+
+        <Text style={[styles.sectionLabel, { color: colors.textSecondary, marginTop: 16 }]}>Numero di turni</Text>
+        <View style={styles.turnsRow}>
+          <TouchableOpacity
+            onPress={() => adjustTurns(-1)}
+            disabled={running || maxTurns <= MIN_TURNS}
+            style={[styles.turnsBtn, { borderColor: colors.border, opacity: running || maxTurns <= MIN_TURNS ? 0.4 : 1 }]}
+            testID="group-chat-turns-minus"
+          >
+            <MaterialCommunityIcons name="minus" size={18} color={colors.text} />
+          </TouchableOpacity>
+          <Text style={[styles.turnsValue, { color: colors.text }]}>{maxTurns}</Text>
+          <TouchableOpacity
+            onPress={() => adjustTurns(1)}
+            disabled={running || maxTurns >= MAX_TURNS}
+            style={[styles.turnsBtn, { borderColor: colors.border, opacity: running || maxTurns >= MAX_TURNS ? 0.4 : 1 }]}
+            testID="group-chat-turns-plus"
+          >
+            <MaterialCommunityIcons name="plus" size={18} color={colors.text} />
+          </TouchableOpacity>
+        </View>
 
         <View style={styles.actionsRow}>
           {!running ? (
@@ -297,6 +377,18 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderRadius: 12, padding: 12, minHeight: 60,
     fontFamily: "Inter_400Regular", fontSize: 14, textAlignVertical: "top",
   },
+  participantsRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 8 },
+  participantChip: {
+    flexDirection: "row", alignItems: "center", gap: 6,
+    borderWidth: 1, borderRadius: 20, paddingHorizontal: 12, paddingVertical: 8,
+  },
+  participantTxt: { fontFamily: "Inter_600SemiBold", fontSize: 13 },
+  turnsRow: { flexDirection: "row", alignItems: "center", gap: 16, marginTop: 8 },
+  turnsBtn: {
+    width: 36, height: 36, borderRadius: 18, borderWidth: 1,
+    alignItems: "center", justifyContent: "center",
+  },
+  turnsValue: { fontFamily: "Inter_700Bold", fontSize: 18, minWidth: 28, textAlign: "center" },
   actionsRow: { flexDirection: "row", alignItems: "center", marginTop: 12 },
   btn: {
     flexDirection: "row", alignItems: "center", gap: 6,
