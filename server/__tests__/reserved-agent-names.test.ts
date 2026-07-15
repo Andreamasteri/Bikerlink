@@ -299,3 +299,120 @@ describe("POST /api/admin/users — stessa regola sul percorso di creazione admi
     expect(res.status).toBe(201);
   });
 });
+
+// ── Module mocks aggiuntivi per il router reale di users/profile.ts ──────────
+
+vi.mock("../lib/auth-middleware", () => ({
+  requireAuth: (_req: Request, _res: Response, next: NextFunction) => next(),
+}));
+
+vi.mock("../lib/api-response", () => ({
+  sendSuccess: (res: Response, data?: unknown) => res.json({ ok: true, ...(data ?? {}) }),
+  sendError: (res: Response, status: number, message: string) => res.status(status).json({ error: message }),
+}));
+
+vi.mock("../lib/map-visibility", () => ({
+  revealOnFirstCoordinate: (_update: unknown, _existing: unknown, _lat: unknown, _lng: unknown) => _update,
+}));
+
+vi.mock("../lib/privacy-log", () => ({
+  logPrivacySettingFireAndForget: vi.fn(),
+}));
+
+vi.mock("../matching-engine", () => ({
+  triggerProposalProfileMatchingForZavorrina: vi.fn(),
+}));
+
+vi.mock("../embeddings/bio-queue", () => ({
+  enqueueBioEmbedding: vi.fn(),
+}));
+
+vi.mock("../embeddings", () => ({
+  deleteEmbedding: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock("../routes/users", () => ({
+  applyFakeZones: vi.fn().mockReturnValue({ applied: false, lat: 0, lng: 0 }),
+  applyPositionFuzz: vi.fn().mockReturnValue({ lat: 0, lng: 0 }),
+  captureFirstAvailabilityLocation: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock("../routes/motoclubs/utils", () => ({
+  createRegionalClubInvite: vi.fn().mockResolvedValue(undefined),
+}));
+
+describe("PUT /api/users/me — rinomina self-service bloccata dai nomi agente AI", () => {
+  let app: import("express").Express;
+
+  const EXISTING_USER = {
+    id: "u99",
+    nickname: "OldNick",
+    email: "user@example.com",
+    password: "hashed",
+    userType: "biker",
+  };
+
+  beforeEach(async () => {
+    vi.clearAllMocks();
+
+    // Configura lo storage mock per le chiamate che PUT /me esegue.
+    const storageModule = await import("../storage");
+    const s = storageModule.storage as unknown as Record<string, unknown>;
+    s.getUserByNickname = vi.fn().mockResolvedValue(null);
+    s.updateUser = vi.fn().mockResolvedValue(undefined);
+    s.getUser = vi.fn().mockResolvedValue(EXISTING_USER);
+    s.getUserProfile = vi.fn().mockResolvedValue(null);
+    s.getUserPhotos = vi.fn().mockResolvedValue([]);
+    s.getUserMotorcycles = vi.fn().mockResolvedValue([]);
+    s.updateUserProfile = vi.fn().mockResolvedValue(undefined);
+    s.createUserProfile = vi.fn().mockResolvedValue(undefined);
+
+    const express = (await import("express")).default;
+    const profileRouter = (await import("../routes/users/profile")).default;
+    app = express();
+    app.use(express.json());
+    // Simula session con userId loggato.
+    app.use((req, _res, next) => {
+      (req as unknown as { session: Record<string, unknown> }).session = { userId: "u99" };
+      next();
+    });
+    app.use("/api/users", profileRouter);
+  });
+
+  it("rifiuta la rinomina verso un nickname che contiene un nome agente AI (posizione iniziale)", async () => {
+    const request = (await import("supertest")).default;
+    const res = await request(app)
+      .put("/api/users/me")
+      .send({ nickname: "AresFan" });
+    expect(res.status).toBe(400);
+  });
+
+  it("rifiuta la rinomina verso un nickname che contiene un nome agente AI (casing misto, posizione centrale/finale)", async () => {
+    const request = (await import("supertest")).default;
+    const res1 = await request(app)
+      .put("/api/users/me")
+      .send({ nickname: "il_HoRuS_99" });
+    expect(res1.status).toBe(400);
+
+    const res2 = await request(app)
+      .put("/api/users/me")
+      .send({ nickname: "TeamNadir" });
+    expect(res2.status).toBe(400);
+  });
+
+  it("rifiuta anche admin/moderator (comportamento esatto storico conservato)", async () => {
+    const request = (await import("supertest")).default;
+    const res = await request(app)
+      .put("/api/users/me")
+      .send({ nickname: "moderator" });
+    expect(res.status).toBe(400);
+  });
+
+  it("accetta una rinomina con nickname legittimo non riservato", async () => {
+    const request = (await import("supertest")).default;
+    const res = await request(app)
+      .put("/api/users/me")
+      .send({ nickname: "MotoRider99" });
+    expect(res.status).toBe(200);
+  });
+});

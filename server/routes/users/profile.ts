@@ -1,6 +1,7 @@
 import { Router, type Request, type Response } from "express";
 import { storage } from "../../storage";
 import { updateUserMeSchema, updateProfileDynamicSchema, ghostModeSchema, privacySettingsSchema, availabilitySchema } from "@shared/validators";
+import { isReservedNickname } from "@shared/validators/auth";
 import { onlineTracker } from "../../online-tracker";
 import { applyFakeZones, applyPositionFuzz, captureFirstAvailabilityLocation } from "../users";
 import { revealOnFirstCoordinate } from "../../lib/map-visibility";
@@ -84,8 +85,7 @@ router.put("/me", requireAuth, async (req: Request, res: Response) => {
 
     if (Object.keys(userUpdate).length > 0) {
       if (userUpdate.nickname) {
-        const reservedNicknames = ["admin", "administrator", "administrators", "amministratore", "amministratori", "mod", "moderator", "moderatore"];
-        if (reservedNicknames.includes(userUpdate.nickname.toLowerCase())) {
+        if (isReservedNickname(userUpdate.nickname)) {
           return sendError(res, 400, "Nickname non disponibile");
         }
         const existing = await storage.getUserByNickname(userUpdate.nickname);
