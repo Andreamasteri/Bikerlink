@@ -50,6 +50,13 @@ const KALMAN_URL = (process.env.KALMAN_URL || "http://127.0.0.1:9210").replace(/
 // garantita da CF Access all'edge + gate token dell'hub). Vedi BikerLink task #153.
 const AI_HUB_URL = (process.env.AI_HUB_URL || "http://127.0.0.1:4405").replace(/\/$/, "");
 
+// Daemon ufw-status (localhost-only, systemd bikerlink-ufw-status, :9099) che
+// espone lo stato del firewall UFW come JSON. Le richieste entrano da
+// tc.biker-link.net/ufw-status → questo agente → daemon :9099. Protetto da
+// X-Agent-Token come il resto dell'agente (a differenza di /ai-hub): il tunnel
+// Cloudflare punta direttamente a questo agente, nginx NON è nel path.
+const UFW_STATUS_URL = (process.env.UFW_DAEMON_URL || "http://127.0.0.1:9099").replace(/\/$/, "");
+
 const PROBE_TIMEOUT_MS = 3000;
 const PROXY_TIMEOUT_MS = 5000;
 
@@ -154,6 +161,29 @@ function localHttpProbe(url) {
   });
 }
 
+/** HTTP GET locale con passthrough del body JSON — usato per il daemon ufw-status */
+function localHttpGetJson(url) {
+  return new Promise((resolve) => {
+    const timer = setTimeout(
+      () => resolve({ ok: false, status: 504, body: JSON.stringify({ status: "error", detail: "ufw daemon timeout" }) }),
+      PROBE_TIMEOUT_MS,
+    );
+    const req = http.get(url, (res) => {
+      let data = "";
+      res.on("data", (c) => (data += c));
+      res.on("end", () => {
+        clearTimeout(timer);
+        const status = res.statusCode || 502;
+        resolve({ ok: status >= 200 && status < 300, status, body: data });
+      });
+    });
+    req.on("error", (err) => {
+      clearTimeout(timer);
+      resolve({ ok: false, status: 503, body: JSON.stringify({ status: "error", detail: err.message }) });
+    });
+  });
+}
+
 // ── Probe endpoints config ────────────────────────────────────────────────────
 
 const PROBE_ROUTES = {
@@ -216,6 +246,17 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(500, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ ok: false, detail: String(err) }));
     }
+    return;
+  }
+
+  // Stato firewall UFW — passthrough del daemon bikerlink-ufw-status (:9099).
+  // Risponde con il JSON del daemon ({ status, ruleCount }) così il probe
+  // server-side (UFW_STATUS_URL) può leggerlo direttamente. Auth: X-Agent-Token
+  // (già verificato sopra).
+  if (method === "GET" && path === "/ufw-status") {
+    const r = await localHttpGetJson(`${UFW_STATUS_URL}/`);
+    res.writeHead(r.ok ? 200 : 503, { "Content-Type": "application/json", "Cache-Control": "no-store" });
+    res.end(r.body || JSON.stringify({ status: "error", detail: "empty response" }));
     return;
   }
 
@@ -320,6 +361,7 @@ server.listen(PORT, "0.0.0.0", () => {
   console.log(`[bikerlink-agent] /probe/uptime-kuma    → check Uptime Kuma localhost:3001`);
   console.log(`[bikerlink-agent] /probe/redis          → check Redis TCP localhost:6379`);
   console.log(`[bikerlink-agent] /probe/postgres       → check PostgreSQL TCP localhost:5432`);
+  console.log(`[bikerlink-agent] /ufw-status           → stato firewall UFW via daemon localhost:9099`);
   console.log(`[bikerlink-agent] POST /self-update     → git pull origin main + pm2 restart bikerlink-agent`);
 });
 

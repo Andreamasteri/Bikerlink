@@ -57,11 +57,17 @@ export async function probeUfwDetailed(): Promise<UfwDetailedHealth> {
       probeLog: getProbeLog("ufw"),
     };
   }
+  // Il tunnel Cloudflare instrada tc.biker-link.net direttamente al ThinkCentre
+  // agent (:9199), che serve /ufw-status come passthrough del daemon :9099 e
+  // richiede X-Agent-Token (stesso schema del probe DragonflyDB). nginx NON è
+  // nel path, quindi non serve alcun header CF Access qui.
+  const agentToken = process.env.THINKCENTRE_AGENT_TOKEN ?? "";
+  const headers: Record<string, string> = agentToken ? { "X-Agent-Token": agentToken } : {};
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), PROBE_TIMEOUT_MS);
   const t0 = Date.now();
   try {
-    const res = await fetch(base, { method: "GET", signal: controller.signal });
+    const res = await fetch(base, { method: "GET", headers, signal: controller.signal });
     const latencyMs = Date.now() - t0;
     if (!res.ok) {
       const body = await readBodySafe(res);
