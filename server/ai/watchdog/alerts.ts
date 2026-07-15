@@ -192,6 +192,44 @@ export async function dispatchAlerts(snap: HealthSnapshot): Promise<{ sent: numb
     }
   }
 
+  // Rientro dal sovraccarico DB sostenuto (Task #84) — l'overload-collector emette
+  // un segnale "info" db.overload_recovered (value = tick di salute) quando un DB
+  // PRECEDENTEMENTE sovraccarico in modo sostenuto torna sano per una finestra
+  // piena. Info → non è un Problem (non intacca lo score): lo leggiamo dai metrics
+  // dello snapshot per chiudere il cerchio con UNA push "rientrato". Throttle
+  // dedicato (chiave distinta dalla start) per non lampeggiare su overload che
+  // vanno e vengono.
+  if (snap.metrics["db.db.overload_recovered"] != null && shouldSend("db.overload_recovered")) {
+    const n = await sendSystemAlertPushToAdmins(
+      `✅ Database rientrato — sovraccarico risolto`,
+      "Il database è tornato in condizioni normali dopo un periodo di sovraccarico sostenuto (pool/ping/errori). Nessun intervento ulteriore necessario.",
+      { type: "watchdog_db_recovered", score: snap.score },
+    );
+    sentCount += n;
+    await writeWatchdogLog({
+      kind: "alert", scope: "db.overload_recovered", status: "ok",
+      summary: `Alert rientro DB sovraccarico inviato a ${n} admin`,
+      details: { sent: n },
+    });
+  }
+
+  // Rientro dal sovraccarico backend Node sostenuto (Task #84) — stessa logica del
+  // blocco DB ma per il segnale info app.backend.overload_recovered, così l'"all
+  // clear" distingue backend da DB (chiave throttle e payload separati).
+  if (snap.metrics["app.backend.overload_recovered"] != null && shouldSend("backend.overload_recovered")) {
+    const n = await sendSystemAlertPushToAdmins(
+      `✅ Backend rientrato — sovraccarico risolto`,
+      "Il server Node è tornato in condizioni normali dopo un periodo di sovraccarico sostenuto (event-loop lag / CPU). Nessun intervento ulteriore necessario.",
+      { type: "watchdog_backend_recovered", score: snap.score },
+    );
+    sentCount += n;
+    await writeWatchdogLog({
+      kind: "alert", scope: "backend.overload_recovered", status: "ok",
+      summary: `Alert rientro backend sovraccarico inviato a ${n} admin`,
+      details: { sent: n },
+    });
+  }
+
   // Problem-level (critical singoli — pool exhaustion e network_instability già gestite sopra)
   for (const p of snap.problems) {
     if (p.severity !== "critical") continue;

@@ -117,4 +117,65 @@ describe("watchdog overload alerts (Task #72)", () => {
     });
     expect(overloadCalls).toHaveLength(0);
   });
+
+  // -------------------------------------------------------------------------
+  // Task #84 — rientro dal sovraccarico sostenuto. L'overload-collector emette un
+  // segnale info *.overload_recovered (value numerico → finisce nei metrics dello
+  // snapshot). dispatchAlerts() legge quei metrics e invia UNA push "rientrato"
+  // distinguendo DB e backend, rispettando il throttle.
+  // -------------------------------------------------------------------------
+  function snapWithMetrics(metrics: Record<string, number>): HealthSnapshot {
+    return { status: "green", score: 96, problems: [], metrics, generatedAt: new Date().toISOString() };
+  }
+
+  it("invia una push di rientro DB quando db.db.overload_recovered è nei metrics", async () => {
+    await dispatchAlerts(snapWithMetrics({ "db.db.overload_recovered": 3 }));
+
+    const dbCalls = sendPushMock.mock.calls.filter(
+      ([, , p]) => (p as { type?: string })?.type === "watchdog_db_recovered",
+    );
+    expect(dbCalls).toHaveLength(1);
+    expect(dbCalls[0][0]).toContain("Database rientrato");
+  });
+
+  it("invia una push di rientro backend quando app.backend.overload_recovered è nei metrics", async () => {
+    await dispatchAlerts(snapWithMetrics({ "app.backend.overload_recovered": 3 }));
+
+    const beCalls = sendPushMock.mock.calls.filter(
+      ([, , p]) => (p as { type?: string })?.type === "watchdog_backend_recovered",
+    );
+    expect(beCalls).toHaveLength(1);
+    expect(beCalls[0][0]).toContain("Backend rientrato");
+  });
+
+  it("distingue rientro DB e backend: due push separate quando entrambi rientrano", async () => {
+    await dispatchAlerts(snapWithMetrics({
+      "db.db.overload_recovered": 3,
+      "app.backend.overload_recovered": 4,
+    }));
+
+    const types = sendPushMock.mock.calls.map(([, , p]) => (p as { type?: string })?.type);
+    expect(types.filter((t) => t === "watchdog_db_recovered")).toHaveLength(1);
+    expect(types.filter((t) => t === "watchdog_backend_recovered")).toHaveLength(1);
+  });
+
+  it("throttle: non reinvia la stessa push di rientro DB entro la finestra TTL", async () => {
+    await dispatchAlerts(snapWithMetrics({ "db.db.overload_recovered": 3 }));
+    await dispatchAlerts(snapWithMetrics({ "db.db.overload_recovered": 3 }));
+
+    const dbCalls = sendPushMock.mock.calls.filter(
+      ([, , p]) => (p as { type?: string })?.type === "watchdog_db_recovered",
+    );
+    expect(dbCalls).toHaveLength(1);
+  });
+
+  it("nessuna push di rientro quando i metrics non contengono le chiavi", async () => {
+    await dispatchAlerts(snapWithMetrics({}));
+
+    const recoveryCalls = sendPushMock.mock.calls.filter(([, , p]) => {
+      const t = (p as { type?: string })?.type;
+      return t === "watchdog_db_recovered" || t === "watchdog_backend_recovered";
+    });
+    expect(recoveryCalls).toHaveLength(0);
+  });
 });

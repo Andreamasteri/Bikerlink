@@ -54,6 +54,34 @@ export function collectOverload(): Signal[] {
         },
       });
     }
+
+    // Task #84 — Rientro dal sovraccarico sostenuto. Quando un lato PRECEDENTEMENTE
+    // sovraccarico in modo sostenuto torna sano per una finestra piena, emettiamo
+    // un segnale "info" (non "high"): l'evento è una BUONA notizia, non deve creare
+    // un Problem né intaccare lo score/status (deriveProblems scarta gli info).
+    // Il segnale porta comunque un `value` numerico, quindi finisce nei metrics
+    // dello snapshot (source.metric) da cui alerts.ts lo legge per la push "rientrato".
+    if (state.db.recovered) {
+      signals.push({
+        source: "db",
+        metric: "db.overload_recovered",
+        value: state.db.healthyTicks,
+        unit: "ticks",
+        severity: "info",
+        details: { healthyTicks: state.db.healthyTicks },
+      });
+    }
+
+    if (state.backend.recovered) {
+      signals.push({
+        source: "app",
+        metric: "backend.overload_recovered",
+        value: state.backend.healthyTicks,
+        unit: "ticks",
+        severity: "info",
+        details: { healthyTicks: state.backend.healthyTicks },
+      });
+    }
   } catch (err) {
     signals.push({
       source: "app",

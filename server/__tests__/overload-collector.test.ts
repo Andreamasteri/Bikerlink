@@ -159,4 +159,80 @@ describe("overload sustained tracking (Task #72)", () => {
     expect(backendSig?.source).toBe("app");
     expect(signals.find((s) => s.metric === "db.overload_sustained")).toBeUndefined();
   });
+
+  // -------------------------------------------------------------------------
+  // Task #84 — dopo un overload DB SOSTENUTO, quando il DB torna sano per una
+  // finestra piena (3 tick) emettiamo un segnale info db.overload_recovered.
+  // Un solo tick di salute NON basta; il rientro si spara UNA volta sola.
+  // -------------------------------------------------------------------------
+  it("un solo tick di salute dopo un overload DB sostenuto NON è ancora un rientro", async () => {
+    // 3 tick di overload → sostenuto (arma il latch di rientro)
+    getPoolStatsMock.mockReturnValue({ total: 10, idle: 0, waiting: 5, max: 10, activePct: 95 });
+    await recordDbMonitorSample(overloadedDbSnap());
+    await recordDbMonitorSample(overloadedDbSnap());
+    await recordDbMonitorSample(overloadedDbSnap());
+    expect(getSustainedOverloadState().db.sustained).toBe(true);
+
+    // 1 solo tick sano: non ancora rientrato
+    getPoolStatsMock.mockReturnValue({ total: 2, idle: 2, waiting: 0, max: 10, activePct: 0 });
+    await recordDbMonitorSample({ problems: [], metrics: {} });
+    expect(getSustainedOverloadState().db.recovered).toBe(false);
+    expect(collectOverload().find((s) => s.metric === "db.overload_recovered")).toBeUndefined();
+  });
+
+  it("3 tick sani dopo un overload DB sostenuto → segnale info db.overload_recovered una volta sola", async () => {
+    // 3 tick di overload → sostenuto
+    getPoolStatsMock.mockReturnValue({ total: 10, idle: 0, waiting: 5, max: 10, activePct: 95 });
+    await recordDbMonitorSample(overloadedDbSnap());
+    await recordDbMonitorSample(overloadedDbSnap());
+    await recordDbMonitorSample(overloadedDbSnap());
+    expect(getSustainedOverloadState().db.sustained).toBe(true);
+
+    // 3 tick sani → rientro all'ultimo
+    getPoolStatsMock.mockReturnValue({ total: 2, idle: 2, waiting: 0, max: 10, activePct: 0 });
+    await recordDbMonitorSample({ problems: [], metrics: {} });
+    await recordDbMonitorSample({ problems: [], metrics: {} });
+    await recordDbMonitorSample({ problems: [], metrics: {} });
+
+    const state = getSustainedOverloadState();
+    expect(state.db.sustained).toBe(false);
+    expect(state.db.recovered).toBe(true);
+    expect(state.db.healthyTicks).toBeGreaterThanOrEqual(3);
+
+    const recSig = collectOverload().find((s) => s.metric === "db.overload_recovered");
+    expect(recSig).toBeDefined();
+    expect(recSig?.severity).toBe("info"); // non deve creare un Problem né toccare lo score
+    expect(recSig?.source).toBe("db");
+    expect(typeof recSig?.value).toBe("number"); // value numerico → finisce nei metrics
+
+    // Il rientro si spara una volta sola: un ulteriore tick sano NON ri-emette.
+    await recordDbMonitorSample({ problems: [], metrics: {} });
+    expect(getSustainedOverloadState().db.recovered).toBe(false);
+    expect(collectOverload().find((s) => s.metric === "db.overload_recovered")).toBeUndefined();
+  });
+
+  it("un overload backend sostenuto che rientra emette backend.overload_recovered, non db", async () => {
+    // backend overloaded per 3 tick, DB sano
+    getPoolStatsMock.mockReturnValue({ total: 2, idle: 2, waiting: 0, max: 10, activePct: 0 });
+    getBackendLoadMock.mockReturnValue({
+      eventLoopLagMs: 150, eventLoopP99Ms: 600, cpuPct: 90, rssMb: 200, overloaded: true, at: Date.now(),
+    });
+    await recordDbMonitorSample({ problems: [], metrics: {} });
+    await recordDbMonitorSample({ problems: [], metrics: {} });
+    await recordDbMonitorSample({ problems: [], metrics: {} });
+    expect(getSustainedOverloadState().backend.sustained).toBe(true);
+
+    // backend torna sano per 3 tick → rientro
+    getBackendLoadMock.mockReturnValue({
+      eventLoopLagMs: 0, eventLoopP99Ms: 0, cpuPct: 0, rssMb: 100, overloaded: false, at: Date.now(),
+    });
+    await recordDbMonitorSample({ problems: [], metrics: {} });
+    await recordDbMonitorSample({ problems: [], metrics: {} });
+    await recordDbMonitorSample({ problems: [], metrics: {} });
+
+    expect(getSustainedOverloadState().backend.recovered).toBe(true);
+    const signals = collectOverload();
+    expect(signals.find((s) => s.metric === "backend.overload_recovered")).toBeDefined();
+    expect(signals.find((s) => s.metric === "db.overload_recovered")).toBeUndefined();
+  });
 });

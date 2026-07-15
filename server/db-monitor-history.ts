@@ -37,11 +37,21 @@ const CLEANUP_INTERVAL_MS = 6 * 60 * 60 * 1000; // ogni 6h
 // throttle. Un singolo tick di picco resta un blip e NON allerta.
 const CONSECUTIVE_TICKS_FOR_SUSTAINED = 3;
 
+// Task #84 — Notifica di rientro. Un overload precedentemente SOSTENUTO è
+// considerato "risolto" solo dopo altrettanti tick consecutivi di salute
+// (simmetrico all'ingresso): così la push di rientro non lampeggia su un singolo
+// tick buono, esattamente come la push di allerta non parte su un singolo picco.
+const CONSECUTIVE_TICKS_FOR_RECOVERY = CONSECUTIVE_TICKS_FOR_SUSTAINED;
+
 /** Stato di sovraccarico sostenuto per DB e backend, letto dall'overload-collector. */
 export interface SustainedOverloadState {
   db: {
     sustained: boolean;
+    /** Task #84 — edge di rientro: true per UN solo tick quando un overload sostenuto rientra. */
+    recovered: boolean;
     consecutiveTicks: number;
+    /** Task #84 — tick consecutivi in cui il DB è risultato sano. */
+    healthyTicks: number;
     poolActivePct: number;
     poolWaiting: number;
     pingMs: number | null;
@@ -51,7 +61,11 @@ export interface SustainedOverloadState {
   };
   backend: {
     sustained: boolean;
+    /** Task #84 — edge di rientro: true per UN solo tick quando un overload sostenuto rientra. */
+    recovered: boolean;
     consecutiveTicks: number;
+    /** Task #84 — tick consecutivi in cui il backend è risultato sano. */
+    healthyTicks: number;
     cpuPct: number;
     eventLoopLagMs: number;
     eventLoopP99Ms: number;
@@ -63,9 +77,15 @@ export interface SustainedOverloadState {
 
 let dbOverloadConsecutive = 0;
 let backendOverloadConsecutive = 0;
+// Task #84 — tick consecutivi di salute + latch "c'è stato un overload sostenuto
+// ancora da segnalare come risolto".
+let dbHealthyConsecutive = 0;
+let backendHealthyConsecutive = 0;
+let dbWasSustained = false;
+let backendWasSustained = false;
 let sustainedState: SustainedOverloadState = {
-  db: { sustained: false, consecutiveTicks: 0, poolActivePct: 0, poolWaiting: 0, pingMs: null, dbErrorCount: 0, reasons: [] },
-  backend: { sustained: false, consecutiveTicks: 0, cpuPct: 0, eventLoopLagMs: 0, eventLoopP99Ms: 0, rssMb: 0, reasons: [] },
+  db: { sustained: false, recovered: false, consecutiveTicks: 0, healthyTicks: 0, poolActivePct: 0, poolWaiting: 0, pingMs: null, dbErrorCount: 0, reasons: [] },
+  backend: { sustained: false, recovered: false, consecutiveTicks: 0, healthyTicks: 0, cpuPct: 0, eventLoopLagMs: 0, eventLoopP99Ms: 0, rssMb: 0, reasons: [] },
 };
 
 /**
@@ -175,6 +195,30 @@ function updateSustainedOverload(input: {
   dbOverloadConsecutive = dbOverload ? dbOverloadConsecutive + 1 : 0;
   backendOverloadConsecutive = backend.overloaded ? backendOverloadConsecutive + 1 : 0;
 
+  // Task #84 — tick consecutivi di salute (specularmente ai tick di overload).
+  dbHealthyConsecutive = dbOverload ? 0 : dbHealthyConsecutive + 1;
+  backendHealthyConsecutive = backend.overloaded ? 0 : backendHealthyConsecutive + 1;
+
+  const dbSustained = dbOverloadConsecutive >= CONSECUTIVE_TICKS_FOR_SUSTAINED;
+  const backendSustained = backendOverloadConsecutive >= CONSECUTIVE_TICKS_FOR_SUSTAINED;
+
+  // Task #84 — latch: appena un lato diventa sostenuto, ricordiamo che va poi
+  // segnalato come RISOLTO quando rientra. Senza latch non sapremmo distinguere
+  // "sano da sempre" (nessuna push) da "sano dopo un incidente" (push di rientro).
+  if (dbSustained) dbWasSustained = true;
+  if (backendSustained) backendWasSustained = true;
+
+  // Task #84 — edge di rientro: era sostenuto e ora è sano da una finestra piena.
+  // Sparato UNA sola volta (azzera il latch); il throttle di alerts fa comunque da
+  // rete anti-flap. recovered NON è "sostenuto rientrato" a ripetizione: dopo la
+  // singola emissione il latch è spento e recovered torna false ai tick seguenti.
+  const dbRecovered =
+    dbWasSustained && !dbOverload && dbHealthyConsecutive >= CONSECUTIVE_TICKS_FOR_RECOVERY;
+  if (dbRecovered) dbWasSustained = false;
+  const backendRecovered =
+    backendWasSustained && !backend.overloaded && backendHealthyConsecutive >= CONSECUTIVE_TICKS_FOR_RECOVERY;
+  if (backendRecovered) backendWasSustained = false;
+
   const dbReasons: string[] = [];
   if (dbErrorCount > 0) dbReasons.push(`${dbErrorCount} errori DB`);
   if (poolActivePct >= POOL_OVERLOAD_PCT) dbReasons.push(`pool al ${Math.round(poolActivePct)}%`);
@@ -187,8 +231,10 @@ function updateSustainedOverload(input: {
 
   sustainedState = {
     db: {
-      sustained: dbOverloadConsecutive >= CONSECUTIVE_TICKS_FOR_SUSTAINED,
+      sustained: dbSustained,
+      recovered: dbRecovered,
       consecutiveTicks: dbOverloadConsecutive,
+      healthyTicks: dbHealthyConsecutive,
       poolActivePct: Math.round(poolActivePct),
       poolWaiting: Math.round(poolWaiting),
       pingMs: pingMs != null ? Math.round(pingMs) : null,
@@ -196,8 +242,10 @@ function updateSustainedOverload(input: {
       reasons: dbReasons,
     },
     backend: {
-      sustained: backendOverloadConsecutive >= CONSECUTIVE_TICKS_FOR_SUSTAINED,
+      sustained: backendSustained,
+      recovered: backendRecovered,
       consecutiveTicks: backendOverloadConsecutive,
+      healthyTicks: backendHealthyConsecutive,
       cpuPct: backend.cpuPct,
       eventLoopLagMs: backend.eventLoopLagMs,
       eventLoopP99Ms: backend.eventLoopP99Ms,
