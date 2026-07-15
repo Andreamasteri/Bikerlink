@@ -40,6 +40,7 @@ const ADMIN_OPTS: Record<string, { title: string } | { headerShown: false }> = {
   "exports": { title: "Export Dati" },
   "system": { title: "System Monitor" },
   "resource-monitor": { title: "Risorse & Salute App" },
+  "db-monitor": { title: "Database Monitor" },
   "eventi": { title: "Raduni — Moderazione" },
   "tabella-lingue": { title: "Tabella Lingue" },
   "gps-errors": { title: "GPS Error Log" },
@@ -189,6 +190,7 @@ export default function AdminLayout() {
         <Stack.Screen name="match-explain" options={ADMIN_OPTS["match-explain"]} />
         <Stack.Screen name="ai-assistant-config" options={ADMIN_OPTS["ai-assistant-config"]} />
         <Stack.Screen name="background-location" options={ADMIN_OPTS["background-location"]} />
+        <Stack.Screen name="db-monitor" options={ADMIN_OPTS["db-monitor"]} />
       </Stack>
     </View>
   );

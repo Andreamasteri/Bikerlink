@@ -240,6 +240,15 @@ export const adminGroupsPart1: AdminGroup[] = [
         keywords: ["risorse", "salute", "resource", "ram", "batteria", "battery", "crash", "riavvio", "restart", "grafico", "campionamento", "metriche dispositivo", "uptime", "logging weight", "memoria", "cpu", "health"],
       },
       {
+        key: "db-monitor",
+        label: "Database Monitor",
+        icon: "database-clock",
+        iconSet: "MaterialCommunityIcons",
+        route: "/admin/db-monitor",
+        accentColor: "#8B5CF6",
+        keywords: ["database", "db", "monitor", "carico", "load", "overload", "sovraccarico", "pool", "saturazione", "ping", "latenza", "latency", "backend", "cpu", "event loop", "event-loop", "storico", "history", "trend", "30 giorni", "download", "csv", "restart", "errori", "produzione", "postgres"],
+      },
+      {
         key: "moderator-logs",
         label: "Log Moderatori",
         icon: "shield-account-outline",

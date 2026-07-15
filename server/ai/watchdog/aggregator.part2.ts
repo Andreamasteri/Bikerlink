@@ -25,6 +25,7 @@ import { collectRoutingCorrectness } from "./collectors/routing-correctness-coll
 import { withBgDbSlot } from "../../lib/bg-db-limiter";
 import { isThinkCentreOffline } from "../../lib/thinkcentre-offline";
 import { setHealthState } from "../../lib/health-arbiter";
+import { recordDbMonitorSample } from "../../db-monitor-history";
 
 let latest: HealthSnapshot | null = null;
 const subscribers = new Set<(s: HealthSnapshot) => void>();
@@ -105,6 +106,11 @@ export async function runAggregatorCycle(): Promise<HealthSnapshot> {
     status, score, problems, metrics, generatedAt: new Date().toISOString(),
   };
   latest = snap;
+
+  // Task #64 — history dedicata Database Monitor: una riga per tick, riusando
+  // pool/ping/errori/restart già calcolati + il probe di carico backend. Passa
+  // da withBgDbSlot internamente ed è fire-and-forget (mai fatale sul ciclo).
+  recordDbMonitorSample({ problems, metrics }).catch(() => { /* non-fatale */ });
 
   // Observability slice: traduce lo status del semaforo watchdog nello stato
   // dell'Health Arbiter. green ⇒ READY, yellow/orange ⇒ DEGRADED, red ⇒ BROKEN.

@@ -282,6 +282,18 @@ export async function runPhase5Schedulers(): Promise<void> {
   }
 
   try {
+    // Task #64 — probe carico backend + cleanup retention history Database Monitor.
+    // Le righe di history sono scritte dal ciclo aggregator (sopra); qui avviamo
+    // solo il probe di carico backend e il timer di retention (35g, withBgDbSlot).
+    const { startDbMonitorHistory } = await import("./db-monitor-history");
+    startDbMonitorHistory();
+    console.log("[INIT] Database Monitor history started");
+  } catch (e) {
+    console.warn("[INIT] Database Monitor history failed (non-fatal):", e);
+    markDegraded("scheduler:db-monitor-history");
+  }
+
+  try {
     const { startCampaignsSelfCheckScheduler } = await import("./ai/watchdog/campaigns-self-check");
     startCampaignsSelfCheckScheduler();
     console.log("[INIT] Campagne self-check scheduler started");

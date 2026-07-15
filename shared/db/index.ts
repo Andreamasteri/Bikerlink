@@ -23,6 +23,7 @@ export * from "./ota";
 export * from "./tags";
 export * from "./embeddings";
 export * from "./watchdog";
+export * from "./db-monitor-history";
 export * from "./db-integrity";
 export * from "./integrity";
 export * from "./ai-console";

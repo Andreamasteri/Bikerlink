@@ -380,6 +380,8 @@ import systemProbeRouter from './admin/system-probe';
 // Task #3894 — Raccolta bug consolidata per il FAB admin.
 import bugReportRouter from './admin/bug-report';
 import resourceMonitorRouter from './admin/resource-monitor';
+// Task #64 — Database Monitor: storia carico DB + backend, retention 30+g, download.
+import dbMonitorRouter from './admin/db-monitor';
 import diagnosticAdminRouter from './admin/diagnostic';
 import pipelineCheckRouter from './admin/pipeline-check';
 import healthCheckRouter from './admin/health-check';
@@ -533,6 +535,7 @@ router.use('/legal', _requireAdmin, legalNextRouter);
 // Task #3894 — Raccolta bug FAB.
 router.use('/', _requireAdmin, bugReportRouter);
 router.use('/', _requireAdmin, resourceMonitorRouter);
+router.use('/', _requireAdmin, dbMonitorRouter);
 router.use('/', _requireAdmin, diagnosticAdminRouter);
 router.use('/', _requireAdmin, pipelineCheckRouter);
 router.use('/', _requireAdmin, healthCheckRouter);
