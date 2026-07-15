@@ -49,6 +49,8 @@ vi.mock("../db", () => {
   return {
     db: { select: vi.fn(() => chain) },
     pool: { query: vi.fn() },
+    // Passthrough: il wrapper di retry deve solo eseguire la funzione avvolta.
+    withDbRetry: <T>(fn: () => Promise<T> | T): Promise<T> | T => fn(),
   };
 });
 

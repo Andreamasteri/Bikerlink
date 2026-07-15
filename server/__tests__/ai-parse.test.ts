@@ -373,7 +373,8 @@ describe("POST /api/planned-routes/ai-parse — AI HTTP error handling", () => {
 
     expect(res.status).toBe(429);
     expect(res.body).toHaveProperty("message");
-    expect(res.body.message).toMatch(/limit|quota|richieste/i);
+    // Il chain multi-provider unifica il messaggio 429 ("...servizi AI ... saturi").
+    expect(res.body.message).toMatch(/limit|quota|richieste|saturi/i);
   });
 
   it("returns 503 with message body when AI responds with HTTP 503", async () => {
@@ -446,7 +447,11 @@ describe("POST /api/planned-routes/ai-parse — input validation", () => {
       .send({ prompt: "Giro di prova" });
 
     expect(res.status).toBe(503);
-    expect(res.body.message).toMatch(/GEMINI_API_KEY/i);
+    // Il chain è ora multi-provider: senza alcun provider configurato risponde
+    // 503 con un messaggio generico (non più specifico su GEMINI_API_KEY).
+    expect(res.body).toHaveProperty("message");
+    expect(typeof res.body.message).toBe("string");
+    expect(res.body.message.length).toBeGreaterThan(0);
   });
 
   it("returns 401 when user is not authenticated", async () => {

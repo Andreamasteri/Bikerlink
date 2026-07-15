@@ -6,10 +6,11 @@ import { vi, describe, it, expect, beforeEach } from "vitest";
 import express from "express";
 import request from "supertest";
 
-const { isCoordinatorKillSwitchActiveMock, setCoordinatorKillSwitchMock, isQuebrachoUnreachableMock, applyJobDirectiveMock, getCoordinatorHealthSummaryMock, getCoordinatorJobsSnapshotMock } = vi.hoisted(() => ({
+const { isCoordinatorKillSwitchActiveMock, setCoordinatorKillSwitchMock, isQuebrachoUnreachableMock, isHorusUnreachableMock, applyJobDirectiveMock, getCoordinatorHealthSummaryMock, getCoordinatorJobsSnapshotMock } = vi.hoisted(() => ({
   isCoordinatorKillSwitchActiveMock: vi.fn(async () => false),
   setCoordinatorKillSwitchMock: vi.fn(async () => {}),
   isQuebrachoUnreachableMock: vi.fn(async () => false),
+  isHorusUnreachableMock: vi.fn(async () => false),
   applyJobDirectiveMock: vi.fn(async (name: string, kind: string) => ({ applied: true, jobName: name, kind })),
   getCoordinatorHealthSummaryMock: vi.fn(() => ({ killSwitch: false, quebrachoReachable: true, jobs: { total: 1, running: 0, paused: 0, throttled: 0 } })),
   getCoordinatorJobsSnapshotMock: vi.fn(() => [{ name: "job-a", state: "idle" }]),
@@ -19,6 +20,7 @@ vi.mock("../ai/coordinator/job-gate", () => ({
   isCoordinatorKillSwitchActive: isCoordinatorKillSwitchActiveMock,
   setCoordinatorKillSwitch: setCoordinatorKillSwitchMock,
   isQuebrachoUnreachable: isQuebrachoUnreachableMock,
+  isHorusUnreachable: isHorusUnreachableMock,
   applyJobDirective: applyJobDirectiveMock,
   getCoordinatorHealthSummary: getCoordinatorHealthSummaryMock,
   getCoordinatorJobsSnapshot: getCoordinatorJobsSnapshotMock,
@@ -37,6 +39,7 @@ beforeEach(() => {
   isCoordinatorKillSwitchActiveMock.mockReset().mockResolvedValue(false);
   setCoordinatorKillSwitchMock.mockReset().mockResolvedValue(undefined);
   isQuebrachoUnreachableMock.mockReset().mockResolvedValue(false);
+  isHorusUnreachableMock.mockReset().mockResolvedValue(false);
   applyJobDirectiveMock.mockReset().mockImplementation(async (name: string, kind: string) => ({ applied: true, jobName: name, kind }));
 });
 

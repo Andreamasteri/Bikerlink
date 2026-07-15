@@ -64,6 +64,7 @@ vi.mock("../storage", () => ({
 vi.mock("../embeddings", () => ({
   findSimilar: vi.fn().mockResolvedValue([]),
   EMBEDDING_MODEL_TAG: "nomic-embed-text",
+  hnswIndexExists: vi.fn().mockResolvedValue(false),
 }));
 
 // NB: path relative to this test file → resolves to server/matching/filters
@@ -235,7 +236,9 @@ describe("Static import guard — protection-filter usage in run-*.ts", () => {
     "run-biker.ts",                  // storage.getAllBikerMotorcyclesWithUsers — storage-level guard
     "run-clubs.ts",                  // club brand matching, no user-nickname SQL
     "run-extra.ts",                  // GPS/event/music via storage methods
+    "run-extra.part2.ts",            // split (ratchet 600 righe) di run-extra.ts: stesse storage method guardate
     "run-matching.ts",               // proposal matching via storage.getActiveProposals
+    "run-matching.part2.ts",         // split (ratchet 600 righe) di run-matching.ts: stesse storage method guardate
     "run-planned-route-affinity.ts", // queries userCurvyProfile, not users.nickname
     "run-profile.ts",                // proposal-to-profile via storage
     "run-proposals.ts",              // proposal CRUD via storage

@@ -21,6 +21,19 @@ vi.mock("../storage", () => ({
   },
 }));
 
+// La route profile.next scrive nella tabella push_tokens (insert upsert + delete).
+// Senza questo mock il test colpirebbe il DB reale e fallirebbe con una FK
+// violation su user_id — mascherando la vera copertura del test.
+vi.mock("../db", () => ({
+  db: {
+    insert: vi.fn(() => ({
+      values: vi.fn(() => ({ onConflictDoUpdate: vi.fn().mockResolvedValue(undefined) })),
+    })),
+    delete: vi.fn(() => ({ where: vi.fn().mockResolvedValue(undefined) })),
+  },
+  withDbRetry: <T>(fn: () => Promise<T> | T): Promise<T> | T => fn(),
+}));
+
 import { storage } from "../storage";
 import profileNextRouter from "../routes/users/profile.next";
 

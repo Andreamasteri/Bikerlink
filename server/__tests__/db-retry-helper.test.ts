@@ -12,6 +12,9 @@ vi.mock("pg", () => ({
   default: {
     Pool: class {
       on(): void {}
+      // db.ts avvolge pool.connect (tracer dei checkout, Task #5229): il mock
+      // deve esporre connect o `pool.connect.bind(pool)` fallisce all'import.
+      connect(): void {}
     },
   },
 }));

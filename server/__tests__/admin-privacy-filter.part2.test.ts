@@ -27,16 +27,26 @@ vi.mock("../db", () => {
   mockDelete.mockReturnValue({ where: vi.fn().mockResolvedValue([]), returning: vi.fn().mockResolvedValue([]) });
   mockUpdate.mockReturnValue({ set: vi.fn().mockReturnValue({ where: vi.fn().mockResolvedValue([]) }) });
 
+  // selectDistinctOn(...).from(...).innerJoin(...).where(...).orderBy(...) — usato da GET /admin/users
+  const distinctOnChain: Record<string, unknown> = {};
+  distinctOnChain.from = vi.fn(() => distinctOnChain);
+  distinctOnChain.innerJoin = vi.fn(() => distinctOnChain);
+  distinctOnChain.where = vi.fn(() => distinctOnChain);
+  distinctOnChain.orderBy = vi.fn().mockResolvedValue([]);
+
   return {
     db: {
       select: mockSelect,
       selectDistinct: mockSelectDistinct,
+      selectDistinctOn: vi.fn(() => distinctOnChain),
       execute: mockExecute,
       insert: mockInsert,
       delete: mockDelete,
       update: mockUpdate,
     },
     pool: { query: vi.fn(), end: vi.fn() },
+    // Passthrough: il wrapper di retry deve solo eseguire la funzione avvolta.
+    withDbRetry: <T>(fn: () => Promise<T> | T): Promise<T> | T => fn(),
   };
 });
 
@@ -241,9 +251,17 @@ afterEach(() => {
 
 describe("Real admin router — GET /users/match-summary", () => {
   function mockMatchSummaryDb(userRows: object[], total = userRows.length) {
-    vi.mocked(db.execute)
-      .mockResolvedValueOnce({ rows: [{ cnt: String(total) }] } as unknown as Awaited<ReturnType<typeof db.execute>>) // COUNT query
-      .mockResolvedValueOnce({ rows: userRows } as unknown as Awaited<ReturnType<typeof db.execute>>);                 // main SELECT
+    const execMock = vi.mocked(db.execute);
+    execMock.mockReset();
+    // Default per tutte le query "extra" della route (profili, moto, tag,
+    // wishlist, breakdown bb/bz): tornano vuote e non sporcano gli assert.
+    execMock.mockResolvedValue({ rows: [] } as unknown as Awaited<ReturnType<typeof db.execute>>);
+    // Sequenza iniziale della route: COUNT totale, COUNT zero-match (nuova
+    // query aggiunta con lo zero-match inspector), SELECT utenti principale.
+    execMock
+      .mockResolvedValueOnce({ rows: [{ cnt: String(total) }] } as unknown as Awaited<ReturnType<typeof db.execute>>) // COUNT totale
+      .mockResolvedValueOnce({ rows: [{ cnt: "0" }] } as unknown as Awaited<ReturnType<typeof db.execute>>)           // COUNT zero-match
+      .mockResolvedValueOnce({ rows: userRows } as unknown as Awaited<ReturnType<typeof db.execute>>);                // SELECT utenti
   }
 
   beforeEach(() => {
@@ -311,8 +329,11 @@ describe("Real admin router — GET /users/match-summary", () => {
     vi.mocked(db.execute).mockReset();
     const totalFromDb = 42;
     vi.mocked(db.execute)
-      .mockResolvedValueOnce({ rows: [{ cnt: String(totalFromDb) }] } as unknown as Awaited<ReturnType<typeof db.execute>>)
-      .mockResolvedValueOnce({ rows: [] } as unknown as Awaited<ReturnType<typeof db.execute>>);
+      .mockResolvedValue({ rows: [] } as unknown as Awaited<ReturnType<typeof db.execute>>);
+    vi.mocked(db.execute)
+      .mockResolvedValueOnce({ rows: [{ cnt: String(totalFromDb) }] } as unknown as Awaited<ReturnType<typeof db.execute>>) // COUNT totale
+      .mockResolvedValueOnce({ rows: [{ cnt: "0" }] } as unknown as Awaited<ReturnType<typeof db.execute>>)                 // COUNT zero-match
+      .mockResolvedValueOnce({ rows: [] } as unknown as Awaited<ReturnType<typeof db.execute>>);                            // SELECT utenti
 
     const response = await supertest(buildAdminApp()).get("/users/match-summary");
     expect(response.status).toBe(200);
@@ -393,8 +414,10 @@ describe("Real admin router — GET /users/match-summary search filtering", () =
   it("source code contains ILIKE nickname filter applied to both COUNT and SELECT", () => {
     const fs = require("fs");
     const path = require("path");
+    // La route match-summary è stata spostata in users.next-match-summary.ts
+    // (split del file per il ratchet delle 600 righe): le query con ILIKE vivono lì.
     const src: string = fs.readFileSync(
-      path.resolve(__dirname, "../routes/admin/users.next.ts"),
+      path.resolve(__dirname, "../routes/admin/users.next-match-summary.ts"),
       "utf-8"
     );
     const ilikeMentions = (src.match(/ILIKE/g) ?? []).length;

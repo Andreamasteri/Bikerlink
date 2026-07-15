@@ -13,11 +13,15 @@ import express from "express";
 import request from "supertest";
 
 vi.mock("../db", () => {
+  // Chain thenable: ogni metodo builder restituisce la catena e la catena
+  // stessa è awaitable → funziona con qualsiasi ordine di .where/.orderBy/.limit
+  // (ota.ts usa .orderBy(...).limit(...), quindi orderBy NON può restituire una Promise).
   const chain: Record<string, unknown> = {};
   chain.from = vi.fn(() => chain);
   chain.where = vi.fn(() => chain);
-  chain.limit = vi.fn(() => Promise.resolve([]));
-  chain.orderBy = vi.fn(() => Promise.resolve([]));
+  chain.orderBy = vi.fn(() => chain);
+  chain.limit = vi.fn(() => chain);
+  chain.then = (resolve: (v: unknown[]) => unknown) => Promise.resolve([]).then(resolve);
   return {
     db: {
       select: vi.fn(() => chain),
@@ -25,6 +29,8 @@ vi.mock("../db", () => {
       update: vi.fn(() => ({ set: vi.fn(() => ({ where: vi.fn().mockResolvedValue(undefined) })) })),
       execute: vi.fn().mockResolvedValue({ rows: [] }),
     },
+    // Passthrough: il wrapper di retry deve solo eseguire la funzione avvolta.
+    withDbRetry: <T>(fn: () => Promise<T> | T): Promise<T> | T => fn(),
   };
 });
 

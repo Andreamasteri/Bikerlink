@@ -52,6 +52,8 @@ vi.mock("../db", () => {
       delete: vi.fn().mockReturnValue({ where: vi.fn().mockResolvedValue([]) }),
     },
     pool: { query: vi.fn(), end: vi.fn(), connect: vi.fn(), on: vi.fn() },
+    // Passthrough: il wrapper di retry deve solo eseguire la funzione avvolta.
+    withDbRetry: <T>(fn: () => Promise<T> | T): Promise<T> | T => fn(),
   };
 });
 
