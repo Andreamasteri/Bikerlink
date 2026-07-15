@@ -163,6 +163,12 @@ export default function DbMonitorScreen() {
     ],
     [series],
   );
+  const rssSeries: ChartSeries[] = useMemo(
+    () => [
+      { values: series.map((s) => s.backendRssMb), color: "#a78bfa", label: "RSS", unit: "MB" },
+    ],
+    [series],
+  );
   const dbOverloadFlags = useMemo(() => series.map((s) => s.dbOverload), [series]);
   const backendOverloadFlags = useMemo(() => series.map((s) => s.backendOverload), [series]);
 
@@ -265,6 +271,13 @@ export default function DbMonitorScreen() {
           overloadColor="#f59e0b"
           width={chartWidth}
         />
+      </View>
+
+      {/* Grafico memoria backend (RSS) */}
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>Memoria Backend (RSS)</Text>
+        <Text style={styles.cardSub}>RSS del processo Node (MB) — un aumento lento e costante segnala un memory leak</Text>
+        <DbMonitorChart series={rssSeries} timestamps={timestamps} width={chartWidth} />
       </View>
 
       {/* Riepilogo range */}
