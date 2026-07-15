@@ -19,6 +19,7 @@ import { appendHorusNote } from "./horus-memory";
 import { reviewTaskPlan, type ReviewAgent } from "./task-review";
 import { searchNadir } from "../nadir";
 import { type AppLanguageCode } from "@shared/languages";
+import { hubPost, isHubAvailable } from "../../lib/ai-hub-client";
 
 export interface InterAgentToolContext {
   /** Sessione admin: sblocca call_ares (solo admin). */
@@ -217,12 +218,41 @@ export function buildSearchManualTool(
           .describe("Numero massimo di frammenti da restituire (default 5)."),
       }),
       execute: async (input: { query: string; limit: number | null }) => {
+        const limit = input.limit ?? 5;
+
+        // Task #153 — Path primario: TC ai-hub (ricerca semantica sui file
+        // markdown in ~/agent-shared/nadir/ via Ollama all-minilm). Su errore
+        // HTTP/timeout si ricade sul motore pgvector locale (searchNadir),
+        // comportamento storico invariato. Se l'hub non è configurato o è
+        // marcato irraggiungibile dal watchdog, si va diretti al fallback.
+        if (isHubAvailable()) {
+          const hubRes = await hubPost<{
+            ok?: boolean;
+            model?: string;
+            fragments?: Array<{ origin?: string; similarity?: number; text?: string }>;
+          }>("/nadir/search", { query: input.query, limit, language });
+          if (hubRes.ok && hubRes.data && Array.isArray(hubRes.data.fragments)) {
+            console.log("[search_manual] TC ai-hub ✓");
+            return {
+              ok: true,
+              model: hubRes.data.model ?? "ai-hub:all-minilm",
+              fragments: hubRes.data.fragments.map((f) => ({
+                origin: f.origin ?? "manual",
+                similarity: Number((f.similarity ?? 0).toFixed(4)),
+                text: f.text ?? "",
+              })),
+            };
+          }
+          console.warn(`[search_manual] ai-hub non utilizzabile (${hubRes.error ?? "risposta inattesa"}), fallback Replit pgvector`);
+        }
+
         try {
-          const result = await searchNadir(input.query, input.limit ?? 5, {
+          const result = await searchNadir(input.query, limit, {
             requesterId,
             includeAllUsers,
             language,
           });
+          console.log("[search_manual] fallback Replit pgvector");
           return {
             ok: true,
             model: result.model,

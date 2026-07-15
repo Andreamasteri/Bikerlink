@@ -39,6 +39,7 @@ import {
   buildReviewTaskPlanTool,
   buildSearchManualTool,
 } from "./tools";
+import { buildHubFileTools, buildCheckVramTool } from "./tc-hub-tools";
 import { loadHorusMemory } from "./horus-memory";
 import { searchNadir, SEARCH_MANUAL_RE } from "../nadir";
 import { SOURCE_APP_LANGUAGE, type AppLanguageCode } from "@shared/languages";
@@ -316,6 +317,9 @@ export async function runAssistantAgent(opts: AssistantAgentOpts): Promise<Assis
         includeAllUsers: isAdmin,
         language: opts.language ?? SOURCE_APP_LANGUAGE,
       }),
+      // Task #153 — File sharing TC ai-hub (~/agent-shared/). Bowie legge ed
+      // elenca ma NON scrive file arbitrari (includeWrite: false).
+      buildHubFileTools({ includeWrite: false }),
     );
   } else if (requestedPersona === "horus") {
     Object.assign(
@@ -328,6 +332,10 @@ export async function runAssistantAgent(opts: AssistantAgentOpts): Promise<Assis
         includeAllUsers: isAdmin,
         language: opts.language ?? SOURCE_APP_LANGUAGE,
       }),
+      // Task #153 — Horus (amministrativo) può leggere, elencare E salvare file
+      // nella cartella condivisa del TC, oltre a leggere la VRAM GPU.
+      buildHubFileTools({ includeWrite: true }),
+      buildCheckVramTool(),
     );
   }
 

@@ -42,6 +42,14 @@ const DISK_PATH   = process.env.DISK_PATH   || "/";
 // riusando l'autenticazione già applicata qui (X-Agent-Token + CF Access edge).
 const KALMAN_URL = (process.env.KALMAN_URL || "http://127.0.0.1:9210").replace(/\/$/, "");
 
+// Reverse-proxy verso l'ai-hub (localhost-only, /home/andrea/ai-hub, pm2 :4405),
+// hub AI condiviso BikerLink/BikerBlog. Le richieste entrano da
+// tc.biker-link.net/ai-hub/* → questo agente → ai-hub. A differenza di Kalman,
+// l'ai-hub verifica il PROPRIO gate token (X-Hub-Gate-Token) per ogni chiamata:
+// perciò /ai-hub/* è ESENTE dal controllo X-Agent-Token dell'agente (l'auth resta
+// garantita da CF Access all'edge + gate token dell'hub). Vedi BikerLink task #153.
+const AI_HUB_URL = (process.env.AI_HUB_URL || "http://127.0.0.1:4405").replace(/\/$/, "");
+
 const PROBE_TIMEOUT_MS = 3000;
 const PROXY_TIMEOUT_MS = 5000;
 
@@ -163,8 +171,12 @@ const server = http.createServer(async (req, res) => {
   const method = req.method.toUpperCase();
   const path   = url.pathname.replace(/\/$/, "") || "/";
 
+  // /ai-hub/* è esente dal token dell'agente: l'ai-hub applica il proprio gate
+  // token (X-Hub-Gate-Token) e CF Access protegge già l'edge (task #153).
+  const isAiHubPath = path === "/ai-hub" || path.startsWith("/ai-hub/");
+
   // Auth
-  if (AGENT_TOKEN) {
+  if (AGENT_TOKEN && !isAiHubPath) {
     const tok = req.headers["x-agent-token"] || url.searchParams.get("token") || "";
     if (tok !== AGENT_TOKEN) {
       res.writeHead(401, { "Content-Type": "application/json" });
@@ -252,6 +264,41 @@ const server = http.createServer(async (req, res) => {
       if (!res.headersSent) {
         res.writeHead(503, { "Content-Type": "application/json" });
         res.end(JSON.stringify({ ok: false, error: `kalman service unreachable: ${err.message}` }));
+      } else {
+        res.destroy();
+      }
+    });
+    req.pipe(proxyReq);
+    return;
+  }
+
+  // Reverse-proxy ai-hub (localhost:4405). Inoltra qualunque metodo su /ai-hub/*
+  // → AI_HUB_URL strippando il prefisso. Nessun controllo X-Agent-Token qui: la
+  // richiesta porta il proprio X-Hub-Gate-Token che l'hub verifica (task #153).
+  if (isAiHubPath) {
+    const targetPath = url.pathname.replace(/^\/ai-hub/, "") || "/";
+    const target = new URL(AI_HUB_URL + targetPath + url.search);
+    const proxyReq = http.request(
+      {
+        hostname: target.hostname,
+        port: target.port || 80,
+        path: target.pathname + target.search,
+        method,
+        headers: { ...req.headers, host: target.host },
+        timeout: PROXY_TIMEOUT_MS,
+      },
+      (proxyRes) => {
+        res.writeHead(proxyRes.statusCode || 502, proxyRes.headers);
+        proxyRes.pipe(res);
+      }
+    );
+    proxyReq.on("timeout", () => {
+      proxyReq.destroy(new Error("upstream timeout"));
+    });
+    proxyReq.on("error", (err) => {
+      if (!res.headersSent) {
+        res.writeHead(503, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ ok: false, error: `ai-hub unreachable: ${err.message}` }));
       } else {
         res.destroy();
       }

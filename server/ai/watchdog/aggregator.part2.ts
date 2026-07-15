@@ -23,6 +23,7 @@ import { collectRestarts } from "./collectors/restart-collector";
 import { collectCrashSignals } from "./collectors/crash-signals-collector";
 import { collectRoutingCorrectness } from "./collectors/routing-correctness-collector";
 import { collectOverload } from "./collectors/overload-collector";
+import { collectAiHub } from "./collectors/ai-hub-collector";
 import { withBgDbSlot } from "../../lib/bg-db-limiter";
 import { isThinkCentreOffline } from "../../lib/thinkcentre-offline";
 import { setHealthState } from "../../lib/health-arbiter";
@@ -52,6 +53,9 @@ export async function runAggregatorCycle(): Promise<HealthSnapshot> {
   const collectors = await Promise.allSettled([
     collectBullMq(), collectDb(), collectDragonfly(), collectLatency(),
     Promise.resolve(collectPool()), collectMaps(),
+    // ai-hub TC (Task #153): probe HTTP di rete lenta come collectMaps → FUORI
+    // da withBgDbSlot (nessuna query DB). Aggiorna isHubAvailable() usato dai tool.
+    collectAiHub(),
     // Routing-correctness (namespace "horus"): sonde di rete lente come collectMaps,
     // quindi FUORI da withBgDbSlot (le sue eventuali query DB sono già cachate/interne).
     collectRoutingCorrectness(),

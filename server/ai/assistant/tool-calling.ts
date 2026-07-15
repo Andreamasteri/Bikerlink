@@ -155,6 +155,20 @@ const REMEMBER_NOTE_RE =
 const REVIEW_TASK_PLAN_RE =
   /task\s*plan|(revision\w*|rivedi|rivedere|rived\w*|controll\w*|analizz\w*|esamin\w*|valut\w*)\s+(il\s+|questo\s+|un\s+|il\s+mio\s+)?(piano|task|task\s*plan)|review\s+(del\s+)?(task|piano)|(piano|task)\s+di\s+lavoro/i;
 
+// Task #153 — Tool file sharing TC ai-hub (~/agent-shared/).
+// save_file: salvare/scrivere un file nella cartella condivisa.
+const SAVE_FILE_RE =
+  /\b(salv\w+|scriv\w+|crea\w*|memorizz\w+)\s+(un\s+|il\s+|questo\s+)?file|file\s+(condivis\w+|nella\s+cartella)|agent[\s-]?shared/i;
+// read_file: leggere/aprire un file dalla cartella condivisa.
+const READ_FILE_RE =
+  /\b(legg\w+|apri|apr\w+|mostra\w*|visualizz\w+)\s+(il\s+|un\s+|questo\s+)?file|contenut\w*\s+del\s+file|agent[\s-]?shared/i;
+// list_files: elencare i file / directory della cartella condivisa.
+const LIST_FILES_RE =
+  /\b(elenc\w+|list\w+)\s+(i\s+|dei\s+)?file|quali\s+file|che\s+file\s+ci\s+sono|file\s+(present\w+|disponibil\w+)|contenut\w*\s+della\s+cartella|agent[\s-]?shared/i;
+// check_vram_usage: utilizzo VRAM/GPU del ThinkCentre.
+const VRAM_RE =
+  /\bvram\b|memoria\s+(della\s+)?gpu|gpu\s+memory|utilizzo\s+(della\s+)?gpu|carico\s+(della\s+)?gpu/i;
+
 /**
  * Restituisce i NOMI dei tool da allegare al turno, partendo dai tool
  * effettivamente disponibili per la persona (`availableToolNames`). Applica la
@@ -198,6 +212,14 @@ export function selectToolNamesForMessage(
   if (REVIEW_TASK_PLAN_RE.test(m)) want("review_task_plan");
   // Task #75 — search_manual (Nadir): mai un default silenzioso, solo su cue esplicito.
   if (SEARCH_MANUAL_RE.test(m)) want("search_manual");
+
+  // Task #153 — Tool TC ai-hub (file sharing + VRAM). `want()` allega solo i
+  // tool DAVVERO disponibili per la persona (save_file solo Horus, check_vram
+  // solo Horus; read/list per entrambe).
+  if (SAVE_FILE_RE.test(m)) want("save_file");
+  if (READ_FILE_RE.test(m)) want("read_file");
+  if (LIST_FILES_RE.test(m)) want("list_files");
+  if (VRAM_RE.test(m)) want("check_vram_usage");
 
   // Ordine stabile e deterministico = ordine di dichiarazione della persona.
   return availableToolNames.filter((n) => wanted.has(n));

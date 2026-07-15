@@ -188,6 +188,10 @@ export function deriveProblems(signals: Signal[]): Problem[] {
       const cf = (s.details as { consecutiveFailures?: number } | undefined)?.consecutiveFailures ?? 1;
       title = `DragonflyDB non raggiungibile — fallback in-memory attivo (${cf} fallimenti consecutivi)`;
       suggestion = "Fallback in-memory attivo: il matching continua a funzionare. Verifica TC_DRAGONFLY_URL e stato del servizio per ripristinare il distributed lock.";
+    } else if (s.metric === "ai_hub.unreachable") {
+      const cf = (s.details as { consecutiveFailures?: number } | undefined)?.consecutiveFailures ?? 1;
+      title = `AI Hub (TC) non raggiungibile — tool file/VRAM degradati, search_manual su fallback pgvector (${cf} fallimenti consecutivi)`;
+      suggestion = "Verifica il servizio ai-hub (pm2, porta 4405) sul ThinkCentre, il thinkcentre-agent proxy /ai-hub/* e i secret AI_HUB_URL/AI_HUB_GATE_TOKEN. search_manual continua sul motore pgvector locale.";
     } else if (s.metric === "latency.p95_ms" || s.metric === "latency.p99_ms") {
       title = `Latenza API ${s.metric}: ${s.value}ms`;
     } else if (s.metric === "http.5xx_per_min") {
