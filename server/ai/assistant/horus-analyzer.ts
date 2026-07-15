@@ -208,7 +208,7 @@ async function persistRun(
 
 // ── Ciclo principale ──────────────────────────────────────────────────────────
 
-async function runCycle(trigger: "schedule" | "manual" = "schedule"): Promise<{ ran: boolean; reason?: string }> {
+export async function runCycle(trigger: "schedule" | "manual" = "schedule"): Promise<{ ran: boolean; reason?: string }> {
   if (running) return { ran: false, reason: "già in corso (single-flight)" };
   const now = Date.now();
   if (trigger === "schedule" && lastRunAt > 0 && now - lastRunAt < COOLDOWN_MS) {
@@ -298,6 +298,19 @@ export function startHorusAnalysisScheduler(): void {
 
 export function stopHorusAnalysisScheduler(): void {
   if (cycleTimer) { clearTimeout(cycleTimer); cycleTimer = null; }
+}
+
+/** Solo per i test: azzera lo stato del modulo (single-flight, cooldown, contatori, fingerprint). */
+export function __resetHorusAnalyzerStateForTest(): void {
+  running = false;
+  lastRunAt = 0;
+  totalCycles = 0;
+  totalRuns = 0;
+  totalSkippedLoad = 0;
+  totalSkippedRoutingBusy = 0;
+  totalSkippedFingerprint = 0;
+  lastError = null;
+  lastFingerprint = null;
 }
 
 export function getHorusAnalysisStats() {
