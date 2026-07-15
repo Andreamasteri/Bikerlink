@@ -335,6 +335,22 @@ export async function runAssistantAgent(opts: AssistantAgentOpts): Promise<Assis
   // Modello Ollama: Horus usa il modello dedicato; Bowie quello di default.
   const ollamaModelName = requestedPersona === "horus" ? HORUS_MODEL_ID : undefined;
 
+  // Task #77 — Ragionamento di Horus (qwen3:4b) fuori dallo stream utente.
+  // Verificato live (2026-07-15) via curl: con `think:false` su Ollama 0.30.x
+  // qwen3:4b NON smette di ragionare — il ragionamento (~4000+ char) finisce nel
+  // `content` (tag <think> di apertura perso, </think> orfano solo se num_predict
+  // è ampio), quindi in streaming i delta di ragionamento raggiungono il client
+  // PRIMA che qualunque strip post-hoc possa agire (a differenza del path consult
+  // non-streaming di inter-agent.ts, che bufferizza tutto e poi chiama stripThink).
+  // Con `think:true` invece Ollama separa il ragionamento nel canale `thinking`:
+  // il provider (ollama-ai-provider-v2) lo mappa a parti "reasoning" del fullStream,
+  // NON a "text" del textStream. Siccome qui consumiamo SOLO `result.textStream`,
+  // il ragionamento non raggiunge mai l'utente, mentre la risposta continua a fare
+  // streaming token-per-token (nessun full-buffering, latenza percepita invariata:
+  // il modello ragiona comunque, ma in silenzio). Scoping a Horus: Bowie resta su
+  // think:false (Task #74 ne verifica separatamente la pulizia su qwen3:1.7b).
+  const ollamaThinkSeparated = requestedPersona === "horus";
+
   // Task #5327 — immagini allegate → path multimodale (vision) sui provider cloud.
   const hasImages = (opts.images?.length ?? 0) > 0;
 
@@ -592,12 +608,14 @@ export async function runAssistantAgent(opts: AssistantAgentOpts): Promise<Assis
       ...(Object.keys(turnTools).length > 0
         ? { tools: turnTools as never, stopWhen: isStepCount(3) as never }
         : {}),
-      // Bowie (qwen3:1.7b) e Horus (qwen3:4b) "pensano" di default: disattiviamo il
-      // ragionamento esplicito così l'output di chat/navigazione resta pulito (niente
-      // blocchi <think>). Vale per tutte le chiamate Ollama (Bowie/Horus); innocuo
-      // per gli altri modelli (accettano think:false).
+      // Bowie (qwen3:1.7b) e Horus (qwen3:4b) "pensano" di default. Per Horus
+      // usiamo think:true (Task #77): Ollama separa il ragionamento nel canale
+      // `thinking` → parti "reasoning" del fullStream, MAI nel textStream che
+      // consumiamo qui, così il chain-of-thought grezzo non trapela in chat.
+      // Per Bowie manteniamo think:false (comportamento invariato). Innocuo per
+      // gli altri modelli (accettano entrambi i valori).
       ...(isOllama
-        ? { providerOptions: { ollama: { think: false } } as never }
+        ? { providerOptions: { ollama: { think: ollamaThinkSeparated } } as never }
         : {}),
     });
     for await (const delta of result.textStream) {

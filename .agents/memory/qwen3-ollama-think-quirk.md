@@ -15,11 +15,27 @@ verbose reasoning consumes the token budget before reaching `</think>`,
 truncating the real answer if `numPredict` is too low (700 was not enough for
 Horus's consult; 1600 worked reliably).
 
-**How to apply:** any Ollama consult path for a qwen3-family persona needs:
-1. A `stripThink()`-style helper that also detects and strips everything up
-   to and including an *orphan* `</think>` even without an opening tag (see
-   `server/ai/assistant/inter-agent.ts`).
-2. Generous `numPredict` headroom for the reasoning phase.
-3. Note: the main streaming persona-swap path (agent.ts) still leaks this
-   text live to the client because deltas are sent before any stripping can
-   happen — tracked as a separate follow-up, not yet fixed.
+**How to apply — two DIFFERENT strategies depending on streaming:**
+
+1. **Non-streaming consult path** (`inter-agent.ts`, `task-review.ts`): keep
+   `think:false` and post-process with a `stripThink()`-style helper that also
+   detects and strips everything up to and including an *orphan* `</think>`
+   even without an opening tag. Give generous `numPredict` headroom so the
+   reasoning phase doesn't truncate the real answer (700 too low, 1600 ok).
+
+2. **Streaming persona path** (`server/ai/assistant/agent.ts`): a post-hoc
+   stripper is USELESS here — deltas are sent to the client before any strip
+   could run, and the reasoning is 4000+ chars (no early `</think>`), so a
+   buffer-till-`</think>` cap would either leak thousands of chars or stall a
+   clean answer. **Fix: pass `think:true` (not false) for the qwen3 persona.**
+   Ollama then puts reasoning in the separate `thinking` channel; the provider
+   `ollama-ai-provider-v2` maps it to **`reasoning-delta` parts of the
+   fullStream, NEVER `text-delta` of the textStream**. Since agent.ts consumes
+   only `result.textStream`, the reasoning never reaches the user, and the
+   answer still streams token-by-token (same perceived latency — the model
+   reasons either way, just silently now).
+   **Why counter-intuitive:** `think:false` sounds like "no reasoning" but on
+   qwen3 it means "reason anyway, dump it into content"; `think:true` means
+   "reason into a side channel we can ignore." Verified live 2026-07-15:
+   think:true → content=127 clean chars, thinking=4232 chars separate.
+   Scoped to Horus in agent.ts; Bowie's streaming stays on think:false.
