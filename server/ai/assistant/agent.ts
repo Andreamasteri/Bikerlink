@@ -346,7 +346,7 @@ export async function runAssistantAgent(opts: AssistantAgentOpts): Promise<Assis
   // Modello Ollama: Horus usa il modello dedicato; Bowie quello di default.
   const ollamaModelName = requestedPersona === "horus" ? HORUS_MODEL_ID : undefined;
 
-  // Task #77 — Ragionamento di Horus (qwen3:4b) fuori dallo stream utente.
+  // Task #77/#122 — Ragionamento qwen3 (Horus=4b, Bowie=1.7b) fuori dallo stream utente.
   // Verificato live (2026-07-15) via curl: con `think:false` su Ollama 0.30.x
   // qwen3:4b NON smette di ragionare — il ragionamento (~4000+ char) finisce nel
   // `content` (tag <think> di apertura perso, </think> orfano solo se num_predict
@@ -358,9 +358,14 @@ export async function runAssistantAgent(opts: AssistantAgentOpts): Promise<Assis
   // NON a "text" del textStream. Siccome qui consumiamo SOLO `result.textStream`,
   // il ragionamento non raggiunge mai l'utente, mentre la risposta continua a fare
   // streaming token-per-token (nessun full-buffering, latenza percepita invariata:
-  // il modello ragiona comunque, ma in silenzio). Scoping a Horus: Bowie resta su
-  // think:false (Task #74 ne verifica separatamente la pulizia su qwen3:1.7b).
-  const ollamaThinkSeparated = requestedPersona === "horus";
+  // il modello ragiona comunque, ma in silenzio).
+  // Task #122: lo stesso comportamento affligge qwen3:1.7b (Bowie): con think:false
+  // il ragionamento in inglese/analitico finisce nel testo visibile, causando risposte
+  // in inglese, tono da "analisi" invece di risposta diretta, e troncamento (il budget
+  // di token viene consumato dal ragionamento prima che inizi la risposta vera).
+  // Soluzione: think:true per ENTRAMBE le personas Ollama (innocuo per eventuali
+  // provider cloud che ignorano questa providerOption Ollama-specifica).
+  const ollamaThinkSeparated = true; // qwen3 family (Bowie + Horus): think:true separa il ragionamento
 
   // Task #5327 — immagini allegate → path multimodale (vision) sui provider cloud.
   const hasImages = (opts.images?.length ?? 0) > 0;
@@ -620,12 +625,12 @@ export async function runAssistantAgent(opts: AssistantAgentOpts): Promise<Assis
       ...(Object.keys(turnTools).length > 0
         ? { tools: turnTools as never, stopWhen: isStepCount(3) as never }
         : {}),
-      // Bowie (qwen3:1.7b) e Horus (qwen3:4b) "pensano" di default. Per Horus
-      // usiamo think:true (Task #77): Ollama separa il ragionamento nel canale
-      // `thinking` → parti "reasoning" del fullStream, MAI nel textStream che
-      // consumiamo qui, così il chain-of-thought grezzo non trapela in chat.
-      // Per Bowie manteniamo think:false (comportamento invariato). Innocuo per
-      // gli altri modelli (accettano entrambi i valori).
+      // qwen3:1.7b (Bowie) e qwen3:4b (Horus) "pensano" di default. Con think:true
+      // (Task #77/#122) Ollama separa il ragionamento nel canale `thinking` →
+      // parti "reasoning" del fullStream, MAI nel textStream che consumiamo qui,
+      // così il chain-of-thought grezzo (tipicamente in inglese, tono analitico)
+      // non trapela mai in chat. Innocuo per i provider cloud (ignorano la
+      // providerOption Ollama-specifica) e per modelli che non ragionano.
       ...(isOllama
         ? { providerOptions: { ollama: { think: ollamaThinkSeparated } } as never }
         : {}),

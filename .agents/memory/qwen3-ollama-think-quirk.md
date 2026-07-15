@@ -38,7 +38,8 @@ Horus's consult; 1600 worked reliably).
    qwen3 it means "reason anyway, dump it into content"; `think:true` means
    "reason into a side channel we can ignore." Verified live 2026-07-15:
    think:true → content=127 clean chars, thinking=4232 chars separate.
-   Scoped to Horus in agent.ts; Bowie's streaming stays on think:false.
+   Applied to BOTH Horus and Bowie in agent.ts (`ollamaThinkSeparated = true`).
+   qwen3:1.7b (Bowie) has the identical reasoning-leak problem; Task #122 fix.
 
 **Worse case confirmed live (2026-07-15, Horus full-scan verification):** for
 longer, more "thoughtful" prompts (Horus's manual-section synthesis), qwen3:4b
