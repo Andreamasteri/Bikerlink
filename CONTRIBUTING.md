@@ -60,9 +60,9 @@ Quando aggiungi file di test (o qualsiasi file non di produzione) che contengono
 
 ```ts
 // Esempi tipici che attivano il gate:
-const TEST_API_KEY = "sk-test-abc123def456";          // OpenAI-like
-const DB_URL = "postgres://test:test@localhost/testdb"; // BasicAuth nel URL
-const CF_TOKEN = "0123456789abcdef0123456789abcdef";   // HexHighEntropy
+const TEST_API_KEY = "sk-test-abc123def456";          // OpenAI-like  // pragma: allowlist secret
+const DB_URL = "postgres://test:test@localhost/testdb"; // BasicAuth nel URL  // pragma: allowlist secret
+const CF_TOKEN = "0123456789abcdef0123456789abcdef";   // HexHighEntropy  // pragma: allowlist secret
 ```
 
 …il gate **bloccherà** il commit perché non riesce a distinguere placeholder da
