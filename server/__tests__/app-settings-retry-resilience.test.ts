@@ -229,3 +229,63 @@ describe("upsertAppSetting / getAllAppSettings — retry resilienza", () => {
     expect(attempt).toBe(2);
   });
 });
+
+// ── Scenari: validazione del parametro key ────────────────────────────────────
+//
+// getAppSetting con chiave null/undefined/vuota deve restituire undefined senza
+// mai toccare il DB (nessun mockDbSelect chiamato).
+// upsertAppSetting con chiave invalida deve lanciare subito un errore strutturato
+// senza mai toccare il DB (nessun mockDbInsert chiamato).
+
+describe("getAppSetting — validazione chiave", () => {
+  it("restituisce undefined per chiave stringa vuota senza colpire il DB", async () => {
+    const result = await storage.getAppSetting("");
+    expect(result).toBeUndefined();
+    expect(mockDbSelect).not.toHaveBeenCalled();
+  });
+
+  it("restituisce undefined per chiave null (cast a string) senza colpire il DB", async () => {
+    // In JavaScript i tipi runtime possono arrivare come null/undefined anche se
+    // la firma TypeScript dice string. Il guard difende da questi casi reali.
+    const result = await storage.getAppSetting(null as unknown as string);
+    expect(result).toBeUndefined();
+    expect(mockDbSelect).not.toHaveBeenCalled();
+  });
+
+  it("restituisce undefined per chiave undefined senza colpire il DB", async () => {
+    const result = await storage.getAppSetting(undefined as unknown as string);
+    expect(result).toBeUndefined();
+    expect(mockDbSelect).not.toHaveBeenCalled();
+  });
+
+  it("colpisce il DB normalmente per una chiave inesistente ma valida", async () => {
+    // La chiave è sintatticamente valida ma non esiste nella tabella → undefined.
+    mockDbSelect.mockImplementation(() => makeSelectChain(() => Promise.resolve([])));
+    const result = await storage.getAppSetting("key_che_non_esiste");
+    expect(result).toBeUndefined();
+    expect(mockDbSelect).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("upsertAppSetting — validazione chiave", () => {
+  it("lancia errore strutturato per chiave stringa vuota senza colpire il DB", async () => {
+    await expect(storage.upsertAppSetting("", "v")).rejects.toMatchObject({
+      code: "APP_SETTING_INVALID_KEY",
+    });
+    expect(mockDbInsert).not.toHaveBeenCalled();
+  });
+
+  it("lancia errore strutturato per chiave null senza colpire il DB", async () => {
+    await expect(
+      storage.upsertAppSetting(null as unknown as string, "v"),
+    ).rejects.toMatchObject({ code: "APP_SETTING_INVALID_KEY" });
+    expect(mockDbInsert).not.toHaveBeenCalled();
+  });
+
+  it("lancia errore strutturato per chiave undefined senza colpire il DB", async () => {
+    await expect(
+      storage.upsertAppSetting(undefined as unknown as string, "v"),
+    ).rejects.toMatchObject({ code: "APP_SETTING_INVALID_KEY" });
+    expect(mockDbInsert).not.toHaveBeenCalled();
+  });
+});

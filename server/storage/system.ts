@@ -85,6 +85,14 @@ export class SystemStorage extends AdsStorage {
   }
 
   async getAppSetting(key: string): Promise<AppSetting | undefined> {
+    // Guard: una chiave nulla/vuota non è mai valida. Restituiamo undefined
+    // immediatamente senza toccare il DB per evitare query malformate tipo
+    // `WHERE key = ''` o `WHERE key = null` che generano errori DB o risultati
+    // inattesi. Un warn visibile aiuta a rintracciare il call site colpevole.
+    if (!key || typeof key !== "string") {
+      console.warn("[app-settings] getAppSetting: chiave non valida ricevuta:", key);
+      return undefined;
+    }
     const cached = _appSettingsCache.get(key);
     if (cached && cached.expiresAt > Date.now()) return cached.value;
     // withDbRetry assorbe un singolo blip transitorio del DB managed. Se il
@@ -101,6 +109,15 @@ export class SystemStorage extends AdsStorage {
   }
 
   async upsertAppSetting(key: string, value?: string, valueJson?: unknown, description?: string): Promise<AppSetting> {
+    // Guard: una chiave nulla/vuota causerebbe un'inserzione con primary key
+    // invalida o un upsert che colpisce la riga sbagliata. Lanciamo subito un
+    // errore strutturato invece di propagare un'eccezione DB opaca.
+    if (!key || typeof key !== "string") {
+      throw Object.assign(
+        new Error(`[app-settings] upsertAppSetting: chiave non valida: ${JSON.stringify(key)}`),
+        { code: "APP_SETTING_INVALID_KEY", key },
+      );
+    }
     const [setting] = await withDbRetry(() => db.insert(appSettings)
       .values({ key, value, valueJson, description, updatedAt: new Date() })
       .onConflictDoUpdate({ target: [appSettings.key], set: { value, valueJson, updatedAt: new Date() } })
