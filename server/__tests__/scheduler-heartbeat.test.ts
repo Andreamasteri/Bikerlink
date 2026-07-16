@@ -21,8 +21,13 @@ vi.mock("../db", () => ({
 }));
 
 // withBgDbSlot esegue subito la fn (nessuna coda nei test).
+// `withBgDbSlotImpl` è controllabile: di default esegue fn(); i test del
+// dedup heartbeat-warn lo fanno rigettare per simulare la saturazione del limiter.
+const withBgDbSlotImpl = vi.hoisted(() => vi.fn((fn: () => unknown) => fn()));
 vi.mock("../lib/bg-db-limiter", () => ({
-  withBgDbSlot: (fn: () => unknown) => fn(),
+  withBgDbSlot: (...args: Parameters<typeof withBgDbSlotImpl>) => withBgDbSlotImpl(...args),
+  isBgDbLimiterDropError: (err: unknown) =>
+    err != null && typeof err === "object" && "name" in err && (err as { name: string }).name === "BgDbQueueOverflowError",
 }));
 
 vi.mock("../lib/dedup-logger", () => ({ dedupWarn: vi.fn() }));
@@ -185,6 +190,70 @@ describe("scheduler heartbeat — triggerMatchingRun skip paths", () => {
     expect(res).toEqual({ started: false, reason: "already_running" });
     await flush();
     expect(lastTickWrite()?.lastTickResult).toBe("skip:already_running");
+  });
+});
+
+describe("scheduler heartbeat — WARN dedup/cooldown quando bg-db-limiter droppato", () => {
+  beforeEach(() => {
+    nowMs = 1_000_000;
+    vi.spyOn(Date, "now").mockImplementation(() => nowMs);
+    // Fa rigettare withBgDbSlot con un errore di tipo BgDbQueueOverflowError per
+    // simulare DragonflyDB offline / coda satura → heartbeat droppato.
+    withBgDbSlotImpl.mockRejectedValue(
+      Object.assign(new Error("bg-db-limiter queue overflow (queued=64, max=64) — job dropped"), {
+        name: "BgDbQueueOverflowError",
+      }),
+    );
+    getAppSettingMock.mockResolvedValue({ valueJson: {} });
+    upsertAppSettingMock.mockClear();
+    addMatchLogMock.mockClear();
+    isPoolHealthyMock.mockReturnValue(true);
+    withMatchingLockMock.mockReset();
+    withMatchingLockMock.mockReturnValue(new Promise(() => {}));
+    forceUnlockMatchingLockMock.mockClear();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    // Ripristina il comportamento default (passthrough) per i test successivi.
+    withBgDbSlotImpl.mockImplementation((fn: () => unknown) => fn());
+  });
+
+  it("emette il WARN solo una volta nella finestra di 10 minuti, non ad ogni tick", async () => {
+    const { recordSchedulerHeartbeat } = await loadScheduler();
+
+    // Ottieni il mock di schedulerLogger.warn tramite il modulo logger già mockato.
+    const { schedulerLogger } = await import("../lib/logger");
+    const warnSpy = vi.mocked(schedulerLogger.warn);
+    warnSpy.mockClear();
+
+    // Primo tick: il WARN deve essere emesso (lastHeartbeatWarnAt = 0).
+    recordSchedulerHeartbeat("started");
+    await flush();
+    const heartbeatWarnCalls = () =>
+      warnSpy.mock.calls.filter((c) => String(c[1] ?? "").includes("heartbeat persist failed"));
+    expect(heartbeatWarnCalls().length).toBe(1);
+
+    // Tick 2–5 entro la finestra di 10 minuti: il WARN NON deve riapparire.
+    for (let i = 1; i <= 4; i++) {
+      nowMs += 60_000; // +1 minuto per tick (totale max 5 min → dentro la finestra)
+      warnSpy.mockClear();
+      recordSchedulerHeartbeat("started");
+      await flush();
+      expect(
+        warnSpy.mock.calls.filter((c) => String(c[1] ?? "").includes("heartbeat persist failed")).length,
+        `tick ${i + 1}: WARN inatteso entro la finestra di cooldown`,
+      ).toBe(0);
+    }
+
+    // Dopo 10 minuti dalla prima emissione il WARN può tornare.
+    nowMs += 6 * 60_000; // totale ~11 minuti dal primo tick
+    warnSpy.mockClear();
+    recordSchedulerHeartbeat("started");
+    await flush();
+    expect(
+      warnSpy.mock.calls.filter((c) => String(c[1] ?? "").includes("heartbeat persist failed")).length,
+    ).toBe(1);
   });
 });
 

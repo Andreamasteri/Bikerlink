@@ -130,6 +130,13 @@ export function forceUnlockMatching(): { wasRunning: boolean; lastStartAt: numbe
 let lastHeartbeatPersistAt = 0;
 const HEARTBEAT_PERSIST_THROTTLE_MS = 30_000;
 
+// Dedup per il WARN "heartbeat persist failed": quando DragonflyDB è offline il
+// bg-db-limiter può droppare la scrittura heartbeat ad ogni tick (~1min). Senza
+// throttle questo WARN inonda il log degli eventi admin e nasconde problemi reali
+// di Postgres. Si riemette al massimo una volta ogni 10 minuti.
+let lastHeartbeatWarnAt = 0;
+const HEARTBEAT_WARN_COOLDOWN_MS = 10 * 60 * 1_000; // 10 minuti
+
 // Esportato per la copertura di test diretta (Task #4804): verifica che ogni
 // path di skip scriva lastTickAt/lastTickResult e rispetti il throttle 30s.
 export function recordSchedulerHeartbeat(tickResult: string, opts?: { force?: boolean }): void {
@@ -158,7 +165,14 @@ export function recordSchedulerHeartbeat(tickResult: string, opts?: { force?: bo
         ...recoveryFields,
       }));
     })
-    .catch((err) => schedulerLogger.warn({ err }, "scheduler heartbeat persist failed (non-blocking)"));
+    .catch((err) => {
+      const now = Date.now();
+      if (now - lastHeartbeatWarnAt >= HEARTBEAT_WARN_COOLDOWN_MS) {
+        lastHeartbeatWarnAt = now;
+        schedulerLogger.warn({ err }, "scheduler heartbeat persist failed (non-blocking)");
+      }
+      // Altrimenti: drop silenzioso — il WARN è già stato emesso nel cooldown corrente.
+    });
 }
 
 export function triggerMatchingRun(): { started: boolean; reason?: string } {
