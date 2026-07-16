@@ -277,6 +277,7 @@ vi.mock("@shared/languages", () => ({
 
 import { runAssistantAgent } from "../ai/assistant/agent";
 import { buildRememberNoteTool, buildSearchManualTool } from "../ai/assistant/tools";
+import { loadHorusMemory } from "../ai/assistant/horus-memory";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -561,5 +562,40 @@ describe("runAssistantAgent — Horus persona tool calling (Ollama provider)", (
     // La chiave restituita dal builder (mock) deve essere nel set passato a streamText
     const callArgs = aiMocks.streamText.mock.calls[0][0] as { tools?: ToolSet };
     expect(callArgs.tools).toHaveProperty("check_vram_usage");
+  });
+
+  // -------------------------------------------------------------------------
+  // (k) Le note di memoria di Horus vengono iniettate nel system prompt.
+  //     Quando loadHorusMemory restituisce contenuto, il blocco "MEMORIA
+  //     PERSISTENTE DI HORUS" deve comparire PRIMA del prompt base nel campo
+  //     `system` passato a streamText. Un refactor che rimuovesse o spostasse
+  //     il blocco di concatenazione (agent.ts righe 482-488) farebbe fallire
+  //     questo test, rendendo il fallimento rumoroso invece che silenzioso.
+  // -------------------------------------------------------------------------
+
+  it("(k) le note di memoria di Horus sono iniettate nel system prompt quando loadHorusMemory restituisce contenuto", async () => {
+    const MEMORY_NOTE = "Ricorda: l'utente preferisce percorsi panoramici evitando autostrade.";
+
+    // Sovrascriviamo il mock per questo test: memoria non vuota.
+    vi.mocked(loadHorusMemory).mockResolvedValueOnce(MEMORY_NOTE);
+
+    aiMocks.streamText.mockReturnValue(makeStream(["Percorso panoramico trovato."]));
+
+    await runAssistantAgent(BASE_OPTS);
+
+    expect(aiMocks.streamText).toHaveBeenCalledTimes(1);
+    const callArgs = aiMocks.streamText.mock.calls[0][0] as { system?: string };
+
+    // Il system prompt deve contenere il blocco memoria e la nota salvata.
+    expect(callArgs.system).toBeDefined();
+    expect(callArgs.system).toContain("MEMORIA PERSISTENTE DI HORUS");
+    expect(callArgs.system).toContain(MEMORY_NOTE);
+
+    // Il blocco memoria deve precedere il prompt base di Horus (prefisso, non suffisso).
+    const systemStr = callArgs.system ?? "";
+    const memoryIdx = systemStr.indexOf("MEMORIA PERSISTENTE DI HORUS");
+    const basePromptIdx = systemStr.indexOf("system: horus specialista percorsi");
+    expect(memoryIdx).toBeGreaterThanOrEqual(0);
+    expect(basePromptIdx).toBeGreaterThan(memoryIdx);
   });
 });
