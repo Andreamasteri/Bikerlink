@@ -50,8 +50,36 @@ let _openAiCircuitReason: string | null = null;
  * cui vale ancora la pena ritentare con backoff) o da un 5xx momentaneo.
  */
 function isQuotaExhaustedError(err: unknown): boolean {
-  const e = err as { statusCode?: number; status?: number; message?: string; responseBody?: string; data?: unknown };
+  const e = err as {
+    statusCode?: number;
+    status?: number;
+    message?: string;
+    responseBody?: string;
+    data?: unknown;
+  };
   const status = e?.statusCode ?? e?.status;
+
+  // ── Controllo strutturale diretto su data.error (forma reale @ai-sdk/openai) ─
+  // APICallError espone il JSON già parsato in `.data`; controllare code/type
+  // direttamente evita falsi negativi da regex su JSON.stringify().
+  try {
+    const dataErr = (e?.data as { error?: { code?: unknown; type?: unknown } } | undefined)?.error;
+    if (dataErr) {
+      const code = String(dataErr.code ?? "").toLowerCase();
+      const type = String(dataErr.type ?? "").toLowerCase();
+      const QUOTA_CODES = [
+        "insufficient_quota",
+        "billing_hard_limit_reached",
+        "account_deactivated",
+        "quota_exceeded",
+      ];
+      if (QUOTA_CODES.some((c) => code === c || type === c)) return true;
+    }
+  } catch {
+    // ignora: il campo data potrebbe non essere un oggetto
+  }
+
+  // ── Ricerca testuale su message + responseBody + data serializzato ────────
   let dataText = "";
   try {
     dataText = JSON.stringify(e?.data ?? {});
@@ -59,7 +87,14 @@ function isQuotaExhaustedError(err: unknown): boolean {
     dataText = "";
   }
   const haystack = `${e?.message ?? ""} ${e?.responseBody ?? ""} ${dataText}`;
-  if (/insufficient_quota|exceeded[^a-z]*(your)?[^a-z]*current quota|billing hard limit/i.test(haystack)) {
+  // "insufficient_quota" appare nel JSON del corpo risposta OpenAI
+  // "billing hard limit" / "billing_hard_limit" coprono entrambe le varianti
+  // "exceeded ... current quota" copre la variante message in prosa
+  if (
+    /insufficient_quota|exceeded[^a-z]*(your)?[^a-z]*current quota|billing[_ ]hard[_ ]limit/i.test(
+      haystack,
+    )
+  ) {
     return true;
   }
   // Un 429 il cui corpo menziona esplicitamente "quota" è quasi certamente
