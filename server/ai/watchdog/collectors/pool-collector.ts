@@ -19,7 +19,6 @@
 import pg from "pg";
 import { getPoolStats, getCheckedOutConnections, APP_NAME } from "../../../db";
 import { getBgDbLimiterStats } from "../../../lib/bg-db-limiter";
-import { storage } from "../../../storage";
 import type { Signal } from "../types";
 
 // ── Local TTL cache for the idle-kill AppSetting ───────────────────────────
@@ -231,14 +230,19 @@ async function detectIdleLeak(client: pg.Client): Promise<void> {
     let killEnabled = false;
     try {
       // TTL cache: evita query ripetute su app_settings durante pressione DB.
-      // Mirrors the pattern in server/lib/thinkcentre-offline.ts.
+      // La cache si aggiorna usando la connessione out-of-band già aperta
+      // (client: pg.Client) — NON il pool principale che è sotto pressione.
       const now = Date.now();
       if (idleKillCached === null || now - idleKillCachedAt >= IDLE_KILL_CACHE_TTL_MS) {
-        const row = await storage.getAppSetting(IDLE_KILL_SETTING_KEY);
+        const settingRes = await client.query<{ value: string | null; value_json: unknown }>(
+          `SELECT value, value_json FROM app_settings WHERE key = $1`,
+          [IDLE_KILL_SETTING_KEY],
+        );
+        const row = settingRes.rows[0];
         idleKillCached =
           row?.value === "true" ||
-          row?.valueJson === true ||
-          (typeof row?.valueJson === "string" && row.valueJson === "true");
+          row?.value_json === true ||
+          (typeof row?.value_json === "string" && row.value_json === "true");
         idleKillCachedAt = Date.now();
       }
       killEnabled = idleKillCached ?? false;

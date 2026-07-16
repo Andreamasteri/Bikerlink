@@ -9,7 +9,7 @@ description: Triage completo dello stato di salute BikerLink via Horus (qwen3:4b
 > - **Horus** / **Bowie** = `OLLAMA_*` — ThinkCentre: usati da QUESTA skill per l'analisi (Horus) e come assistente in-app (Bowie).
 > - **Ares** = `ARES_OLLAMA_*` — PC fisso (GPU): usato da altre skill (es. ollama-diagnostics); NON da questa skill.
 
-Skill che esegue un **triage automatico completo** del sistema BikerLink aggregando sette fonti di dati (DB interno, log filesystem, GitHub Issues, GitHub Actions, Sentry, albero repo GitHub) e inviandole a **Horus** (ThinkCentre, modello `qwen3:4b`) per un'analisi AI strutturata. Dopo il report principale, una **seconda chiamata a Horus** (ruolo architect) filtra i task proposti contro il backlog esistente. Infine i task validati vengono scritti come file plan in `.local/tasks/horus-*.md` e come manifest `logs/horus-tasks-pending.json` — pronti per essere proposti formalmente nel pannello Replit dall'agente.
+Skill che esegue un **triage automatico completo** del sistema BikerLink aggregando fonti di dati (26+ tabelle DB, 12 file di log, GitHub Issues/Actions con dettaglio job, Sentry con evento completo top-5, albero repo GitHub, git log ultimi 30 commit, risoluzione sorgenti dagli stack trace, report triage precedente) e inviandole a **Horus** (ThinkCentre, modello `qwen3:4b`) per un'analisi AI strutturata. Dopo il report principale, una **seconda chiamata a Horus** (ruolo architect) filtra i task proposti contro il backlog esistente. Infine i task validati vengono scritti come file plan in `.local/tasks/horus-*.md` e come manifest `logs/horus-tasks-pending.json` — pronti per essere proposti formalmente nel pannello Replit dall'agente.
 
 > **Nota tecnica**: la proposta formale (`bulkCreateProjectTasks`) richiede il contesto dell'agente Replit e non può essere invocata direttamente da un processo TypeScript. Lo script prepara tutti i file necessari; l'agente li legge e crea i task PROPOSED (task #311 traccia l'automazione completa di questo step).
 
@@ -99,11 +99,14 @@ ls -t logs/horus-log-analysis-*.md | head -1
 ## Flusso completo (6 passi)
 
 ```
-1. Dump log       → DB interno, log filesystem, GitHub Issues/Actions, Sentry
+1. Dump log       → 26+ tabelle DB, 12 file filesystem, GitHub Issues/Actions (con job detail),
+                    Sentry (lista + evento completo top-5), git log ultimi 30 commit,
+                    risoluzione sorgenti stack trace, report triage precedente
 2. Repo tree      → GET /repos/Andreamasteri/Bikerlink/git/trees/HEAD?recursive=1
-3. Horus analizza → report con ## PROBLEMI TROVATI / ## ANALISI CAUSE / ## TASK PROPOSTI
+3. Horus analizza → report con ## PROBLEMI TROVATI / ## ANALISI CAUSE /
+                                ## CORRELAZIONI TROVATE / ## TASK PROPOSTI
 4. Architect revisiona → seconda chiamata Horus (ruolo architect): de-duplicazione vs backlog,
-                         scarto task vaghi/già risolti → ## TASK VALIDATI / ## TASK SCARTATI
+                          scarto task vaghi/senza evidenza letterale → ## TASK VALIDATI / ## TASK SCARTATI
 5. Preparazione   → horus-propose-tasks.ts scrive .local/tasks/horus-<slug>.md per ogni
                     task valido + manifest logs/horus-tasks-pending.json
 6. Proposta formale → l'agente Replit legge il manifest e chiama bulkCreateProjectTasks;
@@ -121,7 +124,7 @@ Prima di ogni sessione di pianificazione ("cosa facciamo adesso?", "proponi task
 
 1. **Lancia il workflow "Planning Session"** (o `bash scripts/start-planning-session.sh`).
 2. **Horus analizza** — aggrega le fonti e produce il report con `## TASK PROPOSTI DA HORUS`.
-3. **Horus-architect revisiona** — filtra duplicati e task vaghi contro il backlog.
+3. **Horus-architect revisiona** — filtra duplicati, task vaghi e task senza evidenza letterale.
 4. **I file plan vengono preparati** in `.local/tasks/horus-*.md` + manifest `logs/horus-tasks-pending.json`.
 5. **Chiedi all'agente** "Proponi i task Horus pendenti" — l'agente legge il manifest e li crea nel pannello.
 6. **L'utente approva** — decide quali task accettare e mettere in lavorazione.
@@ -130,17 +133,41 @@ Prima di ogni sessione di pianificazione ("cosa facciamo adesso?", "proponi task
 
 | Fonte | Disponibilità | Secret richiesto | Fallback |
 |---|---|---|---|
-| **DB — app_crash_logs** | sempre | `DATABASE_URL` (già configurato) | skip graceful se tabella assente |
-| **DB — ai_watchdog_log** | sempre | `DATABASE_URL` | skip graceful |
-| **DB — system_signals** (solo high/critical) | sempre | `DATABASE_URL` | skip graceful |
-| **DB — diagnostic_reports** (ultimi 5) | sempre | `DATABASE_URL` | skip graceful |
-| **DB — ai_call_logs** (solo degraded/errore) | sempre | `DATABASE_URL` | skip graceful |
+| **DB — app_crash_logs** (60 righe, con stack_trace/session_id/device_model completi) | sempre | `DATABASE_URL` | skip graceful |
+| **DB — app_crash_logs distribuzione** (COUNT per crash_type/platform) | sempre | `DATABASE_URL` | skip graceful |
+| **DB — ai_watchdog_log** (80 righe, con details JSONB) | sempre | `DATABASE_URL` | skip graceful |
+| **DB — system_signals** (80 high/critical, con details JSONB) | sempre | `DATABASE_URL` | skip graceful |
+| **DB — system_signals distribuzione** (24h, GROUP BY source/metric/severity) | sempre | `DATABASE_URL` | skip graceful |
+| **DB — diagnostic_reports** (ultimi 15, completi) | sempre | `DATABASE_URL` | skip graceful |
+| **DB — ai_call_logs** (50 degraded/errore, con campo error) | sempre | `DATABASE_URL` | skip graceful |
+| **DB — ai_call_logs security_blocked** (ultimi 20) | sempre | `DATABASE_URL` | skip graceful |
+| **DB — ai_call_logs distribuzione** (48h, GROUP BY provider/model) | sempre | `DATABASE_URL` | skip graceful |
 | **DB — ota_watchdog_reports** | se tabella esiste | `DATABASE_URL` | skip graceful |
-| **Log filesystem** (`/tmp/server-crash.log`, `/tmp/backend.log`, `logs/backend-crashes.log`, `logs/error-monitor.log`, `logs/cerbero.log`) | se file presente | — | file mancanti saltati con nota |
-| **GitHub Issues** (label bug, aperti) | opzionale | `GITHUB_TOKEN` o `DIAG_GITHUB_TOKEN` | skip con avviso se token assente |
-| **GitHub Actions** (run falliti) | opzionale | `GITHUB_TOKEN` o `DIAG_GITHUB_TOKEN` | skip con avviso se token assente |
-| **GitHub repo tree** (albero ricorsivo HEAD) | opzionale | `GITHUB_TOKEN` o `DIAG_GITHUB_TOKEN` | skip con avviso se token assente |
-| **Sentry EU** (issue non risolti) | opzionale | `SENTRY_AUTH_TOKEN` + `SENTRY_ORG` + `SENTRY_PROJECT` | skip con avviso se uno dei tre manca |
+| **DB — app_settings** (tutte le chiavi, ordinato per key) | sempre | `DATABASE_URL` | skip graceful |
+| **DB — system_health_snapshot** (ultimi 3, con problems/metrics JSONB) | sempre | `DATABASE_URL` | skip graceful |
+| **DB — db_monitor_history** (carico orario ultime 24h aggregato) | sempre | `DATABASE_URL` | skip graceful |
+| **DB — feedback_tickets aperti** (ultimi 20, con message completo) | sempre | `DATABASE_URL` | skip graceful |
+| **DB — db_integrity_runs** (ultimi 5) | sempre | `DATABASE_URL` | skip graceful |
+| **DB — db_integrity_violations** non risolte (ultime 30) | sempre | `DATABASE_URL` | skip graceful |
+| **DB — ai_analysis_runs** (ultimi 10) | sempre | `DATABASE_URL` | skip graceful |
+| **DB — ai_knowledge_gaps open** (top 20 per occorrenze) | sempre | `DATABASE_URL` | skip graceful |
+| **DB — ai_vps_jobs** (ultimi 10) | sempre | `DATABASE_URL` | skip graceful |
+| **DB — maps_telemetry_events errori** (ultimi 50) | sempre | `DATABASE_URL` | skip graceful |
+| **DB — pipeline_probe_history** (ultimi 10) | se tabella esiste | `DATABASE_URL` | skip graceful |
+| **DB — ota_releases** (ultimi 5, completi) | sempre | `DATABASE_URL` | skip graceful |
+| **DB — ota_boot_events fallimenti** (ultimi 30) | sempre | `DATABASE_URL` | skip graceful |
+| **DB — weekly_system_reports** (ultimo 1, payload JSONB) | sempre | `DATABASE_URL` | skip graceful |
+| **DB — pg_stat_user_tables** (top 20 per n_dead_tup) | sempre | `DATABASE_URL` | skip graceful |
+| **DB — pg_stat_activity** (connessioni active/idle-in-transaction) | sempre | `DATABASE_URL` | skip graceful |
+| **Log filesystem** (12 file: `/tmp/server-crash.log`, `/tmp/backend.log`, `logs/backend-crashes.log`, `logs/error-monitor.log`, `logs/cerbero.log`, `logs/watchdog.log`, `logs/uptime-resets.log`, `logs/ota-timing.log`, `logs/apk-build-current.log`, `logs/cleanup-cache.log`, `/tmp/metro.log`, `/tmp/metro-session.log`) | se file presente | — | file mancanti saltati con nota |
+| **Git log** (ultimi 30 commit con file toccati, via `git log --oneline --name-only -30`) | se git disponibile | — | skip graceful con nota |
+| **Stack trace file resolution** (estrae path sorgente dagli stack trace, legge ±10 righe attorno) | se crash log presenti | — | skip graceful per file assenti |
+| **Report triage precedente** (sezioni PROBLEMI/TASK dall'ultimo `logs/horus-log-analysis-*.md`) | se file presente | — | skip graceful |
+| **GitHub Issues** (label bug, aperti, 20 — corpo 1000 char) | opzionale | `GITHUB_TOKEN` o `DIAG_GITHUB_TOKEN` | skip con avviso se token assente |
+| **GitHub Issues** (label enhancement + performance, separata) | opzionale | `GITHUB_TOKEN` o `DIAG_GITHUB_TOKEN` | skip con avviso |
+| **GitHub Actions** (run falliti, dettaglio job e step falliti per top-5) | opzionale | `GITHUB_TOKEN` o `DIAG_GITHUB_TOKEN` | skip con avviso |
+| **GitHub repo tree** (albero ricorsivo HEAD) | opzionale | `GITHUB_TOKEN` o `DIAG_GITHUB_TOKEN` | skip con avviso |
+| **Sentry EU** (25 issue non risolti + evento completo per top-5 con stacktrace frames) | opzionale | `SENTRY_AUTH_TOKEN` + `SENTRY_ORG` + `SENTRY_PROJECT` | skip con avviso |
 
 ## Secret / variabili d'ambiente
 
@@ -161,18 +188,22 @@ Per impostare i secret: usa la skill `environment-secrets` (mai scriverli nei fi
 ## Formato output
 
 ### Report principale
-Salvato in `logs/horus-log-analysis-<timestamp>.md`. Struttura fissa (tre sezioni):
+Salvato in `logs/horus-log-analysis-<timestamp>.md`. Struttura fissa (quattro sezioni):
 
 ```markdown
 ## PROBLEMI TROVATI
-- [problema con path file coinvolto se identificabile]
+- [problema con path file coinvolto, valore letterale estratto dai dati, prime 3 righe stack se disponibile]
 
 ## ANALISI CAUSE
 [spiegazione cause radice]
 
+## CORRELAZIONI TROVATE
+- [connessione cross-source: crash timestamp ↔ commit, Sentry ↔ AppSetting, violazione DB ↔ migration, ecc.]
+
 ## TASK PROPOSTI DA HORUS
 | Titolo | Priorità | Problema | Azione |
 |--------|----------|---------|--------|
+| [titolo con valore letterale] | alta/media/bassa | [evidenza specifica dai dati] | [azione] |
 ```
 
 ### Revisione architect
@@ -183,7 +214,7 @@ Salvata in `logs/horus-log-analysis-<timestamp>-architect.md`. Struttura:
 | Titolo | Priorità | Motivazione |
 
 ## TASK SCARTATI
-- [titolo]: [duplicato di "X" / troppo vago / già risolto]
+- [titolo]: [duplicato di "X" / troppo vago / nessuna evidenza letterale / già risolto]
 ```
 
 ### Manifest task
@@ -194,8 +225,8 @@ Salvata in `logs/horus-log-analysis-<timestamp>-architect.md`. Struttura:
 | Flag | Comportamento |
 |---|---|
 | *(nessuno)* | Triage completo + revisione architect + proposta task |
-| `--only-internal` | Solo DB + filesystem (no GitHub, no Sentry, no repo tree) |
-| `--tail N` | Legge le ultime N righe per ogni file di log (default: 300) |
+| `--only-internal` | Solo DB + filesystem + git log (no GitHub, no Sentry, no repo tree) |
+| `--tail N` | Legge le ultime N righe per ogni file di log (default: 500) |
 | `--dry-run` | Mostra il bundle ma non chiama Horus |
 | `--no-propose` | Esegue triage + revisione architect, ma salta la proposta formale |
 
@@ -219,9 +250,9 @@ Se il ThinkCentre è spento o il Cloudflare Tunnel è giù, lo script stampa un 
 
 ## File coinvolti
 
-- `scripts/log-analysis-horus.ts` — script principale (triage + chiamate Horus)
+- `scripts/log-analysis-horus.ts` — script principale (triage + chiamate Horus + git log + stack trace resolution + report precedente)
 - `scripts/horus-propose-tasks.ts` — script companion (parsing task, dedup, file plan, manifest)
-- `scripts/lib/horus-sources.ts` — raccolta sorgenti GitHub (Issues, Actions, repo tree) e Sentry
+- `scripts/lib/horus-sources.ts` — raccolta sorgenti GitHub (Issues, Actions con job detail, repo tree) e Sentry (con eventi completi top-5)
 - `scripts/start-planning-session.sh` — wrapper per sessioni di pianificazione
 - `server/lib/cf-access.ts` — helper `cfAccessHeaders()` per Cloudflare Access
 - `server/db.ts` — import pool DB
