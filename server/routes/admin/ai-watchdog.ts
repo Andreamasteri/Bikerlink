@@ -5,7 +5,7 @@ import { db } from "../../db";
 import { storage } from "../../storage";
 import { aiWatchdogLog, weeklySystemReports, systemSignals } from "@shared/db";
 import { desc, eq, sql, and, gte, or } from "drizzle-orm";
-import { isHubConfigured, isHubAvailable } from "../../lib/ai-hub-client";
+import { isHubConfigured, isHubAvailable, hasHubBeenProbed } from "../../lib/ai-hub-client";
 import { z } from "zod";
 import { getLatestSnapshot, runAggregatorCycle, getRecentSnapshots } from "../../ai/watchdog/aggregator";
 import { streamWatchdogChat } from "../../ai/watchdog/chat";
@@ -397,15 +397,18 @@ router.get("/watchdog/ai-hub-health", async (_req, res) => {
   try {
     const configured = isHubConfigured();
     const reachable  = isHubAvailable();
+    const probeRan   = hasHubBeenProbed();
 
     if (!configured) {
       return res.json({
         configured: false,
         reachable: false,
+        probeRan: false,
         lastProbeAt: null,
         latencyMs: null,
         consecutiveFailures: 0,
         error: null,
+        message: null,
       });
     }
 
@@ -444,13 +447,20 @@ router.get("/watchdog/ai-hub-health", async (_req, res) => {
     const error =
       (unreachableRow?.details as { error?: string } | null)?.error ?? null;
 
+    // Se nessuna probe è mai girata (es. TC spento dal boot), segnala
+    // esplicitamente "nessuna probe eseguita" così il tile non mostra un
+    // flag reachable ottimistico fuorviante.
+    const message = !probeRan ? "Nessuna probe ancora eseguita" : null;
+
     return res.json({
       configured,
       reachable,
+      probeRan,
       lastProbeAt,
       latencyMs: reachable ? latencyMs : null,
       consecutiveFailures,
       error: reachable ? null : error,
+      message,
     });
   } catch (err) {
     return sendError(res, 500, (err as Error).message);

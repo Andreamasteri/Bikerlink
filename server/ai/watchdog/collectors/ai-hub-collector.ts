@@ -39,9 +39,16 @@ export async function collectAiHub(): Promise<Signal[]> {
     return signals;
   }
 
-  // TC spento o in manutenzione: skip (nessun allarme atteso), lascia invariato
-  // lo stato di raggiungibilità precedente e non escalation.
-  if (await isThinkCentrePoweredOff().catch(() => false)) return signals;
+  // TC spento: l'hub è ospitato sul TC, quindi se il TC è spento l'hub è
+  // certamente irraggiungibile. Marchiamo esplicitamente setHubReachable(false)
+  // per evitare che il flag ottimistico di boot ("true") faccia credere al tile
+  // che l'hub sia raggiungibile prima che una vera probe sia mai girata.
+  // Non emettiamo segnali di allarme (nessun allarme atteso per TC spento).
+  if (await isThinkCentrePoweredOff().catch(() => false)) {
+    setHubReachable(false);
+    return signals;
+  }
+  // In manutenzione: skip senza allarmi, ma lo stato rimane quello dell'ultima probe.
   if (await isThinkCentreInMaintenance().catch(() => false)) return signals;
 
   // hubGet include automaticamente X-Hub-Gate-Token + CF Access headers (8s timeout).

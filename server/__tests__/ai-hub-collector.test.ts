@@ -6,6 +6,8 @@
  *     così un 401 viene correttamente trattato come "irraggiungibile" (review feedback);
  *   - chiami setHubReachable(true) su risposta 200+{ok:true};
  *   - chiami setHubReachable(false) su risposta 4xx o errore di rete;
+ *   - chiami setHubReachable(false) quando il TC è spento (evita il flag ottimistico
+ *     di boot che farebbe mostrare il tile come "raggiungibile" prima di qualsiasi probe);
  *   - skippi silenziosamente se l'hub non è configurato.
  *
  * Il modulo ha contatori a livello di module scope (consecutiveFailures, hadSuccessfulProbe)
@@ -17,10 +19,12 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // vi.hoisted garantisce che le variabili siano inizializzate prima che vi.mock
 // sollevi le factory (necessario perché vi.mock viene hoistato all'inizio del file).
-const { mockHubGet, mockSetHubReachable, mockIsHubConfigured } = vi.hoisted(() => ({
+const { mockHubGet, mockSetHubReachable, mockIsHubConfigured, mockIsTcPoweredOff, mockIsTcInMaintenance } = vi.hoisted(() => ({
   mockHubGet: vi.fn(),
   mockSetHubReachable: vi.fn(),
   mockIsHubConfigured: vi.fn(),
+  mockIsTcPoweredOff: vi.fn(),
+  mockIsTcInMaintenance: vi.fn(),
 }));
 
 vi.mock("../lib/ai-hub-client", () => ({
@@ -30,10 +34,10 @@ vi.mock("../lib/ai-hub-client", () => ({
   isHubAvailable: () => true,
 }));
 vi.mock("../lib/thinkcentre-powered-off", () => ({
-  isThinkCentrePoweredOff: () => Promise.resolve(false),
+  isThinkCentrePoweredOff: mockIsTcPoweredOff,
 }));
 vi.mock("../lib/thinkcentre-maintenance", () => ({
-  isThinkCentreInMaintenance: () => Promise.resolve(false),
+  isThinkCentreInMaintenance: mockIsTcInMaintenance,
 }));
 
 import { collectAiHub } from "../ai/watchdog/collectors/ai-hub-collector";
@@ -48,8 +52,10 @@ const netError = () =>
 
 beforeEach(() => {
   vi.clearAllMocks();
-  // Reimposta l'implementazione dopo clearAllMocks (che cancella mockReturnValue).
+  // Reimposta le implementazioni dopo clearAllMocks (che cancella mockReturnValue/Impl).
   mockIsHubConfigured.mockReturnValue(true);
+  mockIsTcPoweredOff.mockResolvedValue(false);
+  mockIsTcInMaintenance.mockResolvedValue(false);
 });
 
 describe("ai-hub collector — autenticazione e comportamento probe", () => {
@@ -113,6 +119,53 @@ describe("ai-hub collector — autenticazione e comportamento probe", () => {
     expect(mockHubGet).not.toHaveBeenCalled();
     expect(mockSetHubReachable).not.toHaveBeenCalled();
     expect(signals.some((s) => s.metric === "ai_hub.absent")).toBe(true);
+  });
+
+  it("TC spento (powered-off) → setHubReachable(false) chiamato, hubGet NON chiamato, nessun segnale di allarme", async () => {
+    // Questo è il bug corretto da Task #166: se il TC è spento dal boot, il
+    // collector saltava silenziosamente senza chiamare setHubReachable — lasciando
+    // il flag ottimistico "true" intatto, così il tile mostrova l'hub come
+    // "RAGGIUNGIBILE" prima che una vera probe fosse mai girata.
+    // La fix: quando TC è spento, chiamiamo setHubReachable(false) esplicitamente
+    // (l'hub è sul TC → se il TC è spento l'hub è certamente irraggiungibile).
+    mockIsTcPoweredOff.mockResolvedValue(true);
+
+    const signals = await collectAiHub();
+
+    // hubGet NON deve essere chiamato (TC spento = skip la rete)
+    expect(mockHubGet).not.toHaveBeenCalled();
+    // Ma setHubReachable(false) DEVE essere chiamato per correggere il flag ottimistico
+    expect(mockSetHubReachable).toHaveBeenCalledWith(false);
+    expect(mockSetHubReachable).toHaveBeenCalledTimes(1);
+    // Nessun segnale di allarme emesso (TC spento = nessun alert atteso)
+    expect(signals).toHaveLength(0);
+  });
+
+  it("TC spento (powered-off) con isHubAvailable ottimistico → il tile riflette DOWN non UP", async () => {
+    // Scenario: server appena avviato, nessuna probe ancora eseguita, TC flaggato
+    // come spento. Prima della fix il tile avrebbe mostrato reachable=true (ottimistico).
+    // Dopo la fix setHubReachable(false) viene chiamato → isHubAvailable() restituisce false.
+    mockIsTcPoweredOff.mockResolvedValue(true);
+
+    // Prima della collect: lo stato ottimistico non deve influenzare il risultato finale.
+    await collectAiHub();
+
+    // Il solo controllo possibile a livello di collector è che setHubReachable(false)
+    // sia stato chiamato — chi legge isHubAvailable() nel processo reale riceverà false.
+    expect(mockSetHubReachable).toHaveBeenCalledWith(false);
+  });
+
+  it("TC in manutenzione → hubGet NON chiamato, setHubReachable NON chiamato (nessuna modifica allo stato)", async () => {
+    // In manutenzione il collector salta ma NON forza setHubReachable: lo stato
+    // rimane quello dell'ultima probe reale (il tile può continuare a mostrare
+    // l'ultimo stato noto durante la finestra di manutenzione).
+    mockIsTcInMaintenance.mockResolvedValue(true);
+
+    const signals = await collectAiHub();
+
+    expect(mockHubGet).not.toHaveBeenCalled();
+    expect(mockSetHubReachable).not.toHaveBeenCalled();
+    expect(signals).toHaveLength(0);
   });
 
   it("ping_ms severity info se latenza ≤ 3000ms, warn se > 3000ms (SLA Task #161)", async () => {

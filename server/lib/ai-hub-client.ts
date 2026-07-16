@@ -45,6 +45,9 @@ export interface HubResult<T = unknown> {
 // Raggiungibilità corrente dell'hub — aggiornata dalla probe del watchdog.
 // Ottimista al boot: finché una probe non lo marca giù, i tool provano l'hub.
 let hubReachable = true;
+// Traccia se almeno una probe (successo O fallimento) è stata eseguita.
+// Rimane false se il collector ha saltato ogni ciclo (es. TC spento al boot).
+let hubProbeRan = false;
 
 /** true se ENTRAMBI i secret (URL + gate token) sono configurati. */
 export function isHubConfigured(): boolean {
@@ -60,9 +63,29 @@ export function isHubAvailable(): boolean {
   return isHubConfigured() && hubReachable;
 }
 
+/**
+ * true se il collector ha eseguito almeno una probe reale (successo o
+ * fallimento) in questa sessione. false se ogni ciclo è stato skippato
+ * (es. TC spento dal boot: il flag ottimista al boot non vale come probe).
+ */
+export function hasHubBeenProbed(): boolean {
+  return hubProbeRan;
+}
+
 /** Aggiorna lo stato di raggiungibilità (chiamato dalla probe del watchdog). */
 export function setHubReachable(reachable: boolean): void {
   hubReachable = reachable;
+  hubProbeRan = true;
+}
+
+/**
+ * Reimposta lo stato in-process al valore di boot.
+ * Usato esclusivamente nei test per isolare i casi.
+ * @internal
+ */
+export function resetHubState(): void {
+  hubReachable = true;
+  hubProbeRan = false;
 }
 
 /** Base URL dell'hub (senza slash finale), o "" se non configurato. */
