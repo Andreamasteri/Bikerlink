@@ -86,7 +86,8 @@ attached_assets/
 
 # Exports — contengono dati di esportazione (ZIP, task, chat history) che
 # gonfiano il Repl layer. Mettere in Object Storage, non in git.
-exports/
+# Ancorato a root: non esclude server/exports/ (codice sorgente).
+/exports/
 
 # Runtime upload assets (transient, not tracked)
 
