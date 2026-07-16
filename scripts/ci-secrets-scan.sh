@@ -107,10 +107,14 @@ else
   echo ""
   echo "   Soluzioni:"
   echo "   1. Rimuovi il segreto dal file (raccomandato)."
-  echo "   2. Falso positivo? Aggiungi sulla riga: # pragma: allowlist secret"
-  echo "   3. Approva nella baseline:"
+  echo "   2. Credenziale fittizia in un test/fixture? Aggiungi sulla riga:"
+  echo "        # pragma: allowlist secret"
+  echo "      Funziona in qualsiasi linguaggio con commenti # o //."
+  echo "   3. Falso positivo in un file non-test? Approva nella baseline:"
   echo "        detect-secrets scan --no-verify > .secrets.baseline"
   echo "        detect-secrets audit .secrets.baseline"
-  echo "   Consulta CONTRIBUTING.md per la procedura completa."
+  echo "        git add .secrets.baseline"
+  echo "   Consulta CONTRIBUTING.md §'Test fixture e credenziali placeholder'"
+  echo "   per la procedura completa e le istruzioni sul pragma."
   exit 1
 fi

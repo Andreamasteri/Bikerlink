@@ -53,25 +53,60 @@ bash scripts/ci-secrets-scan.sh         # solo file modificati (veloce)
 bash scripts/ci-secrets-scan.sh --all   # tutti i file tracciati (completo)
 ```
 
-### Falsi positivi
+### Test fixture e credenziali placeholder
 
-Se il hook blocca un commit per un valore che **non è un segreto reale**
-(es. una stringa di test, un ID pubblico, un hash), hai due opzioni:
+Quando aggiungi file di test (o qualsiasi file non di produzione) che contengono
+**credenziali fittizie** — ad esempio:
 
-#### Opzione 1 — Aggiungi alla baseline (raccomandato)
+```ts
+// Esempi tipici che attivano il gate:
+const TEST_API_KEY = "sk-test-abc123def456";          // OpenAI-like
+const DB_URL = "postgres://test:test@localhost/testdb"; // BasicAuth nel URL
+const CF_TOKEN = "0123456789abcdef0123456789abcdef";   // HexHighEntropy
+```
+
+…il gate **bloccherà** il commit perché non riesce a distinguere placeholder da
+segreti reali senza context.
+
+#### Scelta rapida: pragma inline (preferito per i test)
+
+Aggiungi `# pragma: allowlist secret` **sulla stessa riga** del valore rilevato:
+
+```ts
+const TEST_API_KEY = "sk-test-abc123def456"; // pragma: allowlist secret
+const DB_URL = "postgres://test:test@localhost/testdb"; // pragma: allowlist secret
+```
+
+Il commento funziona in qualsiasi linguaggio che usi `#` o `//` come commento
+singola riga. Dopo averlo aggiunto, il gate lo salta senza toccare la baseline.
+
+> **Regola pratica:** preferisci il pragma per i valori nelle test suite — è
+> auto-documentante ("questo è intenzionalmente finto") e non richiede di
+> rigenerare e committare la baseline ogni volta.
+
+### Falsi positivi (fuori dai test)
+
+Se il gate blocca un commit per un valore che **non è un segreto reale** e
+il pragma inline non è pratico, hai due opzioni:
+
+#### Opzione 1 — Rigenera la baseline (raccomandato per file non-test)
 
 ```bash
-# Rigenera la baseline includendo il nuovo file
-detect-secrets scan > .secrets.baseline
+# Rigenera la baseline includendo tutti i file tracciati
+detect-secrets scan --no-verify > .secrets.baseline
 
-# Apri l'audit interattivo e marca il falso positivo
+# Apri l'audit interattivo e marca ogni falso positivo
 detect-secrets audit .secrets.baseline
-# → scegli 'n' (not a secret) quando richiesto
+# → scegli 'n' (not a secret) per i valori che sai essere fittizi
 
 # Committa la baseline aggiornata insieme ai tuoi file
 git add .secrets.baseline
 git commit -m "chore: aggiorna baseline detect-secrets"
 ```
+
+> **Nota:** usa sempre `--no-verify` nella scansione — senza questo flag
+> `detect-secrets` tenta di verificare i segreti online e può bloccarsi o
+> restituire risultati inaffidabili.
 
 #### Opzione 2 — Bypass una-tantum (solo emergenze)
 
@@ -82,6 +117,21 @@ git commit --no-verify -m "..."
 > **Usa `--no-verify` solo se sei assolutamente certo che non ci siano
 > segreti reali.** Ogni utilizzo dovrebbe essere documentato nel messaggio
 > di commit.
+
+#### Perché il gate è fallito in passato
+
+In precedenza il gate ha bloccato CI con ~28 falsi positivi perché file di test
+aggiunti in un unico batch contenevano URL postgres di test, token CF mock e
+chiavi API placeholder **senza pragma né aggiornamento della baseline**. Il risultato
+è che ogni file diventava un bloccante in CI. Per evitare che si ripeta:
+
+1. **Prima di committare un nuovo file di test**, esegui localmente:
+   ```bash
+   bash scripts/ci-secrets-scan.sh
+   ```
+2. Se escono rilevamenti, aggiungi `# pragma: allowlist secret` sulle righe
+   incriminate **oppure** rigenera la baseline con `--no-verify`.
+3. Committa la baseline aggiornata nello stesso PR del file di test.
 
 ---
 
@@ -131,6 +181,7 @@ npx vitest run components/__tests__
 pip install --upgrade detect-secrets
 
 # Dopo l'aggiornamento, rigenera la baseline
-detect-secrets scan > .secrets.baseline
+detect-secrets scan --no-verify > .secrets.baseline
 detect-secrets audit .secrets.baseline
+git add .secrets.baseline
 ```
