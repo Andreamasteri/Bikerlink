@@ -1,6 +1,7 @@
 import { Router, type Request, type Response } from "express";
 import { storage } from "../../storage";
 import { db } from "../../db";
+import { invalidateIdleKillCache } from "../../ai/watchdog/collectors/pool-collector";
 import bcrypt from "bcryptjs";
 import { emailConfigSchema, disableFeatureSchema, toggleProtectedSchema, mapsProviderSchema, themeDefaultSchema, matchingCountriesSchema, coordinatesMaxAgeSchema, genericSettingSchema, nativeVersionSchema, urlSettingSchema } from "@shared/validators";
 import { sql } from "drizzle-orm";
@@ -308,6 +309,12 @@ router.put("/:key", async (req: Request, res: Response) => {
     const parsed = genericSettingSchema.safeParse(req.body);
     if (!parsed.success) return sendError(res, 400, parsed.error.issues[0].message);
     const setting = await storage.upsertAppSetting(key, undefined, parsed.data.value);
+    // Invalida immediatamente la cache TTL del pool-collector in modo che il
+    // prossimo probe idle-leak rilegga il valore aggiornato senza attendere
+    // fino a 3 minuti (scadenza naturale della cache).
+    if (key === "db_idle_conn_kill_enabled") {
+      invalidateIdleKillCache();
+    }
     return res.json(setting);
   } catch (_error) {
     return sendError(res, 500, "Errore salvataggio setting");

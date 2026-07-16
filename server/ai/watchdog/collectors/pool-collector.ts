@@ -71,6 +71,17 @@ const DROP_BURST_FOR_WARN = 10;
 let consecutiveWaiting = 0;
 let consecutiveLimiterQueued = 0;
 
+/**
+ * Invalida immediatamente la cache del kill-switch idle-leak in modo che il
+ * prossimo probe rilegga il valore corrente dall'AppSetting anziché usare il
+ * valore TTL-cached (fino a 3 minuti stantio). Da chiamare dal route admin
+ * ogni volta che `db_idle_conn_kill_enabled` viene scritto.
+ */
+export function invalidateIdleKillCache(): void {
+  idleKillCached = null;
+  idleKillCachedAt = 0;
+}
+
 // Task #154 — Reset dei contatori/latch anti-blip di questo collector. Azzera i
 // campioni consecutivi di pressione (waiting/queue/drops), i totali di baseline
 // dei drop e l'ultimo esito idle-leak, così uno stato rientrato non resta

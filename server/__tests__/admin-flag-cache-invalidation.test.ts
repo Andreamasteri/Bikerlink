@@ -215,25 +215,15 @@ function makeSelectChain(rows: unknown[]) {
 }
 
 /**
- * Creates a db.insert() chain stub for the upsert in thinkcentre POST routes:
- *   db.insert().values().onConflictDoUpdate()
+ * Creates a db.insert() chain stub that matches upsertAppSetting:
+ *   db.insert().values().onConflictDoUpdate().returning()
  */
 function makeInsertChain() {
   return {
     values: () => ({
-      onConflictDoUpdate: () => Promise.resolve([]),
-    }),
-  };
-}
-
-/**
- * Creates a db.update() chain stub for the OTA toggle:
- *   db.update().set().where()
- */
-function makeUpdateChain() {
-  return {
-    set: () => ({
-      where: () => Promise.resolve([]),
+      onConflictDoUpdate: () => ({
+        returning: () => Promise.resolve([]),
+      }),
     }),
   };
 }
@@ -397,12 +387,9 @@ describe("POST /ota/emergency/toggle — cache invalidation", () => {
     const before = await storage.getAppSetting("ota_emergency_active");
     expect(before?.value).toBe("true");
 
-    // ② Route: active=false skips the approved-release guard.
-    //    Route calls db.select() to check for the existing row, then db.update().
-    mockDbSelect.mockReturnValueOnce(
-      makeSelectChain([{ id: "existing-row" }]), // existing setting check
-    );
-    mockDbUpdate.mockReturnValueOnce(makeUpdateChain());
+    // ② Route: active=false skips the approved-release guard entirely.
+    //    Route calls storage.upsertAppSetting → db.insert().values().onConflictDoUpdate().returning().
+    mockDbInsert.mockReturnValueOnce(makeInsertChain());
 
     const res = await request(buildOtaApp())
       .post("/api/admin/ota/emergency/toggle")
@@ -418,11 +405,11 @@ describe("POST /ota/emergency/toggle — cache invalidation", () => {
     const after = await storage.getAppSetting("ota_emergency_active");
     expect(after?.value).toBe("false");
 
-    // 3 total selects: warmup + existing-row check + post-invalidation miss
-    expect(mockDbSelect).toHaveBeenCalledTimes(3);
+    // 2 total selects: warmup + post-invalidation miss (no extra selects in the route)
+    expect(mockDbSelect).toHaveBeenCalledTimes(2);
   });
 
-  it("activation: cache is cleared even when inserting a new row (no existing row)", async () => {
+  it("activation: cache is cleared after upsert succeeds", async () => {
     const storage = new SystemStorage();
 
     // ① Warm cache: setting absent → undefined
@@ -430,13 +417,12 @@ describe("POST /ota/emergency/toggle — cache invalidation", () => {
     const before = await storage.getAppSetting("ota_emergency_active");
     expect(before).toBeUndefined();
 
-    // ② Route: active=true → checks approved emergency release, then existing row
-    mockDbSelect
-      .mockReturnValueOnce(makeSelectChain([{ id: "approved-release" }])) // approved guard
-      .mockReturnValueOnce(makeSelectChain([])); // no existing setting → insert path
-    mockDbInsert.mockReturnValueOnce({
-      values: () => Promise.resolve([]),
-    });
+    // ② Route: active=true → checks approved emergency release (1 select),
+    //    then calls storage.upsertAppSetting (1 insert, no further selects).
+    mockDbSelect.mockReturnValueOnce(
+      makeSelectChain([{ id: "approved-release" }]), // approved guard
+    );
+    mockDbInsert.mockReturnValueOnce(makeInsertChain());
 
     const res = await request(buildOtaApp())
       .post("/api/admin/ota/emergency/toggle")
@@ -451,8 +437,8 @@ describe("POST /ota/emergency/toggle — cache invalidation", () => {
     const after = await storage.getAppSetting("ota_emergency_active");
     expect(after?.value).toBe("true");
 
-    // 4 selects: warmup + approved-guard + existing-row + post-invalidation miss
-    expect(mockDbSelect).toHaveBeenCalledTimes(4);
+    // 3 selects: warmup + approved-guard + post-invalidation miss
+    expect(mockDbSelect).toHaveBeenCalledTimes(3);
   });
 
   it("rejects activation when no approved emergency release exists", async () => {
