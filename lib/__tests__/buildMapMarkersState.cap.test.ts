@@ -27,7 +27,7 @@
 
 import { describe, it, expect } from "vitest";
 import { buildMapMarkersState } from "@/components/map/buildMapMarkersState";
-import { MARKERS_HARD_CAP } from "@/lib/maps/cap-markers";
+import { MARKERS_HARD_CAP, BRIDGE_PAYLOAD_SAFE_BYTE_LIMIT } from "@/lib/maps/cap-markers";
 import type { MapUser, MapWorkshop, ClubMapPin } from "@/components/map/map-types";
 
 // ---------------------------------------------------------------------------
@@ -378,6 +378,59 @@ describe("buildMapMarkersState — marker cap integration", () => {
     const me = markers.users.find((u) => u.id === CURRENT_USER_ID);
     expect(me).toBeDefined();
     expect(me?.isCurrentUser).toBe(true);
+  });
+
+  it("bridge payload byte size stays below BRIDGE_PAYLOAD_SAFE_BYTE_LIMIT (500 KB) for a worst-case 400-marker session", () => {
+    // Worst-case payload: 400 markers where every string field is at a realistic
+    // production upper bound (long nicknames, long workshop names, etc.).
+    // This catches schema bloat — new fields or longer strings — that would push
+    // the serialised bridge JSON over the Android-safe threshold even though the
+    // marker COUNT stays within MARKERS_HARD_CAP.
+    //
+    // Threshold: BRIDGE_PAYLOAD_SAFE_BYTE_LIMIT = 500 KB (512 000 bytes).
+    // The Android RN bridge serialises the payload string into a Java HashMap;
+    // payloads above ~500 KB risk OOM on 256 MB heaps regardless of marker count.
+    // If this assertion fires, the marker schema has grown — reduce field
+    // verbosity, drop a field, or tighten MARKERS_HARD_CAP before shipping.
+
+    // 350 verbose users + 50 verbose workshops = exactly 400 total (no cap fires).
+    // Using long-but-realistic strings to represent real worst-case production data.
+    const verboseUsers: MapUser[] = Array.from({ length: 350 }, (_, i) => ({
+      id: `user-verbose-${String(i).padStart(4, "0")}`,
+      latitude: 45.0 + (i % 100) * 0.001,
+      longitude: 10.0 + Math.floor(i / 100) * 0.001,
+      userType: "biker" as const,
+      sex: i % 2 === 0 ? ("M" as const) : ("F" as const),
+      nickname: `rider_con_nickname_lungo_${i}`, // ~30 chars — realistic upper bound
+      country: "IT",
+      currentSpeedKph: 95.5,
+      speedProfile: "mountain" as const,
+    }));
+
+    const verboseWorkshops: MapWorkshop[] = Array.from({ length: 50 }, (_, i) => ({
+      id: `ws-verbose-${String(i).padStart(3, "0")}`,
+      latitude: 44.0 + i * 0.01,
+      longitude: 9.0 + i * 0.01,
+      name: `Officina Meccanica Specializzata Con Nome Lungo ${i}`, // ~52 chars
+      isSynecoPartner: false,
+    }));
+
+    const encoded = buildMapMarkersState({
+      ...baseParams(),
+      filteredUsers: verboseUsers,
+      workshops: verboseWorkshops,
+    });
+
+    // Measure the UTF-8 byte length of the full bridge string.
+    // TextEncoder is available in both Node.js and browser environments,
+    // so this works without requiring @types/node in the client tsconfig.
+    const byteLength = new TextEncoder().encode(encoded).length;
+
+    expect(byteLength).toBeLessThan(BRIDGE_PAYLOAD_SAFE_BYTE_LIMIT);
+
+    // Sanity: all 400 markers must have been kept (no cap triggered).
+    const markers = decodeMarkers(encoded);
+    expect(totalMarkers(markers)).toBe(400);
   });
 
   it("total stays exactly below cap across all seven CAPPED categories", () => {

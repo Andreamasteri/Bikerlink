@@ -22,6 +22,23 @@
 
 export const MARKERS_HARD_CAP = 400;
 
+/**
+ * Safe upper bound for the total JSON byte length of the string returned by
+ * buildMapMarkersState (the value injected into the Leaflet WebView bridge).
+ *
+ * The Android RN bridge serialises this string into a Java HashMap; payloads
+ * above ~500 KB risk exhausting the 256 MB Android heap even when the marker
+ * count is within MARKERS_HARD_CAP.  The marker-count gate (400 entries) is
+ * the primary defence; this byte-size gate is a secondary ratchet that catches
+ * schema bloat — verbose field names, longer strings, or new fields added to
+ * the marker shape — before it reaches production.
+ *
+ * If this threshold is ever breached: reduce field verbosity, drop a field, or
+ * tighten MARKERS_HARD_CAP.  Do NOT simply raise this constant without first
+ * profiling the Android heap impact.
+ */
+export const BRIDGE_PAYLOAD_SAFE_BYTE_LIMIT = 512_000; // 500 KB
+
 type LatLng = { lat: number; lng: number };
 
 function _distSq(a: LatLng, b: LatLng): number {
