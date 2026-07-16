@@ -1,3 +1,4 @@
+// LARGE-FILE-ALLOW: script triage Horus monolitico (aggregation pipeline completa, split non praticabile)
 /**
  * BikerLink — Triage AI completo con Horus
  *
