@@ -19,8 +19,8 @@ const { mockListSourceFiles, mockSafeRead, dbChain } = vi.hoisted(() => {
   chain.orderBy.mockReturnValue(chain);
   chain.limit.mockResolvedValue([]);
   return {
-    mockListSourceFiles: vi.fn<[], SourceFile[]>(),
-    mockSafeRead: vi.fn<[string], string>(),
+    mockListSourceFiles: vi.fn<() => SourceFile[]>(),
+    mockSafeRead: vi.fn<(s: string) => string>(),
     dbChain: chain,
   };
 });

@@ -6,9 +6,9 @@ import type { SourceFile } from "../scan-utils";
 
 // --- vi.hoisted: variabili disponibili nelle factory dei mock --------------
 const { mockExistsSync, mockListSourceFiles, mockSafeRead } = vi.hoisted(() => ({
-  mockExistsSync: vi.fn<[string], boolean>(),
-  mockListSourceFiles: vi.fn<[], SourceFile[]>(),
-  mockSafeRead: vi.fn<[string], string>(),
+  mockExistsSync: vi.fn<(s: string) => boolean>(),
+  mockListSourceFiles: vi.fn<() => SourceFile[]>(),
+  mockSafeRead: vi.fn<(s: string) => string>(),
 }));
 
 vi.mock("fs", () => ({

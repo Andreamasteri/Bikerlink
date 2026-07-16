@@ -4,7 +4,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const { mockExecFileSync } = vi.hoisted(() => ({
-  mockExecFileSync: vi.fn<[string, string[], object], string>(),
+  mockExecFileSync: vi.fn<(cmd: string, args: string[], opts: object) => string>(),
 }));
 
 vi.mock("child_process", () => ({

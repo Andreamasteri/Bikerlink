@@ -5,8 +5,8 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { SourceFile } from "../scan-utils";
 
 const { mockListSourceFiles, mockSafeRead } = vi.hoisted(() => ({
-  mockListSourceFiles: vi.fn<[], SourceFile[]>(),
-  mockSafeRead: vi.fn<[string], string>(),
+  mockListSourceFiles: vi.fn<() => SourceFile[]>(),
+  mockSafeRead: vi.fn<(s: string) => string>(),
 }));
 
 vi.mock("../scan-utils", () => ({
