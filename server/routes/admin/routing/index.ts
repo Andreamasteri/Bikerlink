@@ -125,6 +125,8 @@ router.get("/status", async (_req: Request, res: Response) => {
       consecutiveFailures: snap.consecutiveFailures,
       error: snap.error,
       version: ghInfo.version,
+      areasOnline: ghInfo.areasOnline ?? null,
+      areasTotal: ghInfo.areasTotal ?? null,
       motorcycleProfileAvailable,
       motorcycleFastProfileAvailable,
       carProfileAvailable,

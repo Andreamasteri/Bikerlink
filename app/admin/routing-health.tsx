@@ -208,6 +208,9 @@ export default function RoutingHealthScreen() {
               { label: "URL", value: gh?.url || "—" },
               { label: "Self-hosted", value: gh?.selfHosted ? "Sì" : "No" },
               { label: "Stato", value: gh?.status ?? "—" },
+              ...(gh?.areasTotal != null
+                ? [{ label: "Aree online", value: `${gh?.areasOnline ?? 0}/${gh.areasTotal}` }]
+                : []),
               { label: "Latenza", value: gh?.latencyMs != null ? `${gh.latencyMs} ms` : "—" },
               { label: "Ultimo check", value: formatDate(gh?.lastCheckAt ?? null) },
               { label: "Fallimenti consec.", value: String(gh?.consecutiveFailures ?? 0) },

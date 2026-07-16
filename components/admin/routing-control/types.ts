@@ -32,6 +32,9 @@ export interface RoutingStatus {
     consecutiveFailures: number;
     error: string | null;
     version?: string;
+    /** Multi-area self-hosted: aree online / totali (null se non self-hosted). */
+    areasOnline?: number | null;
+    areasTotal?: number | null;
     motorcycleProfileAvailable: boolean | null;
   };
   cloudFallback: {
@@ -77,6 +80,8 @@ export interface ValhallaBenchRow {
 
 export interface ValhallaBenchResult {
   ok: boolean;
+  /** "hardcoded_reference" = confronto vs distanze baked-in, non vs GH live. */
+  groundTruth?: string;
   passDeltaPct: number;
   minPassForActivation: number;
   score: { passed: number; total: number };

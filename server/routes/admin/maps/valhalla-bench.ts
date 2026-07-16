@@ -2,17 +2,18 @@
  * Valhalla — Status, Bench multi-percorso, Attivazione (Admin)
  *
  *   GET  /api/admin/maps/valhalla-status   → { configured, ok, version, osm_date, url_hint }
- *   POST /api/admin/maps/valhalla-bench    → 7 percorsi moto su GraphHopper + Valhalla in parallelo
+ *   POST /api/admin/maps/valhalla-bench    → 7 percorsi moto su Valhalla vs distanze di riferimento
  *   POST /api/admin/maps/activate-valhalla → maps_rollout=all + maps_routing_engine=valhalla (atomico)
  *
- * Il bench chiama gli engine direttamente (bypassando rollout/gating) per
- * confrontarne la qualità prima di promuovere il rollout in produzione.
+ * Il bench confronta Valhalla contro distanze di riferimento HARDCODED
+ * (misurate una volta su GraphHopper self-hosted per-area, 2026-07-16) invece
+ * di chiamare GraphHopper live: così un GH offline non fa mai apparire
+ * Valhalla come "non attivabile" (0/7). groundTruth: "hardcoded_reference".
  */
 
 import { Router, type Request, type Response } from "express";
 import { storage } from "../../../storage";
 import { sendError } from "../../../lib/api-response";
-import { routeViaGraphHopper } from "../../../routing/graphhopper-adapter";
 import { calculateRoute as valhallaCalculateRoute, getInfo as getValhallaInfo } from "../../../routing/valhalla-client";
 import type { RouteRequest } from "../../../routing/graphhopper-adapter";
 
@@ -27,6 +28,10 @@ interface BenchRoute {
   id: string;
   name: string;
   points: [number, number][]; // [lng, lat] (formato interno)
+  /** Distanza di riferimento (km) — misurata una volta su GH self-hosted (area arco-alpino), 2026-07-16. */
+  referenceKm: number;
+  /** Durata di riferimento (min) — informativa, non usata per il pass. */
+  referenceMin: number;
 }
 
 /**
@@ -41,6 +46,8 @@ const BENCH_ROUTES: BenchRoute[] = [
       [10.37, 46.467],   // Bormio (SO)
       [10.4527, 46.5286], // Passo dello Stelvio
     ],
+    referenceKm: 299.2,
+    referenceMin: 356,
   },
   {
     id: "garda-ovest",
@@ -50,6 +57,8 @@ const BENCH_ROUTES: BenchRoute[] = [
       [10.78, 45.787],   // Tremosine sul Garda
       [10.792, 45.813],  // Limone sul Garda
     ],
+    referenceKm: 33.7,
+    referenceMin: 42,
   },
   {
     id: "dolomiti",
@@ -58,6 +67,8 @@ const BENCH_ROUTES: BenchRoute[] = [
       [11.354, 46.498],  // Bolzano
       [12.135, 46.537],  // Cortina d'Ampezzo
     ],
+    referenceKm: 98.7,
+    referenceMin: 110,
   },
   {
     id: "langhe",
@@ -67,6 +78,8 @@ const BENCH_ROUTES: BenchRoute[] = [
       [7.943, 44.611],   // Barolo
       [7.857, 44.643],   // Cherasco
     ],
+    referenceKm: 28.2,
+    referenceMin: 45,
   },
   {
     id: "valle-aosta",
@@ -75,6 +88,8 @@ const BENCH_ROUTES: BenchRoute[] = [
       [7.320, 45.737],   // Aosta
       [6.974, 45.793],   // Courmayeur
     ],
+    referenceKm: 38.2,
+    referenceMin: 53,
   },
   {
     id: "toscana-costa",
@@ -83,6 +98,8 @@ const BENCH_ROUTES: BenchRoute[] = [
       [10.308, 43.548],  // Livorno
       [10.524, 42.926],  // Piombino
     ],
+    referenceKm: 82.2,
+    referenceMin: 105,
   },
   {
     id: "sicilia",
@@ -91,6 +108,8 @@ const BENCH_ROUTES: BenchRoute[] = [
       [13.361, 38.115],  // Palermo
       [14.022, 38.039],  // Cefalù
     ],
+    referenceKm: 72.3,
+    referenceMin: 99,
   },
 ];
 
@@ -190,15 +209,21 @@ router.post("/valhalla-bench", async (_req: Request, res: Response) => {
   const results = await Promise.all(
     BENCH_ROUTES.map(async (route) => {
       const req = buildReq(route.points);
-      const [gh, valhalla] = await Promise.all([
-        runEngine(routeViaGraphHopper, req),
-        runEngine(valhallaCalculateRoute, req),
-      ]);
+      const valhalla = await runEngine(valhallaCalculateRoute, req);
 
-      const deltaDistancePct = pctDelta(gh.distanceKm, valhalla.distanceKm);
-      const deltaTimePct = pctDelta(gh.durationMin, valhalla.durationMin);
+      // Riferimento hardcoded (nessuna chiamata a GraphHopper): un GH offline
+      // non può più azzerare il bench. Esposto nel campo "gh" per compatibilità
+      // con la UI esistente (colonna "km rif.").
+      const gh: EngineRunResult = {
+        ok: true,
+        distanceKm: route.referenceKm,
+        durationMin: route.referenceMin,
+        latencyMs: 0,
+      };
+
+      const deltaDistancePct = pctDelta(route.referenceKm, valhalla.distanceKm);
+      const deltaTimePct = pctDelta(route.referenceMin, valhalla.durationMin);
       const pass =
-        gh.ok &&
         valhalla.ok &&
         deltaDistancePct != null &&
         deltaDistancePct < PASS_DELTA_PCT;
@@ -220,6 +245,7 @@ router.post("/valhalla-bench", async (_req: Request, res: Response) => {
 
   return res.json({
     ok: true,
+    groundTruth: "hardcoded_reference",
     passDeltaPct: PASS_DELTA_PCT,
     minPassForActivation: MIN_PASS_FOR_ACTIVATION,
     score: { passed, total },

@@ -2,8 +2,8 @@
  * Task #3158 — Bench Valhalla.
  *
  * Scheda admin che mostra lo stato di Valhalla, esegue il bench multi-percorso
- * (7 percorsi moto italiani su GraphHopper + Valhalla in parallelo) e consente
- * di attivare Valhalla per tutti se almeno 5/7 percorsi passano.
+ * (7 percorsi moto italiani su Valhalla vs distanze di riferimento hardcoded)
+ * e consente di attivare Valhalla per tutti se almeno 5/7 percorsi passano.
  */
 import React, { useState } from "react";
 import {
@@ -199,10 +199,10 @@ export function ValhallaBenchCard() {
               <View>
                 <View style={[styles.tableRow, styles.tableHeaderRow]}>
                   <Text style={[styles.cell, styles.cellName, styles.headerCell]}>Percorso</Text>
-                  <Text style={[styles.cell, styles.cellNum, styles.headerCell]}>km GH</Text>
+                  <Text style={[styles.cell, styles.cellNum, styles.headerCell]}>km rif.</Text>
                   <Text style={[styles.cell, styles.cellNum, styles.headerCell]}>km VH</Text>
                   <Text style={[styles.cell, styles.cellNum, styles.headerCell]}>Δ%</Text>
-                  <Text style={[styles.cell, styles.cellNum, styles.headerCell]}>min GH</Text>
+                  <Text style={[styles.cell, styles.cellNum, styles.headerCell]}>min rif.</Text>
                   <Text style={[styles.cell, styles.cellNum, styles.headerCell]}>min VH</Text>
                   <Text style={[styles.cell, styles.cellNum, styles.headerCell]}>Δ%</Text>
                   <Text style={[styles.cell, styles.cellNum, styles.headerCell]}>Lat.</Text>

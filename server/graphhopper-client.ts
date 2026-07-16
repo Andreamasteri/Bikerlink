@@ -392,6 +392,9 @@ export interface GHServerInfo {
   osm_date?: string;
   version?: string;
   profiles?: string[];
+  /** Multi-area self-hosted: quante istanze area rispondono su /areas/<code>/info. */
+  areasOnline?: number;
+  areasTotal?: number;
 }
 
 // ─── Map Matching API ──────────────────────────────────────────────────────────
@@ -545,37 +548,56 @@ export async function getServerInfo(): Promise<GHServerInfo> {
     return { status: "disabled", graph_loaded: false, version: "routing-kill-switch" };
   }
   const start = Date.now();
+
+  // Self-hosted multi-area: NON esiste un /health o /info alla root del
+  // ThinkCentre — ogni istanza per-area risponde su /areas/<codice>/info.
+  // La sonda proba tutte le aree in parallelo: basta 1 area online per
+  // considerare il server OK; areasOnline/areasTotal alimentano il pannello.
+  if (isSelfHosted) {
+    const probes = await Promise.all(
+      ROUTING_AREAS.map(async (area) => {
+        const t0 = Date.now();
+        try {
+          const res = await ghFetch(`${area.path}/info`, { method: "GET" });
+          if (!res.ok) return null;
+          const data = await res.json() as GHServerInfo;
+          return { latencyMs: Date.now() - t0, version: data.version };
+        } catch {
+          return null;
+        }
+      }),
+    );
+    const online = probes.filter((p): p is NonNullable<typeof probes[number]> => p !== null);
+    if (online.length > 0) {
+      const best = online.reduce((a, b) => (a.latencyMs <= b.latencyMs ? a : b));
+      recordSelfHostSuccess(best.latencyMs);
+      return {
+        status: "ok",
+        graph_loaded: true,
+        version: online.find((p) => p.version)?.version,
+        areasOnline: online.length,
+        areasTotal: ROUTING_AREAS.length,
+      };
+    }
+    const msg = "nessuna area risponde su /areas/<code>/info";
+    recordSelfHostFailure(msg, false);
+    return {
+      status: "error",
+      graph_loaded: false,
+      version: msg,
+      areasOnline: 0,
+      areasTotal: ROUTING_AREAS.length,
+    };
+  }
+
   try {
-    const path = isSelfHosted ? "/health" : "/info";
-    const res = await ghFetch(path, { method: "GET" });
+    const res = await ghFetch("/info", { method: "GET" });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const info = await res.json() as GHServerInfo;
-    if (isSelfHosted) recordSelfHostSuccess(Date.now() - start);
+    void start;
     return info;
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
-    if (isSelfHosted) {
-      try {
-        const t0 = Date.now();
-        const probe = await ghFetch("/route", {
-          method: "POST",
-          body: JSON.stringify({
-            points: [[9.19, 45.46], [9.08, 45.81]],
-            profile: ACTIVE_PROFILE,
-            points_encoded: true,
-            instructions: false,
-            calc_points: false,
-          }),
-        });
-        if (probe.ok) {
-          recordSelfHostSuccess(Date.now() - t0);
-          return { status: "ok", graph_loaded: true };
-        }
-      } catch {
-        // probe failed — fall through to failure recording
-      }
-      recordSelfHostFailure(msg, false);
-    }
     return { status: "error", graph_loaded: false, version: msg };
   }
 }
