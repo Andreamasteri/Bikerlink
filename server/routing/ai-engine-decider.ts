@@ -178,6 +178,12 @@ export async function decideEngineWithAI(
       const ollamaController = new AbortController();
       const ollamaTimer = setTimeout(() => ollamaController.abort(), effectiveOllamaMs);
       try {
+        // Task #275 — qwen3 (BOWIE_OLLAMA_MODEL) emette token <think>…</think> per
+        // default che rompono il parsing JSON. think:false disattiva il ragionamento
+        // esplicito, seguendo la stessa convenzione già usata in generateStructured()
+        // (provider.ts ~riga 513). Senza questo flag generateObject fallisce sempre con
+        // un errore di validazione schema → il decider scala a cloud (disabilitato) →
+        // ricade sul deterministico → "Modalità AI" non si attiva mai.
         // check-ai-direct-generateobject: safe — Ollama supports json_schema natively (not via runWithFallback)
         const result = await generateObject({
           model: om.model,
@@ -186,6 +192,7 @@ export async function decideEngineWithAI(
           prompt: JSON.stringify(ctx),
           temperature: 0,
           abortSignal: ollamaController.signal,
+          providerOptions: { ollama: { think: false } },
         });
         clearTimeout(ollamaTimer);
         clearTimeout(globalTimer);
