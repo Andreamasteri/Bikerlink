@@ -16,6 +16,7 @@ import {
   probeDragonflyInfra,
   probeNginxInfra,
   probeUptimeKuma,
+  probeAiHub,
 } from "./thinkcentre-health-infra-probes";
 import { isThinkCentreInMaintenance } from "../../lib/thinkcentre-maintenance";
 import { isThinkCentrePoweredOff } from "../../lib/thinkcentre-powered-off";
@@ -67,6 +68,7 @@ export async function updateThinkCentreSystemStatus(
       dragonfly: "unknown",
       nginx: "unknown",
       uptimeKuma: "unknown",
+      aihub: "unknown",
     });
   } else {
     updateSystemStatus({
@@ -80,6 +82,7 @@ export async function updateThinkCentreSystemStatus(
       dragonfly: svcDot(svcMap.get("dragonfly")),
       nginx: svcDot(svcMap.get("nginx")),
       uptimeKuma: svcDot(svcMap.get("uptimekuma")),
+      aihub: svcDot(svcMap.get("aihub")),
     });
   }
 }
@@ -96,7 +99,7 @@ export async function probeThinkCentreStatusSnapshot(): Promise<
     import("../../lib/system-status-cache").SystemStatusSnapshot,
     | "thinkcentre" | "graphhopper" | "valhalla" | "photon"
     | "ollama" | "whisper" | "ufw"
-    | "dragonfly" | "nginx" | "uptimeKuma"
+    | "dragonfly" | "nginx" | "uptimeKuma" | "aihub"
   >
 > {
   // ThinkCentre spento: snapshot sintetico immediato, zero probe di rete.
@@ -112,6 +115,7 @@ export async function probeThinkCentreStatusSnapshot(): Promise<
       dragonfly: "unknown" as CachedDotStatus,
       nginx: "unknown" as CachedDotStatus,
       uptimeKuma: "unknown" as CachedDotStatus,
+      aihub: "unknown" as CachedDotStatus,
     };
     updateSystemStatus(snap);
     return snap;
@@ -129,6 +133,7 @@ export async function probeThinkCentreStatusSnapshot(): Promise<
       dragonfly: "unknown" as CachedDotStatus,
       nginx: "unknown" as CachedDotStatus,
       uptimeKuma: "unknown" as CachedDotStatus,
+      aihub: "unknown" as CachedDotStatus,
     };
     updateSystemStatus(snap);
     return snap;
@@ -144,6 +149,7 @@ export async function probeThinkCentreStatusSnapshot(): Promise<
     dragonflyInfra,
     nginxInfra,
     uptimeKumaInfra,
+    aihubInfra,
   ] = await Promise.all([
     probeGraphHopperAreas(),
     probeValhallaDetailed(),
@@ -154,6 +160,7 @@ export async function probeThinkCentreStatusSnapshot(): Promise<
     probeDragonflyInfra(),
     probeNginxInfra(),
     probeUptimeKuma(),
+    probeAiHub(),
   ]);
 
   function svc(s: { configured: boolean; ok: boolean; startingUp?: boolean }): CachedDotStatus {
@@ -172,7 +179,7 @@ export async function probeThinkCentreStatusSnapshot(): Promise<
     return "offline";
   };
 
-  const configuredServices = [valhallaDetail, photonDetail, ollama, whisper, dragonflyInfra, nginxInfra, uptimeKumaInfra].filter((s) => s.configured);
+  const configuredServices = [valhallaDetail, photonDetail, ollama, whisper, dragonflyInfra, nginxInfra, uptimeKumaInfra, aihubInfra].filter((s) => s.configured);
   const ghContributes = graphhopper.configured && graphhopper.areas.some((a: AreaServiceHealth) => a.enabled);
   const configuredCount = configuredServices.length + (ghContributes ? 1 : 0);
   const onlineCount = configuredServices.filter((s) => s.ok).length + (ghContributes && graphhopper.ok ? 1 : 0);
@@ -192,6 +199,7 @@ export async function probeThinkCentreStatusSnapshot(): Promise<
     dragonfly: svc(dragonflyInfra),
     nginx: svc(nginxInfra),
     uptimeKuma: svc(uptimeKumaInfra),
+    aihub: svc(aihubInfra),
   };
 
   updateSystemStatus(snap);

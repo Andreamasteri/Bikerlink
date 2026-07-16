@@ -18,6 +18,7 @@ export interface SystemStatusSnapshot {
   dragonfly: DotStatus;
   nginx: DotStatus;
   uptimeKuma: DotStatus;
+  aihub: DotStatus;
   routing: DotStatus;
   matching: DotStatus;
   updatedAt: number;
@@ -34,6 +35,7 @@ const _defaults: SystemStatusSnapshot = {
   dragonfly: "unknown",
   nginx: "unknown",
   uptimeKuma: "unknown",
+  aihub: "unknown",
   routing: "unknown",
   matching: "unknown",
   updatedAt: 0,

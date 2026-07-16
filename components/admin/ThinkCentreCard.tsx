@@ -111,7 +111,8 @@ type ThinkCentreStatusKeys =
   | "ufw"
   | "dragonfly"
   | "nginx"
-  | "uptimeKuma";
+  | "uptimeKuma"
+  | "aihub";
 
 // ── Deriva del checkout app sul ThinkCentre ───────────────────────────────
 // Mostrata come banner di avviso quando i file di build dei modelli Ollama
@@ -209,6 +210,7 @@ const ALL_UNKNOWN: Pick<SystemStatuses, ThinkCentreStatusKeys> = {
   dragonfly: "unknown",
   nginx: "unknown",
   uptimeKuma: "unknown",
+  aihub: "unknown",
 };
 
 export function ThinkCentreCard({
@@ -297,6 +299,7 @@ export function ThinkCentreCard({
       dragonfly: serviceToStatus(findSvc("dragonfly")),
       nginx: serviceToStatus(findSvc("nginx")),
       uptimeKuma: serviceToStatus(findSvc("uptimekuma")),
+      aihub: serviceToStatus(findSvc("aihub")),
     });
   }, [data, onStatuses, poweredOffActive]);
 

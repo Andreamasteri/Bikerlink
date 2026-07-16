@@ -70,6 +70,7 @@ export interface SystemStatuses {
   dragonfly: DotStatus;
   nginx: DotStatus;
   uptimeKuma: DotStatus;
+  aihub: DotStatus;
   routing: DotStatus;
   matching: DotStatus;
 }
@@ -91,6 +92,7 @@ const DOT_DEFS: { key: keyof SystemStatuses; label: string }[] = [
   { key: "dragonfly",    label: "DragonflyDB"     },
   { key: "nginx",        label: "nginx"           },
   { key: "uptimeKuma",   label: "Uptime Kuma"     },
+  { key: "aihub",        label: "AI Hub"          },
   { key: "routing",      label: "Routing"         },
   { key: "matching",     label: "Matching Engine" },
 ];

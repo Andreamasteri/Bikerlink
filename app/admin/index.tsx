@@ -104,6 +104,7 @@ const UNKNOWN_STATUSES: SystemStatuses = {
   dragonfly: "unknown",
   nginx: "unknown",
   uptimeKuma: "unknown",
+  aihub: "unknown",
   routing: "unknown",
   matching: "unknown",
 };
