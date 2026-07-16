@@ -61,6 +61,38 @@ export const proposalSchema = z.object({
 });
 export type Proposal = z.infer<typeof proposalSchema>;
 
+// Task #158 — Classificazione UI delle proposte: tipo azione + etichetta bottone.
+// Derivata a runtime dal testo (nessuna chiamata AI), salvata nei details JSONB
+// della proposta così la card admin può mostrarla senza migration.
+export type ProposalActionType = "auto" | "manual" | "info";
+
+export interface ProposalClassification {
+  actionType: ProposalActionType;
+  actionLabel?: string;
+}
+
+/**
+ * Classifica una proposta in base a keyword nel testo:
+ * "riavvia"/"restart" → auto (con actionLabel "Accetta — <prima frase>"),
+ * "controlla"/"verifica"/"check" → manual, altrimenti → info.
+ * Pura e sincrona: NON chiama Ollama.
+ */
+export function classifyProposal(text: string): ProposalClassification {
+  const lower = text.toLowerCase();
+  if (/\b(riavvia|riavvio|restart)/.test(lower)) {
+    const firstSentence = text.split(/[.\n!?]/)[0]?.trim() ?? "";
+    const short = firstSentence.slice(0, 40).trim();
+    return {
+      actionType: "auto",
+      actionLabel: short ? `Accetta — ${short}` : undefined,
+    };
+  }
+  if (/\b(controlla|verifica|check)/.test(lower)) {
+    return { actionType: "manual" };
+  }
+  return { actionType: "info" };
+}
+
 export const weeklyReportSchema = z.object({
   period: z.object({ from: z.string(), to: z.string() }),
   overallStatus: z.enum(["green", "yellow", "orange", "red"]),

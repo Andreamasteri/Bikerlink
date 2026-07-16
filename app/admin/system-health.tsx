@@ -315,7 +315,13 @@ export default function SystemHealthScreen() {
           <SectionTitle icon="brain">TC AI Hub</SectionTitle>
           <AiHubHealthCard />
 
-          <SectionTitle icon="robot-outline">Proposte AI in attesa</SectionTitle>
+          <SectionTitle
+            icon="robot-outline"
+            suffix={`(${pendingProposals.length} pendenti)`}
+            suffixWarn={pendingProposals.length > 3}
+          >
+            Proposte AI in attesa
+          </SectionTitle>
           <ProposalsCard
             proposals={pendingProposals}
             busyId={busyProposalId}
@@ -355,11 +361,20 @@ function Stat({ label, value }: { label: string; value: number }) {
   );
 }
 
-function SectionTitle({ icon, children }: { icon: React.ComponentProps<typeof MaterialCommunityIcons>["name"]; children: React.ReactNode }) {
+// Task #158 — suffix opzionale (es. "(N pendenti)") con colore warning se suffixWarn.
+function SectionTitle({ icon, children, suffix, suffixWarn }: {
+  icon: React.ComponentProps<typeof MaterialCommunityIcons>["name"];
+  children: React.ReactNode;
+  suffix?: string;
+  suffixWarn?: boolean;
+}) {
   return (
     <View style={styles.sectionTitle}>
       <MaterialCommunityIcons name={icon} size={18} color={Colors.accent} />
       <Text style={styles.sectionText}>{children}</Text>
+      {suffix ? (
+        <Text style={[styles.sectionSuffix, suffixWarn && styles.sectionSuffixWarn]}>{suffix}</Text>
+      ) : null}
     </View>
   );
 }
@@ -382,6 +397,8 @@ const styles = StyleSheet.create({
   statLabel: { color: "#9ca3af", fontSize: 11, marginTop: 2 },
   sectionTitle: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 16, marginBottom: 8 },
   sectionText: { color: "#f3f4f6", fontSize: 15, fontWeight: "600" as const },
+  sectionSuffix: { color: "#9ca3af", fontSize: 13, fontWeight: "600" as const },
+  sectionSuffixWarn: { color: "#f59e0b" },
   circuitBanner: { flexDirection: "row", alignItems: "flex-start", borderRadius: 10, padding: 12, marginBottom: 12 },
   circuitOpen: { backgroundColor: "#7f1d1d", borderWidth: 1, borderColor: "#ef4444" },
   circuitHalfOpen: { backgroundColor: "#78350f", borderWidth: 1, borderColor: "#f59e0b" },

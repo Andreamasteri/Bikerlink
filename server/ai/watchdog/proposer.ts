@@ -5,7 +5,7 @@ import { runWithFallback, resolveModel, estimateCostUsd, tryBuildOllama, generat
 import { withBudget } from "../moderation/budget";
 import { logAiCall } from "../moderation/log";
 import { writeWatchdogLog } from "./log";
-import { proposalSchema, type HealthSnapshot, type Proposal } from "./types";
+import { proposalSchema, classifyProposal, type HealthSnapshot, type Proposal } from "./types";
 import { z } from "zod";
 import type { AiCallMeta } from "../moderation/types";
 import { isWatchdogEnabled } from "./kill-switch";
@@ -272,7 +272,9 @@ export async function runProposer(snap: HealthSnapshot): Promise<ProposerResult 
       for (const p of proposals) {
         const logId = await writeWatchdogLog({
           kind: "proposal", scope: p.action.kind, status: "pending",
-          summary: p.title, details: p, costUsd: meta.costUsd / Math.max(1, proposals.length),
+          // Task #158 — actionType/actionLabel per la card admin (classificazione keyword).
+          summary: p.title, details: { ...p, ...classifyProposal(`${p.title}. ${p.reasoning}`) },
+          costUsd: meta.costUsd / Math.max(1, proposals.length),
         });
         withIds.push({ ...p, logId });
       }

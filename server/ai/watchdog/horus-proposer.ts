@@ -16,7 +16,7 @@ import { runWithFallback, estimateCostUsd, generateStructured, type ResolvedMode
 import { withBudget } from "../moderation/budget";
 import { logAiCall } from "../moderation/log";
 import { writeWatchdogLog } from "./log";
-import { proposalSchema, type HealthSnapshot, type Problem, type Proposal } from "./types";
+import { proposalSchema, classifyProposal, type HealthSnapshot, type Problem, type Proposal } from "./types";
 import { z } from "zod";
 import type { AiCallMeta } from "../moderation/types";
 import type { LanguageModelV2 } from "@ai-sdk/provider";
@@ -223,7 +223,8 @@ export async function runHorusRoutingProposer(snap: HealthSnapshot): Promise<Hor
           kind: "proposal", scope: p.action.kind, status: "pending",
           summary: p.title,
           // Firma Horus: la UI mostra il badge se details.persona === "horus".
-          details: { ...p, persona: "horus" },
+          // Task #158 — actionType/actionLabel per la card admin (classificazione keyword).
+          details: { ...p, ...classifyProposal(`${p.title}. ${p.reasoning}`), persona: "horus" },
           costUsd: meta.costUsd / Math.max(1, proposals.length),
         });
         withIds.push({ ...p, logId });
