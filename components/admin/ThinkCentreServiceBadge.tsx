@@ -16,7 +16,7 @@ export interface ThinkCentreHealthMini {
   ufwDetail?: { configured: boolean; ok: boolean };
 }
 
-function svcColor(s: ServiceHealthMini | undefined): string {
+export function svcColor(s: ServiceHealthMini | undefined): string {
   if (!s || !s.configured) return "#6b7280";
   if (s.ok) return "#22c55e";
   if (s.startingUp) return "#f59e0b";
