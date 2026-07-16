@@ -485,7 +485,10 @@ describe("Debounce notifiche per-area GraphHopper", () => {
 
 describe("PROBE_ENV_VARS — parità con le env lette dalle probe", () => {
   // Env NON di probe lette nel modulo (test-mode guard): vanno escluse dal check.
-  const NON_PROBE_ENV = new Set(["VITEST", "NODE_ENV"]);
+  // THINKCENTRE_METRICS_URL è letto SOLO da logTcProbeEndpoints() (log di boot
+  // diagnostico), non da una probe: non richiede isolamento via
+  // resetProbeEnvForTests, quindi non va in PROBE_ENV_VARS.
+  const NON_PROBE_ENV = new Set(["VITEST", "NODE_ENV", "THINKCENTRE_METRICS_URL"]);
 
   it("ogni process.env.X letto in thinkcentre-monitor-probes.ts è registrato in PROBE_ENV_VARS", async () => {
     const fs = await import("node:fs");

@@ -46,6 +46,13 @@ export interface ServiceHealth {
   error?: string;
   tileVersion?: string;
   tokenMissing?: boolean;
+  /**
+   * true quando un 401/403 arriva da Cloudflare Access (blocco a monte
+   * dell'origine: Service Token CF assente/sbagliato) e NON dal token
+   * applicativo del servizio. Permette al pannello di distinguere un problema
+   * di autenticazione CF Access da un token di servizio errato.
+   */
+  cfAccessBlocked?: boolean;
   history: ErrorEvent[];
   probeLog: ProbeLogEntry[];
 }
@@ -286,8 +293,13 @@ export async function probeWhisper(): Promise<ServiceHealth> {
   wav.writeUInt16LE(1, 22); wav.writeUInt32LE(sampleRate, 24);
   wav.writeUInt32LE(sampleRate * 2, 28); wav.writeUInt16LE(2, 32); wav.writeUInt16LE(16, 34);
   wav.write("data", 36); wav.writeUInt32LE(dataSize, 40);
+  // Il client STT reale (server/routes/whisper.ts) autentica verso Whisper con
+  // l'header X-Whisper-Token, che è ciò che la nginx davanti a Whisper sul
+  // ThinkCentre si aspetta. La probe DEVE usare lo stesso header: un
+  // Authorization: Bearer non combacia e produce un 401 applicativo — è stato
+  // il falso-negativo storico ("Whisper 401") di questa probe.
   const headers: Record<string, string> = { ...cfAccessHeaders() };
-  if (token) headers["Authorization"] = `Bearer ${token}`;
+  if (token) headers["X-Whisper-Token"] = token;
 
   const healthResult = await httpProbe(`${base}/health`, headers);
   if (healthResult.ok) {
@@ -310,20 +322,33 @@ export async function probeWhisper(): Promise<ServiceHealth> {
     }
     const body = await readBodySafe(res);
     const bodySnippet = body.trim().slice(0, 400);
+    // Distingui un 401/403 di Cloudflare Access (blocco PRIMA di raggiungere
+    // l'origine: Service Token CF assente o non valido) da un 401 applicativo
+    // (token Whisper errato / drift rispetto all'X-Whisper-Token nella nginx del
+    // ThinkCentre). Il caso CF Access si riconosce dall'header `cf-access-error`
+    // o da un body "Access denied" / "Cloudflare Access".
+    const cfAccessBlocked =
+      (res.status === 401 || res.status === 403) &&
+      (res.headers.get("cf-access-error") !== null ||
+        /access denied|cloudflare access/i.test(bodySnippet));
     let error: string;
-    if (res.status === 401) {
+    if (cfAccessBlocked) {
+      error = sanitizeError(
+        `CF Access ha bloccato la richiesta (HTTP ${res.status}) — Service Token Cloudflare Access assente o non valido, NON il token Whisper${bodySnippet ? ` — ${bodySnippet}` : ""}`,
+      );
+    } else if (res.status === 401) {
       error = bodySnippet
-        ? sanitizeError(`Token non valido — HTTP 401 — ${bodySnippet}`)
-        : "Token non valido (HTTP 401)";
+        ? sanitizeError(`Token Whisper non valido — HTTP 401 — ${bodySnippet}`)
+        : "Token Whisper non valido (HTTP 401)";
     } else {
       error = bodySnippet
         ? sanitizeError(`HTTP ${res.status} — ${bodySnippet}`)
         : `HTTP ${res.status}`;
     }
-    console.error("[thinkcentre-probe] whisper KO", { status: res.status, error });
+    console.error("[thinkcentre-probe] whisper KO", { status: res.status, cfAccessBlocked, error });
     recordError("whisper", error);
     recordProbeLog("whisper", { timestamp: Date.now(), ok: false, latencyMs, detail: error });
-    return { key: "whisper", label: "Whisper ASR", configured: true, ok: false, startingUp: isStartingUp("whisper"), latencyMs, url: maskUrl(base), error, tokenMissing, history: getHistory("whisper"), probeLog: getProbeLog("whisper") };
+    return { key: "whisper", label: "Whisper ASR", configured: true, ok: false, startingUp: isStartingUp("whisper"), latencyMs, url: maskUrl(base), error, tokenMissing, cfAccessBlocked, history: getHistory("whisper"), probeLog: getProbeLog("whisper") };
   } catch (err: unknown) {
     const raw = err instanceof Error ? err.message : String(err);
     let classified: string;

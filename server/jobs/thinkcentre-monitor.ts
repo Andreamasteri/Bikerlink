@@ -40,6 +40,7 @@ import {
   isSelfHosted,
   fetchSelfHostedProfiles,
   runAllProbes,
+  logTcProbeEndpoints,
 } from "./thinkcentre-monitor-probes";
 
 export {
@@ -287,6 +288,8 @@ export async function runThinkCentreProbe(): Promise<void> {
 // ── Start / Stop ──────────────────────────────────────────────────────────────
 export function startThinkCentreMonitor(): void {
   if (intervalHandle) return;
+
+  logTcProbeEndpoints();
 
   const gatedProbe = withJobGate("thinkcentre-monitor", async () => {
     await runThinkCentreProbe();

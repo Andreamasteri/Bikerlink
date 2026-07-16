@@ -59,6 +59,38 @@ export function resetProbeEnvForTests(): void {
   for (const name of PROBE_ENV_VARS) delete process.env[name];
 }
 
+/**
+ * Restituisce solo l'hostname (mai il token) di un URL, o un marcatore leggibile
+ * se non configurato / non valido. Usato per il log di boot diagnostico.
+ */
+function maskEndpointHost(raw: string | undefined): string {
+  const v = raw?.trim();
+  if (!v) return "<unset>";
+  try {
+    return new URL(v).hostname;
+  } catch {
+    return "<url-non-valido>";
+  }
+}
+
+/**
+ * Log di boot diagnostico: stampa l'hostname (mascherato, mai il token) di ogni
+ * servizio ThinkCentre monitorato. Serve a verificare a colpo d'occhio che i
+ * secret puntino agli host CF tunnel (*.biker-link.net) e non a vecchi hostname
+ * DuckDNS, senza dover leggere i valori dei secret.
+ */
+export function logTcProbeEndpoints(): void {
+  console.log("[Whisper probe] URL:", maskEndpointHost(process.env.WHISPER_URL));
+  console.log("[TC probes] endpoints:", {
+    gh: maskEndpointHost(process.env.GRAPHHOPPER_URL),
+    valhalla: maskEndpointHost(process.env.VALHALLA_URL),
+    whisper: maskEndpointHost(process.env.WHISPER_URL),
+    ollama: maskEndpointHost(process.env.BOWIE_OLLAMA_URL),
+    photon: maskEndpointHost(process.env.PHOTON_URL),
+    tcAgent: maskEndpointHost(process.env.THINKCENTRE_METRICS_URL),
+  });
+}
+
 export type OverallStatus = "green" | "yellow" | "red" | "idle";
 type ServiceKey = string;
 

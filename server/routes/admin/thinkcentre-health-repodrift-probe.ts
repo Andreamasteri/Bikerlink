@@ -10,6 +10,8 @@
  * Il fix propaga l'identità dell'admin che ha premuto il pulsante per l'audit.
  */
 
+import { cfAccessHeaders } from "../../lib/cf-access";
+
 export interface RepoDriftHealth {
   /** true se la probe è stata eseguita (TC raggiungibile). */
   checked: boolean;
@@ -57,7 +59,10 @@ export async function fixRepoDrift(triggeredBy: string): Promise<RepoDriftFixRes
 
   const url = `${metricsBase}/repo-drift-fix`;
   const token = process.env.THINKCENTRE_AGENT_TOKEN ?? "";
-  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  // tc.biker-link.net è dietro Cloudflare Access: senza Service Token CF la
+  // richiesta è bloccata all'edge (401/403). Gli header CF sono innocui se la
+  // policy Access non è attiva (l'origine li ignora).
+  const headers: Record<string, string> = { "Content-Type": "application/json", ...cfAccessHeaders() };
   if (token) headers["X-Agent-Token"] = token;
 
   const controller = new AbortController();
@@ -108,7 +113,10 @@ export async function probeRepoDrift(): Promise<RepoDriftHealth> {
 
   const url = `${metricsBase}/repo-drift`;
   const token = process.env.THINKCENTRE_AGENT_TOKEN ?? "";
-  const headers: Record<string, string> = {};
+  // tc.biker-link.net è dietro Cloudflare Access: senza Service Token CF la
+  // richiesta è bloccata all'edge (401/403). Gli header CF sono innocui se la
+  // policy Access non è attiva (l'origine li ignora).
+  const headers: Record<string, string> = { ...cfAccessHeaders() };
   if (token) headers["X-Agent-Token"] = token;
 
   const controller = new AbortController();

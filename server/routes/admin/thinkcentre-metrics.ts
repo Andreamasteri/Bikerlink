@@ -10,6 +10,7 @@
  */
 
 import { Router, type Request, type Response } from "express";
+import { cfAccessHeaders } from "../../lib/cf-access";
 
 const router = Router();
 
@@ -29,7 +30,11 @@ router.get("/thinkcentre-metrics", async (_req: Request, res: Response) => {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
 
-  const headers: Record<string, string> = {};
+  // tc.biker-link.net è dietro Cloudflare Access (oltre all'X-Agent-Token
+  // applicativo): senza il Service Token CF la richiesta viene bloccata all'edge
+  // con 401/403 e il TC risulta erroneamente "offline". Gli header CF sono
+  // innocui se la policy Access non è attiva (l'origine li ignora).
+  const headers: Record<string, string> = { ...cfAccessHeaders() };
   if (AGENT_TOKEN) headers["X-Agent-Token"] = AGENT_TOKEN;
 
   try {
