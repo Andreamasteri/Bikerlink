@@ -7,6 +7,7 @@ import { motoClubs, motoClubMembers, appSettings } from "@shared/db";
 import { clientErrorSchema, startupBeaconSchema } from "@shared/validators";
 import { eq } from "drizzle-orm";
 import { symbolicateStack } from "../lib/symbolicate";
+import { getAdminCached, setAdminCached, deleteAdminCached } from "../lib/admin-auth-cache";
 
 
 const router = Router();
@@ -150,13 +151,6 @@ async function _assignFakeUserToClubs(userId: string): Promise<ClubAssignStats> 
   return stats;
 }
 
-// Cache breve per il middleware admin: evita 1 round-trip DB per ogni richiesta
-// dentro la stessa sessione admin. TTL 10 s — abbastanza per un burst di
-// chiamate parallele al mount del pannello, abbastanza corto da rilevare
-// suspend/block entro pochi secondi.
-const _adminAuthCache = new Map<string, { user: unknown; expiresAt: number }>();
-const _ADMIN_CACHE_TTL_MS = 10_000;
-
 function _requireAdmin(req: Request, res: Response, next: Function) {
   const path = req.originalUrl || req.url;
   // Ultimi 6 char del sessionId per la diagnostica (no PII, no leak completo).
@@ -182,9 +176,12 @@ function _requireAdmin(req: Request, res: Response, next: Function) {
     return sendError(res, 401, "Sessione scaduta. Effettua di nuovo l'accesso.");
   }
   const cacheKey = req.session?.userId;
-  const cached = _adminAuthCache.get(cacheKey);
-  if (cached && cached.expiresAt > Date.now()) {
-    (req as Request & { currentUser?: unknown }).currentUser = cached.user;
+  // Task #397 — shared cache: entrambi i middleware (_requireAdmin + requireAdmin
+  // in more-routes.ts) usano lo stesso Map così invalidateAdminAuthCache() li
+  // svuota entrambi in un colpo solo.
+  const cachedUser = getAdminCached(cacheKey);
+  if (cachedUser !== null) {
+    (req as Request & { currentUser?: unknown }).currentUser = cachedUser;
     return next();
   }
   storage.getUser(req.session?.userId).then((user) => {
@@ -194,6 +191,7 @@ function _requireAdmin(req: Request, res: Response, next: Function) {
     }
     if (user.role !== "admin") {
       console.warn(`[admin-auth] 403 reason=not-admin path=${path} sid=${sid} userId=${user.id} role=${user.role}`);
+      deleteAdminCached(cacheKey);
       return sendError(res, 403, "Accesso riservato agli amministratori.");
     }
     // Task #1078: defense-in-depth — admin sospeso/bloccato non deve continuare
@@ -201,9 +199,10 @@ function _requireAdmin(req: Request, res: Response, next: Function) {
     // (Il middleware globale in routes.ts dovrebbe già averla distrutta.)
     if (user.status !== "active") {
       console.warn(`[admin-auth] 403 reason=not-active path=${path} sid=${sid} userId=${user.id} status=${user.status}`);
+      deleteAdminCached(cacheKey);
       return sendError(res, 403, "Account non attivo.");
     }
-    _adminAuthCache.set(cacheKey, { user, expiresAt: Date.now() + _ADMIN_CACHE_TTL_MS });
+    setAdminCached(cacheKey, user);
     (req as Request & { currentUser?: unknown }).currentUser = user;
     next();
   }).catch((err) => {

@@ -14,6 +14,7 @@ import { isProtectedUser } from "../../constants";
 import { closeSseClient } from "../../chat-sse";
 import { revokeAllUserSessions } from "../../session-utils";
 import { sendSuccess, sendError } from "../../lib/api-response";
+import { invalidateAdminAuthCache } from "../../lib/admin-auth-cache";
 
 const router = Router();
 
@@ -171,6 +172,9 @@ router.put("/:id/status", async (req: Request, res: Response) => {
     });
     if (status === "suspended" || status === "blocked") {
       closeSseClient(id);
+      // Task #397 — evict immediately so the demoted admin can't ride the
+      // 10-second cache window after suspension/block.
+      invalidateAdminAuthCache(id);
     }
     const { password: _, ...safeUser } = user;
     return res.json(safeUser);
@@ -202,6 +206,12 @@ router.put("/:id/role", async (req: Request, res: Response) => {
       targetId: id,
       details: `Ruolo cambiato a ${role}`,
     });
+    // Task #397 — if the target user was an admin and is now demoted, evict
+    // their cache entry immediately so they can't keep calling admin endpoints
+    // for up to 10 more seconds.
+    if (role !== "admin") {
+      invalidateAdminAuthCache(id);
+    }
     const { password: _, ...safeUser } = user;
     return res.json(safeUser);
   } catch (_error) {

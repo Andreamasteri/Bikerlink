@@ -10,30 +10,28 @@ import { getCircuitStatus } from "../db-circuit-breaker";
 import { getHealthState } from "../lib/health-arbiter";
 import { getCoordinatorHealthSummary } from "../ai/coordinator/job-gate";
 import { isQuebrachoLoopRunning } from "../ai/coordinator/quebracho-loop";
-
-// Cache breve per il middleware requireAdmin: evita 1 round-trip DB per ogni
-// richiesta admin in polling frequente (uptime/metrics/logs chiamati ogni ~5s).
-// TTL 10 s — abbastanza per un burst di polling, abbastanza corto da rilevare
-// suspend/block entro pochi secondi.
-const _moreRoutesAdminAuthCache = new Map<string, { user: unknown; expiresAt: number }>();
-const _MORE_ROUTES_ADMIN_TTL_MS = 10_000;
+import { getAdminCached, setAdminCached, deleteAdminCached } from "../lib/admin-auth-cache";
 
 async function requireAdmin(req: Request, res: Response, next: NextFunction) {
   if (!req.session?.userId) {
     return sendError(res, 401, "Non autenticato");
   }
   const cacheKey = req.session.userId;
-  const cached = _moreRoutesAdminAuthCache.get(cacheKey);
-  if (cached && cached.expiresAt > Date.now()) {
-    (req as { adminUser?: unknown }).adminUser = cached.user;
+  const cachedUser = getAdminCached(cacheKey);
+  if (cachedUser !== null) {
+    (req as { adminUser?: unknown }).adminUser = cachedUser;
     return next();
   }
   const user = await storage.getUser(req.session.userId);
   if (!user || user.role !== "admin") {
-    _moreRoutesAdminAuthCache.delete(cacheKey);
+    deleteAdminCached(cacheKey);
     return sendError(res, 403, "Accesso non autorizzato");
   }
-  _moreRoutesAdminAuthCache.set(cacheKey, { user, expiresAt: Date.now() + _MORE_ROUTES_ADMIN_TTL_MS });
+  if (user.status !== "active") {
+    deleteAdminCached(cacheKey);
+    return sendError(res, 403, "Account non attivo.");
+  }
+  setAdminCached(cacheKey, user);
   (req as { adminUser?: typeof user }).adminUser = user;
   next();
 }
