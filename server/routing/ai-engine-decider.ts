@@ -60,12 +60,15 @@ Regole:
 - Imposta confidence < 0.6 quando i due engine sono equivalenti o i dati (globali e bbox) sono insufficienti: attiverà il confronto a doppia route.
 Rispondi SOLO con: engine, confidence (0..1), reason (breve, in italiano).`;
 
-/** True se la modalità AI è attiva (legge il raw setting, non resolveRoutingEngine). */
+/**
+ * True se la modalità AI è attiva. Task #164 — legge la config per-funzione
+ * effettiva (override admin → legacy → default versionato in codice, che ora è
+ * "ai"), non più solo il raw setting legacy `maps_routing_engine`.
+ */
 export async function isAiRoutingMode(): Promise<boolean> {
   try {
-    const { storage } = await import("../storage");
-    const row = await storage.getAppSetting("maps_routing_engine");
-    return row?.value === "ai";
+    const { resolveRoutingEngine } = await import("./function-engine-config");
+    return (await resolveRoutingEngine()) === "ai";
   } catch {
     return false;
   }
@@ -99,6 +102,25 @@ export function buildAiRoutingContext(points: [number, number][], style: string)
       valhalla: latencies.valhalla ?? null,
     },
     bboxQuality: getBboxEngineQuality(bboxKey),
+  };
+}
+
+/**
+ * Task #164 — Fallback deterministico quando l'AI non riesce a decidere
+ * (Ollama giù/timeout, cloud chain disabilitata o fallita, budget esaurito):
+ * engine esplicito "valhalla" invece di ricadere silenziosamente sul selettore
+ * normale. Se Valhalla non è configurato ritorna null (il chiamante ricade sul
+ * selettore normale → GraphHopper). Il kill-switch routing vince comunque su
+ * tutto: viene verificato a monte in getActiveRouterInner, prima del decider.
+ */
+function deterministicFallback(ctx: AiRoutingContext): AiEngineDecision | null {
+  if (!ctx.valhallaConfigured) return null;
+  console.log("[ai-decider] fallback deterministico → valhalla");
+  return {
+    engine: "valhalla",
+    confidence: 0.6,
+    reason: "Fallback deterministico: AI non disponibile → valhalla",
+    provider: null,
   };
 }
 
@@ -182,12 +204,12 @@ export async function decideEngineWithAI(
     // deterministico normale subentra, senza raggiungere alcun provider cloud.
     if (!(await isAiFallbackEnabled())) {
       clearTimeout(globalTimer);
-      return null;
+      return deterministicFallback(ctx);
     }
     const remainingMs = timeoutMs - (Date.now() - startTs);
     if (remainingMs <= 0) {
       clearTimeout(globalTimer);
-      return null;
+      return deterministicFallback(ctx);
     }
 
     const cloudResult = await Promise.race([
@@ -214,11 +236,11 @@ export async function decideEngineWithAI(
     ]);
 
     clearTimeout(globalTimer);
-    return cloudResult;
+    return cloudResult ?? deterministicFallback(ctx);
   } catch (err) {
     clearTimeout(globalTimer);
     console.warn("[ai-engine-decider] decisione AI fallita:", (err as Error)?.message ?? err);
-    return null;
+    return deterministicFallback(ctx);
   }
   });
 }

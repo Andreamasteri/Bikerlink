@@ -12,6 +12,7 @@
  * cambiano comportamento quando l'admin tocca un'altra funzione.
  */
 import { storage } from "../storage";
+import { dedupWarn } from "../lib/dedup-logger";
 import type { RoutingEngineId } from "@shared/maps-config";
 import {
   DEFAULT_FUNCTION_ENGINES,
@@ -62,6 +63,12 @@ export async function getFunctionEngineConfig(): Promise<RoutingFunctionEngineMa
     const legacyVal = legacy?.value;
     if (legacyVal && isEngineSupportedForFunction("routing", legacyVal as RoutingEngineId)) {
       out.routing = legacyVal as RoutingEngineId;
+      // Task #164 — visibilità nei log quando la config effettiva viene ancora
+      // dal setting legacy globale invece che da routing_function_engines.
+      dedupWarn(
+        "routing-config",
+        `legacy fallback maps_routing_engine attivo (="${legacyVal}") — impostare routing_function_engines nel DB`,
+      );
     }
   }
 

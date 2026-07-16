@@ -89,9 +89,8 @@ export const ROUTING_OPTIONS: MapsOption<RoutingEngineId>[] = [
   {
     id: "ai",
     label: "AI (auto-selezione)",
-    description: "Engine sperimentale: un modello AI sceglie il routing ottimale. Archiviato: configurazioni DB esistenti ricadono su GraphHopper.",
+    description: "Un modello AI sceglie l'engine self-hosted ottimale per ogni richiesta (Task #164: default versionato per la funzione routing). Fallback deterministico → Valhalla se l'AI non risponde.",
     implemented: true,
-    archived: true,
   },
 ];
 

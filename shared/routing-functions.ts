@@ -30,8 +30,8 @@ export const ROUTING_FUNCTIONS: RoutingFunctionDef[] = [
     id: "routing",
     label: "Calcolo percorso",
     description: "Calcolo del percorso tra waypoint (route planning, percorsi curvy).",
-    supportedEngines: ["graphhopper", "valhalla", "tomtom"],
-    defaultEngine: "graphhopper",
+    supportedEngines: ["ai", "graphhopper", "valhalla", "tomtom"],
+    defaultEngine: "ai",
   },
   {
     id: "auto_curvy",
@@ -45,7 +45,7 @@ export const ROUTING_FUNCTIONS: RoutingFunctionDef[] = [
     label: "Map matching",
     description: "Associa una traccia GPS alle strade OSM (telemetria, snap-to-road).",
     supportedEngines: ["graphhopper", "valhalla"],
-    defaultEngine: "graphhopper",
+    defaultEngine: "valhalla",
   },
   {
     id: "isochrone",
@@ -68,10 +68,14 @@ export type RoutingFunctionEngineMap = Record<RoutingFunctionId, RoutingEngineId
 /** Chiave AppSetting (valueJson) che persiste la config per-funzione. */
 export const ROUTING_FUNCTION_ENGINES_KEY = "routing_function_engines";
 
+// Task #164 — default versionati in codice: routing = Modalità AI,
+// map_matching = Valhalla. Su DB vuoto la config effettiva è già questa,
+// senza scritture manuali. Gli override admin (routing_function_engines)
+// vincono sempre su questi default.
 export const DEFAULT_FUNCTION_ENGINES: RoutingFunctionEngineMap = {
-  routing: "graphhopper",
+  routing: "ai",
   auto_curvy: "valhalla",
-  map_matching: "graphhopper",
+  map_matching: "valhalla",
   isochrone: "valhalla",
   matrix: "valhalla",
 };

@@ -138,6 +138,26 @@ export async function runBootPhase3DbInit(): Promise<void> {
   }
 
   try {
+    // Task #164 — seed idempotente dei default routing engine (routing → AI mode,
+    // map_matching → Valhalla). Pattern get-then-skip: se la riga esiste già
+    // (override admin), NON viene toccata — il seed scrive solo su DB vuoto.
+    const { storage: routingStorage } = await import("./storage");
+    const { ROUTING_FUNCTION_ENGINES_KEY } = await import("@shared/routing-functions");
+    const existing = await routingStorage.getAppSetting(ROUTING_FUNCTION_ENGINES_KEY);
+    if (!existing) {
+      await routingStorage.upsertAppSetting(ROUTING_FUNCTION_ENGINES_KEY, undefined, {
+        routing: "ai",
+        map_matching: "valhalla",
+      });
+      console.log('[ROUTING BOOTSTRAP] routing_function_engines seminato ai default (routing="ai", map_matching="valhalla")');
+    } else {
+      console.log("[ROUTING BOOTSTRAP] routing_function_engines già presente — nessuna modifica (override admin preservati)");
+    }
+  } catch (e) {
+    console.warn("[INIT] Phase 3: routing engine defaults bootstrap failed (non-fatal):", e);
+  }
+
+  try {
     const { initProviderHealth } = await import("./ai/moderation/provider");
     await initProviderHealth();
   } catch (e) {
