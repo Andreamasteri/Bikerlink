@@ -16,9 +16,16 @@ Skill che esegue un **triage automatico completo** del sistema BikerLink aggrega
 - L'utente scrive "analisi log", "triage sistema", "cosa non va".
 - Vuoi un report sullo stato di salute prima di pianificare nuovi task.
 - Vuoi che Horus proponga task basandosi sullo stato reale del sistema.
-- Prima di una sessione di pianificazione (Horus propone → planner revisonа → utente approva).
+- Prima di una sessione di pianificazione (Horus propone → planner revisiona → utente approva).
 
-## Come lanciarla
+## Come lanciarla — metodo rapido (1 click)
+
+Il triage è disponibile come **workflow Replit**. Nel pannello Workflows del progetto:
+
+- **"Triage Horus"** — esegue il triage completo su tutte le fonti e salva il report in `logs/`.
+- **"Planning Session"** — esegue il triage completo e poi stampa il percorso del report più recente, pronto per la sessione di pianificazione.
+
+## Come lanciarla — da terminale
 
 ```bash
 # Triage completo (tutte le fonti)
@@ -35,7 +42,36 @@ npx tsx scripts/log-analysis-horus.ts --dry-run
 
 # Combinabile
 npx tsx scripts/log-analysis-horus.ts --only-internal --tail 100 --dry-run
+
+# Sessione di pianificazione (triage + path report)
+bash scripts/start-planning-session.sh
 ```
+
+## Dove trovare il report
+
+Il report viene stampato su stdout e salvato in:
+
+```
+logs/horus-log-analysis-<timestamp>.md
+```
+
+Per trovare il più recente:
+
+```bash
+ls -t logs/horus-log-analysis-*.md | head -1
+```
+
+## Flusso: sessione di pianificazione
+
+Prima di ogni sessione di pianificazione ("cosa facciamo adesso?", "proponi task", "revisione piano"):
+
+1. **Lancia il workflow "Planning Session"** (o `bash scripts/start-planning-session.sh`) — esegue il triage e mostra il path del report.
+2. **Horus analizza** — aggrega le fonti e produce il report con `## TASK PROPOSTI DA HORUS`.
+3. **Il planner legge il report** — cerca `logs/horus-log-analysis-*.md` (il più recente) e valuta quali task proposti da Horus sono pertinenti e non duplicati rispetto al backlog esistente.
+4. **L'utente approva** — decide quali task aggiungere al backlog.
+5. **Solo allora** i task vengono creati formalmente nel sistema di project tracking.
+
+> ⚠️ Le proposte di Horus **non vengono create automaticamente**. Il planner le legge, le revisiona e le propone all'utente.
 
 ## Fonti raccolte
 
@@ -87,15 +123,6 @@ Struttura fissa (tre sezioni):
 | ... | alta/media/bassa | ... | ... |
 ```
 
-## Flusso: Horus propone → planner revisonа → utente approva
-
-1. **Horus analizza** — lo script aggrega le fonti e chiama Horus che produce il report con `## TASK PROPOSTI DA HORUS`.
-2. **L'agente planner revisonа** — legge il report (file `logs/horus-log-analysis-*.md`) e valuta quali task proposti da Horus sono pertinenti e non duplicati.
-3. **L'utente approva** — decide quali task aggiungere al backlog.
-4. **Solo allora** i task vengono creati formalmente nel sistema di project tracking.
-
-> ⚠️ Le proposte di Horus **non vengono create automaticamente**. Il planner le legge, le revisonа e le propone all'utente.
-
 ## Se l'endpoint non risponde
 
 Se il ThinkCentre è spento o il Cloudflare Tunnel è giù, lo script stampa un messaggio chiaro ed esce con codice 1. Verifica che il ThinkCentre sia acceso, Ollama in esecuzione e l'hostname in `OLLAMA_URL` raggiungibile.
@@ -114,6 +141,7 @@ Se il ThinkCentre è spento o il Cloudflare Tunnel è giù, lo script stampa un 
 ## File coinvolti
 
 - `scripts/log-analysis-horus.ts` — lo script principale
+- `scripts/start-planning-session.sh` — wrapper per sessioni di pianificazione
 - `server/lib/cf-access.ts` — helper `cfAccessHeaders()` per Cloudflare Access
 - `server/db.ts` — import pool DB
 - `.agents/skills/ollama-diagnostics/SKILL.md` — skill correlata (diagnosi crash boot, usa Ares)

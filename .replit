@@ -178,6 +178,17 @@ args = "npx tsx scripts/log-analysis-horus.ts"
 [workflows.workflow.metadata]
 outputType = "console"
 
+[[workflows.workflow]]
+name = "Planning Session"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "bash scripts/start-planning-session.sh"
+
+[workflows.workflow.metadata]
+outputType = "console"
+
   [objectStorage]
 defaultBucketID = "replit-objstore-eab04d75-96eb-47fa-8ab7-710ec976a6e8"
 
