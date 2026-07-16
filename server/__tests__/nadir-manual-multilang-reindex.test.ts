@@ -1,6 +1,7 @@
 /**
- * Task #107 — Verifica dei DUE bug di correttezza segnalati in code review sulla
- * reindicizzazione multilingua del manuale:
+ * Task #107/#196 — Correttezza della reindicizzazione del manuale Nadir.
+ *
+ * Task #107: due bug segnalati in code review:
  *
  *   1. Fallimento PARZIALE (una lingua/chunk su N fallisce l'embedding): il
  *      manifest pubblicato deve riflettere ESATTAMENTE ciò che è realmente nel
@@ -13,6 +14,11 @@
  *      l'italiano ATTUALE non va mai servita/indicizzata — si ricade sempre
  *      sull'italiano (gestisce sia "tutte le traduzioni sono fallite in questa
  *      corsa" sia "un admin ha modificato a mano il manuale italiano").
+ *
+ * Task #196: le reindicizzazioni SUCCESSIVE devono SOSTITUIRE i vecchi embedding,
+ * non accumularli. Due reindex consecutivi (prima 3 sezioni, poi 4) devono
+ * produrre un manifest con 4 voci — non 7 (3 stale + 4 nuove). La logica
+ * pruneStale deve eliminare i chunk obsoleti dal DB prima di inserire i nuovi.
  */
 import { vi, describe, it, expect, beforeEach } from "vitest";
 
@@ -159,6 +165,114 @@ describe("Task #107 — reindicizzazione manuale multilingua: correttezza manife
     expect(manifest[`${NADIR_MANUAL_ENTITY_TYPE}:it-chunk-0`]).toEqual(
       oldManifest[`${NADIR_MANUAL_ENTITY_TYPE}:it-chunk-0`],
     );
+  });
+});
+
+describe("Task #196 — reindicizzazioni successive sostituiscono i chunk, non li accumulano", () => {
+  beforeEach(() => {
+    appSettingStore.clear();
+    mockUpsertEmbedding.mockReset().mockImplementation(async () => ({ ok: true }));
+    mockDbDelete.mockReset();
+    mockDbSelectRows.length = 0;
+  });
+
+  it("3→4 sezioni: dopo due reindex il manifest ha 4 voci — non 7 (3 stale + 4 nuove)", async () => {
+    // Paragrafi > MIN_FRAGMENT_CHARS (12 caratteri), separati da doppio newline.
+    const manual3 = [
+      "Prima sezione del manuale, abbastanza lunga da superare il minimo.",
+      "Seconda sezione del manuale, abbastanza lunga da superare il minimo.",
+      "Terza sezione del manuale, abbastanza lunga da superare il minimo.",
+    ].join("\n\n");
+
+    await saveNadirManual(manual3);
+    const status1 = await reindexNadir("manual");
+
+    expect(status1.ok).toBe(true);
+    expect(status1.counts.manual).toBe(3);
+
+    const manifest1 = appSettingStore.get(NADIR_FRAGMENTS_KEY) as Record<string, unknown>;
+    const manualKeys1 = Object.keys(manifest1 ?? {}).filter(
+      (k) => k.startsWith(`${NADIR_MANUAL_ENTITY_TYPE}:`),
+    );
+    // Primo run: esattamente 3 chunk nel manifest.
+    expect(manualKeys1).toHaveLength(3);
+    expect(mockUpsertEmbedding).toHaveBeenCalledTimes(3);
+
+    // Secondo run: 4 sezioni (una aggiunta in mezzo, spostando gli indici successivi).
+    const manual4 = [
+      "Prima sezione del manuale, abbastanza lunga da superare il minimo.",
+      "Sezione aggiunta a metà, abbastanza lunga da superare il minimo.",
+      "Seconda sezione del manuale, abbastanza lunga da superare il minimo.",
+      "Terza sezione del manuale, abbastanza lunga da superare il minimo.",
+    ].join("\n\n");
+
+    await saveNadirManual(manual4);
+    const status2 = await reindexNadir("manual");
+
+    expect(status2.ok).toBe(true);
+    expect(status2.counts.manual).toBe(4);
+
+    const manifest2 = appSettingStore.get(NADIR_FRAGMENTS_KEY) as Record<string, unknown>;
+    const manualKeys2 = Object.keys(manifest2 ?? {}).filter(
+      (k) => k.startsWith(`${NADIR_MANUAL_ENTITY_TYPE}:`),
+    );
+
+    // Il manifest deve contenere ESATTAMENTE 4 chunk — non 7.
+    // Il secondo run ha SOSTITUITO i 3 del primo run, non li ha accumulati.
+    expect(manualKeys2).toHaveLength(4);
+
+    // upsertEmbedding: 3 dal primo run + 4 dal secondo = 7 chiamate totali.
+    // Questo conferma che entrambi i run hanno davvero eseguito l'embedding.
+    expect(mockUpsertEmbedding).toHaveBeenCalledTimes(7);
+
+    // pruneStale deve essere stato chiamato: garantisce che il DB `embeddings`
+    // elimini i chunk obsoleti e non accumuli 3+4=7 righe.
+    expect(mockDbDelete).toHaveBeenCalled();
+  });
+
+  it("4→3 sezioni: il chunk in eccesso viene prunato e il manifest scende a 3, non resta a 4", async () => {
+    const manual4 = [
+      "Prima sezione del manuale, lunga abbastanza da superare il minimo.",
+      "Seconda sezione del manuale, lunga abbastanza da superare il minimo.",
+      "Terza sezione del manuale, lunga abbastanza da superare il minimo.",
+      "Quarta sezione del manuale, lunga abbastanza da superare il minimo.",
+    ].join("\n\n");
+
+    await saveNadirManual(manual4);
+    const status1 = await reindexNadir("manual");
+
+    expect(status1.counts.manual).toBe(4);
+    const manifest1 = appSettingStore.get(NADIR_FRAGMENTS_KEY) as Record<string, unknown>;
+    expect(
+      Object.keys(manifest1 ?? {}).filter((k) => k.startsWith(`${NADIR_MANUAL_ENTITY_TYPE}:`)),
+    ).toHaveLength(4);
+
+    // Seconda reindicizzazione: manuale ridotto a 3 sezioni.
+    // it-chunk-3 (indice della quarta sezione) non esiste più nel nuovo testo:
+    // deve sparire dal manifest e pruneStale deve eliminarlo dal DB.
+    const manual3 = [
+      "Prima sezione del manuale, lunga abbastanza da superare il minimo.",
+      "Seconda sezione del manuale, lunga abbastanza da superare il minimo.",
+      "Terza sezione del manuale, lunga abbastanza da superare il minimo.",
+    ].join("\n\n");
+
+    await saveNadirManual(manual3);
+    const status2 = await reindexNadir("manual");
+
+    expect(status2.ok).toBe(true);
+    expect(status2.counts.manual).toBe(3);
+
+    const manifest2 = appSettingStore.get(NADIR_FRAGMENTS_KEY) as Record<string, unknown>;
+    const manualKeys2 = Object.keys(manifest2 ?? {}).filter(
+      (k) => k.startsWith(`${NADIR_MANUAL_ENTITY_TYPE}:`),
+    );
+
+    // Il manifest ha esattamente 3 chunk — it-chunk-3 è sparito, non servito stale.
+    expect(manualKeys2).toHaveLength(3);
+    // Nessuna chiave del tipo it-chunk-3 (o lang-chunk-3) deve restare nel manifest.
+    expect(manualKeys2.some((k) => k.endsWith("-chunk-3"))).toBe(false);
+    // pruneStale deve essere stato invocato per eliminare it-chunk-3 dal DB.
+    expect(mockDbDelete).toHaveBeenCalled();
   });
 });
 
