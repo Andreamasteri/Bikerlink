@@ -16,10 +16,10 @@ import {
   tokenFingerprint,
   type ProbeLogEntry,
 } from "./thinkcentre-health-utils";
-import { isThinkCentreInMaintenance } from "../../lib/thinkcentre-maintenance";
-import { isThinkCentrePoweredOff } from "../../lib/thinkcentre-powered-off";
+import { isThinkCentreInMaintenance, resetThinkCentreMaintenanceCache } from "../../lib/thinkcentre-maintenance";
+import { isThinkCentrePoweredOff, resetThinkCentrePoweredOffCache } from "../../lib/thinkcentre-powered-off";
 import { resetThinkCentreOfflineCache } from "../../lib/thinkcentre-offline";
-import { isThinkCentreIgnoredForTests } from "../../lib/thinkcentre-ignore-tests";
+import { isThinkCentreIgnoredForTests, resetThinkCentreIgnoreForTestsCache } from "../../lib/thinkcentre-ignore-tests";
 import {
   probeValhallaDetailed,
   probePhotonDetailed,
@@ -102,8 +102,9 @@ router.post("/thinkcentre/maintenance", async (req: Request, res: ExpressRespons
           set: { value: enabled ? "true" : "false", updatedAt: new Date() },
         }),
     );
-    // Invalida la cache TTL 3min: lo switch deve avere effetto immediato.
+    // Invalida le cache locali: lo switch deve avere effetto immediato.
     resetThinkCentreOfflineCache();
+    resetThinkCentreMaintenanceCache();
     console.log(`[admin/thinkcentre-maintenance] manutenzione ${enabled ? "ATTIVATA" : "disattivata"}`);
     return res.json({ ok: true, enabled });
   } catch (_err) {
@@ -145,8 +146,9 @@ router.post("/thinkcentre/powered-off", async (req: Request, res: ExpressRespons
           set: { value: enabled ? "true" : "false", updatedAt: new Date() },
         }),
     );
-    // Invalida la cache TTL 3min: lo switch deve avere effetto immediato.
+    // Invalida le cache locali: lo switch deve avere effetto immediato.
     resetThinkCentreOfflineCache();
+    resetThinkCentrePoweredOffCache();
     console.log(`[admin/thinkcentre-powered-off] ThinkCentre ${enabled ? "SPENTO (override attivo)" : "acceso (override rimosso)"}`);
     return res.json({ ok: true, enabled });
   } catch (_err) {
@@ -187,6 +189,8 @@ router.post("/thinkcentre/ignore-for-tests", async (req: Request, res: ExpressRe
           set: { value: enabled ? "true" : "false", updatedAt: new Date() },
         }),
     );
+    // Invalida la cache locale: lo switch deve avere effetto immediato.
+    resetThinkCentreIgnoreForTestsCache();
     console.log(`[admin/thinkcentre-ignore-tests] soppressione alert ${enabled ? "ATTIVATA" : "disattivata"}`);
     return res.json({ ok: true, enabled });
   } catch (_err) {
