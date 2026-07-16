@@ -19,6 +19,9 @@ const ENGINE_LABEL: Record<CorrectnessProbeResult["engine"], string> = {
   valhalla: "Valhalla (routing)",
   photon: "Photon (geocoding)",
   pipeline: "Pipeline combinata",
+  // Task #392 — errore SQL nell'area resolver (fase pre-GH): segnale separato,
+  // non compare nelle sonde standard ma viene iniettato nel system prompt.
+  area_resolver: "Area resolver GH (SQL)",
 };
 
 function engineLine(r: CorrectnessProbeResult): string {

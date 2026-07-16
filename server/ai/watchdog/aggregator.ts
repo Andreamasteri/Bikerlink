@@ -363,6 +363,15 @@ export function deriveProblems(signals: Signal[]): Problem[] {
       const reason = (s.details as { reason?: string } | undefined)?.reason ?? "risultato non plausibile";
       title = `Routing ${engine}: correttezza KO — ${reason}`;
       suggestion = `${engine} risponde ma restituisce un percorso non plausibile o errore silenzioso. Verifica il grafo/i tile di ${engine} e la sua salute sul ThinkCentre.`;
+    } else if (s.metric === "routing.area_resolver.error") {
+      const det = s.details as { reason?: string; sqlCode?: string } | undefined;
+      const reason = det?.reason ?? "errore SQL nell'area resolver";
+      const code = det?.sqlCode ? ` (SQLSTATE ${det.sqlCode})` : "";
+      title = `Area resolver GH: errore SQL${code} — sonda GH saltata`;
+      suggestion = "La query PostGIS di risoluzione area ha restituito un errore prima di contattare GraphHopper. Verifica che PostGIS sia abilitato nel DB e che la sintassi unnest/ST_Contains sia supportata. La sonda GH è stata saltata: non è un guasto GraphHopper.";
+      // Override reason in detail for display
+      if (!det?.reason) { /* keep title */ }
+      else title = `Area resolver GH: ${reason}`;
     } else if (s.metric === "geocoding.photon.correct") {
       const reason = (s.details as { reason?: string } | undefined)?.reason ?? "risultato non plausibile";
       title = `Geocoding Photon: correttezza KO — ${reason}`;
@@ -419,6 +428,9 @@ const OUTAGE_DOWNSTREAM_IDS = new Set<string>([
   "horus.routing.valhalla.correct",
   "horus.geocoding.photon.correct",
   "horus.pipeline.correct",
+  // Task #392 — errore SQL nel resolver dell'area (pre-GH): con TC spento il DB
+  // PostGIS potrebbe essere irraggiungibile → downstream, non azionabile.
+  "horus.routing.area_resolver.error",
 ]);
 
 function isOutageDownstreamProblem(id: string): boolean {

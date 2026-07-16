@@ -27,7 +27,7 @@ import {
 import { getRoutingCounters } from "../../routing/routing-metrics";
 import { getPipelineSummary } from "../../routing/routing-pipeline-log";
 
-export type CorrectnessEngine = "graphhopper" | "valhalla" | "photon" | "pipeline";
+export type CorrectnessEngine = "graphhopper" | "valhalla" | "photon" | "pipeline" | "area_resolver";
 export type CorrectnessSeverity = "info" | "warn" | "high" | "critical";
 
 export interface CorrectnessProbeResult {
@@ -77,6 +77,23 @@ async function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise
   } finally {
     if (timer) clearTimeout(timer);
   }
+}
+
+/**
+ * Rileva se un'eccezione proviene dal driver PostgreSQL (errore SQL/DB), non da
+ * una chiamata di rete verso GraphHopper. I driver pg/drizzle espongono il
+ * SQLSTATE a 5 caratteri in `.code` e opzionalmente `.severity = "ERROR"`.
+ * Usato per distinguere errori nella fase di risoluzione area (pre-GH) dagli
+ * errori di connettività/risposta di GraphHopper stesso.
+ */
+function isAreaResolverDbError(err: unknown): boolean {
+  if (!err || typeof err !== "object") return false;
+  const e = err as Record<string, unknown>;
+  // SQLSTATE code: 5 caratteri alfanumerici (es. "42846", "42P01")
+  if (typeof e.code === "string" && /^[0-9A-Z]{5}$/.test(e.code)) return true;
+  // Attributo severity del protocollo PostgreSQL
+  if (e.severity === "ERROR" || e.severity === "FATAL" || e.severity === "PANIC") return true;
+  return false;
 }
 
 function notConfigured(engine: CorrectnessEngine): CorrectnessProbeResult {
@@ -134,9 +151,89 @@ async function probeRouteEngine(
   }
 }
 
-async function probeGraphHopperCorrectness(): Promise<CorrectnessProbeResult> {
-  if (!process.env.GRAPHHOPPER_URL) return notConfigured("graphhopper");
-  return probeRouteEngine("graphhopper", (req) => graphHopperRoute(req, false));
+/**
+ * Sonda GraphHopper — versione estesa che distingue tre classi di errore:
+ *   (a) errore SQL/DB nel resolver dell'area (fase pre-GH)  → non è un guasto GH
+ *   (b) timeout / errore di rete verso GH                   → GH irraggiungibile
+ *   (c) risposta GH ma percorso non plausibile              → GH risponde male
+ *
+ * Restituisce il risultato GH + un opzionale risultato "area_resolver" separato
+ * per il caso (a), così il collettore può emettere i due segnali distinti.
+ */
+async function probeGraphHopperCorrectness(): Promise<{
+  gh: CorrectnessProbeResult;
+  areaResolverError: CorrectnessProbeResult | null;
+}> {
+  if (!process.env.GRAPHHOPPER_URL) {
+    return { gh: notConfigured("graphhopper"), areaResolverError: null };
+  }
+
+  const req: RouteRequest = {
+    points: ROUTE_PROBE_POINTS,
+    profile: "motorcycle",
+    instructions: false,
+    calc_points: true,
+    points_encoded: false,
+  };
+  const started = Date.now();
+
+  try {
+    const result = await withTimeout(
+      graphHopperRoute(req, false),
+      PROBE_TIMEOUT_MS,
+      "graphhopper",
+    );
+    const latencyMs = Date.now() - started;
+    const m = measureRouteResult(result);
+    const v = validateRoutePlausibility(aerialKm(), m);
+    return {
+      gh: {
+        engine: "graphhopper", configured: true, reachable: true, plausible: v.plausible,
+        ok: v.plausible, skipped: false, latencyMs,
+        distanceKm: v.distanceKm != null ? Math.round(v.distanceKm * 10) / 10 : null,
+        durationMin: v.durationMin != null ? Math.round(v.durationMin) : null,
+        reason: v.plausible ? null : `risultato non plausibile: ${v.reason}`,
+        severity: v.plausible ? "info" : "high",
+        detail: { impliedKmh: v.impliedKmh, coordCount: m.coordCount, aerialKm: Math.round(aerialKm()) },
+      },
+      areaResolverError: null,
+    };
+  } catch (err) {
+    // Caso (a): errore SQL/DB nella fase di risoluzione area — PRIMA di contattare GH.
+    // Non si tratta di un guasto GraphHopper: saltiamo la sonda GH (severity info)
+    // ed emettiamo un risultato "area_resolver" separato con severity warn.
+    if (isAreaResolverDbError(err)) {
+      const msg = (err as Error).message?.slice(0, 200) ?? "errore DB sconosciuto";
+      return {
+        gh: {
+          engine: "graphhopper", configured: true, reachable: false, plausible: false, ok: false,
+          skipped: true,
+          latencyMs: null, distanceKm: null, durationMin: null,
+          reason: "area resolver: errore SQL prima della chiamata GH — sonda saltata",
+          severity: "info",
+          detail: { areaResolverError: true },
+        },
+        areaResolverError: {
+          engine: "area_resolver", configured: true, reachable: false, plausible: false, ok: false,
+          skipped: false, latencyMs: null, distanceKm: null, durationMin: null,
+          reason: `errore SQL nell'area resolver: ${msg}`,
+          severity: "warn",
+          detail: { sqlError: msg, sqlCode: (err as Record<string, unknown>).code ?? null },
+        },
+      };
+    }
+
+    // Caso (b)/(c): timeout di rete o risposta GH non valida → guasto GH reale.
+    return {
+      gh: {
+        engine: "graphhopper", configured: true, reachable: false, plausible: false, ok: false,
+        skipped: false, latencyMs: null, distanceKm: null, durationMin: null,
+        reason: `richiesta fallita: ${(err as Error).message?.slice(0, 160) ?? "errore"}`,
+        severity: "critical",
+      },
+      areaResolverError: null,
+    };
+  }
 }
 
 async function probeValhallaCorrectness(): Promise<CorrectnessProbeResult> {
@@ -298,6 +395,7 @@ export async function runRoutingCorrectnessProbes(force = false): Promise<Correc
   const ROUTING_OFF_REASON = "Routing disabilitato via kill-switch — sonda saltata";
 
   let gh: CorrectnessProbeResult;
+  let areaResolverError: CorrectnessProbeResult | null = null;
   let valhalla: CorrectnessProbeResult;
   let photon: CorrectnessProbeResult;
 
@@ -309,27 +407,37 @@ export async function runRoutingCorrectnessProbes(force = false): Promise<Correc
     // ≤3 sonde di rete in parallelo (nessuna query DB globale in Promise.all).
     // GH/Valhalla saltate solo se il routing è disabilitato in modo confermato.
     const ghProbe = routingOff
-      ? Promise.resolve(
-          process.env.GRAPHHOPPER_URL ? skipped("graphhopper", ROUTING_OFF_REASON) : notConfigured("graphhopper"),
-        )
+      ? Promise.resolve({
+          gh: process.env.GRAPHHOPPER_URL ? skipped("graphhopper", ROUTING_OFF_REASON) : notConfigured("graphhopper"),
+          areaResolverError: null,
+        })
       : probeGraphHopperCorrectness();
     const valhallaProbe = routingOff
       ? Promise.resolve(
           process.env.VALHALLA_URL ? skipped("valhalla", ROUTING_OFF_REASON) : notConfigured("valhalla"),
         )
       : probeValhallaCorrectness();
-    [gh, valhalla, photon] = await Promise.all([
+    const [ghResult, valhallaResult, photonResult] = await Promise.all([
       ghProbe,
       valhallaProbe,
       probePhotonCorrectness(),
     ]);
+    gh = ghResult.gh;
+    areaResolverError = ghResult.areaResolverError;
+    valhalla = valhallaResult;
+    photon = photonResult;
   }
 
   const counters = getRoutingCounters();
   const pipeline = getPipelineSummary();
   const pipelineResult = derivePipelineCorrectness(gh, valhalla, counters, pipeline);
 
-  cachedResults = [gh, valhalla, photon, pipelineResult];
+  cachedResults = [
+    gh, valhalla, photon, pipelineResult,
+    // Se l'area resolver ha generato un errore SQL, lo aggiungiamo come risultato
+    // separato così il collettore può emettere il segnale horus.routing.area_resolver.error.
+    ...(areaResolverError ? [areaResolverError] : []),
+  ];
   lastRunAt = now;
   return cachedResults;
 }

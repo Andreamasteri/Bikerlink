@@ -55,6 +55,10 @@ export async function collectRoutingCorrectness(): Promise<Signal[]> {
     if (valhalla) signals.push(probeToSignal("routing.valhalla.correct", valhalla, safeHistory("valhalla")));
     if (photon) signals.push(probeToSignal("geocoding.photon.correct", photon, safeHistory("photon")));
     if (pipeline) signals.push(probeToSignal("pipeline.correct", pipeline));
+    // area_resolver: errore SQL nella fase pre-GH — segnale separato per non
+    // gonfiare horus.routing.graphhopper.correct con falsi positivi.
+    const areaResolver = byEngine.get("area_resolver");
+    if (areaResolver) signals.push(probeToSignal("routing.area_resolver.error", areaResolver));
   } catch (err) {
     signals.push({
       source: "horus", metric: "collector.error", severity: "warn",
