@@ -3,16 +3,19 @@
  * BikerLink — Triage AI completo con Horus
  *
  * Aggrega tutte le fonti di log di BikerLink (DB interno, filesystem, GitHub
- * Issues/Actions, Sentry EU) e le invia al modello Horus (qwen3:4b sul
- * ThinkCentre via Ollama) per un'analisi AI strutturata. Il report include
- * problemi trovati, analisi cause e proposte di task che l'agente planner
- * revisionerà prima di creare formalmente.
+ * Issues/Actions, Sentry EU, albero repo) e le invia al modello Horus
+ * (qwen3:4b sul ThinkCentre via Ollama) per un'analisi AI strutturata.
+ * Dopo il report principale, una seconda chiamata a Horus (ruolo architect)
+ * filtra i task proposti contro il backlog esistente. Infine, lo script
+ * companion `horus-propose-tasks.ts` prepara i file plan e il manifest JSON
+ * pronti per la proposta formale nel pannello Replit.
  *
  * Uso:
  *   npx tsx scripts/log-analysis-horus.ts
  *   npx tsx scripts/log-analysis-horus.ts --only-internal   # salta GitHub e Sentry
  *   npx tsx scripts/log-analysis-horus.ts --tail 500        # più righe per log
  *   npx tsx scripts/log-analysis-horus.ts --dry-run         # mostra bundle, non chiama Horus
+ *   npx tsx scripts/log-analysis-horus.ts --no-propose      # salta proposta task formale
  *
  * Secret/env:
  *   HORUS_OLLAMA_URL    — URL base di Horus (ThinkCentre) via Cloudflare Tunnel (obbligatorio)
@@ -28,10 +31,12 @@
 
 import fs from "fs";
 import path from "path";
+import { spawnSync } from "child_process";
 import { fileURLToPath } from "url";
 import { db } from "../server/db";
 import { sql } from "drizzle-orm";
 import { cfAccessHeaders } from "../server/lib/cf-access";
+import { collectGitHub, collectSentry, collectGitHubRepoTree } from "./lib/horus-sources";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, "..");
@@ -54,12 +59,12 @@ const DEFAULT_TAIL_LINES = 300;
 const REQUEST_TIMEOUT_MS = 300_000;
 
 const DEFAULT_MODEL = "qwen3:4b";
-const GITHUB_REPO = "Andreamasteri/Bikerlink";
 
 // ─── CLI args ─────────────────────────────────────────────────────────────────
 
 const IS_DRY_RUN = process.argv.includes("--dry-run");
 const ONLY_INTERNAL = process.argv.includes("--only-internal");
+const NO_PROPOSE = process.argv.includes("--no-propose");
 
 function parseTailArg(): number {
   const i = process.argv.indexOf("--tail");
@@ -92,17 +97,12 @@ function readTail(relOrAbs: string, tail: number): string | null {
 
 function rowsToText(rows: unknown[]): string {
   if (!rows || rows.length === 0) return "(nessuna riga)";
-  return rows
-    .map((r, i) => `[${i + 1}] ${JSON.stringify(r)}`)
-    .join("\n");
+  return rows.map((r, i) => `[${i + 1}] ${JSON.stringify(r)}`).join("\n");
 }
 
 // ─── Raccolta fonti DB ────────────────────────────────────────────────────────
 
-interface DbSection {
-  title: string;
-  text: string;
-}
+interface DbSection { title: string; text: string }
 
 async function collectDb(): Promise<DbSection[]> {
   const queries: Array<{ title: string; query: Promise<{ rows: unknown[] }> }> = [
@@ -111,65 +111,49 @@ async function collectDb(): Promise<DbSection[]> {
       query: db.execute(sql`
         SELECT crash_type, LEFT(COALESCE(error_message, ''), 300) AS error_message,
                reported_at, platform, app_version
-        FROM app_crash_logs
-        ORDER BY reported_at DESC
-        LIMIT 20
+        FROM app_crash_logs ORDER BY reported_at DESC LIMIT 20
       `),
     },
     {
       title: "ai_watchdog_log (ultimi 30)",
       query: db.execute(sql`
         SELECT kind, scope, status, LEFT(COALESCE(summary, ''), 300) AS summary, created_at
-        FROM ai_watchdog_log
-        ORDER BY created_at DESC
-        LIMIT 30
+        FROM ai_watchdog_log ORDER BY created_at DESC LIMIT 30
       `),
     },
     {
       title: "system_signals high/critical (ultimi 30)",
       query: db.execute(sql`
         SELECT source, metric, severity, value, unit, created_at
-        FROM system_signals
-        WHERE severity IN ('high', 'critical')
-        ORDER BY created_at DESC
-        LIMIT 30
+        FROM system_signals WHERE severity IN ('high', 'critical')
+        ORDER BY created_at DESC LIMIT 30
       `),
     },
     {
       title: "diagnostic_reports (ultimi 5)",
       query: db.execute(sql`
-        SELECT
-          LEFT(summary::text, 500) AS summary,
-          LEFT(results::text, 500) AS results_preview,
-          platform, app_version, run_at
-        FROM diagnostic_reports
-        ORDER BY run_at DESC
-        LIMIT 5
+        SELECT LEFT(summary::text, 500) AS summary, LEFT(results::text, 500) AS results_preview,
+               platform, app_version, run_at
+        FROM diagnostic_reports ORDER BY run_at DESC LIMIT 5
       `),
     },
     {
       title: "ai_call_logs degraded/errore (ultimi 20)",
       query: db.execute(sql`
         SELECT provider, model, latency_ms, degraded, created_at
-        FROM ai_call_logs
-        WHERE degraded = true OR latency_ms > 10000
-        ORDER BY created_at DESC
-        LIMIT 20
+        FROM ai_call_logs WHERE degraded = true OR latency_ms > 10000
+        ORDER BY created_at DESC LIMIT 20
       `),
     },
     {
       title: "ota_watchdog_reports (ultimi 5)",
       query: db.execute(sql`
-        SELECT *
-        FROM ota_watchdog_reports
-        ORDER BY created_at DESC
-        LIMIT 5
+        SELECT * FROM ota_watchdog_reports ORDER BY created_at DESC LIMIT 5
       `).catch(() => ({ rows: [] as unknown[] })),
     },
   ];
 
   const results = await Promise.allSettled(queries.map((q) => q.query));
-
   const sections: DbSection[] = [];
   for (let i = 0; i < queries.length; i++) {
     const result = results[i];
@@ -186,196 +170,8 @@ async function collectDb(): Promise<DbSection[]> {
 
 // ─── Raccolta filesystem log ──────────────────────────────────────────────────
 
-interface LogSection {
-  file: string;
-  text: string | null;
-}
-
-function collectLogs(tail: number): LogSection[] {
+function collectLogs(tail: number): Array<{ file: string; text: string | null }> {
   return LOG_FILES.map((f) => ({ file: f, text: readTail(f, tail) }));
-}
-
-// ─── Raccolta GitHub ──────────────────────────────────────────────────────────
-
-interface GitHubSection {
-  title: string;
-  text: string;
-}
-
-async function collectGitHub(): Promise<{ sections: GitHubSection[]; skipped: boolean; reason?: string }> {
-  const token =
-    process.env.GITHUB_TOKEN?.trim() || process.env.DIAG_GITHUB_TOKEN?.trim();
-
-  if (!token) {
-    return {
-      sections: [],
-      skipped: true,
-      reason: "GITHUB_TOKEN e DIAG_GITHUB_TOKEN non impostati",
-    };
-  }
-
-  const headers: Record<string, string> = {
-    Authorization: `token ${token}`,
-    Accept: "application/vnd.github+json",
-    "User-Agent": "BikerLink-LogAnalysis/1.0",
-  };
-
-  const sections: GitHubSection[] = [];
-
-  // Issues con label bug
-  try {
-    const issuesUrl = `https://api.github.com/repos/${GITHUB_REPO}/issues?labels=bug&state=open&per_page=10`;
-    const issuesRes = await fetch(issuesUrl, {
-      headers,
-      signal: AbortSignal.timeout(10_000),
-    });
-    if (issuesRes.ok) {
-      type Issue = { number: number; title: string; body?: string | null; created_at: string };
-      const issues = (await issuesRes.json()) as Issue[];
-      const text =
-        issues.length === 0
-          ? "(nessun issue aperto con label bug)"
-          : issues
-              .map(
-                (iss) =>
-                  `#${iss.number} [${iss.created_at.slice(0, 10)}] ${iss.title}\n${
-                    iss.body ? "  " + iss.body.slice(0, 300).replace(/\n/g, " ") : ""
-                  }`,
-              )
-              .join("\n\n");
-      sections.push({ title: "GitHub Issues aperti (label: bug)", text });
-    } else {
-      sections.push({
-        title: "GitHub Issues aperti (label: bug)",
-        text: `[HTTP ${issuesRes.status} — impossibile recuperare issue]`,
-      });
-    }
-  } catch (err) {
-    sections.push({
-      title: "GitHub Issues aperti (label: bug)",
-      text: `[ERRORE: ${err instanceof Error ? err.message : String(err)}]`,
-    });
-  }
-
-  // Workflow run falliti
-  try {
-    const runsUrl = `https://api.github.com/repos/${GITHUB_REPO}/actions/runs?status=failure&per_page=10`;
-    const runsRes = await fetch(runsUrl, {
-      headers,
-      signal: AbortSignal.timeout(10_000),
-    });
-    if (runsRes.ok) {
-      type WorkflowRun = {
-        id: number;
-        name: string;
-        head_branch: string;
-        created_at: string;
-        html_url: string;
-        conclusion: string;
-      };
-      const data = (await runsRes.json()) as { workflow_runs: WorkflowRun[] };
-      const runs = data.workflow_runs ?? [];
-      const text =
-        runs.length === 0
-          ? "(nessun workflow fallito recente)"
-          : runs
-              .map(
-                (r) =>
-                  `[${r.created_at.slice(0, 16)}] ${r.name} (branch: ${r.head_branch}) — ${r.conclusion}\n  ${r.html_url}`,
-              )
-              .join("\n\n");
-      sections.push({ title: "GitHub Actions — run falliti (ultimi 10)", text });
-    } else {
-      sections.push({
-        title: "GitHub Actions — run falliti (ultimi 10)",
-        text: `[HTTP ${runsRes.status} — impossibile recuperare workflow runs]`,
-      });
-    }
-  } catch (err) {
-    sections.push({
-      title: "GitHub Actions — run falliti (ultimi 10)",
-      text: `[ERRORE: ${err instanceof Error ? err.message : String(err)}]`,
-    });
-  }
-
-  return { sections, skipped: false };
-}
-
-// ─── Raccolta Sentry ──────────────────────────────────────────────────────────
-
-interface SentrySection {
-  title: string;
-  text: string;
-}
-
-async function collectSentry(): Promise<{ sections: SentrySection[]; skipped: boolean; reason?: string }> {
-  const authToken = process.env.SENTRY_AUTH_TOKEN?.trim();
-  const org = process.env.SENTRY_ORG?.trim();
-  const project = process.env.SENTRY_PROJECT?.trim();
-  const baseUrl =
-    process.env.SENTRY_BASE_URL?.trim() || "https://de.sentry.io/api/0";
-
-  const missing: string[] = [];
-  if (!authToken) missing.push("SENTRY_AUTH_TOKEN");
-  if (!org) missing.push("SENTRY_ORG");
-  if (!project) missing.push("SENTRY_PROJECT");
-
-  if (missing.length > 0) {
-    return {
-      sections: [],
-      skipped: true,
-      reason: `Secret mancanti: ${missing.join(", ")}`,
-    };
-  }
-
-  const sections: SentrySection[] = [];
-
-  try {
-    const url = `${baseUrl}/projects/${org}/${project}/issues/?is_unresolved=1&limit=20`;
-    const res = await fetch(url, {
-      headers: {
-        Authorization: `Bearer ${authToken}`,
-        "Content-Type": "application/json",
-      },
-      signal: AbortSignal.timeout(10_000),
-    });
-
-    if (res.ok) {
-      type SentryIssue = {
-        id: string;
-        title: string;
-        culprit?: string;
-        count: string;
-        firstSeen: string;
-        lastSeen: string;
-        level: string;
-      };
-      const issues = (await res.json()) as SentryIssue[];
-      const text =
-        issues.length === 0
-          ? "(nessun issue non risolto su Sentry)"
-          : issues
-              .map(
-                (iss) =>
-                  `[${iss.level.toUpperCase()}] ${iss.title}\n  Culprit: ${iss.culprit ?? "?"} | Count: ${iss.count} | LastSeen: ${iss.lastSeen?.slice(0, 16) ?? "?"}`,
-              )
-              .join("\n\n");
-      sections.push({ title: "Sentry — issue non risolti (ultimi 20)", text });
-    } else {
-      const body = await res.text().catch(() => "");
-      sections.push({
-        title: "Sentry — issue non risolti",
-        text: `[HTTP ${res.status} — ${body.slice(0, 300)}]`,
-      });
-    }
-  } catch (err) {
-    sections.push({
-      title: "Sentry — issue non risolti",
-      text: `[ERRORE: ${err instanceof Error ? err.message : String(err)}]`,
-    });
-  }
-
-  return { sections, skipped: false };
 }
 
 // ─── Assemblaggio bundle ──────────────────────────────────────────────────────
@@ -384,7 +180,18 @@ async function buildBundle(tail: number, onlyInternal: boolean): Promise<string>
   const parts: string[] = [];
   parts.push("# TRIAGE BIKERLINK — CONTESTO AGGREGATO\n");
   parts.push(`Generato: ${new Date().toISOString()}\n`);
-  parts.push(`Fonti: ${onlyInternal ? "solo interne (DB + filesystem)" : "DB + filesystem + GitHub + Sentry"}\n`);
+  parts.push(`Fonti: ${onlyInternal ? "solo interne (DB + filesystem)" : "DB + filesystem + GitHub + Sentry + repo tree"}\n`);
+
+  // ── Struttura repo GitHub ──
+  if (!onlyInternal) {
+    parts.push("\n## STRUTTURA REPO GITHUB\n");
+    const tree = await collectGitHubRepoTree();
+    if (tree) {
+      parts.push(tree + "\n");
+    } else {
+      parts.push("[Struttura repo non disponibile — GITHUB_TOKEN assente o API irraggiungibile]\n");
+    }
+  }
 
   // ── DB ──
   parts.push("\n## DATI DB\n");
@@ -398,17 +205,14 @@ async function buildBundle(tail: number, onlyInternal: boolean): Promise<string>
   const logSections = collectLogs(tail);
   const missingLogs: string[] = [];
   for (const { file, text } of logSections) {
-    if (text == null) {
-      missingLogs.push(file);
-    } else {
-      parts.push(fmtSection(`LOG: ${file} (ultime ${tail} righe)`, text));
-    }
+    if (text == null) missingLogs.push(file);
+    else parts.push(fmtSection(`LOG: ${file} (ultime ${tail} righe)`, text));
   }
   if (missingLogs.length > 0) {
     parts.push(`\n[File mancanti/vuoti saltati: ${missingLogs.join(", ")}]\n`);
   }
 
-  // ── GitHub ──
+  // ── GitHub Issues + Actions ──
   if (!onlyInternal) {
     parts.push("\n## GITHUB\n");
     const ghResult = await collectGitHub();
@@ -436,6 +240,7 @@ async function buildBundle(tail: number, onlyInternal: boolean): Promise<string>
   parts.push(
     "\n## RICHIESTA A HORUS\n" +
       "Analizza tutti i dati qui sopra. Identifica i problemi reali del sistema BikerLink.\n" +
+      "Dove pertinente, cita il path esatto del file coinvolto usando la struttura repo qui sopra.\n" +
       "Rispondi ESCLUSIVAMENTE con le tre sezioni richieste nel formato specificato:\n" +
       "  ## PROBLEMI TROVATI\n" +
       "  ## ANALISI CAUSE\n" +
@@ -497,7 +302,8 @@ async function callHorus(
   baseUrl: string,
   model: string,
   token: string | undefined,
-  bundle: string,
+  systemPrompt: string,
+  userContent: string,
 ): Promise<string> {
   const url = `${baseUrl.replace(/\/$/, "")}/api/chat`;
   const controller = new AbortController();
@@ -517,17 +323,15 @@ async function callHorus(
         stream: false,
         options: { temperature: 0.2, think: false },
         messages: [
-          { role: "system", content: SYSTEM_PROMPT },
-          { role: "user", content: bundle },
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userContent },
         ],
       }),
     });
 
     if (!res.ok) {
       const text = await res.text().catch(() => "");
-      throw new Error(
-        `HTTP ${res.status} ${res.statusText}${text ? ` — ${text.slice(0, 500)}` : ""}`,
-      );
+      throw new Error(`HTTP ${res.status} ${res.statusText}${text ? ` — ${text.slice(0, 500)}` : ""}`);
     }
 
     interface OllamaResponse {
@@ -542,6 +346,21 @@ async function callHorus(
     return normalizeTaskSection(stripOrphanThinkTags(raw));
   } finally {
     clearTimeout(timer);
+  }
+}
+
+// ─── Recupero task esistenti (deduplicazione) ─────────────────────────────────
+
+async function fetchExistingTaskTitles(): Promise<string[]> {
+  try {
+    const rows = await db.execute(sql`
+      SELECT title FROM project_tasks
+      WHERE state NOT IN ('CANCELLED', 'MERGED')
+      ORDER BY created_at DESC
+    `);
+    return (rows.rows as Array<{ title: string }>).map((r) => r.title ?? "").filter(Boolean);
+  } catch {
+    return []; // tabella non accessibile: ok, deduplicazione saltata
   }
 }
 
@@ -566,15 +385,14 @@ async function main(): Promise<void> {
   console.log("════════════════════════════════════════════════════════════");
   console.log(`  Modello  : ${model}`);
   console.log(`  Tail     : ${tail} righe/log`);
-  console.log(`  Fonti    : ${ONLY_INTERNAL ? "solo interne (DB + filesystem)" : "DB + filesystem + GitHub + Sentry"}`);
+  console.log(`  Fonti    : ${ONLY_INTERNAL ? "solo interne (DB + filesystem)" : "DB + filesystem + GitHub + Sentry + repo tree"}`);
   if (IS_DRY_RUN) console.log("  Modalità : DRY-RUN (nessuna chiamata a Horus)");
+  if (NO_PROPOSE) console.log("  Proposta : disabilitata (--no-propose)");
   console.log("");
 
-  // Raccolta fonti
   console.log("  ⏳ Raccolta fonti...");
   const bundle = await buildBundle(tail, ONLY_INTERNAL);
 
-  // Dry-run: stampa bundle ed esci
   if (IS_DRY_RUN) {
     console.log("\n════════════════════════════════════════════════════════════");
     console.log("  BUNDLE DA INVIARE (dry-run — Horus NON viene chiamato)");
@@ -596,41 +414,28 @@ async function main(): Promise<void> {
     return;
   }
 
-  console.log(
-    `\n  ⏳ Invio a Horus (timeout ${REQUEST_TIMEOUT_MS / 1000}s, qwen3:4b impiega tipicamente 20-60s)...\n`,
-  );
+  console.log(`\n  ⏳ Invio a Horus (timeout ${REQUEST_TIMEOUT_MS / 1000}s, qwen3:4b impiega tipicamente 20-60s)...\n`);
 
   let report: string;
   try {
-    report = await callHorus(baseUrl, model, token, bundle);
+    report = await callHorus(baseUrl, model, token, SYSTEM_PROMPT, bundle);
   } catch (err) {
     const e = err as Error & { cause?: { code?: string } };
     const isAbort = e.name === "AbortError";
     const code = e.cause?.code;
     console.error("\n❌ Analisi non riuscita: Horus non ha risposto.");
     if (isAbort) {
-      console.error(
-        `   Timeout dopo ${REQUEST_TIMEOUT_MS / 1000}s — il modello è troppo lento o l'host non risponde.`,
-      );
-    } else if (
-      code === "ECONNREFUSED" ||
-      code === "ENOTFOUND" ||
-      code === "EAI_AGAIN"
-    ) {
-      console.error(
-        "   Host irraggiungibile (ThinkCentre spento o Cloudflare Tunnel giù).",
-      );
+      console.error(`   Timeout dopo ${REQUEST_TIMEOUT_MS / 1000}s — il modello è troppo lento o l'host non risponde.`);
+    } else if (code === "ECONNREFUSED" || code === "ENOTFOUND" || code === "EAI_AGAIN") {
+      console.error("   Host irraggiungibile (ThinkCentre spento o Cloudflare Tunnel giù).");
     }
     console.error(`   Dettaglio: ${e.message}`);
-    console.error(
-      "\n   Verifica che il ThinkCentre sia acceso, Ollama in esecuzione\n" +
-        "   e che l'hostname in OLLAMA_URL sia raggiungibile.\n",
-    );
+    console.error("\n   Verifica che il ThinkCentre sia acceso, Ollama in esecuzione\n   e che l'hostname in OLLAMA_URL sia raggiungibile.\n");
     process.exitCode = 1;
     return;
   }
 
-  // Salvataggio
+  // ── Salvataggio report principale ──
   const ts = new Date().toISOString().replace(/[:.]/g, "-");
   const outDir = path.join(ROOT, "logs");
   const outPath = path.join(outDir, `horus-log-analysis-${ts}.md`);
@@ -640,17 +445,14 @@ async function main(): Promise<void> {
       `# Triage AI BikerLink — ${new Date().toISOString()}\n\n` +
       `- Istanza: Horus (ThinkCentre)\n` +
       `- Modello: \`${model}\`\n` +
-      `- Fonti: ${ONLY_INTERNAL ? "DB + filesystem" : "DB + filesystem + GitHub + Sentry"}\n` +
+      `- Fonti: ${ONLY_INTERNAL ? "DB + filesystem" : "DB + filesystem + GitHub + Sentry + repo tree"}\n` +
       `- Tail log: ${tail} righe\n\n` +
       `---\n\n`;
     fs.writeFileSync(outPath, header + report + "\n", "utf8");
   } catch (err) {
-    console.warn(
-      `\n⚠️  Impossibile salvare il report su file: ${(err as Error).message}`,
-    );
+    console.warn(`\n⚠️  Impossibile salvare il report su file: ${(err as Error).message}`);
   }
 
-  // Stampa a console
   console.log("════════════════════════════════════════════════════════════");
   console.log("  REPORT DI TRIAGE");
   console.log("════════════════════════════════════════════════════════════\n");
@@ -658,8 +460,53 @@ async function main(): Promise<void> {
   console.log("\n════════════════════════════════════════════════════════════");
   console.log(`  💾 Report salvato in: ${path.relative(ROOT, outPath)}`);
   console.log("════════════════════════════════════════════════════════════");
-  console.log("\n⚠️  Le proposte di Horus NON vengono create automaticamente.");
-  console.log("   Il planner revisionerà il report prima di creare i task.\n");
+
+  // ── Revisione architect (seconda chiamata a Horus) ──
+  console.log("\n  ⏳ Revisione architect in corso...\n");
+  let architectReview = "";
+  try {
+    const existingTitles = await fetchExistingTaskTitles();
+    const existingList = existingTitles.length > 0
+      ? existingTitles.map((t, i) => `${i + 1}. ${t}`).join("\n")
+      : "(backlog non disponibile)";
+
+    const architectInput =
+      `## REPORT HORUS\n\n${report}\n\n` +
+      `## TASK GIÀ NEL BACKLOG (non proporre duplicati)\n\n${existingList}`;
+
+    architectReview = await callHorus(baseUrl, model, token, ARCHITECT_PROMPT, architectInput);
+
+    const reviewPath = outPath.replace(".md", "-architect.md");
+    fs.writeFileSync(reviewPath, `# Revisione Architect\n\n${architectReview}\n`, "utf8");
+    console.log("\n  📐 REVISIONE ARCHITECT");
+    console.log("════════════════════════════════════════════════════════════\n");
+    console.log(architectReview);
+    console.log(`\n  💾 Revisione salvata in: ${path.relative(ROOT, reviewPath)}`);
+  } catch (err) {
+    console.warn(`\n⚠️  Revisione architect non riuscita: ${(err as Error).message}`);
+    console.warn("   I task verranno proposti dal report principale.\n");
+  }
+
+  // ── Proposta formale task ──
+  if (NO_PROPOSE) {
+    console.log("\n  ⏭️  Proposta task saltata (--no-propose).\n");
+    return;
+  }
+
+  console.log("\n  ⏳ Preparazione proposta task...\n");
+  const proposeScript = path.join(__dirname, "horus-propose-tasks.ts");
+  const proposeArgs = ["tsx", proposeScript, "--report", outPath];
+  if (architectReview) proposeArgs.push("--has-architect-review");
+
+  const result = spawnSync("npx", proposeArgs, {
+    cwd: ROOT,
+    stdio: "inherit",
+    env: process.env,
+  });
+
+  if (result.status !== 0) {
+    console.warn("\n⚠️  Proposta task completata con avvisi (vedi output sopra).\n");
+  }
 }
 
 main().catch((err) => {
@@ -673,10 +520,12 @@ const SYSTEM_PROMPT = `Sei Horus, un ingegnere senior specializzato nell'archite
 
 BikerLink è un'app mobile React Native / Expo per motociclisti (backend Express + PostgreSQL, ThinkCentre self-hosted con Ollama per AI routing e chat, Cloudflare Tunnel per l'esposizione dei servizi). Tu (Horus) sei il modello AI per il routing intelligente e il triage sul ThinkCentre. Bowie è l'assistente in-app.
 
+Hai accesso all'intera struttura del repository GitHub di BikerLink (tutte le cartelle e sottocartelle), inclusa nella sezione "## STRUTTURA REPO GITHUB" del bundle che ricevi. Quando identifichi un problema, fai riferimento al path esatto del file coinvolto usando questa struttura. Se un problema riguarda un componente specifico (routing, auth, telemetria, AI personas, OTA, ecc.) identifica i file coinvolti dalla struttura del repo.
+
 Il tuo compito è analizzare i dati aggregati ricevuti (log DB, log filesystem, GitHub Issues, GitHub Actions, Sentry) e produrre un report strutturato in tre sezioni FISSE, nell'ordine esatto indicato:
 
 ## PROBLEMI TROVATI
-Elenco puntato dei problemi concreti identificati nei dati. Ogni voce deve essere specifica e actionable. Includi: il sintomo osservato, da quale fonte proviene, la frequenza/gravità.
+Elenco puntato dei problemi concreti identificati nei dati. Ogni voce deve essere specifica e actionable. Includi: il sintomo osservato, da quale fonte proviene, la frequenza/gravità, e il path del file coinvolto se identificabile dalla struttura repo.
 
 ## ANALISI CAUSE
 Per ciascun problema trovato, spiega la causa radice più probabile in base ai dati disponibili. Sii conciso ma preciso. Se la causa non è determinabile dai dati, dillo esplicitamente.
@@ -698,3 +547,32 @@ Regole per i task proposti:
 - Massimo 10 task proposti. Se ci sono più problemi, seleziona i più critici.
 
 Rispondi SOLO con le tre sezioni indicate. Niente introduzioni, niente conclusioni extra. Italiano obbligatorio.`;
+
+// ─── Architect Prompt (seconda chiamata Horus) ────────────────────────────────
+
+const ARCHITECT_PROMPT = `Sei Horus nel ruolo di revisore architetturale. Il tuo compito è filtrare e validare la lista di task proposti da una precedente analisi di triage.
+
+Riceverai:
+1. Il report completo di triage (con problemi trovati e task proposti)
+2. La lista dei task già presenti nel backlog del progetto
+
+Per ogni task proposto, valuta:
+(a) È un DUPLICATO di un task già nel backlog (titolo simile, stesso problema)? → SCARTA con motivazione.
+(b) È troppo VAGO o non actionable? ("migliorare X", "aggiungere log", senza scope chiaro) → SCARTA con motivazione.
+(c) È già RISOLTO dai dati disponibili? → SCARTA con motivazione.
+(d) È VALIDO, specifico e non coperto dal backlog? → MANTIENI.
+
+Rispondi con:
+
+## TASK VALIDATI (pronti per proposta formale)
+Tabella markdown solo con i task che passano la revisione:
+
+| Titolo | Priorità | Motivazione |
+|--------|----------|-------------|
+| [titolo] | alta/media/bassa | [perché è valido e non duplicato] |
+
+## TASK SCARTATI
+Elenco puntato dei task esclusi con la ragione:
+- [titolo]: [duplicato di "X" / troppo vago / già risolto]
+
+Sii rigoroso. Meglio pochi task buoni che molti task ridondanti. Italiano obbligatorio.`;
