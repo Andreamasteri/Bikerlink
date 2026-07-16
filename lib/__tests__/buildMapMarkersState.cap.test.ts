@@ -485,4 +485,127 @@ describe("buildMapMarkersState — marker cap integration", () => {
     expect(markers.easterEggs.length).toBeGreaterThanOrEqual(1);
     expect(markers.sos.length).toBeGreaterThanOrEqual(1);
   });
+
+  it("bridge payload byte size stays below BRIDGE_PAYLOAD_SAFE_BYTE_LIMIT when all seven categories are full (400 verbose markers total)", () => {
+    // Worst-case cross-category payload: all seven capped categories populated
+    // with verbose markers whose string fields are at realistic production upper
+    // bounds, totalling exactly 400 (= MARKERS_HARD_CAP) so no count-cap fires
+    // and every marker is serialised.  This complements the single-category
+    // worst-case above and catches schema bloat introduced to any category.
+    //
+    // Distribution (7 categories, sum = 400):
+    //   users=80  workshops=60  businesses=60  events=60
+    //   clubs=60  easterEggs=40  sos=40
+    //
+    // If this assertion fires, the bridge payload has grown — reduce field
+    // verbosity, drop a field, or tighten MARKERS_HARD_CAP before shipping.
+
+    const USERS_N = 80;
+    const WORKSHOPS_N = 60;
+    const BUSINESSES_N = 60;
+    const EVENTS_N = 60;
+    const CLUBS_N = 60;
+    const EASTER_EGGS_N = 40;
+    const SOS_N = 40;
+    // Sanity-check: total must equal MARKERS_HARD_CAP so no trimming occurs
+    // and every verbose marker contributes to the byte measurement.
+    expect(
+      USERS_N + WORKSHOPS_N + BUSINESSES_N + EVENTS_N + CLUBS_N + EASTER_EGGS_N + SOS_N
+    ).toBe(400);
+
+    const verboseUsers: MapUser[] = Array.from({ length: USERS_N }, (_, i) => ({
+      id: `user-all7-${String(i).padStart(4, "0")}`,
+      latitude: 45.0 + (i % 10) * 0.001,
+      longitude: 10.0 + Math.floor(i / 10) * 0.001,
+      userType: "biker" as const,
+      sex: i % 2 === 0 ? ("M" as const) : ("F" as const),
+      nickname: `rider_con_nickname_lungo_all7_${i}`, // ~35 chars
+      country: "IT",
+      currentSpeedKph: 87.3,
+      speedProfile: "mountain" as const,
+    }));
+
+    const verboseWorkshops: MapWorkshop[] = Array.from({ length: WORKSHOPS_N }, (_, i) => ({
+      id: `ws-all7-${String(i).padStart(3, "0")}`,
+      latitude: 44.0 + i * 0.01,
+      longitude: 9.0 + i * 0.01,
+      name: `Officina Meccanica Specializzata Con Nome Lungo All7 ${i}`, // ~56 chars
+      isSynecoPartner: i % 5 === 0,
+    }));
+
+    const verboseBusinesses = Array.from({ length: BUSINESSES_N }, (_, i) => ({
+      id: `biz-all7-${String(i).padStart(3, "0")}`,
+      latitude: 43.0 + i * 0.01,
+      longitude: 8.0 + i * 0.01,
+      name: `Hotel Ristorante Panoramico Con Nome Lungo All7 ${i}`, // ~53 chars
+      type: "hotel",
+    }));
+
+    const verboseEvents = Array.from({ length: EVENTS_N }, (_, i) => ({
+      id: `ev-all7-${String(i).padStart(3, "0")}`,
+      latitude: 42.0 + i * 0.01,
+      longitude: 7.0 + i * 0.01,
+      title: `Raduno Internazionale Motociclisti Con Titolo Lungo All7 ${i}`, // ~60 chars
+      eventDate: "2099-12-31",
+    }));
+
+    const verboseClubs: ClubMapPin[] = Array.from({ length: CLUBS_N }, (_, i) => ({
+      id: `club-all7-${String(i).padStart(3, "0")}`,
+      latitude: 41.0 + i * 0.01,
+      longitude: 6.0 + i * 0.01,
+      name: `Moto Club Regionale Con Nome Lungo All7 ${i}`, // ~44 chars
+      clubType: "generic",
+      logoUrl: null,
+      region: "Lombardia",
+      country: "IT",
+      isFictitious: false,
+      memberCount: 42,
+    }));
+
+    const verboseEasterEggs = Array.from({ length: EASTER_EGGS_N }, (_, i) => ({
+      id: `eg-all7-${String(i).padStart(3, "0")}`,
+      latitude: 40.0 + i * 0.01,
+      longitude: 5.0 + i * 0.01,
+      name: `Easter Egg Nascosto Con Nome Lungo All7 ${i}`, // ~44 chars
+    }));
+
+    const verboseSos = Array.from({ length: SOS_N }, (_, i) => ({
+      id: `sos-all7-${String(i).padStart(3, "0")}`,
+      latitude: 39.0 + i * 0.01,
+      longitude: 4.0 + i * 0.01,
+      radiusKm: 10,
+      reason: "breakdown",
+      requesterNickname: `rider_sos_con_nickname_lungo_all7_${i}`, // ~37 chars
+    }));
+
+    const encoded = buildMapMarkersState({
+      ...baseParams(),
+      filteredUsers: verboseUsers,
+      workshops: verboseWorkshops,
+      businesses: verboseBusinesses,
+      eventPins: verboseEvents,
+      showEventPins: true,
+      filterEvents: true,
+      clubPins: verboseClubs,
+      filterClubs: true,
+      easterEggs: verboseEasterEggs,
+      activeSosRequests: verboseSos,
+    });
+
+    // Measure the UTF-8 byte length of the full bridge string.
+    const byteLength = new TextEncoder().encode(encoded).length;
+    expect(byteLength).toBeLessThan(BRIDGE_PAYLOAD_SAFE_BYTE_LIMIT);
+
+    // Sanity: no trimming should have occurred — all 400 markers must be present.
+    const markers = decodeMarkers(encoded);
+    expect(totalMarkers(markers)).toBe(400);
+    // Every category must be fully represented.
+    expect(markers.users.length).toBe(USERS_N);
+    expect(markers.workshops.length).toBe(WORKSHOPS_N);
+    expect(markers.businesses.length).toBe(BUSINESSES_N);
+    expect(markers.events.length).toBe(EVENTS_N);
+    expect(markers.clubs.length).toBe(CLUBS_N);
+    expect(markers.easterEggs.length).toBe(EASTER_EGGS_N);
+    expect(markers.sos.length).toBe(SOS_N);
+  });
 });
