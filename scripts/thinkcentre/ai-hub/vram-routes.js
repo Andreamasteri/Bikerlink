@@ -237,7 +237,9 @@ function mountVramRoutes(app, opts) {
         { usedMiB: mem.usedMiB, totalMiB: mem.totalMiB, pct, at: now }
       );
       const { breakdown, confidence } = buildBreakdown();
-      return res.json({
+      const nvme = sys.readNvmeStats ? sys.readNvmeStats() : undefined;
+      const pcieAer = sys.readPcieAer ? sys.readPcieAer() : undefined;
+      const response = {
         ok: true,
         current: { usedMiB: mem.usedMiB, totalMiB: mem.totalMiB, pct, gpuUtil: mem.gpuUtil },
         peak24h: {
@@ -249,7 +251,10 @@ function mountVramRoutes(app, opts) {
         breakdown,
         breakdownConfidence: confidence,
         lastSampleAt: new Date(now).toISOString(),
-      });
+      };
+      if (nvme !== undefined) response.nvme = nvme;
+      if (pcieAer !== undefined) response.pcieAer = pcieAer;
+      return res.json(response);
     } catch (err) {
       return res.status(500).json({ error: String(err.message || err) });
     }

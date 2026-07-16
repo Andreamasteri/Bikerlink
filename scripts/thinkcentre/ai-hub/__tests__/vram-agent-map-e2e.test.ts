@@ -57,6 +57,8 @@ function makeTestApp(sys: {
   const { getVramState } = mountVramRoutes(app, {
     sys: {
       ...sys,
+      readNvmeStats: () => null,
+      readPcieAer: () => ({ count24h: 0, warn: false }),
       loadState: () => ({ samples: [], alertActive: false, alertSince: null, pushedAgentMap: {} }),
       saveState: () => { /* no-op in tests */ },
     },

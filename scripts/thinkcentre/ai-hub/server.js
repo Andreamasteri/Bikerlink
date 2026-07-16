@@ -267,11 +267,56 @@ function readOllamaModels() {
   }
 }
 
+function readNvmeStats() {
+  try {
+    const out = execSync("nvme smart-log /dev/nvme0", { encoding: "utf8", timeout: 4000 });
+    // Extract a numeric value from lines like:
+    //   temperature_sensor_1            : 38 °C
+    //   temperature                     : 38 °C
+    //   available_spare                 : 100%
+    //   percentage_used                 : 1%
+    //   unsafe_shutdowns                : 5
+    //   media_errors                    : 0
+    // Keys may use underscores or spaces; values may have °C or % suffixes.
+    const extract = (pattern, transform) => {
+      const m = out.match(pattern);
+      return m ? transform(m[1]) : null;
+    };
+    // Prefer temperature_sensor_1 (more specific); fall back to temperature.
+    const tempC =
+      extract(/temperature_sensor_1\s*[:\s]+([\d.]+)\s*(?:°C|C)?/i, Number) ??
+      extract(/\btemperature\b\s*[:\s]+([\d.]+)\s*(?:°C|C)?/i, Number);
+    const sparePct = extract(/available_spare\s*[:\s]+([\d.]+)\s*%?/i, parseFloat);
+    const usedPct = extract(/percentage_used\s*[:\s]+([\d.]+)\s*%?/i, parseFloat);
+    const unsafeShutdowns = extract(/unsafe_shutdowns\s*[:\s]+(\d+)/i, Number);
+    const mediaErrors = extract(/media_errors\s*[:\s]+(\d+)/i, Number);
+    return { tempC, sparePct, usedPct, unsafeShutdowns, mediaErrors };
+  } catch {
+    return null;
+  }
+}
+
+function readPcieAer() {
+  try {
+    const out = execSync(
+      'journalctl -k --since "24 hours ago" --no-pager -q 2>/dev/null',
+      { encoding: "utf8", timeout: 5000, shell: true }
+    );
+    const lines = out.split("\n");
+    const count24h = lines.filter((l) => /AER:|PCIe Bus Error/i.test(l)).length;
+    return { count24h, warn: count24h >= 5 };
+  } catch {
+    return { count24h: 0, warn: false };
+  }
+}
+
 mountVramRoutes(app, {
   sys: {
     readGpuStats,
     readComputeApps,
     readOllamaModels,
+    readNvmeStats,
+    readPcieAer,
     loadState: loadVramState,
     saveState: saveVramState,
   },
