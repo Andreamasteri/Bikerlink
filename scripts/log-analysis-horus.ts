@@ -452,25 +452,55 @@ function collectGitLog(): string {
 // ─── Parte 10: Report Horus precedente ───────────────────────────────────────
 
 /**
- * Legge l'ultimo report di triage Horus salvato in `logs/` e ne estrae
- * le sezioni "PROBLEMI TROVATI" e "TASK PROPOSTI" per evitare che Horus
- * riproponga gli stessi task del round precedente.
+ * Legge l'ultimo report di triage Horus salvato in `logs/`, in `HORUS_LOG_DIR`
+ * (se impostato) o in `/tmp`, e ne estrae le sezioni "PROBLEMI TROVATI" e
+ * "TASK PROPOSTI" per evitare che Horus riproponga gli stessi task del round
+ * precedente.
+ *
+ * Quando il triage viene eseguito dalla planner shell di Replit con
+ * HORUS_LOG_DIR=/tmp, i report finiscono in /tmp anziché in logs/ e la ricerca
+ * limitata a logs/ farebbe sempre trovare zero precedenti. Questa funzione
+ * scansiona tutte e tre le posizioni candidate (deduplicando) e seleziona il
+ * file più recente in assoluto.
  */
 function collectPreviousHorusReport(): string | null {
-  const logsDir = path.join(ROOT, "logs");
-  if (!fs.existsSync(logsDir)) return null;
+  // Raccogli le directory candidate (senza duplicati)
+  const candidateDirs: string[] = [path.join(ROOT, "logs")];
+  const horusLogDir = process.env.HORUS_LOG_DIR?.trim();
+  if (horusLogDir) {
+    const resolved = path.resolve(horusLogDir);
+    if (!candidateDirs.includes(resolved)) candidateDirs.push(resolved);
+  }
+  if (!candidateDirs.includes("/tmp")) candidateDirs.push("/tmp");
+
+  // Raccogli tutti i file candidati da tutte le directory, con percorso assoluto
+  const FILE_RE = /^horus-(log-analysis|analysis)-.*\.md$/;
+  const allFiles: Array<{ dir: string; name: string }> = [];
+  for (const dir of candidateDirs) {
+    if (!fs.existsSync(dir)) continue;
+    try {
+      const names = fs.readdirSync(dir)
+        .filter((f) => FILE_RE.test(f) && !f.includes("-architect"));
+      for (const name of names) allFiles.push({ dir, name });
+    } catch {
+      // directory non leggibile: saltata
+    }
+  }
+
+  if (allFiles.length === 0) return null;
+
+  // Ordina per nome file (contiene timestamp ISO → ordinamento lessicografico = cronologico)
+  allFiles.sort((a, b) => b.name.localeCompare(a.name));
+  const { dir, name } = allFiles[0];
+  const latest = path.join(dir, name);
+
   try {
-    const files = fs.readdirSync(logsDir)
-      .filter((f) => f.match(/^horus-(log-analysis|analysis)-.*\.md$/) && !f.includes("-architect"))
-      .sort()
-      .reverse();
-    if (files.length === 0) return null;
-    const latest = path.join(logsDir, files[0]);
     const content = fs.readFileSync(latest, "utf8");
     // Estrai le sezioni rilevanti
     const problemsMatch = content.match(/## PROBLEMI TROVATI([\s\S]*?)(?=##|$)/);
     const tasksMatch = content.match(/## TASK PROPOSTI([\s\S]*?)(?=##|$)/);
-    const parts: string[] = [`[Fonte: ${files[0]}]`];
+    const source = dir === path.join(ROOT, "logs") ? name : `${dir}/${name}`;
+    const parts: string[] = [`[Fonte: ${source}]`];
     if (problemsMatch) parts.push(`## PROBLEMI TROVATI (round precedente)\n${problemsMatch[1].trim()}`);
     if (tasksMatch) parts.push(`## TASK PROPOSTI (round precedente)\n${tasksMatch[1].trim()}`);
     return parts.length > 1 ? parts.join("\n\n") : null;
