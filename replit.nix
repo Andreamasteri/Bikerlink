@@ -1,5 +1,6 @@
 {pkgs}: {
   deps = [
+    pkgs.semgrep
     pkgs.zip
     pkgs.xorg.libXScrnSaver
     pkgs.xorg.libXi
