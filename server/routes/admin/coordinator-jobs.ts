@@ -15,6 +15,7 @@ import {
   isHorusUnreachable,
   applyJobDirective,
 } from "../../ai/coordinator/job-gate";
+import { getJob, resetJobToIdle } from "../../ai/coordinator/job-registry";
 
 const router = Router();
 
@@ -58,6 +59,23 @@ router.post("/coordinator/jobs/:name/directive", async (req: Request, res: Respo
       "admin_manual",
     );
     res.json(result);
+  } catch (err) {
+    sendError(res, 500, (err as Error).message);
+  }
+});
+
+// Task #393 — Reset manuale di un job zombie: riporta a idle con messaggio esplicito.
+// Utile quando un job resta bloccato in "running" e il reset periodico non è ancora
+// scattato, o quando l'admin vuole sbloccare manualmente un job senza aspettare.
+router.post("/coordinator/jobs/:name/reset", async (req: Request, res: Response) => {
+  const name = String(req.params.name || "").trim();
+  if (!name) { sendError(res, 400, "Nome job mancante"); return; }
+  try {
+    const job = getJob(name);
+    if (!job) { sendError(res, 404, `Job "${name}" non trovato nel registry`); return; }
+    const previousState = job.state;
+    resetJobToIdle(name, "reset manuale admin");
+    res.json({ name, previousState, state: "idle", reset: true });
   } catch (err) {
     sendError(res, 500, (err as Error).message);
   }

@@ -382,9 +382,18 @@ export async function runPhase5Schedulers(): Promise<void> {
   // vuota di callback `run` (il cablaggio dei ~26 loop è Task #9): il loop resta
   // un no-op leggero ma osservabile via /api/health.
   await arm("quebracho-coordinator-loop", async () => {
-    const { hydrateRegistryFromDb } = await import("./ai/coordinator/job-registry");
+    const { hydrateRegistryFromDb, resetRunningJobsOnStartup } = await import("./ai/coordinator/job-registry");
     const { startQuebrachoLoop } = await import("./ai/coordinator/quebracho-loop");
     await hydrateRegistryFromDb();
+    // Task #393 — Reset zombie: tutti i job che risultano "running" nel DB dopo
+    // l'idratazione vengono riportati a idle. Questo interrompe il ciclo di
+    // perpetuazione degli zombie: un crash precedente senza cleanup non blocca
+    // più il loop al riavvio. Deve avvenire DOPO hydrateRegistryFromDb e PRIMA
+    // di startQuebrachoLoop così il loop parte con una registry pulita.
+    const resetted = resetRunningJobsOnStartup();
+    if (resetted.length > 0) {
+      console.warn(`[INIT] Quebracho startup reset: ${resetted.length} job zombie → idle: ${resetted.join(", ")}`);
+    }
     startQuebrachoLoop();
     console.log("[INIT] Quebracho coordinator loop started (serial control-plane)");
   });
@@ -423,22 +432,32 @@ export async function runPhase5Schedulers(): Promise<void> {
   // single source of truth for bio embedding back-fill scheduling.
   // Registered in bootJobQueue to avoid overlapping with other heavy boot jobs.
   const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
-  const runBioBackfill = withJobGate("bio-embeddings-backfill", () =>
-    import("./embeddings/backfill-bio")
-      .then(({ backfillBioEmbeddings }) => backfillBioEmbeddings())
-      .then((r) =>
-        console.log(
-          `[EMBED BACKFILL] Done — processed=${r.processed}` +
-          ` backfilled=${r.backfilled} skipped=${r.skipped} errors=${r.errors}`,
-        ),
-      )
-      .catch((e) => console.warn("[EMBED BACKFILL] error:", e)),
-  );
+  // Task #393 — Il .catch() originale inghiottiva l'errore e restituiva una
+  // Promise risolta, per cui withJobGate chiamava sempre markRunSuccess anche
+  // in caso di fallimento. Ora l'errore viene loggato e ri-lanciato così
+  // markRunFailure viene invocato correttamente e il job non resta in "running".
+  const runBioBackfill = withJobGate("bio-embeddings-backfill", async () => {
+    console.log("[EMBED BACKFILL] avvio backfill embeddings bio...");
+    try {
+      const { backfillBioEmbeddings } = await import("./embeddings/backfill-bio");
+      const r = await backfillBioEmbeddings();
+      console.log(
+        `[EMBED BACKFILL] Done — processed=${r.processed}` +
+        ` backfilled=${r.backfilled} skipped=${r.skipped} errors=${r.errors}`,
+      );
+    } catch (e) {
+      console.warn("[EMBED BACKFILL] error:", e);
+      throw e; // propaga a withJobGate → markRunFailure
+    }
+  });
   bootJobQueue.register("BioEmbeddingsBackfill", async () => {
     console.log("[INIT][BG] Starting backfillBioEmbeddings (boot-time pass)...");
     await runBioBackfill();
   });
-  setInterval(runBioBackfill, TWENTY_FOUR_HOURS_MS);
+  // Task #393 — Wrapper .catch() esplicito: runBioBackfill ora ri-lancia in caso
+  // di errore così withJobGate può chiamare markRunFailure; passare la funzione
+  // direttamente a setInterval lascerebbe le rejection non gestite → crash del processo.
+  setInterval(() => { runBioBackfill().catch(() => {}); }, TWENTY_FOUR_HOURS_MS);
   console.log("[INIT] Bio embedding back-fill scheduled (boot + every 24h)");
 
   try {

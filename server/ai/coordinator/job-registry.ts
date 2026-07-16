@@ -247,7 +247,12 @@ export async function hydrateRegistryFromDb(): Promise<void> {
       e.directive = d;
       e.pauseSource = (r.pauseSource as PauseSource | null) ?? null;
       e.pauseReason = r.pauseReason ?? null;
-      e.state = d ? deriveDirectiveState(e) : "idle";
+      // Task #393 — Ripristina lo stato persistito (incluso "running") così
+      // resetRunningJobsOnStartup() può rilevare e resettare i job zombie.
+      // Senza questo, hydrateRegistryFromDb azzerava sempre a "idle" e il
+      // reset startup era un no-op silenzioso.
+      const persistedState = (r.state as JobRunState | null) ?? "idle";
+      e.state = d ? deriveDirectiveState(e) : persistedState;
       e.lastRunAt = r.lastRunAt ? r.lastRunAt.getTime() : null;
       e.lastSuccessAt = r.lastSuccessAt ? r.lastSuccessAt.getTime() : null;
       e.lastErrorAt = r.lastErrorAt ? r.lastErrorAt.getTime() : null;
@@ -261,6 +266,48 @@ export async function hydrateRegistryFromDb(): Promise<void> {
     if (isBgDbLimiterDropError(err)) return;
     dedupWarn("coordinator-hydrate", `[coordinator] hydrate registry fallita: ${String(err)}`);
   }
+}
+
+/**
+ * Resetta esplicitamente un singolo job a `idle` con un messaggio di errore.
+ * Usato dal reset manuale admin e dal rilevatore zombie.
+ */
+export function resetJobToIdle(name: string, reason: string): void {
+  const e = ensureJob(name);
+  const now = Date.now();
+  e.state = e.directive ? deriveDirectiveState(e) : "idle";
+  e.lastErrorAt = now;
+  e.lastError = reason;
+  e.failureCount += 1;
+  void persistJob(e);
+}
+
+/**
+ * Ripristina a `idle` tutti i job che al momento del boot risultano in stato
+ * `running` nel registro in-memory (già idratato dal DB). Questo interrompe il
+ * ciclo di perpetuazione degli zombie: un job che ha crashato senza aggiornare
+ * il proprio stato non blocca più il loop al giro successivo.
+ *
+ * Deve essere chiamato DOPO `hydrateRegistryFromDb()` e PRIMA di avviare il
+ * loop (startQuebrachoLoop).
+ */
+export function resetRunningJobsOnStartup(): string[] {
+  const reset: string[] = [];
+  for (const e of registry.values()) {
+    if (e.state !== "running") continue;
+    e.state = e.directive ? deriveDirectiveState(e) : "idle";
+    e.lastError = "reset on startup: was running at boot";
+    e.lastErrorAt = Date.now();
+    reset.push(e.name);
+    void persistJob(e);
+  }
+  if (reset.length > 0) {
+    dedupWarn(
+      "coordinator-startup-reset",
+      `[coordinator] startup reset: ${reset.length} job bloccati in "running" riportati a idle: ${reset.join(", ")}`,
+    );
+  }
+  return reset;
 }
 
 /** Solo per i test: azzera la registry in-memory. */

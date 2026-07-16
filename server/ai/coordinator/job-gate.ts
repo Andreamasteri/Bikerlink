@@ -304,11 +304,26 @@ export function getCoordinatorHealthSummary(): CoordinatorHealthSummary {
   };
 }
 
+// Soglie zombie (specchio di quebracho-loop.ts) per il badge nello snapshot.
+const ZOMBIE_THRESHOLD_FREQUENT_SNAP_MS = 30 * 60_000;
+const ZOMBIE_THRESHOLD_DAILY_SNAP_MS    = 2 * 60 * 60_000;
+const DAILY_INTERVAL_THRESHOLD_SNAP_MS  = 4 * 60 * 60_000;
+
+function isJobZombie(j: JobEntry): boolean {
+  if (j.state !== "running" || j.lastRunAt === null) return false;
+  const threshold = (j.intervalMs !== undefined && j.intervalMs >= DAILY_INTERVAL_THRESHOLD_SNAP_MS)
+    ? ZOMBIE_THRESHOLD_DAILY_SNAP_MS
+    : ZOMBIE_THRESHOLD_FREQUENT_SNAP_MS;
+  return Date.now() - j.lastRunAt >= threshold;
+}
+
 /** Snapshot dettagliato (per admin/debug). */
 export function getCoordinatorJobsSnapshot(): Array<Pick<JobEntry,
   "name" | "state" | "lastRunAt" | "lastSuccessAt" | "lastErrorAt" | "nextRunAt" |
   "pauseSource" | "pauseReason" | "runCount" | "successCount" | "failureCount"> & {
     directive: JobDirective | null;
+    /** true se il job è in stato "running" da più del timeout zombie. */
+    isZombie: boolean;
   }> {
   return listJobs().map((j) => ({
     name: j.name,
@@ -323,6 +338,7 @@ export function getCoordinatorJobsSnapshot(): Array<Pick<JobEntry,
     successCount: j.successCount,
     failureCount: j.failureCount,
     directive: j.directive,
+    isZombie: isJobZombie(j),
   }));
 }
 

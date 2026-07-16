@@ -194,9 +194,13 @@ export function startMatchingEngine(): void {
     } catch (err) {
       console.error("[NegPattern] startup run failed:", err);
       addMatchLog("ERROR", "neg_pattern", `Errore rilevamento pattern negativi (startup): ${err instanceof Error ? err.message : String(err)}`);
+      throw err; // Task #393 — propaga a withJobGate → markRunFailure (evita zombie)
     }
   });
-  setTimeout(() => { void gatedNegPatternStartup(); }, 10 * 60 * 1000);
+  // Task #393 — .catch() esplicito: gatedNegPatternStartup ora ri-lancia
+  // (via throw err nel catch interno) così withJobGate può chiamare markRunFailure;
+  // senza .catch() la rejection diventerebbe non gestita e crasherebbe il processo.
+  setTimeout(() => { gatedNegPatternStartup().catch(() => {}); }, 10 * 60 * 1000);
   const gatedNegPatternDaily = withJobGate("matching-daily-negative-pattern", async () => {
     addMatchLog("INFO", "neg_pattern", "Rilevamento pattern negativi avviato (giornaliero)");
     try {
@@ -208,9 +212,11 @@ export function startMatchingEngine(): void {
     } catch (err) {
       console.error("[NegPattern] daily run failed:", err);
       addMatchLog("ERROR", "neg_pattern", `Errore rilevamento pattern negativi (giornaliero): ${err instanceof Error ? err.message : String(err)}`);
+      throw err; // Task #393 — propaga a withJobGate → markRunFailure (evita zombie)
     }
   });
-  _engineTimers.push(setInterval(() => { void gatedNegPatternDaily(); }, 24 * 60 * 60 * 1000));
+  // Task #393 — stesso .catch() del blocco startup: evita unhandled rejection.
+  _engineTimers.push(setInterval(() => { gatedNegPatternDaily().catch(() => {}); }, 24 * 60 * 60 * 1000));
   console.log("[Matching] Daily negative-pattern detection scheduled");
 
   const gatedTrustStartup = withJobGate("matching-daily-trust-recompute", async () => {
