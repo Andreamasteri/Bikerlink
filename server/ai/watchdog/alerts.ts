@@ -261,6 +261,37 @@ export async function dispatchAlerts(snap: HealthSnapshot): Promise<{ sent: numb
     });
   }
 
+  // TC reboot lento (Task #178) — segnale "high" emesso dal tc-reboot-collector
+  // quando il ThinkCentre impiega >90s per tornare raggiungibile dopo un riavvio.
+  // Indica una potenziale regressione del kernel (cgroup_drain_dying deadlock).
+  // Severity "high" (non critical) → NON catturato dal loop critical-only sotto:
+  // serve un blocco dedicato perché la push parta.
+  // Throttle: 1 push per evento di reboot (chiave include il valore in secondi
+  // così reboot diversi non si throttlano a vicenda nel TTL di 10 min).
+  const tcRebootSlowProblem = snap.problems.find(
+    (p) => p.id === "tc.tc.reboot_slow" && p.severity === "high",
+  );
+  if (tcRebootSlowProblem) {
+    await emitWatchdogAlert({ problem: tcRebootSlowProblem, score: snap.score, status: snap.status });
+    const outageSec = snap.metrics["tc.tc.reboot_slow"] ?? "?";
+    if (shouldSend(`tc.reboot_slow.${outageSec}`)) {
+      let detail: { outageSec?: number; thresholdSec?: number } = {};
+      try { detail = JSON.parse(tcRebootSlowProblem.detail ?? "{}"); } catch { /* use defaults */ }
+      const sec = detail.outageSec ?? outageSec;
+      const n = await sendSystemAlertPushToAdmins(
+        `⚠️ ThinkCentre: riavvio lento (${sec}s)`,
+        "Il TC ha impiegato più di 90s per tornare online. Possibile regressione kernel (cgroup_drain_dying). Verifica la versione kernel e considera l'upgrade.",
+        { type: "watchdog_tc_reboot_slow", outageSec: sec, thresholdSec: detail.thresholdSec ?? 90, score: snap.score },
+      );
+      sentCount += n;
+      await writeWatchdogLog({
+        kind: "alert", scope: "tc.reboot_slow", status: "ok",
+        summary: `Alert riavvio TC lento (${sec}s) inviato a ${n} admin`,
+        details: { sent: n, outageSec: sec, thresholdSec: detail.thresholdSec ?? 90 },
+      });
+    }
+  }
+
   // Problem-level (critical singoli — pool exhaustion e network_instability già gestite sopra)
   for (const p of snap.problems) {
     if (p.severity !== "critical") continue;

@@ -330,6 +330,12 @@ export function deriveProblems(signals: Signal[]): Problem[] {
       const det = s.details as { orphans?: number; threshold?: number; runAt?: string } | undefined;
       title = `Immagini pubblicitarie orfane: ${s.value} file trovati (soglia: ${det?.threshold ?? 10})`;
       suggestion = "Possibile bug a monte nel guard upload o nella cancellazione parziale delle campagne. Verifica cleanup-orphan-images e il flusso di cancellazione campagna.";
+    } else if (s.metric === "tc.reboot_slow") {
+      const det = s.details as { outageSec?: number; thresholdSec?: number } | undefined;
+      const sec = det?.outageSec ?? s.value ?? "?";
+      const threshold = det?.thresholdSec ?? 90;
+      title = `ThinkCentre riavviato lentamente: ${sec}s (soglia ${threshold}s)`;
+      suggestion = "Riavvio del ThinkCentre oltre la soglia di 90s. Possibile regressione del kernel (cgroup_drain_dying deadlock su Ubuntu 26.04 kernel ≤7.0.0-22-generic). Verifica la versione kernel con `uname -r` e considera l'upgrade a un kernel LTS dove il bug è confermato risolto. Il fix `ollama.service` ExecPreStop riduce l'esposizione ma non elimina il bug kernel.";
     } else if (s.metric === "server.restart_alert") {
       const count = s.value ?? 1;
       const det = s.details as { minutesSinceLast?: number; latestAt?: string } | undefined;
