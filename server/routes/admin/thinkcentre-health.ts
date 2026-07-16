@@ -44,7 +44,7 @@ import {
   type ErrorEvent,
 } from "./thinkcentre-health-gh-probes";
 import { probeAres, type AresHealth } from "./thinkcentre-health-ares-probe";
-import { probeRepoDrift, type RepoDriftHealth } from "./thinkcentre-health-repodrift-probe";
+import { probeRepoDrift, fixRepoDrift, type RepoDriftHealth, type RepoDriftFixResult } from "./thinkcentre-health-repodrift-probe";
 import { sendError } from "../../lib/api-response";
 
 import { updateThinkCentreSystemStatus, probeThinkCentreStatusSnapshot } from "./thinkcentre-health.part2";
@@ -60,6 +60,7 @@ export type {
   UfwDetailedHealth,
   AresHealth,
   RepoDriftHealth,
+  RepoDriftFixResult,
 };
 
 export { probeThinkCentreStatusSnapshot };
@@ -188,6 +189,34 @@ router.post("/thinkcentre/ignore-for-tests", async (req: Request, res: ExpressRe
     return res.json({ ok: true, enabled });
   } catch (_err) {
     return sendError(res, 500, "Errore salvataggio flag ignore-for-tests ThinkCentre");
+  }
+});
+
+/**
+ * POST /api/admin/thinkcentre/repo-drift-fix
+ * Sincronizza i Modelfile e lo script di setup con origin/main sul ThinkCentre.
+ * Audit: logga chi ha avviato la sincronizzazione e l'esito.
+ */
+router.post("/thinkcentre/repo-drift-fix", async (req: Request, res: ExpressResponse) => {
+  const user = (req as unknown as { user?: { id?: number; email?: string } }).user;
+  const triggeredBy = user?.email ?? (user?.id != null ? `admin#${user.id}` : "admin");
+  console.log(`[admin/thinkcentre-repo-drift-fix] sincronizzazione avviata da "${triggeredBy}"`);
+  try {
+    const result = await fixRepoDrift(triggeredBy);
+    if (result.ok) {
+      console.log(`[admin/thinkcentre-repo-drift-fix] OK — ripristinati: ${result.fixedFiles.join(", ")} alle ${result.fixedAt ?? "?"}`);
+    } else {
+      console.warn(
+        `[admin/thinkcentre-repo-drift-fix] parziale/fallito` +
+        ` — errors=${JSON.stringify(result.errors)}` +
+        (result.error ? ` transport=${result.error}` : ""),
+      );
+    }
+    return res.status(result.ok ? 200 : 502).json(result);
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error("[admin/thinkcentre-repo-drift-fix] errore inatteso:", msg);
+    return sendError(res, 500, "Errore sincronizzazione Modelfile ThinkCentre");
   }
 });
 

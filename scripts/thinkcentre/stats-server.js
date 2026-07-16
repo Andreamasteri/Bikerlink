@@ -299,6 +299,58 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // ── POST /repo-drift-fix ─────────────────────────────────────────────────
+  // Riallinea i file di build Ollama (Modelfile + setup script) con origin/main
+  // via git checkout. Effetto immediato; nessun restart Ollama richiesto.
+  // Body JSON opzionale: { triggeredBy: string }
+  if (req.method === "POST" && req.url === "/repo-drift-fix") {
+    let body = "";
+    req.on("data", (chunk) => { body += chunk; });
+    req.on("end", () => {
+      let triggeredBy = "admin";
+      try {
+        const parsed = JSON.parse(body);
+        if (parsed && typeof parsed.triggeredBy === "string") triggeredBy = parsed.triggeredBy;
+      } catch { /* body vuoto o non JSON — usa default */ }
+
+      const ts = new Date().toISOString();
+      console.log(`[stats-server/repo-drift-fix] avviato da "${triggeredBy}" alle ${ts}`);
+
+      // Fetch aggiornata prima di qualsiasi checkout.
+      try {
+        execSync(`git -C "${REPO_PATH}" fetch origin ${DRIFT_BRANCH} --quiet 2>/dev/null`, { timeout: 15_000, stdio: "pipe" });
+      } catch (e) {
+        console.warn("[stats-server/repo-drift-fix] git fetch fallita (continua con cache locale):", String(e));
+      }
+
+      const fixedFiles = [];
+      const errors = [];
+
+      for (const f of DRIFT_TRACKED) {
+        try {
+          execSync(
+            `git -C "${REPO_PATH}" checkout "origin/${DRIFT_BRANCH}" -- "${f}"`,
+            { timeout: 5_000, stdio: "pipe" },
+          );
+          fixedFiles.push(f);
+          console.log(`[stats-server/repo-drift-fix] ripristinato: ${f}`);
+        } catch (e) {
+          const msg = String(e);
+          errors.push({ file: f, error: msg });
+          console.error(`[stats-server/repo-drift-fix] errore su ${f}:`, msg);
+        }
+      }
+
+      const ok = errors.length === 0;
+      const fixedAt = new Date().toISOString();
+      console.log(`[stats-server/repo-drift-fix] completato — ok=${ok} fixed=${fixedFiles.length} errors=${errors.length} at=${fixedAt}`);
+
+      res.writeHead(ok ? 200 : 207, { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" });
+      res.end(JSON.stringify({ ok, fixedFiles, errors, fixedAt }));
+    });
+    return;
+  }
+
   // ── GET /ufw-status ─────────────────────────────────────────────────────
   // Passthrough al daemon ufw-status in ascolto su 127.0.0.1:9099.
   // Restituisce { status: "active"|"inactive", ruleCount: number }.

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { View, Text, ActivityIndicator, TouchableOpacity, Switch } from "react-native";
 import { MaterialCommunityIcons, Ionicons } from "@expo/vector-icons";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { getApiUrl, authFetchHeaders } from "@/lib/query-client";
 import Colors from "@/constants/colors";
 import { styles } from "./ThinkCentreCardStyles";
@@ -117,7 +117,15 @@ type ThinkCentreStatusKeys =
 // Mostrata come banner di avviso quando i file di build dei modelli Ollama
 // differiscono da origin/main — evita build da Modelfile stale.
 
-function RepoDriftBanner({ drift }: { drift: RepoDriftHealth }) {
+function RepoDriftBanner({
+  drift,
+  onSync,
+  syncing,
+}: {
+  drift: RepoDriftHealth;
+  onSync?: () => void;
+  syncing?: boolean;
+}) {
   const fileList = drift.driftedFiles
     .map((f) => f.replace("scripts/ollama-modelfile/", "").replace("scripts/", ""))
     .join(", ");
@@ -134,6 +142,23 @@ function RepoDriftBanner({ drift }: { drift: RepoDriftHealth }) {
           {behindStr}
           {"\nNON buildare modelli finché non si riallineano i Modelfile."}
         </Text>
+        {onSync && (
+          <TouchableOpacity
+            style={[repoDriftStyles.syncBtn, syncing && repoDriftStyles.syncBtnDisabled]}
+            onPress={onSync}
+            disabled={syncing}
+            activeOpacity={0.7}
+          >
+            {syncing ? (
+              <ActivityIndicator size="small" color="#92400e" />
+            ) : (
+              <Ionicons name="sync-outline" size={13} color="#92400e" />
+            )}
+            <Text style={repoDriftStyles.syncBtnLabel}>
+              {syncing ? "Sincronizzazione…" : "Sincronizza"}
+            </Text>
+          </TouchableOpacity>
+        )}
       </View>
     </View>
   );
@@ -156,6 +181,21 @@ const repoDriftStyles = {
   title: { fontSize: 12, fontWeight: "700" as const, color: "#f59e0b" },
   sub:   { fontSize: 11, color: "#b45309", lineHeight: 16 },
   mono:  { fontFamily: "monospace" as const, fontWeight: "600" as const },
+  syncBtn: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: 4,
+    alignSelf: "flex-start" as const,
+    marginTop: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    backgroundColor: "#fef3c7",
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: "#fbbf24",
+  },
+  syncBtnDisabled: { opacity: 0.6 },
+  syncBtnLabel: { fontSize: 12, fontWeight: "600" as const, color: "#92400e" },
 };
 
 const ALL_UNKNOWN: Pick<SystemStatuses, ThinkCentreStatusKeys> = {
@@ -226,6 +266,19 @@ export function ThinkCentreCard({
     poweredOffLoading, poweredOffMutation, poweredOffActive,
     ignoreTestsLoading, ignoreTestsMutation, ignoreTestsActive,
   } = useThinkCentreToggles();
+
+  const repoDriftFixMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch(new URL("/api/admin/thinkcentre/repo-drift-fix", getApiUrl()).toString(), {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...(await authFetchHeaders()) },
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return res.json();
+    },
+    onSuccess: () => { void refetch(); },
+  });
 
   useEffect(() => {
     if (!onStatuses) return;
@@ -311,7 +364,11 @@ export function ThinkCentreCard({
       {data && !poweredOffActive && <ServiceBadgeStrip data={data} />}
 
       {data?.repoDrift?.driftDetected && !poweredOffActive && (
-        <RepoDriftBanner drift={data.repoDrift} />
+        <RepoDriftBanner
+          drift={data.repoDrift}
+          onSync={() => repoDriftFixMutation.mutate()}
+          syncing={repoDriftFixMutation.isPending}
+        />
       )}
 
       {!collapsed && (
