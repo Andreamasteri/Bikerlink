@@ -11,6 +11,20 @@ export function estimateTokens(text: string): number {
 }
 
 /**
+ * Formatta una sezione del bundle di triage Horus.
+ *
+ * Il formato DEVE restare coerente con le regex in TRIM_SECTIONS:
+ *   \n===== <title> =====\n<body>\n
+ *
+ * Esportata in modo che i test possano usare la funzione REALE anziché
+ * una copia locale, così qualsiasi modifica al formato viene rilevata
+ * immediatamente dai test unitari.
+ */
+export function fmtSection(title: string, body: string): string {
+  return `\n===== ${title} =====\n${body}\n`;
+}
+
+/**
  * Sezioni a bassa priorità che possono essere rimosse dal bundle (nell'ordine)
  * quando il totale supera il budget. Le sezioni vengono rimosse in sequenza
  * finché il bundle rientra nel budget o le sezioni sono esaurite.

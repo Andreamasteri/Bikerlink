@@ -37,7 +37,7 @@ import { db } from "../server/db";
 import { sql } from "drizzle-orm";
 import { cfAccessHeaders } from "../server/lib/cf-access";
 import { collectGitHub, collectSentry, collectGitHubRepoTree } from "./lib/horus-sources";
-import { estimateTokens, trimBundleToFit } from "./lib/horus-trim";
+import { estimateTokens, fmtSection, trimBundleToFit } from "./lib/horus-trim";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, "..");
@@ -90,10 +90,6 @@ function parseTailArg(): number {
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function fmtSection(title: string, body: string): string {
-  return `\n===== ${title} =====\n${body}\n`;
-}
 
 /** Legge le ultime `tail` righe di un file. Ritorna null se assente/illeggibile. */
 function readTail(relOrAbs: string, tail: number): string | null {

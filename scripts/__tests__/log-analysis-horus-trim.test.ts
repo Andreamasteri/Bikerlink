@@ -7,14 +7,7 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { estimateTokens, TRIM_SECTIONS, trimBundleToFit } from "../lib/horus-trim";
-
-// ─── helpers ──────────────────────────────────────────────────────────────────
-
-/** Builds a synthetic bundle string that matches the real fmtSection() format. */
-function fmtSection(title: string, body: string): string {
-  return `\n===== ${title} =====\n${body}\n`;
-}
+import { estimateTokens, fmtSection, TRIM_SECTIONS, trimBundleToFit } from "../lib/horus-trim";
 
 /**
  * Returns a bundle string that contains all three trimmable sections plus
@@ -235,5 +228,48 @@ describe("trimBundleToFit", () => {
     // Force a tight budget
     const { trimmed } = trimBundleToFit(bundle, 1);
     expect(trimmed).toHaveLength(0);
+  });
+});
+
+// ─── fmtSection ↔ TRIM_SECTIONS sync guard ───────────────────────────────────
+//
+// These tests import the REAL fmtSection() from horus-trim.ts and verify that
+// the TRIM_SECTIONS regexes for weekly_system_reports and pg_stat_activity
+// still match its output.  Any change to fmtSection's separator characters or
+// whitespace will immediately break these tests rather than silently leaving the
+// bundle over-budget.
+
+describe("fmtSection ↔ TRIM_SECTIONS format sync", () => {
+  const weeklySectionEntry = TRIM_SECTIONS.find((s) =>
+    s.label.includes("weekly_system_reports"),
+  )!;
+  const pgStatEntry = TRIM_SECTIONS.find((s) =>
+    s.label.includes("pg_stat_activity"),
+  )!;
+
+  it("weekly_system_reports regex matches output of real fmtSection()", () => {
+    // Build the exact string fmtSection() produces for the weekly_system_reports title.
+    // Wrap it with a leading \n===== to give the lookahead a stop marker,
+    // mirroring real-bundle context.
+    const adjacentSection = fmtSection("DB: next_section", "other content");
+    const target = fmtSection("DB: weekly_system_reports (ultimo 1)", '{"payload":"blob"}');
+    const fragment = target + adjacentSection;
+    expect(weeklySectionEntry.re.test(fragment)).toBe(true);
+  });
+
+  it("pg_stat_activity regex matches output of real fmtSection()", () => {
+    const adjacentSection = fmtSection("DB: next_section", "other content");
+    const target = fmtSection(
+      "DB: pg_stat_activity — connessioni attive/idle in transaction",
+      "state: active",
+    );
+    const fragment = target + adjacentSection;
+    expect(pgStatEntry.re.test(fragment)).toBe(true);
+  });
+
+  it("fmtSection uses the ===== separator expected by TRIM_SECTIONS", () => {
+    // Directly assert the canonical format so a character-count change is obvious.
+    const result = fmtSection("DB: weekly_system_reports (ultimo 1)", "body");
+    expect(result).toMatch(/^\n={5} DB: weekly_system_reports[^\n]*={5}\n/);
   });
 });
