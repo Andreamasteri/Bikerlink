@@ -16,7 +16,7 @@
 // Naming interno: source "ai_hub" (vedi server/ai/watchdog/types.ts); l'id del
 // problema diventa `ai_hub.ai_hub.unreachable` in deriveProblems.
 import type { Signal } from "../types";
-import { hubGet, isHubConfigured, setHubReachable } from "../../../lib/ai-hub-client";
+import { AI_HUB_PING_WARN_MS, hubGet, isHubConfigured, setHubReachable } from "../../../lib/ai-hub-client";
 import { isThinkCentrePoweredOff } from "../../../lib/thinkcentre-powered-off";
 import { isThinkCentreInMaintenance } from "../../../lib/thinkcentre-maintenance";
 
@@ -68,7 +68,10 @@ export async function collectAiHub(): Promise<Signal[]> {
     setHubReachable(true);
     signals.push({
       source: "ai_hub", metric: "ai_hub.ping_ms", value: latencyMs, unit: "ms",
-      severity: latencyMs > 3000 ? "warn" : "info",
+      // Soglia in lockstep con NADIR_SEARCH_TIMEOUT_MS (Task #235): warn scatta
+      // 500ms prima del timeout /nadir/search, così la GPU lenta è visibile
+      // nelle metriche prima che gli utenti vedano il fallback pgvector.
+      severity: latencyMs > AI_HUB_PING_WARN_MS ? "warn" : "info",
     });
   } else {
     consecutiveFailures += 1;

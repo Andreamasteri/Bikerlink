@@ -40,6 +40,14 @@ const HUB_TIMEOUT_MS = 8_000;
  */
 export const NADIR_SEARCH_TIMEOUT_MS = 3_500;
 
+/**
+ * Soglia "warn" per ai_hub.ping_ms (watchdog ai-hub-collector).
+ * Tenuta in lockstep con NADIR_SEARCH_TIMEOUT_MS (timeout − 500ms di margine):
+ * se la latenza dell'hub supera questa soglia, le metriche segnalano la
+ * condizione GPU-lenta PRIMA che il timeout /nadir/search inizi a scattare.
+ */
+export const AI_HUB_PING_WARN_MS = NADIR_SEARCH_TIMEOUT_MS - 500;
+
 export interface HubResult<T = unknown> {
   ok: boolean;
   /** HTTP status quando disponibile. */

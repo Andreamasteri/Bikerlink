@@ -32,6 +32,8 @@ vi.mock("../lib/ai-hub-client", () => ({
   isHubConfigured: mockIsHubConfigured,
   setHubReachable: mockSetHubReachable,
   isHubAvailable: () => true,
+  // Lockstep con NADIR_SEARCH_TIMEOUT_MS (3 500ms) − 500ms di margine (Task #235).
+  AI_HUB_PING_WARN_MS: 3_000,
 }));
 vi.mock("../lib/thinkcentre-powered-off", () => ({
   isThinkCentrePoweredOff: mockIsTcPoweredOff,
