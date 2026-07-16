@@ -32,6 +32,7 @@ import {
   probeDragonflyInfra,
   probeNginxInfra,
   probeUptimeKuma,
+  probeAiHub,
 } from "./thinkcentre-health-infra-probes";
 import {
   probeGraphHopperAreas,
@@ -243,6 +244,7 @@ router.get("/thinkcentre-health", async (_req: Request, res: ExpressResponse) =>
       uptimeKumaInfra,
       aresDetail,
       repoDrift,
+      aiHubInfra,
     ] = await Promise.all([
       isThinkCentreInMaintenance(),
       probeGraphHopperAreas(),
@@ -256,6 +258,7 @@ router.get("/thinkcentre-health", async (_req: Request, res: ExpressResponse) =>
       probeUptimeKuma(),
       probeAres(),
       probeRepoDrift(),
+      probeAiHub(),
     ]);
 
     const valhallaService: ServiceHealth = {
@@ -322,6 +325,19 @@ router.get("/thinkcentre-health", async (_req: Request, res: ExpressResponse) =>
       probeLog: uptimeKumaInfra.probeLog,
     };
 
+    const aiHubService: ServiceHealth = {
+      key: "aihub",
+      label: "AI Hub",
+      configured: aiHubInfra.configured,
+      ok: aiHubInfra.ok,
+      startingUp: false,
+      latencyMs: aiHubInfra.latencyMs,
+      url: aiHubInfra.url,
+      error: aiHubInfra.error,
+      history: aiHubInfra.history,
+      probeLog: aiHubInfra.probeLog,
+    };
+
     const services: ServiceHealth[] = [
       valhallaService,
       ollama,
@@ -330,6 +346,7 @@ router.get("/thinkcentre-health", async (_req: Request, res: ExpressResponse) =>
       dragonflyService,
       nginxService,
       uptimeKumaService,
+      aiHubService,
     ];
 
     const graphhopperContributes = graphhopper.configured && graphhopper.areas.some((a) => a.enabled);

@@ -14,6 +14,7 @@
  */
 
 import { tcpConnectDetailed } from "../../jobs/thinkcentre-monitor-probes";
+import { hubGet, isHubConfigured, getHubBaseUrl } from "../../lib/ai-hub-client";
 import {
   sanitizeError,
   maskUrl,
@@ -139,4 +140,27 @@ export async function probeUptimeKuma(): Promise<InfraServiceHealth> {
   }
   recordProbeLog("uptimekuma", { timestamp: Date.now(), ok: true, latencyMs: r.latencyMs, detail: "HTTP OK" });
   return { configured: true, ok: true, latencyMs: r.latencyMs, url: maskUrl(base), history: getHistory("uptimekuma"), probeLog: getProbeLog("uptimekuma") };
+}
+
+// ── AI Hub ────────────────────────────────────────────────────────────────────
+// Probe verso {AI_HUB_URL}/health usando hubGet() che include automaticamente
+// X-Hub-Gate-Token + CF Access headers — consistente con ai-hub-collector.ts.
+export async function probeAiHub(): Promise<InfraServiceHealth> {
+  if (!isHubConfigured()) {
+    return { configured: false, ok: false, latencyMs: null, url: null, history: getHistory("aihub"), probeLog: getProbeLog("aihub") };
+  }
+  const displayUrl = maskUrl(getHubBaseUrl());
+  const t0 = Date.now();
+  const result = await hubGet("/health");
+  const latencyMs = Date.now() - t0;
+  const healthy = result.ok && (result.data as { ok?: boolean } | undefined)?.ok !== false;
+  if (!healthy) {
+    const error = result.error ?? (result.status ? `HTTP ${result.status}` : "unreachable");
+    console.error("[thinkcentre-probe] ai-hub KO", { error });
+    recordError("aihub", error);
+    recordProbeLog("aihub", { timestamp: Date.now(), ok: false, latencyMs, detail: error });
+    return { configured: true, ok: false, latencyMs, url: displayUrl, error, history: getHistory("aihub"), probeLog: getProbeLog("aihub") };
+  }
+  recordProbeLog("aihub", { timestamp: Date.now(), ok: true, latencyMs, detail: "health OK" });
+  return { configured: true, ok: true, latencyMs, url: displayUrl, history: getHistory("aihub"), probeLog: getProbeLog("aihub") };
 }

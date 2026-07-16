@@ -16,6 +16,7 @@ import {
   DragonflyBlock,
   NginxBlock,
   UptimeKumaBlock,
+  AiHubBlock,
 } from "./ThinkCentreInfraBlocks";
 import { AresBlock } from "./ThinkCentreAresBlock";
 import type { AresDetailedHealth } from "./ThinkCentreAresBlock";
@@ -37,7 +38,8 @@ type ServiceKey =
   | "photon"
   | "dragonfly"
   | "nginx"
-  | "uptimekuma";
+  | "uptimekuma"
+  | "aihub";
 
 interface ServiceHealth {
   key: ServiceKey;
@@ -472,6 +474,13 @@ export function ThinkCentreCard({
           {!poweredOffActive && (
             <UptimeKumaBlock
               service={error ? undefined : data?.services.find((s) => s.key === "uptimekuma")}
+              isLoading={isLoading}
+              hasError={!!error}
+            />
+          )}
+          {!poweredOffActive && (
+            <AiHubBlock
+              service={error ? undefined : data?.services.find((s) => s.key === "aihub")}
               isLoading={isLoading}
               hasError={!!error}
             />

@@ -244,6 +244,24 @@ export function UptimeKumaBlock({
   );
 }
 
+export function AiHubBlock({
+  service,
+  isLoading,
+  hasError,
+}: { service?: SimpleServiceHealth; isLoading?: boolean; hasError?: boolean }) {
+  return (
+    <InfraBlock
+      serviceKey="aihub"
+      label="AI Hub"
+      icon="brain"
+      service={service}
+      configNote="Aggiungere AI_HUB_URL e AI_HUB_GATE_TOKEN nei secret Replit. Il servizio gira su pm2 porta 4405 sul ThinkCentre."
+      isLoading={isLoading}
+      hasError={hasError}
+    />
+  );
+}
+
 // ── Styles ────────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
   block: {
