@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 # check-ai-direct-generateobject.sh
 #
+# Due controlli in sequenza — entrambi devono passare:
+#
+# ── Check 1 — Schema bypass ──────────────────────────────────────────────────
 # Scopo: rilevare chiamate dirette a generateObject con un parametro `schema:`
 # (o shorthand `schema,` / `schema }`) al di fuori del gateway approvato
 # (server/ai/moderation/provider.ts).
@@ -24,15 +27,39 @@
 #   // check-ai-direct-generateobject: safe
 # Aggiungere il commento sulla riga immediatamente precedente a `generateObject(`.
 #
+# ── Check 2 — Ollama think:false ─────────────────────────────────────────────
+# Scopo: rilevare chiamate generateObject che passano un modello Ollama (indicato
+# da `om.model`, `getOllamaModel(`, o una variabile con "ollama" nel nome) senza
+# includere `providerOptions: { ollama: { think: false } }`.
+#
+# Perché è pericoloso:
+#   qwen3 (il modello default su Ollama/ThinkCentre) emette token <think>…</think>
+#   per default. Questi token rompono il parsing JSON di generateObject causando un
+#   errore di validazione schema → il decider scala a cloud (disabilitato) →
+#   ricade sul deterministico → la "Modalità AI" non si attiva mai.
+#
+# Call site approvato: server/routing/ai-engine-decider.ts
+# — ha già `providerOptions: { ollama: { think: false } }` e il commento safe.
+#
+# Soppressione di Check 2 (aggiuntiva, solo se `think:false` non è applicabile):
+#   // check-ai-direct-generateobject: ollama-no-think-ok
+# Aggiungere sulla riga immediatamente precedente a `generateObject(`.
+#
 # Vedi: .agents/memory/ai-strict-schema.md
+#       .agents/memory/qwen3-ollama-think-quirk.md
 #       server/lib/groq-client.ts (commento ATTENZIONE su objectMode:"json")
 #       server/__tests__/ai-schema-compatibility.test.ts (Suite 1b e Suite 5)
 
 set -euo pipefail
 
-echo "🔍 Controllo chiamate generateObject con schema diretto (bypass generateStructured)..."
+OVERALL_OK=true
 
-RESULT=$(python3 - << 'PYEOF'
+# ═══════════════════════════════════════════════════════════════════════════════
+# Check 1 — Schema bypass (generateObject con schema: fuori dal gateway)
+# ═══════════════════════════════════════════════════════════════════════════════
+echo "🔍 Check 1 — Chiamate generateObject con schema diretto (bypass generateStructured)..."
+
+RESULT1=$(python3 - << 'PYEOF'
 import os
 import re
 
@@ -146,37 +173,211 @@ else:
 PYEOF
 )
 
-FIRST_LINE=$(echo "$RESULT" | head -1)
+FIRST_LINE1=$(echo "$RESULT1" | head -1)
 
-if [ "$FIRST_LINE" = "OK" ]; then
-  echo "✅ Nessuna chiamata generateObject con schema diretto fuori dal gateway approvato."
-  exit 0
+if [ "$FIRST_LINE1" = "OK" ]; then
+  echo "✅ Check 1 OK — Nessuna chiamata generateObject con schema diretto fuori dal gateway approvato."
+else
+  OVERALL_OK=false
+  echo ""
+  VIOLATIONS1=$(echo "$RESULT1" | tail -n +2)
+  while IFS= read -r vline; do
+    [ -z "$vline" ] && continue
+    echo "❌ Check 1 — TROVATO — $vline"
+  done <<< "$VIOLATIONS1"
+  echo ""
+  echo "💥 Check 1 FALLITO"
+  echo ""
+  echo "   llama-3.x (default Groq) NON supporta json_schema nativo."
+  echo "   generateObject con schema: o shorthand schema, crasha quando il modello è llama."
+  echo ""
+  echo "   FIX: sostituire"
+  echo "     generateObject({ model, schema, prompt })"
+  echo "   con"
+  echo "     generateStructured(resolvedModel, { schema, prompt })"
+  echo "   dove resolvedModel viene da runWithFallback (ai/moderation/provider.ts)."
+  echo ""
+  echo "   Soppressione (solo se il modello è verificato non-llama / non passa per runWithFallback):"
+  echo "     // check-ai-direct-generateobject: safe"
+  echo "     const result = await generateObject({ schema, ... });"
+  echo ""
+  echo "   Documentazione: server/__tests__/ai-schema-compatibility.test.ts (Suite 1b, Suite 5)"
+  echo "                   server/lib/groq-client.ts (sezione ATTENZIONE objectMode)"
 fi
 
-# FAIL — print violations
+# ═══════════════════════════════════════════════════════════════════════════════
+# Check 2 — Ollama think:false (generateObject con modello Ollama senza think:false)
+# ═══════════════════════════════════════════════════════════════════════════════
 echo ""
-VIOLATIONS=$(echo "$RESULT" | tail -n +2)
-while IFS= read -r vline; do
-  [ -z "$vline" ] && continue
-  echo "❌ TROVATO — $vline"
-done <<< "$VIOLATIONS"
+echo "🔍 Check 2 — Chiamate generateObject con modello Ollama senza providerOptions.ollama.think:false..."
 
+RESULT2=$(python3 - << 'PYEOF'
+import os
+import re
+
+IGNORE_DIRS = {'.local', '.agents', 'node_modules', 'scripts'}
+
+# Soppressione specifica per Check 2: il chiamante garantisce che think:false
+# non è necessario (es. il modello Ollama non è qwen3 o non emette <think>).
+SUPPRESSION_NO_THINK_OK = 'check-ai-direct-generateobject: ollama-no-think-ok'
+
+RE_GENERATE_OBJECT = re.compile(r'\bgenerateObject\s*\(')
+
+# Indicatori che il modello passato è un modello Ollama:
+#   - om.model              → pattern comune da tryBuildOllama()
+#   - getOllamaModel(       → chiamata diretta al factory
+#   - ollamaModel           → variabile che inizia con "ollama" (minuscolo)
+#   - ollama.model          → oggetto Ollama con proprietà .model
+#   - myOllamaModel         → variabile con "Ollama" nel mezzo
+#   - xyzOllama.model       → oggetto con "Ollama" nel nome + .model
+RE_OLLAMA_MODEL = re.compile(
+    r'\bmodel\s*:\s*'
+    r'(?:'
+        r'om\.model'                                                    # om.model (da tryBuildOllama)
+        r'|getOllamaModel\s*\('                                         # factory diretto
+        r'|[Oo]llama[a-zA-Z0-9_$]*(?:\.model)?'                        # ollama, ollamaModel, ollama.model, ollamaFoo.model
+        r'|[a-zA-Z_$][a-zA-Z0-9_$]+[Oo]llama[a-zA-Z0-9_$]*(?:\.model)?'  # myOllama, myOllamaModel, xyzOllama.model
+    r')'
+)
+
+# Presenza di think:false dentro providerOptions.ollama
+RE_THINK_FALSE = re.compile(r'think\s*:\s*false')
+RE_OLLAMA_IN_PROVIDER_OPTS = re.compile(r'providerOptions\s*:[^}]*ollama', re.DOTALL)
+
+
+def extract_call_body(lines: list[str], start_idx: int) -> tuple[str, int]:
+    """
+    Collect lines from start_idx until the top-level paren is closed.
+    Returns (body_text, last_line_index).
+    """
+    depth = 0
+    body_lines: list[str] = []
+    for i in range(start_idx, min(start_idx + 60, len(lines))):
+        line = lines[i]
+        body_lines.append(line)
+        for ch in line:
+            if ch == '(':
+                depth += 1
+            elif ch == ')':
+                depth -= 1
+                if depth == 0:
+                    return ''.join(body_lines), i
+    return ''.join(body_lines), min(start_idx + 60, len(lines) - 1)
+
+
+def has_ollama_think_false(body: str) -> bool:
+    """
+    Return True if the call body has providerOptions with ollama.think:false.
+    We require BOTH: the word 'ollama' inside providerOptions AND think:false
+    somewhere in the body (they are co-located in practice).
+    """
+    return bool(RE_OLLAMA_IN_PROVIDER_OPTS.search(body) and RE_THINK_FALSE.search(body))
+
+
+violations: list[str] = []
+
+for root, dirs, files in os.walk('.'):
+    dirs[:] = [d for d in dirs if d not in IGNORE_DIRS and not d.startswith('.')]
+    for fname in files:
+        if fname.endswith('.test.ts') or fname.endswith('.test.tsx'):
+            continue
+        if not (fname.endswith('.ts') or fname.endswith('.tsx')):
+            continue
+        if fname.endswith('.styles.ts') or fname.endswith('.styles.tsx'):
+            continue
+
+        fpath = os.path.join(root, fname).lstrip('./')
+        if '__tests__' in fpath:
+            continue
+
+        try:
+            with open(os.path.join(root, fname), 'r', encoding='utf-8', errors='ignore') as f:
+                lines = f.readlines()
+        except OSError:
+            continue
+
+        i = 0
+        while i < len(lines):
+            line = lines[i]
+            if not RE_GENERATE_OBJECT.search(line):
+                i += 1
+                continue
+
+            lineno = i + 1  # 1-based
+
+            # Check suppression for Check 2 on the same line or immediately preceding line
+            suppressed = SUPPRESSION_NO_THINK_OK in line
+            if not suppressed and i > 0:
+                suppressed = SUPPRESSION_NO_THINK_OK in lines[i - 1]
+            if suppressed:
+                i += 1
+                continue
+
+            # Extract the call body
+            body, end_idx = extract_call_body(lines, i)
+
+            # Only flag if this call targets an Ollama model
+            if not RE_OLLAMA_MODEL.search(body):
+                i = end_idx + 1
+                continue
+
+            # Require providerOptions: { ollama: { think: false } }
+            if not has_ollama_think_false(body):
+                violations.append(f"{fpath}:{lineno}: {line.rstrip()}")
+
+            i = end_idx + 1
+
+if violations:
+    print("FAIL")
+    for v in violations:
+        print(v)
+else:
+    print("OK")
+PYEOF
+)
+
+FIRST_LINE2=$(echo "$RESULT2" | head -1)
+
+if [ "$FIRST_LINE2" = "OK" ]; then
+  echo "✅ Check 2 OK — Tutte le chiamate generateObject con modello Ollama hanno providerOptions.ollama.think:false."
+else
+  OVERALL_OK=false
+  echo ""
+  VIOLATIONS2=$(echo "$RESULT2" | tail -n +2)
+  while IFS= read -r vline; do
+    [ -z "$vline" ] && continue
+    echo "❌ Check 2 — TROVATO — $vline"
+  done <<< "$VIOLATIONS2"
+  echo ""
+  echo "💥 Check 2 FALLITO"
+  echo ""
+  echo "   qwen3 (modello default Ollama/ThinkCentre) emette token <think>…</think>"
+  echo "   che rompono il parsing JSON di generateObject."
+  echo ""
+  echo "   FIX: aggiungere providerOptions a generateObject:"
+  echo "     const result = await generateObject({"
+  echo "       model: om.model,"
+  echo "       schema: mySchema,"
+  echo "       prompt: myPrompt,"
+  echo "       providerOptions: { ollama: { think: false } },  // ← obbligatorio"
+  echo "     });"
+  echo ""
+  echo "   Soppressione (solo se think:false non è necessario, es. modello non qwen3):"
+  echo "     // check-ai-direct-generateobject: ollama-no-think-ok"
+  echo "     const result = await generateObject({ model: om.model, ... });"
+  echo ""
+  echo "   Vedi: .agents/memory/qwen3-ollama-think-quirk.md"
+  echo "         server/routing/ai-engine-decider.ts (call site approvato)"
+fi
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Esito finale
+# ═══════════════════════════════════════════════════════════════════════════════
 echo ""
-echo "💥 check-ai-direct-generateobject FALLITO"
-echo ""
-echo "   llama-3.x (default Groq) NON supporta json_schema nativo."
-echo "   generateObject con schema: o shorthand schema, crasha quando il modello è llama."
-echo ""
-echo "   FIX: sostituire"
-echo "     generateObject({ model, schema, prompt })"
-echo "   con"
-echo "     generateStructured(resolvedModel, { schema, prompt })"
-echo "   dove resolvedModel viene da runWithFallback (ai/moderation/provider.ts)."
-echo ""
-echo "   Soppressione (solo se il modello è verificato non-llama / non passa per runWithFallback):"
-echo "     // check-ai-direct-generateobject: safe"
-echo "     const result = await generateObject({ schema, ... });"
-echo ""
-echo "   Documentazione: server/__tests__/ai-schema-compatibility.test.ts (Suite 1b, Suite 5)"
-echo "                   server/lib/groq-client.ts (sezione ATTENZIONE objectMode)"
-exit 1
+if [ "$OVERALL_OK" = "true" ]; then
+  echo "✅ check-ai-direct-generateobject PASSATO (tutti i check OK)"
+  exit 0
+else
+  echo "💥 check-ai-direct-generateobject FALLITO — vedere i dettagli sopra"
+  exit 1
+fi

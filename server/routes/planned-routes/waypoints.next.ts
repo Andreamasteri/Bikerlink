@@ -125,6 +125,7 @@ export async function generateRouteObject<T>(opts: RouteAiOptions<T>): Promise<{
         const { object } = await generateObject({
           model: getOllamaModel(), schema, prompt: fullPrompt,
           maxRetries: 0, temperature, abortSignal,
+          providerOptions: { ollama: { think: false } },
         });
         incrementProviderStat("ollama");
         return { result: object, provider_used: "ollama" };
