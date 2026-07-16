@@ -14,7 +14,7 @@
  */
 
 import { tcpConnectDetailed } from "../../jobs/thinkcentre-monitor-probes";
-import { hubGet, isHubConfigured, getHubBaseUrl } from "../../lib/ai-hub-client";
+import { hubGet, isHubConfigured, getHubBaseUrl, HUB_HEALTH_TIMEOUT_MS } from "../../lib/ai-hub-client";
 import {
   sanitizeError,
   maskUrl,
@@ -218,7 +218,7 @@ export async function probeAiHub(): Promise<InfraServiceHealth> {
   }
   const displayUrl = maskUrl(getHubBaseUrl());
   const t0 = Date.now();
-  const result = await hubGet("/health");
+  const result = await hubGet("/health", undefined, HUB_HEALTH_TIMEOUT_MS);
   const latencyMs = Date.now() - t0;
   const healthy = result.ok && (result.data as { ok?: boolean } | undefined)?.ok !== false;
   if (!healthy) {

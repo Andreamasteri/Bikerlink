@@ -16,7 +16,7 @@
 // ma il collector reboot si interessa SOLO al gap temporale, non allo stato
 // dell'hub stesso (setHubReachable è responsabilità dell'ai-hub-collector).
 import type { Signal } from "../types";
-import { isHubConfigured, hubGet } from "../../../lib/ai-hub-client";
+import { isHubConfigured, hubGet, HUB_HEALTH_TIMEOUT_MS } from "../../../lib/ai-hub-client";
 import { isThinkCentrePoweredOff } from "../../../lib/thinkcentre-powered-off";
 
 // ---- soglie -----------------------------------------------------------
@@ -40,17 +40,13 @@ let slowRebootAlertEmittedAt: number | null = null;
 let hadSuccessfulProbe = false;
 
 // ---- probe HTTP -------------------------------------------------------
-// Usa lo stesso hubGet dell'ai-hub-collector, ma con un timeout più corto (5s):
+// Usa lo stesso hubGet dell'ai-hub-collector con HUB_HEALTH_TIMEOUT_MS (5s):
 // vogliamo rilevare la transizione down→up il prima possibile senza bloccare
 // il ciclo watchdog. Un timeout di 5s è sufficiente: se il TC sta bootando,
 // il servizio non risponde affatto, non risponde lentamente.
 async function probeTcHealthForReboot(): Promise<boolean> {
   try {
-    // Limita a 5s via Promise.race: hubGet non espone il timeout come parametro.
-    const timeoutPromise = new Promise<{ ok: false }>((resolve) =>
-      setTimeout(() => resolve({ ok: false }), 5_000),
-    );
-    const result = await Promise.race([hubGet("/health"), timeoutPromise]);
+    const result = await hubGet("/health", undefined, HUB_HEALTH_TIMEOUT_MS);
     return result.ok && (result as { data?: { ok?: boolean } }).data?.ok !== false;
   } catch {
     return false;

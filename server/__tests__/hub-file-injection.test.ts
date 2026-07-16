@@ -14,6 +14,7 @@ vi.mock("../lib/ai-hub-client", () => ({
   isHubAvailable: vi.fn(() => true),
   hubPost: vi.fn(async () => ({ ok: true, status: 200 })),
   hubGet: vi.fn(async () => ({ ok: true, status: 200, data: { files: [] } })),
+  HUB_FILE_READ_TIMEOUT_MS: 5_000,
 }));
 
 import {
@@ -261,7 +262,7 @@ describe("buildHubFileContextForPrompt", () => {
       data: { ok: true, content: "# Ciao\nTesto del file.", path: "nadir/note.md" },
     });
     const result = await buildHubFileContextForPrompt("leggi il file nadir/note.md");
-    expect(hubGet).toHaveBeenCalledWith("/files/read", { path: "nadir/note.md" });
+    expect(hubGet).toHaveBeenCalledWith("/files/read", { path: "nadir/note.md" }, 5_000);
     expect(result).toContain("AI-HUB FILE READ");
     expect(result).toContain("nadir/note.md");
     expect(result).toContain("# Ciao");
@@ -290,7 +291,7 @@ describe("buildHubFileContextForPrompt", () => {
       },
     });
     const result = await buildHubFileContextForPrompt("elenca i file nella cartella condivisa");
-    expect(hubGet).toHaveBeenCalledWith("/files/list", expect.anything());
+    expect(hubGet).toHaveBeenCalledWith("/files/list", expect.anything(), 5_000);
     expect(result).toContain("AI-HUB FILE LIST");
     expect(result).toContain("report.md");
     expect(result).toContain("docs");

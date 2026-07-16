@@ -16,7 +16,7 @@
 // Naming interno: source "ai_hub" (vedi server/ai/watchdog/types.ts); l'id del
 // problema diventa `ai_hub.ai_hub.unreachable` in deriveProblems.
 import type { Signal } from "../types";
-import { AI_HUB_PING_WARN_MS, hubGet, isHubConfigured, setHubReachable } from "../../../lib/ai-hub-client";
+import { AI_HUB_PING_WARN_MS, hubGet, isHubConfigured, setHubReachable, HUB_HEALTH_TIMEOUT_MS } from "../../../lib/ai-hub-client";
 import { isThinkCentrePoweredOff } from "../../../lib/thinkcentre-powered-off";
 import { isThinkCentreInMaintenance } from "../../../lib/thinkcentre-maintenance";
 
@@ -51,11 +51,12 @@ export async function collectAiHub(): Promise<Signal[]> {
   // In manutenzione: skip senza allarmi, ma lo stato rimane quello dell'ultima probe.
   if (await isThinkCentreInMaintenance().catch(() => false)) return signals;
 
-  // hubGet include automaticamente X-Hub-Gate-Token + CF Access headers (8s timeout).
+  // hubGet include automaticamente X-Hub-Gate-Token + CF Access headers.
   // NON usare fetch diretto: senza X-Hub-Gate-Token l'hub risponde 401 e la probe
   // segnerebbe l'hub come irraggiungibile falsamente (task #153 review feedback).
+  // Timeout dedicato 5s: una probe di salute non deve bloccare il ciclo watchdog.
   const started = Date.now();
-  const result = await hubGet("/health");
+  const result = await hubGet("/health", undefined, HUB_HEALTH_TIMEOUT_MS);
   const latencyMs = Date.now() - started;
 
   // hubGet ritorna { ok:true, data:{ok,service,...} } su 2xx, { ok:false, ... } su errori.

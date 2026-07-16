@@ -48,6 +48,26 @@ export const NADIR_SEARCH_TIMEOUT_MS = 3_500;
  */
 export const AI_HUB_PING_WARN_MS = NADIR_SEARCH_TIMEOUT_MS - 500;
 
+/**
+ * Timeout per le probe `/health` (watchdog ai-hub-collector, tc-reboot-collector,
+ * pannello admin infra-probes). Una probe di salute non deve mai bloccare il
+ * ciclo watchdog per 8s: se l'hub non risponde entro 5s è giù, non lento.
+ */
+export const HUB_HEALTH_TIMEOUT_MS = 5_000;
+
+/**
+ * Timeout per `/vram` (tool check_vram_usage + pannello health). Endpoint
+ * leggero (nvidia-smi lato hub): user-visible in chat/health panel, 4s bastano.
+ */
+export const HUB_VRAM_TIMEOUT_MS = 4_000;
+
+/**
+ * Timeout per `/files/read` e `/files/list` (tool shared-file in chat
+ * Ares/Quebracho/Horus + hub-file-injection). User-visible: 5s invece degli
+ * 8s uniformi. `/files/write` resta sul default 8s (endpoint pesante).
+ */
+export const HUB_FILE_READ_TIMEOUT_MS = 5_000;
+
 export interface HubResult<T = unknown> {
   ok: boolean;
   /** HTTP status quando disponibile. */

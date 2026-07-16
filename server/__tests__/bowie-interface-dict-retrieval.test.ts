@@ -70,6 +70,7 @@ const nadirMocks = vi.hoisted(() => ({
 vi.mock("../lib/ai-hub-client", () => ({
   isHubAvailable: hubMocks.isHubAvailable,
   hubPost: hubMocks.hubPost,
+  NADIR_SEARCH_TIMEOUT_MS: 3_500,
 }));
 
 vi.mock("../ai/nadir", () => ({
@@ -216,7 +217,7 @@ describe("search_manual — dizionario interfaccia via TC ai-hub (path primario)
       query: "dove trovo il tasto per unirmi al club?",
       limit: 5,
       language: "it",
-    });
+    }, 3_500);
     expect(nadirMocks.searchNadir).not.toHaveBeenCalled();
 
     // Il risultato contiene il frammento con l'etichetta esatta "Partecipa"
@@ -244,7 +245,7 @@ describe("search_manual — dizionario interfaccia via TC ai-hub (path primario)
       query: "cosa fa il pulsante Azzera?",
       limit: 5,
       language: "it",
-    });
+    }, 3_500);
     expect(res.ok).toBe(true);
     // Entrambi i frammenti del dizionario che menzionano "Azzera" sono restituiti
     const texts = res.fragments.map((f: { text: string }) => f.text).join(" ");
@@ -267,7 +268,7 @@ describe("search_manual — dizionario interfaccia via TC ai-hub (path primario)
       query: "where is the join button?",
       limit: 3,
       language: "en",
-    });
+    }, 3_500);
   });
 });
 

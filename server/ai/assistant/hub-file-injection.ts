@@ -22,7 +22,7 @@
  * relativi, hub non disponibile → nessun tentativo di rete).
  */
 
-import { hubGet, hubPost, isHubAvailable } from "../../lib/ai-hub-client";
+import { hubGet, hubPost, isHubAvailable, HUB_FILE_READ_TIMEOUT_MS } from "../../lib/ai-hub-client";
 
 // ── Utilità path ───────────────────────────────────────────────────────────────
 
@@ -252,7 +252,7 @@ export async function buildHubFileContextForPrompt(
     try {
       const dirMatch = message.match(/(?:in\s+|directory\s+|cartella\s+|folder\s+)([\w/.-]+)/i);
       const dir = dirMatch ? dirMatch[1] : "";
-      const res = await hubGet<FileListResponse>("/files/list", dir ? { path: dir } : {});
+      const res = await hubGet<FileListResponse>("/files/list", dir ? { path: dir } : {}, HUB_FILE_READ_TIMEOUT_MS);
       if (res.ok && res.data) {
         const d = res.data as FileListResponse;
         if (d.files && d.files.length > 0) {
@@ -276,7 +276,7 @@ export async function buildHubFileContextForPrompt(
     try {
       const filePath = extractFilePath(message);
       if (filePath && isSafeRelativePath(filePath)) {
-        const res = await hubGet<FileReadResponse>("/files/read", { path: filePath });
+        const res = await hubGet<FileReadResponse>("/files/read", { path: filePath }, HUB_FILE_READ_TIMEOUT_MS);
         if (res.ok && res.data) {
           const d = res.data as FileReadResponse;
           if (d.content !== undefined) {

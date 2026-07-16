@@ -23,6 +23,8 @@ vi.mock("../lib/ai-hub-client", () => ({
   isHubAvailable: hubMocks.isHubAvailable,
   hubGet: hubMocks.hubGet,
   hubPost: hubMocks.hubPost,
+  HUB_FILE_READ_TIMEOUT_MS: 5_000,
+  HUB_VRAM_TIMEOUT_MS: 4_000,
 }));
 
 import { buildHubFileTools, buildCheckVramTool } from "../ai/assistant/tc-hub-tools";
@@ -69,19 +71,19 @@ describe("tc-hub-tools", () => {
     const vram = buildCheckVramTool() as Record<string, unknown>;
 
     await exec(tools.read_file, { path: "nadir/note.md" });
-    expect(hubMocks.hubGet).toHaveBeenCalledWith("/files/read", { path: "nadir/note.md" });
+    expect(hubMocks.hubGet).toHaveBeenCalledWith("/files/read", { path: "nadir/note.md" }, 5_000);
 
     await exec(tools.list_files, { path: "docs" });
-    expect(hubMocks.hubGet).toHaveBeenCalledWith("/files/list", { path: "docs" });
+    expect(hubMocks.hubGet).toHaveBeenCalledWith("/files/list", { path: "docs" }, 5_000);
 
     await exec(tools.list_files, { path: null });
-    expect(hubMocks.hubGet).toHaveBeenCalledWith("/files/list", { path: "" });
+    expect(hubMocks.hubGet).toHaveBeenCalledWith("/files/list", { path: "" }, 5_000);
 
     await exec(tools.save_file, { path: "docs/a.md", content: "hello" });
     expect(hubMocks.hubPost).toHaveBeenCalledWith("/files/write", { path: "docs/a.md", content: "hello" });
 
     await exec(vram.check_vram_usage, {});
-    expect(hubMocks.hubGet).toHaveBeenCalledWith("/vram");
+    expect(hubMocks.hubGet).toHaveBeenCalledWith("/vram", undefined, 4_000);
   });
 
   it("path traversal rifiutato senza chiamare l'hub", async () => {

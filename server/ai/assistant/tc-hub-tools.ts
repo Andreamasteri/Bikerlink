@@ -19,7 +19,7 @@
 
 import { tool } from "ai";
 import { z } from "zod";
-import { hubGet, hubPost, isHubAvailable } from "../../lib/ai-hub-client";
+import { hubGet, hubPost, isHubAvailable, HUB_FILE_READ_TIMEOUT_MS, HUB_VRAM_TIMEOUT_MS } from "../../lib/ai-hub-client";
 
 const HUB_UNAVAILABLE = { ok: false as const, error: "TC ai-hub non disponibile" };
 
@@ -52,7 +52,7 @@ export function buildHubFileTools(opts: { includeWrite: boolean }): Record<strin
       execute: async (input: { path: string }) => {
         if (!isHubAvailable()) return HUB_UNAVAILABLE;
         if (!isSafeRelativePath(input.path)) return { ok: false, error: "Path non valido (nessun path traversal)." };
-        return hubGet("/files/read", { path: input.path });
+        return hubGet("/files/read", { path: input.path }, HUB_FILE_READ_TIMEOUT_MS);
       },
     }),
     list_files: tool({
@@ -66,7 +66,7 @@ export function buildHubFileTools(opts: { includeWrite: boolean }): Record<strin
         if (!isHubAvailable()) return HUB_UNAVAILABLE;
         const path = input.path ?? "";
         if (path && !isSafeRelativePath(path)) return { ok: false, error: "Path non valido (nessun path traversal)." };
-        return hubGet("/files/list", { path });
+        return hubGet("/files/list", { path }, HUB_FILE_READ_TIMEOUT_MS);
       },
     }),
   };
@@ -102,7 +102,7 @@ export function buildCheckVramTool(): Record<string, unknown> {
       inputSchema: z.object({}),
       execute: async () => {
         if (!isHubAvailable()) return HUB_UNAVAILABLE;
-        return hubGet("/vram");
+        return hubGet("/vram", undefined, HUB_VRAM_TIMEOUT_MS);
       },
     }),
   };

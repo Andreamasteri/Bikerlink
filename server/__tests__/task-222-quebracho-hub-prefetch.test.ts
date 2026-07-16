@@ -40,6 +40,7 @@ vi.mock("../lib/ai-hub-client", () => ({
   isHubAvailable: hubMocks.isHubAvailable,
   hubGet: hubMocks.hubGet,
   hubPost: hubMocks.hubPost,
+  HUB_FILE_READ_TIMEOUT_MS: 5_000,
 }));
 
 vi.mock("../lib/quebracho-client", () => ({

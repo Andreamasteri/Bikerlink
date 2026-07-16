@@ -34,6 +34,7 @@ vi.mock("../lib/ai-hub-client", () => ({
   isHubAvailable: () => true,
   // Lockstep con NADIR_SEARCH_TIMEOUT_MS (3 500ms) − 500ms di margine (Task #235).
   AI_HUB_PING_WARN_MS: 3_000,
+  HUB_HEALTH_TIMEOUT_MS: 5_000,
 }));
 vi.mock("../lib/thinkcentre-powered-off", () => ({
   isThinkCentrePoweredOff: mockIsTcPoweredOff,
@@ -68,7 +69,7 @@ describe("ai-hub collector — autenticazione e comportamento probe", () => {
 
     // Verifica che usiamo hubGet (non fetch diretto): questo garantisce che
     // X-Hub-Gate-Token + CF Access vengano iniettati automaticamente.
-    expect(mockHubGet).toHaveBeenCalledWith("/health");
+    expect(mockHubGet).toHaveBeenCalledWith("/health", undefined, 5_000);
     expect(mockSetHubReachable).toHaveBeenCalledWith(true);
     expect(signals.some((s) => s.metric === "ai_hub.ping_ms")).toBe(true);
     expect(signals.some((s) => s.metric === "ai_hub.unreachable")).toBe(false);
@@ -82,7 +83,7 @@ describe("ai-hub collector — autenticazione e comportamento probe", () => {
 
     const signals = await collectAiHub();
 
-    expect(mockHubGet).toHaveBeenCalledWith("/health");
+    expect(mockHubGet).toHaveBeenCalledWith("/health", undefined, 5_000);
     expect(mockSetHubReachable).toHaveBeenCalledWith(false);
     const sig = signals.find((s) => s.metric === "ai_hub.unreachable");
     expect(sig).toBeDefined();
