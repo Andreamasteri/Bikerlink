@@ -390,6 +390,17 @@ async function runPostReady(needsFakeSeed: boolean): Promise<void> {
   // initMissingClubConversations + enrichBikerMatchBreakdowns sono registrati nel
   // bootJobQueue (vedi runBootSequence, prima del READY): partono dopo 4+ minuti.
 
+  // One-time idempotent migration: move pre-bucket wishlist photos from the
+  // ephemeral uploads/wishlist/ dir into object storage and update DB URLs.
+  void (async () => {
+    try {
+      const { migrateWishlistPhotosToBucket } = await import("./scripts/migrate-wishlist-photos-to-bucket");
+      await migrateWishlistPhotosToBucket();
+    } catch (err) {
+      console.warn("[BOOT][POST-READY] wishlist photo migration unexpected error (non-fatal):", err);
+    }
+  })();
+
   if (needsFakeSeed) {
     console.log("[INIT][BG] Starting autoSeedFakeUsers...");
     autoSeedFakeUsers()
