@@ -342,6 +342,44 @@ describe("buildMapMarkersState — marker cap integration", () => {
     expect(totalMarkers(markers)).toBeLessThanOrEqual(MARKERS_HARD_CAP);
   });
 
+  it("current user survives when centre is null and they are at an arbitrary array position", () => {
+    // No GPS fix → userLocation is null → center passed to capMarkers is null.
+    // The current user is placed near the END of the array (index 449 out of 451),
+    // so array-position trimming without the pin guard would silently discard them.
+    // The null-branch pin guard must hoist them to position 0 before slicing.
+    const otherUsersBefore = makeUsers(449, 45.5, 11.0);
+    const currentUser: MapUser = {
+      id: CURRENT_USER_ID,
+      latitude: 46.0,
+      longitude: 12.0,
+      userType: "biker" as const,
+      sex: null,
+      nickname: "io_no_gps",
+      country: "IT",
+      currentSpeedKph: null,
+      speedProfile: null,
+    };
+    const otherUsersAfter = makeUsers(1, 47.0, 13.0);
+    // currentUser is at index 449 — well past any quota that would survive
+    // unguarded array-position trimming across 451 total entries.
+    const filteredUsers = [...otherUsersBefore, currentUser, ...otherUsersAfter];
+
+    const encoded = buildMapMarkersState({
+      ...baseParams(),
+      userLocation: null, // no GPS fix → null centre
+      filteredUsers,
+      workshops: makeWorkshops(100), // push total to 551 so cap fires
+      currentUserId: CURRENT_USER_ID,
+    });
+
+    const markers = decodeMarkers(encoded);
+    expect(totalMarkers(markers)).toBeLessThanOrEqual(MARKERS_HARD_CAP);
+
+    const me = markers.users.find((u) => u.id === CURRENT_USER_ID);
+    expect(me).toBeDefined();
+    expect(me?.isCurrentUser).toBe(true);
+  });
+
   it("total stays exactly below cap across all seven CAPPED categories", () => {
     // Every capped category populated — total = 7 × 70 = 490, over cap.
     const encoded = buildMapMarkersState({
