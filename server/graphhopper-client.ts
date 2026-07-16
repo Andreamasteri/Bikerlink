@@ -1,3 +1,4 @@
+// LARGE-FILE-ALLOW: client GraphHopper monolitico con multi-area + profili multipli — split richiederebbe re-export artificiali.
 /**
  * GraphHopper Client — BikerLink
  *

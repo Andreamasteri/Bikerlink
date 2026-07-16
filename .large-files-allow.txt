@@ -58,3 +58,7 @@ server/ai/assistant/agent.ts
 # ── Route admin AI watchdog ────────────────────────────────────────────────
 # ~20 endpoint watchdog in un'unica route — split crea accoppiamento inutile.
 server/routes/admin/ai-watchdog.ts
+
+# ── GraphHopper client ─────────────────────────────────────────────────────
+# Client multi-area + profili multipli — split richiederebbe re-export artificiali.
+server/graphhopper-client.ts
