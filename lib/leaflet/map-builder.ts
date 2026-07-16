@@ -383,7 +383,15 @@ export function buildLeafletRouteMapHtml(
       (typeColors && typeColors[w.waypointType]) || (require('./map-markers').getWaypointColor(w.waypointType));
   }
   const rawPolylinePoints = trackPoints ?? waypoints.map((w) => ({ lat: w.lat, lng: w.lng }));
-  const polylinePoints = decimateTrackCurvatureAware(rawPolylinePoints);
+  let polylinePoints = decimateTrackCurvatureAware(rawPolylinePoints);
+  // Hard safety cap: decimation normally produces ≤1500, but guard against
+  // any future change to DEFAULT_MAX_POINTS that would re-open the OOM window.
+  const TRACK_HARD_CAP = 2000;
+  if (polylinePoints.length > TRACK_HARD_CAP) {
+    // eslint-disable-next-line no-console
+    console.warn(`[buildLeafletRouteMapHtml] trackPoints hard cap: ${polylinePoints.length} → ${TRACK_HARD_CAP}`);
+    polylinePoints = polylinePoints.slice(0, TRACK_HARD_CAP);
+  }
   const waypointsJson = JSON.stringify(waypoints);
   const colorsJson = JSON.stringify(resolvedTypeColors);
   const polylineJson = JSON.stringify(polylinePoints);

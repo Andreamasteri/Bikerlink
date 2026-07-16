@@ -78,3 +78,23 @@ export async function lastEventId(): Promise<string | undefined> {
     return undefined;
   }
 }
+
+export async function addBreadcrumb(crumb: {
+  message: string;
+  category?: string;
+  level?: "debug" | "info" | "warning" | "error" | "fatal";
+  data?: Record<string, unknown>;
+}): Promise<void> {
+  const S = await loadSentry();
+  if (!S) return;
+  try {
+    S.addBreadcrumb({
+      message: crumb.message,
+      category: crumb.category,
+      level: crumb.level,
+      data: crumb.data,
+    });
+  } catch {
+    // non-fatal
+  }
+}

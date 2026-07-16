@@ -63,6 +63,16 @@ export function useMapStateSync({
       clubPins, filterClubs, easterEggs, activeSosRequests,
       realMeMarker, fakeMeMarker, currentUserId, fixedPositionEnabled,
     });
+    if (__DEV__) {
+      try {
+        // encoded is double-stringified; parse once to get the actual bridge payload string.
+        const payloadSize = (JSON.parse(encoded) as string).length;
+        // eslint-disable-next-line no-console
+        console.log(`[MapStateSync] updateState payload: ${payloadSize} bytes`);
+      } catch {
+        // non-fatal
+      }
+    }
     inject("window.leafletBridge && window.leafletBridge.updateState(" + encoded + ")");
   }, [
     mapReady, mapsEnabled, activeTileUrl, activeTileMaxZoom, userLocation, isAvailable, searchRadiusKm,

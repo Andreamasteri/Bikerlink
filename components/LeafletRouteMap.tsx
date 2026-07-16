@@ -10,6 +10,10 @@ import type { RouteWaypoint } from "@/lib/leaflet-route-map-html";
 import { MapZoomSlider } from "@/components/map/MapZoomSlider";
 import Colors from "@/constants/colors";
 import { useMapTelemetry } from "@/hooks/useMapTelemetry";
+import { decimateTrackCurvatureAware } from "@/lib/maps/track-decimate";
+import { addBreadcrumb } from "@/lib/sentry";
+
+const TRACK_POINTS_HARD_CAP = 2000;
 
 interface LeafletRouteMapProps {
   waypoints: RouteWaypoint[];
@@ -33,12 +37,32 @@ export default function LeafletRouteMap({ waypoints, height, typeColors, showMar
     return () => { tlm.emit("map_destroy"); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Hard cap on trackPoints before bridge injection to prevent Android OOM.
+  // decimateTrackCurvatureAware normally limits to 1500, but we guard here
+  // in case the raw prop exceeds TRACK_POINTS_HARD_CAP before decimation.
+  const cappedTrackPoints = useMemo(() => {
+    if (!trackPoints || trackPoints.length <= TRACK_POINTS_HARD_CAP) return trackPoints;
+    const before = trackPoints.length;
+    const decimated = decimateTrackCurvatureAware(trackPoints, TRACK_POINTS_HARD_CAP);
+    const result = decimated.length > TRACK_POINTS_HARD_CAP ? decimated.slice(0, TRACK_POINTS_HARD_CAP) : decimated;
+    // eslint-disable-next-line no-console
+    console.warn(`[LeafletRouteMap] trackPoints cap: ${before} → ${result.length}`);
+    void addBreadcrumb({
+      message: `trackPoints capped: ${before} → ${result.length}`,
+      category: "map.oom_guard",
+      level: "warning",
+      data: { before, after: result.length, cap: TRACK_POINTS_HARD_CAP },
+    });
+    return result;
+  }, [trackPoints]);
+
   const mapHtml = useMemo(
     () => buildLeafletRouteMapHtml(
       tileUrl, tileMaxZoom,
-      waypoints, Colors.accent, typeColors || {}, showMarkers, trackPoints || []
+      waypoints, Colors.accent, typeColors || {}, showMarkers, cappedTrackPoints
     ),
-    [tileUrl, tileMaxZoom, waypoints, typeColors, showMarkers, trackPoints]
+    [tileUrl, tileMaxZoom, waypoints, typeColors, showMarkers, cappedTrackPoints]
   );
   const mapBaseUrl = getApiUrl();
 

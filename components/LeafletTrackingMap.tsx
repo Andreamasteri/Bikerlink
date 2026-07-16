@@ -45,6 +45,15 @@ export default function LeafletTrackingMap({ points, currentLocation }: Tracking
         data.current = { lat: loc.latitude, lng: loc.longitude };
       }
       const encoded = JSON.stringify(JSON.stringify(data));
+      if (__DEV__) {
+        try {
+          const payloadSize = (JSON.parse(encoded) as string).length;
+          // eslint-disable-next-line no-console
+          console.log(`[LeafletTrackingMap] updateLocation payload: ${payloadSize} bytes`);
+        } catch {
+          // non-fatal
+        }
+      }
       inject("window.trackingBridge && window.trackingBridge.updateLocation(" + encoded + ")");
     },
     [inject]
