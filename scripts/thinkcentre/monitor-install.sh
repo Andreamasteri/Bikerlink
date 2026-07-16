@@ -1,7 +1,11 @@
 #!/usr/bin/env bash
-# Installa il monitor live e lo stats server sul ThinkCentre.
+# Installa il monitor live sul ThinkCentre.
 # Eseguire DA REMOTO: bash scripts/thinkcentre/monitor-install.sh
 # Oppure via SSH:     bash <(cat scripts/thinkcentre/monitor-install.sh)
+#
+# NOTA: stats-server.js (porta 9199) è stato sostituito dall'agente TC
+# (thinkcentre-agent/server.js, pm2 bikerlink-agent). Questo script NON
+# avvia più stats-server per non collidere con l'agente canonico.
 
 set -e
 
@@ -15,15 +19,10 @@ cp "$SCRIPTS_SRC/monitor.sh" "$SCRIPT_DIR/monitor.sh"
 chmod +x "$SCRIPT_DIR/monitor.sh"
 echo "✅ monitor.sh installato in $SCRIPT_DIR"
 
-# ── stats-server.js ───────────────────────────────────────────────────────
-cp "$SCRIPTS_SRC/stats-server.js" "$SCRIPT_DIR/stats-server.js"
-chmod +x "$SCRIPT_DIR/stats-server.js"
-echo "✅ stats-server.js installato in $SCRIPT_DIR"
-
-# ── UFW: apri porta 9199 ──────────────────────────────────────────────────
+# ── UFW: apri porta 9199 (usata dall'agente TC bikerlink-agent) ───────────
 if command -v ufw &>/dev/null; then
   if ! ufw status | grep -q "9199"; then
-    ufw allow 9199/tcp comment "BikerLink stats-server" 2>/dev/null || true
+    ufw allow 9199/tcp comment "BikerLink TC agent" 2>/dev/null || true
     echo "✅ UFW: porta 9199/tcp aperta"
   else
     echo "ℹ️  UFW: porta 9199 già aperta"
@@ -32,9 +31,25 @@ else
   echo "ℹ️  UFW non trovato — verifica manualmente la porta 9199"
 fi
 
+# ── Pulizia sessione tc-stats legacy (se ancora in esecuzione) ────────────
+# stats-server.js è obsoleto; l'agente TC (pm2 bikerlink-agent) gestisce
+# la porta 9199. Se tc-stats è rimasto da un'installazione precedente,
+# fermalo per evitare conflitti di porta.
+if screen -ls 2>/dev/null | grep -q "tc-stats"; then
+  screen -S tc-stats -X quit 2>/dev/null || true
+  echo "✅ Sessione tc-stats legacy fermata (superseded da bikerlink-agent)"
+fi
+
+# ── Pulizia crontab @reboot legacy ───────────────────────────────────────
+CURRENT_CRON=$(crontab -l 2>/dev/null || true)
+if echo "$CURRENT_CRON" | grep -q "stats-server.js"; then
+  NEW_CRON=$(echo "$CURRENT_CRON" | grep -v "stats-server.js")
+  echo "$NEW_CRON" | crontab -
+  echo "✅ Voce crontab stats-server.js rimossa"
+fi
+
 # ── Crontab @reboot ───────────────────────────────────────────────────────
 CRON_MONITOR="@reboot screen -dmS tc-monitor bash $SCRIPT_DIR/monitor.sh"
-CRON_STATS="@reboot screen -dmS tc-stats node $SCRIPT_DIR/stats-server.js"
 
 CURRENT_CRON=$(crontab -l 2>/dev/null || true)
 
@@ -43,13 +58,6 @@ if echo "$CURRENT_CRON" | grep -qF "$SCRIPT_DIR/monitor.sh"; then
 else
   (echo "$CURRENT_CRON"; echo "$CRON_MONITOR") | crontab -
   echo "✅ @reboot monitor aggiunto al crontab"
-fi
-
-if echo "$CURRENT_CRON" | grep -qF "$SCRIPT_DIR/stats-server.js"; then
-  echo "ℹ️  @reboot stats-server già in crontab"
-else
-  (crontab -l 2>/dev/null; echo "$CRON_STATS") | crontab -
-  echo "✅ @reboot stats-server aggiunto al crontab"
 fi
 
 # ── Avvia subito se non già in esecuzione ─────────────────────────────────
@@ -61,20 +69,11 @@ else
   echo "✅ Monitor avviato (screen tc-monitor)"
 fi
 
-if screen -ls 2>/dev/null | grep -q "tc-stats"; then
-  echo "ℹ️  tc-stats già in esecuzione — riavvio con nuova versione"
-  screen -S tc-stats -X quit 2>/dev/null || true
-  sleep 1
-fi
-screen -dmS tc-stats node "$SCRIPT_DIR/stats-server.js"
-sleep 1
-echo "✅ Stats server avviato su porta 9199 (screen tc-stats)"
-
 echo ""
 echo "📋 Comandi utili:"
-echo "  curl http://localhost:9199/sys-metrics    # test locale metriche sistema"
-echo "  curl http://localhost:9199/repo-drift     # test locale deriva checkout app"
-echo "  screen -r tc-stats                       # log stats server"
+echo "  curl http://localhost:9199/sys-metrics    # test locale metriche (via bikerlink-agent)"
+echo "  pm2 status bikerlink-agent               # stato agente TC"
+echo "  pm2 logs bikerlink-agent                 # log agente TC"
 echo "  screen -r tc-monitor                     # log monitor docker"
 echo "  screen -ls                               # lista sessioni"
 echo "  kill \$(cat ~/bikerlink-monitor/monitor.lock)  # stop monitor"
