@@ -208,6 +208,12 @@ export async function saveNadirManual(text: string): Promise<string> {
  * Spezza il manuale in chunk indicizzabili. Divide prima sui doppi ritorni a capo
  * (paragrafi), poi taglia i paragrafi troppo lunghi a `MANUAL_CHUNK_SIZE` caratteri.
  * Deterministico: l'indice `i` del chunk è stabile finché il testo non cambia.
+ *
+ * Task #195 — quando un paragrafo supera chunkSize (es. una sezione Dizionario
+ * dell'Interfaccia con molti bottoni), lo split preferisce:
+ *   1. Confini \n### (sottosezione interna), così ogni blocco schermata resta integro;
+ *   2. L'ultimo \n prima del limite, per non tagliare a metà una riga;
+ *   3. Hard byte cut come ultima risorsa (paragrafi senza newline).
  */
 export function chunkManual(
   text: string,
@@ -225,8 +231,39 @@ export function chunkManual(
     if (para.length <= chunkSize) {
       chunks.push(para);
     } else {
-      for (let i = 0; i < para.length; i += chunkSize) {
-        chunks.push(para.slice(i, i + chunkSize).trim());
+      // Taglia il paragrafo troppo lungo rispettando i confini di riga e sezione.
+      let start = 0;
+      while (start < para.length) {
+        const remaining = para.slice(start);
+        if (remaining.length <= chunkSize) {
+          const trimmed = remaining.trim();
+          if (trimmed) chunks.push(trimmed);
+          break;
+        }
+        const window = para.slice(start, start + chunkSize);
+        // 1) Preferisci l'ultimo \n### prima del limite (confine di sotto-sezione).
+        const sectionIdx = window.lastIndexOf("\n### ");
+        if (sectionIdx > 0) {
+          const trimmed = window.slice(0, sectionIdx).trim();
+          if (trimmed) chunks.push(trimmed);
+          start += sectionIdx + 1; // salta il \n, la prossima slice parte da ###
+          if (chunks.length >= maxChunks) break;
+          continue;
+        }
+        // 2) Fallback: ultimo \n prima del limite (non taglia a metà riga).
+        const newlineIdx = window.lastIndexOf("\n");
+        if (newlineIdx > 0) {
+          const trimmed = window.slice(0, newlineIdx).trim();
+          if (trimmed) chunks.push(trimmed);
+          start += newlineIdx + 1;
+          if (chunks.length >= maxChunks) break;
+          continue;
+        }
+        // 3) Ultima risorsa: hard byte cut (paragrafo senza newline).
+        const trimmed = window.trim();
+        if (trimmed) chunks.push(trimmed);
+        start += chunkSize;
+        if (chunks.length >= maxChunks) break;
       }
     }
     if (chunks.length >= maxChunks) break;

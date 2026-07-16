@@ -485,3 +485,112 @@ describe("chunkManual — sezioni Dizionario dell'Interfaccia in chunk separati 
     expect(filtriChunk).not.toContain("Centra");
   });
 });
+
+// ---------------------------------------------------------------------------
+// Suite 6 — chunkManual: sezione Dizionario singola più lunga di MANUAL_CHUNK_SIZE
+//           (Task #195)
+//
+// Verifica che quando una sezione "### Schermata" supera MANUAL_CHUNK_SIZE
+// (per via di molti bottoni/campi), chunkManual non la tagli a un confine
+// di byte arbitrario (che può cadere a metà di un'etichetta tra virgolette o
+// a metà di una parola). Il comportamento atteso è:
+//
+//   1. Lo split avviene su un confine \n### (sezione interna) se presente,
+//      oppure sul più vicino \n prima del limite, mai nel mezzo di una riga.
+//   2. Il primo chunk contiene l'intestazione ### della sezione.
+//   3. Nessun dato viene perso: la somma dei chunk copre l'intero testo.
+// ---------------------------------------------------------------------------
+
+describe("chunkManual — sezione Dizionario singola più lunga di MANUAL_CHUNK_SIZE (Task #195)", () => {
+  /**
+   * Sezione Dizionario realistica di una schermata con molti bottoni e messaggi,
+   * senza righe vuote interne → un unico paragrafo per chunkManual.
+   * Supera di poco MANUAL_CHUNK_SIZE in modo da produrre esattamente 2 chunk.
+   */
+  const LONG_SECTION = [
+    "### Profilo Avanzato",
+    '**Percorso di accesso**: tab "Impostazioni" → voce "Il mio profilo"',
+    '**Titolo visualizzato**: "Profilo Avanzato"',
+    '**Bottoni e azioni**: "Salva modifiche" → persiste nome, bio e foto; "Annulla" → scarta le modifiche non salvate; "Elimina foto" → rimuove la foto profilo corrente; "Cambia email" → apre il modulo di modifica email con verifica; "Cambia password" → apre il modulo di modifica password con conferma',
+    '**Campi**: "Nome visualizzato" (testo libero, max 40 car.); "Bio" (testo libero, max 200 car.); "Email" (sola lettura, modificabile via "Cambia email"); "Foto profilo" (immagine, tocca per sostituire)',
+    '**Messaggi**: "Profilo aggiornato con successo" dopo salvataggio; "Email già in uso" se l\'indirizzo è già registrato da un altro account; "Password troppo corta" se inferiore a 8 caratteri; "Le password non coincidono" se la conferma non combacia',
+  ].join("\n");
+
+  it("precondizione: la sezione supera MANUAL_CHUNK_SIZE", () => {
+    expect(LONG_SECTION.length).toBeGreaterThan(MANUAL_CHUNK_SIZE);
+  });
+
+  it("produce più di un chunk", () => {
+    const chunks = chunkManual(LONG_SECTION, MANUAL_CHUNK_SIZE, MANUAL_MAX_CHUNKS);
+    expect(chunks.length).toBeGreaterThan(1);
+  });
+
+  it("il primo chunk contiene l'intestazione ### della sezione", () => {
+    const chunks = chunkManual(LONG_SECTION, MANUAL_CHUNK_SIZE, MANUAL_MAX_CHUNKS);
+    expect(chunks[0]).toContain("### Profilo Avanzato");
+  });
+
+  it("nessun chunk termina a metà di una riga — ogni split cade su \\n o confine ###", () => {
+    const chunks = chunkManual(LONG_SECTION, MANUAL_CHUNK_SIZE, MANUAL_MAX_CHUNKS);
+    // Ricostruisce il testo combinando i chunk con \n e verifica che ogni
+    // giunzione corrisponda a un \n nel testo originale normalizzato.
+    const normalized = LONG_SECTION.replace(/\r\n/g, "\n").trim();
+    let cursor = 0;
+    for (let idx = 0; idx < chunks.length; idx++) {
+      const chunk = chunks[idx];
+      const pos = normalized.indexOf(chunk, cursor);
+      expect(pos).toBeGreaterThanOrEqual(0); // il chunk esiste nel testo originale
+      cursor = pos + chunk.length;
+      if (idx < chunks.length - 1) {
+        // Dopo il chunk (al cursore) deve esserci un \n nel testo originale,
+        // non un carattere di mezzo-parola.
+        const charAfter = normalized[cursor] ?? "\n";
+        expect(charAfter).toBe("\n");
+      }
+    }
+  });
+
+  it("nessun dato viene perso — i chunk coprono l'intero testo della sezione", () => {
+    const chunks = chunkManual(LONG_SECTION, MANUAL_CHUNK_SIZE, MANUAL_MAX_CHUNKS);
+    const normalized = LONG_SECTION.replace(/\r\n/g, "\n").trim();
+    // Ogni riga del testo originale deve apparire in almeno un chunk
+    const lines = normalized.split("\n").filter(Boolean);
+    for (const line of lines) {
+      const found = chunks.some((c) => c.includes(line));
+      expect(found).toBe(true);
+    }
+  });
+
+  it("sezione con sotto-sezioni ### concatenate senza righe vuote: split sui confini ###", () => {
+    // Scenario: Horus genera sezioni concatenate senza blank-line separatrice.
+    // chunkManual deve spezzare su \n### piuttosto che a metà di una riga.
+    const COMBINED = [
+      "### SchermataPrima",
+      '**Bottoni e azioni**: "Conferma" → salva la scelta; "Indietro" → torna alla schermata precedente; "Aiuto" → apre il pannello di aiuto contestuale con la spiegazione della funzione attiva',
+      '**Messaggi**: "Operazione completata" dopo conferma; "Si è verificato un errore, riprova" in caso di timeout di rete',
+      "### SchermataDue",
+      '**Bottoni e azioni**: "Invia" → trasmette il modulo compilato al server; "Svuota" → azzera tutti i campi del modulo; "Anteprima" → mostra una preview del contenuto prima dell\'invio definitivo',
+      '**Messaggi**: "Modulo inviato" dopo trasmissione; "Campi obbligatori mancanti" se manca almeno un campo richiesto',
+    ].join("\n");
+
+    // Precondizione: il testo supera MANUAL_CHUNK_SIZE come unico paragrafo
+    expect(COMBINED.length).toBeGreaterThan(MANUAL_CHUNK_SIZE);
+
+    const chunks = chunkManual(COMBINED, MANUAL_CHUNK_SIZE, MANUAL_MAX_CHUNKS);
+
+    // Con split su \n### i due blocchi restano separati
+    const primaChunk = chunks.find((c) => c.includes("### SchermataPrima"));
+    const dueChunk = chunks.find((c) => c.includes("### SchermataDue"));
+    expect(primaChunk).toBeDefined();
+    expect(dueChunk).toBeDefined();
+
+    // Ognuno contiene solo il proprio contenuto
+    expect(primaChunk).toContain("Conferma");
+    expect(primaChunk).not.toContain("### SchermataDue");
+    expect(primaChunk).not.toContain("Invia");
+
+    expect(dueChunk).toContain("Invia");
+    expect(dueChunk).not.toContain("### SchermataPrima");
+    expect(dueChunk).not.toContain("Conferma");
+  });
+});
