@@ -63,6 +63,10 @@ args = "check-ai-direct-generateobject"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
+args = "check-appsettings-raw-writes"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
 args = "Triage Horus"
 
   [[workflows.workflow]]
@@ -163,6 +167,17 @@ author = "agent"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "bash scripts/check-ai-direct-generateobject.sh"
+
+[workflows.workflow.metadata]
+isValidation = true
+
+[[workflows.workflow]]
+name = "check-appsettings-raw-writes"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "bash scripts/check-appsettings-raw-writes.sh"
 
 [workflows.workflow.metadata]
 isValidation = true

@@ -54,3 +54,6 @@ jobs:
 
       - name: AI schema drift check
         run: bash scripts/check-ai-direct-generateobject.sh
+
+      - name: AppSettings raw-write gate
+        run: bash scripts/check-appsettings-raw-writes.sh
