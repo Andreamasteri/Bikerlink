@@ -1,3 +1,4 @@
+// LARGE-FILE-ALLOW: script triage AI monolitico (Ares+Horus aggregation pipeline, split non praticabile)
 /**
  * BikerLink — Triage AI completo con Ares (Task #287)
  *
