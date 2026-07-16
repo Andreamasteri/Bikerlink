@@ -60,10 +60,10 @@ npx tsx scripts/log-analysis-horus.ts --only-internal --tail 100 --dry-run
 | `ARES_OLLAMA_MODEL` | Env/Secret | opzionale | Default `qwen3.6:35b` |
 | `ARES_OLLAMA_TOKEN` | Secret | opzionale | Bearer token se endpoint protetto |
 | `GITHUB_TOKEN` | Secret | ✅ presente | Fetch issue e workflow runs (fallback: `DIAG_GITHUB_TOKEN`) |
-| `SENTRY_AUTH_TOKEN` | Secret | da configurare | User Auth Token Sentry, scope `project:read` |
-| `SENTRY_ORG` | Secret/Env | da configurare | Organization slug Sentry (es. `my-org`) |
-| `SENTRY_PROJECT` | Secret/Env | da configurare | Project slug Sentry (es. `bikerlink`) |
-| `SENTRY_BASE_URL` | Env | da configurare | Default `https://de.sentry.io/api/0` (istanza EU) |
+| `SENTRY_AUTH_TOKEN` | Secret | ✅ presente | User Auth Token Sentry, scope `project:read` |
+| `SENTRY_ORG` | Secret/Env | ✅ presente | Organization slug Sentry (es. `my-org`) |
+| `SENTRY_PROJECT` | Secret/Env | ✅ presente | Project slug Sentry (es. `bikerlink`) |
+| `SENTRY_BASE_URL` | Secret | ✅ presente | Default `https://de.sentry.io/api/0` (istanza EU) |
 
 Per impostare i secret: usa la skill `environment-secrets` (mai scriverli nei file).
 
