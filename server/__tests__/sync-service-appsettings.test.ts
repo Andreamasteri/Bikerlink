@@ -1,5 +1,6 @@
 /**
  * Tests: sync-service — app_settings reads survive DB pressure (Task #330)
+ *         + upsertJsonSetting reaches storage correctly (Task #341)
  *
  * Verifica che le funzioni interne readSetting/readJsonSetting usino
  * storage.getAppSetting (con cache 60s) e NON interroghino mai il DB
@@ -17,9 +18,15 @@
  *       lancerebbe successivamente (la cache è nel layer storage, non qui)
  *   (7) upsertSetting chiama storage.upsertAppSetting con (key, value, undefined)
  *   (8) upsertJsonSetting chiama storage.upsertAppSetting con (key, undefined, value)
+ *       — path successo: syncProdToDev con spawn stubbed → ok: true
+ *   (9) upsertJsonSetting chiama storage.upsertAppSetting con (key, undefined, value)
+ *       — path fallimento: spawn fallisce → ok: false
+ *  (10) failure path: upsertJsonSetting ha .catch(() => {}) — se storage lancia,
+ *       syncProdToDev() non propaga l'errore e restituisce {ok: false}
  */
 
 import { vi, describe, it, expect, beforeEach } from "vitest";
+import { EventEmitter } from "events";
 
 // ── Hoisted: env vars needed before any module resolves ───────────────────────
 
@@ -53,9 +60,20 @@ vi.mock("../db", async () => {
   return createDbMock();
 });
 
+// ── Mock: child_process — stub spawn per testare syncProdToDev senza binari ──
+// mockSpawn è controllabile per-test: restituisce un processo finto che emette
+// "close" con il codice desiderato in modo asincrono.
+
+const { mockSpawn } = vi.hoisted(() => ({ mockSpawn: vi.fn() }));
+
+vi.mock("child_process", () => ({ spawn: mockSpawn }));
+
+// ── Mock: fs — evita operazioni reali sul filesystem (unlinkSync) ─────────────
+vi.mock("fs", () => ({ default: { unlinkSync: vi.fn() } }));
+
 // ── Imports (dopo i mock) ─────────────────────────────────────────────────────
 
-import { getSyncStatus } from "../sync-service";
+import { getSyncStatus, syncProdToDev } from "../sync-service";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -68,6 +86,47 @@ function makeAppSetting(key: string, value?: string, valueJson?: unknown) {
     description: null,
     updatedAt: new Date(),
   };
+}
+
+/**
+ * Restituisce un oggetto processo finto compatibile con child_process.spawn.
+ * Emette l'evento "close" con `exitCode` in modo asincrono (setImmediate),
+ * simulando il completamento del processo senza richiedere binari reali.
+ *
+ * Il processo finto è un EventEmitter reale con stdout/stderr come
+ * EventEmitter separati allegati come proprietà, così proc.on / proc.emit
+ * funzionano correttamente (metodi dal prototype, non copiati via spread).
+ */
+function makeFakeProcess(exitCode: number, stderrOutput = "") {
+  const procEmitter = new EventEmitter();
+  const stdoutEmitter = new EventEmitter();
+  const stderrEmitter = new EventEmitter();
+
+  // Allega stdout/stderr come proprietà del processo mantenendo i metodi
+  // on/emit/once sul prototype dell'EventEmitter principale.
+  const proc = Object.assign(procEmitter, {
+    stdout: stdoutEmitter,
+    stderr: stderrEmitter,
+  });
+
+  // Emetti stderr e "close" nel prossimo tick per lasciare che i listener
+  // vengano registrati prima che l'evento arrivi.
+  setImmediate(() => {
+    if (stderrOutput) {
+      stderrEmitter.emit("data", Buffer.from(stderrOutput));
+    }
+    procEmitter.emit("close", exitCode);
+  });
+
+  return proc;
+}
+
+/** Configura le env var minime affinché syncProdToDev() superi i guard iniziali. */
+function setupSyncEnv() {
+  process.env.PROD_DATABASE_URL = "postgres://prod:prod@prod-host:5432/prod"; // pragma: allowlist secret
+  process.env.DATABASE_URL = "postgres://dev:dev@localhost:5432/dev"; // pragma: allowlist secret
+  delete process.env.REPLIT_DEPLOYMENT;
+  delete process.env.REPLIT_INTERNAL_APP_DOMAIN;
 }
 
 beforeEach(() => {
@@ -185,11 +244,7 @@ describe("upsertSetting / upsertJsonSetting — chiamate a storage.upsertAppSett
     // Importa dinamicamente per poter usare il mock già configurato.
     const { startSyncScheduler, stopSyncScheduler } = await import("../sync-service");
 
-    // Configurazione minima: non siamo in produzione, URLs diversi
-    process.env.PROD_DATABASE_URL = "postgres://prod:prod@prod-host:5432/prod"; // pragma: allowlist secret
-    process.env.DATABASE_URL = "postgres://dev:dev@localhost:5432/dev"; // pragma: allowlist secret
-    delete process.env.REPLIT_DEPLOYMENT;
-    delete process.env.REPLIT_INTERNAL_APP_DOMAIN;
+    setupSyncEnv();
 
     mockUpsertAppSetting.mockResolvedValue(
       makeAppSetting("sync.next_at", "2099-01-01T00:00:00.000Z"),
@@ -206,5 +261,80 @@ describe("upsertSetting / upsertJsonSetting — chiamate a storage.upsertAppSett
       undefined,
       "Prossimo sync prod→dev",
     );
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("upsertJsonSetting — scrittura su storage via syncProdToDev (Task #341)", () => {
+  /**
+   * Verifica che upsertJsonSetting (chiamata internamente da syncProdToDev)
+   * raggiunga storage.upsertAppSetting con la firma corretta:
+   *   storage.upsertAppSetting(key, undefined, value, description)
+   *
+   * "child_process" è mockato con makeFakeProcess: nessun binario reale
+   * viene eseguito. Sia il path di successo che quello di fallimento vengono
+   * coperti.
+   */
+
+  beforeEach(() => {
+    setupSyncEnv();
+    mockUpsertAppSetting.mockResolvedValue(undefined);
+    mockGetAppSetting.mockResolvedValue(null);
+  });
+
+  it("(8) path successo: storage.upsertAppSetting riceve (key, undefined, meta) con ok=true", async () => {
+    // Entrambe le chiamate spawn (pg_dump + psql) terminano con exit code 0.
+    // mockImplementation (non mockReturnValue) garantisce un EventEmitter fresco
+    // per ogni chiamata: il setImmediate del primo processo non deve avere già
+    // esaurito il suo tick quando il secondo listener viene registrato.
+    mockSpawn.mockImplementation(() => makeFakeProcess(0));
+
+    const result = await syncProdToDev();
+
+    expect(result.ok).toBe(true);
+
+    // upsertJsonSetting("sync.last", meta, "Ultimo sync prod→dev")
+    // → storage.upsertAppSetting("sync.last", undefined, <meta>, "Ultimo sync prod→dev")
+    expect(mockUpsertAppSetting).toHaveBeenCalledWith(
+      "sync.last",
+      undefined,
+      expect.objectContaining({ ok: true, startedAt: expect.any(String), finishedAt: expect.any(String) }),
+      "Ultimo sync prod→dev",
+    );
+  });
+
+  it("(9) path fallimento (spawn esce con codice 1): storage.upsertAppSetting riceve meta con ok=false", async () => {
+    // Prima chiamata (pg_dump) fallisce con codice 1.
+    mockSpawn.mockReturnValue(makeFakeProcess(1, "pg_dump: connection refused"));
+
+    const result = await syncProdToDev();
+
+    expect(result.ok).toBe(false);
+    expect(result.error).toMatch(/exited with code 1/);
+
+    // upsertJsonSetting nel catch → storage.upsertAppSetting("sync.last", undefined, meta, ...)
+    expect(mockUpsertAppSetting).toHaveBeenCalledWith(
+      "sync.last",
+      undefined,
+      expect.objectContaining({ ok: false, startedAt: expect.any(String), finishedAt: expect.any(String) }),
+      "Ultimo sync prod→dev",
+    );
+  });
+
+  it("(10) path fallimento: se storage.upsertAppSetting lancia, syncProdToDev non propaga l'errore", async () => {
+    // spawn fallisce → entra nel catch di syncProdToDev
+    mockSpawn.mockReturnValue(makeFakeProcess(1));
+
+    // upsertAppSetting lancia a sua volta — il .catch(() => {}) nel codice
+    // sorgente deve assorbirlo senza propagare.
+    mockUpsertAppSetting.mockRejectedValue(new Error("storage write failed"));
+
+    // Non deve rigettare la promise
+    const result = await syncProdToDev();
+
+    expect(result.ok).toBe(false);
+    // L'errore riportato è quello di spawn, NON quello di storage
+    expect(result.error).toMatch(/exited with code 1/);
   });
 });
