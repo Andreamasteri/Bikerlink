@@ -380,6 +380,45 @@ describe("buildMapMarkersState — marker cap integration", () => {
     expect(me?.isCurrentUser).toBe(true);
   });
 
+  // ---------------------------------------------------------------------------
+  // Exact-equality tests: total must be EXACTLY 400 when trimming fires
+  // ---------------------------------------------------------------------------
+
+  it("total equals MARKERS_HARD_CAP exactly when pin guard fires with a viewport centre", () => {
+    // 500 users: current user far from centre, 499 others packed near centre.
+    // quota for "users" = 400 (single non-empty category → gets the full cap).
+    // Pin guard: [pinned] + sorted.slice(0, 399) = 400 entries — exact equality.
+    const farCurrentUser: MapUser = {
+      id: CURRENT_USER_ID,
+      latitude: 55.0,
+      longitude: 25.0,
+      userType: "biker" as const,
+      sex: null,
+      nickname: "io_lontano",
+      country: "IT",
+      currentSpeedKph: null,
+      speedProfile: null,
+    };
+    const nearUsers = makeUsers(499, 45.001, 10.001);
+    const filteredUsers = [farCurrentUser, ...nearUsers];
+
+    const encoded = buildMapMarkersState({
+      ...baseParams(),
+      filteredUsers,
+      currentUserId: CURRENT_USER_ID,
+      // userLocation defaults to SESSION_CENTER (45, 10) — far from current user
+    });
+
+    const markers = decodeMarkers(encoded);
+    // Exact equality: quota math must not produce an off-by-one
+    expect(totalMarkers(markers)).toBe(MARKERS_HARD_CAP);
+
+    // Current user must survive despite being the farthest from centre
+    const me = markers.users.find((u) => u.id === CURRENT_USER_ID);
+    expect(me).toBeDefined();
+    expect(me?.isCurrentUser).toBe(true);
+  });
+
   it("bridge payload byte size stays below BRIDGE_PAYLOAD_SAFE_BYTE_LIMIT (500 KB) for a worst-case 400-marker session", () => {
     // Worst-case payload: 400 markers where every string field is at a realistic
     // production upper bound (long nicknames, long workshop names, etc.).
@@ -431,6 +470,41 @@ describe("buildMapMarkersState — marker cap integration", () => {
     // Sanity: all 400 markers must have been kept (no cap triggered).
     const markers = decodeMarkers(encoded);
     expect(totalMarkers(markers)).toBe(400);
+  });
+
+  it("total equals MARKERS_HARD_CAP exactly when pin guard fires with null centre (no viewport)", () => {
+    // Same pin-guard scenario but userLocation is null → array-position fallback.
+    // Pin guard: [pinned] + rest.slice(0, 399) = 400 entries — exact equality.
+    const farCurrentUser: MapUser = {
+      id: CURRENT_USER_ID,
+      latitude: 55.0,
+      longitude: 25.0,
+      userType: "biker" as const,
+      sex: null,
+      nickname: "io_lontano_null",
+      country: "IT",
+      currentSpeedKph: null,
+      speedProfile: null,
+    };
+    // currentUser at index 0, 499 others fill the rest
+    const otherUsers = makeUsers(499, 45.001, 10.001);
+    const filteredUsers = [farCurrentUser, ...otherUsers];
+
+    const encoded = buildMapMarkersState({
+      ...baseParams(),
+      userLocation: null, // null centre → position-based trim
+      filteredUsers,
+      currentUserId: CURRENT_USER_ID,
+    });
+
+    const markers = decodeMarkers(encoded);
+    // Exact equality: quota-1 from rest, pinned prepended → 400 total
+    expect(totalMarkers(markers)).toBe(MARKERS_HARD_CAP);
+
+    // Current user must still survive
+    const me = markers.users.find((u) => u.id === CURRENT_USER_ID);
+    expect(me).toBeDefined();
+    expect(me?.isCurrentUser).toBe(true);
   });
 
   it("total stays exactly below cap across all seven CAPPED categories", () => {
