@@ -14,9 +14,10 @@
  *   npx tsx scripts/log-analysis-horus.ts --dry-run         # mostra bundle, non chiama Horus
  *
  * Secret/env:
- *   OLLAMA_URL    — URL base di Horus (ThinkCentre) via Cloudflare Tunnel (obbligatorio)
- *   OLLAMA_MODEL  — modello da usare (default "qwen3:4b")
- *   OLLAMA_TOKEN  — opzionale, Bearer token se l'endpoint è protetto
+ *   HORUS_OLLAMA_URL    — URL base di Horus (ThinkCentre) via Cloudflare Tunnel (obbligatorio)
+ *   HORUS_OLLAMA_MODEL  — modello da usare (default "qwen3:4b")
+ *   HORUS_OLLAMA_TOKEN  — opzionale, Bearer token se l'endpoint è protetto
+ *   (Alias legacy: OLLAMA_URL / OLLAMA_MODEL / OLLAMA_TOKEN — accettati come fallback)
  *   GITHUB_TOKEN  — token GitHub (fallback: DIAG_GITHUB_TOKEN)
  *   SENTRY_AUTH_TOKEN  — User Auth Token Sentry, scope project:read
  *   SENTRY_ORG         — Organization slug Sentry
@@ -450,6 +451,47 @@ function stripOrphanThinkTags(text: string): string {
   return text.replace(/<\/think>/gi, "").trim();
 }
 
+/**
+ * Se la sezione "## TASK PROPOSTI DA HORUS" contiene una lista (numerata o puntata)
+ * anziché una tabella markdown, la converte in tabella. Lascia invariata la sezione
+ * se è già una tabella (contiene pipe `|`).
+ */
+function normalizeTaskSection(report: string): string {
+  const TASK_HEADER = "## TASK PROPOSTI DA HORUS";
+  const idx = report.indexOf(TASK_HEADER);
+  if (idx === -1) return report;
+
+  const before = report.slice(0, idx + TASK_HEADER.length);
+  const after = report.slice(idx + TASK_HEADER.length);
+
+  // Se c'è già una tabella (almeno una riga con pipe), lascia invariato
+  if (/^\s*\|/m.test(after.split(/\n##/)[0])) return report;
+
+  // Estrai righe della lista (numerate "1. testo" o puntate "- testo" o "* testo")
+  const sectionBody = after.split(/\n##/)[0];
+  const restAfterSection = after.slice(sectionBody.length);
+
+  const listItemRe = /^(?:\d+\.|[-*])\s+(.+)$/;
+  const rows: string[] = [];
+  for (const line of sectionBody.split("\n")) {
+    const m = listItemRe.exec(line.trim());
+    if (m) {
+      const titolo = m[1].slice(0, 80).replace(/\|/g, "—");
+      rows.push(`| ${titolo} | media | vedi analisi | ${titolo} |`);
+    }
+  }
+
+  if (rows.length === 0) return report; // niente da convertire
+
+  const table =
+    "\n| Titolo | Priorità | Problema | Azione |\n" +
+    "|--------|----------|---------|--------|\n" +
+    rows.join("\n") +
+    "\n";
+
+  return before + table + (restAfterSection ? restAfterSection : "");
+}
+
 async function callHorus(
   baseUrl: string,
   model: string,
@@ -496,7 +538,7 @@ async function callHorus(
     if (data.error) throw new Error(`Ollama error: ${data.error}`);
     const raw = data.message?.content?.trim();
     if (!raw) throw new Error("Risposta vuota dal modello.");
-    return stripOrphanThinkTags(raw);
+    return normalizeTaskSection(stripOrphanThinkTags(raw));
   } finally {
     clearTimeout(timer);
   }
@@ -505,9 +547,17 @@ async function callHorus(
 // ─── Main ────────────────────────────────────────────────────────────────────
 
 async function main(): Promise<void> {
-  const baseUrl = process.env.OLLAMA_URL?.trim();
-  const model = process.env.OLLAMA_MODEL?.trim() || DEFAULT_MODEL;
-  const token = process.env.OLLAMA_TOKEN?.trim() || undefined;
+  // Accetta sia HORUS_OLLAMA_* (nomi dei secret nel progetto) sia OLLAMA_* (alias legacy)
+  const baseUrl =
+    process.env.HORUS_OLLAMA_URL?.trim() || process.env.OLLAMA_URL?.trim();
+  const model =
+    process.env.HORUS_OLLAMA_MODEL?.trim() ||
+    process.env.OLLAMA_MODEL?.trim() ||
+    DEFAULT_MODEL;
+  const token =
+    process.env.HORUS_OLLAMA_TOKEN?.trim() ||
+    process.env.OLLAMA_TOKEN?.trim() ||
+    undefined;
   const tail = parseTailArg();
 
   console.log("════════════════════════════════════════════════════════════");
@@ -631,11 +681,13 @@ Elenco puntato dei problemi concreti identificati nei dati. Ogni voce deve esser
 Per ciascun problema trovato, spiega la causa radice più probabile in base ai dati disponibili. Sii conciso ma preciso. Se la causa non è determinabile dai dati, dillo esplicitamente.
 
 ## TASK PROPOSTI DA HORUS
-Tabella markdown con i task da creare per risolvere i problemi trovati:
+DEVI usare ESATTAMENTE questo formato tabella markdown (con intestazione e separatore):
 
 | Titolo | Priorità | Problema | Azione |
 |--------|----------|---------|--------|
 | [titolo breve] | alta/media/bassa | [riferimento al problema] | [azione specifica da intraprendere] |
+
+NON usare liste numerate. NON usare elenchi puntati. SOLO la tabella markdown sopra.
 
 Regole per i task proposti:
 - Titolo: concreto, orientato all'impatto, max 80 caratteri.
