@@ -422,6 +422,7 @@ describe("POST /ota/emergency/toggle — cache invalidation", () => {
     mockDbSelect.mockReturnValueOnce(
       makeSelectChain([{ id: "approved-release" }]), // approved guard
     );
+    // storage.upsertAppSetting → db.insert().values().onConflictDoUpdate().returning()
     mockDbInsert.mockReturnValueOnce(makeInsertChain());
 
     const res = await request(buildOtaApp())
