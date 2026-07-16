@@ -1,23 +1,23 @@
 /**
- * BikerLink — Triage AI completo con Ares (Task #287)
+ * BikerLink — Triage AI completo con Horus
  *
  * Aggrega tutte le fonti di log di BikerLink (DB interno, filesystem, GitHub
- * Issues/Actions, Sentry EU) e le invia al modello Ares (qwen3.6:35b su PC
- * fisso + GPU) per un'analisi AI strutturata. Il report include problemi trovati,
- * analisi cause e proposte di task che l'agente planner revisionerà prima di
- * creare formalmente.
+ * Issues/Actions, Sentry EU) e le invia al modello Horus (qwen3:4b sul
+ * ThinkCentre via Ollama) per un'analisi AI strutturata. Il report include
+ * problemi trovati, analisi cause e proposte di task che l'agente planner
+ * revisionerà prima di creare formalmente.
  *
  * Uso:
  *   npx tsx scripts/log-analysis-horus.ts
  *   npx tsx scripts/log-analysis-horus.ts --only-internal   # salta GitHub e Sentry
  *   npx tsx scripts/log-analysis-horus.ts --tail 500        # più righe per log
- *   npx tsx scripts/log-analysis-horus.ts --dry-run         # mostra bundle, non chiama Ares
+ *   npx tsx scripts/log-analysis-horus.ts --dry-run         # mostra bundle, non chiama Horus
  *
  * Secret/env:
- *   ARES_OLLAMA_URL    — URL base di Ares via Cloudflare Tunnel (obbligatorio)
- *   ARES_OLLAMA_MODEL  — modello da usare (default "qwen3.6:35b")
- *   ARES_OLLAMA_TOKEN  — opzionale, Bearer token se l'endpoint è protetto
- *   GITHUB_TOKEN       — token GitHub (fallback: DIAG_GITHUB_TOKEN)
+ *   OLLAMA_URL    — URL base di Horus (ThinkCentre) via Cloudflare Tunnel (obbligatorio)
+ *   OLLAMA_MODEL  — modello da usare (default "qwen3:4b")
+ *   OLLAMA_TOKEN  — opzionale, Bearer token se l'endpoint è protetto
+ *   GITHUB_TOKEN  — token GitHub (fallback: DIAG_GITHUB_TOKEN)
  *   SENTRY_AUTH_TOKEN  — User Auth Token Sentry, scope project:read
  *   SENTRY_ORG         — Organization slug Sentry
  *   SENTRY_PROJECT     — Project slug Sentry
@@ -48,10 +48,10 @@ const LOG_FILES: string[] = [
 /** Righe finali da prendere per ogni file di log (override con --tail N). */
 const DEFAULT_TAIL_LINES = 300;
 
-/** Timeout chiamata Ares (ms). Il 35b su GPU impiega 1-3 min; su CPU fino a 10 min. */
+/** Timeout chiamata Horus (ms). Il qwen3:4b sul ThinkCentre impiega tipicamente 20-60s. */
 const REQUEST_TIMEOUT_MS = 300_000;
 
-const DEFAULT_MODEL = "qwen3.6:35b";
+const DEFAULT_MODEL = "qwen3:4b";
 const GITHUB_REPO = "Andreamasteri/Bikerlink";
 
 // ─── CLI args ─────────────────────────────────────────────────────────────────
@@ -432,20 +432,25 @@ async function buildBundle(tail: number, onlyInternal: boolean): Promise<string>
 
   // ── Richiesta ──
   parts.push(
-    "\n## RICHIESTA AD ARES\n" +
+    "\n## RICHIESTA A HORUS\n" +
       "Analizza tutti i dati qui sopra. Identifica i problemi reali del sistema BikerLink.\n" +
       "Rispondi ESCLUSIVAMENTE con le tre sezioni richieste nel formato specificato:\n" +
       "  ## PROBLEMI TROVATI\n" +
       "  ## ANALISI CAUSE\n" +
-      "  ## TASK PROPOSTI DA ARES\n",
+      "  ## TASK PROPOSTI DA HORUS\n",
   );
 
   return parts.join("\n");
 }
 
-// ─── Chiamata Ares ────────────────────────────────────────────────────────────
+// ─── Chiamata Horus ───────────────────────────────────────────────────────────
 
-async function callAres(
+/** Rimuove tag </think> orfani (senza apertura <think>) prodotti da qwen3 con think:false. */
+function stripOrphanThinkTags(text: string): string {
+  return text.replace(/<\/think>/gi, "").trim();
+}
+
+async function callHorus(
   baseUrl: string,
   model: string,
   token: string | undefined,
@@ -467,7 +472,7 @@ async function callAres(
       body: JSON.stringify({
         model,
         stream: false,
-        options: { temperature: 0.2 },
+        options: { temperature: 0.2, think: false },
         messages: [
           { role: "system", content: SYSTEM_PROMPT },
           { role: "user", content: bundle },
@@ -489,9 +494,9 @@ async function callAres(
 
     const data = (await res.json()) as OllamaResponse;
     if (data.error) throw new Error(`Ollama error: ${data.error}`);
-    const content = data.message?.content?.trim();
-    if (!content) throw new Error("Risposta vuota dal modello.");
-    return content;
+    const raw = data.message?.content?.trim();
+    if (!raw) throw new Error("Risposta vuota dal modello.");
+    return stripOrphanThinkTags(raw);
   } finally {
     clearTimeout(timer);
   }
@@ -500,18 +505,18 @@ async function callAres(
 // ─── Main ────────────────────────────────────────────────────────────────────
 
 async function main(): Promise<void> {
-  const baseUrl = process.env.ARES_OLLAMA_URL?.trim();
-  const model = process.env.ARES_OLLAMA_MODEL?.trim() || DEFAULT_MODEL;
-  const token = process.env.ARES_OLLAMA_TOKEN?.trim() || undefined;
+  const baseUrl = process.env.OLLAMA_URL?.trim();
+  const model = process.env.OLLAMA_MODEL?.trim() || DEFAULT_MODEL;
+  const token = process.env.OLLAMA_TOKEN?.trim() || undefined;
   const tail = parseTailArg();
 
   console.log("════════════════════════════════════════════════════════════");
-  console.log("  [Ares] BikerLink — Triage AI completo");
+  console.log("  [Horus] BikerLink — Triage AI completo");
   console.log("════════════════════════════════════════════════════════════");
   console.log(`  Modello  : ${model}`);
   console.log(`  Tail     : ${tail} righe/log`);
   console.log(`  Fonti    : ${ONLY_INTERNAL ? "solo interne (DB + filesystem)" : "DB + filesystem + GitHub + Sentry"}`);
-  if (IS_DRY_RUN) console.log("  Modalità : DRY-RUN (nessuna chiamata ad Ares)");
+  if (IS_DRY_RUN) console.log("  Modalità : DRY-RUN (nessuna chiamata a Horus)");
   console.log("");
 
   // Raccolta fonti
@@ -521,7 +526,7 @@ async function main(): Promise<void> {
   // Dry-run: stampa bundle ed esci
   if (IS_DRY_RUN) {
     console.log("\n════════════════════════════════════════════════════════════");
-    console.log("  BUNDLE DA INVIARE (dry-run — Ares NON viene chiamato)");
+    console.log("  BUNDLE DA INVIARE (dry-run — Horus NON viene chiamato)");
     console.log("════════════════════════════════════════════════════════════\n");
     console.log(bundle);
     console.log("\n════════════════════════════════════════════════════════════");
@@ -532,26 +537,26 @@ async function main(): Promise<void> {
 
   if (!baseUrl) {
     console.error(
-      "\n❌ ARES_OLLAMA_URL non impostato.\n" +
-        "   Imposta il secret ARES_OLLAMA_URL con l'URL di Ares via Cloudflare Tunnel\n" +
-        "   (es. https://ares.biker-link.net) e riprova.\n",
+      "\n❌ OLLAMA_URL non impostato.\n" +
+        "   Imposta il secret OLLAMA_URL con l'URL di Horus (ThinkCentre) via Cloudflare Tunnel\n" +
+        "   (es. https://tc.biker-link.net) e riprova.\n",
     );
     process.exitCode = 1;
     return;
   }
 
   console.log(
-    `\n  ⏳ Invio ad Ares (timeout ${REQUEST_TIMEOUT_MS / 1000}s, il 35b può impiegare 1-10 min)...\n`,
+    `\n  ⏳ Invio a Horus (timeout ${REQUEST_TIMEOUT_MS / 1000}s, qwen3:4b impiega tipicamente 20-60s)...\n`,
   );
 
   let report: string;
   try {
-    report = await callAres(baseUrl, model, token, bundle);
+    report = await callHorus(baseUrl, model, token, bundle);
   } catch (err) {
     const e = err as Error & { cause?: { code?: string } };
     const isAbort = e.name === "AbortError";
     const code = e.cause?.code;
-    console.error("\n❌ Analisi non riuscita: Ares non ha risposto.");
+    console.error("\n❌ Analisi non riuscita: Horus non ha risposto.");
     if (isAbort) {
       console.error(
         `   Timeout dopo ${REQUEST_TIMEOUT_MS / 1000}s — il modello è troppo lento o l'host non risponde.`,
@@ -562,13 +567,13 @@ async function main(): Promise<void> {
       code === "EAI_AGAIN"
     ) {
       console.error(
-        "   Host irraggiungibile (PC spento o Cloudflare Tunnel giù).",
+        "   Host irraggiungibile (ThinkCentre spento o Cloudflare Tunnel giù).",
       );
     }
     console.error(`   Dettaglio: ${e.message}`);
     console.error(
-      "\n   Verifica che Ares (PC fisso) sia acceso, Ollama in esecuzione\n" +
-        "   e che l'hostname in ARES_OLLAMA_URL sia raggiungibile.\n",
+      "\n   Verifica che il ThinkCentre sia acceso, Ollama in esecuzione\n" +
+        "   e che l'hostname in OLLAMA_URL sia raggiungibile.\n",
     );
     process.exitCode = 1;
     return;
@@ -582,7 +587,7 @@ async function main(): Promise<void> {
     fs.mkdirSync(outDir, { recursive: true });
     const header =
       `# Triage AI BikerLink — ${new Date().toISOString()}\n\n` +
-      `- Istanza: Ares (PC fisso)\n` +
+      `- Istanza: Horus (ThinkCentre)\n` +
       `- Modello: \`${model}\`\n` +
       `- Fonti: ${ONLY_INTERNAL ? "DB + filesystem" : "DB + filesystem + GitHub + Sentry"}\n` +
       `- Tail log: ${tail} righe\n\n` +
@@ -602,7 +607,7 @@ async function main(): Promise<void> {
   console.log("\n════════════════════════════════════════════════════════════");
   console.log(`  💾 Report salvato in: ${path.relative(ROOT, outPath)}`);
   console.log("════════════════════════════════════════════════════════════");
-  console.log("\n⚠️  Le proposte di Ares NON vengono create automaticamente.");
+  console.log("\n⚠️  Le proposte di Horus NON vengono create automaticamente.");
   console.log("   Il planner revisionerà il report prima di creare i task.\n");
 }
 
@@ -613,9 +618,9 @@ main().catch((err) => {
 
 // ─── System Prompt ────────────────────────────────────────────────────────────
 
-const SYSTEM_PROMPT = `Sei Ares, un ingegnere senior specializzato nell'architettura e nel triage del sistema BikerLink.
+const SYSTEM_PROMPT = `Sei Horus, un ingegnere senior specializzato nell'architettura e nel triage del sistema BikerLink.
 
-BikerLink è un'app mobile React Native / Expo per motociclisti (backend Express + PostgreSQL, ThinkCentre self-hosted con Ollama per AI routing e chat, Cloudflare Tunnel per l'esposizione dei servizi). L'istanza Ollama principale è su ThinkCentre (Bowie=assistente, Horus=routing). Ares (tu) sei su un PC fisso con GPU dedicato.
+BikerLink è un'app mobile React Native / Expo per motociclisti (backend Express + PostgreSQL, ThinkCentre self-hosted con Ollama per AI routing e chat, Cloudflare Tunnel per l'esposizione dei servizi). Tu (Horus) sei il modello AI per il routing intelligente e il triage sul ThinkCentre. Bowie è l'assistente in-app.
 
 Il tuo compito è analizzare i dati aggregati ricevuti (log DB, log filesystem, GitHub Issues, GitHub Actions, Sentry) e produrre un report strutturato in tre sezioni FISSE, nell'ordine esatto indicato:
 
@@ -625,7 +630,7 @@ Elenco puntato dei problemi concreti identificati nei dati. Ogni voce deve esser
 ## ANALISI CAUSE
 Per ciascun problema trovato, spiega la causa radice più probabile in base ai dati disponibili. Sii conciso ma preciso. Se la causa non è determinabile dai dati, dillo esplicitamente.
 
-## TASK PROPOSTI DA ARES
+## TASK PROPOSTI DA HORUS
 Tabella markdown con i task da creare per risolvere i problemi trovati:
 
 | Titolo | Priorità | Problema | Azione |
