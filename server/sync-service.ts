@@ -2,9 +2,7 @@ import { spawn } from "child_process";
 import fs from "fs";
 import os from "os";
 import path from "path";
-import { db } from "./db";
-import { appSettings } from "@shared/db";
-import { eq } from "drizzle-orm";
+import { storage } from "./storage";
 
 const INTERVAL_MS = 6 * 60 * 60 * 1000; // 6 ore
 
@@ -20,36 +18,26 @@ interface SyncMeta {
 
 async function readSetting(key: string): Promise<string | null> {
   try {
-    const rows = await db.select().from(appSettings).where(eq(appSettings.key, key));
-    return rows.length > 0 ? (rows[0].value ?? null) : null;
+    const row = await storage.getAppSetting(key);
+    return row?.value ?? null;
   } catch {
     return null;
   }
 }
 
-async function upsertSetting(key: string, value: string, description?: string) {
-  const existing = await db.select().from(appSettings).where(eq(appSettings.key, key));
-  if (existing.length > 0) {
-    await db.update(appSettings).set({ value, updatedAt: new Date() }).where(eq(appSettings.key, key));
-  } else {
-    await db.insert(appSettings).values({ key, value, description });
-  }
+async function upsertSetting(key: string, value: string, _description?: string) {
+  await storage.upsertAppSetting(key, value, undefined);
 }
 
-async function upsertJsonSetting(key: string, value: unknown, description?: string) {
-  const existing = await db.select().from(appSettings).where(eq(appSettings.key, key));
-  if (existing.length > 0) {
-    await db.update(appSettings).set({ valueJson: value as Record<string, unknown>, updatedAt: new Date() }).where(eq(appSettings.key, key));
-  } else {
-    await db.insert(appSettings).values({ key, valueJson: value as Record<string, unknown>, description });
-  }
+async function upsertJsonSetting(key: string, value: unknown, _description?: string) {
+  await storage.upsertAppSetting(key, undefined, value);
 }
 
 async function readJsonSetting<T>(key: string): Promise<T | null> {
   try {
-    const rows = await db.select().from(appSettings).where(eq(appSettings.key, key));
-    if (rows.length === 0 || rows[0].valueJson == null) return null;
-    return rows[0].valueJson as T;
+    const row = await storage.getAppSetting(key);
+    if (!row || row.valueJson == null) return null;
+    return row.valueJson as T;
   } catch {
     return null;
   }

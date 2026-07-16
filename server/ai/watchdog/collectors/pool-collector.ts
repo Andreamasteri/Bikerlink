@@ -19,7 +19,16 @@
 import pg from "pg";
 import { getPoolStats, getCheckedOutConnections, APP_NAME } from "../../../db";
 import { getBgDbLimiterStats } from "../../../lib/bg-db-limiter";
+import { storage } from "../../../storage";
 import type { Signal } from "../types";
+
+// ── Local TTL cache for the idle-kill AppSetting ───────────────────────────
+// Mirrors the pattern in server/lib/thinkcentre-offline.ts: throttle reads on
+// app_settings to at most once per TTL window so pool-pressure probes never
+// storm the DB with repeated reads under a bg-db-limiter kill-switch.
+const IDLE_KILL_CACHE_TTL_MS = 3 * 60_000;
+let idleKillCached: boolean | null = null;
+let idleKillCachedAt = 0;
 
 // Consecutive over-threshold samples required to escalate. Matches the
 // db-collector anti-blip pattern (CONSECUTIVE_SLOW_FOR_HIGH = 3).
@@ -74,6 +83,10 @@ export function resetState(): void {
   prevDroppedTimeoutTotal = 0;
   consecutiveLimiterDrops = 0;
   lastIdleLeak = null;
+  // Invalida anche la cache del kill-switch così il prossimo probe rilegge il
+  // valore corrente invece di riusare un valore stantio del ciclo precedente.
+  idleKillCached = null;
+  idleKillCachedAt = 0;
 }
 
 // Totali cumulativi (dal boot) degli scarti del bg-db-limiter visti all'ultimo
@@ -217,15 +230,18 @@ async function detectIdleLeak(client: pg.Client): Promise<void> {
   if (anomalous.length >= IDLE_LEAK_THRESHOLD) {
     let killEnabled = false;
     try {
-      const settingRes = await client.query<{ value: string | null; value_json: unknown }>(
-        `SELECT value, value_json FROM app_settings WHERE key = $1`,
-        [IDLE_KILL_SETTING_KEY],
-      );
-      const row = settingRes.rows[0];
-      killEnabled =
-        row?.value === "true" ||
-        row?.value_json === true ||
-        (typeof row?.value_json === "string" && row.value_json === "true");
+      // TTL cache: evita query ripetute su app_settings durante pressione DB.
+      // Mirrors the pattern in server/lib/thinkcentre-offline.ts.
+      const now = Date.now();
+      if (idleKillCached === null || now - idleKillCachedAt >= IDLE_KILL_CACHE_TTL_MS) {
+        const row = await storage.getAppSetting(IDLE_KILL_SETTING_KEY);
+        idleKillCached =
+          row?.value === "true" ||
+          row?.valueJson === true ||
+          (typeof row?.valueJson === "string" && row.valueJson === "true");
+        idleKillCachedAt = Date.now();
+      }
+      killEnabled = idleKillCached ?? false;
     } catch {
       /* AppSetting illeggibile → kill disabilitato (fail-safe). */
     }
