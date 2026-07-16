@@ -231,4 +231,40 @@ describe("decideEngineWithAI — think:false per Ollama", () => {
 
     expect(decision!.confidence).toBe(1); // clampato a 1
   });
+
+  // Task #279 — Smoke verification: la decisione restituita da Ollama con think:false
+  // ha tutti i campi richiesti non-null, coerente con il test live su qwen3:1.7b che
+  // ha prodotto engine/confidence/reason validi in ~1.9s senza reasoning leak.
+  it("decisione Ollama ha engine, confidence e reason non-null (smoke verification Task #279)", async () => {
+    providerMocks.tryBuildOllama.mockReturnValue({
+      id: "ollama",
+      providerName: "ollama",
+      modelId: "qwen3:1.7b",
+      model: ollamaModel,
+      scheduler: <T>(fn: () => Promise<T>) => fn(),
+    });
+    // Risposta che rispecchia l'output live osservato durante la verifica Task #279
+    aiMocks.generateObject.mockResolvedValue({
+      object: {
+        engine: "valhalla",
+        confidence: 0.95,
+        reason:
+          "Valhalla è configurato e ha performance elevate nella zona; stile curvy favorisce Valhalla",
+      },
+    });
+
+    const decision = await decideEngineWithAI(FAKE_CTX, 800, 400);
+
+    // engine deve essere uno dei due candidati
+    expect(["graphhopper", "valhalla"]).toContain(decision!.engine);
+    // confidence deve essere nel range [0, 1] e non-null
+    expect(decision!.confidence).not.toBeNull();
+    expect(decision!.confidence).toBeGreaterThanOrEqual(0);
+    expect(decision!.confidence).toBeLessThanOrEqual(1);
+    // reason deve essere una stringa non vuota
+    expect(typeof decision!.reason).toBe("string");
+    expect(decision!.reason.length).toBeGreaterThan(0);
+    // provider="ollama" conferma che la risposta viene da Ollama, non dal fallback deterministico
+    expect(decision!.provider).toBe("ollama");
+  });
 });
