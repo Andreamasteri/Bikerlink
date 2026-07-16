@@ -29,6 +29,7 @@
 const http = require("http");
 const net  = require("net");
 const os   = require("os");
+const fs   = require("fs");
 const nodePath = require("path");
 const { execSync, exec } = require("child_process");
 
@@ -67,60 +68,201 @@ const PROXY_TIMEOUT_MS = 5000;
 
 // ── Helpers metriche ─────────────────────────────────────────────────────────
 
-function getCpuMetrics() {
-  const load  = os.loadavg();
-  const cores = os.cpus().length;
+function readFile(path) {
+  try { return fs.readFileSync(path, "utf8"); } catch { return ""; }
+}
+
+// CPU/GPU temperatura via `sensors`
+function parseSensors() {
+  let output = "";
+  try { output = execSync("sensors 2>/dev/null", { timeout: 3000 }).toString(); } catch { return { cpuTempC: null, gpuTempC: null }; }
+
+  let cpuTempC = null;
+  let gpuTempC = null;
+
+  for (const line of output.split("\n")) {
+    const lower = line.toLowerCase();
+    // CPU: cerca Core 0, Package id 0, Tctl, cpu_temp
+    if (cpuTempC === null && /core\s*0|package\s*id\s*0|tctl|cpu_temp|cpu_thermal/i.test(line)) {
+      const m = line.match(/[+-]?(\d+(?:\.\d+)?)\s*°?C/i);
+      if (m) cpuTempC = parseFloat(m[1]);
+    }
+    // GPU: cerca edge, gpu, amdgpu, nvidia
+    if (gpuTempC === null && /\bedge\b|amdgpu|nvidia|gpu/i.test(lower)) {
+      const m = line.match(/[+-]?(\d+(?:\.\d+)?)\s*°?C/i);
+      if (m) gpuTempC = parseFloat(m[1]);
+    }
+  }
+
+  // Fallback: qualsiasi linea con °C se non trovato ancora
+  if (cpuTempC === null) {
+    for (const line of output.split("\n")) {
+      const m = line.match(/[+-]?(\d+(?:\.\d+)?)\s*°?C/i);
+      if (m) { cpuTempC = parseFloat(m[1]); break; }
+    }
+  }
+
+  return { cpuTempC, gpuTempC };
+}
+
+// GPU utilizzo, VRAM, temperatura via nvidia-smi. Degrada a null se assente.
+function parseGpu() {
+  let output = "";
+  try {
+    output = execSync(
+      "nvidia-smi --query-gpu=utilization.gpu,memory.used,memory.total,temperature.gpu,name --format=csv,noheader,nounits 2>/dev/null",
+      { timeout: 3000 },
+    ).toString().trim();
+  } catch {
+    return { gpuUtilPct: null, vramUsedMb: null, vramTotalMb: null, gpuTempC: null, gpuName: null };
+  }
+  const line = output.split("\n")[0] ?? "";
+  const cols = line.split(",").map((s) => s.trim());
+  if (cols.length < 4) {
+    return { gpuUtilPct: null, vramUsedMb: null, vramTotalMb: null, gpuTempC: null, gpuName: null };
+  }
+  const num = (v) => (v !== undefined && v !== "" && !Number.isNaN(Number(v)) ? Math.round(Number(v)) : null);
   return {
-    loadAvg1:  parseFloat(load[0].toFixed(2)),
-    loadAvg5:  parseFloat(load[1].toFixed(2)),
-    loadAvg15: parseFloat(load[2].toFixed(2)),
-    cores,
+    gpuUtilPct:  num(cols[0]),
+    vramUsedMb:  num(cols[1]),
+    vramTotalMb: num(cols[2]),
+    gpuTempC:    num(cols[3]),
+    // il nome può contenere virgole → riunisci il resto
+    gpuName:     cols.slice(4).join(",").trim() || null,
   };
 }
 
-function getMemoryMetrics() {
-  const totalBytes = os.totalmem();
-  const freeBytes  = os.freemem();
-  const usedBytes  = totalBytes - freeBytes;
-  const totalMb    = Math.round(totalBytes / 1024 / 1024);
-  const usedMb     = Math.round(usedBytes  / 1024 / 1024);
-  const freeMb     = Math.round(freeBytes  / 1024 / 1024);
-  const usedPercent = Math.round((usedBytes / totalBytes) * 100);
-  return { totalMb, usedMb, freeMb, usedPercent };
-}
-
-function getDiskMetrics(path) {
-  try {
-    const out = execSync(`df -B1 "${path}" 2>/dev/null`, { timeout: 3000 })
-      .toString().trim().split("\n");
-    if (out.length < 2) return null;
-    const cols = out[1].split(/\s+/);
-    const totalBytes = parseInt(cols[1], 10);
-    const usedBytes  = parseInt(cols[2], 10);
-    const freeBytes  = parseInt(cols[3], 10);
-    if (isNaN(totalBytes) || totalBytes === 0) return null;
-    return {
-      totalGb:    parseFloat((totalBytes / 1e9).toFixed(1)),
-      usedGb:     parseFloat((usedBytes  / 1e9).toFixed(1)),
-      freeGb:     parseFloat((freeBytes  / 1e9).toFixed(1)),
-      usedPercent: Math.round((usedBytes / totalBytes) * 100),
-    };
-  } catch {
-    return null;
-  }
-}
-
-function getUptimeSec() {
-  return Math.floor(os.uptime());
-}
-
-function buildMetrics() {
+// RAM/Swap da /proc/meminfo
+function parseMeminfo() {
+  const raw = readFile("/proc/meminfo");
+  const get = (key) => {
+    const m = raw.match(new RegExp(`^${key}:\\s+(\\d+)`, "m"));
+    return m ? parseInt(m[1], 10) : 0;
+  };
+  const memTotalKb  = get("MemTotal");
+  const memAvailKb  = get("MemAvailable");
+  const swapTotalKb = get("SwapTotal");
+  const swapFreeKb  = get("SwapFree");
   return {
-    cpu:      getCpuMetrics(),
-    memory:   getMemoryMetrics(),
-    disk:     getDiskMetrics(DISK_PATH),
-    uptimeSec: getUptimeSec(),
-    checkedAt: Date.now(),
+    ramTotalMb:  Math.round(memTotalKb  / 1024),
+    ramUsedMb:   Math.round((memTotalKb - memAvailKb) / 1024),
+    swapTotalMb: Math.round(swapTotalKb / 1024),
+    swapUsedMb:  Math.round((swapTotalKb - swapFreeKb) / 1024),
+  };
+}
+
+// CPU load da /proc/loadavg
+function parseLoadavg() {
+  const raw = readFile("/proc/loadavg");
+  const parts = raw.trim().split(" ");
+  return {
+    loadAvg1: parseFloat(parts[0]) || 0,
+    loadAvg5: parseFloat(parts[1]) || 0,
+  };
+}
+
+// Rete da /proc/net/dev — prima interfaccia non-loopback/non-docker
+function parseNetDev() {
+  const raw = readFile("/proc/net/dev");
+  const lines = raw.split("\n").slice(2); // salta header
+  for (const line of lines) {
+    const cols = line.trim().split(/\s+/);
+    const iface = (cols[0] ?? "").replace(":", "");
+    if (!iface || iface === "lo" || iface.startsWith("veth") || iface.startsWith("docker") || iface.startsWith("br-")) continue;
+    return {
+      iface,
+      rxBytes: parseInt(cols[1], 10) || 0,
+      txBytes: parseInt(cols[9], 10) || 0,
+    };
+  }
+  return { iface: "", rxBytes: 0, txBytes: 0 };
+}
+
+// I/O disco da /proc/diskstats — primo disco fisico
+function parseDiskStats() {
+  const raw = readFile("/proc/diskstats");
+  for (const line of raw.split("\n")) {
+    const cols = line.trim().split(/\s+/);
+    const dev = cols[2] ?? "";
+    if (/^(sd[a-z]|nvme\d+n\d+|vda|hda)$/.test(dev)) {
+      return {
+        dev,
+        sectorsRead:    parseInt(cols[5],  10) || 0,
+        sectorsWritten: parseInt(cols[9],  10) || 0,
+      };
+    }
+  }
+  return { dev: "", sectorsRead: 0, sectorsWritten: 0 };
+}
+
+// Delta rete + disco su 1s
+function sampleWithDelta() {
+  return new Promise((resolve) => {
+    const net1  = parseNetDev();
+    const disk1 = parseDiskStats();
+    setTimeout(() => {
+      const net2  = parseNetDev();
+      const disk2 = parseDiskStats();
+      const netRxKBs   = Math.max(0, Math.round((net2.rxBytes - net1.rxBytes) / 1024));
+      const netTxKBs   = Math.max(0, Math.round((net2.txBytes - net1.txBytes) / 1024));
+      // 1 settore = 512 byte
+      const diskReadKBs  = Math.max(0, Math.round(((disk2.sectorsRead    - disk1.sectorsRead)    * 512) / 1024));
+      const diskWriteKBs = Math.max(0, Math.round(((disk2.sectorsWritten - disk1.sectorsWritten) * 512) / 1024));
+      resolve({ netRxKBs, netTxKBs, diskReadKBs, diskWriteKBs });
+    }, 1000);
+  });
+}
+
+// Mount points / e /home (esclude /home se stessa partizione di /)
+function diskMounts() {
+  const mounts = [];
+  for (const path of ["/", "/home"]) {
+    try {
+      const st = fs.statfsSync(path);
+      const totalGb = parseFloat(((st.blocks * st.bsize) / 1e9).toFixed(1));
+      const freeGb  = parseFloat(((st.bfree  * st.bsize) / 1e9).toFixed(1));
+      const usedGb  = parseFloat((totalGb - freeGb).toFixed(1));
+      const usedPct = totalGb > 0 ? Math.round((usedGb / totalGb) * 100) : 0;
+      mounts.push({ path, usedGb, totalGb, usedPct });
+    } catch { /* mount non esiste */ }
+  }
+  // rimuovi /home se stesso dispositivo di / (stesso totalGb ≈ stessa partizione)
+  if (mounts.length === 2 && Math.abs(mounts[0].totalGb - mounts[1].totalGb) < 1) {
+    return [mounts[0]];
+  }
+  return mounts;
+}
+
+// Costruisce il payload flat atteso da ThinkCentreSystemMonitor.tsx
+async function buildMetrics() {
+  const [temps, gpu, delta] = await Promise.all([
+    Promise.resolve(parseSensors()),
+    Promise.resolve(parseGpu()),
+    sampleWithDelta(),
+  ]);
+  const mem  = parseMeminfo();
+  const load = parseLoadavg();
+  return {
+    cpuTempC:     temps.cpuTempC,
+    // nvidia-smi è più affidabile di `sensors` per la GPU
+    gpuTempC:     gpu.gpuTempC ?? temps.gpuTempC,
+    gpuUtilPct:   gpu.gpuUtilPct,
+    vramUsedMb:   gpu.vramUsedMb,
+    vramTotalMb:  gpu.vramTotalMb,
+    gpuName:      gpu.gpuName,
+    loadAvg1:     load.loadAvg1,
+    loadAvg5:     load.loadAvg5,
+    ramUsedMb:    mem.ramUsedMb,
+    ramTotalMb:   mem.ramTotalMb,
+    swapUsedMb:   mem.swapUsedMb,
+    swapTotalMb:  mem.swapTotalMb,
+    netRxKBs:     delta.netRxKBs,
+    netTxKBs:     delta.netTxKBs,
+    diskReadKBs:  delta.diskReadKBs,
+    diskWriteKBs: delta.diskWriteKBs,
+    diskMounts:   diskMounts(),
+    uptimeSec:    Math.floor(os.uptime()),
+    checkedAt:    Date.now(),
   };
 }
 
@@ -256,7 +398,7 @@ const server = http.createServer(async (req, res) => {
   // Metriche hardware
   if (method === "GET" && path === "/sys-metrics") {
     try {
-      const data = buildMetrics();
+      const data = await buildMetrics();
       res.writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-store" });
       res.end(JSON.stringify(data));
     } catch (err) {
