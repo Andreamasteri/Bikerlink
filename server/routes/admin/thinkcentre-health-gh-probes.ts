@@ -103,7 +103,7 @@ export async function graphHopperRouteProbe(
   base: string,
   token: string | undefined,
   points: [number, number][] = [[9.19, 45.46], [9.08, 45.81]],
-): Promise<{ ok: boolean; latencyMs: number | null; status?: number; error?: string }> {
+): Promise<{ ok: boolean; latencyMs: number | null; status?: number; error?: string; warn?: string }> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), PROBE_TIMEOUT_MS);
   const t0 = Date.now();
@@ -126,6 +126,12 @@ export async function graphHopperRouteProbe(
     if (res.status >= 200 && res.status < 300) return { ok: true, latencyMs, status: res.status };
     const body = await readBodySafe(res);
     const bodySnippet = body.trim().slice(0, 400);
+    // HTTP 400 + PointNotFoundException → il motore è vivo ma il punto di probe
+    // è fuori dalla rete stradale (es. bbox-center finisce in mare o su un monte).
+    // Non è un guasto del motore: classificare come "alive, probe off-road".
+    if (res.status === 400 && /PointNotFoundException/i.test(body)) {
+      return { ok: true, latencyMs, status: 400, warn: "probe-point-off-road" };
+    }
     let error: string;
     if (res.status === 401 || res.status === 403) {
       error = ghAuthMismatchError(res.status, !token || token.trim() === "", bodySnippet);
@@ -151,7 +157,27 @@ export async function graphHopperRouteProbe(
   }
 }
 
+/**
+ * Punti di probe noti-routable per area (lon, lat su strada principale).
+ * Usati al posto del centro del bbox, che può finire in mare o su terreno
+ * non mappato per aree costiere/insulari (es. Grecia, Ecuador).
+ * Formato: [lon, lat] — due punti distinti nello stesso centro urbano.
+ */
+const AREA_PROBE_POINTS: Partial<Record<string, [[number, number], [number, number]]>> = {
+  "grecia":          [[23.73, 37.98], [23.82, 37.97]],  // Atene, ring-road
+  "balcani":         [[15.97, 45.81], [16.05, 45.83]],  // Zagabria, A1
+  "est":             [[26.10, 44.43], [26.20, 44.42]],  // Bucarest, DN1
+  "iberia":          [[-3.70, 40.42], [-3.65, 40.44]],  // Madrid, M-30
+  "arco-alpino":     [[9.19, 45.46],  [9.08, 45.52]],   // Milano, tangenziale
+  "germania-centro": [[8.68, 50.11],  [8.77, 50.15]],   // Francoforte, A5
+  "francia-benelux": [[4.83, 45.76],  [4.90, 45.78]],   // Lione, A6
+  "ecuador":         [[-78.47, -0.18], [-78.38, -0.19]], // Quito, Av. Simón Bolívar
+};
+
 export function areaProbePoints(area: RoutingArea): [number, number][] {
+  const hardcoded = AREA_PROBE_POINTS[area.codice];
+  if (hardcoded) return hardcoded;
+  // Fallback: centro del bbox con offset del 10% (funziona per aree terrestri pianeggianti)
   const { minLon, minLat, maxLon, maxLat } = area.bbox;
   const cLon = (minLon + maxLon) / 2;
   const cLat = (minLat + maxLat) / 2;
@@ -161,6 +187,22 @@ export function areaProbePoints(area: RoutingArea): [number, number][] {
     [cLon - dLon, cLat - dLat],
     [cLon + dLon, cLat + dLat],
   ];
+}
+
+/**
+ * Contatore di fallimenti consecutivi per area (chiave = area.codice).
+ * In-process, non persistito. Si azzera al riavvio del server — comportamento
+ * corretto: un riavvio significa fresh probe state.
+ * Il badge GH diventa yellow solo quando consecutiveFailures >= 2 per un'area.
+ */
+const consecutiveFailures = new Map<string, number>();
+
+/**
+ * Solo per i test: azzera i contatori di fallimento consecutivo.
+ * Non usare in produzione.
+ */
+export function resetConsecutiveFailuresForTests(): void {
+  consecutiveFailures.clear();
 }
 
 async function probeGraphHopperArea(
@@ -187,6 +229,8 @@ async function probeGraphHopperArea(
   // (drift) che va reso esplicito, non mascherato da stato verde.
   const health = await httpProbe(`${areaBase}/health`, headers);
   if (health.ok) {
+    // Successo dalla /health: azzera il contatore di fallimenti consecutivi.
+    consecutiveFailures.delete(area.codice);
     recordProbeLog(historyKey, { timestamp: Date.now(), ok: true, latencyMs: health.latencyMs, detail: "health OK" });
     return { ...baseShape, enabled: true, ok: true, startingUp: false, latencyMs: health.latencyMs, history: getHistory(historyKey), probeLog: getProbeLog(historyKey) };
   }
@@ -208,21 +252,60 @@ async function probeGraphHopperArea(
     };
   }
   const route = await graphHopperRouteProbe(areaBase, token, areaProbePoints(area));
-  if (!route.ok) {
-    const finalError = route.error ?? health.error ?? "errore sconosciuto";
-    console.error(`[thinkcentre-probe] graphhopper ${area.codice} KO`, { status: finalError });
-    recordError(historyKey, finalError);
-    recordProbeLog(historyKey, { timestamp: Date.now(), ok: false, latencyMs: route.latencyMs, detail: finalError });
-  } else {
-    recordProbeLog(historyKey, { timestamp: Date.now(), ok: true, latencyMs: route.latencyMs, detail: "route OK" });
+
+  if (route.ok) {
+    // Successo (include il caso warn="probe-point-off-road": motore vivo, punto fuori strada).
+    consecutiveFailures.delete(area.codice);
+    if (route.warn === "probe-point-off-road") {
+      console.warn(`[thinkcentre-probe] graphhopper ${area.codice} — punto di probe fuori strada (PointNotFoundException), motore OK`);
+      recordProbeLog(historyKey, { timestamp: Date.now(), ok: true, latencyMs: route.latencyMs, detail: "route OK (probe point off-road, engine alive)" });
+    } else {
+      recordProbeLog(historyKey, { timestamp: Date.now(), ok: true, latencyMs: route.latencyMs, detail: "route OK" });
+    }
+    return {
+      ...baseShape,
+      enabled: true,
+      ok: true,
+      startingUp: false,
+      latencyMs: route.latencyMs,
+      history: getHistory(historyKey),
+      probeLog: getProbeLog(historyKey),
+    };
   }
+
+  // Fallimento genuino: incrementa il contatore di fallimenti consecutivi.
+  const failures = (consecutiveFailures.get(area.codice) ?? 0) + 1;
+  consecutiveFailures.set(area.codice, failures);
+
+  const finalError = route.error ?? health.error ?? "errore sconosciuto";
+
+  if (failures < 2) {
+    // Primo fallimento: badge rimane verde (isteresi), ma logga come WARN.
+    // Il probeLog registra il fallimento così l'admin può vederlo nei dettagli.
+    console.warn(`[thinkcentre-probe] graphhopper ${area.codice} — primo fallimento (${failures}/2), badge invariato`, { error: finalError });
+    recordProbeLog(historyKey, { timestamp: Date.now(), ok: false, latencyMs: route.latencyMs, detail: `[warn, fallimento ${failures}/2] ${finalError}` });
+    return {
+      ...baseShape,
+      enabled: true,
+      ok: true,           // Badge verde: 1 solo fallimento non basta
+      startingUp: false,
+      latencyMs: route.latencyMs,
+      history: getHistory(historyKey),
+      probeLog: getProbeLog(historyKey),
+    };
+  }
+
+  // ≥ 2 fallimenti consecutivi: badge giallo.
+  console.error(`[thinkcentre-probe] graphhopper ${area.codice} KO (${failures} fallimenti consecutivi)`, { error: finalError });
+  recordError(historyKey, finalError);
+  recordProbeLog(historyKey, { timestamp: Date.now(), ok: false, latencyMs: route.latencyMs, detail: finalError });
   return {
     ...baseShape,
     enabled: true,
-    ok: route.ok,
-    startingUp: route.ok ? false : isStartingUp(historyKey),
+    ok: false,
+    startingUp: isStartingUp(historyKey),
     latencyMs: route.latencyMs,
-    error: route.ok ? undefined : (route.error ?? health.error),
+    error: finalError,
     history: getHistory(historyKey),
     probeLog: getProbeLog(historyKey),
   };
