@@ -91,6 +91,47 @@ set_sshd_option "AllowTcpForwarding" "no"
 set_sshd_option "MaxAuthTries" "3"
 set_sshd_option "LoginGraceTime" "20"
 
+# ── Blocca cloud-init dalla gestione di SSH password auth ─────────────────────
+# cloud-init può rigenerare /etc/ssh/sshd_config.d/50-cloud-init.conf ad ogni
+# reboot/re-provision ripristinando silenziosamente PasswordAuthentication yes.
+# La soluzione è duplice:
+#   1) Dichiariamo ssh_pwauth: false nel config override di cloud-init (ha
+#      precedenza su user-data e sulla logica del modulo ssh).
+#   2) Scriviamo il drop-in 50-cloud-init.conf esplicitamente con "no", così
+#      anche se cloud-init venisse invocato prima della nostra verifica, il
+#      contenuto che scrive rispecchia la nostra policy.
+
+CLOUD_INIT_OVERRIDE_DIR="/etc/cloud/cloud.cfg.d"
+CLOUD_INIT_OVERRIDE="${CLOUD_INIT_OVERRIDE_DIR}/99-bikerlink-ssh.cfg"
+SSHD_DROPIN_DIR="/etc/ssh/sshd_config.d"
+SSHD_DROPIN="${SSHD_DROPIN_DIR}/50-cloud-init.conf"
+
+echo "→ Configurazione cloud-init per bloccare SSH password auth..."
+
+if [[ -d "${CLOUD_INIT_OVERRIDE_DIR}" ]]; then
+  cat > "${CLOUD_INIT_OVERRIDE}" <<'CLOUDINIT'
+# BikerLink — impedisce a cloud-init di abilitare SSH password authentication.
+# Generato da scripts/setup-ssh-hardening-thinkcentre.sh — NON modificare a mano.
+# Ref: https://cloudinit.readthedocs.io/en/latest/reference/modules.html#ssh
+ssh_pwauth: false
+CLOUDINIT
+  chmod 644 "${CLOUD_INIT_OVERRIDE}"
+  echo "   ✓ Creato ${CLOUD_INIT_OVERRIDE} (ssh_pwauth: false)"
+else
+  echo "   ⚠  cloud-init non trovato (${CLOUD_INIT_OVERRIDE_DIR} assente) — skip"
+fi
+
+echo "→ Applicazione/aggiornamento drop-in sshd ${SSHD_DROPIN}..."
+mkdir -p "${SSHD_DROPIN_DIR}"
+cat > "${SSHD_DROPIN}" <<'DROPIN'
+# Gestito da scripts/setup-ssh-hardening-thinkcentre.sh — NON modificare a mano.
+# Sovrascritto anche da cloud-init ma la policy 99-bikerlink-ssh.cfg garantisce
+# che cloud-init stesso scriva "no" a ogni re-provision.
+PasswordAuthentication no
+DROPIN
+chmod 644 "${SSHD_DROPIN}"
+echo "   ✓ ${SSHD_DROPIN} → PasswordAuthentication no"
+
 # ── Verifica sintassi sshd_config ─────────────────────────────────────────────
 echo "→ Verifica sintassi sshd_config..."
 if ! sshd -t; then
@@ -102,6 +143,17 @@ fi
 # ── Riavvio sshd ──────────────────────────────────────────────────────────────
 echo "→ Riavvio sshd..."
 systemctl restart ssh 2>/dev/null || systemctl restart sshd 2>/dev/null
+
+# ── Verifica runtime post-riavvio ─────────────────────────────────────────────
+echo "→ Verifica runtime (sshd -T)..."
+PWAUTH=$(sshd -T 2>/dev/null | grep -i "^passwordauthentication" | awk '{print $2}')
+if [[ "${PWAUTH}" == "no" ]]; then
+  echo "   ✓ passwordauthentication = no (corretto)"
+else
+  echo "   ✗ ERRORE: sshd -T riporta passwordauthentication = ${PWAUTH:-<vuoto>}" >&2
+  echo "     Controllare manualmente /etc/ssh/sshd_config.d/ e /etc/ssh/sshd_config" >&2
+  exit 1
+fi
 
 echo ""
 echo "=== SSH hardening completato ==="
@@ -119,9 +171,14 @@ echo ""
 echo "3. Aprire una NUOVA sessione SSH sulla porta ${SSH_NEW_PORT} PRIMA di chiudere questa:"
 echo "   ssh -p ${SSH_NEW_PORT} utente@192.168.1.35"
 echo ""
+echo "4. Dopo il prossimo riavvio del TC, verificare che l'hardening sia ancora attivo:"
+echo "   ssh -p ${SSH_NEW_PORT} utente@192.168.1.35 'sudo sshd -T | grep passwordauthentication'"
+echo "   (deve restituire: passwordauthentication no)"
+echo ""
 echo "Riepilogo hardening applicato:"
-echo "  PasswordAuthentication  → no"
+echo "  PasswordAuthentication  → no (sshd_config + drop-in + cloud-init)"
 echo "  PermitRootLogin         → no"
 echo "  Port                    → ${SSH_NEW_PORT}"
 echo "  MaxAuthTries            → 3"
 echo "  X11/Agent/TcpForwarding → no"
+echo "  cloud-init override     → ${CLOUD_INIT_OVERRIDE}"

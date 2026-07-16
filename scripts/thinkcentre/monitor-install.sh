@@ -43,7 +43,9 @@ fi
 # ── Pulizia crontab @reboot legacy ───────────────────────────────────────
 CURRENT_CRON=$(crontab -l 2>/dev/null || true)
 if echo "$CURRENT_CRON" | grep -q "stats-server.js"; then
-  NEW_CRON=$(echo "$CURRENT_CRON" | grep -v "stats-server.js")
+  # grep -v ritorna exit 1 quando TUTTE le righe combaciano (crontab vuoto dopo
+  # la rimozione) → con set -e il comando fallirebbe. || true lo previene.
+  NEW_CRON=$(echo "$CURRENT_CRON" | grep -v "stats-server.js" || true)
   echo "$NEW_CRON" | crontab -
   echo "✅ Voce crontab stats-server.js rimossa"
 fi
