@@ -19,6 +19,9 @@
   ],
   "exclude": [
     "node_modules",
-    "bowie-terminal"
+    "bowie-terminal",
+    "e2e",
+    "scripts",
+    "server"
   ]
 }
