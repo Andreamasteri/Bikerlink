@@ -30,6 +30,20 @@ const buildReviewTaskPlanToolSpy = vi.hoisted(() =>
   vi.fn(() => ({ review_task_plan: { description: "review", inputSchema: {}, execute: vi.fn() } })),
 );
 
+// Hub-tool builder spies — Horus-specific (Task #233)
+const buildHubFileToolsSpy = vi.hoisted(() =>
+  vi.fn(() => ({
+    read_file: { description: "leggi file hub", inputSchema: {}, execute: vi.fn() },
+    list_files: { description: "elenca file hub", inputSchema: {}, execute: vi.fn() },
+    save_file: { description: "salva file hub", inputSchema: {}, execute: vi.fn() },
+  })),
+);
+const buildCheckVramToolSpy = vi.hoisted(() =>
+  vi.fn(() => ({
+    check_vram_usage: { description: "VRAM GPU ThinkCentre", inputSchema: {}, execute: vi.fn() },
+  })),
+);
+
 // ---------------------------------------------------------------------------
 // Module mocks
 // ---------------------------------------------------------------------------
@@ -148,8 +162,8 @@ vi.mock("../ai/assistant/user-context", () => ({
 }));
 
 vi.mock("../ai/assistant/tc-hub-tools", () => ({
-  buildHubFileTools: vi.fn(() => ({})),
-  buildCheckVramTool: vi.fn(() => ({})),
+  buildHubFileTools: buildHubFileToolsSpy,
+  buildCheckVramTool: buildCheckVramToolSpy,
 }));
 
 vi.mock("../ai/assistant/hub-file-injection", () => ({
@@ -321,6 +335,8 @@ describe("runAssistantAgent — Horus persona tool calling (Ollama provider)", (
     buildRememberNoteToolSpy.mockClear();
     buildSearchManualToolSpy.mockClear();
     buildReviewTaskPlanToolSpy.mockClear();
+    buildHubFileToolsSpy.mockClear();
+    buildCheckVramToolSpy.mockClear();
   });
 
   // -------------------------------------------------------------------------
@@ -501,5 +517,49 @@ describe("runAssistantAgent — Horus persona tool calling (Ollama provider)", (
       expect(tools).not.toHaveProperty("getBikerStats");
       expect(tools).not.toHaveProperty("getUserPlannedRoutes");
     }
+  });
+
+  // -------------------------------------------------------------------------
+  // (i) buildHubFileTools deve essere invocato con { includeWrite: true }
+  //     durante il turno Horus, e le chiavi che restituisce (read_file,
+  //     list_files, save_file) devono comparire nei tool passati a streamText.
+  //     Un refactor che rimuova la chiamata o cambi includeWrite a false
+  //     farebbe fallire questo test.
+  // -------------------------------------------------------------------------
+
+  it("(i) buildHubFileTools è chiamato con { includeWrite: true } e le sue chiavi raggiungono streamText", async () => {
+    aiMocks.streamText.mockReturnValue(makeStream(["Ho letto il file condiviso."]));
+
+    await runAssistantAgent(BASE_OPTS);
+
+    // buildHubFileTools deve essere stato chiamato esattamente una volta
+    expect(buildHubFileToolsSpy).toHaveBeenCalledTimes(1);
+    // Horus ha permesso di scrittura → includeWrite DEVE essere true
+    expect(buildHubFileToolsSpy).toHaveBeenCalledWith({ includeWrite: true });
+
+    // Le chiavi restituite dal builder (mock) devono essere nel set passato a streamText
+    const callArgs = aiMocks.streamText.mock.calls[0][0] as { tools?: ToolSet };
+    expect(callArgs.tools).toHaveProperty("read_file");
+    expect(callArgs.tools).toHaveProperty("list_files");
+    expect(callArgs.tools).toHaveProperty("save_file");
+  });
+
+  // -------------------------------------------------------------------------
+  // (j) buildCheckVramTool deve essere invocato durante il turno Horus, e la
+  //     chiave check_vram_usage che restituisce deve comparire nei tool passati
+  //     a streamText. Un refactor che rimuova la chiamata non passerebbe.
+  // -------------------------------------------------------------------------
+
+  it("(j) buildCheckVramTool è chiamato una volta e check_vram_usage raggiunge streamText", async () => {
+    aiMocks.streamText.mockReturnValue(makeStream(["La VRAM GPU è al 40%."]));
+
+    await runAssistantAgent(BASE_OPTS);
+
+    // buildCheckVramTool deve essere stato chiamato esattamente una volta
+    expect(buildCheckVramToolSpy).toHaveBeenCalledTimes(1);
+
+    // La chiave restituita dal builder (mock) deve essere nel set passato a streamText
+    const callArgs = aiMocks.streamText.mock.calls[0][0] as { tools?: ToolSet };
+    expect(callArgs.tools).toHaveProperty("check_vram_usage");
   });
 });
