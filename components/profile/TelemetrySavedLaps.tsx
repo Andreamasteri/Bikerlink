@@ -6,7 +6,7 @@ import { apiRequest, queryClient } from "@/lib/query-client";
 import type { IdealLap } from "./types";
 
 export function SavedLapsSection({
-  laps,
+  laps: lapsProp,
   compareMode,
   selectedLaps,
   onCompareToggle,
@@ -18,6 +18,11 @@ export function SavedLapsSection({
   onCompareToggle: () => void;
   onSelectLap: (id: string) => void;
 }) {
+  // Defensive guard: the API could return a non-array shape (e.g. null or an
+  // object); calling .map() on a non-array would crash. Normalise here so the
+  // component is crash-safe regardless of what the parent passes.
+  const laps: IdealLap[] = Array.isArray(lapsProp) ? lapsProp : [];
+
   const confirmDelete = (lap: IdealLap) => {
     Alert.alert(
       `Elimina ${lap.lapName ?? `Giro ${lap.lapNumber}`}`,

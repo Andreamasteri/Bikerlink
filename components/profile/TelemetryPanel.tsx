@@ -224,7 +224,7 @@ export default function TelemetryPanel({ telemetryStats }: Props) {
               />
             ))}
 
-            {idealLapsData && idealLapsData.laps.length > 0 && (
+            {idealLapsData && Array.isArray(idealLapsData.laps) && idealLapsData.laps.length > 0 && (
               <View style={styles.savedLapsSection}>
                 <View style={styles.savedLapsHeader}>
                   <Text style={styles.savedLapsTitle}>
