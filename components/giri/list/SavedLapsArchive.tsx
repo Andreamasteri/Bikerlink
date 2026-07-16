@@ -23,8 +23,12 @@ function useIdealLaps() {
     queryKey: ["/api/telemetry/ideal-laps"],
     queryFn: async () => {
       const res = await apiRequest("GET", "/api/telemetry/ideal-laps");
-      const json = await res.json() as { laps: IdealLap[] };
-      return json.laps ?? [];
+      // Guard: la risposta può avere una shape inattesa se il server restituisce
+      // un formato diverso da { laps: IdealLap[] }. Se json.laps non è un array
+      // (es. undefined, null, oggetto generico), laps.map() sarebbe undefined
+      // e causerebbe un "TypeError: undefined is not a function".
+      const json = await res.json() as { laps?: unknown };
+      return Array.isArray(json?.laps) ? (json.laps as IdealLap[]) : [];
     },
     staleTime: 30_000,
   });
@@ -132,7 +136,7 @@ export function SavedLapsArchive() {
         <Text style={s.title}>Giri Ideali Salvati ({laps?.length ?? 0})</Text>
       </View>
 
-      {(!laps || laps.length === 0) ? (
+      {(!laps || !Array.isArray(laps) || laps.length === 0) ? (
         <View style={s.emptyState}>
           <Ionicons name="timer-outline" size={36} color={colors.textSecondary} />
           <Text style={s.emptyTitle}>Nessun giro salvato ancora</Text>
