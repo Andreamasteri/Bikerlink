@@ -115,3 +115,4 @@ bin/cloudflared
 # Generata/aggiornata da scripts/refresh-bikerblog.sh — mai versionata,
 # non deve gonfiare il Repl layer del deploy.
 .bikerblog-ref/
+logs/*.md
