@@ -24,6 +24,17 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // ---------------------------------------------------------------------------
+// Mock per il modulo storage (richiesto da manual.ts a module-scope, ma non
+// usato dalle funzioni pure come chunkManual che testiamo in Suite 5).
+// ---------------------------------------------------------------------------
+vi.mock("../storage", () => ({
+  storage: {
+    getAppSetting: vi.fn(),
+    upsertAppSetting: vi.fn(),
+  },
+}));
+
+// ---------------------------------------------------------------------------
 // Frammento di dizionario dell'interfaccia sintetizzato da Horus (Task #152).
 // Contiene etichette di bottone ESATTE come le produce buildManualLexiconPrompt.
 // ---------------------------------------------------------------------------
@@ -73,7 +84,8 @@ vi.mock("../ai/assistant/horus-memory", () => ({ appendHorusNote: vi.fn() }));
 vi.mock("../ai/assistant/task-review", () => ({ reviewTaskPlan: vi.fn() }));
 
 import { buildSearchManualTool } from "../ai/assistant/inter-agent-tools";
-import { SEARCH_MANUAL_RE } from "../ai/nadir/constants";
+import { SEARCH_MANUAL_RE, MANUAL_CHUNK_SIZE, MANUAL_MAX_CHUNKS } from "../ai/nadir/constants";
+import { chunkManual } from "../ai/nadir/manual";
 
 // ---------------------------------------------------------------------------
 // Helper: costruisce il tool e ritorna solo search_manual
@@ -355,5 +367,91 @@ describe("search_manual — integrità del testo del dizionario nei frammenti re
     const res = await tool.execute({ query: "dove trovo il bottone per filtrare?", limit: 1 }, {});
 
     expect(res.fragments[0].origin).toBe("manual");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Suite 5 — chunkManual produce un chunk per sezione del Dizionario
+//           dell'Interfaccia (Task #187)
+//
+// Verifica che le sezioni ### del Dizionario, separate da righe vuote e
+// ciascuna sotto MANUAL_CHUNK_SIZE, non vengano mai fuse insieme. Se due
+// sezioni finissero in un unico chunk, una query su "Partecipa" (Club)
+// restituirebbe anche contenuto di "Mappa" o "Filtri", riducendo la precisione
+// con cui Bowie può identificare la schermata giusta.
+// ---------------------------------------------------------------------------
+
+describe("chunkManual — sezioni Dizionario dell'Interfaccia in chunk separati (Task #187)", () => {
+  /**
+   * Dizionario realistico con 3 sezioni schermata, ognuna sotto
+   * MANUAL_CHUNK_SIZE (600 car). Le sezioni sono separate da una riga vuota,
+   * come le genera Horus con buildManualLexiconPrompt.
+   */
+  const DIZIONARIO = [
+    "### Club",
+    '**Percorso di accesso**: tab "Proposte" → sezione "Club"',
+    '**Titolo visualizzato**: "Club"',
+    '**Bottoni e azioni**: "Partecipa" → ti unisce al club; "Azzera" → resetta i filtri attivi',
+    '**Messaggi**: "Sei già membro di questo club" se già iscritto',
+    "",
+    "### Mappa",
+    '**Percorso di accesso**: tab "Mappa"',
+    '**Titolo visualizzato**: "Mappa"',
+    '**Bottoni e azioni**: "Centra" → centra la mappa sulla posizione attuale; "Segnala" → apre il form hazard',
+    '**Messaggi**: "Posizione non disponibile" se GPS spento',
+    "",
+    "### Filtri Percorsi",
+    '**Percorso di accesso**: schermata "Percorsi" → icona filtro',
+    '**Titolo visualizzato**: "Filtra Percorsi"',
+    '**Bottoni e azioni**: "Azzera" → cancella tutti i filtri; "Applica" → esegue la ricerca filtrata',
+    '**Messaggi**: "Nessun percorso trovato" se i filtri escludono tutto',
+  ].join("\n");
+
+  it("ogni sezione è sotto MANUAL_CHUNK_SIZE — precondizione del test", () => {
+    const sections = DIZIONARIO.split(/\n\s*\n/);
+    expect(sections).toHaveLength(3);
+    for (const section of sections) {
+      expect(section.length).toBeLessThan(MANUAL_CHUNK_SIZE);
+    }
+  });
+
+  it("produce esattamente un chunk per sezione schermata", () => {
+    const chunks = chunkManual(DIZIONARIO, MANUAL_CHUNK_SIZE, MANUAL_MAX_CHUNKS);
+    expect(chunks).toHaveLength(3);
+  });
+
+  it("il chunk Club contiene solo il contenuto di Club — non quello di Mappa o Filtri", () => {
+    const chunks = chunkManual(DIZIONARIO, MANUAL_CHUNK_SIZE, MANUAL_MAX_CHUNKS);
+    const clubChunk = chunks.find((c) => c.includes("### Club"));
+    expect(clubChunk).toBeDefined();
+    expect(clubChunk).toContain("Partecipa");
+    expect(clubChunk).not.toContain("### Mappa");
+    expect(clubChunk).not.toContain("### Filtri");
+    expect(clubChunk).not.toContain("Centra");
+    expect(clubChunk).not.toContain("Applica");
+  });
+
+  it("il chunk Mappa contiene solo il contenuto di Mappa — non quello di Club o Filtri", () => {
+    const chunks = chunkManual(DIZIONARIO, MANUAL_CHUNK_SIZE, MANUAL_MAX_CHUNKS);
+    const mappaChunk = chunks.find((c) => c.includes("### Mappa"));
+    expect(mappaChunk).toBeDefined();
+    expect(mappaChunk).toContain("Centra");
+    expect(mappaChunk).toContain("Segnala");
+    expect(mappaChunk).not.toContain("### Club");
+    expect(mappaChunk).not.toContain("### Filtri");
+    expect(mappaChunk).not.toContain("Partecipa");
+    expect(mappaChunk).not.toContain("Applica");
+  });
+
+  it("il chunk Filtri contiene solo il contenuto di Filtri — non quello di Club o Mappa", () => {
+    const chunks = chunkManual(DIZIONARIO, MANUAL_CHUNK_SIZE, MANUAL_MAX_CHUNKS);
+    const filtriChunk = chunks.find((c) => c.includes("### Filtri"));
+    expect(filtriChunk).toBeDefined();
+    expect(filtriChunk).toContain("Azzera");
+    expect(filtriChunk).toContain("Applica");
+    expect(filtriChunk).not.toContain("### Club");
+    expect(filtriChunk).not.toContain("### Mappa");
+    expect(filtriChunk).not.toContain("Partecipa");
+    expect(filtriChunk).not.toContain("Centra");
   });
 });
