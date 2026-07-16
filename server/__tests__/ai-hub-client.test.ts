@@ -14,7 +14,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 vi.mock("../lib/cf-access", () => ({
-  cfAccessHeaders: () => ({ "CF-Access-Client-Id": "cid", "CF-Access-Client-Secret": "csecret" }),
+  cfAccessHeaders: () => ({ "CF-Access-Client-Id": "cid", "CF-Access-Client-Secret": "csecret" }), // pragma: allowlist secret
   isCfAccessConfigured: () => true,
 }));
 

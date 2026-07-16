@@ -99,7 +99,7 @@ WHERE "details" IS NOT NULL AND (
 --> statement-breakpoint
 
 -- 4) thinkcentre_health_events — per-service key.
-UPDATE "thinkcentre_health_events" SET "service_key" = 'dragonfly' WHERE "service_key" = 'redis';
+UPDATE "thinkcentre_health_events" SET "service_key" = 'dragonfly' WHERE "service_key" = 'redis'; -- pragma: allowlist secret
 --> statement-breakpoint
 
 -- 5) app_settings — probe_log_snapshot / error_history_snapshot are jsonb

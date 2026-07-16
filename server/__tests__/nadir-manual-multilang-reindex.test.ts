@@ -23,7 +23,7 @@
 import { vi, describe, it, expect, beforeEach } from "vitest";
 
 if (!process.env.DATABASE_URL) {
-  process.env.DATABASE_URL = "postgres://test:test@localhost:5432/test";
+  process.env.DATABASE_URL = "postgres://test:test@localhost:5432/test"; // pragma: allowlist secret
 }
 
 const {

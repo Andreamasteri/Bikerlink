@@ -7,7 +7,7 @@ The Google Cloud e2 VM ("dragonfly" project) has a public ephemeral IP reachable
 directly from the Replit sandbox — unlike Ares/ThinkCentre, no ProxyJump is
 needed. Helper: `scripts/gce/gce.py` (same paramiko pattern as `ares.py`).
 
-Secrets: `GCE_SSH_KEY` (private ed25519), `GCE_SSH_HOST` (external IP, changes
+Secrets: `GCE_SSH_KEY` (private ed25519), `GCE_SSH_HOST` (external IP, changes <!-- pragma: allowlist secret -->
 if the VM is stopped/restarted — no static IP reserved by design, update the
 secret manually if it changes). Non-sensitive: `GCE_SSH_USER=bikerlink`,
 `GCE_SSH_PORT=22` (plain env vars, not secrets).

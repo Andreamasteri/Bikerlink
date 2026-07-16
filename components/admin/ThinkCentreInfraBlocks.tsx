@@ -201,7 +201,7 @@ export function DragonflyBlock({
       label="DragonflyDB"
       icon="database-outline"
       service={service}
-      configNote="Aggiungere DRAGONFLY_PROBE_HOST (e DRAGONFLY_PROBE_PORT se diversa da 6379) nei secret Replit."
+      configNote="Aggiungere DRAGONFLY_PROBE_HOST (e DRAGONFLY_PROBE_PORT se diversa da 6379) nei secret Replit." // pragma: allowlist secret
       isLoading={isLoading}
       hasError={hasError}
     />
@@ -255,7 +255,7 @@ export function AiHubBlock({
       label="AI Hub"
       icon="brain"
       service={service}
-      configNote="Aggiungere AI_HUB_URL e AI_HUB_GATE_TOKEN nei secret Replit. Il servizio gira su pm2 porta 4405 sul ThinkCentre."
+      configNote="Aggiungere AI_HUB_URL e AI_HUB_GATE_TOKEN nei secret Replit. Il servizio gira su pm2 porta 4405 sul ThinkCentre." // pragma: allowlist secret
       isLoading={isLoading}
       hasError={hasError}
     />

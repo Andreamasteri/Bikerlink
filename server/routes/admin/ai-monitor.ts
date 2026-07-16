@@ -81,7 +81,7 @@ async function recordTransitionIfChanged(persona: AgentPersona, online: boolean)
   try {
     await withBgDbSlot(() =>
       db.insert(thinkcentreHealthEvents).values({
-        serviceKey: `ai:${persona}`,
+        serviceKey: `ai:${persona}`, // pragma: allowlist secret
         transitionFrom: prev ? "online" : "offline",
         transitionTo: online ? "online" : "offline",
       }),

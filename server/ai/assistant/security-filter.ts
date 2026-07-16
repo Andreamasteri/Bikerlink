@@ -29,8 +29,8 @@ export const SECURITY_REFUSAL_MESSAGE =
 // un valore reale.
 const SENSITIVE_PATTERNS: RegExp[] = [
   // Chiavi private / certificati PEM
-  /-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----/,
-  /-----BEGIN OPENSSH PRIVATE KEY-----/,
+  /-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----/, // pragma: allowlist secret
+  /-----BEGIN OPENSSH PRIVATE KEY-----/, // pragma: allowlist secret
   // Connection string CON credenziali (user:pass@host)
   /\b(?:postgres(?:ql)?|mysql|mongodb(?:\+srv)?|redis|rediss|amqps?):\/\/[^\s/:@]+:[^\s/@]+@/i,
   // JWT (header.payload.signature)

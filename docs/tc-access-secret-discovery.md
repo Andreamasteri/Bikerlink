@@ -282,7 +282,7 @@ probe HTTP autenticati) usando `cloudflared` scaricato temporaneamente nella
 sandbox (binario e chiave privata rimossi a fine sessione — nessun secret o
 credenziale è stato lasciato su disco).
 
-### ⚠️ Correzione secret: `TC_SSH_HOST`
+### ⚠️ Correzione secret: `TC_SSH_HOST` <!-- pragma: allowlist secret -->
 Il tunnel espone **due hostname SSH distinti**: `ssh.biker-link.net` e
 `tc.biker-link.net`. **Solo `ssh.biker-link.net` fa da bridge SSH funzionante**
 (handshake OK, login riuscito). Il valore attualmente salvato in `TC_SSH_HOST`

@@ -85,7 +85,7 @@ python3 scripts/thinkcentre/ares/ares.py exec "free -h && ollama ps"
 python3 scripts/thinkcentre/ares/ares.py ip       # risolve l'IP LAN di Ares
 ```
 
-- Chiave **privata** dell'agente nel secret `ARES_SSH_KEY`; pubblica incorporata
+- Chiave **privata** dell'agente nel secret `ARES_SSH_KEY`; pubblica incorporata <!-- pragma: allowlist secret -->
   in `ares-bootstrap.sh`. Utente SSH: `ares-agent`.
 - IP di Ares è **dinamico**: `ares.py` lo risolve dalla neighbor table del TC via
   MAC, oppure passa `ARES_LAN_IP=<ip>`.

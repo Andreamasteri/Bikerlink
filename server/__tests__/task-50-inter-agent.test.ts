@@ -165,7 +165,7 @@ describe("Task #50 — memoria persistente di Horus", () => {
   });
 
   it("nota con un segreto → rifiutata, mai scritta su disco", async () => {
-    const secret = "la chiave è sk-abcdefghijklmnopqrstuvwxyz0123456789";
+    const secret = "la chiave è sk-abcdefghijklmnopqrstuvwxyz0123456789"; // pragma: allowlist secret
     await expect(appendHorusNote(secret, "2026-07-15T10:00:00Z")).rejects.toThrow(/credenziali|segret/i);
     // Nessun file creato (nessuna scrittura parziale del segreto).
     expect(await loadHorusMemory()).toBe("");

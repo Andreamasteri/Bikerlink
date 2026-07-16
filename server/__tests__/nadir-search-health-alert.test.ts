@@ -26,7 +26,7 @@ import { vi, describe, it, expect, beforeEach } from "vitest";
 // server/db.ts lancia se DATABASE_URL non è settata; la sonda non tocca il DB in
 // questi test, ma il modulo reindex importa la catena db a livello di modulo.
 if (!process.env.DATABASE_URL) {
-  process.env.DATABASE_URL = "postgres://test:test@localhost:5432/test";
+  process.env.DATABASE_URL = "postgres://test:test@localhost:5432/test"; // pragma: allowlist secret
 }
 
 const {

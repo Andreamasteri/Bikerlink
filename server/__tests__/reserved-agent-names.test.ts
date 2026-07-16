@@ -145,7 +145,7 @@ describe("POST /api/auth/register — blocca nickname/email che imitano un agent
       id: "u1",
       nickname: "placeholder",
       email: "placeholder@example.com",
-      password: "hashed",
+      password: "hashed", // pragma: allowlist secret
     });
 
     const express = (await import("express")).default;
@@ -164,7 +164,7 @@ describe("POST /api/auth/register — blocca nickname/email che imitano un agent
 
   const basePayload = {
     email: "mario.rossi@example.com",
-    password: "Password1",
+    password: "Password1", // pragma: allowlist secret
     userType: "biker" as const,
     eulaAccepted: true as const,
   };
@@ -235,7 +235,7 @@ describe("POST /api/admin/users — stessa regola sul percorso di creazione admi
       id: "u2",
       nickname: "placeholder",
       email: "placeholder@example.com",
-      password: "hashed",
+      password: "hashed", // pragma: allowlist secret
     });
 
     // Reset the ../storage mock used above with admin-relevant methods.
@@ -258,7 +258,7 @@ describe("POST /api/admin/users — stessa regola sul percorso di creazione admi
 
   const basePayload = {
     email: "mario.rossi@example.com",
-    password: "Password1",
+    password: "Password1", // pragma: allowlist secret
     userType: "biker" as const,
   };
 

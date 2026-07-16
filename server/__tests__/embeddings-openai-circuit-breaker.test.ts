@@ -91,7 +91,7 @@ describe("embeddings client — OpenAI quota circuit breaker (Task #108/#111)", 
 
   beforeEach(() => {
     vi.resetModules();
-    process.env.OPENAI_API_KEY = "test-key";
+    process.env.OPENAI_API_KEY = "test-key"; // pragma: allowlist secret
     embedMock.mockReset();
     embedManyMock.mockReset();
   });

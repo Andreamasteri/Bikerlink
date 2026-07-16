@@ -271,7 +271,7 @@ describe("ThinkCentre offline — catena cloud mapbox → tomtom", () => {
 
   it("mapbox fallisce → failure(mapbox) + fallback(mapbox→tomtom) + success attribuito a tomtom", async () => {
     process.env.MAPBOX_ACCESS_TOKEN = "test-token";
-    process.env.TOMTOM_API_KEY = "test-key";
+    process.env.TOMTOM_API_KEY = "test-key"; // pragma: allowlist secret
     mocks.mapboxCalculateRoute.mockRejectedValue(new Error("Mapbox Directions error 500"));
     mocks.tomtomCalculateRoute.mockResolvedValue(TOMTOM_ROUTE);
     const res = makeRes();
@@ -288,7 +288,7 @@ describe("ThinkCentre offline — catena cloud mapbox → tomtom", () => {
   });
 
   it("mapbox non configurato → salto diretto gh→tomtom (nessun campione mapbox)", async () => {
-    process.env.TOMTOM_API_KEY = "test-key";
+    process.env.TOMTOM_API_KEY = "test-key"; // pragma: allowlist secret
     mocks.tomtomCalculateRoute.mockResolvedValue(TOMTOM_ROUTE);
     const res = makeRes();
 

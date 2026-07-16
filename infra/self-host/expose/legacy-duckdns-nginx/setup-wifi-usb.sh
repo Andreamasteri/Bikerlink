@@ -13,7 +13,7 @@
 #
 # Uso:
 #   sudo ./setup-wifi-usb.sh
-#   WIFI_SSID="NomRete" WIFI_PASSWORD="password" WIFI_IFACE="wlan0" sudo -E ./setup-wifi-usb.sh
+#   WIFI_SSID="NomRete" WIFI_PASSWORD="password" WIFI_IFACE="wlan0" sudo -E ./setup-wifi-usb.sh  # pragma: allowlist secret
 #
 # Variabili d'ambiente (override):
 #   WIFI_SSID       SSID della rete WiFi (richiesto se non già connesso)

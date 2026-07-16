@@ -1,6 +1,9 @@
 import { Queue, Worker } from 'bullmq';
 
-const connection = { host: '127.0.0.1', port: 16379, password: 'POMqUPmdOWysQ95oYcld2pUPJhrHyNXoTWyzm9C6iK4', maxRetriesPerRequest: null };
+// Script di test locale (non usato in prod né in CI). La password vuota è
+// accettabile come fallback perché questo script gira solo con un DragonflyDB
+// locale di sviluppo dove l'autenticazione è opzionale.
+const connection = { host: '127.0.0.1', port: 16379, password: process.env.TC_DRAGONFLY_PASSWORD ?? "", maxRetriesPerRequest: null };
 
 const queueName = 'dragonfly-verify-' + Date.now();
 const queue = new Queue(queueName, { connection });

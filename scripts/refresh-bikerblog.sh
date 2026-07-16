@@ -42,8 +42,7 @@ log()  { echo "[refresh-bikerblog] $*"; }
 build_auth_url() {
   if [ -n "${BIKERBLOG_GITHUB_TOKEN:-}" ]; then
     # x-access-token è lo username convenzionale per i PAT GitHub via HTTPS.
-    printf 'https://x-access-token:%s@github.com/%s.git' \
-      "$BIKERBLOG_GITHUB_TOKEN" "$REPO_SLUG"
+    printf 'https://x-access-token:%s@github.com/%s.git' "$BIKERBLOG_GITHUB_TOKEN" "$REPO_SLUG" # pragma: allowlist secret
   else
     printf '%s' "$PUBLIC_URL"
   fi

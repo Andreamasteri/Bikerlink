@@ -29,7 +29,7 @@ va in 401.
 
 ## Contratto Replit-side
 - Secret: `AI_HUB_URL` (`https://hub.biker-link.net` in prod; storicamente
-  `https://tc.biker-link.net/ai-hub`) + `AI_HUB_GATE_TOKEN` (= `HUB_GATE_TOKEN`
+  `https://tc.biker-link.net/ai-hub`) + `AI_HUB_GATE_TOKEN` (= `HUB_GATE_TOKEN` <!-- pragma: allowlist secret -->
   del `.env` ai-hub).
 - **Gate-token drift = 401 `{"error":"unauthorized"}`** su `/nadir/search`. Il
   secret Replit `AI_HUB_GATE_TOKEN` DEVE combaciare byte-per-byte con

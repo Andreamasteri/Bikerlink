@@ -57,7 +57,7 @@ function liveMonitorResponse() {
 function historyResponse() {
   return {
     entries: [
-      { id: "h1", serviceKey: "ai:horus", transitionFrom: "offline", transitionTo: "online", occurredAt: new Date().toISOString() },
+      { id: "h1", serviceKey: "ai:horus", transitionFrom: "offline", transitionTo: "online", occurredAt: new Date().toISOString() }, // pragma: allowlist secret
       { id: "h2", serviceKey: "ai:horus", transitionFrom: "online", transitionTo: "offline", occurredAt: new Date(Date.now() - 3_600_000).toISOString() },
     ],
   };

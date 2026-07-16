@@ -67,9 +67,9 @@ async function fresh(fallback: string | null): Promise<{ provider: ProviderMod; 
 
 describe("Task #110 — master switch OFF (default): solo ThinkCentre, nessun cloud", () => {
   beforeEach(() => {
-    process.env.GROQ_API_KEY = "test-groq";
-    process.env.GEMINI_API_KEY = "test-gemini";
-    process.env.OPENAI_API_KEY = "test-openai";
+    process.env.GROQ_API_KEY = "test-groq"; // pragma: allowlist secret
+    process.env.GEMINI_API_KEY = "test-gemini"; // pragma: allowlist secret
+    process.env.OPENAI_API_KEY = "test-openai"; // pragma: allowlist secret
     process.env.BOWIE_OLLAMA_MODEL = "qwen3:1.7b";
   });
 
@@ -150,9 +150,9 @@ describe("Task #110 — master switch OFF (default): solo ThinkCentre, nessun cl
 
 describe("Task #110 — master switch ON: comportamento multi-provider invariato", () => {
   beforeEach(() => {
-    process.env.GROQ_API_KEY = "test-groq";
-    process.env.GEMINI_API_KEY = "test-gemini";
-    process.env.OPENAI_API_KEY = "test-openai";
+    process.env.GROQ_API_KEY = "test-groq"; // pragma: allowlist secret
+    process.env.GEMINI_API_KEY = "test-gemini"; // pragma: allowlist secret
+    process.env.OPENAI_API_KEY = "test-openai"; // pragma: allowlist secret
   });
 
   it("ON + Ollama fallisce → scala alla chain cloud (Groq)", async () => {
