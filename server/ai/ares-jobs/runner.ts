@@ -19,6 +19,7 @@
 
 import { streamAresChat, isAresConfigured, getAresModelId } from "../../lib/ares-client";
 import { withAresVramPriority } from "../../lib/vram-arbiter";
+import { hubPost, isHubAvailable } from "../../lib/ai-hub-client";
 import {
   saveNadirManualWithBackup,
   reindexNadir,
@@ -270,6 +271,49 @@ function totalChars(arr: string[]): number {
   return arr.reduce((sum, s) => sum + s.length, 0);
 }
 
+// ── Salvataggio report sull'ai-hub (non-fatale) ────────────────────────────────
+
+/**
+ * Scrive il report finale sull'ai-hub TC (~/agent-shared/ares/<mode>-<date>.md).
+ * Best-effort: qualsiasi errore viene loggato ma non rilancia e non marca il job
+ * come fallito. Hub non disponibile → warning e ritorno senza tentare la rete.
+ *
+ * Restituisce il path relativo scritto (es. "ares/analysis-2026-07-16.md"), o null
+ * se la scrittura non è avvenuta.
+ */
+async function saveReportToHub(mode: AresJobMode, content: string): Promise<string | null> {
+  if (!isHubAvailable()) {
+    console.warn(`${ARES_JOB_LOG_PREFIX} hub non disponibile — report "${mode}" non salvato su TC`);
+    return null;
+  }
+  if (!content.trim()) {
+    console.warn(`${ARES_JOB_LOG_PREFIX} report "${mode}" vuoto — skip salvataggio hub`);
+    return null;
+  }
+
+  // Genera un filename sicuro con la data di oggi (UTC).
+  const dateTag = new Date().toISOString().slice(0, 10); // "YYYY-MM-DD"
+  const hubPath = `ares/${mode}-${dateTag}.md`;
+
+  try {
+    const res = await hubPost("/files/write", { path: hubPath, content });
+    if (res.ok) {
+      console.log(`${ARES_JOB_LOG_PREFIX} report "${mode}" salvato su hub: "${hubPath}"`);
+      return hubPath;
+    } else {
+      console.warn(
+        `${ARES_JOB_LOG_PREFIX} salvataggio hub fallito per "${mode}" (non-fatale): ${res.error ?? `HTTP ${res.status}`}`,
+      );
+      return null;
+    }
+  } catch (err) {
+    console.warn(
+      `${ARES_JOB_LOG_PREFIX} salvataggio hub eccezione per "${mode}" (non-fatale): ${(err as Error)?.message ?? String(err)}`,
+    );
+    return null;
+  }
+}
+
 // ── Finalizzazione ─────────────────────────────────────────────────────────────
 async function finalize(
   mode: AresJobMode,
@@ -277,11 +321,21 @@ async function finalize(
   model: string,
   signal: AbortSignal,
 ): Promise<void> {
+  let reportContent: string;
   if (mode === "analysis") {
     await finalizeAnalysis(state, model, signal);
+    reportContent = state.report ?? "";
   } else {
-    await finalizeManual(state);
+    reportContent = await finalizeManual(state);
   }
+
+  // Salva il report sull'hub TC (non-fatale: il job è comunque completato).
+  const hubPath = await saveReportToHub(mode, reportContent);
+  if (hubPath) {
+    state.hubFilePath = hubPath;
+    state.hubFileSavedAt = new Date().toISOString();
+  }
+
   state.status = "completed";
   state.completedAt = new Date().toISOString();
   await writeJobState(state);
@@ -322,7 +376,8 @@ async function finalizeAnalysis(
   }
 }
 
-async function finalizeManual(state: AresJobState): Promise<void> {
+/** Restituisce il testo del manuale assemblato, dopo averlo salvato su Nadir. */
+async function finalizeManual(state: AresJobState): Promise<string> {
   const sections = state.sections ?? [];
   const header =
     `# Manuale BikerLink (generato da Ares)\n\n` +
@@ -347,4 +402,6 @@ async function finalizeManual(state: AresJobState): Promise<void> {
       `${ARES_JOB_LOG_PREFIX} reindicizzazione Nadir fallita dopo la generazione manuale: ${(err as Error)?.message}`,
     );
   }
+
+  return manual;
 }

@@ -47,6 +47,11 @@ export interface AresJobState {
   manualLength?: number;
   previousManualLength?: number | null;
   reindexed?: boolean;
+  // hub file save (both modes)
+  /** Path relativo in ~/agent-shared/ dove il report è stato salvato, o null se non salvato. */
+  hubFilePath?: string | null;
+  /** ISO timestamp dell'ultimo salvataggio su hub. */
+  hubFileSavedAt?: string | null;
 }
 
 export function emptyState(mode: AresJobMode): AresJobState {
