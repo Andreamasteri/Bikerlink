@@ -1,0 +1,17 @@
+# Fix: WebView<P = undefined> → WebView<P = {}> to prevent TypeScript regression.
+# With TypeScript 6.x strict mode, `WebViewProps & undefined` resolves to `never`,
+# causing all <WebView /> JSX usages to fail typecheck.
+# See: .agents/memory/webview-type-regression.md
+diff --git a/node_modules/react-native-webview/index.d.ts b/node_modules/react-native-webview/index.d.ts
+index abc1234..def5678 100644
+--- a/node_modules/react-native-webview/index.d.ts
++++ b/node_modules/react-native-webview/index.d.ts
+@@ -6,7 +6,7 @@
+ 
+ export type WebViewProps = IOSWebViewProps & AndroidWebViewProps & WindowsWebViewProps;
+ 
+-declare class WebView<P = undefined> extends Component<WebViewProps & P> {
++declare class WebView<P = {}> extends Component<WebViewProps & P> {
+   /**
+    * Go back one page in the webview's history.
+    */
