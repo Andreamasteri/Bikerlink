@@ -69,6 +69,10 @@ export async function getPublicUrl(objectPath: string): Promise<string> {
   return file.publicUrl();
 }
 
+// ── Bucket folder constants ───────────────────────────────────────────────────
+/** Object-storage prefix for wishlist photos (zavorrina). */
+export const BUCKET_WISHLIST = "Wishlist/";
+
 // Task #1123: OTA bundle path validator. The OTA upload route writes bundles
 // strictly under `private/ota/<filename>.js` (server/routes/admin.ts /ota/upload).
 // Both the metadata insert and the public asset serve path MUST validate any

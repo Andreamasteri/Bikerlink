@@ -6,16 +6,19 @@ import { createClubInvitesForMoto } from "./motoclubs";
 import { classifyMatch } from "../matching/notifications/classify";
 import { dispatchMatchNotification } from "../matching/notifications/dispatcher";
 import { updateWishlistSchema, uploadPhotoSchema, addWishlistMotoSchema, updateWishlistMotoSchema } from "@shared/validators";
+import { uploadBuffer, downloadBuffer, deleteObject, BUCKET_WISHLIST } from "../objectStorage";
 
 import { requireAuth } from "../lib/auth-middleware";
 import { sendSuccess, sendError } from "../lib/api-response";
 
 const router = Router();
 
-const uploadsDir = path.join(process.cwd(), "uploads", "wishlist");
-if (!fs.existsSync(uploadsDir)) {
-  fs.mkdirSync(uploadsDir, { recursive: true });
-}
+/** Max accepted base64-decoded image size (8 MB). */
+const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
+
+// Legacy upload dir — only used as a read-only fallback for photos uploaded
+// before the bucket migration.
+const LEGACY_UPLOADS_DIR = path.join(process.cwd(), "uploads", "wishlist");
 
 router.get("/", requireAuth, async (req: Request, res: Response) => {
   try {
@@ -73,15 +76,22 @@ router.post("/photos", requireAuth, async (req: Request, res: Response) => {
     if (!parsedPhoto.success) {
       return sendError(res, 400, parsedPhoto.error.issues[0].message);
     }
-    const { imageBase64, filename } = parsedPhoto.data;
+    const { imageBase64 } = parsedPhoto.data;
 
     const base64Data = imageBase64.replace(/^data:image\/\w+;base64,/, "");
-    const ext = (filename ?? "photo.jpg").split(".").pop() ?? "jpg";
-    const uniqueName = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}.${ext}`;
-    const filePath = path.join(uploadsDir, uniqueName);
-    fs.writeFileSync(filePath, Buffer.from(base64Data, "base64"));
+    const rawBuffer = Buffer.from(base64Data, "base64");
 
-    const photoUrl = `/uploads/wishlist/${uniqueName}`;
+    if (rawBuffer.length > MAX_IMAGE_BYTES) {
+      return sendError(res, 400, "Immagine troppo grande (max 8 MB)");
+    }
+
+    const { compressToWebP } = await import("../utils/image-processing");
+    const webpBuffer = await compressToWebP(rawBuffer);
+
+    const uniqueName = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}.webp`;
+    await uploadBuffer(BUCKET_WISHLIST + uniqueName, webpBuffer, "image/webp");
+
+    const photoUrl = `/api/wishlist/photos/${uniqueName}`;
     const photo = await storage.addWishlistPhoto({
       wishlistId: wishlist.id,
       photoUrl,
@@ -92,6 +102,51 @@ router.post("/photos", requireAuth, async (req: Request, res: Response) => {
   } catch (error) {
     console.error("Upload wishlist photo error:", error);
     return sendError(res, 500, "Errore interno del server");
+  }
+});
+
+/**
+ * Serve a wishlist photo. Tries the bucket first; falls back to the legacy
+ * local disk path for photos uploaded before the bucket migration.
+ */
+router.get("/photos/:filename", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const filename = req.params.filename as string;
+    if (!filename || filename.includes("/") || filename.includes("..")) {
+      return res.status(400).end();
+    }
+
+    // 1. Try bucket
+    try {
+      const buffer = await downloadBuffer(BUCKET_WISHLIST + filename);
+      res.set("Content-Type", "image/webp");
+      res.set("Cache-Control", "private, max-age=3600");
+      return res.send(buffer);
+    } catch {
+      // Not found in bucket — try legacy disk fallback below
+    }
+
+    // 2. Legacy disk fallback (pre-migration photos)
+    const diskPath = path.join(LEGACY_UPLOADS_DIR, filename);
+    if (fs.existsSync(diskPath)) {
+      const buffer = fs.readFileSync(diskPath);
+      const ext = path.extname(filename).toLowerCase();
+      const mimeTypes: Record<string, string> = {
+        ".jpg": "image/jpeg",
+        ".jpeg": "image/jpeg",
+        ".png": "image/png",
+        ".webp": "image/webp",
+      };
+      const contentType = mimeTypes[ext] ?? "image/jpeg";
+      res.set("Content-Type", contentType);
+      res.set("Cache-Control", "private, max-age=3600");
+      return res.send(buffer);
+    }
+
+    return sendError(res, 404, "Foto non trovata");
+  } catch (error) {
+    console.error("Serve wishlist photo error:", error);
+    return sendError(res, 404, "Foto non trovata");
   }
 });
 
@@ -111,9 +166,20 @@ router.delete("/photos/:photoId", requireAuth, async (req: Request, res: Respons
     }
 
     const filename = path.basename(photo.photoUrl);
-    const filePath = path.join(uploadsDir, filename);
-    if (fs.existsSync(filePath)) {
-      fs.unlinkSync(filePath);
+
+    // Delete from bucket (new path)
+    if (photo.photoUrl.startsWith("/api/wishlist/photos/")) {
+      try {
+        await deleteObject(BUCKET_WISHLIST + filename);
+      } catch (err) {
+        console.warn(`[wishlist] Bucket delete failed for ${filename}:`, err);
+      }
+    }
+
+    // Also attempt legacy disk cleanup (graceful — may not exist)
+    const diskPath = path.join(LEGACY_UPLOADS_DIR, filename);
+    if (fs.existsSync(diskPath)) {
+      try { fs.unlinkSync(diskPath); } catch { /* no-op */ }
     }
 
     await storage.deleteWishlistPhoto(photoId);
