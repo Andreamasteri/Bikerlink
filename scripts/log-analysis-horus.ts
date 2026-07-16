@@ -509,6 +509,71 @@ function collectPreviousHorusReport(): string | null {
   }
 }
 
+// ─── Token budget & trim ─────────────────────────────────────────────────────
+
+/**
+ * Soglia token oltre la quale si attiva il trim automatico e il warning.
+ * Configurabile via env HORUS_TOKEN_BUDGET (default 28000 = ~87% del contesto
+ * qwen3:4b 32K, con margine per il system prompt e la risposta).
+ */
+const TOKEN_BUDGET = parseInt(process.env.HORUS_TOKEN_BUDGET ?? "28000", 10);
+
+/** Stima approssimativa del conteggio token (chars/4). */
+function estimateTokens(text: string): number {
+  return Math.ceil(text.length / 4);
+}
+
+/**
+ * Sezioni a bassa priorità che possono essere rimosse dal bundle (nell'ordine)
+ * quando il totale supera TOKEN_BUDGET. Le sezioni vengono rimosse in sequenza
+ * finché il bundle rientra nel budget o le sezioni sono esaurite.
+ *
+ * Ordine di rimozione (dalla meno alla più importante):
+ *   1. Report Horus precedente — già analizzato, valore marginale nel round corrente
+ *   2. weekly_system_reports — blob storico grande, meno urgente dei dati live
+ *   3. pg_stat_activity — verboso, le connessioni idle sono meno critiche dei crash
+ */
+const TRIM_SECTIONS: Array<{ label: string; re: RegExp }> = [
+  {
+    label: "TRIAGE PRECEDENTE (report round precedente)",
+    // La sezione inizia con \n## TRIAGE PRECEDENTE\n e finisce alla prossima ## o fine stringa
+    re: /\n## TRIAGE PRECEDENTE\n[\s\S]*?(?=\n## RICHIESTA|\n## [A-Z]|$)/,
+  },
+  {
+    label: "DB: weekly_system_reports",
+    // fmtSection produce \n===== DB: <title> =====\n<body>\n
+    re: /\n={5} DB: weekly_system_reports[^\n]*={5}\n[\s\S]*?(?=\n={5}|\n## |$)/,
+  },
+  {
+    label: "DB: pg_stat_activity",
+    re: /\n={5} DB: pg_stat_activity[^\n]*={5}\n[\s\S]*?(?=\n={5}|\n## |$)/,
+  },
+];
+
+/**
+ * Rimuove sezioni a bassa priorità dal bundle finché la stima token rientra
+ * entro `maxTokens`. Ritorna il bundle (eventualmente ridotto) e la lista
+ * delle sezioni rimosse.
+ */
+function trimBundleToFit(
+  bundle: string,
+  maxTokens: number,
+): { bundle: string; trimmed: string[] } {
+  const trimmed: string[] = [];
+  let current = bundle;
+
+  for (const section of TRIM_SECTIONS) {
+    if (estimateTokens(current) <= maxTokens) break;
+    const before = current.length;
+    current = current.replace(section.re, "");
+    if (current.length < before) {
+      trimmed.push(section.label);
+    }
+  }
+
+  return { bundle: current, trimmed };
+}
+
 // ─── Assemblaggio bundle ──────────────────────────────────────────────────────
 
 async function buildBundle(tail: number, onlyInternal: boolean): Promise<string> {
@@ -754,7 +819,45 @@ async function main(): Promise<void> {
   console.log("");
 
   console.log("  ⏳ Raccolta fonti...");
-  const bundle = await buildBundle(tail, ONLY_INTERNAL);
+  let bundle = await buildBundle(tail, ONLY_INTERNAL);
+
+  // ── Stima token e trim preventivo ────────────────────────────────────────
+  const rawTokens = estimateTokens(bundle);
+  const isOverBudget = rawTokens > TOKEN_BUDGET;
+  const trimResult = isOverBudget
+    ? trimBundleToFit(bundle, TOKEN_BUDGET)
+    : { bundle, trimmed: [] as string[] };
+  bundle = trimResult.bundle;
+  const finalTokens = estimateTokens(bundle);
+
+  console.log(
+    `  📊 Bundle: ${bundle.length.toLocaleString()} caratteri, ~${finalTokens.toLocaleString()} token stimati` +
+      ` (budget: ${TOKEN_BUDGET.toLocaleString()})`,
+  );
+
+  if (isOverBudget) {
+    console.log("");
+    console.log("  ⚠️  ──────────────────────────────────────────────────────");
+    console.log(
+      `  ⚠️  BUNDLE SUPERA IL BUDGET TOKEN: ~${rawTokens.toLocaleString()} > ${TOKEN_BUDGET.toLocaleString()}`,
+    );
+    if (trimResult.trimmed.length > 0) {
+      console.log("  ⚠️  Sezioni rimosse per rientrare nel budget:");
+      for (const s of trimResult.trimmed) {
+        console.log(`  ⚠️    — ${s}`);
+      }
+      console.log(
+        `  ⚠️  Token dopo trim: ~${finalTokens.toLocaleString()} ${finalTokens <= TOKEN_BUDGET ? "(✅ entro budget)" : "(⚠️  ANCORA SOPRA BUDGET)"}`,
+      );
+      if (finalTokens > TOKEN_BUDGET) {
+        console.log("  ⚠️  Nessun'altra sezione trimable: Horus potrebbe troncare l'analisi!");
+      }
+    } else {
+      console.log("  ⚠️  Nessuna sezione trimable disponibile — Horus potrebbe troncare l'analisi!");
+    }
+    console.log("  ⚠️  ──────────────────────────────────────────────────────");
+    console.log("");
+  }
 
   if (IS_DRY_RUN) {
     console.log("\n════════════════════════════════════════════════════════════");
@@ -762,7 +865,17 @@ async function main(): Promise<void> {
     console.log("════════════════════════════════════════════════════════════\n");
     console.log(bundle);
     console.log("\n════════════════════════════════════════════════════════════");
-    console.log(`  Bundle: ${bundle.length} caratteri, ~${Math.round(bundle.length / 4)} token stimati`);
+    console.log(`  Bundle: ${bundle.length.toLocaleString()} caratteri`);
+    console.log(
+      `  Token stimati: ~${finalTokens.toLocaleString()} / budget ${TOKEN_BUDGET.toLocaleString()} — ` +
+        (finalTokens <= TOKEN_BUDGET ? "✅ ENTRO BUDGET" : "⚠️  SOPRA BUDGET"),
+    );
+    if (trimResult.trimmed.length > 0) {
+      console.log(`  Sezioni rimosse dal trim: ${trimResult.trimmed.join(", ")}`);
+    }
+    if (isOverBudget && rawTokens !== finalTokens) {
+      console.log(`  Token originali (prima del trim): ~${rawTokens.toLocaleString()}`);
+    }
     console.log("════════════════════════════════════════════════════════════");
     return;
   }
