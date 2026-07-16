@@ -1,10 +1,11 @@
 /**
- * Tests for hub-file-injection streaming filter — Task #163
+ * Tests for hub-file-injection — Task #163 / Task #169
  *
  * Verifica che `createSaveDirectiveStreamFilter` sopprima COMPLETAMENTE i blocchi
  * [[AGENT_SAVE_FILE:…]][[/AGENT_SAVE_FILE]] dallo stream (nessun byte raggiunge il
  * client), che i blocchi vengano catturati correttamente, e che i marcatori spezzati
- * tra due chunk vengano gestiti. Copre anche `executeHubFileSaves` (hub mock).
+ * tra due chunk vengano gestiti. Copre anche `executeHubFileSaves` e
+ * `buildHubFileContextForPrompt` (hub mock).
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
@@ -18,11 +19,12 @@ vi.mock("../lib/ai-hub-client", () => ({
 import {
   createSaveDirectiveStreamFilter,
   executeHubFileSaves,
+  buildHubFileContextForPrompt,
   SAVE_OPEN_PREFIX,
   SAVE_CLOSE_MARKER,
   isSafeRelativePath,
 } from "../ai/assistant/hub-file-injection";
-import { hubPost, isHubAvailable } from "../lib/ai-hub-client";
+import { hubPost, hubGet, isHubAvailable } from "../lib/ai-hub-client";
 
 // ── Helper ────────────────────────────────────────────────────────────────────
 
@@ -184,6 +186,7 @@ describe("createSaveDirectiveStreamFilter — malformed (no close marker)", () =
 describe("executeHubFileSaves", () => {
   beforeEach(() => {
     vi.mocked(hubPost).mockReset();
+    vi.mocked(hubGet).mockReset();
     vi.mocked(isHubAvailable).mockReturnValue(true);
   });
 
@@ -226,5 +229,108 @@ describe("executeHubFileSaves", () => {
     const outcomes = await executeHubFileSaves([{ path: "ares/x.md", content: "x" }]);
     expect(outcomes[0].ok).toBe(false);
     expect(outcomes[0].error).toMatch(/network timeout/);
+  });
+});
+
+// ── buildHubFileContextForPrompt ──────────────────────────────────────────────
+
+describe("buildHubFileContextForPrompt", () => {
+  beforeEach(() => {
+    vi.mocked(hubPost).mockReset();
+    vi.mocked(hubGet).mockReset();
+    vi.mocked(isHubAvailable).mockReturnValue(true);
+  });
+
+  it("returns empty string when hub is unavailable (no intent check, no network call)", async () => {
+    vi.mocked(isHubAvailable).mockReturnValue(false);
+    const result = await buildHubFileContextForPrompt("leggi il file nadir/note.md");
+    expect(result).toBe("");
+    expect(hubGet).not.toHaveBeenCalled();
+  });
+
+  it("returns empty string when message has no file intent", async () => {
+    const result = await buildHubFileContextForPrompt("Come stai? Dimmi una cosa a caso.");
+    expect(result).toBe("");
+    expect(hubGet).not.toHaveBeenCalled();
+  });
+
+  it("read intent — fetches /files/read and includes content in returned block", async () => {
+    vi.mocked(hubGet).mockResolvedValue({
+      ok: true,
+      status: 200,
+      data: { ok: true, content: "# Ciao\nTesto del file.", path: "nadir/note.md" },
+    });
+    const result = await buildHubFileContextForPrompt("leggi il file nadir/note.md");
+    expect(hubGet).toHaveBeenCalledWith("/files/read", { path: "nadir/note.md" });
+    expect(result).toContain("AI-HUB FILE READ");
+    expect(result).toContain("nadir/note.md");
+    expect(result).toContain("# Ciao");
+  });
+
+  it("read intent — hub returns error → includes error message in block, no throw", async () => {
+    vi.mocked(hubGet).mockResolvedValue({ ok: false, status: 500, error: "file not found" });
+    const result = await buildHubFileContextForPrompt("leggi il file nadir/missing.md");
+    // Should still return a non-empty block describing the error (best-effort)
+    // and must not throw
+    expect(typeof result).toBe("string");
+    expect(hubGet).toHaveBeenCalled();
+  });
+
+  it("list intent — fetches /files/list and includes listing in returned block", async () => {
+    vi.mocked(hubGet).mockResolvedValue({
+      ok: true,
+      status: 200,
+      data: {
+        ok: true,
+        files: [
+          { name: "report.md", type: "file", size: 1234 },
+          { name: "docs", type: "directory" },
+        ],
+        path: "",
+      },
+    });
+    const result = await buildHubFileContextForPrompt("elenca i file nella cartella condivisa");
+    expect(hubGet).toHaveBeenCalledWith("/files/list", expect.anything());
+    expect(result).toContain("AI-HUB FILE LIST");
+    expect(result).toContain("report.md");
+    expect(result).toContain("docs");
+  });
+
+  it("list intent — hub returns empty listing → block still present, no throw", async () => {
+    vi.mocked(hubGet).mockResolvedValue({
+      ok: true,
+      status: 200,
+      data: { ok: true, files: [], path: "" },
+    });
+    const result = await buildHubFileContextForPrompt("elenca i file nella cartella condivisa");
+    expect(typeof result).toBe("string");
+    expect(hubGet).toHaveBeenCalled();
+  });
+
+  it("list intent — hub throws → returns empty string (best-effort, no throw)", async () => {
+    vi.mocked(hubGet).mockRejectedValue(new Error("network error"));
+    const result = await buildHubFileContextForPrompt("elenca i file nella cartella agent-shared");
+    expect(typeof result).toBe("string");
+    // no throw
+  });
+
+  it("includeWrite:true → returned block contains the save directive hint", async () => {
+    vi.mocked(hubGet).mockResolvedValue({
+      ok: true,
+      status: 200,
+      data: { ok: true, files: [{ name: "x.md", type: "file" }], path: "" },
+    });
+    const result = await buildHubFileContextForPrompt("elenca i file nella cartella condivisa", { includeWrite: true });
+    expect(result).toContain("[[AGENT_SAVE_FILE:");
+  });
+
+  it("includeWrite:false (default) → returned block does not contain the save directive hint", async () => {
+    vi.mocked(hubGet).mockResolvedValue({
+      ok: true,
+      status: 200,
+      data: { ok: true, files: [{ name: "x.md", type: "file" }], path: "" },
+    });
+    const result = await buildHubFileContextForPrompt("elenca i file nella cartella condivisa");
+    expect(result).not.toContain("[[AGENT_SAVE_FILE:");
   });
 });
