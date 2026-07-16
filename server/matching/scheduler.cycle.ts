@@ -137,6 +137,12 @@ const HEARTBEAT_PERSIST_THROTTLE_MS = 30_000;
 let lastHeartbeatWarnAt = 0;
 const HEARTBEAT_WARN_COOLDOWN_MS = 10 * 60 * 1_000; // 10 minuti
 
+// Dedup per il WARN "matching_scheduler_state persist failed": stesso problema —
+// quando DragonflyDB è offline, il persist post-ciclo viene droppato ad ogni
+// ciclo riuscito. Si riemette al massimo una volta ogni 10 minuti.
+let lastCycleStatePersistWarnAt = 0;
+const CYCLE_STATE_PERSIST_WARN_COOLDOWN_MS = 10 * 60 * 1_000; // 10 minuti
+
 // Esportato per la copertura di test diretta (Task #4804): verifica che ogni
 // path di skip scriva lastTickAt/lastTickResult e rispetti il throttle 30s.
 export function recordSchedulerHeartbeat(tickResult: string, opts?: { force?: boolean }): void {
@@ -479,7 +485,14 @@ export function triggerMatchingRun(): { started: boolean; reason?: string } {
             lastRunDurationMs: cycleMetric.durationMs,
           }));
         })
-        .catch((err) => schedulerLogger.warn({ err }, "matching_scheduler_state persist failed (non-blocking)"));
+        .catch((err) => {
+          const now = Date.now();
+          if (now - lastCycleStatePersistWarnAt >= CYCLE_STATE_PERSIST_WARN_COOLDOWN_MS) {
+            lastCycleStatePersistWarnAt = now;
+            schedulerLogger.warn({ err }, "matching_scheduler_state persist failed (non-blocking)");
+          }
+          // Altrimenti: drop silenzioso — il WARN è già stato emesso nel cooldown corrente.
+        });
 
       lastCycleOutcome = "ok";
       addMatchLog("INFO", "cycle_complete", `Ciclo completato — ${totalMatches} match totali — ${prettyMs(cycleMetric.durationMs)} — ${memoryRssPretty()}`);
