@@ -45,7 +45,18 @@ async function getUserRole(userId: string | undefined): Promise<string | null> {
 
 // GET /api/ota/manifest — gating server-side per OTA: admin riceve pending+approved,
 // utenti normali e anonimi solo approved. Risposta usata dal client prima di parlare con EAS.
+//
+// CACHE: Cache-Control: no-store è obbligatorio su questa risposta.
+// Il flag ota_emergency_active viene letto direttamente dal DB ad ogni richiesta (nessuna cache
+// in-process), ma senza no-store un proxy/CDN potrebbe mettere in cache la risposta JSON e
+// ritardare l'attivazione del redirect d'emergenza fino alla scadenza della TTL CDN.
+// Con no-store il toggle è effettivo entro il round-trip DB successivo alla POST /emergency/toggle,
+// tipicamente < 100 ms sulla stessa area geografica (propagation time ≈ 0 per i client, immediato
+// per il processo server, nessuna finestra CDN né HTTP cache window).
 router.get("/manifest", async (req: Request, res: Response) => {
+  // Impedisce a qualsiasi CDN o proxy HTTP di mettere in cache la risposta: il flag
+  // ota_emergency_active deve riflettersi entro la prima richiesta successiva al toggle.
+  res.setHeader("Cache-Control", "no-store");
   try {
     // Task #4979 — flag BootGate diagnostico. Il client lo legge dal manifest per
     // attivare la schermata di bisect del boot al prossimo avvio (strettamente opt-in).
