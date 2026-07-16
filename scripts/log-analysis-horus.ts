@@ -63,6 +63,12 @@ const LOG_FILES: string[] = [
 /** Righe finali da prendere per ogni file di log (override con --tail N). */
 const DEFAULT_TAIL_LINES = 500;
 
+/**
+ * Numero di righe ridotto usato come ultimo fallback se il bundle è ancora sopra
+ * budget dopo la rimozione delle sezioni a bassa priorità.
+ */
+const REDUCED_TAIL_LINES = 100;
+
 /** Timeout chiamata Horus (ms). Il qwen3:4b sul ThinkCentre impiega tipicamente 20-60s. */
 const REQUEST_TIMEOUT_MS = 300_000;
 
@@ -521,6 +527,58 @@ const TOKEN_BUDGET = parseInt(process.env.HORUS_TOKEN_BUDGET ?? "28000", 10);
 
 // estimateTokens, TRIM_SECTIONS and trimBundleToFit are imported from ./lib/horus-trim
 
+/**
+ * Secondo livello di riduzione: se il bundle è ancora sopra budget dopo il trim
+ * delle sezioni a bassa priorità, ricostruisce la sezione LOG FILESYSTEM con un
+ * numero ridotto di righe di coda (`REDUCED_TAIL_LINES`).
+ *
+ * Ritorna il bundle aggiornato e il numero di righe ridotto usato, oppure
+ * `null` se il fallback non era necessario o non ha avuto effetto.
+ */
+function trimLogSectionToFit(
+  bundle: string,
+  maxTokens: number,
+  originalTail: number,
+): { bundle: string; reducedTail: number | null } {
+  if (estimateTokens(bundle) <= maxTokens) {
+    return { bundle, reducedTail: null };
+  }
+
+  const reducedTail = REDUCED_TAIL_LINES;
+  if (originalTail <= reducedTail) {
+    // Già al di sotto della soglia ridotta: nessun guadagno possibile.
+    return { bundle, reducedTail: null };
+  }
+
+  // Ricostruisce la sezione LOG FILESYSTEM con il tail ridotto.
+  const logSections = collectLogs(reducedTail);
+  const missingLogs: string[] = [];
+  const newLogParts: string[] = [];
+  for (const { file, text } of logSections) {
+    if (text == null) missingLogs.push(file);
+    else newLogParts.push(fmtSection(`LOG: ${file} (ultime ${reducedTail} righe)`, text));
+  }
+  if (missingLogs.length > 0) {
+    newLogParts.push(`\n[File mancanti/vuoti saltati: ${missingLogs.join(", ")}]\n`);
+  }
+
+  const newLogSection = `\n## LOG FILESYSTEM\n${newLogParts.join("\n")}`;
+
+  // Sostituisce la sezione LOG FILESYSTEM esistente nel bundle.
+  // La sezione termina al prossimo ## di livello 2 oppure a fine stringa.
+  const replaced = bundle.replace(
+    /\n## LOG FILESYSTEM\n[\s\S]*?(?=\n## COMMIT RECENTI|\n## GITHUB|\n## SENTRY|\n## SORGENTI|\n## TRIAGE|\n## RICHIESTA|$)/,
+    newLogSection,
+  );
+
+  if (replaced === bundle) {
+    // Sezione non trovata nel bundle: nessuna sostituzione effettuata.
+    return { bundle, reducedTail: null };
+  }
+
+  return { bundle: replaced, reducedTail };
+}
+
 // ─── Assemblaggio bundle ──────────────────────────────────────────────────────
 
 async function buildBundle(tail: number, onlyInternal: boolean): Promise<string> {
@@ -768,13 +826,19 @@ async function main(): Promise<void> {
   console.log("  ⏳ Raccolta fonti...");
   let bundle = await buildBundle(tail, ONLY_INTERNAL);
 
-  // ── Stima token e trim preventivo ────────────────────────────────────────
+  // ── Stima token e trim preventivo (primo livello: sezioni a bassa priorità) ─
   const rawTokens = estimateTokens(bundle);
   const isOverBudget = rawTokens > TOKEN_BUDGET;
   const trimResult = isOverBudget
     ? trimBundleToFit(bundle, TOKEN_BUDGET)
     : { bundle, trimmed: [] as string[] };
   bundle = trimResult.bundle;
+
+  // ── Secondo livello: riduzione tail LOG FILESYSTEM se ancora sopra budget ──
+  const logTrimResult = trimLogSectionToFit(bundle, TOKEN_BUDGET, tail);
+  bundle = logTrimResult.bundle;
+  const logTailReduced = logTrimResult.reducedTail;
+
   const finalTokens = estimateTokens(bundle);
 
   console.log(
@@ -793,14 +857,18 @@ async function main(): Promise<void> {
       for (const s of trimResult.trimmed) {
         console.log(`  ⚠️    — ${s}`);
       }
-      console.log(
-        `  ⚠️  Token dopo trim: ~${finalTokens.toLocaleString()} ${finalTokens <= TOKEN_BUDGET ? "(✅ entro budget)" : "(⚠️  ANCORA SOPRA BUDGET)"}`,
-      );
-      if (finalTokens > TOKEN_BUDGET) {
-        console.log("  ⚠️  Nessun'altra sezione trimable: Horus potrebbe troncare l'analisi!");
-      }
-    } else {
-      console.log("  ⚠️  Nessuna sezione trimable disponibile — Horus potrebbe troncare l'analisi!");
+    }
+    if (logTailReduced !== null) {
+      console.log("  ⚠️  ──────────────────────────────────────────────────────");
+      console.log("  ⚠️  FALLBACK LOG TAIL ATTIVATO: bundle ancora sopra budget dopo trim sezioni.");
+      console.log(`  ⚠️    Tail originale : ${tail} righe`);
+      console.log(`  ⚠️    Tail ridotto   : ${logTailReduced} righe (sezione LOG FILESYSTEM)`);
+    }
+    console.log(
+      `  ⚠️  Token dopo trim: ~${finalTokens.toLocaleString()} ${finalTokens <= TOKEN_BUDGET ? "(✅ entro budget)" : "(⚠️  ANCORA SOPRA BUDGET)"}`,
+    );
+    if (finalTokens > TOKEN_BUDGET) {
+      console.log("  ⚠️  Budget ancora non raggiunto — Horus potrebbe troncare l'analisi!");
     }
     console.log("  ⚠️  ──────────────────────────────────────────────────────");
     console.log("");
@@ -819,6 +887,9 @@ async function main(): Promise<void> {
     );
     if (trimResult.trimmed.length > 0) {
       console.log(`  Sezioni rimosse dal trim: ${trimResult.trimmed.join(", ")}`);
+    }
+    if (logTailReduced !== null) {
+      console.log(`  Riduzione tail LOG FILESYSTEM: ${tail} righe → ${logTailReduced} righe`);
     }
     if (isOverBudget && rawTokens !== finalTokens) {
       console.log(`  Token originali (prima del trim): ~${rawTokens.toLocaleString()}`);
