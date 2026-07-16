@@ -49,18 +49,15 @@ Il setup di `cloudflared` è documentato in `docs/uptime-kuma-cloudflare-tunnel.
 | DNS Proxy | `--mode dns-proxy` | Se si preferisce il proxy DNS standard |
 | Legacy (nessun flag) | *(nessun --mode)* | Solo pre-Cloudflare, per test iniziali |
 
-Il flag `--ssh-port` specifica la porta SSH da aprire in ufw (default: 2222 — post-hardening; usare 22 solo se l'hardening non è ancora stato applicato):
+Il flag `--ssh-port` specifica la porta SSH da aprire in ufw (default: 2222 — post-hardening, già applicato):
 
 ### Cloudflare Tunnel (raccomandato)
 
 Con Tunnel, `cloudflared` parla con nginx via loopback — nessuna porta 80/443 da aprire verso internet. Il loopback è già aperto dalla regola `allow in on lo`.
 
 ```bash
-# Dopo aver completato l'hardening SSH (porta 2222):
-sudo bash scripts/setup-ufw-thinkcentre.sh --mode tunnel --ssh-port 2222
-
-# Prima dell'hardening SSH (porta 22 ancora):
-sudo bash scripts/setup-ufw-thinkcentre.sh --mode tunnel --ssh-port 22
+# SSH hardening già applicato (porta 2222) — nessun flag necessario:
+sudo bash scripts/setup-ufw-thinkcentre.sh --mode tunnel
 ```
 
 ### DNS Proxy standard
@@ -80,11 +77,8 @@ sudo bash scripts/setup-ufw-thinkcentre.sh --mode dns-proxy --ssh-port 2222
 ### Setup
 
 ```bash
-# Eseguire DOPO setup-ssh-hardening-thinkcentre.sh (porta SSH: 2222)
+# SSH hardening già applicato (porta 2222) — nessun flag necessario:
 sudo bash scripts/setup-fail2ban-thinkcentre.sh
-
-# Se SSH è ancora sulla porta 22 (prima dell'hardening):
-sudo bash scripts/setup-fail2ban-thinkcentre.sh --ssh-port 22
 ```
 
 Lo script scrive automaticamente la porta corretta in `/etc/fail2ban/jail.local`, eliminando il rischio di drift tra porta SSH e porta monitorata da fail2ban.

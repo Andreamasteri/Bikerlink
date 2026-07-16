@@ -14,8 +14,8 @@
 # PRIMA di configurare Cloudflare.
 #
 # Porta SSH:
-#   --ssh-port 2222    porta post-hardening (default — setup-ssh-hardening-thinkcentre.sh)
-#   --ssh-port 22      solo se l'hardening SSH non è ancora stato applicato
+#   --ssh-port 2222    porta post-hardening (default — setup-ssh-hardening-thinkcentre.sh già applicato)
+#   --ssh-port PORT    override se si usa una porta diversa
 #
 # Idempotente: può essere rieseguito senza danni.
 #
