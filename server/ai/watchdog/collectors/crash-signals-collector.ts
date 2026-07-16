@@ -15,9 +15,10 @@
 // Thresholds are configurable via AppSetting key "watchdog_signal_thresholds"
 // (valueJson — partial overrides merged over the defaults above).
 // Example: { "appstate_transition": { "warnCount": 300, "warnUsers": 15 } }
-import { db } from "../../../db";
+import { db, withDbRetry } from "../../../db";
 import { sql } from "drizzle-orm";
 import { storage } from "../../../storage";
+import { dedupWarn } from "../../../lib/dedup-logger";
 import type { Signal } from "../types";
 
 interface SignalRow {
@@ -80,7 +81,7 @@ export function resetState(): void {
 export async function collectCrashSignals(): Promise<Signal[]> {
   try {
     const [result, config] = await Promise.all([
-      db.execute<SignalRow>(sql`
+      withDbRetry(() => db.execute<SignalRow>(sql`
         SELECT
           CASE
             WHEN error_message LIKE '[resume:js_thread_freeze]%'      THEN 'js_thread_freeze'
@@ -96,11 +97,28 @@ export async function collectCrashSignals(): Promise<Signal[]> {
           AND reported_at >= NOW() - INTERVAL '2 hours'
         GROUP BY signal_type
         HAVING signal_type IS NOT NULL
-      `),
+      `)),
       resolveSignalConfig(),
     ]);
 
     const signals: Signal[] = [];
+
+    // Task #155 — metrica separata "segnali resume": totale eventi [resume:%]
+    // nelle 2h, SEMPRE emessa come info (mai un Problem). Serve a mantenere
+    // visibili i resume ora che sono esclusi dal conteggio crash/crash-free-rate
+    // dell'error-collector.
+    const resumeTotal = result.rows.reduce((acc, r) => acc + Number(r.total ?? 0), 0);
+    signals.push({
+      source: "app",
+      metric: "resume.signals_2h",
+      value: resumeTotal,
+      unit: "events/2h",
+      severity: "info",
+      details: {
+        windowH: 2,
+        byType: Object.fromEntries(result.rows.map((r) => [r.signal_type, Number(r.total ?? 0)])),
+      },
+    });
 
     for (const row of result.rows) {
       const cfg = config[row.signal_type];
@@ -128,11 +146,10 @@ export async function collectCrashSignals(): Promise<Signal[]> {
 
     return signals;
   } catch (err) {
-    return [{
-      source: "app",
-      metric: "collector.error",
-      severity: "warn",
-      details: { collector: "crash-signals", error: (err as Error).message?.slice(0, 200) },
-    }];
+    // Task #155 — fallimento query = warning deduplicato, NON un segnale: il
+    // collector.error veniva contato come "errore DB" e latch-ava il problema
+    // "Database sovraccarico sostenuto" anche con ping/pool sani. Ritorno neutro.
+    dedupWarn("watchdog/crash-signals", "query fallita, skip segnale", err);
+    return [];
   }
 }
