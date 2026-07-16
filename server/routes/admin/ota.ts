@@ -190,24 +190,12 @@ router.post("/emergency/toggle", async (req: Request, res: Response) => {
       }
     }
 
-    const [existing] = await db
-      .select({ id: appSettings.id })
-      .from(appSettings)
-      .where(eq(appSettings.key, "ota_emergency_active"))
-      .limit(1);
-    if (existing) {
-      await db.update(appSettings)
-        .set({ value, updatedAt: new Date() })
-        .where(eq(appSettings.key, "ota_emergency_active"));
-    } else {
-      await db.insert(appSettings).values({
-        key: "ota_emergency_active",
-        value,
-        description: "Task #5087 — quando true, /api/ota/manifest serve il canale emergency invece di production.",
-      });
-    }
-
-    storage.invalidateAppSettingCache("ota_emergency_active");
+    await storage.upsertAppSetting(
+      "ota_emergency_active",
+      value,
+      undefined,
+      "quando true, /api/ota/manifest serve il canale emergency invece di production.",
+    );
     console.log(`[ota][AUDIT] EMERGENCY redirect ${value === "true" ? "ATTIVATO" : "disattivato"} by user ${userId}`);
     return res.json({ ok: true, active: body.active });
   } catch (err) {

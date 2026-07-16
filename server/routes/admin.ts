@@ -276,9 +276,7 @@ router.post("/client-error", clientErrorLimiter, clientErrorJson, async (req: Re
         isFatal: !!isFatal,
         ts: Date.now(),
       });
-      db.insert(appSettings)
-        .values({ key: "boot_gate_latest_error", value: errSnapshot })
-        .onConflictDoUpdate({ target: appSettings.key, set: { value: errSnapshot } })
+      storage.upsertAppSetting("boot_gate_latest_error", errSnapshot)
         .catch(() => {/* best-effort: non blocchiamo il report */});
     }
 

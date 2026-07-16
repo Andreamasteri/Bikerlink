@@ -100,9 +100,9 @@ export class SystemStorage extends AdsStorage {
     else _appSettingsCache.clear();
   }
 
-  async upsertAppSetting(key: string, value?: string, valueJson?: unknown): Promise<AppSetting> {
+  async upsertAppSetting(key: string, value?: string, valueJson?: unknown, description?: string): Promise<AppSetting> {
     const [setting] = await withDbRetry(() => db.insert(appSettings)
-      .values({ key, value, valueJson, updatedAt: new Date() })
+      .values({ key, value, valueJson, description, updatedAt: new Date() })
       .onConflictDoUpdate({ target: [appSettings.key], set: { value, valueJson, updatedAt: new Date() } })
       .returning());
     _appSettingsCache.delete(key);

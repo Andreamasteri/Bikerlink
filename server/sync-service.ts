@@ -25,12 +25,12 @@ async function readSetting(key: string): Promise<string | null> {
   }
 }
 
-async function upsertSetting(key: string, value: string, _description?: string) {
-  await storage.upsertAppSetting(key, value, undefined);
+async function upsertSetting(key: string, value: string, description?: string) {
+  await storage.upsertAppSetting(key, value, undefined, description);
 }
 
-async function upsertJsonSetting(key: string, value: unknown, _description?: string) {
-  await storage.upsertAppSetting(key, undefined, value);
+async function upsertJsonSetting(key: string, value: unknown, description?: string) {
+  await storage.upsertAppSetting(key, undefined, value, description);
 }
 
 async function readJsonSetting<T>(key: string): Promise<T | null> {

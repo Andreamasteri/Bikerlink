@@ -14,6 +14,7 @@ import { Router, type Request, type Response } from "express";
 import { db } from "../../db";
 import { users, appSettings } from "@shared/db";
 import { eq } from "drizzle-orm";
+import { storage } from "../../storage";
 
 const router = Router();
 
@@ -137,9 +138,7 @@ router.post("/ping", (req: Request, res: Response) => {
       totalSteps: state.entries.length,
       entries: state.entries.slice(-30),
     });
-    db.insert(appSettings)
-      .values({ key: "boot_gate_latest_ping", value: snapshot })
-      .onConflictDoUpdate({ target: appSettings.key, set: { value: snapshot } })
+    storage.upsertAppSetting("boot_gate_latest_ping", snapshot)
       .catch(() => {/* volatile, ignoriamo errori DB */});
 
     return res.json({ ok: true });
@@ -189,17 +188,7 @@ router.post("/enable", async (req: Request, res: Response) => {
   }
   const enabled = (req.body as { enabled?: unknown })?.enabled === true;
   try {
-    await db
-      .insert(appSettings)
-      .values({
-        key: "boot_gate_enabled",
-        value: enabled ? "true" : "false",
-        description: "Task #4979 — attiva il BootGate diagnostico sui device admin al prossimo avvio.",
-      })
-      .onConflictDoUpdate({
-        target: appSettings.key,
-        set: { value: enabled ? "true" : "false", updatedAt: new Date() },
-      });
+    await storage.upsertAppSetting("boot_gate_enabled", enabled ? "true" : "false");
     return res.json({ ok: true, bootGateEnabled: enabled });
   } catch (err) {
     console.error("[boot-gate/enable] error:", err);

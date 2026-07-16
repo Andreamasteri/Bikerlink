@@ -9,6 +9,7 @@ import { uploadBuffer } from "./objectStorage";
 import { db } from "./db";
 import { appSettings } from "@shared/db";
 import { eq } from "drizzle-orm";
+import { storage } from "./storage";
 import { uploadBackupToGDrive } from "./google-drive-backup";
 
 const execAsync = promisify(exec);
@@ -42,12 +43,7 @@ async function readSetting(key: string): Promise<string | null> {
 }
 
 async function upsertSetting(key: string, value: string, description?: string) {
-  const existing = await db.select().from(appSettings).where(eq(appSettings.key, key));
-  if (existing.length > 0) {
-    await db.update(appSettings).set({ value, updatedAt: new Date() }).where(eq(appSettings.key, key));
-  } else {
-    await db.insert(appSettings).values({ key, value, description });
-  }
+  await storage.upsertAppSetting(key, value, undefined, description);
 }
 
 async function readJsonSetting<T>(key: string): Promise<T | null> {
@@ -61,12 +57,7 @@ async function readJsonSetting<T>(key: string): Promise<T | null> {
 }
 
 async function upsertJsonSetting(key: string, value: unknown, description?: string) {
-  const existing = await db.select().from(appSettings).where(eq(appSettings.key, key));
-  if (existing.length > 0) {
-    await db.update(appSettings).set({ valueJson: value as Record<string, unknown>, updatedAt: new Date() }).where(eq(appSettings.key, key));
-  } else {
-    await db.insert(appSettings).values({ key, valueJson: value as Record<string, unknown>, description });
-  }
+  await storage.upsertAppSetting(key, undefined, value, description);
 }
 
 export interface BackupFrequency {
