@@ -11,16 +11,44 @@ import { getHealthState } from "../lib/health-arbiter";
 import { getCoordinatorHealthSummary } from "../ai/coordinator/job-gate";
 import { isQuebrachoLoopRunning } from "../ai/coordinator/quebracho-loop";
 
+// Cache breve per il middleware requireAdmin: evita 1 round-trip DB per ogni
+// richiesta admin in polling frequente (uptime/metrics/logs chiamati ogni ~5s).
+// TTL 10 s — abbastanza per un burst di polling, abbastanza corto da rilevare
+// suspend/block entro pochi secondi.
+const _moreRoutesAdminAuthCache = new Map<string, { user: unknown; expiresAt: number }>();
+const _MORE_ROUTES_ADMIN_TTL_MS = 10_000;
+
 async function requireAdmin(req: Request, res: Response, next: NextFunction) {
   if (!req.session?.userId) {
     return sendError(res, 401, "Non autenticato");
   }
+  const cacheKey = req.session.userId;
+  const cached = _moreRoutesAdminAuthCache.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now()) {
+    (req as { adminUser?: unknown }).adminUser = cached.user;
+    return next();
+  }
   const user = await storage.getUser(req.session.userId);
   if (!user || user.role !== "admin") {
+    _moreRoutesAdminAuthCache.delete(cacheKey);
     return sendError(res, 403, "Accesso non autorizzato");
   }
+  _moreRoutesAdminAuthCache.set(cacheKey, { user, expiresAt: Date.now() + _MORE_ROUTES_ADMIN_TTL_MS });
   (req as { adminUser?: typeof user }).adminUser = user;
   next();
+}
+
+// Cache in-process breve per le risposte degli endpoint admin letti con polling
+// frequente. TTL configurabile per endpoint; evita query/filesystem ripetuti.
+const _shortCache = new Map<string, { value: unknown; expiresAt: number }>();
+async function withShortCache<T>(key: string, ttlMs: number, fn: () => Promise<T>): Promise<T> {
+  const cached = _shortCache.get(key);
+  if (cached && cached.expiresAt > Date.now()) {
+    return cached.value as T;
+  }
+  const value = await fn();
+  _shortCache.set(key, { value, expiresAt: Date.now() + ttlMs });
+  return value;
 }
 
 // Task #2851 — Monitor Efficienza Server: campionamento rete + CPU processo.
@@ -109,29 +137,32 @@ export function registerMoreRoutes(app: Express) {
 
   app.get("/api/admin/uptime", requireAdmin, async (_req, res) => {
     const { SERVER_START_TIME, uptimeState } = await import("../uptime");
-    let crashCount24h = 0;
-    try {
-      const { appCrashLogs } = await import("@shared/db");
-      const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
-      const rows = await withDbRetry(() => db
-        .select({ count: count() })
-        .from(appCrashLogs)
-        .where(
-          sql`${appCrashLogs.crashType} IN ('crash_system', 'crash_js') AND ${appCrashLogs.reportedAt} >= ${since}`
-        ));
-      crashCount24h = Number(rows[0]?.count ?? 0);
-    } catch {
-      // no-op: non-critical
-    }
-    res.json({
+    // Valori live non cacheable (derivati da stato in-memory, sempre freschi).
+    const liveSnap = {
       backendStartedAt: SERVER_START_TIME,
       metroStartedAt: uptimeState.metroStartTime,
       metroLastSeenAt: uptimeState.metroLastSeenAt,
       metroOnline: uptimeState.metroOnline,
       frontendStartTime: uptimeState.frontendStartTime,
       serverNow: Date.now(),
-      crashCount24h,
+    };
+    // crashCount24h: 1 query DB, cacheato 10 s per ridurre il carico in polling.
+    const crashCount24h = await withShortCache("admin:uptime:crashCount24h", 10_000, async () => {
+      try {
+        const { appCrashLogs } = await import("@shared/db");
+        const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
+        const rows = await withDbRetry(() => db
+          .select({ count: count() })
+          .from(appCrashLogs)
+          .where(
+            sql`${appCrashLogs.crashType} IN ('crash_system', 'crash_js') AND ${appCrashLogs.reportedAt} >= ${since}`
+          ));
+        return Number(rows[0]?.count ?? 0);
+      } catch {
+        return 0;
+      }
     });
+    res.json({ ...liveSnap, crashCount24h });
   });
 
   app.get("/api/admin/system-health", requireAdmin, async (_req, res) => {
@@ -178,84 +209,95 @@ export function registerMoreRoutes(app: Express) {
   });
 
   // Task #2851 — Metriche live del server (CPU/RAM/rete/uptime) per la card admin.
+  // Nessuna query DB — solo OS syscall + stato modulo-level. Cacheato 10 s per
+  // ridurre la frequenza di campionamento in polling rapido dal pannello admin.
   app.get("/api/admin/server-metrics", requireAdmin, async (_req, res) => {
-    const os = await import("os");
-    const { SERVER_START_TIME } = await import("../uptime");
-    const now = Date.now();
+    const payload = await withShortCache("admin:server-metrics", 10_000, async () => {
+      const os = await import("os");
+      const { SERVER_START_TIME } = await import("../uptime");
+      const now = Date.now();
 
-    const [load1, load5, load15] = os.loadavg();
-    const cores = os.cpus().length || 1;
+      const [load1, load5, load15] = os.loadavg();
+      const cores = os.cpus().length || 1;
 
-    const totalMem = os.totalmem();
-    const freeMem = os.freemem();
-    const usedMem = totalMem - freeMem;
-    const mem = process.memoryUsage();
+      const totalMem = os.totalmem();
+      const freeMem = os.freemem();
+      const usedMem = totalMem - freeMem;
+      const mem = process.memoryUsage();
 
-    const net = readNetDev();
-    const cpu = process.cpuUsage();
+      const net = readNetDev();
+      const cpu = process.cpuUsage();
 
-    // Calcolo rate rete + percentuale CPU processo tra due campionamenti.
-    let rxRate = 0;
-    let txRate = 0;
-    let processCpuPercent = 0;
-    if (lastServerSample && now > lastServerSample.at) {
-      const dtSec = (now - lastServerSample.at) / 1000;
-      if (dtSec > 0) {
-        rxRate = Math.max(0, (net.rx - lastServerSample.rx) / dtSec);
-        txRate = Math.max(0, (net.tx - lastServerSample.tx) / dtSec);
-        const cpuDeltaMicros =
-          cpu.user - lastServerSample.cpu.user + (cpu.system - lastServerSample.cpu.system);
-        processCpuPercent = Math.max(0, (cpuDeltaMicros / (dtSec * 1_000_000)) * 100);
+      // Calcolo rate rete + percentuale CPU processo tra due campionamenti.
+      let rxRate = 0;
+      let txRate = 0;
+      let processCpuPercent = 0;
+      if (lastServerSample && now > lastServerSample.at) {
+        const dtSec = (now - lastServerSample.at) / 1000;
+        if (dtSec > 0) {
+          rxRate = Math.max(0, (net.rx - lastServerSample.rx) / dtSec);
+          txRate = Math.max(0, (net.tx - lastServerSample.tx) / dtSec);
+          const cpuDeltaMicros =
+            cpu.user - lastServerSample.cpu.user + (cpu.system - lastServerSample.cpu.system);
+          processCpuPercent = Math.max(0, (cpuDeltaMicros / (dtSec * 1_000_000)) * 100);
+        }
       }
-    }
-    lastServerSample = { at: now, rx: net.rx, tx: net.tx, cpu };
+      lastServerSample = { at: now, rx: net.rx, tx: net.tx, cpu };
 
-    res.json({
-      cpu: {
-        loadAvg1: load1,
-        loadAvg5: load5,
-        loadAvg15: load15,
-        cores,
-        loadPerCore: load1 / cores,
-        processCpuPercent,
-      },
-      memory: {
-        total: totalMem,
-        free: freeMem,
-        used: usedMem,
-        usedPercent: totalMem > 0 ? (usedMem / totalMem) * 100 : 0,
-        processRss: mem.rss,
-        processHeapUsed: mem.heapUsed,
-        processHeapTotal: mem.heapTotal,
-      },
-      network: {
-        rxBytes: net.rx,
-        txBytes: net.tx,
-        rxRate,
-        txRate,
-      },
-      uptimeSec: Math.floor((now - SERVER_START_TIME) / 1000),
-      serverNow: now,
+      return {
+        cpu: {
+          loadAvg1: load1,
+          loadAvg5: load5,
+          loadAvg15: load15,
+          cores,
+          loadPerCore: load1 / cores,
+          processCpuPercent,
+        },
+        memory: {
+          total: totalMem,
+          free: freeMem,
+          used: usedMem,
+          usedPercent: totalMem > 0 ? (usedMem / totalMem) * 100 : 0,
+          processRss: mem.rss,
+          processHeapUsed: mem.heapUsed,
+          processHeapTotal: mem.heapTotal,
+        },
+        network: {
+          rxBytes: net.rx,
+          txBytes: net.tx,
+          rxRate,
+          txRate,
+        },
+        uptimeSec: Math.floor((now - SERVER_START_TIME) / 1000),
+        serverNow: now,
+      };
     });
+    res.json(payload);
   });
 
   // Task #2851 — Anteprima ultime righe di log del server (stessa sorgente di system-health).
+  // Cacheato 10 s: evita readFileSync ripetuti su uptime-resets.log in polling rapido.
   app.get("/api/admin/server-logs", requireAdmin, async (req, res) => {
     const requested = parseInt(String(req.query.lines ?? "40"), 10);
     const limit = Number.isFinite(requested) ? Math.min(Math.max(requested, 1), 200) : 40;
-    const lines: string[] = [];
-    try {
-      const fsInner = await import("fs");
-      const pathInner = await import("path");
-      const logPath = pathInner.join(process.cwd(), "logs", "uptime-resets.log");
-      if (fsInner.existsSync(logPath)) {
-        const all = fsInner.readFileSync(logPath, "utf-8").trim().split("\n").filter(Boolean);
-        lines.push(...all.slice(-limit).reverse());
+    // Cache key include il limite richiesto così richieste con limit diversi
+    // non restituiscono lo stesso payload cacheato.
+    const payload = await withShortCache(`admin:server-logs:${limit}`, 10_000, async () => {
+      const lines: string[] = [];
+      try {
+        const fsInner = await import("fs");
+        const pathInner = await import("path");
+        const logPath = pathInner.join(process.cwd(), "logs", "uptime-resets.log");
+        if (fsInner.existsSync(logPath)) {
+          const all = fsInner.readFileSync(logPath, "utf-8").trim().split("\n").filter(Boolean);
+          lines.push(...all.slice(-limit).reverse());
+        }
+      } catch (err) {
+        console.warn("[admin/server-logs] read failed:", (err as Error).message);
       }
-    } catch (err) {
-      console.warn("[admin/server-logs] read failed:", (err as Error).message);
-    }
-    res.json({ lines, count: lines.length });
+      return { lines, count: lines.length };
+    });
+    res.json(payload);
   });
 
   app.get("/api/admin/restart-history", requireAdmin, async (_req, res) => {
