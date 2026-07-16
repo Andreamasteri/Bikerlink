@@ -370,6 +370,28 @@ Il risultato: qualsiasi modifica fatta in `sites-available/graphhopper`
 passava `nginx -t` e ricaricava senza errori, ma **non aveva alcun effetto**
 a runtime perché nginx caricava il file separato in `sites-enabled/`.
 
+### Guard automatico (luglio 2026)
+
+Il TC agent espone `/probe/nginx-symlinks`: al ogni ciclo di health check (ogni
+5 minuti) il backend chiama questo endpoint, che ispeziona via `fs.lstatSync`
+ogni voce di `/etc/nginx/sites-enabled/` e risponde con:
+
+```json
+{ "ok": true, "nonSymlinks": [] }           // tutto a posto
+{ "ok": false, "nonSymlinks": ["openwebui"] } // file reale trovato
+```
+
+Se `ok` è `false`, il pannello admin ThinkCentre mostra un avviso
+`nginxSymlinksWarning` con i nomi dei file reali. Non è necessario SSH per
+accorgersene.
+
+**Il check non interrompe il boot e non tocca lo stato globale del TC** (verde/
+giallo/rosso): è un avviso di configurazione, non un indicatore di
+servizio-down. Compare come campo separato nella risposta JSON di
+`GET /api/admin/thinkcentre-health`.
+
+### Fix manuale se il guard segnala un file reale
+
 **Prima di editare qualsiasi config nginx su questo box, verificare sempre:**
 
 ```bash
@@ -393,7 +415,8 @@ sudo ln -sf /etc/nginx/sites-available/<nome> /etc/nginx/sites-enabled/
 sudo nginx -t && sudo nginx -s reload
 ```
 
-Da luglio 2026, `sites-enabled/graphhopper` è un symlink come gli altri.
+Da luglio 2026, `sites-enabled/graphhopper` è un symlink come gli altri, e
+il guard automatico segnala eventuali regressioni future.
 
 ---
 

@@ -106,6 +106,73 @@ export async function probeDragonflyInfra(): Promise<InfraServiceHealth> {
   return { configured: true, ok: true, latencyMs: r.latencyMs, url: displayUrl, history: getHistory("dragonfly"), probeLog: getProbeLog("dragonfly") };
 }
 
+// ── nginx symlinks guard ──────────────────────────────────────────────────────
+
+export interface NginxSymlinksHealth {
+  /** false quando NGINX_MONITOR_URL non è impostato */
+  configured: boolean;
+  /** true = tutti i vhost sono symlink; false = almeno un file reale trovato */
+  ok: boolean;
+  /** Nomi dei file reali (non symlink) trovati in sites-enabled/ */
+  nonSymlinks: string[];
+  error?: string;
+}
+
+/**
+ * Chiama il probe /probe/nginx-symlinks sul TC agent per verificare che
+ * ogni voce di /etc/nginx/sites-enabled/ sia un symlink verso sites-available/.
+ * Un file reale causa il bug silenzioso "nginx -t passa ma le modifiche
+ * non hanno effetto a runtime".
+ *
+ * Deriva l'URL del probe dalla variabile NGINX_MONITOR_URL (es.
+ * https://tc.biker-link.net/probe/nginx → https://tc.biker-link.net/probe/nginx-symlinks).
+ * Richiede l'header X-Agent-Token (THINKCENTRE_AGENT_TOKEN).
+ */
+export async function probeNginxSymlinksInfra(): Promise<NginxSymlinksHealth> {
+  const monitorUrl = process.env.NGINX_MONITOR_URL?.trim().replace(/\/$/, "");
+  if (!monitorUrl) return { configured: false, ok: true, nonSymlinks: [] };
+
+  // Ricava il base dell'agente strippando il suffisso /probe/nginx* se presente,
+  // oppure usa la URL com'è e appende il path.
+  const agentBase = monitorUrl.replace(/\/probe\/nginx.*$/, "");
+  const symlinksUrl = `${agentBase}/probe/nginx-symlinks`;
+
+  const agentToken = process.env.THINKCENTRE_AGENT_TOKEN ?? "";
+  const headers: Record<string, string> = agentToken ? { "X-Agent-Token": agentToken } : {};
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 8_000);
+  try {
+    const res = await fetch(symlinksUrl, { method: "GET", headers, signal: controller.signal });
+
+    // Parse the body regardless of HTTP status: the agent returns HTTP 503 when
+    // ok=false but still includes { ok, nonSymlinks } in the JSON body. Bailing
+    // out early on !res.ok would discard the list of offending vhost names,
+    // which is the core data this probe exists to surface.
+    const data = await res.json().catch(() => null) as {
+      ok?: boolean;
+      nonSymlinks?: string[];
+      error?: string;
+    } | null;
+
+    if (data === null) {
+      // Body was not parseable JSON — agent is unreachable or returned an error page.
+      return { configured: true, ok: false, nonSymlinks: [], error: `HTTP ${res.status} (response unparseable)` };
+    }
+
+    const nonSymlinks: string[] = Array.isArray(data.nonSymlinks) ? data.nonSymlinks : [];
+    // Trust data.ok when present (agent sets it explicitly); fall back to
+    // deriving from nonSymlinks length if absent.
+    const ok = typeof data.ok === "boolean" ? data.ok : nonSymlinks.length === 0;
+    return { configured: true, ok, nonSymlinks, ...(data.error ? { error: data.error } : {}) };
+  } catch (err: unknown) {
+    const raw = err instanceof Error ? err.message : String(err);
+    return { configured: true, ok: false, nonSymlinks: [], error: sanitizeError(raw) };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 // ── nginx ─────────────────────────────────────────────────────────────────────
 export async function probeNginxInfra(): Promise<InfraServiceHealth> {
   const base = process.env.NGINX_MONITOR_URL?.trim().replace(/\/$/, "");

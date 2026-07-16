@@ -31,6 +31,7 @@ import {
 import {
   probeDragonflyInfra,
   probeNginxInfra,
+  probeNginxSymlinksInfra,
   probeUptimeKuma,
   probeAiHub,
 } from "./thinkcentre-health-infra-probes";
@@ -254,6 +255,7 @@ router.get("/thinkcentre-health", async (_req: Request, res: ExpressResponse) =>
         ufwDetail: null,
         tokenFingerprints: { graphhopper: null, valhalla: null, ollama: null, whisper: null, photon: null },
         aresDetail: null,
+        nginxSymlinksWarning: null,
         maintenanceMode: false,
         poweredOff: true,
         checkedAt: Date.now(),
@@ -274,6 +276,7 @@ router.get("/thinkcentre-health", async (_req: Request, res: ExpressResponse) =>
       aresDetail,
       repoDrift,
       aiHubInfra,
+      nginxSymlinksResult,
     ] = await Promise.all([
       isThinkCentreInMaintenance(),
       probeGraphHopperAreas(),
@@ -288,6 +291,7 @@ router.get("/thinkcentre-health", async (_req: Request, res: ExpressResponse) =>
       probeAres(),
       probeRepoDrift(),
       probeAiHub(),
+      probeNginxSymlinksInfra(),
     ]);
 
     const valhallaService: ServiceHealth = {
@@ -404,6 +408,17 @@ router.get("/thinkcentre-health", async (_req: Request, res: ExpressResponse) =>
 
     await updateThinkCentreSystemStatus(maintenance, services, graphhopper, ufwDetail, overall);
 
+    // nginxSymlinksWarning: avviso di configurazione — non influenza overall.
+    // Presente solo se NGINX_MONITOR_URL è configurato (configured=true).
+    // nonSymlinks: lista dei vhost che sono file reali anziché symlink.
+    const nginxSymlinksWarning = nginxSymlinksResult.configured
+      ? {
+          ok: nginxSymlinksResult.ok,
+          nonSymlinks: nginxSymlinksResult.nonSymlinks,
+          ...(nginxSymlinksResult.error ? { error: nginxSymlinksResult.error } : {}),
+        }
+      : null;
+
     return res.json({
       overall,
       onlineCount,
@@ -419,6 +434,7 @@ router.get("/thinkcentre-health", async (_req: Request, res: ExpressResponse) =>
       tokenFingerprints,
       aresDetail,
       repoDrift,
+      nginxSymlinksWarning,
       maintenanceMode: maintenance,
       checkedAt: Date.now(),
     });

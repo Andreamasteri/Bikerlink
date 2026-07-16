@@ -191,12 +191,38 @@ function localHttpGetJson(url) {
 
 // ── Probe endpoints config ────────────────────────────────────────────────────
 
+/**
+ * Verifica che ogni voce di /etc/nginx/sites-enabled/ sia un symlink.
+ * Un file reale (non symlink) causa il bug "nginx -t passa ma le modifiche a
+ * sites-available/ non hanno effetto a runtime". Restituisce ok=false + la
+ * lista dei file non-symlink se ne trova almeno uno.
+ */
+function checkNginxSymlinks() {
+  const fs = require("fs");
+  const dir = "/etc/nginx/sites-enabled";
+  try {
+    const entries = fs.readdirSync(dir);
+    const nonSymlinks = entries.filter((entry) => {
+      try {
+        return !fs.lstatSync(`${dir}/${entry}`).isSymbolicLink();
+      } catch {
+        return false; // ignora voci non accessibili
+      }
+    });
+    const ok = nonSymlinks.length === 0;
+    return Promise.resolve({ ok, nonSymlinks, dir });
+  } catch (err) {
+    return Promise.resolve({ ok: false, nonSymlinks: [], dir, error: String(err) });
+  }
+}
+
 const PROBE_ROUTES = {
-  "/probe/nginx":        () => localHttpProbe("http://localhost:80/"),
-  "/probe/pgadmin":      () => localHttpProbe("http://localhost:5050/"),
-  "/probe/uptime-kuma":  () => localHttpProbe("http://localhost:3001/"),
-  "/probe/redis":        () => tcpProbe("localhost", 6379),
-  "/probe/postgres":     () => tcpProbe("localhost", 5432),
+  "/probe/nginx":          () => localHttpProbe("http://localhost:80/"),
+  "/probe/nginx-symlinks": checkNginxSymlinks,
+  "/probe/pgadmin":        () => localHttpProbe("http://localhost:5050/"),
+  "/probe/uptime-kuma":    () => localHttpProbe("http://localhost:3001/"),
+  "/probe/redis":          () => tcpProbe("localhost", 6379),
+  "/probe/postgres":       () => tcpProbe("localhost", 5432),
 };
 
 // ── HTTP Server ───────────────────────────────────────────────────────────────
@@ -362,6 +388,7 @@ server.listen(PORT, "0.0.0.0", () => {
   console.log(`[bikerlink-agent] In ascolto su http://0.0.0.0:${PORT} — ${tokenInfo}`);
   console.log(`[bikerlink-agent] /sys-metrics         → CPU + RAM + disco (${DISK_PATH}) + uptime`);
   console.log(`[bikerlink-agent] /probe/nginx          → check nginx localhost:80`);
+  console.log(`[bikerlink-agent] /probe/nginx-symlinks → verifica che sites-enabled/ siano tutti symlink`);
   console.log(`[bikerlink-agent] /probe/pgadmin        → check pgAdmin localhost:5050`);
   console.log(`[bikerlink-agent] /probe/uptime-kuma    → check Uptime Kuma localhost:3001`);
   console.log(`[bikerlink-agent] /probe/redis          → check Redis TCP localhost:6379`);
