@@ -455,8 +455,17 @@ router.get("/photos/:filename", requireAuth, async (req: Request, res: Response)
       // Fallback: legacy local disk file
       const localPath = path.join(uploadsDir, filename);
       if (fs.existsSync(localPath)) {
+        const legacyBuf = fs.readFileSync(localPath);
+        const ext = path.extname(filename).toLowerCase();
+        const mimeTypes: Record<string, string> = {
+          ".jpg": "image/jpeg",
+          ".jpeg": "image/jpeg",
+          ".png": "image/png",
+          ".webp": "image/webp",
+        };
+        res.set("Content-Type", mimeTypes[ext] ?? "image/jpeg");
         res.set("Cache-Control", "private, max-age=3600");
-        return res.sendFile(localPath);
+        return res.send(legacyBuf);
       }
       return sendError(res, 404, "Foto non trovata");
     }
