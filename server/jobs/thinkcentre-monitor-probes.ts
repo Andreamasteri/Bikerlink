@@ -135,7 +135,32 @@ async function httpProbe(
   }
 }
 
+/**
+ * Punti di probe noti-routable per area (lon, lat su strada principale).
+ * Usati al posto del centro del bbox, che può finire in mare o su terreno
+ * non mappato per aree costiere/insulari (es. Grecia, Ecuador).
+ * Formato: [lon, lat] — due punti distinti nello stesso centro urbano.
+ *
+ * ⚠️ SINCRONIZZAZIONE — tenere allineato con AREA_PROBE_POINTS in
+ * server/routes/admin/thinkcentre-health-gh-probes.ts.
+ * Ogni area in ROUTING_AREAS DEVE avere una entry qui: il gate
+ * "area-probe-points-coverage" nei test lo verifica a ogni PR.
+ */
+export const AREA_PROBE_POINTS: Partial<Record<string, [[number, number], [number, number]]>> = {
+  "grecia":          [[23.73, 37.98], [23.82, 37.97]],  // Atene, ring-road
+  "balcani":         [[15.97, 45.81], [16.05, 45.83]],  // Zagabria, A1
+  "est":             [[26.10, 44.43], [26.20, 44.42]],  // Bucarest, DN1
+  "iberia":          [[-3.70, 40.42], [-3.65, 40.44]],  // Madrid, M-30
+  "arco-alpino":     [[9.19, 45.46],  [9.08, 45.52]],   // Milano, tangenziale
+  "germania-centro": [[8.68, 50.11],  [8.77, 50.15]],   // Francoforte, A5
+  "francia-benelux": [[4.83, 45.76],  [4.90, 45.78]],   // Lione, A6
+  "ecuador":         [[-78.47, -0.18], [-78.38, -0.19]], // Quito, Av. Simón Bolívar
+};
+
 function areaProbePoints(area: RoutingArea): [number, number][] {
+  const hardcoded = AREA_PROBE_POINTS[area.codice];
+  if (hardcoded) return hardcoded;
+  // Fallback: centro del bbox con offset del 10% (funziona per aree terrestri pianeggianti)
   const { minLon, minLat, maxLon, maxLat } = area.bbox;
   const cLon = (minLon + maxLon) / 2;
   const cLat = (minLat + maxLat) / 2;

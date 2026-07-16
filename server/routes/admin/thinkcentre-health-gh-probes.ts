@@ -163,7 +163,7 @@ export async function graphHopperRouteProbe(
  * non mappato per aree costiere/insulari (es. Grecia, Ecuador).
  * Formato: [lon, lat] — due punti distinti nello stesso centro urbano.
  */
-const AREA_PROBE_POINTS: Partial<Record<string, [[number, number], [number, number]]>> = {
+export const AREA_PROBE_POINTS: Partial<Record<string, [[number, number], [number, number]]>> = {
   "grecia":          [[23.73, 37.98], [23.82, 37.97]],  // Atene, ring-road
   "balcani":         [[15.97, 45.81], [16.05, 45.83]],  // Zagabria, A1
   "est":             [[26.10, 44.43], [26.20, 44.42]],  // Bucarest, DN1

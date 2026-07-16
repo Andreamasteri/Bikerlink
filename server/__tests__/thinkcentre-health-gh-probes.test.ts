@@ -50,6 +50,8 @@ import {
   resetConsecutiveFailuresForTests,
 } from "../routes/admin/thinkcentre-health-gh-probes";
 import { ROUTING_AREAS, type RoutingAreaCode } from "@shared/routing-areas";
+import { AREA_PROBE_POINTS as ADMIN_AREA_PROBE_POINTS } from "../routes/admin/thinkcentre-health-gh-probes";
+import { AREA_PROBE_POINTS as MONITOR_AREA_PROBE_POINTS } from "../jobs/thinkcentre-monitor-probes";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -342,22 +344,77 @@ describe("areaProbePoints — coordinate hardcoded per area", () => {
     expect(points[0][0]).toBeCloseTo(-78.47, 1);
     expect(points[0][1]).toBeCloseTo(-0.18, 1);
   });
+});
 
-  it("tutte le aree ROUTING_AREAS hanno coordinate hardcoded (nessuna ricade nel fallback)", () => {
-    // Assicura che nessuna area sia stata aggiunta a ROUTING_AREAS senza
-    // aggiornare la mappa AREA_PROBE_POINTS.
-    const coveredCodes = [
-      "grecia", "balcani", "est", "iberia",
-      "arco-alpino", "germania-centro", "francia-benelux", "ecuador",
-    ];
+// =============================================================================
+// Gate: ogni area in ROUTING_AREAS deve avere coordinate hardcoded in ENTRAMBE
+// le mappe AREA_PROBE_POINTS (admin probe + monitor probe).
+//
+// Se viene aggiunta una nuova area a ROUTING_AREAS senza aggiornare le mappe,
+// questi test falliscono esplicitamente con il nome dell'area mancante.
+// =============================================================================
+
+describe("Gate: AREA_PROBE_POINTS coverage — admin probe (thinkcentre-health-gh-probes)", () => {
+  it("ogni codice in ROUTING_AREAS ha una entry hardcoded in ADMIN_AREA_PROBE_POINTS", () => {
+    const missing: string[] = [];
     for (const area of ROUTING_AREAS) {
-      const hasCoverage = coveredCodes.includes(area.codice);
-      expect(hasCoverage).toBe(true);
-      // Verifica che i punti esistano e abbiano lat/lon plausibili (non NaN)
-      const points = areaProbePoints(area);
-      expect(points).toHaveLength(2);
-      expect(isNaN(points[0][0])).toBe(false);
-      expect(isNaN(points[0][1])).toBe(false);
+      if (!(area.codice in ADMIN_AREA_PROBE_POINTS)) {
+        missing.push(area.codice);
+      }
     }
+    expect(missing, [
+      "Aree mancanti in AREA_PROBE_POINTS (server/routes/admin/thinkcentre-health-gh-probes.ts):",
+      ...missing.map((c) => `  → "${c}" — aggiungi coordinate hardcoded on-road (lon, lat) per questa area`),
+    ].join("\n")).toHaveLength(0);
+  });
+
+  it("le coordinate hardcoded hanno valori plausibili (non NaN, non zero)", () => {
+    for (const area of ROUTING_AREAS) {
+      const entry = ADMIN_AREA_PROBE_POINTS[area.codice];
+      if (!entry) continue; // già catturato dal test precedente
+      const [p1, p2] = entry;
+      expect(isNaN(p1[0]), `${area.codice}: p1.lon è NaN`).toBe(false);
+      expect(isNaN(p1[1]), `${area.codice}: p1.lat è NaN`).toBe(false);
+      expect(isNaN(p2[0]), `${area.codice}: p2.lon è NaN`).toBe(false);
+      expect(isNaN(p2[1]), `${area.codice}: p2.lat è NaN`).toBe(false);
+      expect(p1[0] === 0 && p1[1] === 0, `${area.codice}: p1 è (0,0) — coordinate non inizializzate?`).toBe(false);
+    }
+  });
+});
+
+describe("Gate: AREA_PROBE_POINTS coverage — monitor probe (thinkcentre-monitor-probes)", () => {
+  it("ogni codice in ROUTING_AREAS ha una entry hardcoded in MONITOR_AREA_PROBE_POINTS", () => {
+    const missing: string[] = [];
+    for (const area of ROUTING_AREAS) {
+      if (!(area.codice in MONITOR_AREA_PROBE_POINTS)) {
+        missing.push(area.codice);
+      }
+    }
+    expect(missing, [
+      "Aree mancanti in AREA_PROBE_POINTS (server/jobs/thinkcentre-monitor-probes.ts):",
+      ...missing.map((c) => `  → "${c}" — aggiungi coordinate hardcoded on-road (lon, lat) per questa area`),
+    ].join("\n")).toHaveLength(0);
+  });
+
+  it("le coordinate hardcoded hanno valori plausibili (non NaN, non zero)", () => {
+    for (const area of ROUTING_AREAS) {
+      const entry = MONITOR_AREA_PROBE_POINTS[area.codice];
+      if (!entry) continue; // già catturato dal test precedente
+      const [p1, p2] = entry;
+      expect(isNaN(p1[0]), `${area.codice}: p1.lon è NaN`).toBe(false);
+      expect(isNaN(p1[1]), `${area.codice}: p1.lat è NaN`).toBe(false);
+      expect(isNaN(p2[0]), `${area.codice}: p2.lon è NaN`).toBe(false);
+      expect(isNaN(p2[1]), `${area.codice}: p2.lat è NaN`).toBe(false);
+      expect(p1[0] === 0 && p1[1] === 0, `${area.codice}: p1 è (0,0) — coordinate non inizializzate?`).toBe(false);
+    }
+  });
+
+  it("le mappe admin e monitor hanno le stesse chiavi (sincronizzazione)", () => {
+    const adminKeys = new Set(Object.keys(ADMIN_AREA_PROBE_POINTS));
+    const monitorKeys = new Set(Object.keys(MONITOR_AREA_PROBE_POINTS));
+    const onlyInAdmin = [...adminKeys].filter((k) => !monitorKeys.has(k));
+    const onlyInMonitor = [...monitorKeys].filter((k) => !adminKeys.has(k));
+    expect(onlyInAdmin, `Aree in admin ma non in monitor: ${onlyInAdmin.join(", ")}`).toHaveLength(0);
+    expect(onlyInMonitor, `Aree in monitor ma non in admin: ${onlyInMonitor.join(", ")}`).toHaveLength(0);
   });
 });
