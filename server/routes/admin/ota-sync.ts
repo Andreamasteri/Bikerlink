@@ -4,6 +4,7 @@
 import { db, withDbRetry } from "../../db";
 import { otaReleases } from "@shared/db";
 import { eq, isNull, and, sql } from "drizzle-orm";
+import { writeWatchdogLog } from "../../ai/watchdog/log";
 
 export const EAS_PROJECT_ID = "a25192d7-72e5-46af-97d0-2d38ed9b78e3";
 const EAS_GRAPHQL_URL = "https://api.expo.dev/graphql";
@@ -84,47 +85,102 @@ export async function syncProductionUpdates(): Promise<{ inserted: number; backf
   if (updates.length === 0) return { inserted: 0, backfilled: 0 };
 
   let inserted = 0;
+  // Task #394 — IDs di EAS update non presenti localmente al momento del check.
+  // Viene popolato anche quando l'insert ha successo, per segnalare il gap.
+  const gapIds: string[] = [];
+  // Task #394 — IDs che hanno avuto un errore DB durante il lookup/insert e sono
+  // stati saltati (non crashano il loop, ma vanno segnalati come non riconciliati).
+  const errorIds: string[] = [];
+
   for (const upd of updates) {
-    const existing = await withDbRetry(() => db.select({ id: otaReleases.id })
-      .from(otaReleases)
-      .where(eq(otaReleases.easUpdateId, upd.id))
-      .limit(1));
+    let existing: { id: string }[];
+    try {
+      existing = await withDbRetry(() => db.select({ id: otaReleases.id })
+        .from(otaReleases)
+        .where(eq(otaReleases.easUpdateId, upd.id))
+        .limit(1));
+    } catch (err) {
+      console.warn(`[ota-sync] DB error checking EAS update ${upd.id}, skipping:`, err);
+      errorIds.push(upd.id);
+      continue;
+    }
 
     if (existing.length > 0) continue;
 
-    await withDbRetry(() => db.insert(otaReleases).values({
-      easUpdateId: upd.id,
-      easGroupId: upd.group ?? null,
-      channel: "production",
-      runtimeVersion: upd.runtimeVersion ?? null,
-      message: upd.message ?? null,
-      status: "pending",
-      publishedAt: upd.createdAt ? new Date(upd.createdAt) : new Date(),
-    }).onConflictDoNothing());
-    inserted++;
+    // Record non presente localmente: registra il gap PRIMA dell'insert.
+    gapIds.push(upd.id);
+
+    try {
+      await withDbRetry(() => db.insert(otaReleases).values({
+        easUpdateId: upd.id,
+        easGroupId: upd.group ?? null,
+        channel: "production",
+        runtimeVersion: upd.runtimeVersion ?? null,
+        message: upd.message ?? null,
+        status: "pending",
+        publishedAt: upd.createdAt ? new Date(upd.createdAt) : new Date(),
+      }).onConflictDoNothing());
+      inserted++;
+    } catch (err) {
+      console.warn(`[ota-sync] DB error inserting EAS update ${upd.id}, skipping:`, err);
+      errorIds.push(upd.id);
+    }
+  }
+
+  // Task #394 — Emetti segnale watchdog se ci sono update EAS non riconciliati
+  // con il DB locale. Severity "warn" (non critico): il sync ritenterà al prossimo
+  // ciclo. Non blocca il completamento del job.
+  if (gapIds.length > 0) {
+    const unreconciled = errorIds.filter((id) => gapIds.includes(id));
+    void writeWatchdogLog({
+      kind: "signal",
+      scope: "horus.ota.sync_gap",
+      status: "warn",
+      summary: `OTA sync: trovati ${gapIds.length} update EAS non presenti localmente (${inserted} inseriti, ${unreconciled.length} non riconciliati per errore DB)`,
+      details: {
+        gapIds,
+        insertedCount: inserted,
+        unreconciledIds: unreconciled,
+        errorIds,
+      },
+    }).catch((e) => console.warn("[ota-sync] writeWatchdogLog error (non-fatal):", e));
   }
 
   for (const upd of updates) {
     if (!upd.group) continue;
-    await withDbRetry(() => db.update(otaReleases)
-      .set({ easGroupId: upd.group })
-      .where(and(eq(otaReleases.easUpdateId, upd.id), isNull(otaReleases.easGroupId))));
+    try {
+      await withDbRetry(() => db.update(otaReleases)
+        .set({ easGroupId: upd.group })
+        .where(and(eq(otaReleases.easUpdateId, upd.id), isNull(otaReleases.easGroupId))));
+    } catch (err) {
+      console.warn(`[ota-sync] DB error backfilling group for EAS update ${upd.id}:`, err);
+    }
   }
 
-  await withDbRetry(() => db.execute(sql`
-    UPDATE ota_releases r
-    SET ota_version = src.ota_version
-    FROM ota_releases src
-    WHERE r.ota_version IS NULL
-      AND r.eas_group_id IS NOT NULL
-      AND src.eas_group_id = r.eas_group_id
-      AND src.ota_version IS NOT NULL
-  `));
+  try {
+    await withDbRetry(() => db.execute(sql`
+      UPDATE ota_releases r
+      SET ota_version = src.ota_version
+      FROM ota_releases src
+      WHERE r.ota_version IS NULL
+        AND r.eas_group_id IS NOT NULL
+        AND src.eas_group_id = r.eas_group_id
+        AND src.ota_version IS NOT NULL
+    `));
+  } catch (err) {
+    console.warn("[ota-sync] DB error propagating ota_version by group:", err);
+  }
 
-  const noVersionRecords = await withDbRetry(() => db
-    .select({ id: otaReleases.id, message: otaReleases.message, easGroupId: otaReleases.easGroupId })
-    .from(otaReleases)
-    .where(isNull(otaReleases.otaVersion)));
+  let noVersionRecords: { id: string; message: string | null; easGroupId: string | null }[];
+  try {
+    noVersionRecords = await withDbRetry(() => db
+      .select({ id: otaReleases.id, message: otaReleases.message, easGroupId: otaReleases.easGroupId })
+      .from(otaReleases)
+      .where(isNull(otaReleases.otaVersion)));
+  } catch (err) {
+    console.warn("[ota-sync] DB error fetching no-version records, skipping backfill:", err);
+    return { inserted, backfilled: 0 };
+  }
 
   let backfilled = 0;
   for (const rec of noVersionRecords) {
@@ -132,16 +188,20 @@ export async function syncProductionUpdates(): Promise<{ inserted: number; backf
     if (!match) continue;
     const parsed = match[1];
     const groupId = rec.easGroupId;
-    if (groupId) {
-      await withDbRetry(() => db.update(otaReleases)
-        .set({ otaVersion: parsed })
-        .where(eq(otaReleases.easGroupId, groupId)));
-    } else {
-      await withDbRetry(() => db.update(otaReleases)
-        .set({ otaVersion: parsed })
-        .where(eq(otaReleases.id, rec.id)));
+    try {
+      if (groupId) {
+        await withDbRetry(() => db.update(otaReleases)
+          .set({ otaVersion: parsed })
+          .where(eq(otaReleases.easGroupId, groupId)));
+      } else {
+        await withDbRetry(() => db.update(otaReleases)
+          .set({ otaVersion: parsed })
+          .where(eq(otaReleases.id, rec.id)));
+      }
+      backfilled++;
+    } catch (err) {
+      console.warn(`[ota-sync] DB error backfilling ota_version for record ${rec.id}:`, err);
     }
-    backfilled++;
   }
 
   return { inserted, backfilled };
