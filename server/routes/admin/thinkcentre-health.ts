@@ -48,6 +48,7 @@ import { probeAres, type AresHealth } from "./thinkcentre-health-ares-probe";
 import { getOllamaModelId, type OllamaModelPersona } from "../../lib/ollama-client";
 import { probeRepoDrift, fixRepoDrift, type RepoDriftHealth, type RepoDriftFixResult } from "./thinkcentre-health-repodrift-probe";
 import { sendError } from "../../lib/api-response";
+import { storage } from "../../storage";
 
 import { updateThinkCentreSystemStatus, probeThinkCentreStatusSnapshot } from "./thinkcentre-health.part2";
 
@@ -105,6 +106,7 @@ router.post("/thinkcentre/maintenance", async (req: Request, res: ExpressRespons
     // Invalida le cache locali: lo switch deve avere effetto immediato.
     resetThinkCentreOfflineCache();
     resetThinkCentreMaintenanceCache();
+    storage.invalidateAppSettingCache("thinkcentre_maintenance_mode");
     console.log(`[admin/thinkcentre-maintenance] manutenzione ${enabled ? "ATTIVATA" : "disattivata"}`);
     return res.json({ ok: true, enabled });
   } catch (_err) {
@@ -149,6 +151,7 @@ router.post("/thinkcentre/powered-off", async (req: Request, res: ExpressRespons
     // Invalida le cache locali: lo switch deve avere effetto immediato.
     resetThinkCentreOfflineCache();
     resetThinkCentrePoweredOffCache();
+    storage.invalidateAppSettingCache("thinkcentre_powered_off");
     console.log(`[admin/thinkcentre-powered-off] ThinkCentre ${enabled ? "SPENTO (override attivo)" : "acceso (override rimosso)"}`);
     return res.json({ ok: true, enabled });
   } catch (_err) {
@@ -191,6 +194,7 @@ router.post("/thinkcentre/ignore-for-tests", async (req: Request, res: ExpressRe
     );
     // Invalida la cache locale: lo switch deve avere effetto immediato.
     resetThinkCentreIgnoreForTestsCache();
+    storage.invalidateAppSettingCache("thinkcentre_ignore_for_tests");
     console.log(`[admin/thinkcentre-ignore-tests] soppressione alert ${enabled ? "ATTIVATA" : "disattivata"}`);
     return res.json({ ok: true, enabled });
   } catch (_err) {

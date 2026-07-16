@@ -3,6 +3,7 @@ import { db, withDbRetry } from "../../db";
 import { otaReleases, appSettings } from "@shared/db";
 import { eq, desc, and, sql, ne, inArray, lt } from "drizzle-orm";
 import { sendError } from "../../lib/api-response";
+import { storage } from "../../storage";
 import { EAS_PROJECT_ID, triggerSyncInBackground, forceSyncNow, syncProductionUpdates } from "./ota-sync";
 import otaPart2Router from "./ota.part2";
 
@@ -206,6 +207,7 @@ router.post("/emergency/toggle", async (req: Request, res: Response) => {
       });
     }
 
+    storage.invalidateAppSettingCache("ota_emergency_active");
     console.log(`[ota][AUDIT] EMERGENCY redirect ${value === "true" ? "ATTIVATO" : "disattivato"} by user ${userId}`);
     return res.json({ ok: true, active: body.active });
   } catch (err) {
