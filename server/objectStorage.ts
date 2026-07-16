@@ -91,6 +91,19 @@ export function isValidOtaBundlePath(p: unknown): p is string {
   return OTA_BUNDLE_REGEX.test(p);
 }
 
+// ── Bucket path constants ─────────────────────────────────────────────────────
+// These are the canonical prefixes for each media category in bikerlinkBucket.
+// All upload / serve / delete code MUST use these constants — never raw strings.
+
+/** Prefix for ad-campaign images: `Campaign/ads/<filename>` */
+export const BUCKET_CAMPAIGN = "Campaign/ads/";
+/** Prefix for photo-contest entries: `PhotoContest/<filename>` */
+export const BUCKET_CONTEST = "PhotoContest/";
+/** Prefix for user profile photos: `ProfilePic/<filename>` */
+export const BUCKET_PROFILE_PIC = "ProfilePic/";
+/** Prefix for motorcycle gallery photos: `ProfilePic/motorcycles/<filename>` */
+export const BUCKET_MOTO_PIC = "ProfilePic/motorcycles/";
+
 export async function listObjects(prefix: string): Promise<StorageFile[]> {
   const client = getClient();
   const result = await client.list({ prefix });

@@ -13,7 +13,7 @@
 // è quasi sempre un blip temporaneo del DB: meglio lasciare qualche orfano che
 // cancellare immagini reali irrecuperabili.
 
-import { listObjects, deleteObject } from "../objectStorage";
+import { listObjects, deleteObject, BUCKET_CAMPAIGN } from "../objectStorage";
 import { storage } from "../storage";
 
 export interface OrphanCleanupResult {
@@ -42,7 +42,9 @@ export interface OrphanCleanupOpts {
   log?: (msg: string) => void;
 }
 
-const PREFIX = "public/ads/";
+// Both the canonical new prefix and the legacy prefix are swept so that objects
+// uploaded before and after the bucket-folder migration are managed consistently.
+const PREFIXES = [BUCKET_CAMPAIGN, "public/ads/"] as const;
 
 export async function cleanupOrphanAdImages(
   opts: OrphanCleanupOpts = {},
@@ -50,9 +52,10 @@ export async function cleanupOrphanAdImages(
   const dryRun = opts.dryRun ?? false;
   const log = opts.log ?? (() => {});
 
-  // 1. Lista tutti gli oggetti in public/ads/
-  const files = await listObjects(PREFIX);
-  log(`${files.length} file trovati in ${PREFIX}`);
+  // 1. Lista tutti gli oggetti in entrambi i prefissi (Campaign/ads/ + public/ads/)
+  const fileLists = await Promise.all(PREFIXES.map((p) => listObjects(p)));
+  const files = fileLists.flat();
+  log(`${files.length} file trovati (${PREFIXES.join(", ")})`);
   if (files.length === 0) {
     return { scanned: 0, referenced: 0, orphans: 0, deleted: 0, errors: 0, skipped: false, dryRun };
   }
@@ -75,7 +78,8 @@ export async function cleanupOrphanAdImages(
 
   // 3. Identifica gli orfani. Ignora le sub-prefix (file con "/" dopo il prefix).
   const orphans = files.filter((f) => {
-    const filename = f.name.slice(PREFIX.length);
+    const prefix = PREFIXES.find((p) => f.name.startsWith(p)) ?? PREFIXES[1];
+    const filename = f.name.slice(prefix.length);
     return !!filename && !filename.includes("/") && !referenced.has(filename);
   });
   log(`${orphans.length} file orfani trovati`);

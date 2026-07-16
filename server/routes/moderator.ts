@@ -3,7 +3,7 @@ import multer from "multer";
 import path from "path";
 import * as fs from "fs";
 import { storage } from "../storage";
-import { uploadBuffer, deleteObject } from "../objectStorage";
+import { uploadBuffer, deleteObject, BUCKET_CAMPAIGN, BUCKET_CONTEST } from "../objectStorage";
 import { cacheAdImage } from "./ads";
 import { requireUserId } from "../lib/auth-middleware";
 import { sendSuccess, sendError } from "../lib/api-response";
@@ -145,15 +145,18 @@ router.put("/photos/:id/reject", async (req: Request, res: Response) => {
       if (entry.photoUrl) {
         const photoFilename = entry.photoUrl.split("/").pop();
         if (photoFilename) {
-          await deleteObject(`public/contest/${photoFilename}`).catch((err) => {
-            // Log per audit/incident response: il reject DB è già avvenuto e l'endpoint
-            // contest.ts blocca comunque l'accesso (isApproved !== true). Manteniamo
-            // l'idempotenza ma non perdiamo visibilità sui fallimenti del bucket.
-            console.warn(
-              `[moderator/reject_contest] Object delete failed for ${photoFilename} (entry ${id}):`,
-              err?.message ?? err
-            );
-          });
+          // Try new PhotoContest/ path first, then legacy public/contest/
+          deleteObject(`${BUCKET_CONTEST}${photoFilename}`)
+            .catch(() => deleteObject(`public/contest/${photoFilename}`))
+            .catch((err) => {
+              // Log per audit/incident response: il reject DB è già avvenuto e l'endpoint
+              // contest.ts blocca comunque l'accesso (isApproved !== true). Manteniamo
+              // l'idempotenza ma non perdiamo visibilità sui fallimenti del bucket.
+              console.warn(
+                `[moderator/reject_contest] Object delete failed for ${photoFilename} (entry ${id}):`,
+                err?.message ?? err
+              );
+            });
         }
       }
     } else {
@@ -213,7 +216,7 @@ router.get("/logs", async (req: Request, res: Response) => {
 async function uploadAdImage(buffer: Buffer, originalname: string, mimetype: string): Promise<string> {
   const uniqueSuffix = Date.now().toString() + "-" + Math.random().toString(36).substr(2, 9);
   const filename = uniqueSuffix + path.extname(originalname);
-  const objectPath = `public/ads/${filename}`;
+  const objectPath = `${BUCKET_CAMPAIGN}${filename}`;
   console.log(`[uploadAdImage] Uploading "${originalname}" → ${objectPath} (${buffer.length} bytes, ${mimetype})`);
   await uploadBuffer(objectPath, buffer, mimetype);
   console.log(`[uploadAdImage] Upload OK → /api/ads/images/${filename}`);

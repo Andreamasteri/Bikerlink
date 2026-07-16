@@ -5,8 +5,7 @@ import multer from "multer";
 import { sendError, sendSuccess } from "../../lib/api-response";
 import { safeModLog } from "../../lib/safe-mod-log";
 import { storage } from "../../storage";
-import { objectExists } from "../../objectStorage";
-import { uploadBuffer, deleteObject } from "../../objectStorage";
+import { objectExists, uploadBuffer, deleteObject, BUCKET_CAMPAIGN } from "../../objectStorage";
 import crypto from "crypto";
 
 const router = Router();
@@ -44,7 +43,9 @@ export async function runAdImageHealthCheck(): Promise<void> {
       const filename = match[1];
       if (!filename || filename.includes("..") || filename.includes("/")) continue;
       try {
-        const exists = await objectExists(`public/ads/${filename}`);
+        const existsNew = await objectExists(`${BUCKET_CAMPAIGN}${filename}`);
+        const existsLegacy = existsNew ? false : await objectExists(`public/ads/${filename}`);
+        const exists = existsNew || existsLegacy;
         if (!exists) {
           broken.push(campaign.id);
           const localPath = path.join(adsDir, filename);
@@ -113,7 +114,7 @@ router.post("/:id/reupload-image", adReuploadUpload.single("image"), async (req:
     const existing = await storage.getAdCampaign(id);
     if (!existing) return sendError(res, 404, "Campagna non trovata");
     const filename = `ad-${Date.now()}-${crypto.randomBytes(4).toString("hex")}-${req.file.originalname}`;
-    const objectPath = `public/ads/${filename}`;
+    const objectPath = `${BUCKET_CAMPAIGN}${filename}`;
     await uploadBuffer(objectPath, req.file.buffer, req.file.mimetype);
     // Backup automatico
     try {
@@ -139,7 +140,7 @@ router.post("/:id/reupload-image", adReuploadUpload.single("image"), async (req:
       const oldMatch = oldImageUrl.match(/\/api\/ads\/images\/([^?#]+)/);
       if (oldMatch?.[1]) {
         const oldFilename = oldMatch[1];
-        try { await deleteObject(`public/ads/${oldFilename}`); } catch { /* non-fatal */ }
+        try { await deleteObject(`${BUCKET_CAMPAIGN}${oldFilename}`); } catch { try { await deleteObject(`public/ads/${oldFilename}`); } catch { /* non-fatal */ } }
         try {
           const lp = path.join(adsDir, oldFilename);
           if (fs.existsSync(lp)) fs.unlinkSync(lp);

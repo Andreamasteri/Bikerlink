@@ -1,6 +1,6 @@
 import { Router, type Request, type Response } from "express";
 import { storage } from "../storage";
-import { downloadBuffer, deleteObject, listObjects, uploadBuffer } from "../objectStorage";
+import { downloadBuffer, deleteObject, listObjects, uploadBuffer, BUCKET_CAMPAIGN } from "../objectStorage";
 import { sendSuccess, sendError } from "../lib/api-response";
 import path from "path";
 import fs from "fs";
@@ -73,7 +73,13 @@ export async function warmupAdImageCache(): Promise<void> {
       let ok = false;
       let primaryErr: unknown;
       try {
-        const buffer = await downloadBuffer(`public/ads/${filename}`);
+        // Try new Campaign/ path first, then legacy public/ads/
+        let buffer: Buffer;
+        try {
+          buffer = await downloadBuffer(`${BUCKET_CAMPAIGN}${filename}`);
+        } catch {
+          buffer = await downloadBuffer(`public/ads/${filename}`);
+        }
         fs.writeFileSync(localPath, buffer);
         downloaded++;
         console.log(`[ADS WARMUP] Ripristinata: ${filename} (campagna "${campaign.name}")`);
@@ -83,7 +89,7 @@ export async function warmupAdImageCache(): Promise<void> {
         // Auto-restore dal backup .private/ads-backup/ se disponibile (1 tentativo).
         try {
           const backupBuffer = await downloadBuffer(`${ADS_BACKUP_PREFIX}${filename}`);
-          await uploadBuffer(`public/ads/${filename}`, backupBuffer, "image/jpeg");
+          await uploadBuffer(`${BUCKET_CAMPAIGN}${filename}`, backupBuffer, "image/jpeg");
           fs.writeFileSync(localPath, backupBuffer);
           downloaded++;
           console.log(`[ADS WARMUP] AUTO-RESTORE da backup: ${filename} — campagna "${campaign.name}" ripristinata automaticamente`);
@@ -138,11 +144,16 @@ export async function cacheAdImage(imageUrl: string | null | undefined): Promise
 
     let buffer: Buffer;
     try {
-      buffer = await downloadBuffer(`public/ads/${filename}`);
+      // Try new Campaign/ path first, then legacy public/ads/
+      try {
+        buffer = await downloadBuffer(`${BUCKET_CAMPAIGN}${filename}`);
+      } catch {
+        buffer = await downloadBuffer(`public/ads/${filename}`);
+      }
     } catch (_primaryErr) {
-      // Fallback: tenta il backup .private/ads-backup/ e ripristina in public/ads/
+      // Fallback: tenta il backup .private/ads-backup/ e ripristina nel percorso nuovo
       buffer = await downloadBuffer(`${ADS_BACKUP_PREFIX}${filename}`);
-      await uploadBuffer(`public/ads/${filename}`, buffer, "image/jpeg");
+      await uploadBuffer(`${BUCKET_CAMPAIGN}${filename}`, buffer, "image/jpeg");
       console.log(`[ADS CACHE] AUTO-RESTORE da backup: ${filename}`);
     }
     fs.writeFileSync(localPath, buffer);
@@ -227,18 +238,18 @@ export async function cleanupOrphanedAdImages(): Promise<void> {
       console.log("[ADS CLEANUP] Directory locale non trovata — skip disk sweep, continuo con Object Storage");
     }
 
-    // Also remove orphaned files from object storage (public/ads/).
-    // This covers images replaced/deleted before the per-operation deleteObject
-    // calls were added — those files were never cleaned from the primary store.
-    //
-    // SAFETY GUARD: if no campaigns are in DB and there are files to sweep,
-    // skip the object-storage deletion. An empty campaign list is almost always
-    // a transient DB issue — deleting everything would destroy real images that
-    // can never be recovered. Log a warning instead and retry on the next run.
+    // Remove orphaned files from both the canonical Campaign/ads/ and legacy public/ads/ prefixes.
+    // SAFETY GUARD: if 0 referenced filenames but orphans exist, skip — likely a transient DB blip.
     try {
-      const objectFiles = await listObjects("public/ads/");
-      const sweepableFiles = objectFiles.filter((obj) => {
-        const filename = obj.name.slice("public/ads/".length);
+      const [newFiles, legacyFiles] = await Promise.all([
+        listObjects(BUCKET_CAMPAIGN),
+        listObjects("public/ads/"),
+      ]);
+      const allObjectFiles = [...newFiles, ...legacyFiles];
+
+      const sweepableFiles = allObjectFiles.filter((obj) => {
+        const prefix = obj.name.startsWith(BUCKET_CAMPAIGN) ? BUCKET_CAMPAIGN : "public/ads/";
+        const filename = obj.name.slice(prefix.length);
         return !!filename && !filename.includes("/") && !referencedFilenames.has(filename);
       });
 
@@ -252,8 +263,9 @@ export async function cleanupOrphanedAdImages(): Promise<void> {
       }
 
       let objectRemoved = 0;
-      for (const obj of objectFiles) {
-        const filename = obj.name.slice("public/ads/".length);
+      for (const obj of allObjectFiles) {
+        const prefix = obj.name.startsWith(BUCKET_CAMPAIGN) ? BUCKET_CAMPAIGN : "public/ads/";
+        const filename = obj.name.slice(prefix.length);
         if (!filename || filename.includes("/")) continue; // skip sub-prefixes
         if (referencedFilenames.has(filename)) continue;
         try {
@@ -264,7 +276,7 @@ export async function cleanupOrphanedAdImages(): Promise<void> {
           console.warn(`[ADS CLEANUP] Impossibile rimuovere oggetto ${obj.name} (non-fatal):`, deleteErr);
         }
       }
-      console.log(`[ADS CLEANUP] Object Storage — rimossi: ${objectRemoved}`);
+      console.log(`[ADS CLEANUP] Object Storage — rimossi: ${objectRemoved} (sweep: ${BUCKET_CAMPAIGN} + public/ads/)`);
     } catch (objErr) {
       console.warn("[ADS CLEANUP] Object Storage sweep fallito (non-fatal):", objErr);
     }
@@ -283,7 +295,13 @@ router.get("/images/:filename", async (req: Request, res: Response) => {
     return res.sendFile(localPath);
   }
   try {
-    const imageBuffer = await downloadBuffer(`public/ads/${filename}`);
+    // Try new Campaign/ path first, fall back to legacy public/ads/
+    let imageBuffer: Buffer;
+    try {
+      imageBuffer = await downloadBuffer(`${BUCKET_CAMPAIGN}${filename}`);
+    } catch {
+      imageBuffer = await downloadBuffer(`public/ads/${filename}`);
+    }
     try {
       const localDir = path.resolve(process.cwd(), "uploads", "ads");
       fs.mkdirSync(localDir, { recursive: true });

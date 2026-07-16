@@ -3,18 +3,21 @@ import path from "path";
 import fs from "fs";
 import { and, ne, eq } from "drizzle-orm";
 import { db } from "../db";
-import { userMotorcycles } from "@shared/db";
+import { userMotorcycles, motorcyclePhotos } from "@shared/db";
 import { createMotorcycleSchema, updateMotorcycleSchema, uploadPhotoSchema } from "@shared/validators";
 import { storage } from "../storage";
 import { createClubInvitesForMoto } from "./motoclubs";
 import { classifyMatch } from "../matching/notifications/classify";
 import { dispatchMatchNotification } from "../matching/notifications/dispatcher";
 import { sendSuccess, sendError } from "../lib/api-response";
+import { uploadBuffer, downloadBuffer, deleteObject, BUCKET_MOTO_PIC } from "../objectStorage";
 
 import { requireAuth } from "../lib/auth-middleware";
 
 const router = Router();
 
+// Kept for backward-compat: legacy photos on disk are still served via
+// /uploads/motorcycles/:filename (middleware.ts). New uploads go to the bucket.
 const uploadsDir = path.join(process.cwd(), "uploads", "motorcycles");
 if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
@@ -342,10 +345,10 @@ router.post("/:id/photos", requireAuth, async (req: Request, res: Response) => {
     const { compressToWebP } = await import("../utils/image-processing");
     const webpBuffer = await compressToWebP(rawBuffer);
     const uniqueName = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}.webp`;
-    const filePath = path.join(uploadsDir, uniqueName);
-    fs.writeFileSync(filePath, webpBuffer);
 
-    const photoUrl = `/uploads/motorcycles/${uniqueName}`;
+    await uploadBuffer(`${BUCKET_MOTO_PIC}${uniqueName}`, webpBuffer, "image/webp");
+
+    const photoUrl = `/api/motorcycles/photos/${uniqueName}`;
     const photo = await storage.addMotorcyclePhoto({
       motorcycleId: motoId,
       photoUrl,
@@ -380,10 +383,85 @@ router.delete("/:id/photos/:photoId", requireAuth, async (req: Request, res: Res
       return sendError(res, 404, "Foto non trovata");
     }
 
+    // Remove the file from bucket (new uploads) or legacy disk (pre-migration photos)
+    if (photo.photoUrl.startsWith("/api/motorcycles/photos/")) {
+      const fn = photo.photoUrl.replace("/api/motorcycles/photos/", "");
+      if (fn && !fn.includes("/") && !fn.includes("..")) {
+        deleteObject(`${BUCKET_MOTO_PIC}${fn}`).catch((e) =>
+          console.warn(`[motorcycles] bucket delete failed for ${fn}:`, (e as Error)?.message)
+        );
+      }
+    } else if (photo.photoUrl.startsWith("/uploads/motorcycles/")) {
+      const fn = photo.photoUrl.replace("/uploads/motorcycles/", "");
+      if (fn && !fn.includes("/") && !fn.includes("..")) {
+        try {
+          const localPath = path.join(uploadsDir, fn);
+          if (fs.existsSync(localPath)) fs.unlinkSync(localPath);
+        } catch (e) {
+          console.warn(`[motorcycles] legacy disk delete failed for ${fn}:`, (e as Error)?.message);
+        }
+      }
+    }
+
     await storage.deleteMotorcyclePhoto(photoId);
     return sendSuccess(res, undefined, "Foto eliminata");
   } catch (error) {
     console.error("Delete motorcycle photo error:", error);
+    return sendError(res, 500, "Errore interno del server");
+  }
+});
+
+/**
+ * GET /api/motorcycles/photos/:filename
+ * Serve motorcycle gallery photos from the bucket (ProfilePic/motorcycles/).
+ * Falls back to local uploads/motorcycles/ for photos uploaded before migration.
+ * Auth: only the owner of the motorcycle the photo belongs to may access it.
+ */
+router.get("/photos/:filename", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const requesterId = req.session.userId!;
+    const filename = req.params.filename as string;
+    if (!filename || filename.includes("/") || filename.includes("..")) {
+      return sendError(res, 404, "Foto non trovata");
+    }
+
+    // Verify ownership: the photo must exist in DB and belong to a motorcycle owned by the requester
+    const photoUrl = `/api/motorcycles/photos/${filename}`;
+    const [row] = await db
+      .select({ ownerId: userMotorcycles.userId })
+      .from(motorcyclePhotos)
+      .innerJoin(userMotorcycles, eq(motorcyclePhotos.motorcycleId, userMotorcycles.id))
+      .where(eq(motorcyclePhotos.photoUrl, photoUrl))
+      .limit(1);
+
+    if (!row || row.ownerId !== requesterId) {
+      return sendError(res, 404, "Foto non trovata");
+    }
+
+    // Try new bucket path first, then fall back to local disk (legacy photos)
+    try {
+      const buffer = await downloadBuffer(`${BUCKET_MOTO_PIC}${filename}`);
+      const ext = path.extname(filename).toLowerCase();
+      const mimeTypes: Record<string, string> = {
+        ".jpg": "image/jpeg",
+        ".jpeg": "image/jpeg",
+        ".png": "image/png",
+        ".webp": "image/webp",
+      };
+      res.set("Content-Type", mimeTypes[ext] ?? "image/jpeg");
+      res.set("Cache-Control", "private, max-age=3600");
+      return res.send(buffer);
+    } catch {
+      // Fallback: legacy local disk file
+      const localPath = path.join(uploadsDir, filename);
+      if (fs.existsSync(localPath)) {
+        res.set("Cache-Control", "private, max-age=3600");
+        return res.sendFile(localPath);
+      }
+      return sendError(res, 404, "Foto non trovata");
+    }
+  } catch (error) {
+    console.error("Serve motorcycle photo error:", error);
     return sendError(res, 500, "Errore interno del server");
   }
 });

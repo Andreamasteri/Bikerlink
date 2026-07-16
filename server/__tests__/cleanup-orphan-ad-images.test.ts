@@ -25,6 +25,7 @@ const { mockListObjects, mockDeleteObject, mockGetAllCampaigns } = vi.hoisted(()
 vi.mock("../objectStorage", () => ({
   listObjects: mockListObjects,
   deleteObject: mockDeleteObject,
+  BUCKET_CAMPAIGN: "Campaign/ads/",
 }));
 
 vi.mock("../storage", () => ({
@@ -55,6 +56,10 @@ function makeCampaign(filename: string | null): { id: number; imageUrl: string |
 beforeEach(() => {
   vi.clearAllMocks();
   mockDeleteObject.mockResolvedValue(undefined);
+  // cleanupOrphanAdImages now calls listObjects twice: first for Campaign/ads/, then for
+  // public/ads/. Default the first call (Campaign/ads/) to [] so existing tests that set
+  // mockResolvedValue still work — their data is returned on the second (public/ads/) call.
+  mockListObjects.mockReturnValueOnce(Promise.resolve([]));
 });
 
 // ─────────────────────────────────────────────────────────────────────────────

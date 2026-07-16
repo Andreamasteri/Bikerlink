@@ -2,7 +2,7 @@ import { Router, type Request, type Response } from "express";
 import path from "path";
 import multer from "multer";
 import { storage } from "../storage";
-import { uploadBuffer, downloadBuffer, deleteObject } from "../objectStorage";
+import { uploadBuffer, downloadBuffer, deleteObject, BUCKET_CONTEST } from "../objectStorage";
 import { allLimited } from "../lib/concurrency";
 import { db } from "../db";
 import { photoContestEntries } from "@shared/db";
@@ -79,7 +79,7 @@ router.post("/entries", upload.single("photo"), async (req: Request, res: Respon
 
     // --- Step 2: object storage upload ---
     const filename = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}.${fileExt}`;
-    const objectPath = `public/contest/${filename}`;
+    const objectPath = `${BUCKET_CONTEST}${filename}`;
 
     try {
       await uploadBuffer(objectPath, uploadBuf, uploadMime);
@@ -234,7 +234,10 @@ router.delete("/entries/:id", async (req: Request, res: Response) => {
     if (entry.photoUrl) {
       const photoFilename = entry.photoUrl.split("/").pop();
       if (photoFilename) {
-        await deleteObject(`public/contest/${photoFilename}`).catch(() => {});
+        // Try new PhotoContest/ path first, then legacy public/contest/
+        await deleteObject(`${BUCKET_CONTEST}${photoFilename}`).catch(() =>
+          deleteObject(`public/contest/${photoFilename}`).catch(() => {})
+        );
       }
     }
     return sendSuccess(res, undefined, "Foto eliminata");
@@ -272,8 +275,13 @@ router.get("/photos/:filename", async (req: Request, res: Response) => {
       return sendError(res, 404, "Foto non trovata");
     }
 
-    const objectPath = `public/contest/${filename}`;
-    const buffer = await downloadBuffer(objectPath);
+    // Try new PhotoContest/ path first, fall back to legacy public/contest/
+    let buffer: Buffer;
+    try {
+      buffer = await downloadBuffer(`${BUCKET_CONTEST}${filename}`);
+    } catch {
+      buffer = await downloadBuffer(`public/contest/${filename}`);
+    }
     const ext = path.extname(filename).toLowerCase();
     const mimeTypes: Record<string, string> = {
       ".jpg": "image/jpeg",

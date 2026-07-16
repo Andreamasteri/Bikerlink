@@ -9,7 +9,7 @@ import { generateText } from "ai";
 import { runWithFallback } from "../moderation/provider";
 import { writeWatchdogLog } from "./log";
 import { logAiUsage } from "../audit";
-import { uploadBuffer, deleteObject, objectExists } from "../../objectStorage";
+import { uploadBuffer, deleteObject, objectExists, BUCKET_CAMPAIGN } from "../../objectStorage";
 import { getInternalProbeModeratorHeaderName } from "./internal-token";
 import { storage } from "../../storage";
 import { cleanupOrphanAdImages } from "../../ads/cleanup-orphan-images";
@@ -126,7 +126,7 @@ export async function runCampaignsSelfCheck(opts: RunSelfCheckOpts): Promise<Cam
   const runId = crypto.randomBytes(6).toString("hex");
   const probeBaseName = `__selfcheck__-${runId}`;
   const publicFileName = `selfcheck-${runId}.png`;
-  const publicObjectPath = `public/ads/${publicFileName}`;
+  const publicObjectPath = `${BUCKET_CAMPAIGN}${publicFileName}`;
   const privateObjectPath = `.private/selfcheck/probe-${runId}.png`;
   const imageUrl = `/api/ads/images/${publicFileName}`;
 
@@ -191,7 +191,7 @@ export async function runCampaignsSelfCheck(opts: RunSelfCheckOpts): Promise<Cam
       }
     }
 
-    // 3. Upload pubblico (public/ads/<file>) — è la copia usata dall'URL della campagna
+    // 3. Upload pubblico (Campaign/ads/<file>) — è la copia usata dall'URL della campagna
     checks.push(await runStep("object_storage_upload_public", async () => {
       await uploadBuffer(publicObjectPath, TINY_PNG, "image/png");
       const exists = await objectExists(publicObjectPath);

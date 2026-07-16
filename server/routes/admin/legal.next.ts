@@ -14,7 +14,7 @@ import fs from "fs";
 import path from "path";
 import { storage } from "../../storage";
 import { callOllamaChat, isOllamaConfigured } from "../../lib/ollama-client";
-import { uploadBuffer } from "../../objectStorage";
+import { uploadBuffer, BUCKET_CAMPAIGN } from "../../objectStorage";
 import { sendError } from "../../lib/api-response";
 import { z } from "zod";
 
@@ -129,7 +129,7 @@ router.post("/generate-slides", async (req: Request, res: Response) => {
         const svg = buildSlidesSvg(slide, i, slides.length);
         const pngBuffer = await sharp(Buffer.from(svg)).png().toBuffer();
         const filename = `slide-bikerlink-${ts}-${i}.png`;
-        const objectPath = `public/ads/${filename}`;
+        const objectPath = `${BUCKET_CAMPAIGN}${filename}`;
         await uploadBuffer(objectPath, pngBuffer, "image/png");
         const imageUrl = `/api/ads/images/${filename}`;
         generated.push({ title: slide.title, imageUrl });
@@ -213,7 +213,7 @@ router.post("/upload-slide-image", imageUpload.single("file"), async (req: Reque
     const ts = Date.now();
     const ext = req.file.mimetype === "image/png" ? "png" : "jpg";
     const filename = `slide-upload-${ts}.${ext}`;
-    const objectPath = `public/ads/${filename}`;
+    const objectPath = `${BUCKET_CAMPAIGN}${filename}`;
     await uploadBuffer(objectPath, fileBuffer, req.file.mimetype);
 
     const imageUrl = `/api/ads/images/${filename}`;

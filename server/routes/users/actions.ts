@@ -7,7 +7,7 @@ import { userPhotos } from "@shared/db";
 import { userReportSchema } from "@shared/validators";
 import { db } from "../../db";
 import { eq } from "drizzle-orm";
-import { uploadBuffer, downloadBuffer, deleteObject } from "../../objectStorage";
+import { uploadBuffer, downloadBuffer, deleteObject, BUCKET_PROFILE_PIC } from "../../objectStorage";
 import { reportRateLimiter, getTrustedClientIp } from "../../lib/abuse-rate-limit";
 import { sendSuccess, sendError } from "../../lib/api-response";
 import { isProtectedUser } from "../../constants";
@@ -89,7 +89,7 @@ router.post("/me/photos", requireAuth, async (req: Request, res: Response) => {
     const { compressToWebP } = await import("../../utils/image-processing");
     const webpBuffer = await compressToWebP(req.file.buffer);
     const filename = Date.now().toString() + "-" + Math.random().toString(36).substr(2, 9) + ".webp";
-    const objectPath = `public/photos/${filename}`;
+    const objectPath = `${BUCKET_PROFILE_PIC}${filename}`;
 
     await uploadBuffer(objectPath, webpBuffer, "image/webp");
 
@@ -109,10 +109,15 @@ router.post("/me/photos", requireAuth, async (req: Request, res: Response) => {
       const oldUrl = oldPhoto.photoUrl;
       if (oldUrl.startsWith("/api/users/photos/")) {
         const oldFilename = oldUrl.replace("/api/users/photos/", "");
+        // Try new ProfilePic/ path first, then legacy public/photos/
         try {
-          await deleteObject(`public/photos/${oldFilename}`);
-        } catch (err) {
-          console.warn(`[users] Failed to delete replaced photo object public/photos/${oldFilename}:`, err);
+          await deleteObject(`${BUCKET_PROFILE_PIC}${oldFilename}`);
+        } catch {
+          try {
+            await deleteObject(`public/photos/${oldFilename}`);
+          } catch (err) {
+            console.warn(`[users] Failed to delete replaced photo object for ${oldFilename}:`, err);
+          }
         }
       } else if (oldUrl.startsWith("/uploads/photos/")) {
         try {
@@ -162,8 +167,13 @@ router.get("/photos/:filename", async (req: Request, res: Response) => {
       }
     }
 
-    const objectPath = `public/photos/${filename}`;
-    const buffer = await downloadBuffer(objectPath);
+    // Try new ProfilePic/ path first, fall back to legacy public/photos/
+    let buffer: Buffer;
+    try {
+      buffer = await downloadBuffer(`${BUCKET_PROFILE_PIC}${filename}`);
+    } catch {
+      buffer = await downloadBuffer(`public/photos/${filename}`);
+    }
     const ext = path.extname(filename).toLowerCase();
     const mimeTypes: Record<string, string> = {
       ".jpg": "image/jpeg",
@@ -197,8 +207,13 @@ router.delete("/me/photos/:id", requireAuth, async (req: Request, res: Response)
     const photoUrl = photo.photoUrl;
     if (photoUrl.startsWith("/api/users/photos/")) {
       const filename = photoUrl.replace("/api/users/photos/", "");
-      try { await deleteObject(`public/photos/${filename}`); } catch (err) {
-        console.warn(`[users] Failed to delete photo object public/photos/${filename}:`, err);
+      // Try new ProfilePic/ path first, then legacy public/photos/
+      try {
+        await deleteObject(`${BUCKET_PROFILE_PIC}${filename}`);
+      } catch {
+        try { await deleteObject(`public/photos/${filename}`); } catch (err) {
+          console.warn(`[users] Failed to delete photo object for ${filename}:`, err);
+        }
       }
     } else if (photoUrl.startsWith("/uploads/photos/")) {
       try {

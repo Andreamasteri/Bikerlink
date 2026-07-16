@@ -7,7 +7,7 @@ import { eq, inArray } from "drizzle-orm";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
-import { uploadBuffer, deleteObject } from "../../objectStorage";
+import { uploadBuffer, deleteObject, BUCKET_CAMPAIGN } from "../../objectStorage";
 import { cacheAdImage, warmupAdImageCache } from "../ads";
 import { sendSuccess, sendError } from "../../lib/api-response";
 import { safeModLog } from "../../lib/safe-mod-log";
@@ -32,7 +32,7 @@ function paramStr(v: string | string[] | undefined): string | null {
 
 async function uploadAdImageToObjectStorage(buffer: Buffer, originalname: string, mimetype: string): Promise<string> {
   const filename = `ad-${Date.now()}-${originalname}`;
-  const objectPath = `public/ads/${filename}`;
+  const objectPath = `${BUCKET_CAMPAIGN}${filename}`;
   await uploadBuffer(objectPath, buffer, mimetype);
   // Backup automatico: copia in .private/ads-backup/ per auto-restore al boot
   try {
@@ -74,12 +74,17 @@ export async function deleteAdImageIfUnreferenced(filename: string, excludeIds: 
     } catch (e) {
       console.warn(`[ads/cleanup] local unlink failed for ${filename}:`, e);
     }
-    // Remove object storage copy — log esplicito per tracciabilità
+    // Remove object storage copy — prova il percorso nuovo (Campaign/) poi il legacy
     try {
-      await deleteObject(`public/ads/${filename}`);
-      console.log(`[ads/cleanup] eliminato da Object Storage: public/ads/${filename} (excludeIds=${excludeIds.join(",")})`);
-    } catch (e) {
-      console.warn(`[ads/cleanup] object delete failed for ${filename}:`, e);
+      await deleteObject(`${BUCKET_CAMPAIGN}${filename}`);
+      console.log(`[ads/cleanup] eliminato da Object Storage: ${BUCKET_CAMPAIGN}${filename} (excludeIds=${excludeIds.join(",")})`);
+    } catch (_e1) {
+      try {
+        await deleteObject(`public/ads/${filename}`);
+        console.log(`[ads/cleanup] eliminato da Object Storage (legacy): public/ads/${filename} (excludeIds=${excludeIds.join(",")})`);
+      } catch (e) {
+        console.warn(`[ads/cleanup] object delete failed for ${filename}:`, e);
+      }
     }
   } catch (e) {
     console.warn(`[ads/cleanup] non-fatal error for ${filename}:`, e);
