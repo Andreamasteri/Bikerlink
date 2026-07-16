@@ -12,6 +12,14 @@ export interface RoutingCounters {
   enginesDown: Record<string, number | null>;
 }
 
+export interface PhotonHealthSnapshot {
+  ok: boolean;
+  configured: boolean;
+  latencyMs: number | null;
+  url: string;
+  error?: string;
+}
+
 export interface RoutingStatus {
   killSwitch: {
     enabled: boolean;
@@ -52,6 +60,8 @@ export interface RoutingStatus {
     selfHosted: boolean;
     url: string | null;
   };
+  /** Rispecchia PhotonHealthSnapshot di server/lib/photon-client.ts. */
+  photon?: PhotonHealthSnapshot;
   envConfig: {
     graphhopperUrl: boolean;
     graphhopperToken: boolean;

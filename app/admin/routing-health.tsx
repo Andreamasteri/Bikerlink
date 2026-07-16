@@ -107,6 +107,8 @@ export default function RoutingHealthScreen() {
   const valhalla = data?.valhalla;
   const cloud = data?.cloudFallback;
   const tiles = data?.tiles;
+  const photon = data?.photon;
+  const photonTimeout = photon?.error === "timeout";
   const env = data?.envConfig;
 
   return (
@@ -146,6 +148,8 @@ export default function RoutingHealthScreen() {
                   `Cloud Fallback: ${cloud?.active ? "ATTIVO" : cloud?.available ? "PRONTO" : "N/D"}`,
                   `Valhalla: ${!valhalla?.configured ? "N/D" : valhalla?.down ? "DOWN" : valhalla?.ok ? "OK" : "—"}`,
                   `Tiles: ${tiles?.selfHosted ? "SELF-HOSTED" : "ESTERNI"}`,
+                  `Photon: ${!photon ? "—" : !photon.configured ? "NON CONFIGURATO" : photon.ok ? "OK" : photonTimeout ? "TIMEOUT SONDA" : "DOWN"} · Latenza: ${photon?.latencyMs != null ? `${photon.latencyMs}ms` : "—"}`,
+                  ...(photon?.error && !photonTimeout ? [`Errore Photon: ${photon.error}`] : []),
                   ...(gh?.error ? [`Errore GH: ${gh.error}`] : []),
                 ];
                 const ok = await copyLogToClipboard({
@@ -247,6 +251,29 @@ export default function RoutingHealthScreen() {
               { label: "Configurato", value: valhalla?.configured ? "Sì" : "No" },
               { label: "Stato", value: valhalla?.status ?? "—" },
               ...(valhalla?.version ? [{ label: "Versione", value: valhalla.version }] : []),
+            ]}
+          />
+
+          <EngineCard
+            title="Photon (geocoder)"
+            icon="map-search-outline"
+            color={
+              !photon?.configured
+                ? Colors.textSecondary
+                : photon.ok
+                  ? Colors.success
+                  : photonTimeout ? Colors.warning : Colors.error
+            }
+            statusLabel={
+              !photon?.configured
+                ? "NON CONFIGURATO"
+                : photon.ok ? "OK" : photonTimeout ? "TIMEOUT SONDA" : "DOWN"
+            }
+            rows={[
+              { label: "URL", value: photon?.url || "—" },
+              { label: "Latenza", value: photon?.latencyMs != null ? `${photon.latencyMs} ms` : "—" },
+              ...(photon?.error && !photonTimeout ? [{ label: "Errore", value: photon.error }] : []),
+              ...(photonTimeout ? [{ label: "Sonda", value: "Nessuna risposta entro 5 s" }] : []),
             ]}
           />
 

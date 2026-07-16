@@ -35,6 +35,7 @@ import {
 import { ROUTING_FUNCTIONS } from "@shared/routing-functions";
 import type { RouteRequest } from "../../../routing/graphhopper-adapter";
 import { SELF_HOSTED_TILES_URL, isTilesSelfHosted } from "../../../../lib/map-tiles";
+import { getPhotonHealthSnapshot, type PhotonHealthSnapshot } from "../../../lib/photon-client";
 import { updateSystemStatus } from "../../../lib/system-status-cache";
 import { sendError } from "../../../lib/api-response";
 
@@ -60,13 +61,30 @@ function maskUrl(url: string): string {
  * engine (GraphHopper self-hosted, Cloud fallback, Valhalla, tiles) e contatori.
  */
 router.get("/status", async (_req: Request, res: Response) => {
-  const [killSwitch, ghInfo, valhallaInfo, activeEngine, rolloutSetting, profilesResult] = await Promise.all([
+  // Photon (geocoder self-hosted, TC di casa): probe con timeout individuale di
+  // 5 s — se lento/irraggiungibile NON deve mai bloccare l'intero Promise.all.
+  const photonWithTimeout = (): Promise<PhotonHealthSnapshot> =>
+    Promise.race([
+      getPhotonHealthSnapshot().catch((err: unknown): PhotonHealthSnapshot => ({
+        ok: false,
+        configured: true,
+        latencyMs: null,
+        url: "",
+        error: err instanceof Error ? err.message.slice(0, 300) : String(err).slice(0, 300),
+      })),
+      new Promise<PhotonHealthSnapshot>((resolve) => {
+        setTimeout(() => resolve({ ok: false, configured: true, latencyMs: null, url: "", error: "timeout" }), 5_000).unref();
+      }),
+    ]);
+
+  const [killSwitch, ghInfo, valhallaInfo, activeEngine, rolloutSetting, profilesResult, photon] = await Promise.all([
     getRoutingKillSwitchState(),
     getServerInfo().catch((): GHServerInfo => ({ status: "error" })),
     getValhallaInfo().catch((): GHServerInfo => ({ status: "error" })),
     resolveRoutingEngine(),
     storage.getAppSetting("maps_rollout"),
     fetchSelfHostedProfiles().catch(() => ({ reachable: false, profiles: null, error_reason: "exception" })),
+    photonWithTimeout(),
   ]);
 
   const rollout = (rolloutSetting?.value ?? "disabled") as MapsRollout;
@@ -149,6 +167,7 @@ router.get("/status", async (_req: Request, res: Response) => {
       selfHosted: isTilesSelfHosted,
       url: isTilesSelfHosted && SELF_HOSTED_TILES_URL ? maskUrl(SELF_HOSTED_TILES_URL) : null,
     },
+    photon,
     envConfig: {
       graphhopperUrl: !!process.env.GRAPHHOPPER_URL,
       graphhopperToken: !!process.env.GRAPHHOPPER_TOKEN,
