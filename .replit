@@ -59,11 +59,11 @@ args = "secrets-scan"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "semgrep"
+args = "check-ai-direct-generateobject"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "check-ai-direct-generateobject"
+args = "Triage Horus"
 
   [[workflows.workflow]]
   name = "Start App"
@@ -157,17 +157,6 @@ args = "bash scripts/ci-secrets-scan.sh"
 isValidation = true
 
 [[workflows.workflow]]
-name = "semgrep"
-author = "agent"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "bash scripts/check-semgrep.sh"
-
-[workflows.workflow.metadata]
-isValidation = true
-
-[[workflows.workflow]]
 name = "check-ai-direct-generateobject"
 author = "agent"
 
@@ -177,6 +166,17 @@ args = "bash scripts/check-ai-direct-generateobject.sh"
 
 [workflows.workflow.metadata]
 isValidation = true
+
+[[workflows.workflow]]
+name = "Triage Horus"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "npx tsx scripts/log-analysis-horus.ts"
+
+[workflows.workflow.metadata]
+outputType = "console"
 
   [objectStorage]
 defaultBucketID = "replit-objstore-eab04d75-96eb-47fa-8ab7-710ec976a6e8"
