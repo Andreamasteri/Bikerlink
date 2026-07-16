@@ -67,3 +67,4 @@ server/graphhopper-client.ts
 # ~20 test case correlati — split spezza la leggibilità della suite.
 server/__tests__/ai-assistant-agent-horus-tools.test.ts
 scripts/log-analysis-horus.ts
+scripts/horus-app-analysis.ts
