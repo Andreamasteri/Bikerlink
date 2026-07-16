@@ -54,7 +54,12 @@ function findLatestReport(): string | null {
     if (!fs.existsSync(logsDir)) continue;
     const files = fs
       .readdirSync(logsDir)
-      .filter((f) => f.startsWith("horus-log-analysis-") && f.endsWith(".md") && !f.includes("architect"))
+      .filter(
+        (f) =>
+          (f.startsWith("horus-log-analysis-") || f.startsWith("horus-analysis-")) &&
+          f.endsWith(".md") &&
+          !f.includes("architect"),
+      )
       .sort()
       .reverse();
     if (files.length > 0) return path.join(logsDir, files[0]);
@@ -69,6 +74,7 @@ export interface ParsedTask {
   priority: "alta" | "media" | "bassa" | string;
   problem: string;
   action: string;
+  area?: string;
 }
 
 /**
@@ -101,10 +107,18 @@ function parseTaskTable(tableText: string): ParsedTask[] {
     const cells = trimmed.split("|").map((c) => c.trim()).filter((_, i, a) => i > 0 && i < a.length - 1);
     if (cells.length < 2) continue;
 
-    const [title, priority, problem = "", action = ""] = cells;
+    let title: string, priority: string, problem: string, action: string, area: string | undefined;
+    if (cells.length >= 5) {
+      // 5-column format: Titolo | Priorità | Area | Problema | Azione
+      [title, priority, area, problem = "", action = ""] = cells;
+    } else {
+      // 4-column format: Titolo | Priorità | Problema | Azione
+      [title, priority, problem = "", action = ""] = cells;
+      area = undefined;
+    }
     if (!title || title.startsWith("Titolo")) continue;
 
-    tasks.push({ title, priority: priority?.toLowerCase() ?? "media", problem, action });
+    tasks.push({ title, priority: priority?.toLowerCase() ?? "media", problem, action, area });
   }
 
   return tasks;

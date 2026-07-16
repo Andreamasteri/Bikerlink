@@ -245,8 +245,10 @@ async function detectIdleLeak(client: pg.Client): Promise<void> {
       // (client: pg.Client) — NON il pool principale che è sotto pressione.
       const now = Date.now();
       if (idleKillCached === null || now - idleKillCachedAt >= IDLE_KILL_CACHE_TTL_MS) {
+        // Legge via la connessione out-of-band già aperta — NON via storage/pool,
+        // che è saturo in questo contesto. Invariante documentata nel JSDoc sopra.
         const settingRes = await client.query<{ value: string | null; value_json: unknown }>(
-          `SELECT value, value_json FROM app_settings WHERE key = $1`,
+          `SELECT value, value_json FROM app_settings WHERE key = $1 LIMIT 1`,
           [IDLE_KILL_SETTING_KEY],
         );
         const row = settingRes.rows[0];
