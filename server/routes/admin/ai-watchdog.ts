@@ -40,7 +40,15 @@ router.get("/watchdog/snapshot", async (_req, res) => {
   const enabled = await isWatchdogEnabled();
   const snap = getLatestSnapshot();
   const stats = getWatchdogStats();
-  return res.json({ enabled, snapshot: snap, stats });
+  // Task #157 — ultimo heartbeat del loop scheduler matching (liveness 60s),
+  // mostrato in system-health come "X secondi fa".
+  let schedulerLastHeartbeat: string | null = null;
+  try {
+    const row = await storage.getAppSetting("matching_scheduler_state");
+    const parsed = row?.valueJson as { lastTickAt?: string | null } | null;
+    schedulerLastHeartbeat = parsed?.lastTickAt ?? null;
+  } catch { /* non-fatal: campo opzionale */ }
+  return res.json({ enabled, snapshot: snap, stats, schedulerLastHeartbeat });
 });
 
 router.get("/watchdog/snapshots", async (req, res) => {

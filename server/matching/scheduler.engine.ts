@@ -16,7 +16,7 @@ import { runCleanup, pruneStaleProposalProfileMatches, pruneOldZoneNotifications
 import { recomputeAllUserMatchProfiles } from "./recompute-profiles";
 import { addMatchLog } from "./match-log-buffer";
 import { recordCycleError, recordCycleDrop } from "./metrics";
-import { triggerMatchingRun } from "./scheduler.cycle";
+import { triggerMatchingRun, recordSchedulerHeartbeat } from "./scheduler.cycle";
 import { withJobGate } from "../ai/coordinator/gated-job";
 
 // Task #9 (Quebracho b, "Group D") — questi loop del motore di matching sono
@@ -64,9 +64,32 @@ export function startMatchingEngine(): void {
     }
   });
   _engineTimers.push(setInterval(() => {
-    gatedHourlyTick().catch((err) => console.error("[Matching] Errore imprevisto nel ciclo automatico orario:", err));
+    // Task #157 — try/catch sincrono + .catch async: un'eccezione nel tick
+    // (anche sincrona, prima che la promise esista) non deve MAI far cadere il
+    // loop; logghiamo con dedupWarn e il prossimo tick riparte regolarmente.
+    try {
+      gatedHourlyTick().catch((err) => dedupWarn("matching/hourly-tick", "tick fallito (non-fatal)", err));
+    } catch (err) {
+      dedupWarn("matching/hourly-tick", "tick fallito (non-fatal, sync)", err);
+    }
   }, 60 * 60 * 1000));
   console.log("[Matching] Ciclo di matching automatico orario avviato");
+
+  // Task #157 — Heartbeat di liveness del loop scheduler: ogni 60s registra
+  // che il processo/timer sono vivi (lastTickAt in matching_scheduler_state).
+  // Rende significativa la soglia "scheduler_dead_threshold_ms" (default 5 min)
+  // del collector watchdog: se i timer si fermano (processo appeso,
+  // unhandledRejection che arresta il loop), il heartbeat smette e il watchdog
+  // emette il segnale high "scheduler_heartbeat_dead". Il throttle interno
+  // (30s) evita upsert ridondanti se altri heartbeat sono appena stati emessi.
+  _engineTimers.push(setInterval(() => {
+    try {
+      recordSchedulerHeartbeat("loop_alive");
+    } catch (err) {
+      dedupWarn("matching/heartbeat", "heartbeat loop fallito (non-fatal)", err);
+    }
+  }, 60_000));
+  console.log("[Matching] Heartbeat scheduler avviato (60s)");
 
   const runArchiveStaleMatches = async () => {
     addMatchLog("INFO", "archive_stale", "Archiviazione match stale avviata");

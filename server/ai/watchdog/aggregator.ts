@@ -174,6 +174,9 @@ export function deriveProblems(signals: Signal[]): Problem[] {
     } else if (s.metric === "scheduler.last_run_min_ago") {
       title = `Scheduler matching: ultimo run ${s.value ?? "?"} min fa`;
       suggestion = "Verifica engine matching, eventualmente restart ciclo.";
+    } else if (s.metric === "scheduler_heartbeat_dead") {
+      title = `Scheduler matching silenzioso da ${s.value ?? "?"}min`;
+      suggestion = "Il loop heartbeat (60s) è fermo: processo appeso o timer arrestati. Verifica il backend / riavvia il workflow.";
     } else if (s.metric === "scheduler.lock_age_min") {
       title = `Lock matching attivo da ${s.value} min`;
       suggestion = "Possibile lock zombie: rilascia lock e fai partire un nuovo ciclo.";

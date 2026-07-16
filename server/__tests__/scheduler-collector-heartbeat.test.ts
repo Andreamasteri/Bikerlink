@@ -51,14 +51,50 @@ describe("scheduler-collector — heartbeat fresco declassa last_run_min_ago", (
     expect(lr?.details).toMatchObject({ schedulerAlive: true, lastTickResult: "skip:pool_saturated" });
   });
 
-  it("heartbeat stantio (oltre 130min): il loop è considerato morto → high", async () => {
+  it("heartbeat stantio: il loop è considerato morto → scheduler_heartbeat_dead high", async () => {
     getAppSettingMock.mockResolvedValue({
       valueJson: { lastRunAt: minutesAgo(200), lastTickAt: minutesAgo(200) },
     });
     const collectScheduler = await loadCollector();
     const signals = await collectScheduler();
 
-    expect(heartbeat(signals)?.severity).toBe("high");
+    // Task #157 — la morte del loop è segnalata dal segnale dedicato
+    // scheduler_heartbeat_dead (high); heartbeat_age_min resta descrittivo (warn).
+    const dead = signals.find((x) => x.metric === "scheduler_heartbeat_dead");
+    expect(dead?.severity).toBe("high");
+    expect(dead?.value).toBe(200);
+    expect(heartbeat(signals)?.severity).toBe("warn");
     expect(lastRun(signals)?.severity).toBe("high");
+  });
+
+  it("heartbeat entro la soglia dead (default 5min): nessun scheduler_heartbeat_dead", async () => {
+    getAppSettingMock.mockResolvedValue({
+      valueJson: { lastRunAt: minutesAgo(10), lastTickAt: minutesAgo(3) },
+    });
+    const collectScheduler = await loadCollector();
+    const signals = await collectScheduler();
+    expect(signals.find((x) => x.metric === "scheduler_heartbeat_dead")).toBeUndefined();
+  });
+
+  it("soglia configurabile via scheduler_dead_threshold_ms", async () => {
+    getAppSettingMock.mockImplementation(async (key: string) => {
+      if (key === "scheduler_dead_threshold_ms") return { value: String(30 * 60_000) };
+      return { valueJson: { lastRunAt: minutesAgo(10), lastTickAt: minutesAgo(20) } };
+    });
+    const collectScheduler = await loadCollector();
+    const signals = await collectScheduler();
+    // 20min di silenzio ma soglia 30min → non morto
+    expect(signals.find((x) => x.metric === "scheduler_heartbeat_dead")).toBeUndefined();
+  });
+
+  it("zombie recovery recente → segnale info scheduler.zombie_recovered", async () => {
+    getAppSettingMock.mockResolvedValue({
+      valueJson: { lastRunAt: minutesAgo(10), lastTickAt: minutesAgo(1), lastZombieRecoveredAt: minutesAgo(30) },
+    });
+    const collectScheduler = await loadCollector();
+    const signals = await collectScheduler();
+    const rec = signals.find((x) => x.metric === "scheduler.zombie_recovered");
+    expect(rec?.severity).toBe("info");
+    expect(rec?.value).toBe(30);
   });
 });

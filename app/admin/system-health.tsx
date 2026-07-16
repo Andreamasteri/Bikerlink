@@ -51,6 +51,16 @@ interface SnapshotResp {
     totalProposalsCreated: number; totalAlertsSent: number;
     lastError: { at: string; message: string } | null; running: boolean;
   };
+  // Task #157 — ultimo heartbeat del loop scheduler matching (ISO), o null.
+  schedulerLastHeartbeat?: string | null;
+}
+
+// Task #157 — età heartbeat in secondi; warning se supera 2 minuti.
+const HEARTBEAT_WARN_SEC = 120;
+
+function formatHeartbeatAge(sec: number): string {
+  if (sec < 60) return `${sec} secondi fa`;
+  return `${Math.floor(sec / 60)} min fa`;
 }
 
 export default function SystemHealthScreen() {
@@ -257,6 +267,18 @@ export default function SystemHealthScreen() {
               </View>
             </View>
             <Text style={styles.muted}>Aggiornato: {new Date(snap.generatedAt).toLocaleTimeString("it-IT")}</Text>
+            {(() => {
+              // Task #157 — liveness scheduler matching: heartbeat 60s dal backend.
+              const hb = snapQ.data?.schedulerLastHeartbeat;
+              if (!hb) return <Text style={styles.muted}>Scheduler matching — nessun heartbeat registrato</Text>;
+              const ageSec = Math.max(0, Math.floor((Date.now() - new Date(hb).getTime()) / 1000));
+              const stale = ageSec > HEARTBEAT_WARN_SEC;
+              return (
+                <Text style={[styles.muted, stale && styles.heartbeatWarn]}>
+                  Scheduler matching — ultimo heartbeat: {formatHeartbeatAge(ageSec)}
+                </Text>
+              );
+            })()}
             {stats ? (
               <View style={styles.statsRow}>
                 <Stat label="Cicli" value={stats.totalCycles} />
@@ -348,6 +370,7 @@ const styles = StyleSheet.create({
   headerRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 8, flexWrap: "wrap", gap: 8 },
   title: { color: "#f3f4f6", fontSize: 18, fontWeight: "700" as const },
   muted: { color: "#9ca3af", fontSize: 12, marginTop: 4 },
+  heartbeatWarn: { color: "#f59e0b" },
   primaryBtn: { backgroundColor: "#3b82f6", padding: 12, borderRadius: 8, marginTop: 10, alignItems: "center" },
   btnText: { color: "#fff", fontWeight: "700" as const },
   btnRow: { flexDirection: "row", gap: 6 },

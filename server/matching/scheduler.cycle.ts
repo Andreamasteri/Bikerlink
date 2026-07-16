@@ -132,20 +132,30 @@ const HEARTBEAT_PERSIST_THROTTLE_MS = 30_000;
 
 // Esportato per la copertura di test diretta (Task #4804): verifica che ogni
 // path di skip scriva lastTickAt/lastTickResult e rispetti il throttle 30s.
-export function recordSchedulerHeartbeat(tickResult: string): void {
+export function recordSchedulerHeartbeat(tickResult: string, opts?: { force?: boolean }): void {
   const now = Date.now();
   // Throttle: triggerMatchingRun può essere invocato on-demand (login/admin)
   // oltre che dal tick orario; evitiamo un upsert per ogni chiamata.
-  if (now - lastHeartbeatPersistAt < HEARTBEAT_PERSIST_THROTTLE_MS) return;
+  // `force` bypassa il throttle per gli eventi di recovery (zombie_recovered):
+  // sono rari e DEVONO essere registrati, altrimenti un heartbeat di skip
+  // emesso <30s prima li farebbe sparire (Task #157).
+  if (!opts?.force && now - lastHeartbeatPersistAt < HEARTBEAT_PERSIST_THROTTLE_MS) return;
   lastHeartbeatPersistAt = now;
   const tickAtIso = new Date(now).toISOString();
   withBgDbSlot(() => storage.getAppSetting("matching_scheduler_state"))
     .then((existing) => {
       const prev = (existing?.valueJson as Record<string, unknown>) ?? {};
+      // Task #157 — il marker di recovery viene preservato in un campo dedicato:
+      // lastTickResult viene sovrascritto dal heartbeat successivo entro pochi
+      // secondi, mentre lastZombieRecoveredAt resta visibile al collector.
+      const recoveryFields = tickResult === "zombie_recovered"
+        ? { lastZombieRecoveredAt: tickAtIso }
+        : {};
       return withBgDbSlot(() => storage.upsertAppSetting("matching_scheduler_state", undefined, {
         ...prev,
         lastTickAt: tickAtIso,
         lastTickResult: tickResult,
+        ...recoveryFields,
       }));
     })
     .catch((err) => schedulerLogger.warn({ err }, "scheduler heartbeat persist failed (non-blocking)"));
@@ -160,6 +170,10 @@ export function triggerMatchingRun(): { started: boolean; reason?: string } {
     const stuckForMin = Math.floor((Date.now() - lastMatchingStart) / 60_000);
     schedulerLogger.warn({ stuckForMin, lastStartAt: lastMatchingStart }, "Ciclo zombie rilevato — reset forzato della guardia in-process");
     addMatchLog("WARN", "lock", `Ciclo zombie rilevato (bloccato da ${stuckForMin} min) — reset forzato, riparto`);
+    // Task #157 — heartbeat esplicito PRIMA del reset: così il watchdog
+    // (collectScheduler) registra l'evento di recovery e lo distingue da uno
+    // scheduler morto che semplicemente non emette heartbeat.
+    recordSchedulerHeartbeat("zombie_recovered", { force: true });
     cycleInFlight = false;
     lastMatchingStart = null;
     forceUnlockMatchingLock();
