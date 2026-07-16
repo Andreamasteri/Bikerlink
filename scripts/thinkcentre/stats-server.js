@@ -299,6 +299,32 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // ── GET /ufw-status ─────────────────────────────────────────────────────
+  // Passthrough al daemon ufw-status in ascolto su 127.0.0.1:9099.
+  // Restituisce { status: "active"|"inactive", ruleCount: number }.
+  if (req.method === "GET" && req.url === "/ufw-status") {
+    let settled = false;
+    const reply = (status, body) => {
+      if (settled) return;
+      settled = true;
+      res.writeHead(status, { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" });
+      res.end(typeof body === "string" ? body : JSON.stringify(body));
+    };
+    const ufwReq = http.get("http://127.0.0.1:9099/", (ufwRes) => {
+      let body = "";
+      ufwRes.on("data", (chunk) => { body += chunk; });
+      ufwRes.on("end", () => reply(ufwRes.statusCode ?? 200, body));
+    });
+    ufwReq.setTimeout(5000, () => {
+      ufwReq.destroy();
+      reply(504, { error: "ufw-status daemon timeout" });
+    });
+    ufwReq.on("error", (err) => {
+      reply(502, { error: `ufw-status unreachable: ${err.message}` });
+    });
+    return;
+  }
+
   if (req.method !== "GET" || req.url !== "/sys-metrics") {
     res.writeHead(404, { "Content-Type": "application/json" });
     res.end(JSON.stringify({ error: "not found" }));
