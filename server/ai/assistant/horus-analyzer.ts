@@ -257,7 +257,7 @@ export async function runCycle(trigger: "schedule" | "manual" = "schedule"): Pro
       return { ran: false, reason: "fingerprint invariato" };
     }
 
-    // getOllamaModelId ignora la persona e ritorna sempre BOWIE_OLLAMA_MODEL: qui
+    // HORUS_MODEL_ID risolve come getOllamaModelId("horus") (Task #165): qui
     // registriamo il modello REALE che ha prodotto il report (Horus/qwen3:4b),
     // stesso pattern di horus-scanner-finalize.ts.
     const modelId = HORUS_MODEL_ID;

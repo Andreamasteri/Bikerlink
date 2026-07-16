@@ -17,6 +17,7 @@ import {
   NginxBlock,
   UptimeKumaBlock,
   AiHubBlock,
+  type PersonaModels,
 } from "./ThinkCentreInfraBlocks";
 import { AresBlock } from "./ThinkCentreAresBlock";
 import type { AresDetailedHealth } from "./ThinkCentreAresBlock";
@@ -78,6 +79,8 @@ interface ThinkCentreHealth {
   photonDetail?: PhotonDetailedHealth;
   ufwDetail?: UfwDetailedHealth;
   aresDetail?: AresDetailedHealth | null;
+  /** Task #165 — modello Ollama configurato + disponibilità per ogni persona AI. */
+  personaModels?: PersonaModels | null;
   repoDrift?: RepoDriftHealth;
   tokenFingerprints?: {
     graphhopper: string | null;
@@ -498,6 +501,7 @@ export function ThinkCentreCard({
             <OllamaBlock
               service={error ? undefined : data?.services.find((s) => s.key === "ollama")}
               fingerprint={error ? null : (fp?.ollama ?? null)}
+              personaModels={error ? null : (data?.personaModels ?? null)}
               isLoading={isLoading}
               hasError={!!error}
             />

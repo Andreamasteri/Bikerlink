@@ -196,7 +196,7 @@ async function persistAnalysisRun(
   findingsCount: number,
 ): Promise<void> {
   const expiresAt = new Date(Date.now() + ARTIFACT_TTL_DAYS * 24 * 60 * 60_000);
-  // getOllamaModelId ignora la persona e ritorna sempre BOWIE_OLLAMA_MODEL: qui
+  // HORUS_MODEL_ID risolve come getOllamaModelId("horus") (Task #165): qui
   // registriamo il modello REALE che ha prodotto le proposte (Horus/qwen3:4b).
   const modelId = HORUS_MODEL_ID;
   await withBgDbSlot(async () => {

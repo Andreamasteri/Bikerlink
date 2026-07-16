@@ -159,14 +159,21 @@ export async function httpProbe(
   url: string,
   headers: Record<string, string>,
   isHealthy: (status: number) => boolean = (status) => status >= 200 && status < 300,
-): Promise<{ ok: boolean; latencyMs: number | null; error?: string; status?: number }> {
+  // Task #165 — se true, il body di una risposta OK viene restituito in `bodyText`
+  // (per riusare la risposta già in memoria, es. /api/tags → lista modelli).
+  captureBody = false,
+): Promise<{ ok: boolean; latencyMs: number | null; error?: string; status?: number; bodyText?: string }> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), PROBE_TIMEOUT_MS);
   const t0 = Date.now();
   try {
     const res = await fetch(url, { method: "GET", headers, signal: controller.signal });
     const latencyMs = Date.now() - t0;
-    if (isHealthy(res.status)) return { ok: true, latencyMs, status: res.status };
+    if (isHealthy(res.status)) {
+      if (!captureBody) return { ok: true, latencyMs, status: res.status };
+      const bodyText = await readBodySafe(res, 4_000);
+      return { ok: true, latencyMs, status: res.status, bodyText };
+    }
     const body = await readBodySafe(res);
     const bodySnippet = body.trim().slice(0, 400);
     const error = bodySnippet

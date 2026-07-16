@@ -5,6 +5,58 @@ import Colors from "@/constants/colors";
 import { ErrorHistory, ProbeLog } from "./ThinkCentreCardParts";
 import type { ProbeLogEntry } from "./ThinkCentreCardParts";
 
+// Task #165 — stato del modello Ollama configurato per ogni persona AI.
+export interface PersonaModelStatus {
+  configured: string;
+  /** true/false = presente/assente su Ollama; null = lista modelli non disponibile. */
+  available: boolean | null;
+}
+
+export type PersonaModels = {
+  bowie: PersonaModelStatus;
+  horus: PersonaModelStatus;
+  ares: PersonaModelStatus;
+  quebracho: PersonaModelStatus;
+};
+
+const PERSONA_LABELS: Array<{ key: keyof PersonaModels; label: string }> = [
+  { key: "bowie", label: "Bowie" },
+  { key: "horus", label: "Horus" },
+  { key: "ares", label: "Ares" },
+  { key: "quebracho", label: "Quebracho" },
+];
+
+function PersonaModelRows({ personaModels }: { personaModels: PersonaModels }) {
+  return (
+    <View style={styles.personaSection}>
+      <Text style={styles.personaTitle}>Modelli per persona</Text>
+      {PERSONA_LABELS.map(({ key, label }) => {
+        const pm = personaModels[key];
+        if (!pm) return null;
+        const color = pm.available == null ? "#6b7280" : pm.available ? "#22c55e" : "#ef4444";
+        const badge = pm.available == null ? "sconosciuto" : pm.available ? "disponibile" : "mancante";
+        return (
+          <View key={key}>
+            <View style={styles.personaRow}>
+              <Text style={styles.personaName}>{label}</Text>
+              <Text style={styles.personaModel} numberOfLines={1}>{pm.configured}</Text>
+              <View style={[styles.personaBadge, { borderColor: color }]}>
+                <View style={[styles.personaDot, { backgroundColor: color }]} />
+                <Text style={[styles.personaBadgeText, { color }]}>{badge}</Text>
+              </View>
+            </View>
+            {pm.available === false && (
+              <Text style={styles.personaWarning}>
+                Modello {pm.configured} non trovato su Ollama — {label} non funzionerà
+              </Text>
+            )}
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
 export interface SimpleServiceHealth {
   configured: boolean;
   ok: boolean;
@@ -25,6 +77,8 @@ interface InfraBlockProps {
   configNote?: string;
   isLoading?: boolean;
   hasError?: boolean;
+  /** Task #165 — contenuto extra renderizzato nel body espanso (es. modelli per persona). */
+  extraBody?: React.ReactNode;
 }
 
 function InfraBlock({
@@ -35,6 +89,7 @@ function InfraBlock({
   configNote,
   isLoading,
   hasError,
+  extraBody,
 }: InfraBlockProps) {
   const [open, setOpen] = useState(false);
 
@@ -142,6 +197,7 @@ function InfraBlock({
           {service != null && service.probeLog && service.probeLog.length > 0 && (
             <ProbeLog entries={service.probeLog} />
           )}
+          {extraBody}
         </View>
       )}
     </View>
@@ -153,9 +209,10 @@ function InfraBlock({
 export function OllamaBlock({
   service,
   fingerprint,
+  personaModels,
   isLoading,
   hasError,
-}: { service?: SimpleServiceHealth; fingerprint?: string | null; isLoading?: boolean; hasError?: boolean }) {
+}: { service?: SimpleServiceHealth; fingerprint?: string | null; personaModels?: PersonaModels | null; isLoading?: boolean; hasError?: boolean }) {
   return (
     <InfraBlock
       serviceKey="ollama"
@@ -166,6 +223,7 @@ export function OllamaBlock({
       configNote="Aggiungere OLLAMA_URL e OLLAMA_TOKEN nei secret Replit."
       isLoading={isLoading}
       hasError={hasError}
+      extraBody={personaModels ? <PersonaModelRows personaModels={personaModels} /> : null}
     />
   );
 }
@@ -264,6 +322,62 @@ export function AiHubBlock({
 
 // ── Styles ────────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
+  personaSection: {
+    marginTop: 8,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: "rgba(148, 163, 184, 0.14)",
+  },
+  personaTitle: {
+    fontSize: 10,
+    fontWeight: "600",
+    color: Colors.textSecondary,
+    marginBottom: 4,
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
+  },
+  personaRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 3,
+    gap: 6,
+  },
+  personaName: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: Colors.text,
+    width: 74,
+  },
+  personaModel: {
+    flex: 1,
+    fontSize: 10,
+    color: Colors.textSecondary,
+    fontVariant: ["tabular-nums"],
+  },
+  personaBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  personaDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  personaBadgeText: {
+    fontSize: 9,
+    fontWeight: "600",
+  },
+  personaWarning: {
+    fontSize: 10,
+    color: "#ef4444",
+    marginLeft: 74,
+    marginBottom: 2,
+  },
   block: {
     marginTop: 4,
     borderRadius: 10,

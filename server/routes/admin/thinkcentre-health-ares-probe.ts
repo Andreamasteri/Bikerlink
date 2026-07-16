@@ -71,6 +71,11 @@ export interface AresHealth {
   ramPct: number | null;
   gpuPct: number | null;
   gpuName?: string;
+  /**
+   * Task #165 — modelli presenti sull'Ollama di Ares (da /api/tags,
+   * `models[].name`). [] quando offline o parse fallito.
+   */
+  availableModels: string[];
   /** Storico in-memory delle ultime rilevazioni (per il grafico). */
   samples: AresSample[];
   history: Array<{ timestamp: number; error: string }>;
@@ -167,19 +172,21 @@ export async function probeAres(): Promise<AresHealth> {
       cpuPct: null,
       ramPct: null,
       gpuPct: null,
+      availableModels: [],
       samples: aresSamples.slice(),
       history: getHistory("ares"),
       probeLog: getProbeLog("ares"),
     };
   }
 
-  // Online check via Ollama /api/version (lightweight). Il PC fisso non è dietro
+  // Online check via Ollama /api/tags (leggero come /api/version, ma la risposta
+  // contiene anche i modelli installati — Task #165). Il PC fisso non è dietro
   // CF Access: gli header restano innocui (e comunque solo verso biker-link.net).
   const headers: Record<string, string> = { ...trustedCfHeaders(base) };
   const token = process.env.ARES_OLLAMA_TOKEN;
   if (token) headers["X-Ollama-Token"] = token;
 
-  const r = await httpProbe(`${base}/api/version`, headers);
+  const r = await httpProbe(`${base}/api/tags`, headers, undefined, true);
   if (!r.ok) {
     const error = r.error ?? "offline";
     console.error("[thinkcentre-probe] ares KO", { error });
@@ -195,10 +202,24 @@ export async function probeAres(): Promise<AresHealth> {
       cpuPct: null,
       ramPct: null,
       gpuPct: null,
+      availableModels: [],
       samples: aresSamples.slice(),
       history: getHistory("ares"),
       probeLog: getProbeLog("ares"),
     };
+  }
+
+  // Task #165 — parse dei modelli installati dalla risposta /api/tags già in memoria.
+  let availableModels: string[] = [];
+  if (r.bodyText) {
+    try {
+      const parsed = JSON.parse(r.bodyText) as { models?: Array<{ name?: unknown }> };
+      availableModels = (parsed.models ?? [])
+        .map((m) => (typeof m?.name === "string" ? m.name : null))
+        .filter((n): n is string => !!n);
+    } catch {
+      availableModels = [];
+    }
   }
 
   // Online — leggi le metriche se l'endpoint è configurato.
@@ -228,6 +249,7 @@ export async function probeAres(): Promise<AresHealth> {
     ramPct,
     gpuPct,
     gpuName: metrics?.gpuName,
+    availableModels,
     samples: aresSamples.slice(),
     history: getHistory("ares"),
     probeLog: getProbeLog("ares"),

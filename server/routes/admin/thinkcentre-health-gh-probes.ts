@@ -53,6 +53,12 @@ export interface ServiceHealth {
    * di autenticazione CF Access da un token di servizio errato.
    */
   cfAccessBlocked?: boolean;
+  /**
+   * Task #165 — solo per key="ollama": nomi dei modelli presenti su Ollama
+   * (da /api/tags, `models[].name`). [] se il parse fallisce; assente per gli
+   * altri servizi.
+   */
+  availableModels?: string[];
   history: ErrorEvent[];
   probeLog: ProbeLogEntry[];
 }
@@ -258,7 +264,20 @@ export async function probeOllama(): Promise<ServiceHealth> {
   const tokenMissing = !token || token.trim() === "";
   const headers: Record<string, string> = { ...cfAccessHeaders() };
   if (token) headers["X-Ollama-Token"] = token;
-  const r = await httpProbe(`${base}/api/tags`, headers);
+  const r = await httpProbe(`${base}/api/tags`, headers, undefined, true);
+  // Task #165 — riusa la risposta /api/tags già in memoria per estrarre i nomi
+  // dei modelli disponibili (cross-reference con i modelli per-persona).
+  let availableModels: string[] = [];
+  if (r.ok && r.bodyText) {
+    try {
+      const parsed = JSON.parse(r.bodyText) as { models?: Array<{ name?: unknown }> };
+      availableModels = (parsed.models ?? [])
+        .map((m) => (typeof m?.name === "string" ? m.name : null))
+        .filter((n): n is string => !!n);
+    } catch {
+      availableModels = [];
+    }
+  }
   let error = r.error;
   if (r.error?.startsWith("HTTP 401")) {
     error = `Token non valido — ${r.error}`;
@@ -272,7 +291,7 @@ export async function probeOllama(): Promise<ServiceHealth> {
   } else {
     recordProbeLog("ollama", { timestamp: Date.now(), ok: true, latencyMs: r.latencyMs, detail: "tags OK" });
   }
-  return { key: "ollama", label: "Ollama AI", configured: true, ok: r.ok, startingUp: r.ok ? false : isStartingUp("ollama"), latencyMs: r.latencyMs, url: maskUrl(base), error, tokenMissing, history: getHistory("ollama"), probeLog: getProbeLog("ollama") };
+  return { key: "ollama", label: "Ollama AI", configured: true, ok: r.ok, startingUp: r.ok ? false : isStartingUp("ollama"), latencyMs: r.latencyMs, url: maskUrl(base), error, tokenMissing, availableModels, history: getHistory("ollama"), probeLog: getProbeLog("ollama") };
 }
 
 // ── Whisper ───────────────────────────────────────────────────────────────────

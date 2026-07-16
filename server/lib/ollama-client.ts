@@ -76,6 +76,24 @@ function ollamaHeaders(token: string, persona: OllamaPersona = "bowie"): Record<
 // modificare secret esistenti).
 const BOWIE_OLLAMA_MODEL = process.env.BOWIE_OLLAMA_MODEL ?? "qwen3:1.7b";
 
+// Task #165 — Modelli per persona. I default DEVONO restare allineati ai client
+// dedicati: horus = HORUS_MODEL_ID (server/ai/assistant/*), ares = ares-client.ts,
+// quebracho = quebracho-client.ts. Nomi modello (mai valori di secret) loggati al boot.
+const PERSONA_MODELS = {
+  bowie: BOWIE_OLLAMA_MODEL,
+  horus: process.env.HORUS_OLLAMA_MODEL?.trim() || "qwen3:4b",
+  ares: process.env.ARES_OLLAMA_MODEL?.trim() || "devstral:latest",
+  quebracho: process.env.QUEBRACHO_OLLAMA_MODEL?.trim() || "granite4:tiny-h",
+} as const;
+
+/** Personas per cui è risolvibile un modello (superset di OllamaPersona: include gli agenti con client dedicato). */
+export type OllamaModelPersona = keyof typeof PERSONA_MODELS;
+
+console.log(
+  "[ollama-client] modelli per persona:",
+  Object.entries(PERSONA_MODELS).map(([p, m]) => `${p}=${m}`).join(", "),
+);
+
 // Latenza (Task #5327): keep_alive esplicito tiene il modello caricato in VRAM/RAM
 // tra una richiesta e l'altra, evitando il cold-load (diversi secondi) al primo
 // token quando il modello era stato scaricato. Configurabile via OLLAMA_KEEP_ALIVE
@@ -95,9 +113,14 @@ const OLLAMA_KEEP_ALIVE = normalizeKeepAlive(process.env.OLLAMA_KEEP_ALIVE?.trim
 /** true quando BOWIE_OLLAMA_URL è impostato (Ollama abilitato come provider primario). */
 export const isOllamaConfigured = Boolean(BOWIE_OLLAMA_URL);
 
-/** Nome del modello locale usato per una persona (audit/log; nessun secret). */
-export function getOllamaModelId(_persona: OllamaPersona = "bowie"): string {
-  return BOWIE_OLLAMA_MODEL;
+/**
+ * Nome del modello locale usato per una persona (audit/log; nessun secret).
+ * Task #165 — ora onora la persona: horus → HORUS_OLLAMA_MODEL, ares →
+ * ARES_OLLAMA_MODEL, quebracho → QUEBRACHO_OLLAMA_MODEL. Persona assente o
+ * sconosciuta → modello di Bowie (backward compat).
+ */
+export function getOllamaModelId(persona: OllamaModelPersona = "bowie"): string {
+  return PERSONA_MODELS[persona] ?? BOWIE_OLLAMA_MODEL;
 }
 
 /** Config diagnostica (URL + token configurato sì/no) per una persona — admin panel. */
@@ -231,7 +254,8 @@ export interface OllamaChatOptions {
    * consulta Horus). Se assente, ricade su BOWIE_OLLAMA_MODEL — attenzione:
    * `persona` sceglie solo l'endpoint (URL/token), NON il modello, quindi le
    * chiamate per una persona diversa da Bowie DEVONO passare `model` esplicito
-   * o finiranno per usare il modello di Bowie.
+   * (es. `model: getOllamaModelId("horus")`) o finiranno per usare il modello
+   * di Bowie.
    */
   model?: string;
   /**

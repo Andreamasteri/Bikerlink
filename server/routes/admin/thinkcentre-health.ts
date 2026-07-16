@@ -45,6 +45,7 @@ import {
   type ErrorEvent,
 } from "./thinkcentre-health-gh-probes";
 import { probeAres, type AresHealth } from "./thinkcentre-health-ares-probe";
+import { getOllamaModelId, type OllamaModelPersona } from "../../lib/ollama-client";
 import { probeRepoDrift, fixRepoDrift, type RepoDriftHealth, type RepoDriftFixResult } from "./thinkcentre-health-repodrift-probe";
 import { sendError } from "../../lib/api-response";
 
@@ -237,6 +238,50 @@ router.get("/thinkcentre-events", async (_req: Request, res: ExpressResponse) =>
   }
 });
 
+// ── Task #165 — Modello Ollama per persona ────────────────────────────────────
+
+/** Stato del modello configurato per una persona AI rispetto a `ollama list`. */
+export interface PersonaModelStatus {
+  /** Nome del modello configurato (env/default — mai valori di secret). */
+  configured: string;
+  /** true/false = presente/assente su Ollama; null = lista non disponibile (probe KO). */
+  available: boolean | null;
+}
+
+export type PersonaModels = Record<OllamaModelPersona, PersonaModelStatus>;
+
+/**
+ * `ollama list` mostra sempre il tag (es. "qwen3:4b", "bikerlink:latest"):
+ * match esatto, oppure — se il nome configurato è senza tag — match con ":latest".
+ */
+function modelAvailable(configured: string, list: string[]): boolean {
+  if (list.includes(configured)) return true;
+  if (!configured.includes(":") && list.includes(`${configured}:latest`)) return true;
+  return false;
+}
+
+/**
+ * Cross-reference modello configurato ↔ modelli installati. Bowie/Horus/Quebracho
+ * girano sull'Ollama del ThinkCentre; Ares ha il suo Ollama sul PC fisso, quindi
+ * viene confrontato con la lista di Ares. Lista non disponibile → available: null
+ * (nessun falso allarme quando il servizio è giù).
+ */
+export function buildPersonaModels(
+  tcModels: string[] | null,
+  aresModels: string[] | null,
+): PersonaModels {
+  const entry = (persona: OllamaModelPersona, list: string[] | null): PersonaModelStatus => {
+    const configured = getOllamaModelId(persona);
+    return { configured, available: list == null ? null : modelAvailable(configured, list) };
+  };
+  return {
+    bowie: entry("bowie", tcModels),
+    horus: entry("horus", tcModels),
+    ares: entry("ares", aresModels),
+    quebracho: entry("quebracho", tcModels),
+  };
+}
+
 router.get("/thinkcentre-health", async (_req: Request, res: ExpressResponse) => {
   try {
     // ThinkCentre spento: risposta sintetica immediata, zero probe di rete.
@@ -255,6 +300,7 @@ router.get("/thinkcentre-health", async (_req: Request, res: ExpressResponse) =>
         ufwDetail: null,
         tokenFingerprints: { graphhopper: null, valhalla: null, ollama: null, whisper: null, photon: null },
         aresDetail: null,
+        personaModels: null,
         nginxSymlinksWarning: null,
         maintenanceMode: false,
         poweredOff: true,
@@ -433,6 +479,10 @@ router.get("/thinkcentre-health", async (_req: Request, res: ExpressResponse) =>
       ufwDetail,
       tokenFingerprints,
       aresDetail,
+      personaModels: buildPersonaModels(
+        ollama.ok ? (ollama.availableModels ?? []) : null,
+        aresDetail.configured && aresDetail.online ? aresDetail.availableModels : null,
+      ),
       repoDrift,
       nginxSymlinksWarning,
       maintenanceMode: maintenance,
