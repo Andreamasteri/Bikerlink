@@ -156,13 +156,35 @@ export function capMarkers(
     }
     if (arr.length <= quota) continue; // already within quota — no trim needed
 
+    // Pin any marker with isCurrentUser === true so it always survives,
+    // regardless of its distance from the viewport centre.
+    const pinnedIdx = arr.findIndex(
+      (m) => (m as Record<string, unknown>).isCurrentUser === true
+    );
+
     if (center !== null) {
-      const sorted = [...arr].sort(
-        (a, b) => _distSq(a, center) - _distSq(b, center)
-      );
-      result[k] = sorted.slice(0, quota);
+      if (pinnedIdx !== -1) {
+        const pinned = arr[pinnedIdx];
+        const rest = arr.filter((_, i) => i !== pinnedIdx);
+        const sorted = [...rest].sort(
+          (a, b) => _distSq(a, center) - _distSq(b, center)
+        );
+        // quota - 1 nearest from the rest, then prepend the pinned entry.
+        result[k] = [pinned, ...sorted.slice(0, quota - 1)];
+      } else {
+        const sorted = [...arr].sort(
+          (a, b) => _distSq(a, center) - _distSq(b, center)
+        );
+        result[k] = sorted.slice(0, quota);
+      }
     } else {
-      result[k] = arr.slice(0, quota);
+      if (pinnedIdx !== -1) {
+        const pinned = arr[pinnedIdx];
+        const rest = arr.filter((_, i) => i !== pinnedIdx);
+        result[k] = [pinned, ...rest.slice(0, quota - 1)];
+      } else {
+        result[k] = arr.slice(0, quota);
+      }
     }
   }
 

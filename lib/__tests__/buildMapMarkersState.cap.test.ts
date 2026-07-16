@@ -260,6 +260,40 @@ describe("buildMapMarkersState — marker cap integration", () => {
     expect(me?.isCurrentUser).toBe(true);
   });
 
+  it("current user survives when they are FAR from the viewport centre (pinning guard)", () => {
+    // Current user sits at lat=50, lng=20 — well outside SESSION_CENTER (45, 10).
+    // All other users are clustered near the centre so nearest-first sorting
+    // would normally discard the current user.  The pin must rescue them.
+    const farCurrentUser: MapUser = {
+      id: CURRENT_USER_ID,
+      latitude: 50.0,
+      longitude: 20.0,
+      userType: "biker" as const,
+      sex: null,
+      nickname: "io_lontano",
+      country: "IT",
+      currentSpeedKph: null,
+      speedProfile: null,
+    };
+    // 450 other users packed tightly around the centre — they would all rank
+    // closer than the current user under a pure nearest-first sort.
+    const nearUsers = makeUsers(450, 45.001, 10.001);
+    const filteredUsers = [farCurrentUser, ...nearUsers];
+
+    const encoded = buildMapMarkersState({
+      ...baseParams(),
+      filteredUsers,
+      currentUserId: CURRENT_USER_ID,
+    });
+
+    const markers = decodeMarkers(encoded);
+    expect(totalMarkers(markers)).toBeLessThanOrEqual(MARKERS_HARD_CAP);
+
+    const me = markers.users.find((u) => u.id === CURRENT_USER_ID);
+    expect(me).toBeDefined();
+    expect(me?.isCurrentUser).toBe(true);
+  });
+
   it("current user survives even when mixed with many near-centre users", () => {
     // 200 other users clustered very close to centre, 200 far away, + current user at exact centre.
     // The current user is the very closest → always in surviving set.
