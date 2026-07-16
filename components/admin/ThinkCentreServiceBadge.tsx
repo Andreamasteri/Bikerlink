@@ -23,7 +23,7 @@ export function svcColor(s: ServiceHealthMini | undefined): string {
   return "#ef4444";
 }
 
-function ghBadgeColor(data: ThinkCentreHealthMini): string {
+export function ghBadgeColor(data: ThinkCentreHealthMini): string {
   if (!data.graphhopperConfigured || data.graphhopperAreas.length === 0) return "#6b7280";
   const enabled = data.graphhopperAreas.filter((a) => a.enabled);
   if (enabled.length === 0) return "#6b7280";
