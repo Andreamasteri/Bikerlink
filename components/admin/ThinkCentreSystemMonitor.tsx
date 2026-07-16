@@ -1,224 +1,127 @@
+// Task #354 — Monitor ThinkCentre con storico 24h/7gg e toggle linee.
+// I componenti di rendering (LineChart, DiskBar, VramBar, buildPoints) sono
+// in ThinkCentreCharts.tsx per mantenere questo file sotto 600 righe.
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
-  View, Text, ScrollView, Switch, StyleSheet,
+  View, Text, ScrollView, Switch, TouchableOpacity, ActivityIndicator, StyleSheet,
 } from "react-native";
-import Svg, { Polyline, Line, Text as SvgText } from "react-native-svg";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Ionicons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
 import { getApiUrl, authFetchHeaders } from "@/lib/query-client";
+import {
+  LineChart, DiskBar, VramBar,
+  type DiskMount, type XLabel,
+} from "./ThinkCentreCharts";
 
 // ── Tipi ──────────────────────────────────────────────────────────────────
-
-interface DiskMount {
-  path: string;
-  usedGb: number;
-  totalGb: number;
-  usedPct: number;
-}
 
 interface MetricsSample {
   cpuTempC:     number | null;
   gpuTempC:     number | null;
-  // GPU (nvidia-smi) — assenti se il TC non ha GPU NVIDIA / nvidia-smi mancante.
   gpuUtilPct?:  number | null;
   vramUsedMb?:  number | null;
   vramTotalMb?: number | null;
   gpuName?:     string | null;
   loadAvg1:     number;
-  loadAvg5:     number;
   ramUsedMb:    number;
   ramTotalMb:   number;
-  swapUsedMb:   number;
-  swapTotalMb:  number;
   netRxKBs:     number;
   netTxKBs:     number;
   diskReadKBs:  number;
   diskWriteKBs: number;
   diskMounts:   DiskMount[];
-  sampledAt:    string;
 }
 
-interface ApiResponse extends MetricsSample {
-  online: boolean;
-  reason?: string;
+interface ApiResponse extends MetricsSample { online: boolean; reason?: string }
+
+interface TcHistorySample {
+  sampledAt:    string;
+  online:       boolean;
+  cpuTempC:     number | null;
+  gpuTempC:     number | null;
+  gpuUtilPct:   number | null;
+  vramUsedMb:   number | null;
+  vramTotalMb:  number | null;
+  loadAvg1:     number | null;
+  ramUsedPct:   number | null;
+  netRxKbs:     number | null;
+  netTxKbs:     number | null;
+  diskReadKbs:  number | null;
+  diskWriteKbs: number | null;
 }
+
+interface HistoryResponse { range: string; samples: TcHistorySample[] }
+
+type RangeMode = "live" | "24h" | "7d";
 
 // ── Costanti ──────────────────────────────────────────────────────────────
 
-const RING_SIZE   = 60;   // ultimi 60 campioni
-const POLL_MS     = 5_000;
-
-// ── Linee del grafico SVG ─────────────────────────────────────────────────
-
-const CHART_W  = 260;
-const CHART_H  = 60;
-const PAD_LEFT = 34;
-const PAD_BOT  = 14;
-
-function buildPoints(
-  data: (number | null)[],
-  minVal: number,
-  maxVal: number,
-): string {
-  const range = maxVal - minVal || 1;
-  const w = CHART_W - PAD_LEFT;
-  const h = CHART_H - PAD_BOT;
-  return data
-    .map((v, i) => {
-      if (v === null) return null;
-      const x = PAD_LEFT + (i / (RING_SIZE - 1)) * w;
-      const y = PAD_BOT + h - ((v - minVal) / range) * h;
-      return `${x.toFixed(1)},${y.toFixed(1)}`;
-    })
-    .filter(Boolean)
-    .join(" ");
-}
-
-interface LineChartProps {
-  title: string;
-  unit: string;
-  lines: { color: string; label: string; data: (number | null)[] }[];
-  min?: number;
-  max?: number;
-  threshold?: number;
-  thresholdColor?: string;
-}
-
-function LineChart({ title, unit, lines, min, max, threshold, thresholdColor }: LineChartProps) {
-  const allVals = lines.flatMap(l => l.data).filter((v): v is number => v !== null);
-  const minVal  = min  ?? (allVals.length ? Math.min(...allVals) : 0);
-  const maxVal  = max  ?? (allVals.length ? Math.max(...allVals) * 1.1 : 1);
-
-  const threshY = threshold !== undefined && maxVal > minVal
-    ? PAD_BOT + (CHART_H - PAD_BOT) - ((threshold - minVal) / (maxVal - minVal)) * (CHART_H - PAD_BOT)
-    : null;
-
-  return (
-    <View style={ch.chartBox}>
-      <View style={ch.chartHeader}>
-        <Text style={ch.chartTitle}>{title}</Text>
-        <View style={ch.legendRow}>
-          {lines.map(l => (
-            <View key={l.label} style={ch.legendItem}>
-              <View style={[ch.legendDot, { backgroundColor: l.color }]} />
-              <Text style={ch.legendLabel}>{l.label}</Text>
-            </View>
-          ))}
-        </View>
-      </View>
-      <Svg width={CHART_W} height={CHART_H}>
-        {/* Asse Y labels */}
-        <SvgText x={PAD_LEFT - 2} y={PAD_BOT + 4}     fontSize={9} fill={Colors.textSecondary} textAnchor="end">
-          {formatVal(maxVal, unit)}
-        </SvgText>
-        <SvgText x={PAD_LEFT - 2} y={CHART_H - 1}     fontSize={9} fill={Colors.textSecondary} textAnchor="end">
-          {formatVal(minVal, unit)}
-        </SvgText>
-
-        {/* Griglia leggera */}
-        <Line x1={PAD_LEFT} y1={PAD_BOT}   x2={CHART_W} y2={PAD_BOT}   stroke={Colors.border} strokeWidth={0.5} />
-        <Line x1={PAD_LEFT} y1={CHART_H - PAD_BOT + PAD_BOT} x2={CHART_W} y2={CHART_H - PAD_BOT + PAD_BOT} stroke={Colors.border} strokeWidth={0.5} />
-
-        {/* Soglia */}
-        {threshY !== null && (
-          <Line
-            x1={PAD_LEFT} y1={threshY} x2={CHART_W} y2={threshY}
-            stroke={thresholdColor ?? "#ef4444"} strokeWidth={1} strokeDasharray="4 3"
-          />
-        )}
-
-        {/* Dati */}
-        {lines.map(l => {
-          const pts = buildPoints(l.data, minVal, maxVal);
-          return pts
-            ? <Polyline key={l.label} points={pts} fill="none" stroke={l.color} strokeWidth={1.5} strokeLinejoin="round" />
-            : null;
-        })}
-      </Svg>
-
-      {/* Ultimo valore */}
-      <View style={ch.lastRow}>
-        {lines.map(l => {
-          const last = [...l.data].reverse().find(v => v !== null);
-          return (
-            <Text key={l.label} style={[ch.lastVal, { color: l.color }]}>
-              {last !== undefined && last !== null ? `${formatVal(last, unit)}` : "—"}
-            </Text>
-          );
-        })}
-      </View>
-    </View>
-  );
-}
-
-function formatVal(v: number, unit: string): string {
-  if (unit === "°C" || unit === "%" || unit === "KB/s") return `${Math.round(v)}`;
-  if (unit === "GB") return v.toFixed(1);
-  return `${v}`;
-}
-
-// ── Barra spazio disco ────────────────────────────────────────────────────
-
-function DiskBar({ mount }: { mount: DiskMount }) {
-  const pct  = Math.min(100, mount.usedPct);
-  const color = pct > 90 ? "#ef4444" : pct > 75 ? "#f59e0b" : "#22c55e";
-  return (
-    <View style={ch.diskItem}>
-      <View style={ch.diskLabelRow}>
-        <Text style={ch.diskPath}>{mount.path}</Text>
-        <Text style={[ch.diskPct, { color }]}>{pct}%</Text>
-        <Text style={ch.diskDetail}>{mount.usedGb} / {mount.totalGb} GB</Text>
-      </View>
-      <View style={ch.diskTrack}>
-        <View style={[ch.diskFill, { width: `${pct}%` as `${number}%`, backgroundColor: color }]} />
-      </View>
-    </View>
-  );
-}
-
-// ── Barra VRAM ────────────────────────────────────────────────────────────
-
-function VramBar({ usedMb, totalMb }: { usedMb: number; totalMb: number }) {
-  const pct = totalMb > 0 ? Math.min(100, Math.round((usedMb / totalMb) * 100)) : 0;
-  const color = pct > 90 ? "#ef4444" : pct > 75 ? "#f59e0b" : "#22c55e";
-  const fmtGb = (mb: number) => (mb / 1024).toFixed(1);
-  return (
-    <View style={ch.diskItem}>
-      <View style={ch.diskLabelRow}>
-        <Text style={ch.diskPath}>GPU</Text>
-        <Text style={[ch.diskPct, { color }]}>{pct}%</Text>
-        <Text style={ch.diskDetail}>{fmtGb(usedMb)} / {fmtGb(totalMb)} GB</Text>
-      </View>
-      <View style={ch.diskTrack}>
-        <View style={[ch.diskFill, { width: `${pct}%` as `${number}%`, backgroundColor: color }]} />
-      </View>
-    </View>
-  );
-}
+const RING_SIZE  = 60;
+const POLL_MS    = 5_000;
+const ASYNC_KEY  = "tc_monitor_visible_lines"; // chiave AsyncStorage
+const DAY_IT     = ["Dom", "Lun", "Mar", "Mer", "Gio", "Ven", "Sab"];
 
 // ── Ring buffer ───────────────────────────────────────────────────────────
 
-function makeRing<T>(size: number, fill: T): T[] {
-  return Array(size).fill(fill) as T[];
-}
-
+function makeRing<T>(size: number, fill: T): T[] { return Array(size).fill(fill) as T[]; }
 const NULL_RING: (number | null)[] = makeRing(RING_SIZE, null);
+function pushRing<T>(ring: T[], value: T): T[] { return [...ring.slice(1), value]; }
 
-function pushRing<T>(ring: T[], value: T): T[] {
-  const next = [...ring.slice(1), value];
-  return next;
+// ── Etichette asse X per vista storica ────────────────────────────────────
+
+function buildXLabels(samples: TcHistorySample[], range: "24h" | "7d"): XLabel[] {
+  if (samples.length < 2) return [];
+  const first = new Date(samples[0].sampledAt).getTime();
+  const last  = new Date(samples[samples.length - 1].sampledAt).getTime();
+  const intervalMs = range === "24h" ? 4 * 3_600_000 : 24 * 3_600_000;
+  const results: XLabel[] = [];
+
+  for (let target = first; target <= last + intervalMs / 2; target += intervalMs) {
+    let closest = 0;
+    let minDiff = Infinity;
+    for (let i = 0; i < samples.length; i++) {
+      const d = Math.abs(new Date(samples[i].sampledAt).getTime() - target);
+      if (d < minDiff) { minDiff = d; closest = i; }
+    }
+    if (results.some(r => r.idx === closest)) continue;
+    const dt = new Date(samples[closest].sampledAt);
+    const label = range === "24h"
+      ? `${String(dt.getHours()).padStart(2, "0")}:${String(dt.getMinutes()).padStart(2, "0")}`
+      : `${DAY_IT[dt.getDay()]} ${dt.getDate()}`;
+    results.push({ idx: closest, label });
+  }
+  return results;
 }
 
 // ── Componente principale ─────────────────────────────────────────────────
 
 export function ThinkCentreSystemMonitor() {
-  const [enabled, setEnabled] = useState(false);
-  const [online,  setOnline]  = useState<boolean | null>(null);
-  const [reason,  setReason]  = useState<string>("");
-  const [lastMounts, setLastMounts] = useState<DiskMount[]>([]);
-  // GPU: presente solo se il TC espone metriche nvidia-smi (degrada silenziosa).
+  const [enabled,     setEnabled]     = useState(false);
+  const [online,      setOnline]      = useState<boolean | null>(null);
+  const [reason,      setReason]      = useState("");
+  const [lastMounts,  setLastMounts]  = useState<DiskMount[]>([]);
   const [gpu, setGpu] = useState<{ vramUsedMb: number | null; vramTotalMb: number | null; name: string | null } | null>(null);
 
+  // ── Toggle linee persistito ─────────────────────────────────────────────
+  const [hiddenLines, setHiddenLines] = useState<Set<string>>(new Set());
+
+  const toggleLine = useCallback((label: string) => {
+    setHiddenLines(prev => {
+      const next = new Set(prev);
+      if (next.has(label)) next.delete(label); else next.add(label);
+      AsyncStorage.setItem(ASYNC_KEY, JSON.stringify([...next])).catch(() => {});
+      return next;
+    });
+  }, []);
+
+  useEffect(() => {
+    AsyncStorage.getItem(ASYNC_KEY).then(val => {
+      if (val) { try { setHiddenLines(new Set(JSON.parse(val) as string[])); } catch { /* JSON malformato: ignora */ } }
+    }).catch(() => {});
+  }, []);
+
+  // ── Ring buffer live ────────────────────────────────────────────────────
   const cpuTemp   = useRef<(number | null)[]>([...NULL_RING]);
   const gpuTemp   = useRef<(number | null)[]>([...NULL_RING]);
   const gpuUtil   = useRef<(number | null)[]>([...NULL_RING]);
@@ -228,9 +131,15 @@ export function ThinkCentreSystemMonitor() {
   const netTx     = useRef<(number | null)[]>([...NULL_RING]);
   const diskRead  = useRef<(number | null)[]>([...NULL_RING]);
   const diskWrite = useRef<(number | null)[]>([...NULL_RING]);
-
   const [, setTick] = useState(0);
 
+  // ── Storico ────────────────────────────────────────────────────────────
+  const [rangeMode,    setRangeMode]    = useState<RangeMode>("live");
+  const [historyData,  setHistoryData]  = useState<TcHistorySample[] | null>(null);
+  const [historyError, setHistoryError] = useState(false);
+  const [histLoading,  setHistLoading]  = useState(false);
+
+  // ── Poll live ──────────────────────────────────────────────────────────
   const poll = useCallback(async () => {
     try {
       const url = new URL("/api/admin/thinkcentre-metrics", getApiUrl()).toString();
@@ -239,29 +148,17 @@ export function ThinkCentreSystemMonitor() {
         credentials: "include",
         signal: AbortSignal.timeout(5_000),
       });
-      if (!res.ok) {
-        setOnline(false);
-        setReason(`HTTP ${res.status}`);
-        return;
-      }
+      if (!res.ok) { setOnline(false); setReason(`HTTP ${res.status}`); return; }
       const data: ApiResponse = await res.json();
-      if (!data.online) {
-        setOnline(false);
-        setReason(data.reason ?? "non raggiungibile");
-        return;
-      }
+      if (!data.online) { setOnline(false); setReason(data.reason ?? "non raggiungibile"); return; }
 
       setOnline(true);
       setReason("");
       setLastMounts(data.diskMounts ?? []);
-      // GPU disponibile solo se l'agente TC riporta almeno una metrica nvidia-smi.
       const hasGpu = data.gpuUtilPct != null || data.vramUsedMb != null || data.vramTotalMb != null;
       setGpu(hasGpu ? { vramUsedMb: data.vramUsedMb ?? null, vramTotalMb: data.vramTotalMb ?? null, name: data.gpuName ?? null } : null);
 
-      const ramPctVal = data.ramTotalMb > 0
-        ? Math.round((data.ramUsedMb / data.ramTotalMb) * 100)
-        : null;
-
+      const ramPctVal = data.ramTotalMb > 0 ? Math.round((data.ramUsedMb / data.ramTotalMb) * 100) : null;
       cpuTemp.current   = pushRing(cpuTemp.current,   data.cpuTempC ?? null);
       gpuTemp.current   = pushRing(gpuTemp.current,   data.gpuTempC ?? null);
       gpuUtil.current   = pushRing(gpuUtil.current,   data.gpuUtilPct ?? null);
@@ -271,35 +168,54 @@ export function ThinkCentreSystemMonitor() {
       netTx.current     = pushRing(netTx.current,     data.netTxKBs);
       diskRead.current  = pushRing(diskRead.current,  data.diskReadKBs);
       diskWrite.current = pushRing(diskWrite.current, data.diskWriteKBs);
-
       setTick(t => t + 1);
-    } catch {
-      setOnline(false);
-      setReason("timeout / non raggiungibile");
-    }
+    } catch { setOnline(false); setReason("timeout / non raggiungibile"); }
   }, []);
 
+  // ── Fetch storico ──────────────────────────────────────────────────────
+  const fetchHistory = useCallback(async (mode: "24h" | "7d") => {
+    setHistLoading(true);
+    setHistoryError(false);
+    try {
+      const url = new URL(`/api/admin/tc-metrics-history?range=${mode}`, getApiUrl()).toString();
+      const res = await fetch(url, { headers: { ...(await authFetchHeaders()) }, credentials: "include" });
+      if (!res.ok) { setHistoryError(true); return; }
+      const data: HistoryResponse = await res.json();
+      setHistoryData(data.samples);
+    } catch { setHistoryError(true); }
+    finally { setHistLoading(false); }
+  }, []);
+
+  // ── Reset buffer al disattivazione ────────────────────────────────────
   useEffect(() => {
     if (!enabled) {
-      // reset buffer quando si disattiva
-      cpuTemp.current   = [...NULL_RING];
-      gpuTemp.current   = [...NULL_RING];
-      gpuUtil.current   = [...NULL_RING];
-      loadAvg.current   = [...NULL_RING];
-      ramPct.current    = [...NULL_RING];
-      netRx.current     = [...NULL_RING];
-      netTx.current     = [...NULL_RING];
-      diskRead.current  = [...NULL_RING];
+      cpuTemp.current = [...NULL_RING]; gpuTemp.current = [...NULL_RING];
+      gpuUtil.current = [...NULL_RING]; loadAvg.current = [...NULL_RING];
+      ramPct.current  = [...NULL_RING]; netRx.current   = [...NULL_RING];
+      netTx.current   = [...NULL_RING]; diskRead.current = [...NULL_RING];
       diskWrite.current = [...NULL_RING];
-      setOnline(null);
-      setReason("");
-      setLastMounts([]);
+      setOnline(null); setReason(""); setLastMounts([]); setHistoryData(null);
       return;
     }
-    poll();
-    const id = setInterval(poll, POLL_MS);
-    return () => clearInterval(id);
-  }, [enabled, poll]);
+    if (rangeMode === "live") {
+      poll();
+      const id = setInterval(poll, POLL_MS);
+      return () => clearInterval(id);
+    }
+    // In modalità storica non si fa polling live
+    fetchHistory(rangeMode as "24h" | "7d").catch(() => {});
+  }, [enabled, rangeMode, poll, fetchHistory]);
+
+  // ── Dati grafici storico ───────────────────────────────────────────────
+  const hist = historyData ?? [];
+  const xLabels = hist.length > 1 && rangeMode !== "live"
+    ? buildXLabels(hist, rangeMode as "24h" | "7d")
+    : undefined;
+
+  const hLine = (fn: (s: TcHistorySample) => number | null) => hist.map(fn);
+
+  const isHistory = rangeMode !== "live" && enabled;
+  const showCharts = enabled && (rangeMode === "live" || (isHistory && !historyError && hist.length > 0));
 
   return (
     <ScrollView contentContainerStyle={ch.container}>
@@ -307,10 +223,10 @@ export function ThinkCentreSystemMonitor() {
       <View style={ch.toggleRow}>
         <View style={ch.toggleLeft}>
           <Ionicons name="server-outline" size={18} color={enabled ? Colors.accent : Colors.textSecondary} />
-          <Text style={ch.toggleLabel}>Monitor live ThinkCentre</Text>
+          <Text style={ch.toggleLabel}>Monitor ThinkCentre</Text>
         </View>
         <View style={ch.rightRow}>
-          {online !== null && (
+          {online !== null && rangeMode === "live" && (
             <View style={[ch.badge, { backgroundColor: online ? "#22c55e22" : "#ef444422" }]}>
               <View style={[ch.badgeDot, { backgroundColor: online ? "#22c55e" : "#ef4444" }]} />
               <Text style={[ch.badgeText, { color: online ? "#22c55e" : "#ef4444" }]}>
@@ -335,7 +251,29 @@ export function ThinkCentreSystemMonitor() {
         </View>
       )}
 
-      {enabled && !online && online !== null && (
+      {/* Selettore range */}
+      {enabled && (
+        <View style={ch.pillRow}>
+          {(["live", "24h", "7d"] as RangeMode[]).map(r => (
+            <TouchableOpacity key={r} onPress={() => setRangeMode(r)}
+              style={[ch.pill, rangeMode === r && ch.pillActive]}>
+              <Text style={[ch.pillText, rangeMode === r && ch.pillTextActive]}>
+                {r === "live" ? "Live" : r === "24h" ? "24h" : "7gg"}
+              </Text>
+            </TouchableOpacity>
+          ))}
+          {isHistory && (
+            <TouchableOpacity onPress={() => fetchHistory(rangeMode as "24h" | "7d")} style={ch.refreshBtn}>
+              {histLoading
+                ? <ActivityIndicator size="small" color={Colors.accent} />
+                : <Ionicons name="refresh-outline" size={16} color={Colors.accent} />}
+              <Text style={ch.refreshText}>Aggiorna</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      )}
+
+      {enabled && rangeMode === "live" && !online && online !== null && (
         <View style={ch.offlineState}>
           <Ionicons name="cloud-offline-outline" size={28} color="#ef4444" />
           <Text style={ch.offlineTitle}>Server non raggiungibile</Text>
@@ -343,78 +281,86 @@ export function ThinkCentreSystemMonitor() {
         </View>
       )}
 
-      {enabled && (
+      {isHistory && historyError && (
+        <View style={ch.offlineState}>
+          <Ionicons name="warning-outline" size={28} color="#f59e0b" />
+          <Text style={ch.offlineTitle}>Storico non disponibile</Text>
+          <Text style={ch.offlineReason}>Riprova o torna alla vista Live</Text>
+        </View>
+      )}
+
+      {isHistory && histLoading && hist.length === 0 && (
+        <View style={ch.loadingBox}>
+          <ActivityIndicator color={Colors.accent} />
+          <Text style={ch.loadingText}>Caricamento storico…</Text>
+        </View>
+      )}
+
+      {showCharts && (
         <>
           <LineChart
-            title="CPU Temperatura"
-            unit="°C"
-            lines={[{ color: "#f97316", label: "CPU", data: cpuTemp.current }]}
-            threshold={85}
-            thresholdColor="#ef4444"
+            title="CPU Temperatura" unit="°C"
+            lines={[{ color: "#f97316", label: "CPU", data: isHistory ? hLine(s => s.cpuTempC) : cpuTemp.current }]}
+            threshold={85} thresholdColor="#ef4444"
+            hiddenLines={hiddenLines} onToggleLine={toggleLine}
+            xLabels={isHistory ? xLabels : undefined}
           />
-
           <LineChart
-            title="GPU Temperatura"
-            unit="°C"
-            lines={[{ color: "#3b82f6", label: "GPU", data: gpuTemp.current }]}
+            title="GPU Temperatura" unit="°C"
+            lines={[{ color: "#3b82f6", label: "GPU", data: isHistory ? hLine(s => s.gpuTempC) : gpuTemp.current }]}
+            hiddenLines={hiddenLines} onToggleLine={toggleLine}
+            xLabels={isHistory ? xLabels : undefined}
           />
-
-          {/* GPU utilizzo + VRAM — solo se il TC espone metriche nvidia-smi */}
-          {gpu && (
-            <>
-              <LineChart
-                title={`GPU Utilizzo${gpu.name ? ` — ${gpu.name}` : ""}`}
-                unit="%"
-                lines={[{ color: "#ec4899", label: "GPU", data: gpuUtil.current }]}
-                min={0}
-                max={100}
-              />
-              {gpu.vramTotalMb != null && gpu.vramTotalMb > 0 && (
-                <View style={ch.diskBox}>
-                  <Text style={ch.sectionTitle}>VRAM</Text>
-                  <VramBar usedMb={gpu.vramUsedMb ?? 0} totalMb={gpu.vramTotalMb} />
-                </View>
-              )}
-            </>
+          {(gpu || (isHistory && hist.some(s => s.gpuUtilPct != null))) && (
+            <LineChart
+              title={gpu?.name ? `GPU Utilizzo — ${gpu.name}` : "GPU Utilizzo"} unit="%"
+              lines={[{ color: "#ec4899", label: "GPU", data: isHistory ? hLine(s => s.gpuUtilPct) : gpuUtil.current }]}
+              min={0} max={100}
+              hiddenLines={hiddenLines} onToggleLine={toggleLine}
+              xLabels={isHistory ? xLabels : undefined}
+            />
           )}
-
+          {!isHistory && gpu?.vramTotalMb != null && gpu.vramTotalMb > 0 && (
+            <View style={ch.diskBox}>
+              <Text style={ch.sectionTitle}>VRAM</Text>
+              <VramBar usedMb={gpu.vramUsedMb ?? 0} totalMb={gpu.vramTotalMb} />
+            </View>
+          )}
           <LineChart
-            title="CPU Load Avg 1m"
-            unit=""
-            lines={[{ color: "#22c55e", label: "load1", data: loadAvg.current }]}
+            title="CPU Load Avg 1m" unit=""
+            lines={[{ color: "#22c55e", label: "load1", data: isHistory ? hLine(s => s.loadAvg1) : loadAvg.current }]}
             min={0}
+            hiddenLines={hiddenLines} onToggleLine={toggleLine}
+            xLabels={isHistory ? xLabels : undefined}
           />
-
           <LineChart
-            title="RAM Usata"
-            unit="%"
-            lines={[{ color: "#a855f7", label: "RAM", data: ramPct.current }]}
-            min={0}
-            max={100}
+            title="RAM Usata" unit="%"
+            lines={[{ color: "#a855f7", label: "RAM", data: isHistory ? hLine(s => s.ramUsedPct) : ramPct.current }]}
+            min={0} max={100}
+            hiddenLines={hiddenLines} onToggleLine={toggleLine}
+            xLabels={isHistory ? xLabels : undefined}
           />
-
           <LineChart
-            title="Rete"
-            unit="KB/s"
+            title="Rete" unit="KB/s"
             lines={[
-              { color: "#06b6d4", label: "RX",  data: netRx.current },
-              { color: "#eab308", label: "TX",  data: netTx.current },
+              { color: "#06b6d4", label: "RX", data: isHistory ? hLine(s => s.netRxKbs) : netRx.current },
+              { color: "#eab308", label: "TX", data: isHistory ? hLine(s => s.netTxKbs) : netTx.current },
             ]}
             min={0}
+            hiddenLines={hiddenLines} onToggleLine={toggleLine}
+            xLabels={isHistory ? xLabels : undefined}
           />
-
           <LineChart
-            title="I/O Disco"
-            unit="KB/s"
+            title="I/O Disco" unit="KB/s"
             lines={[
-              { color: "#86efac", label: "Read",  data: diskRead.current },
-              { color: "#fca5a5", label: "Write", data: diskWrite.current },
+              { color: "#86efac", label: "Read",  data: isHistory ? hLine(s => s.diskReadKbs)  : diskRead.current },
+              { color: "#fca5a5", label: "Write", data: isHistory ? hLine(s => s.diskWriteKbs) : diskWrite.current },
             ]}
             min={0}
+            hiddenLines={hiddenLines} onToggleLine={toggleLine}
+            xLabels={isHistory ? xLabels : undefined}
           />
-
-          {/* Spazio disco — widget statico */}
-          {lastMounts.length > 0 && (
+          {!isHistory && lastMounts.length > 0 && (
             <View style={ch.diskBox}>
               <Text style={ch.sectionTitle}>Spazio Disco</Text>
               {lastMounts.map(m => <DiskBar key={m.path} mount={m} />)}
@@ -431,66 +377,35 @@ export function ThinkCentreSystemMonitor() {
 const ch = StyleSheet.create({
   container: { padding: 12, gap: 10 },
 
-  toggleRow: {
-    flexDirection: "row", alignItems: "center",
-    backgroundColor: Colors.card, borderRadius: 10,
-    padding: 12, gap: 10,
-  },
+  toggleRow: { flexDirection: "row", alignItems: "center", backgroundColor: Colors.card, borderRadius: 10, padding: 12, gap: 10 },
   toggleLeft:  { flexDirection: "row", alignItems: "center", gap: 8, flex: 1 },
   toggleLabel: { fontSize: 14, fontWeight: "600", color: Colors.text },
   rightRow:    { flexDirection: "row", alignItems: "center", gap: 8 },
 
-  badge: {
-    flexDirection: "row", alignItems: "center", gap: 4,
-    paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8,
-  },
-  badgeDot:  { width: 7, height: 7, borderRadius: 3.5 },
-  badgeText: { fontSize: 11, fontWeight: "700" },
+  badge:    { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 },
+  badgeDot: { width: 7, height: 7, borderRadius: 3.5 },
+  badgeText:{ fontSize: 11, fontWeight: "700" },
 
-  offState: {
-    alignItems: "center", padding: 40, gap: 8,
-    backgroundColor: Colors.card, borderRadius: 10,
-  },
-  offText: { fontSize: 14, color: Colors.textSecondary, textAlign: "center" },
-  offSub:  { fontSize: 12, color: Colors.textSecondary },
+  pillRow: { flexDirection: "row", alignItems: "center", gap: 8, flexWrap: "wrap" },
+  pill:    { paddingHorizontal: 14, paddingVertical: 6, borderRadius: 20, backgroundColor: Colors.border },
+  pillActive:   { backgroundColor: Colors.accent },
+  pillText:     { fontSize: 13, fontWeight: "600", color: Colors.textSecondary },
+  pillTextActive: { color: "#fff" },
 
-  offlineState: {
-    alignItems: "center", padding: 30, gap: 6,
-    backgroundColor: "#ef444411", borderRadius: 10,
-    borderWidth: 1, borderColor: "#ef444433",
-  },
-  offlineTitle:  { fontSize: 15, fontWeight: "700", color: "#ef4444" },
-  offlineReason: { fontSize: 12, color: Colors.textSecondary, textAlign: "center" },
+  refreshBtn:  { flexDirection: "row", alignItems: "center", gap: 4, marginLeft: "auto" as never, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 14, backgroundColor: Colors.card, borderWidth: 1, borderColor: Colors.accent + "66" },
+  refreshText: { fontSize: 12, color: Colors.accent, fontWeight: "600" },
 
-  chartBox: {
-    backgroundColor: Colors.card, borderRadius: 10,
-    padding: 10, gap: 4,
-  },
-  chartHeader: {
-    flexDirection: "row", justifyContent: "space-between", alignItems: "center",
-  },
-  chartTitle:  { fontSize: 12, fontWeight: "600", color: Colors.text },
-  legendRow:   { flexDirection: "row", gap: 8 },
-  legendItem:  { flexDirection: "row", alignItems: "center", gap: 3 },
-  legendDot:   { width: 8, height: 8, borderRadius: 4 },
-  legendLabel: { fontSize: 10, color: Colors.textSecondary },
+  offState:   { alignItems: "center", padding: 40, gap: 8, backgroundColor: Colors.card, borderRadius: 10 },
+  offText:    { fontSize: 14, color: Colors.textSecondary, textAlign: "center" },
+  offSub:     { fontSize: 12, color: Colors.textSecondary },
 
-  lastRow: { flexDirection: "row", gap: 12 },
-  lastVal: { fontSize: 12, fontWeight: "700" },
+  offlineState: { alignItems: "center", padding: 30, gap: 6, backgroundColor: "#ef444411", borderRadius: 10, borderWidth: 1, borderColor: "#ef444433" },
+  offlineTitle: { fontSize: 15, fontWeight: "700", color: "#ef4444" },
+  offlineReason:{ fontSize: 12, color: Colors.textSecondary, textAlign: "center" },
 
-  diskBox: {
-    backgroundColor: Colors.card, borderRadius: 10, padding: 12, gap: 8,
-  },
-  sectionTitle: { fontSize: 13, fontWeight: "600", color: Colors.text, marginBottom: 2 },
+  loadingBox:  { alignItems: "center", padding: 30, gap: 8, backgroundColor: Colors.card, borderRadius: 10 },
+  loadingText: { fontSize: 13, color: Colors.textSecondary },
 
-  diskItem:     { gap: 4 },
-  diskLabelRow: { flexDirection: "row", alignItems: "center", gap: 6 },
-  diskPath:     { fontSize: 12, fontWeight: "600", color: Colors.text, flex: 1 },
-  diskPct:      { fontSize: 13, fontWeight: "700" },
-  diskDetail:   { fontSize: 11, color: Colors.textSecondary },
-  diskTrack:    {
-    height: 8, borderRadius: 4,
-    backgroundColor: Colors.border, overflow: "hidden",
-  },
-  diskFill:     { height: "100%", borderRadius: 4 },
+  diskBox:     { backgroundColor: Colors.card, borderRadius: 10, padding: 12, gap: 8 },
+  sectionTitle:{ fontSize: 13, fontWeight: "600", color: Colors.text, marginBottom: 2 },
 });

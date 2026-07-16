@@ -293,6 +293,12 @@ export async function runPhase5Schedulers(): Promise<void> {
     markDegraded("scheduler:db-monitor-history");
   }
 
+  await arm("tc-metrics-sampler", async () => {
+    const { startTcMetricsSampler } = await import("./jobs/tc-metrics-sampler");
+    startTcMetricsSampler();
+    console.log("[INIT] TC metrics sampler started (60s interval, 7d retention)");
+  });
+
   try {
     const { startCampaignsSelfCheckScheduler } = await import("./ai/watchdog/campaigns-self-check");
     startCampaignsSelfCheckScheduler();
