@@ -1,3 +1,4 @@
+// LARGE-FILE-ALLOW: suite di test hub-tools Horus — ~20 test case, split spezza la leggibilità.
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // ---------------------------------------------------------------------------

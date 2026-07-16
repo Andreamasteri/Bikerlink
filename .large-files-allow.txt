@@ -62,3 +62,7 @@ server/routes/admin/ai-watchdog.ts
 # ── GraphHopper client ─────────────────────────────────────────────────────
 # Client multi-area + profili multipli — split richiederebbe re-export artificiali.
 server/graphhopper-client.ts
+
+# ── Test suite hub-tools Horus ─────────────────────────────────────────────
+# ~20 test case correlati — split spezza la leggibilità della suite.
+server/__tests__/ai-assistant-agent-horus-tools.test.ts
