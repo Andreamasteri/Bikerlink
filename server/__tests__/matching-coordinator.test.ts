@@ -76,6 +76,13 @@ describe("getCoordinatorState — nessuna regressione sul comportamento determin
     const { state } = await getCoordinatorState();
     expect(state).toBe("paused_by_killswitch");
   });
+
+  it("paused_by_killswitch (senza eccezione) quando getAppSetting lancia un errore di timeout", async () => {
+    getAppSettingMock.mockRejectedValue(new Error("connection timeout"));
+    const result = await getCoordinatorState();
+    expect(result.state).toBe("paused_by_killswitch");
+    expect(result.reason).toMatch(/DB unreachable/);
+  });
 });
 
 describe("canRunCycleNow", () => {

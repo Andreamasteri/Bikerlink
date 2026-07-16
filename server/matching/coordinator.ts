@@ -208,7 +208,16 @@ function pickActiveDirective(effective: {
 export async function getCoordinatorState(): Promise<{ state: CoordinatorState; reason: string }> {
   await loadDirectiveIfNeeded();
 
-  const autoMatchSetting = await storage.getAppSetting("auto_matching_enabled");
+  let autoMatchSetting: Awaited<ReturnType<typeof storage.getAppSetting>>;
+  try {
+    autoMatchSetting = await storage.getAppSetting("auto_matching_enabled");
+  } catch (_err) {
+    dedupWarn(
+      "coordinator:db-timeout",
+      "[coordinator] getAppSetting timeout/errore DB — ciclo saltato silenziosamente",
+    );
+    return { state: "paused_by_killswitch", reason: "DB unreachable — ciclo saltato" };
+  }
   if (autoMatchSetting?.value === "false") {
     return { state: "stopped", reason: "auto_matching_enabled=false (admin)" };
   }
