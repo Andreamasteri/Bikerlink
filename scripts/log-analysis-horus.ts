@@ -436,29 +436,50 @@ async function main(): Promise<void> {
   }
 
   // ── Salvataggio report principale ──
+  // HORUS_LOG_DIR permette di scrivere in /tmp invece di logs/ quando il
+  // filesystem del planner è read-only (es. shell agente Replit → exit 254).
   const ts = new Date().toISOString().replace(/[:.]/g, "-");
-  const outDir = path.join(ROOT, "logs");
-  const outPath = path.join(outDir, `horus-log-analysis-${ts}.md`);
-  try {
-    fs.mkdirSync(outDir, { recursive: true });
-    const header =
-      `# Triage AI BikerLink — ${new Date().toISOString()}\n\n` +
-      `- Istanza: Horus (ThinkCentre)\n` +
-      `- Modello: \`${model}\`\n` +
-      `- Fonti: ${ONLY_INTERNAL ? "DB + filesystem" : "DB + filesystem + GitHub + Sentry + repo tree"}\n` +
-      `- Tail log: ${tail} righe\n\n` +
-      `---\n\n`;
-    fs.writeFileSync(outPath, header + report + "\n", "utf8");
-  } catch (err) {
-    console.warn(`\n⚠️  Impossibile salvare il report su file: ${(err as Error).message}`);
-  }
+  const outDirPrimary = process.env.HORUS_LOG_DIR
+    ? path.resolve(process.env.HORUS_LOG_DIR)
+    : path.join(ROOT, "logs");
+  let outDir = outDirPrimary;
+  let outPath = path.join(outDir, `horus-log-analysis-${ts}.md`);
 
+  // Stampa il report su stdout PRIMA di qualsiasi write su file, così il
+  // contenuto è sempre visibile anche se la scrittura fallisce.
   console.log("════════════════════════════════════════════════════════════");
   console.log("  REPORT DI TRIAGE");
   console.log("════════════════════════════════════════════════════════════\n");
   console.log(report);
   console.log("\n════════════════════════════════════════════════════════════");
-  console.log(`  💾 Report salvato in: ${path.relative(ROOT, outPath)}`);
+
+  const header =
+    `# Triage AI BikerLink — ${new Date().toISOString()}\n\n` +
+    `- Istanza: Horus (ThinkCentre)\n` +
+    `- Modello: \`${model}\`\n` +
+    `- Fonti: ${ONLY_INTERNAL ? "DB + filesystem" : "DB + filesystem + GitHub + Sentry + repo tree"}\n` +
+    `- Tail log: ${tail} righe\n\n` +
+    `---\n\n`;
+
+  try {
+    fs.mkdirSync(outDir, { recursive: true });
+    fs.writeFileSync(outPath, header + report + "\n", "utf8");
+  } catch (err) {
+    // Fallback a /tmp se la directory primaria è read-only (exit 254 del planner)
+    const fallbackDir = "/tmp";
+    const fallbackPath = path.join(fallbackDir, `horus-log-analysis-${ts}.md`);
+    console.warn(`\n⚠️  Impossibile salvare in ${outDir}: ${(err as Error).message}`);
+    try {
+      fs.writeFileSync(fallbackPath, header + report + "\n", "utf8");
+      outDir = fallbackDir;
+      outPath = fallbackPath;
+      console.warn(`   📂 Report salvato in fallback: ${outPath}`);
+    } catch (err2) {
+      console.warn(`   ❌ Fallback /tmp fallito: ${(err2 as Error).message}`);
+    }
+  }
+
+  console.log(`  💾 Report salvato in: ${outPath}`);
   console.log("════════════════════════════════════════════════════════════");
 
   // ── Revisione architect (seconda chiamata a Horus) ──
@@ -476,12 +497,25 @@ async function main(): Promise<void> {
 
     architectReview = await callHorus(baseUrl, model, token, ARCHITECT_PROMPT, architectInput);
 
-    const reviewPath = outPath.replace(".md", "-architect.md");
-    fs.writeFileSync(reviewPath, `# Revisione Architect\n\n${architectReview}\n`, "utf8");
+    // Stampa su stdout PRIMA di scrivere su file
     console.log("\n  📐 REVISIONE ARCHITECT");
     console.log("════════════════════════════════════════════════════════════\n");
     console.log(architectReview);
-    console.log(`\n  💾 Revisione salvata in: ${path.relative(ROOT, reviewPath)}`);
+
+    const reviewPath = outPath.replace(".md", "-architect.md");
+    try {
+      fs.writeFileSync(reviewPath, `# Revisione Architect\n\n${architectReview}\n`, "utf8");
+      console.log(`\n  💾 Revisione salvata in: ${reviewPath}`);
+    } catch (writeErr) {
+      // Fallback /tmp per la revisione architect
+      const fallbackReviewPath = path.join("/tmp", `horus-log-analysis-${ts}-architect.md`);
+      try {
+        fs.writeFileSync(fallbackReviewPath, `# Revisione Architect\n\n${architectReview}\n`, "utf8");
+        console.warn(`\n  ⚠️  Revisione salvata in fallback: ${fallbackReviewPath}`);
+      } catch {
+        console.warn(`\n  ⚠️  Impossibile salvare la revisione: ${(writeErr as Error).message}`);
+      }
+    }
   } catch (err) {
     console.warn(`\n⚠️  Revisione architect non riuscita: ${(err as Error).message}`);
     console.warn("   I task verranno proposti dal report principale.\n");

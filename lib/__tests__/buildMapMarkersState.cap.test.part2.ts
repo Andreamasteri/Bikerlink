@@ -36,20 +36,6 @@ function makeUsers(
   }));
 }
 
-function makeCurrentUser(): MapUser {
-  return {
-    id: CURRENT_USER_ID,
-    latitude: SESSION_CENTER.latitude,
-    longitude: SESSION_CENTER.longitude,
-    userType: "biker" as const,
-    sex: null,
-    nickname: "io",
-    country: "IT",
-    currentSpeedKph: null,
-    speedProfile: null,
-  };
-}
-
 function makeWorkshops(n: number): MapWorkshop[] {
   return Array.from({ length: n }, (_, i) => ({
     id: `ws-${i}`,

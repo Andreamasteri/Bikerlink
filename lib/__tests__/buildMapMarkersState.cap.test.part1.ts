@@ -27,7 +27,7 @@
 
 import { describe, it, expect } from "vitest";
 import { buildMapMarkersState } from "@/components/map/buildMapMarkersState";
-import { MARKERS_HARD_CAP, BRIDGE_PAYLOAD_SAFE_BYTE_LIMIT } from "@/lib/maps/cap-markers";
+import { MARKERS_HARD_CAP } from "@/lib/maps/cap-markers";
 import type { MapUser, MapWorkshop, ClubMapPin } from "@/components/map/map-types";
 
 // ---------------------------------------------------------------------------

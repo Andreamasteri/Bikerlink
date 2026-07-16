@@ -27,6 +27,30 @@ Il triage è disponibile come **workflow Replit**. Nel pannello Workflows del pr
 - **"Triage Horus"** — esegue il triage completo su tutte le fonti, salva il report in `logs/`, fa la revisione architect e prepara i task da proporre.
 - **"Planning Session"** — esegue il triage completo e poi stampa il percorso del report più recente, pronto per la sessione di pianificazione.
 
+## ⚠️ Shell planner: usa HORUS_LOG_DIR=/tmp
+
+La **shell del planner** (agente Replit in modalità task) è **read-only sull'intero workspace**. Quando lo script tenta di scrivere in `logs/`, la piattaforma intercetta la syscall **prima** che Node.js possa catturarla nel try/catch, causando **exit 254** e l'interruzione del triage prima che il report venga stampato su stdout.
+
+**Soluzione**: imposta `HORUS_LOG_DIR=/tmp` per redirigere output e manifest su `/tmp`, che è sempre scrivibile:
+
+```bash
+HORUS_LOG_DIR=/tmp npx tsx scripts/log-analysis-horus.ts
+HORUS_LOG_DIR=/tmp npx tsx scripts/horus-propose-tasks.ts
+```
+
+**Distinguere gli errori:**
+- **Exit 254** (filesystem read-only) → usa `HORUS_LOG_DIR=/tmp`
+- **Exit 1** (ThinkCentre spento / Cloudflare Tunnel giù) → verifica che il TC sia online e Ollama in esecuzione
+
+**Nota**: i file plan `.local/tasks/horus-*.md` vengono scritti come prima — `.local/` è sempre scrivibile anche nella shell planner.
+
+**Tre modalità di esecuzione:**
+| Modalità | Comando | Note |
+|---|---|---|
+| **Workflow** (raccomandato) | Pannello Workflows → "Triage Horus" | Scrive in `logs/`, nessun flag extra |
+| **Shell build** | `npx tsx scripts/log-analysis-horus.ts` | Workspace scrivibile, usa `logs/` |
+| **Shell planner** | `HORUS_LOG_DIR=/tmp npx tsx scripts/log-analysis-horus.ts` | `/tmp` sempre scrivibile |
+
 ## Come lanciarla — da terminale
 
 ```bash
@@ -130,6 +154,7 @@ Prima di ogni sessione di pianificazione ("cosa facciamo adesso?", "proponi task
 | `SENTRY_ORG` | Secret/Env | ✅ presente | Organization slug Sentry (es. `my-org`) |
 | `SENTRY_PROJECT` | Secret/Env | ✅ presente | Project slug Sentry (es. `bikerlink`) |
 | `SENTRY_BASE_URL` | Secret | ✅ presente | Default `https://de.sentry.io/api/0` (istanza EU) |
+| `HORUS_LOG_DIR` | Variabile d'ambiente | opzionale | Override directory output report e manifest (es. `/tmp` nella shell planner); default `logs/` |
 
 Per impostare i secret: usa la skill `environment-secrets` (mai scriverli nei file).
 

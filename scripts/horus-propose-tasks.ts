@@ -43,14 +43,23 @@ const HAS_ARCHITECT_REVIEW = process.argv.includes("--has-architect-review");
 // ─── Trova report più recente ─────────────────────────────────────────────────
 
 function findLatestReport(): string | null {
-  const logsDir = path.join(ROOT, "logs");
-  if (!fs.existsSync(logsDir)) return null;
-  const files = fs
-    .readdirSync(logsDir)
-    .filter((f) => f.startsWith("horus-log-analysis-") && f.endsWith(".md") && !f.includes("architect"))
-    .sort()
-    .reverse();
-  return files.length > 0 ? path.join(logsDir, files[0]) : null;
+  // Cerca prima in HORUS_LOG_DIR (es. /tmp nella shell planner), poi in logs/
+  const candidates: string[] = [];
+  if (process.env.HORUS_LOG_DIR) {
+    candidates.push(path.resolve(process.env.HORUS_LOG_DIR));
+  }
+  candidates.push(path.join(ROOT, "logs"));
+
+  for (const logsDir of candidates) {
+    if (!fs.existsSync(logsDir)) continue;
+    const files = fs
+      .readdirSync(logsDir)
+      .filter((f) => f.startsWith("horus-log-analysis-") && f.endsWith(".md") && !f.includes("architect"))
+      .sort()
+      .reverse();
+    if (files.length > 0) return path.join(logsDir, files[0]);
+  }
+  return null;
 }
 
 // ─── Parsing task dalla tabella markdown ──────────────────────────────────────
@@ -254,8 +263,11 @@ async function main(): Promise<void> {
     skipped,
   };
 
-  const manifestPath = path.join(ROOT, "logs", "horus-tasks-pending.json");
-  fs.mkdirSync(path.join(ROOT, "logs"), { recursive: true });
+  const manifestDir = process.env.HORUS_LOG_DIR
+    ? path.resolve(process.env.HORUS_LOG_DIR)
+    : path.join(ROOT, "logs");
+  const manifestPath = path.join(manifestDir, "horus-tasks-pending.json");
+  fs.mkdirSync(manifestDir, { recursive: true });
   fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2), "utf8");
 
   // ── Riepilogo ──
