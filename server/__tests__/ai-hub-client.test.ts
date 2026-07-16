@@ -134,7 +134,7 @@ describe("ai-hub-client", () => {
     );
     const { hubGet } = await loadClient();
 
-    const resultPromise = hubGet("/nadir/search");
+    const resultPromise = hubGet("/health");
     // Avanza di 8001ms → il setTimeout nel client chiama ctrl.abort() →
     // il signal "abort" event fire → fetchMock reject con AbortError →
     // hubFetch cattura l'errore e ritorna { ok:false, error:"timeout 8000ms" }.
@@ -143,6 +143,37 @@ describe("ai-hub-client", () => {
 
     vi.useRealTimers();
     expect(res.ok).toBe(false);
-    expect(res.error).toMatch(/timeout/i);
+    expect(res.error).toMatch(/timeout 8000ms/i);
+  });
+
+  it("hubPost con timeoutMs ridotto abortisce al timeout personalizzato (NADIR_SEARCH_TIMEOUT_MS = 3 500ms)", async () => {
+    // Task #172 — verifica che il timeout per-endpoint più stretto (3.5s) scatti
+    // molto prima degli 8s uniformi, così il fallback pgvector parte rapidamente.
+    vi.useFakeTimers();
+    fetchMock.mockImplementation((_url: string, init: RequestInit) =>
+      new Promise<Response>((_, reject) => {
+        const signal = init?.signal as AbortSignal | undefined;
+        if (signal?.aborted) {
+          reject(new DOMException("The user aborted a request.", "AbortError"));
+          return;
+        }
+        signal?.addEventListener("abort", () =>
+          reject(new DOMException("The user aborted a request.", "AbortError")),
+        );
+      }),
+    );
+    const { hubPost, NADIR_SEARCH_TIMEOUT_MS } = await loadClient();
+    expect(NADIR_SEARCH_TIMEOUT_MS).toBe(3_500);
+
+    const resultPromise = hubPost("/nadir/search", { query: "test", limit: 3 }, NADIR_SEARCH_TIMEOUT_MS);
+    // A 3 499ms il timer non è ancora scattato — la Promise è ancora pending.
+    await vi.advanceTimersByTimeAsync(3_499);
+    // A 3 501ms il timeout scatta → AbortError → { ok:false, error:"timeout 3500ms" }.
+    await vi.advanceTimersByTimeAsync(2);
+    const res = await resultPromise;
+
+    vi.useRealTimers();
+    expect(res.ok).toBe(false);
+    expect(res.error).toMatch(/timeout 3500ms/i);
   });
 });

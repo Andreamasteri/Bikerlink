@@ -29,8 +29,16 @@ import { cfAccessHeaders } from "./cf-access";
 const AI_HUB_URL = (process.env.AI_HUB_URL ?? "").trim().replace(/\/+$/, "");
 const AI_HUB_GATE_TOKEN = (process.env.AI_HUB_GATE_TOKEN ?? "").trim();
 
-/** Timeout uniforme per ogni chiamata all'hub. */
+/** Timeout di default per ogni chiamata all'hub (endpoint pesanti, es. /files/write). */
 const HUB_TIMEOUT_MS = 8_000;
+
+/**
+ * Timeout ridotto per `/nadir/search`.
+ * La SLA di ping_ms è 3 000ms (soglia "warn" in ai-hub-collector.ts).
+ * Usare 3 500ms lascia un margine e fa scattare il fallback pgvector
+ * molto prima dell'8s uniformi, eliminando il blank-pause nella chat.
+ */
+export const NADIR_SEARCH_TIMEOUT_MS = 3_500;
 
 export interface HubResult<T = unknown> {
   ok: boolean;
@@ -110,7 +118,7 @@ function normalizePath(path: string): string {
 
 async function hubFetch<T = unknown>(
   path: string,
-  init: { method: "GET" | "POST"; query?: Record<string, unknown>; body?: unknown },
+  init: { method: "GET" | "POST"; query?: Record<string, unknown>; body?: unknown; timeoutMs?: number },
 ): Promise<HubResult<T>> {
   if (!isHubConfigured()) {
     return { ok: false, error: "AI Hub non configurato (AI_HUB_URL / AI_HUB_GATE_TOKEN mancanti)" };
@@ -127,8 +135,9 @@ async function hubFetch<T = unknown>(
     if (s) url += `?${s}`;
   }
 
+  const effectiveTimeout = init.timeoutMs ?? HUB_TIMEOUT_MS;
   const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), HUB_TIMEOUT_MS);
+  const timer = setTimeout(() => ctrl.abort(), effectiveTimeout);
   try {
     const res = await fetch(url, {
       method: init.method,
@@ -161,7 +170,7 @@ async function hubFetch<T = unknown>(
 
     return { ok: true, status: res.status, data: data as T };
   } catch (err) {
-    const msg = (err as Error)?.name === "AbortError" ? `timeout ${HUB_TIMEOUT_MS}ms` : (err as Error)?.message ?? String(err);
+    const msg = (err as Error)?.name === "AbortError" ? `timeout ${effectiveTimeout}ms` : (err as Error)?.message ?? String(err);
     console.warn(`[ai-hub] ${init.method} ${path} fallito (non-fatal): ${msg}`);
     return { ok: false, error: msg };
   } finally {
@@ -170,11 +179,13 @@ async function hubFetch<T = unknown>(
 }
 
 /** GET su un endpoint dell'hub con query-string opzionale. Mai throw. */
-export function hubGet<T = unknown>(path: string, params?: Record<string, unknown>): Promise<HubResult<T>> {
-  return hubFetch<T>(path, { method: "GET", query: params });
+export function hubGet<T = unknown>(path: string, params?: Record<string, unknown>, timeoutMs?: number): Promise<HubResult<T>> {
+  return hubFetch<T>(path, { method: "GET", query: params, timeoutMs });
 }
 
-/** POST JSON su un endpoint dell'hub. Mai throw. */
-export function hubPost<T = unknown>(path: string, body: unknown): Promise<HubResult<T>> {
-  return hubFetch<T>(path, { method: "POST", body });
+/** POST JSON su un endpoint dell'hub. Mai throw.
+ *  @param timeoutMs — timeout personalizzato per l'endpoint; default 8s.
+ *                      Usare NADIR_SEARCH_TIMEOUT_MS per /nadir/search (3.5s). */
+export function hubPost<T = unknown>(path: string, body: unknown, timeoutMs?: number): Promise<HubResult<T>> {
+  return hubFetch<T>(path, { method: "POST", body, timeoutMs });
 }

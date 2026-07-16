@@ -19,6 +19,9 @@ const nadirMocks = vi.hoisted(() => ({
 vi.mock("../lib/ai-hub-client", () => ({
   isHubAvailable: hubMocks.isHubAvailable,
   hubPost: hubMocks.hubPost,
+  // La costante deve essere presente nel mock perché inter-agent-tools.ts la importa
+  // e la passa come terzo arg a hubPost; senza di essa il valore sarebbe undefined.
+  NADIR_SEARCH_TIMEOUT_MS: 3_500,
 }));
 vi.mock("../ai/nadir", () => ({
   searchNadir: nadirMocks.searchNadir,
@@ -63,7 +66,7 @@ describe("search_manual — ai-hub vs fallback pgvector", () => {
 
     const res = await tool.execute({ query: "come pianifico un percorso?", limit: 5 }, {});
 
-    expect(hubMocks.hubPost).toHaveBeenCalledWith("/nadir/search", { query: "come pianifico un percorso?", limit: 5, language: "it" });
+    expect(hubMocks.hubPost).toHaveBeenCalledWith("/nadir/search", { query: "come pianifico un percorso?", limit: 5, language: "it" }, 3_500);
     expect(nadirMocks.searchNadir).not.toHaveBeenCalled();
     expect(res.ok).toBe(true);
     expect(res.model).toBe("ai-hub:all-minilm");
@@ -99,5 +102,24 @@ describe("search_manual — ai-hub vs fallback pgvector", () => {
     expect(nadirMocks.searchNadir).toHaveBeenCalledTimes(1);
     expect(res.ok).toBe(true);
     expect(res.fragments[0].text).toBe("fallback");
+  });
+
+  it("usa NADIR_SEARCH_TIMEOUT_MS (3 500ms) come terzo arg di hubPost", async () => {
+    // Verifica che search_manual passi il timeout ridotto a hubPost così che il
+    // fallback pgvector scatti in 3.5s invece che aspettare gli 8s uniformi.
+    hubMocks.hubPost.mockResolvedValue({
+      ok: true,
+      data: { model: "ai-hub:all-minilm", fragments: [] },
+    });
+    const tool = buildTool();
+
+    await tool.execute({ query: "test timeout", limit: 3 }, {});
+
+    // Il terzo argomento deve essere 3_500 (NADIR_SEARCH_TIMEOUT_MS).
+    expect(hubMocks.hubPost).toHaveBeenCalledWith(
+      "/nadir/search",
+      { query: "test timeout", limit: 3, language: "it" },
+      3_500,
+    );
   });
 });

@@ -19,7 +19,7 @@ import { appendHorusNote } from "./horus-memory";
 import { reviewTaskPlan, type ReviewAgent } from "./task-review";
 import { searchNadir } from "../nadir";
 import { type AppLanguageCode } from "@shared/languages";
-import { hubPost, isHubAvailable } from "../../lib/ai-hub-client";
+import { hubPost, isHubAvailable, NADIR_SEARCH_TIMEOUT_MS } from "../../lib/ai-hub-client";
 
 export interface InterAgentToolContext {
   /** Sessione admin: sblocca call_ares (solo admin). */
@@ -230,7 +230,7 @@ export function buildSearchManualTool(
             ok?: boolean;
             model?: string;
             fragments?: Array<{ origin?: string; similarity?: number; text?: string }>;
-          }>("/nadir/search", { query: input.query, limit, language });
+          }>("/nadir/search", { query: input.query, limit, language }, NADIR_SEARCH_TIMEOUT_MS);
           if (hubRes.ok && hubRes.data && Array.isArray(hubRes.data.fragments)) {
             console.log("[search_manual] TC ai-hub ✓");
             return {
