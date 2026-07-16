@@ -108,5 +108,9 @@ export const MIN_FRAGMENT_CHARS = 12; // ignora frammenti troppo corti/rumore
 // "Dizionario dell'Interfaccia" con etichette esatte dei bottoni, e Bowie deve
 // cercarlo invece di inventare. Aggiunta per estensione: ogni pattern nuovo
 // preserva il comportamento esistente (regex è or-chain, test autonomo).
+// Task #188 — estende i cue UI alle altre 6 lingue dell'app (en, de, es, fr,
+// el, tr): utenti non italofoni che chiedono "where is the button?" o
+// "was macht der Knopf?" vengono ora instradati verso search_manual invece di
+// ricevere una risposta inventata da Bowie.
 export const SEARCH_MANUAL_RE =
-  /per\s+significato|\bmanuale\b|cosa\s+ti\s+avevo\s+detto|ne\s+avevamo\s+gi[àa]\s+parlato|come\s+avevamo\s+detto|knowledge\s*base|base\s+di\s+conoscenza|\btasto\b|\bpulsante\b|\bbotton[ei]\b|dove\s+tr[ou]v/i;
+  /per\s+significato|\bmanuale\b|cosa\s+ti\s+avevo\s+detto|ne\s+avevamo\s+gi[àa]\s+parlato|come\s+avevamo\s+detto|knowledge\s*base|base\s+di\s+conoscenza|\btasto\b|\bpulsante\b|\bbotton[ei]\b|dove\s+tr[ou]v|\bbutton\b|where\s+is\s+the|what\s+does\s+the|\bKnopf\b|\bTaste\b|\bSchaltfl[äa]che\b|wo\s+ist\s+der|was\s+macht\s+der|\bbot[oó]n\b|d[oó]nde\s+est[aá]|qu[eé]\s+hace|\bbouton\b|o[uù]\s+est\s+le|que\s+fait\s+le|κουμπί|πού\s+είναι|τι\s+κάνει|düğme|tuş\b|nerede\s+var|ne\s+yapar/i;

@@ -1,5 +1,8 @@
 /**
  * Task #175 — Bowie risponde alle domande esatte "dove è il tasto X" dal manuale.
+ * Task #188 — Estende SEARCH_MANUAL_RE con i cue UI nelle 6 lingue non-italiane
+ *             (en, de, es, fr, el, tr) così Bowie non inventa etichette per utenti
+ *             non italofoni.
  *
  * Il manuale generato da Horus (Task #152) include un "Dizionario dell'Interfaccia —
  * Schermata per Schermata" con titoli esatti di schermate, etichette di bottoni,
@@ -123,10 +126,10 @@ beforeEach(() => {
 });
 
 // ---------------------------------------------------------------------------
-// Suite 1 — SEARCH_MANUAL_RE cattura i cue UI (Task #175, estensione del regex)
+// Suite 1 — SEARCH_MANUAL_RE cattura i cue UI (Task #175 + Task #188)
 // ---------------------------------------------------------------------------
 
-describe("SEARCH_MANUAL_RE — cue UI per domande sull'interfaccia (Task #175)", () => {
+describe("SEARCH_MANUAL_RE — cue UI per domande sull'interfaccia (Task #175 + Task #188)", () => {
   const MATCHING = [
     // Cue esistenti (non regrediti)
     "cosa ti avevo detto la volta scorsa?",
@@ -134,7 +137,7 @@ describe("SEARCH_MANUAL_RE — cue UI per domande sull'interfaccia (Task #175)",
     "cosa dice il manuale sul routing?",
     "cerca nella knowledge base",
     "cerca per significato nella base di conoscenza",
-    // Nuovi cue UI (Task #175)
+    // Nuovi cue UI italiani (Task #175)
     "dove trovo il tasto per unirmi al club?",
     "dove trovate il tasto per confermare?",
     "cosa fa il pulsante Azzera?",
@@ -142,6 +145,33 @@ describe("SEARCH_MANUAL_RE — cue UI per domande sull'interfaccia (Task #175)",
     "cosa fa questo bottone?",
     "dove sono i bottoni di navigazione?",
     "dov'è il tasto per cancellare?",
+    // English (Task #188)
+    "where is the join button?",
+    "what does the reset button do?",
+    "I can't find the button to confirm",
+    // German (Task #188)
+    "wo ist der Knopf zum Beitreten?",
+    "was macht der Knopf Azzera?",
+    "wo ist der Taste zum Bestätigen?",
+    "was macht die Schaltfläche Filter?",
+    // Spanish (Task #188)
+    "¿dónde está el botón para unirse al club?",
+    "¿qué hace el botón Azzera?",
+    "no encuentro el botón de confirmar",
+    "dónde está el botón de filtros",
+    // French (Task #188)
+    "où est le bouton pour rejoindre?",
+    "que fait le bouton Azzera?",
+    "je ne trouve pas le bouton de confirmation",
+    // Greek (Task #188)
+    "πού είναι το κουμπί για ένταξη;",
+    "τι κάνει το κουμπί Azzera;",
+    "δεν βρίσκω το κουμπί επιβεβαίωσης",
+    // Turkish (Task #188)
+    "katılmak için düğme nerede?",
+    "düğme ne yapar?",
+    "Azzera tuşu ne işe yarar?",
+    "filtreleme düğmesi nerede var?",
   ];
 
   const NOT_MATCHING = [
