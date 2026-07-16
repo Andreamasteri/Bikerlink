@@ -52,12 +52,18 @@ export const AI_HUB_PING_WARN_MS = NADIR_SEARCH_TIMEOUT_MS - 500;
  * Timeout per le probe `/health` (watchdog ai-hub-collector, tc-reboot-collector,
  * pannello admin infra-probes). Una probe di salute non deve mai bloccare il
  * ciclo watchdog per 8s: se l'hub non risponde entro 5s è giù, non lento.
+ *
+ * Misurato live (Task #244) con TC sotto carico reale (qwen3:4b + granite4:tiny-h +
+ * all-minilm carichi, 75% VRAM), 10 probe parallele: max 0.48s → margine ×10.
  */
 export const HUB_HEALTH_TIMEOUT_MS = 5_000;
 
 /**
  * Timeout per `/vram` (tool check_vram_usage + pannello health). Endpoint
  * leggero (nvidia-smi lato hub): user-visible in chat/health panel, 4s bastano.
+ *
+ * Misurato live (Task #244) con GPU al 75% VRAM (3 modelli attivi): max 0.49s
+ * → margine ×8. nvidia-smi raramente supera 2s anche sotto carico estremo.
  */
 export const HUB_VRAM_TIMEOUT_MS = 4_000;
 
@@ -65,6 +71,10 @@ export const HUB_VRAM_TIMEOUT_MS = 4_000;
  * Timeout per `/files/read` e `/files/list` (tool shared-file in chat
  * Ares/Quebracho/Horus + hub-file-injection). User-visible: 5s invece degli
  * 8s uniformi. `/files/write` resta sul default 8s (endpoint pesante).
+ *
+ * Misurato live (Task #244) con TC sotto carico: max 0.21s su file da 3.6 KB
+ * → margine ×25. Endpoint I/O-bound, non compute-bound; anche file da qualche
+ * decina di KB resterebbero abbondantemente sotto il budget.
  */
 export const HUB_FILE_READ_TIMEOUT_MS = 5_000;
 
