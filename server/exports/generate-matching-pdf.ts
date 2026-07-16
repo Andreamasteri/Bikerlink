@@ -56,12 +56,6 @@ function sectionTitle(doc: InstanceType<typeof PDFDocument>, text: string) {
   doc.y += 10;
 }
 
-function pill(doc: InstanceType<typeof PDFDocument>, text: string, x: number, y: number, bg: string) {
-  const tw = doc.font("Helvetica-Bold").fontSize(8).widthOfString(text);
-  doc.roundedRect(x, y - 2, tw + 12, 14, 3).fill(bg);
-  doc.font("Helvetica-Bold").fontSize(8).fillColor(WHITE).text(text, x + 6, y);
-}
-
 function row(
   doc: InstanceType<typeof PDFDocument>,
   cols: string[],
