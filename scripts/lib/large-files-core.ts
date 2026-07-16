@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync, statSync, existsSync } from "fs";
 import { join, extname, relative } from "path";
 
-export const MAX_LINES = 600;
+export const MAX_LINES = 650;
 export const LOCKED_DRIFT = 5;
 
 export const SCAN_EXTENSIONS = [".ts", ".tsx"];

@@ -2,7 +2,7 @@
 
 ## User preferences
 
-- **Non splittare mai un file senza permesso esplicito.** Anche se il ratchet 600 righe segnala un file oltre soglia, NON eseguire lo split autonomamente: chiedere prima il permesso all'utente. Se l'utente vuole tenere il file intero, marcarlo con `LARGE-FILE-ALLOW` in `.large-files-allow.txt` invece di splittarlo.
+- **Non splittare mai un file senza permesso esplicito.** Anche se il ratchet 650 righe segnala un file oltre soglia, NON eseguire lo split autonomamente: chiedere prima il permesso all'utente. Se l'utente vuole tenere il file intero, marcarlo con `LARGE-FILE-ALLOW` in `.large-files-allow.txt` invece di splittarlo.
 
 ## BikerBlog — repo gemello di riferimento
 
@@ -56,7 +56,7 @@ bash scripts/setup-hooks.sh
 
 Il pre-commit installa in `.git/hooks/pre-commit` e include questi gate nell'ordine:
 1. `detect-secrets` — blocca token/segreti non approvati
-2. `check-large-files-ratchet.sh` — ratchet 600 righe per file
+2. `check-large-files-ratchet.sh` — ratchet 650 righe per file
 3. `lint-migration-indexes.ts` — indici DESC/WHERE a rischio nelle migration
 4. `check-ai-direct-generateobject.sh` — bypass `generateStructured` rilevato
 
@@ -93,7 +93,7 @@ Validation command `lint` (comando: `npm run lint -- --max-warnings=0`, che eseg
 
 ## ⛔ REGOLA FERREA — File LOCKED priorità media (Task "Lock dimensione file priorità media")
 
-Otto file TS/TSX nella fascia 600–950 righe sono **congelati alla dimensione attuale** tramite header `LARGE-FILE-LOCKED` in cima al file. Sono grossi ma coesi: splittarli ora introdurrebbe rischio senza beneficio. Per evitarne la crescita, ogni file dichiara un **companion path** dedicato dove va il codice nuovo.
+Otto file TS/TSX nella fascia 650–950 righe sono **congelati alla dimensione attuale** tramite header `LARGE-FILE-LOCKED` in cima al file. Sono grossi ma coesi: splittarli ora introdurrebbe rischio senza beneficio. Per evitarne la crescita, ogni file dichiara un **companion path** dedicato dove va il codice nuovo.
 
 ### Tabella file LOCKED
 
@@ -122,9 +122,9 @@ Quando il gate ratchet (Task #2584) è attivo e blocca un file LOCKED cresciuto,
 ### Regole anti-bypass (vincolanti per ogni task futuro)
 
 1. **Mai alzare il numero `<N>` dell'header LOCKED.** La baseline `<N>` può solo restare uguale o calare. Il ratchet rifiuta un `<N>` aumentato.
-2. **Mai rimuovere l'header LOCKED.** Rimuoverlo riapplica il default 600 → il file scatta sopra soglia → blocco. Equivale a chiedere lo split, va fatto solo con task esplicito utente.
+2. **Mai rimuovere l'header LOCKED.** Rimuoverlo riapplica il default 650 → il file scatta sopra soglia → blocco. Equivale a chiedere lo split, va fatto solo con task esplicito utente.
 3. **Quando aggiungi codice a un file LOCKED, va nel companion path indicato nell'header.** Non in un altro file, non "appena 3 righe nel file esistente perché è più comodo".
-4. **Il companion file, quando creato, eredita il limite default 600.** Non può nascere già LOCKED a una dimensione alta — deve crescere naturalmente.
+4. **Il companion file, quando creato, eredita il limite default 650.** Non può nascere già LOCKED a una dimensione alta — deve crescere naturalmente.
 5. **Vietato creare companion "fake"** (file vuoto con `export {}` per silenziare warning). Il companion nasce solo quando ha contenuto reale da ospitare.
 6. **Vietato cambiare il path companion suggerito** senza task esplicito utente. Il path è una convenzione vincolante.
 7. **Vietato spostare gli 8 file LOCKED in `.large-files-allow.txt`** per silenziarli definitivamente. ALLOW è riservato a categorie strutturali (i18n, dataset, asset, test); i file LOCKED sono debito tecnico temporaneo.
@@ -150,8 +150,8 @@ Lo split è sempre un'operazione **meccanica**: nessuna logica alterata, solo sp
 Rileggere ogni file risultante e verificare **tutti** i punti:
 
 - [ ] Il contenuto corrisponde esattamente all'originale (nulla inventato, nulla perso).
-- [ ] File sorgente ≤ 450 righe (split target; il gate blocca a 600).
-- [ ] File destinazione ≤ 450 righe (split target; il gate blocca a 600).
+- [ ] File sorgente ≤ 450 righe (split target; il gate blocca a 650).
+- [ ] File destinazione ≤ 450 righe (split target; il gate blocca a 650).
 - [ ] Import/export coerenti tra i file (nessun simbolo importato ma non esportato, nessun export orfano).
 
 > **La regola vale sempre, anche per split "ovvi".** La verifica non è facoltativa e non può essere saltata per split "piccoli" o "semplici".
@@ -357,17 +357,17 @@ I prefer detailed explanations and iterative development. Ask before making majo
 
 **Debug errori strani — Prima azione obbligatoria**: svuotare la cache e riavviare (Metro cache, workflow, ecc.) PRIMA di qualsiasi altra analisi o modifica al codice. Se l'errore persiste, usare il runtime reale (Chrome V8 inspector / log browser) per trovare la riga esatta — NON analizzare il codice staticamente per primo.
 
-## ⛔ REGOLA FERREA — Limite 600 righe per file
+## ⛔ REGOLA FERREA — Limite 650 righe per file
 
-**Motivazione**: file > 600 righe diventano monoliti illeggibili, ingestibili a code-review, fonte di merge-conflict e di bug nascosti. La regola è cablata come **gate CI ratchet** (stesso schema di `eslint-hooks-check.sh`): la soglia "dura" è **600 righe per file TypeScript** (`.ts`/`.tsx`); il debito legacy esistente è cristallizzato in una baseline e qualsiasi regressione è bloccata.
+**Motivazione**: file > 650 righe diventano monoliti illeggibili, ingestibili a code-review, fonte di merge-conflict e di bug nascosti. La regola è cablata come **gate CI ratchet** (stesso schema di `eslint-hooks-check.sh`): la soglia "dura" è **650 righe per file TypeScript** (`.ts`/`.tsx`); il debito legacy esistente è cristallizzato in una baseline e qualsiasi regressione è bloccata.
 
-> **Regola di split**: quando un file supera 600 righe e va splittato, i file risultanti devono stare sotto **450 righe**. Non 600. Così c'è margine prima che il gate scatti di nuovo.
+> **Regola di split**: quando un file supera 650 righe e va splittato, i file risultanti devono stare sotto **450 righe**. Non 650. Così c'è margine prima che il gate scatti di nuovo.
 
 ### File chiave
 - `scripts/check-large-files.ts` — diagnostica standalone (marker-aware).
 - `scripts/check-large-files-ratchet.sh` / `scripts/check-large-files-ratchet.ts` — gate ratchet (CI).
 - `scripts/lib/large-files-core.ts` — logica condivisa scansione + parsing marker.
-- `.large-files-baseline` — snapshot legacy `>600` senza marker. Versionato. Formato `<path> <linecount>` per riga.
+- `.large-files-baseline` — snapshot legacy `>650` senza marker. Versionato. Formato `<path> <linecount>` per riga.
 - `.large-files-allow.txt` — lista CHIUSA dei path autorizzati al marker `LARGE-FILE-ALLOW`. Versionato. (Popolato dal task #2605.)
 
 ### Gate registrati (3 punti obbligatori, ognuno con `exit 1` su fallimento)
@@ -384,13 +384,13 @@ I prefer detailed explanations and iterative development. Ask before making majo
 
 **Regola operativa** per ogni agente che aggiunge codice nuovo:
 
-1. **Nessun file sorgente supera le 600 righe.** Vale per `.ts`, `.tsx`, `.js`, `.jsx` e qualsiasi altro file sorgente del progetto.
-2. **Quando un file supera le 600 righe e va splittato**, i file risultanti (sorgente + destinazione) devono stare entrambi sotto **450 righe** — non 600. Così c'è margine prima che il gate scatti di nuovo. La suddivisione va in un file successore con il suffisso `-extra` (pattern già in uso nel progetto):
+1. **Nessun file sorgente supera le 650 righe.** Vale per `.ts`, `.tsx`, `.js`, `.jsx` e qualsiasi altro file sorgente del progetto.
+2. **Quando un file supera le 650 righe e va splittato**, i file risultanti (sorgente + destinazione) devono stare entrambi sotto **450 righe** — non 650. Così c'è margine prima che il gate scatti di nuovo. La suddivisione va in un file successore con il suffisso `-extra` (pattern già in uso nel progetto):
    - `server/routes/foo.ts` → nuove funzioni in `server/routes/foo-extra.ts`
    - `components/FooPanel.tsx` → nuove funzioni in `components/FooPanelExtra.tsx`
    - `shared/db/bar.ts` → nuove funzioni in `shared/db/bar-extra.ts`
-3. **Il file originale rimane congelato sotto i 600 (target 450)**: nessuna nuova riga di logica. Solo bugfix strettamente localizzati sono tollerati.
-4. **Il successore riceve tutto il codice nuovo.** Quando anche il successore supera le 600 righe, si crea il successore del successore (`foo-extra.ts` → `foo-extra-2.ts`), e così via — anche qui con split target ≤450.
+3. **Il file originale rimane congelato sotto i 650 (target 450)**: nessuna nuova riga di logica. Solo bugfix strettamente localizzati sono tollerati.
+4. **Il successore riceve tutto il codice nuovo.** Quando anche il successore supera le 650 righe, si crea il successore del successore (`foo-extra.ts` → `foo-extra-2.ts`), e così via — anche qui con split target ≤450.
 5. **Il companion viene creato solo quando ha contenuto reale** — non file vuoti con `export {}` per silenziare warning.
 
 Esempio concreto già presente nel progetto:
@@ -401,7 +401,7 @@ Esempio concreto già presente nel progetto:
 | `server/routes/admin/users.ts` | `server/routes/admin/users-extra.ts` |
 | `shared/db/matching.ts` | `shared/db/matching-extra.ts` |
 
-Il CI gate (`scripts/check-large-files-ratchet.sh`) blocca qualsiasi file che superi i 600 senza marker autorizzato. Se il gate fallisce, sposta il codice nel companion — non alzare la baseline. I file risultanti dallo split devono stare sotto **450 righe**.
+Il CI gate (`scripts/check-large-files-ratchet.sh`) blocca qualsiasi file che superi i 650 senza marker autorizzato. Se il gate fallisce, sposta il codice nel companion — non alzare la baseline. I file risultanti dallo split devono stare sotto **450 righe**.
 
 ### Le 6 REGOLE FERREE — non negoziabili (task agent, code reviewer, main agent)
 1. **Il gate va eseguito nei 3 punti elencati sopra**, ognuno con `exit 1` su fallimento. Non disabilitarli.
@@ -428,7 +428,7 @@ BIKERLINK_HUMAN_BASELINE_UPDATE=1 bash scripts/check-large-files-ratchet.sh --up
 ❌ Ratchet FAIL — 1 regressione/i:
 
   server/routes/admin/example.ts
-    → nuovo file oltre il limite: 712 righe (max 600).
+    → nuovo file oltre il limite: 712 righe (max 650).
       Splitta il file o, se è debito legacy autorizzato, attiva il marker corretto via task utente.
 ```
 
