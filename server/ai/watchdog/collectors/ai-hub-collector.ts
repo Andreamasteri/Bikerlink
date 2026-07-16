@@ -32,13 +32,17 @@ let consecutiveFailures = 0;
 // richiede che l'hub fosse stato raggiungibile in precedenza.
 let hadSuccessfulProbe = false;
 
-// ── Check dimensioni file (Task #248) ─────────────────────────────────────────
+// ── Check dimensioni file (Task #248 + Task #251) ─────────────────────────────
 //
-// Ogni SIZE_CHECK_EVERY_N probe riuscite chiama /files/list (root) per trovare
-// il file più grande in ~/agent-shared/. Se supera LARGE_FILE_WARN_BYTES emette
-// un segnale warn: la latenza di /files/read è proporzionale alla dimensione del
-// file (endpoint I/O-bound) e il margine ×25 calcolato su file da 3.6 KB
-// potrebbe ridursi significativamente su file grandi.
+// Ogni SIZE_CHECK_EVERY_N probe riuscite chiama /files/list ricorsivamente per
+// trovare il file più grande in ~/agent-shared/ incluse le sottodirectory (nadir/,
+// docs/, ecc.). Se supera LARGE_FILE_WARN_BYTES emette un segnale warn con il
+// percorso relativo completo (es. "nadir/big-report.md") così gli admin sanno
+// quale file ha triggerato l'avviso.
+//
+// Task #248 originale usava solo la root: file nascosti nelle sottodirectory erano
+// invisibili al check e potevano superare 50 KB senza triggherare alcun avviso
+// (Task #251 fix).
 //
 // Il check è best-effort: un errore /files/list non produce segnali aggiuntivi.
 
@@ -46,6 +50,8 @@ let hadSuccessfulProbe = false;
 const LARGE_FILE_WARN_BYTES = 50_000; // 50 KB
 /** Esegue il check ogni N probe riuscite (~10 min a cadenza 1 min). */
 const SIZE_CHECK_EVERY_N = 10;
+/** Profondità massima di ricorsione per la scansione delle sottodirectory. */
+const MAX_SCAN_DEPTH = 2;
 
 // Contatore probe riuscite per il throttle del size-check.
 let successfulProbeCount = 0;
@@ -56,27 +62,63 @@ interface HubFileEntry {
   size?: number;
 }
 
-async function checkHubFileSizes(signals: Signal[]): Promise<void> {
+interface LargestFile {
+  /** Percorso relativo completo rispetto a ~/agent-shared/, es. "nadir/big-report.md". */
+  path: string;
+  size: number;
+}
+
+/**
+ * Scansiona ricorsivamente una directory di ~/agent-shared/ via /files/list.
+ * Ritorna il file più grande trovato (incluse le sottodirectory fino a maxDepth),
+ * oppure null se la directory è vuota o la chiamata fallisce.
+ *
+ * @param dir  Percorso relativo della directory (stringa vuota = root).
+ * @param depth  Profondità corrente (0 = root).
+ * @param maxDepth  Profondità massima oltre la quale non si scende nelle subdirectory.
+ */
+async function findLargestFileInDir(
+  dir: string,
+  depth: number,
+  maxDepth: number,
+): Promise<LargestFile | null> {
+  const params = dir ? { path: dir } : {};
   const res = await hubGet<{ ok?: boolean; files?: HubFileEntry[] }>(
-    "/files/list", {}, HUB_FILE_READ_TIMEOUT_MS,
+    "/files/list", params, HUB_FILE_READ_TIMEOUT_MS,
   );
-  if (!res.ok || !res.data) return; // best-effort: nessun segnale se la lista fallisce
+  if (!res.ok || !res.data) return null;
 
-  const files: HubFileEntry[] = res.data.files ?? [];
-  const largest = files
-    .filter((f) => f.type !== "directory" && typeof f.size === "number")
-    .reduce<{ name: string; size: number } | null>((max, f) => {
-      const s = f.size as number;
-      return !max || s > max.size ? { name: f.name, size: s } : max;
-    }, null);
+  const entries: HubFileEntry[] = res.data.files ?? [];
+  let largest: LargestFile | null = null;
 
-  if (largest && largest.size > LARGE_FILE_WARN_BYTES) {
+  for (const entry of entries) {
+    const fullPath = dir ? `${dir}/${entry.name}` : entry.name;
+
+    if (entry.type === "directory") {
+      if (depth < maxDepth) {
+        // Scendi nella sottodirectory (sequenziale: best-effort, non blocca il ciclo).
+        const sub = await findLargestFileInDir(fullPath, depth + 1, maxDepth).catch(() => null);
+        if (sub && (!largest || sub.size > largest.size)) largest = sub;
+      }
+    } else if (typeof entry.size === "number") {
+      if (!largest || entry.size > largest.size) largest = { path: fullPath, size: entry.size };
+    }
+  }
+
+  return largest;
+}
+
+async function checkHubFileSizes(signals: Signal[]): Promise<void> {
+  const largest = await findLargestFileInDir("", 0, MAX_SCAN_DEPTH);
+  if (!largest) return; // best-effort: nessun segnale se la scansione fallisce o la root è vuota
+
+  if (largest.size > LARGE_FILE_WARN_BYTES) {
     signals.push({
       source: "ai_hub",
       metric: "ai_hub.large_file",
       severity: "warn",
       details: {
-        file: largest.name,
+        file: largest.path,
         sizeBytes: largest.size,
         sizeKb: Math.round(largest.size / 1024),
         note: "Rieseguire la probe latenza /files/read (Task #244) e aggiornare HUB_FILE_READ_TIMEOUT_MS in ai-hub-client.ts se il margine ×25 non è più garantito",

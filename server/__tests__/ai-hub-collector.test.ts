@@ -11,7 +11,10 @@
  *   - skippi silenziosamente se l'hub non è configurato;
  *   - emetta `ai_hub.large_file` (warn) quando il file più grande in ~/agent-shared/
  *     supera 50 KB, in modo che gli admin sappiano di rieseguire la probe latenza
- *     (Task #248).
+ *     (Task #248);
+ *   - scansioni ricorsivamente le sottodirectory (nadir/, docs/, ecc.) così i file
+ *     grandi nascosti in subdirectory vengono rilevati, e il campo `file` nel segnale
+ *     riporti il percorso relativo completo (es. "nadir/big-report.md") — Task #251.
  *
  * Il modulo ha contatori a livello di module scope (consecutiveFailures, hadSuccessfulProbe,
  * successfulProbeCount) che persistono tra test nello stesso file. Ogni test è scritto in
@@ -224,6 +227,47 @@ describe("ai-hub collector — autenticazione e comportamento probe", () => {
       const sigs = await collectAiHub();
       expect(sigs.some((s) => s.metric === "ai_hub.large_file")).toBe(false);
     }
+  });
+
+  it("file > 50 KB in una sottodirectory → segnale ai_hub.large_file con percorso relativo completo (Task #251)", async () => {
+    // Scenario: root contiene solo una directory "nadir/"; dentro nadir/ c'è un file
+    // da 80 KB. Il collector deve scendere nella subdirectory e trovare il file grande,
+    // includendo il percorso relativo completo "nadir/big-subdir-file.md" nel segnale
+    // (e non solo il nome base "big-subdir-file.md" come faceva la versione Task #248
+    // che leggeva solo la root).
+
+    const healthOk = { ok: true, status: 200, data: { ok: true } };
+    // Root lista solo la directory "nadir", nessun file in root.
+    const rootListing = {
+      ok: true, status: 200,
+      data: { ok: true, files: [{ name: "nadir", type: "directory" }] },
+    };
+    // Dentro nadir/ c'è un file da 80 KB.
+    const nadirListing = {
+      ok: true, status: 200,
+      data: { ok: true, files: [{ name: "big-subdir-file.md", type: "file", size: 80_000 }] },
+    };
+
+    mockHubGet.mockImplementation((path: string, params?: Record<string, unknown>) => {
+      if (path === "/files/list") {
+        if (params?.path === "nadir") return Promise.resolve(nadirListing);
+        return Promise.resolve(rootListing); // root (params={} o params.path assente)
+      }
+      return Promise.resolve(healthOk);
+    });
+
+    // Avanziamo fino alla prossima occorrenza del size-check (ogni 10 probe riuscite).
+    let largeFileSignal: { details?: Record<string, unknown> } | undefined;
+    for (let i = 0; i < 10; i++) {
+      const sigs = await collectAiHub();
+      const sig = sigs.find((s) => s.metric === "ai_hub.large_file");
+      if (sig) { largeFileSignal = sig; break; }
+    }
+
+    expect(largeFileSignal).toBeDefined();
+    // Il percorso deve essere relativo completo, non solo il nome base.
+    expect(largeFileSignal?.details?.file).toBe("nadir/big-subdir-file.md");
+    expect(largeFileSignal?.details?.sizeBytes).toBe(80_000);
   });
 
   it("ping_ms severity info se latenza ≤ 3000ms, warn se > 3000ms (SLA Task #161)", async () => {
