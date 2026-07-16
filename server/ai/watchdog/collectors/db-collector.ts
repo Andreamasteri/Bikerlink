@@ -30,6 +30,16 @@ const CONSECUTIVE_FAIL_FOR_CRITICAL = 3;
 let consecutiveSlowPings = 0;
 let consecutivePingFailures = 0;
 
+// Task #154 — Reset dei contatori anti-blip. Azzera i campioni consecutivi
+// (lento/fallito) accumulati in memoria di processo, così un incidente rientrato
+// non resta "appiccicato" nel pannello finché il server non riparte. Idempotente,
+// nessun I/O. Sincronizza anche il gauge condiviso bg-db-limiter.
+export function resetState(): void {
+  consecutiveSlowPings = 0;
+  consecutivePingFailures = 0;
+  setDbSlowPingsConsecutive(0);
+}
+
 export async function collectDb(): Promise<Signal[]> {
   const signals: Signal[] = [];
 

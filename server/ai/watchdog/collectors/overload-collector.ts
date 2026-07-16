@@ -11,8 +11,16 @@
 // throttle). Zero-I/O: legge solo lo snapshot in memoria depositato al tick
 // precedente da recordDbMonitorSample (stesso pattern deposit→next-tick del
 // pool-collector).
-import { getSustainedOverloadState } from "../../../db-monitor-history";
+import { getSustainedOverloadState, resetSustainedOverloadState } from "../../../db-monitor-history";
 import type { Signal } from "../types";
+
+// Task #154 — Reset dello stato di sovraccarico sostenuto. Questo collector è
+// zero-state: legge lo snapshot depositato da recordDbMonitorSample in
+// db-monitor-history, dove vivono i contatori/latch. Delega quindi il reset a
+// quel modulo. Idempotente, nessun I/O.
+export function resetState(): void {
+  resetSustainedOverloadState();
+}
 
 export function collectOverload(): Signal[] {
   const signals: Signal[] = [];

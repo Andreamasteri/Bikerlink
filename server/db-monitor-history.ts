@@ -97,6 +97,25 @@ export function getSustainedOverloadState(): SustainedOverloadState {
   return sustainedState;
 }
 
+/**
+ * Task #154 — Reset dello stato di sovraccarico sostenuto. Azzera i contatori di
+ * tick consecutivi (overload/salute), i latch "was sustained" e lo snapshot
+ * pubblico, così un sovraccarico rientrato non resta appiccicato nel pannello
+ * finché il server non riparte. Idempotente, nessun I/O.
+ */
+export function resetSustainedOverloadState(): void {
+  dbOverloadConsecutive = 0;
+  backendOverloadConsecutive = 0;
+  dbHealthyConsecutive = 0;
+  backendHealthyConsecutive = 0;
+  dbWasSustained = false;
+  backendWasSustained = false;
+  sustainedState = {
+    db: { sustained: false, recovered: false, consecutiveTicks: 0, healthyTicks: 0, poolActivePct: 0, poolWaiting: 0, pingMs: null, dbErrorCount: 0, reasons: [] },
+    backend: { sustained: false, recovered: false, consecutiveTicks: 0, healthyTicks: 0, cpuPct: 0, eventLoopLagMs: 0, eventLoopP99Ms: 0, rssMb: 0, reasons: [] },
+  };
+}
+
 let _cleanupTimer: ReturnType<typeof setInterval> | null = null;
 
 // Lo snapshot dell'aggregator ha una forma minima che ci basta: status/score non

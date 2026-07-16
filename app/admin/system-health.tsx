@@ -126,6 +126,17 @@ export default function SystemHealthScreen() {
     onError: (err: Error) => Alert.alert("Errore", err.message),
   });
 
+  // Task #154 — Svuota lista: azzera i contatori interni dei collector lato
+  // backend e rigenera uno snapshot pulito, poi invalida snapshot e log.
+  const resetState = useMutation({
+    mutationFn: async () => (await apiRequest("POST", "/api/admin/watchdog/reset-state")).json(),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["/api/admin/watchdog/snapshot"] });
+      qc.invalidateQueries({ queryKey: ["/api/admin/watchdog/logs?kind=proposal&limit=30"] });
+    },
+    onError: (err: Error) => Alert.alert("Errore", err.message),
+  });
+
   const onAccept = async (id: string) => {
     setBusyProposalId(id);
     try {
@@ -230,6 +241,14 @@ export default function SystemHealthScreen() {
                 <TouchableOpacity style={styles.smallBtn} onPress={() => runNow.mutate()} disabled={runNow.isPending}>
                   <MaterialCommunityIcons name="refresh" size={16} color="#fff" />
                   <Text style={styles.smallBtnText}>Aggiorna</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.smallBtn} onPress={() => resetState.mutate()} disabled={resetState.isPending}>
+                  {resetState.isPending ? (
+                    <ActivityIndicator size="small" color="#fff" />
+                  ) : (
+                    <MaterialCommunityIcons name="trash-can-outline" size={16} color="#fff" />
+                  )}
+                  <Text style={styles.smallBtnText}>{resetState.isPending ? "Svuoto…" : "Svuota lista"}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.smallBtn} onPress={() => proposeNow.mutate()} disabled={proposeNow.isPending}>
                   <MaterialCommunityIcons name="lightbulb-on" size={16} color="#fff" />

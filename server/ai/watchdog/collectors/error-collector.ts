@@ -12,6 +12,15 @@ export function recordHttpError(status: number): void {
   else if (status >= 400) httpErrors4xx++;
 }
 
+// Task #154 — Reset della finestra errori HTTP 4xx/5xx. Azzera i contatori in
+// memoria e riparte la finestra temporale, così i rate mostrati ripartono puliti
+// dopo un reset richiesto dall'admin. Idempotente, nessun I/O.
+export function resetState(): void {
+  httpErrors5xx = 0;
+  httpErrors4xx = 0;
+  lastResetAt = Date.now();
+}
+
 export async function collectErrors(): Promise<Signal[]> {
   const signals: Signal[] = [];
   const now = Date.now();

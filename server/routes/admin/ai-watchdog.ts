@@ -7,7 +7,12 @@ import { aiWatchdogLog, weeklySystemReports, systemSignals } from "@shared/db";
 import { desc, eq, sql, and, gte, or } from "drizzle-orm";
 import { isHubConfigured, isHubAvailable, hasHubBeenProbed } from "../../lib/ai-hub-client";
 import { z } from "zod";
-import { getLatestSnapshot, runAggregatorCycle, getRecentSnapshots } from "../../ai/watchdog/aggregator";
+import { getLatestSnapshot, runAggregatorCycle, getRecentSnapshots, isAggregatorCycleInFlight } from "../../ai/watchdog/aggregator";
+import { resetState as resetDbCollector } from "../../ai/watchdog/collectors/db-collector";
+import { resetState as resetPoolCollector } from "../../ai/watchdog/collectors/pool-collector";
+import { resetState as resetOverloadCollector } from "../../ai/watchdog/collectors/overload-collector";
+import { resetState as resetErrorCollector } from "../../ai/watchdog/collectors/error-collector";
+import { resetState as resetCrashSignalsCollector } from "../../ai/watchdog/collectors/crash-signals-collector";
 import { streamWatchdogChat } from "../../ai/watchdog/chat";
 import { isWatchdogEnabled, setWatchdogEnabled } from "../../ai/watchdog/kill-switch";
 import { getWatchdogStats } from "../../ai/watchdog/scheduler";
@@ -50,6 +55,50 @@ router.post("/watchdog/run-now", async (_req, res) => {
     const snap = await runAggregatorCycle();
     const fixes = await runAutoFix(snap);
     return res.json({ snapshot: snap, autoFixes: fixes });
+  } catch (err) {
+    return sendError(res, 500, (err as Error).message);
+  }
+});
+
+// Task #154 — Svuota lista errori watchdog: azzera i contatori/latch interni dei
+// collector (che possono restare "appiccicati" dopo un incidente rientrato) e
+// rigenera subito uno snapshot pulito. Protetto dalla stessa guardia admin delle
+// altre route watchdog (montaggio del router).
+router.post("/watchdog/reset-state", async (_req, res) => {
+  try {
+    // Guardia anti-race: se un ciclo aggregator è in corso i collector stanno
+    // leggendo il loro stato; attendiamo fino a 2s che finisca (poll ogni 100ms)
+    // per evitare di azzerare a metà lettura. Se non rientra procediamo comunque
+    // loggando un warning: il ciclo successivo ripartirà comunque pulito.
+    const cycleWasRunning = isAggregatorCycleInFlight();
+    if (cycleWasRunning) {
+      const deadline = Date.now() + 2000;
+      while (isAggregatorCycleInFlight() && Date.now() < deadline) {
+        await new Promise((r) => setTimeout(r, 100));
+      }
+      if (isAggregatorCycleInFlight()) {
+        console.warn("[watchdog] reset-state: ciclo aggregator ancora in corso dopo 2s, procedo comunque");
+      }
+    }
+
+    // Azzera lo stato in-process di ogni collector che ne mantiene.
+    resetDbCollector();
+    resetPoolCollector();
+    resetOverloadCollector();
+    resetErrorCollector();
+    resetCrashSignalsCollector();
+
+    const resetAt = new Date().toISOString();
+
+    // Rigenera subito uno snapshot pulito così il pannello si aggiorna senza
+    // attendere il prossimo tick (~60s).
+    try {
+      await runAggregatorCycle();
+    } catch (err) {
+      console.warn("[watchdog] reset-state: rigenerazione snapshot fallita (non-fatale):", (err as Error).message);
+    }
+
+    return res.json({ ok: true, resetAt, cycleWasRunning });
   } catch (err) {
     return sendError(res, 500, (err as Error).message);
   }

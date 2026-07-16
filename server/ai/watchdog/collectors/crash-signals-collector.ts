@@ -68,6 +68,15 @@ async function resolveSignalConfig(): Promise<typeof DEFAULT_SIGNAL_CONFIG> {
   }
 }
 
+// Task #154 — Reset dello stato del collector. Questo collector è stateless:
+// deriva i segnali direttamente da una query a finestra scorrevole (2h) su
+// app_crash_logs, senza contatori/latch in memoria di processo. La finestra si
+// svuota da sé quando i crash escono dalle 2h. La funzione esiste per conformità
+// all'interfaccia ICollectorReset ed è un no-op idempotente.
+export function resetState(): void {
+  /* nessuno stato in-process da azzerare */
+}
+
 export async function collectCrashSignals(): Promise<Signal[]> {
   try {
     const [result, config] = await Promise.all([

@@ -33,6 +33,12 @@ import { recordDbMonitorSample } from "../../db-monitor-history";
 let latest: HealthSnapshot | null = null;
 const subscribers = new Set<(s: HealthSnapshot) => void>();
 
+// Task #154 — Guardia in-process: true mentre un ciclo aggregator è in corso.
+// L'endpoint admin di reset-state la interroga per evitare di azzerare i
+// contatori dei collector proprio mentre un ciclo li sta leggendo (race).
+let cycleInFlight = false;
+export function isAggregatorCycleInFlight(): boolean { return cycleInFlight; }
+
 export function getLatestSnapshot(): HealthSnapshot | null { return latest; }
 export function subscribeSnapshot(cb: (s: HealthSnapshot) => void): () => void {
   subscribers.add(cb);
@@ -51,6 +57,15 @@ function computeStatus(problems: Problem[]): { status: HealthSnapshot["status"];
 }
 
 export async function runAggregatorCycle(): Promise<HealthSnapshot> {
+  cycleInFlight = true;
+  try {
+    return await runAggregatorCycleInner();
+  } finally {
+    cycleInFlight = false;
+  }
+}
+
+async function runAggregatorCycleInner(): Promise<HealthSnapshot> {
   const collectors = await Promise.allSettled([
     collectBullMq(), collectDb(), collectDragonfly(), collectLatency(),
     Promise.resolve(collectPool()), collectMaps(),

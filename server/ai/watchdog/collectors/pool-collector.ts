@@ -63,6 +63,19 @@ const DROP_BURST_FOR_WARN = 10;
 let consecutiveWaiting = 0;
 let consecutiveLimiterQueued = 0;
 
+// Task #154 — Reset dei contatori/latch anti-blip di questo collector. Azzera i
+// campioni consecutivi di pressione (waiting/queue/drops), i totali di baseline
+// dei drop e l'ultimo esito idle-leak, così uno stato rientrato non resta
+// appiccicato. Idempotente, nessun I/O.
+export function resetState(): void {
+  consecutiveWaiting = 0;
+  consecutiveLimiterQueued = 0;
+  prevDroppedOverflowTotal = 0;
+  prevDroppedTimeoutTotal = 0;
+  consecutiveLimiterDrops = 0;
+  lastIdleLeak = null;
+}
+
 // Totali cumulativi (dal boot) degli scarti del bg-db-limiter visti all'ultimo
 // tick: servono a calcolare il DELTA per finestra (quanti job sono stati
 // scartati negli ultimi ~60s) invece di guardare solo il totale che cresce

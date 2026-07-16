@@ -444,4 +444,4 @@ export function suppressDownstreamWhenPoweredOff(problems: Problem[]): Problem[]
   });
 }
 
-export { runAggregatorCycle, getRecentSnapshots, getLatestSnapshot, subscribeSnapshot } from "./aggregator.part2";
+export { runAggregatorCycle, getRecentSnapshots, getLatestSnapshot, subscribeSnapshot, isAggregatorCycleInFlight } from "./aggregator.part2";
