@@ -1,10 +1,14 @@
 /**
- * Push model→agent map to the ai-hub at boot (Task #179).
+ * Push model→agent map to the ai-hub at boot and on a periodic schedule.
  *
  * The api-server knows the TC-hosted agent models from env vars at start-up.
  * Pushing this map lets ai-hub's GET /vram always show the correct per-agent
  * VRAM breakdown, even after a model upgrade, without manual VRAM_AGENT_MAP
  * edits on the TC.
+ *
+ * Periodic re-push (default 6 h, env AI_HUB_MAP_PUSH_INTERVAL_MS) ensures
+ * the map self-heals when the vram-state.json on TC is wiped (e.g. after a
+ * fresh ai-hub deploy or manual cleanup) without requiring an api-server restart.
  *
  * Non-fatal: any error (hub unreachable, misconfigured, TC powered-off) is
  * logged as a warn and never propagated — the server must reach READY regardless.
@@ -43,4 +47,21 @@ export async function pushAgentModelMapToHub(): Promise<void> {
   } catch (err) {
     console.warn(`[ai-hub] map push failed (non-fatal): ${(err as Error)?.message ?? String(err)}`);
   }
+}
+
+/**
+ * Start a periodic re-push of the model→agent map so that the ai-hub
+ * self-heals when its vram-state.json is wiped (e.g. after a fresh deploy
+ * or manual cleanup on the TC), without requiring an api-server restart.
+ *
+ * Interval defaults to 6 h; override with AI_HUB_MAP_PUSH_INTERVAL_MS.
+ * Non-fatal: errors are only logged.
+ */
+export function scheduleAgentMapRepush(): void {
+  const SIX_HOURS_MS = 6 * 60 * 60 * 1000;
+  const intervalMs = Number(process.env.AI_HUB_MAP_PUSH_INTERVAL_MS) || SIX_HOURS_MS;
+  setInterval(() => {
+    void pushAgentModelMapToHub();
+  }, intervalMs);
+  console.log(`[ai-hub] periodic map re-push scheduled every ${intervalMs / 3_600_000}h`);
 }

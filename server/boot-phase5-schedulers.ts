@@ -507,6 +507,11 @@ export async function runPhase5Schedulers(): Promise<void> {
     markDegraded("scheduler:pipeline-radiografia");
   }
 
+  await arm("ai-hub-map-repush", async () => {
+    const { scheduleAgentMapRepush } = await import("./lib/ai-hub-map-push");
+    scheduleAgentMapRepush();
+  });
+
   } finally {
     // Sigilla + arma la boot-job queue qui — phase 5 è l'ultima fase di boot,
     // quindi tutte le register() da startMatchingEngine() e runPhase5Schedulers()
