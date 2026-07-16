@@ -53,8 +53,13 @@ const AI_HUB_URL = (process.env.AI_HUB_URL || "http://127.0.0.1:4405").replace(/
 // Daemon ufw-status (localhost-only, systemd bikerlink-ufw-status, :9099) che
 // espone lo stato del firewall UFW come JSON. Le richieste entrano da
 // tc.biker-link.net/ufw-status → questo agente → daemon :9099. Protetto da
-// X-Agent-Token come il resto dell'agente (a differenza di /ai-hub): il tunnel
-// Cloudflare punta direttamente a questo agente, nginx NON è nel path.
+// X-Agent-Token come il resto dell'agente (a differenza di /ai-hub).
+//
+// Architettura: il tunnel Cloudflare punta DIRETTAMENTE a questo agente (porta
+// 9199); nginx NON è nel path per tc.biker-link.net. Non esiste né è necessario
+// alcun location-block nginx per /ufw-status — il routing è interamente gestito
+// qui. (Il file /etc/nginx/sites-available/bikerlink-ufw-status.conf, che
+// riportava istruzioni di incolla-manuale obsolete, è stato rimosso dal TC.)
 const UFW_STATUS_URL = (process.env.UFW_DAEMON_URL || "http://127.0.0.1:9099").replace(/\/$/, "");
 
 const PROBE_TIMEOUT_MS = 3000;
