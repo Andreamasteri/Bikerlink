@@ -54,3 +54,7 @@ components/admin/users/UserDetailModal.tsx
 # Split vietato per decisione esplicita dell'utente (lug 2026): flusso
 # streaming unico e coeso (persona, fallback chain, memoria conversazionale).
 server/ai/assistant/agent.ts
+
+# ── Route admin AI watchdog ────────────────────────────────────────────────
+# ~20 endpoint watchdog in un'unica route — split crea accoppiamento inutile.
+server/routes/admin/ai-watchdog.ts

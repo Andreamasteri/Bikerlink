@@ -1,3 +1,4 @@
+// LARGE-FILE-ALLOW: route admin monolitica con ~20 endpoint watchdog — split crea accoppiamento inutile.
 // Task #2533 — Endpoint admin AI System Watchdog.
 import { Router, type Request, type Response } from "express";
 import { sendError } from "../../lib/api-response";
