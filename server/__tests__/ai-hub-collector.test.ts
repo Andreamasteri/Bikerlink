@@ -8,12 +8,15 @@
  *   - chiami setHubReachable(false) su risposta 4xx o errore di rete;
  *   - chiami setHubReachable(false) quando il TC è spento (evita il flag ottimistico
  *     di boot che farebbe mostrare il tile come "raggiungibile" prima di qualsiasi probe);
- *   - skippi silenziosamente se l'hub non è configurato.
+ *   - skippi silenziosamente se l'hub non è configurato;
+ *   - emetta `ai_hub.large_file` (warn) quando il file più grande in ~/agent-shared/
+ *     supera 50 KB, in modo che gli admin sappiano di rieseguire la probe latenza
+ *     (Task #248).
  *
- * Il modulo ha contatori a livello di module scope (consecutiveFailures, hadSuccessfulProbe)
- * che persistono tra test nello stesso file. Ogni test è scritto in modo da non dipendere
- * dallo stato lasciato dai test precedenti: i mock vengono reimpostati in beforeEach e
- * i test sull'escalation sono auto-contenuti (sequenziali nello stesso it).
+ * Il modulo ha contatori a livello di module scope (consecutiveFailures, hadSuccessfulProbe,
+ * successfulProbeCount) che persistono tra test nello stesso file. Ogni test è scritto in
+ * modo da non dipendere dallo stato lasciato dai test precedenti: i mock vengono reimpostati
+ * in beforeEach e i test sull'escalation sono auto-contenuti (sequenziali nello stesso it).
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
@@ -35,6 +38,8 @@ vi.mock("../lib/ai-hub-client", () => ({
   // Lockstep con NADIR_SEARCH_TIMEOUT_MS (3 500ms) − 500ms di margine (Task #235).
   AI_HUB_PING_WARN_MS: 3_000,
   HUB_HEALTH_TIMEOUT_MS: 5_000,
+  // Misurato live Task #244: 5s per /files/read e /files/list (Task #248 size check).
+  HUB_FILE_READ_TIMEOUT_MS: 5_000,
 }));
 vi.mock("../lib/thinkcentre-powered-off", () => ({
   isThinkCentrePoweredOff: mockIsTcPoweredOff,
@@ -169,6 +174,56 @@ describe("ai-hub collector — autenticazione e comportamento probe", () => {
     expect(mockHubGet).not.toHaveBeenCalled();
     expect(mockSetHubReachable).not.toHaveBeenCalled();
     expect(signals).toHaveLength(0);
+  });
+
+  it("file > 50 KB in ~/agent-shared/ → segnale ai_hub.large_file (warn) ogni 10 probe (Task #248)", async () => {
+    // La soglia SIZE_CHECK_EVERY_N=10 è module-level state che persiste tra test.
+    // Questo test esegue 10 probe /health riuscite consecutive; sul decimo ciclo il
+    // collector chiama anche /files/list: il mock risponde con un file da 60 KB.
+    // Ci aspettiamo che solo in quel ciclo venga emesso `ai_hub.large_file`.
+
+    const healthOk = { ok: true, status: 200, data: { ok: true } };
+    const listLargeFile = {
+      ok: true,
+      status: 200,
+      data: { ok: true, files: [{ name: "big-report.md", type: "file", size: 60_000 }] },
+    };
+    const listSmallFile = {
+      ok: true,
+      status: 200,
+      data: { ok: true, files: [{ name: "small-note.md", type: "file", size: 3_600 }] },
+    };
+
+    // hubGet risponde in base al path:
+    //   /health → healthOk sempre
+    //   /files/list con file grande → listLargeFile
+    //   /files/list con file piccolo → listSmallFile
+    let listResponse = listLargeFile;
+    mockHubGet.mockImplementation((path: string) => {
+      if (path === "/files/list") return Promise.resolve(listResponse);
+      return Promise.resolve(healthOk);
+    });
+
+    // Esegui esattamente SIZE_CHECK_EVERY_N (=10) probe: le prime 9 non triggherano
+    // il size-check, la decima sì. Il contatore module-level può avere già qualche
+    // incremento dai test precedenti, quindi avanziamo fino alla prossima soglia
+    // eseguendo al massimo 10 collect (l'overflow resetta il contatore a 0).
+    let largeFileFound = false;
+    for (let i = 0; i < 10; i++) {
+      const sigs = await collectAiHub();
+      if (sigs.some((s) => s.metric === "ai_hub.large_file")) {
+        largeFileFound = true;
+        break;
+      }
+    }
+    expect(largeFileFound).toBe(true);
+
+    // Con file piccolo (<50 KB) nessun segnale large_file deve essere emesso.
+    listResponse = listSmallFile;
+    for (let i = 0; i < 10; i++) {
+      const sigs = await collectAiHub();
+      expect(sigs.some((s) => s.metric === "ai_hub.large_file")).toBe(false);
+    }
   });
 
   it("ping_ms severity info se latenza ≤ 3000ms, warn se > 3000ms (SLA Task #161)", async () => {

@@ -11,12 +11,16 @@
 //   - marca `setHubReachable(true/false)` in ai-hub-client, così isHubAvailable()
 //     usato dai tool degrada con grazia senza tentare la rete;
 //   - emette `ai_hub.unreachable` con severity "high" solo dopo N=3 fallimenti
-//     consecutivi (prima "warn"), come il collector DragonflyDB.
+//     consecutivi (prima "warn"), come il collector DragonflyDB;
+//   - ogni SIZE_CHECK_EVERY_N probe riuscite controlla la dimensione dei file in
+//     ~/agent-shared/: se un file supera LARGE_FILE_WARN_BYTES emette
+//     `ai_hub.large_file` (warn) per ricordare di rieseguire la probe latenza
+//     di Task #244 e aggiornare HUB_FILE_READ_TIMEOUT_MS se necessario.
 //
 // Naming interno: source "ai_hub" (vedi server/ai/watchdog/types.ts); l'id del
 // problema diventa `ai_hub.ai_hub.unreachable` in deriveProblems.
 import type { Signal } from "../types";
-import { AI_HUB_PING_WARN_MS, hubGet, isHubConfigured, setHubReachable, HUB_HEALTH_TIMEOUT_MS } from "../../../lib/ai-hub-client";
+import { AI_HUB_PING_WARN_MS, hubGet, isHubConfigured, setHubReachable, HUB_HEALTH_TIMEOUT_MS, HUB_FILE_READ_TIMEOUT_MS } from "../../../lib/ai-hub-client";
 import { isThinkCentrePoweredOff } from "../../../lib/thinkcentre-powered-off";
 import { isThinkCentreInMaintenance } from "../../../lib/thinkcentre-maintenance";
 
@@ -24,9 +28,62 @@ const FAILURES_BEFORE_HIGH = 3;
 
 // Contatore fallimenti consecutivi — azzerato a ogni probe riuscita.
 let consecutiveFailures = 0;
-// True dopo la prima probe riuscita in questa sessione: l'escalation a "high"
+// True dopo la prima probe riuscita in questa sessione: l'escalazione a "high"
 // richiede che l'hub fosse stato raggiungibile in precedenza.
 let hadSuccessfulProbe = false;
+
+// ── Check dimensioni file (Task #248) ─────────────────────────────────────────
+//
+// Ogni SIZE_CHECK_EVERY_N probe riuscite chiama /files/list (root) per trovare
+// il file più grande in ~/agent-shared/. Se supera LARGE_FILE_WARN_BYTES emette
+// un segnale warn: la latenza di /files/read è proporzionale alla dimensione del
+// file (endpoint I/O-bound) e il margine ×25 calcolato su file da 3.6 KB
+// potrebbe ridursi significativamente su file grandi.
+//
+// Il check è best-effort: un errore /files/list non produce segnali aggiuntivi.
+
+/** Soglia dimensione file oltre la quale aggiornare HUB_FILE_READ_TIMEOUT_MS. */
+const LARGE_FILE_WARN_BYTES = 50_000; // 50 KB
+/** Esegue il check ogni N probe riuscite (~10 min a cadenza 1 min). */
+const SIZE_CHECK_EVERY_N = 10;
+
+// Contatore probe riuscite per il throttle del size-check.
+let successfulProbeCount = 0;
+
+interface HubFileEntry {
+  name: string;
+  type?: string;
+  size?: number;
+}
+
+async function checkHubFileSizes(signals: Signal[]): Promise<void> {
+  const res = await hubGet<{ ok?: boolean; files?: HubFileEntry[] }>(
+    "/files/list", {}, HUB_FILE_READ_TIMEOUT_MS,
+  );
+  if (!res.ok || !res.data) return; // best-effort: nessun segnale se la lista fallisce
+
+  const files: HubFileEntry[] = res.data.files ?? [];
+  const largest = files
+    .filter((f) => f.type !== "directory" && typeof f.size === "number")
+    .reduce<{ name: string; size: number } | null>((max, f) => {
+      const s = f.size as number;
+      return !max || s > max.size ? { name: f.name, size: s } : max;
+    }, null);
+
+  if (largest && largest.size > LARGE_FILE_WARN_BYTES) {
+    signals.push({
+      source: "ai_hub",
+      metric: "ai_hub.large_file",
+      severity: "warn",
+      details: {
+        file: largest.name,
+        sizeBytes: largest.size,
+        sizeKb: Math.round(largest.size / 1024),
+        note: "Rieseguire la probe latenza /files/read (Task #244) e aggiornare HUB_FILE_READ_TIMEOUT_MS in ai-hub-client.ts se il margine ×25 non è più garantito",
+      },
+    });
+  }
+}
 
 export async function collectAiHub(): Promise<Signal[]> {
   const signals: Signal[] = [];
@@ -74,6 +131,15 @@ export async function collectAiHub(): Promise<Signal[]> {
       // nelle metriche prima che gli utenti vedano il fallback pgvector.
       severity: latencyMs > AI_HUB_PING_WARN_MS ? "warn" : "info",
     });
+
+    // Task #248: ogni SIZE_CHECK_EVERY_N probe riuscite controlla la dimensione
+    // dei file in ~/agent-shared/ per avvisare se un file supera la soglia oltre
+    // la quale il margine di HUB_FILE_READ_TIMEOUT_MS va rimisurato.
+    successfulProbeCount += 1;
+    if (successfulProbeCount >= SIZE_CHECK_EVERY_N) {
+      successfulProbeCount = 0;
+      await checkHubFileSizes(signals).catch(() => {/* best-effort */});
+    }
   } else {
     consecutiveFailures += 1;
     setHubReachable(false);

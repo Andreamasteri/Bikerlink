@@ -73,8 +73,13 @@ export const HUB_VRAM_TIMEOUT_MS = 4_000;
  * 8s uniformi. `/files/write` resta sul default 8s (endpoint pesante).
  *
  * Misurato live (Task #244) con TC sotto carico: max 0.21s su file da 3.6 KB
- * → margine ×25. Endpoint I/O-bound, non compute-bound; anche file da qualche
- * decina di KB resterebbero abbondantemente sotto il budget.
+ * → margine ×25. Endpoint I/O-bound, non compute-bound.
+ *
+ * ⚠️  SOGLIA DI RITEST: se un file in ~/agent-shared/ supera ~50 KB,
+ * il collector ai-hub-collector emette un segnale `ai_hub.large_file`
+ * (warn). In quel caso rieseguire la probe latenza di Task #244 e
+ * aggiornare questo valore di conseguenza, aggiungendo un commento
+ * con la nuova misurazione e la dimensione del file di riferimento.
  */
 export const HUB_FILE_READ_TIMEOUT_MS = 5_000;
 
