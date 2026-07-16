@@ -28,8 +28,15 @@ l'edge. Perciò il client Replit invia SOLO `X-Hub-Gate-Token` + header CF Acces
 va in 401.
 
 ## Contratto Replit-side
-- Secret: `AI_HUB_URL` (`https://tc.biker-link.net/ai-hub`) + `AI_HUB_GATE_TOKEN`
-  (= `HUB_GATE_TOKEN` del `.env` ai-hub).
+- Secret: `AI_HUB_URL` (`https://hub.biker-link.net` in prod; storicamente
+  `https://tc.biker-link.net/ai-hub`) + `AI_HUB_GATE_TOKEN` (= `HUB_GATE_TOKEN`
+  del `.env` ai-hub).
+- **Gate-token drift = 401 `{"error":"unauthorized"}`** su `/nadir/search`. Il
+  secret Replit `AI_HUB_GATE_TOKEN` DEVE combaciare byte-per-byte con
+  `HUB_GATE_TOKEN` in `/home/andrea/ai-hub/.env` sul TC. Per risincronizzare:
+  `sed -i` il `.env`, `pm2 restart ai-hub --update-env`, poi ri-setta il secret.
+  Verifica veloce senza toccare il secret: `AI_HUB_GATE_TOKEN=<tc-value> npx tsx
+  scripts/smoke-ai-hub-search.ts`.
 - Client: `server/lib/ai-hub-client.ts` — `hubGet/hubPost` non lanciano mai
   (ritornano `{ok,...}`), timeout 8s, riusa `cfAccessHeaders()`.
   `isHubAvailable()` è OTTIMISTA (true) e viene flippato SOLO dal collector
