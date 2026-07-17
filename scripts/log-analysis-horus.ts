@@ -44,6 +44,7 @@ import {
   loadCancelledRefs,
   readCancelledRefsAge,
 } from "./lib/horus-backlog";
+import { cleanupStaleHorusFiles as _cleanupStaleHorusFiles } from "./lib/horus-cleanup";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, "..");
@@ -751,105 +752,18 @@ async function callHorus(
 }
 
 // ─── Pulizia file horus-*.md obsoleti ────────────────────────────────────────
+// Logic extracted to scripts/lib/horus-cleanup.ts for unit testability.
+// normalizeTitle, jaccardSimilarity, readMarkdownTitle imported at the top.
 
 /**
- * Normalizza un titolo per il confronto Jaccard (stesso algoritmo usato da
- * `isDuplicate()` in horus-propose-tasks.ts).
- */
-function normalizeTitle(s: string): string {
-  return s.toLowerCase().replace(/[^a-z0-9\s]/g, "").replace(/\s+/g, " ").trim();
-}
-
-/**
- * Calcola la similarità Jaccard tra due titoli normalizzati.
- * Ritorna un valore tra 0 e 1.
- */
-function jaccardSimilarity(a: string, b: string): number {
-  const setA = new Set(a.split(" ").filter(Boolean));
-  const setB = new Set(b.split(" ").filter(Boolean));
-  const intersection = [...setA].filter((w) => setB.has(w)).length;
-  const union = new Set([...setA, ...setB]).size;
-  return union > 0 ? intersection / union : 0;
-}
-
-/**
- * Legge la prima riga H1 di un file .md. Ritorna null se assente.
- */
-function readMarkdownTitle(filePath: string): string | null {
-  try {
-    const content = fs.readFileSync(filePath, "utf8");
-    const firstLine = content.split("\n").find((l) => l.startsWith("# "));
-    if (!firstLine) return null;
-    const title = firstLine.replace(/^#\s+/, "").trim();
-    return title.length > 0 ? title : null;
-  } catch {
-    return null;
-  }
-}
-
-/**
- * Rimuove i file `horus-*.md` dalla directory `.local/tasks/` che risultano
- * già coperti da un file task numerato (`NNN-*.md`).
- *
- * Quando una proposta Horus viene accettata e trasformata in task formale,
- * viene creato un file numerato con titolo simile. Il file `horus-*.md`
- * originale non viene mai cancellato, così si accumula nel backlog e causa
- * una deduplicazione troppo aggressiva nelle sessioni successive.
- *
- * La soglia Jaccard (0.7) è la stessa usata da `isDuplicate()` in
- * horus-propose-tasks.ts — coerenza garantita.
+ * Thin wrapper: delegates to the lib implementation using the canonical
+ * `.local/tasks/` directory relative to ROOT.
  *
  * Ritorna il numero di file rimossi.
  */
 function cleanupStaleHorusFiles(): number {
   const tasksDir = path.join(ROOT, ".local", "tasks");
-  if (!fs.existsSync(tasksDir)) return 0;
-
-  let allFiles: string[];
-  try {
-    allFiles = fs.readdirSync(tasksDir).filter((f) => f.endsWith(".md"));
-  } catch (err) {
-    console.warn(`  ⚠️  cleanupStaleHorusFiles: impossibile leggere ${tasksDir}: ${(err as Error).message}`);
-    return 0;
-  }
-
-  // File horus-*.md da candidare alla rimozione
-  const horusFiles = allFiles.filter((f) => f.startsWith("horus-"));
-  // File numerati NNN-*.md che rappresentano task formali
-  const numberedFiles = allFiles.filter((f) => /^\d+/.test(f) && !f.startsWith("horus-"));
-
-  if (horusFiles.length === 0 || numberedFiles.length === 0) return 0;
-
-  // Costruisci mappa { titolo normalizzato } dei task numerati
-  const numberedTitles: string[] = [];
-  for (const f of numberedFiles) {
-    const title = readMarkdownTitle(path.join(tasksDir, f));
-    if (title) numberedTitles.push(normalizeTitle(title));
-  }
-
-  let removed = 0;
-  for (const horusFile of horusFiles) {
-    const fullPath = path.join(tasksDir, horusFile);
-    const title = readMarkdownTitle(fullPath);
-    if (!title) continue;
-
-    const normalizedHorus = normalizeTitle(title);
-    const isSuperseded = numberedTitles.some(
-      (nt) => jaccardSimilarity(normalizedHorus, nt) >= 0.7,
-    );
-
-    if (isSuperseded) {
-      try {
-        fs.rmSync(fullPath);
-        removed++;
-        console.log(`  🧹 Rimosso horus file obsoleto: ${horusFile}`);
-      } catch (err) {
-        console.warn(`  ⚠️  Impossibile rimuovere ${horusFile}: ${(err as Error).message}`);
-      }
-    }
-  }
-
-  return removed;
+  return _cleanupStaleHorusFiles(tasksDir);
 }
 
 // ─── Generazione automatica file backlog da task files ───────────────────────
