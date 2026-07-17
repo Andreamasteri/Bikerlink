@@ -73,6 +73,10 @@ args = "Triage Horus"
 task = "workflow.run"
 args = "check-tc-admin-card-tests"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "check-horus-dedup"
+
   [[workflows.workflow]]
   name = "Start App"
   mode = "parallel"
@@ -215,6 +219,17 @@ author = "agent"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "bash scripts/check-tc-admin-card-tests.sh"
+
+[workflows.workflow.metadata]
+isValidation = true
+
+[[workflows.workflow]]
+name = "check-horus-dedup"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "npx tsx scripts/test-horus-dedup.ts"
 
 [workflows.workflow.metadata]
 isValidation = true
