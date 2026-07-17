@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
-import { View, Text, ActivityIndicator, TouchableOpacity, Switch, Linking } from "react-native";
+import { View, Text, ActivityIndicator, TouchableOpacity, Switch, Linking, TextInput, Alert } from "react-native";
 import { MaterialCommunityIcons, Ionicons } from "@expo/vector-icons";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getApiUrl, authFetchHeaders } from "@/lib/query-client";
 import Colors from "@/constants/colors";
 import { styles } from "./ThinkCentreCardStyles";
@@ -214,14 +214,67 @@ const apkBtnStyles = {
     borderRadius: 8,
     paddingHorizontal: 14,
     paddingVertical: 8,
-    marginHorizontal: 10,
-    marginTop: 10,
-    marginBottom: 4,
+  },
+  editBtn: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    alignSelf: "flex-start" as const,
+    gap: 6,
+    backgroundColor: "#f59e0b",
+    borderRadius: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
+  saveBtn: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    alignSelf: "flex-start" as const,
+    gap: 6,
+    backgroundColor: "#22c55e",
+    borderRadius: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
+  cancelBtn: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    alignSelf: "flex-start" as const,
+    gap: 6,
+    backgroundColor: "#374151",
+    borderRadius: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
   },
   label: {
     color: "#fff",
     fontSize: 13,
     fontFamily: "Inter_600SemiBold",
+  },
+  cancelLabel: {
+    color: "#d1d5db",
+    fontSize: 13,
+    fontFamily: "Inter_600SemiBold",
+  },
+  row: {
+    flexDirection: "row" as const,
+    flexWrap: "wrap" as const,
+    gap: 8,
+    marginHorizontal: 10,
+    marginTop: 10,
+    marginBottom: 4,
+  },
+  input: {
+    backgroundColor: "#1f2937",
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#374151",
+    color: "#f9fafb",
+    fontSize: 13,
+    fontFamily: "Inter_400Regular",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginHorizontal: 10,
+    marginTop: 8,
   },
 };
 
@@ -245,10 +298,54 @@ export function ThinkCentreCard({
   onStatuses?: (s: Pick<SystemStatuses, ThinkCentreStatusKeys>) => void;
 }) {
   const [collapsed, setCollapsed] = useState(true);
+  const [apkEditing, setApkEditing] = useState(false);
+  const [apkInputUrl, setApkInputUrl] = useState("");
+  const queryClient = useQueryClient();
 
   const { data: apkData } = useQuery<{ url: string }>({
     queryKey: ["/api/admin/settings/tc-terminal-apk-url"],
   });
+
+  const apkSaveMutation = useMutation({
+    mutationFn: async (url: string) => {
+      const res = await fetch(
+        new URL("/api/admin/settings/tc-terminal-apk-url", getApiUrl()).toString(),
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json", ...(await authFetchHeaders()) },
+          credentials: "include",
+          body: JSON.stringify({ url }),
+        }
+      );
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error((err as { message?: string }).message || "Errore salvataggio");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["/api/admin/settings/tc-terminal-apk-url"] });
+      setApkEditing(false);
+      Alert.alert("Salvato", "URL TC Terminal APK aggiornato.");
+    },
+    onError: (e: Error) => {
+      Alert.alert("Errore", e.message);
+    },
+  });
+
+  const handleApkEdit = () => {
+    setApkInputUrl(apkData?.url ?? "");
+    setApkEditing(true);
+  };
+
+  const handleApkSave = () => {
+    const trimmed = apkInputUrl.trim();
+    if (trimmed && !trimmed.startsWith("http")) {
+      Alert.alert("Errore", "Inserisci un URL valido (https://...)");
+      return;
+    }
+    apkSaveMutation.mutate(trimmed);
+  };
 
   const { data, isLoading, isFetching, error, refetch } = useQuery<ThinkCentreHealth>({
     queryKey: ["/api/admin/thinkcentre-health"],
@@ -580,16 +677,64 @@ export function ThinkCentreCard({
             />
           )}
 
-          {apkData?.url ? (
-            <TouchableOpacity
-              style={apkBtnStyles.btn}
-              onPress={() => Linking.openURL(apkData.url)}
-              activeOpacity={0.7}
-            >
-              <Ionicons name="download-outline" size={16} color="#fff" />
-              <Text style={apkBtnStyles.label}>Scarica TC Terminal APK</Text>
-            </TouchableOpacity>
-          ) : null}
+          {apkEditing && (
+            <TextInput
+              style={apkBtnStyles.input}
+              value={apkInputUrl}
+              onChangeText={setApkInputUrl}
+              placeholder="https://expo.dev/artifacts/..."
+              placeholderTextColor="#6b7280"
+              autoCapitalize="none"
+              autoCorrect={false}
+              keyboardType="url"
+            />
+          )}
+          <View style={apkBtnStyles.row}>
+            {!apkEditing && apkData?.url ? (
+              <TouchableOpacity
+                style={apkBtnStyles.btn}
+                onPress={() => Linking.openURL(apkData.url)}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="download-outline" size={16} color="#fff" />
+                <Text style={apkBtnStyles.label}>Scarica TC Terminal APK</Text>
+              </TouchableOpacity>
+            ) : null}
+            {!apkEditing && (
+              <TouchableOpacity
+                style={apkBtnStyles.editBtn}
+                onPress={handleApkEdit}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="link-outline" size={16} color="#fff" />
+                <Text style={apkBtnStyles.label}>
+                  {apkData?.url ? "Modifica URL" : "Imposta URL"}
+                </Text>
+              </TouchableOpacity>
+            )}
+            {apkEditing && (
+              <>
+                <TouchableOpacity
+                  style={[apkBtnStyles.saveBtn, apkSaveMutation.isPending && { opacity: 0.6 }]}
+                  onPress={handleApkSave}
+                  disabled={apkSaveMutation.isPending}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons name="checkmark-outline" size={16} color="#fff" />
+                  <Text style={apkBtnStyles.label}>Salva</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={apkBtnStyles.cancelBtn}
+                  onPress={() => setApkEditing(false)}
+                  disabled={apkSaveMutation.isPending}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons name="close-outline" size={16} color="#d1d5db" />
+                  <Text style={apkBtnStyles.cancelLabel}>Annulla</Text>
+                </TouchableOpacity>
+              </>
+            )}
+          </View>
 
           <ThinkCentreFooter
             poweredOffActive={poweredOffActive}
