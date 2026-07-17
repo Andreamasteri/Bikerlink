@@ -17,6 +17,13 @@
 //
 // ARCHITETTURA: WebSocketServer con noServer:true + server.on('upgrade')
 //   filtrato per pathname. Non usa express-ws (ha bug con alcuni middleware).
+//
+// RECONNECT RESILIENCE (Task #506)
+//   Se conn.on("error") riceve ECONNREFUSED sul localPort (TC riavviato o
+//   tunnel CF caduto mentre il bridge era segnato "running"), la route chiama
+//   forceBridgeReset() + ensureTcSshBridge() e ritenta una volta la connessione
+//   SSH prima di chiudere il WS con errore. Il tutto avviene entro 30s (8s
+//   bridge wait + 15s SSH readyTimeout + overhead).
 // =============================================================================
 
 import { WebSocketServer, WebSocket } from "ws";
@@ -27,7 +34,10 @@ import signature from "cookie-signature";
 import { pool } from "../db";
 import { storage } from "../storage";
 import { normalizeOpenSshPrivateKey } from "./ssh-exec";
-import { ensureTcSshBridge } from "../lib/tc-ssh-bridge";
+import {
+  ensureTcSshBridge,
+  forceBridgeReset,
+} from "../lib/tc-ssh-bridge";
 
 const WS_PATH = "/api/ssh/terminal";
 
@@ -77,6 +87,130 @@ async function validateAdminToken(
 
 // ── SSH PTY session ───────────────────────────────────────────────────────────
 
+/**
+ * Tenta una singola connessione SSH + apertura shell PTY.
+ * Risolve con true se la shell è stata aperta con successo, false altrimenti.
+ * Risolve con "econnrefused" (string literal) se il bridge locale rifiuta la
+ * connessione, così il chiamante può distinguerla da altri errori SSH.
+ */
+function trySshConnect(
+  ws: WebSocket,
+  localPort: number,
+  username: string,
+  privateKey: string,
+): Promise<true | "econnrefused" | false> {
+  return new Promise((resolve) => {
+    const conn = new SshClient();
+    let settled = false;
+
+    const finish = (result: true | "econnrefused" | false) => {
+      if (settled) return;
+      settled = true;
+      resolve(result);
+    };
+
+    const cleanup = () => {
+      try { conn.end(); } catch { /* ignore */ }
+    };
+
+    ws.on("close", cleanup);
+    ws.on("error", cleanup);
+
+    conn.on("error", (err) => {
+      const code = (err as NodeJS.ErrnoException).code;
+      console.warn(`[ssh-terminal-ws] SSH error: ${err.message}`);
+      if (code === "ECONNREFUSED") {
+        finish("econnrefused");
+      } else {
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.send(`\r\n! SSH error: ${err.message}\r\n`);
+          ws.close(1011, "SSH error");
+        }
+        finish(false);
+      }
+      cleanup();
+    });
+
+    conn.on("ready", () => {
+      conn.shell(
+        { term: "xterm-256color", cols: 80, rows: 24 },
+        (err, stream) => {
+          if (err) {
+            console.warn(`[ssh-terminal-ws] shell error: ${err.message}`);
+            ws.close(1011, "SSH shell error");
+            conn.end();
+            finish(false);
+            return;
+          }
+
+          finish(true);
+
+          // Client → PTY: input + resize.
+          ws.on("message", (data) => {
+            if (ws.readyState !== WebSocket.OPEN) return;
+            const text = typeof data === "string" ? data : data.toString();
+            // Tenta parse JSON per i messaggi di controllo (resize).
+            if (text.startsWith("{")) {
+              try {
+                const msg = JSON.parse(text) as {
+                  type?: string;
+                  cols?: number;
+                  rows?: number;
+                };
+                if (
+                  msg.type === "resize" &&
+                  typeof msg.cols === "number" &&
+                  typeof msg.rows === "number" &&
+                  msg.cols > 0 &&
+                  msg.rows > 0
+                ) {
+                  stream.setWindow(msg.rows, msg.cols, 0, 0);
+                  return;
+                }
+              } catch {
+                // Non JSON: trattato come input terminale.
+              }
+            }
+            try {
+              stream.write(text);
+            } catch {
+              /* stream già chiuso */
+            }
+          });
+
+          // PTY → Client: output.
+          stream.on("data", (chunk: Buffer) => {
+            if (ws.readyState === WebSocket.OPEN) {
+              ws.send(chunk.toString());
+            }
+          });
+
+          stream.on("close", () => {
+            if (ws.readyState === WebSocket.OPEN) {
+              ws.close(1000, "SSH session ended");
+            }
+            conn.end();
+          });
+
+          stream.stderr?.on("data", (chunk: Buffer) => {
+            if (ws.readyState === WebSocket.OPEN) {
+              ws.send(chunk.toString());
+            }
+          });
+        },
+      );
+    });
+
+    conn.connect({
+      host: "127.0.0.1",
+      port: localPort,
+      username,
+      privateKey,
+      readyTimeout: 15_000,
+    });
+  });
+}
+
 async function openPtySession(ws: WebSocket): Promise<void> {
   const username = process.env.TC_SSH_USER;
   const rawKey = process.env.TC_SSH_KEY;
@@ -98,105 +232,40 @@ async function openPtySession(ws: WebSocket): Promise<void> {
   }
 
   const privateKey = normalizeOpenSshPrivateKey(rawKey);
-  const conn = new SshClient();
-  let settled = false;
 
-  const cleanup = () => {
-    if (!settled) return;
-    try { conn.end(); } catch { /* ignore */ }
-  };
+  // Prima connessione SSH.
+  const result = await trySshConnect(ws, bridge.localPort, username, privateKey);
 
-  ws.on("close", () => {
-    cleanup();
-  });
+  if (result === true) return; // sessione aperta con successo
 
-  ws.on("error", () => {
-    cleanup();
-  });
-
-  conn.on("error", (err) => {
-    console.warn(`[ssh-terminal-ws] SSH error: ${err.message}`);
-    if (ws.readyState === WebSocket.OPEN) {
-      ws.send(`\r\n! SSH error: ${err.message}\r\n`);
-      ws.close(1011, "SSH error");
-    }
-  });
-
-  conn.on("ready", () => {
-    settled = true;
-    conn.shell(
-      { term: "xterm-256color", cols: 80, rows: 24 },
-      (err, stream) => {
-        if (err) {
-          console.warn(`[ssh-terminal-ws] shell error: ${err.message}`);
-          ws.close(1011, "SSH shell error");
-          conn.end();
-          return;
-        }
-
-        // Client → PTY: input + resize.
-        ws.on("message", (data) => {
-          if (ws.readyState !== WebSocket.OPEN) return;
-          const text = typeof data === "string" ? data : data.toString();
-          // Tenta parse JSON per i messaggi di controllo (resize).
-          if (text.startsWith("{")) {
-            try {
-              const msg = JSON.parse(text) as {
-                type?: string;
-                cols?: number;
-                rows?: number;
-              };
-              if (
-                msg.type === "resize" &&
-                typeof msg.cols === "number" &&
-                typeof msg.rows === "number" &&
-                msg.cols > 0 &&
-                msg.rows > 0
-              ) {
-                stream.setWindow(msg.rows, msg.cols, 0, 0);
-                return;
-              }
-            } catch {
-              // Non JSON: trattato come input terminale.
-            }
-          }
-          try {
-            stream.write(text);
-          } catch {
-            /* stream già chiuso */
-          }
-        });
-
-        // PTY → Client: output.
-        stream.on("data", (chunk: Buffer) => {
-          if (ws.readyState === WebSocket.OPEN) {
-            ws.send(chunk.toString());
-          }
-        });
-
-        stream.on("close", () => {
-          if (ws.readyState === WebSocket.OPEN) {
-            ws.close(1000, "SSH session ended");
-          }
-          conn.end();
-        });
-
-        stream.stderr?.on("data", (chunk: Buffer) => {
-          if (ws.readyState === WebSocket.OPEN) {
-            ws.send(chunk.toString());
-          }
-        });
-      },
+  if (result === "econnrefused") {
+    // Il bridge locale rifiuta la connessione anche se era segnato "running":
+    // TC riavviato o tunnel CF caduto. Forziamo il reset e riproviamo.
+    console.warn(
+      `[ssh-terminal-ws] ECONNREFUSED su porta ${bridge.localPort} — ` +
+      "bridge stantio rilevato, re-stabilire...",
     );
-  });
+    forceBridgeReset();
 
-  conn.connect({
-    host: "127.0.0.1",
-    port: bridge.localPort,
-    username,
-    privateKey,
-    readyTimeout: 15_000,
-  });
+    const bridge2 = await ensureTcSshBridge();
+    if (!bridge2.ok) {
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.send(`\r\n! Bridge non disponibile dopo reset: ${bridge2.error ?? "sconosciuto"}\r\n`);
+        ws.close(1011, "Bridge SSH non disponibile");
+      }
+      return;
+    }
+
+    const result2 = await trySshConnect(ws, bridge2.localPort, username, privateKey);
+    if (result2 === "econnrefused") {
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.send("\r\n! SSH: ECONNREFUSED anche dopo reset bridge\r\n");
+        ws.close(1011, "SSH ECONNREFUSED");
+      }
+    }
+    // Se result2 === true → sessione aperta; se false → errore già gestito in trySshConnect.
+  }
+  // Se result === false → errore già gestito in trySshConnect.
 }
 
 // ── WebSocket server setup ────────────────────────────────────────────────────

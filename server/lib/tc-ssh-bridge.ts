@@ -29,6 +29,20 @@
 //   fase di deploy da scripts/deploy-build.sh, come per il bridge Redis).
 // - Il processo cloudflared è supervisionato: se esce viene riavviato con backoff.
 // - L'avvio è lazy (alla prima richiesta SSH) e non blocca mai il boot.
+//
+// STALE-BRIDGE DETECTION + RESET SICURO (Task #506)
+// - ensureTcSshBridge() rileva il caso state.running=true ma porta non raggiungibile
+//   (TC riavviato o tunnel CF caduto) e termina il child stantio prima di ri-spaware.
+// - forceBridgeReset() consente alla route SSH-WS di azzerare il flag "running"
+//   dopo aver ricevuto ECONNREFUSED, così la prossima ensureTcSshBridge() non riusa
+//   uno stato stantio.
+// - RACE-SAFE: l'exit handler del vecchio processo è gated su identità di processo
+//   (`if (proc !== child) return`). Quando terminiamo un child intenzionalmente
+//   (reset o stale-kill), impostiamo `child = null` PRIMA di chiamare kill().
+//   Così il successivo evento exit del vecchio processo trova child !== proc e
+//   ritorna subito, senza mutare lo stato del nuovo child né pianificare restart
+//   indesiderati.
+// - spawnBridge() ha un guard `if (child) return` per evitare doppio-spawn.
 // =============================================================================
 
 import { spawn, type ChildProcess } from "node:child_process";
@@ -78,7 +92,7 @@ export function tcSshHostname(): string {
 }
 
 /** Probe TCP best-effort sul listener locale: true se accetta connessioni. */
-function probeLocalPort(port: number, timeoutMs = 1_000): Promise<boolean> {
+export function probeLocalPort(port: number, timeoutMs = 1_000): Promise<boolean> {
   return new Promise((resolve) => {
     const sock = createConnection({ host: "127.0.0.1", port });
     let done = false;
@@ -97,6 +111,11 @@ function probeLocalPort(port: number, timeoutMs = 1_000): Promise<boolean> {
 
 function spawnBridge(): void {
   if (shuttingDown) return;
+
+  // Guard: non spawnare se esiste già un child vivo.
+  // Evita doppio-spawn durante stale-reset o chiamate concorrenti.
+  if (child) return;
+
   const bin = resolveBin();
   if (!bin) {
     state.lastError = "cloudflared binary not found (CLOUDFLARED_BIN/bin/cloudflared)";
@@ -142,6 +161,8 @@ function spawnBridge(): void {
   });
 
   proc.on("error", (err) => {
+    // Ignora eventi da un processo che non è più il child corrente.
+    if (child !== proc) return;
     state.lastError = err instanceof Error ? err.message : String(err);
     if ((err as NodeJS.ErrnoException).code === "ENOENT") {
       console.warn(`[tc-ssh-bridge] cloudflared non eseguibile (ENOENT) — bridge SSH non disponibile`);
@@ -152,6 +173,11 @@ function spawnBridge(): void {
   });
 
   proc.on("exit", (code, signal) => {
+    // RACE-SAFE: se questo processo non è più il child corrente (è stato sostituito
+    // da forceBridgeReset / stale-reset prima che l'exit arrivasse), non tocchiamo
+    // lo stato del nuovo processo né pianifichiamo restart indesiderati.
+    if (child !== proc) return;
+
     state.running = false;
     state.lastExitAt = Date.now();
     child = null;
@@ -167,10 +193,39 @@ function spawnBridge(): void {
 }
 
 /**
+ * Termina il processo bridge corrente (se attivo) e azzera lo stato "running"
+ * senza pianificare un restart automatico. Usato quando una connessione SSH
+ * riceve ECONNREFUSED sul localPort (stale bridge): la prossima chiamata a
+ * ensureTcSshBridge() ripartirà da zero senza attendere il backoff.
+ *
+ * RACE-SAFE: `child` viene azzerato PRIMA di kill() così l'exit handler del
+ * vecchio processo trova (child !== proc) e ritorna senza mutare lo stato.
+ *
+ * Idempotente e non fatale.
+ */
+export function forceBridgeReset(): void {
+  const proc = child;
+  if (proc) {
+    console.warn("[tc-ssh-bridge] forceBridgeReset: terminazione bridge stantio");
+    // Azzera child PRIMA di kill() — l'exit handler vedrà child !== proc e
+    // si fermerà senza pianificare restart né sovrascrivere lo stato.
+    child = null;
+    try { proc.kill("SIGTERM"); } catch { /* ignore */ }
+  }
+  state.running = false;
+  state.lastError = "bridge reset forzato (ECONNREFUSED dal chiamante)";
+}
+
+/**
  * Garantisce che il bridge SSH sia attivo e il listener locale raggiungibile.
  * Lazy + idempotente + non fatale. Ritorna { ok, localPort } se pronto, oppure
  * { ok:false, error } con un messaggio descrittivo (binario mancante, token/host
  * non configurati, timeout). Il chiamante decide come degradare.
+ *
+ * STALE DETECTION: se state.running=true ma il listener locale non risponde
+ * (TC riavviato o tunnel CF caduto), il child viene terminato in modo race-safe
+ * (child=null prima di kill, così l'exit handler è no-op) e il bridge viene
+ * ri-stabilito immediatamente, senza aspettare il backoff del exit-handler.
  */
 export async function ensureTcSshBridge(waitMs = 8_000): Promise<{ ok: boolean; localPort: number; error?: string }> {
   shuttingDown = false;
@@ -195,6 +250,21 @@ export async function ensureTcSshBridge(waitMs = 8_000): Promise<{ ok: boolean; 
     return { ok: true, localPort: state.localPort };
   }
 
+  // STALE-BRIDGE DETECTION: state.running=true ma porta non raggiungibile.
+  // Terminiamo il child stantio in modo race-safe: child=null PRIMA di kill()
+  // così il suo exit handler vedrà (proc !== child) e non pianificherà restart.
+  if (state.running && child) {
+    console.warn(
+      `[tc-ssh-bridge] bridge segnalato running ma porta ${state.localPort} non raggiungibile — ` +
+      "re-stabilire (stale bridge)",
+    );
+    const staleProc = child;
+    child = null; // azzera PRIMA di kill per bloccare l'exit handler del vecchio proc
+    state.running = false;
+    try { staleProc.kill("SIGTERM"); } catch { /* ignore */ }
+  }
+
+  // spawnBridge() ha il guard `if (child) return` — nessun doppio-spawn.
   if (!child) spawnBridge();
 
   // Se lo spawn non è partito (binario mancante), state.running resta false.
@@ -223,9 +293,10 @@ export async function ensureTcSshBridge(waitMs = 8_000): Promise<{ ok: boolean; 
 /** Ferma il bridge (chiamato in shutdown). Idempotente. */
 export function stopTcSshBridge(): void {
   shuttingDown = true;
-  if (child) {
-    try { child.kill("SIGTERM"); } catch { /* ignore */ }
-    child = null;
+  const proc = child;
+  child = null; // azzera prima di kill per neutralizzare l'exit handler
+  if (proc) {
+    try { proc.kill("SIGTERM"); } catch { /* ignore */ }
   }
   state.running = false;
 }
