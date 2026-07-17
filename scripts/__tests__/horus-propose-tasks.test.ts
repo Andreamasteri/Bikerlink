@@ -81,6 +81,77 @@ describe("normalizeArchitectSection", () => {
     // Pipes inside the title must be replaced with em-dash to avoid breaking the table
     expect(out).toContain("Fix foo — bar issue");
   });
+
+  it("strips a complete '(file: foo.ts)' annotation from a bullet title", () => {
+    const content =
+      "## TASK VALIDATI\n- Correggere il race condition nel probe (file: server/probe.ts)\n";
+    const { content: out, normalized } = normalizeArchitectSection(content);
+    expect(normalized).toBe(true);
+    // The table title must not contain the file annotation
+    expect(out).not.toContain("(file:");
+    expect(out).toContain("Correggere il race condition nel probe");
+  });
+
+  it("strips an incomplete '(file: `foo' cut-off annotation from a bullet title", () => {
+    const content =
+      "## TASK VALIDATI\n- Correggere il race condition (file: `server/probe\n";
+    const { content: out, normalized } = normalizeArchitectSection(content);
+    expect(normalized).toBe(true);
+    expect(out).not.toContain("(file:");
+    expect(out).toContain("Correggere il race condition");
+  });
+
+  it("truncates a long title at a word boundary — no mid-word cut", () => {
+    // Title is >80 chars with clear word boundaries; the 80-char prefix ends mid-word
+    const longTitle =
+      "Aggiungere un meccanismo di retry automatico al probe ThinkCentre quando la connessione fallisce";
+    expect(longTitle.length).toBeGreaterThan(80);
+
+    const content = `## TASK VALIDATI\n- ${longTitle}\n`;
+    const { content: out, normalized } = normalizeArchitectSection(content);
+    expect(normalized).toBe(true);
+
+    // Extract the title cell from the first data row
+    const dataRow = out
+      .split("\n")
+      .find(
+        (l) =>
+          l.startsWith("|") &&
+          !/^\|\s*Titolo\s*\|/.test(l) &&
+          !/^\|[-| ]+\|$/.test(l.trim()),
+      ) ?? "";
+    const cells = dataRow.split("|").map((c) => c.trim()).filter((_, i, a) => i > 0 && i < a.length - 1);
+    const title = cells[0] ?? "";
+
+    // Must be within the limit
+    expect(title.length).toBeLessThanOrEqual(80);
+    // Must end on a complete word — every word in the title must be a whole word from the original
+    const originalWords = longTitle.split(" ");
+    const titleWords = title.split(" ");
+    titleWords.forEach((word, i) => {
+      expect(word).toBe(originalWords[i]);
+    });
+  });
+
+  it("strips '(file: …)' annotation before truncating a long title", () => {
+    const longItem =
+      "Aggiungere un meccanismo di retry automatico al probe del ThinkCentre per la connessione (file: server/probe.ts)";
+    const content = `## TASK VALIDATI\n- ${longItem}\n`;
+    const { content: out, normalized } = normalizeArchitectSection(content);
+    expect(normalized).toBe(true);
+    expect(out).not.toContain("(file:");
+    // The resulting title must still be within the limit
+    const dataRow = out
+      .split("\n")
+      .find(
+        (l) =>
+          l.startsWith("|") &&
+          !/^\|\s*Titolo\s*\|/.test(l) &&
+          !/^\|[-| ]+\|$/.test(l.trim()),
+      ) ?? "";
+    const cells = dataRow.split("|").map((c) => c.trim()).filter((_, i, a) => i > 0 && i < a.length - 1);
+    expect((cells[0] ?? "").length).toBeLessThanOrEqual(80);
+  });
 });
 
 // ─── parseTasks ───────────────────────────────────────────────────────────────

@@ -155,7 +155,15 @@ export function normalizeArchitectSection(content: string): { content: string; n
   for (const line of sectionBody.split("\n")) {
     const m = listItemRe.exec(line.trim());
     if (m) {
-      const titolo = m[1].slice(0, 80).replace(/\|/g, "—");
+      // Strip trailing "(file: …)" annotations (complete or cut-off), matching normalizeTaskSection
+      let raw = m[1].replace(/\s*\(file:[^)]*\)?$/, "").trim();
+      // Truncate at a word boundary instead of mid-character
+      if (raw.length > 80) {
+        const cut = raw.slice(0, 80);
+        const lastSpace = cut.lastIndexOf(" ");
+        raw = lastSpace > 10 ? cut.slice(0, lastSpace) : cut;
+      }
+      const titolo = raw.replace(/\|/g, "—");
       rows.push(`| ${titolo} | media | validato da architect |`);
     }
   }
