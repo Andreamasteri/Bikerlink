@@ -158,16 +158,17 @@ export function ThinkCentreSystemMonitor() {
       const hasGpu = data.gpuUtilPct != null || data.vramUsedMb != null || data.vramTotalMb != null;
       setGpu(hasGpu ? { vramUsedMb: data.vramUsedMb ?? null, vramTotalMb: data.vramTotalMb ?? null, name: data.gpuName ?? null } : null);
 
-      const ramPctVal = data.ramTotalMb > 0 ? Math.round((data.ramUsedMb / data.ramTotalMb) * 100) : null;
+      const ramTotal    = data.ramTotalMb ?? 0;
+      const ramPctVal   = ramTotal > 0 ? Math.round(((data.ramUsedMb ?? 0) / ramTotal) * 100) : null;
       cpuTemp.current   = pushRing(cpuTemp.current,   data.cpuTempC ?? null);
       gpuTemp.current   = pushRing(gpuTemp.current,   data.gpuTempC ?? null);
       gpuUtil.current   = pushRing(gpuUtil.current,   data.gpuUtilPct ?? null);
-      loadAvg.current   = pushRing(loadAvg.current,   data.loadAvg1);
+      loadAvg.current   = pushRing(loadAvg.current,   data.loadAvg1 ?? null);
       ramPct.current    = pushRing(ramPct.current,    ramPctVal);
-      netRx.current     = pushRing(netRx.current,     data.netRxKBs);
-      netTx.current     = pushRing(netTx.current,     data.netTxKBs);
-      diskRead.current  = pushRing(diskRead.current,  data.diskReadKBs);
-      diskWrite.current = pushRing(diskWrite.current, data.diskWriteKBs);
+      netRx.current     = pushRing(netRx.current,     data.netRxKBs ?? null);
+      netTx.current     = pushRing(netTx.current,     data.netTxKBs ?? null);
+      diskRead.current  = pushRing(diskRead.current,  data.diskReadKBs ?? null);
+      diskWrite.current = pushRing(diskWrite.current, data.diskWriteKBs ?? null);
       setTick(t => t + 1);
     } catch { setOnline(false); setReason("timeout / non raggiungibile"); }
   }, []);

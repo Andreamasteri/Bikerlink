@@ -112,6 +112,18 @@ const malformedPayload = {
   gpuTempC:     null,
 };
 
+/**
+ * Payload con campi numerici completamente assenti (undefined):
+ * ramTotalMb, ramUsedMb, loadAvg1, netRxKBs, netTxKBs, diskReadKBs, diskWriteKBs
+ * tutti mancanti → le guard `?? null` / `?? 0` devono assorbire senza TypeError.
+ */
+const partialPayload = {
+  online:   true,
+  cpuTempC: 60,
+  gpuTempC: null,
+  // tutti i campi numerici principali assenti
+};
+
 function makeFetchMock(body: unknown) {
   return vi.fn().mockResolvedValue({
     ok:   true,
@@ -218,6 +230,25 @@ describe("ThinkCentreSystemMonitor — resilienza alla shape del payload agente"
     await mount();
 
     // Il fatto stesso che mount+enable non lanci eccezioni è il requisito.
+    await expect(
+      (async () => {
+        await enableMonitor();
+        await act(async () => { await Promise.resolve(); });
+      })(),
+    ).resolves.toBeUndefined();
+  });
+
+  it("5. payload parziale (ramTotalMb/loadAvg1/netRxKBs/netTxKBs/diskReadKBs/diskWriteKBs assenti) — nessun TypeError", async () => {
+    vi.stubGlobal("fetch", makeFetchMock(partialPayload));
+    vi.stubGlobal("AbortSignal", {
+      timeout: () => ({ aborted: false }),
+      any:     (sigs: AbortSignal[]) => sigs[0],
+    });
+
+    await mount();
+
+    // Tutti i campi numerici principali sono undefined:
+    // le guard `?? null` / `?? 0` nel poll() devono assorbire senza TypeError.
     await expect(
       (async () => {
         await enableMonitor();
