@@ -329,6 +329,28 @@ router.put("/play-store-url", async (req: Request, res: Response) => {
   }
 });
 
+router.put("/native-version", async (req: Request, res: Response) => {
+  try {
+    const parsed = nativeVersionSchema.safeParse(req.body);
+    if (!parsed.success) return sendError(res, 400, parsed.error.issues[0].message);
+    const setting = await storage.upsertAppSetting("native_version", undefined, parsed.data);
+    return res.json(setting);
+  } catch (_error) {
+    return sendError(res, 500, "Errore salvataggio native version");
+  }
+});
+
+router.put("/apk-url", async (req: Request, res: Response) => {
+  try {
+    const parsed = urlSettingSchema.safeParse(req.body);
+    if (!parsed.success) return sendError(res, 400, parsed.error.issues[0].message);
+    const setting = await storage.upsertAppSetting("apk_download_url", parsed.data.url);
+    return res.json(setting);
+  } catch (_error) {
+    return sendError(res, 500, "Errore salvataggio APK URL");
+  }
+});
+
 router.put("/:key", async (req: Request, res: Response) => {
   try {
     const key = req.params.key as string;
@@ -435,34 +457,12 @@ router.get("/version-distribution", async (_req: Request, res: Response) => {
   }
 });
 
-router.put("/native-version", async (req: Request, res: Response) => {
-  try {
-    const parsed = nativeVersionSchema.safeParse(req.body);
-    if (!parsed.success) return sendError(res, 400, parsed.error.issues[0].message);
-    const setting = await storage.upsertAppSetting("native_version", undefined, parsed.data);
-    return res.json(setting);
-  } catch (_error) {
-    return sendError(res, 500, "Errore salvataggio native version");
-  }
-});
-
 router.get("/apk-url", async (_req: Request, res: Response) => {
   try {
     const setting = await storage.getAppSetting("apk_download_url");
     return res.json({ url: setting?.value || "" });
   } catch (_error) {
     return sendError(res, 500, "Errore lettura APK URL");
-  }
-});
-
-router.put("/apk-url", async (req: Request, res: Response) => {
-  try {
-    const parsed = urlSettingSchema.safeParse(req.body);
-    if (!parsed.success) return sendError(res, 400, parsed.error.issues[0].message);
-    const setting = await storage.upsertAppSetting("apk_download_url", parsed.data.url);
-    return res.json(setting);
-  } catch (_error) {
-    return sendError(res, 500, "Errore salvataggio APK URL");
   }
 });
 

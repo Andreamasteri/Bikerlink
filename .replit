@@ -77,6 +77,10 @@ args = "check-tc-admin-card-tests"
 task = "workflow.run"
 args = "check-horus-dedup"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "check-settings-route-order"
+
   [[workflows.workflow]]
   name = "Start App"
   mode = "parallel"
@@ -230,6 +234,17 @@ author = "agent"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "npx tsx scripts/test-horus-dedup.ts"
+
+[workflows.workflow.metadata]
+isValidation = true
+
+[[workflows.workflow]]
+name = "check-settings-route-order"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "bash scripts/check-settings-route-order.sh"
 
 [workflows.workflow.metadata]
 isValidation = true
