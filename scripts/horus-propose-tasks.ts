@@ -135,7 +135,7 @@ export interface ParseTasksResult {
  * Lascia invariata la sezione se è già una tabella (contiene `|`).
  * Restituisce il contenuto modificato e un flag `normalized`.
  */
-function normalizeArchitectSection(content: string): { content: string; normalized: boolean } {
+export function normalizeArchitectSection(content: string): { content: string; normalized: boolean } {
   const HEADER = "## TASK VALIDATI";
   const idx = content.indexOf(HEADER);
   if (idx === -1) return { content, normalized: false };
@@ -174,7 +174,7 @@ function normalizeArchitectSection(content: string): { content: string; normaliz
   };
 }
 
-function parseTasks(reportContent: string, architectContent: string | null): ParseTasksResult {
+export function parseTasks(reportContent: string, architectContent: string | null): ParseTasksResult {
   // Preferisce la sezione validata dall'architect se disponibile
   if (architectContent) {
     // Prova prima a normalizzare un'eventuale lista in tabella
