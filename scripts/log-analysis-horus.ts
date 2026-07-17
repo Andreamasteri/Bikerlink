@@ -778,18 +778,47 @@ async function callHorus(
   }
 }
 
-// ─── Recupero task esistenti (deduplicazione) ─────────────────────────────────
+// ─── Recupero task esistenti (deduplicazione via file backlog) ────────────────
+
+/**
+ * Path del file backlog scritto dall'agente Replit prima di ogni triage.
+ * L'agente scrive qui i titoli dei task attivi (non CANCELLED/MERGED) così
+ * gli script possono deduplicare senza interrogare la tabella interna di Replit
+ * `project_tasks` (che non esiste nel DB Postgres del progetto).
+ */
+const BACKLOG_FILE_DEFAULT = path.join(ROOT, ".local", "horus-backlog.json");
+
+function parseBacklogFileArg(): string | null {
+  const i = process.argv.indexOf("--backlog-file");
+  if (i !== -1 && process.argv[i + 1]) return process.argv[i + 1];
+  return null;
+}
 
 async function fetchExistingTaskTitles(): Promise<string[]> {
+  const backlogFile = parseBacklogFileArg() ?? BACKLOG_FILE_DEFAULT;
+  if (!fs.existsSync(backlogFile)) {
+    console.warn(
+      `\n  ⚠️  Backlog non disponibile — deduplicazione saltata.\n` +
+      `       File atteso: ${path.relative(ROOT, backlogFile)}\n` +
+      `       Per attivare la deduplicazione, chiedi all'agente di scrivere\n` +
+      `       i titoli dei task attivi in quel file prima del triage,\n` +
+      `       oppure passa --backlog-file <path>.\n`,
+    );
+    return [];
+  }
   try {
-    const rows = await db.execute(sql`
-      SELECT title FROM project_tasks
-      WHERE state NOT IN ('CANCELLED', 'MERGED')
-      ORDER BY created_at DESC
-    `);
-    return (rows.rows as Array<{ title: string }>).map((r) => r.title ?? "").filter(Boolean);
-  } catch {
-    return []; // tabella non accessibile: ok, deduplicazione saltata
+    const raw = fs.readFileSync(backlogFile, "utf8");
+    const data = JSON.parse(raw) as { titles?: string[] } | string[];
+    const titles = Array.isArray(data) ? data : ((data as { titles?: string[] }).titles ?? []);
+    const filtered = titles.filter((t): t is string => typeof t === "string" && t.length > 0);
+    console.log(`  📋 Backlog letto da file: ${filtered.length} task attivi.`);
+    return filtered;
+  } catch (err) {
+    console.warn(
+      `\n  ⚠️  Errore lettura backlog (${backlogFile}): ${(err as Error).message}\n` +
+      `       Deduplicazione saltata.\n`,
+    );
+    return [];
   }
 }
 
@@ -1007,8 +1036,31 @@ async function main(): Promise<void> {
       }
     }
   } catch (err) {
-    console.warn(`\n⚠️  Revisione architect non riuscita: ${(err as Error).message}`);
-    console.warn("   I task verranno proposti dal report principale.\n");
+    const e = err as Error & { cause?: { code?: string } };
+    const isAbort = e.name === "AbortError";
+    const code = e.cause?.code;
+    const isNetworkErr = code === "ECONNREFUSED" || code === "ENOTFOUND" || code === "EAI_AGAIN";
+    const isEmptyResponse = e.message === "Risposta vuota dal modello.";
+    const isHttpErr = e.message.startsWith("HTTP ");
+
+    console.warn(`\n⚠️  Revisione architect non riuscita.`);
+    if (isAbort) {
+      console.warn(`   Tipo errore  : TIMEOUT — il modello ha impiegato più di ${REQUEST_TIMEOUT_MS / 1000}s.`);
+      console.warn(`   Causa probabile: qwen3:4b troppo lento, host sotto carico o bundle troppo grande.`);
+    } else if (isNetworkErr) {
+      console.warn(`   Tipo errore  : RETE (${code}) — host irraggiungibile.`);
+      console.warn(`   Causa probabile: ThinkCentre spento o Cloudflare Tunnel giù.`);
+    } else if (isHttpErr) {
+      console.warn(`   Tipo errore  : HTTP — risposta non-200 dal server Ollama.`);
+    } else if (isEmptyResponse) {
+      console.warn(`   Tipo errore  : RISPOSTA VUOTA — il modello ha restituito contenuto vuoto.`);
+      console.warn(`   Causa probabile: num_predict insufficiente o modello scaricato durante la chiamata.`);
+    } else {
+      console.warn(`   Tipo errore  : ${e.name || "SCONOSCIUTO"}`);
+    }
+    console.warn(`   Messaggio    : ${e.message}`);
+    if (code) console.warn(`   Codice rete  : ${code}`);
+    console.warn(`   Effetto      : I task verranno proposti dal report principale (senza filtro architect).\n`);
   }
 
   // ── Proposta formale task ──
@@ -1071,7 +1123,17 @@ DEVI usare ESATTAMENTE questo formato tabella markdown (con intestazione e separ
 |--------|----------|---------|--------|
 | [titolo breve] | alta/media/bassa | [riferimento al problema con valore letterale estratto dai dati] | [azione specifica da intraprendere] |
 
+Esempio concreto con valori reali (NON copiare questo esempio, usalo come riferimento del livello di dettaglio richiesto):
+
+| Titolo | Priorità | Problema | Azione |
+|--------|----------|---------|--------|
+| Fix crash loop al boot su Android dopo OTA 1.4.7 | alta | app_crash_logs: "Maximum update depth exceeded" in _layout.tsx (23 eventi in 2h, device Samsung SM-G991B) — commit a3f9c12 tocca lo stesso file | Aggiungere useMemo sulle screenOptions in app/(tabs)/_layout.tsx seguendo il pattern in rnav-memo-guard.md |
+| Blocca incremento dead tuple su ai_call_logs | media | pg_stat_user_tables: ai_call_logs ha n_dead_tup=87432, seq_scan=1540 — nessun indice su created_at | Aggiungere indice su (created_at) e verificare VACUUM schedule per questa tabella |
+
 NON usare liste numerate. NON usare elenchi puntati. SOLO la tabella markdown sopra.
+
+IMPORTANTE — colonne Problema e Azione:
+NON scrivere "vedi analisi" nelle colonne Problema o Azione — cita il valore letterale, la stringa di errore, il nome del file o il timestamp estratto dai dati. Task senza evidenza specifica saranno scartati dall'architect.
 
 Regole per i task proposti:
 - Proponi tutti i task necessari; meglio 15 task precisi che 5 vaghi.

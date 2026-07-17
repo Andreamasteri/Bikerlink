@@ -230,9 +230,82 @@ Salvata in `logs/horus-log-analysis-<timestamp>-architect.md`. Struttura:
 | `--dry-run` | Mostra il bundle ma non chiama Horus |
 | `--no-propose` | Esegue triage + revisione architect, ma salta la proposta formale |
 
+## Backlog dei task attivi (deduplicazione)
+
+Gli script **non** interrogano `project_tasks` (tabella interna di Replit, non accessibile dal DB Postgres del progetto). Invece leggono il file `.local/horus-backlog.json`, che deve essere scritto dall'agente **prima** di ogni triage.
+
+### Formato del file
+
+Il file può essere un array JSON di stringhe o un oggetto con campo `titles`:
+
+```json
+["Titolo task 1", "Titolo task 2", "..."]
+```
+
+oppure:
+
+```json
+{ "titles": ["Titolo task 1", "Titolo task 2", "..."] }
+```
+
+### Come scrivere il backlog (dall'agente)
+
+Prima di lanciare il triage, l'agente deve scrivere il file con i titoli dei task attivi:
+
+```typescript
+// Leggi i task attivi con getProjectTasks() o dalla lista dei task correnti
+const titles = activeTasks.map(t => t.title);
+fs.writeFileSync(".local/horus-backlog.json", JSON.stringify(titles, null, 2));
+```
+
+### Argomento CLI alternativo
+
+È possibile passare un path alternativo con `--backlog-file`:
+
+```bash
+npx tsx scripts/log-analysis-horus.ts --backlog-file /tmp/my-backlog.json
+```
+
+### Se il file non esiste
+
+Se `.local/horus-backlog.json` non esiste, lo script stampa un avviso chiaro e procede senza deduplicazione:
+
+```
+⚠️  Backlog non disponibile — deduplicazione saltata.
+     File atteso: .local/horus-backlog.json
+     Per attivare la deduplicazione, chiedi all'agente di scrivere
+     i titoli dei task attivi in quel file prima del triage,
+     oppure passa --backlog-file <path>.
+```
+
+Questo è uno stato atteso (non un errore fatale): il manifest `horus-tasks-pending.json` viene comunque generato, ma potrebbe contenere duplicati rispetto al backlog esistente.
+
+## Troubleshooting architect
+
+La seconda chiamata Horus (revisione architect) può fallire per questi motivi — ora loggati con il tipo specifico:
+
+| Tipo errore | Log mostrato | Causa | Soluzione |
+|---|---|---|---|
+| `TIMEOUT` | `Tipo errore: TIMEOUT — il modello ha impiegato più di 300s` | qwen3:4b troppo lento, host sotto carico, o bundle troppo grande | Riduci il bundle con `--tail 200` o `--only-internal`; verifica che il ThinkCentre non sia sotto carico |
+| `RETE (ECONNREFUSED)` | `Tipo errore: RETE (ECONNREFUSED) — host irraggiungibile` | ThinkCentre spento o Cloudflare Tunnel giù | Verifica che il TC sia acceso e il tunnel attivo |
+| `RETE (ENOTFOUND)` | `Tipo errore: RETE (ENOTFOUND) — host irraggiungibile` | DNS non risolve l'hostname in `HORUS_OLLAMA_URL` | Verifica il secret `HORUS_OLLAMA_URL` |
+| `HTTP` | `Tipo errore: HTTP — risposta non-200 dal server Ollama` | Ollama ha restituito un errore (es. 503, modello non caricato) | Verifica che Ollama sia in esecuzione e il modello `qwen3:4b` sia disponibile |
+| `RISPOSTA VUOTA` | `Tipo errore: RISPOSTA VUOTA — il modello ha restituito contenuto vuoto` | `num_predict` insufficiente o modello scaricato durante la chiamata | Problema transitorio; riprova il triage |
+
+In tutti i casi, il log mostra anche `Messaggio` (errore completo) e `Codice rete` (se disponibile). Il triage continua usando il report principale senza filtro architect — `hasArchitectReview: false` nel manifest.
+
+## Piani arricchiti con il contesto del report
+
+`horus-propose-tasks.ts` estrae automaticamente il contesto rilevante dalle sezioni `## PROBLEMI TROVATI` e `## ANALISI CAUSE` del report principale e lo include nella sezione `## What & Why` di ogni file plan. L'estrazione usa un match fuzzy per keyword dal titolo del task.
+
+- Se il contesto viene trovato: `What & Why` contiene l'evidenza letterale e l'analisi causa, e `Relevant files` include i path di file citati.
+- Se non viene trovato (nessuna keyword match): fallback al template generico con i campi `Problema` e `Azione` dalla tabella di Horus.
+
+Questo garantisce che i file plan siano utilizzabili dall'executor agent senza riscrittura manuale, anche quando la tabella `## TASK PROPOSTI DA HORUS` contiene valori generici.
+
 ## Se l'endpoint non risponde
 
-Se il ThinkCentre è spento o il Cloudflare Tunnel è giù, lo script stampa un messaggio chiaro ed esce con codice 1. Verifica che il ThinkCentre sia acceso, Ollama in esecuzione e l'hostname in `OLLAMA_URL` raggiungibile.
+Se il ThinkCentre è spento o il Cloudflare Tunnel è giù, lo script stampa un messaggio chiaro ed esce con codice 1. Verifica che il ThinkCentre sia acceso, Ollama in esecuzione e l'hostname in `HORUS_OLLAMA_URL` raggiungibile.
 
 ## Note sul timeout
 

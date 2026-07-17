@@ -24,8 +24,6 @@
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
-import { db } from "../server/db";
-import { sql } from "drizzle-orm";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, "..");
@@ -141,17 +139,44 @@ function parseTasks(reportContent: string, architectContent: string | null): Par
   return [];
 }
 
-// ─── Deduplicazione contro backlog ────────────────────────────────────────────
+// ─── Deduplicazione contro backlog (via file) ─────────────────────────────────
+
+/**
+ * Path del file backlog scritto dall'agente Replit prima di ogni triage.
+ * Contiene i titoli dei task attivi (non CANCELLED/MERGED) come array JSON.
+ * Supporta sia `string[]` che `{ titles: string[] }`.
+ */
+const BACKLOG_FILE_DEFAULT = path.join(ROOT, ".local", "horus-backlog.json");
+
+function parseBacklogFileArg(): string | null {
+  const i = process.argv.indexOf("--backlog-file");
+  if (i !== -1 && process.argv[i + 1]) return process.argv[i + 1];
+  return null;
+}
 
 async function fetchExistingTaskTitles(): Promise<string[]> {
+  const backlogFile = parseBacklogFileArg() ?? BACKLOG_FILE_DEFAULT;
+  if (!fs.existsSync(backlogFile)) {
+    console.warn(
+      `\n  ⚠️  Backlog non disponibile — deduplicazione saltata.\n` +
+      `       File atteso: ${path.relative(ROOT, backlogFile)}\n` +
+      `       Per attivare la deduplicazione, chiedi all'agente di scrivere\n` +
+      `       i titoli dei task attivi in quel file prima del triage,\n` +
+      `       oppure passa --backlog-file <path>.\n`,
+    );
+    return [];
+  }
   try {
-    const rows = await db.execute(sql`
-      SELECT title FROM project_tasks
-      WHERE state NOT IN ('CANCELLED', 'MERGED')
-      ORDER BY created_at DESC
-    `);
-    return (rows.rows as Array<{ title: string }>).map((r) => r.title ?? "").filter(Boolean);
-  } catch {
+    const raw = fs.readFileSync(backlogFile, "utf8");
+    const data = JSON.parse(raw) as { titles?: string[] } | string[];
+    const titles = Array.isArray(data) ? data : ((data as { titles?: string[] }).titles ?? []);
+    const filtered = titles.filter((t): t is string => typeof t === "string" && t.length > 0);
+    return filtered;
+  } catch (err) {
+    console.warn(
+      `\n  ⚠️  Errore lettura backlog (${backlogFile}): ${(err as Error).message}\n` +
+      `       Deduplicazione saltata.\n`,
+    );
     return [];
   }
 }
@@ -173,6 +198,72 @@ function isDuplicate(title: string, existingTitles: string[]): boolean {
   });
 }
 
+// ─── Estrazione contesto dal report ───────────────────────────────────────────
+
+const STOP_WORDS = new Set([
+  "il", "la", "lo", "gli", "le", "un", "una", "uno", "di", "da", "in", "con",
+  "su", "per", "tra", "fra", "e", "o", "ma", "se", "che", "non", "del", "della",
+  "dei", "degli", "al", "alla", "ai", "agli", "nel", "nella", "nei", "nelle",
+  "the", "a", "an", "of", "in", "for", "on", "with", "at", "by", "to", "is",
+]);
+
+/**
+ * Estrae le righe rilevanti dalle sezioni ## PROBLEMI TROVATI e ## ANALISI CAUSE
+ * del report principale, facendo un match fuzzy per keyword dal titolo del task.
+ * Restituisce una stringa vuota se non trova nulla.
+ */
+function extractReportContext(reportContent: string, taskTitle: string): string {
+  const keywords = taskTitle
+    .toLowerCase()
+    .replace(/[^a-zàáâãèéêëìíîïòóôõùúûü0-9\s]/g, " ")
+    .split(/\s+/)
+    .filter((w) => w.length > 3 && !STOP_WORDS.has(w));
+
+  if (keywords.length === 0) return "";
+
+  function extractMatchingLines(sectionHeader: string, bulletOnly: boolean): string[] {
+    const idx = reportContent.indexOf(sectionHeader);
+    if (idx === -1) return [];
+    const after = reportContent.slice(idx + sectionHeader.length);
+    const nextSection = after.search(/\n##\s/);
+    const body = nextSection === -1 ? after : after.slice(0, nextSection);
+    const lines = body.split("\n");
+    const candidates = bulletOnly
+      ? lines.filter((l) => /^\s*[-*]/.test(l))
+      : lines.filter((l) => l.trim().length > 10);
+    return candidates
+      .filter((l) => keywords.some((kw) => l.toLowerCase().includes(kw)))
+      .slice(0, 4);
+  }
+
+  const problemLines = extractMatchingLines("## PROBLEMI TROVATI", true);
+  const causeLines = extractMatchingLines("## ANALISI CAUSE", false);
+
+  const parts: string[] = [];
+  if (problemLines.length > 0) {
+    parts.push("**Evidenza dal triage:**\n" + problemLines.join("\n"));
+  }
+  if (causeLines.length > 0) {
+    parts.push("**Analisi cause:**\n" + causeLines.join("\n"));
+  }
+  return parts.join("\n\n");
+}
+
+/**
+ * Estrae path di file sorgente citati nel testo (es. server/foo.ts, app/bar.tsx).
+ */
+function extractFilePaths(text: string): string[] {
+  const pathRe =
+    /(?:^|[\s`"'(])((server|scripts|app|components|shared|client|lib|hooks)\/[\w./:-]+\.[a-z]{2,4})/gm;
+  const matches = new Set<string>();
+  let m: RegExpExecArray | null;
+  while ((m = pathRe.exec(text)) !== null) {
+    const p = m[1].replace(/[,;:.)"']+$/, "");
+    if (p) matches.add(p);
+  }
+  return [...matches].slice(0, 6);
+}
+
 // ─── Generazione file plan ────────────────────────────────────────────────────
 
 function titleToSlug(title: string): string {
@@ -184,12 +275,39 @@ function titleToSlug(title: string): string {
     .slice(0, 60).replace(/^-|-$/g, "");
 }
 
-function writePlanFile(task: ParsedTask, slug: string): string {
+/**
+ * Scrive il file plan per un task. Se `reportContext` è fornito (estratto da
+ * ## PROBLEMI TROVATI / ## ANALISI CAUSE del report principale), viene usato
+ * per popolare "What & Why" e "Relevant files" con contenuto concreto.
+ * Se non disponibile, usa il template generico come fallback.
+ */
+function writePlanFile(task: ParsedTask, slug: string, reportContext?: string): string {
   const filePath = path.join(ROOT, ".local", "tasks", `horus-${slug}.md`);
+
+  // ── What & Why ──
+  let whatAndWhy: string;
+  if (reportContext && reportContext.trim().length > 0) {
+    whatAndWhy =
+      reportContext.trim() +
+      (task.action ? `\n\n**Azione proposta:** ${task.action}` : "");
+  } else {
+    // Fallback al testo dalla tabella markdown
+    const prob = task.problem && task.problem !== "vedi analisi" ? task.problem : "";
+    const act = task.action && task.action !== "vedi analisi" ? task.action : "";
+    whatAndWhy = [prob, act].filter(Boolean).join(" ") || "Problema identificato dal triage Horus.";
+  }
+
+  // ── Relevant files ──
+  const fileRefs = extractFilePaths(reportContext ?? "" + " " + task.problem + " " + task.action);
+  const relevantFilesSection =
+    fileRefs.length > 0
+      ? fileRefs.map((f) => `- \`${f}\``).join("\n")
+      : "_Da identificare durante l'analisi._";
+
   const content =
     `# ${task.title}\n\n` +
     `## What & Why\n` +
-    `${task.problem || "Problema identificato dal triage Horus."} ${task.action || ""}\n\n` +
+    `${whatAndWhy}\n\n` +
     `## Done looks like\n` +
     `- Il problema "${task.title.toLowerCase()}" è risolto e verificabile.\n` +
     `- Nessuna regressione sui flussi correlati.\n\n` +
@@ -200,7 +318,7 @@ function writePlanFile(task: ParsedTask, slug: string): string {
     `2. **Fix** — Implementare la correzione minima necessaria.\n` +
     `3. **Verifica** — Confermare che il problema non si ripresenta.\n\n` +
     `## Relevant files\n` +
-    `_Da identificare durante l'analisi._\n\n` +
+    `${relevantFilesSection}\n\n` +
     `---\n` +
     `_Proposto automaticamente da Horus triage. Priorità: ${task.priority}._\n`;
 
@@ -257,7 +375,8 @@ async function main(): Promise<void> {
       console.log(`  ⏭️  Saltato (duplicato): "${task.title}"`);
     } else {
       const slug = titleToSlug(task.title);
-      const filePath = writePlanFile(task, slug);
+      const reportContext = extractReportContext(reportContent, task.title);
+      const filePath = writePlanFile(task, slug, reportContext);
       valid.push({ ...task, slug, filePath });
       console.log(`  ✅ Pronto: "${task.title}" → .local/tasks/horus-${slug}.md`);
     }
