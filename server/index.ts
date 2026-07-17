@@ -23,6 +23,7 @@ import { registerAllRoutes } from "./route-mounter";
 import { setupErrorHandler } from "./error-handler";
 import { initSentry, attachSentryErrorHandler } from "./sentry";
 import { runBootSequence } from "./boot-sequence";
+import { setupSshTerminalWs } from "./routes/ssh-terminal-ws";
 import { isOpen as dbCircuitOpen } from "./db-circuit-breaker";
 import { applyCrashBackoff } from "./lib/crash-backoff";
 
@@ -127,6 +128,10 @@ const errorHandlersReady = sentryInitPromise
   .then(() => setupErrorHandler(app));
 
 const server = createServer(app);
+
+// WebSocket PTY per TC Terminal — filtrato per pathname /api/ssh/terminal.
+// Registrato prima del probe server per non interferire con gli altri upgrade.
+setupSshTerminalWs(server);
 
 // In produzione la piattaforma Replit (stack=EXPO) attende Metro su porta 8081.
 // Avviamo un probe server minimale per soddisfare il check senza avviare Metro.

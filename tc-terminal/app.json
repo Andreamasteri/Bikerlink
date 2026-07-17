@@ -1,0 +1,58 @@
+{
+  "expo": {
+    "name": "TC Terminal",
+    "slug": "tc-terminal",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "scheme": "tcterminal",
+    "userInterfaceStyle": "dark",
+    "backgroundColor": "#0D0D0D",
+    "android": {
+      "package": "com.bikerlink.tcterminal",
+      "versionCode": 1,
+      "permissions": [],
+      "adaptiveIcon": {
+        "backgroundColor": "#0D0D0D",
+        "foregroundImage": "./assets/images/icon.png"
+      }
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/images/icon.png",
+          "resizeMode": "contain",
+          "backgroundColor": "#0D0D0D"
+        }
+      ],
+      "expo-secure-store",
+      "expo-task-manager",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "newArchEnabled": true,
+            "enableProguardInReleaseBuilds": true,
+            "enableMinifyInReleaseBuilds": true,
+            "enableShrinkResourcesInReleaseBuilds": true,
+            "buildArchs": [
+              "arm64-v8a"
+            ]
+          }
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": false
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "4e0a9007-ca32-4021-a168-d0c2599bea05"
+      }
+    },
+    "owner": "andreamasteri"
+  }
+}
