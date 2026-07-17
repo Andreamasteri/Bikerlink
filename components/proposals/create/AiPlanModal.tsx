@@ -7,6 +7,7 @@ import {
   Modal,
   ActivityIndicator,
   Alert,
+  Platform,
   StyleSheet,
 } from "react-native";
 import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollViewCompat";
@@ -14,6 +15,8 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 import { getApiUrl } from "@/lib/query-client";
+import { useWhisperRecorder } from "@/hooks/useWhisperRecorder";
+import { t } from "@/lib/i18n";
 
 type RouteStyle = "curvy" | "balanced" | "fast";
 
@@ -62,6 +65,35 @@ export const AiPlanModal = ({ visible, onClose, onRouteReady }: Props) => {
   const [selectedStyle, setSelectedStyle] = useState<RouteStyle>("curvy");
   const [loading, setLoading] = useState(false);
   const [step, setStep] = useState("");
+
+  const whisper = useWhisperRecorder();
+  // Il microfono è disponibile solo su piattaforme native (non web).
+  const micAvailable = Platform.OS !== "web" && whisper.error !== "Permesso microfono negato";
+
+  const handleMicPress = async () => {
+    if (whisper.recording) {
+      // Ferma e trascrivi
+      const text = await whisper.stopAndTranscribe();
+      if (text === null) {
+        if (whisper.error) {
+          Alert.alert(t("aiPlan.mic.errorMic"), whisper.error);
+        } else {
+          Alert.alert(t("aiPlan.mic.noAudio"), "");
+        }
+      } else if (text.trim().length === 0) {
+        Alert.alert(t("aiPlan.mic.noAudio"), "");
+      } else {
+        // Appende al testo esistente (non sovrascrive)
+        setPrompt((prev) => (prev.trim() ? `${prev.trim()} ${text.trim()}` : text.trim()));
+      }
+    } else {
+      await whisper.startRecording();
+      // Se il permesso è stato negato, aggiorna lo stato mic
+      if (whisper.error === "Permesso microfono negato") {
+        Alert.alert(t("aiPlan.mic.errorMic"), whisper.error);
+      }
+    }
+  };
 
   const handleGenerate = async () => {
     if (!prompt.trim()) {
@@ -152,17 +184,46 @@ export const AiPlanModal = ({ visible, onClose, onRouteReady }: Props) => {
           bottomOffset={20}
         >
           <Text style={styles.label}>Descrivi il giro</Text>
-          <TextInput
-            style={[styles.input, styles.textArea]}
-            value={prompt}
-            onChangeText={setPrompt}
-            placeholder={"Es: strade curve nelle Dolomiti, circa 150 km,\nevita autostrade, voglio passare da Cortina"}
-            placeholderTextColor={Colors.textSecondary}
-            multiline
-            numberOfLines={4}
-            textAlignVertical="top"
-            editable={!loading}
-          />
+          <View style={styles.inputRow}>
+            <TextInput
+              style={[styles.input, styles.textArea, styles.inputFlex]}
+              value={prompt}
+              onChangeText={setPrompt}
+              placeholder={"Es: strade curve nelle Dolomiti, circa 150 km,\nevita autostrade, voglio passare da Cortina"}
+              placeholderTextColor={Colors.textSecondary}
+              multiline
+              numberOfLines={4}
+              textAlignVertical="top"
+              editable={!loading && !whisper.transcribing}
+            />
+            {micAvailable && (
+              <TouchableOpacity
+                style={[
+                  styles.micBtn,
+                  whisper.recording && styles.micBtnActive,
+                ]}
+                onPress={handleMicPress}
+                disabled={loading || whisper.transcribing}
+                hitSlop={8}
+              >
+                {whisper.transcribing ? (
+                  <ActivityIndicator size="small" color={Colors.accent} />
+                ) : (
+                  <MaterialCommunityIcons
+                    name={whisper.recording ? "microphone" : "microphone-outline"}
+                    size={24}
+                    color={whisper.recording ? Colors.accent : Colors.textSecondary}
+                  />
+                )}
+              </TouchableOpacity>
+            )}
+          </View>
+          {whisper.recording && (
+            <Text style={styles.micStatus}>{t("aiPlan.mic.recording")}</Text>
+          )}
+          {whisper.transcribing && (
+            <Text style={styles.micStatus}>{t("aiPlan.mic.transcribing")}</Text>
+          )}
 
           <Text style={styles.label}>Stile di guida</Text>
           <View style={styles.styleRow}>
@@ -196,9 +257,9 @@ export const AiPlanModal = ({ visible, onClose, onRouteReady }: Props) => {
           )}
 
           <TouchableOpacity
-            style={[styles.generateBtn, loading && styles.generateBtnDisabled]}
+            style={[styles.generateBtn, (loading || whisper.recording || whisper.transcribing) && styles.generateBtnDisabled]}
             onPress={handleGenerate}
-            disabled={loading}
+            disabled={loading || whisper.recording || whisper.transcribing}
           >
             {loading ? (
               <ActivityIndicator size="small" color="#000" />
@@ -326,5 +387,33 @@ const styles = StyleSheet.create({
     marginTop: 14,
     lineHeight: 18,
     textAlign: "center",
+  },
+  inputRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 8,
+  },
+  inputFlex: {
+    flex: 1,
+  },
+  micBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 10,
+    backgroundColor: Colors.surface,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 0,
+  },
+  micBtnActive: {
+    borderColor: Colors.accent,
+    backgroundColor: Colors.accent + "18",
+  },
+  micStatus: {
+    fontSize: 12,
+    color: Colors.accent,
+    marginTop: 6,
   },
 });

@@ -1398,6 +1398,10 @@ const translations: Record<string, string> = {
   "common.ok": "OK",
   "push.proposalZone.title": "Nuova proposta in zona! 🏍️",
   "push.proposalZone.body": "Un biker ha creato una proposta di viaggio vicino a te.",
+  "aiPlan.mic.recording": "Registrazione in corso… tocca per fermare",
+  "aiPlan.mic.transcribing": "Trascrizione in corso…",
+  "aiPlan.mic.errorMic": "Errore microfono",
+  "aiPlan.mic.noAudio": "Nessun audio rilevato",
 };
 
 export default translations;

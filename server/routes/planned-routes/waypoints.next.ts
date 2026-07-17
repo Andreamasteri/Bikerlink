@@ -14,7 +14,7 @@ import { z } from "zod";
 import { generateObject, streamText } from "ai";
 
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
-import { getOllamaModel, isOllamaConfigured, isOllamaReachable } from "../../lib/ollama-client";
+import { getOllamaModel, getOllamaModelId, isOllamaConfigured, isOllamaReachable } from "../../lib/ollama-client";
 import { getGroqModel, getGroqParseModel, isGroqConfigured } from "../../lib/groq-client";
 import { getOpenAiRouteModel, isOpenAiRouteConfigured } from "../../lib/openai-route-client";
 import { getEffectiveRouteChain } from "../../ai/route-provider-config";
@@ -80,6 +80,21 @@ const NO_PROVIDER_MSG =
   "Nessun provider AI disponibile al momento, riprova tra qualche minuto.";
 
 /**
+ * Rimuove i blocchi di ragionamento `<think>…</think>` e i tag `</think>` orfani
+ * che qwen3:4b (Horus) può emettere anche con `think:false` su Ollama.
+ * Stessa logica di stripThink in server/ai/assistant/inter-agent.ts.
+ */
+function stripThink(text: string): string {
+  let out = (text ?? "").replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
+  const closeTag = "</think>";
+  const closeIdx = out.toLowerCase().indexOf(closeTag);
+  if (closeIdx !== -1) {
+    out = out.slice(closeIdx + closeTag.length).trim();
+  }
+  return out;
+}
+
+/**
  * Restituisce true se l'errore è un 429 rate-limit (qualsiasi provider).
  * In questo caso il chiamante deve saltare IMMEDIATAMENTE al provider successivo
  * senza retry sul provider corrente (maxRetries spreca tempo su un provider esaurito).
@@ -116,14 +131,16 @@ export async function generateRouteObject<T>(opts: RouteAiOptions<T>): Promise<{
 
     if (providerId === "ollama") {
       if (!isOllamaConfigured) continue;
-      if (!(await isOllamaReachable())) {
+      if (!(await isOllamaReachable("horus"))) {
         console.info("[AI parse] Ollama probe fallito (offline/irraggiungibile), skip a provider successivo.");
         continue;
       }
       try {
+        const horusModelId = getOllamaModelId("horus");
+        console.info(`[AI parse] Ollama → persona=horus model=${horusModelId}`);
         // check-ai-direct-generateobject: safe — Ollama supports json_schema natively
         const { object } = await generateObject({
-          model: getOllamaModel(), schema, prompt: fullPrompt,
+          model: getOllamaModel(horusModelId, "horus"), schema, prompt: fullPrompt,
           maxRetries: 0, temperature, abortSignal,
           providerOptions: { ollama: { think: false } },
         });
@@ -253,9 +270,14 @@ async function bufferAndValidateStream(
   for await (const chunk of result.textStream) {
     if (chunk) buffered.push(chunk);
   }
-  const fullText = buffered.join("");
+  // Rimuove i tag <think>…</think> e i </think> orfani che Horus (qwen3:4b) può
+  // emettere anche con think:false — il testo pulito viene passato a validate e
+  // restituito come unico chunk (il client riceve solo la risposta finale, mai il
+  // ragionamento intermedio).
+  const rawText = buffered.join("");
+  const fullText = stripThink(rawText);
   const isValid = validate ? validate(fullText) : fullText.trim().length > 0;
-  return isValid ? buffered : null;
+  return isValid ? [fullText] : null;
 }
 
 export async function* streamRouteText(opts: StreamRouteOptions): AsyncGenerator<string> {
@@ -274,12 +296,14 @@ export async function* streamRouteText(opts: StreamRouteOptions): AsyncGenerator
 
     if (providerId === "ollama") {
       if (!isOllamaConfigured) continue;
-      if (!(await isOllamaReachable())) {
+      if (!(await isOllamaReachable("horus"))) {
         console.info("[AI stream] Ollama probe fallito (offline/irraggiungibile), skip a provider successivo.");
         continue;
       }
       try {
-        const buffered = await bufferAndValidateStream(getOllamaModel(), fullPrompt, streamOpts);
+        const horusModelId = getOllamaModelId("horus");
+        console.info(`[AI stream] Ollama → persona=horus model=${horusModelId}`);
+        const buffered = await bufferAndValidateStream(getOllamaModel(horusModelId, "horus"), fullPrompt, streamOpts);
         if (buffered) {
           incrementProviderStat("ollama");
           onProviderSelected?.("ollama");
