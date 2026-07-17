@@ -50,9 +50,7 @@
 # perché esistevano prima che questa regola fosse introdotta. Non aggiungere
 # nuovi file a questo elenco.
 
-KNOWN_GAPS=(
-  "ThinkCentreCard.part2.tsx"
-)
+KNOWN_GAPS=()
 
 set -euo pipefail
 
