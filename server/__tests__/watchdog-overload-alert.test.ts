@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 // ---------------------------------------------------------------------------
 // Task #72 — sovraccarico sostenuto (DB e backend) emette segnali "high"
@@ -8,6 +8,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 // ---------------------------------------------------------------------------
 
 const sendPushMock = vi.hoisted(() => vi.fn().mockResolvedValue(2));
+const getAdminPushTokenCountMock = vi.hoisted(() => vi.fn().mockResolvedValue(-1));
 
 vi.mock("../push-notifications", () => ({
   sendSystemAlertPushToAdmins: sendPushMock,
@@ -24,6 +25,12 @@ vi.mock("../ai/coordinator/integrations/watchdog", () => ({
 
 vi.mock("../ai/watchdog/maps-kill-switch", () => ({
   isMapsFlagEnabled: vi.fn().mockResolvedValue(true),
+}));
+
+// getAdminPushTokenCount è chiamato a ogni dispatchAlerts() per il guard anti-spam.
+// Default: -1 (errore DB simulato) → guard non si attiva → test pre-esistenti invariati.
+vi.mock("../push-notifications-internal", () => ({
+  getAdminPushTokenCount: getAdminPushTokenCountMock,
 }));
 
 import { dispatchAlerts, _resetThrottleForTests } from "../ai/watchdog/alerts";
@@ -240,5 +247,131 @@ describe("watchdog overload alerts (Task #72)", () => {
       return t === "watchdog_db_recovered" || t === "watchdog_backend_recovered";
     });
     expect(recoveryCalls).toHaveLength(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Task #415 — Guard anti-spam al ripristino dei token admin (0→N).
+// Quando push_tokens torna popolato dopo un periodo a zero token, il primo ciclo
+// NON deve inviare il backlog di alert accumulati (burst soppresso). Solo il
+// ciclo successivo invia i problemi correnti normalmente.
+// ---------------------------------------------------------------------------
+describe("watchdog dispatchAlerts — guard anti-burst 0→N token admin (Task #415)", () => {
+  const ALERT_TTL_MS = 10 * 60 * 1000; // 10 min, stesso valore di alerts.ts
+
+  // Snapshot rosso con un problema critico generico (usa status.red come throttle key)
+  function redSnapshot(): HealthSnapshot {
+    return {
+      status: "red",
+      score: 20,
+      problems: [],
+      metrics: {},
+      generatedAt: new Date().toISOString(),
+    };
+  }
+
+  beforeEach(() => {
+    sendPushMock.mockClear();
+    sendPushMock.mockResolvedValue(1);
+    getAdminPushTokenCountMock.mockClear();
+    _resetThrottleForTests();
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("ciclo 0→N: NON invia alert nella transizione, MA LI invia nel ciclo successivo", async () => {
+    // Fase 1: token count = 5 → alert red inviato, "status.red" entra nel throttle
+    getAdminPushTokenCountMock.mockResolvedValue(5);
+    await dispatchAlerts(redSnapshot());
+    const firstCycleCalls = sendPushMock.mock.calls.filter(
+      ([, , p]) => (p as { status?: string })?.status === "red",
+    );
+    expect(firstCycleCalls).toHaveLength(1); // sanity check: il primo ciclo invia
+
+    sendPushMock.mockClear();
+
+    // Fase 2: token count = 0 → lastKnownAdminTokenCount si azzera a 0
+    getAdminPushTokenCountMock.mockResolvedValue(0);
+    await dispatchAlerts(redSnapshot());
+
+    sendPushMock.mockClear();
+
+    // Fase 3: il TTL scade → shouldSend("status.red") tornerebbe true senza il guard
+    vi.advanceTimersByTime(ALERT_TTL_MS + 1000);
+
+    // Transizione 0→N: il guard stampa "status.red" con timestamp=now → shouldSend=false
+    getAdminPushTokenCountMock.mockResolvedValue(3);
+    await dispatchAlerts(redSnapshot());
+
+    const burstCalls = sendPushMock.mock.calls.filter(
+      ([, , p]) => (p as { status?: string })?.status === "red",
+    );
+    expect(burstCalls).toHaveLength(0); // burst soppresso nel ciclo di transizione
+
+    sendPushMock.mockClear();
+
+    // Fase 4: ciclo successivo (count ancora > 0, nessuna transizione) — TTL scade
+    vi.advanceTimersByTime(ALERT_TTL_MS + 1000);
+    getAdminPushTokenCountMock.mockResolvedValue(3);
+    await dispatchAlerts(redSnapshot());
+
+    const nextCycleCalls = sendPushMock.mock.calls.filter(
+      ([, , p]) => (p as { status?: string })?.status === "red",
+    );
+    expect(nextCycleCalls).toHaveLength(1); // inviato normalmente nel ciclo post-ripristino
+  });
+
+  it("senza transizione 0→N il throttle funziona normalmente (nessuna soppressione extra)", async () => {
+    // count costante > 0: nessun burst guard, throttle standard
+    getAdminPushTokenCountMock.mockResolvedValue(2);
+
+    await dispatchAlerts(redSnapshot());
+    sendPushMock.mockClear();
+
+    // Secondo ciclo entro TTL: throttle blocca (behavior normale)
+    await dispatchAlerts(redSnapshot());
+    const inTTLCalls = sendPushMock.mock.calls.filter(
+      ([, , p]) => (p as { status?: string })?.status === "red",
+    );
+    expect(inTTLCalls).toHaveLength(0);
+
+    sendPushMock.mockClear();
+
+    // Dopo TTL: inviato normalmente
+    vi.advanceTimersByTime(ALERT_TTL_MS + 1000);
+    await dispatchAlerts(redSnapshot());
+    const afterTTLCalls = sendPushMock.mock.calls.filter(
+      ([, , p]) => (p as { status?: string })?.status === "red",
+    );
+    expect(afterTTLCalls).toHaveLength(1);
+  });
+
+  it("errore DB (count=-1) non aggiorna lastKnownAdminTokenCount e non provoca guard spurio", async () => {
+    // Ciclo 1: count=5, alert inviato, lastKnownAdminTokenCount=5
+    getAdminPushTokenCountMock.mockResolvedValue(5);
+    await dispatchAlerts(redSnapshot());
+    sendPushMock.mockClear();
+
+    // Ciclo 2: DB error (count=-1) → lastKnownAdminTokenCount rimane 5 (non si azzera)
+    getAdminPushTokenCountMock.mockResolvedValue(-1);
+    await dispatchAlerts(redSnapshot());
+    sendPushMock.mockClear();
+
+    // TTL scade → shouldSend("status.red") tornerebbe true
+    vi.advanceTimersByTime(ALERT_TTL_MS + 1000);
+
+    // Ciclo 3: count=5 ancora → transizione 5→5 (NON è 0→N) → guard NON scatta
+    // → shouldSend("status.red")=true → push inviata normalmente
+    getAdminPushTokenCountMock.mockResolvedValue(5);
+    await dispatchAlerts(redSnapshot());
+
+    const calls = sendPushMock.mock.calls.filter(
+      ([, , p]) => (p as { status?: string })?.status === "red",
+    );
+    // Il ciclo post-TTL invia normalmente: nessun guard spurio innescato dall'errore DB
+    expect(calls).toHaveLength(1);
   });
 });
