@@ -24,6 +24,10 @@ import { runBootPhase3DbInit } from "./boot-phase3-db-init";
 import { resetCrashBackoff, applyCrashBackoff } from "./lib/crash-backoff";
 import type { Server } from "http";
 
+// ── Pool config invariants (fast synchronous check, fails early if misconfigured) ─
+import { assertPoolConfigInvariants } from "./lib/pool-config";
+assertPoolConfigInvariants();
+
 // ── Phase timeout helper ─────────────────────────────────────────────────────
 const BOOT_PHASE_TIMEOUT_MS = Number(process.env.BOOT_PHASE_TIMEOUT_MS) || 30_000;
 const MIGRATION_TIMEOUT_MS = Number(process.env.MIGRATION_TIMEOUT_MS) || 600_000;
