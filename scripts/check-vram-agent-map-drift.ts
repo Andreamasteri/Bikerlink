@@ -1,0 +1,138 @@
+#!/usr/bin/env tsx
+/**
+ * check-vram-agent-map-drift.ts
+ *
+ * Verifica che DEFAULT_AGENT_MAP in scripts/thinkcentre/ai-hub/vram-routes.js
+ * contenga una chiave per ogni modello elencato in AGENT_MODEL_DEFAULTS in
+ * server/lib/agent-constants.ts.
+ *
+ * PERCHÉ ESISTE:
+ *   vram-routes.js è deployato sul ThinkCentre come parte dell'ai-hub e non
+ *   viene aggiornato automaticamente quando un agente cambia modello.
+ *   Se un model upgrade viene applicato solo in agent-constants.ts (o solo in
+ *   vram-routes.js), il TC torna al DEFAULT_AGENT_MAP hardcoded dopo un
+ *   riavvio e prima che l'api-server abbia fatto la push: GET /vram mostra
+ *   agent:null per il modello aggiornato, rendendo il monitoring inattendibile.
+ *
+ *   Questo script cattura la divergenza PRIMA che arrivi in produzione, senza
+ *   richiedere un TC live o una GPU reale.
+ *
+ * UTILIZZO:
+ *   npx tsx scripts/check-vram-agent-map-drift.ts
+ *
+ * EXIT:
+ *   0 — ogni modello in AGENT_MODEL_DEFAULTS compare come chiave in DEFAULT_AGENT_MAP
+ *   1 — uno o più modelli mancano (drift rilevato)
+ */
+
+import * as fs from "fs";
+import * as path from "path";
+
+const ROOT = path.resolve(__dirname, "..");
+
+// ── 1. Leggi AGENT_MODEL_DEFAULTS da server/lib/agent-constants.ts ──────────
+
+const agentConstantsPath = path.join(ROOT, "server", "lib", "agent-constants.ts");
+const agentConstantsSrc = fs.readFileSync(agentConstantsPath, "utf8");
+
+/**
+ * Estrae i valori stringa da AGENT_MODEL_DEFAULTS tramite regex.
+ * Cerca il blocco `export const AGENT_MODEL_DEFAULTS = { ... } as const;`
+ * e cattura le coppie key: "value".
+ */
+function parseAgentModelDefaults(src: string): Map<string, string> {
+  const blockMatch = src.match(/export const AGENT_MODEL_DEFAULTS\s*=\s*\{([^}]+)\}\s*as const/s);
+  if (!blockMatch) {
+    throw new Error(
+      `[drift-check] Cannot find AGENT_MODEL_DEFAULTS block in ${agentConstantsPath}`
+    );
+  }
+  const block = blockMatch[1];
+  const result = new Map<string, string>();
+  // Match lines like:   bowie: "qwen3:1.7b",
+  for (const m of block.matchAll(/(\w+)\s*:\s*"([^"]+)"/g)) {
+    result.set(m[1], m[2]);
+  }
+  if (result.size === 0) {
+    throw new Error("[drift-check] AGENT_MODEL_DEFAULTS parsed 0 entries — check regex");
+  }
+  return result;
+}
+
+// ── 2. Leggi DEFAULT_AGENT_MAP da scripts/thinkcentre/ai-hub/vram-routes.js ─
+
+const vramRoutesPath = path.join(
+  ROOT,
+  "scripts",
+  "thinkcentre",
+  "ai-hub",
+  "vram-routes.js"
+);
+const vramRoutesSrc = fs.readFileSync(vramRoutesPath, "utf8");
+
+/**
+ * Estrae le chiavi di DEFAULT_AGENT_MAP tramite regex.
+ * Cerca il blocco `const DEFAULT_AGENT_MAP = { ... };`
+ * e cattura tutte le chiavi (stringhe quotate).
+ */
+function parseDefaultAgentMapKeys(src: string): Set<string> {
+  const blockMatch = src.match(/const DEFAULT_AGENT_MAP\s*=\s*\{([^}]+)\}/s);
+  if (!blockMatch) {
+    throw new Error(
+      `[drift-check] Cannot find DEFAULT_AGENT_MAP block in ${vramRoutesPath}`
+    );
+  }
+  const block = blockMatch[1];
+  const result = new Set<string>();
+  // Match lines like:   "qwen3:4b": "Horus",
+  for (const m of block.matchAll(/"([^"]+)"\s*:/g)) {
+    result.add(m[1]);
+  }
+  if (result.size === 0) {
+    throw new Error("[drift-check] DEFAULT_AGENT_MAP parsed 0 keys — check regex");
+  }
+  return result;
+}
+
+// ── 3. Confronta e segnala il drift ─────────────────────────────────────────
+
+function main(): void {
+  const agentDefaults = parseAgentModelDefaults(agentConstantsSrc);
+  const defaultMapKeys = parseDefaultAgentMapKeys(vramRoutesSrc);
+
+  console.log("── AGENT_MODEL_DEFAULTS (server/lib/agent-constants.ts) ──────────────────");
+  for (const [agent, model] of agentDefaults) {
+    console.log(`  ${agent}: "${model}"`);
+  }
+
+  console.log("\n── DEFAULT_AGENT_MAP keys (scripts/thinkcentre/ai-hub/vram-routes.js) ───");
+  for (const key of defaultMapKeys) {
+    console.log(`  "${key}"`);
+  }
+
+  const missing: Array<{ agent: string; model: string }> = [];
+  for (const [agent, model] of agentDefaults) {
+    if (!defaultMapKeys.has(model)) {
+      missing.push({ agent, model });
+    }
+  }
+
+  console.log();
+  if (missing.length === 0) {
+    console.log("✅  No drift: every model in AGENT_MODEL_DEFAULTS appears in DEFAULT_AGENT_MAP.");
+    process.exit(0);
+  } else {
+    console.error(
+      "❌  DRIFT DETECTED — the following models are in AGENT_MODEL_DEFAULTS but missing\n" +
+      "    from DEFAULT_AGENT_MAP in vram-routes.js.\n" +
+      "    Add the missing entries to DEFAULT_AGENT_MAP so the pre-push fallback\n" +
+      "    correctly labels these agents before the api-server pushes its map.\n"
+    );
+    for (const { agent, model } of missing) {
+      console.error(`  agent: ${agent}  →  model: "${model}"  ← MISSING from DEFAULT_AGENT_MAP`);
+    }
+    process.exit(1);
+  }
+}
+
+main();

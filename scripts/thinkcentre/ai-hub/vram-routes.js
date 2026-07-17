@@ -44,10 +44,21 @@ const WINDOW_MS = 24 * 60 * 60 * 1000;
 //
 // Voci RIMOSSE (stantie): "bikerlink:latest" (alias legacy Horus non più in uso),
 // "llama3.2:3b" (vecchio modello Bowie, sostituito da qwen3:1.7b).
+//
+// NOTE: "all-minilm" (no tag) and "all-minilm:latest" are both listed because
+// Ollama may report the model with or without the explicit ":latest" suffix.
+// The canonical name in AGENT_MODEL_DEFAULTS is "all-minilm" (no tag), matching
+// what pushAgentModelMapToHub() sends at runtime — both forms resolve to Nadir
+// in the pre-push window.
+//
+// DRIFT GUARD: this map must stay in sync with AGENT_MODEL_DEFAULTS in
+// server/lib/agent-constants.ts. Run `npx tsx scripts/check-vram-agent-map-drift.ts`
+// to verify; it also runs as the "check-vram-agent-map-drift" CI workflow.
 const DEFAULT_AGENT_MAP = {
   "qwen3:4b": "Horus",
   "qwen3:1.7b": "Bowie",
   "granite4:tiny-h": "Quebracho",
+  "all-minilm": "Nadir",
   "all-minilm:latest": "Nadir",
   "devstral:latest": "Ares",
 };

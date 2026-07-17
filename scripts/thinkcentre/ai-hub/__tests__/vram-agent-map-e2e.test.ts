@@ -102,6 +102,73 @@ const noProcesses = {
   readOllamaModels: () => [],
 };
 
+// ─── Drift guard: DEFAULT_AGENT_MAP vs AGENT_MODEL_DEFAULTS ──────────────────
+
+import * as fs from "fs";
+import * as path from "path";
+
+const ROOT = path.resolve(__dirname, "../../../../");
+
+/**
+ * Parse the canonical model defaults from server/lib/agent-constants.ts.
+ * Returns a Map<agentName, modelString>.
+ */
+function parseAgentModelDefaults(): Map<string, string> {
+  const src = fs.readFileSync(
+    path.join(ROOT, "server", "lib", "agent-constants.ts"),
+    "utf8"
+  );
+  const blockMatch = src.match(/export const AGENT_MODEL_DEFAULTS\s*=\s*\{([^}]+)\}\s*as const/s);
+  if (!blockMatch) throw new Error("Cannot find AGENT_MODEL_DEFAULTS block");
+  const result = new Map<string, string>();
+  for (const m of blockMatch[1].matchAll(/(\w+)\s*:\s*"([^"]+)"/g)) {
+    result.set(m[1], m[2]);
+  }
+  return result;
+}
+
+/**
+ * Parse the DEFAULT_AGENT_MAP keys from vram-routes.js.
+ * Returns a Set<modelString>.
+ */
+function parseDefaultAgentMapKeys(): Set<string> {
+  const src = fs.readFileSync(
+    path.join(ROOT, "scripts", "thinkcentre", "ai-hub", "vram-routes.js"),
+    "utf8"
+  );
+  const blockMatch = src.match(/const DEFAULT_AGENT_MAP\s*=\s*\{([^}]+)\}/s);
+  if (!blockMatch) throw new Error("Cannot find DEFAULT_AGENT_MAP block");
+  const result = new Set<string>();
+  for (const m of blockMatch[1].matchAll(/"([^"]+)"\s*:/g)) {
+    result.add(m[1]);
+  }
+  return result;
+}
+
+describe("vram-routes.js — DEFAULT_AGENT_MAP drift guard", () => {
+  it("every model in AGENT_MODEL_DEFAULTS appears as a key in DEFAULT_AGENT_MAP", () => {
+    const agentDefaults = parseAgentModelDefaults();
+    const defaultMapKeys = parseDefaultAgentMapKeys();
+
+    const missing: string[] = [];
+    for (const [agent, model] of agentDefaults) {
+      if (!defaultMapKeys.has(model)) {
+        missing.push(`${agent}: "${model}"`);
+      }
+    }
+
+    expect(missing, [
+      "DEFAULT_AGENT_MAP in vram-routes.js is missing entries for:",
+      ...missing.map((m) => `  ${m}`),
+      "",
+      "Add the missing model→agent entries to DEFAULT_AGENT_MAP so the",
+      "pre-push fallback correctly labels agents before the api-server",
+      "pushes its runtime map. Also run:",
+      "  npx tsx scripts/check-vram-agent-map-drift.ts",
+    ].join("\n")).toEqual([]);
+  });
+});
+
 // ─── Tests ────────────────────────────────────────────────────────────────────
 
 describe("vram-routes.js — agent name after model upgrade (real production code)", () => {
