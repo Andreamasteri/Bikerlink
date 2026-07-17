@@ -33,7 +33,7 @@ import { Client as SshClient } from "ssh2";
 import signature from "cookie-signature";
 import { pool } from "../db";
 import { storage } from "../storage";
-import { normalizeOpenSshPrivateKey } from "./ssh-exec";
+import { normalizeOpenSshPrivateKey, verifyTcToken } from "./ssh-exec";
 import {
   ensureTcSshBridge,
   forceBridgeReset,
@@ -49,10 +49,23 @@ const WS_PATH = "/api/ssh/terminal";
 
 async function validateAdminToken(
   rawToken: string,
-): Promise<{ userId: string } | null> {
+): Promise<{ userId: string; tcUsername?: string } | null> {
   try {
     if (!rawToken) return null;
 
+    // ── Token TC-native (generato da POST /api/ssh/terminal/auth) ────────────
+    // Formato: "tc:<base64url(payload)>.<hmac>"
+    // Non richiede sessione BikerLink né ruolo admin: la verifica è avvenuta
+    // al momento del login (password SSH Linux del TC).
+    // tcUsername viene propagato al chiamante che lo confronta con TC_SSH_USER
+    // prima di aprire il PTY: identità provata al login = identità SSH runtime.
+    if (rawToken.startsWith("tc:")) {
+      const tcAuth = verifyTcToken(rawToken);
+      if (!tcAuth) return null;
+      return { userId: `tc:${tcAuth.tcUsername}`, tcUsername: tcAuth.tcUsername };
+    }
+
+    // ── Token sessione BikerLink (legacy / accesso dal browser web admin) ────
     const secret = process.env.SESSION_SECRET;
     if (!secret) {
       console.error("[ssh-terminal-ws] SESSION_SECRET non configurato");
@@ -305,14 +318,35 @@ export function setupSshTerminalWs(server: Server): void {
         return;
       }
 
-      // Valida sessione admin.
+      // Valida sessione admin o token TC-native.
       const auth = await validateAdminToken(token);
       if (!auth) {
         ws.close(1008, "Non autorizzato");
         return;
       }
 
-      console.log(`[ssh-terminal-ws] admin ${auth.userId} connesso`);
+      // ── Identity binding per token TC-native ────────────────────────────────
+      // Il PTY apre sempre come TC_SSH_USER (chiave privata). Per i token
+      // TC-native, il tcUsername provato al login DEVE coincidere con
+      // TC_SSH_USER: impedisce che un account Linux diverso (e meno
+      // privilegiato) ottenga una sessione con l'identità SSH configurata.
+      if (auth.tcUsername !== undefined) {
+        const configuredUser = (process.env.TC_SSH_USER ?? "").trim();
+        if (!configuredUser) {
+          ws.close(1011, "TC_SSH_USER non configurato");
+          return;
+        }
+        if (auth.tcUsername !== configuredUser) {
+          console.warn(
+            `[ssh-terminal-ws] rifiuto identità: token per "${auth.tcUsername}", ` +
+            `TC_SSH_USER="${configuredUser}"`,
+          );
+          ws.close(1008, "Utente TC non autorizzato");
+          return;
+        }
+      }
+
+      console.log(`[ssh-terminal-ws] connessione accettata per ${auth.userId}`);
 
       await openPtySession(ws);
     })();

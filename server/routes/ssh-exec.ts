@@ -1,5 +1,6 @@
 import { Router, type Request, type Response } from "express";
 import { Client as SshClient } from "ssh2";
+import { createHmac } from "node:crypto";
 import { storage } from "../storage";
 import { ensureTcSshBridge } from "../lib/tc-ssh-bridge";
 
@@ -209,6 +210,124 @@ router.post("/exec", requireAdminSession, async (req: Request, res: Response) =>
 
 router.get("/log", requireAdminSession, (_req: Request, res: Response) => {
   return res.json(getSshLog());
+});
+
+// ── TC-native token helpers ──────────────────────────────────────────────────
+// Formato: "tc:<base64url(JSON)>.<hmac-sha256-hex>"
+// Il payload contiene { u: tcUsername, exp: epochMs }.
+// Firmato con SESSION_SECRET — indipendente dai token sessione BikerLink.
+
+const TC_TOKEN_TTL_MS = 24 * 60 * 60 * 1000; // 24 ore
+
+export function signTcToken(tcUsername: string): string {
+  const secret = process.env.SESSION_SECRET;
+  if (!secret) throw new Error("SESSION_SECRET non configurato");
+  const payload = Buffer.from(JSON.stringify({
+    u: tcUsername,
+    exp: Date.now() + TC_TOKEN_TTL_MS,
+  })).toString("base64url");
+  const mac = createHmac("sha256", secret).update(payload).digest("hex");
+  return `tc:${payload}.${mac}`;
+}
+
+export function verifyTcToken(raw: string): { tcUsername: string } | null {
+  try {
+    if (!raw.startsWith("tc:")) return null;
+    const secret = process.env.SESSION_SECRET;
+    if (!secret) return null; // fail-closed: nessun token valido senza secret
+    const body = raw.slice(3); // rimuovi "tc:"
+    const dotIdx = body.lastIndexOf(".");
+    if (dotIdx < 0) return null;
+    const payload = body.slice(0, dotIdx);
+    const mac = body.slice(dotIdx + 1);
+    const expected = createHmac("sha256", secret).update(payload).digest("hex");
+    // Confronto a tempo costante manuale (Buffer.compare non è time-safe per stringhe hex di lunghezza diversa)
+    if (mac.length !== expected.length) return null;
+    let diff = 0;
+    for (let i = 0; i < expected.length; i++) diff |= mac.charCodeAt(i) ^ expected.charCodeAt(i);
+    if (diff !== 0) return null;
+    const parsed = JSON.parse(Buffer.from(payload, "base64url").toString("utf8")) as {
+      u?: unknown;
+      exp?: unknown;
+    };
+    if (typeof parsed.u !== "string" || typeof parsed.exp !== "number") return null;
+    if (Date.now() > parsed.exp) return null; // scaduto
+    return { tcUsername: parsed.u };
+  } catch {
+    return null;
+  }
+}
+
+/** Tenta un login SSH password sul bridge CF per verificare le credenziali Linux del TC. */
+async function verifyTcCredentials(tcUsername: string, tcPassword: string): Promise<boolean> {
+  const bridge = await ensureTcSshBridge();
+  if (!bridge.ok) return false;
+
+  return new Promise((resolve) => {
+    const conn = new SshClient();
+    let settled = false;
+    const finish = (ok: boolean) => {
+      if (settled) return;
+      settled = true;
+      try { conn.end(); } catch { /* ignore */ }
+      resolve(ok);
+    };
+
+    const timeout = setTimeout(() => finish(false), 12_000);
+
+    conn.on("ready", () => {
+      clearTimeout(timeout);
+      finish(true);
+    });
+
+    conn.on("error", () => {
+      clearTimeout(timeout);
+      finish(false);
+    });
+
+    conn.connect({
+      host: "127.0.0.1",
+      port: bridge.localPort,
+      username: tcUsername,
+      password: tcPassword,
+      readyTimeout: 10_000,
+      // ssh2 tenta automaticamente password auth quando `password` è fornita
+      // e il server la offre nella lista dei metodi supportati.
+    });
+  });
+}
+
+// POST /api/ssh/terminal/auth
+// Accetta { tcUsername, tcPassword }, verifica le credenziali Linux del TC
+// via SSH password auth sul bridge CF, restituisce { token } firmato.
+// Non richiede sessione BikerLink: è l'endpoint di accesso TC-native.
+router.post("/terminal/auth", async (req: Request, res: Response) => {
+  const body = req.body as { tcUsername?: unknown; tcPassword?: unknown };
+  const tcUsername = typeof body.tcUsername === "string" ? body.tcUsername.trim() : "";
+  const tcPassword = typeof body.tcPassword === "string" ? body.tcPassword : "";
+
+  if (!tcUsername || !tcPassword) {
+    return res.status(400).json({ error: "tcUsername e tcPassword sono obbligatori" });
+  }
+
+  // Blocca username con caratteri non validi per un utente Linux.
+  if (!/^[a-z_][a-z0-9_-]{0,31}$/.test(tcUsername)) {
+    return res.status(400).json({ error: "Nome utente TC non valido" });
+  }
+
+  try {
+    const ok = await verifyTcCredentials(tcUsername, tcPassword);
+    if (!ok) {
+      return res.status(401).json({ error: "Credenziali TC non valide" });
+    }
+    const token = signTcToken(tcUsername);
+    console.log(`[ssh/terminal/auth] accesso TC concesso per utente "${tcUsername}"`);
+    return res.json({ token });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error(`[ssh/terminal/auth] errore verifica credenziali: ${msg}`);
+    return res.status(500).json({ error: "Errore interno durante la verifica delle credenziali" });
+  }
 });
 
 export default router;

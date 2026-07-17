@@ -16,35 +16,34 @@ import { THEME } from "../constants/theme";
 
 const DOMAIN = process.env.EXPO_PUBLIC_DOMAIN || "bikerlink.replit.app";
 
-async function login(
-  identifier: string,
-  password: string,
-): Promise<{ token: string; role: string }> {
-  const res = await fetch(`https://${DOMAIN}/api/auth/login`, {
+async function loginTc(
+  tcUsername: string,
+  tcPassword: string,
+): Promise<{ token: string }> {
+  const res = await fetch(`https://${DOMAIN}/api/ssh/terminal/auth`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ identifier, password, platform: "android" }),
+    body: JSON.stringify({ tcUsername, tcPassword }),
   });
   const json = (await res.json().catch(() => ({}))) as {
-    sessionToken?: string;
-    role?: string;
+    token?: string;
     error?: string;
     message?: string;
   };
   if (!res.ok) {
     throw new Error(json.error ?? json.message ?? "Credenziali non valide");
   }
-  if (!json.sessionToken) {
+  if (!json.token) {
     throw new Error("Token non ricevuto dal server");
   }
-  return { token: json.sessionToken, role: json.role ?? "user" };
+  return { token: json.token };
 }
 
 export default function LoginScreen() {
   const insets = useSafeAreaInsets();
   const topInset = Platform.OS === "web" ? 67 : insets.top;
 
-  const [identifier, setIdentifier] = useState("");
+  const [tcUsername, setTcUsername] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -53,7 +52,7 @@ export default function LoginScreen() {
     (async () => {
       const creds = await getSavedCredentials();
       if (creds) {
-        setIdentifier(creds.identifier);
+        setTcUsername(creds.identifier);
         setPassword(creds.password);
       }
     })();
@@ -61,25 +60,22 @@ export default function LoginScreen() {
 
   const onSubmit = useCallback(async () => {
     if (busy) return;
-    if (!identifier.trim() || !password) {
-      setError("Inserisci email/nickname e password");
+    if (!tcUsername.trim() || !password) {
+      setError("Inserisci utente TC e password");
       return;
     }
     setBusy(true);
     setError(null);
     try {
-      const res = await login(identifier.trim(), password);
-      if (res.role !== "admin") {
-        throw new Error("Accesso riservato agli amministratori");
-      }
-      await saveSession(res.token, res.role);
-      await saveCredentials(identifier.trim(), password);
+      const res = await loginTc(tcUsername.trim(), password);
+      await saveSession(res.token, "tc");
+      await saveCredentials(tcUsername.trim(), password);
       router.replace("/");
     } catch (e) {
       setError((e as Error).message);
       setBusy(false);
     }
-  }, [busy, identifier, password]);
+  }, [busy, tcUsername, password]);
 
   return (
     <View
@@ -94,17 +90,17 @@ export default function LoginScreen() {
         </View>
         <Text style={[styles.title, { color: THEME.accent }]}>TC Terminal</Text>
         <Text style={[styles.subtitle, { color: THEME.textSecondary }]}>
-          ThinkCentre SSH — solo admin
+          ThinkCentre SSH
         </Text>
       </View>
 
       <View style={styles.form}>
         <Text style={[styles.label, { color: THEME.textSecondary }]}>
-          Email o nickname
+          Utente TC
         </Text>
         <TextInput
-          value={identifier}
-          onChangeText={setIdentifier}
+          value={tcUsername}
+          onChangeText={setTcUsername}
           autoCapitalize="none"
           autoCorrect={false}
           editable={!busy}
@@ -116,7 +112,7 @@ export default function LoginScreen() {
               borderColor: THEME.border,
             },
           ]}
-          placeholder="admin@esempio.com"
+          placeholder="andrea"
           placeholderTextColor={THEME.textSecondary}
           returnKeyType="next"
           testID="login-identifier"
@@ -125,7 +121,7 @@ export default function LoginScreen() {
         <Text
           style={[styles.label, { color: THEME.textSecondary, marginTop: 16 }]}
         >
-          Password
+          Password TC
         </Text>
         <TextInput
           value={password}

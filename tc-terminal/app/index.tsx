@@ -18,6 +18,8 @@ import { clearSession, getToken } from "../lib/session";
 import { THEME } from "../constants/theme";
 
 const DOMAIN = process.env.EXPO_PUBLIC_DOMAIN || "bikerlink.replit.app";
+// Label visivo mostrato in UI: indica l'host del ThinkCentre, non il bridge BikerLink.
+const TC_DISPLAY_HOST = process.env.EXPO_PUBLIC_TC_DISPLAY_HOST || "tc.biker-link.net";
 
 // Rimuove i codici ANSI di escape (colori, movimento cursore, ecc.)
 // per visualizzare testo plain in ScrollView.
@@ -239,7 +241,7 @@ export default function TerminalScreen() {
           {connected ? "CONNESSO" : "DISCONNESSO"}
         </Text>
         <Text style={[styles.domainText, { color: THEME.textSecondary }]}>
-          {DOMAIN}
+          {TC_DISPLAY_HOST}
         </Text>
         <Pressable
           onPress={() => {
