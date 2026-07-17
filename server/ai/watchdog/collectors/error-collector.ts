@@ -109,12 +109,24 @@ export async function collectErrors(): Promise<Signal[]> {
         details: { crashCount, totalSessions, insufficientData: true, minSessions },
       });
     } else {
-      const crashFreeRate = Math.round(((totalSessions - crashCount) / totalSessions) * 100 * 10) / 10;
-      signals.push({
-        source: "error", metric: "client.crash_free_rate_24h", value: crashFreeRate, unit: "%",
-        severity: crashFreeRate < 90 ? "critical" : crashFreeRate < 95 ? "warn" : "info",
-        details: { crashCount, totalSessions },
-      });
+      // Guard esplicito: totalSessions=0 non dovrebbe raggiungere questo ramo
+      // (minSessions default=20 lo filtra prima), ma per sicurezza evitiamo NaN.
+      if (totalSessions === 0) {
+        signals.push({
+          source: "error", metric: "client.crash_free_rate_24h", value: null, unit: "%",
+          severity: "info",
+          details: { crashCount: 0, totalSessions: 0, insufficientData: true, minSessions },
+        });
+      } else {
+        const crashFreeRate = Math.round(((totalSessions - crashCount) / totalSessions) * 100 * 10) / 10;
+        signals.push({
+          source: "error", metric: "client.crash_free_rate_24h", value: crashFreeRate, unit: "%",
+          severity: crashFreeRate < 90 ? "critical" : crashFreeRate < 95 ? "warn" : "info",
+          // Task #395 — includi crashFreeRate nei details così alerts.ts può
+          // costruire un testo push informativo senza ricalcolare.
+          details: { crashCount, totalSessions, crashFreeRate },
+        });
+      }
     }
   } catch (err) {
     // Task #155 — vedi sopra: warning deduplicato, nessun segnale di errore.

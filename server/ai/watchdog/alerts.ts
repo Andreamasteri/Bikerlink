@@ -322,10 +322,65 @@ export async function dispatchAlerts(snap: HealthSnapshot): Promise<{ sent: numb
     }
   }
 
+  // Crash-free rate 24h (Task #395) — segnale critical/warn emesso dall'error-collector
+  // quando il tasso di sessioni senza crash scende sotto soglia. Blocco dedicato
+  // perché il loop generico sotto logga solo { sent, suggestion } perdendo tutti i
+  // metadati numerici già calcolati dal collector (crashFreeRate, crashCount,
+  // totalSessions). Il blocco dedicato li include nel payload push e nel log.
+  const crashRateProblem = snap.problems.find(
+    (p) => p.id === "error.client.crash_free_rate_24h" && p.severity === "critical",
+  );
+  if (crashRateProblem) {
+    await emitWatchdogAlert({ problem: crashRateProblem, score: snap.score, status: snap.status });
+    if (shouldSend("error.crash_free_rate_24h")) {
+      let detail: {
+        crashFreeRate?: number | null;
+        crashCount?: number;
+        totalSessions?: number;
+        insufficientData?: boolean;
+      } = {};
+      try { detail = JSON.parse(crashRateProblem.detail ?? "{}"); } catch { /* use defaults */ }
+
+      // Guard: se insufficientData è true (totalSessions troppo basso) non siamo
+      // in un ciclo critical reale — skip push (il collector avrebbe già emesso info,
+      // ma per sicurezza evitiamo un falso allarme).
+      if (!detail.insufficientData) {
+        const rate = detail.crashFreeRate != null ? `${detail.crashFreeRate}%` : "?";
+        const crashes = detail.crashCount ?? "?";
+        const sessions = detail.totalSessions ?? "?";
+        // Soglia hardcoded a 90% (coerente con il collector).
+        const n = await sendSystemAlertPushToAdmins(
+          `📉 Crash-free rate 24h: ${rate} (soglia: 90%)`,
+          `${crashes} crash su ${sessions} sessioni nelle ultime 24h. ${crashRateProblem.suggestion ?? "Verifica i log crash nell'admin."}`,
+          {
+            type: "watchdog_crash_free_rate",
+            crashFreeRate: detail.crashFreeRate ?? null,
+            crashCount: detail.crashCount ?? null,
+            totalSessions: detail.totalSessions ?? null,
+            score: snap.score,
+          },
+        );
+        sentCount += n;
+        await writeWatchdogLog({
+          kind: "alert", scope: "error.client.crash_free_rate_24h", status: "ok",
+          summary: `Alert crash-free rate 24h: ${rate} (${crashes} crash / ${sessions} sessioni)`,
+          details: {
+            sent: n,
+            crashFreeRate: detail.crashFreeRate ?? null,
+            crashCount: detail.crashCount ?? null,
+            totalSessions: detail.totalSessions ?? null,
+            suggestion: crashRateProblem.suggestion,
+          },
+        });
+      }
+    }
+  }
+
   // Problem-level (critical singoli — pool exhaustion e network_instability già gestite sopra)
   for (const p of snap.problems) {
     if (p.severity !== "critical") continue;
     if (p.id === "db.db.pool.waiting") continue; // già gestita nel blocco pool dedicato
+    if (p.id === "error.client.crash_free_rate_24h") continue; // già gestita nel blocco dedicato sopra
     // Task #2654 — emit ogni problem critical anche se throttled (lo throttle è solo per push)
     await emitWatchdogAlert({ problem: p, score: snap.score, status: snap.status });
     // Task #2686 — kill-switch dedicato per push mappe.
