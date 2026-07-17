@@ -12,6 +12,10 @@
  * registro passati come parametri, così si evita il rischio deploy delle
  * migrazioni che toccano lo schema PostGIS.
  *
+ * Se PostGIS non è disponibile (es. DB managed senza estensione), la funzione
+ * degrada automaticamente a un check bbox puro-JS (findRoutingAreasForPoint),
+ * che produce risultati identici per tutti i casi d'uso reali.
+ *
  * Regole:
  *   - I punti GraphHopper sono nel formato [lon, lat].
  *   - Se il punto di PARTENZA non cade in alcun bbox → "area_not_enabled"
@@ -26,6 +30,7 @@
 import { sql, type SQL } from "drizzle-orm";
 import {
   ROUTING_AREAS,
+  findRoutingAreasForPoint,
   routingAreaUrl,
   type RoutingArea,
   type RoutingAreaCode,
@@ -39,11 +44,6 @@ export type RoutingAreaResolution =
   | { kind: "cross_group"; codes: RoutingAreaCode[] }
   | { kind: "area_not_enabled"; area: RoutingArea | null };
 
-/**
- * PostGIS: per ciascun punto ([lon, lat]) restituisce i codici dei gruppi il cui
- * bbox (envelope) contiene il punto, in ordine di registro (ROUTING_AREAS = dal
- * più stretto). Una sola query per tutti i waypoint.
- */
 /**
  * Costruisce un letterale Postgres `ARRAY[$1, $2, ...]::<sqlType>` a partire da
  * un array JS. NECESSARIO invece di interpolare l'array direttamente nel
@@ -61,7 +61,30 @@ function sqlTextArray(values: string[]): SQL {
   return sql`ARRAY[${sql.join(values.map((v) => sql`${v}`), sql`, `)}]::text[]`;
 }
 
-async function candidateCodesPerPoint(
+/**
+ * Rileva se un errore proviene dal driver PostgreSQL (codice SQLSTATE o
+ * attributo severity del protocollo pg). Usato per decidere se fare fallback
+ * al check bbox puro-JS invece di propagare l'eccezione.
+ */
+function isDbDriverError(err: unknown): boolean {
+  if (!err || typeof err !== "object") return false;
+  const e = err as Record<string, unknown>;
+  // SQLSTATE: 5 caratteri alfanumerici (es. "42846", "42883", "42P01", "0A000")
+  if (typeof e.code === "string" && /^[0-9A-Z]{5}$/.test(e.code)) return true;
+  // Severity del protocollo PostgreSQL
+  if (e.severity === "ERROR" || e.severity === "FATAL" || e.severity === "PANIC") return true;
+  return false;
+}
+
+/**
+ * PostGIS: per ciascun punto ([lon, lat]) restituisce i codici dei gruppi il cui
+ * bbox (envelope) contiene il punto, in ordine di registro (ROUTING_AREAS = dal
+ * più stretto). Una sola query per tutti i waypoint.
+ *
+ * Può lanciare un errore con proprietà `.code` SQLSTATE (es. 42883 = function
+ * not found) quando PostGIS non è disponibile nel DB.
+ */
+async function candidateCodesPerPointPostGIS(
   points: [number, number][],
 ): Promise<RoutingAreaCode[][]> {
   const codes = ROUTING_AREAS.map((a) => a.codice);
@@ -100,6 +123,46 @@ async function candidateCodesPerPoint(
 }
 
 /**
+ * Fallback puro-JS: per ciascun punto ([lon, lat]) restituisce i codici dei
+ * gruppi il cui bbox contiene il punto, usando `findRoutingAreasForPoint` dal
+ * registro condiviso (semplice confronto di coordinate, nessuna query DB).
+ *
+ * Produce risultati identici alla variante PostGIS per tutti i casi reali,
+ * poiché entrambe eseguono lo stesso test di inclusione bbox rettangolare.
+ */
+export function candidateCodesPerPointJs(
+  points: [number, number][],
+): RoutingAreaCode[][] {
+  return points.map(([lon, lat]) =>
+    findRoutingAreasForPoint(lat, lon).map((a) => a.codice),
+  );
+}
+
+/**
+ * Per ciascun punto ([lon, lat]) restituisce i codici dei gruppi il cui bbox
+ * contiene il punto, in ordine di registro (dal più stretto).
+ *
+ * Prova prima la variante PostGIS (una sola query per tutti i punti); se il DB
+ * non ha l'estensione PostGIS (errore SQLSTATE dal driver pg), degrada
+ * silenziosamente alla variante puro-JS.
+ */
+async function candidateCodesPerPoint(
+  points: [number, number][],
+): Promise<RoutingAreaCode[][]> {
+  try {
+    return await candidateCodesPerPointPostGIS(points);
+  } catch (err) {
+    if (isDbDriverError(err)) {
+      // PostGIS non disponibile (42883 = function not found, 42P01 = type missing,
+      // 0A000 = feature not supported, 42846 = cannot cast, ecc.) oppure qualsiasi
+      // altro errore SQL: degrada al check bbox puro-JS, stesso comportamento.
+      return candidateCodesPerPointJs(points);
+    }
+    throw err;
+  }
+}
+
+/**
  * Risolve l'area di routing per i punti dati ([lon, lat][]).
  */
 export async function resolveRoutingArea(
@@ -109,7 +172,7 @@ export async function resolveRoutingArea(
     return { kind: "area_not_enabled", area: null };
   }
 
-  // Gruppi candidati per ciascun waypoint (point-in-bbox via PostGIS).
+  // Gruppi candidati per ciascun waypoint (point-in-bbox via PostGIS o JS).
   const candidateSets = await candidateCodesPerPoint(points);
 
   // Il punto di partenza deve essere coperto da almeno un gruppo.
