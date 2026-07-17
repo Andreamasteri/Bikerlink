@@ -38,6 +38,7 @@ import { sql } from "drizzle-orm";
 import { cfAccessHeaders } from "../server/lib/cf-access";
 import { collectGitHub, collectSentry, collectGitHubRepoTree } from "./lib/horus-sources";
 import { estimateTokens, fmtSection, trimBundleToFit } from "./lib/horus-trim";
+import { normalizeTaskSection } from "./lib/horus-normalize";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, "..");
@@ -691,50 +692,7 @@ function stripOrphanThinkTags(text: string): string {
  * anziché una tabella markdown, la converte in tabella. Lascia invariata la sezione
  * se è già una tabella (contiene pipe `|`).
  */
-function normalizeTaskSection(report: string): string {
-  const TASK_HEADER = "## TASK PROPOSTI DA HORUS";
-  const idx = report.indexOf(TASK_HEADER);
-  if (idx === -1) return report;
-
-  const before = report.slice(0, idx + TASK_HEADER.length);
-  const after = report.slice(idx + TASK_HEADER.length);
-
-  // Se c'è già una tabella (almeno una riga con pipe), lascia invariato
-  if (/^\s*\|/m.test(after.split(/\n##/)[0])) return report;
-
-  // Estrai righe della lista (numerate "1. testo" o puntate "- testo" o "* testo")
-  const sectionBody = after.split(/\n##/)[0];
-  const restAfterSection = after.slice(sectionBody.length);
-
-  const listItemRe = /^(?:\d+\.|[-*])\s+(.+)$/;
-  const rows: string[] = [];
-  for (const line of sectionBody.split("\n")) {
-    const m = listItemRe.exec(line.trim());
-    if (m) {
-      // Strip trailing "(file: ...)" annotations that Horus sometimes appends
-      // (handles both complete "(file: foo.ts)" and incomplete "(file: `foo" cut-offs)
-      let raw = m[1].replace(/\s*\(file:[^)]*\)?$/, "").trim();
-      // Truncate at word boundary instead of mid-character
-      if (raw.length > 80) {
-        const cut = raw.slice(0, 80);
-        const lastSpace = cut.lastIndexOf(" ");
-        raw = lastSpace > 10 ? cut.slice(0, lastSpace) : cut;
-      }
-      const titolo = raw.replace(/\|/g, "—");
-      rows.push(`| ${titolo} | media | vedi analisi | ${titolo} |`);
-    }
-  }
-
-  if (rows.length === 0) return report; // niente da convertire
-
-  const table =
-    "\n| Titolo | Priorità | Problema | Azione |\n" +
-    "|--------|----------|---------|--------|\n" +
-    rows.join("\n") +
-    "\n";
-
-  return before + table + (restAfterSection ? restAfterSection : "");
-}
+// normalizeTaskSection is imported from ./lib/horus-normalize (pure, testable)
 
 async function callHorus(
   baseUrl: string,

@@ -24,6 +24,7 @@
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
+import { titleToSlug } from "./lib/horus-slug";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, "..");
@@ -382,19 +383,8 @@ function extractFilePaths(text: string): string[] {
 
 // ─── Generazione file plan ────────────────────────────────────────────────────
 
-function titleToSlug(title: string): string {
-  const slug = title
-    .toLowerCase()
-    .replace(/[àáâã]/g, "a").replace(/[èéêë]/g, "e").replace(/[ìíîï]/g, "i")
-    .replace(/[òóôõ]/g, "o").replace(/[ùúûü]/g, "u").replace(/ñ/g, "n")
-    .replace(/[^a-z0-9\s-]/g, "").replace(/\s+/g, "-").replace(/-+/g, "-")
-    .replace(/^-|-$/g, "");
-  if (slug.length <= 60) return slug;
-  // Truncate at a word boundary (last hyphen before position 60)
-  const cut = slug.slice(0, 60);
-  const lastHyphen = cut.lastIndexOf("-");
-  return lastHyphen > 10 ? cut.slice(0, lastHyphen) : cut;
-}
+// titleToSlug is imported from ./lib/horus-slug (pure, testable, no side effects)
+export { titleToSlug };
 
 /**
  * Scrive il file plan per un task. Se `reportContext` è fornito (estratto da
@@ -553,7 +543,10 @@ async function main(): Promise<void> {
   }
 }
 
-main().catch((err) => {
-  console.error("[horus-propose-tasks] Errore inatteso:", err);
-  process.exitCode = 1;
-});
+// Run only when this file is executed directly (not imported by tests or other modules)
+if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1])) {
+  main().catch((err) => {
+    console.error("[horus-propose-tasks] Errore inatteso:", err);
+    process.exitCode = 1;
+  });
+}
