@@ -276,6 +276,29 @@ describe("ThinkCentreCard — resilienza alla shape del payload agente", () => {
     ).resolves.toBeUndefined();
   });
 
+  it("5. graphhopperAreas assente (payload parziale) — nessun TypeError", async () => {
+    // Simulates a TC partial response where graphhopperAreas is absent but
+    // graphhopperConfigured is true — previously crashed in ghToStatus and as a prop.
+    const partialPayload = {
+      overall:               "green" as const,
+      onlineCount:           2,
+      configuredCount:       3,
+      services:              [],
+      graphhopperConfigured: true,
+      graphhopperUrl:        null,
+      // graphhopperAreas intentionally absent
+      checkedAt:             Date.now(),
+    };
+    setupQueryMocks(partialPayload);
+
+    await expect(
+      (async () => {
+        await mount();
+        await expandCard();
+      })(),
+    ).resolves.toBeUndefined();
+  });
+
   it("4. payload undefined (loading) — solo header, nessun crash", async () => {
     useQueryMock.mockReturnValue({ data: undefined, isLoading: true, isFetching: false, error: null, refetch: vi.fn() });
     useMutationMock.mockReturnValue(buildMutationReturn());

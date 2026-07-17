@@ -238,9 +238,9 @@ export function AresBlock({
                     value={detail.gpuPct}
                     color={GPU_COLOR}
                   />
-                  {detail.samples.length >= 2 ? (
+                  {(detail.samples?.length ?? 0) >= 2 ? (
                     <>
-                      <AresChart samples={detail.samples} width={chartWidth} />
+                      <AresChart samples={detail.samples ?? []} width={chartWidth} />
                       <ChartLegend />
                     </>
                   ) : (

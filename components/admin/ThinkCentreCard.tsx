@@ -295,7 +295,7 @@ export function ThinkCentreCard({
     const findSvc = (key: ServiceKey) => data.services?.find((s) => s.key === key);
     onStatuses({
       thinkcentre: overallToStatus(data.overall),
-      graphhopper: ghToStatus(data.graphhopperAreas, data.graphhopperConfigured),
+      graphhopper: ghToStatus(data.graphhopperAreas ?? [], data.graphhopperConfigured),
       valhalla: serviceToStatus(findSvc("valhalla")),
       photon: serviceToStatus(findSvc("photon")),
       ollama: serviceToStatus(findSvc("ollama")),
@@ -470,7 +470,7 @@ export function ThinkCentreCard({
           )}
           {!poweredOffActive && data && data.graphhopperConfigured && (
             <GraphHopperBlock
-              areas={data.graphhopperAreas}
+              areas={data.graphhopperAreas ?? []}
               fingerprint={fp?.graphhopper ?? null}
               url={data.graphhopperUrl}
               tokenMissing={data.graphhopperTokenMissing}

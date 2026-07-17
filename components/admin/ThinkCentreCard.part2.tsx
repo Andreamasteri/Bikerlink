@@ -31,8 +31,8 @@ export function serviceToStatus(s: any | undefined): DotStatus {
   return "offline";
 }
 
-export function ghToStatus(areas: any[], configured: boolean): DotStatus {
-  if (!configured || areas.length === 0) return "unknown";
+export function ghToStatus(areas: any[] | null | undefined, configured: boolean): DotStatus {
+  if (!configured || !areas || areas.length === 0) return "unknown";
   const enabledAreas = areas.filter((a: any) => a.enabled);
   if (enabledAreas.length === 0) return "unknown";
   const anyOk = enabledAreas.some((a: any) => a.ok);
@@ -116,7 +116,7 @@ export function ThinkCentreFooter({
         </View>
       )}
 
-      {eventsData && eventsData.events.length > 0 && (
+      {eventsData?.events?.length > 0 && (
         <EventLog events={eventsData.events} />
       )}
     </>
