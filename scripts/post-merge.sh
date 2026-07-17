@@ -1341,6 +1341,26 @@ fi
 echo "════════════════════════════════════════"
 echo ""
 
+# ── GATE REGRESSION TEST — horus-prev-report ─────────────────────────────────
+# Verifica che collectPreviousHorusReport() includa correttamente la sezione
+# "TRIAGE PRECEDENTE" nel bundle dry-run quando HORUS_LOG_DIR=/tmp punta a un
+# report precedente sintetico (caso A), e che la sezione sia assente quando non
+# esistono file candidati (caso B). Blocca la regressione silenziosa che causa
+# Horus a riproporre gli stessi task ad ogni ciclo del planner perché non trova
+# mai il report del round precedente.
+echo "════════════════════════════════════════"
+echo "  Test regressione Horus prev-report"
+echo "════════════════════════════════════════"
+HORUS_PREV_REPORT_EXIT=0
+bash scripts/__tests__/horus-prev-report.test.sh || HORUS_PREV_REPORT_EXIT=$?
+echo "════════════════════════════════════════"
+echo ""
+if [ "$HORUS_PREV_REPORT_EXIT" -ne 0 ]; then
+  echo "❌ Regression test horus-prev-report FALLITO — collectPreviousHorusReport() è regredita."
+  echo "   Eseguire 'bash scripts/__tests__/horus-prev-report.test.sh' localmente per i dettagli."
+  exit "$HORUS_PREV_REPORT_EXIT"
+fi
+
 # ── GATE SEMGREP (sicurezza statica, baseline/ratchet) ───────────────────────
 # Scansione di sicurezza statica con Semgrep: regole locali versionate
 # (.semgrep/bikerlink.yml) + ruleset "open" del registry pubblico (NESSUN
