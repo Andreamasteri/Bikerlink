@@ -69,6 +69,10 @@ args = "check-appsettings-raw-writes"
 task = "workflow.run"
 args = "Triage Horus"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "check-tc-admin-card-tests"
+
   [[workflows.workflow]]
   name = "Start App"
   mode = "parallel"
@@ -203,6 +207,17 @@ args = "bash scripts/start-planning-session.sh"
 
 [workflows.workflow.metadata]
 outputType = "console"
+
+[[workflows.workflow]]
+name = "check-tc-admin-card-tests"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "bash scripts/check-tc-admin-card-tests.sh"
+
+[workflows.workflow.metadata]
+isValidation = true
 
   [objectStorage]
 defaultBucketID = "replit-objstore-eab04d75-96eb-47fa-8ab7-710ec976a6e8"
