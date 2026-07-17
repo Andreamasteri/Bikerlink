@@ -57,3 +57,26 @@ jobs:
 
       - name: AppSettings raw-write gate
         run: bash scripts/check-appsettings-raw-writes.sh
+
+  bowie-expo-doctor:
+    name: Bowie Terminal — expo-doctor check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: bowie-terminal/package-lock.json
+
+      - name: Install Bowie Terminal dependencies
+        working-directory: bowie-terminal
+        run: npm ci
+
+      - name: Run expo-doctor (must exit 0)
+        working-directory: bowie-terminal
+        run: npx expo-doctor

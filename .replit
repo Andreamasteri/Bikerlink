@@ -249,6 +249,17 @@ args = "bash scripts/check-settings-route-order.sh"
 [workflows.workflow.metadata]
 isValidation = true
 
+[[workflows.workflow]]
+name = "check-bowie-expo-doctor"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "bash scripts/check-bowie-expo-doctor.sh"
+
+[workflows.workflow.metadata]
+isValidation = true
+
   [objectStorage]
 defaultBucketID = "replit-objstore-eab04d75-96eb-47fa-8ab7-710ec976a6e8"
 
