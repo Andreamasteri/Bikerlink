@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { View, Text, ActivityIndicator, TouchableOpacity, Switch, Linking, TextInput, Alert } from "react-native";
+import { View, Text, ActivityIndicator, TouchableOpacity, Switch, Alert } from "react-native";
 import { MaterialCommunityIcons, Ionicons } from "@expo/vector-icons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getApiUrl, authFetchHeaders } from "@/lib/query-client";
@@ -31,6 +31,9 @@ import {
   ghToStatus,
   ufwToStatus,
 } from "./ThinkCentreCard.part2";
+import { RepoDriftBanner } from "./ThinkCentreRepoDriftBanner";
+import type { RepoDriftHealth } from "./ThinkCentreRepoDriftBanner";
+import { ApkSection } from "./ThinkCentreApkSection";
 
 type ServiceKey =
   | "valhalla"
@@ -55,15 +58,6 @@ interface ServiceHealth {
   tokenMissing?: boolean;
   history: { timestamp: number; error: string }[];
   probeLog?: ProbeLogEntry[];
-}
-
-interface RepoDriftHealth {
-  checked: boolean;
-  driftDetected: boolean;
-  behind: number | null;
-  driftedFiles: string[];
-  checkedAt: string | null;
-  error?: string;
 }
 
 interface ThinkCentreHealth {
@@ -119,164 +113,6 @@ type ThinkCentreStatusKeys =
   | "uptimeKuma"
   | "aihub";
 
-// ── Deriva del checkout app sul ThinkCentre ───────────────────────────────
-// Mostrata come banner di avviso quando i file di build dei modelli Ollama
-// differiscono da origin/main — evita build da Modelfile stale.
-
-function RepoDriftBanner({
-  drift,
-  onSync,
-  syncing,
-}: {
-  drift: RepoDriftHealth;
-  onSync?: () => void;
-  syncing?: boolean;
-}) {
-  const fileList = drift.driftedFiles
-    .map((f) => f.replace("scripts/ollama-modelfile/", "").replace("scripts/", ""))
-    .join(", ");
-  const behindStr = drift.behind != null && drift.behind > 0 ? ` · ${drift.behind} commit indietro` : "";
-
-  return (
-    <View style={repoDriftStyles.banner}>
-      <Ionicons name="git-branch-outline" size={15} color="#f59e0b" style={{ marginTop: 1 }} />
-      <View style={repoDriftStyles.body}>
-        <Text style={repoDriftStyles.title}>⚠ App checkout in deriva rispetto a origin/main</Text>
-        <Text style={repoDriftStyles.sub}>
-          {"File build Ollama diversi: "}
-          <Text style={repoDriftStyles.mono}>{fileList || "—"}</Text>
-          {behindStr}
-          {"\nNON buildare modelli finché non si riallineano i Modelfile."}
-        </Text>
-        {onSync && (
-          <TouchableOpacity
-            style={[repoDriftStyles.syncBtn, syncing && repoDriftStyles.syncBtnDisabled]}
-            onPress={onSync}
-            disabled={syncing}
-            activeOpacity={0.7}
-          >
-            {syncing ? (
-              <ActivityIndicator size="small" color="#92400e" />
-            ) : (
-              <Ionicons name="sync-outline" size={13} color="#92400e" />
-            )}
-            <Text style={repoDriftStyles.syncBtnLabel}>
-              {syncing ? "Sincronizzazione…" : "Sincronizza"}
-            </Text>
-          </TouchableOpacity>
-        )}
-      </View>
-    </View>
-  );
-}
-
-const repoDriftStyles = {
-  banner: {
-    flexDirection: "row" as const,
-    gap: 8,
-    backgroundColor: "#f59e0b18",
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: "#f59e0b55",
-    padding: 10,
-    marginHorizontal: 10,
-    marginBottom: 6,
-    alignItems: "flex-start" as const,
-  },
-  body: { flex: 1, gap: 3 },
-  title: { fontSize: 12, fontWeight: "700" as const, color: "#f59e0b" },
-  sub:   { fontSize: 11, color: "#b45309", lineHeight: 16 },
-  mono:  { fontFamily: "monospace" as const, fontWeight: "600" as const },
-  syncBtn: {
-    flexDirection: "row" as const,
-    alignItems: "center" as const,
-    gap: 4,
-    alignSelf: "flex-start" as const,
-    marginTop: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    backgroundColor: "#fef3c7",
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: "#fbbf24",
-  },
-  syncBtnDisabled: { opacity: 0.6 },
-  syncBtnLabel: { fontSize: 12, fontWeight: "600" as const, color: "#92400e" },
-};
-
-const apkBtnStyles = {
-  btn: {
-    flexDirection: "row" as const,
-    alignItems: "center" as const,
-    alignSelf: "flex-start" as const,
-    gap: 6,
-    backgroundColor: "#3b82f6",
-    borderRadius: 8,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-  },
-  editBtn: {
-    flexDirection: "row" as const,
-    alignItems: "center" as const,
-    alignSelf: "flex-start" as const,
-    gap: 6,
-    backgroundColor: "#f59e0b",
-    borderRadius: 8,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-  },
-  saveBtn: {
-    flexDirection: "row" as const,
-    alignItems: "center" as const,
-    alignSelf: "flex-start" as const,
-    gap: 6,
-    backgroundColor: "#22c55e",
-    borderRadius: 8,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-  },
-  cancelBtn: {
-    flexDirection: "row" as const,
-    alignItems: "center" as const,
-    alignSelf: "flex-start" as const,
-    gap: 6,
-    backgroundColor: "#374151",
-    borderRadius: 8,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-  },
-  label: {
-    color: "#fff",
-    fontSize: 13,
-    fontFamily: "Inter_600SemiBold",
-  },
-  cancelLabel: {
-    color: "#d1d5db",
-    fontSize: 13,
-    fontFamily: "Inter_600SemiBold",
-  },
-  row: {
-    flexDirection: "row" as const,
-    flexWrap: "wrap" as const,
-    gap: 8,
-    marginHorizontal: 10,
-    marginTop: 10,
-    marginBottom: 4,
-  },
-  input: {
-    backgroundColor: "#1f2937",
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: "#374151",
-    color: "#f9fafb",
-    fontSize: 13,
-    fontFamily: "Inter_400Regular",
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    marginHorizontal: 10,
-    marginTop: 8,
-  },
-};
 
 const ALL_UNKNOWN: Pick<SystemStatuses, ThinkCentreStatusKeys> = {
   thinkcentre: "unknown",
@@ -677,64 +513,16 @@ export function ThinkCentreCard({
             />
           )}
 
-          {apkEditing && (
-            <TextInput
-              style={apkBtnStyles.input}
-              value={apkInputUrl}
-              onChangeText={setApkInputUrl}
-              placeholder="https://expo.dev/artifacts/..."
-              placeholderTextColor="#6b7280"
-              autoCapitalize="none"
-              autoCorrect={false}
-              keyboardType="url"
-            />
-          )}
-          <View style={apkBtnStyles.row}>
-            {!apkEditing && apkData?.url ? (
-              <TouchableOpacity
-                style={apkBtnStyles.btn}
-                onPress={() => Linking.openURL(apkData.url)}
-                activeOpacity={0.7}
-              >
-                <Ionicons name="download-outline" size={16} color="#fff" />
-                <Text style={apkBtnStyles.label}>Scarica TC Terminal APK</Text>
-              </TouchableOpacity>
-            ) : null}
-            {!apkEditing && (
-              <TouchableOpacity
-                style={apkBtnStyles.editBtn}
-                onPress={handleApkEdit}
-                activeOpacity={0.7}
-              >
-                <Ionicons name="link-outline" size={16} color="#fff" />
-                <Text style={apkBtnStyles.label}>
-                  {apkData?.url ? "Modifica URL" : "Imposta URL"}
-                </Text>
-              </TouchableOpacity>
-            )}
-            {apkEditing && (
-              <>
-                <TouchableOpacity
-                  style={[apkBtnStyles.saveBtn, apkSaveMutation.isPending && { opacity: 0.6 }]}
-                  onPress={handleApkSave}
-                  disabled={apkSaveMutation.isPending}
-                  activeOpacity={0.7}
-                >
-                  <Ionicons name="checkmark-outline" size={16} color="#fff" />
-                  <Text style={apkBtnStyles.label}>Salva</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={apkBtnStyles.cancelBtn}
-                  onPress={() => setApkEditing(false)}
-                  disabled={apkSaveMutation.isPending}
-                  activeOpacity={0.7}
-                >
-                  <Ionicons name="close-outline" size={16} color="#d1d5db" />
-                  <Text style={apkBtnStyles.cancelLabel}>Annulla</Text>
-                </TouchableOpacity>
-              </>
-            )}
-          </View>
+          <ApkSection
+            apkData={apkData}
+            apkEditing={apkEditing}
+            apkInputUrl={apkInputUrl}
+            setApkInputUrl={setApkInputUrl}
+            setApkEditing={setApkEditing}
+            onEdit={handleApkEdit}
+            onSave={handleApkSave}
+            isSaving={apkSaveMutation.isPending}
+          />
 
           <ThinkCentreFooter
             poweredOffActive={poweredOffActive}

@@ -60,9 +60,11 @@ vi.mock("@/lib/query-client", () => ({
 // ── Mock: @tanstack/react-query — controllato per test ───────────────────
 const useQueryMock    = vi.fn();
 const useMutationMock = vi.fn();
+const mockQueryClient = { invalidateQueries: vi.fn() };
 vi.mock("@tanstack/react-query", () => ({
-  useQuery:    (...args: unknown[]) => useQueryMock(...args),
-  useMutation: (...args: unknown[]) => useMutationMock(...args),
+  useQuery:       (...args: unknown[]) => useQueryMock(...args),
+  useMutation:    (...args: unknown[]) => useMutationMock(...args),
+  useQueryClient: () => mockQueryClient,
 }));
 
 // ── Mock: sotto-componenti ────────────────────────────────────────────────
@@ -98,6 +100,12 @@ vi.mock("@/components/admin/ThinkCentreInfraBlocks", () => ({
 }));
 vi.mock("@/components/admin/ThinkCentreAresBlock", () => ({
   AresBlock: "AresBlock",
+}));
+vi.mock("@/components/admin/ThinkCentreRepoDriftBanner", () => ({
+  RepoDriftBanner: "RepoDriftBanner",
+}));
+vi.mock("@/components/admin/ThinkCentreApkSection", () => ({
+  ApkSection: "ApkSection",
 }));
 vi.mock("@/components/admin/ThinkCentreCard.part2", () => ({
   ThinkCentreFooter:  "ThinkCentreFooter",
