@@ -12,6 +12,17 @@ export interface Signal {
   unit?: string | null;
   severity: Severity;
   details?: Record<string, unknown> | null;
+  /**
+   * Fase 5 (Task #545) — Origine del segnale.
+   * "primary"  : segnale da un sensore diretto (pool, ping, latency, ecc.).
+   * "derived"  : segnale calcolato dall'output di un ciclo precedente
+   *              (es. overload_sustained calcolato da SustainedTracker).
+   *              I segnali derived NON vengono processati da deriveProblems
+   *              per evitare il feedback loop; vengono aggiunti come Problems
+   *              separatamente da buildDerivedProblems.
+   * Omettere il campo equivale a "primary" (backward-compat).
+   */
+  origin?: "primary" | "derived";
 }
 
 export interface Problem {

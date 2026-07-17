@@ -20,14 +20,12 @@ import pg from "pg";
 import { getPoolStats, getCheckedOutConnections, APP_NAME } from "../../../db";
 import { getBgDbLimiterStats } from "../../../lib/bg-db-limiter";
 import type { Signal } from "../types";
-
-// ── Local TTL cache for the idle-kill AppSetting ───────────────────────────
-// Mirrors the pattern in server/lib/thinkcentre-offline.ts: throttle reads on
-// app_settings to at most once per TTL window so pool-pressure probes never
-// storm the DB with repeated reads under a bg-db-limiter kill-switch.
-const IDLE_KILL_CACHE_TTL_MS = 3 * 60_000;
-let idleKillCached: boolean | null = null;
-let idleKillCachedAt = 0;
+// Fase 5 (Task #545) — il kill-switch pg_terminate_backend vive nell'actuator:
+// separa osservazione (questo file) da azione (actuator.ts).
+import {
+  runIdleLeakKill,
+  invalidateIdleKillCache as invalidateActuatorKillCache,
+} from "../actuator";
 
 // Consecutive over-threshold samples required to escalate. Matches the
 // db-collector anti-blip pattern (CONSECUTIVE_SLOW_FOR_HIGH = 3).
@@ -47,13 +45,8 @@ const CONSECUTIVE_FOR_ACTIVITY_PROBE = 5;
 const IDLE_LEAK_MIN_AGE_S = 30;
 // Soglia (numero di connessioni idle anomale) oltre la quale emettiamo un alert
 // "high" nel watchdog e — se il kill è abilitato — terminiamo i backend.
+// La logica di kill vive in actuator.ts (ACTUATOR_IDLE_KILL_MIN_AGE_S = 60).
 const IDLE_LEAK_THRESHOLD = 2;
-// Età minima (più alta della soglia di log) per TERMINARE un backend: kill solo
-// le connessioni davvero bloccate da ≥60s, non quelle appena diventate idle.
-const IDLE_KILL_MIN_AGE_S = 60;
-// AppSetting di sicurezza che abilita pg_terminate_backend. Default OFF: il
-// detector logga sempre, ma la terminazione forzata (ultima difesa) è opt-in.
-const IDLE_KILL_SETTING_KEY = "db_idle_conn_kill_enabled";
 
 // Esito dell'ultima probe idle-leak. La probe è async (fire-and-forget) e non può
 // pushare segnali nel ritorno SINCRONO di collectPool(); quindi deposita qui il
@@ -72,14 +65,13 @@ let consecutiveWaiting = 0;
 let consecutiveLimiterQueued = 0;
 
 /**
- * Invalida immediatamente la cache del kill-switch idle-leak in modo che il
- * prossimo probe rilegga il valore corrente dall'AppSetting anziché usare il
- * valore TTL-cached (fino a 3 minuti stantio). Da chiamare dal route admin
- * ogni volta che `db_idle_conn_kill_enabled` viene scritto.
+ * Invalida immediatamente la cache del kill-switch idle-leak (ora in actuator.ts)
+ * in modo che il prossimo probe rilegga il valore corrente dall'AppSetting.
+ * Da chiamare dal route admin ogni volta che `db_idle_conn_kill_enabled` viene scritto.
+ * Re-export per backward-compat con server/routes/admin/settings.ts.
  */
 export function invalidateIdleKillCache(): void {
-  idleKillCached = null;
-  idleKillCachedAt = 0;
+  invalidateActuatorKillCache();
 }
 
 // Task #154 — Reset dei contatori/latch anti-blip di questo collector. Azzera i
@@ -93,10 +85,9 @@ export function resetState(): void {
   prevDroppedTimeoutTotal = 0;
   consecutiveLimiterDrops = 0;
   lastIdleLeak = null;
-  // Invalida anche la cache del kill-switch così il prossimo probe rilegge il
-  // valore corrente invece di riusare un valore stantio del ciclo precedente.
-  idleKillCached = null;
-  idleKillCachedAt = 0;
+  // Invalida anche la cache del kill-switch (ora in actuator) così il prossimo
+  // probe rilegge il valore corrente invece di usare un valore stantio.
+  invalidateActuatorKillCache();
 }
 
 // Totali cumulativi (dal boot) degli scarti del bg-db-limiter visti all'ultimo
@@ -235,46 +226,13 @@ async function detectIdleLeak(client: pg.Client): Promise<void> {
     );
   }
 
-  // Termina i backend più vecchi SOLO se l'AppSetting di sicurezza è attiva.
+  // Fase 5 — Kill delegato all'actuator (separa osservazione da azione).
+  // L'actuator legge il kill-switch dall'AppSetting (con TTL cache), filtra per
+  // ACTUATOR_IDLE_KILL_MIN_AGE_S (60s) e chiama pg_terminate_backend sui PID
+  // eleggibili. Se il kill-switch è OFF o l'AppSetting non è leggibile → 0.
   let killed = 0;
   if (anomalous.length >= IDLE_LEAK_THRESHOLD) {
-    let killEnabled = false;
-    try {
-      // TTL cache: evita query ripetute su app_settings durante pressione DB.
-      // La cache si aggiorna usando la connessione out-of-band già aperta
-      // (client: pg.Client) — NON il pool principale che è sotto pressione.
-      const now = Date.now();
-      if (idleKillCached === null || now - idleKillCachedAt >= IDLE_KILL_CACHE_TTL_MS) {
-        // Legge via la connessione out-of-band già aperta — NON via storage/pool,
-        // che è saturo in questo contesto. Invariante documentata nel JSDoc sopra.
-        const settingRes = await client.query<{ value: string | null; value_json: unknown }>(
-          `SELECT value, value_json FROM app_settings WHERE key = $1 LIMIT 1`,
-          [IDLE_KILL_SETTING_KEY],
-        );
-        const row = settingRes.rows[0];
-        idleKillCached =
-          row?.value === "true" ||
-          row?.value_json === true ||
-          (typeof row?.value_json === "string" && row.value_json === "true");
-        idleKillCachedAt = Date.now();
-      }
-      killEnabled = idleKillCached ?? false;
-    } catch {
-      /* AppSetting illeggibile → kill disabilitato (fail-safe). */
-    }
-
-    if (killEnabled) {
-      const killable = anomalous.filter((r) => (r.idle_s ?? 0) >= IDLE_KILL_MIN_AGE_S);
-      for (const r of killable) {
-        try {
-          await client.query(`SELECT pg_terminate_backend($1)`, [r.pid]);
-          killed++;
-          console.error(`[pool-collector/idle-leak] 🔪 pg_terminate_backend(${r.pid}) (idle ${r.idle_s}s)`);
-        } catch (err) {
-          console.warn(`[pool-collector/idle-leak] terminate pid=${r.pid} fallito:`, (err as Error).message?.slice(0, 120));
-        }
-      }
-    }
+    killed = await runIdleLeakKill(client, anomalous);
   }
 
   lastIdleLeak = {

@@ -162,6 +162,11 @@ export function deriveProblems(signals: Signal[]): Problem[] {
   const problems: Problem[] = [];
   for (const s of signals) {
     if (s.severity === "info") continue;
+    // Fase 5 (Task #545) — salta i segnali "derived": evita il feedback loop
+    // overload_sustained→problema DB→dbErrorCount→dbOverload→overload_sustained.
+    // I segnali derived vengono aggiunti come Problems separatamente da
+    // buildDerivedProblems (che non alimenta recordDbMonitorSample).
+    if (s.origin === "derived") continue;
     const id = `${s.source}.${s.metric}`;
     let title = s.metric;
     let suggestion: string | undefined;
@@ -319,16 +324,6 @@ export function deriveProblems(signals: Signal[]): Problem[] {
     } else if (s.metric === "db.pool.collector.error") {
       title = `Errore probe pool DB`;
       suggestion = "Verifica che pool sia correttamente inizializzato e accessibile dal collector.";
-    } else if (s.metric === "db.overload_sustained") {
-      const det = s.details as { reasons?: string[]; poolActivePct?: number; pingMs?: number | null } | undefined;
-      const reasons = det?.reasons?.length ? det.reasons.join(", ") : "pool/ping/errori DB";
-      title = `Database sovraccarico da ${s.value} cicli consecutivi (${reasons})`;
-      suggestion = "Il database è sovraccarico in modo sostenuto (pool saturo, ping alto o errori). Verifica query lente/lock (pg_stat_activity), la concorrenza dei job interni e valuta di ridurre il carico o aumentare pool.max.";
-    } else if (s.metric === "backend.overload_sustained") {
-      const det = s.details as { reasons?: string[]; cpuPct?: number; eventLoopLagMs?: number } | undefined;
-      const reasons = det?.reasons?.length ? det.reasons.join(", ") : "event-loop lag / CPU";
-      title = `Backend Node sovraccarico da ${s.value} cicli consecutivi (${reasons})`;
-      suggestion = "Il server Node è sovraccarico in modo sostenuto (event-loop lag alto o CPU satura) INDIPENDENTEMENTE dal DB: le richieste rallentano anche col database sano. Verifica loop bloccanti, lavoro sincrono pesante o chiamate esterne lente sul thread principale.";
     } else if (s.metric === "ads_orphan_images_high_count") {
       const det = s.details as { orphans?: number; threshold?: number; runAt?: string } | undefined;
       title = `Immagini pubblicitarie orfane: ${s.value} file trovati (soglia: ${det?.threshold ?? 10})`;
@@ -457,6 +452,47 @@ export function suppressDownstreamWhenPoweredOff(problems: Problem[]): Problem[]
     }
     return p;
   });
+}
+
+/**
+ * Fase 5 (Task #545) — Costruisce Problems dai segnali "derived".
+ *
+ * I segnali `origin === "derived"` sono saltati da `deriveProblems` per evitare
+ * il feedback loop (overload_sustained → problema DB → dbOverload → overload_sustained).
+ * Questa funzione li traduce in Problems separatamente, così restano visibili nel
+ * pannello admin e attivano gli alert watchdog, ma NON alimentano il calcolo di
+ * dbOverload in recordDbMonitorSample.
+ *
+ * Attualmente gestisce: db.overload_sustained, backend.overload_sustained.
+ */
+export function buildDerivedProblems(signals: Signal[]): Problem[] {
+  const problems: Problem[] = [];
+  for (const s of signals) {
+    if (s.origin !== "derived") continue;
+    if (s.severity === "info") continue;
+
+    const id = `${s.source}.${s.metric}`;
+    let title = s.metric;
+    let suggestion: string | undefined;
+
+    if (s.metric === "db.overload_sustained") {
+      const det = s.details as { reasons?: string[]; poolActivePct?: number; pingMs?: number | null } | undefined;
+      const reasons = det?.reasons?.length ? det.reasons.join(", ") : "pool/ping/errori DB";
+      title = `Database sovraccarico da ${s.value} cicli consecutivi (${reasons})`;
+      suggestion = "Il database è sovraccarico in modo sostenuto (pool saturo, ping alto o errori). Verifica query lente/lock (pg_stat_activity), la concorrenza dei job interni e valuta di ridurre il carico o aumentare pool.max.";
+    } else if (s.metric === "backend.overload_sustained") {
+      const det = s.details as { reasons?: string[]; cpuPct?: number; eventLoopLagMs?: number } | undefined;
+      const reasons = det?.reasons?.length ? det.reasons.join(", ") : "event-loop lag / CPU";
+      title = `Backend Node sovraccarico da ${s.value} cicli consecutivi (${reasons})`;
+      suggestion = "Il server Node è sovraccarico in modo sostenuto (event-loop lag alto o CPU satura) INDIPENDENTEMENTE dal DB: le richieste rallentano anche col database sano. Verifica loop bloccanti, lavoro sincrono pesante o chiamate esterne lente sul thread principale.";
+    }
+
+    problems.push({
+      id, severity: s.severity, source: s.source, title, suggestion,
+      detail: s.details ? JSON.stringify(s.details).slice(0, 300) : undefined,
+    });
+  }
+  return problems;
 }
 
 export { runAggregatorCycle, getRecentSnapshots, getLatestSnapshot, subscribeSnapshot, isAggregatorCycleInFlight } from "./aggregator.part2";

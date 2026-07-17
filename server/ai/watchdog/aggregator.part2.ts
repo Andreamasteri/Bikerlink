@@ -6,6 +6,7 @@ import { recordSignals } from "./signals";
 import {
   SEVERITY_WEIGHT,
   deriveProblems,
+  buildDerivedProblems,
   suppressDownstreamWhenPoweredOff,
   collectDbIntegritySignals,
   collectAdsOrphanSignals,
@@ -97,7 +98,9 @@ async function runAggregatorCycleInner(): Promise<HealthSnapshot> {
   }
   await recordSignals(signals.filter((s) => s.severity !== "info"));
 
-  let problems = deriveProblems(signals);
+  // Fase 5 — pipeline a due stadi: primary signals → deriveProblems,
+  // derived signals → buildDerivedProblems separatamente (no feedback loop).
+  let problems = [...deriveProblems(signals), ...buildDerivedProblems(signals)];
 
   try {
     if (await withBgDbSlot(() => isThinkCentreOffline())) {

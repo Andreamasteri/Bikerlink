@@ -34,6 +34,11 @@ export function collectOverload(): Signal[] {
         value: state.db.consecutiveTicks,
         unit: "ticks",
         severity: "high",
+        // Fase 5 — "derived": calcolato dall'output del ciclo precedente.
+        // deriveProblems lo salta; buildDerivedProblems lo aggiunge come Problem
+        // separatamente per spezzare il feedback loop (overload_sustained →
+        // problema DB → dbErrorCount → dbOverload → overload_sustained).
+        origin: "derived",
         details: {
           consecutiveTicks: state.db.consecutiveTicks,
           poolActivePct: state.db.poolActivePct,
@@ -52,6 +57,8 @@ export function collectOverload(): Signal[] {
         value: state.backend.consecutiveTicks,
         unit: "ticks",
         severity: "high",
+        // Fase 5 — "derived": stesso motivo di db.overload_sustained.
+        origin: "derived",
         details: {
           consecutiveTicks: state.backend.consecutiveTicks,
           cpuPct: state.backend.cpuPct,
