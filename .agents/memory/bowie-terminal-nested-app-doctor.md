@@ -20,9 +20,22 @@ between them, so directory-tree-walking checks see both.
 **How to apply:** When running `expo-doctor` inside `bowie-terminal/` (or any
 future nested standalone app under this repo), a "Check that no duplicate
 dependencies are installed" failure naming packages that also exist at repo
-root (react, react-native, expo-font, etc.) is expected environmental noise,
-not a real bug — verify by checking `Module._nodeModulePaths()` includes the
-parent root, and confirm Metro's `getDefaultConfig` for the nested app has
-empty `watchFolders`/`nodeModulesPaths` (i.e., it isn't merging module
-resolution with the parent). Don't try to "fix" it by touching the parent
-repo's react/react-native versions.
+root (react, react-native, etc.) is expected environmental noise, not a real
+bug. EAS builds run in isolation (EAS_PROJECT_ROOT), so the parent node_modules
+are never present at build time.
+
+**The fix (already applied in bowie-terminal/package.json):**
+- `expo.install.exclude` — suppresses the version-check false-positive for
+  react, react-native, react-native-safe-area-context, react-native-screens
+  (parent's node_modules have newer minor versions than expo SDK 56 expects).
+  Confirmed to work via `validateDependenciesVersions.js` in @expo/cli.
+- `expo.autolinking.exclude` — suppresses the duplicate-detection false-positive
+  for react and react-native. These two are NOT expo modules (no
+  expo-module.config.js), so excluding them from expo-modules-autolinking is
+  safe and has no effect on EAS builds. Confirmed via `autolinkingOptions.js` in
+  expo-modules-autolinking — the `exclude` list builds the `excludeNames` set
+  that filters packages before the duplicate check.
+- `app.json` has an `expo.doctor._comment` entry documenting the rationale
+  (app.json has NO actual per-check disable API for the duplicate check).
+
+Don't try to "fix" it by touching the parent repo's react/react-native versions.

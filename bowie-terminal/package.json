@@ -7,6 +7,22 @@
     "start": "npx expo start",
     "android": "expo run:android"
   },
+  "expo": {
+    "install": {
+      "exclude": [
+        "react",
+        "react-native",
+        "react-native-safe-area-context",
+        "react-native-screens"
+      ]
+    },
+    "autolinking": {
+      "exclude": [
+        "react",
+        "react-native"
+      ]
+    }
+  },
   "dependencies": {
     "@expo/vector-icons": "^15.1.1",
     "expo": "~56.0.16",
