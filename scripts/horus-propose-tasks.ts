@@ -383,12 +383,17 @@ function extractFilePaths(text: string): string[] {
 // ─── Generazione file plan ────────────────────────────────────────────────────
 
 function titleToSlug(title: string): string {
-  return title
+  const slug = title
     .toLowerCase()
     .replace(/[àáâã]/g, "a").replace(/[èéêë]/g, "e").replace(/[ìíîï]/g, "i")
     .replace(/[òóôõ]/g, "o").replace(/[ùúûü]/g, "u").replace(/ñ/g, "n")
     .replace(/[^a-z0-9\s-]/g, "").replace(/\s+/g, "-").replace(/-+/g, "-")
-    .slice(0, 60).replace(/^-|-$/g, "");
+    .replace(/^-|-$/g, "");
+  if (slug.length <= 60) return slug;
+  // Truncate at a word boundary (last hyphen before position 60)
+  const cut = slug.slice(0, 60);
+  const lastHyphen = cut.lastIndexOf("-");
+  return lastHyphen > 10 ? cut.slice(0, lastHyphen) : cut;
 }
 
 /**

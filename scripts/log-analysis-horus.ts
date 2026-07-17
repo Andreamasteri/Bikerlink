@@ -711,7 +711,16 @@ function normalizeTaskSection(report: string): string {
   for (const line of sectionBody.split("\n")) {
     const m = listItemRe.exec(line.trim());
     if (m) {
-      const titolo = m[1].slice(0, 80).replace(/\|/g, "—");
+      // Strip trailing "(file: ...)" annotations that Horus sometimes appends
+      // (handles both complete "(file: foo.ts)" and incomplete "(file: `foo" cut-offs)
+      let raw = m[1].replace(/\s*\(file:[^)]*\)?$/, "").trim();
+      // Truncate at word boundary instead of mid-character
+      if (raw.length > 80) {
+        const cut = raw.slice(0, 80);
+        const lastSpace = cut.lastIndexOf(" ");
+        raw = lastSpace > 10 ? cut.slice(0, lastSpace) : cut;
+      }
+      const titolo = raw.replace(/\|/g, "—");
       rows.push(`| ${titolo} | media | vedi analisi | ${titolo} |`);
     }
   }
