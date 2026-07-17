@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { View, Text, TouchableOpacity, ScrollView, TextInput, findNodeHandle } from "react-native";
 import { useRouter } from "expo-router";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import type { Href } from "expo-router";
 import { MaterialCommunityIcons, MaterialIcons, Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -363,7 +364,9 @@ export default function AdminDashboard() {
           <SystemHealthContainer statuses={systemStatuses} onDotPress={handleDotPress}>
             <ServerEfficiencyCard />
             <DbPoolCard />
-            <ThinkCentreEfficiencyCard />
+            <ErrorBoundary>
+              <ThinkCentreEfficiencyCard />
+            </ErrorBoundary>
             <View ref={thinkcentreRef}>
               <ThinkCentreCard onStatuses={handleThinkCentreStatuses} />
             </View>
