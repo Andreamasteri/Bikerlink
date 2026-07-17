@@ -481,6 +481,26 @@ router.post("/apk-upload", apkUpload.single("file"), async (req: Request, res: R
   }
 });
 
+router.get("/tc-terminal-apk-url", async (_req: Request, res: Response) => {
+  try {
+    const setting = await storage.getAppSetting("tc_terminal_apk_url");
+    return res.json({ url: setting?.value || "" });
+  } catch (_error) {
+    return sendError(res, 500, "Errore lettura TC Terminal APK URL");
+  }
+});
+
+router.put("/tc-terminal-apk-url", async (req: Request, res: Response) => {
+  try {
+    const parsed = urlSettingSchema.safeParse(req.body);
+    if (!parsed.success) return sendError(res, 400, parsed.error.issues[0].message);
+    const setting = await storage.upsertAppSetting("tc_terminal_apk_url", parsed.data.url);
+    return res.json(setting);
+  } catch (_error) {
+    return sendError(res, 500, "Errore salvataggio TC Terminal APK URL");
+  }
+});
+
 router.get("/play-store-url", async (_req: Request, res: Response) => {
   try {
     const setting = await storage.getAppSetting("play_store_url");
