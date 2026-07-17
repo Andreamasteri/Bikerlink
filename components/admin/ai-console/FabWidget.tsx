@@ -4,6 +4,14 @@
 //   Expo Router usa RNGH a livello nativo e reclamava i gesti prima del PanResponder JS,
 //   rendendo il FAB né cliccabile né trascinabile. tap/long-press restano discriminati
 //   via Date.now() (onBegin/onEnd), il drag via translation. Haptics conditional.
+// Task #418 — Fix OOM path: posizione resa via RN Animated.Value (translateX/translateY),
+//   la scala resta Reanimated ma su una view interna separata (1-item transform).
+//   Stessa scelta già adottata per FloatingWidget e UptimeWidget per il medesimo bug
+//   (Sentry 134724851): Reanimated → NativeAnimatedModule → ReadableNativeMap.getLocalMap
+//   → HashMap.resize OOM in sessioni lunghe. posX/posY rimangono come shared values
+//   per il corretto funzionamento del worklet Gesture.Pan() (onBegin legge posX.value),
+//   ma NON entrano nel transform renderizzato — la posizione visiva e la hitbox usano
+//   posXAnim/posYAnim (RN Animated.Value) sincronizzate via runOnJS(updatePos).
 import React, { useEffect, useRef, useState } from "react";
 import {
   View,
@@ -11,12 +19,13 @@ import {
   StyleSheet,
   Platform,
   useWindowDimensions,
+  Animated,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
-import Animated, { useSharedValue, useAnimatedStyle, withSpring, runOnJS } from "react-native-reanimated";
+import ReAnimated, { useSharedValue, useAnimatedStyle, withSpring, runOnJS } from "react-native-reanimated";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useColors } from "@/hooks/useColors";
 import { useAiActionQueue } from "@/hooks/admin/ai-console/useAiActionQueue";
@@ -89,18 +98,36 @@ export default function FabWidget() {
   });
   const initialPos = defaultPos();
 
-  // Posizione e scala come shared values reanimated (thread UI). Lo stesso stack
-  // (RNGH + reanimated) usato da Expo Router, quindi i gesti del FAB non vengono
-  // surclassati dai gesture handler nativi come col vecchio PanResponder JS.
+  // posX/posY: shared values usati dal worklet Gesture.Pan() per leggere la
+  // posizione corrente in onBegin (startX/startY = posX/posY) e aggiornarla in
+  // onUpdate. NON entrano nel transform renderizzato — solo posXAnim/posYAnim
+  // (RN Animated.Value) controllano la posizione visiva e la hitbox touch.
   const posX = useSharedValue(initialPos.x);
   const posY = useSharedValue(initialPos.y);
   const startX = useSharedValue(initialPos.x);
   const startY = useSharedValue(initialPos.y);
+  // scale rimane Reanimated SV per withSpring worklet; renderizzato su una view
+  // interna separata con un transform a 1 solo item (nessun OOM path).
   const scale = useSharedValue(1);
+
+  // Posizione renderizzata: RN Animated.Value — aggiorna la hitbox touch nativa
+  // su Android in lockstep con la posizione visiva (Reanimated useSharedValue
+  // non lo fa). Stesso pattern già adottato da FloatingWidget e UptimeWidget
+  // (vedi floating-widget-android-hitbox.md e Sentry 134724851).
+  const posXAnim = useRef(new Animated.Value(initialPos.x)).current;
+  const posYAnim = useRef(new Animated.Value(initialPos.y)).current;
 
   const [loaded, setLoaded] = useState(false);
   // Timing del press (thread JS) per distinguere tap da long-press in onEnd.
   const pressStartRef = useRef<number>(0);
+
+  // Sincronizza le RN Animated.Value con la posizione calcolata dal worklet.
+  // Chiamata via runOnJS(updatePos) da onUpdate, così la hitbox Android segue
+  // sempre la posizione visiva del FAB.
+  const updatePos = (x: number, y: number) => {
+    posXAnim.setValue(x);
+    posYAnim.setValue(y);
+  };
 
   // Load persisted position
   useEffect(() => {
@@ -113,6 +140,8 @@ export default function FabWidget() {
             const c = clampRef.current(parsed.x, parsed.y);
             posX.value = c.x;
             posY.value = c.y;
+            posXAnim.setValue(c.x);
+            posYAnim.setValue(c.y);
           }
         }
       } catch { /* skip */ }
@@ -126,6 +155,8 @@ export default function FabWidget() {
     const c = clampRef.current(posX.value, posY.value);
     posX.value = c.x;
     posY.value = c.y;
+    posXAnim.setValue(c.x);
+    posYAnim.setValue(c.y);
   }, [winW, winH, insets.top, insets.bottom, insets.left, insets.right, loaded]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Avvio del press: registra il timestamp (thread JS) per il long-press.
@@ -176,6 +207,8 @@ export default function FabWidget() {
       const rawY = startY.value + e.translationY;
       posX.value = Math.min(Math.max(rawX, minX), Math.max(minX, maxX));
       posY.value = Math.min(Math.max(rawY, minY), Math.max(minY, maxY));
+      // Aggiorna le RN Animated.Value sul thread JS per hitbox Android.
+      runOnJS(updatePos)(posX.value, posY.value);
     })
     .onEnd((e) => {
       "worklet";
@@ -189,45 +222,48 @@ export default function FabWidget() {
       scale.value = withSpring(1);
     });
 
-  const animStyle = useAnimatedStyle(() => ({
-    transform: [
-      { translateX: posX.value },
-      { translateY: posY.value },
-      { scale: scale.value },
-    ],
+  // Scale-only style su una view Reanimated interna separata: un solo item nel
+  // transform array (no 3-item OOM path). La posizione è gestita dalla view
+  // esterna con RN Animated.Value (hitbox-safe su Android).
+  const scaleStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
   }));
 
   return (
     <>
+      {/* View esterna: RN Animated.Value per translateX/translateY — hitbox Android corretta. */}
       <Animated.View
-        style={[styles.wrap, animStyle]}
+        style={[styles.wrap, { transform: [{ translateX: posXAnim }, { translateY: posYAnim }] }]}
         accessibilityRole="button"
         accessibilityLabel="AI Console"
         testID="ai-console-fab"
       >
-        <GestureDetector gesture={panGesture}>
-          <View
-            style={[
-              styles.btn,
-              { backgroundColor: colors.accent, shadowColor: colors.accent },
-            ]}
-          >
-            <Ionicons name={hasExplain ? "help-circle" : "sparkles"} size={24} color="#fff" />
-            {total > 0 ? (
-              <View style={[styles.badge, { backgroundColor: colors.error, borderColor: colors.background }]}>
-                <Text style={styles.badgeText}>{total > 99 ? "99+" : total}</Text>
-              </View>
-            ) : hasExplain ? (
-              <View style={[styles.dot, { backgroundColor: colors.warning ?? "#FFB300", borderColor: colors.background }]} />
-            ) : null}
-            {/* Badge bug separato — angolo in basso a sinistra, distinto dagli alert AI */}
-            {bugUnseen > 0 && (
-              <View style={[styles.bugBadge, { backgroundColor: colors.error ?? "#E53E3E", borderColor: colors.background }]}>
-                <Text style={styles.bugBadgeText}>{bugUnseen > 9 ? "9+" : bugUnseen}</Text>
-              </View>
-            )}
-          </View>
-        </GestureDetector>
+        {/* View interna: Reanimated con scale-only (1 item nel transform, no OOM). */}
+        <ReAnimated.View style={scaleStyle}>
+          <GestureDetector gesture={panGesture}>
+            <View
+              style={[
+                styles.btn,
+                { backgroundColor: colors.accent, shadowColor: colors.accent },
+              ]}
+            >
+              <Ionicons name={hasExplain ? "help-circle" : "sparkles"} size={24} color="#fff" />
+              {total > 0 ? (
+                <View style={[styles.badge, { backgroundColor: colors.error, borderColor: colors.background }]}>
+                  <Text style={styles.badgeText}>{total > 99 ? "99+" : total}</Text>
+                </View>
+              ) : hasExplain ? (
+                <View style={[styles.dot, { backgroundColor: colors.warning ?? "#FFB300", borderColor: colors.background }]} />
+              ) : null}
+              {/* Badge bug separato — angolo in basso a sinistra, distinto dagli alert AI */}
+              {bugUnseen > 0 && (
+                <View style={[styles.bugBadge, { backgroundColor: colors.error ?? "#E53E3E", borderColor: colors.background }]}>
+                  <Text style={styles.bugBadgeText}>{bugUnseen > 9 ? "9+" : bugUnseen}</Text>
+                </View>
+              )}
+            </View>
+          </GestureDetector>
+        </ReAnimated.View>
       </Animated.View>
       <FabDrawer visible={drawerOpen} onClose={() => setDrawerOpen(false)} />
     </>
@@ -235,7 +271,8 @@ export default function FabWidget() {
 }
 
 const styles = StyleSheet.create({
-  // left:0/top:0 fissi: la posizione effettiva è data dal transform dell'animStyle.
+  // left:0/top:0 fissi: la posizione effettiva è data dal transform di posXAnim/posYAnim
+  // (RN Animated.Value). Nessun left/top dinamico — hitbox Android sempre corretta.
   wrap: { position: "absolute", left: 0, top: 0, zIndex: 999, width: FAB_SIZE, height: FAB_SIZE },
   btn: {
     width: FAB_SIZE, height: FAB_SIZE, borderRadius: FAB_SIZE / 2,
