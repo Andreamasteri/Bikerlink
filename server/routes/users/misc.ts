@@ -232,6 +232,7 @@ router.get("/:id/time-profile", requireAuth, async (req: Request, res: Response)
  * raggruppati per categoria. Usato dalla schermata profilo per pre-selezionare
  * i tag scelti in precedenza.
  */
+// check-route-order: safe — /:id/public only intercepts when seg[1]="public"; /me/tags seg[1]="tags", no shadow.
 router.get("/me/tags", requireAuth, async (req: Request, res: Response) => {
   try {
     const userId = req.session.userId!;

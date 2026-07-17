@@ -417,6 +417,7 @@ router.delete("/:id/photos/:photoId", requireAuth, async (req: Request, res: Res
  * Falls back to local uploads/motorcycles/ for photos uploaded before migration.
  * Auth: only the owner of the motorcycle the photo belongs to may access it.
  */
+// check-route-order: safe — /:id/tags only intercepts when seg[1]="tags"; /photos/<filename> seg[1]=filename, no shadow.
 router.get("/photos/:filename", requireAuth, async (req: Request, res: Response) => {
   try {
     const requesterId = req.session.userId!;

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # check-settings-route-order.sh
 #
-# CI gate: fails if any specific literal PUT/PATCH/DELETE route is declared
+# CI gate: fails if any specific literal GET/PUT/PATCH/DELETE route is declared
 # AFTER a wildcard param route on the same HTTP verb within any router file
 # under server/routes/.
 #
@@ -14,7 +14,7 @@
 #   in settings.ts before this gate was introduced.
 #
 # What is flagged:
-#   For each HTTP verb (put, patch, delete) in each .ts file under
+#   For each HTTP verb (get, put, patch, delete) in each .ts file under
 #   server/routes/, any specific route (first path segment is a literal)
 #   that appears AFTER a wildcard route (first path segment is a param /:…)
 #   of the SAME verb AND the SAME path depth.
@@ -56,7 +56,7 @@ SUPPRESSION_OLD = "check-settings-route-order: safe"
 
 # Matches: router.<verb>("<path>", …)   (single- or double-quoted path)
 RE_ROUTE = re.compile(
-    r"""router\.(put|patch|delete)\(\s*["'](/[^"']*)["']"""
+    r"""router\.(get|put|patch|delete)\(\s*["'](/[^"']*)["']"""
 )
 
 def path_depth(path):
