@@ -122,21 +122,137 @@ function parseTaskTable(tableText: string): ParsedTask[] {
   return tasks;
 }
 
-function parseTasks(reportContent: string, architectContent: string | null): ParsedTask[] {
-  // Preferisce la sezione validata dall'architect se disponibile
-  if (architectContent) {
-    const validatedSection = extractTaskTable(architectContent, "## TASK VALIDATI");
-    if (validatedSection) {
-      const tasks = parseTaskTable(validatedSection);
-      if (tasks.length > 0) return tasks;
+export interface ParseTasksResult {
+  tasks: ParsedTask[];
+  /** false quando il file architect esiste ma non contiene una tabella '## TASK VALIDATI' parseable (neanche dopo normalizzazione). */
+  architectFormatValid: boolean;
+}
+
+/**
+ * Converte la sezione "## TASK VALIDATI" di una risposta architect da lista
+ * puntata/numerata a tabella markdown, se necessario.
+ * Lascia invariata la sezione se è già una tabella (contiene `|`).
+ * Restituisce il contenuto modificato e un flag `normalized`.
+ */
+function normalizeArchitectSection(content: string): { content: string; normalized: boolean } {
+  const HEADER = "## TASK VALIDATI";
+  const idx = content.indexOf(HEADER);
+  if (idx === -1) return { content, normalized: false };
+
+  const before = content.slice(0, idx + HEADER.length);
+  const after = content.slice(idx + HEADER.length);
+  const sectionBody = after.split(/\n##\s/)[0];
+
+  // Se c'è già una tabella (almeno una riga con pipe), lascia invariato
+  if (/^\s*\|/m.test(sectionBody)) return { content, normalized: false };
+
+  const restAfterSection = after.slice(sectionBody.length);
+
+  // Estrai righe della lista (numerate "1. testo" o puntate "- testo" o "* testo")
+  const listItemRe = /^(?:\d+\.|[-*])\s+(.+)$/;
+  const rows: string[] = [];
+  for (const line of sectionBody.split("\n")) {
+    const m = listItemRe.exec(line.trim());
+    if (m) {
+      const titolo = m[1].slice(0, 80).replace(/\|/g, "—");
+      rows.push(`| ${titolo} | media | validato da architect |`);
     }
   }
 
-  // Fallback: sezione originale Horus
-  const originalSection = extractTaskTable(reportContent, "## TASK PROPOSTI DA HORUS");
-  if (originalSection) return parseTaskTable(originalSection);
+  if (rows.length === 0) return { content, normalized: false };
 
-  return [];
+  const table =
+    "\n| Titolo | Priorità | Motivazione |\n" +
+    "|--------|----------|-------------|\n" +
+    rows.join("\n") +
+    "\n";
+
+  return {
+    content: before + table + (restAfterSection ? restAfterSection : ""),
+    normalized: true,
+  };
+}
+
+function parseTasks(reportContent: string, architectContent: string | null): ParseTasksResult {
+  // Preferisce la sezione validata dall'architect se disponibile
+  if (architectContent) {
+    // Prova prima a normalizzare un'eventuale lista in tabella
+    const { content: normalizedArchitect, normalized } = normalizeArchitectSection(architectContent);
+
+    const validatedSection = extractTaskTable(normalizedArchitect, "## TASK VALIDATI");
+
+    // Il formato è valido se la sezione esiste ED ha una struttura tabella (almeno una riga con |).
+    // Un'architect review che valida 0 task (tabella vuota con solo intestazione) è VALIDA:
+    // significa che l'architect ha scartato tutto — non è un errore di formato.
+    const hasTableStructure = validatedSection !== null && /^\s*\|/m.test(validatedSection);
+
+    if (hasTableStructure) {
+      // Formato valido: l'architect decision è autorevole anche con 0 righe dati
+      const tasks = parseTaskTable(validatedSection!);
+
+      if (normalized) {
+        console.warn(
+          "\n  ⚠️  ──────────────────────────────────────────────────────",
+        );
+        console.warn(
+          "  ⚠️  ARCHITECT FORMAT: la sezione '## TASK VALIDATI' era in formato lista,",
+        );
+        console.warn(
+          "       non tabella markdown. Convertita automaticamente prima del parsing.",
+        );
+        console.warn(
+          "  ⚠️  Considera di rafforzare l'ARCHITECT_PROMPT per evitare il problema.",
+        );
+        console.warn(
+          "  ⚠️  ──────────────────────────────────────────────────────\n",
+        );
+      }
+
+      if (tasks.length === 0) {
+        console.log(
+          "  ℹ️  Architect ha validato 0 task (tutti scartati). Nessun task da proporre.\n",
+        );
+      }
+
+      // Nessun fallback alla sezione originale: la decisione dell'architect è definitiva
+      return { tasks, architectFormatValid: true };
+    }
+
+    // La sezione ## TASK VALIDATI è assente o non ha struttura tabella
+    // (neanche dopo il tentativo di normalizzazione da lista) → formato invalido
+    console.warn(
+      "\n  ⚠️  ──────────────────────────────────────────────────────",
+    );
+    console.warn(
+      "  ⚠️  ARCHITECT FORMAT INVALIDO: il file architect esiste ma non contiene",
+    );
+    console.warn(
+      "       una sezione '## TASK VALIDATI' con tabella markdown parseable",
+    );
+    console.warn(
+      "       (neanche dopo tentativo di normalizzazione da lista).",
+    );
+    console.warn(
+      "       Il filtro architect è stato IGNORATO — fallback al report originale Horus.",
+    );
+    console.warn(
+      "  ⚠️  Rafforzare l'ARCHITECT_PROMPT per evitare output in formato libero.",
+    );
+    console.warn(
+      "  ⚠️  ──────────────────────────────────────────────────────\n",
+    );
+
+    // Fallback: sezione originale Horus (filtro architect perso)
+    const originalSection = extractTaskTable(reportContent, "## TASK PROPOSTI DA HORUS");
+    if (originalSection) return { tasks: parseTaskTable(originalSection), architectFormatValid: false };
+    return { tasks: [], architectFormatValid: false };
+  }
+
+  // Nessuna revisione architect: usa direttamente la sezione originale
+  const originalSection = extractTaskTable(reportContent, "## TASK PROPOSTI DA HORUS");
+  if (originalSection) return { tasks: parseTaskTable(originalSection), architectFormatValid: true };
+
+  return { tasks: [], architectFormatValid: true };
 }
 
 // ─── Deduplicazione contro backlog (via file) ─────────────────────────────────
@@ -355,7 +471,13 @@ async function main(): Promise<void> {
   }
 
   // ── Parsing task ──
-  const tasks = parseTasks(reportContent, architectContent);
+  const { tasks, architectFormatValid } = parseTasks(reportContent, architectContent);
+  if (architectContent && !architectFormatValid) {
+    console.warn(
+      "  ⚠️  architectFormatValid=false — la revisione architect non ha prodotto una tabella\n" +
+      "       valida e il suo filtro è stato ignorato. I task vengono presi dal report originale.\n",
+    );
+  }
   if (tasks.length === 0) {
     console.log("  ℹ️  Nessun task trovato nel report. Niente da proporre.\n");
     return;
@@ -387,6 +509,7 @@ async function main(): Promise<void> {
     generatedAt: new Date().toISOString(),
     reportPath,
     hasArchitectReview: !!architectContent,
+    architectFormatValid,
     tasks: valid.map((t) => ({
       title: t.title,
       priority: t.priority,

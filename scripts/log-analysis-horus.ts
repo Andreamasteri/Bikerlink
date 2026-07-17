@@ -1234,17 +1234,27 @@ Criteri extra:
 - Verifica che ogni task validato abbia almeno un valore o stringa letterale citata dai dati (stringa di errore, chiave AppSetting, score, timestamp, sha commit). Scarta i task che descrivono il problema in modo generico senza evidenza specifica.
 - Preferisci task con correlazione cross-source (crash + commit + Sentry = stessa radice) a task basati su una sola sorgente.
 
-Rispondi con:
+Rispondi con ESATTAMENTE queste due sezioni, nell'ordine indicato:
 
 ## TASK VALIDATI (pronti per proposta formale)
-Tabella markdown solo con i task che passano la revisione:
+DEVI usare ESCLUSIVAMENTE la tabella markdown seguente. NON usare liste puntate, NON usare liste numerate, NON usare testo libero — SOLO la tabella con intestazione e separatore:
 
 | Titolo | Priorità | Motivazione |
 |--------|----------|-------------|
 | [titolo] | alta/media/bassa | [perché è valido, non duplicato, e quale evidenza letterale lo supporta] |
 
+Esempio corretto (NON copiare, usa come riferimento del formato):
+
+| Titolo | Priorità | Motivazione |
+|--------|----------|-------------|
+| Fix crash loop al boot dopo OTA 1.4.7 | alta | app_crash_logs: 23 eventi "Maximum update depth exceeded" — non coperto dal backlog |
+
+Se non ci sono task da validare, scrivi la tabella con intestazione e separatore ma senza righe dati.
+
 ## TASK SCARTATI
 Elenco puntato dei task esclusi con la ragione:
 - [titolo]: [duplicato di "X" / troppo vago / nessuna evidenza letterale / già risolto]
+
+IMPORTANTE: la sezione "## TASK VALIDATI" deve contenere SOLO la tabella markdown. Qualsiasi altro formato (lista puntata, lista numerata, testo descrittivo) sarà ignorato dal sistema di proposta automatica.
 
 Sii rigoroso. Meglio pochi task buoni che molti task ridondanti. Italiano obbligatorio.`;
