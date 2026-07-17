@@ -969,7 +969,7 @@ async function fetchExistingTaskTitles(): Promise<string[]> {
  *   - `hasArchitectReview` è false (nessuna revisione tentata)
  *   - `architectFormatValid` è true o undefined (formato OK)
  */
-async function emitArchitectFormatAlert(): Promise<void> {
+export async function emitArchitectFormatAlert(): Promise<void> {
   // Replica la logica del percorso manifest di horus-propose-tasks.ts
   const manifestDir = process.env.HORUS_LOG_DIR
     ? path.resolve(process.env.HORUS_LOG_DIR)
