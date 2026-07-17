@@ -994,6 +994,143 @@ async function fetchExistingTaskTitles(): Promise<string[]> {
   }
 }
 
+// ─── Architect format alert ───────────────────────────────────────────────────
+
+/**
+ * Legge il manifest `horus-tasks-pending.json` prodotto da horus-propose-tasks.ts
+ * e, se `architectFormatValid === false` con una revisione architect presente,
+ * emette:
+ *   1. Una riga in `system_signals` con source='horus', metric='architect.format_invalid',
+ *      severity='high' — così il watchdog/admin panel la mostra nel feed segnali.
+ *   2. Una push notification agli admin via Expo API — così l'alert è visibile
+ *      sul telefono anche senza guardare i log.
+ *
+ * Entrambe le operazioni sono non-fatali (errori solo loggati come warning).
+ * La funzione è no-op se:
+ *   - Il manifest non esiste (propose non eseguito o --no-propose)
+ *   - `hasArchitectReview` è false (nessuna revisione tentata)
+ *   - `architectFormatValid` è true o undefined (formato OK)
+ */
+async function emitArchitectFormatAlert(): Promise<void> {
+  // Replica la logica del percorso manifest di horus-propose-tasks.ts
+  const manifestDir = process.env.HORUS_LOG_DIR
+    ? path.resolve(process.env.HORUS_LOG_DIR)
+    : path.join(ROOT, "logs");
+  const manifestPath = path.join(manifestDir, "horus-tasks-pending.json");
+
+  if (!fs.existsSync(manifestPath)) return;
+
+  let manifest: {
+    hasArchitectReview?: boolean;
+    architectFormatValid?: boolean;
+    reportPath?: string;
+  };
+  try {
+    manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8")) as typeof manifest;
+  } catch (err) {
+    console.warn(
+      `  ⚠️  [architect-alert] Errore lettura manifest (non-fatal): ${(err as Error).message}\n`,
+    );
+    return;
+  }
+
+  // Emetti alert solo quando una revisione era stata tentata ma il formato è risultato invalido
+  if (!manifest.hasArchitectReview || manifest.architectFormatValid !== false) return;
+
+  const alertTitle = "⚠️ Horus triage: architect format invalido";
+  const alertBody = "Il filtro architect è stato ignorato — i task NON sono stati filtrati.";
+  const alertDetails = {
+    message: "Horus architect format invalid — task filter was skipped",
+    reportPath: manifest.reportPath ?? null,
+    manifestPath: path.relative(ROOT, manifestPath),
+  };
+
+  console.warn("\n  🔔 ──────────────────────────────────────────────────────");
+  console.warn(`  🔔 ALERT ADMIN: ${alertDetails.message}`);
+  console.warn("  🔔 Emissione system_signals + push admin...");
+  console.warn("  🔔 ──────────────────────────────────────────────────────\n");
+
+  // ── 1. Inserimento system_signals ──
+  try {
+    await db.execute(sql`
+      INSERT INTO system_signals (source, metric, severity, details)
+      VALUES (
+        'horus',
+        'architect.format_invalid',
+        'high',
+        ${JSON.stringify(alertDetails)}::jsonb
+      )
+    `);
+    console.log("  ✅ [architect-alert] system_signals 'horus/architect.format_invalid' (high) inserito.\n");
+  } catch (err) {
+    console.warn(
+      `  ⚠️  [architect-alert] Errore inserimento system_signals (non-fatal): ${(err as Error).message}\n`,
+    );
+  }
+
+  // ── 2. Push notification agli admin ──
+  try {
+    // Raccoglie token da push_tokens (per-app) + fallback expo_push_token legacy
+    const tokenRows = await db.execute(sql`
+      SELECT DISTINCT token FROM (
+        SELECT pt.token
+        FROM push_tokens pt
+        JOIN users u ON u.id = pt.user_id
+        WHERE u.role = 'admin' AND pt.app_id = 'main'
+          AND pt.token IS NOT NULL AND pt.token != ''
+        UNION
+        SELECT u.expo_push_token AS token
+        FROM users u
+        WHERE u.role = 'admin'
+          AND u.expo_push_token IS NOT NULL
+          AND u.expo_push_token != ''
+          AND u.expo_push_token LIKE 'ExponentPushToken[%'
+      ) combined
+    `);
+
+    const tokens = (tokenRows.rows as Array<{ token: string }>)
+      .map((r) => r.token)
+      .filter((t) => typeof t === "string" && t.length > 0);
+
+    if (tokens.length === 0) {
+      console.log("  ℹ️  [architect-alert] Nessun token push admin disponibile — push saltata.\n");
+      return;
+    }
+
+    const messages = tokens.map((to) => ({
+      to,
+      title: alertTitle,
+      body: alertBody,
+      sound: "default",
+      data: {
+        type: "system_alert",
+        metric: "architect.format_invalid",
+        reportPath: manifest.reportPath ?? null,
+      },
+      channelId: "matches",
+    }));
+
+    const resp = await fetch("https://exp.host/--/api/v2/push/send", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify(messages),
+    });
+
+    if (!resp.ok) {
+      const text = await resp.text().catch(() => "");
+      console.warn(
+        `  ⚠️  [architect-alert] Expo push API HTTP ${resp.status}: ${text.slice(0, 300)}\n`,
+      );
+    } else {
+      console.log(`  ✅ [architect-alert] Push inviata a ${tokens.length} device admin.\n`);
+    }
+  } catch (err) {
+    console.warn(
+      `  ⚠️  [architect-alert] Errore push admin (non-fatal): ${(err as Error).message}\n`,
+    );
+  }
+}
+
 // ─── Main ────────────────────────────────────────────────────────────────────
 
 async function main(): Promise<void> {
@@ -1276,6 +1413,10 @@ async function main(): Promise<void> {
   if (result.status !== 0) {
     console.warn("\n⚠️  Proposta task completata con avvisi (vedi output sopra).\n");
   }
+
+  // Controlla il manifest prodotto da horus-propose-tasks.ts e, se
+  // architectFormatValid=false, emette system_signals + push admin.
+  await emitArchitectFormatAlert();
 }
 
 main().catch((err) => {
