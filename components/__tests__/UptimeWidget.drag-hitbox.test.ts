@@ -10,11 +10,11 @@
  *   di coordinate degli eventi touch.
  *
  *   Questo è il motivo per cui UptimeWidget usa esclusivamente transform per
- *   il posizionamento dinamico (UptimeWidget.tsx riga ~214-220):
- *     "Posizionamento via transform (translateX/translateY) invece di left/top:
- *      su Android animare left/top sposta il pixel ma lascia l'hitbox del touch
- *      alla posizione di layout originale. Con il transform l'area di tocco
- *      segue la posizione visiva."
+ *   il posizionamento dinamico — stessa scelta già adottata per FloatingWidget
+ *   (vedi floating-widget-android-hitbox.md). Entrambi usano RN Animated.Value
+ *   con transform: evita il percorso Reanimated → NativeAnimatedModule →
+ *   ReadableNativeMap.getLocalMap che causava HashMap.resize OOM in sessioni
+ *   lunghe (Sentry issue 134724851, S26 Ultra, dist 80).
  *
  * NOTA SU DETOX / NEGAZIONE COORDINATE ORIGINALE:
  *   La prova definitiva "il tap alla VECCHIA posizione NON attiva il widget"
@@ -24,7 +24,7 @@
  *   livello JS e non filtra gli eventi per coordinata — qualsiasi chiamata a
  *   onPanResponderGrant raggiunge il componente indipendentemente da dove
  *   verrebbe fisicamente l'evento touch. Questi test coprono la metà testabile
- *   in Node: la pipeline PanResponder → shared value → transform è corretta.
+ *   in Node: la pipeline PanResponder → Animated.Value → transform è corretta.
  *
  * COPERTURA:
  *   (D3) posX/posY aggiornati dopo drag: transform punta alla nuova coordinata
@@ -46,7 +46,11 @@ import renderer from "react-test-renderer";
 
 // ── vi.hoisted: stato condiviso accessibile nelle factory vi.mock ─────────────
 
-const svStore = vi.hoisted(() => ({
+// avStore traccia gli Animated.Value creati durante il mount (slot-based per
+// indice di chiamata, come faceva il vecchio svStore per useSharedValue).
+// Le prime due istanze (slot 0 e 1) sono posXAnim e posYAnim — quelle
+// memorizzate in useRef e su cui viene chiamato setValue() durante drag/tap.
+const avStore = vi.hoisted(() => ({
   slots: [] as Array<{ value: number }>,
   idx: 0,
   reset() { this.idx = 0; },
@@ -69,34 +73,46 @@ const routerMock = vi.hoisted(() => ({
 }));
 
 // ── Mock: react-native ────────────────────────────────────────────────────────
-vi.mock("react-native", () => ({
-  StyleSheet: { create: (s: unknown) => s },
-  View: "View",
-  Text: "Text",
-  PanResponder: {
-    create: (cfg: Record<string, (...a: unknown[]) => unknown>) => {
-      panCapture.config = cfg;
-      return { panHandlers: {} };
+// Animated.Value usa slot stabili per indice di chiamata (come Reanimated
+// useSharedValue faceva in precedenza): stessa istanza riutilizzata tra render,
+// setValue() scrive nel slot condiviso, il test helper posX()/posY() lo legge.
+vi.mock("react-native", () => {
+  class AnimatedValue {
+    _slot: { value: number };
+    constructor(initialValue: number) {
+      const i = avStore.idx++;
+      if (!avStore.slots[i]) avStore.slots[i] = { value: initialValue };
+      this._slot = avStore.slots[i];
+    }
+    setValue(v: number) { this._slot.value = v; }
+    get value() { return this._slot.value; }
+    addListener() { return 0; }
+    removeListener(_id: number) {}
+  }
+  return {
+    StyleSheet: { create: (s: unknown) => s },
+    View: "View",
+    Text: "Text",
+    PanResponder: {
+      create: (cfg: Record<string, (...a: unknown[]) => unknown>) => {
+        panCapture.config = cfg;
+        return { panHandlers: {} };
+      },
     },
-  },
-  useWindowDimensions: () => ({ ...mockEnv.screen }),
-  Platform: { OS: "android" },
-}));
+    useWindowDimensions: () => ({ ...mockEnv.screen }),
+    Platform: { OS: "android" },
+    Animated: {
+      View: "AnimatedView",
+      Value: AnimatedValue,
+    },
+  };
+});
 
-// ── Mock: react-native-reanimated ─────────────────────────────────────────────
-// useSharedValue restituisce sempre lo stesso slot per lo stesso indice di
-// chiamata (simula Reanimated tra render diversi).
-// useAnimatedStyle chiama la factory subito → lo style riflette i valori
-// correnti dei shared value.
+// ── Mock: react-native-reanimated (stub minimo) ───────────────────────────────
+// UptimeWidget non importa più da Reanimated dopo la migrazione a RN
+// Animated.Value. Stub minimo per evitare errori da import transitivi.
 vi.mock("react-native-reanimated", () => ({
   default: { View: "AnimatedView" },
-  useSharedValue: (initialValue: number) => {
-    const i = svStore.idx++;
-    if (!svStore.slots[i]) svStore.slots[i] = { value: initialValue };
-    return svStore.slots[i];
-  },
-  useAnimatedStyle: (fn: () => object) => fn(),
-  runOnJS: (f: unknown) => f,
 }));
 
 // ── Mock: dipendenze esterne ──────────────────────────────────────────────────
@@ -134,18 +150,18 @@ const BOT_INSET = 34;
 const WIDGET_W = 110;
 const WIDGET_H = 32;
 
-// Helper: accede ai shared value 0 (posX) e 1 (posY).
-function posX() { return svStore.slots[0]; }
-function posY() { return svStore.slots[1]; }
+// Helper: accede agli Animated.Value 0 (posXAnim) e 1 (posYAnim) via slot store.
+function posX() { return avStore.slots[0]; }
+function posY() { return avStore.slots[1]; }
 
 // Helper: monta UptimeWidget con stato pulito.
 function mountUptime() {
-  svStore.clear(); panCapture.config = null;
+  avStore.clear(); panCapture.config = null;
   routerMock.push.mockClear();
   mockEnv.screen = { width: SCREEN_W, height: SCREEN_H };
   mockEnv.insets = { top: TOP_INSET, bottom: BOT_INSET, left: 0, right: 0 };
   let comp!: ReturnType<typeof renderer.create>;
-  svStore.reset();
+  avStore.reset();
   renderer.act(() => { comp = renderer.create(React.createElement(UptimeWidget)); });
   return comp;
 }
@@ -209,7 +225,7 @@ describe("UptimeWidget — drag-hitbox Android", () => {
    * con valori dipendenti dalla posizione corrente. Solo il transform deve
    * portare la posizione (left/top fissi a 0 dallo stylesheet).
    *
-   * Regressione target: qualcuno aggiunge `left: posX.value` allo stile →
+   * Regressione target: qualcuno aggiunge `left: posXRef.current` allo stile →
    * su Android il pixel si sposta ma l'hitbox rimane all'origine.
    */
   it("(D4) nessun left/top dinamico dopo drag — solo il transform porta la posizione (Android hitbox)", () => {

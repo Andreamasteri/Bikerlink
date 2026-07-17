@@ -5,14 +5,11 @@ import {
   StyleSheet,
   useWindowDimensions,
   PanResponder,
+  Animated,
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useQuery } from "@tanstack/react-query";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-} from "react-native-reanimated";
 import { useRouter } from "expo-router";
 import { useState } from "react";
 // Riusa la logica di discriminazione tap/drag del pallino flottante: stessa
@@ -68,10 +65,16 @@ export default function UptimeWidget() {
   const defaultX = width - WIDGET_W - 16;
   const defaultY = height - WIDGET_H - 84 - insets.bottom;
 
-  // Posizione corrente del widget come shared values Reanimated — il transform
-  // usa questi valori per posizionare il widget sullo schermo.
-  const posX = useSharedValue(defaultX);
-  const posY = useSharedValue(defaultY);
+  // Posizione corrente del widget come Animated.Value RN — il transform usa questi
+  // valori. A differenza di Reanimated useSharedValue, Animated.Value con transform
+  // aggiorna la hitbox touch nativa su Android (fix: widget non cliccabile).
+  // Stessa scelta già adottata per FloatingWidget (vedi floating-widget-android-hitbox.md).
+  const posXAnim = useRef(new Animated.Value(defaultX)).current;
+  const posYAnim = useRef(new Animated.Value(defaultY)).current;
+  // Ref paralleli per leggere il valore corrente in modo sincrono (Animated.Value
+  // non ha un getter sincrono affidabile cross-platform).
+  const posXRef = useRef(defaultX);
+  const posYRef = useRef(defaultY);
 
   // Origine del drag corrente (salvata a onPanResponderGrant sul JS thread).
   const dragStartX = useRef(defaultX);
@@ -123,8 +126,8 @@ export default function UptimeWidget() {
           parsed.x, parsed.y, width, height,
           insets.top + 8, insets.bottom + 8,
         );
-        posX.value = clamped.x;
-        posY.value = clamped.y;
+        posXAnim.setValue(clamped.x); posXRef.current = clamped.x;
+        posYAnim.setValue(clamped.y); posYRef.current = clamped.y;
       } catch {
         // ignora
       }
@@ -134,7 +137,7 @@ export default function UptimeWidget() {
   // Re-clamp condizionale per rotazione schermo / resize.
   // Differisce dalla versione originale su due punti critici:
   //   1. Salta completamente se isDragging è true — mai interrompere un drag.
-  //   2. Scrive posX/posY solo se il widget si trova realmente fuori dai nuovi
+  //   2. Scrive posXAnim/posYAnim solo se il widget si trova realmente fuori dai nuovi
   //      limiti — così l'apertura di un pannello (che cambia insets ma non
   //      sposta il widget fuori schermo) non provoca alcun "salto".
   useEffect(() => {
@@ -143,13 +146,13 @@ export default function UptimeWidget() {
     const maxYPad = insets.bottom + 8;
     const maxX = width - WIDGET_W;
     const maxY = height - WIDGET_H - maxYPad;
-    const curX = posX.value;
-    const curY = posY.value;
+    const curX = posXRef.current;
+    const curY = posYRef.current;
     const clampedX = Math.max(0, Math.min(curX, maxX));
     const clampedY = Math.max(minY, Math.min(curY, maxY));
     if (clampedX !== curX || clampedY !== curY) {
-      posX.value = clampedX;
-      posY.value = clampedY;
+      posXAnim.setValue(clampedX); posXRef.current = clampedX;
+      posYAnim.setValue(clampedY); posYRef.current = clampedY;
     }
   }, [width, height, insets.top, insets.bottom]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -179,8 +182,8 @@ export default function UptimeWidget() {
       onPanResponderTerminationRequest: () => false,
       onPanResponderGrant: () => {
         isDragging.current = true;
-        dragStartX.current = posX.value;
-        dragStartY.current = posY.value;
+        dragStartX.current = posXRef.current;
+        dragStartY.current = posYRef.current;
       },
       onPanResponderMove: (_, gs) => {
         // Legge sempre i ref aggiornati a ogni render, mai la closure stantia
@@ -194,8 +197,8 @@ export default function UptimeWidget() {
           w, h,
           ins.top + 8, ins.bottom + 8,
         );
-        posX.value = clamped.x;
-        posY.value = clamped.y;
+        posXAnim.setValue(clamped.x); posXRef.current = clamped.x;
+        posYAnim.setValue(clamped.y); posYRef.current = clamped.y;
       },
       onPanResponderRelease: (_, gs) => {
         isDragging.current = false;
@@ -205,11 +208,11 @@ export default function UptimeWidget() {
         const h = heightRef.current;
         const ins = insetsRef.current;
         const clamped = clampUptimePos(
-          posX.value, posY.value, w, h,
+          posXRef.current, posYRef.current, w, h,
           ins.top + 8, ins.bottom + 8,
         );
-        posX.value = clamped.x;
-        posY.value = clamped.y;
+        posXAnim.setValue(clamped.x); posXRef.current = clamped.x;
+        posYAnim.setValue(clamped.y); posYRef.current = clamped.y;
         savePosition(clamped.x, clamped.y);
         if (!isDragGesture(gs.dx, gs.dy, TAP_THRESHOLD)) {
           openHistoryRef.current();
@@ -217,18 +220,17 @@ export default function UptimeWidget() {
       },
       onPanResponderTerminate: () => {
         isDragging.current = false;
-        savePosition(posX.value, posY.value);
+        savePosition(posXRef.current, posYRef.current);
       },
     })
   ).current;
 
-  // Posizionamento via transform (translateX/translateY) invece di left/top: su
-  // Android animare left/top sposta il pixel ma lascia l'hitbox del touch alla
-  // posizione di layout originale. Con il transform l'area di tocco segue la
-  // posizione visiva.
-  const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: posX.value }, { translateY: posY.value }],
-  }));
+  // Posizionamento via transform (translateX/translateY) con Animated.Value di RN:
+  // su Android, Animated.Value con transform aggiorna la hitbox touch nativa in
+  // lockstep con la posizione visiva — Reanimated useSharedValue non lo fa.
+  // Questo elimina anche il percorso Reanimated → NativeAnimatedModule →
+  // ReadableNativeMap.getLocalMap che causava HashMap.resize OOM in sessioni
+  // lunghe (Sentry issue 134724851, S26 Ultra, dist 80).
 
   const now = Date.now();
   const fetchAge = now - fetchTimeRef.current;
@@ -241,7 +243,13 @@ export default function UptimeWidget() {
   const crashCount = data?.crashCount24h ?? 0;
 
   return (
-    <Animated.View testID="uptime-widget" style={[styles.container, animatedStyle]}>
+    <Animated.View
+      testID="uptime-widget"
+      style={[
+        styles.container,
+        { transform: [{ translateX: posXAnim }, { translateY: posYAnim }] },
+      ]}
+    >
       <View {...panResponder.panHandlers} style={styles.inner}>
         <Text style={styles.label}>
           {"⏱ "}

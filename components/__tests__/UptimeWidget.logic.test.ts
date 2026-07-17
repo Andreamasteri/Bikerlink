@@ -17,14 +17,17 @@
  *        il move usa widthRef.current aggiornato, non la closure stantia.
  *   (b3) Release ripristina isDragging=false e clamp finale corretto.
  *
- * useSharedValue mock stabile via slot indicizzati per posizione di chiamata
- * (simulazione del comportamento interno di Reanimated tra i render):
- *   - svStore.slots[i] viene creato al primo render e riusato ai successivi
- *   - svStore.reset() va chiamato PRIMA di ogni renderer.act() / update()
+ * Animated.Value mock stabile via slot indicizzati per posizione di chiamata
+ * (simula il comportamento stabile di RN Animated.Value via useRef tra i render):
+ *   - avStore.slots[i] viene creato al primo render e riusato ai successivi
+ *   - avStore.reset() va chiamato PRIMA di ogni renderer.act() / update()
  *   - Il PanResponder (frozen nel useRef al primo render) e il re-clamp
  *     useEffect leggono/scrivono gli stessi oggetti attraverso i render.
  *
  * Riferimento architetturale: FloatingWidget.mount.test.ts (stesso pattern).
+ * Nota OOM: UptimeWidget usa RN Animated.Value (non Reanimated useSharedValue)
+ * per evitare il percorso NativeAnimatedModule → ReadableNativeMap.getLocalMap
+ * → HashMap.resize che causava OOM in sessioni lunghe (Sentry 134724851).
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
@@ -33,8 +36,12 @@ import renderer from "react-test-renderer";
 
 // ── vi.hoisted: stato condiviso prima di qualsiasi import/mock ────────────────
 
-// Shared values: slot stabili per indice di chiamata (come Reanimated internamente)
-const svStore = vi.hoisted(() => ({
+// Slot stabili per indice di chiamata: simulano il comportamento di RN
+// Animated.Value + useRef tra i render (primo render crea lo slot, i successivi
+// lo riutilizzano). avStore.reset() riporta l'indice a 0 prima di ogni render
+// così la N-esima chiamata a `new Animated.Value(...)` restituisce sempre
+// lo stesso slot — esattamente come `useRef` mantiene il valore iniziale.
+const avStore = vi.hoisted(() => ({
   slots: [] as Array<{ value: number }>,
   idx: 0,
   reset() {
@@ -51,7 +58,7 @@ const panCapture = vi.hoisted(() => ({
   config: null as Record<string, (...a: unknown[]) => unknown> | null,
 }));
 
-// Dimensioni e insets mutabili: cambiarli + svStore.reset() + renderer.update()
+// Dimensioni e insets mutabili: cambiarli + avStore.reset() + renderer.update()
 // simula rotazione schermo / apertura pannello senza rimontare il componente.
 const mockEnv = vi.hoisted(() => ({
   screen: { width: 400, height: 800 },
@@ -59,33 +66,47 @@ const mockEnv = vi.hoisted(() => ({
 }));
 
 // ── mock: react-native ────────────────────────────────────────────────────────
-vi.mock("react-native", () => ({
-  StyleSheet: { create: (s: unknown) => s },
-  View: "View",
-  Text: "Text",
-  PanResponder: {
-    create: (cfg: Record<string, (...a: unknown[]) => unknown>) => {
-      panCapture.config = cfg;
-      return { panHandlers: {} };
+// Animated.Value usa slot stabili per indice (avStore) così posX()/posY()
+// possono leggere/verificare i valori correnti dopo drag e re-render.
+vi.mock("react-native", () => {
+  class AnimatedValue {
+    _slot: { value: number };
+    constructor(initialValue: number) {
+      const i = avStore.idx++;
+      if (!avStore.slots[i]) {
+        avStore.slots[i] = { value: initialValue };
+      }
+      this._slot = avStore.slots[i];
+    }
+    setValue(v: number) { this._slot.value = v; }
+    get value() { return this._slot.value; }
+    addListener() { return 0; }
+    removeListener(_id: number) {}
+  }
+  return {
+    StyleSheet: { create: (s: unknown) => s },
+    View: "View",
+    Text: "Text",
+    PanResponder: {
+      create: (cfg: Record<string, (...a: unknown[]) => unknown>) => {
+        panCapture.config = cfg;
+        return { panHandlers: {} };
+      },
     },
-  },
-  useWindowDimensions: () => ({ ...mockEnv.screen }),
-  Platform: { OS: "ios" },
-}));
+    useWindowDimensions: () => ({ ...mockEnv.screen }),
+    Platform: { OS: "ios" },
+    Animated: {
+      View: "AnimatedView",
+      Value: AnimatedValue,
+    },
+  };
+});
 
-// ── mock: react-native-reanimated (shared values stabili per slot) ────────────
-// svStore.reset() va chiamato prima di ogni render; così ogni i-esima chiamata
-// a useSharedValue restituisce SEMPRE lo stesso oggetto, come fa Reanimated.
+// ── mock: react-native-reanimated (stub minimo) ───────────────────────────────
+// UptimeWidget non importa più da Reanimated dopo la migrazione a RN
+// Animated.Value. Stub minimo per evitare errori da import transitivi.
 vi.mock("react-native-reanimated", () => ({
   default: { View: "AnimatedView" },
-  useSharedValue: (initialValue: number) => {
-    const i = svStore.idx++;
-    if (!svStore.slots[i]) {
-      svStore.slots[i] = { value: initialValue };
-    }
-    return svStore.slots[i];
-  },
-  useAnimatedStyle: () => ({}),
 }));
 
 // ── altri mock indispensabili per caricare il modulo ─────────────────────────
@@ -126,18 +147,18 @@ const MAX_Y_PAD = BOTTOM + 8; // 42
 const MAX_X = SCREEN_W - WIDGET_W; // 290
 const MAX_Y = SCREEN_H - WIDGET_H - MAX_Y_PAD; // 726
 
-// Helper: posX/posY dal primo render (stessi oggetti usati dal PanResponder)
-function posX() { return svStore.slots[0]; }
-function posY() { return svStore.slots[1]; }
+// Helper: posXAnim/posYAnim dal primo render (stessi slot usati dal PanResponder)
+function posX() { return avStore.slots[0]; }
+function posY() { return avStore.slots[1]; }
 
 // Helper: monta UptimeWidget resettando lo slot index prima del render
 function mountWidget() {
-  svStore.clear();
+  avStore.clear();
   panCapture.config = null;
   mockEnv.screen = { width: SCREEN_W, height: SCREEN_H };
   mockEnv.insets = { top: TOP, bottom: BOTTOM, left: 0, right: 0 };
   let comp!: ReturnType<typeof renderer.create>;
-  svStore.reset();
+  avStore.reset();
   renderer.act(() => {
     comp = renderer.create(React.createElement(UptimeWidget));
   });
@@ -153,7 +174,7 @@ function rerender(
   if (patch.height !== undefined) mockEnv.screen.height = patch.height;
   if (patch.top !== undefined) mockEnv.insets.top = patch.top;
   if (patch.bottom !== undefined) mockEnv.insets.bottom = patch.bottom;
-  svStore.reset();
+  avStore.reset();
   renderer.act(() => {
     comp.update(React.createElement(UptimeWidget));
   });
@@ -235,7 +256,7 @@ describe("UptimeWidget — (B1) isDragging guard: re-clamp useEffect non scrive 
     expect(typeof panCapture.config!.onPanResponderRelease).toBe("function");
   });
 
-  it("posX e posY sono shared value osservabili (slot 0 e 1)", () => {
+  it("posX e posY sono Animated.Value osservabili (slot 0 e 1)", () => {
     expect(posX()).toBeDefined();
     expect(posY()).toBeDefined();
     expect(typeof posX().value).toBe("number");

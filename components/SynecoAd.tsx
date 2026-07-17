@@ -19,6 +19,7 @@ import Animated, {
   withRepeat,
   withTiming,
   withSequence,
+  cancelAnimation,
   Easing,
 } from "react-native-reanimated";
 
@@ -55,6 +56,10 @@ function AdBannerItem({ campaign, onPress }: { campaign: AdCampaign; onPress: ()
       -1,
       false
     );
+    // Cancella l'animazione continua all'unmount: withRepeat(-1) gira per sempre
+    // e accumula oggetti nativi (HashMap via ReadableNativeMap.getLocalMap) se
+    // non viene fermato esplicitamente — leak di memoria sessione-lunga.
+    return () => { cancelAnimation(shimmer); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
