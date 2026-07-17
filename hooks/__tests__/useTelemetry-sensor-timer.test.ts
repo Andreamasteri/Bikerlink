@@ -45,6 +45,11 @@ vi.mock("@/lib/background-telemetry-task", () => ({
   stopTelemetryBackgroundTask: vi.fn(),
   drainBackgroundTelemetryBuffer: vi.fn(() => []),
 }));
+vi.mock("@/lib/background-location-task", () => ({
+  stopBackgroundLocationTask: vi.fn(),
+  restartBackgroundLocationTaskWithPrecision: vi.fn(),
+  GPS_PRECISION_STORAGE_KEY: "@bikerlink/gps_precision",
+}));
 
 // ── import delle funzioni PURE DI PRODUZIONE ─────────────────────────────────
 import { GPS_SILENCE_MS, shouldAddSensorSample } from "@/hooks/useTelemetry";
