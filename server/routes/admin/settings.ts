@@ -303,6 +303,32 @@ router.put("/support-whatsapp", async (req: Request, res: Response) => {
   }
 });
 
+// NOTE: these specific PUT handlers MUST stay before the generic /:key handler
+// below — Express matches routes in declaration order and /:key would intercept
+// them first, saving to the wrong DB key (hyphenated path instead of underscored).
+
+router.put("/tc-terminal-apk-url", async (req: Request, res: Response) => {
+  try {
+    const parsed = urlSettingSchema.safeParse(req.body);
+    if (!parsed.success) return sendError(res, 400, parsed.error.issues[0].message);
+    const setting = await storage.upsertAppSetting("tc_terminal_apk_url", parsed.data.url);
+    return res.json(setting);
+  } catch (_error) {
+    return sendError(res, 500, "Errore salvataggio TC Terminal APK URL");
+  }
+});
+
+router.put("/play-store-url", async (req: Request, res: Response) => {
+  try {
+    const parsed = urlSettingSchema.safeParse(req.body);
+    if (!parsed.success) return sendError(res, 400, parsed.error.issues[0].message);
+    const setting = await storage.upsertAppSetting("play_store_url", parsed.data.url);
+    return res.json(setting);
+  } catch (_error) {
+    return sendError(res, 500, "Errore salvataggio Play Store URL");
+  }
+});
+
 router.put("/:key", async (req: Request, res: Response) => {
   try {
     const key = req.params.key as string;
@@ -490,34 +516,12 @@ router.get("/tc-terminal-apk-url", async (_req: Request, res: Response) => {
   }
 });
 
-router.put("/tc-terminal-apk-url", async (req: Request, res: Response) => {
-  try {
-    const parsed = urlSettingSchema.safeParse(req.body);
-    if (!parsed.success) return sendError(res, 400, parsed.error.issues[0].message);
-    const setting = await storage.upsertAppSetting("tc_terminal_apk_url", parsed.data.url);
-    return res.json(setting);
-  } catch (_error) {
-    return sendError(res, 500, "Errore salvataggio TC Terminal APK URL");
-  }
-});
-
 router.get("/play-store-url", async (_req: Request, res: Response) => {
   try {
     const setting = await storage.getAppSetting("play_store_url");
     return res.json({ url: setting?.value || "" });
   } catch (_error) {
     return sendError(res, 500, "Errore lettura Play Store URL");
-  }
-});
-
-router.put("/play-store-url", async (req: Request, res: Response) => {
-  try {
-    const parsed = urlSettingSchema.safeParse(req.body);
-    if (!parsed.success) return sendError(res, 400, parsed.error.issues[0].message);
-    const setting = await storage.upsertAppSetting("play_store_url", parsed.data.url);
-    return res.json(setting);
-  } catch (_error) {
-    return sendError(res, 500, "Errore salvataggio Play Store URL");
   }
 });
 
