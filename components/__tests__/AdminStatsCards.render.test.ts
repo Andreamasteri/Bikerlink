@@ -1,17 +1,27 @@
 /**
- * Regression guard — AdminStatsCards (ValhallaCard, PhotonCard) payload shape resilience.
+ * Regression guard — AdminStatsCards (ValhallaCard, PhotonCard, GraphHopperCard) payload shape resilience.
  *
  * AdminStatsCards.tsx esporta ValhallaCard e PhotonCard che consumano
  * /api/admin/thinkcentre-health via useQuery. Se il payload non include
  * `valhallaDetail.activeProfiles` o `detail.history` il componente lanciava
  * TypeError su `.length` — questa guard verifica che non si ripeta.
+ * GraphHopperCard consuma /api/admin/graphhopper-status e viene testata
+ * con payload parziale (mode mancante) per la stessa categoria di crash.
  *
- * Tre varianti testate per ValhallaCard:
+ * Varianti testate per ValhallaCard:
  *   1. payload con dettaglio valido (online, activeProfiles populated)
  *   2. error state (useQuery.error) → banner senza TypeError
  *   3. malformed: valhallaDetail senza activeProfiles/history → nessun TypeError
  *
- * Stessa struttura 3-variante per PhotonCard.
+ * Stessa struttura per PhotonCard + 4 varianti per GraphHopperCard.
+ *
+ * Pattern da replicare per i componenti restanti in KNOWN_GAPS:
+ *   1. Importa il componente DOPO aver configurato tutti i vi.mock().
+ *   2. Controlla useQuery tramite useQueryMock (dispatch per queryKey[0]).
+ *   3. Testa almeno: payload valido, errore/offline, payload malformed.
+ *   4. Simula l'espansione della card (press header) per coprire il ramo
+ *      {!collapsed && ...} dove avvengono le chiamate critiche ai dati.
+ *   5. Usa react-test-renderer + IS_REACT_ACT_ENVIRONMENT (no Playwright).
  *
  * Strategia: react-test-renderer + IS_REACT_ACT_ENVIRONMENT.
  */
@@ -56,12 +66,6 @@ vi.mock("@/lib/query-client", () => ({
   authFetchHeaders: async () => ({}),
 }));
 
-// ── Mock: @tanstack/react-query ───────────────────────────────────────────
-const useQueryMock = vi.fn();
-vi.mock("@tanstack/react-query", () => ({
-  useQuery: (...args: unknown[]) => useQueryMock(...args),
-}));
-
 // ── Mock: ThinkCentreCardParts (ErrorHistory, ProbeLog) ───────────────────
 vi.mock("@/components/admin/ThinkCentreCardParts", () => ({
   ErrorHistory: "ErrorHistory",
@@ -86,7 +90,13 @@ vi.mock("@/components/admin/AdminTelemetryCard", () => ({
 // ── Mock: ThinkCentreValhallaPhotonBlocks (tipi only, no runtime use) ─────
 vi.mock("@/components/admin/ThinkCentreValhallaPhotonBlocks", () => ({}));
 
-import { ValhallaCard, PhotonCard } from "@/components/admin/AdminStatsCards";
+// ── Mock: @tanstack/react-query — controllato per test ────────────────────
+const useQueryMock = vi.fn();
+vi.mock("@tanstack/react-query", () => ({
+  useQuery: (...args: unknown[]) => useQueryMock(...args),
+}));
+
+import { GraphHopperCard, ValhallaCard, PhotonCard } from "@/components/admin/AdminStatsCards";
 
 // ── Fixture payloads ──────────────────────────────────────────────────────
 
@@ -141,10 +151,26 @@ const malformedPhotonPayload = {
   },
 };
 
+/** GraphHopper online self-hosted. */
+const ghOnline = {
+  mode:    "self-hosted" as const,
+  profile: "motorcycle",
+  healthy: true,
+  url:     "http://tc:8989",
+};
+
 // ── Helpers ───────────────────────────────────────────────────────────────
 
 function buildReturn(data: unknown) {
   return { data, isLoading: false, error: null, refetch: vi.fn() };
+}
+
+function buildQuery(data: unknown, opts?: { error?: Error; isLoading?: boolean }) {
+  return {
+    data,
+    isLoading: opts?.isLoading ?? false,
+    error:     opts?.error ?? null,
+  };
 }
 
 let renderer: TestRenderer.ReactTestRenderer | null = null;
@@ -155,14 +181,25 @@ async function mountComponent(Component: React.ComponentType) {
   });
 }
 
+function findByTestId(testId: string) {
+  return renderer!.root.findAll((n) => n.props.testID === testId);
+}
+
 async function expandCard(testID: string) {
-  const headers = renderer!.root.findAll(
-    (n) => n.props.testID === testID,
-  );
+  const headers = findByTestId(testID);
   expect(headers).toHaveLength(1);
   await act(async () => {
     headers[0].props.onPress();
   });
+}
+
+function allTextContents(): string[] {
+  return renderer!.root
+    .findAll((n) => (n.type as unknown) === "Text")
+    .map((n) => {
+      const c = n.props.children;
+      return Array.isArray(c) ? c.map(String).join("") : String(c ?? "");
+    });
 }
 
 beforeEach(() => {
@@ -179,6 +216,48 @@ afterEach(async () => {
 });
 
 // ══════════════════════════════════════════════════════════════════════════
+// GraphHopperCard
+// ══════════════════════════════════════════════════════════════════════════
+
+describe("GraphHopperCard — resilienza payload", () => {
+
+  it("1. payload online self-hosted — card monta ed espande senza TypeError", async () => {
+    useQueryMock.mockReturnValue(buildQuery(ghOnline));
+    await mountComponent(GraphHopperCard);
+    expect(findByTestId("graphhopper-card-header")).toHaveLength(1);
+
+    await expandCard("graphhopper-card-header");
+
+    const texts = allTextContents();
+    expect(texts.some((t) => t.includes("Self-Hosted") || t.includes("self-hosted") || t.includes("Self"))).toBe(true);
+  });
+
+  it("2. errore HTTP — header reso, nessun crash al expand", async () => {
+    useQueryMock.mockReturnValue(buildQuery(undefined, { error: new Error("HTTP 503") }));
+    await mountComponent(GraphHopperCard);
+    expect(findByTestId("graphhopper-card-header")).toHaveLength(1);
+    await expandCard("graphhopper-card-header");
+  });
+
+  it("3. loading — header reso, nessun crash", async () => {
+    useQueryMock.mockReturnValue(buildQuery(undefined, { isLoading: true }));
+    await mountComponent(GraphHopperCard);
+    expect(findByTestId("graphhopper-card-header")).toHaveLength(1);
+  });
+
+  it("4. payload malformed (mode mancante) — card espansa senza TypeError", async () => {
+    // Risposta parziale: solo `healthy`, nessun `mode` o `profile`.
+    useQueryMock.mockReturnValue(buildQuery({ healthy: true }));
+    await expect(
+      (async () => {
+        await mountComponent(GraphHopperCard);
+        await expandCard("graphhopper-card-header");
+      })(),
+    ).resolves.toBeUndefined();
+  });
+});
+
+// ══════════════════════════════════════════════════════════════════════════
 // ValhallaCard
 // ══════════════════════════════════════════════════════════════════════════
 
@@ -190,13 +269,9 @@ describe("ValhallaCard — resilienza alla shape del payload agente", () => {
     await mountComponent(ValhallaCard);
     await expandCard("valhalla-card-header");
 
-    const allTexts = renderer!.root.findAll((n) => (n.type as unknown) === "Text");
-    const textContents = allTexts.map((n) => {
-      const c = n.props.children;
-      return Array.isArray(c) ? c.map(String).join("") : String(c ?? "");
-    });
+    const texts = allTextContents();
     // latenza resa
-    expect(textContents.some((t) => t.includes("42"))).toBe(true);
+    expect(texts.some((t) => t.includes("42"))).toBe(true);
   });
 
   it("2. error state — banner senza TypeError", async () => {
@@ -210,12 +285,8 @@ describe("ValhallaCard — resilienza alla shape del payload agente", () => {
     await mountComponent(ValhallaCard);
     await expandCard("valhalla-card-header");
 
-    const allTexts = renderer!.root.findAll((n) => (n.type as unknown) === "Text");
-    const textContents = allTexts.map((n) => {
-      const c = n.props.children;
-      return Array.isArray(c) ? c.map(String).join("") : String(c ?? "");
-    });
-    expect(textContents.some((t) => t.toLowerCase().includes("impossibile"))).toBe(true);
+    const texts = allTextContents();
+    expect(texts.some((t) => t.toLowerCase().includes("impossibile"))).toBe(true);
   });
 
   it("3. malformed (activeProfiles e history assenti) — nessun TypeError", async () => {
@@ -242,12 +313,8 @@ describe("PhotonCard — resilienza alla shape del payload agente", () => {
     await mountComponent(PhotonCard);
     await expandCard("photon-card-header");
 
-    const allTexts = renderer!.root.findAll((n) => (n.type as unknown) === "Text");
-    const textContents = allTexts.map((n) => {
-      const c = n.props.children;
-      return Array.isArray(c) ? c.map(String).join("") : String(c ?? "");
-    });
-    expect(textContents.some((t) => t.includes("15"))).toBe(true);
+    const texts = allTextContents();
+    expect(texts.some((t) => t.includes("15"))).toBe(true);
   });
 
   it("2. error state — banner senza TypeError", async () => {
@@ -261,12 +328,8 @@ describe("PhotonCard — resilienza alla shape del payload agente", () => {
     await mountComponent(PhotonCard);
     await expandCard("photon-card-header");
 
-    const allTexts = renderer!.root.findAll((n) => (n.type as unknown) === "Text");
-    const textContents = allTexts.map((n) => {
-      const c = n.props.children;
-      return Array.isArray(c) ? c.map(String).join("") : String(c ?? "");
-    });
-    expect(textContents.some((t) => t.toLowerCase().includes("impossibile"))).toBe(true);
+    const texts = allTextContents();
+    expect(texts.some((t) => t.toLowerCase().includes("impossibile"))).toBe(true);
   });
 
   it("3. malformed (history assente, ok:false) — nessun TypeError", async () => {
