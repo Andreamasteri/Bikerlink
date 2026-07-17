@@ -29,13 +29,19 @@ export async function pushAgentModelMapToHub(): Promise<void> {
     const { isThinkCentrePoweredOff } = await import("./thinkcentre-powered-off");
     if (await isThinkCentrePoweredOff().catch(() => false)) return;
 
-    // Build the map. Ares is on a separate machine (not TC) → excluded.
+    // Task #535 — Build the canonical model→agent map from env vars and push it.
+    // Canonical lineup: Horus=qwen3:4b, Bowie=qwen3:1.7b, Quebracho=granite4:tiny-h,
+    // Nadir=all-minilm, Ares=devstral:latest (on-demand — included for correct
+    // attribution in the monitoring breakdown, even if Ares is on a separate machine).
     const modelAgentMap: Record<string, string> = {
       [process.env.BOWIE_OLLAMA_MODEL ?? "qwen3:1.7b"]: "Bowie",
       [process.env.HORUS_OLLAMA_MODEL ?? "qwen3:4b"]: "Horus",
       [process.env.QUEBRACHO_OLLAMA_MODEL ?? "granite4:tiny-h"]: "Quebracho",
       // Nadir's embedding model on TC — no env override exists today.
       "all-minilm": "Nadir",
+      // Ares — on-demand (devstral), separate machine. Included so GET /vram
+      // correctly attributes the model when Ares borrows the TC GPU slot.
+      [process.env.ARES_OLLAMA_MODEL ?? "devstral:latest"]: "Ares",
     };
 
     const result = await hubPost("/vram/agent-map", { modelAgentMap });

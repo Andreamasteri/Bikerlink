@@ -24,6 +24,7 @@
 
 import { cfAccessHeaders } from "./cf-access";
 import { isThinkCentreOffline } from "./thinkcentre-offline";
+import { KEEP_ALIVE_RESIDENT } from "./agent-constants";
 
 const QUEBRACHO_URL = (
   process.env.QUEBRACHO_OLLAMA_URL?.trim() ||
@@ -156,6 +157,10 @@ export async function streamQuebrachoChat(opts: QuebrachoChatOptions): Promise<{
         model: QUEBRACHO_MODEL,
         stream: true,
         think: false,
+        // Task #535 — Quebracho è residente (CPU+RAM): keep_alive:-1 evita il
+        // cold-load ad ogni consultazione (senza questo campo Ollama usa il default
+        // server di 5 minuti, scaricando granite4:tiny-h dopo inattività breve).
+        keep_alive: KEEP_ALIVE_RESIDENT,
         messages: [{ role: "system", content: opts.system }, ...opts.messages],
         options: { temperature: 0.3, num_predict: opts.numPredict ?? QUEBRACHO_DEFAULT_NUM_PREDICT },
       }),

@@ -19,6 +19,7 @@
  */
 
 import { cfAccessHeaders } from "./cf-access";
+import { KEEP_ALIVE_ON_DEMAND } from "./agent-constants";
 
 const ARES_URL = process.env.ARES_OLLAMA_URL?.trim().replace(/\/$/, "");
 const ARES_TOKEN = process.env.ARES_OLLAMA_TOKEN ?? "";
@@ -98,6 +99,11 @@ export async function streamAresChat(opts: AresChatOptions): Promise<{ text: str
       body: JSON.stringify({
         model: ARES_MODEL,
         stream: true,
+        // Task #535 — Ares è on-demand: keep_alive:0 scarica il modello subito dopo
+        // la chiamata, liberando lo slot VRAM per gli altri agenti (Horus/Bowie/Nadir)
+        // senza attendere il timeout default del server Ollama (5 min). Il vram-arbiter
+        // fa già l'eviction pre-chiamata; questo garantisce il rilascio anche post-chiamata.
+        keep_alive: KEEP_ALIVE_ON_DEMAND,
         messages: [{ role: "system", content: opts.system }, ...opts.messages],
         options: { temperature: 0.3, num_predict: opts.numPredict ?? ARES_DEFAULT_NUM_PREDICT },
       }),

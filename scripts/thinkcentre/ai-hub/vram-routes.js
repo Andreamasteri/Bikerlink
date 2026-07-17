@@ -34,13 +34,22 @@ const { URL } = require("url");
 const WINDOW_MS = 24 * 60 * 60 * 1000;
 
 // model -> agent name; pushed map (POST /vram/agent-map) overrides this at runtime.
+//
+// CANONICAL AGENT LINEUP (Task #535):
+//   qwen3:4b        → Horus      (GPU residente, keep_alive:-1)
+//   qwen3:1.7b      → Bowie      (GPU residente, keep_alive:-1)
+//   granite4:tiny-h → Quebracho  (CPU+RAM residente, keep_alive:-1)
+//   all-minilm      → Nadir      (GPU residente, keep_alive:-1)
+//   devstral:latest → Ares       (on-demand, keep_alive:0 post-call)
+//
+// Voci RIMOSSE (stantie): "bikerlink:latest" (alias legacy Horus non più in uso),
+// "llama3.2:3b" (vecchio modello Bowie, sostituito da qwen3:1.7b).
 const DEFAULT_AGENT_MAP = {
   "qwen3:4b": "Horus",
   "qwen3:1.7b": "Bowie",
   "granite4:tiny-h": "Quebracho",
   "all-minilm:latest": "Nadir",
-  "bikerlink:latest": "Horus",
-  "llama3.2:3b": "Bowie",
+  "devstral:latest": "Ares",
 };
 
 function defaultPostJson(gateToken) {

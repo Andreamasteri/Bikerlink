@@ -36,6 +36,7 @@ import { repairJson } from "./json-repair";
 import { isThinkCentreOffline } from "./thinkcentre-offline";
 import { logAiCall } from "./ai-logger";
 import { cfAccessHeaders } from "./cf-access";
+import { KEEP_ALIVE_RESIDENT } from "./agent-constants";
 
 const BOWIE_OLLAMA_URL = process.env.BOWIE_OLLAMA_URL?.trim().replace(/\/$/, "");
 const BOWIE_OLLAMA_TOKEN = process.env.BOWIE_OLLAMA_TOKEN ?? "";
@@ -94,21 +95,30 @@ console.log(
   Object.entries(PERSONA_MODELS).map(([p, m]) => `${p}=${m}`).join(", "),
 );
 
-// Latenza (Task #5327): keep_alive esplicito tiene il modello caricato in VRAM/RAM
-// tra una richiesta e l'altra, evitando il cold-load (diversi secondi) al primo
-// token quando il modello era stato scaricato. Configurabile via OLLAMA_KEEP_ALIVE
-// (formato Ollama: "30m", "1h", "-1" per non scaricare mai). Default 30 minuti.
+// Task #535 — keep_alive policy:
+//   • Agenti RESIDENTI (Horus, Bowie, Nadir): KEEP_ALIVE_RESIDENT = -1 (mai scaricare).
+//     Il default è cambiato da "30m" a -1: con "30m" i modelli venivano espulsi dalla
+//     VRAM dopo 30 minuti di inattività e ricaricati (cold-load) alla prima chiamata
+//     successiva, con latenza, possibile collisione con altri modelli in coda e log
+//     confusi nel monitoring.
+//   • Agenti ON-DEMAND (Ares, Coder): KEEP_ALIVE_ON_DEMAND = 0 (scarica subito dopo
+//     la chiamata). Questi modelli pesanti devono liberare lo slot il prima possibile
+//     senza attendere il timeout default del server Ollama (5 min).
 //
-// Task #4 — Normalizzazione: Ollama accetta keep_alive sia come durata stringa
-// ("30m") sia come numero di secondi. Il valore speciale "non scaricare mai" DEVE
-// essere il NUMERO -1: la stringa "-1" viene interpretata come 0 secondi (scarica
-// subito), l'opposto di ciò che si vuole. Quindi se il valore è un intero puro lo
-// inviamo come number, altrimenti come stringa di durata.
+// Normalizzazione: Ollama accetta keep_alive sia come durata stringa ("30m") sia
+// come numero di secondi. Il valore "non scaricare mai" DEVE essere il NUMERO -1:
+// la stringa "-1" viene interpretata come 0 secondi (scarica subito), l'opposto
+// di ciò che si vuole. Quindi se il valore è un intero puro lo inviamo come number,
+// altrimenti come stringa di durata.
 export function normalizeKeepAlive(raw: string): string | number {
   const n = Number(raw);
   return raw !== "" && Number.isInteger(n) ? n : raw;
 }
-const OLLAMA_KEEP_ALIVE = normalizeKeepAlive(process.env.OLLAMA_KEEP_ALIVE?.trim() || "30m");
+// Default: KEEP_ALIVE_RESIDENT (-1) — mai scaricare i modelli residenti.
+// Override via OLLAMA_KEEP_ALIVE (es. "30m" per test/sviluppo locale).
+const OLLAMA_KEEP_ALIVE: string | number = process.env.OLLAMA_KEEP_ALIVE?.trim()
+  ? normalizeKeepAlive(process.env.OLLAMA_KEEP_ALIVE.trim())
+  : KEEP_ALIVE_RESIDENT;
 
 /** true quando BOWIE_OLLAMA_URL è impostato (Ollama abilitato come provider primario). */
 export const isOllamaConfigured = Boolean(BOWIE_OLLAMA_URL);
