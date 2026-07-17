@@ -351,6 +351,17 @@ router.put("/apk-url", async (req: Request, res: Response) => {
   }
 });
 
+router.put("/app-store-url", async (req: Request, res: Response) => {
+  try {
+    const parsed = urlSettingSchema.safeParse(req.body);
+    if (!parsed.success) return sendError(res, 400, parsed.error.issues[0].message);
+    const setting = await storage.upsertAppSetting("app_store_url", parsed.data.url);
+    return res.json(setting);
+  } catch (_error) {
+    return sendError(res, 500, "Errore salvataggio App Store URL");
+  }
+});
+
 router.put("/:key", async (req: Request, res: Response) => {
   try {
     const key = req.params.key as string;
@@ -522,6 +533,15 @@ router.get("/play-store-url", async (_req: Request, res: Response) => {
     return res.json({ url: setting?.value || "" });
   } catch (_error) {
     return sendError(res, 500, "Errore lettura Play Store URL");
+  }
+});
+
+router.get("/app-store-url", async (_req: Request, res: Response) => {
+  try {
+    const setting = await storage.getAppSetting("app_store_url");
+    return res.json({ url: setting?.value || "" });
+  } catch (_error) {
+    return sendError(res, 500, "Errore lettura App Store URL");
   }
 });
 
