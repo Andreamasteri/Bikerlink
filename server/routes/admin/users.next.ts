@@ -303,6 +303,102 @@ router.get("/stats/devices", async (req: Request, res: Response) => {
   }
 });
 
+// GET /stats/push-tokens/admins — Copertura token push specifica per gli admin.
+// Mostra per ogni admin: nickname, role, se ha token (push_tokens app_id=main
+// OPPURE users.expoPushToken), e quando è stato registrato l'ultimo token.
+// Separato dal report utenti normali perché gli admin sono esclusi da quello.
+router.get("/stats/push-tokens/admins", async (_req: Request, res: Response) => {
+  try {
+    const result = await db.execute(sql`
+      SELECT
+        u.id,
+        u.nickname,
+        u.role,
+        u.expo_push_token,
+        u.push_token_error,
+        u.push_token_error_at,
+        pt.token        AS pt_token,
+        pt.updated_at   AS pt_updated_at
+      FROM users u
+      LEFT JOIN push_tokens pt
+        ON pt.user_id = u.id AND pt.app_id = 'main'
+      WHERE u.role IN ('admin', 'moderator')
+        AND u.is_fake = false
+      ORDER BY u.role, u.nickname
+    `);
+
+    type Row = {
+      id: string;
+      nickname: string;
+      role: string;
+      expo_push_token: string | null;
+      push_token_error: string | null;
+      push_token_error_at: string | null;
+      pt_token: string | null;
+      pt_updated_at: string | null;
+    };
+
+    const rows = result.rows as Row[];
+
+    // Aggrega per (id, nickname, role): un admin può avere più righe se ha
+    // token registrati su più device (join 1:N con push_tokens).
+    const adminMap = new Map<string, {
+      id: string;
+      nickname: string;
+      role: string;
+      hasToken: boolean;
+      tokenCount: number;
+      lastRegisteredAt: string | null;
+      error: string | null;
+    }>();
+
+    for (const r of rows) {
+      let entry = adminMap.get(r.id);
+      if (!entry) {
+        entry = {
+          id: r.id,
+          nickname: r.nickname,
+          role: r.role,
+          hasToken: false,
+          tokenCount: 0,
+          lastRegisteredAt: null,
+          error: r.push_token_error ?? null,
+        };
+        adminMap.set(r.id, entry);
+      }
+      // Token da push_tokens (preferito)
+      if (r.pt_token) {
+        entry.hasToken = true;
+        entry.tokenCount += 1;
+        if (r.pt_updated_at && (!entry.lastRegisteredAt || r.pt_updated_at > entry.lastRegisteredAt)) {
+          entry.lastRegisteredAt = r.pt_updated_at;
+        }
+      }
+      // Fallback: users.expo_push_token
+      if (!entry.hasToken && r.expo_push_token) {
+        entry.hasToken = true;
+        entry.tokenCount = Math.max(entry.tokenCount, 1);
+        if (r.push_token_error_at && (!entry.lastRegisteredAt || r.push_token_error_at > entry.lastRegisteredAt)) {
+          entry.lastRegisteredAt = r.push_token_error_at;
+        }
+      }
+    }
+
+    const admins = [...adminMap.values()];
+    const totalAdmins = admins.length;
+    const withToken = admins.filter((a) => a.hasToken).length;
+    const withoutToken = totalAdmins - withToken;
+
+    return res.json({
+      summary: { totalAdmins, withToken, withoutToken },
+      admins,
+    });
+  } catch (err) {
+    console.error("[admin] push-tokens/admins error:", err);
+    return sendError(res, 500, "Errore copertura token admin");
+  }
+});
+
 // GET /match-summary e GET /zero-match-snapshots → users.next-match-summary.ts
 
 // GET /stats/push-tokens — Diagnostica aggregata: quanti/quali utenti reali

@@ -239,6 +239,44 @@ export async function sendExpoMessages(
   }
 }
 
+// Conta i token push validi degli admin (sia da push_tokens app_id="main" che
+// dal campo legacy users.expoPushToken). Usato dal guard anti-spam del watchdog
+// per rilevare la transizione 0→N token (ripristino dopo periodo a vuoto).
+// Non lancia mai: restituisce -1 in caso di errore così il guard non si attiva.
+export async function getAdminPushTokenCount(): Promise<number> {
+  try {
+    const adminRows = await db
+      .select({ id: users.id, expoPushToken: users.expoPushToken })
+      .from(users)
+      .where(eq(users.role, "admin"));
+
+    const adminIds = adminRows.map((r) => r.id);
+    if (adminIds.length === 0) return 0;
+
+    const seenTokens = new Set<string>();
+
+    // push_tokens (app_id="main")
+    const appRows = await db
+      .select({ token: pushTokens.token })
+      .from(pushTokens)
+      .where(and(inArray(pushTokens.userId, adminIds), eq(pushTokens.appId, "main")));
+    for (const r of appRows) {
+      if (isValidExpoPushToken(r.token)) seenTokens.add(r.token);
+    }
+
+    // Legacy users.expoPushToken
+    for (const r of adminRows) {
+      if (r.expoPushToken && isValidExpoPushToken(r.expoPushToken)) {
+        seenTokens.add(r.expoPushToken);
+      }
+    }
+
+    return seenTokens.size;
+  } catch {
+    return -1;
+  }
+}
+
 export async function filterUserIdsByPreference(
   userIds: string[],
   prefKey: NotificationPrefKey,

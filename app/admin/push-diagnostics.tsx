@@ -20,6 +20,7 @@ import {
   causeMeta,
   formatDate,
   type PushTokenStatsResponse,
+  type AdminPushTokenStatsResponse,
 } from "./push-diagnostics-panel";
 
 export default function PushDiagnosticsScreen() {
@@ -36,12 +37,27 @@ export default function PushDiagnosticsScreen() {
     staleTime: 60_000,
   });
 
+  const { data: adminData } = useQuery<AdminPushTokenStatsResponse>({
+    queryKey: ["/api/admin/users/stats/push-tokens/admins"],
+    queryFn: async () => {
+      const res = await apiRequest("GET", "/api/admin/users/stats/push-tokens/admins");
+      return res.json() as Promise<AdminPushTokenStatsResponse>;
+    },
+    staleTime: 60_000,
+  });
+
   const summary = data?.summary;
   const causes = data?.causes ?? [];
   const totalReal = summary?.totalReal ?? 0;
   const withToken = summary?.withToken ?? 0;
   const withoutToken = summary?.withoutToken ?? 0;
   const coveragePct = totalReal > 0 ? Math.round((withToken / totalReal) * 100) : 0;
+
+  const adminSummary = adminData?.summary;
+  const adminTotalAdmins = adminSummary?.totalAdmins ?? 0;
+  const adminWithToken = adminSummary?.withToken ?? 0;
+  const adminWithoutToken = adminSummary?.withoutToken ?? 0;
+  const adminAlertColor = adminWithoutToken > 0 ? "#ef4444" : "#22c55e";
 
   const webTopPadding = Platform.OS === "web" ? 67 : 0;
   const webBottomPadding = Platform.OS === "web" ? 34 : 0;
@@ -87,6 +103,63 @@ export default function PushDiagnosticsScreen() {
 
       {!isLoading && !isError && data && (
         <>
+          {/* Card admin token — critica per il watchdog: se 0 admin hanno token,
+              tutti gli alert del sistema vanno nel vuoto. Mostrata per prima. */}
+          {adminData && (
+            <View style={[s.card, { backgroundColor: colors.surface, borderColor: adminAlertColor + "55" }]}>
+              <View style={s.cardHeader}>
+                <MaterialCommunityIcons
+                  name={adminWithoutToken > 0 ? "shield-alert-outline" : "shield-check-outline"}
+                  size={18}
+                  color={adminAlertColor}
+                />
+                <Text style={[s.cardTitle, { color: colors.text }]}>Token admin (alert watchdog)</Text>
+              </View>
+              <View style={s.statsRow}>
+                <View style={s.stat}>
+                  <Text style={[s.statValue, { color: colors.text }]}>{adminTotalAdmins}</Text>
+                  <Text style={[s.statLabel, { color: colors.textSecondary }]}>Admin totali</Text>
+                </View>
+                <View style={[s.divider, { backgroundColor: colors.border }]} />
+                <View style={s.stat}>
+                  <Text style={[s.statValue, { color: "#22c55e" }]}>{adminWithToken}</Text>
+                  <Text style={[s.statLabel, { color: colors.textSecondary }]}>Con token</Text>
+                </View>
+                <View style={[s.divider, { backgroundColor: colors.border }]} />
+                <View style={s.stat}>
+                  <Text style={[s.statValue, { color: adminAlertColor }]}>{adminWithoutToken}</Text>
+                  <Text style={[s.statLabel, { color: colors.textSecondary }]}>Senza token</Text>
+                </View>
+              </View>
+              {adminWithoutToken > 0 && (
+                <Text style={[s.adminWarning, { color: adminAlertColor }]}>
+                  ⚠️ {adminWithoutToken} admin non riceverà gli alert watchdog. Aprire l&apos;app su ogni device admin per registrare il token.
+                </Text>
+              )}
+              {adminData.admins.length > 0 && (
+                <View style={s.adminList}>
+                  {adminData.admins.map((a) => (
+                    <View
+                      key={a.id}
+                      style={[s.adminRow, { borderTopColor: colors.border }]}
+                    >
+                      <MaterialCommunityIcons
+                        name={a.hasToken ? "bell-check" : "bell-off-outline"}
+                        size={16}
+                        color={a.hasToken ? "#22c55e" : "#ef4444"}
+                      />
+                      <Text style={[s.adminNickname, { color: colors.text }]}>{a.nickname}</Text>
+                      <Text style={[s.adminRole, { color: colors.textSecondary }]}>{a.role}</Text>
+                      <Text style={[s.adminTokenCount, { color: a.hasToken ? "#22c55e" : "#ef4444" }]}>
+                        {a.hasToken ? `${a.tokenCount} device` : "nessun token"}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+              )}
+            </View>
+          )}
+
           <View style={[s.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
             <View style={s.cardHeader}>
               <MaterialCommunityIcons name="bell-ring" size={18} color={colors.accent} />
@@ -257,4 +330,21 @@ const s = StyleSheet.create({
   causeRight: { alignItems: "flex-end", gap: 2, minWidth: 48 },
   causeCount: { fontFamily: "Inter_700Bold", fontSize: 18 },
   causePct: { fontFamily: "Inter_600SemiBold", fontSize: 12 },
+  adminWarning: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    marginTop: 12,
+    lineHeight: 18,
+  },
+  adminList: { marginTop: 12, gap: 0 },
+  adminRow: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: 8,
+    paddingVertical: 8,
+    borderTopWidth: 1,
+  },
+  adminNickname: { fontFamily: "Inter_600SemiBold", fontSize: 13, flex: 1 },
+  adminRole: { fontFamily: "Inter_400Regular", fontSize: 11 },
+  adminTokenCount: { fontFamily: "Inter_600SemiBold", fontSize: 12 },
 });

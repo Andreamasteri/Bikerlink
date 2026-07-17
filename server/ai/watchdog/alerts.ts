@@ -6,11 +6,21 @@ import { emitWatchdogAlert, emitWatchdogStatusChange } from "../coordinator/inte
 import { isMapsFlagEnabled } from "./maps-kill-switch";
 import { logger } from "../../lib/logger";
 import { sendSystemAlertPushToAdmins } from "../../push-notifications";
+import { getAdminPushTokenCount } from "../../push-notifications-internal";
 
 const mapsLog = logger.child({ scope: "maps-watchdog", layer: "alerts" });
 
 const ALERT_TTL_MS = 10 * 60 * 1000;
 const sent = new Map<string, number>();
+
+// Guard anti-spam al ripristino dei token admin (0→N).
+// Quando la tabella push_tokens torna popolata dopo un periodo a zero token,
+// il primo ciclo del watchdog troverebbe shouldSend()=true per tutti i problemi
+// accumulati e invierebbe un burst di centinaia di push in pochi secondi.
+// Tracciamo il conteggio noto: se la transizione è 0→N, marchiamo tutti i
+// throttle key come "appena inviati" (timestamp=now) senza spedire nulla,
+// così il primo ciclo reale (il successivo) invia solo i problemi correnti.
+let lastKnownAdminTokenCount = -1; // -1 = non ancora campionato
 
 // Task #96 — Latch: uno START alert di sovraccarico è stato REALMENTE emesso agli
 // admin (segnale severity "high", NON declassato a "warn" dalla soppressione
@@ -35,6 +45,26 @@ function shouldSend(key: string): boolean {
 }
 
 export async function dispatchAlerts(snap: HealthSnapshot): Promise<{ sent: number }> {
+  // Guard anti-spam: rileva la transizione 0→N token admin (ripristino).
+  // Se era a zero e ora ci sono token, marchia tutti i throttle key con timestamp=now
+  // così il burst di alert accumulati NON parte — solo i problemi del ciclo
+  // successivo (post-ripristino) verranno inviati normalmente.
+  const currentTokenCount = await getAdminPushTokenCount();
+  if (currentTokenCount >= 0) {
+    // campione valido (>=0; -1 = errore DB, skip)
+    if (lastKnownAdminTokenCount === 0 && currentTokenCount > 0) {
+      const now = Date.now();
+      // flush throttle: marca tutti i key esistenti come "appena inviati"
+      for (const key of sent.keys()) {
+        sent.set(key, now);
+      }
+      console.warn(
+        `[Watchdog] Token admin ripristinati (0→${currentTokenCount}): alert backlog soppresso per prevenire burst.`,
+      );
+    }
+    lastKnownAdminTokenCount = currentTokenCount;
+  }
+
   // Snapshot-level (status change → red/orange)
   let sentCount = 0;
   // Task #2654 — Emit al Coordinator (graceful, non blocca)
@@ -330,4 +360,5 @@ export function _resetThrottleForTests(): void {
   sent.clear();
   dbOverloadAlertSent = false;
   backendOverloadAlertSent = false;
+  lastKnownAdminTokenCount = -1;
 }

@@ -106,6 +106,7 @@ const ADMIN_OPTS: Record<string, { title: string } | { headerShown: false }> = {
   "match-explain": { title: "Explain Matching" },
   "ai-assistant-config": { title: "Bowie Config" },
   "background-location": { title: "Posizione Background" },
+  "push-diagnostics": { title: "Diagnostica Notifiche Push" },
 } as const;
 
 export default function AdminLayout() {
@@ -197,6 +198,7 @@ export default function AdminLayout() {
         <Stack.Screen name="ai-assistant-config" options={ADMIN_OPTS["ai-assistant-config"]} />
         <Stack.Screen name="background-location" options={ADMIN_OPTS["background-location"]} />
         <Stack.Screen name="db-monitor" options={ADMIN_OPTS["db-monitor"]} />
+        <Stack.Screen name="push-diagnostics" options={ADMIN_OPTS["push-diagnostics"]} />
       </Stack>
     </View>
   );

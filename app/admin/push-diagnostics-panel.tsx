@@ -38,6 +38,25 @@ export interface PushTokenStatsResponse {
   causes: CauseRow[];
 }
 
+export interface AdminTokenRow {
+  id: string;
+  nickname: string;
+  role: string;
+  hasToken: boolean;
+  tokenCount: number;
+  lastRegisteredAt: string | null;
+  error: string | null;
+}
+
+export interface AdminPushTokenStatsResponse {
+  summary: {
+    totalAdmins: number;
+    withToken: number;
+    withoutToken: number;
+  };
+  admins: AdminTokenRow[];
+}
+
 export interface PushUserRow {
   id: string;
   nickname: string;

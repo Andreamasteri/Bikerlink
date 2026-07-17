@@ -8,6 +8,7 @@ import {
   isValidExpoPushToken,
   sendExpoMessages,
   filterUserIdsByPreference,
+  getAppPushTokens,
 } from "./push-notifications-internal";
 
 export async function sendModeratorReportPush(opts: {
@@ -104,16 +105,43 @@ export async function sendSystemAlertPushToAdmins(
     const filteredIds = await filterUserIdsByPreference(adminIds, "system_alerts");
     if (filteredIds.length === 0) return 0;
 
-    const rows = await db
+    const userIdByToken = new Map<string, string>();
+    const messages: ExpoPushMessage[] = [];
+    const seenTokens = new Set<string>();
+
+    // Primary: read from push_tokens table (app_id="main") — fonte di verità
+    // per le registrazioni effettuate dopo l'introduzione del sistema per-app.
+    // Un admin con più device compare una volta per device registrato.
+    const appTokenRows = await getAppPushTokens(filteredIds, "main");
+    for (const t of appTokenRows) {
+      if (!seenTokens.has(t.token)) {
+        seenTokens.add(t.token);
+        userIdByToken.set(t.token, t.userId);
+        messages.push({
+          to: t.token,
+          title,
+          body,
+          sound: "default" as const,
+          data,
+          channelId: "matches",
+        });
+      }
+    }
+
+    // Fallback: users.expoPushToken (campo legacy) per i device registrati prima
+    // che push_tokens fosse introdotto, o se la riga push_tokens è mancante.
+    // dedup tramite seenTokens per non inviare due push allo stesso token.
+    const legacyRows = await db
       .select({ id: users.id, expoPushToken: users.expoPushToken })
       .from(users)
       .where(inArray(users.id, filteredIds));
-
-    const userIdByToken = new Map<string, string>();
-    const messages: ExpoPushMessage[] = [];
-
-    for (const row of rows) {
-      if (row.expoPushToken && isValidExpoPushToken(row.expoPushToken)) {
+    for (const row of legacyRows) {
+      if (
+        row.expoPushToken &&
+        isValidExpoPushToken(row.expoPushToken) &&
+        !seenTokens.has(row.expoPushToken)
+      ) {
+        seenTokens.add(row.expoPushToken);
         userIdByToken.set(row.expoPushToken, row.id);
         messages.push({
           to: row.expoPushToken,
