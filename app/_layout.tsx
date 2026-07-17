@@ -24,6 +24,10 @@ import { useMapConfig } from "@/lib/map-context";
 // Side-effect import: registers the TASK_TELEMETRY background task with expo-task-manager
 // so it is available before any component mounts.
 import "@/lib/background-telemetry-task";
+// Side-effect import: registers the bikerlink-background-location task with
+// expo-task-manager at module scope so it is defined before the OS can trigger
+// it (fixes "not defined" / TaskNotFoundException after OTA or cold start).
+import "@/lib/background-location-task";
 // Task #4979 — Livello B passivo: checkpoint PRE-React emessi a module-load.
 import { passiveCheckpoint } from "@/lib/boot-gate-passive";
 
@@ -54,9 +58,11 @@ import { resolveBootGateActive } from "@/lib/boot-gate-passive";
 // init early), il server conosce comunque l'ultimo checkpoint raggiunto. I ping
 // partono SOLO se il BootGate è attivo; altrimenti i checkpoint sono scartati.
 //
-// background_telemetry_task gira al suo import (in cima al file): lo registriamo
-// per primo perché in ordine cronologico è il primo side-effect del modulo.
+// background_telemetry_task e background_location_task girano al loro import
+// (in cima al file): li registriamo per primi perché in ordine cronologico
+// sono i primi side-effect del modulo.
 passiveCheckpoint("background_telemetry_task");
+passiveCheckpoint("background_location_task");
 
 SplashScreen.preventAutoHideAsync();
 passiveCheckpoint("splash_prevent");
