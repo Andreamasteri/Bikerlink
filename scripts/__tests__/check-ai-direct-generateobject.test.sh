@@ -161,6 +161,83 @@ fi
 
 # ──────────────────────────────────────────────────────────────────────────────
 echo ""
+echo "── Test (g): IGNORE_DIRS (Check 1) contiene esattamente {'.local', '.agents', 'node_modules', 'scripts'}"
+# ──────────────────────────────────────────────────────────────────────────────
+# Protezione anti-bypass: aggiungere una directory a IGNORE_DIRS nel Python
+# heredoc del Check 1 escluderebbe quella directory dalla scansione, permettendo
+# a qualsiasi file al suo interno di bypassare silenziosamente il gate.
+# Qualsiasi modifica richiede una modifica esplicita anche a questo test.
+
+EXPECTED_IGNORE_DIRS_1=('.local' '.agents' 'node_modules' 'scripts')
+
+# Il gate ha due heredoc Python distinti. IGNORE_DIRS appare su riga singola:
+#   IGNORE_DIRS = {'.local', '.agents', 'node_modules', 'scripts'}
+# Prendiamo la PRIMA occorrenza (Check 1).
+IGNORE_DIRS_LINE_1=$(grep -E "IGNORE_DIRS[[:space:]]*=[[:space:]]*\{" "$GATE_SCRIPT" | sed -n '1p')
+ACTUAL_IGNORE_DIRS_1=()
+while IFS= read -r entry; do
+  # Strip surrounding single quotes
+  entry="${entry//\'/}"
+  [ -n "$entry" ] && ACTUAL_IGNORE_DIRS_1+=("$entry")
+done < <(echo "$IGNORE_DIRS_LINE_1" | grep -oP "'[^']+'")
+
+IGNORE_DIRS_1_OK=true
+if [ "${#ACTUAL_IGNORE_DIRS_1[@]}" -ne "${#EXPECTED_IGNORE_DIRS_1[@]}" ]; then
+  nok "IGNORE_DIRS (Check 1) ha ${#ACTUAL_IGNORE_DIRS_1[@]} entry invece di ${#EXPECTED_IGNORE_DIRS_1[@]} — bypass silenzioso potenziale!"
+  echo "     Entry trovati: ${ACTUAL_IGNORE_DIRS_1[*]:-<nessuno>}"
+  echo "     Entry attesi:  ${EXPECTED_IGNORE_DIRS_1[*]}"
+  IGNORE_DIRS_1_OK=false
+else
+  for i in "${!EXPECTED_IGNORE_DIRS_1[@]}"; do
+    if [ "${ACTUAL_IGNORE_DIRS_1[$i]:-}" != "${EXPECTED_IGNORE_DIRS_1[$i]}" ]; then
+      nok "IGNORE_DIRS (Check 1) [$i]: trovato '${ACTUAL_IGNORE_DIRS_1[$i]:-<vuoto>}', atteso '${EXPECTED_IGNORE_DIRS_1[$i]}'"
+      IGNORE_DIRS_1_OK=false
+    fi
+  done
+fi
+if $IGNORE_DIRS_1_OK; then
+  ok "IGNORE_DIRS (Check 1) contiene esattamente {.local, .agents, node_modules, scripts} (nessun bypass silenzioso)"
+fi
+
+# ──────────────────────────────────────────────────────────────────────────────
+echo ""
+echo "── Test (h): IGNORE_DIRS (Check 2) contiene esattamente {'.local', '.agents', 'node_modules', 'scripts'}"
+# ──────────────────────────────────────────────────────────────────────────────
+# Stessa protezione anti-bypass per il secondo heredoc Python (Check 2 —
+# Ollama think:false). Ogni heredoc ha il proprio IGNORE_DIRS separato;
+# ognuno va congelato indipendentemente.
+
+EXPECTED_IGNORE_DIRS_2=('.local' '.agents' 'node_modules' 'scripts')
+
+# Prendiamo la SECONDA occorrenza (Check 2).
+IGNORE_DIRS_LINE_2=$(grep -E "IGNORE_DIRS[[:space:]]*=[[:space:]]*\{" "$GATE_SCRIPT" | sed -n '2p')
+ACTUAL_IGNORE_DIRS_2=()
+while IFS= read -r entry; do
+  # Strip surrounding single quotes
+  entry="${entry//\'/}"
+  [ -n "$entry" ] && ACTUAL_IGNORE_DIRS_2+=("$entry")
+done < <(echo "$IGNORE_DIRS_LINE_2" | grep -oP "'[^']+'")
+
+IGNORE_DIRS_2_OK=true
+if [ "${#ACTUAL_IGNORE_DIRS_2[@]}" -ne "${#EXPECTED_IGNORE_DIRS_2[@]}" ]; then
+  nok "IGNORE_DIRS (Check 2) ha ${#ACTUAL_IGNORE_DIRS_2[@]} entry invece di ${#EXPECTED_IGNORE_DIRS_2[@]} — bypass silenzioso potenziale!"
+  echo "     Entry trovati: ${ACTUAL_IGNORE_DIRS_2[*]:-<nessuno>}"
+  echo "     Entry attesi:  ${EXPECTED_IGNORE_DIRS_2[*]}"
+  IGNORE_DIRS_2_OK=false
+else
+  for i in "${!EXPECTED_IGNORE_DIRS_2[@]}"; do
+    if [ "${ACTUAL_IGNORE_DIRS_2[$i]:-}" != "${EXPECTED_IGNORE_DIRS_2[$i]}" ]; then
+      nok "IGNORE_DIRS (Check 2) [$i]: trovato '${ACTUAL_IGNORE_DIRS_2[$i]:-<vuoto>}', atteso '${EXPECTED_IGNORE_DIRS_2[$i]}'"
+      IGNORE_DIRS_2_OK=false
+    fi
+  done
+fi
+if $IGNORE_DIRS_2_OK; then
+  ok "IGNORE_DIRS (Check 2) contiene esattamente {.local, .agents, node_modules, scripts} (nessun bypass silenzioso)"
+fi
+
+# ──────────────────────────────────────────────────────────────────────────────
+echo ""
 echo "════════════════════════════════════════════════════════════"
 echo "  Risultato: $PASS PASS, $FAIL FAIL"
 echo "════════════════════════════════════════════════════════════"
