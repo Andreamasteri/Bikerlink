@@ -484,6 +484,29 @@ if [ "$BG_PROMISE_ALL_EXIT" -ne 0 ]; then
   exit "$BG_PROMISE_ALL_EXIT"
 fi
 
+# ── GATE TC ADMIN CARD RENDER TEST ───────────────────────────────────────────
+# Ogni componente sotto components/admin/ che interroga /api/admin/thinkcentre-*
+# (tramite fetch o useQuery) DEVE avere un render test in components/__tests__/.
+# Contesto: Task #437 ha dimostrato che un cambio di shape del payload TC agent
+# (nested vs flat) causava un TypeError non rilevabile senza un render test.
+# Gap pre-esistenti alla regola: ThinkCentreCard, ThinkCentreSystemMonitor,
+# AdminStatsCards — allowlistati nel gate, non bloccano.
+# Soppressione per file che usano la URL solo in invalidateQueries:
+#   // check-tc-admin-card-tests: invalidate-only  (cima al file o riga precedente)
+# Vedi: components/__tests__/ThinkCentreEfficiencyCard.render.test.ts (template)
+#        CONTRIBUTING.md § "Render test obbligatori per le card admin ThinkCentre"
+echo "════════════════════════════════════════"
+echo "  Gate TC admin card render test"
+echo "════════════════════════════════════════"
+TC_CARD_TEST_EXIT=0
+bash scripts/check-tc-admin-card-tests.sh || TC_CARD_TEST_EXIT=$?
+echo "════════════════════════════════════════"
+echo ""
+if [ "$TC_CARD_TEST_EXIT" -ne 0 ]; then
+  echo "❌ Gate tc-admin-card-tests fallito — aggiungere il render test o il pragma prima di procedere."
+  exit "$TC_CARD_TEST_EXIT"
+fi
+
 # ── GUARD PORTE .replit (MAPPING [[ports]] + DEPLOY) ─────────
 # REGOLA BLOCCANTE (replit.md § Preferenze utente):
 # Nessun agente può modificare [[ports]] senza autorizzazione esplicita utente.

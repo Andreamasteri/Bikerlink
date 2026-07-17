@@ -162,6 +162,35 @@ eseguiti dal gate **"Gate test gesture componenti"** in `scripts/post-merge.sh`.
 npx vitest run components/__tests__
 ```
 
+### Render test obbligatori per le card admin ThinkCentre
+
+Ogni componente sotto `components/admin/` che interroga un endpoint
+`/api/admin/thinkcentre-*` (tramite `fetch` o `useQuery`) **deve** avere un
+file `components/__tests__/<NomeComponente>.render.test.ts`.
+
+**Perché:** Task #437 ha dimostrato che un cambio di shape del payload del
+ThinkCentre agent (nested vs flat) causava un `TypeError` a runtime senza
+nessun segnale automatico. Il render test cattura questo tipo di regressione
+prima che l'APK venga distribuito.
+
+**Struttura minima richiesta per ogni test:**
+
+1. Payload flat/online valido — il componente monta ed espande senza eccezioni.
+2. Payload offline — il banner offline è visibile, nessuna sezione dati appare.
+3. Payload malformed (es. `online: true` ma campo chiave mancante) — nessun
+   `TypeError`, il componente degrada gracefully.
+
+Usa `components/__tests__/ThinkCentreEfficiencyCard.render.test.ts` come
+riferimento per la struttura di mock (react-native, @expo/vector-icons,
+@tanstack/react-query, @/constants/colors, @/lib/query-client).
+
+**Gate automatico:** il check `scripts/check-tc-admin-card-tests.sh` verifica
+che ogni nuovo componente TC abbia il test corrispondente. Gira in CI e in
+`scripts/post-merge.sh`. Se un file usa `/api/admin/thinkcentre-*` solo per
+`invalidateQueries` senza mai montare un componente dipendente dal payload,
+aggiungi il commento `// check-tc-admin-card-tests: invalidate-only` nel file
+per escluderlo dal gate.
+
 ---
 
 ## Variabili d'ambiente e segreti

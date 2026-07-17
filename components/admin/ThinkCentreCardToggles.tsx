@@ -1,3 +1,6 @@
+// check-tc-admin-card-tests: invalidate-only
+// Questo file usa /api/admin/thinkcentre-health solo in invalidateQueries (side-effect
+// post-mutation). Non monta un componente che dipende dal payload TC → nessun render test richiesto.
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { getApiUrl, authFetchHeaders, queryClient } from "@/lib/query-client";
 
