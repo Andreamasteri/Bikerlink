@@ -525,6 +525,61 @@ if [ "$TC_CARD_REGTEST_EXIT" -ne 0 ]; then
   exit "$TC_CARD_REGTEST_EXIT"
 fi
 
+# ── GATE REGRESSION TEST — check-direct-eval-scope ────────────────────────────
+# Verifica che ALLOWED_FILE (l'unico file autorizzato a usare eval()) sia rimasto
+# esattamente "server/ai/db-integrity/registry.ts" e che il gate rilevi eval()
+# nei file non autorizzati. Cambiare ALLOWED_FILE permetterebbe a un file arbitrario
+# di usare eval() senza che il gate lo rilevi.
+echo "════════════════════════════════════════"
+echo "  Test regressione gate direct-eval-scope"
+echo "════════════════════════════════════════"
+EVAL_SCOPE_REGTEST_EXIT=0
+bash scripts/__tests__/check-direct-eval-scope.test.sh || EVAL_SCOPE_REGTEST_EXIT=$?
+echo "════════════════════════════════════════"
+echo ""
+if [ "$EVAL_SCOPE_REGTEST_EXIT" -ne 0 ]; then
+  echo "❌ Regression test direct-eval-scope FALLITO — ALLOWED_FILE o logica del gate è regredita."
+  echo "   Eseguire 'bash scripts/__tests__/check-direct-eval-scope.test.sh' per i dettagli."
+  exit "$EVAL_SCOPE_REGTEST_EXIT"
+fi
+
+# ── GATE REGRESSION TEST — check-ai-direct-generateobject ────────────────────
+# Verifica che la WHITELIST (embedded nel Python heredoc del Check 1) contenga
+# esattamente 'server/ai/moderation/provider.ts'. Aggiungere un file alla
+# WHITELIST permetterebbe di silenziare silenziosamente il Check 1 per quel file,
+# consentendo l'uso di generateObject con schema diretto fuori dal gateway approvato.
+echo "════════════════════════════════════════"
+echo "  Test regressione gate ai-direct-generateobject"
+echo "════════════════════════════════════════"
+AI_GENERATEOBJ_REGTEST_EXIT=0
+bash scripts/__tests__/check-ai-direct-generateobject.test.sh || AI_GENERATEOBJ_REGTEST_EXIT=$?
+echo "════════════════════════════════════════"
+echo ""
+if [ "$AI_GENERATEOBJ_REGTEST_EXIT" -ne 0 ]; then
+  echo "❌ Regression test ai-direct-generateobject FALLITO — WHITELIST o logica del gate è regredita."
+  echo "   Eseguire 'bash scripts/__tests__/check-ai-direct-generateobject.test.sh' per i dettagli."
+  exit "$AI_GENERATEOBJ_REGTEST_EXIT"
+fi
+
+# ── GATE REGRESSION TEST — check-leaflet-map-guard ────────────────────────────
+# Verifica che PROTECTED (file blindati) e FORBIDDEN (pattern vietati) non siano
+# stati modificati silenziosamente. Rimuovere un file da PROTECTED lo esclude dai
+# controlli; rimuovere un pattern da FORBIDDEN permette a quel simbolo di rientrare
+# nel path Leaflet senza essere rilevato — entrambi ripristinano il rischio
+# "mappa nera" diagnosticato nel ramo 55.x.
+echo "════════════════════════════════════════"
+echo "  Test regressione gate leaflet-map-guard"
+echo "════════════════════════════════════════"
+LEAFLET_GUARD_REGTEST_EXIT=0
+bash scripts/__tests__/check-leaflet-map-guard.test.sh || LEAFLET_GUARD_REGTEST_EXIT=$?
+echo "════════════════════════════════════════"
+echo ""
+if [ "$LEAFLET_GUARD_REGTEST_EXIT" -ne 0 ]; then
+  echo "❌ Regression test leaflet-map-guard FALLITO — PROTECTED o FORBIDDEN sono stati modificati."
+  echo "   Eseguire 'bash scripts/__tests__/check-leaflet-map-guard.test.sh' per i dettagli."
+  exit "$LEAFLET_GUARD_REGTEST_EXIT"
+fi
+
 # ── GUARD PORTE .replit (MAPPING [[ports]] + DEPLOY) ─────────
 # REGOLA BLOCCANTE (replit.md § Preferenze utente):
 # Nessun agente può modificare [[ports]] senza autorizzazione esplicita utente.
