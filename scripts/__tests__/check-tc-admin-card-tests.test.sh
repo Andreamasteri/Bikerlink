@@ -181,6 +181,60 @@ fi
 
 # ──────────────────────────────────────────────────────────────────────────────
 echo ""
+echo "── Test (f): KNOWN_GAPS contiene esattamente i 4 entry originali"
+# ──────────────────────────────────────────────────────────────────────────────
+# Protezione anti-bypass: un agente futuro potrebbe aggiungere un nuovo
+# componente a KNOWN_GAPS per silenziare il gate. Questo test verifica che
+# KNOWN_GAPS abbia ESATTAMENTE i 4 entry originali, nell'ordine corretto.
+# Qualsiasi aggiunta richiede una modifica esplicita anche a questo test.
+
+EXPECTED_GAPS=(
+  "ThinkCentreCard.part2.tsx"
+)
+
+# Estrai gli entry di KNOWN_GAPS dallo script del gate (linee tra "KNOWN_GAPS=(" e ")")
+ACTUAL_GAPS=()
+inside=false
+while IFS= read -r line; do
+  if [[ "$line" =~ ^KNOWN_GAPS=\( ]]; then
+    inside=true
+    continue
+  fi
+  if $inside; then
+    if [[ "$line" =~ ^\) ]]; then
+      break
+    fi
+    # Estrai il valore tra virgolette
+    if [[ "$line" =~ \"([^\"]+)\" ]]; then
+      ACTUAL_GAPS+=("${BASH_REMATCH[1]}")
+    fi
+  fi
+done < "$GATE_SCRIPT"
+
+GAPS_OK=true
+
+# Controlla il numero di entry
+if [ "${#ACTUAL_GAPS[@]}" -ne "${#EXPECTED_GAPS[@]}" ]; then
+  nok "KNOWN_GAPS ha ${#ACTUAL_GAPS[@]} entry invece di ${#EXPECTED_GAPS[@]} — aggiunta o rimozione non autorizzata!"
+  echo "     Entry trovati: ${ACTUAL_GAPS[*]:-<nessuno>}"
+  echo "     Entry attesi:  ${EXPECTED_GAPS[*]}"
+  GAPS_OK=false
+else
+  # Controlla che ogni entry corrisponda nell'ordine
+  for i in "${!EXPECTED_GAPS[@]}"; do
+    if [ "${ACTUAL_GAPS[$i]:-}" != "${EXPECTED_GAPS[$i]}" ]; then
+      nok "KNOWN_GAPS[$i]: trovato '${ACTUAL_GAPS[$i]:-<vuoto>}', atteso '${EXPECTED_GAPS[$i]}'"
+      GAPS_OK=false
+    fi
+  done
+fi
+
+if $GAPS_OK; then
+  ok "KNOWN_GAPS contiene esattamente i 4 entry originali (nessun bypass silenzioso)"
+fi
+
+# ──────────────────────────────────────────────────────────────────────────────
+echo ""
 echo "════════════════════════════════════════════════════════════"
 echo "  Risultato: $PASS PASS, $FAIL FAIL"
 echo "════════════════════════════════════════════════════════════"
