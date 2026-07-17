@@ -5,11 +5,13 @@ import { useQuery } from "@tanstack/react-query";
 import Colors from "@/constants/colors";
 import { getApiUrl, authFetchHeaders } from "@/lib/query-client";
 
-interface ThinkCentreMetrics {
+interface FlatTCMetrics {
   online: true;
-  cpu: { loadAvg1: number; loadAvg5: number; loadAvg15: number; cores: number };
-  memory: { totalMb: number; usedMb: number; freeMb?: number; usedPercent: number };
-  disk?: { totalGb: number; usedGb: number; freeGb: number; usedPercent: number } | null;
+  loadAvg1: number;
+  loadAvg5: number;
+  ramUsedMb: number;
+  ramTotalMb: number;
+  diskMounts?: Array<{ path: string; usedGb: number; totalGb: number; usedPct: number }>;
   uptimeSec: number;
   checkedAt?: number;
 }
@@ -19,7 +21,7 @@ interface ThinkCentreOffline {
   reason?: string;
 }
 
-type MetricsResponse = ThinkCentreMetrics | ThinkCentreOffline;
+type MetricsResponse = FlatTCMetrics | ThinkCentreOffline;
 
 function CollapseChevron({ collapsed }: { collapsed: boolean }) {
   return (
@@ -60,24 +62,35 @@ export function ThinkCentreEfficiencyCard() {
   });
 
   const online = data?.online === true;
-  const metrics = online ? (data as ThinkCentreMetrics) : null;
+  // Secondary guard: if metrics is truthy but loadAvg1 is not a number, treat as offline
+  // to avoid future shape mismatch crashes.
+  const rawMetrics = online ? (data as FlatTCMetrics) : null;
+  const metrics = rawMetrics != null && typeof rawMetrics.loadAvg1 === "number" ? rawMetrics : null;
 
-  const loadPerCore = metrics ? metrics.cpu.loadAvg1 / metrics.cpu.cores : 0;
+  const loadAvg1 = metrics?.loadAvg1 ?? 0;
+  const loadAvg5 = metrics?.loadAvg5 ?? 0;
+  const ramUsedMb = metrics?.ramUsedMb ?? 0;
+  const ramTotalMb = metrics?.ramTotalMb ?? 0;
+  const usedPercent = ramTotalMb > 0 ? Math.round((ramUsedMb / ramTotalMb) * 100) : 0;
+  const freeMb = ramTotalMb - ramUsedMb;
+  const firstDisk = metrics?.diskMounts?.[0] ?? null;
+
+  // Load color based on loadAvg1 alone (thresholds 1.5 / 3.0 for a multi-core TC)
   const headerColor = !data
     ? "#6b7280"
     : !online
     ? "#6b7280"
-    : loadPerCore < 0.7
+    : loadAvg1 < 1.5
     ? "#22c55e"
-    : loadPerCore < 1
+    : loadAvg1 < 3.0
     ? "#f59e0b"
     : "#ef4444";
 
   const memColor = !metrics
     ? Colors.text
-    : metrics.memory.usedPercent < 75
+    : usedPercent < 75
     ? Colors.text
-    : metrics.memory.usedPercent < 90
+    : usedPercent < 90
     ? "#f59e0b"
     : "#ef4444";
 
@@ -105,7 +118,7 @@ export function ThinkCentreEfficiencyCard() {
 
       {!collapsed && (
         <>
-          {(!online) && (
+          {(!online || !metrics) && (
             <View style={styles.offlineBanner}>
               <View style={styles.offlineDot} />
               <Text style={styles.offlineText}>ThinkCentre offline</Text>
@@ -117,22 +130,15 @@ export function ThinkCentreEfficiencyCard() {
               <Text style={styles.sectionLabel}>CPU</Text>
               <View style={styles.statsRow}>
                 <View style={styles.stat}>
-                  <Text style={styles.statValue}>{metrics.cpu.loadAvg1.toFixed(2)}</Text>
+                  <Text style={[styles.statValue, { color: headerColor }]}>
+                    {loadAvg1.toFixed(2)}
+                  </Text>
                   <Text style={styles.statLabel}>Load 1m</Text>
                 </View>
                 <View style={styles.divider} />
                 <View style={styles.stat}>
-                  <Text style={styles.statValue}>
-                    {metrics.cpu.loadAvg5.toFixed(2)} / {metrics.cpu.loadAvg15.toFixed(2)}
-                  </Text>
-                  <Text style={styles.statLabel}>5m / 15m</Text>
-                </View>
-                <View style={styles.divider} />
-                <View style={styles.stat}>
-                  <Text style={[styles.statValue, { color: headerColor }]}>
-                    {(loadPerCore * 100).toFixed(0)}%
-                  </Text>
-                  <Text style={styles.statLabel}>{metrics.cpu.cores} core</Text>
+                  <Text style={styles.statValue}>{loadAvg5.toFixed(2)}</Text>
+                  <Text style={styles.statLabel}>Load 5m</Text>
                 </View>
               </View>
 
@@ -140,43 +146,41 @@ export function ThinkCentreEfficiencyCard() {
               <View style={styles.statsRow}>
                 <View style={styles.stat}>
                   <Text style={[styles.statValue, { color: memColor }]}>
-                    {metrics.memory.usedPercent}%
+                    {usedPercent}%
                   </Text>
                   <Text style={styles.statLabel}>Usata</Text>
                 </View>
                 <View style={styles.divider} />
                 <View style={styles.stat}>
-                  <Text style={styles.statValue}>{metrics.memory.usedMb} MB</Text>
+                  <Text style={styles.statValue}>{ramUsedMb} MB</Text>
                   <Text style={styles.statLabel}>Occupata</Text>
                 </View>
                 <View style={styles.divider} />
                 <View style={styles.stat}>
-                  <Text style={styles.statValue}>
-                    {metrics.memory.freeMb != null ? `${metrics.memory.freeMb} MB` : `${metrics.memory.totalMb - metrics.memory.usedMb} MB`}
-                  </Text>
-                  <Text style={styles.statLabel}>Libera · {metrics.memory.totalMb} tot</Text>
+                  <Text style={styles.statValue}>{freeMb} MB</Text>
+                  <Text style={styles.statLabel}>Libera · {ramTotalMb} tot</Text>
                 </View>
               </View>
 
-              {metrics.disk != null && (
+              {firstDisk != null && (
                 <>
                   <Text style={styles.sectionLabel}>Disco</Text>
                   <View style={styles.statsRow}>
                     <View style={styles.stat}>
-                      <Text style={[styles.statValue, { color: metrics.disk.usedPercent < 80 ? Colors.text : metrics.disk.usedPercent < 95 ? "#f59e0b" : "#ef4444" }]}>
-                        {metrics.disk.usedPercent}%
+                      <Text style={[styles.statValue, { color: firstDisk.usedPct < 80 ? Colors.text : firstDisk.usedPct < 95 ? "#f59e0b" : "#ef4444" }]}>
+                        {firstDisk.usedPct}%
                       </Text>
                       <Text style={styles.statLabel}>Usato</Text>
                     </View>
                     <View style={styles.divider} />
                     <View style={styles.stat}>
-                      <Text style={styles.statValue}>{metrics.disk.usedGb} GB</Text>
+                      <Text style={styles.statValue}>{firstDisk.usedGb} GB</Text>
                       <Text style={styles.statLabel}>Occupato</Text>
                     </View>
                     <View style={styles.divider} />
                     <View style={styles.stat}>
-                      <Text style={styles.statValue}>{metrics.disk.freeGb} GB</Text>
-                      <Text style={styles.statLabel}>Libero · {metrics.disk.totalGb} tot</Text>
+                      <Text style={styles.statValue}>{(firstDisk.totalGb - firstDisk.usedGb).toFixed(1)} GB</Text>
+                      <Text style={styles.statLabel}>Libero · {firstDisk.totalGb} tot</Text>
                     </View>
                   </View>
                 </>
@@ -184,7 +188,7 @@ export function ThinkCentreEfficiencyCard() {
 
               <View style={styles.uptimeRow}>
                 <Ionicons name="time-outline" size={13} color={Colors.textSecondary} />
-                <Text style={styles.uptimeText}>Uptime: {formatUptime(metrics.uptimeSec)}</Text>
+                <Text style={styles.uptimeText}>Uptime: {formatUptime(metrics.uptimeSec ?? 0)}</Text>
               </View>
             </>
           )}
