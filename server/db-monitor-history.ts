@@ -130,7 +130,14 @@ interface SnapshotLike {
 // una volta emesso db.db.overload_sustained (source "db", severity "high"), il
 // tick successivo lo ri-conterebbe come errore DB → dbOverload resta true anche
 // a pool/ping sani → il contatore non si azzera più e la push non si ferma.
-const DERIVED_OVERLOAD_PROBLEM_IDS = new Set(["db.db.overload_sustained"]);
+// Fix — db.pool.waiting HIGH è pressione sul pool già tracciata separatamente
+// via poolWaiting nel sample; non va double-contata come "errore DB" o si
+// auto-latcha: pool pressure → HIGH problem → dbErrorCount=1 → dbOverload=true
+// → latch DEGRADED anche a DB sano. Stessa logica di overload_sustained sopra.
+const DERIVED_OVERLOAD_PROBLEM_IDS = new Set([
+  "db.db.overload_sustained",
+  "db.db.pool.waiting",
+]);
 
 /** Legge una metrica dallo snapshot provando le chiavi note (source.metric). */
 function readMetric(metrics: Record<string, number>, ...keys: string[]): number | null {

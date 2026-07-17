@@ -36,10 +36,16 @@ export const pool = new Pool({
   // 10s < timeout lato Replit managed DB (~20s) → connessioni rilasciate prima
   // che il server le droppi, evitando "Connection terminated unexpectedly".
   idleTimeoutMillis: 10000,
-  // 3s: quando il pool è saturo o il DB è irraggiungibile, ogni tentativo di
-  // connessione fallisce entro 3s invece di 10s. Con 4 query sequenziali nel
-  // login handler il worst-case è 12s — ben sotto il proxy timeout (~30s).
-  connectionTimeoutMillis: 3000,
+  // 8s: aumentato da 3s per dare tempo sufficiente a managed Postgres di
+  // accettare nuove connessioni durante picchi di concorrenza (tick watchdog
+  // con più collector in parallelo). Con managed Postgres lento, stabilire
+  // una nuova connessione può richiedere 3-6s → il vecchio timeout di 3s
+  // causava "Failed query" sistematici nei collector (error-collector,
+  // crash-signals) ad ogni tick, generando falsi "Pool DB sotto pressione".
+  // Con 4 query sequenziali nel login handler il worst-case è 32s — sotto
+  // il proxy timeout (~60s). In caso di DB davvero irraggiungibile il
+  // circuit breaker interviene dopo 3 ping-failure consecutivi dal watchdog.
+  connectionTimeoutMillis: 8000,
   // Limite esplicito di connessioni — evita saturation burst.
   // NOTA TUNING (saturazione pool): max resta 10 — coerente con i limiti del DB
   // managed di Replit; alzarlo sposterebbe solo la contesa lato server DB. La
@@ -50,6 +56,12 @@ export const pool = new Pool({
   // route admin resource-monitor (refactor da 7+16 connect → 1 client) e il
   // resource-graph-sampler (ogni 10s, ora retry+budget).
   max: 10,
+  // min=1: mantiene almeno 1 connessione calda tra i tick del watchdog (60s).
+  // idleTimeoutMillis=10s evictava tutte le connessioni tra un tick e l'altro
+  // → pool ripartiva da 0 conn stabilite ad ogni tick → picco di concorrenza
+  // al momento del Promise.allSettled dei collector → waiting>0 sistematico.
+  // Con min=1 almeno una connessione è sempre pronta, eliminando il cold-start.
+  min: 1,
   // 5s: le query non tengono connessioni appese indefinitamente in caso di
   // query lente o lock. Ridotto da 15s → 5s per il login hardening: il
   // circuit breaker si apre dopo 3 ping-failure dal watchdog, ma fino ad
