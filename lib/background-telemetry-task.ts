@@ -2,6 +2,7 @@ import * as TaskManager from "expo-task-manager";
 import type { LocationObject } from "expo-location";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import type { TelemetrySample } from "@shared/tracking-fusion";
+import { stopBackgroundLocationTask } from "./background-location-task";
 
 export const TASK_TELEMETRY = "bikerlink-telemetry-bg";
 
@@ -28,6 +29,16 @@ export async function startTelemetryBackgroundTask(): Promise<boolean> {
     const isRunning = await TaskManager.isTaskRegisteredAsync(TASK_TELEMETRY);
     if (isRunning) return true;
 
+    // Stop the social location task before starting high-frequency telemetry.
+    // Both tasks share the GPS hardware; running them in parallel drains battery
+    // and causes conflicting location writes to /api/users/location.
+    // Ownership contract: telemetry task is the sole GPS authority during rides;
+    // the social location task (bikerlink-background-location) must not run
+    // concurrently. The social task already skips its API write when
+    // @bikerlink/tracking_active is set, but stopping it entirely eliminates
+    // the unnecessary OS wakeups as well.
+    await stopBackgroundLocationTask();
+
     await Location.startLocationUpdatesAsync(TASK_TELEMETRY, {
       accuracy:         Location.Accuracy.BestForNavigation,
       timeInterval:     1000,
@@ -46,6 +57,12 @@ export async function startTelemetryBackgroundTask(): Promise<boolean> {
 }
 
 export async function stopTelemetryBackgroundTask(): Promise<void> {
+  // NOTE: do NOT restart the social location task here.
+  // This function is called from both the toForeground transition (ride still
+  // active, app resumed to foreground) and the stop transition (ride ended).
+  // Restarting the social task here would wrongly re-enable it mid-ride.
+  // The restart is handled exclusively in finishSession (useTelemetry.ts),
+  // which is only called at true ride-end.
   try {
     const Location = require("expo-location") as typeof import("expo-location");
     const isRunning = await TaskManager.isTaskRegisteredAsync(TASK_TELEMETRY);

@@ -10,6 +10,11 @@ import {
   stopTelemetryBackgroundTask,
 } from "@/lib/background-telemetry-task";
 import {
+  stopBackgroundLocationTask,
+  restartBackgroundLocationTaskWithPrecision,
+  GPS_PRECISION_STORAGE_KEY,
+} from "@/lib/background-location-task";
+import {
   createTelemetryCollector,
   type TelemetryCollectorMachine,
 } from "@/lib/telemetry-collector-machine";
@@ -243,6 +248,13 @@ export function useTelemetry(isActive: boolean, externalGps = false) {
 
   // ── begin session ───────────────────────────────────────────────────────────
   const beginSession = useCallback(async () => {
+    // Ownership contract: telemetry is the sole GPS authority during a ride.
+    // Stop the social location task so it cannot run concurrently, regardless
+    // of whether the app goes to the background during the ride. The task's own
+    // tracking_active guard is a second line of defence; stopping the task
+    // entirely avoids unnecessary OS wakeups while a ride is active.
+    stopBackgroundLocationTask().catch(() => {});
+
     sessionIdRef.current = makeUUID();
     bufferRef.current    = [];
     lastKnownLocRef.current = null;
@@ -261,6 +273,14 @@ export function useTelemetry(isActive: boolean, externalGps = false) {
     const sessionId = sessionIdRef.current;
     await AsyncStorage.removeItem(BG_TELEMETRY_SESSION_KEY);
     await flush(true);
+    // Restore the social location task now that the ride is fully over.
+    // Must happen after the session is cleared so the task's tracking_active
+    // guard no longer suppresses its updates.  Best-effort: if background
+    // permission was revoked during the ride, restartBackgroundLocationTaskWithPrecision
+    // returns false silently and AppStateHandler will retry on next foreground.
+    AsyncStorage.getItem(GPS_PRECISION_STORAGE_KEY)
+      .then((p) => restartBackgroundLocationTaskWithPrecision(p ?? "balanced"))
+      .catch(() => {});
     if (bufferRef.current.length > 0) {
       console.warn(`[useTelemetry] stop: primo flush fallito (${bufferRef.current.length} campioni). Retry tra ${STOP_RETRY_DELAY_MS}ms...`);
       await new Promise<void>((r) => setTimeout(r, STOP_RETRY_DELAY_MS));

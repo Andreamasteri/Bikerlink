@@ -168,13 +168,14 @@ TaskManager.defineTask(
 
     if (!settings.enabled) return;
 
-    // During tracking, flushPoints is the sole source of social location updates.
-    // The ride flush (useTrackingState → flushPoints) calls PUT /api/users/location
-    // every 15 s using the smoothed tracker point. Letting this background task also
-    // call that endpoint would produce parallel, conflicting writes — raw GPS from the
-    // OS vs. the smoothed tracker point. Skip unconditionally here, regardless of the
-    // `trigger` AppSetting, so flushPoints remains the only authority while a ride is
-    // active.
+    // ── Ownership contract ────────────────────────────────────────────────────
+    // bikerlink-telemetry-bg is the sole GPS authority during a ride.
+    // startTelemetryBackgroundTask() stops this task before the telemetry task
+    // starts, and stopTelemetryBackgroundTask() restarts it afterwards, so in
+    // practice this guard should rarely fire. It is kept as a second line of
+    // defence: if the lifecycle coordination is bypassed (e.g. crash recovery),
+    // we still avoid conflicting writes — raw OS GPS here vs. the smoothed
+    // tracker point written by flushPoints every 15 s.
     const trackingActive = await AsyncStorage.getItem("@bikerlink/tracking_active");
     if (trackingActive === "true") {
       return;
