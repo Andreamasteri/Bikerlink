@@ -778,13 +778,72 @@ async function callHorus(
   }
 }
 
+// ─── Generazione automatica file backlog da task files ───────────────────────
+
+/**
+ * Scansiona `.local/tasks/*.md`, estrae i titoli (prima riga H1) e scrive
+ * `.local/horus-backlog.json`. Viene chiamata all'avvio del triage così il
+ * file è sempre aggiornato quando `fetchExistingTaskTitles()` lo legge per
+ * la deduplicazione — senza richiedere alcun passo manuale dell'agente.
+ *
+ * Ritorna il numero di titoli trovati, oppure -1 in caso di errore fatale.
+ */
+function generateBacklogFile(): number {
+  const tasksDir = path.join(ROOT, ".local", "tasks");
+  const backlogFile = BACKLOG_FILE_DEFAULT;
+
+  let files: string[];
+  try {
+    if (!fs.existsSync(tasksDir)) {
+      fs.mkdirSync(tasksDir, { recursive: true });
+      files = [];
+    } else {
+      files = fs.readdirSync(tasksDir).filter((f) => f.endsWith(".md"));
+    }
+  } catch (err) {
+    console.warn(`  ⚠️  Impossibile leggere .local/tasks/: ${(err as Error).message}`);
+    return -1;
+  }
+
+  const titles: string[] = [];
+  for (const file of files) {
+    try {
+      const content = fs.readFileSync(path.join(tasksDir, file), "utf8");
+      const firstLine = content.split("\n").find((l) => l.startsWith("# "));
+      if (firstLine) {
+        const title = firstLine.replace(/^#\s+/, "").trim();
+        if (title.length > 0) titles.push(title);
+      }
+    } catch {
+      // file non leggibile: saltato
+    }
+  }
+
+  try {
+    fs.mkdirSync(path.dirname(backlogFile), { recursive: true });
+    fs.writeFileSync(
+      backlogFile,
+      JSON.stringify(
+        { titles, generatedAt: new Date().toISOString(), source: "task-files", fileCount: files.length },
+        null,
+        2,
+      ),
+      "utf8",
+    );
+    return titles.length;
+  } catch (err) {
+    console.warn(`  ⚠️  Impossibile scrivere backlog file: ${(err as Error).message}`);
+    return -1;
+  }
+}
+
 // ─── Recupero task esistenti (deduplicazione via file backlog) ────────────────
 
 /**
- * Path del file backlog scritto dall'agente Replit prima di ogni triage.
- * L'agente scrive qui i titoli dei task attivi (non CANCELLED/MERGED) così
- * gli script possono deduplicare senza interrogare la tabella interna di Replit
- * `project_tasks` (che non esiste nel DB Postgres del progetto).
+ * Path del file backlog generato automaticamente all'avvio del triage da
+ * `generateBacklogFile()`. Contiene i titoli dei task trovati in
+ * `.local/tasks/*.md` così gli script possono deduplicare senza interrogare
+ * la tabella interna di Replit `project_tasks` (che non esiste nel DB Postgres).
  */
 const BACKLOG_FILE_DEFAULT = path.join(ROOT, ".local", "horus-backlog.json");
 
@@ -800,9 +859,8 @@ async function fetchExistingTaskTitles(): Promise<string[]> {
     console.warn(
       `\n  ⚠️  Backlog non disponibile — deduplicazione saltata.\n` +
       `       File atteso: ${path.relative(ROOT, backlogFile)}\n` +
-      `       Per attivare la deduplicazione, chiedi all'agente di scrivere\n` +
-      `       i titoli dei task attivi in quel file prima del triage,\n` +
-      `       oppure passa --backlog-file <path>.\n`,
+      `       (generato automaticamente da generateBacklogFile() all'avvio del triage)\n` +
+      `       Oppure passa --backlog-file <path> per usare un file personalizzato.\n`,
     );
     return [];
   }
@@ -846,6 +904,17 @@ async function main(): Promise<void> {
   console.log(`  Fonti    : ${ONLY_INTERNAL ? "solo interne (DB + filesystem)" : "DB + filesystem + GitHub + Sentry + repo tree"}`);
   if (IS_DRY_RUN) console.log("  Modalità : DRY-RUN (nessuna chiamata a Horus)");
   if (NO_PROPOSE) console.log("  Proposta : disabilitata (--no-propose)");
+  console.log("");
+
+  // ── Generazione automatica backlog per deduplicazione ──
+  // Deve avvenire PRIMA di qualsiasi chiamata a fetchExistingTaskTitles()
+  // (usata sia nella revisione architect sia in horus-propose-tasks.ts).
+  const backlogCount = generateBacklogFile();
+  if (backlogCount >= 0) {
+    console.log(`  📋 Backlog aggiornato: ${backlogCount} task da .local/tasks/*.md → .local/horus-backlog.json`);
+  } else {
+    console.log("  ⚠️  Backlog non aggiornato (errore lettura/scrittura) — deduplicazione potrebbe essere parziale.");
+  }
   console.log("");
 
   console.log("  ⏳ Raccolta fonti...");
