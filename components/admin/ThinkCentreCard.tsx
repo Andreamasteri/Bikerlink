@@ -8,8 +8,8 @@ import { styles } from "./ThinkCentreCardStyles";
 import { GraphHopperBlock } from "./ThinkCentreCardParts";
 import type { HealthEvent, AreaServiceHealth, ProbeLogEntry } from "./ThinkCentreCardParts";
 import { ServiceBadgeStrip } from "./ThinkCentreServiceBadge";
-import { ValhallaBlock, PhotonBlock, UfwBlock } from "./ThinkCentreValhallaPhotonBlocks";
-import type { ValhallaDetailedHealth, PhotonDetailedHealth, UfwDetailedHealth } from "./ThinkCentreValhallaPhotonBlocks";
+import { ValhallaBlock, PhotonBlock, UfwBlock, AreaResolverBlock } from "./ThinkCentreValhallaPhotonBlocks";
+import type { ValhallaDetailedHealth, PhotonDetailedHealth, UfwDetailedHealth, AreaResolverDetail } from "./ThinkCentreValhallaPhotonBlocks";
 import {
   OllamaBlock,
   WhisperBlock,
@@ -89,6 +89,8 @@ interface ThinkCentreHealth {
     whisper: string | null;
     photon: string | null;
   };
+  /** Non-null only when the area resolver emits a non-info signal (SQL error). */
+  areaResolverDetail?: AreaResolverDetail | null;
   maintenanceMode?: boolean;
   checkedAt: number;
 }
@@ -473,6 +475,9 @@ export function ThinkCentreCard({
               url={data.graphhopperUrl}
               tokenMissing={data.graphhopperTokenMissing}
             />
+          )}
+          {!poweredOffActive && data?.areaResolverDetail != null && (
+            <AreaResolverBlock detail={data.areaResolverDetail} />
           )}
           {!poweredOffActive && (
             <ValhallaBlock

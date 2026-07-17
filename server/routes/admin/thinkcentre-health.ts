@@ -51,6 +51,7 @@ import { sendError } from "../../lib/api-response";
 import { storage } from "../../storage";
 
 import { updateThinkCentreSystemStatus, probeThinkCentreStatusSnapshot } from "./thinkcentre-health.part2";
+import { getLastCorrectnessResults } from "../../ai/watchdog/routing-correctness-probes";
 
 export type {
   ServiceHealth,
@@ -310,6 +311,7 @@ router.get("/thinkcentre-health", async (_req: Request, res: ExpressResponse) =>
         aresDetail: null,
         personaModels: null,
         nginxSymlinksWarning: null,
+        areaResolverDetail: null,
         maintenanceMode: false,
         poweredOff: true,
         checkedAt: Date.now(),
@@ -473,6 +475,21 @@ router.get("/thinkcentre-health", async (_req: Request, res: ExpressResponse) =>
         }
       : null;
 
+    // Area resolver: pull from the correctness probe cache (populated by the watchdog collector).
+    // Returns null when healthy (no non-info result in cache) → no noise when everything is fine.
+    const { results: correctnessResults } = getLastCorrectnessResults();
+    const areaResolverResult = correctnessResults.find(
+      (r) => r.engine === "area_resolver" && r.severity !== "info",
+    ) ?? null;
+    const areaResolverDetail = areaResolverResult
+      ? {
+          ok: areaResolverResult.ok,
+          severity: areaResolverResult.severity,
+          reason: areaResolverResult.reason,
+          sqlCode: (areaResolverResult.detail?.sqlCode as string | null) ?? null,
+        }
+      : null;
+
     return res.json({
       overall,
       onlineCount,
@@ -493,6 +510,7 @@ router.get("/thinkcentre-health", async (_req: Request, res: ExpressResponse) =>
       ),
       repoDrift,
       nginxSymlinksWarning,
+      areaResolverDetail,
       maintenanceMode: maintenance,
       checkedAt: Date.now(),
     });

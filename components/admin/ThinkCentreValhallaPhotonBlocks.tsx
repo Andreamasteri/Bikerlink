@@ -404,4 +404,52 @@ export function UfwBlock({
   );
 }
 
+export interface AreaResolverDetail {
+  ok: boolean;
+  severity: string;
+  reason: string | null;
+  sqlCode: string | null;
+}
+
+export function AreaResolverBlock({ detail }: { detail: AreaResolverDetail }) {
+  const [open, setOpen] = useState(false);
+  // Only "warn" severity is currently emitted, but guard for future escalation.
+  const statusColor = detail.severity === "critical" ? "#ef4444" : detail.severity === "high" ? "#f97316" : "#f59e0b";
+
+  return (
+    <View style={styles.block}>
+      <TouchableOpacity
+        style={styles.header}
+        onPress={() => setOpen((o) => !o)}
+        activeOpacity={0.7}
+        testID="thinkcentre-area-resolver-block-header"
+      >
+        <MaterialCommunityIcons name="database-alert-outline" size={18} color={statusColor} style={styles.headerIcon} />
+        <View style={styles.headerText}>
+          <Text style={styles.title}>Area resolver</Text>
+          <Text style={[styles.subtitle, { color: statusColor }]}>
+            {detail.sqlCode ? `Errore SQL · ${detail.sqlCode}` : "Errore SQL"}
+          </Text>
+        </View>
+        <View style={[styles.dot, { backgroundColor: statusColor }]} />
+        <Ionicons name={open ? "chevron-up" : "chevron-down"} size={16} color={Colors.textSecondary} />
+      </TouchableOpacity>
+
+      {open && (
+        <View style={styles.body}>
+          <View style={styles.statusRow}>
+            <View style={[styles.dot, { backgroundColor: statusColor }]} />
+            <Text style={[styles.statusLabel, { color: statusColor }]}>
+              {detail.sqlCode ? `Errore SQL (SQLSTATE ${detail.sqlCode})` : "Errore SQL nell'area resolver"}
+            </Text>
+          </View>
+          {detail.reason ? (
+            <Text style={styles.meta} numberOfLines={4}>{detail.reason}</Text>
+          ) : null}
+        </View>
+      )}
+    </View>
+  );
+}
+
 import { styles } from "./ThinkCentreValhallaPhotonBlocks.styles";
