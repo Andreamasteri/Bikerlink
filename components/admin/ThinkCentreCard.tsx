@@ -292,7 +292,7 @@ export function ThinkCentreCard({
     if (poweredOffActive) { onStatuses(ALL_UNKNOWN); return; }
     if (!data) return;
     if (data.maintenanceMode) { onStatuses(ALL_UNKNOWN); return; }
-    const findSvc = (key: ServiceKey) => data.services.find((s) => s.key === key);
+    const findSvc = (key: ServiceKey) => data.services?.find((s) => s.key === key);
     onStatuses({
       thinkcentre: overallToStatus(data.overall),
       graphhopper: ghToStatus(data.graphhopperAreas, data.graphhopperConfigured),
@@ -504,7 +504,7 @@ export function ThinkCentreCard({
           )}
           {!poweredOffActive && (
             <OllamaBlock
-              service={error ? undefined : data?.services.find((s) => s.key === "ollama")}
+              service={error ? undefined : data?.services?.find((s) => s.key === "ollama")}
               fingerprint={error ? null : (fp?.ollama ?? null)}
               personaModels={error ? null : (data?.personaModels ?? null)}
               isLoading={isLoading}
@@ -513,7 +513,7 @@ export function ThinkCentreCard({
           )}
           {!poweredOffActive && (
             <WhisperBlock
-              service={error ? undefined : data?.services.find((s) => s.key === "whisper")}
+              service={error ? undefined : data?.services?.find((s) => s.key === "whisper")}
               fingerprint={error ? null : (fp?.whisper ?? null)}
               isLoading={isLoading}
               hasError={!!error}
@@ -528,28 +528,28 @@ export function ThinkCentreCard({
           )}
           {!poweredOffActive && (
             <DragonflyBlock
-              service={error ? undefined : data?.services.find((s) => s.key === "dragonfly")}
+              service={error ? undefined : data?.services?.find((s) => s.key === "dragonfly")}
               isLoading={isLoading}
               hasError={!!error}
             />
           )}
           {!poweredOffActive && (
             <NginxBlock
-              service={error ? undefined : data?.services.find((s) => s.key === "nginx")}
+              service={error ? undefined : data?.services?.find((s) => s.key === "nginx")}
               isLoading={isLoading}
               hasError={!!error}
             />
           )}
           {!poweredOffActive && (
             <UptimeKumaBlock
-              service={error ? undefined : data?.services.find((s) => s.key === "uptimekuma")}
+              service={error ? undefined : data?.services?.find((s) => s.key === "uptimekuma")}
               isLoading={isLoading}
               hasError={!!error}
             />
           )}
           {!poweredOffActive && (
             <AiHubBlock
-              service={error ? undefined : data?.services.find((s) => s.key === "aihub")}
+              service={error ? undefined : data?.services?.find((s) => s.key === "aihub")}
               isLoading={isLoading}
               hasError={!!error}
             />

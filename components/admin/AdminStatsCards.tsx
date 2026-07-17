@@ -226,7 +226,7 @@ export function ValhallaCard() {
                 <View style={styles.stat}>
                   <Text style={styles.statValue}>
                     {detail.configured && detail.ok
-                      ? `${detail.activeProfiles.length}/4`
+                      ? `${detail.activeProfiles?.length ?? 0}/4`
                       : "—"}
                   </Text>
                   <Text style={styles.statLabel}>Profili</Text>
@@ -240,9 +240,9 @@ export function ValhallaCard() {
                 </View>
               </View>
 
-              {detail.configured && detail.ok && detail.activeProfiles.length > 0 && (
+              {detail.configured && detail.ok && (detail.activeProfiles?.length ?? 0) > 0 && (
                 <View style={styles.chipsRow}>
-                  {detail.activeProfiles.map((p) => (
+                  {(detail.activeProfiles ?? []).map((p) => (
                     <View key={p} style={styles.profileChip}>
                       <MaterialCommunityIcons
                         name={PROFILE_ICONS[p] ?? "routes"}
@@ -273,7 +273,7 @@ export function ValhallaCard() {
                 </View>
               )}
 
-              {!detail.ok && detail.history.length > 0 && (
+              {!detail.ok && (detail.history?.length ?? 0) > 0 && (
                 <ErrorHistory history={detail.history} />
               )}
 
@@ -380,7 +380,7 @@ export function PhotonCard() {
                 </View>
               )}
 
-              {!detail.ok && detail.history.length > 0 && (
+              {!detail.ok && (detail.history?.length ?? 0) > 0 && (
                 <ErrorHistory history={detail.history} />
               )}
 

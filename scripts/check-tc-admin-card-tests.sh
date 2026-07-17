@@ -51,10 +51,7 @@
 # nuovi file a questo elenco.
 
 KNOWN_GAPS=(
-  "ThinkCentreCard.tsx"
   "ThinkCentreCard.part2.tsx"
-  "ThinkCentreSystemMonitor.tsx"
-  "AdminStatsCards.tsx"
 )
 
 set -euo pipefail
