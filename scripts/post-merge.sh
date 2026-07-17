@@ -507,6 +507,24 @@ if [ "$TC_CARD_TEST_EXIT" -ne 0 ]; then
   exit "$TC_CARD_TEST_EXIT"
 fi
 
+# ── GATE REGRESSION TEST — check-tc-admin-card-tests ─────────────────────────
+# Verifica che il gate stesso non sia regredito: crea temporaneamente un
+# componente dummy in components/admin/ e ne testa la detection (exit 1),
+# poi verifica exit 0 con pragma e con render test presente.
+# Protegge dalla modifica silenziosa della logica di grep/allowlist nel gate.
+echo "════════════════════════════════════════"
+echo "  Test regressione gate tc-admin-card-tests"
+echo "════════════════════════════════════════"
+TC_CARD_REGTEST_EXIT=0
+bash scripts/__tests__/check-tc-admin-card-tests.test.sh || TC_CARD_REGTEST_EXIT=$?
+echo "════════════════════════════════════════"
+echo ""
+if [ "$TC_CARD_REGTEST_EXIT" -ne 0 ]; then
+  echo "❌ Regression test tc-admin-card-tests FALLITO — la logica del gate è regredita."
+  echo "   Eseguire 'bash scripts/__tests__/check-tc-admin-card-tests.test.sh' per i dettagli."
+  exit "$TC_CARD_REGTEST_EXIT"
+fi
+
 # ── GUARD PORTE .replit (MAPPING [[ports]] + DEPLOY) ─────────
 # REGOLA BLOCCANTE (replit.md § Preferenze utente):
 # Nessun agente può modificare [[ports]] senza autorizzazione esplicita utente.
