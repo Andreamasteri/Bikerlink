@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { View, Text, ActivityIndicator, TouchableOpacity, Switch } from "react-native";
+import { View, Text, ActivityIndicator, TouchableOpacity, Switch, Linking } from "react-native";
 import { MaterialCommunityIcons, Ionicons } from "@expo/vector-icons";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { getApiUrl, authFetchHeaders } from "@/lib/query-client";
@@ -204,6 +204,27 @@ const repoDriftStyles = {
   syncBtnLabel: { fontSize: 12, fontWeight: "600" as const, color: "#92400e" },
 };
 
+const apkBtnStyles = {
+  btn: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    alignSelf: "flex-start" as const,
+    gap: 6,
+    backgroundColor: "#3b82f6",
+    borderRadius: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    marginHorizontal: 10,
+    marginTop: 10,
+    marginBottom: 4,
+  },
+  label: {
+    color: "#fff",
+    fontSize: 13,
+    fontFamily: "Inter_600SemiBold",
+  },
+};
+
 const ALL_UNKNOWN: Pick<SystemStatuses, ThinkCentreStatusKeys> = {
   thinkcentre: "unknown",
   graphhopper: "unknown",
@@ -224,6 +245,10 @@ export function ThinkCentreCard({
   onStatuses?: (s: Pick<SystemStatuses, ThinkCentreStatusKeys>) => void;
 }) {
   const [collapsed, setCollapsed] = useState(true);
+
+  const { data: apkData } = useQuery<{ url: string }>({
+    queryKey: ["/api/admin/settings/tc-terminal-apk-url"],
+  });
 
   const { data, isLoading, isFetching, error, refetch } = useQuery<ThinkCentreHealth>({
     queryKey: ["/api/admin/thinkcentre-health"],
@@ -554,6 +579,17 @@ export function ThinkCentreCard({
               hasError={!!error}
             />
           )}
+
+          {apkData?.url ? (
+            <TouchableOpacity
+              style={apkBtnStyles.btn}
+              onPress={() => Linking.openURL(apkData.url)}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="download-outline" size={16} color="#fff" />
+              <Text style={apkBtnStyles.label}>Scarica TC Terminal APK</Text>
+            </TouchableOpacity>
+          ) : null}
 
           <ThinkCentreFooter
             poweredOffActive={poweredOffActive}
