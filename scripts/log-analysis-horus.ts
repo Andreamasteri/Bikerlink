@@ -39,6 +39,11 @@ import { cfAccessHeaders } from "../server/lib/cf-access";
 import { collectGitHub, collectSentry, collectGitHubRepoTree } from "./lib/horus-sources";
 import { estimateTokens, fmtSection, trimBundleToFit } from "./lib/horus-trim";
 import { normalizeTaskSection } from "./lib/horus-normalize";
+import {
+  collectBacklogTitles,
+  loadCancelledRefs,
+  readCancelledRefsAge,
+} from "./lib/horus-backlog";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, "..");
@@ -850,15 +855,24 @@ function cleanupStaleHorusFiles(): number {
 // ─── Generazione automatica file backlog da task files ───────────────────────
 
 /**
- * Scansiona `.local/tasks/*.md`, estrae i titoli (prima riga H1) e scrive
- * `.local/horus-backlog.json`. Viene chiamata all'avvio del triage così il
- * file è sempre aggiornato quando `fetchExistingTaskTitles()` lo legge per
- * la deduplicazione — senza richiedere alcun passo manuale dell'agente.
+ * Scansiona `.local/tasks/*.md`, estrae i titoli (prima riga H1) escludendo i
+ * task CANCELLED/MERGED, e scrive `.local/horus-backlog.json`.
  *
- * Deve essere preceduta da `cleanupStaleHorusFiles()` per escludere le
- * proposte Horus già promosse a task numerati.
+ * Viene chiamata all'avvio del triage così il file è sempre aggiornato quando
+ * `fetchExistingTaskTitles()` lo legge per la deduplicazione.
  *
- * Ritorna il numero di titoli trovati, oppure -1 in caso di errore fatale.
+ * Deve essere preceduta da `cleanupStaleHorusFiles()` per escludere le proposte
+ * Horus già promosse a task numerati.
+ *
+ * Esclude automaticamente i task CANCELLED/MERGED tramite due meccanismi gestiti
+ * da `collectBacklogTitles()` in ./lib/horus-backlog.ts:
+ *  1. File `scripts/data/horus-cancelled-refs.json` (versionato in git): lista di
+ *     ref numerici da saltare. Rigenerato dall'agente via CodeExecution prima del
+ *     triage con `queryProjectTasks({ states: ["CANCELLED", "MERGED"] })`.
+ *  2. Frontmatter YAML: file `.md` con `state: cancelled` o `state: merged`
+ *     vengono omessi dal backlog.
+ *
+ * Ritorna il numero di titoli inclusi, oppure -1 in caso di errore fatale.
  */
 function generateBacklogFile(): number {
   const tasksDir = path.join(ROOT, ".local", "tasks");
@@ -877,18 +891,37 @@ function generateBacklogFile(): number {
     return -1;
   }
 
-  const titles: string[] = [];
-  for (const file of files) {
-    try {
-      const content = fs.readFileSync(path.join(tasksDir, file), "utf8");
-      const firstLine = content.split("\n").find((l) => l.startsWith("# "));
-      if (firstLine) {
-        const title = firstLine.replace(/^#\s+/, "").trim();
-        if (title.length > 0) titles.push(title);
-      }
-    } catch {
-      // file non leggibile: saltato
-    }
+  // ── Carica la lista di ref CANCELLED/MERGED dal file versionato ──
+  const cancelledRefs = loadCancelledRefs();
+  const cancelledRefsAge = readCancelledRefsAge();
+
+  if (cancelledRefs.size > 0) {
+    const ageNote = cancelledRefsAge ? ` (generato: ${cancelledRefsAge.slice(0, 10)})` : "";
+    console.log(`  📵 Excluded refs caricati: ${cancelledRefs.size} task CANCELLED/MERGED${ageNote}`);
+  } else {
+    console.log(
+      `  ℹ️  Nessun excluded-refs file trovato — tutti i task .md contribuiranno al backlog.\n` +
+      `       Per escludere task cancellati/mergiati, rigenera scripts/data/horus-cancelled-refs.json\n` +
+      `       via CodeExecution con queryProjectTasks({ states: ["CANCELLED", "MERGED"] }).`,
+    );
+  }
+
+  // ── Filtra i file con i due meccanismi (ref-list + frontmatter) ──
+  const { titles, skippedByRef, skippedByFrontmatter } = collectBacklogTitles(
+    files,
+    tasksDir,
+    cancelledRefs,
+  );
+
+  const totalSkipped = skippedByRef + skippedByFrontmatter;
+  if (totalSkipped > 0) {
+    console.log(
+      `  🚫 Task esclusi dal backlog: ${totalSkipped}` +
+      (skippedByRef > 0 ? ` (${skippedByRef} per ref` : "") +
+      (skippedByFrontmatter > 0
+        ? `${skippedByRef > 0 ? ", " : " ("}${skippedByFrontmatter} per frontmatter)`
+        : skippedByRef > 0 ? ")" : ""),
+    );
   }
 
   try {
@@ -896,7 +929,15 @@ function generateBacklogFile(): number {
     fs.writeFileSync(
       backlogFile,
       JSON.stringify(
-        { titles, generatedAt: new Date().toISOString(), source: "task-files", fileCount: files.length },
+        {
+          titles,
+          generatedAt: new Date().toISOString(),
+          source: "task-files",
+          fileCount: files.length,
+          excludedCount: totalSkipped,
+          excludedByRef: skippedByRef,
+          excludedByFrontmatter: skippedByFrontmatter,
+        },
         null,
         2,
       ),
