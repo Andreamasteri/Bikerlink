@@ -306,11 +306,11 @@ async function fetchExistingTaskTitles(): Promise<string[]> {
   }
 }
 
-function normalize(s: string): string {
+export function normalize(s: string): string {
   return s.toLowerCase().replace(/[^a-z0-9\s]/g, "").replace(/\s+/g, " ").trim();
 }
 
-function isDuplicate(title: string, existingTitles: string[]): boolean {
+export function isDuplicate(title: string, existingTitles: string[]): boolean {
   const n = normalize(title);
   return existingTitles.some((t) => {
     const en = normalize(t);
