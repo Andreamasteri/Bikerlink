@@ -113,7 +113,7 @@ async function getCachedSettings(): Promise<{
   return null;
 }
 
-async function fetchAndCacheSettings(domain: string): Promise<{
+export async function fetchAndCacheSettings(domain: string): Promise<{
   enabled: boolean;
   trigger: string;
   intervalSeconds: number;

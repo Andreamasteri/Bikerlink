@@ -12,6 +12,7 @@ import {
   stopBackgroundLocationTask,
   isBackgroundLocationSupported,
   gpsPrecisionToAccuracy,
+  fetchAndCacheSettings,
   GPS_PRECISION_STORAGE_KEY,
 } from "@/lib/background-location-task";
 import {
@@ -313,22 +314,11 @@ export function AppStateHandler() {
         const supported = await isBackgroundLocationSupported();
         if (!supported) return;
 
-        let intervalSeconds = 30;
-        let notificationText = "BikerLink: {motivo} — posizione attiva in background";
-        try {
-          const domain = process.env.EXPO_PUBLIC_DOMAIN || "bikerlink.replit.app";
-          const res = await fetch(`https://${domain}/api/settings/bg-location`, {
-            credentials: "include",
-          });
-          if (res.ok) {
-            const settings = await res.json();
-            if (settings.enabled === false) return;
-            intervalSeconds = settings.intervalSeconds || 30;
-            notificationText = settings.notificationText || notificationText;
-          }
-        } catch {
-          // no-op: use default settings if fetch fails
-        }
+        const domain = process.env.EXPO_PUBLIC_DOMAIN || "bikerlink.replit.app";
+        const settings = await fetchAndCacheSettings(domain);
+        if (settings.enabled === false) return;
+        const intervalSeconds = settings.intervalSeconds || 30;
+        const notificationText = settings.notificationText || "BikerLink: {motivo} — posizione attiva in background";
 
         let gpsPrecision = await AsyncStorage.getItem(GPS_PRECISION_STORAGE_KEY).catch(() => null);
         if (!gpsPrecision) {
