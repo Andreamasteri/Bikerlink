@@ -55,7 +55,7 @@ DOCTOR_OUTPUT_FILE=$(mktemp)
 trap 'rm -f "$DOCTOR_OUTPUT_FILE"' EXIT
 
 set +e
-(cd "$BOWIE_DIR" && npx expo-doctor 2>&1) | tee "$DOCTOR_OUTPUT_FILE"
+(cd "$BOWIE_DIR" && npx --yes expo-doctor 2>&1) | tee "$DOCTOR_OUTPUT_FILE"
 DOCTOR_EXIT=${PIPESTATUS[0]}
 set -e
 

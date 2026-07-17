@@ -69,9 +69,30 @@ Entrambi i profili condividono la stessa configurazione arm64-only + R8 minify (
 
 ## Procedura
 
-### Step 0 — Preflight OBBLIGATORIO (gate, mai saltare)
+### Step 0a — Drift check lockfile (gate bloccante, mai saltare)
 
-Prima di lanciare qualsiasi build reale, verificare che la config nativa generata rifletta davvero arm64+minify:
+Prima di qualsiasi build, verificare che `bowie-terminal/package-lock.json` sia allineato con le versioni risolte dal lockfile della root:
+
+```bash
+bash scripts/check-bowie-pkg-drift.sh
+```
+
+Il comando esce **1 (bloccante)** se uno o più pacchetti dichiarati in `bowie-terminal/package.json` hanno una versione più recente nel lockfile root che soddisfa il range dichiarato. Una build EAS con un lockfile vecchio installa nativi stantii (compatibili a livello di range, ma non aggiornati) che non matchano l'SDK in uso.
+
+> ⚠️ Il workflow **`db-migration-checks`** esegue lo stesso script con `--warn-only` (solo avviso, non bloccante) — **non usare quel workflow come gate pre-build**. Eseguire sempre il comando diretto `bash scripts/check-bowie-pkg-drift.sh` (senza flag) che esce 1 in caso di drift.
+
+Se il gate segnala drift:
+```bash
+cd bowie-terminal && npm install && cd ..
+# Correggere eventuali URL proxy nel lockfile (vedi Pitfall 4):
+sed -i 's|http://package-firewall\.replit\.local/npm/|https://registry.npmjs.org/|g' bowie-terminal/package-lock.json
+git add bowie-terminal/package-lock.json
+git commit -m "chore(bowie): aggiorna lockfile a SDK corrente"
+```
+
+### Step 0b — Preflight config nativa (gate, mai saltare)
+
+Verificare che la config nativa generata rifletta davvero arm64+minify:
 
 ```bash
 cd bowie-terminal && npx expo config --type introspect --json | grep -A3 "reactNativeArchitectures\|enableMinifyInReleaseBuilds\|enableShrinkResourcesInReleaseBuilds"
@@ -183,7 +204,8 @@ Il processo `eas build` (compressione + upload + polling) è un'operazione di re
 
 | Check | release-apk (APK) | production (AAB) |
 |---|---|---|
-| Preflight introspect eseguito e verde (arm64 + minify + shrink) | ✓ obbligatorio | ✓ obbligatorio |
+| **`bash scripts/check-bowie-pkg-drift.sh` → exit 0** (Step 0a, bloccante) | ✓ obbligatorio | ✓ obbligatorio |
+| Preflight introspect eseguito e verde (arm64 + minify + shrink) (Step 0b) | ✓ obbligatorio | ✓ obbligatorio |
 | `EAS_NO_VCS=1` presente | ✓ | ✓ |
 | `EAS_SKIP_AUTO_FINGERPRINT=1` presente | ✓ | ✓ |
 | Comando lanciato da dentro `bowie-terminal/` | ✓ | ✓ |
