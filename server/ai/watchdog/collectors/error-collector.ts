@@ -99,6 +99,31 @@ export async function collectErrors(): Promise<Signal[]> {
     const rateRow = rateResult.rows[0] as Record<string, unknown> | undefined;
     const crashCount = Number(rateRow?.crash_count ?? 0);
     const totalSessions = Number(rateRow?.total_sessions ?? 0);
+
+    // Task #421 — breakdown per piattaforma (android/ios): stessa finestra 24h,
+    // stessi filtri. Restituisce max 2 righe (una per platform nota).
+    const platformResult = await withDbRetry(() => db.execute(sql`
+      SELECT
+        COALESCE(platform, 'unknown') AS platform,
+        COUNT(*) FILTER (WHERE crash_type IN ('crash_system','crash_js')) AS crash_count,
+        COUNT(*) AS total_sessions
+      FROM app_crash_logs
+      WHERE reported_at >= ${since24h}
+        AND COALESCE(error_message, '') NOT LIKE '[resume:%'
+        AND platform IN ('android', 'ios')
+      GROUP BY platform
+    `));
+    // Mappa platform → crashFreeRate (arrotondato a 1 decimale)
+    const byPlatform: Record<string, number> = {};
+    for (const pRow of platformResult.rows as Array<Record<string, unknown>>) {
+      const pTotal = Number(pRow.total_sessions ?? 0);
+      const pCrashes = Number(pRow.crash_count ?? 0);
+      const platform = String(pRow.platform ?? "unknown");
+      if (pTotal > 0) {
+        byPlatform[platform] = Math.round(((pTotal - pCrashes) / pTotal) * 100 * 10) / 10;
+      }
+    }
+
     // Task #155 — campione minimo: sotto soglia niente percentuale (un solo
     // crash su poche sessioni produrrebbe un falso "critical").
     const minSessions = await resolveMinCrashSessions();
@@ -106,7 +131,7 @@ export async function collectErrors(): Promise<Signal[]> {
       signals.push({
         source: "error", metric: "client.crash_free_rate_24h", value: null, unit: "%",
         severity: "info",
-        details: { crashCount, totalSessions, insufficientData: true, minSessions },
+        details: { crashCount, totalSessions, insufficientData: true, minSessions, byPlatform },
       });
     } else {
       // Guard esplicito: totalSessions=0 non dovrebbe raggiungere questo ramo
@@ -115,7 +140,7 @@ export async function collectErrors(): Promise<Signal[]> {
         signals.push({
           source: "error", metric: "client.crash_free_rate_24h", value: null, unit: "%",
           severity: "info",
-          details: { crashCount: 0, totalSessions: 0, insufficientData: true, minSessions },
+          details: { crashCount: 0, totalSessions: 0, insufficientData: true, minSessions, byPlatform },
         });
       } else {
         const crashFreeRate = Math.round(((totalSessions - crashCount) / totalSessions) * 100 * 10) / 10;
@@ -124,7 +149,8 @@ export async function collectErrors(): Promise<Signal[]> {
           severity: crashFreeRate < 90 ? "critical" : crashFreeRate < 95 ? "warn" : "info",
           // Task #395 — includi crashFreeRate nei details così alerts.ts può
           // costruire un testo push informativo senza ricalcolare.
-          details: { crashCount, totalSessions, crashFreeRate },
+          // Task #421 — byPlatform include il crash-free rate per android/ios.
+          details: { crashCount, totalSessions, crashFreeRate, byPlatform },
         });
       }
     }

@@ -338,6 +338,7 @@ export async function dispatchAlerts(snap: HealthSnapshot): Promise<{ sent: numb
         crashCount?: number;
         totalSessions?: number;
         insufficientData?: boolean;
+        byPlatform?: Record<string, number>;
       } = {};
       try { detail = JSON.parse(crashRateProblem.detail ?? "{}"); } catch { /* use defaults */ }
 
@@ -348,27 +349,46 @@ export async function dispatchAlerts(snap: HealthSnapshot): Promise<{ sent: numb
         const rate = detail.crashFreeRate != null ? `${detail.crashFreeRate}%` : "?";
         const crashes = detail.crashCount ?? "?";
         const sessions = detail.totalSessions ?? "?";
+
+        // Task #421 — breakdown per piattaforma nella push body.
+        // Formato: "Android: 81% · iOS: 98%" (ordine canonico: android poi ios).
+        // Se una sola piattaforma ha dati, viene comunque mostrata.
+        let platformLine = "";
+        const bp = detail.byPlatform;
+        if (bp && Object.keys(bp).length > 0) {
+          const parts: string[] = [];
+          if (bp["android"] != null) parts.push(`Android: ${bp["android"]}%`);
+          if (bp["ios"] != null) parts.push(`iOS: ${bp["ios"]}%`);
+          // Includi piattaforme inattese (es. unknown) se presenti
+          for (const [plat, r] of Object.entries(bp)) {
+            if (plat !== "android" && plat !== "ios") parts.push(`${plat}: ${r}%`);
+          }
+          if (parts.length > 0) platformLine = ` (${parts.join(" · ")})`;
+        }
+
         // Soglia hardcoded a 90% (coerente con il collector).
         const n = await sendSystemAlertPushToAdmins(
           `📉 Crash-free rate 24h: ${rate} (soglia: 90%)`,
-          `${crashes} crash su ${sessions} sessioni nelle ultime 24h. ${crashRateProblem.suggestion ?? "Verifica i log crash nell'admin."}`,
+          `${crashes} crash su ${sessions} sessioni nelle ultime 24h${platformLine}. ${crashRateProblem.suggestion ?? "Verifica i log crash nell'admin."}`,
           {
             type: "watchdog_crash_free_rate",
             crashFreeRate: detail.crashFreeRate ?? null,
             crashCount: detail.crashCount ?? null,
             totalSessions: detail.totalSessions ?? null,
+            byPlatform: detail.byPlatform ?? null,
             score: snap.score,
           },
         );
         sentCount += n;
         await writeWatchdogLog({
           kind: "alert", scope: "error.client.crash_free_rate_24h", status: "ok",
-          summary: `Alert crash-free rate 24h: ${rate} (${crashes} crash / ${sessions} sessioni)`,
+          summary: `Alert crash-free rate 24h: ${rate} (${crashes} crash / ${sessions} sessioni)${platformLine}`,
           details: {
             sent: n,
             crashFreeRate: detail.crashFreeRate ?? null,
             crashCount: detail.crashCount ?? null,
             totalSessions: detail.totalSessions ?? null,
+            byPlatform: detail.byPlatform ?? null,
             suggestion: crashRateProblem.suggestion,
           },
         });
