@@ -147,15 +147,15 @@ args = "check-horus-dedup"
   args = "npm run lint -- --max-warnings=0"
 
   [[workflows.workflow]]
-  name = "db-migration-checks"
-  author = "agent"
-
-  [[workflows.workflow.tasks]]
-  task = "shell.exec"
-  args = "npx tsx server/scripts/check-schema-migration-drift.ts && npx tsx server/scripts/check-migration-prefix-duplicates.ts && npx tsx scripts/check-index-drift.ts --static-only"
+name = "db-migration-checks"
+author = "agent"
 
   [workflows.workflow.metadata]
   outputType = "console"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "npx tsx server/scripts/check-schema-migration-drift.ts && npx tsx server/scripts/check-migration-prefix-duplicates.ts && npx tsx scripts/check-index-drift.ts --static-only && bash scripts/check-bowie-pkg-drift.sh --warn-only"
 
 [[workflows.workflow]]
 name = "secrets-scan"
