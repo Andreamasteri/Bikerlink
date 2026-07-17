@@ -107,21 +107,25 @@ export async function recordDbMonitorSample(snap: SnapshotLike): Promise<void> {
     // Restart: restart-collector emette "server.restart_alert" (source "app").
     const dbRestartCount = readMetric(snap.metrics, "app.server.restart_alert", "server.restart_alert") ?? 0;
 
-    // Fase 5 — dbOverload ora dipende SOLO da metriche dirette: pool saturo o
-    // ping lento. NON include dbErrorCount (che includeva overload_sustained e
-    // pool.waiting, causando il feedback loop auto-latch DEGRADED).
-    const dbOverload =
-      poolActivePct >= thresholds.poolActivePct ||
-      (pingMs != null && pingMs >= thresholds.pingMs);
-
-    // dbErrorCount è tenuto solo per il display diagnostico nel pannello admin:
-    // conta Problems DB high/critical che NON sono già catturati in pool/ping.
+    // dbErrorCount: Problems DB high/critical reali — esclude gli ID derivati
+    // (overload_sustained, pool.waiting) che causavano il feedback loop.
+    // Questa è l'unica fonte di "errori DB" che influenza sia il display sia
+    // la formula dbOverload: circuiti aperti, errori di connessione, ecc.
     const dbErrorCount = snap.problems.filter(
       (p) =>
         p.source === "db" &&
         (p.severity === "high" || p.severity === "critical") &&
         !(p.id != null && OVERLOAD_DISPLAY_EXCLUDED_IDS.has(p.id)),
     ).length;
+
+    // Fase 5 — dbOverload include errori DB reali (non derivati) per non perdere
+    // segnali di incidente genuini (circuito aperto, errori di connessione ecc.).
+    // I Problem IDs derivati (overload_sustained, pool.waiting) sono già esclusi
+    // da dbErrorCount via OVERLOAD_DISPLAY_EXCLUDED_IDS → nessun feedback loop.
+    const dbOverload =
+      poolActivePct >= thresholds.poolActivePct ||
+      (pingMs != null && pingMs >= thresholds.pingMs) ||
+      dbErrorCount > 0;
 
     const backend = getBackendLoad();
 
