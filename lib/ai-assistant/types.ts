@@ -34,11 +34,11 @@ export interface AssistantProposedAction {
   confirmKey: string;
 }
 
-// Task #5197 — Le AI di BikerLink: Bowie (entry point), Horus (percorsi),
-// Ares (diagnostica, solo admin). Task #4 — Quebracho (coordinatore, solo admin).
-// Il server comunica CHI sta rispondendo.
+// Task #5197 — Le AI di BikerLink: Bowie (entry point), Horus (percorsi +
+// coordinatore job AI in background), Ares (diagnostica, solo admin).
+// Quebracho rimosso (Task #591 — unificato in Horus). Il server comunica CHI sta rispondendo.
 export interface AssistantPersona {
-  id: "bowie" | "horus" | "ares" | "quebracho";
+  id: "bowie" | "horus" | "ares";
   name: string;
 }
 

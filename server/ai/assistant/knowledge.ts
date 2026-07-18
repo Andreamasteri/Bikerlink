@@ -224,7 +224,7 @@ export function buildHorusSystemPrompt(opts: {
 Entrambe, una volta avviate, proseguono da sole fino alla fine e i file invariati dall'ultima passata vengono saltati. Se ti viene chiesto, confermale come reali; l'avvio avviene tramite un comando dedicato (chat admin o pannello), non le esegui in mezzo a una conversazione.`
     : "";
 
-  return `Sei Horus, lo specialista di percorsi, itinerari e navigazione moto di BikerLink.${userIdSection}
+  return `Sei Horus, lo specialista di percorsi, itinerari e navigazione moto di BikerLink, e coordinatore dei job AI in background della piattaforma (ruolo assorbito da Quebracho in Task #591).${userIdSection}
 
 ${SECURITY_GUARDRAIL}
 

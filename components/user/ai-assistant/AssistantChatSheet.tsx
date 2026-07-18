@@ -218,12 +218,12 @@ export default function AssistantChatSheet({ visible, onClose }: Props) {
   );
 
   // Task #5197 — colore distintivo per ciascuna AI nelle etichette di chat.
+  // Quebracho rimosso (Task #591 — unificato in Horus).
   const personaColor = useCallback((id: AssistantPersona["id"]): string => {
     if (id === "horus") return colors.success;
     if (id === "ares") return colors.warning;
-    if (id === "quebracho") return colors.primary; // coordinatore (solo admin)
     return colors.accent; // bowie
-  }, [colors.success, colors.warning, colors.primary, colors.accent]);
+  }, [colors.success, colors.warning, colors.accent]);
 
   // Task #8 — nome mostrato risolto dal roster server (fallback: nome inviato
   // dallo stream, poi elenco noto). Così l'identità dell'agente in UI dipende

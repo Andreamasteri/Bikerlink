@@ -1,6 +1,6 @@
 # Verifica completezza porting AI da BikerBlog → BikerLink (Task #21)
 
-Verifica sistematica che il sistema AI multi-agente (Bowie/Horus/Ares/Quebracho,
+Verifica sistematica che il sistema AI multi-agente (Bowie/Horus/Ares,
 tool-calling, streaming, memoria) sviluppato nel repo gemello **BikerBlog**
 durante il fermo di BikerLink sia stato portato in **BikerLink**.
 
@@ -91,15 +91,15 @@ mai prematuro. Corrisponde esattamente al fix E1 del contratto di parità BikerB
 task (porting AI) e a rischio regressione se toccate alla cieca → **non modificate**,
 segnalate come follow-up.
 
-## Ares / Quebracho / Nadir / VRAM
+## Ares / Nadir / VRAM (ex Quebracho → unificato in Horus, Task #591)
 
 | Capacità | Stato | Note |
 |---|---|---|
 | Ares (streaming, num_predict, CF-Access, composizione domanda) | ✅ Presente | `ares-client.ts`, `ares-question.ts` |
 | VRAM arbiter (evict/restore per Ares) | ✅ Presente | `lib/vram-arbiter.ts` `withAresVramPriority` |
-| Quebracho coordinatore (client dedicato, gate) | ✅ Presente | `quebracho-*.ts` |
-| Fallback cloud per Ares/Quebracho | ➖ Assente **per scelta** | Da memoria (`quebracho-coordinator-gate`, `ai-tri-persona-handoff`): Ares degrada con grazia, Quebracho no cloud. **Non un gap** |
-| **Nadir** — ricerca semantica manuale (`search_manual`), reindex, alert staleness-streak | ✅ Presente (Task #75) | `server/ai/nadir/*`, tool `search_manual` (Bowie/Horus nativo, Quebracho via injection pre-composizione), job notturno `jobs/nadir-nightly.ts`, pannello `app/admin/nadir.tsx`. **Divergenza deliberata:** riusa la pipeline embedding+HNSW locale invece di un servizio TC standalone `all-minilm` (vedi `nadir/constants.ts`) |
+| Quebracho coordinatore (rimosso) | ~~✅ Presente~~ → **rimosso Task #591** | Ruolo di coordinatore job AI assorbito da Horus. `quebracho-*.ts` deprecati. |
+| Fallback cloud per Ares | ➖ Assente **per scelta** | Ares degrada con grazia, nessun fallback cloud. **Non un gap** |
+| **Nadir** — ricerca semantica manuale (`search_manual`), reindex, alert staleness-streak | ✅ Presente (Task #75) | `server/ai/nadir/*`, tool `search_manual` (Bowie/Horus nativo), job notturno `jobs/nadir-nightly.ts`, pannello `app/admin/nadir.tsx`. **Divergenza deliberata:** riusa la pipeline embedding+HNSW locale invece di un servizio TC standalone `all-minilm` (vedi `nadir/constants.ts`) |
 | `check_vram_usage` tool + iniezione warning congestione nel prompt + isteresi | ➖ Assente (parziale: c'è l'arbiter, non il tool/prompt) | **Feature, report only** |
 | `coder-alert` | ➖ Assente | **Feature, report only** |
 | Tool agente: `remember_note`, `save_file`/`read_file`/`list_files`, `call_[agent]` delega, `typecheck`/`lint`/`sonar`/`search_code`/`git_log`/`architect` | ➖ Assente | BikerLink usa bridge + admin-actions. **Decisioni di architettura/prodotto, report only** |

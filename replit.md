@@ -8,7 +8,7 @@
 
 **BikerBlog** (`https://github.com/Andreamasteri/bikerblog`) è il progetto "costola" di
 BikerLink: mentre BikerLink era down, lo sviluppo dell'ecosistema (agenti AI
-Horus/Bowie/Quebracho/Nadir/Ares, AI-Hub, pipeline) è avvenuto lì. BikerLink deve poter
+Horus/Bowie/Nadir/Ares, AI-Hub, pipeline) è avvenuto lì. BikerLink deve poter
 consultare **sempre** lo stato corrente di quel repo come riferimento per il lavoro di
 allineamento/porting.
 

@@ -1,5 +1,7 @@
 # Diagnostica accesso ThinkCentre + secret (fase di scoperta)
 
+> ⚠️ **Nota di aggiornamento (Task #591):** Quebracho è stato rimosso dalla piattaforma. Il suo ruolo di coordinatore dei job AI è ora gestito direttamente da **Horus**. I riferimenti a Quebracho in questo documento sono storici e conservati come riferimento architetturale.
+
 > **Task #1 — Diagnostica accesso TC + secret.** Fase read-only.
 > Data scoperta: **2026-07-13**. Fonti: repo BikerLink (codice) + endpoint
 > `/_internal/agent-briefing` di BikerBlog (memoria agente, verificato live).
@@ -116,7 +118,7 @@ Endpoint Ollama **unico e condiviso** da tutti gli agenti:
 | **Horus**  | `qwen3:4b`          | Residente      | AI routing / analisi |
 | **Bowie**  | `qwen3:1.7b`        | Residente      | Assistente in-app |
 | **Nadir**  | `all-minilm`        | Residente      | Embedding / semantic search |
-| **Quebracho** | `granite4:tiny-h`| **CPU+RAM** (`num_gpu:0`) | ~4.5GB RAM, ~3.1s load |
+| ~~**Quebracho**~~ | ~~`granite4:tiny-h`~~| ~~**CPU+RAM**~~ | ⚠️ **Rimosso (Task #591)** — ruolo assorbito da Horus |
 | **Ares**   | `devstral:24b`      | Heavy on-demand | Evicts economy lineup, poi ripristina |
 
 > **DIVERGENZE rispetto al testo del task (da correggere nei secret):**
@@ -131,7 +133,7 @@ Endpoint Ollama **unico e condiviso** da tutti gli agenti:
 - **GPU ora abilitata** sul TC per gli agenti Ollama (driver/BIOS risolti).
   ~8.19GB VRAM totali.
 - Lineup residente ~6.1GB (Horus + Bowie + Nadir), headroom confortevole.
-- Quebracho forzato su CPU (`options.num_gpu:0`) — switch reversibile via flag.
+- ~~Quebracho forzato su CPU (`options.num_gpu:0`)~~ — ⚠️ Quebracho rimosso (Task #591).
 - Whisper (`bikerlink-whisper` Docker, faster_whisper/large-v2) è **CPU-only**,
   non compete per la VRAM.
 - **Alert GPU/VRAM dedicati** esistono lato BikerBlog. → **La topologia dei
@@ -209,12 +211,12 @@ secret):
 | `HORUS_OLLAMA_URL` | `https://ollama-tc.biker-link.net` |
 | `BOWIE_OLLAMA_URL` | `https://ollama-tc.biker-link.net` |
 | `ARES_OLLAMA_URL` | `https://ollama-tc.biker-link.net` (vedi §4 — Ares = modello heavy sul TC, non la vecchia macchina LAN) |
-| `QUEBRACHO_OLLAMA_URL` | `https://ollama-tc.biker-link.net` |
+| ~~`QUEBRACHO_OLLAMA_URL`~~ | ~~`https://ollama-tc.biker-link.net`~~ — ⚠️ rimosso (Task #591) |
 | `WHISPER_URL` | `https://whisper.biker-link.net` **(primario)** |
 | `HORUS_OLLAMA_MODEL` | `qwen3:4b` |
 | `BOWIE_OLLAMA_MODEL` | `qwen3:1.7b` |
 | `ARES_OLLAMA_MODEL` | `devstral:24b` |
-| `QUEBRACHO_OLLAMA_MODEL` | `granite4:tiny-h` |
+| ~~`QUEBRACHO_OLLAMA_MODEL`~~ | ~~`granite4:tiny-h`~~ — ⚠️ rimosso (Task #591) |
 
 > **Whisper URL — nome secret corretto:** i path runtime principali
 > (`server/routes/whisper.ts`, `server/ai/whisper-provider-config.ts`,
@@ -236,7 +238,7 @@ secret):
 | `HUB_GATE_TOKEN` | Gate AI Hub | token app-level AI Hub (lato BikerBlog/TC) |
 | `ANALYSIS_GATE_TOKEN` | Gate servizio analysis | token app-level analysis (lato TC) |
 | `THINKCENTRE_AGENT_TOKEN` | Agent token metrics/health-infra probes | agent sul TC |
-| `QUEBRACHO_GITHUB_TOKEN` | PAT GitHub per Quebracho | GitHub (fine-grained PAT — attenzione al prefisso `github_pat_` che il paste può perdere) |
+| ~~`QUEBRACHO_GITHUB_TOKEN`~~ | ~~PAT GitHub per Quebracho~~ — ⚠️ rimosso (Task #591) | — |
 | `ARES_SSH_KEY` | Chiave privata ed25519 per Ares (ProxyJump dal TC) | keypair agente Ares |
 | `ARES_LAN_IP` / `ARES_MAC` / `ARES_USER` | (opzionali) risoluzione IP/utente Ares | LAN; MAC noto `A8:E2:91:2C:90:6A`, user default `ares-agent`; IP dinamico |
 
@@ -263,12 +265,12 @@ Senza CF Access **nessuna** chiamata HTTP autenticata verso il TC funziona (tutt
 `HORUS_OLLAMA_URL` + `HORUS_OLLAMA_MODEL`, `BOWIE_OLLAMA_URL` +
 `BOWIE_OLLAMA_MODEL`, `THINKCENTRE_AGENT_TOKEN`.
 
-**🟡 Media (routing/geocoding + Quebracho + Ares):**
+**🟡 Media (routing/geocoding + Ares):**
 `GRAPHHOPPER_URL`, `VALHALLA_URL`, `NOMINATIM_URL`, `PHOTON_URL`,
 `WHISPER_URL` (primario; `THINKCENTRE_WHISPER_URL` opzionale),
-`QUEBRACHO_OLLAMA_URL` + `QUEBRACHO_OLLAMA_MODEL`,
-`ARES_OLLAMA_URL` + `ARES_OLLAMA_MODEL`, `QUEBRACHO_GITHUB_TOKEN`, `ARES_SSH_KEY`
+`ARES_OLLAMA_URL` + `ARES_OLLAMA_MODEL`, `ARES_SSH_KEY`
 (+ `ARES_LAN_IP/MAC/USER` opzionali — path Ares-LAN legacy, vedi §4).
+~~`QUEBRACHO_OLLAMA_URL`/`QUEBRACHO_OLLAMA_MODEL`/`QUEBRACHO_GITHUB_TOKEN`~~ — ⚠️ rimossi (Task #591).
 
 **🟢 Da valutare/pulire:** token Ollama per-agente legacy (opzionali);
 `OLLAMA_*` generici (legacy); record DNS `ollama.biker-link.net` (dashboard CF).

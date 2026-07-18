@@ -15,11 +15,12 @@ export interface AssistantRosterEntry {
 
 // Elenco noto (specchio di server/ai/assistant/roster.ts): usato SOLO come
 // degradazione quando il roster server non è disponibile.
+// Quebracho rimosso (Task #591 — unificato in Horus, che assorbe anche il
+// ruolo di coordinatore dei job AI in background).
 export const KNOWN_ASSISTANT_PERSONAS: AssistantRosterEntry[] = [
   { id: "bowie", name: "Bowie", adminOnly: false },
   { id: "horus", name: "Horus", adminOnly: false },
   { id: "ares", name: "Ares", adminOnly: true },
-  { id: "quebracho", name: "Quebracho", adminOnly: true },
 ];
 
 /** Nome canonico di una persona dal roster, con fallback all'elenco noto. */

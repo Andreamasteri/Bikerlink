@@ -1,5 +1,7 @@
 # Quebracho → Matching Coordinator wiring test
 
+> ⚠️ **Quebracho è stato rimosso (Task #591).** Questo documento è un resoconto storico del test di cablaggio eseguito quando Quebracho era ancora attivo. Il ruolo di coordinatore dei job AI è ora gestito direttamente da **Horus**. Il documento è conservato come riferimento architetturale.
+
 **Task #271 — moto reale verification**  
 **Date:** 2026-07-16  
 **Method:** Direct in-process tsx test script against the live dev server with TC online  
