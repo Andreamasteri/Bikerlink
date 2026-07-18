@@ -1402,6 +1402,12 @@ const translations: Record<string, string> = {
   "aiPlan.mic.transcribing": "Trascrizione in corso…",
   "aiPlan.mic.errorMic": "Errore microfono",
   "aiPlan.mic.noAudio": "Nessun audio rilevato",
+
+  "match.styleLabel.${label}": "__TODO__:match.styleLabel.${label}",
+  "tracking.fusion.${fusionMode}": "__TODO__:tracking.fusion.${fusionMode}",
+  "aiAssistant.status.thinking": "sta pensando…",
+  "aiAssistant.status.typing": "sta scrivendo…",
+  "aiAssistant.retry": "Riprova",
 };
 
 export default translations;
