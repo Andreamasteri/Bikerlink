@@ -83,10 +83,12 @@ const REQUEST_TIMEOUT_MS = 300_000;
 
 const DEFAULT_MODEL = AGENT_MODEL_DEFAULTS.horus;
 
-// Task #585 — HORUS_THINK=0 disabilita il ragionamento (default: think:true).
-// Stessa logica di horus-patch-scan.core.ts (Task #574).
-// Override CLI: impostare HORUS_THINK=0 prima di lanciare lo script per usare
-// think:false (veloce, nessun reasoning). num_predict ridotto a 600 se think:false.
+// Task #684 — con Ollama ≥0.30.11, `options.think` non funziona (content vuoto).
+// `think` va passato al livello TOP-LEVEL della request, non dentro `options`.
+// Default: think:true (HORUS_THINK=0 per disabilitare il ragionamento).
+// Con Ollama ≥0.30.11 e think top-level, il reasoning finisce in message.thinking
+// e message.content può essere vuoto → il fallback recupera message.thinking.
+// num_predict ridotto a 600 se think:false.
 const HORUS_THINK_ENABLED = process.env.HORUS_THINK !== "0";
 
 // ─── CLI args ─────────────────────────────────────────────────────────────────
@@ -259,10 +261,22 @@ async function collectDb(): Promise<DbSection[]> {
 
     // ── Parte 3: integrity e AI jobs ──
     {
+      // NOTA: violations_found in questa tabella è il conteggio al momento del run,
+      // NON il numero di violazioni attualmente aperte. Per il totale aperte usare
+      // la query "db_integrity_violations — conteggio aperte" qui sotto.
       title: "db_integrity_runs (ultimi 5)",
       query: db.execute(sql`
         SELECT trigger, violations_found, auto_fixed, manual_pending, expensive, run_at
         FROM db_integrity_runs ORDER BY run_at DESC LIMIT 5
+      `).catch(() => ({ rows: [] as unknown[] })),
+    },
+    {
+      // Conteggio diretto delle violazioni aperte — fonte di verità unica.
+      // Questo numero può differire da violations_found nei runs (storico per-run).
+      title: "db_integrity_violations — conteggio aperte (source of truth)",
+      query: db.execute(sql`
+        SELECT COUNT(*) AS open_violations_count
+        FROM db_integrity_violations WHERE status != 'resolved'
       `).catch(() => ({ rows: [] as unknown[] })),
     },
     {
@@ -726,10 +740,13 @@ async function callHorus(
       body: JSON.stringify({
         model,
         stream: false,
-        // Task #585 — think controllato da HORUS_THINK_ENABLED (env HORUS_THINK=0 → false).
-        // Default: true. num_predict ridotto a 600 se think:false (nessun reasoning).
-        // Il blocco <think>…</think> viene strippato da stripThinkBlock() più sotto.
-        options: { temperature: 0.2, think: HORUS_THINK_ENABLED, num_predict: HORUS_THINK_ENABLED ? 800 : 600 },
+        // Task #684 — Ollama ≥0.30.11: `think` deve essere TOP-LEVEL, non dentro `options`.
+        // Con options.think:true il content risulta vuoto (regression 0.30.11).
+        // Con think:false top-level il modello produce output diretto in message.content.
+        // Se think:true top-level, il reasoning finisce in message.thinking (content può
+        // essere vuoto) → il fallback sotto recupera message.thinking in quel caso.
+        think: HORUS_THINK_ENABLED,
+        options: { temperature: 0.2, num_predict: HORUS_THINK_ENABLED ? 800 : 600 },
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userContent },
@@ -743,14 +760,33 @@ async function callHorus(
     }
 
     interface OllamaResponse {
-      message?: { role: string; content: string };
+      message?: { role: string; content: string; thinking?: string };
       error?: string;
     }
 
     const data = (await res.json()) as OllamaResponse;
     if (data.error) throw new Error(`Ollama error: ${data.error}`);
-    const raw = data.message?.content?.trim();
-    if (!raw) throw new Error("Risposta vuota dal modello.");
+
+    // Fallback: Ollama ≥0.30.11 con think:true mette il reasoning in message.thinking
+    // e lascia message.content vuoto. Se content è assente/cortissimo, proviamo thinking.
+    let raw = data.message?.content?.trim() ?? "";
+    if (raw.length < 50 && data.message?.thinking) {
+      console.warn("  ⚠️  [callHorus] message.content vuoto/corto — uso message.thinking come fallback (Ollama ≥0.30.11 con think=true top-level).");
+      raw = data.message.thinking.trim();
+    }
+    if (!raw) throw new Error("Risposta vuota dal modello (né content né thinking presenti).");
+
+    // Guard anti-CoT: se l'output contiene artefatti di chain-of-thought grezzo, fail-fast.
+    const COT_MARKERS = ["Okay, let's", "let me work through", "let me tackle"];
+    const foundMarker = COT_MARKERS.find((m) => raw.includes(m));
+    if (foundMarker) {
+      throw new Error(
+        `Output contiene chain-of-thought grezzo (marker: "${foundMarker}"). ` +
+        "Il modello ha prodotto reasoning non strutturato. Verificare la versione Ollama e la configurazione think:. " +
+        "Impostare HORUS_THINK=0 per usare think=false (default è think=true).",
+      );
+    }
+
     return normalizeTaskSection(stripThinkBlock(raw));
   } finally {
     clearTimeout(timer);
