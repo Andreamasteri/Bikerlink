@@ -108,7 +108,7 @@ export const RETIRED_MODELS: Record<string, string> = {
   // Quebracho was unified into Horus (Task #591). The coordinator process no
   // longer exists; granite4:tiny-h must not be re-added without a matching
   // coordinator entry in server/lib/agent-constants.ts.
-  // check-hardcoded-agent-models: ok
+  // check-hardcoded-agent-models: ok — retired model registry, no longer in agent-constants.ts
   "granite4:tiny-h": "Quebracho (unified into Horus, Task #591) — no coordinator",
 };
 

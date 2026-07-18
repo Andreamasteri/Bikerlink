@@ -14,6 +14,7 @@ import {
   I18N_DIR, 
   SOURCE_LANG 
 } from "./translate-i18n.part2";
+import { AGENT_MODEL_DEFAULTS } from "../server/lib/agent-constants";
 
 async function main() {
   const flags = parseArgs(process.argv.slice(2));
@@ -25,8 +26,7 @@ async function main() {
     process.exit(1);
   }
   if (ollamaConfigured) {
-    // check-hardcoded-agent-models: ok — nome modello in label diagnostica console, non un default di produzione
-    console.log(`[i18n] Provider primario: Ollama (${process.env.BOWIE_OLLAMA_MODEL ?? "qwen3:1.7b"})${apiKey ? " — fallback OpenAI" : " — nessun fallback OpenAI (OPENAI_API_KEY mancante)"}`);
+    console.log(`[i18n] Provider primario: Ollama (${process.env.BOWIE_OLLAMA_MODEL ?? AGENT_MODEL_DEFAULTS.bowie})${apiKey ? " — fallback OpenAI" : " — nessun fallback OpenAI (OPENAI_API_KEY mancante)"}`);
   }
 
   const itPath = path.join(I18N_DIR, `${SOURCE_LANG}.ts`);
