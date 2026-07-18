@@ -85,6 +85,10 @@ args = "check-settings-route-order"
 task = "workflow.run"
 args = "check-vram-agent-map-drift"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "check-horus-think-hardcoded"
+
   [[workflows.workflow]]
   name = "Start App"
   mode = "parallel"
@@ -271,6 +275,17 @@ author = "agent"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "npx tsx scripts/check-vram-agent-map-drift.ts"
+
+[workflows.workflow.metadata]
+isValidation = true
+
+[[workflows.workflow]]
+name = "check-horus-think-hardcoded"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "bash scripts/check-horus-think-hardcoded.sh"
 
 [workflows.workflow.metadata]
 isValidation = true
