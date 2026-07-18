@@ -163,7 +163,7 @@ author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "npx tsx server/scripts/check-schema-migration-drift.ts && npx tsx server/scripts/check-migration-prefix-duplicates.ts && npx tsx scripts/check-index-drift.ts --static-only && bash scripts/check-bowie-pkg-drift.sh --warn-only"
+args = "npx tsx server/scripts/check-schema-migration-drift.ts && npx tsx server/scripts/check-migration-prefix-duplicates.ts && npx tsx scripts/check-index-drift.ts --static-only && bash scripts/check-bowie-pkg-drift.sh --warn-only && npx tsx scripts/check-vram-agent-map-drift.ts"
 
 [[workflows.workflow]]
 name = "secrets-scan"
