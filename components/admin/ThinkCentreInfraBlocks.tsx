@@ -302,11 +302,24 @@ export function UptimeKumaBlock({
   );
 }
 
+function AgentMapSourceBadge({ source }: { source: "default" | "pushed" | null }) {
+  if (source !== "default") return null;
+  return (
+    <View style={styles.agentMapWarn}>
+      <Ionicons name="warning-outline" size={12} color="#f59e0b" />
+      <Text style={styles.agentMapWarnText}>
+        Mappa agenti: sorgente di default — attende il re-push dall'api-server (fino a 6h dopo redeploy)
+      </Text>
+    </View>
+  );
+}
+
 export function AiHubBlock({
   service,
+  vramAgentMapSource,
   isLoading,
   hasError,
-}: { service?: SimpleServiceHealth; isLoading?: boolean; hasError?: boolean }) {
+}: { service?: SimpleServiceHealth; vramAgentMapSource?: "default" | "pushed" | null; isLoading?: boolean; hasError?: boolean }) {
   return (
     <InfraBlock
       serviceKey="aihub"
@@ -316,6 +329,7 @@ export function AiHubBlock({
       configNote="Aggiungere AI_HUB_URL e AI_HUB_GATE_TOKEN nei secret Replit. Il servizio gira su pm2 porta 4405 sul ThinkCentre." // pragma: allowlist secret
       isLoading={isLoading}
       hasError={hasError}
+      extraBody={<AgentMapSourceBadge source={vramAgentMapSource ?? null} />}
     />
   );
 }
@@ -424,6 +438,23 @@ const styles = StyleSheet.create({
     borderColor: "rgba(245, 158, 11, 0.2)",
   },
   configNoteText: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 10,
+    color: "#f59e0b",
+    flex: 1,
+    lineHeight: 14,
+  },
+  agentMapWarn: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 5,
+    padding: 8,
+    backgroundColor: "rgba(245, 158, 11, 0.06)",
+    borderRadius: 7,
+    borderWidth: 1,
+    borderColor: "rgba(245, 158, 11, 0.2)",
+  },
+  agentMapWarnText: {
     fontFamily: "Inter_400Regular",
     fontSize: 10,
     color: "#f59e0b",

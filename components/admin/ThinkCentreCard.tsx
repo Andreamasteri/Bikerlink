@@ -86,6 +86,8 @@ interface ThinkCentreHealth {
   /** Non-null only when the area resolver emits a non-info signal (SQL error). */
   areaResolverDetail?: AreaResolverDetail | null;
   maintenanceMode?: boolean;
+  /** Task #549 — "default" during pre-push window after ai-hub redeploy. */
+  aiHubVramAgentMapSource?: "default" | "pushed" | null;
   checkedAt: number;
 }
 
@@ -508,6 +510,7 @@ export function ThinkCentreCard({
           {!poweredOffActive && (
             <AiHubBlock
               service={error ? undefined : data?.services?.find((s) => s.key === "aihub")}
+              vramAgentMapSource={error ? null : (data?.aiHubVramAgentMapSource ?? null)}
               isLoading={isLoading}
               hasError={!!error}
             />

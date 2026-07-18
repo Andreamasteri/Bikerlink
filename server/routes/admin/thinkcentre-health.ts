@@ -512,6 +512,8 @@ router.get("/thinkcentre-health", async (_req: Request, res: ExpressResponse) =>
       nginxSymlinksWarning,
       areaResolverDetail,
       maintenanceMode: maintenance,
+      /** Task #549 — "default" during pre-push window after ai-hub redeploy; "pushed" once api-server has sent the map. */
+      aiHubVramAgentMapSource: aiHubInfra.vramAgentMapSource ?? null,
       checkedAt: Date.now(),
     });
   } catch (err: unknown) {

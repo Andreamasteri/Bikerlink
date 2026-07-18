@@ -14,7 +14,7 @@
  */
 
 import { tcpConnectDetailed } from "../../jobs/thinkcentre-monitor-probes";
-import { hubGet, isHubConfigured, getHubBaseUrl, HUB_HEALTH_TIMEOUT_MS } from "../../lib/ai-hub-client";
+import { hubGet, isHubConfigured, getHubBaseUrl, HUB_HEALTH_TIMEOUT_MS, HUB_VRAM_TIMEOUT_MS } from "../../lib/ai-hub-client";
 import {
   sanitizeError,
   maskUrl,
@@ -36,6 +36,8 @@ export interface InfraServiceHealth {
   error?: string;
   history: Array<{ timestamp: number; error: string }>;
   probeLog: ProbeLogEntry[];
+  /** Task #549 — "pushed" when api-server has sent agent-map; "default" during pre-push window. */
+  vramAgentMapSource?: "default" | "pushed" | null;
 }
 
 // ── Classificazione errore auth agente TC ──────────────────────────────────────
@@ -212,22 +214,29 @@ export async function probeUptimeKuma(): Promise<InfraServiceHealth> {
 // ── AI Hub ────────────────────────────────────────────────────────────────────
 // Probe verso {AI_HUB_URL}/health usando hubGet() che include automaticamente
 // X-Hub-Gate-Token + CF Access headers — consistente con ai-hub-collector.ts.
+// Also fetches /vram to read agentMapSource (Task #549).
 export async function probeAiHub(): Promise<InfraServiceHealth> {
   if (!isHubConfigured()) {
     return { configured: false, ok: false, latencyMs: null, url: null, history: getHistory("aihub"), probeLog: getProbeLog("aihub") };
   }
   const displayUrl = maskUrl(getHubBaseUrl());
   const t0 = Date.now();
-  const result = await hubGet("/health", undefined, HUB_HEALTH_TIMEOUT_MS);
+  const [healthResult, vramResult] = await Promise.all([
+    hubGet("/health", undefined, HUB_HEALTH_TIMEOUT_MS),
+    hubGet<{ agentMapSource?: string }>("/vram", undefined, HUB_VRAM_TIMEOUT_MS),
+  ]);
   const latencyMs = Date.now() - t0;
-  const healthy = result.ok && (result.data as { ok?: boolean } | undefined)?.ok !== false;
+  const healthy = healthResult.ok && (healthResult.data as { ok?: boolean } | undefined)?.ok !== false;
   if (!healthy) {
-    const error = result.error ?? (result.status ? `HTTP ${result.status}` : "unreachable");
+    const error = healthResult.error ?? (healthResult.status ? `HTTP ${healthResult.status}` : "unreachable");
     console.error("[thinkcentre-probe] ai-hub KO", { error });
     recordError("aihub", error);
     recordProbeLog("aihub", { timestamp: Date.now(), ok: false, latencyMs, detail: error });
     return { configured: true, ok: false, latencyMs, url: displayUrl, error, history: getHistory("aihub"), probeLog: getProbeLog("aihub") };
   }
-  recordProbeLog("aihub", { timestamp: Date.now(), ok: true, latencyMs, detail: "health OK" });
-  return { configured: true, ok: true, latencyMs, url: displayUrl, history: getHistory("aihub"), probeLog: getProbeLog("aihub") };
+  const rawSource = vramResult.ok ? (vramResult.data?.agentMapSource ?? null) : null;
+  const vramAgentMapSource: "default" | "pushed" | null =
+    rawSource === "pushed" ? "pushed" : rawSource === "default" ? "default" : null;
+  recordProbeLog("aihub", { timestamp: Date.now(), ok: true, latencyMs, detail: `health OK · agentMapSource=${vramAgentMapSource ?? "unknown"}` });
+  return { configured: true, ok: true, latencyMs, url: displayUrl, history: getHistory("aihub"), probeLog: getProbeLog("aihub"), vramAgentMapSource };
 }

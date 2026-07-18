@@ -259,8 +259,15 @@ function mountVramRoutes(app, opts) {
       const { breakdown, confidence } = buildBreakdown();
       const nvme = sys.readNvmeStats ? sys.readNvmeStats() : undefined;
       const pcieAer = sys.readPcieAer ? sys.readPcieAer() : undefined;
+      // "pushed" when the api-server has sent at least one POST /vram/agent-map entry;
+      // "default" during the pre-push window after an ai-hub redeploy.
+      const agentMapSource =
+        vramState.pushedAgentMap && Object.keys(vramState.pushedAgentMap).length > 0
+          ? "pushed"
+          : "default";
       const response = {
         ok: true,
+        agentMapSource,
         current: { usedMiB: mem.usedMiB, totalMiB: mem.totalMiB, pct, gpuUtil: mem.gpuUtil },
         peak24h: {
           usedMiB: peak.usedMiB,
