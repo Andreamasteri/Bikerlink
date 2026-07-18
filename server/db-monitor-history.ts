@@ -48,7 +48,13 @@ const CLEANUP_INTERVAL_MS = 6 * 60 * 60 * 1000; // ogni 6h
 // già catturati dalle metriche dirette.
 //   - db.db.overload_sustained: derived, mostrato già come consecutiveTicks
 //   - db.db.pool.waiting: già catturato in poolActivePct/poolWaiting
-const OVERLOAD_DISPLAY_EXCLUDED_IDS = new Set([
+//
+// ⚠️  CI GATE — db-overload-exclusion-set-coverage.test.ts verifica che ogni
+// segnale con origin="derived" e source="db" emesso dai collector sia presente
+// qui. Se aggiungi un nuovo segnale derivato (origin:"derived", source:"db")
+// a qualsiasi collector, DEVI aggiungere il suo Problem ID (= `${source}.${metric}`)
+// a questo set, altrimenti la test suite fallisce.
+export const OVERLOAD_DISPLAY_EXCLUDED_IDS = new Set([
   "db.db.overload_sustained",
   "db.db.pool.waiting",
 ]);
