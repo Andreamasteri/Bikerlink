@@ -71,6 +71,23 @@ bash "$SCRIPT_DIR/metro-cache-nightly.sh" &
 NIGHTLY_PID=$!
 cerbero_log "Job notturno Metro cache avviato (PID: $NIGHTLY_PID)"
 
+# ── Pulizia file temporanei curl-err di istanze precedenti ────────────────────
+# Se Cerbero è stato ucciso con SIGKILL mentre una probe era in volo, il file
+# /tmp/cerbero-health-curl-err.<PID-vecchio> non viene rimosso dalla funzione
+# cerbero_health_backend (l'rm -f non viene mai eseguito). La nuova istanza usa
+# il proprio PID → file diverso → il vecchio resta su disco.
+# Rimuoviamo all'avvio tutti i file curl-err che NON appartengono a questa
+# istanza (PID ≠ $$): sono per definizione stale.
+for _stale_f in /tmp/cerbero-health-curl-err.*; do
+  [ -f "$_stale_f" ] || continue
+  _stale_pid="${_stale_f##*.}"
+  if [ "$_stale_pid" != "$$" ]; then
+    rm -f "$_stale_f" 2>/dev/null || true
+    cerbero_log "STARTUP: rimosso file curl-err stale di istanza precedente: $_stale_f"
+  fi
+done
+unset _stale_f _stale_pid
+
 # ══ TESTA 1 — Backend: crash tracking + restart ═══════════════════════════════
 declare -a BACKEND_CRASH_TIMES=()
 BACKEND_BACKOFF_UNTIL=0
@@ -246,6 +263,7 @@ cerbero_log "  Crash loop: max ${MAX_CRASHES_IN_WINDOW}/${CRASH_WINDOW_SECS}s �
 cerbero_log "========================================="
 
 last_health_log=0
+last_tmp_cleanup=0
 check_count=0
 BOOT_TS=$(date +%s)
 
@@ -366,6 +384,27 @@ while [ "$RUNNING" -eq 1 ]; do
   check_count=$((check_count + 1))
   if [ $((check_count % 60)) -eq 0 ]; then
     cerbero_rotate_log
+  fi
+
+  # ── Pulizia periodica file curl-err stale (ogni ora) ────────────────────────
+  # Copre il caso in cui SIGKILL arrivi DOPO lo startup (es. OOM a runtime).
+  # Rimuove tutti i file /tmp/cerbero-health-curl-err.* non appartenenti a
+  # questa istanza (PID diverso da $) o più vecchi di 3600 secondi.
+  if [ $((now - last_tmp_cleanup)) -ge 3600 ]; then
+    for _old_f in /tmp/cerbero-health-curl-err.*; do
+      [ -f "$_old_f" ] || continue
+      _old_pid="${_old_f##*.}"
+      if [ "$_old_pid" != "$$" ]; then
+        rm -f "$_old_f" 2>/dev/null || true
+        cerbero_log "CLEANUP: rimosso file curl-err stale (PID $$ ≠ $_old_pid): $_old_f"
+      elif [ $((now - $(stat -c%Y "$_old_f" 2>/dev/null || echo 0))) -ge 3600 ]; then
+        # Stesso PID ma il file ha più di 1h: anomalia (probe bloccata?) → rimuovi.
+        rm -f "$_old_f" 2>/dev/null || true
+        cerbero_log "CLEANUP: rimosso file curl-err del PID corrente rimasto >1h: $_old_f"
+      fi
+    done
+    unset _old_f _old_pid
+    last_tmp_cleanup=$now
   fi
 
   sleep "$CHECK_INTERVAL"

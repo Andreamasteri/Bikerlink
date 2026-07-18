@@ -66,6 +66,13 @@ cerbero_health_backend() {
   # di loggare l'errore specifico (es. "Operation timed out", "Recv failure:
   # Connection reset by peer") con il nome dell'endpoint — equivalente di
   # req.on('error', ...) / res.on('error', ...) per probe bash.
+  #
+  # Nome FISSO derivato dal PID del processo Cerbero principale ($, che in una
+  # funzione bash non-subshell è il PID del processo padre, mai del subshell).
+  # Questo garantisce che ogni sessione Cerbero sovrascriva SEMPRE lo stesso
+  # file: se un'istanza precedente è stata uccisa con SIGKILL prima dell'rm,
+  # la nuova istanza usa un nome diverso (PID diverso) e cerbero.sh rimuove i
+  # file stale all'avvio + ogni ora — quindi non si accumulano.
   curl_err_file="/tmp/cerbero-health-curl-err.$$"
   body=$(curl -s --max-time 3 -w $'\n%{http_code}' \
     "http://localhost:$BACKEND_PORT/api/health" 2>"$curl_err_file")
