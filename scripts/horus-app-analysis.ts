@@ -34,13 +34,14 @@ import { fileURLToPath } from "url";
 import { db } from "../server/db";
 import { sql } from "drizzle-orm";
 import { cfAccessHeaders } from "../server/lib/cf-access";
+import { AGENT_MODEL_DEFAULTS } from "../server/lib/agent-constants";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, "..");
 
 // ─── Costanti ─────────────────────────────────────────────────────────────────
 
-const DEFAULT_MODEL = "qwen3:4b";
+const DEFAULT_MODEL = AGENT_MODEL_DEFAULTS.horus;
 const REQUEST_TIMEOUT_MS = 300_000;
 const DEFAULT_TAIL_LINES = 500;
 

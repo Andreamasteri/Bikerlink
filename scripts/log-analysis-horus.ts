@@ -36,6 +36,7 @@ import { fileURLToPath } from "url";
 import { db } from "../server/db";
 import { sql } from "drizzle-orm";
 import { cfAccessHeaders } from "../server/lib/cf-access";
+import { AGENT_MODEL_DEFAULTS } from "../server/lib/agent-constants";
 import { collectGitHub, collectSentry, collectGitHubRepoTree } from "./lib/horus-sources";
 import { estimateTokens, fmtSection, trimBundleToFit } from "./lib/horus-trim";
 import { normalizeTaskSection } from "./lib/horus-normalize";
@@ -79,7 +80,7 @@ const REDUCED_TAIL_LINES = 100;
 /** Timeout chiamata Horus (ms). Il qwen3:4b sul ThinkCentre impiega tipicamente 20-60s. */
 const REQUEST_TIMEOUT_MS = 300_000;
 
-const DEFAULT_MODEL = "qwen3:4b";
+const DEFAULT_MODEL = AGENT_MODEL_DEFAULTS.horus;
 
 // ─── CLI args ─────────────────────────────────────────────────────────────────
 

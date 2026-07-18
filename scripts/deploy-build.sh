@@ -209,7 +209,30 @@ else
   exit 1
 fi
 
-log "=== [1f/3] Verifica versioni stabili dipendenze critiche (non-bloccante) ==="
+log "=== [1f/3] Gate Hardcoded Agent Model Names ==="
+# Verifica che nessun file .ts/.tsx fuori da server/lib/agent-constants.ts
+# contenga i nomi dei modelli Ollama come letterali stringa hardcoded.
+# La sorgente di verità è AGENT_MODEL_DEFAULTS in agent-constants.ts;
+# ogni callsite deve importare da lì invece di duplicare il default.
+#
+# Modelli rilevati: qwen3:1.7b (Bowie), qwen3:4b (Horus), granite4:tiny-h
+# (Quebracho), all-minilm (Nadir), devstral:latest (Ares).
+#
+# Soppressione (riga precedente al letterale):
+#   // check-hardcoded-agent-models: ok
+HARDCODED_MODELS_EXIT=0
+bash scripts/check-hardcoded-agent-models.sh 2>&1 || HARDCODED_MODELS_EXIT=$?
+if [ "$HARDCODED_MODELS_EXIT" -eq 0 ]; then
+  log "  ✅ Hardcoded Agent Models OK — nessun nome modello hardcoded fuori da agent-constants.ts."
+else
+  log "  ❌ DEPLOY BLOCCATO — nome modello Ollama hardcoded rilevato fuori da agent-constants.ts (exit ${HARDCODED_MODELS_EXIT})."
+  log "     Fix: importare AGENT_MODEL_DEFAULTS da server/lib/agent-constants.ts"
+  log "     e usare il default da lì invece del letterale stringa."
+  log "     Dettagli: bash scripts/check-hardcoded-agent-models.sh"
+  exit 1
+fi
+
+log "=== [1g/3] Verifica versioni stabili dipendenze critiche (non-bloccante) ==="
 # Avvisa se esistono versioni major/minor più recenti per le dipendenze critiche.
 # Non blocca il deploy: exit sempre 0.
 # Interroga il registry npm — se la rete è irraggiungibile, lo step viene saltato

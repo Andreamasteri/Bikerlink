@@ -25,6 +25,7 @@ async function main() {
     process.exit(1);
   }
   if (ollamaConfigured) {
+    // check-hardcoded-agent-models: ok — nome modello in label diagnostica console, non un default di produzione
     console.log(`[i18n] Provider primario: Ollama (${process.env.BOWIE_OLLAMA_MODEL ?? "qwen3:1.7b"})${apiKey ? " — fallback OpenAI" : " — nessun fallback OpenAI (OPENAI_API_KEY mancante)"}`);
   }
 
