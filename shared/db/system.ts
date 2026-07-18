@@ -8,7 +8,6 @@ import {
   timestamp,
   jsonb,
   index,
-  uniqueIndex,
   serial,
 } from "drizzle-orm/pg-core";
 import { z } from "zod";
@@ -156,10 +155,11 @@ export const appCrashLogs = pgTable("app_crash_logs", {
   index("app_crash_logs_user_id_idx").on(table.userId),
   index("app_crash_logs_crash_type_idx").on(table.crashType),
   index("app_crash_logs_reported_at_idx").on(table.reportedAt),
-  // Task #578 — UNIQUE (non plain) per far funzionare onConflictDoNothing() e
-  // Task #578 — dedup per-user: (user_id, session_id, crash_type) evita collisioni
-  // cross-user quando session_id cade al valore fallback "unknown".
-  uniqueIndex("app_crash_logs_user_session_crash_type_uidx").on(table.userId, table.sessionId, table.crashType),
+  // NOTA: l'indice UNIQUE (user_id, session_id, crash_type) NON è definito qui
+  // perché Replit userebbe il diff schema→prod per crearlo direttamente, bypassando
+  // il DELETE-dedup incluso in migrations/0150_crash_logs_unique_session_crash_type.sql.
+  // L'indice viene creato dalla migration 0150 al primo boot in prod (dopo il dedup).
+  // Ref: pattern HNSW — indici che richiedono pre-processing non vanno nel schema Drizzle.
 ]);
 
 export type Notification = typeof notifications.$inferSelect;
