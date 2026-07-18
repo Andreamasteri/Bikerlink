@@ -89,6 +89,10 @@ args = "check-vram-agent-map-drift"
 task = "workflow.run"
 args = "check-horus-think-hardcoded"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "check-quebracho-stale"
+
   [[workflows.workflow]]
   name = "Start App"
   mode = "parallel"
@@ -286,6 +290,17 @@ author = "agent"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "bash scripts/check-horus-think-hardcoded.sh"
+
+[workflows.workflow.metadata]
+isValidation = true
+
+[[workflows.workflow]]
+name = "check-quebracho-stale"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "bash scripts/check-quebracho-stale.sh"
 
 [workflows.workflow.metadata]
 isValidation = true
