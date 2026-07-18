@@ -178,13 +178,12 @@ export async function decideEngineWithAI(
       const ollamaController = new AbortController();
       const ollamaTimer = setTimeout(() => ollamaController.abort(), effectiveOllamaMs);
       try {
-        // Task #275 — qwen3 (BOWIE_OLLAMA_MODEL) emette token <think>…</think> per
-        // default che rompono il parsing JSON. think:false disattiva il ragionamento
-        // esplicito, seguendo la stessa convenzione già usata in generateStructured()
-        // (provider.ts ~riga 513). Senza questo flag generateObject fallisce sempre con
-        // un errore di validazione schema → il decider scala a cloud (disabilitato) →
-        // ricade sul deterministico → "Modalità AI" non si attiva mai.
-        // check-ai-direct-generateobject: safe — Ollama supports json_schema natively (not via runWithFallback)
+        // Task #584 — think controllato da HORUS_THINK env (HORUS_THINK=0 → false).
+        // Default: true — ollama-ai-provider-v2 isola il reasoning nel campo `thinking`
+        // separato, il JSON strutturato resta pulito. num_predict ridotto a 600 se
+        // think:false (nessun reasoning, risposte più brevi).
+        const HORUS_THINK_ENABLED = process.env.HORUS_THINK !== "0";
+        // check-ai-direct-generateobject: safe — check-ai-direct-generateobject: ollama-no-think-ok — Ollama json_schema native; think via HORUS_THINK_ENABLED
         const result = await generateObject({
           model: om.model,
           schema: decisionSchema,
@@ -192,7 +191,7 @@ export async function decideEngineWithAI(
           prompt: JSON.stringify(ctx),
           temperature: 0,
           abortSignal: ollamaController.signal,
-          providerOptions: { ollama: { think: false } },
+          providerOptions: { ollama: { think: HORUS_THINK_ENABLED, num_predict: HORUS_THINK_ENABLED ? 800 : 600 } },
         });
         clearTimeout(ollamaTimer);
         clearTimeout(globalTimer);

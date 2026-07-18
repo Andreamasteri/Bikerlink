@@ -150,9 +150,13 @@ describe("horus routing proposer (Task #25)", () => {
     expect(out).not.toBeNull();
     expect(out!.proposals).toHaveLength(1);
     // Prompt di sistema DEDICATO (voce di Horus), non quello generico.
-    const [, callOpts] = generateStructuredMock.mock.calls[0] as [unknown, { system: string; prompt: string }];
+    const [, callOpts] = generateStructuredMock.mock.calls[0] as [unknown, { system: string; prompt: string; providerOptions?: Record<string, Record<string, unknown>> }];
     expect(callOpts.system).toContain("Horus");
     expect(callOpts.prompt).toContain("valhalla");
+
+    // Task #584 — think:true: il chiamante segnala esplicitamente think:true per Ollama.
+    // generateStructured rispetta l'override del chiamante (caller wins via spread).
+    expect(callOpts.providerOptions).toMatchObject({ ollama: { think: true } });
 
     // Scritta con lo stesso meccanismo + firma persona:"horus".
     expect(writeWatchdogLogMock).toHaveBeenCalledTimes(1);

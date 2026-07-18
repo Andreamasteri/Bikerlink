@@ -504,9 +504,11 @@ export async function generateStructured<T>(
   m: ResolvedModel,
   opts: StructuredGenOpts<T>,
 ): Promise<StructuredGenResult<T>> {
-  // Ollama (Bowie=qwen3:1.7b) "pensa" di default: disattiviamo il ragionamento
-  // esplicito quando genera JSON strutturato, altrimenti i blocchi <think>
-  // rompono il parsing. Rispetta eventuali override espliciti del chiamante.
+  // Ollama default: think:false per sicurezza (modelli non-qwen3 o provider
+  // meno aggiornati). I callsite Horus (horus-proposer, ai-engine-decider)
+  // passano esplicitamente think:true perché ollama-ai-provider-v2 isola il
+  // reasoning nel campo `thinking` separato, lasciando il JSON pulito.
+  // Il chiamante vince sempre (spread: caller opts sovrascrivono il default).
   const providerOptions =
     m.id === "ollama"
       ? {

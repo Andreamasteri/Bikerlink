@@ -167,15 +167,18 @@ export async function runHorusRoutingProposer(snap: HealthSnapshot): Promise<Hor
     return await withBudget("triage", async () => {
       const started = Date.now();
 
+      // Task #584 — think controllato da HORUS_THINK env (HORUS_THINK=0 → false).
+      // Default: true — ollama-ai-provider-v2 isola il reasoning nel campo `thinking`
+      // separato, il JSON strutturato resta pulito. num_predict ridotto a 600 se
+      // think:false (nessun reasoning, risposte più brevi).
+      const HORUS_THINK_ENABLED = process.env.HORUS_THINK !== "0";
       const callModel = (mm: ResolvedModel) =>
         mm.scheduler(() => generateStructured(mm, {
           schema: proposalsSchema,
           system: HORUS_PROPOSER_SYSTEM,
           prompt,
           temperature: 0.2,
-          // qwen3:4b "pensa" di default: disattiviamo il ragionamento esplicito
-          // per non corrompere il JSON strutturato (innocuo per gli altri modelli).
-          providerOptions: { ollama: { think: false } },
+          providerOptions: { ollama: { think: HORUS_THINK_ENABLED, num_predict: HORUS_THINK_ENABLED ? 800 : 600 } },
         }));
 
       // Step 0 — modello di Horus (Ollama sul ThinkCentre). Se TC è offline o il

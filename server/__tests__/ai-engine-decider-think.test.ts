@@ -1,10 +1,10 @@
 /**
- * Test suite — decideEngineWithAI: think:false per Ollama (Task #275)
+ * Test suite — decideEngineWithAI: think:true per Ollama (Task #584)
  *
  * Verifica che la chiamata generateObject verso Ollama includa sempre
- * `providerOptions: { ollama: { think: false } }` in modo che qwen3:1.7b
- * (BOWIE_OLLAMA_MODEL) non emetta token <think>…</think> che rompono
- * il parsing dello schema Zod.
+ * `providerOptions: { ollama: { think: true } }`: ollama-ai-provider-v2
+ * isola il reasoning nel campo `thinking` separato, lasciando il JSON
+ * strutturato pulito per la validazione schema Zod.
  *
  * Mock: ai (generateObject), ai/moderation/provider (tryBuildOllama),
  *       ai/ai-priority-gate, ai/fallback-switch, routing-metrics.
@@ -107,10 +107,10 @@ beforeEach(() => {
 });
 
 // ---------------------------------------------------------------------------
-// Suite principale: think:false
+// Suite principale: think:true (Task #584)
 // ---------------------------------------------------------------------------
-describe("decideEngineWithAI — think:false per Ollama", () => {
-  it("passa providerOptions: { ollama: { think: false } } a generateObject", async () => {
+describe("decideEngineWithAI — think:true per Ollama", () => {
+  it("passa providerOptions: { ollama: { think: true } } a generateObject", async () => {
     providerMocks.tryBuildOllama.mockReturnValue({
       id: "ollama",
       providerName: "ollama",
@@ -125,7 +125,7 @@ describe("decideEngineWithAI — think:false per Ollama", () => {
     expect(aiMocks.generateObject).toHaveBeenCalledTimes(1);
     const callArgs = aiMocks.generateObject.mock.calls[0][0] as Record<string, unknown>;
     expect(callArgs).toMatchObject({
-      providerOptions: { ollama: { think: false } },
+      providerOptions: { ollama: { think: true } },
     });
   });
 
