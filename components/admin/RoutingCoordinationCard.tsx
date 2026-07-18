@@ -114,7 +114,7 @@ function overallColor(summary: PipelineSummary | undefined): string {
   return "#22c55e";
 }
 
-function metricsToStatus(
+export function metricsToStatus(
   metrics: RoutingStatusResponse["metrics"] | undefined,
   killSwitch: RoutingStatusResponse["killSwitch"] | undefined,
 ): DotStatus {

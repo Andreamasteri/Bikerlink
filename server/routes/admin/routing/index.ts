@@ -41,6 +41,25 @@ import { sendError } from "../../../lib/api-response";
 
 const router = Router();
 
+/**
+ * Calcola lo stato del pallino routing (usato da GET /status e testabile in isolamento).
+ *
+ * Logica:
+ * - Se non ci sono richieste nella finestra di 5 min, lo stato dipende dalla config:
+ *   "ok" se il routing è abilitato (idle ma attivo), "offline" se il kill-switch è spento.
+ * - Se ci sono richieste: "offline" se ci sono failure, "degraded" se solo fallback, "ok" altrimenti.
+ */
+export function computeRoutingDot(
+  killSwitchEnabled: boolean,
+  counters: { successes: number; fallbacks: number; failures: number },
+): "ok" | "degraded" | "offline" {
+  const total = counters.successes + counters.fallbacks + counters.failures;
+  if (total === 0) return killSwitchEnabled ? "ok" : "offline";
+  if (counters.failures > 0) return "offline";
+  if (counters.fallbacks > 0) return "degraded";
+  return "ok";
+}
+
 // Coordinate di prova: Mira (VE) → Belluno (BL) (~70 km, all'interno della copertura Nord-Est).
 const MIRA: [number, number] = [12.128, 45.43];
 const BELLUNO: [number, number] = [12.216, 46.1411];
@@ -117,15 +136,7 @@ router.get("/status", async (_req: Request, res: Response) => {
   const { successes = 0, fallbacks = 0, failures = 0 } = counters as {
     successes?: number; fallbacks?: number; failures?: number;
   };
-  const routingTotal = successes + fallbacks + failures;
-  // Se non ci sono richieste nella finestra di 5 min, lo stato del pallino dipende
-  // dalla configurazione: "ok" se il routing è abilitato (idle ma attivo),
-  // "offline" se il kill-switch è disattivo (esplicitamente spento).
-  const routingDot =
-    routingTotal === 0
-      ? (killSwitch.enabled ? "ok" : "offline")
-      : failures > 0 ? "offline"
-      : fallbacks > 0 ? "degraded" : "ok";
+  const routingDot = computeRoutingDot(killSwitch.enabled, { successes, fallbacks, failures });
   updateSystemStatus({ routing: routingDot });
 
   return res.json({
