@@ -249,6 +249,12 @@ export function deriveProblems(signals: Signal[]): Problem[] {
       const engine = s.metric.split(".")[2];
       title = `Routing engine ${engine} health-check KO`;
       suggestion = `Pinga manualmente ${engine}, verifica DNS/firewall.`;
+    } else if (s.metric === "dragonfly_blocked") {
+      const det = s.details as { consecutiveCount?: number; thresholdMin?: number } | undefined;
+      const blockedMin = s.value ?? "?";
+      const threshold = det?.thresholdMin ?? 60;
+      title = `Map-matching bloccato da ${blockedMin}min — lock DragonflyDB rifiutato (soglia: ${threshold}min)`;
+      suggestion = "DragonflyDB rifiuta il lock distribuito — il ciclo di matching non parte. Verifica stato DragonflyDB (TC_DRAGONFLY_URL), riavvia il servizio DragonflyDB sul ThinkCentre o forza l'unlock dal pannello admin matching.";
     } else if (s.metric === "matching.last_run_h") {
       title = `Map-matching: ultimo run ${s.value}h fa`;
     } else if (s.metric === "matching.pending") {
@@ -426,6 +432,9 @@ const OUTAGE_DOWNSTREAM_IDS = new Set<string>([
   // Task #392 — errore SQL nel resolver dell'area (pre-GH): con TC spento il DB
   // PostGIS potrebbe essere irraggiungibile → downstream, non azionabile.
   "horus.routing.area_resolver.error",
+  // Task #575 — lock DragonflyDB (su TC): con TC spento il lock non è acquisibile
+  // → il blocco matching è un effetto downstream atteso, non un nuovo incidente.
+  "matching.dragonfly_blocked",
 ]);
 
 function isOutageDownstreamProblem(id: string): boolean {

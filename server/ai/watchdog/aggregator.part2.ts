@@ -27,6 +27,7 @@ import { collectRoutingCorrectness } from "./collectors/routing-correctness-coll
 import { collectOverload } from "./collectors/overload-collector";
 import { collectAiHub } from "./collectors/ai-hub-collector";
 import { collectTcReboot } from "./collectors/tc-reboot-collector";
+import { collectMatchingDragonflyBlocked } from "./collectors/matching-dragonfly-blocked-collector";
 import { withBgDbSlot } from "../../lib/bg-db-limiter";
 import { isThinkCentreOffline } from "../../lib/thinkcentre-offline";
 import { setHealthState } from "../../lib/health-arbiter";
@@ -133,6 +134,9 @@ async function runAggregatorCycleInner(): Promise<HealthSnapshot> {
     withBgDbSlot(() => collectRestarts()),
     withBgDbSlot(() => collectAdsOrphanSignals()),
     withBgDbSlot(() => collectCrashSignals()),
+    // Task #575 — blocco matching da lock DragonflyDB. Zero I/O di rete; una
+    // sola query AppSetting (cachata 10min) → dentro withBgDbSlot.
+    withBgDbSlot(() => collectMatchingDragonflyBlocked()),
   ]);
   const signals: Signal[] = [];
   for (const r of collectors) {

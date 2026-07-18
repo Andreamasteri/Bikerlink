@@ -3,7 +3,7 @@ import { z } from "zod";
 
 export type HealthStatus = "green" | "yellow" | "orange" | "red";
 export type Severity = "info" | "warn" | "high" | "critical";
-export type SignalSource = "bullmq" | "scheduler" | "db" | "dragonfly" | "latency" | "error" | "app" | "maps" | "embedding" | "horus" | "ai_hub" | "tc";
+export type SignalSource = "bullmq" | "scheduler" | "db" | "dragonfly" | "latency" | "error" | "app" | "maps" | "embedding" | "horus" | "ai_hub" | "tc" | "matching";
 
 export interface Signal {
   source: SignalSource;

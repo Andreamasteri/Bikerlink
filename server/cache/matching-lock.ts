@@ -175,6 +175,35 @@ export function forceUnlockMatchingLock(): { wasHeld: boolean; holder: Holder | 
   return { wasHeld, holder };
 }
 
+/**
+ * Returns a snapshot of consecutive "rejected" events with source "dragonfly"
+ * at the tail of the in-process lock history.
+ *
+ * Used by the matching-dragonfly-blocked collector to detect prolonged blocking.
+ * The history is capped at HISTORY_MAX (10) entries; the collector maintains its
+ * own `blockedSinceAt` latch so long outages aren't missed when the streak is
+ * older than the buffer.
+ */
+export function getDragonflyRejectionStreak(): {
+  /** Timestamp (ms) of the most-recent dragonfly rejection, or null if the tail is not a dragonfly rejection. */
+  mostRecentRejectedAt: number | null;
+  /** Number of consecutive dragonfly rejections at the tail of the history buffer. */
+  consecutiveCount: number;
+} {
+  let count = 0;
+  let mostRecentRejectedAt: number | null = null;
+  for (let i = history.length - 1; i >= 0; i--) {
+    const entry = history[i];
+    if (entry.event === "rejected" && entry.source === "dragonfly") {
+      count++;
+      if (mostRecentRejectedAt === null) mostRecentRejectedAt = new Date(entry.at).getTime();
+    } else {
+      break;
+    }
+  }
+  return { mostRecentRejectedAt, consecutiveCount: count };
+}
+
 export async function getMatchingLockStatus() {
   const r = getRawRedis();
   let redisLock: { exists: boolean; ttlSeconds: number | null; remoteHolder: unknown } = { exists: false, ttlSeconds: null, remoteHolder: null };

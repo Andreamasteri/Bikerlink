@@ -31,6 +31,12 @@ let lastKnownAdminTokenCount = -1; // -1 = non ancora campionato
 // Il latch viene consumato (riportato a false) quando la push di rientro parte.
 let dbOverloadAlertSent = false;
 let backendOverloadAlertSent = false;
+// Task #575 — latch per il blocco matching da lock DragonflyDB. Stesso schema
+// dei latch overload: la push di rientro ("✅ matching ripristinato") viene
+// inviata SOLO se lo start alert era stato realmente emesso, così l'admin non
+// riceve un "all-clear" per un blocco mai notificato (es. TC spento sopprimeva
+// il segnale a "warn" prima che la soglia 60min venisse raggiunta).
+let matchingDragonflyBlockedAlertSent = false;
 
 interface AdminWsBroadcast { (msg: { type: string; payload: unknown }): void }
 let wsBroadcast: AdminWsBroadcast | null = null;
@@ -396,6 +402,62 @@ export async function dispatchAlerts(snap: HealthSnapshot): Promise<{ sent: numb
     }
   }
 
+  // Map-matching bloccato da lock DragonflyDB (Task #575) — segnale "high"
+  // emesso dal matching-dragonfly-blocked-collector quando il matching non
+  // parte da > soglia perché Redlock.acquire() fallisce con DragonflyDB
+  // parzialmente irraggiungibile (isRedisAvailable()=true ma ping fallisce).
+  // Severity "high" (non critical) → NON catturato dal loop critical-only
+  // sotto: serve un blocco dedicato per garantire la push.
+  const matchingDragonflyBlockedProblem = snap.problems.find(
+    (p) => p.id === "matching.dragonfly_blocked" && p.severity === "high",
+  );
+  if (matchingDragonflyBlockedProblem) {
+    matchingDragonflyBlockedAlertSent = true;
+    await emitWatchdogAlert({ problem: matchingDragonflyBlockedProblem, score: snap.score, status: snap.status });
+    if (shouldSend("matching.dragonfly_blocked")) {
+      let detail: { blockedSinceAt?: string; consecutiveCount?: number; thresholdMin?: number } = {};
+      try { detail = JSON.parse(matchingDragonflyBlockedProblem.detail ?? "{}"); } catch { /* use defaults */ }
+      const blockedMin = snap.metrics["matching.dragonfly_blocked"] ?? "?";
+      const threshold = detail.thresholdMin ?? 60;
+      const n = await sendSystemAlertPushToAdmins(
+        `🔒 Map-matching bloccato da ${blockedMin}min`,
+        `Il lock distribuito DragonflyDB rifiuta l'acquisizione — nessun ciclo matching è partito da ${blockedMin}min (soglia: ${threshold}min). Verifica DragonflyDB sul ThinkCentre.`,
+        { type: "watchdog_matching_dragonfly_blocked", blockedMin, thresholdMin: threshold, score: snap.score },
+      );
+      sentCount += n;
+      await writeWatchdogLog({
+        kind: "alert", scope: "matching.dragonfly_blocked", status: "ok",
+        summary: `Alert map-matching bloccato da ${blockedMin}min (lock DragonflyDB) inviato a ${n} admin`,
+        details: { sent: n, blockedMin, thresholdMin: threshold, blockedSinceAt: detail.blockedSinceAt },
+      });
+    }
+  }
+
+  // Rientro dal blocco matching DragonflyDB (Task #575) — il collector emette
+  // un segnale info "matching.dragonfly_blocked_recovered" quando i rifiuti
+  // cessano e il matching torna a cicl are. Info → non è un Problem: lo leggiamo
+  // dai metrics dello snapshot. Gate latch: la push di rientro parte SOLO se
+  // lo start alert era stato realmente emesso.
+  if (
+    snap.metrics["matching.dragonfly_blocked_recovered"] != null &&
+    matchingDragonflyBlockedAlertSent &&
+    shouldSend("matching.dragonfly_blocked_recovered")
+  ) {
+    matchingDragonflyBlockedAlertSent = false;
+    const blockedMin = snap.metrics["matching.dragonfly_blocked_recovered"] ?? "?";
+    const n = await sendSystemAlertPushToAdmins(
+      `✅ Map-matching ripristinato — lock DragonflyDB sbloccato`,
+      `Il ciclo di matching è tornato operativo dopo un blocco di ${blockedMin}min causato dal lock distribuito DragonflyDB.`,
+      { type: "watchdog_matching_dragonfly_recovered", blockedMin, score: snap.score },
+    );
+    sentCount += n;
+    await writeWatchdogLog({
+      kind: "alert", scope: "matching.dragonfly_blocked_recovered", status: "ok",
+      summary: `Alert rientro map-matching (lock DragonflyDB) inviato a ${n} admin`,
+      details: { sent: n, blockedMin },
+    });
+  }
+
   // Problem-level (critical singoli — pool exhaustion e network_instability già gestite sopra)
   for (const p of snap.problems) {
     if (p.severity !== "critical") continue;
@@ -435,5 +497,6 @@ export function _resetThrottleForTests(): void {
   sent.clear();
   dbOverloadAlertSent = false;
   backendOverloadAlertSent = false;
+  matchingDragonflyBlockedAlertSent = false;
   lastKnownAdminTokenCount = -1;
 }
