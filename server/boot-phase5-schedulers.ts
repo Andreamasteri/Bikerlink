@@ -382,23 +382,16 @@ export async function runPhase5Schedulers(): Promise<void> {
   await arm("horus-coordinator-loop", async () => {
     const { hydrateRegistryFromDb, resetRunningJobsOnStartup } = await import("./ai/coordinator/job-registry");
     const { startHorusCoordinatorLoop } = await import("./ai/coordinator/horus-coordinator-loop");
-    // Cleanup: remove stale Quebracho directives from DB (no longer valid).
+    // Cleanup: remove stale Quebracho app_settings key from DB (no longer valid).
+    // Note: the `directive` table and `issued_by` column on ai_coordinator_jobs never
+    // existed in migrations, so only the app_settings key needs to be cleared.
     try {
       const { db } = await import("./db");
       const { sql } = await import("drizzle-orm");
-      await db.execute(sql`DELETE FROM directive WHERE issued_by = 'quebracho'`);
-      await db.execute(sql`DELETE FROM ai_coordinator_jobs WHERE issued_by = 'quebracho'`);
       await db.execute(sql`DELETE FROM app_settings WHERE key = 'matching_coordinator_directive:quebracho'`);
-      // Integrity check
-      const result = await db.execute(sql`SELECT COUNT(*) AS n FROM directive WHERE issued_by = 'quebracho'`);
-      const remaining = Number((result.rows?.[0] as Record<string, unknown>)?.n ?? 0);
-      if (remaining > 0) {
-        console.warn(`[INIT] Task #591: ${remaining} Quebracho directive(s) remain after cleanup — manual intervention may be needed.`);
-      } else {
-        console.log("[INIT] Task #591: Quebracho directives cleanup complete.");
-      }
+      console.log("[INIT] Task #591: Quebracho app_settings cleanup complete (0 rows expected).");
     } catch (cleanupErr) {
-      console.warn("[INIT] Task #591: Quebracho directive cleanup failed (non-fatal):", cleanupErr);
+      console.warn("[INIT] Task #591: Quebracho app_settings cleanup failed (non-fatal):", cleanupErr);
     }
     await hydrateRegistryFromDb();
     // Reset zombie: jobs still "running" in DB after hydration are reset to idle.
