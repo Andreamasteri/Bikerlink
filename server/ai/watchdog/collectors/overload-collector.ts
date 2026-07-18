@@ -3,7 +3,7 @@
 // Il Database Monitor calcola già, a ogni tick, se il DB è sovraccarico (pool
 // saturo / ping alto / errori DB) e se il backend Node è sovraccarico (event-loop
 // lag / CPU). recordDbMonitorSample conta i tick consecutivi e, dopo una finestra
-// sostenuta, marca lo stato come `sustained` in getSustainedOverloadState().
+// sostenuta, marca lo stato come `sustained` nel sustainedTracker.
 //
 // Qui traduciamo quello stato in Signal[] "high" DISTINTI per lato (DB vs
 // backend), così deriveProblems crea due Problem con id stabile e alerts.ts può
@@ -11,21 +11,21 @@
 // throttle). Zero-I/O: legge solo lo snapshot in memoria depositato al tick
 // precedente da recordDbMonitorSample (stesso pattern deposit→next-tick del
 // pool-collector).
-import { getSustainedOverloadState, resetSustainedOverloadState } from "../../../db-monitor-history";
+import { sustainedTracker } from "../state/sustained-tracker";
 import type { Signal } from "../types";
 
 // Task #154 — Reset dello stato di sovraccarico sostenuto. Questo collector è
-// zero-state: legge lo snapshot depositato da recordDbMonitorSample in
-// db-monitor-history, dove vivono i contatori/latch. Delega quindi il reset a
-// quel modulo. Idempotente, nessun I/O.
+// zero-state: legge lo snapshot depositato da recordDbMonitorSample nel
+// sustainedTracker, dove vivono i contatori/latch. Delega quindi il reset
+// direttamente al tracker. Idempotente, nessun I/O.
 export function resetState(): void {
-  resetSustainedOverloadState();
+  sustainedTracker.reset();
 }
 
 export function collectOverload(): Signal[] {
   const signals: Signal[] = [];
   try {
-    const state = getSustainedOverloadState();
+    const state = sustainedTracker.getState();
 
     if (state.db.sustained) {
       signals.push({
