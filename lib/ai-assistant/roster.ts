@@ -23,10 +23,23 @@ export const KNOWN_ASSISTANT_PERSONAS: AssistantRosterEntry[] = [
   { id: "ares", name: "Ares", adminOnly: true },
 ];
 
-/** Nome canonico di una persona dal roster, con fallback all'elenco noto. */
+/**
+ * Normalizza un ID persona sconosciuto (es. "quebracho" da vecchi record in DB)
+ * al valore più vicino del set corrente.
+ * Task #599 — guard anti-crash per storia di chat con persona rimossi.
+ */
+export function normalizePersonaId(id: string): AssistantPersona["id"] {
+  const known: AssistantPersona["id"][] = ["bowie", "horus", "ares"];
+  return (known as string[]).includes(id) ? (id as AssistantPersona["id"]) : "bowie";
+}
+
+/** Nome canonico di una persona dal roster, con fallback all'elenco noto.
+ *  Accetta `string` (non solo il tipo union) per gestire gracefully ID obsoleti
+ *  (es. "quebracho") che potrebbero arrivare da record storici nel DB.
+ */
 export function rosterPersonaName(
   roster: AssistantRosterEntry[],
-  id: AssistantPersona["id"],
+  id: string,
   fallbackName?: string,
 ): string {
   const entry = roster.find((p) => p.id === id) ?? KNOWN_ASSISTANT_PERSONAS.find((p) => p.id === id);

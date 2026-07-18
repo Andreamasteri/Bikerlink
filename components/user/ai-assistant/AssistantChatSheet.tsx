@@ -23,7 +23,7 @@ import { streamAssistantMessage } from "@/lib/ai-assistant/sse-client";
 import { friendlyChatErrorMessage, friendlyChatErrorFromEvent } from "@/lib/ai-assistant/friendly-error";
 import { currentAssistantPlatform } from "@/hooks/useAssistantConfig";
 import { useAssistantRoster } from "@/hooks/useAssistantRoster";
-import { rosterPersonaName } from "@/lib/ai-assistant/roster";
+import { rosterPersonaName, normalizePersonaId } from "@/lib/ai-assistant/roster";
 import { executeClientAction } from "@/lib/ai-assistant/client-actions";
 import { BOWIE_INTRO_POEM } from "@shared/bowie-greeting";
 import AssistantActionConfirmSheet from "./AssistantActionConfirmSheet";
@@ -103,20 +103,28 @@ export default function AssistantChatSheet({ visible, onClose }: Props) {
             setMessages((prev) => prev.map((m) => m.id === asstId ? { ...m, thinking: true } : m));
           } else if (ev.event === "persona") {
             // Task #5197 — il server annuncia CHI risponde (Bowie/Horus/Ares).
-            const p = ev.data as AssistantPersona;
+            // Task #599 — normalizza ID obsoleti (es. "quebracho" da sessioni
+            // storiche in DB) prima che raggiungano la UI.
+            const raw = ev.data as { id: string; name: string };
+            const p: AssistantPersona = { ...raw, id: normalizePersonaId(raw.id) };
             setMessages((prev) => prev.map((m) => m.id === asstId ? { ...m, persona: p } : m));
           } else if (ev.event === "action") {
             const a = ev.data as AssistantProposedAction;
             collectedActions.push(a);
           } else if (ev.event === "done") {
-            const d = ev.data as { text?: string; persona?: AssistantPersona };
+            const d = ev.data as { text?: string; persona?: { id: string; name: string } };
+            // Task #599 — normalizza ID persona obsoleti (es. "quebracho") prima
+            // che raggiungano la UI, sia nell'evento "done" che in "persona".
+            const donePersona: AssistantPersona | undefined = d.persona
+              ? { ...d.persona, id: normalizePersonaId(d.persona.id) }
+              : undefined;
             setMessages((prev) => prev.map((m) =>
               m.id === asstId
                 ? {
                     ...m,
                     content: d.text ?? m.content,
                     actions: collectedActions.length ? collectedActions : undefined,
-                    persona: d.persona ?? m.persona,
+                    persona: donePersona ?? m.persona,
                     errorRecoverable: false,
                     thinking: false,
                   }
@@ -219,10 +227,13 @@ export default function AssistantChatSheet({ visible, onClose }: Props) {
 
   // Task #5197 — colore distintivo per ciascuna AI nelle etichette di chat.
   // Quebracho rimosso (Task #591 — unificato in Horus).
-  const personaColor = useCallback((id: AssistantPersona["id"]): string => {
+  // Task #599 — accetta `string` (non solo il tipo union) per gestire ID
+  // obsoleti (es. "quebracho") che possono essere già presenti nello state da
+  // sessioni storiche; fallback a bowie (accent) per qualsiasi ID sconosciuto.
+  const personaColor = useCallback((id: string): string => {
     if (id === "horus") return colors.success;
     if (id === "ares") return colors.warning;
-    return colors.accent; // bowie
+    return colors.accent; // bowie o ID sconosciuto
   }, [colors.success, colors.warning, colors.accent]);
 
   // Task #8 — nome mostrato risolto dal roster server (fallback: nome inviato
