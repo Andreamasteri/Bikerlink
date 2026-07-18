@@ -47,8 +47,10 @@ export function getHorusCoordinatorLoopStats(): {
   lastRoundAt: number;
   roundCount: number;
   roundPauseMs: number;
+  /** Nome della persona coordinatrice attiva. Visibile in /api/health per audit rapido. */
+  persona: string;
 } {
-  return { running: loopActive, roundInFlight, lastRoundAt, roundCount, roundPauseMs: ROUND_PAUSE_MS };
+  return { running: loopActive, roundInFlight, lastRoundAt, roundCount, roundPauseMs: ROUND_PAUSE_MS, persona: "horus" };
 }
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
