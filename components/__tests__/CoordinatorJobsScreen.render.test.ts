@@ -53,8 +53,8 @@ import { Alert } from "react-native";
 // ── Fixture: stessa shape della risposta reale di GET /api/admin/coordinator/jobs
 const liveJobsResponse = () => ({
   killSwitch: false,
-  quebrachoReachable: true,
-  summary: { killSwitch: false, quebrachoReachable: true, jobs: { total: 2, running: 1, paused: 0, throttled: 0 } },
+  horusReachable: true,
+  summary: { killSwitch: false, horusReachable: true, jobs: { total: 2, running: 1, paused: 0, throttled: 0 } },
   jobs: [
     {
       name: "routing-health-probe",
@@ -174,7 +174,7 @@ describe("CoordinatorJobsScreen — render end-to-end con dati live", () => {
     expect(sectionTitle).toHaveLength(1);
   });
 
-  it("banner Quebracho raggiungibile quando quebrachoReachable=true", async () => {
+  it("banner Horus raggiungibile quando horusReachable=true", async () => {
     const client = buildClient();
     await mount(client);
     const banner = renderer!.root.findAll((n) => (n.type as unknown) === "Text" && textOf(n).includes("raggiungibile"));
