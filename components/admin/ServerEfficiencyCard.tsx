@@ -113,19 +113,25 @@ export function ServerEfficiencyCard() {
     refetchOnMount: true,
   });
 
-  const loadPerCore = data?.cpu.loadPerCore ?? 0;
-  const healthColor = !data
+  // Guard: data.cpu / data.memory can be undefined if the API returns a partial
+  // or cached response with a different shape. Use optional chaining throughout
+  // so no property access on undefined crashes the admin screen.
+  const cpu = data?.cpu ?? null;
+  const memory = data?.memory ?? null;
+  const network = data?.network ?? null;
+  const loadPerCore = cpu?.loadPerCore ?? 0;
+  const healthColor = !cpu
     ? "#6b7280"
     : loadPerCore < 0.7
     ? "#22c55e"
     : loadPerCore < 1
     ? "#f59e0b"
     : "#ef4444";
-  const memColor = !data
+  const memColor = !memory
     ? Colors.text
-    : data.memory.usedPercent < 75
+    : memory.usedPercent < 75
     ? Colors.text
-    : data.memory.usedPercent < 90
+    : memory.usedPercent < 90
     ? "#f59e0b"
     : "#ef4444";
 
@@ -144,7 +150,7 @@ export function ServerEfficiencyCard() {
           {error && !isLoading && (
             <MaterialCommunityIcons name="alert-circle-outline" size={16} color="#ef4444" />
           )}
-          {!isLoading && !error && data && (
+          {!isLoading && !error && cpu && (
             <View style={[srvStyles.healthDot, { backgroundColor: healthColor }]} />
           )}
           <CollapseChevron collapsed={collapsed} />
@@ -156,24 +162,24 @@ export function ServerEfficiencyCard() {
           <View style={srvStyles.statsRow}>
             <View style={srvStyles.stat}>
               <Text style={srvStyles.statValue}>
-                {data ? `${data.cpu.loadAvg1.toFixed(2)}` : "—"}
+                {cpu ? `${cpu.loadAvg1.toFixed(2)}` : "—"}
               </Text>
               <Text style={srvStyles.statLabel}>Load 1m</Text>
             </View>
             <View style={srvStyles.divider} />
             <View style={srvStyles.stat}>
               <Text style={srvStyles.statValue}>
-                {data ? `${data.cpu.loadAvg5.toFixed(2)} / ${data.cpu.loadAvg15.toFixed(2)}` : "—"}
+                {cpu ? `${cpu.loadAvg5.toFixed(2)} / ${cpu.loadAvg15.toFixed(2)}` : "—"}
               </Text>
               <Text style={srvStyles.statLabel}>Load 5m / 15m</Text>
             </View>
             <View style={srvStyles.divider} />
             <View style={srvStyles.stat}>
               <Text style={[srvStyles.statValue, { color: healthColor }]}>
-                {data ? `${(loadPerCore * 100).toFixed(0)}%` : "—"}
+                {cpu ? `${(loadPerCore * 100).toFixed(0)}%` : "—"}
               </Text>
               <Text style={srvStyles.statLabel}>
-                {data ? `${data.cpu.cores} core · Node ${data.cpu.processCpuPercent.toFixed(0)}%` : "Carico"}
+                {cpu ? `${cpu.cores} core · Node ${cpu.processCpuPercent.toFixed(0)}%` : "Carico"}
               </Text>
             </View>
           </View>
@@ -182,23 +188,23 @@ export function ServerEfficiencyCard() {
           <View style={srvStyles.statsRow}>
             <View style={srvStyles.stat}>
               <Text style={[srvStyles.statValue, { color: memColor }]}>
-                {data ? `${data.memory.usedPercent.toFixed(0)}%` : "—"}
+                {memory ? `${memory.usedPercent.toFixed(0)}%` : "—"}
               </Text>
               <Text style={srvStyles.statLabel}>
-                {data
-                  ? `${formatBytes(data.memory.used)} usata · ${formatBytes(data.memory.free)} libera · ${formatBytes(data.memory.total)} tot`
+                {memory
+                  ? `${formatBytes(memory.used)} usata · ${formatBytes(memory.free)} libera · ${formatBytes(memory.total)} tot`
                   : "Usata · Libera · Totale"}
               </Text>
             </View>
             <View style={srvStyles.divider} />
             <View style={srvStyles.stat}>
-              <Text style={srvStyles.statValue}>{data ? formatBytes(data.memory.processRss) : "—"}</Text>
+              <Text style={srvStyles.statValue}>{memory ? formatBytes(memory.processRss) : "—"}</Text>
               <Text style={srvStyles.statLabel}>Node RSS</Text>
             </View>
             <View style={srvStyles.divider} />
             <View style={srvStyles.stat}>
               <Text style={srvStyles.statValue}>
-                {data ? `${formatBytes(data.memory.processHeapUsed)} / ${formatBytes(data.memory.processHeapTotal)}` : "—"}
+                {memory ? `${formatBytes(memory.processHeapUsed)} / ${formatBytes(memory.processHeapTotal)}` : "—"}
               </Text>
               <Text style={srvStyles.statLabel}>Heap</Text>
             </View>
@@ -207,13 +213,13 @@ export function ServerEfficiencyCard() {
           <Text style={srvStyles.sectionLabel}>Rete</Text>
           <View style={srvStyles.statsRow}>
             <View style={srvStyles.stat}>
-              <Text style={[srvStyles.statValue, { color: "#22c55e" }]}>{data ? `↓ ${formatRate(data.network.rxRate)}` : "—"}</Text>
-              <Text style={srvStyles.statLabel}>{data ? `Tot ${formatBytes(data.network.rxBytes)}` : "Download"}</Text>
+              <Text style={[srvStyles.statValue, { color: "#22c55e" }]}>{network ? `↓ ${formatRate(network.rxRate)}` : "—"}</Text>
+              <Text style={srvStyles.statLabel}>{network ? `Tot ${formatBytes(network.rxBytes)}` : "Download"}</Text>
             </View>
             <View style={srvStyles.divider} />
             <View style={srvStyles.stat}>
-              <Text style={[srvStyles.statValue, { color: "#0ea5e9" }]}>{data ? `↑ ${formatRate(data.network.txRate)}` : "—"}</Text>
-              <Text style={srvStyles.statLabel}>{data ? `Tot ${formatBytes(data.network.txBytes)}` : "Upload"}</Text>
+              <Text style={[srvStyles.statValue, { color: "#0ea5e9" }]}>{network ? `↑ ${formatRate(network.txRate)}` : "—"}</Text>
+              <Text style={srvStyles.statLabel}>{network ? `Tot ${formatBytes(network.txBytes)}` : "Upload"}</Text>
             </View>
             <View style={srvStyles.divider} />
             <View style={srvStyles.stat}>
