@@ -52,8 +52,41 @@ router.get("/thinkcentre-metrics", async (_req: Request, res: Response) => {
     if (!upstream.ok) {
       return res.json({ online: false, reason: `HTTP ${upstream.status}` });
     }
-    const data = await upstream.json() as unknown;
-    return res.json({ online: true, ...(data as object) });
+    const raw = await upstream.json() as Record<string, unknown>;
+    // Normalizza esplicitamente i campi attesi: se il TC agent cambia shape
+    // (es. rinomina loadAvg1 → loadAvg) il client riceve undefined per quel campo
+    // e la guard client-side degrada a "offline banner" senza crash.
+    // Passare il raw spread non-validato può introdurre campi inattesi o shape
+    // annidate che rompono le assunzioni di ThinkCentreEfficiencyCard.
+    const num = (v: unknown): number | undefined =>
+      typeof v === "number" ? v : undefined;
+    const normalized: Record<string, unknown> = {
+      online: true,
+      loadAvg1:   num(raw.loadAvg1),
+      loadAvg5:   num(raw.loadAvg5),
+      loadAvg15:  num(raw.loadAvg15),
+      ramUsedMb:  num(raw.ramUsedMb),
+      ramTotalMb: num(raw.ramTotalMb),
+      uptimeSec:  num(raw.uptimeSec),
+      cpuTempC:   num(raw.cpuTempC),
+      gpuTempC:   num(raw.gpuTempC),
+      gpuUtilPct: num(raw.gpuUtilPct),
+      vramUsedMb: num(raw.vramUsedMb),
+      vramTotalMb:num(raw.vramTotalMb),
+      checkedAt:  num(raw.checkedAt),
+    };
+    // diskMounts: valida che sia un array di oggetti con la shape attesa
+    if (Array.isArray(raw.diskMounts)) {
+      normalized.diskMounts = raw.diskMounts
+        .filter((m): m is Record<string, unknown> => m !== null && typeof m === "object")
+        .map((m) => ({
+          path:    typeof m.path    === "string" ? m.path    : "?",
+          usedGb:  num(m.usedGb)  ?? 0,
+          totalGb: num(m.totalGb) ?? 0,
+          usedPct: num(m.usedPct) ?? 0,
+        }));
+    }
+    return res.json(normalized);
   } catch (err: unknown) {
     clearTimeout(timer);
     const isTimeout = err instanceof Error && err.name === "AbortError";
