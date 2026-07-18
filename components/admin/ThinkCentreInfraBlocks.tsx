@@ -78,6 +78,8 @@ interface InfraBlockProps {
   hasError?: boolean;
   /** Task #165 — contenuto extra renderizzato nel body espanso (es. modelli per persona). */
   extraBody?: React.ReactNode;
+  /** Task #560 — chip/icona aggiuntiva nella riga header (visibile anche da collassata). */
+  headerChip?: React.ReactNode;
 }
 
 function InfraBlock({
@@ -89,6 +91,7 @@ function InfraBlock({
   isLoading,
   hasError,
   extraBody,
+  headerChip,
 }: InfraBlockProps) {
   const [open, setOpen] = useState(false);
 
@@ -156,6 +159,7 @@ function InfraBlock({
             {subtitleText}
           </Text>
         </View>
+        {headerChip}
         <View style={[styles.dot, { backgroundColor: statusColor }]} />
         <Ionicons name={open ? "chevron-up" : "chevron-down"} size={16} color={Colors.textSecondary} />
       </TouchableOpacity>
@@ -313,12 +317,24 @@ function AgentMapSourceBadge({ source }: { source: "default" | "pushed" | null }
   );
 }
 
+/** Task #560 — small amber chip shown in the collapsed AI Hub header row. */
+function AgentMapHeaderChip({ source }: { source: "default" | "pushed" | null }) {
+  if (source !== "default") return null;
+  return (
+    <View style={styles.agentMapHeaderChip}>
+      <Ionicons name="warning-outline" size={11} color="#f59e0b" />
+      <Text style={styles.agentMapHeaderChipText}>default</Text>
+    </View>
+  );
+}
+
 export function AiHubBlock({
   service,
   vramAgentMapSource,
   isLoading,
   hasError,
 }: { service?: SimpleServiceHealth; vramAgentMapSource?: "default" | "pushed" | null; isLoading?: boolean; hasError?: boolean }) {
+  const src = vramAgentMapSource ?? null;
   return (
     <InfraBlock
       serviceKey="aihub"
@@ -328,7 +344,8 @@ export function AiHubBlock({
       configNote="Aggiungere AI_HUB_URL e AI_HUB_GATE_TOKEN nei secret Replit. Il servizio gira su pm2 porta 4405 sul ThinkCentre." // pragma: allowlist secret
       isLoading={isLoading}
       hasError={hasError}
-      extraBody={<AgentMapSourceBadge source={vramAgentMapSource ?? null} />}
+      headerChip={<AgentMapHeaderChip source={src} />}
+      extraBody={<AgentMapSourceBadge source={src} />}
     />
   );
 }
@@ -459,5 +476,23 @@ const styles = StyleSheet.create({
     color: "#f59e0b",
     flex: 1,
     lineHeight: 14,
+  },
+  /** Task #560 — small amber chip in the collapsed AI Hub header row. */
+  agentMapHeaderChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "rgba(245, 158, 11, 0.45)",
+    backgroundColor: "rgba(245, 158, 11, 0.10)",
+  },
+  agentMapHeaderChipText: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 9,
+    color: "#f59e0b",
+    letterSpacing: 0.3,
   },
 });
