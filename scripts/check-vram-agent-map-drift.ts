@@ -94,7 +94,22 @@ function parseDefaultAgentMapKeys(src: string): Set<string> {
   return result;
 }
 
-// ── 3. Confronta e segnala il drift ─────────────────────────────────────────
+// ── 3. Retired-model blocklist ───────────────────────────────────────────────
+//
+// Models listed here had coordinators that were later removed. They must NOT
+// reappear in DEFAULT_AGENT_MAP or AGENT_MODEL_DEFAULTS — there is no live agent
+// to claim them, and a ghost entry would make GET /vram misleading.
+//
+// Before adding a new entry here, document WHY the coordinator was removed and
+// confirm no replacement coordinator picks up the same model name.
+const RETIRED_MODELS: Record<string, string> = {
+  // Quebracho was unified into Horus (Task #591). The coordinator process no
+  // longer exists; granite4:tiny-h must not be re-added without a matching
+  // coordinator entry in server/lib/agent-constants.ts.
+  "granite4:tiny-h": "Quebracho (unified into Horus, Task #591) — no coordinator",
+};
+
+// ── 4. Confronta e segnala il drift ─────────────────────────────────────────
 
 function main(): void {
   const agentDefaults = parseAgentModelDefaults(agentConstantsSrc);
@@ -110,6 +125,34 @@ function main(): void {
     console.log(`  "${key}"`);
   }
 
+  let failed = false;
+
+  // Check for retired models re-introduced in either source.
+  const retiredViolations: Array<{ model: string; location: string; reason: string }> = [];
+  for (const [model, reason] of Object.entries(RETIRED_MODELS)) {
+    if (defaultMapKeys.has(model)) {
+      retiredViolations.push({ model, location: "DEFAULT_AGENT_MAP (vram-routes.js)", reason });
+    }
+    for (const [, agentModel] of agentDefaults) {
+      if (agentModel === model) {
+        retiredViolations.push({ model, location: "AGENT_MODEL_DEFAULTS (agent-constants.ts)", reason });
+      }
+    }
+  }
+
+  if (retiredViolations.length > 0) {
+    failed = true;
+    console.error(
+      "\n❌  RETIRED MODEL RE-INTRODUCED — the following models are retired and must\n" +
+      "    not appear in either map. Remove them or add a matching coordinator first.\n"
+    );
+    for (const { model, location, reason } of retiredViolations) {
+      console.error(`  model: "${model}"  found in: ${location}`);
+      console.error(`    reason: ${reason}`);
+    }
+  }
+
+  // Check for models in AGENT_MODEL_DEFAULTS that are missing from DEFAULT_AGENT_MAP.
   const missing: Array<{ agent: string; model: string }> = [];
   for (const [agent, model] of agentDefaults) {
     if (!defaultMapKeys.has(model)) {
@@ -118,10 +161,8 @@ function main(): void {
   }
 
   console.log();
-  if (missing.length === 0) {
-    console.log("✅  No drift: every model in AGENT_MODEL_DEFAULTS appears in DEFAULT_AGENT_MAP.");
-    process.exit(0);
-  } else {
+  if (missing.length > 0) {
+    failed = true;
     console.error(
       "❌  DRIFT DETECTED — the following models are in AGENT_MODEL_DEFAULTS but missing\n" +
       "    from DEFAULT_AGENT_MAP in vram-routes.js.\n" +
@@ -131,8 +172,15 @@ function main(): void {
     for (const { agent, model } of missing) {
       console.error(`  agent: ${agent}  →  model: "${model}"  ← MISSING from DEFAULT_AGENT_MAP`);
     }
+  }
+
+  if (failed) {
     process.exit(1);
   }
+
+  console.log("✅  No drift: every model in AGENT_MODEL_DEFAULTS appears in DEFAULT_AGENT_MAP,");
+  console.log("    and no retired models have been re-introduced.");
+  process.exit(0);
 }
 
 main();

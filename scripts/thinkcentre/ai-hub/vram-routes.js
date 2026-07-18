@@ -38,12 +38,20 @@ const WINDOW_MS = 24 * 60 * 60 * 1000;
 // CANONICAL AGENT LINEUP (Task #535):
 //   qwen3:4b        → Horus      (GPU residente, keep_alive:-1)
 //   qwen3:1.7b      → Bowie      (GPU residente, keep_alive:-1)
-// (granite4:tiny-h / Quebracho removed — Task #591: unified into Horus)
 //   all-minilm      → Nadir      (GPU residente, keep_alive:-1)
 //   devstral:latest → Ares       (on-demand, keep_alive:0 post-call)
 //
-// Voci RIMOSSE (stantie): "bikerlink:latest" (alias legacy Horus non più in uso),
-// "llama3.2:3b" (vecchio modello Bowie, sostituito da qwen3:1.7b).
+// ⚠️  RETIRED MODELS — DO NOT RE-ADD without a matching coordinator:
+//   "granite4:tiny-h"   — was Quebracho's model; Quebracho was unified into Horus
+//                         (Task #591). There is no coordinator for this model any
+//                         more. If you re-add it here you will get a ghost entry
+//                         that the drift-check script will flag as unexpected.
+//   "bikerlink:latest"  — legacy Horus alias, no longer in use.
+//   "llama3.2:3b"       — old Bowie model, superseded by qwen3:1.7b.
+//
+// The drift-check script (scripts/check-vram-agent-map-drift.ts) maintains a
+// parallel RETIRED_MODELS blocklist and will fail CI if any retired model name
+// reappears in this map or in AGENT_MODEL_DEFAULTS.
 //
 // NOTE: "all-minilm" (no tag) and "all-minilm:latest" are both listed because
 // Ollama may report the model with or without the explicit ":latest" suffix.
