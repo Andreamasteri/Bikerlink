@@ -1,18 +1,21 @@
 /**
  * Task #91 — Pannello admin per le due scansioni complete on-demand di Horus.
+ * Task #614 — "Genera Manuale" pipeline completa: avanzamento live + ETA +
+ *             push a Bowie/Horus + errori Ollama/ai-hub inline.
  *
  * Card dedicata (finora si poteva lanciare solo da chat o azione generica). Due
  * pulsanti che POSTano su /api/admin/horus-scan/start con { mode }:
  *   • "Analisi completa codice+DB"  (mode: "analysis")
  *   • "Genera manuale"              (mode: "manual")
  *
- * Avanzamento live (file letti / saltati / pendenti, stato, ultimo esito) via
- * polling di GET /api/admin/horus-scan/status. Espone anche un collegamento al
- * manuale generato (schermata Nadir) e alle ultime proposte dell'analisi.
+ * Avanzamento live (file letti / saltati / pendenti, stato, ETA, ultimo esito)
+ * via polling di GET /api/admin/horus-scan/status. A scan completata: pulsanti
+ * "Push a Bowie" e "Push a Horus" (POST /api/admin/horus-scan/push).
+ * Errori Ollama/ai-hub mostrati inline nella card, non solo nei log server.
  *
  * Backend: server/routes/admin/horus-scan.ts. Horus resta in SOLA LETTURA.
  */
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import {
   View,
   Text,
@@ -31,6 +34,7 @@ import { apiRequest } from "@/lib/query-client";
 
 type ScanMode = "analysis" | "manual";
 type ScanStatus = "idle" | "running" | "completed" | "interrupted" | "error";
+type PushTarget = "bowie" | "horus";
 
 interface ScanState {
   mode: ScanMode;
@@ -67,6 +71,11 @@ interface StartResponse {
   started: boolean;
   reason: string | null;
   status: ScanState;
+}
+
+interface PushResponse {
+  target: PushTarget;
+  output: string;
 }
 
 function fmtDate(iso: string | number | null | undefined): string {
@@ -109,10 +118,21 @@ export default function HorusScanScreen() {
     },
   });
 
+  const pushMutation = useMutation<PushResponse, Error, PushTarget>({
+    mutationFn: async (target: PushTarget) =>
+      (await apiRequest("POST", "/api/admin/horus-scan/push", { target })).json(),
+  });
+
   const [pendingMode, setPendingMode] = useState<ScanMode | null>(null);
   const [lastNotStarted, setLastNotStarted] = useState<{ mode: ScanMode; reason: string } | null>(
     null,
   );
+  const [pushResult, setPushResult] = useState<{
+    target: PushTarget;
+    ok: boolean;
+    message: string;
+  } | null>(null);
+  const pushingTarget = useRef<PushTarget | null>(null);
 
   const start = (mode: ScanMode) => {
     setPendingMode(mode);
@@ -127,11 +147,37 @@ export default function HorusScanScreen() {
     });
   };
 
+  const push = (target: PushTarget) => {
+    pushingTarget.current = target;
+    setPushResult(null);
+    pushMutation.mutate(target, {
+      onSuccess: (_res) => {
+        setPushResult({ target, ok: true, message: "Push completato con successo." });
+        pushingTarget.current = null;
+      },
+      onError: (err) => {
+        setPushResult({ target, ok: false, message: err.message });
+        pushingTarget.current = null;
+      },
+      onSettled: () => {
+        pushingTarget.current = null;
+      },
+    });
+  };
+
   const data = statusQuery.data;
   const analysis = data?.scans?.analysis;
   const manual = data?.scans?.manual;
   const lastAnalysis = data?.lastAnalysis ?? null;
   const manualInfo = data?.manual;
+
+  // Mostra i pulsanti push quando il manuale è stato generato almeno una volta
+  // e non c'è una scan manual in corso.
+  const manualDone = manual?.status === "completed";
+  const manualHasContent = (manualInfo?.length ?? 0) > 0;
+  const showPushButtons = manualHasContent && manual?.status !== "running";
+  const isPushingBowie = pushMutation.isPending && pushingTarget.current === "bowie";
+  const isPushingHorus = pushMutation.isPending && pushingTarget.current === "horus";
 
   return (
     <ScrollView
@@ -198,7 +244,7 @@ export default function HorusScanScreen() {
         testID="horus-scan-start-manual"
       />
 
-      {/* Manuale generato */}
+      {/* ── Manuale generato + Push ── */}
       <View style={styles.card}>
         <Text style={styles.cardTitle}>Manuale generato</Text>
         <Row label="Lunghezza testo" value={`${manualInfo?.length ?? 0} caratteri`} />
@@ -206,6 +252,17 @@ export default function HorusScanScreen() {
         {manualInfo?.previousSavedAt ? (
           <Row label="Precedente salvato" value={fmtDate(manualInfo.previousSavedAt)} />
         ) : null}
+
+        {/* Risultato scan completata */}
+        {manualDone && manual?.resultSummary ? (
+          <View style={styles.resultBox}>
+            <MaterialCommunityIcons name="check-circle" size={16} color={Colors.success} />
+            <Text style={[styles.hint, { color: Colors.success, flex: 1, marginBottom: 0 }]}>
+              {manual.resultSummary}
+            </Text>
+          </View>
+        ) : null}
+
         <TouchableOpacity
           style={[styles.btn, styles.btnSecondary, { marginTop: 12 }]}
           onPress={() => router.push("/admin/nadir" as Href)}
@@ -214,6 +271,85 @@ export default function HorusScanScreen() {
           <MaterialCommunityIcons name="open-in-new" size={18} color={Colors.primary} />
           <Text style={[styles.btnText, { color: Colors.primary }]}>Apri manuale (Nadir)</Text>
         </TouchableOpacity>
+
+        {/* Push a Bowie / Horus — visibili quando il manuale esiste */}
+        {showPushButtons ? (
+          <>
+            <View style={styles.pushDivider}>
+              <Text style={styles.pushDividerLabel}>Inietta manuale nei modelli TC</Text>
+            </View>
+            <Text style={styles.pushHint}>
+              Aggiorna il system prompt del modello Ollama sul ThinkCentre con il manuale
+              generato. Richiede TC online (~60–120 s).
+            </Text>
+            <View style={styles.pushRow}>
+              <TouchableOpacity
+                style={[
+                  styles.btn,
+                  styles.btnPush,
+                  (isPushingBowie || isPushingHorus) && styles.btnDisabled,
+                  { flex: 1 },
+                ]}
+                onPress={() => push("bowie")}
+                disabled={isPushingBowie || isPushingHorus}
+                testID="horus-scan-push-bowie"
+              >
+                {isPushingBowie ? (
+                  <ActivityIndicator color="#fff" size="small" />
+                ) : (
+                  <>
+                    <MaterialCommunityIcons name="upload" size={16} color="#fff" />
+                    <Text style={styles.btnText}>Push a Bowie</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.btn,
+                  styles.btnPushSecondary,
+                  (isPushingBowie || isPushingHorus) && styles.btnDisabled,
+                  { flex: 1 },
+                ]}
+                onPress={() => push("horus")}
+                disabled={isPushingBowie || isPushingHorus}
+                testID="horus-scan-push-horus"
+              >
+                {isPushingHorus ? (
+                  <ActivityIndicator color={Colors.primary} size="small" />
+                ) : (
+                  <>
+                    <MaterialCommunityIcons name="upload" size={16} color={Colors.primary} />
+                    <Text style={[styles.btnText, { color: Colors.primary }]}>Push a Horus</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </View>
+
+            {/* Feedback push inline */}
+            {pushResult ? (
+              <View
+                style={[
+                  styles.pushFeedback,
+                  { borderColor: pushResult.ok ? Colors.success : Colors.error },
+                ]}
+              >
+                <MaterialCommunityIcons
+                  name={pushResult.ok ? "check-circle" : "alert-circle"}
+                  size={16}
+                  color={pushResult.ok ? Colors.success : Colors.error}
+                />
+                <Text
+                  style={[
+                    styles.hint,
+                    { color: pushResult.ok ? Colors.success : Colors.error, flex: 1, marginBottom: 0 },
+                  ]}
+                >
+                  {`[${pushResult.target.toUpperCase()}] ${pushResult.message}`}
+                </Text>
+              </View>
+            ) : null}
+          </>
+        ) : null}
       </View>
 
       {statusQuery.isError ? (
@@ -221,6 +357,28 @@ export default function HorusScanScreen() {
       ) : null}
     </ScrollView>
   );
+}
+
+/** Formatta secondi in "X min Y s" oppure "Y s". */
+function fmtDuration(secs: number): string {
+  if (secs < 60) return `${Math.round(secs)} s`;
+  const m = Math.floor(secs / 60);
+  const s = Math.round(secs % 60);
+  return s > 0 ? `${m} min ${s} s` : `${m} min`;
+}
+
+/**
+ * Stima ETA in secondi rimanenti sulla base del tempo trascorso e della
+ * percentuale completata. Restituisce null se non calcolabile.
+ */
+function computeEta(state: ScanState): number | null {
+  if (state.status !== "running") return null;
+  const done = state.filesAnalyzed + state.filesSkipped;
+  if (!state.startedAt || !state.filesTotal || done === 0) return null;
+  const elapsedMs = Date.now() - state.startedAt;
+  const totalEstimatedMs = (elapsedMs / done) * state.filesTotal;
+  const remaining = (totalEstimatedMs - elapsedMs) / 1000;
+  return remaining > 0 ? remaining : null;
 }
 
 function ScanCard({
@@ -254,6 +412,19 @@ function ScanCard({
       ? Math.round(((state.filesAnalyzed + state.filesSkipped) / state.filesTotal) * 100)
       : 0;
   const disabled = starting || isRunning || disabledOther;
+  const eta = state ? computeEta(state) : null;
+
+  // Classifica errori Ollama / ai-hub per messaggio inline chiaro
+  const errorMsg = state?.lastError?.message ?? "";
+  const isOllamaError =
+    errorMsg.toLowerCase().includes("ollama") ||
+    errorMsg.toLowerCase().includes("horus") ||
+    errorMsg.toLowerCase().includes("raggiungibile") ||
+    errorMsg.toLowerCase().includes("reachable");
+  const isHubError =
+    errorMsg.toLowerCase().includes("hub") ||
+    errorMsg.toLowerCase().includes("ai-hub") ||
+    errorMsg.toLowerCase().includes("storage");
 
   return (
     <View style={styles.card}>
@@ -279,6 +450,14 @@ function ScanCard({
         </View>
       ) : null}
 
+      {/* ETA in tempo reale (solo durante la scan) */}
+      {isRunning && eta !== null ? (
+        <View style={styles.etaRow}>
+          <MaterialCommunityIcons name="timer-outline" size={14} color={Colors.textSecondary} />
+          <Text style={styles.etaText}>ETA ~{fmtDuration(eta)}</Text>
+        </View>
+      ) : null}
+
       <Row label="File totali" value={String(state?.filesTotal ?? 0)} />
       <Row label="Analizzati" value={String(state?.filesAnalyzed ?? 0)} />
       <Row label="Saltati" value={String(state?.filesSkipped ?? 0)} />
@@ -286,14 +465,41 @@ function ScanCard({
       {state?.lastFile ? <Row label="Ultimo file" value={state.lastFile} mono /> : null}
       <Row label="Avviata" value={fmtDate(state?.startedAt)} />
       <Row label="Terminata" value={fmtDate(state?.finishedAt)} />
-      {state?.resultSummary ? <Text style={styles.body}>{state.resultSummary}</Text> : null}
-      {state?.lastError ? (
-        <Text style={styles.errText}>
-          {fmtDate(state.lastError.at)}: {state.lastError.message}
-        </Text>
+      {state?.resultSummary && status !== "completed" ? (
+        <Text style={styles.body}>{state.resultSummary}</Text>
       ) : null}
+
+      {/* Errore Ollama — messaggio contestuale */}
+      {state?.lastError ? (
+        <View style={styles.errorBox}>
+          <MaterialCommunityIcons name="alert-circle" size={16} color={Colors.error} />
+          <View style={{ flex: 1 }}>
+            {isOllamaError ? (
+              <Text style={[styles.hint, { color: Colors.error, marginBottom: 2 }]}>
+                Ollama / ThinkCentre non raggiungibile. Verifica che il TC sia online e riprova.
+              </Text>
+            ) : isHubError ? (
+              <Text style={[styles.hint, { color: Colors.warning, marginBottom: 2 }]}>
+                ai-hub offline — il manuale è salvato su Replit, il TC sarà sincronizzato alla prossima scan.
+              </Text>
+            ) : null}
+            <Text style={styles.errText}>
+              {fmtDate(state.lastError.at)}: {state.lastError.message}
+            </Text>
+          </View>
+        </View>
+      ) : null}
+
       {notStartedReason ? (
-        <Text style={styles.warnText}>Non avviata: {notStartedReason}</Text>
+        <View style={styles.errorBox}>
+          <MaterialCommunityIcons name="information" size={16} color={Colors.warning} />
+          <Text style={[styles.warnText, { flex: 1, marginTop: 0 }]}>
+            {notStartedReason.toLowerCase().includes("ollama") ||
+            notStartedReason.toLowerCase().includes("raggiungibile")
+              ? `ThinkCentre / Ollama non raggiungibile: ${notStartedReason}`
+              : `Non avviata: ${notStartedReason}`}
+          </Text>
+        </View>
       ) : null}
 
       <TouchableOpacity
@@ -441,12 +647,83 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_400Regular",
     fontSize: 12,
     color: Colors.error,
-    marginTop: 8,
+    marginTop: 4,
   },
   warnText: {
     fontFamily: "Inter_400Regular",
     fontSize: 12,
     color: Colors.warning,
-    marginTop: 8,
+    marginTop: 4,
+  },
+  // ETA
+  etaRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    marginBottom: 8,
+  },
+  etaText: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    color: Colors.textSecondary,
+  },
+  // Errore/info box contestuale
+  errorBox: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 8,
+    marginTop: 10,
+    padding: 10,
+    borderRadius: 8,
+    backgroundColor: "rgba(239,68,68,0.08)",
+  },
+  // resultSummary completata
+  resultBox: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 8,
+    marginTop: 10,
+    padding: 10,
+    borderRadius: 8,
+    backgroundColor: "rgba(34,197,94,0.08)",
+  },
+  // Sezione Push
+  pushDivider: {
+    marginTop: 18,
+    marginBottom: 4,
+    borderTopWidth: 1,
+    borderTopColor: Colors.border,
+    paddingTop: 12,
+  },
+  pushDividerLabel: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 13,
+    color: Colors.textSecondary,
+  },
+  pushHint: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    color: Colors.textSecondary,
+    marginBottom: 10,
+  },
+  pushRow: {
+    flexDirection: "row",
+    gap: 10,
+  },
+  btnPush: {
+    backgroundColor: "#0369A1",
+  },
+  btnPushSecondary: {
+    borderWidth: 1,
+    borderColor: Colors.primary,
+  },
+  pushFeedback: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 8,
+    marginTop: 10,
+    padding: 10,
+    borderRadius: 8,
+    borderWidth: 1,
   },
 });
