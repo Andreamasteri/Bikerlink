@@ -201,18 +201,55 @@ process.on("SIGINT", () => gracefulShutdown("SIGINT"));
 // Scrivi il motivo del crash in modo sincrono su /tmp/server-crash.log.
 // fs.appendFileSync sopravvive al crash; il file viene letto al prossimo boot
 // da restart-monitor.ts per inserire il segnale in system_signals.
+//
+// Rotazione: se il file supera 50 KB, viene copiato in /tmp/server-crash-prev.log
+// (sovrascrivendolo) e quello corrente azzerato. Si conservano così almeno 2
+// generazioni di crash senza crescita illimitata.
 function writeCrashLog(type: string, err: unknown): void {
   try {
+    const CRASH_LOG = "/tmp/server-crash.log";
+    const CRASH_LOG_PREV = "/tmp/server-crash-prev.log";
+    const MAX_BYTES = 50 * 1024; // 50 KB
+
+    // Ruota se troppo grande, prima di appendere.
+    try {
+      const stat = fs.statSync(CRASH_LOG);
+      if (stat.size > MAX_BYTES) {
+        fs.copyFileSync(CRASH_LOG, CRASH_LOG_PREV);
+        fs.writeFileSync(CRASH_LOG, "", "utf8");
+      }
+    } catch {
+      // Il file non esiste ancora — nessuna rotazione necessaria.
+    }
+
+    // Leggi il passo di boot corrente (scritto da boot-sequence.ts).
+    let bootPhase = "(unknown)";
+    try {
+      bootPhase = fs.readFileSync("/tmp/server-boot-phase.txt", "utf8").trim();
+    } catch {
+      // File non ancora scritto (crash prima del boot) — ok.
+    }
+
+    // Leggi la migration in esecuzione, se presente.
+    let currentMigration = "";
+    try {
+      currentMigration = fs.readFileSync("/tmp/current-migration.txt", "utf8").trim();
+    } catch {
+      // Nessuna migration in corso — ok.
+    }
+
     const now = new Date().toISOString();
     const error = err instanceof Error ? err : new Error(String(err));
-    const entry = [
+    const lines = [
       `--- CRASH ${now} ---`,
       `type: ${type}`,
+      `boot-phase: ${bootPhase}`,
+      ...(currentMigration ? [`migration: ${currentMigration}`] : []),
       `message: ${error.message}`,
       `stack: ${error.stack ?? "(no stack)"}`,
       "",
-    ].join("\n");
-    fs.appendFileSync("/tmp/server-crash.log", entry, "utf8");
+    ];
+    fs.appendFileSync(CRASH_LOG, lines.join("\n"), "utf8");
   } catch {
     // nulla — siamo già in crash, non possiamo fare altro
   }

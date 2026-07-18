@@ -401,6 +401,15 @@ export async function runMigrations(): Promise<void> {
 
         console.log(`[migrate] → ${filename} (${statements.length} statement(s))${noTxn ? " [no-transaction]" : ""}`);
 
+        // Scrivi il file di migration corrente prima di applicarla: se il
+        // server crasha durante questa migration, il crash log includerà il
+        // nome del file, consentendo la diagnosi post-crash.
+        try {
+          fs.writeFileSync("/tmp/current-migration.txt", filename, "utf8");
+        } catch {
+          // Non fatale.
+        }
+
         try {
           if (noTxn) {
             await applyMigrationNoTransaction(client, filename, statements);
@@ -412,6 +421,13 @@ export async function runMigrations(): Promise<void> {
           console.error(`[migrate] ✗ ${filename} FAILED: ${message}`);
           throw err;
         }
+      }
+
+      // Pulizia: nessuna migration in esecuzione.
+      try {
+        fs.unlinkSync("/tmp/current-migration.txt");
+      } catch {
+        // File già assente — ok.
       }
 
       console.log(`[migrate] Done — ${pending.length} migration(s) applied successfully.`);

@@ -8,10 +8,24 @@ PORT=5000
 MAX_RETRIES=10
 LOCK_FILE="/tmp/start-backend.lock"
 CRASH_LOG="logs/backend-crashes.log"
+CRASH_LOG_PREV="logs/backend-crashes.1.log"
+CRASH_LOG_MAX_BYTES=512000  # 500 KB
 SERVER_PID=0
 START_TIME=0
 
 mkdir -p logs
+
+# Ruota backend-crashes.log se supera 500 KB (max 2 file storici).
+rotate_crash_log() {
+  [ -f "$CRASH_LOG" ] || return 0
+  local size
+  size=$(stat -c%s "$CRASH_LOG" 2>/dev/null || echo 0)
+  if [ "$size" -gt "$CRASH_LOG_MAX_BYTES" ]; then
+    cp -f "$CRASH_LOG" "$CRASH_LOG_PREV" 2>/dev/null || true
+    : > "$CRASH_LOG"
+    echo "[$(date '+%Y-%m-%dT%H:%M:%S')] [rotate] backend-crashes.log superava 500 KB — ruotato in backend-crashes.1.log"
+  fi
+}
 
 log_crash() {
   local pid=$1
@@ -62,6 +76,14 @@ if [ -f "$LOCK_FILE" ]; then
 fi
 
 echo $$ > "$LOCK_FILE"
+
+# Ruota il log se necessario, poi scrivi il separatore di sessione: ogni avvio
+# distinto è chiaramente leggibile nel log, anche dopo molti crash successivi.
+rotate_crash_log
+SESSION_START_TS=$(date '+%Y-%m-%dT%H:%M:%S')
+{
+  echo "=== SESSION START === $SESSION_START_TS PID=$$"
+} >> "$CRASH_LOG"
 
 # ── Build server_dist/index.js (cache-aware: veloce se nessun file è cambiato) ──
 echo "[$(date '+%Y-%m-%dT%H:%M:%S')] Build server in corso (cache-aware)..."

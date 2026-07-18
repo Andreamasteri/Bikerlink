@@ -55,6 +55,14 @@ function bootLog(n: number, total: number, step: string, msg: string) {
   console.log(`[${new Date().toISOString()}] [${n}/${total}] ${step} — ${elapsed}s | ${msg}`);
   const ok = msg === "done" ? true : msg === "start" ? null : null;
   addBootLog(`[${n}/${total}] ${step}`, msg, ok);
+  // Aggiorna il file di passo corrente per il crash log: in caso di crash
+  // durante il boot, writeCrashLog leggerà questo file e includerà la fase.
+  try {
+    const { writeFileSync } = require("fs") as typeof import("fs");
+    writeFileSync("/tmp/server-boot-phase.txt", `${n}/${total} ${step} (${msg})`, "utf8");
+  } catch {
+    // Non fatale.
+  }
 }
 
 // ── DB readiness pre-flight ───────────────────────────────────────────────────
