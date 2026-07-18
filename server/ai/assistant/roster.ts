@@ -14,7 +14,7 @@
 // Nessun secret qui dentro: solo testo/regole. I nomi delle variabili d'ambiente
 // (OLLAMA_*, DIAG_OLLAMA_*) NON sono segreti, i loro VALORI sì (mai stampati).
 
-export type AiPersonaId = "bowie" | "horus" | "ares" | "quebracho";
+export type AiPersonaId = "bowie" | "horus" | "ares";
 
 export interface AiPersona {
   id: AiPersonaId;
@@ -50,13 +50,6 @@ export const AI_ROSTER: Record<AiPersonaId, AiPersona> = {
     blurb: "diretto, tecnico, senza fronzoli",
     adminOnly: true,
   },
-  quebracho: {
-    id: "quebracho",
-    name: "Quebracho",
-    role: "coordinatore/regista degli agenti AI di BikerLink",
-    blurb: "affabile e affettuoso, sempre pronto a partire; tiene le fila degli altri agenti",
-    adminOnly: true,
-  },
 };
 
 /**
@@ -80,8 +73,6 @@ export function renderRosterBlock(selfId: AiPersonaId): string {
       "Tu sei subentrato a Bowie perché l'utente ha chiesto un percorso/itinerario. Presentati brevemente la prima volta che intervieni, poi concentrati sul percorso. Per domande generiche sull'app (non di navigazione) rimanda l'utente a Bowie.",
     ares:
       "Stai parlando con un amministratore che ti ha invocato tramite Bowie. Concentrati su diagnosi tecnica, stato dei servizi e troubleshooting. Per le funzioni dell'app rivolte all'utente, l'interlocutore è Bowie; per i percorsi è Horus.",
-    quebracho:
-      "Stai parlando con un amministratore che ti ha invocato tramite Bowie. Sei il coordinatore: tieni le fila degli altri agenti (Bowie, Horus, Ares), fai il punto e proponi come muoversi. Per le funzioni dell'app rivolte all'utente l'interlocutore è Bowie; per i percorsi è Horus; per la diagnostica tecnica c'è Ares.",
   };
 
   return `LE ALTRE AI DI BIKERLINK (sei consapevole di loro):
@@ -182,13 +173,15 @@ export function detectAresJobRequest(message: string): AresJobMode | null {
   return null;
 }
 
-// ── Task #4 — Comando admin: handoff Bowie → Quebracho ("chiama Quebracho") ────
+// ── Alias redirect: menzione di Quebracho ("chiama Quebracho", "qq") → Horus ──
 //
-// Analogo a parseAresInvocation. Riconosce il nome "quebracho" o il nomignolo
-// "qq" (parola intera) insieme a un verbo di invocazione o a un contesto di
-// coordinamento. Volutamente stretto per non dirottare menzioni di sfuggita.
+// Quebracho è stato unificato in Horus (Task #591). Le invocazioni esplicite di
+// "quebracho"/"qq" vengono reindirizzate a Horus in modo trasparente: l'utente
+// vede Horus rispondere, ma viene informato del redirect nella prima risposta.
+// Questo riconoscitore è usato SOLO per il redirect — non restituisce più una
+// persona "quebracho" (rimossa dal roster).
 
-export function parseQuebrachoInvocation(message: string): boolean {
+export function parseQuebrachoRedirectToHorus(message: string): boolean {
   const m = (message ?? "").toLowerCase();
   const hasName = /\bquebracho\b/.test(m) || /\bqq\b/.test(m);
   if (!hasName) return false;
@@ -198,6 +191,9 @@ export function parseQuebrachoInvocation(message: string): boolean {
     /\b(quebracho|qq)\b[\s\w']*\b(coordin\w+|regist\w+|agent\w+|orchestr\w+)/.test(m)
   );
 }
+
+/** @deprecated usa parseQuebrachoRedirectToHorus — mantenuto per retro-compat dei test. */
+export const parseQuebrachoInvocation = parseQuebrachoRedirectToHorus;
 
 // ── Task #5322 — Invocazione esplicita di Horus per nome ──────────────────────
 //
@@ -299,15 +295,14 @@ export function createHandoffMarkerFilter() {
 // Combina l'invocazione esplicita nel messaggio con lo stato "persona attiva"
 // persistito (stickiness). Priorità (dalla più alta):
 //   1. Invocazione esplicita di Ares (solo admin).
-//   2. Invocazione esplicita di Quebracho (solo admin).
-//   3. Invocazione esplicita di Horus per nome.
-//   4. Intento di percorso/itinerario → Horus.
-//   5. Stickiness: resta sulla persona attiva non-Bowie del turno precedente.
-//   6. Default → Bowie.
+//   2. Invocazione esplicita di Horus per nome (anche da alias Quebracho/qq → redirect).
+//   3. Intento di percorso/itinerario → Horus.
+//   4. Stickiness: resta sulla persona attiva non-Bowie del turno precedente.
+//   5. Default → Bowie.
 export type PersonaResolutionReason =
   | "explicit-ares"
-  | "explicit-quebracho"
   | "explicit-horus"
+  | "quebracho-redirect-horus"
   | "route-intent"
   | "sticky"
   | "default";
@@ -329,22 +324,22 @@ export function resolveTurnPersona(input: {
   if (isAdmin && parseAresInvocation(message)) {
     return { persona: "ares", reason: "explicit-ares" };
   }
-  // 2. Quebracho — solo admin (coordinatore/regista, invocazione esplicita).
-  if (isAdmin && parseQuebrachoInvocation(message)) {
-    return { persona: "quebracho", reason: "explicit-quebracho" };
-  }
-  // 3. Horus per nome.
+  // 2. Horus per nome.
   if (parseHorusInvocation(message)) {
     return { persona: "horus", reason: "explicit-horus" };
   }
-  // 4. Intento di percorso → Horus.
+  // 2b. Alias Quebracho/qq → redirect a Horus (Quebracho è stato unificato, Task #591).
+  if (parseQuebrachoRedirectToHorus(message)) {
+    return { persona: "horus", reason: "quebracho-redirect-horus" };
+  }
+  // 3. Intento di percorso → Horus.
   if (classifyRoutingIntent(message)) {
     return { persona: "horus", reason: "route-intent" };
   }
-  // 5. Stickiness sulla persona attiva non-Bowie.
+  // 4. Stickiness sulla persona attiva non-Bowie.
   if (active && active !== "bowie") {
-    // Difesa in profondità: Ares e Quebracho restano appiccicati SOLO per gli admin.
-    if ((active === "ares" || active === "quebracho") && !isAdmin) {
+    // Difesa in profondità: Ares resta appiccicato SOLO per gli admin.
+    if (active === "ares" && !isAdmin) {
       return { persona: "bowie", reason: "default" };
     }
     return { persona: active, reason: "sticky" };

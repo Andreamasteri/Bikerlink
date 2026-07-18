@@ -5,7 +5,7 @@
 // su disco locale (`inbox/horus-memory.md`, coerente con il catalogo di
 // riferimento dell'ecosistema agenti) e vengono ricaricate come contesto di
 // sistema aggiuntivo in OGNI conversazione futura in cui Horus è la persona
-// attiva — così Horus "ricorda" tra sessioni diverse. Bowie/Ares/Quebracho NON
+// attiva — così Horus "ricorda" tra sessioni diverse. Bowie/Ares NON
 // vedono questa memoria.
 //
 // Non contiene segreti: solo testo di appunti. Il file è best-effort (in

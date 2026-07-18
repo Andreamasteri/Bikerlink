@@ -1,5 +1,5 @@
 /**
- * Task #10 (Quebracho c) — monitor unificato Bowie/Horus/Ares/Quebracho.
+ * Monitor unificato Bowie/Horus/Ares (Task #591: Quebracho unified into Horus).
  */
 import { vi, describe, it, expect, beforeEach } from "vitest";
 import express from "express";
@@ -14,14 +14,8 @@ vi.mock("../routes/admin/thinkcentre-health-utils", () => ({ httpProbe: httpProb
 const { probeAresMock } = vi.hoisted(() => ({ probeAresMock: vi.fn(async () => ({ configured: true, online: true, latencyMs: 30, error: undefined })) }));
 vi.mock("../routes/admin/thinkcentre-health-ares-probe", () => ({ probeAres: probeAresMock }));
 
-const { isQuebrachoConfiguredMock, isQuebrachoReachableMock } = vi.hoisted(() => ({
-  isQuebrachoConfiguredMock: { value: true },
-  isQuebrachoReachableMock: vi.fn(async () => true),
-}));
-vi.mock("../lib/quebracho-client", () => ({
-  get isQuebrachoConfigured() { return isQuebrachoConfiguredMock.value; },
-  isQuebrachoReachable: isQuebrachoReachableMock,
-}));
+// isQuebrachoConfiguredMock/isQuebrachoReachableMock removed (Task #591 — Quebracho unified into Horus)
+// quebracho-client removed (Task #591 — Quebracho unified into Horus)
 
 const { getCoordinatorJobsSnapshotMock } = vi.hoisted(() => ({ getCoordinatorJobsSnapshotMock: vi.fn(() => [{ state: "running" }, { state: "idle" }]) }));
 vi.mock("../ai/coordinator/job-gate", () => ({ getCoordinatorJobsSnapshot: getCoordinatorJobsSnapshotMock }));
@@ -57,8 +51,7 @@ beforeEach(() => {
   probeOllamaMock.mockReset().mockResolvedValue({ configured: true, ok: true, latencyMs: 42, error: undefined });
   httpProbeMock.mockReset().mockResolvedValue({ ok: true, latencyMs: 10, error: undefined });
   probeAresMock.mockReset().mockResolvedValue({ configured: true, online: true, latencyMs: 30, error: undefined });
-  isQuebrachoConfiguredMock.value = true;
-  isQuebrachoReachableMock.mockReset().mockResolvedValue(true);
+  // isQuebrachoConfiguredMock/isQuebrachoReachableMock removed (Task #591)
   getCoordinatorJobsSnapshotMock.mockReset().mockReturnValue([{ state: "running" }, { state: "idle" }]);
   insertValuesMock.mockReset().mockResolvedValue({});
   dbMock.insert.mockReset().mockReturnValue({ values: insertValuesMock });
@@ -68,9 +61,10 @@ describe("GET /api/admin/ai-monitor", () => {
   it("aggrega lo stato delle 4 AI", async () => {
     const res = await request(buildApp()).get("/api/admin/ai-monitor");
     expect(res.status).toBe(200);
-    expect(res.body.agents).toHaveLength(4);
-    const quebracho = res.body.agents.find((a: { persona: string }) => a.persona === "quebracho");
-    expect(quebracho.activeJobs).toBe(1); // solo lo stato "running"
+    // Task #591: Quebracho removed — now 3 agents (Bowie/Horus/Ares)
+    expect(res.body.agents).toHaveLength(3);
+    const horus = res.body.agents.find((a: { persona: string }) => a.persona === "horus");
+    expect(horus.activeJobs).toBe(1); // running jobs tracked via Horus coordinator
   });
 
   it("non persiste transizioni al primo probe (no rumore da boot)", async () => {

@@ -81,7 +81,7 @@ vi.mock("../ai/assistant/knowledge", () => ({
   buildAdminSystemPrompt: vi.fn(() => "system: admin"),
   buildHorusSystemPrompt: vi.fn(() => "system: horus"),
   buildAresSystemPrompt: vi.fn(() => "system: ares"),
-  buildQuebrachoSystemPrompt: vi.fn(() => "system: quebracho"),
+  // buildQuebrachoSystemPrompt removed (Task #591)
 }));
 
 vi.mock("../ai/assistant/rag", () => ({

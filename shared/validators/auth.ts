@@ -17,6 +17,7 @@ export const RESERVED_EXACT_NICKNAMES = [
 // SOTTOSTRINGA case-insensitive (es. "AresAdmin", "il_bowie99", "nadir@...")
 // per impedire tentativi di impersonificazione/ingegneria sociale in chat,
 // log e pannelli admin dove questi nomi sono riconoscibili.
+// "quebracho" kept in reservation list to prevent username conflicts (Task #591).
 export const RESERVED_AI_AGENT_NAMES = ["ares", "nadir", "bowie", "quebracho", "horus"];
 
 /** True se il nickname è riservato (match esatto admin/mod, o contiene un nome di agente AI). */

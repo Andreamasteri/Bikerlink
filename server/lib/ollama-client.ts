@@ -78,14 +78,12 @@ import { AGENT_MODEL_DEFAULTS } from "./agent-constants";
 // Modello default di Bowie — centralizzato in AGENT_MODEL_DEFAULTS.bowie.
 const BOWIE_OLLAMA_MODEL = process.env.BOWIE_OLLAMA_MODEL ?? AGENT_MODEL_DEFAULTS.bowie;
 
-// Task #165 — Modelli per persona. I default DEVONO restare allineati ai client
-// dedicati: horus = HORUS_MODEL_ID (server/ai/assistant/*), ares = ares-client.ts,
-// quebracho = quebracho-client.ts. Nomi modello (mai valori di secret) loggati al boot.
+// Task #165 — Modelli per persona. Nomi modello (mai valori di secret) loggati al boot.
+// (Task #591: quebracho rimosso, unificato in Horus.)
 const PERSONA_MODELS = {
   bowie: BOWIE_OLLAMA_MODEL,
   horus: process.env.HORUS_OLLAMA_MODEL?.trim() || AGENT_MODEL_DEFAULTS.horus,
   ares: process.env.ARES_OLLAMA_MODEL?.trim() || AGENT_MODEL_DEFAULTS.ares,
-  quebracho: process.env.QUEBRACHO_OLLAMA_MODEL?.trim() || AGENT_MODEL_DEFAULTS.quebracho,
 } as const;
 
 /** Personas per cui è risolvibile un modello (superset di OllamaPersona: include gli agenti con client dedicato). */
@@ -127,8 +125,7 @@ export const isOllamaConfigured = Boolean(BOWIE_OLLAMA_URL);
 /**
  * Nome del modello locale usato per una persona (audit/log; nessun secret).
  * Task #165 — ora onora la persona: horus → HORUS_OLLAMA_MODEL, ares →
- * ARES_OLLAMA_MODEL, quebracho → QUEBRACHO_OLLAMA_MODEL. Persona assente o
- * sconosciuta → modello di Bowie (backward compat).
+ * ARES_OLLAMA_MODEL. Persona assente o sconosciuta → modello di Bowie (backward compat).
  */
 export function getOllamaModelId(persona: OllamaModelPersona = "bowie"): string {
   return PERSONA_MODELS[persona] ?? BOWIE_OLLAMA_MODEL;

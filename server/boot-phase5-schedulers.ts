@@ -177,7 +177,7 @@ export async function runPhase5Schedulers(): Promise<void> {
     const { syncProductionUpdates } = await import("./routes/admin/ota");
     const { withJobGate } = await import("./ai/coordinator/gated-job");
     // Task #9 — anche il subsystem OTA (già integrato con l'AI Coordinator
-    // event-based) risponde ora al gate unico di Quebracho: kill-switch/pause
+    // event-based) risponde ora al gate unico del coordinator: kill-switch/pause
     // rispettati allo stesso modo di ogni altro job schedulato.
     const gatedSync = withJobGate("ota-sync-cron", syncProductionUpdates);
     setTimeout(() => {
@@ -244,19 +244,19 @@ export async function runPhase5Schedulers(): Promise<void> {
   }, 2 * 60_000);
 
   try {
-    const { startQuebrachoGuards } = await import("./ai/coordinator/guards");
-    startQuebrachoGuards();
+    const { startCoordinatorGuards } = await import("./ai/coordinator/guards");
+    startCoordinatorGuards();
   } catch (e) {
-    console.warn("[INIT] Quebracho guard jobs failed (non-fatal):", e);
-    markDegraded("scheduler:quebracho-guards");
+    console.warn("[INIT] Coordinator guard jobs failed (non-fatal):", e);
+    markDegraded("scheduler:coordinator-guards");
   }
 
   try {
-    const { startQuebrachoAutoLearnScheduler } = await import("./ai/coordinator/quebracho-auto-learn");
-    startQuebrachoAutoLearnScheduler();
+    const { startHorusAutoLearnScheduler } = await import("./ai/coordinator/horus-auto-learn");
+    startHorusAutoLearnScheduler();
   } catch (e) {
-    console.warn("[INIT] Quebracho auto-learn scheduler failed (non-fatal):", e);
-    markDegraded("scheduler:quebracho-auto-learn");
+    console.warn("[INIT] Horus auto-learn scheduler failed (non-fatal):", e);
+    markDegraded("scheduler:horus-auto-learn");
   }
 
   try {
@@ -376,26 +376,38 @@ export async function runPhase5Schedulers(): Promise<void> {
     markDegraded("scheduler:ai-coordinator-integrations");
   }
 
-  // Task #5 (Quebracho a) — Control-plane del coordinatore: idrata la registry
-  // dei job dal DB (ripristina pause/throttle sopravvissuti al restart) e avvia
-  // il loop seriale continuo di Quebracho. In questa fase la registry può essere
-  // vuota di callback `run` (il cablaggio dei ~26 loop è Task #9): il loop resta
-  // un no-op leggero ma osservabile via /api/health.
-  await arm("quebracho-coordinator-loop", async () => {
+  // Control-plane del coordinatore Horus: idrata la registry dei job dal DB
+  // (ripristina pause/throttle sopravvissuti al restart) e avvia il loop.
+  // Task #591: deletes legacy Quebracho directives on startup (fail-open: warns but never blocks).
+  await arm("horus-coordinator-loop", async () => {
     const { hydrateRegistryFromDb, resetRunningJobsOnStartup } = await import("./ai/coordinator/job-registry");
-    const { startQuebrachoLoop } = await import("./ai/coordinator/quebracho-loop");
+    const { startHorusCoordinatorLoop } = await import("./ai/coordinator/horus-coordinator-loop");
+    // Cleanup: remove stale Quebracho directives from DB (no longer valid).
+    try {
+      const { db } = await import("./db");
+      const { sql } = await import("drizzle-orm");
+      await db.execute(sql`DELETE FROM directive WHERE issued_by = 'quebracho'`);
+      await db.execute(sql`DELETE FROM ai_coordinator_jobs WHERE issued_by = 'quebracho'`);
+      await db.execute(sql`DELETE FROM app_settings WHERE key = 'matching_coordinator_directive:quebracho'`);
+      // Integrity check
+      const result = await db.execute(sql`SELECT COUNT(*) AS n FROM directive WHERE issued_by = 'quebracho'`);
+      const remaining = Number((result.rows?.[0] as Record<string, unknown>)?.n ?? 0);
+      if (remaining > 0) {
+        console.warn(`[INIT] Task #591: ${remaining} Quebracho directive(s) remain after cleanup — manual intervention may be needed.`);
+      } else {
+        console.log("[INIT] Task #591: Quebracho directives cleanup complete.");
+      }
+    } catch (cleanupErr) {
+      console.warn("[INIT] Task #591: Quebracho directive cleanup failed (non-fatal):", cleanupErr);
+    }
     await hydrateRegistryFromDb();
-    // Task #393 — Reset zombie: tutti i job che risultano "running" nel DB dopo
-    // l'idratazione vengono riportati a idle. Questo interrompe il ciclo di
-    // perpetuazione degli zombie: un crash precedente senza cleanup non blocca
-    // più il loop al riavvio. Deve avvenire DOPO hydrateRegistryFromDb e PRIMA
-    // di startQuebrachoLoop così il loop parte con una registry pulita.
+    // Reset zombie: jobs still "running" in DB after hydration are reset to idle.
     const resetted = resetRunningJobsOnStartup();
     if (resetted.length > 0) {
-      console.warn(`[INIT] Quebracho startup reset: ${resetted.length} job zombie → idle: ${resetted.join(", ")}`);
+      console.warn(`[INIT] Coordinator startup reset: ${resetted.length} zombie job(s) → idle: ${resetted.join(", ")}`);
     }
-    startQuebrachoLoop();
-    console.log("[INIT] Quebracho coordinator loop started (serial control-plane)");
+    startHorusCoordinatorLoop();
+    console.log("[INIT] Horus coordinator loop started (serial control-plane)");
   });
 
   try {

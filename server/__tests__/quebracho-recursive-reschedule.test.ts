@@ -44,7 +44,7 @@ afterEach(() => {
 
 describe("scheduleDailyUserTimeProfileJob — sopravvivenza del loop a uno skip del gate", () => {
   it("un tick negato dal gate NON esegue il job ma pianifica comunque il tick successivo", async () => {
-    canRunJobMock.mockResolvedValue({ allowed: false, reason: "pausa quebracho", source: "quebracho" });
+    canRunJobMock.mockResolvedValue({ allowed: false, reason: "pausa horus", source: "horus" });
 
     scheduleDailyUserTimeProfileJob();
     // Prima esecuzione pianificata (delay variabile in base all'ora corrente).

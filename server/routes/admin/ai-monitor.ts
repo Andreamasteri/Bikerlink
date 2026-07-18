@@ -1,6 +1,5 @@
-// Task #10 (Quebracho c) — Monitor unificato delle 4 AI di BikerLink
-// (Bowie/Horus/Ares/Quebracho): online/offline, latenza, job attivi (solo
-// Quebracho ne ha), errori recenti. Riusa i probe esistenti dove già
+// Monitor unificato delle AI di BikerLink (Bowie/Horus/Ares):
+// online/offline, latenza, errori recenti. Riusa i probe esistenti dove già
 // disponibili (Bowie via probeOllama, Ares via probeAres) e riusa lo schema
 // già presente `thinkcentre_health_events` per lo storico persistito delle
 // transizioni online↔offline (nessuna nuova tabella).
@@ -15,19 +14,25 @@ import { cfAccessHeaders } from "../../lib/cf-access";
 import { httpProbe } from "./thinkcentre-health-utils";
 import { probeOllama } from "./thinkcentre-health-gh-probes";
 import { probeAres } from "./thinkcentre-health-ares-probe";
-import { isQuebrachoConfigured, isQuebrachoReachable } from "../../lib/quebracho-client";
+// Quebracho removed (Task #591 — unified into Horus); coordinator jobs now tracked via Horus.
 import { getCoordinatorJobsSnapshot } from "../../ai/coordinator/job-gate";
+
+// Count of coordinator jobs actively running — attributed to Horus post-unification.
+function getHorusActiveJobCount(): number {
+  const jobs = getCoordinatorJobsSnapshot();
+  return jobs.filter((j) => j.state === "running").length;
+}
 
 const router = Router();
 
-export type AgentPersona = "bowie" | "horus" | "ares" | "quebracho";
+export type AgentPersona = "bowie" | "horus" | "ares";
 
 export interface AgentMonitorSnapshot {
   persona: AgentPersona;
   configured: boolean;
   online: boolean;
   latencyMs: number | null;
-  /** Job in stato "running" adesso — significativo solo per Quebracho (regista). */
+  /** Job in stato "running" adesso — rilevato dal coordinator Horus. */
   activeJobs: number | null;
   error?: string;
 }
@@ -49,7 +54,7 @@ async function probeHorusAgent(): Promise<AgentMonitorSnapshot> {
   const headers: Record<string, string> = { ...cfAccessHeaders("horus") };
   if (token) headers["X-Ollama-Token"] = token;
   const r = await httpProbe(`${base}/api/tags`, headers);
-  return { persona: "horus", configured: true, online: r.ok, latencyMs: r.latencyMs, activeJobs: null, error: r.error };
+  return { persona: "horus", configured: true, online: r.ok, latencyMs: r.latencyMs, activeJobs: getHorusActiveJobCount(), error: r.error };
 }
 
 async function probeAresAgent(): Promise<AgentMonitorSnapshot> {
@@ -57,15 +62,7 @@ async function probeAresAgent(): Promise<AgentMonitorSnapshot> {
   return { persona: "ares", configured: h.configured, online: h.online, latencyMs: h.latencyMs, activeJobs: null, error: h.error };
 }
 
-async function probeQuebrachoAgent(): Promise<AgentMonitorSnapshot> {
-  if (!isQuebrachoConfigured) {
-    return { persona: "quebracho", configured: false, online: false, latencyMs: null, activeJobs: 0 };
-  }
-  const t0 = Date.now();
-  const online = await isQuebrachoReachable();
-  const activeJobs = getCoordinatorJobsSnapshot().filter((j) => j.state === "running").length;
-  return { persona: "quebracho", configured: true, online, latencyMs: online ? Date.now() - t0 : null, activeJobs };
-}
+// probeQuebrachoAgent removed — Quebracho unified into Horus (Task #591).
 
 // ── Storico transizioni (persistito, best-effort) ───────────────────────────
 //
@@ -94,13 +91,12 @@ async function recordTransitionIfChanged(persona: AgentPersona, online: boolean)
 
 router.get("/ai-monitor", async (_req: Request, res: Response) => {
   try {
-    const [bowie, horus, ares, quebracho] = await Promise.all([
+    const [bowie, horus, ares] = await Promise.all([
       probeBowieAgent(),
       probeHorusAgent(),
       probeAresAgent(),
-      probeQuebrachoAgent(),
     ]);
-    const agents = [bowie, horus, ares, quebracho];
+    const agents = [bowie, horus, ares];
     await Promise.all(agents.map((a) => recordTransitionIfChanged(a.persona, a.online)));
     res.json({ agents, checkedAt: new Date().toISOString() });
   } catch (err) {

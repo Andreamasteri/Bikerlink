@@ -20,8 +20,4 @@ export const ARES_INTRO_POEM =
   "Mi nutro di grandi concetti, per lunghi pensieri.\n\n" +
   "Cosa posso fare per voi?";
 
-// Task #4 — Saluto FISSO di Quebracho ("Qq"), il coordinatore/regista degli
-// agenti. A differenza delle altre persone NON è una poesia lunga: sono
-// esattamente tre righe, sempre uguali, iniettate al primo turno della persona.
-export const QUEBRACHO_INTRO_POEM =
-  "Bentornato.\nSono sempre contento di vederti.\nUsciamo?";
+// QUEBRACHO_INTRO_POEM removed (Task #591 — Quebracho unified into Horus).

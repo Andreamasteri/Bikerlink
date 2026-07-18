@@ -355,11 +355,11 @@ export const aiToolEvents = pgTable("ai_tool_events", {
 export type AiToolEvent = typeof aiToolEvents.$inferSelect;
 export type InsertAiToolEvent = typeof aiToolEvents.$inferInsert;
 
-// ── Task #51 — Conversazione osservabile a più agenti (Horus/Bowie/Quebracho) ─
+// ── Task #51 — Conversazione osservabile a più agenti (Horus/Bowie) ─
 //
 // A differenza della chat diretta (UNA persona attiva per turno, con handoff che
 // SOSTITUISCE), qui l'admin propone un ARGOMENTO e 2-3 agenti (bowie/horus/
-// quebracho — Ares è escluso: resta l'analisi asincrona) discutono a TURNI, in
+// Ares è escluso: resta l'analisi asincrona) discutono a TURNI, in
 // diretta, mentre l'admin osserva. Il transcript è persistito così che, se la
 // connessione cade a metà, riaprendo la stessa conversazione si vedono i turni
 // già avvenuti e la si può far ripartire dall'ultimo turno completato.

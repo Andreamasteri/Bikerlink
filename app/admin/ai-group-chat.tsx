@@ -1,7 +1,7 @@
 /**
  * Admin — Conversazione osservabile a più agenti (Task #51)
  *
- * L'admin propone un argomento e osserva Bowie/Horus/Quebracho discutere a turni,
+ * L'admin propone un argomento e osserva Bowie/Horus discutere a turni,
  * in diretta. Può riprendere una conversazione interrotta dall'ultimo turno e
  * interromperne una in corso. Solo admin (schermata sotto app/admin).
  */
@@ -42,19 +42,16 @@ interface DisplayTurn {
 const PERSONA_COLORS: Record<string, string> = {
   bowie: "#FF6600",
   horus: "#F59E0B",
-  quebracho: "#22C55E",
 };
 
 const PERSONA_ICONS: Record<string, keyof typeof MaterialCommunityIcons.glyphMap> = {
   bowie: "robot-happy-outline",
   horus: "eye-outline",
-  quebracho: "account-tie-outline",
 };
 
 const PARTICIPANT_OPTIONS: { id: GroupTurnPersona["id"]; name: string }[] = [
   { id: "bowie", name: "Bowie" },
   { id: "horus", name: "Horus" },
-  { id: "quebracho", name: "Quebracho" },
 ];
 
 const MIN_PARTICIPANTS = 2;

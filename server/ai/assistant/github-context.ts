@@ -13,13 +13,12 @@ const GITHUB_BRANCH = "main";
 const CACHE_TTL_MS = 10 * 60 * 1000;
 const MAX_FILE_CHARS = 6_000;
 
-export type AiGithubPersona = "bowie" | "horus" | "ares" | "quebracho";
+export type AiGithubPersona = "bowie" | "horus" | "ares";
 
 const PERSONA_TOKEN_ENV: Record<AiGithubPersona, string> = {
   bowie: "BOWIE_GITHUB_TOKEN",
   horus: "HORUS_GITHUB_TOKEN",
   ares: "ARES_GITHUB_TOKEN",
-  quebracho: "QUEBRACHO_GITHUB_TOKEN",
 };
 
 function githubTokenFor(persona: AiGithubPersona): string | null {

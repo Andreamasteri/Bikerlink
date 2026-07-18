@@ -1,5 +1,5 @@
 /**
- * Task #10 (Quebracho c) — Admin: registry dei job del coordinatore Quebracho.
+ * Admin: registry dei job del coordinator Horus (ex Quebracho — Task #591).
  *
  * Vista in lettura dello stato dei job (job-registry.ts/job-gate.ts, Task
  * #5/#9) + kill-switch globale + direttive manuali (pause/resume/force/
@@ -19,20 +19,18 @@ type JobState = "idle" | "running" | "paused" | "throttled" | "disabled";
 interface JobDirective {
   kind: "pause" | "throttle";
   reason: string;
-  issuedBy: "quebracho" | "admin_manual" | "horus";
+  issuedBy: "admin_manual" | "horus";
   issuedAt: string;
   throttleMs?: number;
 }
 
 const ISSUER_LABEL: Record<JobDirective["issuedBy"], string> = {
   admin_manual: "Admin",
-  quebracho: "Quebracho",
   horus: "Horus (autonomo)",
 };
 
 const ISSUER_COLOR: Record<JobDirective["issuedBy"], string> = {
   admin_manual: "#F59E0B",
-  quebracho: "#0EA5E9",
   horus: "#8B5CF6",
 };
 
@@ -53,7 +51,6 @@ interface JobEntry {
 
 interface JobsResponse {
   killSwitch: boolean;
-  quebrachoReachable: boolean;
   horusReachable: boolean;
   jobs: JobEntry[];
 }
@@ -106,17 +103,6 @@ export default function CoordinatorJobsScreen() {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={{ padding: 16, paddingBottom: insets.bottom + 24 }}>
-      <View style={[styles.statusBanner, { borderColor: data?.quebrachoReachable ? "#22C55E" : Colors.error }]}>
-        <MaterialCommunityIcons
-          name={data?.quebrachoReachable ? "check-circle-outline" : "alert-circle-outline"}
-          size={20}
-          color={data?.quebrachoReachable ? "#22C55E" : Colors.error}
-        />
-        <Text style={styles.statusText}>
-          Quebracho {data?.quebrachoReachable ? "raggiungibile" : "non raggiungibile — pause automatiche ignorate (fallback)"}
-        </Text>
-      </View>
-
       <View style={[styles.statusBanner, { borderColor: data?.horusReachable ? "#22C55E" : Colors.error }]} testID="coordinator-horus-status-banner">
         <MaterialCommunityIcons
           name={data?.horusReachable ? "check-circle-outline" : "alert-circle-outline"}
@@ -131,7 +117,7 @@ export default function CoordinatorJobsScreen() {
       <View style={styles.killSwitchRow}>
         <View style={{ flex: 1 }}>
           <Text style={styles.killSwitchLabel}>Kill-switch globale</Text>
-          <Text style={styles.killSwitchSubtitle}>Ferma TUTTI i job del coordinatore, indipendentemente da Quebracho.</Text>
+          <Text style={styles.killSwitchSubtitle}>Ferma TUTTI i job del coordinatore Horus.</Text>
         </View>
         <TouchableOpacity
           style={[styles.killSwitchToggle, { backgroundColor: data?.killSwitch ? Colors.error : Colors.border }]}

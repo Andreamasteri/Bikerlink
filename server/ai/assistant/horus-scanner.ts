@@ -143,7 +143,7 @@ CONTESTO BIKERLINK (com'è fatta l'app):
 - App mobile per motociclisti sviluppata in React Native (Expo).
 - Pianificazione percorsi (routing) self-hosted sul ThinkCentre con GraphHopper e Valhalla.
 - Stack AI multi-persona: Bowie (assistente utenti), Horus (routing e analisi codice),
-  Nadir (ricerca semantica/RAG), Ares (diagnostica), Quebracho (coordinamento job).
+  Nadir (ricerca semantica/RAG), Ares (diagnostica), Horus (coordinamento job).
 - Backend Express + Drizzle ORM + PostgreSQL.
 - Aggiornamenti dell'app distribuiti via OTA con EAS.
 

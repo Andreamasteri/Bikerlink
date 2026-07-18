@@ -32,7 +32,7 @@ const CF_ACCESS_CLIENT_SECRET = process.env.CF_ACCESS_CLIENT_SECRET?.trim() ?? "
 
 /**
  * Task #4 — Override opzionale per-agente. Un agente AI (bowie/horus/ares/
- * quebracho) può avere un Service Token dedicato via <AGENT>_CF_ACCESS_CLIENT_ID
+ * ares) può avere un Service Token dedicato via <AGENT>_CF_ACCESS_CLIENT_ID
  * / <AGENT>_CF_ACCESS_CLIENT_SECRET. Se una delle due manca, si ricade sulla
  * coppia generica CF_ACCESS_CLIENT_ID/SECRET (comportamento storico invariato per
  * GraphHopper/Valhalla/Nominatim/Whisper, che chiamano senza argomento).

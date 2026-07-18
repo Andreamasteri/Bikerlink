@@ -1,7 +1,7 @@
 /**
  * Admin — Conversazione osservabile a più agenti (Task #51)
  *
- * L'admin propone un ARGOMENTO e Bowie/Horus/Quebracho discutono a TURNI, in
+ * L'admin propone un ARGOMENTO e Bowie/Horus discutono a TURNI, in
  * diretta, mentre l'admin osserva. Il transcript è persistito così che, se la
  * connessione cade a metà, riaprendo la stessa conversazione si vedono i turni
  * già avvenuti e la si può far ripartire dall'ultimo turno completato.

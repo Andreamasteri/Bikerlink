@@ -12,7 +12,7 @@ vi.mock("../lib/ollama-client", () => ({
 }));
 vi.mock("../lib/dedup-logger", () => ({ dedupWarn: vi.fn() }));
 vi.mock("../lib/thinkcentre-offline", () => ({ isThinkCentreOffline: vi.fn(async () => false) }));
-vi.mock("../lib/quebracho-client", () => ({ isQuebrachoReachable: vi.fn(async () => true) }));
+// quebracho-client removed (Task #591 — Quebracho unified into Horus)
 vi.mock("../db", () => ({
   db: { insert: () => ({ values: () => ({ onConflictDoUpdate: async () => undefined }) }) },
   withDbRetry: async <T>(fn: () => Promise<T>) => fn(),

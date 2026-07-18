@@ -11,14 +11,13 @@
  * Uso:
  *   npx tsx scripts/review-task-plan.ts --file .local/tasks/task-50.md
  *   npx tsx scripts/review-task-plan.ts --content "..."
- *   npx tsx scripts/review-task-plan.ts --file <path> --agent quebracho
  *
- * Agenti disponibili: ares (default), quebracho, horus, bowie.
+ * Agenti disponibili: ares (default), horus, bowie.
  */
 import { fileURLToPath } from "node:url";
 import { reviewTaskPlan, type ReviewAgent } from "../server/ai/assistant/task-review";
 
-const VALID_AGENTS: ReviewAgent[] = ["ares", "quebracho", "horus", "bowie"];
+const VALID_AGENTS: ReviewAgent[] = ["ares", "horus", "bowie"];
 
 interface CliArgs {
   filePath?: string;
@@ -46,7 +45,7 @@ function parseArgs(argv: string[]): CliArgs {
   }
 
   if (!filePath && content === undefined) {
-    throw new Error("Uso: --file <path> | --content <testo> [--agent ares|quebracho|horus|bowie]");
+    throw new Error("Uso: --file <path> | --content <testo> [--agent ares|horus|bowie]");
   }
   return { filePath, content, agent };
 }

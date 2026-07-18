@@ -11,12 +11,13 @@ import {
 } from "../ai/assistant/group-conversation";
 
 describe("group-conversation — normalizeParticipants", () => {
-  it("accetta solo Bowie/Horus/Quebracho preservando l'ordine", () => {
+  it("accetta solo Bowie/Horus preservando l'ordine", () => {
     expect(normalizeParticipants(["horus", "bowie"])).toEqual(["horus", "bowie"]);
   });
-  it("scarta agenti non ammessi (es. ares) e duplicati", () => {
-    expect(normalizeParticipants(["bowie", "ares", "bowie", "quebracho"]))
-      .toEqual(["bowie", "quebracho"]);
+  it("ricade sul roster completo se il risultato è sotto il minimo", () => {
+    // Only "bowie" survives the filter — below GROUP_MIN_PARTICIPANTS(2) → fallback to full roster
+    expect(normalizeParticipants(["bowie", "ares", "bowie"]))
+      .toEqual([...GROUP_PARTICIPANTS]); // Task #591: GROUP_PARTICIPANTS is now ["bowie","horus"]
   });
   it("ricade sul roster completo se sotto il minimo", () => {
     expect(normalizeParticipants(["ares"])).toEqual([...GROUP_PARTICIPANTS]);
@@ -40,10 +41,10 @@ describe("group-conversation — clampMaxTurns", () => {
 
 describe("group-conversation — personaForTurn", () => {
   it("ruota sull'ordine dei partecipanti", () => {
-    const p = ["bowie", "horus", "quebracho"] as const;
+    const p = ["bowie", "horus"] as const; // Task #591: quebracho removed
     expect(personaForTurn(p, 0)).toBe("bowie");
     expect(personaForTurn(p, 1)).toBe("horus");
-    expect(personaForTurn(p, 2)).toBe("quebracho");
-    expect(personaForTurn(p, 3)).toBe("bowie");
+    expect(personaForTurn(p, 2)).toBe("bowie"); // wraps
+    expect(personaForTurn(p, 3)).toBe("horus");
   });
 });

@@ -60,8 +60,8 @@ export const aiConflicts = pgTable("ai_conflicts", {
   index("ai_conflicts_created_idx").on(t.createdAt),
 ]);
 
-// Task #5 (Quebracho a) — Registry persistente dei job di background gestiti dal
-// coordinatore Quebracho. Fonte di verità live = mappa in-memory (job-registry.ts);
+// Registry persistente dei job di background gestiti dal coordinator Horus
+// (ex Quebracho — Task #591: unified into Horus). Fonte di verità live = mappa in-memory (job-registry.ts);
 // questa tabella persiste stato/direttive fra i restart. Una riga per job.
 export const aiCoordinatorJobs = pgTable("ai_coordinator_jobs", {
   name: varchar("name", { length: 120 }).primaryKey(),
@@ -72,7 +72,7 @@ export const aiCoordinatorJobs = pgTable("ai_coordinator_jobs", {
   lastErrorAt: timestamp("last_error_at"),
   lastError: text("last_error"),
   nextRunAt: timestamp("next_run_at"),
-  // quebracho|admin_manual|killswitch|deterministic
+  // horus|admin_manual|killswitch|deterministic
   pauseSource: varchar("pause_source", { length: 24 }),
   pauseReason: text("pause_reason"),
   // { kind: "pause"|"throttle", reason, issuedBy, issuedAt, throttleMs? }

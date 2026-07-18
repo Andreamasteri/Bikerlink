@@ -1,7 +1,7 @@
 /**
- * AI-hub file operation injection for Ares and Quebracho — Task #163
+ * AI-hub file operation injection for Ares — Task #163
  *
- * Ares e Quebracho NON usano tool-calling nativo (endpoint HTTP dedicati, nessun
+ * Ares NON usa tool-calling nativo (endpoint HTTP dedicati, nessun
  * `streamText`). Per dargli accesso ai file della cartella condivisa del TC
  * (~/agent-shared/) usiamo due meccanismi complementari:
  *
@@ -234,7 +234,7 @@ function extractFilePath(message: string): string | null {
 }
 
 /**
- * Task #163 — Pre-composition per Ares e Quebracho: lettura e/o elenco di file
+ * Task #163 — Pre-composition per Ares: lettura e/o elenco di file
  * dall'ai-hub TC. Se il messaggio contiene un intento file, esegue l'operazione
  * e restituisce un blocco da appendere al system prompt (stesso pattern di
  * `buildNadirContextForPrompt`). Nessun intento → stringa vuota. Best-effort.
@@ -316,8 +316,8 @@ export async function buildHubFileContextForPrompt(
 // ── Descrizione per il system prompt ──────────────────────────────────────────
 
 /**
- * Blocco di testo che descrive le capacità file-hub ad Ares/Quebracho nel loro
- * system prompt. `includeWrite` aggiunge la direttiva di scrittura (Ares e Quebracho).
+ * Blocco di testo che descrive le capacità file-hub ad Ares nel suo system prompt.
+ * `includeWrite` aggiunge la direttiva di scrittura (Ares).
  */
 export function buildHubFileCapabilitiesBlock(opts: { includeWrite: boolean }): string {
   const readSection =

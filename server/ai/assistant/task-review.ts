@@ -3,7 +3,7 @@
 // Dato un file o un testo di task plan, produce una review strutturata in
 // italiano PRIMA che il piano venga eseguito, senza mai modificare nulla. A
 // differenza del meccanismo Ares-only del catalogo di riferimento, qui la review
-// è disponibile a TUTTE le persone (Horus, Bowie, Quebracho, Ares) — coerente
+// è disponibile a TUTTE le persone (Horus, Bowie, Ares) — coerente
 // col fatto che gli altri tool del catalogo sono multi-agente — e viene
 // instradata all'agente richiesto. Resta valido l'invariante "propone, non
 // applica": nessun tool di scrittura, solo analisi testuale + verifica dei
@@ -17,10 +17,10 @@ import path from "node:path";
 import { callOllamaChat, isOllamaConfigured, isOllamaReachable } from "../../lib/ollama-client";
 import { isAresConfigured, getAresModelId, streamAresChat } from "../../lib/ares-client";
 import { withAresVramPriority } from "../../lib/vram-arbiter";
-import { isQuebrachoConfigured, streamQuebrachoChat } from "../../lib/quebracho-client";
+// Quebracho removed (Task #591 — unified into Horus). No quebracho-client import.
 import { createTimeoutSignal } from "./inter-agent";
 
-export type ReviewAgent = "ares" | "quebracho" | "horus" | "bowie";
+export type ReviewAgent = "ares" | "horus" | "bowie";
 
 export interface ReviewTaskPlanOptions {
   /** Testo del task plan (alternativo a filePath). */
@@ -160,8 +160,8 @@ export function resolveWorkspacePath(filePath: string): { ok: true; abs: string 
   return { ok: true, abs };
 }
 
-// ── Task #57 — Rilevamento in-chat per Ares/Quebracho ──────────────────────────
-// Ares e Quebracho non passano da streamText (nessun tool-calling nativo: usano
+// ── Task #57 — Rilevamento in-chat per Ares ──────────────────────────────────
+// Ares non passa da streamText (nessun tool-calling nativo: usa
 // un client HTTP diretto + una singola domanda composta), quindi non possono
 // esporre `review_task_plan` come tool AI SDK come fanno Bowie/Horus. Per dare
 // comunque un percorso in-chat, il messaggio dell'admin viene ispezionato PRIMA
@@ -245,8 +245,6 @@ function agentConfigured(agent: ReviewAgent): boolean {
   switch (agent) {
     case "ares":
       return isAresConfigured;
-    case "quebracho":
-      return isQuebrachoConfigured;
     case "horus":
     case "bowie":
       return isOllamaConfigured;
@@ -293,16 +291,6 @@ async function callReviewAgent(
         numPredict: 1200,
       }),
     );
-    return stripThink(text);
-  }
-  if (agent === "quebracho") {
-    const { text } = await streamQuebrachoChat({
-      system,
-      messages: [{ role: "user", content: prompt }],
-      signal: opts.signal,
-      timeoutMs,
-      numPredict: 1200,
-    });
     return stripThink(text);
   }
   // horus / bowie → Ollama chat con la persona corrispondente. callOllamaChat

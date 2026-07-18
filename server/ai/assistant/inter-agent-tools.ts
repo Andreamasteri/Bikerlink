@@ -2,7 +2,7 @@
  * Tool inter-agente + memoria Horus + revisione piani — Task #50
  *
  * A differenza dei tool "base" in ./tools.ts, questi NON passano da `guardTool`:
- * consultano altre AI (Horus/Quebracho/Ares) o l'agente di revisione, che girano
+ * consultano altre AI (Horus/Ares) o l'agente di revisione, che girano
  * su modelli pesanti self-hosted con latenze di decine di secondi. Il tetto di 8s
  * di `guardTool` li ucciderebbe sempre. Ognuno gestisce il proprio timeout
  * internamente (nei client) e ritorna un testo di cortesia in caso di errore,
@@ -14,7 +14,7 @@
 
 import { tool } from "ai";
 import { z } from "zod";
-import { askHorus, askQuebracho, askAres } from "./inter-agent";
+import { askHorus, askAres } from "./inter-agent";
 import { appendHorusNote } from "./horus-memory";
 import { reviewTaskPlan, type ReviewAgent } from "./task-review";
 import { searchNadir } from "../nadir";
@@ -64,19 +64,6 @@ export function buildBowieInterAgentTools(ctx: InterAgentToolContext): Record<st
       execute: async (input: { prompt: string }) => {
         const r = await askHorus(input.prompt, { signal: ctx.signal });
         return { agent: "horus", ok: r.ok, response: r.text };
-      },
-    }),
-    call_quebracho: tool({
-      description:
-        "Chiede un parere a Quebracho, il coordinatore/regista degli agenti AI, a metà conversazione. " +
-        "Ritorna il suo punto di vista perché tu lo incorpori nella tua risposta. Usalo quando l'utente " +
-        "chiede cosa ne pensa Quebracho o vuole coinvolgerlo.",
-      inputSchema: z.object({
-        message: z.string().min(1).describe("Il messaggio/domanda da inoltrare a Quebracho."),
-      }),
-      execute: async (input: { message: string }) => {
-        const r = await askQuebracho(input.message, { signal: ctx.signal });
-        return { agent: "quebracho", ok: r.ok, response: r.text };
       },
     }),
   };
@@ -178,7 +165,7 @@ export function buildReviewTaskPlanTool(
  * Tool `search_manual` — consulta Nadir, il MOTORE DI RICERCA SEMANTICA (Task #75).
  *
  * Agent-neutral: identico per Bowie, Horus (e, via injection pre-composizione, per
- * Quebracho — vedi agent.ts). NON è un default silenzioso: la selezione contestuale
+ * NON è un default silenzioso: la selezione contestuale
  * lo allega SOLO quando il messaggio contiene un cue esplicito di richiamo semantico
  * (SEARCH_MANUAL_RE in tool-calling.ts). Ritorna frammenti ordinati con origine
  * (manual/conversation/comment) e punteggio di similarità.

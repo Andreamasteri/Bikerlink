@@ -4,23 +4,20 @@
 // ricadano sull'italiano (comportamento storico) quando la lingua è assente.
 import { describe, it, expect, vi } from "vitest";
 
-// group-conversation importa l'SDK "ai" e i client Ollama/Quebracho a livello di
+// group-conversation importa l'SDK "ai" e i client Ollama a livello di
 // modulo: mockarli così l'import (per la funzione PURA buildGroupSystemPrompt)
 // non tira su SDK o rete. buildGroupSystemPrompt non li usa.
 vi.mock("ai", () => ({ streamText: vi.fn() }));
 vi.mock("../lib/ollama-client", () => ({ getOllamaModel: vi.fn() }));
-vi.mock("../lib/quebracho-client", () => ({
-  streamQuebrachoChat: vi.fn(),
-  getQuebrachoModelId: vi.fn(),
-}));
+// quebracho-client removed (Task #591 — Quebracho unified into Horus)
 
 import {
   buildSystemPrompt,
   buildAdminSystemPrompt,
   buildHorusSystemPrompt,
   buildAresSystemPrompt,
-  buildQuebrachoSystemPrompt,
 } from "../ai/assistant/knowledge";
+// buildQuebrachoSystemPrompt removed (Task #591 — Quebracho unified into Horus)
 import { buildGroupSystemPrompt } from "../ai/assistant/group-conversation";
 
 describe("Task #130 — chat 1:1: la lingua dell'utente raggiunge il system prompt", () => {
@@ -48,13 +45,11 @@ describe("Task #130 — chat 1:1: la lingua dell'utente raggiunge il system prom
     expect(buildAresSystemPrompt("ctx", undefined, "es")).toContain("Español");
   });
 
-  it("Quebracho: language='en' → istruzione di risposta in English", () => {
-    expect(buildQuebrachoSystemPrompt("ctx", "en")).toContain("English");
-  });
+  // Quebracho test removed (Task #591 — Quebracho unified into Horus)
 });
 
 describe("Task #130 — chat di gruppo: tutti i turni visibili nella lingua dell'utente", () => {
-  const participants = ["bowie", "horus", "quebracho"] as const;
+  const participants = ["bowie", "horus"] as const; // Task #591: quebracho removed
 
   it("Bowie in gruppo: language='en' → risposta ESCLUSIVAMENTE in English (anche tra agenti)", () => {
     const p = buildGroupSystemPrompt("bowie", participants, "en");

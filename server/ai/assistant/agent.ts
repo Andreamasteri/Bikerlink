@@ -15,7 +15,6 @@ import {
   buildAdminSystemPrompt,
   buildHorusSystemPrompt,
   buildAresSystemPrompt,
-  buildQuebrachoSystemPrompt,
   type KnowledgeEntry,
 } from "./knowledge";
 import { getOllamaModel, isOllamaConfigured, warmOllama } from "../../lib/ollama-client";
@@ -26,8 +25,7 @@ import { recordKnowledgeGap } from "./knowledge-gaps";
 import { composeAresQuestion } from "./ares-question";
 import { isAresConfigured, getAresModelId, streamAresChat } from "../../lib/ares-client";
 import { withAresVramPriority } from "../../lib/vram-arbiter";
-import { composeQuebrachoQuestion } from "./quebracho-question";
-import { isQuebrachoConfigured, getQuebrachoModelId, streamQuebrachoChat } from "../../lib/quebracho-client";
+// Quebracho removed (Task #591 — unified into Horus). No quebracho-client / quebracho-question import.
 import { detectPlanReviewRequest, reviewTaskPlan } from "./task-review";
 import { detectHorusScanRequest, startHorusScan } from "./horus-scanner";
 import { retrieveContext, formatRagContext, indexKnowledge } from "./rag";
@@ -63,7 +61,7 @@ import { aiConversationTurns } from "@shared/db";
 import { eq, desc } from "drizzle-orm";
 import { pruneUserMemory, MEMORY_TURNS_LIMIT } from "./memory-pruner";
 import { fetchUserLiveContext } from "./user-context";
-import { BOWIE_INTRO_POEM, HORUS_INTRO_POEM, ARES_INTRO_POEM, QUEBRACHO_INTRO_POEM } from "@shared/bowie-greeting";
+import { BOWIE_INTRO_POEM, HORUS_INTRO_POEM, ARES_INTRO_POEM } from "@shared/bowie-greeting";
 import { AGENT_MODEL_DEFAULTS } from "../../lib/agent-constants";
 
 // Default Bowie/Horus model fallbacks are centralised in agent-constants.ts so a
@@ -111,7 +109,7 @@ export interface AssistantAgentOpts {
   // Task #107 — Lingua dell'app del richiedente: filtra i frammenti del manuale
   // recuperati da Nadir alla traduzione corrispondente (fallback italiano se
   // mancante/non ancora tradotta). Default italiano quando assente (client
-  // vecchi, admin panel, Ares/Quebracho).
+  // vecchi, admin panel, Ares).
   language?: AppLanguageCode;
   // Task #5228 — Client di origine ("main_app" | "bowie_terminal"). Loggato in
   // ai_call_logs.source_app per il monitor Bowie Standalone.
@@ -189,7 +187,7 @@ async function maybeSummarize(userId: string): Promise<void> {
 }
 
 /**
- * Task #75 — Contesto Nadir per personas SENZA tool-calling nativo (Quebracho).
+ * Task #75 — Contesto Nadir per personas SENZA tool-calling nativo (Ares).
  * Se il messaggio contiene un cue di richiamo semantico (stesso gate del tool
  * `search_manual`), interroga Nadir e ritorna un blocco da appendere al system
  * prompt. Nessun cue → stringa vuota (nessuna ricerca, nessun costo). Best-effort:
@@ -201,7 +199,7 @@ async function buildNadirContextForPrompt(
 ): Promise<string> {
   if (!SEARCH_MANUAL_RE.test(message ?? "")) return "";
   try {
-    // SICUREZZA (Task #75): stesso scoping del tool `search_manual`. Quebracho è
+    // SICUREZZA (Task #75): stesso scoping del tool `search_manual`. Ares è
     // solo-admin (contesto di sistema) → includeAllUsers; passiamo comunque il
     // requesterId per coerenza con Bowie/Horus.
     // Task #107 — la lingua filtra i frammenti del MANUALE alla traduzione del
@@ -224,7 +222,7 @@ async function buildNadirContextForPrompt(
       `solo se serve:\n${lines}\n---`
     );
   } catch (e) {
-    console.warn("[Nadir] injection Quebracho fallita (non-fatal):", (e as Error)?.message ?? e);
+    console.warn("[Nadir] injection fallita (non-fatal):", (e as Error)?.message ?? e);
     return "";
   }
 }
@@ -343,12 +341,12 @@ export async function runAssistantAgent(opts: AssistantAgentOpts): Promise<Assis
   }
 
   // Task #5197 — Persona richiesta (handoff risolto a monte nel route).
-  // Difesa in profondità: Ares e Quebracho sono SOLO per gli admin. Il route già
+  // Difesa in profondità: Ares è SOLO per gli admin. Il route già
   // lo garantisce, ma se runAssistantAgent venisse chiamato direttamente con
-  // persona="ares"/"quebracho" fuori dalla modalità admin, ricadiamo su Bowie
+  // persona="ares" fuori dalla modalità admin, ricadiamo su Bowie
   // invece di esporre agenti riservati.
   const requestedPersona: AiPersonaId =
-    (opts.persona === "ares" || opts.persona === "quebracho") && !isAdmin
+    opts.persona === "ares" && !isAdmin
       ? "bowie"
       : (opts.persona ?? "bowie");
   // Persona EFFETTIVA: può cambiare se la richiesta fallisce (es. Ares offline).
@@ -470,9 +468,9 @@ export async function runAssistantAgent(opts: AssistantAgentOpts): Promise<Assis
 
   // Latenza (Task #5327): scalda il modello Ollama in modo fire-and-forget, in
   // parallelo alla costruzione del contesto (RAG + profilo utente + memoria), così
-  // è già residente quando parte lo stream. Skip per Ares/Quebracho (endpoint
+  // è già residente quando parte lo stream. Skip per Ares (endpoint
   // dedicati) e quando ci sono immagini (si va sul path vision cloud, non Ollama).
-  if (isOllamaConfigured && requestedPersona !== "ares" && requestedPersona !== "quebracho" && !hasImages) {
+  if (isOllamaConfigured && requestedPersona !== "ares" && !hasImages) {
     warmOllama(requestedPersona === "horus" ? "horus" : "bowie", ollamaModelName);
   }
 
@@ -498,13 +496,8 @@ export async function runAssistantAgent(opts: AssistantAgentOpts): Promise<Assis
     // file, fetchhiamo il risultato dall'hub e lo iniettiamo nel system prompt PRIMA
     // della composizione della domanda per Ares. Best-effort: nessun file intent → "".
     system += await buildHubFileContextForPrompt(opts.message, { includeWrite: true });
-  } else if (requestedPersona === "quebracho") {
-    // Task #4 — Quebracho: coordinatore/regista (solo admin), snapshot piattaforma.
-    // Task #163 — Quebracho accede ai file della cartella condivisa TC in lettura e
-    // scrittura (pre-composition + response parser, nessun tool nativo).
-    const quebrachoHubFileCaps = buildHubFileCapabilitiesBlock({ includeWrite: true });
-    system = buildQuebrachoSystemPrompt(opts.adminContext ?? "", opts.language ?? SOURCE_APP_LANGUAGE, quebrachoHubFileCaps);
-    // Task #75 — Nadir agent-neutral anche per Quebracho. Quebracho NON usa il
+  // Note: Quebracho persona removed (Task #591 — unified into Horus).
+    // Task #75 — Nadir agent-neutral anche per Ares. Ares NON usa il
     // tool-calling nativo (endpoint dedicato), quindi invece del tool `search_manual`
     // usiamo l'INTERCETTAZIONE PRE-COMPOSIZIONE: se il messaggio contiene un cue di
     // richiamo semantico, interroghiamo Nadir e iniettiamo i frammenti nel prompt.
@@ -555,7 +548,7 @@ export async function runAssistantAgent(opts: AssistantAgentOpts): Promise<Assis
     // Task #50 — Memoria persistente di Horus: le note salvate via remember_note
     // in conversazioni precedenti vengono iniettate PRIMA del resto del prompt,
     // così Horus "ricorda" tra sessioni diverse. Solo Horus le vede (Bowie/Ares/
-    // Quebracho non passano di qui). Best-effort: assente → nessuna sezione.
+    // (endpoint HTTP diretti, non passano di qui). Best-effort: assente → nessuna sezione.
     const horusMemory = await loadHorusMemory();
     if (horusMemory) {
       system =
@@ -621,16 +614,13 @@ export async function runAssistantAgent(opts: AssistantAgentOpts): Promise<Assis
   // la prima volta via handoff.
   const isNewHorusTurn = requestedPersona === "horus" && !!opts.personaFirstTurn;
   const isNewAresTurn = requestedPersona === "ares" && !!opts.personaFirstTurn;
-  const isNewQuebrachoTurn = requestedPersona === "quebracho" && !!opts.personaFirstTurn;
   const introPoem = isNewBowieConversation
     ? BOWIE_INTRO_POEM
     : isNewHorusTurn
       ? HORUS_INTRO_POEM
       : isNewAresTurn
         ? ARES_INTRO_POEM
-        : isNewQuebrachoTurn
-          ? QUEBRACHO_INTRO_POEM
-          : null;
+        : null;
   const seedTurns: Array<{ role: "user" | "assistant"; content: string }> = introPoem
     ? [{ role: "assistant", content: introPoem }]
     : [];
@@ -801,7 +791,7 @@ export async function runAssistantAgent(opts: AssistantAgentOpts): Promise<Assis
   // codice+DB, o generazione manuale), NON rispondiamo con l'LLM né trattiamo la
   // richiesta come una consultazione mid-chat: avviamo direttamente il job giusto
   // in Horus e confermiamo. Stessa logica di intercettazione pre-composizione di
-  // Ares/Quebracho. Gated ad admin (le scansioni sono capacità admin).
+  // Ares. Gated ad admin (le scansioni sono capacità admin).
   if (!done && isAdmin) {
     const scanReq = detectHorusScanRequest(opts.message);
     if (scanReq) {
@@ -945,105 +935,6 @@ export async function runAssistantAgent(opts: AssistantAgentOpts): Promise<Assis
           "Ho provato a passare la parola ad Ares (la nostra AI tecnica, gira su una macchina dedicata), ma al momento non risponde. Riprova più tardi.";
         provider = "fallback";
         modelId = "ares-offline";
-        opts.onTextDelta?.(finalText);
-        done = true;
-      }
-    }
-  } else if (requestedPersona === "quebracho") {
-    // 0.5) Task #4 — Quebracho: coordinatore/regista su Ollama (client dedicato,
-    //      /api/chat HTTP diretta), NON la chain Ollama/cloud. Se offline degrada
-    //      con GRAZIA: Bowie riprende con un messaggio garbato (mai fallback cloud).
-    opts.onPersona?.({ id: "quebracho", name: AI_ROSTER.quebracho.name });
-    // Task #57 — stesso intercettamento pre-composizione applicato ad Ares sopra:
-    // Quebracho gira anch'esso su HTTP diretta senza tool-calling nativo.
-    const quebrachoReviewReq = detectPlanReviewRequest(opts.message);
-    if (quebrachoReviewReq) {
-      try {
-        const r = await reviewTaskPlan({
-          ...quebrachoReviewReq,
-          agent: "quebracho",
-          signal: opts.signal,
-          allowFileRead: isAdmin,
-        });
-        const text = r.ok
-          ? (r.review ?? "(nessuna review prodotta)") +
-            (r.missingFiles && r.missingFiles.length > 0
-              ? `\n\n⚠️ File citati nel piano ma non trovati nel repository: ${r.missingFiles.join(", ")}`
-              : "")
-          : `⚠️ Revisione non eseguita: ${r.error ?? "errore sconosciuto"}`;
-        ensureIntroEmitted();
-        finalText += text;
-        aiText += text;
-        providerEmittedAny = true;
-        emitAiDelta(text);
-        provider = "quebracho";
-        modelId = getQuebrachoModelId();
-        done = true;
-        console.log(`[assistant] revisione task plan in-chat da Quebracho (ok=${r.ok})`);
-      } catch (reviewErr) {
-        console.warn("[assistant] revisione task plan Quebracho fallita:", (reviewErr as Error).message);
-      }
-    }
-    if (!done) try {
-      if (!isQuebrachoConfigured) throw new Error("Quebracho non configurato (nessun URL Ollama disponibile).");
-      // Composizione: Bowie sintetizza il contesto in UNA richiesta per Quebracho.
-      const quebrachoQuestion = await composeQuebrachoQuestion(opts.history ?? [], opts.message);
-      const quebrachoSystem = `${system}\n\nVINCOLO DI RISPOSTA: rispondi in modo CONTENUTO e STRUTTURATO (punti chiave, niente preamboli né divagazioni). Vai dritto al coordinamento/azione.`;
-      // Task #163 — stesso streaming filter di Ares: sopprime [[AGENT_SAVE_FILE:…]]
-      // in tempo reale durante lo stream di Quebracho.
-      const quebrachoSaveFilter = createSaveDirectiveStreamFilter();
-      await streamQuebrachoChat({
-        system: quebrachoSystem,
-        messages: [{ role: "user", content: quebrachoQuestion }],
-        signal: opts.signal,
-        timeoutMs: 60_000,
-        onDelta: (delta) => {
-          quebrachoSaveFilter.push(delta, (safe) => {
-            ensureIntroEmitted();
-            finalText += safe;
-            aiText += safe;
-            providerEmittedAny = true;
-            emitAiDelta(safe);
-          });
-        },
-      });
-      // Flush residui + esegui scritture catturate (best-effort)
-      const quebraChoCaptured = quebrachoSaveFilter.flush((safe) => {
-        if (safe) {
-          ensureIntroEmitted();
-          finalText += safe;
-          aiText += safe;
-          emitAiDelta(safe);
-        }
-      });
-      if (quebraChoCaptured.length > 0) {
-        const outcomes = await executeHubFileSaves(quebraChoCaptured);
-        const saveLog = outcomes
-          .map((s) => (s.ok ? `✅ File salvato: ${s.path}` : `⚠️ Salvataggio "${s.path}" fallito: ${s.error}`))
-          .join("\n");
-        const summaryDelta = `\n\n${saveLog}`;
-        finalText += summaryDelta;
-        aiText += summaryDelta;
-        opts.onTextDelta?.(summaryDelta);
-        console.log(`[assistant] Quebracho save directives: ${outcomes.map((s) => `${s.path}=${s.ok}`).join(", ")}`);
-      }
-      provider = "quebracho";
-      modelId = getQuebrachoModelId();
-      done = true;
-      console.log("[assistant] risposta da Quebracho (coordinamento)");
-    } catch (quebrachoErr) {
-      if (providerEmittedAny) {
-        console.warn("[assistant] Quebracho fallito a metà stream, mantengo il parziale:", (quebrachoErr as Error).message);
-        degraded = true;
-        done = true;
-      } else {
-        console.warn("[assistant] Quebracho offline, fallback a Bowie:", (quebrachoErr as Error).message);
-        effectivePersona = "bowie";
-        opts.onPersona?.({ id: "bowie", name: AI_ROSTER.bowie.name });
-        finalText =
-          "Ho provato a passare la parola a Quebracho (il nostro coordinatore, gira su una macchina dedicata), ma al momento non risponde. Riprova più tardi.";
-        provider = "fallback";
-        modelId = "quebracho-offline";
         opts.onTextDelta?.(finalText);
         done = true;
       }
@@ -1239,7 +1130,7 @@ export async function runAssistantAgent(opts: AssistantAgentOpts): Promise<Assis
   // Task #5322 — Lacune di conoscenza: se il RAG non ha trovato nulla di
   // pertinente (score basso o nullo) registriamo la domanda. Solo Bowie/Horus
   // (persone RAG-driven), mai admin/Ares. Best-effort, non blocca il turno.
-  if (!isAdmin && effectivePersona !== "ares" && effectivePersona !== "quebracho") {
+  if (!isAdmin && effectivePersona !== "ares") {
     void recordKnowledgeGap({
       question: opts.message,
       topScore: ragTopScore,

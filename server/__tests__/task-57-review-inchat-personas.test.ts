@@ -1,5 +1,5 @@
-// Task #57 — Ares e Quebracho eseguono review_task_plan direttamente in chat.
-// A differenza di Bowie/Horus (streamText + tool AI SDK), Ares e Quebracho girano
+// Task #57 — Ares esegue review_task_plan direttamente in chat.
+// A differenza di Bowie/Horus (streamText + tool AI SDK), Ares gira
 // su HTTP diretta senza tool-calling nativo: detectPlanReviewRequest è l'euristica
 // pura che decide se il messaggio dell'admin va instradato a reviewTaskPlan invece
 // che alla normale composizione domanda→chat.
@@ -8,7 +8,8 @@ import { detectPlanReviewRequest } from "../ai/assistant/task-review";
 
 describe("Task #57 — detectPlanReviewRequest", () => {
   it("riconosce un percorso citato tra backtick", () => {
-    const r = detectPlanReviewRequest("Quebracho, revisiona il piano `.local/tasks/task-57.md`");
+    // Quebracho removed (Task #591); test redirect to Horus behavior via roster alias
+    const r = detectPlanReviewRequest("Horus, revisiona il piano `.local/tasks/task-57.md`");
     expect(r).toEqual({ filePath: ".local/tasks/task-57.md" });
   });
 

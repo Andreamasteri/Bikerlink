@@ -42,7 +42,7 @@ beforeEach(() => {
   // Set env defaults for a clean slate.
   process.env.BOWIE_OLLAMA_MODEL = "qwen3:1.7b";
   process.env.HORUS_OLLAMA_MODEL = "qwen3:4b";
-  process.env.QUEBRACHO_OLLAMA_MODEL = "granite4:tiny-h";
+  // QUEBRACHO_OLLAMA_MODEL removed (Task #591 — Quebracho unified into Horus)
 });
 
 describe("pushAgentModelMapToHub", () => {
@@ -57,7 +57,7 @@ describe("pushAgentModelMapToHub", () => {
       modelAgentMap: {
         "qwen3:1.7b": "Bowie",
         "qwen3:4b": "Horus",
-        "granite4:tiny-h": "Quebracho",
+        // "granite4:tiny-h": "Quebracho",  — removed (Task #591: Quebracho unified into Horus)
         "all-minilm": "Nadir",
       },
     });
@@ -66,7 +66,7 @@ describe("pushAgentModelMapToHub", () => {
   it("uses env var overrides when model env vars are set to custom values", async () => {
     process.env.BOWIE_OLLAMA_MODEL = "qwen3:0.6b";
     process.env.HORUS_OLLAMA_MODEL = "qwen3:8b";
-    process.env.QUEBRACHO_OLLAMA_MODEL = "granite4:micro";
+    // QUEBRACHO_OLLAMA_MODEL removed (Task #591)
 
     const push = await loadPush();
     await push();
@@ -74,7 +74,6 @@ describe("pushAgentModelMapToHub", () => {
     const [, body] = hubPostMock.mock.calls[0];
     expect(body.modelAgentMap["qwen3:0.6b"]).toBe("Bowie");
     expect(body.modelAgentMap["qwen3:8b"]).toBe("Horus");
-    expect(body.modelAgentMap["granite4:micro"]).toBe("Quebracho");
     expect(body.modelAgentMap["all-minilm"]).toBe("Nadir");
   });
 

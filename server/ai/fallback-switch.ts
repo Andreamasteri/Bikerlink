@@ -1,7 +1,7 @@
 // Task #110 — Master switch globale "Fallback AI".
 //
 // Un unico toggle admin che decide se l'app può ricadere dai modelli self-hosted
-// ThinkCentre (Ollama: Bowie/Horus/Quebracho) sui provider cloud a pagamento
+// ThinkCentre (Ollama: Bowie/Horus) sui provider cloud a pagamento
 // (Groq/Gemini/OpenAI).
 //
 //   ON  = comportamento multi-provider odierno (Ollama-first, poi chain cloud).

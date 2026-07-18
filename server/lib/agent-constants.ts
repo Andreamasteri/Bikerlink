@@ -10,13 +10,13 @@
  * |------------|-------------------|-----------------|------------|
  * | Horus      | qwen3:4b          | GPU residente   | -1         |
  * | Bowie      | qwen3:1.7b        | GPU residente   | -1         |
- * | Quebracho  | granite4:tiny-h   | CPU+RAM reside. | -1         |
+ * (Quebracho unified into Horus — Task #591)
  * | Nadir      | all-minilm        | GPU residente   | -1         |
  * | Ares       | devstral          | On-demand       |  0         |
  * | Coder      | devstral          | On-demand       |  0         |
  *
  * keep_alive semantics (Ollama):
- *   -1  → never unload (resident agents: Horus, Bowie, Quebracho, Nadir)
+ *   -1  → never unload (resident agents: Horus, Bowie, Nadir)
  *    0  → unload immediately after the call (on-demand agents: Ares, Coder)
  *  "Xm" → unload after X minutes (legacy default, no longer used)
  *
@@ -26,7 +26,7 @@
  */
 
 /**
- * keep_alive for resident agents (Horus, Bowie, Quebracho, Nadir).
+ * keep_alive for resident agents (Horus, Bowie, Nadir).
  * Numeric -1 = never unload from VRAM/RAM.
  */
 export const KEEP_ALIVE_RESIDENT: -1 = -1;
@@ -41,7 +41,6 @@ export const KEEP_ALIVE_ON_DEMAND: 0 = 0;
 export const AGENT_MODEL_DEFAULTS = {
   bowie: "qwen3:1.7b",
   horus: "qwen3:4b",
-  quebracho: "granite4:tiny-h",
   nadir: "all-minilm",
   ares: "devstral:latest",
 } as const;

@@ -4,7 +4,7 @@
 // che arriva al catch dello stream, dato che i casi permanenti noti — nessun
 // provider configurato, prefs/config disabilitate — sono già intercettati con
 // un 503/403 PRIMA di aprire lo stream, vedi ai-assistant.ts) oppure
-// PERMANENTE (recoverable=false: "Ares non configurato"/"Quebracho non
+// PERMANENTE (recoverable=false: "Ares non configurato" /
 // configurato" in agent.ts — un retry identico darebbe sempre lo stesso esito
 // finché l'admin non interviene sulla configurazione).
 const PERMANENT_ERROR_RE = /non configurat[oa]/i;

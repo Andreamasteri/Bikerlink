@@ -1,8 +1,7 @@
-// Task #10 (Quebracho c) — Admin panel: registry dei job del coordinatore
-// Quebracho + kill-switch globale. Espone in lettura lo snapshot mantenuto da
-// job-registry.ts/job-gate.ts (Task #5/#9) e consente all'admin di applicare
-// direttive manuali (pause/resume/force/throttle), sempre rispettate dal gate
-// indipendentemente dalla raggiungibilità di Quebracho.
+// Admin panel: registry dei job del coordinator Horus + kill-switch globale.
+// Espone in lettura lo snapshot mantenuto da job-registry.ts/job-gate.ts e
+// consente all'admin di applicare direttive manuali (pause/resume/force/throttle),
+// sempre rispettate dal gate indipendentemente dalla raggiungibilità di Horus.
 import { Router, type Request, type Response } from "express";
 import { z } from "zod";
 import { sendError } from "../../lib/api-response";
@@ -11,7 +10,6 @@ import {
   getCoordinatorHealthSummary,
   isCoordinatorKillSwitchActive,
   setCoordinatorKillSwitch,
-  isQuebrachoUnreachable,
   isHorusUnreachable,
   applyJobDirective,
 } from "../../ai/coordinator/job-gate";
@@ -21,14 +19,12 @@ const router = Router();
 
 router.get("/coordinator/jobs", async (_req: Request, res: Response) => {
   try {
-    const [killSwitch, quebrachoDown, horusDown] = await Promise.all([
+    const [killSwitch, horusDown] = await Promise.all([
       isCoordinatorKillSwitchActive(),
-      isQuebrachoUnreachable(),
       isHorusUnreachable(),
     ]);
     res.json({
       killSwitch,
-      quebrachoReachable: !quebrachoDown,
       horusReachable: !horusDown,
       summary: getCoordinatorHealthSummary(),
       jobs: getCoordinatorJobsSnapshot(),

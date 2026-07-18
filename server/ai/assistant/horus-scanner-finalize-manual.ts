@@ -186,7 +186,7 @@ async function writeManualGlossary(corpus: string): Promise<string | null> {
 
 Sei Horus. Scrivi il GLOSSARIO che chiude il manuale di BikerLink: per CIASCUNO
 dei 35 termini elencati qui sotto, una voce con definizione breve (1-2 frasi) in
-italiano. I nomi propri (Bowie, Horus, Nadir, Ares, Quebracho, ThinkCentre, EAS,
+italiano. I nomi propri (Bowie, Horus, Nadir, Ares, ThinkCentre, EAS,
 qwen3…) restano invariati in tutte le lingue. Formato per riga:
 **Termine** — definizione.
 

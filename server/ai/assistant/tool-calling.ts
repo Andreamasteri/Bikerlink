@@ -138,9 +138,8 @@ const WEB_SEARCH_RE =
 const CALL_HORUS_RE =
   /\bhorus\b|(chied\w*|chiam\w*|us\w*|deleg\w*|pass\w*|senti\w*|coinvolg\w*|fall?o?\s+fare)\s+(a\s+)?horus|(itinerari|percors\w+\s+moto|pianific\w*\s+(un\s+)?(percors|itinerari|gir[oi]))/i;
 
-// call_quebracho: parere/coinvolgimento di Quebracho (alias "qq"), o menzione diretta.
-const CALL_QUEBRACHO_RE =
-  /\bquebracho\b|\bqq\b|(chied\w*|chiam\w*|senti\w*|coinvolg\w*|pens\w*|parere)\s+[\s\S]*\b(quebracho|qq)\b|cosa\s+ne\s+pensa\s+quebracho/i;
+// Note: Quebracho has been unified into Horus (Task #591). Mentions of quebracho/qq
+// are now redirected to Horus via the roster alias; no separate call_quebracho tool.
 
 // call_ares: attivazione esplicita di Ares (solo admin — il gating avviene a
 // monte tramite la disponibilità del tool), o menzione diretta.
@@ -206,7 +205,7 @@ export function selectToolNamesForMessage(
   // tool DAVVERO disponibili per la persona (call_* solo Bowie, call_ares solo
   // admin, remember_note solo Horus): la selezione contestuale non li "crea".
   if (CALL_HORUS_RE.test(m)) want("call_horus");
-  if (CALL_QUEBRACHO_RE.test(m)) want("call_quebracho");
+  // quebracho/qq mentions redirect to Horus via roster — no separate call_quebracho tool.
   if (CALL_ARES_RE.test(m)) want("call_ares");
   if (REMEMBER_NOTE_RE.test(m)) want("remember_note");
   if (REVIEW_TASK_PLAN_RE.test(m)) want("review_task_plan");

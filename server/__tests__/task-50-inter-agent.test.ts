@@ -25,7 +25,6 @@ const BOWIE_TOOLS = [
   "getUserPlannedRoutes",
   "webSearch",
   "call_horus",
-  "call_quebracho",
   "call_ares",
   "review_task_plan",
 ];
@@ -47,10 +46,8 @@ describe("Task #50 — selectToolNamesForMessage (tool inter-agente)", () => {
     expect(r).toContain("call_horus");
   });
 
-  it("'cosa ne pensa Quebracho' → call_quebracho", () => {
-    const r = selectToolNamesForMessage(BOWIE_TOOLS, "cosa ne pensa Quebracho di questa idea?", CAPS);
-    expect(r).toContain("call_quebracho");
-  });
+  // Note: call_quebracho removed (Task #591 — Quebracho unified into Horus).
+  // Quebracho mentions now redirect to Horus via roster alias.
 
   it("'chiama Ares' → call_ares (se il tool è disponibile per la persona)", () => {
     const r = selectToolNamesForMessage(BOWIE_TOOLS, "chiama Ares e fagli analizzare il routing", CAPS);
@@ -197,13 +194,13 @@ describe("Task #50 — remember_note gating admin-only", () => {
 
 describe("Task #50 — reviewTaskPlan preflight", () => {
   it("piano vuoto → errore chiaro, ok=false", async () => {
-    const r = await reviewTaskPlan({ content: "   ", agent: "quebracho" });
+    const r = await reviewTaskPlan({ content: "   ", agent: "horus" });
     expect(r.ok).toBe(false);
     expect(r.error).toMatch(/vuoto/i);
   });
 
   it("file inesistente → errore chiaro, ok=false", async () => {
-    const r = await reviewTaskPlan({ filePath: "does/not/exist-xyz.md", agent: "quebracho" });
+    const r = await reviewTaskPlan({ filePath: "does/not/exist-xyz.md", agent: "horus" });
     expect(r.ok).toBe(false);
     expect(r.error).toMatch(/non trovato/i);
   });
@@ -232,13 +229,13 @@ describe("Task #50 — resolveWorkspacePath (anti path traversal)", () => {
 
 describe("Task #50 — reviewTaskPlan protezione lettura file", () => {
   it("percorso assoluto → errore, nessuna lettura", async () => {
-    const r = await reviewTaskPlan({ filePath: "/etc/passwd", agent: "quebracho" });
+    const r = await reviewTaskPlan({ filePath: "/etc/passwd", agent: "horus" });
     expect(r.ok).toBe(false);
     expect(r.error).toMatch(/non ammesso/i);
   });
 
   it("traversal fuori dalla root → errore, nessuna lettura", async () => {
-    const r = await reviewTaskPlan({ filePath: "../../etc/passwd", agent: "quebracho" });
+    const r = await reviewTaskPlan({ filePath: "../../etc/passwd", agent: "horus" });
     expect(r.ok).toBe(false);
     expect(r.error).toMatch(/non ammesso/i);
   });
@@ -247,7 +244,7 @@ describe("Task #50 — reviewTaskPlan protezione lettura file", () => {
     // Anche un file reale del repo non deve essere letto se allowFileRead è false.
     const r = await reviewTaskPlan({
       filePath: "server/ai/assistant/tools.ts",
-      agent: "quebracho",
+      agent: "horus",
       allowFileRead: false,
     });
     expect(r.ok).toBe(false);

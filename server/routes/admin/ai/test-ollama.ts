@@ -41,12 +41,12 @@ export function sanitizeError(msg: string): string {
   let out = msg;
   // Sostituisci eventuali URL http(s) con la sola versione mascherata host.
   out = out.replace(/https?:\/\/[^\s"'`)]+/gi, (m) => maskUrl(m));
-  // Rimuovi il token di ogni agente (Bowie/Horus/Ares/Quebracho) se presente nel testo.
+  // Rimuovi il token di ogni agente (Bowie/Horus/Ares) se presente nel testo.
   for (const token of [
     process.env.BOWIE_OLLAMA_TOKEN,
     process.env.HORUS_OLLAMA_TOKEN,
     process.env.ARES_OLLAMA_TOKEN,
-    process.env.QUEBRACHO_OLLAMA_TOKEN,
+    // process.env.QUEBRACHO_OLLAMA_TOKEN removed (Task #591)
   ]) {
     if (token) out = out.split(token).join("***");
   }

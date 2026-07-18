@@ -1,5 +1,5 @@
 /**
- * VRAM Arbiter per Ares — Task #10 (Quebracho c)
+ * VRAM Arbiter per Ares
  *
  * Ares invoca un modello pesante on-demand (`ARES_OLLAMA_MODEL`, default
  * "devstral:latest") sulla propria macchina Ollama dedicata (ARES_OLLAMA_URL).

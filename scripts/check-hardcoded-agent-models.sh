@@ -10,7 +10,7 @@
 # Modelli rilevati (corrisponde alle chiavi di AGENT_MODEL_DEFAULTS):
 #   "qwen3:1.7b"      → Bowie
 #   "qwen3:4b"        → Horus
-#   "granite4:tiny-h" → Quebracho
+#   (granite4:tiny-h / Quebracho rimosso — Task #591: unificato in Horus)
 #   "all-minilm"      → Nadir
 #   "devstral:latest" → Ares
 #

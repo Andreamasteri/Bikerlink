@@ -1,15 +1,16 @@
 // Task #78 — Nadir citato dagli agenti su richiamo semantico (end-to-end turno).
 //
-// Task #75 ha cablato il tool `search_manual` (Nadir) per Bowie/Horus e
-// l'iniezione pre-composizione per Quebracho, gated su SEARCH_MANUAL_RE. I test
-// unitari coprono il gating e la ricerca, ma NESSUN test esercitava un intero
-// turno d'agente: utente → cue → Nadir consultato → frammenti nella risposta.
+// Task #75 ha cablato il tool `search_manual` (Nadir) per Bowie/Horus,
+// gated su SEARCH_MANUAL_RE. I test unitari coprono il gating e la ricerca,
+// ma NESSUN test esercitava un intero turno d'agente: utente → cue → Nadir
+// consultato → frammenti nella risposta.
 //
-// Qui guidiamo `runAssistantAgent` per Bowie, Horus e Quebracho:
+// Qui guidiamo `runAssistantAgent` per Bowie e Horus:
 //   • con un messaggio che contiene un cue di richiamo semantico verifichiamo che
 //     Nadir sia consultato e che i frammenti (con origine + similarità) emergano
-//     — nella risposta (tool, Bowie/Horus) o nel system prompt (iniezione, Quebracho);
+//     nella risposta (tool);
 //   • con un messaggio generico verifichiamo che Nadir NON venga MAI attaccato/consultato.
+// (Task #591: Quebracho removed — unified into Horus)
 //
 // Così un futuro refactoring della logica di attach dei tool non può spegnere Nadir
 // in silenzio.
@@ -36,8 +37,7 @@ const providerMocks = vi.hoisted(() => ({
 // Spy centrale di Nadir: unica fonte per verificare "Nadir è stato consultato?".
 const searchNadirMock = vi.hoisted(() => vi.fn());
 
-// Spy del client Quebracho: cattura il system prompt (dove finisce l'iniezione).
-const streamQuebrachoChatMock = vi.hoisted(() => vi.fn());
+// streamQuebrachoChatMock removed (Task #591 — Quebracho unified into Horus)
 
 // ---------------------------------------------------------------------------
 // Module mocks
@@ -76,17 +76,7 @@ vi.mock("../ai/nadir", async () => {
   };
 });
 
-// Client Quebracho (endpoint dedicato, NON streamText): iniezione pre-composizione.
-vi.mock("../lib/quebracho-client", () => ({
-  isQuebrachoConfigured: true,
-  getQuebrachoModelId: vi.fn(() => "quebracho-model"),
-  streamQuebrachoChat: streamQuebrachoChatMock,
-}));
-
-// Composizione della domanda per Quebracho (normalmente passa da Ollama): fissa.
-vi.mock("../ai/assistant/quebracho-question", () => ({
-  composeQuebrachoQuestion: vi.fn().mockResolvedValue("domanda composta per Quebracho"),
-}));
+// quebracho-client and quebracho-question removed (Task #591 — Quebracho unified into Horus)
 
 // Tool set per persona. `buildSearchManualTool` rispecchia il tool reale:
 // la sua `execute` delega a `searchNadir` (lo spy). Gli altri builder sono
@@ -133,7 +123,7 @@ vi.mock("../ai/assistant/knowledge", () => ({
   buildAdminSystemPrompt: vi.fn(() => "system: admin"),
   buildHorusSystemPrompt: vi.fn(() => "system: horus"),
   buildAresSystemPrompt: vi.fn(() => "system: ares"),
-  buildQuebrachoSystemPrompt: vi.fn(() => "system: quebracho"),
+  // buildQuebrachoSystemPrompt removed (Task #591)
 }));
 
 vi.mock("../ai/assistant/rag", () => ({
@@ -255,10 +245,7 @@ const HISTORY = [
 const lastStreamTextCall = () =>
   aiMocks.streamText.mock.calls[aiMocks.streamText.mock.calls.length - 1][0] as { tools?: ToolSet };
 
-const lastQuebrachoSystem = () =>
-  (streamQuebrachoChatMock.mock.calls[streamQuebrachoChatMock.mock.calls.length - 1][0] as {
-    system: string;
-  }).system;
+// lastQuebrachoSystem removed (Task #591 — Quebracho unified into Horus)
 
 // ---------------------------------------------------------------------------
 // Suite
@@ -270,13 +257,7 @@ describe("Task #78 — Nadir citato su richiamo semantico (turno d'agente e2e)",
     aiMocks.isStepCount.mockClear();
     searchNadirMock.mockReset();
     searchNadirMock.mockResolvedValue(nadirResult());
-    streamQuebrachoChatMock.mockReset();
-    // Client Quebracho: emette una risposta e ritorna (usa il system iniettato).
-    streamQuebrachoChatMock.mockImplementation(
-      async (opts: { onDelta?: (d: string) => void }) => {
-        opts.onDelta?.("Ok, coordino di conseguenza.");
-      },
-    );
+    // streamQuebrachoChatMock.mockReset() removed (Task #591 — Quebracho unified into Horus)
     providerMocks.runWithFallback.mockRejectedValue(new Error("cloud offline (mock)"));
     installStreamTextMock();
   });
@@ -332,36 +313,7 @@ describe("Task #78 — Nadir citato su richiamo semantico (turno d'agente e2e)",
     expect(result.provider).toBe("ollama");
   });
 
-  // ── Quebracho: cue → iniezione pre-composizione dei frammenti nel prompt ─────
-  it("Quebracho: un cue di richiamo consulta Nadir e inietta i frammenti nel system prompt", async () => {
-    const result = await runAssistantAgent({
-      message: "come avevamo detto in precedenza?",
-      platform: "admin",
-      allowedActions: [],
-      userId: "admin-1",
-      persona: "quebracho",
-      adminContext: "snapshot piattaforma",
-      history: HISTORY,
-    });
-
-    // Nadir consultato in contesto admin (includeAllUsers true).
-    expect(searchNadirMock).toHaveBeenCalledTimes(1);
-    expect(searchNadirMock).toHaveBeenLastCalledWith(
-      expect.any(String),
-      expect.any(Number),
-      expect.objectContaining({ includeAllUsers: true }),
-    );
-
-    // I frammenti (con origine + similarità) sono iniettati nel system prompt che
-    // Quebracho riceve — è il suo canale di "citazione" (nessun tool nativo).
-    const injected = lastQuebrachoSystem();
-    expect(injected).toContain("NADIR");
-    expect(injected).toContain(FRAG_CONVERSATION);
-    expect(injected).toContain(FRAG_MANUAL);
-    expect(injected).toContain("manual");
-    expect(result.persona.id).toBe("quebracho");
-    expect(result.provider).toBe("quebracho");
-  });
+  // (Task #591: Quebracho pre-composition injection tests removed — Quebracho unified into Horus)
 
   // ── Messaggio generico (tool path Bowie): Nadir NON attaccato/consultato ─────
   it("Bowie: un messaggio generico NON attacca né consulta Nadir", async () => {
@@ -381,19 +333,5 @@ describe("Task #78 — Nadir citato su richiamo semantico (turno d'agente e2e)",
     expect(result.degraded).toBe(false);
   });
 
-  // ── Messaggio generico (iniezione Quebracho): Nadir NON consultato/iniettato ─
-  it("Quebracho: un messaggio generico NON consulta Nadir né inietta frammenti nel prompt", async () => {
-    await runAssistantAgent({
-      message: "dammi un aggiornamento generale della situazione",
-      platform: "admin",
-      allowedActions: [],
-      userId: "admin-2",
-      persona: "quebracho",
-      adminContext: "snapshot piattaforma",
-      history: HISTORY,
-    });
-
-    expect(searchNadirMock).not.toHaveBeenCalled();
-    expect(lastQuebrachoSystem()).not.toContain("NADIR");
-  });
+  // (Task #591: Quebracho generic message test removed — Quebracho unified into Horus)
 });

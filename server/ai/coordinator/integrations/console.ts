@@ -76,7 +76,7 @@ export function wireConsoleToCoordinator(): void {
   // sincrone alla richiesta admin, non ripetibili a piacere): gatarle con
   // canRunJob aggiungerebbe latenza/IO a una richiesta interattiva senza un
   // vero beneficio di coordinamento. Ci limitiamo a registrare il subsystem
-  // nel registry di Quebracho per visibilità/audit nell'admin panel, senza
+  // nel registry del coordinator per visibilità/audit nell'admin panel, senza
   // alcun controllo bloccante sulle emit.
   registerGatedJob("console-adapter", { critical: false });
   console.log("[INIT] AI Coordinator wire console");

@@ -1,4 +1,4 @@
-// Task #10 (Quebracho c) — canale di escalation Quebracho→Horus→report.
+// Canale di escalation coordinator→Horus→report.
 //
 // I 3 guard job di Task #9 (guards.ts) rilevano SOLO e loggano su
 // ai_watchdog_log. Questo modulo aggiunge un passo di escalation: dopo aver
@@ -8,7 +8,7 @@
 // stessa history già esposta (system-health, ai-monitor).
 //
 // Horus è SEMPRE opzionale: se irraggiungibile la chiamata fallisce in
-// silenzio (nessun retry, nessun fallback al cloud — Horus/Bowie/Ares/Quebracho
+// silenzio (nessun retry, nessun fallback al cloud — Horus/Bowie/Ares
 // non ricadono mai sui provider cloud per questo tipo di analisi interna) e il
 // finding resta comunque visibile con la sola diagnosi del guard.
 import { callOllamaChat } from "../../lib/ollama-client";
@@ -41,7 +41,7 @@ const ESCALATION_NUM_PREDICT = 320;
 // di pausa viene emessa in autonomia (issuedBy="horus"). Il gate (job-gate.ts)
 // la rispetta SOLO se il backing service di Horus è raggiungibile in quel
 // momento: se Horus è offline, la pausa "congelata" non può bloccare il job
-// per sempre — fallback deterministico, stesso contratto di Quebracho.
+// per sempre — fallback deterministico.
 const AUTO_PAUSE_REPEAT_THRESHOLD = 3;
 const AUTO_PAUSE_WINDOW_MS = 24 * 60 * 60 * 1000;
 

@@ -1,7 +1,7 @@
 /**
- * Task #10 (Quebracho c) — Admin: monitor unificato delle 4 AI di BikerLink
- * (Bowie/Horus/Ares/Quebracho). Online/offline, latenza, job attivi (solo
- * Quebracho), storico transizioni persistito (thinkcentre_health_events).
+ * Admin: monitor unificato delle AI di BikerLink (Bowie/Horus/Ares).
+ * Online/offline, latenza, storico transizioni persistito (thinkcentre_health_events).
+ * (Task #591: Quebracho unified into Horus.)
  */
 import React, { useState } from "react";
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from "react-native";
@@ -11,7 +11,7 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
 import { apiRequest } from "@/lib/query-client";
 
-type AgentPersona = "bowie" | "horus" | "ares" | "quebracho";
+type AgentPersona = "bowie" | "horus" | "ares";
 
 interface AgentMonitorSnapshot {
   persona: AgentPersona;
@@ -39,14 +39,12 @@ const PERSONA_LABEL: Record<AgentPersona, string> = {
   bowie: "Bowie (assistente)",
   horus: "Horus (routing)",
   ares: "Ares (diagnostica)",
-  quebracho: "Quebracho (regista job)",
 };
 
 const PERSONA_ICON: Record<AgentPersona, keyof typeof MaterialCommunityIcons.glyphMap> = {
   bowie: "robot-outline",
   horus: "map-marker-path",
   ares: "cog-outline",
-  quebracho: "sitemap-outline",
 };
 
 export default function AiMonitorScreen() {

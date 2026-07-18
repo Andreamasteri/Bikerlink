@@ -9,7 +9,7 @@ import { initState } from "../init-state";
 import { getCircuitStatus } from "../db-circuit-breaker";
 import { getHealthState } from "../lib/health-arbiter";
 import { getCoordinatorHealthSummary } from "../ai/coordinator/job-gate";
-import { isQuebrachoLoopRunning } from "../ai/coordinator/quebracho-loop";
+import { isHorusCoordinatorLoopRunning } from "../ai/coordinator/horus-coordinator-loop";
 import { getAdminCached, setAdminCached, deleteAdminCached } from "../lib/admin-auth-cache";
 
 async function requireAdmin(req: Request, res: Response, next: NextFunction) {
@@ -117,7 +117,7 @@ export function registerMoreRoutes(app: Express) {
     // offline non degrada il backend). Vista sincrona, non lancia mai.
     let coordinator: unknown;
     try {
-      coordinator = { ...getCoordinatorHealthSummary(), loopRunning: isQuebrachoLoopRunning() };
+      coordinator = { ...getCoordinatorHealthSummary(), loopRunning: isHorusCoordinatorLoopRunning() };
     } catch {
       coordinator = { unavailable: true };
     }

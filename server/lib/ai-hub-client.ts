@@ -69,7 +69,7 @@ export const HUB_VRAM_TIMEOUT_MS = 4_000;
 
 /**
  * Timeout per `/files/read` e `/files/list` (tool shared-file in chat
- * Ares/Quebracho/Horus + hub-file-injection). User-visible: 5s invece degli
+ * Ares/Horus + hub-file-injection). User-visible: 5s invece degli
  * 8s uniformi. `/files/write` resta sul default 8s (endpoint pesante).
  *
  * Misurato live (Task #244) con TC sotto carico: max 0.21s su file da 3.6 KB

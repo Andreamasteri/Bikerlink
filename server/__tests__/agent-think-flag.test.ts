@@ -51,7 +51,7 @@ vi.mock("../ai/assistant/roster", () => ({
     bowie: { name: "Bowie" },
     horus: { name: "Horus" },
     ares: { name: "Ares" },
-    quebracho: { name: "Quebracho" },
+    // quebracho removed (Task #591)
   },
   createHandoffMarkerFilter: vi.fn(() => ({
     push: (delta: string, sink: (d: string) => void) => sink(delta),
@@ -84,15 +84,7 @@ vi.mock("../lib/vram-arbiter", () => ({
   withAresVramPriority: vi.fn(async (_id: string, fn: () => unknown) => fn()),
 }));
 
-vi.mock("../ai/assistant/quebracho-question", () => ({
-  composeQuebrachoQuestion: vi.fn(async () => "quebracho question"),
-}));
-
-vi.mock("../lib/quebracho-client", () => ({
-  isQuebrachoConfigured: false,
-  getQuebrachoModelId: vi.fn(() => "quebracho-model"),
-  streamQuebrachoChat: vi.fn(),
-}));
+// quebracho-question and quebracho-client removed (Task #591 — Quebracho unified into Horus)
 
 vi.mock("../ai/assistant/task-review", () => ({
   detectPlanReviewRequest: vi.fn(() => null),
@@ -195,7 +187,7 @@ vi.mock("@shared/bowie-greeting", () => ({
   BOWIE_INTRO_POEM: "Bowie poem",
   HORUS_INTRO_POEM: "Horus poem",
   ARES_INTRO_POEM: "Ares poem",
-  QUEBRACHO_INTRO_POEM: "Quebracho poem",
+  // QUEBRACHO_INTRO_POEM removed (Task #591)
 }));
 
 vi.mock("../ai/assistant/knowledge", () => ({
@@ -203,7 +195,7 @@ vi.mock("../ai/assistant/knowledge", () => ({
   buildAdminSystemPrompt: vi.fn(() => "admin system prompt"),
   buildHorusSystemPrompt: vi.fn(() => "horus system prompt"),
   buildAresSystemPrompt: vi.fn(() => "ares system prompt"),
-  buildQuebrachoSystemPrompt: vi.fn(() => "quebracho system prompt"),
+  // buildQuebrachoSystemPrompt removed (Task #591)
 }));
 
 vi.mock("../ai/moderation/provider", () => ({

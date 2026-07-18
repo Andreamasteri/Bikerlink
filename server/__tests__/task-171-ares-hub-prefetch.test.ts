@@ -72,7 +72,7 @@ vi.mock("../ai/assistant/knowledge", () => ({
   buildAdminSystemPrompt: vi.fn(() => "system: admin"),
   buildHorusSystemPrompt: vi.fn(() => "system: horus"),
   buildAresSystemPrompt: vi.fn(() => "system: ares-base"),
-  buildQuebrachoSystemPrompt: vi.fn(() => "system: quebracho"),
+  // buildQuebrachoSystemPrompt removed (Task #591)
 }));
 
 vi.mock("../ai/assistant/roster", () => ({
@@ -80,7 +80,7 @@ vi.mock("../ai/assistant/roster", () => ({
     bowie: { name: "Bowie" },
     horus: { name: "Horus" },
     ares: { name: "Ares" },
-    quebracho: { name: "Quebracho" },
+    // quebracho removed (Task #591)
   },
   createHandoffMarkerFilter: vi.fn(() => ({
     push: (delta: string, emit: (s: string) => void) => emit(delta),
@@ -214,7 +214,7 @@ vi.mock("@shared/bowie-greeting", () => ({
   BOWIE_INTRO_POEM: "",
   HORUS_INTRO_POEM: "",
   ARES_INTRO_POEM: "",
-  QUEBRACHO_INTRO_POEM: "",
+  // QUEBRACHO_INTRO_POEM removed (Task #591)
 }));
 
 vi.mock("@shared/languages", () => ({

@@ -100,9 +100,9 @@ export const MANUAL_AREAS: ReadonlyArray<{ title: string; questions: string }> =
       "Qual è la funzione di Ares? Come si invoca? Quali analisi produce? Come interagisce con Nadir?",
   },
   {
-    title: "Quebracho — Coordinamento Job AI",
+    title: "Horus — Coordinamento Job AI",
     questions:
-      "Qual è il ruolo di Quebracho? Come orchestra i job? Come funzionano pause/resume? Cos'è un gated-job?",
+      "Qual è il ruolo di Horus nel coordinamento job? Come orchestra i job? Come funzionano pause/resume? Cos'è un gated-job? Come è cambiato dopo l'unificazione con Quebracho (Task #591)?",
   },
   {
     title: "Watchdog, Monitoraggio e Alert",
@@ -133,7 +133,7 @@ export const MANUAL_AREAS: ReadonlyArray<{ title: string; questions: string }> =
 
 // Task #152 — I 35 termini obbligatori del glossario (chiude il manuale).
 export const GLOSSARY_TERMS =
-  "ThinkCentre, Horus, Bowie, Nadir, Ares, Quebracho, OTA, BootGate, HWM, " +
+  "ThinkCentre, Horus, Bowie, Nadir, Ares, OTA, BootGate, HWM, " +
   "curvy routing, routing area, telemetria, Dead-Reckoning, Kalman filter, " +
   "fusion gate, MotoClub, road-hazard, SOS, watchdog, kill-switch, AI Coordinator, " +
   "db-integrity, reindex, sourceHash, persona AI, RAG, embedding, Cloudflare Tunnel, " +

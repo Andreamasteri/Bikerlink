@@ -81,7 +81,7 @@ vi.mock("../ai/nadir", () => ({
 // di caricare i client Ollama/DB all'import.
 vi.mock("../ai/assistant/inter-agent", () => ({
   askHorus: vi.fn(),
-  askQuebracho: vi.fn(),
+  // askQuebracho removed (Task #591)
   askAres: vi.fn(),
 }));
 vi.mock("../ai/assistant/horus-memory", () => ({ appendHorusNote: vi.fn() }));

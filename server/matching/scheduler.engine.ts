@@ -19,11 +19,11 @@ import { recordCycleError, recordCycleDrop } from "./metrics";
 import { triggerMatchingRun, recordSchedulerHeartbeat } from "./scheduler.cycle";
 import { withJobGate } from "../ai/coordinator/gated-job";
 
-// Task #9 (Quebracho b, "Group D") — questi loop del motore di matching sono
+// Task #9 ("Group D") — questi loop del motore di matching sono
 // GIÀ soggetti al Matching Coordinator (canRunCycleNow, per-issuer
-// admin/horus/quebracho — vedi ./coordinator.ts) per la decisione FINE
+// admin/horus — vedi ./coordinator.ts) per la decisione FINE
 // "può girare un ciclo di matching adesso?". withJobGate qui aggiunge SOLO il
-// gate GROSSOLANO di Quebracho a livello di job-registry (visibilità/pausa
+// gate GROSSOLANO del coordinator Horus a livello di job-registry (visibilità/pausa
 // on-off dal pannello admin, coerente con gli altri ~26+ loop), senza
 // duplicare né sostituire la logica del coordinator.
 

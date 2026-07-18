@@ -9,7 +9,8 @@ import { isRecoverableAiError } from "../ai/assistant/error-classification";
 describe("Task #44 — isRecoverableAiError", () => {
   it("marca come PERMANENTI (non recoverable) gli errori di persona non configurata", () => {
     expect(isRecoverableAiError("Ares non configurato (ARES_OLLAMA_URL mancante).")).toBe(false);
-    expect(isRecoverableAiError("Quebracho non configurato (nessun URL Ollama disponibile).")).toBe(false);
+    // Quebracho removed (Task #591 — unified into Horus); test Ares instead
+    expect(isRecoverableAiError("Ares non configurato (nessun URL Ollama disponibile).")).toBe(false);
   });
 
   it("marca come TRANSITORI (recoverable) qualsiasi altro errore imprevisto", () => {

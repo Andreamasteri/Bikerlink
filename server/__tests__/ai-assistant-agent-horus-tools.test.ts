@@ -98,7 +98,7 @@ vi.mock("../ai/assistant/knowledge", () => ({
   buildAdminSystemPrompt: vi.fn(() => "system: admin"),
   buildHorusSystemPrompt: vi.fn(() => "system: horus specialista percorsi"),
   buildAresSystemPrompt: vi.fn(() => "system: ares diagnostica"),
-  buildQuebrachoSystemPrompt: vi.fn(() => "system: quebracho"),
+  // buildQuebrachoSystemPrompt removed (Task #591 — Quebracho unified into Horus)
 }));
 
 vi.mock("../ai/assistant/rag", () => ({
@@ -211,9 +211,7 @@ vi.mock("../ai/assistant/ares-question", () => ({
   composeAresQuestion: vi.fn().mockResolvedValue("domanda per Ares"),
 }));
 
-vi.mock("../ai/assistant/quebracho-question", () => ({
-  composeQuebrachoQuestion: vi.fn().mockResolvedValue("domanda per Quebracho"),
-}));
+// quebracho-question removed (Task #591 — Quebracho unified into Horus)
 
 vi.mock("../ai/assistant/task-review", () => ({
   detectPlanReviewRequest: vi.fn(() => null),
@@ -235,11 +233,7 @@ vi.mock("../lib/vram-arbiter", () => ({
   withAresVramPriority: vi.fn((_f: () => unknown) => _f()),
 }));
 
-vi.mock("../lib/quebracho-client", () => ({
-  isQuebrachoConfigured: false,
-  getQuebrachoModelId: vi.fn(() => "qwen3:14b"),
-  streamQuebrachoChat: vi.fn(),
-}));
+// quebracho-client removed (Task #591 — Quebracho unified into Horus)
 
 vi.mock("../ai/nadir", () => ({
   searchNadir: vi.fn().mockResolvedValue({ fragments: [], model: "local" }),
@@ -251,7 +245,7 @@ vi.mock("../ai/assistant/roster", () => ({
     bowie: { name: "Bowie" },
     horus: { name: "Horus" },
     ares: { name: "Ares" },
-    quebracho: { name: "Quebracho" },
+    // quebracho removed (Task #591)
   },
   detectAresJobRequest: vi.fn(() => null),
   createHandoffMarkerFilter: vi.fn(() => ({
@@ -265,7 +259,7 @@ vi.mock("@shared/bowie-greeting", () => ({
   BOWIE_INTRO_POEM: "Ciao, sono Bowie.",
   HORUS_INTRO_POEM: "Sono Horus, specialista percorsi.",
   ARES_INTRO_POEM: "Sono Ares, diagnostica tecnica.",
-  QUEBRACHO_INTRO_POEM: "Sono Quebracho.",
+  // QUEBRACHO_INTRO_POEM removed (Task #591 — Quebracho unified into Horus)
 }));
 
 vi.mock("@shared/languages", () => ({

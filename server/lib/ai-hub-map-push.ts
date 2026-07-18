@@ -37,7 +37,7 @@ export async function pushAgentModelMapToHub(): Promise<void> {
     const modelAgentMap: Record<string, string> = {
       [process.env.BOWIE_OLLAMA_MODEL ?? AGENT_MODEL_DEFAULTS.bowie]: "Bowie",
       [process.env.HORUS_OLLAMA_MODEL ?? AGENT_MODEL_DEFAULTS.horus]: "Horus",
-      [process.env.QUEBRACHO_OLLAMA_MODEL ?? AGENT_MODEL_DEFAULTS.quebracho]: "Quebracho",
+      // Quebracho removed (Task #591 — unified into Horus).
       // Nadir's embedding model on TC — no env override exists today.
       [AGENT_MODEL_DEFAULTS.nadir]: "Nadir",
       // Ares — on-demand (devstral), separate machine. Included so GET /vram

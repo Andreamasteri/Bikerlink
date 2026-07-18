@@ -1,4 +1,4 @@
-// Task #5 (Quebracho a) — Gate unico `canRunJob(name)`.
+// Gate unico `canRunJob(name)` — Horus Coordinator (Task #591).
 //
 // Un SOLO punto di decisione, costruito SOPRA l'infrastruttura già esistente:
 //   • pause layer AI  (index.part2.ts: isAiPaused/pauseAi/resumeAi),
@@ -8,15 +8,14 @@
 //   • kill-switch globale del coordinatore (AppSetting).
 //
 // Contratto: `canRunJob` NON lancia MAI e NON blocca MAI un job "per sempre".
-// Quando Quebracho è irraggiungibile, le pause che ha emesso LUI vengono ignorate
+// Quando Horus è irraggiungibile, le pause che ha emesso vengono ignorate
 // (fallback deterministico); restano invece rispettate le pause manuali admin e
 // il kill-switch. Il gate non ferma un job per errori interni: fail-open.
 
 import { storage } from "../../storage";
 import { isPoolHealthy } from "../../db";
-import { isThinkCentreOffline } from "../../lib/thinkcentre-offline";
-import { isQuebrachoReachable } from "../../lib/quebracho-client";
 import { isOllamaReachable } from "../../lib/ollama-client";
+import { isThinkCentreOffline } from "../../lib/thinkcentre-offline";
 import { dedupWarn } from "../../lib/dedup-logger";
 import { isAiPaused } from "./index.part2";
 import { evaluateEvent } from "./policy-engine";
@@ -33,13 +32,14 @@ import {
 
 const KILL_SWITCH_KEY = "coordinator_kill_switch";
 
-/** Cache sync dello stato kill-switch/reachability per la view di /api/health. */
+/** Cache sync dello stato kill-switch per la view di /api/health. */
 let _killSwitchCached = false;
-let _quebrachoReachableCached: boolean | null = null;
+
+/** Cache sync dello stato di raggiungibilità di Horus (per la view admin). */
+let _horusReachableCached: boolean | null = null;
 
 export type JobGateSource =
   | "deterministic"
-  | "quebracho"
   | "horus"
   | "admin_manual"
   | "killswitch"
@@ -83,34 +83,12 @@ export async function setCoordinatorKillSwitch(active: boolean): Promise<void> {
   _killSwitchCached = active;
 }
 
-// ── Fallback: Quebracho raggiungibile? ───────────────────────────────────────
-
-/**
- * true quando NON possiamo contare su Quebracho (spento o TC offline). In questo
- * caso le pause emesse da Quebracho vengono ignorate dal gate.
- */
-export async function isQuebrachoUnreachable(): Promise<boolean> {
-  try {
-    if (await isThinkCentreOffline()) {
-      _quebrachoReachableCached = false;
-      return true;
-    }
-    const reachable = await isQuebrachoReachable();
-    _quebrachoReachableCached = reachable;
-    return !reachable;
-  } catch {
-    _quebrachoReachableCached = false;
-    return true; // in dubbio, degrada in modo deterministico
-  }
-}
-
-/** Cache sync dello stato di raggiungibilità di Horus (per la view admin). */
-let _horusReachableCached: boolean | null = null;
+// ── Fallback: Horus raggiungibile? ───────────────────────────────────────────
 
 /**
  * true quando NON possiamo contare su Horus (TC offline o il suo Ollama
  * self-hosted irraggiungibile). In questo caso le pause emesse da Horus
- * vengono ignorate dal gate — stesso contratto di fallback di Quebracho.
+ * vengono ignorate dal gate — fallback deterministico fail-open.
  */
 export async function isHorusUnreachable(): Promise<boolean> {
   try {
@@ -139,7 +117,7 @@ export interface ApplyDirectiveResult {
 
 /**
  * Applica una direttiva a un job. `issuedBy` distingue le pause admin (sempre
- * rispettate) da quelle di Quebracho (ignorate in fallback quando è offline).
+ * rispettate) da quelle di Horus (ignorate in fallback quando Horus è offline).
  */
 export async function applyJobDirective(
   jobName: string,
@@ -187,11 +165,11 @@ export async function applyJobDirective(
  * Decide se un job può girare ADESSO. Non lancia mai. Ordine di valutazione:
  *   1. kill-switch globale admin      → deny (killswitch)
  *   2. salute DB pool (bg-db-limiter) → deny (health)
- *   3. direttiva pause per-job        → admin: deny; quebracho: deny SOLO se
- *                                       Quebracho è raggiungibile (altrimenti
+ *   3. direttiva pause per-job        → admin: deny; horus: deny SOLO se
+ *                                       Horus è raggiungibile (altrimenti
  *                                       fallback: ignora). force one-shot scavalca.
  *   4. throttle per-job / nextRun     → deny (throttle) se non ancora scaduto
- *   5. pause layer AI (isAiPaused)    → deny (quebracho) se Quebracho raggiungibile
+ *   5. pause layer AI (isAiPaused)    → deny (horus) se Horus raggiungibile
  *   6. policy engine BLOCK            → deny (policy)
  *   7. altrimenti                     → allow (deterministic)
  */
@@ -211,8 +189,8 @@ export async function canRunJob(name: string): Promise<JobGateDecision> {
       return deny(name, "Pool DB non sano: esecuzione rimandata", "health");
     }
 
-    // Fallback: se Quebracho è offline, le sue pause/direttive AI vanno ignorate.
-    const quebrachoDown = await isQuebrachoUnreachable();
+    // Fallback: se Horus è offline, le sue pause vanno ignorate.
+    const horusDown = await isHorusUnreachable();
 
     // 3. Direttiva pause per-job.
     if (e.directive?.kind === "pause") {
@@ -225,11 +203,10 @@ export async function canRunJob(name: string): Promise<JobGateDecision> {
       if (byAdmin) {
         return deny(name, e.directive.reason || "In pausa (admin)", "admin_manual");
       }
-      // Pausa emessa da Quebracho o Horus: rispettata solo se il rispettivo
-      // backing service è raggiungibile (fallback deterministico altrimenti).
-      const issuerDown = e.directive.issuedBy === "horus" ? await isHorusUnreachable() : quebrachoDown;
-      if (!issuerDown) {
-        return deny(name, e.directive.reason || `In pausa (${e.directive.issuedBy})`, e.directive.issuedBy);
+      // Pausa emessa da Horus: rispettata solo se Horus è raggiungibile
+      // (fallback deterministico altrimenti — pausa bloccata non può sopravvivere a un outage).
+      if (!horusDown) {
+        return deny(name, e.directive.reason || `In pausa (${e.directive.issuedBy})`, e.directive.issuedBy as JobGateSource);
       }
       logFallback(name, `pausa ${e.directive.issuedBy} ignorata (irraggiungibile)`);
       // fall-through: consenti
@@ -238,8 +215,7 @@ export async function canRunJob(name: string): Promise<JobGateDecision> {
     // 4. Throttle per-job (direttiva) o nextRun schedulato.
     if (e.directive?.kind === "throttle" && e.lastRunAt !== null) {
       const minGap = e.directive.throttleMs ?? 60_000;
-      const throttleIssuerDown = e.directive.issuedBy === "horus" ? await isHorusUnreachable() : quebrachoDown;
-      const respect = e.directive.issuedBy === "admin_manual" || !throttleIssuerDown;
+      const respect = e.directive.issuedBy === "admin_manual" || !horusDown;
       if (respect && now - e.lastRunAt < minGap) {
         return deny(name, `Throttle attivo (${minGap}ms)`, "throttle");
       }
@@ -248,14 +224,14 @@ export async function canRunJob(name: string): Promise<JobGateDecision> {
       return deny(name, "Non ancora schedulato (nextRun futuro)", "throttle");
     }
 
-    // 5. Pause layer AI esistente (globale "*" o della persona quebracho).
-    if (!quebrachoDown && (await isAiPaused("quebracho"))) {
-      return deny(name, "Layer AI in pausa (quebracho/*)", "quebracho");
+    // 5. Pause layer AI esistente (globale "*" o della persona horus).
+    if (!horusDown && (await isAiPaused("horus"))) {
+      return deny(name, "Layer AI in pausa (horus/*)", "horus");
     }
 
     // 6. Policy engine: un evento di run bloccato da una regola BLOCK.
     try {
-      const evalResult = evaluateEvent({ aiName: "quebracho", eventType: `job.run:${name}`, payload: {}, severity: "info" });
+      const evalResult = evaluateEvent({ aiName: "horus", eventType: `job.run:${name}`, payload: {}, severity: "info" });
       if (evalResult.action === "BLOCK") {
         return deny(name, evalResult.message || "Bloccato da policy", "policy");
       }
@@ -284,7 +260,7 @@ function logFallback(jobName: string, msg: string): void {
 
 export interface CoordinatorHealthSummary {
   killSwitch: boolean;
-  quebrachoReachable: boolean | null;
+  horusReachable: boolean | null;
   jobs: { total: number; running: number; paused: number; throttled: number };
 }
 
@@ -299,12 +275,12 @@ export function getCoordinatorHealthSummary(): CoordinatorHealthSummary {
   }
   return {
     killSwitch: _killSwitchCached,
-    quebrachoReachable: _quebrachoReachableCached,
+    horusReachable: _horusReachableCached,
     jobs: { total: jobs.length, running, paused, throttled },
   };
 }
 
-// Soglie zombie (specchio di quebracho-loop.ts) per il badge nello snapshot.
+// Soglie zombie (specchio di horus-coordinator-loop.ts) per il badge nello snapshot.
 const ZOMBIE_THRESHOLD_FREQUENT_SNAP_MS = 30 * 60_000;
 const ZOMBIE_THRESHOLD_DAILY_SNAP_MS    = 2 * 60 * 60_000;
 const DAILY_INTERVAL_THRESHOLD_SNAP_MS  = 4 * 60 * 60_000;
@@ -342,15 +318,15 @@ export function getCoordinatorJobsSnapshot(): Array<Pick<JobEntry,
   }));
 }
 
-/** Aggiorna la cache sync della reachability (chiamato dal loop). */
-export function _setQuebrachoReachableCache(value: boolean): void {
-  _quebrachoReachableCached = value;
+/** Aggiorna la cache sync della reachability di Horus (chiamato dal loop). */
+export function _setHorusReachableCache(value: boolean): void {
+  _horusReachableCached = value;
 }
 
 /** Solo test: azzera le cache sync. */
 export function __resetGateCachesForTests(): void {
   _killSwitchCached = false;
-  _quebrachoReachableCached = null;
+  _horusReachableCached = null;
   _fallbackLogTs.clear();
 }
 

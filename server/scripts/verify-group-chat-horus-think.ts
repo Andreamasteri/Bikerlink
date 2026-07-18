@@ -1,7 +1,7 @@
 /**
  * Task #114 — Verify that Horus's group-chat turns are clean on a real ThinkCentre run.
  *
- * Starts a 3-turn group conversation (Bowie/Horus/Quebracho) via the admin SSE endpoint,
+ * Starts a 2-turn group conversation (Bowie/Horus) via the admin SSE endpoint,
  * captures every delta event, and asserts that Horus's turn contains NO raw chain-of-thought
  * preamble (English reasoning like "Okay, the user asks...") while the answer still streams
  * token-by-token.
@@ -100,16 +100,17 @@ async function runVerification() {
     token = await createAdminSession(userId);
     console.log(`Admin user created: ${userId.slice(0, 8)}...`);
 
-    // ── Start group conversation (3 turns: Bowie → Horus → Quebracho) ─────────
+    // ── Start group conversation (2 turns: Bowie → Horus) ────────────────────
+    // (Task #591: Quebracho removed — GROUP_PARTICIPANTS is now ["bowie","horus"])
     const topic =
-      "Qual è il percorso moto più scenico d'Italia? Bowie, Horus e Quebracho discutono brevemente.";
+      "Qual è il percorso moto più scenico d'Italia? Bowie e Horus discutono brevemente.";
 
     console.log(`\nStarting group conversation…\nTopic: "${topic}"\n`);
 
     // Track per-persona data
-    const turnDeltas: Record<string, string[]> = { bowie: [], horus: [], quebracho: [] };
+    const turnDeltas: Record<string, string[]> = { bowie: [], horus: [] };
     const turnTexts: Record<string, string> = {};
-    const turnDeltaCounts: Record<string, number> = { bowie: 0, horus: 0, quebracho: 0 };
+    const turnDeltaCounts: Record<string, number> = { bowie: 0, horus: 0 };
     let currentPersona = "";
     let conversationId = "";
 
@@ -123,8 +124,8 @@ async function runVerification() {
       },
       body: JSON.stringify({
         topic,
-        participants: ["bowie", "horus", "quebracho"],
-        maxTurns: 3,
+        participants: ["bowie", "horus"],
+        maxTurns: 2,
       }),
       signal: AbortSignal.timeout(5 * 60 * 1000), // 5 min max for 3 turns
     });
@@ -269,18 +270,12 @@ async function runVerification() {
       `delta count=${horusDeltaCount} (short responses batch in 256-char security-filter window)`,
     );
 
-    // ── Check 6: Bowie and Quebracho turns are also clean ────────────────────
+    // ── Check 6: Bowie turn is also clean ────────────────────────────────────
     const bowieText = turnTexts["bowie"] ?? "";
-    const quebrachoText = turnTexts["quebracho"] ?? "";
     record(
       "Bowie turn is non-empty and clean",
       bowieText.length > 5 && !containsReasoningPreamble(bowieText),
       `len=${bowieText.length}`,
-    );
-    record(
-      "Quebracho turn is non-empty",
-      quebrachoText.length > 5,
-      `len=${quebrachoText.length}`,
     );
 
     // ── Full text summary ──────────────────────────────────────────────────────

@@ -38,7 +38,7 @@ const WINDOW_MS = 24 * 60 * 60 * 1000;
 // CANONICAL AGENT LINEUP (Task #535):
 //   qwen3:4b        → Horus      (GPU residente, keep_alive:-1)
 //   qwen3:1.7b      → Bowie      (GPU residente, keep_alive:-1)
-//   granite4:tiny-h → Quebracho  (CPU+RAM residente, keep_alive:-1)
+// (granite4:tiny-h / Quebracho removed — Task #591: unified into Horus)
 //   all-minilm      → Nadir      (GPU residente, keep_alive:-1)
 //   devstral:latest → Ares       (on-demand, keep_alive:0 post-call)
 //
@@ -57,7 +57,6 @@ const WINDOW_MS = 24 * 60 * 60 * 1000;
 const DEFAULT_AGENT_MAP = {
   "qwen3:4b": "Horus",
   "qwen3:1.7b": "Bowie",
-  "granite4:tiny-h": "Quebracho",
   "all-minilm": "Nadir",
   "all-minilm:latest": "Nadir",
   "devstral:latest": "Ares",

@@ -252,7 +252,7 @@ describe("vram-routes.js — agent name after model upgrade (real production cod
         "all-minilm": "Nadir",
         "all-minilm:latest": "Nadir",
         "qwen3:1.7b": "Bowie",
-        "granite4:tiny-h": "Quebracho",
+        // "granite4:tiny-h": "Quebracho", — removed (Task #591: Quebracho unified into Horus)
       },
     });
 

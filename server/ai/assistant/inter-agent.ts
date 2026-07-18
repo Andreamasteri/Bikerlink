@@ -1,7 +1,7 @@
 // Task #50 — Client di supporto per i tool inter-agente di Bowie.
 //
 // Bowie resta Bowie ma può consultare un'altra AI a metà conversazione tramite
-// tool-calling esplicito (call_horus / call_quebracho / call_ares), mostrando
+// tool-calling esplicito (call_horus / call_ares), mostrando
 // all'utente SOLO il risultato. Queste funzioni interrogano il rispettivo agente
 // e restituiscono la risposta testuale, con timeout e un messaggio di cortesia se
 // il target non è configurato o non raggiungibile — mai uno stack trace.
@@ -13,7 +13,7 @@ import { callOllamaChat, isOllamaConfigured, isOllamaReachable } from "../../lib
 import { AGENT_MODEL_DEFAULTS } from "../../lib/agent-constants";
 import { isAresConfigured, getAresModelId, streamAresChat } from "../../lib/ares-client";
 import { withAresVramPriority } from "../../lib/vram-arbiter";
-import { isQuebrachoConfigured, streamQuebrachoChat } from "../../lib/quebracho-client";
+// Quebracho removed (Task #591 — unified into Horus). No import from quebracho-client.
 
 export interface InterAgentResult {
   /** true se l'agente ha risposto; false se non configurato/irraggiungibile/vuoto. */
@@ -27,10 +27,7 @@ const HORUS_CONSULT_SYSTEM =
   "Bowie ti sta consultando a metà conversazione per conto dell'utente: rispondi SOLO a " +
   "ciò che ti viene chiesto, in italiano, conciso e concreto, senza convenevoli.";
 
-const QUEBRACHO_CONSULT_SYSTEM =
-  "Sei Quebracho, il coordinatore/regista degli agenti AI di BikerLink, affabile e diretto. " +
-  "Bowie ti sta consultando a metà conversazione: dai il tuo punto di vista in italiano, " +
-  "conciso e concreto, senza divagazioni.";
+// Quebracho consult system removed — unified into Horus (Task #591).
 
 const ARES_CONSULT_SYSTEM =
   "Sei Ares, l'AI di diagnostica tecnica di BikerLink. Un amministratore ti attiva tramite Bowie " +
@@ -45,7 +42,6 @@ const ARES_CONSULT_SYSTEM =
 const HORUS_MODEL_ID = process.env.HORUS_OLLAMA_MODEL?.trim() || AGENT_MODEL_DEFAULTS.horus;
 
 const HORUS_TIMEOUT_MS = 60_000;
-const QUEBRACHO_TIMEOUT_MS = 60_000;
 // Verificato live (2026-07-15): il cold-load di devstral:latest (14GB, CPU) su
 // Ares richiede tipicamente 55-90s (load_duration + prompt_eval su CPU) prima
 // di produrre anche solo il primo token: 90s era troppo risicato e faceva
@@ -141,32 +137,7 @@ export async function askHorus(
   }
 }
 
-// ── Quebracho ─────────────────────────────────────────────────────────────────
-
-export async function askQuebracho(
-  message: string,
-  opts: { signal?: AbortSignal } = {},
-): Promise<InterAgentResult> {
-  const clean = (message ?? "").trim();
-  if (!clean) return { ok: false, text: "Non ho ricevuto un messaggio chiaro da inoltrare a Quebracho." };
-  if (!isQuebrachoConfigured) {
-    return { ok: false, text: "Quebracho non è configurato o raggiungibile in questo momento." };
-  }
-  try {
-    const { text } = await streamQuebrachoChat({
-      system: QUEBRACHO_CONSULT_SYSTEM,
-      messages: [{ role: "user", content: clean }],
-      signal: opts.signal,
-      timeoutMs: QUEBRACHO_TIMEOUT_MS,
-      numPredict: 600,
-    });
-    const out = stripThink(text);
-    if (!out) return { ok: false, text: "Quebracho non ha fornito una risposta." };
-    return { ok: true, text: out };
-  } catch (err) {
-    return { ok: false, text: `Non sono riuscito a consultare Quebracho (${(err as Error).message.slice(0, 80)}).` };
-  }
-}
+// Quebracho removed — unified into Horus (Task #591). askQuebracho no longer exists.
 
 // ── Ares (solo admin, dal chiamante) ──────────────────────────────────────────
 
@@ -202,6 +173,5 @@ export async function askAres(
 // Timeout esportati per riuso/test.
 export const INTER_AGENT_TIMEOUTS = {
   horus: HORUS_TIMEOUT_MS,
-  quebracho: QUEBRACHO_TIMEOUT_MS,
   ares: ARES_TIMEOUT_MS,
 } as const;

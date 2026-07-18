@@ -1,25 +1,25 @@
 /**
- * Task #10 (Quebracho c) — route admin del registry job del coordinatore
- * Quebracho: snapshot, direttive manuali, kill-switch.
+ * Route admin del registry job del coordinatore Horus
+ * (ex Quebracho — Task #591: unified into Horus): snapshot, direttive manuali, kill-switch.
  */
 import { vi, describe, it, expect, beforeEach } from "vitest";
 import express from "express";
 import request from "supertest";
 
-const { isCoordinatorKillSwitchActiveMock, setCoordinatorKillSwitchMock, isQuebrachoUnreachableMock, isHorusUnreachableMock, applyJobDirectiveMock, getCoordinatorHealthSummaryMock, getCoordinatorJobsSnapshotMock } = vi.hoisted(() => ({
+const { isCoordinatorKillSwitchActiveMock, setCoordinatorKillSwitchMock, isHorusUnreachableMock, applyJobDirectiveMock, getCoordinatorHealthSummaryMock, getCoordinatorJobsSnapshotMock } = vi.hoisted(() => ({
   isCoordinatorKillSwitchActiveMock: vi.fn(async () => false),
   setCoordinatorKillSwitchMock: vi.fn(async () => {}),
-  isQuebrachoUnreachableMock: vi.fn(async () => false),
+  // isQuebrachoUnreachableMock removed (Task #591 — Quebracho unified into Horus)
   isHorusUnreachableMock: vi.fn(async () => false),
   applyJobDirectiveMock: vi.fn(async (name: string, kind: string) => ({ applied: true, jobName: name, kind })),
-  getCoordinatorHealthSummaryMock: vi.fn(() => ({ killSwitch: false, quebrachoReachable: true, jobs: { total: 1, running: 0, paused: 0, throttled: 0 } })),
+  getCoordinatorHealthSummaryMock: vi.fn(() => ({ killSwitch: false, horusReachable: true, jobs: { total: 1, running: 0, paused: 0, throttled: 0 } })),
   getCoordinatorJobsSnapshotMock: vi.fn(() => [{ name: "job-a", state: "idle" }]),
 }));
 
 vi.mock("../ai/coordinator/job-gate", () => ({
   isCoordinatorKillSwitchActive: isCoordinatorKillSwitchActiveMock,
   setCoordinatorKillSwitch: setCoordinatorKillSwitchMock,
-  isQuebrachoUnreachable: isQuebrachoUnreachableMock,
+  // isQuebrachoUnreachable removed (Task #591)
   isHorusUnreachable: isHorusUnreachableMock,
   applyJobDirective: applyJobDirectiveMock,
   getCoordinatorHealthSummary: getCoordinatorHealthSummaryMock,
@@ -38,7 +38,7 @@ function buildApp() {
 beforeEach(() => {
   isCoordinatorKillSwitchActiveMock.mockReset().mockResolvedValue(false);
   setCoordinatorKillSwitchMock.mockReset().mockResolvedValue(undefined);
-  isQuebrachoUnreachableMock.mockReset().mockResolvedValue(false);
+  // isQuebrachoUnreachableMock removed (Task #591)
   isHorusUnreachableMock.mockReset().mockResolvedValue(false);
   applyJobDirectiveMock.mockReset().mockImplementation(async (name: string, kind: string) => ({ applied: true, jobName: name, kind }));
 });
@@ -48,7 +48,7 @@ describe("GET /api/admin/coordinator/jobs", () => {
     const res = await request(buildApp()).get("/api/admin/coordinator/jobs");
     expect(res.status).toBe(200);
     expect(res.body.killSwitch).toBe(false);
-    expect(res.body.quebrachoReachable).toBe(true);
+    expect(res.body.horusReachable).toBe(true);
     expect(res.body.jobs).toEqual([{ name: "job-a", state: "idle" }]);
   });
 });

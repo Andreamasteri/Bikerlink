@@ -1,16 +1,12 @@
-// Task #5 (Quebracho a) — Loop seriale continuo di Quebracho.
+// Horus Coordinator Loop (ex Quebracho Loop — Task #591).
 //
-// Quebracho gira come UN SOLO loop seriale: un job alla volta, mai in parallelo,
+// Horus gira come UN SOLO loop seriale: un job alla volta, mai in parallelo,
 // con una pausa fra un giro e l'altro. Ogni giro itera i job registrati con un
 // callback `run` e, per ciascuno che è "dovuto", chiede il permesso al gate unico
 // `canRunJob` prima di eseguirlo. Un job che fallisce non ferma il giro.
-//
-// In questa fase (Task #5) NON viene cablato alcun loop reale (→ Task #9): la
-// registry può essere vuota di callback `run` e il giro diventa un no-op leggero.
-// L'infrastruttura è comunque attiva e osservabile.
 
 import { listJobs, markRunStart, markRunSuccess, markRunFailure, resetJobToIdle } from "./job-registry";
-import { canRunJob, isQuebrachoUnreachable, _setQuebrachoReachableCache } from "./job-gate";
+import { canRunJob, isHorusUnreachable, _setHorusReachableCache } from "./job-gate";
 import { dedupWarn } from "../../lib/dedup-logger";
 
 // Soglie zombie: dopo quanto tempo in stato "running" un job è considerato bloccato.
@@ -27,11 +23,11 @@ function zombieThresholdFor(intervalMs: number | undefined): number {
 
 const ROUND_PAUSE_MS = Math.max(
   5_000,
-  Number(process.env.QUEBRACHO_LOOP_ROUND_PAUSE_MS) || 60_000,
+  Number(process.env.HORUS_COORDINATOR_ROUND_PAUSE_MS) || 60_000,
 );
 const JOB_PAUSE_MS = Math.max(
   0,
-  Number(process.env.QUEBRACHO_LOOP_JOB_PAUSE_MS) || 250,
+  Number(process.env.HORUS_COORDINATOR_JOB_PAUSE_MS) || 250,
 );
 
 let loopActive = false;
@@ -41,11 +37,11 @@ let timer: ReturnType<typeof setTimeout> | null = null;
 let lastRoundAt = 0;
 let roundCount = 0;
 
-export function isQuebrachoLoopRunning(): boolean {
+export function isHorusCoordinatorLoopRunning(): boolean {
   return loopActive;
 }
 
-export function getQuebrachoLoopStats(): {
+export function getHorusCoordinatorLoopStats(): {
   running: boolean;
   roundInFlight: boolean;
   lastRoundAt: number;
@@ -69,7 +65,7 @@ export async function runOneRound(): Promise<number> {
   try {
     // Aggiorna la cache sync di reachability una volta per giro (per /api/health).
     try {
-      _setQuebrachoReachableCache(!(await isQuebrachoUnreachable()));
+      _setHorusReachableCache(!(await isHorusUnreachable()));
     } catch {
       /* best-effort */
     }
@@ -91,8 +87,8 @@ export async function runOneRound(): Promise<number> {
       resetJobToIdle(job.name, reason);
       zombieResets.push(job.name);
       dedupWarn(
-        `quebracho-zombie:${job.name}`,
-        `[quebracho] job zombie resettato: "${job.name}" bloccato in "running" da ${staleSec}s`,
+        `horus-coordinator-zombie:${job.name}`,
+        `[horus-coordinator] job zombie resettato: "${job.name}" bloccato in "running" da ${staleSec}s`,
       );
       // Watchdog log (best-effort, non blocca il giro).
       void import("../../ai/watchdog/log").then(({ writeWatchdogLog }) =>
@@ -106,7 +102,7 @@ export async function runOneRound(): Promise<number> {
       ).catch(() => {/* best-effort */});
     }
     if (zombieResets.length > 0) {
-      console.warn(`[quebracho] ${zombieResets.length} job zombie resettati: ${zombieResets.join(", ")}`);
+      console.warn(`[horus-coordinator] ${zombieResets.length} job zombie resettati: ${zombieResets.join(", ")}`);
     }
 
     const jobs = listJobs();
@@ -129,7 +125,7 @@ export async function runOneRound(): Promise<number> {
         executed += 1;
       } catch (err) {
         markRunFailure(job.name, err);
-        dedupWarn("quebracho-loop-job", `[quebracho] job "${job.name}" ha fallito: ${String(err)}`);
+        dedupWarn("horus-coordinator-loop-job", `[horus-coordinator] job "${job.name}" ha fallito: ${String(err)}`);
       }
       if (JOB_PAUSE_MS > 0) await sleep(JOB_PAUSE_MS);
     }
@@ -149,7 +145,7 @@ async function tick(): Promise<void> {
   try {
     await runOneRound();
   } catch (err) {
-    dedupWarn("quebracho-loop", `[quebracho] giro fallito: ${String(err)}`);
+    dedupWarn("horus-coordinator-loop", `[horus-coordinator] giro fallito: ${String(err)}`);
   }
   if (stopRequested) {
     loopActive = false;
@@ -160,7 +156,7 @@ async function tick(): Promise<void> {
 }
 
 /** Avvia il loop seriale continuo. Idempotente. */
-export function startQuebrachoLoop(): void {
+export function startHorusCoordinatorLoop(): void {
   if (loopActive) return;
   loopActive = true;
   stopRequested = false;
@@ -169,7 +165,7 @@ export function startQuebrachoLoop(): void {
 }
 
 /** Ferma il loop (attende la fine del giro in corso, senza interromperlo a metà). */
-export async function stopQuebrachoLoop(): Promise<void> {
+export async function stopHorusCoordinatorLoop(): Promise<void> {
   stopRequested = true;
   if (timer) {
     clearTimeout(timer);

@@ -4,7 +4,7 @@
 #
 # BikerBlog (github.com/Andreamasteri/bikerblog) è il repo "gemello" di
 # riferimento di BikerLink: durante il down di BikerLink l'ecosistema
-# (agenti AI Horus/Bowie/Quebracho/Nadir/Ares, AI-Hub, pipeline) è stato
+# (agenti AI Horus/Bowie/Nadir/Ares, AI-Hub, pipeline) è stato
 # sviluppato lì. Questo script mantiene una copia locale sempre consultabile.
 #
 # Uso:

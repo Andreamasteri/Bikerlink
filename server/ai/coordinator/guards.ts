@@ -1,4 +1,4 @@
-// Task #9 (Quebracho b) — 3 guard job di rilevamento, gated via withJobGate
+// Coordinator guard jobs — 3 guard jobs di rilevamento, gated via withJobGate
 // come gli altri loop, ma di natura diversa: non fanno mai una fix, SOLO
 // diagnosi periodica + alert su ai_watchdog_log se una condizione nota di
 // regressione si manifesta. Nessuno di questi tocca dati applicativi.
@@ -161,7 +161,7 @@ const _guardTimers: ReturnType<typeof setInterval>[] = [];
  * Avvia i 3 guard job. Chiamata una sola volta al boot (Phase 5), come gli
  * altri scheduler — vedi server/boot-phase5-schedulers.ts.
  */
-export function startQuebrachoGuards(): void {
+export function startCoordinatorGuards(): void {
   setTimeout(() => { void gatedSpatialRefSysGuard(); }, 4 * 60_000);
   _guardTimers.push(setInterval(() => { void gatedSpatialRefSysGuard(); }, 24 * 60 * 60 * 1000));
 
@@ -171,11 +171,11 @@ export function startQuebrachoGuards(): void {
   setTimeout(() => { void gatedOnboardingConsistencyGuard(); }, 8 * 60_000);
   _guardTimers.push(setInterval(() => { void gatedOnboardingConsistencyGuard(); }, 24 * 60 * 60 * 1000));
 
-  console.log("[INIT] Quebracho guard jobs avviati (spatial_ref_sys, online-counter congruence, onboarding consistency)");
+  console.log("[INIT] Coordinator guard jobs avviati (spatial_ref_sys, online-counter congruence, onboarding consistency)");
 }
 
 /** Solo per test. */
-export function __stopQuebrachoGuardsForTests(): void {
+export function __stopCoordinatorGuardsForTests(): void {
   for (const t of _guardTimers) clearInterval(t);
   _guardTimers.length = 0;
 }

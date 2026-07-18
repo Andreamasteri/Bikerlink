@@ -215,8 +215,8 @@ log "=== [1f/3] Gate Hardcoded Agent Model Names ==="
 # La sorgente di verità è AGENT_MODEL_DEFAULTS in agent-constants.ts;
 # ogni callsite deve importare da lì invece di duplicare il default.
 #
-# Modelli rilevati: qwen3:1.7b (Bowie), qwen3:4b (Horus), granite4:tiny-h
-# (Quebracho), all-minilm (Nadir), devstral:latest (Ares).
+# Modelli rilevati: qwen3:1.7b (Bowie), qwen3:4b (Horus), all-minilm (Nadir), devstral:latest (Ares).
+# (granite4:tiny-h / Quebracho rimosso — Task #591: unificato in Horus.)
 #
 # Soppressione (riga precedente al letterale):
 #   // check-hardcoded-agent-models: ok

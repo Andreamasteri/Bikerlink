@@ -2,11 +2,11 @@
 //
 // A differenza della chat diretta (UNA persona per turno, con handoff che
 // SOSTITUISCE), qui l'admin propone un ARGOMENTO e 2-3 agenti (Bowie/Horus/
-// Quebracho — Ares è ESCLUSO: resta l'analisi asincrona invocata a parte)
+// Ares è ESCLUSO: resta l'analisi asincrona invocata a parte)
 // discutono a TURNI. Questo modulo è la logica PURA di generazione di un singolo
 // turno: dato l'argomento, la persona di turno e la storia dei turni precedenti,
 // costruisce il prompt appropriato (APERTURA vs RISPOSTA) e richiama il client
-// corrispondente (Ollama SDK per Bowie/Horus, HTTP diretta per Quebracho).
+// corrispondente (Ollama SDK per Bowie/Horus).
 //
 // La distinzione APERTURA/RISPOSTA è essenziale: il primo agente deve presentare
 // la SUA opinione SENZA inventare battute altrui non ancora pronunciate — senza
@@ -17,7 +17,7 @@
 
 import { streamText, type ModelMessage } from "ai";
 import { getOllamaModel } from "../../lib/ollama-client";
-import { streamQuebrachoChat, getQuebrachoModelId } from "../../lib/quebracho-client";
+// Quebracho removed (Task #591 — unified into Horus).
 import { AI_ROSTER, type AiPersonaId } from "./roster";
 import { APP_LANGUAGE_NAMES, SOURCE_APP_LANGUAGE, type AppLanguageCode } from "@shared/languages";
 import { AGENT_MODEL_DEFAULTS } from "../../lib/agent-constants";
@@ -25,7 +25,7 @@ import { AGENT_MODEL_DEFAULTS } from "../../lib/agent-constants";
 // ── Costanti della conversazione di gruppo ───────────────────────────────────
 
 /** Agenti che possono partecipare a una conversazione di gruppo, in ordine di turno. */
-export const GROUP_PARTICIPANTS: readonly AiPersonaId[] = ["bowie", "horus", "quebracho"];
+export const GROUP_PARTICIPANTS: readonly AiPersonaId[] = ["bowie", "horus"];
 
 /** Turni di default (il documento di riferimento fissa 6). */
 export const DEFAULT_GROUP_MAX_TURNS = 6;
@@ -43,7 +43,7 @@ const BOWIE_MODEL_ID = process.env.BOWIE_OLLAMA_MODEL?.trim() || AGENT_MODEL_DEF
 
 /**
  * Normalizza e valida la lista di partecipanti proposta. Filtra i duplicati,
- * accetta SOLO gli agenti ammessi (Bowie/Horus/Quebracho), preserva l'ordine.
+ * accetta SOLO gli agenti ammessi (Bowie/Horus), preserva l'ordine.
  * Se il risultato è vuoto/troppo corto, ricade sul roster di default completo.
  */
 export function normalizeParticipants(raw: unknown): AiPersonaId[] {
@@ -164,18 +164,6 @@ export async function generateGroupTurn(params: GenerateGroupTurnParams): Promis
   const { topic, persona, participants, priorTurns, signal, onDelta, language } = params;
   const system = buildGroupSystemPrompt(persona, participants, language ?? SOURCE_APP_LANGUAGE);
   const messages = buildGroupTurnMessages(persona, topic, priorTurns);
-
-  // Quebracho: HTTP diretta a Ollama (isolato dai probe/log OllamaPersona).
-  if (persona === "quebracho") {
-    const userContent = messages[0].content as string;
-    const { text } = await streamQuebrachoChat({
-      system,
-      messages: [{ role: "user", content: userContent }],
-      signal,
-      onDelta,
-    });
-    return { text: text.trim(), provider: "quebracho", modelId: getQuebrachoModelId() };
-  }
 
   // Bowie / Horus: Vercel AI SDK sul provider Ollama del ThinkCentre.
   const modelName = persona === "horus" ? HORUS_MODEL_ID : BOWIE_MODEL_ID;

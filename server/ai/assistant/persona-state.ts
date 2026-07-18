@@ -31,7 +31,7 @@ const EMPTY_STATE: ConversationStateRow = { activePersona: null, introShownPerso
 function normalizePersonaList(raw: unknown): AiPersonaId[] {
   if (!Array.isArray(raw)) return [];
   return raw.filter(
-    (p): p is AiPersonaId => p === "bowie" || p === "horus" || p === "ares" || p === "quebracho",
+    (p): p is AiPersonaId => p === "bowie" || p === "horus" || p === "ares",
   );
 }
 
@@ -65,7 +65,7 @@ async function getConversationState(
     if (row.expiresAt.getTime() <= Date.now()) return EMPTY_STATE;
     const p = row.activePersona;
     const activePersona =
-      p === "bowie" || p === "horus" || p === "ares" || p === "quebracho" ? p : null;
+      p === "bowie" || p === "horus" || p === "ares" ? p : null;
     return { activePersona, introShownPersonas: normalizePersonaList(row.introShownPersonas) };
   } catch {
     return EMPTY_STATE;

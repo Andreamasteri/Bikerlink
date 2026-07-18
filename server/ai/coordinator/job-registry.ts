@@ -1,4 +1,4 @@
-// Task #5 (Quebracho a) — Registry dei job di background del coordinatore.
+// Registry dei job di background del coordinator (Horus).
 //
 // Fonte di verità LIVE = mappa in-memory (zero latenza per il gate `canRunJob`).
 // La tabella `ai_coordinator_jobs` è solo uno specchio persistente per far
@@ -6,7 +6,7 @@
 // best-effort (via bg-db-limiter) e non bloccano mai il decision-path.
 //
 // Questo modulo NON cabla i ~26 loop reali (quello è Task #9): espone solo le
-// primitive che il loop seriale di Quebracho e il gate consumano.
+// primitive che il loop seriale di Horus e il gate consumano.
 
 import { db } from "../../db";
 import { withBgDbSlot, isBgDbLimiterDropError } from "../../lib/bg-db-limiter";
@@ -14,12 +14,11 @@ import { aiCoordinatorJobs } from "@shared/db";
 import { dedupWarn } from "../../lib/dedup-logger";
 
 export type JobRunState = "idle" | "running" | "paused" | "throttled" | "disabled";
-export type PauseSource = "quebracho" | "admin_manual" | "horus" | "killswitch" | "deterministic";
-// "horus" — Horus può emettere le proprie direttive (pause) in autonomia, con lo
-// STESSO comportamento di fallback di "quebracho": il gate le ignora se il
-// backing service di Horus (Ollama self-hosted) è irraggiungibile, così una
-// pausa bloccata non può mai sopravvivere a un outage dell'emittente.
-export type DirectiveIssuer = "quebracho" | "admin_manual" | "horus";
+export type PauseSource = "admin_manual" | "horus" | "killswitch" | "deterministic";
+// "horus" — Horus può emettere direttive (pause) in autonomia; il gate le ignora
+// se Horus (Ollama self-hosted) è irraggiungibile, così una pausa bloccata non
+// può mai sopravvivere a un outage dell'emittente (fallback deterministico).
+export type DirectiveIssuer = "admin_manual" | "horus";
 
 export interface JobDirective {
   kind: "pause" | "throttle";
@@ -289,7 +288,7 @@ export function resetJobToIdle(name: string, reason: string): void {
  * il proprio stato non blocca più il loop al giro successivo.
  *
  * Deve essere chiamato DOPO `hydrateRegistryFromDb()` e PRIMA di avviare il
- * loop (startQuebrachoLoop).
+ * loop (startHorusCoordinatorLoop).
  */
 export function resetRunningJobsOnStartup(): string[] {
   const reset: string[] = [];

@@ -270,7 +270,7 @@ function modelAvailable(configured: string, list: string[]): boolean {
 }
 
 /**
- * Cross-reference modello configurato ↔ modelli installati. Bowie/Horus/Quebracho
+ * Cross-reference modello configurato ↔ modelli installati. Bowie/Horus
  * girano sull'Ollama del ThinkCentre; Ares ha il suo Ollama sul PC fisso, quindi
  * viene confrontato con la lista di Ares. Lista non disponibile → available: null
  * (nessun falso allarme quando il servizio è giù).
@@ -287,7 +287,7 @@ export function buildPersonaModels(
     bowie: entry("bowie", tcModels),
     horus: entry("horus", tcModels),
     ares: entry("ares", aresModels),
-    quebracho: entry("quebracho", tcModels),
+    // quebracho removed (Task #591 — unified into Horus)
   };
 }
 

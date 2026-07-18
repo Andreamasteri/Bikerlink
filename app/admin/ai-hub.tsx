@@ -154,7 +154,7 @@ export default function AiHubScreen() {
     },
     {
       key: "coordinator-jobs",
-      label: "Quebracho — Job",
+      label: "Horus — Job Coordinator",
       subtitle: "Registry job, kill-switch, direttive",
       icon: "sitemap-outline",
       route: "/admin/coordinator-jobs",
@@ -163,7 +163,7 @@ export default function AiHubScreen() {
     {
       key: "ai-monitor",
       label: "Monitor 4 AI",
-      subtitle: "Bowie · Horus · Ares · Quebracho",
+      subtitle: "Bowie · Horus · Ares",
       icon: "heart-pulse",
       route: "/admin/ai-monitor",
       color: "#0EA5E9",
@@ -171,7 +171,7 @@ export default function AiHubScreen() {
     {
       key: "ai-group-chat",
       label: "Tavola Rotonda AI",
-      subtitle: "Bowie · Horus · Quebracho a confronto",
+      subtitle: "Bowie · Horus a confronto",
       icon: "forum-outline",
       route: "/admin/ai-group-chat",
       color: "#14B8A6",
