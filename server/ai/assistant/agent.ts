@@ -64,12 +64,14 @@ import { eq, desc } from "drizzle-orm";
 import { pruneUserMemory, MEMORY_TURNS_LIMIT } from "./memory-pruner";
 import { fetchUserLiveContext } from "./user-context";
 import { BOWIE_INTRO_POEM, HORUS_INTRO_POEM, ARES_INTRO_POEM, QUEBRACHO_INTRO_POEM } from "@shared/bowie-greeting";
+import { AGENT_MODEL_DEFAULTS } from "../../lib/agent-constants";
 
-// Default Bowie = "qwen3:1.7b" (lineup: Horus=qwen3:4b, Bowie=qwen3:1.7b).
-const OLLAMA_FALLBACK_MODEL_ID = process.env.BOWIE_OLLAMA_MODEL ?? "qwen3:1.7b";
+// Default Bowie/Horus model fallbacks are centralised in agent-constants.ts so a
+// single edit propagates everywhere (env vars still override at runtime).
+const OLLAMA_FALLBACK_MODEL_ID = process.env.BOWIE_OLLAMA_MODEL ?? AGENT_MODEL_DEFAULTS.bowie;
 // Task #5197 — Horus usa un modello Ollama dedicato (stessa infra di Bowie).
 // Task #4 — default aggiornato a "qwen3:4b" (modello residente sul ThinkCentre).
-const HORUS_MODEL_ID = process.env.HORUS_OLLAMA_MODEL?.trim() || "qwen3:4b";
+const HORUS_MODEL_ID = process.env.HORUS_OLLAMA_MODEL?.trim() || AGENT_MODEL_DEFAULTS.horus;
 
 // Task #5210/#5233 — Presentazione poetica di Bowie (BOWIE_INTRO_POEM): iniettata
 // come turno "assistant" seed quando la conversazione è nuova (nessuna history).

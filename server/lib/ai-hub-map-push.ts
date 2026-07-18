@@ -15,6 +15,7 @@
  */
 
 import { isHubConfigured, hubPost } from "./ai-hub-client";
+import { AGENT_MODEL_DEFAULTS } from "./agent-constants";
 
 /**
  * Build the model→agent map from env vars and push it to the ai-hub.
@@ -34,14 +35,14 @@ export async function pushAgentModelMapToHub(): Promise<void> {
     // Nadir=all-minilm, Ares=devstral:latest (on-demand — included for correct
     // attribution in the monitoring breakdown, even if Ares is on a separate machine).
     const modelAgentMap: Record<string, string> = {
-      [process.env.BOWIE_OLLAMA_MODEL ?? "qwen3:1.7b"]: "Bowie",
-      [process.env.HORUS_OLLAMA_MODEL ?? "qwen3:4b"]: "Horus",
-      [process.env.QUEBRACHO_OLLAMA_MODEL ?? "granite4:tiny-h"]: "Quebracho",
+      [process.env.BOWIE_OLLAMA_MODEL ?? AGENT_MODEL_DEFAULTS.bowie]: "Bowie",
+      [process.env.HORUS_OLLAMA_MODEL ?? AGENT_MODEL_DEFAULTS.horus]: "Horus",
+      [process.env.QUEBRACHO_OLLAMA_MODEL ?? AGENT_MODEL_DEFAULTS.quebracho]: "Quebracho",
       // Nadir's embedding model on TC — no env override exists today.
-      "all-minilm": "Nadir",
+      [AGENT_MODEL_DEFAULTS.nadir]: "Nadir",
       // Ares — on-demand (devstral), separate machine. Included so GET /vram
       // correctly attributes the model when Ares borrows the TC GPU slot.
-      [process.env.ARES_OLLAMA_MODEL ?? "devstral:latest"]: "Ares",
+      [process.env.ARES_OLLAMA_MODEL ?? AGENT_MODEL_DEFAULTS.ares]: "Ares",
     };
 
     const result = await hubPost("/vram/agent-map", { modelAgentMap });

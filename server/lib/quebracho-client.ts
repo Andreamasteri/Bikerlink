@@ -24,7 +24,7 @@
 
 import { cfAccessHeaders } from "./cf-access";
 import { isThinkCentreOffline } from "./thinkcentre-offline";
-import { KEEP_ALIVE_RESIDENT } from "./agent-constants";
+import { KEEP_ALIVE_RESIDENT, AGENT_MODEL_DEFAULTS } from "./agent-constants";
 
 const QUEBRACHO_URL = (
   process.env.QUEBRACHO_OLLAMA_URL?.trim() ||
@@ -37,7 +37,7 @@ const QUEBRACHO_TOKEN =
   process.env.HORUS_OLLAMA_TOKEN ??
   process.env.BOWIE_OLLAMA_TOKEN ??
   "";
-const QUEBRACHO_MODEL = process.env.QUEBRACHO_OLLAMA_MODEL?.trim() || "granite4:tiny-h";
+const QUEBRACHO_MODEL = process.env.QUEBRACHO_OLLAMA_MODEL?.trim() || AGENT_MODEL_DEFAULTS.quebracho;
 
 /** true quando un URL Ollama (dedicato o ereditato) è disponibile per Quebracho. */
 export const isQuebrachoConfigured = Boolean(QUEBRACHO_URL);

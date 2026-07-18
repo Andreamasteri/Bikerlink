@@ -9,6 +9,7 @@ import { z } from "zod";
 import { limiters } from "../../lib/throttle";
 import { storage } from "../../storage";
 import { getOllamaModel, isOllamaConfigured } from "../../lib/ollama-client";
+import { AGENT_MODEL_DEFAULTS } from "../../lib/agent-constants";
 import { isThinkCentreOffline } from "../../lib/thinkcentre-offline";
 import { isAiFallbackEnabled, isAiFallbackEnabledSync } from "../fallback-switch";
 import type { AiProviderHealth, AiProviderId } from "./types";
@@ -294,7 +295,7 @@ function tryBuild(id: AiProviderId, role: ModelRole, forcedModelId?: string): Re
 export function tryBuildOllama(): ResolvedModel | null {
   if (!isOllamaConfigured) return null;
   try {
-    const modelId = process.env.BOWIE_OLLAMA_MODEL ?? "qwen3:1.7b";
+    const modelId = process.env.BOWIE_OLLAMA_MODEL ?? AGENT_MODEL_DEFAULTS.bowie;
     const model = getOllamaModel(modelId) as unknown as LanguageModelV2;
     return {
       id: "ollama",

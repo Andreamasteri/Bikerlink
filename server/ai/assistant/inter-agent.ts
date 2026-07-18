@@ -10,6 +10,7 @@
 // si cambia la persona attiva. Bowie riceve `text` e lo incorpora nella propria
 // risposta.
 import { callOllamaChat, isOllamaConfigured, isOllamaReachable } from "../../lib/ollama-client";
+import { AGENT_MODEL_DEFAULTS } from "../../lib/agent-constants";
 import { isAresConfigured, getAresModelId, streamAresChat } from "../../lib/ares-client";
 import { withAresVramPriority } from "../../lib/vram-arbiter";
 import { isQuebrachoConfigured, streamQuebrachoChat } from "../../lib/quebracho-client";
@@ -41,7 +42,7 @@ const ARES_CONSULT_SYSTEM =
 // Bowie (callOllamaChat sceglie l'endpoint in base a `persona`, ma NON il
 // modello — va passato esplicitamente o si finisce per usare il modello di
 // Bowie contro l'endpoint di Horus, causando "model not found").
-const HORUS_MODEL_ID = process.env.HORUS_OLLAMA_MODEL?.trim() || "qwen3:4b";
+const HORUS_MODEL_ID = process.env.HORUS_OLLAMA_MODEL?.trim() || AGENT_MODEL_DEFAULTS.horus;
 
 const HORUS_TIMEOUT_MS = 60_000;
 const QUEBRACHO_TIMEOUT_MS = 60_000;

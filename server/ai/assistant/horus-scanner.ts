@@ -16,6 +16,7 @@
 //   * SOLA LETTURA: nessuna scrittura su codice/GitHub/DB oltre alle proposte,
 //     lo store dei fingerprint e il manuale (nello storage di Nadir).
 import { callOllamaChat, isOllamaConfigured, isOllamaReachable } from "../../lib/ollama-client";
+import { AGENT_MODEL_DEFAULTS } from "../../lib/agent-constants";
 import { isRoutingAiBusy } from "../ai-priority-gate";
 import { redactPII } from "../moderation/redact";
 import { matchesSensitive } from "./security-filter";
@@ -52,7 +53,7 @@ const NOTE_NUM_PREDICT = 4000;
 // modello di Bowie, più piccolo). Le scansioni devono girare sul modello di Horus
 // (qwen3:4b) come tutti gli altri consult persona-specifici (inter-agent, group,
 // proposer). Vedi memory: inter-agent-consult-model-mismatch.
-const HORUS_MODEL_ID = process.env.HORUS_OLLAMA_MODEL?.trim() || "qwen3:4b";
+const HORUS_MODEL_ID = process.env.HORUS_OLLAMA_MODEL?.trim() || AGENT_MODEL_DEFAULTS.horus;
 
 export type ScanStatus = "idle" | "running" | "completed" | "interrupted" | "error";
 

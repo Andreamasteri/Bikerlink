@@ -19,13 +19,13 @@
  */
 
 import { cfAccessHeaders } from "./cf-access";
-import { KEEP_ALIVE_ON_DEMAND } from "./agent-constants";
+import { KEEP_ALIVE_ON_DEMAND, AGENT_MODEL_DEFAULTS } from "./agent-constants";
 
 const ARES_URL = process.env.ARES_OLLAMA_URL?.trim().replace(/\/$/, "");
 const ARES_TOKEN = process.env.ARES_OLLAMA_TOKEN ?? "";
 // Task #4 — default = "devstral:latest" (modello coding residente sul PC fisso/TC).
 // ARES_OLLAMA_MODEL come secret ha la precedenza se impostato.
-const ARES_MODEL = process.env.ARES_OLLAMA_MODEL?.trim() || "devstral:latest";
+const ARES_MODEL = process.env.ARES_OLLAMA_MODEL?.trim() || AGENT_MODEL_DEFAULTS.ares;
 
 /** true quando ARES_OLLAMA_URL è impostato (Ares disponibile come destinazione). */
 export const isAresConfigured = Boolean(ARES_URL);

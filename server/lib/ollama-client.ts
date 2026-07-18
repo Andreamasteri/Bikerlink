@@ -71,20 +71,20 @@ function ollamaHeaders(token: string, persona: OllamaPersona = "bowie"): Record<
   Object.assign(h, cfAccessHeaders(persona));
   return h;
 }
-// Modello default di Bowie = "qwen3:1.7b" (lineup: Horus=qwen3:4b, Bowie=qwen3:1.7b).
-// Se BOWIE_OLLAMA_MODEL è impostato come secret, ha la precedenza. Ricorda: dopo
-// il deploy sul ThinkCentre il secret va aggiornato A MANO (l'agente non può
-// modificare secret esistenti).
-const BOWIE_OLLAMA_MODEL = process.env.BOWIE_OLLAMA_MODEL ?? "qwen3:1.7b";
+// Fallback centralizzati in agent-constants.ts — env vars hanno sempre precedenza.
+import { AGENT_MODEL_DEFAULTS } from "./agent-constants";
+
+// Modello default di Bowie — centralizzato in AGENT_MODEL_DEFAULTS.bowie.
+const BOWIE_OLLAMA_MODEL = process.env.BOWIE_OLLAMA_MODEL ?? AGENT_MODEL_DEFAULTS.bowie;
 
 // Task #165 — Modelli per persona. I default DEVONO restare allineati ai client
 // dedicati: horus = HORUS_MODEL_ID (server/ai/assistant/*), ares = ares-client.ts,
 // quebracho = quebracho-client.ts. Nomi modello (mai valori di secret) loggati al boot.
 const PERSONA_MODELS = {
   bowie: BOWIE_OLLAMA_MODEL,
-  horus: process.env.HORUS_OLLAMA_MODEL?.trim() || "qwen3:4b",
-  ares: process.env.ARES_OLLAMA_MODEL?.trim() || "devstral:latest",
-  quebracho: process.env.QUEBRACHO_OLLAMA_MODEL?.trim() || "granite4:tiny-h",
+  horus: process.env.HORUS_OLLAMA_MODEL?.trim() || AGENT_MODEL_DEFAULTS.horus,
+  ares: process.env.ARES_OLLAMA_MODEL?.trim() || AGENT_MODEL_DEFAULTS.ares,
+  quebracho: process.env.QUEBRACHO_OLLAMA_MODEL?.trim() || AGENT_MODEL_DEFAULTS.quebracho,
 } as const;
 
 /** Personas per cui è risolvibile un modello (superset di OllamaPersona: include gli agenti con client dedicato). */

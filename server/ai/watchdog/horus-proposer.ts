@@ -26,9 +26,10 @@ import { isThinkCentreOffline } from "../../lib/thinkcentre-offline";
 import { getOllamaModel, isOllamaConfigured } from "../../lib/ollama-client";
 import { storage } from "../../storage";
 import { logAiUsage } from "../audit";
+import { AGENT_MODEL_DEFAULTS } from "../../lib/agent-constants";
 
-// Modello Ollama di Horus (stesso default di agent.ts): qwen3:4b sul ThinkCentre.
-const HORUS_MODEL_ID = process.env.HORUS_OLLAMA_MODEL?.trim() || "qwen3:4b";
+// Modello Ollama di Horus — default centralizzato in agent-constants.ts.
+const HORUS_MODEL_ID = process.env.HORUS_OLLAMA_MODEL?.trim() || AGENT_MODEL_DEFAULTS.horus;
 
 // Prompt DEDICATO all'interpretazione dei log di routing (voce di Horus).
 export const HORUS_PROPOSER_SYSTEM = `Sei Horus, lo specialista di routing e navigazione di BikerLink, in modalità diagnostica.

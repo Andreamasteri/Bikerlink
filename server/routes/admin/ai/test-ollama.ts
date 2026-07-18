@@ -13,6 +13,7 @@
 
 import { Router, type Request, type Response } from "express";
 import { callOllamaChat, getOllamaDiagnostics, isOllamaReachable, type OllamaPersona } from "../../../lib/ollama-client";
+import { AGENT_MODEL_DEFAULTS } from "../../../lib/agent-constants";
 
 const router = Router();
 
@@ -63,8 +64,8 @@ router.get("/test-ollama", async (req: Request, res: Response) => {
   const { url: rawUrl, tokenConfigured } = getOllamaDiagnostics(persona);
   const model =
     persona === "horus"
-      ? (process.env.HORUS_OLLAMA_MODEL?.trim() || "qwen3:4b")
-      : (process.env.BOWIE_OLLAMA_MODEL ?? "qwen3:1.7b");
+      ? (process.env.HORUS_OLLAMA_MODEL?.trim() || AGENT_MODEL_DEFAULTS.horus)
+      : (process.env.BOWIE_OLLAMA_MODEL ?? AGENT_MODEL_DEFAULTS.bowie);
 
   // Se l'URL non è impostato: non è un errore, semplicemente non configurato.
   if (!rawUrl) {

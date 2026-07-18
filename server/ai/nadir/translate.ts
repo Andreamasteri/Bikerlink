@@ -15,6 +15,7 @@
  * un cambiamento, così le lingue non restino sull'italiano più del necessario.
  */
 import { callOllamaChat } from "../../lib/ollama-client";
+import { AGENT_MODEL_DEFAULTS } from "../../lib/agent-constants";
 import { HORUS_THINK_TAG_CONTRACT } from "../assistant/codebase-inventory";
 import {
   getNadirManual,
@@ -29,7 +30,7 @@ import { TRANSLATABLE_APP_LANGUAGES, APP_LANGUAGE_NAMES, type AppLanguageCode } 
 // `persona: "horus"` sceglie SOLO l'endpoint, NON il modello: senza `model`
 // esplicito ricadrebbe su BOWIE_OLLAMA_MODEL. La traduzione del manuale deve
 // girare sul modello di Horus (qwen3:4b), come nella scansione MANUALE.
-const HORUS_MODEL_ID = process.env.HORUS_OLLAMA_MODEL?.trim() || "qwen3:4b";
+const HORUS_MODEL_ID = process.env.HORUS_OLLAMA_MODEL?.trim() || AGENT_MODEL_DEFAULTS.horus;
 
 // Verificato: il manuale intero supera comodamente la finestra di generazione
 // di un solo turno. Si traduce un BLOCCO alla volta (spezzato sui titoli "## ",

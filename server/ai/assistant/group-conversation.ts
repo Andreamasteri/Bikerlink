@@ -20,6 +20,7 @@ import { getOllamaModel } from "../../lib/ollama-client";
 import { streamQuebrachoChat, getQuebrachoModelId } from "../../lib/quebracho-client";
 import { AI_ROSTER, type AiPersonaId } from "./roster";
 import { APP_LANGUAGE_NAMES, SOURCE_APP_LANGUAGE, type AppLanguageCode } from "@shared/languages";
+import { AGENT_MODEL_DEFAULTS } from "../../lib/agent-constants";
 
 // ── Costanti della conversazione di gruppo ───────────────────────────────────
 
@@ -35,10 +36,10 @@ export const GROUP_MAX_TURNS_CAP = 20;
 /** Minimo di partecipanti perché sia una "conversazione" (non un monologo). */
 export const GROUP_MIN_PARTICIPANTS = 2;
 
-// Modelli Ollama per Bowie/Horus (coerenti con agent.ts). I VALORI dei secret
-// non vengono mai stampati; questi sono solo nomi di modello, non credenziali.
-const HORUS_MODEL_ID = process.env.HORUS_OLLAMA_MODEL?.trim() || "qwen3:4b";
-const BOWIE_MODEL_ID = process.env.BOWIE_OLLAMA_MODEL?.trim() || "qwen3:1.7b";
+// Modelli Ollama per Bowie/Horus — fallback centralizzato in agent-constants.ts;
+// env vars BOWIE/HORUS_OLLAMA_MODEL sovrascrivono a runtime come sempre.
+const HORUS_MODEL_ID = process.env.HORUS_OLLAMA_MODEL?.trim() || AGENT_MODEL_DEFAULTS.horus;
+const BOWIE_MODEL_ID = process.env.BOWIE_OLLAMA_MODEL?.trim() || AGENT_MODEL_DEFAULTS.bowie;
 
 /**
  * Normalizza e valida la lista di partecipanti proposta. Filtra i duplicati,

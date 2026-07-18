@@ -30,6 +30,7 @@ import { db } from "../../db";
 import { aiAnalysisRuns, aiAnalysisArtifacts } from "@shared/db";
 import { withBgDbSlot } from "../../lib/bg-db-limiter";
 import { callOllamaChat, isOllamaConfigured, isOllamaReachable } from "../../lib/ollama-client";
+import { AGENT_MODEL_DEFAULTS } from "../../lib/agent-constants";
 import { onlineTracker } from "../../online-tracker";
 import { redactPII } from "../moderation/redact";
 import { matchesSensitive } from "./security-filter";
@@ -43,7 +44,7 @@ import type { KnowledgeEntry } from "./knowledge";
 // (URL/token), NON il modello — senza `model` esplicito la chiamata ricade
 // silenziosamente su BOWIE_OLLAMA_MODEL (qwen3:1.7b) invece di qwen3:4b, e il
 // modelId persistito mentirebbe su quale modello ha davvero generato il report.
-const HORUS_MODEL_ID = process.env.HORUS_OLLAMA_MODEL?.trim() || "qwen3:4b";
+const HORUS_MODEL_ID = process.env.HORUS_OLLAMA_MODEL?.trim() || AGENT_MODEL_DEFAULTS.horus;
 
 // ── Parametri di robustezza ──────────────────────────────────────────────────
 const FIRST_RUN_DELAY_MS = 6 * 60_000; // parte 6 min dopo READY (dopo auto-learn)

@@ -17,6 +17,7 @@ import { db } from "../../db";
 import { aiAnalysisRuns, aiAnalysisArtifacts } from "@shared/db";
 import { withBgDbSlot } from "../../lib/bg-db-limiter";
 import { callOllamaChat } from "../../lib/ollama-client";
+import { AGENT_MODEL_DEFAULTS } from "../../lib/agent-constants";
 import { redactPII } from "../moderation/redact";
 import { matchesSensitive } from "./security-filter";
 import { getLatestRunSummary, listOpenViolations } from "../db-integrity/runner";
@@ -37,7 +38,7 @@ export const MANUAL_SECTION_MAX_LEN = 20000;
 // esplicito la sintesi ricadrebbe su BOWIE_OLLAMA_MODEL. Le proposte e il manuale
 // devono essere prodotti dal modello di Horus (qwen3:4b), come gli altri consult
 // persona-specifici. Vedi memory: inter-agent-consult-model-mismatch.
-export const HORUS_MODEL_ID = process.env.HORUS_OLLAMA_MODEL?.trim() || "qwen3:4b";
+export const HORUS_MODEL_ID = process.env.HORUS_OLLAMA_MODEL?.trim() || AGENT_MODEL_DEFAULTS.horus;
 
 // ── Helper condivisi (esportati per horus-scanner-finalize-manual.ts) ────────
 
