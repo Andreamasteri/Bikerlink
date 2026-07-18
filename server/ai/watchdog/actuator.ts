@@ -44,6 +44,17 @@ export interface AnomalousConnection {
   idle_s: number | null;
 }
 
+export interface KillResult {
+  /** Number of backends successfully terminated. */
+  killed: number;
+  /**
+   * Number of backends where pg_terminate_backend threw. These are NOT counted
+   * in `killed` and are surfaced in the watchdog signal so admins are notified
+   * of partial-kill failures instead of silently losing the kill count.
+   */
+  failedKills: number;
+}
+
 /**
  * Legge il kill-switch dall'AppSetting (con TTL cache) e, se abilitato,
  * termina via pg_terminate_backend le connessioni più vecchie della soglia
@@ -52,12 +63,14 @@ export interface AnomalousConnection {
  * Usa la connessione out-of-band `client` (non il pool principale, che è sotto
  * pressione nel contesto in cui viene chiamato).
  *
- * @returns numero di backend terminati (0 se kill-switch disabilitato)
+ * @returns KillResult con i contatori `killed` e `failedKills` (entrambi 0 se
+ *   il kill-switch è disabilitato). `failedKills > 0` indica un fallimento
+ *   parziale che deve essere surfaceto nel segnale watchdog.
  */
 export async function runIdleLeakKill(
   client: pg.Client,
   anomalous: AnomalousConnection[],
-): Promise<number> {
+): Promise<KillResult> {
   let killEnabled = false;
   try {
     // TTL cache: evita query ripetute su app_settings durante pressione DB.
@@ -80,21 +93,23 @@ export async function runIdleLeakKill(
     /* AppSetting illeggibile → kill disabilitato (fail-safe). */
   }
 
-  if (!killEnabled) return 0;
+  if (!killEnabled) return { killed: 0, failedKills: 0 };
 
   const killable = anomalous.filter((r) => (r.idle_s ?? 0) >= ACTUATOR_IDLE_KILL_MIN_AGE_S);
   let killed = 0;
+  let failedKills = 0;
   for (const r of killable) {
     try {
       await client.query(`SELECT pg_terminate_backend($1)`, [r.pid]);
       killed++;
       console.error(`[watchdog/actuator] 🔪 pg_terminate_backend(${r.pid}) (idle ${r.idle_s}s)`);
     } catch (err) {
+      failedKills++;
       console.warn(
-        `[watchdog/actuator] terminate pid=${r.pid} fallito:`,
+        `[watchdog/actuator] terminate pid=${r.pid} fallito (failedKills=${failedKills}):`,
         (err as Error).message?.slice(0, 120),
       );
     }
   }
-  return killed;
+  return { killed, failedKills };
 }

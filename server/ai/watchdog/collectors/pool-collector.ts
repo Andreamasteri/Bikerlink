@@ -52,7 +52,15 @@ const IDLE_LEAK_THRESHOLD = 2;
 // pushare segnali nel ritorno SINCRONO di collectPool(); quindi deposita qui il
 // risultato e il tick successivo emette il segnale "high". Finestra ~130s = il
 // prossimo tick del watchdog (60s) lo raccoglie ancora fresco.
-let lastIdleLeak: { at: number; count: number; pids: number[]; killed: number } | null = null;
+let lastIdleLeak: {
+  at: number;
+  count: number;
+  pids: number[];
+  killed: number;
+  /** PIDs where pg_terminate_backend threw — surfaced in the signal so admins
+   *  are notified of partial-kill failures instead of silently losing the count. */
+  failedKills: number;
+} | null = null;
 
 // Drops scartati IN UN SINGOLO TICK oltre i quali la crescita è "anomala" e va
 // segnalata subito con un warn, senza attendere la conferma anti-blip. Un burst
@@ -229,10 +237,16 @@ async function detectIdleLeak(client: pg.Client): Promise<void> {
   // Fase 5 — Kill delegato all'actuator (separa osservazione da azione).
   // L'actuator legge il kill-switch dall'AppSetting (con TTL cache), filtra per
   // ACTUATOR_IDLE_KILL_MIN_AGE_S (60s) e chiama pg_terminate_backend sui PID
-  // eleggibili. Se il kill-switch è OFF o l'AppSetting non è leggibile → 0.
+  // eleggibili. Se il kill-switch è OFF o l'AppSetting non è leggibile → {0,0}.
   let killed = 0;
+  let failedKills = 0;
   if (anomalous.length >= IDLE_LEAK_THRESHOLD) {
-    killed = await runIdleLeakKill(client, anomalous);
+    ({ killed, failedKills } = await runIdleLeakKill(client, anomalous));
+    if (failedKills > 0) {
+      console.error(
+        `[pool-collector/idle-leak] ⚠️ ${failedKills} pg_terminate_backend falliti su ${killed + failedKills} tentati — segnale watchdog includerà failedKills`,
+      );
+    }
   }
 
   lastIdleLeak = {
@@ -240,6 +254,7 @@ async function detectIdleLeak(client: pg.Client): Promise<void> {
     count: anomalous.length,
     pids: anomalous.map((r) => r.pid),
     killed,
+    failedKills,
   };
 }
 
@@ -325,6 +340,7 @@ export function collectPool(): Signal[] {
         details: {
           pids: lastIdleLeak.pids,
           killed: lastIdleLeak.killed,
+          failedKills: lastIdleLeak.failedKills,
           minAgeS: IDLE_LEAK_MIN_AGE_S,
         },
       });

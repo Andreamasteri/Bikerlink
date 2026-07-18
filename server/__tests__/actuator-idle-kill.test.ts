@@ -3,11 +3,12 @@
  *
  * Tests runIdleLeakKill directly with a mocked pg.Client, without going
  * through pool-collector. Covers:
- *   - kill-switch OFF  → 0 kills
+ *   - kill-switch OFF  → 0 kills, 0 failedKills
  *   - kill-switch ON   → kills only pids >= ACTUATOR_IDLE_KILL_MIN_AGE_S (60s)
  *   - TTL cache hits   → app_settings not re-read within the 3-min window
  *   - invalidateIdleKillCache() forces immediate re-read on the next call
  *   - AppSetting query throws → 0 kills (fail-safe)
+ *   - partial pg_terminate_backend failure → correct killed + failedKills counts
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
@@ -99,9 +100,10 @@ describe("runIdleLeakKill — actuator unit tests", () => {
       return Promise.resolve({ rows: [] });
     });
 
-    const killed = await runIdleLeakKill(client, OLD_ENOUGH);
+    const { killed, failedKills } = await runIdleLeakKill(client, OLD_ENOUGH);
 
     expect(killed).toBe(0);
+    expect(failedKills).toBe(0);
     expect(killedPids(client)).toHaveLength(0);
   });
 
@@ -113,9 +115,10 @@ describe("runIdleLeakKill — actuator unit tests", () => {
       return Promise.resolve({ rows: [] });
     });
 
-    const killed = await runIdleLeakKill(client, OLD_ENOUGH);
+    const { killed, failedKills } = await runIdleLeakKill(client, OLD_ENOUGH);
 
     expect(killed).toBe(0);
+    expect(failedKills).toBe(0);
     expect(killedPids(client)).toHaveLength(0);
   });
 
@@ -132,9 +135,10 @@ describe("runIdleLeakKill — actuator unit tests", () => {
       return Promise.resolve({ rows: [] });
     });
 
-    const killed = await runIdleLeakKill(client, OLD_ENOUGH);
+    const { killed, failedKills } = await runIdleLeakKill(client, OLD_ENOUGH);
 
     expect(killed).toBe(3);
+    expect(failedKills).toBe(0);
     expect(killedPids(client)).toEqual(expect.arrayContaining([101, 102, 103]));
   });
 
@@ -150,9 +154,10 @@ describe("runIdleLeakKill — actuator unit tests", () => {
     });
 
     // MIXED_AGE has pid 201 (45s → skip) and pid 202 (90s → kill)
-    const killed = await runIdleLeakKill(client, MIXED_AGE);
+    const { killed, failedKills } = await runIdleLeakKill(client, MIXED_AGE);
 
     expect(killed).toBe(1);
+    expect(failedKills).toBe(0);
     const pids = killedPids(client);
     expect(pids).toContain(202);
     expect(pids).not.toContain(201);
@@ -169,7 +174,7 @@ describe("runIdleLeakKill — actuator unit tests", () => {
       return Promise.resolve({ rows: [] });
     });
 
-    const killed = await runIdleLeakKill(client, OLD_ENOUGH);
+    const { killed } = await runIdleLeakKill(client, OLD_ENOUGH);
     expect(killed).toBe(3);
   });
 
@@ -184,7 +189,7 @@ describe("runIdleLeakKill — actuator unit tests", () => {
       return Promise.resolve({ rows: [] });
     });
 
-    const killed = await runIdleLeakKill(client, OLD_ENOUGH);
+    const { killed } = await runIdleLeakKill(client, OLD_ENOUGH);
     expect(killed).toBe(3);
   });
 
@@ -260,7 +265,7 @@ describe("runIdleLeakKill — actuator unit tests", () => {
     });
 
     // First call: kill OFF, cache populated.
-    const killed1 = await runIdleLeakKill(client, OLD_ENOUGH);
+    const { killed: killed1 } = await runIdleLeakKill(client, OLD_ENOUGH);
     expect(killed1).toBe(0);
     expect(callsMatching(client, "app_settings")).toBe(1);
 
@@ -269,7 +274,7 @@ describe("runIdleLeakKill — actuator unit tests", () => {
     invalidateIdleKillCache();
 
     // Second call at same frozen time: cache was invalidated → must re-read.
-    const killed2 = await runIdleLeakKill(client, OLD_ENOUGH);
+    const { killed: killed2 } = await runIdleLeakKill(client, OLD_ENOUGH);
     expect(callsMatching(client, "app_settings")).toBe(2); // re-read happened
     expect(killed2).toBe(3); // now enabled → all pids killed
   });
@@ -284,9 +289,10 @@ describe("runIdleLeakKill — actuator unit tests", () => {
       return Promise.resolve({ rows: [] });
     });
 
-    const killed = await runIdleLeakKill(client, OLD_ENOUGH);
+    const { killed, failedKills } = await runIdleLeakKill(client, OLD_ENOUGH);
 
     expect(killed).toBe(0);
+    expect(failedKills).toBe(0);
     expect(killedPids(client)).toHaveLength(0);
   });
 
@@ -298,11 +304,14 @@ describe("runIdleLeakKill — actuator unit tests", () => {
       return Promise.resolve({ rows: [] });
     });
 
-    const killed = await runIdleLeakKill(client, []);
+    const { killed, failedKills } = await runIdleLeakKill(client, []);
 
     expect(killed).toBe(0);
+    expect(failedKills).toBe(0);
     expect(killedPids(client)).toHaveLength(0);
   });
+
+  // ── 6. Partial pg_terminate_backend failure → failedKills surfaced ──────────
 
   it("skips a PID gracefully when pg_terminate_backend throws and continues with the rest", async () => {
     let termCalls = 0;
@@ -323,10 +332,33 @@ describe("runIdleLeakKill — actuator unit tests", () => {
     });
 
     // THREE connections all old enough; first one's terminate call throws.
-    const killed = await runIdleLeakKill(client, OLD_ENOUGH);
+    const { killed, failedKills } = await runIdleLeakKill(client, OLD_ENOUGH);
 
-    // pid 101 threw → not counted; pids 102 and 103 succeeded.
+    // pid 101 threw → counted in failedKills, NOT in killed; pids 102 and 103 succeeded.
     expect(killed).toBe(2);
+    expect(failedKills).toBe(1);
     expect(termCalls).toBe(3); // all three were attempted
+  });
+
+  it("reports failedKills=2 when two out of three pids throw", async () => {
+    const client = makeClient((sql, params) => {
+      if (sql.includes("app_settings")) {
+        return Promise.resolve({ rows: [{ value: "true", value_json: null }] });
+      }
+      if (sql.includes("pg_terminate_backend")) {
+        const pid = (params as number[])[0];
+        if (pid === 101 || pid === 102) {
+          return Promise.reject(new Error("permission denied"));
+        }
+        return Promise.resolve({ rows: [{ pg_terminate_backend: true }] });
+      }
+      return Promise.resolve({ rows: [] });
+    });
+
+    // OLD_ENOUGH has pids 101, 102, 103 — first two throw, third succeeds.
+    const { killed, failedKills } = await runIdleLeakKill(client, OLD_ENOUGH);
+
+    expect(killed).toBe(1);
+    expect(failedKills).toBe(2);
   });
 });
