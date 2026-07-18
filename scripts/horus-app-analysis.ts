@@ -46,6 +46,12 @@ const DEFAULT_MODEL = AGENT_MODEL_DEFAULTS.horus;
 const REQUEST_TIMEOUT_MS = 300_000;
 const DEFAULT_TAIL_LINES = 500;
 
+// Task #585 — HORUS_THINK=0 disabilita il ragionamento (default: think:true).
+// Stessa logica di horus-patch-scan.core.ts (Task #574).
+// Override CLI: impostare HORUS_THINK=0 prima di lanciare lo script per usare
+// think:false (veloce, nessun reasoning). num_predict ridotto a 600 se think:false.
+const HORUS_THINK_ENABLED = process.env.HORUS_THINK !== "0";
+
 const KNOWN_AREAS = ["auth", "routing", "ai", "telemetry", "storage", "boot", "scheduler"] as const;
 type Area = (typeof KNOWN_AREAS)[number];
 
@@ -192,9 +198,10 @@ async function callHorus(
       body: JSON.stringify({
         model,
         stream: false,
-        // think:true — Horus ragiona prima di rispondere (output strutturato migliore).
+        // Task #585 — think controllato da HORUS_THINK_ENABLED (env HORUS_THINK=0 → false).
+        // Default: true. num_predict ridotto a 600 se think:false (nessun reasoning).
         // Il blocco <think>…</think> viene strippato da stripThinkBlock() più sotto.
-        options: { temperature: 0.2, think: true },
+        options: { temperature: 0.2, think: HORUS_THINK_ENABLED, num_predict: HORUS_THINK_ENABLED ? 800 : 600 },
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userContent },
