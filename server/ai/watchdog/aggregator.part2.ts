@@ -3,6 +3,7 @@ import { systemHealthSnapshot } from "@shared/db";
 import { desc } from "drizzle-orm";
 import type { HealthSnapshot, Problem, Signal } from "./types";
 import { recordSignals } from "./signals";
+import { storage } from "../../storage";
 import {
   SEVERITY_WEIGHT,
   deriveProblems,
@@ -51,6 +52,35 @@ export function getSnoozedUntil(): Date | null { return snoozedUntil; }
 export function setSnoozedUntil(until: Date | null): void {
   snoozedUntil = until;
   snoozedAt = until ? new Date() : null;
+  // Task #580 — Persist snooze to AppSettings so it survives server restarts.
+  // Fire-and-forget: non-fatal if the DB write fails.
+  const isoOrNull = until ? until.toISOString() : null;
+  storage.upsertAppSetting("watchdog_snooze_until", isoOrNull ?? "", isoOrNull)
+    .catch((err) => {
+      console.warn("[watchdog/aggregator] setSnoozedUntil persist failed (non-fatal):", (err as Error).message);
+    });
+}
+
+// Task #580 — Rehydrate snoozed-until from AppSettings on aggregator boot.
+// Called once by the watchdog scheduler during startup. Ignores stale timestamps.
+export async function rehydrateSnoozedUntil(): Promise<void> {
+  try {
+    const row = await storage.getAppSetting("watchdog_snooze_until");
+    const iso = row?.valueJson as string | null | undefined ?? row?.value ?? null;
+    if (!iso) return;
+    const candidate = new Date(iso);
+    if (isNaN(candidate.getTime())) return;
+    if (candidate.getTime() > Date.now()) {
+      snoozedUntil = candidate;
+      // snoozedAt unknown after restart — treat as if just set so the
+      // 2-minute critical-bypass window starts fresh (conservative / safe).
+      snoozedAt = new Date();
+      console.log(`[watchdog/aggregator] snooze rehydrated from AppSettings until ${candidate.toISOString()}`);
+    }
+    // If in the past: leave snoozedUntil null (already the default).
+  } catch (err) {
+    console.warn("[watchdog/aggregator] rehydrateSnoozedUntil failed (non-fatal):", (err as Error).message);
+  }
 }
 
 export function getLatestSnapshot(): HealthSnapshot | null { return latest; }

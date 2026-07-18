@@ -8,7 +8,7 @@
 //
 // Task #2533 — Scheduler in-process del watchdog. Ogni 60s: aggregator → auto-fix
 // → (se serve) proposer → alerts. Cleanup signals 1x/h. Weekly report via cron sep.
-import { runAggregatorCycle } from "./aggregator";
+import { runAggregatorCycle, rehydrateSnoozedUntil } from "./aggregator";
 import { runAutoFix } from "./auto-fix";
 import { runProposer } from "./proposer";
 import { runHorusRoutingProposer, filterHorusProblems } from "./horus-proposer";
@@ -150,6 +150,9 @@ async function tick(): Promise<void> {
 
 export function startWatchdogScheduler(): void {
   if (tickTimer) return;
+  // Task #580 — Rehydrate snooze state from AppSettings so a deploy/restart
+  // doesn't silently re-show all suppressed errors. Non-fatal if it fails.
+  rehydrateSnoozedUntil().catch(() => {});
   // Primo tick dopo 90s: il watchdog fa query DB ad ogni ciclo; ritardarlo
   // evita di contribuire al thundering herd durante il burst di avvio.
   // Usiamo un chain di setTimeout auto-rischedulante con ±15% di jitter
