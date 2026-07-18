@@ -39,6 +39,11 @@ interface PipelineLogResponse {
 
 interface RoutingStatusResponse {
   activeEngine: string;
+  killSwitch: {
+    enabled: boolean;
+    envOverride: null;
+    softEnabled: boolean | null;
+  };
   metrics: {
     windowMs: number;
     successes: number;
@@ -109,10 +114,19 @@ function overallColor(summary: PipelineSummary | undefined): string {
   return "#22c55e";
 }
 
-function metricsToStatus(metrics: RoutingStatusResponse["metrics"] | undefined): DotStatus {
+function metricsToStatus(
+  metrics: RoutingStatusResponse["metrics"] | undefined,
+  killSwitch: RoutingStatusResponse["killSwitch"] | undefined,
+): DotStatus {
   if (!metrics) return "unknown";
   const total = metrics.successes + metrics.fallbacks + metrics.failures;
-  if (total === 0) return "unknown";
+  if (total === 0) {
+    // Nessuna richiesta nella finestra: lo stato dipende dalla config.
+    // Se il kill-switch è abilitato il routing è idle ma attivo → verde.
+    // Se è disabilitato (o stato sconosciuto) → grigio/rosso.
+    if (killSwitch == null) return "unknown";
+    return killSwitch.enabled ? "ok" : "offline";
+  }
   if (metrics.failures > 0) return "offline";
   if (metrics.fallbacks > 0) return "degraded";
   return "ok";
@@ -180,8 +194,8 @@ export function RoutingCoordinationCard({
 
   useEffect(() => {
     if (!onStatus) return;
-    onStatus(metricsToStatus(status?.metrics));
-  }, [status?.metrics, onStatus]);
+    onStatus(metricsToStatus(status?.metrics, status?.killSwitch));
+  }, [status?.metrics, status?.killSwitch, onStatus]);
 
   const headerColor = overallColor(pipeline?.summary);
   const summary = pipeline?.summary;

@@ -118,10 +118,14 @@ router.get("/status", async (_req: Request, res: Response) => {
     successes?: number; fallbacks?: number; failures?: number;
   };
   const routingTotal = successes + fallbacks + failures;
+  // Se non ci sono richieste nella finestra di 5 min, lo stato del pallino dipende
+  // dalla configurazione: "ok" se il routing è abilitato (idle ma attivo),
+  // "offline" se il kill-switch è disattivo (esplicitamente spento).
   const routingDot =
-    routingTotal === 0 ? "unknown" :
-    failures > 0 ? "offline" :
-    fallbacks > 0 ? "degraded" : "ok";
+    routingTotal === 0
+      ? (killSwitch.enabled ? "ok" : "offline")
+      : failures > 0 ? "offline"
+      : fallbacks > 0 ? "degraded" : "ok";
   updateSystemStatus({ routing: routingDot });
 
   return res.json({
