@@ -19,6 +19,8 @@ export const TYPE_FILTERS: FilterOption[] = [
   { label: "GPS Flood", value: "gps_flood", color: "#3B82F6" },
   { label: "RAM", value: "memory_pressure", color: "#EF4444" },
   { label: "Modulo Nativo", value: "native_module_missing", color: "#8B5CF6" },
+  // Task #578 — Android OS background kill (long session, no error_message)
+  { label: "BG Kill", value: "background_kill", color: "#0EA5E9" },
   { label: "Transizione", value: "appstate_transition", color: "#6B7280" },
 ];
 

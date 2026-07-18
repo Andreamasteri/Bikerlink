@@ -51,14 +51,25 @@ interface CrashLogEntryInput {
   sessionEndedAt?: unknown;
 }
 
-// SQL expression that derives a signal type from the errorMessage [resume:X] prefix.
+// SQL expression that derives a signal type from the errorMessage [resume:X] prefix
+// or from heuristic patterns on crash_system entries.
+//
+// Task #578 — background_kill: crash_system with no error_message and session
+// duration ≥ 30 min. This identifies Android OS background process kills
+// (battery optimizer, OOM killer) that don't fire AppState events, distinguishing
+// them from immediate native crashes on app open.
 export const DERIVED_TYPE_EXPR = sql`
   CASE
-    WHEN error_message LIKE '[resume:js_thread_freeze]%'     THEN 'js_thread_freeze'
-    WHEN error_message LIKE '[resume:gps_flood]%'            THEN 'gps_flood'
-    WHEN error_message LIKE '[resume:memory_pressure]%'      THEN 'memory_pressure'
+    WHEN error_message LIKE '[resume:js_thread_freeze]%'      THEN 'js_thread_freeze'
+    WHEN error_message LIKE '[resume:gps_flood]%'             THEN 'gps_flood'
+    WHEN error_message LIKE '[resume:memory_pressure]%'       THEN 'memory_pressure'
     WHEN error_message LIKE '[resume:native_module_missing]%' THEN 'native_module_missing'
-    WHEN error_message LIKE '[resume:appstate_transition]%'  THEN 'appstate_transition'
+    WHEN error_message LIKE '[resume:appstate_transition]%'   THEN 'appstate_transition'
+    WHEN crash_type = 'crash_system'
+      AND (error_message IS NULL OR error_message = '')
+      AND session_started_at IS NOT NULL
+      AND reported_at - session_started_at >= INTERVAL '30 minutes'
+      THEN 'background_kill'
     ELSE crash_type
   END
 `;
@@ -71,8 +82,35 @@ export const SIGNAL_TYPES_DIAGNOSTIC = [
   "gps_flood",
   "memory_pressure",
   "native_module_missing",
+  // Task #578 — OS background process kills: informational, not a JS/native crash
+  "background_kill",
 ];
 
+
+// Task #578 — Reusable pure helper: derives the display type for a crash log row.
+// Checks [resume:X] prefix first, then the background_kill heuristic (crash_system +
+// no error + session ≥ 30min = Android OS background process kill).
+// Exported so it can be tested in isolation without a DB.
+export function deriveCrashType(row: {
+  crashType: string | null;
+  errorMessage: string | null;
+  sessionStartedAt: Date | null;
+  reportedAt: Date | null;
+}): string {
+  const msg = row.errorMessage ?? "";
+  const resumeMatch = msg.match(/^\[resume:([^\]]+)\]/);
+  if (resumeMatch) return resumeMatch[1];
+  if (
+    row.crashType === "crash_system" &&
+    !msg &&
+    row.sessionStartedAt != null &&
+    row.reportedAt != null &&
+    (row.reportedAt.getTime() - row.sessionStartedAt.getTime()) >= 30 * 60 * 1000
+  ) {
+    return "background_kill";
+  }
+  return row.crashType ?? "crash_system";
+}
 
 export const publicRouter = Router();
 
@@ -144,20 +182,28 @@ adminRouter.get("/", requireAdmin, (req: Request, res: Response): void => {
 
   const deviceFilter = deviceModel?.trim();
 
+  // Task #578 — background_kill is a server-side heuristic (not a [resume:X] prefix):
+  // crash_system with no error_message and session duration ≥ 30 min.
+  const isBackgroundKillFilter = crashType === "background_kill";
   const signalTypes = ["js_thread_freeze", "gps_flood", "memory_pressure", "native_module_missing", "appstate_transition"];
   const isSignalFilter = signalTypes.includes(crashType);
   const realCrashTypes = ["crash_system", "crash_js", "restart_loop"];
   const isRealCrashFilter = realCrashTypes.includes(crashType);
 
   const where = and(
-    isSignalFilter
-      ? sql`${appCrashLogs.errorMessage} LIKE ${`[resume:${crashType}]%`}`
-      : isRealCrashFilter
-        ? and(
-            eq(appCrashLogs.crashType, crashType as "crash_system" | "crash_js" | "restart_loop"),
-            sql`(${appCrashLogs.errorMessage} IS NULL OR ${appCrashLogs.errorMessage} NOT LIKE '[resume:%]%')`
-          )
-        : sql`(${appCrashLogs.crashType} IN ('crash_system','crash_js','restart_loop') OR ${appCrashLogs.errorMessage} LIKE '[resume:%]%')`,
+    isBackgroundKillFilter
+      ? sql`(${appCrashLogs.crashType} = 'crash_system'
+           AND (${appCrashLogs.errorMessage} IS NULL OR ${appCrashLogs.errorMessage} = '')
+           AND ${appCrashLogs.sessionStartedAt} IS NOT NULL
+           AND ${appCrashLogs.reportedAt} - ${appCrashLogs.sessionStartedAt} >= INTERVAL '30 minutes')`
+      : isSignalFilter
+        ? sql`${appCrashLogs.errorMessage} LIKE ${`[resume:${crashType}]%`}`
+        : isRealCrashFilter
+          ? and(
+              eq(appCrashLogs.crashType, crashType as "crash_system" | "crash_js" | "restart_loop"),
+              sql`(${appCrashLogs.errorMessage} IS NULL OR ${appCrashLogs.errorMessage} NOT LIKE '[resume:%]%')`
+            )
+          : sql`(${appCrashLogs.crashType} IN ('crash_system','crash_js','restart_loop') OR ${appCrashLogs.errorMessage} LIKE '[resume:%]%')`,
     filterUserId ? eq(appCrashLogs.userId, filterUserId) : undefined,
     dateFrom ? gte(appCrashLogs.reportedAt, new Date(dateFrom)) : undefined,
     dateTo ? lte(appCrashLogs.reportedAt, new Date(dateTo.length === 10 ? dateTo + "T23:59:59.999Z" : dateTo)) : undefined,
@@ -222,13 +268,15 @@ adminRouter.get("/", requireAdmin, (req: Request, res: Response): void => {
       const brandList = brandRows as { brand: string; total: number }[];
       const grandTotal = brandList.reduce((s, b) => s + b.total, 0);
 
-      const logsWithDerived = rows.map((row) => {
-        const msg = row.errorMessage ?? "";
-        let derivedType: string = row.crashType ?? "crash_system";
-        const match = msg.match(/^\[resume:([^\]]+)\]/);
-        if (match) derivedType = match[1];
-        return { ...row, derivedType };
-      });
+      const logsWithDerived = rows.map((row) => ({
+        ...row,
+        derivedType: deriveCrashType({
+          crashType: row.crashType,
+          errorMessage: row.errorMessage,
+          sessionStartedAt: row.sessionStartedAt,
+          reportedAt: row.reportedAt,
+        }),
+      }));
 
       res.json({
         logs: logsWithDerived,

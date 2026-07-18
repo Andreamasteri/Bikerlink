@@ -5,13 +5,15 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 // Core stored crash types
 export type StoredCrashType = "crash_system" | "crash_js" | "restart_loop" | "clean_close";
 
-// Signal types derived from [resume:X] errorMessage prefix
+// Signal types derived from [resume:X] errorMessage prefix or server-side heuristic
 export type SignalType =
   | "js_thread_freeze"
   | "gps_flood"
   | "memory_pressure"
   | "native_module_missing"
-  | "appstate_transition";
+  | "appstate_transition"
+  // Task #578 — crash_system with long session and no error = Android OS background kill
+  | "background_kill";
 
 // All types visible in the admin UI
 export type CrashType = StoredCrashType | SignalType;
@@ -25,6 +27,8 @@ export const DIAGNOSTIC_SIGNAL_TYPES: SignalType[] = [
   // appstate_transition uses much higher thresholds (≥200/≥10 → warn; ≥500/≥20 → high)
   // to avoid false positives from normal foreground/background cycling.
   "appstate_transition",
+  // Task #578 — Android OS background process kills (battery optimizer, no AppState event)
+  "background_kill",
 ];
 // Reserved for future context-only signals (no entries currently)
 export const CONTEXT_SIGNAL_TYPES: SignalType[] = [];
@@ -45,6 +49,9 @@ export const CRASH_TYPE_META: Record<string, TypeMeta> = {
   gps_flood:             { label: "GPS Flood",       color: "#3B82F6", icon: "map-marker-alert" },
   memory_pressure:       { label: "Pressione RAM",   color: "#EF4444", icon: "memory" },
   native_module_missing: { label: "Modulo Nativo",   color: "#8B5CF6", icon: "puzzle-remove" },
+  // Task #578 — OS background kill: crash_system with long session and no error_message.
+  // Caused by Android battery optimizer killing the process without AppState event.
+  background_kill:       { label: "BG Kill",         color: "#0EA5E9", icon: "power-sleep" },
   // Context signals (very noisy)
   appstate_transition:   { label: "Transizione App", color: "#6B7280", icon: "transit-connection" },
 };
@@ -120,6 +127,7 @@ export interface CrashAlert {
   gps_flood: number;
   memory_pressure: number;
   native_module_missing: number;
+  background_kill?: number;
 }
 
 export type AlertDominantType = string;
@@ -172,6 +180,7 @@ export interface VersionStat {
   gps_flood: number;
   memory_pressure: number;
   native_module_missing: number;
+  background_kill?: number;
   total: number;
 }
 
@@ -184,6 +193,7 @@ export interface DayTrend {
   gps_flood: number;
   memory_pressure: number;
   native_module_missing: number;
+  background_kill?: number;
 }
 
 export interface CrashStatsResponse {
@@ -196,6 +206,7 @@ export interface CrashStatsResponse {
     memory_pressure: number;
     native_module_missing: number;
     appstate_transition: number;
+    background_kill: number;
   };
   byVersion: VersionStat[];
   dailyTrend: DayTrend[];

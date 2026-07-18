@@ -22,16 +22,22 @@ adminStatsRouter.get("/stats", requireAdmin, (req: Request, res: Response): void
   } = req.query as Record<string, string>;
   const qDeviceFilter = qDeviceModel?.trim();
 
-  const allKnownTypes = ["crash_system", "crash_js", "restart_loop", "js_thread_freeze", "gps_flood", "memory_pressure", "native_module_missing", "appstate_transition"];
+  // Task #578 — background_kill is a server-side heuristic, not a [resume:X] prefix type.
+  const isBackgroundKillFilter = qCrashType === "background_kill";
+  const allKnownTypes = ["crash_system", "crash_js", "restart_loop", "js_thread_freeze", "gps_flood", "memory_pressure", "native_module_missing", "appstate_transition", "background_kill"];
   const isSingleKnownType = allKnownTypes.includes(qCrashType);
 
   const signalTypes = [...SIGNAL_TYPES_DIAGNOSTIC, ...SIGNAL_TYPES_CONTEXT];
-  const isSignalType = signalTypes.includes(qCrashType);
+  const isSignalType = signalTypes.includes(qCrashType) && !isBackgroundKillFilter;
 
   let statsWhere: ReturnType<typeof sql>;
   let aclTypeWhere: ReturnType<typeof sql>;
 
-  if (isSingleKnownType && isSignalType) {
+  if (isBackgroundKillFilter) {
+    // crash_system with no error and session ≥ 30 min = Android OS background process kill
+    statsWhere = sql`crash_type = 'crash_system' AND (error_message IS NULL OR error_message = '') AND session_started_at IS NOT NULL AND reported_at - session_started_at >= INTERVAL '30 minutes'`;
+    aclTypeWhere = sql`acl.crash_type = 'crash_system' AND (acl.error_message IS NULL OR acl.error_message = '') AND acl.session_started_at IS NOT NULL AND acl.reported_at - acl.session_started_at >= INTERVAL '30 minutes'`;
+  } else if (isSingleKnownType && isSignalType) {
     const prefix = `[resume:${qCrashType}]%`;
     statsWhere = sql`error_message LIKE ${prefix}`;
     aclTypeWhere = sql`acl.error_message LIKE ${prefix}`;
@@ -67,8 +73,16 @@ adminStatsRouter.get("/stats", requireAdmin, (req: Request, res: Response): void
     aclTypeWhere = sql`(${aclTypeWhere}) AND (acl.device_model ILIKE ${pat} OR acl.device_brand ILIKE ${pat})`;
   }
 
+  // Task #578 — Exclude background_kill (OS kills) from the crash-free rate.
+  // They are informational, not true app crashes.
   const crashFreeWhere = sql`crash_type IN ('crash_system','crash_js','restart_loop')
-    AND (error_message IS NULL OR error_message NOT LIKE '[resume:%]%')`;
+    AND (error_message IS NULL OR error_message NOT LIKE '[resume:%]%')
+    AND NOT (
+      crash_type = 'crash_system'
+      AND (error_message IS NULL OR error_message = '')
+      AND session_started_at IS NOT NULL
+      AND reported_at - session_started_at >= INTERVAL '30 minutes'
+    )`;
 
   Promise.all([
     db.execute(sql`
@@ -94,6 +108,7 @@ adminStatsRouter.get("/stats", requireAdmin, (req: Request, res: Response): void
         r.app_version AS version,
         SUM(CASE WHEN acl.crash_type = 'crash_system'
           AND (acl.error_message IS NULL OR acl.error_message NOT LIKE '[resume:%]%')
+          AND NOT ((acl.error_message IS NULL OR acl.error_message = '') AND acl.session_started_at IS NOT NULL AND acl.reported_at - acl.session_started_at >= INTERVAL '30 minutes')
           THEN 1 ELSE 0 END)::int AS crash_system,
         SUM(CASE WHEN acl.crash_type = 'crash_js'
           AND (acl.error_message IS NULL OR acl.error_message NOT LIKE '[resume:%]%')
@@ -103,6 +118,11 @@ adminStatsRouter.get("/stats", requireAdmin, (req: Request, res: Response): void
         SUM(CASE WHEN acl.error_message LIKE '[resume:gps_flood]%' THEN 1 ELSE 0 END)::int AS gps_flood,
         SUM(CASE WHEN acl.error_message LIKE '[resume:memory_pressure]%' THEN 1 ELSE 0 END)::int AS memory_pressure,
         SUM(CASE WHEN acl.error_message LIKE '[resume:native_module_missing]%' THEN 1 ELSE 0 END)::int AS native_module_missing,
+        SUM(CASE WHEN acl.crash_type = 'crash_system'
+          AND (acl.error_message IS NULL OR acl.error_message = '')
+          AND acl.session_started_at IS NOT NULL
+          AND acl.reported_at - acl.session_started_at >= INTERVAL '30 minutes'
+          THEN 1 ELSE 0 END)::int AS background_kill,
         COUNT(*)::int AS total
       FROM ranked r
       JOIN app_crash_logs acl ON acl.app_version = r.app_version
@@ -119,6 +139,7 @@ adminStatsRouter.get("/stats", requireAdmin, (req: Request, res: Response): void
         TO_CHAR(reported_at AT TIME ZONE 'UTC', 'YYYY-MM-DD') AS day,
         SUM(CASE WHEN crash_type = 'crash_system'
           AND (error_message IS NULL OR error_message NOT LIKE '[resume:%]%')
+          AND NOT ((error_message IS NULL OR error_message = '') AND session_started_at IS NOT NULL AND reported_at - session_started_at >= INTERVAL '30 minutes')
           THEN 1 ELSE 0 END)::int AS crash_system,
         SUM(CASE WHEN crash_type = 'crash_js'
           AND (error_message IS NULL OR error_message NOT LIKE '[resume:%]%')
@@ -127,7 +148,12 @@ adminStatsRouter.get("/stats", requireAdmin, (req: Request, res: Response): void
         SUM(CASE WHEN error_message LIKE '[resume:js_thread_freeze]%' THEN 1 ELSE 0 END)::int AS js_thread_freeze,
         SUM(CASE WHEN error_message LIKE '[resume:gps_flood]%' THEN 1 ELSE 0 END)::int AS gps_flood,
         SUM(CASE WHEN error_message LIKE '[resume:memory_pressure]%' THEN 1 ELSE 0 END)::int AS memory_pressure,
-        SUM(CASE WHEN error_message LIKE '[resume:native_module_missing]%' THEN 1 ELSE 0 END)::int AS native_module_missing
+        SUM(CASE WHEN error_message LIKE '[resume:native_module_missing]%' THEN 1 ELSE 0 END)::int AS native_module_missing,
+        SUM(CASE WHEN crash_type = 'crash_system'
+          AND (error_message IS NULL OR error_message = '')
+          AND session_started_at IS NOT NULL
+          AND reported_at - session_started_at >= INTERVAL '30 minutes'
+          THEN 1 ELSE 0 END)::int AS background_kill
       FROM app_crash_logs
       WHERE (${statsWhere})
         AND reported_at >= NOW() - INTERVAL '14 days'
@@ -153,7 +179,7 @@ adminStatsRouter.get("/stats", requireAdmin, (req: Request, res: Response): void
       const byType: Record<string, number> = {
         crash_system: 0, crash_js: 0, restart_loop: 0,
         js_thread_freeze: 0, gps_flood: 0, memory_pressure: 0,
-        native_module_missing: 0, appstate_transition: 0,
+        native_module_missing: 0, appstate_transition: 0, background_kill: 0,
       };
       for (const row of typeRows.rows as { derived_type: string; cnt: number }[]) {
         byType[row.derived_type] = (byType[row.derived_type] ?? 0) + row.cnt;
@@ -285,6 +311,7 @@ adminStatsRouter.get("/alerts", requireAdmin, (req: Request, res: Response): voi
       COUNT(*)::int AS cnt,
       SUM(CASE WHEN crash_type = 'crash_system'
         AND (error_message IS NULL OR error_message NOT LIKE '[resume:%]%')
+        AND NOT ((error_message IS NULL OR error_message = '') AND session_started_at IS NOT NULL AND reported_at - session_started_at >= INTERVAL '30 minutes')
         THEN 1 ELSE 0 END)::int AS crash_system,
       SUM(CASE WHEN crash_type = 'crash_js'
         AND (error_message IS NULL OR error_message NOT LIKE '[resume:%]%')
@@ -293,7 +320,12 @@ adminStatsRouter.get("/alerts", requireAdmin, (req: Request, res: Response): voi
       SUM(CASE WHEN error_message LIKE '[resume:js_thread_freeze]%' THEN 1 ELSE 0 END)::int AS js_thread_freeze,
       SUM(CASE WHEN error_message LIKE '[resume:gps_flood]%' THEN 1 ELSE 0 END)::int AS gps_flood,
       SUM(CASE WHEN error_message LIKE '[resume:memory_pressure]%' THEN 1 ELSE 0 END)::int AS memory_pressure,
-      SUM(CASE WHEN error_message LIKE '[resume:native_module_missing]%' THEN 1 ELSE 0 END)::int AS native_module_missing
+      SUM(CASE WHEN error_message LIKE '[resume:native_module_missing]%' THEN 1 ELSE 0 END)::int AS native_module_missing,
+      SUM(CASE WHEN crash_type = 'crash_system'
+        AND (error_message IS NULL OR error_message = '')
+        AND session_started_at IS NOT NULL
+        AND reported_at - session_started_at >= INTERVAL '30 minutes'
+        THEN 1 ELSE 0 END)::int AS background_kill
     FROM app_crash_logs
     WHERE (crash_type IN ('crash_system','crash_js','restart_loop') OR error_message LIKE '[resume:%]%')
       AND (error_message IS NULL OR error_message NOT LIKE '[resume:appstate_transition]%')

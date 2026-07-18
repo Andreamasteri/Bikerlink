@@ -8,6 +8,7 @@ import {
   timestamp,
   jsonb,
   index,
+  uniqueIndex,
   serial,
 } from "drizzle-orm/pg-core";
 import { z } from "zod";
@@ -155,7 +156,10 @@ export const appCrashLogs = pgTable("app_crash_logs", {
   index("app_crash_logs_user_id_idx").on(table.userId),
   index("app_crash_logs_crash_type_idx").on(table.crashType),
   index("app_crash_logs_reported_at_idx").on(table.reportedAt),
-  index("app_crash_logs_session_id_crash_type_idx").on(table.sessionId, table.crashType),
+  // Task #578 — UNIQUE (non plain) per far funzionare onConflictDoNothing() e
+  // Task #578 — dedup per-user: (user_id, session_id, crash_type) evita collisioni
+  // cross-user quando session_id cade al valore fallback "unknown".
+  uniqueIndex("app_crash_logs_user_session_crash_type_uidx").on(table.userId, table.sessionId, table.crashType),
 ]);
 
 export type Notification = typeof notifications.$inferSelect;
