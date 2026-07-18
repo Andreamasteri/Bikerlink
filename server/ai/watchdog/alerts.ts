@@ -152,6 +152,62 @@ export async function dispatchAlerts(snap: HealthSnapshot): Promise<{ sent: numb
     }
   }
 
+  // Idle-leak con kill parzialmente fallito (Task #639) — segnale "high" emesso dal
+  // pool-collector quando vengono rilevate connessioni idle anomale. Il campo
+  // `failedKills` nel dettaglio indica quanti pg_terminate_backend hanno lanciato
+  // un'eccezione (es. permesso negato): un fallimento parziale è visibile solo nei
+  // log e nella health screen senza questo blocco. Severity "high" (non critical) →
+  // NON catturato dal loop critical-only sotto: serve un blocco dedicato.
+  // Due push distinte con throttle separati:
+  //   1. Push base idle-leak (sempre quando high, throttle "db.pool.idle_leak").
+  //   2. Push failedKills dedicata (solo se failedKills>0, throttle "db.pool.idle_leak.partial_kill").
+  const idleLeakProblem = snap.problems.find(
+    (p) => p.id === "db.db.pool.idle_leak" && p.severity === "high",
+  );
+  if (idleLeakProblem) {
+    await emitWatchdogAlert({ problem: idleLeakProblem, score: snap.score, status: snap.status });
+    let idleLeakDetail: { pids?: number[]; killed?: number; failedKills?: number; minAgeS?: number } = {};
+    try { idleLeakDetail = JSON.parse(idleLeakProblem.detail ?? "{}"); } catch { /* use defaults */ }
+    const idleLeakCount = snap.metrics["db.db.pool.idle_leak"] ?? "?";
+    const failedKills = idleLeakDetail.failedKills ?? 0;
+    const killedOk = idleLeakDetail.killed ?? 0;
+
+    // Push base: informa del leak anche quando il kill funziona correttamente.
+    if (shouldSend("db.pool.idle_leak")) {
+      const killLine = killedOk > 0
+        ? `${killedOk} backend terminati.`
+        : (failedKills > 0 ? "Kill tentato ma fallito." : "Kill disabilitato.");
+      const n = await sendSystemAlertPushToAdmins(
+        `🔓 Connessioni idle anomale rilevate (${idleLeakCount})`,
+        `${idleLeakCount} connessioni del pool tenute aperte senza query (≥${idleLeakDetail.minAgeS ?? 30}s). ${killLine}`,
+        { type: "watchdog_idle_leak", count: idleLeakCount, killed: killedOk, failedKills, score: snap.score },
+      );
+      sentCount += n;
+      await writeWatchdogLog({
+        kind: "alert", scope: "db.pool.idle_leak", status: "ok",
+        summary: `Alert idle-leak: ${idleLeakCount} connessioni anomale, ${killedOk} terminate`,
+        details: { sent: n, count: idleLeakCount, killed: killedOk, failedKills, pids: idleLeakDetail.pids },
+      });
+    }
+
+    // Push dedicata al fallimento parziale del kill — throttle separato dalla push
+    // base così arriva anche quando la push base è già stata inviata in precedenza.
+    if (failedKills > 0 && shouldSend("db.pool.idle_leak.partial_kill")) {
+      const total = killedOk + failedKills;
+      const n = await sendSystemAlertPushToAdmins(
+        `⚠️ Kill idle-leak parzialmente fallito (${failedKills}/${total})`,
+        `${failedKills} chiamate pg_terminate_backend hanno lanciato un'eccezione (permesso negato?). Il loop kill è rotto: alcune connessioni anomale non sono state terminate.`,
+        { type: "watchdog_idle_leak_partial_kill", count: idleLeakCount, killed: killedOk, failedKills, score: snap.score },
+      );
+      sentCount += n;
+      await writeWatchdogLog({
+        kind: "alert", scope: "db.pool.idle_leak.partial_kill", status: "ok",
+        summary: `Alert kill idle-leak parziale: ${failedKills}/${total} con errore`,
+        details: { sent: n, count: idleLeakCount, killed: killedOk, failedKills, pids: idleLeakDetail.pids },
+      });
+    }
+  }
+
   // Indice HNSW mancante/invalido (Task #4893) — segnale "high" emesso dal
   // db-collector quando embeddings_vec_hnsw_cosine_idx non esiste o è invalido.
   // findSimilar() degrada a sequential scan: nessun crash, ma latenza alta sotto
