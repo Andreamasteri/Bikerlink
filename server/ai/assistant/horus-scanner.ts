@@ -33,6 +33,11 @@ import {
 } from "./codebase-inventory";
 import { finalizeAnalysisScan } from "./horus-scanner-finalize";
 import { finalizeManualScan } from "./horus-scanner-finalize-manual";
+import {
+  buildSecurityFilePrompt,
+  SECURITY_NOTE_NUM_PREDICT,
+  finalizeSecurityScan,
+} from "./horus-scanner-security";
 
 const BATCH_SIZE = 4;
 const TICK_DELAY_MS = 1500;
@@ -90,15 +95,16 @@ function initialState(mode: ScanMode): ScanState {
 const states: Record<ScanMode, ScanState> = {
   analysis: initialState("analysis"),
   manual: initialState("manual"),
+  security: initialState("security"),
 };
 // Task #152 — Dizionario i18n caricato UNA sola volta all'avvio della scansione
 // MANUALE e riusato dai prompt lessicali di ogni schermata (evita di rileggerlo
-// per-file). Vuoto per la modalità analisi (che non lo usa).
+// per-file). Vuoto per le modalità analisi e security (che non lo usano).
 let manualI18nDict = "";
-const running: Record<ScanMode, boolean> = { analysis: false, manual: false };
-const queues: Record<ScanMode, string[]> = { analysis: [], manual: [] };
-const stores: Record<ScanMode, FileScanStore> = { analysis: {}, manual: {} };
-const timers: Record<ScanMode, NodeJS.Timeout | null> = { analysis: null, manual: null };
+const running: Record<ScanMode, boolean> = { analysis: false, manual: false, security: false };
+const queues: Record<ScanMode, string[]> = { analysis: [], manual: [], security: [] };
+const stores: Record<ScanMode, FileScanStore> = { analysis: {}, manual: {}, security: {} };
+const timers: Record<ScanMode, NodeJS.Timeout | null> = { analysis: null, manual: null, security: null };
 
 // ── Helper testo ─────────────────────────────────────────────────────────────
 
@@ -326,6 +332,24 @@ async function processFile(mode: ScanMode, rel: string): Promise<"ok" | "interru
       return "ok";
     }
 
+    // Task #683 — Modalità SECURITY: prompt focalizzato su vulnerabilità,
+    // numPredict ridotto a 1500 (risposta strutturata corta).
+    if (mode === "security") {
+      const raw = await callOllamaChat(buildSecurityFilePrompt(rel, read.content), undefined, {
+        persona: "horus",
+        model: HORUS_MODEL_ID,
+        system: HORUS_THINK_TAG_CONTRACT,
+        temperature: 0.1,
+        numPredict: SECURITY_NOTE_NUM_PREDICT,
+      });
+      stores[mode][rel] = {
+        hash: read.hash,
+        note: sanitizeNote(stripThink(raw ?? "")),
+        at: new Date().toISOString(),
+      };
+      return "ok";
+    }
+
     // Modalità MANUALE: nota FUNZIONALE per ogni file (Task #152, step 3) e, solo
     // per le schermate/componenti UI, una nota LESSICALE separata (step 4).
     const rawFn = await callOllamaChat(buildManualFunctionalPrompt(rel, read.content), undefined, {
@@ -414,7 +438,9 @@ async function runFinalize(mode: ScanMode): Promise<void> {
     const summary =
       mode === "analysis"
         ? await finalizeAnalysisScan(stores.analysis, states.analysis.filesTotal, states.analysis.filesSkipped)
-        : await finalizeManualScan(stores.manual);
+        : mode === "security"
+          ? await finalizeSecurityScan(stores.security, states.security.filesTotal, states.security.filesSkipped)
+          : await finalizeManualScan(stores.manual);
     states[mode].resultSummary = summary;
     states[mode].status = "completed";
   } catch (err) {
@@ -442,7 +468,11 @@ export function getHorusScanStatus(mode: ScanMode): ScanState {
 }
 
 export function getAllHorusScanStatus(): Record<ScanMode, ScanState> {
-  return { analysis: { ...states.analysis }, manual: { ...states.manual } };
+  return {
+    analysis: { ...states.analysis },
+    manual: { ...states.manual },
+    security: { ...states.security },
+  };
 }
 
 /** Riassunto testuale dello stato di entrambe le scansioni (per chat/pannello). */
@@ -458,6 +488,7 @@ export function formatScanStatusText(): string {
   return [
     line(states.analysis, "Analisi codice+DB"),
     line(states.manual, "Generazione manuale"),
+    line(states.security, "Security scan"),
   ].join("\n");
 }
 
@@ -485,4 +516,28 @@ export function detectHorusScanRequest(message: string): { mode: ScanMode } | nu
   if (wantsAnalysisVerb && mentionsCodeOrDb && fullScope) return { mode: "analysis" };
 
   return null;
+}
+
+/**
+ * Task #683 — Riconosce nel messaggio grezzo dell'admin la richiesta di avviare
+ * la scansione security. Separato da detectHorusScanRequest per evitare ambiguità
+ * con il mode "analysis" (entrambi possono contenere "analisi" + "codice").
+ * Ritorna `{ mode: "security" }` o null.
+ */
+export function detectHorusSecurityScanRequest(message: string): { mode: "security" } | null {
+  const m = (message ?? "").toLowerCase();
+  if (!m.trim()) return null;
+
+  const wantsSecurity =
+    // Frasi esplicite con "sicurezza" o "vulnerabilità" + verbo/azione
+    /(scansion\w*|analis\w*|audit|cerca|controll\w*|trova)\w*\s+(la\s+)?(sicurezza|vulnerabilit\w*|security)/.test(m) ||
+    /(sicurezza|security)\s+(scan|audit|codice|del\s+codice|backend)/.test(m) ||
+    /\bvulnerabilit\w+/.test(m) ||
+    /\bsecurity\s+(scan|audit)\b/.test(m) ||
+    /\baudit\s+di\s+sicurezza\b/.test(m) ||
+    /\bfai\s+(un\s+)?security\b/.test(m) ||
+    /\bscansione\s+sicurezza\b/.test(m) ||
+    /\banalisi\s+sicurezza\b/.test(m);
+
+  return wantsSecurity ? { mode: "security" } : null;
 }

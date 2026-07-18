@@ -27,7 +27,7 @@ import { isAresConfigured, getAresModelId, streamAresChat } from "../../lib/ares
 import { withAresVramPriority } from "../../lib/vram-arbiter";
 // Quebracho removed (Task #591 — unified into Horus). No quebracho-client / quebracho-question import.
 import { detectPlanReviewRequest, reviewTaskPlan } from "./task-review";
-import { detectHorusScanRequest, startHorusScan } from "./horus-scanner";
+import { detectHorusScanRequest, detectHorusSecurityScanRequest, startHorusScan } from "./horus-scanner";
 import { retrieveContext, formatRagContext, indexKnowledge } from "./rag";
 import {
   OLLAMA_TOOLS,
@@ -36,6 +36,7 @@ import {
   buildRememberNoteTool,
   buildReviewTaskPlanTool,
   buildSearchManualTool,
+  buildRunSecurityScanTool,
 } from "./tools";
 import { buildHubFileTools, buildCheckVramTool } from "./tc-hub-tools";
 import {
@@ -404,6 +405,10 @@ export async function runAssistantAgent(opts: AssistantAgentOpts): Promise<Assis
       // nella cartella condivisa del TC, oltre a leggere la VRAM GPU.
       buildHubFileTools({ includeWrite: true }),
       buildCheckVramTool(),
+      // Task #683 — Security scan tool (admin-only): avvia/interroga la scansione
+      // security di Horus dal tool-calling, senza dipendere dal riconoscimento
+      // intento testuale.
+      buildRunSecurityScanTool(isAdmin),
     );
   }
 
@@ -792,6 +797,33 @@ export async function runAssistantAgent(opts: AssistantAgentOpts): Promise<Assis
   // richiesta come una consultazione mid-chat: avviamo direttamente il job giusto
   // in Horus e confermiamo. Stessa logica di intercettazione pre-composizione di
   // Ares. Gated ad admin (le scansioni sono capacità admin).
+  if (!done && isAdmin) {
+    // Task #683 — Riconoscimento intento security scan (distinto dall'analisi
+    // generica per evitare ambiguità con "analisi codice").
+    const securityReq = detectHorusSecurityScanRequest(opts.message);
+    if (securityReq) {
+      opts.onPersona?.({ id: "horus", name: AI_ROSTER.horus.name });
+      try {
+        const res = await startHorusScan("security");
+        const text = res.started
+          ? `Ho avviato la scansione di sicurezza. Processo solo i file ad alto rischio del backend (route, auth, middleware, lib, query DB) — circa ${res.status.filesPending} file da analizzare, ${res.status.filesSkipped} invariati saltati. Cerco vulnerabilità concrete per categoria (injection, auth bypass, IDOR, SSRF, data leak, ecc.). Al termine salvo il report strutturato. Chiedimi "stato scansioni Horus" per l'avanzamento.`
+          : `Non sono riuscito ad avviare la scansione di sicurezza: ${res.reason}.`;
+        ensureIntroEmitted();
+        finalText += text;
+        aiText += text;
+        providerEmittedAny = true;
+        emitAiDelta(text);
+        effectivePersona = "horus";
+        provider = "horus-scan";
+        modelId = "horus-scan";
+        done = true;
+        console.log(`[assistant] scansione Horus "security" avviata da chat (started=${res.started})`);
+      } catch (scanErr) {
+        console.warn("[assistant] avvio scansione Horus security da chat fallito:", (scanErr as Error).message);
+      }
+    }
+  }
+
   if (!done && isAdmin) {
     const scanReq = detectHorusScanRequest(opts.message);
     if (scanReq) {

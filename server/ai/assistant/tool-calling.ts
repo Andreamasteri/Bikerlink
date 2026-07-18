@@ -168,6 +168,12 @@ const LIST_FILES_RE =
 const VRAM_RE =
   /\bvram\b|memoria\s+(della\s+)?gpu|gpu\s+memory|utilizzo\s+(della\s+)?gpu|carico\s+(della\s+)?gpu/i;
 
+// Task #683 — run_security_scan: avvio o interrogazione dello stato della
+// scansione security di Horus (admin-only). Riconoscimento distinto da
+// "analisi codice" generico: richiede esplicitamente sicurezza/vulnerabilità.
+const RUN_SECURITY_SCAN_RE =
+  /\bsicurezza\b.*\b(scan|audit|codice|backend|vulnerabilit\w*)|vulnerabilit\w+|\bsecurity\s+(scan|audit)\b|\baudit\s+di\s+sicurezza\b|\bscansione\s+sicurezza\b|\banalisi\s+sicurezza\b|\bstato\s+security\b|\brun.?security\b/i;
+
 /**
  * Restituisce i NOMI dei tool da allegare al turno, partendo dai tool
  * effettivamente disponibili per la persona (`availableToolNames`). Applica la
@@ -219,6 +225,10 @@ export function selectToolNamesForMessage(
   if (READ_FILE_RE.test(m)) want("read_file");
   if (LIST_FILES_RE.test(m)) want("list_files");
   if (VRAM_RE.test(m)) want("check_vram_usage");
+
+  // Task #683 — run_security_scan (solo Horus, solo admin — want() garantisce
+  // che il tool sia disponibile prima di aggiungerlo al set).
+  if (RUN_SECURITY_SCAN_RE.test(m)) want("run_security_scan");
 
   // Ordine stabile e deterministico = ordine di dichiarazione della persona.
   return availableToolNames.filter((n) => wanted.has(n));

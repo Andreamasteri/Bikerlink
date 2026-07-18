@@ -18,8 +18,8 @@ import path from "node:path";
 import { createHash } from "node:crypto";
 import { storage } from "../../storage";
 
-/** Le due modalità di scansione condividono l'inventario ma NON lo store. */
-export type ScanMode = "analysis" | "manual";
+/** Le tre modalità di scansione condividono l'inventario ma NON lo store. */
+export type ScanMode = "analysis" | "manual" | "security";
 
 /**
  * Contratto di system prompt condiviso da tutte le chiamate Ollama delle scansioni
@@ -121,6 +121,32 @@ const EXCLUDE_DIR_NAMES = new Set([
 /** File da escludere anche se hanno estensione di codice (tipi generati). */
 function isExcludedFile(relPath: string): boolean {
   return relPath.endsWith(".d.ts");
+}
+
+/**
+ * Task #683 — Filtro file ad alto rischio per la modalità SECURITY.
+ * Seleziona solo file del backend con pattern sensibili alla sicurezza:
+ * route API, autenticazione, middleware, helper DB diretti, upload/file.
+ * Solo backend (server/): il frontend React Native è escluso per questa modalità.
+ */
+export const SECURITY_FILE_PATTERNS = [
+  "server/routes/",
+  "server/auth",
+  "server/middleware/",
+  "server/lib/",
+  "server/ai/coordinator/",
+] as const;
+
+const SECURITY_FILENAME_RE = /\b(query|sql|db|upload|file)\b/i;
+
+export function isSecurityFile(rel: string): boolean {
+  const p = rel.replace(/\\/g, "/");
+  if (!p.startsWith("server/")) return false;
+  for (const prefix of SECURITY_FILE_PATTERNS) {
+    if (p.startsWith(prefix)) return true;
+  }
+  const filename = p.split("/").pop() ?? "";
+  return SECURITY_FILENAME_RE.test(filename);
 }
 
 /**
@@ -244,6 +270,7 @@ export type FileScanStore = Record<string, FileScanRecord>;
 const STORE_KEY: Record<ScanMode, string> = {
   analysis: "horus_scan_files_analysis",
   manual: "horus_scan_files_manual",
+  security: "horus_scan_files_security",
 };
 
 export async function loadFileScanStore(mode: ScanMode): Promise<FileScanStore> {
@@ -276,10 +303,14 @@ export interface PendingComputation {
 /**
  * Confronta il filesystem con lo store per capire cosa va (ri)analizzato. I file
  * il cui hash coincide con lo store vengono saltati; quelli spariti vengono
- * rimossi dallo store.
+ * rimossi dallo store. Per la modalità SECURITY il set di file viene pre-filtrato
+ * ai soli file ad alto rischio backend (isSecurityFile), riducendo il carico da
+ * 500+ a 80-150 file circa.
  */
 export async function computePending(mode: ScanMode): Promise<PendingComputation> {
-  const files = await enumerateSourceFiles();
+  const allFiles = await enumerateSourceFiles();
+  // Task #683 — modalità security: solo file ad alto rischio del backend.
+  const files = mode === "security" ? allFiles.filter(isSecurityFile) : allFiles;
   const store = await loadFileScanStore(mode);
   const present = new Set(files);
   const pending: string[] = [];

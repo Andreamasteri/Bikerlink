@@ -20,6 +20,7 @@ import { reviewTaskPlan, type ReviewAgent } from "./task-review";
 import { searchNadir } from "../nadir";
 import { type AppLanguageCode } from "@shared/languages";
 import { hubPost, isHubAvailable, NADIR_SEARCH_TIMEOUT_MS } from "../../lib/ai-hub-client";
+import { startHorusScan, getHorusScanStatus, formatScanStatusText } from "./horus-scanner";
 
 export interface InterAgentToolContext {
   /** Sessione admin: sblocca call_ares (solo admin). */
@@ -156,6 +157,49 @@ export function buildReviewTaskPlanTool(
         });
         if (!r.ok) return { ok: false, error: r.error };
         return { ok: true, review: r.review, missingFiles: r.missingFiles ?? [] };
+      },
+    }),
+  };
+}
+
+/**
+ * Task #683 — Tool `run_security_scan`: avvia o interroga lo stato della
+ * scansione security di Horus. Admin-only. Non usa AI pesante internamente
+ * (avvia il job in background), quindi non ha bisogno del timeout lungo degli
+ * altri tool inter-agente.
+ */
+export function buildRunSecurityScanTool(isAdmin: boolean): Record<string, unknown> {
+  if (!isAdmin) return {};
+  return {
+    run_security_scan: tool({
+      description:
+        "Avvia la scansione security di Horus (ricerca vulnerabilità nel backend) oppure mostra " +
+        "lo stato corrente. Usa action='start' per avviare, action='status' per interrogare. " +
+        "La scansione analizza file ad alto rischio (route, auth, middleware, lib, query DB) e " +
+        "produce un report per categoria (SQL injection, auth bypass, IDOR, SSRF, data leak, ecc.). " +
+        "Usalo quando l'admin chiede di fare un security scan, una scansione sicurezza, un audit " +
+        "di vulnerabilità o di controllare lo stato della scansione security.",
+      inputSchema: z.object({
+        action: z
+          .enum(["start", "status"])
+          .optional()
+          .describe("'start' per avviare la scansione, 'status' per vedere lo stato corrente (default: 'status')."),
+      }),
+      execute: async (input: { action?: "start" | "status" }) => {
+        const action = input.action ?? "status";
+        if (action === "status") {
+          const state = getHorusScanStatus("security");
+          const fullStatus = formatScanStatusText();
+          return { ok: true, action: "status", state, fullStatus };
+        }
+        // action === "start"
+        const result = await startHorusScan("security");
+        return {
+          ok: result.started,
+          action: "start",
+          reason: result.reason,
+          state: result.status,
+        };
       },
     }),
   };

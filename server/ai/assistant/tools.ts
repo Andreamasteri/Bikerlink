@@ -460,5 +460,6 @@ export {
   buildRememberNoteTool,
   buildReviewTaskPlanTool,
   buildSearchManualTool,
+  buildRunSecurityScanTool,
   type InterAgentToolContext,
 } from "./inter-agent-tools";
