@@ -22,7 +22,7 @@ import { withJobGate } from "../ai/coordinator/gated-job";
 import { sendSystemAlertPushToAdmins } from "../push-notifications-admin";
 
 const execFileAsync = promisify(execFile);
-const ROOT = path.resolve(import.meta.dirname, "../..");
+const ROOT = path.resolve(__dirname, "../..");
 const TIMEZONE = "Europe/Rome";
 const LOG_PREFIX = "[horus-patch-scan/scheduler]";
 

@@ -24,7 +24,7 @@ import { getNadirManual, getNadirManualPrevious } from "../../ai/nadir/manual";
 
 const router = Router();
 
-const ROOT = path.resolve(import.meta.dirname, "../../..");
+const ROOT = path.resolve(__dirname, "../../..");
 
 const startSchema = z.object({
   mode: z.enum(["analysis", "manual"]),
