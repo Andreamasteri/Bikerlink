@@ -82,6 +82,27 @@ export function invalidateIdleKillCache(): void {
   invalidateActuatorKillCache();
 }
 
+/**
+ * Returns the most-recent idle-leak detection result deposited by the async
+ * probe, or null when no recent leak was detected. Used by the db-pool-stats
+ * endpoint to surface killed/failedKills in the admin health card without
+ * requiring a full watchdog snapshot fetch.
+ *
+ * The result is considered stale after 130 s (2 watchdog ticks) — same window
+ * used by collectPool() when deciding whether to emit the "high" signal.
+ */
+export function getLastIdleLeakState(): {
+  at: number;
+  count: number;
+  pids: number[];
+  killed: number;
+  failedKills: number;
+} | null {
+  if (!lastIdleLeak) return null;
+  if (Date.now() - lastIdleLeak.at >= 130_000) return null;
+  return lastIdleLeak;
+}
+
 // Task #154 — Reset dei contatori/latch anti-blip di questo collector. Azzera i
 // campioni consecutivi di pressione (waiting/queue/drops), i totali di baseline
 // dei drop e l'ultimo esito idle-leak, così uno stato rientrato non resta

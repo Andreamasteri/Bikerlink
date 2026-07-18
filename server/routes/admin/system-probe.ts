@@ -25,6 +25,7 @@ import { getLastCycleOutcome, getMatchingLockState } from "../../matching/schedu
 import { getRecentErrorCount } from "../../matching/match-log-buffer";
 import { updateSystemStatus, getSystemStatus, type DotStatus } from "../../lib/system-status-cache";
 import { getPoolStats } from "../../db";
+import { getLastIdleLeakState } from "../../ai/watchdog/collectors/pool-collector";
 
 const router = Router();
 
@@ -112,7 +113,19 @@ const SYSTEM_PROBE_COLD_CACHE_TIMEOUT_MS = 4_500;
  * Used by the admin dashboard pool-saturation gauge.
  */
 router.get("/db-pool-stats", (_req: Request, res: Response) => {
-  return res.json(getPoolStats());
+  const pool = getPoolStats();
+  const idleLeak = getLastIdleLeakState();
+  return res.json({
+    ...pool,
+    idleLeak: idleLeak
+      ? {
+          count: idleLeak.count,
+          killed: idleLeak.killed,
+          failedKills: idleLeak.failedKills,
+          detectedAt: idleLeak.at,
+        }
+      : null,
+  });
 });
 
 router.get("/system-probe", async (_req: Request, res: Response) => {

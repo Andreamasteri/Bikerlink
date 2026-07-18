@@ -5,12 +5,20 @@ import { useQuery } from "@tanstack/react-query";
 import Colors from "@/constants/colors";
 import { getApiUrl, authFetchHeaders } from "@/lib/query-client";
 
+interface IdleLeakInfo {
+  count: number;
+  killed: number;
+  failedKills: number;
+  detectedAt: number;
+}
+
 interface PoolStats {
   total: number;
   idle: number;
   waiting: number;
   max: number;
   activePct: number;
+  idleLeak: IdleLeakInfo | null;
 }
 
 function poolColor(pct: number, waiting: number): string {
@@ -144,6 +152,41 @@ export function DbPoolCard() {
               <Text style={styles.legendText}>waiting &gt; 0 — saturo</Text>
             </View>
           </View>
+
+          {data?.idleLeak && (
+            <View style={[
+              styles.idleLeakRow,
+              data.idleLeak.failedKills > 0 ? styles.idleLeakRowWarn : styles.idleLeakRowHigh,
+            ]}>
+              <MaterialCommunityIcons
+                name={data.idleLeak.failedKills > 0 ? "alert" : "connection"}
+                size={15}
+                color={data.idleLeak.failedKills > 0 ? "#f59e0b" : "#ef4444"}
+                style={{ marginRight: 6 }}
+              />
+              <View style={{ flex: 1 }}>
+                <Text style={[
+                  styles.idleLeakTitle,
+                  { color: data.idleLeak.failedKills > 0 ? "#f59e0b" : "#ef4444" },
+                ]}>
+                  {`Idle leak: ${data.idleLeak.count} conn anomale`}
+                </Text>
+                <Text style={styles.idleLeakDetail}>
+                  {`Terminati: ${data.idleLeak.killed}`}
+                  {data.idleLeak.failedKills > 0
+                    ? `  ·  ⚠️ Falliti: ${data.idleLeak.failedKills}`
+                    : ""}
+                </Text>
+              </View>
+              {data.idleLeak.failedKills > 0 && (
+                <View style={styles.failBadge}>
+                  <Text style={styles.failBadgeText}>
+                    {`${data.idleLeak.failedKills} falliti`}
+                  </Text>
+                </View>
+              )}
+            </View>
+          )}
         </>
       )}
     </View>
@@ -262,5 +305,47 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_400Regular",
     fontSize: 11,
     color: Colors.textSecondary,
+  },
+  idleLeakRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    marginTop: 10,
+    marginBottom: 2,
+  },
+  idleLeakRowHigh: {
+    backgroundColor: "rgba(239,68,68,0.08)",
+    borderWidth: 1,
+    borderColor: "rgba(239,68,68,0.25)",
+  },
+  idleLeakRowWarn: {
+    backgroundColor: "rgba(245,158,11,0.08)",
+    borderWidth: 1,
+    borderColor: "rgba(245,158,11,0.35)",
+  },
+  idleLeakTitle: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 13,
+    marginBottom: 2,
+  },
+  idleLeakDetail: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    color: Colors.textSecondary,
+  },
+  failBadge: {
+    backgroundColor: "#f59e0b",
+    borderRadius: 6,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    alignSelf: "flex-start",
+    marginLeft: 6,
+  },
+  failBadgeText: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 11,
+    color: "#fff",
   },
 });
