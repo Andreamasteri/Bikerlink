@@ -30,3 +30,15 @@ Replit Publish error:
 ```
 → Root cause: `uniqueIndex(...)` in `shared/db/system.ts` → Replit diff ran CREATE without DELETE dedup.
 → Fix: remove `uniqueIndex(...)` from schema, keep in migration 0150 only.
+
+## CRITICO: rimozione dallo schema TS non basta — va droppato anche dal dev DB
+
+Replit confronta **dev DB ↔ prod DB** (non schema TypeScript ↔ prod DB).
+Se la migration è già girata nel dev DB (boot locale), l'indice esiste nel dev DB → Replit lo vede nel diff dev→prod → genera `CREATE UNIQUE INDEX` indipendentemente da quanto c'è nel TypeScript.
+
+**Fix completo (3 step):**
+1. Rimuovi `uniqueIndex(...)` dal file schema TypeScript → Replit non lo re-aggiunge
+2. Esegui `DROP INDEX IF EXISTS "nome_uidx"` sul **dev DB** via `executeSql({ environment: "development" })`
+3. Lascia che la migration SQL lo ricrei in prod al boot (con il pre-processing corretto)
+
+**Verifica pre-publish:** `SELECT indexname FROM pg_indexes WHERE tablename = 'tua_tabella'` su entrambi gli environment. Devono essere identici per quella tabella.
