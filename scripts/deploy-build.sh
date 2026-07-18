@@ -15,12 +15,15 @@ set -e
 
 # --- Helper di logging -------------------------------------------------------
 # Obiettivo: rendere i build log del pannello Publish auto-esplicativi.
-# log()  → riga con timestamp UTC, così si vede QUANDO succede ogni step.
-# size() → dimensione di una dir (vuota/assente → "-"), per vedere quanto pesa
-#          e quanto libera ogni pulizia. È proprio la metrica che mancava quando
-#          il Repl layer superava i ~2 GB e il deploy falliva senza spiegazioni.
-log()  { echo "[deploy $(date -u '+%H:%M:%SZ')] $*"; }
-size() { [ -e "$1" ] && du -sh "$1" 2>/dev/null | cut -f1 || echo "-"; }
+# log()     → riga con timestamp UTC, così si vede QUANDO succede ogni step.
+# size()    → dimensione di una dir (vuota/assente → "-"), per vedere quanto pesa
+#             e quanto libera ogni pulizia. È proprio la metrica che mancava quando
+#             il Repl layer superava i ~2 GB e il deploy falliva senza spiegazioni.
+# elapsed() → secondi trascorsi dall'inizio dello script, per capire quale step
+#             è lento senza dover fare differenze tra timestamp assoluti.
+log()     { echo "[deploy $(date -u '+%H:%M:%SZ')] $*"; }
+size()    { [ -e "$1" ] && du -sh "$1" 2>/dev/null | cut -f1 || echo "-"; }
+elapsed() { echo "$(( $(date -u +%s) - SCRIPT_START_EPOCH ))s"; }
 
 # ── Gate ROUTING_DISABLED ────────────────────────────────────────────────────
 # ROUTING_DISABLED è DEPRECATA e non va mai impostata in produzione.
@@ -36,6 +39,7 @@ if [ -n "${ROUTING_DISABLED+x}" ]; then
   log "   ✅ ROUTING_DISABLED rimossa dall'ambiente di build — deploy continua."
 fi
 
+SCRIPT_START_EPOCH=$(date -u +%s)
 BUILD_START=$(date -u '+%H:%M:%SZ')
 log "════════════════════════════════════════════════════════════"
 log " DEPLOY/PUBLISH — mappa delle 4 fasi:"
@@ -55,7 +59,7 @@ log "Workspace iniziale: $(size .) totali"
 # "Creating Autoscale service" senza alcun log di errore.
 # Questi file non servono a runtime: il server Express non li serve.
 # La pulizia avviene PRIMA del build così il layer risultante è snello.
-log "=== [0/3] Pulizia asset workspace non necessari ==="
+log "=== [1/15] Pulizia asset workspace non necessari — $(elapsed) elapsed ==="
 log "  attached_assets/ prima: $(size attached_assets)"
 rm -rf attached_assets/
 mkdir -p attached_assets   # ricrea la dir vuota (evita errori se qualcuno la referenzia)
@@ -69,7 +73,7 @@ log "  attached_assets/ svuotata → $(size attached_assets)"
 # il fallimento silenzioso di "Creating Autoscale service" senza alcun log.
 # Misurato: .local/state/replit/ = 504 MB → Repl layer totale ~1.7 GB → KO.
 # Dopo la pulizia: ~1.2 GB → ampiamente sotto il limite.
-log "=== [1/3] Pulizia .local/state/ (transcript agente + log DB) ==="
+log "=== [2/15] Pulizia .local/state/ (transcript agente + log DB) — $(elapsed) elapsed ==="
 log "  .local/state/ prima: $(size .local/state)"
 rm -rf .local/state/replit/
 rm -rf .local/state/scribe/
@@ -84,7 +88,7 @@ log "  .local/state/ dopo:  $(size .local/state) (replit/, scribe/, workflow-log
 # - dist-ota-env/        → ambiente di build OTA
 # - tmp_review_frames/, tmp_check/, logs/ → artefatti temporanei
 # NB: uploads/ e assets/ NON si toccano — sono serviti a runtime (express.static).
-log "=== [1b/3] Pulizia directory transitorie non runtime ==="
+log "=== [3/15] Pulizia directory transitorie non runtime — $(elapsed) elapsed ==="
 log "  backups=$(size .local/backups) dist=$(size dist) dist-ota-env=$(size dist-ota-env) logs=$(size logs)"
 rm -rf .local/backups/
 rm -rf dist/
@@ -94,17 +98,7 @@ rm -rf tmp_check/
 rm -rf logs/
 log "  backups, dist, dist-ota-env e artefatti temporanei rimossi."
 
-# Pulizia directory non necessarie a runtime che fanno superare il limite ~2 GB del Repl layer.
-# - exports/ → bundle Git e PDF generati dall'agente (~500 MB), non serviti da Express
-# - .git/    → storia git (~3.4 GB di cui ~1.9 GB LFS objects), non necessaria a runtime
-#              Il server non esegue comandi git; il repository completo è su GitHub.
-log "=== [1d/3] Pulizia exports/ e .git/ per rispettare il limite Repl layer ===  "
-log "  exports=$(size exports) .git=$(size .git)"
-rm -rf exports/
-rm -rf .git/
-log "  exports/ e .git/ rimossi — Repl layer ora sotto il limite ~2 GB."
-
-log "=== [1c/3] Gate Index Drift (DESC/WHERE — regressioni migration, solo statico) ==="
+log "=== [4/15] Gate Index Drift (DESC/WHERE — regressioni migration, solo statico) — $(elapsed) elapsed ==="
 # Verifica che nessuna migration SQL abbia introdotto una regressione sugli
 # indici speciali (DESC / WHERE) dichiarati nello schema Drizzle TS.
 #
@@ -120,6 +114,11 @@ log "=== [1c/3] Gate Index Drift (DESC/WHERE — regressioni migration, solo sta
 # Exit code semantica (--static-only):
 #   0 → nessuna regressione nelle migration SQL → OK
 #   1 → regressione trovata (es. DROP + CREATE senza DESC) → GATE DURO
+#
+# ⚠️  PERCHÉ PRIMA della pulizia .git/ ed exports/:
+#   Questo gate legge solo file .ts e .sql del workspace — non il DB live.
+#   Eseguirlo prima della pulizia pesante (.git/ ~3.4 GB) permette di bloccare
+#   un deploy errato prima di attendere l'I/O di pulizia più lento.
 INDEX_DRIFT_EXIT=0
 npx tsx scripts/check-index-drift.ts --static-only 2>&1 || INDEX_DRIFT_EXIT=$?
 if [ "$INDEX_DRIFT_EXIT" -eq 0 ]; then
@@ -136,6 +135,17 @@ else
   exit 1
 fi
 
+# Pulizia directory non necessarie a runtime che fanno superare il limite ~2 GB del Repl layer.
+# - exports/ → bundle Git e PDF generati dall'agente (~500 MB), non serviti da Express
+# - .git/    → storia git (~3.4 GB di cui ~1.9 GB LFS objects), non necessaria a runtime
+#              Il server non esegue comandi git; il repository completo è su GitHub.
+log "=== [5/15] Pulizia exports/ e .git/ per rispettare il limite Repl layer — $(elapsed) elapsed ==="
+log "  exports=$(size exports) .git=$(size .git)"
+rm -rf exports/
+rm -rf .git/
+log "  exports/ e .git/ rimossi — Repl layer ora sotto il limite ~2 GB."
+
+log "=== [6/15] Gate Lint Migration Indexes (CREATE IF NOT EXISTS senza DROP) — $(elapsed) elapsed ==="
 # ── Gate Lint Migration Indexes (drift silenzioso CREATE IF NOT EXISTS) ──────
 # check-index-drift --static-only NON cattura il drift "silenzioso": una migration
 # che crea un indice speciale con `CREATE INDEX IF NOT EXISTS ... DESC` SENZA un
@@ -159,7 +169,7 @@ else
   exit 1
 fi
 
-log "=== [1d/3] Gate Dedup Pattern (DELETE…NOT IN → ROW_NUMBER CTE) ==="
+log "=== [7/15] Gate Dedup Pattern (DELETE…NOT IN → ROW_NUMBER CTE) — $(elapsed) elapsed ==="
 # Verifica che nessuna migration SQL usi il pattern NULL-unsafe
 # `DELETE FROM <t> WHERE id NOT IN (SELECT id FROM <t>)` per deduplicare
 # righe prima di aggiungere un vincolo UNIQUE.
@@ -189,7 +199,7 @@ else
   exit 1
 fi
 
-log "=== [1e/3] Gate Undefined Route Handlers (.next.ts stubs) ==="
+log "=== [8/15] Gate Undefined Route Handlers (.next.ts stubs) — $(elapsed) elapsed ==="
 # Rileva file .next.ts senza `export default` che siano importati come handler
 # di default in un file router. Questi causano:
 #   TypeError: argument handler must be a function
@@ -209,7 +219,7 @@ else
   exit 1
 fi
 
-log "=== [1f/3] Gate Hardcoded Agent Model Names ==="
+log "=== [9/15] Gate Hardcoded Agent Model Names — $(elapsed) elapsed ==="
 # Verifica che nessun file .ts/.tsx fuori da server/lib/agent-constants.ts
 # contenga i nomi dei modelli Ollama come letterali stringa hardcoded.
 # La sorgente di verità è AGENT_MODEL_DEFAULTS in agent-constants.ts;
@@ -232,7 +242,7 @@ else
   exit 1
 fi
 
-log "=== [1g/3] Gate Quebracho Bridge Import (modulo eliminato) ==="
+log "=== [10/15] Gate Quebracho Bridge Import (modulo eliminato) — $(elapsed) elapsed ==="
 # Verifica che nessun file importi da quebracho-bridge, rimosso quando
 # Quebracho è stato assorbito in Horus (Task #591 / #597).
 # Un re-import produrrebbe un "module not found" senza spiegazione;
@@ -249,7 +259,7 @@ else
   exit 1
 fi
 
-log "=== [1h/3] Gate Quebracho Question Import (modulo eliminato) ==="
+log "=== [11/15] Gate Quebracho Question Import (modulo eliminato) — $(elapsed) elapsed ==="
 # Verifica che nessun file importi da quebracho-question, rimosso insieme
 # a Quebracho (Task #591). Il flusso di composizione domanda non esiste più.
 QUEBRACHO_QUESTION_EXIT=0
@@ -265,7 +275,7 @@ else
   exit 1
 fi
 
-log "=== [1i/3] Verifica versioni stabili dipendenze critiche (non-bloccante) ==="
+log "=== [12/15] Verifica versioni stabili dipendenze critiche (non-bloccante) — $(elapsed) elapsed ==="
 # Avvisa se esistono versioni major/minor più recenti per le dipendenze critiche.
 # Non blocca il deploy: exit sempre 0.
 # Interroga il registry npm — se la rete è irraggiungibile, lo step viene saltato
@@ -276,7 +286,7 @@ if [ "$STABLE_VER_EXIT" -ne 0 ]; then
   log "  ⚠️  check-stable-versions.sh ha restituito exit ${STABLE_VER_EXIT} (inatteso — lo script dovrebbe sempre uscire 0)."
 fi
 
-log "=== [2/3] Build server TypeScript ==="
+log "=== [13/15] Build server TypeScript — $(elapsed) elapsed ==="
 node scripts/server-build.js
 log "  server_dist/ prodotto → $(size server_dist) ($(size server_dist/index.js 2>/dev/null) il bundle)"
 
@@ -288,16 +298,18 @@ log "  server_dist/ prodotto → $(size server_dist) ($(size server_dist/index.j
 # potrebbe non essere garantita). NON-FATALE: se il download fallisce, i bridge
 # degradano con grazia (Redis → fallback in-memory; SSH → errore descrittivo, niente
 # crash) e il deploy non è bloccato.
-log "=== [2c/3] Bake binario cloudflared (bridge Redis TCP + SSH) ==="
+log "=== [14/15] Bake binario cloudflared (bridge Redis TCP + SSH) — $(elapsed) elapsed ==="
 CF_BIN="bin/cloudflared"
 if [ -x "$CF_BIN" ]; then
   log "  $CF_BIN già presente ($(size $CF_BIN)) — skip download."
 else
   mkdir -p bin
   CF_URL="https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64"
+  CF_DL_START=$(date -u +%s)
   if curl -fsSL "$CF_URL" -o "$CF_BIN" 2>/dev/null; then
+    CF_DL_SECS=$(( $(date -u +%s) - CF_DL_START ))
     chmod +x "$CF_BIN"
-    log "  cloudflared scaricato → $(size $CF_BIN)"
+    log "  cloudflared scaricato → $(size $CF_BIN) — download: ${CF_DL_SECS}s"
   else
     log "  ⚠️  download cloudflared fallito — il bridge Redis TCP degraderà a no-op (fallback in-memory)."
     rm -f "$CF_BIN"
@@ -311,7 +323,7 @@ fi
 # GET /api/exports/matching-system.pdf non torni mai 500 in produzione.
 # NB: in caso di errore logghiamo un warning ma NON usciamo (set -e è attivo,
 # quindi usiamo || true per non bloccare l'intero deploy).
-log "=== [2b/3] Verifica PDF matching-system ==="
+log "=== [15/15] Verifica PDF matching-system — $(elapsed) elapsed ==="
 MATCHING_PDF="server/public/matching-system.pdf"
 if [ -f "$MATCHING_PDF" ]; then
   log "  $MATCHING_PDF già presente ($(size $MATCHING_PDF)) — nessuna azione."
@@ -350,7 +362,7 @@ log "  Cache migration invalidata (al boot migrate.ts farà sempre il controllo 
 # Conclusione: la piattaforma gestisce .cache/ come layer separato; non va toccata
 # dal build script. Pulire .cache/ era sia la CAUSA del fallimento sia inutile.
 
-log "▶ FASE 2/4 — FINE build script (iniziata $BUILD_START)"
+log "▶ FASE 2/4 — FINE build script (iniziata $BUILD_START, durata totale $(elapsed))"
 log "Workspace finale che entra nel Repl layer: $(size .) totali"
 log "────────────────────────────────────────────────────────────"
 log "▶ FASE 3/4 [piattaforma Replit] — prossimi step nel pannello Publish:"
