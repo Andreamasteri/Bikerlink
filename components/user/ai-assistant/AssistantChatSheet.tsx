@@ -273,7 +273,10 @@ export default function AssistantChatSheet({ visible, onClose }: Props) {
                   : { backgroundColor: colors.surface, alignSelf: "flex-start" },
               ]}>
                 {item.role === "assistant" && item.persona ? (
-                  <Text style={[styles.personaLabel, { color: personaColor(item.persona.id) }]}>
+                  <Text
+                    testID={`persona-label-${item.id}`}
+                    style={[styles.personaLabel, { color: personaColor(item.persona.id) }]}
+                  >
                     {personaName(item.persona)}
                   </Text>
                 ) : null}
