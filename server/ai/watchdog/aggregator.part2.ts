@@ -40,6 +40,19 @@ const subscribers = new Set<(s: HealthSnapshot) => void>();
 let cycleInFlight = false;
 export function isAggregatorCycleInFlight(): boolean { return cycleInFlight; }
 
+// Task #567 — Snooze: quando l'admin preme "Svuota lista errori", i problemi
+// vengono filtrati dalla UI per 10 minuti. I problemi CRITICAL tornano visibili
+// dopo 2 minuti (sicurezza). I dati grezzi (recordDbMonitorSample) non sono
+// influenzati dallo snooze per mantenere la storia accurata.
+let snoozedUntil: Date | null = null;
+let snoozedAt: Date | null = null;
+
+export function getSnoozedUntil(): Date | null { return snoozedUntil; }
+export function setSnoozedUntil(until: Date | null): void {
+  snoozedUntil = until;
+  snoozedAt = until ? new Date() : null;
+}
+
 export function getLatestSnapshot(): HealthSnapshot | null { return latest; }
 export function subscribeSnapshot(cb: (s: HealthSnapshot) => void): () => void {
   subscribers.add(cb);
@@ -108,7 +121,34 @@ async function runAggregatorCycleInner(): Promise<HealthSnapshot> {
     }
   } catch { /* fail-safe */ }
 
-  let { status, score } = computeStatus(problems);
+  // Calcola metrics prima del snooze — usate sia per il DB monitor history
+  // (dati reali) sia per lo snapshot UI.
+  const metrics: Record<string, number> = {};
+  for (const s of signals) if (typeof s.value === "number") metrics[`${s.source}.${s.metric}`] = s.value;
+
+  // Task #567 — Record DB monitor history with REAL (unfiltered) problems, before
+  // snooze. The history must reflect reality even while the UI is snoozed.
+  recordDbMonitorSample({ problems, metrics }).catch(() => { /* non-fatale */ });
+
+  // Task #567 — Snooze filter: se l'admin ha premuto "Svuota lista", nascondi i
+  // problemi dalla UI per 10 minuti. I problemi CRITICAL tornano visibili dopo
+  // 2 minuti come rete di sicurezza. Se lo snooze è scaduto, lo azzeriamo.
+  const snoozeNow = Date.now();
+  let visibleProblems = problems;
+  if (snoozedUntil) {
+    if (snoozeNow >= snoozedUntil.getTime()) {
+      snoozedUntil = null;
+      snoozedAt = null;
+    } else {
+      const snoozeAgeMs = snoozedAt ? snoozeNow - snoozedAt.getTime() : 0;
+      const criticalBypassActive = snoozeAgeMs > 2 * 60 * 1000;
+      visibleProblems = problems.filter(
+        (p) => p.severity === "critical" && criticalBypassActive,
+      );
+    }
+  }
+
+  let { status, score } = computeStatus(visibleProblems);
 
   const MAX_SCORE_DROP_PER_CYCLE = 35;
   if (latest !== null) {
@@ -130,18 +170,10 @@ async function runAggregatorCycleInner(): Promise<HealthSnapshot> {
     }
   }
 
-  const metrics: Record<string, number> = {};
-  for (const s of signals) if (typeof s.value === "number") metrics[`${s.source}.${s.metric}`] = s.value;
-
   const snap: HealthSnapshot = {
-    status, score, problems, metrics, generatedAt: new Date().toISOString(),
+    status, score, problems: visibleProblems, metrics, generatedAt: new Date().toISOString(),
   };
   latest = snap;
-
-  // Task #64 — history dedicata Database Monitor: una riga per tick, riusando
-  // pool/ping/errori/restart già calcolati + il probe di carico backend. Passa
-  // da withBgDbSlot internamente ed è fire-and-forget (mai fatale sul ciclo).
-  recordDbMonitorSample({ problems, metrics }).catch(() => { /* non-fatale */ });
 
   // Observability slice: traduce lo status del semaforo watchdog nello stato
   // dell'Health Arbiter. green ⇒ READY, yellow/orange ⇒ DEGRADED, red ⇒ BROKEN.

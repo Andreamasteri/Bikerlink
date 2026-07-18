@@ -8,7 +8,7 @@ import { aiWatchdogLog, weeklySystemReports, systemSignals } from "@shared/db";
 import { desc, eq, sql, and, gte, or } from "drizzle-orm";
 import { isHubConfigured, isHubAvailable, hasHubBeenProbed } from "../../lib/ai-hub-client";
 import { z } from "zod";
-import { getLatestSnapshot, runAggregatorCycle, getRecentSnapshots, isAggregatorCycleInFlight } from "../../ai/watchdog/aggregator";
+import { getLatestSnapshot, runAggregatorCycle, getRecentSnapshots, isAggregatorCycleInFlight, getSnoozedUntil, setSnoozedUntil } from "../../ai/watchdog/aggregator";
 import { resetState as resetDbCollector } from "../../ai/watchdog/collectors/db-collector";
 import { resetState as resetPoolCollector } from "../../ai/watchdog/collectors/pool-collector";
 import { resetState as resetOverloadCollector } from "../../ai/watchdog/collectors/overload-collector";
@@ -49,7 +49,10 @@ router.get("/watchdog/snapshot", async (_req, res) => {
     const parsed = row?.valueJson as { lastTickAt?: string | null } | null;
     schedulerLastHeartbeat = parsed?.lastTickAt ?? null;
   } catch { /* non-fatal: campo opzionale */ }
-  return res.json({ enabled, snapshot: snap, stats, schedulerLastHeartbeat });
+  // Task #567 — snooze attivo: esponiamo snoozedUntil (ISO string) così il
+  // frontend può mostrare il countdown e il pulsante "Riattiva ora".
+  const snoozedUntil = getSnoozedUntil()?.toISOString() ?? null;
+  return res.json({ enabled, snapshot: snap, stats, schedulerLastHeartbeat, snoozedUntil });
 });
 
 router.get("/watchdog/snapshots", async (req, res) => {
@@ -99,6 +102,14 @@ router.post("/watchdog/reset-state", async (_req, res) => {
 
     const resetAt = new Date().toISOString();
 
+    // Task #567 — Snooze: imposta un silenzio di 10 minuti in modo che i problemi
+    // DB-persistenti (vacuum.last_attempt, matching.last_run_h, ecc.) non
+    // ricompaiano immediatamente al prossimo tick. I CRITICAL tornano visibili
+    // dopo 2 minuti come rete di sicurezza.
+    const SNOOZE_MS = 10 * 60 * 1000;
+    setSnoozedUntil(new Date(Date.now() + SNOOZE_MS));
+    const snoozedUntil = getSnoozedUntil()!.toISOString();
+
     // Rigenera subito uno snapshot pulito così il pannello si aggiorna senza
     // attendere il prossimo tick (~60s).
     try {
@@ -107,10 +118,17 @@ router.post("/watchdog/reset-state", async (_req, res) => {
       console.warn("[watchdog] reset-state: rigenerazione snapshot fallita (non-fatale):", (err as Error).message);
     }
 
-    return res.json({ ok: true, resetAt, cycleWasRunning });
+    return res.json({ ok: true, resetAt, cycleWasRunning, snoozedUntil });
   } catch (err) {
     return sendError(res, 500, (err as Error).message);
   }
+});
+
+// Task #567 — Cancella lo snooze manualmente ("Riattiva ora"): ripristina
+// immediatamente il monitoraggio pieno senza attendere i 10 minuti.
+router.post("/watchdog/snooze/cancel", (_req, res) => {
+  setSnoozedUntil(null);
+  return res.json({ ok: true, snoozedUntil: null });
 });
 
 router.post("/watchdog/enabled", async (req, res) => {

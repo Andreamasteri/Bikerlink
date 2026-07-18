@@ -53,6 +53,8 @@ interface SnapshotResp {
   };
   // Task #157 — ultimo heartbeat del loop scheduler matching (ISO), o null.
   schedulerLastHeartbeat?: string | null;
+  // Task #567 — snooze attivo: ISO string di quando scade, o null.
+  snoozedUntil?: string | null;
 }
 
 // Task #157 — età heartbeat in secondi; warning se supera 2 minuti.
@@ -147,6 +149,13 @@ export default function SystemHealthScreen() {
     onError: (err: Error) => Alert.alert("Errore", err.message),
   });
 
+  // Task #567 — Riattiva ora: cancella lo snooze manualmente prima dei 10 min.
+  const cancelSnooze = useMutation({
+    mutationFn: async () => (await apiRequest("POST", "/api/admin/watchdog/snooze/cancel")).json(),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["/api/admin/watchdog/snapshot"] }),
+    onError: (err: Error) => Alert.alert("Errore", err.message),
+  });
+
   const onAccept = async (id: string) => {
     setBusyProposalId(id);
     try {
@@ -184,6 +193,32 @@ export default function SystemHealthScreen() {
         tintColor={Colors.accent}
       />}
     >
+      {/* Task #567 — Snooze banner: visibile quando l'admin ha premuto "Svuota lista"
+          e lo snooze è ancora attivo. Mostra l'ora di scadenza e un pulsante
+          "Riattiva ora" per cancellare lo snooze manualmente. */}
+      {snapQ.data?.snoozedUntil && new Date(snapQ.data.snoozedUntil) > new Date() && (
+        <View style={styles.snoozeBanner}>
+          <MaterialCommunityIcons name="bell-sleep-outline" size={20} color="#fff" />
+          <View style={{ flex: 1, marginLeft: 10 }}>
+            <Text style={styles.snoozeBannerTitle}>
+              Lista errori silenziata fino alle{" "}
+              {new Date(snapQ.data.snoozedUntil).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" })}
+            </Text>
+            <Text style={styles.snoozeBannerBody}>
+              I problemi non critici non vengono mostrati. Gli allarmi CRITICAL tornano dopo 2 min.
+            </Text>
+          </View>
+          <TouchableOpacity
+            onPress={() => cancelSnooze.mutate()}
+            disabled={cancelSnooze.isPending}
+            style={styles.snoozeCancelBtn}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.snoozeCancelText}>Riattiva ora</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
       {/* Circuit breaker banner */}
       {circuit && circuit.state !== "CLOSED" && (
         <View style={[styles.circuitBanner, circuit.state === "OPEN" ? styles.circuitOpen : styles.circuitHalfOpen]}>
@@ -404,4 +439,17 @@ const styles = StyleSheet.create({
   circuitHalfOpen: { backgroundColor: "#78350f", borderWidth: 1, borderColor: "#f59e0b" },
   circuitBannerTitle: { color: "#fff", fontSize: 13, fontWeight: "700" as const },
   circuitBannerBody: { color: "#fca5a5", fontSize: 12, marginTop: 2, lineHeight: 18 },
+  // Task #567 — snooze banner styles
+  snoozeBanner: {
+    flexDirection: "row" as const, alignItems: "flex-start",
+    backgroundColor: "#1e3a5f", borderRadius: 10, padding: 12, marginBottom: 12,
+    borderWidth: 1, borderColor: "#3b82f6",
+  },
+  snoozeBannerTitle: { color: "#93c5fd", fontSize: 13, fontWeight: "700" as const },
+  snoozeBannerBody: { color: "#bfdbfe", fontSize: 12, marginTop: 2, lineHeight: 18 },
+  snoozeCancelBtn: {
+    marginLeft: 8, paddingHorizontal: 10, paddingVertical: 6,
+    backgroundColor: "#3b82f6", borderRadius: 6, alignSelf: "center" as const,
+  },
+  snoozeCancelText: { color: "#fff", fontSize: 12, fontWeight: "700" as const },
 });

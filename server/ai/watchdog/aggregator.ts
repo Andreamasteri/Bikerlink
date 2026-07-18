@@ -495,4 +495,4 @@ export function buildDerivedProblems(signals: Signal[]): Problem[] {
   return problems;
 }
 
-export { runAggregatorCycle, getRecentSnapshots, getLatestSnapshot, subscribeSnapshot, isAggregatorCycleInFlight } from "./aggregator.part2";
+export { runAggregatorCycle, getRecentSnapshots, getLatestSnapshot, subscribeSnapshot, isAggregatorCycleInFlight, getSnoozedUntil, setSnoozedUntil } from "./aggregator.part2";

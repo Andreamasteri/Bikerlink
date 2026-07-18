@@ -13,15 +13,21 @@ import request from "supertest";
 const {
   isAggregatorCycleInFlightMock,
   runAggregatorCycleMock,
+  getSnoozedUntilMock,
+  setSnoozedUntilMock,
 } = vi.hoisted(() => ({
   isAggregatorCycleInFlightMock: vi.fn(() => false),
   runAggregatorCycleMock: vi.fn(async () => ({})),
+  getSnoozedUntilMock: vi.fn(() => new Date(Date.now() + 10 * 60 * 1000)),
+  setSnoozedUntilMock: vi.fn(),
 }));
 vi.mock("../ai/watchdog/aggregator", () => ({
   getLatestSnapshot: vi.fn(),
   runAggregatorCycle: runAggregatorCycleMock,
   getRecentSnapshots: vi.fn(),
   isAggregatorCycleInFlight: isAggregatorCycleInFlightMock,
+  getSnoozedUntil: getSnoozedUntilMock,
+  setSnoozedUntil: setSnoozedUntilMock,
 }));
 
 const {
@@ -77,6 +83,8 @@ function buildApp() {
 beforeEach(() => {
   isAggregatorCycleInFlightMock.mockReset().mockReturnValue(false);
   runAggregatorCycleMock.mockReset().mockResolvedValue({});
+  getSnoozedUntilMock.mockReset().mockReturnValue(new Date(Date.now() + 10 * 60 * 1000));
+  setSnoozedUntilMock.mockReset();
   resetDbMock.mockReset();
   resetPoolMock.mockReset();
   resetOverloadMock.mockReset();
