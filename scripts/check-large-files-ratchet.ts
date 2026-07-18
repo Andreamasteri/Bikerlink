@@ -1,8 +1,14 @@
 /**
- * CI ratchet for the "max 650 lines per TS file" rule.
+ * CI ratchet for the "max 800 lines per TS file" rule.
+ *
+ * ⛔ SPLIT VIETATO SENZA AUTORIZZAZIONE UTENTE ESPLICITA
+ * Quando questo gate fallisce, NON splittare autonomamente il file.
+ * L'agente DEVE chiedere esplicita autorizzazione all'utente e attendere
+ * il via libera prima di procedere con qualsiasi split.
+ * Nessuna eccezione. Nemmeno se è "meccanico". Nemmeno se è "urgente".
  *
  * Blocks when:
- *   (a) a NEW file (not in baseline, no marker) exceeds 650 lines;
+ *   (a) a NEW file (not in baseline, no marker) exceeds 800 lines;
  *   (b) a baseline-tracked file GROWS above its stored line count;
  *   (c) a LOCKED file exceeds its declared `<N>` (drift > +5);
  *   (d) a marker `LARGE-FILE-ALLOW` appears on a file NOT listed in
@@ -157,12 +163,13 @@ for (const entry of state) {
 
     const baselineLines = baseline.legacy.get(entry.file);
     if (baselineLines === undefined) {
-      // (a) Nuovo file oltre 650.
+      // (a) Nuovo file oltre 800.
       errors.push({
         file: entry.file,
         reason:
           `nuovo file oltre il limite: ${entry.lines} righe (max ${MAX_LINES}). ` +
-          `Splitta il file o, se è debito legacy autorizzato, attiva il marker corretto via task utente.`,
+          `NON splittare autonomamente — chiedere prima approvazione esplicita all'utente. ` +
+          `Oppure, se è debito legacy autorizzato, attiva il marker corretto via task utente.`,
       });
     } else if (entry.lines > baselineLines) {
       // (b) Crescita oltre la baseline.
@@ -181,9 +188,10 @@ if (UPDATE) {
   lockedSnapshot.sort((a, b) => a.file.localeCompare(b.file));
   const header = [
     "# .large-files-baseline",
-    "# Snapshot dei file TypeScript tracciati dal ratchet 650 righe.",
+    "# Snapshot dei file TypeScript tracciati dal ratchet 800 righe.",
+    "# ⛔ NON splittare autonomamente — chiedere approvazione esplicita all'utente prima di procedere.",
     "# Formato (un record per riga, commenti con `#`):",
-    "#   LEGACY <path> <lines>        — file >650 senza marker (debito legacy puro).",
+    "#   LEGACY <path> <lines>        — file >800 senza marker (debito legacy puro).",
     "#   LOCKED <path> <declaredLimit> — file con marker `// LARGE-FILE-LOCKED — limite: <N>`,",
     "#                                   tracciato per anti-bypass (vietato alzare <N>).",
     "# File ALLOW NON compaiono qui — sono elencati in `.large-files-allow.txt`.",
@@ -219,6 +227,7 @@ for (const e of errors) {
   console.error(`    → ${e.reason}\n`);
 }
 console.error(
-  `Limite default: ${MAX_LINES} righe. Vedi sezione "⛔ REGOLA FERREA — Limite 650 righe per file" in replit.md.\n`,
+  `Limite default: ${MAX_LINES} righe. ⛔ NON splittare autonomamente — chiedere prima approvazione esplicita all'utente.\n` +
+  `Vedi sezione "⛔ REGOLA FERREA — Limite 800 righe per file" in replit.md.\n`,
 );
 process.exit(1);
