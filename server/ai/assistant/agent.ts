@@ -247,6 +247,39 @@ async function startAresJobFromChat(mode: AresJobMode, userId: string | null): P
   }
 }
 
+// ── Task #574 — Toggle think:true per Horus (/think on|off) ─────────────────
+// Aggiorna l'AppSetting horus_think_enabled senza passare il messaggio al modello.
+// Se il ThinkCentre è offline, il flag viene comunque salvato (sarà efficace al
+// riavvio) ma Horus segnala lo stato all'admin.
+
+async function setHorusThinkEnabled(enable: boolean): Promise<string> {
+  try {
+    const { storage } = await import("../../storage");
+    await storage.upsertAppSetting(
+      "horus_think_enabled",
+      enable ? "true" : "false",
+      undefined,
+      "Ragionamento esplicito di Horus (think:true). Modificabile con /think on|off dalla chat admin.",
+    );
+    const tcOffline = await isThinkCentreOffline();
+    if (enable && tcOffline) {
+      return (
+        "Think attivato in DB. ⚠️ ThinkCentre attualmente offline — " +
+        "il ragionamento sarà efficace quando il server ritornerà online."
+      );
+    }
+    return enable
+      ? "Think attivato ✓. Dalla prossima risposta userò il ragionamento esplicito (`think:true`): " +
+        "il canale interno di reasoning rimane separato dal testo visibile. " +
+        "Usa `/think off` per passare alla modalità rapida."
+      : "Think disattivato ✓. Dalla prossima risposta opero in modalità rapida (`think:false`): " +
+        "nessun ragionamento separato, risposte più veloci ma meno ponderate. " +
+        "Usa `/think on` per riabilitare.";
+  } catch (err) {
+    throw new Error(`Impossibile aggiornare horus_think_enabled: ${(err as Error)?.message ?? String(err)}`);
+  }
+}
+
 // ── Core agent ────────────────────────────────────────────────────────────────
 
 export async function runAssistantAgent(opts: AssistantAgentOpts): Promise<AssistantAgentResult> {
@@ -277,6 +310,33 @@ export async function runAssistantAgent(opts: AssistantAgentOpts): Promise<Assis
         persona: { id: "bowie", name: AI_ROSTER.bowie.name },
         farewell: false,
       };
+    }
+
+    // Task #574 — Comando /think on|off: intercettato per Horus, aggiorna
+    // horus_think_enabled in app_settings senza passare il messaggio al modello.
+    if (opts.persona === "horus") {
+      const thinkMatch = opts.message.trim().match(/^\/think\s+(on|off)$/i);
+      if (thinkMatch) {
+        let text: string;
+        try {
+          text = await setHorusThinkEnabled(thinkMatch[1].toLowerCase() === "on");
+        } catch (err) {
+          text = `Errore durante l'aggiornamento del toggle think: ${(err as Error)?.message ?? "errore sconosciuto"}.`;
+        }
+        opts.onPersona?.({ id: "horus", name: AI_ROSTER.horus.name });
+        opts.onTextDelta?.(text);
+        return {
+          text,
+          provider: "system",
+          model: "system",
+          tokensIn: 0,
+          tokensOut: 0,
+          costUsd: 0,
+          degraded: false,
+          persona: { id: "horus", name: AI_ROSTER.horus.name },
+          farewell: false,
+        };
+      }
     }
   }
 
@@ -386,9 +446,22 @@ export async function runAssistantAgent(opts: AssistantAgentOpts): Promise<Assis
   // il ragionamento in inglese/analitico finisce nel testo visibile, causando risposte
   // in inglese, tono da "analisi" invece di risposta diretta, e troncamento (il budget
   // di token viene consumato dal ragionamento prima che inizi la risposta vera).
-  // Soluzione: think:true per ENTRAMBE le personas Ollama (innocuo per eventuali
-  // provider cloud che ignorano questa providerOption Ollama-specifica).
-  const ollamaThinkSeparated = true; // qwen3 family (Bowie + Horus): think:true separa il ragionamento
+  // Soluzione: think:true per Bowie SEMPRE; Horus è controllato da horus_think_enabled
+  // (Task #574 — /think on|off in chat admin). Default sicuro = true per entrambi.
+  // NB: con think:false in streaming il ragionamento di Horus appare nel testo visibile
+  // (onThinking non viene invocato): accettabile solo su esplicita richiesta admin.
+  let horusThinkEnabled = true; // default safe
+  if (requestedPersona === "horus") {
+    try {
+      const { storage: thinkStorage } = await import("../../storage");
+      const thinkSetting = await thinkStorage.getAppSetting("horus_think_enabled");
+      if (thinkSetting?.value === "false") horusThinkEnabled = false;
+    } catch {
+      /* best-effort: se la lettura DB fallisce, usa default true */
+    }
+  }
+  // Bowie usa sempre think:true (il ragionamento finisce nel testo altrimenti — Task #122).
+  const ollamaThinkSeparated = requestedPersona === "horus" ? horusThinkEnabled : true;
 
   // Task #5327 — immagini allegate → path multimodale (vision) sui provider cloud.
   const hasImages = (opts.images?.length ?? 0) > 0;

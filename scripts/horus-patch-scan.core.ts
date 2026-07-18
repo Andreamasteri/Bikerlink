@@ -18,6 +18,13 @@ import { isDuplicate } from "./horus-propose-tasks";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 export const ROOT = path.resolve(__dirname, "..");
 
+// Task #574 — HORUS_THINK=0 disabilita il ragionamento (default: think:true, da Task #573).
+// Override CLI: impostare HORUS_THINK=0 prima di lanciare il patch scan per usare
+// think:false (veloce, nessun reasoning). AppSetting horus_think_enabled letto tramite
+// il DB ha precedenza solo se il processo è riavviato con il nuovo valore; per overrides
+// immediati usare la variabile d'ambiente.
+export const HORUS_THINK_ENABLED = process.env.HORUS_THINK !== "0";
+
 // ─── Configurazione ────────────────────────────────────────────────────────────
 
 export const CHUNK_LINES = 220;          // righe massime per chunk inviato a Horus
@@ -346,11 +353,9 @@ export async function callHorus(
       body: JSON.stringify({
         model,
         stream: false,
-        // think:true — Horus ragiona prima di rispondere, producendo output strutturato
-        // più fedele alle istruzioni. Il blocco <think>…</think> viene strippato
-        // da stripThinkBlock() prima di passare il testo al parser.
-        // num_predict alzato a 800 per compensare i token usati dal reasoning.
-        options: { temperature: 0.1, think: true, num_predict: 800 },
+        // Task #574 — think controllato da HORUS_THINK_ENABLED (env HORUS_THINK=0 → false).
+        // Default: true (Task #573). num_predict ridotto a 600 se think:false (nessun reasoning).
+        options: { temperature: 0.1, think: HORUS_THINK_ENABLED, num_predict: HORUS_THINK_ENABLED ? 800 : 600 },
         messages: [
           { role: "system", content: PATCH_SCAN_SYSTEM_PROMPT },
           { role: "user", content },

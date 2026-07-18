@@ -158,6 +158,26 @@ export async function runBootPhase3DbInit(): Promise<void> {
   }
 
   try {
+    // Task #574 — seed idempotente di horus_think_enabled (default "true"):
+    // think:true è il default stabilito da Task #573 per tutti i callsite Horus
+    // non-streaming. Il flag è modificabile a runtime con /think on|off dalla
+    // chat admin Horus. Non sovrascriviamo se esiste già (override admin preservato).
+    const { storage: thinkStorage } = await import("./storage");
+    const existingThink = await thinkStorage.getAppSetting("horus_think_enabled");
+    if (existingThink === undefined) {
+      await thinkStorage.upsertAppSetting(
+        "horus_think_enabled",
+        "true",
+        undefined,
+        "Ragionamento esplicito di Horus (think:true). Modificabile con /think on|off dalla chat admin.",
+      );
+      console.log("[HORUS BOOTSTRAP] horus_think_enabled inizializzato a true");
+    }
+  } catch (e) {
+    console.warn("[INIT] Phase 3: horus_think_enabled bootstrap failed (non-fatal):", e);
+  }
+
+  try {
     const { initProviderHealth } = await import("./ai/moderation/provider");
     await initProviderHealth();
   } catch (e) {
