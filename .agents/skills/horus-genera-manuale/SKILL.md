@@ -54,6 +54,7 @@ Step 6: Push manuale → Horus  (script, opzionale)
   └─ npx tsx scripts/ollama-push-manual.ts --target horus
   └─ Inietta manuale nel SYSTEM prompt del modello bikerlink-routing su TC
   └─ Modelfile: scripts/ollama-modelfile/BikerLink-Horus.Modelfile
+  └─ Auto-detect: --model-name bikerlink-routing seleziona Horus automaticamente
 
 Step 7: Genera PDF  (opzionale)
   └─ node scripts/generate-manual-pdf.mjs
@@ -290,18 +291,30 @@ npx tsx scripts/ollama-push-manual.ts --model-name bikerlink-assistant
 ## Step 6 — Push Manuale a Horus (Script)
 
 ```bash
-# Non esiste ancora un flag --target horus nel codice corrente.
-# Per Horus usare un invocation separata con --model-name e --qa-file espliciti,
-# e puntare a BOWIE_OLLAMA_URL (stesso endpoint TC, model name diverso):
-npx tsx scripts/ollama-push-manual.ts \
-  --model-name bikerlink-routing \
-  --qa-file logs/nadir-manual-latest.md
+# Uso standard con flag --target horus
+npx tsx scripts/ollama-push-manual.ts --target horus
+
+# Dry run: mostra il Modelfile Horus risultante senza inviare né scrivere
+npx tsx scripts/ollama-push-manual.ts --target horus --dry-run
+
+# Specifica un file Q&A diverso
+npx tsx scripts/ollama-push-manual.ts --target horus --qa-file logs/nadir-manual-latest.md
+
+# Auto-detect: passare --model-name bikerlink-routing seleziona Horus automaticamente
+npx tsx scripts/ollama-push-manual.ts --model-name bikerlink-routing
 ```
 
-> **Nota:** il Modelfile di riferimento per Horus è
-> `scripts/ollama-modelfile/BikerLink-Horus.Modelfile`. Lo script attualmente
-> punta sempre a `BikerLink-Bowie.Modelfile` — verificare prima con `--dry-run`
-> o modificare lo script per Horus se necessario.
+**Cosa fa lo script con `--target horus`:**
+1. Legge `docs/bikerlink-qa-manual.md` (o il file specificato via `--qa-file`)
+2. Legge `scripts/ollama-modelfile/BikerLink-Horus.Modelfile` (NON Bowie)
+3. Inietta il Q&A nel blocco `SYSTEM """..."""` tra i marker `=== INIZIO MANUALE UTENTE Q&A ===` / `=== FINE MANUALE UTENTE Q&A ===`
+4. Chiama `POST {BOWIE_OLLAMA_URL}/api/create` con `{name: "bikerlink-routing", modelfile, stream: false}`
+5. **Solo se il push ha successo:** sovrascrive `BikerLink-Horus.Modelfile` su disco (mai `BikerLink-Bowie.Modelfile`)
+
+**Selezione target — priorità:**
+1. `--target bowie|horus` — esplicito, vince sempre
+2. `--model-name bikerlink-routing` — auto-detect → horus
+3. Default (nessun flag) → bowie
 
 ---
 
