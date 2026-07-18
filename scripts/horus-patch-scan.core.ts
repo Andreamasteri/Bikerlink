@@ -353,12 +353,30 @@ export async function callHorus(
       body: JSON.stringify({
         model,
         stream: false,
-        // Task #574 — think controllato da HORUS_THINK_ENABLED (env HORUS_THINK=0 → false).
-        // Default: true (Task #573). num_predict ridotto a 600 se think:false (nessun reasoning).
-        options: { temperature: 0.1, think: HORUS_THINK_ENABLED, num_predict: HORUS_THINK_ENABLED ? 800 : 600 },
+        // Task #570 fix — problemi scoperti durante il primo run live:
+        // 1. `think` dentro `options` viene ignorato da Ollama ≥0.9 con qwen3:
+        //    il modello usa TUTTO num_predict sul reasoning, lascia content:"".
+        // 2. `think: true` al top level → reasoning in `thinking` field separato,
+        //    ma il modello esaurisce i token prima di produrre output visibile in `content`.
+        // 3. `think: false` al top level → il modello ragiona in content (testo libero),
+        //    non produce la tabella markdown.
+        //
+        // SOLUZIONE: "assistant prefix" (pre-fill) — si aggiunge un messaggio col ruolo
+        // "assistant" contenente l'header della tabella; il modello CONTINUA direttamente
+        // con le righe dati senza introdurre ragionamento. CF ≤100s → think:false.
+        think: false,
+        options: {
+          temperature: 0.1,
+          num_predict: 900,  // tabella ≤30 righe ~ 600-800 token
+        },
         messages: [
           { role: "system", content: PATCH_SCAN_SYSTEM_PROMPT },
           { role: "user", content },
+          // Pre-fill: forza il modello a continuare direttamente con le righe della tabella.
+          {
+            role: "assistant",
+            content: "| Severità | File:Riga | Pattern | Motivazione |\n|----------|-----------|---------|-------------|",
+          },
         ],
       }),
     });
@@ -368,16 +386,28 @@ export async function callHorus(
       throw new Error(`HTTP ${res.status} ${res.statusText}${text ? ` — ${text.slice(0, 300)}` : ""}`);
     }
 
+    // Ollama ≥0.9 con qwen3: il reasoning è in `message.thinking` (separato),
+    // l'output visibile è in `message.content`.
+    // Ollama legacy (think inline): `message.content` contiene il blocco <think>…</think>.
+    // Supportiamo entrambi: prendiamo `content`, poi strippiamo eventuali tag residui.
     interface OllamaResponse {
-      message?: { role: string; content: string };
+      message?: { role: string; content: string; thinking?: string };
       error?: string;
     }
 
     const data = (await res.json()) as OllamaResponse;
     if (data.error) throw new Error(`Ollama error: ${data.error}`);
     const raw = data.message?.content?.trim() ?? "";
-    // Strippa il blocco <think>…</think> completo (think:true non-streaming).
-    return stripThinkBlock(raw);
+    // Strippa tag <think>…</think> residui (formato legacy o think:true non-streaming).
+    const stripped = stripThinkBlock(raw);
+    // Con il pre-fill (assistant prefix), il modello restituisce SOLO le righe dati
+    // senza ripetere l'header. Riaggiunge l'header e il separatore per permettere
+    // a parseClassificationTable di trovare tutte le righe (inclusa la prima).
+    const TABLE_HEADER = "| Severità | File:Riga | Pattern | Motivazione |\n|----------|-----------|---------|-------------|";
+    if (stripped.startsWith("|") && !stripped.startsWith("| Severità")) {
+      return TABLE_HEADER + "\n" + stripped;
+    }
+    return stripped;
   } finally {
     clearTimeout(timer);
   }

@@ -10,7 +10,6 @@ import { sendVerificationEmail, sendInvitationGiftEmail, sendNewUserNotification
 import { createRegionalClubInvite } from "../motoclubs";
 import { parseVisitorCookie, recordVisit } from "../../lib/visitor-tracking";
 import { isUniqueViolation } from "../../lib/db-errors";
-// @ts-ignore
 import signature from "cookie-signature";
 
 function buildSessionToken(sessionID: string): string {

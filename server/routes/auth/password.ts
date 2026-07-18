@@ -2,7 +2,6 @@ import { Router, type Request, type Response } from "express";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
 import rateLimit from "express-rate-limit";
-// @ts-ignore
 import signature from "cookie-signature";
 import { storage } from "../../storage";
 import { withDbTimeout, DbTimeoutError } from "../../db";

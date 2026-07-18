@@ -35,7 +35,11 @@ export function appendUptimeLog(line: string) {
     ensureLogsDir();
     const ts = new Date().toISOString();
     fs.appendFileSync(UPTIME_LOG, `${ts} ${line}\n`, "utf-8");
-  } catch (err) { console.warn("[uptime] Failed to write uptime log:", err); }
+  } catch (err) {
+    // Intenzionale: il log di uptime è strumentazione non critica.
+    // Un errore di filesystem (disco pieno, permessi) non deve crashare il server.
+    console.warn("[uptime] Failed to write uptime log:", err);
+  }
 }
 
 interface UptimeStateFile {
@@ -62,7 +66,11 @@ function writeState(state: UptimeStateFile) {
   try {
     ensureLogsDir();
     fs.writeFileSync(STATE_FILE, JSON.stringify(state), "utf-8");
-  } catch (err) { console.warn("[uptime] Failed to write uptime state file:", err); }
+  } catch (err) {
+    // Intenzionale: lo state file di uptime è strumentazione non critica.
+    // Un errore di filesystem non deve bloccare il server o il graceful shutdown.
+    console.warn("[uptime] Failed to write uptime state file:", err);
+  }
 }
 
 // Chiamata (sincrona) dal gracefulShutdown alla ricezione di SIGTERM/SIGINT:

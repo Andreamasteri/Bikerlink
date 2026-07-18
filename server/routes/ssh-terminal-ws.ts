@@ -29,7 +29,6 @@
 import { WebSocketServer, WebSocket } from "ws";
 import type { Server, IncomingMessage } from "http";
 import { Client as SshClient } from "ssh2";
-// @ts-ignore
 import signature from "cookie-signature";
 import { pool } from "../db";
 import { storage } from "../storage";
