@@ -45,6 +45,10 @@ export const EXCLUDED_DIRS = [
   "__tests__",
   ".next",
   ".cache",
+  // Reference clones on disk (untracked, not part of BikerLink source)
+  ".bikerblog-ref",
+  ".agents",
+  ".local",
 ];
 
 /** File da escludere esplicitamente dalla scansione (es. questo script stesso). */
