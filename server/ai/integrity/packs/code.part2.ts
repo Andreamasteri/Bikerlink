@@ -170,7 +170,6 @@ export const circularImportsCheck: AppIntegrityCheck = {
   description: "Cicli di import tra moduli TS/TSX. Rilevati con madge.",
   async query(ctx) {
     try {
-      // @ts-ignore — madge non ha @types
       const mod = (await import("madge").catch(() => null)) as { default?: unknown } | unknown;
       const madge = (mod as { default?: unknown })?.default ?? mod;
       if (typeof madge !== "function") {
