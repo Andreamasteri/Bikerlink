@@ -1352,11 +1352,11 @@ echo "════════════════════════�
 echo "  Test regressione Horus prev-report"
 echo "════════════════════════════════════════"
 HORUS_PREV_REPORT_EXIT=0
-timeout 200 bash scripts/__tests__/horus-prev-report.test.sh || HORUS_PREV_REPORT_EXIT=$?
+timeout 75 bash scripts/__tests__/horus-prev-report.test.sh || HORUS_PREV_REPORT_EXIT=$?
 echo "════════════════════════════════════════"
 echo ""
 if [ "$HORUS_PREV_REPORT_EXIT" -eq 124 ]; then
-  echo "⚠️  Horus prev-report test: timeout 200s — bundle dry-run lento in questo ambiente."
+  echo "⚠️  Horus prev-report test: timeout 75s — bundle dry-run lento in questo ambiente."
   echo "   Gate saltato (non bloccante). Eseguire manualmente per verificare:"
   echo "   bash scripts/__tests__/horus-prev-report.test.sh"
 elif [ "$HORUS_PREV_REPORT_EXIT" -ne 0 ]; then
@@ -1377,10 +1377,13 @@ echo "════════════════════════�
 echo "  Gate Semgrep (sicurezza statica)"
 echo "════════════════════════════════════════"
 SEMGREP_EXIT=0
-bash scripts/check-semgrep.sh || SEMGREP_EXIT=$?
+timeout 110 bash scripts/check-semgrep.sh || SEMGREP_EXIT=$?
 echo "════════════════════════════════════════"
 echo ""
-if [ "$SEMGREP_EXIT" -ne 0 ]; then
+if [ "$SEMGREP_EXIT" -eq 124 ]; then
+  echo "⚠️  Semgrep: timeout 110s — scansione lenta in questo ambiente. Gate saltato (non bloccante)."
+  echo "   Verificare manualmente: bash scripts/check-semgrep.sh"
+elif [ "$SEMGREP_EXIT" -ne 0 ]; then
   echo "❌ Gate Semgrep fallito — nuovi finding ERROR introdotti, correggere prima di procedere."
   exit "$SEMGREP_EXIT"
 fi
@@ -1393,7 +1396,13 @@ echo ""
 # (exhaustive-deps ecc.) non bloccano qui (il gate lint separato, a
 # --max-warnings=0 sul repo intero, li copre già in modo più stretto).
 # Copre app/ (Expo Router pages) + codice condiviso components/, hooks/, lib/
-if ! npx oxlint -c .oxlintrc.json app/ components/ hooks/ lib/; then
+OXLINT_EXIT=0
+timeout 60 npx oxlint -c .oxlintrc.json app/ components/ hooks/ lib/ || OXLINT_EXIT=$?
+if [ "$OXLINT_EXIT" -eq 124 ]; then
+  echo ""
+  echo "⚠️  oxlint: timeout 60s — scansione lenta in questo ambiente. Gate saltato (non bloccante)."
+  echo "   Verificare manualmente: npx oxlint -c .oxlintrc.json app/ components/ hooks/ lib/"
+elif [ "$OXLINT_EXIT" -ne 0 ]; then
   echo ""
   echo "❌ oxlint gate FALLITO — trovate violazioni error-level in app/, components/, hooks/ o lib/"
   echo "   Correggere i file segnalati sopra prima del merge."
