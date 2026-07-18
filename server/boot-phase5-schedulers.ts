@@ -333,6 +333,15 @@ export async function runPhase5Schedulers(): Promise<void> {
     console.log("[INIT] Horus background analysis scheduler started (load-aware)");
   });
 
+  // Task #662 — Patch scan settimanale: domenica 02:00 Europe/Rome.
+  // Rileva TODO/FIXME/@ts-ignore/workaround accumulati; push agli admin se
+  // ci sono trovati CRITICO o ALTO; skip pulito se Horus è irraggiungibile.
+  await arm("horus-patch-scan", async () => {
+    const { scheduleHorusPatchScan } = await import("./jobs/horus-patch-scan-job");
+    scheduleHorusPatchScan();
+    console.log("[INIT] Horus patch scan scheduler avviato (dom 02:00 Europe/Rome)");
+  });
+
   // Task #5322 — Poller dei job VPS (VM Google): raccoglie l'esito dei job async
   // avviati dagli admin in chat e li recapita. Cadenza 2 min, non-fatale.
   await arm("assistant-vps-poller", async () => {
