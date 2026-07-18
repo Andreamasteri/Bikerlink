@@ -37,7 +37,7 @@ interface HistoryEntry {
 
 const PERSONA_LABEL: Record<AgentPersona, string> = {
   bowie: "Bowie (assistente)",
-  horus: "Horus (routing)",
+  horus: "Horus (routing · coordinator)",
   ares: "Ares (diagnostica)",
 };
 

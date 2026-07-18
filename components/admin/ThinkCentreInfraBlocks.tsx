@@ -12,18 +12,17 @@ export interface PersonaModelStatus {
   available: boolean | null;
 }
 
+// Task #591 — quebracho rimosso, unificato in Horus.
 export type PersonaModels = {
   bowie: PersonaModelStatus;
   horus: PersonaModelStatus;
   ares: PersonaModelStatus;
-  quebracho: PersonaModelStatus;
 };
 
 const PERSONA_LABELS: Array<{ key: keyof PersonaModels; label: string }> = [
   { key: "bowie", label: "Bowie" },
-  { key: "horus", label: "Horus" },
+  { key: "horus", label: "Horus (routing · coordinator)" },
   { key: "ares", label: "Ares" },
-  { key: "quebracho", label: "Quebracho" },
 ];
 
 function PersonaModelRows({ personaModels }: { personaModels: PersonaModels }) {

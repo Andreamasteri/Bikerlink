@@ -163,7 +163,7 @@ export default function AiHubScreen() {
     {
       key: "ai-monitor",
       label: "Monitor 4 AI",
-      subtitle: "Bowie · Horus · Ares",
+      subtitle: "Bowie · Horus · Ares · Nadir",
       icon: "heart-pulse",
       route: "/admin/ai-monitor",
       color: "#0EA5E9",

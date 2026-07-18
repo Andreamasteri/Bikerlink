@@ -1,9 +1,13 @@
 // Task #5197 — Roster delle AI BikerLink (coscienza reciproca + delega).
 //
-// BikerLink ha TRE AI, ognuna con un ruolo distinto:
+// BikerLink ha QUATTRO AI, ognuna con un ruolo distinto:
 //   - Bowie  (OLLAMA_*, ThinkCentre)  — assistente in-app, ENTRY POINT.
-//   - Horus  (OLLAMA_*, ThinkCentre)  — specialista percorsi/navigazione.
+//   - Horus  (OLLAMA_*, ThinkCentre)  — specialista percorsi/navigazione E
+//                                       coordinator dei job AI in background
+//                                       (ruolo assorbito da Quebracho in Task #591).
 //   - Ares   (DIAG_OLLAMA_*, PC fisso) — AI di diagnostica tecnica, SOLO admin.
+//   - Nadir  (storage semantico)       — motore di ricerca/indicizzazione manuale,
+//                                       agent-neutral (non conversazionale).
 //
 // Questo modulo è la SINGOLA fonte di verità per:
 //   - i metadati di ogni persona (nome, ruolo, tono),
@@ -39,7 +43,7 @@ export const AI_ROSTER: Record<AiPersonaId, AiPersona> = {
   horus: {
     id: "horus",
     name: "Horus",
-    role: "specialista di percorsi, itinerari e navigazione moto",
+    role: "specialista di percorsi, itinerari e navigazione moto · coordinator dei job AI in background",
     blurb: "«io vedo tutto, io trovo tutto»: sicuro, preciso, un filo solenne",
     adminOnly: false,
   },
