@@ -35,6 +35,7 @@ import { db } from "../server/db";
 import { sql } from "drizzle-orm";
 import { cfAccessHeaders } from "../server/lib/cf-access";
 import { AGENT_MODEL_DEFAULTS } from "../server/lib/agent-constants";
+import { stripThinkBlock } from "../server/lib/ollama-think-strip";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, "..");
@@ -129,12 +130,6 @@ function rowsToText(rows: unknown[]): string {
   return rows.map((r, i) => `[${i + 1}] ${JSON.stringify(r)}`).join("\n");
 }
 
-// ─── Helper: strip tag </think> orfani (qwen3 con think:false) ───────────────
-
-function stripOrphanThinkTags(text: string): string {
-  return text.replace(/<\/think>/gi, "").trim();
-}
-
 // ─── Helper: normalizza sezione task (lista → tabella) ────────────────────────
 
 function normalizeTaskSection(report: string): string {
@@ -197,7 +192,9 @@ async function callHorus(
       body: JSON.stringify({
         model,
         stream: false,
-        options: { temperature: 0.2, think: false },
+        // think:true — Horus ragiona prima di rispondere (output strutturato migliore).
+        // Il blocco <think>…</think> viene strippato da stripThinkBlock() più sotto.
+        options: { temperature: 0.2, think: true },
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userContent },
@@ -219,7 +216,7 @@ async function callHorus(
     if (data.error) throw new Error(`Ollama error: ${data.error}`);
     const raw = data.message?.content?.trim();
     if (!raw) throw new Error("Risposta vuota dal modello.");
-    return normalizeTaskSection(stripOrphanThinkTags(raw));
+    return normalizeTaskSection(stripThinkBlock(raw));
   } finally {
     clearTimeout(timer);
   }

@@ -37,6 +37,7 @@ import { isThinkCentreOffline } from "./thinkcentre-offline";
 import { logAiCall } from "./ai-logger";
 import { cfAccessHeaders } from "./cf-access";
 import { KEEP_ALIVE_RESIDENT } from "./agent-constants";
+import { stripThinkBlock } from "./ollama-think-strip";
 
 const BOWIE_OLLAMA_URL = process.env.BOWIE_OLLAMA_URL?.trim().replace(/\/$/, "");
 const BOWIE_OLLAMA_TOKEN = process.env.BOWIE_OLLAMA_TOKEN ?? "";
@@ -297,16 +298,17 @@ export async function callOllamaChat<T = string>(
   const { system, temperature = 0.2, abortSignal, maxRetries = 2, jsonRetries = 1, onRepair, persona = "bowie", numPredict, model: modelOverride } = options;
 
   // Provider options Ollama:
-  //  - think:false disattiva il ragionamento esplicito di qwen3 (Bowie=qwen3:1.7b,
-  //    Horus=qwen3:4b): senza, i blocchi <think> inquinerebbero le risposte in chat
-  //    e romperebbero il JSON strutturato. Innocuo per modelli che non "pensano".
-  //    Nota Task #56: su Ollama 0.30.11 questo sopprime solo il tag <think> di
-  //    apertura — può restare un </think> orfano a fine blocco di ragionamento;
-  //    vedi stripThink() in inter-agent.ts per il caso Horus.
+  //  - think:false è OBBLIGATORIO per generateObject (JSON strutturato): qwen3 include
+  //    <think>…</think> nel contenuto grezzo, corrompendo il JSON e fallendo la
+  //    validazione schema. Viene applicato solo quando schema è presente.
+  //  - Per generateText su persona "horus": think:true (default qwen3) — Horus ragiona
+  //    prima di rispondere. Il blocco viene strippato con stripThinkBlock() sul risultato.
+  //  - Per generateText su persona "bowie": think:false per mantere le risposte compatte.
   //  - num_predict (Task #5322) cappa la lunghezza per risposte concise.
   const providerOptions = {
     ollama: {
-      think: false,
+      // think:false solo per JSON (schema presente) o per Bowie (testo compatto)
+      ...((schema != null || persona !== "horus") ? { think: false } : {}),
       ...(numPredict ? { options: { num_predict: numPredict } } : {}),
     },
   };
@@ -321,7 +323,9 @@ export async function callOllamaChat<T = string>(
 
   if (!schema) {
     const { text } = await generateText({ model, instructions: system, prompt, temperature, maxRetries, abortSignal, providerOptions });
-    return text as unknown as T;
+    // Per horus (think:true): strippa il blocco <think>…</think> dal testo libero.
+    const result = persona === "horus" ? stripThinkBlock(text) : text;
+    return result as unknown as T;
   }
 
   let lastErr: unknown;

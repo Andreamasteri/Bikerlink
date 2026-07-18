@@ -11,6 +11,7 @@ import { spawnSync } from "child_process";
 import { fileURLToPath } from "url";
 import { cfAccessHeaders } from "../server/lib/cf-access";
 import { AGENT_MODEL_DEFAULTS } from "../server/lib/agent-constants";
+import { stripThinkBlock } from "../server/lib/ollama-think-strip";
 import { titleToSlug } from "./lib/horus-slug";
 import { isDuplicate } from "./horus-propose-tasks";
 
@@ -345,7 +346,11 @@ export async function callHorus(
       body: JSON.stringify({
         model,
         stream: false,
-        options: { temperature: 0.1, think: false, num_predict: 600 },
+        // think:true — Horus ragiona prima di rispondere, producendo output strutturato
+        // più fedele alle istruzioni. Il blocco <think>…</think> viene strippato
+        // da stripThinkBlock() prima di passare il testo al parser.
+        // num_predict alzato a 800 per compensare i token usati dal reasoning.
+        options: { temperature: 0.1, think: true, num_predict: 800 },
         messages: [
           { role: "system", content: PATCH_SCAN_SYSTEM_PROMPT },
           { role: "user", content },
@@ -366,8 +371,8 @@ export async function callHorus(
     const data = (await res.json()) as OllamaResponse;
     if (data.error) throw new Error(`Ollama error: ${data.error}`);
     const raw = data.message?.content?.trim() ?? "";
-    // Rimuovi orphan </think> da qwen3 con think:false
-    return raw.replace(/<\/think>/gi, "").trim();
+    // Strippa il blocco <think>…</think> completo (think:true non-streaming).
+    return stripThinkBlock(raw);
   } finally {
     clearTimeout(timer);
   }
