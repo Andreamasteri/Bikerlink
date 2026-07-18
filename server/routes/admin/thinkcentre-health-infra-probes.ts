@@ -13,6 +13,7 @@
  *   UPTIME_KUMA_URL       URL Uptime Kuma — punta al probe TC agent: https://tc.biker-link.net/probe/uptime-kuma
  */
 
+import Redis from "ioredis";
 import { tcpConnectDetailed } from "../../jobs/thinkcentre-monitor-probes";
 import { hubGet, isHubConfigured, getHubBaseUrl, HUB_HEALTH_TIMEOUT_MS, HUB_VRAM_TIMEOUT_MS } from "../../lib/ai-hub-client";
 import {
@@ -71,7 +72,75 @@ async function tcpConnect(
 }
 
 // ── DragonflyDB ───────────────────────────────────────────────────────────────
+/**
+ * Probe applicativo DragonflyDB — esegue un PING ioredis reale verso TC_DRAGONFLY_URL,
+ * lo stesso URL usato dal client applicativo (matching coordinator, Redlock).
+ *
+ * Distinzione probe-infra vs probe-applicativo:
+ *   - Probe-infra legacy (TCP/HTTP al TC agent via REDIS_PROBE_URL/REDIS_PROBE_HOST):
+ *     verifica che il *tunnel* Cloudflare o la rete siano raggiungibili. Un tunnel UP
+ *     non implica che DragonflyDB accetti connessioni applicative (auth errata, MaxClients,
+ *     URL sbagliato, etc.) → può mostrare verde mentre il client applicativo è offline.
+ *   - Probe-applicativo (PING ioredis a TC_DRAGONFLY_URL — questa funzione):
+ *     verifica che il *client ioredis* possa davvero parlare con DragonflyDB, usando
+ *     lo stesso URL del client reale. È la fonte di verità per il pallino nella System Health
+ *     e allineata allo stato visibile nel Matching Monitor (sezione "Integrità sistema").
+ *
+ * Se TC_DRAGONFLY_URL non è impostato, la probe ricade sul comportamento legacy
+ * (HTTP via REDIS_PROBE_URL o TCP via REDIS_PROBE_HOST) per compatibilità con ambienti
+ * che non espongono DragonflyDB direttamente.
+ */
 export async function probeDragonflyInfra(): Promise<InfraServiceHealth> {
+  const dragonflyUrl = process.env.TC_DRAGONFLY_URL?.trim();
+
+  // Probe applicativo: PING ioredis diretto a TC_DRAGONFLY_URL.
+  // Fonte di verità principale — rispecchia ciò che vede il client applicativo.
+  if (dragonflyUrl) {
+    const t0 = Date.now();
+    let client: { ping: () => Promise<string>; quit: () => Promise<unknown> } | null = null;
+    try {
+      // Uses the statically-imported Redis so vi.mock("ioredis") intercepts it in tests.
+      client = new Redis(dragonflyUrl, {
+        lazyConnect: false,
+        maxRetriesPerRequest: 0,
+        enableOfflineQueue: false,
+        connectTimeout: 3_000,
+        commandTimeout: 3_000,
+        retryStrategy: () => null,
+      });
+
+      // Gara PING vs hard-timeout 3s: garantisce che il probe non blocchi il ciclo
+      // del monitor se DragonflyDB accetta il TCP ma non risponde al comando.
+      await Promise.race([
+        client.ping(),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error("PING timeout (3s)")), 3_000),
+        ),
+      ]);
+
+      const latencyMs = Date.now() - t0;
+      recordProbeLog("dragonfly", { timestamp: Date.now(), ok: true, latencyMs, detail: "PING ioredis OK" });
+      return { configured: true, ok: true, latencyMs, url: maskUrl(dragonflyUrl), history: getHistory("dragonfly"), probeLog: getProbeLog("dragonfly") };
+    } catch (err: unknown) {
+      const latencyMs = Date.now() - t0;
+      const raw = err instanceof Error ? err.message : String(err);
+      const error = sanitizeError(raw);
+      console.error("[thinkcentre-probe] dragonfly PING KO", { error });
+      recordError("dragonfly", error);
+      recordProbeLog("dragonfly", { timestamp: Date.now(), ok: false, latencyMs, detail: error });
+      return { configured: true, ok: false, latencyMs, url: maskUrl(dragonflyUrl), error, history: getHistory("dragonfly"), probeLog: getProbeLog("dragonfly") };
+    } finally {
+      if (client) {
+        client.quit().catch(() => { /* ignore — client usa-e-getta */ });
+      }
+    }
+  }
+
+  // ── Legacy: probe infra tramite TC agent o TCP diretto ────────────────────
+  // Usato solo quando TC_DRAGONFLY_URL non è configurato (ambienti senza
+  // DragonflyDB diretto). In produzione con TC attivo, il ramo ioredis sopra
+  // è la fonte di verità — questi probe possono divergere dallo stato applicativo.
+
   // Modalità HTTP via TC agent (DRAGONFLY_PROBE_URL ha precedenza; legacy REDIS_PROBE_URL)
   const probeUrl = (process.env.DRAGONFLY_PROBE_URL ?? process.env.REDIS_PROBE_URL)?.trim();
   if (probeUrl) {
@@ -85,7 +154,7 @@ export async function probeDragonflyInfra(): Promise<InfraServiceHealth> {
       recordProbeLog("dragonfly", { timestamp: Date.now(), ok: false, latencyMs: r.latencyMs, detail: error });
       return { configured: true, ok: false, latencyMs: r.latencyMs, url: probeUrl, error, history: getHistory("dragonfly"), probeLog: getProbeLog("dragonfly") };
     }
-    recordProbeLog("dragonfly", { timestamp: Date.now(), ok: true, latencyMs: r.latencyMs, detail: "HTTP probe OK" });
+    recordProbeLog("dragonfly", { timestamp: Date.now(), ok: true, latencyMs: r.latencyMs, detail: "HTTP probe OK (legacy)" });
     return { configured: true, ok: true, latencyMs: r.latencyMs, url: probeUrl, history: getHistory("dragonfly"), probeLog: getProbeLog("dragonfly") };
   }
 
@@ -104,7 +173,7 @@ export async function probeDragonflyInfra(): Promise<InfraServiceHealth> {
     recordProbeLog("dragonfly", { timestamp: Date.now(), ok: false, latencyMs: r.latencyMs, detail: error });
     return { configured: true, ok: false, latencyMs: r.latencyMs, url: displayUrl, error, history: getHistory("dragonfly"), probeLog: getProbeLog("dragonfly") };
   }
-  recordProbeLog("dragonfly", { timestamp: Date.now(), ok: true, latencyMs: r.latencyMs, detail: "TCP connect OK" });
+  recordProbeLog("dragonfly", { timestamp: Date.now(), ok: true, latencyMs: r.latencyMs, detail: "TCP connect OK (legacy)" });
   return { configured: true, ok: true, latencyMs: r.latencyMs, url: displayUrl, history: getHistory("dragonfly"), probeLog: getProbeLog("dragonfly") };
 }
 
