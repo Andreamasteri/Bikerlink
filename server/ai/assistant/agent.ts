@@ -259,6 +259,7 @@ async function setHorusThinkEnabled(enable: boolean): Promise<string> {
       "horus_think_enabled",
       enable ? "true" : "false",
       undefined,
+      // check-horus-think-hardcoded: safe — descrizione AppSetting visibile all'admin, non un callsite Ollama
       "Ragionamento esplicito di Horus (think:true). Modificabile con /think on|off dalla chat admin.",
     );
     const tcOffline = await isThinkCentreOffline();
@@ -269,6 +270,7 @@ async function setHorusThinkEnabled(enable: boolean): Promise<string> {
       );
     }
     return enable
+      // check-horus-think-hardcoded: safe — testo UI restituito all'admin, non un callsite Ollama
       ? "Think attivato ✓. Dalla prossima risposta userò il ragionamento esplicito (`think:true`): " +
         "il canale interno di reasoning rimane separato dal testo visibile. " +
         "Usa `/think off` per passare alla modalità rapida."

@@ -169,6 +169,7 @@ export async function runBootPhase3DbInit(): Promise<void> {
         "horus_think_enabled",
         "true",
         undefined,
+        // check-horus-think-hardcoded: safe — descrizione AppSetting visibile all'admin, non un callsite Ollama
         "Ragionamento esplicito di Horus (think:true). Modificabile con /think on|off dalla chat admin.",
       );
       console.log("[HORUS BOOTSTRAP] horus_think_enabled inizializzato a true");
