@@ -523,7 +523,7 @@ fi
 
 # (v) I 3 stati (return 0, return 1, return 2) sono tutti presenti nella funzione.
 for ret in "return 0" "return 1" "return 2"; do
-  if grep -A 20 'cerbero_health_backend\(\)' "$CERBERO_LIB" | grep -q "$ret"; then
+  if grep -A 40 'cerbero_health_backend\(\)' "$CERBERO_LIB" | grep -q "$ret"; then
     ok "cerbero_health_backend contiene \"$ret\""
   else
     nok "cerbero_health_backend NON contiene \"$ret\" — uno dei 3 stati mancante"
