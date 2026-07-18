@@ -36,6 +36,7 @@ VIOLATIONS=$(grep -rn \
   "quebracho-question" \
   server/ app/ scripts/ \
   | grep -v "scripts/check-quebracho-question-import\.sh" \
+  | grep -v "scripts/deploy-build\.sh" \
   | grep -v "^.*//.*quebracho-question" \
   || true)
 

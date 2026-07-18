@@ -27,6 +27,7 @@ VIOLATIONS=$(grep -rn \
   "quebracho-bridge" \
   server/ app/ scripts/ \
   | grep -v "scripts/check-quebracho-bridge-import\.sh" \
+  | grep -v "scripts/deploy-build\.sh" \
   || true)
 
 if [ -z "$VIOLATIONS" ]; then

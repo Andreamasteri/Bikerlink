@@ -1,13 +1,21 @@
 /**
- * Tests: getDragonflyRejectionStreak() in server/cache/matching-lock.ts
+ * Tests: getDragonflyRejectionStreak() and forceUnlockMatchingLock() in
+ * server/cache/matching-lock.ts
  *
- * Verifies:
+ * getDragonflyRejectionStreak() verifies:
  *  1. Empty history → {consecutiveCount: 0, mostRecentRejectedAt: null}
  *  2. Each dragonfly rejection increments the consecutive count
  *  3. A successful dragonfly acquire resets the streak to 0
  *  4. mostRecentRejectedAt is correctly set to the most-recent rejection timestamp
  *  5. In-memory rejections (source="memory") do not contribute to the streak
  *  6. Non-rejection events at the tail (e.g. "released") break the streak
+ *
+ * forceUnlockMatchingLock() verifies:
+ *  7. wasHeld=false and no crash when no lock is held
+ *  8. wasHeld=true and correct holder when an in-memory lock is active
+ *  9. State is fully cleared so a subsequent withMatchingLock can acquire
+ * 10. wasHeld=true and correct holder when a dragonfly lock is active
+ * 11. Holder details (owner, source) are accurate in the returned object
  *
  * Module-level history state is fully reset via vi.resetModules() + re-import
  * before each test. No external Redis/DragonflyDB connection is required.
@@ -289,5 +297,199 @@ describe("getDragonflyRejectionStreak – tail event order matters", () => {
     // Tail has 2 consecutive dragonfly rejections; earlier "released" breaks the run
     expect(consecutiveCount).toBe(2);
     void mockRelease; // suppress unused-var
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 7. forceUnlockMatchingLock – no lock held
+// ---------------------------------------------------------------------------
+
+describe("forceUnlockMatchingLock – no lock held", () => {
+  it("returns wasHeld=false and holder=null when no lock is active", async () => {
+    const { mod } = await freshMatchingLock({ isRedisAvail: false });
+
+    const result = mod.forceUnlockMatchingLock();
+
+    expect(result.wasHeld).toBe(false);
+    expect(result.holder).toBeNull();
+  });
+
+  it("does not throw when called with no lock held", async () => {
+    const { mod } = await freshMatchingLock({ isRedisAvail: false });
+
+    expect(() => mod.forceUnlockMatchingLock()).not.toThrow();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 8 & 9. forceUnlockMatchingLock – in-memory lock active
+// ---------------------------------------------------------------------------
+
+describe("forceUnlockMatchingLock – in-memory lock active", () => {
+  it("returns wasHeld=true and the correct holder owner while a memory lock is held", async () => {
+    const { mod } = await freshMatchingLock({ isRedisAvail: false });
+
+    let resolveInner!: () => void;
+    const innerDone = new Promise<void>((res) => { resolveInner = res; });
+
+    // Start acquiring the lock; keep it held while we inspect.
+    const holdPromise = mod.withMatchingLock("memory-owner", async () => {
+      await innerDone;
+    });
+
+    // forceUnlock while the fn is still executing (lock is active).
+    const result = mod.forceUnlockMatchingLock();
+
+    expect(result.wasHeld).toBe(true);
+    expect(result.holder).not.toBeNull();
+    expect(result.holder?.owner).toBe("memory-owner");
+    expect(result.holder?.source).toBe("memory");
+
+    // Allow the original fn to finish (it will still run, but the lock is gone).
+    resolveInner();
+    await holdPromise;
+  });
+
+  it("clears state so a subsequent withMatchingLock can acquire after force-unlock", async () => {
+    const { mod } = await freshMatchingLock({ isRedisAvail: false });
+
+    let resolveFirst!: () => void;
+    const firstDone = new Promise<void>((res) => { resolveFirst = res; });
+
+    // Acquire and hold the lock.
+    const holdPromise = mod.withMatchingLock("first-owner", async () => {
+      await firstDone;
+    });
+
+    // Force-unlock while held.
+    mod.forceUnlockMatchingLock();
+
+    // Release the original fn.
+    resolveFirst();
+    await holdPromise;
+
+    // A new acquire should now succeed immediately.
+    const secondResult = await mod.withMatchingLock("second-owner", async () => "ok");
+    expect(secondResult.acquired).toBe(true);
+    if (secondResult.acquired) {
+      expect(secondResult.result).toBe("ok");
+    }
+  });
+
+  it("returns holder details including acquiredAt and expiresAt", async () => {
+    const { mod } = await freshMatchingLock({ isRedisAvail: false });
+
+    const before = Date.now();
+
+    let resolveInner!: () => void;
+    const innerDone = new Promise<void>((res) => { resolveInner = res; });
+
+    const holdPromise = mod.withMatchingLock("time-owner", async () => {
+      await innerDone;
+    });
+
+    const { holder } = mod.forceUnlockMatchingLock();
+
+    expect(holder).not.toBeNull();
+    expect(holder!.acquiredAt).toBeGreaterThanOrEqual(before);
+    expect(holder!.expiresAt).toBeGreaterThan(holder!.acquiredAt);
+
+    resolveInner();
+    await holdPromise;
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 10 & 11. forceUnlockMatchingLock – dragonfly lock active
+// ---------------------------------------------------------------------------
+
+describe("forceUnlockMatchingLock – dragonfly lock active", () => {
+  it("returns wasHeld=true and the correct holder owner while a dragonfly lock is held", async () => {
+    const { mod } = await freshMatchingLock({ isRedisAvail: true, acquireThrows: false });
+
+    let resolveInner!: () => void;
+    const innerDone = new Promise<void>((res) => { resolveInner = res; });
+
+    // Acquire via dragonfly path (isRedisAvail=true, acquireThrows=false).
+    const holdPromise = mod.withMatchingLock("dragonfly-owner", async () => {
+      await innerDone;
+    });
+
+    // Yield to the event loop so the mock acquire resolves and memoryLockHolder
+    // is populated before we inspect it.
+    await Promise.resolve();
+
+    // Force-unlock while the fn is still executing (awaiting innerDone).
+    const result = mod.forceUnlockMatchingLock();
+
+    expect(result.wasHeld).toBe(true);
+    expect(result.holder).not.toBeNull();
+    expect(result.holder?.owner).toBe("dragonfly-owner");
+    expect(result.holder?.source).toBe("dragonfly");
+
+    resolveInner();
+    await holdPromise;
+  });
+
+  it("clears memoryLockHolder so a second force-unlock sees wasHeld=false", async () => {
+    const { mod } = await freshMatchingLock({ isRedisAvail: true, acquireThrows: false });
+
+    let resolveInner!: () => void;
+    const innerDone = new Promise<void>((res) => { resolveInner = res; });
+
+    const holdPromise = mod.withMatchingLock("dragonfly-owner-2", async () => {
+      await innerDone;
+    });
+
+    // Yield so the mock acquire resolves and sets memoryLockHolder.
+    await Promise.resolve();
+
+    // First force-unlock clears state.
+    mod.forceUnlockMatchingLock();
+
+    // Second force-unlock should see no lock.
+    const second = mod.forceUnlockMatchingLock();
+    expect(second.wasHeld).toBe(false);
+    expect(second.holder).toBeNull();
+
+    resolveInner();
+    await holdPromise;
+  });
+
+  it("clears state so a subsequent withMatchingLock acquires via dragonfly after force-unlock", async () => {
+    const { mod, mockAcquire, mockRelease } = await freshMatchingLock({
+      isRedisAvail: true,
+      acquireThrows: false,
+    });
+
+    let resolveFirst!: () => void;
+    const firstDone = new Promise<void>((res) => { resolveFirst = res; });
+
+    // Acquire and hold the dragonfly lock.
+    const holdPromise = mod.withMatchingLock("first-dragonfly-owner", async () => {
+      await firstDone;
+    });
+
+    // Yield so the mock acquire resolves and sets memoryLockHolder.
+    await Promise.resolve();
+
+    // Force-unlock while the lock is held.
+    const unlockResult = mod.forceUnlockMatchingLock();
+    expect(unlockResult.wasHeld).toBe(true);
+
+    // Release the original fn.
+    resolveFirst();
+    await holdPromise;
+
+    // A new withMatchingLock should now acquire successfully via dragonfly.
+    const secondResult = await mod.withMatchingLock("second-dragonfly-owner", async () => "re-acquired");
+    expect(secondResult.acquired).toBe(true);
+    if (secondResult.acquired) {
+      expect(secondResult.result).toBe("re-acquired");
+      expect(secondResult.source).toBe("dragonfly");
+    }
+
+    void mockRelease; // suppress unused-var
+    void mockAcquire; // suppress unused-var
   });
 });
