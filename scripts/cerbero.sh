@@ -223,8 +223,14 @@ restart_metro() {
   fi
 
   cerbero_log "[TESTA 2] RIAVVIO: start-expo.sh in background..."
-  bash "$SCRIPT_DIR/start-expo.sh" >> "$CERBERO_LOG_FILE" 2>&1 &
-  cerbero_log "[TESTA 2] RIAVVIO avviato (PID: $!)"
+  # Prefissa ogni riga di output di start-expo.sh (incluso l'stderr di Metro,
+  # es. OOM, bundler crash) con "[TESTA 2]" + timestamp per rendere i log
+  # immediatamente attribuibili alla testa Metro senza dover disambiguare.
+  bash "$SCRIPT_DIR/start-expo.sh" 2>&1 | \
+    while IFS= read -r _cerbero_metro_line; do
+      printf '[%s] [TESTA 2] %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$_cerbero_metro_line" >> "$CERBERO_LOG_FILE"
+    done &
+  cerbero_log "[TESTA 2] RIAVVIO avviato (pipeline PID: $!)"
 }
 
 # ══ Avvio ═════════════════════════════════════════════════════════════════════
