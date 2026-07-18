@@ -134,8 +134,14 @@ restart_backend() {
   fi
 
   cerbero_log "[TESTA 1] RIAVVIO: start-backend.sh in background..."
-  bash "$SCRIPT_DIR/start-backend.sh" >> "$CERBERO_LOG_FILE" 2>&1 &
-  cerbero_log "[TESTA 1] RIAVVIO avviato (PID: $!)"
+  # Prefissa ogni riga di output di start-backend.sh (incluso l'stderr di Node.js,
+  # es. ERR_STREAM_PREMATURE_CLOSE) con "[TESTA 1]" + timestamp per rendere i log
+  # immediatamente attribuibili alla testa backend senza dover disambiguare.
+  bash "$SCRIPT_DIR/start-backend.sh" 2>&1 | \
+    while IFS= read -r _cerbero_be_line; do
+      printf '[%s] [TESTA 1] %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$_cerbero_be_line" >> "$CERBERO_LOG_FILE"
+    done &
+  cerbero_log "[TESTA 1] RIAVVIO avviato (pipeline PID: $!)"
 }
 
 # ══ TESTA 2 — Metro: crash tracking + restart ═════════════════════════════════

@@ -132,7 +132,13 @@ for retry in $(seq 1 $MAX_RETRIES); do
   if kill_port; then
     echo "Porta $PORT libera, avvio backend..."
   else
-    echo "WARN: porta $PORT non confermata libera — tentativo di avvio comunque (SO_REUSEADDR)"
+    # Porta ancora occupata dopo SIGTERM+SIGKILL+15s: un processo zombie tiene la
+    # socket senza rispondere HTTP (es. Express a metà spegnimento in TIME_WAIT
+    # prolungato). Procedere causerebbe EADDRINUSE → crash immediato → loop.
+    # Skip questo tentativo: al prossimo giro kill_port riprova.
+    echo "[$(date '+%Y-%m-%dT%H:%M:%S')] WARN: porta $PORT ancora occupata dopo SIGTERM+SIGKILL+15s — skip tentativo $retry, riprovo al prossimo ciclo"
+    sleep 5
+    continue
   fi
   if [ ! -f "server_dist/index.js" ]; then
     echo "server_dist/index.js non trovato — build in corso..."

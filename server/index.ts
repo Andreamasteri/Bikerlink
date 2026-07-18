@@ -38,6 +38,22 @@ const sentryInitPromise = initSentry();
 
 setupMiddleware(app);
 
+// ── Stream-error context middleware ──────────────────────────────────────────
+// ERR_STREAM_PREMATURE_CLOSE appare in cerbero.log senza contesto quando un
+// client (es. curl probe con --max-time) chiude la connessione prima della fine
+// della risposta. Questo middleware aggiunge un handler res.on('error') su ogni
+// richiesta così il log include il metodo e il percorso dell'endpoint coinvolto.
+app.use((req: Request, res: Response, next) => {
+  res.on("error", (err: NodeJS.ErrnoException) => {
+    if (err.code === "ERR_STREAM_PREMATURE_CLOSE") {
+      console.error(
+        `[stream-close] ${req.method} ${req.path}: stream chiuso prematuramente dal client (probe timeout?)`
+      );
+    }
+  });
+  next();
+});
+
 app.get("/healthz", (_req: Request, res: Response) => {
   res.status(200).send("ok");
 });

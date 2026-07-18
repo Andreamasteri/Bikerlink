@@ -61,12 +61,28 @@ cerbero_port_open() {
 #   return 2  → backend in avvio     (raggiungibile ma non ancora pronto, es. 503)
 #   return 1  → backend IRRAGGIUNGIBILE (porta chiusa/timeout) → da riavviare
 cerbero_health_backend() {
-  local body code
-  body=$(curl -s --max-time 3 -w $'\n%{http_code}' "http://localhost:$BACKEND_PORT/api/health" 2>/dev/null)
+  local body code curl_err_file curl_exit curl_err
+  # Cattura stderr di curl in un file temporaneo invece di scartarlo: permette
+  # di loggare l'errore specifico (es. "Operation timed out", "Recv failure:
+  # Connection reset by peer") con il nome dell'endpoint — equivalente di
+  # req.on('error', ...) / res.on('error', ...) per probe bash.
+  curl_err_file="/tmp/cerbero-health-curl-err.$$"
+  body=$(curl -s --max-time 3 -w $'\n%{http_code}' \
+    "http://localhost:$BACKEND_PORT/api/health" 2>"$curl_err_file")
+  curl_exit=$?
   code=$(printf '%s' "$body" | tail -n1)
   if [ -z "$code" ] || [ "$code" = "000" ]; then
+    # Logga il motivo curl se non è semplice "Connection refused" (atteso quando
+    # il backend è giù): riduce il rumore mantenendo il segnale diagnostico utile
+    # (es. ERR_STREAM_PREMATURE_CLOSE, timeout, reset).
+    curl_err=$(cat "$curl_err_file" 2>/dev/null || true)
+    rm -f "$curl_err_file" 2>/dev/null || true
+    if [ -n "$curl_err" ] && ! echo "$curl_err" | grep -q "Connection refused"; then
+      cerbero_log "[TESTA 1] probe http://localhost:${BACKEND_PORT}/api/health exit=${curl_exit}: $curl_err"
+    fi
     return 1
   fi
+  rm -f "$curl_err_file" 2>/dev/null || true
   # status "ready" = pronto; "degraded" = pronto ma un sottosistema non-critico è
   # in errore; "broken" = una slice critica dell'Health Arbiter è giù ma il
   # backend SERVE ancora (riavviarlo non aiuta) — in tutti questi casi il backend
