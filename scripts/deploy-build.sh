@@ -232,7 +232,40 @@ else
   exit 1
 fi
 
-log "=== [1g/3] Verifica versioni stabili dipendenze critiche (non-bloccante) ==="
+log "=== [1g/3] Gate Quebracho Bridge Import (modulo eliminato) ==="
+# Verifica che nessun file importi da quebracho-bridge, rimosso quando
+# Quebracho è stato assorbito in Horus (Task #591 / #597).
+# Un re-import produrrebbe un "module not found" senza spiegazione;
+# questo gate lo blocca con un messaggio chiaro.
+QUEBRACHO_BRIDGE_EXIT=0
+bash scripts/check-quebracho-bridge-import.sh 2>&1 || QUEBRACHO_BRIDGE_EXIT=$?
+if [ "$QUEBRACHO_BRIDGE_EXIT" -eq 0 ]; then
+  log "  ✅ Quebracho Bridge Import OK — nessun riferimento stale a quebracho-bridge."
+else
+  log "  ❌ DEPLOY BLOCCATO — import stale di quebracho-bridge rilevato (exit ${QUEBRACHO_BRIDGE_EXIT})."
+  log "     quebracho-bridge è stato eliminato (Task #591). Usa Horus direttamente:"
+  log "       server/ai/horus/"
+  log "     Dettagli: bash scripts/check-quebracho-bridge-import.sh"
+  exit 1
+fi
+
+log "=== [1h/3] Gate Quebracho Question Import (modulo eliminato) ==="
+# Verifica che nessun file importi da quebracho-question, rimosso insieme
+# a Quebracho (Task #591). Il flusso di composizione domanda non esiste più.
+QUEBRACHO_QUESTION_EXIT=0
+bash scripts/check-quebracho-question-import.sh 2>&1 || QUEBRACHO_QUESTION_EXIT=$?
+if [ "$QUEBRACHO_QUESTION_EXIT" -eq 0 ]; then
+  log "  ✅ Quebracho Question Import OK — nessun riferimento stale a quebracho-question."
+else
+  log "  ❌ DEPLOY BLOCCATO — import stale di quebracho-question rilevato (exit ${QUEBRACHO_QUESTION_EXIT})."
+  log "     quebracho-question è stato eliminato (Task #591). Usa Horus direttamente:"
+  log "       server/ai/coordinator/horus-coordinator-loop.ts"
+  log "       server/ai/horus/"
+  log "     Dettagli: bash scripts/check-quebracho-question-import.sh"
+  exit 1
+fi
+
+log "=== [1i/3] Verifica versioni stabili dipendenze critiche (non-bloccante) ==="
 # Avvisa se esistono versioni major/minor più recenti per le dipendenze critiche.
 # Non blocca il deploy: exit sempre 0.
 # Interroga il registry npm — se la rete è irraggiungibile, lo step viene saltato
