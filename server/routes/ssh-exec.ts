@@ -3,6 +3,7 @@ import { Client as SshClient } from "ssh2";
 import { createHmac } from "node:crypto";
 import { storage } from "../storage";
 import { ensureTcSshBridge } from "../lib/tc-ssh-bridge";
+import { getTrustedClientIp } from "../lib/abuse-rate-limit";
 
 /**
  * Ricostruisce una chiave privata OpenSSH il cui contenuto ha i newline
@@ -297,11 +298,65 @@ async function verifyTcCredentials(tcUsername: string, tcPassword: string): Prom
   });
 }
 
+// ── Brute-force guard for /terminal/auth ────────────────────────────────────
+// Tracks per-IP failure counts in memory (intentionally not persisted across
+// restarts — in-memory is acceptable for this risk level per task spec).
+// Rules:
+//   • Up to MAX_AUTH_FAILURES failed attempts are allowed per IP in AUTH_WINDOW_MS.
+//   • Once the threshold is reached, the IP is locked for the remainder of the
+//     window even if the correct password is supplied on a later attempt.
+//   • The window starts at the first failure and expires AUTH_WINDOW_MS later.
+//   • Successful logins before the threshold is reached do NOT reset the counter,
+//     but the failure count never increments on success.
+
+const MAX_AUTH_FAILURES = 5;
+const AUTH_WINDOW_MS = 15 * 60 * 1000; // 15 minutes
+
+interface AuthFailureRecord {
+  failures: number;
+  windowStart: number; // epoch ms of first failure in current window
+}
+
+const authFailureMap = new Map<string, AuthFailureRecord>();
+
+/** Returns true if this IP is currently locked out. */
+function isAuthLockedOut(ip: string): boolean {
+  const rec = authFailureMap.get(ip);
+  if (!rec) return false;
+  if (Date.now() - rec.windowStart >= AUTH_WINDOW_MS) {
+    authFailureMap.delete(ip);
+    return false;
+  }
+  return rec.failures >= MAX_AUTH_FAILURES;
+}
+
+/** Records a failed auth attempt for this IP. */
+function recordAuthFailure(ip: string): void {
+  const now = Date.now();
+  const rec = authFailureMap.get(ip);
+  if (!rec || now - rec.windowStart >= AUTH_WINDOW_MS) {
+    // No record yet, or previous window has expired — start a fresh one.
+    authFailureMap.set(ip, { failures: 1, windowStart: now });
+  } else {
+    rec.failures += 1;
+  }
+}
+
 // POST /api/ssh/terminal/auth
 // Accetta { tcUsername, tcPassword }, verifica le credenziali Linux del TC
 // via SSH password auth sul bridge CF, restituisce { token } firmato.
 // Non richiede sessione BikerLink: è l'endpoint di accesso TC-native.
 router.post("/terminal/auth", async (req: Request, res: Response) => {
+  const clientIp = getTrustedClientIp(req) ?? req.ip ?? "unknown";
+
+  // Check lockout BEFORE doing anything else, so locked IPs get a fast 429
+  // and cannot probe whether a particular username exists.
+  if (isAuthLockedOut(clientIp)) {
+    return res.status(429).json({
+      error: "Troppi tentativi falliti. Riprova tra 15 minuti.",
+    });
+  }
+
   const body = req.body as { tcUsername?: unknown; tcPassword?: unknown };
   const tcUsername = typeof body.tcUsername === "string" ? body.tcUsername.trim() : "";
   const tcPassword = typeof body.tcPassword === "string" ? body.tcPassword : "";
@@ -318,6 +373,15 @@ router.post("/terminal/auth", async (req: Request, res: Response) => {
   try {
     const ok = await verifyTcCredentials(tcUsername, tcPassword);
     if (!ok) {
+      recordAuthFailure(clientIp);
+      // Re-check: if this failure just crossed the threshold, return 429 so
+      // the attacker gets the same response as on subsequent locked requests.
+      if (isAuthLockedOut(clientIp)) {
+        console.warn(`[ssh/terminal/auth] IP ${clientIp} bloccato dopo ${MAX_AUTH_FAILURES} tentativi falliti`);
+        return res.status(429).json({
+          error: "Troppi tentativi falliti. Riprova tra 15 minuti.",
+        });
+      }
       return res.status(401).json({ error: "Credenziali TC non valide" });
     }
     const token = signTcToken(tcUsername);
