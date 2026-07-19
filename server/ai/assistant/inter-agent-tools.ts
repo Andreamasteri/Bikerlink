@@ -55,10 +55,11 @@ export function buildBowieInterAgentTools(ctx: InterAgentToolContext): Record<st
   const tools: Record<string, unknown> = {
     call_horus: tool({
       description:
-        "Consulta Horus, lo specialista di percorsi, itinerari e navigazione moto, per una domanda " +
-        "specifica a metà conversazione. Ritorna la sua risposta perché tu la incorpori nella tua, " +
-        "senza passargli la conversazione. Usalo quando l'utente chiede il parere di Horus o la " +
-        "questione riguarda routing/itinerari/percorsi.",
+        "Consulta Horus, lo specialista di percorsi, per CALCOLARE o TROVARE un itinerario/percorso " +
+        "moto concreto, o quando l'utente chiede esplicitamente il parere di Horus su una strada o " +
+        "un giro. Usalo per richieste tipo 'pianificami un percorso', 'trova un itinerario', 'chiedi " +
+        "a Horus'. NON usarlo per domande su COME FUNZIONA o COME SI USA la funzione di pianificazione " +
+        "nell'app BikerLink: per quelle usa search_manual.",
       inputSchema: z.object({
         prompt: z.string().min(1).describe("La domanda da porre a Horus, chiara e autosufficiente."),
       }),
@@ -236,8 +237,9 @@ export function buildSearchManualTool(
         "Cerca per SIGNIFICATO (non per parole esatte) nella base di conoscenza Nadir: il manuale " +
         "scritto dagli admin, le conversazioni AI recenti e i commenti recenti degli utenti. Ritorna i " +
         "frammenti più pertinenti con la loro origine e un punteggio di similarità, perché tu li " +
-        "incorpori nella risposta. Usalo quando ti si chiede cosa dice il manuale, cosa ci si era detti, " +
-        "se ne avevate già parlato, o di cercare nella knowledge base.",
+        "incorpori nella risposta. Usalo quando ti si chiede: cosa dice il manuale, come si usa una " +
+        "funzione dell'app BikerLink, come funziona una feature (es. pianificazione, mappa, profilo), " +
+        "cosa ci si era detti, se ne avevate già parlato, o di cercare nella knowledge base.",
       inputSchema: z.object({
         query: z.string().min(1).describe("La domanda o il concetto da cercare per significato."),
         limit: z

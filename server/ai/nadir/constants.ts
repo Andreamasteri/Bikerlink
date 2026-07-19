@@ -112,5 +112,11 @@ export const MIN_FRAGMENT_CHARS = 12; // ignora frammenti troppo corti/rumore
 // el, tr): utenti non italofoni che chiedono "where is the button?" o
 // "was macht der Knopf?" vengono ora instradati verso search_manual invece di
 // ricevere una risposta inventata da Bowie.
+// Task #798 — estende i cue "how-to" dell'app alle domande di utilizzo
+// ("come funziona", "come si usa", "come faccio", "a cosa serve", "istruzioni").
+// Questi pattern coprivano il caso in cui CALL_HORUS_RE catturava "pianific\w*"
+// senza che search_manual fosse allegato, causando l'inoltro a Horus invece di
+// Nadir per domande sul manuale d'uso BikerLink. La regex è conservativa:
+// richiede parole d'uso-app ("si usa", "si fa", "funziona", ecc.) non generiche.
 export const SEARCH_MANUAL_RE =
-  /per\s+significato|\bmanuale\b|cosa\s+ti\s+avevo\s+detto|ne\s+avevamo\s+gi[àa]\s+parlato|come\s+avevamo\s+detto|knowledge\s*base|base\s+di\s+conoscenza|\btasto\b|\bpulsante\b|\bbotton[ei]\b|dove\s+tr[ou]v|\bbutton\b|where\s+is\s+the|what\s+does\s+the|\bKnopf\b|\bTaste\b|\bSchaltfl[äa]che\b|wo\s+ist\s+der|was\s+macht\s+der|\bbot[oó]n\b|d[oó]nde\s+est[aá]|qu[eé]\s+hace|\bbouton\b|o[uù]\s+est\s+le|que\s+fait\s+le|κουμπί|πού\s+είναι|τι\s+κάνει|düğme|tuş\b|nerede\s+var|ne\s+yapar/i;
+  /per\s+significato|\bmanuale\b|cosa\s+ti\s+avevo\s+detto|ne\s+avevamo\s+gi[àa]\s+parlato|come\s+avevamo\s+detto|knowledge\s*base|base\s+di\s+conoscenza|\btasto\b|\bpulsante\b|\bbotton[ei]\b|dove\s+tr[ou]v|\bbutton\b|where\s+is\s+the|what\s+does\s+the|\bKnopf\b|\bTaste\b|\bSchaltfl[äa]che\b|wo\s+ist\s+der|was\s+macht\s+der|\bbot[oó]n\b|d[oó]nde\s+est[aá]|qu[eé]\s+hace|\bbouton\b|o[uù]\s+est\s+le|que\s+fait\s+le|κουμπί|πού\s+είναι|τι\s+κάνει|düğme|tuş\b|nerede\s+var|ne\s+yapar|come\s+(?:si\s+)?(?:usa\b|utiliz\w+|fa\b|imposta\w*|configur\w+|attiv\w+|disattiv\w+|abilit\w+|pianifica\b)|come\s+funziona\b|come\s+(?:faccio|posso)\b|a\s+cosa\s+serve|spiegami\s+(?:come|cosa)|istruzion\w+|how\s+(?:do\s+I\b|to\s+use\b|does\s+\w+\s+work|can\s+I\b)|wie\s+(?:benutze|funktioniert|kann\s+ich)\b|comment\s+(?:utiliser|ça\s+marche|fonctionne)\b|cómo\s+(?:usar|usar|funciona|puedo)\b/i;
