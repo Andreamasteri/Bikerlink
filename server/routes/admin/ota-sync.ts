@@ -9,7 +9,7 @@ import { writeWatchdogLog } from "../../ai/watchdog/log";
 export const EAS_PROJECT_ID = "a25192d7-72e5-46af-97d0-2d38ed9b78e3";
 const EAS_GRAPHQL_URL = "https://api.expo.dev/graphql";
 
-export async function easGraphQL(query: string, variables?: Record<string, unknown>): Promise<unknown> {
+export async function easGraphQL(query: string, variables?: Record<string, unknown>, signal?: AbortSignal): Promise<unknown> {
   const token = process.env.EAS_TOKEN ?? process.env.EXPO_TOKEN;
   if (!token) throw new Error("EAS_TOKEN / EXPO_TOKEN non configurato");
   const res = await fetch(EAS_GRAPHQL_URL, {
@@ -19,6 +19,7 @@ export async function easGraphQL(query: string, variables?: Record<string, unkno
       "Authorization": `Bearer ${token}`,
     },
     body: JSON.stringify({ query, variables }),
+    signal,
   });
   if (!res.ok) {
     let body = "";
@@ -35,7 +36,7 @@ export async function easGraphQL(query: string, variables?: Record<string, unkno
 // Sincronizza il branch EAS `production` nel DB locale per tracking admin.
 // Task #2503: i nuovi update sincronizzati da EAS finiscono come `pending`.
 // Usa paginazione (limit 100 per pagina) per recuperare tutti gli update.
-export async function syncProductionUpdates(): Promise<{ inserted: number; backfilled: number }> {
+export async function syncProductionUpdates(signal?: AbortSignal): Promise<{ inserted: number; backfilled: number }> {
   const PAGE_LIMIT = 100;
 
   type EasUpdate = { id: string; group?: string; message?: string; runtimeVersion?: string; createdAt?: string };
@@ -64,9 +65,10 @@ export async function syncProductionUpdates(): Promise<{ inserted: number; backf
   const updates: EasUpdate[] = [];
   let offset = 0;
   while (true) {
+    signal?.throwIfAborted();
     let data: EasData;
     try {
-      data = await easGraphQL(pageQuery, { appId: EAS_PROJECT_ID, offset, limit: PAGE_LIMIT }) as EasData;
+      data = await easGraphQL(pageQuery, { appId: EAS_PROJECT_ID, offset, limit: PAGE_LIMIT }, signal) as EasData;
     } catch (err) {
       console.warn("[ota-sync] EAS GraphQL error:", err);
       throw err;
@@ -220,14 +222,36 @@ const SYNC_TTL_MS = 60_000;
 let _lastSyncAt = 0;
 let _syncInFlight: Promise<{ inserted: number; backfilled: number }> | null = null;
 
+const BACKGROUND_SYNC_TIMEOUT_MS = 60_000;
+
 // Innesca il sync EAS in background senza bloccare il chiamante.
 export function triggerSyncInBackground(): void {
   if (Date.now() - _lastSyncAt < SYNC_TTL_MS) return;
   if (_syncInFlight) return;
-  _syncInFlight = syncProductionUpdates()
-    .then(() => { _lastSyncAt = Date.now(); return { inserted: 0, backfilled: 0 }; })
-    .catch((err) => { console.warn("[ota] background sync warning:", err); return { inserted: 0, backfilled: 0 }; })
-    .finally(() => { _syncInFlight = null; });
+
+  // AbortController propagates cancellation into fetch calls and the pagination
+  // loop inside syncProductionUpdates, so the underlying work actually stops
+  // rather than just the caller-side promise being abandoned.
+  const controller = new AbortController();
+  const timeoutHandle = setTimeout(() => {
+    console.warn(`[ota] background sync timed out after ${BACKGROUND_SYNC_TIMEOUT_MS / 1000}s — aborting`);
+    controller.abort(new Error(`background OTA sync timed out after ${BACKGROUND_SYNC_TIMEOUT_MS / 1000}s`));
+  }, BACKGROUND_SYNC_TIMEOUT_MS);
+
+  // _syncInFlight points at the real underlying promise; deduplication stays
+  // correct for the full duration of the actual work (not just until the timer fires).
+  _syncInFlight = syncProductionUpdates(controller.signal)
+    .then((result) => { _lastSyncAt = Date.now(); return result; })
+    .catch((err) => {
+      // On abort/timeout or other errors: do NOT update _lastSyncAt so the next
+      // scheduled tick can retry.
+      console.warn("[ota] background sync warning:", err);
+      return { inserted: 0, backfilled: 0 };
+    })
+    .finally(() => {
+      clearTimeout(timeoutHandle);
+      _syncInFlight = null;
+    });
 }
 
 // Forza un sync immediato resettando la cache TTL (usato dal POST /sync manuale).
