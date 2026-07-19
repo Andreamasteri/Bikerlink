@@ -430,10 +430,16 @@ export default function TerminalScreen() {
           onDelta: (d) => appendLineText(aiId, d),
           onDone: (done) => {
             if (done.persona) setLinePersona(aiId, done.persona);
-            setLineText(aiId, done.text);
+            // Task #849 — guard aggiuntivo lato client: se per qualsiasi
+            // ragione futura il backend invia done.text vuoto o solo spazio,
+            // il bubble NON resta muto — mostra un messaggio di errore chiaro.
+            const doneText = done.text?.trim()
+              ? done.text
+              : "⚠️ Nessuna risposta ricevuta — riprova.";
+            setLineText(aiId, doneText);
             historyRef.current.push(
               { role: "user", content: outMessage },
-              { role: "assistant", content: done.text },
+              { role: "assistant", content: doneText },
             );
           },
           onError: (e) => appendLineText(aiId, `\n! ${e.message}`),

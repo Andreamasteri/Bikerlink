@@ -411,8 +411,14 @@ router.post("/ai/assistant/message", requireUser, messageLimiter, async (req: Re
         payload: { actionId: a.actionId },
       });
     }
+    // Task #849 — guard: se il backend non produce testo (Ollama timeout, modello
+    // non caricato, TC offline con cloud fallback anch'esso muto) l'evento "done"
+    // non deve mai uscire con text:"" o il bubble resta vuoto e muto sul client.
+    const finalText = cleanText.trim()
+      ? cleanText
+      : "⚠️ Nessuna risposta ricevuta — riprova tra qualche istante.";
     send("done", {
-      text: cleanText,
+      text: finalText,
       provider: result.provider,
       model: result.model,
       costUsd: result.costUsd,
