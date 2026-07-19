@@ -67,6 +67,14 @@ vi.mock("@tanstack/react-query", () => ({
   useQuery: (...args: unknown[]) => useQueryMock(...args),
 }));
 
+// ── Mock: AdminCardErrorBoundary — pass-through per test ──────────────────
+// Il componente wrappa ThinkCentreEfficiencyCardInner con un ErrorBoundary;
+// nei test lo sostituiamo con un semplice pass-through in modo che
+// findHeader() trovi ancora il testID del componente interno.
+vi.mock("@/components/admin/AdminCardErrorBoundary", () => ({
+  AdminCardErrorBoundary: ({ children }: { children: React.ReactNode }) => children,
+}));
+
 import { ThinkCentreEfficiencyCard } from "@/components/admin/ThinkCentreEfficiencyCard";
 
 // ── Fixture payloads ──────────────────────────────────────────────────────
@@ -214,5 +222,31 @@ describe("ThinkCentreEfficiencyCard — resilienza alla shape del payload agente
     await mount();
     // Nessun crash; l'header è l'unica cosa resa.
     expect(findHeader()).toHaveLength(1);
+  });
+
+  it("5. remount con cache evicted (data=undefined, isLoading=false) — nessun TypeError anche espandendo", async () => {
+    // Simula il caso React Navigation: la cache viene svuotata durante un
+    // re-render forzato (es. errore di navigazione "ai-assistant-config"),
+    // useQuery ritorna data=undefined con isLoading=false (mount freddo dopo eviction).
+    // Il componente NON deve accedere a rawMetrics.loadAvg1 prima del guard.
+    useQueryMock.mockReturnValue({ data: undefined, isLoading: false, error: null });
+
+    await mount();
+    expect(findHeader()).toHaveLength(1);
+
+    // Espandere la card è il path che in passato scatenava il crash:
+    // la sezione CPU/RAM era raggiunta con metrics=null.
+    await expandCard();
+
+    // Nessuna sezione CPU deve apparire (metrics=null per assenza di data)
+    const allTexts = renderer!.root.findAll((n) => (n.type as unknown) === "Text");
+    const textContents = allTexts.map((n) => {
+      const c = n.props.children;
+      return Array.isArray(c) ? c.map(String).join("") : String(c ?? "");
+    });
+
+    expect(textContents.some((t) => t === "CPU")).toBe(false);
+    // Il banner offline è mostrato quando data è undefined (online=false)
+    expect(textContents.some((t) => t.toLowerCase().includes("offline"))).toBe(true);
   });
 });

@@ -4,6 +4,7 @@ import { MaterialCommunityIcons, Ionicons } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
 import Colors from "@/constants/colors";
 import { getApiUrl, authFetchHeaders } from "@/lib/query-client";
+import { AdminCardErrorBoundary } from "@/components/admin/AdminCardErrorBoundary";
 
 interface FlatTCMetrics {
   online: true;
@@ -43,7 +44,7 @@ function formatUptime(sec: number): string {
   return `${m}m`;
 }
 
-export function ThinkCentreEfficiencyCard() {
+function ThinkCentreEfficiencyCardInner() {
   const [collapsed, setCollapsed] = useState(true);
 
   const { data, isLoading, error } = useQuery<MetricsResponse>({
@@ -195,6 +196,14 @@ export function ThinkCentreEfficiencyCard() {
         </>
       )}
     </View>
+  );
+}
+
+export function ThinkCentreEfficiencyCard() {
+  return (
+    <AdminCardErrorBoundary label="ThinkCentre — dati non disponibili">
+      <ThinkCentreEfficiencyCardInner />
+    </AdminCardErrorBoundary>
   );
 }
 
