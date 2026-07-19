@@ -37,8 +37,8 @@
 // - Nessun ramo è fatale: il bridge non deve mai impedire il boot.
 // =============================================================================
 
-import { spawn, type ChildProcess } from "node:child_process";
-import { existsSync } from "node:fs";
+import { spawn, execFileSync, type ChildProcess } from "node:child_process";
+import { existsSync, writeFileSync, chmodSync } from "node:fs";
 import { createConnection } from "node:net";
 import path from "node:path";
 
@@ -151,15 +151,86 @@ export function parseExitReason(
   return "unknown";
 }
 
-function resolveBin(): string | null {
+/**
+ * Path del binario cloudflared risolto in questa sessione del processo.
+ * `undefined` = non ancora risolto; `null` = risoluzione fallita (no-op).
+ */
+let _resolvedBinCache: string | null | undefined = undefined;
+
+/**
+ * Risolve il path del binario cloudflared con fallback progressivo:
+ *  1. CLOUDFLARED_BIN env override
+ *  2. bin/cloudflared nel cwd (baked dal deploy-build)
+ *  3. cloudflared nel PATH di sistema
+ *  4. Download on-demand da GitHub releases in /tmp/cloudflared-<arch>
+ *
+ * Idempotente: il risultato viene cachato per l'intera vita del processo, quindi
+ * il download avviene al massimo una volta per sessione.
+ * Ritorna `null` se tutte le strade falliscono → il bridge resta no-op.
+ */
+async function resolveCloudflaredBin(): Promise<string | null> {
+  if (_resolvedBinCache !== undefined) return _resolvedBinCache;
+
+  // 1. Override esplicito tramite env.
   const explicit = process.env.CLOUDFLARED_BIN?.trim();
-  if (explicit) return existsSync(explicit) ? explicit : null;
-  // Default: binario baked dal deploy-build (./bin/cloudflared), poi PATH.
+  if (explicit) {
+    if (existsSync(explicit)) {
+      console.log(`[redis-tunnel] cloudflared trovato (CLOUDFLARED_BIN): ${explicit}`);
+      _resolvedBinCache = explicit;
+      return explicit;
+    }
+    console.warn(`[redis-tunnel] CLOUDFLARED_BIN="${explicit}" non trovato su disco — ignorato`);
+  }
+
+  // 2. Binario baked dal deploy-build.
   const baked = path.resolve(process.cwd(), "bin", "cloudflared");
-  if (existsSync(baked)) return baked;
-  // Lascia che spawn risolva dal PATH; se assente, spawn emette ENOENT che
-  // gestiamo come no-op.
-  return "cloudflared";
+  if (existsSync(baked)) {
+    console.log(`[redis-tunnel] cloudflared trovato (baked): ${baked}`);
+    _resolvedBinCache = baked;
+    return baked;
+  }
+
+  // 3. Cerca nel PATH.
+  try {
+    const found = execFileSync("which", ["cloudflared"], { encoding: "utf8" }).trim();
+    if (found) {
+      console.log(`[redis-tunnel] cloudflared trovato nel PATH: ${found}`);
+      _resolvedBinCache = found;
+      return found;
+    }
+  } catch {
+    // non presente nel PATH
+  }
+
+  // 4. Download on-demand da GitHub releases.
+  const arch = process.arch === "arm64" ? "arm64" : "amd64";
+  const tmpPath = `/tmp/cloudflared-${arch}`;
+
+  // Se già scaricato in una sessione precedente del container, riusa.
+  if (existsSync(tmpPath)) {
+    console.log(`[redis-tunnel] cloudflared già scaricato (riuso): ${tmpPath}`);
+    _resolvedBinCache = tmpPath;
+    return tmpPath;
+  }
+
+  const url = `https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-${arch}`;
+  console.log(`[redis-tunnel] cloudflared non trovato — download da ${url} ...`);
+
+  try {
+    const response = await fetch(url);
+    if (!response.ok) throw new Error(`HTTP ${response.status} ${response.statusText}`);
+    const buffer = await response.arrayBuffer();
+    writeFileSync(tmpPath, Buffer.from(buffer));
+    chmodSync(tmpPath, 0o755);
+    console.log(`[redis-tunnel] cloudflared scaricato in ${tmpPath} (${buffer.byteLength} byte)`);
+    _resolvedBinCache = tmpPath;
+    return tmpPath;
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.warn(`[redis-tunnel] download cloudflared fallito: ${msg} — bridge no-op`);
+    _resolvedBinCache = null;
+    return null;
+  }
 }
 
 /** Probe TCP best-effort sul listener locale: true se accetta connessioni. */
@@ -180,11 +251,11 @@ function probeLocalPort(port: number, timeoutMs = 1_000): Promise<boolean> {
   });
 }
 
-function spawnBridge(): void {
+async function spawnBridge(): Promise<void> {
   if (shuttingDown) return;
-  const bin = resolveBin();
+  const bin = await resolveCloudflaredBin();
   if (!bin) {
-    state.lastError = "cloudflared binary not found (CLOUDFLARED_BIN/bin/cloudflared)";
+    state.lastError = "cloudflared binary not found or download failed";
     console.warn(`[redis-tunnel] ${state.lastError} — bridge disattivato, uso fallback diretto`);
     return;
   }
@@ -320,7 +391,9 @@ export async function startRedisTunnel(waitMs = 8_000): Promise<boolean> {
   state.hostname = hostname;
   state.localPort = parseInt(process.env.REDIS_TUNNEL_LOCAL_PORT ?? "16379", 10) || 16379;
 
-  spawnBridge();
+  // Await la prima chiamata in modo che il download (se necessario) completi prima
+  // di iniziare il polling del listener locale.
+  await spawnBridge();
 
   // Attende che il listener locale accetti connessioni (best-effort).
   const deadline = Date.now() + waitMs;
