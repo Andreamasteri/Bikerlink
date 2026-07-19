@@ -52,6 +52,24 @@ fi
 
 SCRIPT_START_EPOCH=$(date -u +%s)
 BUILD_START=$(date -u '+%H:%M:%SZ')
+
+# ── Pre-flight: step-numbering integrity gate ────────────────────────────────
+# Verifica che i label [N/TOTAL] in questo file siano sequenziali, senza
+# duplicati, e che il TOTAL corrisponda al numero effettivo di step.
+# Viene eseguito QUI, prima di qualsiasi step distruttivo (pulizia filesystem),
+# così un TOTAL stantio viene rilevato prima di rimuovere .git/ o .local/state/.
+# Questo gate è la stessa logica verificata dal workflow `check-deploy-build-step-numbers`
+# ma cablata nel deploy stesso come secondo livello di difesa.
+PRE_STEP_NUMBERS_EXIT=0
+bash scripts/check-deploy-build-step-numbers.sh 2>&1 || PRE_STEP_NUMBERS_EXIT=$?
+if [ "$PRE_STEP_NUMBERS_EXIT" -ne 0 ]; then
+  echo "[deploy pre-flight] ❌ DEPLOY BLOCCATO — step numbering non valido in deploy-build.sh (exit ${PRE_STEP_NUMBERS_EXIT})."
+  echo "[deploy pre-flight]    Rinumera i label [N/TOTAL] sequenzialmente prima di fare deploy."
+  echo "[deploy pre-flight]    Dettagli: bash scripts/check-deploy-build-step-numbers.sh"
+  exit 1
+fi
+echo "[deploy pre-flight] ✅ Step numbering OK — deploy-build.sh ha label [N/TOTAL] coerenti."
+
 log "════════════════════════════════════════════════════════════"
 log " DEPLOY/PUBLISH — mappa delle 4 fasi:"
 log "   FASE 1/4 [piattaforma] security scan · copia dev→prod DB · install pacchetti"
