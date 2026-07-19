@@ -406,7 +406,7 @@ export async function startRedisTunnel(waitMs = 8_000): Promise<boolean> {
   }
   console.warn(
     `[redis-tunnel] listener locale non pronto entro ${waitMs}ms — proseguo comunque ` +
-    `(il monitor TC riproverà reInitRedis quando la probe Redis passa)`,
+    `(il monitor TC chiama reInitRedis non appena la probe DragonflyDB torna true)`,
   );
   return false;
 }

@@ -178,6 +178,14 @@ async function handlePerServiceNotifications(
       void recordHealthEvent(s.key, prevOk ? "ok" : "ko", currentOk ? "ok" : "ko");
     }
 
+    // Se la probe DragonflyDB torna OK (false → true), avvia reInit anche quando il TC
+    // non era "red" (altri servizi ancora up) — evita che ioredis resti disconnesso a
+    // tempo indeterminato dopo la race ECONNREFUSED al boot del bridge cloudflared.
+    if (s.key === "dragonfly" && prevOk === false && currentOk === true) {
+      void reInitRedis();
+      console.log("[thinkcentre-monitor] DragonflyDB probe tornata OK — reInit avviato");
+    }
+
     if (!pushEnabled) continue;
     if (prevOk === false && currentOk === false) continue;
     if (currentOk) continue;
