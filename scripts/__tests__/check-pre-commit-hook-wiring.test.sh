@@ -29,6 +29,7 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 GATE_SCRIPT="$PROJECT_ROOT/scripts/check-pre-commit-hook-wiring.sh"
 GATE_MARKER="check-deploy-build-step-numbers.sh"
 GATE_MARKER_2="check-large-files-limit-sync.sh"
+GATE_MARKER_3="check-replit-ports.sh"
 
 PASS=0
 FAIL=0
@@ -150,12 +151,12 @@ fi
 
 # ──────────────────────────────────────────────────────────────────────────────
 echo ""
-echo "── Test (d): happy path — hook presente, eseguibile e con entrambi i GATE_MARKER → exit 0"
+echo "── Test (d): happy path — hook presente, eseguibile e con tutti i GATE_MARKER → exit 0"
 # ──────────────────────────────────────────────────────────────────────────────
 TMPDIR_D="$(make_temp_repo)"
 mkdir -p "$TMPDIR_D/.git/hooks"
-# Hook presente, eseguibile e contiene entrambi i GATE_MARKER
-printf '#!/usr/bin/env bash\nbash scripts/%s\nbash scripts/%s\n' "$GATE_MARKER" "$GATE_MARKER_2" > "$TMPDIR_D/.git/hooks/pre-commit"
+# Hook presente, eseguibile e contiene tutti e tre i GATE_MARKER
+printf '#!/usr/bin/env bash\nbash scripts/%s\nbash scripts/%s\nbash scripts/%s\n' "$GATE_MARKER" "$GATE_MARKER_2" "$GATE_MARKER_3" > "$TMPDIR_D/.git/hooks/pre-commit"
 chmod +x "$TMPDIR_D/.git/hooks/pre-commit"
 
 EXIT_D=0
@@ -209,6 +210,41 @@ if echo "$OUTPUT_F" | grep -q "LIMIT-SYNC"; then
 else
   nok "hook stale (limit-sync mancante): messaggio 'LIMIT-SYNC' assente nell'output"
   echo "     Output ricevuto: $(echo "$OUTPUT_F" | head -5)"
+fi
+
+# ──────────────────────────────────────────────────────────────────────────────
+echo ""
+echo "── Test (g): hook stale — ha $GATE_MARKER e $GATE_MARKER_2 ma manca $GATE_MARKER_3 → exit 1 con messaggio STALE"
+# ──────────────────────────────────────────────────────────────────────────────
+TMPDIR_G="$(make_temp_repo)"
+mkdir -p "$TMPDIR_G/.git/hooks"
+# Hook presente ed eseguibile, ha i primi due gate ma NON il gate replit-ports
+printf '#!/usr/bin/env bash\nbash scripts/%s\nbash scripts/%s\n' \
+  "$GATE_MARKER" "$GATE_MARKER_2" > "$TMPDIR_G/.git/hooks/pre-commit"
+chmod +x "$TMPDIR_G/.git/hooks/pre-commit"
+
+EXIT_G=0
+OUTPUT_G="$(cd "$TMPDIR_G" && bash "$GATE_SCRIPT" 2>&1)" || EXIT_G=$?
+rm -rf "$TMPDIR_G"
+
+if [ "$EXIT_G" -eq 1 ]; then
+  ok "hook stale (replit-ports mancante): exit 1 (corretto)"
+else
+  nok "hook stale (replit-ports mancante): exit $EXIT_G invece di 1 — il gate non ha rilevato il ports gate mancante"
+fi
+
+if echo "$OUTPUT_G" | grep -q "STALE"; then
+  ok "hook stale (replit-ports mancante): messaggio 'STALE' presente nell'output"
+else
+  nok "hook stale (replit-ports mancante): messaggio 'STALE' assente nell'output"
+  echo "     Output ricevuto: $(echo "$OUTPUT_G" | head -5)"
+fi
+
+if echo "$OUTPUT_G" | grep -q "REPLIT-PORTS"; then
+  ok "hook stale (replit-ports mancante): messaggio specifica 'REPLIT-PORTS' presente nell'output"
+else
+  nok "hook stale (replit-ports mancante): messaggio 'REPLIT-PORTS' assente nell'output"
+  echo "     Output ricevuto: $(echo "$OUTPUT_G" | head -5)"
 fi
 
 # ──────────────────────────────────────────────────────────────────────────────

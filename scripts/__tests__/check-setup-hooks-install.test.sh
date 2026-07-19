@@ -129,6 +129,13 @@ STUB
 exit 0
 STUB
   chmod +x "$SANDBOX_DIR/scripts/check-large-files-limit-sync.sh"
+
+  # Stub per check-replit-ports.sh — gate non in esame
+  cat > "$SANDBOX_DIR/scripts/check-replit-ports.sh" << 'STUB'
+#!/bin/bash
+exit 0
+STUB
+  chmod +x "$SANDBOX_DIR/scripts/check-replit-ports.sh"
 }
 
 # ──────────────────────────────────────────────────────────────────────────────
