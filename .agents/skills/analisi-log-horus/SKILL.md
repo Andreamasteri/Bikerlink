@@ -53,6 +53,7 @@ HORUS_LOG_DIR=/tmp npx tsx scripts/horus-propose-tasks.ts
 **Distinguere gli errori:**
 - **Exit 254** (filesystem read-only) → usa `HORUS_LOG_DIR=/tmp`
 - **Exit 1** (ThinkCentre spento / Cloudflare Tunnel giù) → verifica che il TC sia online e Ollama in esecuzione
+- **HTTP 524** (Cloudflare timeout a 100s) → Horus è occupato su un altro job pesante (es. benchmark Bowie) oppure il bundle è troppo grande; attendi che Horus sia idle e riprova con `--only-internal --tail 50`
 
 **Nota**: i file plan `.local/tasks/horus-*.md` vengono scritti come prima — `.local/` è sempre scrivibile anche nella shell planner.
 
@@ -61,11 +62,34 @@ HORUS_LOG_DIR=/tmp npx tsx scripts/horus-propose-tasks.ts
 |---|---|---|
 | **Workflow** (raccomandato) | Pannello Workflows → "Triage Horus" | Scrive in `logs/`, nessun flag extra |
 | **Shell build** | `npx tsx scripts/log-analysis-horus.ts` | Workspace scrivibile, usa `logs/` |
-| **Shell planner** | `HORUS_LOG_DIR=/tmp HORUS_BACKLOG_DIR=/tmp npx tsx scripts/log-analysis-horus.ts` | `/tmp` sempre scrivibile |
+| **Shell planner** | `HORUS_LOG_DIR=/tmp HORUS_BACKLOG_DIR=/tmp npx tsx scripts/log-analysis-horus.ts --only-internal --tail 50` | `/tmp` sempre scrivibile; `--only-internal --tail 50` obbligatorio per restare nel budget token |
 
 > **Nota `HORUS_BACKLOG_DIR`**: controlla dove viene scritto `horus-backlog.json` (default: `.local/`). Senza questo flag, anche con `HORUS_LOG_DIR=/tmp` lo script tenta di scrivere il backlog in `.local/` — causando exit 254 nella shell planner.
 
+## Budget token e bundle overflow
+
+Il modello `qwen3:4b` su ThinkCentre ha un context budget effettivo di **~28k token**. Il bundle inviato a Horus varia molto in base ai flag usati:
+
+| Modalità | Token stimati | Note |
+|---|---|---|
+| Completo (no flag) | ~150k | GitHub Issues + Sentry + repo tree + DB + log — supera abbondantemente il budget |
+| `--only-internal` | ~106k | Nessuna fonte esterna, ma il bundle rimane oltre il budget |
+| `--only-internal --tail 50` | ~28–35k | ✅ Entro il budget; **unica combinazione sicura per la shell planner** |
+| `--only-internal --tail 100` | ~55–65k | Ancora oltre il budget; Horus potrebbe allucinare |
+
+**Sintomo di overflow / allucinazione**: quando il bundle supera il budget, `qwen3:4b` ignora il contesto BikerLink e produce testo non correlato. Lo script rileva `message.content` vuoto e usa `message.thinking` come fallback (ragionamento grezzo, non strutturato). Il risultato tipico è:
+
+```
+ℹ️  Nessun task trovato nel report
+```
+
+oppure un report privo delle sezioni `## PROBLEMI TROVATI` / `## TASK PROPOSTI DA HORUS`. In questo caso riduci il bundle con `--only-internal --tail 50` e riprova.
+
+---
+
 ## Step 0 — Pre-flight obbligatorio (prima di ogni chiamata Horus)
+
+> ⚠️ **Verifica che Horus sia IDLE prima di lanciare.** Se Horus sta già girando un job pesante (es. benchmark Bowie, full-app scan), il CF tunnel taglia la connessione a 100s con **HTTP 524** oppure il modello produce output allucinato per overload. Controlla lo stato prima di procedere.
 
 ```bash
 source scripts/ai-agent-access.sh
@@ -85,11 +109,11 @@ fi
 # Triage completo (tutte le fonti) + revisione architect + proposta task
 npx tsx scripts/log-analysis-horus.ts
 
-# Solo fonti interne (no GitHub, no Sentry, no repo tree)
+# Solo fonti interne (no GitHub, no Sentry, no repo tree) — bundle ridotto
 npx tsx scripts/log-analysis-horus.ts --only-internal
 
-# Più righe di log dal filesystem
-npx tsx scripts/log-analysis-horus.ts --tail 500
+# Solo fonti interne + log limitati a 50 righe — unica combinazione sicura per budget token
+npx tsx scripts/log-analysis-horus.ts --only-internal --tail 50
 
 # Dry-run: mostra il bundle che verrebbe inviato a Horus, non chiama niente
 npx tsx scripts/log-analysis-horus.ts --dry-run
@@ -97,8 +121,10 @@ npx tsx scripts/log-analysis-horus.ts --dry-run
 # Salta la fase di proposta formale (solo report + revisione architect)
 npx tsx scripts/log-analysis-horus.ts --no-propose
 
-# Combinabile
-npx tsx scripts/log-analysis-horus.ts --only-internal --tail 100 --dry-run
+# Shell planner: combinazione completa raccomandato (log /tmp, backlog separato, budget token ok)
+HORUS_LOG_DIR=/tmp HORUS_BACKLOG_DIR=/tmp npx tsx scripts/log-analysis-horus.ts \
+  --only-internal --tail 50 \
+  --backlog-file /tmp/horus-backlog-agent.json
 
 # Script companion (proposta task da un report già esistente)
 npx tsx scripts/horus-propose-tasks.ts
@@ -265,6 +291,8 @@ Salvata in `logs/horus-log-analysis-<timestamp>-architect.md`. Struttura:
 
 Gli script **non** interrogano `project_tasks` (tabella interna di Replit, non accessibile dal DB Postgres del progetto). Invece leggono il file `.local/horus-backlog.json`, che deve essere scritto dall'agente **prima** di ogni triage.
 
+> ⚠️ **Sovrascrittura automatica di `.local/horus-backlog.json`**: lo script legge anche i file `.local/tasks/*.md` e può sovrascrivere `.local/horus-backlog.json` con 2000+ voci estratte dai file plan. Se l'agente ha già scritto un backlog personalizzato in `.local/horus-backlog.json` prima del lancio, quel file verrà perso. **Workaround**: usa `--backlog-file /tmp/horus-backlog-agent.json` per passare il backlog dell'agente su un path separato che lo script non sovrascrive.
+
 ### Formato del file
 
 Il file può essere un array JSON di stringhe o un oggetto con campo `titles`:
@@ -281,12 +309,19 @@ oppure:
 
 ### Come scrivere il backlog (dall'agente)
 
-Prima di lanciare il triage, l'agente deve scrivere il file con i titoli dei task attivi:
+Prima di lanciare il triage, l'agente deve scrivere il file con i titoli dei task attivi. Per evitare la sovrascrittura, usa un path in `/tmp`:
 
 ```typescript
 // Leggi i task attivi con getProjectTasks() o dalla lista dei task correnti
 const titles = activeTasks.map(t => t.title);
-fs.writeFileSync(".local/horus-backlog.json", JSON.stringify(titles, null, 2));
+fs.writeFileSync("/tmp/horus-backlog-agent.json", JSON.stringify(titles, null, 2));
+```
+
+Poi lancia lo script con `--backlog-file`:
+
+```bash
+npx tsx scripts/log-analysis-horus.ts --only-internal --tail 50 \
+  --backlog-file /tmp/horus-backlog-agent.json
 ```
 
 ### Argomento CLI alternativo
@@ -317,7 +352,9 @@ La seconda chiamata Horus (revisione architect) può fallire per questi motivi �
 
 | Tipo errore | Log mostrato | Causa | Soluzione |
 |---|---|---|---|
-| `TIMEOUT` | `Tipo errore: TIMEOUT — il modello ha impiegato più di 300s` | qwen3:4b troppo lento, host sotto carico, o bundle troppo grande | Riduci il bundle con `--tail 200` o `--only-internal`; verifica che il ThinkCentre non sia sotto carico |
+| `TIMEOUT` | `Tipo errore: TIMEOUT — il modello ha impiegato più di 300s` | qwen3:4b troppo lento, host sotto carico, Horus occupato su altri job, o bundle troppo grande | Riduci il bundle con `--only-internal --tail 50`; attendi che Horus sia idle; verifica che il ThinkCentre non sia sotto carico |
+| `HTTP 524` | HTTP 524 da Cloudflare | Horus occupato su un altro job pesante oppure bundle troppo grande (CF taglia a 100s) | Attendi che Horus sia idle; riprova con `--only-internal --tail 50` |
+| `ARCHITECT FORMAT INVALIDO` | Report architect privo delle sezioni `## TASK VALIDATI` / `## TASK SCARTATI` | Bundle overflow → allucinazione: Horus ignora il contesto e produce testo non strutturato | Riduci il bundle con `--only-internal --tail 50`; verifica che Horus fosse idle al lancio |
 | `RETE (ECONNREFUSED)` | `Tipo errore: RETE (ECONNREFUSED) — host irraggiungibile` | ThinkCentre spento o Cloudflare Tunnel giù | Verifica che il TC sia acceso e il tunnel attivo |
 | `RETE (ENOTFOUND)` | `Tipo errore: RETE (ENOTFOUND) — host irraggiungibile` | DNS non risolve l'hostname in `HORUS_OLLAMA_URL` | Verifica il secret `HORUS_OLLAMA_URL` |
 | `HTTP` | `Tipo errore: HTTP — risposta non-200 dal server Ollama` | Ollama ha restituito un errore (es. 503, modello non caricato) | Verifica che Ollama sia in esecuzione e il modello `qwen3:4b` sia disponibile |
