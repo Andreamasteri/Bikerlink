@@ -80,6 +80,42 @@ log "Report: $REPORT_FILE"
   echo "---"
 } > "$REPORT_FILE"
 
+# ── STEP 0 — Smoke test produzione ──────────────────────────────────────────
+log "STEP 0 — Smoke test produzione (/api/health)"
+{
+  echo "## STEP 0 — Smoke test produzione"
+  echo ""
+} >> "$REPORT_FILE"
+
+SMOKE_OUTPUT=$(bash "$SCRIPT_DIR/smoke-test-prod.sh" 2>&1) || SMOKE_FAILED=1
+SMOKE_FAILED="${SMOKE_FAILED:-0}"
+
+if [ "$SMOKE_FAILED" -eq 1 ]; then
+  log "  ❌ Smoke test FALLITO — possibile probe leak o API non-JSON in produzione"
+  {
+    echo "### ❌ SMOKE TEST FALLITO"
+    echo ""
+    echo "Il check di \`https://bikerlink.replit.app/api/health\` ha rilevato un problema:"
+    echo ""
+    echo "\`\`\`"
+    echo "$SMOKE_OUTPUT"
+    echo "\`\`\`"
+    echo ""
+    echo "**Azione richiesta**: verificare che la porta 5000 (Express) sia mappata su externalPort 80 e che la porta 8081 (probe) non intercetti il traffico principale."
+    echo ""
+  } >> "$REPORT_FILE"
+else
+  log "  ✅ Smoke test OK — /api/health risponde JSON valido"
+  {
+    echo "### ✅ Smoke test OK"
+    echo ""
+    echo "\`\`\`"
+    echo "$SMOKE_OUTPUT"
+    echo "\`\`\`"
+    echo ""
+  } >> "$REPORT_FILE"
+fi
+
 # ── STEP 1 — Raccolta dati locali ────────────────────────────────────────────
 log "STEP 1 — Raccolta dimensioni directory (Repl layer)"
 {
