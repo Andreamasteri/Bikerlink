@@ -129,7 +129,7 @@ Quando il gate ratchet (Task #2584) è attivo e blocca un file LOCKED cresciuto,
 1. **Mai alzare il numero `<N>` dell'header LOCKED.** La baseline `<N>` può solo restare uguale o calare. Il ratchet rifiuta un `<N>` aumentato.
 2. **Mai rimuovere l'header LOCKED.** Rimuoverlo riapplica il default 800 → il file scatta sopra soglia → blocco. Equivale a chiedere lo split, va fatto solo con task esplicito utente.
 3. **Quando aggiungi codice a un file LOCKED, va nel companion path indicato nell'header.** Non in un altro file, non "appena 3 righe nel file esistente perché è più comodo".
-4. **Il companion file, quando creato, eredita il limite default 800.** Non può nascere già LOCKED a una dimensione alta — deve crescere naturalmente.
+4. **Il companion file, quando creato, eredita il limite default corrente (800, post-ratchet).** Non può nascere già LOCKED a una dimensione alta — deve crescere naturalmente. ⚠️ Nota: i companion già esistenti creati sotto la vecchia soglia 650 possono avere un limite inferiore a 800 — rispettare il limite dichiarato nell'header del file, non assumere sempre 800.
 5. **Vietato creare companion "fake"** (file vuoto con `export {}` per silenziare warning). Il companion nasce solo quando ha contenuto reale da ospitare.
 6. **Vietato cambiare il path companion suggerito** senza task esplicito utente. Il path è una convenzione vincolante.
 7. **Vietato spostare gli 8 file LOCKED in `.large-files-allow.txt`** per silenziarli definitivamente. ALLOW è riservato a categorie strutturali (i18n, dataset, asset, test); i file LOCKED sono debito tecnico temporaneo.
