@@ -6,12 +6,28 @@ import { writeWatchdogLog } from "../log";
 import { releaseLockZombie } from "./release-lock-zombie";
 import { clearCacheDegraded } from "./clear-cache-degraded";
 import { resetErrorWindow } from "./reset-error-window";
+import { rebuildIndexRule } from "./rebuild-index";
+import { restartWorkerRule } from "./restart-worker";
+import { scaleConcurrencyRule } from "./scale-concurrency";
 
+// Regole eseguite dallo scheduler/watchdog in modo AUTONOMO (cicli periodici e
+// /run-now). Solo operazioni SICURE e IDEMPOTENTI con trigger metrici chiari.
+// NON aggiungere qui operazioni ad alto impatto (rebuild index, restart worker,
+// scale concurrency) — quelle vanno in PROPOSAL_DISPATCH_RULES.
 const RULES: AutoFixRule[] = [
   releaseLockZombie,
   clearCacheDegraded,
   resetErrorWindow,
 ];
+
+// Regole eseguite SOLO quando un admin accetta esplicitamente una proposta Horus.
+// Queste azioni sono troppo impattanti per l'esecuzione autonoma: richiedono
+// approvazione umana. La chiave è l'ActionKind della proposta (action.kind).
+export const PROPOSAL_DISPATCH_RULES: Record<string, AutoFixRule> = {
+  rebuild_index:      rebuildIndexRule,
+  restart_worker:     restartWorkerRule,
+  scale_concurrency:  scaleConcurrencyRule,
+};
 
 export interface AutoFixOutcome {
   ruleId: string;

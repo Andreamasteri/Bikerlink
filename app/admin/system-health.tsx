@@ -159,9 +159,15 @@ export default function SystemHealthScreen() {
   const onAccept = async (id: string) => {
     setBusyProposalId(id);
     try {
-      await apiRequest("POST", `/api/admin/watchdog/proposals/${id}/accept`);
+      const resp = await apiRequest("POST", `/api/admin/watchdog/proposals/${id}/accept`);
+      const data = await resp.json() as { dispatch?: { autoApplied?: boolean; summary?: string; message?: string } | null };
       await qc.invalidateQueries({ queryKey: ["/api/admin/watchdog/logs?kind=proposal&limit=30"] });
-      Alert.alert("Proposta accettata", "Ricorda: l'azione resta MANUALE. Esegui tu il fix.");
+      const dispatch = data?.dispatch;
+      if (dispatch?.autoApplied) {
+        Alert.alert("✅ Fix applicato automaticamente", dispatch.summary ?? dispatch.message ?? "Operazione completata con successo.");
+      } else {
+        Alert.alert("Proposta accettata", "Ricorda: l'azione resta MANUALE. Esegui tu il fix.");
+      }
     } catch (err) {
       Alert.alert("Errore", (err as Error).message);
     } finally { setBusyProposalId(null); }

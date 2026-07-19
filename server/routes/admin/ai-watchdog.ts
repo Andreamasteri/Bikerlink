@@ -178,27 +178,43 @@ router.post("/watchdog/proposals/:id/accept", async (req, res) => {
   // (releaseLockZombie / clearCacheDegraded / resetErrorWindow) la eseguiamo
   // qui dopo l'accept. Per azioni non mappate o riskLevel="high" restiamo
   // manual-only e ritorniamo dispatch=null.
-  let dispatch: { action: string; applied: boolean; summary: string } | null = null;
+  let dispatch: { action: string; applied: boolean; autoApplied: boolean; summary: string; message: string } | null = null;
   try {
     const [row] = await db.select().from(aiWatchdogLog).where(eq(aiWatchdogLog.id, id)).limit(1);
     const details = (row?.details ?? {}) as Record<string, unknown>;
-    const action = typeof details.action === "string" ? details.action : null;
+    // Proposal logs store `action` as an object { kind, target, params } (Proposal type).
+    // Legacy logs may store it as a plain string. Support both.
+    const rawAction = details.action;
+    const action =
+      rawAction && typeof rawAction === "object" && typeof (rawAction as Record<string, unknown>).kind === "string"
+        ? (rawAction as Record<string, unknown>).kind as string
+        : typeof rawAction === "string"
+          ? rawAction
+          : null;
     const riskLevel = typeof details.riskLevel === "string" ? details.riskLevel : null;
     if (action && riskLevel !== "high") {
       const snap = getLatestSnapshot();
       if (snap) {
-        const { AUTO_FIX_RULES } = await import("../../ai/watchdog/auto-fix");
-        const rule = AUTO_FIX_RULES.find((r) => r.id === action);
+        // Usa il registro PROPOSAL_DISPATCH_RULES (solo accept-time) — NON
+        // AUTO_FIX_RULES (scheduler-driven) — per evitare esecuzione autonoma
+        // di operazioni ad alto impatto fuori dal controllo dell'admin.
+        const { PROPOSAL_DISPATCH_RULES } = await import("../../ai/watchdog/auto-fix");
+        const rule = PROPOSAL_DISPATCH_RULES[action];
         if (rule) {
           const out = await rule.run(snap);
+          const autoApplied = out.applied;
+          const summary = out.applied ? out.summary : out.reason;
           dispatch = {
             action,
             applied: out.applied,
-            summary: out.applied ? out.summary : out.reason,
+            autoApplied,
+            summary,
+            message: autoApplied ? `Fix applicato automaticamente: ${summary}` : "Azione manuale richiesta",
           };
         }
       }
     }
+    // Azioni non mappate a nessuna regola o manual_only: dispatch null → frontend mostra messaggio manuale.
   } catch (err) {
     console.warn("[watchdog] dispatch error (non-fatal):", err);
   }

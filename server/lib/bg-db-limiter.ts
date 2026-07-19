@@ -33,6 +33,19 @@ import { pool } from "../db";
 
 const BG_DB_MAX_CONCURRENCY = 3;
 
+// Task #877 — override temporaneo della concorrenza massima bg (usato da auto-fix
+// scale_concurrency). null = usa il valore di default BG_DB_MAX_CONCURRENCY.
+let _concurrencyOverride: number | null = null;
+
+/**
+ * Imposta un override temporaneo del limite di concorrenza bg-db.
+ * Passare null per ripristinare il valore di default (BG_DB_MAX_CONCURRENCY).
+ * Chiamato da auto-fix scale_concurrency con rollback automatico via setTimeout.
+ */
+export function setConcurrencyOverride(n: number | null): void {
+  _concurrencyOverride = n !== null ? Math.max(1, n) : null;
+}
+
 // ─── Fix 1: statement_timeout su connessioni bg ──────────────────────────────
 // Ogni connessione acquisita da withBgDbConnection riceve un timeout esplicito
 // di 12s. Postgres uccide la query e rilascia la connessione automaticamente:
@@ -150,7 +163,8 @@ function acquire(critical?: boolean): Promise<void> {
     return Promise.reject(new BgDbSlowKillSwitchError(dbSlowPingsConsecutive, BG_DB_SLOW_THRESHOLD));
   }
 
-  if (active < BG_DB_MAX_CONCURRENCY) {
+  const effectiveMax = _concurrencyOverride ?? BG_DB_MAX_CONCURRENCY;
+  if (active < effectiveMax) {
     active++;
     return Promise.resolve();
   }
@@ -180,15 +194,29 @@ function acquire(critical?: boolean): Promise<void> {
 }
 
 function release(): void {
-  // Trova il prossimo waiter ancora valido (non scaduto) e passagli lo slot.
+  // Il limite effettivo può essere abbassato dinamicamente da setConcurrencyOverride.
+  // Rispettare il nuovo limite: svegliare il prossimo waiter SOLO se active-1
+  // è ancora sotto il limite corrente; altrimenti decrementare active e basta,
+  // lasciando che il backlog si dreni naturalmente al ritmo del nuovo tetto.
+  const effectiveMax = _concurrencyOverride ?? BG_DB_MAX_CONCURRENCY;
   while (queue.length > 0) {
     const next = queue.shift()!;
     if (next.settled) continue; // già scaduto: salta, lo slot resta da assegnare
-    next.settled = true;
-    clearTimeout(next.timer);
-    // Passa lo slot direttamente al prossimo in coda: `active` resta invariato.
-    next.resolve();
-    return;
+    // active è ancora "in uso" (stiamo rilasciando): dopo il passaggio lo slot
+    // rimane occupato dal prossimo — active resta invariato solo se il tetto lo
+    // consente. Se active-1 < effectiveMax possiamo passare il token al waiter;
+    // altrimenti dobbiamo prima decrementare e non svegliare nessuno.
+    if (active - 1 < effectiveMax) {
+      next.settled = true;
+      clearTimeout(next.timer);
+      // Passa lo slot direttamente al prossimo in coda: `active` resta invariato.
+      next.resolve();
+      return;
+    }
+    // Il tetto dinamico è stato abbassato: non possiamo ammettere altri job ora.
+    // Rimettiamo il waiter in testa alla coda e usciamo decrementando active.
+    queue.unshift(next);
+    break;
   }
   active = Math.max(0, active - 1);
 }
@@ -289,7 +317,7 @@ export function getBgDbLimiterStats(): {
   return {
     active,
     queued: queue.length,
-    max: BG_DB_MAX_CONCURRENCY,
+    max: _concurrencyOverride ?? BG_DB_MAX_CONCURRENCY,
     maxQueue: BG_DB_MAX_QUEUE,
     droppedOverflowTotal,
     droppedTimeoutTotal,
