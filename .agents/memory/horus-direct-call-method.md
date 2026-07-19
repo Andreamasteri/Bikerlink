@@ -1,6 +1,6 @@
 ---
 name: Horus direct call method (analyst + architect)
-description: Come chiamare Horus e Horus-Architect direttamente dall'agente via curl/ShellExec per review task, con i limiti CF Access e i workaround.
+description: Come chiamare Horus e Horus-Architect direttamente dall'agente via curl/ShellExec per review task, con i limiti CF Access e i workaround streaming.
 ---
 
 # Horus — chiamata diretta dall'agente
@@ -15,14 +15,31 @@ CodeExecution **non funziona** per chiamare Horus direttamente:
 
 **→ Usare sempre ShellExec con curl.**
 
-## Limite critico: CF timeout a 100s
+## Fix CF 524 — usa sempre `stream: true`
 
 `HORUS_OLLAMA_URL`, `HORUS_ANALYSIS_URL` e `HORUS_HUB_URL` sono tutti dietro Cloudflare.
-CF taglia la connessione dopo ~100s con HTTP 524 (origin timeout).
+Con `stream: false` Ollama genera l'intera risposta prima di mandare il primo byte HTTP.
+Con `qwen3:4b` e prompt da 100-200 parole la generazione richiede 60-90s.
+CF vede il tunnel silenzioso per ≥ 100s → taglia con **HTTP 524** (origin timeout).
 
-Con `think: false` e `qwen3:4b`, la risposta arriva in ~60-90s se `num_predict ≤ 700`.
+**La soluzione: `stream: true`.**
+In streaming il primo token arriva in 2-5s (i modelli sono già in VRAM, `keep_alive:-1`).
+CF riceve dati immediatamente → l'idle timeout si azzera ad ogni chunk → la connessione
+rimane viva per tutta la durata della generazione, indipendentemente da quanto tempo richieda.
 
-**Regola:** `num_predict` ≤ 600 per l'analyst, ≤ 700 per l'architect. Prompt brevi (< 300 parole).
+**Non serve più limitare `num_predict`** come workaround al timeout — il limite artificiale
+è rimosso. Usare valori generosi (800-1600) per risposta completa.
+
+## CF Tunnel — configurazione timeout (azione manuale one-time)
+
+Per sicurezza strutturale, configurare anche l'`httpResponseTimeout` nel dashboard CF:
+
+**Percorso:** Zero Trust → Networks → Tunnels → `[tunnel bikerlink]` → Edit →
+Public Hostname → hostname Ollama (`ollama.biker-link.net`) → Additional application settings →
+HTTP Response Timeout → **300s**
+
+Questo è un fallback per quando il TC è sotto carico e il primo token tarda >100s.
+Con lo streaming attivo è raramente necessario, ma elimina la causa strutturale.
 
 ## Segreti necessari
 
@@ -51,36 +68,50 @@ print('Models:', [m['name'] for m in d.get('models', [])])
 Interpretazione risposta:
 - Lista modelli → TC online ✅
 - Pagina HTML CF Access (403) → secret CF sbagliati o tunnel giù
-- HTTP 524 / timeout shell → CF ha tagliato (prompt troppo lungo o TC molto lento)
-- JSON vuoto o errore JSON → risposta troncata, riduci `num_predict`
+- HTTP 524 / timeout shell → CF ha tagliato (TC molto lento o tunnel non risponde)
 - Risposta vuota → TC offline
 
-## Template curl — Analyst
+## Template curl — Analyst (streaming NDJSON)
 
 ```bash
-PROMPT='Il tuo prompt conciso qui (< 200 parole)'
+PROMPT='Il tuo prompt conciso qui (fino a 500 parole)'
 
-curl -s --max-time 90 \
+curl -s --no-buffer --max-time 300 \
   -H "Content-Type: application/json" \
   -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" \
   -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET" \
   -H "Authorization: Bearer $HORUS_OLLAMA_TOKEN" \
   -d "{
     \"model\": \"${HORUS_OLLAMA_MODEL:-qwen3:4b}\",
-    \"stream\": false,
+    \"stream\": true,
     \"think\": false,
-    \"options\": {\"num_predict\": 600},
+    \"options\": {\"num_predict\": 1200},
     \"messages\": [{\"role\": \"user\", \"content\": $(echo "$PROMPT" | python3 -c 'import sys,json; print(json.dumps(sys.stdin.read()))')}]
   }" \
   "$HORUS_OLLAMA_URL/api/chat" | python3 -c "
 import sys, json, re
-d = json.loads(sys.stdin.read())
-c = d.get('message', {}).get('content', '') or d.get('response', '')
-print(re.sub(r'<think>.*?</think>', '', c, flags=re.DOTALL).strip())
+chunks = []
+for line in sys.stdin:
+    line = line.strip()
+    if not line:
+        continue
+    try:
+        d = json.loads(line)
+        chunk = d.get('message', {}).get('content', '') or ''
+        if chunk:
+            chunks.append(chunk)
+    except Exception:
+        pass
+text = ''.join(chunks)
+# Strip <think>...</think> completo
+text = re.sub(r'<think>[\s\S]*?</think>', '', text)
+# Strip orphan closing </think> e tutto ciò che precede (qwen3 omette il tag di apertura)
+text = re.sub(r'^[\s\S]*?</think>\s*', '', text)
+print(text.strip())
 "
 ```
 
-## Template curl — Architect (sequenziale dopo analyst)
+## Template curl — Architect (streaming NDJSON, sequenziale dopo analyst)
 
 ```bash
 # Salva prima l'output dell'analyst in ANALYST_OUTPUT
@@ -93,30 +124,46 @@ PROMPT="Sei Horus-Architect BikerLink. Revisiona architetturalmente questo piano
 
 ANALYST: $ANALYST_OUTPUT"
 
-curl -s --max-time 90 \
+curl -s --no-buffer --max-time 300 \
   -H "Content-Type: application/json" \
   -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" \
   -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET" \
   -H "Authorization: Bearer $HORUS_OLLAMA_TOKEN" \
-  -d "{\"model\":\"${HORUS_OLLAMA_MODEL:-qwen3:4b}\",\"stream\":false,\"think\":false,\"options\":{\"num_predict\":700},\"messages\":[{\"role\":\"user\",\"content\":$(echo "$PROMPT" | python3 -c 'import sys,json; print(json.dumps(sys.stdin.read()))')}]}" \
+  -d "{\"model\":\"${HORUS_OLLAMA_MODEL:-qwen3:4b}\",\"stream\":true,\"think\":false,\"options\":{\"num_predict\":1000},\"messages\":[{\"role\":\"user\",\"content\":$(echo "$PROMPT" | python3 -c 'import sys,json; print(json.dumps(sys.stdin.read()))')}]}" \
   "$HORUS_OLLAMA_URL/api/chat" | python3 -c "
 import sys, json, re
-d = json.loads(sys.stdin.read())
-c = d.get('message', {}).get('content', '') or d.get('response', '')
-print(re.sub(r'<think>.*?</think>', '', c, flags=re.DOTALL).strip())
+chunks = []
+for line in sys.stdin:
+    line = line.strip()
+    if not line:
+        continue
+    try:
+        d = json.loads(line)
+        chunk = d.get('message', {}).get('content', '') or ''
+        if chunk:
+            chunks.append(chunk)
+    except Exception:
+        pass
+text = ''.join(chunks)
+text = re.sub(r'<think>[\s\S]*?</think>', '', text)
+text = re.sub(r'^[\s\S]*?</think>\s*', '', text)
+print(text.strip())
 "
 ```
 
 ## Flusso consigliato per review task
 
 1. Verifica TC online (`/api/tags`, `--max-time 10`)
-2. Chiama analyst con prompt breve (< 200 parole, `num_predict 600`)
+2. Chiama analyst con prompt (fino a 500 parole, `num_predict 1200`, stream:true)
 3. Salva output analyst in variabile bash
-4. Chiama architect con output analyst come contesto (`num_predict 700`)
-5. Se l'architect tima out per CF (524), sintetizza tu basandoti sull'analyst
+4. Chiama architect con output analyst come contesto (`num_predict 1000`, stream:true)
 
 ## Note su HORUS_ANALYSIS_URL e HORUS_HUB_URL
 
-Entrambi i secret puntano a domini CF (`analysis.biker-link.net`, `hub.biker-link.net`) con lo stesso timeout a 100s. Non bypassano il limite CF. Usarli non risolve il problema.
+Entrambi i secret puntano a domini CF con lo stesso problema di timeout.
+Con `stream: true` il problema è risolto per entrambi — il primo token azzera l'idle timer CF.
 
-**Why:** CF timeout 100s è il vincolo dominante per qualsiasi chiamata diretta a Horus dall'agente. La qualità della risposta degrada se il prompt è lungo (il modello usa più token per ragionare). Prompt brevi + `think:false` + `num_predict` contenuto è l'unico modo per restare sotto il limite.
+**Why:** con `stream: false` CF vede connessione silenziosa → 524 dopo ~100s.
+Con `stream: true` il primo token arriva in 2-5s → CF mantiene viva la connessione
+per tutta la durata della generazione. Il vincolo `num_predict ≤ 700` era un workaround
+temporaneo al timeout, non più necessario.
