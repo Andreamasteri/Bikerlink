@@ -76,7 +76,13 @@ After DNS recovered, cloudflared resumed normally without any config change. Cur
 
 **Diagnosis pattern**: `journalctl -u cloudflared | grep 'server misbehaving\|i/o timeout\|edge discovery'` immediately shows DNS as cause. If this line appears on code=1, it's DNS — NOT auth.
 
-**Mitigation to apply at next TC maintenance**: Add `Environment=TUNNEL_DNS_UPSTREAM=https://1.1.1.1/dns-query` to the cloudflared systemd unit so it bypasses the `127.0.0.53` stub and hits 1.1.1.1 DoH directly. See: https://developers.cloudflare.com/1.1.1.1/setup/
+**FIXED Jul 2026**: `/etc/systemd/system/cloudflared.service` now has:
+- `Environment=TUNNEL_DNS_UPSTREAM=https://1.1.1.1/dns-query` — bypasses stub 127.0.0.53, hits 1.1.1.1 DoH directly for argotunnel.com SRV lookups
+- `Environment=TUNNEL_GRACE_PERIOD=30s` — extra headroom for transient DNS/network blips
+
+**Verified**: after fix, `sudo systemctl restart systemd-resolved` leaves cloudflared PID unchanged (same process, zero restarts). DNS precheck logs show "DNS Resolved successfully" for both region1/region2.argotunnel.com on each cloudflared start.
+
+**How to restart cloudflared from Replit** (SSH session goes through the tunnel itself): use `sudo systemd-run --on-active=5s systemctl restart cloudflared` so the SSH command exits before the tunnel drops.
 
 ## Verification pattern
 Test with the exact same headers the app probe code sends (`cfAccessHeaders()` +
