@@ -193,6 +193,40 @@ describe("Task #737 — callOllamaChat stream:true", () => {
     expect(result).toBe("Risposta diretta senza think block.");
   });
 
+  // ── Task #742 — guard per interfaccia SDK che cambia ────────────────────────
+
+  it("lancia esplicitamente se textStream è undefined (SDK che rinomina il campo)", async () => {
+    // Simula un SDK che non espone più textStream (es. lo rinomina in stream)
+    mockStreamText.mockResolvedValue({ /* textStream assente */ });
+
+    const { callOllamaChat } = await import("../lib/ollama-client");
+    await expect(
+      callOllamaChat("test prompt", undefined, { stream: true, persona: "bowie" }),
+    ).rejects.toThrow("[Ollama stream] result.textStream non è un AsyncIterable");
+  });
+
+  it("lancia esplicitamente se textStream è un ReadableStream (non AsyncIterable)", async () => {
+    // Simula un SDK che sostituisce textStream con un ReadableStream (nessun Symbol.asyncIterator)
+    const fakeReadableStream = { getReader: () => ({}) }; // non ha Symbol.asyncIterator
+    mockStreamText.mockResolvedValue({ textStream: fakeReadableStream });
+
+    const { callOllamaChat } = await import("../lib/ollama-client");
+    await expect(
+      callOllamaChat("test prompt", undefined, { stream: true, persona: "bowie" }),
+    ).rejects.toThrow("[Ollama stream] result.textStream non è un AsyncIterable");
+  });
+
+  it("lancia esplicitamente se textStream è esaurito senza emettere token (risposta vuota silenziosa)", async () => {
+    // Un AsyncIterable che non produce nessun chunk — il loop finirebbe con text=""
+    async function* emptyStream(): AsyncIterable<string> { /* nessun yield */ }
+    mockStreamText.mockResolvedValue({ textStream: emptyStream() });
+
+    const { callOllamaChat } = await import("../lib/ollama-client");
+    await expect(
+      callOllamaChat("test prompt", undefined, { stream: true, persona: "bowie" }),
+    ).rejects.toThrow("[Ollama stream] textStream esaurito senza emettere token");
+  });
+
   it("passa stream:false al path generateText senza schema (regression guard)", async () => {
     const text = "Risposta non-streaming.";
     mockGenerateText.mockResolvedValue({ text });

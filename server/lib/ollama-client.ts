@@ -333,10 +333,33 @@ export async function callOllamaChat<T = string>(
     // evitando il 524 su sintesi lunghe (SYNTHESIS_NUM_PREDICT=6000, SECTION_NUM_PREDICT=7000).
     if (useStream) {
       const result = await streamText({ model, system, prompt, temperature, maxRetries, abortSignal, providerOptions });
+
+      // Task #742 — Guard: verifica che result.textStream sia un AsyncIterable prima di
+      // iterare. Se il SDK rinomina textStream, lo sostituisce con un ReadableStream, o
+      // non lo popola, il loop produrrebbe silenziosamente "" senza segnalare nulla.
+      // Lanciamo esplicitamente così il chiamante scala al provider cloud.
+      if (
+        result.textStream == null ||
+        typeof (result.textStream as unknown as Record<symbol, unknown>)[Symbol.asyncIterator] !== "function"
+      ) {
+        throw new Error(
+          "[Ollama stream] result.textStream non è un AsyncIterable: il SDK potrebbe aver cambiato interfaccia.",
+        );
+      }
+
       let text = "";
       for await (const chunk of result.textStream) {
         text += chunk;
       }
+
+      // Guard: se il testo è vuoto il modello non ha emesso nessun token. Lanciamo
+      // esplicitamente invece di ritornare "" che il chiamante non distingue da un errore.
+      if (!text) {
+        throw new Error(
+          "[Ollama stream] textStream esaurito senza emettere token: risposta vuota.",
+        );
+      }
+
       // Per horus (think:true): strippa il blocco <think>…</think> dal testo libero.
       const stripped = persona === "horus" ? stripThinkBlock(text) : text;
       return stripped as unknown as T;
