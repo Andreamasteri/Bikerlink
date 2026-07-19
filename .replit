@@ -167,11 +167,11 @@ name = "db-migration-checks"
 author = "agent"
 
   [workflows.workflow.metadata]
-  outputType = "console"
+outputType = "console"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "npx tsx server/scripts/check-schema-migration-drift.ts && npx tsx server/scripts/check-migration-prefix-duplicates.ts && npx tsx scripts/check-index-drift.ts --static-only && bash scripts/check-bowie-pkg-drift.sh --warn-only && npx tsx scripts/check-vram-agent-map-drift.ts"
+args = "npx tsx server/scripts/check-schema-migration-drift.ts && npx tsx server/scripts/check-migration-prefix-duplicates.ts && npx tsx scripts/check-index-drift.ts --static-only && bash scripts/check-bowie-pkg-drift.sh --warn-only && npx tsx scripts/check-vram-agent-map-drift.ts && bash scripts/check-large-files-limit-sync.sh"
 
 [[workflows.workflow]]
 name = "secrets-scan"

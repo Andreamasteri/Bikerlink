@@ -56,11 +56,22 @@ else
   fi
 fi
 
+# Leggi MAX_LINES dalla sorgente autorevole in modo che il summary
+# rimanga sempre in sync quando il limite cambia.
+LARGE_FILES_CORE="$SCRIPT_DIR/lib/large-files-core.ts"
+MAX_LINES_VALUE="800"  # fallback se il file non è leggibile
+if [[ -f "$LARGE_FILES_CORE" ]]; then
+  _extracted=$(grep -E '^export const MAX_LINES\s*=' "$LARGE_FILES_CORE" | grep -oE '[0-9]+' | head -1)
+  if [[ -n "$_extracted" ]]; then
+    MAX_LINES_VALUE="$_extracted"
+  fi
+fi
+
 echo ""
 echo "🎉 Setup completato. Il hook pre-commit è attivo."
 echo "   Gate inclusi nel pre-commit:"
 echo "     • detect-secrets         — blocca commit con token/segreti"
-echo "     • check-large-files      — ratchet 800 righe per file"
+echo "     • check-large-files      — ratchet $MAX_LINES_VALUE righe per file"
 echo "     • lint-migration-indexes — indici DESC/WHERE a rischio"
 echo "     • check-ai-direct-generateobject — bypass generateStructured rilevato"
 echo "   Per bypassare (solo falsi positivi): git commit --no-verify"
