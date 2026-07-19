@@ -122,6 +122,13 @@ STUB
 exit 0
 STUB
   chmod +x "$SANDBOX_DIR/scripts/check-ai-direct-generateobject.sh"
+
+  # Stub per check-large-files-limit-sync.sh — gate non in esame
+  cat > "$SANDBOX_DIR/scripts/check-large-files-limit-sync.sh" << 'STUB'
+#!/bin/bash
+exit 0
+STUB
+  chmod +x "$SANDBOX_DIR/scripts/check-large-files-limit-sync.sh"
 }
 
 # ──────────────────────────────────────────────────────────────────────────────
