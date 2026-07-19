@@ -1,3 +1,8 @@
+// @no-split — check-auto-learn-no-cloud-ai.sh scansiona questo file e tutti i
+// moduli locali (./...) che importa, ricorsivamente, per individuare import
+// cloud AI vietati. Mantieni tutta la logica in questo file; usa funzioni
+// helper interne invece di creare nuovi sotto-moduli locali.
+//
 // Task #5322 — Job di auto-apprendimento LOCALE di Bowie (step 4 + 5).
 //
 // Bowie, in autonomia e usando ESCLUSIVAMENTE il proprio modello Ollama locale
