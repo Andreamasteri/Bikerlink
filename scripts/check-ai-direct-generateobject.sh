@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # check-ai-direct-generateobject.sh
 #
-# Due controlli in sequenza — entrambi devono passare:
+# Quattro controlli in sequenza — tutti devono passare:
 #
 # ── Check 1 — Schema bypass ──────────────────────────────────────────────────
 # Scopo: rilevare chiamate dirette a generateObject con un parametro `schema:`
@@ -49,6 +49,29 @@
 #       .agents/memory/qwen3-ollama-think-quirk.md
 #       server/lib/groq-client.ts (commento ATTENZIONE su objectMode:"json")
 #       server/__tests__/ai-schema-compatibility.test.ts (Suite 1b e Suite 5)
+#
+# ── Check 4 — callOllamaChat think:true in contesto non-streaming ─────────────
+# Scopo: rilevare chiamate callOllamaChat che passano `think: true` nel terzo
+# argomento (options) senza contestualmente passare `stream: true`.
+#
+# Perché è pericoloso:
+#   callOllamaChat costruisce providerOptions internamente in base a `schema` e
+#   `persona` — il chiamante non ha visibilità su quel calcolo. Se un futuro
+#   callsite aggiunge `think: true` all'options e OllamaChatOptions è estesa per
+#   accettarlo, il valore bypassa l'enforcement interno che forza think:false per
+#   le chiamate non-streaming con schema (generateObject). Il risultato è che
+#   qwen3 emette token <think>…</think> nel body JSON, rompendo la validazione
+#   schema silenziosamente.
+#
+# Caso legittimo (think:true implicito, non da passare esplicitamente):
+#   callOllamaChat con persona="horus", schema=undefined, stream:true (Horus
+#   reasoning in full-stream). L'enforcement interno di callOllamaChat gestisce
+#   questo caso senza che il chiamante debba specificare think:true.
+#
+# FIX: rimuovere think:true dal terzo argomento di callOllamaChat. L'enforcement
+#   interno gestisce già il flag correttamente. Se il callsite è un path di testo
+#   libero Horus non-streaming che vuole il reasoning, usare persona:"horus" e
+#   stream:true (così CF non va in timeout) — think sarà automaticamente true.
 
 set -euo pipefail
 
@@ -479,6 +502,125 @@ else
   echo "   generateStructured (path non-streaming) forza sempre think:false."
   echo ""
   echo "   Vedi: server/ai/moderation/provider.ts (generateStructured)"
+  echo "         .agents/memory/qwen3-ollama-think-quirk.md"
+fi
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Check 4 — callOllamaChat con think:true in contesto non-streaming
+# ═══════════════════════════════════════════════════════════════════════════════
+# callOllamaChat gestisce internamente il flag think in base a `schema` e
+# `persona`. Un callsite che passa think:true esplicitamente nelle options è
+# sempre sbagliato: se lo schema è presente think è già forzato a false
+# (silenziosamente ignorato, ma fuorviante); se in futuro OllamaChatOptions
+# accetta think come campo esplicito un valore true senza stream:true corrompere
+# il JSON di generateObject.
+echo ""
+echo "🔍 Check 4 — Chiamate callOllamaChat con think:true in contesto non-streaming..."
+
+RESULT4=$(python3 - << 'PYEOF'
+import os
+import re
+
+IGNORE_DIRS = {'.local', '.agents', 'node_modules', 'scripts'}
+
+# Match the callOllamaChat( call site opener
+RE_CALL = re.compile(r'\bcallOllamaChat\s*\(')
+RE_THINK_TRUE = re.compile(r'think\s*:\s*true')
+RE_STREAM_TRUE = re.compile(r'stream\s*:\s*true')
+
+
+def extract_call_body(lines: list[str], start_idx: int) -> tuple[str, int]:
+    depth = 0
+    body_lines: list[str] = []
+    for i in range(start_idx, min(start_idx + 80, len(lines))):
+        line = lines[i]
+        body_lines.append(line)
+        for ch in line:
+            if ch == '(':
+                depth += 1
+            elif ch == ')':
+                depth -= 1
+                if depth == 0:
+                    return ''.join(body_lines), i
+    return ''.join(body_lines), min(start_idx + 80, len(lines) - 1)
+
+
+violations: list[str] = []
+
+for root, dirs, files in os.walk('.'):
+    dirs[:] = [d for d in dirs if d not in IGNORE_DIRS and not d.startswith('.')]
+    for fname in files:
+        if fname.endswith('.test.ts') or fname.endswith('.test.tsx'):
+            continue
+        if not (fname.endswith('.ts') or fname.endswith('.tsx')):
+            continue
+        if fname.endswith('.styles.ts') or fname.endswith('.styles.tsx'):
+            continue
+
+        fpath = os.path.join(root, fname).lstrip('./')
+        if '__tests__' in fpath:
+            continue
+        # Skip the implementation file itself — the enforcement lives there.
+        if fpath == 'server/lib/ollama-client.ts':
+            continue
+
+        try:
+            with open(os.path.join(root, fname), 'r', encoding='utf-8', errors='ignore') as f:
+                lines = f.readlines()
+        except OSError:
+            continue
+
+        i = 0
+        while i < len(lines):
+            line = lines[i]
+            if not RE_CALL.search(line):
+                i += 1
+                continue
+
+            lineno = i + 1
+            body, end_idx = extract_call_body(lines, i)
+
+            # Flag: think:true present AND stream:true absent → non-streaming + explicit think
+            if RE_THINK_TRUE.search(body) and not RE_STREAM_TRUE.search(body):
+                violations.append(f"{fpath}:{lineno}: {line.rstrip()}")
+
+            i = end_idx + 1
+
+if violations:
+    print("FAIL")
+    for v in violations:
+        print(v)
+else:
+    print("OK")
+PYEOF
+)
+
+FIRST_LINE4=$(echo "$RESULT4" | head -1)
+
+if [ "$FIRST_LINE4" = "OK" ]; then
+  echo "✅ Check 4 OK — Nessun callOllamaChat passa think:true in contesto non-streaming."
+else
+  OVERALL_OK=false
+  echo ""
+  VIOLATIONS4=$(echo "$RESULT4" | tail -n +2)
+  while IFS= read -r vline; do
+    [ -z "$vline" ] && continue
+    echo "❌ Check 4 — TROVATO — $vline"
+  done <<< "$VIOLATIONS4"
+  echo ""
+  echo "💥 Check 4 FALLITO"
+  echo ""
+  echo "   callOllamaChat costruisce providerOptions internamente in base a \`schema\`"
+  echo "   e \`persona\` — il chiamante non deve specificare think:true."
+  echo "   Un callsite non-streaming con think:true esplicito è fuorviante e,"
+  echo "   se OllamaChatOptions venisse estesa per accettare il campo, bypasserebbe"
+  echo "   l'enforcement interno che forza think:false per le chiamate con schema."
+  echo ""
+  echo "   FIX: rimuovere think:true dall'options di callOllamaChat."
+  echo "   Per i path di testo Horus non-streaming, usare stream:true per"
+  echo "   evitare il timeout CF (think sarà automaticamente true via persona)."
+  echo ""
+  echo "   Vedi: server/lib/ollama-client.ts (callOllamaChat, righe 313-319)"
   echo "         .agents/memory/qwen3-ollama-think-quirk.md"
 fi
 
