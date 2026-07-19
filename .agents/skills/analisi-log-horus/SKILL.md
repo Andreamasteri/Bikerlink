@@ -5,6 +5,18 @@ description: Triage completo dello stato di salute BikerLink via Horus (qwen3:4b
 
 # Analisi Log con Horus — Triage AI completo BikerLink
 
+## Prerequisito: carica `.agents/skills/ai-agent-access/SKILL.md`
+
+Prima di qualsiasi chiamata a Horus, leggi la skill `ai-agent-access` e sourcia lo script canonico:
+
+```bash
+source scripts/ai-agent-access.sh
+```
+
+Quella skill contiene: tabella secret, tabella errori CF, note cold-load, funzioni `ai_check_tc` / `ai_call_horus`.
+
+---
+
 > **Nomi delle istanze Ollama** (vedi `.agents/memory/ollama-naming.md`):
 > - **Horus** / **Bowie** = `OLLAMA_*` — ThinkCentre: usati da QUESTA skill per l'analisi (Horus) e come assistente in-app (Bowie).
 > - **Ares** = `ARES_OLLAMA_*` — PC fisso (GPU): usato da altre skill (es. ollama-diagnostics); NON da questa skill.
@@ -52,6 +64,20 @@ HORUS_LOG_DIR=/tmp npx tsx scripts/horus-propose-tasks.ts
 | **Shell planner** | `HORUS_LOG_DIR=/tmp HORUS_BACKLOG_DIR=/tmp npx tsx scripts/log-analysis-horus.ts` | `/tmp` sempre scrivibile |
 
 > **Nota `HORUS_BACKLOG_DIR`**: controlla dove viene scritto `horus-backlog.json` (default: `.local/`). Senza questo flag, anche con `HORUS_LOG_DIR=/tmp` lo script tenta di scrivere il backlog in `.local/` — causando exit 254 nella shell planner.
+
+## Step 0 — Pre-flight obbligatorio (prima di ogni chiamata Horus)
+
+```bash
+source scripts/ai-agent-access.sh
+STATUS=$(ai_check_tc)
+echo "TC status: $STATUS"
+if [ "$STATUS" != "online" ]; then
+  echo "ERROR: TC non raggiungibile ($STATUS) — impossibile procedere con il triage"
+  exit 1
+fi
+```
+
+> **Cold-load**: `qwen3:4b` richiede ~125s a freddo prima del primo token. `ai_call_horus` usa già `--max-time 180` internamente. Il workflow "Triage Horus" gestisce questo automaticamente.
 
 ## Come lanciarla — da terminale
 
@@ -175,9 +201,11 @@ Prima di ogni sessione di pianificazione ("cosa facciamo adesso?", "proponi task
 
 | Variabile | Tipo | Stato | Note |
 |---|---|---|---|
-| `OLLAMA_URL` | Secret | **necessario** | URL Horus (ThinkCentre) via Cloudflare Tunnel, es. `https://tc.biker-link.net` |
-| `OLLAMA_MODEL` | Env/Secret | opzionale | Default `qwen3:4b` |
-| `OLLAMA_TOKEN` | Secret | opzionale | Bearer token se endpoint protetto |
+| `HORUS_OLLAMA_URL` | Secret | **necessario** | URL Horus (ThinkCentre) via Cloudflare Tunnel, es. `https://tc.biker-link.net` |
+| `HORUS_OLLAMA_MODEL` | Env/Secret | opzionale | Default `qwen3:4b` |
+| `HORUS_OLLAMA_TOKEN` | Secret | **necessario** | Bearer token per l'endpoint Horus (già presente) |
+| `CF_ACCESS_CLIENT_ID` | Secret | **necessario** | Cloudflare Access Service Token |
+| `CF_ACCESS_CLIENT_SECRET` | Secret | **necessario** | Cloudflare Access Service Token |
 | `GITHUB_TOKEN` | Secret | ✅ presente | Fetch issue, workflow runs e repo tree (fallback: `DIAG_GITHUB_TOKEN`) |
 | `SENTRY_AUTH_TOKEN` | Secret | ✅ presente | User Auth Token Sentry, scope `project:read` |
 | `SENTRY_ORG` | Secret/Env | ✅ presente | Organization slug Sentry (es. `my-org`) |

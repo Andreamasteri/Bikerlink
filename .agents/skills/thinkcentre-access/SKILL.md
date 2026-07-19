@@ -68,6 +68,37 @@ curl -s -o /dev/null -w "%{http_code}\n" -H "Authorization: Bearer ${GRAPHHOPPER
 curl -s -o /dev/null -w "%{http_code}\n" "${VALHALLA_URL}/status"
 ```
 
+### Tabella header per-servizio TC (probe auth parity)
+
+Ogni servizio TC usa un header custom diverso — **NON** `Authorization: Bearer` generico. Usare l'header sbagliato dà `401` anche con le credenziali giuste:
+
+| Servizio | Header auth richiesto | Secret |
+|----------|-----------------------|--------|
+| GraphHopper | `X-GH-Token: $GRAPHHOPPER_TOKEN` | `GRAPHHOPPER_TOKEN` |
+| Valhalla | `X-Valhalla-Key: $VALHALLA_API_KEY` | `VALHALLA_API_KEY` |
+| Photon | `X-Photon-Token: $PHOTON_TOKEN` | `PHOTON_TOKEN` |
+| Whisper | `X-Whisper-Token: $WHISPER_TOKEN` | `WHISPER_TOKEN` |
+| Ollama (raw) | `X-Ollama-Token: $HORUS_OLLAMA_TOKEN` | `HORUS_OLLAMA_TOKEN` |
+| TC-agent | `X-Agent-Token: $THINKCENTRE_AGENT_TOKEN` | `THINKCENTRE_AGENT_TOKEN` |
+
+Tutti i servizi TC esposti via CF tunnel richiedono anche i due header Cloudflare Access:
+```
+CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID
+CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET
+```
+
+> Per le chiamate Ollama (Horus/Bowie) usa sempre lo script canonico `ai_call_horus` / `ai_call_tc_agent` da `scripts/ai-agent-access.sh` — gestisce già tutti gli header in modo corretto.
+
+### ⚠️ Avviso cold-boot secret
+
+Un secret **appena aggiunto o modificato nel valore** non appare in ShellExec/CodeExecution finché il workflow non viene riavviato ("Start Backend"). Un secret **nuovo** entra subito; un secret con **valore modificato** richiede cold boot/restart.
+
+Verifica sempre dopo un restart:
+```bash
+echo "$TC_SSH_KEY" | wc -c         # deve essere > 100
+echo "$CF_ACCESS_CLIENT_ID" | wc -c # deve essere > 5
+```
+
 ## Ares (PC fisso, Ollama diagnostica/studio `DIAG_OLLAMA_*`)
 
 Ares è una macchina SEPARATA dal ThinkCentre, sulla **stessa LAN**. È in

@@ -5,6 +5,39 @@ description: Analisi profonda e multi-fase del codebase BikerLink via Horus (qwe
 
 # Horus App Analysis — Analisi profonda codebase BikerLink
 
+## Prerequisito: carica `.agents/skills/ai-agent-access/SKILL.md`
+
+Prima di qualsiasi chiamata a Horus, leggi la skill `ai-agent-access` e sourcia lo script canonico:
+
+```bash
+source scripts/ai-agent-access.sh
+```
+
+Quella skill contiene: tabella secret canonica, tabella errori CF, funzioni `ai_check_tc` / `ai_call_horus`, note cold-load.
+
+### Ordine canonico — 3 step non negoziabili
+
+**Step 1** — Verifica secret non vuoti:
+```bash
+echo "$HORUS_OLLAMA_URL" | wc -c        # deve essere > 5
+echo "$HORUS_OLLAMA_TOKEN" | wc -c      # deve essere > 5
+echo "$CF_ACCESS_CLIENT_ID" | wc -c     # deve essere > 5
+echo "$CF_ACCESS_CLIENT_SECRET" | wc -c # deve essere > 5
+```
+
+**Step 2** — Verifica TC online (≤10s, exit ≠ 0 → fermarsi):
+```bash
+STATUS=$(ai_check_tc)
+[ "$STATUS" = "online" ] || { echo "TC $STATUS — impossibile procedere"; exit 1; }
+```
+
+**Step 3** — Lancia la scansione (gestisce cold-load ~125s internamente):
+```bash
+npx tsx scripts/horus-app-analysis.ts
+```
+
+---
+
 > **Skill sorella**: `analisi-log-horus` — triage reattivo su sintomi già manifesti (crash, log, errori).
 > Questa skill analizza strutturalmente il codebase, indipendentemente dai sintomi visibili.
 
@@ -196,12 +229,12 @@ logs/horus-tasks-pending.json                         # manifest task pronti
 
 | Variabile | Tipo | Stato | Note |
 |---|---|---|---|
-| `HORUS_OLLAMA_URL` | Secret | **necessario** | URL Horus (ThinkCentre) via Cloudflare Tunnel |
+| `HORUS_OLLAMA_URL` | Secret | **obbligatorio** | URL Horus (ThinkCentre) via Cloudflare Tunnel |
 | `HORUS_OLLAMA_MODEL` | Env/Secret | opzionale | Default `qwen3:4b` |
-| `HORUS_OLLAMA_TOKEN` | Secret | opzionale | Bearer token se endpoint protetto |
+| `HORUS_OLLAMA_TOKEN` | Secret | **obbligatorio** | Bearer token per l'endpoint Horus — senza di esso ogni chiamata riceve 401 |
 | `HORUS_LOG_DIR` | Variabile d'ambiente | opzionale | Override directory output (es. `/tmp` in shell planner) |
-| `CF_ACCESS_CLIENT_ID` | Secret | ✅ presente | Cloudflare Access per tc.biker-link.net |
-| `CF_ACCESS_CLIENT_SECRET` | Secret | ✅ presente | Cloudflare Access |
+| `CF_ACCESS_CLIENT_ID` | Secret | **obbligatorio** | Cloudflare Access per tc.biker-link.net |
+| `CF_ACCESS_CLIENT_SECRET` | Secret | **obbligatorio** | Cloudflare Access |
 
 ## Note sul timeout
 

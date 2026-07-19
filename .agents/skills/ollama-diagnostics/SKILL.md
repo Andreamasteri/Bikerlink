@@ -5,6 +5,50 @@ description: Diagnosi AI di crash/boot di BikerLink. Raccoglie log + file chiave
 
 # Ollama Diagnostics — Diagnosi AI con ARES (PC fisso)
 
+## Prerequisito: carica `.agents/skills/ai-agent-access/SKILL.md`
+
+Prima di qualsiasi chiamata diretta ad Ares, leggi la skill `ai-agent-access` e sourcia lo script canonico:
+
+```bash
+source scripts/ai-agent-access.sh
+```
+
+Quella skill contiene: tabella secret (`DIAG_OLLAMA_*`), tabella errori CF, funzione `ai_call_ares`.
+
+### Pre-flight per Ares (`DIAG_OLLAMA_*`)
+
+```bash
+source scripts/ai-agent-access.sh
+
+# Verifica secret Ares (distinti da HORUS_OLLAMA_*)
+echo "$DIAG_OLLAMA_URL" | wc -c        # deve essere > 5
+echo "$DIAG_OLLAMA_TOKEN" | wc -c      # deve essere > 5
+echo "$CF_ACCESS_CLIENT_ID" | wc -c    # deve essere > 5
+echo "$CF_ACCESS_CLIENT_SECRET" | wc -c # deve essere > 5
+
+# Chiamata Ares (usa ai_call_ares — gestisce stream:true, max-time 180, strip think)
+RESPONSE=$(ai_call_ares "Analizza questo crash: ...")
+echo "$RESPONSE"
+```
+
+> **Ares non disponibile in tutti gli env**: `DIAG_OLLAMA_*` sono secret configurati solo in ambienti specifici. `ai_call_ares` stampa `[Ares non configurato in questo env: ...]` ed esce con codice 1 senza crashare — comportamento intenzionale.
+
+> **Cold-load Ares**: `devstral:latest` su CPU/GPU richiede **55–170s** a freddo. Il timeout 180s è il minimo — non ridurlo.
+
+### Tabella errori canonici CF (per Ares)
+
+| HTTP / Condizione | Causa | Rimedio |
+|---|---|---|
+| 403 HTML CF Access | `CF_ACCESS_CLIENT_ID`/`SECRET` sbagliati | Ruota i secret nel pannello Replit |
+| 502 + SSH timeout | Ares spento o `cloudflared` giù | Verifica che Ares sia acceso (WoL se necessario) |
+| 524 | `stream:false` usato — CF taglia dopo ~100s | `ai_call_ares` usa `stream:true` internamente |
+| 000 o DNS fail | Secret vuoto → URL malformato | `echo $DIAG_OLLAMA_URL \| wc -c` |
+| 0 byte dopo 30s | Modello in cold load (55–170s su Ares) | Normale — attendi i 180s di max-time |
+| 401 con `cf-access-error` | CF Access policy non riconosce client ID/secret | Verifica CF_ACCESS_CLIENT_ID/SECRET |
+| 401 senza `cf-access-error` | Token applicativo sbagliato (`DIAG_OLLAMA_TOKEN`) | Verifica il token di servizio Ares |
+
+---
+
 > **Nomi delle istanze Ollama** (vedi `.agents/memory/ollama-naming.md`):
 > - **Ares** = `DIAG_OLLAMA_*` — PC fisso (Windows + GPU): diagnosi, studio codebase,
 >   generazione del manuale Q&A. È l'istanza usata da QUESTA skill.

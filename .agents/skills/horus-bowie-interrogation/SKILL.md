@@ -14,6 +14,34 @@ description: >
 
 # Skill: Interrogazione Incrociata Horus ↔ Bowie
 
+## Prerequisito: carica `.agents/skills/ai-agent-access/SKILL.md`
+
+Prima di qualsiasi chiamata a Horus o Bowie, leggi la skill `ai-agent-access` e sourcia lo script canonico:
+
+```bash
+source scripts/ai-agent-access.sh
+```
+
+Quella skill contiene: tabella secret, tabella errori CF, funzione `ai_check_tc`, note cold-load e strip reasoning inglese.
+
+### Pre-flight obbligatorio (usa `ai_check_tc`)
+
+```bash
+source scripts/ai-agent-access.sh
+STATUS=$(ai_check_tc)
+echo "TC status: $STATUS"
+if [ "$STATUS" != "online" ]; then
+  echo "ERROR: TC non raggiungibile ($STATUS) — impossibile avviare l'interrogazione"
+  exit 1
+fi
+```
+
+> **Strip reasoning inglese**: `qwen3:4b` con `think:false` può far "trapelare" righe di reasoning in inglese (`Okay,`, `Sure,`, `Let me`) prima della risposta reale. Lo script `horus-bowie-interrogation.ts` applica il parser `_ai_parse_ndjson` (dallo script canonico) che rimuove automaticamente queste righe.
+
+> **Cold-load**: `qwen3:4b` richiede ~125s a freddo. Il timeout per chiamata nello script è 4 min — non ridurlo.
+
+---
+
 Script standalone che fa interrogare Horus e Bowie a vicenda, poi produce un report leggibile.
 Nessun server avviato, nessuna dipendenza DB: solo chiamate dirette agli endpoint Ollama sul ThinkCentre.
 

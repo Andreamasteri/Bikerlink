@@ -16,6 +16,46 @@ description: >
 
 # Skill: Pipeline Manuale Horus → Nadir → Bowie/Horus
 
+## Prerequisito: carica `.agents/skills/ai-agent-access/SKILL.md`
+
+Prima di qualsiasi chiamata diretta a Horus o ai servizi TC, leggi la skill `ai-agent-access`:
+
+```bash
+source scripts/ai-agent-access.sh
+```
+
+Quella skill contiene: tabella secret, tabella errori CF, funzioni `ai_check_tc` / `ai_call_horus` / `ai_call_tc_agent`.
+
+### Distinzione critica: `stream:false` vs `stream:true`
+
+| Endpoint | `stream` | Motivo |
+|----------|----------|--------|
+| `POST /api/create` (Ollama — crea/aggiorna modello) | `false` | Operazione idempotente di creazione, non una chat — non ha token da stremare; il timeout è gestito dall'applicazione |
+| `POST /api/chat` (Ollama — chiamata chat/inferenza) | **`true` obbligatorio** | CF Cloudflare taglia connessioni silenziose dopo ~100s (524); `stream:true` mantiene viva la connessione dal primo token |
+
+> ⚠️ **Non usare mai `stream:false` con `/api/chat` dietro CF tunnel** — si ottiene HTTP 524 dopo ~100s.
+
+### Ordine canonico per le chiamate Horus dirette
+
+```bash
+source scripts/ai-agent-access.sh
+
+# 1. Verifica secret
+echo "$HORUS_OLLAMA_URL" | wc -c        # > 5
+echo "$HORUS_OLLAMA_TOKEN" | wc -c      # > 5
+echo "$CF_ACCESS_CLIENT_ID" | wc -c     # > 5
+
+# 2. Verifica TC online
+STATUS=$(ai_check_tc)
+[ "$STATUS" = "online" ] || { echo "TC $STATUS"; exit 1; }
+
+# 3. Chiamata (usa ai_call_horus per /api/chat — stream:true, strip think, max-time 180)
+RESPONSE=$(ai_call_horus "Il tuo prompt qui")
+echo "$RESPONSE"
+```
+
+---
+
 Questa skill documenta l'intera pipeline di generazione del manuale utente BikerLink
 e guida l'esecuzione di ogni step. È completa e autonomamente eseguibile.
 

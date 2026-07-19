@@ -5,6 +5,20 @@ description: Analisi completa dell'ultimo deploy BikerLink insieme a Horus dopo 
 
 # Analisi Deploy con Horus — Diagnosi post-deploy BikerLink
 
+## Prerequisito: carica `.agents/skills/ai-agent-access/SKILL.md`
+
+Prima di qualsiasi chiamata a Horus, leggi la skill `ai-agent-access` e sourcia lo script canonico:
+
+```bash
+source scripts/ai-agent-access.sh
+```
+
+Quella skill contiene: tabella secret, tabella errori CF, funzioni `ai_check_tc` / `ai_call_horus`, note cold-load.
+
+> **Cold-load verificato**: `qwen3:4b` richiede **~124.9s** a freddo prima del primo token — `ai_call_horus` usa `--max-time 180` internamente, che è il valore minimo corretto. Non ridurlo.
+
+---
+
 > **Quando usarla**: SOLO su richiesta esplicita dell'utente, dopo che il deploy è completato (pannello Publish mostra "Deployment successful" o è fallito). NON durante il deploy. NON avviarla automaticamente dopo ogni deploy. Le fasi 3 e 4 sono sistematicamente le più lente; questa skill dà una procedura strutturata per diagnosticarle.
 
 > **Ruolo dell'agente**: raccogliere i dati, passarli a Horus, materializzare le proposte in task. L'agente **non decide** autonomamente cosa fixare — lo decide Horus.
@@ -186,11 +200,16 @@ fi
 
 > **Quando lanciarla**: solo se STEP 5 ha trovato almeno un'anomalia. Se il report è pulito, salta a **Uscita B**.
 
-### Come lanciarla (streaming NDJSON — obbligatorio per CF tunnel)
+### Come lanciarla (via script canonico — obbligatorio)
 
-> ⚠️ **IMPORTANTE**: usare sempre `stream: true`. Con `stream: false` Cloudflare taglia la connessione con HTTP 524 dopo ~100s (CF idle timeout). Lo streaming mantiene viva la connessione dal primo token. Vedi `.agents/memory/horus-direct-call-method.md`.
+> ⚠️ **IMPORTANTE**: usare sempre `ai_call_horus` dallo script canonico. Con `stream: false` Cloudflare taglia la connessione con HTTP 524 dopo ~100s (CF idle timeout). `ai_call_horus` usa `stream: true` internamente, mantenendo viva la connessione dal primo token.
 
 ```bash
+source scripts/ai-agent-access.sh
+
+# Verifica TC online prima di chiamare
+[ "$(ai_check_tc)" = "online" ] || { echo "TC offline — salta chiamata Horus"; exit 1; }
+
 # Costruisci il bundle (sostituisci [BUNDLE] con il contenuto reale da STEP 5)
 BUNDLE="[incolla qui: dimensioni directory + timing fase 3/4 + sezioni ANOMALIE + TASK dal report Horus]"
 
@@ -208,40 +227,20 @@ AZIONE: <una riga — cosa modificare e in quale file>
 Se un'anomalia è già risolta o non richiede azione, scrivila sotto ## IGNORATI con motivazione.
 Se non ci sono anomalie da correggere, scrivi solo: TUTTO_OK"
 
-curl -s --no-buffer --max-time 300 \
-  -H "Content-Type: application/json" \
-  -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" \
-  -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET" \
-  -H "Authorization: Bearer $HORUS_OLLAMA_TOKEN" \
-  -d "{
-    \"model\": \"${HORUS_OLLAMA_MODEL:-qwen3:4b}\",
-    \"stream\": true,
-    \"think\": false,
-    \"options\": {\"num_predict\": 800},
-    \"messages\": [{\"role\": \"user\", \"content\": $(echo "$PROMPT" | python3 -c 'import sys,json; print(json.dumps(sys.stdin.read()))')}]
-  }" \
-  "$HORUS_OLLAMA_URL/api/chat" | python3 -c "
-import sys, json, re
-chunks = []
-for line in sys.stdin:
-    line = line.strip()
-    if not line:
-        continue
-    try:
-        d = json.loads(line)
-        chunk = d.get('message', {}).get('content', '') or ''
-        if chunk:
-            chunks.append(chunk)
-    except Exception:
-        pass
-text = ''.join(chunks)
-text = re.sub(r'<think>[\s\S]*?</think>', '', text)
-text = re.sub(r'^[\s\S]*?</think>\s*', '', text)
-print(text.strip())
-"
+# num_predict 800 — prompt BUNDLE < 300 parole per risposta rapida e sotto il budget CF
+RESPONSE=$(ai_call_horus "$PROMPT" 800)
+echo "$RESPONSE"
 ```
 
-**Parametri Horus**: `think: false`, `num_predict: 800`, `stream: true`. Tieni il prompt BUNDLE < 300 parole per risposta rapida e sotto il budget CF.
+**Tabella errori canonici** (dalla skill `ai-agent-access`):
+
+| HTTP / Condizione | Causa | Rimedio |
+|---|---|---|
+| 403 HTML CF Access | `CF_ACCESS_CLIENT_ID`/`SECRET` sbagliati | Ruota i secret nel pannello Replit |
+| 502 + SSH timeout | TC box spento o `cloudflared` giù | Infrastruttura utente |
+| 524 | `stream:false` — CF taglia dopo ~100s | Non usare mai `stream:false` |
+| 000 o DNS fail | Secret vuoto → URL malformato | `echo $HORUS_OLLAMA_URL \| wc -c` |
+| 0 byte dopo 30s | Modello in cold load (~124.9s a freddo) | Normale — `ai_call_horus` usa `--max-time 180` |
 
 ### Formato risposta atteso
 
@@ -358,28 +357,24 @@ Horus non ha proposto task correttivi.
 
 ---
 
-## Verifica TC online prima delle chiamate Horus
+## Verifica TC online prima delle chiamate Horus (STEP 3 e STEP 6)
 
-Prima di STEP 3 e STEP 6, verifica che il ThinkCentre sia raggiungibile:
+Usa sempre `ai_check_tc` dallo script canonico:
 
 ```bash
-curl -s --max-time 10 \
-  -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" \
-  -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET" \
-  -H "Authorization: Bearer $HORUS_OLLAMA_TOKEN" \
-  "$HORUS_OLLAMA_URL/api/tags" | python3 -c "
-import sys, json
-try:
-    d = json.load(sys.stdin)
-    print('TC online. Models:', [m['name'] for m in d.get('models', [])])
-except Exception as e:
-    print('TC offline o errore:', e)
-"
+source scripts/ai-agent-access.sh
+STATUS=$(ai_check_tc)
+echo "TC status: $STATUS"
+# Output possibili: online | offline | cf-blocked | auth-failed | secret-empty
+if [ "$STATUS" != "online" ]; then
+  echo "TC non raggiungibile ($STATUS) — salta chiamate Horus, registra solo dati locali"
+  exit 1
+fi
 ```
 
-- Lista modelli → TC online ✅ — procedi
-- HTML CF Access (403) → secret CF sbagliati o tunnel giù ❌
-- Timeout / risposta vuota → TC offline ❌ — salta chiamate Horus, registra solo dati locali
+- `online` → TC online ✅ — procedi
+- `cf-blocked` → secret CF sbagliati o tunnel giù ❌
+- `offline` / `secret-empty` → TC offline ❌ — salta chiamate Horus
 
 ---
 
