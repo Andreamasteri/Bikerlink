@@ -183,6 +183,25 @@ if [ "$RATCHET_EXIT" -ne 0 ]; then
   exit "$RATCHET_EXIT"
 fi
 
+# ── GATE LIMIT/SPLIT-TARGET SYNC ─────────────────────────────
+# Verifica che setup-hooks.sh, i doc e i commenti TS non abbiano
+# un numero hardcoded che diverge da MAX_LINES o SPLIT_TARGET in
+# scripts/lib/large-files-core.ts (es. dopo che il target è stato abbassato).
+# Copre sia il gate-threshold (MAX_LINES) sia il split-target floor (SPLIT_TARGET).
+# Equivalente alla check nel CI workflow db-migration-checks, ma anticipato
+# al merge così lo sviluppatore riceve feedback immediato.
+echo "════════════════════════════════════════"
+echo "  Gate limit/split-target sync (large-files)"
+echo "════════════════════════════════════════"
+LIMIT_SYNC_EXIT=0
+bash scripts/check-large-files-limit-sync.sh || LIMIT_SYNC_EXIT=$?
+echo "════════════════════════════════════════"
+echo ""
+if [ "$LIMIT_SYNC_EXIT" -ne 0 ]; then
+  echo "❌ Gate large-files-limit-sync fallito — aggiornare i riferimenti hardcoded in sync con scripts/lib/large-files-core.ts."
+  exit "$LIMIT_SYNC_EXIT"
+fi
+
 # ── GATE ROTTE FANTASMA app/(tabs)/ ──────────────────────────
 # Expo Router registra OGNI file in app/(tabs)/ come rotta.
 # Regola STRETTA:

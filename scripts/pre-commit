@@ -83,6 +83,19 @@ if "$DETECT_SECRETS_HOOK" --baseline "$BASELINE" "${STAGED_FILES[@]}"; then
   fi
   echo "✅ Gate 800 righe OK."
 
+  # Gate "limit/split-target sync" — verifica che setup-hooks.sh e i doc
+  # non abbiano un numero hardcoded che diverge da MAX_LINES o SPLIT_TARGET
+  # in scripts/lib/large-files-core.ts (es. dopo che il target è stato abbassato).
+  echo ""
+  echo "🔍 Limit/split-target sync (large-files-limit-sync + docs-sync)..."
+  if ! bash scripts/check-large-files-limit-sync.sh; then
+    echo ""
+    echo "❌ COMMIT BLOCCATO — riferimento hardcoded stale al gate-limit o split-target."
+    echo "   Aggiorna il numero in sync con scripts/lib/large-files-core.ts."
+    echo "   Bypass una-tantum (solo se sicuro): git commit --no-verify"
+    exit 1
+  fi
+
   # Gate "indici speciali nelle migration" — rileva due pattern a rischio:
   #   A) DROP INDEX su indice DESC/WHERE senza ricreazione corretta.
   #   B) CREATE INDEX IF NOT EXISTS DESC/WHERE senza DROP precedente (drift silenzioso).
