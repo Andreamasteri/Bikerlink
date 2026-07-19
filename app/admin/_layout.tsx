@@ -104,7 +104,6 @@ const ADMIN_OPTS: Record<string, { title: string } | { headerShown: false }> = {
   "bowie-standalone": { title: "Bowie · Standalone" },
   "ai-group-chat": { title: "Tavola Rotonda AI" },
   "match-explain": { title: "Explain Matching" },
-  "ai-assistant-config": { title: "Bowie Config" },
   "background-location": { title: "Posizione Background" },
   "push-diagnostics": { title: "Diagnostica Notifiche Push" },
 } as const;
@@ -195,7 +194,6 @@ export default function AdminLayout() {
         <Stack.Screen name="bowie-standalone" options={ADMIN_OPTS["bowie-standalone"]} />
         <Stack.Screen name="ai-group-chat" options={ADMIN_OPTS["ai-group-chat"]} />
         <Stack.Screen name="match-explain" options={ADMIN_OPTS["match-explain"]} />
-        <Stack.Screen name="ai-assistant-config" options={ADMIN_OPTS["ai-assistant-config"]} />
         <Stack.Screen name="background-location" options={ADMIN_OPTS["background-location"]} />
         <Stack.Screen name="db-monitor" options={ADMIN_OPTS["db-monitor"]} />
         <Stack.Screen name="push-diagnostics" options={ADMIN_OPTS["push-diagnostics"]} />

@@ -208,15 +208,13 @@ score_t1_snapshot() {
   local resp="$1"
   local expected="$2"
   python3 -c "
-import json, sys, re
+import json, sys
 resp = '''$resp'''
 expected = '$expected'
-# Try to parse JSON from response
 try:
-    # Find JSON in response
-    m = re.search(r'\{[^{}]*\}', resp)
-    if m:
-        d = json.loads(m.group())
+    s = resp.find('{')
+    if s >= 0:
+        d, _ = json.JSONDecoder().raw_decode(resp, s)
         got = d.get('status','').lower().strip()
         if got == expected:
             print(1)
@@ -245,7 +243,7 @@ pin_horus
 # Step 1: VRAM pre-load check
 VRAM_BEFORE=$(vram_read)
 VRAM_FREE_MB=$(echo "$VRAM_BEFORE" | cut -d',' -f2)
-echo "[vram] Pre-load: used=$(echo $VRAM_BEFORE|cut -d,'-f1) free=${VRAM_FREE_MB} temp=$(echo $VRAM_BEFORE|cut -d,'-f3)°C"
+echo "[vram] Pre-load: used=$(echo $VRAM_BEFORE|cut -d',' -f1) free=${VRAM_FREE_MB} temp=$(echo $VRAM_BEFORE|cut -d',' -f3)°C"
 
 if [ "$VRAM_FREE_MB" -lt 2000 ]; then
   echo "[SKIP] VRAM libera ${VRAM_FREE_MB} MB < 2000 MB — skip $MODEL"
@@ -279,7 +277,7 @@ RAW=$(call_model "$MODEL" "$T1_SYS" '{"db_pool_used":5,"last_cycle_min_ago":45,"
 T1_LAT1=$(echo "$RAW" | grep "LATENCY_MS:" | cut -d: -f2)
 T1_RESP1=$(echo "$RAW" | grep -v "LATENCY_MS:" | sed 's/^RESPONSE://')
 SNAP1=$(vram_used); [ "$SNAP1" -gt "$VRAM_T1_PEAK" ] && VRAM_T1_PEAK=$SNAP1
-S1=$(echo "$T1_RESP1" | python3 -c "import json,sys,re; resp=sys.stdin.read(); m=re.search(r'\{[^{}]*\}',resp); d=json.loads(m.group()) if m else {}; print(1 if d.get('status','').lower()=='ok' else 0)" 2>/dev/null || echo 0)
+S1=$(echo "$T1_RESP1" | python3 -c "import json,sys; resp=sys.stdin.read(); s=resp.find('{'); d=json.JSONDecoder().raw_decode(resp,s)[0] if s>=0 else {}; print(1 if d.get('status','').lower()=='ok' else 0)" 2>/dev/null || echo 0)
 echo "  S1 (expect ok): score=$S1 lat=${T1_LAT1}ms resp=$(echo $T1_RESP1|head -c 80)"
 T1_TOTAL=$((T1_TOTAL + S1))
 
@@ -288,7 +286,7 @@ RAW=$(call_model "$MODEL" "$T1_SYS" '{"db_pool_used":9,"last_cycle_min_ago":80,"
 T1_LAT2=$(echo "$RAW" | grep "LATENCY_MS:" | cut -d: -f2)
 T1_RESP2=$(echo "$RAW" | grep -v "LATENCY_MS:" | sed 's/^RESPONSE://')
 SNAP2=$(vram_used); [ "$SNAP2" -gt "$VRAM_T1_PEAK" ] && VRAM_T1_PEAK=$SNAP2
-S2=$(echo "$T1_RESP2" | python3 -c "import json,sys,re; resp=sys.stdin.read(); m=re.search(r'\{[^{}]*\}',resp); d=json.loads(m.group()) if m else {}; print(1 if d.get('status','').lower()=='error' else 0)" 2>/dev/null || echo 0)
+S2=$(echo "$T1_RESP2" | python3 -c "import json,sys; resp=sys.stdin.read(); s=resp.find('{'); d=json.JSONDecoder().raw_decode(resp,s)[0] if s>=0 else {}; print(1 if d.get('status','').lower()=='error' else 0)" 2>/dev/null || echo 0)
 echo "  S2 (expect error): score=$S2 lat=${T1_LAT2}ms resp=$(echo $T1_RESP2|head -c 80)"
 T1_TOTAL=$((T1_TOTAL + S2))
 
@@ -297,7 +295,7 @@ RAW=$(call_model "$MODEL" "$T1_SYS" '{"db_pool_used":6,"last_cycle_min_ago":55,"
 T1_LAT3=$(echo "$RAW" | grep "LATENCY_MS:" | cut -d: -f2)
 T1_RESP3=$(echo "$RAW" | grep -v "LATENCY_MS:" | sed 's/^RESPONSE://')
 SNAP3=$(vram_used); [ "$SNAP3" -gt "$VRAM_T1_PEAK" ] && VRAM_T1_PEAK=$SNAP3
-S3=$(echo "$T1_RESP3" | python3 -c "import json,sys,re; resp=sys.stdin.read(); m=re.search(r'\{[^{}]*\}',resp); d=json.loads(m.group()) if m else {}; print(1 if d.get('status','').lower()=='error' else 0)" 2>/dev/null || echo 0)
+S3=$(echo "$T1_RESP3" | python3 -c "import json,sys; resp=sys.stdin.read(); s=resp.find('{'); d=json.JSONDecoder().raw_decode(resp,s)[0] if s>=0 else {}; print(1 if d.get('status','').lower()=='error' else 0)" 2>/dev/null || echo 0)
 echo "  S3 (expect error): score=$S3 lat=${T1_LAT3}ms resp=$(echo $T1_RESP3|head -c 80)"
 T1_TOTAL=$((T1_TOTAL + S3))
 
@@ -306,7 +304,7 @@ RAW=$(call_model "$MODEL" "$T1_SYS" '{"db_pool_used":8,"last_cycle_min_ago":71,"
 T1_LAT4=$(echo "$RAW" | grep "LATENCY_MS:" | cut -d: -f2)
 T1_RESP4=$(echo "$RAW" | grep -v "LATENCY_MS:" | sed 's/^RESPONSE://')
 SNAP4=$(vram_used); [ "$SNAP4" -gt "$VRAM_T1_PEAK" ] && VRAM_T1_PEAK=$SNAP4
-S4=$(echo "$T1_RESP4" | python3 -c "import json,sys,re; resp=sys.stdin.read(); m=re.search(r'\{[^{}]*\}',resp); d=json.loads(m.group()) if m else {}; print(1 if d.get('status','').lower()=='warn' else 0)" 2>/dev/null || echo 0)
+S4=$(echo "$T1_RESP4" | python3 -c "import json,sys; resp=sys.stdin.read(); s=resp.find('{'); d=json.JSONDecoder().raw_decode(resp,s)[0] if s>=0 else {}; print(1 if d.get('status','').lower()=='warn' else 0)" 2>/dev/null || echo 0)
 echo "  S4 (expect warn): score=$S4 lat=${T1_LAT4}ms resp=$(echo $T1_RESP4|head -c 80)"
 T1_TOTAL=$((T1_TOTAL + S4))
 
@@ -325,14 +323,14 @@ T2_RESP=$(echo "$RAW" | grep -v "LATENCY_MS:" | sed 's/^RESPONSE://')
 VRAM_T2_PEAK=$(vram_used)
 
 T2_SCORES=$(echo "$T2_RESP" | python3 -c "
-import json, sys, re
+import json, sys
 resp = sys.stdin.read()
 score = 0
 details = []
 try:
-    m = re.search(r'\{[^{}]*\}', resp, re.DOTALL)
-    if m:
-        d = json.loads(m.group())
+    s = resp.find('{')
+    d = json.JSONDecoder().raw_decode(resp, s)[0] if s >= 0 else {}
+    if d:
         if d.get('wake_horus') == True:
             score += 1
             details.append('wake_horus=true OK')
@@ -381,11 +379,10 @@ T3_LAT1=$(echo "$RAW" | grep "LATENCY_MS:" | cut -d: -f2)
 T3_RESP1=$(echo "$RAW" | grep -v "LATENCY_MS:" | sed 's/^RESPONSE://')
 VRAM_T3_PEAK=$(vram_used)
 SQ1=$(echo "$T3_RESP1" | python3 -c "
-import json, sys, re
+import json, sys
 resp = sys.stdin.read()
 try:
-    m = re.search(r'\{[^{}]*\}', resp)
-    d = json.loads(m.group()) if m else {}
+    s = resp.find('{'); d = json.JSONDecoder().raw_decode(resp, s)[0] if s >= 0 else {}
     print(1 if d.get('tool','').lower() == 'get_weather' else 0)
 except: print(0)
 " 2>/dev/null || echo 0)
@@ -397,11 +394,10 @@ RAW=$(call_model "$MODEL" "$T3_SYS" "come funziona il matching su bikerlink?")
 T3_LAT2=$(echo "$RAW" | grep "LATENCY_MS:" | cut -d: -f2)
 T3_RESP2=$(echo "$RAW" | grep -v "LATENCY_MS:" | sed 's/^RESPONSE://')
 SQ2=$(echo "$T3_RESP2" | python3 -c "
-import json, sys, re
+import json, sys
 resp = sys.stdin.read()
 try:
-    m = re.search(r'\{[^{}]*\}', resp)
-    d = json.loads(m.group()) if m else {}
+    s = resp.find('{'); d = json.JSONDecoder().raw_decode(resp, s)[0] if s >= 0 else {}
     print(1 if d.get('tool','').lower() == 'search_manual' else 0)
 except: print(0)
 " 2>/dev/null || echo 0)
@@ -413,11 +409,10 @@ RAW=$(call_model "$MODEL" "$T3_SYS" "qual è il limite di velocità in autostrad
 T3_LAT3=$(echo "$RAW" | grep "LATENCY_MS:" | cut -d: -f2)
 T3_RESP3=$(echo "$RAW" | grep -v "LATENCY_MS:" | sed 's/^RESPONSE://')
 SQ3=$(echo "$T3_RESP3" | python3 -c "
-import json, sys, re
+import json, sys
 resp = sys.stdin.read()
 try:
-    m = re.search(r'\{[^{}]*\}', resp)
-    d = json.loads(m.group()) if m else {}
+    s = resp.find('{'); d = json.JSONDecoder().raw_decode(resp, s)[0] if s >= 0 else {}
     print(1 if d.get('tool','').lower() == 'web_search' else 0)
 except: print(0)
 " 2>/dev/null || echo 0)
@@ -633,7 +628,7 @@ fi
 
 echo ""
 FINAL_VRAM=$(vram_read)
-echo "[final] VRAM after cleanup: used=$(echo $FINAL_VRAM|cut -d,'-f1) free=$(echo $FINAL_VRAM|cut -d,'-f2) temp=$(echo $FINAL_VRAM|cut -d,'-f3)°C"
+echo "[final] VRAM after cleanup: used=$(echo $FINAL_VRAM|cut -d',' -f1) free=$(echo $FINAL_VRAM|cut -d',' -f2) temp=$(echo $FINAL_VRAM|cut -d',' -f3)°C"
 echo ""
 echo "========================================"
 echo "DONE: $MODEL → $TOTAL/17"
