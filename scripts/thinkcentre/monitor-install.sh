@@ -79,3 +79,34 @@ echo "  pm2 logs bikerlink-agent                 # log agente TC"
 echo "  screen -r tc-monitor                     # log monitor docker"
 echo "  screen -ls                               # lista sessioni"
 echo "  kill \$(cat ~/bikerlink-monitor/monitor.lock)  # stop monitor"
+
+# ── cloudflared DNS upstream (manutenzione) ───────────────────────────────
+# Verifica che /etc/systemd/system/cloudflared.service contenga:
+#   Environment=TUNNEL_DNS_UPSTREAM=https://1.1.1.1/dns-query
+#   Environment=TUNNEL_GRACE_PERIOD=30s
+#
+# Queste variabili bypassano il resolver stub di systemd-resolved (127.0.0.53)
+# e mitigano il flood di restart causato da "server misbehaving" / "i/o timeout"
+# sulle SRV lookup di argotunnel.com (Sentry #126649029, restart flood #157, Jul 2026).
+# Il bridge redis-tunnel.ts nel cloud ora imposta TUNNEL_DNS_UPSTREAM=https://1.1.1.1/dns-query
+# automaticamente nello spawn env del processo cloudflared su Replit; il service
+# systemd sul TC DEVE avere la stessa variabile per coerenza.
+#
+# Controllo rapido:
+#   grep TUNNEL_DNS_UPSTREAM /etc/systemd/system/cloudflared.service
+# Se mancante:
+#   sudo sed -i '/\[Service\]/a Environment=TUNNEL_DNS_UPSTREAM=https://1.1.1.1/dns-query\nEnvironment=TUNNEL_GRACE_PERIOD=30s' /etc/systemd/system/cloudflared.service
+#   sudo systemd-run --on-active=5s systemctl restart cloudflared
+echo ""
+echo "🔍 cloudflared DNS upstream check:"
+if [ -f /etc/systemd/system/cloudflared.service ]; then
+  if grep -q "TUNNEL_DNS_UPSTREAM" /etc/systemd/system/cloudflared.service; then
+    echo "  ✅ cloudflared.service ha TUNNEL_DNS_UPSTREAM impostato"
+  else
+    echo "  ⚠️  cloudflared.service NON ha TUNNEL_DNS_UPSTREAM — aggiungere:"
+    echo "       Environment=TUNNEL_DNS_UPSTREAM=https://1.1.1.1/dns-query"
+    echo "     in [Service] e riavviare: sudo systemd-run --on-active=5s systemctl restart cloudflared"
+  fi
+else
+  echo "  ℹ️  /etc/systemd/system/cloudflared.service non trovato — verifica manuale necessaria"
+fi

@@ -195,10 +195,17 @@ function spawnBridge(): void {
   ];
 
   // Service token via env (NON in argv → non compare in `ps`).
+  // TUNNEL_DNS_UPSTREAM: bypassa il resolver stub di systemd-resolved (127.0.0.53)
+  // e colpisce direttamente Cloudflare DoH per le SRV lookup di argotunnel.com.
+  // Mitiga il flood di restart causato dal resolver stub che restituisce
+  // "server misbehaving"/"i/o timeout" (Sentry #126649029, restart flood #157, Jul 2026).
+  // Se l'operatore ha già impostato la variabile nell'ambiente del processo, il suo
+  // valore ha priorità (override esplicito); in tutti gli altri casi usiamo 1.1.1.1 DoH.
   const env = {
     ...process.env,
     TUNNEL_SERVICE_TOKEN_ID: process.env.CF_ACCESS_CLIENT_ID ?? "",
     TUNNEL_SERVICE_TOKEN_SECRET: process.env.CF_ACCESS_CLIENT_SECRET ?? "",
+    TUNNEL_DNS_UPSTREAM: process.env.TUNNEL_DNS_UPSTREAM ?? "https://1.1.1.1/dns-query",
   };
 
   console.log(`[redis-tunnel] avvio bridge: ${bin} access tcp --hostname ${state.hostname} --url 127.0.0.1:${state.localPort}`);
