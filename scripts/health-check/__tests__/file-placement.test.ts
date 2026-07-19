@@ -147,9 +147,9 @@ describe("runFilePlacement — FP-orphan-stub", () => {
 });
 
 describe("runFilePlacement — FP-large-file", () => {
-  it("file da 601 righe → FP-large-file warning", async () => {
+  it("file da 801 righe → FP-large-file warning", async () => {
     mockListSourceFiles.mockReturnValue([makeFile("server/routes/big.ts")]);
-    mockSafeRead.mockReturnValue(makeContent(601));
+    mockSafeRead.mockReturnValue(makeContent(801));
 
     const results = await runFilePlacement();
     const hit = results.find((r) => r.checkId === "FP-large-file");
@@ -160,16 +160,16 @@ describe("runFilePlacement — FP-large-file", () => {
 
   it("FP-large-file → line riporta il conteggio righe reale", async () => {
     mockListSourceFiles.mockReturnValue([makeFile("lib/large.ts")]);
-    mockSafeRead.mockReturnValue(makeContent(750));
+    mockSafeRead.mockReturnValue(makeContent(850));
 
     const results = await runFilePlacement();
     const hit = results.find((r) => r.checkId === "FP-large-file");
-    expect(hit!.line).toBe(750);
+    expect(hit!.line).toBe(850);
   });
 
   it("FP-large-file → file relativo riportato correttamente", async () => {
     mockListSourceFiles.mockReturnValue([makeFile("components/Monster.tsx")]);
-    mockSafeRead.mockReturnValue(makeContent(620));
+    mockSafeRead.mockReturnValue(makeContent(820));
 
     const results = await runFilePlacement();
     const hit = results.find((r) => r.checkId === "FP-large-file");
@@ -180,7 +180,7 @@ describe("runFilePlacement — FP-large-file", () => {
 describe("runFilePlacement — combinazioni di problemi sullo stesso file", () => {
   it("file helper in app/(tabs)/ E troppo grande → entrambi i check emessi", async () => {
     mockListSourceFiles.mockReturnValue([makeFile("app/(tabs)/foo.styles.ts")]);
-    mockSafeRead.mockReturnValue(makeContent(700));
+    mockSafeRead.mockReturnValue(makeContent(820));
 
     const results = await runFilePlacement();
     const ids = results.map((r) => r.checkId);
