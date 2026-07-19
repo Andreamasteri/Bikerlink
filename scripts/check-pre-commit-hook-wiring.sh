@@ -33,6 +33,7 @@ REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 HOOK_PATH="$REPO_ROOT/.git/hooks/pre-commit"
 GATE_MARKER="check-deploy-build-step-numbers.sh"
 GATE_MARKER_2="check-large-files-limit-sync.sh"
+GATE_MARKER_3="check-replit-ports.sh"
 
 FAIL=0
 
@@ -104,5 +105,23 @@ if ! grep -qF "$GATE_MARKER_2" "$HOOK_PATH"; then
   exit 1
 fi
 
-echo "✅ check-pre-commit-hook-wiring PASSATO — .git/hooks/pre-commit è installato ed include il gate step-numbering e il gate limit-sync."
+# ── Check 5: hook contains the replit-ports gate ────────────────────────────
+if ! grep -qF "$GATE_MARKER_3" "$HOOK_PATH"; then
+  echo ""
+  echo "╔══════════════════════════════════════════════════════════════════════╗"
+  echo "║  PRE-COMMIT HOOK IS STALE — REPLIT-PORTS GATE MISSING               ║"
+  echo "╠══════════════════════════════════════════════════════════════════════╣"
+  echo "║  .git/hooks/pre-commit does not call                                 ║"
+  echo "║  check-replit-ports.sh.                                              ║"
+  echo "║                                                                      ║"
+  echo "║  The hook was likely installed before the replit-ports gate was      ║"
+  echo "║  added to scripts/pre-commit.                                        ║"
+  echo "║                                                                      ║"
+  echo "║  FIX: bash scripts/setup-hooks.sh  (refreshes the installed hook)    ║"
+  echo "╚══════════════════════════════════════════════════════════════════════╝"
+  echo ""
+  exit 1
+fi
+
+echo "✅ check-pre-commit-hook-wiring PASSATO — .git/hooks/pre-commit è installato ed include il gate step-numbering, il gate limit-sync e il gate replit-ports."
 exit 0

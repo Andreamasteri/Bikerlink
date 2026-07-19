@@ -76,6 +76,7 @@ echo "     • check-large-files-limit-sync    — MAX_LINES/SPLIT_TARGET in syn
 echo "     • lint-migration-indexes          — indici DESC/WHERE a rischio"
 echo "     • check-ai-direct-generateobject  — bypass generateStructured rilevato"
 echo "     • check-deploy-build-step-numbers — numerazione [N/TOTAL] corretta"
+echo "     • check-replit-ports              — mapping [[ports]] .replit canonico (anti-inversione)"
 echo "   Per bypassare (solo falsi positivi): git commit --no-verify"
 
 # Verifica wiring post-installazione

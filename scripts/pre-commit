@@ -142,6 +142,22 @@ if "$DETECT_SECRETS_HOOK" --baseline "$BASELINE" "${STAGED_FILES[@]}"; then
     exit 1
   fi
 
+  # Gate "mapping [[ports]] .replit" — blocca l'inversione localPort=5000→externalPort=8081
+  # che ha mandato giù prod in passato (traffico pubblico instradato al probe probe/8081).
+  # Vedi: .agents/memory/port-mapping-probe-vs-express.md
+  echo ""
+  echo "🔍 Gate mapping [[ports]] .replit (anti-inversione)..."
+  if ! bash scripts/check-replit-ports.sh; then
+    echo ""
+    echo "❌ COMMIT BLOCCATO — mapping [[ports]] .replit non canonico."
+    echo "   Configurazione richiesta:"
+    echo "     [[ports]] localPort=5000  → externalPort=80"
+    echo "     [[ports]] localPort=8081  → externalPort=8081"
+    echo "     [deployment] run → PORT=5000"
+    echo "   Bypass una-tantum (solo se sicuro): git commit --no-verify"
+    exit 1
+  fi
+
   echo "✅ Commit consentito."
   exit 0
 else

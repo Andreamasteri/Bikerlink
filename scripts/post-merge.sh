@@ -1573,4 +1573,46 @@ if [ "$NIGHTLY_PREFIX_EXIT" -ne 0 ]; then
   exit "$NIGHTLY_PREFIX_EXIT"
 fi
 
+# ── GATE MAPPING [[ports]] .replit (anti-inversione) ──────────────
+# L'inversione localPort=5000→externalPort=8081 / localPort=8081→externalPort=80
+# ha già mandato giù la produzione: tutto il traffico pubblico finiva al probe
+# invece che all'API Express. Il merge driver (merge=ours in .gitattributes)
+# protegge durante i git merge, ma non copre le modifiche dirette da un agente.
+# Questo gate blocca la regressione a tempo di merge.
+# Vedi: .agents/memory/port-mapping-probe-vs-express.md
+echo "════════════════════════════════════════"
+echo "  Gate mapping [[ports]] .replit (anti-inversione)"
+echo "════════════════════════════════════════"
+REPLIT_PORTS_EXIT=0
+bash scripts/check-replit-ports.sh || REPLIT_PORTS_EXIT=$?
+echo "════════════════════════════════════════"
+echo ""
+if [ "$REPLIT_PORTS_EXIT" -ne 0 ]; then
+  echo "❌ Gate check-replit-ports FALLITO — correggere .replit prima di procedere."
+  echo "   Configurazione canonica:"
+  echo "     [[ports]] localPort=5000  → externalPort=80"
+  echo "     [[ports]] localPort=8081  → externalPort=8081"
+  echo "     [deployment] run → PORT=5000"
+  exit "$REPLIT_PORTS_EXIT"
+fi
+
+# ── GATE REGRESSION TEST — check-replit-ports ────────────────────────────────
+# Verifica che il gate stesso non sia regredito: tutti e 7 gli scenari (canonico,
+# invertito, parziale, PORT=8081, PORT=5000 assente, file assente, corretto)
+# devono produrre il comportamento atteso. Se un agente rompe la logica del gate,
+# questa regressione lo scopre prima che entri in produzione.
+# Vedi: scripts/__tests__/check-replit-ports.test.sh
+echo "════════════════════════════════════════"
+echo "  Regression test — check-replit-ports"
+echo "════════════════════════════════════════"
+REPLIT_PORTS_TEST_EXIT=0
+bash scripts/__tests__/check-replit-ports.test.sh || REPLIT_PORTS_TEST_EXIT=$?
+echo "════════════════════════════════════════"
+echo ""
+if [ "$REPLIT_PORTS_TEST_EXIT" -ne 0 ]; then
+  echo "❌ Regression test check-replit-ports FALLITO — la logica del gate è regredita."
+  echo "   Eseguire 'bash scripts/__tests__/check-replit-ports.test.sh' localmente per i dettagli."
+  exit "$REPLIT_PORTS_TEST_EXIT"
+fi
+
 exit 0
