@@ -200,10 +200,11 @@ async function callHorus(
       signal: controller.signal,
       body: JSON.stringify({
         model,
-        stream: false,
+        // stream:true obbligatorio — CF Tunnel taglia con HTTP 524 dopo ~100s
+        // se stream:false (Ollama genera tutto prima di inviare il primo byte).
+        // Con stream:true i chunk arrivano subito, la connessione resta viva.
+        stream: true,
         // Task #684 — Ollama ≥0.30.11: think TOP-LEVEL (non dentro options).
-        // options.think:true → content vuoto; think:false top-level → output diretto.
-        // Fallback: se content vuoto, usa message.thinking (think:true + 0.30.11).
         think: HORUS_THINK_ENABLED,
         options: { temperature: 0.2, num_predict: HORUS_THINK_ENABLED ? 800 : 600 },
         messages: [
@@ -218,19 +219,41 @@ async function callHorus(
       throw new Error(`HTTP ${res.status} ${res.statusText}${text ? ` — ${text.slice(0, 500)}` : ""}`);
     }
 
-    interface OllamaResponse {
-      message?: { role: string; content: string; thinking?: string };
-      error?: string;
+    // Parser NDJSON: ogni riga è un chunk JSON {message:{content:...}}.
+    // Concatena i content, poi applica stripThinkBlock (gestisce anche il tag
+    // </think> orfano che qwen3 emette quando think:true + stream:true).
+    if (!res.body) throw new Error("Risposta streaming vuota (res.body null).");
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = "";
+    const contentChunks: string[] = [];
+
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+      const lines = buf.split("\n");
+      buf = lines.pop() ?? "";
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed) continue;
+        try {
+          const chunk = JSON.parse(trimmed) as {
+            message?: { content?: string };
+            error?: string;
+            done?: boolean;
+          };
+          if (chunk.error) throw new Error(`Ollama error: ${chunk.error}`);
+          if (chunk.message?.content) contentChunks.push(chunk.message.content);
+        } catch (parseErr) {
+          // riga non-JSON (rara): ignora
+        }
+      }
     }
 
-    const data = (await res.json()) as OllamaResponse;
-    if (data.error) throw new Error(`Ollama error: ${data.error}`);
-    let raw = data.message?.content?.trim() ?? "";
-    if (raw.length < 50 && data.message?.thinking) {
-      console.warn("  ⚠️  [callHorus] message.content vuoto/corto — uso message.thinking come fallback (Ollama ≥0.30.11 con think=true top-level).");
-      raw = data.message.thinking.trim();
-    }
-    if (!raw) throw new Error("Risposta vuota dal modello (né content né thinking presenti).");
+    let raw = contentChunks.join("").trim();
+    if (!raw) throw new Error("Risposta vuota dal modello (stream concluso senza content).");
+
     // Guard anti-CoT: fail-fast se l'output contiene reasoning grezzo non strutturato.
     const COT_MARKERS = ["Okay, let's", "let me work through", "let me tackle"];
     const foundMarker = COT_MARKERS.find((m) => raw.includes(m));
