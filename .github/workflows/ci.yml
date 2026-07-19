@@ -64,6 +64,9 @@ jobs:
       - name: Quebracho-question deleted-module guard
         run: bash scripts/check-quebracho-question-import.sh
 
+      - name: deploy-build.sh step numbering gate
+        run: bash scripts/check-deploy-build-step-numbers.sh
+
   bowie-expo-doctor:
     name: Bowie Terminal — expo-doctor check
     runs-on: ubuntu-latest
