@@ -914,7 +914,14 @@ function generateBacklogFile(): number {
  * `.local/tasks/*.md` così gli script possono deduplicare senza interrogare
  * la tabella interna di Replit `project_tasks` (che non esiste nel DB Postgres).
  */
-const BACKLOG_FILE_DEFAULT = path.join(ROOT, ".local", "horus-backlog.json");
+/**
+ * Path del file backlog. Se `HORUS_BACKLOG_DIR` è impostato, il file viene
+ * scritto in quella directory (es. `/tmp` nella shell planner dove `.local/`
+ * è read-only). Default: `.local/horus-backlog.json`.
+ */
+const BACKLOG_FILE_DEFAULT = process.env.HORUS_BACKLOG_DIR
+  ? path.join(path.resolve(process.env.HORUS_BACKLOG_DIR), "horus-backlog.json")
+  : path.join(ROOT, ".local", "horus-backlog.json");
 
 function parseBacklogFileArg(): string | null {
   const i = process.argv.indexOf("--backlog-file");

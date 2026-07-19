@@ -31,10 +31,10 @@ Il triage è disponibile come **workflow Replit**. Nel pannello Workflows del pr
 
 La **shell del planner** (agente Replit in modalità task) è **read-only sull'intero workspace**. Quando lo script tenta di scrivere in `logs/`, la piattaforma intercetta la syscall **prima** che Node.js possa catturarla nel try/catch, causando **exit 254** e l'interruzione del triage prima che il report venga stampato su stdout.
 
-**Soluzione**: imposta `HORUS_LOG_DIR=/tmp` per redirigere output e manifest su `/tmp`, che è sempre scrivibile:
+**Soluzione**: imposta `HORUS_LOG_DIR=/tmp` e `HORUS_BACKLOG_DIR=/tmp` per redirigere output, manifest e backlog su `/tmp`, che è sempre scrivibile:
 
 ```bash
-HORUS_LOG_DIR=/tmp npx tsx scripts/log-analysis-horus.ts
+HORUS_LOG_DIR=/tmp HORUS_BACKLOG_DIR=/tmp npx tsx scripts/log-analysis-horus.ts
 HORUS_LOG_DIR=/tmp npx tsx scripts/horus-propose-tasks.ts
 ```
 
@@ -49,7 +49,9 @@ HORUS_LOG_DIR=/tmp npx tsx scripts/horus-propose-tasks.ts
 |---|---|---|
 | **Workflow** (raccomandato) | Pannello Workflows → "Triage Horus" | Scrive in `logs/`, nessun flag extra |
 | **Shell build** | `npx tsx scripts/log-analysis-horus.ts` | Workspace scrivibile, usa `logs/` |
-| **Shell planner** | `HORUS_LOG_DIR=/tmp npx tsx scripts/log-analysis-horus.ts` | `/tmp` sempre scrivibile |
+| **Shell planner** | `HORUS_LOG_DIR=/tmp HORUS_BACKLOG_DIR=/tmp npx tsx scripts/log-analysis-horus.ts` | `/tmp` sempre scrivibile |
+
+> **Nota `HORUS_BACKLOG_DIR`**: controlla dove viene scritto `horus-backlog.json` (default: `.local/`). Senza questo flag, anche con `HORUS_LOG_DIR=/tmp` lo script tenta di scrivere il backlog in `.local/` — causando exit 254 nella shell planner.
 
 ## Come lanciarla — da terminale
 
@@ -182,6 +184,7 @@ Prima di ogni sessione di pianificazione ("cosa facciamo adesso?", "proponi task
 | `SENTRY_PROJECT` | Secret/Env | ✅ presente | Project slug Sentry (es. `bikerlink`) |
 | `SENTRY_BASE_URL` | Secret | ✅ presente | Default `https://de.sentry.io/api/0` (istanza EU) |
 | `HORUS_LOG_DIR` | Variabile d'ambiente | opzionale | Override directory output report e manifest (es. `/tmp` nella shell planner); default `logs/` |
+| `HORUS_BACKLOG_DIR` | Variabile d'ambiente | opzionale | Override directory per `horus-backlog.json` (es. `/tmp` nella shell planner); default `.local/`. **Obbligatorio insieme a `HORUS_LOG_DIR`** nella shell planner |
 
 Per impostare i secret: usa la skill `environment-secrets` (mai scriverli nei file).
 
