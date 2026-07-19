@@ -1,6 +1,17 @@
 #!/bin/bash
 set -e
 
+# ⛔ NO-SPLIT — questo file NON deve essere diviso in part file.
+#
+# Il gate `scripts/check-deploy-build-step-numbers.sh` conta i label [N/TOTAL]
+# leggendo UN SINGOLO FILE (questo).  Se i label venissero distribuiti su file
+# part sourced, il gate opererebbe su un sottoinsieme incompleto, producendo
+# TOTAL stantii che arrivano silenziosamente in produzione.
+#
+# Se il file dovesse crescere oltre la soglia del ratchet, la soluzione corretta
+# è estrarre la logica degli step in sub-script CHIAMATI (non sourced/.) e
+# mantenere i label [N/TOTAL] in questo wrapper principale.
+#
 # Task #1150 — deploy build minimale.
 #
 # Storia: lo script ha avuto in passato uno step `npx expo export --platform web`
