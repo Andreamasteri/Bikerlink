@@ -59,6 +59,7 @@ log "Workspace iniziale: $(size .) totali"
 # "Creating Autoscale service" senza alcun log di errore.
 # Questi file non servono a runtime: il server Express non li serve.
 # La pulizia avviene PRIMA del build così il layer risultante è snello.
+STEP_TS_1=$(date -u +%s)
 log "=== [1/15] Pulizia asset workspace non necessari — $(elapsed) elapsed ==="
 log "  attached_assets/ prima: $(size attached_assets)"
 rm -rf attached_assets/
@@ -73,6 +74,7 @@ log "  attached_assets/ svuotata → $(size attached_assets)"
 # il fallimento silenzioso di "Creating Autoscale service" senza alcun log.
 # Misurato: .local/state/replit/ = 504 MB → Repl layer totale ~1.7 GB → KO.
 # Dopo la pulizia: ~1.2 GB → ampiamente sotto il limite.
+STEP_TS_2=$(date -u +%s)
 log "=== [2/15] Pulizia .local/state/ (transcript agente + log DB) — $(elapsed) elapsed ==="
 log "  .local/state/ prima: $(size .local/state)"
 rm -rf .local/state/replit/
@@ -88,6 +90,7 @@ log "  .local/state/ dopo:  $(size .local/state) (replit/, scribe/, workflow-log
 # - dist-ota-env/        → ambiente di build OTA
 # - tmp_review_frames/, tmp_check/, logs/ → artefatti temporanei
 # NB: uploads/ e assets/ NON si toccano — sono serviti a runtime (express.static).
+STEP_TS_3=$(date -u +%s)
 log "=== [3/15] Pulizia directory transitorie non runtime — $(elapsed) elapsed ==="
 log "  backups=$(size .local/backups) dist=$(size dist) dist-ota-env=$(size dist-ota-env) logs=$(size logs)"
 rm -rf .local/backups/
@@ -98,6 +101,7 @@ rm -rf tmp_check/
 rm -rf logs/
 log "  backups, dist, dist-ota-env e artefatti temporanei rimossi."
 
+STEP_TS_4=$(date -u +%s)
 log "=== [4/15] Gate Index Drift (DESC/WHERE — regressioni migration, solo statico) — $(elapsed) elapsed ==="
 # Verifica che nessuna migration SQL abbia introdotto una regressione sugli
 # indici speciali (DESC / WHERE) dichiarati nello schema Drizzle TS.
@@ -139,12 +143,14 @@ fi
 # - exports/ → bundle Git e PDF generati dall'agente (~500 MB), non serviti da Express
 # - .git/    → storia git (~3.4 GB di cui ~1.9 GB LFS objects), non necessaria a runtime
 #              Il server non esegue comandi git; il repository completo è su GitHub.
+STEP_TS_5=$(date -u +%s)
 log "=== [5/15] Pulizia exports/ e .git/ per rispettare il limite Repl layer — $(elapsed) elapsed ==="
 log "  exports=$(size exports) .git=$(size .git)"
 rm -rf exports/
 rm -rf .git/
 log "  exports/ e .git/ rimossi — Repl layer ora sotto il limite ~2 GB."
 
+STEP_TS_6=$(date -u +%s)
 log "=== [6/15] Gate Lint Migration Indexes (CREATE IF NOT EXISTS senza DROP) — $(elapsed) elapsed ==="
 # ── Gate Lint Migration Indexes (drift silenzioso CREATE IF NOT EXISTS) ──────
 # check-index-drift --static-only NON cattura il drift "silenzioso": una migration
@@ -169,6 +175,7 @@ else
   exit 1
 fi
 
+STEP_TS_7=$(date -u +%s)
 log "=== [7/15] Gate Dedup Pattern (DELETE…NOT IN → ROW_NUMBER CTE) — $(elapsed) elapsed ==="
 # Verifica che nessuna migration SQL usi il pattern NULL-unsafe
 # `DELETE FROM <t> WHERE id NOT IN (SELECT id FROM <t>)` per deduplicare
@@ -199,6 +206,7 @@ else
   exit 1
 fi
 
+STEP_TS_8=$(date -u +%s)
 log "=== [8/15] Gate Undefined Route Handlers (.next.ts stubs) — $(elapsed) elapsed ==="
 # Rileva file .next.ts senza `export default` che siano importati come handler
 # di default in un file router. Questi causano:
@@ -219,6 +227,7 @@ else
   exit 1
 fi
 
+STEP_TS_9=$(date -u +%s)
 log "=== [9/15] Gate Hardcoded Agent Model Names — $(elapsed) elapsed ==="
 # Verifica che nessun file .ts/.tsx fuori da server/lib/agent-constants.ts
 # contenga i nomi dei modelli Ollama come letterali stringa hardcoded.
@@ -242,6 +251,7 @@ else
   exit 1
 fi
 
+STEP_TS_10=$(date -u +%s)
 log "=== [10/15] Gate Quebracho Bridge Import (modulo eliminato) — $(elapsed) elapsed ==="
 # Verifica che nessun file importi da quebracho-bridge, rimosso quando
 # Quebracho è stato assorbito in Horus (Task #591 / #597).
@@ -259,6 +269,7 @@ else
   exit 1
 fi
 
+STEP_TS_11=$(date -u +%s)
 log "=== [11/15] Gate Quebracho Question Import (modulo eliminato) — $(elapsed) elapsed ==="
 # Verifica che nessun file importi da quebracho-question, rimosso insieme
 # a Quebracho (Task #591). Il flusso di composizione domanda non esiste più.
@@ -275,6 +286,7 @@ else
   exit 1
 fi
 
+STEP_TS_12=$(date -u +%s)
 log "=== [12/15] Verifica versioni stabili dipendenze critiche (non-bloccante) — $(elapsed) elapsed ==="
 # Avvisa se esistono versioni major/minor più recenti per le dipendenze critiche.
 # Non blocca il deploy: exit sempre 0.
@@ -286,6 +298,7 @@ if [ "$STABLE_VER_EXIT" -ne 0 ]; then
   log "  ⚠️  check-stable-versions.sh ha restituito exit ${STABLE_VER_EXIT} (inatteso — lo script dovrebbe sempre uscire 0)."
 fi
 
+STEP_TS_13=$(date -u +%s)
 log "=== [13/15] Build server TypeScript — $(elapsed) elapsed ==="
 node scripts/server-build.js
 log "  server_dist/ prodotto → $(size server_dist) ($(size server_dist/index.js 2>/dev/null) il bundle)"
@@ -298,6 +311,7 @@ log "  server_dist/ prodotto → $(size server_dist) ($(size server_dist/index.j
 # potrebbe non essere garantita). NON-FATALE: se il download fallisce, i bridge
 # degradano con grazia (Redis → fallback in-memory; SSH → errore descrittivo, niente
 # crash) e il deploy non è bloccato.
+STEP_TS_14=$(date -u +%s)
 log "=== [14/15] Bake binario cloudflared (bridge Redis TCP + SSH) — $(elapsed) elapsed ==="
 CF_BIN="bin/cloudflared"
 if [ -x "$CF_BIN" ]; then
@@ -323,6 +337,7 @@ fi
 # GET /api/exports/matching-system.pdf non torni mai 500 in produzione.
 # NB: in caso di errore logghiamo un warning ma NON usciamo (set -e è attivo,
 # quindi usiamo || true per non bloccare l'intero deploy).
+STEP_TS_15=$(date -u +%s)
 log "=== [15/15] Verifica PDF matching-system — $(elapsed) elapsed ==="
 MATCHING_PDF="server/public/matching-system.pdf"
 if [ -f "$MATCHING_PDF" ]; then
@@ -348,6 +363,47 @@ fi
 # sul DB e confronta con schema_migrations (la vera fonte di verità).
 rm -f server_dist/.migrations-hash
 log "  Cache migration invalidata (al boot migrate.ts farà sempre il controllo DB)."
+
+STEP_TS_16=$(date -u +%s)
+
+# ── Slow-step detector (warning only — non blocca il deploy) ──────────────────
+# Calcola il delta di ogni step e avvisa se supera la soglia configurabile.
+# Soglia default: 120s. Override: variabile DEPLOY_SLOW_STEP_THRESHOLD (secondi).
+SLOW_STEP_THRESHOLD=${DEPLOY_SLOW_STEP_THRESHOLD:-120}
+declare -a _STEP_TS=( $STEP_TS_1 $STEP_TS_2 $STEP_TS_3 $STEP_TS_4 $STEP_TS_5
+                      $STEP_TS_6 $STEP_TS_7 $STEP_TS_8 $STEP_TS_9 $STEP_TS_10
+                      $STEP_TS_11 $STEP_TS_12 $STEP_TS_13 $STEP_TS_14 $STEP_TS_15
+                      $STEP_TS_16 )
+declare -a _STEP_NAMES=(
+  "Pulizia asset workspace"
+  "Pulizia .local/state/"
+  "Pulizia directory transitorie"
+  "Gate Index Drift"
+  "Pulizia exports/ e .git/"
+  "Gate Lint Migration Indexes"
+  "Gate Dedup Pattern"
+  "Gate Undefined Route Handlers"
+  "Gate Hardcoded Agent Model Names"
+  "Gate Quebracho Bridge Import"
+  "Gate Quebracho Question Import"
+  "Verifica versioni stabili"
+  "Build server TypeScript"
+  "Bake cloudflared"
+  "Verifica PDF matching-system"
+)
+log "=== Slow-step report (soglia: ${SLOW_STEP_THRESHOLD}s) ==="
+_SLOW_FOUND=0
+for _i in $(seq 0 14); do
+  _N=$(( _i + 1 ))
+  _DELTA=$(( _STEP_TS[_i+1] - _STEP_TS[_i] ))
+  if [ "$_DELTA" -gt "$SLOW_STEP_THRESHOLD" ]; then
+    log "  ⚠️  STEP LENTO [${_N}/15] '${_STEP_NAMES[$_i]}' — ${_DELTA}s (soglia: ${SLOW_STEP_THRESHOLD}s)"
+    _SLOW_FOUND=$(( _SLOW_FOUND + 1 ))
+  fi
+done
+if [ "$_SLOW_FOUND" -eq 0 ]; then
+  log "  ✅ Tutti i 15 step entro la soglia di ${SLOW_STEP_THRESHOLD}s."
+fi
 
 # NB: NON rimuovere .cache/ qui.
 # Verificato dai build log Replit (31 mag 2026):
