@@ -167,18 +167,19 @@ export async function runHorusRoutingProposer(snap: HealthSnapshot): Promise<Hor
     return await withBudget("triage", async () => {
       const started = Date.now();
 
-      // Task #584 — think controllato da HORUS_THINK env (HORUS_THINK=0 → false).
-      // Default: true — ollama-ai-provider-v2 isola il reasoning nel campo `thinking`
-      // separato, il JSON strutturato resta pulito. num_predict ridotto a 600 se
-      // think:false (nessun reasoning, risposte più brevi).
-      const HORUS_THINK_ENABLED = process.env.HORUS_THINK !== "0";
+      // Task #858 — think:false OBBLIGATORIO per generateObject (JSON strutturato).
+      // Con think:true su Ollama 0.30.11 + qwen3, il path non-streaming di structured-output
+      // JSON restituisce 400 Bad Request: il canale reasoning e il JSON-schema mode sono
+      // incompatibili. Il path streaming in agent.ts usa think:true correttamente (canale
+      // `thinking` separato) — solo questo path non-streaming deve usare think:false.
+      // Vedi memory: qwen3-ollama-think-quirk.md.
       const callModel = (mm: ResolvedModel) =>
         mm.scheduler(() => generateStructured(mm, {
           schema: proposalsSchema,
           system: HORUS_PROPOSER_SYSTEM,
           prompt,
           temperature: 0.2,
-          providerOptions: { ollama: { think: HORUS_THINK_ENABLED, num_predict: HORUS_THINK_ENABLED ? 800 : 600 } },
+          providerOptions: { ollama: { think: false, num_predict: 800 } },
         }));
 
       // Step 0 — modello di Horus (Ollama sul ThinkCentre). Se TC è offline o il

@@ -203,9 +203,13 @@ export async function runProposer(snap: HealthSnapshot): Promise<ProposerResult 
       // Helper: structured generation tramite generateStructured (AI SDK v6).
       // I modelli Groq llama-3.x (objectMode:"json") usano output:"no-schema" +
       // validazione Zod; gli altri usano structured outputs nativi. Vedi provider.ts.
+      // Task #858 — think:false esplicito per Ollama: generateStructured ha già un
+      // default think:false, ma lo rendiamo esplicito per chiarezza e robustezza.
+      // Con think:true su Ollama 0.30.11 + qwen3, generateObject restituisce 400.
       const callModel = (mm: ReturnType<typeof resolveModel>) =>
         mm.scheduler(() => generateStructured(mm, {
           schema: proposalsSchema, system: SYSTEM, prompt, temperature: 0.2,
+          providerOptions: { ollama: { think: false } },
         }));
 
       // Three-step model routing (Task #3872 — Ollama-first universale):
