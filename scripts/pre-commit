@@ -116,6 +116,19 @@ if "$DETECT_SECRETS_HOOK" --baseline "$BASELINE" "${STAGED_FILES[@]}"; then
     exit 1
   fi
 
+  # Gate "step-numbering di deploy-build.sh" — rileva numerazione rotta [N/TOTAL]
+  # prima che lo sviluppatore faccia push. Previene il caso "step aggiunto senza
+  # rinumerare" che si scoprirebbe solo eseguendo il workflow CI manualmente.
+  echo ""
+  echo "🔍 Gate deploy-build step numbering [N/TOTAL]..."
+  if ! bash scripts/check-deploy-build-step-numbers.sh; then
+    echo ""
+    echo "❌ COMMIT BLOCCATO — numerazione step in deploy-build.sh non corretta."
+    echo "   Rinumerare i label [N/TOTAL] sequenzialmente e aggiornare il TOTAL."
+    echo "   Bypass una-tantum (solo se sicuro): git commit --no-verify"
+    exit 1
+  fi
+
   echo "✅ Commit consentito."
   exit 0
 else

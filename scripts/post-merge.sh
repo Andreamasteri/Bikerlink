@@ -580,6 +580,23 @@ if [ "$LEAFLET_GUARD_REGTEST_EXIT" -ne 0 ]; then
   exit "$LEAFLET_GUARD_REGTEST_EXIT"
 fi
 
+# ── GATE DEPLOY-BUILD STEP NUMBERING ─────────────────────────
+# Verifica che i label [N/TOTAL] in deploy-build.sh siano sequenziali e
+# che il TOTAL dichiarato corrisponda al conteggio reale degli step.
+# Previene il caso "nuovo step aggiunto senza rinumerare" che si scoprirebbe
+# solo in produzione — troppo tardi. Il gate è bloccante.
+echo "════════════════════════════════════════"
+echo "  Gate deploy-build step numbering [N/TOTAL]"
+echo "════════════════════════════════════════"
+DEPLOY_STEP_NUMBERS_EXIT=0
+bash scripts/check-deploy-build-step-numbers.sh || DEPLOY_STEP_NUMBERS_EXIT=$?
+echo "════════════════════════════════════════"
+echo ""
+if [ "$DEPLOY_STEP_NUMBERS_EXIT" -ne 0 ]; then
+  echo "❌ Gate deploy-build-step-numbers fallito — rinumerare i label [N/TOTAL] in scripts/deploy-build.sh."
+  exit "$DEPLOY_STEP_NUMBERS_EXIT"
+fi
+
 # ── GUARD PORTE .replit (MAPPING [[ports]] + DEPLOY) ─────────
 # REGOLA BLOCCANTE (replit.md § Preferenze utente):
 # Nessun agente può modificare [[ports]] senza autorizzazione esplicita utente.
