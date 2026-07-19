@@ -16,7 +16,7 @@ import { runCleanup, pruneStaleProposalProfileMatches, pruneOldZoneNotifications
 import { recomputeAllUserMatchProfiles } from "./recompute-profiles";
 import { addMatchLog } from "./match-log-buffer";
 import { recordCycleError, recordCycleDrop } from "./metrics";
-import { triggerMatchingRun, recordSchedulerHeartbeat } from "./scheduler.cycle";
+import { triggerMatchingRun, recordSchedulerHeartbeat, recordGapRecovery } from "./scheduler.cycle";
 import { withJobGate } from "../ai/coordinator/gated-job";
 
 // Task #9 ("Group D") — questi loop del motore di matching sono
@@ -90,6 +90,26 @@ export function startMatchingEngine(): void {
     }
   }, 60_000));
   console.log("[Matching] Heartbeat scheduler avviato (60s)");
+
+  // Task #705 — Rilevamento gap al boot: quando il motore si (ri)avvia dopo un
+  // crash loop o deploy, legge lastTickAt dal DB e se il silenzio è stato >30
+  // min registra l'evento scheduler.resumed_after_gap così il collector può
+  // emetterlo come segnale. Ritardo 5s per lasciare al DB il tempo di rispondere.
+  setTimeout(() => {
+    storage.getAppSetting("matching_scheduler_state")
+      .then((row) => {
+        const parsed = row?.valueJson as { lastTickAt?: string } | null;
+        if (!parsed?.lastTickAt) return;
+        const gapMs = Date.now() - new Date(parsed.lastTickAt).getTime();
+        const GAP_RECOVERY_THRESHOLD_MS = 30 * 60 * 1000;
+        if (gapMs > GAP_RECOVERY_THRESHOLD_MS) {
+          recordGapRecovery(gapMs);
+        }
+      })
+      .catch((err) => {
+        dedupWarn("matching/gap-check", "startup gap check fallito (non-fatal)", err);
+      });
+  }, 5_000);
 
   const runArchiveStaleMatches = async () => {
     addMatchLog("INFO", "archive_stale", "Archiviazione match stale avviata");

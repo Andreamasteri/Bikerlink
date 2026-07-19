@@ -119,6 +119,26 @@ export function forceUnlockMatching(): { wasRunning: boolean; lastStartAt: numbe
   return { wasRunning, lastStartAt };
 }
 
+// Task #705 — Gap recovery: scritto da startMatchingEngine() al boot se
+// lastTickAt era >30min fa; il collector lo legge e emette resumed_after_gap.
+let lastGapWarnAt = 0;
+export function recordGapRecovery(gapMs: number): void {
+  const gapMin = Math.round(gapMs / 60_000);
+  const now = new Date().toISOString();
+  withBgDbSlot(() => storage.getAppSetting("matching_scheduler_state"))
+    .then((existing) => {
+      const prev = (existing?.valueJson as Record<string, unknown>) ?? {};
+      return withBgDbSlot(() => storage.upsertAppSetting("matching_scheduler_state", undefined,
+        { ...prev, lastGapRecoveredAt: now, lastGapDurationMin: gapMin }));
+    })
+    .catch((err) => {
+      const t = Date.now();
+      if (t - lastGapWarnAt >= 10 * 60_000) { lastGapWarnAt = t; schedulerLogger.warn({ err }, "gap recovery persist failed"); }
+    });
+  schedulerLogger.warn({ gapMin }, `Scheduler ripreso dopo gap — heartbeat_dead per ${gapMin}min`);
+  addMatchLog("WARN", "scheduler", `Loop ripreso dopo gap di ${gapMin}min di silenzio (heartbeat_dead)`);
+}
+
 // ─── Scheduler heartbeat (Task #4798) ───────────────────────────────────────
 //
 // `lastRunAt` viene scritto SOLO al completamento di un ciclo riuscito, quindi
@@ -521,7 +541,29 @@ export function triggerMatchingRun(): { started: boolean; reason?: string } {
     });
     if (!lockOutcome.acquired) {
       schedulerLogger.warn({ reason: lockOutcome.reason }, "Ciclo skippato — lock già attivo");
-      addMatchLog("WARN", "lock", `Ciclo skippato — lock già attivo: ${lockOutcome.reason ?? ""}`);
+      // Task #705 — Diagnosi: recupera i dettagli del holder (PID, acquiredAt, TTL
+      // residua) e li persiste in matching_scheduler_state.lastSkipReason così
+      // l'admin può vedere PERCHÉ i run non completano senza aprire DragonflyDB.
+      getMatchingLockStatus().then((ls) => {
+        const holderInfo = ls.holder
+          ? `holder=${ls.holder.owner} source=${ls.holder.source} elapsed=${ls.holder.elapsedMs}ms`
+          : ls.redis.exists
+            ? `Redis lock presente (TTL ${ls.redis.ttlSeconds}s) holder=${JSON.stringify(ls.redis.remoteHolder)}`
+            : "nessun holder rilevabile";
+        addMatchLog("WARN", "lock", `Ciclo skippato — lock già attivo: ${lockOutcome.reason ?? ""} — ${holderInfo}`);
+        withBgDbSlot(() => storage.getAppSetting("matching_scheduler_state"))
+          .then((existing) => {
+            const prev = (existing?.valueJson as Record<string, unknown>) ?? {};
+            return withBgDbSlot(() => storage.upsertAppSetting("matching_scheduler_state", undefined, {
+              ...prev,
+              lastSkipReason: `lock_held: ${holderInfo}`,
+              lastSkipAt: new Date().toISOString(),
+            }));
+          })
+          .catch(() => { /* best-effort */ });
+      }).catch(() => {
+        addMatchLog("WARN", "lock", `Ciclo skippato — lock già attivo: ${lockOutcome.reason ?? ""}`);
+      });
     }
     } catch (err) {
       if (isBgDbLimiterDropError(err)) {

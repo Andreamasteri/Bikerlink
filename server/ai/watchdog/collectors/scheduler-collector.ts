@@ -1,8 +1,22 @@
 // Task #2533 — Collector scheduler matching. Legge stato lock + lastRun.
 import { storage } from "../../../storage";
+import { getMatchingLockStatus } from "../../../cache/matching-lock";
 import type { Signal } from "../types";
 
-interface LockSetting { lockedAt?: string | null; lastRunAt?: string | null; lastRunDurationMs?: number | null; lastTickAt?: string | null; lastTickResult?: string | null; lastZombieRecoveredAt?: string | null }
+interface LockSetting {
+  lockedAt?: string | null;
+  lastRunAt?: string | null;
+  lastRunDurationMs?: number | null;
+  lastTickAt?: string | null;
+  lastTickResult?: string | null;
+  lastZombieRecoveredAt?: string | null;
+  // Task #705: heartbeat gap recovery
+  lastGapRecoveredAt?: string | null;
+  lastGapDurationMin?: number | null;
+  // Task #705: skip diagnostics
+  lastSkipReason?: string | null;
+  lastSkipAt?: string | null;
+}
 
 // Task #157 — Soglia "scheduler morto": il loop scheduler emette un heartbeat
 // di liveness ogni 60s (scheduler.engine.ts); se lastTickAt è più vecchio di
@@ -71,6 +85,27 @@ export async function collectScheduler(): Promise<Signal[]> {
       }
     }
 
+    // Task #705 — Segnale di recovery dopo gap: se il loop è tornato vivo dopo
+    // un'assenza >30 min, viene scritto lastGapRecoveredAt+lastGapDurationMin in
+    // matching_scheduler_state da startMatchingEngine(). Emettilo come segnale
+    // INFO per le ultime 2 ore, così l'admin vede l'evento nella dashboard.
+    if (parsed?.lastGapRecoveredAt && parsed.lastGapDurationMin != null) {
+      const recoveredAgoMs = now - new Date(parsed.lastGapRecoveredAt).getTime();
+      const recoveredAgoMin = Math.floor(recoveredAgoMs / 60_000);
+      if (recoveredAgoMin >= 0 && recoveredAgoMin <= 120) {
+        signals.push({
+          source: "scheduler", metric: "scheduler.resumed_after_gap", value: parsed.lastGapDurationMin, unit: "min",
+          severity: "warn",
+          details: {
+            lastGapRecoveredAt: parsed.lastGapRecoveredAt,
+            gapDurationMin: parsed.lastGapDurationMin,
+            recoveredAgoMin,
+            message: `Loop ripreso ${recoveredAgoMin}min fa dopo ${parsed.lastGapDurationMin}min di silenzio`,
+          },
+        });
+      }
+    }
+
     const lastRunAt = parsed?.lastRunAt ? new Date(parsed.lastRunAt).getTime() : null;
     if (lastRunAt) {
       const ageMs = now - lastRunAt;
@@ -87,8 +122,70 @@ export async function collectScheduler(): Promise<Signal[]> {
       signals.push({
         source: "scheduler", metric: "scheduler.last_run_min_ago", value: ageMin, unit: "min",
         severity,
-        details: { lastRunAt: parsed?.lastRunAt, schedulerAlive, lastTickResult: parsed?.lastTickResult },
+        details: {
+          lastRunAt: parsed?.lastRunAt,
+          schedulerAlive,
+          lastTickResult: parsed?.lastTickResult,
+          lastSkipReason: parsed?.lastSkipReason ?? null,
+          lastSkipAt: parsed?.lastSkipAt ?? null,
+        },
       });
+
+      // Task #705 — Zombie lock detection: se il loop è alive ma non completa
+      // un ciclo da >4h, interroga DragonflyDB per vedere se il lock è tenuto
+      // da un processo diverso (PID divergente = istanza morta che non ha
+      // rilasciato). Solo warning + segnale HIGH, NO force-unlock automatico.
+      const RUN_GAP_ZOMBIE_THRESHOLD_MS = 4 * 60 * 60 * 1000; // 4 ore
+      if (schedulerAlive && ageMs > RUN_GAP_ZOMBIE_THRESHOLD_MS) {
+        try {
+          const ls = await getMatchingLockStatus();
+          const remoteHolder = ls.redis.remoteHolder as { pid?: number } | null;
+          const isZombieLock = ls.redis.exists
+            && remoteHolder?.pid != null
+            && remoteHolder.pid !== process.pid;
+          if (isZombieLock) {
+            signals.push({
+              source: "scheduler", metric: "scheduler.lock_zombie_suspected", value: ageMin, unit: "min",
+              severity: "high",
+              details: {
+                lastRunMinAgo: ageMin,
+                lockHolder: ls.redis.remoteHolder,
+                currentPid: process.pid,
+                holderPid: remoteHolder?.pid,
+                message: `Lock tenuto da PID ${remoteHolder?.pid} (processo corrente: ${process.pid}) — possibile zombie`,
+              },
+            });
+          } else if (ls.active) {
+            // Lock attivo ma stesso PID: ciclo in corso (normale), già gestito
+            // da CYCLE_STALE_MS. Aggiungi solo come dettaglio diagnostico.
+            signals.push({
+              source: "scheduler", metric: "scheduler.lock_active_long_gap", value: ageMin, unit: "min",
+              severity: "warn",
+              details: {
+                lastRunMinAgo: ageMin,
+                lockHolder: ls.holder,
+                lockRedis: ls.redis,
+                message: `Lock attivo ma lastRunAt è ${ageMin}min fa — ciclo potenzialmente bloccato`,
+              },
+            });
+          } else {
+            // Nessun lock attivo: il loop salta i cicli per un'altra ragione
+            // (coordinator, pool saturo). Segnale WARN con contesto diagnostico.
+            signals.push({
+              source: "scheduler", metric: "scheduler.run_gap_no_lock", value: ageMin, unit: "min",
+              severity: "warn",
+              details: {
+                lastRunMinAgo: ageMin,
+                lastSkipReason: parsed?.lastSkipReason ?? null,
+                lastSkipAt: parsed?.lastSkipAt ?? null,
+                message: `Nessun ciclo completato da ${ageMin}min — nessun lock attivo (coordinator/pool saturo?)`,
+              },
+            });
+          }
+        } catch {
+          /* best-effort — non bloccare il collector se DragonflyDB è offline */
+        }
+      }
     } else {
       signals.push({
         source: "scheduler", metric: "scheduler.last_run_min_ago", value: null, severity: "warn",
