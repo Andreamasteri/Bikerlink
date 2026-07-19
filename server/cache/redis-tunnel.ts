@@ -111,7 +111,8 @@ const recentRestartTimes: number[] = [];
  *   systemd-resolved restituisce "server misbehaving" o "i/o timeout" sulle SRV
  *   lookup di argotunnel.com → cloudflared non riesce a scoprire l'edge IP → exit(1).
  */
-function parseExitReason(
+/** @internal exported for unit tests only */
+export function parseExitReason(
   lastOutputLine: string | null,
   code: number | null,
   signal: string | null,
