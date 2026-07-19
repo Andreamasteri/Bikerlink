@@ -434,15 +434,15 @@ if [ "$_SLOW_FOUND" -eq 0 ]; then
   log "  ✅ Tutti i 15 step entro la soglia di ${SLOW_STEP_THRESHOLD}s."
 fi
 
-# ── Deploy stamp + timing summary per l'analisi post-deploy automatica ───────
+# ── Deploy stamp + timing summary per l'analisi post-deploy (su richiesta) ────
 # Scritto in server_dist/ (sempre presente dopo il step [13/15] Build TS) così
-# il container di produzione (FASE 4) può leggerlo al boot senza accedere ai log
-# del pannello Publish che sono visibili solo nell'interfaccia Replit.
+# l'operatore può eseguire manualmente l'analisi post-deploy tramite il workflow
+# "Post-Deploy Analysis" oppure con: FORCE_RERUN=1 bash scripts/post-deploy-analysis.sh
 #
 # .deploy-stamp        → epoch Unix del deploy (usato come "id" del deploy)
 # .deploy-timing.json  → timing step + step lenti + dimensione workspace finale
-# .deploy-stamp.analyzed viene RIMOSSO qui così il prossimo boot può rilevarlo
-# come "deploy fresco" e avviare post-deploy-analysis.sh automaticamente.
+# .deploy-stamp.analyzed viene RIMOSSO qui così la prossima esecuzione manuale
+# non viene bloccata dal marker "già analizzato".
 _DEPLOY_EPOCH=$(date -u +%s)
 _DEPLOY_ISO=$(date -u -d "@$_DEPLOY_EPOCH" '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null || python3 -c "import datetime; print(datetime.datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ'))" 2>/dev/null || echo "unknown")
 _WS_FINAL=$(size .)

@@ -1,11 +1,11 @@
 ---
 name: analisi-deploy-horus
-description: Analisi completa dell'ultimo deploy BikerLink insieme a Horus dopo il completamento del deploy. Usare DOPO che il pannello Publish mostra "Deployment successful". Diagnosi di deploy lento, perché il deploy è lento, cosa ha rallentato il deploy, analizza le fasi 3 e 4, boot lento, creating autoscale lento, pushing repl layer lento, fase 3 lenta, fase 4 lenta, boot runtime lento, deploy completato cosa è successo.
+description: Analisi completa dell'ultimo deploy BikerLink insieme a Horus dopo il completamento del deploy. Usare DOPO che il pannello Publish mostra "Deployment successful". Diagnosi di deploy lento, perché il deploy è lento, cosa ha rallentato il deploy, analizza le fasi 3 e 4, boot lento, creating autoscale lento, pushing repl layer lento, fase 3 lenta, fase 4 lenta, boot runtime lento, deploy completato cosa è successo. DA ESEGUIRE SOLO SU RICHIESTA ESPLICITA DELL'UTENTE — mai automaticamente.
 ---
 
 # Analisi Deploy con Horus — Diagnosi post-deploy BikerLink
 
-> **Quando usarla**: SOLO dopo che il deploy è completato (pannello Publish mostra "Deployment successful" o è fallito). NON durante il deploy. Le fasi 3 e 4 sono sistematicamente le più lente; questa skill dà una procedura strutturata per diagnosticarle.
+> **Quando usarla**: SOLO su richiesta esplicita dell'utente, dopo che il deploy è completato (pannello Publish mostra "Deployment successful" o è fallito). NON durante il deploy. NON avviarla automaticamente dopo ogni deploy. Le fasi 3 e 4 sono sistematicamente le più lente; questa skill dà una procedura strutturata per diagnosticarle.
 
 > **Ruolo dell'agente**: raccogliere i dati, passarli a Horus, materializzare le proposte in task. L'agente **non decide** autonomamente cosa fixare — lo decide Horus.
 

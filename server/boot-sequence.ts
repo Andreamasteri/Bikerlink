@@ -422,33 +422,12 @@ async function runPostReady(needsFakeSeed: boolean): Promise<void> {
       });
   }
 
-  // ── Post-deploy analysis (solo in produzione, solo su deploy fresco) ────────
-  // Rileva un nuovo deploy tramite server_dist/.deploy-stamp (scritto da
-  // deploy-build.sh al termine della FASE 2) e avvia post-deploy-analysis.sh
-  // in background SOLO se .deploy-stamp.analyzed non esiste ancora.
-  // Detached + stdio:ignore → sopravvive al processo padre, non blocca il boot.
-  void (async () => {
-    try {
-      if (process.env.REPLIT_DEPLOYMENT !== "1") return;
-      const { existsSync } = await import("fs");
-      const { join } = await import("path");
-      const stampFile = join(__dirname, "../server_dist/.deploy-stamp");
-      const analyzedMarker = join(__dirname, "../server_dist/.deploy-stamp.analyzed");
-      if (!existsSync(stampFile) || existsSync(analyzedMarker)) return;
-      console.log("[BOOT][POST-DEPLOY] Deploy fresco rilevato — avvio analisi in background...");
-      const { spawn } = await import("child_process");
-      const scriptPath = join(__dirname, "../scripts/post-deploy-analysis.sh");
-      const child = spawn("bash", [scriptPath], {
-        detached: true,
-        stdio: "ignore",
-        env: process.env,
-      });
-      child.unref();
-      console.log(`[BOOT][POST-DEPLOY] post-deploy-analysis.sh avviato (pid ${child.pid}).`);
-    } catch (err) {
-      console.warn("[BOOT][POST-DEPLOY] errore avvio analisi post-deploy (non-fatale):", err);
-    }
-  })();
+  // ── Post-deploy analysis: solo su richiesta manuale ─────────────────────────
+  // L'analisi post-deploy NON viene avviata automaticamente al boot.
+  // Va eseguita manualmente dall'operatore tramite il workflow "Post-Deploy Analysis"
+  // oppure con: FORCE_RERUN=1 bash scripts/post-deploy-analysis.sh
+  // Il deploy stamp (server_dist/.deploy-stamp) scritto da deploy-build.sh è
+  // disponibile per consultazione, ma non innesca nessun processo automatico.
 }
 
 // Index-drift check post-READY. NB: in passato il mode=block faceva
