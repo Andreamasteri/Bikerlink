@@ -14,6 +14,8 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 const writeWatchdogLogMock = vi.hoisted(() => vi.fn().mockResolvedValue("log-id-1"));
 const generateStructuredMock = vi.hoisted(() => vi.fn());
 const appSettingStore = vi.hoisted(() => new Map<string, string>());
+// Controls whether isOllamaConfigured is truthy within a test.
+const ollamaConfiguredRef = vi.hoisted(() => ({ value: false }));
 
 vi.mock("../ai/watchdog/log", () => ({
   writeWatchdogLog: writeWatchdogLogMock,
@@ -33,7 +35,7 @@ vi.mock("../lib/thinkcentre-offline", () => ({
 }));
 
 vi.mock("../lib/ollama-client", () => ({
-  isOllamaConfigured: false,
+  get isOllamaConfigured() { return ollamaConfiguredRef.value; },
   getOllamaModel: vi.fn(),
 }));
 
@@ -79,6 +81,9 @@ import {
   _resetHorusProposerForTests,
 } from "../ai/watchdog/horus-proposer";
 import type { HealthSnapshot, Problem } from "../ai/watchdog/types";
+import { isThinkCentreOffline } from "../lib/thinkcentre-offline";
+import { getOllamaModel } from "../lib/ollama-client";
+import { runWithFallback } from "../ai/moderation/provider";
 
 const valhallaKO: Problem = {
   id: "horus.routing.valhalla.correct",
@@ -109,8 +114,12 @@ describe("horus routing proposer (Task #25)", () => {
   beforeEach(() => {
     writeWatchdogLogMock.mockClear();
     generateStructuredMock.mockReset();
+    vi.mocked(runWithFallback).mockClear();
     appSettingStore.clear();
     _resetHorusProposerForTests();
+    // Default: TC offline + Ollama non configurato (comportamento dei test precedenti).
+    vi.mocked(isThinkCentreOffline).mockResolvedValue(true);
+    ollamaConfiguredRef.value = false;
   });
 
   it("filterHorusProblems seleziona solo i problemi horus high/critical", () => {
@@ -173,6 +182,47 @@ describe("horus routing proposer (Task #25)", () => {
     const out = await runHorusRoutingProposer(snapshot([dbNoise, horusWarn]));
     expect(out).toBeNull();
     expect(generateStructuredMock).not.toHaveBeenCalled();
+  });
+
+  it("path TC online: enforces think:false sul modello Ollama di Horus (Task #863)", async () => {
+    // Arrange — ThinkCentre raggiungibile + Ollama configurato con modello fittizio.
+    vi.mocked(isThinkCentreOffline).mockResolvedValue(false);
+    ollamaConfiguredRef.value = true;
+    // getOllamaModel deve restituire un valore non-null (viene castato a LanguageModelV2 internamente).
+    vi.mocked(getOllamaModel).mockReturnValue({} as ReturnType<typeof getOllamaModel>);
+
+    generateStructuredMock.mockResolvedValue({
+      object: {
+        proposals: [{
+          title: "Rebuild tile Valhalla (via Ollama)",
+          reasoning: "Percorso implausibile rilevato da Horus.",
+          riskLevel: "high",
+          action: { kind: "manual_only", target: "valhalla", params: null },
+          affectedComponents: ["valhalla"],
+          rollbackHint: "Ripristina tile dal backup.",
+        }],
+      },
+      usage: { inputTokens: 90, outputTokens: 70 },
+    });
+
+    const out = await runHorusRoutingProposer(snapshot([valhallaKO]));
+
+    // Act + Assert
+    expect(out).not.toBeNull();
+    expect(generateStructuredMock).toHaveBeenCalledTimes(1);
+
+    const [, callOpts] = generateStructuredMock.mock.calls[0] as [
+      unknown,
+      { system: string; prompt: string; providerOptions?: Record<string, Record<string, unknown>> },
+    ];
+
+    // Task #858/#863 — think:false OBBLIGATORIO anche sul path Ollama diretto (TC online).
+    // Con think:true su Ollama 0.30.11 + qwen3 non-streaming, generateObject riceve 400 Bad Request.
+    expect(callOpts.providerOptions).toMatchObject({ ollama: { think: false } });
+
+    // Il mock non lancia Bad Request → nessun fallback cloud deve essere stato chiamato.
+    // runWithFallback NON deve essere invocato quando Ollama è live e risponde.
+    expect(vi.mocked(runWithFallback)).not.toHaveBeenCalled();
   });
 
   it("fingerprint: non rigenera se il set di problemi routing è invariato", async () => {
