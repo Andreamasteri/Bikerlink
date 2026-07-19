@@ -17,8 +17,9 @@ import { Router, type Request, type Response } from "express";
 import { cfAccessHeaders } from "../../lib/cf-access";
 import { db, withDbRetry } from "../../db";
 import { tcMetricsHistory } from "@shared/db";
-import { gte, asc } from "drizzle-orm";
+import { gte, asc, desc, and, isNotNull } from "drizzle-orm";
 import { withBgDbSlot } from "../../lib/bg-db-limiter";
+import { hubGet, HUB_VRAM_TIMEOUT_MS } from "../../lib/ai-hub-client";
 
 const router = Router();
 
@@ -92,6 +93,55 @@ router.get("/thinkcentre-metrics", async (_req: Request, res: Response) => {
     const isTimeout = err instanceof Error && err.name === "AbortError";
     return res.json({ online: false, reason: isTimeout ? "timeout" : "unreachable" });
   }
+});
+
+// ── Picchi GPU 24h ────────────────────────────────────────────────────────
+// GET /api/admin/tc-gpu-peaks
+// Restituisce il picco temperatura GPU (da tc_metrics_history) e i picchi
+// VRAM per-agente (da ai-hub /vram) nelle ultime 24h.
+// Non fa mai 500: se una sorgente fallisce, il campo corrispondente è null.
+
+interface AgentPeak { usedMiB: number; pct: number; at: string }
+interface VramResponse {
+  ok: boolean;
+  agentPeaks24h?: Record<string, AgentPeak>;
+}
+
+router.get("/tc-gpu-peaks", async (_req: Request, res: Response) => {
+  const cutoff24h = new Date(Date.now() - 24 * 60 * 60_000);
+
+  // ── Picco temperatura GPU da storico DB ──────────────────────────────────
+  let gpuTempPeak: { valueC: number; at: string } | null = null;
+  try {
+    const rows = await withBgDbSlot(() =>
+      withDbRetry(() =>
+        db
+          .select({ gpuTempC: tcMetricsHistory.gpuTempC, sampledAt: tcMetricsHistory.sampledAt })
+          .from(tcMetricsHistory)
+          .where(and(gte(tcMetricsHistory.sampledAt, cutoff24h), isNotNull(tcMetricsHistory.gpuTempC)))
+          .orderBy(desc(tcMetricsHistory.gpuTempC))
+          .limit(1),
+      ),
+    );
+    if (rows.length > 0 && rows[0].gpuTempC != null) {
+      gpuTempPeak = { valueC: rows[0].gpuTempC, at: rows[0].sampledAt.toISOString() };
+    }
+  } catch (err) {
+    console.warn("[tc-gpu-peaks] DB query error:", err);
+  }
+
+  // ── Picchi VRAM per-agente da ai-hub /vram ───────────────────────────────
+  let agentPeaks24h: Record<string, AgentPeak> | null = null;
+  try {
+    const result = await hubGet<VramResponse>("/vram", undefined, HUB_VRAM_TIMEOUT_MS);
+    if (result.ok && result.data?.agentPeaks24h) {
+      agentPeaks24h = result.data.agentPeaks24h;
+    }
+  } catch (err) {
+    console.warn("[tc-gpu-peaks] ai-hub /vram error:", err);
+  }
+
+  return res.json({ gpuTempPeak, agentPeaks24h });
 });
 
 // ── Storico metriche TC ────────────────────────────────────────────────────

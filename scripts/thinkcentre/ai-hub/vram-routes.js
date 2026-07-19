@@ -192,6 +192,25 @@ function mountVramRoutes(app, opts) {
     }
   }
 
+  /**
+   * Builds a map of agentName → peak { usedMiB, pct, at } across all samples
+   * in the current 24h window that contain an agentMiB breakdown.
+   */
+  function buildAgentPeaks24h() {
+    const now = Date.now();
+    const windowSamples = vramState.samples.filter((s) => now - s.t <= WINDOW_MS && s.agentMiB);
+    const peaks = {};
+    for (const sample of windowSamples) {
+      for (const [agent, mib] of Object.entries(sample.agentMiB)) {
+        const pct = sample.totalMiB > 0 ? (mib / sample.totalMiB) * 100 : 0;
+        if (!peaks[agent] || mib > peaks[agent].usedMiB) {
+          peaks[agent] = { usedMiB: mib, pct, at: new Date(sample.t).toISOString() };
+        }
+      }
+    }
+    return peaks;
+  }
+
   async function sampleOnce() {
     let mem;
     try {
@@ -202,7 +221,27 @@ function mountVramRoutes(app, opts) {
     }
     const pct = (mem.usedMiB / mem.totalMiB) * 100;
     const now = Date.now();
-    vramState.samples.push({ t: now, usedMiB: mem.usedMiB, totalMiB: mem.totalMiB, gpuUtil: mem.gpuUtil });
+
+    // Capture current per-agent VRAM breakdown for this sample.
+    let agentMiB = null;
+    try {
+      const { breakdown } = buildBreakdown();
+      if (breakdown.length > 0) {
+        agentMiB = {};
+        for (const entry of breakdown) {
+          if (entry.agent && typeof entry.usedMiB === "number") {
+            agentMiB[entry.agent] = (agentMiB[entry.agent] || 0) + entry.usedMiB;
+          }
+        }
+        if (Object.keys(agentMiB).length === 0) agentMiB = null;
+      }
+    } catch {
+      // Non-fatal: agentMiB stays null if breakdown fails
+    }
+
+    const sample = { t: now, usedMiB: mem.usedMiB, totalMiB: mem.totalMiB, gpuUtil: mem.gpuUtil };
+    if (agentMiB) sample.agentMiB = agentMiB;
+    vramState.samples.push(sample);
     vramState.samples = vramState.samples.filter((s) => now - s.t <= WINDOW_MS);
 
     // GPU utilization stuck detection
@@ -282,6 +321,7 @@ function mountVramRoutes(app, opts) {
           pct: peak.pct,
           at: new Date(peak.at).toISOString(),
         },
+        agentPeaks24h: buildAgentPeaks24h(),
         breakdown,
         breakdownConfidence: confidence,
         lastSampleAt: new Date(now).toISOString(),

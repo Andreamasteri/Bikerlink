@@ -258,3 +258,106 @@ describe("NVMe smart-log parser — regex coverage across output formats", () =>
     expect(result.mediaErrors).toBeNull();
   });
 });
+
+// ─── agentPeaks24h — ring-buffer peak tracking ────────────────────────────
+
+describe("/vram — agentPeaks24h", () => {
+  /**
+   * Build an app with pre-seeded samples in the ring buffer via the injected
+   * loadState, so we can verify buildAgentPeaks24h without triggering sampleOnce.
+   */
+  function makeAppWithSamples(
+    samples: Array<{ t: number; usedMiB: number; totalMiB: number; gpuUtil: number | null; agentMiB?: Record<string, number> }>
+  ) {
+    const app = express();
+    app.use(express.json());
+    mountVramRoutes(app, {
+      sys: {
+        readGpuStats: () => ({ usedMiB: 4000, totalMiB: 24576, gpuUtil: 30 }),
+        readComputeApps: () => [],
+        readOllamaModels: () => [],
+        loadState: () => ({ samples, alertActive: false, alertSince: null, pushedAgentMap: {} }),
+        saveState: () => {},
+      },
+      gateMiddleware: openGate as unknown as ReturnType<typeof express.Router>,
+      startSampling: false,
+    });
+    return supertest(app);
+  }
+
+  it("returns Horus and Bowie peaks when samples contain agentMiB breakdown", async () => {
+    const now = Date.now();
+    const samples = [
+      {
+        t: now - 60_000,
+        usedMiB: 20000,
+        totalMiB: 24576,
+        gpuUtil: 80,
+        agentMiB: { Horus: 8000, Bowie: 3000 },
+      },
+      {
+        t: now - 30_000,
+        usedMiB: 22000,
+        totalMiB: 24576,
+        gpuUtil: 90,
+        agentMiB: { Horus: 7000, Bowie: 4500 },
+      },
+    ];
+
+    const res = await makeAppWithSamples(samples).get("/vram");
+    expect(res.status).toBe(200);
+    expect(res.body.agentPeaks24h).toBeDefined();
+
+    // Horus peak should be the first sample (8000 > 7000)
+    expect(res.body.agentPeaks24h.Horus).toBeDefined();
+    expect(res.body.agentPeaks24h.Horus.usedMiB).toBe(8000);
+    expect(res.body.agentPeaks24h.Horus.pct).toBeCloseTo((8000 / 24576) * 100, 1);
+    expect(res.body.agentPeaks24h.Horus.at).toBeDefined();
+
+    // Bowie peak should be the second sample (4500 > 3000)
+    expect(res.body.agentPeaks24h.Bowie).toBeDefined();
+    expect(res.body.agentPeaks24h.Bowie.usedMiB).toBe(4500);
+    expect(res.body.agentPeaks24h.Bowie.pct).toBeCloseTo((4500 / 24576) * 100, 1);
+    expect(res.body.agentPeaks24h.Bowie.at).toBeDefined();
+  });
+
+  it("returns empty agentPeaks24h object when no samples have agentMiB", async () => {
+    const now = Date.now();
+    const samples = [
+      { t: now - 60_000, usedMiB: 18000, totalMiB: 24576, gpuUtil: 70 },
+      { t: now - 30_000, usedMiB: 20000, totalMiB: 24576, gpuUtil: 75 },
+    ];
+
+    const res = await makeAppWithSamples(samples).get("/vram");
+    expect(res.status).toBe(200);
+    expect(res.body.agentPeaks24h).toBeDefined();
+    expect(Object.keys(res.body.agentPeaks24h)).toHaveLength(0);
+  });
+
+  it("returns empty agentPeaks24h when ring buffer is empty", async () => {
+    const res = await makeAppWithSamples([]).get("/vram");
+    expect(res.status).toBe(200);
+    expect(res.body.agentPeaks24h).toBeDefined();
+    expect(Object.keys(res.body.agentPeaks24h)).toHaveLength(0);
+  });
+
+  it("agentPeaks24h.at is a valid ISO string", async () => {
+    const now = Date.now();
+    const samples = [
+      {
+        t: now - 10_000,
+        usedMiB: 15000,
+        totalMiB: 24576,
+        gpuUtil: 60,
+        agentMiB: { Horus: 9000 },
+      },
+    ];
+
+    const res = await makeAppWithSamples(samples).get("/vram");
+    expect(res.status).toBe(200);
+    const at = res.body.agentPeaks24h?.Horus?.at;
+    expect(at).toBeDefined();
+    expect(() => new Date(at).toISOString()).not.toThrow();
+    expect(new Date(at).getTime()).toBeGreaterThan(0);
+  });
+});

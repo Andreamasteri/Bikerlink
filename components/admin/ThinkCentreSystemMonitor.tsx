@@ -94,6 +94,33 @@ function buildXLabels(samples: TcHistorySample[], range: "24h" | "7d"): XLabel[]
   return results;
 }
 
+// ── Tipi picchi GPU ────────────────────────────────────────────────────────
+
+interface AgentPeak { usedMiB: number; pct: number; at: string }
+interface GpuPeaks {
+  gpuTempPeak: { valueC: number; at: string } | null;
+  agentPeaks24h: Record<string, AgentPeak> | null;
+}
+
+// ── PeakRow helper ────────────────────────────────────────────────────────
+
+function fmtAt(iso: string | null): string {
+  if (!iso) return "";
+  try {
+    return new Date(iso).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit", hour12: false });
+  } catch { return ""; }
+}
+
+function PeakRow({ label, value, at }: { label: string; value: string; at: string | null }) {
+  return (
+    <View style={ch2.peakRow}>
+      <Text style={ch2.peakLabel}>{label}</Text>
+      <Text style={ch2.peakValue}>{value}</Text>
+      {at ? <Text style={ch2.peakAt}>alle {fmtAt(at)}</Text> : null}
+    </View>
+  );
+}
+
 // ── Componente principale ─────────────────────────────────────────────────
 
 export function ThinkCentreSystemMonitor() {
@@ -102,6 +129,14 @@ export function ThinkCentreSystemMonitor() {
   const [reason,      setReason]      = useState("");
   const [lastMounts,  setLastMounts]  = useState<DiskMount[]>([]);
   const [gpu, setGpu] = useState<{ vramUsedMb: number | null; vramTotalMb: number | null; name: string | null } | null>(null);
+
+  // Valori correnti GPU live (esposti come state per la card numerica)
+  const [liveGpuUtil, setLiveGpuUtil] = useState<number | null>(null);
+  const [liveGpuTemp, setLiveGpuTemp] = useState<number | null>(null);
+
+  // Picchi 24h (GPU temp da DB + VRAM agenti da ai-hub)
+  const [gpuPeaks,        setGpuPeaks]        = useState<GpuPeaks | null>(null);
+  const [gpuPeaksLoading, setGpuPeaksLoading] = useState(false);
 
   // ── Toggle linee persistito ─────────────────────────────────────────────
   const [hiddenLines, setHiddenLines] = useState<Set<string>>(new Set());
@@ -157,6 +192,8 @@ export function ThinkCentreSystemMonitor() {
       setLastMounts(data.diskMounts ?? []);
       const hasGpu = data.gpuUtilPct != null || data.vramUsedMb != null || data.vramTotalMb != null;
       setGpu(hasGpu ? { vramUsedMb: data.vramUsedMb ?? null, vramTotalMb: data.vramTotalMb ?? null, name: data.gpuName ?? null } : null);
+      setLiveGpuUtil(data.gpuUtilPct ?? null);
+      setLiveGpuTemp(data.gpuTempC ?? null);
 
       const ramTotal    = data.ramTotalMb ?? 0;
       const ramPctVal   = ramTotal > 0 ? Math.round(((data.ramUsedMb ?? 0) / ramTotal) * 100) : null;
@@ -187,6 +224,26 @@ export function ThinkCentreSystemMonitor() {
     finally { setHistLoading(false); }
   }, []);
 
+  // ── Fetch picchi GPU 24h ───────────────────────────────────────────────
+  const fetchGpuPeaks = useCallback(async () => {
+    setGpuPeaksLoading(true);
+    try {
+      const url = new URL("/api/admin/tc-gpu-peaks", getApiUrl()).toString();
+      const res = await fetch(url, {
+        headers: { ...(await authFetchHeaders()) },
+        credentials: "include",
+        signal: AbortSignal.timeout(6_000),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setGpuPeaks(data);
+      } else {
+        setGpuPeaks(null);
+      }
+    } catch { setGpuPeaks(null); }
+    finally { setGpuPeaksLoading(false); }
+  }, []);
+
   // ── Reset buffer al disattivazione ────────────────────────────────────
   useEffect(() => {
     if (!enabled) {
@@ -196,16 +253,18 @@ export function ThinkCentreSystemMonitor() {
       netTx.current   = [...NULL_RING]; diskRead.current = [...NULL_RING];
       diskWrite.current = [...NULL_RING];
       setOnline(null); setReason(""); setLastMounts([]); setHistoryData(null);
+      setLiveGpuUtil(null); setLiveGpuTemp(null); setGpuPeaks(null);
       return;
     }
     if (rangeMode === "live") {
       poll();
       const id = setInterval(poll, POLL_MS);
+      fetchGpuPeaks();
       return () => clearInterval(id);
     }
     // In modalità storica non si fa polling live
     fetchHistory(rangeMode as "24h" | "7d").catch(() => {});
-  }, [enabled, rangeMode, poll, fetchHistory]);
+  }, [enabled, rangeMode, poll, fetchHistory, fetchGpuPeaks]);
 
   // ── Dati grafici storico ───────────────────────────────────────────────
   const hist = historyData ?? [];
@@ -294,6 +353,56 @@ export function ThinkCentreSystemMonitor() {
         <View style={ch.loadingBox}>
           <ActivityIndicator color={Colors.accent} />
           <Text style={ch.loadingText}>Caricamento storico…</Text>
+        </View>
+      )}
+
+      {/* Card GPU live — valori correnti numerici */}
+      {enabled && rangeMode === "live" && online && (liveGpuUtil != null || liveGpuTemp != null) && (
+        <View style={ch.gpuCard}>
+          <Text style={ch.sectionTitle}>GPU — valori correnti</Text>
+          <View style={ch.gpuCallouts}>
+            <View style={ch.gpuCallout}>
+              <Text style={ch.gpuCalloutValue}>{liveGpuUtil != null ? `${Math.round(liveGpuUtil)}` : "—"}</Text>
+              <Text style={ch.gpuCalloutUnit}>% carico</Text>
+            </View>
+            <View style={ch.gpuCalloutDivider} />
+            <View style={ch.gpuCallout}>
+              <Text style={ch.gpuCalloutValue}>{liveGpuTemp != null ? `${Math.round(liveGpuTemp)}` : "—"}</Text>
+              <Text style={ch.gpuCalloutUnit}>°C temp</Text>
+            </View>
+          </View>
+        </View>
+      )}
+
+      {/* Picchi 24h — GPU temp + VRAM per agente */}
+      {enabled && rangeMode === "live" && (
+        <View style={ch.peaksBox}>
+          <Text style={ch.sectionTitle}>Picchi 24h</Text>
+          {gpuPeaksLoading ? (
+            <ActivityIndicator size="small" color={Colors.accent} style={{ alignSelf: "flex-start" }} />
+          ) : (
+            <>
+              <PeakRow
+                label="GPU temp"
+                value={gpuPeaks?.gpuTempPeak ? `${Math.round(gpuPeaks.gpuTempPeak.valueC)}°C` : "—"}
+                at={gpuPeaks?.gpuTempPeak?.at ?? null}
+              />
+              <PeakRow
+                label="Horus VRAM"
+                value={gpuPeaks?.agentPeaks24h?.["Horus"]
+                  ? `${(gpuPeaks.agentPeaks24h["Horus"].usedMiB / 1024).toFixed(1)} GB`
+                  : "—"}
+                at={gpuPeaks?.agentPeaks24h?.["Horus"]?.at ?? null}
+              />
+              <PeakRow
+                label="Bowie VRAM"
+                value={gpuPeaks?.agentPeaks24h?.["Bowie"]
+                  ? `${(gpuPeaks.agentPeaks24h["Bowie"].usedMiB / 1024).toFixed(1)} GB`
+                  : "—"}
+                at={gpuPeaks?.agentPeaks24h?.["Bowie"]?.at ?? null}
+              />
+            </>
+          )}
         </View>
       )}
 
@@ -409,4 +518,22 @@ const ch = StyleSheet.create({
 
   diskBox:     { backgroundColor: Colors.card, borderRadius: 10, padding: 12, gap: 8 },
   sectionTitle:{ fontSize: 13, fontWeight: "600", color: Colors.text, marginBottom: 2 },
+
+  gpuCard:     { backgroundColor: Colors.card, borderRadius: 10, padding: 12, gap: 8 },
+  gpuCallouts: { flexDirection: "row", alignItems: "center" },
+  gpuCallout:  { flex: 1, alignItems: "center", paddingVertical: 6 },
+  gpuCalloutValue:  { fontSize: 32, fontWeight: "700", color: Colors.text },
+  gpuCalloutUnit:   { fontSize: 12, color: Colors.textSecondary, marginTop: 2 },
+  gpuCalloutDivider:{ width: 1, height: 40, backgroundColor: Colors.border },
+
+  peaksBox:   { backgroundColor: Colors.card, borderRadius: 10, padding: 12, gap: 6 },
+});
+
+// ── Stili ausiliari (PeakRow) ──────────────────────────────────────────────
+
+const ch2 = StyleSheet.create({
+  peakRow:   { flexDirection: "row", alignItems: "center", gap: 6, paddingVertical: 3 },
+  peakLabel: { fontSize: 13, color: Colors.textSecondary, flex: 1 },
+  peakValue: { fontSize: 13, fontWeight: "700", color: Colors.text },
+  peakAt:    { fontSize: 12, color: Colors.textSecondary },
 });
