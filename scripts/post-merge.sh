@@ -656,6 +656,25 @@ if [ "$PRE_COMMIT_REGTEST_EXIT" -ne 0 ]; then
   exit "$PRE_COMMIT_REGTEST_EXIT"
 fi
 
+# ── REGRESSION TEST: setup-hooks.sh install path ─────────────
+# Esercita il percorso completo che uno sviluppatore esegue su un fresh clone:
+# setup-hooks.sh → hook installato → hook blocca TOTAL stantio in deploy-build.sh.
+# A differenza del gate sopra (che verifica solo il contenuto dell'hook già
+# installato), questo test cattura regressioni in setup-hooks.sh stesso
+# (es. sorgente sbagliata copiata, post-install wiring check rimosso).
+echo "════════════════════════════════════════"
+echo "  Regression test — setup-hooks.sh install path"
+echo "════════════════════════════════════════"
+SETUP_HOOKS_INSTALL_EXIT=0
+bash scripts/__tests__/check-setup-hooks-install.test.sh || SETUP_HOOKS_INSTALL_EXIT=$?
+echo "════════════════════════════════════════"
+echo ""
+if [ "$SETUP_HOOKS_INSTALL_EXIT" -ne 0 ]; then
+  echo "❌ Regression test check-setup-hooks-install FALLITO — setup-hooks.sh non installa un hook funzionante."
+  echo "   Eseguire 'bash scripts/__tests__/check-setup-hooks-install.test.sh' per i dettagli."
+  exit "$SETUP_HOOKS_INSTALL_EXIT"
+fi
+
 # ── GUARD PORTE .replit (MAPPING [[ports]] + DEPLOY) ─────────
 # REGOLA BLOCCANTE (replit.md § Preferenze utente):
 # Nessun agente può modificare [[ports]] senza autorizzazione esplicita utente.
