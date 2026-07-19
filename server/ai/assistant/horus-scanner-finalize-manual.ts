@@ -109,12 +109,14 @@ NOTE PER-FILE:
 ${corpus}
 
 SEZIONE "${area}":`;
+  // stream:true → Ollama stream:true via doStream → CF riceve token subito (no 524 timeout).
   const raw = await callOllamaChat(prompt, undefined, {
     persona: "horus",
     model: HORUS_MODEL_ID,
     system: HORUS_THINK_TAG_CONTRACT,
     temperature: 0.3,
     numPredict: SECTION_NUM_PREDICT,
+    stream: true,
   });
   return sanitizeManual(stripThink(raw ?? ""));
 }
@@ -144,12 +146,14 @@ NOTE LESSICALI PER-SCHERMATA:
 ${notesText}
 
 DIZIONARIO:`;
+  // stream:true → Ollama stream:true via doStream → CF riceve token subito (no 524 timeout).
   const raw = await callOllamaChat(prompt, undefined, {
     persona: "horus",
     model: HORUS_MODEL_ID,
     system: HORUS_THINK_TAG_CONTRACT,
     temperature: 0.3,
     numPredict: SECTION_NUM_PREDICT,
+    stream: true,
   });
   return sanitizeManual(stripThink(raw ?? ""));
 }
@@ -170,12 +174,14 @@ parole, prosa scorrevole in italiano) che apre il documento. Copri:
 Frasi complete e traducibili, nessun elenco di file, nessun codice.
 
 PANORAMICA:`;
+  // stream:true → Ollama stream:true via doStream → CF riceve token subito (no 524 timeout).
   const raw = await callOllamaChat(prompt, undefined, {
     persona: "horus",
     model: HORUS_MODEL_ID,
     system: HORUS_THINK_TAG_CONTRACT,
     temperature: 0.4,
     numPredict: SECTION_NUM_PREDICT,
+    stream: true,
   });
   return sanitizeManual(stripThink(raw ?? ""));
 }
@@ -198,12 +204,14 @@ non serve, non elencare i file):
 ${corpus}
 
 GLOSSARIO:`;
+  // stream:true → Ollama stream:true via doStream → CF riceve token subito (no 524 timeout).
   const raw = await callOllamaChat(prompt, undefined, {
     persona: "horus",
     model: HORUS_MODEL_ID,
     system: HORUS_THINK_TAG_CONTRACT,
     temperature: 0.3,
     numPredict: SECTION_NUM_PREDICT,
+    stream: true,
   });
   return sanitizeManual(stripThink(raw ?? ""));
 }

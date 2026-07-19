@@ -30,7 +30,7 @@
  */
 
 import { createOllama } from "ollama-ai-provider-v2";
-import { generateObject, generateText, type LanguageModel } from "ai";
+import { generateObject, generateText, streamText, type LanguageModel } from "ai";
 import type { z } from "zod";
 import { repairJson } from "./json-repair";
 import { isThinkCentreOffline } from "./thinkcentre-offline";
@@ -272,6 +272,14 @@ export interface OllamaChatOptions {
    * il Modelfile/personalità. Se assente, il modello usa il suo default.
    */
   numPredict?: number;
+  /**
+   * Task #733 — Usa `streamText` invece di `generateText` (solo path testuale, senza
+   * schema). Con `stream: true` Ollama invia i token man mano che li genera (`stream: true`
+   * nell'API Ollama via `doStream`): il tunnel Cloudflare riceve dati subito e l'idle
+   * timeout CF (100s) si azzera ad ogni chunk, evitando il 524 su generazioni lunghe.
+   * Usare per le chiamate di sintesi/finalizzazione che producono output >700 token.
+   */
+  stream?: boolean;
 }
 
 /**
@@ -292,7 +300,7 @@ export async function callOllamaChat<T = string>(
   schema?: z.ZodType<T>,
   options: OllamaChatOptions = {},
 ): Promise<T> {
-  const { system, temperature = 0.2, abortSignal, maxRetries = 2, jsonRetries = 1, onRepair, persona = "bowie", numPredict, model: modelOverride } = options;
+  const { system, temperature = 0.2, abortSignal, maxRetries = 2, jsonRetries = 1, onRepair, persona = "bowie", numPredict, model: modelOverride, stream: useStream } = options;
 
   // Provider options Ollama:
   //  - think:false è OBBLIGATORIO per generateObject (JSON strutturato): qwen3 include
@@ -319,6 +327,20 @@ export async function callOllamaChat<T = string>(
   const model = getOllamaModel(modelOverride, persona);
 
   if (!schema) {
+    // Task #733 — stream:true usa streamText (doStream → Ollama stream:true) invece di
+    // generateText (doGenerate → Ollama stream:false). In streaming Ollama invia i token
+    // man mano: CF riceve dati subito e l'idle timeout (100s) si azzera ad ogni chunk,
+    // evitando il 524 su sintesi lunghe (SYNTHESIS_NUM_PREDICT=6000, SECTION_NUM_PREDICT=7000).
+    if (useStream) {
+      const result = await streamText({ model, system, prompt, temperature, maxRetries, abortSignal, providerOptions });
+      let text = "";
+      for await (const chunk of result.textStream) {
+        text += chunk;
+      }
+      // Per horus (think:true): strippa il blocco <think>…</think> dal testo libero.
+      const stripped = persona === "horus" ? stripThinkBlock(text) : text;
+      return stripped as unknown as T;
+    }
     const { text } = await generateText({ model, instructions: system, prompt, temperature, maxRetries, abortSignal, providerOptions });
     // Per horus (think:true): strippa il blocco <think>…</think> dal testo libero.
     const result = persona === "horus" ? stripThinkBlock(text) : text;

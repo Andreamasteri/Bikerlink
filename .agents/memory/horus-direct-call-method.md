@@ -30,6 +30,16 @@ rimane viva per tutta la durata della generazione, indipendentemente da quanto t
 **Non serve più limitare `num_predict`** come workaround al timeout — il limite artificiale
 è rimosso. Usare valori generosi (800-1600) per risposta completa.
 
+## callOllamaChat — opzione stream:true
+
+Per le chiamate server-side (non curl) che producono output lungo (>700 token), passare
+`stream: true` in `OllamaChatOptions`. Questo usa `streamText` invece di `generateText`,
+il che fa chiamare `doStream` (Ollama `stream:true`) invece di `doGenerate` (Ollama
+`stream:false`). CF riceve il primo token in 2-5s e l'idle timeout si azzera.
+
+Usato in: `synthesizeGroup`, `mergeProposals` (finalize.ts) e `writeManualSection`,
+`writeLexiconSection`, `writeManualOverview`, `writeManualGlossary` (finalize-manual.ts).
+
 ## CF Tunnel — configurazione timeout (azione manuale one-time)
 
 Per sicurezza strutturale, configurare anche l'`httpResponseTimeout` nel dashboard CF:

@@ -140,12 +140,14 @@ OSSERVAZIONI:
 ${renderFindings(group)}
 
 PROPOSTE:`;
+  // stream:true → Ollama stream:true via doStream → CF riceve token subito (no 524 timeout).
   const raw = await callOllamaChat(prompt, undefined, {
     persona: "horus",
     model: HORUS_MODEL_ID,
     system: HORUS_THINK_TAG_CONTRACT,
     temperature: 0.2,
     numPredict: SYNTHESIS_NUM_PREDICT,
+    stream: true,
   });
   return sanitize(stripThink(raw ?? ""));
 }
@@ -165,12 +167,14 @@ PROPOSTE PARZIALI:
 ${partials.join("\n\n---\n\n")}
 
 PROPOSTE FINALI:`;
+  // stream:true → Ollama stream:true via doStream → CF riceve token subito (no 524 timeout).
   const raw = await callOllamaChat(prompt, undefined, {
     persona: "horus",
     model: HORUS_MODEL_ID,
     system: HORUS_THINK_TAG_CONTRACT,
     temperature: 0.2,
     numPredict: SYNTHESIS_NUM_PREDICT,
+    stream: true,
   });
   return sanitize(stripThink(raw ?? ""));
 }
