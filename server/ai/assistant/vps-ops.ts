@@ -24,6 +24,13 @@ import { sendSystemAlertPushToAdmins } from "../../push-notifications-admin";
 
 const GCE_SCRIPT = "scripts/gce/gce.py";
 const JOBS_DIR = "/tmp/bowie-jobs";
+
+/** Ritorna true solo se i secret SSH GCE minimi sono presenti. Usato in Phase 5
+ *  per evitare di registrare il poller (e loggare stack trace ogni 2 min) quando
+ *  il VPS Google non è configurato. */
+export function isGceConfigured(): boolean {
+  return !!(process.env.GCE_SSH_KEY?.trim() && process.env.GCE_SSH_HOST?.trim());
+}
 const EXEC_TIMEOUT_MS = 120_000; // exec sincrono: max 2 min
 const POLL_EXEC_TIMEOUT_MS = 30_000; // comandi del poller: brevi
 const MAX_OUTPUT_CHARS = 6_000; // tetto output raccolto/persistito

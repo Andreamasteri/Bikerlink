@@ -344,8 +344,15 @@ export async function runPhase5Schedulers(): Promise<void> {
 
   // Task #5322 — Poller dei job VPS (VM Google): raccoglie l'esito dei job async
   // avviati dagli admin in chat e li recapita. Cadenza 2 min, non-fatale.
+  // Guard: se GCE_SSH_KEY/GCE_SSH_HOST non sono configurati il poller non si
+  // registra — evita stack trace "[vps-poller] tick error" ogni 2 min in produzione
+  // quando il VPS Google non è in uso.
   await arm("assistant-vps-poller", async () => {
-    const { pollVpsJobs, reapStaleVpsJobsOnBoot } = await import("./ai/assistant/vps-ops");
+    const { pollVpsJobs, reapStaleVpsJobsOnBoot, isGceConfigured } = await import("./ai/assistant/vps-ops");
+    if (!isGceConfigured()) {
+      console.log("[INIT] Bowie VPS job poller skipped — GCE_SSH_KEY/GCE_SSH_HOST non configurati");
+      return;
+    }
     await reapStaleVpsJobsOnBoot().catch((e) => console.warn("[INIT][BG] reapStaleVpsJobsOnBoot error:", e));
     setInterval(withJobGate("assistant-vps-poller", () => {
       pollVpsJobs().catch((e) => console.warn("[vps-poller] tick error:", e));
