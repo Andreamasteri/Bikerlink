@@ -522,8 +522,11 @@ else
 fi
 
 # (v) I 3 stati (return 0, return 1, return 2) sono tutti presenti nella funzione.
+# Usiamo awk per estrarre il corpo completo della funzione senza limite di righe,
+# così il test non regredisce quando la funzione cresce (no -A N fragile).
+_HEALTH_FN_BODY=$(awk '/^cerbero_health_backend\(\)/{p=1} p{print} /^\}$/{if(p){p=0}}' "$CERBERO_LIB")
 for ret in "return 0" "return 1" "return 2"; do
-  if grep -A 40 'cerbero_health_backend\(\)' "$CERBERO_LIB" | grep -q "$ret"; then
+  if echo "$_HEALTH_FN_BODY" | grep -q "$ret"; then
     ok "cerbero_health_backend contiene \"$ret\""
   else
     nok "cerbero_health_backend NON contiene \"$ret\" — uno dei 3 stati mancante"
