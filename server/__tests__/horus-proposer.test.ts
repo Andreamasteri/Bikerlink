@@ -154,9 +154,9 @@ describe("horus routing proposer (Task #25)", () => {
     expect(callOpts.system).toContain("Horus");
     expect(callOpts.prompt).toContain("valhalla");
 
-    // Task #584 — think:true: il chiamante segnala esplicitamente think:true per Ollama.
-    // generateStructured rispetta l'override del chiamante (caller wins via spread).
-    expect(callOpts.providerOptions).toMatchObject({ ollama: { think: true } });
+    // Task #858 — think:false OBBLIGATORIO per generateObject (JSON strutturato).
+    // Con think:true su Ollama 0.30.11 + qwen3, il path non-streaming restituisce 400 Bad Request.
+    expect(callOpts.providerOptions).toMatchObject({ ollama: { think: false } });
 
     // Scritta con lo stesso meccanismo + firma persona:"horus".
     expect(writeWatchdogLogMock).toHaveBeenCalledTimes(1);

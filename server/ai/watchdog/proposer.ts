@@ -302,3 +302,8 @@ export async function getProposerSettings(): Promise<{ model: string; defaultMod
 export async function setProposerModel(model: string): Promise<void> {
   await storage.upsertAppSetting(MODEL_KEY, model.trim());
 }
+
+/** Esposto solo per i test — azzera il fingerprint in-process tra i test. */
+export function _resetProposerForTests(): void {
+  _cachedFingerprint = null;
+}
