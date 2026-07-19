@@ -35,10 +35,11 @@ RUNNING=1
 trap 'RUNNING=0' SIGTERM SIGINT
 
 log() {
-  local msg="[$(date '+%Y-%m-%d %H:%M:%S')] [metro-cache-nightly] $1"
-  echo "$msg"
-  mkdir -p "$(dirname "$CERBERO_LOG_FILE")" 2>/dev/null || true
-  echo "$msg" >> "$CERBERO_LOG_FILE" 2>/dev/null || true
+  # Scrive solo su stdout: il chiamante (cerbero.sh) prefissa ogni riga con
+  # [TESTA 2 NIGHTLY] e la aggiunge a cerbero.log via pipeline.
+  # Evita la doppia scrittura che si avrebbe se scrivessimo qui direttamente
+  # nel file E venissimo anche catturati dalla pipeline del chiamante.
+  echo "[metro-cache-nightly] $1"
 }
 
 # Secondi fino alla prossima occorrenza delle 01:00 UTC.

@@ -23,6 +23,9 @@ METRO_PORT=8081
 METRO_LOCK_FILE="/tmp/start-metro.lock"
 CERBERO_LOG_FILE="$PROJECT_ROOT/logs/cerbero.log"
 CERBERO_LOG_MAX_BYTES=1048576
+# PID file per tracciare il processo produttore del job notturno (lato sinistro
+# della pipeline) separatamente dal PID della pipeline stessa ($!).
+NIGHTLY_PRODUCER_PID_FILE="/tmp/cerbero-nightly-producer.pid"
 
 CHECK_INTERVAL=10
 HEALTH_LOG_INTERVAL=60
@@ -55,8 +58,18 @@ NIGHTLY_PID=""
 graceful_shutdown() {
   cerbero_log "CERBERO: ricevuto segnale di arresto, uscita pulita..."
   RUNNING=0
+  # Termina il lato consumatore della pipeline (il while-loop che prefissa le righe).
   if [ -n "$NIGHTLY_PID" ] && kill -0 "$NIGHTLY_PID" 2>/dev/null; then
     kill -TERM "$NIGHTLY_PID" 2>/dev/null || true
+  fi
+  # Termina anche il lato produttore (metro-cache-nightly.sh) tramite il PID file:
+  # $! cattura solo l'ultimo processo della pipeline (il consumatore), non il
+  # produttore; senza questo secondo kill il produttore resta orfano fino al
+  # prossimo tentativo di scrittura su stdout (SIGPIPE).
+  local _npid
+  _npid=$(cat "$NIGHTLY_PRODUCER_PID_FILE" 2>/dev/null || true)
+  if [ -n "$_npid" ] && kill -0 "$_npid" 2>/dev/null; then
+    kill -TERM "$_npid" 2>/dev/null || true
   fi
 }
 trap graceful_shutdown SIGTERM SIGINT
@@ -67,9 +80,27 @@ trap graceful_shutdown SIGTERM SIGINT
 # /tmp/.metro-cache-purged che start-expo.sh legge al prossimo avvio.
 # Deve vivere in Cerbero (non in start-expo.sh) per sopravvivere ai riavvii
 # di Metro e girare indipendentemente dal ciclo di vita del dev server.
-bash "$SCRIPT_DIR/metro-cache-nightly.sh" &
+# Rimuovi PID file stale di un'istanza precedente fermata con SIGKILL.
+rm -f "$NIGHTLY_PRODUCER_PID_FILE" 2>/dev/null || true
+
+# Prefissa ogni riga di output di metro-cache-nightly.sh (incluso stderr da
+# set -uo pipefail) con "[TESTA 2 NIGHTLY]" + timestamp, esattamente come
+# clean-metro.sh e start-expo.sh, così gli errori del job notturno sono
+# immediatamente visibili in cerbero.log senza leggere nessun altro file.
+#
+# PID tracking: $! cattura il consumatore (while-loop), NON il produttore.
+# Usiamo un subshell che scrive $BASHPID nel PID file e poi fa `exec` per
+# diventare metro-cache-nightly.sh: in questo modo il PID file referenzia
+# esattamente il processo produttore che dobbiamo terminare su graceful_shutdown.
+{
+  echo $BASHPID > "$NIGHTLY_PRODUCER_PID_FILE"
+  exec bash "$SCRIPT_DIR/metro-cache-nightly.sh"
+} 2>&1 | \
+  while IFS= read -r _cerbero_nightly_line; do
+    printf '[%s] [TESTA 2 NIGHTLY] %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$_cerbero_nightly_line" >> "$CERBERO_LOG_FILE"
+  done &
 NIGHTLY_PID=$!
-cerbero_log "Job notturno Metro cache avviato (PID: $NIGHTLY_PID)"
+cerbero_log "Job notturno Metro cache avviato (pipeline PID: $NIGHTLY_PID)"
 
 # ── Pulizia file temporanei curl-err di istanze precedenti ────────────────────
 # Se Cerbero è stato ucciso con SIGKILL mentre una probe era in volo, il file
