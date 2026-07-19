@@ -259,9 +259,32 @@ function readOllamaModels() {
   try {
     const out = execSync("ollama ps", { encoding: "utf8", timeout: 5000 }).trim();
     const lines = out.split("\n").slice(1); // salta l'header "NAME ID SIZE ..."
-    return lines
-      .map((line) => line.trim().split(/\s+/)[0])
+    // Parse name AND size so we can sort by size descending — this must match
+    // the sort order used by readComputeApps() (VRAM desc), otherwise the
+    // index-based pairing in buildBreakdown() would assign the wrong agent label.
+    //
+    // `ollama ps` columns: NAME  ID  SIZE_VAL  SIZE_UNIT  PROCESSOR  UNTIL
+    // e.g.:  qwen3:4b  abc123  3.6  GB  100% GPU  Forever
+    const entries = lines
+      .map((line) => {
+        const parts = line.trim().split(/\s+/);
+        const name = parts[0];
+        if (!name) return null;
+        const sizeVal = parseFloat(parts[2]);
+        const sizeUnit = (parts[3] || "").toUpperCase();
+        let sizeMiB = 0;
+        if (Number.isFinite(sizeVal)) {
+          if (sizeUnit === "GB") sizeMiB = sizeVal * 1024;
+          else if (sizeUnit === "MB") sizeMiB = sizeVal;
+          else sizeMiB = sizeVal; // unknown unit — treat as MiB
+        }
+        return { name, sizeMiB };
+      })
       .filter(Boolean);
+    // Sort largest-first so index-pairing with readComputeApps() (also sorted
+    // VRAM desc) correctly attributes each process to the right model/agent.
+    entries.sort((a, b) => b.sizeMiB - a.sizeMiB);
+    return entries.map((e) => e.name);
   } catch {
     return [];
   }
