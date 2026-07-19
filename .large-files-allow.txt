@@ -1,5 +1,5 @@
 # .large-files-allow.txt
-# Lista chiusa di file TypeScript autorizzati a superare il limite di 600 righe
+# Lista chiusa di file TypeScript autorizzati a superare il limite di 800 righe
 # tramite marker `// LARGE-FILE-ALLOW: <motivo>` in prima riga.
 #
 # Formato: un path per riga, relativo alla root del repo.
@@ -9,7 +9,7 @@
 # qui fa fallire il gate (`scripts/check-large-files-ratchet.sh`).
 # Aggiunte a questa lista richiedono un task utente esplicito.
 #
-# Vedi `replit.md` → sezione "⛔ REGOLA FERREA — Limite 600 righe per file".
+# Vedi `replit.md` → sezione "⛔ REGOLA FERREA — Limite 800 righe per file".
 
 # ── File di traduzione i18n ────────────────────────────────────────────────
 # Struttura piatta inevitabile: una chiave-valore per riga, nessuna logica.

@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync, statSync, existsSync } from "fs";
 import { join, extname, relative } from "path";
 
-export const MAX_LINES = 800; // split target when exceeded: ≤600 righe per file risultante
+export const MAX_LINES = 800; // split target when exceeded: ≤750 righe per file risultante
 export const LOCKED_DRIFT = 5;
 
 export const SCAN_EXTENSIONS = [".ts", ".tsx"];
@@ -165,7 +165,7 @@ export function loadAllowList(root: string = process.cwd()): Set<string> {
 }
 
 export interface BaselineState {
-  /** Map<path, line count> for legacy files (>600, no marker). */
+  /** Map<path, line count> for legacy files (>800, no marker). */
   legacy: Map<string, number>;
   /** Map<path, declared limit N> for LOCKED files. Anti-bypass tracker. */
   locked: Map<string, number>;

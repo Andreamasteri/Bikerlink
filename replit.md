@@ -155,8 +155,8 @@ Lo split è sempre un'operazione **meccanica**: nessuna logica alterata, solo sp
 Rileggere ogni file risultante e verificare **tutti** i punti:
 
 - [ ] Il contenuto corrisponde esattamente all'originale (nulla inventato, nulla perso).
-- [ ] File sorgente ≤ 600 righe (split target; il gate blocca a 800).
-- [ ] File destinazione ≤ 600 righe (split target; il gate blocca a 800).
+- [ ] File sorgente ≤ 750 righe (split target; il gate blocca a 800).
+- [ ] File destinazione ≤ 750 righe (split target; il gate blocca a 800).
 - [ ] Import/export coerenti tra i file (nessun simbolo importato ma non esportato, nessun export orfano).
 
 > **La regola vale sempre, anche per split "ovvi".** La verifica non è facoltativa e non può essere saltata per split "piccoli" o "semplici".
@@ -371,7 +371,7 @@ I prefer detailed explanations and iterative development. Ask before making majo
 
 **Motivazione**: file > 800 righe diventano monoliti illeggibili, ingestibili a code-review, fonte di merge-conflict e di bug nascosti. La regola è cablata come **gate CI ratchet** (stesso schema di `eslint-hooks-check.sh`): la soglia "dura" è **800 righe per file TypeScript** (`.ts`/`.tsx`); il debito legacy esistente è cristallizzato in una baseline e qualsiasi regressione è bloccata.
 
-> **Regola di split**: quando un file supera 800 righe e va splittato (solo dopo approvazione utente esplicita), i file risultanti devono stare sotto **600 righe**. Non 800. Così c'è margine prima che il gate scatti di nuovo.
+> **Regola di split**: quando un file supera 800 righe e va splittato (solo dopo approvazione utente esplicita), i file risultanti devono stare sotto **750 righe**. Non 800. Così c'è ~50 righe di headroom prima che il gate scatti di nuovo.
 
 ### File chiave
 - `scripts/check-large-files.ts` — diagnostica standalone (marker-aware).
@@ -396,12 +396,12 @@ I prefer detailed explanations and iterative development. Ask before making majo
 
 0. **⛔ BLOCCO TOTALE — nessun split senza approvazione.** Prima di splittare qualsiasi file — per qualsiasi ragione, a qualsiasi dimensione — l'agente DEVE chiedere esplicita autorizzazione all'utente e attendere il via libera. Il gate che fallisce NON è autorizzazione a splittare: è il segnale di fermarsi e segnalare.
 1. **Nessun file sorgente supera le 800 righe.** Vale per `.ts`, `.tsx`, `.js`, `.jsx` e qualsiasi altro file sorgente del progetto.
-2. **Quando un file supera le 800 righe e va splittato** (solo dopo approvazione utente), i file risultanti (sorgente + destinazione) devono stare entrambi sotto **600 righe** — non 800. Così c'è margine prima che il gate scatti di nuovo. La suddivisione va in un file successore con il suffisso `-extra` (pattern già in uso nel progetto):
+2. **Quando un file supera le 800 righe e va splittato** (solo dopo approvazione utente), i file risultanti (sorgente + destinazione) devono stare entrambi sotto **750 righe** — non 800. Così c'è ~50 righe di headroom prima che il gate scatti di nuovo. La suddivisione va in un file successore con il suffisso `-extra` (pattern già in uso nel progetto):
    - `server/routes/foo.ts` → nuove funzioni in `server/routes/foo-extra.ts`
    - `components/FooPanel.tsx` → nuove funzioni in `components/FooPanelExtra.tsx`
    - `shared/db/bar.ts` → nuove funzioni in `shared/db/bar-extra.ts`
-3. **Il file originale rimane congelato sotto le 800 (target 600)**: nessuna nuova riga di logica. Solo bugfix strettamente localizzati sono tollerati.
-4. **Il successore riceve tutto il codice nuovo.** Quando anche il successore supera le 800 righe, si crea il successore del successore (`foo-extra.ts` → `foo-extra-2.ts`), e così via — anche qui con split target ≤600.
+3. **Il file originale rimane congelato sotto le 800 (target 750)**: nessuna nuova riga di logica. Solo bugfix strettamente localizzati sono tollerati.
+4. **Il successore riceve tutto il codice nuovo.** Quando anche il successore supera le 800 righe, si crea il successore del successore (`foo-extra.ts` → `foo-extra-2.ts`), e così via — anche qui con split target ≤750.
 5. **Il companion viene creato solo quando ha contenuto reale** — non file vuoti con `export {}` per silenziare warning.
 
 Esempio concreto già presente nel progetto:
@@ -412,7 +412,7 @@ Esempio concreto già presente nel progetto:
 | `server/routes/admin/users.ts` | `server/routes/admin/users-extra.ts` |
 | `shared/db/matching.ts` | `shared/db/matching-extra.ts` |
 
-Il CI gate (`scripts/check-large-files-ratchet.sh`) blocca qualsiasi file che superi le 800 senza marker autorizzato. Se il gate fallisce, NON splittare autonomamente — segnalare all'utente e attendere approvazione. I file risultanti dallo split devono stare sotto **600 righe**.
+Il CI gate (`scripts/check-large-files-ratchet.sh`) blocca qualsiasi file che superi le 800 senza marker autorizzato. Se il gate fallisce, NON splittare autonomamente — segnalare all'utente e attendere approvazione. I file risultanti dallo split devono stare sotto **750 righe**.
 
 ### Le 6 REGOLE FERREE — non negoziabili (task agent, code reviewer, main agent)
 1. **Il gate va eseguito nei 3 punti elencati sopra**, ognuno con `exit 1` su fallimento. Non disabilitarli.
