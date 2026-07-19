@@ -3,7 +3,7 @@
 // triggerSyncInBackground, forceSyncNow.
 import { db, withDbRetry } from "../../db";
 import { otaReleases } from "@shared/db";
-import { eq, isNull, and, sql } from "drizzle-orm";
+import { eq, isNull, and, sql, inArray } from "drizzle-orm";
 import { writeWatchdogLog } from "../../ai/watchdog/log";
 
 export const EAS_PROJECT_ID = "a25192d7-72e5-46af-97d0-2d38ed9b78e3";
@@ -84,46 +84,50 @@ export async function syncProductionUpdates(): Promise<{ inserted: number; backf
   console.log(`[ota-sync] recuperati ${updates.length} update dal branch production`);
   if (updates.length === 0) return { inserted: 0, backfilled: 0 };
 
-  let inserted = 0;
+  // Task #802 — Bulk SELECT: una sola query per trovare tutti gli ID già presenti,
+  // invece del loop N+1 originale (1 SELECT per update × 200+ update = timeout proxy).
+  const allEasIds = updates.map((u) => u.id);
+  let existingSet: Set<string>;
+  try {
+    const existingRows = await withDbRetry(() =>
+      db.select({ easUpdateId: otaReleases.easUpdateId })
+        .from(otaReleases)
+        .where(inArray(otaReleases.easUpdateId, allEasIds))
+    );
+    existingSet = new Set(existingRows.map((r) => r.easUpdateId));
+  } catch (err) {
+    console.warn("[ota-sync] DB error fetching existing IDs, aborting sync:", err);
+    throw err;
+  }
+
+  const missing = updates.filter((u) => !existingSet.has(u.id));
+  console.log(`[ota-sync] ${missing.length} nuovi update da inserire (${existingSet.size} già presenti)`);
+
   // Task #394 — IDs di EAS update non presenti localmente al momento del check.
-  // Viene popolato anche quando l'insert ha successo, per segnalare il gap.
-  const gapIds: string[] = [];
-  // Task #394 — IDs che hanno avuto un errore DB durante il lookup/insert e sono
-  // stati saltati (non crashano il loop, ma vanno segnalati come non riconciliati).
+  const gapIds: string[] = missing.map((u) => u.id);
   const errorIds: string[] = [];
 
-  for (const upd of updates) {
-    let existing: { id: string }[];
+  // Task #802 — Bulk INSERT: un singolo insert per tutti i record mancanti.
+  let inserted = 0;
+  if (missing.length > 0) {
     try {
-      existing = await withDbRetry(() => db.select({ id: otaReleases.id })
-        .from(otaReleases)
-        .where(eq(otaReleases.easUpdateId, upd.id))
-        .limit(1));
+      const insertedRows = await withDbRetry(() =>
+        db.insert(otaReleases).values(
+          missing.map((u) => ({
+            easUpdateId: u.id,
+            easGroupId: u.group ?? null,
+            channel: "production",
+            runtimeVersion: u.runtimeVersion ?? null,
+            message: u.message ?? null,
+            status: "pending",
+            publishedAt: u.createdAt ? new Date(u.createdAt) : new Date(),
+          }))
+        ).onConflictDoNothing().returning({ id: otaReleases.id })
+      );
+      inserted = insertedRows.length;
     } catch (err) {
-      console.warn(`[ota-sync] DB error checking EAS update ${upd.id}, skipping:`, err);
-      errorIds.push(upd.id);
-      continue;
-    }
-
-    if (existing.length > 0) continue;
-
-    // Record non presente localmente: registra il gap PRIMA dell'insert.
-    gapIds.push(upd.id);
-
-    try {
-      await withDbRetry(() => db.insert(otaReleases).values({
-        easUpdateId: upd.id,
-        easGroupId: upd.group ?? null,
-        channel: "production",
-        runtimeVersion: upd.runtimeVersion ?? null,
-        message: upd.message ?? null,
-        status: "pending",
-        publishedAt: upd.createdAt ? new Date(upd.createdAt) : new Date(),
-      }).onConflictDoNothing());
-      inserted++;
-    } catch (err) {
-      console.warn(`[ota-sync] DB error inserting EAS update ${upd.id}, skipping:`, err);
-      errorIds.push(upd.id);
+      console.warn("[ota-sync] DB error during bulk insert, skipping:", err);
+      errorIds.push(...gapIds);
     }
   }
 
@@ -146,8 +150,12 @@ export async function syncProductionUpdates(): Promise<{ inserted: number; backf
     }).catch((e) => console.warn("[ota-sync] writeWatchdogLog error (non-fatal):", e));
   }
 
+  // Task #802 — Backfill easGroupId solo per i record già esistenti (i nuovi
+  // hanno già il gruppo impostato nel bulk insert). Questo loop tocca solo i
+  // record legacy privi di easGroupId, in pratica quasi zero in produzione.
   for (const upd of updates) {
     if (!upd.group) continue;
+    if (!existingSet.has(upd.id)) continue; // già inserito con il gruppo corretto
     try {
       await withDbRetry(() => db.update(otaReleases)
         .set({ easGroupId: upd.group })

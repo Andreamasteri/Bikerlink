@@ -125,16 +125,29 @@ router.post("/prune", async (_req: Request, res: Response) => {
 
 // POST /api/admin/ota/sync — forza una sincronizzazione sincrona con EAS.
 // Questa route DEVE stare PRIMA di /:id/... per non essere catturata dal parametro dinamico.
+// Task #802 — timeout esplicito 45s: restituisce JSON 504 invece di lasciare che
+// sia il proxy Replit a tagliare la connessione con HTML (→ "Risposta non valida").
+const SYNC_TIMEOUT_MS = 45_000;
 router.post("/sync", async (_req: Request, res: Response) => {
   if (!(process.env.EAS_TOKEN ?? process.env.EXPO_TOKEN)) {
     return res.status(503).json({ ok: false, message: "EAS_TOKEN / EXPO_TOKEN non configurato sul server. Impossibile contattare EAS." });
   }
+  let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timeoutHandle = setTimeout(() => reject(new Error("SYNC_TIMEOUT")), SYNC_TIMEOUT_MS);
+  });
   try {
-    const { inserted, backfilled } = await forceSyncNow();
+    const { inserted, backfilled } = await Promise.race([forceSyncNow(), timeoutPromise]);
+    clearTimeout(timeoutHandle);
     console.log(`[ota][SYNC] sync manuale completato: ${inserted} nuove, ${backfilled} backfill`);
     return res.json({ ok: true, inserted, backfilled, syncedAt: new Date().toISOString() });
   } catch (err) {
+    clearTimeout(timeoutHandle);
     const msg = err instanceof Error ? err.message : String(err);
+    if (msg === "SYNC_TIMEOUT") {
+      console.warn("[ota] POST /sync timeout dopo 45s");
+      return res.status(504).json({ ok: false, message: "Sync EAS timeout (>45s): il server è sotto carico, riprova tra qualche istante." });
+    }
     console.error("[ota] POST /sync error:", err);
     return res.status(502).json({ ok: false, message: `Errore sincronizzazione EAS: ${msg}` });
   }
