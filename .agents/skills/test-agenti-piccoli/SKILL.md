@@ -5,6 +5,163 @@ description: Batteria test standardizzata per valutare modelli LLM ≤2GB candid
 
 # Test Agenti Piccoli — Batteria Benchmark Bowie
 
+---
+
+## ⚠️ Difetti trovati nell'esecuzione reale (2026-07-19) e correzioni apportate
+
+Queste note sono obbligatorie da leggere prima di eseguire il benchmark. Descrivono bug reali incontrati e come risolverli.
+
+### Bug #1 — `--max-time=N` non supportato dalla curl sul TC
+
+**Sintomo:** `curl` ritorna immediatamente con exit 0 e output vuoto. Nessun errore visibile.
+
+**Causa:** La versione di curl sul TC non accetta la forma `--max-time=90` (con segno `=`). La forma equivalente con spazio (`--max-time 90`) è l'unica supportata.
+
+**Fix obbligatorio:** In tutti gli script bash e Python, usare sempre la forma con spazio:
+```bash
+# SBAGLIATO — silenziosamente ignorato:
+curl --max-time=90 ...
+
+# CORRETTO:
+curl --max-time 90 ...
+```
+In Python subprocess:
+```python
+# SBAGLIATO:
+["curl", "--max-time=90", ...]
+
+# CORRETTO:
+["curl", "--max-time", "90", ...]
+```
+
+---
+
+### Bug #2 — Benchmark via CF tunnel: timeout ShellExec per caricamento modello
+
+**Sintomo:** Il modello impiega 90–120s solo per caricarsi via Cloudflare tunnel. Con 15+ chiamate VRAM (10s ciascuna via SSH) il totale supera il limite di 280s di ShellExec.
+
+**Causa:** Il tunnel Cloudflare aggiunge overhead significativo su ogni operazione. `ollama ps` via CF costa ~10s; il caricamento di un modello da disco via `/api/generate` costa 90–120s anche se il file è locale sul TC.
+
+**Fix obbligatorio: eseguire il benchmark direttamente sul TC via SSH.**
+
+Procedura corretta per un benchmark completo di tutti i modelli:
+1. Scrivere lo script Python in workspace locale (`scripts/tc-benchmark.py`)
+2. Caricare sul TC via base64:
+   ```bash
+   SCRIPT_B64=$(base64 -w0 scripts/tc-benchmark.py)
+   python3 .agents/skills/thinkcentre-access/tc.py exec \
+     "echo '$SCRIPT_B64' | base64 -d > /tmp/tc-benchmark.py && echo 'upload_ok'"
+   ```
+3. Avviare in background con nohup:
+   ```bash
+   python3 .agents/skills/thinkcentre-access/tc.py exec \
+     "nohup python3 /tmp/tc-benchmark.py > /tmp/tc-benchmark.log 2>&1 & echo \$!"
+   ```
+4. Fare polling del log ogni 90–120s:
+   ```bash
+   python3 .agents/skills/thinkcentre-access/tc.py exec "tail -50 /tmp/tc-benchmark.log"
+   ```
+
+Lo script sul TC chiama `http://localhost:11434` direttamente: caricamento modello ~5s (vs 90–120s via CF), chiamate API ~500ms (vs 1–5s via CF).
+
+Script di riferimento: `scripts/tc-benchmark.py` (esegue tutti gli 8 modelli), `scripts/tc-benchmark-cont.py` (continua da un modello specifico).
+
+---
+
+### Bug #3 — Bash non gestisce history multi-turn con risposte multi-riga
+
+**Sintomo:** La storia conversazionale costruita in bash si corrompe quando le risposte del modello contengono newline, caratteri di controllo o JSON su più righe. Bash non permette variabili multi-riga sicure da passare in `-d` a curl.
+
+**Fix:** Usare Python per gestire la history. Il tipo `list[dict]` di Python serializza correttamente in JSON anche con contenuto multi-riga:
+```python
+history = []
+history.append({"role": "user", "content": prompt})
+history.append({"role": "assistant", "content": resp})
+msgs = [{"role": "system", "content": SYS}] + history + [{"role": "user", "content": new_prompt}]
+payload = json.dumps({"model": model, "messages": msgs, "stream": True, ...})
+```
+
+---
+
+### Bug #4 — Regex `\{[^{}]*\}` non gestisce JSON annidato in T3
+
+**Sintomo:** T3 (tool calling) restituisce sempre 0 punti anche quando il modello risponde correttamente con `{"tool":"get_weather","args":{"city":"napoli","date":"domani"}}`. La regex non cattura il JSON perché contiene `{}` annidati.
+
+**Fix:** Usare un parser JSON con conteggio delle parentesi (brace-matching):
+```python
+def extract_json(text):
+    try: return json.loads(text.strip())
+    except: pass
+    start = text.find("{")
+    if start == -1: return {}
+    depth = 0
+    for i, ch in enumerate(text[start:], start):
+        if ch == "{": depth += 1
+        elif ch == "}":
+            depth -= 1
+            if depth == 0:
+                try: return json.loads(text[start:i+1])
+                except: break
+    return {}
+```
+
+---
+
+### Bug #5 — Troppe letture VRAM via SSH → overhead critico
+
+**Sintomo:** Con 15+ letture `nvidia-smi` via SSH (una per ogni sotto-prompt), l'overhead totale raggiunge 150s per modello — sufficiente a far scadere il timeout.
+
+**Fix:** Ridurre le letture VRAM a **una sola per gruppo di test** (T1, T2, T3, T4, T5), non per ogni prompt individuale. Questo riduce l'overhead da ~150s a ~50s (5 letture × 10s):
+```python
+# Dopo tutti i 4 prompt di T1 — una sola lettura:
+v = vram()
+vram_t1_peak = v[0]
+
+# NON fare una lettura dopo ogni S1, S2, S3, S4
+```
+
+---
+
+### Bug #6 — Modello non verificato in VRAM dopo il caricamento → 15 min di timeout sprecati
+
+**Sintomo:** Il modello "si carica" (la chiamata pin() ritorna), ma `/api/ps` mostra solo `qwen3:4b`. Tutte le 15 chiamate successive scadono a 60s ciascuna = 15 minuti sprecati per modello.
+
+**Causa:** Ollama tenta di caricare il modello, va in timeout interno (architettura non supportata), e la chiamata curl ritorna comunque dopo `--max-time`. Il modello non è mai entrato in VRAM.
+
+**Fix obbligatorio:** Verificare `/api/ps` subito dopo pin/load. Se il modello non appare, marcarlo come `LOAD_FAILED` e passare al successivo immediatamente:
+```python
+def load_model(model, keep_alive=600):
+    pin(model, keep_alive=keep_alive)
+    time.sleep(2)
+    loaded = ps_loaded()
+    model_in_vram = any(model in m or m in model for m in loaded)
+    if not model_in_vram:
+        return False  # LOAD_FAILED — non eseguire i test
+    return True
+```
+
+---
+
+### Bug #7 — Ollama versione vecchia non supporta architetture nuove
+
+**Sintomo:** Tutti i modelli Qwen3.5 e Granite 3.3 falliscono con `LOAD_FAILED` (vedi Bug #6). Queste architetture sono state aggiunte in versioni successive di Ollama.
+
+**Versione sul TC al momento del benchmark:** 0.30.11 (non supporta Qwen3.5 né Granite 3.3).
+
+**Controllo obbligatorio prima del benchmark:**
+```bash
+python3 .agents/skills/thinkcentre-access/tc.py exec "ollama --version"
+```
+
+**Architetture per versione (nota: verificare sempre con la versione attuale):**
+- Qwen3 (es. `qwen3:1.7b`, GGUF Qwen3-1.7B): supportato da Ollama 0.x recente
+- Qwen3.5 (es. `Qwen3.5-2B-Q4_K_M`): richiede versione Ollama post-0.30.x
+- Granite 3.3 (es. `granite-3.3-2b-instruct`): richiede versione Ollama post-0.30.x
+
+Se un modello in `ollama list` non si carica, verificare prima la versione Ollama prima di diagnosticare altri problemi.
+
+---
+
 Protocollo standardizzato per confrontare modelli LLM ≤2GB come candidati al ruolo di **Bowie** (assistente in-app BikerLink + monitor matching real-time). La batteria è composta da 5 prove (T1–T5, 17pt totali) con scoring esatto, raccolta metriche GPU/VRAM per-test tramite `nvidia-smi dmon`, e template report riutilizzabile.
 
 ## Hardware di riferimento
@@ -343,18 +500,25 @@ La tabella 2 mostra come la VRAM cresce da T1 (JSON semplice) a T5 (multi-turn c
 
 ## Modelli candidato di riferimento (campagna 2026-07)
 
-I seguenti modelli erano presenti sul TC al momento del primo benchmark reale:
+I seguenti modelli erano presenti sul TC al momento del primo benchmark reale (Ollama 0.30.11).  
+**Vincitore: `Qwen3-1.7B-Q5_K_M` — 16/17 pt.** I modelli 3–7 non sono stati testati per incompatibilità Ollama (vedi Bug #7).
 
-| # | Nome Ollama | Dim disco | Note |
-|---|-------------|-----------|------|
-| 0 | `qwen3:1.7b` | 1.4 GB | **Baseline** — non rimuovere mai |
-| 1 | `hf.co/unsloth/Qwen3-1.7B-GGUF:Qwen3-1.7B-Q5_K_M` | 1.3 GB | quant aggressiva |
-| 2 | `hf.co/unsloth/Qwen3-1.7B-GGUF:Qwen3-1.7B-Q6_K` | 1.4 GB | quant alta qualità |
-| 3 | `hf.co/ggml-org/Qwen3.5-0.8B-GGUF:Qwen3.5-0.8B-Q8_0.gguf` | 833 MB | molto piccolo |
-| 4 | `hf.co/unsloth/Qwen3.5-2B-GGUF:Qwen3.5-2B-Q3_K_M` | 1.8 GB | ⚠️ verificare VRAM reale a caldo |
-| 5 | `hf.co/unsloth/Qwen3.5-2B-GGUF:Qwen3.5-2B-Q4_K_M` | 1.9 GB | ⚠️ verificare VRAM reale a caldo |
-| 6 | `hf.co/ibm-granite/granite-3.3-2b-instruct-GGUF:granite-3.3-2b-instruct-Q2_K` | 978 MB | granite arch |
-| 7 | `hf.co/ibm-granite/granite-3.3-2b-instruct-GGUF:granite-3.3-2b-instruct-Q3_K_M` | 1.3 GB | granite arch |
+| # | Nome Ollama | Dim disco | Score | Note |
+|---|-------------|-----------|:-----:|------|
+| 0 | `qwen3:1.7b` | 1.4 GB | **15/17** | **Baseline** — non rimuovere mai |
+| 1 | `hf.co/unsloth/Qwen3-1.7B-GGUF:Qwen3-1.7B-Q5_K_M` | 1.3 GB | **16/17** 🏆 | Migliore: T1 4/4, lat 2356ms |
+| 2 | `hf.co/unsloth/Qwen3-1.7B-GGUF:Qwen3-1.7B-Q6_K` | 1.4 GB | **15/17** | T1 3/4 (sbaglia S4 warn→error) |
+| 3 | `hf.co/ggml-org/Qwen3.5-0.8B-GGUF:Qwen3.5-0.8B-Q8_0.gguf` | 833 MB | **SKIP** | LOAD_FAILED — Ollama 0.30.11 non supporta Qwen3.5 |
+| 4 | `hf.co/unsloth/Qwen3.5-2B-GGUF:Qwen3.5-2B-Q3_K_M` | 1.8 GB | **SKIP** | LOAD_FAILED — Ollama 0.30.11 non supporta Qwen3.5 |
+| 5 | `hf.co/unsloth/Qwen3.5-2B-GGUF:Qwen3.5-2B-Q4_K_M` | 1.9 GB | **SKIP** | LOAD_FAILED — Ollama 0.30.11 non supporta Qwen3.5 |
+| 6 | `hf.co/ibm-granite/granite-3.3-2b-instruct-GGUF:granite-3.3-2b-instruct-Q2_K` | 978 MB | **SKIP** | LOAD_FAILED — Ollama 0.30.11 non supporta Granite 3.3 |
+| 7 | `hf.co/ibm-granite/granite-3.3-2b-instruct-GGUF:granite-3.3-2b-instruct-Q3_K_M` | 1.3 GB | **SKIP** | LOAD_FAILED — Ollama 0.30.11 non supporta Granite 3.3 |
+
+### Comportamento comune osservato su tutti i modelli testati
+
+- **T3 Q2** (`search_manual` per domande sul matching BikerLink): tutti rispondono `none` con risposta diretta invece di delegare al tool. Richiede few-shot nel system prompt di produzione — vedi task #798.
+- **T1 S4** (db_pool=8, warn): solo Q5_K_M classifica correttamente `warn`. Baseline e Q6_K restituiscono `error` probabilmente perché anche `last_cycle_min_ago=71` è in zona WARN e il modello aggrega in ERROR.
+- **T4 + T5**: tutti i modelli Qwen3 gestiscono perfettamente dialetto meridionale (4/4) e multi-turn (3/3).
 
 ---
 
