@@ -201,49 +201,53 @@ for i, line in enumerate(lines):
 
 if not labels:
     print("FAIL — no [N/TOTAL] step labels found in " + TARGET)
-    sys.exit(1)
+    # Do NOT call sys.exit(1) here: bash captures this block via RESULT=$(python3 ...)
+    # with set -euo pipefail active.  A non-zero Python exit fires bash errexit
+    # immediately, before the violation-box echo statements below can run, so the
+    # gate would exit silently with no message.  The bash layer already branches
+    # entirely on FIRST_LINE — no Python exit code is needed.
+else:
+    violations = []
+    actual_count = len(labels)
 
-violations = []
-actual_count = len(labels)
+    # Check 1: TOTAL on each label must match the actual count.
+    for lineno, n, total in labels:
+        if total != actual_count:
+            violations.append(
+                f"  line {lineno}: [{n}/{total}] — TOTAL is {total} but {actual_count} step labels exist"
+            )
 
-# Check 1: TOTAL on each label must match the actual count.
-for lineno, n, total in labels:
-    if total != actual_count:
-        violations.append(
-            f"  line {lineno}: [{n}/{total}] — TOTAL is {total} but {actual_count} step labels exist"
-        )
+    # Check 2: No duplicate N values.
+    seen_n = {}
+    for lineno, n, total in labels:
+        if n in seen_n:
+            violations.append(
+                f"  line {lineno}: [{n}/{total}] — duplicate step number {n} (first seen at line {seen_n[n]})"
+            )
+        else:
+            seen_n[n] = lineno
 
-# Check 2: No duplicate N values.
-seen_n = {}
-for lineno, n, total in labels:
-    if n in seen_n:
-        violations.append(
-            f"  line {lineno}: [{n}/{total}] — duplicate step number {n} (first seen at line {seen_n[n]})"
-        )
+    # Check 3: N values must be strictly increasing starting at 1.
+    sorted_labels = sorted(labels, key=lambda x: x[0])  # sort by line number
+    for idx, (lineno, n, total) in enumerate(sorted_labels):
+        expected = idx + 1
+        if n != expected:
+            violations.append(
+                f"  line {lineno}: [{n}/{total}] — expected step number {expected} at position {idx + 1}"
+            )
+
+    if not violations:
+        print(f"OK ({actual_count} step{'s' if actual_count != 1 else ''} found, numbering correct)")
     else:
-        seen_n[n] = lineno
-
-# Check 3: N values must be strictly increasing starting at 1.
-sorted_labels = sorted(labels, key=lambda x: x[0])  # sort by line number
-for idx, (lineno, n, total) in enumerate(sorted_labels):
-    expected = idx + 1
-    if n != expected:
-        violations.append(
-            f"  line {lineno}: [{n}/{total}] — expected step number {expected} at position {idx + 1}"
-        )
-
-if not violations:
-    print(f"OK ({actual_count} step{'s' if actual_count != 1 else ''} found, numbering correct)")
-    sys.exit(0)
-
-print(f"FAIL ({len(violations)} violation{'s' if len(violations) != 1 else ''})")
-for v in violations:
-    print(v)
-sys.exit(1)
+        print(f"FAIL ({len(violations)} violation{'s' if len(violations) != 1 else ''})")
+        for v in violations:
+            print(v)
 PYEOF
 )
 
-EXIT_CODE=$?
+# Note: EXIT_CODE is intentionally not captured here.  With bash set -euo pipefail,
+# a non-zero exit from inside RESULT=$(...) would fire errexit before the violation
+# box below could print.  The gate branches entirely on FIRST_LINE content instead.
 FIRST_LINE=$(echo "$RESULT" | head -1)
 
 if [[ "$FIRST_LINE" == OK* ]]; then

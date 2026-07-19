@@ -597,6 +597,23 @@ if [ "$DEPLOY_STEP_NUMBERS_EXIT" -ne 0 ]; then
   exit "$DEPLOY_STEP_NUMBERS_EXIT"
 fi
 
+# ── GATE REGRESSION TEST — check-deploy-build-step-numbers ───────────────────
+# Verifica che il gate stesso non sia silenziosamente rotto (es. un bug Python
+# nel parser che fa passare un TOTAL stantio senza rilevarlo).  Usa fixture
+# temporanee con violazioni note e controlla exit code + messaggio.
+echo "════════════════════════════════════════"
+echo "  Test regressione gate deploy-build-step-numbers"
+echo "════════════════════════════════════════"
+STEP_NUMBERS_REGTEST_EXIT=0
+bash scripts/__tests__/check-deploy-build-step-numbers.test.sh || STEP_NUMBERS_REGTEST_EXIT=$?
+echo "════════════════════════════════════════"
+echo ""
+if [ "$STEP_NUMBERS_REGTEST_EXIT" -ne 0 ]; then
+  echo "❌ Regression test check-deploy-build-step-numbers FALLITO — il gate potrebbe non rilevare TOTAL stantii o step duplicati."
+  echo "   Eseguire 'bash scripts/__tests__/check-deploy-build-step-numbers.test.sh' per i dettagli."
+  exit "$STEP_NUMBERS_REGTEST_EXIT"
+fi
+
 # ── GATE PRE-COMMIT HOOK WIRING ───────────────────────────────
 # Verifica che .git/hooks/pre-commit sia installato (via setup-hooks.sh)
 # e che contenga il gate check-deploy-build-step-numbers.sh.
