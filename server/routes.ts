@@ -65,14 +65,23 @@ import { registerMoreRoutes } from "./routes/more-routes";
 import { registerMoreRoutes2 } from "./routes/more-routes-2";
 import { registerMediaPromoRoutes } from "./routes/media-promo";
 import { recordSessionError, recordSessionSuccess } from "./session-health";
+import { getOrFetchAdminCached, deleteAdminCached } from "./lib/admin-auth-cache";
 
 async function _requireAdmin(req: Request, res: Response, next: NextFunction) {
   const session = req.session as { userId?: string };
   if (!session?.userId) {
     return res.status(401).json({ message: "Non autenticato" });
   }
-  const user = await storage.getUser(session.userId);
+  const userId = session.userId;
+  let user: Awaited<ReturnType<typeof storage.getUser>>;
+  try {
+    const result = await getOrFetchAdminCached(userId, () => storage.getUser(userId));
+    user = result as typeof user;
+  } catch {
+    return res.status(500).json({ message: "Errore interno" });
+  }
   if (!user || user.role !== "admin") {
+    deleteAdminCached(userId);
     return res.status(403).json({ message: "Accesso non autorizzato" });
   }
   (req as Request & { adminUser?: unknown }).adminUser = user;

@@ -245,13 +245,13 @@ async function callHorus(
           };
           if (chunk.error) throw new Error(`Ollama error: ${chunk.error}`);
           if (chunk.message?.content) contentChunks.push(chunk.message.content);
-        } catch (parseErr) {
+        } catch {
           // riga non-JSON (rara): ignora
         }
       }
     }
 
-    let raw = contentChunks.join("").trim();
+    const raw = contentChunks.join("").trim();
     if (!raw) throw new Error("Risposta vuota dal modello (stream concluso senza content).");
 
     // Guard anti-CoT: fail-fast se l'output contiene reasoning grezzo non strutturato.

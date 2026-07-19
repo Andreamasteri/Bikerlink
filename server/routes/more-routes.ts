@@ -10,19 +10,20 @@ import { getCircuitStatus } from "../db-circuit-breaker";
 import { getHealthState } from "../lib/health-arbiter";
 import { getCoordinatorHealthSummary } from "../ai/coordinator/job-gate";
 import { isHorusCoordinatorLoopRunning, getHorusCoordinatorLoopStats } from "../ai/coordinator/horus-coordinator-loop";
-import { getAdminCached, setAdminCached, deleteAdminCached } from "../lib/admin-auth-cache";
+import { getOrFetchAdminCached, deleteAdminCached } from "../lib/admin-auth-cache";
 
 async function requireAdmin(req: Request, res: Response, next: NextFunction) {
   if (!req.session?.userId) {
     return sendError(res, 401, "Non autenticato");
   }
   const cacheKey = req.session.userId;
-  const cachedUser = getAdminCached(cacheKey);
-  if (cachedUser !== null) {
-    (req as { adminUser?: unknown }).adminUser = cachedUser;
-    return next();
+  let user: Awaited<ReturnType<typeof storage.getUser>>;
+  try {
+    const result = await getOrFetchAdminCached(cacheKey, () => storage.getUser(cacheKey));
+    user = result as typeof user;
+  } catch {
+    return sendError(res, 500, "Errore interno");
   }
-  const user = await storage.getUser(req.session.userId);
   if (!user || user.role !== "admin") {
     deleteAdminCached(cacheKey);
     return sendError(res, 403, "Accesso non autorizzato");
@@ -31,7 +32,6 @@ async function requireAdmin(req: Request, res: Response, next: NextFunction) {
     deleteAdminCached(cacheKey);
     return sendError(res, 403, "Account non attivo.");
   }
-  setAdminCached(cacheKey, user);
   (req as { adminUser?: typeof user }).adminUser = user;
   next();
 }
