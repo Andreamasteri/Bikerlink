@@ -7,6 +7,7 @@
 import type { Signal } from "../types";
 import { aggregateMapsTelemetry } from "../maps-telemetry-store";
 import { isMapsFlagEnabled } from "../maps-kill-switch";
+import { getBgDbLimiterStats } from "../../../lib/bg-db-limiter";
 import { checkQuota as checkMapboxQuota } from "../../../routing/mapbox/quota-guard";
 import { checkQuota as checkTomTomQuota } from "../../../routing/tomtom/quota-guard";
 import { getMatchingBacklogEstimate, MAP_MATCHING_LAST_ATTEMPT_KEY } from "../../../map-matching-job";
@@ -252,10 +253,20 @@ export async function collectMaps(): Promise<Signal[]> {
     const attempt = await withBgDbSlot(() => readJobAttempt(MAP_MATCHING_LAST_ATTEMPT_KEY));
     if (attempt) {
       const ageH = Math.round((Date.now() - new Date(attempt.ts).getTime()) / 3_600_000);
+      // Quando il DB è confermato lento (≥ 2 ping lenti consecutivi), anche il
+      // map-matching fallisce per lo stesso motivo. Cappare a "warn" evita il
+      // double-counting che porta lo score sotto la soglia BROKEN.
+      const matchFailSev: Signal["severity"] = attempt.ok
+        ? "info"
+        : (getBgDbLimiterStats().dbSlowPingsConsecutive >= 2 ? "warn" : "high");
       signals.push({
         source: "maps", metric: "matching.last_attempt", value: attempt.ok ? 1 : 0,
-        severity: attempt.ok ? "info" : "high",
-        details: { ts: attempt.ts, ok: attempt.ok, retries: attempt.retries, error: attempt.error, ageH },
+        severity: matchFailSev,
+        details: {
+          ts: attempt.ts, ok: attempt.ok, retries: attempt.retries,
+          error: attempt.error, ageH,
+          ...(getBgDbLimiterStats().dbSlowPingsConsecutive >= 2 && !attempt.ok ? { suppressedBy: "db_slow" } : {}),
+        },
       });
     }
   } catch (err) {

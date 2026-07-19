@@ -315,10 +315,21 @@ export async function collectDb(): Promise<Signal[]> {
     const attempt = await withBgDbSlot(() => readJobAttempt(VACUUM_LAST_ATTEMPT_SETTING_KEY));
     if (attempt) {
       const ageH = Math.round((Date.now() - new Date(attempt.ts).getTime()) / 3_600_000);
+      // Quando il DB è confermato lento (≥ 2 ping lenti consecutivi), il vacuum
+      // fallisce inevitabilmente per lo stesso motivo. Cappare a "warn" evita che
+      // un fallimento atteso e derivato dalla stessa root cause contribuisca a
+      // portare lo score sotto la soglia BROKEN (< 40 pt).
+      const vacuumFailSev: Signal["severity"] = attempt.ok
+        ? "info"
+        : (consecutiveSlowPings >= 2 ? "warn" : "high");
       signals.push({
         source: "db", metric: "vacuum.last_attempt", value: attempt.ok ? 1 : 0,
-        severity: attempt.ok ? "info" : "high",
-        details: { ts: attempt.ts, ok: attempt.ok, retries: attempt.retries, error: attempt.error, ageH },
+        severity: vacuumFailSev,
+        details: {
+          ts: attempt.ts, ok: attempt.ok, retries: attempt.retries,
+          error: attempt.error, ageH,
+          ...(consecutiveSlowPings >= 2 && !attempt.ok ? { suppressedBy: "db_slow" } : {}),
+        },
       });
     }
   } catch (err) {
