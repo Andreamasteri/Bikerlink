@@ -125,7 +125,10 @@ router.post("/generate", async (req: Request, res: Response) => {
     const { docType } = parsed.data;
 
     const prompt = buildPrompt(docType);
-    const text = await callOllamaChat(prompt, undefined, { temperature: 0.3, maxRetries: 1 });
+    // stream:true → Ollama stream:true via doStream → CF riceve token subito (no 524 timeout).
+    // Documenti legali non hanno numPredict esplicito: il default Ollama è 2048+ token,
+    // sufficiente a superare i 100s di idle CF senza streaming.
+    const text = await callOllamaChat(prompt, undefined, { temperature: 0.3, maxRetries: 1, stream: true });
 
     return res.json({ ok: true, docType, text });
   } catch (err) {

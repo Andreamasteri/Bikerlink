@@ -53,12 +53,16 @@ TESTO ORIGINALE (italiano):
 ${block}
 
 TRADUZIONE (${langName}):`;
+  // stream:true → Ollama stream:true via doStream → CF riceve token subito (no 524 timeout).
+  // TRANSLATE_NUM_PREDICT=4000: senza streaming una traduzione di blocco può superare i 100s
+  // di idle CF, causando un 524. Con stream il timeout si azzera ad ogni chunk.
   const raw = await callOllamaChat(prompt, undefined, {
     persona: "horus",
     model: HORUS_MODEL_ID,
     system: HORUS_THINK_TAG_CONTRACT,
     temperature: 0.2,
     numPredict: TRANSLATE_NUM_PREDICT,
+    stream: true,
   });
   const clean = stripThink(raw ?? "").trim();
   return clean.length > 0 ? clean : null;

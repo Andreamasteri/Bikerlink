@@ -124,6 +124,9 @@ export async function askHorus(
       // arrivi al </think> e alla risposta vera — serve headroom sufficiente
       // per lasciar chiudere il ragionamento e produrre comunque la risposta.
       numPredict: 1600,
+      // stream:true → Ollama stream:true via doStream → CF riceve token subito (no 524 timeout).
+      // numPredict=1600: senza streaming la chiamata può superare i 100s di idle CF.
+      stream: true,
       abortSignal: t.signal,
     });
     const out = stripThink(raw ?? "");

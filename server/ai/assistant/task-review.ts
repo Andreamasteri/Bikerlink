@@ -302,6 +302,9 @@ async function callReviewAgent(
       system,
       temperature: 0.3,
       numPredict: 1200,
+      // stream:true → Ollama stream:true via doStream → CF riceve token subito (no 524 timeout).
+      // numPredict=1200: senza streaming la revisione di un task plan può superare i 100s idle CF.
+      stream: true,
       abortSignal: t.signal,
     });
     return stripThink(raw ?? "");
