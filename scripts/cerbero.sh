@@ -233,7 +233,14 @@ restart_metro() {
   kill_port_pid "$METRO_PORT"
 
   cerbero_log "[TESTA 2] CLEAN: esecuzione clean-metro.sh prima del riavvio..."
-  if bash "$SCRIPT_DIR/clean-metro.sh" >> "$CERBERO_LOG_FILE" 2>&1; then
+  # Prefissa ogni riga di output di clean-metro.sh con "[TESTA 2]" + timestamp,
+  # esattamente come start-expo.sh e start-backend.sh, così gli errori di pulizia
+  # cache sono immediatamente attribuibili senza disambiguare nel log grezzo.
+  bash "$SCRIPT_DIR/clean-metro.sh" 2>&1 | \
+    while IFS= read -r _cerbero_clean_line; do
+      printf '[%s] [TESTA 2] %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$_cerbero_clean_line" >> "$CERBERO_LOG_FILE"
+    done
+  if [ "${PIPESTATUS[0]}" -eq 0 ]; then
     cerbero_log "[TESTA 2] CLEAN completata"
   else
     cerbero_log "[TESTA 2] CLEAN errore (continuo comunque con il riavvio)"
