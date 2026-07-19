@@ -42,6 +42,19 @@ import { existsSync } from "node:fs";
 import { createConnection } from "node:net";
 import path from "node:path";
 
+/**
+ * Causa classificata dell'ultima uscita di cloudflared.
+ *
+ *   dns_failure — SRV lookup su argotunnel.com fallito ("server misbehaving",
+ *                 "i/o timeout", "unable to lookup", "edge discovery").
+ *                 Confermato causa flood Jul 2026 (Sentry #126649029, restart #157).
+ *   oom         — processo terminato da SIGKILL senza output di errore (OOM killer).
+ *   auth        — rifiuto autenticazione CF Access (401/unauthorized/token).
+ *   signal      — segnale inatteso non-SIGKILL (SIGTERM da esterno, watchdog ecc.).
+ *   unknown     — nessun pattern riconosciuto.
+ */
+export type RedisTunnelExitReason = "dns_failure" | "oom" | "auth" | "signal" | "unknown";
+
 interface TunnelState {
   enabled: boolean;
   running: boolean;
@@ -52,6 +65,8 @@ interface TunnelState {
   lastExitAt: number | null;
   lastExitCode: number | null;
   lastOutputLine: string | null;
+  /** Causa classificata dell'ultima uscita — null se mai uscito o exit normale in shutdown. */
+  lastExitReason: RedisTunnelExitReason | null;
   /** Timestamp dell'inizio del flood-restart corrente (null se non in flood). */
   floodStartedAt: number | null;
 }
@@ -66,6 +81,7 @@ const state: TunnelState = {
   lastExitAt: null,
   lastExitCode: null,
   lastOutputLine: null,
+  lastExitReason: null,
   floodStartedAt: null,
 };
 
@@ -86,6 +102,53 @@ const FLOOD_BACKOFF_MS = 5 * 60_000;  // 5 min
 
 /** Timestamp dei restart recenti usati per il rilevamento del flood. */
 const recentRestartTimes: number[] = [];
+
+/**
+ * Classifica la causa di uscita di cloudflared in base all'ultima riga di output
+ * e al codice/segnale di uscita.
+ *
+ * Patterns DNS confermati da Sentry #126649029 / restart flood #157 (Jul 2026):
+ *   systemd-resolved restituisce "server misbehaving" o "i/o timeout" sulle SRV
+ *   lookup di argotunnel.com → cloudflared non riesce a scoprire l'edge IP → exit(1).
+ */
+function parseExitReason(
+  lastOutputLine: string | null,
+  code: number | null,
+  signal: string | null,
+): RedisTunnelExitReason {
+  const line = (lastOutputLine ?? "").toLowerCase();
+
+  // DNS failure: pattern confermati da diagnosi journalctl reale
+  if (
+    line.includes("server misbehaving") ||
+    line.includes("i/o timeout") ||
+    line.includes("unable to lookup") ||
+    line.includes("edge discovery") ||
+    line.includes("argotunnel")
+  ) {
+    return "dns_failure";
+  }
+
+  // Auth failure: CF Access token rifiutato
+  if (
+    line.includes("401") ||
+    line.includes("unauthorized") ||
+    line.includes("authentication failed") ||
+    line.includes("access denied") ||
+    line.includes("invalid token")
+  ) {
+    return "auth";
+  }
+
+  // Signal-based exits (shuttingDown è già filtrato prima di arrivare qui)
+  if (signal) {
+    // SIGKILL senza output di errore → probabile OOM killer del kernel
+    if (signal === "SIGKILL" || code === 137) return "oom";
+    return "signal";
+  }
+
+  return "unknown";
+}
 
 function resolveBin(): string | null {
   const explicit = process.env.CLOUDFLARED_BIN?.trim();
@@ -186,6 +249,9 @@ function spawnBridge(): void {
     if (shuttingDown) return;
     state.restarts += 1;
 
+    // Classifica la causa dell'uscita (esposta in getRedisTunnelStatus + panel admin TC).
+    state.lastExitReason = parseExitReason(state.lastOutputLine, code, signal as string | null);
+
     // Aggiorna la finestra dei restart recenti per il flood-detector.
     const now = Date.now();
     recentRestartTimes.push(now);
@@ -201,7 +267,7 @@ function spawnBridge(): void {
         state.floodStartedAt = now;
         console.warn(
           `[redis-tunnel] flood-restart rilevato (${recentRestartTimes.length} restart in ${FLOOD_WINDOW_MS / 60_000} min, ` +
-          `code=${code} lastOutput="${state.lastOutputLine ?? "(nessuno)"}") — ` +
+          `code=${code} reason=${state.lastExitReason} lastOutput="${state.lastOutputLine ?? "(nessuno)"}") — ` +
           `backoff esteso a ${FLOOD_BACKOFF_MS / 60_000} min per ridurre rumore`,
         );
       }
@@ -213,7 +279,7 @@ function spawnBridge(): void {
 
     console.warn(
       `[redis-tunnel] cloudflared uscito (code=${code} signal=${signal} ` +
-      `lastOutput="${state.lastOutputLine ?? "(nessuno)"}"); ` +
+      `reason=${state.lastExitReason} lastOutput="${state.lastOutputLine ?? "(nessuno)"}"); ` +
       `restart #${state.restarts} tra ${backoff}ms`,
     );
     setTimeout(spawnBridge, backoff);

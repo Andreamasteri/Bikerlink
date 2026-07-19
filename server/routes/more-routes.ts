@@ -134,6 +134,7 @@ export function registerMoreRoutes(app: Express) {
         running: t.running,
         restarts: t.restarts,
         lastExitCode: t.lastExitCode,
+        lastExitReason: t.lastExitReason,
         lastError: t.lastError,
         lastExitAt: t.lastExitAt,
         floodActive: t.floodStartedAt !== null,

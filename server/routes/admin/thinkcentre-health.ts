@@ -16,6 +16,7 @@ import {
   tokenFingerprint,
   type ProbeLogEntry,
 } from "./thinkcentre-health-utils";
+import { getRedisTunnelStatus, type RedisTunnelExitReason } from "../../cache/redis-tunnel";
 import { isThinkCentreInMaintenance, resetThinkCentreMaintenanceCache } from "../../lib/thinkcentre-maintenance";
 import { isThinkCentrePoweredOff, resetThinkCentrePoweredOffCache } from "../../lib/thinkcentre-powered-off";
 import { resetThinkCentreOfflineCache } from "../../lib/thinkcentre-offline";
@@ -490,6 +491,34 @@ router.get("/thinkcentre-health", async (_req: Request, res: ExpressResponse) =>
         }
       : null;
 
+    // Tunnel cloudflared redis — stato del bridge TCP Replit→DragonflyDB TC.
+    // Informativo: non influenza overall. Esposto qui per il panel DragonflyDB.
+    let redisTunnel: {
+      enabled: boolean;
+      running: boolean;
+      restarts: number;
+      lastExitCode: number | null;
+      lastExitReason: RedisTunnelExitReason | null;
+      lastError: string | null;
+      lastExitAt: number | null;
+      floodActive: boolean;
+    } | null = null;
+    try {
+      const t = getRedisTunnelStatus();
+      redisTunnel = {
+        enabled: t.enabled,
+        running: t.running,
+        restarts: t.restarts,
+        lastExitCode: t.lastExitCode,
+        lastExitReason: t.lastExitReason,
+        lastError: t.lastError,
+        lastExitAt: t.lastExitAt,
+        floodActive: t.floodStartedAt !== null,
+      };
+    } catch {
+      // Non-fatal: il bridge potrebbe non essere stato ancora inizializzato.
+    }
+
     return res.json({
       overall,
       onlineCount,
@@ -514,6 +543,7 @@ router.get("/thinkcentre-health", async (_req: Request, res: ExpressResponse) =>
       maintenanceMode: maintenance,
       /** Task #549 — "default" during pre-push window after ai-hub redeploy; "pushed" once api-server has sent the map. */
       aiHubVramAgentMapSource: aiHubInfra.vramAgentMapSource ?? null,
+      redisTunnel,
       checkedAt: Date.now(),
     });
   } catch (err: unknown) {

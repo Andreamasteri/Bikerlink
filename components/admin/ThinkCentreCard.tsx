@@ -22,6 +22,9 @@ import {
 import { AresBlock } from "./ThinkCentreAresBlock";
 import type { AresDetailedHealth } from "./ThinkCentreAresBlock";
 import type { SystemStatuses } from "./SystemHealthContainer";
+
+/** Specchio del tipo RedisTunnelExitReason da server/cache/redis-tunnel.ts */
+type RedisTunnelExitReason = "dns_failure" | "oom" | "auth" | "signal" | "unknown";
 import { useThinkCentreToggles } from "./ThinkCentreCardToggles";
 import {
   ThinkCentreFooter,
@@ -88,6 +91,17 @@ interface ThinkCentreHealth {
   maintenanceMode?: boolean;
   /** Task #549 — "default" during pre-push window after ai-hub redeploy. */
   aiHubVramAgentMapSource?: "default" | "pushed" | null;
+  /** Stato del bridge cloudflared access tcp Replit→DragonflyDB (Task #815). */
+  redisTunnel?: {
+    enabled: boolean;
+    running: boolean;
+    restarts: number;
+    lastExitCode: number | null;
+    lastExitReason: RedisTunnelExitReason | null;
+    lastError: string | null;
+    lastExitAt: number | null;
+    floodActive: boolean;
+  } | null;
   checkedAt: number;
 }
 
@@ -115,6 +129,61 @@ type ThinkCentreStatusKeys =
   | "uptimeKuma"
   | "aihub";
 
+
+const REASON_LABEL: Record<RedisTunnelExitReason, string> = {
+  dns_failure: "DNS failure",
+  oom:         "OOM kill",
+  auth:        "Auth rifiutato",
+  signal:      "Segnale inatteso",
+  unknown:     "Causa ignota",
+};
+const REASON_COLOR: Record<RedisTunnelExitReason, string> = {
+  dns_failure: "#f59e0b",
+  oom:         "#ef4444",
+  auth:        "#ef4444",
+  signal:      "#f59e0b",
+  unknown:     "#6b7280",
+};
+
+function RedisTunnelBadge({
+  tunnel,
+}: {
+  tunnel: NonNullable<ThinkCentreHealth["redisTunnel"]>;
+}) {
+  if (!tunnel.enabled) return null;
+  const statusColor = tunnel.running ? "#22c55e" : tunnel.floodActive ? "#ef4444" : "#f59e0b";
+  const statusLabel = tunnel.running
+    ? "Tunnel attivo"
+    : tunnel.floodActive
+      ? `Flood (${tunnel.restarts} restart)`
+      : `Inattivo (${tunnel.restarts} restart)`;
+  return (
+    <View style={redisTunnelStyles.row}>
+      <Ionicons name="git-network-outline" size={12} color={statusColor} style={redisTunnelStyles.icon} />
+      <Text style={[redisTunnelStyles.label, { color: statusColor }]}>
+        cloudflared·redis — {statusLabel}
+      </Text>
+      {!tunnel.running && tunnel.lastExitReason && (
+        <View style={[redisTunnelStyles.reasonBadge, { borderColor: REASON_COLOR[tunnel.lastExitReason] }]}>
+          <Text style={[redisTunnelStyles.reasonText, { color: REASON_COLOR[tunnel.lastExitReason] }]}>
+            {REASON_LABEL[tunnel.lastExitReason]}
+          </Text>
+        </View>
+      )}
+    </View>
+  );
+}
+
+const redisTunnelStyles = {
+  row: { flexDirection: "row" as const, alignItems: "center" as const, marginTop: 6, flexWrap: "wrap" as const, gap: 6 },
+  icon: { marginRight: 4 },
+  label: { fontSize: 11 },
+  reasonBadge: {
+    borderWidth: 1, borderRadius: 4,
+    paddingHorizontal: 5, paddingVertical: 1,
+  },
+  reasonText: { fontSize: 10, fontWeight: "600" as const },
+};
 
 const ALL_UNKNOWN: Pick<SystemStatuses, ThinkCentreStatusKeys> = {
   thinkcentre: "unknown",
@@ -492,6 +561,9 @@ export function ThinkCentreCard({
               isLoading={isLoading}
               hasError={!!error}
             />
+          )}
+          {!poweredOffActive && data?.redisTunnel && data.redisTunnel.enabled && (
+            <RedisTunnelBadge tunnel={data.redisTunnel} />
           )}
           {!poweredOffActive && (
             <NginxBlock
