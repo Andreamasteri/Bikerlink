@@ -337,6 +337,46 @@ fi
 
 # ──────────────────────────────────────────────────────────────────────────────
 echo ""
+echo "── Test (6): check-setup-hooks-wiring-noop.sh fallisce quando check-pre-commit-hook-wiring.sh è assente"
+# ──────────────────────────────────────────────────────────────────────────────
+# Rationale: Check 3 del gate statico verifica che il file
+# scripts/check-pre-commit-hook-wiring.sh esista sul filesystem prima ancora
+# di eseguire l'installazione.  Se lo script fosse rinominato o cancellato il
+# gate deve rilevarlo e uscire con exit non-zero.
+#
+# Strategia: punta HELPER_SCRIPT a un percorso inesistente e TARGET al vero
+# setup-hooks.sh (che resta invariato — Check 1/2 devono passare); solo
+# Check 3 deve far fallire il gate.
+
+MISSING_HELPER="/tmp/missing-check-pre-commit-hook-wiring-$.sh"
+# Assicuriamoci che il file non esista
+rm -f "$MISSING_HELPER"
+
+MISSING_EXIT=0
+MISSING_OUTPUT=$(
+  TARGET="$PROJECT_ROOT/scripts/setup-hooks.sh" \
+  HELPER_SCRIPT="$MISSING_HELPER" \
+  bash "$PROJECT_ROOT/scripts/check-setup-hooks-wiring-noop.sh" 2>&1
+) || MISSING_EXIT=$?
+
+if [ "$MISSING_EXIT" -ne 0 ]; then
+  ok "check-setup-hooks-wiring-noop.sh esce con exit $MISSING_EXIT quando check-pre-commit-hook-wiring.sh è assente"
+else
+  nok "check-setup-hooks-wiring-noop.sh esce con exit 0 — file mancante NON rilevato (REGRESSIONE)"
+  echo "     Output:"
+  echo "$MISSING_OUTPUT" | sed 's/^/       /'
+fi
+
+if echo "$MISSING_OUTPUT" | grep -qi "NON trovato\|not found\|FAIL\|❌\|mancante\|esiste"; then
+  ok "output menziona il file mancante — messaggio di errore Check 3 presente"
+else
+  nok "output non menziona il file mancante — messaggio di errore Check 3 assente o soppresso"
+  echo "     Output:"
+  echo "$MISSING_OUTPUT" | sed 's/^/       /'
+fi
+
+# ──────────────────────────────────────────────────────────────────────────────
+echo ""
 echo "════════════════════════════════════════════════════════════"
 echo "  Risultato: $PASS PASS, $FAIL FAIL"
 echo "════════════════════════════════════════════════════════════"

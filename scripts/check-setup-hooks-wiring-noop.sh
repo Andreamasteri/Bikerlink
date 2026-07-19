@@ -77,6 +77,33 @@ else
   fi
 fi
 
+# ── Check 3: check-pre-commit-hook-wiring.sh esiste ed è eseguibile ───────────
+# Se lo script referenziato da setup-hooks.sh venisse rinominato o cancellato,
+# bash uscirebbe con exit ≠0 al momento dell'installazione; ma questo errore
+# potrebbe passare inosservato in ambienti con shell option lasse.  Questo check
+# statico verifica che il file esista sul filesystem prima ancora di eseguire
+# l'installazione.
+#
+# HELPER_SCRIPT può essere sovrascritta dall'esterno (utile nei test).
+if [ -z "${HELPER_SCRIPT:-}" ]; then
+  REPO_ROOT_FOR_HELPER="$(git rev-parse --show-toplevel 2>/dev/null || dirname "$(dirname "$TARGET")")"
+  HELPER_SCRIPT="$REPO_ROOT_FOR_HELPER/scripts/check-pre-commit-hook-wiring.sh"
+fi
+
+if [ ! -f "$HELPER_SCRIPT" ]; then
+  echo "❌ FAIL: scripts/check-pre-commit-hook-wiring.sh NON trovato su filesystem."
+  echo "   Percorso atteso: $HELPER_SCRIPT"
+  echo "   Lo script è stato rinominato o cancellato? Ripristinarlo prima di continuare."
+  FAIL=1
+elif [ ! -x "$HELPER_SCRIPT" ]; then
+  echo "❌ FAIL: scripts/check-pre-commit-hook-wiring.sh esiste ma NON è eseguibile."
+  echo "   Percorso: $HELPER_SCRIPT"
+  echo "   Fix: chmod +x scripts/check-pre-commit-hook-wiring.sh"
+  FAIL=1
+else
+  echo "   ✔ scripts/check-pre-commit-hook-wiring.sh esiste ed è eseguibile."
+fi
+
 # ── Risultato finale ───────────────────────────────────────────────────────────
 echo ""
 if [ "$FAIL" -ne 0 ]; then
