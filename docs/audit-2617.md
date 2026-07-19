@@ -27,7 +27,7 @@ Audit dello stato del main DOPO #2603 (split meccanico) + #2584 (ratchet 600) + 
 | E.1-5 | Rotte critiche utente | ⚠️ N/V | Richiedono auth sessione — backend mount OK confermato |
 | F.1 | Typecheck root + server + client | ✅ PASS | Tutti e 3 verdi (workflow `typecheck`) |
 | F.2 | ESLint | ✅ PASS dopo fix | 1 errore trovato e fissato inline (vedi sotto); 2 warning pre-esistenti residui |
-| F.3 | Ratchet 600 righe | ✅ PASS | 0 regressioni, 31 LEGACY, 0 LOCKED, 26 file oltre limite |
+| F.3 | Ratchet 600 righe (storico — gate era 600 al momento dell'audit) | ✅ PASS | 0 regressioni, 31 LEGACY, 0 LOCKED, 26 file oltre limite |
 | F.4 | file-conflict-guard | ✅ PASS | Clean |
 | F.5 | Tutti i typecheck script | ✅ PASS | scripts, server-tests, root, schema-import guard, version alignment VERDE |
 | G.1 | Stabilità 30 min | ✅ PASS parziale | Backend stabile da ~6 min di log: 12 cicli health OK consecutivi, no crash |

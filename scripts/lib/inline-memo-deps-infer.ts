@@ -4,7 +4,7 @@
  * Helper puri (regex + inferenza del dep) usati da
  * scripts/fix-inline-default-memo-deps.ts.
  *
- * Estratto dal fixer per restare sotto il limite 600 righe per file.
+ * Estratto dal fixer per restare sotto il limite 800 righe per file.
  * Nessuna logica modificata: solo relocazione + export.
  */
 

@@ -1,5 +1,5 @@
 /**
- * Standalone diagnostic: list TypeScript files exceeding 600 lines.
+ * Standalone diagnostic: list TypeScript files exceeding MAX_LINES (currently 800).
  *
  * This script is now MARKER-AWARE:
  *   - `// LARGE-FILE-ALLOW: <motivo>` on line 1 → skipped IF path appears

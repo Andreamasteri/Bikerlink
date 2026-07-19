@@ -33,7 +33,7 @@
  *
  * NOTA: la logica pura (regex + inferenza) vive in lib/inline-memo-deps-infer.ts
  * e il core di scansione in lib/inline-memo-deps-process.ts, per rispettare il
- * limite 600 righe per file.
+ * limite 800 righe per file.
  */
 
 import * as fs from "fs";

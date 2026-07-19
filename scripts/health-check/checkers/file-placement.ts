@@ -1,9 +1,8 @@
 // Task #4825 — Checker posizionamento file: file helper dentro app/(tabs)/ (route pollution),
-// file orfani .partN/.next, e file sorgente troppo grandi (oltre il ratchet 600).
+// file orfani .partN/.next, e file sorgente troppo grandi (oltre il ratchet 800).
 import { listSourceFiles, safeRead } from "../scan-utils";
 import type { CheckResult } from "../types";
-
-const RATCHET_LIMIT = 600;
+import { MAX_LINES as RATCHET_LIMIT } from "../../lib/large-files-core";
 
 export async function runFilePlacement(): Promise<CheckResult[]> {
   const out: CheckResult[] = [];
@@ -33,7 +32,7 @@ export async function runFilePlacement(): Promise<CheckResult[]> {
       }
     }
 
-    // 3) File oltre il ratchet 600 righe.
+    // 3) File oltre il ratchet MAX_LINES righe.
     const text = safeRead(f.abs);
     if (text) {
       const lines = text.split("\n").length;

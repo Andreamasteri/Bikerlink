@@ -1,6 +1,6 @@
 /**
  * lint-migration-indexes.part2.ts
- * Implementazioni helper spostate da lint-migration-indexes.ts per rispettare il gate ≤600 righe.
+ * Implementazioni helper spostate da lint-migration-indexes.ts per rispettare il gate ≤800 righe.
  */
 
 // ─── Tipi ────────────────────────────────────────────────────────────────────

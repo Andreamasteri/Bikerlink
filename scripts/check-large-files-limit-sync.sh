@@ -32,7 +32,9 @@ fi
 
 if [[ "$USES_DYNAMIC" == "true" ]]; then
   echo "✅ check-large-files-limit-sync: setup-hooks.sh usa l'estrazione dinamica da large-files-core.ts (MAX_LINES=$AUTHORITATIVE) — nessun drift possibile."
-  exit 0
+  # Still run the broader docs/scripts gate-reference scan before exiting.
+  bash "$(dirname "$0")/check-large-files-docs-sync.sh"
+  exit $?
 fi
 
 # --- Fallback: cerca un numero hardcoded nella riga check-large-files ---
@@ -54,3 +56,6 @@ if [[ "$AUTHORITATIVE" != "$SUMMARY" ]]; then
 fi
 
 echo "✅ check-large-files-limit-sync: numero hardcoded $SUMMARY in sync con MAX_LINES=$AUTHORITATIVE"
+
+# --- Also run the broader docs/scripts gate-reference scan ---
+bash "$(dirname "$0")/check-large-files-docs-sync.sh"

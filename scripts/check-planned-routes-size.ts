@@ -12,7 +12,7 @@
  * solo strutturale (presenza del file). Usare questo script come gate CI/lint
  * prima di ogni merge che tocca server/routes/.
  *
- * Soglia: 450 righe (più bassa del limite globale 600 per intercettare
+ * Soglia: 450 righe (più bassa del limite globale 800 per intercettare
  * la crescita con anticipo).
  *
  * Uso:

@@ -237,19 +237,38 @@ async function callHorus(
       for (const line of lines) {
         const trimmed = line.trim();
         if (!trimmed) continue;
+        let chunk: { message?: { content?: string }; error?: string; done?: boolean } | null =
+          null;
         try {
-          const chunk = JSON.parse(trimmed) as {
+          chunk = JSON.parse(trimmed) as {
             message?: { content?: string };
             error?: string;
             done?: boolean;
           };
-          if (chunk.error) throw new Error(`Ollama error: ${chunk.error}`);
-          if (chunk.message?.content) contentChunks.push(chunk.message.content);
         } catch {
           // riga non-JSON (rara): ignora
+          continue;
         }
+        // chunk.error check is OUTSIDE the try so it is never silently swallowed.
+        if (chunk.error) throw new Error(`Ollama error: ${chunk.error}`);
+        if (chunk.message?.content) contentChunks.push(chunk.message.content);
       }
     }
+
+    // Flush any trailing buffer content that lacked a terminating newline.
+    if (buf.trim()) {
+      try {
+        const trailing = JSON.parse(buf.trim()) as {
+          message?: { content?: string };
+          error?: string;
+        };
+        if (trailing.error) throw new Error(`Ollama error: ${trailing.error}`);
+        if (trailing.message?.content) contentChunks.push(trailing.message.content);
+      } catch {
+        // riga finale non-JSON: ignora
+      }
+    }
+
 
     const raw = contentChunks.join("").trim();
     if (!raw) throw new Error("Risposta vuota dal modello (stream concluso senza content).");

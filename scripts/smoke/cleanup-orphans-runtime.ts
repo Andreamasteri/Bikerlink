@@ -4,7 +4,7 @@
  * Funzione invocata da run-smoke.ts all'avvio per rimuovere utenti smoke
  * residui da run precedenti (cleanup per-run pulisce solo il proprio utente,
  * eventuali process kill mid-run lasciano leak). Estratta in file separato per
- * rispettare il ratchet 600 righe su run-smoke.ts.
+ * rispettare il ratchet 800 righe su run-smoke.ts.
  */
 
 export async function cleanupOrphanSmokeUsers(): Promise<void> {

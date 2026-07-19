@@ -118,8 +118,8 @@ async function main(): Promise<void> {
 }
 
 function runLargeFilesRatchet(): number {
-  // Gate "max 600 righe per file" — chiamato anche da pre-commit e post-merge.
-  // Vedi replit.md → "⛔ REGOLA FERREA — Limite 600 righe per file".
+  // Gate "max 800 righe per file" — chiamato anche da pre-commit e post-merge.
+  // Vedi replit.md → "⛔ REGOLA FERREA — Limite 800 righe per file".
   const r = spawnSync("bash", ["scripts/check-large-files-ratchet.sh"], {
     stdio: "inherit",
   });

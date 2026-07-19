@@ -3,7 +3,7 @@
  *
  * Core di scansione/fix per scripts/fix-inline-default-memo-deps.ts:
  * fixDepsArray + processFile. Estratto dal fixer per restare sotto il
- * limite 600 righe per file. Nessuna logica modificata: solo relocazione +
+ * limite 800 righe per file. Nessuna logica modificata: solo relocazione +
  * `apply` passato come parametro (prima leggeva la const globale APPLY).
  */
 
