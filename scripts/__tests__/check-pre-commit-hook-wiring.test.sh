@@ -1,211 +1,176 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # check-pre-commit-hook-wiring.test.sh
 #
-# Regression test per il wiring del pre-commit hook con il gate
-# check-deploy-build-step-numbers.sh.
+# Regression test per il gate check-pre-commit-hook-wiring.sh.
 #
-# Verifica che:
-#   (1) scripts/pre-commit contenga una chiamata esplicita a
-#       check-deploy-build-step-numbers.sh (gate wired).
-#   (2) Il pre-commit hook — eseguito in un repo git temporaneo con
-#       scripts/deploy-build.sh staged a TOTAL stantio — esegua il gate
-#       e blocchi il commit (exit 1).
-#   (3) Il pre-commit hook NON blocchi il commit quando deploy-build.sh è
-#       numerato correttamente (exit 0).
+# Verifica che il gate:
+#   (a) esca con codice 1 quando .git/hooks/pre-commit è mancante
+#   (b) esca con codice 1 quando .git/hooks/pre-commit non è eseguibile
+#   (c) esca con codice 1 quando .git/hooks/pre-commit è stale
+#       (non contiene check-deploy-build-step-numbers.sh)
+#   (d) esca con codice 0 (happy path) quando il hook è presente,
+#       eseguibile e contiene il GATE_MARKER corretto
+#   (e) il gate sia eseguibile (permessi +x)
 #
-# Strategia sandbox:
-#   Tutto avviene in directory temporanee; il repo reale (.git/) non viene
-#   mai toccato.  Le dipendenze del hook che non riguardano lo step-numbering
-#   (detect-secrets-hook, check-large-files-ratchet.sh,
-#   check-ai-direct-generateobject.sh) vengono stubbed con script che escono
-#   sempre con 0 in modo che il flusso raggiunga il gate in esame.
-#   Il gate check-deploy-build-step-numbers.sh è sempre quello REALE copiato
-#   dal repo corrente.
+# Tecnica: ogni caso di test usa un git repo temporaneo isolato
+# (`git init` in /tmp) così il gate trova REPO_ROOT via
+# `git rev-parse --show-toplevel` senza toccare mai il vero
+# .git/hooks/ del workspace Replit.
 #
-# Pattern modellato su scripts/__tests__/check-deploy-build-step-numbers.test.sh
+# Pattern modellato su scripts/__tests__/check-ai-direct-generateobject.test.sh
 
 set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
-PRE_COMMIT_SRC="$PROJECT_ROOT/scripts/pre-commit"
-GATE_SCRIPT="$PROJECT_ROOT/scripts/check-deploy-build-step-numbers.sh"
+GATE_SCRIPT="$PROJECT_ROOT/scripts/check-pre-commit-hook-wiring.sh"
+GATE_MARKER="check-deploy-build-step-numbers.sh"
 
 PASS=0
 FAIL=0
 
-SANDBOX_DIR=""
-cleanup() {
-  [ -n "${SANDBOX_DIR:-}" ] && rm -rf "$SANDBOX_DIR" 2>/dev/null || true
+# ── Helper: crea un git repo temporaneo isolato ───────────────────────────────
+make_temp_repo() {
+  local tmpdir
+  tmpdir="$(mktemp -d /tmp/hook-wiring-test.XXXXXX)"
+  git init --quiet "$tmpdir" 2>/dev/null
+  echo "$tmpdir"
 }
-trap cleanup EXIT
+
+cleanup_all() {
+  # I tmpdir sono rimossi esplicitamente da ogni test; questa è una rete di sicurezza.
+  : # noop — cleanup avviene inline per chiarezza
+}
+trap cleanup_all EXIT
 
 ok()  { echo "  [PASS] $1"; PASS=$((PASS + 1)); }
 nok() { echo "  [FAIL] $1"; FAIL=$((FAIL + 1)); }
 
 echo "════════════════════════════════════════════════════════════"
-echo "  Regression test — check-pre-commit-hook-wiring"
-echo "  (hook esegue check-deploy-build-step-numbers.sh)"
+echo "  Regression test — check-pre-commit-hook-wiring.sh"
 echo "════════════════════════════════════════════════════════════"
 
-# Pre-condizioni: i file sorgente devono esistere
-if [ ! -f "$PRE_COMMIT_SRC" ]; then
-  echo "ERRORE: scripts/pre-commit non trovato: $PRE_COMMIT_SRC"
-  exit 1
-fi
+# Pre-condizione: il gate esiste
 if [ ! -f "$GATE_SCRIPT" ]; then
-  echo "ERRORE: gate script non trovato: $GATE_SCRIPT"
+  echo "ERRORE: gate script mancante: $GATE_SCRIPT"
   exit 1
 fi
 
-# ── Helper: crea un repo sandbox completo ────────────────────────────────────
-# Uso: make_sandbox
-# Risultato: SANDBOX_DIR inizializzato con git repo + hook + stub script.
-# Il chiamante aggiunge il fixture scripts/deploy-build.sh e lo staga.
-make_sandbox() {
-  SANDBOX_DIR="$(mktemp -d /tmp/hook-wiring-test.XXXXXX)"
-
-  # ── Init repo git minimale ────────────────────────────────────────────────
-  cd "$SANDBOX_DIR"
-  git init -q
-  git config user.email "test@test.com"
-  git config user.name "Test"
-  # Commit iniziale: necessario affinché git diff --cached funzioni
-  echo "# BikerLink test sandbox" > README.md
-  git add README.md
-  git commit -q -m "init"
-
-  # ── Fake binaries: detect-secrets-hook e detect-secrets ──────────────────
-  # Queste dipendenze non testano il gate in esame; le stubbiamo con exit 0
-  # per permettere al flusso del hook di raggiungere check-deploy-build-step-numbers.sh.
-  mkdir -p "$SANDBOX_DIR/bin"
-
-  cat > "$SANDBOX_DIR/bin/detect-secrets-hook" << 'STUB'
-#!/bin/bash
-# Stub per detect-secrets-hook — sempre OK (non testate qui)
-exit 0
-STUB
-  chmod +x "$SANDBOX_DIR/bin/detect-secrets-hook"
-
-  cat > "$SANDBOX_DIR/bin/detect-secrets" << 'STUB'
-#!/bin/bash
-# Stub per detect-secrets — emette baseline vuota
-echo '{"version":"1.5.0","plugins_used":[],"filters_used":[],"results":{},"generated_at":"2024-01-01T00:00:00Z"}'
-exit 0
-STUB
-  chmod +x "$SANDBOX_DIR/bin/detect-secrets"
-
-  # Baseline presente: evita la logica "crea baseline" che complicherebbe il test
-  echo '{"version":"1.5.0","plugins_used":[],"filters_used":[],"results":{},"generated_at":"2024-01-01T00:00:00Z"}' \
-    > "$SANDBOX_DIR/.secrets.baseline"
-
-  # ── Struttura scripts/ ────────────────────────────────────────────────────
-  mkdir -p "$SANDBOX_DIR/scripts"
-
-  # Gate REALE: check-deploy-build-step-numbers.sh
-  cp "$GATE_SCRIPT" "$SANDBOX_DIR/scripts/check-deploy-build-step-numbers.sh"
-
-  # Stub: check-large-files-ratchet.sh (gate non in esame → passa sempre)
-  cat > "$SANDBOX_DIR/scripts/check-large-files-ratchet.sh" << 'STUB'
-#!/bin/bash
-exit 0
-STUB
-  chmod +x "$SANDBOX_DIR/scripts/check-large-files-ratchet.sh"
-
-  # Stub: check-ai-direct-generateobject.sh (gate non in esame → passa sempre)
-  cat > "$SANDBOX_DIR/scripts/check-ai-direct-generateobject.sh" << 'STUB'
-#!/bin/bash
-exit 0
-STUB
-  chmod +x "$SANDBOX_DIR/scripts/check-ai-direct-generateobject.sh"
-
-  # ── Installa il hook reale ────────────────────────────────────────────────
-  cp "$PRE_COMMIT_SRC" "$SANDBOX_DIR/.git/hooks/pre-commit"
-  chmod +x "$SANDBOX_DIR/.git/hooks/pre-commit"
-}
-
 # ──────────────────────────────────────────────────────────────────────────────
 echo ""
-echo "── Test (1): scripts/pre-commit contiene la chiamata a check-deploy-build-step-numbers.sh"
+echo "── Test (e): il gate è eseguibile"
 # ──────────────────────────────────────────────────────────────────────────────
-if grep -qF "check-deploy-build-step-numbers.sh" "$PRE_COMMIT_SRC"; then
-  ok "scripts/pre-commit contiene la chiamata al gate step-numbering"
+if [ -x "$GATE_SCRIPT" ]; then
+  ok "check-pre-commit-hook-wiring.sh è eseguibile"
 else
-  nok "scripts/pre-commit NON contiene 'check-deploy-build-step-numbers.sh' — gate non wired"
+  nok "check-pre-commit-hook-wiring.sh NON è eseguibile (chmod +x mancante)"
 fi
 
 # ──────────────────────────────────────────────────────────────────────────────
 echo ""
-echo "── Test (2): hook blocca il commit quando deploy-build.sh ha TOTAL stantio → exit 1"
+echo "── Test (a): hook mancante → exit 1 con messaggio PRE-COMMIT HOOK NOT INSTALLED"
 # ──────────────────────────────────────────────────────────────────────────────
-make_sandbox
+TMPDIR_A="$(make_temp_repo)"
+# Non creiamo nulla in .git/hooks/ → hook assente
+EXIT_A=0
+OUTPUT_A="$(cd "$TMPDIR_A" && bash "$GATE_SCRIPT" 2>&1)" || EXIT_A=$?
+rm -rf "$TMPDIR_A"
 
-# Fixture: 3 step reali ma tutte dichiarano TOTAL=2 (stantio)
-cat > "$SANDBOX_DIR/scripts/deploy-build.sh" << 'FIXTURE'
-#!/bin/bash
-# Fixture — TOTAL stantio: dichiara [N/2] ma ci sono 3 step reali
-log() { echo "$*"; }
-log "=== [1/2] Step uno — desc"
-log "=== [2/2] Step due — desc"
-log "=== [3/2] Step tre — step aggiunto senza rinumerare il TOTAL"
-FIXTURE
-
-cd "$SANDBOX_DIR"
-git add scripts/deploy-build.sh
-
-EXIT_STALE=0
-OUTPUT_STALE=$(PATH="$SANDBOX_DIR/bin:$PATH" bash .git/hooks/pre-commit 2>&1) || EXIT_STALE=$?
-
-if [ "$EXIT_STALE" -eq 1 ]; then
-  ok "hook esce con exit 1 — commit bloccato su TOTAL stantio"
+if [ "$EXIT_A" -eq 1 ]; then
+  ok "hook mancante: exit 1 (corretto)"
 else
-  nok "hook esce con exit $EXIT_STALE invece di 1 — TOTAL stantio non ha bloccato il commit (REGRESSIONE)"
-  echo "     Output del hook:"
-  echo "$OUTPUT_STALE" | sed 's/^/       /'
+  nok "hook mancante: exit $EXIT_A invece di 1 — il gate non ha rilevato il hook mancante"
 fi
 
-# Verifica che l'output menzioni esplicitamente il gate o la violazione step
-if echo "$OUTPUT_STALE" | grep -qi "step\|TOTAL\|numbering\|deploy-build"; then
-  ok "output hook menziona il gate step-numbering — gate raggiunto ed eseguito"
+if echo "$OUTPUT_A" | grep -q "PRE-COMMIT HOOK NOT INSTALLED"; then
+  ok "hook mancante: messaggio 'PRE-COMMIT HOOK NOT INSTALLED' presente"
 else
-  nok "output hook non menziona 'step/TOTAL/numbering/deploy-build' — gate potrebbe non essere stato eseguito"
-  echo "     Output del hook:"
-  echo "$OUTPUT_STALE" | sed 's/^/       /'
+  nok "hook mancante: messaggio 'PRE-COMMIT HOOK NOT INSTALLED' assente nell'output"
+  echo "     Output ricevuto: $(echo "$OUTPUT_A" | head -5)"
 fi
-
-rm -rf "$SANDBOX_DIR"; SANDBOX_DIR=""
 
 # ──────────────────────────────────────────────────────────────────────────────
 echo ""
-echo "── Test (3): hook lascia passare il commit quando deploy-build.sh è numerato correttamente → exit 0"
+echo "── Test (b): hook non eseguibile → exit 1 con messaggio PRE-COMMIT HOOK NOT EXECUTABLE"
 # ──────────────────────────────────────────────────────────────────────────────
-make_sandbox
+TMPDIR_B="$(make_temp_repo)"
+mkdir -p "$TMPDIR_B/.git/hooks"
+# Crea il hook con contenuto valido ma SENZA permesso +x
+printf '#!/usr/bin/env bash\nbash scripts/%s\n' "$GATE_MARKER" > "$TMPDIR_B/.git/hooks/pre-commit"
+chmod -x "$TMPDIR_B/.git/hooks/pre-commit"
 
-# Fixture corretta: 3 step con TOTAL=3
-cat > "$SANDBOX_DIR/scripts/deploy-build.sh" << 'FIXTURE'
-#!/bin/bash
-# Fixture — numerazione corretta
-log() { echo "$*"; }
-log "=== [1/3] Step uno — desc"
-log "=== [2/3] Step due — desc"
-log "=== [3/3] Step tre — desc"
-FIXTURE
+EXIT_B=0
+OUTPUT_B="$(cd "$TMPDIR_B" && bash "$GATE_SCRIPT" 2>&1)" || EXIT_B=$?
+rm -rf "$TMPDIR_B"
 
-cd "$SANDBOX_DIR"
-git add scripts/deploy-build.sh
-
-EXIT_OK=0
-OUTPUT_OK=$(PATH="$SANDBOX_DIR/bin:$PATH" bash .git/hooks/pre-commit 2>&1) || EXIT_OK=$?
-
-if [ "$EXIT_OK" -eq 0 ]; then
-  ok "hook esce con exit 0 — numerazione corretta non blocca il commit"
+if [ "$EXIT_B" -eq 1 ]; then
+  ok "hook non eseguibile: exit 1 (corretto)"
 else
-  nok "hook esce con exit $EXIT_OK invece di 0 — commit bloccato ingiustamente (REGRESSIONE)"
-  echo "     Output del hook:"
-  echo "$OUTPUT_OK" | sed 's/^/       /'
+  nok "hook non eseguibile: exit $EXIT_B invece di 1 — il gate non ha rilevato i permessi mancanti"
 fi
 
-rm -rf "$SANDBOX_DIR"; SANDBOX_DIR=""
+if echo "$OUTPUT_B" | grep -q "PRE-COMMIT HOOK NOT EXECUTABLE"; then
+  ok "hook non eseguibile: messaggio 'PRE-COMMIT HOOK NOT EXECUTABLE' presente"
+else
+  nok "hook non eseguibile: messaggio 'PRE-COMMIT HOOK NOT EXECUTABLE' assente nell'output"
+  echo "     Output ricevuto: $(echo "$OUTPUT_B" | head -5)"
+fi
+
+# ──────────────────────────────────────────────────────────────────────────────
+echo ""
+echo "── Test (c): hook stale (senza $GATE_MARKER) → exit 1 con messaggio STALE"
+# ──────────────────────────────────────────────────────────────────────────────
+TMPDIR_C="$(make_temp_repo)"
+mkdir -p "$TMPDIR_C/.git/hooks"
+# Hook presente ed eseguibile ma NON contiene il GATE_MARKER
+printf '#!/usr/bin/env bash\n# Hook stale — non include il gate step-numbering\necho "commit consentito"\n' \
+  > "$TMPDIR_C/.git/hooks/pre-commit"
+chmod +x "$TMPDIR_C/.git/hooks/pre-commit"
+
+EXIT_C=0
+OUTPUT_C="$(cd "$TMPDIR_C" && bash "$GATE_SCRIPT" 2>&1)" || EXIT_C=$?
+rm -rf "$TMPDIR_C"
+
+if [ "$EXIT_C" -eq 1 ]; then
+  ok "hook stale: exit 1 (corretto)"
+else
+  nok "hook stale: exit $EXIT_C invece di 1 — il gate non ha rilevato il hook stale"
+fi
+
+if echo "$OUTPUT_C" | grep -q "STALE"; then
+  ok "hook stale: messaggio 'STALE' presente nell'output"
+else
+  nok "hook stale: messaggio 'STALE' assente nell'output"
+  echo "     Output ricevuto: $(echo "$OUTPUT_C" | head -5)"
+fi
+
+# ──────────────────────────────────────────────────────────────────────────────
+echo ""
+echo "── Test (d): happy path — hook presente, eseguibile e con $GATE_MARKER → exit 0"
+# ──────────────────────────────────────────────────────────────────────────────
+TMPDIR_D="$(make_temp_repo)"
+mkdir -p "$TMPDIR_D/.git/hooks"
+# Hook presente, eseguibile e contiene il GATE_MARKER
+printf '#!/usr/bin/env bash\nbash scripts/%s\n' "$GATE_MARKER" > "$TMPDIR_D/.git/hooks/pre-commit"
+chmod +x "$TMPDIR_D/.git/hooks/pre-commit"
+
+EXIT_D=0
+OUTPUT_D="$(cd "$TMPDIR_D" && bash "$GATE_SCRIPT" 2>&1)" || EXIT_D=$?
+rm -rf "$TMPDIR_D"
+
+if [ "$EXIT_D" -eq 0 ]; then
+  ok "happy path: exit 0 (corretto)"
+else
+  nok "happy path: exit $EXIT_D invece di 0 — il gate ha fallito su un hook valido"
+  echo "     Output ricevuto: $(echo "$OUTPUT_D" | head -5)"
+fi
+
+if echo "$OUTPUT_D" | grep -q "PASSATO"; then
+  ok "happy path: messaggio di successo 'PASSATO' presente"
+else
+  nok "happy path: messaggio di successo 'PASSATO' assente nell'output"
+  echo "     Output ricevuto: $(echo "$OUTPUT_D" | head -5)"
+fi
 
 # ──────────────────────────────────────────────────────────────────────────────
 echo ""

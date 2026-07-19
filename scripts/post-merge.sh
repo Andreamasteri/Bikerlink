@@ -635,6 +635,27 @@ if [ "$PRE_COMMIT_HOOK_EXIT" -ne 0 ]; then
   exit "$PRE_COMMIT_HOOK_EXIT"
 fi
 
+# ── GATE REGRESSION TEST — check-pre-commit-hook-wiring ──────────────────────
+# Verifica che il gate stesso rilevi correttamente i tre casi di guasto:
+#   (a) hook mancante → exit 1 + "PRE-COMMIT HOOK NOT INSTALLED"
+#   (b) hook non eseguibile → exit 1 + "PRE-COMMIT HOOK NOT EXECUTABLE"
+#   (c) hook stale (senza check-deploy-build-step-numbers.sh) → exit 1 + "STALE"
+# e il caso felice (d) → exit 0.
+# Ogni caso usa un git repo temporaneo isolato così il test non tocca mai
+# il vero .git/hooks/ del workspace.
+echo "════════════════════════════════════════"
+echo "  Test regressione gate pre-commit hook wiring"
+echo "════════════════════════════════════════"
+PRE_COMMIT_REGTEST_EXIT=0
+bash scripts/__tests__/check-pre-commit-hook-wiring.test.sh || PRE_COMMIT_REGTEST_EXIT=$?
+echo "════════════════════════════════════════"
+echo ""
+if [ "$PRE_COMMIT_REGTEST_EXIT" -ne 0 ]; then
+  echo "❌ Regression test pre-commit-hook-wiring FALLITO — la logica del gate è regredita."
+  echo "   Eseguire 'bash scripts/__tests__/check-pre-commit-hook-wiring.test.sh' per i dettagli."
+  exit "$PRE_COMMIT_REGTEST_EXIT"
+fi
+
 # ── GUARD PORTE .replit (MAPPING [[ports]] + DEPLOY) ─────────
 # REGOLA BLOCCANTE (replit.md § Preferenze utente):
 # Nessun agente può modificare [[ports]] senza autorizzazione esplicita utente.
