@@ -6,6 +6,10 @@
 // Prod evidence (2026-07-17): query su system_signals WHERE metric =
 // 'routing.area_resolver.error' AND source = 'horus' ha restituito 0 righe
 // dopo il deploy del fix sqlFloatArray() in routing-area-resolver.ts.
+//
+// Task #704 — Regression test per severity: probe con esito OK devono produrre
+// segnali severity="info" (filtrati da recordSignals nell'aggregator prima della
+// scrittura su system_signals). Solo i probe KO devono produrre high/critical.
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { CorrectnessProbeResult } from "../ai/watchdog/routing-correctness-probes";
@@ -122,5 +126,135 @@ describe("collectRoutingCorrectness — segnale area_resolver.error", () => {
 
     const areaResolverSignal = signals.find((s) => s.metric === "routing.area_resolver.error");
     expect(areaResolverSignal).toBeUndefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Task #704 — Regression: severity mapping probe OK → "info", KO → high/critical
+//
+// Il collector deve mappare:
+//   - probe ok=true           → severity "info"  (filtrato da recordSignals, mai scritto su system_signals)
+//   - probe ok=false, errore di rete → severity "critical"
+//   - probe ok=false, risposta non plausibile → severity "high"
+//   - probe non configurato o skipped → severity "info"
+//
+// Questo impedisce che i segnali horus.routing.*.correct e
+// horus.geocoding.*.correct con esito positivo compaiano nella coda
+// high/critical di system_signals, coprendo alert reali.
+// ---------------------------------------------------------------------------
+describe("collectRoutingCorrectness — severity mapping (Task #704)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("tutti i segnali hanno severity='info' quando tutte le sonde sono ok", async () => {
+    runProbesMock.mockResolvedValue([
+      makeProbe("graphhopper", { ok: true, latencyMs: 200, distanceKm: 47, durationMin: 52 }),
+      makeProbe("valhalla",    { ok: true, latencyMs: 180, distanceKm: 47, durationMin: 50 }),
+      makeProbe("photon",      { ok: true, latencyMs: 80 }),
+      makeProbe("pipeline",    { ok: true }),
+    ]);
+
+    const signals = await collectRoutingCorrectness();
+
+    // Tutti e 4 i segnali devono avere severity info (→ non scritti su system_signals).
+    for (const s of signals) {
+      expect(s.severity).toBe("info");
+    }
+    // Tutti i segnali devono avere source "horus".
+    for (const s of signals) {
+      expect(s.source).toBe("horus");
+    }
+  });
+
+  it("routing.graphhopper.correct ha severity='critical' quando il probe GH fallisce per errore di rete", async () => {
+    runProbesMock.mockResolvedValue([
+      makeProbe("graphhopper", {
+        ok: false, reachable: false, plausible: false,
+        severity: "critical",
+        reason: "richiesta fallita: timeout 8000ms",
+      }),
+      makeProbe("valhalla", { ok: true }),
+      makeProbe("photon",   { ok: true }),
+      makeProbe("pipeline", { ok: false, severity: "critical", reason: "nessun motore restituisce percorsi corretti" }),
+    ]);
+
+    const signals = await collectRoutingCorrectness();
+
+    const ghSignal = signals.find((s) => s.metric === "routing.graphhopper.correct");
+    expect(ghSignal).toBeDefined();
+    expect(ghSignal!.severity).toBe("critical");
+  });
+
+  it("routing.valhalla.correct ha severity='high' quando il percorso è non plausibile", async () => {
+    runProbesMock.mockResolvedValue([
+      makeProbe("graphhopper", { ok: true }),
+      makeProbe("valhalla", {
+        ok: false, reachable: true, plausible: false,
+        severity: "high",
+        reason: "risultato non plausibile: distanza <10% della linea d'aria",
+      }),
+      makeProbe("photon",   { ok: true }),
+      makeProbe("pipeline", { ok: true }),
+    ]);
+
+    const signals = await collectRoutingCorrectness();
+
+    const valhallaSignal = signals.find((s) => s.metric === "routing.valhalla.correct");
+    expect(valhallaSignal).toBeDefined();
+    expect(valhallaSignal!.severity).toBe("high");
+  });
+
+  it("geocoding.photon.correct ha severity='critical' quando Photon restituisce HTTP 500", async () => {
+    runProbesMock.mockResolvedValue([
+      makeProbe("graphhopper", { ok: true }),
+      makeProbe("valhalla",    { ok: true }),
+      makeProbe("photon", {
+        ok: false, reachable: false, plausible: false,
+        severity: "critical",
+        reason: "HTTP 500",
+      }),
+      makeProbe("pipeline", { ok: true }),
+    ]);
+
+    const signals = await collectRoutingCorrectness();
+
+    const photonSignal = signals.find((s) => s.metric === "geocoding.photon.correct");
+    expect(photonSignal).toBeDefined();
+    expect(photonSignal!.severity).toBe("critical");
+  });
+
+  it("sonda non configurata produce severity='info' (non è un errore)", async () => {
+    runProbesMock.mockResolvedValue([
+      makeProbe("graphhopper", { ok: true }),
+      makeProbe("valhalla",    { configured: false, ok: false, reachable: false, plausible: false, severity: "info" }),
+      makeProbe("photon",      { configured: false, ok: false, reachable: false, plausible: false, severity: "info" }),
+      makeProbe("pipeline",    { configured: false, ok: false, severity: "info" }),
+    ]);
+
+    const signals = await collectRoutingCorrectness();
+
+    const valhallaSignal = signals.find((s) => s.metric === "routing.valhalla.correct");
+    expect(valhallaSignal).toBeDefined();
+    expect(valhallaSignal!.severity).toBe("info");
+
+    const photonSignal = signals.find((s) => s.metric === "geocoding.photon.correct");
+    expect(photonSignal).toBeDefined();
+    expect(photonSignal!.severity).toBe("info");
+  });
+
+  it("sonda skipped (TC spento) produce severity='info' per tutti i segnali self-hosted", async () => {
+    runProbesMock.mockResolvedValue([
+      makeProbe("graphhopper", { ok: false, skipped: true, reachable: false, plausible: false, severity: "info" }),
+      makeProbe("valhalla",    { ok: false, skipped: true, reachable: false, plausible: false, severity: "info" }),
+      makeProbe("photon",      { ok: false, skipped: true, reachable: false, plausible: false, severity: "info" }),
+      makeProbe("pipeline",    { ok: false, skipped: true, reachable: false, plausible: false, severity: "info" }),
+    ]);
+
+    const signals = await collectRoutingCorrectness();
+
+    for (const s of signals) {
+      expect(s.severity).toBe("info");
+    }
   });
 });
