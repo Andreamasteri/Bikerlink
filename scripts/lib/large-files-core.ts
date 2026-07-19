@@ -1,7 +1,8 @@
 import { readdirSync, readFileSync, statSync, existsSync } from "fs";
 import { join, extname, relative } from "path";
 
-export const MAX_LINES = 800; // split target when exceeded: ≤750 righe per file risultante
+export const MAX_LINES = 800;    // gate threshold: file oltre questa soglia bloccano il CI
+export const SPLIT_TARGET = 750; // target split: i file risultanti devono stare sotto questa soglia
 export const LOCKED_DRIFT = 5;
 
 export const SCAN_EXTENSIONS = [".ts", ".tsx"];

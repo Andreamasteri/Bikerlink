@@ -170,7 +170,7 @@ fi
 # Subito dopo il merge (prima di chiudere): se un merge ha portato
 # dentro un file > 800 senza marker, falliamo qui e lasciamo
 # evidenza nei log. Vedi replit.md → "⛔ REGOLA FERREA — Limite 800 righe per file".
-# N.B.: quando si splitta un file, i file risultanti vanno tenuti ≤450 righe.
+# N.B.: quando si splitta un file, i file risultanti vanno tenuti ≤750 righe (split target).
 echo "════════════════════════════════════════"
 echo "  Ratchet 800 righe per file (post-merge)"
 echo "════════════════════════════════════════"

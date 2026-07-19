@@ -4,7 +4,8 @@
 # Self-test for check-large-files-docs-sync.sh.
 # Proves that:
 #   (A) A stale gate-limit comment causes the scanner to exit 1.
-#   (B) A split-target line (contains "risultant") is correctly skipped (exit 0).
+#   (B) A split-target line with the WRONG value causes the scanner to exit 1.
+#   (B2) A split-target line with the CORRECT SPLIT_TARGET value passes (exit 0).
 #   (C) A historical audit line (contains "storico") is correctly skipped (exit 0).
 #   (D) A comment already using MAX_LINES causes the scanner to exit 0.
 #
@@ -22,7 +23,9 @@ CORE="$REPO_ROOT/scripts/lib/large-files-core.ts"
 FIXTURE="$REPO_ROOT/docs/_large-files-docs-sync-selftest.md"
 
 MAX=$(grep -E '^export const MAX_LINES\s*=' "$CORE" | grep -oE '[0-9]+' | head -1)
+SPLIT_TGT=$(grep -E '^export const SPLIT_TARGET\s*=' "$CORE" | grep -oE '[0-9]+' | head -1)
 OLD=$((MAX - 200))   # plausibly old gate value (600 when MAX=800)
+OLD_SPLIT=$((SPLIT_TGT - 300))  # plausibly old split-target value (e.g. 450 when SPLIT_TARGET=750)
 
 PASS=0
 FAIL=0
@@ -51,23 +54,27 @@ assert_scanner() {
   rm -f "$FIXTURE"
 }
 
-echo "🔍 check-large-files-docs-sync self-test (MAX_LINES=$MAX, stale=$OLD)"
+echo "🔍 check-large-files-docs-sync self-test (MAX_LINES=$MAX, SPLIT_TARGET=$SPLIT_TGT, stale_gate=$OLD, stale_split=$OLD_SPLIT)"
 echo ""
 
 # (A) Stale gate-limit comment → scanner must FAIL (exit 1)
-assert_scanner "stale 'max ${OLD} lines' → exit 1" 1 \
+assert_scanner "stale gate 'max ${OLD} lines' → exit 1" 1 \
   "# CI ratchet for the \"max ${OLD} lines per TS file\" rule."
 
-# (B) Split-target line (contains "risultant") → scanner must PASS (exit 0)
-assert_scanner "split-target 'risultant ${OLD} righe' → exit 0" 0 \
-  "# i file risultanti devono stare sotto ${OLD} righe (split target)."
+# (B) Stale split-target line (risultant with wrong value) → scanner must FAIL (exit 1)
+assert_scanner "stale split-target 'risultant ${OLD_SPLIT} righe' → exit 1" 1 \
+  "# i file risultanti devono stare sotto ${OLD_SPLIT} righe (split target)."
+
+# (B2) Correct split-target line (risultant with SPLIT_TARGET value) → scanner must PASS (exit 0)
+assert_scanner "correct split-target 'risultant ${SPLIT_TGT} righe' → exit 0" 0 \
+  "# i file risultanti devono stare sotto ${SPLIT_TGT} righe (split target)."
 
 # (C) Historical audit (contains "storico") → scanner must PASS (exit 0)
 assert_scanner "storico 'Ratchet ${OLD} righe (storico)' → exit 0" 0 \
   "# | Ratchet ${OLD} righe (storico — gate era ${OLD} al momento) |"
 
 # (D) Correct gate comment matching MAX_LINES → scanner must PASS (exit 0)
-assert_scanner "correct 'max ${MAX} lines' → exit 0" 0 \
+assert_scanner "correct gate 'max ${MAX} lines' → exit 0" 0 \
   "# CI ratchet for the \"max ${MAX} lines per TS file\" rule."
 
 echo ""
