@@ -258,7 +258,15 @@ export function triggerSyncInBackground(): void {
 export async function forceSyncNow(): Promise<{ inserted: number; backfilled: number }> {
   _lastSyncAt = 0;
   _syncInFlight = null;
-  const result = await syncProductionUpdates();
-  _lastSyncAt = Date.now();
-  return result;
+  try {
+    const result = await syncProductionUpdates();
+    // Only update _lastSyncAt on success — a failure must leave it at 0 so the
+    // next scheduled tick can retry immediately (no 60s TTL block).
+    _lastSyncAt = Date.now();
+    return result;
+  } finally {
+    // Defensive guard: ensure _syncInFlight is never left non-null even if a
+    // future caller wraps this in a try/catch without re-throwing.
+    _syncInFlight = null;
+  }
 }
