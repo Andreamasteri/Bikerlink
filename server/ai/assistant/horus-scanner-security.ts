@@ -9,7 +9,7 @@
 //     `horus_security_scan_last_report`.
 //
 // INVARIANTI:
-//   * Prompt compatto e risposta corta → numPredict ridotto a 1500 (vs 4000 analisi).
+//   * Prompt compatto e risposta corta → numPredict 700 (vincolo CF 100s / GTX 1070 ~27 tok/s).
 //   * Sola lettura: nessuna scrittura su codice/GitHub/DB oltre all'AppSetting report.
 //   * PII redatta, output sensibile soppresso prima del salvataggio.
 
@@ -18,8 +18,9 @@ import { matchesSensitive } from "./security-filter";
 import { type FileScanStore } from "./codebase-inventory";
 import { storage } from "../../storage";
 
-// Formato risposta corto → budget token ridotto (vs 4000 per analisi/manuale).
-export const SECURITY_NOTE_NUM_PREDICT = 1500;
+// Vincolo operativo: timeout CF 100s, GTX 1070 ~27 tok/s → max ~700 tok/call.
+// Il formato risposta [CAT] breve è naturalmente corto: 700 è sufficiente.
+export const SECURITY_NOTE_NUM_PREDICT = 700;
 
 const MAX_FILE_CHARS = 6000;
 const REPORT_SETTING_KEY = "horus_security_scan_last_report";

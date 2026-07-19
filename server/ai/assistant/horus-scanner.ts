@@ -47,11 +47,11 @@ const MAX_FILE_CHARS = 6000;
 // funzionale in 4-7 frasi + nota lessicale con testi UI esatti), quindi il tetto
 // di caratteri per nota è più alto di quello dell'analisi.
 const NOTE_MAX = 2000;
-// Verificato live: con un tetto stretto il ragionamento di qwen3:4b (senza tag,
-// vedi HORUS_THINK_TAG_CONTRACT) consuma tutto lo spazio e la nota vera non viene
-// mai scritta. Budget generoso: nessuna fretta, la nota per-file può richiedere
-// più tempo — la scansione è un job in background, non un flusso interattivo.
-const NOTE_NUM_PREDICT = 4000;
+// Vincolo operativo: timeout Cloudflare = 100s, GTX 1070 ~27 tok/s → max ~700
+// token/call (~26s). Con 4000 tok ogni call durava ~148s (timeout CF garantito);
+// con 700 la cold scan (2233 file × 2 call) scende a ~20-25 min invece di 102h.
+// Non alzare oltre 700 senza aver misurato la latenza live sul ThinkCentre.
+const NOTE_NUM_PREDICT = 700;
 
 // `persona: "horus"` in callOllamaChat sceglie SOLO l'endpoint (URL/token), NON il
 // modello: senza `model` esplicito la chiamata ricade su BOWIE_OLLAMA_MODEL (il
@@ -333,7 +333,7 @@ async function processFile(mode: ScanMode, rel: string): Promise<"ok" | "interru
     }
 
     // Task #683 — Modalità SECURITY: prompt focalizzato su vulnerabilità,
-    // numPredict ridotto a 1500 (risposta strutturata corta).
+    // numPredict = 700 (stesso vincolo CF 100s / GTX 1070 ~27 tok/s).
     if (mode === "security") {
       const raw = await callOllamaChat(buildSecurityFilePrompt(rel, read.content), undefined, {
         persona: "horus",
