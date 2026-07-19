@@ -1509,4 +1509,26 @@ fi
 echo "════════════════════════════════════════"
 echo ""
 
+# ── GATE REGRESSION TEST — pipeline [TESTA 2 NIGHTLY] ────────────────────────
+# Verifica che la pipeline di prefissazione [TESTA 2 NIGHTLY] in cerbero.sh
+# (righe 95-101) sia ancora correttamente collegata a metro-cache-nightly.sh
+# e che ogni riga di output venga prefissata con timestamp e tag attesi.
+# Se la pipeline è rotta (tag rimosso, printf sostituito, wiring staccato),
+# il job notturno di pulizia .metro-cache/ non lascia traccia in cerbero.log
+# → la regressione resterebbe invisibile fino alle 01:00 UTC successive.
+# Vedi: scripts/__tests__/metro-cache-nightly-prefix.test.sh
+#        scripts/cerbero.sh righe 95-101
+echo "════════════════════════════════════════"
+echo "  Test pipeline [TESTA 2 NIGHTLY] (metro-cache-nightly)"
+echo "════════════════════════════════════════"
+NIGHTLY_PREFIX_EXIT=0
+bash scripts/__tests__/metro-cache-nightly-prefix.test.sh || NIGHTLY_PREFIX_EXIT=$?
+echo "════════════════════════════════════════"
+echo ""
+if [ "$NIGHTLY_PREFIX_EXIT" -ne 0 ]; then
+  echo "❌ Test pipeline [TESTA 2 NIGHTLY] FALLITO — la pipeline cerbero.sh è regredita."
+  echo "   Eseguire 'bash scripts/__tests__/metro-cache-nightly-prefix.test.sh' localmente per i dettagli."
+  exit "$NIGHTLY_PREFIX_EXIT"
+fi
+
 exit 0
