@@ -371,6 +371,118 @@ else
 fi
 
 # ═══════════════════════════════════════════════════════════════════════════════
+# Check 3 — generateStructured con think:true nel providerOptions Ollama
+# ═══════════════════════════════════════════════════════════════════════════════
+# generateStructured forza think:false incondizionatamente (spread finale in
+# provider.ts), quindi passare think:true è sempre un errore: è silenziosamente
+# ignorato e può confondere future manutenzioni facendo credere che il valore
+# venga rispettato.
+echo ""
+echo "🔍 Check 3 — Chiamate generateStructured con providerOptions.ollama.think:true..."
+
+RESULT3=$(python3 - << 'PYEOF'
+import os
+import re
+
+IGNORE_DIRS = {'.local', '.agents', 'node_modules', 'scripts'}
+
+RE_GENERATE_STRUCTURED = re.compile(r'\bgenerateStructured\s*\(')
+RE_THINK_TRUE = re.compile(r'think\s*:\s*true')
+RE_OLLAMA_IN_PROVIDER_OPTS = re.compile(r'providerOptions\s*:[^}]*ollama', re.DOTALL)
+
+
+def extract_call_body(lines: list[str], start_idx: int) -> tuple[str, int]:
+    depth = 0
+    body_lines: list[str] = []
+    for i in range(start_idx, min(start_idx + 80, len(lines))):
+        line = lines[i]
+        body_lines.append(line)
+        for ch in line:
+            if ch == '(':
+                depth += 1
+            elif ch == ')':
+                depth -= 1
+                if depth == 0:
+                    return ''.join(body_lines), i
+    return ''.join(body_lines), min(start_idx + 80, len(lines) - 1)
+
+
+violations: list[str] = []
+
+for root, dirs, files in os.walk('.'):
+    dirs[:] = [d for d in dirs if d not in IGNORE_DIRS and not d.startswith('.')]
+    for fname in files:
+        if fname.endswith('.test.ts') or fname.endswith('.test.tsx'):
+            continue
+        if not (fname.endswith('.ts') or fname.endswith('.tsx')):
+            continue
+        if fname.endswith('.styles.ts') or fname.endswith('.styles.tsx'):
+            continue
+
+        fpath = os.path.join(root, fname).lstrip('./')
+        if '__tests__' in fpath:
+            continue
+
+        try:
+            with open(os.path.join(root, fname), 'r', encoding='utf-8', errors='ignore') as f:
+                lines = f.readlines()
+        except OSError:
+            continue
+
+        i = 0
+        while i < len(lines):
+            line = lines[i]
+            if not RE_GENERATE_STRUCTURED.search(line):
+                i += 1
+                continue
+
+            lineno = i + 1
+
+            body, end_idx = extract_call_body(lines, i)
+
+            # Flag if the call passes ollama.think:true inside providerOptions
+            if RE_OLLAMA_IN_PROVIDER_OPTS.search(body) and RE_THINK_TRUE.search(body):
+                violations.append(f"{fpath}:{lineno}: {line.rstrip()}")
+
+            i = end_idx + 1
+
+if violations:
+    print("FAIL")
+    for v in violations:
+        print(v)
+else:
+    print("OK")
+PYEOF
+)
+
+FIRST_LINE3=$(echo "$RESULT3" | head -1)
+
+if [ "$FIRST_LINE3" = "OK" ]; then
+  echo "✅ Check 3 OK — Nessuna chiamata generateStructured passa think:true ad Ollama."
+else
+  OVERALL_OK=false
+  echo ""
+  VIOLATIONS3=$(echo "$RESULT3" | tail -n +2)
+  while IFS= read -r vline; do
+    [ -z "$vline" ] && continue
+    echo "❌ Check 3 — TROVATO — $vline"
+  done <<< "$VIOLATIONS3"
+  echo ""
+  echo "💥 Check 3 FALLITO"
+  echo ""
+  echo "   generateStructured() forza think:false incondizionatamente per Ollama."
+  echo "   Passare think:true nel providerOptions è silenziosamente ignorato e"
+  echo "   può trarre in inganno chi legge il codice."
+  echo ""
+  echo "   FIX: rimuovere think:true dal providerOptions passato a generateStructured."
+  echo "   Il path streaming (agent.ts) usa think:true correttamente — solo"
+  echo "   generateStructured (path non-streaming) forza sempre think:false."
+  echo ""
+  echo "   Vedi: server/ai/moderation/provider.ts (generateStructured)"
+  echo "         .agents/memory/qwen3-ollama-think-quirk.md"
+fi
+
+# ═══════════════════════════════════════════════════════════════════════════════
 # Esito finale
 # ═══════════════════════════════════════════════════════════════════════════════
 echo ""

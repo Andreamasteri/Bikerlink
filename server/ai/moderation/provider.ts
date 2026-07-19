@@ -504,16 +504,20 @@ export async function generateStructured<T>(
   m: ResolvedModel,
   opts: StructuredGenOpts<T>,
 ): Promise<StructuredGenResult<T>> {
-  // Ollama default: think:false per sicurezza (modelli non-qwen3 o provider
-  // meno aggiornati). I callsite Horus (horus-proposer, ai-engine-decider)
-  // passano esplicitamente think:true perché ollama-ai-provider-v2 isola il
-  // reasoning nel campo `thinking` separato, lasciando il JSON pulito.
-  // Il chiamante vince sempre (spread: caller opts sovrascrivono il default).
+  // Ollama: think:false è FORZATO incondizionatamente per generateObject (path
+  // non-streaming). qwen3 emette <think>…</think> che rompono il parsing JSON
+  // strutturato indipendentemente dall'uso di ollama-ai-provider-v2.
+  // Il caller NON può sovrascrivere questo valore — la posizione finale nel
+  // spread garantisce che think:false vinca sempre, anche se providerOptions
+  // contiene { ollama: { think: true } }.
+  // Il path streaming (agent.ts) usa think:true correttamente tramite fullStream;
+  // solo questo path non-streaming deve sempre usare think:false.
+  // Vedi: .agents/memory/qwen3-ollama-think-quirk.md
   const providerOptions =
     m.id === "ollama"
       ? {
           ...(opts.providerOptions ?? {}),
-          ollama: { think: false, ...(opts.providerOptions?.ollama ?? {}) },
+          ollama: { ...(opts.providerOptions?.ollama ?? {}), think: false },
         }
       : opts.providerOptions;
   if (m.objectMode === "json") {
