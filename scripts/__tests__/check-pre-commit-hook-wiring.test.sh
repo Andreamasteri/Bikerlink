@@ -9,8 +9,11 @@
 #   (c) esca con codice 1 quando .git/hooks/pre-commit è stale
 #       (non contiene check-deploy-build-step-numbers.sh)
 #   (d) esca con codice 0 (happy path) quando il hook è presente,
-#       eseguibile e contiene il GATE_MARKER corretto
+#       eseguibile e contiene entrambi i GATE_MARKER
 #   (e) il gate sia eseguibile (permessi +x)
+#   (f) esca con codice 1 quando .git/hooks/pre-commit è stale
+#       (contiene check-deploy-build-step-numbers.sh ma NON
+#       check-large-files-limit-sync.sh)
 #
 # Tecnica: ogni caso di test usa un git repo temporaneo isolato
 # (`git init` in /tmp) così il gate trova REPO_ROOT via
@@ -25,6 +28,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 GATE_SCRIPT="$PROJECT_ROOT/scripts/check-pre-commit-hook-wiring.sh"
 GATE_MARKER="check-deploy-build-step-numbers.sh"
+GATE_MARKER_2="check-large-files-limit-sync.sh"
 
 PASS=0
 FAIL=0
@@ -146,12 +150,12 @@ fi
 
 # ──────────────────────────────────────────────────────────────────────────────
 echo ""
-echo "── Test (d): happy path — hook presente, eseguibile e con $GATE_MARKER → exit 0"
+echo "── Test (d): happy path — hook presente, eseguibile e con entrambi i GATE_MARKER → exit 0"
 # ──────────────────────────────────────────────────────────────────────────────
 TMPDIR_D="$(make_temp_repo)"
 mkdir -p "$TMPDIR_D/.git/hooks"
-# Hook presente, eseguibile e contiene il GATE_MARKER
-printf '#!/usr/bin/env bash\nbash scripts/%s\n' "$GATE_MARKER" > "$TMPDIR_D/.git/hooks/pre-commit"
+# Hook presente, eseguibile e contiene entrambi i GATE_MARKER
+printf '#!/usr/bin/env bash\nbash scripts/%s\nbash scripts/%s\n' "$GATE_MARKER" "$GATE_MARKER_2" > "$TMPDIR_D/.git/hooks/pre-commit"
 chmod +x "$TMPDIR_D/.git/hooks/pre-commit"
 
 EXIT_D=0
@@ -170,6 +174,41 @@ if echo "$OUTPUT_D" | grep -q "PASSATO"; then
 else
   nok "happy path: messaggio di successo 'PASSATO' assente nell'output"
   echo "     Output ricevuto: $(echo "$OUTPUT_D" | head -5)"
+fi
+
+# ──────────────────────────────────────────────────────────────────────────────
+echo ""
+echo "── Test (f): hook stale — ha $GATE_MARKER ma manca $GATE_MARKER_2 → exit 1 con messaggio STALE"
+# ──────────────────────────────────────────────────────────────────────────────
+TMPDIR_F="$(make_temp_repo)"
+mkdir -p "$TMPDIR_F/.git/hooks"
+# Hook presente ed eseguibile, ha il gate step-numbering ma NON il gate limit-sync
+printf '#!/usr/bin/env bash\n# Hook stale — include il gate step-numbering ma non il gate limit-sync\nbash scripts/%s\n' \
+  "$GATE_MARKER" > "$TMPDIR_F/.git/hooks/pre-commit"
+chmod +x "$TMPDIR_F/.git/hooks/pre-commit"
+
+EXIT_F=0
+OUTPUT_F="$(cd "$TMPDIR_F" && bash "$GATE_SCRIPT" 2>&1)" || EXIT_F=$?
+rm -rf "$TMPDIR_F"
+
+if [ "$EXIT_F" -eq 1 ]; then
+  ok "hook stale (limit-sync mancante): exit 1 (corretto)"
+else
+  nok "hook stale (limit-sync mancante): exit $EXIT_F invece di 1 — il gate non ha rilevato il limit-sync mancante"
+fi
+
+if echo "$OUTPUT_F" | grep -q "STALE"; then
+  ok "hook stale (limit-sync mancante): messaggio 'STALE' presente nell'output"
+else
+  nok "hook stale (limit-sync mancante): messaggio 'STALE' assente nell'output"
+  echo "     Output ricevuto: $(echo "$OUTPUT_F" | head -5)"
+fi
+
+if echo "$OUTPUT_F" | grep -q "LIMIT-SYNC"; then
+  ok "hook stale (limit-sync mancante): messaggio specifica 'LIMIT-SYNC' presente nell'output"
+else
+  nok "hook stale (limit-sync mancante): messaggio 'LIMIT-SYNC' assente nell'output"
+  echo "     Output ricevuto: $(echo "$OUTPUT_F" | head -5)"
 fi
 
 # ──────────────────────────────────────────────────────────────────────────────
