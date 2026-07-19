@@ -625,6 +625,181 @@ else
 fi
 
 # ═══════════════════════════════════════════════════════════════════════════════
+# Check 5 — streamAresChat / generateText diretti con think:true (path non AI-SDK-streaming)
+# ═══════════════════════════════════════════════════════════════════════════════
+# Due sotto-check in un unico blocco Python:
+#
+# 5a) streamAresChat callsites con think:true nel corpo della chiamata.
+#     streamAresChat fa sempre HTTP-direct streaming verso Ollama (stream:true nel
+#     body JSON). AresChatOptions NON ha un campo `think`; se qualcuno lo inietta
+#     nell'oggetto options inviato ad Ollama, il modello qwen3/devstral emetterà
+#     token <think>…</think> che corrompono la risposta testuale. Poiché il tipo
+#     non prevede il campo, TypeScript lo cattura già; questo gate aggiunge un
+#     controllo statico testuale belt-and-suspenders.
+#
+# 5b) generateText callsites (al di fuori di server/lib/ollama-client.ts, che è
+#     il gateway approvato) con providerOptions.ollama.think:true.
+#     generateText è per definizione non-streaming (non esiste fullStream): se un
+#     modello qwen3 riceve think:true in una chiamata non-streaming, i token
+#     <think>…</think> finiscono nel campo `text` restituito, corrompendo
+#     qualsiasi parsing downstream. Il path streaming usa streamText, non
+#     generateText: nessun callsite legittimo di generateText ha bisogno di
+#     think:true.
+#
+# Gateway approvato per generateText + Ollama: server/lib/ollama-client.ts
+# (callOllamaChat — gestisce internamente think:false per generateText e
+# think:true solo quando stream:true via streamText).
+#
+# Soppressione (solo se la chiamata è verificata sicura per una ragione specifica):
+#   // check-ai-direct-generateobject: think-stream-ok
+# Aggiungere sulla riga immediatamente precedente alla chiamata.
+echo ""
+echo "🔍 Check 5 — streamAresChat/generateText con think:true in contesto non AI-SDK-streaming..."
+
+RESULT5=$(python3 - << 'PYEOF'
+import os
+import re
+
+IGNORE_DIRS = {'.local', '.agents', 'node_modules', 'scripts'}
+SUPPRESSION = 'check-ai-direct-generateobject: think-stream-ok'
+
+# 5a — streamAresChat con think:true nel corpo della chiamata
+RE_STREAM_ARES = re.compile(r'\bstreamAresChat\s*\(')
+
+# 5b — generateText con providerOptions.ollama.think:true (escluso il gateway)
+RE_GENERATE_TEXT = re.compile(r'\bgenerateText\s*\(')
+RE_OLLAMA_IN_PROVIDER_OPTS = re.compile(r'providerOptions\s*:[^}]*ollama', re.DOTALL)
+
+RE_THINK_TRUE = re.compile(r'think\s*:\s*true')
+
+
+def extract_call_body(lines: list, start_idx: int, max_lines: int = 80) -> tuple:
+    depth = 0
+    body_lines: list = []
+    for i in range(start_idx, min(start_idx + max_lines, len(lines))):
+        line = lines[i]
+        body_lines.append(line)
+        for ch in line:
+            if ch == '(':
+                depth += 1
+            elif ch == ')':
+                depth -= 1
+                if depth == 0:
+                    return ''.join(body_lines), i
+    return ''.join(body_lines), min(start_idx + max_lines, len(lines) - 1)
+
+
+violations: list = []
+
+for root, dirs, files in os.walk('.'):
+    dirs[:] = [d for d in dirs if d not in IGNORE_DIRS and not d.startswith('.')]
+    for fname in files:
+        if fname.endswith('.test.ts') or fname.endswith('.test.tsx'):
+            continue
+        if not (fname.endswith('.ts') or fname.endswith('.tsx')):
+            continue
+        if fname.endswith('.styles.ts') or fname.endswith('.styles.tsx'):
+            continue
+
+        fpath = os.path.join(root, fname).lstrip('./')
+        if '__tests__' in fpath:
+            continue
+        # Escludi l'implementazione di ares-client.ts (il controllo è sulle chiamate esterne)
+        if fpath == 'server/lib/ares-client.ts':
+            continue
+        # Escludi il gateway approvato per generateText + Ollama
+        if fpath == 'server/lib/ollama-client.ts':
+            continue
+
+        try:
+            with open(os.path.join(root, fname), 'r', encoding='utf-8', errors='ignore') as f:
+                lines = f.readlines()
+        except OSError:
+            continue
+
+        i = 0
+        while i < len(lines):
+            line = lines[i]
+
+            # ── 5a: streamAresChat con think:true ────────────────────────────────
+            if RE_STREAM_ARES.search(line):
+                lineno = i + 1
+                suppressed = SUPPRESSION in line or (i > 0 and SUPPRESSION in lines[i - 1])
+                if not suppressed:
+                    body, end_idx = extract_call_body(lines, i)
+                    if RE_THINK_TRUE.search(body):
+                        violations.append(f"5a:{fpath}:{lineno}: {line.rstrip()}")
+                    i = end_idx + 1
+                    continue
+
+            # ── 5b: generateText con providerOptions.ollama.think:true ────────────
+            if RE_GENERATE_TEXT.search(line):
+                lineno = i + 1
+                suppressed = SUPPRESSION in line or (i > 0 and SUPPRESSION in lines[i - 1])
+                if not suppressed:
+                    body, end_idx = extract_call_body(lines, i)
+                    if RE_OLLAMA_IN_PROVIDER_OPTS.search(body) and RE_THINK_TRUE.search(body):
+                        violations.append(f"5b:{fpath}:{lineno}: {line.rstrip()}")
+                    i = end_idx + 1
+                    continue
+
+            i += 1
+
+if violations:
+    print("FAIL")
+    for v in violations:
+        print(v)
+else:
+    print("OK")
+PYEOF
+)
+
+FIRST_LINE5=$(echo "$RESULT5" | head -1)
+
+if [ "$FIRST_LINE5" = "OK" ]; then
+  echo "✅ Check 5 OK — Nessun streamAresChat/generateText diretto con think:true fuori dal gateway approvato."
+else
+  OVERALL_OK=false
+  echo ""
+  VIOLATIONS5=$(echo "$RESULT5" | tail -n +2)
+  while IFS= read -r vline; do
+    [ -z "$vline" ] && continue
+    PREFIX=$(echo "$vline" | cut -d: -f1)
+    DETAIL=$(echo "$vline" | cut -d: -f2-)
+    if [ "$PREFIX" = "5a" ]; then
+      echo "❌ Check 5a — streamAresChat con think:true — $DETAIL"
+    else
+      echo "❌ Check 5b — generateText con providerOptions.ollama.think:true — $DETAIL"
+    fi
+  done <<< "$VIOLATIONS5"
+  echo ""
+  echo "💥 Check 5 FALLITO"
+  echo ""
+  echo "   5a) streamAresChat usa HTTP-direct streaming verso Ollama (stream:true nel body)."
+  echo "       AresChatOptions NON espone un campo 'think': aggiungere think:true nell'oggetto"
+  echo "       options passato all'API Ollama farebbe emettere token <think>…</think> che"
+  echo "       corrompono il testo. Il check è belt-and-suspenders: TypeScript lo cattura già."
+  echo ""
+  echo "       FIX: rimuovere think:true dal corpo della chiamata streamAresChat."
+  echo ""
+  echo "   5b) generateText è per definizione non-streaming: i token <think>…</think>"
+  echo "       finiscono nel campo 'text' restituito, corrompendo qualsiasi parsing downstream."
+  echo "       Il gateway approvato è server/lib/ollama-client.ts (callOllamaChat), che gestisce"
+  echo "       internamente think:false per generateText e think:true solo via streamText."
+  echo ""
+  echo "       FIX: usare callOllamaChat (server/lib/ollama-client.ts) invece di generateText"
+  echo "       diretto con modello Ollama, oppure rimuovere think:true dal providerOptions."
+  echo ""
+  echo "   Soppressione (solo se verificato sicuro — raro):"
+  echo "     // check-ai-direct-generateobject: think-stream-ok"
+  echo "     await streamAresChat({ ... }) | await generateText({ ... })"
+  echo ""
+  echo "   Vedi: server/lib/ares-client.ts (streamAresChat, AresChatOptions)"
+  echo "         server/lib/ollama-client.ts (callOllamaChat — gateway approvato)"
+  echo "         .agents/memory/qwen3-ollama-think-quirk.md"
+fi
+
+# ═══════════════════════════════════════════════════════════════════════════════
 # Esito finale
 # ═══════════════════════════════════════════════════════════════════════════════
 echo ""
