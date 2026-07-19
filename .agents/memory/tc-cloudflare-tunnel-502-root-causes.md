@@ -59,6 +59,25 @@ as `pm2 start thinkcentre-agent/server.js --name bikerlink-agent` with
 `AGENT_TOKEN=$THINKCENTRE_AGENT_TOKEN`, then `pm2 save` (pm2-andrea systemd unit
 is already `enabled`, so saved processes resurrect on reboot automatically).
 
+## 4. cloudflared exits code=1 on startup — DNS resolver misbehaving (CONFIRMED Jul 2026)
+
+**Sentry #126649029 / restart flood #157** — cloudflared exiting code=1 at restart was NOT:
+- OOM kill (no kernel OOM events in dmesg/syslog on either date)
+- CF Access token expiry (`bikerlink-tc-access` expires 2036-06-26, `bikerlink-backend` 2036-06-26, `Ares` 2031-06-29 — all years away)
+- Tunnel credential failure (auth happens AFTER edge discovery)
+
+**Confirmed root cause: TC's `systemd-resolved` (stub `127.0.0.53`) returning "server misbehaving" or "i/o timeout" for `argotunnel.com` SRV record lookups.**
+
+Cloudflared sequence: startup → edge IP discovery via DNS SRV → if lookup fails → retry → exit(1). The code=1 flood recurred on two separate dates:
+- **Jul 7 22:45 UTC**: `server misbehaving` on `_v2-origintunneld._tcp.argotunnel.com` and `cfd-features.argotunnel.com`; also `Unable to lookup protocol percentage`. Flood of code=1 exits at restart #157.
+- **Jul 13 12:16-12:21 UTC**: `i/o timeout` on same SRV records; same pattern, resolved ~1h later.
+
+After DNS recovered, cloudflared resumed normally without any config change. Current run stable since Jul 17 16:36 UTC (PID 1729). Current upstream DNS: 8.8.8.8/8.8.4.4 (Google) via systemd-resolved stub.
+
+**Diagnosis pattern**: `journalctl -u cloudflared | grep 'server misbehaving\|i/o timeout\|edge discovery'` immediately shows DNS as cause. If this line appears on code=1, it's DNS — NOT auth.
+
+**Mitigation to apply at next TC maintenance**: Add `Environment=TUNNEL_DNS_UPSTREAM=https://1.1.1.1/dns-query` to the cloudflared systemd unit so it bypasses the `127.0.0.53` stub and hits 1.1.1.1 DoH directly. See: https://developers.cloudflare.com/1.1.1.1/setup/
+
 ## Verification pattern
 Test with the exact same headers the app probe code sends (`cfAccessHeaders()` +
 the service-specific token header), against the public hostname, not just
