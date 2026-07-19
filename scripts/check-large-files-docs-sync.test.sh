@@ -21,6 +21,7 @@ REPO_ROOT="$(git rev-parse --show-toplevel)"
 SCANNER="$REPO_ROOT/scripts/check-large-files-docs-sync.sh"
 CORE="$REPO_ROOT/scripts/lib/large-files-core.ts"
 FIXTURE="$REPO_ROOT/docs/_large-files-docs-sync-selftest.md"
+SUBDIR_FIXTURE="$REPO_ROOT/scripts/__tests__/_large-files-docs-sync-selftest.sh"
 
 MAX=$(grep -E '^export const MAX_LINES\s*=' "$CORE" | grep -oE '[0-9]+' | head -1)
 SPLIT_TGT=$(grep -E '^export const SPLIT_TARGET\s*=' "$CORE" | grep -oE '[0-9]+' | head -1)
@@ -30,7 +31,7 @@ OLD_SPLIT=$((SPLIT_TGT - 300))  # plausibly old split-target value (e.g. 450 whe
 PASS=0
 FAIL=0
 
-cleanup() { rm -f "$FIXTURE"; }
+cleanup() { rm -f "$FIXTURE" "$SUBDIR_FIXTURE"; }
 trap cleanup EXIT
 
 assert_scanner() {
@@ -57,6 +58,9 @@ assert_scanner() {
 echo "🔍 check-large-files-docs-sync self-test (MAX_LINES=$MAX, SPLIT_TARGET=$SPLIT_TGT, stale_gate=$OLD, stale_split=$OLD_SPLIT)"
 echo ""
 
+# Ensure scripts/__tests__/ exists for the sub-directory fixture test
+mkdir -p "$REPO_ROOT/scripts/__tests__"
+
 # (A) Stale gate-limit comment → scanner must FAIL (exit 1)
 assert_scanner "stale gate 'max ${OLD} lines' → exit 1" 1 \
   "# CI ratchet for the \"max ${OLD} lines per TS file\" rule."
@@ -76,6 +80,20 @@ assert_scanner "storico 'Ratchet ${OLD} righe (storico)' → exit 0" 0 \
 # (D) Correct gate comment matching MAX_LINES → scanner must PASS (exit 0)
 assert_scanner "correct gate 'max ${MAX} lines' → exit 0" 0 \
   "# CI ratchet for the \"max ${MAX} lines per TS file\" rule."
+
+# (E) Stale split-target in a sub-directory .sh fixture → scanner must FAIL (exit 1)
+# This proves scripts/__tests__/*.sh files are covered by the recursive scan.
+printf '%s\n' "# i file risultanti devono stare sotto ${OLD_SPLIT} righe (split target)." > "$SUBDIR_FIXTURE"
+local_exit=0
+bash "$SCANNER" >/dev/null 2>&1 || local_exit=$?
+rm -f "$SUBDIR_FIXTURE"
+if [[ "$local_exit" -eq 1 ]]; then
+  echo "  ✅ PASS  [stale split-target in scripts/__tests__/*.sh → exit 1]"
+  PASS=$((PASS + 1))
+else
+  echo "  ❌ FAIL  [stale split-target in scripts/__tests__/*.sh → exit 1]  expected exit 1, got $local_exit"
+  FAIL=$((FAIL + 1))
+fi
 
 echo ""
 if [[ $FAIL -eq 0 ]]; then

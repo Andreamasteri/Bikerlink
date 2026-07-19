@@ -24,9 +24,9 @@
 #   "target ≤N lines/righe/per"
 #
 # Files scanned:
-#   scripts/*.sh, scripts/pre-commit  — full text
-#   scripts/**/*.ts                   — comment lines only (// or *)
-#   replit.md, docs/*.md              — full text
+#   scripts/**/*.sh (recursive), scripts/pre-commit  — full text
+#   scripts/**/*.ts                                  — comment lines only (// or *)
+#   replit.md, docs/*.md                             — full text
 #
 # Exit 0  — all gate and split-target references use the correct values
 # Exit 1  — one or more stale hardcoded references found
@@ -98,11 +98,13 @@ process_match() {
 }
 
 # --- A1) Scan plain text files (shell, markdown) — full file ---
-PLAIN_GLOBS=(
-  "$REPO_ROOT/scripts/"*.sh
-  "$REPO_ROOT/scripts/pre-commit"
-  "$REPO_ROOT/replit.md"
-  "$REPO_ROOT/docs/"*.md
+# Build file list: all *.sh under scripts/ recursively (covers sub-directories
+# like scripts/__tests__/ and scripts/lib/) + pre-commit + replit.md + docs/*.md
+mapfile -t PLAIN_GLOBS < <(
+  find "$REPO_ROOT/scripts" -name '*.sh' -type f 2>/dev/null | sort
+  [[ -f "$REPO_ROOT/scripts/pre-commit" ]] && echo "$REPO_ROOT/scripts/pre-commit"
+  [[ -f "$REPO_ROOT/replit.md" ]] && echo "$REPO_ROOT/replit.md"
+  find "$REPO_ROOT/docs" -name '*.md' -type f 2>/dev/null | sort
 )
 
 for f in "${PLAIN_GLOBS[@]}"; do
