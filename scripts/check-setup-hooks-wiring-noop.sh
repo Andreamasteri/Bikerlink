@@ -104,10 +104,74 @@ else
   echo "   ✔ scripts/check-pre-commit-hook-wiring.sh esiste ed è eseguibile."
 fi
 
+# ── Check 4: la chiamata a check-setup-hooks-install.test.sh in post-merge.sh ──
+# Analogamente a Check 1, verifica che l'invocazione del regression test
+# check-setup-hooks-install.test.sh in scripts/post-merge.sh non sia stata
+# silenziata con "|| true", "|| :", o simili no-op.
+# Se POST_MERGE_TARGET non è settata esternamente, la deriviamo dalla root del
+# repo. Per evitare una seconda chiamata a "git rev-parse" (che fallirebbe se
+# la cwd è una directory di sandbox già rimossa), riusiamo REPO_ROOT se già
+# calcolato, oppure lo deriviamo da TARGET (parent del parent di setup-hooks.sh).
+if [ -z "${POST_MERGE_TARGET:-}" ]; then
+  if [ -n "${REPO_ROOT:-}" ]; then
+    REPO_ROOT_PM="$REPO_ROOT"
+  elif [ -n "${TARGET:-}" ]; then
+    # TARGET = $REPO_ROOT/scripts/setup-hooks.sh → root = dirname(dirname(TARGET))
+    REPO_ROOT_PM="$(dirname "$(dirname "$TARGET")")"
+  else
+    REPO_ROOT_PM="$(git rev-parse --show-toplevel)"
+  fi
+  POST_MERGE_TARGET="$REPO_ROOT_PM/scripts/post-merge.sh"
+fi
+
+echo ""
+echo "🔍 check-setup-hooks-wiring-noop: analisi statica di $POST_MERGE_TARGET"
+
+if [ ! -f "$POST_MERGE_TARGET" ]; then
+  echo "❌ FAIL: $POST_MERGE_TARGET non trovato."
+  FAIL=1
+else
+  # Considera solo le righe non-commento (il contenuto dopo "<linenum>:" non inizia con "#").
+  # Questo evita falsi positivi da commenti esplicativi che menzionano "|| true".
+  for pat in "${NOOP_PATTERNS[@]}"; do
+    if grep -n "check-setup-hooks-install\.test\.sh" "$POST_MERGE_TARGET" \
+        | grep -v ':[[:space:]]*#' \
+        | grep -qF "$pat"; then
+      echo "❌ FAIL: la chiamata a check-setup-hooks-install.test.sh in post-merge.sh"
+      echo "   contiene il no-op fallback '$pat' — il regression test è silenziato."
+      echo "   Righe incriminate:"
+      grep -n "check-setup-hooks-install\.test\.sh" "$POST_MERGE_TARGET" \
+        | grep -v ':[[:space:]]*#' \
+        | grep -F "$pat" | sed 's/^/     /'
+      FAIL=1
+    fi
+  done
+
+  # Verifica anche che la riga (non-commento) esista (non sia stata rimossa del tutto)
+  if ! grep -n "check-setup-hooks-install\.test\.sh" "$POST_MERGE_TARGET" \
+       | grep -v ':[[:space:]]*#' \
+       | grep -q .; then
+    echo "❌ FAIL: check-setup-hooks-install.test.sh non trovato (in righe non-commento) in post-merge.sh."
+    echo "   Il regression test potrebbe essere stato rimosso."
+    FAIL=1
+  else
+    # Nessun no-op trovato nei loop precedenti — segnala OK
+    _PM_FAIL=0
+    for pat in "${NOOP_PATTERNS[@]}"; do
+      grep -n "check-setup-hooks-install\.test\.sh" "$POST_MERGE_TARGET" \
+        | grep -v ':[[:space:]]*#' \
+        | grep -qF "$pat" && _PM_FAIL=1
+    done
+    if [ "$_PM_FAIL" -eq 0 ]; then
+      echo "   ✔ Nessun no-op fallback sulla riga della chiamata al regression test in post-merge.sh."
+    fi
+  fi
+fi
+
 # ── Risultato finale ───────────────────────────────────────────────────────────
 echo ""
 if [ "$FAIL" -ne 0 ]; then
-  echo "❌ check-setup-hooks-wiring-noop: FALLITO — il wiring check è stato silenziato."
+  echo "❌ check-setup-hooks-wiring-noop: FALLITO — il wiring check o il regression test è stato silenziato."
   echo "   Ripristina il blocco originale in scripts/setup-hooks.sh (righe 82-87):"
   echo "     if bash \"\$SCRIPT_DIR/check-pre-commit-hook-wiring.sh\"; then"
   echo "       echo '✅ Wiring verificato ...'"
@@ -115,8 +179,10 @@ if [ "$FAIL" -ne 0 ]; then
   echo "       echo '❌ Wiring fallito ...'"
   echo "       exit 1"
   echo "     fi"
+  echo "   E ripristina la riga in scripts/post-merge.sh:"
+  echo "     bash scripts/__tests__/check-setup-hooks-install.test.sh || SETUP_HOOKS_INSTALL_EXIT=\$?"
   exit 1
 fi
 
-echo "✅ check-setup-hooks-wiring-noop: OK — il wiring check non è silenziato."
+echo "✅ check-setup-hooks-wiring-noop: OK — il wiring check e il regression test non sono silenziati."
 exit 0

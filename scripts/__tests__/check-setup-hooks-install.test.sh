@@ -311,12 +311,17 @@ else
 fi
 
 # (5b) Versione con "|| true" iniettato — il gate deve uscire con exit non-zero
+# Passiamo POST_MERGE_TARGET esplicitamente: quando TARGET è un file temp in /tmp,
+# la derivazione automatica ($REPO_ROOT_PM = dirname(dirname(TARGET))) punterebbe a
+# /tmp invece che al repo, causando un "POST_MERGE_TARGET non trovato" non correlato.
 TAMPERED=$(mktemp /tmp/setup-hooks-tampered.XXXXXX.sh)
 sed 's|bash "\$SCRIPT_DIR/check-pre-commit-hook-wiring.sh"|bash "$SCRIPT_DIR/check-pre-commit-hook-wiring.sh" \|\| true|' \
   "$PROJECT_ROOT/scripts/setup-hooks.sh" > "$TAMPERED"
 
 NOOP_TAMPERED_EXIT=0
-NOOP_TAMPERED_OUTPUT=$(TARGET="$TAMPERED" bash "$PROJECT_ROOT/scripts/check-setup-hooks-wiring-noop.sh" 2>&1) || NOOP_TAMPERED_EXIT=$?
+NOOP_TAMPERED_OUTPUT=$(TARGET="$TAMPERED" \
+  POST_MERGE_TARGET="$PROJECT_ROOT/scripts/post-merge.sh" \
+  bash "$PROJECT_ROOT/scripts/check-setup-hooks-wiring-noop.sh" 2>&1) || NOOP_TAMPERED_EXIT=$?
 rm -f "$TAMPERED"
 
 if [ "$NOOP_TAMPERED_EXIT" -ne 0 ]; then
@@ -356,6 +361,7 @@ MISSING_EXIT=0
 MISSING_OUTPUT=$(
   TARGET="$PROJECT_ROOT/scripts/setup-hooks.sh" \
   HELPER_SCRIPT="$MISSING_HELPER" \
+  POST_MERGE_TARGET="$PROJECT_ROOT/scripts/post-merge.sh" \
   bash "$PROJECT_ROOT/scripts/check-setup-hooks-wiring-noop.sh" 2>&1
 ) || MISSING_EXIT=$?
 
@@ -373,6 +379,64 @@ else
   nok "output non menziona il file mancante — messaggio di errore Check 3 assente o soppresso"
   echo "     Output:"
   echo "$MISSING_OUTPUT" | sed 's/^/       /'
+fi
+
+# ──────────────────────────────────────────────────────────────────────────────
+echo ""
+echo "── Test (7): check-setup-hooks-wiring-noop.sh rileva no-op fallback nel post-merge.sh"
+# ──────────────────────────────────────────────────────────────────────────────
+# Rationale: il Check 4 di check-setup-hooks-wiring-noop.sh verifica che la
+# chiamata a check-setup-hooks-install.test.sh in scripts/post-merge.sh non sia
+# silenziata con "|| true" o simili no-op. Questo test esercita entrambi i rami:
+#
+#   (7a) La versione corrente di post-merge.sh deve far uscire il gate con exit 0.
+#   (7b) Una versione con "|| true" iniettata sulla riga deve far uscire il gate
+#        con exit non-zero.
+
+# (7a) Versione corrente di post-merge.sh — il gate deve passare (exit 0)
+# Passiamo TARGET, HELPER_SCRIPT e POST_MERGE_TARGET esplicitamente: dopo il
+# cleanup dei sandbox precedenti la cwd potrebbe non essere più valida e
+# "git rev-parse" fallirebbe (stesso pattern del Test 5).
+PM_NOOP_CHECK_EXIT=0
+PM_NOOP_CHECK_OUTPUT=$(TARGET="$PROJECT_ROOT/scripts/setup-hooks.sh" \
+  HELPER_SCRIPT="$PROJECT_ROOT/scripts/check-pre-commit-hook-wiring.sh" \
+  POST_MERGE_TARGET="$PROJECT_ROOT/scripts/post-merge.sh" \
+  bash "$PROJECT_ROOT/scripts/check-setup-hooks-wiring-noop.sh" 2>&1) || PM_NOOP_CHECK_EXIT=$?
+
+if [ "$PM_NOOP_CHECK_EXIT" -eq 0 ]; then
+  ok "check-setup-hooks-wiring-noop.sh esce con exit 0 sulla versione corrente di post-merge.sh"
+else
+  nok "check-setup-hooks-wiring-noop.sh esce con exit $PM_NOOP_CHECK_EXIT sulla versione corrente di post-merge.sh — REGRESSIONE"
+  echo "     Output:"
+  echo "$PM_NOOP_CHECK_OUTPUT" | sed 's/^/       /'
+fi
+
+# (7b) Versione con "|| true" iniettata sulla riga check-setup-hooks-install.test.sh
+PM_TAMPERED=$(mktemp /tmp/post-merge-tampered.XXXXXX.sh)
+sed 's|bash scripts/__tests__/check-setup-hooks-install\.test\.sh|bash scripts/__tests__/check-setup-hooks-install.test.sh \|\| true|' \
+  "$PROJECT_ROOT/scripts/post-merge.sh" > "$PM_TAMPERED"
+
+PM_TAMPERED_EXIT=0
+PM_TAMPERED_OUTPUT=$(TARGET="$PROJECT_ROOT/scripts/setup-hooks.sh" \
+  HELPER_SCRIPT="$PROJECT_ROOT/scripts/check-pre-commit-hook-wiring.sh" \
+  POST_MERGE_TARGET="$PM_TAMPERED" \
+  bash "$PROJECT_ROOT/scripts/check-setup-hooks-wiring-noop.sh" 2>&1) || PM_TAMPERED_EXIT=$?
+rm -f "$PM_TAMPERED"
+
+if [ "$PM_TAMPERED_EXIT" -ne 0 ]; then
+  ok "check-setup-hooks-wiring-noop.sh esce con exit $PM_TAMPERED_EXIT su post-merge.sh con '|| true' — bypass rilevato correttamente"
+else
+  nok "check-setup-hooks-wiring-noop.sh esce con exit 0 su post-merge.sh con '|| true' — bypass NON rilevato (REGRESSIONE)"
+  echo "     Output:"
+  echo "$PM_TAMPERED_OUTPUT" | sed 's/^/       /'
+fi
+
+if echo "$PM_TAMPERED_OUTPUT" | grep -qi "noop\|true\|silenziato\|fallback\|FAIL"; then
+  ok "output menziona il problema rilevato — messaggio di errore del gate presente"
+else
+  nok "output non menziona 'noop/true/silenziato/fallback/FAIL' — messaggio di errore assente o soppresso"
+  echo "     Output:"
+  echo "$PM_TAMPERED_OUTPUT" | sed 's/^/       /'
 fi
 
 # ──────────────────────────────────────────────────────────────────────────────

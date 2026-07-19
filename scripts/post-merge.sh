@@ -675,6 +675,26 @@ if [ "$PRE_COMMIT_REGTEST_EXIT" -ne 0 ]; then
   exit "$PRE_COMMIT_REGTEST_EXIT"
 fi
 
+# ── GATE STATICO — no-op bypass su setup-hooks wiring check e regression test ──
+# Verifica staticamente (grep) che né la chiamata al wiring check in setup-hooks.sh
+# né la chiamata al regression test check-setup-hooks-install.test.sh qui sotto
+# siano stati silenziati con "|| true", "|| :", o simili no-op.
+# Questo gate è INDIPENDENTE dal regression test che protegge: se qualcuno
+# aggiungesse "|| true" alla riga di check-setup-hooks-install.test.sh qui sotto,
+# il post-merge fallirebbe su questo gate (non arrivando mai al regression test
+# silenziato). Vedi scripts/check-setup-hooks-wiring-noop.sh.
+echo "════════════════════════════════════════"
+echo "  Gate statico — no-op bypass wiring check / regression test"
+echo "════════════════════════════════════════"
+WIRING_NOOP_EXIT=0
+bash scripts/check-setup-hooks-wiring-noop.sh || WIRING_NOOP_EXIT=$?
+echo "════════════════════════════════════════"
+echo ""
+if [ "$WIRING_NOOP_EXIT" -ne 0 ]; then
+  echo "❌ Gate setup-hooks-wiring-noop fallito — il wiring check o il regression test è stato silenziato."
+  exit "$WIRING_NOOP_EXIT"
+fi
+
 # ── REGRESSION TEST: setup-hooks.sh install path ─────────────
 # Esercita il percorso completo che uno sviluppatore esegue su un fresh clone:
 # setup-hooks.sh → hook installato → hook blocca TOTAL stantio in deploy-build.sh.
