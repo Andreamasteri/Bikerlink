@@ -229,6 +229,55 @@ rm -rf "$SANDBOX_DIR"; SANDBOX_DIR=""
 
 # ──────────────────────────────────────────────────────────────────────────────
 echo ""
+echo "── Test (4): setup-hooks.sh esce con exit 1 quando installa un hook senza il gate marker"
+# ──────────────────────────────────────────────────────────────────────────────
+# Rationale: setup-hooks.sh runs check-pre-commit-hook-wiring.sh as a
+# post-install sanity check (lines 82-87 of setup-hooks.sh) and calls exit 1
+# on failure.  If the wiring check were ever silenced (e.g. || true), a broken
+# hook would be installed silently.  This test exercises the negative path by
+# replacing scripts/pre-commit in the sandbox with a stripped version that
+# lacks the check-deploy-build-step-numbers.sh call — exactly the condition
+# check-pre-commit-hook-wiring.sh flags as "stale".
+make_sandbox
+
+cd "$SANDBOX_DIR"
+
+# Replace the canonical pre-commit source with a stripped version that does
+# NOT contain the gate marker ("check-deploy-build-step-numbers.sh").
+# The hook is still syntactically valid bash so setup-hooks.sh can install it,
+# but check-pre-commit-hook-wiring.sh will detect the missing gate and exit 1.
+cat > "$SANDBOX_DIR/scripts/pre-commit" << 'STRIPPED'
+#!/usr/bin/env bash
+# Stripped pre-commit — missing the step-numbering gate (simulates a stale hook)
+set -euo pipefail
+# (intentionally empty — no gates wired)
+exit 0
+STRIPPED
+chmod +x "$SANDBOX_DIR/scripts/pre-commit"
+
+EXIT_BROKEN=0
+OUTPUT_BROKEN=$(PATH="$SANDBOX_DIR/bin:$PATH" bash scripts/setup-hooks.sh 2>&1) || EXIT_BROKEN=$?
+
+if [ "$EXIT_BROKEN" -ne 0 ]; then
+  ok "setup-hooks.sh esce con exit $EXIT_BROKEN (non-zero) — hook rotto rilevato correttamente"
+else
+  nok "setup-hooks.sh esce con exit 0 — avrebbe dovuto fallire per hook senza gate marker (REGRESSIONE)"
+  echo "     Output di setup-hooks.sh:"
+  echo "$OUTPUT_BROKEN" | sed 's/^/       /'
+fi
+
+if echo "$OUTPUT_BROKEN" | grep -qi "wiring\|stale\|gate\|❌"; then
+  ok "output menziona il problema di wiring — messaggio di errore raggiunto"
+else
+  nok "output non menziona 'wiring/stale/gate/❌' — il messaggio di errore potrebbe essere stato soppresso"
+  echo "     Output di setup-hooks.sh:"
+  echo "$OUTPUT_BROKEN" | sed 's/^/       /'
+fi
+
+rm -rf "$SANDBOX_DIR"; SANDBOX_DIR=""
+
+# ──────────────────────────────────────────────────────────────────────────────
+echo ""
 echo "════════════════════════════════════════════════════════════"
 echo "  Risultato: $PASS PASS, $FAIL FAIL"
 echo "════════════════════════════════════════════════════════════"
