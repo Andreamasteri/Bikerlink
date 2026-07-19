@@ -341,8 +341,8 @@ BIKERBLOG_BRIEFING_URL = "https://3abefdc3-a018-4771-90ae-b2c3a0fd6b0e-00-2g5dq1
 
 [[ports]]
 localPort = 5000
-externalPort = 5000
+externalPort = 80
 
 [[ports]]
 localPort = 8081
-externalPort = 80
+externalPort = 8081

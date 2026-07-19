@@ -764,6 +764,9 @@ else
   echo "     [[ports]] localPort=8081  → externalPort=8081"
   echo "     [[ports]] localPort=8082  → externalPort=6000"
   echo "     [deployment] run → PORT=5000"
+  echo "════════════════════════════════════════"
+  echo ""
+  exit 1
 fi
 echo "════════════════════════════════════════"
 echo ""
