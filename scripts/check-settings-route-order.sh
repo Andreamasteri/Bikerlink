@@ -132,13 +132,16 @@ for filepath in files:
 if not all_violations:
     count = len(files)
     print(f"OK ({count} file{'s' if count != 1 else ''} scanned, 0 violations)")
-    sys.exit(0)
-
-print(f"FAIL ({len(all_violations)} violation{'s' if len(all_violations) != 1 else ''} across {len(set(v['file'] for v in all_violations))} file{'s' if len(set(v['file'] for v in all_violations)) != 1 else ''})")
-for v in all_violations:
-    print(f"  {v['file']}:{v['lineno']}: [{v['verb']}] {v['path']!r} -- shadowed by {v['wc_path']!r} at line {v['wc_lineno']}")
-    print(f"    {v['text'].strip()}")
-sys.exit(1)
+    # Do NOT call sys.exit(1) here: bash captures this block via RESULT=$(python3 ...)
+    # with set -euo pipefail active.  A non-zero Python exit fires bash errexit
+    # immediately, before the violation-box echo statements below can run, so the
+    # gate would exit silently with no message.  The bash layer already branches
+    # entirely on FIRST_LINE content — no Python exit code is needed.
+else:
+    print(f"FAIL ({len(all_violations)} violation{'s' if len(all_violations) != 1 else ''} across {len(set(v['file'] for v in all_violations))} file{'s' if len(set(v['file'] for v in all_violations)) != 1 else ''})")
+    for v in all_violations:
+        print(f"  {v['file']}:{v['lineno']}: [{v['verb']}] {v['path']!r} -- shadowed by {v['wc_path']!r} at line {v['wc_lineno']}")
+        print(f"    {v['text'].strip()}")
 PYEOF
 )
 

@@ -167,13 +167,16 @@ if not violations:
         ) if os.path.isdir(sd) else 0
         scanned.append(f"{sd}/ ({count} files)")
     print(f"OK — 0 violations in {', '.join(scanned)}")
-    sys.exit(0)
-
-unique_files = len(set(v["file"] for v in violations))
-print(f"FAIL — {len(violations)} violation{'s' if len(violations) != 1 else ''} in {unique_files} file{'s' if unique_files != 1 else ''}")
-for v in violations:
-    print(f"  {v['file']}:{v['lineno']}: {v['text'].strip()}")
-sys.exit(1)
+    # Do NOT call sys.exit(1) here: bash captures this block via RESULT=$(python3 ...)
+    # with set -euo pipefail active.  A non-zero Python exit fires bash errexit
+    # immediately, before the violation-box echo statements below can run, so the
+    # gate would exit silently with no message.  The bash layer already branches
+    # entirely on FIRST_LINE content — no Python exit code is needed.
+else:
+    unique_files = len(set(v["file"] for v in violations))
+    print(f"FAIL — {len(violations)} violation{'s' if len(violations) != 1 else ''} in {unique_files} file{'s' if unique_files != 1 else ''}")
+    for v in violations:
+        print(f"  {v['file']}:{v['lineno']}: {v['text'].strip()}")
 PYEOF
 )
 
