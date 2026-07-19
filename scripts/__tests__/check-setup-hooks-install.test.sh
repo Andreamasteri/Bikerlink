@@ -278,6 +278,58 @@ rm -rf "$SANDBOX_DIR"; SANDBOX_DIR=""
 
 # ──────────────────────────────────────────────────────────────────────────────
 echo ""
+echo "── Test (5): check-setup-hooks-wiring-noop.sh rileva no-op fallback statico"
+# ──────────────────────────────────────────────────────────────────────────────
+# Rationale: anche se il test (4) verifica che setup-hooks.sh esca con exit 1
+# quando il hook installato è rotto, non cattura il caso in cui qualcuno aggiunga
+# "|| true" alla riga della chiamata a check-pre-commit-hook-wiring.sh dentro
+# setup-hooks.sh stesso.  Il gate statico check-setup-hooks-wiring-noop.sh
+# verifica staticamente (grep) che tale silencing non sia presente.
+#
+# Sotto-test (5a): il gate deve passare sulla versione corrente di setup-hooks.sh.
+# Sotto-test (5b): il gate deve fallire se "|| true" è aggiunto alla chiamata.
+
+# (5a) Versione corrente — deve uscire con exit 0
+# Passiamo TARGET esplicitamente: dopo il cleanup dei sandbox precedenti la cwd
+# potrebbe non essere più valida, e "git rev-parse" fallirebbe.
+NOOP_CHECK_EXIT=0
+NOOP_CHECK_OUTPUT=$(TARGET="$PROJECT_ROOT/scripts/setup-hooks.sh" bash "$PROJECT_ROOT/scripts/check-setup-hooks-wiring-noop.sh" 2>&1) || NOOP_CHECK_EXIT=$?
+
+if [ "$NOOP_CHECK_EXIT" -eq 0 ]; then
+  ok "check-setup-hooks-wiring-noop.sh esce con exit 0 sulla versione corrente di setup-hooks.sh"
+else
+  nok "check-setup-hooks-wiring-noop.sh esce con exit $NOOP_CHECK_EXIT sulla versione corrente — REGRESSIONE"
+  echo "     Output:"
+  echo "$NOOP_CHECK_OUTPUT" | sed 's/^/       /'
+fi
+
+# (5b) Versione con "|| true" iniettato — il gate deve uscire con exit non-zero
+TAMPERED=$(mktemp /tmp/setup-hooks-tampered.XXXXXX.sh)
+sed 's|bash "\$SCRIPT_DIR/check-pre-commit-hook-wiring.sh"|bash "$SCRIPT_DIR/check-pre-commit-hook-wiring.sh" \|\| true|' \
+  "$PROJECT_ROOT/scripts/setup-hooks.sh" > "$TAMPERED"
+
+NOOP_TAMPERED_EXIT=0
+NOOP_TAMPERED_OUTPUT=$(TARGET="$TAMPERED" bash "$PROJECT_ROOT/scripts/check-setup-hooks-wiring-noop.sh" 2>&1) || NOOP_TAMPERED_EXIT=$?
+rm -f "$TAMPERED"
+
+if [ "$NOOP_TAMPERED_EXIT" -ne 0 ]; then
+  ok "check-setup-hooks-wiring-noop.sh esce con exit $NOOP_TAMPERED_EXIT su versione con '|| true' — bypass rilevato correttamente"
+else
+  nok "check-setup-hooks-wiring-noop.sh esce con exit 0 su versione con '|| true' — bypass NON rilevato (REGRESSIONE)"
+  echo "     Output:"
+  echo "$NOOP_TAMPERED_OUTPUT" | sed 's/^/       /'
+fi
+
+if echo "$NOOP_TAMPERED_OUTPUT" | grep -qi "noop\|true\|silenziato\|fallback\|FAIL"; then
+  ok "output menziona il problema rilevato — messaggio di errore del gate presente"
+else
+  nok "output non menziona 'noop/true/silenziato/fallback/FAIL' — messaggio di errore assente o soppresso"
+  echo "     Output:"
+  echo "$NOOP_TAMPERED_OUTPUT" | sed 's/^/       /'
+fi
+
+# ──────────────────────────────────────────────────────────────────────────────
+echo ""
 echo "════════════════════════════════════════════════════════════"
 echo "  Risultato: $PASS PASS, $FAIL FAIL"
 echo "════════════════════════════════════════════════════════════"
