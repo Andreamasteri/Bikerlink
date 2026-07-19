@@ -3,6 +3,7 @@ import type { Request, Response } from "express";
 import { db } from "../db";
 import { siteVisits } from "@shared/db";
 import { getTrustedClientIp } from "./abuse-rate-limit";
+import { withBgDbSlot, isBgDbLimiterDropError } from "./bg-db-limiter";
 
 // geoip-lite: bundled ~60 MB IPv4+IPv6 database, zero runtime cost, no external calls.
 let geoip: typeof import("geoip-lite") | null = null;
@@ -123,20 +124,28 @@ export function recordVisit(opts: RecordVisitOpts): void {
   const ua = (req.headers["user-agent"] as string | undefined) || null;
   const referrer = (req.headers["referer"] as string | undefined) || null;
   const path = (opts.path ?? req.path ?? "").substring(0, 500);
-  db.insert(siteVisits)
-    .values({
-      visitorId,
-      userId: opts.userId ?? null,
-      event: opts.event ?? "view",
-      path,
-      referrer: referrer ? referrer.substring(0, 500) : null,
-      userAgent: ua ? ua.substring(0, 500) : null,
-      ipHash: hashIp(ip),
-      ipPrefix: ipPrefix(ip),
-      lang: pickLang(req),
-      country: pickCountry(req, ip),
-    })
-    .catch((err) => {
+  // Fire-and-forget, guarded by the bg-db-limiter kill-switch: if the DB is
+  // slow (≥2 consecutive slow pings) the slot acquire throws
+  // BgDbSlowKillSwitchError and we skip the insert entirely instead of adding
+  // pressure to an already overloaded pool.
+  withBgDbSlot(() =>
+    db.insert(siteVisits)
+      .values({
+        visitorId,
+        userId: opts.userId ?? null,
+        event: opts.event ?? "view",
+        path,
+        referrer: referrer ? referrer.substring(0, 500) : null,
+        userAgent: ua ? ua.substring(0, 500) : null,
+        ipHash: hashIp(ip),
+        ipPrefix: ipPrefix(ip),
+        lang: pickLang(req),
+        country: pickCountry(req, ip),
+      })
+      .execute()
+  ).catch((err) => {
+    if (!isBgDbLimiterDropError(err)) {
       console.warn("[site-visits] insert failed (non-blocking):", err?.message || err);
-    });
+    }
+  });
 }

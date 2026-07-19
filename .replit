@@ -9,6 +9,7 @@ packages = ["freetype", "glibcLocales", "lcms2", "libimagequant", "libjpeg", "li
   deploymentTarget = "autoscale"
   build = ["bash", "scripts/deploy-build.sh"]
   run = ["bash", "-c", "PORT=5000 node server_dist/index.js"]
+  healthcheckPath = "/healthz"
 
   [env]
   PORT = "5000"

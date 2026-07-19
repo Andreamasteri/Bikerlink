@@ -149,7 +149,7 @@ export async function collectCrashSignals(): Promise<Signal[]> {
     // Task #155 — fallimento query = warning deduplicato, NON un segnale: il
     // collector.error veniva contato come "errore DB" e latch-ava il problema
     // "Database sovraccarico sostenuto" anche con ping/pool sani. Ritorno neutro.
-    dedupWarn("watchdog/crash-signals", "query fallita, skip segnale", err);
+    dedupWarn("watchdog/crash-signals", "query fallita, skip segnale", (err instanceof Error ? err.message : String(err)));
     return [];
   }
 }
