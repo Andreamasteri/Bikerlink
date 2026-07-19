@@ -70,8 +70,19 @@ fi
 echo ""
 echo "🎉 Setup completato. Il hook pre-commit è attivo."
 echo "   Gate inclusi nel pre-commit:"
-echo "     • detect-secrets         — blocca commit con token/segreti"
-echo "     • check-large-files      — ratchet $MAX_LINES_VALUE righe per file"
-echo "     • lint-migration-indexes — indici DESC/WHERE a rischio"
-echo "     • check-ai-direct-generateobject — bypass generateStructured rilevato"
+echo "     • detect-secrets                  — blocca commit con token/segreti"
+echo "     • check-large-files               — ratchet $MAX_LINES_VALUE righe per file"
+echo "     • lint-migration-indexes          — indici DESC/WHERE a rischio"
+echo "     • check-ai-direct-generateobject  — bypass generateStructured rilevato"
+echo "     • check-deploy-build-step-numbers — numerazione [N/TOTAL] corretta"
 echo "   Per bypassare (solo falsi positivi): git commit --no-verify"
+
+# Verifica wiring post-installazione
+echo ""
+echo "🔍 Verifica wiring hook installato..."
+if bash "$SCRIPT_DIR/check-pre-commit-hook-wiring.sh"; then
+  echo "✅ Wiring verificato — il hook è aggiornato e include tutti i gate."
+else
+  echo "❌ Wiring fallito — qualcosa non va con il hook appena installato."
+  exit 1
+fi

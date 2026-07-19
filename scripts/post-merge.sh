@@ -597,6 +597,25 @@ if [ "$DEPLOY_STEP_NUMBERS_EXIT" -ne 0 ]; then
   exit "$DEPLOY_STEP_NUMBERS_EXIT"
 fi
 
+# ── GATE PRE-COMMIT HOOK WIRING ───────────────────────────────
+# Verifica che .git/hooks/pre-commit sia installato (via setup-hooks.sh)
+# e che contenga il gate check-deploy-build-step-numbers.sh.
+# Un hook mancante o stale permette a uno sviluppatore di committare
+# deploy-build.sh con step mal numerati senza alcun avviso locale.
+# Il gate è bloccante: se l'hook non è installato sul runner, lo sviluppatore
+# deve eseguire 'bash scripts/setup-hooks.sh' prima di procedere.
+echo "════════════════════════════════════════"
+echo "  Gate pre-commit hook wiring"
+echo "════════════════════════════════════════"
+PRE_COMMIT_HOOK_EXIT=0
+bash scripts/check-pre-commit-hook-wiring.sh || PRE_COMMIT_HOOK_EXIT=$?
+echo "════════════════════════════════════════"
+echo ""
+if [ "$PRE_COMMIT_HOOK_EXIT" -ne 0 ]; then
+  echo "❌ Gate pre-commit hook wiring fallito — eseguire 'bash scripts/setup-hooks.sh' per installare/aggiornare il hook."
+  exit "$PRE_COMMIT_HOOK_EXIT"
+fi
+
 # ── GUARD PORTE .replit (MAPPING [[ports]] + DEPLOY) ─────────
 # REGOLA BLOCCANTE (replit.md § Preferenze utente):
 # Nessun agente può modificare [[ports]] senza autorizzazione esplicita utente.
