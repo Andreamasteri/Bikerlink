@@ -50,6 +50,10 @@ interface TunnelState {
   restarts: number;
   lastError: string | null;
   lastExitAt: number | null;
+  lastExitCode: number | null;
+  lastOutputLine: string | null;
+  /** Timestamp dell'inizio del flood-restart corrente (null se non in flood). */
+  floodStartedAt: number | null;
 }
 
 const state: TunnelState = {
@@ -60,6 +64,9 @@ const state: TunnelState = {
   restarts: 0,
   lastError: null,
   lastExitAt: null,
+  lastExitCode: null,
+  lastOutputLine: null,
+  floodStartedAt: null,
 };
 
 let child: ChildProcess | null = null;
@@ -68,6 +75,17 @@ let startAttempted = false;
 
 const MAX_BACKOFF_MS = 30_000;
 const BASE_BACKOFF_MS = 1_000;
+
+// ── Circuit breaker soft per flood-restart ─────────────────────────────────
+// Se cloudflared esce più di FLOOD_RESTART_THRESHOLD volte in meno di
+// FLOOD_WINDOW_MS (es. ogni ~30 s per ore) → backoff FLOOD_BACKOFF_MS (5 min)
+// per ridurre il rumore nei log e il carico sul pool DB durante i gap del tunnel.
+const FLOOD_RESTART_THRESHOLD = 10;
+const FLOOD_WINDOW_MS = 5 * 60_000;   // 5 min
+const FLOOD_BACKOFF_MS = 5 * 60_000;  // 5 min
+
+/** Timestamp dei restart recenti usati per il rilevamento del flood. */
+const recentRestartTimes: number[] = [];
 
 function resolveBin(): string | null {
   const explicit = process.env.CLOUDFLARED_BIN?.trim();
@@ -136,12 +154,18 @@ function spawnBridge(): void {
 
   proc.stdout?.on("data", (d: Buffer) => {
     const line = d.toString().trim();
-    if (line) console.log(`[redis-tunnel:cloudflared] ${line}`);
+    if (line) {
+      state.lastOutputLine = line.slice(-500); // mantieni solo il finale
+      console.log(`[redis-tunnel:cloudflared] ${line}`);
+    }
   });
   proc.stderr?.on("data", (d: Buffer) => {
     // cloudflared logga su stderr anche a livello INFO; non è necessariamente errore.
     const line = d.toString().trim();
-    if (line) console.log(`[redis-tunnel:cloudflared] ${line}`);
+    if (line) {
+      state.lastOutputLine = line.slice(-500);
+      console.log(`[redis-tunnel:cloudflared] ${line}`);
+    }
   });
 
   proc.on("error", (err) => {
@@ -157,12 +181,39 @@ function spawnBridge(): void {
   proc.on("exit", (code, signal) => {
     state.running = false;
     state.lastExitAt = Date.now();
+    state.lastExitCode = code;
     child = null;
     if (shuttingDown) return;
     state.restarts += 1;
-    const backoff = Math.min(BASE_BACKOFF_MS * 2 ** Math.min(state.restarts, 5), MAX_BACKOFF_MS);
+
+    // Aggiorna la finestra dei restart recenti per il flood-detector.
+    const now = Date.now();
+    recentRestartTimes.push(now);
+    // Rimuovi i timestamp fuori dalla finestra di rilevamento.
+    while (recentRestartTimes.length > 0 && now - recentRestartTimes[0] > FLOOD_WINDOW_MS) {
+      recentRestartTimes.shift();
+    }
+
+    // Flood-restart: backoff lungo se troppi restart nella finestra.
+    let backoff: number;
+    if (recentRestartTimes.length >= FLOOD_RESTART_THRESHOLD) {
+      if (!state.floodStartedAt) {
+        state.floodStartedAt = now;
+        console.warn(
+          `[redis-tunnel] flood-restart rilevato (${recentRestartTimes.length} restart in ${FLOOD_WINDOW_MS / 60_000} min, ` +
+          `code=${code} lastOutput="${state.lastOutputLine ?? "(nessuno)"}") — ` +
+          `backoff esteso a ${FLOOD_BACKOFF_MS / 60_000} min per ridurre rumore`,
+        );
+      }
+      backoff = FLOOD_BACKOFF_MS;
+    } else {
+      state.floodStartedAt = null;
+      backoff = Math.min(BASE_BACKOFF_MS * 2 ** Math.min(state.restarts, 5), MAX_BACKOFF_MS);
+    }
+
     console.warn(
-      `[redis-tunnel] cloudflared uscito (code=${code} signal=${signal}); ` +
+      `[redis-tunnel] cloudflared uscito (code=${code} signal=${signal} ` +
+      `lastOutput="${state.lastOutputLine ?? "(nessuno)"}"); ` +
       `restart #${state.restarts} tra ${backoff}ms`,
     );
     setTimeout(spawnBridge, backoff);

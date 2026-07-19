@@ -85,17 +85,28 @@ let pendingForceCycleIssuedBy: DirectiveIssuer | null = null;
 async function loadDirectiveIfNeeded(): Promise<void> {
   if (directivesLoaded) return;
   directivesLoaded = true;
-  try {
-    for (const issuer of DIRECTIVE_ISSUERS) {
+  // Protezione granulare per-issuer (Sentry #126649029): un timeout DB su un
+  // singolo slot non deve bloccare né propagare — ogni chiamata ha il proprio
+  // catch così le direttive recuperabili vengono caricate comunque.
+  for (const issuer of DIRECTIVE_ISSUERS) {
+    try {
       const row = await storage.getAppSetting(settingKeyFor(issuer));
       const val = row?.valueJson as CoordinatorDirective | undefined;
       // Solo "pause" sopravvive al riavvio come stato persistente; resume/force_cycle
       // sono transitori e non vanno ri-applicati automaticamente al boot.
       if (val?.kind === "pause") directives[issuer] = val;
+    } catch (err) {
+      dedupWarn(
+        `coordinator:db-timeout:${issuer}`,
+        `[coordinator] timeout/errore DB lettura direttiva ${issuer} — slot saltato (non-fatal)`,
+        err,
+      );
     }
+  }
 
-    // Migrazione one-shot dalla vecchia chiave condivisa, solo se lo slot
-    // per-issuer corrispondente è ancora vuoto (non sovrascrive nulla).
+  // Migrazione one-shot dalla vecchia chiave condivisa, solo se lo slot
+  // per-issuer corrispondente è ancora vuoto (non sovrascrive nulla).
+  try {
     const legacyRow = await storage.getAppSetting(LEGACY_APP_SETTING_KEY);
     const legacyVal = legacyRow?.valueJson as CoordinatorDirective | undefined;
     if (legacyVal?.kind === "pause" && legacyVal.issuedBy && !directives[legacyVal.issuedBy]) {
@@ -103,7 +114,11 @@ async function loadDirectiveIfNeeded(): Promise<void> {
       await persistDirective(legacyVal.issuedBy, legacyVal);
     }
   } catch (err) {
-    dedupWarn("matching-coordinator/load", "errore lettura direttive persistite (non-fatal, riparto senza direttive)", err);
+    dedupWarn(
+      "coordinator:db-timeout:legacy",
+      "[coordinator] timeout/errore DB lettura chiave legacy — migrazione saltata (non-fatal)",
+      err,
+    );
   }
 }
 

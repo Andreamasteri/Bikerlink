@@ -10,6 +10,7 @@ import { getCircuitStatus } from "../db-circuit-breaker";
 import { getHealthState } from "../lib/health-arbiter";
 import { getCoordinatorHealthSummary } from "../ai/coordinator/job-gate";
 import { isHorusCoordinatorLoopRunning, getHorusCoordinatorLoopStats } from "../ai/coordinator/horus-coordinator-loop";
+import { getRedisTunnelStatus } from "../cache/redis-tunnel";
 import { getOrFetchAdminCached, deleteAdminCached } from "../lib/admin-auth-cache";
 
 async function requireAdmin(req: Request, res: Response, next: NextFunction) {
@@ -122,6 +123,24 @@ export function registerMoreRoutes(app: Express) {
     } catch {
       coordinator = { unavailable: true };
     }
+    // Stato del redis-tunnel cloudflared — INFORMATIVO (Sentry #126649029).
+    // Non influenza `status`/`degraded`; esposto per il watchdog e l'admin TC.
+    // floodActive=true quando il circuit breaker soft è intervenuto (>10 restart/5min).
+    let redisTunnel: unknown;
+    try {
+      const t = getRedisTunnelStatus();
+      redisTunnel = {
+        enabled: t.enabled,
+        running: t.running,
+        restarts: t.restarts,
+        lastExitCode: t.lastExitCode,
+        lastError: t.lastError,
+        lastExitAt: t.lastExitAt,
+        floodActive: t.floodStartedAt !== null,
+      };
+    } catch {
+      redisTunnel = { unavailable: true };
+    }
     return res.status(200).json({
       status,
       initializing: false,
@@ -131,6 +150,7 @@ export function registerMoreRoutes(app: Express) {
       slices: arbiter.slices,
       dbCircuit,
       coordinator,
+      redisTunnel,
     });
   });
 

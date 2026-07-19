@@ -104,7 +104,10 @@ export async function runCleanup(): Promise<number> {
   try {
     return await storage.expireOldProposals();
   } catch (error) {
-    console.error("Cleanup error:", error);
+    // Non fatale: il cleanup dei proposal scaduti può fallire temporaneamente
+    // per timeout DB senza impatto funzionale. Abbassato da console.error a
+    // console.warn per non generare eventi Sentry (Sentry #126649029).
+    console.warn("[Cleanup] expireOldProposals errore (non-fatal):", error);
     return 0;
   }
 }
