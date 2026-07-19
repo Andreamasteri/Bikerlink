@@ -434,6 +434,62 @@ if [ "$_SLOW_FOUND" -eq 0 ]; then
   log "  ✅ Tutti i 15 step entro la soglia di ${SLOW_STEP_THRESHOLD}s."
 fi
 
+# ── Deploy stamp + timing summary per l'analisi post-deploy automatica ───────
+# Scritto in server_dist/ (sempre presente dopo il step [13/15] Build TS) così
+# il container di produzione (FASE 4) può leggerlo al boot senza accedere ai log
+# del pannello Publish che sono visibili solo nell'interfaccia Replit.
+#
+# .deploy-stamp        → epoch Unix del deploy (usato come "id" del deploy)
+# .deploy-timing.json  → timing step + step lenti + dimensione workspace finale
+# .deploy-stamp.analyzed viene RIMOSSO qui così il prossimo boot può rilevarlo
+# come "deploy fresco" e avviare post-deploy-analysis.sh automaticamente.
+_DEPLOY_EPOCH=$(date -u +%s)
+_DEPLOY_ISO=$(date -u -d "@$_DEPLOY_EPOCH" '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null || python3 -c "import datetime; print(datetime.datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ'))" 2>/dev/null || echo "unknown")
+_WS_FINAL=$(size .)
+
+# Raccoglie deltas step per il JSON
+_STEP_DELTAS_JSON="{"
+for _si in $(seq 0 14); do
+  _sn=$(( _si + 1 ))
+  _sd=$(( _STEP_TS[_si+1] - _STEP_TS[_si] ))
+  _STEP_DELTAS_JSON="${_STEP_DELTAS_JSON}\"${_sn}\":${_sd},"
+done
+_STEP_DELTAS_JSON="${_STEP_DELTAS_JSON%,}}"
+
+# Raccoglie step lenti come array JSON
+_SLOW_ARRAY_JSON="["
+for _si in $(seq 0 14); do
+  _sn=$(( _si + 1 ))
+  _sd=$(( _STEP_TS[_si+1] - _STEP_TS[_si] ))
+  if [ "$_sd" -gt "$SLOW_STEP_THRESHOLD" ]; then
+    _SLOW_ARRAY_JSON="${_SLOW_ARRAY_JSON}\"[${_sn}/15] ${_STEP_NAMES[$_si]} — ${_sd}s\","
+  fi
+done
+_SLOW_ARRAY_JSON="${_SLOW_ARRAY_JSON%,}]"
+
+# Calcola durata totale
+_TOTAL_SECS=$(( _STEP_TS[15] - SCRIPT_START_EPOCH ))
+
+echo "$_DEPLOY_EPOCH" > server_dist/.deploy-stamp
+cat > server_dist/.deploy-timing.json << EOF
+{
+  "deployEpoch": $_DEPLOY_EPOCH,
+  "deployIso": "$_DEPLOY_ISO",
+  "totalSecs": $_TOTAL_SECS,
+  "workspaceSizeAfterBuild": "$_WS_FINAL",
+  "slowStepThreshold": $SLOW_STEP_THRESHOLD,
+  "slowSteps": $_SLOW_ARRAY_JSON,
+  "stepDeltas": $_STEP_DELTAS_JSON
+}
+EOF
+
+# Rimuovi il marker "già analizzato" così il prossimo boot può rilevare il deploy
+# come fresco e avviare post-deploy-analysis.sh
+rm -f server_dist/.deploy-stamp.analyzed
+
+log "  📋 Deploy stamp scritto: server_dist/.deploy-stamp (epoch: $_DEPLOY_EPOCH)"
+log "  📋 Timing JSON scritto: server_dist/.deploy-timing.json (${_TOTAL_SECS}s totali)"
+
 # NB: NON rimuovere .cache/ qui.
 # Verificato dai build log Replit (31 mag 2026):
 #  - il build RIUSCITO (09:38) NON aveva alcuno step di pulizia .cache/ e ha

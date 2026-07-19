@@ -305,6 +305,17 @@ args = "bash scripts/check-quebracho-stale.sh"
 [workflows.workflow.metadata]
 isValidation = true
 
+[[workflows.workflow]]
+name = "Post-Deploy Analysis"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "FORCE_RERUN=1 bash scripts/post-deploy-analysis.sh"
+
+[workflows.workflow.metadata]
+outputType = "console"
+
   [objectStorage]
 defaultBucketID = "replit-objstore-eab04d75-96eb-47fa-8ab7-710ec976a6e8"
 
