@@ -20,6 +20,7 @@ import { AGENT_MODEL_DEFAULTS } from "../../lib/agent-constants";
 import { isRoutingAiBusy } from "../ai-priority-gate";
 import { redactPII } from "../moderation/redact";
 import { matchesSensitive } from "./security-filter";
+import { storage } from "../../storage";
 import {
   type ScanMode,
   type FileScanStore,
@@ -38,6 +39,9 @@ import {
   SECURITY_NOTE_NUM_PREDICT,
   finalizeSecurityScan,
 } from "./horus-scanner-security";
+
+// Chiave app_settings usata per persistere lo stato della scan manuale tra restart.
+const MANUAL_STATE_KEY = "horus_scan_manual_state";
 
 const BATCH_SIZE = 4;
 const TICK_DELAY_MS = 1500;
@@ -60,7 +64,7 @@ const NOTE_NUM_PREDICT = 700;
 // proposer). Vedi memory: inter-agent-consult-model-mismatch.
 const HORUS_MODEL_ID = process.env.HORUS_OLLAMA_MODEL?.trim() || AGENT_MODEL_DEFAULTS.horus;
 
-export type ScanStatus = "idle" | "running" | "completed" | "interrupted" | "error";
+export type ScanStatus = "idle" | "running" | "resuming" | "completed" | "interrupted" | "error";
 
 export interface ScanState {
   mode: ScanMode;
@@ -97,6 +101,74 @@ const states: Record<ScanMode, ScanState> = {
   manual: initialState("manual"),
   security: initialState("security"),
 };
+
+// ── Persistenza stato scan manuale (solo "manual") ────────────────────────────
+
+/**
+ * Serializza lo stato corrente della scan manuale in app_settings.
+ * Fire-and-forget: gli errori DB non bloccano la scan.
+ */
+async function persistManualState(): Promise<void> {
+  try {
+    const s = states.manual;
+    const payload = {
+      status: s.status,
+      filesAnalyzed: s.filesAnalyzed,
+      filesSkipped: s.filesSkipped,
+      filesPending: s.filesPending,
+      filesTotal: s.filesTotal,
+      startedAt: s.startedAt,
+      finishedAt: s.finishedAt,
+      lastFile: s.lastFile,
+    };
+    await storage.upsertAppSetting(MANUAL_STATE_KEY, undefined, payload);
+  } catch (err) {
+    console.warn("[horus-scan:manual] persistManualState fallita (non-fatal):", (err as Error).message);
+  }
+}
+
+/**
+ * Al boot (post-READY), controlla se la scan manuale era in corso al momento
+ * dell'ultimo restart. Se sì, la riavvia automaticamente.
+ * Chiamata solo da runPostReady() in boot-sequence.ts.
+ */
+export async function tryAutoResumeManualScan(): Promise<void> {
+  try {
+    const row = await storage.getAppSetting(MANUAL_STATE_KEY);
+    if (!row?.valueJson) return;
+
+    const saved = row.valueJson as {
+      status?: string;
+      finishedAt?: number | null;
+    };
+
+    // Riprendi solo se era in esecuzione e non aveva finito.
+    if (saved.status !== "running" || saved.finishedAt != null) return;
+
+    console.log("[horus-scan:manual] stato 'running' trovato al boot — ripresa automatica in corso...");
+
+    // Segnala "resuming" nell'in-memory state così l'admin vede il feedback.
+    states.manual = {
+      ...states.manual,
+      status: "resuming",
+      startedAt: (saved as { startedAt?: number | null }).startedAt ?? null,
+    };
+
+    // Avvia la scan; startHorusScan sovrascriverà lo stato con "running" e
+    // userà la cache SHA-256 per saltare i file già processati.
+    const result = await startHorusScan("manual");
+    if (!result.started) {
+      console.warn(`[horus-scan:manual] ripresa automatica non avviata: ${result.reason ?? "motivo sconosciuto"}`);
+      // Ripristina lo stato a "interrupted" così non ritenterà al prossimo boot.
+      states.manual.status = "interrupted";
+      await persistManualState();
+    } else {
+      console.log("[horus-scan:manual] ripresa automatica avviata con successo.");
+    }
+  } catch (err) {
+    console.warn("[horus-scan:manual] tryAutoResumeManualScan fallita (non-fatal):", (err as Error).message);
+  }
+}
 // Task #152 — Dizionario i18n caricato UNA sola volta all'avvio della scansione
 // MANUALE e riusato dai prompt lessicali di ogni schermata (evita di rileggerlo
 // per-file). Vuoto per le modalità analisi e security (che non lo usano).
@@ -309,6 +381,8 @@ function interrupt(mode: ScanMode, message: string): void {
     `Scansione interrotta dopo ${s.filesAnalyzed} file: ${message}. ` +
     `Il progresso è salvato: una nuova richiesta esplicita riprende senza rianalizzare i file già letti.`;
   console.warn(`[horus-scan:${mode}] interrotta: ${message}`);
+  // Persisti lo stato finale nel DB così il prossimo boot non la rilancia.
+  if (mode === "manual") void persistManualState();
 }
 
 /** Processa un singolo file. Ritorna "interrupt" se Ollama è irraggiungibile. */
@@ -424,6 +498,10 @@ async function runTick(mode: ScanMode): Promise<void> {
   // Persisti lo store dopo ogni lotto (durabilità del progresso).
   await saveFileScanStore(mode, stores[mode]).catch(() => {});
 
+  // Persisti lo stato di avanzamento nel DB (solo scan manuale) così un restart
+  // del server può riprendere dal punto in cui era senza riprocessare i file.
+  if (mode === "manual") await persistManualState();
+
   if (queues[mode].length === 0) {
     await runFinalize(mode);
   } else {
@@ -458,6 +536,9 @@ async function runFinalize(mode: ScanMode): Promise<void> {
       timers[mode] = null;
     }
     console.log(`[horus-scan:${mode}] terminata (status=${states[mode].status})`);
+    // Persisti lo stato finale nel DB (solo scan manuale) così il prossimo boot
+    // non la rilancia (finishedAt != null → la logica di resume non scatta).
+    if (mode === "manual") await persistManualState();
   }
 }
 

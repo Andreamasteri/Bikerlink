@@ -386,6 +386,17 @@ async function runPostReady(needsFakeSeed: boolean): Promise<void> {
 
   ensureCompetitorAnalysisPdf();
 
+  // Auto-resume scan manuale Horus se era in corso al momento del restart.
+  // Fire-and-forget: non deve bloccare né fallire il boot post-READY.
+  void (async () => {
+    try {
+      const { tryAutoResumeManualScan } = await import("./ai/assistant/horus-scanner");
+      await tryAutoResumeManualScan();
+    } catch (err) {
+      console.warn("[BOOT][POST-READY] Horus auto-resume scan failed (non-fatal):", err);
+    }
+  })();
+
   // Push model→agent map to the ai-hub (fire-and-forget, never markDegraded).
   void (async () => {
     try {
