@@ -434,6 +434,7 @@ export async function runAllProbes(): Promise<AggregateProbeResult> {
   ];
 
   // Whisper è eseguita separatamente per ottenere il risultato strutturato.
+  // check-bg-promise-all-burst: safe — probe di rete puri (Whisper, GH areas, altri servizi), nessuna connessione al pool DB
   const [otherResults, whisperResult, gh] = await Promise.all([
     Promise.allSettled(probes.map((p) => p.fn())),
     probeWhisperOk(),
