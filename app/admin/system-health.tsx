@@ -23,6 +23,7 @@ import { WhisperWatchdogBadge, type WhisperHealthData } from "@/components/admin
 import { EmbeddingUsageCard } from "@/components/admin/EmbeddingUsageCard";
 import { AiTokenAuditCard } from "@/components/admin/AiTokenAuditCard";
 import { CrashBreakdownCard } from "@/components/admin/system-health/CrashBreakdownCard";
+import { syntheticCrashSignalId } from "@/lib/crash-signal-id";
 import { SignalThresholdsCard } from "@/components/admin/system-health/SignalThresholdsCard";
 import { AiHubHealthCard } from "@/components/admin/system-health/AiHubHealthCard";
 
@@ -473,10 +474,8 @@ export default function SystemHealthScreen() {
           <CrashBreakdownCard
             pendingLogs={proposalsQ.data?.logs ?? []}
             onAnalyzeCrash={async (group) => {
-              // Costruisce un syntheticSignalId stabile dallo stesso algoritmo
-              // usato dentro CrashBreakdownCard per la deduplication pending.
-              const normalized = (group.errorSummary ?? "").replace(/[^a-zA-Z0-9]/g, "").slice(0, 36);
-              const syntheticSignalId = `app.crash.${group.crashType}.${normalized}`;
+              // Task #932 — use the shared helper so this never drifts from the card's hasPending check.
+              const syntheticSignalId = syntheticCrashSignalId(group);
               const res = await apiRequest(
                 "POST",
                 "/api/admin/watchdog/propose-now",

@@ -8,6 +8,7 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { getQueryFnWithTimeout } from "@/lib/query-client";
 import Colors from "@/constants/colors";
 import type { WatchdogLog } from "@/components/admin/system-health/ProposalsCard";
+import { syntheticCrashSignalId } from "@/lib/crash-signal-id";
 
 interface CrashGroup {
   crashType: string;
@@ -38,13 +39,6 @@ interface BreakdownResp {
 
 interface SamplesResp {
   samples: CrashSample[];
-}
-
-// Task #925 — stable synthetic ID shared with backend for proposal deduplication.
-// Must produce the same string from the same CrashGroup both here and in system-health.tsx.
-function syntheticCrashSignalId(group: CrashGroup): string {
-  const normalized = (group.errorSummary ?? "").replace(/[^a-zA-Z0-9]/g, "").slice(0, 36);
-  return `app.crash.${group.crashType}.${normalized}`;
 }
 
 function makeSamplesKey(group: CrashGroup, days: number) {
