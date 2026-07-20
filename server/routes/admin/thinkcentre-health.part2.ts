@@ -29,6 +29,15 @@ import { clearShortCache } from "../../lib/short-cache";
 let _prevTcOverall: CachedDotStatus | null = null;
 
 /**
+ * Resets the previous-overall sentinel so the next probe starts clean.
+ * Called when maintenance mode is disabled so that a TC recovery that happened
+ * while maintenance was active is not missed by evictMetricsCacheOnRecovery.
+ */
+export function resetPrevTcOverall(): void {
+  _prevTcOverall = null;
+}
+
+/**
  * Called whenever a new TC overall status is computed by a probe.
  * If the TC just recovered from offline, evict the stale metrics cache so
  * the next admin poll fetches fresh data rather than serving the last

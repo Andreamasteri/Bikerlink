@@ -51,7 +51,8 @@ import { probeRepoDrift, fixRepoDrift, type RepoDriftHealth, type RepoDriftFixRe
 import { sendError } from "../../lib/api-response";
 import { storage } from "../../storage";
 
-import { updateThinkCentreSystemStatus, probeThinkCentreStatusSnapshot } from "./thinkcentre-health.part2";
+import { updateThinkCentreSystemStatus, probeThinkCentreStatusSnapshot, resetPrevTcOverall } from "./thinkcentre-health.part2";
+import { clearShortCache } from "../../lib/short-cache";
 import { getLastCorrectnessResults } from "../../ai/watchdog/routing-correctness-probes";
 
 export type {
@@ -109,6 +110,16 @@ router.post("/thinkcentre/maintenance", async (req: Request, res: ExpressRespons
     resetThinkCentreOfflineCache();
     resetThinkCentreMaintenanceCache();
     storage.invalidateAppSettingCache("thinkcentre_maintenance_mode");
+    if (!enabled) {
+      // When maintenance ends, probes resume. If the TC recovered while maintenance
+      // was active, _prevTcOverall still holds the pre-maintenance offline value and
+      // the metrics cache still holds a stale snapshot. Clear both so the first
+      // probe after re-enable fetches and caches fresh data.
+      clearShortCache("admin:thinkcentre-metrics");
+      clearShortCache("admin:tc-gpu-peaks");
+      resetPrevTcOverall();
+      console.log("[admin/thinkcentre-maintenance] manutenzione disattivata: evicted thinkcentre-metrics and tc-gpu-peaks short-cache, reset _prevTcOverall");
+    }
     console.log(`[admin/thinkcentre-maintenance] manutenzione ${enabled ? "ATTIVATA" : "disattivata"}`);
     return res.json({ ok: true, enabled });
   } catch (_err) {
